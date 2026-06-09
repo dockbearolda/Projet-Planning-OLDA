@@ -55,6 +55,44 @@ const $btnNew = document.getElementById('btnNew');
 const $stageLink = document.getElementById('stageLink');
 const $stageLinkLabel = document.getElementById('stageLinkLabel');
 
+// --- Outil de devis logo Fiverr -------------------------------------------
+// Reprend la feuille de calcul : on saisit le prix du graphiste Fiverr (B) et
+// on lit le prix de revente OLDA (J), arrondi à l'euro supérieur.
+//   J = (B × 1,055 + 3,5) × 0,87 × 2,5
+const FIVERR_FEE_PCT = 0.055; // commission (colonne D)
+const FIVERR_FIXED = 3.5;     // frais fixe (colonne C)
+const FIVERR_FACTOR = 0.87;   // facteur (colonne G)
+const OLDA_MARGIN = 2.5;      // marge de revente (colonne I)
+
+const $fiverrTool = document.getElementById('fiverrTool');
+const $fiverrCost = document.getElementById('fiverrCost');
+const $fiverrPrice = document.getElementById('fiverrPrice');
+
+// Recalcule le prix client à partir du champ de saisie.
+function updateFiverrPrice() {
+  if (!$fiverrCost || !$fiverrPrice) return;
+  const cost = parseFloat($fiverrCost.value.replace(',', '.').trim());
+  if (!Number.isFinite(cost) || cost < 0) {
+    $fiverrPrice.textContent = '—';
+    return;
+  }
+  const resale = Math.ceil((cost * (1 + FIVERR_FEE_PCT) + FIVERR_FIXED) * FIVERR_FACTOR * OLDA_MARGIN);
+  $fiverrPrice.textContent = `${resale} €`;
+}
+
+// Affiche l'outil uniquement sur l'onglet Fiverr et place le focus sur la saisie.
+function updateFiverrTool(slug) {
+  if (!$fiverrTool) return;
+  const show = slug === 'maquette_fiverr';
+  $fiverrTool.hidden = !show;
+  if (show) {
+    updateFiverrPrice();
+    requestAnimationFrame(() => $fiverrCost && $fiverrCost.focus());
+  }
+}
+
+if ($fiverrCost) $fiverrCost.addEventListener('input', updateFiverrPrice);
+
 // Affiche (ou masque) le lien externe associé à l'étape courante.
 function updateStageLink(slug) {
   if (!$stageLink) return;
@@ -114,6 +152,7 @@ function selectStage(slug) {
   sort = { key: null, dir: 1 };
   $stageTitle.textContent = STAGE_LABEL[slug];
   updateStageLink(slug);
+  updateFiverrTool(slug);
   document.querySelectorAll('.stage').forEach((el) => {
     el.classList.toggle('active', el.dataset.slug === slug);
   });
@@ -1469,6 +1508,7 @@ async function start() {
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);
+  updateFiverrTool(currentStage);
   await loadRows();
   lastRowsSig = signature(rows);
   startRealtime();

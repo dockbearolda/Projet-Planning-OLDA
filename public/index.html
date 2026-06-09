@@ -40,6 +40,22 @@
       <button class="btn-primary" id="btnNew" type="button">+ Nouvelle commande</button>
       </header>
 
+      <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
+      <div class="fiverr-tool" id="fiverrTool" hidden>
+        <div class="fiverr-tool-field">
+          <label class="fiverr-tool-label" for="fiverrCost">Prix graphiste Fiverr</label>
+          <div class="fiverr-tool-input-wrap">
+            <input class="fiverr-tool-input" id="fiverrCost" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
+            <span class="fiverr-tool-unit">€</span>
+          </div>
+        </div>
+        <svg class="fiverr-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+        <div class="fiverr-tool-result">
+          <span class="fiverr-tool-result-label">Prix client OLDA</span>
+          <span class="fiverr-tool-result-value" id="fiverrPrice">—</span>
+        </div>
+      </div>
+
       <div class="grid-wrap">
         <div class="print-head" id="printHead" aria-hidden="true"></div>
         <table class="grid" id="grid">
