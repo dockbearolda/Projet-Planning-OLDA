@@ -158,6 +158,28 @@ html, body {
 .btn-primary:active { filter: brightness(0.95); }
 .btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+/* bouton secondaire « fantôme » (Imprimer) */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-ghost svg { flex-shrink: 0; }
+.btn-ghost:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+.btn-ghost:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
 .stage-link {
   display: inline-flex;
   align-items: center;
@@ -386,6 +408,113 @@ tr:hover .handle { color: var(--text-2); }
   font-size: 12px;
   color: var(--danger);
 }
+
+/* Icône pièces jointes PDF : gris si vide, bleu si au moins un PDF. */
+.attach-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #c4c7cc;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.attach-btn:hover { color: var(--accent); background: var(--accent-soft); }
+.attach-btn.has-attach { color: var(--accent); }
+.attach-btn svg { display: block; }
+.attach-count {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+}
+
+/* Popover pièces jointes */
+.attach-pop {
+  position: fixed;
+  z-index: 1100;
+  width: 268px;
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.attach-pop .ap-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ap-slot { display: flex; flex-direction: column; gap: 6px; }
+.ap-slot-label { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.ap-slot-body { display: flex; flex-direction: column; gap: 6px; }
+.ap-file {
+  font-size: 12.5px;
+  color: var(--text-1);
+  background: #f5f5f7;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 6px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ap-act {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.ap-act:hover { color: var(--accent); border-color: var(--accent); }
+.ap-act.ap-open { color: var(--accent); border-color: rgba(0, 113, 227, 0.3); background: var(--accent-soft); }
+.ap-act.ap-del:hover { color: var(--danger); border-color: var(--danger); }
+.ap-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px dashed rgba(0, 113, 227, 0.35);
+  border-radius: 6px;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.ap-add:hover { background: rgba(0, 113, 227, 0.14); }
+.ap-add svg { display: block; }
+.ap-progress { font-size: 12.5px; color: var(--text-3); padding: 4px 0; }
 
 /* étoiles priorité */
 .col-priority { width: 92px; }
@@ -755,4 +884,56 @@ body.dragging-active * { cursor: grabbing !important; }
 @media (max-width: 820px) {
   .app { grid-template-columns: 188px 1fr; }
   .sidebar-head { padding: 16px 14px 12px; }
+}
+
+/* =========================================================================
+   Impression — mise en page papier propre de la catégorie affichée.
+   On masque la barre latérale, l'en-tête interactif et les colonnes d'action ;
+   on garde un en-tête papier (titre + date) et le tableau, en noir sur blanc.
+   ========================================================================= */
+.print-head { display: none; }
+
+@media print {
+  @page { margin: 12mm; size: landscape; }
+
+  html, body { height: auto; background: #fff; font-size: 11px; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  .app { display: block; height: auto; overflow: visible; }
+  .sidebar, .work-head { display: none !important; }
+  .work { display: block; overflow: visible; }
+  .grid-wrap { overflow: visible !important; flex: none; }
+
+  /* en-tête papier */
+  .print-head { display: block; margin: 0 0 12px; }
+  .print-head .ph-title { font-size: 18px; font-weight: 700; color: #000; }
+  .print-head .ph-meta { font-size: 11px; color: #555; margin-top: 2px; }
+
+  /* on retire les colonnes interactives (poignée, contact/PDF, actions) */
+  .col-handle, .col-del { display: none !important; }
+
+  /* tableau lisible à plat, sans interaction */
+  .grid { min-width: 0; width: 100%; font-size: 11px; }
+  .grid thead th { position: static; background: #f0f0f0 !important; border: 1px solid #bbb; padding: 5px 6px; }
+  .grid thead th .arrow { display: none; }
+  .grid tbody td { height: auto; border: 1px solid #ddd; }
+  .grid tbody tr { break-inside: avoid; }
+  .grid tbody tr:hover { background: transparent; }
+
+  /* les champs deviennent du texte simple */
+  .cell-input {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 5px 6px !important;
+    height: auto !important;
+    color: #000;
+  }
+  .cell-input::placeholder { color: transparent !important; }
+  .date-empty { height: auto; padding: 5px 6px; color: #999; }
+
+  /* pastilles / badges conservés mais figés (pas de pointeur) */
+  .type-pill, .status-pill, .days-badge { margin: 4px 6px; cursor: default; }
+
+  .empty { display: none; }
 }

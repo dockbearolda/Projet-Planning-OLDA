@@ -142,18 +142,26 @@ app.get('/api/stages', (req, res) => res.json(STAGES));
 // GET /api/requests               → toutes
 app.get('/api/requests', asyncH(async (req, res) => {
   const { stage } = req.query;
+  // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
+  // grille et le temps réel restent légers.
+  const SELECT = `SELECT r.*,
+      ad.filename AS devis_name,
+      ab.filename AS bat_name
+    FROM requests r
+    LEFT JOIN attachments ad ON ad.request_id = r.id AND ad.kind = 'devis'
+    LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'`;
   let result;
   if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
     result = await pool.query(
-      `SELECT * FROM requests WHERE stage = $1
-       ORDER BY position ASC NULLS LAST, priority DESC, deadline ASC NULLS LAST, created_at ASC`,
+      `${SELECT} WHERE r.stage = $1
+       ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
       [stage],
     );
   } else {
     result = await pool.query(
-      `SELECT * FROM requests
-       ORDER BY stage, position ASC NULLS LAST, priority DESC, deadline ASC NULLS LAST, created_at ASC`,
+      `${SELECT}
+       ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
     );
   }
   res.json(result.rows);
@@ -239,9 +247,85 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
 
 // DELETE /api/requests/:id
 app.delete('/api/requests/:id', asyncH(async (req, res) => {
+  // Supprime d'abord les PDF rattachés (cascade gérée côté applicatif pour
+  // rester compatible avec pg-mem en local).
+  await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
   const { rowCount } = await pool.query('DELETE FROM requests WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
   broadcast({ kind: 'delete' });
+  res.status(204).end();
+}));
+
+// ---------------------------------------------------------------------------
+// Pièces jointes PDF (Devis / BAT) — 2 emplacements fixes par commande.
+// Stockées en base (base64) ; servies inline pour consultation immédiate.
+// ---------------------------------------------------------------------------
+const PDF_KINDS = ['devis', 'bat'];
+
+// Marque la commande comme modifiée pour que le temps réel (signature basée sur
+// updated_at) propage l'apparition / suppression d'un PDF aux autres clients.
+async function touchRequest(id) {
+  const { rows } = await pool.query(
+    'UPDATE requests SET updated_at = now() WHERE id = $1 RETURNING stage', [id],
+  );
+  return rows[0] ? rows[0].stage : null;
+}
+
+// PUT /api/requests/:id/pdf/:kind  (corps = PDF brut, ?name=<nom de fichier>)
+app.put('/api/requests/:id/pdf/:kind',
+  express.raw({ type: () => true, limit: '12mb' }),
+  asyncH(async (req, res) => {
+    const { id, kind } = req.params;
+    if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || buf.length === 0) return res.status(400).json({ error: 'PDF vide' });
+
+    const exists = await pool.query('SELECT 1 FROM requests WHERE id = $1', [id]);
+    if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
+
+    let filename = String(req.query.name || '').slice(0, 255).trim();
+    if (!filename) filename = `${kind}.pdf`;
+    const data = buf.toString('base64');
+
+    // upsert manuel (compatible pg-mem) : delete + insert sur (request_id, kind).
+    await pool.query('DELETE FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind]);
+    await pool.query(
+      'INSERT INTO attachments (request_id, kind, filename, data, updated_at) VALUES ($1, $2, $3, $4, now())',
+      [id, kind, filename, data],
+    );
+    const stage = await touchRequest(id);
+    broadcast({ kind: 'update', stages: stage ? [stage] : [] });
+    res.json({ kind, filename });
+  }));
+
+// GET /api/requests/:id/pdf/:kind  → ouvre le PDF inline (consultable à tout moment)
+app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
+  const { id, kind } = req.params;
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+  const { rows } = await pool.query(
+    'SELECT filename, data FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind],
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'PDF introuvable' });
+  const buf = Buffer.from(rows[0].data, 'base64');
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Length': buf.length,
+    'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(rows[0].filename)}`,
+    'Cache-Control': 'private, no-store',
+  });
+  res.send(buf);
+}));
+
+// DELETE /api/requests/:id/pdf/:kind
+app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
+  const { id, kind } = req.params;
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+  const { rowCount } = await pool.query(
+    'DELETE FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind],
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'PDF introuvable' });
+  const stage = await touchRequest(id);
+  broadcast({ kind: 'update', stages: stage ? [stage] : [] });
   res.status(204).end();
 }));
 

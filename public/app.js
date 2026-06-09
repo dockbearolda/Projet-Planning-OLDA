@@ -264,6 +264,7 @@ function buildRow(r) {
     attachDrag(grip, tr, r);
   }
   handleCell.appendChild(contactButton(r));
+  handleCell.appendChild(attachButton(r));
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
@@ -302,7 +303,7 @@ function buildRow(r) {
       send.title = `Envoyer vers ${t.label}`;
       send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
       send.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg><span>${escapeHtml(t.label)}</span>`;
-      send.addEventListener('click', () => moveToStage(r, t.slug));
+      send.addEventListener('click', () => copyToStage(r, t.slug));
       tdDel.appendChild(send);
     }
   }
@@ -424,6 +425,206 @@ function openContactPopover(r, anchor) {
     document.addEventListener('keydown', onContactKey, true);
   }, 0);
   phone.focus();
+}
+
+// --- Pièces jointes PDF (Devis / BAT) --------------------------------------
+// Deux emplacements fixes par commande. Le PDF est consultable à tout moment
+// (ouverture inline dans un nouvel onglet). Géré via un petit icône « trombone »
+// par ligne, gris si vide, bleu si au moins un PDF présent.
+const PDF_SLOTS = [
+  { kind: 'devis', label: 'Devis' },
+  { kind: 'bat', label: 'BAT' },
+];
+
+function attachCount(r) {
+  return (r.devis_name ? 1 : 0) + (r.bat_name ? 1 : 0);
+}
+
+function attachButton(r) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  const n = attachCount(r);
+  btn.className = 'attach-btn' + (n > 0 ? ' has-attach' : '');
+  btn.title = n ? `${n} PDF joint${n > 1 ? 's' : ''} — voir / gérer` : 'Joindre des PDF (Devis, BAT)';
+  btn.setAttribute('aria-label', 'Pièces jointes PDF');
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.07-7.07l8.6-8.6a3.34 3.34 0 0 1 4.72 4.72l-8.6 8.6a1.67 1.67 0 0 1-2.36-2.36l7.9-7.9"/></svg>';
+  if (n > 0) {
+    const dot = document.createElement('span');
+    dot.className = 'attach-count';
+    dot.textContent = n;
+    btn.appendChild(dot);
+  }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); openAttachPopover(r, btn); });
+  return btn;
+}
+
+let openAttachPop = null;
+function closeAttachPopover() {
+  if (!openAttachPop) return;
+  openAttachPop.pop.remove();
+  document.removeEventListener('pointerdown', onAttachDocDown, true);
+  document.removeEventListener('keydown', onAttachKey, true);
+  openAttachPop = null;
+}
+function onAttachDocDown(e) {
+  if (openAttachPop && !openAttachPop.pop.contains(e.target) && !e.target.closest('.attach-btn')) {
+    closeAttachPopover();
+  }
+}
+function onAttachKey(e) { if (e.key === 'Escape') closeAttachPopover(); }
+
+// Met à jour l'icône d'ancrage (couleur + badge) après un changement de PDF.
+function refreshAttachAnchor(r, anchor) {
+  const n = attachCount(r);
+  anchor.classList.toggle('has-attach', n > 0);
+  anchor.title = n ? `${n} PDF joint${n > 1 ? 's' : ''} — voir / gérer` : 'Joindre des PDF (Devis, BAT)';
+  const existing = anchor.querySelector('.attach-count');
+  if (existing) existing.remove();
+  if (n > 0) {
+    const dot = document.createElement('span');
+    dot.className = 'attach-count';
+    dot.textContent = n;
+    anchor.appendChild(dot);
+  }
+}
+
+// Construit la ligne d'un emplacement PDF. Se reconstruit après upload/suppression.
+function attachSlot(r, slot, anchor) {
+  const row = document.createElement('div');
+  row.className = 'ap-slot';
+  const nameKey = `${slot.kind}_name`;
+
+  const lbl = document.createElement('div');
+  lbl.className = 'ap-slot-label';
+  lbl.textContent = slot.label;
+  row.appendChild(lbl);
+
+  const body = document.createElement('div');
+  body.className = 'ap-slot-body';
+  row.appendChild(body);
+
+  const rerender = () => row.replaceWith(attachSlot(r, slot, anchor));
+
+  const pickFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,.pdf';
+    input.addEventListener('change', () => uploadPdf(input.files && input.files[0]));
+    input.click();
+  };
+
+  const uploadPdf = (file) => {
+    if (!file) return;
+    if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+      reportError(new Error('Seuls les fichiers PDF sont acceptés.'));
+      return;
+    }
+    body.innerHTML = '<span class="ap-progress">Envoi…</span>';
+    fetch(`/api/requests/${r.id}/pdf/${slot.kind}?name=${encodeURIComponent(file.name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: file,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          let d = res.statusText;
+          try { d = (await res.json()).error || d; } catch (_) {}
+          throw new Error(d);
+        }
+        return res.json();
+      })
+      .then((meta) => {
+        r[nameKey] = meta.filename;
+        const live = rows.find((x) => x.id === r.id);
+        if (live && live !== r) live[nameKey] = meta.filename;
+        refreshAttachAnchor(r, anchor);
+        rerender();
+      })
+      .catch((err) => { reportError(err); rerender(); });
+  };
+
+  if (r[nameKey]) {
+    const file = document.createElement('div');
+    file.className = 'ap-file';
+    file.textContent = r[nameKey];
+    file.title = r[nameKey];
+    body.appendChild(file);
+
+    const actions = document.createElement('div');
+    actions.className = 'ap-actions';
+
+    const open = document.createElement('a');
+    open.className = 'ap-act ap-open';
+    open.href = `/api/requests/${r.id}/pdf/${slot.kind}`;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.textContent = 'Ouvrir';
+    actions.appendChild(open);
+
+    const replace = document.createElement('button');
+    replace.type = 'button';
+    replace.className = 'ap-act';
+    replace.textContent = 'Remplacer';
+    replace.addEventListener('click', pickFile);
+    actions.appendChild(replace);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'ap-act ap-del';
+    del.textContent = 'Supprimer';
+    del.addEventListener('click', () => {
+      api('DELETE', `/api/requests/${r.id}/pdf/${slot.kind}`)
+        .then(() => {
+          r[nameKey] = null;
+          const live = rows.find((x) => x.id === r.id);
+          if (live && live !== r) live[nameKey] = null;
+          refreshAttachAnchor(r, anchor);
+          rerender();
+        })
+        .catch(reportError);
+    });
+    actions.appendChild(del);
+
+    body.appendChild(actions);
+  } else {
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'ap-add';
+    add.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Ajouter un PDF';
+    add.addEventListener('click', pickFile);
+    body.appendChild(add);
+  }
+
+  return row;
+}
+
+function openAttachPopover(r, anchor) {
+  if (openAttachPop && openAttachPop.id === r.id) { closeAttachPopover(); return; }
+  closeAttachPopover();
+
+  const pop = document.createElement('div');
+  pop.className = 'attach-pop';
+  const title = document.createElement('div');
+  title.className = 'ap-title';
+  title.textContent = 'Pièces jointes';
+  pop.appendChild(title);
+  for (const slot of PDF_SLOTS) pop.appendChild(attachSlot(r, slot, anchor));
+
+  document.body.appendChild(pop);
+  const ar = anchor.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let left = ar.left;
+  if (left + pr.width > window.innerWidth - 8) left = window.innerWidth - pr.width - 8;
+  let top = ar.bottom + 6;
+  if (top + pr.height > window.innerHeight - 8) top = ar.top - pr.height - 6;
+  pop.style.left = Math.max(8, Math.round(left)) + 'px';
+  pop.style.top = Math.max(8, Math.round(top)) + 'px';
+
+  openAttachPop = { id: r.id, pop };
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onAttachDocDown, true);
+    document.addEventListener('keydown', onAttachKey, true);
+  }, 0);
 }
 
 // --- Cellules ---------------------------------------------------------------
@@ -750,11 +951,11 @@ async function removeRow(r) {
   } catch (err) { reportError(err); }
 }
 
-// Duplique une commande : crée une copie de tous ses champs (sans la position,
-// recalculée en bas de l'étape). La copie reste dans la même étape.
-async function duplicateRow(r) {
-  const body = {
-    stage: r.stage,
+// Construit le corps de copie d'une commande (tous les champs sauf la position,
+// recalculée en bas de l'étape cible). Les PDF ne sont pas recopiés.
+function copyBody(r, stage) {
+  return {
+    stage: stage || r.stage,
     priority: r.priority,
     client_type: r.client_type,
     billing_company: r.billing_company,
@@ -768,8 +969,12 @@ async function duplicateRow(r) {
     deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
     status: r.status,
   };
+}
+
+// Duplique une commande : crée une copie qui reste dans la même étape.
+async function duplicateRow(r) {
   try {
-    const created = await api('POST', '/api/requests', body);
+    const created = await api('POST', '/api/requests', copyBody(r));
     if (created.stage === currentStage) {
       rows.push(created);
       applySortAndRender();
@@ -777,6 +982,16 @@ async function duplicateRow(r) {
       if (tr) tr.scrollIntoView({ block: 'nearest' });
     }
     await loadCounts();
+  } catch (err) { reportError(err); }
+}
+
+// Envoi vers Fiverr / Toptex : copie la commande dans la catégorie cible en
+// laissant l'originale en place (contrairement au déplacement par glisser).
+async function copyToStage(r, slug) {
+  try {
+    await api('POST', '/api/requests', copyBody(r, slug));
+    await loadCounts();
+    showToast(`Copié vers ${STAGE_LABEL[slug] || slug}`);
   } catch (err) { reportError(err); }
 }
 
@@ -1000,6 +1215,7 @@ let lastRowsSig = '';
 // Vrai si l'utilisateur est en train d'éditer / glisser → on ne touche pas à la grille.
 function isInteracting() {
   if (dragState) return true;
+  if (openAttachPop) return true; // panneau PDF ouvert : on ne reconstruit pas la grille
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
   return false;
@@ -1224,6 +1440,28 @@ if ($searchTrigger) $searchTrigger.addEventListener('click', openSearch);
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openSearch(); }
 });
+
+// --- Impression de la catégorie courante -----------------------------------
+// Le DOM ne contient que les lignes de l'étape affichée : window.print() imprime
+// donc exactement la catégorie en cours. On renseigne un en-tête papier (titre
+// de la catégorie + date) juste avant l'impression ; le CSS @media print masque
+// la barre latérale, la recherche et les colonnes d'action.
+const $btnPrint = document.getElementById('btnPrint');
+const $printHead = document.getElementById('printHead');
+
+function preparePrint() {
+  if (!$printHead) return;
+  const label = STAGE_LABEL[currentStage] || '';
+  const n = rows.length;
+  const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+  $printHead.innerHTML =
+    `<div class="ph-title">${escapeHtml(label)}</div>` +
+    `<div class="ph-meta">${n} commande${n > 1 ? 's' : ''} · imprimé le ${escapeHtml(dateStr)}</div>`;
+}
+
+if ($btnPrint) {
+  $btnPrint.addEventListener('click', () => { preparePrint(); window.print(); });
+}
 
 // --- Init ------------------------------------------------------------------
 async function start() {
