@@ -158,6 +158,27 @@ html, body {
 .btn-primary:active { filter: brightness(0.95); }
 .btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+.stage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface, #fff);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.stage-link[hidden] { display: none; }
+.stage-link:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+.stage-link:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.stage-link-ic { width: 15px; height: 15px; flex-shrink: 0; }
+
 /* ---------------------------------------------------------------- Grid */
 .grid-wrap { flex: 1; overflow: auto; }
 
@@ -445,7 +466,31 @@ tr:hover .handle { color: var(--text-2); }
 .col-desc { min-width: 220px; }
 
 /* suppression */
-.col-del { width: 64px; white-space: nowrap; text-align: right; padding-right: 4px; }
+.col-del { width: 188px; white-space: nowrap; text-align: right; padding-right: 4px; }
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0;
+  height: 26px;
+  padding: 0 8px;
+  margin-right: 4px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.send-btn svg { display: block; }
+tr:hover .send-btn { opacity: 1; }
+.send-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(0, 0, 0, 0.02); }
+.send-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .del-btn,
 .dup-btn {
   display: inline-flex;
@@ -668,6 +713,7 @@ body.dragging-active * { cursor: grabbing !important; }
   /* contrôles toujours visibles : pas de :hover sur tablette */
   .handle,
   .del-btn,
+  .send-btn,
   .dup-btn { opacity: 1 !important; }
   .handle { color: var(--text-2); }
 
@@ -686,7 +732,8 @@ body.dragging-active * { cursor: grabbing !important; }
   .days-badge { padding: 5px 11px; font-size: 13px; }
   .del-btn,
   .dup-btn { width: 38px; }
-  .col-del { width: 80px; }
+  .send-btn { height: 34px; font-size: 13px; }
+  .col-del { width: 210px; }
 
   /* étapes de la sidebar : zones cliquables plus généreuses */
   .stage { padding: 13px 14px; }

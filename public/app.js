@@ -10,22 +10,34 @@ const STAGE_GROUPS = [
     { slug: 'devis_accepte', label: 'Devis accepté' },
   ],
   [
-    { slug: 'prod_dtf', label: 'Production DTF' },
-    { slug: 'prod_pressage', label: 'Production Pressage' },
-    { slug: 'prod_trotec', label: 'Production Trotec' },
-    { slug: 'prod_roland_uv', label: 'Production Roland UV' },
-    { slug: 'prod_sous_traitance', label: 'Production Sous-traitance' },
-    { slug: 'prod_autre', label: 'Production Autre' },
+    { slug: 'prod_dtf', label: 'Prod DTF' },
+    { slug: 'prod_pressage', label: 'Prod Pressage' },
+    { slug: 'prod_trotec', label: 'Prod Trotec' },
+    { slug: 'prod_roland_uv', label: 'Prod Roland UV' },
+    { slug: 'prod_sous_traitance', label: 'Prod Sous-traitance' },
+    { slug: 'prod_autre', label: 'Prod Autre' },
   ],
   [
     { slug: 'facturation', label: 'Facturation' },
     { slug: 'archive', label: 'Archivé' },
-    { slug: 'maquette_fiverr', label: 'Commande Maquette Fiverr' },
+    { slug: 'maquette_fiverr', label: 'Fiverr' },
     { slug: 'toptex', label: 'Toptex' },
   ],
 ];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
+
+// --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
+const STAGE_LINKS = {
+  maquette_fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
+  toptex: { url: 'https://www.toptex.fr/', label: 'Ouvrir Toptex' },
+};
+
+// Cibles d'envoi rapide proposées sur chaque ligne (boutons « → … »).
+const SEND_TARGETS = [
+  { slug: 'maquette_fiverr', label: 'Fiverr' },
+  { slug: 'toptex', label: 'Toptex' },
+];
 
 // --- État applicatif -------------------------------------------------------
 let currentStage = 'demande';
@@ -40,6 +52,22 @@ const $empty = document.getElementById('empty');
 const $stageTitle = document.getElementById('stageTitle');
 const $stageCount = document.getElementById('stageCount');
 const $btnNew = document.getElementById('btnNew');
+const $stageLink = document.getElementById('stageLink');
+const $stageLinkLabel = document.getElementById('stageLinkLabel');
+
+// Affiche (ou masque) le lien externe associé à l'étape courante.
+function updateStageLink(slug) {
+  if (!$stageLink) return;
+  const link = STAGE_LINKS[slug];
+  if (link) {
+    $stageLink.href = link.url;
+    if ($stageLinkLabel) $stageLinkLabel.textContent = link.label;
+    $stageLink.hidden = false;
+  } else {
+    $stageLink.removeAttribute('href');
+    $stageLink.hidden = true;
+  }
+}
 
 // --- API helpers -----------------------------------------------------------
 async function api(method, url, body) {
@@ -85,6 +113,7 @@ function selectStage(slug) {
   currentStage = slug;
   sort = { key: null, dir: 1 };
   $stageTitle.textContent = STAGE_LABEL[slug];
+  updateStageLink(slug);
   document.querySelectorAll('.stage').forEach((el) => {
     el.classList.toggle('active', el.dataset.slug === slug);
   });
@@ -260,9 +289,23 @@ function buildRow(r) {
   tr.appendChild(cellDays(r));
   // état
   tr.appendChild(cellStatus(r));
-  // actions de fin de ligne : dupliquer + supprimer (révélées au survol)
+  // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
+  // supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
+  if (!draft) {
+    for (const t of SEND_TARGETS) {
+      if (t.slug === r.stage) continue; // déjà dans cette catégorie
+      const send = document.createElement('button');
+      send.className = 'send-btn';
+      send.type = 'button';
+      send.title = `Envoyer vers ${t.label}`;
+      send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
+      send.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg><span>${escapeHtml(t.label)}</span>`;
+      send.addEventListener('click', () => moveToStage(r, t.slug));
+      tdDel.appendChild(send);
+    }
+  }
   const dup = document.createElement('button');
   dup.className = 'dup-btn';
   dup.type = 'button';
@@ -1187,6 +1230,7 @@ async function start() {
   renderSidebar();
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
+  updateStageLink(currentStage);
   await loadRows();
   lastRowsSig = signature(rows);
   startRealtime();
