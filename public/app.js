@@ -18,6 +18,7 @@ const STAGE_GROUPS = [
     { slug: 'prod_autre', label: 'Prod Autre' },
   ],
   [
+    { slug: 'pret_facturation', label: 'Prête à facturer' },
     { slug: 'facturation', label: 'Facturation' },
     { slug: 'archive', label: 'Archivé' },
     { slug: 'maquette_fiverr', label: 'Fiverr' },
@@ -26,6 +27,14 @@ const STAGE_GROUPS = [
 ];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
+STAGE_LABEL.production = 'Production'; // phase interne (vue via les secteurs)
+
+// Secteurs de production : les 6 lignes « Prod … » du bloc du milieu. Une commande
+// en production en porte 1..N (table production_sectors côté serveur).
+const SECTOR_SLUGS = ['prod_dtf', 'prod_pressage', 'prod_trotec', 'prod_roland_uv', 'prod_sous_traitance', 'prod_autre'];
+const isSector = (slug) => SECTOR_SLUGS.includes(slug);
+// Libellé court pour les pastilles (« Prod Trotec » → « Trotec »).
+const sectorShort = (slug) => (STAGE_LABEL[slug] || slug).replace(/^Prod\s+/, '');
 
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
@@ -334,6 +343,8 @@ function buildRow(r) {
   tr.appendChild(cellDate(r, 'deadline'));
   // jours restant (calculé)
   tr.appendChild(cellDays(r));
+  // secteurs de production (pastilles cochables)
+  tr.appendChild(cellSectors(r));
   // état
   tr.appendChild(cellStatus(r));
   // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
@@ -1132,6 +1143,80 @@ const STATUS_OPTIONS = ['À traiter', 'Maquette à faire', 'Maquette à valider'
 
 // États « maquette » : mis en avant (pastille violette + compteur d'étape)
 // pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
+// --- Secteurs de production (pastilles) ------------------------------------
+// Affiche les machines par lesquelles passe une commande en production. Chaque
+// pastille se coche (« fait ») ou se retire (✕). On affecte un secteur en
+// glissant la commande sur la colonne machine de la sidebar (voir onDragEnd).
+function cellSectors(r) {
+  const td = document.createElement('td');
+  td.className = 'col-sectors';
+  const secs = Array.isArray(r.sectors) ? r.sectors : [];
+  if (r.stage !== 'production' && secs.length === 0) return td; // pas en prod : rien
+  const wrap = document.createElement('div');
+  wrap.className = 'sec-chips';
+  for (const s of secs) {
+    const chip = document.createElement('span');
+    chip.className = 'sec-chip' + (s.done ? ' done' : '');
+    const lab = document.createElement('button');
+    lab.type = 'button';
+    lab.className = 'sec-chip-label';
+    lab.title = s.done
+      ? `${sectorShort(s.sector)} : fait — cliquer pour rouvrir`
+      : `${sectorShort(s.sector)} : à faire — cliquer quand c'est terminé`;
+    const check = s.done
+      ? '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'
+      : '';
+    lab.innerHTML = check + `<span>${escapeHtml(sectorShort(s.sector))}</span>`;
+    lab.addEventListener('click', (e) => { e.stopPropagation(); toggleSector(r, s.sector, !s.done); });
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'sec-chip-x';
+    x.title = 'Retirer ce secteur';
+    x.setAttribute('aria-label', `Retirer ${sectorShort(s.sector)}`);
+    x.textContent = '×';
+    x.addEventListener('click', (e) => { e.stopPropagation(); removeSector(r, s.sector); });
+    chip.appendChild(lab);
+    chip.appendChild(x);
+    wrap.appendChild(chip);
+  }
+  if (secs.length === 0) {
+    const hint = document.createElement('span');
+    hint.className = 'sec-empty';
+    hint.textContent = 'prête à facturer';
+    wrap.appendChild(hint);
+  }
+  td.appendChild(wrap);
+  return td;
+}
+
+// Affecte un secteur à une commande (la fait entrer en production si besoin).
+async function addSector(r, sector) {
+  try {
+    await api('POST', `/api/requests/${r.id}/sectors`, { sector });
+    await loadRows();
+    await loadCounts();
+    showToast(`Ajouté à ${sectorShort(sector)}`);
+  } catch (err) { reportError(err); }
+}
+
+// Coche / décoche un secteur (« fait »). Coché → la carte quitte la colonne.
+async function toggleSector(r, sector, done) {
+  try {
+    await api('PATCH', `/api/requests/${r.id}/sectors/${sector}`, { done });
+    await loadRows();
+    await loadCounts();
+  } catch (err) { reportError(err); }
+}
+
+// Retire complètement un secteur de la commande.
+async function removeSector(r, sector) {
+  try {
+    await api('DELETE', `/api/requests/${r.id}/sectors/${sector}`);
+    await loadRows();
+    await loadCounts();
+  } catch (err) { reportError(err); }
+}
+
 const MAQUETTE_STATUSES = ['Maquette à faire', 'Maquette à valider'];
 
 function cellStatus(r) {
@@ -1248,14 +1333,31 @@ function patch(r, body, applyOptimistic) {
 }
 
 // --- Création --------------------------------------------------------------
+// Crée une commande adaptée à la vue courante et renvoie son id.
+//  - vue secteur (prod_*) → commande en production + ce secteur affecté
+//  - vue « prête à facturer » → commande en production sans secteur
+//  - sinon → commande dans cette phase
+async function createForCurrentView() {
+  if (isSector(currentStage)) {
+    const created = await api('POST', '/api/requests', { stage: 'production' });
+    await api('POST', `/api/requests/${created.id}/sectors`, { sector: currentStage });
+    return created.id;
+  }
+  if (currentStage === 'pret_facturation') {
+    const created = await api('POST', '/api/requests', { stage: 'production' });
+    return created.id;
+  }
+  const created = await api('POST', '/api/requests', { stage: currentStage });
+  return created.id;
+}
+
 $btnNew.addEventListener('click', async () => {
   try {
-    const created = await api('POST', '/api/requests', { stage: currentStage });
-    rows.push(created);
-    applySortAndRender();
+    const id = await createForCurrentView();
+    await loadRows();
     await loadCounts();
     // focus première cellule éditable de la nouvelle ligne
-    const tr = $rows.querySelector(`tr[data-id="${created.id}"]`);
+    const tr = $rows.querySelector(`tr[data-id="${id}"]`);
     if (tr) {
       tr.scrollIntoView({ block: 'nearest' });
       const firstInput = tr.querySelector('.col-company input, .cell-input');
@@ -1264,21 +1366,21 @@ $btnNew.addEventListener('click', async () => {
   } catch (err) { reportError(err); }
 });
 
-// Bouton global « Commande vocale » : crée une ligne dans l'étape courante,
+// Bouton global « Commande vocale » : crée une ligne dans la vue courante,
 // puis ouvre immédiatement la dictée dessus.
 const $btnVoice = document.getElementById('btnVoice');
 if ($btnVoice) {
   $btnVoice.addEventListener('click', async () => {
     if (openVoicePop) { closeVoicePopover(); return; }
     try {
-      const created = await api('POST', '/api/requests', { stage: currentStage });
-      rows.push(created);
-      applySortAndRender();
+      const id = await createForCurrentView();
+      await loadRows();
       lastRowsSig = signature(rows);
       await loadCounts();
-      const tr = $rows.querySelector(`tr[data-id="${created.id}"]`);
+      const tr = $rows.querySelector(`tr[data-id="${id}"]`);
       if (tr) tr.scrollIntoView({ block: 'nearest' });
-      const live = rows.find((x) => x.id === created.id) || created;
+      const live = rows.find((x) => x.id === id);
+      if (!live) return;
       const anchor = (tr && tr.querySelector('.voice-btn')) || $btnVoice;
       openVoicePopover(live, anchor);
     } catch (err) { reportError(err); }
@@ -1427,10 +1529,18 @@ async function onDragEnd(e) {
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
   dragState = null;
 
-  if (stageEl && stageEl.dataset.slug !== ds.r.stage) {
-    await moveToStage(ds.r, stageEl.dataset.slug);
+  const slug = stageEl ? stageEl.dataset.slug : null;
+  if (slug) {
+    // déposé sur une entrée de la sidebar
+    if (isSector(slug)) {
+      await addSector(ds.r, slug); // colonne machine → affecter ce secteur
+    } else if (slug === 'pret_facturation') {
+      showToast('« Prête à facturer » se remplit tout seul quand tous les secteurs sont faits.');
+    } else if (slug !== ds.r.stage) {
+      await moveToStage(ds.r, slug); // autre phase → déplacer
+    }
   } else {
-    await commitReorder(ds.r);
+    await commitReorder(ds.r); // déposé dans la grille → réordonnancement
   }
 }
 
@@ -1523,10 +1633,11 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 
 let colWidths = {};
 try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } catch (_) { colWidths = {}; }
-// Migration : la colonne « Couleur » n'existait pas dans les largeurs déjà
-// mémorisées — largeur par défaut pour éviter la largeur plancher (36 px).
+// Migration : colonnes ajoutées après coup (Couleur, Secteurs prod) absentes des
+// largeurs déjà mémorisées — largeur par défaut pour éviter le plancher (36 px).
 for (const k of Object.keys(colWidths)) {
   if (colWidths[k] && colWidths[k].color == null) colWidths[k].color = 96;
+  if (colWidths[k] && colWidths[k].sectors == null) colWidths[k].sectors = 150;
 }
 
 function saveColWidths() {

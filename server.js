@@ -12,7 +12,7 @@ try {
 
 const path = require('path');
 const express = require('express');
-const { pool, init, STAGES, STAGE_SLUGS } = require('./db');
+const { pool, init, STAGES, STAGE_SLUGS, SECTOR_SLUGS } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -148,41 +148,95 @@ function broadcast(payload) {
 // Liste des étapes (pour le front).
 app.get('/api/stages', (req, res) => res.json(STAGES));
 
-// GET /api/requests?stage=<slug>  → triée priorité desc, échéance asc
-// GET /api/requests               → toutes
+// On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
+// grille et le temps réel restent légers.
+const SELECT = `SELECT r.*,
+    ad.filename AS devis_name,
+    ab.filename AS bat_name
+  FROM requests r
+  LEFT JOIN attachments ad ON ad.request_id = r.id AND ad.kind = 'devis'
+  LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'`;
+const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
+
+// Attache à chaque commande la liste de ses secteurs de production [{sector, done}].
+async function attachSectors(rows) {
+  if (!rows.length) return rows;
+  const ids = rows.map((r) => r.id);
+  const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows: secs } = await pool.query(
+    `SELECT request_id, sector, done FROM production_sectors
+     WHERE request_id IN (${ph}) ORDER BY created_at ASC`, ids,
+  );
+  const by = {};
+  for (const s of secs) (by[s.request_id] = by[s.request_id] || []).push({ sector: s.sector, done: s.done });
+  for (const r of rows) r.sectors = by[r.id] || [];
+  return rows;
+}
+
+// GET /api/requests?stage=<phase>   → commandes de cette phase
+// GET /api/requests?sector=<machine>→ commandes en prod ayant ce secteur à faire
+//   (compat : ?stage=<machine> est aussi accepté côté sidebar)
+// GET /api/requests?bucket=ready_billing → prod terminée, prête à facturer
+// GET /api/requests                 → toutes
 app.get('/api/requests', asyncH(async (req, res) => {
-  const { stage } = req.query;
-  // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
-  // grille et le temps réel restent légers.
-  const SELECT = `SELECT r.*,
-      ad.filename AS devis_name,
-      ab.filename AS bat_name
-    FROM requests r
-    LEFT JOIN attachments ad ON ad.request_id = r.id AND ad.kind = 'devis'
-    LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'`;
+  const { stage, sector, bucket } = req.query;
   let result;
-  if (stage) {
-    if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
-    result = await pool.query(
-      `${SELECT} WHERE r.stage = $1
-       ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
-      [stage],
-    );
-  } else {
+  if (sector || (stage && SECTOR_SLUGS.includes(stage))) {
+    const sec = sector || stage;
+    if (!SECTOR_SLUGS.includes(sec)) return res.status(400).json({ error: `secteur invalide: ${sec}` });
     result = await pool.query(
       `${SELECT}
-       ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
+       JOIN production_sectors ps ON ps.request_id = r.id AND ps.sector = $1 AND ps.done = false
+       WHERE r.stage = 'production' ${ORDER}`, [sec],
+    );
+  } else if (bucket === 'ready_billing' || stage === 'pret_facturation') {
+    // En production, plus aucun secteur à faire. NOT IN non corrélé (compat pg-mem).
+    result = await pool.query(
+      `${SELECT}
+       WHERE r.stage = 'production'
+       AND r.id NOT IN (SELECT request_id FROM production_sectors WHERE done = false)
+       ${ORDER}`,
+    );
+  } else if (stage) {
+    if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
+    result = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]);
+  } else {
+    result = await pool.query(
+      `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
     );
   }
+  await attachSectors(result.rows);
   res.json(result.rows);
 }));
 
-// GET /api/counts → { slug: n, ... } (toutes les étapes présentes, 0 inclus)
+// GET /api/counts → { slug: n, ... } : phases + secteurs (en attente) + prête à
+// facturer. Objet plat → la sidebar lit counts[slug] sans rien changer.
 app.get('/api/counts', asyncH(async (req, res) => {
-  const { rows } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
   const counts = {};
   for (const s of STAGE_SLUGS) counts[s] = 0;
-  for (const r of rows) if (r.stage in counts) counts[r.stage] = r.n;
+  for (const s of SECTOR_SLUGS) counts[s] = 0;
+  counts.pret_facturation = 0;
+
+  const { rows: byStage } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
+  for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
+
+  // Secteurs : commandes en production avec ce secteur encore à faire.
+  const { rows: bySector } = await pool.query(
+    `SELECT ps.sector, COUNT(*)::int AS n
+     FROM production_sectors ps JOIN requests r ON r.id = ps.request_id
+     WHERE ps.done = false AND r.stage = 'production'
+     GROUP BY ps.sector`,
+  );
+  for (const r of bySector) if (r.sector in counts) counts[r.sector] = r.n;
+
+  // Prête à facturer : en production, plus aucun secteur à faire (NOT IN : compat pg-mem).
+  const { rows: ready } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM requests r
+     WHERE r.stage = 'production'
+     AND r.id NOT IN (SELECT request_id FROM production_sectors WHERE done = false)`,
+  );
+  counts.pret_facturation = ready[0].n;
+
   res.json(counts);
 }));
 
@@ -257,12 +311,73 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
 
 // DELETE /api/requests/:id
 app.delete('/api/requests/:id', asyncH(async (req, res) => {
-  // Supprime d'abord les PDF rattachés (cascade gérée côté applicatif pour
-  // rester compatible avec pg-mem en local).
+  // Supprime d'abord les PDF + secteurs rattachés (cascade gérée côté applicatif
+  // pour rester compatible avec pg-mem en local).
   await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
+  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
   const { rowCount } = await pool.query('DELETE FROM requests WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
   broadcast({ kind: 'delete' });
+  res.status(204).end();
+}));
+
+// ---------------------------------------------------------------------------
+// Secteurs de production d'une commande (relation 1 commande ↔ N machines).
+// Ajouter un secteur fait entrer la commande en production ; cocher « done »
+// la retire de la colonne de cette machine ; toutes cochées → prête à facturer.
+// ---------------------------------------------------------------------------
+
+// POST /api/requests/:id/sectors  body { sector } → ajoute (ou réactive) un secteur
+app.post('/api/requests/:id/sectors', asyncH(async (req, res) => {
+  const { id } = req.params;
+  const sector = (req.body || {}).sector;
+  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
+
+  const exists = await pool.query('SELECT stage FROM requests WHERE id = $1', [id]);
+  if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
+
+  // Affecter un secteur fait basculer la commande en phase 'production'.
+  if (exists.rows[0].stage !== 'production') {
+    await pool.query("UPDATE requests SET stage = 'production', updated_at = now() WHERE id = $1", [id]);
+  }
+
+  const has = await pool.query(
+    'SELECT 1 FROM production_sectors WHERE request_id = $1 AND sector = $2', [id, sector],
+  );
+  if (has.rowCount === 0) {
+    await pool.query(
+      'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)', [id, sector],
+    );
+  }
+  await touchRequest(id);
+  broadcast({ kind: 'update', stages: ['production'] });
+  res.status(201).json({ sector, done: false });
+}));
+
+// PATCH /api/requests/:id/sectors/:sector  body { done } → coche / décoche
+app.patch('/api/requests/:id/sectors/:sector', asyncH(async (req, res) => {
+  const { id, sector } = req.params;
+  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
+  const done = !!(req.body || {}).done;
+  const { rowCount } = await pool.query(
+    'UPDATE production_sectors SET done = $1 WHERE request_id = $2 AND sector = $3', [done, id, sector],
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'Secteur introuvable sur cette commande' });
+  await touchRequest(id);
+  broadcast({ kind: 'update', stages: ['production'] });
+  res.json({ sector, done });
+}));
+
+// DELETE /api/requests/:id/sectors/:sector → retire le secteur de la commande
+app.delete('/api/requests/:id/sectors/:sector', asyncH(async (req, res) => {
+  const { id, sector } = req.params;
+  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
+  const { rowCount } = await pool.query(
+    'DELETE FROM production_sectors WHERE request_id = $1 AND sector = $2', [id, sector],
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'Secteur introuvable sur cette commande' });
+  await touchRequest(id);
+  broadcast({ kind: 'update', stages: ['production'] });
   res.status(204).end();
 }));
 

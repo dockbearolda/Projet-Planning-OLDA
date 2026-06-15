@@ -4,17 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
-// Liste canonique des étapes du pipeline (slug), dans l'ordre exact.
+// Phases du pipeline (valeurs possibles de requests.stage), dans l'ordre.
+// La production est UNE phase ; les machines sont des « secteurs » (ci-dessous),
+// rattachés à la commande via la table production_sectors.
 const STAGES = [
   { slug: 'demande', label: 'Demande' },
   { slug: 'devis_en_cours', label: 'Devis en cours' },
   { slug: 'devis_accepte', label: 'Devis accepté' },
-  { slug: 'prod_dtf', label: 'Production DTF' },
-  { slug: 'prod_pressage', label: 'Production Pressage' },
-  { slug: 'prod_trotec', label: 'Production Trotec' },
-  { slug: 'prod_roland_uv', label: 'Production Roland UV' },
-  { slug: 'prod_sous_traitance', label: 'Production Sous-traitance' },
-  { slug: 'prod_autre', label: 'Production Autre' },
+  { slug: 'production', label: 'Production' },
   { slug: 'facturation', label: 'Facturation' },
   { slug: 'archive', label: 'Archivé' },
   { slug: 'maquette_fiverr', label: 'Commande Maquette Fiverr' },
@@ -22,6 +19,18 @@ const STAGES = [
 ];
 
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
+
+// Secteurs de production (machines). Une commande en production en porte 1..N.
+const SECTORS = [
+  { slug: 'prod_dtf', label: 'Prod DTF' },
+  { slug: 'prod_pressage', label: 'Prod Pressage' },
+  { slug: 'prod_trotec', label: 'Prod Trotec' },
+  { slug: 'prod_roland_uv', label: 'Prod Roland UV' },
+  { slug: 'prod_sous_traitance', label: 'Prod Sous-traitance' },
+  { slug: 'prod_autre', label: 'Prod Autre' },
+];
+
+const SECTOR_SLUGS = SECTORS.map((s) => s.slug);
 
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
@@ -66,11 +75,36 @@ async function init() {
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
   }
 
+  // Migration multi-secteurs : les anciennes étapes prod_* deviennent la phase
+  // 'production' + un secteur dans production_sectors. Non destructif, idempotent.
+  await migrateProdStages();
+
   // Seed : si la table est vide, on insère quelques demandes d'exemple
   // réparties sur plusieurs étapes pour démontrer le pipeline.
   const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM requests');
   if (rows[0].n === 0) {
     await seed();
+  }
+}
+
+// Convertit les commandes encore taguées avec une ancienne étape prod_* :
+//  stage = 'production' + une ligne production_sectors pour ce secteur.
+async function migrateProdStages() {
+  const inList = SECTOR_SLUGS.map((s) => `'${s}'`).join(', ');
+  const { rows } = await pool.query(
+    `SELECT id, stage FROM requests WHERE stage IN (${inList})`,
+  );
+  for (const r of rows) {
+    const ex = await pool.query(
+      'SELECT 1 FROM production_sectors WHERE request_id = $1 AND sector = $2', [r.id, r.stage],
+    );
+    if (ex.rowCount === 0) {
+      await pool.query(
+        'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)',
+        [r.id, r.stage],
+      );
+    }
+    await pool.query("UPDATE requests SET stage = 'production' WHERE id = $1", [r.id]);
   }
 }
 
@@ -108,10 +142,18 @@ async function seed() {
       status: 'Validé', position: 1000,
     },
     {
-      stage: 'prod_dtf', priority: 2, client_type: 'pro', billing_company: 'Auto-école Rapid',
-      contact_referent: 'M. Faure', quantity: 15, product: 'Polos brodés DTF',
-      project_value: 540, description: 'Polos moniteurs', deadline: inDays(-1),
-      status: 'Bloqué', position: 1000,
+      stage: 'production', sectors: ['prod_dtf'], priority: 2, client_type: 'pro',
+      billing_company: 'Auto-école Rapid', contact_referent: 'M. Faure', quantity: 15,
+      product: 'Polos brodés DTF', project_value: 540, description: 'Polos moniteurs',
+      deadline: inDays(-1), status: 'Bloqué', position: 1000,
+    },
+    {
+      // Exemple multi-secteurs : une même commande passe par 2 machines.
+      stage: 'production', sectors: ['prod_trotec', 'prod_roland_uv'], priority: 3,
+      client_type: 'pro', billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.',
+      quantity: 40, product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
+      description: 'Découpe forme sur la Trotec, puis impression couleur sur la Roland UV',
+      deadline: inDays(5), status: 'Validé', position: 1000,
     },
     {
       stage: 'facturation', priority: 1, client_type: 'pro', billing_company: 'Pizzeria Bella',
@@ -122,15 +164,21 @@ async function seed() {
   ];
 
   for (const s of samples) {
-    await pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO requests
         (stage, priority, client_type, billing_company, contact_referent, quantity,
          product, color, project_value, description, deadline, status, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
       [s.stage, s.priority, s.client_type, s.billing_company, s.contact_referent,
        s.quantity, s.product, s.color ?? null, s.project_value, s.description, s.deadline, s.status, s.position],
     );
+    for (const sector of s.sectors || []) {
+      await pool.query(
+        'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)',
+        [rows[0].id, sector],
+      );
+    }
   }
 }
 
-module.exports = { pool, init, STAGES, STAGE_SLUGS };
+module.exports = { pool, init, STAGES, STAGE_SLUGS, SECTORS, SECTOR_SLUGS };
