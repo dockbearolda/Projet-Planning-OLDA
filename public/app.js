@@ -65,12 +65,14 @@ const $stageLink = document.getElementById('stageLink');
 const $stageLinkLabel = document.getElementById('stageLinkLabel');
 
 // --- Outil de devis logo Fiverr -------------------------------------------
-// Reprend la feuille de calcul : on saisit le prix du graphiste Fiverr (B) et
-// on lit le prix de revente OLDA (J), arrondi à l'euro supérieur.
-//   J = (B × 1,055 + 3,5) × 0,87 × 2,5
-const FIVERR_FEE_PCT = 0.055; // commission (colonne D)
+// Reprend la feuille de calcul : on saisit le prix du graphiste Fiverr EN DOLLARS
+// (B) et on lit le prix de revente OLDA EN EUROS (J), arrondi à l'euro supérieur.
+//   J = (B$ × 1,055 + 3,5) × 0,87 × 2,5
+// Le 0,87 (colonne G) est la conversion dollar → euro (1 $ ≈ 0,87 €) : la sortie
+// est donc bien en euros.
+const FIVERR_FEE_PCT = 0.055; // commission Fiverr +5,5 % (colonne D)
 const FIVERR_FIXED = 3.5;     // frais fixe (colonne C)
-const FIVERR_FACTOR = 0.87;   // facteur (colonne G)
+const USD_TO_EUR = 0.87;      // conversion dollar → euro (colonne G)
 const OLDA_MARGIN = 2.5;      // marge de revente (colonne I)
 
 const $fiverrTool = document.getElementById('fiverrTool');
@@ -85,7 +87,8 @@ function updateFiverrPrice() {
     $fiverrPrice.textContent = '—';
     return;
   }
-  const resale = Math.ceil((cost * (1 + FIVERR_FEE_PCT) + FIVERR_FIXED) * FIVERR_FACTOR * OLDA_MARGIN);
+  // cost = prix graphiste en $ ; USD_TO_EUR convertit en €. Résultat en euros.
+  const resale = Math.ceil((cost * (1 + FIVERR_FEE_PCT) + FIVERR_FIXED) * USD_TO_EUR * OLDA_MARGIN);
   $fiverrPrice.textContent = `${resale} €`;
 }
 
