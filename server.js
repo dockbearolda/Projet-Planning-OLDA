@@ -174,28 +174,21 @@ async function attachSectors(rows) {
 }
 
 // GET /api/requests?stage=<phase>   → commandes de cette phase
-// GET /api/requests?sector=<machine>→ commandes en prod ayant ce secteur à faire
+// GET /api/requests?sector=<machine>→ commandes en prod rattachées à ce secteur
 //   (compat : ?stage=<machine> est aussi accepté côté sidebar)
-// GET /api/requests?bucket=ready_billing → prod terminée, prête à facturer
 // GET /api/requests                 → toutes
 app.get('/api/requests', asyncH(async (req, res) => {
-  const { stage, sector, bucket } = req.query;
+  const { stage, sector } = req.query;
   let result;
   if (sector || (stage && SECTOR_SLUGS.includes(stage))) {
     const sec = sector || stage;
     if (!SECTOR_SLUGS.includes(sec)) return res.status(400).json({ error: `secteur invalide: ${sec}` });
+    // La commande reste dans la colonne de la machine même une fois ce secteur
+    // coché « fait » ; elle ne la quitte qu'en étant déplacée vers une autre phase.
     result = await pool.query(
       `${SELECT}
-       JOIN production_sectors ps ON ps.request_id = r.id AND ps.sector = $1 AND ps.done = false
+       JOIN production_sectors ps ON ps.request_id = r.id AND ps.sector = $1
        WHERE r.stage = 'production' ${ORDER}`, [sec],
-    );
-  } else if (bucket === 'ready_billing' || stage === 'pret_facturation') {
-    // En production, plus aucun secteur à faire. NOT IN non corrélé (compat pg-mem).
-    result = await pool.query(
-      `${SELECT}
-       WHERE r.stage = 'production'
-       AND r.id NOT IN (SELECT request_id FROM production_sectors WHERE done = false)
-       ${ORDER}`,
     );
   } else if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
@@ -209,33 +202,25 @@ app.get('/api/requests', asyncH(async (req, res) => {
   res.json(result.rows);
 }));
 
-// GET /api/counts → { slug: n, ... } : phases + secteurs (en attente) + prête à
-// facturer. Objet plat → la sidebar lit counts[slug] sans rien changer.
+// GET /api/counts → { slug: n, ... } : phases + secteurs. Objet plat → la
+// sidebar lit counts[slug] sans rien changer.
 app.get('/api/counts', asyncH(async (req, res) => {
   const counts = {};
   for (const s of STAGE_SLUGS) counts[s] = 0;
   for (const s of SECTOR_SLUGS) counts[s] = 0;
-  counts.pret_facturation = 0;
 
   const { rows: byStage } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
   for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
 
-  // Secteurs : commandes en production avec ce secteur encore à faire.
+  // Secteurs : toutes les commandes en production rattachées à ce secteur
+  // (le badge reflète les cartes affichées dans la colonne, cochées comprises).
   const { rows: bySector } = await pool.query(
     `SELECT ps.sector, COUNT(*)::int AS n
      FROM production_sectors ps JOIN requests r ON r.id = ps.request_id
-     WHERE ps.done = false AND r.stage = 'production'
+     WHERE r.stage = 'production'
      GROUP BY ps.sector`,
   );
   for (const r of bySector) if (r.sector in counts) counts[r.sector] = r.n;
-
-  // Prête à facturer : en production, plus aucun secteur à faire (NOT IN : compat pg-mem).
-  const { rows: ready } = await pool.query(
-    `SELECT COUNT(*)::int AS n FROM requests r
-     WHERE r.stage = 'production'
-     AND r.id NOT IN (SELECT request_id FROM production_sectors WHERE done = false)`,
-  );
-  counts.pret_facturation = ready[0].n;
 
   res.json(counts);
 }));
@@ -324,7 +309,8 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
 // ---------------------------------------------------------------------------
 // Secteurs de production d'une commande (relation 1 commande ↔ N machines).
 // Ajouter un secteur fait entrer la commande en production ; cocher « done »
-// la retire de la colonne de cette machine ; toutes cochées → prête à facturer.
+// marque ce secteur comme fait, mais la commande reste dans la colonne de la
+// machine jusqu'à ce qu'on la déplace manuellement vers Facturation.
 // ---------------------------------------------------------------------------
 
 // POST /api/requests/:id/sectors  body { sector } → ajoute (ou réactive) un secteur
