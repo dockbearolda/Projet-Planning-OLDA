@@ -51,6 +51,8 @@ const SEND_TARGETS = [
 let currentStage = 'demande';
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
+let attention = {};            // { slug: true } : étape/secteur avec ≥1 commande « à traiter » ou en retard
+let gridQuery = '';            // texte du filtre de recherche live (étape courante)
 let sort = { key: null, dir: 1 }; // tri manuel via en-têtes (null = tri par défaut)
 
 // --- Sélecteurs ------------------------------------------------------------
@@ -144,8 +146,12 @@ function renderSidebar() {
       el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
       el.dataset.slug = s.slug;
       const n = counts[s.slug] ?? 0;
+      if (n === 0) el.classList.add('is-empty');
       el.innerHTML = `<span class="stage-label">${escapeHtml(s.label)}</span>` +
-        `<span class="stage-count${n > 0 ? ' has-items' : ''}">${n}</span>`;
+        `<span class="stage-meta">` +
+          `<span class="stage-dot"${attention[s.slug] ? '' : ' hidden'}></span>` +
+          `<span class="stage-count${n > 0 ? ' has-items' : ''}">${n}</span>` +
+        `</span>`;
       el.addEventListener('click', () => selectStage(s.slug));
       attachDrop(el, s.slug);
       $stages.appendChild(el);
@@ -175,12 +181,28 @@ function selectStage(slug) {
 async function loadCounts() {
   counts = await api('GET', '/api/counts');
   document.querySelectorAll('.stage').forEach((el) => {
+    const n = counts[el.dataset.slug] ?? 0;
     const c = el.querySelector('.stage-count');
     if (c) {
-      const n = counts[el.dataset.slug] ?? 0;
       c.textContent = n;
       c.classList.toggle('has-items', n > 0);
     }
+    el.classList.toggle('is-empty', n === 0);
+  });
+}
+
+// Pastille « attention » (ambre) sur les étapes/secteurs ayant ≥1 commande
+// « À traiter » ou en retard. Non critique : en cas d'échec, on garde l'état
+// précédent sans déranger l'utilisateur.
+async function loadAttention() {
+  let next;
+  try {
+    next = await api('GET', '/api/attention');
+  } catch (_) { return; }
+  attention = next || {};
+  document.querySelectorAll('.stage').forEach((el) => {
+    const dot = el.querySelector('.stage-dot');
+    if (dot) dot.hidden = !attention[el.dataset.slug];
   });
 }
 
@@ -192,16 +214,21 @@ async function loadRows() {
 
 // --- Tri -------------------------------------------------------------------
 function applySortAndRender() {
-  const data = [...rows];
+  const sorted = [...rows];
   if (sort.key) {
-    data.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
+    sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
   } else {
     // tri par défaut : priorité desc, échéance asc
-    data.sort((a, b) => {
+    sorted.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       return cmpDeadline(a.deadline, b.deadline);
     });
   }
+  // Filtre de recherche live : on garde toujours la ligne brouillon (ajout).
+  const q = fold(gridQuery.trim());
+  const data = q
+    ? sorted.filter((r) => isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q)))
+    : sorted;
   renderRows(data);
   const nMaq = data.filter((r) => MAQUETTE_STATUSES.includes(r.status)).length;
   const base = data.length ? `${data.length} commande${data.length > 1 ? 's' : ''}` : '';
@@ -274,6 +301,11 @@ function cmp(a, b, key) {
 function renderRows(data) {
   $rows.innerHTML = '';
   $empty.hidden = data.length > 0;
+  if (data.length === 0) {
+    $empty.textContent = gridQuery.trim()
+      ? 'Aucune commande ne correspond à la recherche.'
+      : 'Aucune commande à cette étape.';
+  }
   for (const r of data) $rows.appendChild(buildRow(r));
   updateSortArrows();
 }
@@ -1735,6 +1767,7 @@ async function poll() {
   if (document.hidden) return; // onglet en arrière-plan : on économise
   try {
     await loadCounts(); // compteurs sidebar : toujours sûrs à rafraîchir
+    await loadAttention(); // pastilles « attention » : sûres aussi
     if (isInteracting()) return; // ne pas perturber une saisie / un glisser
     const fresh = await api('GET', `/api/requests?stage=${encodeURIComponent(currentStage)}`);
     const sig = signature(fresh);
@@ -1774,9 +1807,19 @@ function startRealtime() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 }
 
-// --- Recherche : palette de commandes (⌘K) ---------------------------------
-const $searchTrigger = document.getElementById('searchTrigger');
+// --- Recherche live : filtre la grille de l'étape courante -----------------
+// Le champ inline (work-head) filtre en direct les lignes affichées par
+// société / référent / produit / description / contact. ⌘K (ou Ctrl+K) place
+// le curseur dans le champ ; Échap efface le filtre puis rend la main.
 const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color', 'description', 'contact_phone', 'contact_email'];
+
+function fold(s) {
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+const $gridSearch = document.getElementById('gridSearch');
+const $gridSearchInput = document.getElementById('gridSearchInput');
+const $gridSearchClear = document.getElementById('gridSearchClear');
 
 (function () {
   const kbd = document.getElementById('searchKbd');
@@ -1784,166 +1827,43 @@ const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color'
   if (kbd) kbd.textContent = isMac ? '⌘K' : 'Ctrl K';
 })();
 
-function fold(s) {
-  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-function highlightMatch(text, q) {
-  const t = String(text == null ? '' : text);
-  if (!q) return escapeHtml(t);
-  const i = t.toLowerCase().indexOf(q.toLowerCase());
-  if (i < 0) return escapeHtml(t);
-  return escapeHtml(t.slice(0, i)) + '<mark>' + escapeHtml(t.slice(i, i + q.length)) + '</mark>' + escapeHtml(t.slice(i + q.length));
+function syncSearchUI() {
+  const has = gridQuery !== '';
+  if ($gridSearch) $gridSearch.classList.toggle('has-value', has);
+  if ($gridSearchClear) $gridSearchClear.hidden = !has;
 }
 
-let searchState = null;
-
-function closeSearch() {
-  if (!searchState) return;
-  document.removeEventListener('keydown', onSearchKeydown, true);
-  const bd = searchState.backdrop;
-  bd.classList.remove('open');
-  setTimeout(() => bd.remove(), 180);
-  searchState = null;
+function setGridQuery(v) {
+  const next = v || '';
+  if (next === gridQuery) return;
+  gridQuery = next;
+  syncSearchUI();
+  applySortAndRender();
 }
 
-async function openSearch() {
-  if (searchState) { searchState.input.focus(); return; }
-  const backdrop = document.createElement('div');
-  backdrop.className = 'cmdk-backdrop';
-  backdrop.innerHTML = `
-    <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="Recherche de commandes">
-      <div class="cmdk-head">
-        <svg class="cmdk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input class="cmdk-input" type="text" placeholder="Rechercher — société, référent, produit, contact…" autocomplete="off" autocapitalize="off" spellcheck="false" />
-        <kbd class="cmdk-esc">Esc</kbd>
-      </div>
-      <div class="cmdk-list" role="listbox"></div>
-      <div class="cmdk-foot">
-        <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
-        <span><kbd>↵</kbd> ouvrir</span>
-        <span><kbd>esc</kbd> fermer</span>
-        <span class="cmdk-count"></span>
-      </div>
-    </div>`;
-  document.body.appendChild(backdrop);
-  const input = backdrop.querySelector('.cmdk-input');
-  const list = backdrop.querySelector('.cmdk-list');
-  const countEl = backdrop.querySelector('.cmdk-count');
-  searchState = { backdrop, input, list, countEl, results: [], sel: 0, all: null };
-
-  backdrop.addEventListener('pointerdown', (e) => { if (e.target === backdrop) closeSearch(); });
-  input.addEventListener('input', () => runSearch(input.value));
-  document.addEventListener('keydown', onSearchKeydown, true);
-
-  requestAnimationFrame(() => backdrop.classList.add('open'));
-  input.focus();
-  renderSearch('');
-
-  try {
-    const all = await api('GET', '/api/requests');
-    if (searchState) { searchState.all = all; runSearch(input.value); }
-  } catch (_) {
-    if (searchState) searchState.list.innerHTML = '<div class="cmdk-empty">Erreur de chargement.</div>';
-  }
-}
-
-function runSearch(qRaw) {
-  if (!searchState) return;
-  const q = (qRaw || '').trim();
-  const all = searchState.all || [];
-  let results = [];
-  if (q) {
-    const fq = fold(q);
-    results = all.filter((r) => SEARCH_FIELDS.some((f) => fold(r[f]).includes(fq))).slice(0, 50);
-  }
-  searchState.results = results;
-  searchState.sel = 0;
-  renderSearch(q);
-}
-
-function renderSearch(q) {
-  if (!searchState) return;
-  const { list, countEl, results } = searchState;
-  if (!q) {
-    list.innerHTML = '<div class="cmdk-empty">Tapez pour rechercher dans toutes les étapes…</div>';
-    countEl.textContent = '';
-    return;
-  }
-  if (results.length === 0) {
-    list.innerHTML = '<div class="cmdk-empty">Aucune commande trouvée.</div>';
-    countEl.textContent = '0 résultat';
-    return;
-  }
-  countEl.textContent = results.length + (results.length > 1 ? ' résultats' : ' résultat');
-  list.innerHTML = results.map((r, i) => {
-    const title = r.billing_company || r.product || r.contact_referent || '(sans nom)';
-    const subParts = [];
-    if (r.contact_referent && r.billing_company) subParts.push(highlightMatch(r.contact_referent, q));
-    if (r.product) subParts.push(highlightMatch(r.product, q));
-    if (r.contact_phone) subParts.push(highlightMatch(r.contact_phone, q));
-    if (r.contact_email) subParts.push(highlightMatch(r.contact_email, q));
-    const sub = subParts.slice(0, 3).join(' · ');
-    return `<button class="cmdk-item${i === searchState.sel ? ' sel' : ''}" role="option" data-i="${i}">
-      <span class="cmdk-item-body">
-        <span class="cmdk-item-title">${highlightMatch(title, q)}</span>
-        ${sub ? `<span class="cmdk-item-sub">${sub}</span>` : ''}
-      </span>
-      <span class="cmdk-badge">${escapeHtml(STAGE_LABEL[r.stage] || r.stage)}</span>
-    </button>`;
-  }).join('');
-  [...list.querySelectorAll('.cmdk-item')].forEach((el) => {
-    const i = +el.dataset.i;
-    el.addEventListener('mousemove', () => setSel(i));
-    el.addEventListener('click', () => openResult(searchState.results[i]));
+if ($gridSearchInput) {
+  $gridSearchInput.addEventListener('input', () => setGridQuery($gridSearchInput.value));
+  $gridSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (gridQuery) { $gridSearchInput.value = ''; setGridQuery(''); }
+      else $gridSearchInput.blur();
+    }
   });
-  scrollSelIntoView();
+}
+if ($gridSearchClear) {
+  $gridSearchClear.addEventListener('click', () => {
+    if ($gridSearchInput) { $gridSearchInput.value = ''; $gridSearchInput.focus(); }
+    setGridQuery('');
+  });
 }
 
-function setSel(i) {
-  if (!searchState) return;
-  searchState.sel = i;
-  [...searchState.list.querySelectorAll('.cmdk-item')].forEach((el, idx) => el.classList.toggle('sel', idx === i));
-}
-function scrollSelIntoView() {
-  if (!searchState) return;
-  const el = searchState.list.querySelector('.cmdk-item.sel');
-  if (el) el.scrollIntoView({ block: 'nearest' });
-}
-
-function onSearchKeydown(e) {
-  if (!searchState) return;
-  if (e.key === 'Escape') { e.preventDefault(); closeSearch(); return; }
-  const n = searchState.results.length;
-  if (e.key === 'ArrowDown') { e.preventDefault(); if (n) { searchState.sel = (searchState.sel + 1) % n; setSel(searchState.sel); scrollSelIntoView(); } }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); if (n) { searchState.sel = (searchState.sel - 1 + n) % n; setSel(searchState.sel); scrollSelIntoView(); } }
-  else if (e.key === 'Enter') { e.preventDefault(); if (n) openResult(searchState.results[searchState.sel]); }
-}
-
-function openResult(r) {
-  if (!r) return;
-  const id = r.id, stage = r.stage;
-  closeSearch();
-  const flashRow = () => {
-    const tr = $rows.querySelector(`tr[data-id="${id}"]`);
-    if (!tr) return false;
-    tr.scrollIntoView({ block: 'center' });
-    tr.classList.remove('row-flash'); void tr.offsetWidth; tr.classList.add('row-flash');
-    setTimeout(() => tr.classList.remove('row-flash'), 1700);
-    return true;
-  };
-  if (stage === currentStage) {
-    flashRow();
-  } else {
-    selectStage(stage);
-    let tries = 0;
-    const tick = () => { if (flashRow()) return; if (tries++ < 25) setTimeout(tick, 80); };
-    setTimeout(tick, 120);
-  }
-}
-
-if ($searchTrigger) $searchTrigger.addEventListener('click', openSearch);
+// ⌘K / Ctrl+K : place le curseur dans le champ de recherche (plus de modal).
 document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openSearch(); }
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    if ($gridSearchInput) { $gridSearchInput.focus(); $gridSearchInput.select(); }
+  }
 });
 
 // --- Impression de la catégorie courante -----------------------------------
@@ -1974,6 +1894,7 @@ async function start() {
   attachColResizers();
   applyColWidths();
   await loadCounts();
+  await loadAttention();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);
   updateFiverrTool(currentStage);
