@@ -333,12 +333,10 @@ function buildRow(r) {
   tr.appendChild(cellText(r, 'contact_referent', 'référent'));
   // quantité
   tr.appendChild(cellNumber(r, 'quantity', 'qté'));
-  // produits
-  tr.appendChild(cellText(r, 'product', 'produits'));
+  // produit (nom + description fusionnés sur deux lignes)
+  tr.appendChild(cellProduct(r));
   // valeur
   tr.appendChild(cellMoney(r, 'project_value'));
-  // description
-  tr.appendChild(cellText(r, 'description', 'description'));
   // échéance
   tr.appendChild(cellDate(r, 'deadline'));
   // jours restant (calculé)
@@ -1002,6 +1000,39 @@ function cellText(r, field, placeholder) {
   input.placeholder = placeholder;
   bindInline(input, r, field, (v) => v === '' ? null : v);
   td.appendChild(input);
+  return td;
+}
+
+// Produit : nom (gras, 1re ligne) + description (texte secondaire gris en
+// dessous). Les deux restent éditables en ligne. La description disparaît au
+// repos quand elle est vide, et réapparaît au survol / focus de la cellule —
+// même idiome que les actions « révélées au survol » ailleurs dans la grille.
+function cellProduct(r) {
+  const td = document.createElement('td');
+  td.className = 'col-product-cell';
+  const stack = document.createElement('div');
+  stack.className = 'product-stack';
+
+  const name = document.createElement('input');
+  name.className = 'cell-input product-name';
+  name.type = 'text';
+  name.value = r.product ?? '';
+  name.placeholder = 'produit';
+  bindInline(name, r, 'product', (v) => v === '' ? null : v);
+
+  const desc = document.createElement('input');
+  desc.className = 'cell-input product-desc';
+  desc.type = 'text';
+  desc.value = r.description ?? '';
+  desc.placeholder = 'description';
+  const syncEmpty = () => stack.classList.toggle('desc-empty', desc.value.trim() === '');
+  syncEmpty();
+  desc.addEventListener('input', syncEmpty);
+  bindInline(desc, r, 'description', (v) => v === '' ? null : v);
+
+  stack.appendChild(name);
+  stack.appendChild(desc);
+  td.appendChild(stack);
   return td;
 }
 
