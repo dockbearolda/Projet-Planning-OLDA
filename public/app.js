@@ -335,8 +335,6 @@ function buildRow(r) {
   tr.appendChild(cellNumber(r, 'quantity', 'qté'));
   // produits
   tr.appendChild(cellText(r, 'product', 'produits'));
-  // couleur
-  tr.appendChild(cellText(r, 'color', 'couleur'));
   // valeur
   tr.appendChild(cellMoney(r, 'project_value'));
   // description
@@ -345,8 +343,6 @@ function buildRow(r) {
   tr.appendChild(cellDate(r, 'deadline'));
   // jours restant (calculé)
   tr.appendChild(cellDays(r));
-  // secteurs de production (pastilles cochables)
-  tr.appendChild(cellSectors(r));
   // état
   tr.appendChild(cellStatus(r));
   // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
@@ -1145,78 +1141,15 @@ const STATUS_OPTIONS = ['À traiter', 'Maquette à faire', 'Maquette à valider'
 
 // États « maquette » : mis en avant (pastille violette + compteur d'étape)
 // pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
-// --- Secteurs de production (pastilles) ------------------------------------
-// Affiche les machines par lesquelles passe une commande en production. Chaque
-// pastille se coche (« fait ») ou se retire (✕). On affecte un secteur en
-// glissant la commande sur la colonne machine de la sidebar (voir onDragEnd).
-function cellSectors(r) {
-  const td = document.createElement('td');
-  td.className = 'col-sectors';
-  const secs = Array.isArray(r.sectors) ? r.sectors : [];
-  if (r.stage !== 'production' && secs.length === 0) return td; // pas en prod : rien
-  const wrap = document.createElement('div');
-  wrap.className = 'sec-chips';
-  for (const s of secs) {
-    const chip = document.createElement('span');
-    chip.className = 'sec-chip' + (s.done ? ' done' : '');
-    const lab = document.createElement('button');
-    lab.type = 'button';
-    lab.className = 'sec-chip-label';
-    lab.title = s.done
-      ? `${sectorShort(s.sector)} : fait — cliquer pour rouvrir`
-      : `${sectorShort(s.sector)} : à faire — cliquer quand c'est terminé`;
-    const check = s.done
-      ? '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'
-      : '';
-    lab.innerHTML = check + `<span>${escapeHtml(sectorShort(s.sector))}</span>`;
-    lab.addEventListener('click', (e) => { e.stopPropagation(); toggleSector(r, s.sector, !s.done); });
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'sec-chip-x';
-    x.title = 'Retirer ce secteur';
-    x.setAttribute('aria-label', `Retirer ${sectorShort(s.sector)}`);
-    x.textContent = '×';
-    x.addEventListener('click', (e) => { e.stopPropagation(); removeSector(r, s.sector); });
-    chip.appendChild(lab);
-    chip.appendChild(x);
-    wrap.appendChild(chip);
-  }
-  if (secs.length === 0) {
-    const hint = document.createElement('span');
-    hint.className = 'sec-empty';
-    hint.textContent = 'aucun secteur';
-    wrap.appendChild(hint);
-  }
-  td.appendChild(wrap);
-  return td;
-}
-
-// Affecte un secteur à une commande (la fait entrer en production si besoin).
+// --- Secteurs de production -------------------------------------------------
+// On affecte un secteur à une commande en la glissant sur la colonne machine
+// de la sidebar (voir onDragEnd) ; cela la fait entrer en production.
 async function addSector(r, sector) {
   try {
     await api('POST', `/api/requests/${r.id}/sectors`, { sector });
     await loadRows();
     await loadCounts();
     showToast(`Ajouté à ${sectorShort(sector)}`);
-  } catch (err) { reportError(err); }
-}
-
-// Coche / décoche un secteur (« fait »). La carte reste dans la colonne ;
-// le badge sert juste de repère visuel d'avancement.
-async function toggleSector(r, sector, done) {
-  try {
-    await api('PATCH', `/api/requests/${r.id}/sectors/${sector}`, { done });
-    await loadRows();
-    await loadCounts();
-  } catch (err) { reportError(err); }
-}
-
-// Retire complètement un secteur de la commande.
-async function removeSector(r, sector) {
-  try {
-    await api('DELETE', `/api/requests/${r.id}/sectors/${sector}`);
-    await loadRows();
-    await loadCounts();
   } catch (err) { reportError(err); }
 }
 
@@ -1629,12 +1562,6 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 
 let colWidths = {};
 try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } catch (_) { colWidths = {}; }
-// Migration : colonnes ajoutées après coup (Couleur, Secteurs prod) absentes des
-// largeurs déjà mémorisées — largeur par défaut pour éviter le plancher (36 px).
-for (const k of Object.keys(colWidths)) {
-  if (colWidths[k] && colWidths[k].color == null) colWidths[k].color = 96;
-  if (colWidths[k] && colWidths[k].sectors == null) colWidths[k].sectors = 150;
-}
 
 function saveColWidths() {
   try { localStorage.setItem(COLW_KEY, JSON.stringify(colWidths)); } catch (_) {}
