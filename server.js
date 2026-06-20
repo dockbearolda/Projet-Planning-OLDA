@@ -225,33 +225,6 @@ app.get('/api/counts', asyncH(async (req, res) => {
   res.json(counts);
 }));
 
-// GET /api/attention → { slug: true } : étapes/secteurs ayant AU MOINS une
-// commande « À traiter » OU en retard (échéance dépassée et non « Terminé »).
-// Sert à afficher la pastille ambre dans la sidebar.
-app.get('/api/attention', asyncH(async (req, res) => {
-  const attention = {};
-  const FLAG = `status = 'À traiter'
-               OR (deadline IS NOT NULL AND deadline < CURRENT_DATE
-                   AND COALESCE(status, '') <> 'Terminé')`;
-
-  // Étapes classiques (hors production : gérée par secteurs ci-dessous).
-  const { rows: byStage } = await pool.query(
-    `SELECT stage FROM requests WHERE ${FLAG} GROUP BY stage`,
-  );
-  for (const r of byStage) attention[r.stage] = true;
-
-  // Secteurs de production : commande en production rattachée au secteur.
-  const { rows: bySector } = await pool.query(
-    `SELECT ps.sector FROM production_sectors ps
-     JOIN requests r ON r.id = ps.request_id
-     WHERE r.stage = 'production' AND (${FLAG})
-     GROUP BY ps.sector`,
-  );
-  for (const r of bySector) attention[r.sector] = true;
-
-  res.json(attention);
-}));
-
 // POST /api/requests → crée (corps partiel autorisé)
 app.post('/api/requests', asyncH(async (req, res) => {
   const body = req.body || {};

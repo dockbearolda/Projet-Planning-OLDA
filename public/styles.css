@@ -153,18 +153,6 @@ body {
 
 .stage-sep { height: 1px; background: var(--hairline); margin: 8px 12px; border: 0; }
 
-/* --- Méta de colonne : pastille « attention » + compteur ------------------ */
-.stage-meta { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
-/* Pastille ambre : la colonne contient ≥1 commande « À traiter » ou en retard */
-.stage-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--warn, #f5a623);
-  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18);
-  flex-shrink: 0;
-}
-.stage-dot[hidden] { display: none; }
 /* Colonne à 0 : grisée / atténuée */
 .stage.is-empty .stage-label { color: var(--text-3); font-weight: 400; }
 .stage.is-empty .stage-count { color: #aab2b9; }
