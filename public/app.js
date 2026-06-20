@@ -18,7 +18,6 @@ const STAGE_GROUPS = [
     { slug: 'prod_autre', label: 'Prod Autre' },
   ],
   [
-    { slug: 'pret_facturation', label: 'Prête à facturer' },
     { slug: 'facturation', label: 'Facturation' },
     { slug: 'archive', label: 'Archivé' },
     { slug: 'maquette_fiverr', label: 'Fiverr' },
@@ -1185,7 +1184,7 @@ function cellSectors(r) {
   if (secs.length === 0) {
     const hint = document.createElement('span');
     hint.className = 'sec-empty';
-    hint.textContent = 'prête à facturer';
+    hint.textContent = 'aucun secteur';
     wrap.appendChild(hint);
   }
   td.appendChild(wrap);
@@ -1202,7 +1201,8 @@ async function addSector(r, sector) {
   } catch (err) { reportError(err); }
 }
 
-// Coche / décoche un secteur (« fait »). Coché → la carte quitte la colonne.
+// Coche / décoche un secteur (« fait »). La carte reste dans la colonne ;
+// le badge sert juste de repère visuel d'avancement.
 async function toggleSector(r, sector, done) {
   try {
     await api('PATCH', `/api/requests/${r.id}/sectors/${sector}`, { done });
@@ -1338,16 +1338,11 @@ function patch(r, body, applyOptimistic) {
 // --- Création --------------------------------------------------------------
 // Crée une commande adaptée à la vue courante et renvoie son id.
 //  - vue secteur (prod_*) → commande en production + ce secteur affecté
-//  - vue « prête à facturer » → commande en production sans secteur
 //  - sinon → commande dans cette phase
 async function createForCurrentView() {
   if (isSector(currentStage)) {
     const created = await api('POST', '/api/requests', { stage: 'production' });
     await api('POST', `/api/requests/${created.id}/sectors`, { sector: currentStage });
-    return created.id;
-  }
-  if (currentStage === 'pret_facturation') {
-    const created = await api('POST', '/api/requests', { stage: 'production' });
     return created.id;
   }
   const created = await api('POST', '/api/requests', { stage: currentStage });
@@ -1537,8 +1532,6 @@ async function onDragEnd(e) {
     // déposé sur une entrée de la sidebar
     if (isSector(slug)) {
       await addSector(ds.r, slug); // colonne machine → affecter ce secteur
-    } else if (slug === 'pret_facturation') {
-      showToast('« Prête à facturer » se remplit tout seul quand tous les secteurs sont faits.');
     } else if (slug !== ds.r.stage) {
       await moveToStage(ds.r, slug); // autre phase → déplacer
     }
