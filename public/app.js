@@ -51,7 +51,6 @@ const SEND_TARGETS = [
 let currentStage = 'demande';
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
-let attention = {};            // { slug: true } : étape/secteur avec ≥1 commande « à traiter » ou en retard
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
 let sort = { key: null, dir: 1 }; // tri manuel via en-têtes (null = tri par défaut)
 
@@ -148,10 +147,7 @@ function renderSidebar() {
       const n = counts[s.slug] ?? 0;
       if (n === 0) el.classList.add('is-empty');
       el.innerHTML = `<span class="stage-label">${escapeHtml(s.label)}</span>` +
-        `<span class="stage-meta">` +
-          `<span class="stage-dot"${attention[s.slug] ? '' : ' hidden'}></span>` +
-          `<span class="stage-count${n > 0 ? ' has-items' : ''}">${n}</span>` +
-        `</span>`;
+        `<span class="stage-count${n > 0 ? ' has-items' : ''}">${n}</span>`;
       el.addEventListener('click', () => selectStage(s.slug));
       attachDrop(el, s.slug);
       $stages.appendChild(el);
@@ -188,21 +184,6 @@ async function loadCounts() {
       c.classList.toggle('has-items', n > 0);
     }
     el.classList.toggle('is-empty', n === 0);
-  });
-}
-
-// Pastille « attention » (ambre) sur les étapes/secteurs ayant ≥1 commande
-// « À traiter » ou en retard. Non critique : en cas d'échec, on garde l'état
-// précédent sans déranger l'utilisateur.
-async function loadAttention() {
-  let next;
-  try {
-    next = await api('GET', '/api/attention');
-  } catch (_) { return; }
-  attention = next || {};
-  document.querySelectorAll('.stage').forEach((el) => {
-    const dot = el.querySelector('.stage-dot');
-    if (dot) dot.hidden = !attention[el.dataset.slug];
   });
 }
 
@@ -1767,7 +1748,6 @@ async function poll() {
   if (document.hidden) return; // onglet en arrière-plan : on économise
   try {
     await loadCounts(); // compteurs sidebar : toujours sûrs à rafraîchir
-    await loadAttention(); // pastilles « attention » : sûres aussi
     if (isInteracting()) return; // ne pas perturber une saisie / un glisser
     const fresh = await api('GET', `/api/requests?stage=${encodeURIComponent(currentStage)}`);
     const sig = signature(fresh);
@@ -1894,7 +1874,6 @@ async function start() {
   attachColResizers();
   applyColWidths();
   await loadCounts();
-  await loadAttention();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);
   updateFiverrTool(currentStage);
