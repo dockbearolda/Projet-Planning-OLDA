@@ -695,8 +695,31 @@ tr:hover .handle { color: var(--text-2); }
 .col-value { width: 120px; }
 .col-deadline { width: 130px; }
 .col-company, .col-ref { min-width: 150px; }
-.col-product { min-width: 150px; }
-.col-desc { min-width: 220px; }
+.col-product { min-width: 240px; }
+
+/* Produit : nom (gras) + description (gris, masquée si vide) empilés */
+.col-product-cell { padding: 0; vertical-align: middle; }
+.product-stack { display: flex; flex-direction: column; padding: 4px 0; }
+.product-stack .product-name {
+  height: auto;
+  min-height: 0;
+  padding: 4px 12px;
+  font-weight: 600;
+}
+.product-stack .product-desc {
+  height: auto;
+  min-height: 0;
+  padding: 2px 12px 4px;
+  font-size: 12px;
+  font-weight: 450;
+  color: #86868b;
+}
+.product-stack .product-desc::placeholder { color: #b0b4bb; }
+/* Au repos, description vide → masquée. Réapparaît au survol / focus pour
+   rester éditable (même logique que les actions révélées au survol). */
+.product-stack.desc-empty .product-desc { display: none; }
+.grid tbody tr:hover .product-stack.desc-empty .product-desc,
+.product-stack.desc-empty:focus-within .product-desc { display: block; }
 
 /* ------------------------------------------- Largeur des colonnes réglable */
 /* Mode manuel : le tableau suit exactement les largeurs posées sur les <col>
@@ -996,6 +1019,13 @@ body.dragging-active * { cursor: grabbing !important; }
 
   /* éviter le zoom auto de Chrome au focus d'un champ (≥ 16px) */
   .cell-input { font-size: 16px; }
+
+  /* produit empilé : la cellule s'adapte, le nom garde une bonne cible
+     tactile et la description reste toujours visible (pas de survol au doigt) */
+  .col-product-cell { height: auto; }
+  .product-stack .product-name { min-height: 44px; height: auto; }
+  .product-stack .product-desc { min-height: 0; height: auto; font-size: 14px; }
+  .product-stack.desc-empty .product-desc { display: block; }
 
   /* cibles de toucher plus grandes */
   .star { font-size: 21px; padding: 6px 3px; }
