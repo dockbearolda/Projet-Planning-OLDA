@@ -730,10 +730,10 @@ tr:hover .handle { color: var(--text-2); }
   color: #86868b;
 }
 .product-stack .product-desc::placeholder { color: #b0b4bb; }
-/* Au repos, description vide → masquée. Réapparaît au survol / focus pour
-   rester éditable (même logique que les actions révélées au survol). */
+/* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
+   cellule Produit) pour rester éditable, mais PAS au survol : la révéler au
+   survol agrandissait la ligne — effet de saut désagréable au passage souris. */
 .product-stack.desc-empty .product-desc { display: none; }
-.grid tbody tr:hover .product-stack.desc-empty .product-desc,
 .product-stack.desc-empty:focus-within .product-desc { display: block; }
 
 /* ------------------------------------------- Largeur des colonnes réglable */
