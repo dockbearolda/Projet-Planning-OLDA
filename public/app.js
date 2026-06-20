@@ -1286,7 +1286,16 @@ function showStatusMenu(r, pill, render) {
 // --- Édition inline générique (texte/nombre) ------------------------------
 function bindInline(input, r, field, transform) {
   let lastSent = r[field] ?? '';
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      input.blur(); // Entrée valide → blur déclenche l'enregistrement
+    } else if (e.key === 'Escape') {
+      // Échap annule : on restaure la dernière valeur validée et on quitte le
+      // champ. Comme input.value === lastSent, le blur ci-dessous ne PATCH pas.
+      input.value = (lastSent ?? '').toString();
+      input.blur();
+    }
+  });
   input.addEventListener('blur', () => {
     const raw = input.value;
     if (raw === (lastSent ?? '').toString()) return;
