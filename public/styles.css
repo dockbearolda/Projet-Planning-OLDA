@@ -153,6 +153,28 @@ body {
 
 .stage-sep { height: 1px; background: var(--hairline); margin: 8px 12px; border: 0; }
 
+/* --- Méta de colonne : pastille « attention » + compteur ------------------ */
+.stage-meta { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
+/* Pastille ambre : la colonne contient ≥1 commande « À traiter » ou en retard */
+.stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn, #f5a623);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18);
+  flex-shrink: 0;
+}
+.stage-dot[hidden] { display: none; }
+/* Colonne à 0 : grisée / atténuée */
+.stage.is-empty .stage-label { color: var(--text-3); font-weight: 400; }
+.stage.is-empty .stage-count { color: #aab2b9; }
+.stage.is-empty { opacity: 0.6; }
+.stage.is-empty:hover { opacity: 1; }
+/* L'état actif reste pleinement lisible même à 0 */
+.stage.active.is-empty { opacity: 1; }
+.stage.active.is-empty .stage-label { color: var(--accent); font-weight: 600; }
+
+
 /* ---------------------------------------------------------------- Work area */
 .work {
   display: flex;
@@ -676,16 +698,21 @@ tr:hover .handle { color: var(--text-2); }
   color: var(--text-3);
   background: #eef0f2;
 }
-/* Vert → validé / terminé */
-.status-pill.s-valide,
-.status-pill.s-termine { color: var(--success); background: var(--success-bg); }
-/* Ambre → en attente (à traiter, en attente client) */
-.status-pill.s-atraiter,
-.status-pill.s-attente { color: var(--warn); background: var(--warn-bg); }
-/* Violet → maquette à faire, fuchsia → maquette à faire valider par le client */
+/* === Couleurs fixes des 6 états (liste fermée) === */
+/* À traiter → ambre */
+.status-pill.s-atraiter { color: var(--warn); background: var(--warn-bg); }
+/* En attente client → ambre clair */
+.status-pill.s-attente { color: #b88726; background: rgba(245, 196, 90, 0.16); }
+/* Maquette à faire → violet */
 .status-pill.s-maquette { color: var(--maquette); background: var(--maquette-bg); }
+/* Validé → vert */
+.status-pill.s-valide { color: var(--success); background: var(--success-bg); }
+/* En production → bleu */
+.status-pill.s-production { color: #1d6fd6; background: rgba(43, 127, 226, 0.13); }
+/* Terminé → gris */
+.status-pill.s-termine { color: #6b7280; background: rgba(107, 114, 128, 0.14); }
+/* Valeurs héritées (non proposées au menu) */
 .status-pill.s-maquette-valid { color: var(--maquette-valid); background: var(--maquette-valid-bg); }
-/* Rouge doux → bloqué */
 .status-pill.s-bloque { color: var(--danger); background: var(--danger-bg); }
 /* Gris clair → à définir / non renseigné */
 .status-pill.placeholder { color: #9aa0a6; background: #f2f3f5; }
@@ -890,6 +917,69 @@ body.dragging-active * { cursor: grabbing !important; }
   padding: 0 6px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
+/* --- Champ de recherche live du tableau ----------------------------------- */
+.grid-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 6px 10px 6px 12px;
+  min-width: 280px;
+  max-width: 420px;
+  flex: 0 1 360px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-3);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.grid-search:hover { background: #fff; border-color: rgba(var(--accent-rgb), 0.30); }
+.grid-search:focus-within { background: #fff; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.grid-search-ic { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-3); }
+.grid-search-input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--text-1);
+  min-width: 0;
+}
+.grid-search-input::placeholder { color: var(--text-3); }
+.grid-search-clear {
+  border: 0; background: transparent; color: var(--text-3);
+  font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 4px;
+  border-radius: 5px; flex-shrink: 0;
+}
+.grid-search-clear:hover { color: var(--text-1); background: rgba(0, 0, 0, 0.05); }
+.grid-search-kbd {
+  font-family: inherit; font-size: 11px; line-height: 1.5; color: var(--text-3);
+  background: #fff; border: 1px solid var(--hairline); border-radius: 5px;
+  padding: 0 6px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04); flex-shrink: 0;
+}
+.grid-search.has-value .grid-search-kbd { display: none; }
+
+/* Cellule en mode lecture pendant la recherche + surlignage du terme trouvé */
+.cell-search {
+  padding: 4px 8px;
+  border-radius: 6px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell-search:hover { background: rgba(var(--accent-rgb), 0.06); }
+.cell-search:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.cell-search mark {
+  background: rgba(245, 166, 35, 0.32);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
 .cmdk-backdrop {
   position: fixed; inset: 0; z-index: 2000;
   display: flex; align-items: flex-start; justify-content: center;
@@ -973,6 +1063,8 @@ body.dragging-active * { cursor: grabbing !important; }
 @media (max-width: 720px) {
   .search-trigger { min-width: 0; }
   .search-trigger-label, .search-trigger-kbd { display: none; }
+  .grid-search { min-width: 0; flex: 1 1 auto; }
+  .grid-search-kbd { display: none; }
 }
 
 /* =========================================================================
