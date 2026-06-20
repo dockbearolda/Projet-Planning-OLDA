@@ -26,10 +26,6 @@
   --accent-soft: rgba(74, 98, 116, 0.10);
   --focus-ring: 0 0 0 3px rgba(107, 129, 145, 0.22);
 
-  /* étoiles */
-  --star-on: #f5a623;
-  --star-off: #c2cdd3;
-
   /* sémantique (badges/pastilles uniquement) */
   --success: #1d9e75;
   --success-bg: rgba(118, 211, 163, 0.18);
@@ -49,6 +45,7 @@
   --shadow: 0 1px 3px rgba(32, 41, 48, .06), 0 14px 36px rgba(74, 98, 116, .12);
   --radius: 10px;                            /* boutons */
   --radius-card: 18px;                       /* cartes / panneaux */
+  --row-h: 60px;                             /* hauteur de ligne — dense mais tactile (≥56px) */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
 }
 
@@ -332,7 +329,7 @@ body {
   font-weight: 600;
   font-size: 13px;
   text-align: left;
-  padding: 11px 12px;
+  padding: 13px 14px;
   white-space: nowrap;
   user-select: none;
 }
@@ -345,7 +342,7 @@ body {
   border-bottom: 1px solid var(--grid-line);
   padding: 0;
   vertical-align: middle;
-  height: 40px;
+  height: var(--row-h);
 }
 .grid tbody tr:hover { background: rgba(var(--accent-rgb), 0.05); }
 .grid tbody tr.dragging { opacity: 0.4; }
@@ -384,12 +381,12 @@ body {
 
 /* cellules */
 .cell {
-  padding: 8px 12px;
+  padding: 10px 14px;
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
-  min-height: 40px;
+  min-height: var(--row-h);
 }
 .cell.num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
 
@@ -401,8 +398,8 @@ body {
   font: inherit;
   font-weight: 450;
   color: var(--text-1);
-  padding: 8px 12px;
-  height: 40px;
+  padding: 10px 14px;
+  height: var(--row-h);
   font-family: inherit;
 }
 .cell-input::placeholder { color: #86868b; }
@@ -424,26 +421,27 @@ body {
 .date-empty {
   display: flex;
   align-items: center;
-  height: 40px;
-  padding: 0 12px;
+  height: var(--row-h);
+  padding: 0 14px;
   color: #b0b4bb;
   cursor: pointer;
 }
 
 /* poignée de glisser */
-.col-handle { width: 50px; }
+.col-handle { width: 92px; }
 .handle-cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  height: 40px;
+  gap: 6px;
+  height: var(--row-h);
 }
 .handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
+  width: 30px;
+  height: var(--row-h);
   color: var(--text-3);
   cursor: grab;
   touch-action: none; /* le doigt sur la poignée déclenche le drag, pas le scroll */
@@ -451,7 +449,7 @@ body {
   -webkit-user-select: none;
 }
 .handle:active { cursor: grabbing; }
-.handle svg { width: 14px; height: 14px; }
+.handle svg { width: 18px; height: 18px; }
 tr:hover .handle { color: var(--text-2); }
 
 /* Icône contact : gris pâle si vide, bleu si renseigné. Aucune pollution. */
@@ -459,19 +457,19 @@ tr:hover .handle { color: var(--text-2); }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 28px;
+  width: 30px;
+  height: 36px;
   padding: 0;
   border: 0;
   background: transparent;
   color: #c4c7cc;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 7px;
   transition: color 0.12s ease, background 0.12s ease;
 }
 .contact-btn:hover { color: var(--accent); background: var(--accent-soft); }
 .contact-btn.has-contact { color: var(--accent); }
-.contact-btn svg { display: block; }
+.contact-btn svg { display: block; width: 18px; height: 18px; }
 
 /* Popover contact */
 .contact-pop {
@@ -526,19 +524,19 @@ tr:hover .handle { color: var(--text-2); }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 28px;
+  width: 30px;
+  height: 36px;
   padding: 0;
   border: 0;
   background: transparent;
   color: #c4c7cc;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 7px;
   transition: color 0.12s ease, background 0.12s ease;
 }
 .attach-btn:hover { color: var(--accent); background: var(--accent-soft); }
 .attach-btn.has-attach { color: var(--accent); }
-.attach-btn svg { display: block; }
+.attach-btn svg { display: block; width: 18px; height: 18px; }
 .attach-count {
   position: absolute;
   top: -2px;
@@ -627,11 +625,31 @@ tr:hover .handle { color: var(--text-2); }
 .ap-add svg { display: block; }
 .ap-progress { font-size: 12.5px; color: var(--text-3); padding: 4px 0; }
 
-/* étoiles priorité */
-.col-priority { width: 92px; }
-.stars { display: flex; gap: 2px; padding: 8px 12px; align-items: center; }
-.star { cursor: pointer; color: var(--star-off); line-height: 1; font-size: 15px; transition: color 0.1s ease; }
-.star.on { color: var(--star-on); }
+/* priorité — 3 niveaux clairs codés couleur (basse / moyenne / haute) */
+.col-priority { width: 118px; }
+.prio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 14px;
+  padding: 8px 13px;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.prio-pill:hover { filter: brightness(0.97); }
+.prio-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.prio-dot { width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
+/* Basse → vert (calme) · Moyenne → ambre · Haute → rouge */
+.prio-pill.p1 { color: var(--success); background: var(--success-bg); }
+.prio-pill.p2 { color: var(--warn); background: var(--warn-bg); }
+.prio-pill.p3 { color: var(--danger); background: var(--danger-bg); }
 
 /* type pro/perso */
 .col-type { width: 78px; }
@@ -990,9 +1008,9 @@ body.dragging-active * { cursor: grabbing !important; }
   .dup-btn { opacity: 1 !important; }
   .handle { color: var(--text-2); }
 
-  /* lignes et cellules plus hautes pour le doigt */
-  .grid tbody td { height: 50px; }
-  .cell, .cell-input { min-height: 50px; height: 50px; }
+  /* lignes et cellules encore un cran plus hautes pour le doigt */
+  .grid tbody td { height: 64px; }
+  .cell, .cell-input { min-height: 64px; height: 64px; }
 
   /* éviter le zoom auto de Chrome au focus d'un champ (≥ 16px) */
   .cell-input { font-size: 16px; }
@@ -1005,8 +1023,7 @@ body.dragging-active * { cursor: grabbing !important; }
   .product-stack.desc-empty .product-desc { display: block; }
 
   /* cibles de toucher plus grandes */
-  .star { font-size: 21px; padding: 6px 3px; }
-  .stars { gap: 4px; }
+  .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .type-pill,
   .status-pill { padding: 7px 13px; font-size: 13.5px; }
   .days-badge { padding: 5px 11px; font-size: 13px; }

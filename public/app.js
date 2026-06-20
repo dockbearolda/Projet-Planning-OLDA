@@ -336,8 +336,8 @@ function buildRow(r) {
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
-  // priorité (étoiles)
-  tr.appendChild(cellStars(r));
+  // priorité (3 niveaux codés couleur)
+  tr.appendChild(cellPriority(r));
   // type
   tr.appendChild(cellType(r));
   // société
@@ -966,23 +966,33 @@ function renderVoiceError(s, msg, retry) {
 }
 
 // --- Cellules ---------------------------------------------------------------
-function cellStars(r) {
+// Priorité : 3 niveaux clairs codés couleur (basse → moyenne → haute).
+// Une seule pastille tactile ; un clic fait défiler les niveaux 1 → 2 → 3 → 1.
+const PRIORITY_LEVELS = {
+  1: { cls: 'p1', label: 'Basse' },
+  2: { cls: 'p2', label: 'Moyenne' },
+  3: { cls: 'p3', label: 'Haute' },
+};
+
+function cellPriority(r) {
   const td = document.createElement('td');
   td.className = 'col-priority';
-  const wrap = document.createElement('div');
-  wrap.className = 'stars';
-  for (let n = 1; n <= 3; n++) {
-    const star = document.createElement('span');
-    star.className = 'star' + (n <= r.priority ? ' on' : '');
-    star.textContent = '★';
-    star.title = `priorité ${n}`;
-    star.addEventListener('click', () => patch(r, { priority: n }, () => {
-      r.priority = n;
-      [...wrap.children].forEach((s, i) => s.classList.toggle('on', i < n));
-    }));
-    wrap.appendChild(star);
-  }
-  td.appendChild(wrap);
+  const pill = document.createElement('button');
+  pill.type = 'button';
+  const render = () => {
+    const lvl = PRIORITY_LEVELS[r.priority] || PRIORITY_LEVELS[1];
+    pill.className = 'prio-pill ' + lvl.cls;
+    pill.innerHTML = `<span class="prio-dot" aria-hidden="true"></span><span>${lvl.label}</span>`;
+    pill.title = `Priorité ${lvl.label.toLowerCase()} — cliquer pour changer`;
+    pill.setAttribute('aria-label', `Priorité ${lvl.label}`);
+  };
+  render();
+  pill.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const next = (r.priority % 3) + 1; // 1 → 2 → 3 → 1
+    patch(r, { priority: next }, () => { r.priority = next; render(); });
+  });
+  td.appendChild(pill);
   return td;
 }
 
