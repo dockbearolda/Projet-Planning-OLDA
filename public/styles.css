@@ -724,7 +724,98 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
 }
 .deadline-badge.empty:hover { color: var(--accent); filter: none; }
-.deadline-input { max-width: 150px; }
+
+/* Calendrier d'échéance : popup grille du mois (clic sur le badge échéance). */
+.cal-pop {
+  position: fixed;
+  z-index: 1100;
+  width: 252px;
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(74, 98, 116, 0.20);
+  padding: 10px;
+  user-select: none;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-title { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cal-nav:hover { background: var(--accent-soft); color: var(--accent); }
+.cal-dow,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  margin-bottom: 2px;
+}
+.cal-dow span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 2px 0;
+}
+.cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.12s ease;
+}
+.cal-day:hover { background: var(--accent-soft); }
+.cal-day.today { border-color: rgba(var(--accent-rgb), 0.45); font-weight: 600; }
+.cal-day.selected { background: var(--accent); color: #fff; font-weight: 600; }
+.cal-day.selected:hover { background: var(--accent-hover); }
+.cal-foot {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+.cal-foot-btn {
+  flex: 1;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cal-foot-btn:hover { background: rgba(var(--accent-rgb), 0.16); }
+.cal-foot-btn.clear { background: transparent; color: var(--text-3); }
+.cal-foot-btn.clear:hover { background: var(--danger-bg); color: var(--danger); }
 
 /* === État : signal principal de la ligne (liste fixe, 1 couleur par statut) ===
    Chaque statut a UNE couleur dédiée, réutilisée à l'identique dans la grille et
@@ -775,12 +866,6 @@ tr:hover .handle { color: var(--text-2); }
 .grid.hide-quantity colgroup col[data-col="quantity"],
 .grid.hide-quantity thead th.col-qty,
 .grid.hide-quantity tbody td.col-qty { display: none; }
-.grid.hide-value colgroup col[data-col="project_value"],
-.grid.hide-value thead th.col-value,
-.grid.hide-value tbody td.col-value { display: none; }
-.grid.hide-deadline colgroup col[data-col="deadline"],
-.grid.hide-deadline thead th.col-deadline,
-.grid.hide-deadline tbody td.col-deadline-cell { display: none; }
 
 /* Produit : nom (gras) + description (gris, masquée si vide) empilés */
 .col-product-cell { padding: 0; vertical-align: middle; }
@@ -1093,6 +1178,13 @@ body.dragging-active * { cursor: grabbing !important; }
   .dup-btn { width: 38px; }
   .send-btn { height: 34px; font-size: 13px; }
   .col-del { width: 248px; }
+
+  /* calendrier d'échéance : cases plus grandes pour le doigt */
+  .cal-pop { width: 300px; padding: 12px; }
+  .cal-day { height: 40px; font-size: 15px; }
+  .cal-nav { width: 40px; height: 40px; }
+  .cal-foot-btn { padding: 11px 8px; font-size: 14px; }
+  .cal-dow span { font-size: 12px; }
 
   /* étapes de la sidebar : zones cliquables plus généreuses */
   .stage { padding: 13px 14px; }

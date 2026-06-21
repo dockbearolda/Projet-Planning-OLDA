@@ -286,18 +286,15 @@ function renderRows(data) {
   updateSortArrows();
 }
 
-// Masque les colonnes optionnelles (Quantité, Valeur, Échéance) quand aucune
-// commande réelle de la vue ne les renseigne — plutôt que d'afficher des « — ».
-// Exception : tant qu'une ligne brouillon (formulaire d'ajout) est présente, on
-// garde ces colonnes visibles, sinon leurs champs seraient masqués et la 1re
-// saisie (échéance / quantité / valeur) sur une commande neuve serait impossible.
+// Prix et Échéance restent TOUJOURS affichés. Seule la Quantité est masquée
+// quand aucune commande réelle de la vue ne la renseigne (et qu'aucune ligne
+// brouillon n'est présente, sinon son champ de saisie serait inaccessible).
 function applyEmptyCols(data) {
   const hasDraft = data.some(isDraftRow);
-  const real = data.filter((r) => !isDraftRow(r));
-  const has = (f) => hasDraft || real.some((r) => r[f] !== null && r[f] !== undefined && r[f] !== '');
-  $grid.classList.toggle('hide-quantity', !has('quantity'));
-  $grid.classList.toggle('hide-value', !has('project_value'));
-  $grid.classList.toggle('hide-deadline', !has('deadline'));
+  const hasQty = hasDraft ||
+    data.some((r) => !isDraftRow(r) && r.quantity !== null && r.quantity !== undefined && r.quantity !== '');
+  $grid.classList.toggle('hide-quantity', !hasQty);
+  $grid.classList.remove('hide-value', 'hide-deadline');
   // Les largeurs manuelles dépendent des colonnes visibles : on recalcule.
   applyColWidths();
 }
@@ -1131,17 +1128,18 @@ function cellDeadline(r) {
   const td = document.createElement('td');
   td.className = 'col-deadline-cell';
 
-  const commit = (input) => {
-    const val = input.value === '' ? null : input.value;
+  // Enregistre la nouvelle échéance (optimiste) puis re-rend le badge.
+  const setDeadline = (val) => {
     if (val === (r.deadline || null)) return;
     const prev = r.deadline;
     r.deadline = val;
+    showBadge();
     api('PATCH', `/api/requests/${r.id}`, { deadline: val }).catch((err) => {
-      r.deadline = prev; reportError(err);
+      r.deadline = prev; showBadge(); reportError(err);
     });
   };
 
-  const showBadge = () => {
+  function showBadge() {
     td.innerHTML = '';
     const badge = document.createElement('button');
     badge.type = 'button';
@@ -1149,7 +1147,7 @@ function cellDeadline(r) {
     if (r.deadline == null || d === null) {
       badge.className = 'deadline-badge empty';
       badge.textContent = '+ échéance';
-      badge.title = 'cliquer pour définir une échéance';
+      badge.title = 'cliquer pour choisir une date';
     } else {
       let cls, label;
       if (d > 0) { cls = d <= 7 ? 'orange' : 'green'; label = `${d} j`; }
@@ -1160,27 +1158,117 @@ function cellDeadline(r) {
       const dd = parseDeadline(r.deadline);
       badge.title = (dd ? dd.toLocaleDateString('fr-FR') : '') + ' — cliquer pour modifier';
     }
-    badge.addEventListener('click', (e) => { e.stopPropagation(); showInput(true); });
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (openCalendar) { closeCalendar(); return; }
+      showDeadlineCalendar(r, badge, setDeadline);
+    });
     td.appendChild(badge);
-  };
-
-  const showInput = (openPicker) => {
-    td.innerHTML = '';
-    const input = document.createElement('input');
-    input.className = 'cell-input deadline-input';
-    input.type = 'date';
-    input.value = r.deadline ? r.deadline.slice(0, 10) : '';
-    input.addEventListener('change', () => { commit(input); showBadge(); });
-    input.addEventListener('blur', () => { commit(input); showBadge(); });
-    td.appendChild(input);
-    if (openPicker) {
-      input.focus();
-      if (typeof input.showPicker === 'function') { try { input.showPicker(); } catch (_) {} }
-    }
-  };
+  }
 
   showBadge();
   return td;
+}
+
+// --- Calendrier d'échéance (popup mois complet) ----------------------------
+// Au clic sur le badge échéance, on ouvre un vrai calendrier (grille du mois)
+// pour choisir la date — même idiome de popup que le menu d'état.
+const CAL_MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const CAL_DOW = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const ymd = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+let openCalendar = null;
+function closeCalendar() {
+  if (!openCalendar) return;
+  openCalendar.remove();
+  openCalendar = null;
+  document.removeEventListener('pointerdown', onCalDocDown, true);
+  document.removeEventListener('keydown', onCalKey, true);
+}
+function onCalDocDown(e) {
+  if (openCalendar && !openCalendar.contains(e.target) && !e.target.closest('.deadline-badge')) closeCalendar();
+}
+function onCalKey(e) { if (e.key === 'Escape') closeCalendar(); }
+
+function showDeadlineCalendar(r, anchor, onPick) {
+  closeCalendar();
+  const sel = parseDeadline(r.deadline);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let viewY = sel ? sel.getFullYear() : today.getFullYear();
+  let viewM = sel ? sel.getMonth() : today.getMonth();
+
+  const cal = document.createElement('div');
+  cal.className = 'cal-pop';
+
+  const build = () => {
+    cal.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'cal-head';
+    const mkNav = (label, aria, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cal-nav'; b.textContent = label;
+      b.setAttribute('aria-label', aria);
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(); build(); });
+      return b;
+    };
+    const title = document.createElement('span');
+    title.className = 'cal-title';
+    title.textContent = `${CAL_MONTHS[viewM]} ${viewY}`;
+    head.appendChild(mkNav('‹', 'Mois précédent', () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } }));
+    head.appendChild(title);
+    head.appendChild(mkNav('›', 'Mois suivant', () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } }));
+    cal.appendChild(head);
+
+    const dow = document.createElement('div');
+    dow.className = 'cal-dow';
+    CAL_DOW.forEach((d) => { const s = document.createElement('span'); s.textContent = d; dow.appendChild(s); });
+    cal.appendChild(dow);
+
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+    const offset = (new Date(viewY, viewM, 1).getDay() + 6) % 7; // semaine commençant lundi
+    const nDays = new Date(viewY, viewM + 1, 0).getDate();
+    for (let i = 0; i < offset; i++) grid.appendChild(document.createElement('span'));
+    for (let day = 1; day <= nDays; day++) {
+      const cell = document.createElement('button');
+      cell.type = 'button'; cell.className = 'cal-day'; cell.textContent = day;
+      if (viewY === today.getFullYear() && viewM === today.getMonth() && day === today.getDate()) cell.classList.add('today');
+      if (sel && viewY === sel.getFullYear() && viewM === sel.getMonth() && day === sel.getDate()) cell.classList.add('selected');
+      cell.addEventListener('click', (e) => { e.stopPropagation(); onPick(ymd(viewY, viewM, day)); closeCalendar(); });
+      grid.appendChild(cell);
+    }
+    cal.appendChild(grid);
+
+    const foot = document.createElement('div');
+    foot.className = 'cal-foot';
+    const tBtn = document.createElement('button');
+    tBtn.type = 'button'; tBtn.className = 'cal-foot-btn'; tBtn.textContent = "Aujourd'hui";
+    tBtn.addEventListener('click', (e) => { e.stopPropagation(); onPick(ymd(today.getFullYear(), today.getMonth(), today.getDate())); closeCalendar(); });
+    const cBtn = document.createElement('button');
+    cBtn.type = 'button'; cBtn.className = 'cal-foot-btn clear'; cBtn.textContent = 'Effacer';
+    cBtn.addEventListener('click', (e) => { e.stopPropagation(); onPick(null); closeCalendar(); });
+    foot.appendChild(tBtn); foot.appendChild(cBtn);
+    cal.appendChild(foot);
+  };
+  build();
+
+  document.body.appendChild(cal);
+  const pr = anchor.getBoundingClientRect();
+  const cr = cal.getBoundingClientRect();
+  let top = pr.bottom + 4;
+  if (top + cr.height > window.innerHeight - 8) top = pr.top - cr.height - 4;
+  let left = pr.left;
+  if (left + cr.width > window.innerWidth - 8) left = window.innerWidth - cr.width - 8;
+  cal.style.top = Math.max(8, Math.round(top)) + 'px';
+  cal.style.left = Math.max(8, Math.round(left)) + 'px';
+
+  openCalendar = cal;
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onCalDocDown, true);
+    document.addEventListener('keydown', onCalKey, true);
+  }, 0);
 }
 
 const STATUS_CLASS = {
