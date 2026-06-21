@@ -148,7 +148,17 @@ body {
   color: var(--accent);
 }
 
-.stage-sep { height: 1px; background: var(--hairline); margin: 8px 12px; border: 0; }
+/* mini-titres de section : Pipeline · Production · Admin */
+.stage-group-title {
+  padding: 15px 12px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  user-select: none;
+}
+.stages > .stage-group-title:first-child { padding-top: 4px; }
 
 /* Colonne à 0 : grisée / atténuée */
 .stage.is-empty .stage-label { color: var(--text-3); font-weight: 400; }
@@ -417,16 +427,6 @@ body {
 .cell-display { cursor: text; }
 .cell-display.placeholder { color: var(--text-3); }
 
-/* échéance vide : tiret gris clair à la place de « jj/mm/aaaa » */
-.date-empty {
-  display: flex;
-  align-items: center;
-  height: var(--row-h);
-  padding: 0 14px;
-  color: #b0b4bb;
-  cursor: pointer;
-}
-
 /* poignée de glisser */
 .col-handle { width: 92px; }
 .handle-cell {
@@ -651,84 +651,136 @@ tr:hover .handle { color: var(--text-2); }
 .prio-pill.p2 { color: var(--warn); background: var(--warn-bg); }
 .prio-pill.p3 { color: var(--danger); background: var(--danger-bg); }
 
-/* type pro/perso */
-.col-type { width: 78px; }
-.type-pill {
-  display: inline-flex;
+/* Client : société (info principale, en gras) + sous-ligne discrète référent +
+   bascule pro/perso. Fusionne les anciennes colonnes Type / Société / Référent. */
+.col-client-cell { padding: 0; vertical-align: middle; }
+.client-stack { display: flex; flex-direction: column; padding: 4px 0; gap: 1px; }
+.client-stack .client-company {
+  height: auto;
+  min-height: 0;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.client-sub {
+  display: flex;
   align-items: center;
-  margin: 8px 12px;
-  padding: 3px 9px;
-  border-radius: 999px;
+  gap: 7px;
+  padding: 0 12px 4px;
+}
+.client-sub .client-ref {
+  height: auto;
+  min-height: 0;
+  padding: 1px 0;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 450;
+  color: var(--text-3);
+  flex: 1;
+  min-width: 0;
+}
+.client-sub .client-ref::placeholder { color: #b0b4bb; }
+.type-tag {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   cursor: pointer;
-  user-select: none;
-  border: 1px solid var(--hairline);
-  color: var(--text-2);
-  background: #fff;
+  border: 1px solid transparent;
 }
-.type-pill.pro { color: var(--accent); border-color: rgba(var(--accent-rgb),0.25); background: var(--accent-soft); }
-.type-pill.perso { color: var(--text-2); }
+.type-tag.pro { color: var(--accent); background: var(--accent-soft); border-color: rgba(var(--accent-rgb), 0.22); }
+.type-tag.perso { color: var(--text-3); background: rgba(91, 107, 120, 0.08); }
 
-/* badge jours restant */
-.col-days { width: 110px; }
-.days-badge {
+/* Échéance fusionnée : un seul badge relatif et coloré (« En retard 1j », « 4j »,
+   « Aujourd'hui »). Au repos = badge ; au clic = sélecteur de date natif. */
+.col-deadline-cell { padding: 0; }
+.deadline-badge {
   display: inline-flex;
   align-items: center;
   margin: 8px 12px;
-  padding: 3px 9px;
+  padding: 4px 11px;
+  border: 1px solid transparent;
   border-radius: 999px;
+  font: inherit;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.12s ease;
 }
-.days-badge.green { color: var(--success); background: var(--success-bg); }
-.days-badge.orange { color: var(--warn); background: var(--warn-bg); }
-.days-badge.red { color: var(--danger); background: var(--danger-bg); }
-.days-badge.muted { color: var(--muted, #9aa0a6); background: transparent; }
+.deadline-badge:hover { filter: brightness(0.97); }
+.deadline-badge:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.deadline-badge.green { color: var(--success); background: var(--success-bg); }
+.deadline-badge.orange { color: var(--warn); background: var(--warn-bg); }
+.deadline-badge.red { color: var(--danger); background: var(--danger-bg); }
+.deadline-badge.empty {
+  color: #aab2b9;
+  background: transparent;
+  font-weight: 500;
+}
+.deadline-badge.empty:hover { color: var(--accent); filter: none; }
+.deadline-input { max-width: 150px; }
 
-/* état pastille */
-.col-status { width: 150px; }
+/* === État : signal principal de la ligne (liste fixe, 1 couleur par statut) ===
+   Chaque statut a UNE couleur dédiée, réutilisée à l'identique dans la grille et
+   dans le menu de sélection. Colonne alignée à droite, pastille pleine et lisible. */
+.col-status { width: 162px; }
+.grid thead th.col-status { text-align: right; }
+.grid tbody td.col-status { text-align: right; }
 .status-pill {
   display: inline-flex;
   align-items: center;
   margin: 8px 12px;
-  padding: 3px 10px;
+  padding: 5px 13px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
   border: 1px solid transparent;
   white-space: nowrap;
-  /* défaut = gris doux (statut inconnu / non renseigné) */
-  color: var(--text-3);
-  background: #eef0f2;
 }
-/* === Couleurs fixes des 6 états (liste fermée) === */
-/* À traiter → ambre */
-.status-pill.s-atraiter { color: var(--warn); background: var(--warn-bg); }
-/* En attente client → ambre clair */
-.status-pill.s-attente { color: #b88726; background: rgba(245, 196, 90, 0.16); }
-/* Maquette à faire → violet */
-.status-pill.s-maquette { color: var(--maquette); background: var(--maquette-bg); }
-/* Validé → vert */
-.status-pill.s-valide { color: var(--success); background: var(--success-bg); }
-/* En production → bleu */
-.status-pill.s-production { color: #1d6fd6; background: rgba(43, 127, 226, 0.13); }
-/* Terminé → gris */
-.status-pill.s-termine { color: #6b7280; background: rgba(107, 114, 128, 0.14); }
-/* Valeurs héritées (non proposées au menu) */
-.status-pill.s-maquette-valid { color: var(--maquette-valid); background: var(--maquette-valid-bg); }
-.status-pill.s-bloque { color: var(--danger); background: var(--danger-bg); }
-/* Gris clair → à définir / non renseigné */
-.status-pill.placeholder { color: #9aa0a6; background: #f2f3f5; }
+/* à définir → ardoise, présence réelle (anneau pointillé) au lieu d'un gris fantôme */
+.status-pill.placeholder {
+  color: var(--text-2);
+  background: rgba(91, 107, 120, 0.10);
+  border: 1px dashed rgba(91, 107, 120, 0.45);
+}
+.status-pill.s-atraiter       { color: #b07515; background: rgba(245, 166, 35, 0.16); }      /* ambre  */
+.status-pill.s-maquette       { color: var(--maquette); background: var(--maquette-bg); }     /* violet */
+.status-pill.s-maquette-valid { color: var(--maquette-valid); background: var(--maquette-valid-bg); } /* magenta */
+.status-pill.s-attente        { color: #2563eb; background: rgba(37, 99, 235, 0.11); }        /* bleu   */
+.status-pill.s-valide         { color: var(--success); background: var(--success-bg); }       /* vert   */
+.status-pill.s-bloque         { color: var(--danger); background: var(--danger-bg); }          /* rouge  */
+.status-pill.s-termine        { color: #6b7280; background: rgba(107, 114, 128, 0.14); }       /* gris   */
 
 /* colonnes largeurs */
-.col-qty { width: 90px; }
-.col-value { width: 120px; }
-.col-deadline { width: 130px; }
-.col-company, .col-ref { min-width: 150px; }
+.col-qty { width: 92px; }
+.col-value { width: 118px; }
+.col-deadline { width: 134px; }
+.col-client { min-width: 196px; }
 .col-product { min-width: 240px; }
+
+/* Hiérarchie : quantité & valeur en retrait (info secondaire, point 3) */
+.grid tbody td.col-qty .cell-input,
+.grid tbody td.col-value .cell-input { color: var(--text-2); font-weight: 450; }
+
+/* Colonnes optionnelles masquées quand la vue ne les renseigne pas
+   (cf. applyEmptyCols) — plutôt que d'afficher une colonne de « — ». */
+.grid.hide-quantity colgroup col[data-col="quantity"],
+.grid.hide-quantity thead th.col-qty,
+.grid.hide-quantity tbody td.col-qty { display: none; }
+.grid.hide-value colgroup col[data-col="project_value"],
+.grid.hide-value thead th.col-value,
+.grid.hide-value tbody td.col-value { display: none; }
+.grid.hide-deadline colgroup col[data-col="deadline"],
+.grid.hide-deadline thead th.col-deadline,
+.grid.hide-deadline tbody td.col-deadline-cell { display: none; }
 
 /* Produit : nom (gras) + description (gris, masquée si vide) empilés */
 .col-product-cell { padding: 0; vertical-align: middle; }
@@ -1024,9 +1076,11 @@ body.dragging-active * { cursor: grabbing !important; }
 
   /* cibles de toucher plus grandes */
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
-  .type-pill,
-  .status-pill { padding: 7px 13px; font-size: 13.5px; }
-  .days-badge { padding: 5px 11px; font-size: 13px; }
+  .status-pill { padding: 8px 14px; font-size: 14px; }
+  .deadline-badge { padding: 7px 13px; font-size: 13.5px; }
+  .type-tag { padding: 3px 10px; font-size: 11.5px; }
+  .client-stack .client-company { font-size: 16px; }
+  .client-sub .client-ref { font-size: 14px; }
   .del-btn,
   .dup-btn { width: 38px; }
   .send-btn { height: 34px; font-size: 13px; }
@@ -1101,10 +1155,10 @@ body.dragging-active * { cursor: grabbing !important; }
     color: #000;
   }
   .cell-input::placeholder { color: transparent !important; }
-  .date-empty { height: auto; padding: 5px 6px; color: #999; }
 
   /* pastilles / badges conservés mais figés (pas de pointeur) */
-  .type-pill, .status-pill, .days-badge { margin: 4px 6px; cursor: default; }
+  .status-pill, .deadline-badge, .type-tag { margin: 4px 6px; cursor: default; }
+  .deadline-badge.empty { display: none; }
 
   .empty { display: none; }
 }

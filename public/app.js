@@ -24,6 +24,8 @@ const STAGE_GROUPS = [
     { slug: 'toptex', label: 'Toptex' },
   ],
 ];
+// Mini-titres des 3 blocs de la barre latérale (même ordre que STAGE_GROUPS).
+const GROUP_TITLES = ['Pipeline', 'Production', 'Admin'];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
 STAGE_LABEL.production = 'Production'; // phase interne (vue via les secteurs)
@@ -140,6 +142,10 @@ async function api(method, url, body) {
 function renderSidebar() {
   $stages.innerHTML = '';
   STAGE_GROUPS.forEach((group, gi) => {
+    const title = document.createElement('div');
+    title.className = 'stage-group-title';
+    title.textContent = GROUP_TITLES[gi] || '';
+    $stages.appendChild(title);
     group.forEach((s) => {
       const el = document.createElement('div');
       el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
@@ -152,11 +158,6 @@ function renderSidebar() {
       attachDrop(el, s.slug);
       $stages.appendChild(el);
     });
-    if (gi < STAGE_GROUPS.length - 1) {
-      const hr = document.createElement('hr');
-      hr.className = 'stage-sep';
-      $stages.appendChild(hr);
-    }
   });
 }
 
@@ -288,7 +289,18 @@ function renderRows(data) {
       : 'Aucune commande à cette étape.';
   }
   for (const r of data) $rows.appendChild(buildRow(r));
+  applyEmptyCols(data);
   updateSortArrows();
+}
+
+// Masque les colonnes optionnelles (Quantité, Valeur, Échéance) quand aucune
+// commande réelle de la vue ne les renseigne — plutôt que d'afficher des « — ».
+function applyEmptyCols(data) {
+  const real = data.filter((r) => !isDraftRow(r));
+  const has = (f) => real.some((r) => r[f] !== null && r[f] !== undefined && r[f] !== '');
+  $grid.classList.toggle('hide-quantity', !has('quantity'));
+  $grid.classList.toggle('hide-value', !has('project_value'));
+  $grid.classList.toggle('hide-deadline', !has('deadline'));
 }
 
 // Une ligne est un « brouillon d'ajout » tant qu'aucun champ de contenu n'est
@@ -319,7 +331,7 @@ function buildRow(r) {
     add.setAttribute('aria-label', 'Ajouter une commande');
     add.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
     add.addEventListener('click', () => {
-      const first = tr.querySelector('.col-company input');
+      const first = tr.querySelector('.client-company');
       if (first) first.focus();
     });
     handleCell.appendChild(add);
@@ -338,23 +350,17 @@ function buildRow(r) {
 
   // priorité (3 niveaux codés couleur)
   tr.appendChild(cellPriority(r));
-  // type
-  tr.appendChild(cellType(r));
-  // société
-  tr.appendChild(cellText(r, 'billing_company', 'société'));
-  // référent
-  tr.appendChild(cellText(r, 'contact_referent', 'référent'));
-  // quantité
-  tr.appendChild(cellNumber(r, 'quantity', 'qté'));
+  // client : société (info principale) + référent + type pro/perso fusionnés
+  tr.appendChild(cellClient(r));
   // produit (nom + description fusionnés sur deux lignes)
   tr.appendChild(cellProduct(r));
-  // valeur
+  // quantité (masquée si la colonne est vide sur la vue)
+  tr.appendChild(cellNumber(r, 'quantity', 'qté'));
+  // valeur (masquée si la colonne est vide sur la vue)
   tr.appendChild(cellMoney(r, 'project_value'));
-  // échéance
-  tr.appendChild(cellDate(r, 'deadline'));
-  // jours restant (calculé)
-  tr.appendChild(cellDays(r));
-  // état
+  // échéance : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
+  tr.appendChild(cellDeadline(r));
+  // état : signal principal, aligné à droite
   tr.appendChild(cellStatus(r));
   // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
   // supprimer (révélées au survol)
@@ -996,33 +1002,50 @@ function cellPriority(r) {
   return td;
 }
 
-function cellType(r) {
+// Client : société (info principale, en gras) + sous-ligne discrète référent +
+// bascule pro/perso. Fusionne les anciennes colonnes Type / Société / Référent.
+function cellClient(r) {
   const td = document.createElement('td');
-  td.className = 'col-type';
-  const pill = document.createElement('span');
-  const render = () => {
-    pill.className = 'type-pill ' + (r.client_type === 'pro' ? 'pro' : 'perso');
-    pill.textContent = r.client_type === 'pro' ? 'pro' : 'perso';
-  };
-  render();
-  pill.title = 'cliquer pour basculer';
-  pill.addEventListener('click', () => {
-    const next = r.client_type === 'pro' ? 'perso' : 'pro';
-    patch(r, { client_type: next }, () => { r.client_type = next; render(); });
-  });
-  td.appendChild(pill);
-  return td;
-}
+  td.className = 'col-client-cell';
+  const stack = document.createElement('div');
+  stack.className = 'client-stack';
 
-function cellText(r, field, placeholder) {
-  const td = document.createElement('td');
-  const input = document.createElement('input');
-  input.className = 'cell-input';
-  input.type = 'text';
-  input.value = r[field] ?? '';
-  input.placeholder = placeholder;
-  bindInline(input, r, field, (v) => v === '' ? null : v);
-  td.appendChild(input);
+  const company = document.createElement('input');
+  company.className = 'cell-input client-company';
+  company.type = 'text';
+  company.value = r.billing_company ?? '';
+  company.placeholder = 'société';
+  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v);
+
+  const sub = document.createElement('div');
+  sub.className = 'client-sub';
+
+  const type = document.createElement('button');
+  type.type = 'button';
+  const renderType = () => {
+    type.className = 'type-tag ' + (r.client_type === 'pro' ? 'pro' : 'perso');
+    type.textContent = r.client_type === 'pro' ? 'Pro' : 'Perso';
+  };
+  renderType();
+  type.title = 'cliquer pour basculer pro / perso';
+  type.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const next = r.client_type === 'pro' ? 'perso' : 'pro';
+    patch(r, { client_type: next }, () => { r.client_type = next; renderType(); });
+  });
+
+  const ref = document.createElement('input');
+  ref.className = 'cell-input client-ref';
+  ref.type = 'text';
+  ref.value = r.contact_referent ?? '';
+  ref.placeholder = 'référent';
+  bindInline(ref, r, 'contact_referent', (v) => v === '' ? null : v);
+
+  sub.appendChild(type);
+  sub.appendChild(ref);
+  stack.appendChild(company);
+  stack.appendChild(sub);
+  td.appendChild(stack);
   return td;
 }
 
@@ -1061,7 +1084,7 @@ function cellProduct(r) {
 
 function cellNumber(r, field, placeholder) {
   const td = document.createElement('td');
-  td.className = 'num';
+  td.className = 'num' + (field === 'quantity' ? ' col-qty' : '');
   const input = document.createElement('input');
   input.className = 'cell-input num';
   input.type = 'number';
@@ -1074,7 +1097,7 @@ function cellNumber(r, field, placeholder) {
 
 function cellMoney(r, field) {
   const td = document.createElement('td');
-  td.className = 'num';
+  td.className = 'num col-value';
   const input = document.createElement('input');
   input.className = 'cell-input num';
   input.type = 'text';
@@ -1103,45 +1126,53 @@ function cellMoney(r, field) {
   return td;
 }
 
-function cellDate(r, field) {
+// Échéance fusionnée : un seul badge relatif et coloré (« En retard 1j », « 4j »,
+// « Aujourd'hui »). Au repos = badge ; au clic = sélecteur de date natif.
+function cellDeadline(r) {
   const td = document.createElement('td');
+  td.className = 'col-deadline-cell';
 
   const commit = (input) => {
     const val = input.value === '' ? null : input.value;
-    if (val === (r[field] || null)) return; // pas de changement
-    const prev = r[field];
-    r[field] = val;
-    // re-render badge jours restant
-    const td2 = td.closest('tr').querySelector('.col-days');
-    if (td2) td2.replaceWith(cellDays(r));
+    if (val === (r.deadline || null)) return;
+    const prev = r.deadline;
+    r.deadline = val;
     api('PATCH', `/api/requests/${r.id}`, { deadline: val }).catch((err) => {
-      r[field] = prev; reportError(err);
+      r.deadline = prev; reportError(err);
     });
   };
 
-  // Affichage « vide » : un simple tiret gris clair (pas de « jj/mm/aaaa »).
-  const showDash = () => {
+  const showBadge = () => {
     td.innerHTML = '';
-    const dash = document.createElement('span');
-    dash.className = 'date-empty';
-    dash.textContent = '—';
-    dash.title = 'cliquer pour définir une échéance';
-    dash.addEventListener('click', () => showInput(true));
-    td.appendChild(dash);
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    const d = daysLeft(r.deadline);
+    if (r.deadline == null || d === null) {
+      badge.className = 'deadline-badge empty';
+      badge.textContent = '+ échéance';
+      badge.title = 'cliquer pour définir une échéance';
+    } else {
+      let cls, label;
+      if (d > 0) { cls = d <= 7 ? 'orange' : 'green'; label = `${d} j`; }
+      else if (d === 0) { cls = 'orange'; label = "Aujourd'hui"; }
+      else { cls = 'red'; label = `En retard ${-d} j`; }
+      badge.className = `deadline-badge ${cls}`;
+      badge.textContent = label;
+      const dd = parseDeadline(r.deadline);
+      badge.title = (dd ? dd.toLocaleDateString('fr-FR') : '') + ' — cliquer pour modifier';
+    }
+    badge.addEventListener('click', (e) => { e.stopPropagation(); showInput(true); });
+    td.appendChild(badge);
   };
 
-  // Affichage / édition via l'input date natif.
   const showInput = (openPicker) => {
     td.innerHTML = '';
     const input = document.createElement('input');
-    input.className = 'cell-input';
+    input.className = 'cell-input deadline-input';
     input.type = 'date';
-    input.value = r[field] ? r[field].slice(0, 10) : '';
-    input.addEventListener('change', () => commit(input));
-    input.addEventListener('blur', () => {
-      commit(input);
-      if (!input.value) showDash(); // revient au tiret si laissé vide
-    });
+    input.value = r.deadline ? r.deadline.slice(0, 10) : '';
+    input.addEventListener('change', () => { commit(input); showBadge(); });
+    input.addEventListener('blur', () => { commit(input); showBadge(); });
     td.appendChild(input);
     if (openPicker) {
       input.focus();
@@ -1149,36 +1180,7 @@ function cellDate(r, field) {
     }
   };
 
-  if (r[field]) showInput(false);
-  else showDash();
-  return td;
-}
-
-function cellDays(r) {
-  const td = document.createElement('td');
-  td.className = 'col-days';
-  const d = daysLeft(r.deadline);
-  const badge = document.createElement('span');
-  if (d === null) {
-    badge.className = 'days-badge muted';
-    badge.textContent = '—';
-    td.appendChild(badge);
-    return td;
-  }
-  let cls, label;
-  if (d > 0) {
-    cls = d <= 7 ? 'orange' : 'green';
-    label = `${d} j`;
-  } else if (d === 0) {
-    cls = 'orange';
-    label = "Aujourd'hui";
-  } else {
-    cls = 'red';
-    label = `En retard de ${-d} j`;
-  }
-  badge.className = `days-badge ${cls}`;
-  badge.textContent = label;
-  td.appendChild(badge);
+  showBadge();
   return td;
 }
 
@@ -1354,7 +1356,7 @@ $btnNew.addEventListener('click', async () => {
     const tr = $rows.querySelector(`tr[data-id="${id}"]`);
     if (tr) {
       tr.scrollIntoView({ block: 'nearest' });
-      const firstInput = tr.querySelector('.col-company input, .cell-input');
+      const firstInput = tr.querySelector('.client-company, .cell-input');
       if (firstInput) firstInput.focus();
     }
   } catch (err) { reportError(err); }
@@ -1617,7 +1619,7 @@ function updateSortArrows() {
 // Chaque catégorie mémorise ses propres largeurs (localStorage, par appareil).
 // Tant qu'aucune colonne n'a été réglée à la main, la répartition reste celle
 // du navigateur.
-const COLW_KEY = 'olda_col_widths_v1';
+const COLW_KEY = 'olda_col_widths_v2';
 const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];
