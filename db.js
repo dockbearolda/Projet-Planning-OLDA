@@ -79,11 +79,40 @@ async function init() {
   // 'production' + un secteur dans production_sectors. Non destructif, idempotent.
   await migrateProdStages();
 
+  // Seed des états par défaut (liste éditable ensuite). Idempotent : seulement
+  // si la table est vide. Les libellés reprennent ceux déjà utilisés en base,
+  // donc les commandes existantes gardent leur couleur.
+  await seedStatuses();
+
   // Seed : si la table est vide, on insère quelques demandes d'exemple
   // réparties sur plusieurs étapes pour démontrer le pipeline.
   const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM requests');
   if (rows[0].n === 0) {
     await seed();
+  }
+}
+
+// États par défaut (mêmes libellés + couleurs que l'ancienne liste figée).
+const DEFAULT_STATUSES = [
+  { label: 'À traiter', color: '#b07515' },
+  { label: 'Maquette à faire', color: '#6b46c1' },
+  { label: 'Maquette à valider', color: '#bb3aa4' },
+  { label: 'En attente client', color: '#2563eb' },
+  { label: 'Validé', color: '#1d9e75' },
+  { label: 'Bloqué', color: '#dc2626' },
+  { label: 'Terminé', color: '#6b7280' },
+];
+
+async function seedStatuses() {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM statuses');
+  if (rows[0].n > 0) return;
+  let pos = 1000;
+  for (const s of DEFAULT_STATUSES) {
+    await pool.query(
+      'INSERT INTO statuses (label, color, position) VALUES ($1, $2, $3)',
+      [s.label, s.color, pos],
+    );
+    pos += 1000;
   }
 }
 

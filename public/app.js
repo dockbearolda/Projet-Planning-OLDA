@@ -1285,16 +1285,56 @@ function showDeadlineCalendar(r, anchor, onPick) {
   }, 0);
 }
 
-const STATUS_CLASS = {
-  'À traiter': 's-atraiter',
-  'Maquette à faire': 's-maquette',
-  'Maquette à valider': 's-maquette-valid',
-  'En attente client': 's-attente',
-  'Validé': 's-valide',
-  'Bloqué': 's-bloque',
-  'Terminé': 's-termine',
-};
-const STATUS_OPTIONS = ['À traiter', 'Maquette à faire', 'Maquette à valider', 'En attente client', 'Validé', 'Bloqué', 'Terminé'];
+// États de commande : liste DYNAMIQUE chargée du serveur (créés / supprimés
+// depuis le menu d'état). requests.status stocke le LIBELLÉ ; la couleur est
+// retrouvée ici par libellé.
+let statuses = [];
+async function loadStatuses() {
+  try { statuses = await api('GET', '/api/statuses'); } catch (_) { statuses = []; }
+}
+function statusByLabel(label) {
+  return statuses.find((s) => s.label === label) || null;
+}
+// Couleur hex → rgba (fond translucide de la pastille).
+function hexAlpha(hex, a) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
+  if (!m) return 'transparent';
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+// Rendu d'une pastille d'état : couleur dynamique, neutre si état supprimé,
+// « définir » si vide.
+function paintStatusPill(pill, label) {
+  pill.className = 'status-pill';
+  pill.style.color = '';
+  pill.style.background = '';
+  if (!label) { pill.classList.add('placeholder'); pill.textContent = 'définir'; return; }
+  pill.textContent = label;
+  const s = statusByLabel(label);
+  if (s) {
+    pill.style.color = s.color;
+    pill.style.background = hexAlpha(s.color, 0.14);
+  } else {
+    pill.classList.add('unknown'); // état supprimé : rendu neutre
+  }
+}
+// Palette proposée à la création d'un nouvel état.
+const STATUS_PALETTE = ['#b07515', '#d97706', '#dc2626', '#bb3aa4', '#6b46c1', '#2563eb', '#0891b2', '#1d9e75'];
+
+// On diffère le re-rendu de la grille (qui remplacerait la pastille servant
+// d'ancre au menu ouvert) jusqu'à la fermeture du menu.
+let statusListDirty = false;
+async function addStatus(label, color) {
+  const created = await api('POST', '/api/statuses', { label, color });
+  await loadStatuses();
+  statusListDirty = true;
+  return created;
+}
+async function deleteStatus(id) {
+  await api('DELETE', `/api/statuses/${id}`);
+  await loadStatuses();
+  statusListDirty = true;
+}
 
 // États « maquette » : mis en avant (pastille violette + compteur d'étape)
 // pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
@@ -1316,12 +1356,7 @@ function cellStatus(r) {
   const td = document.createElement('td');
   td.className = 'col-status';
   const pill = document.createElement('span');
-  const render = () => {
-    const val = r.status || '';
-    pill.className = 'status-pill ' + (STATUS_CLASS[val] || '');
-    pill.textContent = val || 'définir';
-    if (!val) pill.classList.add('placeholder');
-  };
+  const render = () => paintStatusPill(pill, r.status || '');
   render();
   pill.title = 'cliquer pour choisir un état';
   pill.addEventListener('click', (e) => {
@@ -1341,6 +1376,9 @@ function closeStatusMenu() {
   openStatusMenu = null;
   document.removeEventListener('pointerdown', onStatusDocDown, true);
   document.removeEventListener('keydown', onStatusKey, true);
+  // La liste d'états a changé pendant que le menu était ouvert : on rafraîchit
+  // les couleurs de la grille maintenant que l'ancre n'est plus nécessaire.
+  if (statusListDirty) { statusListDirty = false; applySortAndRender(); }
 }
 function onStatusDocDown(e) {
   if (openStatusMenu && !openStatusMenu.contains(e.target) && !e.target.closest('.status-pill')) closeStatusMenu();
@@ -1361,33 +1399,102 @@ function showStatusMenu(r, pill, render) {
   closeStatusMenu();
   const menu = document.createElement('div');
   menu.className = 'status-menu';
-  for (const opt of STATUS_OPTIONS) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'status-menu-item' + (r.status === opt ? ' current' : '');
-    const p = document.createElement('span');
-    p.className = 'status-pill ' + STATUS_CLASS[opt];
-    p.textContent = opt;
-    item.appendChild(p);
-    item.addEventListener('click', () => { setStatus(r, opt, render); closeStatusMenu(); });
-    menu.appendChild(item);
-  }
-  const clear = document.createElement('button');
-  clear.type = 'button';
-  clear.className = 'status-menu-item clear';
-  clear.textContent = '— effacer —';
-  clear.addEventListener('click', () => { setStatus(r, null, render); closeStatusMenu(); });
-  menu.appendChild(clear);
+  let pickedColor = STATUS_PALETTE[0];
+  // Ancre figée à l'ouverture : le menu se replace sans dépendre de la pastille
+  // de la grille (qui peut être re-rendue pendant que le menu est ouvert).
+  const anchor = pill.getBoundingClientRect();
+  const place = () => {
+    const mr = menu.getBoundingClientRect();
+    let top = anchor.bottom + 4;
+    if (top + mr.height > window.innerHeight - 8) top = anchor.top - mr.height - 4;
+    let left = anchor.left;
+    if (left + mr.width > window.innerWidth - 8) left = window.innerWidth - mr.width - 8;
+    menu.style.top = Math.max(8, Math.round(top)) + 'px';
+    menu.style.left = Math.max(8, Math.round(left)) + 'px';
+  };
 
+  const renderItems = () => {
+    menu.innerHTML = '';
+
+    for (const s of statuses) {
+      const item = document.createElement('div');
+      item.className = 'status-menu-item' + (r.status === s.label ? ' current' : '');
+      const sel = document.createElement('button');
+      sel.type = 'button';
+      sel.className = 'status-menu-pick';
+      const p = document.createElement('span');
+      paintStatusPill(p, s.label);
+      sel.appendChild(p);
+      sel.addEventListener('click', () => { setStatus(r, s.label, render); closeStatusMenu(); });
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'status-menu-del';
+      del.textContent = '×';
+      del.title = `Supprimer l'état « ${s.label} »`;
+      del.setAttribute('aria-label', `Supprimer l'état ${s.label}`);
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try { await deleteStatus(s.id); renderItems(); place(); }
+        catch (err) { reportError(err); }
+      });
+      item.appendChild(sel);
+      item.appendChild(del);
+      menu.appendChild(item);
+    }
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'status-menu-item clear';
+    clear.textContent = '— effacer l’état —';
+    clear.addEventListener('click', () => { setStatus(r, null, render); closeStatusMenu(); });
+    menu.appendChild(clear);
+
+    // Formulaire de création d'un nouvel état (nom + couleur).
+    const form = document.createElement('div');
+    form.className = 'status-new';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'status-new-input';
+    input.placeholder = 'Nouvel état…';
+    input.maxLength = 40;
+    const sw = document.createElement('div');
+    sw.className = 'status-new-swatches';
+    const swatchEls = [];
+    STATUS_PALETTE.forEach((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'status-swatch' + (c === pickedColor ? ' on' : '');
+      b.style.background = c;
+      b.title = c;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pickedColor = c;
+        swatchEls.forEach((el) => el.classList.toggle('on', el === b));
+      });
+      swatchEls.push(b);
+      sw.appendChild(b);
+    });
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'status-new-add';
+    add.textContent = 'Ajouter';
+    const submit = async () => {
+      const label = input.value.trim();
+      if (!label) { input.focus(); return; }
+      try { await addStatus(label, pickedColor); input.value = ''; renderItems(); place(); }
+      catch (err) { reportError(err); }
+    };
+    add.addEventListener('click', (e) => { e.stopPropagation(); submit(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    form.appendChild(input);
+    form.appendChild(sw);
+    form.appendChild(add);
+    menu.appendChild(form);
+  };
+
+  renderItems();
   document.body.appendChild(menu);
-  const pr = pill.getBoundingClientRect();
-  const mr = menu.getBoundingClientRect();
-  let top = pr.bottom + 4;
-  if (top + mr.height > window.innerHeight - 8) top = pr.top - mr.height - 4;
-  let left = pr.left;
-  if (left + mr.width > window.innerWidth - 8) left = window.innerWidth - mr.width - 8;
-  menu.style.top = Math.max(8, Math.round(top)) + 'px';
-  menu.style.left = Math.max(8, Math.round(left)) + 'px';
+  place();
 
   openStatusMenu = menu;
   setTimeout(() => {
@@ -1897,7 +2004,16 @@ async function poll() {
 let streamAlive = false;
 let streamDebounce = null;
 
-function onStreamChange() {
+function onStreamChange(e) {
+  // Changement de la liste d'états (ajout / suppression) : on recharge la liste
+  // et on rafraîchit les couleurs — sans re-rendre si un menu d'état est ouvert
+  // (cela détacherait la pastille servant d'ancre).
+  let payload = {};
+  try { payload = JSON.parse(e && e.data); } catch (_) {}
+  if (payload.kind === 'statuses') {
+    loadStatuses().then(() => { if (!openStatusMenu) applySortAndRender(); });
+    return;
+  }
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(poll, 120);
@@ -2002,10 +2118,22 @@ if ($btnPrint) {
 }
 
 // --- Init ------------------------------------------------------------------
+// Date du jour affichée dans l'en-tête de la barre latérale (« Samedi 21 juin 2026 »).
+function setTodayDate() {
+  const el = document.getElementById('todayDate');
+  if (!el) return;
+  const s = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+  el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 async function start() {
+  setTodayDate();
   renderSidebar();
   attachColResizers();
   applyColWidths();
+  await loadStatuses();
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);

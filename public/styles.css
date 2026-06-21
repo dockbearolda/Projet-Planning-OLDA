@@ -96,7 +96,7 @@ body {
   gap: 2px;
 }
 .brand { font-size: 15px; font-weight: 600; color: var(--text-1); }
-.brand-sub { font-size: 12px; color: #6e6e73; }
+.brand-sub { font-size: 12.5px; font-weight: 500; color: var(--text-2); margin-top: 2px; }
 
 .stages { padding: 4px 10px 24px; display: flex; flex-direction: column; gap: 1px; }
 
@@ -675,7 +675,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 1px 0;
   font-size: 12px;
   font-weight: 450;
-  color: var(--text-3);
+  color: var(--text-2); /* référent plus lisible */
   flex: 1;
   min-width: 0;
 }
@@ -842,13 +842,9 @@ tr:hover .handle { color: var(--text-2); }
   background: rgba(91, 107, 120, 0.10);
   border: 1px dashed rgba(91, 107, 120, 0.45);
 }
-.status-pill.s-atraiter       { color: #b07515; background: rgba(245, 166, 35, 0.16); }      /* ambre  */
-.status-pill.s-maquette       { color: var(--maquette); background: var(--maquette-bg); }     /* violet */
-.status-pill.s-maquette-valid { color: var(--maquette-valid); background: var(--maquette-valid-bg); } /* magenta */
-.status-pill.s-attente        { color: #2563eb; background: rgba(37, 99, 235, 0.11); }        /* bleu   */
-.status-pill.s-valide         { color: var(--success); background: var(--success-bg); }       /* vert   */
-.status-pill.s-bloque         { color: var(--danger); background: var(--danger-bg); }          /* rouge  */
-.status-pill.s-termine        { color: #6b7280; background: rgba(107, 114, 128, 0.14); }       /* gris   */
+/* La couleur de chaque état est appliquée en ligne (liste dynamique, cf. app.js
+   paintStatusPill). État supprimé / inconnu → rendu neutre. */
+.status-pill.unknown { color: var(--text-2); background: rgba(91, 107, 120, 0.10); }
 
 /* colonnes largeurs */
 .col-qty { width: 92px; }
@@ -882,7 +878,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 2px 12px 4px;
   font-size: 12px;
   font-weight: 450;
-  color: #86868b;
+  color: var(--text-2); /* lisible (sous-note plus contrastée qu'un gris clair) */
 }
 .product-stack .product-desc::placeholder { color: #b0b4bb; }
 /* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
@@ -996,24 +992,100 @@ tr:hover .dup-btn { opacity: 1; }
 .status-menu-item {
   display: flex;
   align-items: center;
+  border-radius: 7px;
+}
+.status-menu-item.current { background: rgba(0, 0, 0, 0.04); }
+/* bouton de sélection d'un état (la pastille colorée) */
+.status-menu-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
   border: 0;
   background: transparent;
   padding: 5px 6px;
   border-radius: 7px;
   cursor: pointer;
   text-align: left;
+  min-width: 0;
 }
-.status-menu-item:hover { background: var(--accent-soft); }
-.status-menu-item.current { background: rgba(0, 0, 0, 0.04); }
-.status-menu-item .status-pill { margin: 0; cursor: pointer; }
+.status-menu-pick:hover { background: var(--accent-soft); }
+.status-menu-pick .status-pill { margin: 0; cursor: pointer; }
+/* suppression d'un état : discret, révélé au survol de la ligne */
+.status-menu-del {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 17px;
+  line-height: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.status-menu-item:hover .status-menu-del { opacity: 1; }
+.status-menu-del:hover { color: var(--danger); background: var(--danger-bg); }
 .status-menu-item.clear {
   justify-content: center;
+  border: 0;
+  background: transparent;
   color: var(--text-3);
   font-size: 12px;
   padding: 7px 8px;
   margin-top: 2px;
+  cursor: pointer;
 }
 .status-menu-item.clear:hover { color: var(--danger); }
+
+/* Création d'un nouvel état : nom + couleur (palette) + Ajouter. */
+.status-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+.status-new-input {
+  flex: 1 1 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-1);
+  padding: 7px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: #fff;
+}
+.status-new-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.status-new-swatches { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+.status-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.status-swatch.on { border-color: var(--text-1); box-shadow: inset 0 0 0 1px #fff; }
+.status-new-add {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.status-new-add:hover { background: var(--accent-hover); }
 
 .empty { padding: 40px; text-align: center; color: var(--text-3); font-size: 14px; }
 
