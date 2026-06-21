@@ -1207,6 +1207,7 @@ function onCalKey(e) { if (e.key === 'Escape') closeCalendar(); }
 
 function showDeadlineCalendar(r, anchor, onPick) {
   closeCalendar();
+  closeStatusMenu(); // un seul popup à la fois
   const sel = parseDeadline(r.deadline);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let viewY = sel ? sel.getFullYear() : today.getFullYear();
@@ -1336,6 +1337,16 @@ async function deleteStatus(id) {
   statusListDirty = true;
 }
 
+// Rafraîchit la couleur des pastilles déjà affichées (après ajout/suppression
+// d'un état) SANS reconstruire les lignes — donc sans détacher une éventuelle
+// pastille servant d'ancre à un popup ouvert. L'ordre de tri ne dépend pas des
+// états, inutile de re-trier.
+function repaintStatusPills() {
+  document.querySelectorAll('#rows .status-pill').forEach((p) => {
+    paintStatusPill(p, p.classList.contains('placeholder') ? '' : p.textContent);
+  });
+}
+
 // États « maquette » : mis en avant (pastille violette + compteur d'étape)
 // pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
 // --- Secteurs de production -------------------------------------------------
@@ -1377,8 +1388,8 @@ function closeStatusMenu() {
   document.removeEventListener('pointerdown', onStatusDocDown, true);
   document.removeEventListener('keydown', onStatusKey, true);
   // La liste d'états a changé pendant que le menu était ouvert : on rafraîchit
-  // les couleurs de la grille maintenant que l'ancre n'est plus nécessaire.
-  if (statusListDirty) { statusListDirty = false; applySortAndRender(); }
+  // les couleurs des pastilles (repaint en place, pas de reconstruction).
+  if (statusListDirty) { statusListDirty = false; repaintStatusPills(); }
 }
 function onStatusDocDown(e) {
   if (openStatusMenu && !openStatusMenu.contains(e.target) && !e.target.closest('.status-pill')) closeStatusMenu();
@@ -1397,6 +1408,7 @@ function setStatus(r, val, render) {
 
 function showStatusMenu(r, pill, render) {
   closeStatusMenu();
+  closeCalendar(); // un seul popup à la fois
   const menu = document.createElement('div');
   menu.className = 'status-menu';
   let pickedColor = STATUS_PALETTE[0];
@@ -1974,6 +1986,7 @@ function isInteracting() {
   if (dragState) return true;
   if (openAttachPop) return true; // panneau PDF ouvert : on ne reconstruit pas la grille
   if (openVoicePop) return true; // dictée en cours : on ne reconstruit pas la grille
+  if (openStatusMenu || openCalendar) return true; // popup ancré à une pastille/badge de la grille
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
   return false;
@@ -2011,7 +2024,7 @@ function onStreamChange(e) {
   let payload = {};
   try { payload = JSON.parse(e && e.data); } catch (_) {}
   if (payload.kind === 'statuses') {
-    loadStatuses().then(() => { if (!openStatusMenu) applySortAndRender(); });
+    loadStatuses().then(repaintStatusPills); // repaint en place : sûr même menu ouvert
     return;
   }
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
