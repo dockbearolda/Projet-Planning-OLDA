@@ -261,13 +261,6 @@ function daysLeft(deadline) {
 }
 
 function cmp(a, b, key) {
-  if (key === 'days') {
-    const da = daysLeft(a.deadline), db = daysLeft(b.deadline);
-    if (da === null && db === null) return 0;
-    if (da === null) return 1;
-    if (db === null) return -1;
-    return da - db;
-  }
   let va = a[key], vb = b[key];
   if (key === 'priority' || key === 'quantity' || key === 'project_value') {
     va = va == null ? -Infinity : Number(va);
@@ -295,12 +288,18 @@ function renderRows(data) {
 
 // Masque les colonnes optionnelles (Quantité, Valeur, Échéance) quand aucune
 // commande réelle de la vue ne les renseigne — plutôt que d'afficher des « — ».
+// Exception : tant qu'une ligne brouillon (formulaire d'ajout) est présente, on
+// garde ces colonnes visibles, sinon leurs champs seraient masqués et la 1re
+// saisie (échéance / quantité / valeur) sur une commande neuve serait impossible.
 function applyEmptyCols(data) {
+  const hasDraft = data.some(isDraftRow);
   const real = data.filter((r) => !isDraftRow(r));
-  const has = (f) => real.some((r) => r[f] !== null && r[f] !== undefined && r[f] !== '');
+  const has = (f) => hasDraft || real.some((r) => r[f] !== null && r[f] !== undefined && r[f] !== '');
   $grid.classList.toggle('hide-quantity', !has('quantity'));
   $grid.classList.toggle('hide-value', !has('project_value'));
   $grid.classList.toggle('hide-deadline', !has('deadline'));
+  // Les largeurs manuelles dépendent des colonnes visibles : on recalcule.
+  applyColWidths();
 }
 
 // Une ligne est un « brouillon d'ajout » tant qu'aucun champ de contenu n'est
@@ -1624,6 +1623,13 @@ const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];
 const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
+// Largeurs naturelles (miroir des .col-* du CSS) : sert de repli quand une
+// colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
+// pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
+const COL_DEFAULTS = {
+  handle: 92, priority: 118, client: 196, product: 240, quantity: 92,
+  project_value: 118, deadline: 134, status: 162, del: 216,
+};
 
 let colWidths = {};
 try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } catch (_) { colWidths = {}; }
@@ -1640,9 +1646,11 @@ function applyColWidths() {
   if (w) {
     let sum = 0;
     COL_ELS.forEach((col, i) => {
-      const px = Math.max(COL_MIN, Math.round(w[COL_KEYS[i]] || COL_MIN));
+      const px = Math.max(COL_MIN, Math.round(w[COL_KEYS[i]] || COL_DEFAULTS[COL_KEYS[i]] || COL_MIN));
       col.style.width = px + 'px';
-      sum += px;
+      // Une colonne masquée (display:none) ne compte pas dans la largeur fixe,
+      // sinon les colonnes visibles s'étirent pour absorber l'espace fantôme.
+      if (getComputedStyle(col).display !== 'none') sum += px;
     });
     $grid.classList.add('manual-cols');
     $grid.style.width = sum + 'px';
@@ -1659,7 +1667,9 @@ function ensureManualWidths() {
   if (colWidths[currentStage]) return;
   const w = {};
   document.querySelectorAll('#grid thead th').forEach((th, i) => {
-    w[COL_KEYS[i]] = th.offsetWidth;
+    // Colonne masquée → offsetWidth 0 : on garde sa largeur naturelle de repli
+    // pour ne pas la figer au plancher si elle réapparaît plus tard.
+    w[COL_KEYS[i]] = th.offsetWidth || COL_DEFAULTS[COL_KEYS[i]] || COL_MIN;
   });
   colWidths[currentStage] = w;
   applyColWidths();
