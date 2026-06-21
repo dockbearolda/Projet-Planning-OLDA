@@ -200,8 +200,13 @@ function applySortAndRender() {
   if (sort.key) {
     sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
   } else {
-    // tri par défaut : priorité desc, échéance asc
+    // tri par défaut : les commandes urgentes (échéance dans ≤ 1 jour, aujourd'hui
+    // ou déjà dépassée) remontent en tête, la plus urgente d'abord ; le reste suit
+    // le tri priorité décroissante puis échéance la plus proche.
     sorted.sort((a, b) => {
+      const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
+      if ((ua !== null) !== (ub !== null)) return ua !== null ? -1 : 1;
+      if (ua !== null && ub !== null) return ua - ub;
       if (b.priority !== a.priority) return b.priority - a.priority;
       return cmpDeadline(a.deadline, b.deadline);
     });
@@ -224,6 +229,15 @@ function cmpDeadline(a, b) {
   if (!a) return 1;
   if (!b) return -1;
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// Une commande devient « urgente » quand il lui reste 1 jour ou moins avant
+// l'échéance (aujourd'hui ou déjà dépassée comprises) : elle remonte alors en
+// tête de liste. Renvoie le nombre de jours restants si urgente, sinon null.
+const URGENT_DAYS = 1;
+function urgentDaysLeft(r) {
+  const d = daysLeft(r.deadline);
+  return (d !== null && d <= URGENT_DAYS) ? d : null;
 }
 
 // Parse une échéance en date locale (minuit). Gère l'ISO renvoyé par la DB
