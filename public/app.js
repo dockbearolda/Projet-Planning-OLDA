@@ -200,8 +200,13 @@ function applySortAndRender() {
   if (sort.key) {
     sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
   } else {
-    // tri par défaut : priorité desc, échéance asc
+    // tri par défaut : les commandes urgentes (échéance dans ≤ 1 jour, aujourd'hui
+    // ou déjà dépassée) remontent en tête, la plus urgente d'abord ; le reste suit
+    // le tri priorité décroissante puis échéance la plus proche.
     sorted.sort((a, b) => {
+      const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
+      if ((ua !== null) !== (ub !== null)) return ua !== null ? -1 : 1;
+      if (ua !== null && ub !== null) return ua - ub;
       if (b.priority !== a.priority) return b.priority - a.priority;
       return cmpDeadline(a.deadline, b.deadline);
     });
@@ -224,6 +229,15 @@ function cmpDeadline(a, b) {
   if (!a) return 1;
   if (!b) return -1;
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// Une commande devient « urgente » quand il lui reste 1 jour ou moins avant
+// l'échéance (aujourd'hui ou déjà dépassée comprises) : elle remonte alors en
+// tête de liste. Renvoie le nombre de jours restants si urgente, sinon null.
+const URGENT_DAYS = 1;
+function urgentDaysLeft(r) {
+  const d = daysLeft(r.deadline);
+  return (d !== null && d <= URGENT_DAYS) ? d : null;
 }
 
 // Parse une échéance en date locale (minuit). Gère l'ISO renvoyé par la DB
@@ -286,18 +300,15 @@ function renderRows(data) {
   updateSortArrows();
 }
 
-// Masque les colonnes optionnelles (Quantité, Valeur, Échéance) quand aucune
-// commande réelle de la vue ne les renseigne — plutôt que d'afficher des « — ».
-// Exception : tant qu'une ligne brouillon (formulaire d'ajout) est présente, on
-// garde ces colonnes visibles, sinon leurs champs seraient masqués et la 1re
-// saisie (échéance / quantité / valeur) sur une commande neuve serait impossible.
+// Prix et Échéance restent TOUJOURS affichés. Seule la Quantité est masquée
+// quand aucune commande réelle de la vue ne la renseigne (et qu'aucune ligne
+// brouillon n'est présente, sinon son champ de saisie serait inaccessible).
 function applyEmptyCols(data) {
   const hasDraft = data.some(isDraftRow);
-  const real = data.filter((r) => !isDraftRow(r));
-  const has = (f) => hasDraft || real.some((r) => r[f] !== null && r[f] !== undefined && r[f] !== '');
-  $grid.classList.toggle('hide-quantity', !has('quantity'));
-  $grid.classList.toggle('hide-value', !has('project_value'));
-  $grid.classList.toggle('hide-deadline', !has('deadline'));
+  const hasQty = hasDraft ||
+    data.some((r) => !isDraftRow(r) && r.quantity !== null && r.quantity !== undefined && r.quantity !== '');
+  $grid.classList.toggle('hide-quantity', !hasQty);
+  $grid.classList.remove('hide-value', 'hide-deadline');
   // Les largeurs manuelles dépendent des colonnes visibles : on recalcule.
   applyColWidths();
 }
@@ -1131,17 +1142,18 @@ function cellDeadline(r) {
   const td = document.createElement('td');
   td.className = 'col-deadline-cell';
 
-  const commit = (input) => {
-    const val = input.value === '' ? null : input.value;
+  // Enregistre la nouvelle échéance (optimiste) puis re-rend le badge.
+  const setDeadline = (val) => {
     if (val === (r.deadline || null)) return;
     const prev = r.deadline;
     r.deadline = val;
+    showBadge();
     api('PATCH', `/api/requests/${r.id}`, { deadline: val }).catch((err) => {
-      r.deadline = prev; reportError(err);
+      r.deadline = prev; showBadge(); reportError(err);
     });
   };
 
-  const showBadge = () => {
+  function showBadge() {
     td.innerHTML = '';
     const badge = document.createElement('button');
     badge.type = 'button';
@@ -1149,7 +1161,7 @@ function cellDeadline(r) {
     if (r.deadline == null || d === null) {
       badge.className = 'deadline-badge empty';
       badge.textContent = '+ échéance';
-      badge.title = 'cliquer pour définir une échéance';
+      badge.title = 'cliquer pour choisir une date';
     } else {
       let cls, label;
       if (d > 0) { cls = d <= 7 ? 'orange' : 'green'; label = `${d} j`; }
@@ -1160,39 +1172,180 @@ function cellDeadline(r) {
       const dd = parseDeadline(r.deadline);
       badge.title = (dd ? dd.toLocaleDateString('fr-FR') : '') + ' — cliquer pour modifier';
     }
-    badge.addEventListener('click', (e) => { e.stopPropagation(); showInput(true); });
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (openCalendar) { closeCalendar(); return; }
+      showDeadlineCalendar(r, badge, setDeadline);
+    });
     td.appendChild(badge);
-  };
-
-  const showInput = (openPicker) => {
-    td.innerHTML = '';
-    const input = document.createElement('input');
-    input.className = 'cell-input deadline-input';
-    input.type = 'date';
-    input.value = r.deadline ? r.deadline.slice(0, 10) : '';
-    input.addEventListener('change', () => { commit(input); showBadge(); });
-    input.addEventListener('blur', () => { commit(input); showBadge(); });
-    td.appendChild(input);
-    if (openPicker) {
-      input.focus();
-      if (typeof input.showPicker === 'function') { try { input.showPicker(); } catch (_) {} }
-    }
-  };
+  }
 
   showBadge();
   return td;
 }
 
-const STATUS_CLASS = {
-  'À traiter': 's-atraiter',
-  'Maquette à faire': 's-maquette',
-  'Maquette à valider': 's-maquette-valid',
-  'En attente client': 's-attente',
-  'Validé': 's-valide',
-  'Bloqué': 's-bloque',
-  'Terminé': 's-termine',
-};
-const STATUS_OPTIONS = ['À traiter', 'Maquette à faire', 'Maquette à valider', 'En attente client', 'Validé', 'Bloqué', 'Terminé'];
+// --- Calendrier d'échéance (popup mois complet) ----------------------------
+// Au clic sur le badge échéance, on ouvre un vrai calendrier (grille du mois)
+// pour choisir la date — même idiome de popup que le menu d'état.
+const CAL_MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const CAL_DOW = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const ymd = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+let openCalendar = null;
+function closeCalendar() {
+  if (!openCalendar) return;
+  openCalendar.remove();
+  openCalendar = null;
+  document.removeEventListener('pointerdown', onCalDocDown, true);
+  document.removeEventListener('keydown', onCalKey, true);
+}
+function onCalDocDown(e) {
+  if (openCalendar && !openCalendar.contains(e.target) && !e.target.closest('.deadline-badge')) closeCalendar();
+}
+function onCalKey(e) { if (e.key === 'Escape') closeCalendar(); }
+
+function showDeadlineCalendar(r, anchor, onPick) {
+  closeCalendar();
+  closeStatusMenu(); // un seul popup à la fois
+  const sel = parseDeadline(r.deadline);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let viewY = sel ? sel.getFullYear() : today.getFullYear();
+  let viewM = sel ? sel.getMonth() : today.getMonth();
+
+  const cal = document.createElement('div');
+  cal.className = 'cal-pop';
+
+  const build = () => {
+    cal.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'cal-head';
+    const mkNav = (label, aria, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cal-nav'; b.textContent = label;
+      b.setAttribute('aria-label', aria);
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(); build(); });
+      return b;
+    };
+    const title = document.createElement('span');
+    title.className = 'cal-title';
+    title.textContent = `${CAL_MONTHS[viewM]} ${viewY}`;
+    head.appendChild(mkNav('‹', 'Mois précédent', () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } }));
+    head.appendChild(title);
+    head.appendChild(mkNav('›', 'Mois suivant', () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } }));
+    cal.appendChild(head);
+
+    const dow = document.createElement('div');
+    dow.className = 'cal-dow';
+    CAL_DOW.forEach((d) => { const s = document.createElement('span'); s.textContent = d; dow.appendChild(s); });
+    cal.appendChild(dow);
+
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+    const offset = (new Date(viewY, viewM, 1).getDay() + 6) % 7; // semaine commençant lundi
+    const nDays = new Date(viewY, viewM + 1, 0).getDate();
+    for (let i = 0; i < offset; i++) grid.appendChild(document.createElement('span'));
+    for (let day = 1; day <= nDays; day++) {
+      const cell = document.createElement('button');
+      cell.type = 'button'; cell.className = 'cal-day'; cell.textContent = day;
+      if (viewY === today.getFullYear() && viewM === today.getMonth() && day === today.getDate()) cell.classList.add('today');
+      if (sel && viewY === sel.getFullYear() && viewM === sel.getMonth() && day === sel.getDate()) cell.classList.add('selected');
+      cell.addEventListener('click', (e) => { e.stopPropagation(); onPick(ymd(viewY, viewM, day)); closeCalendar(); });
+      grid.appendChild(cell);
+    }
+    cal.appendChild(grid);
+
+    const foot = document.createElement('div');
+    foot.className = 'cal-foot';
+    const tBtn = document.createElement('button');
+    tBtn.type = 'button'; tBtn.className = 'cal-foot-btn'; tBtn.textContent = "Aujourd'hui";
+    tBtn.addEventListener('click', (e) => { e.stopPropagation(); onPick(ymd(today.getFullYear(), today.getMonth(), today.getDate())); closeCalendar(); });
+    const cBtn = document.createElement('button');
+    cBtn.type = 'button'; cBtn.className = 'cal-foot-btn clear'; cBtn.textContent = 'Effacer';
+    cBtn.addEventListener('click', (e) => { e.stopPropagation(); onPick(null); closeCalendar(); });
+    foot.appendChild(tBtn); foot.appendChild(cBtn);
+    cal.appendChild(foot);
+  };
+  build();
+
+  document.body.appendChild(cal);
+  const pr = anchor.getBoundingClientRect();
+  const cr = cal.getBoundingClientRect();
+  let top = pr.bottom + 4;
+  if (top + cr.height > window.innerHeight - 8) top = pr.top - cr.height - 4;
+  let left = pr.left;
+  if (left + cr.width > window.innerWidth - 8) left = window.innerWidth - cr.width - 8;
+  cal.style.top = Math.max(8, Math.round(top)) + 'px';
+  cal.style.left = Math.max(8, Math.round(left)) + 'px';
+
+  openCalendar = cal;
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onCalDocDown, true);
+    document.addEventListener('keydown', onCalKey, true);
+  }, 0);
+}
+
+// États de commande : liste DYNAMIQUE chargée du serveur (créés / supprimés
+// depuis le menu d'état). requests.status stocke le LIBELLÉ ; la couleur est
+// retrouvée ici par libellé.
+let statuses = [];
+async function loadStatuses() {
+  try { statuses = await api('GET', '/api/statuses'); } catch (_) { statuses = []; }
+}
+function statusByLabel(label) {
+  return statuses.find((s) => s.label === label) || null;
+}
+// Couleur hex → rgba (fond translucide de la pastille).
+function hexAlpha(hex, a) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
+  if (!m) return 'transparent';
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+// Rendu d'une pastille d'état : couleur dynamique, neutre si état supprimé,
+// « définir » si vide.
+function paintStatusPill(pill, label) {
+  pill.className = 'status-pill';
+  pill.style.color = '';
+  pill.style.background = '';
+  if (!label) { pill.classList.add('placeholder'); pill.textContent = 'définir'; return; }
+  pill.textContent = label;
+  const s = statusByLabel(label);
+  if (s) {
+    pill.style.color = s.color;
+    pill.style.background = hexAlpha(s.color, 0.14);
+  } else {
+    pill.classList.add('unknown'); // état supprimé : rendu neutre
+  }
+}
+// Palette proposée à la création d'un nouvel état.
+const STATUS_PALETTE = ['#b07515', '#d97706', '#dc2626', '#bb3aa4', '#6b46c1', '#2563eb', '#0891b2', '#1d9e75'];
+
+// On diffère le re-rendu de la grille (qui remplacerait la pastille servant
+// d'ancre au menu ouvert) jusqu'à la fermeture du menu.
+let statusListDirty = false;
+async function addStatus(label, color) {
+  const created = await api('POST', '/api/statuses', { label, color });
+  await loadStatuses();
+  statusListDirty = true;
+  return created;
+}
+async function deleteStatus(id) {
+  await api('DELETE', `/api/statuses/${id}`);
+  await loadStatuses();
+  statusListDirty = true;
+}
+
+// Rafraîchit la couleur des pastilles déjà affichées (après ajout/suppression
+// d'un état) SANS reconstruire les lignes — donc sans détacher une éventuelle
+// pastille servant d'ancre à un popup ouvert. L'ordre de tri ne dépend pas des
+// états, inutile de re-trier.
+function repaintStatusPills() {
+  document.querySelectorAll('#rows .status-pill').forEach((p) => {
+    paintStatusPill(p, p.classList.contains('placeholder') ? '' : p.textContent);
+  });
+}
 
 // États « maquette » : mis en avant (pastille violette + compteur d'étape)
 // pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
@@ -1214,12 +1367,7 @@ function cellStatus(r) {
   const td = document.createElement('td');
   td.className = 'col-status';
   const pill = document.createElement('span');
-  const render = () => {
-    const val = r.status || '';
-    pill.className = 'status-pill ' + (STATUS_CLASS[val] || '');
-    pill.textContent = val || 'définir';
-    if (!val) pill.classList.add('placeholder');
-  };
+  const render = () => paintStatusPill(pill, r.status || '');
   render();
   pill.title = 'cliquer pour choisir un état';
   pill.addEventListener('click', (e) => {
@@ -1239,6 +1387,9 @@ function closeStatusMenu() {
   openStatusMenu = null;
   document.removeEventListener('pointerdown', onStatusDocDown, true);
   document.removeEventListener('keydown', onStatusKey, true);
+  // La liste d'états a changé pendant que le menu était ouvert : on rafraîchit
+  // les couleurs des pastilles (repaint en place, pas de reconstruction).
+  if (statusListDirty) { statusListDirty = false; repaintStatusPills(); }
 }
 function onStatusDocDown(e) {
   if (openStatusMenu && !openStatusMenu.contains(e.target) && !e.target.closest('.status-pill')) closeStatusMenu();
@@ -1257,35 +1408,105 @@ function setStatus(r, val, render) {
 
 function showStatusMenu(r, pill, render) {
   closeStatusMenu();
+  closeCalendar(); // un seul popup à la fois
   const menu = document.createElement('div');
   menu.className = 'status-menu';
-  for (const opt of STATUS_OPTIONS) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'status-menu-item' + (r.status === opt ? ' current' : '');
-    const p = document.createElement('span');
-    p.className = 'status-pill ' + STATUS_CLASS[opt];
-    p.textContent = opt;
-    item.appendChild(p);
-    item.addEventListener('click', () => { setStatus(r, opt, render); closeStatusMenu(); });
-    menu.appendChild(item);
-  }
-  const clear = document.createElement('button');
-  clear.type = 'button';
-  clear.className = 'status-menu-item clear';
-  clear.textContent = '— effacer —';
-  clear.addEventListener('click', () => { setStatus(r, null, render); closeStatusMenu(); });
-  menu.appendChild(clear);
+  let pickedColor = STATUS_PALETTE[0];
+  // Ancre figée à l'ouverture : le menu se replace sans dépendre de la pastille
+  // de la grille (qui peut être re-rendue pendant que le menu est ouvert).
+  const anchor = pill.getBoundingClientRect();
+  const place = () => {
+    const mr = menu.getBoundingClientRect();
+    let top = anchor.bottom + 4;
+    if (top + mr.height > window.innerHeight - 8) top = anchor.top - mr.height - 4;
+    let left = anchor.left;
+    if (left + mr.width > window.innerWidth - 8) left = window.innerWidth - mr.width - 8;
+    menu.style.top = Math.max(8, Math.round(top)) + 'px';
+    menu.style.left = Math.max(8, Math.round(left)) + 'px';
+  };
 
+  const renderItems = () => {
+    menu.innerHTML = '';
+
+    for (const s of statuses) {
+      const item = document.createElement('div');
+      item.className = 'status-menu-item' + (r.status === s.label ? ' current' : '');
+      const sel = document.createElement('button');
+      sel.type = 'button';
+      sel.className = 'status-menu-pick';
+      const p = document.createElement('span');
+      paintStatusPill(p, s.label);
+      sel.appendChild(p);
+      sel.addEventListener('click', () => { setStatus(r, s.label, render); closeStatusMenu(); });
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'status-menu-del';
+      del.textContent = '×';
+      del.title = `Supprimer l'état « ${s.label} »`;
+      del.setAttribute('aria-label', `Supprimer l'état ${s.label}`);
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try { await deleteStatus(s.id); renderItems(); place(); }
+        catch (err) { reportError(err); }
+      });
+      item.appendChild(sel);
+      item.appendChild(del);
+      menu.appendChild(item);
+    }
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'status-menu-item clear';
+    clear.textContent = '— effacer l’état —';
+    clear.addEventListener('click', () => { setStatus(r, null, render); closeStatusMenu(); });
+    menu.appendChild(clear);
+
+    // Formulaire de création d'un nouvel état (nom + couleur).
+    const form = document.createElement('div');
+    form.className = 'status-new';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'status-new-input';
+    input.placeholder = 'Nouvel état…';
+    input.maxLength = 40;
+    const sw = document.createElement('div');
+    sw.className = 'status-new-swatches';
+    const swatchEls = [];
+    STATUS_PALETTE.forEach((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'status-swatch' + (c === pickedColor ? ' on' : '');
+      b.style.background = c;
+      b.title = c;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pickedColor = c;
+        swatchEls.forEach((el) => el.classList.toggle('on', el === b));
+      });
+      swatchEls.push(b);
+      sw.appendChild(b);
+    });
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'status-new-add';
+    add.textContent = 'Ajouter';
+    const submit = async () => {
+      const label = input.value.trim();
+      if (!label) { input.focus(); return; }
+      try { await addStatus(label, pickedColor); input.value = ''; renderItems(); place(); }
+      catch (err) { reportError(err); }
+    };
+    add.addEventListener('click', (e) => { e.stopPropagation(); submit(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    form.appendChild(input);
+    form.appendChild(sw);
+    form.appendChild(add);
+    menu.appendChild(form);
+  };
+
+  renderItems();
   document.body.appendChild(menu);
-  const pr = pill.getBoundingClientRect();
-  const mr = menu.getBoundingClientRect();
-  let top = pr.bottom + 4;
-  if (top + mr.height > window.innerHeight - 8) top = pr.top - mr.height - 4;
-  let left = pr.left;
-  if (left + mr.width > window.innerWidth - 8) left = window.innerWidth - mr.width - 8;
-  menu.style.top = Math.max(8, Math.round(top)) + 'px';
-  menu.style.left = Math.max(8, Math.round(left)) + 'px';
+  place();
 
   openStatusMenu = menu;
   setTimeout(() => {
@@ -1765,6 +1986,7 @@ function isInteracting() {
   if (dragState) return true;
   if (openAttachPop) return true; // panneau PDF ouvert : on ne reconstruit pas la grille
   if (openVoicePop) return true; // dictée en cours : on ne reconstruit pas la grille
+  if (openStatusMenu || openCalendar) return true; // popup ancré à une pastille/badge de la grille
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
   return false;
@@ -1795,7 +2017,16 @@ async function poll() {
 let streamAlive = false;
 let streamDebounce = null;
 
-function onStreamChange() {
+function onStreamChange(e) {
+  // Changement de la liste d'états (ajout / suppression) : on recharge la liste
+  // et on rafraîchit les couleurs — sans re-rendre si un menu d'état est ouvert
+  // (cela détacherait la pastille servant d'ancre).
+  let payload = {};
+  try { payload = JSON.parse(e && e.data); } catch (_) {}
+  if (payload.kind === 'statuses') {
+    loadStatuses().then(repaintStatusPills); // repaint en place : sûr même menu ouvert
+    return;
+  }
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(poll, 120);
@@ -1900,10 +2131,22 @@ if ($btnPrint) {
 }
 
 // --- Init ------------------------------------------------------------------
+// Date du jour affichée dans l'en-tête de la barre latérale (« Samedi 21 juin 2026 »).
+function setTodayDate() {
+  const el = document.getElementById('todayDate');
+  if (!el) return;
+  const s = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+  el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 async function start() {
+  setTodayDate();
   renderSidebar();
   attachColResizers();
   applyColWidths();
+  await loadStatuses();
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);

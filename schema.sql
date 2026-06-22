@@ -41,6 +41,17 @@ CREATE TABLE IF NOT EXISTS production_sectors (
 CREATE INDEX IF NOT EXISTS idx_prodsec_sector  ON production_sectors (sector, done);
 CREATE INDEX IF NOT EXISTS idx_prodsec_request ON production_sectors (request_id);
 
+-- États de commande (liste éditable : créés / supprimés depuis le menu d'état).
+-- Le champ requests.status stocke le LIBELLÉ ; la couleur est retrouvée ici par
+-- libellé. Une commande dont l'état a été supprimé garde son texte (sans couleur).
+CREATE TABLE IF NOT EXISTS statuses (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  label      text NOT NULL,
+  color      text NOT NULL,                 -- couleur hex « #rrggbb »
+  position   double precision,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Pièces jointes PDF par commande : 2 emplacements fixes par ligne
 -- (kind = 'devis' ou 'bat'). Le PDF est stocké en base (base64) car le
 -- système de fichiers Railway est éphémère. Table séparée de requests pour

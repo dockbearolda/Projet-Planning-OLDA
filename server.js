@@ -368,6 +368,49 @@ app.delete('/api/requests/:id/sectors/:sector', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
+// États de commande — liste éditable (créer / supprimer depuis le menu d'état).
+// requests.status garde le LIBELLÉ ; la couleur est rattachée ici par libellé.
+// ---------------------------------------------------------------------------
+
+// GET /api/statuses → liste ordonnée
+app.get('/api/statuses', asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, label, color FROM statuses ORDER BY position ASC NULLS LAST, created_at ASC',
+  );
+  res.json(rows);
+}));
+
+// POST /api/statuses  body { label, color } → crée un état
+app.post('/api/statuses', asyncH(async (req, res) => {
+  const body = req.body || {};
+  const label = String(body.label == null ? '' : body.label).trim();
+  const color = String(body.color == null ? '' : body.color).trim();
+  if (!label) return res.status(400).json({ error: 'Libellé requis' });
+  if (label.length > 40) return res.status(400).json({ error: 'Libellé trop long' });
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Couleur invalide' });
+
+  const dup = await pool.query('SELECT 1 FROM statuses WHERE lower(label) = lower($1)', [label]);
+  if (dup.rowCount) return res.status(409).json({ error: 'Cet état existe déjà' });
+
+  const { rows: p } = await pool.query('SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM statuses');
+  const { rows } = await pool.query(
+    'INSERT INTO statuses (label, color, position) VALUES ($1, $2, $3) RETURNING id, label, color',
+    [label, color, p[0].pos],
+  );
+  broadcast({ kind: 'statuses' });
+  res.status(201).json(rows[0]);
+}));
+
+// DELETE /api/statuses/:id → retire un état de la liste (les commandes gardent
+// leur texte, sans couleur). Recréer le même libellé restitue la couleur.
+app.delete('/api/statuses/:id', asyncH(async (req, res) => {
+  const { rowCount } = await pool.query('DELETE FROM statuses WHERE id = $1', [req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: 'État introuvable' });
+  broadcast({ kind: 'statuses' });
+  res.status(204).end();
+}));
+
+// ---------------------------------------------------------------------------
 // Pièces jointes PDF (Devis / BAT) — 2 emplacements fixes par commande.
 // Stockées en base (base64) ; servies inline pour consultation immédiate.
 // ---------------------------------------------------------------------------

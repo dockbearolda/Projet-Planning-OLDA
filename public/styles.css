@@ -95,8 +95,9 @@ body {
   flex-direction: column;
   gap: 2px;
 }
-.brand { font-size: 15px; font-weight: 600; color: var(--text-1); }
-.brand-sub { font-size: 12px; color: #6e6e73; }
+.brand-row { display: flex; align-items: center; gap: 10px; }
+.brand-logo { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; display: block; }
+.brand-sub { font-size: 12.5px; font-weight: 500; color: var(--text-2); margin-top: 2px; }
 
 .stages { padding: 4px 10px 24px; display: flex; flex-direction: column; gap: 1px; }
 
@@ -675,7 +676,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 1px 0;
   font-size: 12px;
   font-weight: 450;
-  color: var(--text-3);
+  color: var(--text-2); /* référent plus lisible */
   flex: 1;
   min-width: 0;
 }
@@ -724,7 +725,98 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
 }
 .deadline-badge.empty:hover { color: var(--accent); filter: none; }
-.deadline-input { max-width: 150px; }
+
+/* Calendrier d'échéance : popup grille du mois (clic sur le badge échéance). */
+.cal-pop {
+  position: fixed;
+  z-index: 1100;
+  width: 252px;
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(74, 98, 116, 0.20);
+  padding: 10px;
+  user-select: none;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-title { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cal-nav:hover { background: var(--accent-soft); color: var(--accent); }
+.cal-dow,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  margin-bottom: 2px;
+}
+.cal-dow span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 2px 0;
+}
+.cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.12s ease;
+}
+.cal-day:hover { background: var(--accent-soft); }
+.cal-day.today { border-color: rgba(var(--accent-rgb), 0.45); font-weight: 600; }
+.cal-day.selected { background: var(--accent); color: #fff; font-weight: 600; }
+.cal-day.selected:hover { background: var(--accent-hover); }
+.cal-foot {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+.cal-foot-btn {
+  flex: 1;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cal-foot-btn:hover { background: rgba(var(--accent-rgb), 0.16); }
+.cal-foot-btn.clear { background: transparent; color: var(--text-3); }
+.cal-foot-btn.clear:hover { background: var(--danger-bg); color: var(--danger); }
 
 /* === État : signal principal de la ligne (liste fixe, 1 couleur par statut) ===
    Chaque statut a UNE couleur dédiée, réutilisée à l'identique dans la grille et
@@ -751,13 +843,9 @@ tr:hover .handle { color: var(--text-2); }
   background: rgba(91, 107, 120, 0.10);
   border: 1px dashed rgba(91, 107, 120, 0.45);
 }
-.status-pill.s-atraiter       { color: #b07515; background: rgba(245, 166, 35, 0.16); }      /* ambre  */
-.status-pill.s-maquette       { color: var(--maquette); background: var(--maquette-bg); }     /* violet */
-.status-pill.s-maquette-valid { color: var(--maquette-valid); background: var(--maquette-valid-bg); } /* magenta */
-.status-pill.s-attente        { color: #2563eb; background: rgba(37, 99, 235, 0.11); }        /* bleu   */
-.status-pill.s-valide         { color: var(--success); background: var(--success-bg); }       /* vert   */
-.status-pill.s-bloque         { color: var(--danger); background: var(--danger-bg); }          /* rouge  */
-.status-pill.s-termine        { color: #6b7280; background: rgba(107, 114, 128, 0.14); }       /* gris   */
+/* La couleur de chaque état est appliquée en ligne (liste dynamique, cf. app.js
+   paintStatusPill). État supprimé / inconnu → rendu neutre. */
+.status-pill.unknown { color: var(--text-2); background: rgba(91, 107, 120, 0.10); }
 
 /* colonnes largeurs */
 .col-qty { width: 92px; }
@@ -775,12 +863,6 @@ tr:hover .handle { color: var(--text-2); }
 .grid.hide-quantity colgroup col[data-col="quantity"],
 .grid.hide-quantity thead th.col-qty,
 .grid.hide-quantity tbody td.col-qty { display: none; }
-.grid.hide-value colgroup col[data-col="project_value"],
-.grid.hide-value thead th.col-value,
-.grid.hide-value tbody td.col-value { display: none; }
-.grid.hide-deadline colgroup col[data-col="deadline"],
-.grid.hide-deadline thead th.col-deadline,
-.grid.hide-deadline tbody td.col-deadline-cell { display: none; }
 
 /* Produit : nom (gras) + description (gris, masquée si vide) empilés */
 .col-product-cell { padding: 0; vertical-align: middle; }
@@ -797,7 +879,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 2px 12px 4px;
   font-size: 12px;
   font-weight: 450;
-  color: #86868b;
+  color: var(--text-2); /* lisible (sous-note plus contrastée qu'un gris clair) */
 }
 .product-stack .product-desc::placeholder { color: #b0b4bb; }
 /* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
@@ -911,24 +993,100 @@ tr:hover .dup-btn { opacity: 1; }
 .status-menu-item {
   display: flex;
   align-items: center;
+  border-radius: 7px;
+}
+.status-menu-item.current { background: rgba(0, 0, 0, 0.04); }
+/* bouton de sélection d'un état (la pastille colorée) */
+.status-menu-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
   border: 0;
   background: transparent;
   padding: 5px 6px;
   border-radius: 7px;
   cursor: pointer;
   text-align: left;
+  min-width: 0;
 }
-.status-menu-item:hover { background: var(--accent-soft); }
-.status-menu-item.current { background: rgba(0, 0, 0, 0.04); }
-.status-menu-item .status-pill { margin: 0; cursor: pointer; }
+.status-menu-pick:hover { background: var(--accent-soft); }
+.status-menu-pick .status-pill { margin: 0; cursor: pointer; }
+/* suppression d'un état : discret, révélé au survol de la ligne */
+.status-menu-del {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 17px;
+  line-height: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.status-menu-item:hover .status-menu-del { opacity: 1; }
+.status-menu-del:hover { color: var(--danger); background: var(--danger-bg); }
 .status-menu-item.clear {
   justify-content: center;
+  border: 0;
+  background: transparent;
   color: var(--text-3);
   font-size: 12px;
   padding: 7px 8px;
   margin-top: 2px;
+  cursor: pointer;
 }
 .status-menu-item.clear:hover { color: var(--danger); }
+
+/* Création d'un nouvel état : nom + couleur (palette) + Ajouter. */
+.status-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+.status-new-input {
+  flex: 1 1 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-1);
+  padding: 7px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: #fff;
+}
+.status-new-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.status-new-swatches { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+.status-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.status-swatch.on { border-color: var(--text-1); box-shadow: inset 0 0 0 1px #fff; }
+.status-new-add {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.status-new-add:hover { background: var(--accent-hover); }
 
 .empty { padding: 40px; text-align: center; color: var(--text-3); font-size: 14px; }
 
@@ -1093,6 +1251,13 @@ body.dragging-active * { cursor: grabbing !important; }
   .dup-btn { width: 38px; }
   .send-btn { height: 34px; font-size: 13px; }
   .col-del { width: 248px; }
+
+  /* calendrier d'échéance : cases plus grandes pour le doigt */
+  .cal-pop { width: 300px; padding: 12px; }
+  .cal-day { height: 40px; font-size: 15px; }
+  .cal-nav { width: 40px; height: 40px; }
+  .cal-foot-btn { padding: 11px 8px; font-size: 14px; }
+  .cal-dow span { font-size: 12px; }
 
   /* étapes de la sidebar : zones cliquables plus généreuses */
   .stage { padding: 13px 14px; }
