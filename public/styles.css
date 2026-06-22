@@ -1398,6 +1398,10 @@ button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
   padding: 0 1px;
 }
 
+/* Recherche live : la grille reste montée, on masque les lignes hors-filtre
+   (aucune reconstruction du DOM, donc filtrage instantané et scroll préservé). */
+#rows tr.is-hidden { display: none; }
+
 /* Flash de la ligne ciblée après ouverture d'un résultat */
 @keyframes rowFlash {
   0% { background: rgba(var(--accent-rgb), 0.22); }

@@ -55,6 +55,7 @@ let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
 let sort = { key: null, dir: 1 }; // tri manuel via en-têtes (null = tri par défaut)
+let lastRendered = [];         // dernière liste triée montée (pour le masquage recherche)
 
 // --- Sélecteurs ------------------------------------------------------------
 const $stages = document.getElementById('stages');
@@ -211,17 +212,12 @@ function applySortAndRender() {
       return cmpDeadline(a.deadline, b.deadline);
     });
   }
-  // Filtre de recherche live : on garde toujours la ligne brouillon (ajout).
-  const q = fold(gridQuery.trim());
-  const data = q
-    ? sorted.filter((r) => isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q)))
-    : sorted;
-  renderRows(data);
-  const nMaq = data.filter((r) => MAQUETTE_STATUSES.includes(r.status)).length;
-  const base = data.length ? `${data.length} commande${data.length > 1 ? 's' : ''}` : '';
-  $stageCount.innerHTML = base
-    ? escapeHtml(base) + (nMaq ? ` <span class="maq-count">· ${nMaq} maquette${nMaq > 1 ? 's' : ''}</span>` : '')
-    : '';
+  // Rendu incrémental : on monte / réutilise TOUTES les lignes de l'étape. Le
+  // filtre de recherche se fait ensuite par masquage CSS (aucune reconstruction
+  // par frappe) — cf. applySearchAndCounts.
+  lastRendered = sorted;
+  renderRows(sorted);
+  applySearchAndCounts();
 }
 
 function cmpDeadline(a, b) {
@@ -286,18 +282,84 @@ function cmp(a, b, key) {
   return va < vb ? -1 : va > vb ? 1 : 0;
 }
 
-// --- Rendu grille ----------------------------------------------------------
+// --- Rendu grille (incrémental, réconcilié par clé) ------------------------
+// On ne vide JAMAIS le <tbody> : chaque ligne est créée une fois puis réutilisée.
+// rowEls mémorise, par id, le <tr> monté et sa signature `id:updated_at`. À chaque
+// rendu : on retire les lignes disparues, on reconstruit UNIQUEMENT celles dont la
+// signature a changé, on réutilise les autres telles quelles, et on ne déplace que
+// les lignes réellement hors-position. La ligne en cours d'édition ou de drag n'est
+// jamais reconstruite (isRowBusy).
+const rowEls = new Map(); // id (string) -> { tr, sig }
+
 function renderRows(data) {
-  $rows.innerHTML = '';
-  $empty.hidden = data.length > 0;
-  if (data.length === 0) {
-    $empty.textContent = gridQuery.trim()
+  const wanted = new Set(data.map((r) => String(r.id)));
+
+  // 1. Retirer les <tr> dont l'id n'est plus présent dans la liste voulue.
+  for (const [id, entry] of rowEls) {
+    if (!wanted.has(id)) { entry.tr.remove(); rowEls.delete(id); }
+  }
+
+  // 2. Créer / reconstruire / réutiliser, puis replacer dans l'ordre voulu.
+  let prev = null; // dernière ligne correctement placée
+  for (const r of data) {
+    const id = String(r.id);
+    const sig = `${r.id}:${r.updated_at}`;
+    let entry = rowEls.get(id);
+    if (!entry) {
+      entry = { tr: buildRow(r), sig };
+      rowEls.set(id, entry);
+    } else if (entry.sig !== sig && !isRowBusy(entry.tr)) {
+      const tr = buildRow(r);
+      entry.tr.replaceWith(tr);
+      entry.tr = tr;
+      entry.sig = sig;
+    }
+    const tr = entry.tr;
+    // Ne pas déplacer la ligne en cours de drag : sa position est pilotée à la main.
+    if (!tr.classList.contains('dragging')) {
+      const expectedNext = prev ? prev.nextSibling : $rows.firstChild;
+      if (tr !== expectedNext) $rows.insertBefore(tr, expectedNext);
+    }
+    prev = tr;
+  }
+
+  applyEmptyCols(data);
+  updateSortArrows();
+}
+
+// Vrai si la ligne ne doit pas être reconstruite : focus d'édition à l'intérieur
+// ou drag en cours. On la réutilise alors intacte (on ne perd ni la saisie ni le drag).
+function isRowBusy(tr) {
+  if (!tr) return false;
+  if (tr.classList.contains('dragging')) return true;
+  const ae = document.activeElement;
+  return !!(ae && tr.contains(ae));
+}
+
+// Filtre de recherche par masquage CSS (.is-hidden) : la grille reste montée,
+// aucune ligne n'est reconstruite par frappe. Met aussi à jour l'état vide et le
+// compteur d'étape à partir des seules lignes visibles. On garde toujours la ligne
+// brouillon (ajout) visible.
+function applySearchAndCounts() {
+  const q = fold(gridQuery.trim());
+  let visible = 0, nMaq = 0;
+  for (const r of lastRendered) {
+    const entry = rowEls.get(String(r.id));
+    if (!entry) continue;
+    const match = !q || isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
+    entry.tr.classList.toggle('is-hidden', !match);
+    if (match) { visible++; if (MAQUETTE_STATUSES.includes(r.status)) nMaq++; }
+  }
+  $empty.hidden = visible > 0;
+  if (visible === 0) {
+    $empty.textContent = q
       ? 'Aucune commande ne correspond à la recherche.'
       : 'Aucune commande à cette étape.';
   }
-  for (const r of data) $rows.appendChild(buildRow(r));
-  applyEmptyCols(data);
-  updateSortArrows();
+  const base = visible ? `${visible} commande${visible > 1 ? 's' : ''}` : '';
+  $stageCount.innerHTML = base
+    ? escapeHtml(base) + (nMaq ? ` <span class="maq-count">· ${nMaq} maquette${nMaq > 1 ? 's' : ''}</span>` : '')
+    : '';
 }
 
 // Prix et Échéance restent TOUJOURS affichés. Seule la Quantité est masquée
@@ -1556,7 +1618,7 @@ async function moveToStage(r, slug) {
 }
 
 async function commitReorder(r) {
-  const siblings = [...$rows.querySelectorAll('tr')];
+  const siblings = [...$rows.querySelectorAll('tr:not(.is-hidden)')];
   const idx = siblings.findIndex((el) => el.dataset.id === r.id);
   const posOf = (el) => el ? (rows.find((x) => x.id === el.dataset.id)?.position ?? null) : null;
   const pPrev = posOf(siblings[idx - 1]);
@@ -1591,7 +1653,7 @@ function autoScroll(y) {
 }
 
 function getDragAfterElement(container, y) {
-  const els = [...container.querySelectorAll('tr:not(.dragging)')];
+  const els = [...container.querySelectorAll('tr:not(.dragging):not(.is-hidden)')];
   return els.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -1867,7 +1929,8 @@ function setGridQuery(v) {
   if (next === gridQuery) return;
   gridQuery = next;
   syncSearchUI();
-  applySortAndRender();
+  // Pas de reconstruction : on ne fait que masquer/démasquer les lignes déjà montées.
+  applySearchAndCounts();
 }
 
 if ($gridSearchInput) {
