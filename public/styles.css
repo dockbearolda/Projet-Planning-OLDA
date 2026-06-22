@@ -907,20 +907,49 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
   color: var(--text-1b); /* corps : un cran sous le nom du client */
 }
+/* Description multi-ligne (textarea) + flèche de dépliage. */
+.product-desc-row { display: flex; align-items: flex-start; gap: 2px; }
 .product-stack .product-desc {
-  height: auto;
+  flex: 1;
+  min-width: 0;
+  height: auto;          /* rows=1 → 1 ligne repliée ; JS pose la hauteur dépliée */
   min-height: 0;
   padding: 2px 12px 4px;
   font-size: 13px;
   font-weight: 450;
+  line-height: 1.35;
   color: var(--text-2); /* lisible (sous-note plus contrastée qu'un gris clair) */
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  font-family: inherit;
 }
 .product-stack .product-desc::placeholder { color: #b0b4bb; }
+/* flèche de dépliage : visible seulement si ≥ 2 lignes (toggle.hidden côté JS) */
+.desc-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 1px 6px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.15s ease;
+}
+.desc-toggle:hover { background: var(--accent-soft); color: var(--accent); }
+.desc-toggle svg { width: 15px; height: 15px; display: block; transition: transform 0.15s ease; }
+.desc-toggle.open svg { transform: rotate(180deg); }
+.desc-toggle[hidden] { display: none; }
 /* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
-   cellule Produit) pour rester éditable, mais PAS au survol : la révéler au
-   survol agrandissait la ligne — effet de saut désagréable au passage souris. */
-.product-stack.desc-empty .product-desc { display: none; }
-.product-stack.desc-empty:focus-within .product-desc { display: block; }
+   cellule Produit) pour rester éditable, mais PAS au survol. */
+.product-stack.desc-empty .product-desc-row { display: none; }
+.product-stack.desc-empty:focus-within .product-desc-row { display: flex; }
 
 /* ------------------------------------------- Largeur des colonnes réglable */
 /* Mode manuel : le tableau suit exactement les largeurs posées sur les <col>
@@ -1264,7 +1293,8 @@ body.dragging-active * { cursor: grabbing !important; }
   .col-product-cell { height: auto; }
   .product-stack .product-name { min-height: 44px; height: auto; }
   .product-stack .product-desc { min-height: 0; height: auto; font-size: 14px; }
-  .product-stack.desc-empty .product-desc { display: block; }
+  .product-stack.desc-empty .product-desc-row { display: flex; }
+  .desc-toggle { width: 32px; height: 32px; }
 
   /* cibles de toucher plus grandes */
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
@@ -1367,6 +1397,9 @@ body.dragging-active * { cursor: grabbing !important; }
   /* pastilles / badges conservés mais figés (pas de pointeur) */
   .status-pill, .deadline-badge, .type-tag { margin: 4px 6px; cursor: default; }
   .deadline-badge.empty, .empty-field { display: none; }
+  /* description : imprimer toutes les lignes, sans la flèche */
+  .product-desc { height: auto !important; overflow: visible !important; }
+  .desc-toggle { display: none !important; }
 
   .empty { display: none; }
 }

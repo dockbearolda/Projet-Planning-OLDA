@@ -1076,19 +1076,68 @@ function cellProduct(r) {
   name.placeholder = 'produit';
   bindInline(name, r, 'product', (v) => v === '' ? null : v);
 
-  const desc = document.createElement('input');
+  // Description : multi-ligne (Entrée = nouvelle ligne). Repliée à 1 ligne par
+  // défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les lignes suivantes.
+  const descRow = document.createElement('div');
+  descRow.className = 'product-desc-row';
+  const desc = document.createElement('textarea');
   desc.className = 'cell-input product-desc';
-  desc.type = 'text';
+  desc.rows = 1;
   desc.value = r.description ?? '';
   desc.placeholder = 'description';
-  const syncEmpty = () => stack.classList.toggle('desc-empty', desc.value.trim() === '');
-  syncEmpty();
-  desc.addEventListener('input', syncEmpty);
-  bindInline(desc, r, 'description', (v) => v === '' ? null : v);
 
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'desc-toggle';
+  toggle.title = 'Afficher / masquer les lignes suivantes';
+  toggle.setAttribute('aria-label', 'Afficher les lignes suivantes');
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+  let open = false;
+  let lastSent = r.description ?? '';
+  const isMulti = () => desc.value.indexOf('\n') !== -1;
+
+  const sync = () => {
+    stack.classList.toggle('desc-empty', desc.value.trim() === '');
+    const multi = isMulti();
+    toggle.hidden = !multi;
+    if (!multi) open = false;
+    toggle.classList.toggle('open', open);
+    // hauteur : repliée = 1 ligne (CSS) ; dépliée OU en édition = tout le contenu.
+    const expanded = open || document.activeElement === desc;
+    if (expanded) {
+      desc.style.height = 'auto';
+      desc.style.height = desc.scrollHeight + 'px';
+    } else {
+      desc.style.height = '';
+    }
+  };
+
+  toggle.addEventListener('click', (e) => { e.stopPropagation(); open = !open; sync(); });
+  desc.addEventListener('input', sync);
+  desc.addEventListener('focus', sync);
+  desc.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { desc.value = lastSent; desc.blur(); } // Entrée = nouvelle ligne
+  });
+  desc.addEventListener('blur', () => {
+    const val = desc.value === '' ? null : desc.value;
+    if ((val ?? '') !== (lastSent ?? '')) {
+      const prev = r.description;
+      r.description = val;
+      lastSent = desc.value;
+      api('PATCH', `/api/requests/${r.id}`, { description: val }).catch((err) => {
+        r.description = prev; reportError(err);
+      });
+    }
+    sync();
+  });
+
+  descRow.appendChild(desc);
+  descRow.appendChild(toggle);
   stack.appendChild(name);
-  stack.appendChild(desc);
+  stack.appendChild(descRow);
   td.appendChild(stack);
+  sync();
   return td;
 }
 
