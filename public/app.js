@@ -1108,31 +1108,48 @@ function cellNumber(r, field, placeholder) {
 function cellMoney(r, field) {
   const td = document.createElement('td');
   td.className = 'num col-value';
-  const input = document.createElement('input');
-  input.className = 'cell-input num';
-  input.type = 'text';
-  input.inputMode = 'decimal';
-  const fmt = () => { input.value = r[field] != null ? formatMoney(r[field]) : ''; };
-  fmt();
-  input.classList.add('val-cell');
-  input.placeholder = '—'; // valeur vide → tiret gris clair (cf. .val-cell::placeholder)
-  input.addEventListener('focus', () => {
-    input.value = r[field] != null ? String(r[field]) : '';
-  });
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
-  input.addEventListener('blur', () => {
-    const raw = input.value.replace(/\s/g, '').replace(',', '.').replace('€', '');
-    const val = raw === '' ? null : Number(raw);
-    if (val !== null && Number.isNaN(val)) { fmt(); return; }
-    if (val === r[field]) { fmt(); return; }
-    const prev = r[field];
-    r[field] = val;
-    fmt();
-    api('PATCH', `/api/requests/${r.id}`, { project_value: val }).catch((err) => {
-      r[field] = prev; fmt(); reportError(err);
+
+  const showInput = (focus) => {
+    td.innerHTML = '';
+    const input = document.createElement('input');
+    input.className = 'cell-input num val-cell';
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.value = r[field] != null ? formatMoney(r[field]) : '';
+    input.addEventListener('focus', () => { input.value = r[field] != null ? String(r[field]) : ''; });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    input.addEventListener('blur', () => {
+      const raw = input.value.replace(/\s/g, '').replace(',', '.').replace('€', '');
+      const val = raw === '' ? null : Number(raw);
+      if (val !== null && Number.isNaN(val)) { render(); return; }
+      if (val === (r[field] ?? null)) { render(); return; }
+      const prev = r[field];
+      r[field] = val;
+      api('PATCH', `/api/requests/${r.id}`, { project_value: val }).catch((err) => {
+        r[field] = prev; render(); reportError(err);
+      });
+      render();
     });
-  });
-  td.appendChild(input);
+    td.appendChild(input);
+    if (focus) input.focus();
+  };
+
+  // Vide → bouton pointillé « + Prix » (cliquer pour saisir) ; sinon montant éditable.
+  const render = () => {
+    if (r[field] == null) {
+      td.innerHTML = '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'empty-field';
+      btn.title = 'cliquer pour saisir un prix';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>Prix</span>';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); showInput(true); });
+      td.appendChild(btn);
+    } else {
+      showInput(false);
+    }
+  };
+  render();
   return td;
 }
 
@@ -1160,7 +1177,7 @@ function cellDeadline(r) {
     const d = daysLeft(r.deadline);
     if (r.deadline == null || d === null) {
       badge.className = 'deadline-badge empty';
-      badge.textContent = '+ échéance';
+      badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span>Échéance</span>';
       badge.title = 'cliquer pour choisir une date';
     } else {
       let cls, label;
@@ -1839,7 +1856,7 @@ function updateSortArrows() {
 // Chaque catégorie mémorise ses propres largeurs (localStorage, par appareil).
 // Tant qu'aucune colonne n'a été réglée à la main, la répartition reste celle
 // du navigateur.
-const COLW_KEY = 'olda_col_widths_v2';
+const COLW_KEY = 'olda_col_widths_v3';
 const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];

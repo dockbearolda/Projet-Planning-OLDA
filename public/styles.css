@@ -11,11 +11,12 @@
   --work-bg: rgba(248, 249, 250, 0.86);      /* carte verre, plus opaque (grille dense) */
   --card-border: rgba(255, 255, 255, 0.55);
   --hairline: rgba(74, 98, 116, 0.14);       /* filets teintés canard */
-  --grid-line: rgba(74, 98, 116, 0.10);
+  --grid-line: rgba(74, 98, 116, 0.13);
   --thead-bg: #e7ecef;                       /* en-tête de grille, froid, opaque */
 
   /* texte — encre froide */
   --text-1: #202930;
+  --text-1b: #2f3b45;                         /* corps (produit) : un cran sous --text-1 */
   --text-2: #5b6b78;
   --text-3: #7a8893;
 
@@ -24,6 +25,7 @@
   --accent-rgb: 74, 98, 116;
   --accent-hover: #42596a;
   --accent-soft: rgba(74, 98, 116, 0.10);
+  --accent-300: #6b8191;                      /* canard désaturé : en-têtes, champs vides */
   --focus-ring: 0 0 0 3px rgba(107, 129, 145, 0.22);
 
   /* sémantique (badges/pastilles uniquement) */
@@ -335,10 +337,12 @@ body {
   top: 0;
   z-index: 2;
   background: var(--thead-bg);
-  border-bottom: 1.5px solid rgba(var(--accent-rgb), 0.22);
-  color: var(--text-1);
-  font-weight: 600;
-  font-size: 13px;
+  border-bottom: 1.5px solid rgba(var(--accent-rgb), 0.30);
+  color: var(--accent); /* canard plein : muté mais lisible (contraste AA sur l'en-tête) */
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   text-align: left;
   padding: 13px 14px;
   white-space: nowrap;
@@ -355,7 +359,8 @@ body {
   vertical-align: middle;
   height: var(--row-h);
 }
-.grid tbody tr:hover { background: rgba(var(--accent-rgb), 0.05); }
+.grid tbody tr { transition: background 0.14s ease; }
+.grid tbody tr:hover { background: rgba(var(--accent-rgb), 0.04); }
 .grid tbody tr.dragging { opacity: 0.4; }
 
 /* Ligne brouillon : se lit comme un formulaire d'ajout, pas comme une donnée */
@@ -414,8 +419,6 @@ body {
   font-family: inherit;
 }
 .cell-input::placeholder { color: #86868b; }
-/* valeur du projet vide → tiret « — » gris clair */
-.cell-input.val-cell::placeholder { color: #b0b4bb; opacity: 1; }
 .cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
 .cell-input:focus {
   outline: none;
@@ -638,7 +641,7 @@ tr:hover .handle { color: var(--text-2); }
   border-radius: 999px;
   border: 1px solid transparent;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -646,7 +649,7 @@ tr:hover .handle { color: var(--text-2); }
 }
 .prio-pill:hover { filter: brightness(0.97); }
 .prio-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.prio-dot { width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
+.prio-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
 /* Basse → vert (calme) · Moyenne → ambre · Haute → rouge */
 .prio-pill.p1 { color: var(--success); background: var(--success-bg); }
 .prio-pill.p2 { color: var(--warn); background: var(--warn-bg); }
@@ -660,8 +663,9 @@ tr:hover .handle { color: var(--text-2); }
   height: auto;
   min-height: 0;
   padding: 4px 12px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-1);
 }
 .client-sub {
@@ -674,7 +678,7 @@ tr:hover .handle { color: var(--text-2); }
   height: auto;
   min-height: 0;
   padding: 1px 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 450;
   color: var(--text-2); /* référent plus lisible */
   flex: 1;
@@ -686,7 +690,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 1px 8px;
   border-radius: 999px;
   font: inherit;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -719,12 +723,29 @@ tr:hover .handle { color: var(--text-2); }
 .deadline-badge.green { color: var(--success); background: var(--success-bg); }
 .deadline-badge.orange { color: var(--warn); background: var(--warn-bg); }
 .deadline-badge.red { color: var(--danger); background: var(--danger-bg); }
-.deadline-badge.empty {
-  color: #aab2b9;
+/* Champ vide actionnable : vrai bouton pointillé (« Prix », « Échéance »). */
+.deadline-badge.empty,
+.empty-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 12px;
+  padding: 5px 11px;
+  border: 1px dashed rgba(var(--accent-rgb), 0.35);
+  border-radius: var(--radius);
   background: transparent;
+  font: inherit;
+  font-size: 12.5px;
   font-weight: 500;
+  color: var(--accent-300);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease;
 }
-.deadline-badge.empty:hover { color: var(--accent); filter: none; }
+.deadline-badge.empty:hover,
+.empty-field:hover { border-color: var(--accent-300); color: var(--accent); filter: none; }
+.empty-field svg,
+.deadline-badge.empty svg { width: 13px; height: 13px; flex-shrink: 0; }
 
 /* Calendrier d'échéance : popup grille du mois (clic sur le badge échéance). */
 .cal-pop {
@@ -828,9 +849,9 @@ tr:hover .handle { color: var(--text-2); }
   display: inline-flex;
   align-items: center;
   margin: 8px 12px;
-  padding: 5px 13px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -848,15 +869,26 @@ tr:hover .handle { color: var(--text-2); }
 .status-pill.unknown { color: var(--text-2); background: rgba(91, 107, 120, 0.10); }
 
 /* colonnes largeurs */
-.col-qty { width: 92px; }
-.col-value { width: 118px; }
-.col-deadline { width: 134px; }
+/* min-width = plancher dur : le champ (input) ne contribue pas à la largeur de
+   colonne en table-layout auto, donc sans plancher la colonne se réduit au libellé
+   d'en-tête et tronque les montants en gras. */
+.col-qty { width: 92px; min-width: 82px; }
+.col-value { width: 118px; min-width: 104px; }
+.col-deadline { width: 134px; min-width: 116px; }
 .col-client { min-width: 196px; }
 .col-product { min-width: 240px; }
 
-/* Hiérarchie : quantité & valeur en retrait (info secondaire, point 3) */
+/* Quantité & Prix : chiffres mis en avant, alignés à droite, tabulaires. */
+.grid tbody td.col-qty,
+.grid tbody td.col-value { text-align: right; } /* aligne aussi le bouton « + Prix » */
 .grid tbody td.col-qty .cell-input,
-.grid tbody td.col-value .cell-input { color: var(--text-2); font-weight: 450; }
+.grid tbody td.col-value .cell-input {
+  color: var(--text-1);
+  font-weight: 700;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
 
 /* Colonnes optionnelles masquées quand la vue ne les renseigne pas
    (cf. applyEmptyCols) — plutôt que d'afficher une colonne de « — ». */
@@ -871,13 +903,15 @@ tr:hover .handle { color: var(--text-2); }
   height: auto;
   min-height: 0;
   padding: 4px 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1b); /* corps : un cran sous le nom du client */
 }
 .product-stack .product-desc {
   height: auto;
   min-height: 0;
   padding: 2px 12px 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 450;
   color: var(--text-2); /* lisible (sous-note plus contrastée qu'un gris clair) */
 }
@@ -1235,7 +1269,8 @@ body.dragging-active * { cursor: grabbing !important; }
   /* cibles de toucher plus grandes */
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .status-pill { padding: 8px 14px; font-size: 14px; min-height: 44px; }
-  .deadline-badge { padding: 7px 13px; font-size: 13.5px; min-height: 44px; }
+  .deadline-badge,
+  .empty-field { padding: 7px 13px; font-size: 13.5px; min-height: 44px; }
   .type-tag {
     min-height: 44px;
     padding: 4px 13px;
@@ -1331,7 +1366,7 @@ body.dragging-active * { cursor: grabbing !important; }
 
   /* pastilles / badges conservés mais figés (pas de pointeur) */
   .status-pill, .deadline-badge, .type-tag { margin: 4px 6px; cursor: default; }
-  .deadline-badge.empty { display: none; }
+  .deadline-badge.empty, .empty-field { display: none; }
 
   .empty { display: none; }
 }
