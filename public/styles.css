@@ -580,6 +580,18 @@ body {
 }
 .cell-input::placeholder { color: #86868b; }
 .cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Pas de petites flèches (incrément) sur les champs numériques : on tape la
+   valeur, point. Vaut pour la quantité et tout autre input[type=number]. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .cell-input:focus {
   outline: none;
   background: #fff;
