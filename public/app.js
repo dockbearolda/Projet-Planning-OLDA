@@ -225,14 +225,16 @@ function applySortAndRender() {
   if (sort.key) {
     sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
   } else {
-    // tri par défaut : les commandes urgentes (échéance dans ≤ 1 jour, aujourd'hui
-    // ou déjà dépassée) remontent en tête, la plus urgente d'abord ; le reste suit
-    // le tri priorité décroissante puis échéance la plus proche.
+    // tri par défaut : groupé par PRIORITÉ (Haute → Moyenne → Basse) pour que les
+    // bandes soient contiguës (en-têtes de groupe). À l'intérieur d'une bande, les
+    // commandes urgentes (échéance ≤ 1 jour, aujourd'hui ou dépassée) remontent en
+    // tête, la plus urgente d'abord, puis échéance la plus proche.
     sorted.sort((a, b) => {
+      const pa = prioBand(a), pb = prioBand(b);
+      if (pa !== pb) return pb - pa;
       const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
       if ((ua !== null) !== (ub !== null)) return ua !== null ? -1 : 1;
       if (ua !== null && ub !== null) return ua - ub;
-      if (b.priority !== a.priority) return b.priority - a.priority;
       return cmpDeadline(a.deadline, b.deadline);
     });
   }
@@ -314,18 +316,54 @@ function cmp(a, b, key) {
 // les lignes réellement hors-position. La ligne en cours d'édition ou de drag n'est
 // jamais reconstruite (isRowBusy).
 const rowEls = new Map(); // id (string) -> { tr, sig }
+const groupEls = new Map(); // bande de priorité (1..3) -> <tr> en-tête de groupe
+
+// En-tête de groupe de priorité : bandeau « ● Haute · 3 » couvrant toute la
+// largeur. Réutilisé d'un rendu à l'autre (le total est posé par applySearchAndCounts).
+function buildGroupHeader(band) {
+  const lvl = PRIORITY_LEVELS[band] || PRIORITY_LEVELS[1];
+  const tr = document.createElement('tr');
+  tr.className = `prio-group ${lvl.cls}`;
+  const td = document.createElement('td');
+  td.colSpan = COL_KEYS.length;
+  td.innerHTML = '<div class="prio-group-inner">' +
+    '<span class="prio-group-dot" aria-hidden="true"></span>' +
+    `<span class="prio-group-label">${escapeHtml(lvl.label)}</span>` +
+    '<span class="prio-group-count"></span></div>';
+  tr.appendChild(td);
+  return tr;
+}
+function ensureGroupHeader(band) {
+  let g = groupEls.get(band);
+  if (!g) { g = buildGroupHeader(band); groupEls.set(band, g); }
+  return g;
+}
 
 function renderRows(data) {
+  // Les en-têtes de groupe n'apparaissent que dans la vue par défaut (triée par
+  // priorité) ; dès qu'un tri par colonne est actif, on affiche une liste à plat.
+  const grouping = !sort.key;
   const wanted = new Set(data.map((r) => String(r.id)));
 
-  // 1. Retirer les <tr> dont l'id n'est plus présent dans la liste voulue.
+  // 1. Retirer les <tr> de données dont l'id n'est plus présent dans la liste voulue.
   for (const [id, entry] of rowEls) {
     if (!wanted.has(id)) { entry.tr.remove(); rowEls.delete(id); }
   }
 
-  // 2. Créer / reconstruire / réutiliser, puis replacer dans l'ordre voulu.
-  let prev = null; // dernière ligne correctement placée
+  // 2. Construire la séquence ordonnée des nœuds (en-têtes de groupe + lignes),
+  //    en créant / reconstruisant / réutilisant les lignes au passage.
+  const order = [];
+  const usedGroups = new Set();
+  let curBand = null;
   for (const r of data) {
+    if (grouping) {
+      const band = prioBand(r);
+      if (band !== curBand) {
+        curBand = band;
+        order.push(ensureGroupHeader(band));
+        usedGroups.add(band);
+      }
+    }
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = rowEls.get(id);
@@ -338,13 +376,23 @@ function renderRows(data) {
       entry.tr = tr;
       entry.sig = sig;
     }
-    const tr = entry.tr;
-    // Ne pas déplacer la ligne en cours de drag : sa position est pilotée à la main.
-    if (!tr.classList.contains('dragging')) {
+    order.push(entry.tr);
+  }
+
+  // 3. Retirer les en-têtes de groupe inutilisés à ce rendu.
+  for (const [band, g] of groupEls) {
+    if (!usedGroups.has(band)) { g.remove(); groupEls.delete(band); }
+  }
+
+  // 4. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
+  //    cours de drag : sa position est pilotée à la main).
+  let prev = null;
+  for (const node of order) {
+    if (!node.classList.contains('dragging')) {
       const expectedNext = prev ? prev.nextSibling : $rows.firstChild;
-      if (tr !== expectedNext) $rows.insertBefore(tr, expectedNext);
+      if (node !== expectedNext) $rows.insertBefore(node, expectedNext);
     }
-    prev = tr;
+    prev = node;
   }
 
   applyEmptyCols(data);
@@ -367,12 +415,25 @@ function isRowBusy(tr) {
 function applySearchAndCounts() {
   const q = fold(gridQuery.trim());
   let visible = 0, nMaq = 0;
+  const bandVisible = { 1: 0, 2: 0, 3: 0 };
   for (const r of lastRendered) {
     const entry = rowEls.get(String(r.id));
     if (!entry) continue;
     const match = !q || isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
     entry.tr.classList.toggle('is-hidden', !match);
-    if (match) { visible++; if (MAQUETTE_STATUSES.includes(r.status)) nMaq++; }
+    if (match) {
+      visible++;
+      if (MAQUETTE_STATUSES.includes(r.status)) nMaq++;
+      bandVisible[prioBand(r)]++;
+    }
+  }
+  // En-têtes de groupe : on masque une bande vide (après filtre) et on affiche le
+  // total des lignes visibles de la bande.
+  for (const [band, g] of groupEls) {
+    const n = bandVisible[band] || 0;
+    g.classList.toggle('is-hidden', n === 0);
+    const c = g.querySelector('.prio-group-count');
+    if (c) c.textContent = `· ${n}`;
   }
   $empty.hidden = visible > 0;
   if (visible === 0) {
@@ -412,6 +473,7 @@ function buildRow(r) {
   tr.dataset.id = r.id;
   const draft = isDraftRow(r);
   if (draft) tr.classList.add('is-draft');
+  else applyPrioBar(tr, r.priority); // barre de couleur à gauche selon la priorité
 
   // début de ligne : poignée draggable (ou bouton « + Ajouter » si brouillon)
   // + icône contact discret (téléphone / email), sans modifier le reste.
@@ -804,6 +866,18 @@ const PRIORITY_LEVELS = {
   3: { cls: 'p3', label: 'Haute' },
 };
 
+// Niveau de priorité normalisé en bande 1..3 (toute valeur inattendue → Basse).
+function prioBand(r) {
+  return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
+}
+
+// Pose / met à jour la barre de couleur à gauche d'une ligne selon sa priorité.
+function applyPrioBar(tr, priority) {
+  const band = PRIORITY_LEVELS[priority] ? priority : 1;
+  tr.classList.remove('prio-bar-p1', 'prio-bar-p2', 'prio-bar-p3');
+  tr.classList.add('prio-bar-p' + band);
+}
+
 function cellPriority(r) {
   const td = document.createElement('td');
   td.className = 'col-priority';
@@ -819,8 +893,21 @@ function cellPriority(r) {
   render();
   pill.addEventListener('click', (e) => {
     e.stopPropagation();
-    const next = (r.priority % 3) + 1; // 1 → 2 → 3 → 1
-    patch(r, { priority: next }, () => { r.priority = next; render(); });
+    const prev = prioBand(r);
+    const next = (prev % 3) + 1; // 1 → 2 → 3 → 1
+    r.priority = next;
+    render();
+    const tr = pill.closest('tr');
+    if (tr) applyPrioBar(tr, next);
+    // La priorité pilote le groupe et l'ordre : on re-rend pour déplacer la ligne
+    // dans la bonne bande (la ligne elle-même n'est pas reconstruite — focus / saisie
+    // préservés via isRowBusy / signature inchangée).
+    applySortAndRender();
+    patchRow(r, { priority: next }).catch((err) => {
+      r.priority = prev;
+      reportError(err);
+      applySortAndRender();
+    });
   });
   td.appendChild(pill);
   return td;
@@ -1827,7 +1914,7 @@ function moveToStage(r, slug) {
 }
 
 async function commitReorder(r) {
-  const siblings = [...$rows.querySelectorAll('tr:not(.is-hidden)')];
+  const siblings = [...$rows.querySelectorAll('tr[data-id]:not(.is-hidden)')];
   const idx = siblings.findIndex((el) => el.dataset.id === r.id);
   const posOf = (el) => el ? (rows.find((x) => x.id === el.dataset.id)?.position ?? null) : null;
   const pPrev = posOf(siblings[idx - 1]);
@@ -1862,7 +1949,7 @@ function autoScroll(y) {
 }
 
 function getDragAfterElement(container, y) {
-  const els = [...container.querySelectorAll('tr:not(.dragging):not(.is-hidden)')];
+  const els = [...container.querySelectorAll('tr[data-id]:not(.dragging):not(.is-hidden)')];
   return els.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -2166,6 +2253,37 @@ document.addEventListener('keydown', (e) => {
     if ($gridSearchInput) { $gridSearchInput.focus(); $gridSearchInput.select(); }
   }
 });
+
+// --- Réglage de densité (Compact / Normal / Confort) -----------------------
+// Pilote la hauteur de ligne via une classe sur .app (--row-h). Mémorisé par
+// appareil (localStorage). Réglage visuel pur : aucun aller-retour serveur.
+const DENSITY_KEY = 'olda_density';
+const DENSITIES = ['compact', 'normal', 'confort'];
+const $app = document.querySelector('.app');
+const $densityToggle = document.getElementById('densityToggle');
+let density = 'normal';
+try { const d = localStorage.getItem(DENSITY_KEY); if (DENSITIES.includes(d)) density = d; } catch (_) {}
+
+function applyDensity(d) {
+  density = DENSITIES.includes(d) ? d : 'normal';
+  if ($app) DENSITIES.forEach((x) => $app.classList.toggle('density-' + x, x === density));
+  if ($densityToggle) {
+    $densityToggle.querySelectorAll('.density-opt').forEach((b) => {
+      const on = b.dataset.density === density;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  try { localStorage.setItem(DENSITY_KEY, density); } catch (_) {}
+}
+
+if ($densityToggle) {
+  $densityToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.density-opt');
+    if (btn) applyDensity(btn.dataset.density);
+  });
+}
+applyDensity(density);
 
 // --- Init ------------------------------------------------------------------
 // Date du jour affichée en haut à gauche : jour de la semaine + date complète.
