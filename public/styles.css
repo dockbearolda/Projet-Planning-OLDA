@@ -7,8 +7,8 @@
   /* surfaces */
   --bg: #ebeae8;                          /* base claire du dégradé */
   --app-gradient: linear-gradient(140deg, #ebeae8, #cdd4cd 50%, #adb8b9);
-  --sidebar-bg: rgba(245, 247, 248, 0.72);   /* carte verre claire */
-  --work-bg: rgba(248, 249, 250, 0.86);      /* carte verre, plus opaque (grille dense) */
+  --sidebar-bg: rgba(245, 247, 248, 0.82);   /* carte verre claire (opacité portée pour tenir sans flou tablette) */
+  --work-bg: rgba(248, 249, 250, 0.92);      /* carte verre, plus opaque (grille dense) */
   --card-border: rgba(255, 255, 255, 0.55);
   --hairline: rgba(74, 98, 116, 0.14);       /* filets teintés canard */
   --grid-line: rgba(74, 98, 116, 0.13);
@@ -62,11 +62,17 @@ html, body {
   font-size: 14px;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  /* le grey-flash au tap (Chrome Android) casse la sensation « native » */
+  -webkit-tap-highlight-color: transparent;
+  /* pas de rebond/élastique global : l'app tient dans le viewport */
+  overscroll-behavior: none;
 }
 body {
+  /* gradient NON-fixed : `fixed` repeint à chaque frame et invalide en
+     continu le flou caché derrière les cartes verre (gros coût tablette).
+     Le body fait exactement 100vh et ne défile pas → rendu identique. */
   background: var(--app-gradient);
-  background-attachment: fixed;
 }
 
 .app {
@@ -81,8 +87,8 @@ body {
 /* ---------------------------------------------------------------- Sidebar */
 .sidebar {
   background: var(--sidebar-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  /* flou réservé au desktop (cf. media query plus bas) : sur tablette tactile
+     il écroule le GPU pour un gain visuel nul (le fond est déjà ~opaque). */
   border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
@@ -179,8 +185,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--work-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  /* flou réservé au desktop (cf. media query plus bas) — voir .sidebar */
   border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
@@ -301,7 +306,15 @@ body {
 }
 
 /* ---------------------------------------------------------------- Grid */
-.grid-wrap { flex: 1; overflow: auto; }
+.grid-wrap {
+  flex: 1;
+  overflow: auto;
+  /* couche compositeur dédiée + isolation peinture/layout : défiler la grille
+     ne repeint plus la sidebar ni l'en-tête, et un re-rendu des lignes ne
+     reflue plus le reste de la page. */
+  transform: translateZ(0);
+  contain: layout paint;
+}
 
 .grid {
   border-collapse: collapse;
@@ -1144,6 +1157,8 @@ input[type="date"].cell-input { color: var(--text-1); }
 .drag-ghost {
   position: fixed;
   left: 0; top: 0;
+  /* déplacé par transform (cf. app.js) : compositor-only, zéro layout/repaint */
+  will-change: transform;
   z-index: 1000;
   pointer-events: none;
   background: #fff;
@@ -1166,6 +1181,32 @@ body.dragging-active * { cursor: grabbing !important; }
 .grid-wrap, .sidebar {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+/* taps instantanés (pas de double-tap-zoom à attendre) sur les contrôles */
+button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
+.type-tag, .empty-field, .cal-day, .desc-toggle {
+  touch-action: manipulation;
+}
+
+/* Glassmorphism : flou réservé au pointeur fin (souris/desktop). Le fond du
+   body n'étant plus `fixed`, le backdrop derrière les cartes est statique →
+   le flou est mis en cache et reste fluide. Sur tactile (tablette atelier) on
+   ne l'active pas : fond ~opaque, zéro coût GPU, rendu quasi identique. */
+@media (hover: hover) and (pointer: fine) {
+  .sidebar, .work {
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+}
+
+/* Respecte le réglage système « réduire les animations » */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* --- Champ de recherche live du tableau ----------------------------------- */
