@@ -926,7 +926,7 @@ function cellClient(r) {
   company.type = 'text';
   company.value = r.billing_company ?? '';
   company.placeholder = 'société';
-  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v);
+  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
 
   const sub = document.createElement('div');
   sub.className = 'client-sub';
@@ -950,7 +950,7 @@ function cellClient(r) {
   ref.type = 'text';
   ref.value = r.contact_referent ?? '';
   ref.placeholder = 'référent';
-  bindInline(ref, r, 'contact_referent', (v) => v === '' ? null : v);
+  bindInline(ref, r, 'contact_referent', (v) => v === '' ? null : v, capitalizeName);
 
   sub.appendChild(type);
   sub.appendChild(ref);
@@ -975,7 +975,7 @@ function cellProduct(r) {
   name.type = 'text';
   name.value = r.product ?? '';
   name.placeholder = 'produit';
-  bindInline(name, r, 'product', (v) => v === '' ? null : v);
+  bindInline(name, r, 'product', (v) => v === '' ? null : v, capitalizeName);
 
   // Description : multi-ligne (Entrée = nouvelle ligne). Repliée à 1 ligne par
   // défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les lignes suivantes.
@@ -1498,8 +1498,35 @@ function showStatusMenu(r, pill, render) {
   }, 0);
 }
 
+// --- Majuscules automatiques (noms, référents, projets) --------------------
+// On tape vite en minuscules ; le champ se range proprement à la validation
+// (Entrée / sortie du champ). Title-case « à la française » :
+//   - 1re lettre de chaque mot en majuscule (« mug photo » → « Mug Photo ») ;
+//   - particules en minuscule sauf en tête (« brasserie du coin » → « Brasserie du Coin ») ;
+//   - sigles métier toujours en capitales (dtf, uv, bat… → DTF, UV, BAT) ;
+//   - un mot déjà saisi avec une majuscule interne est respecté (acronyme voulu).
+// Idempotent : ré-appliquer ne change rien (sûr à repasser à chaque blur).
+const NAME_PARTICLES = new Set(['de', 'du', 'des', 'd', 'la', 'le', 'les', 'l', 'et', 'au', 'aux', 'von', 'van', 'der', 'den', 'di', 'da', 'dos', 'das']);
+const FORCE_UPPER = new Set(['dtf', 'uv', 'bat', 'tva', 'olda', 'pdf', 'cmjn', 'rvb', 'sav']);
+
+function capitalizeName(s) {
+  if (s == null) return s;
+  let first = true;
+  return s.trim().replace(/\s+/g, ' ').replace(/[\p{L}\p{N}]+/gu, (word) => {
+    const lower = word.toLowerCase();
+    const wasFirst = first;
+    first = false;
+    if (FORCE_UPPER.has(lower)) return lower.toUpperCase();
+    if (/\p{Lu}/u.test(word.slice(1))) return word;       // majuscule interne → acronyme voulu
+    if (!wasFirst && NAME_PARTICLES.has(lower)) return lower; // particule (hors tête) → minuscule
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
 // --- Édition inline générique (texte/nombre) ------------------------------
-function bindInline(input, r, field, transform) {
+// `normalize` (optionnel) range la valeur saisie avant l'enregistrement et la
+// réécrit dans le champ (ex. capitalizeName pour les noms / projets).
+function bindInline(input, r, field, transform, normalize) {
   let lastSent = r[field] ?? '';
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -1512,7 +1539,11 @@ function bindInline(input, r, field, transform) {
     }
   });
   input.addEventListener('blur', () => {
-    const raw = input.value;
+    let raw = input.value;
+    if (normalize) {
+      const norm = normalize(raw);
+      if (norm !== raw) { input.value = norm; raw = norm; } // range le champ à l'écran
+    }
     if (raw === (lastSent ?? '').toString()) return;
     const val = transform(raw);
     if (val !== null && typeof val === 'number' && Number.isNaN(val)) {
