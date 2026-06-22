@@ -1881,18 +1881,42 @@ document.addEventListener('keydown', (e) => {
 });
 
 // --- Init ------------------------------------------------------------------
-// Date du jour affichée dans l'en-tête de la barre latérale (« Samedi 21 juin 2026 »).
+// Date du jour affichée en haut à gauche : jour de la semaine + date complète.
 function setTodayDate() {
   const el = document.getElementById('todayDate');
   if (!el) return;
-  const s = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  const now = new Date();
+  const dow = now.toLocaleDateString('fr-FR', { weekday: 'long' });
+  const date = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  el.replaceChildren();
+  const a = document.createElement('span');
+  a.className = 'today-dow';
+  a.textContent = dow.charAt(0).toUpperCase() + dow.slice(1);
+  const b = document.createElement('span');
+  b.className = 'today-date';
+  b.textContent = date;
+  el.append(a, b);
+}
+
+// Reflet spéculaire dynamique du logo : le halo lumineux suit le pointeur.
+function initBrandReflection() {
+  const tile = document.getElementById('brandLogo');
+  if (!tile) return;
+  if (window.matchMedia('(hover: none)').matches) return; // inutile au tactile
+  tile.addEventListener('pointermove', (e) => {
+    const r = tile.getBoundingClientRect();
+    tile.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    tile.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
   });
-  el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+  tile.addEventListener('pointerleave', () => {
+    tile.style.setProperty('--mx', '50%');
+    tile.style.setProperty('--my', '8%');
+  });
 }
 
 async function start() {
   setTodayDate();
+  initBrandReflection();
   renderSidebar();
   attachColResizers();
   applyColWidths();
