@@ -16,6 +16,7 @@
 
   /* texte — encre froide */
   --text-1: #202930;
+  --text-1b: #2f3b45;                         /* corps (produit) : un cran sous --text-1 */
   --text-2: #5b6b78;
   --text-3: #7a8893;
 
@@ -337,7 +338,7 @@ body {
   z-index: 2;
   background: var(--thead-bg);
   border-bottom: 1.5px solid rgba(var(--accent-rgb), 0.30);
-  color: var(--accent-300);
+  color: var(--accent); /* canard plein : muté mais lisible (contraste AA sur l'en-tête) */
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
@@ -418,8 +419,6 @@ body {
   font-family: inherit;
 }
 .cell-input::placeholder { color: #86868b; }
-/* valeur du projet vide → tiret « — » gris clair */
-.cell-input.val-cell::placeholder { color: #b0b4bb; opacity: 1; }
 .cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
 .cell-input:focus {
   outline: none;
@@ -870,9 +869,12 @@ tr:hover .handle { color: var(--text-2); }
 .status-pill.unknown { color: var(--text-2); background: rgba(91, 107, 120, 0.10); }
 
 /* colonnes largeurs */
-.col-qty { width: 92px; }
-.col-value { width: 118px; }
-.col-deadline { width: 134px; }
+/* min-width = plancher dur : le champ (input) ne contribue pas à la largeur de
+   colonne en table-layout auto, donc sans plancher la colonne se réduit au libellé
+   d'en-tête et tronque les montants en gras. */
+.col-qty { width: 92px; min-width: 82px; }
+.col-value { width: 118px; min-width: 104px; }
+.col-deadline { width: 134px; min-width: 116px; }
 .col-client { min-width: 196px; }
 .col-product { min-width: 240px; }
 
@@ -903,7 +905,7 @@ tr:hover .handle { color: var(--text-2); }
   padding: 4px 12px;
   font-size: 15px;
   font-weight: 500;
-  color: #2f3b45; /* corps : un cran sous le nom du client (fg-2) */
+  color: var(--text-1b); /* corps : un cran sous le nom du client */
 }
 .product-stack .product-desc {
   height: auto;
@@ -1267,7 +1269,8 @@ body.dragging-active * { cursor: grabbing !important; }
   /* cibles de toucher plus grandes */
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .status-pill { padding: 8px 14px; font-size: 14px; min-height: 44px; }
-  .deadline-badge { padding: 7px 13px; font-size: 13.5px; min-height: 44px; }
+  .deadline-badge,
+  .empty-field { padding: 7px 13px; font-size: 13.5px; min-height: 44px; }
   .type-tag {
     min-height: 44px;
     padding: 4px 13px;
