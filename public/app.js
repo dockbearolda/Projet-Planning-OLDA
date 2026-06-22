@@ -1445,6 +1445,7 @@ function attachDrag(handle, tr, r) {
       id: r.id, r, tr, handle,
       startX: e.clientX, startY: e.clientY,
       pointerId: e.pointerId, active: false, ghost: null, grabDX: 0, grabDY: 0,
+      raf: 0, lastX: e.clientX, lastY: e.clientY,
     };
     try { handle.setPointerCapture(e.pointerId); } catch (_) {}
     // Écouteurs sur window (pas sur la poignée) : on reçoit ainsi tous les
@@ -1482,26 +1483,40 @@ function onDragMove(e) {
     beginDrag();
   }
   e.preventDefault();
-  dragState.ghost.style.left = (e.clientX - dragState.grabDX) + 'px';
-  dragState.ghost.style.top = (e.clientY - dragState.grabDY) + 'px';
+  // Position du fantôme : transform compositor-only → suit le doigt à chaque
+  // évènement, sans déclencher de layout/repaint.
+  dragState.ghost.style.transform =
+    `translate3d(${e.clientX - dragState.grabDX}px, ${e.clientY - dragState.grabDY}px, 0)`;
+  // Détection de cible + réordonnancement : ces lectures de layout
+  // (elementFromPoint, getBoundingClientRect par ligne) sont coûteuses, on les
+  // limite à une fois par frame pour ne pas saturer le thread au tactile.
+  dragState.lastX = e.clientX;
+  dragState.lastY = e.clientY;
+  if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
+}
 
-  const el = document.elementFromPoint(e.clientX, e.clientY);
+function updateDragTarget() {
+  if (!dragState) return;
+  dragState.raf = 0;
+  const x = dragState.lastX, y = dragState.lastY;
+  const el = document.elementFromPoint(x, y);
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
   const stageEl = el && el.closest ? el.closest('.stage') : null;
   if (stageEl) {
     if (stageEl.dataset.slug !== dragState.r.stage) stageEl.classList.add('drop-target');
   } else {
     // réordonnancement vertical dans la grille
-    const after = getDragAfterElement($rows, e.clientY);
+    const after = getDragAfterElement($rows, y);
     if (after == null) $rows.appendChild(dragState.tr);
     else if (after !== dragState.tr) $rows.insertBefore(dragState.tr, after);
   }
-  autoScroll(e.clientY);
+  autoScroll(y);
 }
 
 async function onDragEnd(e) {
   if (!dragState) return;
   const ds = dragState;
+  if (ds.raf) cancelAnimationFrame(ds.raf);
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointerup', onDragEnd);
   window.removeEventListener('pointercancel', onDragEnd);
