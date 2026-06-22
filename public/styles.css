@@ -96,8 +96,7 @@ body {
   gap: 2px;
 }
 .brand-row { display: flex; align-items: center; gap: 10px; }
-.brand-logo { width: 30px; height: 30px; color: var(--accent); flex-shrink: 0; display: block; }
-.brand { font-size: 15px; font-weight: 600; color: var(--text-1); }
+.brand-logo { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; display: block; }
 .brand-sub { font-size: 12.5px; font-weight: 500; color: var(--text-2); margin-top: 2px; }
 
 .stages { padding: 4px 10px 24px; display: flex; flex-direction: column; gap: 1px; }
