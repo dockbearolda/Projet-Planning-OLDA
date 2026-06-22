@@ -195,6 +195,30 @@ async function loadRows() {
   applySortAndRender();
 }
 
+// Met à jour un compteur de la sidebar EN OPTIMISTE (sans aller-retour) : objet
+// `counts` local + pastille correspondante. Le SSE/poll (loadCounts) réconciliera
+// ensuite la valeur exacte, donc une approximation passagère est sans gravité.
+function bumpCount(slug, delta) {
+  if (!slug) return;
+  counts[slug] = Math.max(0, (counts[slug] ?? 0) + delta);
+  const el = document.querySelector(`.stage[data-slug="${slug}"]`);
+  if (!el) return;
+  const n = counts[slug];
+  const c = el.querySelector('.stage-count');
+  if (c) { c.textContent = n; c.classList.toggle('has-items', n > 0); }
+  el.classList.toggle('is-empty', n === 0);
+}
+
+// Vrai si la commande appartient à la vue actuellement affichée (même critère que
+// le filtre serveur) : sert à décider, en optimiste, si une ligne reste visible
+// après un changement d'étape / d'affectation secteur.
+function belongsToCurrentView(r) {
+  if (isSector(currentStage)) {
+    return r.stage === 'production' && (r.sectors || []).some((s) => s.sector === currentStage);
+  }
+  return r.stage === currentStage;
+}
+
 // --- Tri -------------------------------------------------------------------
 function applySortAndRender() {
   const sorted = [...rows];
@@ -535,7 +559,7 @@ function openContactPopover(r, anchor) {
     if (val === (r[field] || null)) return;
     const prev = r[field];
     r[field] = val;
-    api('PATCH', `/api/requests/${r.id}`, { [field]: val })
+    patchRow(r, { [field]: val })
       .then(() => {
         anchor.classList.toggle('has-contact', hasContact(r));
         anchor.title = hasContact(r) ? 'Contact renseigné — voir / éditer' : 'Ajouter un contact (téléphone, email)';
@@ -915,7 +939,7 @@ function cellProduct(r) {
       const prev = r.description;
       r.description = val;
       lastSent = desc.value;
-      api('PATCH', `/api/requests/${r.id}`, { description: val }).catch((err) => {
+      patchRow(r, { description: val }).catch((err) => {
         r.description = prev; reportError(err);
       });
     }
@@ -964,7 +988,7 @@ function cellMoney(r, field) {
       if (val === (r[field] ?? null)) { render(); return; }
       const prev = r[field];
       r[field] = val;
-      api('PATCH', `/api/requests/${r.id}`, { project_value: val }).catch((err) => {
+      patchRow(r, { project_value: val }).catch((err) => {
         r[field] = prev; render(); reportError(err);
       });
       render();
@@ -1004,7 +1028,7 @@ function cellDeadline(r) {
     const prev = r.deadline;
     r.deadline = val;
     showBadge();
-    api('PATCH', `/api/requests/${r.id}`, { deadline: val }).catch((err) => {
+    patchRow(r, { deadline: val }).catch((err) => {
       r.deadline = prev; showBadge(); reportError(err);
     });
   };
@@ -1208,13 +1232,29 @@ function repaintStatusPills() {
 // --- Secteurs de production -------------------------------------------------
 // On affecte un secteur à une commande en la glissant sur la colonne machine
 // de la sidebar (voir onDragEnd) ; cela la fait entrer en production.
-async function addSector(r, sector) {
-  try {
-    await api('POST', `/api/requests/${r.id}/sectors`, { sector });
-    await loadRows();
-    await loadCounts();
-    showToast(`Ajouté à ${sectorShort(sector)}`);
-  } catch (err) { reportError(err); }
+function addSector(r, sector) {
+  const prevRows = rows;
+  const prevStage = r.stage;
+  const hadSector = (r.sectors || []).some((s) => s.sector === sector);
+  // Mutation optimiste : la commande entre en production et gagne ce secteur.
+  r.stage = 'production';
+  if (!hadSector) r.sectors = [...(r.sectors || []), { sector, done: false }];
+  if (!belongsToCurrentView(r)) rows = rows.filter((x) => x.id !== r.id);
+  applySortAndRender();
+  if (!hadSector) bumpCount(sector, +1);
+  if (prevStage !== 'production') bumpCount(prevStage, -1);
+  showToast(`Ajouté à ${sectorShort(sector)}`);
+  api('POST', `/api/requests/${r.id}/sectors`, { sector }).catch((err) => {
+    r.stage = prevStage;
+    if (!hadSector) r.sectors = (r.sectors || []).filter((s) => s.sector !== sector);
+    rows = prevRows;
+    lastRowsSig = signature(rows);
+    if (!hadSector) bumpCount(sector, -1);
+    if (prevStage !== 'production') bumpCount(prevStage, +1);
+    applySortAndRender();
+    reportError(err);
+    resyncAfterRollback();
+  });
 }
 
 const MAQUETTE_STATUSES = ['Maquette à faire', 'Maquette à valider'];
@@ -1257,7 +1297,7 @@ function setStatus(r, val, render) {
   if (val === prev) return;
   r.status = val;
   render();
-  api('PATCH', `/api/requests/${r.id}`, { status: val }).catch((err) => {
+  patchRow(r, { status: val }).catch((err) => {
     r.status = prev; render(); reportError(err);
   });
 }
@@ -1394,7 +1434,7 @@ function bindInline(input, r, field, transform) {
     const prev = r[field];
     r[field] = val;
     lastSent = raw;
-    api('PATCH', `/api/requests/${r.id}`, { [field]: val }).catch((err) => {
+    patchRow(r, { [field]: val }).catch((err) => {
       r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
     });
   });
@@ -1403,50 +1443,175 @@ function bindInline(input, r, field, transform) {
 // --- PATCH générique optimiste --------------------------------------------
 function patch(r, body, applyOptimistic) {
   applyOptimistic();
-  api('PATCH', `/api/requests/${r.id}`, body).catch((err) => {
+  patchRow(r, body).catch((err) => {
     reportError(err);
     loadRows(); // resync en cas d'échec
   });
 }
 
-// --- Création --------------------------------------------------------------
-// Crée une commande adaptée à la vue courante et renvoie son id.
-//  - vue secteur (prod_*) → commande en production + ce secteur affecté
-//  - sinon → commande dans cette phase
-async function createForCurrentView() {
-  if (isSector(currentStage)) {
-    const created = await api('POST', '/api/requests', { stage: 'production' });
-    await api('POST', `/api/requests/${created.id}/sectors`, { sector: currentStage });
-    return created.id;
-  }
-  const created = await api('POST', '/api/requests', { stage: currentStage });
-  return created.id;
+// --- Création / sauvegardes optimistes ------------------------------------
+// Une ligne tout juste créée reçoit d'abord un id temporaire (« tmp-N ») et
+// s'affiche instantanément ; le POST part en arrière-plan. Tant que l'id réel
+// n'est pas revenu, les sauvegardes de champs de cette ligne sont mises EN FILE
+// (pendingCreates) au lieu d'appeler /api/requests/tmp-… ; finalizeCreate les
+// envoie d'un bloc dès l'arrivée de l'id réel.
+const pendingCreates = new Map(); // tmpId -> { patch: {champ: valeur, …} }
+// Ids temporaires supprimés AVANT que leur POST de création ne réponde : on
+// supprimera la vraie ligne (orpheline côté serveur) dès l'arrivée de l'id réel.
+const cancelledCreates = new Set();
+let tmpSeq = 0;
+const isTempId = (id) => typeof id === 'string' && id.startsWith('tmp-');
+
+// Réconcilie discrètement la grille + les compteurs avec le serveur après un
+// rollback : récupère un éventuel changement concurrent d'un autre poste et la
+// valeur exacte des compteurs. Silencieux si le serveur est injoignable — le
+// rollback local a déjà rétabli un état cohérent (cas « serveur coupé »).
+function resyncAfterRollback() {
+  loadRows().catch(() => {});
+  loadCounts().catch(() => {});
 }
 
-$btnNew.addEventListener('click', async () => {
-  try {
-    const id = await createForCurrentView();
-    await loadRows();
-    await loadCounts();
-    // focus première cellule éditable de la nouvelle ligne
-    const tr = $rows.querySelector(`tr[data-id="${id}"]`);
-    if (tr) {
-      tr.scrollIntoView({ block: 'nearest' });
-      const firstInput = tr.querySelector('.client-company, .cell-input');
-      if (firstInput) firstInput.focus();
-    }
-  } catch (err) { reportError(err); }
-});
+// PATCH d'un (ou plusieurs) champ d'une commande, compatible ligne optimiste.
+// Renvoie une promesse : réseau réel si l'id est définitif, résolue tout de suite
+// si la modif a été mise en file (l'appelant ne déclenche alors pas son rollback).
+function patchRow(r, body) {
+  const pending = pendingCreates.get(String(r.id));
+  if (pending) {
+    Object.assign(pending.patch, body); // coalesce les champs en attente
+    return Promise.resolve(null);
+  }
+  return api('PATCH', `/api/requests/${r.id}`, body);
+}
 
-// --- Suppression -----------------------------------------------------------
-async function removeRow(r) {
+// Construit une ligne brouillon optimiste (tous champs vides) pour la vue
+// courante : en vue secteur elle entre directement en production avec ce secteur.
+function makeOptimisticRow() {
+  const sectorView = isSector(currentStage);
+  const maxPos = rows.reduce((m, r) => Math.max(m, r.position ?? 0), 0);
+  const now = new Date().toISOString();
+  return {
+    id: `tmp-${++tmpSeq}`,
+    stage: sectorView ? 'production' : currentStage,
+    priority: 1, client_type: 'pro',
+    billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
+    quantity: null, product: null, color: null, project_value: null,
+    description: null, deadline: null, status: null,
+    position: maxPos + 1000,
+    sectors: sectorView ? [{ sector: currentStage, done: false }] : [],
+    devis_name: null, bat_name: null,
+    created_at: now, updated_at: now,
+  };
+}
+
+// Remplace l'id temporaire par l'id réel renvoyé par le serveur — dans `rows`,
+// dans le <tr> (data-id) et dans le renderer incrémental (rowEls) — sans jamais
+// reconstruire la ligne (on préserve le focus / la saisie en cours). Puis envoie
+// les modifications de champs mises en file pendant l'attente.
+function finalizeCreate(tmpId, created) {
+  // La ligne a été supprimée pendant que son POST était en vol : on retire la
+  // commande désormais orpheline côté serveur au lieu de la « finaliser ».
+  if (cancelledCreates.has(tmpId)) {
+    cancelledCreates.delete(tmpId);
+    pendingCreates.delete(tmpId);
+    api('DELETE', `/api/requests/${created.id}`).catch(reportError);
+    return;
+  }
+  const pending = pendingCreates.get(tmpId);
+  pendingCreates.delete(tmpId);
+  const r = rows.find((x) => x.id === tmpId);
+  if (r) {
+    r.id = created.id;
+    if (created.position != null) r.position = created.position;
+    if (created.created_at) r.created_at = created.created_at;
+    if (created.updated_at) r.updated_at = created.updated_at;
+    const entry = rowEls.get(tmpId);
+    if (entry) {
+      rowEls.delete(tmpId);
+      entry.tr.dataset.id = created.id;
+      entry.sig = `${created.id}:${r.updated_at}`;
+      rowEls.set(String(created.id), entry);
+    }
+    lastRowsSig = signature(rows);
+  }
+  if (pending && Object.keys(pending.patch).length) {
+    // Échec du flush : on resynchronise pour montrer l'état réel du serveur
+    // plutôt que de laisser des valeurs locales non enregistrées en silence.
+    api('PATCH', `/api/requests/${created.id}`, pending.patch).catch((err) => {
+      reportError(err);
+      loadRows().catch(() => {});
+    });
+  }
+}
+
+// Crée une commande adaptée à la vue courante, en optimiste : la ligne brouillon
+// apparaît et reçoit le focus immédiatement, le POST suit en arrière-plan.
+function createForCurrentView() {
+  const sectorView = isSector(currentStage);
+  const r = makeOptimisticRow();
+  const tmpId = r.id;
+  const viewSlug = currentStage; // figé : la vue peut changer avant la réponse
+  rows.push(r);
+  pendingCreates.set(tmpId, { patch: {} });
+  applySortAndRender();
+  bumpCount(viewSlug, +1);
+
+  const tr = $rows.querySelector(`tr[data-id="${tmpId}"]`);
+  if (tr) {
+    tr.scrollIntoView({ block: 'nearest' });
+    const firstInput = tr.querySelector('.client-company, .cell-input');
+    if (firstInput) firstInput.focus();
+  }
+
+  const sector = sectorView ? viewSlug : null;
+  api('POST', '/api/requests', { stage: sectorView ? 'production' : viewSlug })
+    .then(async (created) => {
+      if (sector) {
+        await api('POST', `/api/requests/${created.id}/sectors`, { sector });
+        created.stage = 'production';
+      }
+      finalizeCreate(tmpId, created);
+    })
+    .catch((err) => {
+      pendingCreates.delete(tmpId);
+      cancelledCreates.delete(tmpId);
+      rows = rows.filter((x) => x.id !== tmpId);
+      applySortAndRender();
+      bumpCount(viewSlug, -1);
+      reportError(err);
+      loadCounts().catch(() => {}); // valeur exacte (un loadCounts concurrent a pu déjà corriger)
+    });
+}
+
+$btnNew.addEventListener('click', () => createForCurrentView());
+
+// --- Suppression (optimiste) ----------------------------------------------
+function removeRow(r) {
   if (!confirm('Supprimer cette commande définitivement ?')) return;
-  try {
-    await api('DELETE', `/api/requests/${r.id}`);
+  // Ligne pas encore créée côté serveur : on l'enlève localement et on marque
+  // l'id temporaire — si son POST de création est encore en vol, finalizeCreate
+  // supprimera la commande orpheline à la réponse.
+  if (isTempId(r.id)) {
+    pendingCreates.delete(String(r.id));
+    cancelledCreates.add(String(r.id));
     rows = rows.filter((x) => x.id !== r.id);
     applySortAndRender();
-    await loadCounts();
-  } catch (err) { reportError(err); }
+    bumpCount(currentStage, -1);
+    return;
+  }
+  const prevRows = rows;
+  const viewSlug = currentStage;
+  rows = rows.filter((x) => x.id !== r.id);
+  applySortAndRender();
+  bumpCount(viewSlug, -1);
+  api('DELETE', `/api/requests/${r.id}`).catch((err) => {
+    // rollback local immédiat (résilient même serveur coupé), puis resync.
+    rows = prevRows;
+    lastRowsSig = signature(rows);
+    bumpCount(viewSlug, +1);
+    applySortAndRender();
+    reportError(err);
+    resyncAfterRollback();
+  });
 }
 
 // Construit le corps de copie d'une commande (tous les champs sauf la position,
@@ -1470,28 +1635,53 @@ function copyBody(r, stage) {
   };
 }
 
-// Duplique une commande : crée une copie qui reste dans la même étape.
-async function duplicateRow(r) {
-  try {
-    const created = await api('POST', '/api/requests', copyBody(r));
-    if (created.stage === currentStage) {
-      rows.push(created);
+// Duplique une commande (optimiste) : la copie reste dans la même étape et
+// apparaît tout de suite. Les PDF et secteurs ne sont pas recopiés (comme côté
+// serveur), donc en vue secteur la copie n'appartient pas à la colonne courante.
+function duplicateRow(r) {
+  const maxPos = rows.reduce((m, x) => Math.max(m, x.position ?? 0), 0);
+  const now = new Date().toISOString();
+  const tmpId = `tmp-${++tmpSeq}`;
+  const copy = {
+    ...r, id: tmpId, sectors: [], devis_name: null, bat_name: null,
+    position: maxPos + 1000, created_at: now, updated_at: now,
+  };
+  // La copie n'apparaît dans la grille que si elle relève bien de la vue courante.
+  if (!belongsToCurrentView(copy)) {
+    api('POST', '/api/requests', copyBody(r)).catch(reportError);
+    return;
+  }
+  const viewSlug = currentStage;
+  rows.push(copy);
+  pendingCreates.set(tmpId, { patch: {} });
+  applySortAndRender();
+  bumpCount(viewSlug, +1);
+  const tr = $rows.querySelector(`tr[data-id="${tmpId}"]`);
+  if (tr) tr.scrollIntoView({ block: 'nearest' });
+  api('POST', '/api/requests', copyBody(r))
+    .then((created) => finalizeCreate(tmpId, created))
+    .catch((err) => {
+      pendingCreates.delete(tmpId);
+      cancelledCreates.delete(tmpId);
+      rows = rows.filter((x) => x.id !== tmpId);
       applySortAndRender();
-      const tr = $rows.querySelector(`tr[data-id="${created.id}"]`);
-      if (tr) tr.scrollIntoView({ block: 'nearest' });
-    }
-    await loadCounts();
-  } catch (err) { reportError(err); }
+      bumpCount(viewSlug, -1);
+      reportError(err);
+      loadCounts().catch(() => {});
+    });
 }
 
-// Envoi vers Fiverr / Toptex : copie la commande dans la catégorie cible en
-// laissant l'originale en place (contrairement au déplacement par glisser).
-async function copyToStage(r, slug) {
-  try {
-    await api('POST', '/api/requests', copyBody(r, slug));
-    await loadCounts();
-    showToast(`Copié vers ${STAGE_LABEL[slug] || slug}`);
-  } catch (err) { reportError(err); }
+// Envoi vers Fiverr / Toptex (optimiste) : copie la commande dans la catégorie
+// cible en laissant l'originale en place. La copie n'est pas dans la vue courante
+// (autre étape) : seul le compteur de la cible bouge, le SSE réconciliera.
+function copyToStage(r, slug) {
+  bumpCount(slug, +1);
+  showToast(`Copié vers ${STAGE_LABEL[slug] || slug}`);
+  api('POST', '/api/requests', copyBody(r, slug)).catch((err) => {
+    bumpCount(slug, -1);
+    reportError(err);
+    loadCounts().catch(() => {}); // valeur exacte (un loadCounts concurrent a pu déjà corriger)
+  });
 }
 
 // --- Glisser-déposer unifié souris + tactile (Pointer Events) --------------
@@ -1595,6 +1785,16 @@ async function onDragEnd(e) {
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
   dragState = null;
 
+  // Ligne encore en cours de création (id temporaire, ex. duplication non
+  // brouillon) : on ne peut pas la déplacer / réordonner tant que son id réel
+  // n'est pas revenu (sinon PATCH/POST vers /api/requests/tmp-…). On annule le
+  // geste proprement et on remet la grille en ordre.
+  if (isTempId(ds.r.id)) {
+    showToast('Commande en cours de création — réessaie dans un instant.');
+    applySortAndRender();
+    return;
+  }
+
   const slug = stageEl ? stageEl.dataset.slug : null;
   if (slug) {
     // déposé sur une entrée de la sidebar
@@ -1608,13 +1808,22 @@ async function onDragEnd(e) {
   }
 }
 
-async function moveToStage(r, slug) {
-  try {
-    await api('PATCH', `/api/requests/${r.id}`, { stage: slug });
-    rows = rows.filter((x) => x.id !== r.id);
+function moveToStage(r, slug) {
+  const prevRows = rows;
+  const viewSlug = currentStage;
+  rows = rows.filter((x) => x.id !== r.id);
+  applySortAndRender();
+  bumpCount(viewSlug, -1);
+  bumpCount(slug, +1);
+  api('PATCH', `/api/requests/${r.id}`, { stage: slug }).catch((err) => {
+    rows = prevRows;
+    lastRowsSig = signature(rows);
+    bumpCount(viewSlug, +1);
+    bumpCount(slug, -1);
     applySortAndRender();
-    await loadCounts();
-  } catch (err) { reportError(err); loadRows(); }
+    reportError(err);
+    resyncAfterRollback();
+  });
 }
 
 async function commitReorder(r) {
