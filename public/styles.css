@@ -97,9 +97,135 @@ body {
   flex-direction: column;
   gap: 2px;
 }
-.brand-row { display: flex; align-items: center; gap: 10px; }
-.brand-logo { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; display: block; }
-.brand-sub { font-size: 12.5px; font-weight: 500; color: var(--text-2); margin-top: 2px; }
+.brand-row { display: flex; align-items: center; gap: 13px; }
+
+/* --- Logo OLDA : tuile glassmorphism haut de gamme à reflets dynamiques --- */
+.brand-logo-glass {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  isolation: isolate;          /* contient les couches de lumière */
+  overflow: hidden;
+  cursor: default;
+  /* corps du verre : dégradé translucide froid */
+  background:
+    linear-gradient(150deg,
+      rgba(255, 255, 255, 0.62),
+      rgba(255, 255, 255, 0.14) 44%,
+      rgba(74, 98, 116, 0.12) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(185%);
+  backdrop-filter: blur(16px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  /* arêtes lumineuses + profondeur interne + ombre portée */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 -11px 20px rgba(74, 98, 116, 0.12),
+    0 6px 16px rgba(74, 98, 116, 0.22),
+    0 1px 2px rgba(32, 41, 48, 0.10);
+  /* position du reflet spéculaire (suit le curseur via JS) */
+  --mx: 50%;
+  --my: 8%;
+  transition: transform .4s cubic-bezier(.2, .7, .2, 1),
+              box-shadow .4s cubic-bezier(.2, .7, .2, 1);
+}
+
+/* reflet spéculaire : halo radial qui suit le pointeur */
+.brand-logo-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: radial-gradient(70% 70% at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.92),
+    rgba(255, 255, 255, 0.22) 38%,
+    rgba(255, 255, 255, 0) 64%);
+  opacity: .55;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: opacity .35s ease;
+}
+
+/* balayage de lumière : bande brillante qui traverse en diagonale */
+.brand-logo-glass::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: -50%;
+  left: 0;
+  width: 42%;
+  height: 200%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.9),
+    transparent);
+  filter: blur(2px);
+  transform: translateX(-220%) rotate(20deg);
+  animation: brandSheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes brandSheen {
+  0%, 68%  { transform: translateX(-220%) rotate(20deg); opacity: 0; }
+  74%      { opacity: 1; }
+  92%      { opacity: 1; }
+  100%     { transform: translateX(430%) rotate(20deg); opacity: 0; }
+}
+
+.brand-logo-glass:hover {
+  transform: translateY(-1.5px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 -11px 22px rgba(74, 98, 116, 0.14),
+    0 10px 24px rgba(74, 98, 116, 0.30),
+    0 2px 4px rgba(32, 41, 48, 0.12);
+}
+.brand-logo-glass:hover::after { opacity: .95; }
+
+.brand-logo {
+  position: relative;
+  z-index: 1;
+  width: 29px;
+  height: 29px;
+  color: var(--accent);
+  display: block;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55))
+    drop-shadow(0 1px 2px rgba(74, 98, 116, 0.28));
+}
+
+/* --- Date du jour, en haut à gauche --- */
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.1;
+  min-width: 0;
+}
+.today-dow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent-300);
+}
+.today-date {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--text-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo-glass { transition: none; }
+  .brand-logo-glass::before { animation: none; opacity: 0; }
+}
 
 .stages { padding: 4px 10px 24px; display: flex; flex-direction: column; gap: 1px; }
 
@@ -1338,6 +1464,8 @@ body.dragging-active * { cursor: grabbing !important; }
   .app { grid-template-columns: 216px 1fr; }
   .work-head { padding: 16px 20px 12px; }
   .grid { min-width: 980px; }
+  /* sidebar étroite : logo au-dessus, date en dessous (toujours en haut à gauche) */
+  .brand-row { flex-direction: column; align-items: flex-start; gap: 10px; }
 }
 
 /* Portrait étroit : la sidebar reste visible, la grille défile horizontalement. */
