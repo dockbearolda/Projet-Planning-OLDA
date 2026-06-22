@@ -84,6 +84,12 @@ body {
   overflow: hidden;
 }
 
+/* Densité d'affichage : pilote la hauteur de ligne (--row-h) pour toute la grille.
+   Compact / Normal / Confort, mémorisé par appareil (localStorage). */
+.app.density-compact { --row-h: 50px; }
+.app.density-normal  { --row-h: 60px; }
+.app.density-confort { --row-h: 78px; }
+
 /* ---------------------------------------------------------------- Sidebar */
 .sidebar {
   background: var(--sidebar-bg);
@@ -321,10 +327,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   padding: 20px 28px 16px;
   border-bottom: 1px solid var(--hairline);
   flex-shrink: 0;
 }
+/* « Nouvelle commande » en tête à gauche · réglages à droite · recherche centrée */
+.work-head-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.work-head-right { display: flex; align-items: center; gap: 12px; }
 .work-title { display: flex; align-items: baseline; gap: 10px; }
 .work-title h1 { font-size: 18px; font-weight: 500; margin: 0; color: var(--text-1); }
 .work-count { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
@@ -366,6 +377,38 @@ body {
 .stage-link:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
 .stage-link:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
 .stage-link-ic { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* ---------------------------------------- Réglage de densité (segmenté) */
+.density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+.density-opt {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.density-opt:hover { color: var(--text-1); }
+.density-opt.active {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(32, 41, 48, .10);
+}
+.density-opt:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* ------------------------------------------------ Outil de devis Fiverr */
 .fiverr-tool {
@@ -771,6 +814,38 @@ tr:hover .handle { color: var(--text-2); }
 .prio-pill.p1 { color: var(--success); background: var(--success-bg); }
 .prio-pill.p2 { color: var(--warn); background: var(--warn-bg); }
 .prio-pill.p3 { color: var(--danger); background: var(--danger-bg); }
+
+/* --- Groupes de priorité (vue par défaut) -------------------------------- */
+/* Barre de couleur à gauche de chaque ligne (bord intérieur de la 1re cellule),
+   codée par niveau de priorité — même palette que les pastilles. */
+.grid tbody tr.prio-bar-p1 td:first-child { box-shadow: inset 4px 0 0 0 var(--success); }
+.grid tbody tr.prio-bar-p2 td:first-child { box-shadow: inset 4px 0 0 0 var(--warn); }
+.grid tbody tr.prio-bar-p3 td:first-child { box-shadow: inset 4px 0 0 0 var(--danger); }
+
+/* En-tête de groupe : bandeau discret avec pastille de couleur + libellé + total. */
+.grid tbody tr.prio-group td {
+  padding: 0;
+  height: auto;
+  border-bottom: 1px solid var(--grid-line);
+  background: rgba(var(--accent-rgb), 0.045);
+}
+.grid tbody tr.prio-group:hover td { background: rgba(var(--accent-rgb), 0.045); }
+.grid tbody tr.prio-group.p1 td { box-shadow: inset 4px 0 0 0 var(--success); }
+.grid tbody tr.prio-group.p2 td { box-shadow: inset 4px 0 0 0 var(--warn); }
+.grid tbody tr.prio-group.p3 td { box-shadow: inset 4px 0 0 0 var(--danger); }
+.prio-group-inner { display: flex; align-items: center; gap: 8px; padding: 7px 16px; }
+.prio-group-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+.prio-group.p1 .prio-group-dot { background: var(--success); }
+.prio-group.p2 .prio-group-dot { background: var(--warn); }
+.prio-group.p3 .prio-group-dot { background: var(--danger); }
+.prio-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.prio-group-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 /* Client : société (info principale, en gras) + sous-ligne discrète référent +
    bascule pro/perso. Fusionne les anciennes colonnes Type / Société / Référent. */
@@ -1430,9 +1505,11 @@ button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
   .dup-btn { opacity: 1 !important; }
   .handle { color: var(--text-2); }
 
-  /* lignes et cellules encore un cran plus hautes pour le doigt */
-  .grid tbody td { height: 64px; }
-  .cell, .cell-input { min-height: 64px; height: 64px; }
+  /* lignes et cellules : suivent la densité, avec un plancher tactile (≥ 56px) */
+  .grid tbody td { height: max(var(--row-h), 56px); }
+  .cell, .cell-input { min-height: max(var(--row-h), 56px); height: max(var(--row-h), 56px); }
+  /* l'en-tête de groupe garde sa hauteur naturelle (pas un plancher de ligne) */
+  .grid tbody tr.prio-group td { height: auto; }
 
   /* éviter le zoom auto de Chrome au focus d'un champ (≥ 16px) */
   .cell-input { font-size: 16px; }
@@ -1479,6 +1556,9 @@ button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
 
   /* bouton principal plus grand */
   .btn-primary { padding: 11px 18px; font-size: 15px; }
+
+  /* réglage de densité : cibles tactiles ≥ 44px */
+  .density-opt { min-height: 44px; padding: 10px 14px; font-size: 14px; }
 }
 
 /* Tablette en paysage / largeur intermédiaire : sidebar un peu plus compacte

@@ -31,21 +31,30 @@
     <!-- Zone de travail -->
     <main class="work">
       <header class="work-head">
-        <div class="work-title">
-          <h1 id="stageTitle">Commande</h1>
-          <span class="work-count" id="stageCount"></span>
+        <div class="work-head-left">
+          <button class="btn-primary" id="btnNew" type="button">+ Nouvelle commande</button>
+          <div class="work-title">
+            <h1 id="stageTitle">Commande</h1>
+            <span class="work-count" id="stageCount"></span>
+          </div>
         </div>
         <div class="grid-search" id="gridSearch">
-        <svg class="grid-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
-        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
-        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
-      </div>
-      <a class="stage-link" id="stageLink" target="_blank" rel="noopener noreferrer" hidden>
-        <svg class="stage-link-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-        <span class="stage-link-label" id="stageLinkLabel"></span>
-      </a>
-      <button class="btn-primary" id="btnNew" type="button">+ Nouvelle commande</button>
+          <svg class="grid-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
+          <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
+          <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
+        </div>
+        <div class="work-head-right">
+          <a class="stage-link" id="stageLink" target="_blank" rel="noopener noreferrer" hidden>
+            <svg class="stage-link-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+            <span class="stage-link-label" id="stageLinkLabel"></span>
+          </a>
+          <div class="density-toggle" id="densityToggle" role="group" aria-label="Densité d'affichage">
+            <button type="button" class="density-opt" data-density="compact" aria-pressed="false">Compact</button>
+            <button type="button" class="density-opt" data-density="normal" aria-pressed="false">Normal</button>
+            <button type="button" class="density-opt" data-density="confort" aria-pressed="false">Confort</button>
+          </div>
+        </div>
       </header>
 
       <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
