@@ -215,28 +215,6 @@ body {
 .btn-primary:active { transform: scale(0.97); }
 .btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-/* bouton secondaire « fantôme » (Imprimer) */
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-right: 10px;
-  padding: 7px 12px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  background: #fff;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
-}
-.btn-ghost svg { flex-shrink: 0; }
-.btn-ghost:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
-.btn-ghost:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
-
 .stage-link {
   display: inline-flex;
   align-items: center;
@@ -907,20 +885,49 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
   color: var(--text-1b); /* corps : un cran sous le nom du client */
 }
+/* Description multi-ligne (textarea) + flèche de dépliage. */
+.product-desc-row { display: flex; align-items: flex-start; gap: 2px; }
 .product-stack .product-desc {
-  height: auto;
+  flex: 1;
+  min-width: 0;
+  height: auto;          /* rows=1 → 1 ligne repliée ; JS pose la hauteur dépliée */
   min-height: 0;
   padding: 2px 12px 4px;
   font-size: 13px;
   font-weight: 450;
+  line-height: 1.35;
   color: var(--text-2); /* lisible (sous-note plus contrastée qu'un gris clair) */
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  font-family: inherit;
 }
 .product-stack .product-desc::placeholder { color: #b0b4bb; }
+/* flèche de dépliage : visible seulement si ≥ 2 lignes (toggle.hidden côté JS) */
+.desc-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 1px 6px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.15s ease;
+}
+.desc-toggle:hover { background: var(--accent-soft); color: var(--accent); }
+.desc-toggle svg { width: 15px; height: 15px; display: block; transition: transform 0.15s ease; }
+.desc-toggle.open svg { transform: rotate(180deg); }
+.desc-toggle[hidden] { display: none; }
 /* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
-   cellule Produit) pour rester éditable, mais PAS au survol : la révéler au
-   survol agrandissait la ligne — effet de saut désagréable au passage souris. */
-.product-stack.desc-empty .product-desc { display: none; }
-.product-stack.desc-empty:focus-within .product-desc { display: block; }
+   cellule Produit) pour rester éditable, mais PAS au survol. */
+.product-stack.desc-empty .product-desc-row { display: none; }
+.product-stack.desc-empty:focus-within .product-desc-row { display: flex; }
 
 /* ------------------------------------------- Largeur des colonnes réglable */
 /* Mode manuel : le tableau suit exactement les largeurs posées sur les <col>
@@ -1264,7 +1271,8 @@ body.dragging-active * { cursor: grabbing !important; }
   .col-product-cell { height: auto; }
   .product-stack .product-name { min-height: 44px; height: auto; }
   .product-stack .product-desc { min-height: 0; height: auto; font-size: 14px; }
-  .product-stack.desc-empty .product-desc { display: block; }
+  .product-stack.desc-empty .product-desc-row { display: flex; }
+  .desc-toggle { width: 32px; height: 32px; }
 
   /* cibles de toucher plus grandes */
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
@@ -1314,191 +1322,5 @@ body.dragging-active * { cursor: grabbing !important; }
 @media (max-width: 820px) {
   .app { grid-template-columns: 188px 1fr; }
   .sidebar-head { padding: 16px 14px 12px; }
-}
-
-/* =========================================================================
-   Impression — mise en page papier propre de la catégorie affichée.
-   On masque la barre latérale, l'en-tête interactif et les colonnes d'action ;
-   on garde un en-tête papier (titre + date) et le tableau, en noir sur blanc.
-   ========================================================================= */
-.print-head { display: none; }
-
-@media print {
-  @page { margin: 12mm; size: landscape; }
-
-  html, body { height: auto; background: #fff; font-size: 11px; }
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-
-  .app { display: block; height: auto; overflow: visible; }
-  .sidebar, .work-head, .fiverr-tool { display: none !important; }
-  .work { display: block; overflow: visible; }
-  .grid-wrap { overflow: visible !important; flex: none; }
-
-  /* en-tête papier */
-  .print-head { display: block; margin: 0 0 12px; }
-  .print-head .ph-title { font-size: 18px; font-weight: 700; color: #000; }
-  .print-head .ph-meta { font-size: 11px; color: #555; margin-top: 2px; }
-
-  /* on retire les colonnes interactives (poignée, contact/PDF, actions) */
-  .col-handle, .col-del { display: none !important; }
-
-  /* tableau lisible à plat, sans interaction : on ignore les largeurs
-     manuelles d'écran pour laisser le papier se répartir automatiquement */
-  .grid, .grid.manual-cols { table-layout: auto !important; min-width: 0; width: 100% !important; font-size: 11px; }
-  .grid col { width: auto !important; }
-  .col-resizer { display: none !important; }
-  .grid thead th { position: static; background: #f0f0f0 !important; border: 1px solid #bbb; padding: 5px 6px; }
-  .grid thead th .arrow { display: none; }
-  .grid tbody td { height: auto; border: 1px solid #ddd; }
-  .grid tbody tr { break-inside: avoid; }
-  .grid tbody tr:hover { background: transparent; }
-
-  /* les champs deviennent du texte simple */
-  .cell-input {
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 5px 6px !important;
-    height: auto !important;
-    color: #000;
-  }
-  .cell-input::placeholder { color: transparent !important; }
-
-  /* pastilles / badges conservés mais figés (pas de pointeur) */
-  .status-pill, .deadline-badge, .type-tag { margin: 4px 6px; cursor: default; }
-  .deadline-badge.empty, .empty-field { display: none; }
-
-  .empty { display: none; }
-}
-
-/* =========================================================================
-   Dictée vocale — micro par ligne + popover (écoute / analyse / confirmation)
-   ========================================================================= */
-.voice-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  border: 0;
-  background: transparent;
-  color: var(--text-3);
-  cursor: pointer;
-  opacity: 0;
-  width: 28px;
-  height: 40px;
-  padding: 0;
-  transition: opacity 0.12s ease, color 0.12s ease;
-}
-.voice-btn svg { display: block; }
-tr:hover .voice-btn { opacity: 1; }
-tr.is-draft .voice-btn { opacity: 1; color: var(--accent); } /* ligne vide : micro visible */
-.voice-btn:hover { color: var(--accent); }
-.voice-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 6px; }
-
-.voice-pop {
-  position: fixed;
-  z-index: 1100;
-  width: 320px;
-  background: #fff;
-  border: 1px solid var(--hairline);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(74, 98, 116, 0.20);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.vp-head { display: flex; align-items: center; gap: 8px; min-height: 18px; }
-.vp-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.vp-head.error .vp-title { color: var(--danger); }
-
-/* pastille rouge « enregistrement » */
-.vp-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--danger);
-  flex-shrink: 0;
-  animation: vpPulse 1.3s ease-in-out infinite;
-}
-@keyframes vpPulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(226, 75, 74, 0.35); }
-  50% { opacity: 0.65; box-shadow: 0 0 0 7px rgba(226, 75, 74, 0); }
-}
-
-/* spinner d'analyse */
-.vp-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--hairline);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  flex-shrink: 0;
-  animation: vpSpin 0.8s linear infinite;
-}
-@keyframes vpSpin { to { transform: rotate(360deg); } }
-
-/* transcript en direct */
-.vp-transcript {
-  min-height: 64px;
-  max-height: 150px;
-  overflow-y: auto;
-  background: #f5f5f7;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  padding: 9px 10px;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--text-1);
-}
-.vp-interim { color: var(--text-3); }
-.vp-placeholder { color: #b0b4bb; }
-
-/* récapitulatif des champs extraits */
-.vp-fields { display: flex; flex-direction: column; gap: 4px; max-height: 250px; overflow-y: auto; }
-.vp-field {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 13px;
-  padding: 5px 9px;
-  background: #f8f8fa;
-  border-radius: 6px;
-}
-.vp-field-label { color: var(--text-3); flex-shrink: 0; }
-.vp-field-value { color: var(--text-1); font-weight: 500; text-align: right; overflow-wrap: anywhere; }
-
-.vp-msg { font-size: 13px; color: var(--text-1); line-height: 1.45; }
-
-.vp-actions { display: flex; justify-content: flex-end; gap: 6px; }
-.vp-btn {
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  padding: 7px 12px;
-  border-radius: 7px;
-  border: 1px solid var(--hairline);
-  background: #fff;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
-}
-.vp-btn:hover { color: var(--accent); border-color: var(--accent); }
-.vp-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.vp-btn.vp-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.vp-btn.vp-primary:hover { filter: brightness(1.05); color: #fff; }
-
-/* tablette / tactile : micro toujours visible, cibles plus grandes */
-@media (pointer: coarse) {
-  .voice-btn { opacity: 1 !important; width: 38px; }
-  .vp-btn { padding: 10px 15px; font-size: 14px; }
-  .vp-transcript { font-size: 15px; }
 }
 

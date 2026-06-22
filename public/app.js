@@ -376,7 +376,6 @@ function buildRow(r) {
   // supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
-  tdDel.appendChild(voiceButton(r));
   if (!draft) {
     for (const t of SEND_TARGETS) {
       if (t.slug === r.stage) continue; // déjà dans cette catégorie
@@ -710,277 +709,6 @@ function openAttachPopover(r, anchor) {
   }, 0);
 }
 
-// --- Dictée vocale -----------------------------------------------------------
-// Un micro par ligne (+ bouton global « Commande vocale ») : la voix est
-// transcrite en direct par le navigateur (Web Speech API, fr-FR), le texte est
-// envoyé à /api/voice/extract qui en déduit les champs (API Claude), puis
-// l'utilisateur confirme avant remplissage de la ligne (PATCH classique → SSE).
-const VOICE_FIELD_LABELS = {
-  billing_company: 'Société',
-  contact_referent: 'Référent',
-  contact_phone: 'Téléphone',
-  contact_email: 'Email',
-  product: 'Produits',
-  color: 'Couleur',
-  quantity: 'Quantité',
-  project_value: 'Valeur',
-  deadline: 'Échéance',
-  description: 'Description',
-  client_type: 'Type',
-};
-
-const MIC_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v4"/></svg>';
-
-function speechRecognitionClass() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
-function voiceButton(r) {
-  const btn = document.createElement('button');
-  btn.className = 'voice-btn';
-  btn.type = 'button';
-  btn.title = 'Dicter la commande — remplissage automatique';
-  btn.setAttribute('aria-label', 'Dicter la commande');
-  btn.innerHTML = MIC_SVG;
-  btn.addEventListener('click', (e) => { e.stopPropagation(); openVoicePopover(r, btn); });
-  return btn;
-}
-
-let openVoicePop = null;
-function closeVoicePopover() {
-  if (!openVoicePop) return;
-  const s = openVoicePop;
-  s.closed = true;
-  if (s.rec) { try { s.rec.onend = null; s.rec.abort(); } catch (_) {} }
-  s.pop.remove();
-  document.removeEventListener('pointerdown', onVoiceDocDown, true);
-  document.removeEventListener('keydown', onVoiceKey, true);
-  openVoicePop = null;
-}
-function onVoiceDocDown(e) {
-  if (openVoicePop && !openVoicePop.pop.contains(e.target) &&
-      !e.target.closest('.voice-btn') && !e.target.closest('#btnVoice')) {
-    closeVoicePopover();
-  }
-}
-function onVoiceKey(e) { if (e.key === 'Escape') closeVoicePopover(); }
-
-function positionVoicePop(pop, anchor) {
-  const ar = anchor.getBoundingClientRect();
-  const pr = pop.getBoundingClientRect();
-  let left = ar.left;
-  if (left + pr.width > window.innerWidth - 8) left = window.innerWidth - pr.width - 8;
-  let top = ar.bottom + 6;
-  if (top + pr.height > window.innerHeight - 8) top = ar.top - pr.height - 6;
-  pop.style.left = Math.max(8, Math.round(left)) + 'px';
-  pop.style.top = Math.max(8, Math.round(top)) + 'px';
-}
-
-function openVoicePopover(r, anchor) {
-  if (openVoicePop && openVoicePop.id === r.id) { closeVoicePopover(); return; }
-  closeVoicePopover();
-  closeContactPopover(false);
-  closeAttachPopover();
-
-  const pop = document.createElement('div');
-  pop.className = 'voice-pop';
-  document.body.appendChild(pop);
-
-  const s = { id: r.id, r, pop, anchor, rec: null, finalText: '', closed: false, stopping: false };
-  openVoicePop = s;
-
-  setTimeout(() => {
-    document.addEventListener('pointerdown', onVoiceDocDown, true);
-    document.addEventListener('keydown', onVoiceKey, true);
-  }, 0);
-
-  if (!speechRecognitionClass()) {
-    renderVoiceError(s, "La dictée n'est pas disponible sur ce navigateur. Utilisez Chrome, Edge ou Safari.", false);
-    return;
-  }
-  startListening(s);
-}
-
-function startListening(s) {
-  s.finalText = '';
-  s.stopping = false;
-  renderVoiceListen(s);
-
-  const SR = speechRecognitionClass();
-  const rec = new SR();
-  s.rec = rec;
-  rec.lang = 'fr-FR';
-  rec.continuous = true;
-  rec.interimResults = true;
-
-  rec.onresult = (e) => {
-    if (s.closed) return;
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) s.finalText += t + ' ';
-      else interim += t;
-    }
-    updateVoiceTranscript(s, interim);
-  };
-  rec.onerror = (e) => {
-    if (s.closed) return;
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      s.stopping = true;
-      renderVoiceError(s, 'Accès au micro refusé. Autorisez le micro pour ce site dans le navigateur, puis réessayez.', true);
-    }
-    // 'no-speech' / 'aborted' : gérés par onend (relance automatique)
-  };
-  rec.onend = () => {
-    if (s.closed) return;
-    if (s.stopping) return; // arrêt volontaire : la suite est déjà déclenchée
-    // certains navigateurs coupent après un silence : on relance la dictée
-    try { rec.start(); } catch (_) {}
-  };
-
-  try { rec.start(); } catch (_) {
-    renderVoiceError(s, 'Impossible de démarrer le micro.', true);
-  }
-}
-
-function finishListening(s) {
-  s.stopping = true;
-  if (s.rec) { try { s.rec.stop(); } catch (_) {} }
-  // courte latence pour laisser arriver le dernier segment finalisé
-  setTimeout(() => { if (!s.closed) analyzeVoice(s); }, 350);
-}
-
-async function analyzeVoice(s) {
-  const text = s.finalText.trim();
-  if (!text) {
-    renderVoiceError(s, "Je n'ai rien entendu. Parlez après l'ouverture du panneau, puis appuyez sur « Terminer ».", true);
-    return;
-  }
-  renderVoiceAnalyze(s);
-  try {
-    const { fields } = await api('POST', '/api/voice/extract', { transcript: text });
-    if (s.closed) return;
-    const entries = Object.entries(fields || {}).filter(([, v]) => v !== null && v !== undefined && v !== '');
-    if (!entries.length) {
-      renderVoiceError(s, 'Aucune information de commande reconnue dans la dictée.', true);
-      return;
-    }
-    renderVoiceConfirm(s, fields, entries);
-  } catch (err) {
-    if (s.closed) return;
-    renderVoiceError(s, err.message || "L'analyse a échoué.", true);
-  }
-}
-
-function voiceDisplayValue(key, v) {
-  if (key === 'project_value') return formatMoney(v);
-  if (key === 'deadline') {
-    const d = parseDeadline(v);
-    return d ? d.toLocaleDateString('fr-FR') : String(v);
-  }
-  return String(v);
-}
-
-async function applyVoiceFields(s, fields) {
-  const r = s.r;
-  const body = {};
-  for (const [k, v] of Object.entries(fields)) {
-    if (v === null || v === undefined || v === '') continue; // jamais d'effacement
-    if ((r[k] ?? null) === v) continue;
-    body[k] = v;
-  }
-  if (Object.keys(body).length === 0) { closeVoicePopover(); return; }
-  try {
-    const updated = await api('PATCH', `/api/requests/${r.id}`, body);
-    closeVoicePopover();
-    const idx = rows.findIndex((x) => x.id === updated.id);
-    if (idx >= 0) rows[idx] = Object.assign({}, rows[idx], updated);
-    applySortAndRender();
-    lastRowsSig = signature(rows);
-    const tr = $rows.querySelector(`tr[data-id="${updated.id}"]`);
-    if (tr) {
-      tr.scrollIntoView({ block: 'nearest' });
-      tr.classList.add('row-flash');
-      setTimeout(() => tr.classList.remove('row-flash'), 1700);
-    }
-    showToast('Commande remplie depuis la dictée');
-  } catch (err) { reportError(err); }
-}
-
-function renderVoiceListen(s) {
-  s.pop.innerHTML = `
-    <div class="vp-head">
-      <span class="vp-dot" aria-hidden="true"></span>
-      <span class="vp-title">Dictée en cours…</span>
-    </div>
-    <div class="vp-transcript"><span class="vp-placeholder">Parlez : société, contact, téléphone, produit, couleur, quantité, échéance…</span></div>
-    <div class="vp-actions">
-      <button type="button" class="vp-btn vp-cancel">Annuler</button>
-      <button type="button" class="vp-btn vp-primary vp-done">Terminer</button>
-    </div>`;
-  s.pop.querySelector('.vp-cancel').addEventListener('click', () => closeVoicePopover());
-  s.pop.querySelector('.vp-done').addEventListener('click', () => finishListening(s));
-  positionVoicePop(s.pop, s.anchor);
-}
-
-function updateVoiceTranscript(s, interim) {
-  const box = s.pop.querySelector('.vp-transcript');
-  if (!box) return;
-  const fin = escapeHtml(s.finalText);
-  const int = escapeHtml(interim || '');
-  box.innerHTML = (fin || int)
-    ? `${fin}<span class="vp-interim">${int}</span>`
-    : '<span class="vp-placeholder">…</span>';
-  box.scrollTop = box.scrollHeight;
-}
-
-function renderVoiceAnalyze(s) {
-  s.pop.innerHTML = `
-    <div class="vp-head">
-      <span class="vp-spinner" aria-hidden="true"></span>
-      <span class="vp-title">Analyse de la commande…</span>
-    </div>`;
-  positionVoicePop(s.pop, s.anchor);
-}
-
-function renderVoiceConfirm(s, fields, entries) {
-  const rowsHtml = entries.map(([k, v]) => `
-    <div class="vp-field">
-      <span class="vp-field-label">${escapeHtml(VOICE_FIELD_LABELS[k] || k)}</span>
-      <span class="vp-field-value">${escapeHtml(voiceDisplayValue(k, v))}</span>
-    </div>`).join('');
-  s.pop.innerHTML = `
-    <div class="vp-head">
-      <span class="vp-title">Vérifiez avant d'appliquer</span>
-    </div>
-    <div class="vp-fields">${rowsHtml}</div>
-    <div class="vp-actions">
-      <button type="button" class="vp-btn vp-cancel">Annuler</button>
-      <button type="button" class="vp-btn vp-redo">↻ Re-dicter</button>
-      <button type="button" class="vp-btn vp-primary vp-apply">✓ Appliquer</button>
-    </div>`;
-  s.pop.querySelector('.vp-cancel').addEventListener('click', () => closeVoicePopover());
-  s.pop.querySelector('.vp-redo').addEventListener('click', () => startListening(s));
-  s.pop.querySelector('.vp-apply').addEventListener('click', () => applyVoiceFields(s, fields));
-  positionVoicePop(s.pop, s.anchor);
-}
-
-function renderVoiceError(s, msg, retry) {
-  s.pop.innerHTML = `
-    <div class="vp-head error">
-      <span class="vp-title">Dictée vocale</span>
-    </div>
-    <div class="vp-msg">${escapeHtml(msg)}</div>
-    <div class="vp-actions">
-      <button type="button" class="vp-btn vp-cancel">Fermer</button>
-      ${retry ? '<button type="button" class="vp-btn vp-primary vp-retry">Réessayer</button>' : ''}
-    </div>`;
-  s.pop.querySelector('.vp-cancel').addEventListener('click', () => closeVoicePopover());
-  const r2 = s.pop.querySelector('.vp-retry');
-  if (r2) r2.addEventListener('click', () => startListening(s));
-  positionVoicePop(s.pop, s.anchor);
-}
-
 // --- Cellules ---------------------------------------------------------------
 // Priorité : 3 niveaux clairs codés couleur (basse → moyenne → haute).
 // Une seule pastille tactile ; un clic fait défiler les niveaux 1 → 2 → 3 → 1.
@@ -1076,19 +804,68 @@ function cellProduct(r) {
   name.placeholder = 'produit';
   bindInline(name, r, 'product', (v) => v === '' ? null : v);
 
-  const desc = document.createElement('input');
+  // Description : multi-ligne (Entrée = nouvelle ligne). Repliée à 1 ligne par
+  // défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les lignes suivantes.
+  const descRow = document.createElement('div');
+  descRow.className = 'product-desc-row';
+  const desc = document.createElement('textarea');
   desc.className = 'cell-input product-desc';
-  desc.type = 'text';
+  desc.rows = 1;
   desc.value = r.description ?? '';
   desc.placeholder = 'description';
-  const syncEmpty = () => stack.classList.toggle('desc-empty', desc.value.trim() === '');
-  syncEmpty();
-  desc.addEventListener('input', syncEmpty);
-  bindInline(desc, r, 'description', (v) => v === '' ? null : v);
 
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'desc-toggle';
+  toggle.title = 'Afficher / masquer les lignes suivantes';
+  toggle.setAttribute('aria-label', 'Afficher les lignes suivantes');
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+  let open = false;
+  let lastSent = r.description ?? '';
+  const isMulti = () => desc.value.indexOf('\n') !== -1;
+
+  const sync = () => {
+    stack.classList.toggle('desc-empty', desc.value.trim() === '');
+    const multi = isMulti();
+    toggle.hidden = !multi;
+    if (!multi) open = false;
+    toggle.classList.toggle('open', open);
+    // hauteur : repliée = 1 ligne (CSS) ; dépliée OU en édition = tout le contenu.
+    const expanded = open || document.activeElement === desc;
+    if (expanded) {
+      desc.style.height = 'auto';
+      desc.style.height = desc.scrollHeight + 'px';
+    } else {
+      desc.style.height = '';
+    }
+  };
+
+  toggle.addEventListener('click', (e) => { e.stopPropagation(); open = !open; sync(); });
+  desc.addEventListener('input', sync);
+  desc.addEventListener('focus', sync);
+  desc.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { desc.value = lastSent; desc.blur(); } // Entrée = nouvelle ligne
+  });
+  desc.addEventListener('blur', () => {
+    const val = desc.value === '' ? null : desc.value;
+    if ((val ?? '') !== (lastSent ?? '')) {
+      const prev = r.description;
+      r.description = val;
+      lastSent = desc.value;
+      api('PATCH', `/api/requests/${r.id}`, { description: val }).catch((err) => {
+        r.description = prev; reportError(err);
+      });
+    }
+    sync();
+  });
+
+  descRow.appendChild(desc);
+  descRow.appendChild(toggle);
   stack.appendChild(name);
-  stack.appendChild(desc);
+  stack.appendChild(descRow);
   td.appendChild(stack);
+  sync();
   return td;
 }
 
@@ -1599,27 +1376,6 @@ $btnNew.addEventListener('click', async () => {
   } catch (err) { reportError(err); }
 });
 
-// Bouton global « Commande vocale » : crée une ligne dans la vue courante,
-// puis ouvre immédiatement la dictée dessus.
-const $btnVoice = document.getElementById('btnVoice');
-if ($btnVoice) {
-  $btnVoice.addEventListener('click', async () => {
-    if (openVoicePop) { closeVoicePopover(); return; }
-    try {
-      const id = await createForCurrentView();
-      await loadRows();
-      lastRowsSig = signature(rows);
-      await loadCounts();
-      const tr = $rows.querySelector(`tr[data-id="${id}"]`);
-      if (tr) tr.scrollIntoView({ block: 'nearest' });
-      const live = rows.find((x) => x.id === id);
-      if (!live) return;
-      const anchor = (tr && tr.querySelector('.voice-btn')) || $btnVoice;
-      openVoicePopover(live, anchor);
-    } catch (err) { reportError(err); }
-  });
-}
-
 // --- Suppression -----------------------------------------------------------
 async function removeRow(r) {
   if (!confirm('Supprimer cette commande définitivement ?')) return;
@@ -2002,7 +1758,6 @@ let lastRowsSig = '';
 function isInteracting() {
   if (dragState) return true;
   if (openAttachPop) return true; // panneau PDF ouvert : on ne reconstruit pas la grille
-  if (openVoicePop) return true; // dictée en cours : on ne reconstruit pas la grille
   if (openStatusMenu || openCalendar) return true; // popup ancré à une pastille/badge de la grille
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
@@ -2124,28 +1879,6 @@ document.addEventListener('keydown', (e) => {
     if ($gridSearchInput) { $gridSearchInput.focus(); $gridSearchInput.select(); }
   }
 });
-
-// --- Impression de la catégorie courante -----------------------------------
-// Le DOM ne contient que les lignes de l'étape affichée : window.print() imprime
-// donc exactement la catégorie en cours. On renseigne un en-tête papier (titre
-// de la catégorie + date) juste avant l'impression ; le CSS @media print masque
-// la barre latérale, la recherche et les colonnes d'action.
-const $btnPrint = document.getElementById('btnPrint');
-const $printHead = document.getElementById('printHead');
-
-function preparePrint() {
-  if (!$printHead) return;
-  const label = STAGE_LABEL[currentStage] || '';
-  const n = rows.length;
-  const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-  $printHead.innerHTML =
-    `<div class="ph-title">${escapeHtml(label)}</div>` +
-    `<div class="ph-meta">${n} commande${n > 1 ? 's' : ''} · imprimé le ${escapeHtml(dateStr)}</div>`;
-}
-
-if ($btnPrint) {
-  $btnPrint.addEventListener('click', () => { preparePrint(); window.print(); });
-}
 
 // --- Init ------------------------------------------------------------------
 // Date du jour affichée dans l'en-tête de la barre latérale (« Samedi 21 juin 2026 »).
