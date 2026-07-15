@@ -2,55 +2,54 @@
 // Planning OLDA — frontend (vanilla ES module, aucun build)
 // ===========================================================================
 
-// --- Étapes : groupes pour les séparateurs (3 blocs). ----------------------
+// --- Étapes : pipeline LINÉAIRE (une commande = une seule étape à la fois). --
+// Groupes = séparateurs visuels de la barre latérale gauche ; l'ordre et les
+// libellés sont ceux affichés tels quels.
 const STAGE_GROUPS = [
   [
-    { slug: 'demande', label: 'Demande' },
-    { slug: 'devis_en_cours', label: 'Devis en cours' },
-    { slug: 'devis_accepte', label: 'Devis accepté' },
+    { slug: 'nouvelle_demande', label: 'Nouvelle demande' },
+    { slug: 'chiffrage', label: 'Chiffrage à faire' },
+    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+    { slug: 'attente_validation_devis', label: 'Attente validation du devis' },
+    { slug: 'devis_accepte_bat', label: 'Devis accepté – BAT à faire' },
+    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    { slug: 'bat_a_modifier', label: 'BAT à modifier' },
+    { slug: 'projet_valide', label: 'Projet validé – Lancement autorisé' },
   ],
   [
+    { slug: 'a_commander', label: 'À commander' },
+    { slug: 'preparation_production', label: 'Préparation production' },
+    { slug: 'prod_trotec', label: 'Prod TROTEC' },
     { slug: 'prod_dtf', label: 'Prod DTF' },
     { slug: 'prod_pressage', label: 'Prod Pressage' },
-    { slug: 'prod_trotec', label: 'Prod Trotec' },
-    { slug: 'prod_roland_uv', label: 'Prod Roland UV' },
-    { slug: 'prod_sous_traitance', label: 'Prod Sous-traitance' },
-    { slug: 'prod_autre', label: 'Prod Autre' },
+    { slug: 'prod_uv', label: 'Prod UV' },
+    { slug: 'montage_nettoyage', label: 'Montage / Nettoyage' },
+    { slug: 'finitions_qualite', label: 'Finitions et contrôle qualité' },
   ],
   [
     { slug: 'facturation', label: 'Facturation' },
-    { slug: 'archive', label: 'Archivé' },
-    { slug: 'maquette_fiverr', label: 'Fiverr' },
-    { slug: 'toptex', label: 'Toptex' },
+    { slug: 'termine_archive', label: 'Terminé – Archivé' },
+    { slug: 'bloque', label: 'Bloqué – Action requise' },
+    { slug: 'fiverr', label: 'Fiverr' },
   ],
 ];
 // Mini-titres des 3 blocs de la barre latérale (même ordre que STAGE_GROUPS).
-const GROUP_TITLES = ['Pipeline', 'Production', 'Admin'];
+const GROUP_TITLES = ['Devis & BAT', 'Production', 'Clôture'];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
-STAGE_LABEL.production = 'Production'; // phase interne (vue via les secteurs)
-
-// Secteurs de production : les 6 lignes « Prod … » du bloc du milieu. Une commande
-// en production en porte 1..N (table production_sectors côté serveur).
-const SECTOR_SLUGS = ['prod_dtf', 'prod_pressage', 'prod_trotec', 'prod_roland_uv', 'prod_sous_traitance', 'prod_autre'];
-const isSector = (slug) => SECTOR_SLUGS.includes(slug);
-// Libellé court pour les pastilles (« Prod Trotec » → « Trotec »).
-const sectorShort = (slug) => (STAGE_LABEL[slug] || slug).replace(/^Prod\s+/, '');
 
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
-  maquette_fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
-  toptex: { url: 'https://www.toptex.fr/', label: 'Ouvrir Toptex' },
+  fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
 };
 
 // Cibles d'envoi rapide proposées sur chaque ligne (boutons « → … »).
 const SEND_TARGETS = [
-  { slug: 'maquette_fiverr', label: 'Fiverr' },
-  { slug: 'toptex', label: 'Toptex' },
+  { slug: 'fiverr', label: 'Fiverr' },
 ];
 
 // --- État applicatif -------------------------------------------------------
-let currentStage = 'demande';
+let currentStage = 'nouvelle_demande';
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
@@ -98,7 +97,7 @@ function updateFiverrPrice() {
 // Affiche l'outil uniquement sur l'onglet Fiverr et place le focus sur la saisie.
 function updateFiverrTool(slug) {
   if (!$fiverrTool) return;
-  const show = slug === 'maquette_fiverr';
+  const show = slug === 'fiverr';
   $fiverrTool.hidden = !show;
   if (show) {
     updateFiverrPrice();
@@ -213,9 +212,6 @@ function bumpCount(slug, delta) {
 // le filtre serveur) : sert à décider, en optimiste, si une ligne reste visible
 // après un changement d'étape / d'affectation secteur.
 function belongsToCurrentView(r) {
-  if (isSector(currentStage)) {
-    return r.stage === 'production' && (r.sectors || []).some((s) => s.sector === currentStage);
-  }
   return r.stage === currentStage;
 }
 
@@ -414,7 +410,7 @@ function isRowBusy(tr) {
 // brouillon (ajout) visible.
 function applySearchAndCounts() {
   const q = fold(gridQuery.trim());
-  let visible = 0, nMaq = 0;
+  let visible = 0;
   const bandVisible = { 1: 0, 2: 0, 3: 0 };
   for (const r of lastRendered) {
     const entry = rowEls.get(String(r.id));
@@ -423,7 +419,6 @@ function applySearchAndCounts() {
     entry.tr.classList.toggle('is-hidden', !match);
     if (match) {
       visible++;
-      if (MAQUETTE_STATUSES.includes(r.status)) nMaq++;
       bandVisible[prioBand(r)]++;
     }
   }
@@ -442,9 +437,7 @@ function applySearchAndCounts() {
       : 'Aucune commande à cette étape.';
   }
   const base = visible ? `${visible} commande${visible > 1 ? 's' : ''}` : '';
-  $stageCount.innerHTML = base
-    ? escapeHtml(base) + (nMaq ? ` <span class="maq-count">· ${nMaq} maquette${nMaq > 1 ? 's' : ''}</span>` : '')
-    : '';
+  $stageCount.textContent = base;
 }
 
 // Toutes les colonnes du planning simplifié restent affichées en permanence :
@@ -456,7 +449,7 @@ function applyEmptyCols() {
 // Une ligne est un « brouillon d'ajout » tant qu'aucun champ de contenu n'est
 // renseigné : on l'affiche alors comme un formulaire, pas comme une donnée.
 function isDraftRow(r) {
-  const fields = ['billing_company', 'product', 'description', 'deadline', 'status'];
+  const fields = ['billing_company', 'product', 'description', 'deadline'];
   return fields.every((k) => r[k] === null || r[k] === undefined || r[k] === '');
 }
 
@@ -507,9 +500,7 @@ function buildRow(r) {
   tr.appendChild(cellInfos(r));
   // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
   tr.appendChild(cellDeadline(r));
-  // statut : signal principal, aligné à droite
-  tr.appendChild(cellStatus(r));
-  // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
+  // actions de fin de ligne : envoyer vers (Fiverr) + dupliquer +
   // supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
@@ -1071,7 +1062,6 @@ function onCalKey(e) { if (e.key === 'Escape') closeCalendar(); }
 
 function showDeadlineCalendar(r, anchor, onPick) {
   closeCalendar();
-  closeStatusMenu(); // un seul popup à la fois
   const sel = parseDeadline(r.deadline);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let viewY = sel ? sel.getFullYear() : today.getFullYear();
@@ -1147,251 +1137,6 @@ function showDeadlineCalendar(r, anchor, onPick) {
   setTimeout(() => {
     document.addEventListener('pointerdown', onCalDocDown, true);
     document.addEventListener('keydown', onCalKey, true);
-  }, 0);
-}
-
-// États de commande : liste DYNAMIQUE chargée du serveur (créés / supprimés
-// depuis le menu d'état). requests.status stocke le LIBELLÉ ; la couleur est
-// retrouvée ici par libellé.
-let statuses = [];
-async function loadStatuses() {
-  try { statuses = await api('GET', '/api/statuses'); } catch (_) { statuses = []; }
-}
-function statusByLabel(label) {
-  return statuses.find((s) => s.label === label) || null;
-}
-// Couleur hex → rgba (fond translucide de la pastille).
-function hexAlpha(hex, a) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return 'transparent';
-  const n = parseInt(m[1], 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
-}
-// Rendu d'une pastille d'état : couleur dynamique, neutre si état supprimé,
-// « définir » si vide.
-function paintStatusPill(pill, label) {
-  pill.className = 'status-pill';
-  pill.style.color = '';
-  pill.style.background = '';
-  if (!label) { pill.classList.add('placeholder'); pill.textContent = 'définir'; return; }
-  pill.textContent = label;
-  const s = statusByLabel(label);
-  if (s) {
-    pill.style.color = s.color;
-    pill.style.background = hexAlpha(s.color, 0.14);
-  } else {
-    pill.classList.add('unknown'); // état supprimé : rendu neutre
-  }
-}
-// Palette proposée à la création d'un nouvel état.
-const STATUS_PALETTE = ['#b07515', '#d97706', '#dc2626', '#bb3aa4', '#6b46c1', '#2563eb', '#0891b2', '#1d9e75'];
-
-// On diffère le re-rendu de la grille (qui remplacerait la pastille servant
-// d'ancre au menu ouvert) jusqu'à la fermeture du menu.
-let statusListDirty = false;
-async function addStatus(label, color) {
-  const created = await api('POST', '/api/statuses', { label, color });
-  await loadStatuses();
-  statusListDirty = true;
-  return created;
-}
-async function deleteStatus(id) {
-  await api('DELETE', `/api/statuses/${id}`);
-  await loadStatuses();
-  statusListDirty = true;
-}
-
-// Rafraîchit la couleur des pastilles déjà affichées (après ajout/suppression
-// d'un état) SANS reconstruire les lignes — donc sans détacher une éventuelle
-// pastille servant d'ancre à un popup ouvert. L'ordre de tri ne dépend pas des
-// états, inutile de re-trier.
-function repaintStatusPills() {
-  document.querySelectorAll('#rows .status-pill').forEach((p) => {
-    paintStatusPill(p, p.classList.contains('placeholder') ? '' : p.textContent);
-  });
-}
-
-// États « maquette » : mis en avant (pastille violette + compteur d'étape)
-// pour repérer d'un coup d'œil les maquettes à faire / à faire valider.
-// --- Secteurs de production -------------------------------------------------
-// On affecte un secteur à une commande en la glissant sur la colonne machine
-// de la sidebar (voir onDragEnd) ; cela la fait entrer en production.
-function addSector(r, sector) {
-  const prevRows = rows;
-  const prevStage = r.stage;
-  const hadSector = (r.sectors || []).some((s) => s.sector === sector);
-  // Mutation optimiste : la commande entre en production et gagne ce secteur.
-  r.stage = 'production';
-  if (!hadSector) r.sectors = [...(r.sectors || []), { sector, done: false }];
-  if (!belongsToCurrentView(r)) rows = rows.filter((x) => x.id !== r.id);
-  applySortAndRender();
-  if (!hadSector) bumpCount(sector, +1);
-  if (prevStage !== 'production') bumpCount(prevStage, -1);
-  showToast(`Ajouté à ${sectorShort(sector)}`);
-  api('POST', `/api/requests/${r.id}/sectors`, { sector }).catch((err) => {
-    r.stage = prevStage;
-    if (!hadSector) r.sectors = (r.sectors || []).filter((s) => s.sector !== sector);
-    rows = prevRows;
-    lastRowsSig = signature(rows);
-    if (!hadSector) bumpCount(sector, -1);
-    if (prevStage !== 'production') bumpCount(prevStage, +1);
-    applySortAndRender();
-    reportError(err);
-    resyncAfterRollback();
-  });
-}
-
-const MAQUETTE_STATUSES = ['Maquette à faire', 'Maquette à valider'];
-
-function cellStatus(r) {
-  const td = document.createElement('td');
-  td.className = 'col-status';
-  const pill = document.createElement('span');
-  const render = () => paintStatusPill(pill, r.status || '');
-  render();
-  pill.title = 'cliquer pour choisir un état';
-  pill.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (openStatusMenu) { closeStatusMenu(); return; }
-    showStatusMenu(r, pill, render);
-  });
-  td.appendChild(pill);
-  return td;
-}
-
-// Menu d'état : au clic, tous les choix apparaissent directement ; on sélectionne.
-let openStatusMenu = null;
-function closeStatusMenu() {
-  if (!openStatusMenu) return;
-  openStatusMenu.remove();
-  openStatusMenu = null;
-  document.removeEventListener('pointerdown', onStatusDocDown, true);
-  document.removeEventListener('keydown', onStatusKey, true);
-  // La liste d'états a changé pendant que le menu était ouvert : on rafraîchit
-  // les couleurs des pastilles (repaint en place, pas de reconstruction).
-  if (statusListDirty) { statusListDirty = false; repaintStatusPills(); }
-}
-function onStatusDocDown(e) {
-  if (openStatusMenu && !openStatusMenu.contains(e.target) && !e.target.closest('.status-pill')) closeStatusMenu();
-}
-function onStatusKey(e) { if (e.key === 'Escape') closeStatusMenu(); }
-
-function setStatus(r, val, render) {
-  const prev = r.status || null;
-  if (val === prev) return;
-  r.status = val;
-  render();
-  patchRow(r, { status: val }).catch((err) => {
-    r.status = prev; render(); reportError(err);
-  });
-}
-
-function showStatusMenu(r, pill, render) {
-  closeStatusMenu();
-  closeCalendar(); // un seul popup à la fois
-  const menu = document.createElement('div');
-  menu.className = 'status-menu';
-  let pickedColor = STATUS_PALETTE[0];
-  // Ancre figée à l'ouverture : le menu se replace sans dépendre de la pastille
-  // de la grille (qui peut être re-rendue pendant que le menu est ouvert).
-  const anchor = pill.getBoundingClientRect();
-  const place = () => {
-    const mr = menu.getBoundingClientRect();
-    let top = anchor.bottom + 4;
-    if (top + mr.height > window.innerHeight - 8) top = anchor.top - mr.height - 4;
-    let left = anchor.left;
-    if (left + mr.width > window.innerWidth - 8) left = window.innerWidth - mr.width - 8;
-    menu.style.top = Math.max(8, Math.round(top)) + 'px';
-    menu.style.left = Math.max(8, Math.round(left)) + 'px';
-  };
-
-  const renderItems = () => {
-    menu.innerHTML = '';
-
-    for (const s of statuses) {
-      const item = document.createElement('div');
-      item.className = 'status-menu-item' + (r.status === s.label ? ' current' : '');
-      const sel = document.createElement('button');
-      sel.type = 'button';
-      sel.className = 'status-menu-pick';
-      const p = document.createElement('span');
-      paintStatusPill(p, s.label);
-      sel.appendChild(p);
-      sel.addEventListener('click', () => { setStatus(r, s.label, render); closeStatusMenu(); });
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'status-menu-del';
-      del.textContent = '×';
-      del.title = `Supprimer l'état « ${s.label} »`;
-      del.setAttribute('aria-label', `Supprimer l'état ${s.label}`);
-      del.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try { await deleteStatus(s.id); renderItems(); place(); }
-        catch (err) { reportError(err); }
-      });
-      item.appendChild(sel);
-      item.appendChild(del);
-      menu.appendChild(item);
-    }
-
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'status-menu-item clear';
-    clear.textContent = '— effacer l’état —';
-    clear.addEventListener('click', () => { setStatus(r, null, render); closeStatusMenu(); });
-    menu.appendChild(clear);
-
-    // Formulaire de création d'un nouvel état (nom + couleur).
-    const form = document.createElement('div');
-    form.className = 'status-new';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'status-new-input';
-    input.placeholder = 'Nouvel état…';
-    input.maxLength = 40;
-    const sw = document.createElement('div');
-    sw.className = 'status-new-swatches';
-    const swatchEls = [];
-    STATUS_PALETTE.forEach((c) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'status-swatch' + (c === pickedColor ? ' on' : '');
-      b.style.background = c;
-      b.title = c;
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        pickedColor = c;
-        swatchEls.forEach((el) => el.classList.toggle('on', el === b));
-      });
-      swatchEls.push(b);
-      sw.appendChild(b);
-    });
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'status-new-add';
-    add.textContent = 'Ajouter';
-    const submit = async () => {
-      const label = input.value.trim();
-      if (!label) { input.focus(); return; }
-      try { await addStatus(label, pickedColor); input.value = ''; renderItems(); place(); }
-      catch (err) { reportError(err); }
-    };
-    add.addEventListener('click', (e) => { e.stopPropagation(); submit(); });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-    form.appendChild(input);
-    form.appendChild(sw);
-    form.appendChild(add);
-    menu.appendChild(form);
-  };
-
-  renderItems();
-  document.body.appendChild(menu);
-  place();
-
-  openStatusMenu = menu;
-  setTimeout(() => {
-    document.addEventListener('pointerdown', onStatusDocDown, true);
-    document.addEventListener('keydown', onStatusKey, true);
   }, 0);
 }
 
@@ -1498,21 +1243,19 @@ function patchRow(r, body) {
   return api('PATCH', `/api/requests/${r.id}`, body);
 }
 
-// Construit une ligne brouillon optimiste (tous champs vides) pour la vue
-// courante : en vue secteur elle entre directement en production avec ce secteur.
+// Construit une ligne brouillon optimiste (tous champs vides) pour l'étape
+// courante.
 function makeOptimisticRow() {
-  const sectorView = isSector(currentStage);
   const maxPos = rows.reduce((m, r) => Math.max(m, r.position ?? 0), 0);
   const now = new Date().toISOString();
   return {
     id: `tmp-${++tmpSeq}`,
-    stage: sectorView ? 'production' : currentStage,
+    stage: currentStage,
     priority: 1, client_type: 'pro',
     billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
     quantity: null, product: null, color: null, project_value: null,
-    description: null, deadline: null, status: null,
+    description: null, deadline: null,
     position: maxPos + 1000,
-    sectors: sectorView ? [{ sector: currentStage, done: false }] : [],
     devis_name: null, bat_name: null,
     created_at: now, updated_at: now,
   };
@@ -1561,7 +1304,6 @@ function finalizeCreate(tmpId, created) {
 // Crée une commande adaptée à la vue courante, en optimiste : la ligne brouillon
 // apparaît et reçoit le focus immédiatement, le POST suit en arrière-plan.
 function createForCurrentView() {
-  const sectorView = isSector(currentStage);
   const r = makeOptimisticRow();
   const tmpId = r.id;
   const viewSlug = currentStage; // figé : la vue peut changer avant la réponse
@@ -1577,15 +1319,8 @@ function createForCurrentView() {
     if (firstInput) firstInput.focus();
   }
 
-  const sector = sectorView ? viewSlug : null;
-  api('POST', '/api/requests', { stage: sectorView ? 'production' : viewSlug })
-    .then(async (created) => {
-      if (sector) {
-        await api('POST', `/api/requests/${created.id}/sectors`, { sector });
-        created.stage = 'production';
-      }
-      finalizeCreate(tmpId, created);
-    })
+  api('POST', '/api/requests', { stage: viewSlug })
+    .then((created) => finalizeCreate(tmpId, created))
     .catch((err) => {
       pendingCreates.delete(tmpId);
       cancelledCreates.delete(tmpId);
@@ -1646,19 +1381,17 @@ function copyBody(r, stage) {
     project_value: r.project_value,
     description: r.description,
     deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
-    status: r.status,
   };
 }
 
 // Duplique une commande (optimiste) : la copie reste dans la même étape et
-// apparaît tout de suite. Les PDF et secteurs ne sont pas recopiés (comme côté
-// serveur), donc en vue secteur la copie n'appartient pas à la colonne courante.
+// apparaît tout de suite. Les PDF ne sont pas recopiés (comme côté serveur).
 function duplicateRow(r) {
   const maxPos = rows.reduce((m, x) => Math.max(m, x.position ?? 0), 0);
   const now = new Date().toISOString();
   const tmpId = `tmp-${++tmpSeq}`;
   const copy = {
-    ...r, id: tmpId, sectors: [], devis_name: null, bat_name: null,
+    ...r, id: tmpId, devis_name: null, bat_name: null,
     position: maxPos + 1000, created_at: now, updated_at: now,
   };
   // La copie n'apparaît dans la grille que si elle relève bien de la vue courante.
@@ -1686,8 +1419,8 @@ function duplicateRow(r) {
     });
 }
 
-// Envoi vers Fiverr / Toptex (optimiste) : copie la commande dans la catégorie
-// cible en laissant l'originale en place. La copie n'est pas dans la vue courante
+// Envoi vers Fiverr (optimiste) : copie la commande dans l'étape cible en
+// laissant l'originale en place. La copie n'est pas dans la vue courante
 // (autre étape) : seul le compteur de la cible bouge, le SSE réconciliera.
 function copyToStage(r, slug) {
   bumpCount(slug, +1);
@@ -1812,12 +1545,8 @@ async function onDragEnd(e) {
 
   const slug = stageEl ? stageEl.dataset.slug : null;
   if (slug) {
-    // déposé sur une entrée de la sidebar
-    if (isSector(slug)) {
-      await addSector(ds.r, slug); // colonne machine → affecter ce secteur
-    } else if (slug !== ds.r.stage) {
-      await moveToStage(ds.r, slug); // autre phase → déplacer
-    }
+    // déposé sur une entrée de la sidebar → déplacer vers cette étape
+    if (slug !== ds.r.stage) await moveToStage(ds.r, slug);
   } else {
     await commitReorder(ds.r); // déposé dans la grille → réordonnancement
   }
@@ -1923,7 +1652,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
   handle: 92, client_type: 96, client: 220, product: 240, description: 240,
-  deadline: 140, status: 170, del: 200,
+  deadline: 140, del: 200,
 };
 
 let colWidths = {};
@@ -2059,7 +1788,7 @@ let lastRowsSig = '';
 function isInteracting() {
   if (dragState) return true;
   if (openAttachPop) return true; // panneau PDF ouvert : on ne reconstruit pas la grille
-  if (openStatusMenu || openCalendar) return true; // popup ancré à une pastille/badge de la grille
+  if (openCalendar) return true; // popup ancré à un badge de la grille
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
   return false;
@@ -2091,15 +1820,6 @@ let streamAlive = false;
 let streamDebounce = null;
 
 function onStreamChange(e) {
-  // Changement de la liste d'états (ajout / suppression) : on recharge la liste
-  // et on rafraîchit les couleurs — sans re-rendre si un menu d'état est ouvert
-  // (cela détacherait la pastille servant d'ancre).
-  let payload = {};
-  try { payload = JSON.parse(e && e.data); } catch (_) {}
-  if (payload.kind === 'statuses') {
-    loadStatuses().then(repaintStatusPills); // repaint en place : sûr même menu ouvert
-    return;
-  }
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(poll, 120);
@@ -2253,7 +1973,6 @@ async function start() {
   renderSidebar();
   attachColResizers();
   applyColWidths();
-  await loadStatuses();
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);

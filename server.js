@@ -12,7 +12,7 @@ try {
 
 const path = require('path');
 const express = require('express');
-const { pool, init, STAGES, STAGE_SLUGS, SECTOR_SLUGS } = require('./db');
+const { pool, init, STAGES, STAGE_SLUGS } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,7 +50,7 @@ app.use(basicAuth);
 const PATCHABLE = [
   'stage', 'priority', 'client_type', 'billing_company', 'contact_referent',
   'contact_phone', 'contact_email',
-  'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'status', 'position',
+  'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
 ];
 
 function validateField(key, value) {
@@ -158,39 +158,12 @@ const SELECT = `SELECT r.*,
   LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'`;
 const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
 
-// Attache à chaque commande la liste de ses secteurs de production [{sector, done}].
-async function attachSectors(rows) {
-  if (!rows.length) return rows;
-  const ids = rows.map((r) => r.id);
-  const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
-  const { rows: secs } = await pool.query(
-    `SELECT request_id, sector, done FROM production_sectors
-     WHERE request_id IN (${ph}) ORDER BY created_at ASC`, ids,
-  );
-  const by = {};
-  for (const s of secs) (by[s.request_id] = by[s.request_id] || []).push({ sector: s.sector, done: s.done });
-  for (const r of rows) r.sectors = by[r.id] || [];
-  return rows;
-}
-
-// GET /api/requests?stage=<phase>   → commandes de cette phase
-// GET /api/requests?sector=<machine>→ commandes en prod rattachées à ce secteur
-//   (compat : ?stage=<machine> est aussi accepté côté sidebar)
+// GET /api/requests?stage=<étape>   → commandes de cette étape
 // GET /api/requests                 → toutes
 app.get('/api/requests', asyncH(async (req, res) => {
-  const { stage, sector } = req.query;
+  const { stage } = req.query;
   let result;
-  if (sector || (stage && SECTOR_SLUGS.includes(stage))) {
-    const sec = sector || stage;
-    if (!SECTOR_SLUGS.includes(sec)) return res.status(400).json({ error: `secteur invalide: ${sec}` });
-    // La commande reste dans la colonne de la machine même une fois ce secteur
-    // coché « fait » ; elle ne la quitte qu'en étant déplacée vers une autre phase.
-    result = await pool.query(
-      `${SELECT}
-       JOIN production_sectors ps ON ps.request_id = r.id AND ps.sector = $1
-       WHERE r.stage = 'production' ${ORDER}`, [sec],
-    );
-  } else if (stage) {
+  if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
     result = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]);
   } else {
@@ -198,29 +171,17 @@ app.get('/api/requests', asyncH(async (req, res) => {
       `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
     );
   }
-  await attachSectors(result.rows);
   res.json(result.rows);
 }));
 
-// GET /api/counts → { slug: n, ... } : phases + secteurs. Objet plat → la
+// GET /api/counts → { slug: n, ... } : une entrée par étape. Objet plat → la
 // sidebar lit counts[slug] sans rien changer.
 app.get('/api/counts', asyncH(async (req, res) => {
   const counts = {};
   for (const s of STAGE_SLUGS) counts[s] = 0;
-  for (const s of SECTOR_SLUGS) counts[s] = 0;
 
   const { rows: byStage } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
   for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
-
-  // Secteurs : toutes les commandes en production rattachées à ce secteur
-  // (le badge reflète les cartes affichées dans la colonne, cochées comprises).
-  const { rows: bySector } = await pool.query(
-    `SELECT ps.sector, COUNT(*)::int AS n
-     FROM production_sectors ps JOIN requests r ON r.id = ps.request_id
-     WHERE r.stage = 'production'
-     GROUP BY ps.sector`,
-  );
-  for (const r of bySector) if (r.sector in counts) counts[r.sector] = r.n;
 
   res.json(counts);
 }));
@@ -245,7 +206,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 
   // position par défaut : place la nouvelle ligne en bas de son étape.
   if (!cols.includes('position')) {
-    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
+    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'nouvelle_demande';
     const { rows } = await pool.query(
       'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [stage],
     );
@@ -303,110 +264,6 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM requests WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
   broadcast({ kind: 'delete' });
-  res.status(204).end();
-}));
-
-// ---------------------------------------------------------------------------
-// Secteurs de production d'une commande (relation 1 commande ↔ N machines).
-// Ajouter un secteur fait entrer la commande en production ; cocher « done »
-// marque ce secteur comme fait, mais la commande reste dans la colonne de la
-// machine jusqu'à ce qu'on la déplace manuellement vers Facturation.
-// ---------------------------------------------------------------------------
-
-// POST /api/requests/:id/sectors  body { sector } → ajoute (ou réactive) un secteur
-app.post('/api/requests/:id/sectors', asyncH(async (req, res) => {
-  const { id } = req.params;
-  const sector = (req.body || {}).sector;
-  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
-
-  const exists = await pool.query('SELECT stage FROM requests WHERE id = $1', [id]);
-  if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
-
-  // Affecter un secteur fait basculer la commande en phase 'production'.
-  if (exists.rows[0].stage !== 'production') {
-    await pool.query("UPDATE requests SET stage = 'production', updated_at = now() WHERE id = $1", [id]);
-  }
-
-  const has = await pool.query(
-    'SELECT 1 FROM production_sectors WHERE request_id = $1 AND sector = $2', [id, sector],
-  );
-  if (has.rowCount === 0) {
-    await pool.query(
-      'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)', [id, sector],
-    );
-  }
-  await touchRequest(id);
-  broadcast({ kind: 'update', stages: ['production'] });
-  res.status(201).json({ sector, done: false });
-}));
-
-// PATCH /api/requests/:id/sectors/:sector  body { done } → coche / décoche
-app.patch('/api/requests/:id/sectors/:sector', asyncH(async (req, res) => {
-  const { id, sector } = req.params;
-  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
-  const done = !!(req.body || {}).done;
-  const { rowCount } = await pool.query(
-    'UPDATE production_sectors SET done = $1 WHERE request_id = $2 AND sector = $3', [done, id, sector],
-  );
-  if (rowCount === 0) return res.status(404).json({ error: 'Secteur introuvable sur cette commande' });
-  await touchRequest(id);
-  broadcast({ kind: 'update', stages: ['production'] });
-  res.json({ sector, done });
-}));
-
-// DELETE /api/requests/:id/sectors/:sector → retire le secteur de la commande
-app.delete('/api/requests/:id/sectors/:sector', asyncH(async (req, res) => {
-  const { id, sector } = req.params;
-  if (!SECTOR_SLUGS.includes(sector)) return res.status(400).json({ error: `secteur invalide: ${sector}` });
-  const { rowCount } = await pool.query(
-    'DELETE FROM production_sectors WHERE request_id = $1 AND sector = $2', [id, sector],
-  );
-  if (rowCount === 0) return res.status(404).json({ error: 'Secteur introuvable sur cette commande' });
-  await touchRequest(id);
-  broadcast({ kind: 'update', stages: ['production'] });
-  res.status(204).end();
-}));
-
-// ---------------------------------------------------------------------------
-// États de commande — liste éditable (créer / supprimer depuis le menu d'état).
-// requests.status garde le LIBELLÉ ; la couleur est rattachée ici par libellé.
-// ---------------------------------------------------------------------------
-
-// GET /api/statuses → liste ordonnée
-app.get('/api/statuses', asyncH(async (req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, label, color FROM statuses ORDER BY position ASC NULLS LAST, created_at ASC',
-  );
-  res.json(rows);
-}));
-
-// POST /api/statuses  body { label, color } → crée un état
-app.post('/api/statuses', asyncH(async (req, res) => {
-  const body = req.body || {};
-  const label = String(body.label == null ? '' : body.label).trim();
-  const color = String(body.color == null ? '' : body.color).trim();
-  if (!label) return res.status(400).json({ error: 'Libellé requis' });
-  if (label.length > 40) return res.status(400).json({ error: 'Libellé trop long' });
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Couleur invalide' });
-
-  const dup = await pool.query('SELECT 1 FROM statuses WHERE lower(label) = lower($1)', [label]);
-  if (dup.rowCount) return res.status(409).json({ error: 'Cet état existe déjà' });
-
-  const { rows: p } = await pool.query('SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM statuses');
-  const { rows } = await pool.query(
-    'INSERT INTO statuses (label, color, position) VALUES ($1, $2, $3) RETURNING id, label, color',
-    [label, color, p[0].pos],
-  );
-  broadcast({ kind: 'statuses' });
-  res.status(201).json(rows[0]);
-}));
-
-// DELETE /api/statuses/:id → retire un état de la liste (les commandes gardent
-// leur texte, sans couleur). Recréer le même libellé restitue la couleur.
-app.delete('/api/statuses/:id', asyncH(async (req, res) => {
-  const { rowCount } = await pool.query('DELETE FROM statuses WHERE id = $1', [req.params.id]);
-  if (rowCount === 0) return res.status(404).json({ error: 'État introuvable' });
-  broadcast({ kind: 'statuses' });
   res.status(204).end();
 }));
 

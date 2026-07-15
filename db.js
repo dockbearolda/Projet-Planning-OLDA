@@ -4,33 +4,33 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
-// Phases du pipeline (valeurs possibles de requests.stage), dans l'ordre.
-// La production est UNE phase ; les machines sont des « secteurs » (ci-dessous),
-// rattachés à la commande via la table production_sectors.
+// Étapes du planning (valeurs possibles de requests.stage), dans l'ordre.
+// Pipeline LINÉAIRE : une commande est dans une seule étape à la fois. La liste
+// s'affiche telle quelle dans la barre latérale gauche.
 const STAGES = [
-  { slug: 'demande', label: 'Demande' },
-  { slug: 'devis_en_cours', label: 'Devis en cours' },
-  { slug: 'devis_accepte', label: 'Devis accepté' },
-  { slug: 'production', label: 'Production' },
+  { slug: 'nouvelle_demande', label: 'Nouvelle demande' },
+  { slug: 'chiffrage', label: 'Chiffrage à faire' },
+  { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+  { slug: 'attente_validation_devis', label: 'Attente validation du devis' },
+  { slug: 'devis_accepte_bat', label: 'Devis accepté – BAT à faire' },
+  { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+  { slug: 'bat_a_modifier', label: 'BAT à modifier' },
+  { slug: 'projet_valide', label: 'Projet validé – Lancement autorisé' },
+  { slug: 'a_commander', label: 'À commander' },
+  { slug: 'preparation_production', label: 'Préparation production' },
+  { slug: 'prod_trotec', label: 'Prod TROTEC' },
+  { slug: 'prod_dtf', label: 'Prod DTF' },
+  { slug: 'prod_pressage', label: 'Prod Pressage' },
+  { slug: 'prod_uv', label: 'Prod UV' },
+  { slug: 'montage_nettoyage', label: 'Montage / Nettoyage' },
+  { slug: 'finitions_qualite', label: 'Finitions et contrôle qualité' },
   { slug: 'facturation', label: 'Facturation' },
-  { slug: 'archive', label: 'Archivé' },
-  { slug: 'maquette_fiverr', label: 'Commande Maquette Fiverr' },
-  { slug: 'toptex', label: 'Toptex' },
+  { slug: 'termine_archive', label: 'Terminé – Archivé' },
+  { slug: 'bloque', label: 'Bloqué – Action requise' },
+  { slug: 'fiverr', label: 'Fiverr' },
 ];
 
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
-
-// Secteurs de production (machines). Une commande en production en porte 1..N.
-const SECTORS = [
-  { slug: 'prod_dtf', label: 'Prod DTF' },
-  { slug: 'prod_pressage', label: 'Prod Pressage' },
-  { slug: 'prod_trotec', label: 'Prod Trotec' },
-  { slug: 'prod_roland_uv', label: 'Prod Roland UV' },
-  { slug: 'prod_sous_traitance', label: 'Prod Sous-traitance' },
-  { slug: 'prod_autre', label: 'Prod Autre' },
-];
-
-const SECTOR_SLUGS = SECTORS.map((s) => s.slug);
 
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
@@ -75,17 +75,10 @@ async function init() {
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
   }
 
-  // Migration multi-secteurs : les anciennes étapes prod_* deviennent la phase
-  // 'production' + un secteur dans production_sectors. Non destructif, idempotent.
-  await migrateProdStages();
-
-  // Seed des états par défaut (liste éditable ensuite). Idempotent : seulement
-  // si la table est vide.
-  await seedStatuses();
-  // Bases déjà peuplées : on ajoute les statuts par défaut manquants et on retire
-  // les anciens statuts par défaut inutilisés (migration douce, non destructive).
-  await ensureDefaultStatuses();
-  await pruneLegacyStatuses();
+  // Migration vers le planning linéaire : convertit les anciens slugs d'étape
+  // (dont la phase « production » multi-machines) vers la nouvelle liste.
+  // Non destructif, idempotent, réversible (voir migrateStagesToLinear).
+  await migrateStagesToLinear();
 
   // Seed : si la table est vide, on insère quelques demandes d'exemple
   // réparties sur plusieurs étapes pour démontrer le pipeline.
@@ -95,93 +88,52 @@ async function init() {
   }
 }
 
-// États par défaut : les statuts du planning simplifié (fichier « Planning express »),
-// dans l'ordre logique du flux de travail. Liste éditable ensuite depuis la grille.
-const DEFAULT_STATUSES = [
-  { label: 'Demande Client', color: '#2563eb' },
-  { label: 'Chiffrage', color: '#b07515' },
-  { label: 'Devis en Cours', color: '#d97706' },
-  { label: 'A commander', color: '#ca8a04' },
-  { label: 'Fiverr en cours', color: '#6b46c1' },
-  { label: 'Attente retour client', color: '#db2777' },
-  { label: 'Préparation pour Production', color: '#0891b2' },
-  { label: 'Production PRINT DTF', color: '#1d9e75' },
-  { label: 'Production Pressage', color: '#16a34a' },
-  { label: 'Production TROTEC', color: '#0d9488' },
-  { label: 'Production UV', color: '#7c3aed' },
-  { label: 'PROBLEMES', color: '#dc2626' },
-  { label: 'Facturation', color: '#6b7280' },
-];
+// Correspondance ancien slug d'étape → nouveau (planning linéaire). Réversible :
+// aucune donnée n'est supprimée (la table production_sectors est conservée
+// intacte, ce qui permet de reconstruire l'ancien modèle si besoin). Idempotent :
+// après un passage, plus aucune ligne ne porte d'ancien slug.
+const STAGE_MIGRATION = {
+  demande: 'nouvelle_demande',
+  devis_en_cours: 'chiffrage',
+  devis_accepte: 'devis_accepte_bat',
+  archive: 'termine_archive',
+  maquette_fiverr: 'fiverr',
+  toptex: 'a_commander',
+  // 'facturation' : slug inchangé.
+  // Anciennes étapes prod_* restées telles quelles (sécurité) :
+  prod_roland_uv: 'prod_uv',
+  prod_sous_traitance: 'preparation_production',
+  prod_autre: 'preparation_production',
+};
 
-// Anciens états par défaut (avant le passage au planning « Planning express »).
-// Retirés des bases existantes s'ils ne sont portés par aucune commande.
-const LEGACY_DEFAULT_STATUSES = [
-  'À traiter', 'Maquette à faire', 'Maquette à valider',
-  'En attente client', 'Validé', 'Bloqué', 'Terminé',
-];
-
-async function seedStatuses() {
-  const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM statuses');
-  if (rows[0].n > 0) return;
-  let pos = 1000;
-  for (const s of DEFAULT_STATUSES) {
-    await pool.query(
-      'INSERT INTO statuses (label, color, position) VALUES ($1, $2, $3)',
-      [s.label, s.color, pos],
+async function migrateStagesToLinear() {
+  // 1) Commandes en phase « production » (modèle multi-machines) : on choisit
+  //    l'étape prod correspondant au secteur porté (priorité TROTEC > DTF >
+  //    Pressage > UV ; sinon « Préparation production »).
+  const { rows: prod } = await pool.query("SELECT id FROM requests WHERE stage = 'production'");
+  for (const r of prod) {
+    const { rows: secs } = await pool.query(
+      'SELECT sector FROM production_sectors WHERE request_id = $1', [r.id],
     );
-    pos += 1000;
+    const have = new Set(secs.map((s) => s.sector));
+    let target = 'preparation_production';
+    if (have.has('prod_trotec')) target = 'prod_trotec';
+    else if (have.has('prod_dtf')) target = 'prod_dtf';
+    else if (have.has('prod_pressage')) target = 'prod_pressage';
+    else if (have.has('prod_roland_uv')) target = 'prod_uv';
+    await pool.query('UPDATE requests SET stage = $1 WHERE id = $2', [target, r.id]);
   }
-}
 
-// Ajoute les statuts par défaut manquants (idempotent, comparaison par libellé).
-// Sert aux bases déjà peuplées : elles reçoivent les nouveaux statuts sans écraser
-// ceux que l'utilisateur aurait ajoutés lui-même.
-async function ensureDefaultStatuses() {
-  const { rows } = await pool.query('SELECT lower(label) AS l FROM statuses');
-  const have = new Set(rows.map((r) => r.l));
-  const { rows: p } = await pool.query('SELECT COALESCE(MAX(position), 0) AS pos FROM statuses');
-  let pos = Number(p[0].pos) || 0;
-  for (const s of DEFAULT_STATUSES) {
-    if (have.has(s.label.toLowerCase())) continue;
-    pos += 1000;
-    await pool.query(
-      'INSERT INTO statuses (label, color, position) VALUES ($1, $2, $3)',
-      [s.label, s.color, pos],
-    );
+  // 2) Renommage direct des autres anciens slugs.
+  for (const [from, to] of Object.entries(STAGE_MIGRATION)) {
+    if (from === to) continue;
+    await pool.query('UPDATE requests SET stage = $1 WHERE stage = $2', [to, from]);
   }
-}
 
-// Retire les anciens statuts par défaut UNIQUEMENT s'ils ne sont utilisés par
-// aucune commande : suppression réversible (seul le mapping libellé→couleur part,
-// le texte des commandes est préservé) et sans impact visible.
-async function pruneLegacyStatuses() {
-  for (const label of LEGACY_DEFAULT_STATUSES) {
-    const used = await pool.query('SELECT 1 FROM requests WHERE status = $1 LIMIT 1', [label]);
-    if (used.rowCount === 0) {
-      await pool.query('DELETE FROM statuses WHERE label = $1', [label]);
-    }
-  }
-}
-
-// Convertit les commandes encore taguées avec une ancienne étape prod_* :
-//  stage = 'production' + une ligne production_sectors pour ce secteur.
-async function migrateProdStages() {
-  const inList = SECTOR_SLUGS.map((s) => `'${s}'`).join(', ');
-  const { rows } = await pool.query(
-    `SELECT id, stage FROM requests WHERE stage IN (${inList})`,
-  );
-  for (const r of rows) {
-    const ex = await pool.query(
-      'SELECT 1 FROM production_sectors WHERE request_id = $1 AND sector = $2', [r.id, r.stage],
-    );
-    if (ex.rowCount === 0) {
-      await pool.query(
-        'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)',
-        [r.id, r.stage],
-      );
-    }
-    await pool.query("UPDATE requests SET stage = 'production' WHERE id = $1", [r.id]);
-  }
+  // 3) Aligne la valeur par défaut de la colonne sur la première étape.
+  try {
+    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'nouvelle_demande'");
+  } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
 }
 
 async function seed() {
@@ -194,67 +146,60 @@ async function seed() {
 
   const samples = [
     {
-      stage: 'demande', priority: 3, client_type: 'pro', billing_company: 'Brasserie du Coin',
+      stage: 'nouvelle_demande', priority: 3, client_type: 'pro', billing_company: 'Brasserie du Coin',
       contact_referent: 'Julie M.', quantity: 50, product: 'T-shirts DTF logo', color: 'Noir',
       project_value: 850, description: 'Tee-shirts événement bière artisanale',
-      deadline: inDays(3), status: 'Demande Client', position: 1000,
+      deadline: inDays(3), position: 1000,
     },
     {
-      stage: 'demande', priority: 1, client_type: 'perso', billing_company: 'Particulier',
+      stage: 'nouvelle_demande', priority: 1, client_type: 'perso', billing_company: 'Particulier',
       contact_referent: 'Léa', quantity: 2, product: 'Mug photo',
       project_value: 30, description: 'Cadeau anniversaire', deadline: inDays(12),
-      status: 'Attente retour client', position: 2000,
+      position: 2000,
     },
     {
-      stage: 'devis_en_cours', priority: 2, client_type: 'pro', billing_company: 'Club Sportif Aurillac',
+      stage: 'chiffrage', priority: 2, client_type: 'pro', billing_company: 'Club Sportif Aurillac',
       contact_referent: 'Coach Bernard', quantity: 30, product: 'Maillots floqués',
       project_value: 1450, description: 'Maillots saison 2026', deadline: inDays(8),
-      status: 'Devis en Cours', position: 1000,
+      position: 1000,
     },
     {
-      stage: 'devis_accepte', priority: 3, client_type: 'pro', billing_company: 'Mairie de Vic',
+      stage: 'a_commander', priority: 3, client_type: 'pro', billing_company: 'Mairie de Vic',
       contact_referent: 'Service Com', quantity: 120, product: 'Tote bags sérigraphie', color: 'Écru',
       project_value: 3200, description: 'Sacs marché de Noël', deadline: inDays(1),
-      status: 'A commander', position: 1000,
+      position: 1000,
     },
     {
-      stage: 'production', sectors: ['prod_dtf'], priority: 2, client_type: 'pro',
+      stage: 'prod_dtf', priority: 2, client_type: 'pro',
       billing_company: 'Auto-école Rapid', contact_referent: 'M. Faure', quantity: 15,
       product: 'Polos brodés DTF', project_value: 540, description: 'Polos moniteurs',
-      deadline: inDays(-1), status: 'Production PRINT DTF', position: 1000,
+      deadline: inDays(-1), position: 1000,
     },
     {
-      // Exemple multi-secteurs : une même commande passe par 2 machines.
-      stage: 'production', sectors: ['prod_trotec', 'prod_roland_uv'], priority: 3,
+      stage: 'prod_trotec', priority: 3,
       client_type: 'pro', billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.',
       quantity: 40, product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
-      description: 'Découpe forme sur la Trotec, puis impression couleur sur la Roland UV',
-      deadline: inDays(5), status: 'Production TROTEC', position: 1000,
+      description: 'Découpe forme sur la Trotec',
+      deadline: inDays(5), position: 1000,
     },
     {
       stage: 'facturation', priority: 1, client_type: 'pro', billing_company: 'Pizzeria Bella',
       contact_referent: 'Marco', quantity: 8, product: 'Tabliers personnalisés',
       project_value: 240, description: 'Tabliers cuisine', deadline: inDays(-5),
-      status: 'Facturation', position: 1000,
+      position: 1000,
     },
   ];
 
   for (const s of samples) {
-    const { rows } = await pool.query(
+    await pool.query(
       `INSERT INTO requests
         (stage, priority, client_type, billing_company, contact_referent, quantity,
-         product, color, project_value, description, deadline, status, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+         product, color, project_value, description, deadline, position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [s.stage, s.priority, s.client_type, s.billing_company, s.contact_referent,
-       s.quantity, s.product, s.color ?? null, s.project_value, s.description, s.deadline, s.status, s.position],
+       s.quantity, s.product, s.color ?? null, s.project_value, s.description, s.deadline, s.position],
     );
-    for (const sector of s.sectors || []) {
-      await pool.query(
-        'INSERT INTO production_sectors (request_id, sector, done) VALUES ($1, $2, false)',
-        [rows[0].id, sector],
-      );
-    }
   }
 }
 
-module.exports = { pool, init, STAGES, STAGE_SLUGS, SECTORS, SECTOR_SLUGS };
+module.exports = { pool, init, STAGES, STAGE_SLUGS };
