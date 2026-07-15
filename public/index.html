@@ -4,102 +4,135 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Planning OLDA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
-  <div class="app">
-    <!-- Sidebar = pipeline -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-head">
-        <div class="brand-row">
-          <span class="brand-logo-glass" id="brandLogo" aria-hidden="true">
-            <svg class="brand-logo" viewBox="55 68 174 176" fill="currentColor">
-              <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
-              <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
-              <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
-              <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
-              <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
-            </svg>
-          </span>
-          <div class="today" id="todayDate"></div>
-        </div>
-      </div>
-      <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
-    </aside>
-
-    <!-- Zone de travail -->
-    <main class="work">
-      <header class="work-head">
-        <div class="work-head-left">
-          <button class="btn-primary" id="btnNew" type="button">+ Nouvelle commande</button>
-          <div class="work-title">
-            <h1 id="stageTitle">Commande</h1>
-            <span class="work-count" id="stageCount"></span>
-          </div>
-        </div>
-        <div class="grid-search" id="gridSearch">
-          <svg class="grid-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
-          <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
-          <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
-        </div>
-        <div class="work-head-right">
-          <a class="stage-link" id="stageLink" target="_blank" rel="noopener noreferrer" hidden>
-            <svg class="stage-link-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-            <span class="stage-link-label" id="stageLinkLabel"></span>
-          </a>
-          <div class="density-toggle" id="densityToggle" role="group" aria-label="Densité d'affichage">
-            <button type="button" class="density-opt" data-density="compact" aria-pressed="false">Compact</button>
-            <button type="button" class="density-opt" data-density="normal" aria-pressed="false">Normal</button>
-            <button type="button" class="density-opt" data-density="confort" aria-pressed="false">Confort</button>
-          </div>
-        </div>
-      </header>
-
-      <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
-      <div class="fiverr-tool" id="fiverrTool" hidden>
-        <div class="fiverr-tool-field">
-          <label class="fiverr-tool-label" for="fiverrCost">Prix graphiste Fiverr ($)</label>
-          <div class="fiverr-tool-input-wrap">
-            <input class="fiverr-tool-input" id="fiverrCost" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
-            <span class="fiverr-tool-unit">$</span>
-          </div>
-        </div>
-        <svg class="fiverr-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
-        <div class="fiverr-tool-result">
-          <span class="fiverr-tool-result-label">Prix client OLDA</span>
-          <span class="fiverr-tool-result-value" id="fiverrPrice">—</span>
+  <div class="shell">
+    <!-- Barre du haut : logo + titre + recherche + avatar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-logo" id="brandLogo" aria-hidden="true">
+          <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
+            <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
+            <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
+            <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
+            <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
+            <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <span class="brand-title">Planning OLDA</span>
+          <span class="brand-sub" id="todayDate"></span>
         </div>
       </div>
 
-      <div class="grid-wrap">
-        <table class="grid" id="grid">
-          <colgroup>
-            <col data-col="handle" />
-            <col data-col="client_type" />
-            <col data-col="client" />
-            <col data-col="product" />
-            <col data-col="description" />
-            <col data-col="deadline" />
-            <col data-col="del" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="col-handle" aria-label="Glisser"></th>
-              <th class="col-type sortable" data-sort="client_type">Type</th>
-              <th class="col-client sortable" data-sort="billing_company">Nom du Dossier Client</th>
-              <th class="col-product sortable" data-sort="product">Description</th>
-              <th class="col-infos sortable" data-sort="description">Infos</th>
-              <th class="col-deadline sortable" data-sort="deadline">Date Souhaité</th>
-              <th class="col-del" aria-label=""></th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-        <div class="empty" id="empty" hidden>Aucune commande à cette étape.</div>
+      <div class="grid-search" id="gridSearch">
+        <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
+        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
+        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
+        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
       </div>
-    </main>
+
+      <div class="topbar-right">
+        <span class="avatar" aria-hidden="true">O</span>
+      </div>
+    </header>
+    <div class="topbar-filet" aria-hidden="true"></div>
+
+    <div class="app">
+      <!-- Sidebar = rail de filtres par étape -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-head">
+          <span class="sidebar-head-label">Étapes</span>
+        </div>
+        <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
+      </aside>
+
+      <!-- Zone de travail -->
+      <main class="work">
+        <header class="work-head">
+          <div class="work-head-left">
+            <button class="btn-primary" id="btnNew" type="button">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+              <span>Nouvelle commande</span>
+            </button>
+            <div class="work-title">
+              <h1 id="stageTitle">Commande</h1>
+              <span class="work-count" id="stageCount"></span>
+            </div>
+          </div>
+          <div class="work-head-right">
+            <a class="stage-link" id="stageLink" target="_blank" rel="noopener noreferrer" hidden>
+              <span class="material-symbols-outlined stage-link-ic" aria-hidden="true">open_in_new</span>
+              <span class="stage-link-label" id="stageLinkLabel"></span>
+            </a>
+            <div class="density-toggle" id="densityToggle" role="group" aria-label="Densité d'affichage">
+              <button type="button" class="density-opt" data-density="compact" aria-pressed="false">Compact</button>
+              <button type="button" class="density-opt" data-density="normal" aria-pressed="false">Normal</button>
+              <button type="button" class="density-opt" data-density="confort" aria-pressed="false">Confort</button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
+        <div class="fiverr-tool" id="fiverrTool" hidden>
+          <div class="fiverr-tool-field">
+            <label class="fiverr-tool-label" for="fiverrCost">Prix graphiste Fiverr ($)</label>
+            <div class="fiverr-tool-input-wrap">
+              <input class="fiverr-tool-input" id="fiverrCost" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
+              <span class="fiverr-tool-unit">$</span>
+            </div>
+          </div>
+          <span class="material-symbols-outlined fiverr-tool-arrow" aria-hidden="true">arrow_forward</span>
+          <div class="fiverr-tool-result">
+            <span class="fiverr-tool-result-label">Prix client OLDA</span>
+            <span class="fiverr-tool-result-value" id="fiverrPrice">—</span>
+          </div>
+        </div>
+
+        <div class="grid-wrap">
+          <table class="grid" id="grid">
+            <colgroup>
+              <col data-col="handle" />
+              <col data-col="client_type" />
+              <col data-col="client" />
+              <col data-col="product" />
+              <col data-col="description" />
+              <col data-col="deadline" />
+              <col data-col="del" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="col-handle" aria-label="Glisser"></th>
+                <th class="col-type sortable" data-sort="client_type">Type</th>
+                <th class="col-client sortable" data-sort="billing_company">Nom du Dossier Client</th>
+                <th class="col-product sortable" data-sort="product">Description</th>
+                <th class="col-infos sortable" data-sort="description">Infos</th>
+                <th class="col-deadline sortable" data-sort="deadline">Date Souhaité</th>
+                <th class="col-del" aria-label=""></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+            <tfoot>
+              <tr class="add-row">
+                <td colspan="7">
+                  <button class="add-row-btn" id="btnAddRow" type="button">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    <span>Ajouter une commande</span>
+                  </button>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <div class="empty" id="empty" hidden>Aucune commande à cette étape.</div>
+        </div>
+      </main>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>
