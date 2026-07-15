@@ -859,8 +859,8 @@ tr:hover .handle { color: var(--text-2); }
 }
 .prio-group-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
-/* Client : société (info principale, en gras) + sous-ligne discrète référent +
-   bascule pro/perso. Fusionne les anciennes colonnes Type / Société / Référent. */
+/* Nom du dossier client : champ principal éditable. Le référent / téléphone /
+   email sont saisis via le popover contact (icône de la 1re colonne). */
 .col-client-cell { padding: 0; vertical-align: middle; }
 .client-stack { display: flex; flex-direction: column; padding: 4px 0; gap: 1px; }
 .client-stack .client-company {
@@ -872,23 +872,7 @@ tr:hover .handle { color: var(--text-2); }
   letter-spacing: -0.01em;
   color: var(--text-1);
 }
-.client-sub {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 12px 4px;
-}
-.client-sub .client-ref {
-  height: auto;
-  min-height: 0;
-  padding: 1px 0;
-  font-size: 13px;
-  font-weight: 450;
-  color: var(--text-2); /* référent plus lisible */
-  flex: 1;
-  min-width: 0;
-}
-.client-sub .client-ref::placeholder { color: #b0b4bb; }
+/* Type Pro / Perso : pastille (désormais dans sa propre colonne). */
 .type-tag {
   flex-shrink: 0;
   padding: 1px 8px;
@@ -1075,34 +1059,22 @@ tr:hover .handle { color: var(--text-2); }
 /* colonnes largeurs */
 /* min-width = plancher dur : le champ (input) ne contribue pas à la largeur de
    colonne en table-layout auto, donc sans plancher la colonne se réduit au libellé
-   d'en-tête et tronque les montants en gras. */
-.col-qty { width: 92px; min-width: 82px; }
-.col-value { width: 118px; min-width: 104px; }
-.col-deadline { width: 134px; min-width: 116px; }
-.col-client { min-width: 196px; }
-.col-product { min-width: 240px; }
+   d'en-tête et tronque le texte. */
+.col-type { width: 96px; min-width: 84px; }
+.col-deadline { width: 140px; min-width: 122px; }
+.col-client { min-width: 200px; }
+.col-product { min-width: 200px; }
+.col-infos { min-width: 200px; }
 
-/* Quantité & Prix : chiffres mis en avant, alignés à droite, tabulaires. */
-.grid tbody td.col-qty,
-.grid tbody td.col-value { text-align: right; } /* aligne aussi le bouton « + Prix » */
-.grid tbody td.col-qty .cell-input,
-.grid tbody td.col-value .cell-input {
-  color: var(--text-1);
-  font-weight: 700;
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
+/* Type Pro / Perso : pastille centrée dans sa colonne. */
+.grid thead th.col-type { text-align: center; }
+.grid tbody td.col-type { text-align: center; vertical-align: middle; }
 
-/* Colonnes optionnelles masquées quand la vue ne les renseigne pas
-   (cf. applyEmptyCols) — plutôt que d'afficher une colonne de « — ». */
-.grid.hide-quantity colgroup col[data-col="quantity"],
-.grid.hide-quantity thead th.col-qty,
-.grid.hide-quantity tbody td.col-qty { display: none; }
-
-/* Produit : nom (gras) + description (gris, masquée si vide) empilés */
-.col-product-cell { padding: 0; vertical-align: middle; }
-.product-stack { display: flex; flex-direction: column; padding: 4px 0; }
+/* Description (produit) + Infos (notes) : mêmes réglages de cellule empilée. */
+.col-product-cell,
+.col-infos-cell { padding: 0; vertical-align: middle; }
+.product-stack,
+.infos-stack { display: flex; flex-direction: column; padding: 4px 0; }
 .product-stack .product-name {
   height: auto;
   min-height: 0;
@@ -1111,9 +1083,9 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
   color: var(--text-1b); /* corps : un cran sous le nom du client */
 }
-/* Description multi-ligne (textarea) + flèche de dépliage. */
+/* Notes multi-ligne (textarea) + flèche de dépliage. */
 .product-desc-row { display: flex; align-items: flex-start; gap: 2px; }
-.product-stack .product-desc {
+.product-desc {
   flex: 1;
   min-width: 0;
   height: auto;          /* rows=1 → 1 ligne repliée ; JS pose la hauteur dépliée */
@@ -1128,7 +1100,7 @@ tr:hover .handle { color: var(--text-2); }
   white-space: pre-wrap;
   font-family: inherit;
 }
-.product-stack .product-desc::placeholder { color: #b0b4bb; }
+.product-desc::placeholder { color: #b0b4bb; }
 /* flèche de dépliage : visible seulement si ≥ 2 lignes (toggle.hidden côté JS) */
 .desc-toggle {
   flex-shrink: 0;
@@ -1150,10 +1122,12 @@ tr:hover .handle { color: var(--text-2); }
 .desc-toggle svg { width: 15px; height: 15px; display: block; transition: transform 0.15s ease; }
 .desc-toggle.open svg { transform: rotate(180deg); }
 .desc-toggle[hidden] { display: none; }
-/* Au repos, description vide → masquée. Réapparaît au focus (clic dans la
-   cellule Produit) pour rester éditable, mais PAS au survol. */
-.product-stack.desc-empty .product-desc-row { display: none; }
-.product-stack.desc-empty:focus-within .product-desc-row { display: flex; }
+/* Au repos, note vide → masquée. Réapparaît au focus (clic dans la cellule
+   Infos) pour rester éditable, mais PAS au survol. */
+.product-stack.desc-empty .product-desc-row,
+.infos-stack.desc-empty .product-desc-row { display: none; }
+.product-stack.desc-empty:focus-within .product-desc-row,
+.infos-stack.desc-empty:focus-within .product-desc-row { display: flex; }
 
 /* ------------------------------------------- Largeur des colonnes réglable */
 /* Mode manuel : le tableau suit exactement les largeurs posées sur les <col>
@@ -1526,12 +1500,14 @@ button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
   /* éviter le zoom auto de Chrome au focus d'un champ (≥ 16px) */
   .cell-input { font-size: 16px; }
 
-  /* produit empilé : la cellule s'adapte, le nom garde une bonne cible
-     tactile et la description reste toujours visible (pas de survol au doigt) */
-  .col-product-cell { height: auto; }
+  /* description / infos empilées : la cellule s'adapte, le nom garde une bonne
+     cible tactile et les notes restent toujours visibles (pas de survol au doigt) */
+  .col-product-cell,
+  .col-infos-cell { height: auto; }
   .product-stack .product-name { min-height: 44px; height: auto; }
-  .product-stack .product-desc { min-height: 0; height: auto; font-size: 14px; }
-  .product-stack.desc-empty .product-desc-row { display: flex; }
+  .product-desc { min-height: 0; height: auto; font-size: 14px; }
+  .product-stack.desc-empty .product-desc-row,
+  .infos-stack.desc-empty .product-desc-row { display: flex; }
   .desc-toggle { width: 32px; height: 32px; }
 
   /* cibles de toucher plus grandes */
@@ -1549,7 +1525,6 @@ button, a, .stage, .prio-pill, .status-pill, .deadline-badge,
   }
   /* champs saisissables ≥ 16px : pas de zoom auto iOS au focus */
   .client-stack .client-company { font-size: 16px; }
-  .client-sub .client-ref { font-size: 16px; }
   .del-btn,
   .dup-btn { width: 38px; }
   .send-btn { height: 34px; font-size: 13px; }

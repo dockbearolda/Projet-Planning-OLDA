@@ -77,11 +77,10 @@
         <table class="grid" id="grid">
           <colgroup>
             <col data-col="handle" />
-            <col data-col="priority" />
+            <col data-col="client_type" />
             <col data-col="client" />
             <col data-col="product" />
-            <col data-col="quantity" />
-            <col data-col="project_value" />
+            <col data-col="description" />
             <col data-col="deadline" />
             <col data-col="status" />
             <col data-col="del" />
@@ -89,13 +88,12 @@
           <thead>
             <tr>
               <th class="col-handle" aria-label="Glisser"></th>
-              <th class="col-priority sortable" data-sort="priority">Priorité</th>
-              <th class="col-client sortable" data-sort="billing_company">Client</th>
-              <th class="col-product sortable" data-sort="product">Produit</th>
-              <th class="col-qty sortable num" data-sort="quantity">Quantité</th>
-              <th class="col-value sortable num" data-sort="project_value">Prix</th>
-              <th class="col-deadline sortable" data-sort="deadline">Échéance</th>
-              <th class="col-status sortable" data-sort="status">État</th>
+              <th class="col-type sortable" data-sort="client_type">Type</th>
+              <th class="col-client sortable" data-sort="billing_company">Nom du Dossier Client</th>
+              <th class="col-product sortable" data-sort="product">Description</th>
+              <th class="col-infos sortable" data-sort="description">Infos</th>
+              <th class="col-deadline sortable" data-sort="deadline">Date Souhaité</th>
+              <th class="col-status sortable" data-sort="status">Statut</th>
               <th class="col-del" aria-label=""></th>
             </tr>
           </thead>
