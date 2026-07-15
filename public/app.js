@@ -340,9 +340,9 @@ function ensureGroupHeader(band) {
 }
 
 function renderRows(data) {
-  // Les en-têtes de groupe n'apparaissent que dans la vue par défaut (triée par
-  // priorité) ; dès qu'un tri par colonne est actif, on affiche une liste à plat.
-  const grouping = !sort.key;
+  // Planning simplifié : plus de colonne priorité, donc plus de regroupement par
+  // bande. On affiche toujours une liste à plat (tri par urgence puis échéance).
+  const grouping = false;
   const wanted = new Set(data.map((r) => String(r.id)));
 
   // 1. Retirer les <tr> de données dont l'id n'est plus présent dans la liste voulue.
@@ -395,7 +395,7 @@ function renderRows(data) {
     prev = node;
   }
 
-  applyEmptyCols(data);
+  applyEmptyCols();
   updateSortArrows();
 }
 
@@ -447,24 +447,16 @@ function applySearchAndCounts() {
     : '';
 }
 
-// Prix et Échéance restent TOUJOURS affichés. Seule la Quantité est masquée
-// quand aucune commande réelle de la vue ne la renseigne (et qu'aucune ligne
-// brouillon n'est présente, sinon son champ de saisie serait inaccessible).
-function applyEmptyCols(data) {
-  const hasDraft = data.some(isDraftRow);
-  const hasQty = hasDraft ||
-    data.some((r) => !isDraftRow(r) && r.quantity !== null && r.quantity !== undefined && r.quantity !== '');
-  $grid.classList.toggle('hide-quantity', !hasQty);
-  $grid.classList.remove('hide-value', 'hide-deadline');
-  // Les largeurs manuelles dépendent des colonnes visibles : on recalcule.
+// Toutes les colonnes du planning simplifié restent affichées en permanence :
+// on se contente de recaler les largeurs manuelles au rendu.
+function applyEmptyCols() {
   applyColWidths();
 }
 
 // Une ligne est un « brouillon d'ajout » tant qu'aucun champ de contenu n'est
 // renseigné : on l'affiche alors comme un formulaire, pas comme une donnée.
 function isDraftRow(r) {
-  const fields = ['billing_company', 'contact_referent', 'quantity', 'product',
-    'project_value', 'description', 'deadline', 'status'];
+  const fields = ['billing_company', 'product', 'description', 'deadline', 'status'];
   return fields.every((k) => r[k] === null || r[k] === undefined || r[k] === '');
 }
 
@@ -473,7 +465,6 @@ function buildRow(r) {
   tr.dataset.id = r.id;
   const draft = isDraftRow(r);
   if (draft) tr.classList.add('is-draft');
-  else applyPrioBar(tr, r.priority); // barre de couleur à gauche selon la priorité
 
   // début de ligne : poignée draggable (ou bouton « + Ajouter » si brouillon)
   // + icône contact discret (téléphone / email), sans modifier le reste.
@@ -506,19 +497,17 @@ function buildRow(r) {
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
-  // priorité (3 niveaux codés couleur)
-  tr.appendChild(cellPriority(r));
-  // client : société (info principale) + référent + type pro/perso fusionnés
-  tr.appendChild(cellClient(r));
-  // produit (nom + description fusionnés sur deux lignes)
-  tr.appendChild(cellProduct(r));
-  // quantité (masquée si la colonne est vide sur la vue)
-  tr.appendChild(cellNumber(r, 'quantity', 'qté'));
-  // valeur (masquée si la colonne est vide sur la vue)
-  tr.appendChild(cellMoney(r, 'project_value'));
-  // échéance : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
+  // type : bascule Pro / Perso
+  tr.appendChild(cellType(r));
+  // nom du dossier client (référent / contact déplacés dans le popover contact)
+  tr.appendChild(cellDossier(r));
+  // description : ce qui est produit (ancien champ « produit »)
+  tr.appendChild(cellDescription(r));
+  // infos : notes libres multi-lignes (ancien champ « description »)
+  tr.appendChild(cellInfos(r));
+  // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
   tr.appendChild(cellDeadline(r));
-  // état : signal principal, aligné à droite
+  // statut : signal principal, aligné à droite
   tr.appendChild(cellStatus(r));
   // actions de fin de ligne : envoyer vers (Fiverr / Toptex) + dupliquer +
   // supprimer (révélées au survol)
@@ -562,14 +551,15 @@ function buildRow(r) {
 // Stocké sur la commande, jamais affiché en clair dans la ligne : on l'expose
 // via un petit icône (gris si vide, bleu si renseigné) ouvrant un popover.
 function hasContact(r) {
-  return !!((r.contact_phone && r.contact_phone !== '') || (r.contact_email && r.contact_email !== ''));
+  return !!((r.contact_referent && r.contact_referent !== '') ||
+    (r.contact_phone && r.contact_phone !== '') || (r.contact_email && r.contact_email !== ''));
 }
 
 function contactButton(r) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'contact-btn' + (hasContact(r) ? ' has-contact' : '');
-  btn.title = hasContact(r) ? 'Contact renseigné — voir / éditer' : 'Ajouter un contact (téléphone, email)';
+  btn.title = hasContact(r) ? 'Contact renseigné — voir / éditer' : 'Ajouter un contact (référent, téléphone, email)';
   btn.setAttribute('aria-label', 'Contact');
   btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5"/><circle cx="12" cy="11" r="2.4"/><path d="M8.5 17a3.5 3.5 0 0 1 7 0"/></svg>';
   btn.addEventListener('click', (e) => { e.stopPropagation(); openContactPopover(r, btn); });
@@ -602,6 +592,9 @@ function openContactPopover(r, anchor) {
   pop.className = 'contact-pop';
   pop.innerHTML = `
     <div class="cp-title">Contact</div>
+    <label class="cp-field">Référent
+      <input type="text" class="cp-ref" placeholder="nom du référent" autocomplete="name" />
+    </label>
     <label class="cp-field">Téléphone
       <input type="tel" class="cp-phone" placeholder="06 12 34 56 78" autocomplete="tel" />
     </label>
@@ -609,9 +602,11 @@ function openContactPopover(r, anchor) {
       <input type="email" class="cp-email" placeholder="nom@exemple.fr" autocomplete="email" />
     </label>
     <div class="cp-err" hidden></div>`;
+  const ref = pop.querySelector('.cp-ref');
   const phone = pop.querySelector('.cp-phone');
   const email = pop.querySelector('.cp-email');
   const err = pop.querySelector('.cp-err');
+  ref.value = r.contact_referent || '';
   phone.value = r.contact_phone || '';
   email.value = r.contact_email || '';
 
@@ -624,7 +619,7 @@ function openContactPopover(r, anchor) {
     patchRow(r, { [field]: val })
       .then(() => {
         anchor.classList.toggle('has-contact', hasContact(r));
-        anchor.title = hasContact(r) ? 'Contact renseigné — voir / éditer' : 'Ajouter un contact (téléphone, email)';
+        anchor.title = hasContact(r) ? 'Contact renseigné — voir / éditer' : 'Ajouter un contact (référent, téléphone, email)';
         err.hidden = true;
       })
       .catch((e2) => {
@@ -633,8 +628,11 @@ function openContactPopover(r, anchor) {
         err.hidden = false;
       });
   };
-  const commitAll = () => { save('contact_phone', phone); save('contact_email', email); };
+  const commitAll = () => {
+    save('contact_referent', ref); save('contact_phone', phone); save('contact_email', email);
+  };
 
+  ref.addEventListener('change', () => save('contact_referent', ref));
   phone.addEventListener('change', () => save('contact_phone', phone));
   email.addEventListener('change', () => save('contact_email', email));
 
@@ -871,66 +869,10 @@ function prioBand(r) {
   return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
 }
 
-// Pose / met à jour la barre de couleur à gauche d'une ligne selon sa priorité.
-function applyPrioBar(tr, priority) {
-  const band = PRIORITY_LEVELS[priority] ? priority : 1;
-  tr.classList.remove('prio-bar-p1', 'prio-bar-p2', 'prio-bar-p3');
-  tr.classList.add('prio-bar-p' + band);
-}
-
-function cellPriority(r) {
+// Type : bascule Pro / Perso, désormais dans sa propre colonne (1re du fichier).
+function cellType(r) {
   const td = document.createElement('td');
-  td.className = 'col-priority';
-  const pill = document.createElement('button');
-  pill.type = 'button';
-  const render = () => {
-    const lvl = PRIORITY_LEVELS[r.priority] || PRIORITY_LEVELS[1];
-    pill.className = 'prio-pill ' + lvl.cls;
-    pill.innerHTML = `<span class="prio-dot" aria-hidden="true"></span><span>${lvl.label}</span>`;
-    pill.title = `Priorité ${lvl.label.toLowerCase()} — cliquer pour changer`;
-    pill.setAttribute('aria-label', `Priorité ${lvl.label}`);
-  };
-  render();
-  pill.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const prev = prioBand(r);
-    const next = (prev % 3) + 1; // 1 → 2 → 3 → 1
-    r.priority = next;
-    render();
-    const tr = pill.closest('tr');
-    if (tr) applyPrioBar(tr, next);
-    // La priorité pilote le groupe et l'ordre : on re-rend pour déplacer la ligne
-    // dans la bonne bande (la ligne elle-même n'est pas reconstruite — focus / saisie
-    // préservés via isRowBusy / signature inchangée).
-    applySortAndRender();
-    patchRow(r, { priority: next }).catch((err) => {
-      r.priority = prev;
-      reportError(err);
-      applySortAndRender();
-    });
-  });
-  td.appendChild(pill);
-  return td;
-}
-
-// Client : société (info principale, en gras) + sous-ligne discrète référent +
-// bascule pro/perso. Fusionne les anciennes colonnes Type / Société / Référent.
-function cellClient(r) {
-  const td = document.createElement('td');
-  td.className = 'col-client-cell';
-  const stack = document.createElement('div');
-  stack.className = 'client-stack';
-
-  const company = document.createElement('input');
-  company.className = 'cell-input client-company';
-  company.type = 'text';
-  company.value = r.billing_company ?? '';
-  company.placeholder = 'société';
-  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
-
-  const sub = document.createElement('div');
-  sub.className = 'client-sub';
-
+  td.className = 'col-type';
   const type = document.createElement('button');
   type.type = 'button';
   const renderType = () => {
@@ -944,27 +886,33 @@ function cellClient(r) {
     const next = r.client_type === 'pro' ? 'perso' : 'pro';
     patch(r, { client_type: next }, () => { r.client_type = next; renderType(); });
   });
+  td.appendChild(type);
+  return td;
+}
 
-  const ref = document.createElement('input');
-  ref.className = 'cell-input client-ref';
-  ref.type = 'text';
-  ref.value = r.contact_referent ?? '';
-  ref.placeholder = 'référent';
-  bindInline(ref, r, 'contact_referent', (v) => v === '' ? null : v, capitalizeName);
+// Nom du dossier client : champ principal éditable. Le référent, le téléphone et
+// l'email restent saisissables via le popover contact (icône de la 1re colonne).
+function cellDossier(r) {
+  const td = document.createElement('td');
+  td.className = 'col-client-cell';
+  const stack = document.createElement('div');
+  stack.className = 'client-stack';
 
-  sub.appendChild(type);
-  sub.appendChild(ref);
+  const company = document.createElement('input');
+  company.className = 'cell-input client-company';
+  company.type = 'text';
+  company.value = r.billing_company ?? '';
+  company.placeholder = 'nom du dossier';
+  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
+
   stack.appendChild(company);
-  stack.appendChild(sub);
   td.appendChild(stack);
   return td;
 }
 
-// Produit : nom (gras, 1re ligne) + description (texte secondaire gris en
-// dessous). Les deux restent éditables en ligne. La description disparaît au
-// repos quand elle est vide, et réapparaît au survol / focus de la cellule —
-// même idiome que les actions « révélées au survol » ailleurs dans la grille.
-function cellProduct(r) {
+// Description : ce qui est produit (ancien champ « produit »). Champ simple,
+// éditable en ligne, avec majuscules automatiques à la validation.
+function cellDescription(r) {
   const td = document.createElement('td');
   td.className = 'col-product-cell';
   const stack = document.createElement('div');
@@ -974,18 +922,29 @@ function cellProduct(r) {
   name.className = 'cell-input product-name';
   name.type = 'text';
   name.value = r.product ?? '';
-  name.placeholder = 'produit';
+  name.placeholder = 'description';
   bindInline(name, r, 'product', (v) => v === '' ? null : v, capitalizeName);
 
-  // Description : multi-ligne (Entrée = nouvelle ligne). Repliée à 1 ligne par
-  // défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les lignes suivantes.
+  stack.appendChild(name);
+  td.appendChild(stack);
+  return td;
+}
+
+// Infos : notes libres multi-lignes (ancien champ « description »). Repliée à
+// 1 ligne par défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les suivantes.
+function cellInfos(r) {
+  const td = document.createElement('td');
+  td.className = 'col-infos-cell';
+  const stack = document.createElement('div');
+  stack.className = 'infos-stack';
+
   const descRow = document.createElement('div');
   descRow.className = 'product-desc-row';
   const desc = document.createElement('textarea');
   desc.className = 'cell-input product-desc';
   desc.rows = 1;
   desc.value = r.description ?? '';
-  desc.placeholder = 'description';
+  desc.placeholder = 'infos';
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -1035,71 +994,9 @@ function cellProduct(r) {
 
   descRow.appendChild(desc);
   descRow.appendChild(toggle);
-  stack.appendChild(name);
   stack.appendChild(descRow);
   td.appendChild(stack);
   sync();
-  return td;
-}
-
-function cellNumber(r, field, placeholder) {
-  const td = document.createElement('td');
-  td.className = 'num' + (field === 'quantity' ? ' col-qty' : '');
-  const input = document.createElement('input');
-  input.className = 'cell-input num';
-  input.type = 'number';
-  input.value = r[field] ?? '';
-  input.placeholder = placeholder;
-  bindInline(input, r, field, (v) => v === '' ? null : parseInt(v, 10));
-  td.appendChild(input);
-  return td;
-}
-
-function cellMoney(r, field) {
-  const td = document.createElement('td');
-  td.className = 'num col-value';
-
-  const showInput = (focus) => {
-    td.innerHTML = '';
-    const input = document.createElement('input');
-    input.className = 'cell-input num val-cell';
-    input.type = 'text';
-    input.inputMode = 'decimal';
-    input.value = r[field] != null ? formatMoney(r[field]) : '';
-    input.addEventListener('focus', () => { input.value = r[field] != null ? String(r[field]) : ''; });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
-    input.addEventListener('blur', () => {
-      const raw = input.value.replace(/\s/g, '').replace(',', '.').replace('€', '');
-      const val = raw === '' ? null : Number(raw);
-      if (val !== null && Number.isNaN(val)) { render(); return; }
-      if (val === (r[field] ?? null)) { render(); return; }
-      const prev = r[field];
-      r[field] = val;
-      patchRow(r, { project_value: val }).catch((err) => {
-        r[field] = prev; render(); reportError(err);
-      });
-      render();
-    });
-    td.appendChild(input);
-    if (focus) input.focus();
-  };
-
-  // Vide → bouton pointillé « + Prix » (cliquer pour saisir) ; sinon montant éditable.
-  const render = () => {
-    if (r[field] == null) {
-      td.innerHTML = '';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'empty-field';
-      btn.title = 'cliquer pour saisir un prix';
-      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>Prix</span>';
-      btn.addEventListener('click', (e) => { e.stopPropagation(); showInput(true); });
-      td.appendChild(btn);
-    } else {
-      showInput(false);
-    }
-  };
-  render();
   return td;
 }
 
@@ -1127,7 +1024,7 @@ function cellDeadline(r) {
     const d = daysLeft(r.deadline);
     if (r.deadline == null || d === null) {
       badge.className = 'deadline-badge empty';
-      badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span>Échéance</span>';
+      badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span>Date souhaitée</span>';
       badge.title = 'cliquer pour choisir une date';
     } else {
       let cls, label;
@@ -2016,7 +1913,7 @@ function updateSortArrows() {
 // Chaque catégorie mémorise ses propres largeurs (localStorage, par appareil).
 // Tant qu'aucune colonne n'a été réglée à la main, la répartition reste celle
 // du navigateur.
-const COLW_KEY = 'olda_col_widths_v3';
+const COLW_KEY = 'olda_col_widths_v4';
 const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];
@@ -2025,8 +1922,8 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 92, priority: 118, client: 196, product: 240, quantity: 92,
-  project_value: 118, deadline: 134, status: 162, del: 216,
+  handle: 92, client_type: 96, client: 220, product: 240, description: 240,
+  deadline: 140, status: 170, del: 200,
 };
 
 let colWidths = {};
