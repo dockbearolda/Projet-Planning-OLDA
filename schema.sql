@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS requests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage           text NOT NULL DEFAULT 'demande',
+  stage           text NOT NULL DEFAULT 'nouvelle_demande',
   priority        int  NOT NULL DEFAULT 1,
   client_type     text DEFAULT 'pro',
   billing_company text,
