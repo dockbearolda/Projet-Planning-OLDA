@@ -38,15 +38,6 @@ const GROUP_TITLES = ['Devis & BAT', 'Production', 'Clôture'];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
 
-// Teinte du point coloré de chaque étape dans le rail (palette Material) :
-// couleur par bloc, avec quelques étapes de clôture différenciées.
-const STAGE_TONE_OVERRIDE = {
-  facturation: 'facture', termine_archive: 'archive', bloque: 'bloque', fiverr: 'livree',
-};
-function stageTone(slug, groupIndex) {
-  return STAGE_TONE_OVERRIDE[slug] || ['demande', 'cours', 'archive'][groupIndex] || 'demande';
-}
-
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
   fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
@@ -159,7 +150,6 @@ function renderSidebar() {
       const el = document.createElement('div');
       el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
       el.dataset.slug = s.slug;
-      el.dataset.tone = stageTone(s.slug, gi);
       const n = counts[s.slug] ?? 0;
       if (n === 0) el.classList.add('is-empty');
       el.innerHTML = `<span class="stage-label">${escapeHtml(s.label)}</span>` +
@@ -1034,11 +1024,6 @@ function createForCurrentView() {
 
 $btnNew.addEventListener('click', () => createForCurrentView());
 
-// Dernière ligne du tableau (« + Ajouter une commande ») : même action que le
-// bouton d'en-tête — insère une ligne brouillon prête à remplir.
-const $btnAddRow = document.getElementById('btnAddRow');
-if ($btnAddRow) $btnAddRow.addEventListener('click', () => createForCurrentView());
-
 // --- Suppression (optimiste) ----------------------------------------------
 function removeRow(r) {
   if (!confirm('Supprimer cette commande définitivement ?')) return;
@@ -1606,36 +1591,47 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// --- Réglage de densité (Compact / Normal / Confort) -----------------------
-// Pilote la hauteur de ligne via une classe sur .app (--row-h). Mémorisé par
-// appareil (localStorage). Réglage visuel pur : aucun aller-retour serveur.
-const DENSITY_KEY = 'olda_density';
-const DENSITIES = ['compact', 'normal', 'confort'];
+// --- Densité d'affichage ---------------------------------------------------
+// Le sélecteur Compact/Normal/Confort a été retiré : densité fixée à « Confort ».
 const $app = document.querySelector('.app');
-const $densityToggle = document.getElementById('densityToggle');
-let density = 'normal';
-try { const d = localStorage.getItem(DENSITY_KEY); if (DENSITIES.includes(d)) density = d; } catch (_) {}
+if ($app) $app.classList.add('density-confort');
 
-function applyDensity(d) {
-  density = DENSITIES.includes(d) ? d : 'normal';
-  if ($app) DENSITIES.forEach((x) => $app.classList.toggle('density-' + x, x === density));
-  if ($densityToggle) {
-    $densityToggle.querySelectorAll('.density-opt').forEach((b) => {
-      const on = b.dataset.density === density;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-  }
-  try { localStorage.setItem(DENSITY_KEY, density); } catch (_) {}
-}
-
-if ($densityToggle) {
-  $densityToggle.addEventListener('click', (e) => {
-    const btn = e.target.closest('.density-opt');
-    if (btn) applyDensity(btn.dataset.density);
+// --- Largeur du rail réglable ----------------------------------------------
+// Une poignée verticale entre le rail et la zone de travail règle la largeur du
+// rail (glisser souris / doigt). Mémorisé par appareil (localStorage).
+const SIDEBAR_W_KEY = 'olda_sidebar_w';
+const SIDEBAR_MIN = 180, SIDEBAR_MAX = 460;
+const $sidebarResizer = document.getElementById('sidebarResizer');
+if ($app && $sidebarResizer) {
+  const clampW = (w) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(w)));
+  const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || '', 10);
+  if (Number.isFinite(saved)) $app.style.setProperty('--sidebar-w', clampW(saved) + 'px');
+  $sidebarResizer.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = document.getElementById('sidebar').getBoundingClientRect().width;
+    let lastW = clampW(startW);
+    $sidebarResizer.classList.add('active');
+    document.body.classList.add('sidebar-resizing');
+    try { $sidebarResizer.setPointerCapture(e.pointerId); } catch (_) {}
+    const onMove = (ev) => {
+      lastW = clampW(startW + ev.clientX - startX);
+      $app.style.setProperty('--sidebar-w', lastW + 'px');
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      $sidebarResizer.classList.remove('active');
+      document.body.classList.remove('sidebar-resizing');
+      try { localStorage.setItem(SIDEBAR_W_KEY, String(lastW)); } catch (_) {}
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   });
 }
-applyDensity(density);
 
 // --- Init ------------------------------------------------------------------
 // Date du jour affichée en haut à gauche : jour de la semaine + date complète.

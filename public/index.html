@@ -31,6 +31,11 @@
         </div>
       </div>
 
+      <button class="btn-primary" id="btnNew" type="button">
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        <span class="btn-primary-label">Nouvelle commande</span>
+      </button>
+
       <div class="grid-search" id="gridSearch">
         <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
         <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
@@ -53,14 +58,13 @@
         <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
       </aside>
 
+      <!-- Poignée de redimensionnement du rail -->
+      <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Régler la largeur du rail" title="Glisser pour régler la largeur"></div>
+
       <!-- Zone de travail -->
       <main class="work">
         <header class="work-head">
           <div class="work-head-left">
-            <button class="btn-primary" id="btnNew" type="button">
-              <span class="material-symbols-outlined" aria-hidden="true">add</span>
-              <span>Nouvelle commande</span>
-            </button>
             <div class="work-title">
               <h1 id="stageTitle">Commande</h1>
               <span class="work-count" id="stageCount"></span>
@@ -71,11 +75,6 @@
               <span class="material-symbols-outlined stage-link-ic" aria-hidden="true">open_in_new</span>
               <span class="stage-link-label" id="stageLinkLabel"></span>
             </a>
-            <div class="density-toggle" id="densityToggle" role="group" aria-label="Densité d'affichage">
-              <button type="button" class="density-opt" data-density="compact" aria-pressed="false">Compact</button>
-              <button type="button" class="density-opt" data-density="normal" aria-pressed="false">Normal</button>
-              <button type="button" class="density-opt" data-density="confort" aria-pressed="false">Confort</button>
-            </div>
           </div>
         </header>
 
@@ -118,16 +117,6 @@
               </tr>
             </thead>
             <tbody id="rows"></tbody>
-            <tfoot>
-              <tr class="add-row">
-                <td colspan="7">
-                  <button class="add-row-btn" id="btnAddRow" type="button">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                    <span>Ajouter une commande</span>
-                  </button>
-                </td>
-              </tr>
-            </tfoot>
           </table>
           <div class="empty" id="empty" hidden>Aucune commande à cette étape.</div>
         </div>
