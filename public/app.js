@@ -38,6 +38,15 @@ const GROUP_TITLES = ['Devis & BAT', 'Production', 'Clôture'];
 const STAGES = STAGE_GROUPS.flat();
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
 
+// Teinte du point coloré de chaque étape dans le rail (palette Material) :
+// couleur par bloc, avec quelques étapes de clôture différenciées.
+const STAGE_TONE_OVERRIDE = {
+  facturation: 'facture', termine_archive: 'archive', bloque: 'bloque', fiverr: 'livree',
+};
+function stageTone(slug, groupIndex) {
+  return STAGE_TONE_OVERRIDE[slug] || ['demande', 'cours', 'archive'][groupIndex] || 'demande';
+}
+
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
   fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
@@ -150,6 +159,7 @@ function renderSidebar() {
       const el = document.createElement('div');
       el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
       el.dataset.slug = s.slug;
+      el.dataset.tone = stageTone(s.slug, gi);
       const n = counts[s.slug] ?? 0;
       if (n === 0) el.classList.add('is-empty');
       el.innerHTML = `<span class="stage-label">${escapeHtml(s.label)}</span>` +
@@ -1023,6 +1033,11 @@ function createForCurrentView() {
 }
 
 $btnNew.addEventListener('click', () => createForCurrentView());
+
+// Dernière ligne du tableau (« + Ajouter une commande ») : même action que le
+// bouton d'en-tête — insère une ligne brouillon prête à remplir.
+const $btnAddRow = document.getElementById('btnAddRow');
+if ($btnAddRow) $btnAddRow.addEventListener('click', () => createForCurrentView());
 
 // --- Suppression (optimiste) ----------------------------------------------
 function removeRow(r) {
