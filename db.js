@@ -2,7 +2,15 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// `deadline` est une colonne `date` : un jour civil, sans heure ni fuseau. Par
+// défaut pg la convertit en Date à minuit LOCAL, que res.json re-sérialise en
+// UTC — à l'est de Greenwich l'échéance recule d'un jour à chaque lecture, et
+// copyBody() (« Envoyer vers Fiverr », dupliquer) réécrit la valeur reculée en
+// base, donc la dérive s'accumule. On garde donc la chaîne « aaaa-mm-jj » telle
+// que Postgres la renvoie.
+types.setTypeParser(types.builtins.DATE, (v) => v);
 
 // Étapes du planning (valeurs possibles de requests.stage), dans l'ordre.
 // Pipeline LINÉAIRE : une commande est dans une seule étape à la fois. La liste
