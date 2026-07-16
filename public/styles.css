@@ -157,7 +157,14 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Android/Chrome : suit la hauteur réellement visible (barre d'adresse comprise) */
+  height: 100dvh;
   overflow: hidden;
+}
+
+/* En PWA installée (plein écran natif), le bouton plein écran est superflu */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  #fullscreenToggle { display: none !important; }
 }
 
 /* ---------------------------------------------------------------- Barre du haut */
