@@ -63,6 +63,10 @@
   --dur-2: .2s;
   --dur-3: .32s;
 
+  /* infobulle : surface inversée façon Material (plain tooltip) */
+  --tip-bg: #303134;
+  --tip-fg: #f1f3f4;
+
   --radius-card: 16px;
   --radius: 10px;
   --row-h: 60px;
@@ -91,6 +95,10 @@
 
   --state-hover: rgba(227, 227, 227, .06);
   --state-press: rgba(227, 227, 227, .1);
+
+  /* infobulle : la surface inversée s'inverse aussi en sombre */
+  --tip-bg: #e3e3e3;
+  --tip-fg: #1f1f1f;
 
   --primary: #a3c1f5;
   --primary-hover: #b7cff8;
@@ -894,6 +902,33 @@ tr:hover .handle { color: var(--text-2); }
 .empty-field svg,
 .deadline-badge.empty svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* Infobulle maison — remplace la bulle système de Chrome (attribut `title`),
+   grise, lente et impossible à styler. En `fixed` sur <body> comme le
+   calendrier : la grille (.grid-wrap) est en overflow et rognerait une bulle
+   positionnée dans la cellule. Au-dessus du calendrier (z-index 1100). */
+.tip {
+  position: fixed;
+  z-index: 1300;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none; /* ne doit jamais intercepter le clic sur le badge */
+  animation: tipIn var(--dur-1) var(--ease) both;
+}
+@keyframes tipIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tip { animation: none; }
+}
+
 /* Calendrier d'échéance (popup) */
 .cal-pop {
   position: fixed;
@@ -1129,8 +1164,13 @@ tr:hover .dup-btn { opacity: 1; }
 .dup-btn:hover { color: var(--primary); background: var(--primary-soft); }
 .del-btn:hover { color: var(--st-bloque); background: var(--st-bloque-bg); }
 
-/* état vide : icône + message */
-.empty {
+/* état vide de la grille : grosse icône + message (« Aucune commande »).
+   Classe volontairement nommée `grid-empty` et non `empty` : `empty` sert aussi
+   de modificateur ailleurs (`.deadline-badge.empty`), et une règle aussi
+   générique s'y appliquait — le badge « Date souhaitée » héritait alors du
+   flex-direction: column et de l'icône ::before, et s'affichait en grosse
+   bulle à la place d'une pastille. */
+.grid-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1140,8 +1180,8 @@ tr:hover .dup-btn { opacity: 1; }
   color: var(--text-2);
   font-size: 14px;
 }
-.empty[hidden] { display: none; }
-.empty::before {
+.grid-empty[hidden] { display: none; }
+.grid-empty::before {
   content: 'inbox';
   font-family: 'Material Symbols Outlined';
   font-size: 30px;

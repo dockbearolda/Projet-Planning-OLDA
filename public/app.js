@@ -481,7 +481,7 @@ function buildRow(r) {
     const add = document.createElement('button');
     add.className = 'add-btn';
     add.type = 'button';
-    add.title = 'Ajouter — remplir cette ligne';
+    attachTip(add, 'Ajouter — remplir cette ligne');
     add.setAttribute('aria-label', 'Ajouter une commande');
     add.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
     add.addEventListener('click', () => {
@@ -492,7 +492,7 @@ function buildRow(r) {
   } else {
     const grip = document.createElement('div');
     grip.className = 'handle';
-    grip.title = 'glisser pour déplacer';
+    attachTip(grip, 'glisser pour déplacer');
     grip.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/><circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/><circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/></svg>';
     handleCell.appendChild(grip);
     attachDrag(grip, tr, r);
@@ -520,7 +520,7 @@ function buildRow(r) {
       const send = document.createElement('button');
       send.className = 'send-btn';
       send.type = 'button';
-      send.title = `Envoyer vers ${t.label}`;
+      attachTip(send, `Envoyer vers ${t.label}`);
       send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
       send.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg><span>${escapeHtml(t.label)}</span>`;
       send.addEventListener('click', () => copyToStage(r, t.slug));
@@ -530,14 +530,14 @@ function buildRow(r) {
   const dup = document.createElement('button');
   dup.className = 'dup-btn';
   dup.type = 'button';
-  dup.title = 'Dupliquer cette commande';
+  attachTip(dup, 'Dupliquer cette commande');
   dup.setAttribute('aria-label', 'Dupliquer cette commande');
   dup.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   dup.addEventListener('click', () => duplicateRow(r));
   const del = document.createElement('button');
   del.className = 'del-btn';
   del.type = 'button';
-  del.title = 'Supprimer cette commande';
+  attachTip(del, 'Supprimer cette commande');
   del.setAttribute('aria-label', 'Supprimer cette commande');
   del.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
   del.addEventListener('click', () => removeRow(r));
@@ -573,7 +573,7 @@ function cellType(r) {
     type.textContent = r.client_type === 'pro' ? 'Pro' : 'Perso';
   };
   renderType();
-  type.title = 'cliquer pour basculer pro / perso';
+  attachTip(type, 'cliquer pour basculer pro / perso');
   type.addEventListener('click', (e) => {
     e.stopPropagation();
     const next = r.client_type === 'pro' ? 'perso' : 'pro';
@@ -642,7 +642,7 @@ function cellInfos(r) {
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'desc-toggle';
-  toggle.title = 'Afficher / masquer les lignes suivantes';
+  attachTip(toggle, 'Afficher / masquer les lignes suivantes');
   toggle.setAttribute('aria-label', 'Afficher les lignes suivantes');
   toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
@@ -718,7 +718,7 @@ function cellDeadline(r) {
     if (r.deadline == null || d === null) {
       badge.className = 'deadline-badge empty';
       badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span>Date souhaitée</span>';
-      badge.title = 'cliquer pour choisir une date';
+      attachTip(badge, 'cliquer pour choisir une date');
     } else {
       let cls, label;
       if (d > 0) { cls = d <= 7 ? 'orange' : 'green'; label = `${d} j`; }
@@ -727,7 +727,7 @@ function cellDeadline(r) {
       badge.className = `deadline-badge ${cls}`;
       badge.textContent = label;
       const dd = parseDeadline(r.deadline);
-      badge.title = (dd ? dd.toLocaleDateString('fr-FR') : '') + ' — cliquer pour modifier';
+      attachTip(badge, (dd ? dd.toLocaleDateString('fr-FR') : '') + ' — cliquer pour modifier');
     }
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -740,6 +740,67 @@ function cellDeadline(r) {
   showBadge();
   return td;
 }
+
+// --- Infobulles maison -----------------------------------------------------
+// L'attribut `title` déclenche la bulle système de Chrome : grise, hors charte,
+// lente à venir puis longue à partir — elle se superposait au calendrier qu'on
+// vient d'ouvrir. On la remplace par une bulle aux tokens du thème.
+// Souris et clavier seulement : au doigt (tablette), une infobulle gênerait le
+// tap sans rien apporter. `aria-label` porte le texte pour les lecteurs d'écran.
+const TIP_DELAY = 400;
+let tipEl = null;
+let tipTimer = 0;
+
+function hideTip() {
+  clearTimeout(tipTimer);
+  if (tipEl) { tipEl.remove(); tipEl = null; }
+}
+
+function showTip(anchor, text) {
+  hideTip();
+  // L'ancre a pu être démontée (re-rendu de la ligne) pendant le délai.
+  if (!anchor.isConnected) return;
+  tipEl = document.createElement('div');
+  tipEl.className = 'tip';
+  tipEl.textContent = text;
+  document.body.appendChild(tipEl);
+  const a = anchor.getBoundingClientRect();
+  const t = tipEl.getBoundingClientRect();
+  let left = Math.round(a.left + (a.width - t.width) / 2);
+  left = Math.min(Math.max(8, left), window.innerWidth - t.width - 8);
+  let top = Math.round(a.bottom + 8);
+  if (top + t.height > window.innerHeight - 8) top = Math.round(a.top - t.height - 8);
+  tipEl.style.left = left + 'px';
+  tipEl.style.top = Math.max(8, top) + 'px';
+}
+
+// Remplace `el.title = texte` : même intention, bulle maison. Ré-appelable sur
+// un même élément pour changer le texte (bouton plein écran) sans réempiler
+// d'écouteurs — on lit donc le texte au survol, pas à la capture.
+function attachTip(el, text) {
+  el.setAttribute('aria-label', text);
+  el.tipText = text;
+  if (el.tipBound) return;
+  el.tipBound = true;
+  el.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'mouse') return; // pas d'infobulle au doigt / stylet
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => showTip(el, el.tipText), TIP_DELAY);
+  });
+  el.addEventListener('pointerleave', hideTip);
+  el.addEventListener('pointerdown', hideTip); // le clic ouvre un popup : la bulle dégage
+  // Au clavier seulement : un clic souris donne aussi le focus, et la bulle
+  // reviendrait aussitôt se poser sur le calendrier qu'on vient d'ouvrir.
+  el.addEventListener('focus', () => {
+    if (el.matches(':focus-visible')) showTip(el, el.tipText);
+  });
+  el.addEventListener('blur', hideTip);
+}
+
+// Filets de sécurité : une ancre peut disparaître sans pointerleave (ligne
+// re-rendue, grille défilée, onglet changé) — la bulle resterait orpheline.
+window.addEventListener('scroll', hideTip, true);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); }, true);
 
 // --- Calendrier d'échéance (popup mois complet) ----------------------------
 // Au clic sur le badge échéance, on ouvre un vrai calendrier (grille du mois)
@@ -1407,7 +1468,7 @@ function attachColResizers() {
     if (key === 'del') return; // colonne d'actions : pas de poignée
     const h = document.createElement('span');
     h.className = 'col-resizer';
-    h.title = 'glisser pour régler la largeur';
+    attachTip(h, 'glisser pour régler la largeur');
     th.appendChild(h);
     h.addEventListener('click', (e) => e.stopPropagation()); // ne pas déclencher le tri
     h.addEventListener('pointerdown', (e) => {
@@ -1616,6 +1677,7 @@ function applyTheme(t) {
   if ($themeToggle) {
     const ic = $themeToggle.querySelector('.material-symbols-outlined');
     if (ic) ic.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+    attachTip($themeToggle, t === 'dark' ? 'Passer en clair' : 'Passer en sombre');
   }
 }
 applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -1641,7 +1703,7 @@ if ($fullscreenToggle && document.documentElement.requestFullscreen) {
     const on = !!document.fullscreenElement;
     const ic = $fullscreenToggle.querySelector('.material-symbols-outlined');
     if (ic) ic.textContent = on ? 'fullscreen_exit' : 'fullscreen';
-    $fullscreenToggle.title = on ? 'Quitter le plein écran' : 'Plein écran';
+    attachTip($fullscreenToggle, on ? 'Quitter le plein écran' : 'Plein écran');
     $fullscreenToggle.setAttribute('aria-label', $fullscreenToggle.title);
   };
   $fullscreenToggle.addEventListener('click', () => {
@@ -1696,6 +1758,7 @@ if ($app && $sidebarResizer) {
   const clampW = (w) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(w)));
   const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || '', 10);
   if (Number.isFinite(saved)) $app.style.setProperty('--sidebar-w', clampW(saved) + 'px');
+  attachTip($sidebarResizer, 'Glisser pour régler la largeur');
   $sidebarResizer.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
