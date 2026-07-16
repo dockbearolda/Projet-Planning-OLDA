@@ -1632,6 +1632,29 @@ try {
   });
 } catch (_) {}
 
+// --- Plein écran (tablette / navigateur) --------------------------------------
+// Masqué en PWA installée (déjà plein écran) via CSS display-mode.
+const $fullscreenToggle = document.getElementById('fullscreenToggle');
+if ($fullscreenToggle && document.documentElement.requestFullscreen) {
+  $fullscreenToggle.hidden = false;
+  const syncFullscreenIcon = () => {
+    const on = !!document.fullscreenElement;
+    const ic = $fullscreenToggle.querySelector('.material-symbols-outlined');
+    if (ic) ic.textContent = on ? 'fullscreen_exit' : 'fullscreen';
+    $fullscreenToggle.title = on ? 'Quitter le plein écran' : 'Plein écran';
+    $fullscreenToggle.setAttribute('aria-label', $fullscreenToggle.title);
+  };
+  $fullscreenToggle.addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    }
+  });
+  document.addEventListener('fullscreenchange', syncFullscreenIcon);
+  syncFullscreenIcon();
+}
+
 // --- Élévation de l'en-tête de grille au scroll --------------------------------
 const $gridWrap = document.querySelector('.grid-wrap');
 if ($gridWrap) {
