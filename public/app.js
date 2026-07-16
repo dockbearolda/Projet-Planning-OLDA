@@ -161,9 +161,21 @@ function renderSidebar() {
   });
 }
 
+// Rejoue l'animation d'entrée des lignes (léger fondu décalé) au changement d'étape.
+let stageEnterTimer = null;
+function playStageEnter() {
+  if (!$rows) return;
+  $rows.classList.remove('stage-enter');
+  void $rows.offsetWidth; // relance l'animation CSS
+  $rows.classList.add('stage-enter');
+  clearTimeout(stageEnterTimer);
+  stageEnterTimer = setTimeout(() => $rows.classList.remove('stage-enter'), 600);
+}
+
 function selectStage(slug) {
   currentStage = slug;
   sort = { key: null, dir: 1 };
+  playStageEnter();
   $stageTitle.textContent = STAGE_LABEL[slug];
   updateStageLink(slug);
   updateFiverrTool(slug);
@@ -1456,15 +1468,13 @@ function showToast(text) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
-    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
-      'background:#1d1d1f;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;' +
-      'z-index:1000;opacity:0;transition:opacity .2s;pointer-events:none;';
+    t.className = 'toast';
     document.body.appendChild(t);
   }
   t.textContent = text;
-  t.style.opacity = '1';
+  t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 2600);
 }
 
 // --- Synchronisation temps réel (polling) ----------------------------------
@@ -1595,6 +1605,63 @@ document.addEventListener('keydown', (e) => {
 // Le sélecteur Compact/Normal/Confort a été retiré : densité fixée à « Confort ».
 const $app = document.querySelector('.app');
 if ($app) $app.classList.add('density-confort');
+
+// --- Thème clair / sombre ----------------------------------------------------
+// Suit le système par défaut ; la bascule manuelle est mémorisée par appareil.
+// (le thème initial est appliqué avant le premier rendu par un script dans <head>)
+const THEME_KEY = 'olda_theme';
+const $themeToggle = document.getElementById('themeToggle');
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  if ($themeToggle) {
+    const ic = $themeToggle.querySelector('.material-symbols-outlined');
+    if (ic) ic.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+  }
+}
+applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+if ($themeToggle) {
+  $themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+  });
+}
+try {
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem(THEME_KEY)) applyTheme(e.matches ? 'dark' : 'light');
+  });
+} catch (_) {}
+
+// --- Élévation de l'en-tête de grille au scroll --------------------------------
+const $gridWrap = document.querySelector('.grid-wrap');
+if ($gridWrap) {
+  let gridScrolled = false;
+  $gridWrap.addEventListener('scroll', () => {
+    const s = $gridWrap.scrollTop > 0;
+    if (s !== gridScrolled) {
+      gridScrolled = s;
+      $gridWrap.classList.toggle('is-scrolled', s);
+    }
+  }, { passive: true });
+}
+
+// --- Ripple Material -----------------------------------------------------------
+// Onde discrète au toucher/clic sur les surfaces interactives en pilule.
+const RIPPLE_SELECTOR = '.stage, .btn-primary, .cal-foot-btn, .send-btn, .stage-link, ' +
+  '.type-tag, .deadline-badge, .prio-pill';
+document.addEventListener('pointerdown', (e) => {
+  const host = e.target.closest(RIPPLE_SELECTOR);
+  if (!host) return;
+  const r = host.getBoundingClientRect();
+  const d = Math.max(r.width, r.height) * 2;
+  const span = document.createElement('span');
+  span.className = 'ripple';
+  span.style.width = span.style.height = `${d}px`;
+  span.style.left = `${e.clientX - r.left - d / 2}px`;
+  span.style.top = `${e.clientY - r.top - d / 2}px`;
+  host.appendChild(span);
+  span.addEventListener('animationend', () => span.remove());
+}, { passive: true });
 
 // --- Largeur du rail réglable ----------------------------------------------
 // Une poignée verticale entre le rail et la zone de travail règle la largeur du

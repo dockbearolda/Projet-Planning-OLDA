@@ -3,7 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1e1f20" media="(prefers-color-scheme: dark)" />
   <title>Planning OLDA</title>
+  <script>
+    // Applique le thème avant le premier rendu (évite le flash clair/sombre).
+    try {
+      var t = localStorage.getItem('olda_theme');
+      if (t !== 'dark' && t !== 'light') {
+        t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -44,6 +56,9 @@
       </div>
 
       <div class="topbar-right">
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Basculer clair / sombre" title="Clair / sombre">
+          <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
+        </button>
         <span class="avatar" aria-hidden="true">O</span>
       </div>
     </header>
