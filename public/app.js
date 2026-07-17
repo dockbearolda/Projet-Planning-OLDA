@@ -450,6 +450,20 @@ function applySearchAndCounts() {
   }
   const base = visible ? `${visible} commande${visible > 1 ? 's' : ''}` : '';
   $stageCount.textContent = base;
+  paintZebra();
+}
+
+// Zébrage : pose la classe `.row-alt` une ligne visible sur deux, dans l'ordre
+// d'affichage réel du <tbody>. On compte sur le DOM (et non sur nth-child CSS)
+// parce que la recherche masque des lignes (.is-hidden) et le drag les réordonne :
+// le zébrage doit suivre les lignes réellement affichées, pas leur index brut.
+function paintZebra() {
+  let i = 0;
+  for (const tr of $rows.children) {
+    if (tr.dataset.id == null || tr.classList.contains('is-hidden')) continue;
+    tr.classList.toggle('row-alt', i % 2 === 1);
+    i++;
+  }
 }
 
 // Toutes les colonnes du planning simplifié restent affichées en permanence :
@@ -1272,6 +1286,7 @@ function updateDragTarget() {
     const after = getDragAfterElement($rows, y);
     if (after == null) $rows.appendChild(dragState.tr);
     else if (after !== dragState.tr) $rows.insertBefore(dragState.tr, after);
+    paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
   }
   autoScroll(y);
 }
