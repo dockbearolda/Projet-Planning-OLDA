@@ -11,7 +11,10 @@
   /* surfaces */
   --bg: #f6f8fc;                     /* fond général, gris-bleu Workspace */
   --surface: #fff;
-  --surface-hover: #f7faff;          /* survol de ligne, bleu très clair */
+  --surface-hover: #f7faff;          /* survol générique (boutons, etc.) */
+  --row-alt: #eef2f9;                /* bande paire des lignes (zébrage) */
+  --row-hover: #e2ebf8;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #d8deea;              /* filet de séparation entre lignes */
   --field-focus: #f1f4f9;            /* fond d'un champ au focus */
   --search-bg: #eef1f8;              /* pilule de recherche au repos */
   --search-bg-hover: #e7ebf3;
@@ -80,6 +83,9 @@
   --bg: #131314;
   --surface: #1e1f20;
   --surface-hover: #26282d;
+  --row-alt: #26282c;                /* bande paire des lignes (zébrage) */
+  --row-hover: #303338;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #35373b;               /* filet de séparation entre lignes */
   --field-focus: #26282d;
   --search-bg: #282a2d;
   --search-bg-hover: #303236;
@@ -638,13 +644,17 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .grid thead th .arrow { color: var(--primary); font-size: 10px; margin-left: 3px; }
 
 .grid tbody td {
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--row-line);
   padding: 0;
   vertical-align: middle;
   height: var(--row-h);
 }
 .grid tbody tr { transition: background var(--dur-1) var(--ease); }
-.grid tbody tr:hover { background: var(--surface-hover); }
+/* Zébrage : une ligne sur deux (parmi les lignes VISIBLES, cf. paintZebra dans
+   app.js) reçoit une bande tonale. Une différence de surface reste lisible même
+   sur un écran très lumineux, là où un simple filet de 1px se délave. */
+.grid tbody tr.row-alt { background: var(--row-alt); }
+.grid tbody tr:hover { background: var(--row-hover); }
 .grid tbody tr.dragging { opacity: .4; }
 
 /* entrée en scène des lignes au changement d'étape (léger, rapide) */
