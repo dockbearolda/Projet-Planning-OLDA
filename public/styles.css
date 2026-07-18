@@ -616,8 +616,13 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .grid {
   border-collapse: collapse;
+  /* Largeur FIXE et fluide : les colonnes « puce » ont une largeur fixe, les
+     colonnes texte (client / description / infos) se partagent le reste. Ainsi
+     la grille tient dans la fenêtre ET les colonnes NE SAUTENT PLUS d'une famille
+     à l'autre (plus de dimensionnement selon le contenu). */
+  table-layout: fixed;
   width: 100%;
-  min-width: 1000px;
+  min-width: 880px;
   font-size: 14px;
 }
 
@@ -1148,13 +1153,15 @@ tr:hover .handle { color: var(--text-2); }
 .cal-foot-btn.clear:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
 
 /* colonnes largeurs */
-.col-type { width: 96px; min-width: 84px; }
-.col-resp { width: 148px; min-width: 116px; }
-.col-sub { width: 170px; min-width: 130px; }
-.col-deadline { width: 140px; min-width: 122px; }
-.col-client { min-width: 190px; }
-.col-product { min-width: 190px; }
-.col-infos { min-width: 180px; }
+/* En table-layout: fixed, seule la largeur des colonnes « puce » est fixée ;
+   les 3 colonnes texte (client / description / infos) n'ont PAS de largeur et se
+   partagent équitablement l'espace restant → la grille s'adapte à la fenêtre. */
+.col-handle { width: 44px; }
+.col-type { width: 66px; }
+.col-resp { width: 132px; }
+.col-sub { width: 140px; }
+.col-deadline { width: 124px; }
+.col-del { width: 116px; }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
@@ -1255,8 +1262,10 @@ body.col-resizing { user-select: none; }
 body.col-resizing * { cursor: col-resize !important; }
 @media (pointer: coarse) { .col-resizer { width: 18px; } }
 
-/* actions de fin de ligne : envoyer / dupliquer / supprimer */
-.col-del { width: 216px; white-space: nowrap; text-align: right; padding-right: 8px; }
+/* actions de fin de ligne : envoyer / dupliquer / supprimer.
+   Largeur définie plus haut (.col-del) ; ici seulement l'alignement. Les actions
+   n'apparaissent qu'au survol et peuvent déborder visuellement à gauche sans gêner. */
+.col-del { white-space: nowrap; text-align: right; padding-right: 8px; }
 .send-btn {
   position: relative;
   overflow: hidden;
@@ -1280,6 +1289,10 @@ body.col-resizing * { cursor: col-resize !important; }
   transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
 .send-btn svg { display: block; }
+/* Libellé masqué : le bouton « Envoyer vers Fiverr » reste une icône compacte
+   (l'infobulle / aria-label conserve le sens) pour tenir dans la colonne actions. */
+.send-btn span { display: none; }
+.send-btn { width: 30px; padding: 0; gap: 0; justify-content: center; }
 tr:hover .send-btn { opacity: 1; }
 .send-btn:hover { color: var(--primary); border-color: transparent; background: var(--primary-soft); }
 .send-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
@@ -1521,8 +1534,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .client-stack .client-company { font-size: 16px; }
   .del-btn,
   .dup-btn { width: 40px; height: 40px; }
-  .send-btn { height: 34px; font-size: 13px; }
-  .col-del { width: 248px; }
+  .send-btn { width: 40px; height: 40px; }
+  .col-del { width: 140px; }
 
   .cal-pop { width: 308px; padding: 14px; }
   .cal-day { height: 40px; font-size: 15px; }
