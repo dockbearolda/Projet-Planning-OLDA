@@ -222,19 +222,38 @@ function updateSubColVisibility(slug) {
   if (grid) grid.classList.toggle('no-sub', !familyHasSub(slug));
 }
 
-function selectStage(slug) {
+// Vide la grille INSTANTANÉMENT au changement de famille : on ne laisse jamais les
+// lignes (ni le compteur) de l'ancienne famille sous le nouvel entête pendant que
+// les nouvelles données arrivent. La colonne « Sous-étape » et l'animation d'entrée
+// sont posées avec la donnée (dans loadRows), pas avant — tout reste cohérent.
+function clearGrid() {
+  for (const [, entry] of rowEls) entry.tr.remove();
+  rowEls.clear();
+  for (const [, g] of groupEls) g.remove();
+  groupEls.clear();
+  rows = [];
+  lastRendered = [];
+  lastRowsSig = '';
+  $stageCount.textContent = '';
+  $empty.hidden = true; // pas de « Aucune commande » pendant le chargement
+}
+
+async function selectStage(slug) {
   currentStage = slug;
   sort = { key: null, dir: 1 };
-  playStageEnter();
+  // Réponse immédiate au clic : entête + surbrillance (c'est ce qu'on a cliqué,
+  // donc jamais périmé). Le reste (colonnes, lignes, animation) suit la donnée.
   $stageTitle.textContent = STAGE_LABEL[slug];
   updateStageLink(slug);
   updateFiverrTool(slug);
-  updateSubColVisibility(slug);
-  applyColWidths();
   document.querySelectorAll('.stage').forEach((el) => {
     el.classList.toggle('active', el.dataset.slug === slug);
   });
-  loadRows();
+  clearGrid();
+  await loadRows();
+  // Anime l'entrée des VRAIES lignes, seulement si cette sélection est toujours
+  // celle affichée (un clic plus récent a pu prendre le relais entre-temps).
+  if (currentStage === slug) playStageEnter();
 }
 
 // --- Chargement données ----------------------------------------------------
@@ -251,9 +270,18 @@ async function loadCounts() {
   });
 }
 
+// Jeton de chargement : deux clics rapides lancent deux fetch ; on ne monte QUE la
+// réponse de la sélection la plus récente. Sinon une requête lente (ancienne famille)
+// pourrait écraser une famille sélectionnée depuis → « bug d'affichage » à l'arrivée.
+let loadToken = 0;
 async function loadRows() {
-  rows = await api('GET', `/api/requests?stage=${encodeURIComponent(currentStage)}`);
+  const slug = currentStage;
+  const token = ++loadToken;
+  const data = await api('GET', `/api/requests?stage=${encodeURIComponent(slug)}`);
+  if (token !== loadToken || slug !== currentStage) return; // sélection dépassée
+  rows = data;
   lastRowsSig = signature(rows);
+  updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
   applySortAndRender();
 }
 
