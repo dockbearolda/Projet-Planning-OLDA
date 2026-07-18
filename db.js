@@ -228,26 +228,29 @@ const STAGE_TO_FAMILY = {
 };
 
 async function migrateStagesToFamilies() {
-  // Garde d'idempotence : ne bascule qu'une fois.
+  // Valeur par défaut de la colonne = première famille. Posée à CHAQUE démarrage
+  // (idempotent) car migrateStagesToLinear la repositionne sur un slug linéaire ;
+  // sinon, après la bascule, le défaut resterait bloqué sur l'ancien modèle.
+  try {
+    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'demande'");
+  } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
+
+  // Garde d'idempotence : ne rejoue la bascule des DONNÉES qu'une seule fois
+  // (certains slugs se recoupent entre les deux modèles → on ne peut pas se fier
+  // au seul slug pour la détecter).
   try {
     const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model'");
     if (rows[0] && rows[0].value === 'families') return;
   } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
 
   for (const [from, [family, sub]] of Object.entries(STAGE_TO_FAMILY)) {
-    // On ne fixe sub_stage QUE lors de cette bascule initiale ; on ne réécrit
-    // jamais une valeur déjà choisie par un utilisateur (sub_stage IS NULL only
-    // n'est pas requis ici car la garde app_meta empêche tout second passage).
+    // On ne fixe sub_stage QUE lors de cette bascule initiale ; la garde app_meta
+    // empêche tout second passage, donc aucune valeur choisie ensuite n'est écrasée.
     await pool.query(
       'UPDATE requests SET stage = $1, sub_stage = $2 WHERE stage = $3',
       [family, sub, from],
     );
   }
-
-  // Nouvelle valeur par défaut de la colonne : première famille.
-  try {
-    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'demande'");
-  } catch (_) { /* pg-mem local */ }
 
   // Pose le flag (upsert manuel, compatible pg-mem).
   await pool.query("DELETE FROM app_meta WHERE key = 'stage_model'");
