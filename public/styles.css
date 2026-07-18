@@ -449,6 +449,13 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .stages > .stage-group-title:first-child { padding-top: 6px; }
 
+/* séparateur : filet fin isolant la catégorie spéciale (Fiverr) des 8 familles */
+.stage-sep {
+  height: 1px;
+  margin: 10px 12px;
+  background: var(--border-soft);
+}
+
 /* étape vide : atténuée */
 .stage.is-empty { opacity: .55; }
 .stage.is-empty .stage-label { font-weight: 400; color: var(--text-2); }
@@ -854,6 +861,129 @@ tr:hover .handle { color: var(--text-2); }
 .type-tag:hover { filter: brightness(.97); }
 .type-tag.pro { color: var(--st-demande); background: var(--st-demande-bg); }
 .type-tag.perso { color: var(--st-archive); background: var(--st-archive-bg); }
+.type-tag.asso { color: var(--st-livree); background: var(--st-livree-bg); }
+.type-tag.revendeur { color: var(--st-facture); background: var(--st-facture-bg); }
+
+/* Responsable : puce « initiale + nom » (QUI agit sur le projet) */
+.col-resp-cell { padding: 0; vertical-align: middle; }
+.resp-chip {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 20px);
+  margin: 8px 12px;
+  padding: 4px 12px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease);
+}
+.resp-chip:hover { filter: brightness(.97); }
+.resp-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.resp-ini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--chip-on-tonal);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.resp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Non assigné : puce discrète en pointillé, appelle à remplir. */
+.resp-chip.empty {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-2);
+  font-weight: 400;
+}
+.resp-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
+
+/* Sous-étape : puce tonale neutre précisant l'action en cours dans la famille */
+.col-sub-cell { padding: 0; vertical-align: middle; }
+.sub-chip {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--st-cours-bg);
+  color: var(--st-cours);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease);
+}
+.sub-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-chip:hover { filter: brightness(.97); }
+.sub-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.sub-chip.empty {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-2);
+  font-weight: 400;
+}
+.sub-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
+
+/* Colonne « Sous-étape » masquée pour les familles sans sous-familles
+   (Demande, Attente Client, Archivé, Fiverr) → vue plus aérée. */
+.grid.no-sub col[data-col="sub_stage"],
+.grid.no-sub th.col-sub,
+.grid.no-sub td.col-sub-cell { display: none; }
+
+/* Menu déroulant réutilisable (type / responsable / sous-étape) */
+.menu-pop {
+  position: fixed;
+  z-index: 1150;
+  min-width: 172px;
+  max-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-pop);
+  animation: popIn var(--dur-2) var(--ease) both;
+}
+.menu-item {
+  display: block;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.menu-item:hover { background: var(--state-hover); }
+.menu-item.selected { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.menu-item.muted { color: var(--text-3); }
+.menu-item.muted:hover { color: var(--text-2); }
 
 /* Échéance : badge relatif coloré (point + valeur) */
 .col-deadline-cell { padding: 0; }
@@ -1019,10 +1149,12 @@ tr:hover .handle { color: var(--text-2); }
 
 /* colonnes largeurs */
 .col-type { width: 96px; min-width: 84px; }
+.col-resp { width: 148px; min-width: 116px; }
+.col-sub { width: 170px; min-width: 130px; }
 .col-deadline { width: 140px; min-width: 122px; }
-.col-client { min-width: 200px; }
-.col-product { min-width: 200px; }
-.col-infos { min-width: 200px; }
+.col-client { min-width: 190px; }
+.col-product { min-width: 190px; }
+.col-infos { min-width: 180px; }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
@@ -1373,6 +1505,11 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .deadline-badge,
   .empty-field { padding: 8px 14px; font-size: 13.5px; min-height: 44px; }
+  .resp-chip { min-height: 44px; padding: 5px 14px 5px 5px; font-size: 14px; }
+  .resp-chip.empty { padding: 8px 14px; }
+  .resp-ini { width: 26px; height: 26px; font-size: 12px; }
+  .sub-chip { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
+  .menu-item { padding: 12px 14px; font-size: 15px; }
   .type-tag {
     min-height: 40px;
     padding: 6px 14px;

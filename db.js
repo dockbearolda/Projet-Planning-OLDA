@@ -12,33 +12,75 @@ const { Pool, types } = require('pg');
 // que Postgres la renvoie.
 types.setTypeParser(types.builtins.DATE, (v) => v);
 
-// Étapes du planning (valeurs possibles de requests.stage), dans l'ordre.
-// Pipeline LINÉAIRE : une commande est dans une seule étape à la fois. La liste
-// s'affiche telle quelle dans la barre latérale gauche.
-const STAGES = [
-  { slug: 'nouvelle_demande', label: 'Nouvelle demande' },
-  { slug: 'chiffrage', label: 'Chiffrage à faire' },
-  { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
-  { slug: 'attente_validation_devis', label: 'Attente validation du devis' },
-  { slug: 'devis_accepte_bat', label: 'Devis accepté – BAT à faire' },
-  { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
-  { slug: 'bat_a_modifier', label: 'BAT à modifier' },
-  { slug: 'projet_valide', label: 'Projet validé – Lancement autorisé' },
-  { slug: 'a_commander', label: 'À commander' },
-  { slug: 'preparation_production', label: 'Préparation production' },
-  { slug: 'prod_trotec', label: 'Prod TROTEC' },
-  { slug: 'prod_dtf', label: 'Prod DTF' },
-  { slug: 'prod_pressage', label: 'Prod Pressage' },
-  { slug: 'prod_uv', label: 'Prod UV' },
-  { slug: 'montage_nettoyage', label: 'Montage / Nettoyage' },
-  { slug: 'finitions_qualite', label: 'Finitions et contrôle qualité' },
-  { slug: 'facturation', label: 'Facturation' },
-  { slug: 'termine_archive', label: 'Terminé – Archivé' },
-  { slug: 'bloque', label: 'Bloqué – Action requise' },
+// Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) :
+//   - la FAMILLE (requests.stage) dit OÙ en est le projet — 8 grandes étapes,
+//     affichées dans la barre latérale gauche ;
+//   - la SOUS-FAMILLE (requests.sub_stage) précise CE QUI SE PASSE MAINTENANT —
+//     choisie en ligne sur la commande (puce), uniquement pour les familles qui
+//     en ont. « 1 projet = 1 seule place. »
+const FAMILIES = [
+  { slug: 'demande', label: 'Demande' },
+  { slug: 'chiffrage', label: 'Chiffrage / Devis' },
+  { slug: 'attente_client', label: 'Attente Client' },
+  { slug: 'preparation', label: 'Préparation' },
+  { slug: 'production', label: 'Production' },
+  { slug: 'facturation', label: 'Facturation / Retrait' },
+  { slug: 'termine', label: 'Terminé' },
+  { slug: 'archive', label: 'Archivé' },
+];
+
+// Catégorie spéciale conservée hors des 8 familles : sous-traitance graphiste
+// (outil de devis + « Envoyer vers Fiverr »). Épinglée en bas de la sidebar.
+const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
 ];
 
+// Toutes les valeurs possibles de requests.stage (familles + spécial).
+const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
+
+// Sous-familles par famille (slug → libellé). Une famille absente d'ici n'a pas
+// de sous-étape (Demande, Attente Client, Archivé, Fiverr).
+const SUB_STAGES = {
+  chiffrage: [
+    { slug: 'a_chiffrer', label: 'À chiffrer' },
+    { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
+    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+  ],
+  preparation: [
+    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'a_commander', label: 'À commander' },
+    { slug: 'attente_marchandise', label: 'Attente marchandise' },
+    { slug: 'pret_a_produire', label: 'Prêt à produire' },
+  ],
+  production: [
+    { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'prod_pressage', label: 'Pressage' },
+    { slug: 'prod_trotec', label: 'Production Trotec' },
+    { slug: 'prod_uv', label: 'Production UV' },
+    { slug: 'montage_finition', label: 'Montage / Finition' },
+    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+  ],
+  facturation: [
+    { slug: 'facturation_a_faire', label: 'Facturation à faire' },
+    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+  ],
+  termine: [
+    { slug: 'attente_paiement', label: 'Attente paiement' },
+    { slug: 'solde', label: 'Soldé' },
+  ],
+};
+
+// Ensemble plat des slugs de sous-étape valides (pour la validation serveur).
+const SUB_SLUGS = new Set(
+  Object.values(SUB_STAGES).flatMap((list) => list.map((s) => s.slug)),
+);
+
+// Responsables proposés (le champ reste du texte libre côté base).
+const RESPONSABLES = ['Loïc', 'Mélina', 'Charlie', 'Opérateur', 'À attribuer'];
+
+// Types de client.
+const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
 
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
@@ -77,16 +119,20 @@ async function init() {
 
   // Migration : colonnes ajoutées après coup sur les bases existantes
   // (CREATE TABLE IF NOT EXISTS n'ajoute pas de colonnes à une table déjà créée).
-  for (const col of ['contact_phone', 'contact_email', 'color']) {
+  for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable']) {
     try {
       await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
   }
 
   // Migration vers le planning linéaire : convertit les anciens slugs d'étape
-  // (dont la phase « production » multi-machines) vers la nouvelle liste.
+  // (dont la phase « production » multi-machines) vers la liste linéaire.
   // Non destructif, idempotent, réversible (voir migrateStagesToLinear).
   await migrateStagesToLinear();
+
+  // Puis bascule du modèle linéaire vers le modèle « familles » à 2 niveaux.
+  // Non destructif, exécuté UNE seule fois (garde app_meta).
+  await migrateStagesToFamilies();
 
   // Seed : si la table est vide, on insère quelques demandes d'exemple
   // réparties sur plusieurs étapes pour démontrer le pipeline.
@@ -138,10 +184,74 @@ async function migrateStagesToLinear() {
     await pool.query('UPDATE requests SET stage = $1 WHERE stage = $2', [to, from]);
   }
 
-  // 3) Aligne la valeur par défaut de la colonne sur la première étape.
+  // 3) Aligne la valeur par défaut de la colonne sur la première étape linéaire.
+  //    (migrateStagesToFamilies la repositionnera ensuite sur 'demande'.)
   try {
     await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'nouvelle_demande'");
   } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
+}
+
+// Bascule du pipeline LINÉAIRE (20 étapes à plat) vers le modèle « FAMILLES »
+// à 2 niveaux (8 familles + sous-étapes). Chaque ancien slug d'étape devient une
+// FAMILLE (requests.stage) + éventuellement une SOUS-FAMILLE (requests.sub_stage).
+//
+// Idempotence : certains slugs se recoupent entre les deux modèles
+// (« chiffrage », « facturation », « fiverr »), donc on ne peut pas se fier au
+// seul slug pour savoir si la bascule a déjà eu lieu. On la protège par un flag
+// dans app_meta : la migration ne s'exécute qu'une fois.
+//
+// Réversibilité : non destructif. Le détail perdu par le regroupement est
+// conservé dans sub_stage, ce qui permet de reconstruire l'ancien modèle si
+// besoin (mapping inverse : famille+sous-étape → ancien slug linéaire).
+const STAGE_TO_FAMILY = {
+  // ancien slug linéaire → [famille, sous-étape | null]
+  nouvelle_demande:         ['demande', null],
+  chiffrage:                ['chiffrage', 'a_chiffrer'],
+  devis_a_envoyer:          ['chiffrage', 'devis_a_envoyer'],
+  attente_validation_devis: ['attente_client', null],
+  devis_accepte_bat:        ['preparation', 'prepa_fichiers'],
+  bat_envoye:               ['attente_client', null],
+  bat_a_modifier:           ['preparation', 'prepa_fichiers'],
+  projet_valide:            ['preparation', 'prepa_fichiers'],
+  a_commander:              ['preparation', 'a_commander'],
+  preparation_production:   ['preparation', 'prepa_fichiers'],
+  prod_trotec:              ['production', 'prod_trotec'],
+  prod_dtf:                 ['production', 'prod_dtf'],
+  prod_pressage:            ['production', 'prod_pressage'],
+  prod_uv:                  ['production', 'prod_uv'],
+  montage_nettoyage:        ['production', 'montage_finition'],
+  finitions_qualite:        ['production', 'controle_emballage'],
+  facturation:              ['facturation', 'facturation_a_faire'],
+  termine_archive:          ['termine', null],
+  bloque:                   ['attente_client', null],
+  fiverr:                   ['fiverr', null],
+};
+
+async function migrateStagesToFamilies() {
+  // Garde d'idempotence : ne bascule qu'une fois.
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model'");
+    if (rows[0] && rows[0].value === 'families') return;
+  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+
+  for (const [from, [family, sub]] of Object.entries(STAGE_TO_FAMILY)) {
+    // On ne fixe sub_stage QUE lors de cette bascule initiale ; on ne réécrit
+    // jamais une valeur déjà choisie par un utilisateur (sub_stage IS NULL only
+    // n'est pas requis ici car la garde app_meta empêche tout second passage).
+    await pool.query(
+      'UPDATE requests SET stage = $1, sub_stage = $2 WHERE stage = $3',
+      [family, sub, from],
+    );
+  }
+
+  // Nouvelle valeur par défaut de la colonne : première famille.
+  try {
+    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'demande'");
+  } catch (_) { /* pg-mem local */ }
+
+  // Pose le flag (upsert manuel, compatible pg-mem).
+  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model', 'families')");
 }
 
 async function seed() {
@@ -154,60 +264,63 @@ async function seed() {
 
   const samples = [
     {
-      stage: 'nouvelle_demande', priority: 3, client_type: 'pro', billing_company: 'Brasserie du Coin',
-      contact_referent: 'Julie M.', quantity: 50, product: 'T-shirts DTF logo', color: 'Noir',
-      project_value: 850, description: 'Tee-shirts événement bière artisanale',
-      deadline: inDays(3), position: 1000,
+      stage: 'demande', sub_stage: null, responsable: 'Mélina', priority: 3, client_type: 'pro',
+      billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', quantity: 50,
+      product: '50 t-shirts staff', color: 'Noir', project_value: 850,
+      description: 'Tee-shirts équipe — gros devis', deadline: inDays(3), position: 1000,
     },
     {
-      stage: 'nouvelle_demande', priority: 1, client_type: 'perso', billing_company: 'Particulier',
-      contact_referent: 'Léa', quantity: 2, product: 'Mug photo',
-      project_value: 30, description: 'Cadeau anniversaire', deadline: inDays(12),
-      position: 2000,
+      stage: 'demande', sub_stage: null, responsable: 'À attribuer', priority: 1, client_type: 'perso',
+      billing_company: 'Alessandro', contact_referent: 'Alessandro', quantity: 1,
+      product: 'Impression plexi A3', project_value: 30, description: 'Photo à vérifier',
+      deadline: inDays(12), position: 2000,
     },
     {
-      stage: 'chiffrage', priority: 2, client_type: 'pro', billing_company: 'Club Sportif Aurillac',
-      contact_referent: 'Coach Bernard', quantity: 30, product: 'Maillots floqués',
-      project_value: 1450, description: 'Maillots saison 2026', deadline: inDays(8),
-      position: 1000,
+      stage: 'chiffrage', sub_stage: 'a_chiffrer', responsable: 'Charlie', priority: 2, client_type: 'revendeur',
+      billing_company: 'Saint-Barth Store', contact_referent: 'Coach Bernard', quantity: 120,
+      product: 'Collection été', project_value: 1450, description: 'Maillots saison 2026',
+      deadline: inDays(8), position: 1000,
     },
     {
-      stage: 'a_commander', priority: 3, client_type: 'pro', billing_company: 'Mairie de Vic',
-      contact_referent: 'Service Com', quantity: 120, product: 'Tote bags sérigraphie', color: 'Écru',
-      project_value: 3200, description: 'Sacs marché de Noël', deadline: inDays(1),
-      position: 1000,
+      stage: 'preparation', sub_stage: 'a_commander', responsable: 'Charlie', priority: 3, client_type: 'pro',
+      billing_company: 'Mairie de Vic', contact_referent: 'Service Com', quantity: 120,
+      product: 'Tote bags sérigraphie', color: 'Écru', project_value: 3200,
+      description: 'Sacs marché de Noël — TopTex en cours', deadline: inDays(1), position: 1000,
     },
     {
-      stage: 'prod_dtf', priority: 2, client_type: 'pro',
+      stage: 'production', sub_stage: 'prod_dtf', responsable: 'Opérateur', priority: 2, client_type: 'asso',
       billing_company: 'Auto-école Rapid', contact_referent: 'M. Faure', quantity: 15,
       product: 'Polos brodés DTF', project_value: 540, description: 'Polos moniteurs',
       deadline: inDays(-1), position: 1000,
     },
     {
-      stage: 'prod_trotec', priority: 3,
-      client_type: 'pro', billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.',
-      quantity: 40, product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
-      description: 'Découpe forme sur la Trotec',
-      deadline: inDays(5), position: 1000,
+      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie', priority: 3, client_type: 'pro',
+      billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.', quantity: 40,
+      product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
+      description: 'Découpe forme sur la Trotec', deadline: inDays(5), position: 1000,
     },
     {
-      stage: 'facturation', priority: 1, client_type: 'pro', billing_company: 'Pizzeria Bella',
-      contact_referent: 'Marco', quantity: 8, product: 'Tabliers personnalisés',
-      project_value: 240, description: 'Tabliers cuisine', deadline: inDays(-5),
-      position: 1000,
+      stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', priority: 1, client_type: 'pro',
+      billing_company: 'Pizzeria Bella', contact_referent: 'Marco', quantity: 8,
+      product: 'Tabliers personnalisés', project_value: 240, description: 'Tabliers cuisine',
+      deadline: inDays(-5), position: 1000,
     },
   ];
 
   for (const s of samples) {
     await pool.query(
       `INSERT INTO requests
-        (stage, priority, client_type, billing_company, contact_referent, quantity,
-         product, color, project_value, description, deadline, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [s.stage, s.priority, s.client_type, s.billing_company, s.contact_referent,
-       s.quantity, s.product, s.color ?? null, s.project_value, s.description, s.deadline, s.position],
+        (stage, sub_stage, responsable, priority, client_type, billing_company, contact_referent,
+         quantity, product, color, project_value, description, deadline, position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.priority, s.client_type,
+       s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
+       s.project_value, s.description, s.deadline, s.position],
     );
   }
 }
 
-module.exports = { pool, init, STAGES, STAGE_SLUGS };
+module.exports = {
+  pool, init,
+  STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
+};

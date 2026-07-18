@@ -11,10 +11,16 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 ## Fonctionnalités
 
-- Sidebar pipeline : 13 étapes ordonnées, compteurs live, séparateurs de groupes.
-- Grille type tableur : 11 colonnes + poignée de glisser, en-tête collant.
+- Sidebar pipeline : **8 familles** (grandes étapes) + Fiverr épinglé, compteurs
+  live. « 1 projet = 1 seule place. »
+- **Sous-étape** en puce inline (précise l'action en cours), affichée uniquement
+  pour les familles qui en ont (Chiffrage, Préparation, Production, Facturation,
+  Terminé). Changer de famille en glissant remet la sous-étape à zéro.
+- **Responsable** en puce (Loïc / Mélina / Charlie / Opérateur / À attribuer) :
+  chaque projet porte un nom, pour la responsabilisation.
+- Grille type tableur, poignée de glisser, en-tête collant.
 - Édition inline avec persistance optimiste (PATCH immédiat, rollback si échec).
-- Priorité par étoiles (1–3), bascule type pro/perso, état en pastille.
+- Priorité par étoiles (1–3), type client pro / perso / asso / revendeur, état en pastille.
 - « Jours restant » calculé et coloré (vert > 7 j, orange 1–7 j, rouge ≤ 0 j).
 - Glisser-déposer d'une ligne sur une étape de la sidebar → change le `stage`,
   compteurs mis à jour sans rechargement. Réordonnancement vertical (position).
@@ -100,8 +106,10 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
 
-Validation serveur : `stage` ∈ liste des slugs ; `priority` ∈ {1,2,3} ;
-`client_type` ∈ {pro, perso}. Erreurs renvoyées en JSON avec code HTTP adapté.
+Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
+connues ou null ; `responsable` ∈ liste connue ou null ; `priority` ∈ {1,2,3} ;
+`client_type` ∈ {pro, perso, asso, revendeur}. Erreurs renvoyées en JSON avec
+code HTTP adapté.
 
 ## Structure
 
@@ -121,10 +129,19 @@ Validation serveur : `stage` ∈ liste des slugs ; `priority` ∈ {1,2,3} ;
 
 ## Modèle de données — table `requests`
 
-`id` (uuid), `stage` (slug du pipeline), `priority` (1–3), `client_type`
-(pro/perso), `billing_company`, `contact_referent`, `quantity`, `product`,
-`project_value` (numeric), `description`, `deadline` (date), `status` (sous-statut
-libre, distinct du `stage`), `position` (tri manuel), `created_at`, `updated_at`.
+`id` (uuid), `stage` (slug de la FAMILLE, 8 valeurs + `fiverr`), `sub_stage`
+(slug de la SOUS-FAMILLE ou null), `responsable` (Loïc / Mélina / Charlie /
+Opérateur / À attribuer), `priority` (1–3), `client_type`
+(pro/perso/asso/revendeur), `billing_company`, `contact_referent`, `quantity`,
+`product`, `project_value` (numeric), `description`, `deadline` (date), `status`
+(sous-statut libre, distinct du `stage`), `position` (tri manuel), `created_at`,
+`updated_at`.
+
+Le passage de l'ancien pipeline linéaire (20 étapes) au modèle « familles » se
+fait par une migration non destructive au démarrage (`migrateStagesToFamilies`
+dans `db.js`), protégée par un flag `app_meta.stage_model = 'families'` pour ne
+s'exécuter qu'une fois. Le détail des anciennes étapes est conservé dans
+`sub_stage`, ce qui rend la bascule réversible.
 
 `jours_restant` n'est jamais stocké : il est calculé à l'affichage
 (`deadline − aujourd'hui`).

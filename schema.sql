@@ -4,9 +4,11 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS requests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage           text NOT NULL DEFAULT 'nouvelle_demande',
+  stage           text NOT NULL DEFAULT 'demande',   -- FAMILLE (8 grandes étapes + fiverr)
+  sub_stage       text,                              -- SOUS-FAMILLE (précise l'action en cours ; null si la famille n'en a pas)
+  responsable     text,                              -- QUI agit (Loïc / Mélina / Charlie / Opérateur / À attribuer)
   priority        int  NOT NULL DEFAULT 1,
-  client_type     text DEFAULT 'pro',
+  client_type     text DEFAULT 'pro',                -- pro / perso / asso / revendeur
   billing_company text,
   contact_referent text,
   contact_phone   text,
@@ -21,6 +23,13 @@ CREATE TABLE IF NOT EXISTS requests (
   position        double precision,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- Clé/valeur applicative : sert de garde d'idempotence aux migrations de données
+-- ponctuelles (ex. bascule du pipeline linéaire vers le modèle « familles »).
+CREATE TABLE IF NOT EXISTS app_meta (
+  key   text PRIMARY KEY,
+  value text
 );
 
 -- Index pour le tri/filtre par étape
