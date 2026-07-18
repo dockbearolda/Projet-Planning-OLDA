@@ -12,7 +12,9 @@ try {
 
 const path = require('path');
 const express = require('express');
-const { pool, init, STAGES, STAGE_SLUGS } = require('./db');
+const { pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES } = require('./db');
+const RESPONSABLE_SET = new Set(RESPONSABLES);
+const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,8 +50,8 @@ app.use(basicAuth);
 // Helpers
 // ---------------------------------------------------------------------------
 const PATCHABLE = [
-  'stage', 'priority', 'client_type', 'billing_company', 'contact_referent',
-  'contact_phone', 'contact_email',
+  'stage', 'sub_stage', 'responsable', 'priority', 'client_type', 'billing_company',
+  'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
 ];
 
@@ -59,13 +61,25 @@ function validateField(key, value) {
     case 'stage':
       if (!STAGE_SLUGS.includes(value)) return { ok: false, error: `stage invalide: ${value}` };
       return { ok: true, value };
+    case 'sub_stage': {
+      // null = pas de sous-étape (familles sans sous-familles, ou « à préciser »).
+      if (value === '') return { ok: true, value: null };
+      if (!SUB_SLUGS.has(value)) return { ok: false, error: `sous-étape invalide: ${value}` };
+      return { ok: true, value };
+    }
+    case 'responsable': {
+      const s = String(value).trim();
+      if (s === '') return { ok: true, value: null };
+      if (!RESPONSABLE_SET.has(s)) return { ok: false, error: `responsable invalide: ${s}` };
+      return { ok: true, value: s };
+    }
     case 'priority': {
       const n = Number(value);
       if (![1, 2, 3].includes(n)) return { ok: false, error: 'priority doit être 1, 2 ou 3' };
       return { ok: true, value: n };
     }
     case 'client_type':
-      if (!['pro', 'perso'].includes(value)) return { ok: false, error: "client_type doit être 'pro' ou 'perso'" };
+      if (!CLIENT_TYPE_SET.has(value)) return { ok: false, error: `client_type invalide: ${value}` };
       return { ok: true, value };
     case 'quantity': {
       if (value === '' ) return { ok: true, value: null };
@@ -206,7 +220,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 
   // position par défaut : place la nouvelle ligne en bas de son étape.
   if (!cols.includes('position')) {
-    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'nouvelle_demande';
+    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
     const { rows } = await pool.query(
       'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [stage],
     );

@@ -2,41 +2,74 @@
 // Planning OLDA — frontend (vanilla ES module, aucun build)
 // ===========================================================================
 
-// --- Étapes : pipeline LINÉAIRE (une commande = une seule étape à la fois). --
-// Groupes = séparateurs visuels de la barre latérale gauche ; l'ordre et les
-// libellés sont ceux affichés tels quels.
-const STAGE_GROUPS = [
-  [
-    { slug: 'nouvelle_demande', label: 'Nouvelle demande' },
-    { slug: 'chiffrage', label: 'Chiffrage à faire' },
-    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
-    { slug: 'attente_validation_devis', label: 'Attente validation du devis' },
-    { slug: 'devis_accepte_bat', label: 'Devis accepté – BAT à faire' },
-    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
-    { slug: 'bat_a_modifier', label: 'BAT à modifier' },
-    { slug: 'projet_valide', label: 'Projet validé – Lancement autorisé' },
-  ],
-  [
-    { slug: 'a_commander', label: 'À commander' },
-    { slug: 'preparation_production', label: 'Préparation production' },
-    { slug: 'prod_trotec', label: 'Prod TROTEC' },
-    { slug: 'prod_dtf', label: 'Prod DTF' },
-    { slug: 'prod_pressage', label: 'Prod Pressage' },
-    { slug: 'prod_uv', label: 'Prod UV' },
-    { slug: 'montage_nettoyage', label: 'Montage / Nettoyage' },
-    { slug: 'finitions_qualite', label: 'Finitions et contrôle qualité' },
-  ],
-  [
-    { slug: 'facturation', label: 'Facturation' },
-    { slug: 'termine_archive', label: 'Terminé – Archivé' },
-    { slug: 'bloque', label: 'Bloqué – Action requise' },
-    { slug: 'fiverr', label: 'Fiverr' },
-  ],
+// --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
+// La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
+// la ligne) précise CE QUI SE PASSE MAINTENANT. « 1 projet = 1 seule place. »
+// 8 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
+const FAMILIES = [
+  { slug: 'demande', label: 'Demande' },
+  { slug: 'chiffrage', label: 'Chiffrage / Devis' },
+  { slug: 'attente_client', label: 'Attente Client' },
+  { slug: 'preparation', label: 'Préparation' },
+  { slug: 'production', label: 'Production' },
+  { slug: 'facturation', label: 'Facturation / Retrait' },
+  { slug: 'termine', label: 'Terminé' },
+  { slug: 'archive', label: 'Archivé' },
 ];
-// Mini-titres des 3 blocs de la barre latérale (même ordre que STAGE_GROUPS).
-const GROUP_TITLES = ['Devis & BAT', 'Production', 'Clôture'];
-const STAGES = STAGE_GROUPS.flat();
+// Catégorie spéciale (sous-traitance graphiste), épinglée sous les familles.
+const SPECIAL = [
+  { slug: 'fiverr', label: 'Fiverr' },
+];
+const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
+
+// Sous-étapes par famille (miroir de db.js). Une famille absente = pas de puce.
+const SUB_STAGES = {
+  chiffrage: [
+    { slug: 'a_chiffrer', label: 'À chiffrer' },
+    { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
+    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+  ],
+  preparation: [
+    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'a_commander', label: 'À commander' },
+    { slug: 'attente_marchandise', label: 'Attente marchandise' },
+    { slug: 'pret_a_produire', label: 'Prêt à produire' },
+  ],
+  production: [
+    { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'prod_pressage', label: 'Pressage' },
+    { slug: 'prod_trotec', label: 'Production Trotec' },
+    { slug: 'prod_uv', label: 'Production UV' },
+    { slug: 'montage_finition', label: 'Montage / Finition' },
+    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+  ],
+  facturation: [
+    { slug: 'facturation_a_faire', label: 'Facturation à faire' },
+    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+  ],
+  termine: [
+    { slug: 'attente_paiement', label: 'Attente paiement' },
+    { slug: 'solde', label: 'Soldé' },
+  ],
+};
+// Libellé d'une sous-étape par son slug (toutes familles confondues).
+const SUB_LABEL = Object.fromEntries(
+  Object.values(SUB_STAGES).flat().map((s) => [s.slug, s.label]),
+);
+const familyHasSub = (slug) => Array.isArray(SUB_STAGES[slug]) && SUB_STAGES[slug].length > 0;
+
+// Responsables proposés (le champ reste modifiable au clic sur la puce).
+const RESPONSABLES = ['Loïc', 'Mélina', 'Charlie', 'Opérateur', 'À attribuer'];
+
+// Types de client : libellé court affiché + classe de couleur.
+const CLIENT_TYPES = [
+  { value: 'pro', label: 'Pro', cls: 'pro' },
+  { value: 'perso', label: 'Perso', cls: 'perso' },
+  { value: 'asso', label: 'Asso', cls: 'asso' },
+  { value: 'revendeur', label: 'Revendeur', cls: 'revendeur' },
+];
+const CLIENT_TYPE_LABEL = Object.fromEntries(CLIENT_TYPES.map((t) => [t.value, t.label]));
 
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
@@ -49,7 +82,7 @@ const SEND_TARGETS = [
 ];
 
 // --- État applicatif -------------------------------------------------------
-let currentStage = 'nouvelle_demande';
+let currentStage = 'demande';
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
@@ -139,26 +172,36 @@ async function api(method, url, body) {
 }
 
 // --- Rendu sidebar ---------------------------------------------------------
+function buildStageEl(s) {
+  const el = document.createElement('div');
+  el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
+  el.dataset.slug = s.slug;
+  const n = counts[s.slug] ?? 0;
+  if (n === 0) el.classList.add('is-empty');
+  const label = document.createElement('span');
+  label.className = 'stage-label';
+  label.textContent = s.label;
+  const count = document.createElement('span');
+  count.className = 'stage-count' + (n > 0 ? ' has-items' : '');
+  count.textContent = n;
+  el.append(label, count);
+  el.addEventListener('click', () => selectStage(s.slug));
+  attachDrop(el, s.slug);
+  return el;
+}
+
 function renderSidebar() {
-  $stages.innerHTML = '';
-  STAGE_GROUPS.forEach((group, gi) => {
-    const title = document.createElement('div');
-    title.className = 'stage-group-title';
-    title.textContent = GROUP_TITLES[gi] || '';
-    $stages.appendChild(title);
-    group.forEach((s) => {
-      const el = document.createElement('div');
-      el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
-      el.dataset.slug = s.slug;
-      const n = counts[s.slug] ?? 0;
-      if (n === 0) el.classList.add('is-empty');
-      el.innerHTML = `<span class="stage-label">${escapeHtml(s.label)}</span>` +
-        `<span class="stage-count${n > 0 ? ' has-items' : ''}">${n}</span>`;
-      el.addEventListener('click', () => selectStage(s.slug));
-      attachDrop(el, s.slug);
-      $stages.appendChild(el);
-    });
-  });
+  $stages.replaceChildren();
+  // 8 familles à plat : liste courte, très lisible/aérée.
+  FAMILIES.forEach((s) => $stages.appendChild(buildStageEl(s)));
+  // Séparateur + catégorie spéciale Fiverr épinglée dessous.
+  if (SPECIAL.length) {
+    const sep = document.createElement('div');
+    sep.className = 'stage-sep';
+    sep.setAttribute('aria-hidden', 'true');
+    $stages.appendChild(sep);
+    SPECIAL.forEach((s) => $stages.appendChild(buildStageEl(s)));
+  }
 }
 
 // Rejoue l'animation d'entrée des lignes (léger fondu décalé) au changement d'étape.
@@ -172,6 +215,13 @@ function playStageEnter() {
   stageEnterTimer = setTimeout(() => $rows.classList.remove('stage-enter'), 600);
 }
 
+// Masque la colonne « Sous-étape » quand la famille courante n'a pas de
+// sous-familles (Demande, Attente Client, Archivé, Fiverr) → vue plus aérée.
+function updateSubColVisibility(slug) {
+  const grid = document.getElementById('grid');
+  if (grid) grid.classList.toggle('no-sub', !familyHasSub(slug));
+}
+
 function selectStage(slug) {
   currentStage = slug;
   sort = { key: null, dir: 1 };
@@ -179,6 +229,7 @@ function selectStage(slug) {
   $stageTitle.textContent = STAGE_LABEL[slug];
   updateStageLink(slug);
   updateFiverrTool(slug);
+  updateSubColVisibility(slug);
   applyColWidths();
   document.querySelectorAll('.stage').forEach((el) => {
     el.classList.toggle('active', el.dataset.slug === slug);
@@ -514,12 +565,17 @@ function buildRow(r) {
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
-  // type : bascule Pro / Perso
+  // type : Pro / Perso / Asso / Revendeur (menu au clic)
   tr.appendChild(cellType(r));
+  // responsable : QUI agit (puce cliquable) — la réponse du patron au « personne
+  // ne remplit » : chaque projet porte un nom.
+  tr.appendChild(cellResponsable(r));
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
+  // sous-étape : puce précisant ce qui se passe maintenant dans la famille
+  tr.appendChild(cellSubStage(r));
   // infos : notes libres multi-lignes (ancien champ « description »)
   tr.appendChild(cellInfos(r));
   // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
@@ -576,24 +632,102 @@ function prioBand(r) {
   return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
 }
 
-// Type : bascule Pro / Perso, désormais dans sa propre colonne (1re du fichier).
+// Type de client : Pro / Perso / Asso / Revendeur. Menu au clic (4 valeurs).
 function cellType(r) {
   const td = document.createElement('td');
   td.className = 'col-type';
   const type = document.createElement('button');
   type.type = 'button';
   const renderType = () => {
-    type.className = 'type-tag ' + (r.client_type === 'pro' ? 'pro' : 'perso');
-    type.textContent = r.client_type === 'pro' ? 'Pro' : 'Perso';
+    const t = CLIENT_TYPES.find((x) => x.value === r.client_type) || CLIENT_TYPES[0];
+    type.className = 'type-tag ' + t.cls;
+    type.textContent = t.label;
   };
   renderType();
-  attachTip(type, 'cliquer pour basculer pro / perso');
+  attachTip(type, 'cliquer pour changer le type de client');
   type.addEventListener('click', (e) => {
     e.stopPropagation();
-    const next = r.client_type === 'pro' ? 'perso' : 'pro';
-    patch(r, { client_type: next }, () => { r.client_type = next; renderType(); });
+    openMenu(type, CLIENT_TYPES.map((t) => ({ value: t.value, label: t.label })), r.client_type, (val) => {
+      if (val === r.client_type) return;
+      patch(r, { client_type: val }, () => { r.client_type = val; renderType(); });
+    });
   });
   td.appendChild(type);
+  return td;
+}
+
+// Responsable : QUI agit sur le projet. Puce cliquable (initiale + nom) ; menu
+// des responsables + « Aucun ». Champ clé pour la responsabilisation.
+function cellResponsable(r) {
+  const td = document.createElement('td');
+  td.className = 'col-resp-cell';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  const render = () => {
+    btn.replaceChildren();
+    if (r.responsable) {
+      btn.className = 'resp-chip';
+      const ini = document.createElement('span');
+      ini.className = 'resp-ini';
+      ini.textContent = r.responsable.charAt(0).toUpperCase();
+      const name = document.createElement('span');
+      name.className = 'resp-name';
+      name.textContent = r.responsable;
+      btn.append(ini, name);
+    } else {
+      btn.className = 'resp-chip empty';
+      const name = document.createElement('span');
+      name.className = 'resp-name';
+      name.textContent = 'Qui ?';
+      btn.append(name);
+    }
+  };
+  render();
+  attachTip(btn, 'assigner un responsable');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const items = RESPONSABLES.map((n) => ({ value: n, label: n }));
+    items.push({ value: null, label: 'Aucun', muted: true });
+    openMenu(btn, items, r.responsable ?? null, (val) => {
+      if ((val ?? null) === (r.responsable ?? null)) return;
+      patch(r, { responsable: val }, () => { r.responsable = val; render(); });
+    });
+  });
+  td.appendChild(btn);
+  return td;
+}
+
+// Sous-étape : précise ce qui se passe MAINTENANT dans la famille. Puce
+// cliquable ; menu des sous-familles de la famille + « Aucune ». Rien à afficher
+// (et colonne masquée par CSS) pour les familles sans sous-étapes.
+function cellSubStage(r) {
+  const td = document.createElement('td');
+  td.className = 'col-sub-cell';
+  const subs = SUB_STAGES[r.stage];
+  if (!subs || !subs.length) return td;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  const render = () => {
+    if (r.sub_stage && SUB_LABEL[r.sub_stage]) {
+      btn.className = 'sub-chip';
+      btn.textContent = SUB_LABEL[r.sub_stage];
+    } else {
+      btn.className = 'sub-chip empty';
+      btn.textContent = 'à préciser';
+    }
+  };
+  render();
+  attachTip(btn, 'préciser la sous-étape');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const items = subs.map((s) => ({ value: s.slug, label: s.label }));
+    items.push({ value: null, label: 'Aucune', muted: true });
+    openMenu(btn, items, r.sub_stage ?? null, (val) => {
+      if ((val ?? null) === (r.sub_stage ?? null)) return;
+      patch(r, { sub_stage: val }, () => { r.sub_stage = val; render(); });
+    });
+  });
+  td.appendChild(btn);
   return td;
 }
 
@@ -816,6 +950,54 @@ function attachTip(el, text) {
 window.addEventListener('scroll', hideTip, true);
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); }, true);
 
+// --- Menu déroulant réutilisable (type / responsable / sous-étape) ---------
+// Petit popover ancré à une puce : liste d'options, fermé au clic dehors / Échap.
+// Même idiome de popup que le calendrier. items : [{ value, label, muted? }].
+let openMenuEl = null;
+function closeMenu() {
+  if (!openMenuEl) return;
+  openMenuEl.remove();
+  openMenuEl = null;
+  document.removeEventListener('pointerdown', onMenuDocDown, true);
+  document.removeEventListener('keydown', onMenuKey, true);
+}
+function onMenuDocDown(e) {
+  if (openMenuEl && !openMenuEl.contains(e.target)) closeMenu();
+}
+function onMenuKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); } }
+
+function openMenu(anchor, items, current, onPick) {
+  closeMenu();
+  closeCalendar();
+  const menu = document.createElement('div');
+  menu.className = 'menu-pop';
+  items.forEach((it) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const isSel = (it.value ?? null) === (current ?? null);
+    b.className = 'menu-item' + (it.muted ? ' muted' : '') + (isSel ? ' selected' : '');
+    b.textContent = it.label;
+    b.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); onPick(it.value); });
+    menu.appendChild(b);
+  });
+
+  document.body.appendChild(menu);
+  const pr = anchor.getBoundingClientRect();
+  const cr = menu.getBoundingClientRect();
+  let top = pr.bottom + 4;
+  if (top + cr.height > window.innerHeight - 8) top = pr.top - cr.height - 4;
+  let left = pr.left;
+  if (left + cr.width > window.innerWidth - 8) left = window.innerWidth - cr.width - 8;
+  menu.style.top = Math.max(8, Math.round(top)) + 'px';
+  menu.style.left = Math.max(8, Math.round(left)) + 'px';
+
+  openMenuEl = menu;
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onMenuDocDown, true);
+    document.addEventListener('keydown', onMenuKey, true);
+  }, 0);
+}
+
 // --- Calendrier d'échéance (popup mois complet) ----------------------------
 // Au clic sur le badge échéance, on ouvre un vrai calendrier (grille du mois)
 // pour choisir la date — même idiome de popup que le menu d'état.
@@ -1028,6 +1210,7 @@ function makeOptimisticRow() {
   return {
     id: `tmp-${++tmpSeq}`,
     stage: currentStage,
+    sub_stage: null, responsable: null,
     priority: 1, client_type: 'pro',
     billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
     quantity: null, product: null, color: null, project_value: null,
@@ -1146,6 +1329,10 @@ function removeRow(r) {
 function copyBody(r, stage) {
   return {
     stage: stage || r.stage,
+    // On ne transporte la sous-étape que si la commande reste dans sa famille
+    // (une copie « Envoyer vers … » change de famille → sous-étape repartie à zéro).
+    sub_stage: (!stage || stage === r.stage) ? (r.sub_stage ?? null) : null,
+    responsable: r.responsable ?? null,
     priority: r.priority,
     client_type: r.client_type,
     billing_company: r.billing_company,
@@ -1332,13 +1519,18 @@ async function onDragEnd(e) {
 
 function moveToStage(r, slug) {
   const prevRows = rows;
+  const prevSub = r.sub_stage;
   const viewSlug = currentStage;
+  // Changer de famille invalide l'ancienne sous-étape : on la remet à zéro pour
+  // ne pas transporter, p. ex., « Production UV » dans « Facturation ».
+  r.sub_stage = null;
   rows = rows.filter((x) => x.id !== r.id);
   applySortAndRender();
   bumpCount(viewSlug, -1);
   bumpCount(slug, +1);
-  api('PATCH', `/api/requests/${r.id}`, { stage: slug }).catch((err) => {
+  api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: null }).catch((err) => {
     rows = prevRows;
+    r.sub_stage = prevSub;
     lastRowsSig = signature(rows);
     bumpCount(viewSlug, +1);
     bumpCount(slug, -1);
@@ -1420,7 +1612,7 @@ function updateSortArrows() {
 // Chaque catégorie mémorise ses propres largeurs (localStorage, par appareil).
 // Tant qu'aucune colonne n'a été réglée à la main, la répartition reste celle
 // du navigateur.
-const COLW_KEY = 'olda_col_widths_v4';
+const COLW_KEY = 'olda_col_widths_v5';
 const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];
@@ -1429,8 +1621,8 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 52, client_type: 96, client: 220, product: 240, description: 240,
-  deadline: 140, del: 200,
+  handle: 52, client_type: 96, responsable: 148, client: 210, product: 220,
+  sub_stage: 170, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};
@@ -1564,6 +1756,7 @@ let lastRowsSig = '';
 function isInteracting() {
   if (dragState) return true;
   if (openCalendar) return true; // popup ancré à un badge de la grille
+  if (openMenuEl) return true;   // menu (type / responsable / sous-étape) ouvert
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
   return false;
@@ -1621,7 +1814,7 @@ function startRealtime() {
 // Le champ inline (work-head) filtre en direct les lignes affichées par
 // société / référent / produit / description / contact. ⌘K (ou Ctrl+K) place
 // le curseur dans le champ ; Échap efface le filtre puis rend la main.
-const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color', 'description', 'contact_phone', 'contact_email'];
+const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color', 'description', 'contact_phone', 'contact_email', 'responsable'];
 
 function fold(s) {
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -1748,7 +1941,7 @@ if ($gridWrap) {
 // --- Ripple Material -----------------------------------------------------------
 // Onde discrète au toucher/clic sur les surfaces interactives en pilule.
 const RIPPLE_SELECTOR = '.stage, .btn-primary, .cal-foot-btn, .send-btn, .stage-link, ' +
-  '.type-tag, .deadline-badge, .prio-pill';
+  '.type-tag, .deadline-badge, .prio-pill, .resp-chip, .sub-chip, .menu-item';
 document.addEventListener('pointerdown', (e) => {
   const host = e.target.closest(RIPPLE_SELECTOR);
   if (!host) return;
@@ -1840,6 +2033,7 @@ async function start() {
   initBrandReflection();
   renderSidebar();
   attachColResizers();
+  updateSubColVisibility(currentStage);
   applyColWidths();
   await loadCounts();
   $stageTitle.textContent = STAGE_LABEL[currentStage];
