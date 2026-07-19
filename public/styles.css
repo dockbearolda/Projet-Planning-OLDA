@@ -449,6 +449,34 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .stages > .stage-group-title:first-child { padding-top: 6px; }
 
+/* Sous-catégories : déroulées sous leur famille (miroir de la « Vue Étapes »).
+   Plus compactes, en retrait à gauche (le bord droit — donc les compteurs —
+   reste aligné sur les familles), texte plus léger : hiérarchie claire, rail
+   lisible. Une sous-catégorie active reprend la surbrillance pastel. */
+.stage.substage {
+  padding: 6px 16px 6px 30px;
+}
+.stage.substage .stage-label {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.stage.substage:hover .stage-label { color: var(--text-1); }
+.stage.substage.active .stage-label { color: var(--primary); font-weight: 600; }
+.stage.substage .stage-count { min-width: 20px; height: 18px; font-size: 11px; }
+/* Repère vertical discret matérialisant le rattachement à la famille. */
+.stage.substage::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--border-soft);
+  border-radius: 2px;
+}
+.stage.substage.active::before { background: var(--primary); }
+
 /* séparateur : filet fin isolant la catégorie spéciale (Fiverr) des 8 familles */
 .stage-sep {
   height: 1px;

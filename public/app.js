@@ -83,6 +83,7 @@ const SEND_TARGETS = [
 
 // --- État applicatif -------------------------------------------------------
 let currentStage = 'demande';
+let currentSub = null;         // sous-catégorie active (null = toute la famille)
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
@@ -172,28 +173,43 @@ async function api(method, url, body) {
 }
 
 // --- Rendu sidebar ---------------------------------------------------------
-function buildStageEl(s) {
+// Une entrée de rail = une FAMILLE (sub omis) ou une SOUS-CATÉGORIE (sub fourni).
+// La sous-catégorie porte data-slug = famille (cible de dépôt) + data-sub = sous-slug.
+function buildStageEl(family, sub) {
+  const isSub = !!sub;
+  const slug = family.slug;
+  const countKey = isSub ? sub.slug : slug;
   const el = document.createElement('div');
-  el.className = 'stage' + (s.slug === currentStage ? ' active' : '');
-  el.dataset.slug = s.slug;
-  const n = counts[s.slug] ?? 0;
+  el.className = 'stage' + (isSub ? ' substage' : '');
+  el.dataset.slug = slug;
+  if (isSub) el.dataset.sub = sub.slug;
+  const active = isSub
+    ? (currentStage === slug && currentSub === sub.slug)
+    : (currentStage === slug && currentSub === null);
+  if (active) el.classList.add('active');
+  const n = counts[countKey] ?? 0;
   if (n === 0) el.classList.add('is-empty');
   const label = document.createElement('span');
   label.className = 'stage-label';
-  label.textContent = s.label;
+  label.textContent = isSub ? sub.label : family.label;
   const count = document.createElement('span');
   count.className = 'stage-count' + (n > 0 ? ' has-items' : '');
   count.textContent = n;
   el.append(label, count);
-  el.addEventListener('click', () => selectStage(s.slug));
-  attachDrop(el, s.slug);
+  el.addEventListener('click', () => selectStage(slug, isSub ? sub.slug : null));
   return el;
 }
 
 function renderSidebar() {
   $stages.replaceChildren();
-  // 8 familles à plat : liste courte, très lisible/aérée.
-  FAMILIES.forEach((s) => $stages.appendChild(buildStageEl(s)));
+  // 8 familles ; chaque famille déroule ses sous-catégories juste en dessous
+  // (miroir de la « Vue Étapes » du CRM : total famille + détail par sous-étape).
+  FAMILIES.forEach((f) => {
+    $stages.appendChild(buildStageEl(f));
+    if (familyHasSub(f.slug)) {
+      SUB_STAGES[f.slug].forEach((sub) => $stages.appendChild(buildStageEl(f, sub)));
+    }
+  });
   // Séparateur + catégorie spéciale Fiverr épinglée dessous.
   if (SPECIAL.length) {
     const sep = document.createElement('div');
@@ -238,17 +254,41 @@ function clearGrid() {
   $empty.hidden = true; // pas de « Aucune commande » pendant le chargement
 }
 
-async function selectStage(slug) {
+// Surbrillance du rail : une seule entrée active à la fois (famille OU sous-cat).
+function paintSidebarActive() {
+  document.querySelectorAll('.stage').forEach((el) => {
+    const isSub = el.dataset.sub != null;
+    const on = isSub
+      ? (el.dataset.slug === currentStage && el.dataset.sub === currentSub)
+      : (el.dataset.slug === currentStage && (el.dataset.sub != null ? false : currentSub === null));
+    el.classList.toggle('active', on);
+  });
+}
+
+// Libellé d'en-tête : la sous-catégorie si l'une est active, sinon la famille.
+function currentViewLabel() {
+  if (currentSub && SUB_LABEL[currentSub]) return SUB_LABEL[currentSub];
+  return STAGE_LABEL[currentStage];
+}
+
+async function selectStage(slug, sub = null) {
+  const sameFamily = slug === currentStage;
   currentStage = slug;
+  currentSub = sub ?? null;
   sort = { key: null, dir: 1 };
   // Réponse immédiate au clic : entête + surbrillance (c'est ce qu'on a cliqué,
   // donc jamais périmé). Le reste (colonnes, lignes, animation) suit la donnée.
-  $stageTitle.textContent = STAGE_LABEL[slug];
+  $stageTitle.textContent = currentViewLabel();
   updateStageLink(slug);
   updateFiverrTool(slug);
-  document.querySelectorAll('.stage').forEach((el) => {
-    el.classList.toggle('active', el.dataset.slug === slug);
-  });
+  paintSidebarActive();
+  // Changer de sous-catégorie DANS la même famille ne recharge rien : les lignes
+  // de la famille sont déjà en mémoire, on ne fait que re-filtrer (instantané).
+  if (sameFamily && lastRowsSig !== '') {
+    applySortAndRender();
+    playStageEnter();
+    return;
+  }
   clearGrid();
   await loadRows();
   // Anime l'entrée des VRAIES lignes, seulement si cette sélection est toujours
@@ -260,7 +300,9 @@ async function selectStage(slug) {
 async function loadCounts() {
   counts = await api('GET', '/api/counts');
   document.querySelectorAll('.stage').forEach((el) => {
-    const n = counts[el.dataset.slug] ?? 0;
+    // Sous-catégorie → compteur par sous-slug ; famille → total famille.
+    const key = el.dataset.sub != null ? el.dataset.sub : el.dataset.slug;
+    const n = counts[key] ?? 0;
     const c = el.querySelector('.stage-count');
     if (c) {
       c.textContent = n;
@@ -303,12 +345,19 @@ function bumpCount(slug, delta) {
 // le filtre serveur) : sert à décider, en optimiste, si une ligne reste visible
 // après un changement d'étape / d'affectation secteur.
 function belongsToCurrentView(r) {
-  return r.stage === currentStage;
+  if (r.stage !== currentStage) return false;
+  if (currentSub === null) return true;
+  return (r.sub_stage ?? null) === currentSub;
 }
 
 // --- Tri -------------------------------------------------------------------
 function applySortAndRender() {
-  const sorted = [...rows];
+  // `rows` contient TOUTE la famille ; si une sous-catégorie est active, on ne
+  // rend que les commandes qui en relèvent (filtre instantané, côté client).
+  const base = currentSub === null
+    ? rows
+    : rows.filter((r) => (r.sub_stage ?? null) === currentSub);
+  const sorted = [...base];
   if (sort.key) {
     sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
   } else {
@@ -752,7 +801,13 @@ function cellSubStage(r) {
     items.push({ value: null, label: 'Aucune', muted: true });
     openMenu(btn, items, r.sub_stage ?? null, (val) => {
       if ((val ?? null) === (r.sub_stage ?? null)) return;
-      patch(r, { sub_stage: val }, () => { r.sub_stage = val; render(); });
+      patch(r, { sub_stage: val }, () => {
+        r.sub_stage = val;
+        render();
+        // Si on filtre sur une sous-catégorie, la ligne peut sortir/entrer de la
+        // vue courante : on re-filtre. Les pastilles se recalent au prochain SSE.
+        if (currentSub !== null) applySortAndRender();
+      });
     });
   });
   td.appendChild(btn);
@@ -1238,7 +1293,9 @@ function makeOptimisticRow() {
   return {
     id: `tmp-${++tmpSeq}`,
     stage: currentStage,
-    sub_stage: null, responsable: null,
+    // Créée depuis une sous-catégorie → elle en hérite (sinon la ligne
+    // n'apparaîtrait pas dans la vue filtrée où on vient de la créer).
+    sub_stage: currentSub, responsable: null,
     priority: 1, client_type: 'pro',
     billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
     quantity: null, product: null, color: null, project_value: null,
@@ -1295,6 +1352,7 @@ function createForCurrentView() {
   const r = makeOptimisticRow();
   const tmpId = r.id;
   const viewSlug = currentStage; // figé : la vue peut changer avant la réponse
+  const viewSub = currentSub;    // sous-catégorie éventuelle, figée de même
   rows.push(r);
   pendingCreates.set(tmpId, { patch: {} });
   applySortAndRender();
@@ -1307,7 +1365,7 @@ function createForCurrentView() {
     if (firstInput) firstInput.focus();
   }
 
-  api('POST', '/api/requests', { stage: viewSlug })
+  api('POST', '/api/requests', viewSub ? { stage: viewSlug, sub_stage: viewSub } : { stage: viewSlug })
     .then((created) => finalizeCreate(tmpId, created))
     .catch((err) => {
       pendingCreates.delete(tmpId);
@@ -1536,32 +1594,46 @@ async function onDragEnd(e) {
     return;
   }
 
-  const slug = stageEl ? stageEl.dataset.slug : null;
-  if (slug) {
-    // déposé sur une entrée de la sidebar → déplacer vers cette étape
-    if (slug !== ds.r.stage) await moveToStage(ds.r, slug);
+  if (stageEl) {
+    // déposé sur une entrée de la sidebar : famille (data-slug) ou sous-catégorie
+    // (data-slug = famille + data-sub = sous-slug).
+    const slug = stageEl.dataset.slug;
+    const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
+    const changed = slug !== ds.r.stage || (sub ?? null) !== (ds.r.sub_stage ?? null);
+    if (changed) await moveToStage(ds.r, slug, sub);
   } else {
     await commitReorder(ds.r); // déposé dans la grille → réordonnancement
   }
 }
 
-function moveToStage(r, slug) {
+// Déplace une commande vers une famille (targetSub null) ou directement vers une
+// sous-catégorie (targetSub = sous-slug de la MÊME famille que `slug`).
+function moveToStage(r, slug, targetSub = null) {
   const prevRows = rows;
+  const prevStage = r.stage;
   const prevSub = r.sub_stage;
   const viewSlug = currentStage;
-  // Changer de famille invalide l'ancienne sous-étape : on la remet à zéro pour
-  // ne pas transporter, p. ex., « Production UV » dans « Facturation ».
-  r.sub_stage = null;
-  rows = rows.filter((x) => x.id !== r.id);
+  // Changer de famille invalide toute ancienne sous-étape : on ne transporte pas,
+  // p. ex., « Production UV » dans « Facturation ». Déposer sur une sous-catégorie
+  // la pose directement ; déposer sur l'en-tête de famille la remet à zéro.
+  const familyChanged = slug !== r.stage;
+  r.stage = slug;
+  r.sub_stage = targetSub;
+  if (familyChanged) {
+    // La ligne quitte la famille affichée : on la retire de la vue courante.
+    rows = rows.filter((x) => x.id !== r.id);
+    bumpCount(viewSlug, -1);
+    bumpCount(slug, +1);
+  }
+  // Même famille, seule la sous-étape change : la ligne reste dans `rows` ; le
+  // filtre de sous-catégorie (applySortAndRender) l'affiche ou la masque.
   applySortAndRender();
-  bumpCount(viewSlug, -1);
-  bumpCount(slug, +1);
-  api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: null }).catch((err) => {
+  api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: targetSub }).catch((err) => {
     rows = prevRows;
+    r.stage = prevStage;
     r.sub_stage = prevSub;
     lastRowsSig = signature(rows);
-    bumpCount(viewSlug, +1);
-    bumpCount(slug, -1);
+    if (familyChanged) { bumpCount(viewSlug, +1); bumpCount(slug, -1); }
     applySortAndRender();
     reportError(err);
     resyncAfterRollback();
