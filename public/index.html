@@ -91,11 +91,18 @@
             </div>
           </div>
           <div class="work-head-right">
+            <button class="help-btn" id="stageHelp" type="button" hidden aria-haspopup="dialog">
+              <span class="material-symbols-outlined help-btn-ic" aria-hidden="true">help</span>
+              <span class="help-btn-label">Guide</span>
+            </button>
             <a class="stage-link" id="stageLink" target="_blank" rel="noopener noreferrer" hidden>
               <span class="material-symbols-outlined stage-link-ic" aria-hidden="true">open_in_new</span>
               <span class="stage-link-label" id="stageLinkLabel"></span>
             </a>
           </div>
+          <!-- Explication du patron (feuille « Descriptif Étapes ») : à quoi sert
+               l'étape courante, toujours visible pour que l'employé comprenne. -->
+          <p class="stage-desc" id="stageDesc" hidden></p>
         </header>
 
         <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
@@ -145,6 +152,43 @@
           <div class="grid-empty" id="empty" hidden>Aucune commande à cette étape.</div>
         </div>
       </main>
+    </div>
+  </div>
+
+  <!-- Panneau « Guide de l'étape » : ouvre l'explication complète du patron
+       (à quoi sert, qui agit, quand y mettre, quand le sortir). Pensé tactile :
+       grandes cibles, fermeture au fond ou à la croix. -->
+  <div class="guide-overlay" id="guideOverlay" hidden>
+    <div class="guide-card" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <button class="guide-close" id="guideClose" type="button" aria-label="Fermer le guide">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+      <div class="guide-eyebrow" id="guideEyebrow">Guide de l'étape</div>
+      <h2 class="guide-title" id="guideTitle"></h2>
+      <p class="guide-desc" id="guideDesc"></p>
+      <div class="guide-fields">
+        <div class="guide-field">
+          <span class="guide-field-ic material-symbols-outlined" aria-hidden="true">person</span>
+          <div class="guide-field-body">
+            <span class="guide-field-label">Qui agit ?</span>
+            <p class="guide-field-text" id="guideWho"></p>
+          </div>
+        </div>
+        <div class="guide-field">
+          <span class="guide-field-ic material-symbols-outlined" aria-hidden="true">login</span>
+          <div class="guide-field-body">
+            <span class="guide-field-label">Quand y mettre le projet ?</span>
+            <p class="guide-field-text" id="guideWhenIn"></p>
+          </div>
+        </div>
+        <div class="guide-field">
+          <span class="guide-field-ic material-symbols-outlined" aria-hidden="true">logout</span>
+          <div class="guide-field-body">
+            <span class="guide-field-label">Quand le sortir ?</span>
+            <p class="guide-field-text" id="guideWhenOut"></p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
