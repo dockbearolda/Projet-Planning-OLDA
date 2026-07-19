@@ -76,6 +76,14 @@ const SUB_SLUGS = new Set(
   Object.values(SUB_STAGES).flatMap((list) => list.map((s) => s.slug)),
 );
 
+// Famille propriétaire de chaque sous-slug. Les sous-slugs sont GLOBALEMENT
+// uniques (aucun chevauchement entre familles), donc une sous-étape suffit à
+// désigner sa famille — ce qui sert à la réparation des lignes orphelines.
+const SUB_TO_FAMILY = {};
+for (const [family, subs] of Object.entries(SUB_STAGES)) {
+  for (const s of subs) SUB_TO_FAMILY[s.slug] = family;
+}
+
 // Responsables proposés (le champ reste du texte libre côté base).
 const RESPONSABLES = ['Loïc', 'Mélina', 'Charlie', 'Opérateur', 'À attribuer'];
 
@@ -133,6 +141,10 @@ async function init() {
   // Puis bascule du modèle linéaire vers le modèle « familles » à 2 niveaux.
   // Non destructif, exécuté UNE seule fois (garde app_meta).
   await migrateStagesToFamilies();
+
+  // Filet de sécurité : réaligne toute ligne restée sur un ancien slug malgré la
+  // garde ci-dessus (import / restauration de sauvegarde). Idempotent.
+  await repairOrphanStages();
 
   // Seed : si la table est vide, on insère quelques demandes d'exemple
   // réparties sur plusieurs étapes pour démontrer le pipeline.
@@ -257,6 +269,48 @@ async function migrateStagesToFamilies() {
   await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model', 'families')");
 }
 
+// Réparation AUTO-CICATRISANTE (idempotente, non destructive). Certaines lignes
+// portent un `stage` resté sur un ANCIEN slug (linéaire ou multi-machines :
+// « prod_trotec », « preparation_production », « nouvelle_demande »…) jamais
+// converti vers le modèle « familles ». Elles ont franchi la garde app_meta de
+// migrateStagesToFamilies (import / restauration de sauvegarde, ou garde posée
+// avant leur conversion), donc la bascule ne les rejoue jamais.
+//
+// Conséquence exacte du bug observé : leur famille n'existe pas dans la sidebar
+// (ex. stage='prod_trotec'), donc /api/counts les agrège par sub_stage — « 7 » —
+// mais /api/requests?stage=production ne les renvoie pas → liste vide sous la
+// sous-famille. On réaligne à CHAQUE démarrage ; une fois réparé, plus aucune
+// ligne ne matche, donc les passages suivants ne touchent rien.
+async function repairOrphanStages() {
+  // On filtre les orphelines en JS (table petite) plutôt qu'avec un NOT IN sur la
+  // colonne `stage` indexée : pg-mem (dev local) plante sur ce cas.
+  const familySlugs = new Set(STAGE_SLUGS);
+  const { rows: all } = await pool.query('SELECT id, stage, sub_stage FROM requests');
+  const rows = all.filter((r) => !familySlugs.has(r.stage));
+  for (const r of rows) {
+    let family;
+    let sub = r.sub_stage ?? null;
+    if (sub && SUB_TO_FAMILY[sub]) {
+      // La sous-étape est déjà valide : elle désigne la famille et reste TELLE
+      // QUELLE (plus précise que le mapping générique — ex. une ligne bloquée en
+      // stage='preparation_production' mais sub_stage='prod_trotec' est bien une
+      // commande de production Trotec, pas une préparation fichiers).
+      family = SUB_TO_FAMILY[sub];
+    } else if (STAGE_TO_FAMILY[r.stage]) {
+      [family, sub] = STAGE_TO_FAMILY[r.stage];
+    } else {
+      // Slug totalement inconnu : on la renvoie en tête de pipeline plutôt que de
+      // la laisser invisible dans la sidebar.
+      family = 'demande';
+      sub = null;
+    }
+    await pool.query('UPDATE requests SET stage = $1, sub_stage = $2 WHERE id = $3', [family, sub, r.id]);
+  }
+  if (rows.length) {
+    console.log(`ℹ  Réparation : ${rows.length} commande(s) réalignée(s) vers le modèle « familles ».`);
+  }
+}
+
 async function seed() {
   const today = new Date();
   const inDays = (d) => {
@@ -324,6 +378,6 @@ async function seed() {
 }
 
 module.exports = {
-  pool, init,
+  pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
 };
