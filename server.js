@@ -188,14 +188,23 @@ app.get('/api/requests', asyncH(async (req, res) => {
   res.json(result.rows);
 }));
 
-// GET /api/counts → { slug: n, ... } : une entrée par étape. Objet plat → la
-// sidebar lit counts[slug] sans rien changer.
+// GET /api/counts → { slug: n, ... } : objet plat mêlant FAMILLES et SOUS-FAMILLES
+// (leurs slugs ne se chevauchent jamais). La sidebar lit counts[familleSlug] pour
+// le total d'une famille et counts[sousSlug] pour chaque sous-catégorie. Le total
+// famille inclut les commandes « à préciser » (sub_stage null), donc il peut être
+// supérieur à la somme des sous-catégories : c'est voulu.
 app.get('/api/counts', asyncH(async (req, res) => {
   const counts = {};
   for (const s of STAGE_SLUGS) counts[s] = 0;
+  for (const s of SUB_SLUGS) counts[s] = 0;
 
   const { rows: byStage } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
   for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
+
+  const { rows: bySub } = await pool.query(
+    'SELECT sub_stage, COUNT(*)::int AS n FROM requests WHERE sub_stage IS NOT NULL GROUP BY sub_stage',
+  );
+  for (const r of bySub) if (SUB_SLUGS.has(r.sub_stage)) counts[r.sub_stage] = r.n;
 
   res.json(counts);
 }));
