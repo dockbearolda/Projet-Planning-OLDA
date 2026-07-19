@@ -572,6 +572,165 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .stage-link:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .stage-link-ic { font-size: 18px; flex-shrink: 0; }
 
+/* -------------------------------------- Bouton « Guide » + sous-titre étape */
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;              /* cible tactile confortable (tablette) */
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.help-btn[hidden] { display: none; }
+.help-btn:hover { background: var(--primary-soft); border-color: transparent; }
+.help-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.help-btn-ic { font-size: 19px; flex-shrink: 0; }
+
+/* Sous-titre : à quoi sert l'étape (texte du patron), toujours visible. Passe à
+   la ligne sous le titre (flex-basis 100 % dans le work-head). */
+.stage-desc {
+  flex: 1 0 100%;
+  margin: 2px 0 0;
+  max-width: 90ch;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.stage-desc[hidden] { display: none; }
+
+/* ------------------------------------------------ Panneau « Guide de l'étape » */
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* respecte les safe-areas (notch / barres système) */
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: rgba(15, 22, 38, .55);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.guide-overlay.open { opacity: 1; }
+.guide-overlay[hidden] { display: none; }
+
+.guide-card {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 26px 28px 28px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-2);
+  transform: translateY(8px) scale(.98);
+  transition: transform var(--dur-3) var(--ease);
+}
+.guide-overlay.open .guide-card { transform: translateY(0) scale(1); }
+
+.guide-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.guide-close:hover { background: var(--state-hover); color: var(--text-1); }
+.guide-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.guide-close .material-symbols-outlined { font-size: 24px; }
+
+.guide-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.guide-title {
+  margin: 4px 40px 0 0;         /* laisse la place à la croix */
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.2px;
+  color: var(--text-1);
+}
+.guide-desc {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-1);
+}
+
+.guide-fields {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-field {
+  display: flex;
+  gap: 14px;
+  padding: 14px 4px;
+  border-top: 1px solid var(--border-soft);
+}
+.guide-field-ic {
+  flex-shrink: 0;
+  font-size: 22px;
+  color: var(--primary);
+  margin-top: 1px;
+}
+.guide-field-body { min-width: 0; }
+.guide-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.guide-field-text {
+  margin: 3px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-1);
+}
+
+/* Tablette / téléphone étroit : le panneau devient une feuille en bas d'écran,
+   plus naturelle au pouce. */
+@media (max-width: 820px) {
+  .guide-overlay { align-items: flex-end; padding: 0; }
+  .guide-card {
+    max-width: none;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    max-height: 85%;
+  }
+  .guide-overlay.open .guide-card { transform: translateY(0); }
+}
+
 /* ------------------------------------------------ Outil de devis Fiverr */
 .fiverr-tool {
   display: flex;
