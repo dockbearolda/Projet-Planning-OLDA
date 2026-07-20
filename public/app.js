@@ -714,6 +714,8 @@ function buildRow(r) {
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
+  // étoiles : 1 à 3, attribuables au clic (réglent la priorité de la ligne)
+  tr.appendChild(cellStars(r));
   // type : Pro / Perso / Asso / Revendeur (menu au clic)
   tr.appendChild(cellType(r));
   // responsable : QUI agit (puce cliquable) — la réponse du patron au « personne
@@ -779,6 +781,40 @@ const PRIORITY_LEVELS = {
 // Niveau de priorité normalisé en bande 1..3 (toute valeur inattendue → Basse).
 function prioBand(r) {
   return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
+}
+
+// Cellule étoiles (1 à 3) : attribuée au clic, règle la priorité de la ligne.
+// Recliquer la même note ne fait rien ; changer de note enregistre en optimiste.
+function cellStars(r) {
+  const td = document.createElement('td');
+  td.className = 'col-stars-cell';
+  if (isDraftRow(r)) return td; // pas d'étoiles sur la ligne brouillon
+  const wrap = document.createElement('div');
+  wrap.className = 'grid-stars';
+  attachTip(wrap, 'attribuer des étoiles (priorité)');
+  const cur = prioBand(r);
+  for (let i = 1; i <= 3; i++) {
+    const star = document.createElement('button');
+    star.type = 'button';
+    star.className = 'grid-star' + (i <= cur ? ' on' : '');
+    star.textContent = i <= cur ? '★' : '☆';
+    star.setAttribute('aria-label', `${i} étoile${i > 1 ? 's' : ''} sur 3`);
+    star.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (prioBand(r) === i) return;
+      patch(r, { priority: i }, () => {
+        r.priority = i;
+        for (let j = 0; j < wrap.children.length; j++) {
+          const on = (j + 1) <= i;
+          wrap.children[j].classList.toggle('on', on);
+          wrap.children[j].textContent = on ? '★' : '☆';
+        }
+      });
+    });
+    wrap.appendChild(star);
+  }
+  td.appendChild(wrap);
+  return td;
 }
 
 // Type de client : Pro / Perso / Asso / Revendeur. Menu au clic (4 valeurs).
@@ -1825,7 +1861,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 52, client_type: 96, responsable: 148, client: 210, product: 220,
+  handle: 52, stars: 78, client_type: 96, responsable: 148, client: 210, product: 220,
   sub_stage: 170, description: 210, deadline: 136, del: 200,
 };
 

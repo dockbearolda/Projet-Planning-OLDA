@@ -969,6 +969,34 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .handle svg { width: 18px; height: 18px; }
 tr:hover .handle { color: var(--text-2); }
 
+/* étoiles de priorité, attribuables par ligne */
+.col-stars { width: 78px; }
+.col-stars-cell { text-align: center; }
+.grid-stars {
+  display: inline-flex;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+  height: var(--row-h);
+}
+.grid-star {
+  border: 0;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-3);
+  transition: transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.grid-star.on { color: #f5a623; }
+.grid-star:hover { transform: scale(1.18); }
+.grid-star:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+  border-radius: 4px;
+}
+
 /* priorité — pastilles (grouping désactivé mais styles conservés) */
 .col-priority { width: 118px; }
 .prio-pill {
