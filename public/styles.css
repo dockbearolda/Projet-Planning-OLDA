@@ -1104,6 +1104,31 @@ tr:hover .handle { color: var(--text-2); }
 }
 .resp-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
 
+/* Pile Pilote (haut) + Référent (bas, plus discret) dans une seule cellule. */
+.resp-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 12px; }
+.resp-stack .resp-chip { margin: 0; max-width: 100%; }
+.ref-chip {
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.ref-chip:hover { color: var(--primary); background: var(--primary-soft); }
+.ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.ref-chip.empty { color: var(--text-3, var(--text-2)); font-weight: 400; opacity: .75; }
+.ref-chip.empty:hover { opacity: 1; color: var(--primary); }
+
 /* Sous-étape : puce tonale neutre précisant l'action en cours dans la famille */
 .col-sub-cell { padding: 0; vertical-align: middle; }
 .sub-chip {
@@ -1939,4 +1964,437 @@ button, a, .stage, .prio-pill, .deadline-badge,
 
   .btn-primary { padding: 12px 20px 12px 16px; font-size: 15px; }
   .icon-btn { width: 46px; height: 46px; }
+}
+
+/* ===========================================================================
+   ONGLET DASHBOARD
+   =========================================================================== */
+
+/* Commutateur Planning / Dashboard en haut du rail. */
+.view-switch {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.view-switch-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.view-switch-btn .material-symbols-outlined { font-size: 20px; }
+.view-switch-btn:hover { background: var(--surface-hover); color: var(--text-1); }
+.view-switch-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.view-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+
+/* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
+   fonctionne ; affiché seulement quand il n'est pas masqué. */
+.dashboard:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* En mode Dashboard, on masque tout l'échafaudage du Planning (l'attribut
+   `hidden` ne suffit pas : ces éléments ont leur propre règle `display`). */
+body.view-dashboard .work-head,
+body.view-dashboard .grid-wrap,
+body.view-dashboard .fiverr-tool,
+body.view-dashboard .sidebar-head,
+body.view-dashboard #stages { display: none !important; }
+
+/* Barre de contrôle : « Je suis » [employés] [Équipe] + Attribution. */
+.dash-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.dash-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-hover);
+  border-radius: 999px;
+}
+.dash-seg-label {
+  padding: 0 10px 0 8px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.dash-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+.dash-seg-btn .material-symbols-outlined { font-size: 19px; }
+.dash-seg-btn:hover { color: var(--text-1); }
+.dash-seg-btn.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-1);
+}
+.dash-seg-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+
+.dash-config-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.dash-config-btn .material-symbols-outlined { font-size: 19px; }
+.dash-config-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.dash-config-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+
+/* Corps défilant. */
+.dash-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 40px;
+}
+
+/* Blocs (Ma journée, En pilotage, Référent). */
+.dash-section { margin-bottom: 26px; }
+.dash-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.dash-section-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.dash-section-ic { font-size: 22px; color: var(--primary); }
+.dash-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.dash-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.dash-empty {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+
+/* Grille de cartes (Ma journée = large ; blocs duo = 1 colonne). */
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.dash-duo .dash-cards { grid-template-columns: 1fr; }
+
+/* Carte de commande. Liseré gauche = niveau de priorité. */
+.dash-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px 12px;
+  border: 1px solid var(--card-border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  cursor: pointer;
+  transition: box-shadow var(--dur-1) var(--ease), transform var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.dash-card:hover { box-shadow: var(--shadow-2); transform: translateY(-1px); }
+.dash-card.prio-3 { border-left-color: #e5484d; }
+.dash-card.prio-2 { border-left-color: #f5a623; }
+.dash-card.prio-1 { border-left-color: var(--border); }
+
+.dash-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-card-client {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.dash-card-due {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface-hover);
+  color: var(--text-2);
+}
+.dash-card-due.dl-late { background: #fdecec; color: #c62828; }
+.dash-card-due.dl-today { background: #fff1e6; color: #d9640a; }
+.dash-card-due.dl-soon { background: #fff7e0; color: #a97400; }
+.dash-card-product {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dash-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dash-card-stage, .dash-card-sub {
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.dash-card-stage { background: var(--primary-soft); color: var(--primary); }
+.dash-card-sub { background: var(--surface-hover); color: var(--text-2); }
+.dash-card-role {
+  margin-left: auto;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.dash-card-role.role-pilote { background: rgba(var(--primary-rgb), .14); color: var(--primary); }
+.dash-card-role.role-referent { background: var(--surface-hover); color: var(--text-2); }
+.dash-card-role.role-both { background: rgba(var(--primary-rgb), .14); color: var(--primary); }
+
+/* Étoiles de priorité. */
+.dash-stars { display: inline-flex; gap: 1px; flex-shrink: 0; }
+.dash-star {
+  border: 0;
+  background: none;
+  padding: 0 1px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.dash-star.on { color: #f5a623; }
+.dash-star:hover { transform: scale(1.18); }
+.dash-star:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); border-radius: 4px; }
+
+/* Vue équipe : 4 colonnes qui défilent horizontalement si étroit. */
+.dash-team {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 16px;
+}
+.dash-team-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: 12px;
+}
+.dash-team-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 4px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}
+.dash-team-ini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--chip-on-tonal);
+  font-size: 14px;
+  font-weight: 700;
+}
+.dash-team-name { flex: 1; font-size: 15px; font-weight: 700; color: var(--text-1); }
+.dash-team-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.dash-team .dash-cards { display: flex; flex-direction: column; gap: 10px; }
+
+/* Panneau « Attribution des catégories ». */
+.cat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .42);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.cat-overlay.open { opacity: 1; }
+.cat-card {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 20px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop);
+  transform: translateY(8px) scale(.98);
+  transition: transform var(--dur-2) var(--ease);
+}
+.cat-overlay.open .cat-card { transform: none; }
+.cat-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.cat-close:hover { background: var(--surface-hover); color: var(--text-1); }
+.cat-title { margin: 0 0 6px; font-size: 19px; font-weight: 700; color: var(--text-1); }
+.cat-desc { margin: 0 0 18px; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
+.cat-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cat-row.indented { padding-left: 22px; }
+.cat-row.indented .cat-row-label { color: var(--text-2); font-weight: 500; font-size: 13.5px; }
+.cat-row-label { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text-1); }
+.cat-row-select {
+  flex-shrink: 0;
+  min-width: 150px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cat-row-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+
+/* Échéances : couleurs adaptées au thème sombre. */
+:root[data-theme="dark"] .dash-card-due.dl-late { background: rgba(229,72,77,.2); color: #ff8a8d; }
+:root[data-theme="dark"] .dash-card-due.dl-today { background: rgba(217,100,10,.22); color: #ffab66; }
+:root[data-theme="dark"] .dash-card-due.dl-soon { background: rgba(169,116,0,.24); color: #f0c65a; }
+
+/* --- Responsive dashboard --- */
+@media (max-width: 1280px) {
+  .dash-team { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: minmax(240px, 1fr); overflow-x: auto; }
+}
+@media (max-width: 900px) {
+  .dash-duo { grid-template-columns: 1fr; gap: 20px; }
+  .dash-body { padding: 16px 16px 32px; }
+  .dash-controls { padding: 14px 16px 12px; }
+}
+@media (max-width: 640px) {
+  .dash-config-btn .material-symbols-outlined + span { display: none; }
+  .dash-config-btn { padding: 8px 12px; }
+  .dash-seg { flex-wrap: wrap; }
+}
+@media (pointer: coarse) {
+  .dash-star { font-size: 20px; padding: 2px 3px; }
+  .dash-seg-btn { min-height: 44px; }
 }
