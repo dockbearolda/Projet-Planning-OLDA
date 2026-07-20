@@ -1254,6 +1254,29 @@ function showDeadlineCalendar(r, anchor, onPick) {
   const build = () => {
     cal.innerHTML = '';
 
+    // Échéances rapides : quand le client n'a pas donné de date, la vendeuse pose
+    // une cible en un tap (aujourd'hui + N jours). Ne dépend pas du mois affiché.
+    const quick = document.createElement('div');
+    quick.className = 'cal-quick';
+    const qlab = document.createElement('span');
+    qlab.className = 'cal-quick-label';
+    qlab.textContent = 'Sous';
+    quick.appendChild(qlab);
+    [5, 7, 10, 15].forEach((n) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cal-quick-btn'; b.textContent = `${n} j`;
+      const t = new Date(today); t.setDate(t.getDate() + n);
+      attachTip(b, t.toLocaleDateString('fr-FR'));
+      b.setAttribute('aria-label', `Échéance dans ${n} jours (${t.toLocaleDateString('fr-FR')})`);
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onPick(ymd(t.getFullYear(), t.getMonth(), t.getDate()));
+        closeCalendar();
+      });
+      quick.appendChild(b);
+    });
+    cal.appendChild(quick);
+
     const head = document.createElement('div');
     head.className = 'cal-head';
     const mkNav = (label, aria, fn) => {
