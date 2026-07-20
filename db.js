@@ -84,8 +84,13 @@ for (const [family, subs] of Object.entries(SUB_STAGES)) {
   for (const s of subs) SUB_TO_FAMILY[s.slug] = family;
 }
 
-// Responsables proposés (le champ reste du texte libre côté base).
-const RESPONSABLES = ['Loïc', 'Mélina', 'Charlie', 'Opérateur', 'À attribuer'];
+// Employés de l'entreprise. `responsable` = PILOTE (qui pilote le projet),
+// `referent` = 2e personne rattachée à la tâche : les deux champs puisent dans
+// cette même liste. « À attribuer » = pas encore de pilote désigné.
+//   - EMPLOYEES : les 4 personnes réelles (Loïc = patron).
+//   - RESPONSABLES : valeurs acceptées pour responsable/referent (+ « À attribuer »).
+const EMPLOYEES = ['Loïc', 'Charlie', 'Mélina', 'Julien'];
+const RESPONSABLES = [...EMPLOYEES, 'À attribuer'];
 
 // Types de client.
 const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
@@ -127,11 +132,18 @@ async function init() {
 
   // Migration : colonnes ajoutées après coup sur les bases existantes
   // (CREATE TABLE IF NOT EXISTS n'ajoute pas de colonnes à une table déjà créée).
-  for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable']) {
+  for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable', 'referent']) {
     try {
       await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
   }
+
+  // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
+  // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
+  // sur « À attribuer » (valeur neutre, toujours valide) pour rester éditables.
+  // Down : UPDATE requests SET responsable='Opérateur' WHERE responsable='À attribuer'
+  // (non rejouable à l'identique, mais aucune donnée n'est perdue).
+  await pool.query("UPDATE requests SET responsable = 'À attribuer' WHERE responsable = 'Opérateur'");
 
   // Migration vers le planning linéaire : convertit les anciens slugs d'étape
   // (dont la phase « production » multi-machines) vers la liste linéaire.
@@ -321,7 +333,7 @@ async function seed() {
 
   const samples = [
     {
-      stage: 'demande', sub_stage: null, responsable: 'Mélina', priority: 3, client_type: 'pro',
+      stage: 'demande', sub_stage: null, responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
       billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', quantity: 50,
       product: '50 t-shirts staff', color: 'Noir', project_value: 850,
       description: 'Tee-shirts équipe — gros devis', deadline: inDays(3), position: 1000,
@@ -330,22 +342,22 @@ async function seed() {
       stage: 'demande', sub_stage: null, responsable: 'À attribuer', priority: 1, client_type: 'perso',
       billing_company: 'Alessandro', contact_referent: 'Alessandro', quantity: 1,
       product: 'Impression plexi A3', project_value: 30, description: 'Photo à vérifier',
-      deadline: inDays(12), position: 2000,
+      deadline: inDays(1), position: 2000,
     },
     {
-      stage: 'chiffrage', sub_stage: 'a_chiffrer', responsable: 'Charlie', priority: 2, client_type: 'revendeur',
+      stage: 'chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
       billing_company: 'Saint-Barth Store', contact_referent: 'Coach Bernard', quantity: 120,
       product: 'Collection été', project_value: 1450, description: 'Maillots saison 2026',
       deadline: inDays(8), position: 1000,
     },
     {
-      stage: 'preparation', sub_stage: 'a_commander', responsable: 'Charlie', priority: 3, client_type: 'pro',
+      stage: 'preparation', sub_stage: 'a_commander', responsable: 'Charlie', referent: 'Julien', priority: 3, client_type: 'pro',
       billing_company: 'Mairie de Vic', contact_referent: 'Service Com', quantity: 120,
       product: 'Tote bags sérigraphie', color: 'Écru', project_value: 3200,
       description: 'Sacs marché de Noël — TopTex en cours', deadline: inDays(1), position: 1000,
     },
     {
-      stage: 'production', sub_stage: 'prod_dtf', responsable: 'Opérateur', priority: 2, client_type: 'asso',
+      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', priority: 2, client_type: 'asso',
       billing_company: 'Auto-école Rapid', contact_referent: 'M. Faure', quantity: 15,
       product: 'Polos brodés DTF', project_value: 540, description: 'Polos moniteurs',
       deadline: inDays(-1), position: 1000,
@@ -357,7 +369,7 @@ async function seed() {
       description: 'Découpe forme sur la Trotec', deadline: inDays(5), position: 1000,
     },
     {
-      stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', priority: 1, client_type: 'pro',
+      stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', referent: 'Loïc', priority: 1, client_type: 'pro',
       billing_company: 'Pizzeria Bella', contact_referent: 'Marco', quantity: 8,
       product: 'Tabliers personnalisés', project_value: 240, description: 'Tabliers cuisine',
       deadline: inDays(-5), position: 1000,
@@ -367,17 +379,50 @@ async function seed() {
   for (const s of samples) {
     await pool.query(
       `INSERT INTO requests
-        (stage, sub_stage, responsable, priority, client_type, billing_company, contact_referent,
+        (stage, sub_stage, responsable, referent, priority, client_type, billing_company, contact_referent,
          quantity, product, color, project_value, description, deadline, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.priority, s.client_type,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.referent ?? null, s.priority, s.client_type,
        s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
        s.project_value, s.description, s.deadline, s.position],
     );
   }
 }
 
+// --- Attribution des catégories à un employé (config éditable par le patron) --
+// Stockée en clé/valeur applicative (app_meta.category_owners) sous forme d'un
+// objet JSON { slugCatégorie: employé }. Une catégorie = une FAMILLE (ex.
+// « chiffrage ») ou une SOUS-ÉTAPE (ex. « prod_pressage ») ; la sous-étape est
+// plus précise et l'emporte sur sa famille lors du calcul du pilote effectif.
+// Absente → aucune attribution par défaut (pilote effectif = « À attribuer »).
+async function getCategoryOwners() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'category_owners'");
+  if (!rows[0]) return {};
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function setCategoryOwners(map) {
+  const clean = {};
+  const validSlugs = new Set([...STAGE_SLUGS, ...SUB_SLUGS]);
+  const employeeSet = new Set(EMPLOYEES);
+  for (const [slug, who] of Object.entries(map || {})) {
+    // On ne retient que des couples valides : catégorie connue + vrai employé.
+    // Une valeur vide / « À attribuer » = pas d'attribution → on l'omet.
+    if (validSlugs.has(slug) && employeeSet.has(who)) clean[slug] = who;
+  }
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'category_owners'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('category_owners', $1)", [value]);
+  return clean;
+}
+
 module.exports = {
   pool, init, repairOrphanStages,
-  STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
+  STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES,
+  getCategoryOwners, setCategoryOwners,
 };

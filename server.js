@@ -12,7 +12,10 @@ try {
 
 const path = require('path');
 const express = require('express');
-const { pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES } = require('./db');
+const {
+  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
+  getCategoryOwners, setCategoryOwners,
+} = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 
@@ -50,7 +53,7 @@ app.use(basicAuth);
 // Helpers
 // ---------------------------------------------------------------------------
 const PATCHABLE = [
-  'stage', 'sub_stage', 'responsable', 'priority', 'client_type', 'billing_company',
+  'stage', 'sub_stage', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
 ];
@@ -71,6 +74,13 @@ function validateField(key, value) {
       const s = String(value).trim();
       if (s === '') return { ok: true, value: null };
       if (!RESPONSABLE_SET.has(s)) return { ok: false, error: `responsable invalide: ${s}` };
+      return { ok: true, value: s };
+    }
+    case 'referent': {
+      const s = String(value).trim();
+      // Référent facultatif : vide / « À attribuer » = pas de référent (null).
+      if (s === '' || s === 'À attribuer') return { ok: true, value: null };
+      if (!RESPONSABLE_SET.has(s)) return { ok: false, error: `referent invalide: ${s}` };
       return { ok: true, value: s };
     }
     case 'priority': {
@@ -161,6 +171,24 @@ function broadcast(payload) {
 
 // Liste des étapes (pour le front).
 app.get('/api/stages', (req, res) => res.json(STAGES));
+
+// Attribution des catégories à un employé (config du patron).
+// GET  → { slugCatégorie: employé, ... }
+// PUT  → remplace la config (corps = même forme). Diffusé en SSE pour que le
+//        dashboard des autres postes se recalcule instantanément.
+app.get('/api/category-owners', asyncH(async (req, res) => {
+  res.json(await getCategoryOwners());
+}));
+
+app.put('/api/category-owners', asyncH(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Objet { catégorie: employé } attendu' });
+  }
+  const saved = await setCategoryOwners(body);
+  broadcast({ kind: 'category-owners' });
+  res.json(saved);
+}));
 
 // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
 // grille et le temps réel restent légers.

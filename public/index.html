@@ -72,7 +72,17 @@
     <div class="app">
       <!-- Sidebar = rail de filtres par étape -->
       <aside class="sidebar" id="sidebar">
-        <div class="sidebar-head">
+        <div class="view-switch" role="tablist" aria-label="Vue">
+          <button class="view-switch-btn active" id="viewPlanning" type="button" role="tab" aria-selected="true">
+            <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
+            <span class="view-switch-label">Planning</span>
+          </button>
+          <button class="view-switch-btn" id="viewDashboard" type="button" role="tab" aria-selected="false">
+            <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+            <span class="view-switch-label">Dashboard</span>
+          </button>
+        </div>
+        <div class="sidebar-head" id="sidebarHead">
           <span class="sidebar-head-label">Étapes</span>
         </div>
         <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
@@ -138,7 +148,7 @@
               <tr>
                 <th class="col-handle" aria-label="Glisser"></th>
                 <th class="col-type sortable" data-sort="client_type">Type</th>
-                <th class="col-resp sortable" data-sort="responsable">Responsable</th>
+                <th class="col-resp sortable" data-sort="responsable">Pilote / Réf.</th>
                 <th class="col-client sortable" data-sort="billing_company">Nom du Dossier Client</th>
                 <th class="col-product sortable" data-sort="product">Description</th>
                 <th class="col-sub sortable" data-sort="sub_stage">Sous-étape</th>
@@ -151,6 +161,10 @@
           </table>
           <div class="grid-empty" id="empty" hidden>Aucune commande à cette étape.</div>
         </div>
+
+        <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS
+             (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
+        <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
       </main>
     </div>
   </div>
