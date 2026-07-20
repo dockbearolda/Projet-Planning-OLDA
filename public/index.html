@@ -192,6 +192,22 @@
     </div>
   </div>
 
+  <!-- Palette de recherche GLOBALE : cherche dans TOUTES les catégories, peu
+       importe l'étape affichée. S'ouvre dès qu'on tape dans le champ (ou ⌘K).
+       Résultats groupés par étape, navigables au clavier, clic = saut direct. -->
+  <div class="search-palette" id="searchPalette" hidden aria-live="polite">
+    <div class="search-palette-scrim" id="searchPaletteScrim"></div>
+    <div class="search-palette-panel" role="listbox" aria-label="Résultats de recherche">
+      <div class="search-palette-head">
+        <span class="search-palette-count" id="searchPaletteCount"></span>
+        <span class="search-palette-hint">
+          <kbd>↑</kbd><kbd>↓</kbd> parcourir · <kbd>↵</kbd> ouvrir · <kbd>Esc</kbd> fermer
+        </span>
+      </div>
+      <div class="search-palette-results" id="searchPaletteResults"></div>
+    </div>
+  </div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

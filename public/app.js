@@ -1958,6 +1958,10 @@ let streamAlive = false;
 let streamDebounce = null;
 
 function onStreamChange(e) {
+  // Le planning a changé côté serveur → le cache global de recherche est périmé.
+  // On l'invalide, et si la palette est ouverte on recharge + ré-affiche.
+  allRows = null;
+  if (paletteOpen) loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(poll, 120);
@@ -2006,22 +2010,293 @@ function syncSearchUI() {
   if ($gridSearchClear) $gridSearchClear.hidden = !has;
 }
 
+// ===========================================================================
+// Recherche GLOBALE (palette « Spotlight ») — cherche dans TOUTES les étapes.
+// ===========================================================================
+// Peu importe la catégorie affichée : on tape, on voit les commandes de tout le
+// planning qui correspondent, groupées par étape. Un clic (ou ↵) saute vers la
+// commande dans sa catégorie et la met brièvement en évidence.
+//
+// Données : on charge TOUT le planning une fois (cache `allRows`) à la première
+// frappe, puis on l'invalide au moindre changement temps réel (SSE) pour rester
+// juste sans re-fetch à chaque touche.
+
+const $palette = document.getElementById('searchPalette');
+const $paletteScrim = document.getElementById('searchPaletteScrim');
+const $paletteResults = document.getElementById('searchPaletteResults');
+const $paletteCount = document.getElementById('searchPaletteCount');
+
+let allRows = null;           // cache de toutes les commandes (tous stages)
+let allRowsPromise = null;    // fetch en cours (dédup)
+let paletteOpen = false;
+let paletteItems = [];        // résultats plats, dans l'ordre affiché
+let paletteActive = -1;       // index surligné (navigation clavier)
+const PALETTE_MAX = 60;       // plafond d'affichage (au-delà : « affinez »)
+
+// Ordre d'affichage des groupes = ordre du pipeline (familles puis spécial).
+const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.slug, i]));
+
+// Recharge le cache global depuis le serveur (une requête, dédupliquée).
+function loadAllRows() {
+  if (allRowsPromise) return allRowsPromise;
+  allRowsPromise = api('GET', '/api/requests')
+    .then((data) => { allRows = data; return data; })
+    .finally(() => { allRowsPromise = null; });
+  return allRowsPromise;
+}
+
+// Découpe la requête en jetons (espaces) ; une commande matche si CHAQUE jeton
+// est présent dans l'un de ses champs cherchés (accent- et casse-insensible).
+function matchRow(r, tokens) {
+  const hay = ' ' + SEARCH_FIELDS.map((f) => fold(r[f])).join(' ') + ' ';
+  return tokens.every((t) => hay.includes(t));
+}
+
+// Ajoute `text` à `parent` en soulignant (<mark>) les occurrences des jetons.
+// Accent-sensible (suffisant visuellement) ; construit des nœuds DOM, pas d'HTML.
+function appendHighlighted(parent, text, tokens) {
+  const s = String(text == null ? '' : text);
+  if (!s) return;
+  const esc = tokens
+    .filter(Boolean)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .sort((a, b) => b.length - a.length);
+  if (!esc.length) { parent.appendChild(document.createTextNode(s)); return; }
+  const re = new RegExp('(' + esc.join('|') + ')', 'gi');
+  let last = 0;
+  for (const m of s.matchAll(re)) {
+    if (m.index > last) parent.appendChild(document.createTextNode(s.slice(last, m.index)));
+    const mark = document.createElement('mark');
+    mark.textContent = m[0];
+    parent.appendChild(mark);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) parent.appendChild(document.createTextNode(s.slice(last)));
+}
+
+// Libellé + classe couleur de l'échéance, pour la pastille du résultat.
+function deadlineChip(r) {
+  const d = daysLeft(r.deadline);
+  if (r.deadline == null || d === null) return null;
+  if (d > 0) return { cls: d <= 7 ? 'orange' : 'green', label: `${d} j` };
+  if (d === 0) return { cls: 'orange', label: 'Auj.' };
+  return { cls: 'red', label: `-${-d} j` };
+}
+
+const $palettePanel = $palette ? $palette.querySelector('.search-palette-panel') : null;
+
+// Ancre le panneau juste sous la pilule de recherche, aligné à gauche, largeur
+// bornée. Sur mobile la pilule occupe toute la barre → le panneau prend toute la
+// largeur automatiquement (le clamp gère les deux cas).
+function positionPalette() {
+  if (!$palettePanel || !$gridSearch) return;
+  const r = $gridSearch.getBoundingClientRect();
+  const width = Math.min(Math.max(r.width, 360), window.innerWidth - 24);
+  let left = r.left;
+  left = Math.min(left, window.innerWidth - width - 12);
+  left = Math.max(12, left);
+  $palettePanel.style.left = `${Math.round(left)}px`;
+  $palettePanel.style.top = `${Math.round(r.bottom + 8)}px`;
+  $palettePanel.style.width = `${Math.round(width)}px`;
+}
+
+const $topbar = document.querySelector('.topbar');
+
+function openPalette() {
+  if (paletteOpen) return;
+  paletteOpen = true;
+  $palette.hidden = false;
+  // La barre du haut passe AU-DESSUS de l'assombrissement : le champ (et sa
+  // croix) restent cliquables et bien nets pendant la recherche.
+  if ($topbar) $topbar.classList.add('searching');
+  positionPalette();
+  requestAnimationFrame(() => $palette.classList.add('open'));
+}
+
+window.addEventListener('resize', () => { if (paletteOpen) positionPalette(); });
+
+function closePalette() {
+  if (!paletteOpen) return;
+  paletteOpen = false;
+  paletteActive = -1;
+  if ($topbar) $topbar.classList.remove('searching');
+  $palette.classList.remove('open');
+  setTimeout(() => { if (!paletteOpen) $palette.hidden = true; }, 200);
+}
+
+// (Re)calcule et rend les résultats à partir de la requête courante.
+function runSearch() {
+  const raw = gridQuery.trim();
+  if (!raw) { closePalette(); return; }
+  openPalette();
+  // Cache vide → on lance le chargement et on ré-affiche à l'arrivée.
+  if (!allRows) {
+    renderPaletteLoading();
+    loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
+    return;
+  }
+  const tokens = fold(raw).split(/\s+/).filter(Boolean);
+  const hits = allRows
+    .filter((r) => !isDraftRow(r) && matchRow(r, tokens))
+    .sort((a, b) => {
+      const sa = STAGE_ORDER[a.stage] ?? 99, sb = STAGE_ORDER[b.stage] ?? 99;
+      if (sa !== sb) return sa - sb;
+      return cmpDeadline(a.deadline, b.deadline);
+    });
+  renderPaletteResults(hits, tokens);
+}
+
+function clearPalette() {
+  paletteItems = [];
+  paletteActive = -1;
+  while ($paletteResults.firstChild) $paletteResults.removeChild($paletteResults.firstChild);
+}
+
+function paletteMessage(text) {
+  const el = document.createElement('div');
+  el.className = 'search-palette-empty';
+  el.textContent = text;
+  $paletteResults.appendChild(el);
+}
+
+function renderPaletteLoading() {
+  clearPalette();
+  $paletteCount.textContent = 'Recherche…';
+  paletteMessage('Chargement du planning…');
+}
+
+function renderPaletteResults(hits, tokens) {
+  clearPalette();
+
+  if (!hits.length) {
+    $paletteCount.textContent = '0 résultat';
+    paletteMessage('Aucune commande ne correspond dans tout le planning.');
+    return;
+  }
+
+  const total = hits.length;
+  const shown = hits.slice(0, PALETTE_MAX);
+  $paletteCount.textContent = total > PALETTE_MAX
+    ? `${PALETTE_MAX} sur ${total} résultats`
+    : `${total} résultat${total > 1 ? 's' : ''}`;
+
+  let curStage = null;
+  for (const r of shown) {
+    if (r.stage !== curStage) {
+      curStage = r.stage;
+      const gh = document.createElement('div');
+      gh.className = 'search-palette-group';
+      gh.textContent = STAGE_LABEL[r.stage] || r.stage;
+      $paletteResults.appendChild(gh);
+    }
+    const idx = paletteItems.length;
+    const item = buildPaletteItem(r, tokens, idx);
+    paletteItems.push({ r, el: item });
+    $paletteResults.appendChild(item);
+  }
+  setActive(0);
+}
+
+function buildPaletteItem(r, tokens, idx) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'search-palette-item';
+  el.setAttribute('role', 'option');
+  el.dataset.idx = idx;
+
+  const title = r.billing_company || r.contact_referent || '— sans dossier';
+  const desc = r.product || r.description || '';
+
+  const main = document.createElement('div');
+  main.className = 'spi-main';
+  const t = document.createElement('div');
+  t.className = 'spi-title';
+  appendHighlighted(t, title, tokens);
+  main.appendChild(t);
+  if (desc) {
+    const d = document.createElement('div');
+    d.className = 'spi-desc';
+    appendHighlighted(d, desc, tokens);
+    main.appendChild(d);
+  }
+  el.appendChild(main);
+
+  const meta = document.createElement('div');
+  meta.className = 'spi-meta';
+  const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? SUB_LABEL[r.sub_stage] : null;
+  if (sub) {
+    const chip = document.createElement('span');
+    chip.className = 'spi-sub';
+    chip.textContent = sub;
+    meta.appendChild(chip);
+  }
+  const dl = deadlineChip(r);
+  if (dl) {
+    const badge = document.createElement('span');
+    badge.className = `spi-deadline ${dl.cls}`;
+    badge.textContent = dl.label;
+    meta.appendChild(badge);
+  }
+  el.appendChild(meta);
+
+  el.addEventListener('mouseenter', () => setActive(idx));
+  el.addEventListener('click', () => jumpToResult(r));
+  return el;
+}
+
+function setActive(i) {
+  if (!paletteItems.length) { paletteActive = -1; return; }
+  const n = paletteItems.length;
+  paletteActive = ((i % n) + n) % n;
+  paletteItems.forEach((it, k) => it.el.classList.toggle('active', k === paletteActive));
+  const cur = paletteItems[paletteActive];
+  if (cur) cur.el.scrollIntoView({ block: 'nearest' });
+}
+
+// Saute vers la commande choisie : ouvre sa catégorie (et sa sous-étape), ferme
+// la palette, met la ligne brièvement en évidence.
+async function jumpToResult(r) {
+  closePalette();
+  if ($gridSearchInput) $gridSearchInput.blur();
+  const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
+  await selectStage(r.stage, sub);
+  const entry = rowEls.get(String(r.id));
+  if (entry && entry.tr) {
+    entry.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    entry.tr.classList.remove('row-flash');
+    void entry.tr.offsetWidth; // relance l'animation même si déjà posée
+    entry.tr.classList.add('row-flash');
+    setTimeout(() => entry.tr && entry.tr.classList.remove('row-flash'), 1800);
+  }
+}
+
 function setGridQuery(v) {
   const next = v || '';
   if (next === gridQuery) return;
   gridQuery = next;
   syncSearchUI();
-  // Pas de reconstruction : on ne fait que masquer/démasquer les lignes déjà montées.
-  applySearchAndCounts();
+  runSearch();
 }
 
 if ($gridSearchInput) {
   $gridSearchInput.addEventListener('input', () => setGridQuery($gridSearchInput.value));
+  $gridSearchInput.addEventListener('focus', () => { if (gridQuery.trim()) runSearch(); });
   $gridSearchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       if (gridQuery) { $gridSearchInput.value = ''; setGridQuery(''); }
       else $gridSearchInput.blur();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (paletteOpen) setActive(paletteActive + 1); else runSearch();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (paletteOpen) setActive(paletteActive - 1);
+    } else if (e.key === 'Enter') {
+      if (paletteOpen && paletteActive >= 0 && paletteItems[paletteActive]) {
+        e.preventDefault();
+        jumpToResult(paletteItems[paletteActive].r);
+      }
     }
   });
 }
@@ -2031,6 +2306,7 @@ if ($gridSearchClear) {
     setGridQuery('');
   });
 }
+if ($paletteScrim) $paletteScrim.addEventListener('click', () => closePalette());
 
 // ⌘K / Ctrl+K : place le curseur dans le champ de recherche (plus de modal).
 document.addEventListener('keydown', (e) => {
