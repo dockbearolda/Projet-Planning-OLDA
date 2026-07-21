@@ -513,7 +513,6 @@ export function createDashboard(deps) {
       return sec;
     };
     side.appendChild(mkList('Mes projets en pilotage', 'flight_takeoff', sortCards(piloting(who)), 'pilote'));
-    side.appendChild(mkList('Mes projets où je suis référent', 'diversity_3', sortCards(refereeing(who)), 'referent'));
     wrap.appendChild(side);
     return wrap;
   }
