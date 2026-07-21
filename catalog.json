@@ -1,0 +1,38 @@
+{
+  "products": [
+    { "sku": "tasse350", "label": "Tasse Céramique 350 ml", "short": "Céramique 350", "price": 10 },
+    { "sku": "expresso180", "label": "Tasse Expresso 180 ml", "short": "Expresso 180", "price": 6 }
+  ],
+  "colors": ["Blanc", "Noir / Blanc", "Rouge / Blanc", "Bleu / Blanc", "Magique"],
+  "faces": [
+    { "id": "face1", "label": "Face 01", "hint": "anse à droite", "logoOption": "logo_olda_face" },
+    { "id": "face2", "label": "Face 02", "hint": "anse à gauche", "logoOption": "logo_olda_face" },
+    { "id": "dessous", "label": "Dessous 03", "hint": "sous la tasse", "logoOption": "logo_olda_dessous" }
+  ],
+  "options": [
+    { "id": "aucune", "label": "Aucune", "price": 0, "icon": "block", "needs": null },
+    { "id": "texte", "label": "Texte personnalisé", "price": 10, "icon": "text_fields", "needs": "texte" },
+    { "id": "logo_olda_face", "label": "Logo OLDA", "price": 6, "icon": "auto_awesome", "needs": "logo_olda" },
+    { "id": "logo_olda_dessous", "label": "Logo OLDA", "price": 2, "icon": "auto_awesome", "needs": "logo_olda" },
+    { "id": "logo_client_vecto", "label": "Logo client vectorisé", "price": 8, "icon": "image", "needs": "logo_client" },
+    { "id": "logo_client_reprise", "label": "Logo client à reprendre", "price": 10, "icon": "brush", "needs": "logo_client" }
+  ],
+  "typos": [
+    { "id": "TYPO-01", "label": "Calibri", "css": "'Calibri','Carlito',sans-serif" },
+    { "id": "TYPO-02", "label": "Times", "css": "'Times New Roman',Times,serif" },
+    { "id": "TYPO-03", "label": "Script", "css": "'Segoe Script','Brush Script MT',cursive" },
+    { "id": "TYPO-04", "label": "Impact", "css": "Impact,'Haettenschweiler',sans-serif" },
+    { "id": "TYPO-05", "label": "Courier", "css": "'Courier New',Courier,monospace" }
+  ],
+  "logosOlda": ["BEA-16", "CAS-02", "WRA-01", "SXM-01", "HAV-01"],
+  "delais": [
+    { "id": "urgent", "label": "Urgent", "hint": "jour même", "days": 0, "rate": 0.2 },
+    { "id": "express", "label": "Express", "hint": "moins de 3 jours", "days": 3, "rate": 0.1 },
+    { "id": "standard", "label": "Standard", "hint": "7 jours", "days": 7, "rate": 0 }
+  ],
+  "paiements": [
+    { "id": "cb", "label": "Carte bancaire", "icon": "credit_card" },
+    { "id": "espece", "label": "Espèces", "icon": "payments" },
+    { "id": "attente", "label": "Attente paiement", "icon": "schedule" }
+  ]
+}

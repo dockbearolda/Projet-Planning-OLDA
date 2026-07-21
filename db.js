@@ -146,6 +146,15 @@ async function init() {
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
   }
 
+  // Migration : détail structuré de la fiche vendeuse (client, faces, typos,
+  // logos, prix). Colonne nullable, sans contrainte : les lignes créées
+  // autrement restent valides. `requests.description` porte en parallèle un
+  // résumé lisible, donc la grille n'a jamais besoin de lire ce JSON.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS fiche.
+  try {
+    await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS fiche jsonb');
+  } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+
   // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
   // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
   // sur « À attribuer » (valeur neutre, toujours valide) pour rester éditables.
