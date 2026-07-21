@@ -2100,7 +2100,7 @@ body.view-dashboard #stages { display: none !important; }
 .cat-overlay.open { opacity: 1; }
 .cat-card {
   position: relative;
-  width: min(560px, 100%);
+  width: min(680px, 100%);
   max-height: 86vh;
   display: flex;
   flex-direction: column;
@@ -2135,14 +2135,24 @@ body.view-dashboard #stages { display: none !important; }
 .cat-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .cat-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 4px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 4px;
   border-bottom: 1px solid var(--border-soft);
 }
 .cat-row.indented { padding-left: 22px; }
 .cat-row.indented .cat-row-label { color: var(--text-2); font-weight: 500; font-size: 13.5px; }
-.cat-row-label { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text-1); }
+.cat-row-label { font-size: 14.5px; font-weight: 700; color: var(--text-1); }
+/* Pilote (select) + référents (puces) côte à côte dès qu'il y a la place. */
+.cat-row-fields { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 16px; }
+.cat-field { display: flex; flex-direction: column; gap: 5px; }
+.cat-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
 .cat-row-select {
   flex-shrink: 0;
   min-width: 150px;
@@ -2157,6 +2167,46 @@ body.view-dashboard #stages { display: none !important; }
   cursor: pointer;
 }
 .cat-row-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.cat-refs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.cat-ref-chip:hover { background: var(--surface-hover); }
+.cat-ref-chip.on {
+  border-color: rgba(var(--primary-rgb), .55);
+  background: rgba(var(--primary-rgb), .12);
+  color: var(--text-1);
+}
+.cat-ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.cat-ref-av {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--av, #94A3B8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .38;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.cat-ref-chip.on .cat-ref-av { opacity: 1; }
 
 /* ===========================================================================
    POINT DU JOUR — dashboard refondu (design system dédié, scopé)

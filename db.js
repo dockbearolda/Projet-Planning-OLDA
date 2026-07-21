@@ -430,8 +430,42 @@ async function setCategoryOwners(map) {
   return clean;
 }
 
+// --- Référents des catégories (config éditable par le patron) ---------------
+// Même principe que l'attribution du pilote, mais N employés par catégorie :
+// app_meta.category_referents = { slugCatégorie: [employé, ...] }. Sous-étape
+// prioritaire sur sa famille (une liste posée sur la sous-étape REMPLACE celle
+// de la famille). Sert de référents PAR DÉFAUT : un référent saisi à la main
+// sur une commande (requests.referent) reste prioritaire.
+async function getCategoryReferents() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'category_referents'");
+  if (!rows[0]) return {};
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function setCategoryReferents(map) {
+  const clean = {};
+  const validSlugs = new Set([...STAGE_SLUGS, ...SUB_SLUGS]);
+  const employeeSet = new Set(EMPLOYEES);
+  for (const [slug, list] of Object.entries(map || {})) {
+    if (!validSlugs.has(slug) || !Array.isArray(list)) continue;
+    // Catégorie connue + vrais employés, dédupliqués, ordre des EMPLOYEES.
+    const who = EMPLOYEES.filter((e) => list.includes(e) && employeeSet.has(e));
+    if (who.length) clean[slug] = who;   // liste vide = pas de référent → omise
+  }
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'category_referents'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('category_referents', $1)", [value]);
+  return clean;
+}
+
 module.exports = {
   pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES,
   getCategoryOwners, setCategoryOwners,
+  getCategoryReferents, setCategoryReferents,
 };

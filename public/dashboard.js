@@ -13,6 +13,10 @@
 // sous-étape prioritaire sur la famille) ; sinon « À attribuer ». Envoyer une
 // commande vers une autre catégorie ne PATCH que stage/sub_stage : le pilote
 // suit tout seul l'attribution — sauf pilote manuel, jamais écrasé.
+//
+// Sous le pilote, une catégorie porte aussi 0..N RÉFÉRENTS par défaut
+// (/api/category-referents) : les référents effectifs d'une commande sont son
+// `referent` s'il a été saisi à la main, sinon ceux de sa catégorie.
 
 export function createDashboard(deps) {
   const {
@@ -63,7 +67,8 @@ export function createDashboard(deps) {
 
   // --- État ----------------------------------------------------------------
   let rows = [];                // toutes les commandes (cache, resynchro SSE)
-  let owners = {};              // { slugCatégorie: employé } (attribution)
+  let owners = {};              // { slugCatégorie: employé } (pilote par défaut)
+  let catRefs = {};             // { slugCatégorie: [employés] } (référents par défaut)
   let loaded = false;
 
   // 'team' | 'me' | prénom. « JE SUIS » = vue perso de l'identité locale.
@@ -93,6 +98,22 @@ export function createDashboard(deps) {
     return ownerOf(r.stage, r.sub_stage);
   }
   const isManualPilot = (r) => !!(r.responsable && EMPLOYEES.includes(r.responsable));
+
+  // Référents par défaut d'une catégorie (sous-étape > famille, comme le pilote :
+  // une liste posée sur la sous-étape REMPLACE celle de la famille).
+  function referentsOf(family, sub) {
+    const subList = sub && catRefs[sub];
+    if (Array.isArray(subList) && subList.length) return subList;
+    const famList = catRefs[family];
+    return Array.isArray(famList) ? famList : [];
+  }
+
+  // Référents effectifs : celui saisi à la main prime, sinon ceux de la catégorie.
+  function effectiveReferents(r) {
+    if (r.referent && EMPLOYEES.includes(r.referent)) return [r.referent];
+    return referentsOf(r.stage, r.sub_stage);
+  }
+  const isManualReferent = (r) => !!(r.referent && EMPLOYEES.includes(r.referent));
 
   function ageDays(r) {
     const t = Date.parse(r.created_at);
@@ -139,7 +160,7 @@ export function createDashboard(deps) {
   }
 
   const piloting = (who) => rows.filter((r) => isActive(r) && effectivePilot(r) === who);
-  const refereeing = (who) => rows.filter((r) => isActive(r) && r.referent === who);
+  const refereeing = (who) => rows.filter((r) => isActive(r) && effectiveReferents(r).includes(who));
 
   // Cartes d'une personne (pilote OU référent, dédupliquées), triées.
   function dayList(who) {
@@ -155,7 +176,7 @@ export function createDashboard(deps) {
 
   function roleOf(r, who) {
     const pil = effectivePilot(r) === who;
-    const ref = r.referent === who;
+    const ref = effectiveReferents(r).includes(who);
     return pil && ref ? 'both' : pil ? 'pilote' : ref ? 'referent' : null;
   }
 
@@ -183,7 +204,7 @@ export function createDashboard(deps) {
     if (!searchQuery) return true;
     const tokens = fold(searchQuery).split(/\s+/).filter(Boolean);
     const hay = DASH_SEARCH_FIELDS.map((f) => fold(r[f])).join(' ')
-      + ' ' + fold(effectivePilot(r)) + ' ' + fold(r.referent);
+      + ' ' + fold(effectivePilot(r)) + ' ' + fold(effectiveReferents(r).join(' '));
     return tokens.every((t) => hay.includes(t));
   }
   const isDimmed = (r) => (kpiFilter && !KPI_PRED[kpiFilter](r)) || !matchesSearch(r);
@@ -644,7 +665,7 @@ export function createDashboard(deps) {
     }
     scroll.appendChild(send);
 
-    // Équipe : pilote effectif + référent.
+    // Équipe : pilote effectif + référents effectifs (manuel, sinon catégorie).
     const team = el('section', 'dd-team');
     team.appendChild(el('h3', 'dd-sec-title', 'Équipe'));
     const pilot = effectivePilot(r);
@@ -654,15 +675,21 @@ export function createDashboard(deps) {
     p1.appendChild(el('span', 'dd-team-name', pilot || 'À attribuer'));
     p1.appendChild(el('span', 'dd-team-tag', isManualPilot(r) ? 'Pilote' : 'Pilote · auto'));
     line.appendChild(p1);
-    const p2 = el('span', 'dd-team-who');
-    if (r.referent) {
-      p2.appendChild(avatarEl(r.referent));
-      p2.appendChild(el('span', 'dd-team-name', r.referent));
-      p2.appendChild(el('span', 'dd-team-tag', 'Référent'));
-    } else {
+    const refs = effectiveReferents(r);
+    if (!refs.length) {
+      const p2 = el('span', 'dd-team-who');
       p2.appendChild(el('span', 'dd-team-none', 'Pas de référent'));
+      line.appendChild(p2);
+    } else {
+      const tag = isManualReferent(r) ? 'Référent' : 'Référent · auto';
+      for (const who of refs) {
+        const p2 = el('span', 'dd-team-who');
+        p2.appendChild(avatarEl(who));
+        p2.appendChild(el('span', 'dd-team-name', who));
+        p2.appendChild(el('span', 'dd-team-tag', tag));
+        line.appendChild(p2);
+      }
     }
-    line.appendChild(p2);
     team.appendChild(line);
     scroll.appendChild(team);
 
@@ -706,7 +733,11 @@ export function createDashboard(deps) {
     if (current) {
       b.setAttribute('aria-current', 'true');
     } else {
-      attachTip(b, owner ? `Envoyer vers ${label} — pilote par défaut : ${owner}` : `Envoyer vers ${label}`);
+      const refs = referentsOf(fam.slug, sub ? sub.slug : null);
+      let tip = `Envoyer vers ${label}`;
+      if (owner) tip += ` — pilote par défaut : ${owner}`;
+      if (refs.length) tip += `${owner ? ' · ' : ' — '}référents : ${refs.join(', ')}`;
+      attachTip(b, tip);
       b.addEventListener('click', () => sendTo(r, fam.slug, sub ? sub.slug : null));
     }
     return b;
@@ -1014,13 +1045,19 @@ export function createDashboard(deps) {
     closeBtn.addEventListener('click', close);
 
     const title = el('h2', 'cat-title', 'Attribution des catégories');
-    const desc = el('p', 'cat-desc', 'Qui pilote chaque catégorie par défaut ? Une ligne sans pilote saisi « tombe » automatiquement chez l’employé choisi ici. Le pilote posé sur une ligne précise reste prioritaire.');
+    const desc = el('p', 'cat-desc', 'Qui pilote chaque catégorie par défaut, et qui l’épaule ? Une ligne sans pilote ni référent saisi « tombe » automatiquement sur l’équipe choisie ici. Le pilote et le référent posés sur une ligne précise restent prioritaires.');
     card.append(closeBtn, title, desc);
 
     const list = el('div', 'cat-list');
     const mkRow = (slug, label, indented) => {
       const row = el('div', 'cat-row' + (indented ? ' indented' : ''));
       row.appendChild(el('span', 'cat-row-label', label));
+
+      const fields = el('div', 'cat-row-fields');
+
+      // Pilote : un seul employé (ou aucun).
+      const pilotField = el('label', 'cat-field');
+      pilotField.appendChild(el('span', 'cat-field-label', 'Pilote'));
       const select = document.createElement('select');
       select.className = 'cat-row-select';
       const none = document.createElement('option');
@@ -1041,7 +1078,39 @@ export function createDashboard(deps) {
           .then((saved) => { owners = saved && typeof saved === 'object' ? saved : {}; renderAll(); })
           .catch(() => { showToast('Échec de l’enregistrement de l’attribution'); refresh(); });
       });
-      row.appendChild(select);
+      pilotField.appendChild(select);
+      fields.appendChild(pilotField);
+
+      // Référents : 0..N employés, une puce par employé (tap pour ajouter/retirer).
+      const refField = el('div', 'cat-field');
+      refField.appendChild(el('span', 'cat-field-label', 'Référents'));
+      const chips = el('div', 'cat-refs');
+      for (const who of EMPLOYEES) {
+        const on = (catRefs[slug] || []).includes(who);
+        const chip = el('button', 'cat-ref-chip' + (on ? ' on' : ''));
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+        const av = el('span', 'cat-ref-av', who.charAt(0).toUpperCase());
+        av.style.setProperty('--av', AVATAR[who] || '#94A3B8');
+        chip.append(av, el('span', null, who));
+        chip.addEventListener('click', () => {
+          const cur = new Set(catRefs[slug] || []);
+          if (cur.has(who)) cur.delete(who); else cur.add(who);
+          const next = EMPLOYEES.filter((e) => cur.has(e));
+          if (next.length) catRefs[slug] = next; else delete catRefs[slug];
+          const nowOn = cur.has(who);
+          chip.classList.toggle('on', nowOn);
+          chip.setAttribute('aria-pressed', nowOn ? 'true' : 'false');
+          api('PUT', '/api/category-referents', catRefs)
+            .then((saved) => { catRefs = saved && typeof saved === 'object' ? saved : {}; renderAll(); })
+            .catch(() => { showToast('Échec de l’enregistrement des référents'); refresh(); });
+        });
+        chips.appendChild(chip);
+      }
+      refField.appendChild(chips);
+      fields.appendChild(refField);
+
+      row.appendChild(fields);
       return row;
     };
     for (const slug of ACTIVE_FAMILIES) {
@@ -1069,9 +1138,10 @@ export function createDashboard(deps) {
     if (refreshing) { refreshQueued = true; return; }
     refreshing = true;
     try {
-      const [reqs, own] = await Promise.all([
+      const [reqs, own, refs] = await Promise.all([
         api('GET', '/api/requests'),
         api('GET', '/api/category-owners'),
+        api('GET', '/api/category-referents'),
       ]);
       const fresh = Array.isArray(reqs) ? reqs : [];
       // Diff pour le fil d'activité (seulement après le premier chargement).
@@ -1081,6 +1151,7 @@ export function createDashboard(deps) {
       }
       rows = fresh;
       owners = own && typeof own === 'object' ? own : {};
+      catRefs = refs && typeof refs === 'object' ? refs : {};
       loaded = true;
       renderAll();
     } catch (_) {
