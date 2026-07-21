@@ -21,8 +21,8 @@
 export function createDashboard(deps) {
   const {
     root, api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
-    daysLeft, prioBand, showToast, attachTip, fold, openMenu,
-    jumpToPlanning, isLive,
+    daysLeft, prioBand, showToast, attachTip, fold,
+    jumpToPlanning,
   } = deps;
 
   // --- Constantes métier ---------------------------------------------------
@@ -30,8 +30,8 @@ export function createDashboard(deps) {
   const ACTIVE_FAMILIES = ['demande', 'chiffrage', 'attente_client', 'preparation', 'production', 'facturation'];
   const ACTIVE_SET = new Set(ACTIVE_FAMILIES);
 
-  // Couleur d'avatar par employé (charte du point du jour).
-  const AVATAR = { 'Loïc': '#2563EB', 'Charlie': '#7C3AED', 'Mélina': '#0D9488', 'Julien': '#EA580C' };
+  // Couleur d'avatar : même bleu pour tout le monde (charte du point du jour).
+  const AVATAR = { 'Loïc': '#2563EB', 'Charlie': '#2563EB', 'Mélina': '#2563EB', 'Julien': '#2563EB' };
 
   // Une commande « Sans date » vieillit : au bout de 7 jours elle devient
   // « À planifier » (badge orange, remonte dans le tri). Jamais comptée en retard.
@@ -71,11 +71,8 @@ export function createDashboard(deps) {
   let catRefs = {};             // { slugCatégorie: [employés] } (référents par défaut)
   let loaded = false;
 
-  // 'team' | 'me' | prénom. « JE SUIS » = vue perso de l'identité locale.
+  // 'team' | prénom.
   let activeTab = 'team';
-  let identity = null;
-  try { identity = localStorage.getItem('olda_identity'); } catch (_) {}
-  if (identity && !EMPLOYEES.includes(identity)) identity = null;
 
   let kpiFilter = null;         // null | 'late' | 'soon' | 'waiting' | 'active'
   let searchQuery = '';
@@ -320,22 +317,12 @@ export function createDashboard(deps) {
   }
 
   // --- Header (construit une fois, mis à jour par refs) --------------------
-  let $head, $sub, $liveDot, $searchInput, $searchClear, $actBadge, $kpiEls = {}, $chip, $chipLabel, $tabs;
+  let $head, $searchInput, $searchClear, $actBadge, $kpiEls = {}, $chip, $chipLabel, $tabs;
 
   function buildHead() {
     $head = el('header', 'pj-head');
 
     const row = el('div', 'pj-head-row');
-
-    row.appendChild(logoEl('pj-logo'));
-    const titles = el('div', 'pj-titles');
-    titles.appendChild(el('h1', 'pj-title', 'Point du jour'));
-    $sub = el('p', 'pj-subtitle');
-    $liveDot = el('span', 'pj-live');
-    $sub.appendChild($liveDot);
-    $sub.appendChild(document.createTextNode(''));
-    titles.appendChild($sub);
-    row.appendChild(titles);
 
     // Recherche : filtre en direct toutes les vues (estompe les non-concernées).
     const search = el('div', 'pj-search');
@@ -374,14 +361,6 @@ export function createDashboard(deps) {
     attachTip(act, 'Ce qui a bougé');
     act.addEventListener('click', openActivity);
     row.appendChild(act);
-
-    // Écran mural (mode atelier plein écran).
-    const wallBtn = el('button', 'pj-tool');
-    wallBtn.type = 'button';
-    wallBtn.append(icon('tv'), el('span', 'pj-tool-label', 'Écran mural'));
-    attachTip(wallBtn, 'Afficher sur l’écran de l’atelier');
-    wallBtn.addEventListener('click', openWall);
-    row.appendChild(wallBtn);
 
     // Attribution des catégories (config du patron).
     const gear = el('button', 'pj-tool pj-tool--icon');
@@ -430,12 +409,6 @@ export function createDashboard(deps) {
   }
 
   function renderHead() {
-    const now = new Date();
-    const dow = now.toLocaleDateString('fr-FR', { weekday: 'long' });
-    const dm = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-    $sub.lastChild.textContent = ` ${dow.charAt(0).toUpperCase() + dow.slice(1)} ${dm} · synchronisé au planning`;
-    $liveDot.classList.toggle('off', !(isLive && isLive()));
-
     const k = kpis();
     for (const key of Object.keys($kpiEls)) {
       $kpiEls[key].n.textContent = k[key === 'active' ? 'active' : key];
@@ -462,24 +435,6 @@ export function createDashboard(deps) {
       return b;
     };
     const hasLate = (who) => who && dayList(who).some((r) => urgency(r).band === 0);
-    const meLabel = identity ? `Je suis · ${identity}` : 'Je suis';
-    const me = mkTab('me', meLabel, hasLate(identity));
-    me.classList.add('pj-tab--me');
-    attachTip(me, identity ? 'Ma vue perso — recliquer pour changer qui je suis' : 'Choisir qui je suis');
-    me.addEventListener('click', () => {
-      // Pas d'identité, ou re-clic sur l'onglet déjà actif → choisir qui je suis.
-      if (!identity || activeTab === 'me') {
-        openMenu(me, EMPLOYEES.map((n) => ({ value: n, label: n })), identity, (val) => {
-          identity = val;
-          try { localStorage.setItem('olda_identity', val); } catch (_) {}
-          activeTab = 'me';
-          renderHead(); renderBody();
-        });
-        return;
-      }
-      activeTab = 'me';
-      renderHead(); renderBody();
-    });
     for (const who of EMPLOYEES) {
       const t = mkTab(who, who, hasLate(who));
       t.addEventListener('click', () => { activeTab = who; renderHead(); renderBody(); });
@@ -572,9 +527,7 @@ export function createDashboard(deps) {
     if (activeTab === 'team') {
       $body.appendChild(buildTeamView());
     } else {
-      const who = activeTab === 'me' ? identity : activeTab;
-      if (!who) { $body.appendChild(el('p', 'pj-empty', 'Choisis qui tu es avec l’onglet « Je suis ».')); return; }
-      $body.appendChild(buildPersonView(who));
+      $body.appendChild(buildPersonView(activeTab));
     }
   }
 
