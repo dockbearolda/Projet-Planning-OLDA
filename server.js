@@ -15,6 +15,7 @@ const express = require('express');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
   getCategoryOwners, setCategoryOwners,
+  getCategoryReferents, setCategoryReferents,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -187,6 +188,23 @@ app.put('/api/category-owners', asyncH(async (req, res) => {
   }
   const saved = await setCategoryOwners(body);
   broadcast({ kind: 'category-owners' });
+  res.json(saved);
+}));
+
+// Référents par catégorie (0..N employés sous le pilote de la catégorie).
+// GET  → { slugCatégorie: [employé, ...], ... }
+// PUT  → remplace la config (corps = même forme), diffusé en SSE.
+app.get('/api/category-referents', asyncH(async (req, res) => {
+  res.json(await getCategoryReferents());
+}));
+
+app.put('/api/category-referents', asyncH(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Objet { catégorie: [employés] } attendu' });
+  }
+  const saved = await setCategoryReferents(body);
+  broadcast({ kind: 'category-referents' });
   res.json(saved);
 }));
 
