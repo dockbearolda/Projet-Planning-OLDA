@@ -23,6 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Manrope:wght@400..800&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="express.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
@@ -83,7 +84,7 @@
             <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
             <span class="nav-switch-label">Dashboard</span>
           </a>
-          <a class="nav-switch-btn" href="/fiche">
+          <a class="nav-switch-btn" id="viewExpress" href="#express">
             <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
             <span class="nav-switch-label">Commande Express</span>
           </a>
@@ -177,6 +178,176 @@
         <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
+
+        <!-- Onglet Commande Express : la prise de commande au comptoir. Le
+             balisage est là dès le départ, mais son module (express.js) n'est
+             chargé qu'au premier affichage. Une fois monté, la bascule entre
+             les trois vues est instantanée et ne perd aucune saisie. -->
+        <section class="express" id="express" hidden aria-label="Commande Express">
+          <header class="appbar">
+            <span class="appbar__bolt ms" aria-hidden="true">bolt</span>
+            <div class="appbar__titles">
+              <h2 class="appbar__title">Commande Express</h2>
+              <p class="appbar__sub" id="appbar-sub">Tasse personnalisée</p>
+            </div>
+            <div class="appbar__actions">
+              <a class="btn btn--ghost" href="#planning">Annuler</a>
+              <button class="btn btn--primary" type="button" id="save">Enregistrer la commande</button>
+            </div>
+          </header>
+
+          <div class="content">
+            <div class="colside">
+              <section class="card">
+                <h3 class="card__title">Client</h3>
+                <div class="client">
+                  <div class="avatar ms" aria-hidden="true">person</div>
+                  <div class="client__id">
+                    <div class="client__line">
+                      <input id="prenom" class="ghost ghost--name" type="text" placeholder="Prénom" autocomplete="off" aria-label="Prénom du client" />
+                      <span class="wa" id="wa-badge" hidden><span class="ms" aria-hidden="true">chat</span> WhatsApp</span>
+                    </div>
+                    <input id="nom" class="ghost" type="text" placeholder="Nom" autocomplete="off" aria-label="Nom du client" />
+                    <input id="whatsapp" class="ghost" type="tel" inputmode="tel" placeholder="Téléphone WhatsApp" autocomplete="off" aria-label="Téléphone WhatsApp" />
+                  </div>
+                </div>
+                <button class="btn btn--block" type="button" id="see-client" disabled>Voir la fiche client</button>
+              </section>
+
+              <section class="card">
+                <h3 class="card__title">Produit</h3>
+                <div class="product">
+                  <div class="product__thumb" id="product-thumb" aria-hidden="true"></div>
+                  <div class="product__body">
+                    <select id="product" class="select select--strong" aria-label="Produit"></select>
+                    <div class="product__row">
+                      <label class="product__label" for="qty">Quantité</label>
+                      <input id="qty" class="input input--qty" type="number" min="1" max="999" step="1" value="1" />
+                    </div>
+                    <p class="product__row product__stock">
+                      <span class="product__label">Stock :</span>
+                      <span class="dot" id="stock-dot"></span><span id="stock-label">—</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="color">Couleur</label>
+                  <select id="color" class="select"></select>
+                </div>
+              </section>
+
+              <section class="card">
+                <h3 class="card__title">Résumé commande</h3>
+                <dl class="sum" id="sum"></dl>
+                <div class="sum__total"><span>TOTAL</span><b id="total">0,00 €</b></div>
+              </section>
+
+              <section class="card">
+                <div class="card__head">
+                  <h3 class="card__title">Paiement</h3>
+                  <span class="pill" id="pay-pill">En attente</span>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="pay-statut">Statut</label>
+                  <select id="pay-statut" class="select"></select>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="pay-mode">Mode de paiement</label>
+                  <select id="pay-mode" class="select"></select>
+                </div>
+              </section>
+            </div>
+
+            <section class="card card--perso">
+              <h3 class="card__title">Personnalisation de la tasse</h3>
+              <p class="banner">
+                <span class="ms" aria-hidden="true">info</span>
+                Choisissez un visuel existant ou saisissez votre texte personnalisé pour chaque face.
+              </p>
+
+              <div class="perso">
+                <div class="preview">
+                  <div class="mugs" id="mugs"></div>
+                  <p class="note">
+                    <span class="ms" aria-hidden="true">lightbulb</span>
+                    Aperçu indicatif. Le rendu final peut varier légèrement.
+                  </p>
+                  <div class="addbox">
+                    <p class="addbox__title">Ajouter un élément supplémentaire <span>(optionnel)</span></p>
+                    <button class="add" type="button" id="add-el">
+                      <span class="ms" aria-hidden="true">add</span> Ajouter un élément (logo, texte, dessous…)
+                    </button>
+                  </div>
+                </div>
+                <div class="panels" id="panels"></div>
+              </div>
+            </section>
+
+            <div class="bottom">
+              <section class="card">
+                <h3 class="card__title">Délai souhaité par le client</h3>
+                <div class="delais" id="delais" role="radiogroup" aria-label="Délai souhaité"></div>
+              </section>
+
+              <section class="card">
+                <h3 class="card__title">Date promise client</h3>
+                <div class="promise">
+                  <span class="ms" aria-hidden="true">event</span>
+                  <input id="deadline" class="input input--date" type="date" aria-label="Date promise" />
+                </div>
+                <div class="promise promise--time">
+                  <span class="promise__at">à</span>
+                  <input id="heure" class="input input--time" type="time" step="900" value="15:00" aria-label="Heure de retrait" />
+                </div>
+              </section>
+
+              <section class="card">
+                <h3 class="card__title">Référent production</h3>
+                <div class="field field--icon">
+                  <span class="ms" aria-hidden="true">person</span>
+                  <select id="referent" class="select" aria-label="Référent production"></select>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="vendeuse">Commande prise par</label>
+                  <select id="vendeuse" class="select"></select>
+                </div>
+              </section>
+
+              <section class="card">
+                <h3 class="card__title">Statut</h3>
+                <div class="field field--icon">
+                  <span class="dot dot--blue" aria-hidden="true"></span>
+                  <select id="stage" class="select" aria-label="Statut de la commande"></select>
+                </div>
+                <div class="field">
+                  <span class="field__label">Priorité</span>
+                  <div class="stars" id="priority" role="radiogroup" aria-label="Priorité">
+                    <button class="star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="ms">star</span></button>
+                    <button class="star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="ms">star</span></button>
+                    <button class="star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="ms">star</span></button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+          <div class="done" id="done" hidden>
+            <div class="done__card">
+              <div class="done__check"><span class="ms">check</span></div>
+              <p class="done__title">Commande enregistrée</p>
+              <p class="done__sub" id="done-sub"></p>
+              <div class="done__actions">
+                <button class="btn btn--ghost" type="button" id="done-print"><span class="ms" aria-hidden="true">print</span> Imprimer le reçu</button>
+                <a class="btn btn--ghost" href="#planning">Voir le planning</a>
+                <button class="btn btn--primary" type="button" id="done-new">Nouvelle commande</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="receipt" id="receipt" aria-hidden="true"></div>
+        </section>
       </main>
     </div>
   </div>

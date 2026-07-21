@@ -164,7 +164,7 @@ code HTTP adapté.
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
-## Commande Express — `/fiche`
+## Commande Express — `/#express`
 
 La prise de commande au comptoir, sur la trame validée par la direction :
 menu latéral, en-tête d'action, colonne de synthèse, **aperçu visuel de la
@@ -182,17 +182,26 @@ part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
 - **Total live**, recalculé à chaque geste sans aller-retour réseau.
 - **Reçu imprimable** après validation.
 
-## Navigation
+## Navigation — une seule page, trois vues
 
-Les trois écrans de l'outil — Planning, Dashboard, Commande Express — se
-rejoignent depuis le **rail de gauche**, présent sur les deux pages. Il n'y a
-plus de boutons de bascule dans le planning.
+Planning, Dashboard et Commande Express sont **trois vues d'un même
+document**, pas trois pages. Passer de l'une à l'autre ne recharge rien : ni
+requête, ni réaffichage, ni saisie perdue. Une commande à moitié remplie
+survit à un aller-retour vers le planning.
 
-Le **hash de l'URL est l'unique pilote** de la vue : `/#planning`,
-`/#dashboard`, et `/fiche` pour la prise de commande. La navigation n'est
-faite que de liens — cliquer change le hash, le hash change la vue. Un écran
-est donc toujours partageable par son URL, et le bouton « Retour » du
-navigateur fonctionne.
+Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`,
+`#express`. La navigation, dans le rail de gauche, n'est faite que de liens —
+cliquer change le hash, le hash change la vue. Chaque écran est donc
+partageable par son URL et le bouton « Retour » du navigateur fonctionne.
+
+`/fiche` redirige (301) vers `/#express` : les raccourcis déjà posés sur les
+écrans de l'atelier continuent de marcher.
+
+Le module de la Commande Express (`express.js`, catalogue + aperçu de la
+tasse) n'est chargé qu'au **premier** passage sur la vue : le planning ne paie
+rien tant qu'on ne prend pas de commande. Sa feuille de style est entièrement
+scopée sous `#express`, pour qu'aucune règle ne puisse fuir sur les deux
+autres vues.
 
 ### Le barème vit dans `catalog.json`
 
@@ -226,12 +235,11 @@ n'a jamais besoin de lire ce JSON.
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
 ├── catalog.json      barème + catalogue Commande Express (source unique des prix)
 ├── public/
-│   ├── index.html    sidebar + grille
+│   ├── index.html    coquille + les 3 vues (planning, dashboard, express)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
-│   ├── fiche.html    Commande Express (poste de vente)
-│   ├── fiche.css     coquille, aperçu tasse, panneaux de face
-│   └── fiche.js      état, aperçu, calcul du total, envoi
+│   ├── express.css   vue Commande Express, scopée sous #express
+│   └── express.js    état, aperçu tasse, calcul du total, envoi
 ├── .env.example
 └── README.md
 ```

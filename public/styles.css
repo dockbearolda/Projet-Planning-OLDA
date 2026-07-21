@@ -2244,7 +2244,12 @@ body.view-dashboard .work-head,
 body.view-dashboard .grid-wrap,
 body.view-dashboard .fiverr-tool,
 body.view-dashboard .sidebar-head,
-body.view-dashboard #stages { display: none !important; }
+body.view-dashboard #stages,
+body.view-express .work-head,
+body.view-express .grid-wrap,
+body.view-express .fiverr-tool,
+body.view-express .sidebar-head,
+body.view-express #stages { display: none !important; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {

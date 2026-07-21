@@ -2902,8 +2902,10 @@ function initBrandReflection() {
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
+const $viewExpress = document.getElementById('viewExpress');
+const $express = document.getElementById('express');
 
-let viewMode = 'planning';        // 'planning' | 'dashboard'
+let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express'
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 async function jumpToPlanning(r) {
@@ -2933,28 +2935,51 @@ const dashboard = createDashboard({
 // deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
 // contredire — « #dashboard » affiché sur le planning, et retour au dashboard
 // au premier rechargement.
+// Le module de la Commande Express est lourd (catalogue, aperçu de la tasse) :
+// on ne le charge qu'au premier passage sur la vue, puis il reste monté. Les
+// bascules suivantes ne sont qu'un changement de classe — instantanées, et la
+// saisie en cours est conservée.
+let expressLoading = null;
+function mountExpress() {
+  if (!$express) return;
+  if (!expressLoading) {
+    expressLoading = import('./express.js')
+      .then((m) => m.initExpress($express))
+      .catch((err) => {
+        expressLoading = null;              // rechargeable au prochain essai
+        console.error('Commande Express : chargement impossible', err);
+      });
+  }
+}
+
 function setViewMode(mode) {
-  const dash = mode === 'dashboard';
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
-  // pilotée par la classe body.view-dashboard en CSS : l'attribut `hidden` seul
-  // ne suffit pas car ces éléments portent une règle `display` qui l'écrase.
-  if ($viewPlanning) $viewPlanning.classList.toggle('active', !dash);
-  if ($viewDashboard) $viewDashboard.classList.toggle('active', dash);
+  // pilotée par une classe sur <body> : l'attribut `hidden` seul ne suffit pas,
+  // ces éléments portent une règle `display` qui l'écrase.
+  if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
+  if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
+  if ($viewExpress) $viewExpress.classList.toggle('active', mode === 'express');
   if (mode === viewMode) return;
   viewMode = mode;
+
+  const dash = mode === 'dashboard';
+  const express = mode === 'express';
   if ($dashboard) $dashboard.hidden = !dash;
+  if ($express) $express.hidden = !express;
   document.body.classList.toggle('view-dashboard', dash);
-  if (dash) {
-    dashboard.show();
-  } else {
-    dashboard.hide();
+  document.body.classList.toggle('view-express', express);
+
+  if (dash) dashboard.show(); else dashboard.hide();
+  if (express) mountExpress();
+  if (mode === 'planning') {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
   }
 }
 
+const VIEWS = { '#dashboard': 'dashboard', '#express': 'express' };
 function applyHash() {
-  setViewMode(location.hash === '#dashboard' ? 'dashboard' : 'planning');
+  setViewMode(VIEWS[location.hash] || 'planning');
 }
 window.addEventListener('hashchange', applyHash);
 applyHash();

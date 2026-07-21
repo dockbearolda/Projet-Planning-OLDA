@@ -1,8 +1,17 @@
 // Commande Express — Atelier OLDA
 // Un seul état, un seul rendu. Le prix se recalcule localement à chaque geste ;
 // le serveur ne voit la fiche qu'à l'enregistrement, et refait le calcul.
+//
+// Ce module est chargé À LA DEMANDE par app.js, au premier passage sur la vue
+// Express : le planning ne paie donc rien tant qu'on ne prend pas de commande.
+// Une fois monté, basculer d'une vue à l'autre n'est qu'un changement de
+// classe — aucun rechargement, aucune saisie perdue.
 
-const $ = (sel) => document.querySelector(sel);
+// Toutes les recherches DOM restent CONFINÉES à la vue : le document porte
+// aussi le planning et le dashboard, qui ont leurs propres identifiants.
+let ROOT = null;
+const $ = (sel) => ROOT.querySelector(sel);
+const $$ = (sel) => ROOT.querySelectorAll(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -29,13 +38,6 @@ function daysUntil(day) {
   const [y, m, d] = day.split('-').map(Number);
   return Math.round((Date.UTC(y, m - 1, d) - today) / DAY);
 }
-
-// Menu : les trois écrans qui existent, rien d'autre.
-const NAV = [
-  { icon: 'grid_view', label: 'Planning', href: '/#planning' },
-  { icon: 'speed', label: 'Dashboard', href: '/#dashboard' },
-  { icon: 'bolt', label: 'Commande Express', href: '/fiche', active: true },
-];
 
 let CAT = null;
 let uid = 0;
@@ -120,9 +122,11 @@ function missing() {
 // Dessin de la tasse. Fond en SVG, contenu imprimé en HTML par-dessus : le
 // texte se répartit tout seul sur plusieurs lignes et reprend la vraie police.
 // ---------------------------------------------------------------------------
+// Zone imprimable, en POURCENTAGE de la scène (210 × 190 de référence) : la
+// tasse se redimensionne avec sa colonne sans que le visuel se décale.
 const MUG_ZONES = {
-  side: { left: 52, top: 54, width: 106, height: 88 },
-  none: { left: 58, top: 64, width: 94, height: 66 },
+  side: { left: 24.8, top: 28.4, width: 50.5, height: 46.3 },
+  none: { left: 27.6, top: 33.7, width: 44.8, height: 34.7 },
 };
 const MUG_STROKE = '#cfd6e2';
 
@@ -174,7 +178,7 @@ function renderMugs() {
     const z = MUG_ZONES[face.handle === 'none' ? 'none' : 'side'];
     const zone = el('div', 'mug__zone');
     Object.assign(zone.style, {
-      left: `${z.left}px`, top: `${z.top}px`, width: `${z.width}px`, height: `${z.height}px`,
+      left: `${z.left}%`, top: `${z.top}%`, width: `${z.width}%`, height: `${z.height}%`,
     });
 
     const stack = el('div', 'mug__stack');
@@ -387,17 +391,6 @@ function renderPanels() {
 // Construction statique
 // ---------------------------------------------------------------------------
 function buildStatic() {
-  const nav = $('#nav');
-  for (const item of NAV) {
-    const li = el('li');
-    const a = el('a');
-    a.href = item.href;
-    if (item.active) a.classList.add('is-active');
-    a.append(el('span', 'ms', item.icon), el('span', null, item.label));
-    li.append(a);
-    nav.append(li);
-  }
-
   const prod = $('#product');
   for (const p of CAT.products) prod.append(new Option(`${p.short} — ${eur(p.price)}`, p.sku));
   state.product = CAT.products[0];
@@ -461,11 +454,11 @@ function render() {
   $('#stock-label').textContent = stock ? 'Disponible' : 'Rupture';
   $('#appbar-sub').textContent = state.product ? state.product.label : 'Tasse personnalisée';
 
-  for (const b of document.querySelectorAll('#priority .star')) {
+  for (const b of $$('#priority .star')) {
     b.classList.toggle('is-on', Number(b.dataset.v) <= state.priority);
     b.setAttribute('aria-checked', String(Number(b.dataset.v) === state.priority));
   }
-  for (const b of document.querySelectorAll('#delais .delai')) {
+  for (const b of $$('#delais .delai')) {
     const on = !!state.delai && b.dataset.delai === state.delai.id;
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-checked', String(on));
@@ -520,7 +513,7 @@ const byUid = (u) => state.elements.find((e) => String(e.uid) === String(u));
 // Interactions
 // ---------------------------------------------------------------------------
 function wire() {
-  document.addEventListener('click', (e) => {
+  ROOT.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
 
@@ -551,10 +544,10 @@ function wire() {
     }
     if (t.id === 'save') return submit();
     if (t.id === 'done-print') return window.print();
-    if (t.id === 'done-new') return window.location.reload();
+    if (t.id === 'done-new') return reset();
   });
 
-  document.addEventListener('change', (e) => {
+  ROOT.addEventListener('change', (e) => {
     const t = e.target;
     if (t.id === 'product') { state.product = CAT.products.find((p) => p.sku === t.value); return render(); }
     if (t.id === 'color') { state.color = t.value; return render(); }
@@ -583,7 +576,7 @@ function wire() {
     if (t.dataset.role === 'typo') { item.typo = t.value; return render(); }
   });
 
-  document.addEventListener('input', (e) => {
+  ROOT.addEventListener('input', (e) => {
     const t = e.target;
     if (t.id === 'prenom' || t.id === 'nom' || t.id === 'whatsapp') { state[t.id] = t.value; return render(); }
     if (t.id === 'qty') {
@@ -598,7 +591,7 @@ function wire() {
     if (!item) return;
     if (t.dataset.role === 'texte') {
       item.texte = t.value;
-      const c = document.querySelector(`[data-count="${item.uid}"]`);
+      const c = $(`[data-count="${item.uid}"]`);
       if (c) {
         c.textContent = `${item.texte.length} / ${CAT.texteMax}`;
         c.classList.toggle('is-full', item.texte.length >= CAT.texteMax);
@@ -682,10 +675,30 @@ function buildReceipt(f) {
 }
 
 // ---------------------------------------------------------------------------
-(async function start() {
+// Remet la vue à zéro sans recharger la page (« Nouvelle commande »).
+function reset() {
+  Object.assign(state, {
+    prenom: '', nom: '', whatsapp: '', priority: 1, quantity: 1,
+    elements: [newElement('face1'), newElement('face2')],
+    deadlineTouched: false, sending: false,
+  });
+  state.deadline = todayPlus(state.delai.days);
+  for (const id of ['prenom', 'nom', 'whatsapp']) $(`#${id}`).value = '';
+  $('#qty').value = '1';
+  $('#done').hidden = true;
+  renderPanels();
+  render();
+}
+
+// Montage unique, déclenché par app.js au premier affichage de la vue.
+let mounted = false;
+export async function initExpress(root) {
+  if (mounted) return;
+  mounted = true;
+  ROOT = root;
   CAT = await (await fetch('/api/fiche/catalog')).json();
   buildStatic();
   renderPanels();
   wire();
   render();
-}());
+}
