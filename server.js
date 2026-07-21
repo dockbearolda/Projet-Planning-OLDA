@@ -435,27 +435,117 @@ app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
-// Fiche vendeuse (tablette) — /fiche
-// Le catalogue (produits, options, délais, typos, logos) est la source unique
-// des prix : le front l'affiche, le serveur s'en ressert pour RECALCULER le
-// total. Le montant envoyé par la tablette n'est jamais cru sur parole.
+// Fiche « Commande Express » — /fiche
+// Le catalogue (produits, options, délais, typos, logos, placements, encres)
+// est la source unique des prix : le front l'affiche, le serveur s'en ressert
+// pour RECALCULER le total. Le montant envoyé par le poste de vente n'est
+// jamais cru sur parole.
 // ---------------------------------------------------------------------------
 const CATALOG = require('./catalog.json');
 const OPTION_BY_ID = new Map(CATALOG.options.map((o) => [o.id, o]));
 const DELAI_BY_ID = new Map(CATALOG.delais.map((d) => [d.id, d]));
 const PRODUCT_BY_SKU = new Map(CATALOG.products.map((p) => [p.sku, p]));
-const PAIEMENT_BY_ID = new Map(CATALOG.paiements.map((p) => [p.id, p]));
+const FACE_BY_ID = new Map(CATALOG.faces.map((f) => [f.id, f]));
+const PLACEMENT_BY_ID = new Map(CATALOG.placements.map((p) => [p.id, p]));
+const TAILLE_BY_ID = new Map(CATALOG.tailles.map((t) => [t.id, t]));
+const ENCRE_BY_ID = new Map(CATALOG.encres.map((e) => [e.id, e]));
+const MODE_BY_ID = new Map(CATALOG.paiementModes.map((p) => [p.id, p]));
+const STATUT_BY_ID = new Map(CATALOG.paiementStatuts.map((p) => [p.id, p]));
+const LOGO_BY_REF = new Map(CATALOG.logosOlda.map((l) => [l.ref, l]));
 
 app.get('/api/fiche/catalog', (req, res) => {
-  res.json({ ...CATALOG, vendeuses: RESPONSABLES });
+  res.json({ ...CATALOG, vendeuses: RESPONSABLES, stages: STAGES });
 });
 
 // Arrondi monétaire : évite les 30.800000000000004 en base et sur le reçu.
 const euro = (n) => Math.round(n * 100) / 100;
 
+const DAY = 86400000;
+const isDay = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+// Nombre de jours pleins entre aujourd'hui et une date civile, sans heure ni
+// fuseau : les deux bornes sont ramenées à minuit UTC avant la soustraction.
+function daysUntil(day) {
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const [y, m, d] = day.split('-').map(Number);
+  return Math.round((Date.UTC(y, m - 1, d) - today) / DAY);
+}
+
+// Majoration effective. Les délais nommés portent leur taux ; « Date précise »
+// n'en a pas (rate: null) et le déduit de la date choisie, avec les mêmes
+// seuils. Sans cette dérivation, choisir « Date précise = demain » offrirait
+// l'express au tarif standard.
+function rateFor(delai, deadline) {
+  if (delai.rate !== null && delai.rate !== undefined) return delai.rate;
+  const d = daysUntil(deadline);
+  if (d <= 0) return 0.2;
+  if (d < 3) return 0.1;
+  return 0;
+}
+
+// Valide un élément de personnalisation (un visuel posé sur une face).
+// Renvoie { element } ou { error }.
+function buildElement(raw, index) {
+  const where = `Élément ${index + 1}`;
+  const face = FACE_BY_ID.get(raw && raw.face);
+  if (!face) return { error: `${where} : emplacement inconnu` };
+
+  // Le logo OLDA vaut 6 € sur un flanc et 2 € sous la tasse : c'est la FACE qui
+  // désigne le tarif. On normalise TOUTE variante de logo OLDA (y compris un
+  // `logo_olda_dessous` envoyé sur un flanc) vers l'option de la face — sinon
+  // le poste de vente pourrait réclamer le tarif du dessous n'importe où.
+  const asked = String((raw && raw.option) || 'aucune');
+  const wanted = asked.startsWith('logo_olda') ? face.logoOption : asked;
+  const opt = OPTION_BY_ID.get(wanted || 'aucune');
+  if (!opt) return { error: `${where} : visuel inconnu` };
+  if (opt.id === 'aucune') return { element: null };
+
+  const placement = PLACEMENT_BY_ID.get(raw.placement) || CATALOG.placements[1];
+  const taille = TAILLE_BY_ID.get(raw.taille) || CATALOG.tailles[1];
+
+  const element = {
+    face: face.id,
+    faceLabel: `${face.label} — ${face.hint}`,
+    option: opt.id,
+    optionLabel: opt.label,
+    price: opt.price,
+    placement: placement.id,
+    placementLabel: placement.label,
+    taille: taille.id,
+    tailleLabel: taille.label,
+    remarque: String(raw.remarque || '').trim() || null,
+  };
+
+  if (opt.needs === 'texte') {
+    element.texte = String(raw.texte || '').trim();
+    if (!element.texte) return { error: `${where} : le texte est vide` };
+    if (element.texte.length > CATALOG.texteMax) {
+      return { error: `${where} : texte trop long (${CATALOG.texteMax} caractères maximum)` };
+    }
+    const typo = CATALOG.typos.find((t) => t.id === raw.typo);
+    if (!typo) return { error: `${where} : police manquante` };
+    element.typo = typo.id;
+    element.typoLabel = typo.label;
+    const encre = ENCRE_BY_ID.get(raw.encre) || CATALOG.encres[0];
+    element.encre = encre.id;
+    element.encreLabel = encre.label;
+    element.encreHex = encre.hex;
+  } else if (opt.needs === 'logo_olda') {
+    const logo = LOGO_BY_REF.get(raw.logo);
+    if (!logo) return { error: `${where} : référence du visuel OLDA manquante` };
+    element.logo = logo.ref;
+    element.logoLabel = logo.label;
+  } else if (opt.needs === 'logo_client') {
+    element.logo = String(raw.logo || '').trim();
+    if (!element.logo) return { error: `${where} : nom du fichier client manquant` };
+  }
+
+  return { element };
+}
+
 // Reconstruit le détail d'une fiche à partir du corps reçu : valide chaque
-// référence contre le catalogue et renvoie { fiche, total, resume } ou une
-// erreur explicite. Aucune écriture ici — la fonction est pure.
+// référence contre le catalogue et renvoie { fiche, resume } ou une erreur
+// explicite. Aucune écriture ici — la fonction est pure.
 function buildFiche(body) {
   const product = PRODUCT_BY_SKU.get(body.product);
   if (!product) return { error: `produit inconnu : ${body.product}` };
@@ -463,8 +553,11 @@ function buildFiche(body) {
   const delai = DELAI_BY_ID.get(body.delai);
   if (!delai) return { error: `délai inconnu : ${body.delai}` };
 
-  const paiement = PAIEMENT_BY_ID.get(body.paiement);
-  if (!paiement) return { error: `mode de paiement inconnu : ${body.paiement}` };
+  const mode = MODE_BY_ID.get(body.paiementMode);
+  if (!mode) return { error: `mode de paiement inconnu : ${body.paiementMode}` };
+
+  const statut = STATUT_BY_ID.get(body.paiementStatut);
+  if (!statut) return { error: `statut de paiement inconnu : ${body.paiementStatut}` };
 
   const quantity = Number.parseInt(body.quantity, 10);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
@@ -477,88 +570,64 @@ function buildFiche(body) {
 
   const color = CATALOG.colors.includes(body.color) ? body.color : CATALOG.colors[0];
 
-  const faces = [];
-  for (const def of CATALOG.faces) {
-    const raw = (body.faces && body.faces[def.id]) || {};
-    const opt = OPTION_BY_ID.get(raw.option || 'aucune');
-    if (!opt) return { error: `option inconnue : ${raw.option}` };
-    if (opt.id === 'aucune') continue;
-
-    const face = {
-      id: def.id,
-      label: `${def.label} — ${def.hint}`,
-      option: opt.id,
-      optionLabel: opt.label,
-      price: opt.price,
-      remarque: String(raw.remarque || '').trim() || null,
-    };
-
-    if (opt.needs === 'texte') {
-      face.texte = String(raw.texte || '').trim();
-      if (!face.texte) return { error: `${def.label} : le texte personnalisé est vide` };
-      const typo = CATALOG.typos.find((t) => t.id === raw.typo);
-      if (!typo) return { error: `${def.label} : typographie manquante` };
-      face.typo = typo.id;
-      face.typoLabel = typo.label;
-    } else if (opt.needs === 'logo_olda') {
-      if (!CATALOG.logosOlda.includes(raw.logo)) {
-        return { error: `${def.label} : référence logo OLDA manquante` };
-      }
-      face.logo = raw.logo;
-    } else if (opt.needs === 'logo_client') {
-      face.logo = String(raw.logo || '').trim();
-      if (!face.logo) return { error: `${def.label} : nom du fichier client manquant` };
-    }
-    faces.push(face);
+  const elements = [];
+  const raws = Array.isArray(body.elements) ? body.elements : [];
+  for (let i = 0; i < raws.length; i += 1) {
+    const built = buildElement(raws[i], i);
+    if (built.error) return { error: built.error };
+    if (built.element) elements.push(built.element);
   }
+  if (elements.length === 0) return { error: 'aucune personnalisation : la fiche est vide' };
 
-  if (faces.length === 0) return { error: 'aucune personnalisation : la fiche est vide' };
-
-  const unitaire = euro(product.price + faces.reduce((s, f) => s + f.price, 0));
-  const sousTotal = euro(unitaire * quantity);
-  const supplement = euro(sousTotal * delai.rate);
-  const total = euro(sousTotal + supplement);
-
-  // Échéance : la date choisie par la vendeuse fait foi ; à défaut on applique
-  // le nombre de jours du délai retenu.
-  let deadline = typeof body.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.deadline)
-    ? body.deadline
-    : null;
-  if (!deadline) {
+  // Échéance : la date posée fait foi ; à défaut on applique les jours du délai.
+  const deadline = isDay(body.deadline) ? body.deadline : (() => {
     const d = new Date();
     d.setDate(d.getDate() + delai.days);
-    deadline = d.toISOString().slice(0, 10);
-  }
+    return d.toISOString().slice(0, 10);
+  })();
+  const heure = /^\d{2}:\d{2}$/.test(body.heure) ? body.heure : null;
+
+  const rate = rateFor(delai, deadline);
+  const unitaire = euro(product.price + elements.reduce((s, e) => s + e.price, 0));
+  const personnalisation = euro(elements.reduce((s, e) => s + e.price, 0) * quantity);
+  const sousTotal = euro(unitaire * quantity);
+  const supplement = euro(sousTotal * rate);
+  const total = euro(sousTotal + supplement);
+
+  const stage = STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
 
   const fiche = {
     client: { prenom, nom, whatsapp: String(body.whatsapp || '').trim() || null },
     vendeuse: RESPONSABLE_SET.has(body.vendeuse) ? body.vendeuse : 'À attribuer',
+    referent: RESPONSABLE_SET.has(body.referent) ? body.referent : null,
     product: { sku: product.sku, label: product.label, price: product.price },
     color,
     quantity,
-    faces,
-    delai: { id: delai.id, label: delai.label, hint: delai.hint, rate: delai.rate },
-    paiement: { id: paiement.id, label: paiement.label },
-    prix: { unitaire, sousTotal, supplement, total },
+    elements,
+    delai: { id: delai.id, label: delai.label, hint: delai.hint, rate },
+    paiement: { mode: mode.id, modeLabel: mode.label, statut: statut.id, statutLabel: statut.label },
+    prix: { unitaire, produit: euro(product.price * quantity), personnalisation, sousTotal, supplement, total },
     deadline,
+    heure,
+    stage,
     createdAt: new Date().toISOString(),
   };
 
-  const lignes = faces.map((f) => {
-    const detail = f.texte ? `« ${f.texte} » (${f.typoLabel})` : f.logo;
-    return `• ${f.label} — ${f.optionLabel} : ${detail}${f.remarque ? ` — ${f.remarque}` : ''}`;
+  const lignes = elements.map((e) => {
+    const quoi = e.texte ? `« ${e.texte} » (${e.typoLabel}, ${e.encreLabel})` : e.logo;
+    return `• ${e.faceLabel} — ${e.optionLabel} : ${quoi} · ${e.placementLabel.toLowerCase()}, ${e.tailleLabel.toLowerCase()}${e.remarque ? ` — ${e.remarque}` : ''}`;
   });
   const resume = [
     `${quantity} × ${product.label} — ${color}`,
     ...lignes,
-    `Délai ${delai.label} (${delai.hint}) · Paiement ${paiement.label}`,
-    `Total ${total.toFixed(2)} €${supplement ? ` (dont ${supplement.toFixed(2)} € express)` : ''}`,
+    `Délai ${delai.label}${heure ? ` — à retirer à ${heure}` : ''} · ${mode.label} (${statut.label})`,
+    `Total ${total.toFixed(2)} €${supplement ? ` (dont ${supplement.toFixed(2)} € de majoration)` : ''}`,
   ].join('\n');
 
-  return { fiche, total, resume, deadline, product, color, quantity };
+  return { fiche, resume };
 }
 
-// POST /api/fiche → crée la demande dans le planning, à l'étape « demande ».
+// POST /api/fiche → crée la demande dans le planning.
 app.post('/api/fiche', asyncH(async (req, res) => {
   const built = buildFiche(req.body || {});
   if (built.error) return res.status(400).json({ error: built.error });
@@ -566,17 +635,18 @@ app.post('/api/fiche', asyncH(async (req, res) => {
 
   const clientName = [fiche.client.prenom, fiche.client.nom].filter(Boolean).join(' ');
   const { rows: posRows } = await pool.query(
-    "SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = 'demande'",
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [fiche.stage],
   );
 
   const { rows } = await pool.query(
     `INSERT INTO requests
        (stage, priority, client_type, billing_company, contact_referent, contact_phone,
         quantity, product, color, project_value, description, deadline, responsable,
-        position, fiche)
-     VALUES ('demande', $1, 'perso', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        referent, position, fiche)
+     VALUES ($1, $2, 'perso', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING *`,
     [
+      fiche.stage,
       Math.min(3, Math.max(1, Number.parseInt(req.body.priority, 10) || 1)),
       clientName,
       clientName,
@@ -588,12 +658,13 @@ app.post('/api/fiche', asyncH(async (req, res) => {
       resume,
       fiche.deadline,
       fiche.vendeuse,
+      fiche.referent,
       posRows[0].pos,
       JSON.stringify(fiche),
     ],
   );
 
-  broadcast({ kind: 'create', stages: ['demande'] });
+  broadcast({ kind: 'create', stages: [fiche.stage] });
   res.status(201).json({ id: rows[0].id, fiche });
 }));
 
