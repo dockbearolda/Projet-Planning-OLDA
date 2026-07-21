@@ -32,7 +32,7 @@ function daysUntil(day) {
 
 // Menu : les trois écrans qui existent, rien d'autre.
 const NAV = [
-  { icon: 'grid_view', label: 'Planning', href: '/' },
+  { icon: 'grid_view', label: 'Planning', href: '/#planning' },
   { icon: 'speed', label: 'Dashboard', href: '/#dashboard' },
   { icon: 'bolt', label: 'Commande Express', href: '/fiche', active: true },
 ];

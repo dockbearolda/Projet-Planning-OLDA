@@ -2193,18 +2193,19 @@ button, a, .stage, .prio-pill, .deadline-badge,
    =========================================================================== */
 
 /* Commutateur Planning / Dashboard en haut du rail. */
-.view-switch {
+/* Navigation de l'outil, en tête du rail. Trois entrées empilées : les
+   libellés (« Commande Express ») ne tiennent pas côte à côte. */
+.nav-switch {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  gap: 2px;
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--border-soft);
 }
-.view-switch-btn {
-  flex: 1;
-  display: inline-flex;
+.nav-switch-btn {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 10px;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid transparent;
@@ -2214,16 +2215,18 @@ button, a, .stage, .prio-pill, .deadline-badge,
   font: inherit;
   font-size: 13.5px;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.view-switch-btn .material-symbols-outlined { font-size: 20px; }
-.view-switch-btn:hover { background: var(--surface-hover); color: var(--text-1); }
-.view-switch-btn.active {
+.nav-switch-btn .material-symbols-outlined { font-size: 20px; flex: 0 0 auto; }
+.nav-switch-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-switch-btn:hover { background: var(--surface-hover); color: var(--text-1); }
+.nav-switch-btn.active {
   background: var(--primary-soft);
   color: var(--primary);
 }
-.view-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
 /* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
    fonctionne ; affiché seulement quand il n'est pas masqué. */
