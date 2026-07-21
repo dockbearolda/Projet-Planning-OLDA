@@ -2608,9 +2608,8 @@ async function jumpToPlanning(r) {
 const dashboard = createDashboard({
   root: $dashboard,
   api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
-  daysLeft, prioBand, showToast, attachTip, fold, openMenu,
+  daysLeft, prioBand, showToast, attachTip, fold,
   jumpToPlanning,
-  isLive: () => streamAlive,
 });
 
 // --- Bascule Planning / Dashboard ------------------------------------------
