@@ -4,6 +4,8 @@
 
 // Guide des étapes (texte du patron, feuille « Descriptif Étapes »).
 import { STEP_GUIDE } from './guide.js';
+// Dashboard « Point du jour » (projection temps réel du planning).
+import { createDashboard } from './dashboard.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -2058,8 +2060,10 @@ function onStreamChange(e) {
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(() => {
-    if (viewMode === 'dashboard') loadDashData().catch(() => {});
-    else poll();
+    // Le dashboard maintient son cache en continu (fil d'activité, badges,
+    // écran mural), même quand on est sur le Planning.
+    dashboard.notifyChange();
+    if (viewMode === 'planning') poll();
   }, 120);
 }
 
@@ -2075,9 +2079,11 @@ function connectStream() {
 function startRealtime() {
   connectStream();
   // filet de sécurité : si le flux est coupé, on revient à un poll lent
-  setInterval(() => { if (!streamAlive) poll(); }, POLL_MS);
+  setInterval(() => { if (!streamAlive) { poll(); dashboard.notifyChange(); } }, POLL_MS);
   // rafraîchit immédiatement quand on revient sur l'onglet / réveille la tablette
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { poll(); dashboard.notifyChange(); }
+  });
 }
 
 // --- Recherche live : filtre la grille de l'étape courante -----------------
@@ -2571,346 +2577,21 @@ function initBrandReflection() {
 }
 
 // ===========================================================================
-// ONGLET DASHBOARD — « ce que chacun a à faire ce matin »
+// ONGLET DASHBOARD — « Point du jour » (module dédié : dashboard.js)
 // ===========================================================================
-// Deux modes : « moi » (une personne → 3 blocs : Ma journée / En pilotage /
-// Référent) et « équipe » (les 4 employés en colonnes). Données = TOUT le
-// planning, restreint aux familles ACTIVES (Terminé, Archivé, Fiverr exclus).
-//
-// PILOTE EFFECTIF d'une ligne = son pilote saisi (responsable) s'il est un vrai
-// employé ; sinon le propriétaire de sa catégorie (sous-étape → sinon famille) ;
-// sinon personne (« À attribuer »). → une ligne « tombe » automatiquement chez
-// le bon employé via l'attribution des catégories, sans ressaisie, tout en
-// laissant le patron surcharger ligne par ligne.
-
-const DASH_ACTIVE_FAMILIES = ['demande', 'chiffrage', 'attente_client', 'preparation', 'production', 'facturation'];
-const DASH_ACTIVE_SET = new Set(DASH_ACTIVE_FAMILIES);
+// Toute la vue (KPI, vue équipe / perso, panneau détail « Envoyer vers », fil
+// d'activité, écran mural, attribution des catégories) vit dans dashboard.js.
+// Ici : le câblage — bascule Planning/Dashboard, saut vers une ligne du
+// planning, et injection des utilitaires partagés.
 
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
-const $sidebarHead = document.getElementById('sidebarHead');
-const $workHead = document.querySelector('.work-head');
-const $gridWrapEl = document.querySelector('.grid-wrap');
-const $fiverrToolEl = document.getElementById('fiverrTool');
 
 let viewMode = 'planning';        // 'planning' | 'dashboard'
-const savedMode = localStorage.getItem('olda_dash_mode');
-const savedWho = localStorage.getItem('olda_dash_who');
-let dashMode = savedMode === 'team' ? 'team' : 'me';   // 'me' | 'team'
-let dashWho = EMPLOYEES.includes(savedWho) ? savedWho : EMPLOYEES[0];
-let dashRows = [];                // tout le planning (cache dashboard)
-let categoryOwners = {};          // { slugCatégorie: employé }
-let dashLoaded = false;
-
-// Pilote effectif d'une ligne (voir en-tête de section).
-function effectivePilot(r) {
-  if (r.responsable && EMPLOYEES.includes(r.responsable)) return r.responsable;
-  return categoryOwners[r.sub_stage] || categoryOwners[r.stage] || null;
-}
-
-const isActiveDashRow = (r) => DASH_ACTIVE_SET.has(r.stage);
-
-// Tri « journée » : palier URGENT (retard/aujourd'hui/demain) en tête, trié par
-// deadline croissante puis étoiles décroissantes ; puis le RESTE, trié par
-// étoiles décroissantes puis deadline croissante (sans date = en bas).
-function sortDay(list) {
-  return list.slice().sort((a, b) => {
-    const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
-    const aU = ua !== null, bU = ub !== null;
-    if (aU !== bU) return aU ? -1 : 1;
-    if (aU && bU) {
-      if (ua !== ub) return ua - ub;
-      return prioBand(b) - prioBand(a);
-    }
-    const pd = prioBand(b) - prioBand(a);
-    if (pd !== 0) return pd;
-    return cmpDeadline(a.deadline, b.deadline);
-  });
-}
-
-const rowsPiloting = (who) => dashRows.filter((r) => isActiveDashRow(r) && effectivePilot(r) === who);
-const rowsReferent = (who) => dashRows.filter((r) => isActiveDashRow(r) && r.referent === who);
-function rowsDay(who) {
-  const seen = new Set();
-  const out = [];
-  for (const r of [...rowsPiloting(who), ...rowsReferent(who)]) {
-    if (seen.has(r.id)) continue;
-    seen.add(r.id);
-    out.push(r);
-  }
-  return sortDay(out);
-}
-
-// Libellé + classe d'urgence de l'échéance (pour la pastille de date).
-function deadlineInfo(r) {
-  const d = daysLeft(r.deadline);
-  if (d === null) return { txt: 'Sans date', cls: 'none' };
-  if (d < 0) return { txt: `Retard ${-d} j`, cls: 'late' };
-  if (d === 0) return { txt: "Aujourd'hui", cls: 'today' };
-  if (d === 1) return { txt: 'Demain', cls: 'soon' };
-  if (d <= 7) return { txt: `Dans ${d} j`, cls: 'week' };
-  return { txt: `Dans ${d} j`, cls: 'far' };
-}
-
-// Sauvegarde optimiste d'un champ depuis le dashboard (met à jour le cache local
-// puis appelle l'API ; le SSE resynchronisera de toute façon).
-function dashPatch(r, body) {
-  Object.assign(r, body);
-  renderDashboard();
-  api('PATCH', `/api/requests/${r.id}`, body).catch((err) => {
-    reportError(err);
-    loadDashData();
-  });
-}
-
-// Notes d'étoiles cliquables (1 à 3) réglant la priorité de la ligne.
-function buildStars(r) {
-  const wrap = document.createElement('div');
-  wrap.className = 'dash-stars';
-  attachTip(wrap, 'régler la priorité (étoiles)');
-  for (let i = 1; i <= 3; i++) {
-    const star = document.createElement('button');
-    star.type = 'button';
-    star.className = 'dash-star' + (i <= (r.priority || 1) ? ' on' : '');
-    star.textContent = i <= (r.priority || 1) ? '★' : '☆';
-    star.setAttribute('aria-label', `Priorité ${i} sur 3`);
-    star.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if ((r.priority || 1) === i) return;
-      dashPatch(r, { priority: i });
-    });
-    wrap.appendChild(star);
-  }
-  return wrap;
-}
-
-// Une carte de commande dans le dashboard. `role` = 'pilote' | 'referent' | 'both'.
-function buildDashCard(r, role) {
-  const card = document.createElement('article');
-  card.className = 'dash-card prio-' + prioBand(r);
-  const dl = deadlineInfo(r);
-  card.classList.add('dl-' + dl.cls);
-
-  // Ligne 1 : étoiles + client + pastille d'échéance.
-  const top = document.createElement('div');
-  top.className = 'dash-card-top';
-  top.appendChild(buildStars(r));
-  const client = document.createElement('span');
-  client.className = 'dash-card-client';
-  client.textContent = r.billing_company || 'Sans nom';
-  const due = document.createElement('span');
-  due.className = 'dash-card-due dl-' + dl.cls;
-  due.textContent = dl.txt;
-  top.append(client, due);
-  card.appendChild(top);
-
-  // Ligne 2 : produit / description.
-  const prod = document.createElement('p');
-  prod.className = 'dash-card-product';
-  prod.textContent = r.product || r.description || '—';
-  card.appendChild(prod);
-
-  // Ligne 3 : étape + sous-étape + badge de rôle.
-  const meta = document.createElement('div');
-  meta.className = 'dash-card-meta';
-  const stage = document.createElement('span');
-  stage.className = 'dash-card-stage';
-  stage.textContent = STAGE_LABEL[r.stage] || r.stage;
-  meta.appendChild(stage);
-  if (r.sub_stage && SUB_LABEL[r.sub_stage]) {
-    const sub = document.createElement('span');
-    sub.className = 'dash-card-sub';
-    sub.textContent = SUB_LABEL[r.sub_stage];
-    meta.appendChild(sub);
-  }
-  if (role) {
-    const badge = document.createElement('span');
-    badge.className = 'dash-card-role role-' + role;
-    badge.textContent = role === 'both' ? 'Pilote · Réf.' : role === 'pilote' ? 'Pilote' : 'Référent';
-    meta.appendChild(badge);
-  }
-  card.appendChild(meta);
-
-  card.addEventListener('click', () => dashJumpTo(r));
-  return card;
-}
-
-// Un bloc titré (« Ma journée », etc.) contenant une liste de cartes.
-function buildDashSection(title, icon, list, roleFor) {
-  const sec = document.createElement('section');
-  sec.className = 'dash-section';
-  const head = document.createElement('header');
-  head.className = 'dash-section-head';
-  const ic = document.createElement('span');
-  ic.className = 'material-symbols-outlined dash-section-ic';
-  ic.setAttribute('aria-hidden', 'true');
-  ic.textContent = icon;
-  const h = document.createElement('h2');
-  h.className = 'dash-section-title';
-  h.textContent = title;
-  const count = document.createElement('span');
-  count.className = 'dash-section-count';
-  count.textContent = list.length;
-  head.append(ic, h, count);
-  sec.appendChild(head);
-
-  if (!list.length) {
-    const empty = document.createElement('p');
-    empty.className = 'dash-empty';
-    empty.textContent = 'Rien pour le moment.';
-    sec.appendChild(empty);
-  } else {
-    const grid = document.createElement('div');
-    grid.className = 'dash-cards';
-    for (const r of list) grid.appendChild(buildDashCard(r, roleFor ? roleFor(r) : null));
-    sec.appendChild(grid);
-  }
-  return sec;
-}
-
-// Rôle d'une ligne pour une personne (dans « Ma journée »).
-function roleOf(r, who) {
-  const pil = effectivePilot(r) === who;
-  const ref = r.referent === who;
-  return pil && ref ? 'both' : pil ? 'pilote' : ref ? 'referent' : null;
-}
-
-// Vue « moi » : les 3 blocs pour la personne sélectionnée.
-function buildPersonView(who) {
-  const frag = document.createDocumentFragment();
-  frag.appendChild(buildDashSection('Ma journée', 'wb_sunny', rowsDay(who), (r) => roleOf(r, who)));
-  const cols = document.createElement('div');
-  cols.className = 'dash-duo';
-  cols.appendChild(buildDashSection('Mes projets en pilotage', 'flight_takeoff', sortDay(rowsPiloting(who)), () => 'pilote'));
-  cols.appendChild(buildDashSection('Mes projets où je suis référent', 'diversity_3', sortDay(rowsReferent(who)), () => 'referent'));
-  frag.appendChild(cols);
-  return frag;
-}
-
-// Vue « équipe » : les 4 employés en colonnes, chacun sa journée triée.
-function buildTeamView() {
-  const board = document.createElement('div');
-  board.className = 'dash-team';
-  for (const who of EMPLOYEES) {
-    const col = document.createElement('div');
-    col.className = 'dash-team-col';
-    const head = document.createElement('header');
-    head.className = 'dash-team-head';
-    const ini = document.createElement('span');
-    ini.className = 'dash-team-ini';
-    ini.textContent = who.charAt(0).toUpperCase();
-    const name = document.createElement('span');
-    name.className = 'dash-team-name';
-    name.textContent = who;
-    const day = rowsDay(who);
-    const count = document.createElement('span');
-    count.className = 'dash-team-count';
-    count.textContent = day.length;
-    head.append(ini, name, count);
-    col.appendChild(head);
-    const cards = document.createElement('div');
-    cards.className = 'dash-cards';
-    if (!day.length) {
-      const empty = document.createElement('p');
-      empty.className = 'dash-empty';
-      empty.textContent = 'Rien pour le moment.';
-      cards.appendChild(empty);
-    } else {
-      for (const r of day) cards.appendChild(buildDashCard(r, roleOf(r, who)));
-    }
-    col.appendChild(cards);
-    board.appendChild(col);
-  }
-  return board;
-}
-
-// Barre de contrôle : segmenté [employés…] [Équipe] + roue « Attribution ».
-function buildDashControls() {
-  const bar = document.createElement('div');
-  bar.className = 'dash-controls';
-
-  const seg = document.createElement('div');
-  seg.className = 'dash-seg';
-  const meLabel = document.createElement('span');
-  meLabel.className = 'dash-seg-label';
-  meLabel.textContent = 'Je suis';
-  seg.appendChild(meLabel);
-  for (const who of EMPLOYEES) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dash-seg-btn' + (dashMode === 'me' && dashWho === who ? ' active' : '');
-    b.textContent = who;
-    b.addEventListener('click', () => setDashPerson(who));
-    seg.appendChild(b);
-  }
-  const team = document.createElement('button');
-  team.type = 'button';
-  team.className = 'dash-seg-btn team' + (dashMode === 'team' ? ' active' : '');
-  const tIc = document.createElement('span');
-  tIc.className = 'material-symbols-outlined';
-  tIc.setAttribute('aria-hidden', 'true');
-  tIc.textContent = 'groups';
-  const tLabel = document.createElement('span');
-  tLabel.textContent = 'Équipe';
-  team.append(tIc, tLabel);
-  team.addEventListener('click', setDashTeam);
-  seg.appendChild(team);
-  bar.appendChild(seg);
-
-  const gear = document.createElement('button');
-  gear.type = 'button';
-  gear.className = 'dash-config-btn';
-  const gIc = document.createElement('span');
-  gIc.className = 'material-symbols-outlined';
-  gIc.setAttribute('aria-hidden', 'true');
-  gIc.textContent = 'tune';
-  const gLabel = document.createElement('span');
-  gLabel.textContent = 'Attribution des catégories';
-  gear.append(gIc, gLabel);
-  gear.addEventListener('click', openCategoryConfig);
-  bar.appendChild(gear);
-
-  return bar;
-}
-
-function renderDashboard() {
-  if (!$dashboard || viewMode !== 'dashboard') return;
-  $dashboard.replaceChildren();
-  $dashboard.appendChild(buildDashControls());
-  const body = document.createElement('div');
-  body.className = 'dash-body';
-  body.appendChild(dashMode === 'team' ? buildTeamView() : buildPersonView(dashWho));
-  $dashboard.appendChild(body);
-}
-
-function setDashPerson(who) {
-  dashMode = 'me';
-  dashWho = who;
-  localStorage.setItem('olda_dash_mode', 'me');
-  localStorage.setItem('olda_dash_who', who);
-  renderDashboard();
-}
-
-function setDashTeam() {
-  dashMode = 'team';
-  localStorage.setItem('olda_dash_mode', 'team');
-  renderDashboard();
-}
-
-async function loadDashData() {
-  const [reqs, owners] = await Promise.all([
-    api('GET', '/api/requests'),
-    api('GET', '/api/category-owners'),
-  ]);
-  dashRows = Array.isArray(reqs) ? reqs : [];
-  categoryOwners = owners && typeof owners === 'object' ? owners : {};
-  dashLoaded = true;
-  renderDashboard();
-}
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
-async function dashJumpTo(r) {
+async function jumpToPlanning(r) {
   setViewMode('planning');
   const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
   await selectStage(r.stage, sub);
@@ -2924,9 +2605,17 @@ async function dashJumpTo(r) {
   }
 }
 
+const dashboard = createDashboard({
+  root: $dashboard,
+  api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
+  daysLeft, prioBand, showToast, attachTip, fold, openMenu,
+  jumpToPlanning,
+  isLive: () => streamAlive,
+});
+
 // --- Bascule Planning / Dashboard ------------------------------------------
 function setViewMode(mode) {
-  if (mode === viewMode) { if (mode === 'dashboard') renderDashboard(); return; }
+  if (mode === viewMode) return;
   viewMode = mode;
   const dash = mode === 'dashboard';
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
@@ -2937,8 +2626,9 @@ function setViewMode(mode) {
   if ($viewDashboard) { $viewDashboard.classList.toggle('active', dash); $viewDashboard.setAttribute('aria-selected', String(dash)); }
   document.body.classList.toggle('view-dashboard', dash);
   if (dash) {
-    loadDashData().catch(reportError);
+    dashboard.show();
   } else {
+    dashboard.hide();
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
   }
@@ -2946,101 +2636,6 @@ function setViewMode(mode) {
 
 if ($viewPlanning) $viewPlanning.addEventListener('click', () => setViewMode('planning'));
 if ($viewDashboard) $viewDashboard.addEventListener('click', () => setViewMode('dashboard'));
-
-// ---------------------------------------------------------------------------
-// Panneau « Attribution des catégories » (config du patron). Pour chaque famille
-// active et ses sous-étapes, choisir l'employé propriétaire. Enregistré en direct.
-// ---------------------------------------------------------------------------
-let categoryConfigOpen = false;
-
-function buildCategoryRow(slug, label, indented) {
-  const row = document.createElement('div');
-  row.className = 'cat-row' + (indented ? ' indented' : '');
-  const name = document.createElement('span');
-  name.className = 'cat-row-label';
-  name.textContent = label;
-  const select = document.createElement('select');
-  select.className = 'cat-row-select';
-  const none = document.createElement('option');
-  none.value = '';
-  none.textContent = '— (aucun)';
-  select.appendChild(none);
-  for (const who of EMPLOYEES) {
-    const opt = document.createElement('option');
-    opt.value = who;
-    opt.textContent = who;
-    select.appendChild(opt);
-  }
-  select.value = categoryOwners[slug] || '';
-  select.addEventListener('change', () => {
-    if (select.value) categoryOwners[slug] = select.value;
-    else delete categoryOwners[slug];
-    saveCategoryOwners();
-  });
-  row.append(name, select);
-  return row;
-}
-
-function saveCategoryOwners() {
-  api('PUT', '/api/category-owners', categoryOwners)
-    .then((saved) => { categoryOwners = saved && typeof saved === 'object' ? saved : {}; renderDashboard(); })
-    .catch(reportError);
-}
-
-function openCategoryConfig() {
-  const overlay = document.createElement('div');
-  overlay.className = 'cat-overlay';
-  const card = document.createElement('div');
-  card.className = 'cat-card';
-  card.setAttribute('role', 'dialog');
-  card.setAttribute('aria-modal', 'true');
-
-  const close = () => {
-    categoryConfigOpen = false;
-    overlay.classList.remove('open');
-    setTimeout(() => overlay.remove(), 180);
-  };
-
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'cat-close';
-  closeBtn.setAttribute('aria-label', 'Fermer');
-  const closeIc = document.createElement('span');
-  closeIc.className = 'material-symbols-outlined';
-  closeIc.setAttribute('aria-hidden', 'true');
-  closeIc.textContent = 'close';
-  closeBtn.appendChild(closeIc);
-  closeBtn.addEventListener('click', close);
-
-  const title = document.createElement('h2');
-  title.className = 'cat-title';
-  title.textContent = 'Attribution des catégories';
-  const desc = document.createElement('p');
-  desc.className = 'cat-desc';
-  desc.textContent = "Qui pilote chaque catégorie par défaut ? Une ligne sans pilote saisi « tombe » automatiquement chez l'employé choisi ici. Le pilote posé sur une ligne précise reste prioritaire.";
-
-  card.append(closeBtn, title, desc);
-
-  const list = document.createElement('div');
-  list.className = 'cat-list';
-  for (const slug of DASH_ACTIVE_FAMILIES) {
-    const fam = FAMILIES.find((f) => f.slug === slug);
-    if (!fam) continue;
-    list.appendChild(buildCategoryRow(fam.slug, fam.label, false));
-    if (familyHasSub(fam.slug)) {
-      for (const sub of SUB_STAGES[fam.slug]) list.appendChild(buildCategoryRow(sub.slug, sub.label, true));
-    }
-  }
-  card.appendChild(list);
-  overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  document.body.appendChild(overlay);
-  categoryConfigOpen = true;
-  requestAnimationFrame(() => overlay.classList.add('open'));
-  document.addEventListener('keydown', function esc(e) {
-    if (e.key === 'Escape' && categoryConfigOpen) { close(); document.removeEventListener('keydown', esc); }
-  });
-}
 
 async function start() {
   setTodayDate();
@@ -3056,6 +2651,7 @@ async function start() {
   updateFiverrTool(currentStage);
   await loadRows();
   lastRowsSig = signature(rows);
+  dashboard.start(); // monte le « Point du jour » et charge son cache en fond
   startRealtime();
 }
 
