@@ -2,11 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
-  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1b30" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <title>Reçu client — Atelier OLDA</title>
+  <title>Commande Express — OLDA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -15,89 +14,174 @@
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
+<div class="app">
 
-<header class="topbar">
-  <img class="topbar__logo" src="olda-logo.svg" alt="" />
-  <h1 class="topbar__title">Reçu client</h1>
-  <div class="topbar__spacer"></div>
-  <label class="seller">
-    <span class="seller__label">Commande prise par</span>
-    <select id="vendeuse" class="seller__select"></select>
-  </label>
-  <a class="topbar__link" href="/" title="Ouvrir le planning">
-    <span class="ms" aria-hidden="true">grid_view</span> Planning
-  </a>
-</header>
+  <!-- ── Menu latéral ─────────────────────────────────────────────────── -->
+  <nav class="side" aria-label="Navigation principale">
+    <a class="side__brand" href="/" aria-label="Accueil OLDA">
+      <img src="olda-logo-glass.svg" alt="OLDA Saint-Martin" />
+    </a>
+    <ul class="side__nav" id="nav"></ul>
+  </nav>
 
-<main class="board">
-
-  <!-- ── Colonne 1 : client + article ─────────────────────────────────── -->
-  <section class="col col--client">
-    <div class="card">
-      <h2 class="card__title"><span class="ms" aria-hidden="true">person</span> Client</h2>
-      <div class="field-row">
-        <input id="prenom" class="input" type="text" placeholder="Prénom" autocomplete="off" enterkeyhint="next" />
-        <input id="nom" class="input" type="text" placeholder="Nom" autocomplete="off" enterkeyhint="next" />
+  <!-- ── Colonne applicative ──────────────────────────────────────────── -->
+  <div class="main">
+    <header class="appbar">
+      <span class="appbar__bolt ms" aria-hidden="true">bolt</span>
+      <div class="appbar__titles">
+        <h1 class="appbar__title">Commande Express</h1>
+        <p class="appbar__sub" id="appbar-sub">Tasse personnalisée</p>
       </div>
-      <input id="whatsapp" class="input" type="tel" inputmode="tel" placeholder="WhatsApp" autocomplete="off" />
-      <div class="stars" id="priority" role="radiogroup" aria-label="Priorité">
-        <button class="star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="ms">star</span></button>
-        <button class="star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="ms">star</span></button>
-        <button class="star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="ms">star</span></button>
+      <div class="appbar__actions">
+        <a class="btn btn--ghost" href="/">Annuler</a>
+        <button class="btn btn--primary" type="button" id="save">Enregistrer la commande</button>
       </div>
-    </div>
+    </header>
 
-    <div class="card card--grow">
-      <h2 class="card__title"><span class="ms" aria-hidden="true">local_cafe</span> Article</h2>
-      <div class="tiles" id="products" role="radiogroup" aria-label="Produit"></div>
-      <p class="label">Couleur</p>
-      <div class="chips" id="colors" role="radiogroup" aria-label="Couleur"></div>
-      <p class="label">Quantité</p>
-      <div class="stepper">
-        <button class="stepper__btn" type="button" id="qty-minus" aria-label="Retirer un article"><span class="ms">remove</span></button>
-        <output class="stepper__val" id="qty" for="qty-minus qty-plus">1</output>
-        <button class="stepper__btn" type="button" id="qty-plus" aria-label="Ajouter un article"><span class="ms">add</span></button>
+    <div class="content">
+
+      <!-- ── Colonne de gauche ──────────────────────────────────────── -->
+      <div class="colside">
+        <section class="card">
+          <h2 class="card__title">Client</h2>
+          <div class="client">
+            <div class="avatar ms" aria-hidden="true">person</div>
+            <div class="client__id">
+              <div class="client__line">
+                <input id="prenom" class="ghost ghost--name" type="text" placeholder="Prénom" autocomplete="off" aria-label="Prénom du client" />
+                <span class="wa" id="wa-badge" hidden><span class="ms" aria-hidden="true">chat</span> WhatsApp</span>
+              </div>
+              <input id="nom" class="ghost" type="text" placeholder="Nom" autocomplete="off" aria-label="Nom du client" />
+              <input id="whatsapp" class="ghost" type="tel" inputmode="tel" placeholder="Téléphone WhatsApp" autocomplete="off" aria-label="Téléphone WhatsApp" />
+            </div>
+          </div>
+          <button class="btn btn--block" type="button" id="see-client" disabled>Voir la fiche client</button>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">Produit</h2>
+          <div class="product">
+            <div class="product__thumb" id="product-thumb" aria-hidden="true"></div>
+            <div class="product__body">
+              <select id="product" class="select select--strong" aria-label="Produit"></select>
+              <div class="product__row">
+                <label class="product__label" for="qty">Quantité</label>
+                <input id="qty" class="input input--qty" type="number" min="1" max="999" step="1" value="1" />
+              </div>
+              <p class="product__row product__stock">
+                <span class="product__label">Stock :</span>
+                <span class="dot" id="stock-dot"></span><span id="stock-label">—</span>
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="color">Couleur</label>
+            <select id="color" class="select"></select>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">Résumé commande</h2>
+          <dl class="sum" id="sum"></dl>
+          <div class="sum__total"><span>TOTAL</span><b id="total">0,00 €</b></div>
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <h2 class="card__title">Paiement</h2>
+            <span class="pill" id="pay-pill">En attente</span>
+          </div>
+          <div class="field">
+            <label class="field__label" for="pay-statut">Statut</label>
+            <select id="pay-statut" class="select"></select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="pay-mode">Mode de paiement</label>
+            <select id="pay-mode" class="select"></select>
+          </div>
+        </section>
       </div>
-    </div>
-  </section>
 
-  <!-- ── Colonne 2 : les 3 faces ──────────────────────────────────────── -->
-  <section class="col col--faces" id="faces"></section>
+      <!-- ── Personnalisation ───────────────────────────────────────── -->
+      <section class="card card--perso">
+        <h2 class="card__title">Personnalisation de la tasse</h2>
+        <p class="banner">
+          <span class="ms" aria-hidden="true">info</span>
+          Choisissez un visuel existant ou saisissez votre texte personnalisé pour chaque face.
+        </p>
 
-  <!-- ── Colonne 3 : récapitulatif + validation ───────────────────────── -->
-  <aside class="col col--rail">
-    <div class="card card--grow">
-      <h2 class="card__title"><span class="ms" aria-hidden="true">receipt_long</span> Récapitulatif</h2>
-      <ul class="recap" id="recap"></ul>
-      <div class="recap__spacer"></div>
-      <p class="label">Délai</p>
-      <div class="chips chips--delai" id="delais" role="radiogroup" aria-label="Délai"></div>
-      <label class="date-row">
-        <span class="ms" aria-hidden="true">event</span>
-        <input id="deadline" class="input input--date" type="date" />
-      </label>
-      <p class="label">Paiement</p>
-      <div class="chips" id="paiements" role="radiogroup" aria-label="Mode de paiement"></div>
-    </div>
+        <div class="perso">
+          <div class="preview">
+            <div class="mugs" id="mugs"></div>
+            <p class="note">
+              <span class="ms" aria-hidden="true">lightbulb</span>
+              Aperçu indicatif. Le rendu final peut varier légèrement.
+            </p>
+            <div class="addbox">
+              <p class="addbox__title">Ajouter un élément supplémentaire <span>(optionnel)</span></p>
+              <button class="add" type="button" id="add-el">
+                <span class="ms" aria-hidden="true">add</span> Ajouter un élément (logo, texte, dessous…)
+              </button>
+            </div>
+          </div>
+          <div class="panels" id="panels"></div>
+        </div>
+      </section>
 
-    <div class="total">
-      <div class="total__line"><span>Sous-total</span><b id="t-sous">0,00 €</b></div>
-      <div class="total__line total__line--sup" id="t-sup-row"><span id="t-sup-lbl">Supplément</span><b id="t-sup">0,00 €</b></div>
-      <div class="total__grand"><span>Total</span><b id="t-total">0,00 €</b></div>
+      <!-- ── Bandeau du bas ─────────────────────────────────────────── -->
+      <div class="bottom">
+        <section class="card">
+          <h2 class="card__title">Délai souhaité par le client</h2>
+          <div class="delais" id="delais" role="radiogroup" aria-label="Délai souhaité"></div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">Date promise client</h2>
+          <div class="promise">
+            <span class="ms" aria-hidden="true">event</span>
+            <input id="deadline" class="input input--date" type="date" aria-label="Date promise" />
+          </div>
+          <div class="promise promise--time">
+            <span class="promise__at">à</span>
+            <input id="heure" class="input input--time" type="time" step="900" value="15:00" aria-label="Heure de retrait" />
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">Référent production</h2>
+          <div class="field field--icon">
+            <span class="ms" aria-hidden="true">person</span>
+            <select id="referent" class="select" aria-label="Référent production"></select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="vendeuse">Commande prise par</label>
+            <select id="vendeuse" class="select"></select>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">Statut</h2>
+          <div class="field field--icon">
+            <span class="dot dot--blue" aria-hidden="true"></span>
+            <select id="stage" class="select" aria-label="Statut de la commande"></select>
+          </div>
+          <div class="field">
+            <span class="field__label">Priorité</span>
+            <div class="stars" id="priority" role="radiogroup" aria-label="Priorité">
+              <button class="star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="ms">star</span></button>
+              <button class="star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="ms">star</span></button>
+              <button class="star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="ms">star</span></button>
+            </div>
+          </div>
+        </section>
+      </div>
+
     </div>
-    <div class="cta">
-      <p class="hint" id="hint"></p>
-      <button class="validate" type="button" id="validate">
-        <span class="ms" aria-hidden="true">check_circle</span>
-        <span id="validate-label">Valider la commande</span>
-      </button>
-    </div>
-  </aside>
-</main>
+  </div>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<!-- Confirmation plein écran : ce que la vendeuse montre au client. -->
 <div class="done" id="done" hidden>
   <div class="done__card">
     <div class="done__check"><span class="ms">check</span></div>
@@ -105,12 +189,12 @@
     <p class="done__sub" id="done-sub"></p>
     <div class="done__actions">
       <button class="btn btn--ghost" type="button" id="done-print"><span class="ms" aria-hidden="true">print</span> Imprimer le reçu</button>
-      <button class="btn btn--primary" type="button" id="done-new"><span class="ms" aria-hidden="true">add</span> Nouvelle commande</button>
+      <a class="btn btn--ghost" href="/">Voir le planning</a>
+      <button class="btn btn--primary" type="button" id="done-new">Nouvelle commande</button>
     </div>
   </div>
 </div>
 
-<!-- Reçu papier : masqué à l'écran, seule chose visible à l'impression. -->
 <div class="receipt" id="receipt" aria-hidden="true"></div>
 
 <script type="module" src="fiche.js"></script>

@@ -2951,6 +2951,14 @@ function setViewMode(mode) {
 if ($viewPlanning) $viewPlanning.addEventListener('click', () => setViewMode('planning'));
 if ($viewDashboard) $viewDashboard.addEventListener('click', () => setViewMode('dashboard'));
 
+// Lien profond « /#dashboard » : le menu latéral de la fiche (et n'importe quel
+// raccourci posé sur un écran) peut ouvrir directement le Point du jour.
+function applyHash() {
+  setViewMode(location.hash === '#dashboard' ? 'dashboard' : 'planning');
+}
+window.addEventListener('hashchange', applyHash);
+applyHash();
+
 async function start() {
   setTodayDate();
   initBrandReflection();
