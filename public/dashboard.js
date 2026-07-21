@@ -286,12 +286,22 @@ export function createDashboard(deps) {
     if (isDimmed(r)) b.classList.add('is-dim');
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
-    if (variant === 'mini') {
-      b.append(starsEl(r, 'mini'), el('span', 'pj-card-client', clientName(r)),
+    if (variant === 'mini' || variant === 'day') {
+      // Une ligne : étoiles · client · article · alerte · échéance.
+      // En « Ma journée » on ajoute dessous la prochaine action.
+      const row = el('div', 'pj-card-row');
+      row.append(starsEl(r, 'mini'), el('span', 'pj-card-client', clientName(r)),
         el('span', 'pj-card-article', articleOf(r)));
       const f = flagEl(r, false);
-      if (f) b.appendChild(f);
-      b.appendChild(badgeEl(r));
+      if (f) row.appendChild(f);
+      row.appendChild(badgeEl(r));
+      b.appendChild(row);
+      if (variant === 'day') {
+        const na = el('div', 'pj-card-next');
+        na.append(icon('bolt'), el('span', 'pj-card-next-label', 'Prochaine action'),
+          el('span', 'pj-card-next-text', nextActionOf(r)));
+        b.appendChild(na);
+      }
     } else {
       const top = el('div', 'pj-card-top');
       top.append(starsEl(r), el('span', 'pj-card-client', clientName(r)), badgeEl(r));
@@ -305,12 +315,6 @@ export function createDashboard(deps) {
       meta.appendChild(catChips(r));
       if (role) meta.appendChild(roleTag(role));
       b.appendChild(meta);
-      if (variant === 'day') {
-        const na = el('div', 'pj-card-next');
-        na.append(icon('bolt'), el('span', 'pj-card-next-label', 'Prochaine action'),
-          el('span', 'pj-card-next-text', nextActionOf(r)));
-        b.appendChild(na);
-      }
     }
     b.addEventListener('click', () => openDetail(r.id));
     return b;
@@ -478,11 +482,11 @@ export function createDashboard(deps) {
     const wrap = el('div', 'pj-person');
 
     // Ma journée : le plus pressant (retards, échéances proches, à planifier,
-    // « À commander »), 4 cartes max, avec la prochaine action.
+    // « À commander »), en liste, avec la prochaine action.
     const day = dayList(who).filter((r) => {
       const b = urgency(r).band;
       return b === 0 || b === 1 || b === 3 || r.sub_stage === 'a_commander';
-    }).slice(0, 4);
+    }).slice(0, 8);
 
     const main = el('section', 'pj-person-main');
     const mh = el('header', 'pj-section-head');
