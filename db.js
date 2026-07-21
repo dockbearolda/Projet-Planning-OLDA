@@ -95,6 +95,11 @@ const RESPONSABLES = [...EMPLOYEES, 'À attribuer'];
 // Types de client.
 const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
 
+// ALERTE portée par une commande (requests.flag), posable par n'importe quel
+// collaborateur depuis la grille. null = rien à signaler. Le MOTIF libre vit
+// dans requests.flag_reason (« BLOQUÉE — attente BAT client »).
+const FLAGS = ['bloque', 'a_voir'];
+
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
 // Choix du backend :
@@ -132,7 +137,10 @@ async function init() {
 
   // Migration : colonnes ajoutées après coup sur les bases existantes
   // (CREATE TABLE IF NOT EXISTS n'ajoute pas de colonnes à une table déjà créée).
-  for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable', 'referent']) {
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS <col> (aucune contrainte,
+  // aucune valeur par défaut → suppression sans effet de bord sur le reste).
+  for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable', 'referent',
+    'flag', 'flag_reason']) {
     try {
       await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
@@ -355,6 +363,7 @@ async function seed() {
       billing_company: 'Mairie de Vic', contact_referent: 'Service Com', quantity: 120,
       product: 'Tote bags sérigraphie', color: 'Écru', project_value: 3200,
       description: 'Sacs marché de Noël — TopTex en cours', deadline: inDays(1), position: 1000,
+      flag: 'bloque', flag_reason: 'Attente du BAT signé par le service Com',
     },
     {
       stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', priority: 2, client_type: 'asso',
@@ -367,6 +376,7 @@ async function seed() {
       billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.', quantity: 40,
       product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
       description: 'Découpe forme sur la Trotec', deadline: inDays(5), position: 1000,
+      flag: 'a_voir', flag_reason: 'Vérifier la teinte du blanc avec le client',
     },
     {
       stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', referent: 'Loïc', priority: 1, client_type: 'pro',
@@ -389,11 +399,13 @@ async function seed() {
     await pool.query(
       `INSERT INTO requests
         (stage, sub_stage, responsable, referent, priority, client_type, billing_company, contact_referent,
-         quantity, product, color, project_value, description, deadline, position, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+         quantity, product, color, project_value, description, deadline, position, created_at,
+         flag, flag_reason)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.referent ?? null, s.priority, s.client_type,
        s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
-       s.project_value, s.description, s.deadline, s.position, createdAt],
+       s.project_value, s.description, s.deadline, s.position, createdAt,
+       s.flag ?? null, s.flag_reason ?? null],
     );
   }
 }
@@ -465,7 +477,7 @@ async function setCategoryReferents(map) {
 
 module.exports = {
   pool, init, repairOrphanStages,
-  STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES,
+  STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
 };

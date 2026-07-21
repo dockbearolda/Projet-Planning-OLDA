@@ -78,6 +78,44 @@ const CLIENT_TYPES = [
 ];
 const CLIENT_TYPE_LABEL = Object.fromEntries(CLIENT_TYPES.map((t) => [t.value, t.label]));
 
+// --- Alerte de commande (requests.flag / flag_reason) ----------------------
+// N'importe quel collaborateur pose l'alerte depuis la colonne « État » : la
+// commande est BLOQUÉE (elle n'avance plus, on dit pourquoi) ou À VOIR (elle
+// avance, mais quelqu'un doit y jeter un œil). Le motif est libre et facultatif.
+const FLAGS = [
+  { value: 'bloque', label: 'BLOQUÉE', cls: 'bloque' },
+  { value: 'a_voir', label: 'À VOIR', cls: 'a-voir' },
+];
+const FLAG_BY_VALUE = Object.fromEntries(FLAGS.map((f) => [f.value, f]));
+const FLAG_REASON_MAX = 240; // miroir de server.js
+
+// --- Flux linéaire du pipeline (bouton « étape suivante ») ------------------
+// Ordre de progression réel d'un projet : les familles dans l'ordre de la
+// sidebar, et à l'intérieur d'une famille ses sous-étapes dans l'ordre. Un clic
+// sur la flèche d'une ligne l'envoie à la position suivante de cette liste.
+// Fiverr (catégorie spéciale hors flux) n'y figure pas : pas de flèche.
+const FLOW = FAMILIES.flatMap((f) => (
+  familyHasSub(f.slug)
+    ? SUB_STAGES[f.slug].map((s) => ({ stage: f.slug, sub: s.slug }))
+    : [{ stage: f.slug, sub: null }]
+));
+
+// Position suivante pour une commande, ou null si elle est en bout de flux
+// (Archivé) ou hors flux (Fiverr). Une commande posée sur une famille sans
+// sous-étape précisée (« à préciser ») avance vers la 1re sous-étape de sa
+// famille : c'est bien l'étape d'après pour elle.
+function nextFlowStep(r) {
+  if (!familyHasSub(r.stage)) {
+    const i = FLOW.findIndex((p) => p.stage === r.stage && p.sub === null);
+    return i >= 0 && i + 1 < FLOW.length ? FLOW[i + 1] : null;
+  }
+  if (!r.sub_stage) return FLOW.find((p) => p.stage === r.stage) || null;
+  const i = FLOW.findIndex((p) => p.stage === r.stage && p.sub === r.sub_stage);
+  return i >= 0 && i + 1 < FLOW.length ? FLOW[i + 1] : null;
+}
+
+const flowLabel = (p) => (p.sub ? `${STAGE_LABEL[p.stage]} · ${SUB_LABEL[p.sub]}` : STAGE_LABEL[p.stage]);
+
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
   fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
@@ -96,6 +134,41 @@ let counts = {};               // compteurs par étape
 let gridQuery = '';            // texte du filtre de recherche live (étape courante)
 let sort = { key: null, dir: 1 }; // tri manuel via en-têtes (null = tri par défaut)
 let lastRendered = [];         // dernière liste triée montée (pour le masquage recherche)
+let catOwners = {};            // { slugCatégorie: employé }   → pilote NOMMÉ DE BASE
+let catRefs = {};              // { slugCatégorie: [employés] } → référents NOMMÉS DE BASE
+
+// --- Pilote / référent effectifs -------------------------------------------
+// Chaque catégorie porte un pilote et des référents « de base » (config
+// « Attribution des catégories », sous-étape prioritaire sur la famille) : une
+// commande n'est donc JAMAIS sans nom. Ce qui est posé à la main sur la ligne
+// prime — et n'importe quel collaborateur peut le changer à tout moment, ou
+// revenir au nom de base en choisissant « Par défaut ».
+const ownerOf = (family, sub) => (sub && catOwners[sub]) || catOwners[family] || null;
+
+function referentsOf(family, sub) {
+  const subList = sub && catRefs[sub];
+  if (Array.isArray(subList) && subList.length) return subList;
+  const famList = catRefs[family];
+  return Array.isArray(famList) ? famList : [];
+}
+
+const isManualPilot = (r) => !!(r.responsable && EMPLOYEES.includes(r.responsable));
+const isManualReferent = (r) => !!(r.referent && EMPLOYEES.includes(r.referent));
+const effectivePilot = (r) => (isManualPilot(r) ? r.responsable : ownerOf(r.stage, r.sub_stage));
+const effectiveReferents = (r) => (isManualReferent(r) ? [r.referent] : referentsOf(r.stage, r.sub_stage));
+
+// Config d'attribution (pilote + référents de base). Silencieuse en cas
+// d'échec : la grille reste utilisable, elle affiche juste « Qui ? ».
+async function loadCategoryConfig() {
+  try {
+    const [owners, refs] = await Promise.all([
+      api('GET', '/api/category-owners'),
+      api('GET', '/api/category-referents'),
+    ]);
+    catOwners = owners && typeof owners === 'object' ? owners : {};
+    catRefs = refs && typeof refs === 'object' ? refs : {};
+  } catch (_) { /* silencieux */ }
+}
 
 // --- Sélecteurs ------------------------------------------------------------
 const $stages = document.getElementById('stages');
@@ -506,8 +579,20 @@ function daysLeft(deadline) {
   return Math.ceil((d - today) / 86400000);
 }
 
+// Rang de tri de la colonne État : ce qui bloque remonte, le calme descend.
+const FLAG_RANK = { bloque: 0, a_voir: 1 };
+
 function cmp(a, b, key) {
   let va = a[key], vb = b[key];
+  if (key === 'responsable') {
+    // On trie sur le nom AFFICHÉ (pilote effectif), pas sur la colonne brute :
+    // sinon toutes les lignes au pilote automatique se retrouvent groupées à vide.
+    va = effectivePilot(a) ?? '';
+    vb = effectivePilot(b) ?? '';
+  }
+  if (key === 'flag') {
+    return (FLAG_RANK[va] ?? 2) - (FLAG_RANK[vb] ?? 2);
+  }
   if (key === 'priority' || key === 'quantity' || key === 'project_value') {
     va = va == null ? -Infinity : Number(va);
     vb = vb == null ? -Infinity : Number(vb);
@@ -547,6 +632,19 @@ function ensureGroupHeader(band) {
   let g = groupEls.get(band);
   if (!g) { g = buildGroupHeader(band); groupEls.set(band, g); }
   return g;
+}
+
+// Force la reconstruction des lignes au prochain rendu. renderRows() ne remonte
+// une ligne que si son `updated_at` a bougé ; or l'affichage dépend aussi de
+// données EXTÉRIEURES à la ligne (pilote / référent de base d'une catégorie).
+// Quand cette config change, on périme les signatures pour tout recalculer.
+function invalidateRowCache(id) {
+  if (id != null) {
+    const entry = rowEls.get(String(id));
+    if (entry) entry.sig = '';
+    return;
+  }
+  for (const [, entry] of rowEls) entry.sig = '';
 }
 
 function renderRows(data) {
@@ -686,6 +784,10 @@ function buildRow(r) {
   tr.dataset.id = r.id;
   const draft = isDraftRow(r);
   if (draft) tr.classList.add('is-draft');
+  // Teinte d'alerte posée ici : cellFlag() ne peut pas atteindre le <tr> tant que
+  // sa cellule n'est pas montée (elle la remet à jour aux changements suivants).
+  if (r.flag === 'bloque') tr.classList.add('is-bloque');
+  else if (r.flag === 'a_voir') tr.classList.add('is-a-voir');
 
   // début de ligne : poignée draggable (ou bouton « + Ajouter » si brouillon)
   // + icône contact discret (téléphone / email), sans modifier le reste.
@@ -723,12 +825,16 @@ function buildRow(r) {
   // responsable : QUI agit (puce cliquable) — la réponse du patron au « personne
   // ne remplit » : chaque projet porte un nom.
   tr.appendChild(cellResponsable(r));
+  // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
+  tr.appendChild(cellFlag(r));
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
   // sous-étape : puce précisant ce qui se passe maintenant dans la famille
   tr.appendChild(cellSubStage(r));
+  // étape suivante : un clic pousse la commande à la position suivante du flux
+  tr.appendChild(cellNext(r));
   // infos : notes libres multi-lignes (ancien champ « description »)
   tr.appendChild(cellInfos(r));
   // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
@@ -843,9 +949,12 @@ function cellType(r) {
   return td;
 }
 
-// Pilote / Référent : QUI pilote le projet (puce principale) et QUI est le
-// référent secondaire (puce plus discrète en dessous). Les deux ouvrent le même
-// menu d'employés. Champ clé pour la responsabilisation et pour le dashboard.
+// Espace RESPONSABLE : QUI pilote le projet (puce principale) et QUI en est le
+// référent (puce plus discrète en dessous). Les deux affichent le nom EFFECTIF —
+// celui posé à la main sur la ligne, sinon le nom DE BASE de la catégorie
+// (puce en pointillés), pour qu'aucune commande ne reste anonyme. N'importe quel
+// collaborateur peut changer le référent (et le pilote) à tout moment, ou
+// revenir au nom de base via « Par défaut ».
 function cellResponsable(r) {
   const td = document.createElement('td');
   td.className = 'col-resp-cell';
@@ -857,14 +966,18 @@ function cellResponsable(r) {
   pilot.type = 'button';
   const renderPilot = () => {
     pilot.replaceChildren();
-    if (r.responsable) {
-      pilot.className = 'resp-chip';
+    const who = effectivePilot(r);
+    const auto = !!who && !isManualPilot(r);
+    if (who) {
+      pilot.className = 'resp-chip' + (auto ? ' auto' : '');
       const ini = document.createElement('span');
       ini.className = 'resp-ini';
-      ini.textContent = r.responsable.charAt(0).toUpperCase();
+      ini.textContent = who.charAt(0).toUpperCase();
       const name = document.createElement('span');
       name.className = 'resp-name';
-      name.textContent = r.responsable;
+      name.textContent = who;
+      // Pas de mot « auto » écrit dans la puce : la colonne est étroite et le NOM
+      // est ce qui compte. Le liseré pointillé le signale, l'infobulle l'explique.
       pilot.append(ini, name);
     } else {
       pilot.className = 'resp-chip empty';
@@ -873,37 +986,46 @@ function cellResponsable(r) {
       name.textContent = 'Qui ?';
       pilot.append(name);
     }
+    attachTip(pilot, auto
+      ? `Pilote par défaut de la catégorie : ${who} — cliquer pour en nommer un autre`
+      : 'assigner le pilote');
   };
   renderPilot();
-  attachTip(pilot, 'assigner le pilote');
   pilot.addEventListener('click', (e) => {
     e.stopPropagation();
+    const base = ownerOf(r.stage, r.sub_stage);
     const items = RESPONSABLES.map((n) => ({ value: n, label: n }));
-    items.push({ value: null, label: 'Aucun', muted: true });
+    items.push({ value: null, label: base ? `Par défaut (${base})` : 'Aucun', muted: true });
     openMenu(pilot, items, r.responsable ?? null, (val) => {
       if ((val ?? null) === (r.responsable ?? null)) return;
       patch(r, { responsable: val }, () => { r.responsable = val; renderPilot(); });
     });
   });
 
-  // --- Référent (2e personne, facultatif) ---
+  // --- Référent (2e personne) : modifiable par n'importe quel collaborateur ---
   const ref = document.createElement('button');
   ref.type = 'button';
   const renderRef = () => {
-    if (r.referent) {
-      ref.className = 'ref-chip';
-      ref.textContent = 'Réf. ' + r.referent;
+    const who = effectiveReferents(r);
+    const auto = who.length > 0 && !isManualReferent(r);
+    if (who.length) {
+      ref.className = 'ref-chip' + (auto ? ' auto' : '');
+      ref.textContent = 'Réf. ' + who.join(', ');
+      attachTip(ref, auto
+        ? `Référent${who.length > 1 ? 's' : ''} par défaut de la catégorie : ${who.join(', ')} — cliquer pour en nommer un autre`
+        : 'changer le référent');
     } else {
       ref.className = 'ref-chip empty';
       ref.textContent = '+ référent';
+      attachTip(ref, 'ajouter un référent');
     }
   };
   renderRef();
-  attachTip(ref, 'ajouter un référent');
   ref.addEventListener('click', (e) => {
     e.stopPropagation();
+    const base = referentsOf(r.stage, r.sub_stage);
     const items = EMPLOYEES.map((n) => ({ value: n, label: n }));
-    items.push({ value: null, label: 'Aucun', muted: true });
+    items.push({ value: null, label: base.length ? `Par défaut (${base.join(', ')})` : 'Aucun', muted: true });
     openMenu(ref, items, r.referent ?? null, (val) => {
       if ((val ?? null) === (r.referent ?? null)) return;
       patch(r, { referent: val }, () => { r.referent = val; renderRef(); });
@@ -913,6 +1035,124 @@ function cellResponsable(r) {
   stack.append(pilot, ref);
   td.appendChild(stack);
   return td;
+}
+
+// Colonne ÉTAT : l'alerte que n'importe qui pose sur la commande — BLOQUÉE
+// (avec le motif : pourquoi ça n'avance plus) ou À VOIR. Un clic ouvre le menu ;
+// choisir une alerte enchaîne sur la saisie du motif (facultatif).
+function cellFlag(r) {
+  const td = document.createElement('td');
+  td.className = 'col-flag-cell';
+  const stack = document.createElement('div');
+  stack.className = 'flag-stack';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  const reason = document.createElement('button');
+  reason.type = 'button';
+  reason.className = 'flag-reason';
+
+  const render = () => {
+    const f = FLAG_BY_VALUE[r.flag];
+    if (f) {
+      btn.className = 'flag-chip ' + f.cls;
+      btn.textContent = f.label;
+      attachTip(btn, r.flag_reason ? `${f.label} — ${r.flag_reason}` : `${f.label} — ajouter un motif`);
+      reason.textContent = r.flag_reason || '+ motif';
+      reason.classList.toggle('empty', !r.flag_reason);
+      reason.hidden = false;
+      attachTip(reason, r.flag_reason ? `Motif : ${r.flag_reason}` : 'préciser le motif');
+    } else {
+      btn.className = 'flag-chip empty';
+      btn.textContent = '+ état';
+      attachTip(btn, 'signaler : BLOQUÉE (avec motif) ou À VOIR');
+      reason.textContent = '';
+      reason.hidden = true;
+    }
+    // La ligne entière se teinte : une commande bloquée doit sauter aux yeux.
+    const tr = td.closest('tr');
+    if (tr) {
+      tr.classList.toggle('is-bloque', r.flag === 'bloque');
+      tr.classList.toggle('is-a-voir', r.flag === 'a_voir');
+    }
+  };
+
+  // Enregistre alerte + motif d'un bloc (un seul PATCH, un seul rollback).
+  const save = (flag, motif) => {
+    const body = { flag: flag ?? null, flag_reason: flag ? (motif || null) : null };
+    if (body.flag === (r.flag ?? null) && body.flag_reason === (r.flag_reason ?? null)) return;
+    patch(r, body, () => { r.flag = body.flag; r.flag_reason = body.flag_reason; render(); });
+  };
+
+  render();
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const items = FLAGS.map((f) => ({ value: f.value, label: f.label }));
+    items.push({ value: null, label: 'Rien à signaler', muted: true });
+    openMenu(btn, items, r.flag ?? null, (val) => {
+      if (!val) return save(null, null);
+      // Une alerte se justifie : on enchaîne sur le motif (validable à vide).
+      openReasonPrompt(btn, FLAG_BY_VALUE[val].label, r.flag_reason || '', (motif) => save(val, motif));
+    });
+  });
+  reason.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!r.flag) return;
+    openReasonPrompt(reason, FLAG_BY_VALUE[r.flag].label, r.flag_reason || '', (motif) => save(r.flag, motif));
+  });
+
+  stack.append(btn, reason);
+  td.appendChild(stack);
+  return td;
+}
+
+// Bouton « étape suivante » : un clic envoie la commande à la position suivante
+// du flux (sous-étape suivante, ou 1re sous-étape de la famille d'après). Rien à
+// afficher en bout de flux (Archivé) ou hors flux (Fiverr).
+function cellNext(r) {
+  const td = document.createElement('td');
+  td.className = 'col-next-cell';
+  if (isDraftRow(r)) return td;
+  const next = nextFlowStep(r);
+  if (!next) return td;
+
+  const btn = document.createElement('button');
+  btn.className = 'next-btn';
+  btn.type = 'button';
+  const label = flowLabel(next);
+  attachTip(btn, `Étape suivante → ${label}`);
+  btn.setAttribute('aria-label', `Envoyer à l’étape suivante : ${label}`);
+  btn.appendChild(arrowIcon());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideTip();
+    showToast(`→ ${label}`);
+    moveToStage(r, next.stage, next.sub);
+  });
+  td.appendChild(btn);
+  return td;
+}
+
+// Flèche « suivant » construite en DOM (pas d'innerHTML) : même trait que les
+// autres icônes de la grille.
+function arrowIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '17');
+  svg.setAttribute('height', '17');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2.2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of ['M5 12h13', 'M12 5l7 7-7 7']) {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  return svg;
 }
 
 // Sous-étape : précise ce qui se passe MAINTENANT dans la famille. Puce
@@ -1222,6 +1462,68 @@ function openMenu(anchor, items, current, onPick) {
   }, 0);
 }
 
+// --- Saisie du motif d'alerte (popover) ------------------------------------
+// « BLOQUÉE — pourquoi ? » : petit popover ancré à la puce d'état, même idiome
+// que le menu. Le motif est FACULTATIF (Entrée / Enregistrer valide même vide),
+// pour ne jamais bloquer quelqu'un qui veut juste signaler vite fait.
+// Réutilise openMenuEl : ouvrir l'un ferme l'autre, un clic dehors ferme tout.
+function openReasonPrompt(anchor, title, value, onSave) {
+  closeMenu();
+  closeCalendar();
+  const pop = document.createElement('div');
+  pop.className = 'menu-pop reason-pop';
+
+  const head = document.createElement('div');
+  head.className = 'reason-title';
+  head.textContent = `${title} — motif`;
+
+  const input = document.createElement('textarea');
+  input.className = 'reason-input';
+  input.rows = 2;
+  input.maxLength = FLAG_REASON_MAX;
+  input.value = value || '';
+  input.placeholder = 'ex. attente du BAT signé par le client';
+
+  const actions = document.createElement('div');
+  actions.className = 'reason-actions';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'reason-btn';
+  cancel.textContent = 'Annuler';
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'reason-btn primary';
+  ok.textContent = 'Enregistrer';
+  actions.append(cancel, ok);
+
+  const commit = () => { const v = input.value.trim(); closeMenu(); onSave(v); };
+  ok.addEventListener('click', (e) => { e.stopPropagation(); commit(); });
+  cancel.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); });
+  // Entrée valide (Maj+Entrée = retour à la ligne) : saisie au clavier sans souris.
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
+  });
+
+  pop.append(head, input, actions);
+  document.body.appendChild(pop);
+  const pr = anchor.getBoundingClientRect();
+  const cr = pop.getBoundingClientRect();
+  let top = pr.bottom + 4;
+  if (top + cr.height > window.innerHeight - 8) top = pr.top - cr.height - 4;
+  let left = pr.left;
+  if (left + cr.width > window.innerWidth - 8) left = window.innerWidth - cr.width - 8;
+  pop.style.top = Math.max(8, Math.round(top)) + 'px';
+  pop.style.left = Math.max(8, Math.round(left)) + 'px';
+
+  openMenuEl = pop;
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onMenuDocDown, true);
+    document.addEventListener('keydown', onMenuKey, true);
+    input.focus();
+    input.select();
+  }, 0);
+}
+
 // --- Calendrier d'échéance (popup mois complet) ----------------------------
 // Au clic sur le badge échéance, on ouvre un vrai calendrier (grille du mois)
 // pour choisir la date — même idiome de popup que le menu d'état.
@@ -1459,7 +1761,8 @@ function makeOptimisticRow() {
     stage: currentStage,
     // Créée depuis une sous-catégorie → elle en hérite (sinon la ligne
     // n'apparaîtrait pas dans la vue filtrée où on vient de la créer).
-    sub_stage: currentSub, responsable: null,
+    sub_stage: currentSub, responsable: null, referent: null,
+    flag: null, flag_reason: null,
     priority: 1, client_type: 'pro',
     billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
     quantity: null, product: null, color: null, project_value: null,
@@ -1596,6 +1899,8 @@ function copyBody(r, stage) {
     project_value: r.project_value,
     description: r.description,
     deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
+    // `flag` / `flag_reason` volontairement NON copiés : une copie repart d'une
+    // page blanche, elle n'hérite pas du blocage de l'originale.
   };
 }
 
@@ -1791,7 +2096,10 @@ function moveToStage(r, slug, targetSub = null) {
     bumpCount(slug, +1);
   }
   // Même famille, seule la sous-étape change : la ligne reste dans `rows` ; le
-  // filtre de sous-catégorie (applySortAndRender) l'affiche ou la masque.
+  // filtre de sous-catégorie (applySortAndRender) l'affiche ou la masque. On
+  // périme sa signature pour que la puce de sous-étape, le pilote de base et la
+  // flèche « étape suivante » se recalculent tout de suite (sans attendre le SSE).
+  invalidateRowCache(r.id);
   applySortAndRender();
   api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: targetSub }).catch((err) => {
     rows = prevRows;
@@ -1886,8 +2194,8 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 52, stars: 78, client_type: 96, responsable: 148, client: 210, product: 220,
-  sub_stage: 170, description: 210, deadline: 136, del: 200,
+  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, product: 220,
+  sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};
@@ -1937,7 +2245,7 @@ function ensureManualWidths() {
 function attachColResizers() {
   document.querySelectorAll('#grid thead th').forEach((th, i) => {
     const key = COL_KEYS[i];
-    if (key === 'del') return; // colonne d'actions : pas de poignée
+    if (key === 'del' || key === 'next') return; // colonnes d'actions : pas de poignée
     const h = document.createElement('span');
     h.className = 'col-resizer';
     attachTip(h, 'glisser pour régler la largeur');
@@ -2053,6 +2361,13 @@ let streamAlive = false;
 let streamDebounce = null;
 
 function onStreamChange(e) {
+  // Le patron vient de changer l'attribution des catégories : les pilotes et
+  // référents « de base » affichés sur les lignes doivent suivre immédiatement.
+  let kind = null;
+  try { kind = JSON.parse(e && e.data ? e.data : '{}').kind; } catch (_) {}
+  if (kind === 'category-owners' || kind === 'category-referents') {
+    loadCategoryConfig().then(() => { invalidateRowCache(); applySortAndRender(); });
+  }
   // Le planning a changé côté serveur → le cache global de recherche est périmé.
   // On l'invalide, et si la palette est ouverte on recharge + ré-affiche.
   allRows = null;
@@ -2090,7 +2405,7 @@ function startRealtime() {
 // Le champ inline (work-head) filtre en direct les lignes affichées par
 // société / référent / produit / description / contact. ⌘K (ou Ctrl+K) place
 // le curseur dans le champ ; Échap efface le filtre puis rend la main.
-const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color', 'description', 'contact_phone', 'contact_email', 'responsable', 'referent'];
+const SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'color', 'description', 'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason'];
 
 function fold(s) {
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -2644,7 +2959,9 @@ async function start() {
   attachColResizers();
   updateSubColVisibility(currentStage);
   applyColWidths();
-  await loadCounts();
+  // Les noms « de base » (pilote + référents par catégorie) doivent être connus
+  // AVANT le premier rendu, sinon les lignes s'affichent en « Qui ? » puis sautent.
+  await Promise.all([loadCategoryConfig(), loadCounts()]);
   $stageTitle.textContent = STAGE_LABEL[currentStage];
   updateStageLink(currentStage);
   updateStageHelp();

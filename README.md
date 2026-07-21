@@ -16,11 +16,20 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 - **Sous-étape** en puce inline (précise l'action en cours), affichée uniquement
   pour les familles qui en ont (Chiffrage, Préparation, Production, Facturation,
   Terminé). Changer de famille en glissant remet la sous-étape à zéro.
-- **Responsable** en puce (Loïc / Mélina / Charlie / Opérateur / À attribuer) :
-  chaque projet porte un nom, pour la responsabilisation.
+- **Espace Responsable** sur chaque ligne : le PILOTE et le RÉFÉRENT du projet.
+  Les deux affichent le nom EFFECTIF — celui posé à la main, sinon le nom « de
+  base » de la catégorie (puce en pointillés). N'importe quel collaborateur peut
+  en changer à tout moment, ou revenir au nom de base via « Par défaut ».
+- **Colonne État** : l'alerte que n'importe qui pose sur une commande —
+  **BLOQUÉE** (avec un **motif** libre : pourquoi ça n'avance plus) ou
+  **À VOIR**. La ligne entière se teinte et porte un liseré, le motif est
+  cherchable, et le Point du jour compte les bloquées.
+- **Bouton « étape suivante »** (colonne `→`) : un clic pousse la commande à la
+  position suivante du flux — sous-étape suivante, ou 1re sous-étape de la
+  famille d'après. Rien à afficher en bout de flux (Archivé) ni hors flux (Fiverr).
 - Grille type tableur, poignée de glisser, en-tête collant.
 - Édition inline avec persistance optimiste (PATCH immédiat, rollback si échec).
-- Priorité par étoiles (1–3), type client pro / perso / asso / revendeur, état en pastille.
+- Priorité par étoiles (1–3), type client pro / perso / asso / revendeur.
 - « Jours restant » calculé et coloré (vert > 7 j, orange 1–7 j, rouge ≤ 0 j).
 - Glisser-déposer d'une ligne sur une étape de la sidebar → change le `stage`,
   compteurs mis à jour sans rechargement. Réordonnancement vertical (position).
@@ -45,7 +54,7 @@ propre, tout vient de `/api/requests` + `/api/category-owners`, et toute action
 resynchronise Planning et Dashboard.
 
 Composants (`public/dashboard.js`, styles scopés `.pj-*` / `.dd-*` / `.wall`) :
-header sticky avec 4 KPI cliquables (filtre par estompage), vue Équipe en
+header sticky avec 5 KPI cliquables dont « Bloquées » (filtre par estompage), vue Équipe en
 4 colonnes / vue perso (« Je suis »), panneau détail avec « Envoyer vers »,
 fil d'activité « Ce qui a bougé », mode Écran mural (rotation A/B 20 s).
 
@@ -64,6 +73,10 @@ Le **pilote effectif** d'une commande est calculé ainsi :
 l'attribution (la commande change de colonne), sauf pilote manuel qui reste.
 Une commande **« Sans date » créée depuis ≥ 7 jours** devient « À planifier »
 (badge orange, remonte dans le tri, jamais comptée en retard).
+
+Une commande **BLOQUÉE / À VOIR** porte son bandeau d'alerte (motif compris) sur
+sa carte, et l'alerte se **lève d'un tap** depuis le panneau détail : c'est la
+manœuvre du point du matin. La poser (avec motif) se fait depuis le Planning.
 
 ## Démarrage local
 
@@ -137,8 +150,12 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 
 Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
 connues ou null ; `responsable` ∈ liste connue ou null ; `priority` ∈ {1,2,3} ;
-`client_type` ∈ {pro, perso, asso, revendeur}. Erreurs renvoyées en JSON avec
+`client_type` ∈ {pro, perso, asso, revendeur} ; `flag` ∈ {bloque, a_voir} ou
+null ; `flag_reason` tronqué à 240 caractères. Erreurs renvoyées en JSON avec
 code HTTP adapté.
+
+**Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
+l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
 ## Structure
 
@@ -163,7 +180,8 @@ code HTTP adapté.
 Opérateur / À attribuer), `priority` (1–3), `client_type`
 (pro/perso/asso/revendeur), `billing_company`, `contact_referent`, `quantity`,
 `product`, `project_value` (numeric), `description`, `deadline` (date), `status`
-(sous-statut libre, distinct du `stage`), `position` (tri manuel), `created_at`,
+(sous-statut libre, distinct du `stage`), `flag` (`bloque` / `a_voir` / null),
+`flag_reason` (motif libre de l'alerte), `position` (tri manuel), `created_at`,
 `updated_at`.
 
 Le passage de l'ancien pipeline linéaire (20 étapes) au modèle « familles » se
