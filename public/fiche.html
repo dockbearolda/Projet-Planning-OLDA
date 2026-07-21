@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Reçu client — Atelier OLDA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="fiche.css" />
+  <link rel="icon" href="olda-logo.svg" />
+</head>
+<body>
+
+<header class="topbar">
+  <img class="topbar__logo" src="olda-logo.svg" alt="" />
+  <h1 class="topbar__title">Reçu client</h1>
+  <div class="topbar__spacer"></div>
+  <label class="seller">
+    <span class="seller__label">Commande prise par</span>
+    <select id="vendeuse" class="seller__select"></select>
+  </label>
+  <a class="topbar__link" href="/" title="Ouvrir le planning">
+    <span class="ms" aria-hidden="true">grid_view</span> Planning
+  </a>
+</header>
+
+<main class="board">
+
+  <!-- ── Colonne 1 : client + article ─────────────────────────────────── -->
+  <section class="col col--client">
+    <div class="card">
+      <h2 class="card__title"><span class="ms" aria-hidden="true">person</span> Client</h2>
+      <div class="field-row">
+        <input id="prenom" class="input" type="text" placeholder="Prénom" autocomplete="off" enterkeyhint="next" />
+        <input id="nom" class="input" type="text" placeholder="Nom" autocomplete="off" enterkeyhint="next" />
+      </div>
+      <input id="whatsapp" class="input" type="tel" inputmode="tel" placeholder="WhatsApp" autocomplete="off" />
+      <div class="stars" id="priority" role="radiogroup" aria-label="Priorité">
+        <button class="star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="ms">star</span></button>
+        <button class="star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="ms">star</span></button>
+        <button class="star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="ms">star</span></button>
+      </div>
+    </div>
+
+    <div class="card card--grow">
+      <h2 class="card__title"><span class="ms" aria-hidden="true">local_cafe</span> Article</h2>
+      <div class="tiles" id="products" role="radiogroup" aria-label="Produit"></div>
+      <p class="label">Couleur</p>
+      <div class="chips" id="colors" role="radiogroup" aria-label="Couleur"></div>
+      <p class="label">Quantité</p>
+      <div class="stepper">
+        <button class="stepper__btn" type="button" id="qty-minus" aria-label="Retirer un article"><span class="ms">remove</span></button>
+        <output class="stepper__val" id="qty" for="qty-minus qty-plus">1</output>
+        <button class="stepper__btn" type="button" id="qty-plus" aria-label="Ajouter un article"><span class="ms">add</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Colonne 2 : les 3 faces ──────────────────────────────────────── -->
+  <section class="col col--faces" id="faces"></section>
+
+  <!-- ── Colonne 3 : récapitulatif + validation ───────────────────────── -->
+  <aside class="col col--rail">
+    <div class="card card--grow">
+      <h2 class="card__title"><span class="ms" aria-hidden="true">receipt_long</span> Récapitulatif</h2>
+      <ul class="recap" id="recap"></ul>
+      <div class="recap__spacer"></div>
+      <p class="label">Délai</p>
+      <div class="chips chips--delai" id="delais" role="radiogroup" aria-label="Délai"></div>
+      <label class="date-row">
+        <span class="ms" aria-hidden="true">event</span>
+        <input id="deadline" class="input input--date" type="date" />
+      </label>
+      <p class="label">Paiement</p>
+      <div class="chips" id="paiements" role="radiogroup" aria-label="Mode de paiement"></div>
+    </div>
+
+    <div class="total">
+      <div class="total__line"><span>Sous-total</span><b id="t-sous">0,00 €</b></div>
+      <div class="total__line total__line--sup" id="t-sup-row"><span id="t-sup-lbl">Supplément</span><b id="t-sup">0,00 €</b></div>
+      <div class="total__grand"><span>Total</span><b id="t-total">0,00 €</b></div>
+    </div>
+    <div class="cta">
+      <p class="hint" id="hint"></p>
+      <button class="validate" type="button" id="validate">
+        <span class="ms" aria-hidden="true">check_circle</span>
+        <span id="validate-label">Valider la commande</span>
+      </button>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Confirmation plein écran : ce que la vendeuse montre au client. -->
+<div class="done" id="done" hidden>
+  <div class="done__card">
+    <div class="done__check"><span class="ms">check</span></div>
+    <p class="done__title">Commande enregistrée</p>
+    <p class="done__sub" id="done-sub"></p>
+    <div class="done__actions">
+      <button class="btn btn--ghost" type="button" id="done-print"><span class="ms" aria-hidden="true">print</span> Imprimer le reçu</button>
+      <button class="btn btn--primary" type="button" id="done-new"><span class="ms" aria-hidden="true">add</span> Nouvelle commande</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reçu papier : masqué à l'écran, seule chose visible à l'impression. -->
+<div class="receipt" id="receipt" aria-hidden="true"></div>
+
+<script type="module" src="fiche.js"></script>
+</body>
+</html>

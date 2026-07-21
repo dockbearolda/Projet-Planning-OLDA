@@ -435,10 +435,174 @@ app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
+// Fiche vendeuse (tablette) — /fiche
+// Le catalogue (produits, options, délais, typos, logos) est la source unique
+// des prix : le front l'affiche, le serveur s'en ressert pour RECALCULER le
+// total. Le montant envoyé par la tablette n'est jamais cru sur parole.
+// ---------------------------------------------------------------------------
+const CATALOG = require('./catalog.json');
+const OPTION_BY_ID = new Map(CATALOG.options.map((o) => [o.id, o]));
+const DELAI_BY_ID = new Map(CATALOG.delais.map((d) => [d.id, d]));
+const PRODUCT_BY_SKU = new Map(CATALOG.products.map((p) => [p.sku, p]));
+const PAIEMENT_BY_ID = new Map(CATALOG.paiements.map((p) => [p.id, p]));
+
+app.get('/api/fiche/catalog', (req, res) => {
+  res.json({ ...CATALOG, vendeuses: RESPONSABLES });
+});
+
+// Arrondi monétaire : évite les 30.800000000000004 en base et sur le reçu.
+const euro = (n) => Math.round(n * 100) / 100;
+
+// Reconstruit le détail d'une fiche à partir du corps reçu : valide chaque
+// référence contre le catalogue et renvoie { fiche, total, resume } ou une
+// erreur explicite. Aucune écriture ici — la fonction est pure.
+function buildFiche(body) {
+  const product = PRODUCT_BY_SKU.get(body.product);
+  if (!product) return { error: `produit inconnu : ${body.product}` };
+
+  const delai = DELAI_BY_ID.get(body.delai);
+  if (!delai) return { error: `délai inconnu : ${body.delai}` };
+
+  const paiement = PAIEMENT_BY_ID.get(body.paiement);
+  if (!paiement) return { error: `mode de paiement inconnu : ${body.paiement}` };
+
+  const quantity = Number.parseInt(body.quantity, 10);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
+    return { error: 'quantité invalide (1 à 999)' };
+  }
+
+  const prenom = String(body.prenom || '').trim();
+  const nom = String(body.nom || '').trim();
+  if (!prenom && !nom) return { error: 'nom du client requis' };
+
+  const color = CATALOG.colors.includes(body.color) ? body.color : CATALOG.colors[0];
+
+  const faces = [];
+  for (const def of CATALOG.faces) {
+    const raw = (body.faces && body.faces[def.id]) || {};
+    const opt = OPTION_BY_ID.get(raw.option || 'aucune');
+    if (!opt) return { error: `option inconnue : ${raw.option}` };
+    if (opt.id === 'aucune') continue;
+
+    const face = {
+      id: def.id,
+      label: `${def.label} — ${def.hint}`,
+      option: opt.id,
+      optionLabel: opt.label,
+      price: opt.price,
+      remarque: String(raw.remarque || '').trim() || null,
+    };
+
+    if (opt.needs === 'texte') {
+      face.texte = String(raw.texte || '').trim();
+      if (!face.texte) return { error: `${def.label} : le texte personnalisé est vide` };
+      const typo = CATALOG.typos.find((t) => t.id === raw.typo);
+      if (!typo) return { error: `${def.label} : typographie manquante` };
+      face.typo = typo.id;
+      face.typoLabel = typo.label;
+    } else if (opt.needs === 'logo_olda') {
+      if (!CATALOG.logosOlda.includes(raw.logo)) {
+        return { error: `${def.label} : référence logo OLDA manquante` };
+      }
+      face.logo = raw.logo;
+    } else if (opt.needs === 'logo_client') {
+      face.logo = String(raw.logo || '').trim();
+      if (!face.logo) return { error: `${def.label} : nom du fichier client manquant` };
+    }
+    faces.push(face);
+  }
+
+  if (faces.length === 0) return { error: 'aucune personnalisation : la fiche est vide' };
+
+  const unitaire = euro(product.price + faces.reduce((s, f) => s + f.price, 0));
+  const sousTotal = euro(unitaire * quantity);
+  const supplement = euro(sousTotal * delai.rate);
+  const total = euro(sousTotal + supplement);
+
+  // Échéance : la date choisie par la vendeuse fait foi ; à défaut on applique
+  // le nombre de jours du délai retenu.
+  let deadline = typeof body.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.deadline)
+    ? body.deadline
+    : null;
+  if (!deadline) {
+    const d = new Date();
+    d.setDate(d.getDate() + delai.days);
+    deadline = d.toISOString().slice(0, 10);
+  }
+
+  const fiche = {
+    client: { prenom, nom, whatsapp: String(body.whatsapp || '').trim() || null },
+    vendeuse: RESPONSABLE_SET.has(body.vendeuse) ? body.vendeuse : 'À attribuer',
+    product: { sku: product.sku, label: product.label, price: product.price },
+    color,
+    quantity,
+    faces,
+    delai: { id: delai.id, label: delai.label, hint: delai.hint, rate: delai.rate },
+    paiement: { id: paiement.id, label: paiement.label },
+    prix: { unitaire, sousTotal, supplement, total },
+    deadline,
+    createdAt: new Date().toISOString(),
+  };
+
+  const lignes = faces.map((f) => {
+    const detail = f.texte ? `« ${f.texte} » (${f.typoLabel})` : f.logo;
+    return `• ${f.label} — ${f.optionLabel} : ${detail}${f.remarque ? ` — ${f.remarque}` : ''}`;
+  });
+  const resume = [
+    `${quantity} × ${product.label} — ${color}`,
+    ...lignes,
+    `Délai ${delai.label} (${delai.hint}) · Paiement ${paiement.label}`,
+    `Total ${total.toFixed(2)} €${supplement ? ` (dont ${supplement.toFixed(2)} € express)` : ''}`,
+  ].join('\n');
+
+  return { fiche, total, resume, deadline, product, color, quantity };
+}
+
+// POST /api/fiche → crée la demande dans le planning, à l'étape « demande ».
+app.post('/api/fiche', asyncH(async (req, res) => {
+  const built = buildFiche(req.body || {});
+  if (built.error) return res.status(400).json({ error: built.error });
+  const { fiche, resume } = built;
+
+  const clientName = [fiche.client.prenom, fiche.client.nom].filter(Boolean).join(' ');
+  const { rows: posRows } = await pool.query(
+    "SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = 'demande'",
+  );
+
+  const { rows } = await pool.query(
+    `INSERT INTO requests
+       (stage, priority, client_type, billing_company, contact_referent, contact_phone,
+        quantity, product, color, project_value, description, deadline, responsable,
+        position, fiche)
+     VALUES ('demande', $1, 'perso', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     RETURNING *`,
+    [
+      Math.min(3, Math.max(1, Number.parseInt(req.body.priority, 10) || 1)),
+      clientName,
+      clientName,
+      fiche.client.whatsapp,
+      fiche.quantity,
+      fiche.product.label,
+      fiche.color,
+      fiche.prix.total,
+      resume,
+      fiche.deadline,
+      fiche.vendeuse,
+      posRows[0].pos,
+      JSON.stringify(fiche),
+    ],
+  );
+
+  broadcast({ kind: 'create', stages: ['demande'] });
+  res.status(201).json({ id: rows[0].id, fiche });
+}));
+
+// ---------------------------------------------------------------------------
 // Statique + SPA
 // ---------------------------------------------------------------------------
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/fiche', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fiche.html')));
 
 // ---------------------------------------------------------------------------
 // Démarrage

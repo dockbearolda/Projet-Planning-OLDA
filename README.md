@@ -147,6 +147,8 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
+| GET | `/api/fiche/catalog` | Catalogue de la fiche vendeuse (produits, options, délais, typos, logos, vendeuses). |
+| POST | `/api/fiche` | Enregistre une fiche vendeuse → crée la demande à l'étape `demande`. |
 
 Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
 connues ou null ; `responsable` ∈ liste connue ou null ; `priority` ∈ {1,2,3} ;
@@ -157,6 +159,33 @@ code HTTP adapté.
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
+## Fiche vendeuse — `/fiche`
+
+La prise de commande au comptoir, sur la tablette, **devant le client**. Reprend
+à l'identique le reçu papier de l'atelier (tasse, 3 faces personnalisables,
+délais majorés, mode de paiement) et pousse la commande dans le planning à
+l'étape `demande` — elle apparaît sur tous les écrans ouverts en ~150 ms via SSE.
+
+- **Un seul écran, zéro scroll de page** en paysage 1280 × 800 (Galaxy Tab A9+).
+  Trois colonnes : client + article · les 3 faces · récapitulatif + total.
+  En portrait 800 × 1280 le récapitulatif passe en bande basse.
+- **Tout au doigt** : tuiles produit, puces d'option, compteur de quantité,
+  étoiles de priorité. Cibles ≥ 44 px, champs en 16 px (pas de zoom parasite).
+  Le seul clavier obligatoire, c'est le nom du client et le texte à graver.
+- **Total live** : le prix se recalcule à chaque geste, sans aller-retour réseau.
+  Le client voit le montant bouger pendant qu'il choisit.
+- **Aperçu du texte** dans la typographie retenue — ce qu'il aura sur sa tasse.
+- **Le barème vit dans `catalog.json`** : prix des tasses, des options, taux de
+  majoration, références de logos et de typos, couleurs. C'est le SEUL endroit à
+  modifier quand les tarifs changent — le front l'affiche, le serveur s'en ressert
+  pour **recalculer** le total. Le montant envoyé par la tablette n'est jamais cru
+  sur parole (test : `test/fiche.test.js`).
+- **Reçu imprimable** après validation (feuille de style `@media print`).
+
+Le détail structuré de la fiche est conservé dans `requests.fiche` (jsonb) ;
+`requests.description` en porte en parallèle un résumé lisible, donc la grille
+n'a jamais besoin de lire ce JSON.
+
 ## Structure
 
 ```
@@ -165,10 +194,14 @@ l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloq
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
+├── catalog.json      barème de la fiche vendeuse (source unique des prix)
 ├── public/
 │   ├── index.html    sidebar + grille
 │   ├── styles.css    design system
-│   └── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
+│   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
+│   ├── fiche.html    fiche vendeuse (tablette)
+│   ├── fiche.css     mise en page 3 colonnes, paysage / portrait / téléphone
+│   └── fiche.js      état, calcul du total, envoi
 ├── .env.example
 └── README.md
 ```

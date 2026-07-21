@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS requests (
   flag            text,                              -- ALERTE : null / 'bloque' / 'a_voir' (posée par n'importe quel collaborateur)
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
+  fiche           jsonb,                             -- détail de la fiche vendeuse (null si créée à la main)
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
