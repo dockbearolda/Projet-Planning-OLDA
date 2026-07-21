@@ -123,10 +123,15 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres npm start
    railway variables set APP_PASSWORD="un-mot-de-passe-solide"
    ```
 
-3. **Déploie** (Nixpacks détecte Node et lance `npm start`) :
+3. **Déploiement automatique** : le service `web` est branché sur ce dépôt
+   GitHub, branche `main`. Tout merge sur `main` déclenche un build et une mise
+   en ligne — rien à lancer à la main.
+
+   Pour forcer un déploiement depuis la machine locale (dépannage, ou pour
+   pousser un état non commité) :
 
    ```bash
-   railway up
+   railway up --service web
    ```
 
 4. Le schéma se crée automatiquement au premier démarrage — aucune commande
