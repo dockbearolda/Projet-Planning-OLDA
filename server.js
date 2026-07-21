@@ -13,12 +13,16 @@ try {
 const path = require('path');
 const express = require('express');
 const {
-  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES,
+  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
+const FLAG_SET = new Set(FLAGS);
+// Longueur maximale du motif d'alerte : une phrase, pas un roman (la ligne de
+// grille l'affiche tronqué, l'infobulle en donne le texte complet).
+const FLAG_REASON_MAX = 240;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +61,7 @@ const PATCHABLE = [
   'stage', 'sub_stage', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
+  'flag', 'flag_reason',
 ];
 
 function validateField(key, value) {
@@ -83,6 +88,17 @@ function validateField(key, value) {
       if (s === '' || s === 'À attribuer') return { ok: true, value: null };
       if (!RESPONSABLE_SET.has(s)) return { ok: false, error: `referent invalide: ${s}` };
       return { ok: true, value: s };
+    }
+    case 'flag': {
+      // Alerte de la commande : rien / bloquée / à voir.
+      const s = String(value).trim();
+      if (s === '') return { ok: true, value: null };
+      if (!FLAG_SET.has(s)) return { ok: false, error: `flag invalide: ${s}` };
+      return { ok: true, value: s };
+    }
+    case 'flag_reason': {
+      const s = String(value).trim().slice(0, FLAG_REASON_MAX);
+      return { ok: true, value: s === '' ? null : s };
     }
     case 'priority': {
       const n = Number(value);
@@ -126,6 +142,15 @@ function validateField(key, value) {
     default:
       return { ok: true, value };
   }
+}
+
+// Un motif n'a de sens qu'avec une alerte : lever l'alerte (flag → null) efface
+// le motif, même si l'appelant ne l'a pas envoyé. Appliqué avant la validation
+// pour que POST et PATCH partagent exactement la même règle.
+function normalizeFlagBody(body) {
+  if (!('flag' in body)) return body;
+  const raw = body.flag == null ? '' : String(body.flag).trim();
+  return raw === '' ? { ...body, flag_reason: null } : body;
 }
 
 function asyncH(fn) {
@@ -257,7 +282,7 @@ app.get('/api/counts', asyncH(async (req, res) => {
 
 // POST /api/requests → crée (corps partiel autorisé)
 app.post('/api/requests', asyncH(async (req, res) => {
-  const body = req.body || {};
+  const body = normalizeFlagBody(req.body || {});
   const cols = [];
   const vals = [];
   const params = [];
@@ -299,7 +324,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 
 // PATCH /api/requests/:id → met à jour un ou plusieurs champs
 app.patch('/api/requests/:id', asyncH(async (req, res) => {
-  const body = req.body || {};
+  const body = normalizeFlagBody(req.body || {});
   const sets = [];
   const params = [];
   let i = 1;
@@ -420,8 +445,10 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 // ---------------------------------------------------------------------------
 init()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Planning OLDA — en écoute sur le port ${PORT}`);
+    // `__server` est exposé pour les tests (PORT=0 → port libre, adresse lue au
+    // moment où le serveur écoute). En production rien ne le lit.
+    app.__server = app.listen(PORT, () => {
+      console.log(`Planning OLDA — en écoute sur le port ${app.__server.address().port}`);
       if (!APP_PASSWORD) console.log('⚠  APP_PASSWORD non défini : accès ouvert (mode dev).');
     });
   })
@@ -429,3 +456,5 @@ init()
     console.error('Échec de l\'initialisation de la base :', err);
     process.exit(1);
   });
+
+module.exports = app;

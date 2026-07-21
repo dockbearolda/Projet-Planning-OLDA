@@ -180,10 +180,17 @@ export function createDashboard(deps) {
     return pil && ref ? 'both' : pil ? 'pilote' : ref ? 'referent' : null;
   }
 
+  // Alerte posée sur une commande depuis le Planning (colonne « État ») :
+  // BLOQUÉE = elle n'avance plus et on sait pourquoi, À VOIR = quelqu'un doit
+  // y jeter un œil. C'est ce qu'on regarde en premier au point du matin.
+  const FLAG_LABEL = { bloque: 'BLOQUÉE', a_voir: 'À VOIR' };
+  const isBlocked = (r) => r.flag === 'bloque';
+
   function kpis() {
     const act = rows.filter(isActive);
     return {
       late: act.filter((r) => urgency(r).band === 0).length,
+      blocked: act.filter(isBlocked).length,
       soon: act.filter((r) => urgency(r).band === 1).length,
       waiting: act.filter((r) => r.stage === 'attente_client').length,
       active: act.length,
@@ -193,13 +200,14 @@ export function createDashboard(deps) {
   // --- Filtres (KPI + recherche) : estompe les cartes non concernées -------
   const KPI_PRED = {
     late: (r) => urgency(r).band === 0,
+    blocked: isBlocked,
     soon: (r) => urgency(r).band === 1,
     waiting: (r) => r.stage === 'attente_client',
     active: () => true,
   };
-  const KPI_LABEL = { late: 'En retard', soon: 'Échéance proche', waiting: 'Attente client', active: 'Commandes actives' };
+  const KPI_LABEL = { late: 'En retard', blocked: 'Bloquées', soon: 'Échéance proche', waiting: 'Attente client', active: 'Commandes actives' };
 
-  const DASH_SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'description'];
+  const DASH_SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'description', 'flag_reason'];
   function matchesSearch(r) {
     if (!searchQuery) return true;
     const tokens = fold(searchQuery).split(/\s+/).filter(Boolean);
@@ -240,6 +248,15 @@ export function createDashboard(deps) {
     const u = urgency(r);
     return el('span', `pj-badge u-${u.cls}`, u.label);
   }
+  // Pastille d'alerte (BLOQUÉE / À VOIR) + son motif, ou null si rien à signaler.
+  function flagEl(r, withReason) {
+    if (!FLAG_LABEL[r.flag]) return null;
+    const w = el('span', `pj-flag f-${r.flag === 'bloque' ? 'bloque' : 'a-voir'}`);
+    w.appendChild(el('span', 'pj-flag-tag', FLAG_LABEL[r.flag]));
+    if (withReason && r.flag_reason) w.appendChild(el('span', 'pj-flag-why', r.flag_reason));
+    return w;
+  }
+
   function catChips(r) {
     const w = el('span', 'pj-chips');
     w.appendChild(el('span', 'pj-chip', STAGE_LABEL[r.stage] || r.stage));
@@ -270,14 +287,22 @@ export function createDashboard(deps) {
     const b = el('button', `pj-card pj-card--${variant} u-${u.cls}`);
     b.type = 'button';
     if (isDimmed(r)) b.classList.add('is-dim');
+    if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
     if (variant === 'mini') {
       b.append(starsEl(r, 'mini'), el('span', 'pj-card-client', clientName(r)),
-        el('span', 'pj-card-article', articleOf(r)), badgeEl(r));
+        el('span', 'pj-card-article', articleOf(r)));
+      const f = flagEl(r, false);
+      if (f) b.appendChild(f);
+      b.appendChild(badgeEl(r));
     } else {
       const top = el('div', 'pj-card-top');
       top.append(starsEl(r), el('span', 'pj-card-client', clientName(r)), badgeEl(r));
       b.appendChild(top);
+      // L'alerte passe AVANT l'article : « pourquoi ça n'avance pas » prime sur
+      // « ce que c'est » quand on balaie le tableau le matin.
+      const f = flagEl(r, true);
+      if (f) b.appendChild(f);
       b.appendChild(el('p', 'pj-card-article', articleOf(r)));
       const meta = el('div', 'pj-card-meta');
       meta.appendChild(catChips(r));
@@ -370,7 +395,7 @@ export function createDashboard(deps) {
 
     // 4 KPI cliquables : un clic filtre toutes les vues, re-clic annule.
     const kpisEl = el('div', 'pj-kpis');
-    for (const k of ['late', 'soon', 'waiting', 'active']) {
+    for (const k of ['late', 'blocked', 'soon', 'waiting', 'active']) {
       const b = el('button', `pj-kpi k-${k}`);
       b.type = 'button';
       const n = el('span', 'pj-kpi-n', '0');
@@ -643,6 +668,21 @@ export function createDashboard(deps) {
 
     const scroll = el('div', 'dd-scroll');
 
+    // Alerte en cours : on la voit et on la LÈVE d'ici (au point du matin, on
+    // débloque en direct). La poser avec un motif se fait dans le Planning.
+    if (FLAG_LABEL[r.flag]) {
+      const sec = el('section', `dd-flag f-${r.flag === 'bloque' ? 'bloque' : 'a-voir'}`);
+      const body = el('div', 'dd-flag-body');
+      body.appendChild(el('span', 'dd-flag-tag', FLAG_LABEL[r.flag]));
+      body.appendChild(el('p', 'dd-flag-why', r.flag_reason || 'Aucun motif précisé'));
+      const clear = el('button', 'dd-flag-clear');
+      clear.type = 'button';
+      clear.append(icon('check'), el('span', null, 'Lever'));
+      clear.addEventListener('click', () => clearFlag(r));
+      sec.append(icon(r.flag === 'bloque' ? 'block' : 'visibility'), body, clear);
+      scroll.appendChild(sec);
+    }
+
     // « Envoyer vers » — un tap change la catégorie ; le pilote suit
     // automatiquement l'attribution (sauf pilote posé à la main).
     const send = el('section', 'dd-send');
@@ -762,6 +802,23 @@ export function createDashboard(deps) {
       Object.assign(r, prev);
       renderAll();
       showToast(`Échec de l’envoi — ${clientName(r)} reste en ${STAGE_LABEL[prev.stage]}`);
+      refresh();
+    });
+  }
+
+  // Lever l'alerte (optimiste + rollback). Le motif part avec elle : le serveur
+  // efface flag_reason dès que flag repasse à null.
+  function clearFlag(r) {
+    const prev = { flag: r.flag, flag_reason: r.flag_reason };
+    r.flag = null;
+    r.flag_reason = null;
+    logActivity(`${clientName(r)} — alerte levée ✓`, '#16A34A');
+    renderAll();
+    showToast(`${clientName(r)} — alerte levée ✓`);
+    api('PATCH', `/api/requests/${r.id}`, { flag: null }).catch(() => {
+      Object.assign(r, prev);
+      renderAll();
+      showToast('Échec — l’alerte est toujours là');
       refresh();
     });
   }

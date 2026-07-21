@@ -1157,6 +1157,109 @@ tr:hover .handle { color: var(--text-2); }
 .ref-chip.empty { color: var(--text-3, var(--text-2)); font-weight: 400; opacity: .75; }
 .ref-chip.empty:hover { opacity: 1; color: var(--primary); }
 
+/* Nom « de base » hérité de la catégorie (pilote / référent non posés à la main).
+   Le NOM reste plein format — la colonne est étroite et c'est lui qui compte ;
+   c'est le trait POINTILLÉ qui dit « personne ne l'a nommé à la main, ça vient de
+   l'attribution de la catégorie ». L'infobulle le formule en toutes lettres. */
+.resp-chip.auto { border: 1px dashed var(--border); background: transparent; }
+.ref-chip.auto {
+  opacity: .9;
+  font-weight: 400;
+  text-decoration: underline dotted var(--border);
+  text-underline-offset: 3px;
+}
+
+/* Colonne « État » : l'alerte posée sur la commande (BLOQUÉE / À VOIR) et son
+   motif. Volontairement bruyante — c'est ce qu'on doit voir en premier. */
+.col-flag-cell { padding: 0; vertical-align: middle; }
+.flag-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; }
+.flag-chip {
+  max-width: 100%;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease), background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.flag-chip:hover { filter: brightness(.97); }
+.flag-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* Puce pleine (et non tonale comme les autres) : la ligne étant déjà teintée,
+   une puce tonale s'y fondrait. `color: var(--surface)` donne du blanc sur le
+   rouge clair, du sombre sur le rose du thème sombre — lisible dans les deux. */
+.flag-chip.bloque { background: var(--st-bloque); color: var(--surface); }
+.flag-chip.a-voir { background: var(--st-cours); color: var(--surface); }
+.flag-chip.empty {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-3, var(--text-2));
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: .75;
+}
+.flag-chip.empty:hover { opacity: 1; border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
+/* Motif : 2 lignes max, le texte complet est dans l'infobulle. */
+.flag-reason {
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 11px 2px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--text-2);
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color var(--dur-1) var(--ease);
+}
+.flag-reason:hover { color: var(--primary); }
+.flag-reason:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); border-radius: 6px; }
+.flag-reason.empty { color: var(--text-3, var(--text-2)); opacity: .7; }
+
+/* Ligne entière teintée + liseré en tête de ligne : une commande bloquée doit
+   sauter aux yeux depuis le fond de l'atelier, sans lire la colonne État. La
+   teinte est adoucie (mélangée à la surface) pour ne pas écraser le texte. */
+.grid tbody tr.is-bloque > td { background: color-mix(in srgb, var(--st-bloque-bg) 62%, var(--surface)); }
+.grid tbody tr.is-a-voir > td { background: color-mix(in srgb, var(--st-cours-bg) 62%, var(--surface)); }
+.grid tbody tr.is-bloque > td:first-child { box-shadow: inset 4px 0 0 0 var(--st-bloque); }
+.grid tbody tr.is-a-voir > td:first-child { box-shadow: inset 4px 0 0 0 var(--st-cours); }
+.grid tbody tr.is-bloque:hover > td,
+.grid tbody tr.is-a-voir:hover > td { filter: brightness(.98); }
+
+/* Bouton « étape suivante » : toujours visible (jamais réservé au survol), la
+   flèche pousse la commande d'un cran dans le flux. */
+.col-next-cell { padding: 0; text-align: center; vertical-align: middle; }
+.next-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.next-btn svg { display: block; }
+.next-btn:hover { border-color: transparent; background: var(--primary-soft); color: var(--primary); }
+.next-btn:active { transform: scale(.92); }
+.next-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.grid thead th.col-next { text-align: center; color: var(--text-3, var(--text-2)); }
+
 /* Sous-étape : puce tonale neutre précisant l'action en cours dans la famille */
 .col-sub-cell { padding: 0; vertical-align: middle; }
 .sub-chip {
@@ -1229,6 +1332,50 @@ tr:hover .handle { color: var(--text-2); }
 .menu-item.selected { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .menu-item.muted { color: var(--text-3); }
 .menu-item.muted:hover { color: var(--text-2); }
+
+/* Saisie du motif d'alerte (« BLOQUÉE — pourquoi ? ») : même popover que le menu.
+   Champ à 16px pour que Chrome mobile / la tablette ne zooment pas à la saisie. */
+.reason-pop { width: 288px; max-width: calc(100vw - 16px); padding: 12px; overflow: visible; }
+.reason-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-3, var(--text-2));
+}
+.reason-input {
+  display: block;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.35;
+  resize: vertical;
+}
+.reason-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .22); }
+.reason-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.reason-btn {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), filter var(--dur-1) var(--ease);
+}
+.reason-btn:hover { background: var(--state-hover); color: var(--text-1); }
+.reason-btn.primary { border-color: transparent; background: var(--primary); color: #fff; }
+.reason-btn.primary:hover { filter: brightness(1.06); }
+.reason-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
 /* Échéance : badge relatif coloré (point + valeur) */
 .col-deadline-cell { padding: 0; }
@@ -1637,7 +1784,9 @@ tr:hover .handle { color: var(--text-2); }
 .col-handle { width: 44px; }
 .col-type { width: 66px; }
 .col-resp { width: 132px; }
+.col-flag { width: 120px; }
 .col-sub { width: 140px; }
+.col-next { width: 48px; }
 .col-deadline { width: 124px; }
 .col-del { width: 116px; }
 
@@ -1930,7 +2079,10 @@ button, a, .stage, .prio-pill, .deadline-badge,
 /* Tablette paysage / largeur intermédiaire */
 @media (max-width: 1280px) {
   .app { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; padding: 12px; }
-  .grid { min-width: 940px; }
+  /* +240 px depuis l'ajout des colonnes « État » et « → », pour que les 3 colonnes
+     de texte gardent la même largeur plancher qu'avant (~104 px) : sans ça elles
+     se tassent au lieu de laisser la grille défiler horizontalement. */
+  .grid { min-width: 1180px; }
 }
 
 /* Portrait étroit : rail réduit, grille scrollable */
@@ -2000,7 +2152,14 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .resp-chip.empty { padding: 8px 14px; }
   .resp-ini { width: 26px; height: 26px; font-size: 12px; }
   .sub-chip { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
+  .ref-chip { min-height: 40px; padding: 8px 12px; font-size: 13px; }
+  .flag-chip { min-height: 44px; padding: 8px 14px; font-size: 12.5px; }
+  .flag-reason { min-height: 32px; padding: 4px 12px; font-size: 12.5px; }
+  .next-btn { width: 44px; height: 44px; }
+  .col-next { width: 60px; }
+  .col-flag { width: 148px; }
   .menu-item { padding: 12px 14px; font-size: 15px; }
+  .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
   .type-tag {
     min-height: 40px;
     padding: 6px 14px;
@@ -2444,8 +2603,82 @@ body.view-dashboard #stages { display: none !important; }
   white-space: nowrap;
 }
 .pj-kpi.k-late .pj-kpi-n { color: var(--pj-late); }
+.pj-kpi.k-blocked .pj-kpi-n { color: var(--pj-late); }
 .pj-kpi.k-soon .pj-kpi-n { color: var(--pj-soon); }
 .pj-kpi.k-waiting .pj-kpi-n { color: var(--pj-accent); }
+
+/* --- Alerte de commande (BLOQUÉE / À VOIR) au point du jour --------------- */
+/* Bandeau sur la carte : c'est ce qu'on doit lire avant l'article. */
+.pj-flag {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 2px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border-left: 3px solid currentColor;
+}
+.pj-flag.f-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-flag.f-a-voir { background: var(--pj-soon-bg); color: var(--pj-soon-deep, var(--pj-soon)); }
+.pj-flag-tag { font-size: 10px; font-weight: 800; letter-spacing: .07em; }
+.pj-flag-why {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--pj-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Carte entière marquée : liseré latéral, visible même sur l'écran mural. */
+.pj-card.is-bloque { box-shadow: inset 3px 0 0 0 var(--pj-late); }
+.pj-card.is-a-voir { box-shadow: inset 3px 0 0 0 var(--pj-soon); }
+.pj-card--mini .pj-flag { flex-direction: row; margin: 0; padding: 3px 8px; border-left-width: 2px; }
+
+/* Encart du panneau détail : l'alerte s'y lève d'un tap. */
+.dd-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border-radius: 12px;
+}
+.dd-flag.f-bloque { background: var(--pj-late-bg); border: 1px solid rgba(220, 38, 38, .25); }
+.dd-flag.f-a-voir { background: var(--pj-soon-bg); border: 1px solid rgba(217, 119, 6, .25); }
+.dd-flag > .material-symbols-outlined { font-size: 20px; flex-shrink: 0; }
+.dd-flag.f-bloque > .material-symbols-outlined { color: var(--pj-late); }
+.dd-flag.f-a-voir > .material-symbols-outlined { color: var(--pj-soon); }
+.dd-flag-body { flex: 1; min-width: 0; }
+.dd-flag-tag {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .07em;
+}
+.dd-flag.f-bloque .dd-flag-tag { color: var(--pj-late); }
+.dd-flag.f-a-voir .dd-flag-tag { color: var(--pj-soon-deep, var(--pj-soon)); }
+.dd-flag-why { margin: 3px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--pj-ink); }
+.dd-flag-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--pj-border);
+  border-radius: 999px;
+  background: var(--pj-surface);
+  color: var(--pj-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.dd-flag-clear .material-symbols-outlined { font-size: 18px; }
+.dd-flag-clear:hover { border-color: var(--pj-accent); background: var(--pj-surface-2, var(--pj-surface)); }
 .pj-filterchip {
   display: inline-flex;
   align-items: center;

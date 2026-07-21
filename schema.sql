@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS requests (
   description     text,
   deadline        date,
   status          text,
+  flag            text,                              -- ALERTE : null / 'bloque' / 'a_voir' (posée par n'importe quel collaborateur)
+  flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
