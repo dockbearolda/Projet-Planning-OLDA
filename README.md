@@ -36,6 +36,35 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 - Création / suppression de demandes.
 - Accès protégé par mot de passe partagé (Basic Auth).
 
+## Dashboard « Point du jour »
+
+Onglet lu chaque matin au point d'équipe (et affiché sur la tablette murale de
+l'atelier). C'est une **projection temps réel du planning** : aucune donnée
+propre, tout vient de `/api/requests` + `/api/category-owners`, et toute action
+(envoi de catégorie, « Marquer traité », étoiles) écrit via la même API — le SSE
+resynchronise Planning et Dashboard.
+
+Composants (`public/dashboard.js`, styles scopés `.pj-*` / `.dd-*` / `.wall`) :
+header sticky avec 4 KPI cliquables (filtre par estompage), vue Équipe en
+4 colonnes / vue perso (« Je suis »), panneau détail avec « Envoyer vers »,
+fil d'activité « Ce qui a bougé », mode Écran mural (rotation A/B 20 s).
+
+### Routage catégorie → pilote
+
+Le **pilote effectif** d'une commande est calculé ainsi :
+
+1. `responsable` posé à la main sur la ligne (un vrai employé) → **prioritaire,
+   jamais écrasé** ;
+2. sinon le propriétaire de sa **sous-étape** dans la config « Attribution des
+   catégories » (`app_meta.category_owners`) ;
+3. sinon le propriétaire de sa **famille** ;
+4. sinon « À attribuer ».
+
+« Envoyer vers » ne PATCH que `stage`/`sub_stage` : le pilote suit tout seul
+l'attribution (la commande change de colonne), sauf pilote manuel qui reste.
+Une commande **« Sans date » créée depuis ≥ 7 jours** devient « À planifier »
+(badge orange, remonte dans le tri, jamais comptée en retard).
+
 ## Démarrage local
 
 Prérequis : Node 18+. **Aucune installation de PostgreSQL n'est nécessaire pour

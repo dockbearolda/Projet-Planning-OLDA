@@ -374,17 +374,26 @@ async function seed() {
       product: 'Tabliers personnalisés', project_value: 240, description: 'Tabliers cuisine',
       deadline: inDays(-5), position: 1000,
     },
+    {
+      // Sans date et ancienne (> 7 j) : illustre le vieillissement « À planifier »
+      // du dashboard (badge orange, remonte au-dessus des « Sans date » récentes).
+      stage: 'preparation', sub_stage: 'prepa_fichiers', priority: 1, client_type: 'perso',
+      billing_company: 'Atelier Broderie Sud', contact_referent: 'Mme Costa', quantity: 6,
+      product: 'Casquettes brodées', project_value: 120, description: 'Client pas pressé — à planifier',
+      deadline: null, position: 3000, created_days_ago: 9,
+    },
   ];
 
   for (const s of samples) {
+    const createdAt = new Date(today.getTime() - (s.created_days_ago ?? 0) * 86400000).toISOString();
     await pool.query(
       `INSERT INTO requests
         (stage, sub_stage, responsable, referent, priority, client_type, billing_company, contact_referent,
-         quantity, product, color, project_value, description, deadline, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+         quantity, product, color, project_value, description, deadline, position, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.referent ?? null, s.priority, s.client_type,
        s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
-       s.project_value, s.description, s.deadline, s.position],
+       s.project_value, s.description, s.deadline, s.position, createdAt],
     );
   }
 }
