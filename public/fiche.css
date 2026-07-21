@@ -70,24 +70,17 @@ body {
 .side__brand img { max-width: 100%; max-height: 44px; }
 
 .side__nav { list-style: none; margin: 10px 0 0; padding: 0; overflow: hidden; }
-/* Cible l'ÉLÉMENT de menu seulement : `.side__nav span` sans `>` attraperait
-   aussi l'icône, le libellé et la pastille « bientôt » qui vivent dedans. */
-.side__nav > li > a,
-.side__nav > li > span {
+/* Cible l'ÉLÉMENT de menu seulement : `.side__nav a` suffit, mais on garde le
+   `>` pour que l'icône et le libellé qui vivent dedans ne soient pas repris. */
+.side__nav > li > a {
   display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px;
+  padding: 12px 14px;
   color: var(--side-text); text-decoration: none;
   font-size: 13.5px; font-weight: 500; line-height: 1.2;
   border-left: 3px solid transparent;
 }
 .side__nav > li > a:hover { background: var(--side-hover); color: #fff; }
 .side__nav > li > a.is-active { background: var(--blue); color: #fff; border-left-color: #fff; }
-.side__nav > li > span { opacity: .45; cursor: default; }
-.side__soon {
-  margin-left: auto; flex: 0 0 auto;
-  font-size: 9px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
-  padding: 2px 5px; border-radius: 8px; background: rgba(255, 255, 255, .14);
-}
 
 /* ── En-tête d'action ────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; }
@@ -190,6 +183,8 @@ body {
   font-size: 11px; font-weight: 500; white-space: nowrap;
 }
 .wa .ms { font-size: 14px; }
+/* `display` explicite écrase l'attribut `hidden` : il faut le rétablir. */
+.wa[hidden] { display: none; }
 
 /* ── Produit ─────────────────────────────────────────────────────────── */
 .product { display: flex; gap: 12px; align-items: flex-start; }
@@ -423,9 +418,8 @@ textarea.input { height: 62px; padding: 8px 10px; resize: vertical; font-family:
   .side__brand { height: 52px; background: none; }
   .side__brand img { max-height: 30px; }
   .side__nav { display: flex; margin: 0; }
-  .side__nav a, .side__nav span { white-space: nowrap; border-left: 0; border-bottom: 3px solid transparent; }
-  .side__nav a.is-active { border-left: 0; border-bottom-color: #fff; }
-  .side__soon { display: none; }
+  .side__nav > li > a { white-space: nowrap; border-left: 0; border-bottom: 3px solid transparent; }
+  .side__nav > li > a.is-active { border-left: 0; border-bottom-color: #fff; }
   .appbar { flex-wrap: wrap; }
   .appbar__actions { width: 100%; }
   .appbar__actions .btn { flex: 1; }

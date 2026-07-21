@@ -182,9 +182,8 @@ part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
 - **Total live**, recalculé à chaque geste sans aller-retour réseau.
 - **Reçu imprimable** après validation.
 
-Le menu latéral montre la trame complète. Seules les sections qui existent
-sont cliquables (Tableau de bord → `/#dashboard`, Commandes → le planning) ;
-les autres sont visibles, inertes et marquées « bientôt ».
+Le menu latéral tient en trois entrées — les trois écrans qui existent :
+Planning (`/`), Dashboard (`/#dashboard`) et Commande Express (`/fiche`).
 
 ### Le barème vit dans `catalog.json`
 

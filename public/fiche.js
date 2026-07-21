@@ -30,18 +30,11 @@ function daysUntil(day) {
   return Math.round((Date.UTC(y, m - 1, d) - today) / DAY);
 }
 
-// Sections du menu. `href` absent = section pas encore construite : visible
-// (la trame complète reste lisible) mais inerte et marquée « bientôt ».
+// Menu : les trois écrans qui existent, rien d'autre.
 const NAV = [
-  { icon: 'speed', label: 'Tableau de bord', href: '/#dashboard' },
-  { icon: 'shopping_cart', label: 'Commandes', href: '/', active: true },
-  { icon: 'person', label: 'Clients' },
-  { icon: 'image', label: 'Produits / Visuels' },
-  { icon: 'settings', label: 'Production' },
-  { icon: 'calendar_month', label: 'Calendrier' },
-  { icon: 'description', label: 'Facturation' },
-  { icon: 'monitoring', label: 'Rapports' },
-  { icon: 'tune', label: 'Paramètres' },
+  { icon: 'grid_view', label: 'Planning', href: '/' },
+  { icon: 'speed', label: 'Dashboard', href: '/#dashboard' },
+  { icon: 'bolt', label: 'Commande Express', href: '/fiche', active: true },
 ];
 
 let CAT = null;
@@ -397,14 +390,11 @@ function buildStatic() {
   const nav = $('#nav');
   for (const item of NAV) {
     const li = el('li');
-    const node = item.href ? el('a') : el('span');
-    if (item.href) {
-      node.href = item.href;
-      if (item.active) node.classList.add('is-active');
-    }
-    node.append(el('span', 'ms', item.icon), el('span', null, item.label));
-    if (!item.href) node.append(el('span', 'side__soon', 'bientôt'));
-    li.append(node);
+    const a = el('a');
+    a.href = item.href;
+    if (item.active) a.classList.add('is-active');
+    a.append(el('span', 'ms', item.icon), el('span', null, item.label));
+    li.append(a);
     nav.append(li);
   }
 
