@@ -2928,16 +2928,21 @@ const dashboard = createDashboard({
 });
 
 // --- Bascule Planning / Dashboard ------------------------------------------
+// Le HASH de l'URL est l'unique pilote de la vue. La navigation du rail n'est
+// faite que de liens : cliquer change le hash, le hash change la vue. Avoir eu
+// deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
+// contredire — « #dashboard » affiché sur le planning, et retour au dashboard
+// au premier rechargement.
 function setViewMode(mode) {
-  if (mode === viewMode) return;
-  viewMode = mode;
   const dash = mode === 'dashboard';
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
   // pilotée par la classe body.view-dashboard en CSS : l'attribut `hidden` seul
   // ne suffit pas car ces éléments portent une règle `display` qui l'écrase.
+  if ($viewPlanning) $viewPlanning.classList.toggle('active', !dash);
+  if ($viewDashboard) $viewDashboard.classList.toggle('active', dash);
+  if (mode === viewMode) return;
+  viewMode = mode;
   if ($dashboard) $dashboard.hidden = !dash;
-  if ($viewPlanning) { $viewPlanning.classList.toggle('active', !dash); $viewPlanning.setAttribute('aria-selected', String(!dash)); }
-  if ($viewDashboard) { $viewDashboard.classList.toggle('active', dash); $viewDashboard.setAttribute('aria-selected', String(dash)); }
   document.body.classList.toggle('view-dashboard', dash);
   if (dash) {
     dashboard.show();
@@ -2948,11 +2953,6 @@ function setViewMode(mode) {
   }
 }
 
-if ($viewPlanning) $viewPlanning.addEventListener('click', () => setViewMode('planning'));
-if ($viewDashboard) $viewDashboard.addEventListener('click', () => setViewMode('dashboard'));
-
-// Lien profond « /#dashboard » : le menu latéral de la fiche (et n'importe quel
-// raccourci posé sur un écran) peut ouvrir directement le Point du jour.
 function applyHash() {
   setViewMode(location.hash === '#dashboard' ? 'dashboard' : 'planning');
 }

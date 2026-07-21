@@ -182,8 +182,17 @@ part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
 - **Total live**, recalculé à chaque geste sans aller-retour réseau.
 - **Reçu imprimable** après validation.
 
-Le menu latéral tient en trois entrées — les trois écrans qui existent :
-Planning (`/`), Dashboard (`/#dashboard`) et Commande Express (`/fiche`).
+## Navigation
+
+Les trois écrans de l'outil — Planning, Dashboard, Commande Express — se
+rejoignent depuis le **rail de gauche**, présent sur les deux pages. Il n'y a
+plus de boutons de bascule dans le planning.
+
+Le **hash de l'URL est l'unique pilote** de la vue : `/#planning`,
+`/#dashboard`, et `/fiche` pour la prise de commande. La navigation n'est
+faite que de liens — cliquer change le hash, le hash change la vue. Un écran
+est donc toujours partageable par son URL, et le bouton « Retour » du
+navigateur fonctionne.
 
 ### Le barème vit dans `catalog.json`
 

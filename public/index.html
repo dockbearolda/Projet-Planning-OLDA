@@ -72,16 +72,22 @@
     <div class="app">
       <!-- Sidebar = rail de filtres par étape -->
       <aside class="sidebar" id="sidebar">
-        <div class="view-switch" role="tablist" aria-label="Vue">
-          <button class="view-switch-btn active" id="viewPlanning" type="button" role="tab" aria-selected="true">
+        <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
+             dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
+        <nav class="nav-switch" aria-label="Navigation">
+          <a class="nav-switch-btn" id="viewPlanning" href="#planning">
             <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
-            <span class="view-switch-label">Planning</span>
-          </button>
-          <button class="view-switch-btn" id="viewDashboard" type="button" role="tab" aria-selected="false">
+            <span class="nav-switch-label">Planning</span>
+          </a>
+          <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
             <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
-            <span class="view-switch-label">Dashboard</span>
-          </button>
-        </div>
+            <span class="nav-switch-label">Dashboard</span>
+          </a>
+          <a class="nav-switch-btn" href="/fiche">
+            <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+            <span class="nav-switch-label">Commande Express</span>
+          </a>
+        </nav>
         <div class="sidebar-head" id="sidebarHead">
           <span class="sidebar-head-label">Étapes</span>
         </div>
