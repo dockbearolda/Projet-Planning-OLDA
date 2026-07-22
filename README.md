@@ -197,7 +197,8 @@ pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fi
 
 - une **Demande** part dans la colonne **« Demande »** du planning ;
 - une **Commande** part dans la colonne **« Commande »** (l'ancienne
-  « Chiffrage / Devis », renommée : un client a dit oui, le devis reste à faire).
+  « Chiffrage / Devis », renommée : un client a dit oui, le devis reste à faire),
+  directement sur la sous-étape **« À chiffrer »**.
 
 La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
 la ligne du planning. Le reste :

@@ -67,10 +67,11 @@ const jour = (days) => {
   assert.strictEqual(c.articles[0].zones[0].consigne, 'Les Doudous à SXM');
   assert.strictEqual(c.quantite, 2);
 
-  // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage) ;
-  //    une DEMANDE reste dans « Demande ».
+  // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage),
+  //    directement sur la sous-étape « À chiffrer » ; une DEMANDE reste dans
+  //    « Demande ».
   assert.strictEqual(c.stage, 'chiffrage');
-  assert.strictEqual(c.subStage, null);
+  assert.strictEqual(c.subStage, 'a_chiffrer');
   const dem = await post({ ...iguana, kind: 'demande' });
   assert.strictEqual(dem.body.commande.stage, 'demande');
   assert.strictEqual(dem.body.commande.subStage, null);
