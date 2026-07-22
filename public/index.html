@@ -77,6 +77,17 @@
         <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
              dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
         <nav class="nav-switch" aria-label="Navigation">
+          <!-- Le premier pas du client : deux entrées distinctes, tout en haut,
+               pour saisir en un tap une Demande (à chiffrer) ou une Commande
+               (déjà validée). Les deux ouvrent la même fiche rapide. -->
+          <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
+            <span class="material-symbols-outlined" aria-hidden="true">help</span>
+            <span class="nav-switch-label">Demande</span>
+          </a>
+          <a class="nav-switch-btn nav-switch-btn--intake" id="viewCommande" href="#commande">
+            <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+            <span class="nav-switch-label">Commande</span>
+          </a>
           <a class="nav-switch-btn" id="viewPlanning" href="#planning">
             <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
             <span class="nav-switch-label">Planning</span>
@@ -84,10 +95,6 @@
           <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
             <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
             <span class="nav-switch-label">Dashboard</span>
-          </a>
-          <a class="nav-switch-btn" id="viewCommande" href="#commande">
-            <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-            <span class="nav-switch-label">Prise de commande</span>
           </a>
           <a class="nav-switch-btn" id="viewExpress" href="#express">
             <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
@@ -184,18 +191,18 @@
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
 
-        <!-- Onglet Prise de commande : la saisie d'un besoin client reçu au
-             téléphone ou par mail (textile & personnalisation). On tranche
-             DEMANDE ou COMMANDE dès la 1re ligne, puis on liste les articles
-             et, pour chacun, ses zones d'impression. Comme la vue Express, le
-             balisage est là dès le départ mais le module (commande.js) n'est
-             chargé qu'au premier affichage. -->
+        <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
+             remplit au comptoir, en face de lui : juste les infos de base, sous
+             forme de tableau simple et rapide. La NATURE (demande / commande)
+             est décidée par l'entrée du menu (deux liens distincts), pas par un
+             réglage ici. Le balisage est là dès le départ ; le module
+             (commande.js) n'est chargé qu'au premier affichage. -->
         <section class="cmd" id="commande" hidden aria-label="Prise de commande">
           <header class="cmd-bar">
             <span class="cmd-bar__ic material-symbols-outlined" aria-hidden="true">edit_note</span>
             <div class="cmd-bar__titles">
-              <h2 class="cmd-bar__title">Prise de commande</h2>
-              <p class="cmd-bar__sub" id="cmd-sub">Nouvelle saisie</p>
+              <h2 class="cmd-bar__title" id="cmd-title">Demande</h2>
+              <p class="cmd-bar__sub" id="cmd-sub"></p>
             </div>
             <div class="cmd-bar__actions">
               <a class="cmd-btn" href="#planning">Annuler</a>
@@ -203,108 +210,62 @@
             </div>
           </header>
 
-          <!-- Le tout premier geste : demande (à chiffrer) ou commande (validée) ?
-               Le reste du formulaire est identique, seule la destination change. -->
-          <div class="cmd-nature" id="cmd-nature" role="radiogroup" aria-label="Nature de la saisie"></div>
-
-          <div class="cmd-content">
-            <div class="cmd-col">
-              <section class="cmd-card">
-                <h3 class="cmd-card__title">Client</h3>
-                <div class="cmd-field cmd-auto">
-                  <label class="cmd-label" for="cmd-societe">Société / Marque</label>
-                  <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
-                         autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
-                         aria-controls="cmd-auto-list" />
-                  <ul class="cmd-auto__list" id="cmd-auto-list" role="listbox" aria-label="Clients connus" hidden></ul>
-                  <p class="cmd-hint" id="cmd-client-known" hidden></p>
-                </div>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-contact">Contact</label>
-                  <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
-                </div>
-                <div class="cmd-row">
-                  <div class="cmd-field">
-                    <label class="cmd-label" for="cmd-tel">Téléphone</label>
-                    <input class="cmd-input" id="cmd-tel" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
-                  </div>
-                  <div class="cmd-field">
-                    <label class="cmd-label" for="cmd-type">Type</label>
-                    <select class="cmd-input cmd-select" id="cmd-type"></select>
-                  </div>
-                </div>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-email">Email</label>
-                  <input class="cmd-input" id="cmd-email" type="email" placeholder="contact@exemple.com" autocomplete="off" />
-                </div>
-              </section>
-
-              <section class="cmd-card">
-                <h3 class="cmd-card__title">Préparation</h3>
-                <div class="cmd-switch">
-                  <span class="cmd-switch__label">Article en boîte<small>marchandise déjà en stock</small></span>
-                  <button class="cmd-toggle" type="button" id="cmd-boite" role="switch" aria-checked="false" aria-label="Article en boîte">
-                    <span class="cmd-toggle__knob"></span>
-                  </button>
-                </div>
-                <div class="cmd-switch">
-                  <span class="cmd-switch__label">Maquette à faire<small>BAT à produire avant l'atelier</small></span>
-                  <button class="cmd-toggle" type="button" id="cmd-maquette" role="switch" aria-checked="true" aria-label="Maquette à faire">
-                    <span class="cmd-toggle__knob"></span>
-                  </button>
-                </div>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-facture">Facture</label>
-                  <select class="cmd-input cmd-select" id="cmd-facture"></select>
-                </div>
-              </section>
-
-              <section class="cmd-card">
-                <h3 class="cmd-card__title">Délai &amp; suivi</h3>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-deadline">Date souhaitée</label>
-                  <input class="cmd-input" id="cmd-deadline" type="date" />
-                  <p class="cmd-hint" id="cmd-delai-hint"></p>
-                </div>
-                <div class="cmd-field">
-                  <span class="cmd-label">Priorité</span>
-                  <div class="cmd-stars" id="cmd-priority" role="radiogroup" aria-label="Priorité">
-                    <button class="cmd-star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="material-symbols-outlined">star</span></button>
-                    <button class="cmd-star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="material-symbols-outlined">star</span></button>
-                    <button class="cmd-star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="material-symbols-outlined">star</span></button>
-                  </div>
-                </div>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-vendeuse">Commande prise par</label>
-                  <select class="cmd-input cmd-select" id="cmd-vendeuse"></select>
-                </div>
-                <div class="cmd-field">
-                  <label class="cmd-label" for="cmd-referent">Référent</label>
-                  <select class="cmd-input cmd-select" id="cmd-referent"></select>
-                </div>
-              </section>
+          <div class="cmd-body">
+            <!-- Client : une seule ligne, l'essentiel. -->
+            <div class="cmd-client">
+              <div class="cmd-field cmd-field--grow cmd-auto">
+                <label class="cmd-label" for="cmd-societe">Client — société / marque</label>
+                <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
+                       autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                       aria-controls="cmd-auto-list" />
+                <ul class="cmd-auto__list" id="cmd-auto-list" role="listbox" aria-label="Clients connus" hidden></ul>
+                <p class="cmd-hint" id="cmd-client-known" hidden></p>
+              </div>
+              <div class="cmd-field">
+                <label class="cmd-label" for="cmd-tel">Téléphone</label>
+                <input class="cmd-input" id="cmd-tel" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+              </div>
+              <div class="cmd-field">
+                <label class="cmd-label" for="cmd-contact">Contact</label>
+                <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+              </div>
             </div>
 
-            <div class="cmd-main">
-              <section class="cmd-card">
-                <div class="cmd-card__head">
-                  <h3 class="cmd-card__title">Articles <span class="cmd-count" id="cmd-art-count"></span></h3>
-                  <button class="cmd-btn cmd-btn--small" type="button" id="cmd-add-art">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span> Ajouter un article
-                  </button>
-                </div>
-                <div class="cmd-arts" id="cmd-arts"></div>
-              </section>
+            <!-- Articles : un tableau. Une ligne = un article ; en dessous, son
+                 marquage (zones + consignes). Ajout / retrait en un tap. -->
+            <div class="cmd-table" role="group" aria-label="Articles">
+              <div class="cmd-thead" aria-hidden="true">
+                <span>Qté</span>
+                <span>Vêtement</span>
+                <span>Référence</span>
+                <span>Couleur</span>
+                <span>Taille</span>
+                <span></span>
+              </div>
+              <div class="cmd-arts" id="cmd-arts"></div>
+              <button class="cmd-addrow" type="button" id="cmd-add-art">
+                <span class="material-symbols-outlined" aria-hidden="true">add</span> Ajouter un article
+              </button>
+            </div>
 
-              <section class="cmd-card">
-                <h3 class="cmd-card__title">Remarque atelier</h3>
-                <textarea class="cmd-input cmd-textarea" id="cmd-remarque" rows="2" placeholder="Précision utile à la production (facultatif)"></textarea>
-              </section>
-
-              <section class="cmd-card cmd-card--recap">
-                <h3 class="cmd-card__title">Ce qui partira au planning</h3>
-                <pre class="cmd-recap" id="cmd-recap"></pre>
-              </section>
+            <!-- Options de base, sur une ligne : boîte, maquette, facture, date. -->
+            <div class="cmd-opts">
+              <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
+                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                <span>Article en boîte</span>
+              </button>
+              <button class="cmd-optswitch" type="button" id="cmd-maquette" role="switch" aria-checked="true">
+                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                <span>Maquette à faire</span>
+              </button>
+              <div class="cmd-field cmd-field--inline">
+                <label class="cmd-label" for="cmd-facture">Facture</label>
+                <select class="cmd-input cmd-select" id="cmd-facture"></select>
+              </div>
+              <div class="cmd-field cmd-field--inline">
+                <label class="cmd-label" for="cmd-deadline">Date souhaitée</label>
+                <input class="cmd-input" id="cmd-deadline" type="date" />
+              </div>
             </div>
           </div>
 

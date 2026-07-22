@@ -185,44 +185,44 @@ part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
 - **Total live**, recalculé à chaque geste sans aller-retour réseau.
 - **Reçu imprimable** après validation.
 
-## Prise de commande — `/#commande`
+## Prise de commande — `/#demande` et `/#commande`
 
-La saisie d'un besoin reçu au téléphone ou par mail (textile & personnalisation).
-Là où la Commande Express vend une tasse au comptoir avec son tarif, cet écran
-enregistre **ce que le client demande** — le chiffrage reste une étape du
-pipeline, il n'y a donc aucun prix ici.
+Le **premier pas du client** : la fiche qu'on remplit au comptoir, en face de
+lui. Juste les infos de base, dans un **tableau simple et rapide** — aucun prix
+(le chiffrage est une étape du planning), aucune option superflue.
 
-- **Nature tranchée d'entrée** : *Demande* (à chiffrer) ou *Commande* (validée).
-  C'est le tout premier geste, et il décide de la destination : une demande part
-  en `demande`, une commande file directement en `préparation / prépa fichiers`.
-  La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
-  la ligne du planning.
+Deux entrées **en tête du menu**, l'une pour une *Demande* (à chiffrer), l'autre
+pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fiche**
+— la nature est décidée par le lien cliqué, pas par un réglage dans l'écran :
+
+- une **Demande** part dans la colonne **« Demande »** du planning ;
+- une **Commande** part dans la colonne **« Commande »** (l'ancienne
+  « Chiffrage / Devis », renommée : un client a dit oui, le devis reste à faire).
+
+La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
+la ligne du planning. Le reste :
+
 - **Client auto-complété** : taper « Igua » propose « Iguana (Discover) » avec son
-  contact et son téléphone. L'annuaire (`GET /api/clients`) est **déduit des
+  contact et son numéro. L'annuaire (`GET /api/clients`) est **déduit des
   commandes déjà saisies** — aucune table de plus, aucun doublon mal orthographié
   (rapprochement insensible à la casse, aux accents et à la ponctuation). La
-  reprise ne remplit que les champs restés vides : rien de ce qui vient d'être
-  tapé n'est écrasé.
-- **N articles** : type de vêtement, référence produit (`K3022`), couleur, taille,
-  quantité. Le catalogue *propose*, la saisie libre reste permise — une grille
-  fournisseur exotique ne doit pas bloquer une prise de commande.
-  « Dupliquer » reprend l'article ET son marquage : le cas courant, c'est la même
-  impression sur une autre taille.
-- **Zones d'impression / broderie** par article : Cœur, Dos, Manche… chacune avec
-  sa **technique** et sa **consigne libre** (« Les Doudous à SXM », « Grand Case »,
-  « doudous à 6 cm »).
-- **Statuts de préparation** : *Article en boîte* (oui/non), *Maquette à faire*
-  (oui/non), *Facture* (à faire / à préparer / déjà faite / pas de facture).
-- **Délai** : 7 jours par défaut (`catalog.commande.delaiDefautJours`), jamais de
-  ligne sans échéance.
-- **Aperçu en direct** de ce qui partira dans la colonne « Infos » du planning :
-  la personne qui saisit voit le texte exact que l'atelier lira.
+  reprise ne remplit que les champs restés vides.
+- **Articles en tableau** : quantité, vêtement, référence (`K3022`), couleur,
+  taille. Le catalogue *propose* (datalist), la saisie libre reste permise.
+  « Dupliquer » reprend l'article ET son marquage : la même impression sur une
+  autre taille, en un tap.
+- **Marquage par article** : on coche les zones (Cœur, Dos, Manche…) et on tape la
+  **consigne libre** de chacune (« Les Doudous à SXM », « Grand Case »). La
+  technique d'impression est une décision de production, pas de la prise : on ne
+  la demande pas ici.
+- **Options de base** sur une ligne : *Article en boîte*, *Maquette à faire*,
+  *Facture*, *Date souhaitée* (7 jours par défaut, jamais « sans échéance »).
 
 Le détail structuré est conservé dans `requests.fiche` (jsonb, discriminant
 `kind: 'commande-atelier'`) ; `requests.description` en porte le résumé lisible,
 donc la grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans
 `catalog.json`, section `commande` — seul endroit à modifier pour ajouter un
-vêtement, une taille, une zone ou une technique.
+vêtement, une taille ou une zone.
 
 ## Navigation — une seule page, quatre vues
 
@@ -231,10 +231,12 @@ d'un même document**, pas quatre pages. Passer de l'une à l'autre ne recharge
 rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
 
-Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`,
+Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`, `#demande`,
 `#commande`, `#express`. La navigation, dans le rail de gauche, n'est faite que
 de liens — cliquer change le hash, le hash change la vue. Chaque écran est donc
 partageable par son URL et le bouton « Retour » du navigateur fonctionne.
+`#demande` et `#commande` ouvrent la même vue de saisie, seule la nature diffère
+(poussée au module par `setNature`) — d'où deux liens distincts en tête du menu.
 
 Le bouton « Nouvelle commande » de la barre du haut ne crée une ligne que dans
 la grille : il est donc masqué hors du Planning, où son résultat serait

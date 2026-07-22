@@ -70,7 +70,7 @@
   "commande": {
     "types": [
       { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande", "subStage": null },
-      { "id": "commande", "label": "Commande", "hint": "validée, à préparer", "stage": "preparation", "subStage": "prepa_fichiers" }
+      { "id": "commande", "label": "Commande", "hint": "validée par le client", "stage": "chiffrage", "subStage": null }
     ],
     "vetements": [
       "T-shirt",

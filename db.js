@@ -20,7 +20,9 @@ types.setTypeParser(types.builtins.DATE, (v) => v);
 //     en ont. « 1 projet = 1 seule place. »
 const FAMILIES = [
   { slug: 'demande', label: 'Demande' },
-  { slug: 'chiffrage', label: 'Chiffrage / Devis' },
+  // Ex-« Chiffrage / Devis » : c'est là qu'atterrit une COMMANDE validée prise
+  // au comptoir (le devis/chiffrage reste à faire, mais le client a dit oui).
+  { slug: 'chiffrage', label: 'Commande' },
   { slug: 'attente_client', label: 'Attente Client' },
   { slug: 'preparation', label: 'Préparation' },
   { slug: 'production', label: 'Production' },

@@ -67,17 +67,17 @@ const jour = (days) => {
   assert.strictEqual(c.articles[0].zones[0].consigne, 'Les Doudous à SXM');
   assert.strictEqual(c.quantite, 2);
 
-  // 2. Une COMMANDE validée n'a rien à faire dans « Demande » : elle part
-  //    directement en préparation. Une DEMANDE reste à chiffrer.
-  assert.strictEqual(c.stage, 'preparation');
-  assert.strictEqual(c.subStage, 'prepa_fichiers');
+  // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage) ;
+  //    une DEMANDE reste dans « Demande ».
+  assert.strictEqual(c.stage, 'chiffrage');
+  assert.strictEqual(c.subStage, null);
   const dem = await post({ ...iguana, kind: 'demande' });
   assert.strictEqual(dem.body.commande.stage, 'demande');
   assert.strictEqual(dem.body.commande.subStage, null);
 
   // 3. La ligne atterrit dans le planning, lisible SANS ouvrir le JSON : la
   //    nature, le détail des zones et les statuts sont dans les colonnes.
-  const list = await (await fetch(`${base}/api/requests?stage=preparation`)).json();
+  const list = await (await fetch(`${base}/api/requests?stage=chiffrage`)).json();
   const row = list.find((r) => r.id === ok.body.id);
   assert.ok(row, 'la commande doit apparaître à l\'étape préparation');
   assert.strictEqual(row.order_kind, 'commande');

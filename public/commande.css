@@ -1,10 +1,8 @@
 /* ===========================================================================
-   Prise de commande — la 4e vue de l'application
-   Tout est scopé sous #commande : les quatre vues partagent un seul document,
-   aucune règle ne doit pouvoir fuir sur le planning, le dashboard ou l'Express.
-   Contrairement à express.css (qui redéfinit ses jetons en clair uniquement),
-   cette vue consomme les JETONS GLOBAUX de styles.css : elle suit donc la
-   bascule clair / sombre sans une ligne de plus.
+   Prise de commande — le premier pas du client
+   Fiche remplie au comptoir : infos de base, tableau simple, ultra rapide.
+   Tout est scopé sous #commande ; la vue consomme les JETONS GLOBAUX de
+   styles.css, donc elle suit la bascule clair / sombre sans une ligne de plus.
    =========================================================================== */
 
 #commande:not([hidden]) {
@@ -12,9 +10,14 @@
   min-height: 0; height: 100%; overflow-y: auto;
 }
 #commande, #commande * { box-sizing: border-box; }
-/* `hidden` doit gagner même sur les éléments qui portent un display. */
 #commande [hidden] { display: none !important; }
 #commande button { font-family: inherit; }
+
+#commande button:focus-visible,
+#commande .cmd-input:focus-visible,
+#commande .cmd-auto__item:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+}
 
 /* ------------------------------------------------------------------ barre */
 #commande .cmd-bar {
@@ -43,8 +46,6 @@
 #commande .cmd-btn--primary { border-color: var(--primary); background: var(--primary); color: #fff; }
 #commande .cmd-btn--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 #commande .cmd-btn--primary:disabled { opacity: .55; cursor: default; }
-#commande .cmd-btn--small { padding: 0 14px; font-size: 13px; }
-#commande .cmd-btn .material-symbols-outlined { font-size: 20px; }
 
 #commande .cmd-icon {
   width: 44px; height: 44px; flex: 0 0 auto;
@@ -56,69 +57,18 @@
 #commande .cmd-icon--danger:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
 #commande .cmd-icon .material-symbols-outlined { font-size: 20px; }
 
-/* Focus clavier visible partout dans la vue (le design system n'a pas de règle
-   universelle : chaque composant déclare la sienne). */
-#commande button:focus-visible,
-#commande .cmd-input:focus-visible,
-#commande .cmd-auto__item:focus-visible {
-  outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
-}
-
-/* --------------------------------------------------- nature : demande/commande */
-#commande .cmd-nature {
-  flex: 0 0 auto;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
-  padding: 16px 22px 0;
-}
-#commande .cmd-nature__opt {
-  display: flex; align-items: center; gap: 12px;
-  min-height: 64px; padding: 12px 18px;
-  border: 2px solid var(--border); border-radius: var(--radius-card);
-  background: var(--surface); color: var(--text-2);
-  text-align: left; cursor: pointer;
-  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-#commande .cmd-nature__opt:hover { background: var(--surface-hover); }
-#commande .cmd-nature__opt.is-on {
-  border-color: var(--primary); background: var(--primary-soft); color: var(--text-1);
-}
-#commande .cmd-nature__opt .material-symbols-outlined { font-size: 26px; }
-#commande .cmd-nature__opt.is-on .material-symbols-outlined { color: var(--primary); }
-#commande .cmd-nature__body { display: flex; flex-direction: column; min-width: 0; }
-#commande .cmd-nature__label { font-size: 16px; font-weight: 500; color: var(--text-1); }
-#commande .cmd-nature__hint { font-size: 12.5px; color: var(--text-2); }
-
-/* ----------------------------------------------------------------- grille */
-#commande .cmd-content {
+/* ------------------------------------------------------------------- corps */
+#commande .cmd-body {
   flex: 1;
-  display: grid; grid-template-columns: 340px minmax(0, 1fr);
-  gap: 16px; align-items: start;
-  padding: 16px 22px calc(28px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 18px 22px calc(28px + env(safe-area-inset-bottom));
+  max-width: 1100px; width: 100%;
 }
-#commande .cmd-col, #commande .cmd-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-#commande .cmd-card {
-  background: var(--surface);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-1);
-  padding: 16px;
-}
-#commande .cmd-card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-#commande .cmd-card__head .cmd-card__title { margin: 0; }
-#commande .cmd-card__title {
-  margin: 0 0 12px;
-  font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--primary);
-}
-#commande .cmd-count { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-2); font-size: 12px; }
-
-/* ----------------------------------------------------------------- champs */
-#commande .cmd-field { margin-top: 10px; min-width: 0; }
-#commande .cmd-card > .cmd-field:first-of-type { margin-top: 0; }
+/* --------------------------------------------------------------- champs */
+#commande .cmd-field { min-width: 0; }
 #commande .cmd-label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-2); }
-#commande .cmd-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
-#commande .cmd-hint { margin: 4px 0 0; font-size: 12px; color: var(--text-3); }
+#commande .cmd-hint { margin: 4px 0 0; font-size: 12px; color: var(--st-livree); }
 
 #commande .cmd-input {
   width: 100%; height: 44px; padding: 0 12px;
@@ -126,13 +76,10 @@
   background: var(--surface); color: var(--text-1);
   /* 16px : en dessous, iOS zoome à la mise au point du champ. */
   font: 400 16px var(--font);
-  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+  transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
 #commande .cmd-input::placeholder { color: var(--text-3); }
-/* `background-color`, PAS `background` : le raccourci effacerait le chevron des
-   <select>, qui est un background-image. */
 #commande .cmd-input:focus { outline: none; border-color: var(--primary); background-color: var(--field-focus); }
-#commande .cmd-textarea { height: auto; min-height: 64px; padding: 10px 12px; resize: vertical; line-height: 1.45; }
 #commande .cmd-select {
   appearance: none; padding-right: 32px; cursor: pointer;
   background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
@@ -142,7 +89,11 @@
   background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239aa0a6'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
 }
 
-/* ------------------------------------------------------- auto-complétion client */
+/* -------------------------------------------------------------- client */
+#commande .cmd-client {
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px; align-items: start;
+}
 #commande .cmd-auto { position: relative; }
 #commande .cmd-auto__list {
   position: absolute; z-index: 20; left: 0; right: 0; top: 100%;
@@ -161,63 +112,32 @@
 #commande .cmd-auto__meta { font-size: 12px; color: var(--text-2); }
 #commande .cmd-auto__n { font-size: 11px; color: var(--text-3); }
 
-/* ---------------------------------------------------------------- switches */
-#commande .cmd-switch {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: 48px; padding: 4px 0;
-  border-bottom: 1px solid var(--border-soft);
+/* -------------------------------------------------------- tableau articles */
+#commande .cmd-table {
+  border: 1px solid var(--card-border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+  overflow: hidden;
 }
-#commande .cmd-switch:last-of-type { border-bottom: 0; }
-#commande .cmd-switch__label { display: flex; flex-direction: column; font-size: 14px; color: var(--text-1); }
-#commande .cmd-switch__label small { font-size: 12px; color: var(--text-3); }
-/* Interrupteur volontairement large : c'est un geste au doigt, en atelier. La
-   piste fait donc 44px de haut comme toutes les autres cibles de la vue. */
-#commande .cmd-toggle {
-  flex: 0 0 auto; width: 60px; height: 44px; padding: 5px;
-  border: 1px solid var(--border); border-radius: 999px;
-  background: var(--search-bg); cursor: pointer;
-  display: flex; align-items: center;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+/* Une ligne d'en-tête + les lignes d'articles partagent la même grille, donc
+   les colonnes s'alignent parfaitement — le « tableau » de la fiche. */
+#commande .cmd-thead, #commande .cmd-art__row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 96px;
+  gap: 10px; align-items: center;
 }
-#commande .cmd-toggle__knob {
-  width: 32px; height: 32px; border-radius: 999px;
-  background: var(--text-3);
-  transition: transform var(--dur-2) var(--ease), background var(--dur-1) var(--ease);
+#commande .cmd-thead {
+  padding: 10px 14px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
 }
-#commande .cmd-toggle.is-on { background: var(--primary-soft); border-color: var(--primary); }
-#commande .cmd-toggle.is-on .cmd-toggle__knob { background: var(--primary); transform: translateX(16px); }
+#commande .cmd-art { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+#commande .cmd-art:last-child { border-bottom: 0; }
+#commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 2px; }
+#commande .cmd-cell--quantite { text-align: center; font-weight: 600; }
 
-/* ---------------------------------------------------------------- étoiles */
-#commande .cmd-stars { display: flex; gap: 2px; }
-#commande .cmd-star {
-  width: 44px; height: 44px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 999px; background: transparent;
-  /* Une étoile éteinte doit rester VISIBLE : sinon la priorité 2 et 3 n'existent
-     pas pour qui ne les a jamais vues. */
-  color: var(--text-3); cursor: pointer;
-}
-#commande .cmd-star:hover { background: var(--state-hover); }
-#commande .cmd-star.is-on { color: #f2b25c; }
-#commande .cmd-star .material-symbols-outlined { font-size: 24px; font-variation-settings: 'FILL' 1; }
-
-/* --------------------------------------------------------------- articles */
-#commande .cmd-arts { display: flex; flex-direction: column; gap: 12px; }
-#commande .cmd-art {
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); padding: 12px;
-}
-#commande .cmd-art__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-#commande .cmd-art__n { font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .04em; text-transform: uppercase; }
-#commande .cmd-art__tools { margin-left: auto; display: flex; gap: 2px; }
-#commande .cmd-art__grid {
-  display: grid; gap: 10px;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 96px;
-}
-#commande .cmd-art__grid .cmd-field { margin-top: 0; }
-
-#commande .cmd-zones { margin-top: 12px; }
-#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+/* Marquage : chips de zones + une ligne de consigne par zone cochée. */
+#commande .cmd-art__mark { margin-top: 10px; }
+#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 #commande .cmd-chip {
   min-height: 44px; padding: 0 16px;
   display: inline-flex; align-items: center;
@@ -228,22 +148,44 @@
 }
 #commande .cmd-chip:hover { background: var(--surface-hover); }
 #commande .cmd-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
-
-#commande .cmd-zrow {
-  display: grid; grid-template-columns: 120px 150px minmax(0, 1fr);
-  align-items: center; gap: 8px; margin-top: 8px;
+#commande .cmd-zline {
+  display: grid; grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center; gap: 10px; margin-top: 8px;
 }
-#commande .cmd-zrow__name { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
+#commande .cmd-zline__name { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
 
-/* ----------------------------------------------------------------- aperçu */
-#commande .cmd-card--recap { background: var(--bg); }
-#commande .cmd-recap {
-  margin: 0; padding: 12px;
-  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
-  font: 400 13px ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  line-height: 1.55; color: var(--text-2);
-  white-space: pre-wrap; word-break: break-word;
+#commande .cmd-addrow {
+  width: 100%; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-top: 1px dashed var(--border); background: var(--bg);
+  color: var(--primary); font: 600 14px var(--font); cursor: pointer;
 }
+#commande .cmd-addrow:hover { background: var(--primary-soft); }
+#commande .cmd-addrow .material-symbols-outlined { font-size: 20px; }
+
+/* --------------------------------------------------------------- options */
+#commande .cmd-opts {
+  display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px;
+}
+#commande .cmd-optswitch {
+  min-height: 44px; padding: 0 6px 0 4px;
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 0; background: transparent; cursor: pointer;
+  font: 500 14px var(--font); color: var(--text-1);
+}
+#commande .cmd-optswitch__box {
+  width: 24px; height: 24px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border); border-radius: 7px;
+  background: var(--surface);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+#commande .cmd-optswitch__box .material-symbols-outlined { font-size: 18px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box { background: var(--primary); border-color: var(--primary); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
+#commande .cmd-field--inline { display: flex; align-items: center; gap: 8px; }
+#commande .cmd-field--inline .cmd-label { margin: 0; white-space: nowrap; }
+#commande .cmd-field--inline .cmd-input { width: auto; min-width: 150px; }
 
 /* ------------------------------------------------------------- toast / fin */
 #commande .cmd-toast {
@@ -258,10 +200,9 @@
 }
 #commande .cmd-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
-/* `.work` porte une animation qui laisse un `transform` : il devient donc le
-   bloc conteneur de ce `fixed`. Le voile couvre l'écran de travail, pas la
-   barre du haut ni le rail — même comportement que la Commande Express, et
-   quitter par le rail reste possible. */
+/* `.work` porte un transform (animation d'entrée) : il devient le bloc conteneur
+   de ce `fixed`. Le voile couvre l'écran de travail, pas la barre du haut ni le
+   rail — donc quitter par le menu reste possible. */
 #commande .cmd-done {
   position: fixed; inset: 0; z-index: 70;
   display: flex; align-items: center; justify-content: center;
@@ -282,35 +223,30 @@
 #commande .cmd-done__actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
 /* ------------------------------------------------------------ responsive
-   Cibles : Chrome PC (large), Galaxy Tab A9+ 11" (1280 paysage / 800 portrait),
-   iPhone (390-430). La densité descend d'un cran à chaque palier, les cibles
-   tactiles restent à 44px. */
-/* Tablette paysage (Galaxy Tab A9+ : 1280 × 800). Les 5 champs d'un article ne
-   tiennent plus sur une ligne lisible : on passe à 3 colonnes pleines, le type
-   de vêtement en occupant 2 — plutôt que de laisser la quantité tomber seule. */
-@media (max-width: 1280px) {
-#commande .cmd-content { grid-template-columns: 300px minmax(0, 1fr); }
-#commande .cmd-art__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-#commande .cmd-art__grid .cmd-field--wide { grid-column: 1 / 3; }
+   Chrome PC, Galaxy Tab A9+ (1280 paysage / 800 portrait), iPhone 390-430. */
+@media (max-width: 900px) {
+/* Sous la tablette portrait, la ligne d'article ne rentre plus alignée : on
+   masque l'en-tête (les placeholders guident) et on empile les champs. */
+#commande .cmd-thead { display: none; }
+#commande .cmd-client { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#commande .cmd-client .cmd-field--grow { grid-column: 1 / -1; }
+#commande .cmd-art__row {
+  display: flex; flex-wrap: wrap; gap: 8px;
 }
-@media (max-width: 1000px) {
-#commande .cmd-content { grid-template-columns: minmax(0, 1fr); }
-#commande .cmd-art__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-#commande .cmd-art__grid .cmd-field--wide { grid-column: 1 / -1; }
-#commande .cmd-zrow { grid-template-columns: 110px minmax(0, 1fr); }
-#commande .cmd-zrow .cmd-zrow__cons { grid-column: 1 / -1; }
+#commande .cmd-cell--quantite { width: 74px; text-align: left; }
+#commande .cmd-cell--vetement { flex: 1 1 55%; min-width: 160px; }
+#commande .cmd-cell--ref, #commande .cmd-cell--couleur, #commande .cmd-cell--taille { flex: 1 1 28%; min-width: 100px; }
+#commande .cmd-art__tools { margin-left: auto; }
 }
-@media (max-width: 640px) {
-/* Le titre et les deux actions ne tiennent pas sur une ligne de téléphone : on
-   passe l'en-tête sur deux niveaux plutôt que d'écraser le titre en colonne. */
+@media (max-width: 560px) {
 #commande .cmd-bar { flex-wrap: wrap; padding: 10px 14px; }
 #commande .cmd-bar__titles { flex: 1 1 0; }
 #commande .cmd-bar__title { font-size: 17px; }
-#commande .cmd-bar__sub { display: none; }   /* la nature est rappelée juste en dessous */
 #commande .cmd-bar__actions { width: 100%; margin-left: 0; }
 #commande .cmd-bar__actions .cmd-btn { flex: 1; }
-#commande .cmd-nature { grid-template-columns: minmax(0, 1fr); padding: 12px 14px 0; }
-#commande .cmd-content { padding: 12px 14px calc(24px + env(safe-area-inset-bottom)); }
-#commande .cmd-art__grid { grid-template-columns: minmax(0, 1fr); }
-#commande .cmd-row { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-body { padding: 14px; gap: 14px; }
+#commande .cmd-client { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-zline { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+#commande .cmd-field--inline { width: 100%; justify-content: space-between; }
+#commande .cmd-field--inline .cmd-input { flex: 1; }
 }

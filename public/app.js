@@ -13,7 +13,7 @@ import { createDashboard } from './dashboard.js';
 // 8 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
 const FAMILIES = [
   { slug: 'demande', label: 'Demande' },
-  { slug: 'chiffrage', label: 'Chiffrage / Devis' },
+  { slug: 'chiffrage', label: 'Commande' },
   { slug: 'attente_client', label: 'Attente Client' },
   { slug: 'preparation', label: 'Préparation' },
   { slug: 'production', label: 'Production' },
@@ -2921,9 +2921,14 @@ const $viewDashboard = document.getElementById('viewDashboard');
 const $viewExpress = document.getElementById('viewExpress');
 const $express = document.getElementById('express');
 const $viewCommande = document.getElementById('viewCommande');
+const $viewDemande = document.getElementById('viewDemande');
 const $commande = document.getElementById('commande');
 
 let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express' | 'commande'
+// La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
+// la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
+let commandeNature = 'demande';
+let commandeModule = null;
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 async function jumpToPlanning(r) {
@@ -2971,17 +2976,22 @@ function mountExpress() {
 }
 
 // Même traitement pour la Prise de commande (catalogue textile, annuaire
-// client) : chargée au premier passage, puis montée une bonne fois.
+// client) : chargée au premier passage, puis montée une bonne fois. La nature
+// courante (demande / commande) lui est poussée dès qu'elle est prête.
 let commandeLoading = null;
 function mountCommande() {
   if (!$commande) return;
   if (!commandeLoading) {
     commandeLoading = import('./commande.js')
-      .then((m) => m.initCommande($commande))
+      .then((m) => { commandeModule = m; return m.initCommande($commande); })
+      .then(() => commandeModule.setNature(commandeNature))
       .catch((err) => {
         commandeLoading = null;             // rechargeable au prochain essai
+        commandeModule = null;
         console.error('Prise de commande : chargement impossible', err);
       });
+  } else if (commandeModule) {
+    commandeModule.setNature(commandeNature);
   }
 }
 
@@ -2992,7 +3002,11 @@ function setViewMode(mode) {
   if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewExpress) $viewExpress.classList.toggle('active', mode === 'express');
-  if ($viewCommande) $viewCommande.classList.toggle('active', mode === 'commande');
+  // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
+  // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
+  const onIntake = mode === 'commande';
+  if ($viewDemande) $viewDemande.classList.toggle('active', onIntake && commandeNature === 'demande');
+  if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
 
@@ -3015,9 +3029,16 @@ function setViewMode(mode) {
   }
 }
 
-const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#commande': 'commande' };
+// #demande et #commande ouvrent la MÊME vue, avec une nature différente.
+const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#demande': 'commande', '#commande': 'commande' };
 function applyHash() {
-  setViewMode(VIEWS[location.hash] || 'planning');
+  const h = location.hash;
+  const mode = VIEWS[h] || 'planning';
+  if (mode === 'commande') commandeNature = h === '#commande' ? 'commande' : 'demande';
+  setViewMode(mode);
+  // Changer de nature SANS changer de vue (#demande ↔ #commande) : setViewMode a
+  // pris le raccourci « même vue », on pousse donc la nature à la main.
+  if (mode === 'commande' && commandeModule) commandeModule.setNature(commandeNature);
 }
 window.addEventListener('hashchange', applyHash);
 applyHash();

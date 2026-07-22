@@ -2242,6 +2242,16 @@ button, a, .stage, .prio-pill, .deadline-badge,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
+/* Les deux entrées de saisie (Demande / Commande) sont le premier pas : posées
+   en tête, un peu plus présentes, et séparées du reste par un filet. */
+.nav-switch-btn--intake {
+  color: var(--text-1);
+  background: var(--surface-hover);
+}
+.nav-switch-btn--intake .material-symbols-outlined { color: var(--primary); }
+/* Filet sous la 2e entrée de saisie (Commande), pour la détacher du reste. */
+#viewCommande { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); }
+
 /* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
    fonctionne ; affiché seulement quand il n'est pas masqué. */
 .dashboard:not([hidden]) {
