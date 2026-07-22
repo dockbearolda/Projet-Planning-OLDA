@@ -13,13 +13,14 @@ try {
 const path = require('path');
 const express = require('express');
 const {
-  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS,
+  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 const FLAG_SET = new Set(FLAGS);
+const ORDER_KIND_SET = new Set(ORDER_KINDS);
 // Longueur maximale du motif d'alerte : une phrase, pas un roman (la ligne de
 // grille l'affiche tronqué, l'infobulle en donne le texte complet).
 const FLAG_REASON_MAX = 240;
@@ -58,7 +59,7 @@ app.use(basicAuth);
 // Helpers
 // ---------------------------------------------------------------------------
 const PATCHABLE = [
-  'stage', 'sub_stage', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
+  'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason',
@@ -94,6 +95,14 @@ function validateField(key, value) {
       const s = String(value).trim();
       if (s === '') return { ok: true, value: null };
       if (!FLAG_SET.has(s)) return { ok: false, error: `flag invalide: ${s}` };
+      return { ok: true, value: s };
+    }
+    case 'order_kind': {
+      // Nature de la ligne : demande (à chiffrer) ou commande (validée). Vide =
+      // on ne se prononce pas — la ligne reste neutre, pas de nature inventée.
+      const s = String(value).trim();
+      if (s === '') return { ok: true, value: null };
+      if (!ORDER_KIND_SET.has(s)) return { ok: false, error: `order_kind invalide: ${s}` };
       return { ok: true, value: s };
     }
     case 'flag_reason': {
@@ -461,7 +470,23 @@ app.get('/api/fiche/catalog', (req, res) => {
 const euro = (n) => Math.round(n * 100) / 100;
 
 const DAY = 86400000;
-const isDay = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+// Une date civile valide, pas seulement bien formée : « 2026-02-30 » a la bonne
+// tête mais n'existe pas, et la colonne `date` rejetterait l'INSERT (500). On la
+// traite donc comme une date absente — le délai par défaut s'applique.
+const isDay = (s) => {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+};
+
+// Date civile LOCALE à J+n. `toISOString()` bascule en UTC : à l'ouest de
+// Greenwich (l'atelier est aux Antilles) il rend déjà la date du lendemain en
+// soirée, et le délai « 7 jours » en vaudrait 8. Le front calcule pareil.
+function todayPlus(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 // Nombre de jours pleins entre aujourd'hui et une date civile, sans heure ni
 // fuseau : les deux bornes sont ramenées à minuit UTC avant la soustraction.
 function daysUntil(day) {
@@ -580,11 +605,7 @@ function buildFiche(body) {
   if (elements.length === 0) return { error: 'aucune personnalisation : la fiche est vide' };
 
   // Échéance : la date posée fait foi ; à défaut on applique les jours du délai.
-  const deadline = isDay(body.deadline) ? body.deadline : (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + delai.days);
-    return d.toISOString().slice(0, 10);
-  })();
+  const deadline = isDay(body.deadline) ? body.deadline : todayPlus(delai.days);
   const heure = /^\d{2}:\d{2}$/.test(body.heure) ? body.heure : null;
 
   const rate = rateFor(delai, deadline);
@@ -666,6 +687,284 @@ app.post('/api/fiche', asyncH(async (req, res) => {
 
   broadcast({ kind: 'create', stages: [fiche.stage] });
   res.status(201).json({ id: rows[0].id, fiche });
+}));
+
+// ---------------------------------------------------------------------------
+// Annuaire client — déduit des commandes déjà saisies, sans table dédiée.
+// La prise de commande s'en sert pour l'auto-complétion : taper « Igua » propose
+// « Iguana (Discover) » avec son contact et son téléphone, donc on ne resaisit
+// jamais un client connu (et on n'en crée pas un doublon mal orthographié).
+// ---------------------------------------------------------------------------
+
+// Clé de rapprochement : insensible à la casse, aux accents et à la ponctuation,
+// pour que « Iguana (Discover) » et « iguana discover » soient LE MÊME client.
+const clientKey = (s) => String(s)
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+const trimOrNull = (v) => {
+  const s = String(v == null ? '' : v).trim();
+  return s === '' ? null : s;
+};
+
+app.get('/api/clients', asyncH(async (req, res) => {
+  // Le tri par date décroissante fait que la ligne la PLUS RÉCENTE d'un client
+  // est vue en premier : c'est elle qui donne l'orthographe de référence, les
+  // plus anciennes ne servent qu'à combler les champs restés vides.
+  const { rows } = await pool.query(
+    `SELECT billing_company, contact_referent, contact_phone, contact_email, client_type
+       FROM requests
+      WHERE billing_company IS NOT NULL
+      ORDER BY created_at DESC`,
+  );
+
+  const byKey = new Map();
+  for (const r of rows) {
+    const nom = trimOrNull(r.billing_company);
+    if (!nom) continue;
+    const key = clientKey(nom);
+    if (!key) continue;
+    let c = byKey.get(key);
+    if (!c) {
+      c = { nom, contact: null, telephone: null, email: null, type: null, commandes: 0 };
+      byKey.set(key, c);
+    }
+    c.commandes += 1;
+    c.contact = c.contact || trimOrNull(r.contact_referent);
+    c.telephone = c.telephone || trimOrNull(r.contact_phone);
+    c.email = c.email || trimOrNull(r.contact_email);
+    c.type = c.type || (CLIENT_TYPE_SET.has(r.client_type) ? r.client_type : null);
+  }
+
+  // Les clients qui reviennent le plus sont proposés en premier.
+  const list = [...byKey.values()].sort(
+    (a, b) => b.commandes - a.commandes || a.nom.localeCompare(b.nom, 'fr'),
+  );
+  res.json(list);
+}));
+
+// ---------------------------------------------------------------------------
+// Prise de commande atelier — POST /api/commande
+// La saisie de Mélina : on tranche DEMANDE ou COMMANDE dès le départ, on liste
+// les articles (vêtement, référence, couleur, taille) et, pour chacun, les zones
+// d'impression avec leur consigne (« Cœur : Les Doudous à SXM »).
+// Le catalogue (`catalog.commande`) est la source unique des listes ; le serveur
+// revalide tout ce que le poste de saisie envoie.
+// ---------------------------------------------------------------------------
+const COM = CATALOG.commande;
+const COM_TYPE_BY_ID = new Map(COM.types.map((t) => [t.id, t]));
+const COM_ZONE_BY_ID = new Map(COM.zones.map((z) => [z.id, z]));
+const COM_TECH_BY_ID = new Map(COM.techniques.map((t) => [t.id, t]));
+const COM_FACTURE_BY_ID = new Map(COM.factureEtats.map((f) => [f.id, f]));
+
+// Longueurs bornées : ces textes finissent dans une cellule de grille, pas dans
+// un traitement de texte.
+const VETEMENT_MAX = 80;
+const REF_MAX = 40;
+const COULEUR_MAX = 40;
+const REMARQUE_MAX = 400;
+
+app.get('/api/commande/catalog', (req, res) => {
+  res.json({ ...COM, employes: RESPONSABLES, clientTypes: CLIENT_TYPES });
+});
+
+// Valide un article et ses zones d'impression. Renvoie { article } ou { error }.
+function buildArticle(raw, index) {
+  const where = `Article ${index + 1}`;
+  const a = raw && typeof raw === 'object' ? raw : {};
+
+  const vetement = trimOrNull(a.vetement);
+  if (!vetement) return { error: `${where} : le type de vêtement est vide` };
+  if (vetement.length > VETEMENT_MAX) return { error: `${where} : type de vêtement trop long` };
+
+  const quantite = Number.parseInt(a.quantite, 10);
+  if (!Number.isInteger(quantite) || quantite < 1 || quantite > 9999) {
+    return { error: `${where} : quantité invalide (1 à 9999)` };
+  }
+
+  // La taille peut ne pas être au catalogue (grille fournisseur exotique) : on
+  // l'accepte telle quelle plutôt que de bloquer la prise de commande.
+  const taille = trimOrNull(a.taille);
+  if (taille && taille.length > 24) return { error: `${where} : taille trop longue` };
+
+  const ref = trimOrNull(a.ref);
+  if (ref && ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
+  const couleur = trimOrNull(a.couleur);
+  if (couleur && couleur.length > COULEUR_MAX) return { error: `${where} : couleur trop longue` };
+
+  const zones = [];
+  const rawZones = Array.isArray(a.zones) ? a.zones : [];
+  for (const rz of rawZones) {
+    const zone = COM_ZONE_BY_ID.get(rz && rz.zone);
+    if (!zone) return { error: `${where} : zone d'impression inconnue` };
+    if (zones.some((z) => z.zone === zone.id)) {
+      return { error: `${where} : la zone « ${zone.label} » est posée deux fois` };
+    }
+    const consigne = trimOrNull(rz.consigne);
+    if (consigne && consigne.length > COM.consigneMax) {
+      return { error: `${where} — ${zone.label} : consigne trop longue (${COM.consigneMax} caractères maximum)` };
+    }
+    const tech = COM_TECH_BY_ID.get(rz.technique) || COM.techniques[0];
+    zones.push({
+      zone: zone.id,
+      zoneLabel: zone.label,
+      consigne,
+      technique: tech.id,
+      techniqueLabel: tech.label,
+    });
+  }
+
+  return {
+    article: {
+      vetement, ref, couleur, taille: taille || null, quantite, zones,
+    },
+  };
+}
+
+// Reconstruit une prise de commande à partir du corps reçu. Fonction pure :
+// aucune écriture, elle renvoie { commande, resume, produit } ou { error }.
+function buildCommande(body) {
+  const b = body && typeof body === 'object' ? body : {};
+
+  const type = COM_TYPE_BY_ID.get(b.kind);
+  if (!type) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
+
+  const rawClient = b.client && typeof b.client === 'object' ? b.client : {};
+  const societe = trimOrNull(rawClient.societe);
+  if (!societe) return { error: 'le nom du client (société / marque) est requis' };
+  if (societe.length > 120) return { error: 'nom du client trop long' };
+
+  const email = trimOrNull(rawClient.email);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'email invalide' };
+
+  const client = {
+    societe,
+    contact: trimOrNull(rawClient.contact),
+    telephone: trimOrNull(rawClient.telephone),
+    email,
+    type: CLIENT_TYPE_SET.has(rawClient.type) ? rawClient.type : 'pro',
+  };
+
+  const rawArticles = Array.isArray(b.articles) ? b.articles : [];
+  if (rawArticles.length === 0) return { error: 'aucun article : la commande est vide' };
+  if (rawArticles.length > COM.articlesMax) {
+    return { error: `trop d'articles (${COM.articlesMax} maximum)` };
+  }
+  const articles = [];
+  for (let i = 0; i < rawArticles.length; i += 1) {
+    const built = buildArticle(rawArticles[i], i);
+    if (built.error) return { error: built.error };
+    articles.push(built.article);
+  }
+
+  const facture = COM_FACTURE_BY_ID.get(b.facture) || COM_FACTURE_BY_ID.get('a_faire');
+
+  const remarque = trimOrNull(b.remarque);
+  if (remarque && remarque.length > REMARQUE_MAX) return { error: 'remarque trop longue' };
+
+  // Délai : la date posée fait foi. Sans date, la règle maison s'applique —
+  // 7 jours (catalog.commande.delaiDefautJours), jamais « sans échéance ».
+  const deadline = isDay(b.deadline) ? b.deadline : todayPlus(COM.delaiDefautJours);
+
+  const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
+  const quantite = articles.reduce((s, a) => s + a.quantite, 0);
+
+  const commande = {
+    kind: 'commande-atelier',        // discriminant : distingue ce JSON d'une fiche Express
+    type: { id: type.id, label: type.label },
+    client,
+    articles,
+    enBoite: b.enBoite === true,
+    maquette: b.maquette === true,
+    facture: { id: facture.id, label: facture.label },
+    remarque,
+    deadline,
+    priority,
+    vendeuse: RESPONSABLE_SET.has(b.vendeuse) ? b.vendeuse : 'À attribuer',
+    referent: RESPONSABLE_SET.has(b.referent) && b.referent !== 'À attribuer' ? b.referent : null,
+    stage: type.stage,
+    subStage: type.subStage,
+    quantite,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Colonne « Description » de la grille : de quoi reconnaître la commande d'un
+  // coup d'œil, sans ouvrir le détail.
+  const noms = [...new Set(articles.map((a) => a.vetement))];
+  const produit = articles.length === 1
+    ? `${articles[0].quantite} × ${articles[0].vetement}`
+    : `${quantite} pièces — ${noms.slice(0, 3).join(', ')}${noms.length > 3 ? '…' : ''}`;
+
+  // Colonne « Infos » : le détail lisible, pour que la grille n'ait jamais à
+  // lire le JSON.
+  const lignes = articles.map((a) => {
+    const id = [a.ref && `réf. ${a.ref}`, a.couleur, a.taille && `taille ${a.taille}`]
+      .filter(Boolean).join(' · ');
+    const tete = `• ${a.quantite} × ${a.vetement}${id ? ` — ${id}` : ''}`;
+    const zs = a.zones.map((z) => {
+      const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
+      return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
+    });
+    return [tete, ...zs].join('\n');
+  });
+
+  const etats = [
+    `Article en boîte : ${commande.enBoite ? 'oui' : 'non'}`,
+    commande.maquette ? 'Maquette à faire' : 'Maquette : non',
+    `Facture : ${facture.label.toLowerCase()}`,
+  ].join(' · ');
+
+  const resume = [
+    `${type.label.toUpperCase()} — ${societe}${client.contact ? ` (${client.contact})` : ''}`,
+    ...lignes,
+    etats,
+    ...(remarque ? [`Remarque : ${remarque}`] : []),
+  ].join('\n');
+
+  return { commande, resume, produit };
+}
+
+// POST /api/commande → crée la demande / commande dans le planning.
+app.post('/api/commande', asyncH(async (req, res) => {
+  const built = buildCommande(req.body || {});
+  if (built.error) return res.status(400).json({ error: built.error });
+  const { commande, resume, produit } = built;
+
+  const { rows: posRows } = await pool.query(
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [commande.stage],
+  );
+
+  const { rows } = await pool.query(
+    `INSERT INTO requests
+       (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
+        contact_phone, contact_email, quantity, product, color, description, deadline,
+        responsable, referent, position, fiche)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+     RETURNING *`,
+    [
+      commande.stage,
+      commande.subStage,
+      commande.type.id,
+      commande.priority,
+      commande.client.type,
+      commande.client.societe,
+      commande.client.contact,
+      commande.client.telephone,
+      commande.client.email,
+      commande.quantite,
+      produit,
+      commande.articles[0].couleur,
+      resume,
+      commande.deadline,
+      commande.vendeuse,
+      commande.referent,
+      posRows[0].pos,
+      JSON.stringify(commande),
+    ],
+  );
+
+  broadcast({ kind: 'create', stages: [commande.stage] });
+  res.status(201).json({ id: rows[0].id, commande });
 }));
 
 // ---------------------------------------------------------------------------

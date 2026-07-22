@@ -1,0 +1,18 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: x
+  - generic [ref=e5]:
+    - complementary [ref=e6]
+    - main [ref=e8]:
+      - region "Prise de commande" [ref=e9]:
+        - heading "T" [level=2] [ref=e12]
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: Type
+            - combobox "Type" [ref=e18] [cursor=pointer]:
+              - option "Pro" [selected]
+          - radiogroup "Priorité" [ref=e19]:
+            - radio "star" [checked] [ref=e20] [cursor=pointer]
+            - radio "star" [ref=e22] [cursor=pointer]
+        - status
+        - generic [ref=e24]: ok

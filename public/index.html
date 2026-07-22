@@ -23,6 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Manrope:wght@400..800&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="commande.css" />
   <link rel="stylesheet" href="express.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
@@ -76,6 +77,17 @@
         <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
              dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
         <nav class="nav-switch" aria-label="Navigation">
+          <!-- Le premier pas du client : deux entrées distinctes, tout en haut,
+               pour saisir en un tap une Demande (à chiffrer) ou une Commande
+               (déjà validée). Les deux ouvrent la même fiche rapide. -->
+          <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
+            <span class="material-symbols-outlined" aria-hidden="true">help</span>
+            <span class="nav-switch-label">Demande</span>
+          </a>
+          <a class="nav-switch-btn nav-switch-btn--intake" id="viewCommande" href="#commande">
+            <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+            <span class="nav-switch-label">Commande</span>
+          </a>
           <a class="nav-switch-btn" id="viewPlanning" href="#planning">
             <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
             <span class="nav-switch-label">Planning</span>
@@ -178,6 +190,104 @@
         <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
+
+        <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
+             remplit au comptoir, en face de lui : juste les infos de base, sous
+             forme de tableau simple et rapide. La NATURE (demande / commande)
+             est décidée par l'entrée du menu (deux liens distincts), pas par un
+             réglage ici. Le balisage est là dès le départ ; le module
+             (commande.js) n'est chargé qu'au premier affichage. -->
+        <section class="cmd" id="commande" hidden aria-label="Prise de commande">
+          <header class="cmd-bar">
+            <span class="cmd-bar__ic material-symbols-outlined" aria-hidden="true">edit_note</span>
+            <div class="cmd-bar__titles">
+              <h2 class="cmd-bar__title" id="cmd-title">Demande</h2>
+              <p class="cmd-bar__sub" id="cmd-sub"></p>
+            </div>
+            <div class="cmd-bar__actions">
+              <a class="cmd-btn" href="#planning">Annuler</a>
+              <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-save">Enregistrer</button>
+            </div>
+          </header>
+
+          <div class="cmd-body">
+            <!-- Client : une seule ligne, l'essentiel. -->
+            <div class="cmd-client">
+              <div class="cmd-field cmd-field--grow cmd-auto">
+                <label class="cmd-label" for="cmd-societe">Client — société / marque</label>
+                <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
+                       autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                       aria-controls="cmd-auto-list" />
+                <ul class="cmd-auto__list" id="cmd-auto-list" role="listbox" aria-label="Clients connus" hidden></ul>
+                <p class="cmd-hint" id="cmd-client-known" hidden></p>
+              </div>
+              <div class="cmd-field">
+                <label class="cmd-label" for="cmd-tel">Téléphone</label>
+                <input class="cmd-input" id="cmd-tel" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+              </div>
+              <div class="cmd-field">
+                <label class="cmd-label" for="cmd-contact">Contact</label>
+                <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- Articles : un tableau. Une ligne = un article ; en dessous, son
+                 marquage (zones + consignes). Ajout / retrait en un tap. -->
+            <div class="cmd-table" role="group" aria-label="Articles">
+              <div class="cmd-thead" aria-hidden="true">
+                <span>Qté</span>
+                <span>Vêtement</span>
+                <span>Référence</span>
+                <span>Couleur</span>
+                <span>Taille</span>
+                <span></span>
+              </div>
+              <div class="cmd-arts" id="cmd-arts"></div>
+              <button class="cmd-addrow" type="button" id="cmd-add-art">
+                <span class="material-symbols-outlined" aria-hidden="true">add</span> Ajouter un article
+              </button>
+            </div>
+
+            <!-- Options de base, sur une ligne : boîte, maquette, facture, date. -->
+            <div class="cmd-opts">
+              <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
+                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                <span>Article en boîte</span>
+              </button>
+              <button class="cmd-optswitch" type="button" id="cmd-maquette" role="switch" aria-checked="true">
+                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                <span>Maquette à faire</span>
+              </button>
+              <div class="cmd-field cmd-field--inline">
+                <label class="cmd-label" for="cmd-facture">Facture</label>
+                <select class="cmd-input cmd-select" id="cmd-facture"></select>
+              </div>
+              <div class="cmd-field cmd-field--inline">
+                <label class="cmd-label" for="cmd-deadline">Date souhaitée</label>
+                <input class="cmd-input" id="cmd-deadline" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Listes de suggestion : saisie libre autorisée, le catalogue ne fait
+               que proposer (une grille fournisseur exotique ne doit pas bloquer). -->
+          <datalist id="cmd-dl-vetements"></datalist>
+          <datalist id="cmd-dl-tailles"></datalist>
+
+          <div class="cmd-toast" id="cmd-toast" role="status" aria-live="polite"></div>
+
+          <div class="cmd-done" id="cmd-done" hidden>
+            <div class="cmd-done__card" role="dialog" aria-modal="true" aria-labelledby="cmd-done-title">
+              <div class="cmd-done__check"><span class="material-symbols-outlined">check</span></div>
+              <p class="cmd-done__title" id="cmd-done-title">Enregistré</p>
+              <p class="cmd-done__sub" id="cmd-done-sub"></p>
+              <div class="cmd-done__actions">
+                <a class="cmd-btn" href="#planning">Voir le planning</a>
+                <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-done-new">Nouvelle saisie</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <!-- Onglet Commande Express : la prise de commande au comptoir. Le
              balisage est là dès le départ, mais son module (express.js) n'est

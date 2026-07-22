@@ -1,0 +1,252 @@
+/* ===========================================================================
+   Prise de commande — le premier pas du client
+   Fiche remplie au comptoir : infos de base, tableau simple, ultra rapide.
+   Tout est scopé sous #commande ; la vue consomme les JETONS GLOBAUX de
+   styles.css, donc elle suit la bascule clair / sombre sans une ligne de plus.
+   =========================================================================== */
+
+#commande:not([hidden]) {
+  display: flex; flex-direction: column;
+  min-height: 0; height: 100%; overflow-y: auto;
+}
+#commande, #commande * { box-sizing: border-box; }
+#commande [hidden] { display: none !important; }
+#commande button { font-family: inherit; }
+
+#commande button:focus-visible,
+#commande .cmd-input:focus-visible,
+#commande .cmd-auto__item:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+}
+
+/* ------------------------------------------------------------------ barre */
+#commande .cmd-bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 22px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 5;
+}
+#commande .cmd-bar__ic { color: var(--primary); font-size: 26px; }
+#commande .cmd-bar__titles { min-width: 0; }
+#commande .cmd-bar__title { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.01em; color: var(--text-1); }
+#commande .cmd-bar__sub { margin: 0; font-size: 13px; color: var(--text-2); }
+#commande .cmd-bar__actions { margin-left: auto; display: flex; gap: 10px; }
+
+/* ---------------------------------------------------------------- boutons */
+#commande .cmd-btn {
+  min-height: 44px; padding: 0 20px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-1);
+  font: 500 14px var(--font); text-decoration: none; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+#commande .cmd-btn:hover { background: var(--surface-hover); }
+#commande .cmd-btn--primary { border-color: var(--primary); background: var(--primary); color: #fff; }
+#commande .cmd-btn--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+#commande .cmd-btn--primary:disabled { opacity: .55; cursor: default; }
+
+#commande .cmd-icon {
+  width: 44px; height: 44px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 999px; background: transparent;
+  color: var(--text-2); cursor: pointer;
+}
+#commande .cmd-icon:hover { background: var(--state-hover); color: var(--text-1); }
+#commande .cmd-icon--danger:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
+#commande .cmd-icon .material-symbols-outlined { font-size: 20px; }
+
+/* ------------------------------------------------------------------- corps */
+#commande .cmd-body {
+  flex: 1;
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 18px 22px calc(28px + env(safe-area-inset-bottom));
+  max-width: 1100px; width: 100%;
+}
+
+/* --------------------------------------------------------------- champs */
+#commande .cmd-field { min-width: 0; }
+#commande .cmd-label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-2); }
+#commande .cmd-hint { margin: 4px 0 0; font-size: 12px; color: var(--st-livree); }
+
+#commande .cmd-input {
+  width: 100%; height: 44px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text-1);
+  /* 16px : en dessous, iOS zoome à la mise au point du champ. */
+  font: 400 16px var(--font);
+  transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+#commande .cmd-input::placeholder { color: var(--text-3); }
+#commande .cmd-input:focus { outline: none; border-color: var(--primary); background-color: var(--field-focus); }
+#commande .cmd-select {
+  appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; background-size: 20px;
+}
+:root[data-theme="dark"] #commande .cmd-select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239aa0a6'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+}
+
+/* -------------------------------------------------------------- client */
+#commande .cmd-client {
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px; align-items: start;
+}
+#commande .cmd-auto { position: relative; }
+#commande .cmd-auto__list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: 100%;
+  margin: 4px 0 0; padding: 6px; list-style: none;
+  max-height: 300px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-pop);
+}
+#commande .cmd-auto__item {
+  display: flex; flex-direction: column; gap: 1px;
+  min-height: 44px; padding: 8px 10px; justify-content: center;
+  border-radius: 8px; cursor: pointer;
+}
+#commande .cmd-auto__item:hover, #commande .cmd-auto__item.is-on { background: var(--primary-soft); }
+#commande .cmd-auto__name { font-size: 14px; font-weight: 500; color: var(--text-1); }
+#commande .cmd-auto__meta { font-size: 12px; color: var(--text-2); }
+#commande .cmd-auto__n { font-size: 11px; color: var(--text-3); }
+
+/* -------------------------------------------------------- tableau articles */
+#commande .cmd-table {
+  border: 1px solid var(--card-border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+/* Une ligne d'en-tête + les lignes d'articles partagent la même grille, donc
+   les colonnes s'alignent parfaitement — le « tableau » de la fiche. */
+#commande .cmd-thead, #commande .cmd-art__row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 96px;
+  gap: 10px; align-items: center;
+}
+#commande .cmd-thead {
+  padding: 10px 14px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+}
+#commande .cmd-art { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+#commande .cmd-art:last-child { border-bottom: 0; }
+#commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 2px; }
+#commande .cmd-cell--quantite { text-align: center; font-weight: 600; }
+
+/* Marquage : chips de zones + une ligne de consigne par zone cochée. */
+#commande .cmd-art__mark { margin-top: 10px; }
+#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#commande .cmd-chip {
+  min-height: 44px; padding: 0 16px;
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+  font: 500 13.5px var(--font); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+#commande .cmd-chip:hover { background: var(--surface-hover); }
+#commande .cmd-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+#commande .cmd-zline {
+  display: grid; grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center; gap: 10px; margin-top: 8px;
+}
+#commande .cmd-zline__name { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+
+#commande .cmd-addrow {
+  width: 100%; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-top: 1px dashed var(--border); background: var(--bg);
+  color: var(--primary); font: 600 14px var(--font); cursor: pointer;
+}
+#commande .cmd-addrow:hover { background: var(--primary-soft); }
+#commande .cmd-addrow .material-symbols-outlined { font-size: 20px; }
+
+/* --------------------------------------------------------------- options */
+#commande .cmd-opts {
+  display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px;
+}
+#commande .cmd-optswitch {
+  min-height: 44px; padding: 0 6px 0 4px;
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 0; background: transparent; cursor: pointer;
+  font: 500 14px var(--font); color: var(--text-1);
+}
+#commande .cmd-optswitch__box {
+  width: 24px; height: 24px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border); border-radius: 7px;
+  background: var(--surface);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+#commande .cmd-optswitch__box .material-symbols-outlined { font-size: 18px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box { background: var(--primary); border-color: var(--primary); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
+#commande .cmd-field--inline { display: flex; align-items: center; gap: 8px; }
+#commande .cmd-field--inline .cmd-label { margin: 0; white-space: nowrap; }
+#commande .cmd-field--inline .cmd-input { width: auto; min-width: 150px; }
+
+/* ------------------------------------------------------------- toast / fin */
+#commande .cmd-toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 16px);
+  z-index: 60; max-width: min(90vw, 460px);
+  padding: 12px 18px; border-radius: 999px;
+  background: var(--tip-bg); color: var(--tip-fg);
+  font-size: 14px; box-shadow: var(--shadow-pop);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+#commande .cmd-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* `.work` porte un transform (animation d'entrée) : il devient le bloc conteneur
+   de ce `fixed`. Le voile couvre l'écran de travail, pas la barre du haut ni le
+   rail — donc quitter par le menu reste possible. */
+#commande .cmd-done {
+  position: fixed; inset: 0; z-index: 70;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(15, 23, 42, .45);
+}
+#commande .cmd-done__card {
+  width: min(440px, 100%); padding: 28px 24px; text-align: center;
+  background: var(--surface); border-radius: var(--radius-card); box-shadow: var(--shadow-pop);
+}
+#commande .cmd-done__check {
+  width: 56px; height: 56px; margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--st-livree-bg); color: var(--st-livree);
+}
+#commande .cmd-done__check .material-symbols-outlined { font-size: 30px; }
+#commande .cmd-done__title { margin: 0 0 6px; font-size: 21px; font-weight: 500; color: var(--text-1); }
+#commande .cmd-done__sub { margin: 0 0 22px; font-size: 14.5px; color: var(--text-2); }
+#commande .cmd-done__actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------ responsive
+   Chrome PC, Galaxy Tab A9+ (1280 paysage / 800 portrait), iPhone 390-430. */
+@media (max-width: 900px) {
+/* Sous la tablette portrait, la ligne d'article ne rentre plus alignée : on
+   masque l'en-tête (les placeholders guident) et on empile les champs. */
+#commande .cmd-thead { display: none; }
+#commande .cmd-client { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#commande .cmd-client .cmd-field--grow { grid-column: 1 / -1; }
+#commande .cmd-art__row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+#commande .cmd-cell--quantite { width: 74px; text-align: left; }
+#commande .cmd-cell--vetement { flex: 1 1 55%; min-width: 160px; }
+#commande .cmd-cell--ref, #commande .cmd-cell--couleur, #commande .cmd-cell--taille { flex: 1 1 28%; min-width: 100px; }
+#commande .cmd-art__tools { margin-left: auto; }
+}
+@media (max-width: 560px) {
+#commande .cmd-bar { flex-wrap: wrap; padding: 10px 14px; }
+#commande .cmd-bar__titles { flex: 1 1 0; }
+#commande .cmd-bar__title { font-size: 17px; }
+#commande .cmd-bar__actions { width: 100%; margin-left: 0; }
+#commande .cmd-bar__actions .cmd-btn { flex: 1; }
+#commande .cmd-body { padding: 14px; gap: 14px; }
+#commande .cmd-client { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-zline { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+#commande .cmd-field--inline { width: 100%; justify-content: space-between; }
+#commande .cmd-field--inline .cmd-input { flex: 1; }
+}

@@ -65,5 +65,66 @@
     { "id": "paye", "label": "Payé" },
     { "id": "acompte", "label": "Acompte versé" },
     { "id": "attente", "label": "En attente" }
-  ]
+  ],
+
+  "commande": {
+    "types": [
+      { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande", "subStage": null },
+      { "id": "commande", "label": "Commande", "hint": "validée par le client", "stage": "chiffrage", "subStage": "a_chiffrer" }
+    ],
+    "vetements": [
+      "T-shirt",
+      "T-shirt sans manches",
+      "Débardeur",
+      "Crop top",
+      "Débardeur crop top",
+      "Polo",
+      "Sweat",
+      "Sweat à capuche",
+      "Chemise",
+      "Short",
+      "Casquette",
+      "Bob",
+      "Tote bag",
+      "Serviette",
+      "Tablier",
+      "Sac"
+    ],
+    "tailles": [
+      "Taille unique", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL",
+      "2 ans", "4 ans", "6 ans", "8 ans", "10 ans", "12 ans", "14 ans"
+    ],
+    "zones": [
+      { "id": "coeur", "label": "Cœur", "hint": "poitrine gauche" },
+      { "id": "poitrine", "label": "Poitrine", "hint": "centré" },
+      { "id": "dos", "label": "Dos" },
+      { "id": "haut_dos", "label": "Haut du dos", "hint": "sous la nuque" },
+      { "id": "manche_g", "label": "Manche gauche" },
+      { "id": "manche_d", "label": "Manche droite" },
+      { "id": "capuche", "label": "Capuche" },
+      { "id": "poche", "label": "Poche" },
+      { "id": "avant", "label": "Avant" },
+      { "id": "arriere", "label": "Arrière" },
+      { "id": "cote", "label": "Côté" }
+    ],
+    "techniques": [
+      { "id": "a_definir", "label": "À définir" },
+      { "id": "dtf", "label": "DTF" },
+      { "id": "broderie", "label": "Broderie" },
+      { "id": "flex", "label": "Flex" },
+      { "id": "sublimation", "label": "Sublimation" },
+      { "id": "serigraphie", "label": "Sérigraphie" },
+      { "id": "uv", "label": "Impression UV" },
+      { "id": "laser", "label": "Gravure laser" }
+    ],
+    "factureEtats": [
+      { "id": "a_faire", "label": "À faire" },
+      { "id": "a_preparer", "label": "À préparer" },
+      { "id": "faite", "label": "Déjà faite" },
+      { "id": "sans", "label": "Pas de facture" }
+    ],
+    "delaiDefautJours": 7,
+    "consigneMax": 160,
+    "articlesMax": 40
+  }
 }

@@ -1,0 +1,8 @@
+[     249ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8911/api/category-owners:0
+[     249ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8911/api/category-referents:0
+[     249ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8911/api/counts:0
+[     253ms] [ERROR] Error: File not found
+    at api (http://127.0.0.1:8911/app.js:315:11)
+    at async loadCounts (http://127.0.0.1:8911/app.js:448:12)
+    at async Promise.all (index 1)
+    at async start (http://127.0.0.1:8911/app.js:3031:3) @ http://127.0.0.1:8911/app.js:2312

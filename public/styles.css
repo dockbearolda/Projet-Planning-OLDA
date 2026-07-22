@@ -1062,6 +1062,20 @@ tr:hover .handle { color: var(--text-2); }
   color: var(--text-1);
 }
 
+/* Nature posée à la prise de commande : DEMANDE (à chiffrer) ou COMMANDE
+   (validée par le client). Purement informatif sur la ligne — l'étape du
+   pipeline reste ce qui pilote le travail. */
+.kind-badge {
+  align-self: flex-start;
+  margin: 0 0 0 14px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.kind-badge--demande { background: var(--st-demande-bg); color: var(--st-demande); }
+.kind-badge--commande { background: var(--st-livree-bg); color: var(--st-livree); }
+
 /* Type Pro / Perso : pastille */
 .type-tag {
   position: relative;
@@ -2228,6 +2242,16 @@ button, a, .stage, .prio-pill, .deadline-badge,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
+/* Les deux entrées de saisie (Demande / Commande) sont le premier pas : posées
+   en tête, un peu plus présentes, et séparées du reste par un filet. */
+.nav-switch-btn--intake {
+  color: var(--text-1);
+  background: var(--surface-hover);
+}
+.nav-switch-btn--intake .material-symbols-outlined { color: var(--primary); }
+/* Filet sous la 2e entrée de saisie (Commande), pour la détacher du reste. */
+#viewCommande { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); }
+
 /* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
    fonctionne ; affiché seulement quand il n'est pas masqué. */
 .dashboard:not([hidden]) {
@@ -2249,7 +2273,18 @@ body.view-express .work-head,
 body.view-express .grid-wrap,
 body.view-express .fiverr-tool,
 body.view-express .sidebar-head,
-body.view-express #stages { display: none !important; }
+body.view-express #stages,
+body.view-commande .work-head,
+body.view-commande .grid-wrap,
+body.view-commande .fiverr-tool,
+body.view-commande .sidebar-head,
+body.view-commande #stages { display: none !important; }
+
+/* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
+   du Planning il n'a rien à piloter, et son résultat serait invisible. */
+body.view-dashboard #btnNew,
+body.view-express #btnNew,
+body.view-commande #btnNew { display: none !important; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {

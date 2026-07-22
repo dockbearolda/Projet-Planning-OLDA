@@ -154,6 +154,9 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | DELETE | `/api/requests/:id` | Supprime une demande. |
 | GET | `/api/fiche/catalog` | Catalogue Commande Express (produits, options, délais, polices, visuels, encres, placements). |
 | POST | `/api/fiche` | Enregistre une Commande Express → crée la demande dans le planning. |
+| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, vêtements, tailles, zones, techniques, états de facture). |
+| POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning. |
+| GET | `/api/clients` | Annuaire client déduit des commandes déjà saisies (auto-complétion). |
 
 Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
 connues ou null ; `responsable` ∈ liste connue ou null ; `priority` ∈ {1,2,3} ;
@@ -182,17 +185,63 @@ part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
 - **Total live**, recalculé à chaque geste sans aller-retour réseau.
 - **Reçu imprimable** après validation.
 
-## Navigation — une seule page, trois vues
+## Prise de commande — `/#demande` et `/#commande`
 
-Planning, Dashboard et Commande Express sont **trois vues d'un même
-document**, pas trois pages. Passer de l'une à l'autre ne recharge rien : ni
-requête, ni réaffichage, ni saisie perdue. Une commande à moitié remplie
-survit à un aller-retour vers le planning.
+Le **premier pas du client** : la fiche qu'on remplit au comptoir, en face de
+lui. Juste les infos de base, dans un **tableau simple et rapide** — aucun prix
+(le chiffrage est une étape du planning), aucune option superflue.
 
-Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`,
-`#express`. La navigation, dans le rail de gauche, n'est faite que de liens —
-cliquer change le hash, le hash change la vue. Chaque écran est donc
+Deux entrées **en tête du menu**, l'une pour une *Demande* (à chiffrer), l'autre
+pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fiche**
+— la nature est décidée par le lien cliqué, pas par un réglage dans l'écran :
+
+- une **Demande** part dans la colonne **« Demande »** du planning ;
+- une **Commande** part dans la colonne **« Commande »** (l'ancienne
+  « Chiffrage / Devis », renommée : un client a dit oui, le devis reste à faire),
+  directement sur la sous-étape **« À chiffrer »**.
+
+La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
+la ligne du planning. Le reste :
+
+- **Client auto-complété** : taper « Igua » propose « Iguana (Discover) » avec son
+  contact et son numéro. L'annuaire (`GET /api/clients`) est **déduit des
+  commandes déjà saisies** — aucune table de plus, aucun doublon mal orthographié
+  (rapprochement insensible à la casse, aux accents et à la ponctuation). La
+  reprise ne remplit que les champs restés vides.
+- **Articles en tableau** : quantité, vêtement, référence (`K3022`), couleur,
+  taille. Le catalogue *propose* (datalist), la saisie libre reste permise.
+  « Dupliquer » reprend l'article ET son marquage : la même impression sur une
+  autre taille, en un tap.
+- **Marquage par article** : on coche les zones (Cœur, Dos, Manche…) et on tape la
+  **consigne libre** de chacune (« Les Doudous à SXM », « Grand Case »). La
+  technique d'impression est une décision de production, pas de la prise : on ne
+  la demande pas ici.
+- **Options de base** sur une ligne : *Article en boîte*, *Maquette à faire*,
+  *Facture*, *Date souhaitée* (7 jours par défaut, jamais « sans échéance »).
+
+Le détail structuré est conservé dans `requests.fiche` (jsonb, discriminant
+`kind: 'commande-atelier'`) ; `requests.description` en porte le résumé lisible,
+donc la grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans
+`catalog.json`, section `commande` — seul endroit à modifier pour ajouter un
+vêtement, une taille ou une zone.
+
+## Navigation — une seule page, quatre vues
+
+Planning, Dashboard, Prise de commande et Commande Express sont **quatre vues
+d'un même document**, pas quatre pages. Passer de l'une à l'autre ne recharge
+rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
+remplie survit à un aller-retour vers le planning.
+
+Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`, `#demande`,
+`#commande`, `#express`. La navigation, dans le rail de gauche, n'est faite que
+de liens — cliquer change le hash, le hash change la vue. Chaque écran est donc
 partageable par son URL et le bouton « Retour » du navigateur fonctionne.
+`#demande` et `#commande` ouvrent la même vue de saisie, seule la nature diffère
+(poussée au module par `setNature`) — d'où deux liens distincts en tête du menu.
+
+Le bouton « Nouvelle commande » de la barre du haut ne crée une ligne que dans
+la grille : il est donc masqué hors du Planning, où son résultat serait
+invisible.
 
 `/fiche` redirige (301) vers `/#express` : les raccourcis déjà posés sur les
 écrans de l'atelier continuent de marcher.
@@ -233,11 +282,13 @@ n'a jamais besoin de lire ce JSON.
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
-├── catalog.json      barème + catalogue Commande Express (source unique des prix)
+├── catalog.json      barème Express + catalogue Prise de commande (source unique)
 ├── public/
-│   ├── index.html    coquille + les 3 vues (planning, dashboard, express)
+│   ├── index.html    coquille + les 4 vues (planning, dashboard, commande, express)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
+│   ├── commande.css  vue Prise de commande, scopée sous #commande
+│   ├── commande.js   état, articles, zones, annuaire client, envoi
 │   ├── express.css   vue Commande Express, scopée sous #express
 │   └── express.js    état, aperçu tasse, calcul du total, envoi
 ├── .env.example
@@ -247,8 +298,9 @@ n'a jamais besoin de lire ce JSON.
 ## Modèle de données — table `requests`
 
 `id` (uuid), `stage` (slug de la FAMILLE, 8 valeurs + `fiverr`), `sub_stage`
-(slug de la SOUS-FAMILLE ou null), `responsable` (Loïc / Mélina / Charlie /
-Opérateur / À attribuer), `priority` (1–3), `client_type`
+(slug de la SOUS-FAMILLE ou null), `order_kind` (nature posée à la prise :
+`demande` / `commande` / null pour une ligne créée à la main), `responsable`
+(Loïc / Mélina / Charlie / Opérateur / À attribuer), `priority` (1–3), `client_type`
 (pro/perso/asso/revendeur), `billing_company`, `contact_referent`, `quantity`,
 `product`, `project_value` (numeric), `description`, `deadline` (date), `status`
 (sous-statut libre, distinct du `stage`), `flag` (`bloque` / `a_voir` / null),
