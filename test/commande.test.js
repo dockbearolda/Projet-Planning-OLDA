@@ -134,12 +134,14 @@ const jour = (days) => {
     assert.match(res.body.error, re);
   }
 
-  // 7. L'annuaire client se déduit du planning : le client qu'on vient de
-  //    saisir est proposé à la saisie suivante, dédoublonné malgré la casse.
+  // 7. La prise de commande alimente la BASE CLIENTS : le client saisi y est
+  //    créé (une seule fois, dédoublonné malgré la casse) et proposé ensuite à
+  //    la saisie suivante, avec son contact, son téléphone et son compteur de
+  //    commandes au planning.
   const clients = await (await fetch(`${base}/api/clients`)).json();
-  const iguanaEntry = clients.filter((x) => /iguana/i.test(x.nom));
-  assert.strictEqual(iguanaEntry.length, 1, 'un seul Iguana, quel que soit le nombre de commandes');
-  assert.strictEqual(iguanaEntry[0].contact, 'Jérôme');
+  const iguanaEntry = clients.filter((x) => x.entreprise === 'Iguana (Discover)');
+  assert.strictEqual(iguanaEntry.length, 1, 'un seul Iguana (Discover), quel que soit le nombre de commandes');
+  assert.strictEqual(iguanaEntry[0].nom, 'Jérôme', 'le contact saisi est repris dans la fiche');
   assert.strictEqual(iguanaEntry[0].telephone, '0690 66 24 00');
   assert.ok(iguanaEntry[0].commandes >= 2, 'le compteur suit les commandes du client');
 

@@ -66,6 +66,36 @@ CREATE TABLE IF NOT EXISTS statuses (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Base clients professionnelle (CRM). Rapatriée de l'ancienne app « Base clients »
+-- (Next.js) pour vivre DANS le planning : la prise de commande y puise ses
+-- suggestions et y crée automatiquement le client absent. Éditable en place.
+-- `type` = catégorie métier LIBRE (Boutique, Hôtel, Entretien…), pas le
+-- client_type pro/perso des commandes. Down : DROP TABLE client_notes; DROP TABLE clients;
+CREATE TABLE IF NOT EXISTS clients (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entreprise  text NOT NULL,                 -- société / marque (obligatoire)
+  nom         text,                          -- personne contact
+  fonction    text,                          -- son rôle (Gérante, Resp. Marketing…)
+  type        text,                          -- catégorie métier libre
+  zone        text,                          -- localité (Grand Case, Marigot…)
+  email       text,
+  telephone   text,
+  adresse     text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_clients_entreprise ON clients (entreprise);
+
+-- Notes & historique d'un client (timeline). kind : note / appel / email / rdv.
+CREATE TABLE IF NOT EXISTS client_notes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id  uuid NOT NULL,
+  kind       text NOT NULL DEFAULT 'note',
+  body       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_client_notes_client ON client_notes (client_id);
+
 -- Pièces jointes PDF par commande : 2 emplacements fixes par ligne
 -- (kind = 'devis' ou 'bat'). Le PDF est stocké en base (base64) car le
 -- système de fichiers Railway est éphémère. Table séparée de requests pour

@@ -73,8 +73,10 @@ function missing() {
 }
 
 // ---------------------------------------------------------------------------
-// Annuaire client — auto-complétion sur les clients déjà connus du planning.
+// Base clients — auto-complétion sur les clients de la base pro (/api/clients).
 // Taper « Igua » propose « Iguana (Discover) » avec son contact et son numéro.
+// Un client absent de la base y est créé automatiquement à l'enregistrement.
+// Forme d'un client : { entreprise, nom (contact), telephone, email, commandes }.
 // ---------------------------------------------------------------------------
 const fold = (s) => String(s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
@@ -102,10 +104,14 @@ function renderAuto() {
     li.setAttribute('role', 'option');
     li.setAttribute('aria-selected', String(i === autoIndex));
     li.dataset.i = i;
-    li.append(el('span', 'cmd-auto__name', c.nom));
-    const meta = [c.contact, c.telephone].filter(Boolean).join(' · ');
+    li.append(el('span', 'cmd-auto__name', c.entreprise));
+    const meta = [c.nom, c.telephone].filter(Boolean).join(' · ');
     if (meta) li.append(el('span', 'cmd-auto__meta', meta));
-    li.append(el('span', 'cmd-auto__n', c.commandes > 1 ? `${c.commandes} commandes` : '1 commande'));
+    // Compteur de commandes seulement s'il y en a : un client de la base pas
+    // encore commandé ne doit pas afficher « 1 commande » à tort.
+    if (c.commandes > 0) {
+      li.append(el('span', 'cmd-auto__n', c.commandes > 1 ? `${c.commandes} commandes` : '1 commande'));
+    }
     list.append(li);
   }
   list.hidden = autoMatches.length === 0;
@@ -118,18 +124,22 @@ function renderAuto() {
 function openAuto(query) {
   const q = fold(query).trim();
   if (!q) return closeAuto();
-  autoMatches = CLIENTS.filter((c) => fold(c.nom).includes(q)).slice(0, 6);
+  // On propose sur le nom de société ET le contact : « Jérôme » retrouve Iguana.
+  autoMatches = CLIENTS
+    .filter((c) => fold(c.entreprise).includes(q) || (c.nom && fold(c.nom).includes(q)))
+    .slice(0, 6);
   autoIndex = -1;
   renderAuto();
 }
 
 // Reprend une fiche connue : on ne remplit QUE les champs restés vides, pour ne
-// jamais écraser ce que la personne vient de taper.
+// jamais écraser ce que la personne vient de taper. Le `type` de la base est une
+// catégorie métier (Boutique, Hôtel…), pas le pro/perso de la commande : on ne
+// le recopie donc pas dans le client_type.
 function pickClient(c) {
-  state.client.societe = c.nom;
-  if (!state.client.contact.trim() && c.contact) state.client.contact = c.contact;
+  state.client.societe = c.entreprise;
+  if (!state.client.contact.trim() && c.nom) state.client.contact = c.nom;
   if (!state.client.telephone.trim() && c.telephone) state.client.telephone = c.telephone;
-  if (c.type) state.client.type = c.type;
 
   $('#cmd-societe').value = state.client.societe;
   $('#cmd-contact').value = state.client.contact;
@@ -244,9 +254,12 @@ function render() {
   $('#cmd-maquette').setAttribute('aria-checked', String(state.maquette));
   $('#cmd-maquette').classList.toggle('is-on', state.maquette);
 
-  const known = CLIENTS.find((c) => fold(c.nom) === fold(state.client.societe.trim()));
+  const known = CLIENTS.find((c) => fold(c.entreprise) === fold(state.client.societe.trim()));
   const badge = $('#cmd-client-known');
-  badge.textContent = known ? `Client connu — ${known.commandes} commande${known.commandes > 1 ? 's' : ''} au planning` : '';
+  const n = known ? (known.commandes || 0) : 0;
+  badge.textContent = known
+    ? (n > 0 ? `Client connu — ${n} commande${n > 1 ? 's' : ''} au planning` : 'Client connu — base pro')
+    : '';
   badge.hidden = !known;
 
   const need = missing();

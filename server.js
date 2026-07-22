@@ -690,10 +690,10 @@ app.post('/api/fiche', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
-// Annuaire client — déduit des commandes déjà saisies, sans table dédiée.
-// La prise de commande s'en sert pour l'auto-complétion : taper « Igua » propose
-// « Iguana (Discover) » avec son contact et son téléphone, donc on ne resaisit
-// jamais un client connu (et on n'en crée pas un doublon mal orthographié).
+// Base clients professionnelle (CRM) — table `clients` + `client_notes`.
+// Rapatriée de l'ancienne app « Base clients » (Next.js) pour vivre DANS le
+// planning : la prise de commande y puise ses suggestions (auto-complétion) et
+// y crée automatiquement le client absent ; la fiche est éditable en place.
 // ---------------------------------------------------------------------------
 
 // Clé de rapprochement : insensible à la casse, aux accents et à la ponctuation,
@@ -707,41 +707,170 @@ const trimOrNull = (v) => {
   return s === '' ? null : s;
 };
 
-app.get('/api/clients', asyncH(async (req, res) => {
-  // Le tri par date décroissante fait que la ligne la PLUS RÉCENTE d'un client
-  // est vue en premier : c'est elle qui donne l'orthographe de référence, les
-  // plus anciennes ne servent qu'à combler les champs restés vides.
-  const { rows } = await pool.query(
-    `SELECT billing_company, contact_referent, contact_phone, contact_email, client_type
-       FROM requests
-      WHERE billing_company IS NOT NULL
-      ORDER BY created_at DESC`,
-  );
+// Champs éditables d'un client et leur longueur bornée (ces textes vivent dans
+// une carte / une cellule, pas dans un traitement de texte).
+const CLIENT_MAX = {
+  entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
+  email: 160, telephone: 40, adresse: 200,
+};
+const CLIENT_FIELDS = Object.keys(CLIENT_MAX);
+const NOTE_KINDS = new Set(['note', 'appel', 'email', 'rdv']);
+const NOTE_MAX = 2000;
 
-  const byKey = new Map();
-  for (const r of rows) {
-    const nom = trimOrNull(r.billing_company);
-    if (!nom) continue;
-    const key = clientKey(nom);
-    if (!key) continue;
-    let c = byKey.get(key);
-    if (!c) {
-      c = { nom, contact: null, telephone: null, email: null, type: null, commandes: 0 };
-      byKey.set(key, c);
-    }
-    c.commandes += 1;
-    c.contact = c.contact || trimOrNull(r.contact_referent);
-    c.telephone = c.telephone || trimOrNull(r.contact_phone);
-    c.email = c.email || trimOrNull(r.contact_email);
-    c.type = c.type || (CLIENT_TYPE_SET.has(r.client_type) ? r.client_type : null);
+function validateClientField(key, value) {
+  const s = String(value == null ? '' : value).trim().slice(0, CLIENT_MAX[key]);
+  if (key === 'email' && s !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) {
+    return { ok: false, error: 'email invalide' };
   }
+  return { ok: true, value: s === '' ? null : s };
+}
 
-  // Les clients qui reviennent le plus sont proposés en premier.
-  const list = [...byKey.values()].sort(
-    (a, b) => b.commandes - a.commandes || a.nom.localeCompare(b.nom, 'fr'),
+// Compte des commandes du planning rattachées à chaque client (rapprochement
+// normalisé sur le nom de société). Sert la pastille « 3 commandes au planning »
+// de l'auto-complétion et de la fiche. Table petite : agrégation en JS.
+async function commandeCountByClientKey() {
+  const { rows } = await pool.query(
+    'SELECT billing_company FROM requests WHERE billing_company IS NOT NULL',
   );
+  const counts = new Map();
+  for (const r of rows) {
+    const key = clientKey(r.billing_company);
+    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
+// GET /api/clients → base clients complète, enrichie du nombre de commandes au
+// planning et de notes. Sert AUSSI l'auto-complétion de la prise de commande.
+app.get('/api/clients', asyncH(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM clients');
+  const { rows: noteRows } = await pool.query(
+    'SELECT client_id, COUNT(*)::int AS n FROM client_notes GROUP BY client_id',
+  );
+  const notesByClient = new Map(noteRows.map((r) => [r.client_id, r.n]));
+  const counts = await commandeCountByClientKey();
+
+  const list = rows.map((c) => ({
+    ...c,
+    notes_count: notesByClient.get(c.id) || 0,
+    commandes: counts.get(clientKey(c.entreprise)) || 0,
+  }));
+  list.sort((a, b) => a.entreprise.localeCompare(b.entreprise, 'fr'));
   res.json(list);
 }));
+
+// GET /api/clients/:id → une fiche + sa timeline de notes (récent en premier).
+app.get('/api/clients/:id', asyncH(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM clients WHERE id = $1', [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'Client introuvable' });
+  const { rows: notes } = await pool.query(
+    'SELECT * FROM client_notes WHERE client_id = $1 ORDER BY created_at DESC', [req.params.id],
+  );
+  const counts = await commandeCountByClientKey();
+  res.json({ ...rows[0], notes, commandes: counts.get(clientKey(rows[0].entreprise)) || 0 });
+}));
+
+// POST /api/clients → crée un client. Seule l'entreprise est obligatoire.
+app.post('/api/clients', asyncH(async (req, res) => {
+  const body = req.body || {};
+  const cols = [];
+  const vals = [];
+  const params = [];
+  let i = 1;
+  for (const key of CLIENT_FIELDS) {
+    if (!(key in body)) continue;
+    const v = validateClientField(key, body[key]);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    cols.push(key); vals.push(`$${i++}`); params.push(v.value);
+  }
+  if (!cols.includes('entreprise') || params[cols.indexOf('entreprise')] == null) {
+    return res.status(400).json({ error: 'le nom de la société est requis' });
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO clients (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
+  );
+  broadcast({ kind: 'client' });
+  res.status(201).json(rows[0]);
+}));
+
+// PATCH /api/clients/:id → met à jour un ou plusieurs champs (édition en place).
+app.patch('/api/clients/:id', asyncH(async (req, res) => {
+  const body = req.body || {};
+  const sets = [];
+  const params = [];
+  let i = 1;
+  for (const key of CLIENT_FIELDS) {
+    if (!(key in body)) continue;
+    const v = validateClientField(key, body[key]);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    // L'entreprise ne peut pas être vidée : c'est l'identité du client.
+    if (key === 'entreprise' && v.value == null) {
+      return res.status(400).json({ error: 'le nom de la société est requis' });
+    }
+    sets.push(`${key} = $${i++}`); params.push(v.value);
+  }
+  if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
+  sets.push('updated_at = now()');
+  params.push(req.params.id);
+  const { rows } = await pool.query(
+    `UPDATE clients SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`, params,
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'Client introuvable' });
+  broadcast({ kind: 'client' });
+  res.json(rows[0]);
+}));
+
+// DELETE /api/clients/:id → supprime le client et ses notes (cascade applicative).
+app.delete('/api/clients/:id', asyncH(async (req, res) => {
+  await pool.query('DELETE FROM client_notes WHERE client_id = $1', [req.params.id]);
+  const { rowCount } = await pool.query('DELETE FROM clients WHERE id = $1', [req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: 'Client introuvable' });
+  broadcast({ kind: 'client' });
+  res.status(204).end();
+}));
+
+// POST /api/clients/:id/notes → ajoute une note (note / appel / email / rdv).
+app.post('/api/clients/:id/notes', asyncH(async (req, res) => {
+  const body = req.body || {};
+  const kind = NOTE_KINDS.has(body.kind) ? body.kind : 'note';
+  const text = String(body.body == null ? '' : body.body).trim().slice(0, NOTE_MAX);
+  if (!text) return res.status(400).json({ error: 'la note est vide' });
+  const exists = await pool.query('SELECT 1 FROM clients WHERE id = $1', [req.params.id]);
+  if (exists.rowCount === 0) return res.status(404).json({ error: 'Client introuvable' });
+  const { rows } = await pool.query(
+    'INSERT INTO client_notes (client_id, kind, body) VALUES ($1,$2,$3) RETURNING *',
+    [req.params.id, kind, text],
+  );
+  broadcast({ kind: 'client' });
+  res.status(201).json(rows[0]);
+}));
+
+// DELETE /api/clients/:id/notes/:noteId → retire une note de la timeline.
+app.delete('/api/clients/:id/notes/:noteId', asyncH(async (req, res) => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM client_notes WHERE id = $1 AND client_id = $2',
+    [req.params.noteId, req.params.id],
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'Note introuvable' });
+  broadcast({ kind: 'client' });
+  res.status(204).end();
+}));
+
+// Crée le client dans la base s'il n'y est pas encore (rapprochement normalisé
+// sur le nom de société). Appelé à chaque prise de commande : « si c'est un
+// nouveau client, on crée sa fiche ». Ne touche jamais un client déjà présent.
+async function upsertClientFromCommande(cl) {
+  const entreprise = trimOrNull(cl && cl.societe);
+  if (!entreprise) return;
+  const key = clientKey(entreprise);
+  const { rows } = await pool.query('SELECT entreprise FROM clients');
+  if (rows.some((r) => clientKey(r.entreprise) === key)) return;
+  await pool.query(
+    'INSERT INTO clients (entreprise, nom, telephone, email) VALUES ($1,$2,$3,$4)',
+    [entreprise, trimOrNull(cl.contact), trimOrNull(cl.telephone), trimOrNull(cl.email)],
+  );
+  broadcast({ kind: 'client' });
+}
 
 // ---------------------------------------------------------------------------
 // Prise de commande atelier — POST /api/commande
@@ -962,6 +1091,11 @@ app.post('/api/commande', asyncH(async (req, res) => {
       JSON.stringify(commande),
     ],
   );
+
+  // « Si c'est un nouveau client, on crée sa fiche » : la base clients se
+  // remplit toute seule à la prise de commande, sans jamais dédoublonner un
+  // client déjà connu.
+  await upsertClientFromCommande(commande.client);
 
   broadcast({ kind: 'create', stages: [commande.stage] });
   res.status(201).json({ id: rows[0].id, commande });

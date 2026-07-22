@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="commande.css" />
   <link rel="stylesheet" href="express.css" />
+  <link rel="stylesheet" href="clients.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
@@ -99,6 +100,13 @@
           <a class="nav-switch-btn" id="viewExpress" href="#express">
             <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
             <span class="nav-switch-label">Commande Express</span>
+          </a>
+          <!-- Base clients (CRM) : la fiche pro de référence, éditable, qui
+               alimente la prise de commande. Épinglée en bas, avant les
+               réglages, comme un socle de l'outil. -->
+          <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
+            <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
+            <span class="nav-switch-label">Base clients</span>
           </a>
         </nav>
         <div class="sidebar-head" id="sidebarHead">
@@ -190,6 +198,10 @@
         <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
+
+        <!-- Onglet Base clients : le CRM pro. Liste + fiche éditable + notes,
+             entièrement rendu par clients.js (chargé au premier affichage). -->
+        <section class="clients" id="clients" hidden aria-label="Base clients"></section>
 
         <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
              remplit au comptoir, en face de lui : juste les infos de base, sous

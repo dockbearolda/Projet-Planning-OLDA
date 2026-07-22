@@ -2278,13 +2278,19 @@ body.view-commande .work-head,
 body.view-commande .grid-wrap,
 body.view-commande .fiverr-tool,
 body.view-commande .sidebar-head,
-body.view-commande #stages { display: none !important; }
+body.view-commande #stages,
+body.view-clients .work-head,
+body.view-clients .grid-wrap,
+body.view-clients .fiverr-tool,
+body.view-clients .sidebar-head,
+body.view-clients #stages { display: none !important; }
 
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
 body.view-dashboard #btnNew,
 body.view-express #btnNew,
-body.view-commande #btnNew { display: none !important; }
+body.view-commande #btnNew,
+body.view-clients #btnNew { display: none !important; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {
