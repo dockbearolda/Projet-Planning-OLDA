@@ -516,7 +516,21 @@ export function createDashboard(deps) {
       }
       return sec;
     };
-    side.appendChild(mkList('Mes projets en pilotage', 'flight_takeoff', sortCards(piloting(who)), 'pilote'));
+    // Les deux facettes du travail : ce qu'on PILOTE et ce qu'on ÉPAULE en
+    // référent. Sans la liste « référent », une personne qui pilote peu mais
+    // suit beaucoup de commandes en référent (Julien : « Contrôle & emballage »
+    // pilote, toute la production en référent) ne verrait pas ses dossiers non
+    // urgents — « Ma journée » ne retient que le pressant. On masque une liste
+    // vide pour ne pas encombrer, et on affiche un repère si les deux le sont.
+    const pilote = sortCards(piloting(who));
+    const referent = sortCards(refereeing(who));
+    if (pilote.length) side.appendChild(mkList('Mes projets en pilotage', 'flight_takeoff', pilote, 'pilote'));
+    if (referent.length) side.appendChild(mkList('Mes projets où je suis référent', 'diversity_3', referent, 'referent'));
+    if (!pilote.length && !referent.length) {
+      const sec = el('section', 'pj-section');
+      sec.appendChild(el('p', 'pj-empty', 'Aucun projet attribué pour le moment.'));
+      side.appendChild(sec);
+    }
     wrap.appendChild(side);
     return wrap;
   }
