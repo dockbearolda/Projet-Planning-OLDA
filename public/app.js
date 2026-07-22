@@ -1211,6 +1211,18 @@ function cellDossier(r) {
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
 
   stack.appendChild(company);
+  // Nature tranchée à la prise : DEMANDE (à chiffrer) ou COMMANDE (validée).
+  // Les lignes créées à la main dans la grille n'en portent pas — on n'invente
+  // pas la nature à la place de la personne qui saisit.
+  if (r.order_kind === 'demande' || r.order_kind === 'commande') {
+    const kind = document.createElement('span');
+    kind.className = `kind-badge kind-badge--${r.order_kind}`;
+    kind.textContent = r.order_kind === 'demande' ? 'Demande' : 'Commande';
+    attachTip(kind, r.order_kind === 'demande'
+      ? 'Demande reçue : reste à chiffrer'
+      : 'Commande validée par le client');
+    stack.appendChild(kind);
+  }
   td.appendChild(stack);
   return td;
 }
@@ -1762,6 +1774,7 @@ function makeOptimisticRow() {
     // Créée depuis une sous-catégorie → elle en hérite (sinon la ligne
     // n'apparaîtrait pas dans la vue filtrée où on vient de la créer).
     sub_stage: currentSub, responsable: null, referent: null,
+    order_kind: null,
     flag: null, flag_reason: null,
     priority: 1, client_type: 'pro',
     billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
@@ -1885,6 +1898,9 @@ function copyBody(r, stage) {
     // On ne transporte la sous-étape que si la commande reste dans sa famille
     // (une copie « Envoyer vers … » change de famille → sous-étape repartie à zéro).
     sub_stage: (!stage || stage === r.stage) ? (r.sub_stage ?? null) : null,
+    // La nature (demande / commande) est une propriété du dossier, pas de sa
+    // place dans le flux : une copie la garde, où qu'on l'envoie.
+    order_kind: r.order_kind ?? null,
     responsable: r.responsable ?? null,
     referent: r.referent ?? null,
     priority: r.priority,
@@ -2904,8 +2920,10 @@ const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
 const $viewExpress = document.getElementById('viewExpress');
 const $express = document.getElementById('express');
+const $viewCommande = document.getElementById('viewCommande');
+const $commande = document.getElementById('commande');
 
-let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express'
+let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express' | 'commande'
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 async function jumpToPlanning(r) {
@@ -2952,6 +2970,21 @@ function mountExpress() {
   }
 }
 
+// Même traitement pour la Prise de commande (catalogue textile, annuaire
+// client) : chargée au premier passage, puis montée une bonne fois.
+let commandeLoading = null;
+function mountCommande() {
+  if (!$commande) return;
+  if (!commandeLoading) {
+    commandeLoading = import('./commande.js')
+      .then((m) => m.initCommande($commande))
+      .catch((err) => {
+        commandeLoading = null;             // rechargeable au prochain essai
+        console.error('Prise de commande : chargement impossible', err);
+      });
+  }
+}
+
 function setViewMode(mode) {
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
   // pilotée par une classe sur <body> : l'attribut `hidden` seul ne suffit pas,
@@ -2959,25 +2992,30 @@ function setViewMode(mode) {
   if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewExpress) $viewExpress.classList.toggle('active', mode === 'express');
+  if ($viewCommande) $viewCommande.classList.toggle('active', mode === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
 
   const dash = mode === 'dashboard';
   const express = mode === 'express';
+  const commande = mode === 'commande';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($express) $express.hidden = !express;
+  if ($commande) $commande.hidden = !commande;
   document.body.classList.toggle('view-dashboard', dash);
   document.body.classList.toggle('view-express', express);
+  document.body.classList.toggle('view-commande', commande);
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (express) mountExpress();
+  if (commande) mountCommande();
   if (mode === 'planning') {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
   }
 }
 
-const VIEWS = { '#dashboard': 'dashboard', '#express': 'express' };
+const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#commande': 'commande' };
 function applyHash() {
   setViewMode(VIEWS[location.hash] || 'planning');
 }

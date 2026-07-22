@@ -100,6 +100,12 @@ const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
 // dans requests.flag_reason (« BLOQUÉE — attente BAT client »).
 const FLAGS = ['bloque', 'a_voir'];
 
+// NATURE de la ligne, tranchée dès la prise de commande (requests.order_kind) :
+// une DEMANDE est à chiffrer (devis à faire), une COMMANDE est déjà validée par
+// le client. null = ligne créée avant l'existence du champ, ou saisie à la main
+// dans la grille : on n'invente pas la nature à sa place.
+const ORDER_KINDS = ['demande', 'commande'];
+
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
 // Choix du backend :
@@ -140,7 +146,7 @@ async function init() {
   // Down : ALTER TABLE requests DROP COLUMN IF EXISTS <col> (aucune contrainte,
   // aucune valeur par défaut → suppression sans effet de bord sur le reste).
   for (const col of ['contact_phone', 'contact_email', 'color', 'sub_stage', 'responsable', 'referent',
-    'flag', 'flag_reason']) {
+    'flag', 'flag_reason', 'order_kind']) {
     try {
       await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonnes déjà présentes via le schéma */ }
@@ -487,6 +493,7 @@ async function setCategoryReferents(map) {
 module.exports = {
   pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
+  ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
 };

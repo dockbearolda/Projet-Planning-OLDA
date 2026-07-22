@@ -23,6 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Manrope:wght@400..800&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="commande.css" />
   <link rel="stylesheet" href="express.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
@@ -83,6 +84,10 @@
           <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
             <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
             <span class="nav-switch-label">Dashboard</span>
+          </a>
+          <a class="nav-switch-btn" id="viewCommande" href="#commande">
+            <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+            <span class="nav-switch-label">Prise de commande</span>
           </a>
           <a class="nav-switch-btn" id="viewExpress" href="#express">
             <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
@@ -178,6 +183,150 @@
         <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
+
+        <!-- Onglet Prise de commande : la saisie d'un besoin client reçu au
+             téléphone ou par mail (textile & personnalisation). On tranche
+             DEMANDE ou COMMANDE dès la 1re ligne, puis on liste les articles
+             et, pour chacun, ses zones d'impression. Comme la vue Express, le
+             balisage est là dès le départ mais le module (commande.js) n'est
+             chargé qu'au premier affichage. -->
+        <section class="cmd" id="commande" hidden aria-label="Prise de commande">
+          <header class="cmd-bar">
+            <span class="cmd-bar__ic material-symbols-outlined" aria-hidden="true">edit_note</span>
+            <div class="cmd-bar__titles">
+              <h2 class="cmd-bar__title">Prise de commande</h2>
+              <p class="cmd-bar__sub" id="cmd-sub">Nouvelle saisie</p>
+            </div>
+            <div class="cmd-bar__actions">
+              <a class="cmd-btn" href="#planning">Annuler</a>
+              <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-save">Enregistrer</button>
+            </div>
+          </header>
+
+          <!-- Le tout premier geste : demande (à chiffrer) ou commande (validée) ?
+               Le reste du formulaire est identique, seule la destination change. -->
+          <div class="cmd-nature" id="cmd-nature" role="radiogroup" aria-label="Nature de la saisie"></div>
+
+          <div class="cmd-content">
+            <div class="cmd-col">
+              <section class="cmd-card">
+                <h3 class="cmd-card__title">Client</h3>
+                <div class="cmd-field cmd-auto">
+                  <label class="cmd-label" for="cmd-societe">Société / Marque</label>
+                  <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
+                         autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                         aria-controls="cmd-auto-list" />
+                  <ul class="cmd-auto__list" id="cmd-auto-list" role="listbox" aria-label="Clients connus" hidden></ul>
+                  <p class="cmd-hint" id="cmd-client-known" hidden></p>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-contact">Contact</label>
+                  <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+                </div>
+                <div class="cmd-row">
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-tel">Téléphone</label>
+                    <input class="cmd-input" id="cmd-tel" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-type">Type</label>
+                    <select class="cmd-input cmd-select" id="cmd-type"></select>
+                  </div>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-email">Email</label>
+                  <input class="cmd-input" id="cmd-email" type="email" placeholder="contact@exemple.com" autocomplete="off" />
+                </div>
+              </section>
+
+              <section class="cmd-card">
+                <h3 class="cmd-card__title">Préparation</h3>
+                <div class="cmd-switch">
+                  <span class="cmd-switch__label">Article en boîte<small>marchandise déjà en stock</small></span>
+                  <button class="cmd-toggle" type="button" id="cmd-boite" role="switch" aria-checked="false" aria-label="Article en boîte">
+                    <span class="cmd-toggle__knob"></span>
+                  </button>
+                </div>
+                <div class="cmd-switch">
+                  <span class="cmd-switch__label">Maquette à faire<small>BAT à produire avant l'atelier</small></span>
+                  <button class="cmd-toggle" type="button" id="cmd-maquette" role="switch" aria-checked="true" aria-label="Maquette à faire">
+                    <span class="cmd-toggle__knob"></span>
+                  </button>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-facture">Facture</label>
+                  <select class="cmd-input cmd-select" id="cmd-facture"></select>
+                </div>
+              </section>
+
+              <section class="cmd-card">
+                <h3 class="cmd-card__title">Délai &amp; suivi</h3>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-deadline">Date souhaitée</label>
+                  <input class="cmd-input" id="cmd-deadline" type="date" />
+                  <p class="cmd-hint" id="cmd-delai-hint"></p>
+                </div>
+                <div class="cmd-field">
+                  <span class="cmd-label">Priorité</span>
+                  <div class="cmd-stars" id="cmd-priority" role="radiogroup" aria-label="Priorité">
+                    <button class="cmd-star is-on" type="button" data-v="1" role="radio" aria-checked="true" aria-label="Priorité 1 étoile"><span class="material-symbols-outlined">star</span></button>
+                    <button class="cmd-star" type="button" data-v="2" role="radio" aria-checked="false" aria-label="Priorité 2 étoiles"><span class="material-symbols-outlined">star</span></button>
+                    <button class="cmd-star" type="button" data-v="3" role="radio" aria-checked="false" aria-label="Priorité 3 étoiles"><span class="material-symbols-outlined">star</span></button>
+                  </div>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-vendeuse">Commande prise par</label>
+                  <select class="cmd-input cmd-select" id="cmd-vendeuse"></select>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-referent">Référent</label>
+                  <select class="cmd-input cmd-select" id="cmd-referent"></select>
+                </div>
+              </section>
+            </div>
+
+            <div class="cmd-main">
+              <section class="cmd-card">
+                <div class="cmd-card__head">
+                  <h3 class="cmd-card__title">Articles <span class="cmd-count" id="cmd-art-count"></span></h3>
+                  <button class="cmd-btn cmd-btn--small" type="button" id="cmd-add-art">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span> Ajouter un article
+                  </button>
+                </div>
+                <div class="cmd-arts" id="cmd-arts"></div>
+              </section>
+
+              <section class="cmd-card">
+                <h3 class="cmd-card__title">Remarque atelier</h3>
+                <textarea class="cmd-input cmd-textarea" id="cmd-remarque" rows="2" placeholder="Précision utile à la production (facultatif)"></textarea>
+              </section>
+
+              <section class="cmd-card cmd-card--recap">
+                <h3 class="cmd-card__title">Ce qui partira au planning</h3>
+                <pre class="cmd-recap" id="cmd-recap"></pre>
+              </section>
+            </div>
+          </div>
+
+          <!-- Listes de suggestion : saisie libre autorisée, le catalogue ne fait
+               que proposer (une grille fournisseur exotique ne doit pas bloquer). -->
+          <datalist id="cmd-dl-vetements"></datalist>
+          <datalist id="cmd-dl-tailles"></datalist>
+
+          <div class="cmd-toast" id="cmd-toast" role="status" aria-live="polite"></div>
+
+          <div class="cmd-done" id="cmd-done" hidden>
+            <div class="cmd-done__card" role="dialog" aria-modal="true" aria-labelledby="cmd-done-title">
+              <div class="cmd-done__check"><span class="material-symbols-outlined">check</span></div>
+              <p class="cmd-done__title" id="cmd-done-title">Enregistré</p>
+              <p class="cmd-done__sub" id="cmd-done-sub"></p>
+              <div class="cmd-done__actions">
+                <a class="cmd-btn" href="#planning">Voir le planning</a>
+                <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-done-new">Nouvelle saisie</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <!-- Onglet Commande Express : la prise de commande au comptoir. Le
              balisage est là dès le départ, mais son module (express.js) n'est
