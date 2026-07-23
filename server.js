@@ -16,6 +16,7 @@ const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
+  getMachines, setMachines,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -239,6 +240,23 @@ app.put('/api/category-referents', asyncH(async (req, res) => {
   }
   const saved = await setCategoryReferents(body);
   broadcast({ kind: 'category-referents' });
+  res.json(saved);
+}));
+
+// Registre des machines (réglages du patron : importance + durée de fab).
+// GET  → [ { slug, name, importance, minutesPerUnit }, ... ]
+// PUT  → remplace la liste (corps = tableau), diffusé en SSE pour que le
+//        dashboard des autres postes recalcule la file « À faire maintenant ».
+app.get('/api/machines', asyncH(async (req, res) => {
+  res.json(await getMachines());
+}));
+
+app.put('/api/machines', asyncH(async (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Tableau de machines attendu' });
+  }
+  const saved = await setMachines(req.body);
+  broadcast({ kind: 'machines' });
   res.json(saved);
 }));
 
