@@ -77,14 +77,29 @@
   max-width: 1560px; width: 100%;
 }
 
-/* -------------------------------------------------------------- bandeau */
+/* -------------------------------------------------------------- bandeau
+   Les deux zones reçoivent des traitements OPPOSÉS, sinon elles se confondent :
+   la vue est posée sur une carte blanche (`.work`), donc un bandeau blanc de
+   plus ne se détache de rien.
+   Ici : un bloc MAT, en creux, teinté, sans ombre — l'en-tête déjà rempli de la
+   fiche. En face, les produits sont des cartes blanches qui FLOTTENT (voir plus
+   bas). Mat en creux ↔ blanc en relief : la frontière ne se discute pas. */
 #commande .cmd-head {
   flex: 0 0 auto;
   display: flex; flex-direction: column; gap: 8px;
   padding: 10px 14px;
-  border: 1px solid var(--card-border); border-radius: var(--radius-card);
-  background: var(--surface); box-shadow: var(--shadow-1);
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  /* Une pointe de bleu dans le gris de fond : assez pour que la bulle se voie
+     d'un coup d'œil, pas assez pour crier. La première déclaration sert de
+     repli là où `color-mix` n'est pas connu. */
+  background: var(--bg);
+  background: color-mix(in srgb, var(--primary) 7%, var(--bg));
 }
+/* Sur fond mat, un champ blanc se voit tout seul : c'est ce qui reste à
+   remplir. Au focus il vire au bleu, comme partout ailleurs. */
+#commande .cmd-head .cmd-input { background: var(--surface); }
+#commande .cmd-head .cmd-input:focus { background: var(--field-focus); }
+#commande .cmd-head .cmd-seg { background: var(--surface); }
 #commande .cmd-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 /* La rangée du bas n'a que des puces : elles s'alignent sur leur milieu. */
 #commande .cmd-row--bas { align-items: center; gap: 8px 18px; }
@@ -93,6 +108,9 @@
   font-size: 11.5px; font-weight: 700; letter-spacing: .05em;
   text-transform: uppercase; color: var(--text-2); white-space: nowrap;
 }
+/* « CLIENT » s'aligne avec les libellés des champs de sa rangée. */
+#commande .cmd-field--nature { flex: 0 0 auto; }
+#commande .cmd-field--nature .cmd-inline__t { display: block; margin-bottom: 3px; }
 
 /* --------------------------------------------------------------- champs */
 #commande .cmd-field { min-width: 0; }
@@ -236,7 +254,9 @@
    flottants côte à côte se lisaient comme du désordre. */
 #commande .cmd-fam {
   border: 1px solid var(--card-border); border-radius: var(--radius-card);
-  background: var(--surface); box-shadow: var(--shadow-1); overflow: hidden;
+  /* Ombre franche : c'est elle qui fait FLOTTER les produits au-dessus de la
+     page, en face du bandeau mat qui, lui, s'enfonce. */
+  background: var(--surface); box-shadow: var(--shadow-2); overflow: hidden;
 }
 #commande .cmd-fam__head {
   display: flex; align-items: center; gap: 8px;

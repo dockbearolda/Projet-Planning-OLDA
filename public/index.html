@@ -233,9 +233,15 @@
                    jamais demander un « prénom » à un hôtel ni une « société » à
                    un particulier. -->
               <div class="cmd-row">
-                <div class="cmd-seg" id="cmd-nature" role="radiogroup" aria-label="Type de client">
-                  <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
-                  <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+                <!-- Le bandeau s'annonce comme les produits s'annoncent : même
+                     capitale, même place. « CLIENT » d'un côté, « PRODUITS » de
+                     l'autre — on sait dans quelle bulle on écrit sans réfléchir. -->
+                <div class="cmd-field cmd-field--nature">
+                  <span class="cmd-inline__t" id="cmd-nature-label">Client</span>
+                  <div class="cmd-seg" id="cmd-nature" role="radiogroup" aria-labelledby="cmd-nature-label">
+                    <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
+                    <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+                  </div>
                 </div>
 
                 <div class="cmd-grid cmd-grid--pro" id="cmd-pro">
