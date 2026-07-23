@@ -189,6 +189,40 @@ async function init() {
   if (rows[0].n === 0) {
     await seed();
   }
+
+  // Base clients : import initial des clients pros rapatriés de l'ancienne app.
+  await seedClients();
+}
+
+// Import initial de la base clients professionnelle (clients-seed.json). Joué
+// UNE seule fois (garde app_meta), et seulement si la table est vide : on ne
+// réinjecte jamais un client que le patron aurait volontairement supprimé.
+// Réversible : DELETE FROM app_meta WHERE key = 'clients_seeded' rejoue l'import.
+async function seedClients() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'clients_seeded'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  const { rows: cnt } = await pool.query('SELECT COUNT(*)::int AS n FROM clients');
+  if (cnt[0].n === 0) {
+    let list = [];
+    try {
+      list = JSON.parse(fs.readFileSync(path.join(__dirname, 'clients-seed.json'), 'utf8'));
+    } catch (_) { list = []; }
+    for (const c of list) {
+      const entreprise = String(c.entreprise || '').trim();
+      if (!entreprise) continue;
+      const g = (v) => { const s = String(v == null ? '' : v).trim(); return s === '' ? null : s; };
+      await pool.query(
+        `INSERT INTO clients (entreprise, nom, fonction, type, zone, email, telephone, adresse)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [entreprise, g(c.nom), g(c.fonction), g(c.type), g(c.zone), g(c.email), g(c.telephone), g(c.adresse)],
+      );
+    }
+    if (list.length) console.log(`ℹ  Base clients : ${list.length} clients pros importés.`);
+  }
+
+  await pool.query("DELETE FROM app_meta WHERE key = 'clients_seeded'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('clients_seeded', '1')");
 }
 
 // Correspondance ancien slug d'étape → nouveau (planning linéaire). Réversible :

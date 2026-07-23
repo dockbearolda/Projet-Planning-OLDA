@@ -2923,6 +2923,8 @@ const $express = document.getElementById('express');
 const $viewCommande = document.getElementById('viewCommande');
 const $viewDemande = document.getElementById('viewDemande');
 const $commande = document.getElementById('commande');
+const $viewClients = document.getElementById('viewClients');
+const $clients = document.getElementById('clients');
 
 let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express' | 'commande'
 // La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
@@ -2995,6 +2997,26 @@ function mountCommande() {
   }
 }
 
+// La Base clients (CRM) : liste + fiche éditable + notes. Module lourd (rendu
+// complet), chargé au premier passage puis monté ; les visites suivantes
+// rafraîchissent seulement les données (un client a pu être créé à la commande).
+let clientsLoading = null;
+let clientsModule = null;
+function mountClients() {
+  if (!$clients) return;
+  if (!clientsLoading) {
+    clientsLoading = import('./clients.js')
+      .then((m) => { clientsModule = m; return m.initClients($clients); })
+      .catch((err) => {
+        clientsLoading = null;                // rechargeable au prochain essai
+        clientsModule = null;
+        console.error('Base clients : chargement impossible', err);
+      });
+  } else if (clientsModule && clientsModule.refreshClients) {
+    clientsModule.refreshClients();
+  }
+}
+
 function setViewMode(mode) {
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
   // pilotée par une classe sur <body> : l'attribut `hidden` seul ne suffit pas,
@@ -3002,6 +3024,7 @@ function setViewMode(mode) {
   if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewExpress) $viewExpress.classList.toggle('active', mode === 'express');
+  if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
   // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
   const onIntake = mode === 'commande';
@@ -3013,16 +3036,20 @@ function setViewMode(mode) {
   const dash = mode === 'dashboard';
   const express = mode === 'express';
   const commande = mode === 'commande';
+  const clients = mode === 'clients';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($express) $express.hidden = !express;
   if ($commande) $commande.hidden = !commande;
+  if ($clients) $clients.hidden = !clients;
   document.body.classList.toggle('view-dashboard', dash);
   document.body.classList.toggle('view-express', express);
   document.body.classList.toggle('view-commande', commande);
+  document.body.classList.toggle('view-clients', clients);
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (express) mountExpress();
   if (commande) mountCommande();
+  if (clients) mountClients();
   if (mode === 'planning') {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
@@ -3030,7 +3057,7 @@ function setViewMode(mode) {
 }
 
 // #demande et #commande ouvrent la MÊME vue, avec une nature différente.
-const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#demande': 'commande', '#commande': 'commande' };
+const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#demande': 'commande', '#commande': 'commande', '#clients': 'clients' };
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
