@@ -1,11 +1,12 @@
 /* ===========================================================================
    Prise de commande — le premier pas du client
-   Fiche remplie au comptoir, EN FACE DE LUI : elle doit tenir en 30 à 45
-   secondes ET TENIR DANS L'ÉCRAN. Deux zones, pas deux colonnes :
+   Fiche remplie au comptoir, EN FACE DE LUI : elle doit se remplir en 30 à 45
+   secondes. Deux zones, pas deux colonnes :
      - EN HAUT un bandeau qui se lit de gauche à droite (qui, quoi, pour quand,
        payé comment). Ses champs sont courts : trois rangées suffisent.
      - EN BAS les produits, sur TOUTE la largeur, parce que leurs lignes ont six
-       colonnes à aligner. C'est la seule zone qui défile.
+       colonnes à aligner. Quand elles s'empilent, c'est la PAGE entière qui
+       défile (barre du haut épinglée), pas un cadre interne.
    Une ligne de produit = une rangée de champs. Les libellés sont dans la rangée
    d'en-tête de la famille, pas dans chaque ligne ; un emplacement d'impression
    choisi perd sa puce et prend sa ligne. C'est ce qui permet d'empiler quatre
@@ -16,7 +17,7 @@
 
 #commande:not([hidden]) {
   display: flex; flex-direction: column;
-  min-height: 0; height: 100%; overflow: hidden;
+  min-height: 0; height: 100%; overflow-y: auto;
 }
 #commande, #commande * { box-sizing: border-box; }
 #commande [hidden] { display: none !important; }
@@ -31,6 +32,7 @@
 /* ------------------------------------------------------------------ barre */
 #commande .cmd-bar {
   flex: 0 0 auto;
+  position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 20px;
   background: var(--surface); border-bottom: 1px solid var(--border);
@@ -68,10 +70,10 @@
 #commande .cmd-icon--sm .material-symbols-outlined { font-size: 18px; }
 
 /* --------------------------------------------------------------- le corps
-   `min-height: 0` partout sur la chaîne : sans lui, un enfant qui déborde
-   pousse son parent au lieu de défiler à l'intérieur. */
+   Le corps prend sa hauteur NATURELLE (`flex: 0 0 auto`) : quand les lignes
+   s'empilent il dépasse l'écran et c'est #commande qui défile, d'un bloc. */
 #commande .cmd-body {
-  flex: 1; min-height: 0;
+  flex: 0 0 auto;
   display: flex; flex-direction: column; gap: 10px;
   padding: 10px 18px calc(10px + env(safe-area-inset-bottom));
   max-width: 1560px; width: 100%;
@@ -210,7 +212,7 @@
 #commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
 
 /* --------------------------------------------------------- les produits */
-#commande .cmd-prods { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+#commande .cmd-prods { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
 #commande .cmd-prods__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-left: 2px; }
 #commande .cmd-prods__t {
   font-size: 11.5px; font-weight: 700; letter-spacing: .05em;
@@ -219,10 +221,11 @@
 #commande .cmd-chips--fam .cmd-chip { min-height: 46px; padding: 0 20px; font-size: 14.5px; font-weight: 600; }
 #commande .cmd-chips--fam .cmd-chip .material-symbols-outlined { font-size: 21px; }
 
-/* LE SEUL panneau qui défile. Il se déclare CONTENEUR : la mise en page des
-   lignes se décide sur SA largeur, pas sur celle de la fenêtre. */
+/* La liste grandit avec les lignes : c'est la PAGE qui défile (voir #commande),
+   pas ce panneau. Il se déclare CONTENEUR : la mise en page des lignes se décide
+   sur SA largeur, pas sur celle de la fenêtre. */
 #commande .cmd-fams {
-  flex: 1; min-height: 0; overflow-y: auto;
+  flex: 0 0 auto;
   display: flex; flex-direction: column; gap: 8px;
   padding-right: 2px;
   container-type: inline-size; container-name: prods;
@@ -424,15 +427,11 @@
 #commande .cmd-ztag { justify-content: flex-start; align-self: flex-start; }
 }
 
-/* Sous la tablette portrait : le bandeau s'empile, la page redevient défilante
-   — sur ces formats on fait défiler naturellement. `flex: 0 0 auto` sur le
-   corps, sinon il garderait la hauteur de l'écran et COMPRIMERAIT ses zones. */
+/* Sous la tablette portrait : le bandeau s'empile. La page défile déjà d'un bloc
+   à toutes les largeurs (voir plus haut) ; ici on ne touche qu'à la disposition
+   des champs, qui passent sur une ou deux colonnes. */
 @media (max-width: 900px) {
-#commande:not([hidden]) { overflow-y: auto; }
-#commande .cmd-bar { position: sticky; top: 0; z-index: 5; }
-#commande .cmd-body { flex: 0 0 auto; min-height: auto; max-width: 900px; }
-#commande .cmd-head, #commande .cmd-prods { flex: 0 0 auto; }
-#commande .cmd-fams { flex: none; min-height: 0; overflow: visible; }
+#commande .cmd-body { max-width: 900px; }
 #commande .cmd-grid { flex: 1 1 100%; }
 #commande .cmd-grid--pro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 #commande .cmd-seg { width: 100%; }
