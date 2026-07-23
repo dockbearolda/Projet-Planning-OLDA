@@ -265,18 +265,16 @@ function cell(role, l, value, placeholder, label, opts) {
   return n;
 }
 
-// Un champ libre sous la ligne (face de tasse, typo, info de perso…) : son
-// libellé au-dessus, pour qu'on sache ce qu'on écrit sans deviner. Ce n'est PAS
-// une cellule de tableur : Entrée n'y descend pas d'une ligne, elle ne fait rien
-// — taper « Joyeux 80 ans » puis Entrée ne doit pas créer une seconde tasse.
-function souschamp(role, l, value, label, placeholder, opts) {
-  const wrap = el('label', 'cmd-sub');
-  wrap.append(el('span', 'cmd-sub__label', label));
-  const n = cell(role, l, value, placeholder, label, opts);
-  n.className = 'cmd-input cmd-sub__input';
-  wrap.append(n);
-  return wrap;
-}
+// En-têtes de colonnes, une fois pour toute la famille : c'est ce qui permet
+// aux lignes de n'avoir AUCUN libellé et de tenir sur 44 px de haut. Sous la
+// tablette portrait la CSS masque cette rangée — les placeholders prennent le
+// relais, d'où leur formulation (« anse à droite : logo… ») qui redit la
+// convention plutôt qu'un simple exemple.
+const THEADS = {
+  tasse: ['Qté', 'Référence tasse', 'Coloris', 'Face 1 (anse à droite)', 'Face 2 (anse à gauche)', ''],
+  textile: ['Qté', 'Vêtement', 'Réf. OLDA / fournisseur', 'Coloris', 'Taille', ''],
+  objet: ['Qté', 'Référence objet', 'Personnalisation', ''],
+};
 
 function outils(l, index) {
   const tools = el('div', 'cmd-art__tools');
@@ -301,6 +299,10 @@ function outils(l, index) {
 }
 
 // --------------------------------------------------------------------- tasse
+// Deux rangées : ce qu'on dit toujours (combien, quoi, les deux faces), puis
+// ce qu'on précise parfois (options, typo, infos, remarques). La convention
+// d'anse vit dans l'en-tête ET dans le placeholder : c'est elle qui évite
+// d'imprimer le visuel du mauvais côté.
 function buildTasse(l, index) {
   const art = el('div', 'cmd-art');
   art.dataset.uid = l.uid;
@@ -310,33 +312,22 @@ function buildTasse(l, index) {
     cell('quantite', l, l.quantite, '1', `Quantité, tasse ${index + 1}`, { inputmode: 'numeric' }),
     cell('ref', l, l.ref, 'Tasse blanche 33 cl', `Référence, tasse ${index + 1}`, { list: 'cmd-dl-tasses' }),
     cell('couleur', l, l.couleur, 'Blanc', `Coloris, tasse ${index + 1}`),
+    cell('face1', l, l.face1, 'anse à droite : logo…', `Face 1, anse à droite, tasse ${index + 1}`),
+    cell('face2', l, l.face2, 'anse à gauche : texte…', `Face 2, anse à gauche, tasse ${index + 1}`),
     outils(l, index),
   );
   art.append(row);
 
-  // Les deux faces. La convention d'anse est DANS le libellé : c'est elle qui
-  // évite d'imprimer le visuel du mauvais côté.
-  const faces = el('div', 'cmd-art__faces');
-  for (const f of CAT.faces) {
-    faces.append(souschamp(
-      f.id, l, l[f.id],
-      `${f.label} (${f.hint})`,
-      f.id === 'face1' ? 'Logo client' : 'Texte, date, prénom…',
-    ));
-  }
-  art.append(faces);
-
+  const bas = el('div', 'cmd-art__bas');
   const opts = el('div', 'cmd-chips cmd-chips--opt');
   for (const o of CAT.tasseOptions) {
     opts.append(chip(o.label, { on: l.options.includes(o.id), role: 'tasse-opt', value: o.id }));
   }
-  art.append(opts);
-
-  const bas = el('div', 'cmd-art__bas');
   bas.append(
-    souschamp('infos', l, l.infos, 'Informations personnalisation', 'centré, 8 cm de large…'),
-    souschamp('typo', l, l.typo, 'Typo', 'Bebas Neue', { list: 'cmd-dl-typos' }),
-    souschamp('remarque', l, l.remarque, 'Remarques', 'emballage cadeau…'),
+    opts,
+    cell('typo', l, l.typo, 'Typo (Bebas Neue…)', `Typo, tasse ${index + 1}`, { list: 'cmd-dl-typos' }),
+    cell('infos', l, l.infos, 'Infos perso (centré, 8 cm…)', `Informations de personnalisation, tasse ${index + 1}`),
+    cell('remarque', l, l.remarque, 'Remarques', `Remarques, tasse ${index + 1}`),
   );
   art.append(bas);
   return art;
@@ -367,7 +358,9 @@ function buildTextile(l, index) {
   const visibles = deplie ? CAT.zones : CAT.zones.filter((z) => z.principal);
 
   for (const z of visibles) {
-    const b = chip(z.label, { on: pose(z), role: 'zone', value: z.id });
+    // Libellé COURT sur la puce (« Manche Dr ») pour que les six emplacements
+    // courants tiennent sur une rangée ; la fiche, elle, garde le nom entier.
+    const b = chip(z.court || z.label, { on: pose(z), role: 'zone', value: z.id });
     // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
     // catalogue, jamais. Les commandes déjà enregistrées gardent leur marquage.
     if (z.custom) {
@@ -380,7 +373,10 @@ function buildTextile(l, index) {
     chips.append(b);
   }
   if (!deplie && secondaires.length) {
-    chips.append(chip(`Autres (${secondaires.length})`, { role: 'zone-plus', cls: 'cmd-chip--ghost' }));
+    const plus = chip(String(secondaires.length), { role: 'zone-plus', cls: 'cmd-chip--ghost cmd-chip--plus', icone: 'add' });
+    plus.title = `${secondaires.length} autres emplacements`;
+    plus.setAttribute('aria-label', `Afficher les ${secondaires.length} autres emplacements`);
+    chips.append(plus);
   } else {
     // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant sur
     // place, il rejoint la liste de tous les postes.
@@ -413,29 +409,32 @@ function buildTextile(l, index) {
 }
 
 // --------------------------------------------------------------------- objet
+// Une seule rangée : ce qui compte à l'atelier, c'est par quelle MACHINE ça
+// passe. Les trois puces vivent dans la ligne, à côté de la consigne.
 function buildObjet(l, index) {
   const art = el('div', 'cmd-art');
   art.dataset.uid = l.uid;
 
-  const row = el('div', 'cmd-art__row cmd-art__row--objet');
-  row.append(
-    cell('quantite', l, l.quantite, '1', `Quantité, objet ${index + 1}`, { inputmode: 'numeric' }),
-    cell('ref', l, l.ref, 'Gourde inox', `Référence, objet ${index + 1}`, { list: 'cmd-dl-objets' }),
-    outils(l, index),
-  );
-  art.append(row);
-
-  // Ce qui compte à l'atelier : par quelle machine ça passe.
-  const bas = el('div', 'cmd-art__bas cmd-art__bas--objet');
-  const techs = el('div', 'cmd-chips', null);
+  const perso = el('div', 'cmd-objperso');
+  const techs = el('div', 'cmd-chips');
   techs.setAttribute('role', 'radiogroup');
   techs.setAttribute('aria-label', `Type de personnalisation, objet ${index + 1}`);
   for (const t of CAT.objetTechniques) {
     techs.append(chip(t.label, { on: l.technique === t.id, role: 'obj-tech', value: t.id, radio: true }));
   }
-  bas.append(techs);
-  bas.append(souschamp('infos', l, l.infos, 'Info sur la personnalisation', 'gravure logo 5 cm, prénom…'));
-  art.append(bas);
+  perso.append(
+    techs,
+    cell('infos', l, l.infos, 'gravure logo 5 cm, prénom…', `Info sur la personnalisation, objet ${index + 1}`),
+  );
+
+  const row = el('div', 'cmd-art__row cmd-art__row--objet');
+  row.append(
+    cell('quantite', l, l.quantite, '1', `Quantité, objet ${index + 1}`, { inputmode: 'numeric' }),
+    cell('ref', l, l.ref, 'Gourde inox', `Référence, objet ${index + 1}`, { list: 'cmd-dl-objets' }),
+    perso,
+    outils(l, index),
+  );
+  art.append(row);
   return art;
 }
 
@@ -462,6 +461,11 @@ function buildFamille(id) {
   box.append(head);
 
   const table = el('div', 'cmd-table');
+  const thead = el('div', `cmd-thead cmd-thead--${id}`);
+  thead.setAttribute('aria-hidden', 'true');
+  thead.append(...THEADS[id].map((t) => el('span', null, t)));
+  table.append(thead);
+
   const lignes = el('div', 'cmd-arts');
   lignes.append(...listOf(id).map((l, i) => BUILDERS[id](l, i)));
   table.append(lignes);
@@ -476,8 +480,23 @@ function buildFamille(id) {
   return box;
 }
 
+// Panneau vide : plutôt qu'un trou, on dit ce qui se passe si on ne touche à
+// rien — la fiche part quand même, avec son seul objet.
+function buildVide() {
+  const box = el('div', 'cmd-vide');
+  box.append(
+    ic('inventory_2'),
+    el('p', 'cmd-vide__t', 'Aucun produit détaillé'),
+    el('p', 'cmd-vide__s', 'Tapez une famille ci-dessus pour détailler. Sinon l\'objet de la demande suffit : la fiche part telle quelle.'),
+  );
+  return box;
+}
+
 function renderFams() {
-  $('#cmd-fams').replaceChildren(...state.ouvertes.map(buildFamille));
+  const box = $('#cmd-fams');
+  box.classList.toggle('is-vide', state.ouvertes.length === 0);
+  if (!state.ouvertes.length) return box.replaceChildren(buildVide());
+  box.replaceChildren(...state.ouvertes.map(buildFamille));
 }
 
 // Pose le curseur sur la première cellule d'une ligne : on enchaîne la frappe
