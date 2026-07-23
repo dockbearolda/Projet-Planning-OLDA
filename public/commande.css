@@ -1,15 +1,21 @@
 /* ===========================================================================
    Prise de commande — le premier pas du client
    Fiche remplie au comptoir, EN FACE DE LUI : elle doit tenir en 30 à 45
-   secondes. D'où quatre cartes numérotées, des puces de 44 px qu'on tape au
-   lieu de menus qu'on déroule, et rien à l'écran tant qu'on n'en a pas besoin.
+   secondes ET TENIR DANS L'ÉCRAN. D'où la règle de mise en page : au-dessus de
+   1040 px, la PAGE NE DÉFILE PAS. Deux colonnes à hauteur fixe — la fiche à
+   gauche, les produits à droite — et seul le panneau des produits défile quand
+   on empile les lignes. Le nom du client et le bouton d'enregistrement restent
+   toujours sous les yeux.
+   Les lignes de produits n'ont aucun libellé : une rangée d'en-tête donne les
+   colonnes une fois pour toute la famille, comme dans un tableur. C'est ce qui
+   les fait tenir sur 44 px de haut.
    Tout est scopé sous #commande ; la vue consomme les JETONS GLOBAUX de
    styles.css, donc elle suit la bascule clair / sombre sans une ligne de plus.
    =========================================================================== */
 
 #commande:not([hidden]) {
   display: flex; flex-direction: column;
-  min-height: 0; height: 100%; overflow-y: auto;
+  min-height: 0; height: 100%; overflow: hidden;
 }
 #commande, #commande * { box-sizing: border-box; }
 #commande [hidden] { display: none !important; }
@@ -25,14 +31,13 @@
 #commande .cmd-bar {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 22px;
+  padding: 10px 20px;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 5;
 }
-#commande .cmd-bar__ic { color: var(--primary); font-size: 26px; }
+#commande .cmd-bar__ic { color: var(--primary); font-size: 24px; }
 #commande .cmd-bar__titles { min-width: 0; }
-#commande .cmd-bar__title { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.01em; color: var(--text-1); }
-#commande .cmd-bar__sub { margin: 0; font-size: 13px; color: var(--text-2); }
+#commande .cmd-bar__title { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: -.01em; color: var(--text-1); }
+#commande .cmd-bar__sub { margin: 0; font-size: 12.5px; color: var(--text-2); }
 #commande .cmd-bar__actions { margin-left: auto; display: flex; gap: 10px; }
 
 /* ---------------------------------------------------------------- boutons */
@@ -59,37 +64,44 @@
 #commande .cmd-icon--danger:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
 #commande .cmd-icon .material-symbols-outlined { font-size: 20px; }
 
-/* ------------------------------------------------------------------- corps */
+/* --------------------------------------------------------- les deux colonnes
+   `min-height: 0` sur la grille ET sur ses colonnes : sans lui, un enfant qui
+   déborde pousse la grille au lieu de défiler à l'intérieur. */
 #commande .cmd-body {
-  flex: 1;
-  display: flex; flex-direction: column; gap: 14px;
-  padding: 18px 22px calc(28px + env(safe-area-inset-bottom));
-  max-width: 1100px; width: 100%;
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  max-width: 1560px; width: 100%;
 }
 
-/* ------------------------------------------------------------------ cartes
-   Un bloc = une question. Le numéro donne l'ordre de lecture d'un coup d'œil,
-   sans avoir à lire les titres. */
-#commande .cmd-card {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 16px 18px;
+/* ------------------------------------------------------------- la fiche */
+/* `align-self: start` : la carte s'arrête à son contenu au lieu de s'étirer sur
+   toute la colonne — pas de grand vide sous le dernier champ. Elle défile
+   d'elle-même le jour où l'écran est vraiment trop court. */
+#commande .cmd-left {
+  align-self: start; max-height: 100%; overflow-y: auto;
   border: 1px solid var(--card-border); border-radius: var(--radius-card);
   background: var(--surface); box-shadow: var(--shadow-1);
 }
-#commande .cmd-card__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-#commande .cmd-card__n {
-  width: 26px; height: 26px; flex: 0 0 auto;
+/* Sections séparées d'un TRAIT, pas d'un écart : chaque pixel gagné en hauteur
+   est un pixel de moins à faire défiler. */
+#commande .cmd-sec { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px; }
+#commande .cmd-sec + .cmd-sec { border-top: 1px solid var(--border-soft); }
+#commande .cmd-sec__head { display: flex; align-items: center; gap: 9px; min-height: 24px; }
+#commande .cmd-sec__n {
+  width: 22px; height: 22px; flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 999px; background: var(--primary-soft); color: var(--primary);
-  font: 700 13px var(--font);
+  font: 700 12px var(--font);
 }
-#commande .cmd-card__title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-1); }
-#commande .cmd-card__hint { font-size: 12.5px; color: var(--text-3); }
-#commande .cmd-card__head .cmd-seg { margin-left: auto; }
+#commande .cmd-sec__title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-1); }
+#commande .cmd-sec__hint { font-size: 12.5px; color: var(--text-3); }
+#commande .cmd-sec__head .cmd-seg { margin-left: auto; }
 
 /* --------------------------------------------------------------- champs */
 #commande .cmd-field { min-width: 0; }
-#commande .cmd-label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-2); }
+#commande .cmd-label { display: block; margin-bottom: 3px; font-size: 11.5px; color: var(--text-2); }
 #commande .cmd-label__opt { color: var(--text-3); font-style: italic; }
 #commande .cmd-hint { margin: 0; font-size: 12px; color: var(--st-livree); }
 
@@ -104,8 +116,18 @@
 #commande .cmd-input::placeholder { color: var(--text-3); }
 #commande .cmd-input:focus { outline: none; border-color: var(--primary); background-color: var(--field-focus); }
 /* L'objet est le titre du dossier : il se voit et se tape en premier. */
-#commande .cmd-input--lg { height: 50px; font-size: 17px; font-weight: 500; }
-#commande .cmd-textarea { height: auto; min-height: 60px; padding: 10px 12px; line-height: 1.45; resize: vertical; }
+#commande .cmd-input--lg { font-size: 16.5px; font-weight: 500; }
+/* Une seule ligne au repos, deux dès qu'on écrit vraiment : la description ne
+   réserve pas de la hauteur « au cas où ». */
+#commande .cmd-textarea {
+  height: 44px; min-height: 44px; padding: 10px 12px; line-height: 1.4; resize: vertical;
+  transition: height var(--dur-2) var(--ease), border-color var(--dur-1) var(--ease);
+}
+#commande .cmd-textarea:focus { height: 82px; }
+/* La date exacte tient sur la ligne du libellé : une rangée de moins. */
+#commande .cmd-delai__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+#commande .cmd-delai__head .cmd-label { margin: 0; }
+#commande .cmd-input--date { width: auto; margin-left: auto; padding: 0 8px 0 10px; font-size: 14px; }
 
 /* ---------------------------------------------------- nature pro / perso */
 #commande .cmd-seg {
@@ -113,12 +135,11 @@
   background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
 }
 #commande .cmd-seg__btn {
-  min-height: 38px; padding: 0 18px;
+  min-height: 38px; padding: 0 22px;
   border: 0; border-radius: 999px; background: transparent;
   color: var(--text-2); font: 500 14px var(--font); cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-#commande .cmd-seg--big .cmd-seg__btn { min-height: 44px; padding: 0 30px; font-size: 15px; }
 #commande .cmd-seg__btn:hover { color: var(--text-1); }
 #commande .cmd-seg__btn.is-on {
   background: var(--surface); color: var(--primary);
@@ -126,15 +147,21 @@
 }
 
 /* -------------------------------------------------------------- contact */
-#commande .cmd-grid { display: grid; gap: 12px; align-items: start; }
-#commande .cmd-grid--pro { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); }
-#commande .cmd-grid--perso { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+#commande .cmd-grid { display: grid; gap: 9px 10px; align-items: start; }
+/* Le nom de facturation prend toute la largeur : c'est LUI qu'on lit dans le
+   planning, il ne doit pas se faire tronquer à la saisie. L'email aussi, qui
+   est toujours plus long qu'une demi-colonne. */
+#commande .cmd-grid--pro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#commande .cmd-grid--pro .cmd-field:first-child,
+#commande .cmd-grid--pro .cmd-field:last-child { grid-column: 1 / -1; }
+#commande .cmd-grid--perso { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#commande .cmd-grid--perso .cmd-field:last-child { grid-column: 1 / -1; }
 
 #commande .cmd-auto { position: relative; }
 #commande .cmd-auto__list {
   position: absolute; z-index: 20; left: 0; right: 0; top: 100%;
   margin: 4px 0 0; padding: 6px; list-style: none;
-  max-height: 300px; overflow-y: auto;
+  max-height: 280px; overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-pop);
 }
@@ -150,13 +177,13 @@
 
 /* ----------------------------------------------------------------- puces
    La brique de toute la fiche : 44 px de haut, un état visible sans lire. */
-#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 #commande .cmd-chip {
-  min-height: 44px; padding: 0 16px;
+  min-height: 44px; padding: 0 15px;
   display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid var(--border); border-radius: 999px;
   background: var(--surface); color: var(--text-2);
-  font: 500 13.5px var(--font); cursor: pointer; text-align: left;
+  font: 500 13.5px var(--font); cursor: pointer; text-align: left; white-space: nowrap;
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 #commande .cmd-chip:hover { background: var(--surface-hover); }
@@ -164,72 +191,145 @@
 #commande .cmd-chip .material-symbols-outlined { font-size: 19px; }
 #commande .cmd-chip__note { font-size: 11.5px; font-weight: 600; opacity: .8; }
 #commande .cmd-chip--ghost { border-style: dashed; color: var(--text-3); }
+/* « + 6 » : les emplacements rares tiennent dans une puce de la largeur d'un
+   doigt, pour que les six courants gardent leur rangée. */
+#commande .cmd-chip--plus { padding: 0 14px 0 10px; gap: 2px; }
 
-/* Délais : quatre choix, le plus long à droite. Le « sous 3 jours » porte sa
-   majoration DANS la puce — on ne la découvre pas à la facture. */
-#commande .cmd-chips--delai .cmd-chip { min-width: 104px; justify-content: center; font-size: 14.5px; font-weight: 600; }
-#commande .cmd-delai__date { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-#commande .cmd-delai__date .cmd-label { margin: 0; }
-#commande .cmd-delai__date .cmd-input { width: auto; min-width: 168px; }
+/* Délais : quatre choix qui remplissent la largeur, le plus long à droite. Le
+   « sous 3 jours » porte sa majoration DANS la puce — on ne la découvre pas à
+   la facture. */
+/* Une grille plutôt qu'un flux : les puces se répartissent 4 par rangée quand
+   la place est là, 2 par 2 quand la colonne se resserre — jamais « 3 puis 1 »,
+   qui donne l'impression d'un oubli. */
+#commande .cmd-chips--delai {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 6px;
+}
+#commande .cmd-chips--delai .cmd-chip {
+  min-width: 0; padding: 0 10px;
+  justify-content: center; font-size: 13.5px; font-weight: 600;
+}
 
-/* Familles : de grosses cibles, on vise sans regarder. */
-#commande .cmd-chips--fam .cmd-chip { min-height: 52px; padding: 0 22px; font-size: 15px; font-weight: 600; }
-#commande .cmd-chips--fam .cmd-chip .material-symbols-outlined { font-size: 22px; }
+/* Paiement : en pied de colonne droite, juste sous les produits qu'il règle.
+   Statut, mode et réflexes d'atelier sur une seule rangée tant qu'elle tient. */
+#commande .cmd-pay {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 1px solid var(--card-border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+#commande .cmd-pay__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+#commande .cmd-pay__opts { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+#commande .cmd-chips--mode { padding-left: 14px; border-left: 1px solid var(--border); }
 
-/* --------------------------------------------------- familles dépliées */
-#commande .cmd-fams { display: flex; flex-direction: column; gap: 12px; }
-#commande .cmd-fams:empty { display: none; }
-#commande .cmd-fam { display: flex; flex-direction: column; gap: 8px; }
-#commande .cmd-fam__head { display: flex; align-items: center; gap: 8px; }
-#commande .cmd-fam__head .material-symbols-outlined { font-size: 20px; color: var(--primary); }
+#commande .cmd-optswitch {
+  min-height: 44px; padding: 0 4px;
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; background: transparent; cursor: pointer;
+  font: 500 13.5px var(--font); color: var(--text-1);
+}
+#commande .cmd-optswitch__box {
+  width: 22px; height: 22px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border); border-radius: 7px;
+  background: var(--surface);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+#commande .cmd-optswitch__box .material-symbols-outlined { font-size: 17px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box { background: var(--primary); border-color: var(--primary); }
+#commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
+
+/* --------------------------------------------------------- les produits */
+#commande .cmd-right { display: flex; flex-direction: column; min-height: 0; gap: 9px; }
+/* Les puces de familles passent à la ligne sous le titre : trois grosses cibles
+   qu'on vise sans regarder. */
+#commande .cmd-sec__head--right { padding: 0 2px; flex-wrap: wrap; row-gap: 9px; }
+#commande .cmd-sec__head--right .cmd-chips--fam { margin-left: 6px; }
+#commande .cmd-chips--fam .cmd-chip { min-height: 48px; padding: 0 20px; font-size: 14.5px; font-weight: 600; }
+#commande .cmd-chips--fam .cmd-chip .material-symbols-outlined { font-size: 21px; }
+
+/* LE SEUL panneau qui défile : on empile les produits sans pousser la page.
+   Il se déclare CONTENEUR : la mise en page des lignes se décide sur SA
+   largeur, pas sur celle de la fenêtre — c'est lui qui rétrécit quand la fiche
+   occupe la colonne de gauche (voir la requête de conteneur plus bas). */
+#commande .cmd-fams {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-right: 2px;
+  container-type: inline-size; container-name: prods;
+}
+#commande .cmd-fams.is-vide { justify-content: center; }
+
+#commande .cmd-vide {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 24px; text-align: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-card);
+  color: var(--text-3);
+}
+#commande .cmd-vide .material-symbols-outlined { font-size: 30px; opacity: .7; }
+#commande .cmd-vide__t { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text-2); }
+#commande .cmd-vide__s { margin: 0; max-width: 380px; font-size: 12.5px; line-height: 1.5; }
+
+#commande .cmd-fam { display: flex; flex-direction: column; gap: 6px; }
+#commande .cmd-fam__head { display: flex; align-items: center; gap: 8px; padding-left: 2px; }
+#commande .cmd-fam__head .material-symbols-outlined { font-size: 19px; color: var(--primary); }
 #commande .cmd-fam__title {
-  margin: 0; font-size: 12px; font-weight: 700;
+  margin: 0; font-size: 11.5px; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
 }
-#commande .cmd-fam__head .cmd-icon { margin-left: auto; }
+#commande .cmd-fam__head .cmd-icon { margin-left: auto; width: 36px; height: 36px; }
 
 #commande .cmd-table {
-  border: 1px solid var(--border); border-radius: var(--radius-card);
-  background: var(--bg); overflow: hidden;
+  border: 1px solid var(--card-border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-1); overflow: hidden;
 }
-#commande .cmd-art { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
-#commande .cmd-art:last-child { border-bottom: 0; }
-#commande .cmd-art + .cmd-art { border-top: 0; }
 
-/* Une ligne = une grille. Les colonnes varient selon la famille, la dernière
-   (les outils) reste toujours à droite. */
-#commande .cmd-art__row { display: grid; gap: 10px; align-items: center; }
-#commande .cmd-art__row--tasse { grid-template-columns: 74px minmax(0, 2.4fr) minmax(0, 1.4fr) 96px; }
-#commande .cmd-art__row--textile { grid-template-columns: 74px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 96px; }
-#commande .cmd-art__row--objet { grid-template-columns: 74px minmax(0, 1fr) 96px; }
-#commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 2px; }
-#commande .cmd-cell--quantite { text-align: center; font-weight: 600; }
+/* La rangée d'en-tête et les lignes partagent la MÊME grille : c'est ce qui
+   aligne les colonnes et dispense chaque champ d'un libellé. */
+#commande .cmd-thead, #commande .cmd-art__row { display: grid; gap: 8px; align-items: center; }
+#commande .cmd-thead {
+  padding: 7px 12px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2);
+}
+#commande .cmd-thead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#commande .cmd-thead--tasse, #commande .cmd-art__row--tasse {
+  grid-template-columns: 60px minmax(0, 1.3fr) minmax(0, .9fr) minmax(0, 1.5fr) minmax(0, 1.5fr) 76px;
+}
+#commande .cmd-thead--textile, #commande .cmd-art__row--textile {
+  grid-template-columns: 60px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, .9fr) 76px;
+}
+#commande .cmd-thead--objet, #commande .cmd-art__row--objet {
+  grid-template-columns: 60px minmax(0, 1.1fr) minmax(0, 2.4fr) 76px;
+}
+
+#commande .cmd-art { padding: 8px 12px; border-bottom: 1px solid var(--border-soft); }
+#commande .cmd-art:last-child { border-bottom: 0; }
+#commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 0; }
+#commande .cmd-art__tools .cmd-icon { width: 36px; height: 36px; }
+#commande .cmd-cell--quantite { text-align: center; font-weight: 600; padding: 0 6px; }
+
+/* Deuxième rangée d'une tasse : ce qu'on précise parfois. Elle s'étire sur la
+   largeur et se replie toute seule quand le panneau se rétrécit. */
+#commande .cmd-art__bas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+#commande .cmd-art__bas .cmd-input { flex: 1 1 150px; width: auto; min-width: 0; }
+#commande .cmd-art__bas .cmd-chips { flex: 0 0 auto; }
+/* Objet : les trois machines et la consigne, dans la ligne elle-même. */
+#commande .cmd-objperso { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#commande .cmd-objperso .cmd-chips { flex: 0 0 auto; }
+#commande .cmd-objperso .cmd-input { flex: 1 1 120px; min-width: 0; }
 
 /* Cellules façon tableur : aucune flèche (ni compteur d'un champ nombre, ni
    chevron d'une liste de suggestions), on clique et on écrit. La cellule active
    se voit d'un coup d'œil, comme la sélection d'une feuille de calcul. */
+#commande .cmd-cell { height: 42px; font-size: 15px; }
 #commande .cmd-cell::-webkit-outer-spin-button,
 #commande .cmd-cell::-webkit-inner-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }
 #commande .cmd-cell::-webkit-calendar-picker-indicator { display: none !important; }
 #commande .cmd-cell::selection { background: rgba(var(--primary-rgb), .3); }
-#commande .cmd-cell:focus {
-  border-color: var(--primary);
-  box-shadow: inset 0 0 0 1px var(--primary);
-}
-
-/* Sous-champs d'une ligne (faces de tasse, typo, info de perso) : le libellé
-   au-dessus, parce que « Face 1 » ne veut rien dire sans « anse à droite ». */
-#commande .cmd-sub { display: block; min-width: 0; }
-#commande .cmd-sub__label { display: block; margin-bottom: 4px; font-size: 11.5px; color: var(--text-2); }
-#commande .cmd-art__faces,
-#commande .cmd-art__bas { display: grid; gap: 10px; margin-top: 10px; }
-#commande .cmd-art__faces { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-#commande .cmd-art__bas { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); }
-#commande .cmd-art__bas--objet { grid-template-columns: auto minmax(0, 1fr); align-items: end; }
-#commande .cmd-chips--opt { margin-top: 10px; }
+#commande .cmd-cell:focus { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
 
 /* Marquage textile : chips de zones + une ligne de consigne par zone cochée. */
-#commande .cmd-art__mark { margin-top: 10px; }
+#commande .cmd-art__mark { margin-top: 8px; }
 
 /* Croix d'un emplacement ajouté au comptoir : cible de 28px dans la puce, elle
    ne gêne pas le tap qui coche (le reste de la puce). */
@@ -241,49 +341,24 @@
 #commande .cmd-chip__x:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
 
 /* « + Emplacement » : la puce qui en crée un. Trait discontinu = à remplir. */
-#commande .cmd-chip--add { padding: 0 16px 0 12px; border-style: dashed; color: var(--primary); }
+#commande .cmd-chip--add { padding: 0 15px 0 11px; border-style: dashed; color: var(--primary); }
 #commande .cmd-chip--add:hover { background: var(--primary-soft); }
-#commande .cmd-chip--new {
-  width: 200px; height: 44px; padding: 0 16px;
-  border-radius: 999px; border-color: var(--primary);
-}
+#commande .cmd-chip--new { width: 190px; height: 44px; padding: 0 15px; border-radius: 999px; border-color: var(--primary); }
 #commande .cmd-zline {
-  display: grid; grid-template-columns: 120px minmax(0, 1fr);
-  align-items: center; gap: 10px; margin-top: 8px;
+  display: grid; grid-template-columns: 108px minmax(0, 1fr);
+  align-items: center; gap: 8px; margin-top: 6px;
 }
-#commande .cmd-zline__name { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+#commande .cmd-zline__name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+#commande .cmd-zline__cons { height: 42px; font-size: 15px; }
 
 #commande .cmd-addrow {
-  width: 100%; min-height: 48px;
+  width: 100%; min-height: 44px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  border: 0; border-top: 1px dashed var(--border); background: transparent;
-  color: var(--primary); font: 600 14px var(--font); cursor: pointer;
+  border: 0; border-top: 1px dashed var(--border); background: var(--bg);
+  color: var(--primary); font: 600 13.5px var(--font); cursor: pointer;
 }
 #commande .cmd-addrow:hover { background: var(--primary-soft); }
-#commande .cmd-addrow .material-symbols-outlined { font-size: 20px; }
-
-/* --------------------------------------------------------------- paiement */
-#commande .cmd-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-/* Le mode d'encaissement se distingue du statut : il ne s'allume qu'après lui. */
-#commande .cmd-chips--mode { padding-left: 18px; border-left: 1px solid var(--border); }
-
-#commande .cmd-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-#commande .cmd-optswitch {
-  min-height: 44px; padding: 0 6px 0 4px;
-  display: inline-flex; align-items: center; gap: 10px;
-  border: 0; background: transparent; cursor: pointer;
-  font: 500 14px var(--font); color: var(--text-1);
-}
-#commande .cmd-optswitch__box {
-  width: 24px; height: 24px; flex: 0 0 auto;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 2px solid var(--border); border-radius: 7px;
-  background: var(--surface);
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-#commande .cmd-optswitch__box .material-symbols-outlined { font-size: 18px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
-#commande .cmd-optswitch.is-on .cmd-optswitch__box { background: var(--primary); border-color: var(--primary); }
-#commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
+#commande .cmd-addrow .material-symbols-outlined { font-size: 19px; }
 
 /* ------------------------------------------------------------- toast / fin */
 #commande .cmd-toast {
@@ -322,21 +397,59 @@
 
 /* ------------------------------------------------------------ responsive
    Chrome PC, Galaxy Tab A9+ (1280 paysage / 800 portrait), iPhone 390-430. */
-@media (max-width: 1100px) {
-#commande .cmd-grid--pro { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
-#commande .cmd-art__bas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Écran très large : la fiche peut s'offrir ses quatre champs de contact sur
+   une seule rangée. */
+@media (min-width: 1500px) {
+#commande .cmd-body { grid-template-columns: 520px minmax(0, 1fr); }
+#commande .cmd-grid--perso { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#commande .cmd-grid--perso .cmd-field:last-child { grid-column: auto; }
 }
-@media (max-width: 900px) {
-/* Sous la tablette portrait, la ligne ne rentre plus alignée : on empile les
-   champs, les placeholders font office d'en-têtes. */
+
+/* Sous 1040 px (tablette portrait, téléphone) : une seule colonne, et la page
+   redevient défilante — sur ces formats on fait défiler naturellement. */
+@media (max-width: 1040px) {
+#commande:not([hidden]) { overflow-y: auto; }
+#commande .cmd-bar { position: sticky; top: 0; z-index: 5; }
+/* `flex: 0 0 auto` : la fiche reprend sa hauteur naturelle au lieu d'être
+   contrainte à celle de l'écran. Sans ça, elle resterait haute d'un écran et
+   COMPRIMERAIT ses deux colonnes — le panneau des produits tombait à zéro et
+   son contenu se superposait au titre. */
+#commande .cmd-body {
+  display: flex; flex-direction: column; max-width: 900px;
+  flex: 0 0 auto; min-height: auto;
+}
+#commande .cmd-left, #commande .cmd-right { flex: 0 0 auto; }
+/* Plus rien ne défile à l'intérieur : chaque bloc reprend sa hauteur naturelle
+   et se range à la suite. Sans `flex: none` sur la liste, elle garderait sa
+   hauteur de panneau et le bloc Paiement viendrait se poser AU MILIEU des
+   produits ; sans le retour à `stretch`, la fiche se rétracterait à la largeur
+   de son texte (l'axe transversal a changé de sens avec la colonne). */
+#commande .cmd-left {
+  align-self: stretch; max-height: none; overflow: visible;
+}
+#commande .cmd-right { min-height: 0; }
+#commande .cmd-fams { flex: none; min-height: 0; overflow: visible; }
+}
+
+/* Panneau des produits trop étroit pour aligner six colonnes : la ligne se
+   replie et l'en-tête disparaît — les placeholders reprennent le relais, d'où
+   leur formulation (« anse à droite : logo… ») qui redit la convention au lieu
+   de donner un simple exemple. Le seuil porte sur la LARGEUR DU PANNEAU : la
+   même règle sert la colonne de droite sur tablette et la pleine largeur sur
+   téléphone, sans jamais se contredire. */
+@container prods (max-width: 600px) {
+#commande .cmd-thead { display: none; }
 #commande .cmd-art__row { display: flex; flex-wrap: wrap; gap: 8px; }
-#commande .cmd-cell--quantite { width: 74px; text-align: left; }
-#commande .cmd-cell--vetement, #commande .cmd-cell--ref { flex: 1 1 55%; min-width: 160px; }
+#commande .cmd-cell--quantite { width: 60px; text-align: left; }
+#commande .cmd-cell--vetement, #commande .cmd-cell--ref { flex: 1 1 55%; min-width: 150px; }
 #commande .cmd-art__row--textile .cmd-cell--ref { flex: 1 1 28%; min-width: 100px; }
 #commande .cmd-cell--couleur, #commande .cmd-cell--taille { flex: 1 1 28%; min-width: 100px; }
+#commande .cmd-cell--face1, #commande .cmd-cell--face2 { flex: 1 1 46%; min-width: 160px; }
+#commande .cmd-objperso { flex: 1 1 100%; flex-wrap: wrap; }
 #commande .cmd-art__tools { margin-left: auto; }
-#commande .cmd-art__bas--objet { grid-template-columns: minmax(0, 1fr); }
 }
+
 @media (max-width: 640px) {
 #commande .cmd-bar { flex-wrap: wrap; padding: 10px 14px; }
 #commande .cmd-bar__titles { flex: 1 1 0; }
@@ -344,21 +457,21 @@
 #commande .cmd-bar__actions { width: 100%; margin-left: 0; }
 #commande .cmd-bar__actions .cmd-btn { flex: 1; }
 #commande .cmd-body { padding: 12px; gap: 12px; }
-#commande .cmd-card { padding: 14px; }
-#commande .cmd-card__head .cmd-seg { margin-left: 0; width: 100%; }
-#commande .cmd-card__head .cmd-seg__btn { flex: 1; }
+#commande .cmd-sec { padding: 12px 13px; }
+#commande .cmd-sec__head .cmd-seg { margin-left: 0; width: 100%; }
+#commande .cmd-sec__head { flex-wrap: wrap; }
+#commande .cmd-sec__head .cmd-seg__btn { flex: 1; }
 #commande .cmd-grid--pro, #commande .cmd-grid--perso { grid-template-columns: minmax(0, 1fr); }
-#commande .cmd-art__faces, #commande .cmd-art__bas { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-grid--perso .cmd-field:last-child { grid-column: auto; }
 /* Deux puces par ligne : la majoration passe SOUS son libellé plutôt que de le
    couper en deux (« Sous 3 / jours »). */
 #commande .cmd-chips--delai .cmd-chip {
-  flex: 1 1 46%; min-width: 0; gap: 0;
+  flex: 1 1 46%; gap: 0;
   flex-direction: column; justify-content: center; padding: 4px 10px;
 }
 #commande .cmd-chips--delai .cmd-chip__note { line-height: 1.1; }
 #commande .cmd-chips--fam .cmd-chip { flex: 1 1 46%; justify-content: center; }
 #commande .cmd-zline { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-#commande .cmd-chips--mode { padding-left: 0; border-left: 0; }
-#commande .cmd-delai__date { width: 100%; }
-#commande .cmd-delai__date .cmd-input { flex: 1; }
+#commande .cmd-chips--mode { padding-right: 0; border-right: 0; }
+#commande .cmd-art__bas .cmd-input { flex: 1 1 100%; }
 }

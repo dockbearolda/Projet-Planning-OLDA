@@ -189,6 +189,24 @@ La nature est conservée dans `requests.order_kind` et rappelée par un badge su
 la ligne du planning. La fiche tient en **quatre blocs numérotés**, dans l'ordre
 où ça se dit.
 
+### La page ne défile pas
+
+Au-dessus de 1040 px, la fiche est en **deux colonnes à hauteur fixe** : la
+fiche à gauche (contact, demande), les produits à droite. **Seul le panneau des
+produits défile** — on empile autant de lignes qu'on veut sans jamais perdre de
+vue le nom du client ni le bouton d'enregistrement, et le paiement reste posé
+en pied de colonne droite. Sous 1040 px (tablette portrait, téléphone) les deux
+colonnes s'empilent et la page redevient défilante, comme n'importe quel
+formulaire mobile.
+
+Les lignes de produits **n'ont aucun libellé** : une rangée d'en-tête donne les
+colonnes une fois pour toute la famille, comme dans un tableur — c'est ce qui
+les fait tenir sur 44 px de haut. Quand le panneau devient trop étroit pour
+aligner six colonnes (**requête de conteneur**, pas de média : le seuil porte
+sur la largeur du panneau, pas de la fenêtre), la ligne se replie et les
+placeholders reprennent le relais. D'où leur formulation : « anse à droite :
+logo… » redit la convention au lieu de donner un simple exemple.
+
 ### 1 — Contact : PRO ou PERSO
 
 Deux jeux de champs **exclusifs**, pour ne jamais demander un « prénom » à un
@@ -226,11 +244,14 @@ mardi »). Les produits ne sont détaillés que si on les détaille.
 | Famille | Ce qu'on saisit |
 |---|---|
 | **Tasses** | Qté · référence · coloris · **Face 1 (anse à droite)** et **Face 2 (anse à gauche)** · options (*Logo OLDA*, *Texte personnalisé*, *Logo client*) · infos de personnalisation · typo · remarques |
-| **Textile** | Qté · vêtement · réf. OLDA ou fournisseur · coloris · taille · **placements** (Cœur, Dos, Avant, Manche droite, Manche gauche, Poitrine — les autres derrière « Autres ») avec la **consigne libre** de chacun |
+| **Textile** | Qté · vêtement · réf. OLDA ou fournisseur · coloris · taille · **placements** (Cœur, Dos, Avant, Manche Dr, Manche Ga, Poitrine — les six sur une rangée, les autres derrière « ＋ 6 ») avec la **consigne libre** de chacun |
 | **Objets** | Qté · réf. objet · **TROTEC / UV / Autres** · info sur la personnalisation |
 
-La convention d'anse des tasses est **dans le libellé du champ** : c'est elle qui
-évite d'imprimer le visuel du mauvais côté. Une fiche peut mêler les trois
+Les puces de placement portent un libellé **court** (« Manche Dr ») pour tenir
+sur une seule rangée ; la fiche, elle, garde le nom entier (« Manche droite »).
+La convention d'anse des tasses est **dans l'en-tête de colonne et dans le
+placeholder** : c'est elle qui évite d'imprimer le visuel du mauvais côté. Une
+fiche peut mêler les trois
 familles ; le total de pièces les additionne. « Dupliquer » reprend la ligne ET
 son marquage : la même impression sur une autre taille, en un tap. Une ligne
 qu'on n'a pas remplie part en silence à l'enregistrement — un tap de trop sur
@@ -239,6 +260,7 @@ décision de production, pas de la prise : on ne la demande pas ici.
 
 ### 4 — Paiement
 
+En pied de colonne droite, juste sous les produits qu'il règle :
 **Non payé / Acompte payé / Payé**, puis le **mode** (CB / Espèces) — qui
 n'apparaît qu'une fois quelque chose à encaisser, et qui s'efface si on
 repasse à « non payé » (jamais de « CB » trompeur sur une commande impayée).
