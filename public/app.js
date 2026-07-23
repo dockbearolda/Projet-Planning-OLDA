@@ -348,15 +348,24 @@ function buildStageEl(family, sub) {
 
 function renderSidebar() {
   $stages.replaceChildren();
-  // 8 familles ; chaque famille déroule ses sous-catégories juste en dessous
-  // (miroir de la « Vue Étapes » du CRM : total famille + détail par sous-étape).
+  // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
+  // sous-catégories. On enveloppe le tout dans un bloc pour que l'œil isole d'un
+  // coup une zone de la suivante (miroir de la « Vue Étapes » du CRM : total
+  // famille + détail par sous-étape).
   FAMILIES.forEach((f) => {
-    $stages.appendChild(buildStageEl(f));
-    if (familyHasSub(f.slug)) {
-      SUB_STAGES[f.slug].forEach((sub) => $stages.appendChild(buildStageEl(f, sub)));
+    const zone = document.createElement('div');
+    zone.className = 'stage-zone';
+    const hasSub = familyHasSub(f.slug);
+    if (hasSub) zone.classList.add('has-sub');
+    const head = buildStageEl(f);
+    head.classList.add('zone-head'); // le grand titre se lit comme un en-tête de zone
+    zone.appendChild(head);
+    if (hasSub) {
+      SUB_STAGES[f.slug].forEach((sub) => zone.appendChild(buildStageEl(f, sub)));
     }
+    $stages.appendChild(zone);
   });
-  // Séparateur + catégorie spéciale Fiverr épinglée dessous.
+  // Séparateur + catégorie spéciale Fiverr épinglée dessous (hors pipeline).
   if (SPECIAL.length) {
     const sep = document.createElement('div');
     sep.className = 'stage-sep';
@@ -2031,6 +2040,19 @@ function onDragMove(e) {
   if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
 }
 
+// Une entrée du rail accepte-t-elle qu'on y DÉPOSE la ligne `r` ?
+// Un GRAND TITRE qui a des sous-catégories n'est JAMAIS une cible : la ligne doit
+// atterrir sur une sous-catégorie précise, pas rester « à préciser » sur le titre.
+// Les familles sans sous-catégorie (Demande, Attente Client, Archivé) et Fiverr
+// restent des cibles directes — il n'y a rien de plus fin où viser.
+function stageAcceptsDrop(stageEl, r) {
+  const slug = stageEl.dataset.slug;
+  const isSub = stageEl.dataset.sub != null;
+  if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
+  const sub = isSub ? stageEl.dataset.sub : null;
+  return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
+}
+
 function updateDragTarget() {
   if (!dragState) return;
   dragState.raf = 0;
@@ -2039,7 +2061,7 @@ function updateDragTarget() {
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
   const stageEl = el && el.closest ? el.closest('.stage') : null;
   if (stageEl) {
-    if (stageEl.dataset.slug !== dragState.r.stage) stageEl.classList.add('drop-target');
+    if (stageAcceptsDrop(stageEl, dragState.r)) stageEl.classList.add('drop-target');
   } else {
     // réordonnancement vertical dans la grille
     const after = getDragAfterElement($rows, y);
@@ -2081,12 +2103,19 @@ async function onDragEnd(e) {
   }
 
   if (stageEl) {
-    // déposé sur une entrée de la sidebar : famille (data-slug) ou sous-catégorie
-    // (data-slug = famille + data-sub = sous-slug).
-    const slug = stageEl.dataset.slug;
-    const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
-    const changed = slug !== ds.r.stage || (sub ?? null) !== (ds.r.sub_stage ?? null);
-    if (changed) await moveToStage(ds.r, slug, sub);
+    // Relâché sur le rail. Une cible valide (sous-catégorie, ou famille sans
+    // sous-catégorie) déplace la ligne ; un grand titre À sous-catégories la
+    // refuse (on guide vers une sous-catégorie) ; même place = rien à faire.
+    if (stageAcceptsDrop(stageEl, ds.r)) {
+      const slug = stageEl.dataset.slug;
+      const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
+      await moveToStage(ds.r, slug, sub);
+    } else {
+      if (stageEl.dataset.sub == null && familyHasSub(stageEl.dataset.slug)) {
+        showToast('Dépose la ligne sur une sous-catégorie, pas sur le titre.');
+      }
+      applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
+    }
   } else {
     await commitReorder(ds.r); // déposé dans la grille → réordonnancement
   }
