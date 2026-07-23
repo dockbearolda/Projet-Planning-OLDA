@@ -1,7 +1,9 @@
 // Prise de commande — Atelier OLDA
-// Le PREMIER PAS du client : la fiche qu'on remplit au comptoir, en face de lui.
-// Juste les infos de base, sous forme de tableau simple et rapide. Aucun prix
-// (le chiffrage est une étape du planning), aucune option superflue.
+// Le PREMIER PAS du client : la fiche qu'on remplit au comptoir, EN FACE DE LUI.
+// Contrainte de conception : 30 à 45 secondes, montre en main. Tout en découle —
+// des blocs numérotés dans l'ordre où ça se dit, des puces à taper plutôt que
+// des menus à dérouler, des valeurs par défaut déjà justes, et rien à l'écran
+// tant qu'on n'en a pas besoin (les familles de produits restent fermées).
 //
 // La NATURE (demande / commande) vient de l'entrée de menu cliquée, poussée par
 // app.js via setNature() — il n'y a pas de réglage de nature dans la fiche.
@@ -39,41 +41,88 @@ let CAT = null;
 let CLIENTS = [];
 let uid = 0;
 
+// Les trois familles, dans l'ordre de lecture de l'atelier.
+const FAMILLES = ['tasse', 'textile', 'objet'];
+
 const state = {
   kind: 'demande',
-  client: { societe: '', contact: '', telephone: '', type: 'pro' },
-  articles: [],
+  client: { type: 'pro', facturation: '', contact: '', whatsapp: '', email: '', prenom: '', nom: '' },
+  objet: '',
+  description: '',
+  delai: '',            // id du délai tapé ; vide = date choisie à la main
+  deadline: '',
+  ouvertes: [],         // familles dépliées (dans l'ordre où on les a tapées)
+  lignes: { tasse: [], textile: [], objet: [] },
+  paiement: { statut: 'non_paye', mode: '' },
   enBoite: false,
   maquette: true,
-  facture: 'a_faire',
-  deadline: '',
   sending: false,
 };
 
 const zoneById = (id) => CAT.zones.find((z) => z.id === id);
 const typeById = (id) => CAT.types.find((t) => t.id === id);
+const delaiById = (id) => CAT.delais.find((d) => d.id === id);
+const familleById = (id) => CAT.familles.find((f) => f.id === id);
 
-function newArticle() {
+// Une ligne neuve, par famille. Les champs sont TOUS présents dès la création :
+// le rendu n'a jamais à se demander si une propriété existe.
+function newLigne(famille) {
   uid += 1;
-  return { uid, vetement: '', ref: '', couleur: '', taille: '', quantite: 1, zones: [] };
+  const base = { uid, famille, quantite: 1, ref: '' };
+  if (famille === 'tasse') {
+    return { ...base, couleur: '', face1: '', face2: '', options: [], infos: '', typo: '', remarque: '' };
+  }
+  if (famille === 'textile') {
+    return { ...base, vetement: '', couleur: '', taille: '', zones: [], plus: false };
+  }
+  return { ...base, technique: '', infos: '' };
 }
 
-const byUid = (u) => state.articles.find((a) => String(a.uid) === String(u));
+const listOf = (famille) => state.lignes[famille];
+const byUid = (u) => FAMILLES
+  .map((f) => state.lignes[f].find((l) => String(l.uid) === String(u)))
+  .find(Boolean);
+
+// Une ligne à laquelle on n'a rien dit : ajoutée d'un tap de trop, elle part en
+// silence à l'enregistrement plutôt que de réclamer sa référence.
+function ligneVide(l) {
+  if (l.famille === 'tasse') {
+    return !l.ref.trim() && !l.couleur.trim() && !l.face1.trim() && !l.face2.trim()
+      && !l.options.length && !l.infos.trim() && !l.typo.trim() && !l.remarque.trim();
+  }
+  if (l.famille === 'textile') {
+    return !l.vetement.trim() && !l.ref.trim() && !l.couleur.trim() && !l.taille.trim() && !l.zones.length;
+  }
+  return !l.ref.trim() && !l.technique && !l.infos.trim();
+}
+
+const lignesRemplies = (famille) => listOf(famille).filter((l) => !ligneVide(l));
+const toutesLignes = () => FAMILLES.flatMap(lignesRemplies);
 
 // ---------------------------------------------------------------------------
 // Ce qui manque pour enregistrer. null = la saisie est complète.
 // ---------------------------------------------------------------------------
+function nomClient() {
+  const c = state.client;
+  return c.type === 'perso'
+    ? [c.prenom.trim(), c.nom.trim()].filter(Boolean).join(' ')
+    : c.facturation.trim();
+}
+
 function missing() {
-  if (!state.client.societe.trim()) return 'le nom du client';
-  if (!state.articles.length) return 'au moins un article';
-  for (let i = 0; i < state.articles.length; i += 1) {
-    if (!state.articles[i].vetement.trim()) return `le vêtement de l'article ${i + 1}`;
+  if (!nomClient()) return state.client.type === 'perso' ? 'le prénom du client' : 'le nom de facturation';
+  const lignes = toutesLignes();
+  if (!state.objet.trim() && !lignes.length) return 'un objet (ou un produit)';
+  for (const l of lignes) {
+    if (l.famille === 'tasse' && !l.ref.trim()) return 'la référence d\'une tasse';
+    if (l.famille === 'textile' && !l.vetement.trim()) return 'le vêtement d\'une ligne textile';
+    if (l.famille === 'objet' && !l.ref.trim()) return 'la référence d\'un objet';
   }
   return null;
 }
 
 // ---------------------------------------------------------------------------
-// Base clients — auto-complétion sur les clients de la base pro (/api/clients).
+// Base clients — auto-complétion sur les clients connus (/api/clients).
 // Taper « Igua » propose « Iguana (Discover) » avec son contact et son numéro.
 // Un client absent de la base y est créé automatiquement à l'enregistrement.
 // Forme d'un client : { entreprise, nom (contact), telephone, email, commandes }.
@@ -83,19 +132,27 @@ const fold = (s) => String(s).normalize('NFD').replace(/\p{Diacritic}/gu, '').to
 let autoIndex = -1;
 let autoMatches = [];
 
+// Le champ qui porte la recherche dépend du mode : le nom de facturation pour
+// un pro, le prénom pour un particulier.
+const autoChamp = () => $(state.client.type === 'perso' ? '#cmd-prenom' : '#cmd-facturation');
+const autoListe = () => $(state.client.type === 'perso' ? '#cmd-auto-perso' : '#cmd-auto-pro');
+
 function closeAuto() {
   autoIndex = -1;
   autoMatches = [];
-  const list = $('#cmd-auto-list');
-  list.hidden = true;
-  list.replaceChildren();
-  const champ = $('#cmd-societe');
-  champ.setAttribute('aria-expanded', 'false');
-  champ.removeAttribute('aria-activedescendant');
+  for (const list of $$('.cmd-auto__list')) {
+    list.hidden = true;
+    list.replaceChildren();
+  }
+  for (const champ of [$('#cmd-facturation'), $('#cmd-prenom')]) {
+    champ.setAttribute('aria-expanded', 'false');
+    champ.removeAttribute('aria-activedescendant');
+  }
 }
 
 function renderAuto() {
-  const list = $('#cmd-auto-list');
+  const list = autoListe();
+  const champ = autoChamp();
   list.replaceChildren();
   for (let i = 0; i < autoMatches.length; i += 1) {
     const c = autoMatches[i];
@@ -115,7 +172,6 @@ function renderAuto() {
     list.append(li);
   }
   list.hidden = autoMatches.length === 0;
-  const champ = $('#cmd-societe');
   champ.setAttribute('aria-expanded', String(autoMatches.length > 0));
   if (autoIndex >= 0) champ.setAttribute('aria-activedescendant', `cmd-auto-${autoIndex}`);
   else champ.removeAttribute('aria-activedescendant');
@@ -125,7 +181,11 @@ function openAuto(query) {
   const q = fold(query).trim();
   if (!q) return closeAuto();
   // On propose sur le nom de société ET le contact : « Jérôme » retrouve Iguana.
+  // Un particulier ne se voit proposer que des particuliers, et l'inverse : au
+  // comptoir on ne mélange pas l'annuaire des hôtels et celui des voisins.
+  const perso = state.client.type === 'perso';
   autoMatches = CLIENTS
+    .filter((c) => (c.client_type === 'perso') === perso)
     .filter((c) => fold(c.entreprise).includes(q) || (c.nom && fold(c.nom).includes(q)))
     .slice(0, 6);
   autoIndex = -1;
@@ -134,87 +194,180 @@ function openAuto(query) {
 
 // Reprend une fiche connue : on ne remplit QUE les champs restés vides, pour ne
 // jamais écraser ce que la personne vient de taper. Le `type` de la base est une
-// catégorie métier (Boutique, Hôtel…) qu'on ne recopie pas ; en revanche la
-// NATURE pro/perso de la fiche (client_type) suit le client à sa nouvelle commande.
+// catégorie métier (Boutique, Hôtel…) qu'on ne recopie pas.
 function pickClient(c) {
-  state.client.societe = c.entreprise;
-  if (!state.client.contact.trim() && c.nom) state.client.contact = c.nom;
-  if (!state.client.telephone.trim() && c.telephone) state.client.telephone = c.telephone;
-  if (c.client_type === 'pro' || c.client_type === 'perso') state.client.type = c.client_type;
-
-  $('#cmd-societe').value = state.client.societe;
-  $('#cmd-contact').value = state.client.contact;
-  $('#cmd-tel').value = state.client.telephone;
+  const cl = state.client;
+  if (cl.type === 'perso') {
+    // La base ne connaît qu'un nom complet : le premier mot fait le prénom.
+    const mots = String(c.entreprise).trim().split(/\s+/);
+    cl.prenom = mots.shift() || '';
+    if (!cl.nom.trim()) cl.nom = mots.join(' ');
+    $('#cmd-prenom').value = cl.prenom;
+    $('#cmd-nom').value = cl.nom;
+    if (!cl.whatsapp.trim() && c.telephone) cl.whatsapp = c.telephone;
+    $('#cmd-whatsapp-perso').value = cl.whatsapp;
+  } else {
+    cl.facturation = c.entreprise;
+    if (!cl.contact.trim() && c.nom) cl.contact = c.nom;
+    if (!cl.whatsapp.trim() && c.telephone) cl.whatsapp = c.telephone;
+    if (!cl.email.trim() && c.email) cl.email = c.email;
+    $('#cmd-facturation').value = cl.facturation;
+    $('#cmd-contact').value = cl.contact;
+    $('#cmd-whatsapp').value = cl.whatsapp;
+    $('#cmd-email').value = cl.email;
+  }
   closeAuto();
   render();
+  // Le client est identifié : la suite, c'est ce qu'il vient chercher.
+  $('#cmd-objet').focus();
 }
 
 // ---------------------------------------------------------------------------
-// Articles — reconstruits à chaque changement de STRUCTURE (ajout, retrait,
-// zone cochée), jamais pendant la frappe (sinon le curseur saute).
+// Puces — la brique de toute la fiche : un tap, un état visible, 44 px de haut.
 // ---------------------------------------------------------------------------
-// Une cellule du tableau des articles. Toujours un `text` : un `number` sort
-// ses flèches au survol et refuse la frappe libre — au comptoir on clique et on
-// écrit, comme dans un tableur. Le contrôle se fait à la saisie (voir wire()).
-function cell(role, a, value, placeholder, label, opts) {
+function chip(label, opts) {
+  const o = opts || {};
+  const b = el('button', `cmd-chip${o.on ? ' is-on' : ''}${o.cls ? ` ${o.cls}` : ''}`);
+  b.type = 'button';
+  if (o.role) b.dataset.role = o.role;
+  if (o.value != null) b.dataset.value = o.value;
+  if (o.radio) {
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(!!o.on));
+  } else {
+    b.setAttribute('aria-pressed', String(!!o.on));
+  }
+  if (o.icone) b.append(ic(o.icone));
+  b.append(el('span', null, label));
+  if (o.note) b.append(el('span', 'cmd-chip__note', o.note));
+  return b;
+}
+
+// ---------------------------------------------------------------------------
+// Lignes de produits — reconstruites à chaque changement de STRUCTURE (ajout,
+// retrait, zone cochée), jamais pendant la frappe (sinon le curseur saute).
+// ---------------------------------------------------------------------------
+// Une cellule de tableau. Toujours un `text` : un `number` sort ses flèches au
+// survol et refuse la frappe libre — au comptoir on clique et on écrit, comme
+// dans un tableur. Le contrôle se fait à la saisie (voir wire()).
+function cell(role, l, value, placeholder, label, opts) {
   const n = el('input', `cmd-input cmd-cell cmd-cell--${role}`);
   n.type = 'text';
   n.value = value == null ? '' : value;
   n.placeholder = placeholder || '';
   n.autocomplete = 'off';
   n.dataset.role = role;
-  n.dataset.uid = a.uid;
+  n.dataset.uid = l.uid;
+  n.dataset.fam = l.famille;
   n.setAttribute('aria-label', label);
   if (opts && opts.list) n.setAttribute('list', opts.list);
   if (opts && opts.inputmode) n.inputMode = opts.inputmode;
   return n;
 }
 
-function buildArticle(a, index) {
-  const art = el('div', 'cmd-art');
-  art.dataset.uid = a.uid;
+// Un champ libre sous la ligne (face de tasse, typo, info de perso…) : son
+// libellé au-dessus, pour qu'on sache ce qu'on écrit sans deviner. Ce n'est PAS
+// une cellule de tableur : Entrée n'y descend pas d'une ligne, elle ne fait rien
+// — taper « Joyeux 80 ans » puis Entrée ne doit pas créer une seconde tasse.
+function souschamp(role, l, value, label, placeholder, opts) {
+  const wrap = el('label', 'cmd-sub');
+  wrap.append(el('span', 'cmd-sub__label', label));
+  const n = cell(role, l, value, placeholder, label, opts);
+  n.className = 'cmd-input cmd-sub__input';
+  wrap.append(n);
+  return wrap;
+}
 
-  const row = el('div', 'cmd-art__row');
-  row.append(
-    cell('quantite', a, a.quantite, '1', `Quantité, article ${index + 1}`, { inputmode: 'numeric' }),
-    cell('vetement', a, a.vetement, 'T-shirt sans manches', `Vêtement, article ${index + 1}`, { list: 'cmd-dl-vetements' }),
-    cell('ref', a, a.ref, 'K3022', `Référence, article ${index + 1}`),
-    cell('couleur', a, a.couleur, 'Light Sand', `Couleur, article ${index + 1}`),
-    cell('taille', a, a.taille, 'S', `Taille, article ${index + 1}`, { list: 'cmd-dl-tailles' }),
-  );
-
+function outils(l, index) {
   const tools = el('div', 'cmd-art__tools');
   const dup = el('button', 'cmd-icon');
   dup.type = 'button';
   dup.dataset.role = 'dup';
   dup.title = 'Dupliquer';
-  dup.setAttribute('aria-label', `Dupliquer l'article ${index + 1}`);
+  dup.setAttribute('aria-label', `Dupliquer la ligne ${index + 1}`);
   dup.append(ic('content_copy'));
   tools.append(dup);
-  // Le dernier article ne se supprime pas : une saisie sans article n'existe pas.
-  if (state.articles.length > 1) {
+  // La dernière ligne ne se supprime pas : elle se vide, et disparaît à l'envoi.
+  if (listOf(l.famille).length > 1) {
     const del = el('button', 'cmd-icon cmd-icon--danger');
     del.type = 'button';
     del.dataset.role = 'del';
     del.title = 'Retirer';
-    del.setAttribute('aria-label', `Retirer l'article ${index + 1}`);
+    del.setAttribute('aria-label', `Retirer la ligne ${index + 1}`);
     del.append(ic('close'));
     tools.append(del);
   }
-  row.append(tools);
+  return tools;
+}
+
+// --------------------------------------------------------------------- tasse
+function buildTasse(l, index) {
+  const art = el('div', 'cmd-art');
+  art.dataset.uid = l.uid;
+
+  const row = el('div', 'cmd-art__row cmd-art__row--tasse');
+  row.append(
+    cell('quantite', l, l.quantite, '1', `Quantité, tasse ${index + 1}`, { inputmode: 'numeric' }),
+    cell('ref', l, l.ref, 'Tasse blanche 33 cl', `Référence, tasse ${index + 1}`, { list: 'cmd-dl-tasses' }),
+    cell('couleur', l, l.couleur, 'Blanc', `Coloris, tasse ${index + 1}`),
+    outils(l, index),
+  );
   art.append(row);
 
-  // Marquage : zones à cocher, chacune avec sa consigne (« Cœur : Les Doudous »).
+  // Les deux faces. La convention d'anse est DANS le libellé : c'est elle qui
+  // évite d'imprimer le visuel du mauvais côté.
+  const faces = el('div', 'cmd-art__faces');
+  for (const f of CAT.faces) {
+    faces.append(souschamp(
+      f.id, l, l[f.id],
+      `${f.label} (${f.hint})`,
+      f.id === 'face1' ? 'Logo client' : 'Texte, date, prénom…',
+    ));
+  }
+  art.append(faces);
+
+  const opts = el('div', 'cmd-chips cmd-chips--opt');
+  for (const o of CAT.tasseOptions) {
+    opts.append(chip(o.label, { on: l.options.includes(o.id), role: 'tasse-opt', value: o.id }));
+  }
+  art.append(opts);
+
+  const bas = el('div', 'cmd-art__bas');
+  bas.append(
+    souschamp('infos', l, l.infos, 'Informations personnalisation', 'centré, 8 cm de large…'),
+    souschamp('typo', l, l.typo, 'Typo', 'Bebas Neue', { list: 'cmd-dl-typos' }),
+    souschamp('remarque', l, l.remarque, 'Remarques', 'emballage cadeau…'),
+  );
+  art.append(bas);
+  return art;
+}
+
+// ------------------------------------------------------------------- textile
+function buildTextile(l, index) {
+  const art = el('div', 'cmd-art');
+  art.dataset.uid = l.uid;
+
+  const row = el('div', 'cmd-art__row cmd-art__row--textile');
+  row.append(
+    cell('quantite', l, l.quantite, '1', `Quantité, textile ${index + 1}`, { inputmode: 'numeric' }),
+    cell('vetement', l, l.vetement, 'T-shirt sans manches', `Vêtement, ligne ${index + 1}`, { list: 'cmd-dl-vetements' }),
+    cell('ref', l, l.ref, 'K3022', `Référence, ligne ${index + 1}`),
+    cell('couleur', l, l.couleur, 'Light Sand', `Coloris, ligne ${index + 1}`),
+    cell('taille', l, l.taille, 'S', `Taille, ligne ${index + 1}`, { list: 'cmd-dl-tailles' }),
+    outils(l, index),
+  );
+  art.append(row);
+
+  // Placements : les six courants sous la main, le reste derrière « Autres ».
   const mark = el('div', 'cmd-art__mark');
   const chips = el('div', 'cmd-chips');
-  for (const z of CAT.zones) {
-    const on = a.zones.some((x) => x.zone === z.id);
-    const b = el('button', `cmd-chip${on ? ' is-on' : ''}`);
-    b.type = 'button';
-    b.dataset.role = 'zone';
-    b.dataset.zone = z.id;
-    b.setAttribute('aria-pressed', String(on));
-    b.append(z.label);
+  const pose = (z) => l.zones.some((x) => x.zone === z.id);
+  const secondaires = CAT.zones.filter((z) => !z.principal);
+  const deplie = l.plus || secondaires.some(pose);
+  const visibles = deplie ? CAT.zones : CAT.zones.filter((z) => z.principal);
+
+  for (const z of visibles) {
+    const b = chip(z.label, { on: pose(z), role: 'zone', value: z.id });
     // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
     // catalogue, jamais. Les commandes déjà enregistrées gardent leur marquage.
     if (z.custom) {
@@ -226,17 +379,18 @@ function buildArticle(a, index) {
     }
     chips.append(b);
   }
-  // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant sur
-  // place, il rejoint la liste de tous les postes.
-  const add = el('button', 'cmd-chip cmd-chip--add');
-  add.type = 'button';
-  add.dataset.role = 'zone-add';
-  add.setAttribute('aria-label', `Ajouter un emplacement, article ${index + 1}`);
-  add.append(ic('add'), el('span', null, 'Emplacement'));
-  chips.append(add);
+  if (!deplie && secondaires.length) {
+    chips.append(chip(`Autres (${secondaires.length})`, { role: 'zone-plus', cls: 'cmd-chip--ghost' }));
+  } else {
+    // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant sur
+    // place, il rejoint la liste de tous les postes.
+    const add = chip('Emplacement', { role: 'zone-add', cls: 'cmd-chip--add', icone: 'add' });
+    add.setAttribute('aria-label', `Ajouter un emplacement, ligne ${index + 1}`);
+    chips.append(add);
+  }
   mark.append(chips);
 
-  for (const z of a.zones) {
+  for (const z of l.zones) {
     const zone = zoneById(z.zone);
     if (!zone) continue;                 // emplacement retiré entre-temps
     const line = el('label', 'cmd-zline');
@@ -244,7 +398,8 @@ function buildArticle(a, index) {
     const cons = el('input', 'cmd-input cmd-zline__cons');
     cons.type = 'text';
     cons.dataset.role = 'consigne';
-    cons.dataset.uid = a.uid;
+    cons.dataset.uid = l.uid;
+    cons.dataset.fam = 'textile';
     cons.dataset.zone = z.zone;
     cons.maxLength = CAT.consigneMax;
     cons.autocomplete = 'off';
@@ -257,8 +412,79 @@ function buildArticle(a, index) {
   return art;
 }
 
-function renderArticles() {
-  $('#cmd-arts').replaceChildren(...state.articles.map(buildArticle));
+// --------------------------------------------------------------------- objet
+function buildObjet(l, index) {
+  const art = el('div', 'cmd-art');
+  art.dataset.uid = l.uid;
+
+  const row = el('div', 'cmd-art__row cmd-art__row--objet');
+  row.append(
+    cell('quantite', l, l.quantite, '1', `Quantité, objet ${index + 1}`, { inputmode: 'numeric' }),
+    cell('ref', l, l.ref, 'Gourde inox', `Référence, objet ${index + 1}`, { list: 'cmd-dl-objets' }),
+    outils(l, index),
+  );
+  art.append(row);
+
+  // Ce qui compte à l'atelier : par quelle machine ça passe.
+  const bas = el('div', 'cmd-art__bas cmd-art__bas--objet');
+  const techs = el('div', 'cmd-chips', null);
+  techs.setAttribute('role', 'radiogroup');
+  techs.setAttribute('aria-label', `Type de personnalisation, objet ${index + 1}`);
+  for (const t of CAT.objetTechniques) {
+    techs.append(chip(t.label, { on: l.technique === t.id, role: 'obj-tech', value: t.id, radio: true }));
+  }
+  bas.append(techs);
+  bas.append(souschamp('infos', l, l.infos, 'Info sur la personnalisation', 'gravure logo 5 cm, prénom…'));
+  art.append(bas);
+  return art;
+}
+
+const BUILDERS = { tasse: buildTasse, textile: buildTextile, objet: buildObjet };
+
+// ---------------------------------------------------------------------------
+// Les familles ouvertes : chacune son bloc, ses lignes, son bouton d'ajout.
+// ---------------------------------------------------------------------------
+function buildFamille(id) {
+  const f = familleById(id);
+  const box = el('section', 'cmd-fam');
+  box.dataset.fam = id;
+
+  const head = el('div', 'cmd-fam__head');
+  head.append(ic(f.icone), el('h4', 'cmd-fam__title', f.label));
+  const close = el('button', 'cmd-icon');
+  close.type = 'button';
+  close.dataset.role = 'fam-close';
+  close.dataset.fam = id;
+  close.title = `Retirer le bloc ${f.label}`;
+  close.setAttribute('aria-label', `Retirer le bloc ${f.label}`);
+  close.append(ic('close'));
+  head.append(close);
+  box.append(head);
+
+  const table = el('div', 'cmd-table');
+  const lignes = el('div', 'cmd-arts');
+  lignes.append(...listOf(id).map((l, i) => BUILDERS[id](l, i)));
+  table.append(lignes);
+
+  const add = el('button', 'cmd-addrow');
+  add.type = 'button';
+  add.dataset.role = 'add-ligne';
+  add.dataset.fam = id;
+  add.append(ic('add'), el('span', null, `Ajouter ${id === 'objet' ? 'un objet' : id === 'tasse' ? 'une tasse' : 'une ligne'}`));
+  table.append(add);
+  box.append(table);
+  return box;
+}
+
+function renderFams() {
+  $('#cmd-fams').replaceChildren(...state.ouvertes.map(buildFamille));
+}
+
+// Pose le curseur sur la première cellule d'une ligne : on enchaîne la frappe
+// sans repasser par la souris.
+function focusLigne(l) {
+  const c = ROOT.querySelector(`.cmd-art[data-uid="${l.uid}"] .cmd-cell--${l.famille === 'textile' ? 'vetement' : 'ref'}`);
+  if (c) { c.focus(); c.select(); }
 }
 
 // ---------------------------------------------------------------------------
@@ -270,36 +496,36 @@ function renderArticles() {
 const zoneSlug = (s) => fold(s).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 // Ordre du catalogue : Cœur avant Dos, quel que soit l'ordre des clics.
-const sortZones = (a) => a.zones.sort(
+const sortZones = (l) => l.zones.sort(
   (x, y) => CAT.zones.findIndex((z) => z.id === x.zone) - CAT.zones.findIndex((z) => z.id === y.zone),
 );
 
-function toggleZone(a, id) {
-  const i = a.zones.findIndex((z) => z.zone === id);
-  if (i >= 0) a.zones.splice(i, 1);
-  else a.zones.push({ zone: id, consigne: '' });
-  sortZones(a);
+function toggleZone(l, id) {
+  const i = l.zones.findIndex((z) => z.zone === id);
+  if (i >= 0) l.zones.splice(i, 1);
+  else l.zones.push({ zone: id, consigne: '' });
+  sortZones(l);
 }
 
 // Pose le curseur sur la consigne de la zone qu'on vient de cocher : on tape
 // le visuel dans la foulée, sans repasser par la souris.
-function focusConsigne(a, id) {
-  const line = $(`.cmd-art[data-uid="${a.uid}"] .cmd-zline__cons[data-zone="${id}"]`);
+function focusConsigne(l, id) {
+  const line = ROOT.querySelector(`.cmd-art[data-uid="${l.uid}"] .cmd-zline__cons[data-zone="${id}"]`);
   if (line) line.focus();
 }
 
-// Remplace un identifiant de zone par un autre dans TOUS les articles : sert à
+// Remplace un identifiant de zone par un autre dans TOUTES les lignes : sert à
 // se raccrocher à l'identifiant que le serveur a tranché.
 function remapZone(from, to) {
-  for (const a of state.articles) {
-    for (const z of a.zones) if (z.zone === from) z.zone = to;
+  for (const l of state.lignes.textile) {
+    for (const z of l.zones) if (z.zone === from) z.zone = to;
     // Un doublon peut apparaître si la zone visée était déjà posée.
-    a.zones = a.zones.filter((z, i) => a.zones.findIndex((y) => y.zone === z.zone) === i);
-    sortZones(a);
+    l.zones = l.zones.filter((z, i) => l.zones.findIndex((y) => y.zone === z.zone) === i);
+    sortZones(l);
   }
 }
 
-async function addZone(label, a) {
+async function addZone(label, l) {
   const clean = String(label || '').trim().slice(0, 40);
   const id = zoneSlug(clean);
   if (!clean || !id) return;
@@ -308,15 +534,15 @@ async function addZone(label, a) {
   // serveur : retaper « Avant gauche » coche la zone du catalogue.
   const known = CAT.zones.find((z) => z.id === id || zoneSlug(z.label) === id);
   if (known) {
-    if (!a.zones.some((z) => z.zone === known.id)) toggleZone(a, known.id);
-    renderArticles();
-    return focusConsigne(a, known.id);
+    if (!l.zones.some((z) => z.zone === known.id)) toggleZone(l, known.id);
+    renderFams();
+    return focusConsigne(l, known.id);
   }
 
   CAT.zones = [...CAT.zones, { id, label: clean, custom: true }];
-  toggleZone(a, id);
-  renderArticles();
-  focusConsigne(a, id);
+  toggleZone(l, id);
+  renderFams();
+  focusConsigne(l, id);
 
   try {
     const res = await fetch('/api/commande/zones', {
@@ -329,29 +555,29 @@ async function addZone(label, a) {
     CAT.zones = data.zones;              // la base fait foi
     if (data.zone.id !== id) {
       remapZone(id, data.zone.id);
-      renderArticles();
-      focusConsigne(a, data.zone.id);
+      renderFams();
+      focusConsigne(l, data.zone.id);
     }
   } catch (err) {
     CAT.zones = CAT.zones.filter((z) => z.id !== id);
-    for (const art of state.articles) {
+    for (const art of state.lignes.textile) {
       const i = art.zones.findIndex((z) => z.zone === id);
       if (i >= 0) art.zones.splice(i, 1);
     }
-    renderArticles();
+    renderFams();
     toast(`« ${clean} » non enregistré — réessayez.`);
   }
 }
 
 async function removeZone(id) {
   const before = CAT.zones;
-  const beforeArticles = state.articles.map((a) => a.zones.map((z) => ({ ...z })));
+  const beforeLignes = state.lignes.textile.map((l) => l.zones.map((z) => ({ ...z })));
   CAT.zones = CAT.zones.filter((z) => z.id !== id);
-  for (const a of state.articles) {
-    const i = a.zones.findIndex((z) => z.zone === id);
-    if (i >= 0) a.zones.splice(i, 1);
+  for (const l of state.lignes.textile) {
+    const i = l.zones.findIndex((z) => z.zone === id);
+    if (i >= 0) l.zones.splice(i, 1);
   }
-  renderArticles();
+  renderFams();
 
   try {
     const res = await fetch(`/api/commande/zones/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -360,15 +586,15 @@ async function removeZone(id) {
     CAT.zones = data.zones;
   } catch (err) {
     CAT.zones = before;
-    state.articles.forEach((a, i) => { a.zones = beforeArticles[i]; });
-    renderArticles();
+    state.lignes.textile.forEach((l, i) => { l.zones = beforeLignes[i]; });
+    renderFams();
     toast('Emplacement non retiré — réessayez.');
   }
 }
 
 // Saisie du nom : la puce « + Emplacement » devient un champ, sur place.
 // Entrée valide, Échap (ou la perte du focus) annule.
-function openZoneInput(btn, a) {
+function openZoneInput(btn, l) {
   const input = el('input', 'cmd-input cmd-chip cmd-chip--new');
   input.type = 'text';
   input.maxLength = 40;
@@ -380,40 +606,69 @@ function openZoneInput(btn, a) {
 
   const close = () => { if (input.isConnected) input.replaceWith(btn); };
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); addZone(input.value, a); }
+    if (e.key === 'Enter') { e.preventDefault(); addZone(input.value, l); }
     else if (e.key === 'Escape') { e.preventDefault(); close(); }
   });
   input.addEventListener('blur', () => setTimeout(close, 120));
 }
 
 // ---------------------------------------------------------------------------
-// Rendu (hors articles : ne touche à aucun champ en cours de frappe)
+// Rendu (hors lignes : ne touche à aucun champ en cours de frappe)
 // ---------------------------------------------------------------------------
 function render() {
   const t = typeById(state.kind);
   $('#cmd-title').textContent = t.label;
   $('#cmd-sub').textContent = t.hint;
 
-  // Nature pro / perso : segmented + adapte le libellé du champ « société ».
+  // Contact : pro ou perso, jamais les deux.
   const perso = state.client.type === 'perso';
   for (const b of $$('#cmd-nature .cmd-seg__btn')) {
     const on = b.dataset.nature === state.client.type;
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-checked', String(on));
   }
-  $('#cmd-societe-label').textContent = perso ? 'Client — nom du particulier' : 'Client — société / marque';
-  $('#cmd-societe').placeholder = perso ? 'Marie Dupont' : 'Iguana (Discover)';
+  $('#cmd-pro').hidden = perso;
+  $('#cmd-perso').hidden = !perso;
+
+  // Délais : la puce tapée, ou aucune si la date a été choisie à la main.
+  for (const b of $$('#cmd-delais .cmd-chip')) {
+    const on = b.dataset.value === state.delai;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+
+  // Familles : la puce est allumée quand son bloc est ouvert.
+  for (const b of $$('#cmd-familles .cmd-chip')) {
+    const on = state.ouvertes.includes(b.dataset.value);
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+
+  // Paiement : le mode n'a de sens qu'une fois quelque chose encaissé.
+  for (const b of $$('#cmd-pay-statut .cmd-chip')) {
+    const on = b.dataset.value === state.paiement.statut;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+  const encaisse = state.paiement.statut !== 'non_paye';
+  $('#cmd-pay-mode').hidden = !encaisse;
+  for (const b of $$('#cmd-pay-mode .cmd-chip')) {
+    const on = encaisse && b.dataset.value === state.paiement.mode;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
 
   $('#cmd-boite').setAttribute('aria-checked', String(state.enBoite));
   $('#cmd-boite').classList.toggle('is-on', state.enBoite);
   $('#cmd-maquette').setAttribute('aria-checked', String(state.maquette));
   $('#cmd-maquette').classList.toggle('is-on', state.maquette);
 
-  const known = CLIENTS.find((c) => fold(c.entreprise) === fold(state.client.societe.trim()));
+  const nom = nomClient();
+  const known = nom && CLIENTS.find((c) => fold(c.entreprise) === fold(nom));
   const badge = $('#cmd-client-known');
   const n = known ? (known.commandes || 0) : 0;
   badge.textContent = known
-    ? (n > 0 ? `Client connu — ${n} commande${n > 1 ? 's' : ''} au planning` : 'Client connu — base pro')
+    ? (n > 0 ? `Client connu — ${n} commande${n > 1 ? 's' : ''} au planning` : 'Client connu — déjà dans la base')
     : '';
   badge.hidden = !known;
 
@@ -437,17 +692,35 @@ function toast(msg) {
 // Construction statique
 // ---------------------------------------------------------------------------
 function buildStatic() {
-  const fact = $('#cmd-facture');
-  for (const f of CAT.factureEtats) fact.append(new Option(f.label, f.id));
-  fact.value = state.facture;
-
   $('#cmd-dl-vetements').replaceChildren(...CAT.vetements.map((v) => new Option(v)));
   $('#cmd-dl-tailles').replaceChildren(...CAT.tailles.map((t) => new Option(t)));
+  $('#cmd-dl-tasses').replaceChildren(...CAT.tasses.map((t) => new Option(t)));
+  $('#cmd-dl-objets').replaceChildren(...CAT.objets.map((o) => new Option(o)));
+  $('#cmd-dl-typos').replaceChildren(...CAT.typos.map((t) => new Option(t)));
 
-  state.deadline = todayPlus(CAT.delaiDefautJours);
+  $('#cmd-delais').replaceChildren(...CAT.delais.map((d) => chip(d.label, {
+    role: 'delai', value: d.id, radio: true, note: d.note,
+  })));
+  $('#cmd-familles').replaceChildren(...CAT.familles.map((f) => chip(f.label, {
+    role: 'famille', value: f.id, icone: f.icone, cls: 'cmd-chip--fam',
+  })));
+  $('#cmd-pay-statut').replaceChildren(...CAT.paiementStatuts.map((p) => chip(p.label, {
+    role: 'pay-statut', value: p.id, radio: true,
+  })));
+  $('#cmd-pay-mode').replaceChildren(...CAT.paiementModes.map((p) => chip(p.label, {
+    role: 'pay-mode', value: p.id, radio: true,
+  })));
+
+  setDelai(CAT.delaiDefaut);
+}
+
+// Le délai tapé pose l'échéance ; la date reste modifiable pour un jour précis.
+function setDelai(id) {
+  const d = delaiById(id);
+  if (!d) return;
+  state.delai = d.id;
+  state.deadline = todayPlus(d.jours);
   $('#cmd-deadline').value = state.deadline;
-
-  state.articles = [newArticle()];
 }
 
 // ---------------------------------------------------------------------------
@@ -465,64 +738,103 @@ function wire() {
 
     const t = e.target.closest('button');
     if (!t) return closeAuto();
+    const role = t.dataset.role;
 
-    if (t.dataset.nature) { state.client.type = t.dataset.nature; return render(); }
+    if (t.dataset.nature) return setNatureClient(t.dataset.nature);
+    if (role === 'delai') { setDelai(t.dataset.value); return render(); }
+    if (role === 'famille') return toggleFamille(t.dataset.value);
+    if (role === 'fam-close') return toggleFamille(t.dataset.fam);
+    if (role === 'pay-statut') {
+      state.paiement.statut = t.dataset.value;
+      if (state.paiement.statut === 'non_paye') state.paiement.mode = '';
+      return render();
+    }
+    if (role === 'pay-mode') {
+      state.paiement.mode = state.paiement.mode === t.dataset.value ? '' : t.dataset.value;
+      return render();
+    }
     if (t.id === 'cmd-boite') { state.enBoite = !state.enBoite; return render(); }
     if (t.id === 'cmd-maquette') { state.maquette = !state.maquette; return render(); }
-    if (t.id === 'cmd-add-art') {
-      state.articles.push(newArticle());
-      renderArticles();
-      return render();
+    if (role === 'add-ligne') {
+      const l = newLigne(t.dataset.fam);
+      listOf(t.dataset.fam).push(l);
+      renderFams();
+      render();
+      return focusLigne(l);
     }
     if (t.id === 'cmd-save') return submit();
     if (t.id === 'cmd-done-new') return reset();
 
     const host = t.closest('.cmd-art');
     if (!host) return;
-    const a = byUid(host.dataset.uid);
-    if (!a) return;
+    const l = byUid(host.dataset.uid);
+    if (!l) return;
 
-    if (t.dataset.role === 'del') {
-      state.articles = state.articles.filter((x) => x.uid !== a.uid);
-      renderArticles();
+    if (role === 'del') {
+      state.lignes[l.famille] = listOf(l.famille).filter((x) => x.uid !== l.uid);
+      renderFams();
       return render();
     }
-    if (t.dataset.role === 'dup') {
+    if (role === 'dup') {
       // Le cas courant du comptoir : même marquage, autre taille / couleur.
+      // Les tableaux sont recopiés, sinon les deux lignes partagent leurs zones.
       uid += 1;
-      const copy = { ...a, uid, zones: a.zones.map((z) => ({ ...z })) };
-      state.articles.splice(state.articles.indexOf(a) + 1, 0, copy);
-      renderArticles();
+      const copy = { ...l, uid };
+      if (l.zones) copy.zones = l.zones.map((z) => ({ ...z }));
+      if (l.options) copy.options = [...l.options];
+      const list = listOf(l.famille);
+      list.splice(list.indexOf(l) + 1, 0, copy);
+      renderFams();
+      render();
+      return focusLigne(copy);
+    }
+    if (role === 'tasse-opt') {
+      const i = l.options.indexOf(t.dataset.value);
+      if (i >= 0) l.options.splice(i, 1); else l.options.push(t.dataset.value);
+      t.classList.toggle('is-on', i < 0);
+      t.setAttribute('aria-pressed', String(i < 0));
       return render();
     }
-    if (t.dataset.role === 'zone-add') return openZoneInput(t, a);
-    if (t.dataset.role === 'zone') {
-      const id = t.dataset.zone;
-      const posee = a.zones.some((z) => z.zone === id);
-      toggleZone(a, id);
-      renderArticles();
-      if (!posee) focusConsigne(a, id);   // cochée : on enchaîne sur la consigne
+    if (role === 'obj-tech') {
+      l.technique = l.technique === t.dataset.value ? '' : t.dataset.value;
+      renderFams();
       return render();
     }
-  });
-
-  ROOT.addEventListener('change', (e) => {
-    if (e.target.id === 'cmd-facture') { state.facture = e.target.value; return; }
+    if (role === 'zone-plus') { l.plus = true; return renderFams(); }
+    if (role === 'zone-add') return openZoneInput(t, l);
+    if (role === 'zone') {
+      const id = t.dataset.value;
+      const posee = l.zones.some((z) => z.zone === id);
+      toggleZone(l, id);
+      renderFams();
+      if (!posee) focusConsigne(l, id);   // cochée : on enchaîne sur la consigne
+      return render();
+    }
   });
 
   ROOT.addEventListener('input', (e) => {
     const t = e.target;
-    if (t.id === 'cmd-societe') {
-      state.client.societe = t.value;
+    if (t.id === 'cmd-facturation') {
+      state.client.facturation = t.value;
       openAuto(t.value);
       return render();
     }
+    if (t.id === 'cmd-prenom') {
+      state.client.prenom = t.value;
+      openAuto(t.value);
+      return render();
+    }
+    if (t.id === 'cmd-nom') { state.client.nom = t.value; return render(); }
     if (t.id === 'cmd-contact') { state.client.contact = t.value; return; }
-    if (t.id === 'cmd-tel') { state.client.telephone = t.value; return; }
-    if (t.id === 'cmd-deadline') { state.deadline = t.value; return; }
+    if (t.id === 'cmd-whatsapp' || t.id === 'cmd-whatsapp-perso') { state.client.whatsapp = t.value; return; }
+    if (t.id === 'cmd-email') { state.client.email = t.value; return; }
+    if (t.id === 'cmd-objet') { state.objet = t.value; return render(); }
+    if (t.id === 'cmd-desc') { state.description = t.value; return; }
+    // Une date posée à la main l'emporte : plus aucune puce de délai allumée.
+    if (t.id === 'cmd-deadline') { state.deadline = t.value; state.delai = ''; return render(); }
 
-    const a = t.dataset.uid ? byUid(t.dataset.uid) : null;
-    if (!a) return;
+    const l = t.dataset.uid ? byUid(t.dataset.uid) : null;
+    if (!l) return;
     if (t.dataset.role === 'quantite') {
       // Champ texte : on filtre les chiffres à la frappe (pas de flèches, pas
       // de « e » ni de moins). On ne réécrit la valeur QUE si elle change,
@@ -530,37 +842,44 @@ function wire() {
       const digits = t.value.replace(/\D+/g, '').replace(/^0+(?=\d)/, '').slice(0, 4);
       if (digits !== t.value) t.value = digits;
       const n = Number.parseInt(digits, 10);
-      a.quantite = Number.isInteger(n) && n > 0 ? n : 1;
+      l.quantite = Number.isInteger(n) && n > 0 ? n : 1;
       return;
     }
     if (t.dataset.role === 'consigne') {
-      const z = a.zones.find((x) => x.zone === t.dataset.zone);
+      const z = l.zones.find((x) => x.zone === t.dataset.zone);
       if (z) z.consigne = t.value;
       return;
     }
-    if (['vetement', 'ref', 'couleur', 'taille'].includes(t.dataset.role)) {
-      a[t.dataset.role] = t.value;
-      if (t.dataset.role === 'vetement') render(); // (dé)verrouille « Enregistrer »
+    const champs = ['vetement', 'ref', 'couleur', 'taille', 'face1', 'face2', 'infos', 'typo', 'remarque'];
+    if (champs.includes(t.dataset.role)) {
+      l[t.dataset.role] = t.value;
+      // Ces champs (dé)verrouillent « Enregistrer » : ils portent l'identité
+      // de la ligne, ou la font passer de « vide » à « à compléter ».
+      if (['vetement', 'ref'].includes(t.dataset.role)) render();
     }
   });
 
   // Auto-complétion au clavier : la liste se parcourt sans lâcher le champ.
-  $('#cmd-societe').addEventListener('keydown', (e) => {
-    if (!autoMatches.length) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      autoIndex += e.key === 'ArrowDown' ? 1 : -1;
-      if (autoIndex >= autoMatches.length) autoIndex = 0;
-      if (autoIndex < 0) autoIndex = autoMatches.length - 1;
-      return renderAuto();
-    }
-    if (e.key === 'Enter' && autoIndex >= 0) { e.preventDefault(); return pickClient(autoMatches[autoIndex]); }
-    if (e.key === 'Escape') return closeAuto();
-  });
+  for (const champ of [$('#cmd-facturation'), $('#cmd-prenom')]) {
+    champ.addEventListener('keydown', (e) => {
+      if (!autoMatches.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        autoIndex += e.key === 'ArrowDown' ? 1 : -1;
+        if (autoIndex >= autoMatches.length) autoIndex = 0;
+        if (autoIndex < 0) autoIndex = autoMatches.length - 1;
+        return renderAuto();
+      }
+      if (e.key === 'Enter' && autoIndex >= 0) { e.preventDefault(); return pickClient(autoMatches[autoIndex]); }
+      if (e.key === 'Escape') return closeAuto();
+    });
+    champ.addEventListener('blur', () => setTimeout(closeAuto, 120));
+  }
   // Le `blur` part au mousedown, le `click` de sélection au mouseup : on empêche
   // le champ de perdre le focus sur la liste plutôt que de courir après un délai.
-  $('#cmd-auto-list').addEventListener('mousedown', (e) => e.preventDefault());
-  $('#cmd-societe').addEventListener('blur', () => setTimeout(closeAuto, 120));
+  for (const list of $$('.cmd-auto__list')) {
+    list.addEventListener('mousedown', (e) => e.preventDefault());
+  }
 
   // Échap ferme la confirmation en repartant sur une saisie vierge.
   ROOT.addEventListener('keydown', (e) => {
@@ -570,30 +889,61 @@ function wire() {
   wireCells();
 }
 
+// Bascule pro / perso : les deux jeux de champs partagent le WhatsApp (au
+// comptoir on tape le numéro avant de savoir si on facture une société).
+function setNatureClient(nature) {
+  if (state.client.type === nature) return;
+  state.client.type = nature;
+  closeAuto();
+  $('#cmd-whatsapp').value = state.client.whatsapp;
+  $('#cmd-whatsapp-perso').value = state.client.whatsapp;
+  render();
+  const champ = autoChamp();
+  champ.focus();
+}
+
+// Une famille se déplie d'un tap, avec sa première ligne déjà prête. La refermer
+// jette ses lignes : on ne garde pas de produit invisible dans une fiche.
+function toggleFamille(id) {
+  if (state.ouvertes.includes(id)) {
+    state.ouvertes = state.ouvertes.filter((f) => f !== id);
+    state.lignes[id] = [];
+    renderFams();
+    return render();
+  }
+  state.ouvertes = FAMILLES.filter((f) => f === id || state.ouvertes.includes(f));
+  if (!listOf(id).length) state.lignes[id] = [newLigne(id)];
+  renderFams();
+  render();
+  focusLigne(listOf(id)[0]);
+}
+
 // ---------------------------------------------------------------------------
-// Le tableau des articles se tient au clavier comme un tableur : on clique, la
-// cellule est sélectionnée, on écrit par-dessus ; Entrée ou ↓ descendent d'une
-// ligne (et en créent une au bout), ↑ remonte. Tab reste le déplacement natif
-// d'une colonne à l'autre.
+// Les tableaux se tiennent au clavier comme un tableur : on clique, la cellule
+// est sélectionnée, on écrit par-dessus ; Entrée ou ↓ descendent d'une ligne
+// (et en créent une au bout), ↑ remonte. Tab reste le déplacement natif d'une
+// colonne à l'autre.
 // ---------------------------------------------------------------------------
-function cellAt(article, role) {
-  return $(`.cmd-art[data-uid="${article.uid}"] .cmd-cell--${role}`);
+function cellAt(ligne, role) {
+  return ROOT.querySelector(`.cmd-art[data-uid="${ligne.uid}"] .cmd-cell--${role}`);
 }
 
 function moveCell(from, step) {
   const role = from.dataset.role;
-  const i = state.articles.findIndex((a) => String(a.uid) === String(from.dataset.uid));
+  const list = listOf(from.dataset.fam);
+  if (!list) return;
+  const i = list.findIndex((l) => String(l.uid) === String(from.dataset.uid));
   if (i < 0) return;
   let j = i + step;
   if (j < 0) return;
-  if (j >= state.articles.length) {
+  if (j >= list.length) {
     // Entrée sur la dernière ligne : on en ouvre une nouvelle, comme un tableur.
-    state.articles.push(newArticle());
-    renderArticles();
+    list.push(newLigne(from.dataset.fam));
+    renderFams();
     render();
-    j = state.articles.length - 1;
+    j = list.length - 1;
   }
-  const next = cellAt(state.articles[j], role);
+  const next = cellAt(list[j], role);
   if (next) { next.focus(); next.select(); }
 }
 
@@ -623,8 +973,8 @@ function wireCells() {
   ROOT.addEventListener('focusout', (e) => {
     const t = e.target;
     if (!t.dataset || t.dataset.role !== 'quantite' || t.value !== '') return;
-    const a = byUid(t.dataset.uid);
-    if (a) t.value = a.quantite;
+    const l = byUid(t.dataset.uid);
+    if (l) t.value = l.quantite;
   });
 
   ROOT.addEventListener('keydown', (e) => {
@@ -639,6 +989,47 @@ function wireCells() {
 // ---------------------------------------------------------------------------
 // Envoi
 // ---------------------------------------------------------------------------
+// Ce que le serveur attend, à partir de l'état de la fiche. Les lignes restées
+// vides ne partent pas : un tap de trop sur « Ajouter » ne doit rien réclamer.
+function payload() {
+  const c = state.client;
+  const client = c.type === 'perso'
+    ? { type: 'perso', prenom: c.prenom, nom: c.nom, whatsapp: c.whatsapp }
+    : { type: 'pro', facturation: c.facturation, contact: c.contact, whatsapp: c.whatsapp, email: c.email };
+
+  const net = (l) => {
+    if (l.famille === 'tasse') {
+      return {
+        ref: l.ref, couleur: l.couleur, quantite: l.quantite,
+        face1: l.face1, face2: l.face2, options: l.options,
+        infos: l.infos, typo: l.typo, remarque: l.remarque,
+      };
+    }
+    if (l.famille === 'textile') {
+      return {
+        vetement: l.vetement, ref: l.ref, couleur: l.couleur, taille: l.taille, quantite: l.quantite,
+        zones: l.zones.map((z) => ({ zone: z.zone, consigne: z.consigne })),
+      };
+    }
+    return { ref: l.ref, quantite: l.quantite, technique: l.technique, infos: l.infos };
+  };
+
+  return {
+    kind: state.kind,
+    client,
+    objet: state.objet,
+    description: state.description,
+    delai: state.delai,
+    deadline: state.deadline,
+    tasses: lignesRemplies('tasse').map(net),
+    textiles: lignesRemplies('textile').map(net),
+    objets: lignesRemplies('objet').map(net),
+    paiement: { statut: state.paiement.statut, mode: state.paiement.mode },
+    enBoite: state.enBoite,
+    maquette: state.maquette,
+  };
+}
+
 async function submit() {
   const need = missing();
   if (need) return toast(`Il manque ${need}.`);
@@ -649,19 +1040,7 @@ async function submit() {
     const res = await fetch('/api/commande', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        kind: state.kind,
-        client: state.client,
-        articles: state.articles.map((a) => ({
-          vetement: a.vetement, ref: a.ref, couleur: a.couleur, taille: a.taille,
-          quantite: a.quantite,
-          zones: a.zones.map((z) => ({ zone: z.zone, consigne: z.consigne })),
-        })),
-        enBoite: state.enBoite,
-        maquette: state.maquette,
-        facture: state.facture,
-        deadline: state.deadline,
-      }),
+      body: JSON.stringify(payload()),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
@@ -677,10 +1056,12 @@ async function submit() {
 }
 
 function showDone(c) {
-  const pieces = c.articles.reduce((s, a) => s + a.quantite, 0);
+  const lignes = [...c.tasses, ...c.textiles, ...c.objets];
+  const detail = lignes.length
+    ? `${lignes.length} ligne${lignes.length > 1 ? 's' : ''} (${c.quantite} pièce${c.quantite > 1 ? 's' : ''})`
+    : c.objet;
   $('#cmd-done-title').textContent = `${c.type.label} enregistrée`;
-  $('#cmd-done-sub').textContent =
-    `${c.client.societe} · ${c.articles.length} article${c.articles.length > 1 ? 's' : ''} (${pieces} pièce${pieces > 1 ? 's' : ''}) · au planning`;
+  $('#cmd-done-sub').textContent = `${c.client.societe} · ${detail} · au planning`;
   $('#cmd-done').hidden = false;
   $('#cmd-done-new').focus();
 }
@@ -688,21 +1069,26 @@ function showDone(c) {
 // Remet la fiche à zéro sans recharger la page. La nature reste celle de
 // l'entrée de menu : on enchaîne souvent plusieurs saisies du même type.
 function reset() {
-  state.client = { societe: '', contact: '', telephone: '', type: 'pro' };
-  state.articles = [newArticle()];
+  state.client = { type: 'pro', facturation: '', contact: '', whatsapp: '', email: '', prenom: '', nom: '' };
+  state.objet = '';
+  state.description = '';
+  state.ouvertes = [];
+  state.lignes = { tasse: [], textile: [], objet: [] };
+  state.paiement = { statut: 'non_paye', mode: '' };
   state.enBoite = false;
   state.maquette = true;
-  state.facture = 'a_faire';
-  state.deadline = todayPlus(CAT.delaiDefautJours);
   state.sending = false;
 
-  for (const id of ['cmd-societe', 'cmd-contact', 'cmd-tel']) $(`#${id}`).value = '';
-  $('#cmd-facture').value = state.facture;
-  $('#cmd-deadline').value = state.deadline;
+  for (const id of ['cmd-facturation', 'cmd-contact', 'cmd-whatsapp', 'cmd-email',
+    'cmd-prenom', 'cmd-nom', 'cmd-whatsapp-perso', 'cmd-objet', 'cmd-desc']) {
+    $(`#${id}`).value = '';
+  }
+  setDelai(CAT.delaiDefaut);
   $('#cmd-done').hidden = true;
   closeAuto();
-  renderArticles();
+  renderFams();
   render();
+  $('#cmd-facturation').focus();
 }
 
 async function loadClients() {
@@ -730,7 +1116,7 @@ export async function initCommande(root) {
   CAT = await (await fetch('/api/commande/catalog')).json();
   mounted = true;
   buildStatic();
-  renderArticles();
+  renderFams();
   wire();
   render();
   loadClients().then(render);

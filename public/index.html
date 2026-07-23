@@ -199,11 +199,17 @@
         <section class="clients" id="clients" hidden aria-label="Base clients"></section>
 
         <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
-             remplit au comptoir, en face de lui : juste les infos de base, sous
-             forme de tableau simple et rapide. La NATURE (demande / commande)
-             est décidée par l'entrée du menu (deux liens distincts), pas par un
-             réglage ici. Le balisage est là dès le départ ; le module
-             (commande.js) n'est chargé qu'au premier affichage. -->
+             remplit au comptoir, EN FACE DE LUI — elle doit tenir en 30 à 45
+             secondes. Quatre blocs numérotés, dans l'ordre où ça se dit :
+             1. le contact (PRO ou PERSO, deux formulaires exclusifs),
+             2. la demande (objet, description, délai d'un tap),
+             3. les produits (tasses / textile / objets), ouverts seulement si on
+                les détaille — sinon la demande simple suffit,
+             4. le paiement.
+             La NATURE (demande / commande) est décidée par l'entrée du menu
+             (deux liens distincts), pas par un réglage ici. Le balisage est là
+             dès le départ ; le module (commande.js) n'est chargé qu'au premier
+             affichage. -->
         <section class="cmd" id="commande" hidden aria-label="Prise de commande">
           <header class="cmd-bar">
             <span class="cmd-bar__ic material-symbols-outlined" aria-hidden="true">edit_note</span>
@@ -218,78 +224,136 @@
           </header>
 
           <div class="cmd-body">
-            <!-- Nature du client : pro (société) ou perso (particulier). Tranché
-                 dès l'entête ; suit le client dans sa fiche de base. -->
-            <div class="cmd-nature">
-              <span class="cmd-label">Type de client</span>
-              <div class="cmd-seg" id="cmd-nature" role="radiogroup" aria-label="Type de client">
-                <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
-                <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+            <!-- 1 — CONTACT. Pro ou perso : deux jeux de champs exclusifs, pour
+                 ne jamais demander un « prénom » à un hôtel ni une « société »
+                 à un particulier. -->
+            <section class="cmd-card" aria-label="Contact">
+              <div class="cmd-card__head">
+                <span class="cmd-card__n" aria-hidden="true">1</span>
+                <h3 class="cmd-card__title">Contact</h3>
+                <div class="cmd-seg cmd-seg--big" id="cmd-nature" role="radiogroup" aria-label="Type de client">
+                  <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
+                  <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+                </div>
               </div>
-            </div>
 
-            <!-- Client : une seule ligne, l'essentiel. -->
-            <div class="cmd-client">
-              <div class="cmd-field cmd-field--grow cmd-auto">
-                <label class="cmd-label" for="cmd-societe" id="cmd-societe-label">Client — société / marque</label>
-                <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
-                       autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
-                       aria-controls="cmd-auto-list" />
-                <ul class="cmd-auto__list" id="cmd-auto-list" role="listbox" aria-label="Clients connus" hidden></ul>
-                <p class="cmd-hint" id="cmd-client-known" hidden></p>
+              <!-- PRO : nom de facturation, contact, WhatsApp, email. -->
+              <div class="cmd-grid cmd-grid--pro" id="cmd-pro">
+                <div class="cmd-field cmd-field--grow cmd-auto">
+                  <label class="cmd-label" for="cmd-facturation">Nom de facturation</label>
+                  <input class="cmd-input" id="cmd-facturation" type="text" placeholder="Iguana (Discover)"
+                         autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                         aria-controls="cmd-auto-pro" />
+                  <ul class="cmd-auto__list" id="cmd-auto-pro" role="listbox" aria-label="Clients connus" hidden></ul>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-contact">Contact</label>
+                  <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-whatsapp">WhatsApp</label>
+                  <input class="cmd-input" id="cmd-whatsapp" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-email">Email</label>
+                  <input class="cmd-input" id="cmd-email" type="email" inputmode="email" placeholder="jerome@iguana.fr" autocomplete="off" />
+                </div>
+              </div>
+
+              <!-- PERSO : prénom, nom, WhatsApp. Trois champs, rien de plus. -->
+              <div class="cmd-grid cmd-grid--perso" id="cmd-perso" hidden>
+                <div class="cmd-field cmd-auto">
+                  <label class="cmd-label" for="cmd-prenom">Prénom</label>
+                  <input class="cmd-input" id="cmd-prenom" type="text" placeholder="Marie"
+                         autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                         aria-controls="cmd-auto-perso" />
+                  <ul class="cmd-auto__list" id="cmd-auto-perso" role="listbox" aria-label="Clients connus" hidden></ul>
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-nom">Nom</label>
+                  <input class="cmd-input" id="cmd-nom" type="text" placeholder="Dupont" autocomplete="off" />
+                </div>
+                <div class="cmd-field">
+                  <label class="cmd-label" for="cmd-whatsapp-perso">WhatsApp</label>
+                  <input class="cmd-input" id="cmd-whatsapp-perso" type="tel" inputmode="tel" placeholder="0690 99 88 77" autocomplete="off" />
+                </div>
+              </div>
+              <p class="cmd-hint" id="cmd-client-known" hidden></p>
+            </section>
+
+            <!-- 2 — LA DEMANDE. Un objet, deux mots de description, et le délai
+                 d'un seul tap : c'est la fiche minimale, celle qui suffit quand
+                 le client est pressé. -->
+            <section class="cmd-card" aria-label="La demande">
+              <div class="cmd-card__head">
+                <span class="cmd-card__n" aria-hidden="true">2</span>
+                <h3 class="cmd-card__title">La demande</h3>
               </div>
               <div class="cmd-field">
-                <label class="cmd-label" for="cmd-tel">Téléphone</label>
-                <input class="cmd-input" id="cmd-tel" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+                <label class="cmd-label" for="cmd-objet">Objet</label>
+                <input class="cmd-input cmd-input--lg" id="cmd-objet" type="text"
+                       placeholder="20 t-shirts équipe · Devis 40 polos brodés…" autocomplete="off" />
               </div>
               <div class="cmd-field">
-                <label class="cmd-label" for="cmd-contact">Contact</label>
-                <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+                <label class="cmd-label" for="cmd-desc">Description <span class="cmd-label__opt">facultatif</span></label>
+                <textarea class="cmd-input cmd-textarea" id="cmd-desc" rows="2"
+                          placeholder="Ce que le client précise de vive voix…"></textarea>
               </div>
-            </div>
+              <div class="cmd-field">
+                <span class="cmd-label" id="cmd-delai-label">Date souhaitée</span>
+                <div class="cmd-chips cmd-chips--delai" id="cmd-delais" role="radiogroup" aria-labelledby="cmd-delai-label"></div>
+                <div class="cmd-delai__date">
+                  <label class="cmd-label" for="cmd-deadline">Le</label>
+                  <input class="cmd-input" id="cmd-deadline" type="date" aria-label="Date souhaitée précise" />
+                </div>
+              </div>
+            </section>
 
-            <!-- Articles : un tableau. Une ligne = un article ; en dessous, son
-                 marquage (zones + consignes). Ajout / retrait en un tap. -->
-            <div class="cmd-table" role="group" aria-label="Articles">
-              <div class="cmd-thead" aria-hidden="true">
-                <span>Qté</span>
-                <span>Vêtement</span>
-                <span>Référence</span>
-                <span>Couleur</span>
-                <span>Taille</span>
-                <span></span>
+            <!-- 3 — LES PRODUITS. Rien n'est ouvert par défaut : on tape la
+                 famille concernée et son bloc apparaît, déjà prêt à recevoir une
+                 ligne. Une fiche peut en mêler plusieurs. -->
+            <section class="cmd-card" aria-label="Produits">
+              <div class="cmd-card__head">
+                <span class="cmd-card__n" aria-hidden="true">3</span>
+                <h3 class="cmd-card__title">Produits</h3>
+                <span class="cmd-card__hint">au besoin — l'objet ci-dessus suffit pour une demande simple</span>
               </div>
-              <div class="cmd-arts" id="cmd-arts"></div>
-              <button class="cmd-addrow" type="button" id="cmd-add-art">
-                <span class="material-symbols-outlined" aria-hidden="true">add</span> Ajouter un article
-              </button>
-            </div>
+              <div class="cmd-chips cmd-chips--fam" id="cmd-familles"></div>
+              <div class="cmd-fams" id="cmd-fams"></div>
+            </section>
 
-            <!-- Options de base, sur une ligne : boîte, maquette, facture, date. -->
-            <div class="cmd-opts">
-              <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
-                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
-                <span>Article en boîte</span>
-              </button>
-              <button class="cmd-optswitch" type="button" id="cmd-maquette" role="switch" aria-checked="true">
-                <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
-                <span>Maquette à faire</span>
-              </button>
-              <div class="cmd-field cmd-field--inline">
-                <label class="cmd-label" for="cmd-facture">Facture</label>
-                <select class="cmd-input cmd-select" id="cmd-facture"></select>
+            <!-- 4 — PAIEMENT. Statut d'abord ; le mode n'apparaît que s'il y a
+                 quelque chose à encaisser. Les deux réflexes d'atelier (boîte,
+                 maquette) tiennent sur la même ligne. -->
+            <section class="cmd-card" aria-label="Paiement">
+              <div class="cmd-card__head">
+                <span class="cmd-card__n" aria-hidden="true">4</span>
+                <h3 class="cmd-card__title">Paiement</h3>
               </div>
-              <div class="cmd-field cmd-field--inline">
-                <label class="cmd-label" for="cmd-deadline">Date souhaitée</label>
-                <input class="cmd-input" id="cmd-deadline" type="date" />
+              <div class="cmd-pay">
+                <div class="cmd-chips" id="cmd-pay-statut" role="radiogroup" aria-label="Statut du paiement"></div>
+                <div class="cmd-chips cmd-chips--mode" id="cmd-pay-mode" role="radiogroup" aria-label="Mode de paiement" hidden></div>
               </div>
-            </div>
+              <div class="cmd-opts">
+                <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
+                  <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                  <span>Article en boîte</span>
+                </button>
+                <button class="cmd-optswitch" type="button" id="cmd-maquette" role="switch" aria-checked="true">
+                  <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                  <span>Maquette à faire</span>
+                </button>
+              </div>
+            </section>
           </div>
 
           <!-- Listes de suggestion : saisie libre autorisée, le catalogue ne fait
                que proposer (une grille fournisseur exotique ne doit pas bloquer). -->
           <datalist id="cmd-dl-vetements"></datalist>
           <datalist id="cmd-dl-tailles"></datalist>
+          <datalist id="cmd-dl-tasses"></datalist>
+          <datalist id="cmd-dl-objets"></datalist>
+          <datalist id="cmd-dl-typos"></datalist>
 
           <div class="cmd-toast" id="cmd-toast" role="status" aria-live="polite"></div>
 
