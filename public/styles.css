@@ -166,17 +166,17 @@ body {
   user-select: none;
 }
 
-/* Ossature : barre du haut fixe + filet + zone de travail qui remplit l'écran */
-/* Le rail latéral est PLEINE HAUTEUR à gauche ; la barre du haut et la zone de
-   travail occupent la colonne de droite. Grille : l'ordre des enfants dans le
-   HTML n'a plus d'importance, chacun est posé par sa zone. */
+/* Ossature : barre du haut PLEINE LARGEUR + filet, puis en dessous le rail des
+   étapes (à gauche) et la zone de travail (à droite). La barre du haut coiffe
+   tout : elle porte la marque et la navigation. Grille : l'ordre des enfants
+   dans le HTML n'a plus d'importance, chacun est posé par sa zone. */
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-w, 240px) 16px 1fr;
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
-    "sidebar resizer topbar"
-    "sidebar resizer filet"
+    "topbar  topbar  topbar"
+    "filet   filet   filet"
     "sidebar resizer main";
   height: 100vh;
   /* Android/Chrome : suit la hauteur réellement visible (barre d'adresse comprise) */
@@ -195,7 +195,7 @@ body {
 }
 
 /* ---------------------------------------------------------------- Barre du haut
-   Elle ne couvre plus que la colonne de droite (la marque vit dans le rail).
+   Pleine largeur : marque + navigation + recherche + actions, sur une rangée.
    `position: relative` est nécessaire pour que son `z-index` compte — c'est lui
    qui, pendant une recherche, garde le champ AU-DESSUS de l'assombrissement
    (voir `.topbar.searching`) et donc cliquable. */
@@ -204,19 +204,24 @@ body {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 10px 20px;
+  gap: 14px;
+  padding: 8px 16px;
   min-height: 64px;
   background: var(--surface);
 }
 
-/* La marque coiffe le rail : cliquable (retour planning), sans soulignement. */
+/* La marque coiffe la barre : cliquable (retour planning), sans soulignement.
+   Ne se comprime pas — c'est la recherche, au centre, qui absorbe la place. */
 .brand {
-  display: flex; align-items: center; gap: 12px; min-width: 0;
-  padding: 14px 16px 10px;
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 4px 6px;
+  flex-shrink: 0;
   color: inherit; text-decoration: none;
+  border-radius: var(--radius);
+  transition: background var(--dur-1) var(--ease);
 }
-.sidebar .brand { border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
+.brand:hover { background: var(--surface-hover); }
+.brand:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .brand-logo {
   width: 40px;
   height: 40px;
@@ -299,12 +304,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 auto;
+  margin: 0;
   padding: 0 14px;
   height: 44px;
   width: 100%;
-  max-width: 560px;
-  flex: 0 1 560px;
+  min-width: 0;
+  max-width: 520px;
+  flex: 1 1 220px;
   border-radius: 999px;
   background: var(--search-bg);
   color: var(--text-2);
@@ -385,18 +391,18 @@ body.sidebar-resizing { user-select: none; cursor: col-resize; }
 body.sidebar-resizing * { cursor: col-resize !important; }
 
 /* ---------------------------------------------------------------- Sidebar (rail)
-   Pleine hauteur à gauche (posée par la grille du .shell), avec son propre
-   défilement et un filet qui la sépare de la zone de travail. */
+   Sous la barre du haut, à gauche (posée par la grille du .shell). Ne porte plus
+   que les ÉTAPES du planning : courte, elle ne défile qu'en dernier recours.
+   Un filet la sépare de la zone de travail. */
 .sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 0 4px;
+  padding: 6px 0 4px;
   background: var(--surface);
   border-right: 1px solid var(--border);
 }
-.sidebar .nav-switch { padding-top: 4px; }
 .sidebar-head { padding: 12px 16px 6px; }
 .sidebar-head-label {
   font-size: 11px;
@@ -406,7 +412,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   color: var(--text-2);
 }
 
-.stages { padding: 0 8px 20px; display: flex; flex-direction: column; gap: 2px; }
+.stages { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 1px; }
 
 .stage {
   position: relative;
@@ -414,7 +420,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px;
+  padding: 8px 16px;
   border-radius: 999px;
   cursor: pointer;
   color: var(--text-1);
@@ -480,7 +486,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    reste aligné sur les familles), texte plus léger : hiérarchie claire, rail
    lisible. Une sous-catégorie active reprend la surbrillance pastel. */
 .stage.substage {
-  padding: 6px 16px 6px 30px;
+  padding: 5px 16px 5px 30px;
 }
 .stage.substage .stage-label {
   font-size: 12.5px;
@@ -2124,6 +2130,10 @@ button, a, .stage, .prio-pill, .deadline-badge,
 @media (max-width: 1280px) {
   .shell { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; }
   .app { padding: 12px; }
+  /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
+     la place aux onglets et à la recherche. */
+  .topbar { gap: 10px; }
+  .brand-text { display: none; }
   /* +240 px depuis l'ajout des colonnes « État » et « → », pour que les 3 colonnes
      de texte gardent la même largeur plancher qu'avant (~104 px) : sans ça elles
      se tassent au lieu de laisser la grille défiler horizontalement. */
@@ -2133,9 +2143,13 @@ button, a, .stage, .prio-pill, .deadline-badge,
 /* Portrait étroit : rail réduit, grille scrollable */
 @media (max-width: 900px) {
   .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
-  .topbar { gap: 12px; padding: 8px 12px; min-height: 56px; }
+  .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
   .grid-search { max-width: none; }
-  /* barre du haut serrée : bouton réduit à l'icône « + » */
+  /* barre du haut serrée : onglets réduits à leur icône, bouton à l'icône « + ». */
+  .nav-switch { gap: 2px; }
+  .nav-switch-label { display: none; }
+  .nav-switch-btn { padding: 8px; }
+  #viewCommande { padding-right: 8px; margin-right: 4px; }
   .btn-primary-label { display: none; }
   .topbar .btn-primary { padding: 10px; }
 }
@@ -2152,6 +2166,31 @@ button, a, .stage, .prio-pill, .deadline-badge,
     overflow: auto;
   }
   .topbar-filet { display: none; }
+  /* La barre du haut, le rail et la zone de travail ne suivent QUE la largeur de
+     l'écran : sans ce `min-width: 0`, la grille du planning (min-width 1180) les
+     étirerait tous et pousserait les boutons hors de l'écran. Seule la grille
+     défile horizontalement, dans son propre cadre (.grid-wrap). */
+  .topbar, .app, .sidebar { min-width: 0; }
+  /* La barre du haut se plie en deux lignes : 1re ligne = marque + recherche +
+     bouton + actions ; 2e ligne = les onglets, pleine largeur, défilables au
+     doigt. On pose des `order` explicites pour que le pli soit net (la recherche
+     ne prend plus toute la ligne). */
+  .topbar { flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
+  .grid-search { order: 1; width: auto; flex: 1 1 100px; min-width: 0; max-width: none; }
+  #btnNew { order: 2; }
+  .topbar-right { order: 3; }
+  .nav-switch {
+    order: 4;
+    flex: 1 0 100%;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+  .nav-switch-btn { flex: 0 0 auto; padding: 8px 12px; }
+  .nav-switch-label { display: inline; }
+  #viewCommande { padding-right: 12px; margin-right: 6px; }
   /* rail empilé au-dessus de la zone de travail : pas de poignée horizontale */
   .sidebar-resizer { display: none; }
   .sidebar {
@@ -2159,7 +2198,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
-  .sidebar .brand { padding: 10px 14px 8px; }
   .app { padding: 12px; overflow: visible; }
   .work-head { padding: 14px 16px; }
   .grid-search-kbd { display: none; }
@@ -2231,6 +2269,9 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .stage { padding: 12px 16px; }
   .stage-label { font-size: 14.5px; }
 
+  /* Onglets de navigation : cible tactile plancher 44 px. */
+  .nav-switch-btn { min-height: 44px; }
+
   .btn-primary { padding: 12px 20px 12px 16px; font-size: 15px; }
   .icon-btn { width: 46px; height: 46px; }
 }
@@ -2239,22 +2280,23 @@ button, a, .stage, .prio-pill, .deadline-badge,
    ONGLET DASHBOARD
    =========================================================================== */
 
-/* Commutateur Planning / Dashboard en haut du rail. */
-/* Navigation de l'outil, en tête du rail. Entrées empilées : les libellés
-   (« Base clients », « Dashboard ») ne tiennent pas côte à côte. */
+/* Navigation de l'outil, dans la barre du haut : onglets sur une rangée.
+   Ne se comprime pas — les libellés se replient en icônes seules quand la barre
+   se resserre (voir les media queries plus bas). */
 .nav-switch {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--border-soft);
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  flex-shrink: 0;
 }
 .nav-switch-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   min-height: 40px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
@@ -2262,6 +2304,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   font: inherit;
   font-size: 13.5px;
   font-weight: 600;
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -2275,15 +2318,15 @@ button, a, .stage, .prio-pill, .deadline-badge,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
-/* Les deux entrées de saisie (Demande / Commande) sont le premier pas : posées
-   en tête, un peu plus présentes, et séparées du reste par un filet. */
+/* Les deux entrées de saisie (Demande / Commande) sont le premier pas : un peu
+   plus présentes, et détachées du reste par un filet vertical. */
 .nav-switch-btn--intake {
   color: var(--text-1);
   background: var(--surface-hover);
 }
 .nav-switch-btn--intake .material-symbols-outlined { color: var(--primary); }
-/* Filet sous la 2e entrée de saisie (Commande), pour la détacher du reste. */
-#viewCommande { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); }
+/* Filet à droite de la 2e entrée de saisie (Commande), pour la détacher du reste. */
+#viewCommande { margin-right: 6px; padding-right: 14px; border-right: 1px solid var(--border-soft); border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
 /* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
    fonctionne ; affiché seulement quand il n'est pas masqué. */
@@ -2300,18 +2343,30 @@ button, a, .stage, .prio-pill, .deadline-badge,
 body.view-dashboard .work-head,
 body.view-dashboard .grid-wrap,
 body.view-dashboard .fiverr-tool,
-body.view-dashboard .sidebar-head,
-body.view-dashboard #stages,
 body.view-commande .work-head,
 body.view-commande .grid-wrap,
 body.view-commande .fiverr-tool,
-body.view-commande .sidebar-head,
-body.view-commande #stages,
 body.view-clients .work-head,
 body.view-clients .grid-wrap,
-body.view-clients .fiverr-tool,
-body.view-clients .sidebar-head,
-body.view-clients #stages { display: none !important; }
+body.view-clients .fiverr-tool { display: none !important; }
+
+/* Hors Planning, le rail des étapes n'a rien à montrer : on le replie et la
+   zone de travail prend TOUTE la largeur (dashboard, prise de commande, CRM). */
+body.view-dashboard .shell,
+body.view-commande .shell,
+body.view-clients .shell {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "filet"
+    "main";
+}
+body.view-dashboard .sidebar,
+body.view-dashboard .sidebar-resizer,
+body.view-commande .sidebar,
+body.view-commande .sidebar-resizer,
+body.view-clients .sidebar,
+body.view-clients .sidebar-resizer { display: none; }
 
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */

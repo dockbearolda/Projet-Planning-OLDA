@@ -29,36 +29,12 @@
 </head>
 <body>
   <div class="shell">
-    <!-- Barre du haut : elle ne couvre plus que la zone de travail (à droite du
-         rail). La marque a rejoint le sommet du rail latéral, pleine hauteur. -->
+    <!-- Barre du haut PLEINE LARGEUR : la marque, la navigation de l'outil
+         (Demande · Commande · Planning · Dashboard · Base clients), la recherche
+         globale et les actions. Le rail latéral, dessous, ne porte plus que les
+         étapes du planning — il n'a donc plus à défiler. -->
     <header class="topbar">
-      <button class="btn-primary" id="btnNew" type="button">
-        <span class="material-symbols-outlined" aria-hidden="true">add</span>
-        <span class="btn-primary-label">Nouvelle commande</span>
-      </button>
-
-      <div class="grid-search" id="gridSearch">
-        <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
-        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
-        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
-        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
-      </div>
-
-      <div class="topbar-right">
-        <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Passer en plein écran" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
-        </button>
-        <button class="icon-btn" id="themeToggle" type="button" aria-label="Basculer clair / sombre">
-          <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
-        </button>
-        <span class="avatar" aria-hidden="true">O</span>
-      </div>
-    </header>
-    <div class="topbar-filet" aria-hidden="true"></div>
-
-    <!-- Rail latéral PLEINE HAUTEUR : placé tout à gauche par la grille du
-         .shell (quel que soit son ordre dans le HTML). La marque le coiffe. -->
-    <aside class="sidebar" id="sidebar">
+      <!-- La marque coiffe la barre : cliquable (retour planning), sans soulignement. -->
       <a class="brand" id="brandHome" href="#planning" aria-label="Planning OLDA — aller au planning">
         <span class="brand-logo" id="brandLogo" aria-hidden="true">
           <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
@@ -74,12 +50,12 @@
           <span class="brand-sub" id="todayDate"></span>
         </div>
       </a>
-      <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
-           dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
+
+      <!-- Navigation de l'outil, désormais dans la barre du haut. Le hash de
+           l'URL fait foi (voir applyHash dans app.js) : un seul pilote, donc pas
+           de vue qui se contredit. Demande / Commande = le premier pas du client
+           (deux entrées distinctes) ; Base clients (CRM) = le socle. -->
       <nav class="nav-switch" aria-label="Navigation">
-        <!-- Le premier pas du client : deux entrées distinctes, tout en haut,
-             pour saisir en un tap une Demande (à chiffrer) ou une Commande
-             (déjà validée). Les deux ouvrent la même fiche rapide. -->
         <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
           <span class="material-symbols-outlined" aria-hidden="true">help</span>
           <span class="nav-switch-label">Demande</span>
@@ -96,14 +72,42 @@
           <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
           <span class="nav-switch-label">Dashboard</span>
         </a>
-        <!-- Base clients (CRM) : la fiche pro de référence, éditable, qui
-             alimente la prise de commande. Épinglée en bas, avant les
-             réglages, comme un socle de l'outil. -->
         <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
           <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
           <span class="nav-switch-label">Base clients</span>
         </a>
       </nav>
+
+      <div class="grid-search" id="gridSearch">
+        <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
+        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
+        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
+        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
+      </div>
+
+      <button class="btn-primary" id="btnNew" type="button">
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        <span class="btn-primary-label">Nouvelle commande</span>
+      </button>
+
+      <div class="topbar-right">
+        <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Passer en plein écran" hidden>
+          <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
+        </button>
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Basculer clair / sombre">
+          <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
+        </button>
+        <span class="avatar" aria-hidden="true">O</span>
+      </div>
+    </header>
+    <div class="topbar-filet" aria-hidden="true"></div>
+
+    <!-- Rail latéral : sous la barre du haut, à gauche. Il ne porte plus que les
+         ÉTAPES du planning (la navigation de l'outil est passée dans la barre du
+         haut). Il reste donc court et n'a plus besoin de défiler. Masqué hors du
+         planning (voir le repli du .shell) pour laisser la zone de travail
+         prendre toute la largeur. -->
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-head" id="sidebarHead">
         <span class="sidebar-head-label">Étapes</span>
       </div>
