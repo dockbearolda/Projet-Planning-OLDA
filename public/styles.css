@@ -2974,39 +2974,8 @@ body.view-commande #btnNew { display: none !important; }
   font-weight: 800;
   text-align: center;
 }
-.pj-day-cards { display: flex; flex-direction: column; gap: 7px; }
-.pj-card--day { padding: 9px 13px; gap: 5px; }
-.pj-card--day .pj-card-next { padding-left: 2px; }
-.pj-card-next {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  margin-top: 2px;
-  padding-top: 9px;
-  border-top: 1px solid var(--pj-border-soft);
-}
-.pj-card-next .material-symbols-outlined { font-size: 16px; color: var(--pj-soon); flex-shrink: 0; }
-.pj-card-next-label {
-  flex-shrink: 0;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--pj-soon-deep);
-}
-.pj-card-next-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--pj-ink-2);
-}
 .pj-mini-list { display: flex; flex-direction: column; gap: 7px; }
-.pj-card--mini { padding: 10px 13px; }
-.pj-card--mini, .pj-card--day { min-height: 44px; justify-content: center; }
+.pj-card--mini { padding: 10px 13px; min-height: 44px; justify-content: center; }
 .pj-card-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .pj-card-row .pj-card-client { flex: 0 1 auto; max-width: 45%; font-size: 13px; }
 .pj-card-row .pj-card-article { flex: 1; }
@@ -3455,6 +3424,142 @@ body.wall-open { overflow: hidden; }
 .wall-row-who { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
 .wall-row-who .pj-avatar { width: 30px; height: 30px; font-size: 13px; }
 .wall-row-name { font-size: 15px; font-weight: 700; color: #CBD5E1; }
+
+/* ------------------------------------------------ À faire maintenant (file) */
+.pj-todo { display: flex; flex-direction: column; gap: 22px; }
+.pj-todo-sec { display: flex; flex-direction: column; }
+.pj-todo-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Carte de file : rang à gauche, contenu + « pourquoi » à droite. */
+.pj-todo-card { flex-direction: row; align-items: stretch; gap: 12px; padding: 11px 13px 11px 11px; }
+.pj-todo-rank {
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--pj-neutral-bg);
+  color: var(--pj-ink-3);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pj-todo-card.u-late .pj-todo-rank { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-todo-card.u-soon .pj-todo-rank { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
+.pj-todo-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.pj-todo-why { display: flex; flex-wrap: wrap; gap: 6px; }
+.pj-todo-why-chip {
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--pj-soon-bg);
+  color: var(--pj-soon-deep);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+/* Le motif le plus fort (échéance) en tête, teinté « accent ». */
+.pj-todo-why-chip:first-child { background: var(--pj-chip-bg); color: var(--pj-chip-ink); }
+.pj-todo-pilot { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
+.pj-todo-pilot-name { font-size: 12px; font-weight: 700; color: var(--pj-ink-2); }
+
+/* Bac « à débloquer / relancer » : ce qui attend quelqu'un d'autre. */
+.pj-todo-hold { margin-top: 2px; }
+.pj-hold-list { display: flex; flex-direction: column; gap: 7px; }
+.pj-hold-card { border-left-color: var(--pj-neutral); }
+.pj-hold-card.is-bloque { border-left-color: var(--pj-late); }
+.pj-hold-card.is-attente { border-left-color: var(--pj-soon); }
+.pj-hold-card .pj-card-row { flex-wrap: wrap; row-gap: 4px; }
+.pj-hold-tag {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.pj-hold-tag.t-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-hold-tag.t-attente { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
+.pj-hold-why {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pj-ink-3);
+}
+
+/* Motif de priorité sur l'écran mural (sous l'article). */
+.wall-row-why { font-size: 13px; font-weight: 700; color: #FBBF24; }
+
+/* ------------------------------------------------ Réglages Machines */
+.mac-card { width: min(640px, 100%); }
+.mac-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.mac-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.mac-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mac-field--name { flex: 1 1 170px; }
+.mac-field--imp { flex: 1 1 150px; }
+.mac-field--dur { flex: 0 1 130px; }
+.mac-name, .mac-dur {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 14px;
+}
+.mac-name:focus-visible, .mac-dur:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.mac-imp { width: 100%; min-height: 40px; accent-color: var(--pj-accent); cursor: pointer; }
+.mac-remove {
+  flex-shrink: 0;
+  align-self: flex-end;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.mac-remove:hover { background: var(--pj-late-bg); color: var(--pj-late); border-color: transparent; }
+.mac-add {
+  align-self: flex-start;
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--pj-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mac-add:hover { background: var(--surface-hover); border-color: var(--pj-accent); }
 
 /* ------------------------------------------------ Responsive Point du jour */
 @media (max-width: 1100px) {

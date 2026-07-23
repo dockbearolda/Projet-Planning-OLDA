@@ -492,10 +492,83 @@ async function setCategoryReferents(map) {
   return clean;
 }
 
+// --- Registre des MACHINES (réglages du patron) ------------------------------
+// Chaque poste de production porte deux leviers, réglés dans le dashboard :
+//   - `importance` (1..5) : poids de priorité. Une machine « goulot » (importance
+//     haute) fait remonter les commandes qui passent par elle dans la file
+//     « À faire maintenant ». 3 = neutre.
+//   - `minutesPerUnit` : durée de fabrication indicative (min/pièce), FACULTATIVE
+//     (null tant qu'elle n'est pas renseignée) — réservée à l'estimation de charge.
+// Le `slug` fait le lien avec la sous-étape de production (prod_dtf → dtf, etc.)
+// et la technique de la fiche ; il est stable, le libellé peut changer.
+// Stocké en clé/valeur applicative (app_meta.machines, tableau JSON), comme les
+// autres réglages. Absent → on sert la liste par défaut (les 4 postes du flux).
+const DEFAULT_MACHINES = [
+  { slug: 'dtf', name: 'DTF', importance: 3, minutesPerUnit: null },
+  { slug: 'presse', name: 'Presse', importance: 3, minutesPerUnit: null },
+  { slug: 'trotec', name: 'Trotec', importance: 3, minutesPerUnit: null },
+  { slug: 'uv', name: 'UV', importance: 3, minutesPerUnit: null },
+];
+
+// Clé stable à partir d'un libellé : minuscules, sans accents, alphanumérique.
+function slugify(s) {
+  return String(s)
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// Normalise une entrée machine reçue du client (défensif : le patron édite à la
+// main). Renvoie null si inexploitable (nom vide).
+function cleanMachine(m, index) {
+  if (!m || typeof m !== 'object') return null;
+  const name = String(m.name == null ? '' : m.name).trim().slice(0, 40);
+  if (!name) return null;
+  const slug = (typeof m.slug === 'string' && slugify(m.slug)) || slugify(name) || `machine-${index + 1}`;
+  let importance = Number.parseInt(m.importance, 10);
+  if (!Number.isInteger(importance)) importance = 3;
+  importance = Math.min(5, Math.max(1, importance));
+  let minutesPerUnit = null;
+  if (m.minutesPerUnit != null && m.minutesPerUnit !== '') {
+    const n = Number(m.minutesPerUnit);
+    if (Number.isFinite(n) && n > 0) minutesPerUnit = Math.round(n * 10) / 10;
+  }
+  return { slug, name, importance, minutesPerUnit };
+}
+
+async function getMachines() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'machines'");
+  if (!rows[0]) return DEFAULT_MACHINES.map((m) => ({ ...m }));
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    if (!Array.isArray(parsed)) return DEFAULT_MACHINES.map((m) => ({ ...m }));
+    const clean = parsed.map(cleanMachine).filter(Boolean);
+    return clean.length ? clean : DEFAULT_MACHINES.map((m) => ({ ...m }));
+  } catch (_) {
+    return DEFAULT_MACHINES.map((m) => ({ ...m }));
+  }
+}
+
+async function setMachines(list) {
+  const seen = new Set();
+  const clean = [];
+  const raw = Array.isArray(list) ? list : [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const m = cleanMachine(raw[i], i);
+    if (!m || seen.has(m.slug)) continue;   // slug unique : premier gagne
+    seen.add(m.slug);
+    clean.push(m);
+  }
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'machines'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('machines', $1)", [value]);
+  return clean;
+}
+
 module.exports = {
   pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
+  DEFAULT_MACHINES, getMachines, setMachines,
 };

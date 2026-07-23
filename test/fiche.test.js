@@ -10,10 +10,14 @@ const assert = require('node:assert');
 delete process.env.DATABASE_URL;
 delete process.env.APP_PASSWORD;
 
+// Date civile LOCALE à J+n — MÊME convention que le serveur (todayPlus), qui
+// raisonne en local (atelier aux Antilles, UTC-4). `toISOString()` basculerait
+// en UTC : en soirée locale il rend déjà le lendemain, et « iso(0) » ne serait
+// plus vu comme aujourd'hui par le serveur (le taux express passerait à côté).
 const iso = (days) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 (async () => {

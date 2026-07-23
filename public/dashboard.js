@@ -18,6 +18,8 @@
 // (/api/category-referents) : les référents effectifs d'une commande sont son
 // `referent` s'il a été saisi à la main, sinon ceux de sa catégorie.
 
+import { rankRequests } from './priority.js';
+
 export function createDashboard(deps) {
   const {
     root, api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
@@ -69,10 +71,11 @@ export function createDashboard(deps) {
   let rows = [];                // toutes les commandes (cache, resynchro SSE)
   let owners = {};              // { slugCatégorie: employé } (pilote par défaut)
   let catRefs = {};             // { slugCatégorie: [employés] } (référents par défaut)
+  let machines = [];            // [{ slug, name, importance, minutesPerUnit }] (réglages patron)
   let loaded = false;
 
-  // 'team' | prénom.
-  let activeTab = 'team';
+  // 'todo' (à faire maintenant) | 'team' | prénom.
+  let activeTab = 'todo';
 
   let kpiFilter = null;         // null | 'late' | 'soon' | 'waiting' | 'active'
   let searchQuery = '';
@@ -278,7 +281,7 @@ export function createDashboard(deps) {
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
   // --- Cartes --------------------------------------------------------------
-  // variant : 'board' (colonne équipe) | 'day' (Ma journée) | 'mini' (une ligne).
+  // variant : 'board' (colonne équipe) | 'mini' (une ligne).
   function buildCard(r, role, variant) {
     const u = urgency(r);
     const b = el('button', `pj-card pj-card--${variant} u-${u.cls}`);
@@ -286,9 +289,8 @@ export function createDashboard(deps) {
     if (isDimmed(r)) b.classList.add('is-dim');
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
-    if (variant === 'mini' || variant === 'day') {
+    if (variant === 'mini') {
       // Une ligne : étoiles · client · article · alerte · échéance.
-      // En « Ma journée » on ajoute dessous la prochaine action.
       const row = el('div', 'pj-card-row');
       row.append(starsEl(r, 'mini'), el('span', 'pj-card-client', clientName(r)),
         el('span', 'pj-card-article', articleOf(r)));
@@ -296,12 +298,6 @@ export function createDashboard(deps) {
       if (f) row.appendChild(f);
       row.appendChild(badgeEl(r));
       b.appendChild(row);
-      if (variant === 'day') {
-        const na = el('div', 'pj-card-next');
-        na.append(icon('bolt'), el('span', 'pj-card-next-label', 'Prochaine action'),
-          el('span', 'pj-card-next-text', nextActionOf(r)));
-        b.appendChild(na);
-      }
     } else {
       const top = el('div', 'pj-card-top');
       top.append(starsEl(r), el('span', 'pj-card-client', clientName(r)), badgeEl(r));
@@ -365,6 +361,14 @@ export function createDashboard(deps) {
     attachTip(act, 'Ce qui a bougé');
     act.addEventListener('click', openActivity);
     row.appendChild(act);
+
+    // Machines (réglages du patron : importance + durée de fabrication).
+    const mach = el('button', 'pj-tool pj-tool--icon');
+    mach.type = 'button';
+    mach.appendChild(icon('precision_manufacturing'));
+    attachTip(mach, 'Machines — priorité & durée');
+    mach.addEventListener('click', openMachines);
+    row.appendChild(mach);
 
     // Attribution des catégories (config du patron).
     const gear = el('button', 'pj-tool pj-tool--icon');
@@ -438,6 +442,12 @@ export function createDashboard(deps) {
       $tabs.appendChild(b);
       return b;
     };
+    // « À faire » : la file commune, en tête. Point rouge s'il y a du retard.
+    const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque'
+      && r.stage !== 'attente_client' && urgency(r).band === 0);
+    const todo = mkTab('todo', 'À faire', todoLate);
+    todo.addEventListener('click', () => { activeTab = 'todo'; renderHead(); renderBody(); });
+
     const hasLate = (who) => who && dayList(who).some((r) => urgency(r).band === 0);
     for (const who of EMPLOYEES) {
       const t = mkTab(who, who, hasLate(who));
@@ -481,22 +491,21 @@ export function createDashboard(deps) {
   function buildPersonView(who) {
     const wrap = el('div', 'pj-person');
 
-    // Ma journée : le plus pressant (retards, échéances proches, à planifier,
-    // « À commander »), en liste, avec la prochaine action.
-    const day = dayList(who).filter((r) => {
-      const b = urgency(r).band;
-      return b === 0 || b === 1 || b === 3 || r.sub_stage === 'a_commander';
-    }).slice(0, 8);
+    // Ma file : le MÊME moteur de priorité, filtré à mes commandes (pilote ou
+    // référent). Classée par urgence/priorité/machine/stagnation, avec le pourquoi.
+    const { queue } = rankFor(who);
+    const mine = queue.slice(0, 10);
 
     const main = el('section', 'pj-person-main');
     const mh = el('header', 'pj-section-head');
-    mh.append(icon('wb_sunny'), el('h2', 'pj-section-title', 'Ma journée'), el('span', 'pj-section-count', String(day.length)));
+    mh.append(icon('playlist_play'), el('h2', 'pj-section-title', 'Ma file — à faire maintenant'),
+      el('span', 'pj-section-count', String(queue.length)));
     main.appendChild(mh);
-    if (!day.length) {
-      main.appendChild(el('p', 'pj-empty', 'Rien d’urgent pour le moment.'));
+    if (!mine.length) {
+      main.appendChild(el('p', 'pj-empty', 'Rien à lancer — tout est à jour.'));
     } else {
-      const list = el('div', 'pj-day-cards');
-      for (const r of day) list.appendChild(buildCard(r, roleOf(r, who), 'day'));
+      const list = el('div', 'pj-todo-list');
+      mine.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
       main.appendChild(list);
     }
     wrap.appendChild(main);
@@ -541,11 +550,110 @@ export function createDashboard(deps) {
     if (!$body) return;
     $body.replaceChildren();
     if (!loaded) { $body.appendChild(el('p', 'pj-empty', 'Chargement du planning…')); return; }
-    if (activeTab === 'team') {
+    if (activeTab === 'todo') {
+      $body.appendChild(buildTodoView());
+    } else if (activeTab === 'team') {
       $body.appendChild(buildTeamView());
     } else {
       $body.appendChild(buildPersonView(activeTab));
     }
+  }
+
+  // --- Vue « À faire maintenant » : la file classée par le moteur -----------
+  // Rang · étoiles · client · article · POURQUOI · pilote. Un clic ouvre le
+  // détail (mêmes actions : envoyer vers, marquer traité). `who` filtre à une
+  // personne (vue perso) ; sinon toute l'équipe.
+  function rankFor(who) {
+    const base = who ? rows.filter((r) => effectivePilot(r) === who || effectiveReferents(r).includes(who)) : rows;
+    return rankRequests(base, machines, { now: Date.now() });
+  }
+
+  function buildTodoCard(item, index) {
+    const { r, reasons } = item;
+    const u = urgency(r);
+    const b = el('button', `pj-card pj-todo-card u-${u.cls}`);
+    b.type = 'button';
+    if (isDimmed(r)) b.classList.add('is-dim');
+    if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
+
+    b.appendChild(el('span', 'pj-todo-rank', String(index + 1)));
+
+    const main = el('div', 'pj-todo-main');
+    const top = el('div', 'pj-card-top');
+    top.append(starsEl(r, 'mini'), el('span', 'pj-card-client', clientName(r)), badgeEl(r));
+    main.appendChild(top);
+    main.appendChild(el('p', 'pj-card-article', articleOf(r)));
+
+    if (reasons && reasons.length) {
+      const why = el('div', 'pj-todo-why');
+      for (const t of reasons) why.appendChild(el('span', 'pj-todo-why-chip', t));
+      main.appendChild(why);
+    }
+
+    const meta = el('div', 'pj-card-meta');
+    meta.appendChild(catChips(r));
+    const pilot = effectivePilot(r);
+    const who = el('span', 'pj-todo-pilot');
+    who.append(avatarEl(pilot), el('span', 'pj-todo-pilot-name', pilot || 'À attribuer'));
+    meta.appendChild(who);
+    main.appendChild(meta);
+
+    b.appendChild(main);
+    b.addEventListener('click', () => openDetail(r.id));
+    return b;
+  }
+
+  // Carte compacte du bac « à débloquer / relancer » (hors file : on attend qqn).
+  function buildHoldCard(r, kind) {
+    const b = el('button', 'pj-card pj-card--mini pj-hold-card ' + (kind === 'bloque' ? 'is-bloque' : 'is-attente'));
+    b.type = 'button';
+    if (isDimmed(r)) b.classList.add('is-dim');
+    const row = el('div', 'pj-card-row');
+    row.append(
+      el('span', 'pj-hold-tag ' + (kind === 'bloque' ? 't-bloque' : 't-attente'), kind === 'bloque' ? 'BLOQUÉE' : 'RELANCER'),
+      el('span', 'pj-card-client', clientName(r)),
+      el('span', 'pj-card-article', articleOf(r)),
+    );
+    const why = kind === 'bloque' ? (r.flag_reason || 'Sans motif précisé') : 'En attente d’une réponse du client';
+    row.appendChild(el('span', 'pj-hold-why', why));
+    b.appendChild(row);
+    b.addEventListener('click', () => openDetail(r.id));
+    return b;
+  }
+
+  function buildTodoView(who) {
+    const wrap = el('div', 'pj-todo');
+    const { queue, blocked, waiting } = rankFor(who);
+
+    const main = el('section', 'pj-todo-sec');
+    const mh = el('header', 'pj-section-head');
+    mh.append(icon('playlist_play'),
+      el('h2', 'pj-section-title', who ? 'Ma file — à faire maintenant' : 'À faire maintenant'),
+      el('span', 'pj-section-count', String(queue.length)));
+    main.appendChild(mh);
+    if (!queue.length) {
+      main.appendChild(el('p', 'pj-empty', 'Rien à lancer — tout est à jour.'));
+    } else {
+      const list = el('div', 'pj-todo-list');
+      queue.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
+      main.appendChild(list);
+    }
+    wrap.appendChild(main);
+
+    // Bac « à débloquer / relancer » : ce qui attend quelqu'un d'autre, à part.
+    if (blocked.length || waiting.length) {
+      const sec = el('section', 'pj-todo-sec pj-todo-hold');
+      const h = el('header', 'pj-section-head');
+      h.append(icon('pause_circle'), el('h2', 'pj-section-title', 'À débloquer / relancer'),
+        el('span', 'pj-section-count', String(blocked.length + waiting.length)));
+      sec.appendChild(h);
+      const list = el('div', 'pj-hold-list');
+      for (const r of blocked) list.appendChild(buildHoldCard(r, 'bloque'));
+      for (const r of waiting) list.appendChild(buildHoldCard(r, 'attente'));
+      sec.appendChild(list);
+      wrap.appendChild(sec);
+    }
+    return wrap;
   }
 
   function renderAll() {
@@ -926,7 +1034,7 @@ export function createDashboard(deps) {
     $wallDots = [0, 1].map((i) => {
       const d = el('button', 'wall-dot');
       d.type = 'button';
-      d.setAttribute('aria-label', i === 0 ? 'Écran équipe' : 'Écran retards');
+      d.setAttribute('aria-label', i === 0 ? 'Écran équipe' : 'Écran à faire');
       d.addEventListener('click', () => setWallScreen(i, true));
       dots.appendChild(d);
       return d;
@@ -1022,21 +1130,24 @@ export function createDashboard(deps) {
     }
     a.appendChild(board);
 
-    // Écran B : retards & à planifier, en grandes lignes lisibles à 3 m.
+    // Écran B : la file « À faire maintenant » du moteur, en grandes lignes
+    // lisibles à 3 m, avec le premier motif (« En retard de 2 j »…).
     const b = $wallScreens[1];
     b.replaceChildren();
-    b.appendChild(el('h2', 'wall-b-title', 'Retards & à planifier'));
-    const urgent = sortCards(rows.filter((r) => isActive(r) && (urgency(r).band === 0 || urgency(r).band === 3)));
-    if (!urgent.length) {
-      b.appendChild(el('p', 'wall-b-empty', 'Aucun retard — tout roule.'));
+    b.appendChild(el('h2', 'wall-b-title', 'À faire maintenant'));
+    const ranked = rankRequests(rows, machines, { now: Date.now() }).queue;
+    if (!ranked.length) {
+      b.appendChild(el('p', 'wall-b-empty', 'Rien à lancer — tout roule.'));
     } else {
       const list = el('div', 'wall-b-list');
-      for (const r of urgent.slice(0, 8)) {
+      for (const item of ranked.slice(0, 8)) {
+        const r = item.r;
         const u = urgency(r);
         const line = el('div', `wall-row u-${u.cls}`);
         line.appendChild(starsEl(r));
         const main = el('div', 'wall-row-main');
         main.append(el('span', 'wall-row-client', clientName(r)), el('span', 'wall-row-article', articleOf(r)));
+        if (item.reasons && item.reasons.length) main.appendChild(el('span', 'wall-row-why', item.reasons[0]));
         line.appendChild(main);
         line.appendChild(el('span', `pj-badge u-${u.cls}`, u.label));
         const pilot = effectivePilot(r);
@@ -1045,7 +1156,7 @@ export function createDashboard(deps) {
         line.appendChild(who);
         list.appendChild(line);
       }
-      if (urgent.length > 8) list.appendChild(el('div', 'wall-more', `+ ${urgent.length - 8} autres`));
+      if (ranked.length > 8) list.appendChild(el('div', 'wall-more', `+ ${ranked.length - 8} autres`));
       b.appendChild(list);
     }
   }
@@ -1158,6 +1269,123 @@ export function createDashboard(deps) {
     });
   }
 
+  // --- Réglages « Machines » (config du patron) ----------------------------
+  // Deux leviers par poste : IMPORTANCE (curseur 1..5 → remonte les commandes
+  // dans « À faire maintenant ») et DURÉE de fabrication (min/pièce, facultative).
+  // On édite une copie de travail et on enregistre l'ensemble à chaque change ;
+  // le SSE resynchronise les autres postes.
+  function openMachines() {
+    const overlay = el('div', 'cat-overlay');
+    const card = el('div', 'cat-card mac-card');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+
+    const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 180); };
+
+    const closeBtn = el('button', 'cat-close');
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Fermer');
+    closeBtn.appendChild(icon('close'));
+    closeBtn.addEventListener('click', close);
+
+    const title = el('h2', 'cat-title', 'Machines');
+    const desc = el('p', 'cat-desc', 'Par poste : une IMPORTANCE (plus elle est haute, plus ses commandes remontent dans « À faire maintenant ») et une DURÉE de fabrication indicative, facultative. Ces réglages pèsent partout, en temps réel.');
+    card.append(closeBtn, title, desc);
+
+    // Copie de travail : on édite `work`, on enregistre l'ensemble à chaque change.
+    const work = machines.map((m) => ({ ...m }));
+    const list = el('div', 'mac-list');
+
+    const save = () => {
+      api('PUT', '/api/machines', work)
+        .then((saved) => { machines = Array.isArray(saved) ? saved : []; renderAll(); })
+        .catch(() => { showToast('Échec de l’enregistrement des machines'); refresh(); });
+    };
+
+    function mkMachineRow(m, i) {
+      const rowEl = el('div', 'mac-row');
+
+      const nameField = el('label', 'mac-field mac-field--name');
+      nameField.appendChild(el('span', 'cat-field-label', 'Machine'));
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.className = 'mac-name';
+      name.value = m.name || '';
+      name.placeholder = 'Nom du poste';
+      name.addEventListener('change', () => { m.name = name.value.trim(); save(); });
+      nameField.appendChild(name);
+      rowEl.appendChild(nameField);
+
+      const impField = el('label', 'mac-field mac-field--imp');
+      const impLabel = el('span', 'cat-field-label', `Importance ${m.importance}`);
+      impField.appendChild(impLabel);
+      const imp = document.createElement('input');
+      imp.type = 'range';
+      imp.className = 'mac-imp';
+      imp.min = '1'; imp.max = '5'; imp.step = '1';
+      imp.value = String(m.importance || 3);
+      imp.addEventListener('input', () => { impLabel.textContent = `Importance ${imp.value}`; });
+      imp.addEventListener('change', () => { m.importance = parseInt(imp.value, 10); save(); });
+      impField.appendChild(imp);
+      rowEl.appendChild(impField);
+
+      const durField = el('label', 'mac-field mac-field--dur');
+      durField.appendChild(el('span', 'cat-field-label', 'Durée (min/pièce)'));
+      const dur = document.createElement('input');
+      dur.type = 'number';
+      dur.className = 'mac-dur';
+      dur.min = '0'; dur.step = '0.5';
+      dur.value = m.minutesPerUnit == null ? '' : String(m.minutesPerUnit);
+      dur.placeholder = '—';
+      dur.addEventListener('change', () => {
+        const v = dur.value.trim();
+        const n = Number(v);
+        m.minutesPerUnit = (v === '' || !Number.isFinite(n) || n <= 0) ? null : n;
+        save();
+      });
+      durField.appendChild(dur);
+      rowEl.appendChild(durField);
+
+      const rm = el('button', 'mac-remove');
+      rm.type = 'button';
+      rm.setAttribute('aria-label', `Retirer ${m.name || 'la machine'}`);
+      rm.appendChild(icon('delete'));
+      rm.addEventListener('click', () => { work.splice(i, 1); renderRows(); save(); });
+      rowEl.appendChild(rm);
+
+      return rowEl;
+    }
+
+    function renderRows() {
+      list.replaceChildren();
+      if (!work.length) {
+        list.appendChild(el('p', 'pj-empty', 'Aucune machine — ajoutez-en une.'));
+        return;
+      }
+      work.forEach((m, i) => list.appendChild(mkMachineRow(m, i)));
+    }
+
+    renderRows();
+    card.appendChild(list);
+
+    const add = el('button', 'mac-add');
+    add.type = 'button';
+    add.append(icon('add'), el('span', null, 'Ajouter une machine'));
+    add.addEventListener('click', () => {
+      work.push({ slug: '', name: '', importance: 3, minutesPerUnit: null });
+      renderRows();
+    });
+    card.appendChild(add);
+
+    overlay.appendChild(card);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape' && document.body.contains(overlay)) { close(); document.removeEventListener('keydown', esc); }
+    });
+  }
+
   // --- Données -------------------------------------------------------------
   let refreshing = false, refreshQueued = false;
 
@@ -1165,10 +1393,11 @@ export function createDashboard(deps) {
     if (refreshing) { refreshQueued = true; return; }
     refreshing = true;
     try {
-      const [reqs, own, refs] = await Promise.all([
+      const [reqs, own, refs, macs] = await Promise.all([
         api('GET', '/api/requests'),
         api('GET', '/api/category-owners'),
         api('GET', '/api/category-referents'),
+        api('GET', '/api/machines'),
       ]);
       const fresh = Array.isArray(reqs) ? reqs : [];
       // Diff pour le fil d'activité (seulement après le premier chargement).
@@ -1179,6 +1408,7 @@ export function createDashboard(deps) {
       rows = fresh;
       owners = own && typeof own === 'object' ? own : {};
       catRefs = refs && typeof refs === 'object' ? refs : {};
+      machines = Array.isArray(macs) ? macs : [];
       loaded = true;
       renderAll();
     } catch (_) {
