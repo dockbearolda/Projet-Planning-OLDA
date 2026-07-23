@@ -683,9 +683,16 @@ async function upsertClientFromCommande(cl) {
 
 // ---------------------------------------------------------------------------
 // Prise de commande atelier — POST /api/commande
-// La saisie de Mélina : on tranche DEMANDE ou COMMANDE dès le départ, on liste
-// les articles (vêtement, référence, couleur, taille) et, pour chacun, les zones
-// d'impression avec leur consigne (« Cœur : Les Doudous à SXM »).
+// La saisie du comptoir, EN FACE DU CLIENT : elle doit tenir en 30 à 45 secondes.
+// On tranche DEMANDE ou COMMANDE dès le départ, puis :
+//   - le CONTACT, en deux formes exclusives — PRO (nom de facturation, contact,
+//     WhatsApp, email) ou PERSO (prénom, nom, WhatsApp) ;
+//   - la DEMANDE : objet, description, délai choisi d'un tap (3 / 5 / 10 / 15 j) ;
+//   - les PRODUITS, en trois familles indépendantes qu'on n'ouvre que si besoin :
+//     TASSES (réf, coloris, face 1 anse à droite / face 2 anse à gauche, options,
+//     typo), TEXTILE (réf, coloris, taille, placements + consignes) et
+//     OBJETS (réf, TROTEC / UV / autre, info de personnalisation) ;
+//   - le PAIEMENT : non payé / acompte / payé, et le mode (CB / espèces).
 // Le catalogue (`catalog.commande`) est la source unique des listes ; le serveur
 // revalide tout ce que le poste de saisie envoie.
 // ---------------------------------------------------------------------------
@@ -693,7 +700,15 @@ const COM = CATALOG.commande;
 const COM_TYPE_BY_ID = new Map(COM.types.map((t) => [t.id, t]));
 const COM_ZONE_BY_ID = new Map(COM.zones.map((z) => [z.id, z]));
 const COM_TECH_BY_ID = new Map(COM.techniques.map((t) => [t.id, t]));
-const COM_FACTURE_BY_ID = new Map(COM.factureEtats.map((f) => [f.id, f]));
+const COM_DELAI_BY_ID = new Map(COM.delais.map((d) => [d.id, d]));
+const COM_TASSE_OPT_BY_ID = new Map(COM.tasseOptions.map((o) => [o.id, o]));
+const COM_OBJ_TECH_BY_ID = new Map(COM.objetTechniques.map((t) => [t.id, t]));
+const COM_PAY_STATUT_BY_ID = new Map(COM.paiementStatuts.map((p) => [p.id, p]));
+const COM_PAY_MODE_BY_ID = new Map(COM.paiementModes.map((p) => [p.id, p]));
+const COM_FACE_BY_ID = new Map(COM.faces.map((f) => [f.id, f]));
+// Délai retenu quand la fiche n'en porte aucun : la règle maison, jamais
+// « sans échéance ».
+const DELAI_DEFAUT = COM_DELAI_BY_ID.get(COM.delaiDefaut) || COM.delais[0];
 
 // Longueurs bornées : ces textes finissent dans une cellule de grille, pas dans
 // un traitement de texte.
@@ -701,6 +716,9 @@ const VETEMENT_MAX = 80;
 const REF_MAX = 40;
 const COULEUR_MAX = 40;
 const REMARQUE_MAX = 400;
+const OBJET_MAX = 140;          // objet de la demande (titre d'une ligne du planning)
+const DESCRIPTION_MAX = 1200;   // description libre de la demande
+const TEXTE_MAX = 200;          // face de tasse, typo, info de personnalisation…
 
 // Emplacements d'impression ajoutés au comptoir (base), en plus de ceux du
 // catalogue. Gardés en MÉMOIRE pour que la validation d'un article reste
@@ -744,22 +762,37 @@ app.delete('/api/commande/zones/:id', asyncH(async (req, res) => {
   res.json({ zones: allZones() });
 }));
 
-// Valide un article et ses zones d'impression. Renvoie { article } ou { error }.
-function buildArticle(raw, index) {
-  const where = `Article ${index + 1}`;
+// Quantité d'une ligne : « Qté identique », le nombre de pièces rigoureusement
+// semblables. Toujours au moins 1 — une ligne sans pièce n'existe pas.
+function readQuantite(raw, where) {
+  const quantite = Number.parseInt(raw, 10);
+  if (!Number.isInteger(quantite) || quantite < 1 || quantite > 9999) {
+    return { error: `${where} : quantité invalide (1 à 9999)` };
+  }
+  return { quantite };
+}
+
+// Un texte libre borné (face de tasse, typo, remarque…). Renvoie { value } ou
+// { error } — jamais d'exception, l'appelant remonte le message tel quel.
+function readTexte(raw, where, quoi, max) {
+  const value = trimOrNull(raw);
+  if (value && value.length > max) return { error: `${where} : ${quoi} trop long` };
+  return { value };
+}
+
+// TEXTILE — le vêtement et ses placements (ex-« article »). Le catalogue ne fait
+// que proposer : une taille de grille fournisseur exotique passe telle quelle.
+function buildTextile(raw, index) {
+  const where = `Textile ${index + 1}`;
   const a = raw && typeof raw === 'object' ? raw : {};
 
   const vetement = trimOrNull(a.vetement);
   if (!vetement) return { error: `${where} : le type de vêtement est vide` };
   if (vetement.length > VETEMENT_MAX) return { error: `${where} : type de vêtement trop long` };
 
-  const quantite = Number.parseInt(a.quantite, 10);
-  if (!Number.isInteger(quantite) || quantite < 1 || quantite > 9999) {
-    return { error: `${where} : quantité invalide (1 à 9999)` };
-  }
+  const q = readQuantite(a.quantite, where);
+  if (q.error) return { error: q.error };
 
-  // La taille peut ne pas être au catalogue (grille fournisseur exotique) : on
-  // l'accepte telle quelle plutôt que de bloquer la prise de commande.
   const taille = trimOrNull(a.taille);
   if (taille && taille.length > 24) return { error: `${where} : taille trop longue` };
 
@@ -791,10 +824,165 @@ function buildArticle(raw, index) {
   }
 
   return {
-    article: {
-      vetement, ref, couleur, taille: taille || null, quantite, zones,
+    ligne: {
+      famille: 'textile',
+      vetement, ref, couleur, taille: taille || null, quantite: q.quantite, zones,
     },
   };
+}
+
+// TASSE — la référence, le coloris, et SURTOUT les deux faces : l'atelier
+// imprime face 1 anse à droite, face 2 anse à gauche. Sans cette convention le
+// visuel se retrouve à l'envers pour un gaucher.
+function buildTasse(raw, index) {
+  const where = `Tasse ${index + 1}`;
+  const a = raw && typeof raw === 'object' ? raw : {};
+
+  const ref = trimOrNull(a.ref);
+  if (!ref) return { error: `${where} : la référence de tasse est vide` };
+  if (ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
+
+  const q = readQuantite(a.quantite, where);
+  if (q.error) return { error: q.error };
+
+  const couleur = trimOrNull(a.couleur);
+  if (couleur && couleur.length > COULEUR_MAX) return { error: `${where} : coloris trop long` };
+
+  const faces = [];
+  for (const f of COM.faces) {
+    const t = readTexte(a[f.id], where, `visuel de la ${f.label.toLowerCase()}`, TEXTE_MAX);
+    if (t.error) return { error: t.error };
+    if (t.value) faces.push({ face: f.id, label: f.label, hint: f.hint, visuel: t.value });
+  }
+
+  // Options cochées (logo OLDA, texte personnalisé, logo client) : rien
+  // d'obligatoire, mais pas d'identifiant inventé non plus.
+  const options = [];
+  for (const id of Array.isArray(a.options) ? a.options : []) {
+    const opt = COM_TASSE_OPT_BY_ID.get(id);
+    if (!opt) return { error: `${where} : option inconnue` };
+    if (!options.some((o) => o.id === opt.id)) options.push({ id: opt.id, label: opt.label });
+  }
+
+  const infos = readTexte(a.infos, where, 'information de personnalisation', TEXTE_MAX);
+  if (infos.error) return { error: infos.error };
+  const typo = readTexte(a.typo, where, 'typo', TEXTE_MAX);
+  if (typo.error) return { error: typo.error };
+  const remarque = readTexte(a.remarque, where, 'remarque', REMARQUE_MAX);
+  if (remarque.error) return { error: remarque.error };
+
+  return {
+    ligne: {
+      famille: 'tasse',
+      ref, couleur, quantite: q.quantite, faces, options,
+      infos: infos.value, typo: typo.value, remarque: remarque.value,
+    },
+  };
+}
+
+// OBJET — tout le reste (gourde, plaque, trophée…). Ce qui compte à l'atelier,
+// c'est PAR QUELLE MACHINE ça passe : TROTEC, UV, ou autre chose à préciser.
+function buildObjet(raw, index) {
+  const where = `Objet ${index + 1}`;
+  const a = raw && typeof raw === 'object' ? raw : {};
+
+  const ref = trimOrNull(a.ref);
+  if (!ref) return { error: `${where} : la référence d'objet est vide` };
+  if (ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
+
+  const q = readQuantite(a.quantite, where);
+  if (q.error) return { error: q.error };
+
+  const tech = COM_OBJ_TECH_BY_ID.get(a.technique) || null;
+  if (a.technique && !tech) return { error: `${where} : type de personnalisation inconnu` };
+
+  const infos = readTexte(a.infos, where, 'information de personnalisation', TEXTE_MAX);
+  if (infos.error) return { error: infos.error };
+
+  return {
+    ligne: {
+      famille: 'objet',
+      ref, quantite: q.quantite,
+      technique: tech ? tech.id : null,
+      techniqueLabel: tech ? tech.label : null,
+      infos: infos.value,
+    },
+  };
+}
+
+// Le CONTACT, en deux formes exclusives. `societe` est le nom qui fait foi
+// partout ailleurs (colonne du planning, base clients) : le nom de facturation
+// pour un pro, « Prénom Nom » pour un particulier.
+// Les anciens noms de champs (societe / contact / telephone) restent acceptés.
+function buildClient(raw) {
+  const c = raw && typeof raw === 'object' ? raw : {};
+  const type = CLIENT_TYPE_SET.has(c.type) ? c.type : 'pro';
+
+  const email = trimOrNull(c.email);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'email invalide' };
+  const whatsapp = trimOrNull(c.whatsapp) || trimOrNull(c.telephone);
+  if (whatsapp && whatsapp.length > 40) return { error: 'numéro WhatsApp trop long' };
+
+  if (type === 'perso') {
+    const prenom = trimOrNull(c.prenom);
+    const nom = trimOrNull(c.nom);
+    const societe = [prenom, nom].filter(Boolean).join(' ') || trimOrNull(c.societe);
+    if (!societe) return { error: 'le nom du client (prénom, nom) est requis' };
+    if (societe.length > 120) return { error: 'nom du client trop long' };
+    // Pas de doublon dans la grille : le nom occupe déjà la colonne « Client ».
+    return {
+      client: {
+        type, societe, facturation: null, prenom, nom,
+        contact: null, whatsapp, telephone: whatsapp, email,
+      },
+    };
+  }
+
+  const facturation = trimOrNull(c.facturation) || trimOrNull(c.societe);
+  if (!facturation) return { error: 'le nom du client (facturation) est requis' };
+  if (facturation.length > 120) return { error: 'nom du client trop long' };
+  const contact = trimOrNull(c.contact);
+  if (contact && contact.length > 120) return { error: 'nom du contact trop long' };
+  return {
+    client: {
+      type, societe: facturation, facturation, prenom: null, nom: null,
+      contact, whatsapp, telephone: whatsapp, email,
+    },
+  };
+}
+
+// Nom lisible d'une ligne, quelle que soit sa famille — sert à la colonne
+// « Description » du planning (« 20 × Tasse blanche 33 cl »).
+const nomLigne = (l) => (l.famille === 'textile' ? l.vetement : l.ref);
+
+// Le détail d'une ligne, en clair, pour la colonne « Infos » : ce que l'atelier
+// doit lire sans jamais ouvrir le JSON ni rappeler le comptoir.
+function detailLigne(l) {
+  if (l.famille === 'textile') {
+    const id = [l.ref && `réf. ${l.ref}`, l.couleur, l.taille && `taille ${l.taille}`]
+      .filter(Boolean).join(' · ');
+    const tete = `• ${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`;
+    return [tete, ...l.zones.map((z) => {
+      const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
+      return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
+    })].join('\n');
+  }
+  if (l.famille === 'tasse') {
+    const tete = `• ${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`;
+    const suite = [
+      ...l.faces.map((f) => `   ↳ ${f.label} (${f.hint}) : ${f.visuel}`),
+      l.options.length ? `   ↳ ${l.options.map((o) => o.label).join(' · ')}` : null,
+      l.typo ? `   ↳ Typo : ${l.typo}` : null,
+      l.infos ? `   ↳ ${l.infos}` : null,
+      l.remarque ? `   ↳ Remarque : ${l.remarque}` : null,
+    ].filter(Boolean);
+    return [tete, ...suite].join('\n');
+  }
+  const tete = `• ${l.quantite} × ${l.ref}`;
+  const suite = [
+    l.techniqueLabel ? `   ↳ ${l.techniqueLabel}${l.infos ? ` : ${l.infos}` : ''}` : (l.infos ? `   ↳ ${l.infos}` : null),
+  ].filter(Boolean);
+  return [tete, ...suite].join('\n');
 }
 
 // Reconstruit une prise de commande à partir du corps reçu. Fonction pure :
@@ -805,54 +993,86 @@ function buildCommande(body) {
   const type = COM_TYPE_BY_ID.get(b.kind);
   if (!type) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
 
-  const rawClient = b.client && typeof b.client === 'object' ? b.client : {};
-  const societe = trimOrNull(rawClient.societe);
-  if (!societe) return { error: 'le nom du client (société / marque) est requis' };
-  if (societe.length > 120) return { error: 'nom du client trop long' };
+  const who = buildClient(b.client);
+  if (who.error) return { error: who.error };
+  const { client } = who;
 
-  const email = trimOrNull(rawClient.email);
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'email invalide' };
+  // La DEMANDE SIMPLE : de quoi enregistrer en dix secondes une affaire qu'on
+  // détaillera plus tard (« Devis 40 polos brodés »), sans ouvrir une famille.
+  const objet = trimOrNull(b.objet);
+  if (objet && objet.length > OBJET_MAX) return { error: 'objet de la demande trop long' };
+  const description = trimOrNull(b.description);
+  if (description && description.length > DESCRIPTION_MAX) return { error: 'description trop longue' };
 
-  const client = {
-    societe,
-    contact: trimOrNull(rawClient.contact),
-    telephone: trimOrNull(rawClient.telephone),
-    email,
-    type: CLIENT_TYPE_SET.has(rawClient.type) ? rawClient.type : 'pro',
+  // Trois familles, chacune facultative. `articles` (ancien nom) = le textile.
+  const rawTextiles = Array.isArray(b.textiles) ? b.textiles
+    : (Array.isArray(b.articles) ? b.articles : []);
+  const sources = [
+    ['tasses', Array.isArray(b.tasses) ? b.tasses : [], buildTasse],
+    ['textiles', rawTextiles, buildTextile],
+    ['objets', Array.isArray(b.objets) ? b.objets : [], buildObjet],
+  ];
+  const total = sources.reduce((s, [, raw]) => s + raw.length, 0);
+  if (total === 0 && !objet) {
+    return { error: 'ni objet ni produit : la commande est vide' };
+  }
+  if (total > COM.articlesMax) {
+    return { error: `trop de lignes (${COM.articlesMax} maximum)` };
+  }
+
+  const produits = { tasses: [], textiles: [], objets: [] };
+  for (const [cle, raw, build] of sources) {
+    for (let i = 0; i < raw.length; i += 1) {
+      const built = build(raw[i], i);
+      if (built.error) return { error: built.error };
+      produits[cle].push(built.ligne);
+    }
+  }
+  const lignes = [...produits.tasses, ...produits.textiles, ...produits.objets];
+
+  const paie = b.paiement && typeof b.paiement === 'object' ? b.paiement : {};
+  const statut = COM_PAY_STATUT_BY_ID.get(paie.statut) || COM.paiementStatuts[0];
+  // Le mode ne veut rien dire tant que rien n'est encaissé : on ne l'invente pas.
+  const modeBrut = statut.id === 'non_paye' ? null : COM_PAY_MODE_BY_ID.get(paie.mode);
+  const paiement = {
+    statut: { id: statut.id, label: statut.label },
+    mode: modeBrut ? { id: modeBrut.id, label: modeBrut.label } : null,
   };
-
-  const rawArticles = Array.isArray(b.articles) ? b.articles : [];
-  if (rawArticles.length === 0) return { error: 'aucun article : la commande est vide' };
-  if (rawArticles.length > COM.articlesMax) {
-    return { error: `trop d'articles (${COM.articlesMax} maximum)` };
-  }
-  const articles = [];
-  for (let i = 0; i < rawArticles.length; i += 1) {
-    const built = buildArticle(rawArticles[i], i);
-    if (built.error) return { error: built.error };
-    articles.push(built.article);
-  }
-
-  const facture = COM_FACTURE_BY_ID.get(b.facture) || COM_FACTURE_BY_ID.get('a_faire');
 
   const remarque = trimOrNull(b.remarque);
   if (remarque && remarque.length > REMARQUE_MAX) return { error: 'remarque trop longue' };
 
-  // Délai : la date posée fait foi. Sans date, la règle maison s'applique —
-  // 7 jours (catalog.commande.delaiDefautJours), jamais « sans échéance ».
-  const deadline = isDay(b.deadline) ? b.deadline : todayPlus(COM.delaiDefautJours);
+  // Délai et date sont deux façons de dire la même chose. Le délai TAPÉ fait
+  // foi (il porte sa majoration : « sous 3 jours, +10 % ») ; à défaut, une date
+  // choisie à la main s'impose seule ; sans rien, la règle maison s'applique —
+  // jamais « sans échéance ».
+  const delaiChoisi = COM_DELAI_BY_ID.get(b.delai) || null;
+  const dateChoisie = isDay(b.deadline) ? b.deadline : null;
+  const delai = delaiChoisi || (dateChoisie ? null : DELAI_DEFAUT);
+  const deadline = delaiChoisi
+    ? (dateChoisie || todayPlus(delaiChoisi.jours))
+    : (dateChoisie || todayPlus(DELAI_DEFAUT.jours));
 
   const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
-  const quantite = articles.reduce((s, a) => s + a.quantite, 0);
+  const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
 
   const commande = {
     kind: 'commande-atelier',        // discriminant : identifie ce JSON dans requests.fiche
+    version: 2,                      // v1 = { articles } sans objet ni paiement
     type: { id: type.id, label: type.label },
     client,
-    articles,
+    objet,
+    description,
+    tasses: produits.tasses,
+    textiles: produits.textiles,
+    objets: produits.objets,
+    articles: produits.textiles,     // alias historique : le textile s'appelait « articles »
+    paiement,
+    delai: delai
+      ? { id: delai.id, label: delai.label, jours: delai.jours, majoration: delai.majoration || 0 }
+      : null,                        // date choisie à la main : pas de délai type
     enBoite: b.enBoite === true,
     maquette: b.maquette === true,
-    facture: { id: facture.id, label: facture.label },
     remarque,
     deadline,
     priority,
@@ -865,34 +1085,40 @@ function buildCommande(body) {
   };
 
   // Colonne « Description » de la grille : de quoi reconnaître la commande d'un
-  // coup d'œil, sans ouvrir le détail.
-  const noms = [...new Set(articles.map((a) => a.vetement))];
-  const produit = articles.length === 1
-    ? `${articles[0].quantite} × ${articles[0].vetement}`
-    : `${quantite} pièces — ${noms.slice(0, 3).join(', ')}${noms.length > 3 ? '…' : ''}`;
+  // coup d'œil, sans ouvrir le détail. Une demande sans produit affiche son objet.
+  const noms = [...new Set(lignes.map(nomLigne))];
+  let produit;
+  if (lignes.length === 0) produit = objet;
+  else if (lignes.length === 1) produit = `${lignes[0].quantite} × ${noms[0]}`;
+  else produit = `${quantite} pièces — ${noms.slice(0, 3).join(', ')}${noms.length > 3 ? '…' : ''}`;
 
   // Colonne « Infos » : le détail lisible, pour que la grille n'ait jamais à
-  // lire le JSON.
-  const lignes = articles.map((a) => {
-    const id = [a.ref && `réf. ${a.ref}`, a.couleur, a.taille && `taille ${a.taille}`]
-      .filter(Boolean).join(' · ');
-    const tete = `• ${a.quantite} × ${a.vetement}${id ? ` — ${id}` : ''}`;
-    const zs = a.zones.map((z) => {
-      const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-      return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
-    });
-    return [tete, ...zs].join('\n');
-  });
+  // lire le JSON. Une famille vide ne laisse aucune trace.
+  const bloc = (titre, ls) => (ls.length ? [titre, ...ls.map(detailLigne)] : []);
+
+  const contact = [
+    client.contact,
+    client.whatsapp && `WhatsApp ${client.whatsapp}`,
+    client.email,
+  ].filter(Boolean).join(' · ');
 
   const etats = [
     `Article en boîte : ${commande.enBoite ? 'oui' : 'non'}`,
     commande.maquette ? 'Maquette à faire' : 'Maquette : non',
-    `Facture : ${facture.label.toLowerCase()}`,
+    `Paiement : ${paiement.statut.label.toLowerCase()}${paiement.mode ? ` (${paiement.mode.label})` : ''}`,
   ].join(' · ');
 
   const resume = [
-    `${type.label.toUpperCase()} — ${societe}${client.contact ? ` (${client.contact})` : ''}`,
-    ...lignes,
+    `${type.label.toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
+    ...(contact ? [`Contact : ${contact}`] : []),
+    ...(objet ? [`Objet : ${objet}`] : []),
+    ...(description ? [description] : []),
+    ...bloc('Tasses', produits.tasses),
+    ...bloc('Textile', produits.textiles),
+    ...bloc('Objets', produits.objets),
+    // La date a sa colonne : on n'écrit ici que le délai TYPE, pour sa
+    // majoration (« sous 3 jours, +10 % ») que le chiffrage doit voir.
+    ...(delai ? [`Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`] : []),
     etats,
     ...(remarque ? [`Remarque : ${remarque}`] : []),
   ].join('\n');
@@ -927,9 +1153,11 @@ app.post('/api/commande', asyncH(async (req, res) => {
       commande.client.contact,
       commande.client.telephone,
       commande.client.email,
-      commande.quantite,
+      commande.quantite || null,      // demande simple : aucune pièce comptée
       produit,
-      commande.articles[0].couleur,
+      // Colonne « Coloris » : le premier renseigné, toutes familles confondues
+      // (une demande simple, sans produit, la laisse vide).
+      [...commande.tasses, ...commande.textiles].map((l) => l.couleur).find(Boolean) || null,
       resume,
       commande.deadline,
       commande.vendeuse,

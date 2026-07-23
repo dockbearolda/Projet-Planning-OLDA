@@ -1,6 +1,8 @@
 /* ===========================================================================
    Prise de commande — le premier pas du client
-   Fiche remplie au comptoir : infos de base, tableau simple, ultra rapide.
+   Fiche remplie au comptoir, EN FACE DE LUI : elle doit tenir en 30 à 45
+   secondes. D'où quatre cartes numérotées, des puces de 44 px qu'on tape au
+   lieu de menus qu'on déroule, et rien à l'écran tant qu'on n'en a pas besoin.
    Tout est scopé sous #commande ; la vue consomme les JETONS GLOBAUX de
    styles.css, donc elle suit la bascule clair / sombre sans une ligne de plus.
    =========================================================================== */
@@ -60,15 +62,36 @@
 /* ------------------------------------------------------------------- corps */
 #commande .cmd-body {
   flex: 1;
-  display: flex; flex-direction: column; gap: 18px;
+  display: flex; flex-direction: column; gap: 14px;
   padding: 18px 22px calc(28px + env(safe-area-inset-bottom));
   max-width: 1100px; width: 100%;
 }
 
+/* ------------------------------------------------------------------ cartes
+   Un bloc = une question. Le numéro donne l'ordre de lecture d'un coup d'œil,
+   sans avoir à lire les titres. */
+#commande .cmd-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--card-border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+#commande .cmd-card__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#commande .cmd-card__n {
+  width: 26px; height: 26px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--primary-soft); color: var(--primary);
+  font: 700 13px var(--font);
+}
+#commande .cmd-card__title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-1); }
+#commande .cmd-card__hint { font-size: 12.5px; color: var(--text-3); }
+#commande .cmd-card__head .cmd-seg { margin-left: auto; }
+
 /* --------------------------------------------------------------- champs */
 #commande .cmd-field { min-width: 0; }
 #commande .cmd-label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-2); }
-#commande .cmd-hint { margin: 4px 0 0; font-size: 12px; color: var(--st-livree); }
+#commande .cmd-label__opt { color: var(--text-3); font-style: italic; }
+#commande .cmd-hint { margin: 0; font-size: 12px; color: var(--st-livree); }
 
 #commande .cmd-input {
   width: 100%; height: 44px; padding: 0 12px;
@@ -80,20 +103,11 @@
 }
 #commande .cmd-input::placeholder { color: var(--text-3); }
 #commande .cmd-input:focus { outline: none; border-color: var(--primary); background-color: var(--field-focus); }
-#commande .cmd-select {
-  appearance: none; padding-right: 32px; cursor: pointer;
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 8px center; background-size: 20px;
-}
-:root[data-theme="dark"] #commande .cmd-select {
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239aa0a6'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-}
+/* L'objet est le titre du dossier : il se voit et se tape en premier. */
+#commande .cmd-input--lg { height: 50px; font-size: 17px; font-weight: 500; }
+#commande .cmd-textarea { height: auto; min-height: 60px; padding: 10px 12px; line-height: 1.45; resize: vertical; }
 
 /* ---------------------------------------------------- nature pro / perso */
-#commande .cmd-nature {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
-}
-#commande .cmd-nature .cmd-label { margin: 0; }
 #commande .cmd-seg {
   display: inline-flex; padding: 3px; gap: 2px;
   background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
@@ -104,17 +118,18 @@
   color: var(--text-2); font: 500 14px var(--font); cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+#commande .cmd-seg--big .cmd-seg__btn { min-height: 44px; padding: 0 30px; font-size: 15px; }
 #commande .cmd-seg__btn:hover { color: var(--text-1); }
 #commande .cmd-seg__btn.is-on {
   background: var(--surface); color: var(--primary);
   box-shadow: var(--shadow-1); font-weight: 600;
 }
 
-/* -------------------------------------------------------------- client */
-#commande .cmd-client {
-  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px; align-items: start;
-}
+/* -------------------------------------------------------------- contact */
+#commande .cmd-grid { display: grid; gap: 12px; align-items: start; }
+#commande .cmd-grid--pro { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); }
+#commande .cmd-grid--perso { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+
 #commande .cmd-auto { position: relative; }
 #commande .cmd-auto__list {
   position: absolute; z-index: 20; left: 0; right: 0; top: 100%;
@@ -133,26 +148,60 @@
 #commande .cmd-auto__meta { font-size: 12px; color: var(--text-2); }
 #commande .cmd-auto__n { font-size: 11px; color: var(--text-3); }
 
-/* -------------------------------------------------------- tableau articles */
+/* ----------------------------------------------------------------- puces
+   La brique de toute la fiche : 44 px de haut, un état visible sans lire. */
+#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+#commande .cmd-chip {
+  min-height: 44px; padding: 0 16px;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+  font: 500 13.5px var(--font); cursor: pointer; text-align: left;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+#commande .cmd-chip:hover { background: var(--surface-hover); }
+#commande .cmd-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+#commande .cmd-chip .material-symbols-outlined { font-size: 19px; }
+#commande .cmd-chip__note { font-size: 11.5px; font-weight: 600; opacity: .8; }
+#commande .cmd-chip--ghost { border-style: dashed; color: var(--text-3); }
+
+/* Délais : quatre choix, le plus long à droite. Le « sous 3 jours » porte sa
+   majoration DANS la puce — on ne la découvre pas à la facture. */
+#commande .cmd-chips--delai .cmd-chip { min-width: 104px; justify-content: center; font-size: 14.5px; font-weight: 600; }
+#commande .cmd-delai__date { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+#commande .cmd-delai__date .cmd-label { margin: 0; }
+#commande .cmd-delai__date .cmd-input { width: auto; min-width: 168px; }
+
+/* Familles : de grosses cibles, on vise sans regarder. */
+#commande .cmd-chips--fam .cmd-chip { min-height: 52px; padding: 0 22px; font-size: 15px; font-weight: 600; }
+#commande .cmd-chips--fam .cmd-chip .material-symbols-outlined { font-size: 22px; }
+
+/* --------------------------------------------------- familles dépliées */
+#commande .cmd-fams { display: flex; flex-direction: column; gap: 12px; }
+#commande .cmd-fams:empty { display: none; }
+#commande .cmd-fam { display: flex; flex-direction: column; gap: 8px; }
+#commande .cmd-fam__head { display: flex; align-items: center; gap: 8px; }
+#commande .cmd-fam__head .material-symbols-outlined { font-size: 20px; color: var(--primary); }
+#commande .cmd-fam__title {
+  margin: 0; font-size: 12px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+}
+#commande .cmd-fam__head .cmd-icon { margin-left: auto; }
+
 #commande .cmd-table {
-  border: 1px solid var(--card-border); border-radius: var(--radius-card);
-  background: var(--surface); box-shadow: var(--shadow-1);
-  overflow: hidden;
-}
-/* Une ligne d'en-tête + les lignes d'articles partagent la même grille, donc
-   les colonnes s'alignent parfaitement — le « tableau » de la fiche. */
-#commande .cmd-thead, #commande .cmd-art__row {
-  display: grid;
-  grid-template-columns: 74px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 96px;
-  gap: 10px; align-items: center;
-}
-#commande .cmd-thead {
-  padding: 10px 14px;
-  background: var(--bg); border-bottom: 1px solid var(--border);
-  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--bg); overflow: hidden;
 }
 #commande .cmd-art { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
 #commande .cmd-art:last-child { border-bottom: 0; }
+#commande .cmd-art + .cmd-art { border-top: 0; }
+
+/* Une ligne = une grille. Les colonnes varient selon la famille, la dernière
+   (les outils) reste toujours à droite. */
+#commande .cmd-art__row { display: grid; gap: 10px; align-items: center; }
+#commande .cmd-art__row--tasse { grid-template-columns: 74px minmax(0, 2.4fr) minmax(0, 1.4fr) 96px; }
+#commande .cmd-art__row--textile { grid-template-columns: 74px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 96px; }
+#commande .cmd-art__row--objet { grid-template-columns: 74px minmax(0, 1fr) 96px; }
 #commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 2px; }
 #commande .cmd-cell--quantite { text-align: center; font-weight: 600; }
 
@@ -168,19 +217,19 @@
   box-shadow: inset 0 0 0 1px var(--primary);
 }
 
-/* Marquage : chips de zones + une ligne de consigne par zone cochée. */
+/* Sous-champs d'une ligne (faces de tasse, typo, info de perso) : le libellé
+   au-dessus, parce que « Face 1 » ne veut rien dire sans « anse à droite ». */
+#commande .cmd-sub { display: block; min-width: 0; }
+#commande .cmd-sub__label { display: block; margin-bottom: 4px; font-size: 11.5px; color: var(--text-2); }
+#commande .cmd-art__faces,
+#commande .cmd-art__bas { display: grid; gap: 10px; margin-top: 10px; }
+#commande .cmd-art__faces { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#commande .cmd-art__bas { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+#commande .cmd-art__bas--objet { grid-template-columns: auto minmax(0, 1fr); align-items: end; }
+#commande .cmd-chips--opt { margin-top: 10px; }
+
+/* Marquage textile : chips de zones + une ligne de consigne par zone cochée. */
 #commande .cmd-art__mark { margin-top: 10px; }
-#commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-#commande .cmd-chip {
-  min-height: 44px; padding: 0 16px;
-  display: inline-flex; align-items: center;
-  border: 1px solid var(--border); border-radius: 999px;
-  background: var(--surface); color: var(--text-2);
-  font: 500 13.5px var(--font); cursor: pointer;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-#commande .cmd-chip:hover { background: var(--surface-hover); }
-#commande .cmd-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
 
 /* Croix d'un emplacement ajouté au comptoir : cible de 28px dans la puce, elle
    ne gêne pas le tap qui coche (le reste de la puce). */
@@ -192,9 +241,8 @@
 #commande .cmd-chip__x:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
 
 /* « + Emplacement » : la puce qui en crée un. Trait discontinu = à remplir. */
-#commande .cmd-chip--add { gap: 4px; padding: 0 16px 0 12px; border-style: dashed; color: var(--primary); }
+#commande .cmd-chip--add { padding: 0 16px 0 12px; border-style: dashed; color: var(--primary); }
 #commande .cmd-chip--add:hover { background: var(--primary-soft); }
-#commande .cmd-chip--add .material-symbols-outlined { font-size: 18px; }
 #commande .cmd-chip--new {
   width: 200px; height: 44px; padding: 0 16px;
   border-radius: 999px; border-color: var(--primary);
@@ -208,16 +256,18 @@
 #commande .cmd-addrow {
   width: 100%; min-height: 48px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  border: 0; border-top: 1px dashed var(--border); background: var(--bg);
+  border: 0; border-top: 1px dashed var(--border); background: transparent;
   color: var(--primary); font: 600 14px var(--font); cursor: pointer;
 }
 #commande .cmd-addrow:hover { background: var(--primary-soft); }
 #commande .cmd-addrow .material-symbols-outlined { font-size: 20px; }
 
-/* --------------------------------------------------------------- options */
-#commande .cmd-opts {
-  display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px;
-}
+/* --------------------------------------------------------------- paiement */
+#commande .cmd-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+/* Le mode d'encaissement se distingue du statut : il ne s'allume qu'après lui. */
+#commande .cmd-chips--mode { padding-left: 18px; border-left: 1px solid var(--border); }
+
+#commande .cmd-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 #commande .cmd-optswitch {
   min-height: 44px; padding: 0 6px 0 4px;
   display: inline-flex; align-items: center; gap: 10px;
@@ -234,9 +284,6 @@
 #commande .cmd-optswitch__box .material-symbols-outlined { font-size: 18px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
 #commande .cmd-optswitch.is-on .cmd-optswitch__box { background: var(--primary); border-color: var(--primary); }
 #commande .cmd-optswitch.is-on .cmd-optswitch__box .material-symbols-outlined { opacity: 1; transform: scale(1); }
-#commande .cmd-field--inline { display: flex; align-items: center; gap: 8px; }
-#commande .cmd-field--inline .cmd-label { margin: 0; white-space: nowrap; }
-#commande .cmd-field--inline .cmd-input { width: auto; min-width: 150px; }
 
 /* ------------------------------------------------------------- toast / fin */
 #commande .cmd-toast {
@@ -275,29 +322,43 @@
 
 /* ------------------------------------------------------------ responsive
    Chrome PC, Galaxy Tab A9+ (1280 paysage / 800 portrait), iPhone 390-430. */
+@media (max-width: 1100px) {
+#commande .cmd-grid--pro { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+#commande .cmd-art__bas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 900px) {
-/* Sous la tablette portrait, la ligne d'article ne rentre plus alignée : on
-   masque l'en-tête (les placeholders guident) et on empile les champs. */
-#commande .cmd-thead { display: none; }
-#commande .cmd-client { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-#commande .cmd-client .cmd-field--grow { grid-column: 1 / -1; }
-#commande .cmd-art__row {
-  display: flex; flex-wrap: wrap; gap: 8px;
-}
+/* Sous la tablette portrait, la ligne ne rentre plus alignée : on empile les
+   champs, les placeholders font office d'en-têtes. */
+#commande .cmd-art__row { display: flex; flex-wrap: wrap; gap: 8px; }
 #commande .cmd-cell--quantite { width: 74px; text-align: left; }
-#commande .cmd-cell--vetement { flex: 1 1 55%; min-width: 160px; }
-#commande .cmd-cell--ref, #commande .cmd-cell--couleur, #commande .cmd-cell--taille { flex: 1 1 28%; min-width: 100px; }
+#commande .cmd-cell--vetement, #commande .cmd-cell--ref { flex: 1 1 55%; min-width: 160px; }
+#commande .cmd-art__row--textile .cmd-cell--ref { flex: 1 1 28%; min-width: 100px; }
+#commande .cmd-cell--couleur, #commande .cmd-cell--taille { flex: 1 1 28%; min-width: 100px; }
 #commande .cmd-art__tools { margin-left: auto; }
+#commande .cmd-art__bas--objet { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
 #commande .cmd-bar { flex-wrap: wrap; padding: 10px 14px; }
 #commande .cmd-bar__titles { flex: 1 1 0; }
 #commande .cmd-bar__title { font-size: 17px; }
 #commande .cmd-bar__actions { width: 100%; margin-left: 0; }
 #commande .cmd-bar__actions .cmd-btn { flex: 1; }
-#commande .cmd-body { padding: 14px; gap: 14px; }
-#commande .cmd-client { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-body { padding: 12px; gap: 12px; }
+#commande .cmd-card { padding: 14px; }
+#commande .cmd-card__head .cmd-seg { margin-left: 0; width: 100%; }
+#commande .cmd-card__head .cmd-seg__btn { flex: 1; }
+#commande .cmd-grid--pro, #commande .cmd-grid--perso { grid-template-columns: minmax(0, 1fr); }
+#commande .cmd-art__faces, #commande .cmd-art__bas { grid-template-columns: minmax(0, 1fr); }
+/* Deux puces par ligne : la majoration passe SOUS son libellé plutôt que de le
+   couper en deux (« Sous 3 / jours »). */
+#commande .cmd-chips--delai .cmd-chip {
+  flex: 1 1 46%; min-width: 0; gap: 0;
+  flex-direction: column; justify-content: center; padding: 4px 10px;
+}
+#commande .cmd-chips--delai .cmd-chip__note { line-height: 1.1; }
+#commande .cmd-chips--fam .cmd-chip { flex: 1 1 46%; justify-content: center; }
 #commande .cmd-zline { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-#commande .cmd-field--inline { width: 100%; justify-content: space-between; }
-#commande .cmd-field--inline .cmd-input { flex: 1; }
+#commande .cmd-chips--mode { padding-left: 0; border-left: 0; }
+#commande .cmd-delai__date { width: 100%; }
+#commande .cmd-delai__date .cmd-input { flex: 1; }
 }

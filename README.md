@@ -152,7 +152,7 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
-| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, vêtements, tailles, zones, techniques, états de facture). |
+| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, familles, délais, vêtements, tailles, tasses, objets, typos, zones, techniques, options de tasse, statuts et modes de paiement). |
 | POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning. |
 | POST | `/api/commande/zones` | Ajoute un emplacement d'impression (`{ label }`) et renvoie la liste complète. |
 | DELETE | `/api/commande/zones/:id` | Retire un emplacement ajouté au comptoir (ceux du catalogue sont figés). |
@@ -169,9 +169,12 @@ l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloq
 
 ## Prise de commande — `/#demande` et `/#commande`
 
-Le **premier pas du client** : la fiche qu'on remplit au comptoir, en face de
-lui. Juste les infos de base, dans un **tableau simple et rapide** — aucun prix
-(le chiffrage est une étape du planning), aucune option superflue.
+Le **premier pas du client** : la fiche qu'on remplit au comptoir, EN FACE DE
+LUI. La contrainte de conception est un chrono — **30 à 45 secondes**, client
+debout devant le comptoir. Tout en découle : des puces de 44 px qu'on tape au
+lieu de menus qu'on déroule, des valeurs par défaut déjà justes, et rien à
+l'écran tant qu'on n'en a pas besoin. Aucun prix (le chiffrage est une étape du
+planning).
 
 Deux entrées **en tête du menu**, l'une pour une *Demande* (à chiffrer), l'autre
 pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fiche**
@@ -183,29 +186,71 @@ pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fi
   directement sur la sous-étape **« À chiffrer »**.
 
 La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
-la ligne du planning. Le reste :
+la ligne du planning. La fiche tient en **quatre blocs numérotés**, dans l'ordre
+où ça se dit.
 
-- **Client auto-complété** : taper « Igua » propose « Iguana (Discover) » avec son
-  contact et son numéro. L'annuaire (`GET /api/clients`) est **déduit des
-  commandes déjà saisies** — aucune table de plus, aucun doublon mal orthographié
-  (rapprochement insensible à la casse, aux accents et à la ponctuation). La
-  reprise ne remplit que les champs restés vides.
-- **Articles en tableau** : quantité, vêtement, référence (`K3022`), couleur,
-  taille. Le catalogue *propose* (datalist), la saisie libre reste permise.
-  « Dupliquer » reprend l'article ET son marquage : la même impression sur une
-  autre taille, en un tap.
-- **Marquage par article** : on coche les zones (Cœur, Dos, Manche…) et on tape la
-  **consigne libre** de chacune (« Les Doudous à SXM », « Grand Case »). La
-  technique d'impression est une décision de production, pas de la prise : on ne
-  la demande pas ici.
-- **Options de base** sur une ligne : *Article en boîte*, *Maquette à faire*,
-  *Facture*, *Date souhaitée* (7 jours par défaut, jamais « sans échéance »).
+### 1 — Contact : PRO ou PERSO
+
+Deux jeux de champs **exclusifs**, pour ne jamais demander un « prénom » à un
+hôtel ni une « société » à un particulier :
+
+| PRO | PERSO |
+|---|---|
+| Nom de facturation · Contact · WhatsApp · Email | Prénom · Nom · WhatsApp |
+
+Le nom qui fait foi partout ailleurs (colonne « Client » du planning, base
+clients) est le **nom de facturation** pour un pro, **« Prénom Nom »** pour un
+particulier. La nature suit le client dans sa fiche (`clients.client_type`).
+
+**Auto-complétion** : taper « Igua » propose « Iguana (Discover) » avec son
+contact et son numéro ; l'annuaire ne propose que des pros en mode pro, que des
+particuliers en mode perso. Rapprochement insensible à la casse, aux accents et
+à la ponctuation. La reprise ne remplit que les champs restés vides, puis pose
+le curseur sur l'objet — le client identifié, la suite c'est ce qu'il vient
+chercher. Un client absent est **créé automatiquement** à l'enregistrement.
+
+### 2 — La demande
+
+**Objet** (le titre du dossier), **description** libre facultative, et le
+**délai d'un seul tap** : *Sous 3 jours (+10 %)* · *5 jours* · *10 jours* ·
+*15 jours*, plus un champ date pour viser un jour précis. Par défaut **5 jours**,
+jamais « sans échéance ». La majoration du délai express voyage dans la fiche,
+donc le chiffrage la voit.
+
+À ce stade la fiche est déjà enregistrable : c'est la **demande simple**, celle
+qui suffit quand le client est pressé (« Devis 40 polos brodés, il repasse
+mardi »). Les produits ne sont détaillés que si on les détaille.
+
+### 3 — Produits : trois familles, dépliées à la demande
+
+| Famille | Ce qu'on saisit |
+|---|---|
+| **Tasses** | Qté · référence · coloris · **Face 1 (anse à droite)** et **Face 2 (anse à gauche)** · options (*Logo OLDA*, *Texte personnalisé*, *Logo client*) · infos de personnalisation · typo · remarques |
+| **Textile** | Qté · vêtement · réf. OLDA ou fournisseur · coloris · taille · **placements** (Cœur, Dos, Avant, Manche droite, Manche gauche, Poitrine — les autres derrière « Autres ») avec la **consigne libre** de chacun |
+| **Objets** | Qté · réf. objet · **TROTEC / UV / Autres** · info sur la personnalisation |
+
+La convention d'anse des tasses est **dans le libellé du champ** : c'est elle qui
+évite d'imprimer le visuel du mauvais côté. Une fiche peut mêler les trois
+familles ; le total de pièces les additionne. « Dupliquer » reprend la ligne ET
+son marquage : la même impression sur une autre taille, en un tap. Une ligne
+qu'on n'a pas remplie part en silence à l'enregistrement — un tap de trop sur
+« Ajouter » ne réclame rien. La technique d'impression du textile est une
+décision de production, pas de la prise : on ne la demande pas ici.
+
+### 4 — Paiement
+
+**Non payé / Acompte payé / Payé**, puis le **mode** (CB / Espèces) — qui
+n'apparaît qu'une fois quelque chose à encaisser, et qui s'efface si on
+repasse à « non payé » (jamais de « CB » trompeur sur une commande impayée).
+Sur la même ligne, les deux réflexes d'atelier : *Article en boîte*,
+*Maquette à faire*.
 
 Le détail structuré est conservé dans `requests.fiche` (jsonb, discriminant
-`kind: 'commande-atelier'`) ; `requests.description` en porte le résumé lisible,
-donc la grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans
-`catalog.json`, section `commande` — seul endroit à modifier pour ajouter un
-vêtement, une taille ou une zone.
+`kind: 'commande-atelier'`, `version: 2`) ; `requests.description` en porte le
+résumé lisible — contact, objet, chaque famille, délai, paiement — donc la
+grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans `catalog.json`,
+section `commande` — seul endroit à modifier pour ajouter un vêtement, une
+taille, un délai ou une option de tasse.
 
 ## Navigation — une seule page, quatre vues
 
@@ -228,7 +273,7 @@ invisible.
 `/fiche` redirige (301) vers `/#commande` : les raccourcis déjà posés sur les
 écrans de l'atelier continuent de marcher.
 
-Le module de la Prise de commande (`commande.js`, catalogue textile + annuaire
+Le module de la Prise de commande (`commande.js`, catalogue produits + annuaire
 client) n'est chargé qu'au **premier** passage sur la vue : le planning ne paie
 rien tant qu'on ne prend pas de commande. Sa feuille de style est entièrement
 scopée sous `#commande`, pour qu'aucune règle ne puisse fuir sur les autres
@@ -237,7 +282,8 @@ vues.
 ### Le catalogue vit dans `catalog.json`
 
 C'est le SEUL endroit à modifier pour ajouter un vêtement, une taille, une
-technique ou un état de facture. Les **emplacements d'impression**, eux, se
+référence de tasse, un délai, une option de tasse ou une technique. Les
+**emplacements d'impression**, eux, se
 complètent aussi depuis la fiche (« + Emplacement ») : la zone créée est
 stockée en base (`app_meta.commande_zones`) et rejoint la liste de tous les
 postes, sans redéploiement. Les zones du catalogue restent figées ; seules
