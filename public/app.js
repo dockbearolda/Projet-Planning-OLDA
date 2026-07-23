@@ -2691,6 +2691,17 @@ function setActive(i) {
 async function jumpToResult(r) {
   closePalette();
   if ($gridSearchInput) $gridSearchInput.blur();
+  // On cherche dans TOUT le planning, y compris depuis la prise de commande, le
+  // dashboard ou la base clients. Si on n'est pas déjà sur le planning, on y
+  // revient AVANT de pointer la ligne — sinon la cible reste cachée derrière la
+  // vue courante et le clic semble « ne rien faire ». On bascule la vue tout de
+  // suite (le hashchange est asynchrone) et on aligne le hash sans le relancer.
+  if (viewMode !== 'planning') {
+    setViewMode('planning');
+    if (location.hash && location.hash !== '#planning') {
+      history.replaceState(null, '', '#planning');
+    }
+  }
   const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
   await selectStage(r.stage, sub);
   const entry = rowEls.get(String(r.id));
@@ -2841,10 +2852,13 @@ document.addEventListener('pointerdown', (e) => {
 const SIDEBAR_W_KEY = 'olda_sidebar_w';
 const SIDEBAR_MIN = 180, SIDEBAR_MAX = 460;
 const $sidebarResizer = document.getElementById('sidebarResizer');
-if ($app && $sidebarResizer) {
+// La largeur du rail est une colonne de la grille du .shell : c'est donc lui qui
+// porte `--sidebar-w` (le rail n'est plus enfant de `.app`).
+const $shell = document.querySelector('.shell');
+if ($shell && $sidebarResizer) {
   const clampW = (w) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(w)));
   const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || '', 10);
-  if (Number.isFinite(saved)) $app.style.setProperty('--sidebar-w', clampW(saved) + 'px');
+  if (Number.isFinite(saved)) $shell.style.setProperty('--sidebar-w', clampW(saved) + 'px');
   attachTip($sidebarResizer, 'Glisser pour régler la largeur');
   $sidebarResizer.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2857,7 +2871,7 @@ if ($app && $sidebarResizer) {
     try { $sidebarResizer.setPointerCapture(e.pointerId); } catch (_) {}
     const onMove = (ev) => {
       lastW = clampW(startW + ev.clientX - startX);
-      $app.style.setProperty('--sidebar-w', lastW + 'px');
+      $shell.style.setProperty('--sidebar-w', lastW + 'px');
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);

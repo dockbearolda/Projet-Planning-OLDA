@@ -780,8 +780,14 @@ function readTexte(raw, where, quoi, max) {
   return { value };
 }
 
-// TEXTILE — le vêtement et ses placements (ex-« article »). Le catalogue ne fait
-// que proposer : une taille de grille fournisseur exotique passe telle quelle.
+// TEXTILE — le vêtement, sa GRILLE DE TAILLES et ses placements (ex-« article »).
+// Le catalogue ne fait que proposer : une taille de grille fournisseur exotique
+// passe telle quelle. Deux formats acceptés :
+//   - GRILLE (nouveau) : `tailles: [{ taille, quantite }]` — une quantité par
+//     taille (XS…2XL). La quantité de la ligne est la SOMME ; les tailles à zéro
+//     sont ignorées. Une ligne sans aucune quantité reste valable (demande dont
+//     les tailles se préciseront plus tard).
+//   - HISTORIQUE : `taille` (une seule) + `quantite` (pièces identiques).
 function buildTextile(raw, index) {
   const where = `Textile ${index + 1}`;
   const a = raw && typeof raw === 'object' ? raw : {};
@@ -790,11 +796,32 @@ function buildTextile(raw, index) {
   if (!vetement) return { error: `${where} : le type de vêtement est vide` };
   if (vetement.length > VETEMENT_MAX) return { error: `${where} : type de vêtement trop long` };
 
-  const q = readQuantite(a.quantite, where);
-  if (q.error) return { error: q.error };
+  // Grille de tailles OU taille unique historique.
+  let taille = trimOrNull(a.taille);
+  let tailles = [];
+  let quantite;
+  if (Array.isArray(a.tailles) && a.tailles.length) {
+    for (const rt of a.tailles) {
+      const lab = trimOrNull(rt && rt.taille);
+      if (!lab) continue;
+      if (lab.length > 24) return { error: `${where} : taille trop longue` };
+      const n = Number.parseInt(rt && rt.quantite, 10);
+      if (!Number.isInteger(n) || n < 0 || n > 9999) {
+        return { error: `${where} — ${lab} : quantité invalide (0 à 9999)` };
+      }
+      if (n > 0) tailles.push({ taille: lab, quantite: n });
+    }
+    quantite = tailles.reduce((s, t) => s + t.quantite, 0);
+    taille = null;                       // le détail vit désormais dans `tailles`
+  } else {
+    if (taille && taille.length > 24) return { error: `${where} : taille trop longue` };
+    const q = readQuantite(a.quantite, where);
+    if (q.error) return { error: q.error };
+    quantite = q.quantite;
+  }
 
-  const taille = trimOrNull(a.taille);
-  if (taille && taille.length > 24) return { error: `${where} : taille trop longue` };
+  const note = readTexte(a.note, where, 'description', REMARQUE_MAX);
+  if (note.error) return { error: note.error };
 
   const ref = trimOrNull(a.ref);
   if (ref && ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
@@ -826,7 +853,8 @@ function buildTextile(raw, index) {
   return {
     ligne: {
       famille: 'textile',
-      vetement, ref, couleur, taille: taille || null, quantite: q.quantite, zones,
+      vetement, ref, couleur, note: note.value,
+      taille: taille || null, tailles, quantite, zones,
     },
   };
 }
@@ -959,13 +987,21 @@ const nomLigne = (l) => (l.famille === 'textile' ? l.vetement : l.ref);
 // doit lire sans jamais ouvrir le JSON ni rappeler le comptoir.
 function detailLigne(l) {
   if (l.famille === 'textile') {
-    const id = [l.ref && `réf. ${l.ref}`, l.couleur, l.taille && `taille ${l.taille}`]
+    // Grille de tailles (XS×2 · M×5…) ou taille unique historique.
+    const tailleTxt = (l.tailles && l.tailles.length)
+      ? l.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ')
+      : (l.taille ? `taille ${l.taille}` : '');
+    const id = [l.ref && `réf. ${l.ref}`, l.couleur, tailleTxt]
       .filter(Boolean).join(' · ');
     const tete = `• ${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`;
-    return [tete, ...l.zones.map((z) => {
-      const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-      return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
-    })].join('\n');
+    return [
+      tete,
+      ...(l.note ? [`   ↳ ${l.note}`] : []),
+      ...l.zones.map((z) => {
+        const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
+        return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
+      }),
+    ].join('\n');
   }
   if (l.famille === 'tasse') {
     const tete = `• ${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`;
@@ -1072,7 +1108,6 @@ function buildCommande(body) {
       ? { id: delai.id, label: delai.label, jours: delai.jours, majoration: delai.majoration || 0 }
       : null,                        // date choisie à la main : pas de délai type
     enBoite: b.enBoite === true,
-    maquette: b.maquette === true,
     remarque,
     deadline,
     priority,
@@ -1104,7 +1139,6 @@ function buildCommande(body) {
 
   const etats = [
     `Article en boîte : ${commande.enBoite ? 'oui' : 'non'}`,
-    commande.maquette ? 'Maquette à faire' : 'Maquette : non',
     `Paiement : ${paiement.statut.label.toLowerCase()}${paiement.mode ? ` (${paiement.mode.label})` : ''}`,
   ].join(' · ');
 

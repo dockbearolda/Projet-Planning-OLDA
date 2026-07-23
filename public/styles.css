@@ -167,24 +167,40 @@ body {
 }
 
 /* Ossature : barre du haut fixe + filet + zone de travail qui remplit l'écran */
+/* Le rail latéral est PLEINE HAUTEUR à gauche ; la barre du haut et la zone de
+   travail occupent la colonne de droite. Grille : l'ordre des enfants dans le
+   HTML n'a plus d'importance, chacun est posé par sa zone. */
 .shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--sidebar-w, 240px) 16px 1fr;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "sidebar resizer topbar"
+    "sidebar resizer filet"
+    "sidebar resizer main";
   height: 100vh;
   /* Android/Chrome : suit la hauteur réellement visible (barre d'adresse comprise) */
   height: 100dvh;
   overflow: hidden;
 }
+.topbar { grid-area: topbar; }
+.topbar-filet { grid-area: filet; }
+.sidebar { grid-area: sidebar; }
+.sidebar-resizer { grid-area: resizer; }
+.app { grid-area: main; }
 
 /* En PWA installée (plein écran natif), le bouton plein écran est superflu */
 @media (display-mode: fullscreen), (display-mode: standalone) {
   #fullscreenToggle { display: none !important; }
 }
 
-/* ---------------------------------------------------------------- Barre du haut */
+/* ---------------------------------------------------------------- Barre du haut
+   Elle ne couvre plus que la colonne de droite (la marque vit dans le rail).
+   `position: relative` est nécessaire pour que son `z-index` compte — c'est lui
+   qui, pendant une recherche, garde le champ AU-DESSUS de l'assombrissement
+   (voir `.topbar.searching`) et donc cliquable. */
 .topbar {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -192,10 +208,15 @@ body {
   padding: 10px 20px;
   min-height: 64px;
   background: var(--surface);
-  flex-shrink: 0;
 }
 
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* La marque coiffe le rail : cliquable (retour planning), sans soulignement. */
+.brand {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  padding: 14px 16px 10px;
+  color: inherit; text-decoration: none;
+}
+.sidebar .brand { border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
 .brand-logo {
   width: 40px;
   height: 40px;
@@ -321,13 +342,12 @@ body {
 .grid-search.has-value .grid-search-kbd { display: none; }
 
 /* ---------------------------------------------------------------- App = rail + travail */
+/* Zone de travail : simple conteneur de la carte `.work` (le rail et la poignée
+   sont désormais des frères, posés par la grille du .shell). La classe de
+   densité reste ici pour que `--row-h` descende jusqu'à la grille du planning. */
 .app {
-  flex: 1;
   min-height: 0;
-  display: grid;
-  /* rail (largeur réglable) · poignée · zone de travail */
-  grid-template-columns: var(--sidebar-w, 240px) 16px 1fr;
-  gap: 0;
+  display: flex;
   padding: 16px;
   overflow: hidden;
 }
@@ -364,13 +384,19 @@ body {
 body.sidebar-resizing { user-select: none; cursor: col-resize; }
 body.sidebar-resizing * { cursor: col-resize !important; }
 
-/* ---------------------------------------------------------------- Sidebar (rail) */
+/* ---------------------------------------------------------------- Sidebar (rail)
+   Pleine hauteur à gauche (posée par la grille du .shell), avec son propre
+   défilement et un filet qui la sépare de la zone de travail. */
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 0 0 4px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
 }
+.sidebar .nav-switch { padding-top: 4px; }
 .sidebar-head { padding: 12px 16px 6px; }
 .sidebar-head-label {
   font-size: 11px;
@@ -494,6 +520,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 
 /* ---------------------------------------------------------------- Zone de travail */
 .work {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2092,9 +2120,10 @@ button, a, .stage, .prio-pill, .deadline-badge,
    Responsive
    ========================================================================= */
 
-/* Tablette paysage / largeur intermédiaire */
+/* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
-  .app { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; padding: 12px; }
+  .shell { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; }
+  .app { padding: 12px; }
   /* +240 px depuis l'ajout des colonnes « État » et « → », pour que les 3 colonnes
      de texte gardent la même largeur plancher qu'avant (~104 px) : sans ça elles
      se tassent au lieu de laisser la grille défiler horizontalement. */
@@ -2103,31 +2132,35 @@ button, a, .stage, .prio-pill, .deadline-badge,
 
 /* Portrait étroit : rail réduit, grille scrollable */
 @media (max-width: 900px) {
-  .app { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
+  .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
   .topbar { gap: 12px; padding: 8px 12px; min-height: 56px; }
-  .brand-text { display: none; }
   .grid-search { max-width: none; }
   /* barre du haut serrée : bouton réduit à l'icône « + » */
   .btn-primary-label { display: none; }
   .topbar .btn-primary { padding: 10px; }
 }
 
-/* Mobile : rail au-dessus, grille pleine largeur */
+/* Mobile : tout s'empile — la barre du haut, puis le rail (compact, défilant),
+   puis la zone de travail. Le .shell devient une seule colonne qui défile. */
 @media (max-width: 640px) {
-  .app {
+  .shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "topbar" "sidebar" "main";
+    height: auto;
+    min-height: 100dvh;
     overflow: auto;
   }
-  /* rail empilé au-dessus : pas de redimensionnement horizontal */
+  .topbar-filet { display: none; }
+  /* rail empilé au-dessus de la zone de travail : pas de poignée horizontale */
   .sidebar-resizer { display: none; }
   .sidebar {
-    max-height: 168px;
-    border-radius: var(--radius-card);
-    background: var(--surface);
-    border: 1px solid var(--card-border);
-    box-shadow: var(--shadow-1);
+    max-height: 42vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
+  .sidebar .brand { padding: 10px 14px 8px; }
+  .app { padding: 12px; overflow: visible; }
   .work-head { padding: 14px 16px; }
   .grid-search-kbd { display: none; }
   .avatar { display: none; }
