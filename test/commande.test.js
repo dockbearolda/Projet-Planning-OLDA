@@ -59,7 +59,7 @@ const jour = (days) => {
       { vetement: 'T-shirt sans manches', ref: 'K3022', couleur: 'Light Sand', taille: 'S', quantite: 1, zones: marquage },
       { vetement: 'Débardeur crop top', ref: 'NS342', couleur: 'Ivory', taille: 'XS', quantite: 1, zones: marquage },
     ],
-    enBoite: true, maquette: true,
+    enBoite: true,
     deadline: jour(7), priority: 2, vendeuse: 'Mélina', referent: 'Loïc',
   };
 
@@ -102,7 +102,7 @@ const jour = (days) => {
   assert.match(row.description, /Cœur \[DTF\] : Les Doudous à SXM/);
   assert.match(row.description, /Dos \[DTF\] : Grand Case/);
   assert.match(row.description, /réf\. K3022 · Light Sand · taille S/);
-  assert.match(row.description, /Article en boîte : oui · Maquette à faire · Paiement : non payé/);
+  assert.match(row.description, /Article en boîte : oui · Paiement : non payé/);
   assert.match(row.product, /2 pièces/);
 
   // 4. Sans date ni délai, la règle maison s'applique : 5 jours (le délai par
@@ -322,7 +322,45 @@ const jour = (days) => {
   });
   assert.strictEqual(impaye.body.commande.paiement.mode, null);
 
-  console.log('✓ commande : contact pro/perso, demande simple, tasses/textile/objets, délais, paiement, annuaire et refus OK');
+  // 17. GRILLE DE TAILLES : un textile peut porter une quantité PAR TAILLE
+  //     (XS…2XL). La quantité de la ligne est la somme, les tailles à zéro
+  //     tombent, et le détail reste lisible dans le planning. Une description
+  //     de ligne accompagne la référence.
+  const grille = await post({
+    kind: 'commande',
+    client: { type: 'pro', facturation: 'Beach Club' },
+    textiles: [{
+      vetement: 'T-shirt', ref: 'BC100', couleur: 'Sable', note: 'Col rond, coupe large',
+      tailles: [
+        { taille: 'XS', quantite: 2 },
+        { taille: 'S', quantite: 0 },
+        { taille: 'M', quantite: 5 },
+        { taille: '2XL', quantite: 3 },
+      ],
+      zones: [{ zone: 'coeur', consigne: 'Logo' }],
+    }],
+    delai: 'jour_j',
+  });
+  assert.strictEqual(grille.status, 201, JSON.stringify(grille.body));
+  const gc = grille.body.commande;
+  assert.strictEqual(gc.textiles[0].quantite, 10, 'la quantité de ligne = somme des tailles');
+  assert.strictEqual(gc.textiles[0].tailles.length, 3, 'les tailles à zéro ne comptent pas');
+  assert.strictEqual(gc.quantite, 10);
+  // Le délai « Jour J » pose l'échéance du jour même et garde sa majoration.
+  assert.strictEqual(gc.deadline, jour(0));
+  assert.strictEqual(gc.delai.id, 'jour_j');
+  assert.strictEqual(gc.delai.majoration, 20);
+  const grilleRow = await rowOf(grille.body.id, 'chiffrage');
+  assert.match(grilleRow.description, /XS×2 · M×5 · 2XL×3/);
+  assert.match(grilleRow.description, /Col rond, coupe large/);
+  assert.match(grilleRow.description, /Délai : Jour J \(\+20 %\)/);
+
+  // 18. La maquette n'est plus un état de la fiche : plus de ligne « Maquette »
+  //     dans le récapitulatif, même si un ancien poste l'envoie encore.
+  const sansMaq = await post({ ...iguana, maquette: true });
+  assert.doesNotMatch((await rowOf(sansMaq.body.id, 'chiffrage')).description, /Maquette/);
+
+  console.log('✓ commande : contact pro/perso, demande simple, tasses/textile/objets, grille de tailles, délais, paiement, annuaire et refus OK');
   process.exit(0);
 })().catch((err) => {
   console.error(err);

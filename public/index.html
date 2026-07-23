@@ -29,24 +29,9 @@
 </head>
 <body>
   <div class="shell">
-    <!-- Barre du haut : logo + titre + recherche + avatar -->
+    <!-- Barre du haut : elle ne couvre plus que la zone de travail (à droite du
+         rail). La marque a rejoint le sommet du rail latéral, pleine hauteur. -->
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-logo" id="brandLogo" aria-hidden="true">
-          <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
-            <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
-            <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
-            <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
-            <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
-            <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
-          </svg>
-        </span>
-        <div class="brand-text">
-          <span class="brand-title">Planning OLDA</span>
-          <span class="brand-sub" id="todayDate"></span>
-        </div>
-      </div>
-
       <button class="btn-primary" id="btnNew" type="button">
         <span class="material-symbols-outlined" aria-hidden="true">add</span>
         <span class="btn-primary-label">Nouvelle commande</span>
@@ -71,49 +56,65 @@
     </header>
     <div class="topbar-filet" aria-hidden="true"></div>
 
-    <div class="app">
-      <!-- Sidebar = rail de filtres par étape -->
-      <aside class="sidebar" id="sidebar">
-        <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
-             dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
-        <nav class="nav-switch" aria-label="Navigation">
-          <!-- Le premier pas du client : deux entrées distinctes, tout en haut,
-               pour saisir en un tap une Demande (à chiffrer) ou une Commande
-               (déjà validée). Les deux ouvrent la même fiche rapide. -->
-          <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
-            <span class="material-symbols-outlined" aria-hidden="true">help</span>
-            <span class="nav-switch-label">Demande</span>
-          </a>
-          <a class="nav-switch-btn nav-switch-btn--intake" id="viewCommande" href="#commande">
-            <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
-            <span class="nav-switch-label">Commande</span>
-          </a>
-          <a class="nav-switch-btn" id="viewPlanning" href="#planning">
-            <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
-            <span class="nav-switch-label">Planning</span>
-          </a>
-          <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
-            <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
-            <span class="nav-switch-label">Dashboard</span>
-          </a>
-          <!-- Base clients (CRM) : la fiche pro de référence, éditable, qui
-               alimente la prise de commande. Épinglée en bas, avant les
-               réglages, comme un socle de l'outil. -->
-          <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
-            <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
-            <span class="nav-switch-label">Base clients</span>
-          </a>
-        </nav>
-        <div class="sidebar-head" id="sidebarHead">
-          <span class="sidebar-head-label">Étapes</span>
+    <!-- Rail latéral PLEINE HAUTEUR : placé tout à gauche par la grille du
+         .shell (quel que soit son ordre dans le HTML). La marque le coiffe. -->
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" id="brandHome" href="#planning" aria-label="Planning OLDA — aller au planning">
+        <span class="brand-logo" id="brandLogo" aria-hidden="true">
+          <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
+            <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
+            <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
+            <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
+            <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
+            <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <span class="brand-title">Planning OLDA</span>
+          <span class="brand-sub" id="todayDate"></span>
         </div>
-        <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
-      </aside>
+      </a>
+      <!-- Navigation de l'outil. Le hash de l'URL fait foi (voir applyHash
+           dans app.js) : un seul pilote, donc pas de vue qui se contredit. -->
+      <nav class="nav-switch" aria-label="Navigation">
+        <!-- Le premier pas du client : deux entrées distinctes, tout en haut,
+             pour saisir en un tap une Demande (à chiffrer) ou une Commande
+             (déjà validée). Les deux ouvrent la même fiche rapide. -->
+        <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
+          <span class="material-symbols-outlined" aria-hidden="true">help</span>
+          <span class="nav-switch-label">Demande</span>
+        </a>
+        <a class="nav-switch-btn nav-switch-btn--intake" id="viewCommande" href="#commande">
+          <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+          <span class="nav-switch-label">Commande</span>
+        </a>
+        <a class="nav-switch-btn" id="viewPlanning" href="#planning">
+          <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
+          <span class="nav-switch-label">Planning</span>
+        </a>
+        <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
+          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+          <span class="nav-switch-label">Dashboard</span>
+        </a>
+        <!-- Base clients (CRM) : la fiche pro de référence, éditable, qui
+             alimente la prise de commande. Épinglée en bas, avant les
+             réglages, comme un socle de l'outil. -->
+        <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
+          <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
+          <span class="nav-switch-label">Base clients</span>
+        </a>
+      </nav>
+      <div class="sidebar-head" id="sidebarHead">
+        <span class="sidebar-head-label">Étapes</span>
+      </div>
+      <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
+    </aside>
 
-      <!-- Poignée de redimensionnement du rail -->
-      <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Régler la largeur du rail"></div>
+    <!-- Poignée de redimensionnement du rail -->
+    <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Régler la largeur du rail"></div>
 
-      <!-- Zone de travail -->
+    <!-- Zone de travail : colonne de droite, sous la barre du haut. -->
+    <div class="app">
       <main class="work">
         <header class="work-head">
           <div class="work-head-left">
@@ -286,27 +287,20 @@
               </div>
               <p class="cmd-hint" id="cmd-client-known" hidden></p>
 
-              <!-- QUOI. L'objet est le titre du dossier : c'est lui qui part en
-                   colonne « Description » du planning quand rien n'est détaillé. -->
+              <!-- QUOI. Un seul champ « Objet / note » : le titre du dossier,
+                   qui part en colonne « Description » du planning quand rien
+                   n'est détaillé. Le détail, lui, vit désormais SOUS chaque
+                   produit (une description par ligne). -->
               <div class="cmd-row">
                 <div class="cmd-field cmd-field--objet">
-                  <label class="cmd-label" for="cmd-objet">Objet</label>
+                  <label class="cmd-label" for="cmd-objet">Objet / note <span class="cmd-label__opt">facultatif si un produit est ajouté</span></label>
                   <input class="cmd-input" id="cmd-objet" type="text"
-                         placeholder="20 t-shirts équipe · Devis 40 polos brodés…" autocomplete="off" />
-                </div>
-                <div class="cmd-field cmd-field--desc">
-                  <label class="cmd-label" for="cmd-desc">Description <span class="cmd-label__opt">facultatif</span></label>
-                  <textarea class="cmd-input cmd-textarea" id="cmd-desc" rows="1"
-                            placeholder="Ce que le client précise de vive voix…"></textarea>
+                         placeholder="20 t-shirts équipe · Devis 40 polos brodés · le client repasse mardi…" autocomplete="off" />
                 </div>
                 <div class="cmd-opts">
                   <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
                     <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
                     <span>En boîte</span>
-                  </button>
-                  <button class="cmd-optswitch" type="button" id="cmd-maquette" role="switch" aria-checked="true">
-                    <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
-                    <span>Maquette</span>
                   </button>
                 </div>
               </div>

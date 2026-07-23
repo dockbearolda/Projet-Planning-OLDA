@@ -128,21 +128,14 @@
 }
 #commande .cmd-input::placeholder { color: var(--text-3); }
 #commande .cmd-input:focus { outline: none; border-color: var(--primary); background-color: var(--field-focus); }
-/* Une seule ligne au repos, trois dès qu'on écrit vraiment : la description ne
-   réserve pas de la hauteur « au cas où ». */
-#commande .cmd-textarea {
-  height: 44px; min-height: 44px; padding: 10px 12px; line-height: 1.4; resize: vertical;
-  transition: height var(--dur-2) var(--ease), border-color var(--dur-1) var(--ease);
-}
-#commande .cmd-textarea:focus { height: 96px; }
 #commande .cmd-input--date { width: auto; min-width: 138px; padding: 0 6px 0 8px; font-size: 13.5px; }
 
 /* Le client d'abord, largement : c'est LUI qu'on lit dans le planning. */
 #commande .cmd-grid { display: grid; gap: 10px; align-items: end; flex: 1 1 620px; min-width: 0; }
 #commande .cmd-grid--pro { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); }
 #commande .cmd-grid--perso { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-#commande .cmd-field--objet { flex: 2 1 340px; }
-#commande .cmd-field--desc { flex: 2 1 300px; }
+/* L'objet / note prend toute la largeur restante ; « En boîte » se cale à droite. */
+#commande .cmd-field--objet { flex: 1 1 340px; }
 
 #commande .cmd-auto { position: relative; }
 #commande .cmd-auto__list {
@@ -292,7 +285,7 @@
   grid-template-columns: 60px minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 76px;
 }
 #commande .cmd-thead--textile, #commande .cmd-art__row--textile {
-  grid-template-columns: 60px minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .8fr) 76px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.1fr) 76px;
 }
 #commande .cmd-thead--objet, #commande .cmd-art__row--objet {
   grid-template-columns: 60px minmax(0, 1.1fr) minmax(0, 2.4fr) 76px;
@@ -323,6 +316,24 @@
 #commande .cmd-cell::-webkit-calendar-picker-indicator { display: none !important; }
 #commande .cmd-cell::selection { background: rgba(var(--primary-rgb), .3); }
 #commande .cmd-cell:focus { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+
+/* Textile : la description de la ligne, pleine largeur, juste sous la référence. */
+#commande .cmd-art__desc { margin-top: 8px; }
+
+/* Grille de tailles : une petite case chiffrable par taille (XS…2XL), alignées
+   comme les colonnes d'un tableau. Le libellé coiffe son champ ; les cases
+   restent compactes et se replient si le panneau se resserre. */
+#commande .cmd-sizes { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+#commande .cmd-size { flex: 0 0 78px; display: flex; flex-direction: column; gap: 3px; }
+#commande .cmd-size__lab {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-2); text-align: center;
+}
+#commande .cmd-size__in {
+  height: 40px; width: 100%; padding: 0 6px;
+  text-align: center; font-size: 15px; font-weight: 600;
+}
+#commande .cmd-size__in:focus { border-color: var(--primary); background-color: var(--field-focus); }
 
 /* Marquage textile. Un emplacement CHOISI perd sa puce et prend sa ligne :
    son nom en étiquette (qui le retire d'un tap) puis sa consigne. */
@@ -438,7 +449,7 @@
 #commande .cmd-body { padding: 12px; gap: 10px; }
 #commande .cmd-head { padding: 12px 13px; }
 #commande .cmd-grid--pro, #commande .cmd-grid--perso { grid-template-columns: minmax(0, 1fr); }
-#commande .cmd-field--objet, #commande .cmd-field--desc { flex: 1 1 100%; }
+#commande .cmd-field--objet { flex: 1 1 100%; }
 #commande .cmd-chips--delai { flex: 1 1 100%; }
 #commande .cmd-chips--delai .cmd-chip { flex: 1 1 46%; justify-content: center; }
 #commande .cmd-chips--fam .cmd-chip { flex: 1 1 46%; justify-content: center; }

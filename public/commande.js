@@ -47,17 +47,19 @@ const FAMILLES = ['tasse', 'textile', 'objet'];
 const state = {
   kind: 'demande',
   client: { type: 'pro', facturation: '', contact: '', whatsapp: '', email: '', prenom: '', nom: '' },
-  objet: '',
-  description: '',
+  objet: '',            // objet / note libre : le titre du dossier au planning
   delai: '',            // id du délai tapé ; vide = date choisie à la main
   deadline: '',
   ouvertes: [],         // familles dépliées (dans l'ordre où on les a tapées)
   lignes: { tasse: [], textile: [], objet: [] },
   paiement: { statut: 'non_paye', mode: '' },
   enBoite: false,
-  maquette: true,
   sending: false,
 };
+
+// Une ligne restée vierge se ramasse toute seule au bout de ce délai : on ne
+// laisse pas des lignes fantômes polluer la fiche entre deux clients.
+const LIGNE_TTL = 5 * 60 * 1000;
 
 const zoneById = (id) => CAT.zones.find((z) => z.id === id);
 const typeById = (id) => CAT.types.find((t) => t.id === id);
@@ -68,17 +70,24 @@ const familleById = (id) => CAT.familles.find((f) => f.id === id);
 // le rendu n'a jamais à se demander si une propriété existe.
 function newLigne(famille) {
   uid += 1;
-  const base = { uid, famille, quantite: 1, ref: '' };
+  // `ts` : dernier moment où on a touché la ligne — sert au ramassage des
+  // lignes vides restées à l'abandon (voir sweepVides).
+  const base = { uid, famille, quantite: 1, ref: '', ts: Date.now() };
   if (famille === 'tasse') {
     return { ...base, couleur: '', face1: '', face2: '', options: [], infos: '', typo: '', remarque: '' };
   }
   if (famille === 'textile') {
+    // `tailles` : une quantité par taille (XS…2XL), saisie dans la grille.
+    // `note` : la description libre de la ligne, sous la référence.
     // `choix` : la rangée de puces d'emplacements est ouverte. `plus` : elle
     // montre aussi les emplacements rares.
-    return { ...base, vetement: '', couleur: '', taille: '', zones: [], choix: false, plus: false };
+    return { ...base, vetement: '', couleur: '', note: '', tailles: {}, zones: [], choix: false, plus: false };
   }
   return { ...base, technique: '', infos: '' };
 }
+
+// Une taille de la grille porte-t-elle au moins une pièce ?
+const tailleRemplie = (l) => Object.values(l.tailles).some((v) => Number.parseInt(v, 10) > 0);
 
 const listOf = (famille) => state.lignes[famille];
 const byUid = (u) => FAMILLES
@@ -93,7 +102,8 @@ function ligneVide(l) {
       && !l.options.length && !l.infos.trim() && !l.typo.trim() && !l.remarque.trim();
   }
   if (l.famille === 'textile') {
-    return !l.vetement.trim() && !l.ref.trim() && !l.couleur.trim() && !l.taille.trim() && !l.zones.length;
+    return !l.vetement.trim() && !l.ref.trim() && !l.couleur.trim()
+      && !l.note.trim() && !tailleRemplie(l) && !l.zones.length;
   }
   return !l.ref.trim() && !l.technique && !l.infos.trim();
 }
@@ -274,7 +284,7 @@ function cell(role, l, value, placeholder, label, opts) {
 // convention plutôt qu'un simple exemple.
 const THEADS = {
   tasse: ['Qté', 'Référence tasse', 'Coloris', 'Face 1 (anse à droite)', 'Face 2 (anse à gauche)', ''],
-  textile: ['Qté', 'Vêtement', 'Réf. OLDA / fournisseur', 'Coloris', 'Taille', ''],
+  textile: ['Vêtement', 'Réf. OLDA / fournisseur', 'Coloris', ''],
   objet: ['Qté', 'Référence objet', 'Personnalisation', ''],
 };
 
@@ -336,20 +346,49 @@ function buildTasse(l, index) {
 }
 
 // ------------------------------------------------------------------- textile
+// Le vêtement, puis DEUX choses sous sa référence : une description libre, et
+// une GRILLE DE TAILLES (XS…2XL) où l'on inscrit la quantité par taille. La
+// quantité de la ligne se déduit de la grille — on ne redemande pas un « Qté ».
 function buildTextile(l, index) {
   const art = el('div', 'cmd-art');
   art.dataset.uid = l.uid;
 
   const row = el('div', 'cmd-art__row cmd-art__row--textile');
   row.append(
-    cell('quantite', l, l.quantite, '1', `Quantité, textile ${index + 1}`, { inputmode: 'numeric' }),
     cell('vetement', l, l.vetement, 'T-shirt sans manches', `Vêtement, ligne ${index + 1}`, { list: 'cmd-dl-vetements' }),
     cell('ref', l, l.ref, 'K3022', `Référence, ligne ${index + 1}`),
     cell('couleur', l, l.couleur, 'Light Sand', `Coloris, ligne ${index + 1}`),
-    cell('taille', l, l.taille, 'S', `Taille, ligne ${index + 1}`, { list: 'cmd-dl-tailles' }),
     outils(l, index),
   );
   art.append(row);
+
+  // Description de la ligne, juste sous la référence.
+  const desc = el('div', 'cmd-art__desc');
+  desc.append(cell('note', l, l.note, 'Description : col rond, coupe large, remarques…', `Description, ligne ${index + 1}`));
+  art.append(desc);
+
+  // Grille des tailles : une petite case chiffrable par taille.
+  const grille = el('div', 'cmd-sizes');
+  grille.setAttribute('role', 'group');
+  grille.setAttribute('aria-label', `Tailles, ligne ${index + 1}`);
+  for (const t of CAT.taillesGrille) {
+    const box = el('label', 'cmd-size');
+    box.append(el('span', 'cmd-size__lab', t));
+    const inp = el('input', 'cmd-input cmd-size__in');
+    inp.type = 'text';
+    inp.inputMode = 'numeric';
+    inp.autocomplete = 'off';
+    inp.placeholder = '0';
+    inp.value = l.tailles[t] || '';
+    inp.dataset.role = 'taille-qty';
+    inp.dataset.uid = l.uid;
+    inp.dataset.fam = 'textile';
+    inp.dataset.size = t;
+    inp.setAttribute('aria-label', `Quantité taille ${t}, ligne ${index + 1}`);
+    box.append(inp);
+    grille.append(box);
+  }
+  art.append(grille);
 
   // Placements. Un emplacement CHOISI n'a plus besoin de sa puce : il prend sa
   // ligne, avec sa consigne. Les puces ne s'affichent donc que pendant le
@@ -521,7 +560,7 @@ function buildVide() {
   box.append(
     ic('inventory_2'),
     el('p', 'cmd-vide__t', 'Aucun produit détaillé'),
-    el('p', 'cmd-vide__s', 'Tapez une famille ci-dessus pour détailler. Sinon l\'objet de la demande suffit : la fiche part telle quelle.'),
+    el('p', 'cmd-vide__s', 'Tapez une famille ci-dessus pour détailler. Sinon l\'objet / note en haut suffit : la fiche part telle quelle.'),
   );
   return box;
 }
@@ -715,8 +754,6 @@ function render() {
 
   $('#cmd-boite').setAttribute('aria-checked', String(state.enBoite));
   $('#cmd-boite').classList.toggle('is-on', state.enBoite);
-  $('#cmd-maquette').setAttribute('aria-checked', String(state.maquette));
-  $('#cmd-maquette').classList.toggle('is-on', state.maquette);
 
   const nom = nomClient();
   const known = nom && CLIENTS.find((c) => fold(c.entreprise) === fold(nom));
@@ -798,7 +835,7 @@ function wire() {
     if (t.dataset.nature) return setNatureClient(t.dataset.nature);
     if (role === 'delai') { setDelai(t.dataset.value); return render(); }
     if (role === 'famille') return toggleFamille(t.dataset.value);
-    if (role === 'fam-close') return toggleFamille(t.dataset.fam);
+    if (role === 'fam-close') return removeFamille(t.dataset.fam);
     if (role === 'pay-statut') {
       state.paiement.statut = t.dataset.value;
       if (state.paiement.statut === 'non_paye') state.paiement.mode = '';
@@ -809,7 +846,6 @@ function wire() {
       return render();
     }
     if (t.id === 'cmd-boite') { state.enBoite = !state.enBoite; return render(); }
-    if (t.id === 'cmd-maquette') { state.maquette = !state.maquette; return render(); }
     if (role === 'add-ligne') {
       const l = newLigne(t.dataset.fam);
       listOf(t.dataset.fam).push(l);
@@ -831,12 +867,13 @@ function wire() {
       return render();
     }
     if (role === 'dup') {
-      // Le cas courant du comptoir : même marquage, autre taille / couleur.
-      // Les tableaux sont recopiés, sinon les deux lignes partagent leurs zones.
+      // Le cas courant du comptoir : même marquage, autres tailles / couleur.
+      // Les tableaux et objets sont recopiés, sinon les deux lignes les partagent.
       uid += 1;
-      const copy = { ...l, uid };
+      const copy = { ...l, uid, ts: Date.now() };
       if (l.zones) copy.zones = l.zones.map((z) => ({ ...z }));
       if (l.options) copy.options = [...l.options];
+      if (l.tailles) copy.tailles = { ...l.tailles };
       const list = listOf(l.famille);
       list.splice(list.indexOf(l) + 1, 0, copy);
       renderFams();
@@ -892,12 +929,12 @@ function wire() {
     if (t.id === 'cmd-whatsapp' || t.id === 'cmd-whatsapp-perso') { state.client.whatsapp = t.value; return; }
     if (t.id === 'cmd-email') { state.client.email = t.value; return; }
     if (t.id === 'cmd-objet') { state.objet = t.value; return render(); }
-    if (t.id === 'cmd-desc') { state.description = t.value; return; }
     // Une date posée à la main l'emporte : plus aucune puce de délai allumée.
     if (t.id === 'cmd-deadline') { state.deadline = t.value; state.delai = ''; return render(); }
 
     const l = t.dataset.uid ? byUid(t.dataset.uid) : null;
     if (!l) return;
+    l.ts = Date.now();                    // la ligne vient d'être touchée : elle ne sera pas ramassée
     if (t.dataset.role === 'quantite') {
       // Champ texte : on filtre les chiffres à la frappe (pas de flèches, pas
       // de « e » ni de moins). On ne réécrit la valeur QUE si elle change,
@@ -908,12 +945,21 @@ function wire() {
       l.quantite = Number.isInteger(n) && n > 0 ? n : 1;
       return;
     }
+    if (t.dataset.role === 'taille-qty') {
+      // Quantité d'une taille de la grille : on filtre les chiffres. Vide = 0
+      // (la taille ne part pas). Pas de re-rendu à la frappe (le curseur saute).
+      const digits = t.value.replace(/\D+/g, '').replace(/^0+(?=\d)/, '').slice(0, 4);
+      if (digits !== t.value) t.value = digits;
+      if (digits) l.tailles[t.dataset.size] = digits;
+      else delete l.tailles[t.dataset.size];
+      return;
+    }
     if (t.dataset.role === 'consigne') {
       const z = l.zones.find((x) => x.zone === t.dataset.zone);
       if (z) z.consigne = t.value;
       return;
     }
-    const champs = ['vetement', 'ref', 'couleur', 'taille', 'face1', 'face2', 'infos', 'typo', 'remarque'];
+    const champs = ['vetement', 'ref', 'couleur', 'note', 'face1', 'face2', 'infos', 'typo', 'remarque'];
     if (champs.includes(t.dataset.role)) {
       l[t.dataset.role] = t.value;
       // Ces champs (dé)verrouillent « Enregistrer » : ils portent l'identité
@@ -965,10 +1011,13 @@ function setNatureClient(nature) {
   champ.focus();
 }
 
-// Une famille se déplie d'un tap, avec sa première ligne déjà prête. La refermer
-// jette ses lignes : on ne garde pas de produit invisible dans une fiche.
+// Une famille se déplie d'un tap, avec sa première ligne déjà prête.
+// RE-CLIC : on ne détruit JAMAIS ce qui est déjà saisi. Une famille encore
+// vierge se referme (elle ne servait à rien) ; une famille qui contient quelque
+// chose reste ouverte — pour la retirer volontairement, la croix du bloc.
 function toggleFamille(id) {
   if (state.ouvertes.includes(id)) {
+    if (lignesRemplies(id).length) return;   // des lignes remplies : re-clic sans effet
     state.ouvertes = state.ouvertes.filter((f) => f !== id);
     state.lignes[id] = [];
     renderFams();
@@ -981,11 +1030,50 @@ function toggleFamille(id) {
   focusLigne(listOf(id)[0]);
 }
 
+// Retrait VOLONTAIRE d'un bloc (la croix de son bandeau). Si des lignes sont
+// remplies, on confirme : c'est le seul chemin qui jette des données, et il ne
+// doit jamais partir d'un tap malheureux.
+function removeFamille(id) {
+  if (lignesRemplies(id).length
+      && !window.confirm(`Retirer le bloc ${familleById(id).label} et ses lignes ?`)) {
+    return;
+  }
+  state.ouvertes = state.ouvertes.filter((f) => f !== id);
+  state.lignes[id] = [];
+  renderFams();
+  render();
+}
+
+// Ramasse les lignes restées vierges trop longtemps (voir LIGNE_TTL) : on évite
+// qu'un tap de trop ou une hésitation laissent traîner des lignes fantômes. On
+// ne balaie pas pendant une frappe (on ne vole pas le focus), et une famille
+// ouverte garde toujours au moins une ligne pour rester utilisable.
+function sweepVides() {
+  const a = document.activeElement;
+  if (a && ROOT.contains(a) && a.tagName === 'INPUT') return;
+  const now = Date.now();
+  let changed = false;
+  for (const fam of FAMILLES) {
+    if (!state.ouvertes.includes(fam)) continue;
+    const list = state.lignes[fam];
+    const kept = list.filter((l) => !(ligneVide(l) && now - (l.ts || now) > LIGNE_TTL));
+    if (kept.length === list.length) continue;
+    if (!kept.length) {
+      // Tout était vide : on garde une seule ligne neuve, prête à servir.
+      kept.push(newLigne(fam));
+    }
+    state.lignes[fam] = kept;
+    changed = true;
+  }
+  if (changed) { renderFams(); render(); }
+}
+
 // ---------------------------------------------------------------------------
 // Les tableaux se tiennent au clavier comme un tableur : on clique, la cellule
-// est sélectionnée, on écrit par-dessus ; Entrée ou ↓ descendent d'une ligne
-// (et en créent une au bout), ↑ remonte. Tab reste le déplacement natif d'une
-// colonne à l'autre.
+// est sélectionnée, on écrit par-dessus. ↑ / ↓ passent d'une ligne à l'autre
+// PARMI CELLES QUI EXISTENT — jamais de création automatique. ENTRÉE ne fait que
+// valider la saisie (elle sort du champ) : pour une ligne de plus, « + Ligne ».
+// Tab reste le déplacement natif d'une colonne à l'autre.
 // ---------------------------------------------------------------------------
 function cellAt(ligne, role) {
   return ROOT.querySelector(`.cmd-art[data-uid="${ligne.uid}"] .cmd-cell--${role}`);
@@ -997,15 +1085,8 @@ function moveCell(from, step) {
   if (!list) return;
   const i = list.findIndex((l) => String(l.uid) === String(from.dataset.uid));
   if (i < 0) return;
-  let j = i + step;
-  if (j < 0) return;
-  if (j >= list.length) {
-    // Entrée sur la dernière ligne : on en ouvre une nouvelle, comme un tableur.
-    list.push(newLigne(from.dataset.fam));
-    renderFams();
-    render();
-    j = list.length - 1;
-  }
+  const j = i + step;
+  if (j < 0 || j >= list.length) return;   // on ne déborde pas, on ne crée rien
   const next = cellAt(list[j], role);
   if (next) { next.focus(); next.select(); }
 }
@@ -1043,7 +1124,10 @@ function wireCells() {
   ROOT.addEventListener('keydown', (e) => {
     const c = e.target.closest && e.target.closest('.cmd-cell');
     if (!c) return;
-    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); moveCell(c, 1); }
+    // Entrée = « je valide ce que je viens de taper » : on sort du champ, sans
+    // créer de ligne. Les flèches naviguent entre lignes existantes.
+    if (e.key === 'Enter') { e.preventDefault(); c.blur(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); moveCell(c, 1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveCell(c, -1); }
     else if (e.key === 'Escape') c.blur();
   });
@@ -1069,8 +1153,13 @@ function payload() {
       };
     }
     if (l.famille === 'textile') {
+      // La grille : une entrée par taille effectivement chiffrée (> 0).
+      const tailles = CAT.taillesGrille
+        .map((t) => ({ taille: t, quantite: Number.parseInt(l.tailles[t], 10) || 0 }))
+        .filter((t) => t.quantite > 0);
       return {
-        vetement: l.vetement, ref: l.ref, couleur: l.couleur, taille: l.taille, quantite: l.quantite,
+        vetement: l.vetement, ref: l.ref, couleur: l.couleur, note: l.note,
+        tailles,
         zones: l.zones.map((z) => ({ zone: z.zone, consigne: z.consigne })),
       };
     }
@@ -1081,7 +1170,6 @@ function payload() {
     kind: state.kind,
     client,
     objet: state.objet,
-    description: state.description,
     delai: state.delai,
     deadline: state.deadline,
     tasses: lignesRemplies('tasse').map(net),
@@ -1089,7 +1177,6 @@ function payload() {
     objets: lignesRemplies('objet').map(net),
     paiement: { statut: state.paiement.statut, mode: state.paiement.mode },
     enBoite: state.enBoite,
-    maquette: state.maquette,
   };
 }
 
@@ -1134,16 +1221,14 @@ function showDone(c) {
 function reset() {
   state.client = { type: 'pro', facturation: '', contact: '', whatsapp: '', email: '', prenom: '', nom: '' };
   state.objet = '';
-  state.description = '';
   state.ouvertes = [];
   state.lignes = { tasse: [], textile: [], objet: [] };
   state.paiement = { statut: 'non_paye', mode: '' };
   state.enBoite = false;
-  state.maquette = true;
   state.sending = false;
 
   for (const id of ['cmd-facturation', 'cmd-contact', 'cmd-whatsapp', 'cmd-email',
-    'cmd-prenom', 'cmd-nom', 'cmd-whatsapp-perso', 'cmd-objet', 'cmd-desc']) {
+    'cmd-prenom', 'cmd-nom', 'cmd-whatsapp-perso', 'cmd-objet']) {
     $(`#${id}`).value = '';
   }
   setDelai(CAT.delaiDefaut);
@@ -1183,4 +1268,6 @@ export async function initCommande(root) {
   wire();
   render();
   loadClients().then(render);
+  // Ramassage périodique des lignes restées vierges (voir sweepVides).
+  setInterval(sweepVides, 60 * 1000);
 }
