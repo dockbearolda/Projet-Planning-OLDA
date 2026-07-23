@@ -2918,15 +2918,13 @@ function initBrandReflection() {
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
-const $viewExpress = document.getElementById('viewExpress');
-const $express = document.getElementById('express');
 const $viewCommande = document.getElementById('viewCommande');
 const $viewDemande = document.getElementById('viewDemande');
 const $commande = document.getElementById('commande');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 
-let viewMode = 'planning';        // 'planning' | 'dashboard' | 'express' | 'commande'
+let viewMode = 'planning';        // 'planning' | 'dashboard' | 'commande' | 'clients'
 // La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
 // la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
 let commandeNature = 'demande';
@@ -2960,26 +2958,11 @@ const dashboard = createDashboard({
 // deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
 // contredire — « #dashboard » affiché sur le planning, et retour au dashboard
 // au premier rechargement.
-// Le module de la Commande Express est lourd (catalogue, aperçu de la tasse) :
-// on ne le charge qu'au premier passage sur la vue, puis il reste monté. Les
-// bascules suivantes ne sont qu'un changement de classe — instantanées, et la
-// saisie en cours est conservée.
-let expressLoading = null;
-function mountExpress() {
-  if (!$express) return;
-  if (!expressLoading) {
-    expressLoading = import('./express.js')
-      .then((m) => m.initExpress($express))
-      .catch((err) => {
-        expressLoading = null;              // rechargeable au prochain essai
-        console.error('Commande Express : chargement impossible', err);
-      });
-  }
-}
-
-// Même traitement pour la Prise de commande (catalogue textile, annuaire
-// client) : chargée au premier passage, puis montée une bonne fois. La nature
-// courante (demande / commande) lui est poussée dès qu'elle est prête.
+// La Prise de commande (catalogue textile, annuaire client) est chargée au
+// premier passage sur la vue, puis montée une bonne fois : les bascules
+// suivantes ne sont qu'un changement de classe — instantanées, et la saisie en
+// cours est conservée. La nature (demande / commande) lui est poussée dès
+// qu'elle est prête.
 let commandeLoading = null;
 function mountCommande() {
   if (!$commande) return;
@@ -3023,7 +3006,6 @@ function setViewMode(mode) {
   // ces éléments portent une règle `display` qui l'écrase.
   if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
-  if ($viewExpress) $viewExpress.classList.toggle('active', mode === 'express');
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
   // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
@@ -3034,20 +3016,16 @@ function setViewMode(mode) {
   viewMode = mode;
 
   const dash = mode === 'dashboard';
-  const express = mode === 'express';
   const commande = mode === 'commande';
   const clients = mode === 'clients';
   if ($dashboard) $dashboard.hidden = !dash;
-  if ($express) $express.hidden = !express;
   if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   document.body.classList.toggle('view-dashboard', dash);
-  document.body.classList.toggle('view-express', express);
   document.body.classList.toggle('view-commande', commande);
   document.body.classList.toggle('view-clients', clients);
 
   if (dash) dashboard.show(); else dashboard.hide();
-  if (express) mountExpress();
   if (commande) mountCommande();
   if (clients) mountClients();
   if (mode === 'planning') {
@@ -3057,7 +3035,7 @@ function setViewMode(mode) {
 }
 
 // #demande et #commande ouvrent la MÊME vue, avec une nature différente.
-const VIEWS = { '#dashboard': 'dashboard', '#express': 'express', '#demande': 'commande', '#commande': 'commande', '#clients': 'clients' };
+const VIEWS = { '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande', '#clients': 'clients' };
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';

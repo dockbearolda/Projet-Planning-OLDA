@@ -607,6 +607,69 @@ async function setMachines(list) {
   return clean;
 }
 
+// --- Emplacements d'impression ajoutés au comptoir ---------------------------
+// Le catalogue couvre les zones courantes (cœur, dos, manches…), mais l'atelier
+// en croise toujours une nouvelle : « Nuque », « Bas du dos », un flanc de sac.
+// La fiche de prise de commande permet donc d'en créer une à la volée ; elle est
+// stockée ici (app_meta.commande_zones, tableau JSON) et rejoint la liste de
+// TOUS les postes, sans redéploiement ni migration.
+// Les zones du catalogue, elles, ne passent jamais par là : elles sont figées.
+const ZONE_LABEL_MAX = 40;
+// Même convention d'identifiant que le catalogue (« haut_dos », « manche_g ») :
+// le front applique la même règle pour afficher la zone sans attendre le serveur.
+const zoneSlug = (s) => slugify(s).replace(/-/g, '_');
+
+async function getCommandeZones() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones'");
+  if (!rows[0]) return [];
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((z) => z && typeof z === 'object' && z.id && z.label)
+      .map((z) => ({ id: String(z.id), label: String(z.label) }));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Ajoute une zone. `reserved` = les zones du catalogue, qu'on ne double jamais.
+// Renvoie { id, zone, zones } ; `zone` est l'existante si le libellé retombe sur
+// une zone déjà ajoutée (« Nuque » deux fois = une seule zone), et null si c'est
+// une zone du catalogue (rien à créer, l'appelant l'a déjà). Le rapprochement se
+// fait sur l'identifiant ET sur le libellé normalisé : « Avant gauche » retrouve
+// la zone `avant_g` du catalogue plutôt que d'en créer une jumelle.
+async function addCommandeZone(label, reserved = []) {
+  const clean = String(label == null ? '' : label).trim().slice(0, ZONE_LABEL_MAX);
+  const id = zoneSlug(clean);
+  if (!clean || !id) return null;
+
+  const zones = await getCommandeZones();
+  const same = (z) => z.id === id || zoneSlug(z.label) === id;
+  const cat = reserved.find(same);
+  if (cat) return { id: cat.id, zone: null, zones };
+  const known = zones.find(same);
+  if (known) return { id: known.id, zone: known, zones };
+
+  const next = [...zones, { id, label: clean }];
+  const value = JSON.stringify(next);
+  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [value]);
+  return { id, zone: next[next.length - 1], zones: next };
+}
+
+// Retire une zone ajoutée au comptoir (une faute de frappe se corrige). Les
+// commandes déjà enregistrées gardent leur marquage : le libellé y est recopié
+// au moment de l'enregistrement, pas relu dans cette liste.
+async function removeCommandeZone(id) {
+  const zones = await getCommandeZones();
+  const next = zones.filter((z) => z.id !== id);
+  if (next.length === zones.length) return zones;
+  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [JSON.stringify(next)]);
+  return next;
+}
+
 module.exports = {
   pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
@@ -614,4 +677,5 @@ module.exports = {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
+  getCommandeZones, addCommandeZone, removeCommandeZone,
 };

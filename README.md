@@ -152,10 +152,10 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
-| GET | `/api/fiche/catalog` | Catalogue Commande Express (produits, options, délais, polices, visuels, encres, placements). |
-| POST | `/api/fiche` | Enregistre une Commande Express → crée la demande dans le planning. |
 | GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, vêtements, tailles, zones, techniques, états de facture). |
 | POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning. |
+| POST | `/api/commande/zones` | Ajoute un emplacement d'impression (`{ label }`) et renvoie la liste complète. |
+| DELETE | `/api/commande/zones/:id` | Retire un emplacement ajouté au comptoir (ceux du catalogue sont figés). |
 | GET | `/api/clients` | Annuaire client déduit des commandes déjà saisies (auto-complétion). |
 
 Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
@@ -166,24 +166,6 @@ code HTTP adapté.
 
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
-
-## Commande Express — `/#express`
-
-La prise de commande au comptoir, sur la trame validée par la direction :
-menu latéral, en-tête d'action, colonne de synthèse, **aperçu visuel de la
-tasse**, panneaux par face, bandeau de pilotage en bas. La commande validée
-part dans le planning et apparaît sur tous les écrans ouverts en ~150 ms.
-
-- **Aperçu en direct** : le texte s'affiche dans sa vraie police et sa vraie
-  couleur d'encre, le visuel OLDA à sa taille et à sa place, sur un dessin de
-  tasse (anse à droite / à gauche, plus une vue de dessous si elle sert).
-- **2 faces par défaut + éléments libres** : « Ajouter un élément » pose un
-  visuel de plus, sur n'importe quelle face — y compris le dessous.
-- **Par élément** : visuel ou texte, police, couleur d'encre, emplacement
-  (gauche / centré / droite), taille, remarque atelier. Texte borné à
-  60 caractères, avec compteur.
-- **Total live**, recalculé à chaque geste sans aller-retour réseau.
-- **Reçu imprimable** après validation.
 
 ## Prise de commande — `/#demande` et `/#commande`
 
@@ -227,13 +209,13 @@ vêtement, une taille ou une zone.
 
 ## Navigation — une seule page, quatre vues
 
-Planning, Dashboard, Prise de commande et Commande Express sont **quatre vues
+Planning, Dashboard, Prise de commande et Base clients sont **quatre vues
 d'un même document**, pas quatre pages. Passer de l'une à l'autre ne recharge
 rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
 
 Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`, `#demande`,
-`#commande`, `#express`. La navigation, dans le rail de gauche, n'est faite que
+`#commande`, `#clients`. La navigation, dans le rail de gauche, n'est faite que
 de liens — cliquer change le hash, le hash change la vue. Chaque écran est donc
 partageable par son URL et le bouton « Retour » du navigateur fonctionne.
 `#demande` et `#commande` ouvrent la même vue de saisie, seule la nature diffère
@@ -243,32 +225,23 @@ Le bouton « Nouvelle commande » de la barre du haut ne crée une ligne que dan
 la grille : il est donc masqué hors du Planning, où son résultat serait
 invisible.
 
-`/fiche` redirige (301) vers `/#express` : les raccourcis déjà posés sur les
+`/fiche` redirige (301) vers `/#commande` : les raccourcis déjà posés sur les
 écrans de l'atelier continuent de marcher.
 
-Le module de la Commande Express (`express.js`, catalogue + aperçu de la
-tasse) n'est chargé qu'au **premier** passage sur la vue : le planning ne paie
+Le module de la Prise de commande (`commande.js`, catalogue textile + annuaire
+client) n'est chargé qu'au **premier** passage sur la vue : le planning ne paie
 rien tant qu'on ne prend pas de commande. Sa feuille de style est entièrement
-scopée sous `#express`, pour qu'aucune règle ne puisse fuir sur les deux
-autres vues.
+scopée sous `#commande`, pour qu'aucune règle ne puisse fuir sur les autres
+vues.
 
-### Le barème vit dans `catalog.json`
+### Le catalogue vit dans `catalog.json`
 
-C'est le SEUL endroit à modifier quand les tarifs changent : prix des tasses,
-prix de chaque option, taux de majoration, références de visuels, polices,
-encres, placements, tailles. Le front l'affiche, le serveur s'en ressert pour
-**recalculer** le total — le montant envoyé par le poste de vente n'est jamais
-cru sur parole.
-
-Deux règles de prix que le serveur applique quoi qu'il arrive :
-
-- **Le tarif du logo OLDA est porté par la face**, pas par le choix reçu :
-  6 € sur un flanc, 2 € sous la tasse. Réclamer le tarif « dessous » sur une
-  face ne change rien.
-- **« Date précise » n'a pas de taux propre** : il se déduit de la date
-  choisie, avec les mêmes seuils que les délais nommés (jour même → +20 %,
-  moins de 3 jours → +10 %, au-delà → 0 %). Sinon « date précise = demain »
-  offrirait l'express au tarif standard.
+C'est le SEUL endroit à modifier pour ajouter un vêtement, une taille, une
+technique ou un état de facture. Les **emplacements d'impression**, eux, se
+complètent aussi depuis la fiche (« + Emplacement ») : la zone créée est
+stockée en base (`app_meta.commande_zones`) et rejoint la liste de tous les
+postes, sans redéploiement. Les zones du catalogue restent figées ; seules
+celles ajoutées au comptoir se retirent.
 
 Le détail structuré est conservé dans `requests.fiche` (jsonb) ;
 `requests.description` en porte en parallèle un résumé lisible, donc la grille
@@ -282,15 +255,15 @@ n'a jamais besoin de lire ce JSON.
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
-├── catalog.json      barème Express + catalogue Prise de commande (source unique)
+├── catalog.json      catalogue Prise de commande (source unique)
 ├── public/
-│   ├── index.html    coquille + les 4 vues (planning, dashboard, commande, express)
+│   ├── index.html    coquille + les 4 vues (planning, dashboard, commande, clients)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── commande.css  vue Prise de commande, scopée sous #commande
 │   ├── commande.js   état, articles, zones, annuaire client, envoi
-│   ├── express.css   vue Commande Express, scopée sous #express
-│   └── express.js    état, aperçu tasse, calcul du total, envoi
+│   ├── clients.css   vue Base clients, scopée sous #clients
+│   └── clients.js    liste, fiche éditable, notes
 ├── .env.example
 └── README.md
 ```

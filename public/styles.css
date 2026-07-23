@@ -2207,8 +2207,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
    =========================================================================== */
 
 /* Commutateur Planning / Dashboard en haut du rail. */
-/* Navigation de l'outil, en tête du rail. Trois entrées empilées : les
-   libellés (« Commande Express ») ne tiennent pas côte à côte. */
+/* Navigation de l'outil, en tête du rail. Entrées empilées : les libellés
+   (« Base clients », « Dashboard ») ne tiennent pas côte à côte. */
 .nav-switch {
   display: flex;
   flex-direction: column;
@@ -2269,11 +2269,6 @@ body.view-dashboard .grid-wrap,
 body.view-dashboard .fiverr-tool,
 body.view-dashboard .sidebar-head,
 body.view-dashboard #stages,
-body.view-express .work-head,
-body.view-express .grid-wrap,
-body.view-express .fiverr-tool,
-body.view-express .sidebar-head,
-body.view-express #stages,
 body.view-commande .work-head,
 body.view-commande .grid-wrap,
 body.view-commande .fiverr-tool,
@@ -2288,7 +2283,6 @@ body.view-clients #stages { display: none !important; }
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
 body.view-dashboard #btnNew,
-body.view-express #btnNew,
 body.view-commande #btnNew,
 body.view-clients #btnNew { display: none !important; }
 

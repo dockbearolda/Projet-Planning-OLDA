@@ -1,72 +1,4 @@
 {
-  "products": [
-    { "sku": "tasse350", "label": "Tasse Céramique 350 ml", "short": "Tasse blanche", "price": 10, "stock": true },
-    { "sku": "expresso180", "label": "Tasse Expresso 180 ml", "short": "Tasse expresso", "price": 6, "stock": true }
-  ],
-  "colors": ["Blanc", "Noir / Blanc", "Rouge / Blanc", "Bleu / Blanc", "Magique"],
-  "faces": [
-    { "id": "face1", "label": "Face 1", "hint": "côté anse", "handle": "left", "logoOption": "logo_olda_face" },
-    { "id": "face2", "label": "Face 2", "hint": "face opposée", "handle": "right", "logoOption": "logo_olda_face" },
-    { "id": "dessous", "label": "Dessous", "hint": "sous la tasse", "handle": "none", "logoOption": "logo_olda_dessous" }
-  ],
-  "options": [
-    { "id": "aucune", "label": "Aucun visuel", "price": 0, "needs": null },
-    { "id": "texte", "label": "Texte personnalisé", "price": 10, "needs": "texte" },
-    { "id": "logo_olda_face", "label": "Logo OLDA", "price": 6, "needs": "logo_olda" },
-    { "id": "logo_olda_dessous", "label": "Logo OLDA", "price": 2, "needs": "logo_olda" },
-    { "id": "logo_client_vecto", "label": "Logo client vectorisé", "price": 8, "needs": "logo_client" },
-    { "id": "logo_client_reprise", "label": "Logo client à reprendre", "price": 10, "needs": "logo_client" }
-  ],
-  "typos": [
-    { "id": "TYPO-01", "label": "Calibri", "css": "'Calibri','Carlito',sans-serif" },
-    { "id": "TYPO-02", "label": "Times", "css": "'Times New Roman',Times,serif" },
-    { "id": "TYPO-03", "label": "Script", "css": "'Segoe Script','Brush Script MT',cursive" },
-    { "id": "TYPO-04", "label": "Impact", "css": "Impact,'Haettenschweiler',sans-serif" },
-    { "id": "TYPO-05", "label": "Courier", "css": "'Courier New',Courier,monospace" }
-  ],
-  "logosOlda": [
-    { "ref": "BEA-16", "label": "Logo OLDA", "src": "olda-logo.svg" },
-    { "ref": "CAS-02", "label": "Logo OLDA", "src": "olda-logo.svg" },
-    { "ref": "WRA-01", "label": "Logo OLDA", "src": "olda-logo.svg" },
-    { "ref": "SXM-01", "label": "Logo OLDA", "src": "olda-logo.svg" },
-    { "ref": "HAV-01", "label": "Logo OLDA", "src": "olda-logo.svg" }
-  ],
-  "placements": [
-    { "id": "gauche", "label": "Gauche", "x": 0.3 },
-    { "id": "centre", "label": "Centré", "x": 0.5 },
-    { "id": "droite", "label": "Droite", "x": 0.7 }
-  ],
-  "tailles": [
-    { "id": "petite", "label": "Petite", "scale": 0.72 },
-    { "id": "moyenne", "label": "Moyenne", "scale": 1 },
-    { "id": "grande", "label": "Grande", "scale": 1.32 }
-  ],
-  "encres": [
-    { "id": "noir", "label": "Noir", "hex": "#1f1f1f" },
-    { "id": "blanc", "label": "Blanc", "hex": "#ffffff" },
-    { "id": "rouge", "label": "Rouge", "hex": "#d3392e" },
-    { "id": "bleu", "label": "Bleu", "hex": "#1d4ed8" },
-    { "id": "vert", "label": "Vert", "hex": "#1e8e3e" },
-    { "id": "dore", "label": "Doré", "hex": "#b8860b" }
-  ],
-  "texteMax": 60,
-  "delais": [
-    { "id": "urgent", "label": "Express aujourd'hui", "hint": "jour même", "days": 0, "rate": 0.2 },
-    { "id": "express", "label": "Demain", "hint": "sous 3 jours", "days": 1, "rate": 0.1 },
-    { "id": "standard", "label": "Standard", "hint": "7 jours", "days": 7, "rate": 0 },
-    { "id": "precise", "label": "Date précise", "hint": "au choix", "days": 7, "rate": null }
-  ],
-  "paiementModes": [
-    { "id": "cb", "label": "Carte bancaire" },
-    { "id": "espece", "label": "Espèces" },
-    { "id": "virement", "label": "Virement" }
-  ],
-  "paiementStatuts": [
-    { "id": "paye", "label": "Payé" },
-    { "id": "acompte", "label": "Acompte versé" },
-    { "id": "attente", "label": "En attente" }
-  ],
-
   "commande": {
     "types": [
       { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande", "subStage": null },
@@ -104,6 +36,7 @@
       { "id": "capuche", "label": "Capuche" },
       { "id": "poche", "label": "Poche" },
       { "id": "avant", "label": "Avant" },
+      { "id": "avant_g", "label": "Avant gauche" },
       { "id": "arriere", "label": "Arrière" },
       { "id": "cote", "label": "Côté" }
     ],

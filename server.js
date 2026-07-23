@@ -17,6 +17,7 @@ const {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
+  getCommandeZones, addCommandeZone, removeCommandeZone,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -462,32 +463,11 @@ app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
-// Fiche « Commande Express » — /fiche
-// Le catalogue (produits, options, délais, typos, logos, placements, encres)
-// est la source unique des prix : le front l'affiche, le serveur s'en ressert
-// pour RECALCULER le total. Le montant envoyé par le poste de vente n'est
-// jamais cru sur parole.
+// Catalogue de l'atelier (catalog.json) — source unique des listes de la
+// prise de commande : vêtements, tailles, zones d'impression, techniques.
 // ---------------------------------------------------------------------------
 const CATALOG = require('./catalog.json');
-const OPTION_BY_ID = new Map(CATALOG.options.map((o) => [o.id, o]));
-const DELAI_BY_ID = new Map(CATALOG.delais.map((d) => [d.id, d]));
-const PRODUCT_BY_SKU = new Map(CATALOG.products.map((p) => [p.sku, p]));
-const FACE_BY_ID = new Map(CATALOG.faces.map((f) => [f.id, f]));
-const PLACEMENT_BY_ID = new Map(CATALOG.placements.map((p) => [p.id, p]));
-const TAILLE_BY_ID = new Map(CATALOG.tailles.map((t) => [t.id, t]));
-const ENCRE_BY_ID = new Map(CATALOG.encres.map((e) => [e.id, e]));
-const MODE_BY_ID = new Map(CATALOG.paiementModes.map((p) => [p.id, p]));
-const STATUT_BY_ID = new Map(CATALOG.paiementStatuts.map((p) => [p.id, p]));
-const LOGO_BY_REF = new Map(CATALOG.logosOlda.map((l) => [l.ref, l]));
 
-app.get('/api/fiche/catalog', (req, res) => {
-  res.json({ ...CATALOG, vendeuses: RESPONSABLES, stages: STAGES });
-});
-
-// Arrondi monétaire : évite les 30.800000000000004 en base et sur le reçu.
-const euro = (n) => Math.round(n * 100) / 100;
-
-const DAY = 86400000;
 // Une date civile valide, pas seulement bien formée : « 2026-02-30 » a la bonne
 // tête mais n'existe pas, et la colonne `date` rejetterait l'INSERT (500). On la
 // traite donc comme une date absente — le délai par défaut s'applique.
@@ -505,207 +485,6 @@ function todayPlus(days) {
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-// Nombre de jours pleins entre aujourd'hui et une date civile, sans heure ni
-// fuseau : les deux bornes sont ramenées à minuit UTC avant la soustraction.
-function daysUntil(day) {
-  const now = new Date();
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const [y, m, d] = day.split('-').map(Number);
-  return Math.round((Date.UTC(y, m - 1, d) - today) / DAY);
-}
-
-// Majoration effective. Les délais nommés portent leur taux ; « Date précise »
-// n'en a pas (rate: null) et le déduit de la date choisie, avec les mêmes
-// seuils. Sans cette dérivation, choisir « Date précise = demain » offrirait
-// l'express au tarif standard.
-function rateFor(delai, deadline) {
-  if (delai.rate !== null && delai.rate !== undefined) return delai.rate;
-  const d = daysUntil(deadline);
-  if (d <= 0) return 0.2;
-  if (d < 3) return 0.1;
-  return 0;
-}
-
-// Valide un élément de personnalisation (un visuel posé sur une face).
-// Renvoie { element } ou { error }.
-function buildElement(raw, index) {
-  const where = `Élément ${index + 1}`;
-  const face = FACE_BY_ID.get(raw && raw.face);
-  if (!face) return { error: `${where} : emplacement inconnu` };
-
-  // Le logo OLDA vaut 6 € sur un flanc et 2 € sous la tasse : c'est la FACE qui
-  // désigne le tarif. On normalise TOUTE variante de logo OLDA (y compris un
-  // `logo_olda_dessous` envoyé sur un flanc) vers l'option de la face — sinon
-  // le poste de vente pourrait réclamer le tarif du dessous n'importe où.
-  const asked = String((raw && raw.option) || 'aucune');
-  const wanted = asked.startsWith('logo_olda') ? face.logoOption : asked;
-  const opt = OPTION_BY_ID.get(wanted || 'aucune');
-  if (!opt) return { error: `${where} : visuel inconnu` };
-  if (opt.id === 'aucune') return { element: null };
-
-  const placement = PLACEMENT_BY_ID.get(raw.placement) || CATALOG.placements[1];
-  const taille = TAILLE_BY_ID.get(raw.taille) || CATALOG.tailles[1];
-
-  const element = {
-    face: face.id,
-    faceLabel: `${face.label} — ${face.hint}`,
-    option: opt.id,
-    optionLabel: opt.label,
-    price: opt.price,
-    placement: placement.id,
-    placementLabel: placement.label,
-    taille: taille.id,
-    tailleLabel: taille.label,
-    remarque: String(raw.remarque || '').trim() || null,
-  };
-
-  if (opt.needs === 'texte') {
-    element.texte = String(raw.texte || '').trim();
-    if (!element.texte) return { error: `${where} : le texte est vide` };
-    if (element.texte.length > CATALOG.texteMax) {
-      return { error: `${where} : texte trop long (${CATALOG.texteMax} caractères maximum)` };
-    }
-    const typo = CATALOG.typos.find((t) => t.id === raw.typo);
-    if (!typo) return { error: `${where} : police manquante` };
-    element.typo = typo.id;
-    element.typoLabel = typo.label;
-    const encre = ENCRE_BY_ID.get(raw.encre) || CATALOG.encres[0];
-    element.encre = encre.id;
-    element.encreLabel = encre.label;
-    element.encreHex = encre.hex;
-  } else if (opt.needs === 'logo_olda') {
-    const logo = LOGO_BY_REF.get(raw.logo);
-    if (!logo) return { error: `${where} : référence du visuel OLDA manquante` };
-    element.logo = logo.ref;
-    element.logoLabel = logo.label;
-  } else if (opt.needs === 'logo_client') {
-    element.logo = String(raw.logo || '').trim();
-    if (!element.logo) return { error: `${where} : nom du fichier client manquant` };
-  }
-
-  return { element };
-}
-
-// Reconstruit le détail d'une fiche à partir du corps reçu : valide chaque
-// référence contre le catalogue et renvoie { fiche, resume } ou une erreur
-// explicite. Aucune écriture ici — la fonction est pure.
-function buildFiche(body) {
-  const product = PRODUCT_BY_SKU.get(body.product);
-  if (!product) return { error: `produit inconnu : ${body.product}` };
-
-  const delai = DELAI_BY_ID.get(body.delai);
-  if (!delai) return { error: `délai inconnu : ${body.delai}` };
-
-  const mode = MODE_BY_ID.get(body.paiementMode);
-  if (!mode) return { error: `mode de paiement inconnu : ${body.paiementMode}` };
-
-  const statut = STATUT_BY_ID.get(body.paiementStatut);
-  if (!statut) return { error: `statut de paiement inconnu : ${body.paiementStatut}` };
-
-  const quantity = Number.parseInt(body.quantity, 10);
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
-    return { error: 'quantité invalide (1 à 999)' };
-  }
-
-  const prenom = String(body.prenom || '').trim();
-  const nom = String(body.nom || '').trim();
-  if (!prenom && !nom) return { error: 'nom du client requis' };
-
-  const color = CATALOG.colors.includes(body.color) ? body.color : CATALOG.colors[0];
-
-  const elements = [];
-  const raws = Array.isArray(body.elements) ? body.elements : [];
-  for (let i = 0; i < raws.length; i += 1) {
-    const built = buildElement(raws[i], i);
-    if (built.error) return { error: built.error };
-    if (built.element) elements.push(built.element);
-  }
-  if (elements.length === 0) return { error: 'aucune personnalisation : la fiche est vide' };
-
-  // Échéance : la date posée fait foi ; à défaut on applique les jours du délai.
-  const deadline = isDay(body.deadline) ? body.deadline : todayPlus(delai.days);
-  const heure = /^\d{2}:\d{2}$/.test(body.heure) ? body.heure : null;
-
-  const rate = rateFor(delai, deadline);
-  const unitaire = euro(product.price + elements.reduce((s, e) => s + e.price, 0));
-  const personnalisation = euro(elements.reduce((s, e) => s + e.price, 0) * quantity);
-  const sousTotal = euro(unitaire * quantity);
-  const supplement = euro(sousTotal * rate);
-  const total = euro(sousTotal + supplement);
-
-  const stage = STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
-
-  const fiche = {
-    client: { prenom, nom, whatsapp: String(body.whatsapp || '').trim() || null },
-    vendeuse: RESPONSABLE_SET.has(body.vendeuse) ? body.vendeuse : 'À attribuer',
-    referent: RESPONSABLE_SET.has(body.referent) ? body.referent : null,
-    product: { sku: product.sku, label: product.label, price: product.price },
-    color,
-    quantity,
-    elements,
-    delai: { id: delai.id, label: delai.label, hint: delai.hint, rate },
-    paiement: { mode: mode.id, modeLabel: mode.label, statut: statut.id, statutLabel: statut.label },
-    prix: { unitaire, produit: euro(product.price * quantity), personnalisation, sousTotal, supplement, total },
-    deadline,
-    heure,
-    stage,
-    createdAt: new Date().toISOString(),
-  };
-
-  const lignes = elements.map((e) => {
-    const quoi = e.texte ? `« ${e.texte} » (${e.typoLabel}, ${e.encreLabel})` : e.logo;
-    return `• ${e.faceLabel} — ${e.optionLabel} : ${quoi} · ${e.placementLabel.toLowerCase()}, ${e.tailleLabel.toLowerCase()}${e.remarque ? ` — ${e.remarque}` : ''}`;
-  });
-  const resume = [
-    `${quantity} × ${product.label} — ${color}`,
-    ...lignes,
-    `Délai ${delai.label}${heure ? ` — à retirer à ${heure}` : ''} · ${mode.label} (${statut.label})`,
-    `Total ${total.toFixed(2)} €${supplement ? ` (dont ${supplement.toFixed(2)} € de majoration)` : ''}`,
-  ].join('\n');
-
-  return { fiche, resume };
-}
-
-// POST /api/fiche → crée la demande dans le planning.
-app.post('/api/fiche', asyncH(async (req, res) => {
-  const built = buildFiche(req.body || {});
-  if (built.error) return res.status(400).json({ error: built.error });
-  const { fiche, resume } = built;
-
-  const clientName = [fiche.client.prenom, fiche.client.nom].filter(Boolean).join(' ');
-  const { rows: posRows } = await pool.query(
-    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [fiche.stage],
-  );
-
-  const { rows } = await pool.query(
-    `INSERT INTO requests
-       (stage, priority, client_type, billing_company, contact_referent, contact_phone,
-        quantity, product, color, project_value, description, deadline, responsable,
-        referent, position, fiche)
-     VALUES ($1, $2, 'perso', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-     RETURNING *`,
-    [
-      fiche.stage,
-      Math.min(3, Math.max(1, Number.parseInt(req.body.priority, 10) || 1)),
-      clientName,
-      clientName,
-      fiche.client.whatsapp,
-      fiche.quantity,
-      fiche.product.label,
-      fiche.color,
-      fiche.prix.total,
-      resume,
-      fiche.deadline,
-      fiche.vendeuse,
-      fiche.referent,
-      posRows[0].pos,
-      JSON.stringify(fiche),
-    ],
-  );
-
-  broadcast({ kind: 'create', stages: [fiche.stage] });
-  res.status(201).json({ id: rows[0].id, fiche });
-}));
 
 // ---------------------------------------------------------------------------
 // Base clients professionnelle (CRM) — table `clients` + `client_notes`.
@@ -923,9 +702,47 @@ const REF_MAX = 40;
 const COULEUR_MAX = 40;
 const REMARQUE_MAX = 400;
 
+// Emplacements d'impression ajoutés au comptoir (base), en plus de ceux du
+// catalogue. Gardés en MÉMOIRE pour que la validation d'un article reste
+// synchrone ; la base n'est relue qu'au démarrage et à chaque ajout / retrait.
+let CUSTOM_ZONES = [];
+// `custom: true` distingue les zones effaçables (ajoutées) de celles du
+// catalogue, que la fiche ne propose pas de retirer.
+const allZones = () => [...COM.zones, ...CUSTOM_ZONES.map((z) => ({ ...z, custom: true }))];
+const zoneById = (id) => COM_ZONE_BY_ID.get(id) || CUSTOM_ZONES.find((z) => z.id === id) || null;
+async function loadCommandeZones() {
+  CUSTOM_ZONES = await getCommandeZones();
+}
+
 app.get('/api/commande/catalog', (req, res) => {
-  res.json({ ...COM, employes: RESPONSABLES, clientTypes: CLIENT_TYPES });
+  res.json({ ...COM, zones: allZones(), employes: RESPONSABLES, clientTypes: CLIENT_TYPES });
 });
+
+// POST /api/commande/zones { label } → crée l'emplacement et renvoie la liste
+// complète. Idempotent : deux fois « Nuque » ne fait qu'une zone.
+app.post('/api/commande/zones', asyncH(async (req, res) => {
+  const label = req.body && req.body.label;
+  const added = await addCommandeZone(label, COM.zones);
+  if (!added) return res.status(400).json({ error: 'libellé d\'emplacement vide' });
+  CUSTOM_ZONES = added.zones;
+  // On rend la zone telle qu'elle figure dans la liste servie — y compris quand
+  // le libellé retombe sur une zone du CATALOGUE : le poste de saisie n'a pas à
+  // connaître la nuance, il la coche et c'est tout.
+  const zones = allZones();
+  res.status(201).json({ zone: zones.find((z) => z.id === added.id) || null, zones });
+}));
+
+// DELETE /api/commande/zones/:id → retire un emplacement ajouté au comptoir.
+// Les zones du catalogue ne s'effacent pas ; les commandes déjà enregistrées
+// gardent leur marquage (le libellé y est recopié à l'enregistrement).
+app.delete('/api/commande/zones/:id', asyncH(async (req, res) => {
+  const id = String(req.params.id || '');
+  if (COM_ZONE_BY_ID.has(id)) {
+    return res.status(400).json({ error: 'emplacement du catalogue : non supprimable' });
+  }
+  CUSTOM_ZONES = await removeCommandeZone(id);
+  res.json({ zones: allZones() });
+}));
 
 // Valide un article et ses zones d'impression. Renvoie { article } ou { error }.
 function buildArticle(raw, index) {
@@ -954,7 +771,7 @@ function buildArticle(raw, index) {
   const zones = [];
   const rawZones = Array.isArray(a.zones) ? a.zones : [];
   for (const rz of rawZones) {
-    const zone = COM_ZONE_BY_ID.get(rz && rz.zone);
+    const zone = zoneById(rz && rz.zone);
     if (!zone) return { error: `${where} : zone d'impression inconnue` };
     if (zones.some((z) => z.zone === zone.id)) {
       return { error: `${where} : la zone « ${zone.label} » est posée deux fois` };
@@ -1029,7 +846,7 @@ function buildCommande(body) {
   const quantite = articles.reduce((s, a) => s + a.quantite, 0);
 
   const commande = {
-    kind: 'commande-atelier',        // discriminant : distingue ce JSON d'une fiche Express
+    kind: 'commande-atelier',        // discriminant : identifie ce JSON dans requests.fiche
     type: { id: type.id, label: type.label },
     client,
     articles,
@@ -1137,13 +954,14 @@ app.post('/api/commande', asyncH(async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 // L'ancienne adresse de la fiche reste valide (raccourcis déjà posés sur les
-// écrans) : elle renvoie sur la vue Express de l'application.
-app.get('/fiche', (req, res) => res.redirect(301, '/#express'));
+// écrans) : elle renvoie sur la prise de commande de l'application.
+app.get('/fiche', (req, res) => res.redirect(301, '/#commande'));
 
 // ---------------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------------
 init()
+  .then(loadCommandeZones)
   .then(() => {
     // `__server` est exposé pour les tests (PORT=0 → port libre, adresse lue au
     // moment où le serveur écoute). En production rien ne le lit.
