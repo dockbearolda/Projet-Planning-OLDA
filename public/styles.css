@@ -19,6 +19,7 @@
   --search-bg: #eef1f8;              /* pilule de recherche au repos */
   --search-bg-hover: #e7ebf3;
   --chip-on-tonal: #fff;             /* pastille compteur sur pilule active */
+  --zone-bg: #eef3fa;                /* fond doux d'une zone (famille + sous-cat) */
 
   /* texte */
   --text-1: #1f1f1f;                 /* principal */
@@ -90,6 +91,7 @@
   --search-bg: #282a2d;
   --search-bg-hover: #303236;
   --chip-on-tonal: #1e1f20;
+  --zone-bg: #26282c;                /* fond doux d'une zone (famille + sous-cat) */
 
   --text-1: #e3e3e3;
   --text-2: #9aa0a6;
@@ -412,7 +414,18 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   color: var(--text-2);
 }
 
-.stages { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 1px; }
+/* Le rail empile des ZONES (une par famille), nettement espacées entre elles.
+   À l'intérieur d'une zone, l'en-tête et ses sous-catégories restent très serrés :
+   on lit d'abord « où en est le projet » (la zone), puis le détail. */
+.stages { padding: 6px 8px 10px; display: flex; flex-direction: column; gap: 9px; }
+.stage-zone { display: flex; flex-direction: column; gap: 1px; }
+/* Une zone à sous-catégories devient un bloc tonal : le fond commun relie le
+   grand titre à ses enfants et détache le groupe de la zone voisine. */
+.stage-zone.has-sub {
+  background: var(--zone-bg);
+  border-radius: 14px;
+  padding: 3px;
+}
 
 .stage {
   position: relative;
@@ -469,17 +482,29 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   color: var(--primary);
 }
 
-/* mini-titres de section (Devis & BAT · Production · Clôture) */
-.stage-group-title {
-  padding: 18px 16px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  user-select: none;
+/* Grand titre de ZONE : plus affirmé qu'une sous-catégorie, avec un repère
+   d'accent à gauche. Il reste cliquable (afficher toute la famille) mais se lit
+   comme un EN-TÊTE — d'où le verrouillage du dépôt dessus quand la zone a des
+   sous-catégories (voir stageAcceptsDrop). */
+.stage.zone-head { border-radius: var(--radius); padding-left: 22px; }
+.stage.zone-head .stage-label { font-weight: 600; color: var(--text-1); }
+.stage.zone-head::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 3px;
+  height: 15px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--primary);
+  opacity: .45;
+  transition: opacity var(--dur-2) var(--ease);
 }
-.stages > .stage-group-title:first-child { padding-top: 6px; }
+.stage.zone-head:hover::before { opacity: .7; }
+.stage.zone-head.active::before { opacity: 1; }
+.stage.zone-head.is-empty::before { opacity: .22; }
+.stage.zone-head.active .stage-label { color: var(--primary); }
 
 /* Sous-catégories : déroulées sous leur famille (miroir de la « Vue Étapes »).
    Plus compactes, en retrait à gauche (le bord droit — donc les compteurs —
