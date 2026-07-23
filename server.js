@@ -726,16 +726,25 @@ const trimOrNull = (v) => {
 };
 
 // Champs éditables d'un client et leur longueur bornée (ces textes vivent dans
-// une carte / une cellule, pas dans un traitement de texte).
+// une carte / une cellule, pas dans un traitement de texte). `client_type` est
+// une ÉNUMÉRATION (pro / perso), pas un texte libre : validé à part.
 const CLIENT_MAX = {
   entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
   email: 160, telephone: 40, adresse: 200,
 };
-const CLIENT_FIELDS = Object.keys(CLIENT_MAX);
+const CLIENT_FIELDS = [...Object.keys(CLIENT_MAX), 'client_type'];
+// La base clients ne tranche qu'entre pro et perso ; les nuances asso/revendeur
+// restent au niveau de la commande (requests.client_type).
+const CLIENT_NATURE = new Set(['pro', 'perso']);
 const NOTE_KINDS = new Set(['note', 'appel', 'email', 'rdv']);
 const NOTE_MAX = 2000;
 
 function validateClientField(key, value) {
+  if (key === 'client_type') {
+    const s = String(value == null ? '' : value).trim().toLowerCase();
+    if (s !== '' && !CLIENT_NATURE.has(s)) return { ok: false, error: `nature invalide : ${value}` };
+    return { ok: true, value: s === '' ? 'pro' : s };
+  }
   const s = String(value == null ? '' : value).trim().slice(0, CLIENT_MAX[key]);
   if (key === 'email' && s !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) {
     return { ok: false, error: 'email invalide' };
@@ -883,9 +892,12 @@ async function upsertClientFromCommande(cl) {
   const key = clientKey(entreprise);
   const { rows } = await pool.query('SELECT entreprise FROM clients');
   if (rows.some((r) => clientKey(r.entreprise) === key)) return;
+  // La nature pro/perso choisie au comptoir suit le client dans sa fiche ;
+  // toute autre valeur (asso/revendeur d'une commande) retombe sur 'pro'.
+  const nature = cl.type === 'perso' ? 'perso' : 'pro';
   await pool.query(
-    'INSERT INTO clients (entreprise, nom, telephone, email) VALUES ($1,$2,$3,$4)',
-    [entreprise, trimOrNull(cl.contact), trimOrNull(cl.telephone), trimOrNull(cl.email)],
+    'INSERT INTO clients (entreprise, nom, telephone, email, client_type) VALUES ($1,$2,$3,$4,$5)',
+    [entreprise, trimOrNull(cl.contact), trimOrNull(cl.telephone), trimOrNull(cl.email), nature],
   );
   broadcast({ kind: 'client' });
 }
