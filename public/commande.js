@@ -153,9 +153,12 @@ function pickClient(c) {
 // Articles — reconstruits à chaque changement de STRUCTURE (ajout, retrait,
 // zone cochée), jamais pendant la frappe (sinon le curseur saute).
 // ---------------------------------------------------------------------------
+// Une cellule du tableau des articles. Toujours un `text` : un `number` sort
+// ses flèches au survol et refuse la frappe libre — au comptoir on clique et on
+// écrit, comme dans un tableur. Le contrôle se fait à la saisie (voir wire()).
 function cell(role, a, value, placeholder, label, opts) {
   const n = el('input', `cmd-input cmd-cell cmd-cell--${role}`);
-  n.type = (opts && opts.type) || 'text';
+  n.type = 'text';
   n.value = value == null ? '' : value;
   n.placeholder = placeholder || '';
   n.autocomplete = 'off';
@@ -163,8 +166,6 @@ function cell(role, a, value, placeholder, label, opts) {
   n.dataset.uid = a.uid;
   n.setAttribute('aria-label', label);
   if (opts && opts.list) n.setAttribute('list', opts.list);
-  if (opts && opts.min != null) n.min = opts.min;
-  if (opts && opts.max != null) n.max = opts.max;
   if (opts && opts.inputmode) n.inputMode = opts.inputmode;
   return n;
 }
@@ -175,7 +176,7 @@ function buildArticle(a, index) {
 
   const row = el('div', 'cmd-art__row');
   row.append(
-    cell('quantite', a, a.quantite, '1', `Quantité, article ${index + 1}`, { type: 'number', min: 1, max: 9999, inputmode: 'numeric' }),
+    cell('quantite', a, a.quantite, '1', `Quantité, article ${index + 1}`, { inputmode: 'numeric' }),
     cell('vetement', a, a.vetement, 'T-shirt sans manches', `Vêtement, article ${index + 1}`, { list: 'cmd-dl-vetements' }),
     cell('ref', a, a.ref, 'K3022', `Référence, article ${index + 1}`),
     cell('couleur', a, a.couleur, 'Light Sand', `Couleur, article ${index + 1}`),
@@ -213,13 +214,31 @@ function buildArticle(a, index) {
     b.dataset.role = 'zone';
     b.dataset.zone = z.id;
     b.setAttribute('aria-pressed', String(on));
-    b.textContent = z.label;
+    b.append(z.label);
+    // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
+    // catalogue, jamais. Les commandes déjà enregistrées gardent leur marquage.
+    if (z.custom) {
+      const x = el('span', 'cmd-chip__x material-symbols-outlined', 'close');
+      x.dataset.zone = z.id;
+      x.title = `Retirer l'emplacement « ${z.label} »`;
+      x.setAttribute('aria-hidden', 'true');
+      b.append(x);
+    }
     chips.append(b);
   }
+  // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant sur
+  // place, il rejoint la liste de tous les postes.
+  const add = el('button', 'cmd-chip cmd-chip--add');
+  add.type = 'button';
+  add.dataset.role = 'zone-add';
+  add.setAttribute('aria-label', `Ajouter un emplacement, article ${index + 1}`);
+  add.append(ic('add'), el('span', null, 'Emplacement'));
+  chips.append(add);
   mark.append(chips);
 
   for (const z of a.zones) {
     const zone = zoneById(z.zone);
+    if (!zone) continue;                 // emplacement retiré entre-temps
     const line = el('label', 'cmd-zline');
     line.append(el('span', 'cmd-zline__name', zone.label));
     const cons = el('input', 'cmd-input cmd-zline__cons');
@@ -240,6 +259,131 @@ function buildArticle(a, index) {
 
 function renderArticles() {
   $('#cmd-arts').replaceChildren(...state.articles.map(buildArticle));
+}
+
+// ---------------------------------------------------------------------------
+// Emplacements d'impression — le catalogue de base, plus ceux ajoutés ici.
+// Tout est OPTIMISTE : la zone s'affiche et se coche tout de suite, le serveur
+// suit. S'il refuse, on la retire et on le dit.
+// ---------------------------------------------------------------------------
+// Même règle d'identifiant que le serveur (db.js) : « Avant gauche » → avant_gauche.
+const zoneSlug = (s) => fold(s).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+// Ordre du catalogue : Cœur avant Dos, quel que soit l'ordre des clics.
+const sortZones = (a) => a.zones.sort(
+  (x, y) => CAT.zones.findIndex((z) => z.id === x.zone) - CAT.zones.findIndex((z) => z.id === y.zone),
+);
+
+function toggleZone(a, id) {
+  const i = a.zones.findIndex((z) => z.zone === id);
+  if (i >= 0) a.zones.splice(i, 1);
+  else a.zones.push({ zone: id, consigne: '' });
+  sortZones(a);
+}
+
+// Pose le curseur sur la consigne de la zone qu'on vient de cocher : on tape
+// le visuel dans la foulée, sans repasser par la souris.
+function focusConsigne(a, id) {
+  const line = $(`.cmd-art[data-uid="${a.uid}"] .cmd-zline__cons[data-zone="${id}"]`);
+  if (line) line.focus();
+}
+
+// Remplace un identifiant de zone par un autre dans TOUS les articles : sert à
+// se raccrocher à l'identifiant que le serveur a tranché.
+function remapZone(from, to) {
+  for (const a of state.articles) {
+    for (const z of a.zones) if (z.zone === from) z.zone = to;
+    // Un doublon peut apparaître si la zone visée était déjà posée.
+    a.zones = a.zones.filter((z, i) => a.zones.findIndex((y) => y.zone === z.zone) === i);
+    sortZones(a);
+  }
+}
+
+async function addZone(label, a) {
+  const clean = String(label || '').trim().slice(0, 40);
+  const id = zoneSlug(clean);
+  if (!clean || !id) return;
+
+  // Zone déjà là ? On la rapproche par identifiant ET par libellé, comme le
+  // serveur : retaper « Avant gauche » coche la zone du catalogue.
+  const known = CAT.zones.find((z) => z.id === id || zoneSlug(z.label) === id);
+  if (known) {
+    if (!a.zones.some((z) => z.zone === known.id)) toggleZone(a, known.id);
+    renderArticles();
+    return focusConsigne(a, known.id);
+  }
+
+  CAT.zones = [...CAT.zones, { id, label: clean, custom: true }];
+  toggleZone(a, id);
+  renderArticles();
+  focusConsigne(a, id);
+
+  try {
+    const res = await fetch('/api/commande/zones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: clean }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.zone) throw new Error(data.error || `Erreur ${res.status}`);
+    CAT.zones = data.zones;              // la base fait foi
+    if (data.zone.id !== id) {
+      remapZone(id, data.zone.id);
+      renderArticles();
+      focusConsigne(a, data.zone.id);
+    }
+  } catch (err) {
+    CAT.zones = CAT.zones.filter((z) => z.id !== id);
+    for (const art of state.articles) {
+      const i = art.zones.findIndex((z) => z.zone === id);
+      if (i >= 0) art.zones.splice(i, 1);
+    }
+    renderArticles();
+    toast(`« ${clean} » non enregistré — réessayez.`);
+  }
+}
+
+async function removeZone(id) {
+  const before = CAT.zones;
+  const beforeArticles = state.articles.map((a) => a.zones.map((z) => ({ ...z })));
+  CAT.zones = CAT.zones.filter((z) => z.id !== id);
+  for (const a of state.articles) {
+    const i = a.zones.findIndex((z) => z.zone === id);
+    if (i >= 0) a.zones.splice(i, 1);
+  }
+  renderArticles();
+
+  try {
+    const res = await fetch(`/api/commande/zones/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+    CAT.zones = data.zones;
+  } catch (err) {
+    CAT.zones = before;
+    state.articles.forEach((a, i) => { a.zones = beforeArticles[i]; });
+    renderArticles();
+    toast('Emplacement non retiré — réessayez.');
+  }
+}
+
+// Saisie du nom : la puce « + Emplacement » devient un champ, sur place.
+// Entrée valide, Échap (ou la perte du focus) annule.
+function openZoneInput(btn, a) {
+  const input = el('input', 'cmd-input cmd-chip cmd-chip--new');
+  input.type = 'text';
+  input.maxLength = 40;
+  input.placeholder = 'Nom de l\'emplacement';
+  input.setAttribute('aria-label', 'Nom du nouvel emplacement');
+  input.autocomplete = 'off';
+  btn.replaceWith(input);
+  input.focus();
+
+  const close = () => { if (input.isConnected) input.replaceWith(btn); };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addZone(input.value, a); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); }
+  });
+  input.addEventListener('blur', () => setTimeout(close, 120));
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +458,11 @@ function wire() {
     const auto = e.target.closest('.cmd-auto__item');
     if (auto) return pickClient(autoMatches[Number(auto.dataset.i)]);
 
+    // La croix d'un emplacement ajouté : elle vit DANS la puce, on la traite
+    // avant le clic de la puce (qui, lui, coche / décoche).
+    const x = e.target.closest('.cmd-chip__x');
+    if (x) return removeZone(x.dataset.zone);
+
     const t = e.target.closest('button');
     if (!t) return closeAuto();
 
@@ -346,14 +495,13 @@ function wire() {
       renderArticles();
       return render();
     }
+    if (t.dataset.role === 'zone-add') return openZoneInput(t, a);
     if (t.dataset.role === 'zone') {
       const id = t.dataset.zone;
-      const i = a.zones.findIndex((z) => z.zone === id);
-      if (i >= 0) a.zones.splice(i, 1);
-      else a.zones.push({ zone: id, consigne: '' });
-      // Ordre du catalogue : Cœur avant Dos, quel que soit l'ordre des clics.
-      a.zones.sort((x, y) => CAT.zones.findIndex((z) => z.id === x.zone) - CAT.zones.findIndex((z) => z.id === y.zone));
+      const posee = a.zones.some((z) => z.zone === id);
+      toggleZone(a, id);
       renderArticles();
+      if (!posee) focusConsigne(a, id);   // cochée : on enchaîne sur la consigne
       return render();
     }
   });
@@ -376,8 +524,13 @@ function wire() {
     const a = t.dataset.uid ? byUid(t.dataset.uid) : null;
     if (!a) return;
     if (t.dataset.role === 'quantite') {
-      const n = Number.parseInt(t.value, 10);
-      a.quantite = Number.isInteger(n) && n > 0 ? Math.min(9999, n) : 1;
+      // Champ texte : on filtre les chiffres à la frappe (pas de flèches, pas
+      // de « e » ni de moins). On ne réécrit la valeur QUE si elle change,
+      // sinon le curseur saute en fin de champ à chaque touche.
+      const digits = t.value.replace(/\D+/g, '').replace(/^0+(?=\d)/, '').slice(0, 4);
+      if (digits !== t.value) t.value = digits;
+      const n = Number.parseInt(digits, 10);
+      a.quantite = Number.isInteger(n) && n > 0 ? n : 1;
       return;
     }
     if (t.dataset.role === 'consigne') {
@@ -412,6 +565,74 @@ function wire() {
   // Échap ferme la confirmation en repartant sur une saisie vierge.
   ROOT.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#cmd-done').hidden) reset();
+  });
+
+  wireCells();
+}
+
+// ---------------------------------------------------------------------------
+// Le tableau des articles se tient au clavier comme un tableur : on clique, la
+// cellule est sélectionnée, on écrit par-dessus ; Entrée ou ↓ descendent d'une
+// ligne (et en créent une au bout), ↑ remonte. Tab reste le déplacement natif
+// d'une colonne à l'autre.
+// ---------------------------------------------------------------------------
+function cellAt(article, role) {
+  return $(`.cmd-art[data-uid="${article.uid}"] .cmd-cell--${role}`);
+}
+
+function moveCell(from, step) {
+  const role = from.dataset.role;
+  const i = state.articles.findIndex((a) => String(a.uid) === String(from.dataset.uid));
+  if (i < 0) return;
+  let j = i + step;
+  if (j < 0) return;
+  if (j >= state.articles.length) {
+    // Entrée sur la dernière ligne : on en ouvre une nouvelle, comme un tableur.
+    state.articles.push(newArticle());
+    renderArticles();
+    render();
+    j = state.articles.length - 1;
+  }
+  const next = cellAt(state.articles[j], role);
+  if (next) { next.focus(); next.select(); }
+}
+
+function wireCells() {
+  // Le focus sélectionne la cellule entière ; encore faut-il que le clic ne la
+  // désélectionne pas juste après. On annule donc le `mouseup` — SAUF si la
+  // cellule était déjà active (deuxième clic : on vise un endroit précis) ou si
+  // le pointeur a glissé (l'utilisateur sélectionne un morceau à la main).
+  let reclick = false;
+  let downAt = null;
+  ROOT.addEventListener('pointerdown', (e) => {
+    const c = e.target.closest && e.target.closest('.cmd-cell');
+    reclick = !!c && document.activeElement === c;
+    downAt = c ? { x: e.clientX, y: e.clientY } : null;
+  });
+  ROOT.addEventListener('mouseup', (e) => {
+    const c = e.target.closest && e.target.closest('.cmd-cell');
+    if (!c || reclick || !downAt) return;
+    const glisse = Math.abs(e.clientX - downAt.x) > 4 || Math.abs(e.clientY - downAt.y) > 4;
+    if (!glisse) e.preventDefault();
+  });
+  ROOT.addEventListener('focusin', (e) => {
+    if (e.target.classList && e.target.classList.contains('cmd-cell')) e.target.select();
+  });
+  // Quantité vidée puis quittée : on réaffiche celle qui fait foi (jamais de
+  // case vide dans une commande).
+  ROOT.addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (!t.dataset || t.dataset.role !== 'quantite' || t.value !== '') return;
+    const a = byUid(t.dataset.uid);
+    if (a) t.value = a.quantite;
+  });
+
+  ROOT.addEventListener('keydown', (e) => {
+    const c = e.target.closest && e.target.closest('.cmd-cell');
+    if (!c) return;
+    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); moveCell(c, 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveCell(c, -1); }
+    else if (e.key === 'Escape') c.blur();
   });
 }
 

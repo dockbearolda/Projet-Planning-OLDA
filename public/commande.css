@@ -156,6 +156,18 @@
 #commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 2px; }
 #commande .cmd-cell--quantite { text-align: center; font-weight: 600; }
 
+/* Cellules façon tableur : aucune flèche (ni compteur d'un champ nombre, ni
+   chevron d'une liste de suggestions), on clique et on écrit. La cellule active
+   se voit d'un coup d'œil, comme la sélection d'une feuille de calcul. */
+#commande .cmd-cell::-webkit-outer-spin-button,
+#commande .cmd-cell::-webkit-inner-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }
+#commande .cmd-cell::-webkit-calendar-picker-indicator { display: none !important; }
+#commande .cmd-cell::selection { background: rgba(var(--primary-rgb), .3); }
+#commande .cmd-cell:focus {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
 /* Marquage : chips de zones + une ligne de consigne par zone cochée. */
 #commande .cmd-art__mark { margin-top: 10px; }
 #commande .cmd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -169,6 +181,24 @@
 }
 #commande .cmd-chip:hover { background: var(--surface-hover); }
 #commande .cmd-chip.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+
+/* Croix d'un emplacement ajouté au comptoir : cible de 28px dans la puce, elle
+   ne gêne pas le tap qui coche (le reste de la puce). */
+#commande .cmd-chip__x {
+  width: 28px; height: 28px; margin: 0 -8px 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-size: 16px; color: var(--text-3);
+}
+#commande .cmd-chip__x:hover { background: var(--st-bloque-bg); color: var(--st-bloque); }
+
+/* « + Emplacement » : la puce qui en crée un. Trait discontinu = à remplir. */
+#commande .cmd-chip--add { gap: 4px; padding: 0 16px 0 12px; border-style: dashed; color: var(--primary); }
+#commande .cmd-chip--add:hover { background: var(--primary-soft); }
+#commande .cmd-chip--add .material-symbols-outlined { font-size: 18px; }
+#commande .cmd-chip--new {
+  width: 200px; height: 44px; padding: 0 16px;
+  border-radius: 999px; border-color: var(--primary);
+}
 #commande .cmd-zline {
   display: grid; grid-template-columns: 120px minmax(0, 1fr);
   align-items: center; gap: 10px; margin-top: 8px;
