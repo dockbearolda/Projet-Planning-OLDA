@@ -1866,10 +1866,12 @@ tr:hover .handle { color: var(--text-2); }
 .desc-toggle svg { width: 15px; height: 15px; display: block; transition: transform var(--dur-2) var(--ease); }
 .desc-toggle.open svg { transform: rotate(180deg); }
 .desc-toggle[hidden] { display: none; }
-.product-stack.desc-empty .product-desc-row,
-.infos-stack.desc-empty .product-desc-row { display: none; }
-.product-stack.desc-empty:focus-within .product-desc-row,
-.infos-stack.desc-empty:focus-within .product-desc-row { display: flex; }
+/* Case Infos vide : on garde le textarea visible (placeholder « infos ») pour
+   qu'un collaborateur puisse cliquer dedans et saisir une note. Avant, la ligne
+   passait en display:none quand vide → case non cliquable sur desktop, donc
+   impossible d'AJOUTER une info (un textarea masqué n'est pas focusable). Le
+   mobile la montrait déjà toujours ; on aligne desktop dessus. La ligne .product-desc-row
+   par défaut est déjà en display:flex — rien de plus à faire ici. */
 
 /* Largeur des colonnes réglable */
 .grid.manual-cols { table-layout: fixed; min-width: 0; }
@@ -2155,8 +2157,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .col-infos-cell { height: auto; }
   .product-stack .product-name { min-height: 44px; height: auto; }
   .product-desc { min-height: 0; height: auto; font-size: 14px; }
-  .product-stack.desc-empty .product-desc-row,
-  .infos-stack.desc-empty .product-desc-row { display: flex; }
   .desc-toggle { width: 32px; height: 32px; }
 
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
