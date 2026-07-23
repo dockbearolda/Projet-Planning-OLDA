@@ -186,26 +186,38 @@ pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fi
   directement sur la sous-étape **« À chiffrer »**.
 
 La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
-la ligne du planning. La fiche tient en **quatre blocs numérotés**, dans l'ordre
-où ça se dit.
+la ligne du planning. La fiche se lit dans l'ordre où ça se dit.
 
 ### La page ne défile pas
 
-Au-dessus de 1040 px, la fiche est en **deux colonnes à hauteur fixe** : la
-fiche à gauche (contact, demande), les produits à droite. **Seul le panneau des
-produits défile** — on empile autant de lignes qu'on veut sans jamais perdre de
-vue le nom du client ni le bouton d'enregistrement, et le paiement reste posé
-en pied de colonne droite. Sous 1040 px (tablette portrait, téléphone) les deux
-colonnes s'empilent et la page redevient défilante, comme n'importe quel
-formulaire mobile.
+Deux zones, pas deux colonnes :
 
-Les lignes de produits **n'ont aucun libellé** : une rangée d'en-tête donne les
-colonnes une fois pour toute la famille, comme dans un tableur — c'est ce qui
-les fait tenir sur 44 px de haut. Quand le panneau devient trop étroit pour
-aligner six colonnes (**requête de conteneur**, pas de média : le seuil porte
-sur la largeur du panneau, pas de la fenêtre), la ligne se replie et les
-placeholders reprennent le relais. D'où leur formulation : « anse à droite :
-logo… » redit la convention au lieu de donner un simple exemple.
+- **en haut, un bandeau** qui se lit de gauche à droite — qui, quoi, pour quand,
+  payé comment. Ses champs sont courts : trois rangées suffisent ;
+- **en bas, les produits, sur toute la largeur**, parce que leurs lignes ont six
+  colonnes à aligner. C'est la **seule zone qui défile**.
+
+On empile donc autant de produits qu'on veut sans jamais perdre de vue le nom du
+client, l'échéance ni le bouton d'enregistrement. Sous 900 px (tablette
+portrait, téléphone) le bandeau s'empile et la page redevient défilante, comme
+n'importe quel formulaire mobile.
+
+Une ligne de produit = **une rangée de champs**, sans aucun libellé : la rangée
+d'en-tête nomme les colonnes une fois pour toute la famille, comme dans un
+tableur. Le bouton d'ajout vit dans le bandeau de la famille plutôt qu'en pied
+de tableau : une rangée gagnée par famille. Un **emplacement d'impression
+choisi perd sa puce et prend sa ligne** (son étiquette, puis sa consigne), et
+le « ＋ » qui en ajoute un second se loge en bout de la dernière consigne —
+rien n'occupe de la hauteur tant qu'on ne l'a pas demandé.
+
+Repère : sur un Galaxy Tab A9+ en paysage (1280×800), **une tasse et un textile
+entièrement remplis tiennent sans défiler du tout**.
+
+Quand le panneau devient trop étroit pour aligner six colonnes (**requête de
+conteneur**, pas de média : le seuil porte sur la largeur du panneau, pas de la
+fenêtre), la ligne se replie et les placeholders reprennent le relais. D'où leur
+formulation : « anse à droite : logo… » redit la convention au lieu de donner un
+simple exemple.
 
 ### 1 — Contact : PRO ou PERSO
 
@@ -260,7 +272,7 @@ décision de production, pas de la prise : on ne la demande pas ici.
 
 ### 4 — Paiement
 
-En pied de colonne droite, juste sous les produits qu'il règle :
+Sur la rangée du bas du bandeau, à côté de l'échéance :
 **Non payé / Acompte payé / Payé**, puis le **mode** (CB / Espèces) — qui
 n'apparaît qu'une fois quelque chose à encaisser, et qui s'efface si on
 repasse à « non payé » (jamais de « CB » trompeur sur une commande impayée).

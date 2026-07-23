@@ -73,7 +73,9 @@ function newLigne(famille) {
     return { ...base, couleur: '', face1: '', face2: '', options: [], infos: '', typo: '', remarque: '' };
   }
   if (famille === 'textile') {
-    return { ...base, vetement: '', couleur: '', taille: '', zones: [], plus: false };
+    // `choix` : la rangée de puces d'emplacements est ouverte. `plus` : elle
+    // montre aussi les emplacements rares.
+    return { ...base, vetement: '', couleur: '', taille: '', zones: [], choix: false, plus: false };
   }
   return { ...base, technique: '', infos: '' };
 }
@@ -349,48 +351,25 @@ function buildTextile(l, index) {
   );
   art.append(row);
 
-  // Placements : les six courants sous la main, le reste derrière « Autres ».
+  // Placements. Un emplacement CHOISI n'a plus besoin de sa puce : il prend sa
+  // ligne, avec sa consigne. Les puces ne s'affichent donc que pendant le
+  // choix — sinon elles mangeraient deux rangées par article, pour rien.
   const mark = el('div', 'cmd-art__mark');
-  const chips = el('div', 'cmd-chips');
-  const pose = (z) => l.zones.some((x) => x.zone === z.id);
-  const secondaires = CAT.zones.filter((z) => !z.principal);
-  const deplie = l.plus || secondaires.some(pose);
-  const visibles = deplie ? CAT.zones : CAT.zones.filter((z) => z.principal);
 
-  for (const z of visibles) {
-    // Libellé COURT sur la puce (« Manche Dr ») pour que les six emplacements
-    // courants tiennent sur une rangée ; la fiche, elle, garde le nom entier.
-    const b = chip(z.court || z.label, { on: pose(z), role: 'zone', value: z.id });
-    // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
-    // catalogue, jamais. Les commandes déjà enregistrées gardent leur marquage.
-    if (z.custom) {
-      const x = el('span', 'cmd-chip__x material-symbols-outlined', 'close');
-      x.dataset.zone = z.id;
-      x.title = `Retirer l'emplacement « ${z.label} »`;
-      x.setAttribute('aria-hidden', 'true');
-      b.append(x);
-    }
-    chips.append(b);
-  }
-  if (!deplie && secondaires.length) {
-    const plus = chip(String(secondaires.length), { role: 'zone-plus', cls: 'cmd-chip--ghost cmd-chip--plus', icone: 'add' });
-    plus.title = `${secondaires.length} autres emplacements`;
-    plus.setAttribute('aria-label', `Afficher les ${secondaires.length} autres emplacements`);
-    chips.append(plus);
-  } else {
-    // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant sur
-    // place, il rejoint la liste de tous les postes.
-    const add = chip('Emplacement', { role: 'zone-add', cls: 'cmd-chip--add', icone: 'add' });
-    add.setAttribute('aria-label', `Ajouter un emplacement, ligne ${index + 1}`);
-    chips.append(add);
-  }
-  mark.append(chips);
-
+  let derniere = null;
   for (const z of l.zones) {
     const zone = zoneById(z.zone);
     if (!zone) continue;                 // emplacement retiré entre-temps
-    const line = el('label', 'cmd-zline');
-    line.append(el('span', 'cmd-zline__name', zone.label));
+    const line = el('div', 'cmd-zline');
+    derniere = line;
+    const tag = el('button', 'cmd-ztag');
+    tag.type = 'button';
+    tag.dataset.role = 'zone-off';
+    tag.dataset.value = z.zone;
+    tag.title = `Retirer ${zone.label}`;
+    tag.setAttribute('aria-label', `Retirer l'emplacement ${zone.label}`);
+    tag.append(el('span', null, zone.label), ic('close'));
+    line.append(tag);
     const cons = el('input', 'cmd-input cmd-zline__cons');
     cons.type = 'text';
     cons.dataset.role = 'consigne';
@@ -399,11 +378,60 @@ function buildTextile(l, index) {
     cons.dataset.zone = z.zone;
     cons.maxLength = CAT.consigneMax;
     cons.autocomplete = 'off';
+    cons.setAttribute('aria-label', `Consigne pour ${zone.label}, ligne ${index + 1}`);
     cons.placeholder = zone.id === 'coeur' ? 'Les Doudous à SXM' : 'visuel, texte, taille…';
     cons.value = z.consigne;
     line.append(cons);
     mark.append(line);
   }
+
+  const pose = (z) => l.zones.some((x) => x.zone === z.id);
+  const secondaires = CAT.zones.filter((z) => !z.principal);
+  if (!l.zones.length || l.choix) {
+    const chips = el('div', 'cmd-chips');
+    const deplie = l.plus || secondaires.some(pose);
+    const visibles = deplie ? CAT.zones : CAT.zones.filter((z) => z.principal);
+    for (const z of visibles) {
+      if (pose(z)) continue;             // déjà posé : il a sa ligne au-dessus
+      // Libellé COURT sur la puce (« Manche Dr ») pour que les six emplacements
+      // courants tiennent sur une rangée ; la fiche garde le nom entier.
+      const b = chip(z.court || z.label, { role: 'zone', value: z.id });
+      // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
+      // catalogue, jamais. Les commandes enregistrées gardent leur marquage.
+      if (z.custom) {
+        const x = el('span', 'cmd-chip__x material-symbols-outlined', 'close');
+        x.dataset.zone = z.id;
+        x.title = `Retirer l'emplacement « ${z.label} »`;
+        x.setAttribute('aria-hidden', 'true');
+        b.append(x);
+      }
+      chips.append(b);
+    }
+    if (!deplie && secondaires.length) {
+      const plus = chip(String(secondaires.length), { role: 'zone-plus', cls: 'cmd-chip--ghost cmd-chip--plus', icone: 'add' });
+      plus.title = `${secondaires.length} autres emplacements`;
+      plus.setAttribute('aria-label', `Afficher les ${secondaires.length} autres emplacements`);
+      chips.append(plus);
+    } else {
+      // Le catalogue ne peut pas tout prévoir : on crée l'emplacement manquant
+      // sur place, il rejoint la liste de tous les postes.
+      const add = chip('Emplacement', { role: 'zone-add', cls: 'cmd-chip--add', icone: 'add' });
+      add.setAttribute('aria-label', `Ajouter un emplacement, ligne ${index + 1}`);
+      chips.append(add);
+    }
+    mark.append(chips);
+  } else if (derniere) {
+    // Le « + » se loge EN BOUT de la dernière consigne : un deuxième placement
+    // ne coûte pas une rangée de plus tant qu'on ne l'a pas demandé.
+    const rouvrir = el('button', 'cmd-icon cmd-icon--sm cmd-zline__add');
+    rouvrir.type = 'button';
+    rouvrir.dataset.role = 'zone-choix';
+    rouvrir.title = 'Ajouter un placement';
+    rouvrir.setAttribute('aria-label', `Ajouter un placement, ligne ${index + 1}`);
+    rouvrir.append(ic('add'));
+    derniere.append(rouvrir);
+  }
+
   art.append(mark);
   return art;
 }
@@ -443,14 +471,29 @@ const BUILDERS = { tasse: buildTasse, textile: buildTextile, objet: buildObjet }
 // ---------------------------------------------------------------------------
 // Les familles ouvertes : chacune son bloc, ses lignes, son bouton d'ajout.
 // ---------------------------------------------------------------------------
+// Un bloc de famille = UNE carte. Le titre vit DANS la carte, sur la rangée des
+// noms de colonnes : deux objets flottants côte à côte se lisaient comme du
+// désordre, un seul se lit comme un tableau.
 function buildFamille(id) {
   const f = familleById(id);
   const box = el('section', 'cmd-fam');
   box.dataset.fam = id;
 
+  // Bandeau de la famille : son nom, son bouton d'ajout, sa fermeture. En le
+  // mettant EN HAUT plutôt qu'un « + Ajouter » pleine largeur en bas, on
+  // économise une rangée par famille et on supprime un trait de plus.
   const head = el('div', 'cmd-fam__head');
   head.append(ic(f.icone), el('h4', 'cmd-fam__title', f.label));
-  const close = el('button', 'cmd-icon');
+
+  const add = el('button', 'cmd-fam__add');
+  add.type = 'button';
+  add.dataset.role = 'add-ligne';
+  add.dataset.fam = id;
+  add.append(ic('add'), el('span', null, id === 'objet' ? 'Objet' : id === 'tasse' ? 'Tasse' : 'Ligne'));
+  add.title = `Ajouter ${id === 'objet' ? 'un objet' : id === 'tasse' ? 'une tasse' : 'une ligne'}`;
+  head.append(add);
+
+  const close = el('button', 'cmd-icon cmd-icon--sm');
   close.type = 'button';
   close.dataset.role = 'fam-close';
   close.dataset.fam = id;
@@ -460,23 +503,14 @@ function buildFamille(id) {
   head.append(close);
   box.append(head);
 
-  const table = el('div', 'cmd-table');
   const thead = el('div', `cmd-thead cmd-thead--${id}`);
   thead.setAttribute('aria-hidden', 'true');
   thead.append(...THEADS[id].map((t) => el('span', null, t)));
-  table.append(thead);
+  box.append(thead);
 
   const lignes = el('div', 'cmd-arts');
   lignes.append(...listOf(id).map((l, i) => BUILDERS[id](l, i)));
-  table.append(lignes);
-
-  const add = el('button', 'cmd-addrow');
-  add.type = 'button';
-  add.dataset.role = 'add-ligne';
-  add.dataset.fam = id;
-  add.append(ic('add'), el('span', null, `Ajouter ${id === 'objet' ? 'un objet' : id === 'tasse' ? 'une tasse' : 'une ligne'}`));
-  table.append(add);
-  box.append(table);
+  box.append(lignes);
   return box;
 }
 
@@ -554,12 +588,14 @@ async function addZone(label, l) {
   const known = CAT.zones.find((z) => z.id === id || zoneSlug(z.label) === id);
   if (known) {
     if (!l.zones.some((z) => z.zone === known.id)) toggleZone(l, known.id);
+    l.choix = false;
     renderFams();
     return focusConsigne(l, known.id);
   }
 
   CAT.zones = [...CAT.zones, { id, label: clean, custom: true }];
   toggleZone(l, id);
+  l.choix = false;
   renderFams();
   focusConsigne(l, id);
 
@@ -820,13 +856,21 @@ function wire() {
       return render();
     }
     if (role === 'zone-plus') { l.plus = true; return renderFams(); }
+    if (role === 'zone-choix') { l.choix = true; return renderFams(); }
     if (role === 'zone-add') return openZoneInput(t, l);
+    if (role === 'zone-off') {
+      toggleZone(l, t.dataset.value);
+      renderFams();
+      return render();
+    }
     if (role === 'zone') {
       const id = t.dataset.value;
-      const posee = l.zones.some((z) => z.zone === id);
       toggleZone(l, id);
+      // Choisi = rangé : les puces se referment et on enchaîne sur la consigne.
+      // Un second placement se rouvre d'un tap sur « + Placement ».
+      l.choix = false;
       renderFams();
-      if (!posee) focusConsigne(l, id);   // cochée : on enchaîne sur la consigne
+      focusConsigne(l, id);
       return render();
     }
   });
