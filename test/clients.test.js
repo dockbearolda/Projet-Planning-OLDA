@@ -42,6 +42,8 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(villas.zone, 'Baie Nettle');
   assert.strictEqual(villas.type, 'Conciergerie');
   assert.ok('notes_count' in villas && 'commandes' in villas, 'champs enrichis attendus');
+  // Les clients rapatriés de la base PRO sont marqués « pro » par la migration.
+  assert.strictEqual(villas.client_type, 'pro', 'les clients seedés sont pro');
   // Trié par entreprise (fr) : chaque nom vient après le précédent.
   for (let i = 1; i < seeded.body.length; i += 1) {
     assert.ok(
@@ -68,6 +70,20 @@ delete process.env.APP_PASSWORD;
   assert.ok(id, 'un id est renvoyé');
   assert.strictEqual(cree.body.entreprise, 'Test Boutique');
   assert.strictEqual(cree.body.nom, 'Léa');
+  assert.strictEqual(cree.body.client_type, 'pro', 'nature « pro » par défaut');
+
+  // Nature pro/perso : création explicite en perso, puis bascule et rejet.
+  const perso = await j('POST', '/api/clients', { entreprise: 'Marie Dupont', client_type: 'perso' });
+  assert.strictEqual(perso.status, 201, JSON.stringify(perso.body));
+  assert.strictEqual(perso.body.client_type, 'perso');
+
+  const natBad = await j('PATCH', `/api/clients/${id}`, { client_type: 'zzz' });
+  assert.strictEqual(natBad.status, 400);
+  assert.match(natBad.body.error, /nature invalide/i);
+
+  const natOk = await j('PATCH', `/api/clients/${id}`, { client_type: 'perso' });
+  assert.strictEqual(natOk.status, 200);
+  assert.strictEqual(natOk.body.client_type, 'perso', 'la nature bascule pro → perso');
 
   // 3. Édition en place : on change un champ, la fiche le reflète.
   const patch = await j('PATCH', `/api/clients/${id}`, { fonction: 'Directrice', zone: 'Grand Case' });
@@ -122,6 +138,7 @@ delete process.env.APP_PASSWORD;
   assert.ok(auto, 'le client de la commande est dans la base');
   assert.strictEqual(auto.nom, 'Paul');
   assert.strictEqual(auto.telephone, '0690 12 34 56');
+  assert.strictEqual(auto.client_type, 'pro', 'la nature pro de la commande suit le client');
   assert.ok(auto.commandes >= 1, 'la commande est comptée');
 
   // Une 2e commande du MÊME client (casse différente) ne crée pas de doublon.
@@ -130,6 +147,18 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(after2.body.length, before + 1, 'pas de doublon malgré la casse');
   const autoBis = after2.body.find((c) => c.entreprise === nouveauClient);
   assert.ok(autoBis.commandes >= 2, 'le compteur suit les commandes');
+
+  // Une commande PERSO crée un client perso dans la base (la nature suit).
+  const persoName = 'Particulier Testeur ' + Math.floor(seeded.body.length);
+  const cmdPerso = await j('POST', '/api/commande', {
+    kind: 'demande',
+    client: { societe: persoName, contact: 'Sophie', type: 'perso' },
+    articles: [{ vetement: 'Sweat', quantite: 1, zones: [] }],
+  });
+  assert.strictEqual(cmdPerso.status, 201, JSON.stringify(cmdPerso.body));
+  const autoPerso = (await j('GET', '/api/clients')).body.find((c) => c.entreprise === persoName);
+  assert.ok(autoPerso, 'le client perso est dans la base');
+  assert.strictEqual(autoPerso.client_type, 'perso', 'la nature perso suit le client');
 
   // 6. Suppression du client (et de ses notes).
   const del = await j('DELETE', `/api/clients/${id}`);

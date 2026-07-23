@@ -163,6 +163,15 @@ async function init() {
     await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS fiche jsonb');
   } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
 
+  // Migration : NATURE pro / perso sur la base clients (distincte du `type`
+  // métier libre). Les clients déjà présents viennent tous de la base PRO
+  // rapatriée → on les marque 'pro'. Nouveaux clients perso saisis au comptoir.
+  // Down : ALTER TABLE clients DROP COLUMN IF EXISTS client_type.
+  try {
+    await pool.query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type text DEFAULT 'pro'");
+  } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  await pool.query("UPDATE clients SET client_type = 'pro' WHERE client_type IS NULL");
+
   // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
   // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
   // sur « À attribuer » (valeur neutre, toujours valide) pour rester éditables.

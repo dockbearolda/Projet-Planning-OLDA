@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS clients (
   entreprise  text NOT NULL,                 -- société / marque (obligatoire)
   nom         text,                          -- personne contact
   fonction    text,                          -- son rôle (Gérante, Resp. Marketing…)
+  client_type text DEFAULT 'pro',            -- NATURE du client : 'pro' / 'perso' (≠ `type` métier)
   type        text,                          -- catégorie métier libre
   zone        text,                          -- localité (Grand Case, Marigot…)
   email       text,

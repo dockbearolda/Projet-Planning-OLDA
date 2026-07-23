@@ -223,10 +223,20 @@
           </header>
 
           <div class="cmd-body">
+            <!-- Nature du client : pro (société) ou perso (particulier). Tranché
+                 dès l'entête ; suit le client dans sa fiche de base. -->
+            <div class="cmd-nature">
+              <span class="cmd-label">Type de client</span>
+              <div class="cmd-seg" id="cmd-nature" role="radiogroup" aria-label="Type de client">
+                <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
+                <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+              </div>
+            </div>
+
             <!-- Client : une seule ligne, l'essentiel. -->
             <div class="cmd-client">
               <div class="cmd-field cmd-field--grow cmd-auto">
-                <label class="cmd-label" for="cmd-societe">Client — société / marque</label>
+                <label class="cmd-label" for="cmd-societe" id="cmd-societe-label">Client — société / marque</label>
                 <input class="cmd-input" id="cmd-societe" type="text" placeholder="Iguana (Discover)"
                        autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
                        aria-controls="cmd-auto-list" />

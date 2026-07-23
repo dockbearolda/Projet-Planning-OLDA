@@ -43,10 +43,20 @@ const NOTE_KINDS = [
 ];
 const KIND_BY_ID = new Map(NOTE_KINDS.map((k) => [k.id, k]));
 
+// Nature du client : pro (société) / perso (particulier). Axe DISTINCT du `type`
+// métier libre (Boutique, Hôtel…). Filtre de liste + segmented dans la fiche.
+const NATURES = [
+  { id: 'pro', label: 'Pro', icon: 'apartment' },
+  { id: 'perso', label: 'Perso', icon: 'person' },
+];
+const nature = (v) => (v === 'perso' ? 'perso' : 'pro');
+const natureLabel = (v) => (nature(v) === 'perso' ? 'Perso' : 'Pro');
+
 // --- État ------------------------------------------------------------------
 let LIST = [];             // clients (forme /api/clients, enrichie)
 let query = '';
 let sort = 'nom';          // 'nom' | 'recent'
+let natureFilter = 'all';  // 'all' | 'pro' | 'perso'
 let drawer = null;         // { id | null, mode, draft?, notes? }
 let noteKind = 'note';
 
@@ -130,6 +140,16 @@ function buildStatic() {
   clear.setAttribute('aria-label', 'Effacer la recherche');
   search.append(clear);
 
+  const natWrap = el('div', 'cl-filter');
+  natWrap.setAttribute('role', 'group');
+  natWrap.setAttribute('aria-label', 'Filtrer par nature');
+  for (const f of [{ id: 'all', label: 'Tous' }, ...NATURES]) {
+    const b = el('button', `cl-filter__btn${natureFilter === f.id ? ' is-on' : ''}`, f.label);
+    b.type = 'button';
+    b.dataset.nature = f.id;
+    natWrap.append(b);
+  }
+
   const sortWrap = el('div', 'cl-sort');
   for (const s of [{ id: 'nom', label: 'Nom' }, { id: 'recent', label: 'Récent' }]) {
     const b = el('button', `cl-sort__btn${sort === s.id ? ' is-on' : ''}`, s.label);
@@ -143,7 +163,7 @@ function buildStatic() {
   nw.id = 'cl-new';
   nw.append(ic('add'), el('span', null, 'Nouveau'));
 
-  head.append(brand, search, sortWrap, nw);
+  head.append(brand, search, natWrap, sortWrap, nw);
 
   const list = el('div', 'cl-list');
   list.id = 'cl-list';
@@ -188,10 +208,11 @@ function suggestions() {
 function filtered() {
   const needle = fold(query).trim();
   let list = LIST;
+  if (natureFilter !== 'all') list = list.filter((c) => nature(c.client_type) === natureFilter);
   if (needle) {
     const parts = needle.split(/\s+/);
     list = list.filter((c) => {
-      const hay = fold([c.entreprise, c.nom, c.fonction, c.type, c.zone, c.telephone, c.email].filter(Boolean).join(' '));
+      const hay = fold([c.entreprise, c.nom, c.fonction, natureLabel(c.client_type), c.type, c.zone, c.telephone, c.email].filter(Boolean).join(' '));
       return parts.every((p) => hay.includes(p));
     });
   }
@@ -210,7 +231,11 @@ function card(c) {
   b.append(el('span', 'cl-av', initials(c.entreprise)));
 
   const body = el('div', 'cl-card__body');
-  body.append(el('div', 'cl-card__name', c.entreprise));
+  const nameRow = el('div', 'cl-card__namerow');
+  nameRow.append(el('span', 'cl-card__name', c.entreprise));
+  const nat = nature(c.client_type);
+  nameRow.append(el('span', `cl-nature cl-nature--${nat}`, natureLabel(nat)));
+  body.append(nameRow);
   const sub = [c.nom, c.type, c.zone].filter(Boolean).join(' · ');
   body.append(el('div', 'cl-card__sub', sub || '—'));
   b.append(body);
@@ -333,8 +358,25 @@ function renderDrawer() {
 
   const bodyScroll = el('div', 'cl-dbody');
 
-  // Champs éditables.
+  // Champs éditables. La NATURE pro/perso ouvre la fiche : segmented, pas texte.
   const fields = el('div', 'cl-fields');
+  const natRow = el('div', 'cl-f cl-f--nature');
+  const natLab = el('span', 'cl-f__label');
+  natLab.append(ic('badge', 'cl-f__ic'), el('span', null, 'Nature'));
+  const seg = el('div', 'cl-seg');
+  seg.setAttribute('role', 'radiogroup');
+  seg.setAttribute('aria-label', 'Nature du client');
+  const cur = nature(c.client_type);
+  for (const n of NATURES) {
+    const nb = el('button', `cl-seg__btn${n.id === cur ? ' is-on' : ''}`, n.label);
+    nb.type = 'button';
+    nb.dataset.nature = n.id;
+    nb.setAttribute('role', 'radio');
+    nb.setAttribute('aria-checked', String(n.id === cur));
+    seg.append(nb);
+  }
+  natRow.append(natLab, seg);
+  fields.append(natRow);
   for (const f of FIELDS) fields.append(fieldRow(f, c[f.key]));
   bodyScroll.append(fields);
 
@@ -436,7 +478,7 @@ async function openClient(id) {
 }
 
 function openNew() {
-  drawer = { id: null, mode: 'create', draft: { entreprise: '', nom: '', fonction: '', type: '', zone: '', telephone: '', email: '', adresse: '' }, notes: [] };
+  drawer = { id: null, mode: 'create', draft: { entreprise: '', nom: '', fonction: '', client_type: 'pro', type: '', zone: '', telephone: '', email: '', adresse: '' }, notes: [] };
   renderDrawer();
 }
 
@@ -472,9 +514,33 @@ async function saveField(key, raw) {
   }
 }
 
+// Nature pro/perso : posée par le segmented (bouton, pas champ texte). En
+// édition on PATCH aussitôt ; en création on ne fait que mémoriser le choix.
+async function setNature(value) {
+  if (!drawer) return;
+  const nat = nature(value);
+  const unchanged = nature(drawer.draft.client_type) === nat;
+  drawer.draft.client_type = nat;
+  for (const b of ROOT.querySelectorAll('.cl-seg__btn')) {
+    const on = b.dataset.nature === nat;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+  if (drawer.mode !== 'edit' || unchanged) return;   // création, ou rien à changer
+  try {
+    const updated = await api('PATCH', `/api/clients/${drawer.id}`, { client_type: nat });
+    drawer.draft = { ...drawer.draft, ...updated };
+    const i = LIST.findIndex((c) => c.id === drawer.id);
+    if (i >= 0) LIST[i] = { ...LIST[i], ...updated };
+    renderList();
+  } catch (err) {
+    toast(err.message || 'Modification refusée.');
+  }
+}
+
 async function createClient() {
   if (!drawer || drawer.mode !== 'create') return;
-  const draft = {};
+  const draft = { client_type: nature(drawer.draft.client_type) };
   for (const f of FIELDS) {
     const input = $(`#cl-f-${f.key}`);
     if (input) draft[f.key] = input.value.trim();
@@ -554,6 +620,16 @@ function wire() {
       for (const b of ROOT.querySelectorAll('.cl-sort__btn')) b.classList.toggle('is-on', b === sortBtn);
       return renderList();
     }
+
+    const filterBtn = t.closest('.cl-filter__btn');
+    if (filterBtn) {
+      natureFilter = filterBtn.dataset.nature;
+      for (const b of ROOT.querySelectorAll('.cl-filter__btn')) b.classList.toggle('is-on', b === filterBtn);
+      return renderList();
+    }
+
+    const segBtn = t.closest('.cl-seg__btn');
+    if (segBtn) return setNature(segBtn.dataset.nature);
 
     if (t.closest('#cl-new')) return openNew();
     if (t.closest('#cl-q-clear')) { query = ''; $('#cl-q').value = ''; $('#cl-q').focus(); return renderList(); }

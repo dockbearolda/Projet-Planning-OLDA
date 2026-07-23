@@ -134,12 +134,13 @@ function openAuto(query) {
 
 // Reprend une fiche connue : on ne remplit QUE les champs restés vides, pour ne
 // jamais écraser ce que la personne vient de taper. Le `type` de la base est une
-// catégorie métier (Boutique, Hôtel…), pas le pro/perso de la commande : on ne
-// le recopie donc pas dans le client_type.
+// catégorie métier (Boutique, Hôtel…) qu'on ne recopie pas ; en revanche la
+// NATURE pro/perso de la fiche (client_type) suit le client à sa nouvelle commande.
 function pickClient(c) {
   state.client.societe = c.entreprise;
   if (!state.client.contact.trim() && c.nom) state.client.contact = c.nom;
   if (!state.client.telephone.trim() && c.telephone) state.client.telephone = c.telephone;
+  if (c.client_type === 'pro' || c.client_type === 'perso') state.client.type = c.client_type;
 
   $('#cmd-societe').value = state.client.societe;
   $('#cmd-contact').value = state.client.contact;
@@ -249,6 +250,16 @@ function render() {
   $('#cmd-title').textContent = t.label;
   $('#cmd-sub').textContent = t.hint;
 
+  // Nature pro / perso : segmented + adapte le libellé du champ « société ».
+  const perso = state.client.type === 'perso';
+  for (const b of $$('#cmd-nature .cmd-seg__btn')) {
+    const on = b.dataset.nature === state.client.type;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+  $('#cmd-societe-label').textContent = perso ? 'Client — nom du particulier' : 'Client — société / marque';
+  $('#cmd-societe').placeholder = perso ? 'Marie Dupont' : 'Iguana (Discover)';
+
   $('#cmd-boite').setAttribute('aria-checked', String(state.enBoite));
   $('#cmd-boite').classList.toggle('is-on', state.enBoite);
   $('#cmd-maquette').setAttribute('aria-checked', String(state.maquette));
@@ -306,6 +317,7 @@ function wire() {
     const t = e.target.closest('button');
     if (!t) return closeAuto();
 
+    if (t.dataset.nature) { state.client.type = t.dataset.nature; return render(); }
     if (t.id === 'cmd-boite') { state.enBoite = !state.enBoite; return render(); }
     if (t.id === 'cmd-maquette') { state.maquette = !state.maquette; return render(); }
     if (t.id === 'cmd-add-art') {
