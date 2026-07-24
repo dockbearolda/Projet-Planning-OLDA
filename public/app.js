@@ -1278,6 +1278,8 @@ function cellDossier(r) {
   line.appendChild(company);
   const wa = cellWhatsapp(r);
   if (wa) line.appendChild(wa);
+  line.appendChild(cellPdfSlot(r, 'devis'));
+  line.appendChild(cellPdfSlot(r, 'facture'));
   stack.appendChild(line);
   // Nature tranchée à la prise : DEMANDE (à chiffrer) ou COMMANDE (validée).
   // Les lignes créées à la main dans la grille n'en portent pas — on n'invente
@@ -2019,7 +2021,7 @@ function makeOptimisticRow() {
     quantity: null, product: null, color: null, project_value: null,
     description: null, deadline: null,
     position: maxPos + 1000,
-    devis_name: null, bat_name: null,
+    devis_name: null, bat_name: null, facture_name: null,
     created_at: now, updated_at: now,
   };
 }
@@ -2165,7 +2167,7 @@ function duplicateRow(r) {
   const now = new Date().toISOString();
   const tmpId = `tmp-${++tmpSeq}`;
   const copy = {
-    ...r, id: tmpId, devis_name: null, bat_name: null,
+    ...r, id: tmpId, devis_name: null, bat_name: null, facture_name: null,
     position: maxPos + 1000, created_at: now, updated_at: now,
   };
   // La copie n'apparaît dans la grille que si elle relève bien de la vue courante.
