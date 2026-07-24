@@ -110,33 +110,6 @@ const FLAGS = [
 const FLAG_BY_VALUE = Object.fromEntries(FLAGS.map((f) => [f.value, f]));
 const FLAG_REASON_MAX = 240; // miroir de server.js
 
-// --- Flux linéaire du pipeline (bouton « étape suivante ») ------------------
-// Ordre de progression réel d'un projet : les familles dans l'ordre de la
-// sidebar, et à l'intérieur d'une famille ses sous-étapes dans l'ordre. Un clic
-// sur la flèche d'une ligne l'envoie à la position suivante de cette liste.
-// Fiverr (catégorie spéciale hors flux) n'y figure pas : pas de flèche.
-const FLOW = FAMILIES.flatMap((f) => (
-  familyHasSub(f.slug)
-    ? SUB_STAGES[f.slug].map((s) => ({ stage: f.slug, sub: s.slug }))
-    : [{ stage: f.slug, sub: null }]
-));
-
-// Position suivante pour une commande, ou null si elle est en bout de flux
-// (Archivé) ou hors flux (Fiverr). Une commande posée sur une famille sans
-// sous-étape précisée (« à préciser ») avance vers la 1re sous-étape de sa
-// famille : c'est bien l'étape d'après pour elle.
-function nextFlowStep(r) {
-  if (!familyHasSub(r.stage)) {
-    const i = FLOW.findIndex((p) => p.stage === r.stage && p.sub === null);
-    return i >= 0 && i + 1 < FLOW.length ? FLOW[i + 1] : null;
-  }
-  if (!r.sub_stage) return FLOW.find((p) => p.stage === r.stage) || null;
-  const i = FLOW.findIndex((p) => p.stage === r.stage && p.sub === r.sub_stage);
-  return i >= 0 && i + 1 < FLOW.length ? FLOW[i + 1] : null;
-}
-
-const flowLabel = (p) => (p.sub ? `${STAGE_LABEL[p.stage]} · ${SUB_LABEL[p.sub]}` : STAGE_LABEL[p.stage]);
-
 // --- Liens externes par catégorie (affichés dans l'en-tête de l'étape). -----
 const STAGE_LINKS = {
   fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
@@ -916,8 +889,6 @@ function buildRow(r) {
   tr.appendChild(cellPrice(r));
   // sous-étape : puce précisant ce qui se passe maintenant dans la famille
   tr.appendChild(cellSubStage(r));
-  // étape suivante : un clic pousse la commande à la position suivante du flux
-  tr.appendChild(cellNext(r));
   // infos : notes libres multi-lignes (ancien champ « description »)
   tr.appendChild(cellInfos(r));
   // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
@@ -1204,61 +1175,6 @@ function cellFlag(r) {
   return td;
 }
 
-// Bouton « étape suivante » : un clic envoie la commande à la position suivante
-// du flux (sous-étape suivante, ou 1re sous-étape de la famille d'après). Rien à
-// afficher en bout de flux (Archivé) ou hors flux (Fiverr).
-function cellNext(r) {
-  const td = document.createElement('td');
-  td.className = 'col-next-cell';
-  if (isDraftRow(r)) return td;
-  const next = nextFlowStep(r);
-  if (!next) return td;
-
-  const btn = document.createElement('button');
-  btn.className = 'next-btn';
-  btn.type = 'button';
-  const label = flowLabel(next);
-  attachTip(btn, `Étape suivante → ${label}`);
-  btn.setAttribute('aria-label', `Envoyer à l’étape suivante : ${label}`);
-  btn.appendChild(arrowIcon());
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    hideTip();
-    if (blockedByPrice(r, next.stage, next.sub)) {
-      const msg = priceBlockMessage(next.stage, next.sub);
-      showTip(btn, msg);
-      showToast(msg);
-      return;
-    }
-    showToast(`→ ${label}`);
-    moveToStage(r, next.stage, next.sub);
-  });
-  td.appendChild(btn);
-  return td;
-}
-
-// Flèche « suivant » construite en DOM (pas d'innerHTML) : même trait que les
-// autres icônes de la grille.
-function arrowIcon() {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '17');
-  svg.setAttribute('height', '17');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2.2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const d of ['M5 12h13', 'M12 5l7 7-7 7']) {
-    const p = document.createElementNS(NS, 'path');
-    p.setAttribute('d', d);
-    svg.appendChild(p);
-  }
-  return svg;
-}
-
 // Sous-étape : précise ce qui se passe MAINTENANT dans la famille. Puce
 // cliquable ; menu des sous-familles de la famille + « Aucune ». Rien à afficher
 // (et colonne masquée par CSS) pour les familles sans sous-étapes.
@@ -1348,7 +1264,7 @@ function whatsappIcon() {
   return svg;
 }
 
-// Icônes devis/facture construites en DOM (même trait que arrowIcon/whatsappIcon,
+// Icônes devis/facture construites en DOM (même trait que whatsappIcon,
 // pas d'innerHTML) : deux glyphes neutres et distincts, pour reconnaître la
 // pastille au premier coup d'œil sans attendre l'infobulle.
 function strokeIcon(paths) {
