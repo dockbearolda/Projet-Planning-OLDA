@@ -2334,6 +2334,7 @@ function stageAcceptsDrop(stageEl, r) {
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
+  if (blockedByPrice(r, slug)) return false;                // pas de prix : entrée refusée
   const sub = isSub ? stageEl.dataset.sub : null;
   return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
 }
