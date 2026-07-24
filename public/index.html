@@ -72,9 +72,25 @@
           <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
           <span class="nav-switch-label">Dashboard</span>
         </a>
+        <!-- Deux raccourcis sortis du rail des étapes : ce sont les deux listes
+             qu'on ouvre le plus souvent dans la journée, elles méritent un
+             onglet à elles plutôt qu'une ligne perdue au milieu du pipeline.
+             Elles ouvrent le planning, filtré sur leur catégorie. -->
+        <a class="nav-switch-btn" id="viewFiverr" href="#fiverr">
+          <span class="material-symbols-outlined" aria-hidden="true">draw</span>
+          <span class="nav-switch-label">Fiverr</span>
+        </a>
+        <a class="nav-switch-btn" id="viewACommander" href="#a-commander">
+          <span class="material-symbols-outlined" aria-hidden="true">shopping_cart</span>
+          <span class="nav-switch-label">À commander</span>
+        </a>
         <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
           <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
           <span class="nav-switch-label">Base clients</span>
+        </a>
+        <a class="nav-switch-btn nav-switch-btn--reglages" id="viewReglages" href="#reglages">
+          <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+          <span class="nav-switch-label">Réglages</span>
         </a>
       </nav>
 
@@ -202,6 +218,11 @@
         <!-- Onglet Base clients : le CRM pro. Liste + fiche éditable + notes,
              entièrement rendu par clients.js (chargé au premier affichage). -->
         <section class="clients" id="clients" hidden aria-label="Base clients"></section>
+
+        <!-- Onglet Réglages : ce que le patron règle une fois pour tout
+             l'atelier (message WhatsApp « commande prête »…). Rendu par
+             reglages.js, chargé au premier affichage. -->
+        <section class="reglages" id="reglages" hidden aria-label="Réglages"></section>
 
         <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
              remplit au comptoir, EN FACE DE LUI — elle doit se remplir en 30 à
@@ -345,6 +366,24 @@
           <datalist id="cmd-dl-typos"></datalist>
 
           <div class="cmd-toast" id="cmd-toast" role="status" aria-live="polite"></div>
+
+          <!-- DERNIÈRE ÉTAPE, obligatoire : où la fiche atterrit dans le
+               planning. On ne l'enregistre jamais « quelque part par défaut »
+               sans le dire — la question est posée à chaque saisie, et taper
+               une destination enregistre aussitôt (un seul geste, pas de
+               double confirmation au comptoir). La destination habituelle de
+               la nature choisie est marquée, en tête de liste. -->
+          <div class="cmd-dest" id="cmd-dest" hidden>
+            <div class="cmd-dest__card" role="dialog" aria-modal="true" aria-labelledby="cmd-dest-title">
+              <button class="cmd-dest__close" id="cmd-dest-close" type="button" aria-label="Revenir à la fiche">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+              <p class="cmd-dest__eyebrow">Dernière étape</p>
+              <h3 class="cmd-dest__title" id="cmd-dest-title">Où l'enregistrer ?</h3>
+              <p class="cmd-dest__sub" id="cmd-dest-sub"></p>
+              <div class="cmd-dest__list" id="cmd-dest-list"></div>
+            </div>
+          </div>
 
           <div class="cmd-done" id="cmd-done" hidden>
             <div class="cmd-done__card" role="dialog" aria-modal="true" aria-labelledby="cmd-done-title">

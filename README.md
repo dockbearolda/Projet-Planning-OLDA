@@ -11,8 +11,16 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 ## Fonctionnalités
 
-- Sidebar pipeline : **8 familles** (grandes étapes) + Fiverr épinglé, compteurs
-  live. « 1 projet = 1 seule place. »
+- Sidebar pipeline : **8 familles** (grandes étapes), compteurs live.
+  « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
+  qu'on ouvre le plus souvent, ont quitté le rail pour un **onglet** de la barre
+  du haut — sans quitter le pipeline (flux, compteurs, puces inchangés).
+- **Pastille WhatsApp** sur toute ligne dont le client a laissé un numéro : un
+  clic ouvre la conversation avec le message « votre commande est prête » déjà
+  écrit. Rien ne part tout seul, c'est l'employé qui appuie sur Envoyer. Le
+  texte se règle dans l'onglet **Réglages** (jetons `{client}`, `{commande}`,
+  `{date}`) ; le numéro est mis au format international selon son préfixe
+  (0690/0691 → +590, 0696/0697 → +596, 0694 → +594, 0692/0693 → +262, sinon +33).
 - **Sous-étape** en puce inline (précise l'action en cours), affichée uniquement
   pour les familles qui en ont (Chiffrage, Préparation, Production, Facturation,
   Terminé). Changer de famille en glissant remet la sous-étape à zéro.
@@ -152,8 +160,10 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
-| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, familles, délais, vêtements, tailles, tasses, objets, typos, zones, techniques, options de tasse, statuts et modes de paiement). |
-| POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning. |
+| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, familles, délais, vêtements, tailles, tasses, objets, typos, zones, techniques, options de tasse, statuts et modes de paiement) **+ `pipeline`** : familles et sous-étapes, pour le choix de la destination. |
+| POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). |
+| GET | `/api/settings/whatsapp` | `{ message }` — le texte « commande prête » réglé par le patron. |
+| PUT | `/api/settings/whatsapp` | Remplace ce texte (`{ message }`, 1000 caractères max), diffusé en SSE. |
 | POST | `/api/commande/zones` | Ajoute un emplacement d'impression (`{ label }`) et renvoie la liste complète. |
 | DELETE | `/api/commande/zones/:id` | Retire un emplacement ajouté au comptoir (ceux du catalogue sont figés). |
 | GET | `/api/clients` | Annuaire client déduit des commandes déjà saisies (auto-complétion). |
@@ -178,15 +188,24 @@ planning).
 
 Deux entrées **en tête du menu**, l'une pour une *Demande* (à chiffrer), l'autre
 pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fiche**
-— la nature est décidée par le lien cliqué, pas par un réglage dans l'écran :
-
-- une **Demande** part dans la colonne **« Demande »** du planning ;
-- une **Commande** part dans la colonne **« Commande »** (l'ancienne
-  « Chiffrage / Devis », renommée : un client a dit oui, le devis reste à faire),
-  directement sur la sous-étape **« À chiffrer »**.
+— la nature est décidée par le lien cliqué, pas par un réglage dans l'écran.
 
 La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
 la ligne du planning. La fiche se lit dans l'ordre où ça se dit.
+
+### La dernière question : où l'enregistrer ?
+
+« Enregistrer » n'envoie rien tout seul : il **demande d'abord où la fiche
+atterrit**, à chaque saisie. Tout le pipeline s'affiche (familles + sous-étapes,
+Fiverr compris) ; la destination habituelle de la nature choisie — Demande →
+*Demande*, Commande → *Commande · À chiffrer* — est marquée **habituel** et
+placée en tête. **Taper une destination enregistre aussitôt** : un seul geste,
+comme le reste de la fiche, mais un geste conscient. L'écran de confirmation
+redit où la commande est partie.
+
+Le serveur revalide : une sous-étape étrangère à la famille visée est refusée
+(400) plutôt que rangée n'importe où. Un corps sans destination retombe sur
+celle du catalogue — les appels existants continuent de marcher.
 
 ### La page ne défile pas
 
@@ -286,19 +305,28 @@ grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans `catalog.json`,
 section `commande` — seul endroit à modifier pour ajouter un vêtement, une
 taille, un délai ou une option de tasse.
 
-## Navigation — une seule page, quatre vues
+## Navigation — une seule page, plusieurs vues
 
-Planning, Dashboard, Prise de commande et Base clients sont **quatre vues
-d'un même document**, pas quatre pages. Passer de l'une à l'autre ne recharge
+Planning, Dashboard, Prise de commande, Base clients et Réglages sont **des vues
+d'un même document**, pas des pages. Passer de l'une à l'autre ne recharge
 rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
 
 Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`, `#demande`,
-`#commande`, `#clients`. La navigation, dans le rail de gauche, n'est faite que
-de liens — cliquer change le hash, le hash change la vue. Chaque écran est donc
-partageable par son URL et le bouton « Retour » du navigateur fonctionne.
+`#commande`, `#clients`, `#reglages`, plus `#fiverr` et `#a-commander`. La
+navigation, dans la barre du haut, n'est faite que de liens — cliquer change le
+hash, le hash change la vue. Chaque écran est donc partageable par son URL et le
+bouton « Retour » du navigateur fonctionne.
 `#demande` et `#commande` ouvrent la même vue de saisie, seule la nature diffère
 (poussée au module par `setNature`) — d'où deux liens distincts en tête du menu.
+
+`#fiverr` et `#a-commander` restent des vues de **planning** : même grille, même
+en-tête, seule la catégorie est imposée et le rail s'efface (l'onglet le
+remplace). Revenir sur `#planning` depuis l'une d'elles repart du début du
+pipeline, pour ne jamais laisser une grille sans entrée allumée en face. Ces
+deux catégories ne quittent PAS le modèle : `FLOW`, les compteurs, la puce de
+sous-étape et les commandes déjà posées sont inchangés — seul l'affichage du
+rail les saute (`PROMOTED` dans `app.js`).
 
 Le bouton « Nouvelle commande » de la barre du haut ne crée une ligne que dans
 la grille : il est donc masqué hors du Planning, où son résultat serait
@@ -327,6 +355,32 @@ Le détail structuré est conservé dans `requests.fiche` (jsonb) ;
 `requests.description` en porte en parallèle un résumé lisible, donc la grille
 n'a jamais besoin de lire ce JSON.
 
+## Réglages — `/#reglages`
+
+Ce que le patron règle **une fois pour tous les postes**. Aujourd'hui : le
+**message WhatsApp « commande prête »**.
+
+Sur le planning, toute ligne dont le client a laissé un numéro porte une
+**pastille WhatsApp** verte, toujours visible (la tablette de l'atelier n'a pas
+de survol) et taillée pour le doigt (44 px de zone tactile). Un clic ouvre la
+conversation — application sur la tablette, WhatsApp Web sur le PC — avec le
+message **déjà écrit**. **Rien ne part tout seul** : l'employé relit et appuie
+sur Envoyer lui-même.
+
+Le texte s'écrit dans cet onglet, avec trois jetons remplis à l'ouverture —
+`{client}` (nom du dossier), `{commande}` (description), `{date}` (date
+souhaitée) — et un aperçu de ce que le client lira. Il est stocké en base
+(`app_meta.whatsapp_message`) et diffusé en SSE : les autres postes utilisent le
+nouveau texte sans recharger. Un message **vidé** est un choix (on écrira à la
+main), pas un oubli : il le reste.
+
+Le numéro est mis au format international par `public/whatsapp.js` — l'atelier
+est à Saint-Martin, on y croise autant de `0690` que de `06` métropole, donc
+l'indicatif se déduit du préfixe (`0690`/`0691` → +590, `0696`/`0697` → +596,
+`0694` → +594, `0692`/`0693` → +262, sinon +33). Un numéro déjà international
+(`+590…`, `00590…`) passe tel quel ; un numéro illisible **n'affiche pas de
+pastille** du tout, plutôt que d'ouvrir une conversation avec un inconnu.
+
 ## Structure
 
 ```
@@ -337,13 +391,15 @@ n'a jamais besoin de lire ce JSON.
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
 ├── catalog.json      catalogue Prise de commande (source unique)
 ├── public/
-│   ├── index.html    coquille + les 4 vues (planning, dashboard, commande, clients)
+│   ├── index.html    coquille + les vues (planning, dashboard, commande, clients, réglages)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
+│   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── commande.css  vue Prise de commande, scopée sous #commande
-│   ├── commande.js   état, articles, zones, annuaire client, envoi
+│   ├── commande.js   état, articles, zones, annuaire client, destination, envoi
 │   ├── clients.css   vue Base clients, scopée sous #clients
-│   └── clients.js    liste, fiche éditable, notes
+│   ├── clients.js    liste, fiche éditable, notes
+│   └── reglages.js   vue Réglages (message WhatsApp « commande prête »)
 ├── .env.example
 └── README.md
 ```

@@ -6,6 +6,8 @@
 import { STEP_GUIDE } from './guide.js';
 // Dashboard « Point du jour » (projection temps réel du planning).
 import { createDashboard } from './dashboard.js';
+// WhatsApp « commande prête » : numéro au format international + message rempli.
+import { whatsappLink } from './whatsapp.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -21,7 +23,7 @@ const FAMILIES = [
   { slug: 'termine', label: 'Terminé' },
   { slug: 'archive', label: 'Archivé' },
 ];
-// Catégorie spéciale (sous-traitance graphiste), épinglée sous les familles.
+// Catégorie spéciale (sous-traitance graphiste), hors des 8 familles.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
 ];
@@ -63,6 +65,22 @@ const SUB_LABEL = Object.fromEntries(
   Object.values(SUB_STAGES).flat().map((s) => [s.slug, s.label]),
 );
 const familyHasSub = (slug) => Array.isArray(SUB_STAGES[slug]) && SUB_STAGES[slug].length > 0;
+
+// --- Catégories PROMUES EN ONGLET ------------------------------------------
+// « Fiverr » et « À commander » sont les deux listes qu'on ouvre le plus souvent
+// dans la journée : elles ont désormais leur onglet dans la barre du haut, entre
+// Dashboard et Base clients. Elles quittent donc le rail des étapes — sans
+// quitter le pipeline : le flux (« étape suivante »), les compteurs, la puce de
+// sous-étape et les commandes déjà posées ne bougent pas d'un pouce.
+const PROMOTED = [
+  { hash: '#fiverr', view: 'fiverr', btn: 'viewFiverr', stage: 'fiverr', sub: null },
+  { hash: '#a-commander', view: 'a_commander', btn: 'viewACommander', stage: 'preparation', sub: 'a_commander' },
+];
+const PROMOTED_BY_VIEW = Object.fromEntries(PROMOTED.map((p) => [p.view, p]));
+// Ce que le rail ne montre plus : la famille « fiverr » et la sous-étape
+// « a_commander » (leur onglet les remplace).
+const RAIL_HIDDEN_STAGES = new Set(PROMOTED.filter((p) => !p.sub).map((p) => p.stage));
+const RAIL_HIDDEN_SUBS = new Set(PROMOTED.filter((p) => p.sub).map((p) => p.sub));
 
 // Employés de l'entreprise (miroir de db.js). `responsable` = PILOTE du projet,
 // `referent` = 2e personne rattachée : les deux puisent dans cette liste.
@@ -136,6 +154,33 @@ let sort = { key: null, dir: 1 }; // tri manuel via en-têtes (null = tri par d�
 let lastRendered = [];         // dernière liste triée montée (pour le masquage recherche)
 let catOwners = {};            // { slugCatégorie: employé }   → pilote NOMMÉ DE BASE
 let catRefs = {};              // { slugCatégorie: [employés] } → référents NOMMÉS DE BASE
+let whatsappMessage = '';      // message « commande prête » réglé par le patron
+let booted = false;            // la grille est montée (start() est allé au bout)
+
+// --- WhatsApp « votre commande est prête » ---------------------------------
+// Chaque ligne dont le client a laissé un numéro porte une pastille WhatsApp :
+// un clic ouvre la conversation avec le message DÉJÀ ÉCRIT. Rien ne part tout
+// seul — c'est l'employé qui appuie sur Envoyer dans WhatsApp. Le texte se règle
+// dans l'onglet Réglages (voir reglages.js) ; la mise au format international du
+// numéro et le remplissage des jetons vivent dans whatsapp.js (règles pures).
+
+// L'adresse wa.me d'une ligne du planning, ou null si son numéro est illisible
+// (ou absent) — la ligne ne porte alors aucune pastille.
+function rowWhatsappLink(r) {
+  const d = parseDeadline(r.deadline);
+  return whatsappLink(r.contact_phone, whatsappMessage, {
+    client: r.billing_company || r.contact_referent || '',
+    commande: r.product || r.description || '',
+    date: d ? d.toLocaleDateString('fr-FR') : '',
+  });
+}
+
+async function loadWhatsappMessage() {
+  try {
+    const data = await api('GET', '/api/settings/whatsapp');
+    whatsappMessage = typeof data.message === 'string' ? data.message : '';
+  } catch (_) { /* silencieux : la pastille ouvrira une conversation vide */ }
+}
 
 // --- Pilote / référent effectifs -------------------------------------------
 // Chaque catégorie porte un pilote et des référents « de base » (config
@@ -351,8 +396,9 @@ function renderSidebar() {
   // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
   // sous-catégories. On enveloppe le tout dans un bloc pour que l'œil isole d'un
   // coup une zone de la suivante (miroir de la « Vue Étapes » du CRM : total
-  // famille + détail par sous-étape).
-  FAMILIES.forEach((f) => {
+  // famille + détail par sous-étape). Les catégories promues en onglet (voir
+  // PROMOTED) n'y figurent plus : leur place est dans la barre du haut.
+  FAMILIES.filter((f) => !RAIL_HIDDEN_STAGES.has(f.slug)).forEach((f) => {
     const zone = document.createElement('div');
     zone.className = 'stage-zone';
     const hasSub = familyHasSub(f.slug);
@@ -361,18 +407,12 @@ function renderSidebar() {
     head.classList.add('zone-head'); // le grand titre se lit comme un en-tête de zone
     zone.appendChild(head);
     if (hasSub) {
-      SUB_STAGES[f.slug].forEach((sub) => zone.appendChild(buildStageEl(f, sub)));
+      SUB_STAGES[f.slug]
+        .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug))  // promue en onglet
+        .forEach((sub) => zone.appendChild(buildStageEl(f, sub)));
     }
     $stages.appendChild(zone);
   });
-  // Séparateur + catégorie spéciale Fiverr épinglée dessous (hors pipeline).
-  if (SPECIAL.length) {
-    const sep = document.createElement('div');
-    sep.className = 'stage-sep';
-    sep.setAttribute('aria-hidden', 'true');
-    $stages.appendChild(sep);
-    SPECIAL.forEach((s) => $stages.appendChild(buildStageEl(s)));
-  }
 }
 
 // Rejoue l'animation d'entrée des lignes (léger fondu décalé) au changement d'étape.
@@ -420,6 +460,17 @@ function paintSidebarActive() {
   });
 }
 
+// L'onglet allumé et la grille affichée ne doivent jamais se contredire :
+// demander une AUTRE catégorie alors qu'on est sur l'onglet Fiverr / À commander
+// (rail d'un saut depuis le dashboard, recherche globale…) ramène sur Planning,
+// où le rail est visible. Défini ici, utilisé par selectStage ; la bascule de
+// vue elle-même vit plus bas (setViewMode / applyHash).
+function syncTabForStage(slug, sub) {
+  const promoted = PROMOTED_BY_VIEW[viewMode];
+  if (!promoted || (promoted.stage === slug && promoted.sub === sub)) return;
+  location.hash = '#planning';
+}
+
 // Libellé d'en-tête : la sous-catégorie si l'une est active, sinon la famille.
 function currentViewLabel() {
   if (currentSub && SUB_LABEL[currentSub]) return SUB_LABEL[currentSub];
@@ -428,6 +479,7 @@ function currentViewLabel() {
 
 async function selectStage(slug, sub = null) {
   const sameFamily = slug === currentStage;
+  syncTabForStage(slug, sub ?? null);
   currentStage = slug;
   currentSub = sub ?? null;
   sort = { key: null, dir: 1 };
@@ -1219,7 +1271,14 @@ function cellDossier(r) {
   company.placeholder = 'nom du dossier';
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
 
-  stack.appendChild(company);
+  // Le nom du dossier et la pastille WhatsApp sur la MÊME ligne : le numéro
+  // appartient au client, il se lit juste à côté de son nom.
+  const line = document.createElement('div');
+  line.className = 'client-line';
+  line.appendChild(company);
+  const wa = cellWhatsapp(r);
+  if (wa) line.appendChild(wa);
+  stack.appendChild(line);
   // Nature tranchée à la prise : DEMANDE (à chiffrer) ou COMMANDE (validée).
   // Les lignes créées à la main dans la grille n'en portent pas — on n'invente
   // pas la nature à la place de la personne qui saisit.
@@ -1234,6 +1293,51 @@ function cellDossier(r) {
   }
   td.appendChild(stack);
   return td;
+}
+
+// Le logo WhatsApp, monté en DOM (pas en `innerHTML`) : c'est la seule icône de
+// marque de l'application, Material Symbols n'en fournit pas.
+const WA_GLYPH = 'M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2 22l5.25-1.38a9.86 9.86 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23a8.23 8.23 0 0 1 .01 16.47Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.79.97-.14.16-.29.18-.54.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.09-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.47c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07s.89 2.4 1.01 2.56c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29Z';
+
+function whatsappIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '14');
+  svg.setAttribute('height', '14');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', WA_GLYPH);
+  svg.appendChild(path);
+  return svg;
+}
+
+// Pastille WhatsApp : présente UNIQUEMENT si le client a laissé un numéro
+// lisible. Un clic ouvre WhatsApp (application sur la tablette, WhatsApp Web sur
+// le PC) avec le message du patron déjà écrit — l'employé n'a plus qu'à relire
+// et appuyer sur Envoyer. Renvoie null quand il n'y a pas de numéro : la ligne
+// ne porte alors aucune pastille morte.
+// L'adresse est recalculée AU CLIC et pas seulement au rendu : le nom du
+// dossier, la description ou le message du patron ont pu changer depuis que la
+// ligne est à l'écran, et c'est le texte du moment qu'il faut envoyer.
+function cellWhatsapp(r) {
+  const lien = rowWhatsappLink(r);
+  if (!lien) return null;
+  const a = document.createElement('a');
+  a.className = 'wa-btn';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.href = lien;
+  a.setAttribute('aria-label', 'Prévenir le client sur WhatsApp que sa commande est prête');
+  attachTip(a, 'WhatsApp — prévenir que la commande est prête');
+  a.appendChild(whatsappIcon());
+  a.addEventListener('click', (e) => {
+    const href = rowWhatsappLink(r);
+    if (!href) { e.preventDefault(); return; }
+    a.href = href;
+  });
+  return a;
 }
 
 // Description : ce qui est produit (ancien champ « produit »). Champ simple,
@@ -2413,6 +2517,9 @@ function onStreamChange(e) {
   if (kind === 'category-owners' || kind === 'category-referents') {
     loadCategoryConfig().then(() => { invalidateRowCache(); applySortAndRender(); });
   }
+  // Le patron vient de réécrire le message WhatsApp : les pastilles des lignes
+  // doivent ouvrir le NOUVEAU texte, sans recharger la page.
+  if (kind === 'settings') loadWhatsappMessage();
   // Le planning a changé côté serveur → le cache global de recherche est périmé.
   // On l'invalide, et si la palette est ouverte on recharge + ré-affiche.
   allRows = null;
@@ -2423,7 +2530,7 @@ function onStreamChange(e) {
     // Le dashboard maintient son cache en continu (fil d'activité, badges,
     // écran mural), même quand on est sur le Planning.
     dashboard.notifyChange();
-    if (viewMode === 'planning') poll();
+    if (isPlanningMode(viewMode)) poll();
   }, 120);
 }
 
@@ -2966,17 +3073,25 @@ const $viewDemande = document.getElementById('viewDemande');
 const $commande = document.getElementById('commande');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
+const $viewReglages = document.getElementById('viewReglages');
+const $reglages = document.getElementById('reglages');
 
-let viewMode = 'planning';        // 'planning' | 'dashboard' | 'commande' | 'clients'
+// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages'
+// | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
+let viewMode = 'planning';
 // La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
 // la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
 let commandeNature = 'demande';
 let commandeModule = null;
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
+// Si elle vit dans une catégorie promue en onglet (Fiverr, À commander), c'est
+// SON onglet qu'on ouvre : sinon on afficherait une grille dont l'onglet allumé
+// et le rail ne parlent pas.
 async function jumpToPlanning(r) {
-  setViewMode('planning');
   const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
+  const promoted = PROMOTED.find((p) => p.stage === r.stage && p.sub === sub);
+  setViewMode(promoted ? promoted.view : 'planning');
   await selectStage(r.stage, sub);
   const entry = rowEls.get(String(r.id));
   if (entry && entry.tr) {
@@ -3043,6 +3158,30 @@ function mountClients() {
   }
 }
 
+// Les Réglages du patron (message WhatsApp « commande prête »…). Petit module,
+// chargé au premier passage puis monté ; les visites suivantes relisent la
+// valeur enregistrée — un autre poste a pu la changer entre-temps.
+let reglagesLoading = null;
+let reglagesModule = null;
+function mountReglages() {
+  if (!$reglages) return;
+  if (!reglagesLoading) {
+    reglagesLoading = import('./reglages.js')
+      .then((m) => { reglagesModule = m; return m.initReglages($reglages); })
+      .catch((err) => {
+        reglagesLoading = null;               // rechargeable au prochain essai
+        reglagesModule = null;
+        console.error('Réglages : chargement impossible', err);
+      });
+  } else if (reglagesModule && reglagesModule.refreshReglages) {
+    reglagesModule.refreshReglages();
+  }
+}
+
+// Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
+// en-tête. Seul le rail s'efface (l'onglet le remplace).
+const isPlanningMode = (mode) => mode === 'planning' || mode in PROMOTED_BY_VIEW;
+
 function setViewMode(mode) {
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
   // pilotée par une classe sur <body> : l'attribut `hidden` seul ne suffit pas,
@@ -3050,6 +3189,11 @@ function setViewMode(mode) {
   if ($viewPlanning) $viewPlanning.classList.toggle('active', mode === 'planning');
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
+  if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
+  for (const p of PROMOTED) {
+    const btn = document.getElementById(p.btn);
+    if (btn) btn.classList.toggle('active', mode === p.view);
+  }
   // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
   // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
   const onIntake = mode === 'commande';
@@ -3061,24 +3205,30 @@ function setViewMode(mode) {
   const dash = mode === 'dashboard';
   const commande = mode === 'commande';
   const clients = mode === 'clients';
+  const reglages = mode === 'reglages';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
-  document.body.classList.toggle('view-dashboard', dash);
-  document.body.classList.toggle('view-commande', commande);
-  document.body.classList.toggle('view-clients', clients);
+  if ($reglages) $reglages.hidden = !reglages;
+  document.body.classList.toggle('view-plein', !isPlanningMode(mode));
+  document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (commande) mountCommande();
   if (clients) mountClients();
-  if (mode === 'planning') {
+  if (reglages) mountReglages();
+  if (isPlanningMode(mode)) {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
   }
 }
 
 // #demande et #commande ouvrent la MÊME vue, avec une nature différente.
-const VIEWS = { '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande', '#clients': 'clients' };
+const VIEWS = {
+  '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
+  '#clients': 'clients', '#reglages': 'reglages',
+  ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
+};
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
@@ -3087,6 +3237,26 @@ function applyHash() {
   // Changer de nature SANS changer de vue (#demande ↔ #commande) : setViewMode a
   // pris le raccourci « même vue », on pousse donc la nature à la main.
   if (mode === 'commande' && commandeModule) commandeModule.setNature(commandeNature);
+  // Onglet Fiverr / À commander : la grille doit pointer sur LEUR catégorie.
+  // On ne recharge que si elle affiche autre chose (revenir sur l'onglet déjà
+  // ouvert ne doit pas vider la grille sous les yeux). Au tout premier passage
+  // la grille n'est pas encore montée : on pose seulement la catégorie, start()
+  // s'occupe du chargement — sinon on la chargerait deux fois.
+  const promoted = PROMOTED_BY_VIEW[mode];
+  if (promoted) {
+    if (!booted) { currentStage = promoted.stage; currentSub = promoted.sub; }
+    else if (currentStage !== promoted.stage || currentSub !== promoted.sub) {
+      selectStage(promoted.stage, promoted.sub);
+    }
+    return;
+  }
+  // Retour sur l'onglet Planning alors que la grille affiche une catégorie
+  // promue : elle ne figure plus dans le rail, on repart donc du début du
+  // pipeline plutôt que de laisser une grille sans entrée allumée en face.
+  const onPromotedStage = PROMOTED.some((p) => p.stage === currentStage && p.sub === currentSub);
+  if (booted && mode === 'planning' && onPromotedStage) {
+    selectStage(FAMILIES[0].slug, null);
+  }
 }
 window.addEventListener('hashchange', applyHash);
 applyHash();
@@ -3100,13 +3270,16 @@ async function start() {
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
   // AVANT le premier rendu, sinon les lignes s'affichent en « Qui ? » puis sautent.
-  await Promise.all([loadCategoryConfig(), loadCounts()]);
-  $stageTitle.textContent = STAGE_LABEL[currentStage];
+  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage()]);
+  $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
   updateStageHelp();
   updateFiverrTool(currentStage);
   await loadRows();
   lastRowsSig = signature(rows);
+  // À partir d'ici la grille est montée : les changements d'onglet peuvent la
+  // recharger d'eux-mêmes (voir applyHash).
+  booted = true;
   dashboard.start(); // monte le « Point du jour » et charge son cache en fond
   startRealtime();
 }
