@@ -886,8 +886,6 @@ function buildRow(r) {
   // responsable : QUI agit (puce cliquable) — la réponse du patron au « personne
   // ne remplit » : chaque projet porte un nom.
   tr.appendChild(cellResponsable(r));
-  // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
-  tr.appendChild(cellFlag(r));
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
   // description : ce qui est produit (ancien champ « produit »)
@@ -902,6 +900,8 @@ function buildRow(r) {
   tr.appendChild(cellInfos(r));
   // date souhaitée : badge relatif coloré (« En retard 1j », « 4j »), éditable au clic
   tr.appendChild(cellDeadline(r));
+  // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
+  tr.appendChild(cellFlag(r));
   // actions de fin de ligne : envoyer vers (Fiverr) + dupliquer +
   // supprimer (révélées au survol)
   const tdDel = document.createElement('td');
