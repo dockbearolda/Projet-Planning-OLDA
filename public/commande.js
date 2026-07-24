@@ -418,8 +418,9 @@ function buildTextile(l, index) {
   art.append(grille);
 
   // Placements. Un emplacement CHOISI n'a plus besoin de sa puce : il prend sa
-  // ligne, avec sa consigne. Les puces ne s'affichent donc que pendant le
-  // choix — sinon elles mangeraient deux rangées par article, pour rien.
+  // ligne, avec son logo, sa couleur et sa largeur. Les puces ne s'affichent
+  // donc que pendant le choix — sinon elles mangeraient deux rangées par
+  // article, pour rien.
   const mark = el('div', 'cmd-art__mark');
 
   let derniere = null;
@@ -436,18 +437,47 @@ function buildTextile(l, index) {
     tag.setAttribute('aria-label', `Retirer l'emplacement ${zone.label}`);
     tag.append(el('span', null, zone.label), ic('close'));
     line.append(tag);
-    const cons = el('input', 'cmd-input cmd-zline__cons');
-    cons.type = 'text';
-    cons.dataset.role = 'consigne';
-    cons.dataset.uid = l.uid;
-    cons.dataset.fam = 'textile';
-    cons.dataset.zone = z.zone;
-    cons.maxLength = CAT.consigneMax;
-    cons.autocomplete = 'off';
-    cons.setAttribute('aria-label', `Consigne pour ${zone.label}, ligne ${index + 1}`);
-    cons.placeholder = zone.id === 'coeur' ? 'Les Doudous à SXM' : 'visuel, texte, taille…';
-    cons.value = z.consigne;
-    line.append(cons);
+
+    const logo = el('input', 'cmd-input cmd-zline__logo');
+    logo.type = 'text';
+    logo.dataset.role = 'zone-logo';
+    logo.dataset.uid = l.uid;
+    logo.dataset.fam = 'textile';
+    logo.dataset.zone = z.zone;
+    logo.maxLength = CAT.consigneMax;
+    logo.autocomplete = 'off';
+    logo.setAttribute('aria-label', `Logo, ${zone.label}, ligne ${index + 1}`);
+    logo.placeholder = zone.id === 'coeur' ? 'Les Doudous à SXM' : 'Logo, texte…';
+    logo.value = z.logo || '';
+    line.append(logo);
+
+    const couleur = el('input', 'cmd-input cmd-zline__couleur');
+    couleur.type = 'text';
+    couleur.dataset.role = 'zone-couleur';
+    couleur.dataset.uid = l.uid;
+    couleur.dataset.fam = 'textile';
+    couleur.dataset.zone = z.zone;
+    couleur.maxLength = 40;
+    couleur.autocomplete = 'off';
+    couleur.setAttribute('aria-label', `Couleur du logo, ${zone.label}, ligne ${index + 1}`);
+    couleur.placeholder = 'Couleur';
+    couleur.value = z.couleur || '';
+    line.append(couleur);
+
+    const largeur = el('input', 'cmd-input cmd-zline__largeur');
+    largeur.type = 'text';
+    largeur.inputMode = 'numeric';
+    largeur.dataset.role = 'zone-largeur';
+    largeur.dataset.uid = l.uid;
+    largeur.dataset.fam = 'textile';
+    largeur.dataset.zone = z.zone;
+    largeur.maxLength = 3;
+    largeur.autocomplete = 'off';
+    largeur.setAttribute('aria-label', `Largeur du logo en cm, ${zone.label}, ligne ${index + 1}`);
+    largeur.placeholder = 'cm';
+    largeur.value = z.largeur || '';
+    line.append(largeur);
+
     mark.append(line);
   }
 
@@ -623,14 +653,14 @@ const sortZones = (l) => l.zones.sort(
 function toggleZone(l, id) {
   const i = l.zones.findIndex((z) => z.zone === id);
   if (i >= 0) l.zones.splice(i, 1);
-  else l.zones.push({ zone: id, consigne: '' });
+  else l.zones.push({ zone: id, logo: '', couleur: '', largeur: '' });
   sortZones(l);
 }
 
-// Pose le curseur sur la consigne de la zone qu'on vient de cocher : on tape
-// le visuel dans la foulée, sans repasser par la souris.
-function focusConsigne(l, id) {
-  const line = ROOT.querySelector(`.cmd-art[data-uid="${l.uid}"] .cmd-zline__cons[data-zone="${id}"]`);
+// Pose le curseur sur le logo de la zone qu'on vient de cocher : on tape le
+// visuel dans la foulée, sans repasser par la souris.
+function focusLogo(l, id) {
+  const line = ROOT.querySelector(`.cmd-art[data-uid="${l.uid}"] .cmd-zline__logo[data-zone="${id}"]`);
   if (line) line.focus();
 }
 
@@ -657,14 +687,14 @@ async function addZone(label, l) {
     if (!l.zones.some((z) => z.zone === known.id)) toggleZone(l, known.id);
     l.choix = true;
     renderFams();
-    return focusConsigne(l, known.id);
+    return focusLogo(l, known.id);
   }
 
   CAT.zones = [...CAT.zones, { id, label: clean, custom: true }];
   toggleZone(l, id);
   l.choix = true;
   renderFams();
-  focusConsigne(l, id);
+  focusLogo(l, id);
 
   try {
     const res = await fetch('/api/commande/zones', {
@@ -678,7 +708,7 @@ async function addZone(label, l) {
     if (data.zone.id !== id) {
       remapZone(id, data.zone.id);
       renderFams();
-      focusConsigne(l, data.zone.id);
+      focusLogo(l, data.zone.id);
     }
   } catch (err) {
     CAT.zones = CAT.zones.filter((z) => z.id !== id);
@@ -940,7 +970,7 @@ function wire() {
       // devoir rouvrir le choix à chaque fois.
       l.choix = true;
       renderFams();
-      focusConsigne(l, id);
+      focusLogo(l, id);
       return render();
     }
   });
@@ -987,9 +1017,17 @@ function wire() {
       else delete l.tailles[t.dataset.size];
       return;
     }
-    if (t.dataset.role === 'consigne') {
+    if (t.dataset.role === 'zone-logo' || t.dataset.role === 'zone-couleur') {
       const z = l.zones.find((x) => x.zone === t.dataset.zone);
-      if (z) z.consigne = t.value;
+      if (z) z[t.dataset.role === 'zone-logo' ? 'logo' : 'couleur'] = t.value;
+      return;
+    }
+    if (t.dataset.role === 'zone-largeur') {
+      // Largeur du logo, en cm : on filtre les chiffres, comme les quantités.
+      const digits = t.value.replace(/\D+/g, '').slice(0, 3);
+      if (digits !== t.value) t.value = digits;
+      const z = l.zones.find((x) => x.zone === t.dataset.zone);
+      if (z) z.largeur = digits;
       return;
     }
     const champs = ['vetement', 'ref', 'couleur', 'note', 'face1', 'face2', 'infos', 'typo', 'remarque'];
@@ -1202,7 +1240,7 @@ function payload() {
       return {
         vetement: l.vetement, ref: l.ref, couleur: l.couleur, note: l.note,
         tailles,
-        zones: l.zones.map((z) => ({ zone: z.zone, consigne: z.consigne })),
+        zones: l.zones.map((z) => ({ zone: z.zone, logo: z.logo, couleur: z.couleur, largeur: z.largeur })),
       };
     }
     return { ref: l.ref, quantite: l.quantite, technique: l.technique, infos: l.infos };

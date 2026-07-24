@@ -49,8 +49,8 @@ const jour = (days) => {
   };
 
   const marquage = [
-    { zone: 'coeur', consigne: 'Les Doudous à SXM', technique: 'dtf' },
-    { zone: 'dos', consigne: 'Grand Case', technique: 'dtf' },
+    { zone: 'coeur', logo: 'Les Doudous à SXM', couleur: 'Blanc', largeur: 10, technique: 'dtf' },
+    { zone: 'dos', logo: 'Grand Case', couleur: 'Noir', largeur: 20, technique: 'dtf' },
   ];
   const iguana = {
     kind: 'commande',
@@ -75,7 +75,9 @@ const jour = (days) => {
   assert.strictEqual(c.textiles[0].ref, 'K3022');
   assert.strictEqual(c.textiles[0].zones.length, 2);
   assert.strictEqual(c.textiles[0].zones[0].zoneLabel, 'Cœur');
-  assert.strictEqual(c.textiles[0].zones[0].consigne, 'Les Doudous à SXM');
+  assert.strictEqual(c.textiles[0].zones[0].logo, 'Les Doudous à SXM');
+  assert.strictEqual(c.textiles[0].zones[0].couleur, 'Blanc');
+  assert.strictEqual(c.textiles[0].zones[0].largeur, 10);
   assert.strictEqual(c.quantite, 2);
 
   // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage),
@@ -149,7 +151,8 @@ const jour = (days) => {
     [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 0 }] }, /quantité invalide/i],
     [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 1, zones: [{ zone: 'nulle-part' }] }] }, /zone d'impression inconnue/i],
     [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 1, zones: [{ zone: 'dos' }, { zone: 'dos' }] }] }, /deux fois/i],
-    [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 1, zones: [{ zone: 'dos', consigne: 'x'.repeat(161) }] }] }, /consigne trop longue/i],
+    [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 1, zones: [{ zone: 'dos', logo: 'x'.repeat(161) }] }] }, /logo trop long/i],
+    [{ ...iguana, articles: [{ vetement: 'T-shirt', quantite: 1, zones: [{ zone: 'dos', largeur: '0' }] }] }, /largeur du logo invalide/i],
     [{ ...iguana, articles: [], tasses: [{ ref: '', quantite: 1 }] }, /référence de tasse est vide/i],
     [{ ...iguana, articles: [], tasses: [{ ref: 'Tasse', quantite: 1, options: ['logo_martien'] }] }, /option inconnue/i],
     [{ ...iguana, articles: [], objets: [{ ref: '', quantite: 1 }] }, /référence d'objet est vide/i],
@@ -207,7 +210,7 @@ const jour = (days) => {
       email: 'sophie@samanna.com',
     },
     objet: 'Polos réception',
-    textiles: [{ vetement: 'Polo', quantite: 12, couleur: 'Marine', taille: 'L', zones: [{ zone: 'coeur', consigne: 'Logo brodé' }] }],
+    textiles: [{ vetement: 'Polo', quantite: 12, couleur: 'Marine', taille: 'L', zones: [{ zone: 'coeur', logo: 'Logo brodé' }] }],
     delai: 'j10',
   });
   assert.strictEqual(pro.status, 201, JSON.stringify(pro.body));
@@ -337,7 +340,7 @@ const jour = (days) => {
         { taille: 'M', quantite: 5 },
         { taille: '2XL', quantite: 3 },
       ],
-      zones: [{ zone: 'coeur', consigne: 'Logo' }],
+      zones: [{ zone: 'coeur', logo: 'Logo' }],
     }],
     delai: 'jour_j',
   });
