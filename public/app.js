@@ -1038,6 +1038,20 @@ function cellResponsable(r) {
   // --- Pilote (responsable) ---
   const pilot = document.createElement('button');
   pilot.type = 'button';
+  // --- Référent (2e personne) : modifiable par n'importe quel collaborateur ---
+  const ref = document.createElement('button');
+  ref.type = 'button';
+
+  // Cas le plus courant : le référent EST le pilote. Répéter son nom juste en
+  // dessous n'apprend rien et alourdit la ligne — la puce ne réapparaît que
+  // lorsque le référent diffère effectivement du pilote (ou qu'il y en a
+  // plusieurs), le seul cas où l'information est nouvelle.
+  const updateRefVisibility = () => {
+    const pilotWho = effectivePilot(r);
+    const refWho = effectiveReferents(r);
+    ref.hidden = refWho.length > 0 && refWho.every((n) => n === pilotWho);
+  };
+
   const renderPilot = () => {
     pilot.replaceChildren();
     const who = effectivePilot(r);
@@ -1063,6 +1077,7 @@ function cellResponsable(r) {
     attachTip(pilot, auto
       ? `Pilote par défaut de la catégorie : ${who} — cliquer pour en nommer un autre`
       : 'assigner le pilote');
+    updateRefVisibility();
   };
   renderPilot();
   pilot.addEventListener('click', (e) => {
@@ -1076,9 +1091,6 @@ function cellResponsable(r) {
     });
   });
 
-  // --- Référent (2e personne) : modifiable par n'importe quel collaborateur ---
-  const ref = document.createElement('button');
-  ref.type = 'button';
   const renderRef = () => {
     const who = effectiveReferents(r);
     const auto = who.length > 0 && !isManualReferent(r);
@@ -1093,6 +1105,7 @@ function cellResponsable(r) {
       ref.textContent = '+ référent';
       attachTip(ref, 'ajouter un référent');
     }
+    updateRefVisibility();
   };
   renderRef();
   ref.addEventListener('click', (e) => {
@@ -1289,14 +1302,14 @@ function cellDossier(r) {
   company.value = r.billing_company ?? '';
   company.placeholder = 'nom du dossier';
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
+  syncTitleOnOverflow(company);
 
   // Le nom du dossier et la pastille WhatsApp sur la MÊME ligne : le numéro
   // appartient au client, il se lit juste à côté de son nom.
   const line = document.createElement('div');
   line.className = 'client-line';
   line.appendChild(company);
-  const wa = cellWhatsapp(r);
-  if (wa) line.appendChild(wa);
+  line.appendChild(cellWhatsapp(r));
   line.appendChild(cellPdfSlot(r, 'devis'));
   line.appendChild(cellPdfSlot(r, 'facture'));
   const pdfWa = cellPdfWhatsapp(r);
@@ -1507,17 +1520,25 @@ function cellPdfWhatsapp(r) {
   return a;
 }
 
-// Pastille WhatsApp : présente UNIQUEMENT si le client a laissé un numéro
-// lisible. Un clic ouvre WhatsApp (application sur la tablette, WhatsApp Web sur
-// le PC) avec le message du patron déjà écrit — l'employé n'a plus qu'à relire
-// et appuyer sur Envoyer. Renvoie null quand il n'y a pas de numéro : la ligne
-// ne porte alors aucune pastille morte.
+// Pastille WhatsApp : un clic ouvre WhatsApp (application sur la tablette,
+// WhatsApp Web sur le PC) avec le message du patron déjà écrit — l'employé n'a
+// plus qu'à relire et appuyer sur Envoyer. Sans numéro lisible, la pastille
+// reste affichée mais grisée et inerte plutôt que de disparaître sans
+// explication : un nouvel arrivant doit comprendre pourquoi elle manque à
+// l'action (« pas de numéro »), pas juste ne rien voir.
 // L'adresse est recalculée AU CLIC et pas seulement au rendu : le nom du
 // dossier, la description ou le message du patron ont pu changer depuis que la
 // ligne est à l'écran, et c'est le texte du moment qu'il faut envoyer.
 function cellWhatsapp(r) {
   const lien = rowWhatsappLink(r);
-  if (!lien) return null;
+  if (!lien) {
+    const span = document.createElement('span');
+    span.className = 'wa-btn wa-btn--disabled';
+    span.setAttribute('aria-disabled', 'true');
+    attachTip(span, 'WhatsApp — aucun numéro de téléphone renseigné pour ce client');
+    span.appendChild(whatsappIcon());
+    return span;
+  }
   const a = document.createElement('a');
   a.className = 'wa-btn';
   a.target = '_blank';
@@ -1548,6 +1569,7 @@ function cellDescription(r) {
   name.value = r.product ?? '';
   name.placeholder = 'description';
   bindInline(name, r, 'product', (v) => v === '' ? null : v, capitalizeName);
+  syncTitleOnOverflow(name);
 
   stack.appendChild(name);
   td.appendChild(stack);
@@ -2056,6 +2078,16 @@ function bindInline(input, r, field, transform, normalize) {
       r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
     });
   });
+}
+
+// Infobulle native (title) calée sur la valeur d'un champ tronqué en « … »
+// (voir .client-company / .product-name en CSS) : le survol révèle le texte
+// complet sans attendre la bulle maison (attachTip), absente sur ces champs.
+function syncTitleOnOverflow(input) {
+  const sync = () => { input.title = input.value; };
+  sync();
+  input.addEventListener('input', sync);
+  input.addEventListener('blur', sync);
 }
 
 // --- PATCH générique optimiste --------------------------------------------
@@ -2674,6 +2706,13 @@ function ensureManualWidths() {
   });
   colWidths[currentStage] = w;
   applyColWidths();
+}
+
+// Légende de la colonne étoiles : rien dans l'en-tête ne dit qu'une commande
+// se note de 1 à 3 — un nouvel arrivant ne le devine pas au seul pictogramme.
+function attachStarsHeaderTip() {
+  const th = document.querySelector('#grid thead th.col-stars');
+  if (th) attachTip(th, 'Priorité : de 1 (basse) à 3 étoiles (haute) — cliquer une étoile sur la ligne pour l’attribuer');
 }
 
 function attachColResizers() {
@@ -3551,6 +3590,7 @@ async function start() {
   initBrandReflection();
   renderSidebar();
   attachColResizers();
+  attachStarsHeaderTip();
   updateSubColVisibility(currentStage);
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
