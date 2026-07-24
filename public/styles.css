@@ -1389,7 +1389,9 @@ tr:hover .handle { color: var(--text-2); }
    une puce tonale s'y fondrait. `color: var(--surface)` donne du blanc sur le
    rouge clair, du sombre sur le rose du thème sombre — lisible dans les deux. */
 .flag-chip.bloque { background: var(--st-bloque); color: var(--surface); }
-.flag-chip.a-voir { background: var(--st-cours); color: var(--surface); }
+/* « À voir » est un statut, pas une urgence de date : palette neutre bleu/gris,
+   distincte du rouge/orange/vert réservés à l'échéance (voir .deadline-badge). */
+.flag-chip.a-voir { background: var(--primary); color: var(--surface); }
 .flag-chip.empty {
   border: 1px dashed var(--border);
   background: transparent;
@@ -1426,9 +1428,9 @@ tr:hover .handle { color: var(--text-2); }
    sauter aux yeux depuis le fond de l'atelier, sans lire la colonne État. La
    teinte est adoucie (mélangée à la surface) pour ne pas écraser le texte. */
 .grid tbody tr.is-bloque > td { background: color-mix(in srgb, var(--st-bloque-bg) 62%, var(--surface)); }
-.grid tbody tr.is-a-voir > td { background: color-mix(in srgb, var(--st-cours-bg) 62%, var(--surface)); }
+.grid tbody tr.is-a-voir > td { background: color-mix(in srgb, var(--primary-soft) 62%, var(--surface)); }
 .grid tbody tr.is-bloque > td:first-child { box-shadow: inset 4px 0 0 0 var(--st-bloque); }
-.grid tbody tr.is-a-voir > td:first-child { box-shadow: inset 4px 0 0 0 var(--st-cours); }
+.grid tbody tr.is-a-voir > td:first-child { box-shadow: inset 4px 0 0 0 var(--primary); }
 .grid tbody tr.is-bloque:hover > td,
 .grid tbody tr.is-a-voir:hover > td { filter: brightness(.98); }
 
@@ -1491,6 +1493,12 @@ tr:hover .handle { color: var(--text-2); }
 .grid.no-sub col[data-col="sub_stage"],
 .grid.no-sub th.col-sub,
 .grid.no-sub td.col-sub-cell { display: none; }
+
+/* Colonne « Prix » masquée hors des étapes où elle est réellement remplie
+   (Commande, Facturation) : inutile de l'afficher en Demande, Production… */
+.grid.no-price col[data-col="price"],
+.grid.no-price th.col-price,
+.grid.no-price td.col-price-cell { display: none; }
 
 /* Menu déroulant réutilisable (type / responsable / sous-étape) */
 .menu-pop {
@@ -2019,12 +2027,16 @@ tr:hover .handle { color: var(--text-2); }
   color: var(--text-2);
   resize: none;
   overflow: hidden;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-family: inherit;
   background: transparent;
   border: 0;
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+/* Repliée = 1 ligne tronquée (…) + infobulle sur le texte complet. Dépliée
+   (flèche) ou en cours d'édition = retour au texte multi-lignes normal. */
+.product-desc.expanded { white-space: pre-wrap; text-overflow: clip; }
 .product-desc::placeholder { color: var(--text-3); }
 .product-desc:focus {
   outline: none;
