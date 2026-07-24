@@ -2309,6 +2309,22 @@ function onDragMove(e) {
   if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
 }
 
+// --- Blocage prix : entrée en Facturation (glisser-déposer + étape suivante) ------
+// Une commande sans prix ne peut pas ENTRER dans la famille Facturation depuis une
+// autre famille (on chiffre avant de facturer). Une fois la ligne dans la famille,
+// réordonner ou changer de sous-étape (Facturation à faire ↔ Prêt client / Attente
+// retrait) reste toujours possible, même si le prix venait à manquer entre-temps :
+// la règle ne verrouille que l'ENTRÉE, jamais les mouvements internes.
+function hasPrice(r) {
+  return r.project_value != null;
+}
+
+function blockedByPrice(r, targetStage) {
+  return targetStage === 'facturation' && r.stage !== 'facturation' && !hasPrice(r);
+}
+
+const PRICE_BLOCK_MESSAGE = 'Sans prix, impossible de passer en Facturation.';
+
 // Une entrée du rail accepte-t-elle qu'on y DÉPOSE la ligne `r` ?
 // Un GRAND TITRE qui a des sous-catégories n'est JAMAIS une cible : la ligne doit
 // atterrir sur une sous-catégorie précise, pas rester « à préciser » sur le titre.
