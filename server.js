@@ -288,10 +288,12 @@ app.put('/api/settings/whatsapp', asyncH(async (req, res) => {
 // grille et le temps réel restent légers.
 const SELECT = `SELECT r.*,
     ad.filename AS devis_name,
-    ab.filename AS bat_name
+    ab.filename AS bat_name,
+    af.filename AS facture_name
   FROM requests r
   LEFT JOIN attachments ad ON ad.request_id = r.id AND ad.kind = 'devis'
-  LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'`;
+  LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'
+  LEFT JOIN attachments af ON af.request_id = r.id AND af.kind = 'facture'`;
 const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
 
 // GET /api/requests?stage=<étape>   → commandes de cette étape
@@ -413,10 +415,10 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
-// Pièces jointes PDF (Devis / BAT) — 2 emplacements fixes par commande.
+// Pièces jointes PDF (Devis / BAT / Facture) — 3 emplacements fixes par commande.
 // Stockées en base (base64) ; servies inline pour consultation immédiate.
 // ---------------------------------------------------------------------------
-const PDF_KINDS = ['devis', 'bat'];
+const PDF_KINDS = ['devis', 'bat', 'facture'];
 
 // Marque la commande comme modifiée pour que le temps réel (signature basée sur
 // updated_at) propage l'apparition / suppression d'un PDF aux autres clients.
@@ -432,7 +434,7 @@ app.put('/api/requests/:id/pdf/:kind',
   express.raw({ type: () => true, limit: '12mb' }),
   asyncH(async (req, res) => {
     const { id, kind } = req.params;
-    if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+    if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
     const buf = req.body;
     if (!Buffer.isBuffer(buf) || buf.length === 0) return res.status(400).json({ error: 'PDF vide' });
 
@@ -457,7 +459,7 @@ app.put('/api/requests/:id/pdf/:kind',
 // GET /api/requests/:id/pdf/:kind  → ouvre le PDF inline (consultable à tout moment)
 app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
   const { id, kind } = req.params;
-  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
   const { rows } = await pool.query(
     'SELECT filename, data FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind],
   );
@@ -475,7 +477,7 @@ app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 // DELETE /api/requests/:id/pdf/:kind
 app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
   const { id, kind } = req.params;
-  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: 'type invalide (devis|bat)' });
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
   const { rowCount } = await pool.query(
     'DELETE FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind],
   );
