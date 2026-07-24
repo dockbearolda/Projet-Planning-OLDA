@@ -90,7 +90,7 @@ function newLigne(famille) {
   uid += 1;
   // `ts` : dernier moment où on a touché la ligne — sert au ramassage des
   // lignes vides restées à l'abandon (voir sweepVides).
-  const base = { uid, famille, quantite: 1, ref: '', ts: Date.now() };
+  const base = { uid, famille, quantite: 1, ref: '', ts: Date.now(), collapsed: false };
   if (famille === 'tasse') {
     return { ...base, couleur: '', face1: '', face2: '', options: [], infos: '', typo: '', remarque: '' };
   }
@@ -352,6 +352,38 @@ function outils(l, index) {
     tools.append(del);
   }
   return tools;
+}
+
+// Résumé d'une ligne repliée : de quoi la reconnaître sans la rouvrir. La
+// quantité d'une ligne textile se lit dans sa grille de tailles, pas dans un
+// champ dédié.
+const RESUMES = {
+  tasse: (l) => [`${l.quantite || 1} ×`, l.ref, l.couleur].filter((s) => String(s || '').trim()).join(' · '),
+  textile: (l) => {
+    const qte = Object.values(l.tailles).reduce((s, v) => s + (Number.parseInt(v, 10) || 0), 0);
+    return [qte ? `${qte} ×` : null, l.vetement, l.ref, l.couleur].filter((s) => String(s || '').trim()).join(' · ');
+  },
+  objet: (l) => [`${l.quantite || 1} ×`, l.ref].filter((s) => String(s || '').trim()).join(' · '),
+};
+
+// Une ligne repliée sur elle-même : un bandeau qu'on rouvre d'un tap, plutôt
+// qu'une carte entière pour un article déjà rempli. C'est elle qui laisse la
+// place à l'article qu'on est en train de saisir.
+function buildRepliee(l, index) {
+  const art = el('div', 'cmd-art cmd-art--repliee');
+  art.dataset.uid = l.uid;
+
+  const row = el('div', 'cmd-art__row cmd-art__row--repliee');
+  const toggle = el('button', 'cmd-art__resume');
+  toggle.type = 'button';
+  toggle.dataset.role = 'toggle-ligne';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.title = 'Déplier';
+  toggle.setAttribute('aria-label', `Déplier la ligne ${index + 1}`);
+  toggle.append(ic('chevron_right'), el('span', 'cmd-art__resume-txt', RESUMES[l.famille](l) || `Ligne ${index + 1}`));
+  row.append(toggle, outils(l, index));
+  art.append(row);
+  return art;
 }
 
 // --------------------------------------------------------------------- tasse
@@ -620,7 +652,7 @@ function buildFamille(id) {
   box.append(thead);
 
   const lignes = el('div', 'cmd-arts');
-  lignes.append(...listOf(id).map((l, i) => BUILDERS[id](l, i)));
+  lignes.append(...listOf(id).map((l, i) => (l.collapsed ? buildRepliee(l, i) : BUILDERS[id](l, i))));
   box.append(lignes);
   return box;
 }
@@ -922,8 +954,12 @@ function wire() {
     }
     if (t.id === 'cmd-boite') { state.enBoite = !state.enBoite; return render(); }
     if (role === 'add-ligne') {
+      const list = listOf(t.dataset.fam);
+      // Le nouvel article prend toute la place : les précédents se replient,
+      // on les rouvre d'un tap si besoin.
+      for (const x of list) x.collapsed = true;
       const l = newLigne(t.dataset.fam);
-      listOf(t.dataset.fam).push(l);
+      list.push(l);
       renderFams();
       render();
       return focusLigne(l);
@@ -941,6 +977,7 @@ function wire() {
     const l = byUid(host.dataset.uid);
     if (!l) return;
 
+    if (role === 'toggle-ligne') { l.collapsed = !l.collapsed; return renderFams(); }
     if (role === 'del') {
       state.lignes[l.famille] = listOf(l.famille).filter((x) => x.uid !== l.uid);
       renderFams();
@@ -950,11 +987,13 @@ function wire() {
       // Le cas courant du comptoir : même marquage, autres tailles / couleur.
       // Les tableaux et objets sont recopiés, sinon les deux lignes les partagent.
       uid += 1;
-      const copy = { ...l, uid, ts: Date.now() };
+      const copy = { ...l, uid, ts: Date.now(), collapsed: false };
       if (l.zones) copy.zones = l.zones.map((z) => ({ ...z }));
       if (l.options) copy.options = [...l.options];
       if (l.tailles) copy.tailles = { ...l.tailles };
       const list = listOf(l.famille);
+      // Comme un ajout : la copie prend la place, l'original se replie.
+      for (const x of list) x.collapsed = true;
       list.splice(list.indexOf(l) + 1, 0, copy);
       renderFams();
       render();
