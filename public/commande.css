@@ -298,6 +298,18 @@
 #commande .cmd-art + .cmd-art { border-top: 1px solid var(--border-soft); }
 #commande .cmd-art__tools { display: flex; justify-content: flex-end; gap: 0; }
 #commande .cmd-art__tools .cmd-icon { width: 36px; height: 36px; }
+
+/* Article replié : une seule rangée, place laissée à celui qu'on saisit. */
+#commande .cmd-art--repliee { padding: 0 6px 0 12px; }
+#commande .cmd-art__row--repliee { display: flex; align-items: center; gap: 4px; }
+#commande .cmd-art__resume {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px;
+  height: 44px; padding: 0 4px 0 0; border: none; background: transparent;
+  color: var(--text-2); font: 600 14px var(--font); text-align: left; cursor: pointer;
+}
+#commande .cmd-art__resume:hover { color: var(--text-1); }
+#commande .cmd-art__resume .material-symbols-outlined { font-size: 18px; color: var(--text-3); flex: 0 0 auto; }
+#commande .cmd-art__resume-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #commande .cmd-cell--quantite { text-align: center; font-weight: 600; padding: 0 6px; }
 
 /* Deuxième rangée d'une tasse : ce qu'on précise parfois. Sur toute la largeur
