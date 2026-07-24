@@ -493,7 +493,19 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    comme un EN-TÊTE — d'où le verrouillage du dépôt dessus quand la zone a des
    sous-catégories (voir stageAcceptsDrop). */
 .stage.zone-head { border-radius: var(--radius); padding-left: 22px; }
-.stage.zone-head .stage-label { font-weight: 600; color: var(--text-1); }
+.stage.zone-head .stage-label {
+  font-weight: 700;
+  color: var(--text-1);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  font-size: 12.5px;
+}
+/* Fond légèrement teinté propre au NIVEAU 1 : hors survol/actif/dépôt (ces
+   états gardent leur propre fond plus marqué), pour que l'en-tête se détache
+   visuellement de ses sous-catégories (niveau 2) même sans les comparer. */
+.stage.zone-head:not(.active):not(.drop-target):not(.drop-blocked) {
+  background: rgba(var(--primary-rgb), .06);
+}
 .stage.zone-head::before {
   content: "";
   position: absolute;
@@ -517,10 +529,10 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    reste aligné sur les familles), texte plus léger : hiérarchie claire, rail
    lisible. Une sous-catégorie active reprend la surbrillance pastel. */
 .stage.substage {
-  padding: 5px 16px 5px 30px;
+  padding: 5px 16px 5px 34px;
 }
 .stage.substage .stage-label {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-2);
 }
@@ -531,7 +543,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .stage.substage::before {
   content: "";
   position: absolute;
-  left: 18px;
+  left: 20px;
   top: 0;
   bottom: 0;
   width: 1.5px;
@@ -1134,6 +1146,10 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
   letter-spacing: -.01em;
   color: var(--text-1);
+  /* Colonne resserrable par l'utilisateur : un nom long se lit en « … » plutôt
+     que de couper un caractère au milieu, le survol (title) montre le reste. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Le nom du dossier et la pastille WhatsApp partagent une rangée : le champ
@@ -1169,6 +1185,15 @@ tr:hover .handle { color: var(--text-2); }
 .wa-btn:hover { background: color-mix(in srgb, #25d366 26%, transparent); }
 .wa-btn:active { transform: scale(.92); }
 .wa-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Pas de numéro client : la pastille reste à sa place (pas de « trou » dans la
+   ligne) mais se lit clairement comme inactive plutôt que de disparaître. */
+.wa-btn--disabled {
+  color: var(--text-3);
+  background: var(--state-hover);
+  cursor: default;
+}
+.wa-btn--disabled:hover { background: var(--state-hover); }
+.wa-btn--disabled:active { transform: none; }
 
 /* Pastille PDF (devis / facture) : même gabarit que .wa-btn (24 px visuel,
    44 px de zone tactile via ::after). Toujours visible, contrairement à
@@ -1976,6 +2001,10 @@ tr:hover .handle { color: var(--text-2); }
   font-size: 14.5px;
   font-weight: 500;
   color: var(--text-1);
+  /* Idem colonne « Nom du dossier » : « … » plutôt qu'une coupe silencieuse,
+     le survol (title) révèle le texte complet. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .product-desc-row { display: flex; align-items: flex-start; gap: 2px; }
 .product-desc {
