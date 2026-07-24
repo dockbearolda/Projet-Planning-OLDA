@@ -35,7 +35,6 @@ delete process.env.APP_PASSWORD;
   };
 
   const fiche = (extra) => ({
-    kind: 'commande',
     client: { type: 'pro', facturation: 'Hôtel Mercure', whatsapp: '0690 66 24 00' },
     objet: '30 polos brodés',
     ...extra,
@@ -54,11 +53,12 @@ delete process.env.APP_PASSWORD;
   assert.ok(r.body.pipeline.some((f) => f.slug === 'fiverr'),
     'Fiverr reste une destination possible');
 
-  // 1.2 Sans destination (ancien corps) : celle du catalogue, comme avant.
+  // 1.2 Sans destination (ancien corps, script) : retombe sur l'étape « demande »
+  // (il n'y a plus de nature pour deviner une autre destination).
   r = await call('POST', '/api/commande', fiche());
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'chiffrage');
-  assert.strictEqual(r.body.commande.subStage, 'a_chiffrer');
+  assert.strictEqual(r.body.commande.stage, 'demande');
+  assert.strictEqual(r.body.commande.subStage, null);
 
   // 1.3 Destination choisie : c'est elle qui l'emporte sur l'habitude.
   r = await call('POST', '/api/commande', fiche({ stage: 'preparation', subStage: 'a_commander' }));

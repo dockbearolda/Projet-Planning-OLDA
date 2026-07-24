@@ -53,7 +53,7 @@ const jour = (days) => {
     { zone: 'dos', consigne: 'Grand Case', technique: 'dtf' },
   ];
   const iguana = {
-    kind: 'commande',
+    stage: 'chiffrage', subStage: 'a_chiffrer',
     client: { societe: 'Iguana (Discover)', contact: 'Jérôme', telephone: '0690 66 24 00', type: 'pro' },
     articles: [
       { vetement: 'T-shirt sans manches', ref: 'K3022', couleur: 'Light Sand', taille: 'S', quantite: 1, zones: marquage },
@@ -63,13 +63,12 @@ const jour = (days) => {
     deadline: jour(7), priority: 2, vendeuse: 'Mélina', referent: 'Loïc',
   };
 
-  // 1. Le mail de référence passe en entier : nature, client, articles, zones.
-  //    Le textile reste lisible sous son ancien nom (`articles`), la fiche le
-  //    range dans la famille `textiles`.
+  // 1. Le mail de référence passe en entier : client, articles, zones,
+  //    destination choisie. Le textile reste lisible sous son ancien nom
+  //    (`articles`), la fiche le range dans la famille `textiles`.
   const ok = await post(iguana);
   assert.strictEqual(ok.status, 201, JSON.stringify(ok.body));
   const c = ok.body.commande;
-  assert.strictEqual(c.type.id, 'commande');
   assert.strictEqual(c.client.societe, 'Iguana (Discover)');
   assert.strictEqual(c.textiles.length, 2);
   assert.strictEqual(c.textiles[0].ref, 'K3022');
@@ -78,20 +77,18 @@ const jour = (days) => {
   assert.strictEqual(c.textiles[0].zones[0].consigne, 'Les Doudous à SXM');
   assert.strictEqual(c.quantite, 2);
 
-  // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage),
-  //    directement sur la sous-étape « À chiffrer » ; une DEMANDE reste dans
-  //    « Demande ».
+  // 2. La destination choisie l'emporte toujours : ici « Commande » (ex-chiffrage),
+  //    sous-étape « À chiffrer ». Une fiche envoyée vers « Demande » y reste.
   assert.strictEqual(c.stage, 'chiffrage');
   assert.strictEqual(c.subStage, 'a_chiffrer');
-  const dem = await post({ ...iguana, kind: 'demande' });
+  const dem = await post({ ...iguana, stage: 'demande', subStage: null });
   assert.strictEqual(dem.body.commande.stage, 'demande');
   assert.strictEqual(dem.body.commande.subStage, null);
 
-  // 3. La ligne atterrit dans le planning, lisible SANS ouvrir le JSON : la
-  //    nature, le contact, le détail des zones et les statuts sont en colonnes.
+  // 3. La ligne atterrit dans le planning, lisible SANS ouvrir le JSON : le
+  //    contact, le détail des zones et les statuts sont en colonnes.
   const row = await rowOf(ok.body.id, 'chiffrage');
   assert.ok(row, 'la commande doit apparaître à l\'étape chiffrage');
-  assert.strictEqual(row.order_kind, 'commande');
   assert.strictEqual(row.billing_company, 'Iguana (Discover)');
   assert.strictEqual(row.contact_referent, 'Jérôme');
   assert.strictEqual(row.contact_phone, '0690 66 24 00');
@@ -138,9 +135,9 @@ const jour = (days) => {
     'le serveur conserve l\'ordre reçu — c\'est le front qui trie',
   );
 
-  // 6. Refus explicites : chaque manque a son message.
+  // 6. Refus explicites : chaque manque a son message. (Le refus d'une étape
+  //    inconnue est couvert par test/destination-whatsapp.test.js.)
   const cases = [
-    [{ ...iguana, kind: 'peut-être' }, /nature inconnue/i],
     [{ ...iguana, client: { societe: '' } }, /nom du client/i],
     [{ ...iguana, client: { type: 'perso', prenom: '', nom: '' } }, /nom du client/i],
     [{ ...iguana, client: { societe: 'X', email: 'pas-un-email' } }, /email invalide/i],
@@ -172,33 +169,10 @@ const jour = (days) => {
   assert.strictEqual(iguanaEntry[0].telephone, '0690 66 24 00');
   assert.ok(iguanaEntry[0].commandes >= 2, 'le compteur suit les commandes du client');
 
-  // 8. La nature est aussi validée sur la grille : on ne pose pas n'importe quoi.
-  const bad = await fetch(`${base}/api/requests/${ok.body.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order_kind: 'brouillon' }),
-  });
-  assert.strictEqual(bad.status, 400);
-  const cleared = await fetch(`${base}/api/requests/${ok.body.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order_kind: '' }),
-  });
-  assert.strictEqual((await cleared.json()).order_kind, null, 'vide = pas de nature, pas d\'erreur');
-
-  // 9. La nature est une propriété du DOSSIER : elle survit à une duplication
-  //    et à un « Envoyer vers » (le front la recopie, le serveur l'accepte).
-  const copie = await fetch(`${base}/api/requests`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stage: 'fiverr', order_kind: 'commande', billing_company: 'Iguana (Discover)' }),
-  });
-  assert.strictEqual((await copie.json()).order_kind, 'commande');
-
-  // 10. CONTACT PRO complet : nom de facturation, contact, WhatsApp, email.
-  //     Les quatre atterrissent dans les colonnes du planning, pas dans un JSON.
+  // 8. CONTACT PRO complet : nom de facturation, contact, WhatsApp, email.
+  //    Les quatre atterrissent dans les colonnes du planning, pas dans un JSON.
   const pro = await post({
-    kind: 'commande',
+    stage: 'chiffrage', subStage: 'a_chiffrer',
     client: {
       type: 'pro',
       facturation: 'Hôtel La Samanna',
@@ -220,11 +194,11 @@ const jour = (days) => {
   assert.strictEqual(proRow.contact_email, 'sophie@samanna.com');
   assert.match(proRow.description, /Contact : Sophie · WhatsApp 0690 12 34 56 · sophie@samanna\.com/);
 
-  // 11. CONTACT PERSO : prénom + nom + WhatsApp. Le nom complet occupe la
-  //     colonne « Client » (pas de doublon en contact) et la fiche créée dans
-  //     la base clients est marquée « perso ».
+  // 9. CONTACT PERSO : prénom + nom + WhatsApp. Le nom complet occupe la
+  //    colonne « Client » (pas de doublon en contact) et la fiche créée dans
+  //    la base clients est marquée « perso ».
   const perso = await post({
-    kind: 'demande',
+    stage: 'demande', subStage: null,
     client: { type: 'perso', prenom: 'Marie', nom: 'Dupont', whatsapp: '0690 99 88 77' },
     objet: 'Tasse anniversaire',
     tasses: [{
@@ -249,7 +223,7 @@ const jour = (days) => {
   assert.ok(marie, 'le particulier entre aussi dans la base clients');
   assert.strictEqual(marie.client_type, 'perso');
 
-  // 12. TASSES : les deux faces gardent leur convention d'anse — c'est elle qui
+  // 10. TASSES : les deux faces gardent leur convention d'anse — c'est elle qui
   //     évite d'imprimer le visuel du mauvais côté pour un gaucher.
   assert.strictEqual(pc.tasses[0].faces.length, 2);
   assert.strictEqual(pc.tasses[0].faces[0].hint, 'anse à droite');
@@ -262,9 +236,9 @@ const jour = (days) => {
   assert.match(persoRow.description, /Paiement : acompte payé \(Espèces\)/);
   assert.match(persoRow.product, /2 × Tasse blanche 33 cl/);
 
-  // 13. OBJETS : ce qui compte, c'est la machine (TROTEC / UV / autre).
+  // 11. OBJETS : ce qui compte, c'est la machine (TROTEC / UV / autre).
   const objets = await post({
-    kind: 'commande',
+    stage: 'chiffrage', subStage: 'a_chiffrer',
     client: { type: 'pro', facturation: 'Sunset Bar' },
     objets: [
       { ref: 'Gourde inox', quantite: 30, technique: 'trotec', infos: 'Gravure logo 5 cm' },
@@ -278,11 +252,11 @@ const jour = (days) => {
   assert.match(objRow.description, /UV : Panneau entrée/);
   assert.match(objRow.product, /31 pièces — Gourde inox, Plaque bois/);
 
-  // 14. DEMANDE SIMPLE : un objet et deux lignes de description suffisent à
+  // 12. DEMANDE SIMPLE : un objet et deux lignes de description suffisent à
   //     ouvrir le dossier. Aucun produit détaillé, et la ligne est quand même
   //     lisible dans le planning (l'objet devient la description).
   const simple = await post({
-    kind: 'demande',
+    stage: 'demande', subStage: null,
     client: { type: 'pro', facturation: 'Karibuni' },
     objet: 'Devis 40 polos brodés',
     description: 'Le client repasse mardi avec son logo vectorisé.',
@@ -294,11 +268,11 @@ const jour = (days) => {
   assert.match(simpleRow.description, /Objet : Devis 40 polos brodés/);
   assert.match(simpleRow.description, /logo vectorisé/);
 
-  // 15. Les trois familles cohabitent sur une même fiche, dans l'ordre de
+  // 13. Les trois familles cohabitent sur une même fiche, dans l'ordre de
   //     lecture de l'atelier (tasses, textile, objets), et le total de pièces
   //     les additionne toutes.
   const melange = await post({
-    kind: 'commande',
+    stage: 'chiffrage', subStage: 'a_chiffrer',
     client: { type: 'pro', facturation: 'Le Piment' },
     tasses: [{ ref: 'Mug thermos', quantite: 10 }],
     textiles: [{ vetement: 'T-shirt', quantite: 20, zones: [{ zone: 'dos' }] }],
@@ -312,22 +286,24 @@ const jour = (days) => {
   assert.ok(ordre[0] >= 0 && ordre[0] < ordre[1] && ordre[1] < ordre[2], 'tasses, puis textile, puis objets');
   assert.match(melRow.description, /Paiement : payé \(CB\)/);
 
-  // 16. Le mode de paiement ne veut rien dire tant que rien n'est encaissé :
+  // 14. Le mode de paiement ne veut rien dire tant que rien n'est encaissé :
   //     « non payé » l'efface au lieu de laisser traîner un « CB » trompeur.
+  //     Sans étape choisie, la fiche retombe sur « demande » (plus de nature
+  //     pour deviner une autre destination).
   const impaye = await post({
-    kind: 'commande',
     client: { type: 'pro', facturation: 'Le Piment' },
     objet: 'Réassort',
     paiement: { statut: 'non_paye', mode: 'cb' },
   });
   assert.strictEqual(impaye.body.commande.paiement.mode, null);
+  assert.strictEqual(impaye.body.commande.stage, 'demande', 'sans étape choisie, retombe sur « demande »');
 
-  // 17. GRILLE DE TAILLES : un textile peut porter une quantité PAR TAILLE
+  // 15. GRILLE DE TAILLES : un textile peut porter une quantité PAR TAILLE
   //     (XS…2XL). La quantité de la ligne est la somme, les tailles à zéro
   //     tombent, et le détail reste lisible dans le planning. Une description
   //     de ligne accompagne la référence.
   const grille = await post({
-    kind: 'commande',
+    stage: 'chiffrage', subStage: 'a_chiffrer',
     client: { type: 'pro', facturation: 'Beach Club' },
     textiles: [{
       vetement: 'T-shirt', ref: 'BC100', couleur: 'Sable', note: 'Col rond, coupe large',
@@ -355,7 +331,7 @@ const jour = (days) => {
   assert.match(grilleRow.description, /Col rond, coupe large/);
   assert.match(grilleRow.description, /Délai : Jour J \(\+20 %\)/);
 
-  // 18. La maquette n'est plus un état de la fiche : plus de ligne « Maquette »
+  // 16. La maquette n'est plus un état de la fiche : plus de ligne « Maquette »
   //     dans le récapitulatif, même si un ancien poste l'envoie encore.
   const sansMaq = await post({ ...iguana, maquette: true });
   assert.doesNotMatch((await rowOf(sansMaq.body.id, 'chiffrage')).description, /Maquette/);

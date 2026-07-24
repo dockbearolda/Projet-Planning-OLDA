@@ -66,7 +66,6 @@ const jour = (days) => {
 
   // 6. La nouvelle zone est acceptée à l'enregistrement d'une commande.
   const commande = {
-    kind: 'commande',
     client: { societe: 'Atelier test', type: 'pro' },
     articles: [{
       vetement: 'Sweat à capuche', quantite: 2,

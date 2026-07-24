@@ -126,7 +126,6 @@ delete process.env.APP_PASSWORD;
   const before = (await j('GET', '/api/clients')).body.length;
   const nouveauClient = 'Chez Testeur ' + Math.floor(seeded.body.length);
   const cmd = {
-    kind: 'commande',
     client: { societe: nouveauClient, contact: 'Paul', telephone: '0690 12 34 56', type: 'pro' },
     articles: [{ vetement: 'T-shirt', quantite: 3, zones: [] }],
   };
@@ -151,7 +150,6 @@ delete process.env.APP_PASSWORD;
   // Une commande PERSO crée un client perso dans la base (la nature suit).
   const persoName = 'Particulier Testeur ' + Math.floor(seeded.body.length);
   const cmdPerso = await j('POST', '/api/commande', {
-    kind: 'demande',
     client: { societe: persoName, contact: 'Sophie', type: 'perso' },
     articles: [{ vetement: 'Sweat', quantite: 1, zones: [] }],
   });
