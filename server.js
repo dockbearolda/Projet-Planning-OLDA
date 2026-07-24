@@ -13,7 +13,7 @@ try {
 const path = require('path');
 const express = require('express');
 const {
-  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
+  pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
@@ -24,7 +24,6 @@ const {
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 const FLAG_SET = new Set(FLAGS);
-const ORDER_KIND_SET = new Set(ORDER_KINDS);
 // Longueur maximale du motif d'alerte : une phrase, pas un roman (la ligne de
 // grille l'affiche tronqué, l'infobulle en donne le texte complet).
 const FLAG_REASON_MAX = 240;
@@ -63,7 +62,7 @@ app.use(basicAuth);
 // Helpers
 // ---------------------------------------------------------------------------
 const PATCHABLE = [
-  'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
+  'stage', 'sub_stage', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason',
@@ -99,14 +98,6 @@ function validateField(key, value) {
       const s = String(value).trim();
       if (s === '') return { ok: true, value: null };
       if (!FLAG_SET.has(s)) return { ok: false, error: `flag invalide: ${s}` };
-      return { ok: true, value: s };
-    }
-    case 'order_kind': {
-      // Nature de la ligne : demande (à chiffrer) ou commande (validée). Vide =
-      // on ne se prononce pas — la ligne reste neutre, pas de nature inventée.
-      const s = String(value).trim();
-      if (s === '') return { ok: true, value: null };
-      if (!ORDER_KIND_SET.has(s)) return { ok: false, error: `order_kind invalide: ${s}` };
       return { ok: true, value: s };
     }
     case 'flag_reason': {
@@ -723,7 +714,6 @@ async function upsertClientFromCommande(cl) {
 // revalide tout ce que le poste de saisie envoie.
 // ---------------------------------------------------------------------------
 const COM = CATALOG.commande;
-const COM_TYPE_BY_ID = new Map(COM.types.map((t) => [t.id, t]));
 const COM_ZONE_BY_ID = new Map(COM.zones.map((z) => [z.id, z]));
 const COM_TECH_BY_ID = new Map(COM.techniques.map((t) => [t.id, t]));
 const COM_DELAI_BY_ID = new Map(COM.delais.map((d) => [d.id, d]));
@@ -1074,8 +1064,8 @@ const SUB_SLUGS_BY_STAGE = new Map(
   Object.entries(SUB_STAGES).map(([stage, list]) => [stage, new Set(list.map((s) => s.slug))]),
 );
 
-function buildDestination(b, type) {
-  if (b.stage == null || b.stage === '') return { stage: type.stage, subStage: type.subStage };
+function buildDestination(b) {
+  if (b.stage == null || b.stage === '') return { stage: 'demande', subStage: null };
   if (!STAGE_SLUGS.includes(b.stage)) return { error: `étape inconnue : ${b.stage}` };
   const subStage = b.subStage == null || b.subStage === '' ? null : b.subStage;
   if (subStage === null) return { stage: b.stage, subStage: null };
@@ -1091,14 +1081,10 @@ function buildDestination(b, type) {
 function buildCommande(body) {
   const b = body && typeof body === 'object' ? body : {};
 
-  const type = COM_TYPE_BY_ID.get(b.kind);
-  if (!type) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
-
   // OÙ la fiche atterrit dans le planning. Le poste de saisie le demande
-  // TOUJOURS avant d'enregistrer (« Où l'enregistrer ? ») ; la nature ne fait
-  // plus que proposer la destination habituelle. Un corps sans destination
-  // (ancien client, script) retombe donc sur celle du catalogue.
-  const dest = buildDestination(b, type);
+  // TOUJOURS avant d'enregistrer (« Où l'enregistrer ? »). Un corps sans
+  // destination (ancien client, script) retombe sur l'étape « demande ».
+  const dest = buildDestination(b);
   if (dest.error) return { error: dest.error };
 
   const who = buildClient(b.client);
@@ -1167,7 +1153,6 @@ function buildCommande(body) {
   const commande = {
     kind: 'commande-atelier',        // discriminant : identifie ce JSON dans requests.fiche
     version: 2,                      // v1 = { articles } sans objet ni paiement
-    type: { id: type.id, label: type.label },
     client,
     objet,
     description,
@@ -1215,7 +1200,7 @@ function buildCommande(body) {
   ].join(' · ');
 
   const resume = [
-    `${type.label.toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
+    `DEMANDE — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
     ...(contact ? [`Contact : ${contact}`] : []),
     ...(objet ? [`Objet : ${objet}`] : []),
     ...(description ? [description] : []),
@@ -1244,15 +1229,14 @@ app.post('/api/commande', asyncH(async (req, res) => {
 
   const { rows } = await pool.query(
     `INSERT INTO requests
-       (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
+       (stage, sub_stage, priority, client_type, billing_company, contact_referent,
         contact_phone, contact_email, quantity, product, color, description, deadline,
         responsable, referent, position, fiche)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING *`,
     [
       commande.stage,
       commande.subStage,
-      commande.type.id,
       commande.priority,
       commande.client.type,
       commande.client.societe,
