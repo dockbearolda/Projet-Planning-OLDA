@@ -1134,21 +1134,25 @@ function wireCells() {
   // désélectionne pas juste après. On annule donc le `mouseup` — SAUF si la
   // cellule était déjà active (deuxième clic : on vise un endroit précis) ou si
   // le pointeur a glissé (l'utilisateur sélectionne un morceau à la main).
+  // Une description (textarea) garde le clavier et la souris standard : Entrée
+  // saute une ligne, les flèches déplacent le curseur dans le texte, un clic le
+  // pose où on vise. Rien de tout ça n'a de sens sur une cellule à une ligne.
+  const CELL_SEL = '.cmd-cell:not(.cmd-cell--desc)';
   let reclick = false;
   let downAt = null;
   ROOT.addEventListener('pointerdown', (e) => {
-    const c = e.target.closest && e.target.closest('.cmd-cell');
+    const c = e.target.closest && e.target.closest(CELL_SEL);
     reclick = !!c && document.activeElement === c;
     downAt = c ? { x: e.clientX, y: e.clientY } : null;
   });
   ROOT.addEventListener('mouseup', (e) => {
-    const c = e.target.closest && e.target.closest('.cmd-cell');
+    const c = e.target.closest && e.target.closest(CELL_SEL);
     if (!c || reclick || !downAt) return;
     const glisse = Math.abs(e.clientX - downAt.x) > 4 || Math.abs(e.clientY - downAt.y) > 4;
     if (!glisse) e.preventDefault();
   });
   ROOT.addEventListener('focusin', (e) => {
-    if (e.target.classList && e.target.classList.contains('cmd-cell')) e.target.select();
+    if (e.target.matches && e.target.matches(CELL_SEL)) e.target.select();
   });
   // Quantité vidée puis quittée : on réaffiche celle qui fait foi (jamais de
   // case vide dans une commande).
@@ -1160,7 +1164,7 @@ function wireCells() {
   });
 
   ROOT.addEventListener('keydown', (e) => {
-    const c = e.target.closest && e.target.closest('.cmd-cell');
+    const c = e.target.closest && e.target.closest(CELL_SEL);
     if (!c) return;
     // Entrée = « je valide ce que je viens de taper » : on sort du champ, sans
     // créer de ligne. Les flèches naviguent entre lignes existantes.
