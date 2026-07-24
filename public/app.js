@@ -1487,6 +1487,8 @@ function cellPdfWhatsapp(r) {
 
   const a = document.createElement('a');
   a.className = 'wa-btn';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
   a.href = lien;
   a.setAttribute('aria-label', `Envoyer ${label.withArticle} par WhatsApp`);
   attachTip(a, `Envoyer ${label.withArticle} par WhatsApp (${filename})`);
