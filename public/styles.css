@@ -1434,29 +1434,6 @@ tr:hover .handle { color: var(--text-2); }
 .grid tbody tr.is-bloque:hover > td,
 .grid tbody tr.is-a-voir:hover > td { filter: brightness(.98); }
 
-/* Bouton « étape suivante » : toujours visible (jamais réservé au survol), la
-   flèche pousse la commande d'un cran dans le flux. */
-.col-next-cell { padding: 0; text-align: center; vertical-align: middle; }
-.next-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
-    border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
-}
-.next-btn svg { display: block; }
-.next-btn:hover { border-color: transparent; background: var(--primary-soft); color: var(--primary); }
-.next-btn:active { transform: scale(.92); }
-.next-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.grid thead th.col-next { text-align: center; color: var(--text-3, var(--text-2)); }
-
 /* Sous-étape : puce tonale neutre précisant l'action en cours dans la famille */
 .col-sub-cell { padding: 0; vertical-align: middle; }
 .sub-chip {
@@ -1990,7 +1967,6 @@ tr:hover .handle { color: var(--text-2); }
 .col-flag { width: 120px; }
 .col-price { width: 92px; }
 .col-sub { width: 140px; }
-.col-next { width: 48px; }
 .col-deadline { width: 124px; }
 .col-del { width: 116px; }
 
@@ -2428,8 +2404,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .ref-chip { min-height: 40px; padding: 8px 12px; font-size: 13px; }
   .flag-chip { min-height: 44px; padding: 8px 14px; font-size: 12.5px; }
   .flag-reason { min-height: 32px; padding: 4px 12px; font-size: 12.5px; }
-  .next-btn { width: 44px; height: 44px; }
-  .col-next { width: 60px; }
   .col-flag { width: 148px; }
   .menu-item { padding: 12px 14px; font-size: 15px; }
   .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
