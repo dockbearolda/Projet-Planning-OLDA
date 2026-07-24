@@ -13,6 +13,8 @@
 // Chargé À LA DEMANDE par app.js au premier passage sur la vue ; ensuite la
 // bascule entre vues n'est qu'un changement de classe, sans saisie perdue.
 
+import { groupDigits } from './whatsapp.js';
+
 // Recherches DOM CONFINÉES à la vue : le document porte aussi les autres écrans.
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -28,6 +30,21 @@ const ic = (name) => {
   n.setAttribute('aria-hidden', 'true');
   return n;
 };
+
+// Reformate un champ téléphone à la frappe (chiffres groupés par deux, comme
+// « 06 90 66 24 00 ») en conservant la position du curseur, pour ne pas gêner
+// la saisie en cours de numéro.
+function formatPhoneAsTyped(input) {
+  const pos = input.selectionStart ?? input.value.length;
+  const digitsBefore = input.value.slice(0, pos).replace(/\D/g, '').length;
+  input.value = groupDigits(input.value);
+  let seen = 0, i = 0;
+  while (i < input.value.length && seen < digitsBefore) {
+    if (/\d/.test(input.value[i])) seen++;
+    i++;
+  }
+  input.setSelectionRange(i, i);
+}
 
 // Date civile LOCALE : `toISOString()` bascule en UTC et ferait reculer
 // l'échéance d'un jour à l'ouest de Greenwich (l'atelier est aux Antilles).
@@ -959,7 +976,11 @@ function wire() {
     }
     if (t.id === 'cmd-nom') { state.client.nom = t.value; return render(); }
     if (t.id === 'cmd-contact') { state.client.contact = t.value; return; }
-    if (t.id === 'cmd-whatsapp' || t.id === 'cmd-whatsapp-perso') { state.client.whatsapp = t.value; return; }
+    if (t.id === 'cmd-whatsapp' || t.id === 'cmd-whatsapp-perso') {
+      formatPhoneAsTyped(t);
+      state.client.whatsapp = t.value;
+      return;
+    }
     if (t.id === 'cmd-email') { state.client.email = t.value; return; }
     if (t.id === 'cmd-objet') { state.objet = t.value; return render(); }
     // Une date posée à la main l'emporte : plus aucune puce de délai allumée.

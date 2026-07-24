@@ -20,10 +20,11 @@ const vm = require('node:vm');
     `${SRC.replace(/^export\s+/gm, '')}
      globalThis.whatsappNumber = whatsappNumber;
      globalThis.fillMessage = fillMessage;
-     globalThis.whatsappLink = whatsappLink;`,
+     globalThis.whatsappLink = whatsappLink;
+     globalThis.groupDigits = groupDigits;`,
     sandbox,
   );
-  const { whatsappNumber, fillMessage, whatsappLink } = sandbox;
+  const { whatsappNumber, fillMessage, whatsappLink, groupDigits } = sandbox;
 
   // --- Numéro ---------------------------------------------------------------
   // Antilles / Saint-Martin : 0690 et 0691 → +590.
@@ -69,6 +70,14 @@ const vm = require('node:vm');
   // Pas de numéro lisible → pas de lien (donc pas de pastille).
   assert.strictEqual(whatsappLink('', 'Bonjour', {}), null);
   assert.strictEqual(whatsappLink('à rappeler', 'Bonjour', {}), null);
+
+  // --- Groupement à la frappe -------------------------------------------------
+  assert.strictEqual(groupDigits('0690662400'), '06 90 66 24 00');
+  assert.strictEqual(groupDigits('06 90 66 24 00'), '06 90 66 24 00', 'idempotent une fois déjà groupé');
+  assert.strictEqual(groupDigits('069'), '06 9', 'chiffre impair en fin : pas d\'espace en trop');
+  assert.strictEqual(groupDigits('+590690662400'), '+59 06 90 66 24 00');
+  assert.strictEqual(groupDigits(''), '');
+  assert.strictEqual(groupDigits(null), '');
 
   console.log('✓ whatsapp : indicatifs Antilles/métropole, jetons du message et adresse wa.me OK');
 })().catch((err) => { console.error(err); process.exit(1); });

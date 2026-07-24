@@ -39,6 +39,16 @@ export function whatsappNumber(raw) {
   return digits.length >= 10 ? digits : null;
 }
 
+// Regroupe les chiffres d'un numéro par paires (« 06 90 66 24 00 ») : c'est le
+// format que tout le monde sait relire d'un coup d'œil, plutôt qu'un bloc de
+// dix chiffres collés. Le « + » international éventuel est conservé en tête.
+export function groupDigits(raw) {
+  const s = String(raw == null ? '' : raw);
+  const plus = s.trim().startsWith('+') ? '+' : '';
+  const digits = s.replace(/\D/g, '');
+  return plus + digits.replace(/(\d{2})(?=\d)/g, '$1 ');
+}
+
 // Le message du patron, ses jetons remplis. Un jeton sans valeur laisse un
 // blanc — jamais un « null » en clair sous les yeux du client — et les espaces
 // en trop qu'il laisse derrière lui sont refermés.

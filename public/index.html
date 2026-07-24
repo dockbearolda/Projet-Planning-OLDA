@@ -155,6 +155,9 @@
         </header>
 
         <!-- Outil de devis logo (épinglé, visible uniquement sur l'onglet Fiverr) -->
+        <!-- Détaillé étape par étape pour que tout le monde comprenne le calcul,
+             pas juste le résultat final : coût payé à Fiverr → coût réel une fois
+             les frais Fiverr convertis en euros → marge OLDA ajoutée → prix client. -->
         <div class="fiverr-tool" id="fiverrTool" hidden>
           <div class="fiverr-tool-field">
             <label class="fiverr-tool-label" for="fiverrCost">Prix graphiste Fiverr ($)</label>
@@ -162,6 +165,16 @@
               <input class="fiverr-tool-input" id="fiverrCost" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
               <span class="fiverr-tool-unit">$</span>
             </div>
+          </div>
+          <span class="material-symbols-outlined fiverr-tool-arrow" aria-hidden="true">arrow_forward</span>
+          <div class="fiverr-tool-detail">
+            <span class="fiverr-tool-detail-label">Coût réel (frais Fiverr + conversion €)</span>
+            <span class="fiverr-tool-detail-value" id="fiverrCostEur">—</span>
+          </div>
+          <span class="material-symbols-outlined fiverr-tool-arrow" aria-hidden="true">arrow_forward</span>
+          <div class="fiverr-tool-detail">
+            <span class="fiverr-tool-detail-label">Notre marge (×2,5)</span>
+            <span class="fiverr-tool-detail-value" id="fiverrMargin">—</span>
           </div>
           <span class="material-symbols-outlined fiverr-tool-arrow" aria-hidden="true">arrow_forward</span>
           <div class="fiverr-tool-result">
@@ -281,7 +294,7 @@
                   </div>
                   <div class="cmd-field">
                     <label class="cmd-label" for="cmd-whatsapp">WhatsApp</label>
-                    <input class="cmd-input" id="cmd-whatsapp" type="tel" inputmode="tel" placeholder="0690 66 24 00" autocomplete="off" />
+                    <input class="cmd-input" id="cmd-whatsapp" type="tel" inputmode="tel" placeholder="06 90 66 24 00" autocomplete="off" />
                   </div>
                   <div class="cmd-field">
                     <label class="cmd-label" for="cmd-email">Email</label>
@@ -303,7 +316,7 @@
                   </div>
                   <div class="cmd-field">
                     <label class="cmd-label" for="cmd-whatsapp-perso">WhatsApp</label>
-                    <input class="cmd-input" id="cmd-whatsapp-perso" type="tel" inputmode="tel" placeholder="0690 99 88 77" autocomplete="off" />
+                    <input class="cmd-input" id="cmd-whatsapp-perso" type="tel" inputmode="tel" placeholder="06 90 99 88 77" autocomplete="off" />
                   </div>
                 </div>
               </div>
