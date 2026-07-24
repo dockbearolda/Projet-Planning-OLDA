@@ -2391,6 +2391,9 @@ async function onDragEnd(e) {
   ds.tr.classList.remove('dragging');
   document.body.classList.remove('dragging-active');
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
+  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
+  hideTip();
+  priceBlockedEl = null;
   dragState = null;
 
   // Ligne encore en cours de création (id temporaire, ex. duplication non
@@ -2414,6 +2417,8 @@ async function onDragEnd(e) {
     } else {
       if (stageEl.dataset.sub == null && familyHasSub(stageEl.dataset.slug)) {
         showToast('Dépose la ligne sur une sous-catégorie, pas sur le titre.');
+      } else if (blockedByPrice(ds.r, stageEl.dataset.slug)) {
+        showToast(PRICE_BLOCK_MESSAGE);
       }
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }
