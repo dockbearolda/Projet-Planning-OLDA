@@ -1148,6 +1148,69 @@ tr:hover .handle { color: var(--text-2); }
 .wa-btn:active { transform: scale(.92); }
 .wa-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* Pastille PDF (devis / facture) : même gabarit que .wa-btn (24 px visuel,
+   44 px de zone tactile via ::after). Toujours visible, contrairement à
+   .wa-btn : une facture s'archive même sans numéro client. */
+.pdf-slot { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; }
+.pdf-btn {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  margin-right: 6px;
+  border-radius: 50%;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.pdf-btn::after {
+  content: '';
+  position: absolute;
+  inset: -10px;             /* 24 + 2×10 = 44 px de zone tactile */
+}
+.pdf-btn:active { transform: scale(.92); }
+.pdf-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Vide : trombone neutre, discret tant qu'aucun PDF n'est attaché. */
+.pdf-btn--empty {
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--text-3) 12%, transparent);
+}
+.pdf-btn--empty:hover { background: color-mix(in srgb, var(--text-3) 22%, transparent); }
+
+/* Remplie : accent de l'app (pas le vert WhatsApp, réservé à la pastille de
+   marque) — signale un PDF prêt à partir. */
+.pdf-btn--filled {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.pdf-btn--filled:hover { background: color-mix(in srgb, var(--primary) 28%, transparent); }
+
+/* Croix de retrait : cachée par défaut, révélée au survol du slot (souris
+   uniquement — comme les infobulles, la tablette n'a pas de survol ; sur
+   tablette le retrait se fait en rattachant un nouveau PDF n'est pas possible
+   tant qu'un fichier est présent : ce cas reste un usage PC/Mac assumé,
+   cf. spec). */
+.pdf-btn__remove {
+  position: absolute;
+  top: -6px; right: -2px;
+  width: 16px; height: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-1);
+  color: var(--surface-1, #fff);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
+
 /* Nature posée à la prise de commande : DEMANDE (à chiffrer) ou COMMANDE
    (validée par le client). Purement informatif sur la ligne — l'étape du
    pipeline reste ce qui pilote le travail. */
