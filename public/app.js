@@ -1280,6 +1280,8 @@ function cellDossier(r) {
   if (wa) line.appendChild(wa);
   line.appendChild(cellPdfSlot(r, 'devis'));
   line.appendChild(cellPdfSlot(r, 'facture'));
+  const pdfWa = cellPdfWhatsapp(r);
+  if (pdfWa) line.appendChild(pdfWa);
   stack.appendChild(line);
   // Nature tranchée à la prise : DEMANDE (à chiffrer) ou COMMANDE (validée).
   // Les lignes créées à la main dans la grille n'en portent pas — on n'invente
@@ -1315,9 +1317,10 @@ function whatsappIcon() {
   return svg;
 }
 
-// Trombone construit en DOM (même trait que arrowIcon/whatsappIcon, pas
-// d'innerHTML) : icône neutre de l'app, pas une icône de marque.
-function pdfClipIcon() {
+// Icônes devis/facture construites en DOM (même trait que arrowIcon/whatsappIcon,
+// pas d'innerHTML) : deux glyphes neutres et distincts, pour reconnaître la
+// pastille au premier coup d'œil sans attendre l'infobulle.
+function strokeIcon(paths) {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
@@ -1329,13 +1332,32 @@ function pdfClipIcon() {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute(
-    'd',
-    'M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48',
-  );
-  svg.appendChild(path);
+  for (const d of paths) {
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
   return svg;
+}
+
+// Devis : une feuille avec des lignes de texte (un document à lire).
+function devisIcon() {
+  return strokeIcon([
+    'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z',
+    'M14 2v6h6',
+    'M9 13h6',
+    'M9 17h6',
+  ]);
+}
+
+// Facture : un ticket au bord dentelé (une pièce à régler).
+function factureIcon() {
+  return strokeIcon([
+    'M6 2h12v18l-3-2-3 2-3-2-3 2Z',
+    'M9 7h6',
+    'M9 11h6',
+    'M9 15h3',
+  ]);
 }
 
 // Libellés pour les infobulles des deux emplacements PDF de la ligne.
@@ -1357,11 +1379,12 @@ async function uploadPdf(requestId, kind, file) {
   return res.json(); // { kind, filename }
 }
 
-// Clic sur la pastille remplie : télécharge le PDF ET ouvre la conversation
-// WhatsApp du client VIERGE (aucun texte pré-rempli — le patron/employé tape
-// son message à la main avec ses réponses rapides « / »). Glisser le fichier
-// téléchargé dans la conversation puis Envoyer restent deux gestes manuels :
-// aucun lien wa.me ne peut porter une pièce jointe.
+// Déclenchée par la pastille WhatsApp dédiée (cellPdfWhatsapp) : télécharge le
+// PDF ET ouvre la conversation WhatsApp du client VIERGE (aucun texte
+// pré-rempli — le patron/employé tape son message à la main avec ses réponses
+// rapides « / »). Glisser le fichier téléchargé dans la conversation puis
+// Envoyer restent deux gestes manuels : aucun lien wa.me ne peut porter une
+// pièce jointe.
 function sendPdf(r, kind, filename) {
   const a = document.createElement('a');
   a.href = `/api/requests/${r.id}/pdf/${kind}`;
@@ -1373,15 +1396,19 @@ function sendPdf(r, kind, filename) {
   if (lien) window.open(lien, '_blank', 'noopener,noreferrer');
 }
 
-// Pastille PDF à deux états, pour `devis` et `facture` (mêmes règles) :
-//  - vide   : trombone neutre, clic → sélecteur de fichier → upload immédiat.
-//  - remplie : trombone accentué, clic → sendPdf() (téléchargement + WhatsApp
-//    vierge) ; une petite croix apparaît au survol pour retirer le fichier.
-// Toujours rendue (contrairement à cellWhatsapp) : une facture s'archive même
-// sans numéro client lisible — dans ce cas l'état rempli télécharge sans
-// ouvrir WhatsApp (whatsappLink renvoie null, sendPdf n'ouvre alors rien).
+const PDF_SLOT_ICON = { devis: devisIcon, facture: factureIcon };
+
+// Pastille PDF à deux états, pour `devis` et `facture` (mêmes règles, icône
+// propre à chaque type — cf. PDF_SLOT_ICON) :
+//  - vide   : icône neutre, clic → sélecteur de fichier → upload immédiat.
+//  - remplie : icône accentuée, clic → ouvre le PDF dans un nouvel onglet pour
+//    le visualiser ; une petite croix apparaît au survol pour retirer le
+//    fichier. L'envoi via WhatsApp est une pastille séparée (cellPdfWhatsapp).
+// Toujours rendue (contrairement à cellWhatsapp) : un devis/une facture
+// s'archive même sans numéro client lisible.
 function cellPdfSlot(r, kind) {
   const label = PDF_SLOT_LABELS[kind];
+  const icon = PDF_SLOT_ICON[kind];
   const filename = r[`${kind}_name`];
   const wrap = document.createElement('span');
   wrap.className = 'pdf-slot';
@@ -1407,7 +1434,7 @@ function cellPdfSlot(r, kind) {
         .catch(reportError);
     });
     lbl.appendChild(input);
-    lbl.appendChild(pdfClipIcon());
+    lbl.appendChild(icon());
     wrap.appendChild(lbl);
     return wrap;
   }
@@ -1415,13 +1442,11 @@ function cellPdfSlot(r, kind) {
   const btn = document.createElement('a');
   btn.className = 'pdf-btn pdf-btn--filled';
   btn.href = `/api/requests/${r.id}/pdf/${kind}`;
+  btn.target = '_blank';
+  btn.rel = 'noopener noreferrer';
   const labelCap = label.noun.charAt(0).toUpperCase() + label.noun.slice(1);
-  attachTip(btn, `${labelCap} : ${filename} — clic = télécharger + ouvrir WhatsApp`);
-  btn.appendChild(pdfClipIcon());
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    sendPdf(r, kind, filename);
-  });
+  attachTip(btn, `${labelCap} : ${filename} — clic pour visualiser`);
+  btn.appendChild(icon());
   wrap.appendChild(btn);
 
   const remove = document.createElement('button');
@@ -1443,6 +1468,34 @@ function cellPdfSlot(r, kind) {
   });
   wrap.appendChild(remove);
   return wrap;
+}
+
+// Pastille d'envoi WhatsApp du devis/de la facture : présente UNIQUEMENT si au
+// moins un des deux est attaché ET que le numéro du client est lisible (sinon
+// il n'y a rien à envoyer, ou personne à qui l'envoyer). La facture prime sur
+// le devis quand les deux sont attachés — c'est elle qui part en priorité en
+// fin de production. Réutilise le style de la pastille WhatsApp de marque
+// (.wa-btn) : c'est la même action (envoyer via WhatsApp), sur un fichier
+// différent de « commande prête ».
+function cellPdfWhatsapp(r) {
+  const kind = r.facture_name ? 'facture' : r.devis_name ? 'devis' : null;
+  if (!kind) return null;
+  const filename = r[`${kind}_name`];
+  const lien = whatsappLink(r.contact_phone, '', {});
+  if (!lien) return null;
+  const label = PDF_SLOT_LABELS[kind];
+
+  const a = document.createElement('a');
+  a.className = 'wa-btn';
+  a.href = lien;
+  a.setAttribute('aria-label', `Envoyer ${label.withArticle} par WhatsApp`);
+  attachTip(a, `Envoyer ${label.withArticle} par WhatsApp (${filename})`);
+  a.appendChild(whatsappIcon());
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    sendPdf(r, kind, filename);
+  });
+  return a;
 }
 
 // Pastille WhatsApp : présente UNIQUEMENT si le client a laissé un numéro
