@@ -670,6 +670,30 @@ async function removeCommandeZone(id) {
   return next;
 }
 
+// Un emplacement du CATALOGUE (figé dans catalog.json) ne se supprime pas —
+// mais un poste peut vouloir le masquer (inutile pour son activité). On garde
+// la liste des identifiants masqués à part (app_meta.commande_zones_masquees) :
+// le catalogue lui-même ne bouge pas, on filtre juste ce qu'on en sert.
+async function getHiddenCommandeZones() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones_masquees'");
+  if (!rows[0]) return [];
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function hideCommandeZone(id) {
+  const hidden = await getHiddenCommandeZones();
+  if (hidden.includes(id)) return hidden;
+  const next = [...hidden, id];
+  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones_masquees'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones_masquees', $1)", [JSON.stringify(next)]);
+  return next;
+}
+
 // --- Message WhatsApp « commande prête » -------------------------------------
 // Le planning affiche une pastille WhatsApp sur chaque commande dont le client a
 // laissé un numéro : un clic ouvre WhatsApp avec le message DÉJÀ ÉCRIT (rien ne
@@ -706,5 +730,6 @@ module.exports = {
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
   getCommandeZones, addCommandeZone, removeCommandeZone,
+  getHiddenCommandeZones, hideCommandeZone,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
 };

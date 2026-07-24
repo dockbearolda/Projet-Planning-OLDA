@@ -18,6 +18,7 @@ const {
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
   getCommandeZones, addCommandeZone, removeCommandeZone,
+  getHiddenCommandeZones, hideCommandeZone,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
@@ -749,12 +750,19 @@ const TEXTE_MAX = 200;          // face de tasse, typo, info de personnalisation
 // catalogue. Gardés en MÉMOIRE pour que la validation d'un article reste
 // synchrone ; la base n'est relue qu'au démarrage et à chaque ajout / retrait.
 let CUSTOM_ZONES = [];
+// Emplacements du catalogue masqués (inutiles pour ce poste) : le catalogue
+// n'est pas modifié, on filtre juste ce qu'on en sert.
+let HIDDEN_ZONES = [];
 // `custom: true` distingue les zones effaçables (ajoutées) de celles du
 // catalogue, que la fiche ne propose pas de retirer.
-const allZones = () => [...COM.zones, ...CUSTOM_ZONES.map((z) => ({ ...z, custom: true }))];
+const allZones = () => [
+  ...COM.zones.filter((z) => !HIDDEN_ZONES.includes(z.id)),
+  ...CUSTOM_ZONES.map((z) => ({ ...z, custom: true })),
+];
 const zoneById = (id) => COM_ZONE_BY_ID.get(id) || CUSTOM_ZONES.find((z) => z.id === id) || null;
 async function loadCommandeZones() {
   CUSTOM_ZONES = await getCommandeZones();
+  HIDDEN_ZONES = await getHiddenCommandeZones();
 }
 
 // Le poste de saisie demande OÙ enregistrer avant de valider : il lui faut donc
@@ -783,15 +791,18 @@ app.post('/api/commande/zones', asyncH(async (req, res) => {
   res.status(201).json({ zone: zones.find((z) => z.id === added.id) || null, zones });
 }));
 
-// DELETE /api/commande/zones/:id → retire un emplacement ajouté au comptoir.
-// Les zones du catalogue ne s'effacent pas ; les commandes déjà enregistrées
-// gardent leur marquage (le libellé y est recopié à l'enregistrement).
+// DELETE /api/commande/zones/:id → retire un emplacement inutile de la liste
+// proposée. Une zone du catalogue est MASQUÉE (catalog.json ne bouge pas) ;
+// une zone ajoutée au comptoir est supprimée pour de bon. Dans les deux cas,
+// les commandes déjà enregistrées gardent leur marquage (le libellé y est
+// recopié à l'enregistrement, pas relu dans cette liste).
 app.delete('/api/commande/zones/:id', asyncH(async (req, res) => {
   const id = String(req.params.id || '');
   if (COM_ZONE_BY_ID.has(id)) {
-    return res.status(400).json({ error: 'emplacement du catalogue : non supprimable' });
+    HIDDEN_ZONES = await hideCommandeZone(id);
+  } else {
+    CUSTOM_ZONES = await removeCommandeZone(id);
   }
-  CUSTOM_ZONES = await removeCommandeZone(id);
   res.json({ zones: allZones() });
 }));
 

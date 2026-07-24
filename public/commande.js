@@ -278,6 +278,32 @@ function cell(role, l, value, placeholder, label, opts) {
   return n;
 }
 
+// Une description : elle grandit avec le texte au lieu de le couper — la
+// tasse, le vêtement ou l'objet a souvent besoin de plus qu'une ligne. Même
+// habillage qu'une cellule au repos ; c'est autosize() qui la fait pousser.
+function descField(role, l, value, placeholder, label) {
+  const n = el('textarea', `cmd-input cmd-cell cmd-cell--${role} cmd-cell--desc`);
+  n.value = value == null ? '' : value;
+  n.placeholder = placeholder || '';
+  n.autocomplete = 'off';
+  n.rows = 1;
+  n.dataset.role = role;
+  n.dataset.uid = l.uid;
+  n.dataset.fam = l.famille;
+  n.setAttribute('aria-label', label);
+  return n;
+}
+
+// Hauteur pilotée par le contenu, jusqu'à un plafond (au-delà, elle scrolle :
+// une carte ne s'étire pas à l'infini). Reprise à la frappe ET juste après un
+// rendu structurel (ligne dupliquée, commande chargée…).
+const DESC_MAX_H = 160;
+function autosize(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = `${Math.min(ta.scrollHeight, DESC_MAX_H)}px`;
+  ta.style.overflowY = ta.scrollHeight > DESC_MAX_H ? 'auto' : 'hidden';
+}
+
 // En-têtes de colonnes, une fois pour toute la famille : c'est ce qui permet
 // aux lignes de n'avoir AUCUN libellé et de tenir sur 44 px de haut. Sous la
 // tablette portrait la CSS masque cette rangée — les placeholders prennent le
@@ -339,8 +365,8 @@ function buildTasse(l, index) {
   bas.append(
     opts,
     cell('typo', l, l.typo, 'Typo (Bebas Neue…)', `Typo, tasse ${index + 1}`, { list: 'cmd-dl-typos' }),
-    cell('infos', l, l.infos, 'Infos perso (centré, 8 cm…)', `Informations de personnalisation, tasse ${index + 1}`),
-    cell('remarque', l, l.remarque, 'Remarques', `Remarques, tasse ${index + 1}`),
+    descField('infos', l, l.infos, 'Infos perso (centré, 8 cm…)', `Informations de personnalisation, tasse ${index + 1}`),
+    descField('remarque', l, l.remarque, 'Remarques', `Remarques, tasse ${index + 1}`),
   );
   art.append(bas);
   return art;
@@ -365,7 +391,7 @@ function buildTextile(l, index) {
 
   // Description de la ligne, juste sous la référence.
   const desc = el('div', 'cmd-art__desc');
-  desc.append(cell('note', l, l.note, 'Description : col rond, coupe large, remarques…', `Description, ligne ${index + 1}`));
+  desc.append(descField('note', l, l.note, 'Description : col rond, coupe large, remarques…', `Description, ligne ${index + 1}`));
   art.append(desc);
 
   // Grille des tailles : une petite case chiffrable par taille.
@@ -436,15 +462,13 @@ function buildTextile(l, index) {
       // Libellé COURT sur la puce (« Manche Dr ») pour que les six emplacements
       // courants tiennent sur une rangée ; la fiche garde le nom entier.
       const b = chip(z.court || z.label, { role: 'zone', value: z.id });
-      // Un emplacement ajouté au comptoir se retire (faute de frappe) ; ceux du
-      // catalogue, jamais. Les commandes enregistrées gardent leur marquage.
-      if (z.custom) {
-        const x = el('span', 'cmd-chip__x material-symbols-outlined', 'close');
-        x.dataset.zone = z.id;
-        x.title = `Retirer l'emplacement « ${z.label} »`;
-        x.setAttribute('aria-hidden', 'true');
-        b.append(x);
-      }
+      // N'importe quel emplacement inutile se retire, catalogue ou ajouté au
+      // comptoir. Les commandes déjà enregistrées gardent leur marquage.
+      const x = el('span', 'cmd-chip__x material-symbols-outlined', 'close');
+      x.dataset.zone = z.id;
+      x.title = `Retirer l'emplacement « ${z.label} »`;
+      x.setAttribute('aria-hidden', 'true');
+      b.append(x);
       chips.append(b);
     }
     if (!deplie && secondaires.length) {
@@ -492,7 +516,7 @@ function buildObjet(l, index) {
   }
   perso.append(
     techs,
-    cell('infos', l, l.infos, 'gravure logo 5 cm, prénom…', `Info sur la personnalisation, objet ${index + 1}`),
+    descField('infos', l, l.infos, 'gravure logo 5 cm, prénom…', `Info sur la personnalisation, objet ${index + 1}`),
   );
 
   const row = el('div', 'cmd-art__row cmd-art__row--objet');
@@ -571,6 +595,9 @@ function renderFams() {
   box.classList.toggle('is-vide', state.ouvertes.length === 0);
   if (!state.ouvertes.length) return box.replaceChildren(buildVide());
   box.replaceChildren(...state.ouvertes.map(buildFamille));
+  // Reconstruites, les descriptions repartent sur une ligne : on retrouve
+  // aussitôt la hauteur qui correspond à leur contenu.
+  for (const ta of box.querySelectorAll('.cmd-cell--desc')) autosize(ta);
 }
 
 // Pose le curseur sur la première cellule d'une ligne : on enchaîne la frappe
@@ -628,14 +655,14 @@ async function addZone(label, l) {
   const known = CAT.zones.find((z) => z.id === id || zoneSlug(z.label) === id);
   if (known) {
     if (!l.zones.some((z) => z.zone === known.id)) toggleZone(l, known.id);
-    l.choix = false;
+    l.choix = true;
     renderFams();
     return focusConsigne(l, known.id);
   }
 
   CAT.zones = [...CAT.zones, { id, label: clean, custom: true }];
   toggleZone(l, id);
-  l.choix = false;
+  l.choix = true;
   renderFams();
   focusConsigne(l, id);
 
@@ -909,9 +936,9 @@ function wire() {
     if (role === 'zone') {
       const id = t.dataset.value;
       toggleZone(l, id);
-      // Choisi = rangé : les puces se referment et on enchaîne sur la consigne.
-      // Un second placement se rouvre d'un tap sur « + Placement ».
-      l.choix = false;
+      // Les puces restent affichées : on enchaîne les emplacements sans
+      // devoir rouvrir le choix à chaque fois.
+      l.choix = true;
       renderFams();
       focusConsigne(l, id);
       return render();
@@ -968,6 +995,7 @@ function wire() {
     const champs = ['vetement', 'ref', 'couleur', 'note', 'face1', 'face2', 'infos', 'typo', 'remarque'];
     if (champs.includes(t.dataset.role)) {
       l[t.dataset.role] = t.value;
+      if (t.tagName === 'TEXTAREA') autosize(t);
       // Ces champs (dé)verrouillent « Enregistrer » : ils portent l'identité
       // de la ligne, ou la font passer de « vide » à « à compléter ».
       if (['vetement', 'ref'].includes(t.dataset.role)) render();
