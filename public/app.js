@@ -1339,7 +1339,10 @@ function pdfClipIcon() {
 }
 
 // Libellés pour les infobulles des deux emplacements PDF de la ligne.
-const PDF_SLOT_LABELS = { devis: 'devis', facture: 'facture' };
+const PDF_SLOT_LABELS = {
+  devis: { noun: 'devis', withArticle: 'le devis' },
+  facture: { noun: 'facture', withArticle: 'la facture' },
+};
 
 // PUT brut (pas de JSON) : `api()` ne convient pas, il JSON.stringify toujours
 // le corps. Le serveur lit le corps quel que soit son Content-Type.
@@ -1386,7 +1389,7 @@ function cellPdfSlot(r, kind) {
   if (!filename) {
     const lbl = document.createElement('label');
     lbl.className = 'pdf-btn pdf-btn--empty';
-    attachTip(lbl, `Attacher le ${label}`);
+    attachTip(lbl, `Attacher ${label.withArticle}`);
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/pdf';
@@ -1396,6 +1399,7 @@ function cellPdfSlot(r, kind) {
       if (!file) return;
       uploadPdf(r.id, kind, file)
         .then(({ filename: name }) => {
+          input.blur();
           r[`${kind}_name`] = name;
           invalidateRowCache(r.id);
           applySortAndRender();
@@ -1411,7 +1415,7 @@ function cellPdfSlot(r, kind) {
   const btn = document.createElement('a');
   btn.className = 'pdf-btn pdf-btn--filled';
   btn.href = `/api/requests/${r.id}/pdf/${kind}`;
-  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+  const labelCap = label.noun.charAt(0).toUpperCase() + label.noun.slice(1);
   attachTip(btn, `${labelCap} : ${filename} — clic = télécharger + ouvrir WhatsApp`);
   btn.appendChild(pdfClipIcon());
   btn.addEventListener('click', (e) => {
@@ -1423,13 +1427,14 @@ function cellPdfSlot(r, kind) {
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'pdf-btn__remove';
-  remove.setAttribute('aria-label', `Retirer le ${label}`);
+  remove.setAttribute('aria-label', `Retirer ${label.withArticle}`);
   remove.textContent = '×';
   remove.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     api('DELETE', `/api/requests/${r.id}/pdf/${kind}`)
       .then(() => {
+        remove.blur();
         r[`${kind}_name`] = null;
         invalidateRowCache(r.id);
         applySortAndRender();
