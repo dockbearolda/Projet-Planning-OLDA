@@ -1188,11 +1188,10 @@ tr:hover .handle { color: var(--text-2); }
 }
 .pdf-btn--filled:hover { background: color-mix(in srgb, var(--primary) 28%, transparent); }
 
-/* Croix de retrait : cachée par défaut, révélée au survol du slot (souris
-   uniquement — comme les infobulles, la tablette n'a pas de survol ; sur
-   tablette le retrait se fait en rattachant un nouveau PDF n'est pas possible
-   tant qu'un fichier est présent : ce cas reste un usage PC/Mac assumé,
-   cf. spec). */
+/* Croix de retrait : cachée par défaut, révélée au survol du slot. Geste
+   souris uniquement (comme les infobulles) — pas d'équivalent tactile dans
+   cette version, cohérent avec l'usage PC/Mac visé par cette fonctionnalité
+   (cf. spec). */
 .pdf-btn__remove {
   position: absolute;
   top: -6px; right: -2px;
@@ -1203,7 +1202,7 @@ tr:hover .handle { color: var(--text-2); }
   border: none;
   border-radius: 50%;
   background: var(--text-1);
-  color: var(--surface-1, #fff);
+  color: var(--surface);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
