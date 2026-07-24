@@ -892,6 +892,8 @@ function buildRow(r) {
   tr.appendChild(cellDossier(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
+  // prix : montant HT — une ligne sans prix ne peut pas entrer en Facturation
+  tr.appendChild(cellPrice(r));
   // sous-étape : puce précisant ce qui se passe maintenant dans la famille
   tr.appendChild(cellSubStage(r));
   // étape suivante : un clic pousse la commande à la position suivante du flux
@@ -1489,6 +1491,37 @@ function cellDescription(r) {
 
   stack.appendChild(name);
   td.appendChild(stack);
+  return td;
+}
+
+// Prix : montant HT de la commande. Une ligne sans prix ne peut pas ENTRER dans la
+// famille Facturation (voir blockedByPrice plus bas) — affiché ici pour que la saisie
+// se fasse tôt, pas au moment du glisser-déposer.
+function cellPrice(r) {
+  const td = document.createElement('td');
+  td.className = 'col-price-cell';
+
+  const price = document.createElement('input');
+  price.className = 'cell-input num cell-price';
+  price.type = 'text';
+  price.inputMode = 'decimal';
+  price.value = r.project_value != null ? String(r.project_value) : '';
+  price.placeholder = '—';
+  bindInline(
+    price, r, 'project_value',
+    (raw) => {
+      const t = raw.trim();
+      return t === '' ? null : parseFloat(t.replace(',', '.'));
+    },
+    (raw) => {
+      const t = raw.trim();
+      if (t === '') return '';
+      const n = parseFloat(t.replace(',', '.'));
+      return Number.isNaN(n) ? raw : n.toFixed(2);
+    },
+  );
+
+  td.appendChild(price);
   return td;
 }
 
