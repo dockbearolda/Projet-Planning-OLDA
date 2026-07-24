@@ -1189,9 +1189,10 @@ function cellNext(r) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     hideTip();
-    if (blockedByPrice(r, next.stage)) {
-      showTip(btn, PRICE_BLOCK_MESSAGE);
-      showToast(PRICE_BLOCK_MESSAGE);
+    if (blockedByPrice(r, next.stage, next.sub)) {
+      const msg = priceBlockMessage(next.stage, next.sub);
+      showTip(btn, msg);
+      showToast(msg);
       return;
     }
     showToast(`→ ${label}`);
@@ -1555,8 +1556,8 @@ function cellDescription(r) {
 }
 
 // Prix : montant HT de la commande. Une ligne sans prix ne peut pas ENTRER dans la
-// famille Facturation (voir blockedByPrice plus bas) — affiché ici pour que la saisie
-// se fasse tôt, pas au moment du glisser-déposer.
+// zone Devis à envoyer → Archivé (voir blockedByPrice plus bas) — affiché ici pour
+// que la saisie se fasse tôt, pas au moment du glisser-déposer.
 function cellPrice(r) {
   const td = document.createElement('td');
   td.className = 'col-price-cell';
@@ -2372,21 +2373,38 @@ function onDragMove(e) {
   if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
 }
 
-// --- Blocage prix : entrée en Facturation (glisser-déposer + étape suivante) ------
-// Une commande sans prix ne peut pas ENTRER dans la famille Facturation depuis une
-// autre famille (on chiffre avant de facturer). Une fois la ligne dans la famille,
-// réordonner ou changer de sous-étape (Facturation à faire ↔ Prêt client / Attente
-// retrait) reste toujours possible, même si le prix venait à manquer entre-temps :
-// la règle ne verrouille que l'ENTRÉE, jamais les mouvements internes.
+// --- Blocage prix : zone « Devis à envoyer » → Archivé (glisser-déposer + étape
+// suivante) ------------------------------------------------------------------
+// Le devis fixe le prix : une commande sans prix ne peut pas ENTRER dans cette
+// zone (sous-étape Devis à envoyer, ou toute famille après Commande/Chiffrage —
+// Attente Client, Préparation, Production, Facturation, Terminé, Archivé) depuis
+// une position en dehors. Une fois la ligne dans la zone, tous les mouvements
+// internes (réordonner, changer de sous-étape, revenir en arrière dans la zone)
+// restent toujours possibles, même si le prix venait à manquer entre-temps : la
+// règle ne verrouille que l'ENTRÉE, jamais les mouvements internes.
 function hasPrice(r) {
   return r.project_value != null;
 }
 
-function blockedByPrice(r, targetStage) {
-  return targetStage === 'facturation' && r.stage !== 'facturation' && !hasPrice(r);
+function inPriceZone(stage, sub) {
+  if (stage === 'chiffrage') return sub === 'devis_a_envoyer';
+  const idx = STAGE_ORDER[stage];
+  const chiffrageIdx = STAGE_ORDER.chiffrage;
+  return idx != null && chiffrageIdx != null && idx > chiffrageIdx;
 }
 
-const PRICE_BLOCK_MESSAGE = 'Sans prix, impossible de passer en Facturation.';
+function blockedByPrice(r, targetStage, targetSub = null) {
+  if (hasPrice(r)) return false;
+  if (!inPriceZone(targetStage, targetSub)) return false;
+  return !inPriceZone(r.stage, r.sub_stage ?? null);
+}
+
+function priceBlockMessage(targetStage, targetSub) {
+  const label = targetStage === 'chiffrage' && targetSub
+    ? SUB_LABEL[targetSub]
+    : STAGE_LABEL[targetStage];
+  return `Sans prix, impossible de passer en ${label}.`;
+}
 
 // Une entrée du rail accepte-t-elle qu'on y DÉPOSE la ligne `r` ?
 // Un GRAND TITRE qui a des sous-catégories n'est JAMAIS une cible : la ligne doit
@@ -2397,8 +2415,8 @@ function stageAcceptsDrop(stageEl, r) {
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
-  if (blockedByPrice(r, slug)) return false;                // pas de prix : entrée refusée
   const sub = isSub ? stageEl.dataset.sub : null;
+  if (blockedByPrice(r, slug, sub)) return false;            // pas de prix : entrée refusée
   return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
 }
 
@@ -2412,9 +2430,10 @@ function updateDragTarget() {
   const stageEl = el && el.closest ? el.closest('.stage') : null;
   let blockedEl = null;
   if (stageEl) {
+    const stageSub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
     if (stageAcceptsDrop(stageEl, dragState.r)) {
       stageEl.classList.add('drop-target');
-    } else if (blockedByPrice(dragState.r, stageEl.dataset.slug)) {
+    } else if (blockedByPrice(dragState.r, stageEl.dataset.slug, stageSub)) {
       stageEl.classList.add('drop-blocked');
       blockedEl = stageEl;
     }
@@ -2427,8 +2446,10 @@ function updateDragTarget() {
   }
   if (blockedEl !== priceBlockedEl) {
     priceBlockedEl = blockedEl;
-    if (blockedEl) showTip(blockedEl, PRICE_BLOCK_MESSAGE);
-    else hideTip();
+    if (blockedEl) {
+      const sub = blockedEl.dataset.sub != null ? blockedEl.dataset.sub : null;
+      showTip(blockedEl, priceBlockMessage(blockedEl.dataset.slug, sub));
+    } else hideTip();
   }
   autoScroll(y);
 }
@@ -2477,8 +2498,11 @@ async function onDragEnd(e) {
     } else {
       if (stageEl.dataset.sub == null && familyHasSub(stageEl.dataset.slug)) {
         showToast('Dépose la ligne sur une sous-catégorie, pas sur le titre.');
-      } else if (blockedByPrice(ds.r, stageEl.dataset.slug)) {
-        showToast(PRICE_BLOCK_MESSAGE);
+      } else {
+        const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
+        if (blockedByPrice(ds.r, stageEl.dataset.slug, sub)) {
+          showToast(priceBlockMessage(stageEl.dataset.slug, sub));
+        }
       }
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }
