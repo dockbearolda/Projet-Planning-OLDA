@@ -29,6 +29,9 @@ const SPECIAL = [
 ];
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
+// Colonne « Prix » : n'a de sens que là où le prix se remplit réellement
+// (devis en Commande, montant à Facturation) — masquée ailleurs.
+const PRICE_VISIBLE_STAGES = new Set(['chiffrage', 'facturation']);
 
 // Sous-étapes par famille (miroir de db.js). Une famille absente = pas de puce.
 const SUB_STAGES = {
@@ -203,7 +206,7 @@ const effectivePilot = (r) => (isManualPilot(r) ? r.responsable : ownerOf(r.stag
 const effectiveReferents = (r) => (isManualReferent(r) ? [r.referent] : referentsOf(r.stage, r.sub_stage));
 
 // Config d'attribution (pilote + référents de base). Silencieuse en cas
-// d'échec : la grille reste utilisable, elle affiche juste « Qui ? ».
+// d'échec : la grille reste utilisable, elle affiche juste « Non défini ».
 async function loadCategoryConfig() {
   try {
     const [owners, refs] = await Promise.all([
@@ -444,6 +447,13 @@ function updateSubColVisibility(slug) {
   if (grid) grid.classList.toggle('no-sub', !familyHasSub(slug));
 }
 
+// Masque la colonne « Prix » hors des étapes où elle se remplit réellement
+// (Commande, Facturation) → pas de colonne vide en Demande, Production…
+function updatePriceColVisibility(slug) {
+  const grid = document.getElementById('grid');
+  if (grid) grid.classList.toggle('no-price', !PRICE_VISIBLE_STAGES.has(slug));
+}
+
 // Vide la grille INSTANTANÉMENT au changement de famille : on ne laisse jamais les
 // lignes (ni le compteur) de l'ancienne famille sous le nouvel entête pendant que
 // les nouvelles données arrivent. La colonne « Sous-étape » et l'animation d'entrée
@@ -543,6 +553,7 @@ async function loadRows() {
   rows = data;
   lastRowsSig = signature(rows);
   updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
+  updatePriceColVisibility(slug);
   applySortAndRender();
 }
 
@@ -1071,7 +1082,7 @@ function cellResponsable(r) {
       pilot.className = 'resp-chip empty';
       const name = document.createElement('span');
       name.className = 'resp-name';
-      name.textContent = 'Qui ?';
+      name.textContent = 'Non défini';
       pilot.append(name);
     }
     attachTip(pilot, auto
@@ -1621,7 +1632,7 @@ function cellInfos(r) {
   desc.className = 'cell-input product-desc';
   desc.rows = 1;
   desc.value = r.description ?? '';
-  desc.placeholder = 'infos';
+  desc.placeholder = '+ Ajouter une note';
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -1640,14 +1651,17 @@ function cellInfos(r) {
     toggle.hidden = !multi;
     if (!multi) open = false;
     toggle.classList.toggle('open', open);
-    // hauteur : repliée = 1 ligne (CSS) ; dépliée OU en édition = tout le contenu.
+    // hauteur : repliée = 1 ligne tronquée (CSS) ; dépliée OU en édition = tout le contenu.
     const expanded = open || document.activeElement === desc;
+    desc.classList.toggle('expanded', expanded);
     if (expanded) {
       desc.style.height = 'auto';
       desc.style.height = desc.scrollHeight + 'px';
     } else {
       desc.style.height = '';
     }
+    // Repliée + texte tronqué : l'infobulle donne la note complète au survol.
+    attachTip(desc, desc.value.trim() ? desc.value : 'cliquer pour ajouter une note');
   };
 
   toggle.addEventListener('click', (e) => { e.stopPropagation(); open = !open; sync(); });
@@ -3592,9 +3606,10 @@ async function start() {
   attachColResizers();
   attachStarsHeaderTip();
   updateSubColVisibility(currentStage);
+  updatePriceColVisibility(currentStage);
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
-  // AVANT le premier rendu, sinon les lignes s'affichent en « Qui ? » puis sautent.
+  // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis sautent.
   await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage()]);
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
