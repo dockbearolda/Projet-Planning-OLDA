@@ -892,6 +892,8 @@ function buildRow(r) {
   tr.appendChild(cellDossier(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
+  // prix : montant HT — une ligne sans prix ne peut pas entrer en Facturation
+  tr.appendChild(cellPrice(r));
   // sous-étape : puce précisant ce qui se passe maintenant dans la famille
   tr.appendChild(cellSubStage(r));
   // étape suivante : un clic pousse la commande à la position suivante du flux
@@ -1187,6 +1189,11 @@ function cellNext(r) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     hideTip();
+    if (blockedByPrice(r, next.stage)) {
+      showTip(btn, PRICE_BLOCK_MESSAGE);
+      showToast(PRICE_BLOCK_MESSAGE);
+      return;
+    }
     showToast(`→ ${label}`);
     moveToStage(r, next.stage, next.sub);
   });
@@ -1544,6 +1551,37 @@ function cellDescription(r) {
 
   stack.appendChild(name);
   td.appendChild(stack);
+  return td;
+}
+
+// Prix : montant HT de la commande. Une ligne sans prix ne peut pas ENTRER dans la
+// famille Facturation (voir blockedByPrice plus bas) — affiché ici pour que la saisie
+// se fasse tôt, pas au moment du glisser-déposer.
+function cellPrice(r) {
+  const td = document.createElement('td');
+  td.className = 'col-price-cell';
+
+  const price = document.createElement('input');
+  price.className = 'cell-input num cell-price';
+  price.type = 'text';
+  price.inputMode = 'decimal';
+  price.value = r.project_value != null ? String(r.project_value) : '';
+  price.placeholder = '—';
+  bindInline(
+    price, r, 'project_value',
+    (raw) => {
+      const t = raw.trim();
+      return t === '' ? null : parseFloat(t.replace(',', '.'));
+    },
+    (raw) => {
+      const t = raw.trim();
+      if (t === '') return '';
+      const n = parseFloat(t.replace(',', '.'));
+      return Number.isNaN(n) ? raw : n.toFixed(2);
+    },
+  );
+
+  td.appendChild(price);
   return td;
 }
 
@@ -2272,6 +2310,9 @@ function copyToStage(r, slug) {
 // Fonctionne au doigt sur tablette : le DnD HTML5 ne se déclenche pas au tactile,
 // on utilise donc les Pointer Events (souris, doigt et stylet unifiés).
 let dragState = null;
+// Cible Facturation actuellement affichée comme refusée (classe + bulle visibles),
+// pour ne rafraîchir la bulle qu'au changement de cible, pas à chaque frame de survol.
+let priceBlockedEl = null;
 
 function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
@@ -2331,6 +2372,22 @@ function onDragMove(e) {
   if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
 }
 
+// --- Blocage prix : entrée en Facturation (glisser-déposer + étape suivante) ------
+// Une commande sans prix ne peut pas ENTRER dans la famille Facturation depuis une
+// autre famille (on chiffre avant de facturer). Une fois la ligne dans la famille,
+// réordonner ou changer de sous-étape (Facturation à faire ↔ Prêt client / Attente
+// retrait) reste toujours possible, même si le prix venait à manquer entre-temps :
+// la règle ne verrouille que l'ENTRÉE, jamais les mouvements internes.
+function hasPrice(r) {
+  return r.project_value != null;
+}
+
+function blockedByPrice(r, targetStage) {
+  return targetStage === 'facturation' && r.stage !== 'facturation' && !hasPrice(r);
+}
+
+const PRICE_BLOCK_MESSAGE = 'Sans prix, impossible de passer en Facturation.';
+
 // Une entrée du rail accepte-t-elle qu'on y DÉPOSE la ligne `r` ?
 // Un GRAND TITRE qui a des sous-catégories n'est JAMAIS une cible : la ligne doit
 // atterrir sur une sous-catégorie précise, pas rester « à préciser » sur le titre.
@@ -2340,6 +2397,7 @@ function stageAcceptsDrop(stageEl, r) {
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
+  if (blockedByPrice(r, slug)) return false;                // pas de prix : entrée refusée
   const sub = isSub ? stageEl.dataset.sub : null;
   return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
 }
@@ -2350,15 +2408,27 @@ function updateDragTarget() {
   const x = dragState.lastX, y = dragState.lastY;
   const el = document.elementFromPoint(x, y);
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
+  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
   const stageEl = el && el.closest ? el.closest('.stage') : null;
+  let blockedEl = null;
   if (stageEl) {
-    if (stageAcceptsDrop(stageEl, dragState.r)) stageEl.classList.add('drop-target');
+    if (stageAcceptsDrop(stageEl, dragState.r)) {
+      stageEl.classList.add('drop-target');
+    } else if (blockedByPrice(dragState.r, stageEl.dataset.slug)) {
+      stageEl.classList.add('drop-blocked');
+      blockedEl = stageEl;
+    }
   } else {
     // réordonnancement vertical dans la grille
     const after = getDragAfterElement($rows, y);
     if (after == null) $rows.appendChild(dragState.tr);
     else if (after !== dragState.tr) $rows.insertBefore(dragState.tr, after);
     paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
+  }
+  if (blockedEl !== priceBlockedEl) {
+    priceBlockedEl = blockedEl;
+    if (blockedEl) showTip(blockedEl, PRICE_BLOCK_MESSAGE);
+    else hideTip();
   }
   autoScroll(y);
 }
@@ -2381,6 +2451,9 @@ async function onDragEnd(e) {
   ds.tr.classList.remove('dragging');
   document.body.classList.remove('dragging-active');
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
+  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
+  hideTip();
+  priceBlockedEl = null;
   dragState = null;
 
   // Ligne encore en cours de création (id temporaire, ex. duplication non
@@ -2404,6 +2477,8 @@ async function onDragEnd(e) {
     } else {
       if (stageEl.dataset.sub == null && familyHasSub(stageEl.dataset.slug)) {
         showToast('Dépose la ligne sur une sous-catégorie, pas sur le titre.');
+      } else if (blockedByPrice(ds.r, stageEl.dataset.slug)) {
+        showToast(PRICE_BLOCK_MESSAGE);
       }
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }
@@ -2531,7 +2606,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
   handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, product: 220,
-  sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
+  price: 92, sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};

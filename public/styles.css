@@ -481,6 +481,12 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   box-shadow: inset 0 0 0 1.5px var(--primary);
   color: var(--primary);
 }
+.stage.drop-blocked {
+  background: color-mix(in srgb, var(--st-bloque-bg) 45%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--st-bloque);
+  color: var(--st-bloque);
+  cursor: not-allowed;
+}
 
 /* Grand titre de ZONE : plus affirmé qu'une sous-catégorie, avec un repère
    d'accent à gauche. Il reste cliquable (afficher toute la famille) mais se lit
@@ -1947,6 +1953,7 @@ tr:hover .handle { color: var(--text-2); }
 .col-type { width: 66px; }
 .col-resp { width: 132px; }
 .col-flag { width: 120px; }
+.col-price { width: 92px; }
 .col-sub { width: 140px; }
 .col-next { width: 48px; }
 .col-deadline { width: 124px; }
