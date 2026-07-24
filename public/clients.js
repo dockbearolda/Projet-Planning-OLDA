@@ -7,6 +7,8 @@
 // Chargé À LA DEMANDE par app.js au premier passage sur la vue ; ensuite chaque
 // retour ne fait que rafraîchir les données (un client a pu naître d'une commande).
 
+import { groupDigits } from './whatsapp.js';
+
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -279,6 +281,21 @@ function renderList() {
   }
 }
 
+// Reformate un champ téléphone à la frappe (chiffres groupés par deux, comme
+// « 06 90 66 24 00 ») en conservant la position du curseur, pour ne pas gêner
+// la saisie en cours de numéro.
+function formatPhoneAsTyped(input) {
+  const pos = input.selectionStart ?? input.value.length;
+  const digitsBefore = input.value.slice(0, pos).replace(/\D/g, '').length;
+  input.value = groupDigits(input.value);
+  let seen = 0, i = 0;
+  while (i < input.value.length && seen < digitsBefore) {
+    if (/\d/.test(input.value[i])) seen++;
+    i++;
+  }
+  input.setSelectionRange(i, i);
+}
+
 // --- Fiche (tiroir) --------------------------------------------------------
 function fieldRow(field, value, opts) {
   const row = el('div', 'cl-f');
@@ -295,6 +312,7 @@ function fieldRow(field, value, opts) {
   const id = `cl-f-${field.key}`;
   input.id = id;
   lab.setAttribute('for', id);
+  if (field.type === 'tel') input.addEventListener('input', () => formatPhoneAsTyped(input));
   row.append(lab, input);
   if (field.key === 'entreprise') input.classList.add('cl-f__input--strong');
   return row;

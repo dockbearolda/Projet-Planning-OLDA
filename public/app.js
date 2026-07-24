@@ -240,18 +240,29 @@ const OLDA_MARGIN = 2.5;      // marge de revente (colonne I)
 
 const $fiverrTool = document.getElementById('fiverrTool');
 const $fiverrCost = document.getElementById('fiverrCost');
+const $fiverrCostEur = document.getElementById('fiverrCostEur');
+const $fiverrMargin = document.getElementById('fiverrMargin');
 const $fiverrPrice = document.getElementById('fiverrPrice');
 
-// Recalcule le prix client à partir du champ de saisie.
+const eur = (n) => `${n.toFixed(2).replace('.', ',')} €`;
+
+// Recalcule le prix client à partir du champ de saisie, en détaillant chaque
+// étape (coût réel, marge ajoutée) pour que le calcul soit lisible par tous,
+// pas seulement le résultat final.
 function updateFiverrPrice() {
   if (!$fiverrCost || !$fiverrPrice) return;
   const cost = parseFloat($fiverrCost.value.replace(',', '.').trim());
   if (!Number.isFinite(cost) || cost < 0) {
+    if ($fiverrCostEur) $fiverrCostEur.textContent = '—';
+    if ($fiverrMargin) $fiverrMargin.textContent = '—';
     $fiverrPrice.textContent = '—';
     return;
   }
   // cost = prix graphiste en $ ; USD_TO_EUR convertit en €. Résultat en euros.
-  const resale = Math.ceil((cost * (1 + FIVERR_FEE_PCT) + FIVERR_FIXED) * USD_TO_EUR * OLDA_MARGIN);
+  const costEur = (cost * (1 + FIVERR_FEE_PCT) + FIVERR_FIXED) * USD_TO_EUR;
+  const resale = Math.ceil(costEur * OLDA_MARGIN);
+  if ($fiverrCostEur) $fiverrCostEur.textContent = eur(costEur);
+  if ($fiverrMargin) $fiverrMargin.textContent = `+ ${eur(resale - costEur)}`;
   $fiverrPrice.textContent = `${resale} €`;
 }
 
@@ -1291,18 +1302,6 @@ function cellDossier(r) {
   const pdfWa = cellPdfWhatsapp(r);
   if (pdfWa) line.appendChild(pdfWa);
   stack.appendChild(line);
-  // Nature tranchée à la prise : DEMANDE (à chiffrer) ou COMMANDE (validée).
-  // Les lignes créées à la main dans la grille n'en portent pas — on n'invente
-  // pas la nature à la place de la personne qui saisit.
-  if (r.order_kind === 'demande' || r.order_kind === 'commande') {
-    const kind = document.createElement('span');
-    kind.className = `kind-badge kind-badge--${r.order_kind}`;
-    kind.textContent = r.order_kind === 'demande' ? 'Demande' : 'Commande';
-    attachTip(kind, r.order_kind === 'demande'
-      ? 'Demande reçue : reste à chiffrer'
-      : 'Commande validée par le client');
-    stack.appendChild(kind);
-  }
   td.appendChild(stack);
   return td;
 }

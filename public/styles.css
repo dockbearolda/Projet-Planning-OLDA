@@ -793,7 +793,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .fiverr-tool {
   display: flex;
   align-items: flex-end;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 14px 18px;
   padding: 14px 22px;
   border-bottom: 1px solid var(--border-soft);
   background: var(--primary-soft);
@@ -843,6 +844,21 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .fiverr-tool-input::placeholder { color: var(--text-3); }
 .fiverr-tool-unit { font-size: 16px; color: var(--text-2); font-weight: 500; }
 .fiverr-tool-arrow { font-size: 24px; color: var(--text-3); flex-shrink: 0; margin-bottom: 6px; }
+.fiverr-tool-detail { display: flex; flex-direction: column; gap: 6px; }
+.fiverr-tool-detail-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.fiverr-tool-detail-value {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
 .fiverr-tool-result { display: flex; flex-direction: column; gap: 6px; }
 .fiverr-tool-result-value {
   font-size: 27px;
@@ -1215,20 +1231,6 @@ tr:hover .handle { color: var(--text-2); }
   padding: 0;
 }
 .pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
-
-/* Nature posée à la prise de commande : DEMANDE (à chiffrer) ou COMMANDE
-   (validée par le client). Purement informatif sur la ligne — l'étape du
-   pipeline reste ce qui pilote le travail. */
-.kind-badge {
-  align-self: flex-start;
-  margin: 0 0 0 14px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  white-space: nowrap;
-}
-.kind-badge--demande { background: var(--st-demande-bg); color: var(--st-demande); }
-.kind-badge--commande { background: var(--st-livree-bg); color: var(--st-livree); }
 
 /* Type Pro / Perso : pastille */
 .type-tag {
