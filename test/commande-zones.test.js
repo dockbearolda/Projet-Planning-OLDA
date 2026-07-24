@@ -83,12 +83,15 @@ const jour = (days) => {
   assert.deepStrictEqual(posees.map((z) => z.zoneLabel), ['Avant gauche', 'Bas du dos'],
     'le libellé est recopié dans la commande');
 
-  // 7. Retrait : la zone ajoutée disparaît de la liste, celles du catalogue non.
+  // 7. Retrait : la zone ajoutée disparaît de la liste pour de bon, celle du
+  // catalogue est masquée (mais reste connue du serveur pour les anciennes
+  // commandes — catalog.json n'est jamais modifié).
   r = await call('DELETE', '/api/commande/zones/bas_du_dos');
   assert.strictEqual(r.status, 200);
   assert.ok(!r.body.zones.map((z) => z.id).includes('bas_du_dos'), 'la zone ajoutée est retirée');
   r = await call('DELETE', '/api/commande/zones/avant_g');
-  assert.strictEqual(r.status, 400, 'une zone du catalogue ne se supprime pas');
+  assert.strictEqual(r.status, 200, 'une zone du catalogue se masque');
+  assert.ok(!r.body.zones.map((z) => z.id).includes('avant_g'), 'la zone du catalogue masquée ne figure plus dans la liste');
 
   // 8. Une zone inconnue reste refusée à l'enregistrement.
   r = await call('POST', '/api/commande', {
