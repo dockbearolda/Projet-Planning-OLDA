@@ -534,13 +534,6 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .stage.substage.active::before { background: var(--primary); }
 
-/* séparateur : filet fin isolant la catégorie spéciale (Fiverr) des 8 familles */
-.stage-sep {
-  height: 1px;
-  margin: 10px 12px;
-  background: var(--border-soft);
-}
-
 /* étape vide : atténuée */
 .stage.is-empty { opacity: .55; }
 .stage.is-empty .stage-label { font-weight: 400; color: var(--text-2); }
@@ -1120,6 +1113,40 @@ tr:hover .handle { color: var(--text-2); }
   letter-spacing: -.01em;
   color: var(--text-1);
 }
+
+/* Le nom du dossier et la pastille WhatsApp partagent une rangée : le champ
+   prend la place restante, la pastille reste collée au bout du nom. */
+.client-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.client-line .client-company { flex: 1 1 auto; min-width: 0; }
+
+/* Pastille WhatsApp : seulement sur les lignes dont le client a laissé un
+   numéro. Un clic ouvre la conversation avec le message déjà écrit (réglé dans
+   l'onglet Réglages) — rien ne part tout seul.
+   Toujours VISIBLE (jamais révélée au survol) : la tablette de l'atelier n'a
+   pas de survol, et c'est un geste qu'on fait vingt fois par jour. Cible
+   tactile de 44 px obtenue par un pseudo-élément, sans gonfler la rangée. */
+.wa-btn {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  margin-right: 6px;
+  border-radius: 50%;
+  color: #25d366;
+  background: color-mix(in srgb, #25d366 14%, transparent);
+  text-decoration: none;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.wa-btn::after {
+  content: '';
+  position: absolute;
+  inset: -10px;             /* 24 + 2×10 = 44 px de zone tactile */
+}
+.wa-btn:hover { background: color-mix(in srgb, #25d366 26%, transparent); }
+.wa-btn:active { transform: scale(.92); }
+.wa-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* Nature posée à la prise de commande : DEMANDE (à chiffrer) ou COMMANDE
    (validée par le client). Purement informatif sur la ligne — l'étape du
@@ -2151,6 +2178,30 @@ button, a, .stage, .prio-pill, .deadline-badge,
    Responsive
    ========================================================================= */
 
+/* La barre du haut porte huit onglets LIBELLÉS (Demande · Commande · Planning ·
+   Dashboard · Fiverr · À commander · Base clients · Réglages), la recherche, le
+   bouton d'ajout et les actions : il faut ~1750 px pour aligner tout ça sur une
+   rangée avec un champ de recherche encore lisible. En dessous, plutôt que
+   d'effacer les libellés (« Fiverr » et « À commander » ne se devinent pas à
+   l'icône) ou d'éjecter les actions hors de l'écran, la barre se plie en DEUX
+   rangées — les onglets prennent la seconde, pleine largeur. Rien ne
+   disparaît, rien ne déborde. */
+@media (max-width: 1750px) {
+  .topbar { flex-wrap: wrap; row-gap: 8px; }
+  .brand { order: 0; }
+  .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
+  #btnNew { order: 2; }
+  .topbar-right { order: 3; }
+  .nav-switch {
+    order: 4;
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
   .shell { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; }
@@ -2353,6 +2404,17 @@ button, a, .stage, .prio-pill, .deadline-badge,
 /* Filet à droite de la 2e entrée de saisie (Commande), pour la détacher du reste. */
 #viewCommande { margin-right: 6px; padding-right: 14px; border-right: 1px solid var(--border-soft); border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
+/* Réglages ferme la marche, détaché lui aussi : on n'y va pas pour travailler,
+   on y va pour régler l'outil. */
+.nav-switch-btn--reglages {
+  margin-left: 6px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border-soft);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--text-2);
+}
+
 /* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
    fonctionne ; affiché seulement quand il n'est pas masqué. */
 .dashboard:not([hidden]) {
@@ -2363,41 +2425,35 @@ button, a, .stage, .prio-pill, .deadline-badge,
   overflow: hidden;
 }
 
-/* En mode Dashboard, on masque tout l'échafaudage du Planning (l'attribut
-   `hidden` ne suffit pas : ces éléments ont leur propre règle `display`). */
-body.view-dashboard .work-head,
-body.view-dashboard .grid-wrap,
-body.view-dashboard .fiverr-tool,
-body.view-commande .work-head,
-body.view-commande .grid-wrap,
-body.view-commande .fiverr-tool,
-body.view-clients .work-head,
-body.view-clients .grid-wrap,
-body.view-clients .fiverr-tool { display: none !important; }
+/* Deux familles de vues, deux classes sur <body> :
+     - `view-plein`  : l'écran n'est PAS le planning (dashboard, prise de
+       commande, CRM, réglages) → tout l'échafaudage de la grille disparaît ;
+     - `view-focus`  : c'est bien le planning, mais sur UNE catégorie promue en
+       onglet (Fiverr, À commander) → la grille reste, seul le rail s'efface.
+   Les deux replient le rail : la zone de travail prend toute la largeur. */
+body.view-plein .work-head,
+body.view-plein .grid-wrap,
+body.view-plein .fiverr-tool { display: none !important; }
 
-/* Hors Planning, le rail des étapes n'a rien à montrer : on le replie et la
-   zone de travail prend TOUTE la largeur (dashboard, prise de commande, CRM). */
-body.view-dashboard .shell,
-body.view-commande .shell,
-body.view-clients .shell {
-  grid-template-columns: 1fr;
+body.view-plein .shell,
+body.view-focus .shell {
+  /* `minmax(0, …)` et pas `1fr` : sur un onglet Fiverr / À commander la grille
+     du planning est bien là, et sa largeur mini pousserait la colonne au-delà
+     de l'écran. C'est à la grille de défiler, pas à la page. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "topbar"
     "filet"
     "main";
 }
-body.view-dashboard .sidebar,
-body.view-dashboard .sidebar-resizer,
-body.view-commande .sidebar,
-body.view-commande .sidebar-resizer,
-body.view-clients .sidebar,
-body.view-clients .sidebar-resizer { display: none; }
+body.view-plein .sidebar,
+body.view-plein .sidebar-resizer,
+body.view-focus .sidebar,
+body.view-focus .sidebar-resizer { display: none; }
 
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
-body.view-dashboard #btnNew,
-body.view-commande #btnNew,
-body.view-clients #btnNew { display: none !important; }
+body.view-plein #btnNew { display: none !important; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {
@@ -3701,4 +3757,126 @@ body.wall-open { overflow: hidden; }
   .pj-kpis { padding: 8px 0 2px; }
   .pj-tabs { padding: 8px 0 10px; }
   .pj-body { padding-top: 12px; }
+}
+
+/* ===========================================================================
+   Onglet RÉGLAGES — ce que le patron règle une fois pour tout l'atelier.
+   Une colonne bornée en largeur (on lit un formulaire, on ne remplit pas un
+   tableau) et centrée, comme les autres écrans hors planning.
+   =========================================================================== */
+.reglages:not([hidden]) {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reg-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 26px 22px calc(40px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.reg-head { display: flex; align-items: flex-start; gap: 12px; }
+.reg-head__ic { font-size: 26px; color: var(--primary); }
+.reg-head__title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--text-1); }
+.reg-head__sub { margin: 2px 0 0; font-size: 13.5px; color: var(--text-2); }
+
+.reg-card {
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reg-card__head { display: flex; align-items: flex-start; gap: 12px; }
+.reg-card__ic { font-size: 22px; color: var(--st-livree); }
+.reg-card__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-1); }
+.reg-card__desc { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+
+.reg-field { display: flex; flex-direction: column; gap: 8px; }
+.reg-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 16px;            /* iOS : en dessous de 16px, le champ zoome */
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 104px;
+}
+.reg-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+.reg-field__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.reg-jetons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.reg-jetons__t { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.reg-jeton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.reg-jeton:hover { background: var(--primary-soft); border-color: var(--primary); }
+.reg-count { margin-left: auto; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Aperçu : une bulle de conversation, pour juger le message tel qu'il arrive. */
+.reg-apercu { display: flex; flex-direction: column; gap: 6px; }
+.reg-apercu__t { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.reg-apercu__bulle {
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--st-livree-bg);
+  color: var(--text-1);
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.reg-apercu__bulle.is-vide { background: var(--surface-hover); color: var(--text-2); font-style: italic; }
+
+.reg-actions { display: flex; align-items: center; gap: 10px; }
+.reg-status { margin-right: auto; font-size: 13px; color: var(--text-2); }
+.reg-status.is-ok { color: var(--st-livree); font-weight: 600; }
+.reg-status.is-ko { color: var(--st-bloque); font-weight: 600; }
+.reg-btn {
+  min-height: 44px;           /* cible tactile : la tablette de l'atelier */
+  padding: 0 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+.reg-btn:hover:not(:disabled) { background: var(--state-hover); }
+.reg-btn:disabled { opacity: .45; cursor: default; }
+.reg-btn--primary { border-color: transparent; background: var(--primary); color: #fff; }
+.reg-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+@media (max-width: 700px) {
+  .reg-page { padding: 18px 14px calc(32px + env(safe-area-inset-bottom)); }
+  .reg-card { padding: 16px; }
+  .reg-actions { flex-wrap: wrap; }
+  .reg-status { flex-basis: 100%; margin-right: 0; }
+  .reg-btn { flex: 1; }
 }

@@ -18,6 +18,7 @@ const {
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
   getCommandeZones, addCommandeZone, removeCommandeZone,
+  SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -259,6 +260,28 @@ app.put('/api/machines', asyncH(async (req, res) => {
   const saved = await setMachines(req.body);
   broadcast({ kind: 'machines' });
   res.json(saved);
+}));
+
+// Message WhatsApp « votre commande est prête » (réglage du patron, onglet
+// Réglages). Le planning s'en sert pour pré-remplir WhatsApp au clic sur la
+// pastille d'une ligne ; il n'envoie jamais rien tout seul.
+// GET → { message } · PUT { message } → texte retenu, diffusé en SSE pour que
+// les autres postes utilisent le nouveau texte sans recharger.
+app.get('/api/settings/whatsapp', asyncH(async (req, res) => {
+  res.json({ message: await getWhatsappMessage() });
+}));
+
+app.put('/api/settings/whatsapp', asyncH(async (req, res) => {
+  const body = req.body || {};
+  if (typeof body.message !== 'string') {
+    return res.status(400).json({ error: 'Champ « message » (texte) attendu' });
+  }
+  if (body.message.length > WHATSAPP_MESSAGE_MAX) {
+    return res.status(400).json({ error: `Message trop long (max ${WHATSAPP_MESSAGE_MAX} caractères)` });
+  }
+  const message = await setWhatsappMessage(body.message);
+  broadcast({ kind: 'settings' });
+  res.json({ message });
 }));
 
 // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
@@ -732,8 +755,16 @@ async function loadCommandeZones() {
   CUSTOM_ZONES = await getCommandeZones();
 }
 
+// Le poste de saisie demande OÙ enregistrer avant de valider : il lui faut donc
+// le pipeline complet (familles + sous-étapes), servi ici plutôt que recopié
+// dans le module — une étape ajoutée en base apparaît dans le choix sans
+// retoucher le front.
+const PIPELINE = STAGES.map((s) => ({ ...s, subs: SUB_STAGES[s.slug] || [] }));
+
 app.get('/api/commande/catalog', (req, res) => {
-  res.json({ ...COM, zones: allZones(), employes: RESPONSABLES, clientTypes: CLIENT_TYPES });
+  res.json({
+    ...COM, zones: allZones(), employes: RESPONSABLES, clientTypes: CLIENT_TYPES, pipeline: PIPELINE,
+  });
 });
 
 // POST /api/commande/zones { label } → crée l'emplacement et renvoie la liste
@@ -1021,6 +1052,27 @@ function detailLigne(l) {
   return [tete, ...suite].join('\n');
 }
 
+// Destination retenue pour la fiche : { stage, subStage } ou { error }.
+// Une sous-étape n'est acceptée QUE si elle appartient bien à la famille visée —
+// sinon la ligne s'afficherait dans une famille dont la puce vient d'ailleurs.
+// Une famille à sous-étapes peut rester « à préciser » (subStage null) : c'est
+// une position valide du planning, pas un oubli.
+const SUB_SLUGS_BY_STAGE = new Map(
+  Object.entries(SUB_STAGES).map(([stage, list]) => [stage, new Set(list.map((s) => s.slug))]),
+);
+
+function buildDestination(b, type) {
+  if (b.stage == null || b.stage === '') return { stage: type.stage, subStage: type.subStage };
+  if (!STAGE_SLUGS.includes(b.stage)) return { error: `étape inconnue : ${b.stage}` };
+  const subStage = b.subStage == null || b.subStage === '' ? null : b.subStage;
+  if (subStage === null) return { stage: b.stage, subStage: null };
+  const allowed = SUB_SLUGS_BY_STAGE.get(b.stage);
+  if (!allowed || !allowed.has(subStage)) {
+    return { error: `sous-étape « ${subStage} » étrangère à l'étape « ${b.stage} »` };
+  }
+  return { stage: b.stage, subStage };
+}
+
 // Reconstruit une prise de commande à partir du corps reçu. Fonction pure :
 // aucune écriture, elle renvoie { commande, resume, produit } ou { error }.
 function buildCommande(body) {
@@ -1028,6 +1080,13 @@ function buildCommande(body) {
 
   const type = COM_TYPE_BY_ID.get(b.kind);
   if (!type) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
+
+  // OÙ la fiche atterrit dans le planning. Le poste de saisie le demande
+  // TOUJOURS avant d'enregistrer (« Où l'enregistrer ? ») ; la nature ne fait
+  // plus que proposer la destination habituelle. Un corps sans destination
+  // (ancien client, script) retombe donc sur celle du catalogue.
+  const dest = buildDestination(b, type);
+  if (dest.error) return { error: dest.error };
 
   const who = buildClient(b.client);
   if (who.error) return { error: who.error };
@@ -1113,8 +1172,8 @@ function buildCommande(body) {
     priority,
     vendeuse: RESPONSABLE_SET.has(b.vendeuse) ? b.vendeuse : 'À attribuer',
     referent: RESPONSABLE_SET.has(b.referent) && b.referent !== 'À attribuer' ? b.referent : null,
-    stage: type.stage,
-    subStage: type.subStage,
+    stage: dest.stage,
+    subStage: dest.subStage,
     quantite,
     createdAt: new Date().toISOString(),
   };

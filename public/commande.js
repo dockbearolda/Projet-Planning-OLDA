@@ -54,6 +54,7 @@ const state = {
   lignes: { tasse: [], textile: [], objet: [] },
   paiement: { statut: 'non_paye', mode: '' },
   enBoite: false,
+  dest: null,           // { stage, sub } choisi à la DERNIÈRE étape, avant l'envoi
   sending: false,
 };
 
@@ -768,7 +769,7 @@ function render() {
   const save = $('#cmd-save');
   save.disabled = state.sending;
   save.textContent = state.sending ? 'Enregistrement…' : `Enregistrer la ${t.label.toLowerCase()}`;
-  save.title = need ? `Il manque ${need}` : 'Enregistrer et envoyer au planning';
+  save.title = need ? `Il manque ${need}` : 'Choisir où l’enregistrer dans le planning';
 }
 
 let toastTimer;
@@ -855,6 +856,11 @@ function wire() {
     }
     if (t.id === 'cmd-save') return submit();
     if (t.id === 'cmd-done-new') return reset();
+    // Choix de la destination : taper une étape enregistre la fiche dedans.
+    if (t.id === 'cmd-dest-close') return closeDestinations();
+    if (t.matches('.cmd-dest__opt, .cmd-dest__sub')) {
+      return submit({ stage: t.dataset.stage, sub: t.dataset.sub || null });
+    }
 
     const host = t.closest('.cmd-art');
     if (!host) return;
@@ -990,9 +996,13 @@ function wire() {
     list.addEventListener('mousedown', (e) => e.preventDefault());
   }
 
-  // Échap ferme la confirmation en repartant sur une saisie vierge.
+  // Échap ferme la confirmation en repartant sur une saisie vierge — ou rend la
+  // main à la fiche si on regardait la liste des destinations (rien n'est encore
+  // enregistré à ce stade : on ne perd pas la saisie).
   ROOT.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('#cmd-done').hidden) reset();
+    if (e.key !== 'Escape') return;
+    if (!$('#cmd-dest').hidden) return closeDestinations();
+    if (!$('#cmd-done').hidden) reset();
   });
 
   wireCells();
@@ -1168,6 +1178,10 @@ function payload() {
 
   return {
     kind: state.kind,
+    // Où la fiche atterrit : choisi à la main juste avant l'envoi (voir
+    // openDestinations). Jamais deviné en silence.
+    stage: state.dest ? state.dest.stage : null,
+    subStage: state.dest ? state.dest.sub : null,
     client,
     objet: state.objet,
     delai: state.delai,
@@ -1180,9 +1194,93 @@ function payload() {
   };
 }
 
-async function submit() {
+// ---------------------------------------------------------------------------
+// Dernière étape, OBLIGATOIRE : où l'enregistrer dans le planning
+// ---------------------------------------------------------------------------
+// « Enregistrer » n'envoie plus rien tout seul : il pose la question. On voit
+// tout le pipeline, la destination habituelle de la nature choisie est marquée
+// et placée en tête — et taper une destination enregistre aussitôt. Un geste,
+// comme le reste de la fiche, mais un geste CONSCIENT.
+
+// La destination habituelle d'une nature, telle que le catalogue la définit
+// (Demande → Demande · Commande → Commande / À chiffrer).
+function destHabituelle() {
+  const t = typeById(state.kind);
+  return t ? { stage: t.stage, sub: t.subStage || null } : null;
+}
+
+const memeDest = (a, b) => !!a && !!b && a.stage === b.stage && a.sub === b.sub;
+
+// « Préparation · À commander » — la destination écrite en clair.
+function destLabel(stage, sub) {
+  const fam = (CAT.pipeline || []).find((f) => f.slug === stage);
+  if (!fam) return 'au planning';
+  const s = sub && (fam.subs || []).find((x) => x.slug === sub);
+  return s ? `${fam.label} · ${s.label}` : fam.label;
+}
+
+// Une carte par famille : son grand titre enregistre dans la famille « à
+// préciser », ses puces dans la sous-étape correspondante.
+function destCarte(fam, habituelle) {
+  const carte = el('div', 'cmd-dest__fam');
+  const tete = el('button', 'cmd-dest__opt', fam.label);
+  tete.type = 'button';
+  tete.dataset.stage = fam.slug;
+  if (memeDest({ stage: fam.slug, sub: null }, habituelle)) {
+    tete.classList.add('is-habituel');
+    tete.appendChild(el('span', 'cmd-dest__tag', 'habituel'));
+  }
+  carte.appendChild(tete);
+
+  if (fam.subs && fam.subs.length) {
+    const puces = el('div', 'cmd-dest__subs');
+    for (const s of fam.subs) {
+      const b = el('button', 'cmd-dest__sub', s.label);
+      b.type = 'button';
+      b.dataset.stage = fam.slug;
+      b.dataset.sub = s.slug;
+      if (memeDest({ stage: fam.slug, sub: s.slug }, habituelle)) {
+        b.classList.add('is-habituel');
+        b.appendChild(el('span', 'cmd-dest__tag', 'habituel'));
+      }
+      puces.appendChild(b);
+    }
+    carte.appendChild(puces);
+  }
+  return carte;
+}
+
+function openDestinations() {
+  const habituelle = destHabituelle();
+  const t = typeById(state.kind);
+  // La famille qui porte la destination habituelle passe en tête : au comptoir,
+  // c'est celle qu'on tape neuf fois sur dix.
+  const pipeline = [...(CAT.pipeline || [])].sort((a, b) => (
+    Number(b.slug === (habituelle && habituelle.stage)) - Number(a.slug === (habituelle && habituelle.stage))
+  ));
+  $('#cmd-dest-title').textContent = `Où enregistrer cette ${t ? t.label.toLowerCase() : 'fiche'} ?`;
+  const lignes = toutesLignes();
+  $('#cmd-dest-sub').textContent = [
+    nomClient(),
+    lignes.length ? `${lignes.length} ligne${lignes.length > 1 ? 's' : ''}` : state.objet.trim(),
+  ].filter(Boolean).join(' · ');
+  $('#cmd-dest-list').replaceChildren(...pipeline.map((f) => destCarte(f, habituelle)));
+  $('#cmd-dest').hidden = false;
+  const premier = $('#cmd-dest-list .cmd-dest__opt');
+  if (premier) premier.focus();
+}
+
+function closeDestinations() {
+  $('#cmd-dest').hidden = true;
+  $('#cmd-save').focus();
+}
+
+async function submit(dest) {
   const need = missing();
   if (need) return toast(`Il manque ${need}.`);
+  if (!dest) return openDestinations();   // on demande TOUJOURS où enregistrer
+  state.dest = dest;
+  closeDestinations();
 
   state.sending = true;
   render();
@@ -1211,7 +1309,9 @@ function showDone(c) {
     ? `${lignes.length} ligne${lignes.length > 1 ? 's' : ''} (${c.quantite} pièce${c.quantite > 1 ? 's' : ''})`
     : c.objet;
   $('#cmd-done-title').textContent = `${c.type.label} enregistrée`;
-  $('#cmd-done-sub').textContent = `${c.client.societe} · ${detail} · au planning`;
+  // On redit OÙ elle est partie : c'est la question qu'on vient de poser, la
+  // réponse mérite d'être confirmée noir sur blanc.
+  $('#cmd-done-sub').textContent = `${c.client.societe} · ${detail} · ${destLabel(c.stage, c.subStage)}`;
   $('#cmd-done').hidden = false;
   $('#cmd-done-new').focus();
 }
@@ -1225,6 +1325,7 @@ function reset() {
   state.lignes = { tasse: [], textile: [], objet: [] };
   state.paiement = { statut: 'non_paye', mode: '' };
   state.enBoite = false;
+  state.dest = null;      // la destination se redemande à chaque fiche
   state.sending = false;
 
   for (const id of ['cmd-facturation', 'cmd-contact', 'cmd-whatsapp', 'cmd-email',
@@ -1233,6 +1334,7 @@ function reset() {
   }
   setDelai(CAT.delaiDefaut);
   $('#cmd-done').hidden = true;
+  $('#cmd-dest').hidden = true;
   closeAuto();
   renderFams();
   render();

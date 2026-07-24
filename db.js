@@ -670,6 +670,34 @@ async function removeCommandeZone(id) {
   return next;
 }
 
+// --- Message WhatsApp « commande prête » -------------------------------------
+// Le planning affiche une pastille WhatsApp sur chaque commande dont le client a
+// laissé un numéro : un clic ouvre WhatsApp avec le message DÉJÀ ÉCRIT (rien ne
+// part tout seul, c'est l'employé qui appuie sur Envoyer). Le texte n'est pas
+// figé dans le code : le patron l'écrit dans l'onglet Réglages, et il vaut pour
+// tous les postes. Stocké en clé/valeur applicative (app_meta.whatsapp_message).
+// Trois jetons sont remplacés à l'ouverture, tous facultatifs :
+//   {client} → nom du dossier · {commande} → description · {date} → date souhaitée
+const WHATSAPP_MESSAGE_MAX = 1000;
+const DEFAULT_WHATSAPP_MESSAGE =
+  'Bonjour {client}, votre commande « {commande} » est prête, '
+  + 'vous pouvez venir la récupérer à l\'atelier. À bientôt — OLDA';
+
+async function getWhatsappMessage() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'whatsapp_message'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return DEFAULT_WHATSAPP_MESSAGE;
+  // Un message VIDÉ est un choix (le patron préfère écrire à la main) : on le
+  // respecte au lieu de lui remettre le texte par défaut à chaque chargement.
+  return rows[0].value.slice(0, WHATSAPP_MESSAGE_MAX);
+}
+
+async function setWhatsappMessage(text) {
+  const clean = String(text == null ? '' : text).slice(0, WHATSAPP_MESSAGE_MAX);
+  await pool.query("DELETE FROM app_meta WHERE key = 'whatsapp_message'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('whatsapp_message', $1)", [clean]);
+  return clean;
+}
+
 module.exports = {
   pool, init, repairOrphanStages,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
@@ -678,4 +706,5 @@ module.exports = {
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
   getCommandeZones, addCommandeZone, removeCommandeZone,
+  WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
 };
