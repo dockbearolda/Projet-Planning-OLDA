@@ -71,8 +71,8 @@ const jour = (days) => {
     articles: [{
       vetement: 'Sweat à capuche', quantite: 2,
       zones: [
-        { zone: 'avant_g', consigne: 'Logo brodé' },
-        { zone: 'bas_du_dos', consigne: 'Site web' },
+        { zone: 'avant_g', logo: 'Logo brodé' },
+        { zone: 'bas_du_dos', logo: 'Site web' },
       ],
     }],
     deadline: jour(7),

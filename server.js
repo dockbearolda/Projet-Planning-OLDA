@@ -880,15 +880,29 @@ function buildTextile(raw, index) {
     if (zones.some((z) => z.zone === zone.id)) {
       return { error: `${where} : la zone « ${zone.label} » est posée deux fois` };
     }
-    const consigne = trimOrNull(rz.consigne);
-    if (consigne && consigne.length > COM.consigneMax) {
-      return { error: `${where} — ${zone.label} : consigne trop longue (${COM.consigneMax} caractères maximum)` };
+    const logo = trimOrNull(rz.logo);
+    if (logo && logo.length > COM.consigneMax) {
+      return { error: `${where} — ${zone.label} : logo trop long (${COM.consigneMax} caractères maximum)` };
+    }
+    const couleurZone = trimOrNull(rz.couleur);
+    if (couleurZone && couleurZone.length > COULEUR_MAX) {
+      return { error: `${where} — ${zone.label} : couleur du logo trop longue` };
+    }
+    let largeur = null;
+    if (rz.largeur !== undefined && rz.largeur !== null && rz.largeur !== '') {
+      const n = Number.parseInt(rz.largeur, 10);
+      if (!Number.isInteger(n) || n < 1 || n > 999) {
+        return { error: `${where} — ${zone.label} : largeur du logo invalide (1 à 999 cm)` };
+      }
+      largeur = n;
     }
     const tech = COM_TECH_BY_ID.get(rz.technique) || COM.techniques[0];
     zones.push({
       zone: zone.id,
       zoneLabel: zone.label,
-      consigne,
+      logo,
+      couleur: couleurZone,
+      largeur,
       technique: tech.id,
       techniqueLabel: tech.label,
     });
@@ -1043,7 +1057,11 @@ function detailLigne(l) {
       ...(l.note ? [`   ↳ ${l.note}`] : []),
       ...l.zones.map((z) => {
         const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-        return `   ↳ ${z.zoneLabel}${tech}${z.consigne ? ` : ${z.consigne}` : ''}`;
+        // `consigne` : anciennes fiches (avant le détail logo/couleur/largeur),
+        // gardées lisibles telles qu'enregistrées.
+        const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null]
+          .filter(Boolean).join(' · ') || z.consigne || '';
+        return `   ↳ ${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
       }),
     ].join('\n');
   }

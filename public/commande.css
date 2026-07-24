@@ -351,9 +351,11 @@
 #commande .cmd-size__in:focus { border-color: var(--primary); background-color: var(--field-focus); }
 
 /* Marquage textile. Un emplacement CHOISI perd sa puce et prend sa ligne :
-   son nom en étiquette (qui le retire d'un tap) puis sa consigne. */
+   son nom en étiquette (qui le retire d'un tap), puis son logo, sa couleur
+   et sa largeur — les trois vivent par emplacement, un t-shirt cœur+dos
+   pouvant très bien porter deux logos différents. */
 #commande .cmd-art__mark { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-#commande .cmd-zline { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; }
+#commande .cmd-zline { display: grid; grid-template-columns: 132px minmax(0, 1fr) 110px 64px auto; align-items: center; gap: 8px; width: 100%; }
 #commande .cmd-zline__add { color: var(--primary); border: 1px dashed var(--border); }
 #commande .cmd-zline__add:hover { background: var(--primary-soft); border-style: solid; color: var(--primary); }
 #commande .cmd-ztag {
@@ -365,7 +367,8 @@
 }
 #commande .cmd-ztag:hover { background: var(--st-bloque-bg); border-color: var(--st-bloque); color: var(--st-bloque); }
 #commande .cmd-ztag .material-symbols-outlined { font-size: 17px; }
-#commande .cmd-zline__cons { height: 42px; font-size: 15px; }
+#commande .cmd-zline__logo, #commande .cmd-zline__couleur, #commande .cmd-zline__largeur { height: 42px; font-size: 15px; }
+#commande .cmd-zline__largeur { text-align: center; }
 
 /* Croix d'un emplacement ajouté au comptoir : cible de 28px dans la puce, elle
    ne gêne pas le tap qui coche (le reste de la puce). */
@@ -524,8 +527,11 @@
 #commande .cmd-cell--face1, #commande .cmd-cell--face2 { flex: 1 1 46%; min-width: 160px; }
 #commande .cmd-objperso { flex: 1 1 100%; flex-wrap: wrap; }
 #commande .cmd-art__tools { margin-left: auto; }
-#commande .cmd-zline { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-#commande .cmd-ztag { justify-content: flex-start; align-self: flex-start; }
+#commande .cmd-zline { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+#commande .cmd-ztag { flex: 1 1 100%; justify-content: flex-start; align-self: flex-start; }
+#commande .cmd-zline__logo { flex: 1 1 100%; }
+#commande .cmd-zline__couleur { flex: 1 1 60%; }
+#commande .cmd-zline__largeur { flex: 1 1 30%; }
 }
 
 /* Sous la tablette portrait : le bandeau s'empile. La page défile déjà d'un bloc
