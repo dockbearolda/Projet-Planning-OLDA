@@ -1947,6 +1947,7 @@ tr:hover .handle { color: var(--text-2); }
 .col-type { width: 66px; }
 .col-resp { width: 132px; }
 .col-flag { width: 120px; }
+.col-price { width: 92px; }
 .col-sub { width: 140px; }
 .col-next { width: 48px; }
 .col-deadline { width: 124px; }

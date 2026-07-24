@@ -2476,7 +2476,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
   handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, product: 220,
-  sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
+  price: 92, sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};
