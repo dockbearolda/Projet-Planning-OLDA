@@ -1189,6 +1189,11 @@ function cellNext(r) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     hideTip();
+    if (blockedByPrice(r, next.stage)) {
+      showTip(btn, PRICE_BLOCK_MESSAGE);
+      showToast(PRICE_BLOCK_MESSAGE);
+      return;
+    }
     showToast(`→ ${label}`);
     moveToStage(r, next.stage, next.sub);
   });
