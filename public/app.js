@@ -2250,6 +2250,9 @@ function copyToStage(r, slug) {
 // Fonctionne au doigt sur tablette : le DnD HTML5 ne se déclenche pas au tactile,
 // on utilise donc les Pointer Events (souris, doigt et stylet unifiés).
 let dragState = null;
+// Cible Facturation actuellement affichée comme refusée (classe + bulle visibles),
+// pour ne rafraîchir la bulle qu'au changement de cible, pas à chaque frame de survol.
+let priceBlockedEl = null;
 
 function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
@@ -2345,15 +2348,27 @@ function updateDragTarget() {
   const x = dragState.lastX, y = dragState.lastY;
   const el = document.elementFromPoint(x, y);
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
+  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
   const stageEl = el && el.closest ? el.closest('.stage') : null;
+  let blockedEl = null;
   if (stageEl) {
-    if (stageAcceptsDrop(stageEl, dragState.r)) stageEl.classList.add('drop-target');
+    if (stageAcceptsDrop(stageEl, dragState.r)) {
+      stageEl.classList.add('drop-target');
+    } else if (blockedByPrice(dragState.r, stageEl.dataset.slug)) {
+      stageEl.classList.add('drop-blocked');
+      blockedEl = stageEl;
+    }
   } else {
     // réordonnancement vertical dans la grille
     const after = getDragAfterElement($rows, y);
     if (after == null) $rows.appendChild(dragState.tr);
     else if (after !== dragState.tr) $rows.insertBefore(dragState.tr, after);
     paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
+  }
+  if (blockedEl !== priceBlockedEl) {
+    priceBlockedEl = blockedEl;
+    if (blockedEl) showTip(blockedEl, PRICE_BLOCK_MESSAGE);
+    else hideTip();
   }
   autoScroll(y);
 }
