@@ -1313,6 +1313,131 @@ function whatsappIcon() {
   return svg;
 }
 
+// Trombone construit en DOM (même trait que arrowIcon/whatsappIcon, pas
+// d'innerHTML) : icône neutre de l'app, pas une icône de marque.
+function pdfClipIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '14');
+  svg.setAttribute('height', '14');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute(
+    'd',
+    'M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48',
+  );
+  svg.appendChild(path);
+  return svg;
+}
+
+// Libellés pour les infobulles des deux emplacements PDF de la ligne.
+const PDF_SLOT_LABELS = { devis: 'devis', facture: 'facture' };
+
+// PUT brut (pas de JSON) : `api()` ne convient pas, il JSON.stringify toujours
+// le corps. Le serveur lit le corps quel que soit son Content-Type.
+async function uploadPdf(requestId, kind, file) {
+  const url = `/api/requests/${requestId}/pdf/${kind}?name=${encodeURIComponent(file.name)}`;
+  const res = await fetch(url, { method: 'PUT', body: await file.arrayBuffer() });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).error || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json(); // { kind, filename }
+}
+
+// Clic sur la pastille remplie : télécharge le PDF ET ouvre la conversation
+// WhatsApp du client VIERGE (aucun texte pré-rempli — le patron/employé tape
+// son message à la main avec ses réponses rapides « / »). Glisser le fichier
+// téléchargé dans la conversation puis Envoyer restent deux gestes manuels :
+// aucun lien wa.me ne peut porter une pièce jointe.
+function sendPdf(r, kind, filename) {
+  const a = document.createElement('a');
+  a.href = `/api/requests/${r.id}/pdf/${kind}`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  const lien = whatsappLink(r.contact_phone, '', {});
+  if (lien) window.open(lien, '_blank', 'noopener,noreferrer');
+}
+
+// Pastille PDF à deux états, pour `devis` et `facture` (mêmes règles) :
+//  - vide   : trombone neutre, clic → sélecteur de fichier → upload immédiat.
+//  - remplie : trombone accentué, clic → sendPdf() (téléchargement + WhatsApp
+//    vierge) ; une petite croix apparaît au survol pour retirer le fichier.
+// Toujours rendue (contrairement à cellWhatsapp) : une facture s'archive même
+// sans numéro client lisible — dans ce cas l'état rempli télécharge sans
+// ouvrir WhatsApp (whatsappLink renvoie null, sendPdf n'ouvre alors rien).
+function cellPdfSlot(r, kind) {
+  const label = PDF_SLOT_LABELS[kind];
+  const filename = r[`${kind}_name`];
+  const wrap = document.createElement('span');
+  wrap.className = 'pdf-slot';
+
+  if (!filename) {
+    const lbl = document.createElement('label');
+    lbl.className = 'pdf-btn pdf-btn--empty';
+    attachTip(lbl, `Attacher le ${label}`);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf';
+    input.hidden = true;
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      uploadPdf(r.id, kind, file)
+        .then(({ filename: name }) => {
+          r[`${kind}_name`] = name;
+          invalidateRowCache(r.id);
+          applySortAndRender();
+        })
+        .catch(reportError);
+    });
+    lbl.appendChild(input);
+    lbl.appendChild(pdfClipIcon());
+    wrap.appendChild(lbl);
+    return wrap;
+  }
+
+  const btn = document.createElement('a');
+  btn.className = 'pdf-btn pdf-btn--filled';
+  btn.href = `/api/requests/${r.id}/pdf/${kind}`;
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+  attachTip(btn, `${labelCap} : ${filename} — clic = télécharger + ouvrir WhatsApp`);
+  btn.appendChild(pdfClipIcon());
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    sendPdf(r, kind, filename);
+  });
+  wrap.appendChild(btn);
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'pdf-btn__remove';
+  remove.setAttribute('aria-label', `Retirer le ${label}`);
+  remove.textContent = '×';
+  remove.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    api('DELETE', `/api/requests/${r.id}/pdf/${kind}`)
+      .then(() => {
+        r[`${kind}_name`] = null;
+        invalidateRowCache(r.id);
+        applySortAndRender();
+      })
+      .catch(reportError);
+  });
+  wrap.appendChild(remove);
+  return wrap;
+}
+
 // Pastille WhatsApp : présente UNIQUEMENT si le client a laissé un numéro
 // lisible. Un clic ouvre WhatsApp (application sur la tablette, WhatsApp Web sur
 // le PC) avec le message du patron déjà écrit — l'employé n'a plus qu'à relire
