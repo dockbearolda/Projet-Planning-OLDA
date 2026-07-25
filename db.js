@@ -172,6 +172,17 @@ async function init() {
   } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
   await pool.query("UPDATE clients SET client_type = 'pro' WHERE client_type IS NULL");
 
+  // Migration : champs enrichis de la fiche client (venus du classeur patron
+  // « CRM OLDA CREATION CLIENTS ») — identifiant lisible, raison sociale,
+  // adresse détaillée, secteur d'activité, référent. Tous nullable : une fiche
+  // créée avant cette migration reste valide, juste incomplète.
+  // Down : ALTER TABLE clients DROP COLUMN IF EXISTS <col> pour chacune.
+  for (const col of ['code', 'raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom']) {
+    try {
+      await pool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col} text`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
   // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
   // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
   // sur « À attribuer » (valeur neutre, toujours valide) pour rester éditables.

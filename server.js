@@ -536,18 +536,19 @@ const trimOrNull = (v) => {
 const CLIENT_MAX = {
   entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
   email: 160, telephone: 40, adresse: 200,
+  raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
 };
 const CLIENT_FIELDS = [...Object.keys(CLIENT_MAX), 'client_type'];
-// La base clients ne tranche qu'entre pro et perso ; les nuances asso/revendeur
-// restent au niveau de la commande (requests.client_type).
-const CLIENT_NATURE = new Set(['pro', 'perso']);
+// La nature du client (pro/perso/asso/revendeur) partage désormais la MÊME liste
+// que requests.client_type — la fiche patron distingue Professionnel/Revendeur/
+// Association/Particulier (classeur « CRM OLDA CREATION CLIENTS »).
 const NOTE_KINDS = new Set(['note', 'appel', 'email', 'rdv']);
 const NOTE_MAX = 2000;
 
 function validateClientField(key, value) {
   if (key === 'client_type') {
     const s = String(value == null ? '' : value).trim().toLowerCase();
-    if (s !== '' && !CLIENT_NATURE.has(s)) return { ok: false, error: `nature invalide : ${value}` };
+    if (s !== '' && !CLIENT_TYPE_SET.has(s)) return { ok: false, error: `nature invalide : ${value}` };
     return { ok: true, value: s === '' ? 'pro' : s };
   }
   const s = String(value == null ? '' : value).trim().slice(0, CLIENT_MAX[key]);
@@ -602,6 +603,21 @@ app.get('/api/clients/:id', asyncH(async (req, res) => {
   res.json({ ...rows[0], notes, commandes: counts.get(clientKey(rows[0].entreprise)) || 0 });
 }));
 
+// Identifiant lisible « CLI-PRO-0007 » / « CLI-PERSO-0007 » : un repère visuel
+// pour le patron (comme dans son classeur), pas un UUID. Compteur persistant en
+// app_meta (jamais dérivé des lignes existantes) : un numéro attribué n'est
+// JAMAIS réutilisé, même si le client qui le portait est supprimé ensuite.
+async function nextClientCode(clientType) {
+  const perso = clientType === 'perso';
+  const prefix = perso ? 'CLI-PERSO-' : 'CLI-PRO-';
+  const metaKey = perso ? 'client_code_seq_perso' : 'client_code_seq_pro';
+  const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
+  const next = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
+  await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
+  await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(next)]);
+  return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
 // POST /api/clients → crée un client. Seule l'entreprise est obligatoire.
 app.post('/api/clients', asyncH(async (req, res) => {
   const body = req.body || {};
@@ -618,6 +634,8 @@ app.post('/api/clients', asyncH(async (req, res) => {
   if (!cols.includes('entreprise') || params[cols.indexOf('entreprise')] == null) {
     return res.status(400).json({ error: 'le nom de la société est requis' });
   }
+  const clientType = cols.includes('client_type') ? params[cols.indexOf('client_type')] : 'pro';
+  cols.push('code'); vals.push(`$${i++}`); params.push(await nextClientCode(clientType));
   const { rows } = await pool.query(
     `INSERT INTO clients (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
   );
