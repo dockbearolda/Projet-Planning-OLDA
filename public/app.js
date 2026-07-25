@@ -3448,6 +3448,10 @@ function mountProjet() {
         projetModule = null;
         console.error('Nouveau Projet : chargement impossible', err);
       });
+  } else if (projetModule && projetModule.resetProjet) {
+    // Comptoir : chaque passage sur l'onglet repart de « Quel client ? »,
+    // jamais sur un brouillon laissé par le passage précédent.
+    projetModule.resetProjet();
   }
 }
 

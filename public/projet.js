@@ -19,11 +19,16 @@ const ic = (name, cls) => {
 const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // --- État --------------------------------------------------------------------
-// `page` pilote QUEL écran est affiché : 'client' | 'type' | 'produit'.
+// `page` pilote QUEL écran est affiché : 'client' (plein écran, pas de client
+// choisi) | 'main' (client épinglé dans la colonne de gauche ; la colonne de
+// droite montre les tuiles de type si `type` est vide, sinon la config produit).
+// Un client peut commander plusieurs produits différents dans la même visite :
+// rester sur 'main' en vidant juste `type`/`lignes` évite de le rechercher
+// deux fois (voir resetType()/showConfirmation()).
 const state = {
   page: 'client',
   client: null,          // { id, entreprise, nom, telephone, email, type: 'pro'|'perso' } choisi ou créé
-  type: null,            // 'tasse' | 'textile' | 'autres' | 'signaletique'
+  type: null,            // 'textile' | 'tasse' | 'signaletique' | 'autres'
   lignes: [],
   delai: 'j5',
   paiement: 'non_paye',
@@ -48,10 +53,10 @@ async function api(method, path, body) {
 }
 
 const TYPES = [
-  { id: 'tasse', label: 'Tasse', icon: 'local_cafe' },
   { id: 'textile', label: 'Textile', icon: 'checkroom' },
-  { id: 'autres', label: 'Autres', icon: 'category' },
+  { id: 'tasse', label: 'Tasse', icon: 'local_cafe' },
   { id: 'signaletique', label: 'Plaque signalétique', icon: 'signpost' },
+  { id: 'autres', label: 'Autres', icon: 'category' },
 ];
 
 const DELAIS = [
@@ -73,8 +78,7 @@ function render() {
   const body = $('#proj-body');
   if (!body) return;
   if (state.page === 'client') return renderClientPage(body);
-  if (state.page === 'type') return renderTypePage(body);
-  return renderProduitPage(body);
+  return renderMainPage(body);
 }
 function renderCurrentPage() { render(); }
 
@@ -94,7 +98,25 @@ function matchClients(query) {
 
 function goToClient(client) {
   state.client = client;
-  state.page = 'type';
+  state.page = 'main';
+  state.type = null;
+  state.lignes = [];
+  render();
+}
+
+// Repart chercher un AUTRE client : sort de 'main' complètement.
+function changeClient() {
+  state.page = 'client'; state.client = null; state.type = null; state.lignes = [];
+  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
+  render();
+}
+
+// Même client, produit suivant : un client commande souvent plusieurs types
+// différents (tasses ET textile) dans la même visite — pas besoin de le
+// rechercher une deuxième fois, seule la colonne de droite se réinitialise.
+function resetType() {
+  state.type = null; state.lignes = [];
+  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
   render();
 }
 
@@ -194,36 +216,58 @@ function renderClientPage(body) {
   input.focus();
 }
 
-// --- Page 2 : type de projet ----------------------------------------------------
-function goToType(typeId) {
-  state.type = typeId;
-  state.lignes = [];
-  state.page = 'produit';
-  render();
+// --- Page 2 (colonne de gauche) : client épinglé ---------------------------------
+// Un client peut avoir plusieurs produits différents dans la même visite : il
+// reste visible dans cette colonne tant qu'on ne clique pas « Changer de client »,
+// pour ne jamais avoir à le rechercher deux fois.
+function renderClientSidebar() {
+  const c = state.client;
+  const box = el('aside', 'proj-sidebar');
+  const av = el('div', 'proj-sidebar__av', (clientLabel(c).trim()[0] || '?').toUpperCase());
+  const info = el('div', 'proj-sidebar__info');
+  info.append(el('p', 'proj-sidebar__name', clientLabel(c)));
+  const meta = [c.type === 'perso' ? 'Particulier' : 'Pro', c.telephone].filter(Boolean).join(' · ');
+  if (meta) info.append(el('p', 'proj-sidebar__meta', meta));
+  box.append(av, info);
+  const change = el('button', 'proj-sidebar__change', '');
+  change.type = 'button';
+  change.append(ic('sync_alt'), el('span', null, 'Changer de client'));
+  change.addEventListener('click', changeClient);
+  box.append(change);
+  return box;
 }
 
-function renderTypePage(body) {
+function renderMainPage(body) {
   body.replaceChildren();
-  const wrap = el('div', 'proj-type');
-  const back = el('button', 'proj-back', '← Changer de client');
-  back.type = 'button';
-  back.addEventListener('click', () => { state.page = 'client'; render(); });
-  wrap.append(back);
-  wrap.append(el('h3', 'proj-step__title', `${clientLabel(state.client)} — Quel type de projet ?`));
+  const layout = el('div', 'proj-layout');
+  layout.append(renderClientSidebar());
+  const main = el('div', 'proj-main');
+  if (!state.type) {
+    renderTypeTiles(main);
+  } else {
+    if (!state.lignes.length) state.lignes.push(state.type === 'tasse' ? newTasseLigne() : newSommaireLigne());
+    if (state.type === 'tasse') renderTasseProduit(main);
+    else renderSommaireProduit(main);
+  }
+  layout.append(main);
+  body.append(layout);
+}
 
+// --- Colonne de droite : tuiles de type ------------------------------------------
+function renderTypeTiles(main) {
+  main.append(el('h3', 'proj-step__title', 'Quel type de projet ?'));
   const grid = el('div', 'proj-type__grid');
   for (const t of TYPES) {
     const tile = el('button', 'proj-tile');
     tile.type = 'button';
     tile.append(ic(t.icon, 'proj-tile__ic'), el('span', 'proj-tile__label', t.label));
-    tile.addEventListener('click', () => goToType(t.id));
+    tile.addEventListener('click', () => { state.type = t.id; state.lignes = []; render(); });
     grid.appendChild(tile);
   }
-  wrap.append(grid);
-  body.appendChild(wrap);
+  main.append(grid);
 }
 
-// --- Page 3 : produit ------------------------------------------------------------
+// --- Colonne de droite : produit ------------------------------------------------
 function tarifsByCat(cat) { return TARIFS.filter((t) => t.categorie === cat && t.actif); }
 function tarifById(id) { return TARIFS.find((t) => t.id === id); }
 
@@ -264,13 +308,6 @@ function totalTtc() {
 function totalRevient() {
   if (state.type !== 'tasse') return 0;
   return state.lignes.reduce((s, l) => s + calcLigneTasseRevient(l), 0);
-}
-
-function renderProduitPage(body) {
-  if (!state.lignes.length) {
-    state.lignes.push(state.type === 'tasse' ? newTasseLigne() : newSommaireLigne());
-  }
-  return state.type === 'tasse' ? renderTasseProduit(body) : renderSommaireProduit(body);
 }
 
 function selectField(value, onChange, options, placeholder) {
@@ -327,38 +364,32 @@ function renderTasseLigne(l, index) {
   return card;
 }
 
-function renderTasseProduit(body) {
-  body.replaceChildren();
-  const wrap = el('div', 'proj-produit');
+function renderTasseProduit(main) {
   const back = el('button', 'proj-back', '← Changer de type');
   back.type = 'button';
-  back.addEventListener('click', () => { state.page = 'type'; render(); });
-  wrap.append(back, el('h3', 'proj-step__title', 'Tasse — configuration'));
+  back.addEventListener('click', resetType);
+  main.append(back, el('h3', 'proj-step__title', 'Tasse — configuration'));
 
   const list = el('div', 'proj-lignes');
   state.lignes.forEach((l, i) => list.appendChild(renderTasseLigne(l, i)));
-  wrap.append(list);
+  main.append(list);
 
   const addBtn = el('button', 'proj-btn proj-btn--ghost');
   addBtn.type = 'button';
   addBtn.append(ic('add'), el('span', null, 'Ajouter une autre tasse'));
   addBtn.addEventListener('click', () => { state.lignes.push(newTasseLigne()); renderCurrentPage(); });
-  wrap.append(addBtn);
+  main.append(addBtn);
 
-  wrap.append(renderDelaiPaiement());
-  wrap.append(renderTotalBar());
-
-  body.appendChild(wrap);
+  main.append(renderDelaiPaiement());
+  main.append(renderTotalBar());
 }
 
-function renderSommaireProduit(body) {
-  body.replaceChildren();
-  const wrap = el('div', 'proj-produit');
+function renderSommaireProduit(main) {
   const back = el('button', 'proj-back', '← Changer de type');
   back.type = 'button';
-  back.addEventListener('click', () => { state.page = 'type'; render(); });
+  back.addEventListener('click', resetType);
   const titre = TYPES.find((t) => t.id === state.type).label;
-  wrap.append(back, el('h3', 'proj-step__title', `${titre} — description`));
+  main.append(back, el('h3', 'proj-step__title', `${titre} — description`));
 
   const list = el('div', 'proj-lignes');
   state.lignes.forEach((l, i) => {
@@ -393,17 +424,16 @@ function renderSommaireProduit(body) {
     card.append(row);
     list.appendChild(card);
   });
-  wrap.append(list);
+  main.append(list);
 
   const addBtn = el('button', 'proj-btn proj-btn--ghost');
   addBtn.type = 'button';
   addBtn.append(ic('add'), el('span', null, 'Ajouter une ligne'));
   addBtn.addEventListener('click', () => { state.lignes.push(newSommaireLigne()); render(); });
-  wrap.append(addBtn);
+  main.append(addBtn);
 
-  wrap.append(renderDelaiPaiement());
-  wrap.append(renderTotalBar());
-  body.appendChild(wrap);
+  main.append(renderDelaiPaiement());
+  main.append(renderTotalBar());
 }
 
 // Les champs texte perdraient le focus à un render() complet à chaque frappe :
@@ -563,21 +593,23 @@ function showConfirmation(created) {
     el('p', 'proj-done__title', 'Projet enregistré'),
     el('p', 'proj-done__sub', `${created.projet.prixTotalTtc.toFixed(2)} € TTC — ${created.projet.client.societe}`),
   );
+  // Action la PLUS fréquente au comptoir : le même client repart sur un
+  // produit différent (tasses ET textile dans la même visite) — mise en avant,
+  // le client reste épinglé dans la colonne de gauche.
+  const addAnother = el('button', 'proj-btn proj-btn--primary proj-btn--wide', '');
+  addAnother.type = 'button';
+  addAnother.append(ic('add'), el('span', null, 'Ajouter un produit pour ce client'));
+  addAnother.addEventListener('click', () => { overlay.remove(); resetType(); });
+  card.append(addAnother);
+
   const actions = el('div', 'proj-done__actions');
   const planning = el('a', 'proj-btn', 'Voir le planning');
   planning.href = '#planning';
-  // Repart de zéro : au retour sur l'onglet, on ne veut jamais retomber sur la
-  // fiche remplie (ni sur cette pop-up) du projet qu'on vient d'enregistrer.
-  const resetState = () => {
-    overlay.remove();
-    state.page = 'client'; state.client = null; state.type = null; state.lignes = [];
-    state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
-  };
-  planning.addEventListener('click', resetState);
-  const again = el('button', 'proj-btn proj-btn--primary', 'Nouveau projet');
-  again.type = 'button';
-  again.addEventListener('click', () => { resetState(); render(); });
-  actions.append(planning, again);
+  planning.addEventListener('click', () => overlay.remove());
+  const nouveauClient = el('button', 'proj-btn', 'Nouveau client');
+  nouveauClient.type = 'button';
+  nouveauClient.addEventListener('click', () => { overlay.remove(); changeClient(); });
+  actions.append(planning, nouveauClient);
   card.append(actions);
   overlay.append(card);
   ROOT.appendChild(overlay);
@@ -608,5 +640,15 @@ export async function initProjet(root) {
       api('GET', '/api/clients'), api('GET', '/api/tarifs-tasse'), api('GET', '/api/tarifs-tasse/parametres'),
     ]);
   } catch (_) { /* silencieux : les pages suivantes gèrent une liste vide */ }
+  render();
+}
+
+// Un tap sur « Nouveau Projet » dans la nav ouvre TOUJOURS « Quel client ? »,
+// même si un poste avait laissé une fiche en cours — comptoir = on repart net,
+// on ne cherche jamais un brouillon abandonné entre deux clients.
+export function resetProjet() {
+  if (!mounted) return;
+  state.page = 'client'; state.client = null; state.type = null; state.lignes = [];
+  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
   render();
 }
