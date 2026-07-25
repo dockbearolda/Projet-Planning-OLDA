@@ -1,0 +1,89 @@
+/* Nouveau Projet — Atelier OLDA
+   Flux comptoir ultra-minimal : client → type → produit → prix, façon caisse. */
+
+.proj-page { display: flex; flex-direction: column; height: 100%; }
+.proj-bar { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.proj-bar__ic { font-size: 22px; color: var(--primary); }
+.proj-bar__title { margin: 0; font-size: 17px; font-weight: 700; }
+.proj-bar__sub { margin: 0; font-size: 13px; color: var(--text-2); }
+.proj-body { flex: 1; overflow-y: auto; padding: 20px; max-width: 640px; margin: 0 auto; width: 100%; }
+.proj-step__title { margin: 0 0 16px; font-size: 20px; font-weight: 700; }
+.proj-todo { color: var(--text-2); font-style: italic; }
+
+.proj-back { align-self: flex-start; margin-bottom: 10px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
+.proj-back:hover { color: var(--primary); }
+
+/* --- Page client ------------------------------------------------------------ */
+.proj-client__row { display: flex; gap: 10px; margin-bottom: 14px; }
+.proj-search { flex: 1; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 12px; background: var(--surface); }
+.proj-search__ic { color: var(--text-2); font-size: 20px; }
+.proj-search__input { flex: 1; border: 0; background: transparent; padding: 14px 0; font: inherit; font-size: 16px; color: var(--text-1); outline: none; }
+.proj-client__results { display: flex; flex-direction: column; gap: 6px; }
+.proj-client__item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); cursor: pointer; text-align: left; }
+.proj-client__item:hover { background: var(--surface-hover); }
+.proj-client__name { font-weight: 600; font-size: 15px; color: var(--text-1); }
+.proj-client__meta { font-size: 12.5px; color: var(--text-2); }
+
+.proj-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
+.proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.proj-btn:disabled { opacity: .6; cursor: default; }
+
+.proj-quick { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius); align-items: center; }
+.proj-input { flex: 1 1 180px; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
+.proj-input--sm { min-height: 44px; }
+.proj-seg { display: flex; gap: 4px; border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; }
+.proj-seg__btn { min-height: 38px; padding: 0 14px; border: 0; border-radius: calc(var(--radius) - 3px); background: transparent; font: inherit; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.proj-seg__btn.is-on { background: var(--primary-soft); color: var(--primary); }
+
+/* --- Page type ---------------------------------------------------------------- */
+.proj-type__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (min-width: 560px) { .proj-type__grid { grid-template-columns: repeat(4, 1fr); } }
+.proj-tile { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 12px; min-height: 120px; border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); background: var(--surface); cursor: pointer; }
+.proj-tile:hover { background: var(--surface-hover); border-color: var(--primary-soft); }
+.proj-tile__ic { font-size: 34px; color: var(--primary); }
+.proj-tile__label { font-weight: 700; font-size: 14px; text-align: center; color: var(--text-1); }
+
+/* --- Page produit -------------------------------------------------------------- */
+.proj-lignes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.proj-ligne { border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+.proj-ligne__row { display: flex; gap: 8px; flex-wrap: wrap; }
+.proj-ligne__row > * { flex: 1 1 160px; }
+.proj-qty { flex: 0 0 64px !important; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius); text-align: center; font: inherit; font-size: 16px; }
+.proj-select { min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); color: var(--text-1); }
+.proj-ligne__del { flex: 0 0 36px !important; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+.proj-ligne__del:hover { color: var(--danger, #d33); }
+.proj-ligne__prix { align-self: flex-end; font-weight: 700; color: var(--primary); }
+.proj-textarea { flex: 1 1 260px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 15px; resize: vertical; background: var(--surface); color: var(--text-1); }
+
+.proj-delai { margin: 16px 0; }
+.proj-delai__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.proj-delai__label { font-weight: 600; color: var(--text-2); font-size: 13px; }
+.proj-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.proj-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.proj-chip.is-on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary-soft); }
+
+.proj-total { position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 16px; margin: 0 -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); flex-wrap: wrap; }
+.proj-total__label { color: var(--text-2); font-size: 13px; margin-left: auto; }
+.proj-total__value { font-size: 22px; font-weight: 800; color: var(--text-1); }
+.proj-marge-toggle { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: var(--text-2); font-size: 12px; cursor: pointer; opacity: .7; }
+.proj-marge-toggle:hover { opacity: 1; }
+.proj-marge-toggle__ic { font-size: 16px; }
+.proj-marge { display: flex; gap: 12px; font-size: 12px; color: var(--text-2); }
+.proj-btn--save { min-width: 140px; justify-content: center; }
+
+/* --- Destination + confirmation ------------------------------------------------ */
+.proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.proj-dest-card, .proj-done-card { position: relative; background: var(--surface); border-radius: calc(var(--radius) + 6px); padding: 28px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.proj-dest__eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.proj-dest__title { margin: 4px 0 16px; font-size: 19px; font-weight: 800; }
+.proj-dest__list { display: flex; flex-direction: column; gap: 6px; }
+.proj-dest__item { min-height: 44px; padding: 0 14px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
+.proj-dest__item:hover { background: var(--surface-hover); }
+.proj-dest__close { position: absolute; top: 14px; right: 14px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+
+.proj-done-card { text-align: center; }
+.proj-done__check { width: 56px; height: 56px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 30px; }
+.proj-done__title { font-size: 19px; font-weight: 800; margin: 0 0 4px; }
+.proj-done__sub { color: var(--text-2); margin: 0 0 20px; }
+.proj-done__actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }

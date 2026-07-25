@@ -3329,8 +3329,10 @@ const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $reglages = document.getElementById('reglages');
+const $viewProjet = document.getElementById('viewProjet');
+const $projet = document.getElementById('nouveau-projet');
 
-// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages'
+// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages' | 'projet'
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
 // La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
@@ -3432,6 +3434,23 @@ function mountReglages() {
   }
 }
 
+// Nouveau Projet : même principe que Base clients / Réglages (module lourd,
+// chargé au premier passage, monté une bonne fois).
+let projetLoading = null;
+let projetModule = null;
+function mountProjet() {
+  if (!$projet) return;
+  if (!projetLoading) {
+    projetLoading = import('./projet.js')
+      .then((m) => { projetModule = m; return m.initProjet($projet); })
+      .catch((err) => {
+        projetLoading = null;
+        projetModule = null;
+        console.error('Nouveau Projet : chargement impossible', err);
+      });
+  }
+}
+
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
 // en-tête. Seul le rail s'efface (l'onglet le remplace).
 const isPlanningMode = (mode) => mode === 'planning' || mode in PROMOTED_BY_VIEW;
@@ -3444,6 +3463,7 @@ function setViewMode(mode) {
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
+  if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
@@ -3460,10 +3480,12 @@ function setViewMode(mode) {
   const commande = mode === 'commande';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
+  const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
+  if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
 
@@ -3471,6 +3493,7 @@ function setViewMode(mode) {
   if (commande) mountCommande();
   if (clients) mountClients();
   if (reglages) mountReglages();
+  if (projet) mountProjet();
   if (isPlanningMode(mode)) {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
@@ -3480,6 +3503,7 @@ function setViewMode(mode) {
 // #demande et #commande ouvrent la MÊME vue, avec une nature différente.
 const VIEWS = {
   '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
+  '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
