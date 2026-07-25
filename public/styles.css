@@ -2480,6 +2480,22 @@ button, a, .stage, .prio-pill, .deadline-badge,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
+/* « Nouveau Projet » est LA feature principale de l'outil : rempli d'un aplat
+   de couleur, pas juste teinté, pour qu'il saute aux yeux avant tout le reste
+   de la barre — le geste qu'on fait le plus souvent doit être le plus visible. */
+.nav-switch-btn--projet {
+  background: var(--primary);
+  color: #fff;
+  margin-right: 6px;
+  padding-right: 14px;
+  border-right: 1px solid var(--border-soft);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.nav-switch-btn--projet .material-symbols-outlined { color: #fff; }
+.nav-switch-btn--projet:hover { background: var(--primary); filter: brightness(1.08); color: #fff; }
+.nav-switch-btn--projet.active { background: var(--primary); color: #fff; }
+
 /* Les deux entrées de saisie (Demande / Commande) sont le premier pas : un peu
    plus présentes, et détachées du reste par un filet vertical. */
 .nav-switch-btn--intake {
@@ -3958,6 +3974,19 @@ body.wall-open { overflow: hidden; }
 .reg-btn:disabled { opacity: .45; cursor: default; }
 .reg-btn--primary { border-color: transparent; background: var(--primary); color: #fff; }
 .reg-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+.reg-tarif-cat { margin: 18px 0 8px; font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
+.reg-tarif-cat:first-child { margin-top: 4px; }
+.reg-tarif-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.reg-tarif-input { min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: 13.5px; background: var(--surface); color: var(--text-1); }
+.reg-tarif-input--nom { flex: 1 1 220px; }
+.reg-tarif-input--num { flex: 0 0 90px; text-align: right; }
+.reg-tarif-toggle, .reg-tarif-del { flex: 0 0 36px; min-height: 36px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.reg-tarif-toggle.is-on { color: var(--primary); }
+.reg-tarif-del:hover { color: var(--danger, #d33); }
+.reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: 38px; padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: 13px; cursor: pointer; }
+.reg-tarif-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-2); }
 
 @media (max-width: 700px) {
   .reg-page { padding: 18px 14px calc(32px + env(safe-area-inset-bottom)); }
