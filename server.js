@@ -17,6 +17,8 @@ const {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
+  getTarifsTasseArticles, setTarifsTasseArticles,
+  getTarifsTasseParametres, setTarifsTasseParametres,
   getCommandeZones, addCommandeZone, removeCommandeZone,
   getHiddenCommandeZones, hideCommandeZone,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
@@ -260,6 +262,41 @@ app.put('/api/machines', asyncH(async (req, res) => {
   }
   const saved = await setMachines(req.body);
   broadcast({ kind: 'machines' });
+  res.json(saved);
+}));
+
+// Catalogue tarifs TASSE (réglages du patron : prix + temps par produit/option).
+// GET  → [ { id, categorie, designation, prixAchat, prixVenteTtc, tempsMoMin,
+//            tempsMachineMin, actif, position }, ... ]
+// PUT  → remplace la liste (corps = tableau), diffusé en SSE pour que Nouveau
+//        Projet et Réglages voient le même catalogue partout sans recharger.
+app.get('/api/tarifs-tasse', asyncH(async (req, res) => {
+  res.json(await getTarifsTasseArticles());
+}));
+
+app.put('/api/tarifs-tasse', asyncH(async (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Tableau d\'articles attendu' });
+  }
+  const saved = await setTarifsTasseArticles(req.body);
+  broadcast({ kind: 'tarifs-tasse' });
+  res.json(saved);
+}));
+
+// Paramètres globaux du calcul (taux horaires MO/machine, TGCA).
+app.get('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
+  res.json(await getTarifsTasseParametres());
+}));
+
+app.put('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
+  const body = req.body || {};
+  for (const key of ['tauxHoraireMo', 'tauxHoraireMachine', 'tgca']) {
+    if (key in body && !Number.isFinite(Number(body[key]))) {
+      return res.status(400).json({ error: `${key} doit être numérique` });
+    }
+  }
+  const saved = await setTarifsTasseParametres(body);
+  broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
 }));
 
