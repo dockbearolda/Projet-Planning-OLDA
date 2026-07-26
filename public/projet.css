@@ -103,15 +103,23 @@
 .proj-tile__ic { font-size: 34px; color: var(--primary); }
 .proj-tile__label { font-weight: 700; font-size: 14px; text-align: center; color: var(--text-1); }
 
-/* --- Page produit -------------------------------------------------------------- */
-.proj-lignes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+/* --- Panier (colonne de droite) -------------------------------------------------- */
+.proj-lignes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.proj-cart-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); }
+.proj-cart-item__info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.proj-cart-item__type { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--primary); }
+.proj-cart-item__desc { font-size: 14px; color: var(--text-1); overflow-wrap: break-word; }
+.proj-cart-item__prix { font-weight: 700; color: var(--text-1); white-space: nowrap; }
+.proj-cart-item__del { flex: 0 0 32px; min-height: 32px; border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.proj-cart-item__del:hover { color: var(--danger, #d33); }
+.proj-addmore__title { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--text-2); }
+
+/* --- Formulaire d'ajout d'un produit ---------------------------------------------- */
 .proj-ligne { border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
 .proj-ligne__row { display: flex; gap: 8px; flex-wrap: wrap; }
 .proj-ligne__row > * { flex: 1 1 160px; }
 .proj-qty { flex: 0 0 64px !important; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius); text-align: center; font: inherit; font-size: 16px; }
 .proj-select { min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); color: var(--text-1); }
-.proj-ligne__del { flex: 0 0 36px !important; border: 0; background: none; color: var(--text-2); cursor: pointer; }
-.proj-ligne__del:hover { color: var(--danger, #d33); }
 .proj-ligne__prix { align-self: flex-end; font-weight: 700; color: var(--primary); }
 .proj-textarea { flex: 1 1 260px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 15px; resize: vertical; background: var(--surface); color: var(--text-1); }
 

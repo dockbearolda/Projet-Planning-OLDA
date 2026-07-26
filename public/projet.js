@@ -1,7 +1,8 @@
 // Nouveau Projet — Atelier OLDA
-// LE flux comptoir : client (recherche/création) → type de projet → produit +
-// prix, façon caisse SumUp. Rendu entièrement par JS dans une section vide
-// (même principe que clients.js / reglages.js), chargé à la demande par app.js.
+// LE flux comptoir : client (recherche/création) → panier (plusieurs produits,
+// de types différents) → prix, façon caisse SumUp. Rendu entièrement par JS
+// dans une section vide (même principe que clients.js / reglages.js), chargé
+// à la demande par app.js.
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -21,15 +22,17 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 // --- État --------------------------------------------------------------------
 // `page` pilote QUEL écran est affiché : 'client' (plein écran, pas de client
 // choisi) | 'main' (client épinglé dans la colonne de gauche ; la colonne de
-// droite montre les tuiles de type si `type` est vide, sinon la config produit).
-// Un client peut commander plusieurs produits différents dans la même visite :
-// rester sur 'main' en vidant juste `type`/`lignes` évite de le rechercher
-// deux fois (voir resetType()/showConfirmation()).
+// droite montre le panier + les tuiles d'ajout, ou le formulaire d'un produit
+// en cours de configuration si `addingType` est posé).
+// Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
+// tasse, un polo…), pour le même client et le même enregistrement — façon
+// caisse SumUp, on encaisse tout d'un coup.
 const state = {
   page: 'client',
   client: null,          // { id, entreprise, nom, telephone, email, type: 'pro'|'perso' } choisi ou créé
-  type: null,            // 'textile' | 'tasse' | 'signaletique' | 'autres'
-  lignes: [],
+  panier: [],             // [{ uid, type, quantite, ...champs selon le type }]
+  addingType: null,       // type en cours de configuration (formulaire ouvert), null = fermé
+  addingLigne: null,      // brouillon de la ligne en cours d'ajout
   delai: 'j5',
   paiement: 'non_paye',
   margeVisible: false,
@@ -58,6 +61,7 @@ const TYPES = [
   { id: 'signaletique', label: 'Plaque signalétique', icon: 'signpost' },
   { id: 'autres', label: 'Autres', icon: 'category' },
 ];
+const typeLabel = (id) => (TYPES.find((t) => t.id === id) || {}).label || id;
 
 const DELAIS = [
   { id: 'jour_j', label: 'Jour J', majoration: 20 },
@@ -76,17 +80,12 @@ const PAIEMENT_STATUTS = [
 // --- Rendu : dispatcher --------------------------------------------------------
 const STEPS = [
   { id: 'client', label: 'Client' },
-  { id: 'type', label: 'Type' },
-  { id: 'produit', label: 'Produit' },
+  { id: 'produits', label: 'Produits' },
 ];
 
-// 1 = choix du client, 2 = choix du type, 3 = configuration du produit.
-function currentStepIndex() {
-  if (state.page === 'client') return 0;
-  return state.type ? 2 : 1;
-}
+function currentStepIndex() { return state.page === 'client' ? 0 : 1; }
 
-// Barre de progression visuelle (3 puces reliées), remplace le fil texte
+// Barre de progression visuelle (puces reliées), remplace le fil texte
 // « Client → type → produit » — l'employé voit d'un coup d'œil où il en est.
 function renderStepper() {
   const box = $('#proj-stepper');
@@ -133,23 +132,24 @@ function matchClients(query) {
 function goToClient(client) {
   state.client = client;
   state.page = 'main';
-  state.type = null;
-  state.lignes = [];
+  state.panier = [];
+  state.addingType = null;
+  state.addingLigne = null;
   render();
 }
 
 // Repart chercher un AUTRE client : sort de 'main' complètement.
 function changeClient() {
-  state.page = 'client'; state.client = null; state.type = null; state.lignes = [];
+  state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
   render();
 }
 
-// Même client, produit suivant : un client commande souvent plusieurs types
-// différents (tasses ET textile) dans la même visite — pas besoin de le
-// rechercher une deuxième fois, seule la colonne de droite se réinitialise.
-function resetType() {
-  state.type = null; state.lignes = [];
+// Même client, panier vidé (après enregistrement) : un client commande
+// souvent plusieurs types différents dans la même visite — pas besoin de le
+// rechercher une deuxième fois.
+function resetPanier() {
+  state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
   render();
 }
@@ -250,7 +250,7 @@ function renderClientPage(body) {
   input.focus();
 }
 
-// --- Page 2 (colonne de gauche) : client épinglé ---------------------------------
+// --- Colonne de gauche : client épinglé ------------------------------------------
 // Un client peut avoir plusieurs produits différents dans la même visite : il
 // reste visible dans cette colonne tant qu'on ne clique pas « Changer de client »,
 // pour ne jamais avoir à le rechercher deux fois.
@@ -276,36 +276,13 @@ function renderMainPage(body) {
   const layout = el('div', 'proj-layout');
   layout.append(renderClientSidebar());
   const main = el('div', 'proj-main');
-  if (!state.type) {
-    renderTypeTiles(main);
-  } else {
-    if (!state.lignes.length) state.lignes.push(state.type === 'tasse' ? newTasseLigne() : newSommaireLigne());
-    if (state.type === 'tasse') renderTasseProduit(main);
-    else renderSommaireProduit(main);
-  }
+  if (state.addingType) renderAddForm(main);
+  else renderPanier(main);
   layout.append(main);
   body.append(layout);
 }
 
-// --- Colonne de droite : tuiles de type ------------------------------------------
-function renderTypeTiles(main) {
-  // Une seule question à l'écran, centrée dans la colonne de droite (le
-  // client reste visible dans la sidebar, mais la question, elle, est seule).
-  const center = el('div', 'proj-center');
-  center.append(el('h3', 'proj-step__title', 'Quel type de projet ?'));
-  const grid = el('div', 'proj-type__grid');
-  for (const t of TYPES) {
-    const tile = el('button', 'proj-tile');
-    tile.type = 'button';
-    tile.append(ic(t.icon, 'proj-tile__ic'), el('span', 'proj-tile__label', t.label));
-    tile.addEventListener('click', () => { state.type = t.id; state.lignes = []; render(); });
-    grid.appendChild(tile);
-  }
-  center.append(grid);
-  main.append(center);
-}
-
-// --- Colonne de droite : produit ------------------------------------------------
+// --- Catalogue tarifs tasse : accès rapide ---------------------------------------
 function tarifsByCat(cat) { return TARIFS.filter((t) => t.categorie === cat && t.actif); }
 function tarifById(id) { return TARIFS.find((t) => t.id === id); }
 
@@ -336,16 +313,98 @@ function calcLigneTasseRevient(l) {
   return q * (achat + (moMin / 60) * TARIFS_PARAMS.tauxHoraireMo + (machineMin / 60) * TARIFS_PARAMS.tauxHoraireMachine);
 }
 
+// --- Panier : prix, description, rendu -------------------------------------------
+function calcItemTtc(item) {
+  return item.type === 'tasse' ? calcLigneTasseTtc(item) : (Number(item.prixTtcManuel) || 0);
+}
+function calcItemRevient(item) {
+  return item.type === 'tasse' ? calcLigneTasseRevient(item) : 0;
+}
+function describeItem(item) {
+  if (item.type === 'tasse') {
+    const produit = tarifById(item.produitId);
+    const opts = [item.face1Id, item.face2Id, item.dessousId].map(tarifById)
+      .filter((a) => a && a.designation !== 'Aucune').map((a) => a.designation);
+    return `${item.quantite} × ${produit ? produit.designation : 'Tasse'}${item.coloris ? ` (${item.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
+  }
+  return `${item.quantite} × ${item.description || '—'}`;
+}
+
 function totalTtc() {
-  const base = state.type === 'tasse'
-    ? state.lignes.reduce((s, l) => s + calcLigneTasseTtc(l), 0)
-    : state.lignes.reduce((s, l) => s + (Number(l.prixTtcManuel) || 0), 0);
+  const base = state.panier.reduce((s, item) => s + calcItemTtc(item), 0);
   const delai = DELAIS.find((d) => d.id === state.delai) || DELAIS[2];
   return Math.round(base * (1 + delai.majoration / 100) * 100) / 100;
 }
 function totalRevient() {
-  if (state.type !== 'tasse') return 0;
-  return state.lignes.reduce((s, l) => s + calcLigneTasseRevient(l), 0);
+  return state.panier.reduce((s, item) => s + calcItemRevient(item), 0);
+}
+
+function renderPanierItem(item) {
+  const row = el('div', 'proj-cart-item');
+  const info = el('div', 'proj-cart-item__info');
+  info.append(el('span', 'proj-cart-item__type', typeLabel(item.type)));
+  info.append(el('span', 'proj-cart-item__desc', describeItem(item)));
+  row.append(info);
+  row.append(el('span', 'proj-cart-item__prix', `${calcItemTtc(item).toFixed(2)} €`));
+  const rm = el('button', 'proj-cart-item__del');
+  rm.type = 'button';
+  rm.append(ic('close'));
+  rm.addEventListener('click', () => {
+    state.panier = state.panier.filter((x) => x.uid !== item.uid);
+    render();
+  });
+  row.append(rm);
+  return row;
+}
+
+// --- Colonne de droite : panier + tuiles d'ajout ---------------------------------
+function renderPanier(main) {
+  const vide = state.panier.length === 0;
+
+  if (!vide) {
+    main.append(el('h3', 'proj-step__title', 'Panier'));
+    const list = el('div', 'proj-lignes');
+    state.panier.forEach((item) => list.appendChild(renderPanierItem(item)));
+    main.append(list);
+  }
+
+  const tilesWrap = vide ? el('div', 'proj-center') : el('div');
+  tilesWrap.append(el('h3', vide ? 'proj-step__title' : 'proj-addmore__title', vide ? 'Quel type de projet ?' : 'Ajouter un autre produit'));
+  const grid = el('div', 'proj-type__grid');
+  for (const t of TYPES) {
+    const tile = el('button', 'proj-tile');
+    tile.type = 'button';
+    tile.append(ic(t.icon, 'proj-tile__ic'), el('span', 'proj-tile__label', t.label));
+    tile.addEventListener('click', () => startAdding(t.id));
+    grid.appendChild(tile);
+  }
+  tilesWrap.append(grid);
+  main.append(tilesWrap);
+
+  main.append(renderDelaiPaiement());
+  main.append(renderTotalBar());
+}
+
+// --- Formulaire d'ajout d'un produit au panier ------------------------------------
+function startAdding(typeId) {
+  state.addingType = typeId;
+  state.addingLigne = typeId === 'tasse' ? newTasseLigne() : newSommaireLigne();
+  render();
+}
+function cancelAdding() {
+  state.addingType = null; state.addingLigne = null;
+  render();
+}
+function confirmAdd() {
+  const l = state.addingLigne;
+  if (state.addingType === 'tasse') {
+    if (!l.produitId) { window.alert('Choisis un type de tasse.'); return; }
+  } else if (!l.description.trim()) {
+    window.alert('Ajoute une description.'); return;
+  }
+  state.panier.push({ ...l, type: state.addingType });
+  state.addingType = null; state.addingLigne = null;
+  render();
 }
 
 function selectField(value, onChange, options, placeholder) {
@@ -363,7 +422,7 @@ function selectField(value, onChange, options, placeholder) {
   return select;
 }
 
-function renderTasseLigne(l, index) {
+function renderTasseFields(l) {
   const card = el('div', 'proj-ligne');
   const row1 = el('div', 'proj-ligne__row');
   const qty = el('input', 'proj-qty');
@@ -375,13 +434,6 @@ function renderTasseLigne(l, index) {
   coloris.value = l.coloris;
   coloris.addEventListener('input', () => { l.coloris = coloris.value; });
   row1.append(coloris);
-  if (state.lignes.length > 1) {
-    const rm = el('button', 'proj-ligne__del');
-    rm.type = 'button';
-    rm.append(ic('close'));
-    rm.addEventListener('click', () => { state.lignes.splice(index, 1); renderCurrentPage(); });
-    row1.append(rm);
-  }
   card.append(row1);
 
   const row2 = el('div', 'proj-ligne__row');
@@ -402,35 +454,16 @@ function renderTasseLigne(l, index) {
   return card;
 }
 
-function renderTasseProduit(main) {
-  const back = el('button', 'proj-back', '← Changer de type');
+function renderAddForm(main) {
+  const back = el('button', 'proj-back', '← Annuler');
   back.type = 'button';
-  back.addEventListener('click', resetType);
-  main.append(back, el('h3', 'proj-step__title', 'Tasse — configuration'));
+  back.addEventListener('click', cancelAdding);
+  main.append(back, el('h3', 'proj-step__title', typeLabel(state.addingType)));
 
-  const list = el('div', 'proj-lignes');
-  state.lignes.forEach((l, i) => list.appendChild(renderTasseLigne(l, i)));
-  main.append(list);
-
-  const addBtn = el('button', 'proj-btn proj-btn--ghost');
-  addBtn.type = 'button';
-  addBtn.append(ic('add'), el('span', null, 'Ajouter une autre tasse'));
-  addBtn.addEventListener('click', () => { state.lignes.push(newTasseLigne()); renderCurrentPage(); });
-  main.append(addBtn);
-
-  main.append(renderDelaiPaiement());
-  main.append(renderTotalBar());
-}
-
-function renderSommaireProduit(main) {
-  const back = el('button', 'proj-back', '← Changer de type');
-  back.type = 'button';
-  back.addEventListener('click', resetType);
-  const titre = TYPES.find((t) => t.id === state.type).label;
-  main.append(back, el('h3', 'proj-step__title', `${titre} — description`));
-
-  const list = el('div', 'proj-lignes');
-  state.lignes.forEach((l, i) => {
+  const l = state.addingLigne;
+  if (state.addingType === 'tasse') {
+    main.append(renderTasseFields(l));
+  } else {
     const card = el('div', 'proj-ligne');
     const row = el('div', 'proj-ligne__row');
     const desc = el('textarea', 'proj-textarea');
@@ -449,36 +482,18 @@ function renderSommaireProduit(main) {
     prix.type = 'number'; prix.min = '0'; prix.step = '0.01'; prix.inputMode = 'decimal';
     prix.placeholder = 'Prix TTC €';
     prix.value = l.prixTtcManuel;
-    prix.addEventListener('input', () => { l.prixTtcManuel = prix.value; renderTotalOnly(); });
+    prix.addEventListener('input', () => { l.prixTtcManuel = prix.value; });
     row.append(prix);
 
-    if (state.lignes.length > 1) {
-      const rm = el('button', 'proj-ligne__del');
-      rm.type = 'button';
-      rm.append(ic('close'));
-      rm.addEventListener('click', () => { state.lignes.splice(i, 1); render(); });
-      row.append(rm);
-    }
     card.append(row);
-    list.appendChild(card);
-  });
-  main.append(list);
+    main.append(card);
+  }
 
-  const addBtn = el('button', 'proj-btn proj-btn--ghost');
+  const addBtn = el('button', 'proj-btn proj-btn--primary proj-btn--wide', '');
   addBtn.type = 'button';
-  addBtn.append(ic('add'), el('span', null, 'Ajouter une ligne'));
-  addBtn.addEventListener('click', () => { state.lignes.push(newSommaireLigne()); render(); });
+  addBtn.append(ic('add'), el('span', null, 'Ajouter au panier'));
+  addBtn.addEventListener('click', confirmAdd);
   main.append(addBtn);
-
-  main.append(renderDelaiPaiement());
-  main.append(renderTotalBar());
-}
-
-// Les champs texte perdraient le focus à un render() complet à chaque frappe :
-// seul le total en bas se recalcule pour un changement de prix manuel.
-function renderTotalOnly() {
-  const val = $('.proj-total__value');
-  if (val) val.textContent = `${totalTtc().toFixed(2)} €`;
 }
 
 function renderDelaiPaiement() {
@@ -517,7 +532,7 @@ function renderTotalBar() {
   margeBtn.addEventListener('click', () => { state.margeVisible = !state.margeVisible; renderCurrentPage(); });
   bar.append(margeBtn);
 
-  if (state.margeVisible && state.type === 'tasse') {
+  if (state.margeVisible) {
     const venteHt = totalTtc() / (1 + TARIFS_PARAMS.tgca);
     const marge = Math.round((venteHt - totalRevient()) * 100) / 100;
     const margeBox = el('div', 'proj-marge');
@@ -533,6 +548,7 @@ function renderTotalBar() {
 
   const saveBtn = el('button', 'proj-btn proj-btn--primary proj-btn--save', 'Enregistrer');
   saveBtn.type = 'button';
+  saveBtn.disabled = state.panier.length === 0;
   saveBtn.addEventListener('click', () => { openDestinationPopup(); });
   bar.append(saveBtn);
   return bar;
@@ -547,17 +563,15 @@ async function loadPipeline() {
 }
 
 function buildPayload(kind, dest) {
-  const isTasse = state.type === 'tasse';
   const nomParts = (state.client.nom || state.client.entreprise || '').split(' ');
   return {
     kind,
-    type: state.type,
     client: state.client.type === 'perso'
       ? { type: 'perso', prenom: nomParts[0] || '', nom: nomParts.slice(1).join(' '), societe: state.client.entreprise, whatsapp: state.client.telephone, email: state.client.email }
       : { type: 'pro', facturation: state.client.entreprise, contact: state.client.nom, whatsapp: state.client.telephone, email: state.client.email },
-    lignes: state.lignes.map((l) => (isTasse
-      ? { quantite: l.quantite, produitId: l.produitId, coloris: l.coloris, face1Id: l.face1Id, face2Id: l.face2Id, dessousId: l.dessousId, batId: l.batId, remarque: l.remarque }
-      : { quantite: l.quantite, description: l.description, prixTtcManuel: Number(l.prixTtcManuel) || 0 })),
+    lignes: state.panier.map((item) => (item.type === 'tasse'
+      ? { type: item.type, quantite: item.quantite, produitId: item.produitId, coloris: item.coloris, face1Id: item.face1Id, face2Id: item.face2Id, dessousId: item.dessousId, batId: item.batId, remarque: item.remarque }
+      : { type: item.type, quantite: item.quantite, description: item.description, prixTtcManuel: Number(item.prixTtcManuel) || 0 })),
     delai: state.delai,
     paiement: { statut: state.paiement },
     stage: dest ? dest.stage : undefined,
@@ -632,12 +646,12 @@ function showConfirmation(created) {
     el('p', 'proj-done__sub', `${created.projet.prixTotalTtc.toFixed(2)} € TTC — ${created.projet.client.societe}`),
   );
   // Action la PLUS fréquente au comptoir : le même client repart sur un
-  // produit différent (tasses ET textile dans la même visite) — mise en avant,
+  // nouveau panier (tasses ET textile dans la même visite) — mise en avant,
   // le client reste épinglé dans la colonne de gauche.
   const addAnother = el('button', 'proj-btn proj-btn--primary proj-btn--wide', '');
   addAnother.type = 'button';
-  addAnother.append(ic('add'), el('span', null, 'Ajouter un produit pour ce client'));
-  addAnother.addEventListener('click', () => { overlay.remove(); resetType(); });
+  addAnother.append(ic('add'), el('span', null, 'Nouveau panier pour ce client'));
+  addAnother.addEventListener('click', () => { overlay.remove(); resetPanier(); });
   card.append(addAnother);
 
   const actions = el('div', 'proj-done__actions');
@@ -687,7 +701,7 @@ export async function initProjet(root) {
 // on ne cherche jamais un brouillon abandonné entre deux clients.
 export function resetProjet() {
   if (!mounted) return;
-  state.page = 'client'; state.client = null; state.type = null; state.lignes = [];
+  state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
   render();
 }
