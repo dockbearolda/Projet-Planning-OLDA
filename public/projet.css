@@ -5,7 +5,10 @@
 .proj-bar { display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
 .proj-bar__ic { font-size: 22px; color: var(--primary); flex: 0 0 auto; }
 .proj-bar__title { margin: 0; font-size: 17px; font-weight: 700; flex: 0 0 auto; }
-.proj-body { flex: 1; overflow-y: auto; padding: 20px; max-width: 1080px; margin: 0 auto; width: 100%; }
+/* Pas d'overflow ici : le défilement vit sur .work (parent) — un overflow-y
+   local piégerait le sticky de la barre du bas dans un cadre qui ne défile
+   jamais, et le CTA ne resterait pas visible. */
+.proj-body { flex: 1; padding: 20px; max-width: 1080px; margin: 0 auto; width: 100%; }
 .proj-body > .proj-client {
   max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
   min-height: 55vh; justify-content: center; text-align: center;
@@ -161,29 +164,76 @@
 .proj-addmore__title { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--text-2); }
 
 /* --- Formulaire d'ajout d'un produit ---------------------------------------------- */
-.proj-ligne { border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
-.proj-ligne__row { display: flex; gap: 8px; flex-wrap: wrap; }
-.proj-ligne__row > * { flex: 1 1 160px; }
-.proj-qty { flex: 0 0 64px !important; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius); text-align: center; font: inherit; font-size: 16px; }
-.proj-select { min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); color: var(--text-1); }
-.proj-ligne__prix { align-self: flex-end; font-weight: 700; color: var(--primary); }
-.proj-textarea { flex: 1 1 260px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 15px; resize: vertical; background: var(--surface); color: var(--text-1); }
+/* Suite de choix visuels : un groupe = un titre + de gros boutons tactiles.
+   Aucun <select> — tout se choisit au doigt, l'option active saute aux yeux. */
+.proj-form { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-soft); border-radius: 18px; padding: 20px; background: var(--surface); }
+.proj-group { margin: 0 0 18px; }
+.proj-group__label { margin: 0 0 10px; font-size: 12.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
 
-.proj-delai { margin: 16px 0; }
-.proj-delai__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-.proj-delai__label { font-weight: 600; color: var(--text-2); font-size: 13px; }
-.proj-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.proj-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
-.proj-chip.is-on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary-soft); }
+.proj-choices { display: flex; flex-wrap: wrap; gap: 10px; }
+.proj-choice {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 18px;
+  border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface);
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--text-1); cursor: pointer;
+}
+.proj-choice:hover { background: var(--surface-hover); border-color: var(--primary-soft); }
+.proj-choice.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.proj-choice__prix { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.proj-choice.is-on .proj-choice__prix { color: var(--primary); }
+.proj-choices--duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.proj-choices--duo .proj-choice { justify-content: center; }
 
-.proj-total { position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 16px; margin: 0 -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); flex-wrap: wrap; }
-.proj-total__label { color: var(--text-2); font-size: 13px; margin-left: auto; }
-.proj-total__value { font-size: 22px; font-weight: 800; color: var(--text-1); }
-.proj-marge-toggle { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: var(--text-2); font-size: 12px; cursor: pointer; opacity: .7; }
+.proj-stepq { display: flex; align-items: center; gap: 12px; }
+.proj-stepq__btn {
+  width: 56px; height: 56px; border: 1.5px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text-1); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.proj-stepq__btn:hover { border-color: var(--primary); color: var(--primary); background: var(--surface-hover); }
+.proj-stepq__btn .material-symbols-outlined { font-size: 26px; }
+.proj-stepq__val { width: 88px; height: 56px; text-align: center; font: inherit; font-size: 20px; font-weight: 700; border: 1.5px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text-1); }
+
+.proj-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.proj-swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; padding: 4px; border: 0; border-radius: 12px; background: none; font: inherit; cursor: pointer; }
+.proj-swatch__dot { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); }
+.proj-swatch__dot--autre { background: conic-gradient(#d64541, #f4c542, #10b981, #3b82f6, #ec6fa9, #d64541); }
+.proj-swatch.is-on .proj-swatch__dot { outline: 3px solid var(--primary); outline-offset: 2px; }
+.proj-swatch__label { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.proj-swatch.is-on .proj-swatch__label { color: var(--primary); }
+.proj-swatch-input { margin-top: 10px; width: 100%; }
+
+.proj-input--lg { min-height: 56px; font-size: 20px; font-weight: 700; border-radius: 16px; max-width: 220px; }
+.proj-textarea { width: 100%; min-height: 44px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; resize: vertical; background: var(--surface); color: var(--text-1); }
+
+/* Délai + paiement : boutons segmentés pleine largeur, un choix clair. */
+.proj-delai { margin: 20px 0 4px; }
+.proj-segbar { display: grid; gap: 8px; width: 100%; }
+.proj-segbar--cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.proj-segbar--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 620px) {
+  .proj-segbar--cols5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.proj-segbar__btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 56px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 14px;
+  background: var(--surface); font: inherit; font-size: 14.5px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; text-align: center;
+}
+.proj-segbar__btn:hover { background: var(--surface-hover); }
+.proj-segbar__btn.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.proj-segbar__sub { font-size: 11.5px; font-weight: 700; opacity: .75; }
+
+/* Barre du bas façon caisse : total en gros, CTA pleine largeur toujours
+   visible. La marge (info interne) reste derrière une icône discrète. */
+.proj-total { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 20px; margin: 24px -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); }
+.proj-total__row { display: flex; align-items: baseline; gap: 12px; }
+.proj-total__label { color: var(--text-2); font-size: 14px; margin-left: auto; }
+.proj-total__value { font-size: 26px; font-weight: 800; color: var(--text-1); }
+.proj-marge-toggle { align-self: center; display: inline-flex; align-items: center; border: 0; background: none; color: var(--text-2); cursor: pointer; opacity: .4; padding: 6px; }
 .proj-marge-toggle:hover { opacity: 1; }
-.proj-marge-toggle__ic { font-size: 16px; }
-.proj-marge { display: flex; gap: 12px; font-size: 12px; color: var(--text-2); }
-.proj-btn--save { min-width: 140px; justify-content: center; }
+.proj-marge-toggle__ic { font-size: 20px; }
+.proj-marge { display: flex; gap: 14px; font-size: 12.5px; color: var(--text-2); }
+.proj-btn--cta { width: 100%; justify-content: center; min-height: 58px; border-radius: 16px; font-size: 17px; font-weight: 700; }
 
 /* --- Destination + confirmation ------------------------------------------------ */
 .proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }

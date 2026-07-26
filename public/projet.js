@@ -473,50 +473,124 @@ function confirmAdd() {
   render();
 }
 
-function selectField(value, onChange, options, placeholder) {
-  const select = el('select', 'proj-select');
-  const empty = el('option', null, placeholder);
-  empty.value = '';
-  select.appendChild(empty);
+// --- Briques tactiles du formulaire produit ----------------------------------
+// Le comptoir se pilote au doigt : pas de <select>, que des gros boutons.
+function groupBox(label) {
+  const g = el('div', 'proj-group');
+  g.append(el('p', 'proj-group__label', label));
+  return g;
+}
+
+// Stepper « − 1 + » : gros boutons tactiles, saisie directe possible au centre
+// (validée au blur/Entrée pour ne pas perdre le focus à chaque chiffre).
+function qtyStepper(get, set) {
+  const box = el('div', 'proj-stepq');
+  const commit = (n) => { set(Math.max(1, n || 1)); renderCurrentPage(); };
+  const minus = el('button', 'proj-stepq__btn');
+  minus.type = 'button';
+  minus.setAttribute('aria-label', 'Diminuer la quantité');
+  minus.append(ic('remove'));
+  minus.addEventListener('click', () => commit(get() - 1));
+  const val = el('input', 'proj-stepq__val');
+  val.type = 'number'; val.min = '1'; val.inputMode = 'numeric'; val.value = String(get());
+  val.addEventListener('change', () => commit(Number.parseInt(val.value, 10)));
+  const plus = el('button', 'proj-stepq__btn');
+  plus.type = 'button';
+  plus.setAttribute('aria-label', 'Augmenter la quantité');
+  plus.append(ic('add'));
+  plus.addEventListener('click', () => commit(get() + 1));
+  box.append(minus, val, plus);
+  return box;
+}
+
+// Rangée de chips : une option = un gros bouton, prix affiché dessus.
+// `none` : l'option « Aucune » (ou `noneDesign`) est montrée active tant que
+// rien n'est choisi — l'état par défaut se voit, pas de case vide ambiguë.
+function choiceChips(options, value, onPick, opts = {}) {
+  const wrap = el('div', `proj-choices${opts.duo ? ' proj-choices--duo' : ''}`);
+  const noneName = opts.noneDesign || 'Aucune';
   for (const o of options) {
-    const opt = el('option', null, `${o.designation}${o.prixVenteTtc ? ` (+${o.prixVenteTtc.toFixed(2)} €)` : ''}`);
-    opt.value = o.id;
-    if (o.id === value) opt.selected = true;
-    select.appendChild(opt);
+    const isNone = o.designation === noneName;
+    const on = value === o.id || (opts.none && isNone && !value);
+    const b = el('button', `proj-choice${on ? ' is-on' : ''}`);
+    b.type = 'button';
+    b.append(el('span', 'proj-choice__txt', o.designation));
+    if (o.prixVenteTtc) b.append(el('span', 'proj-choice__prix', `+${o.prixVenteTtc.toFixed(2)} €`));
+    b.addEventListener('click', () => { onPick(o.id); renderCurrentPage(); });
+    wrap.appendChild(b);
   }
-  select.addEventListener('change', () => onChange(select.value));
-  return select;
+  return wrap;
+}
+
+// Coloris en pastilles cliquables ; « Autre » ouvre une saisie libre — le champ
+// texte reste disponible pour les teintes hors palette, jamais imposé.
+const COLORIS = [
+  { label: 'Blanc', hex: '#f5f5f0' }, { label: 'Noir', hex: '#1f1f1f' },
+  { label: 'Rouge', hex: '#d64541' }, { label: 'Bleu', hex: '#3b82f6' },
+  { label: 'Vert', hex: '#10b981' }, { label: 'Jaune', hex: '#f4c542' },
+  { label: 'Rose', hex: '#ec6fa9' }, { label: 'Orange', hex: '#f08a24' },
+];
+function colorSwatches(l) {
+  const box = el('div');
+  const wrap = el('div', 'proj-swatches');
+  const known = COLORIS.some((c) => c.label === l.coloris);
+  for (const c of COLORIS) {
+    const b = el('button', `proj-swatch${l.coloris === c.label ? ' is-on' : ''}`);
+    b.type = 'button';
+    const dot = el('span', 'proj-swatch__dot');
+    dot.style.background = c.hex;
+    b.append(dot, el('span', 'proj-swatch__label', c.label));
+    b.addEventListener('click', () => { l.coloris = c.label; l.colorisAutre = false; renderCurrentPage(); });
+    wrap.appendChild(b);
+  }
+  const autreOn = l.colorisAutre || (!!l.coloris && !known);
+  const autre = el('button', `proj-swatch${autreOn ? ' is-on' : ''}`);
+  autre.type = 'button';
+  autre.append(el('span', 'proj-swatch__dot proj-swatch__dot--autre'), el('span', 'proj-swatch__label', 'Autre'));
+  autre.addEventListener('click', () => { l.colorisAutre = true; if (known) l.coloris = ''; renderCurrentPage(); });
+  wrap.appendChild(autre);
+  box.append(wrap);
+  if (autreOn) {
+    const input = el('input', 'proj-input proj-swatch-input');
+    input.placeholder = 'Coloris personnalisé…';
+    input.value = known ? '' : l.coloris;
+    input.addEventListener('input', () => { l.coloris = input.value; });
+    box.append(input);
+  }
+  return box;
 }
 
 function renderTasseFields(l) {
-  const card = el('div', 'proj-ligne');
-  const row1 = el('div', 'proj-ligne__row');
-  const qty = el('input', 'proj-qty');
-  qty.type = 'number'; qty.min = '1'; qty.inputMode = 'numeric'; qty.value = String(l.quantite);
-  qty.addEventListener('input', () => { l.quantite = Math.max(1, Number.parseInt(qty.value, 10) || 1); renderCurrentPage(); });
-  row1.append(qty, selectField(l.produitId, (v) => { l.produitId = v; renderCurrentPage(); }, tarifsByCat('produit'), 'Type de tasse…'));
-  const coloris = el('input', 'proj-input proj-input--sm');
-  coloris.placeholder = 'Coloris';
-  coloris.value = l.coloris;
-  coloris.addEventListener('input', () => { l.coloris = coloris.value; });
-  row1.append(coloris);
-  card.append(row1);
+  const card = el('div', 'proj-form');
 
-  const row2 = el('div', 'proj-ligne__row');
-  row2.append(
-    selectField(l.face1Id, (v) => { l.face1Id = v; renderCurrentPage(); }, tarifsByCat('face'), 'Face 1 (anse à droite)…'),
-    selectField(l.face2Id, (v) => { l.face2Id = v; renderCurrentPage(); }, tarifsByCat('face'), 'Face 2 (anse à gauche)…'),
-  );
-  card.append(row2);
+  const gQty = groupBox('Quantité');
+  gQty.append(qtyStepper(() => l.quantite, (n) => { l.quantite = n; }));
+  card.append(gQty);
 
-  const row3 = el('div', 'proj-ligne__row');
-  row3.append(
-    selectField(l.dessousId, (v) => { l.dessousId = v; renderCurrentPage(); }, tarifsByCat('dessous'), 'Dessous…'),
-    selectField(l.batId, (v) => { l.batId = v; renderCurrentPage(); }, tarifsByCat('bat'), 'BAT avant production…'),
-  );
-  card.append(row3);
+  const gProd = groupBox('Type de tasse');
+  gProd.append(choiceChips(tarifsByCat('produit'), l.produitId, (v) => { l.produitId = v; }));
+  card.append(gProd);
 
-  card.append(el('div', 'proj-ligne__prix', `${calcLigneTasseTtc(l).toFixed(2)} €`));
+  const gCol = groupBox('Coloris');
+  gCol.append(colorSwatches(l));
+  card.append(gCol);
+
+  const gF1 = groupBox('Face 1 · anse à droite');
+  gF1.append(choiceChips(tarifsByCat('face'), l.face1Id, (v) => { l.face1Id = v; }, { none: true }));
+  card.append(gF1);
+
+  const gF2 = groupBox('Face 2 · anse à gauche');
+  gF2.append(choiceChips(tarifsByCat('face'), l.face2Id, (v) => { l.face2Id = v; }, { none: true }));
+  card.append(gF2);
+
+  const gDs = groupBox('Dessous');
+  gDs.append(choiceChips(tarifsByCat('dessous'), l.dessousId, (v) => { l.dessousId = v; }, { none: true }));
+  card.append(gDs);
+
+  const gBat = groupBox('BAT avant production');
+  gBat.append(choiceChips(tarifsByCat('bat'), l.batId, (v) => { l.batId = v; }, { none: true, noneDesign: 'Non', duo: true }));
+  card.append(gBat);
+
   return card;
 }
 
@@ -530,73 +604,92 @@ function renderAddForm(main) {
   if (state.addingType === 'tasse') {
     main.append(renderTasseFields(l));
   } else {
-    const card = el('div', 'proj-ligne');
-    const row = el('div', 'proj-ligne__row');
+    const card = el('div', 'proj-form');
+    const gDesc = groupBox('Description');
     const desc = el('textarea', 'proj-textarea');
     desc.placeholder = '5 polos brodés équipe, taille M à XL…';
     desc.value = l.description;
-    desc.rows = 2;
+    desc.rows = 3;
     desc.addEventListener('input', () => { l.description = desc.value; });
-    row.append(desc);
+    gDesc.append(desc);
+    card.append(gDesc);
 
-    const qty = el('input', 'proj-qty');
-    qty.type = 'number'; qty.min = '1'; qty.inputMode = 'numeric'; qty.value = String(l.quantite);
-    qty.addEventListener('input', () => { l.quantite = Math.max(1, Number.parseInt(qty.value, 10) || 1); });
-    row.append(qty);
+    const gQty = groupBox('Quantité');
+    gQty.append(qtyStepper(() => l.quantite, (n) => { l.quantite = n; }));
+    card.append(gQty);
 
-    const prix = el('input', 'proj-input proj-input--sm');
+    const gPrix = groupBox('Prix TTC (€)');
+    const prix = el('input', 'proj-input proj-input--lg');
     prix.type = 'number'; prix.min = '0'; prix.step = '0.01'; prix.inputMode = 'decimal';
-    prix.placeholder = 'Prix TTC €';
+    prix.placeholder = '0,00';
     prix.value = l.prixTtcManuel;
     prix.addEventListener('input', () => { l.prixTtcManuel = prix.value; });
-    row.append(prix);
-
-    card.append(row);
+    prix.addEventListener('change', renderCurrentPage);
+    gPrix.append(prix);
+    card.append(gPrix);
     main.append(card);
   }
 
-  const addBtn = el('button', 'proj-btn proj-btn--primary proj-btn--wide', '');
+  // CTA façon caisse : barre collée en bas, prix de la ligne + gros bouton
+  // pleine largeur — jamais un petit bouton perdu sous le formulaire.
+  const bar = el('div', 'proj-total');
+  const row = el('div', 'proj-total__row');
+  row.append(
+    el('span', 'proj-total__label', 'Prix de cette ligne'),
+    el('span', 'proj-total__value', `${calcItemTtc({ ...l, type: state.addingType }).toFixed(2)} €`),
+  );
+  bar.append(row);
+  const addBtn = el('button', 'proj-btn proj-btn--primary proj-btn--cta', '');
   addBtn.type = 'button';
   addBtn.append(ic('add'), el('span', null, 'Ajouter au panier'));
   addBtn.addEventListener('click', confirmAdd);
-  main.append(addBtn);
+  bar.append(addBtn);
+  main.append(bar);
+}
+
+// Segments pleine largeur : un choix = un gros bouton, l'option active se voit
+// de loin — remplace les petites pilules serrées.
+function segBar(items, activeId, onPick, cols) {
+  const seg = el('div', `proj-segbar proj-segbar--cols${cols}`);
+  for (const it of items) {
+    const b = el('button', `proj-segbar__btn${it.id === activeId ? ' is-on' : ''}`);
+    b.type = 'button';
+    b.append(el('span', 'proj-segbar__txt', it.label));
+    if (it.majoration) b.append(el('span', 'proj-segbar__sub', `+${it.majoration} %`));
+    b.addEventListener('click', () => { onPick(it.id); renderCurrentPage(); });
+    seg.appendChild(b);
+  }
+  return seg;
 }
 
 function renderDelaiPaiement() {
   const box = el('div', 'proj-delai');
-  const delaiRow = el('div', 'proj-delai__row');
-  delaiRow.append(el('span', 'proj-delai__label', 'Pour le'));
-  const chips = el('div', 'proj-chips');
-  for (const d of DELAIS) {
-    const chip = el('button', `proj-chip${d.id === state.delai ? ' is-on' : ''}`, d.label);
-    chip.type = 'button';
-    chip.addEventListener('click', () => { state.delai = d.id; renderCurrentPage(); });
-    chips.appendChild(chip);
-  }
-  delaiRow.append(chips);
-  box.append(delaiRow);
-
-  const payRow = el('div', 'proj-delai__row');
-  payRow.append(el('span', 'proj-delai__label', 'Paiement'));
-  const payChips = el('div', 'proj-chips');
-  for (const p of PAIEMENT_STATUTS) {
-    const chip = el('button', `proj-chip${p.id === state.paiement ? ' is-on' : ''}`, p.label);
-    chip.type = 'button';
-    chip.addEventListener('click', () => { state.paiement = p.id; renderCurrentPage(); });
-    payChips.appendChild(chip);
-  }
-  payRow.append(payChips);
-  box.append(payRow);
+  const gD = groupBox('Pour le');
+  gD.append(segBar(DELAIS, state.delai, (id) => { state.delai = id; }, 5));
+  box.append(gD);
+  const gP = groupBox('Paiement');
+  gP.append(segBar(PAIEMENT_STATUTS, state.paiement, (id) => { state.paiement = id; }, 3));
+  box.append(gP);
   return box;
 }
 
 function renderTotalBar() {
   const bar = el('div', 'proj-total');
+  const row = el('div', 'proj-total__row');
+
+  // Marge cachée par défaut (info interne, pas pour les yeux du client au
+  // comptoir) : une simple icône œil discrète, sans libellé qui attire l'œil.
   const margeBtn = el('button', 'proj-marge-toggle');
   margeBtn.type = 'button';
-  margeBtn.append(ic('visibility', 'proj-marge-toggle__ic'), el('span', null, 'Voir marge'));
+  margeBtn.setAttribute('aria-label', state.margeVisible ? 'Masquer la marge' : 'Afficher la marge (interne)');
+  margeBtn.title = state.margeVisible ? 'Masquer la marge' : 'Marge (interne)';
+  margeBtn.append(ic(state.margeVisible ? 'visibility_off' : 'visibility', 'proj-marge-toggle__ic'));
   margeBtn.addEventListener('click', () => { state.margeVisible = !state.margeVisible; renderCurrentPage(); });
-  bar.append(margeBtn);
+  row.append(margeBtn);
+
+  row.append(el('span', 'proj-total__label', 'Total TTC'));
+  row.append(el('span', 'proj-total__value', `${totalTtc().toFixed(2)} €`));
+  bar.append(row);
 
   if (state.margeVisible) {
     const venteHt = totalTtc() / (1 + TARIFS_PARAMS.tgca);
@@ -609,10 +702,7 @@ function renderTotalBar() {
     bar.append(margeBox);
   }
 
-  bar.append(el('span', 'proj-total__label', 'Total TTC'));
-  bar.append(el('span', 'proj-total__value', `${totalTtc().toFixed(2)} €`));
-
-  const saveBtn = el('button', 'proj-btn proj-btn--primary proj-btn--save', 'Enregistrer');
+  const saveBtn = el('button', 'proj-btn proj-btn--primary proj-btn--cta', 'Enregistrer');
   saveBtn.type = 'button';
   saveBtn.disabled = state.panier.length === 0;
   saveBtn.addEventListener('click', () => { openDestinationPopup(); });
