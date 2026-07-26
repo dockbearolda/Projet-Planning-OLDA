@@ -33,6 +33,7 @@ const state = {
   panier: [],             // [{ uid, type, quantite, ...champs selon le type }]
   addingType: null,       // type en cours de configuration (formulaire ouvert), null = fermé
   addingLigne: null,      // brouillon de la ligne en cours d'ajout
+  customOpen: false,      // marquage (faces/dessous/BAT) déplié ? réduit la densité par défaut
   delai: 'j5',
   paiement: 'non_paye',
   margeVisible: false,
@@ -436,7 +437,7 @@ function renderPanier(main) {
   tilesWrap.append(el('h3', vide ? 'proj-step__title' : 'proj-addmore__title', vide ? 'Quel type de projet ?' : 'Ajouter un autre produit'));
   const grid = el('div', 'proj-type__grid');
   for (const t of TYPES) {
-    const tile = el('button', `proj-tile proj-tile--${t.id}`);
+    const tile = el('button', 'proj-tile');
     tile.type = 'button';
     const circle = el('span', 'proj-tile__circle');
     circle.append(ic(t.icon, 'proj-tile__ic'));
@@ -455,6 +456,7 @@ function renderPanier(main) {
 function startAdding(typeId) {
   state.addingType = typeId;
   state.addingLigne = typeId === 'tasse' ? newTasseLigne() : newSommaireLigne();
+  state.customOpen = false;
   render();
 }
 function cancelAdding() {
@@ -575,21 +577,36 @@ function renderTasseFields(l) {
   gCol.append(colorSwatches(l));
   card.append(gCol);
 
-  const gF1 = groupBox('Face 1 · anse à droite');
-  gF1.append(choiceChips(tarifsByCat('face'), l.face1Id, (v) => { l.face1Id = v; }, { none: true }));
-  card.append(gF1);
+  // Personnalisation (faces, dessous, BAT) repliée par défaut : un objectif à
+  // la fois — la quantité, le modèle et le coloris d'abord, le marquage
+  // seulement pour qui en a besoin. Toujours calculée dans le prix même
+  // fermée (les valeurs restent posées sur `l` si l'employé rouvre puis
+  // referme sans toucher — rien n'est perdu).
+  if (!state.customOpen) {
+    const gToggle = groupBox('');
+    const openBtn = el('button', 'proj-choice proj-choice--add');
+    openBtn.type = 'button';
+    openBtn.append(ic('add'), el('span', 'proj-choice__txt', 'Ajouter un marquage (logo, texte, QR code…)'));
+    openBtn.addEventListener('click', () => { state.customOpen = true; renderCurrentPage(); });
+    gToggle.append(openBtn);
+    card.append(gToggle);
+  } else {
+    const gF1 = groupBox('Face 1 · anse à droite');
+    gF1.append(choiceChips(tarifsByCat('face'), l.face1Id, (v) => { l.face1Id = v; }, { none: true }));
+    card.append(gF1);
 
-  const gF2 = groupBox('Face 2 · anse à gauche');
-  gF2.append(choiceChips(tarifsByCat('face'), l.face2Id, (v) => { l.face2Id = v; }, { none: true }));
-  card.append(gF2);
+    const gF2 = groupBox('Face 2 · anse à gauche');
+    gF2.append(choiceChips(tarifsByCat('face'), l.face2Id, (v) => { l.face2Id = v; }, { none: true }));
+    card.append(gF2);
 
-  const gDs = groupBox('Dessous');
-  gDs.append(choiceChips(tarifsByCat('dessous'), l.dessousId, (v) => { l.dessousId = v; }, { none: true }));
-  card.append(gDs);
+    const gDs = groupBox('Dessous');
+    gDs.append(choiceChips(tarifsByCat('dessous'), l.dessousId, (v) => { l.dessousId = v; }, { none: true }));
+    card.append(gDs);
 
-  const gBat = groupBox('BAT avant production');
-  gBat.append(choiceChips(tarifsByCat('bat'), l.batId, (v) => { l.batId = v; }, { none: true, noneDesign: 'Non', duo: true }));
-  card.append(gBat);
+    const gBat = groupBox('BAT avant production');
+    gBat.append(choiceChips(tarifsByCat('bat'), l.batId, (v) => { l.batId = v; }, { none: true, noneDesign: 'Non', duo: true }));
+    card.append(gBat);
+  }
 
   return card;
 }
