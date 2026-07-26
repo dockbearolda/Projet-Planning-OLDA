@@ -2557,6 +2557,13 @@ body.view-focus .sidebar-resizer { display: none; }
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
 body.view-plein #btnNew { display: none !important; }
 
+/* `view-comptoir` (Nouveau Projet) : poste de vente, devant le client — il ne
+   doit voir QUE l'étape en cours, jamais la nav du back-office (Dashboard,
+   Fiverr, Réglages…) ni la recherche globale. La marque reste (seule sortie,
+   elle ramène au planning) ainsi que plein écran / thème / avatar. */
+body.view-comptoir .nav-switch,
+body.view-comptoir .grid-search { display: none !important; }
+
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {
   position: fixed;

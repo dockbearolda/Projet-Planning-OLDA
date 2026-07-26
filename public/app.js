@@ -3492,6 +3492,9 @@ function setViewMode(mode) {
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
+  // Nouveau Projet = poste comptoir, devant le client : la nav du back-office
+  // (Dashboard, Fiverr, Réglages…) disparaît, il ne reste que l'étape en cours.
+  document.body.classList.toggle('view-comptoir', mode === 'projet');
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (commande) mountCommande();

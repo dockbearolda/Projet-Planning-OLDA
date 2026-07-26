@@ -2,14 +2,41 @@
    Flux comptoir ultra-minimal : client → type → produit → prix, façon caisse. */
 
 .proj-page { display: flex; flex-direction: column; height: 100%; }
-.proj-bar { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
-.proj-bar__ic { font-size: 22px; color: var(--primary); }
-.proj-bar__title { margin: 0; font-size: 17px; font-weight: 700; }
-.proj-bar__sub { margin: 0; font-size: 13px; color: var(--text-2); }
+.proj-bar { display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.proj-bar__ic { font-size: 22px; color: var(--primary); flex: 0 0 auto; }
+.proj-bar__title { margin: 0; font-size: 17px; font-weight: 700; flex: 0 0 auto; }
 .proj-body { flex: 1; overflow-y: auto; padding: 20px; max-width: 920px; margin: 0 auto; width: 100%; }
-.proj-body > .proj-client { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; }
-.proj-step__title { margin: 0 0 16px; font-size: 20px; font-weight: 700; }
+.proj-body > .proj-client {
+  max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
+  min-height: 55vh; justify-content: center; text-align: center;
+}
+.proj-step__title { margin: 0 0 20px; font-size: 28px; font-weight: 800; letter-spacing: -.01em; }
 .proj-todo { color: var(--text-2); font-style: italic; }
+
+/* --- Barre de progression (remplace le fil texte) ------------------------------ */
+.proj-stepper { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
+.proj-stepper__step { display: flex; align-items: center; gap: 8px; }
+.proj-stepper__dot {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 700; border: 2px solid var(--border); color: var(--text-2); background: var(--surface);
+  flex: 0 0 auto;
+}
+.proj-stepper__dot .material-symbols-outlined { font-size: 15px; }
+.proj-stepper__label { font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.proj-stepper__step.is-current .proj-stepper__dot { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.proj-stepper__step.is-current .proj-stepper__label { color: var(--text-1); }
+.proj-stepper__step.is-done .proj-stepper__dot { border-color: var(--primary); background: var(--primary); color: #fff; }
+.proj-stepper__step.is-done .proj-stepper__label { color: var(--text-1); }
+.proj-stepper__line { flex: 0 1 40px; height: 2px; background: var(--border); }
+.proj-stepper__line.is-done { background: var(--primary); }
+@media (max-width: 640px) {
+  .proj-stepper__label { display: none; }
+  .proj-stepper__line { flex-basis: 20px; }
+}
+
+/* Question centrée dans la colonne de droite (tuiles de type) : le client
+   reste dans la sidebar, mais la question elle-même est seule à l'écran. */
+.proj-center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 45vh; }
 
 .proj-back { align-self: flex-start; margin-bottom: 10px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
 .proj-back:hover { color: var(--primary); }

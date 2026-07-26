@@ -74,7 +74,41 @@ const PAIEMENT_STATUTS = [
 ];
 
 // --- Rendu : dispatcher --------------------------------------------------------
+const STEPS = [
+  { id: 'client', label: 'Client' },
+  { id: 'type', label: 'Type' },
+  { id: 'produit', label: 'Produit' },
+];
+
+// 1 = choix du client, 2 = choix du type, 3 = configuration du produit.
+function currentStepIndex() {
+  if (state.page === 'client') return 0;
+  return state.type ? 2 : 1;
+}
+
+// Barre de progression visuelle (3 puces reliées), remplace le fil texte
+// « Client → type → produit » — l'employé voit d'un coup d'œil où il en est.
+function renderStepper() {
+  const box = $('#proj-stepper');
+  if (!box) return;
+  box.replaceChildren();
+  const current = currentStepIndex();
+  STEPS.forEach((s, i) => {
+    if (i > 0) {
+      const line = el('span', `proj-stepper__line${i <= current ? ' is-done' : ''}`);
+      box.appendChild(line);
+    }
+    const status = i < current ? 'is-done' : i === current ? 'is-current' : 'is-todo';
+    const step = el('span', `proj-stepper__step ${status}`);
+    const dot = el('span', 'proj-stepper__dot');
+    dot.append(i < current ? ic('check') : document.createTextNode(String(i + 1)));
+    step.append(dot, el('span', 'proj-stepper__label', s.label));
+    box.appendChild(step);
+  });
+}
+
 function render() {
+  renderStepper();
   const body = $('#proj-body');
   if (!body) return;
   if (state.page === 'client') return renderClientPage(body);
@@ -255,7 +289,10 @@ function renderMainPage(body) {
 
 // --- Colonne de droite : tuiles de type ------------------------------------------
 function renderTypeTiles(main) {
-  main.append(el('h3', 'proj-step__title', 'Quel type de projet ?'));
+  // Une seule question à l'écran, centrée dans la colonne de droite (le
+  // client reste visible dans la sidebar, mais la question, elle, est seule).
+  const center = el('div', 'proj-center');
+  center.append(el('h3', 'proj-step__title', 'Quel type de projet ?'));
   const grid = el('div', 'proj-type__grid');
   for (const t of TYPES) {
     const tile = el('button', 'proj-tile');
@@ -264,7 +301,8 @@ function renderTypeTiles(main) {
     tile.addEventListener('click', () => { state.type = t.id; state.lignes = []; render(); });
     grid.appendChild(tile);
   }
-  main.append(grid);
+  center.append(grid);
+  main.append(center);
 }
 
 // --- Colonne de droite : produit ------------------------------------------------
@@ -620,9 +658,10 @@ function buildStatic() {
   const page = el('div', 'proj-page');
   const head = el('header', 'proj-bar');
   head.append(ic('bolt', 'proj-bar__ic'));
-  const titles = el('div', 'proj-bar__titles');
-  titles.append(el('h2', 'proj-bar__title', 'Nouveau Projet'), el('p', 'proj-bar__sub', 'Client → type → produit'));
-  head.append(titles);
+  head.append(el('h2', 'proj-bar__title', 'Nouveau Projet'));
+  const stepper = el('div', 'proj-stepper');
+  stepper.id = 'proj-stepper';
+  head.append(stepper);
   const bodyEl = el('div', 'proj-body', '');
   bodyEl.id = 'proj-body';
   page.append(head, bodyEl);
