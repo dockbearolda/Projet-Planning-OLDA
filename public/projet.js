@@ -129,7 +129,40 @@ function matchClients(query) {
     .slice(0, 8);
 }
 
+// Derniers clients choisis sur CE poste : ce sont les suggestions tactiles de
+// l'écran « Quel client ? » — au comptoir, le même client revient souvent.
+const RECENT_KEY = 'olda:proj-recents';
+function loadRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; }
+}
+function saveRecent(id) {
+  if (!id) return;
+  try {
+    const r = [id, ...loadRecents().filter((x) => x !== id)].slice(0, 6);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(r));
+  } catch { /* stockage indisponible : suggestions moins fraîches, rien de cassé */ }
+}
+// Récents d'abord, complétés par les habitués (le plus de commandes) : la
+// grille n'est jamais vide, même sur un poste neuf.
+function suggestClients() {
+  const byId = new Map(CLIENTS.map((c) => [c.id, c]));
+  const out = [];
+  for (const id of loadRecents()) {
+    const c = byId.get(id);
+    if (c) out.push(c);
+  }
+  const rest = CLIENTS.filter((c) => !out.includes(c))
+    .sort((a, b) => (b.commandes || 0) - (a.commandes || 0)
+      || String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+  for (const c of rest) {
+    if (out.length >= 6) break;
+    out.push(c);
+  }
+  return out.slice(0, 6);
+}
+
 function goToClient(client) {
+  saveRecent(client.id);
   state.client = client;
   state.page = 'main';
   state.panier = [];
@@ -182,8 +215,41 @@ function renderClientPage(body) {
   quickForm.hidden = true;
   wrap.append(quickForm);
 
+  const pick = (c) => {
+    const nature = c.client_type === 'perso' ? 'perso' : 'pro';
+    goToClient({
+      id: c.id, entreprise: c.entreprise, nom: c.nom, telephone: c.telephone,
+      email: c.email, type: nature,
+    });
+  };
+
+  // Champ vide → grille de suggestions tactiles (récents + habitués) plutôt
+  // qu'un champ isolé ; dès qu'on tape, la liste de résultats reprend la main.
+  const renderSuggestions = () => {
+    const sugg = suggestClients();
+    if (!sugg.length) return;
+    results.append(el('p', 'proj-sugg__title', 'Récents & habitués'));
+    const grid = el('div', 'proj-sugg');
+    for (const c of sugg) {
+      const nature = c.client_type === 'perso' ? 'perso' : 'pro';
+      const name = nature === 'perso' ? (c.nom || c.entreprise) : c.entreprise;
+      const item = el('button', 'proj-sugg__item');
+      item.type = 'button';
+      const info = el('span', 'proj-sugg__info');
+      info.append(
+        el('span', 'proj-sugg__name', name),
+        el('span', 'proj-sugg__meta', [nature === 'perso' ? 'Particulier' : 'Pro', c.telephone].filter(Boolean).join(' · ')),
+      );
+      item.append(el('span', 'proj-sugg__av', (String(name).trim()[0] || '?').toUpperCase()), info);
+      item.addEventListener('click', () => pick(c));
+      grid.appendChild(item);
+    }
+    results.append(grid);
+  };
+
   const renderResults = () => {
     results.replaceChildren();
+    if (!input.value.trim()) { renderSuggestions(); return; }
     for (const c of matchClients(input.value)) {
       const item = el('button', 'proj-client__item');
       item.type = 'button';
@@ -192,14 +258,12 @@ function renderClientPage(body) {
         el('span', 'proj-client__name', c.client_type === 'perso' ? (c.nom || c.entreprise) : c.entreprise),
         el('span', 'proj-client__meta', [c.telephone, nature === 'perso' ? 'Particulier' : 'Pro'].filter(Boolean).join(' · ')),
       );
-      item.addEventListener('click', () => goToClient({
-        id: c.id, entreprise: c.entreprise, nom: c.nom, telephone: c.telephone,
-        email: c.email, type: nature,
-      }));
+      item.addEventListener('click', () => pick(c));
       results.appendChild(item);
     }
   };
   input.addEventListener('input', renderResults);
+  renderResults();
 
   const renderQuickForm = (nature) => {
     quickForm.hidden = false;
@@ -372,9 +436,11 @@ function renderPanier(main) {
   tilesWrap.append(el('h3', vide ? 'proj-step__title' : 'proj-addmore__title', vide ? 'Quel type de projet ?' : 'Ajouter un autre produit'));
   const grid = el('div', 'proj-type__grid');
   for (const t of TYPES) {
-    const tile = el('button', 'proj-tile');
+    const tile = el('button', `proj-tile proj-tile--${t.id}`);
     tile.type = 'button';
-    tile.append(ic(t.icon, 'proj-tile__ic'), el('span', 'proj-tile__label', t.label));
+    const circle = el('span', 'proj-tile__circle');
+    circle.append(ic(t.icon, 'proj-tile__ic'));
+    tile.append(circle, el('span', 'proj-tile__label', t.label));
     tile.addEventListener('click', () => startAdding(t.id));
     grid.appendChild(tile);
   }
