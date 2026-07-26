@@ -1,10 +1,11 @@
 'use strict';
 
-// Nouveau Projet — le flux comptoir ultra-minimal : client → type → produit.
-// On vérifie ici la route POST /api/projets de bout en bout : calcul du prix
-// SERVEUR (jamais confiance dans un total envoyé par le client), lignes tasse
-// détaillées, lignes sommaires (textile/autres/signalétique), destination,
-// et création automatique du client.
+// Nouveau Projet — le flux comptoir ultra-minimal : client → panier → prix.
+// Un projet est un PANIER : plusieurs produits, de types différents (tasse,
+// textile…), pour un seul client et un seul enregistrement — façon caisse
+// SumUp. On vérifie ici POST /api/projets de bout en bout : calcul du prix
+// SERVEUR (jamais confiance dans un total envoyé par le client), panier
+// mixte (types différents dans le même projet), refus et planning.
 
 const assert = require('node:assert');
 
@@ -42,10 +43,9 @@ delete process.env.APP_PASSWORD;
   // 1. Une tasse, Jour J (+20%) : prix TTC = (10+8+6+0+0) × 1 × 1.20 = 28.8.
   const tasseBody = {
     kind: 'commande',
-    type: 'tasse',
     client: { societe: 'Le Temps des Cerises', contact: 'Cédric', whatsapp: '0690479788', type: 'pro' },
     lignes: [{
-      quantite: 1, produitId: produit.id, coloris: 'TC 01 Rouge Blanc',
+      type: 'tasse', quantite: 1, produitId: produit.id, coloris: 'TC 01 Rouge Blanc',
       face1Id: faceLogoAjout.id, face2Id: faceTexte.id, dessousId: dessousAucune.id, batId: batNon.id,
     }],
     delai: 'jour_j',
@@ -57,49 +57,55 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(r.body.projet.subStage, 'a_chiffrer');
   assert.strictEqual(r.body.projet.client.societe, 'Le Temps des Cerises');
   assert.strictEqual(r.body.projet.lignes[0].produit.label, 'Tasse Céramique 350 ml');
+  assert.strictEqual(r.body.projet.lignes[0].type.id, 'tasse');
 
   // Le total envoyé par le client (s'il y en avait un) est IGNORÉ : le serveur
   // recalcule toujours depuis les ids de catalogue.
   const triche = await call('POST', '/api/projets', { ...tasseBody, prixTotalTtc: 1 });
   assert.strictEqual(triche.body.projet.prixTotalTtc, 28.8, 'le total client est ignoré, jamais fait confiance');
 
-  // 2. Deux lignes tasse dans le même projet : le total s'additionne.
-  const deuxLignes = await call('POST', '/api/projets', {
-    ...tasseBody,
+  // 2. PANIER MIXTE : une tasse ET une ligne textile dans le MÊME projet,
+  // pour le même client — l'essentiel de la demande « façon SumUp ».
+  const panierMixte = await call('POST', '/api/projets', {
+    kind: 'commande',
+    client: { societe: 'Le Temps des Cerises', type: 'pro' },
     lignes: [
-      { quantite: 2, produitId: produit.id, face1Id: faceLogoAjout.id, face2Id: '', dessousId: dessousAucune.id, batId: batNon.id },
-      { quantite: 1, produitId: produit.id, face1Id: '', face2Id: '', dessousId: dessousAucune.id, batId: batNon.id },
+      { type: 'tasse', quantite: 2, produitId: produit.id, face1Id: faceLogoAjout.id, face2Id: '', dessousId: dessousAucune.id, batId: batNon.id },
+      { type: 'textile', quantite: 5, description: '5 polos brodés équipe', prixTtcManuel: 150 },
     ],
     delai: 'j5',
   });
-  assert.strictEqual(deuxLignes.status, 201, JSON.stringify(deuxLignes.body));
-  // Ligne 1 : qty 2 × (10+8+0) = 36 ; ligne 2 : qty 1 × 10 = 10 ; pas de majoration (j5) → 46.
-  assert.strictEqual(deuxLignes.body.projet.prixTotalTtc, 46);
+  assert.strictEqual(panierMixte.status, 201, JSON.stringify(panierMixte.body));
+  // Tasse : 2 × (10+8) = 36 ; textile : 150 ; pas de majoration (j5) → 186.
+  assert.strictEqual(panierMixte.body.projet.prixTotalTtc, 186);
+  assert.strictEqual(panierMixte.body.projet.lignes.length, 2);
+  assert.strictEqual(panierMixte.body.projet.lignes[0].type.id, 'tasse');
+  assert.strictEqual(panierMixte.body.projet.lignes[1].type.id, 'textile');
+  assert.strictEqual(panierMixte.body.projet.quantite, 7, 'quantité totale = somme des deux lignes (2 + 5)');
 
-  // 3. Type textile/autres/signalétique : ligne sommaire, prix saisi à la main.
+  // 3. Type textile/autres/signalétique seul : ligne sommaire, prix manuel.
   const textile = await call('POST', '/api/projets', {
     kind: 'demande',
-    type: 'textile',
     client: { societe: 'Client Textile', type: 'pro' },
-    lignes: [{ quantite: 5, description: '5 polos brodés équipe', prixTtcManuel: 150 }],
+    lignes: [{ type: 'textile', quantite: 5, description: '5 polos brodés équipe', prixTtcManuel: 150 }],
     delai: 'j10',
   });
   assert.strictEqual(textile.status, 201, JSON.stringify(textile.body));
   assert.strictEqual(textile.body.projet.prixTotalTtc, 150);
   assert.strictEqual(textile.body.projet.stage, 'demande');
 
-  // 4. Sans lignes → refusé (un projet vide n'a pas de sens).
-  const vide = await call('POST', '/api/projets', { kind: 'commande', type: 'tasse', client: { societe: 'X' }, lignes: [] });
+  // 4. Sans lignes → refusé (un panier vide n'a pas de sens).
+  const vide = await call('POST', '/api/projets', { kind: 'commande', client: { societe: 'X' }, lignes: [] });
   assert.strictEqual(vide.status, 400);
 
-  // 5. Type inconnu → refusé.
-  const typeInconnu = await call('POST', '/api/projets', { kind: 'commande', type: 'zzz', client: { societe: 'X' }, lignes: [{ quantite: 1, description: 'x', prixTtcManuel: 1 }] });
+  // 5. Type inconnu sur une ligne → refusé.
+  const typeInconnu = await call('POST', '/api/projets', { kind: 'commande', client: { societe: 'X' }, lignes: [{ type: 'zzz', quantite: 1, description: 'x', prixTtcManuel: 1 }] });
   assert.strictEqual(typeInconnu.status, 400);
 
   // 6. Id de catalogue inconnu (tasse) → refusé, pas un crash silencieux à 0€.
   const idInconnu = await call('POST', '/api/projets', {
-    kind: 'commande', type: 'tasse', client: { societe: 'X' },
-    lignes: [{ quantite: 1, produitId: 'nimporte-quoi', face1Id: '', face2Id: '', dessousId: dessousAucune.id, batId: batNon.id }],
+    kind: 'commande', client: { societe: 'X' },
+    lignes: [{ type: 'tasse', quantite: 1, produitId: 'nimporte-quoi', face1Id: '', face2Id: '', dessousId: dessousAucune.id, batId: batNon.id }],
   });
   assert.strictEqual(idInconnu.status, 400);
 
@@ -114,6 +120,6 @@ delete process.env.APP_PASSWORD;
   const clients = await (await fetch(`${base}/api/clients`)).json();
   assert.ok(clients.some((c) => c.entreprise === 'Le Temps des Cerises'), 'le client du projet est créé');
 
-  console.log('✓ nouveau projet : calcul prix serveur, lignes multiples, sommaire, refus et planning OK');
+  console.log('✓ nouveau projet : calcul prix serveur, panier mixte, refus et planning OK');
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });

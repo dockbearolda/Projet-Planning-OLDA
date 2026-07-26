@@ -1262,11 +1262,12 @@ let PROJET_TAUX_MO = 25;
 let PROJET_TAUX_MACHINE = 25;
 let PROJET_TGCA = 0.04;
 
+// Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
+// tasse, un polo, une plaque…), pour un seul client et un seul enregistrement
+// — façon caisse SumUp, on encaisse tout d'un coup. Chaque ligne du panier
+// porte donc son propre type ; il n'y a plus de type unique au niveau projet.
 function buildProjet(body, tarifsById) {
   const b = body && typeof body === 'object' ? body : {};
-
-  const type = PROJET_TYPE_BY_ID.get(b.type);
-  if (!type) return { error: `type de projet inconnu : ${b.type}` };
 
   const orderType = COM_TYPE_BY_ID.get(b.kind);
   if (!orderType) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
@@ -1278,17 +1279,21 @@ function buildProjet(body, tarifsById) {
   const { client } = who;
 
   const rawLignes = Array.isArray(b.lignes) ? b.lignes : [];
-  if (rawLignes.length === 0) return { error: 'un projet doit contenir au moins une ligne' };
-  if (rawLignes.length > PROJET_LIGNES_MAX) return { error: `trop de lignes (${PROJET_LIGNES_MAX} maximum)` };
+  if (rawLignes.length === 0) return { error: 'un projet doit contenir au moins un produit' };
+  if (rawLignes.length > PROJET_LIGNES_MAX) return { error: `trop de produits (${PROJET_LIGNES_MAX} maximum)` };
 
   const lignes = [];
   let prixTotalTtc = 0;
   let prixRevientTotal = 0;
   for (let i = 0; i < rawLignes.length; i += 1) {
+    const raw = rawLignes[i] && typeof rawLignes[i] === 'object' ? rawLignes[i] : {};
+    const type = PROJET_TYPE_BY_ID.get(raw.type);
+    if (!type) return { error: `Produit ${i + 1} : type de projet inconnu (${raw.type})` };
     const built = type.detaille
-      ? buildLigneTasse(rawLignes[i], i, tarifsById)
-      : buildLigneSommaire(rawLignes[i], i);
+      ? buildLigneTasse(raw, i, tarifsById)
+      : buildLigneSommaire(raw, i);
     if (built.error) return { error: built.error };
+    built.ligne.type = { id: type.id, label: type.label };
     lignes.push(built.ligne);
     prixTotalTtc += built.prixLigneTtc;
     prixRevientTotal += built.prixRevientLigne;
@@ -1308,8 +1313,7 @@ function buildProjet(body, tarifsById) {
 
   const projet = {
     kind: 'projet-simple',
-    version: 1,
-    type: { id: type.id, label: type.label },
+    version: 2,        // v1 = un type unique par projet ; v2 = panier multi-type
     client,
     lignes,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
@@ -1323,12 +1327,6 @@ function buildProjet(body, tarifsById) {
     createdAt: new Date().toISOString(),
   };
 
-  const noms = lignes.map((l) => (l.produit ? l.produit.label : l.description));
-  const uniqNoms = [...new Set(noms)];
-  const produitResume = lignes.length === 1
-    ? `${lignes[0].quantite} × ${noms[0]}`
-    : `${quantite} pièces — ${uniqNoms.slice(0, 3).join(', ')}${uniqNoms.length > 3 ? '…' : ''}`;
-
   const detailLigneTexte = (l) => {
     if (l.produit) {
       const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
@@ -1336,8 +1334,15 @@ function buildProjet(body, tarifsById) {
     }
     return `${l.quantite} × ${l.description}`;
   };
+  const noms = lignes.map((l) => (l.produit ? l.produit.label : l.description));
+  const uniqNoms = [...new Set(noms)];
+  const produitResume = lignes.length === 1
+    ? `${lignes[0].quantite} × ${noms[0]}`
+    : `${quantite} pièces — ${uniqNoms.slice(0, 3).join(', ')}${uniqNoms.length > 3 ? '…' : ''}`;
+
+  const typesPresents = [...new Set(lignes.map((l) => l.type.label))];
   const resume = [
-    `${type.label.toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
+    `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
     ...lignes.map(detailLigneTexte),
     `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
     `Prix TTC : ${prixTotalTtc.toFixed(2)} €`,
