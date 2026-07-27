@@ -62,7 +62,7 @@ delete process.env.APP_PASSWORD;
   assert.match(mailFaux.body.error, /email invalide/i);
 
   const cree = await j('POST', '/api/clients', {
-    entreprise: 'Test Boutique', nom: 'Léa', fonction: 'Gérante',
+    entreprise: 'Test Boutique', nom: 'Léa',
     type: 'Boutique', zone: 'Marigot', telephone: '06 90 00 00 00', email: 'lea@test.fr',
   });
   assert.strictEqual(cree.status, 201, JSON.stringify(cree.body));
@@ -86,9 +86,9 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(natOk.body.client_type, 'perso', 'la nature bascule pro → perso');
 
   // 3. Édition en place : on change un champ, la fiche le reflète.
-  const patch = await j('PATCH', `/api/clients/${id}`, { fonction: 'Directrice', zone: 'Grand Case' });
+  const patch = await j('PATCH', `/api/clients/${id}`, { secteur: 'Boutique haut de gamme', zone: 'Grand Case' });
   assert.strictEqual(patch.status, 200);
-  assert.strictEqual(patch.body.fonction, 'Directrice');
+  assert.strictEqual(patch.body.secteur, 'Boutique haut de gamme');
   assert.strictEqual(patch.body.zone, 'Grand Case');
 
   // L'entreprise ne peut pas être vidée : c'est l'identité du client.

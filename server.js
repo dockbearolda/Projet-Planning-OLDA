@@ -571,8 +571,8 @@ const trimOrNull = (v) => {
 // une carte / une cellule, pas dans un traitement de texte). `client_type` est
 // une ÉNUMÉRATION (pro / perso), pas un texte libre : validé à part.
 const CLIENT_MAX = {
-  entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
-  email: 160, telephone: 40, adresse: 200,
+  entreprise: 120, nom: 80, type: 60, zone: 60,
+  email: 160, telephone: 40,
   raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
   prenom: 80,
 };
