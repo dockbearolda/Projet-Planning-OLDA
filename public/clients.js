@@ -356,6 +356,41 @@ export function fieldRow(field, value, opts) {
   return row;
 }
 
+// Validation "tout rempli" partagée par le tiroir Base Clients ET le
+// quick-form Nouveau Projet : bouton bloqué tant qu'il manque un champ,
+// ligne d'état qui nomme précisément ce qui manque, et surlignage d'un champ
+// laissé vide au blur (jamais au chargement — le formulaire est vide par
+// défaut, on ne veut pas tout voir rouge à l'ouverture).
+export function wireCreateValidation(fieldsWrap, submitBtn, hintEl) {
+  const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
+  const labelOf = (input) => {
+    const row = input.closest('.cl-f');
+    const labelSpan = row && row.querySelector('.cl-f__label').lastElementChild;
+    return labelSpan ? labelSpan.textContent : '';
+  };
+  const refresh = () => {
+    const missing = inputs.filter((i) => !i.value.trim());
+    submitBtn.disabled = missing.length > 0;
+    for (const i of inputs) {
+      if (i.value.trim()) i.classList.remove('cl-f__input--missing');
+    }
+    if (missing.length === 0) {
+      hintEl.textContent = 'Prêt à créer.';
+      hintEl.className = 'cl-fields__hint cl-fields__hint--ok';
+    } else {
+      hintEl.textContent = `Il manque : ${missing.map(labelOf).join(', ')}`;
+      hintEl.className = 'cl-fields__hint cl-fields__hint--warn';
+    }
+  };
+  for (const i of inputs) {
+    i.addEventListener('input', refresh);
+    i.addEventListener('blur', () => {
+      if (!i.value.trim()) i.classList.add('cl-f__input--missing');
+    });
+  }
+  refresh();
+}
+
 function noteEl(n) {
   const k = KIND_BY_ID.get(n.kind) || KIND_BY_ID.get('note');
   const item = el('div', `cl-note cl-note--${k.id}`);
