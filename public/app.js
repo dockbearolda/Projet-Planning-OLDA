@@ -947,37 +947,33 @@ function prioBand(r) {
   return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
 }
 
-// Cellule étoiles (1 à 3) : attribuée au clic, règle la priorité de la ligne.
-// Recliquer la même note ne fait rien ; changer de note enregistre en optimiste.
+// Cellule priorité : badge texte (Basse/Moyenne/Haute), menu au clic — même
+// patron que cellType. Les étoiles ★☆☆ étaient moins lisibles d'un coup d'œil
+// et moins « pro » qu'un mot ; « Haute » seule reste en accent (c'est la
+// priorité qui doit sauter aux yeux dans la file), Basse/Moyenne restent
+// neutres pour ne pas rivaliser avec elle.
 function cellStars(r) {
   const td = document.createElement('td');
   td.className = 'col-stars-cell';
-  if (isDraftRow(r)) return td; // pas d'étoiles sur la ligne brouillon
-  const wrap = document.createElement('div');
-  wrap.className = 'grid-stars';
-  attachTip(wrap, 'attribuer des étoiles (priorité)');
-  const cur = prioBand(r);
-  for (let i = 1; i <= 3; i++) {
-    const star = document.createElement('button');
-    star.type = 'button';
-    star.className = 'grid-star' + (i <= cur ? ' on' : '');
-    star.textContent = i <= cur ? '★' : '☆';
-    star.setAttribute('aria-label', `${i} étoile${i > 1 ? 's' : ''} sur 3`);
-    star.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (prioBand(r) === i) return;
-      patch(r, { priority: i }, () => {
-        r.priority = i;
-        for (let j = 0; j < wrap.children.length; j++) {
-          const on = (j + 1) <= i;
-          wrap.children[j].classList.toggle('on', on);
-          wrap.children[j].textContent = on ? '★' : '☆';
-        }
-      });
+  if (isDraftRow(r)) return td; // pas de priorité sur la ligne brouillon
+  const tag = document.createElement('button');
+  tag.type = 'button';
+  const renderTag = () => {
+    const lvl = PRIORITY_LEVELS[prioBand(r)];
+    tag.className = 'prio-tag ' + lvl.cls;
+    tag.textContent = lvl.label;
+  };
+  renderTag();
+  attachTip(tag, 'cliquer pour changer la priorité');
+  tag.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const cur = prioBand(r);
+    openMenu(tag, [1, 2, 3].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })), cur, (val) => {
+      if (val === cur) return;
+      patch(r, { priority: val }, () => { r.priority = val; renderTag(); });
     });
-    wrap.appendChild(star);
-  }
-  td.appendChild(wrap);
+  });
+  td.appendChild(tag);
   return td;
 }
 

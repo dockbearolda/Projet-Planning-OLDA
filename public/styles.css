@@ -591,8 +591,10 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .work-head-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .work-head-right { display: flex; align-items: center; gap: 12px; }
 .work-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.work-title h1 { font-size: 19px; font-weight: 500; letter-spacing: -.1px; margin: 0; color: var(--text-1); white-space: nowrap; }
-.work-count { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Titre de section nettement au-dessus du contenu (23px/600 vs 14px table /
+   11px en-tête) : la hiérarchie se lit à la taille, pas seulement au poids. */
+.work-title h1 { font-size: 23px; font-weight: 600; letter-spacing: -.2px; margin: 0; color: var(--text-1); white-space: nowrap; }
+.work-count { font-size: 13px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Bouton « Nouvelle commande » façon Composer de Gmail : surface élevée */
 .btn-primary {
@@ -911,7 +913,10 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   text-transform: uppercase;
   letter-spacing: .06em;
   text-align: left;
-  padding: 13px 14px;
+  /* Gouttière plus large entre colonnes (façon SumUp) : 14 → 20px, même
+     rythme que .cell/.cell-input ci-dessous, pour que l'en-tête et le
+     contenu restent alignés. */
+  padding: 14px 20px;
   white-space: nowrap;
   user-select: none;
   transition: box-shadow var(--dur-2) var(--ease);
@@ -990,7 +995,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 
 /* cellules éditables en ligne : bordure invisible, fond transparent */
 .cell {
-  padding: 10px 14px;
+  padding: 12px 20px;
   width: 100%;
   height: 100%;
   display: flex;
@@ -1005,7 +1010,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   background: transparent;
   font: inherit;
   color: var(--text-1);
-  padding: 10px 14px;
+  padding: 12px 20px;
   height: var(--row-h);
   font-family: inherit;
   border-radius: 0;
@@ -1055,33 +1060,33 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .handle svg { width: 18px; height: 18px; }
 tr:hover .handle { color: var(--text-2); }
 
-/* étoiles de priorité, attribuables par ligne */
-.col-stars { width: 78px; }
+/* Priorité, attribuable par ligne : badge texte (Basse/Moyenne/Haute),
+   remplace les étoiles ★☆☆ — plus lisible d'un coup d'œil, même patron que
+   .type-tag. Seule « Haute » (p3) porte l'accent : c'est la seule qui doit
+   sauter aux yeux dans une file de travail, Basse/Moyenne restent neutres. */
+.col-stars { width: 92px; }
 .col-stars-cell { text-align: center; }
-.grid-stars {
-  display: inline-flex;
-  gap: 1px;
-  align-items: center;
-  justify-content: center;
-  height: var(--row-h);
-}
-.grid-star {
-  border: 0;
-  background: none;
-  padding: 2px;
+.prio-tag {
+  position: relative;
+  overflow: hidden;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  color: var(--text-3);
-  transition: transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  border: 0;
+  transition: filter var(--dur-1) var(--ease);
 }
-.grid-star.on { color: #f5a623; }
-.grid-star:hover { transform: scale(1.18); }
-.grid-star:focus-visible {
+.prio-tag:hover { filter: brightness(.97); }
+.prio-tag:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
-  border-radius: 4px;
 }
+.prio-tag.p1, .prio-tag.p2 { color: var(--text-2); background: var(--state-hover); }
+.prio-tag.p3 { color: var(--primary); background: var(--primary-soft); }
 
 /* priorité — pastilles (grouping désactivé mais styles conservés) */
 .col-priority { width: 118px; }
@@ -1565,7 +1570,7 @@ tr:hover .handle { color: var(--text-2); }
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin: 8px 14px;
+  margin: 8px 20px;
   padding: 5px 13px;
   border: 0;
   border-radius: 999px;
@@ -1601,7 +1606,7 @@ tr:hover .handle { color: var(--text-2); }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin: 8px 14px;
+  margin: 8px 20px;
   padding: 6px 12px;
   border: 1px dashed var(--border);
   border-radius: 999px;
@@ -2412,7 +2417,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .col-flag { width: 148px; }
   .menu-item { padding: 12px 14px; font-size: 15px; }
   .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
-  .type-tag {
+  .type-tag,
+  .prio-tag {
     min-height: 40px;
     padding: 6px 14px;
     font-size: 12px;
