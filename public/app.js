@@ -2628,11 +2628,11 @@ function ensureManualWidths() {
   applyColWidths();
 }
 
-// Légende de la colonne étoiles : rien dans l'en-tête ne dit qu'une commande
-// se note de 1 à 3 — un nouvel arrivant ne le devine pas au seul pictogramme.
+// Légende de la colonne priorité : rien dans l'en-tête ne dit qu'un clic sur
+// le badge fait défiler les 3 niveaux — un nouvel arrivant ne le devine pas.
 function attachStarsHeaderTip() {
   const th = document.querySelector('#grid thead th.col-stars');
-  if (th) attachTip(th, 'Priorité : de 1 (basse) à 3 étoiles (haute) — cliquer une étoile sur la ligne pour l’attribuer');
+  if (th) attachTip(th, 'Priorité : Basse, Moyenne ou Haute — cliquer le badge sur la ligne pour la changer');
 }
 
 function attachColResizers() {
