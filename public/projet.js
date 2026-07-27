@@ -26,7 +26,12 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 // `code`, généré côté serveur, et `prenom`, réservé au particulier — un pro
 // n'a pas de prénom propre, seulement un référent).
 const PRO_FIELDS = FIELDS.filter((f) => f.key !== 'code' && f.key !== 'prenom');
-const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'].map((k) => FIELDS.find((f) => f.key === k));
+// Le champ `nom` porte le libellé « Contact » dans la fiche pro (personne à
+// contacter chez le client) — pour un particulier c'est son propre nom de
+// famille, donc on relabellise juste pour ce contexte.
+const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email']
+  .map((k) => FIELDS.find((f) => f.key === k))
+  .map((f) => (f.key === 'nom' ? { ...f, label: 'Nom', ph: 'Nom de famille' } : f));
 
 // --- État --------------------------------------------------------------------
 // `page` pilote QUEL écran est affiché : 'client' (plein écran, pas de client
