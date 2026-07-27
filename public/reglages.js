@@ -23,7 +23,28 @@ const ic = (name, cls) => {
   return n;
 };
 
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
+  return data;
+}
+
 const MESSAGE_MAX = 1000;      // miroir de db.js (WHATSAPP_MESSAGE_MAX)
+
+let tarifsArticles = [];
+let tarifsParams = { tauxHoraireMo: 25, tauxHoraireMachine: 25, tgca: 0.04 };
+const TARIFS_CATEGORIES = [
+  { id: 'produit', label: 'Tasses' },
+  { id: 'face', label: 'Options Face 1 / Face 2' },
+  { id: 'dessous', label: 'Options Dessous' },
+  { id: 'bat', label: 'BAT' },
+];
 
 // Les jetons remplacés à l'ouverture de WhatsApp. Le tableau sert à la fois de
 // documentation à l'écran et de source des boutons « insérer ».
@@ -112,6 +133,28 @@ function buildStatic() {
   card.appendChild(actions);
 
   page.appendChild(card);
+
+  // --- Carte « Tarifs tasse » -------------------------------------------------
+  const tcard = el('section', 'reg-card');
+  const tch = el('header', 'reg-card__head');
+  tch.append(ic('local_cafe', 'reg-card__ic'),
+    (() => {
+      const t = el('div');
+      t.append(el('h3', 'reg-card__title', 'Tarifs — Tasse'),
+        el('p', 'reg-card__desc',
+          'Les prix et temps utilisés par Nouveau Projet pour calculer le total TTC '
+          + 'd’une tasse personnalisée. Chaque changement est immédiat pour tous les postes.'));
+      return t;
+    })());
+  tcard.appendChild(tch);
+  const tarifsList = el('div', 'reg-tarifs-list');
+  tarifsList.id = 'reg-tarifs-list';
+  tcard.appendChild(tarifsList);
+  const tarifsParamsEl = el('div', 'reg-tarifs-params');
+  tarifsParamsEl.id = 'reg-tarifs-params';
+  tcard.appendChild(tarifsParamsEl);
+  page.appendChild(tcard);
+
   ROOT.replaceChildren(page);
 }
 
@@ -181,6 +224,86 @@ async function save() {
   }
 }
 
+// --- Tarifs tasse -------------------------------------------------------------
+let tarifsSaveTimer = null;
+async function saveTarifs() {
+  clearTimeout(tarifsSaveTimer);
+  tarifsSaveTimer = setTimeout(async () => {
+    try { tarifsArticles = await api('PUT', '/api/tarifs-tasse', tarifsArticles); } catch (_) { /* réessayé au prochain changement */ }
+  }, 400);
+}
+async function saveTarifsParams() {
+  try { tarifsParams = await api('PUT', '/api/tarifs-tasse/parametres', tarifsParams); } catch (_) { /* réessayé au prochain changement */ }
+}
+
+function tarifRow(a) {
+  const row = el('div', 'reg-tarif-row');
+  const desig = el('input', 'reg-tarif-input reg-tarif-input--nom');
+  desig.value = a.designation; desig.placeholder = 'Désignation';
+  desig.addEventListener('change', () => { a.designation = desig.value; saveTarifs(); });
+  const achat = el('input', 'reg-tarif-input reg-tarif-input--num');
+  achat.type = 'number'; achat.step = '0.01'; achat.min = '0'; achat.value = a.prixAchat;
+  achat.title = 'Prix d’achat';
+  achat.addEventListener('change', () => { a.prixAchat = Number(achat.value) || 0; saveTarifs(); });
+  const prix = el('input', 'reg-tarif-input reg-tarif-input--num');
+  prix.type = 'number'; prix.step = '0.01'; prix.min = '0'; prix.value = a.prixVenteTtc;
+  prix.title = 'Prix de vente TTC';
+  prix.addEventListener('change', () => { a.prixVenteTtc = Number(prix.value) || 0; saveTarifs(); });
+  const actif = el('button', `reg-tarif-toggle${a.actif ? ' is-on' : ''}`);
+  actif.type = 'button';
+  actif.title = a.actif ? 'Actif — cliquer pour désactiver' : 'Inactif — cliquer pour activer';
+  actif.append(ic(a.actif ? 'visibility' : 'visibility_off'));
+  actif.addEventListener('click', () => { a.actif = !a.actif; saveTarifs(); renderTarifs(); });
+  const del = el('button', 'reg-tarif-del');
+  del.type = 'button';
+  del.append(ic('delete'));
+  del.addEventListener('click', () => {
+    tarifsArticles = tarifsArticles.filter((x) => x !== a);
+    saveTarifs(); renderTarifs();
+  });
+  row.append(desig, achat, prix, actif, del);
+  return row;
+}
+
+function renderTarifs() {
+  const box = $('#reg-tarifs-list');
+  if (!box) return;
+  box.replaceChildren();
+  for (const cat of TARIFS_CATEGORIES) {
+    box.appendChild(el('h4', 'reg-tarif-cat', cat.label));
+    const rows = tarifsArticles.filter((a) => a.categorie === cat.id);
+    for (const a of rows) box.appendChild(tarifRow(a));
+    const addBtn = el('button', 'reg-tarif-add');
+    addBtn.type = 'button';
+    addBtn.append(ic('add'), el('span', null, `Ajouter (${cat.label.toLowerCase()})`));
+    addBtn.addEventListener('click', () => {
+      tarifsArticles.push({
+        id: `tmp-${Date.now()}`, categorie: cat.id, designation: '', prixAchat: 0, prixVenteTtc: 0,
+        tempsMoMin: 0, tempsMachineMin: 0, actif: true, position: tarifsArticles.length * 1000,
+      });
+      renderTarifs();
+    });
+    box.appendChild(addBtn);
+  }
+
+  const p = $('#reg-tarifs-params');
+  p.replaceChildren();
+  const field = (key, label) => {
+    const wrap = el('label', 'reg-tarif-param');
+    wrap.append(el('span', null, label));
+    const input = el('input', 'reg-tarif-input reg-tarif-input--num');
+    input.type = 'number'; input.step = key === 'tgca' ? '0.001' : '0.5'; input.min = '0';
+    input.value = tarifsParams[key];
+    input.addEventListener('change', () => {
+      tarifsParams[key] = Number(input.value) || 0;
+      saveTarifsParams();
+    });
+    wrap.appendChild(input);
+    return wrap;
+  };
+  p.append(field('tauxHoraireMo', 'Taux horaire MO (€)'), field('tauxHoraireMachine', 'Taux horaire machine (€)'), field('tgca', 'TGCA (ex. 0.04 = 4 %)'));
+}
+
 function wire() {
   const ta = $('#reg-wa-message');
   ta.addEventListener('input', sync);
@@ -209,6 +332,12 @@ export async function refreshReglages() {
   } catch (_) { /* silencieux : on garde ce qu'on affiche déjà */ }
   if (ta && !dirty) ta.value = saved;
   sync();
+
+  try {
+    tarifsArticles = await api('GET', '/api/tarifs-tasse');
+    tarifsParams = await api('GET', '/api/tarifs-tasse/parametres');
+    renderTarifs();
+  } catch (_) { /* on garde ce qui est déjà affiché */ }
 }
 
 let mounted = false;

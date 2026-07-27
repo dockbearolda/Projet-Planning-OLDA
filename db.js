@@ -172,6 +172,17 @@ async function init() {
   } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
   await pool.query("UPDATE clients SET client_type = 'pro' WHERE client_type IS NULL");
 
+  // Migration : champs enrichis de la fiche client (venus du classeur patron
+  // « CRM OLDA CREATION CLIENTS ») — identifiant lisible, raison sociale,
+  // adresse détaillée, secteur d'activité, référent. Tous nullable : une fiche
+  // créée avant cette migration reste valide, juste incomplète.
+  // Down : ALTER TABLE clients DROP COLUMN IF EXISTS <col> pour chacune.
+  for (const col of ['code', 'raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom']) {
+    try {
+      await pool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col} text`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
   // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
   // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
   // sur « À attribuer » (valeur neutre, toujours valide) pour rester éditables.
@@ -607,6 +618,108 @@ async function setMachines(list) {
   return clean;
 }
 
+// --- Catalogue TARIFS TASSE (réglages du patron) -----------------------------
+// Reprend l'onglet « Tarifs & coûts » du classeur CRM TASSES OLDA : une ligne
+// par tasse / option face / option dessous / BAT, avec prix d'achat, prix de
+// vente TTC, temps main-d'œuvre et temps machine. Stocké en app_meta (2 clés),
+// même principe que les machines — pas de table dédiée, le patron l'édite
+// depuis Réglages.
+const TARIFS_TASSE_CATEGORIES = new Set(['produit', 'face', 'dessous', 'bat']);
+
+// Valeurs du classeur patron au 2026-07-25 (onglet « Tarifs & coûts »).
+const DEFAULT_TARIFS_TASSE_ARTICLES = [
+  { categorie: 'produit', designation: 'Tasse Céramique 350 ml', prixAchat: 1.78, prixVenteTtc: 10, tempsMoMin: 0.5, tempsMachineMin: 0 },
+  { categorie: 'produit', designation: 'Tasse Expresso 180 ml', prixAchat: 0, prixVenteTtc: 7, tempsMoMin: 0.5, tempsMachineMin: 0 },
+  { categorie: 'produit', designation: 'Tasse en Bois', prixAchat: 0, prixVenteTtc: 10, tempsMoMin: 0.5, tempsMachineMin: 0 },
+  { categorie: 'face', designation: 'Aucune', prixAchat: 0, prixVenteTtc: 0, tempsMoMin: 0, tempsMachineMin: 0 },
+  { categorie: 'face', designation: 'Logo OLDA existant', prixAchat: 0, prixVenteTtc: 6, tempsMoMin: 0, tempsMachineMin: 0 },
+  { categorie: 'face', designation: 'Logo OLDA à ajouter', prixAchat: 0, prixVenteTtc: 8, tempsMoMin: 3, tempsMachineMin: 3 },
+  { categorie: 'face', designation: 'Texte personnalisé simple', prixAchat: 0, prixVenteTtc: 6, tempsMoMin: 3, tempsMachineMin: 3 },
+  { categorie: 'face', designation: 'Logo client vectorisé', prixAchat: 0, prixVenteTtc: 6, tempsMoMin: 3, tempsMachineMin: 3 },
+  { categorie: 'face', designation: 'Logo client non vectorisé', prixAchat: 0, prixVenteTtc: 10, tempsMoMin: 5, tempsMachineMin: 3 },
+  { categorie: 'face', designation: 'Création graphique OLDA', prixAchat: 0, prixVenteTtc: 10, tempsMoMin: 6, tempsMachineMin: 3 },
+  { categorie: 'dessous', designation: 'Aucune', prixAchat: 0, prixVenteTtc: 0, tempsMoMin: 0, tempsMachineMin: 0 },
+  { categorie: 'dessous', designation: 'Logo Client Vectorisé', prixAchat: 0, prixVenteTtc: 4, tempsMoMin: 3, tempsMachineMin: 3 },
+  { categorie: 'dessous', designation: 'Logo Client Non Vectorisé', prixAchat: 0, prixVenteTtc: 5, tempsMoMin: 5, tempsMachineMin: 3 },
+  { categorie: 'dessous', designation: 'Logo OLDA dessous', prixAchat: 0, prixVenteTtc: 3, tempsMoMin: 1, tempsMachineMin: 3 },
+  { categorie: 'dessous', designation: 'Texte personnalisé dessous', prixAchat: 0, prixVenteTtc: 6, tempsMoMin: 3, tempsMachineMin: 3 },
+  { categorie: 'dessous', designation: 'QR Code dessous', prixAchat: 0, prixVenteTtc: 5, tempsMoMin: 5, tempsMachineMin: 3 },
+  { categorie: 'bat', designation: 'Oui', prixAchat: 0, prixVenteTtc: 2, tempsMoMin: 5, tempsMachineMin: 0 },
+  { categorie: 'bat', designation: 'Non', prixAchat: 0, prixVenteTtc: 0, tempsMoMin: 0, tempsMachineMin: 0 },
+].map((a, i) => ({ ...a, id: `seed-${i + 1}`, actif: true, position: (i + 1) * 1000 }));
+
+const DEFAULT_TARIFS_TASSE_PARAMETRES = { tauxHoraireMo: 25, tauxHoraireMachine: 25, tgca: 0.04 };
+
+let tarifsTasseUid = 0;
+
+// Normalise une entrée reçue du client (défensif : édition à la main dans
+// Réglages). Renvoie null si inexploitable (désignation vide ou catégorie
+// inconnue).
+function cleanTarifTasseArticle(a, index) {
+  if (!a || typeof a !== 'object') return null;
+  const designation = String(a.designation == null ? '' : a.designation).trim().slice(0, 80);
+  if (!designation) return null;
+  if (!TARIFS_TASSE_CATEGORIES.has(a.categorie)) return null;
+  const num = (v, def = 0) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : def; };
+  tarifsTasseUid += 1;
+  return {
+    id: typeof a.id === 'string' && a.id ? a.id : `tt-${Date.now()}-${tarifsTasseUid}`,
+    categorie: a.categorie,
+    designation,
+    prixAchat: Math.round(num(a.prixAchat) * 100) / 100,
+    prixVenteTtc: Math.round(num(a.prixVenteTtc) * 100) / 100,
+    tempsMoMin: Math.round(num(a.tempsMoMin) * 10) / 10,
+    tempsMachineMin: Math.round(num(a.tempsMachineMin) * 10) / 10,
+    actif: a.actif !== false,
+    position: Number.isFinite(Number(a.position)) ? Number(a.position) : (index + 1) * 1000,
+  };
+}
+
+async function getTarifsTasseArticles() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tarifs_tasse_articles'");
+  if (!rows[0]) return DEFAULT_TARIFS_TASSE_ARTICLES.map((a) => ({ ...a }));
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return Array.isArray(parsed) ? parsed : DEFAULT_TARIFS_TASSE_ARTICLES.map((a) => ({ ...a }));
+  } catch (_) {
+    return DEFAULT_TARIFS_TASSE_ARTICLES.map((a) => ({ ...a }));
+  }
+}
+
+async function setTarifsTasseArticles(list) {
+  const raw = Array.isArray(list) ? list : [];
+  const clean = raw.map(cleanTarifTasseArticle).filter(Boolean);
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'tarifs_tasse_articles'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('tarifs_tasse_articles', $1)", [value]);
+  return clean;
+}
+
+async function getTarifsTasseParametres() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tarifs_tasse_parametres'");
+  if (!rows[0]) return { ...DEFAULT_TARIFS_TASSE_PARAMETRES };
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return parsed && typeof parsed === 'object' ? { ...DEFAULT_TARIFS_TASSE_PARAMETRES, ...parsed } : { ...DEFAULT_TARIFS_TASSE_PARAMETRES };
+  } catch (_) {
+    return { ...DEFAULT_TARIFS_TASSE_PARAMETRES };
+  }
+}
+
+async function setTarifsTasseParametres(p) {
+  const src = p && typeof p === 'object' ? p : {};
+  const num = (v, def) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : def; };
+  const clean = {
+    tauxHoraireMo: num(src.tauxHoraireMo, DEFAULT_TARIFS_TASSE_PARAMETRES.tauxHoraireMo),
+    tauxHoraireMachine: num(src.tauxHoraireMachine, DEFAULT_TARIFS_TASSE_PARAMETRES.tauxHoraireMachine),
+    tgca: num(src.tgca, DEFAULT_TARIFS_TASSE_PARAMETRES.tgca),
+  };
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'tarifs_tasse_parametres'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('tarifs_tasse_parametres', $1)", [value]);
+  return clean;
+}
+
 // --- Emplacements d'impression ajoutés au comptoir ---------------------------
 // Le catalogue couvre les zones courantes (cœur, dos, manches…), mais l'atelier
 // en croise toujours une nouvelle : « Nuque », « Bas du dos », un flanc de sac.
@@ -729,6 +842,9 @@ module.exports = {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
+  getTarifsTasseArticles, setTarifsTasseArticles,
+  getTarifsTasseParametres, setTarifsTasseParametres,
+  DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
   getCommandeZones, addCommandeZone, removeCommandeZone,
   getHiddenCommandeZones, hideCommandeZone,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,

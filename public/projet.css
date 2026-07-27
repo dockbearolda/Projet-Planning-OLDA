@@ -1,0 +1,239 @@
+/* Nouveau Projet — Atelier OLDA
+   Flux comptoir ultra-minimal : client → type → produit → prix, façon caisse. */
+
+/* Style global du flux comptoir : texte jamais sous 16px (lu/tapé vite en
+   boutique), un seul accent bleu (var(--primary)), coins très arrondis,
+   ombres légères — voir --radius-lg / --shadow-1 utilisés partout ci-dessous. */
+.proj-page { --radius-lg: 18px; display: flex; flex-direction: column; height: 100%; font-size: 16px; }
+.proj-bar { display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.proj-bar__ic { font-size: 24px; color: var(--primary); flex: 0 0 auto; }
+.proj-bar__title { margin: 0; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
+/* Pas d'overflow ici : le défilement vit sur .work (parent) — un overflow-y
+   local piégerait le sticky de la barre du bas dans un cadre qui ne défile
+   jamais, et le CTA ne resterait pas visible. */
+.proj-body { flex: 1; padding: 20px; max-width: 1080px; margin: 0 auto; width: 100%; }
+.proj-body > .proj-client {
+  max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
+  min-height: 55vh; justify-content: center; text-align: center;
+}
+.proj-step__title { margin: 0 0 20px; font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
+.proj-todo { color: var(--text-2); font-style: italic; font-size: 16px; }
+
+/* --- Barre de progression (remplace le fil texte) ------------------------------ */
+.proj-stepper { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
+.proj-stepper__step { display: flex; align-items: center; gap: 8px; }
+.proj-stepper__dot {
+  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; border: 2px solid var(--border); color: var(--text-2); background: var(--surface);
+  flex: 0 0 auto;
+}
+.proj-stepper__dot .material-symbols-outlined { font-size: 16px; }
+.proj-stepper__label { font-size: 15px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.proj-stepper__step.is-current .proj-stepper__dot { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.proj-stepper__step.is-current .proj-stepper__label { color: var(--text-1); }
+.proj-stepper__step.is-done .proj-stepper__dot { border-color: var(--primary); background: var(--primary); color: #fff; }
+.proj-stepper__step.is-done .proj-stepper__label { color: var(--text-1); }
+.proj-stepper__line { flex: 0 1 40px; height: 2px; background: var(--border); }
+.proj-stepper__line.is-done { background: var(--primary); }
+@media (max-width: 640px) {
+  .proj-stepper__label { display: none; }
+  .proj-stepper__line { flex-basis: 20px; }
+}
+
+/* Question centrée dans la colonne de droite (tuiles de type) : le client
+   reste dans la sidebar, mais la question elle-même est seule à l'écran. */
+.proj-center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 45vh; }
+
+.proj-back { align-self: flex-start; margin-bottom: 10px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
+.proj-back:hover { color: var(--primary); }
+
+/* --- Colonne client épinglée + colonne produit --------------------------------- */
+.proj-layout { display: flex; align-items: flex-start; gap: 28px; }
+.proj-sidebar {
+  flex: 0 0 220px;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+  padding: 20px 16px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+  background: var(--surface); box-shadow: var(--shadow-1); position: sticky; top: 20px;
+}
+.proj-sidebar__av {
+  flex: 0 0 52px;
+  width: 52px; height: 52px; border-radius: 50%; background: var(--primary-soft); color: var(--primary);
+  display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; margin-bottom: 6px;
+}
+.proj-sidebar__info { min-width: 0; }
+.proj-sidebar__name { margin: 0; font-weight: 700; font-size: 16px; color: var(--text-1); overflow-wrap: break-word; }
+.proj-sidebar__meta { margin: 0; font-size: 14px; color: var(--text-2); }
+.proj-sidebar__change { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.proj-sidebar__change:hover { color: var(--primary); border-color: var(--primary-soft); }
+.proj-main { flex: 1; min-width: 0; }
+
+@media (max-width: 720px) {
+  .proj-layout { flex-direction: column; }
+  .proj-sidebar {
+    flex: 0 0 auto; width: 100%; flex-wrap: wrap; flex-direction: row; align-items: center;
+    justify-content: flex-start; text-align: left; position: static; gap: 10px 12px;
+  }
+  .proj-sidebar__av { margin-bottom: 0; }
+  .proj-sidebar__info { flex: 1 1 auto; }
+  .proj-sidebar__change { flex: 1 1 100%; margin-top: 0; justify-content: center; }
+}
+
+/* --- Page client ------------------------------------------------------------ */
+/* Recherche + « Nouveau client » en grand format comptoir (~60px, coins bien
+   ronds) : c'est le premier geste de chaque encaissement, il doit se viser
+   au doigt sans regarder. */
+.proj-client__row { display: flex; gap: 12px; margin-bottom: 20px; }
+.proj-search { flex: 1; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 18px; padding: 0 18px; background: var(--surface); }
+.proj-search:focus-within { border-color: var(--primary); }
+.proj-search__ic { color: var(--text-2); font-size: 24px; }
+.proj-search__input { flex: 1; border: 0; background: transparent; padding: 17px 0; font: inherit; font-size: 18px; color: var(--text-1); outline: none; }
+.proj-client__row .proj-btn { min-height: 60px; border-radius: 18px; padding: 0 22px; font-size: 16px; }
+.proj-client__row .proj-btn .material-symbols-outlined { font-size: 22px; }
+.proj-client__results { display: flex; flex-direction: column; gap: 6px; }
+
+.proj-client__item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer; text-align: left; }
+.proj-client__item:hover { background: var(--surface-hover); }
+.proj-client__name { font-weight: 600; font-size: 16px; color: var(--text-1); }
+.proj-client__meta { font-size: 14px; color: var(--text-2); }
+
+.proj-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-1); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
+.proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.proj-btn:disabled { opacity: .6; cursor: default; }
+
+.proj-quick { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius-lg); align-items: center; }
+.proj-quick[hidden] { display: none; }
+.proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
+.proj-input--sm { min-height: 48px; }
+.proj-seg { display: flex; gap: 4px; border: 1px solid var(--border); border-radius: 14px; padding: 3px; }
+.proj-seg__btn { min-height: 40px; padding: 0 14px; border: 0; border-radius: 11px; background: transparent; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.proj-seg__btn.is-on { background: var(--primary-soft); color: var(--primary); }
+
+/* --- Tuiles de type (colonne de droite) ---------------------------------------- */
+/* Grosses tuiles carrées façon catégories SumUp : icône dans un cercle bleu
+   (accent UNIQUE de l'app, jamais une couleur par famille), texte lisible de
+   loin, grille aérée, ombre légère au repos. */
+/* minmax(0, 1fr) : sans lui, l'aspect-ratio des tuiles transfère leur hauteur
+   en largeur minimale et la grille déborde du conteneur. */
+.proj-type__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; max-width: 760px; }
+@media (min-width: 900px) { .proj-type__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; } }
+.proj-tile {
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 18px 12px; border: 1px solid var(--border); border-radius: 22px;
+  background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.proj-tile:hover { background: var(--surface-hover); border-color: var(--primary-soft); transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.proj-tile__circle {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--primary-soft); color: var(--primary);
+}
+.proj-tile__ic { font-size: 34px; }
+.proj-tile__label { font-weight: 700; font-size: 17px; text-align: center; color: var(--text-1); }
+
+/* --- Panier (colonne de droite) -------------------------------------------------- */
+.proj-lignes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.proj-cart-item { display: flex; align-items: center; gap: 12px; padding: 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-1); }
+.proj-cart-item__info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.proj-cart-item__type { font-size: 12.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--primary); }
+.proj-cart-item__desc { font-size: 16px; color: var(--text-1); overflow-wrap: break-word; }
+.proj-cart-item__prix { font-weight: 700; font-size: 16px; color: var(--text-1); white-space: nowrap; }
+.proj-cart-item__del { flex: 0 0 36px; min-height: 36px; border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.proj-cart-item__del:hover { color: var(--danger, #d33); }
+.proj-addmore__title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-2); }
+
+/* --- Formulaire d'ajout d'un produit ---------------------------------------------- */
+/* Suite de choix visuels : un groupe = un titre + de gros boutons tactiles.
+   Aucun <select> — tout se choisit au doigt, l'option active saute aux yeux. */
+.proj-form { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-1); }
+.proj-group { margin: 0 0 24px; }
+.proj-group__label { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+
+.proj-choices { display: flex; flex-wrap: wrap; gap: 10px; }
+.proj-choice {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 18px;
+  border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface);
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--text-1); cursor: pointer;
+}
+.proj-choice:hover { background: var(--surface-hover); border-color: var(--primary-soft); }
+.proj-choice.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.proj-choice__prix { font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+.proj-choice.is-on .proj-choice__prix { color: var(--primary); }
+.proj-choices--duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.proj-choices--duo .proj-choice { justify-content: center; }
+/* Bouton « + Ajouter un marquage » : réduit le nombre d'éléments visibles par
+   défaut (un objectif = une action) — les 4 groupes de personnalisation ne
+   s'affichent qu'après ce tap. */
+.proj-choice--add { width: 100%; justify-content: center; border-style: dashed; color: var(--primary); }
+
+.proj-stepq { display: flex; align-items: center; gap: 12px; }
+.proj-stepq__btn {
+  width: 56px; height: 56px; border: 1.5px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text-1); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.proj-stepq__btn:hover { border-color: var(--primary); color: var(--primary); background: var(--surface-hover); }
+.proj-stepq__btn .material-symbols-outlined { font-size: 26px; }
+.proj-stepq__val { width: 88px; height: 56px; text-align: center; font: inherit; font-size: 20px; font-weight: 700; border: 1.5px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text-1); }
+
+/* Coloris : pastilles neutres (identité de la couleur elle-même), le SEUL
+   accent bleu de l'app reste réservé à l'état sélectionné (outline). */
+.proj-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.proj-swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; padding: 4px; border: 0; border-radius: 12px; background: none; font: inherit; cursor: pointer; }
+.proj-swatch__dot { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); }
+.proj-swatch__dot--autre { background: conic-gradient(#d64541, #f4c542, #10b981, #3b82f6, #ec6fa9, #d64541); }
+.proj-swatch.is-on .proj-swatch__dot { outline: 3px solid var(--primary); outline-offset: 2px; }
+.proj-swatch__label { font-size: 13.5px; font-weight: 600; color: var(--text-2); }
+.proj-swatch.is-on .proj-swatch__label { color: var(--primary); }
+.proj-swatch-input { margin-top: 10px; width: 100%; }
+
+.proj-input--lg { min-height: 56px; font-size: 20px; font-weight: 700; border-radius: 16px; max-width: 220px; }
+.proj-textarea { width: 100%; min-height: 44px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; resize: vertical; background: var(--surface); color: var(--text-1); }
+
+/* Délai + paiement : boutons segmentés pleine largeur, un choix clair. */
+.proj-delai { margin: 20px 0 4px; }
+.proj-segbar { display: grid; gap: 8px; width: 100%; }
+.proj-segbar--cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.proj-segbar--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 620px) {
+  .proj-segbar--cols5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.proj-segbar__btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 56px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 14px;
+  background: var(--surface); font: inherit; font-size: 15.5px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; text-align: center;
+}
+.proj-segbar__btn:hover { background: var(--surface-hover); }
+.proj-segbar__btn.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.proj-segbar__sub { font-size: 12.5px; font-weight: 700; opacity: .75; }
+
+/* Barre du bas façon caisse : total en gros, CTA pleine largeur toujours
+   visible. La marge (info interne) reste derrière une icône discrète. */
+.proj-total { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 20px; margin: 24px -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); }
+.proj-total__row { display: flex; align-items: baseline; gap: 12px; }
+.proj-total__label { color: var(--text-2); font-size: 15px; margin-left: auto; }
+.proj-total__value { font-size: 28px; font-weight: 800; color: var(--text-1); }
+.proj-marge-toggle { align-self: center; display: inline-flex; align-items: center; border: 0; background: none; color: var(--text-2); cursor: pointer; opacity: .4; padding: 6px; }
+.proj-marge-toggle:hover { opacity: 1; }
+.proj-marge-toggle__ic { font-size: 20px; }
+.proj-marge { display: flex; gap: 14px; font-size: 14px; color: var(--text-2); }
+.proj-btn--cta { width: 100%; justify-content: center; min-height: 58px; border-radius: var(--radius-lg); font-size: 17.5px; font-weight: 700; box-shadow: var(--shadow-1); }
+
+/* --- Destination + confirmation ------------------------------------------------ */
+.proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.proj-dest-card, .proj-done-card { position: relative; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-pop); padding: 28px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.proj-dest__eyebrow { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.proj-dest__title { margin: 4px 0 16px; font-size: 21px; font-weight: 800; }
+.proj-dest__list { display: flex; flex-direction: column; gap: 6px; }
+.proj-dest__item { min-height: 48px; padding: 0 16px; border: 1px solid var(--border-soft); border-radius: 14px; background: var(--surface); text-align: left; font: inherit; font-size: 16px; cursor: pointer; }
+.proj-dest__item:hover { background: var(--surface-hover); }
+.proj-dest__close { position: absolute; top: 14px; right: 14px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+
+.proj-done-card { text-align: center; }
+.proj-done__check { width: 56px; height: 56px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 30px; }
+.proj-done__title { font-size: 21px; font-weight: 800; margin: 0 0 4px; }
+.proj-done__sub { color: var(--text-2); font-size: 16px; margin: 0 0 20px; }
+.proj-done__actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.proj-btn--wide { width: 100%; justify-content: center; margin-bottom: 14px; }

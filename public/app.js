@@ -857,7 +857,7 @@ function buildRow(r) {
     add.type = 'button';
     attachTip(add, 'Ajouter — remplir cette ligne');
     add.setAttribute('aria-label', 'Ajouter une commande');
-    add.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
+    add.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
     add.addEventListener('click', () => {
       const first = tr.querySelector('.client-company');
       if (first) first.focus();
@@ -917,14 +917,14 @@ function buildRow(r) {
   dup.type = 'button';
   attachTip(dup, 'Dupliquer cette commande');
   dup.setAttribute('aria-label', 'Dupliquer cette commande');
-  dup.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  dup.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   dup.addEventListener('click', () => duplicateRow(r));
   const del = document.createElement('button');
   del.className = 'del-btn';
   del.type = 'button';
   attachTip(del, 'Supprimer cette commande');
   del.setAttribute('aria-label', 'Supprimer cette commande');
-  del.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  del.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
   del.addEventListener('click', () => removeRow(r));
   tdDel.appendChild(dup);
   tdDel.appendChild(del);
@@ -947,37 +947,33 @@ function prioBand(r) {
   return PRIORITY_LEVELS[r && r.priority] ? r.priority : 1;
 }
 
-// Cellule étoiles (1 à 3) : attribuée au clic, règle la priorité de la ligne.
-// Recliquer la même note ne fait rien ; changer de note enregistre en optimiste.
+// Cellule priorité : badge texte (Basse/Moyenne/Haute), menu au clic — même
+// patron que cellType. Les étoiles ★☆☆ étaient moins lisibles d'un coup d'œil
+// et moins « pro » qu'un mot ; « Haute » seule reste en accent (c'est la
+// priorité qui doit sauter aux yeux dans la file), Basse/Moyenne restent
+// neutres pour ne pas rivaliser avec elle.
 function cellStars(r) {
   const td = document.createElement('td');
   td.className = 'col-stars-cell';
-  if (isDraftRow(r)) return td; // pas d'étoiles sur la ligne brouillon
-  const wrap = document.createElement('div');
-  wrap.className = 'grid-stars';
-  attachTip(wrap, 'attribuer des étoiles (priorité)');
-  const cur = prioBand(r);
-  for (let i = 1; i <= 3; i++) {
-    const star = document.createElement('button');
-    star.type = 'button';
-    star.className = 'grid-star' + (i <= cur ? ' on' : '');
-    star.textContent = i <= cur ? '★' : '☆';
-    star.setAttribute('aria-label', `${i} étoile${i > 1 ? 's' : ''} sur 3`);
-    star.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (prioBand(r) === i) return;
-      patch(r, { priority: i }, () => {
-        r.priority = i;
-        for (let j = 0; j < wrap.children.length; j++) {
-          const on = (j + 1) <= i;
-          wrap.children[j].classList.toggle('on', on);
-          wrap.children[j].textContent = on ? '★' : '☆';
-        }
-      });
+  if (isDraftRow(r)) return td; // pas de priorité sur la ligne brouillon
+  const tag = document.createElement('button');
+  tag.type = 'button';
+  const renderTag = () => {
+    const lvl = PRIORITY_LEVELS[prioBand(r)];
+    tag.className = 'prio-tag ' + lvl.cls;
+    tag.textContent = lvl.label;
+  };
+  renderTag();
+  attachTip(tag, 'cliquer pour changer la priorité');
+  tag.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const cur = prioBand(r);
+    openMenu(tag, [1, 2, 3].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })), cur, (val) => {
+      if (val === cur) return;
+      patch(r, { priority: val }, () => { r.priority = val; renderTag(); });
     });
-    wrap.appendChild(star);
-  }
-  td.appendChild(wrap);
+  });
+  td.appendChild(tag);
   return td;
 }
 
@@ -1246,27 +1242,13 @@ function cellDossier(r) {
   return td;
 }
 
-// Le logo WhatsApp, monté en DOM (pas en `innerHTML`) : c'est la seule icône de
-// marque de l'application, Material Symbols n'en fournit pas.
-const WA_GLYPH = 'M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2 22l5.25-1.38a9.86 9.86 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23a8.23 8.23 0 0 1 .01 16.47Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.79.97-.14.16-.29.18-.54.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.09-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.47c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07s.89 2.4 1.01 2.56c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29Z';
-
-function whatsappIcon() {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '14');
-  svg.setAttribute('height', '14');
-  svg.setAttribute('fill', 'currentColor');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d', WA_GLYPH);
-  svg.appendChild(path);
-  return svg;
-}
-
-// Icônes devis/facture construites en DOM (même trait que whatsappIcon,
-// pas d'innerHTML) : deux glyphes neutres et distincts, pour reconnaître la
-// pastille au premier coup d'œil sans attendre l'infobulle.
+// Toutes les icônes maison (WhatsApp/devis/facture) montées en DOM (pas en
+// `innerHTML`), un seul set fin au trait : même stroke-width, même viewBox,
+// pour qu'elles se lisent comme UNE famille dans la ligne du tableau plutôt
+// que trois styles différents côte à côte. WhatsApp portait avant un logo
+// plein (fill) — reconnaissable seul, mais visuellement plus « lourd » que
+// les deux glyphes voisins ; la couleur de marque (#25d366, .wa-btn) et
+// l'infobulle suffisent à l'identifier sans logo plein.
 function strokeIcon(paths) {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
@@ -1285,6 +1267,14 @@ function strokeIcon(paths) {
     svg.appendChild(path);
   }
   return svg;
+}
+
+// WhatsApp : bulle de conversation au trait — la couleur de marque (.wa-btn)
+// et l'infobulle portent la reconnaissance, pas un logo plein.
+function whatsappIcon() {
+  return strokeIcon([
+    'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z',
+  ]);
 }
 
 // Devis : une feuille avec des lignes de texte (un document à lire).
@@ -1555,7 +1545,7 @@ function cellInfos(r) {
   toggle.className = 'desc-toggle';
   attachTip(toggle, 'Afficher / masquer les lignes suivantes');
   toggle.setAttribute('aria-label', 'Afficher les lignes suivantes');
-  toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
   let open = false;
   let lastSent = r.description ?? '';
@@ -2638,11 +2628,11 @@ function ensureManualWidths() {
   applyColWidths();
 }
 
-// Légende de la colonne étoiles : rien dans l'en-tête ne dit qu'une commande
-// se note de 1 à 3 — un nouvel arrivant ne le devine pas au seul pictogramme.
+// Légende de la colonne priorité : rien dans l'en-tête ne dit qu'un clic sur
+// le badge fait défiler les 3 niveaux — un nouvel arrivant ne le devine pas.
 function attachStarsHeaderTip() {
   const th = document.querySelector('#grid thead th.col-stars');
-  if (th) attachTip(th, 'Priorité : de 1 (basse) à 3 étoiles (haute) — cliquer une étoile sur la ligne pour l’attribuer');
+  if (th) attachTip(th, 'Priorité : Basse, Moyenne ou Haute — cliquer le badge sur la ligne pour la changer');
 }
 
 function attachColResizers() {
@@ -3329,8 +3319,10 @@ const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $reglages = document.getElementById('reglages');
+const $viewProjet = document.getElementById('viewProjet');
+const $projet = document.getElementById('nouveau-projet');
 
-// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages'
+// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages' | 'projet'
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
 // La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
@@ -3432,6 +3424,27 @@ function mountReglages() {
   }
 }
 
+// Nouveau Projet : même principe que Base clients / Réglages (module lourd,
+// chargé au premier passage, monté une bonne fois).
+let projetLoading = null;
+let projetModule = null;
+function mountProjet() {
+  if (!$projet) return;
+  if (!projetLoading) {
+    projetLoading = import('./projet.js')
+      .then((m) => { projetModule = m; return m.initProjet($projet); })
+      .catch((err) => {
+        projetLoading = null;
+        projetModule = null;
+        console.error('Nouveau Projet : chargement impossible', err);
+      });
+  } else if (projetModule && projetModule.resetProjet) {
+    // Comptoir : chaque passage sur l'onglet repart de « Quel client ? »,
+    // jamais sur un brouillon laissé par le passage précédent.
+    projetModule.resetProjet();
+  }
+}
+
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
 // en-tête. Seul le rail s'efface (l'onglet le remplace).
 const isPlanningMode = (mode) => mode === 'planning' || mode in PROMOTED_BY_VIEW;
@@ -3444,6 +3457,7 @@ function setViewMode(mode) {
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
+  if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
@@ -3460,17 +3474,23 @@ function setViewMode(mode) {
   const commande = mode === 'commande';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
+  const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
+  if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
+  // Nouveau Projet = poste comptoir, devant le client : la nav du back-office
+  // (Dashboard, Fiverr, Réglages…) disparaît, il ne reste que l'étape en cours.
+  document.body.classList.toggle('view-comptoir', mode === 'projet');
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (commande) mountCommande();
   if (clients) mountClients();
   if (reglages) mountReglages();
+  if (projet) mountProjet();
   if (isPlanningMode(mode)) {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
@@ -3480,6 +3500,7 @@ function setViewMode(mode) {
 // #demande et #commande ouvrent la MÊME vue, avec une nature différente.
 const VIEWS = {
   '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
+  '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };

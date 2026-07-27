@@ -28,13 +28,30 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 // (datalist) construites depuis les valeurs déjà présentes dans la base.
 const FIELDS = [
   { key: 'entreprise', label: 'Société', icon: 'apartment', ph: 'Nom de la société', required: true },
+  { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: 'SARL Evelyne' },
+  { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
   { key: 'nom', label: 'Contact', icon: 'person', ph: 'Personne à contacter' },
+  { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: 'Cédric' },
   { key: 'fonction', label: 'Fonction', icon: 'badge', ph: 'Gérante, Resp. Marketing…' },
   { key: 'type', label: 'Type', icon: 'sell', ph: 'Boutique, Hôtel, Entretien…', list: 'cl-dl-types' },
+  { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: 'Hôtel / Restaurant, Boutique…', list: 'cl-dl-secteurs' },
   { key: 'zone', label: 'Zone', icon: 'location_on', ph: 'Grand Case, Marigot…', list: 'cl-dl-zones' },
+  { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '97150' },
+  { key: 'ville', label: 'Ville', icon: 'location_city', ph: 'Saint-Martin' },
+  { key: 'pays', label: 'Pays', icon: 'public', ph: 'Saint-Martin' },
   { key: 'telephone', label: 'Téléphone', icon: 'call', ph: '06 90 …', type: 'tel', inputmode: 'tel' },
   { key: 'email', label: 'E-mail', icon: 'mail', ph: 'contact@…', type: 'email', inputmode: 'email' },
   { key: 'adresse', label: 'Adresse', icon: 'home', ph: 'Ajouter…' },
+];
+
+// Secteurs suggérés (classeur patron « CRM OLDA CREATION CLIENTS », onglet
+// « Liste Secteurs ») : liste de référence, saisie libre autorisée comme le
+// reste du catalogue.
+const SECTEURS_SUGGERES = [
+  'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
+  'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
+  'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',
+  'Administration', 'Autre',
 ];
 
 const NOTE_KINDS = [
@@ -48,11 +65,14 @@ const KIND_BY_ID = new Map(NOTE_KINDS.map((k) => [k.id, k]));
 // Nature du client : pro (société) / perso (particulier). Axe DISTINCT du `type`
 // métier libre (Boutique, Hôtel…). Filtre de liste + segmented dans la fiche.
 const NATURES = [
-  { id: 'pro', label: 'Pro', icon: 'apartment' },
-  { id: 'perso', label: 'Perso', icon: 'person' },
+  { id: 'pro', label: 'Professionnel', icon: 'apartment' },
+  { id: 'revendeur', label: 'Revendeur', icon: 'storefront' },
+  { id: 'asso', label: 'Association', icon: 'groups' },
+  { id: 'perso', label: 'Particulier', icon: 'person' },
 ];
-const nature = (v) => (v === 'perso' ? 'perso' : 'pro');
-const natureLabel = (v) => (nature(v) === 'perso' ? 'Perso' : 'Pro');
+const NATURE_IDS = new Set(NATURES.map((n) => n.id));
+const nature = (v) => (NATURE_IDS.has(v) ? v : 'pro');
+const natureLabel = (v) => (NATURES.find((n) => n.id === nature(v)) || NATURES[0]).label;
 
 // --- État ------------------------------------------------------------------
 let LIST = [];             // clients (forme /api/clients, enrichie)
@@ -175,9 +195,11 @@ function buildStatic() {
 
   view.append(head, list, empty);
 
-  // Suggestions type / zone (remplies au rendu).
+  // Suggestions type / zone (remplies au rendu) + secteur (liste fixe du patron).
   const dlT = el('datalist'); dlT.id = 'cl-dl-types';
   const dlZ = el('datalist'); dlZ.id = 'cl-dl-zones';
+  const dlS = el('datalist'); dlS.id = 'cl-dl-secteurs';
+  dlS.append(...SECTEURS_SUGGERES.map((s) => new Option(s)));
 
   // Tiroir (fiche), overlay plein écran.
   const drawerEl = el('div', 'cl-drawer');
@@ -196,7 +218,7 @@ function buildStatic() {
   toastEl.setAttribute('role', 'status');
   toastEl.setAttribute('aria-live', 'polite');
 
-  ROOT.append(view, dlT, dlZ, drawerEl, toastEl);
+  ROOT.append(view, dlT, dlZ, dlS, drawerEl, toastEl);
 }
 
 // --- Liste -----------------------------------------------------------------
@@ -315,6 +337,8 @@ function fieldRow(field, value, opts) {
   if (field.type === 'tel') input.addEventListener('input', () => formatPhoneAsTyped(input));
   row.append(lab, input);
   if (field.key === 'entreprise') input.classList.add('cl-f__input--strong');
+  // Identifiant lisible : généré par le serveur à la création, jamais modifiable.
+  if (field.key === 'code') { input.readOnly = true; input.classList.add('cl-f__input--readonly'); }
   return row;
 }
 
@@ -496,7 +520,15 @@ async function openClient(id) {
 }
 
 function openNew() {
-  drawer = { id: null, mode: 'create', draft: { entreprise: '', nom: '', fonction: '', client_type: 'pro', type: '', zone: '', telephone: '', email: '', adresse: '' }, notes: [] };
+  drawer = {
+    id: null, mode: 'create',
+    draft: {
+      entreprise: '', raison_sociale: '', nom: '', referent_prenom: '', fonction: '',
+      client_type: 'pro', type: '', secteur: '', zone: '', code_postal: '', ville: '', pays: '',
+      telephone: '', email: '', adresse: '',
+    },
+    notes: [],
+  };
   renderDrawer();
 }
 

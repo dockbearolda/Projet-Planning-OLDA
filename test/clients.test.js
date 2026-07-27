@@ -166,6 +166,42 @@ delete process.env.APP_PASSWORD;
   const gone = await j('GET', `/api/clients/${id}`);
   assert.strictEqual(gone.status, 404);
 
+  // 7. Champs enrichis (fiche complète) + nature étendue (pro/perso/asso/revendeur)
+  //    + identifiant lisible généré côté serveur.
+  const proEnrichi = await j('POST', '/api/clients', {
+    entreprise: 'SARL Evelyne', raison_sociale: 'SARL EVELYNE', code_postal: '97150',
+    ville: 'Saint-Martin', pays: 'Saint-Martin', secteur: 'Hôtel / Restaurant',
+    referent_prenom: 'Cédric', client_type: 'revendeur',
+  });
+  assert.strictEqual(proEnrichi.status, 201, JSON.stringify(proEnrichi.body));
+  assert.strictEqual(proEnrichi.body.raison_sociale, 'SARL EVELYNE');
+  assert.strictEqual(proEnrichi.body.code_postal, '97150');
+  assert.strictEqual(proEnrichi.body.secteur, 'Hôtel / Restaurant');
+  assert.strictEqual(proEnrichi.body.client_type, 'revendeur', 'nature étendue acceptée');
+  assert.match(proEnrichi.body.code, /^CLI-PRO-\d{4}$/, 'code lisible CLI-PRO-xxxx généré');
+
+  const persoEnrichi = await j('POST', '/api/clients', { entreprise: 'Grégory Lacroix', client_type: 'perso' });
+  assert.strictEqual(persoEnrichi.status, 201);
+  assert.match(persoEnrichi.body.code, /^CLI-PERSO-\d{4}$/, 'code lisible CLI-PERSO-xxxx pour un perso');
+
+  const assoEnrichi = await j('POST', '/api/clients', { entreprise: 'Asso Test', client_type: 'asso' });
+  assert.strictEqual(assoEnrichi.status, 201, JSON.stringify(assoEnrichi.body));
+  assert.strictEqual(assoEnrichi.body.client_type, 'asso');
+
+  const natureInvalide = await j('POST', '/api/clients', { entreprise: 'X2', client_type: 'zzz' });
+  assert.strictEqual(natureInvalide.status, 400);
+
+  // Les codes s'incrémentent, jamais réutilisés (robuste aux suppressions).
+  const proEnrichi2 = await j('POST', '/api/clients', { entreprise: 'Deuxième Pro', client_type: 'pro' });
+  const codeN1 = Number.parseInt(proEnrichi.body.code.slice('CLI-PRO-'.length), 10);
+  const codeN2 = Number.parseInt(proEnrichi2.body.code.slice('CLI-PRO-'.length), 10);
+  assert.ok(codeN2 > codeN1, 'le code suivant est strictement supérieur');
+
+  await j('DELETE', `/api/clients/${proEnrichi2.body.id}`);
+  const proEnrichi3 = await j('POST', '/api/clients', { entreprise: 'Troisième Pro', client_type: 'pro' });
+  const codeN3 = Number.parseInt(proEnrichi3.body.code.slice('CLI-PRO-'.length), 10);
+  assert.ok(codeN3 > codeN2, 'le code n\'est jamais réutilisé après suppression');
+
   console.log('✓ base clients : seed, CRUD, notes, création auto à la commande et dédoublonnage OK');
   process.exit(0);
 })().catch((err) => {

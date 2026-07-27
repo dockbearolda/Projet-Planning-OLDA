@@ -17,6 +17,8 @@ const {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
+  getTarifsTasseArticles, setTarifsTasseArticles,
+  getTarifsTasseParametres, setTarifsTasseParametres,
   getCommandeZones, addCommandeZone, removeCommandeZone,
   getHiddenCommandeZones, hideCommandeZone,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
@@ -260,6 +262,41 @@ app.put('/api/machines', asyncH(async (req, res) => {
   }
   const saved = await setMachines(req.body);
   broadcast({ kind: 'machines' });
+  res.json(saved);
+}));
+
+// Catalogue tarifs TASSE (réglages du patron : prix + temps par produit/option).
+// GET  → [ { id, categorie, designation, prixAchat, prixVenteTtc, tempsMoMin,
+//            tempsMachineMin, actif, position }, ... ]
+// PUT  → remplace la liste (corps = tableau), diffusé en SSE pour que Nouveau
+//        Projet et Réglages voient le même catalogue partout sans recharger.
+app.get('/api/tarifs-tasse', asyncH(async (req, res) => {
+  res.json(await getTarifsTasseArticles());
+}));
+
+app.put('/api/tarifs-tasse', asyncH(async (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Tableau d\'articles attendu' });
+  }
+  const saved = await setTarifsTasseArticles(req.body);
+  broadcast({ kind: 'tarifs-tasse' });
+  res.json(saved);
+}));
+
+// Paramètres globaux du calcul (taux horaires MO/machine, TGCA).
+app.get('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
+  res.json(await getTarifsTasseParametres());
+}));
+
+app.put('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
+  const body = req.body || {};
+  for (const key of ['tauxHoraireMo', 'tauxHoraireMachine', 'tgca']) {
+    if (key in body && !Number.isFinite(Number(body[key]))) {
+      return res.status(400).json({ error: `${key} doit être numérique` });
+    }
+  }
+  const saved = await setTarifsTasseParametres(body);
+  broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
 }));
 
@@ -536,18 +573,19 @@ const trimOrNull = (v) => {
 const CLIENT_MAX = {
   entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
   email: 160, telephone: 40, adresse: 200,
+  raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
 };
 const CLIENT_FIELDS = [...Object.keys(CLIENT_MAX), 'client_type'];
-// La base clients ne tranche qu'entre pro et perso ; les nuances asso/revendeur
-// restent au niveau de la commande (requests.client_type).
-const CLIENT_NATURE = new Set(['pro', 'perso']);
+// La nature du client (pro/perso/asso/revendeur) partage désormais la MÊME liste
+// que requests.client_type — la fiche patron distingue Professionnel/Revendeur/
+// Association/Particulier (classeur « CRM OLDA CREATION CLIENTS »).
 const NOTE_KINDS = new Set(['note', 'appel', 'email', 'rdv']);
 const NOTE_MAX = 2000;
 
 function validateClientField(key, value) {
   if (key === 'client_type') {
     const s = String(value == null ? '' : value).trim().toLowerCase();
-    if (s !== '' && !CLIENT_NATURE.has(s)) return { ok: false, error: `nature invalide : ${value}` };
+    if (s !== '' && !CLIENT_TYPE_SET.has(s)) return { ok: false, error: `nature invalide : ${value}` };
     return { ok: true, value: s === '' ? 'pro' : s };
   }
   const s = String(value == null ? '' : value).trim().slice(0, CLIENT_MAX[key]);
@@ -602,6 +640,21 @@ app.get('/api/clients/:id', asyncH(async (req, res) => {
   res.json({ ...rows[0], notes, commandes: counts.get(clientKey(rows[0].entreprise)) || 0 });
 }));
 
+// Identifiant lisible « CLI-PRO-0007 » / « CLI-PERSO-0007 » : un repère visuel
+// pour le patron (comme dans son classeur), pas un UUID. Compteur persistant en
+// app_meta (jamais dérivé des lignes existantes) : un numéro attribué n'est
+// JAMAIS réutilisé, même si le client qui le portait est supprimé ensuite.
+async function nextClientCode(clientType) {
+  const perso = clientType === 'perso';
+  const prefix = perso ? 'CLI-PERSO-' : 'CLI-PRO-';
+  const metaKey = perso ? 'client_code_seq_perso' : 'client_code_seq_pro';
+  const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
+  const next = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
+  await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
+  await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(next)]);
+  return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
 // POST /api/clients → crée un client. Seule l'entreprise est obligatoire.
 app.post('/api/clients', asyncH(async (req, res) => {
   const body = req.body || {};
@@ -618,6 +671,8 @@ app.post('/api/clients', asyncH(async (req, res) => {
   if (!cols.includes('entreprise') || params[cols.indexOf('entreprise')] == null) {
     return res.status(400).json({ error: 'le nom de la société est requis' });
   }
+  const clientType = cols.includes('client_type') ? params[cols.indexOf('client_type')] : 'pro';
+  cols.push('code'); vals.push(`$${i++}`); params.push(await nextClientCode(clientType));
   const { rows } = await pool.query(
     `INSERT INTO clients (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
   );
@@ -735,6 +790,19 @@ const COM_FACE_BY_ID = new Map(COM.faces.map((f) => [f.id, f]));
 // Délai retenu quand la fiche n'en porte aucun : la règle maison, jamais
 // « sans échéance ».
 const DELAI_DEFAUT = COM_DELAI_BY_ID.get(COM.delaiDefaut) || COM.delais[0];
+
+// Les 4 types de projet (classeur « CRM TASSES OLDA », onglet Création Projet :
+// Tasse / T-shirt / Goodies / Signalétique / Reprise Graphique / Autre, réduits
+// aux 4 que le patron a validés pour Nouveau Projet). Seule la tasse a une
+// grille de prix détaillée ; les autres restent sommaires (prix manuel).
+const PROJET_TYPES = [
+  { id: 'tasse', label: 'Tasse', detaille: true },
+  { id: 'textile', label: 'Textile', detaille: false },
+  { id: 'autres', label: 'Autres', detaille: false },
+  { id: 'signaletique', label: 'Plaque signalétique', detaille: false },
+];
+const PROJET_TYPE_BY_ID = new Map(PROJET_TYPES.map((t) => [t.id, t]));
+const PROJET_LIGNES_MAX = 30;
 
 // Longueurs bornées : ces textes finissent dans une cellule de grille, pas dans
 // un traitement de texte.
@@ -1104,6 +1172,185 @@ function buildDestination(b, type) {
   return { stage: b.stage, subStage };
 }
 
+// --- NOUVEAU PROJET -----------------------------------------------------------
+// Le flux comptoir ultra-minimal : client → type de projet → lignes → prix.
+// Contrairement à buildCommande (familles mélangées, options en chips), un
+// projet a UN SEUL type, et pour la tasse chaque ligne référence des ids du
+// catalogue tarifs (jamais un prix envoyé par le client — toujours recalculé
+// depuis `tarifsById` chargé juste avant l'appel).
+
+// Ligne TASSE : résout produit/face1/face2/dessous/bat depuis le catalogue.
+// Renvoie { ligne, prixLigneTtc, prixRevientLigne } ou { error }.
+function buildLigneTasse(raw, index, tarifsById) {
+  const where = `Tasse ${index + 1}`;
+  const l = raw && typeof raw === 'object' ? raw : {};
+  const q = readQuantite(l.quantite, where);
+  if (q.error) return { error: q.error };
+
+  const resolve = (id, champ, categorie) => {
+    if (id == null || id === '') return { article: null };
+    const a = tarifsById.get(id);
+    if (!a || a.categorie !== categorie) return { error: `${where} : ${champ} inconnu` };
+    return { article: a };
+  };
+  const produit = resolve(l.produitId, 'type de tasse', 'produit');
+  if (produit.error) return { error: produit.error };
+  if (!produit.article) return { error: `${where} : le type de tasse est requis` };
+  const face1 = resolve(l.face1Id, 'option face 1', 'face');
+  if (face1.error) return { error: face1.error };
+  const face2 = resolve(l.face2Id, 'option face 2', 'face');
+  if (face2.error) return { error: face2.error };
+  const dessous = resolve(l.dessousId, 'option dessous', 'dessous');
+  if (dessous.error) return { error: dessous.error };
+  const bat = resolve(l.batId, 'BAT', 'bat');
+  if (bat.error) return { error: bat.error };
+
+  const coloris = trimOrNull(l.coloris);
+  if (coloris && coloris.length > TEXTE_MAX) return { error: `${where} : coloris trop long` };
+  const remarque = trimOrNull(l.remarque);
+  if (remarque && remarque.length > REMARQUE_MAX) return { error: `${where} : remarque trop longue` };
+
+  const parts = [produit.article, face1.article, face2.article, dessous.article, bat.article].filter(Boolean);
+  const prixUnitaireTtc = parts.reduce((s, a) => s + a.prixVenteTtc, 0);
+  const prixAchatUnitaire = parts.reduce((s, a) => s + a.prixAchat, 0);
+  const tempsMoUnitaire = parts.reduce((s, a) => s + a.tempsMoMin, 0);
+  const tempsMachineUnitaire = parts.reduce((s, a) => s + a.tempsMachineMin, 0);
+
+  const asRef = (a) => (a ? { id: a.id, label: a.designation, prixTtc: a.prixVenteTtc } : null);
+  return {
+    ligne: {
+      quantite: q.quantite,
+      produit: asRef(produit.article), coloris,
+      face1: asRef(face1.article), face2: asRef(face2.article), dessous: asRef(dessous.article),
+      bat: bat.article ? bat.article.designation === 'Oui' : false,
+      remarque,
+      description: null, prixTtcManuel: null,
+    },
+    prixLigneTtc: q.quantite * prixUnitaireTtc,
+    prixRevientLigne: q.quantite * (prixAchatUnitaire + (tempsMoUnitaire / 60) * PROJET_TAUX_MO
+      + (tempsMachineUnitaire / 60) * PROJET_TAUX_MACHINE),
+  };
+}
+
+// Ligne SOMMAIRE (textile / autres / signalétique) : description + prix manuel.
+function buildLigneSommaire(raw, index) {
+  const where = `Ligne ${index + 1}`;
+  const l = raw && typeof raw === 'object' ? raw : {};
+  const q = readQuantite(l.quantite, where);
+  if (q.error) return { error: q.error };
+  const description = trimOrNull(l.description);
+  if (!description) return { error: `${where} : la description est vide` };
+  if (description.length > DESCRIPTION_MAX) return { error: `${where} : description trop longue` };
+  const prix = Number(l.prixTtcManuel);
+  if (!Number.isFinite(prix) || prix < 0) return { error: `${where} : prix TTC invalide` };
+
+  return {
+    ligne: {
+      quantite: q.quantite, description, prixTtcManuel: Math.round(prix * 100) / 100,
+      produit: null, coloris: null, face1: null, face2: null, dessous: null, bat: false, remarque: null,
+    },
+    prixLigneTtc: Math.round(prix * 100) / 100,
+    prixRevientLigne: 0,
+  };
+}
+
+// Variables de calcul (taux horaires, TGCA) injectées avant chaque appel à
+// buildProjet — évite de faire de buildProjet une fonction async (elle reste
+// pure/testable comme buildCommande), tout en lisant les tarifs réglés par le
+// patron plutôt que des constantes figées dans le code.
+let PROJET_TAUX_MO = 25;
+let PROJET_TAUX_MACHINE = 25;
+let PROJET_TGCA = 0.04;
+
+// Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
+// tasse, un polo, une plaque…), pour un seul client et un seul enregistrement
+// — façon caisse SumUp, on encaisse tout d'un coup. Chaque ligne du panier
+// porte donc son propre type ; il n'y a plus de type unique au niveau projet.
+function buildProjet(body, tarifsById) {
+  const b = body && typeof body === 'object' ? body : {};
+
+  const orderType = COM_TYPE_BY_ID.get(b.kind);
+  if (!orderType) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
+  const dest = buildDestination(b, orderType);
+  if (dest.error) return { error: dest.error };
+
+  const who = buildClient(b.client);
+  if (who.error) return { error: who.error };
+  const { client } = who;
+
+  const rawLignes = Array.isArray(b.lignes) ? b.lignes : [];
+  if (rawLignes.length === 0) return { error: 'un projet doit contenir au moins un produit' };
+  if (rawLignes.length > PROJET_LIGNES_MAX) return { error: `trop de produits (${PROJET_LIGNES_MAX} maximum)` };
+
+  const lignes = [];
+  let prixTotalTtc = 0;
+  let prixRevientTotal = 0;
+  for (let i = 0; i < rawLignes.length; i += 1) {
+    const raw = rawLignes[i] && typeof rawLignes[i] === 'object' ? rawLignes[i] : {};
+    const type = PROJET_TYPE_BY_ID.get(raw.type);
+    if (!type) return { error: `Produit ${i + 1} : type de projet inconnu (${raw.type})` };
+    const built = type.detaille
+      ? buildLigneTasse(raw, i, tarifsById)
+      : buildLigneSommaire(raw, i);
+    if (built.error) return { error: built.error };
+    built.ligne.type = { id: type.id, label: type.label };
+    lignes.push(built.ligne);
+    prixTotalTtc += built.prixLigneTtc;
+    prixRevientTotal += built.prixRevientLigne;
+  }
+
+  const delaiChoisi = COM_DELAI_BY_ID.get(b.delai) || null;
+  const delai = delaiChoisi || DELAI_DEFAUT;
+  prixTotalTtc = prixTotalTtc * (1 + (delai.majoration || 0) / 100);
+  prixTotalTtc = Math.round(prixTotalTtc * 100) / 100;
+
+  const deadline = todayPlus(delai.jours);
+  const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
+  const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
+
+  const venteHt = prixTotalTtc / (1 + PROJET_TGCA);
+  const margeHt = Math.round((venteHt - prixRevientTotal) * 100) / 100;
+
+  const projet = {
+    kind: 'projet-simple',
+    version: 2,        // v1 = un type unique par projet ; v2 = panier multi-type
+    client,
+    lignes,
+    delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
+    prixTotalTtc,
+    margeHt,
+    deadline,
+    priority,
+    stage: dest.stage,
+    subStage: dest.subStage,
+    quantite,
+    createdAt: new Date().toISOString(),
+  };
+
+  const detailLigneTexte = (l) => {
+    if (l.produit) {
+      const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
+      return `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
+    }
+    return `${l.quantite} × ${l.description}`;
+  };
+  const noms = lignes.map((l) => (l.produit ? l.produit.label : l.description));
+  const uniqNoms = [...new Set(noms)];
+  const produitResume = lignes.length === 1
+    ? `${lignes[0].quantite} × ${noms[0]}`
+    : `${quantite} pièces — ${uniqNoms.slice(0, 3).join(', ')}${uniqNoms.length > 3 ? '…' : ''}`;
+
+  const typesPresents = [...new Set(lignes.map((l) => l.type.label))];
+  const resume = [
+    `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
+    ...lignes.map(detailLigneTexte),
+    `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
+    `Prix TTC : ${prixTotalTtc.toFixed(2)} €`,
+  ].join('\n');
+
+  return { projet, resume, produit: produitResume };
+}
+
 // Reconstruit une prise de commande à partir du corps reçu. Fonction pure :
 // aucune écriture, elle renvoie { commande, resume, produit } ou { error }.
 function buildCommande(body) {
@@ -1298,6 +1545,44 @@ app.post('/api/commande', asyncH(async (req, res) => {
 
   broadcast({ kind: 'create', stages: [commande.stage] });
   res.status(201).json({ id: rows[0].id, commande });
+}));
+
+// POST /api/projets → crée un Nouveau Projet (comptoir ultra-minimal). Recharge
+// systématiquement le catalogue tarifs + paramètres AVANT de construire, pour
+// ne jamais calculer avec des prix périmés.
+app.post('/api/projets', asyncH(async (req, res) => {
+  const [articles, parametres] = await Promise.all([getTarifsTasseArticles(), getTarifsTasseParametres()]);
+  PROJET_TAUX_MO = parametres.tauxHoraireMo;
+  PROJET_TAUX_MACHINE = parametres.tauxHoraireMachine;
+  PROJET_TGCA = parametres.tgca;
+  const tarifsById = new Map(articles.filter((a) => a.actif).map((a) => [a.id, a]));
+
+  const built = buildProjet(req.body || {}, tarifsById);
+  if (built.error) return res.status(400).json({ error: built.error });
+  const { projet, resume, produit } = built;
+
+  const { rows: posRows } = await pool.query(
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [projet.stage],
+  );
+
+  const { rows } = await pool.query(
+    `INSERT INTO requests
+       (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
+        contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     RETURNING *`,
+    [
+      projet.stage, projet.subStage, 'commande', projet.priority, projet.client.type,
+      projet.client.societe, projet.client.contact, projet.client.telephone, projet.client.email,
+      projet.quantite, produit, resume, projet.deadline, posRows[0].pos,
+      JSON.stringify(projet), projet.prixTotalTtc,
+    ],
+  );
+
+  await upsertClientFromCommande(projet.client);
+
+  broadcast({ kind: 'create', stages: [projet.stage] });
+  res.status(201).json({ id: rows[0].id, projet });
 }));
 
 // ---------------------------------------------------------------------------
