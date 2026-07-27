@@ -4,7 +4,15 @@
 // dans une section vide (même principe que clients.js / reglages.js), chargé
 // à la demande par app.js.
 
-import { fieldRow, fieldsForNature, wireCreateValidation } from './clients.js';
+import { fieldRow, fieldsForNature, wireCreateValidation, SECTEURS_SUGGERES } from './clients.js';
+
+// Secteurs prédéfinis (Base Clients) : le champ `secteur` référence le
+// datalist `cl-dl-secteurs`, construit par clients.js dans SON propre DOM.
+// Nouveau Projet est chargé indépendamment (et peut être visité avant Base
+// Clients) : sans ce datalist local, l'attribut `list` pointe dans le vide et
+// aucune suggestion n'apparaît. Id distinct pour ne pas dupliquer `cl-dl-secteurs`
+// si les deux vues finissent montées en même temps.
+const PROJ_SECTEURS_DL_ID = 'proj-dl-secteurs';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -229,7 +237,10 @@ function renderClientPage(body) {
     quickForm.classList.toggle('proj-quick--pro', nature !== 'perso');
 
     const fieldsWrap = el('div', 'proj-quick__fields');
-    for (const f of fieldsForNature(nature)) fieldsWrap.appendChild(fieldRow(f, ''));
+    for (const f of fieldsForNature(nature)) {
+      const field = f.key === 'secteur' ? { ...f, list: PROJ_SECTEURS_DL_ID } : f;
+      fieldsWrap.appendChild(fieldRow(field, ''));
+    }
     quickForm.appendChild(fieldsWrap);
     const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
 
@@ -811,7 +822,10 @@ function buildStatic() {
   const bodyEl = el('div', 'proj-body', '');
   bodyEl.id = 'proj-body';
   page.append(head, bodyEl);
-  ROOT.replaceChildren(page);
+  const dlSecteurs = el('datalist');
+  dlSecteurs.id = PROJ_SECTEURS_DL_ID;
+  dlSecteurs.append(...SECTEURS_SUGGERES.map((s) => new Option(s)));
+  ROOT.replaceChildren(page, dlSecteurs);
 }
 
 let mounted = false;

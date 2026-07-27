@@ -61,7 +61,7 @@ export function fieldsForNature(nat) {
 // Secteurs suggérés (classeur patron « CRM OLDA CREATION CLIENTS », onglet
 // « Liste Secteurs ») : liste de référence, saisie libre autorisée comme le
 // reste du catalogue.
-const SECTEURS_SUGGERES = [
+export const SECTEURS_SUGGERES = [
   'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
   'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
   'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',

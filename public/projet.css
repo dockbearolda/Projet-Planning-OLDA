@@ -27,7 +27,7 @@
   max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
   min-height: 55vh; justify-content: center; text-align: center;
 }
-.proj-step__title { margin: 0 0 20px; font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
+.proj-step__title { margin: 0 0 16px; font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
 .proj-todo { color: var(--text-2); font-style: italic; font-size: 16px; }
 
 /* --- Barre de progression (remplace le fil texte) ------------------------------ */
@@ -96,7 +96,7 @@
 /* Recherche + « Nouveau client » en grand format comptoir (~60px, coins bien
    ronds) : c'est le premier geste de chaque encaissement, il doit se viser
    au doigt sans regarder. */
-.proj-client__row { display: flex; gap: 12px; margin-bottom: 20px; }
+.proj-client__row { display: flex; gap: 12px; margin-bottom: 16px; }
 .proj-search { flex: 1; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 18px; padding: 0 18px; background: var(--surface); }
 .proj-search:focus-within { border-color: var(--primary); }
 .proj-search__ic { color: var(--text-2); font-size: 24px; }
@@ -115,17 +115,26 @@
 .proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .proj-btn:disabled { opacity: .6; cursor: default; }
 
-.proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 6px; padding: 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
+.proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
 .proj-quick[hidden] { display: none; }
 /* Teinte légère façon SumUp : vert Particulier, ambre Pro/Revendeur/Asso —
    même palette que la fiche complète (Base Clients), zéro nouvelle couleur. */
 .proj-quick--perso { border-left-color: var(--st-livree); background: var(--st-livree-bg); }
 .proj-quick--pro { border-left-color: var(--st-cours); background: var(--st-cours-bg); }
-/* Une colonne (mobile, tablette portrait) ; 2 colonnes au-dessus de 720px
-   (desktop, tablette paysage) — même breakpoint que `.cl-f` dans clients.css,
-   qui bascule déjà label-au-dessus/label-à-côté au même seuil. */
+/* Une colonne (mobile, tablette portrait) ; 2 colonnes au-dessus de 720px ;
+   3 au-dessus de 980px (desktop large) — la fiche pro (10 champs) tient sur
+   4 lignes au lieu de 5, ce qu'il faut pour ne jamais scroller ici. */
 .proj-quick__fields { align-self: stretch; display: grid; grid-template-columns: 1fr; gap: 4px 20px; }
 @media (min-width: 720px) { .proj-quick__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 980px) { .proj-quick__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* `.cl-f` (clients.css) empile label/champ depuis #ecf7133 — bien pour le
+   tiroir Base Clients (colonne unique, étroite). Ici l'écran est contraint à
+   NE JAMAIS scroller (voir .proj-body) et la fiche pro affiche jusqu'à 10
+   champs : le label reste à côté du champ pour diviser par ~2 la hauteur de
+   chaque ligne. Largeur dispo par colonne (grille de 2 ou 3 colonnes, max
+   1080px) largement suffisante, pas de retour du problème de troncature
+   WhatsApp qui visait le tiroir (plus étroit, une seule colonne). */
+.proj-quick__fields .cl-f { grid-template-columns: 132px 1fr; align-items: center; gap: 6px 10px; padding: 4px 0; }
 .proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
 .proj-input--sm { min-height: 48px; }
 .proj-seg { display: flex; gap: 4px; border: 1px solid var(--border); border-radius: 14px; padding: 3px; }
