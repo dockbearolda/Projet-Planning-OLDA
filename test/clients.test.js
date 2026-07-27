@@ -171,11 +171,12 @@ delete process.env.APP_PASSWORD;
   const proEnrichi = await j('POST', '/api/clients', {
     entreprise: 'SARL Evelyne', raison_sociale: 'SARL EVELYNE', code_postal: '97150',
     ville: 'Saint-Martin', pays: 'Saint-Martin', secteur: 'Hôtel / Restaurant',
-    referent_prenom: 'Cédric', client_type: 'revendeur',
+    referent_prenom: 'Cédric', prenom: 'Evelyne', client_type: 'revendeur',
   });
   assert.strictEqual(proEnrichi.status, 201, JSON.stringify(proEnrichi.body));
   assert.strictEqual(proEnrichi.body.raison_sociale, 'SARL EVELYNE');
   assert.strictEqual(proEnrichi.body.code_postal, '97150');
+  assert.strictEqual(proEnrichi.body.prenom, 'Evelyne');
   assert.strictEqual(proEnrichi.body.secteur, 'Hôtel / Restaurant');
   assert.strictEqual(proEnrichi.body.client_type, 'revendeur', 'nature étendue acceptée');
   assert.match(proEnrichi.body.code, /^CLI-PRO-\d{4}$/, 'code lisible CLI-PRO-xxxx généré');
