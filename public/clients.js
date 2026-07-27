@@ -33,7 +33,6 @@ export const FIELDS = [
   { key: 'nom', label: 'Contact', icon: 'person', ph: 'Personne à contacter' },
   { key: 'prenom', label: 'Prénom', icon: 'badge', ph: 'Evelyne' },
   { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: 'Cédric' },
-  { key: 'fonction', label: 'Fonction', icon: 'badge', ph: 'Gérante, Resp. Marketing…' },
   { key: 'type', label: 'Type', icon: 'sell', ph: 'Boutique, Hôtel, Entretien…', list: 'cl-dl-types' },
   { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: 'Hôtel / Restaurant, Boutique…', list: 'cl-dl-secteurs' },
   { key: 'zone', label: 'Zone', icon: 'location_on', ph: 'Grand Case, Marigot…', list: 'cl-dl-zones' },
@@ -42,7 +41,6 @@ export const FIELDS = [
   { key: 'pays', label: 'Pays', icon: 'public', ph: 'Saint-Martin' },
   { key: 'telephone', label: 'Téléphone', icon: 'call', ph: '06 90 …', type: 'tel', inputmode: 'tel' },
   { key: 'email', label: 'E-mail', icon: 'mail', ph: 'contact@…', type: 'email', inputmode: 'email' },
-  { key: 'adresse', label: 'Adresse', icon: 'home', ph: 'Ajouter…' },
 ];
 
 // Secteurs suggérés (classeur patron « CRM OLDA CREATION CLIENTS », onglet
@@ -524,9 +522,9 @@ function openNew() {
   drawer = {
     id: null, mode: 'create',
     draft: {
-      entreprise: '', raison_sociale: '', nom: '', prenom: '', referent_prenom: '', fonction: '',
+      entreprise: '', raison_sociale: '', nom: '', prenom: '', referent_prenom: '',
       client_type: 'pro', type: '', secteur: '', zone: '', code_postal: '', ville: '', pays: '',
-      telephone: '', email: '', adresse: '',
+      telephone: '', email: '',
     },
     notes: [],
   };
