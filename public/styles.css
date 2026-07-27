@@ -58,8 +58,9 @@
   --scrollbar: #ccd2dc;
   --scrollbar-hover: #b4bcc9;
 
-  /* filet signature sous la barre (version pastel) */
-  --filet: linear-gradient(90deg, #7c9fd9, #e79a93, #f0cd7a, #86c799);
+  /* filet sous la barre : accent unique (plus le dégradé 4 teintes), cohérent
+     avec la palette quasi monochrome + un seul accent. */
+  --filet: var(--primary);
 
   /* mouvement Material */
   --ease: cubic-bezier(.2, 0, 0, 1);
@@ -128,7 +129,7 @@
   --scrollbar: #45474b;
   --scrollbar-hover: #55585d;
 
-  --filet: linear-gradient(90deg, #4d648f, #8f5b56, #94794a, #4f7d5c);
+  --filet: var(--primary);
 }
 
 * { box-sizing: border-box; }
@@ -296,9 +297,10 @@ body {
 
 /* Filet signature sous la barre (pastel, discret) */
 .topbar-filet {
-  height: 3px;
+  height: 2px;
   flex-shrink: 0;
   background: var(--filet);
+  opacity: .55;
 }
 
 /* ---------------------------------------------------------------- Recherche (pilule) */
@@ -414,17 +416,22 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   color: var(--text-2);
 }
 
-/* Le rail empile des ZONES (une par famille), nettement espacées entre elles.
-   À l'intérieur d'une zone, l'en-tête et ses sous-catégories restent très serrés :
-   on lit d'abord « où en est le projet » (la zone), puis le détail. */
-.stages { padding: 6px 8px 10px; display: flex; flex-direction: column; gap: 9px; }
+/* Le rail empile des ZONES (une par famille), nettement espacées entre elles
+   (16px — plus généreux qu'avant : les groupes doivent se voir sans avoir à
+   les compter). À l'intérieur d'une zone, l'en-tête et ses sous-catégories
+   restent très serrés : on lit d'abord « où en est le projet » (la zone),
+   puis le détail. */
+.stages { padding: 6px 8px 10px; display: flex; flex-direction: column; gap: 16px; }
 .stage-zone { display: flex; flex-direction: column; gap: 1px; }
-/* Une zone à sous-catégories devient un bloc tonal : le fond commun relie le
-   grand titre à ses enfants et détache le groupe de la zone voisine. */
+/* Une zone à sous-catégories devient une vraie petite carte (fond + liseré +
+   ombre légère, même grammaire que .work) plutôt qu'un simple fond tonal :
+   le groupe se voit comme une SECTION, pas comme une teinte qui s'estompe. */
 .stage-zone.has-sub {
-  background: var(--zone-bg);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 3px;
+  box-shadow: var(--shadow-1);
 }
 
 .stage {
@@ -470,12 +477,12 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   flex-shrink: 0;
   transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
-.stage-count.has-items {
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-weight: 600;
-}
-.stage.active .stage-count.has-items { background: var(--chip-on-tonal); color: var(--primary); }
+/* Compteur discret : plus de pastille colorée pour chaque ligne non vide (elle
+   se répétait sur presque tout le rail) — un chiffre simplement plus affirmé
+   que le « 0 » atténué. L'accent ne revient que sur la ligne ACTIVE. */
+.stage-count.has-items { color: var(--text-2); font-weight: 600; }
+.stage.active .stage-count { color: var(--primary); }
+.stage.active .stage-count.has-items { color: var(--primary); }
 .stage.drop-target {
   background: var(--primary-soft);
   box-shadow: inset 0 0 0 1.5px var(--primary);
@@ -488,23 +495,17 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   cursor: not-allowed;
 }
 
-/* Grand titre de ZONE : plus affirmé qu'une sous-catégorie, avec un repère
-   d'accent à gauche. Il reste cliquable (afficher toute la famille) mais se lit
-   comme un EN-TÊTE — d'où le verrouillage du dépôt dessus quand la zone a des
-   sous-catégories (voir stageAcceptsDrop). */
+/* Grand titre de ZONE : plus affirmé qu'une sous-catégorie par la TAILLE et un
+   repère d'accent à gauche — plus par le gras+majuscules+fond teinté en
+   permanence (bruit sur tout le rail, actif ou pas). Reste cliquable
+   (afficher toute la famille) et se lit comme un EN-TÊTE — d'où le
+   verrouillage du dépôt dessus quand la zone a des sous-catégories (voir
+   stageAcceptsDrop). */
 .stage.zone-head { border-radius: var(--radius); padding-left: 22px; }
 .stage.zone-head .stage-label {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-1);
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  font-size: 12.5px;
-}
-/* Fond légèrement teinté propre au NIVEAU 1 : hors survol/actif/dépôt (ces
-   états gardent leur propre fond plus marqué), pour que l'en-tête se détache
-   visuellement de ses sous-catégories (niveau 2) même sans les comparer. */
-.stage.zone-head:not(.active):not(.drop-target):not(.drop-blocked) {
-  background: rgba(var(--primary-rgb), .06);
+  font-size: 13.5px;
 }
 .stage.zone-head::before {
   content: "";
@@ -2485,27 +2486,36 @@ button, a, .stage, .prio-pill, .deadline-badge,
 .nav-switch-btn .material-symbols-outlined { font-size: 20px; flex: 0 0 auto; }
 .nav-switch-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-switch-btn:hover { background: var(--surface-hover); color: var(--text-1); }
+/* Onglet actif : plus de fond bleu clair (c'était le seul endroit où l'accent
+   se répétait dix fois d'affilée dans la barre). La position se lit au texte
+   sombre + gras et à un simple soulignement — l'accent reste réservé au SEUL
+   bouton d'action principal de l'écran (Enregistrer, Ajouter au panier…). */
 .nav-switch-btn.active {
-  background: var(--primary-soft);
-  color: var(--primary);
+  position: relative;
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 700;
+}
+.nav-switch-btn.active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
-/* « Nouveau Projet » est LA feature principale de l'outil : rempli d'un aplat
-   de couleur, pas juste teinté, pour qu'il saute aux yeux avant tout le reste
-   de la barre — le geste qu'on fait le plus souvent doit être le plus visible. */
-.nav-switch-btn--projet {
-  background: var(--primary);
-  color: #fff;
-  margin-right: 6px;
-  padding-right: 14px;
-  border-right: 1px solid var(--border-soft);
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.nav-switch-btn--projet .material-symbols-outlined { color: #fff; }
-.nav-switch-btn--projet:hover { background: var(--primary); filter: brightness(1.08); color: #fff; }
-.nav-switch-btn--projet.active { background: var(--primary); color: #fff; }
+/* « Nouveau Projet » reste reconnaissable par son icône accentuée et son
+   texte gras — plus par un aplat plein en permanence, qui rivalisait avec le
+   VRAI bouton d'action de l'écran (Enregistrer la commande, etc.). Un seul
+   remplissage plein par écran : celui de l'action, jamais celui de la nav. */
+.nav-switch-btn--projet { font-weight: 700; }
+.nav-switch-btn--projet .material-symbols-outlined { color: var(--primary); }
+.nav-switch-btn--projet.active { background: transparent; color: var(--text-1); }
+.nav-switch-btn--projet.active .material-symbols-outlined { color: var(--primary); }
 
 /* Les deux entrées de saisie (Demande / Commande) sont le premier pas : un peu
    plus présentes, et détachées du reste par un filet vertical. */
