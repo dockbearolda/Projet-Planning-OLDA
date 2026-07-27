@@ -177,7 +177,7 @@ async function init() {
   // adresse détaillée, secteur d'activité, référent. Tous nullable : une fiche
   // créée avant cette migration reste valide, juste incomplète.
   // Down : ALTER TABLE clients DROP COLUMN IF EXISTS <col> pour chacune.
-  for (const col of ['code', 'raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom']) {
+  for (const col of ['code', 'raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom', 'prenom']) {
     try {
       await pool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
