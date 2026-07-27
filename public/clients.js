@@ -468,7 +468,20 @@ function renderDrawer() {
   }
   natRow.append(natLab, seg);
   fields.append(natRow);
-  for (const f of FIELDS) fields.append(fieldRow(f, c[f.key]));
+  // Identifiant : lecture seule, uniquement utile une fois le client créé.
+  if (!creating) {
+    const codeField = FIELDS.find((f) => f.key === 'code');
+    fields.append(fieldRow(codeField, c.code));
+  }
+  const tintClass = cur === 'perso' ? 'cl-fields__group--perso' : 'cl-fields__group--pro';
+  const fieldGroup = el('div', `cl-fields__group ${tintClass}`);
+  for (const f of fieldsForNature(cur)) fieldGroup.append(fieldRow(f, c[f.key]));
+  fields.append(fieldGroup);
+  let hint = null;
+  if (creating) {
+    hint = el('p', 'cl-fields__hint');
+    fields.append(hint);
+  }
   bodyScroll.append(fields);
 
   // Actions rapides : appeler / écrire (fiche existante seulement).
@@ -545,7 +558,11 @@ function renderDrawer() {
     create.id = 'cl-create';
     foot.append(cancel, create);
     card.append(foot);
-    setTimeout(() => { const e = $('#cl-f-entreprise'); if (e) e.focus(); }, 40);
+    wireCreateValidation(fieldGroup, create, hint);
+    setTimeout(() => {
+      const first = fieldGroup.querySelector('.cl-f__input');
+      if (first) first.focus();
+    }, 40);
   }
 }
 
