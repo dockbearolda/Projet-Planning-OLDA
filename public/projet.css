@@ -52,8 +52,11 @@
 }
 
 /* Question centrée dans la colonne de droite (tuiles de type) : le client
-   reste dans la sidebar, mais la question elle-même est seule à l'écran. */
-.proj-center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 45vh; }
+   reste dans la sidebar. Pas de min-height ici — le délai/paiement/total
+   s'affichent toujours juste en dessous, un min-height fixe les pousserait
+   hors de l'écran et forcerait un scroll vertical qu'on ne veut pas
+   (façon SumUp : tout tient sur un seul écran, sans barre de scroll). */
+.proj-center { display: flex; flex-direction: column; align-items: center; text-align: center; }
 
 .proj-back { align-self: flex-start; margin-bottom: 10px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
 .proj-back:hover { color: var(--primary); }
@@ -126,21 +129,21 @@
    loin, grille aérée, ombre légère au repos. */
 /* minmax(0, 1fr) : sans lui, l'aspect-ratio des tuiles transfère leur hauteur
    en largeur minimale et la grille déborde du conteneur. */
-.proj-type__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; max-width: 760px; }
-@media (min-width: 900px) { .proj-type__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; } }
+.proj-type__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 700px; }
+@media (min-width: 900px) { .proj-type__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
 .proj-tile {
   aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px; padding: 18px 12px; border: 1px solid var(--border); border-radius: 22px;
+  gap: 10px; padding: 14px 10px; border: 1px solid var(--border); border-radius: 22px;
   background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer;
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
 .proj-tile:hover { background: var(--surface-hover); border-color: var(--primary-soft); transform: translateY(-2px); box-shadow: var(--shadow-2); }
 .proj-tile__circle {
-  width: 68px; height: 68px; border-radius: 50%;
+  width: 56px; height: 56px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--primary-soft); color: var(--primary);
 }
-.proj-tile__ic { font-size: 34px; }
+.proj-tile__ic { font-size: 30px; }
 .proj-tile__label { font-weight: 700; font-size: 17px; text-align: center; color: var(--text-1); }
 
 /* --- Panier (colonne de droite) -------------------------------------------------- */
@@ -158,7 +161,7 @@
 /* Suite de choix visuels : un groupe = un titre + de gros boutons tactiles.
    Aucun <select> — tout se choisit au doigt, l'option active saute aux yeux. */
 .proj-form { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-1); }
-.proj-group { margin: 0 0 24px; }
+.proj-group { margin: 0 0 18px; }
 .proj-group__label { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
 
 .proj-choices { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -203,7 +206,7 @@
 .proj-textarea { width: 100%; min-height: 44px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; resize: vertical; background: var(--surface); color: var(--text-1); }
 
 /* Délai + paiement : boutons segmentés pleine largeur, un choix clair. */
-.proj-delai { margin: 20px 0 4px; }
+.proj-delai { margin: 10px 0 0; }
 .proj-segbar { display: grid; gap: 8px; width: 100%; }
 .proj-segbar--cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .proj-segbar--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -222,7 +225,7 @@
 
 /* Barre du bas façon caisse : total en gros, CTA pleine largeur toujours
    visible. La marge (info interne) reste derrière une icône discrète. */
-.proj-total { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 20px; margin: 24px -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); }
+.proj-total { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 8px; padding: 6px 20px 10px; margin: 8px -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); }
 .proj-total__row { display: flex; align-items: baseline; gap: 12px; }
 .proj-total__label { color: var(--text-2); font-size: 15px; margin-left: auto; }
 .proj-total__value { font-size: 28px; font-weight: 800; color: var(--text-1); }
