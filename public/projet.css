@@ -91,25 +91,6 @@
 .proj-client__row .proj-btn .material-symbols-outlined { font-size: 22px; }
 .proj-client__results { display: flex; flex-direction: column; gap: 6px; }
 
-/* Suggestions tactiles sous la recherche : derniers clients choisis sur ce
-   poste, complétés par les habitués — le champ vide n'est plus seul à l'écran. */
-.proj-sugg__title { margin: 2px 0 10px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); text-align: left; }
-.proj-sugg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-@media (min-width: 560px) { .proj-sugg { grid-template-columns: repeat(3, 1fr); } }
-.proj-sugg__item {
-  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px;
-  border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface);
-  box-shadow: var(--shadow-1); font: inherit; cursor: pointer; text-align: left; min-width: 0;
-}
-.proj-sugg__item:hover { background: var(--surface-hover); border-color: var(--primary-soft); }
-.proj-sugg__av {
-  flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%;
-  background: var(--primary-soft); color: var(--primary);
-  display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800;
-}
-.proj-sugg__info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.proj-sugg__name { font-weight: 600; font-size: 16px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.proj-sugg__meta { font-size: 13.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .proj-client__item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer; text-align: left; }
 .proj-client__item:hover { background: var(--surface-hover); }
 .proj-client__name { font-weight: 600; font-size: 16px; color: var(--text-1); }
