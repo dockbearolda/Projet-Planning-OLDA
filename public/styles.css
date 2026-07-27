@@ -1587,9 +1587,14 @@ tr:hover .handle { color: var(--text-2); }
 }
 .deadline-badge:hover { filter: brightness(.97); }
 .deadline-badge:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.deadline-badge.green { color: var(--st-livree); background: var(--st-livree-bg); }
-.deadline-badge.orange { color: var(--st-cours); background: var(--st-cours-bg); }
-.deadline-badge.red { color: var(--st-bloque); background: var(--st-bloque-bg); font-weight: 600; }
+/* Un seul accent (le bleu de l'app) pour « ça approche / c'est en retard »,
+   gris neutre pour « rien à faire tout de suite » — au lieu de reprendre les
+   couleurs du statut (vert/orange/rouge), sans rapport avec l'échéance.
+   Le retard reste distinct sans 3e teinte : poids de police + le texte
+   (« En retard N j ») portent la différence, pas la couleur seule. */
+.deadline-badge.green { color: var(--text-2); background: var(--state-hover); }
+.deadline-badge.orange { color: var(--primary); background: var(--primary-soft); }
+.deadline-badge.red { color: var(--primary); background: var(--primary-soft); font-weight: 700; }
 /* champ vide actionnable */
 .deadline-badge.empty,
 .empty-field {
@@ -1811,9 +1816,9 @@ tr:hover .handle { color: var(--text-2); }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.spi-deadline.green { color: var(--st-livree); background: var(--st-livree-bg); }
-.spi-deadline.orange { color: var(--st-cours); background: var(--st-cours-bg); }
-.spi-deadline.red { color: var(--st-bloque); background: var(--st-bloque-bg); }
+.spi-deadline.green { color: var(--text-2); background: var(--state-hover); }
+.spi-deadline.orange { color: var(--primary); background: var(--primary-soft); }
+.spi-deadline.red { color: var(--primary); background: var(--primary-soft); font-weight: 700; }
 
 .search-palette-empty {
   padding: 28px 16px;
@@ -2679,8 +2684,10 @@ body.view-comptoir .grid-search { display: none !important; }
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--av, #94A3B8);
-  color: #fff;
+  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
+     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 12px;
   font-weight: 700;
   opacity: .38;
@@ -3141,8 +3148,10 @@ body.view-comptoir .grid-search { display: none !important; }
   height: 26px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--av, #94A3B8);
-  color: #fff;
+  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
+     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 12px;
   font-weight: 800;
 }
@@ -3385,8 +3394,10 @@ body.view-comptoir .grid-search { display: none !important; }
   margin-left: -4px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--av, #94A3B8);
-  color: #fff;
+  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
+     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 10px;
   font-weight: 800;
 }
