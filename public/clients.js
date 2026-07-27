@@ -26,11 +26,12 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 
 // Champs éditables de la fiche (ordre d'affichage). `list` = suggestions
 // (datalist) construites depuis les valeurs déjà présentes dans la base.
-const FIELDS = [
+export const FIELDS = [
   { key: 'entreprise', label: 'Société', icon: 'apartment', ph: 'Nom de la société', required: true },
   { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: 'SARL Evelyne' },
   { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
   { key: 'nom', label: 'Contact', icon: 'person', ph: 'Personne à contacter' },
+  { key: 'prenom', label: 'Prénom', icon: 'badge', ph: 'Evelyne' },
   { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: 'Cédric' },
   { key: 'fonction', label: 'Fonction', icon: 'badge', ph: 'Gérante, Resp. Marketing…' },
   { key: 'type', label: 'Type', icon: 'sell', ph: 'Boutique, Hôtel, Entretien…', list: 'cl-dl-types' },
@@ -319,7 +320,7 @@ function formatPhoneAsTyped(input) {
 }
 
 // --- Fiche (tiroir) --------------------------------------------------------
-function fieldRow(field, value, opts) {
+export function fieldRow(field, value, opts) {
   const row = el('div', 'cl-f');
   const lab = el('label', 'cl-f__label');
   lab.append(ic(field.icon, 'cl-f__ic'), el('span', null, field.label));
@@ -523,7 +524,7 @@ function openNew() {
   drawer = {
     id: null, mode: 'create',
     draft: {
-      entreprise: '', raison_sociale: '', nom: '', referent_prenom: '', fonction: '',
+      entreprise: '', raison_sociale: '', nom: '', prenom: '', referent_prenom: '', fonction: '',
       client_type: 'pro', type: '', secteur: '', zone: '', code_postal: '', ville: '', pays: '',
       telephone: '', email: '', adresse: '',
     },
