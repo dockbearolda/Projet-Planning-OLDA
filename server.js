@@ -574,6 +574,7 @@ const CLIENT_MAX = {
   entreprise: 120, nom: 80, fonction: 80, type: 60, zone: 60,
   email: 160, telephone: 40, adresse: 200,
   raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
+  prenom: 80,
 };
 const CLIENT_FIELDS = [...Object.keys(CLIENT_MAX), 'client_type'];
 // La nature du client (pro/perso/asso/revendeur) partage désormais la MÊME liste
