@@ -654,12 +654,24 @@ async function setNature(value) {
 
 async function createClient() {
   if (!drawer || drawer.mode !== 'create') return;
-  const draft = { client_type: nature(drawer.draft.client_type) };
-  for (const f of FIELDS) {
+  const nat = nature(drawer.draft.client_type);
+  const draft = { client_type: nat };
+  const shown = fieldsForNature(nat);
+  for (const f of shown) {
     const input = $(`#cl-f-${f.key}`);
     if (input) draft[f.key] = input.value.trim();
   }
-  if (!draft.entreprise) { toast('Le nom de la société est requis.'); const e = $('#cl-f-entreprise'); if (e) e.focus(); return; }
+  const missing = shown.find((f) => !draft[f.key]);
+  if (missing) {
+    toast('Merci de remplir tous les champs.');
+    const e = $(`#cl-f-${missing.key}`);
+    if (e) e.focus();
+    return;
+  }
+  // `entreprise` reste la colonne obligatoire côté serveur : pour un
+  // particulier, on la dérive du prénom + nom plutôt que de la demander une
+  // deuxième fois (même logique que le quick-form Nouveau Projet).
+  if (nat === 'perso') draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
   const btn = $('#cl-create');
   if (btn) { btn.disabled = true; btn.textContent = 'Création…'; }
   try {
