@@ -115,8 +115,12 @@
 .proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .proj-btn:disabled { opacity: .6; cursor: default; }
 
-.proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 6px; padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius-lg); }
+.proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 6px; padding: 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
 .proj-quick[hidden] { display: none; }
+/* Teinte légère façon SumUp : vert Particulier, ambre Pro/Revendeur/Asso —
+   même palette que la fiche complète (Base Clients), zéro nouvelle couleur. */
+.proj-quick--perso { border-left-color: var(--st-livree); background: var(--st-livree-bg); }
+.proj-quick--pro { border-left-color: var(--st-cours); background: var(--st-cours-bg); }
 /* Une colonne (mobile, tablette portrait) ; 2 colonnes au-dessus de 720px
    (desktop, tablette paysage) — même breakpoint que `.cl-f` dans clients.css,
    qui bascule déjà label-au-dessus/label-à-côté au même seuil. */
