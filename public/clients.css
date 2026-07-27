@@ -234,11 +234,6 @@
 }
 .cl-fields__hint--warn { color: var(--st-cours); font-weight: 600; }
 .cl-fields__hint--ok { color: var(--st-livree); font-weight: 600; }
-
-.cl-f__input--missing {
-  border-color: var(--st-bloque);
-  background: var(--st-bloque-bg);
-}
 .cl-card__sub {
   font-size: 13px;
   color: var(--text-2);
@@ -377,6 +372,7 @@
 
 .cl-f__input--strong { font-weight: 600; }
 .cl-f__input--readonly { color: var(--text-2); background: var(--surface-hover); cursor: default; }
+.cl-f__input--missing { border-color: var(--st-bloque); background: var(--st-bloque-bg); }
 .cl-f__input::placeholder { color: var(--text-3); }
 .cl-f__input:hover { background: var(--state-hover); }
 .cl-f__input:focus { outline: none; background: var(--surface); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .18); }
