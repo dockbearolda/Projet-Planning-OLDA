@@ -30,18 +30,33 @@ export const FIELDS = [
   { key: 'entreprise', label: 'Société', icon: 'apartment', ph: 'Nom de la société', required: true },
   { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: 'SARL Evelyne' },
   { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
-  { key: 'nom', label: 'Contact', icon: 'person', ph: 'Personne à contacter' },
+  { key: 'nom', label: 'Nom', icon: 'person', ph: 'Nom de famille' },
   { key: 'prenom', label: 'Prénom', icon: 'badge', ph: 'Evelyne' },
   { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: 'Cédric' },
-  { key: 'type', label: 'Type', icon: 'sell', ph: 'Boutique, Hôtel, Entretien…', list: 'cl-dl-types' },
   { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: 'Hôtel / Restaurant, Boutique…', list: 'cl-dl-secteurs' },
-  { key: 'zone', label: 'Zone', icon: 'location_on', ph: 'Grand Case, Marigot…', list: 'cl-dl-zones' },
+  { key: 'zone', label: 'Localisation', icon: 'location_on', ph: 'Grand Case, Marigot…', list: 'cl-dl-zones' },
   { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '97150' },
   { key: 'ville', label: 'Ville', icon: 'location_city', ph: 'Saint-Martin' },
   { key: 'pays', label: 'Pays', icon: 'public', ph: 'Saint-Martin' },
-  { key: 'telephone', label: 'Téléphone', icon: 'call', ph: '06 90 …', type: 'tel', inputmode: 'tel' },
+  { key: 'telephone', label: 'WhatsApp', icon: 'call', ph: '06 90 …', type: 'tel', inputmode: 'tel' },
   { key: 'email', label: 'E-mail', icon: 'mail', ph: 'contact@…', type: 'email', inputmode: 'email' },
 ];
+
+// Champs affichés à la CRÉATION (et à l'édition) selon la nature du client.
+// `code` (identifiant serveur) est géré à part : jamais dans ces listes, montré
+// en lecture seule uniquement en édition. `type` (texte libre "Boutique,
+// Hôtel…") n'est plus proposé dans les formulaires — redondant avec Secteur —
+// mais la colonne reste lisible pour les fiches qui en ont déjà une.
+export const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'];
+export const PRO_FIELDS = [
+  'entreprise', 'raison_sociale', 'zone', 'code_postal', 'ville', 'pays',
+  'referent_prenom', 'telephone', 'secteur', 'email',
+];
+
+export function fieldsForNature(nat) {
+  const keys = nat === 'perso' ? PERSO_FIELDS : PRO_FIELDS;
+  return keys.map((k) => FIELDS.find((f) => f.key === k));
+}
 
 // Secteurs suggérés (classeur patron « CRM OLDA CREATION CLIENTS », onglet
 // « Liste Secteurs ») : liste de référence, saisie libre autorisée comme le
