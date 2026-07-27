@@ -4,7 +4,7 @@
 // dans une section vide (même principe que clients.js / reglages.js), chargé
 // à la demande par app.js.
 
-import { FIELDS, fieldRow } from './clients.js';
+import { fieldRow, fieldsForNature, wireCreateValidation } from './clients.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -20,18 +20,6 @@ const ic = (name, cls) => {
   return n;
 };
 const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-
-// Quick-form "Nouveau client" (page Client) : un particulier ne demande que son
-// identité + contact ; un pro demande TOUTE la fiche Base Clients (sauf
-// `code`, généré côté serveur, et `prenom`, réservé au particulier — un pro
-// n'a pas de prénom propre, seulement un référent).
-const PRO_FIELDS = FIELDS.filter((f) => f.key !== 'code' && f.key !== 'prenom');
-// Le champ `nom` porte le libellé « Contact » dans la fiche pro (personne à
-// contacter chez le client) — pour un particulier c'est son propre nom de
-// famille, donc on relabellise juste pour ce contexte.
-const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email']
-  .map((k) => FIELDS.find((f) => f.key === k))
-  .map((f) => (f.key === 'nom' ? { ...f, label: 'Nom', ph: 'Nom de famille' } : f));
 
 // --- État --------------------------------------------------------------------
 // `page` pilote QUEL écran est affiché : 'client' (plein écran, pas de client
@@ -235,21 +223,26 @@ function renderClientPage(body) {
     }
     quickForm.appendChild(seg);
 
-    const fields = nature === 'perso' ? PERSO_FIELDS : PRO_FIELDS;
+    // Teinte légère façon SumUp : vert Particulier, ambre Pro — même palette
+    // que la fiche complète (Base Clients).
+    quickForm.classList.toggle('proj-quick--perso', nature === 'perso');
+    quickForm.classList.toggle('proj-quick--pro', nature !== 'perso');
+
     const fieldsWrap = el('div', 'proj-quick__fields');
-    for (const f of fields) fieldsWrap.appendChild(fieldRow(f, ''));
+    for (const f of fieldsForNature(nature)) fieldsWrap.appendChild(fieldRow(f, ''));
     quickForm.appendChild(fieldsWrap);
     const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
+
+    const hint = el('p', 'cl-fields__hint');
+    quickForm.appendChild(hint);
 
     const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
     createBtn.type = 'button';
     quickForm.appendChild(createBtn);
 
     // Tous les champs affichés sont obligatoires : le bouton reste désactivé
-    // tant qu'il en manque un (perso comme pro).
-    const updateCreateBtn = () => { createBtn.disabled = inputs.some((i) => !i.value.trim()); };
-    for (const i of inputs) i.addEventListener('input', updateCreateBtn);
-    updateCreateBtn();
+    // et la ligne d'état nomme précisément ce qui manque (perso comme pro).
+    wireCreateValidation(fieldsWrap, createBtn, hint);
 
     createBtn.addEventListener('click', async () => {
       const missing = inputs.find((i) => !i.value.trim());
