@@ -27,19 +27,19 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 // Champs éditables de la fiche (ordre d'affichage). `list` = suggestions
 // (datalist) construites depuis les valeurs déjà présentes dans la base.
 export const FIELDS = [
-  { key: 'entreprise', label: 'Société', icon: 'apartment', ph: 'Nom de la société', required: true },
-  { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: 'SARL Evelyne' },
+  { key: 'entreprise', label: 'Société', icon: 'apartment', ph: '', required: true },
+  { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: '' },
   { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
-  { key: 'nom', label: 'Nom', icon: 'person', ph: 'Nom de famille' },
-  { key: 'prenom', label: 'Prénom', icon: 'badge', ph: 'Evelyne' },
-  { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: 'Cédric' },
-  { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: 'Hôtel / Restaurant, Boutique…', list: 'cl-dl-secteurs' },
-  { key: 'zone', label: 'Localisation', icon: 'location_on', ph: 'Grand Case, Marigot…', list: 'cl-dl-zones' },
-  { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '97150' },
-  { key: 'ville', label: 'Ville', icon: 'location_city', ph: 'Saint-Martin' },
-  { key: 'pays', label: 'Pays', icon: 'public', ph: 'Saint-Martin' },
-  { key: 'telephone', label: 'WhatsApp', icon: 'call', ph: '06 90 …', type: 'tel', inputmode: 'tel' },
-  { key: 'email', label: 'E-mail', icon: 'mail', ph: 'contact@…', type: 'email', inputmode: 'email' },
+  { key: 'nom', label: 'Nom', icon: 'person', ph: '' },
+  { key: 'prenom', label: 'Prénom', icon: 'badge', ph: '' },
+  { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: '' },
+  { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: '', list: 'cl-dl-secteurs' },
+  { key: 'zone', label: 'Localisation', icon: 'location_on', ph: '', list: 'cl-dl-zones' },
+  { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '' },
+  { key: 'ville', label: 'Ville', icon: 'location_city', ph: '' },
+  { key: 'pays', label: 'Pays', icon: 'public', ph: '' },
+  { key: 'telephone', label: 'WhatsApp', icon: 'call', ph: '', type: 'tel', inputmode: 'tel' },
+  { key: 'email', label: 'E-mail', icon: 'mail', ph: '', type: 'email', inputmode: 'email' },
 ];
 
 // Champs affichés à la CRÉATION (et à l'édition) selon la nature du client.
