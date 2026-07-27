@@ -637,11 +637,9 @@ async function setNature(value) {
   const nat = nature(value);
   const unchanged = nature(drawer.draft.client_type) === nat;
   drawer.draft.client_type = nat;
-  for (const b of ROOT.querySelectorAll('.cl-seg__btn')) {
-    const on = b.dataset.nature === nat;
-    b.classList.toggle('is-on', on);
-    b.setAttribute('aria-checked', String(on));
-  }
+  // La liste de champs affichée dépend de la nature : on re-render tout de
+  // suite (création ET édition), avant même le PATCH réseau en édition.
+  if (!unchanged) renderDrawer();
   if (drawer.mode !== 'edit' || unchanged) return;   // création, ou rien à changer
   try {
     const updated = await api('PATCH', `/api/clients/${drawer.id}`, { client_type: nat });
