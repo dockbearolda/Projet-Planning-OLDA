@@ -4,6 +4,8 @@
 // dans une section vide (même principe que clients.js / reglages.js), chargé
 // à la demande par app.js.
 
+import { FIELDS, fieldRow } from './clients.js';
+
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -18,6 +20,13 @@ const ic = (name, cls) => {
   return n;
 };
 const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+// Quick-form "Nouveau client" (page Client) : un particulier ne demande que son
+// identité + contact ; un pro demande TOUTE la fiche Base Clients (sauf
+// `code`, généré côté serveur, et `prenom`, réservé au particulier — un pro
+// n'a pas de prénom propre, seulement un référent).
+const PRO_FIELDS = FIELDS.filter((f) => f.key !== 'code' && f.key !== 'prenom');
+const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'].map((k) => FIELDS.find((f) => f.key === k));
 
 // --- État --------------------------------------------------------------------
 // `page` pilote QUEL écran est affiché : 'client' (plein écran, pas de client
@@ -221,23 +230,33 @@ function renderClientPage(body) {
     }
     quickForm.appendChild(seg);
 
-    const nameField = el('input', 'proj-input');
-    nameField.placeholder = nature === 'perso' ? 'Prénom Nom' : 'Nom de facturation';
-    const phoneField = el('input', 'proj-input');
-    phoneField.placeholder = 'WhatsApp';
-    phoneField.type = 'tel';
-    quickForm.append(nameField, phoneField);
+    const fields = nature === 'perso' ? PERSO_FIELDS : PRO_FIELDS;
+    const fieldsWrap = el('div', 'proj-quick__fields');
+    for (const f of fields) fieldsWrap.appendChild(fieldRow(f, ''));
+    quickForm.appendChild(fieldsWrap);
+    const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
 
     const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
     createBtn.type = 'button';
+    quickForm.appendChild(createBtn);
+
+    // Tous les champs affichés sont obligatoires : le bouton reste désactivé
+    // tant qu'il en manque un (perso comme pro).
+    const updateCreateBtn = () => { createBtn.disabled = inputs.some((i) => !i.value.trim()); };
+    for (const i of inputs) i.addEventListener('input', updateCreateBtn);
+    updateCreateBtn();
+
     createBtn.addEventListener('click', async () => {
-      const nom = nameField.value.trim();
-      if (!nom) { nameField.focus(); return; }
+      const missing = inputs.find((i) => !i.value.trim());
+      if (missing) { missing.focus(); return; }
       createBtn.disabled = true;
+      const draft = { client_type: nature };
+      for (const i of inputs) draft[i.dataset.key] = i.value.trim();
+      // `entreprise` reste la colonne obligatoire côté serveur et sert à la
+      // recherche/l'affichage : pour un particulier, on la dérive du prénom +
+      // nom plutôt que de la demander une deuxième fois.
+      if (nature === 'perso') draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
       try {
-        const draft = nature === 'perso'
-          ? { entreprise: nom, nom, client_type: 'perso', telephone: phoneField.value.trim() }
-          : { entreprise: nom, client_type: 'pro', telephone: phoneField.value.trim() };
         const created = await api('POST', '/api/clients', draft);
         CLIENTS.push(created);
         goToClient({
@@ -249,8 +268,7 @@ function renderClientPage(body) {
         window.alert(err.message || 'Création impossible');
       }
     });
-    quickForm.appendChild(createBtn);
-    nameField.focus();
+    inputs[0].focus();
   };
   newBtn.addEventListener('click', () => renderQuickForm('pro'));
 
