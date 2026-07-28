@@ -1698,6 +1698,14 @@ function openLigneDetail(id) {
   ensureLigneDrawer();
   ligneDrawerId = String(id);
   ligneDrawerEl.hidden = false;
+  // Le corps du tiroir précédent est encore monté (closeLigneDetail masque, ne
+  // vide pas) et le navigateur lui rend sa position de scroll dès qu'il
+  // redevient visible : on la remet à zéro APRÈS l'affichage — sinon la remise
+  // à zéro tombe sur un élément sans boîte de défilement et reste sans effet —
+  // pour que renderLigneDetail n'aille pas reporter le scroll d'une AUTRE ligne
+  // sur celle qu'on ouvre.
+  const oldBody = ligneDrawerCard.querySelector('.ld-body');
+  if (oldBody) oldBody.scrollTop = 0;
   renderLigneDetail();
 }
 
@@ -1713,8 +1721,22 @@ function closeLigneDetail() {
 function renderLigneDetailIfOpen() {
   if (!ligneDrawerId) return;
   const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  // La fermeture passe AVANT la garde : un tiroir ouvert sur une ligne qui a
+  // quitté la vue doit se fermer même si le focus est resté dedans.
   if (!r) { closeLigneDetail(); return; }
+  if (isDrawerBusy()) return;
   renderLigneDetail();
+}
+
+// Vrai si le tiroir ne doit pas être reconstruit : focus d'édition à l'intérieur
+// (même protection que isRowBusy pour une ligne de la grille). Sans elle, un
+// rendu déclenché par un tiers — ex. `category-owners` en SSE, qui appelle
+// applySortAndRender() sans passer par la garde isInteracting() de poll() —
+// remplacerait le <textarea> des Notes et effacerait la saisie non sauvegardée.
+function isDrawerBusy() {
+  if (!ligneDrawerCard) return false;
+  const ae = document.activeElement;
+  return !!(ae && ligneDrawerCard.contains(ae));
 }
 
 // Une ligne « libellé / valeur » du détail (sections Contact et Suivi).
@@ -1827,6 +1849,13 @@ function ficheItems(fiche) {
 function renderLigneDetail() {
   const r = rows.find((x) => String(x.id) === ligneDrawerId);
   if (!r) { closeLigneDetail(); return; }
+  // `.ld-body` est le conteneur scrollable, et replaceChildren() le détruit :
+  // on relève sa position pour la reposer sur le corps reconstruit, sinon le
+  // panneau remonte en haut à chaque sauvegarde alors que les Notes sont tout
+  // en bas. Le navigateur borne lui-même la valeur au scroll réellement
+  // disponible, donc un contenu plus court retombe naturellement.
+  const oldBody = ligneDrawerCard.querySelector('.ld-body');
+  const prevScrollTop = oldBody ? oldBody.scrollTop : 0;
   ligneDrawerCard.replaceChildren();
 
   const head = document.createElement('header');
@@ -1972,6 +2001,7 @@ function renderLigneDetail() {
   body.appendChild(notesSection);
 
   ligneDrawerCard.appendChild(body);
+  if (prevScrollTop) body.scrollTop = prevScrollTop;
 }
 
 // Bouton « voir détails » : rejoint le cluster documents de la cellule
