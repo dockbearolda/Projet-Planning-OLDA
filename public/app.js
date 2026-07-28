@@ -1228,19 +1228,26 @@ function cellDossier(r) {
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
   syncTitleOnOverflow(company);
 
-  // Le nom du dossier et la pastille WhatsApp sur la MÊME ligne : le numéro
-  // appartient au client, il se lit juste à côté de son nom.
   const line = document.createElement('div');
   line.className = 'client-line';
   line.appendChild(company);
-  line.appendChild(cellWhatsapp(r));
-  line.appendChild(cellPdfSlot(r, 'devis'));
-  line.appendChild(cellPdfSlot(r, 'facture'));
-  line.appendChild(cellPdfSlot(r, 'bat'));
-  line.appendChild(cellLigneDetailButton(r));
+
+  // Les pastilles sur leur PROPRE rangée, sous le nom (cf. .client-docs) : à
+  // cinq ou six elles occupent 172 à 204 px incompressibles, alors que le nom se
+  // réduit jusqu'à zéro. Sur la même rangée, c'était donc toujours le nom qui
+  // disparaissait — et le cluster sortait quand même de la cellule pour
+  // recouvrir la colonne voisine.
+  const docs = document.createElement('div');
+  docs.className = 'client-docs';
+  docs.appendChild(cellWhatsapp(r));
+  docs.appendChild(cellPdfSlot(r, 'devis'));
+  docs.appendChild(cellPdfSlot(r, 'facture'));
+  docs.appendChild(cellPdfSlot(r, 'bat'));
+  docs.appendChild(cellLigneDetailButton(r));
   const pdfWa = cellPdfWhatsapp(r);
-  if (pdfWa) line.appendChild(pdfWa);
-  stack.appendChild(line);
+  if (pdfWa) docs.appendChild(pdfWa);
+
+  stack.append(line, docs);
   td.appendChild(stack);
   return td;
 }

@@ -1155,10 +1155,31 @@ tr:hover .handle { color: var(--text-2); }
   text-overflow: ellipsis;
 }
 
-/* Le nom du dossier et la pastille WhatsApp partagent une rangée : le champ
-   prend la place restante, la pastille reste collée au bout du nom. */
-.client-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+/* Le nom du dossier occupe toute la 1re rangée de la cellule. */
+.client-line { display: flex; align-items: center; min-width: 0; }
 .client-line .client-company { flex: 1 1 auto; min-width: 0; }
+
+/* Les pastilles du dossier (WhatsApp, devis, facture, BAT, détail, envoi PDF)
+   tiennent leur PROPRE rangée, sous le nom. Elles pèsent 204 px
+   INCOMPRESSIBLES à six (6 × 24 px + marges + écarts + le retrait
+   d'alignement ; 172 px à cinq), alors que le
+   nom, lui, se réduit jusqu'à zéro : côte à côte sur la même rangée, c'est
+   toujours le nom qui payait — il tombait à 0 px de texte visible dès que la
+   colonne descendait sous ~190 px (soit toutes les étapes sauf Demande en
+   1280×800) et le cluster débordait quand même sur la colonne voisine
+   (+97 px mesurés en Commande / Facturation). Deux rangées : le nom garde
+   toute la largeur, les pastilles aussi.
+   Aucun coût en hauteur : --row-h vaut 76 px, les deux rangées (~32 + 24)
+   y tiennent sans faire grandir la ligne.
+   `flex-wrap` = filet de sécurité : la largeur de colonne est réglable à la
+   main (poignée d'en-tête), et un cluster trop large doit passer à la ligne
+   plutôt que recouvrir la colonne voisine.
+   Le retrait de 14 px aligne les pastilles sur le texte du nom (même padding
+   que .client-company).
+   `gap: 2px` : l'écart d'origine, à conserver tel quel. Les zones tactiles de
+   44 px (::after) se chevauchent déjà entre pastilles voisines ; resserrer de
+   2 px mangeait la croix « retirer » de la pastille précédente. */
+.client-docs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-left: 14px; }
 
 /* Pastille WhatsApp : seulement sur les lignes dont le client a laissé un
    numéro. Un clic ouvre la conversation avec le message déjà écrit (réglé dans
@@ -1969,7 +1990,7 @@ tr:hover .handle { color: var(--text-2); }
 
 /* colonnes largeurs */
 /* En table-layout: fixed, seule la largeur des colonnes « puce » est fixée ;
-   les 3 colonnes texte (client / description / infos) n'ont PAS de largeur et se
+   les 2 colonnes texte (description / infos) n'ont PAS de largeur et se
    partagent équitablement l'espace restant → la grille s'adapte à la fenêtre. */
 .col-handle { width: 44px; }
 .col-type { width: 66px; }
@@ -1979,6 +2000,24 @@ tr:hover .handle { color: var(--text-2); }
 .col-sub { width: 140px; }
 .col-deadline { width: 124px; }
 .col-del { width: 116px; }
+/* « Nom du Dossier » ne peut plus être élastique : sa rangée de pastilles est
+   incompressible (204 px à six pastilles). Élastique, elle tombait à 85 px sur les étapes qui
+   affichent Prix ET Sous-étape, et le cluster sortait de la cellule. 210 px =
+   les pastilles + une marge, et le nom dispose de la même largeur au-dessus. */
+.col-client { width: 210px; }
+
+/* Plancher de largeur de la grille, par jeu de colonnes affichées.
+   Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a
+   plus la place, la grille DÉFILE horizontalement au lieu de tasser les
+   colonnes de texte. « Nom du Dossier » étant maintenant fixe (210 px), sans
+   ces planchers ce sont Description et Infos qui absorbaient tout le manque
+   (27 px sur les étapes qui montrent Prix + Sous-étape : illisible).
+   Calcul : colonnes fixes + 210 (dossier) + ~92 (priorité) + 2 × 110 (texte).
+   `:not(.manual-cols)` : dès que l'utilisateur règle ses largeurs à la main,
+   c'est lui qui décide (cf. .grid.manual-cols { min-width: 0 }). */
+.grid:not(.manual-cols):not(.no-sub) { min-width: 1270px; }
+.grid:not(.manual-cols):not(.no-price) { min-width: 1220px; }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: 1360px; }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
