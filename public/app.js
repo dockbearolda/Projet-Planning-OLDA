@@ -1717,6 +1717,99 @@ function renderLigneDetailIfOpen() {
   renderLigneDetail();
 }
 
+// Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
+// archivé à la création de la commande, jamais retouché après). Deux formats
+// possibles selon le flux de création — cf. server.js buildCommande/buildProjet.
+// Retourne `null` si `fiche` est absent ou d'un format non reconnu (ligne créée
+// à la main dans la grille, ou ancienne fiche v1) : la section est alors
+// masquée, sans erreur.
+function ficheLigneEl(titre, sousLignes) {
+  const box = document.createElement('div');
+  box.className = 'ld-fiche-item';
+  const t = document.createElement('p');
+  t.className = 'ld-fiche-item__title';
+  t.textContent = titre;
+  box.appendChild(t);
+  for (const s of sousLignes) {
+    if (!s) continue;
+    const p = document.createElement('p');
+    p.className = 'ld-fiche-item__sub';
+    p.textContent = s;
+    box.appendChild(p);
+  }
+  return box;
+}
+
+// Flux « Commande » (tasses / textiles / objets), fiche.kind = 'commande-atelier'.
+// Mêmes champs que detailLigne() côté serveur (server.js:1115-1153), rendus en
+// HTML structuré plutôt qu'en texte à flèches « ↳ ».
+function ficheItemsCommandeAtelier(fiche) {
+  const items = [];
+  for (const l of fiche.tasses || []) {
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`,
+      [
+        ...(l.faces || []).map((f) => `${f.label} (${f.hint}) : ${f.visuel}`),
+        (l.options || []).length ? l.options.map((o) => o.label).join(' · ') : null,
+        l.typo ? `Typo : ${l.typo}` : null,
+        l.infos || null,
+        l.remarque ? `Remarque : ${l.remarque}` : null,
+      ],
+    ));
+  }
+  for (const l of fiche.textiles || []) {
+    const tailleTxt = (l.tailles && l.tailles.length)
+      ? l.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ')
+      : (l.taille ? `taille ${l.taille}` : '');
+    const id = [l.ref && `réf. ${l.ref}`, l.couleur, tailleTxt].filter(Boolean).join(' · ');
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`,
+      [
+        l.note || null,
+        ...(l.zones || []).map((z) => {
+          const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
+          const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null].filter(Boolean).join(' · ') || z.consigne || '';
+          return `${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
+        }),
+      ],
+    ));
+  }
+  for (const l of fiche.objets || []) {
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.ref}`,
+      [l.techniqueLabel ? `${l.techniqueLabel}${l.infos ? ` : ${l.infos}` : ''}` : (l.infos || null)],
+    ));
+  }
+  return items;
+}
+
+// Flux « Nouveau Projet » (panier multi-type), fiche.kind = 'projet-simple'.
+// `l.bat` est l'option catalogue tarifée (server.js:1206, 1226) — à NE PAS
+// confondre avec la pièce jointe BAT (documents) : badge texte distinct.
+function ficheItemsProjetSimple(fiche) {
+  return (fiche.lignes || []).map((l) => {
+    if (l.produit) {
+      const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
+      return ficheLigneEl(
+        `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}`,
+        [
+          opts.length ? opts.join(', ') : null,
+          l.remarque ? `Remarque : ${l.remarque}` : null,
+          l.bat ? '★ BAT inclus (option catalogue)' : null,
+        ],
+      );
+    }
+    return ficheLigneEl(`${l.quantite} × ${l.description}`, []);
+  });
+}
+
+function ficheItems(fiche) {
+  if (!fiche || typeof fiche !== 'object') return null;
+  if (fiche.kind === 'commande-atelier') return ficheItemsCommandeAtelier(fiche);
+  if (fiche.kind === 'projet-simple') return ficheItemsProjetSimple(fiche);
+  return null;
+}
+
 function renderLigneDetail() {
   const r = rows.find((x) => String(x.id) === ligneDrawerId);
   if (!r) { closeLigneDetail(); return; }
@@ -1799,6 +1892,19 @@ function renderLigneDetail() {
   docsRow.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
   docsSection.append(docsTitle, docsRow);
   body.appendChild(docsSection);
+
+  // --- Détail produit (structuré, depuis fiche) -------------------------------
+  const items = ficheItems(r.fiche);
+  if (items && items.length) {
+    const ficheSection = document.createElement('section');
+    ficheSection.className = 'ld-section';
+    const ficheTitle = document.createElement('p');
+    ficheTitle.className = 'ld-section-title';
+    ficheTitle.textContent = 'Détail produit';
+    ficheSection.appendChild(ficheTitle);
+    for (const it of items) ficheSection.appendChild(it);
+    body.appendChild(ficheSection);
+  }
 
   ligneDrawerCard.appendChild(body);
 }
