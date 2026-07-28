@@ -40,9 +40,9 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(putBody.filename, 'BAT 2026-001.pdf');
 
   // --- Le nom de fichier remonte dans la liste des commandes ---------------
-  const list = await (await fetch(`${base}/api/requests?stage=demande`)).json();
+  const list = await (await fetch(`${base}/api/requests?stage=demande_chiffrage`)).json();
   const row = list.find((r) => r.id === id);
-  assert.ok(row, 'la commande créée doit apparaître dans /api/requests?stage=demande');
+  assert.ok(row, 'la commande créée doit apparaître dans /api/requests?stage=demande_chiffrage');
   assert.strictEqual(row.bat_name, 'BAT 2026-001.pdf');
 
   // --- Consultation : contenu identique, servi en PDF -----------------------

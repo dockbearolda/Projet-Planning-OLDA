@@ -1,8 +1,8 @@
 {
   "commande": {
     "types": [
-      { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande", "subStage": null },
-      { "id": "commande", "label": "Commande", "hint": "validée par le client", "stage": "chiffrage", "subStage": "a_chiffrer" }
+      { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande_chiffrage", "subStage": "demande_recue" },
+      { "id": "commande", "label": "Commande", "hint": "validée par le client", "stage": "demande_chiffrage", "subStage": "a_chiffrer" }
     ],
     "familles": [
       { "id": "tasse", "label": "Tasses", "icone": "local_cafe", "unite": "tasse" },

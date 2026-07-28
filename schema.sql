@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS requests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage           text NOT NULL DEFAULT 'demande',   -- FAMILLE (8 grandes étapes + fiverr)
+  stage           text NOT NULL DEFAULT 'demande_chiffrage',   -- FAMILLE (5 grandes étapes + fiverr)
   sub_stage       text,                              -- SOUS-FAMILLE (précise l'action en cours ; null si la famille n'en a pas)
   order_kind      text,                              -- NATURE tranchée à la prise : 'demande' (à chiffrer) / 'commande' (validée) ; null = ancienne ligne
   responsable     text,                              -- PILOTE : qui pilote le projet (Loïc / Charlie / Mélina / Julien / À attribuer)

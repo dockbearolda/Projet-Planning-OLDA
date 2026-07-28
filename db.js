@@ -19,16 +19,14 @@ types.setTypeParser(types.builtins.DATE, (v) => v);
 //     choisie en ligne sur la commande (puce), uniquement pour les familles qui
 //     en ont. « 1 projet = 1 seule place. »
 const FAMILIES = [
-  { slug: 'demande', label: 'Demande' },
-  // Ex-« Chiffrage / Devis » : c'est là qu'atterrit une COMMANDE validée prise
-  // au comptoir (le devis/chiffrage reste à faire, mais le client a dit oui).
-  { slug: 'chiffrage', label: 'Commande' },
-  { slug: 'attente_client', label: 'Attente Client' },
-  { slug: 'preparation', label: 'Préparation' },
+  // Reçu, qualifié, chiffré, devis envoyé, devis validé : tout le commercial
+  // avant que l'atelier ne touche quoi que ce soit.
+  { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
+  { slug: 'preparation', label: 'Préparation du projet' },
   { slug: 'production', label: 'Production' },
-  { slug: 'facturation', label: 'Facturation / Retrait' },
-  { slug: 'termine', label: 'Terminé' },
-  { slug: 'archive', label: 'Archivé' },
+  { slug: 'facturation', label: 'Facturation & remise au client' },
+  // Le dossier est parti chez le client : reste l'argent, puis l'archive.
+  { slug: 'paiement', label: 'Paiement & clôture' },
 ];
 
 // Catégorie spéciale conservée hors des 8 familles : sous-traitance graphiste
@@ -41,35 +39,49 @@ const SPECIAL = [
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
 
-// Sous-familles par famille (slug → libellé). Une famille absente d'ici n'a pas
-// de sous-étape (Demande, Attente Client, Archivé, Fiverr).
+// Sous-familles par famille (slug → libellé). Seul Fiverr n'en a pas : les 5
+// familles décrivent toutes une suite d'actions précises.
+// « À commander » et « Attente marchandise » se glissent entre la validation de
+// l'acompte et « Prêt à produire » : on valide l'argent, on commande la
+// marchandise, on la reçoit, alors seulement la production peut démarrer.
 const SUB_STAGES = {
-  chiffrage: [
+  demande_chiffrage: [
+    { slug: 'demande_recue', label: 'Demande reçue' },
+    { slug: 'demande_a_qualifier', label: 'Demande à qualifier' },
     { slug: 'a_chiffrer', label: 'À chiffrer' },
     { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
-    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+    { slug: 'devis_envoye', label: 'Tarif / Devis envoyé – Attente client' },
+    { slug: 'devis_valide', label: 'Devis validé' },
   ],
   preparation: [
-    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'prepa_produits', label: 'Préparation des produits' },
+    { slug: 'prepa_bat', label: 'Préparation du BAT' },
+    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    { slug: 'bat_valide', label: 'BAT validé' },
+    { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
     { slug: 'attente_marchandise', label: 'Attente marchandise' },
     { slug: 'pret_a_produire', label: 'Prêt à produire' },
   ],
   production: [
     { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'decoupe_dtf', label: 'Découpe & Contrôle DTF' },
     { slug: 'prod_pressage', label: 'Pressage' },
     { slug: 'prod_trotec', label: 'Production Trotec' },
     { slug: 'prod_uv', label: 'Production UV' },
     { slug: 'montage_finition', label: 'Montage / Finition' },
-    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+    { slug: 'controle_emballage', label: 'Contrôle & Emballage' },
   ],
   facturation: [
     { slug: 'facturation_a_faire', label: 'Facturation à faire' },
-    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+    { slug: 'client_a_prevenir', label: 'Client à prévenir' },
+    { slug: 'client_prevenu', label: 'Client prévenu – Attente retrait' },
+    { slug: 'commande_recuperee', label: 'Commande récupérée' },
   ],
-  termine: [
-    { slug: 'attente_paiement', label: 'Attente paiement' },
-    { slug: 'solde', label: 'Soldé' },
+  paiement: [
+    { slug: 'paiement_a_controler', label: 'Paiement à contrôler' },
+    { slug: 'paiement_valide', label: 'Paiement validé / Soldé' },
+    { slug: 'archive', label: 'Archivé' },
   ],
 };
 
@@ -198,6 +210,10 @@ async function init() {
   // Puis bascule du modèle linéaire vers le modèle « familles » à 2 niveaux.
   // Non destructif, exécuté UNE seule fois (garde app_meta).
   await migrateStagesToFamilies();
+
+  // Enfin, regroupement des 8 familles en 5 (liste d'étapes du patron).
+  // Non destructif, exécuté UNE seule fois (garde app_meta séparée).
+  await migrateFamiliesToFive();
 
   // Filet de sécurité : réaligne toute ligne restée sur un ancien slug malgré la
   // garde ci-dessus (import / restauration de sauvegarde). Idempotent.
@@ -360,6 +376,113 @@ async function migrateStagesToFamilies() {
   await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model', 'families')");
 }
 
+// Bascule du modèle « 8 familles » (v2) vers le modèle « 5 FAMILLES » (v3), la
+// liste d'étapes écrite par le patron le 28/07/2026.
+//
+// Clé de correspondance : `famille/sous-étape` (sous-étape vide = la famille
+// sans puce). `famille/*` sert de repli pour toute sous-étape non listée.
+// Une position ABSENTE de cette table ne bouge pas : Préparation (sauf
+// prepa_fichiers), Production, Facturation à faire et Fiverr gardent leurs
+// slugs, donc la grande majorité des lignes n'est même pas réécrite.
+const V2_TO_V3 = {
+  'demande/*': ['demande_chiffrage', 'demande_recue'],
+  'chiffrage/': ['demande_chiffrage', 'a_chiffrer'],
+  'chiffrage/a_chiffrer': ['demande_chiffrage', 'a_chiffrer'],
+  'chiffrage/chiffrage_en_cours': ['demande_chiffrage', 'chiffrage_en_cours'],
+  'chiffrage/devis_a_envoyer': ['demande_chiffrage', 'devis_envoye'],
+  'chiffrage/*': ['demande_chiffrage', 'a_chiffrer'],
+  'attente_client/*': ['demande_chiffrage', 'devis_envoye'],
+  'preparation/prepa_fichiers': ['preparation', 'prepa_produits'],
+  'facturation/pret_retrait': ['facturation', 'client_prevenu'],
+  'termine/attente_paiement': ['paiement', 'paiement_a_controler'],
+  'termine/solde': ['paiement', 'paiement_valide'],
+  'termine/*': ['paiement', 'paiement_a_controler'],
+  'archive/*': ['paiement', 'archive'],
+};
+
+// Position v2 → position v3, ou null si rien ne change. Exportée : le test de
+// migration l'exerce directement, sans passer par une base.
+function toFiveFamilies(stage, sub) {
+  const key = `${stage}/${sub ?? ''}`;
+  return V2_TO_V3[key] || V2_TO_V3[`${stage}/*`] || null;
+}
+
+// Garde d'idempotence SÉPARÉE de `stage_model` : cette clé-là doit garder la
+// valeur 'families', sinon migrateStagesToFamilies se rejouerait à chaque
+// démarrage et son UPDATE « WHERE stage = 'facturation' » écraserait la
+// sous-étape de toutes les lignes en facturation.
+//
+// Down : appliquer V2_TO_V3 à l'envers (demande_recue/demande_a_qualifier →
+// demande, devis_envoye → attente_client, prepa_produits → prepa_fichiers,
+// client_prevenu → facturation/pret_retrait, paiement/* → termine et archive),
+// puis DELETE FROM app_meta WHERE key = 'stage_model_v3'.
+async function migrateFamiliesToFive() {
+  try {
+    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'demande_chiffrage'");
+  } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
+
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model_v3'");
+    if (rows[0] && rows[0].value === '1') return;
+  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+
+  const { rows: all } = await pool.query('SELECT id, stage, sub_stage FROM requests');
+  let moved = 0;
+  for (const r of all) {
+    const next = toFiveFamilies(r.stage, r.sub_stage ?? null);
+    if (!next) continue;
+    await pool.query('UPDATE requests SET stage = $1, sub_stage = $2 WHERE id = $3', [next[0], next[1], r.id]);
+    moved += 1;
+  }
+  if (moved) console.log(`ℹ  Pipeline : ${moved} commande(s) reclassée(s) dans les 5 familles.`);
+
+  await renameCategorySettingKeys();
+
+  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model_v3'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model_v3', '1')");
+}
+
+// Les pilotes et référents PAR DÉFAUT sont réglés par étape (app_meta
+// category_owners / category_referents, clé = slug). Cinq sous-étapes changent
+// simplement de nom : sans ce report, le patron verrait ses réglages disparaître
+// sans comprendre pourquoi.
+//
+// Seules les correspondances 1 pour 1 sont reportées. Les anciennes FAMILLES
+// (demande, chiffrage, attente_client → une seule famille aujourd'hui) sont
+// laissées telles quelles : trois réglages différents ne peuvent pas fusionner
+// sans en écraser deux, autant que le patron retranche lui-même.
+const SETTING_KEY_RENAMES = {
+  prepa_fichiers: 'prepa_produits',
+  devis_a_envoyer: 'devis_envoye',
+  pret_retrait: 'client_prevenu',
+  attente_paiement: 'paiement_a_controler',
+  solde: 'paiement_valide',
+};
+
+async function renameCategorySettingKeys() {
+  for (const key of ['category_owners', 'category_referents']) {
+    const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [key]);
+    if (!rows[0]) continue;
+    let map;
+    try {
+      map = JSON.parse(rows[0].value);
+    } catch (_) { continue; }
+    if (!map || typeof map !== 'object') continue;
+
+    let changed = false;
+    for (const [from, to] of Object.entries(SETTING_KEY_RENAMES)) {
+      // Un réglage déjà posé sur le nouveau slug fait foi : on ne l'écrase pas.
+      if (map[from] === undefined || map[to] !== undefined) continue;
+      map[to] = map[from];
+      delete map[from];
+      changed = true;
+    }
+    if (!changed) continue;
+    await pool.query('DELETE FROM app_meta WHERE key = $1', [key]);
+    await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [key, JSON.stringify(map)]);
+  }
+}
+
 // Réparation AUTO-CICATRISANTE (idempotente, non destructive). Certaines lignes
 // portent un `stage` resté sur un ANCIEN slug (linéaire ou multi-machines :
 // « prod_trotec », « preparation_production », « nouvelle_demande »…) jamais
@@ -387,13 +510,23 @@ async function repairOrphanStages() {
       // stage='preparation_production' mais sub_stage='prod_trotec' est bien une
       // commande de production Trotec, pas une préparation fichiers).
       family = SUB_TO_FAMILY[sub];
-    } else if (STAGE_TO_FAMILY[r.stage]) {
-      [family, sub] = STAGE_TO_FAMILY[r.stage];
     } else {
-      // Slug totalement inconnu : on la renvoie en tête de pipeline plutôt que de
-      // la laisser invisible dans la sidebar.
-      family = 'demande';
-      sub = null;
+      // Deux modèles peuvent précéder celui-ci : le linéaire (20 étapes à plat)
+      // et les 8 familles. On les traverse dans l'ordre — linéaire → v2 → v3 —
+      // pour qu'un slug très ancien retombe quand même sur sa place actuelle.
+      const [v2Stage, v2Sub] = STAGE_TO_FAMILY[r.stage] || [r.stage, sub];
+      const v3 = toFiveFamilies(v2Stage, v2Sub);
+      if (v3) {
+        [family, sub] = v3;
+      } else if (STAGE_SLUGS.includes(v2Stage)) {
+        family = v2Stage;
+        sub = v2Sub;
+      } else {
+        // Slug totalement inconnu : on la renvoie en tête de pipeline plutôt que
+        // de la laisser invisible dans la sidebar.
+        family = 'demande_chiffrage';
+        sub = 'demande_recue';
+      }
     }
     await pool.query('UPDATE requests SET stage = $1, sub_stage = $2 WHERE id = $3', [family, sub, r.id]);
   }
@@ -412,19 +545,19 @@ async function seed() {
 
   const samples = [
     {
-      stage: 'demande', sub_stage: null, responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
+      stage: 'demande_chiffrage', sub_stage: 'demande_recue', responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
       billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', quantity: 50,
       product: '50 t-shirts staff', color: 'Noir', project_value: 850,
       description: 'Tee-shirts équipe — gros devis', deadline: inDays(3), position: 1000,
     },
     {
-      stage: 'demande', sub_stage: null, responsable: 'À attribuer', priority: 1, client_type: 'perso',
+      stage: 'demande_chiffrage', sub_stage: 'demande_a_qualifier', responsable: 'À attribuer', priority: 1, client_type: 'perso',
       billing_company: 'Alessandro', contact_referent: 'Alessandro', quantity: 1,
       product: 'Impression plexi A3', project_value: 30, description: 'Photo à vérifier',
       deadline: inDays(1), position: 2000,
     },
     {
-      stage: 'chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
+      stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
       billing_company: 'Saint-Barth Store', contact_referent: 'Coach Bernard', quantity: 120,
       product: 'Collection été', project_value: 1450, description: 'Maillots saison 2026',
       deadline: inDays(8), position: 1000,
@@ -458,7 +591,7 @@ async function seed() {
     {
       // Sans date et ancienne (> 7 j) : illustre le vieillissement « À planifier »
       // du dashboard (badge orange, remonte au-dessus des « Sans date » récentes).
-      stage: 'preparation', sub_stage: 'prepa_fichiers', priority: 1, client_type: 'perso',
+      stage: 'preparation', sub_stage: 'prepa_produits', priority: 1, client_type: 'perso',
       billing_company: 'Atelier Broderie Sud', contact_referent: 'Mme Costa', quantity: 6,
       product: 'Casquettes brodées', project_value: 120, description: 'Client pas pressé — à planifier',
       deadline: null, position: 3000, created_days_ago: 9,
@@ -836,7 +969,7 @@ async function setWhatsappMessage(text) {
 }
 
 module.exports = {
-  pool, init, repairOrphanStages,
+  pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,

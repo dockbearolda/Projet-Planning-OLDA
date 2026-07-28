@@ -32,7 +32,7 @@ const PILO_TO = SRC.indexOf('\n', REF_MARK);
 assert.ok(PILO_FROM >= 0 && REF_MARK > PILO_FROM, 'blocs piloting/refereeing introuvables');
 
 const sandbox = {
-  ACTIVE_SET: new Set(['demande', 'chiffrage', 'attente_client', 'preparation', 'production', 'facturation']),
+  ACTIVE_SET: new Set(['demande_chiffrage', 'preparation', 'production', 'facturation']),
   EMPLOYEES: ['Loïc', 'Charlie', 'Mélina', 'Julien'],
   owners: {},
   catRefs: {},

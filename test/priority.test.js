@@ -65,12 +65,12 @@ assert.strictEqual(daysUntil('pas une date', NOW), null, 'date invalide = null')
 {
   const rows = [
     mk({ id: 'file', stage: 'preparation' }),
-    mk({ id: 'fini', stage: 'termine' }),
-    mk({ id: 'arch', stage: 'archive' }),
+    mk({ id: 'fini', stage: 'paiement', sub_stage: 'paiement_valide' }),
+    mk({ id: 'arch', stage: 'paiement', sub_stage: 'archive' }),
     mk({ id: 'fiv', stage: 'fiverr' }),
     mk({ id: 'bloq', stage: 'production', flag: 'bloque' }),
-    mk({ id: 'attente', stage: 'attente_client' }),
-    mk({ id: 'bloq_attente', stage: 'attente_client', flag: 'bloque' }),
+    mk({ id: 'attente', stage: 'demande_chiffrage', sub_stage: 'devis_envoye' }),
+    mk({ id: 'bloq_attente', stage: 'demande_chiffrage', sub_stage: 'devis_envoye', flag: 'bloque' }),
   ];
   const { queue, blocked, waiting } = rank(rows);
   assert.deepStrictEqual(ids(queue), ['file'], 'seule la ligne active reste dans la file');
@@ -135,7 +135,7 @@ assert.strictEqual(
   machineOf(mk({ fiche: { articles: [{ zones: [{ technique: 'laser' }] }] } })), 'trotec',
   'la gravure laser de la fiche pointe la Trotec',
 );
-assert.strictEqual(machineOf(mk({ stage: 'demande' })), null, 'sans machine identifiable → null');
+assert.strictEqual(machineOf(mk({ stage: 'demande_chiffrage' })), null, 'sans machine identifiable → null');
 
 // 6. Dégradation : sans config machine, aucune erreur, tri par échéance conservé.
 {

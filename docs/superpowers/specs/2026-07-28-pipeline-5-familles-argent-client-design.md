@@ -97,8 +97,10 @@ donc aucune collision.
 
 ### Migration des lignes existantes
 
-Une seule exécution, garde `app_meta.stage_model = 'v3_five_families'` (même patron que la
-bascule `families` existante). Table de correspondance :
+Une seule exécution, garde `app_meta.stage_model_v3 = '1'` — une clé SÉPARÉE de
+`stage_model`, qui doit garder la valeur `'families'` : sinon la bascule précédente se
+rejouerait à chaque démarrage et son `UPDATE … WHERE stage = 'facturation'` écraserait la
+sous-étape de toutes les lignes en facturation. Table de correspondance :
 
 | Ancien `stage` / `sub_stage` | Nouveau `stage` / `sub_stage` |
 |---|---|
@@ -126,7 +128,7 @@ bascule `families` existante). Table de correspondance :
 **Down** (documenté, non automatisé — comme la bascule précédente) : appliquer la table à
 l'envers, `demande_chiffrage/{demande_recue, demande_a_qualifier}` → `demande/null`,
 `demande_chiffrage/devis_envoye` → `attente_client/null`, puis
-`DELETE FROM app_meta WHERE key = 'stage_model'`.
+`DELETE FROM app_meta WHERE key = 'stage_model_v3'`.
 
 Aucune ligne ne change de main : une ligne qui n'entre dans aucun cas garde son couple
 tel quel, et la réparation des orphelines (`SUB_TO_FAMILY`) la replace à la première lecture.
@@ -144,6 +146,10 @@ tel quel, et la réparation des orphelines (`SUB_TO_FAMILY`) la replace à la pr
   `prepa_bat`, `bat_envoye`, `bat_valide`, `validation_acompte`, `decoupe_dtf`,
   `client_a_prevenir`, `commande_recuperee`, `paiement_a_controler`, `paiement_valide`).
   Une entrée absente n'affiche simplement pas de guide : pas de régression bloquante.
+- `app_meta.category_owners` / `category_referents` (pilote et référents par défaut, clé =
+  slug) : les 5 sous-étapes simplement renommées voient leur réglage reporté sur le nouveau
+  slug. Les anciennes FAMILLES fusionnées ne le sont pas — trois réglages ne peuvent pas
+  fusionner sans en écraser deux, le patron retranche lui-même.
 - Tests existants qui nomment des slugs : `test/repair-orphan-stages.test.js`,
   `test/priority.test.js`, `test/projet.test.js`, `test/dashboard-person-view.test.js`,
   `test/price-block.test.js`.

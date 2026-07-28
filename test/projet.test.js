@@ -53,7 +53,7 @@ delete process.env.APP_PASSWORD;
   let r = await call('POST', '/api/projets', tasseBody);
   assert.strictEqual(r.status, 201, JSON.stringify(r.body));
   assert.strictEqual(r.body.projet.prixTotalTtc, 28.8, 'prix recalculé serveur : (10+8+6)×1.2');
-  assert.strictEqual(r.body.projet.stage, 'chiffrage');
+  assert.strictEqual(r.body.projet.stage, 'demande_chiffrage');
   assert.strictEqual(r.body.projet.subStage, 'a_chiffrer');
   assert.strictEqual(r.body.projet.client.societe, 'Le Temps des Cerises');
   assert.strictEqual(r.body.projet.lignes[0].produit.label, 'Tasse Céramique 350 ml');
@@ -92,7 +92,7 @@ delete process.env.APP_PASSWORD;
   });
   assert.strictEqual(textile.status, 201, JSON.stringify(textile.body));
   assert.strictEqual(textile.body.projet.prixTotalTtc, 150);
-  assert.strictEqual(textile.body.projet.stage, 'demande');
+  assert.strictEqual(textile.body.projet.stage, 'demande_chiffrage');
 
   // 4. Sans lignes → refusé (un panier vide n'a pas de sens).
   const vide = await call('POST', '/api/projets', { kind: 'commande', client: { societe: 'X' }, lignes: [] });
@@ -110,7 +110,7 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(idInconnu.status, 400);
 
   // 7. La ligne atterrit dans le planning, lisible sans ouvrir le JSON.
-  const list = await (await fetch(`${base}/api/requests?stage=chiffrage`)).json();
+  const list = await (await fetch(`${base}/api/requests?stage=demande_chiffrage`)).json();
   const row = list.find((x) => x.id === r.body.id);
   assert.ok(row, 'le projet doit apparaître à l\'étape chiffrage');
   assert.strictEqual(row.project_value, 28.8);

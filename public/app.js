@@ -12,55 +12,63 @@ import { whatsappLink } from './whatsapp.js';
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
 // la ligne) précise CE QUI SE PASSE MAINTENANT. « 1 projet = 1 seule place. »
-// 8 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
+// 5 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
 const FAMILIES = [
-  { slug: 'demande', label: 'Demande' },
-  { slug: 'chiffrage', label: 'Commande' },
-  { slug: 'attente_client', label: 'Attente Client' },
-  { slug: 'preparation', label: 'Préparation' },
+  { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
+  { slug: 'preparation', label: 'Préparation du projet' },
   { slug: 'production', label: 'Production' },
-  { slug: 'facturation', label: 'Facturation / Retrait' },
-  { slug: 'termine', label: 'Terminé' },
-  { slug: 'archive', label: 'Archivé' },
+  { slug: 'facturation', label: 'Facturation & remise au client' },
+  { slug: 'paiement', label: 'Paiement & clôture' },
 ];
-// Catégorie spéciale (sous-traitance graphiste), hors des 8 familles.
+// Catégorie spéciale (sous-traitance graphiste), hors des 5 familles.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
 ];
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
-// Colonne « Prix » : n'a de sens que là où le prix se remplit réellement
-// (devis en Commande, montant à Facturation) — masquée ailleurs.
-const PRICE_VISIBLE_STAGES = new Set(['chiffrage', 'facturation']);
+// Colonne « Prix TTC » : n'a de sens que là où le prix se remplit réellement
+// (chiffrage, montant à facturer, contrôle du paiement) — masquée ailleurs.
+const PRICE_VISIBLE_STAGES = new Set(['demande_chiffrage', 'facturation', 'paiement']);
 
 // Sous-étapes par famille (miroir de db.js). Une famille absente = pas de puce.
 const SUB_STAGES = {
-  chiffrage: [
+  demande_chiffrage: [
+    { slug: 'demande_recue', label: 'Demande reçue' },
+    { slug: 'demande_a_qualifier', label: 'Demande à qualifier' },
     { slug: 'a_chiffrer', label: 'À chiffrer' },
     { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
-    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+    { slug: 'devis_envoye', label: 'Tarif / Devis envoyé – Attente client' },
+    { slug: 'devis_valide', label: 'Devis validé' },
   ],
   preparation: [
-    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'prepa_produits', label: 'Préparation des produits' },
+    { slug: 'prepa_bat', label: 'Préparation du BAT' },
+    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    { slug: 'bat_valide', label: 'BAT validé' },
+    { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
     { slug: 'attente_marchandise', label: 'Attente marchandise' },
     { slug: 'pret_a_produire', label: 'Prêt à produire' },
   ],
   production: [
     { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'decoupe_dtf', label: 'Découpe & Contrôle DTF' },
     { slug: 'prod_pressage', label: 'Pressage' },
     { slug: 'prod_trotec', label: 'Production Trotec' },
     { slug: 'prod_uv', label: 'Production UV' },
     { slug: 'montage_finition', label: 'Montage / Finition' },
-    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+    { slug: 'controle_emballage', label: 'Contrôle & Emballage' },
   ],
   facturation: [
     { slug: 'facturation_a_faire', label: 'Facturation à faire' },
-    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+    { slug: 'client_a_prevenir', label: 'Client à prévenir' },
+    { slug: 'client_prevenu', label: 'Client prévenu – Attente retrait' },
+    { slug: 'commande_recuperee', label: 'Commande récupérée' },
   ],
-  termine: [
-    { slug: 'attente_paiement', label: 'Attente paiement' },
-    { slug: 'solde', label: 'Soldé' },
+  paiement: [
+    { slug: 'paiement_a_controler', label: 'Paiement à contrôler' },
+    { slug: 'paiement_valide', label: 'Paiement validé / Soldé' },
+    { slug: 'archive', label: 'Archivé' },
   ],
 };
 // Libellé d'une sous-étape par son slug (toutes familles confondues).
@@ -121,7 +129,7 @@ const SEND_TARGETS = [
 ];
 
 // --- État applicatif -------------------------------------------------------
-let currentStage = 'demande';
+let currentStage = 'demande_chiffrage';
 let currentSub = null;         // sous-catégorie active (null = toute la famille)
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
@@ -2992,11 +3000,15 @@ function hasPrice(r) {
   return r.project_value != null;
 }
 
+// La zone s'ouvre au moment où le tarif part chez le client : les deux dernières
+// sous-étapes de « Demande & chiffrage », puis toutes les familles suivantes.
+const PRICE_ZONE_SUBS = new Set(['devis_envoye', 'devis_valide']);
+
 function inPriceZone(stage, sub) {
-  if (stage === 'chiffrage') return sub === 'devis_a_envoyer';
+  if (stage === 'demande_chiffrage') return PRICE_ZONE_SUBS.has(sub);
   const idx = STAGE_ORDER[stage];
-  const chiffrageIdx = STAGE_ORDER.chiffrage;
-  return idx != null && chiffrageIdx != null && idx > chiffrageIdx;
+  const firstIdx = STAGE_ORDER.demande_chiffrage;
+  return idx != null && firstIdx != null && idx > firstIdx;
 }
 
 function blockedByPrice(r, targetStage, targetSub = null) {
@@ -3006,7 +3018,7 @@ function blockedByPrice(r, targetStage, targetSub = null) {
 }
 
 function priceBlockMessage(targetStage, targetSub) {
-  const label = targetStage === 'chiffrage' && targetSub
+  const label = targetStage === 'demande_chiffrage' && targetSub
     ? SUB_LABEL[targetSub]
     : STAGE_LABEL[targetStage];
   return `Sans prix, impossible de passer en ${label}.`;

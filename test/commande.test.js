@@ -81,17 +81,17 @@ const jour = (days) => {
   assert.strictEqual(c.quantite, 2);
 
   // 2. Une COMMANDE validée va dans la colonne « Commande » (ex-chiffrage),
-  //    directement sur la sous-étape « À chiffrer » ; une DEMANDE reste dans
-  //    « Demande ».
-  assert.strictEqual(c.stage, 'chiffrage');
+  //    directement sur la sous-étape « À chiffrer » ; une DEMANDE atterrit sur
+  //    « Demande reçue », dans la même famille.
+  assert.strictEqual(c.stage, 'demande_chiffrage');
   assert.strictEqual(c.subStage, 'a_chiffrer');
   const dem = await post({ ...iguana, kind: 'demande' });
-  assert.strictEqual(dem.body.commande.stage, 'demande');
-  assert.strictEqual(dem.body.commande.subStage, null);
+  assert.strictEqual(dem.body.commande.stage, 'demande_chiffrage');
+  assert.strictEqual(dem.body.commande.subStage, 'demande_recue');
 
   // 3. La ligne atterrit dans le planning, lisible SANS ouvrir le JSON : la
   //    nature, le contact, le détail des zones et les statuts sont en colonnes.
-  const row = await rowOf(ok.body.id, 'chiffrage');
+  const row = await rowOf(ok.body.id, 'demande_chiffrage');
   assert.ok(row, 'la commande doit apparaître à l\'étape chiffrage');
   assert.strictEqual(row.order_kind, 'commande');
   assert.strictEqual(row.billing_company, 'Iguana (Discover)');
@@ -124,7 +124,7 @@ const jour = (days) => {
   const urgent = await post({ ...iguana, deadline: '', delai: 'express' });
   assert.strictEqual(urgent.body.commande.deadline, jour(3));
   assert.strictEqual(urgent.body.commande.delai.majoration, 10);
-  assert.match((await rowOf(urgent.body.id, 'chiffrage')).description, /Délai : Sous 3 jours \(\+10 %\)/);
+  assert.match((await rowOf(urgent.body.id, 'demande_chiffrage')).description, /Délai : Sous 3 jours \(\+10 %\)/);
   const long = await post({ ...iguana, deadline: '', delai: 'j15' });
   assert.strictEqual(long.body.commande.deadline, jour(15));
 
@@ -216,7 +216,7 @@ const jour = (days) => {
   assert.strictEqual(pro.status, 201, JSON.stringify(pro.body));
   assert.strictEqual(pro.body.commande.client.facturation, 'Hôtel La Samanna');
   assert.strictEqual(pro.body.commande.client.whatsapp, '0690 12 34 56');
-  const proRow = await rowOf(pro.body.id, 'chiffrage');
+  const proRow = await rowOf(pro.body.id, 'demande_chiffrage');
   assert.strictEqual(proRow.billing_company, 'Hôtel La Samanna');
   assert.strictEqual(proRow.contact_referent, 'Sophie');
   assert.strictEqual(proRow.contact_phone, '0690 12 34 56');
@@ -244,7 +244,7 @@ const jour = (days) => {
   assert.strictEqual(pc.client.type, 'perso');
   assert.strictEqual(pc.client.societe, 'Marie Dupont');
   assert.strictEqual(pc.client.contact, null, 'le nom occupe déjà la colonne client');
-  const persoRow = await rowOf(perso.body.id, 'demande');
+  const persoRow = await rowOf(perso.body.id, 'demande_chiffrage');
   assert.strictEqual(persoRow.billing_company, 'Marie Dupont');
   assert.strictEqual(persoRow.client_type, 'perso');
   assert.strictEqual(persoRow.contact_phone, '0690 99 88 77');
@@ -275,7 +275,7 @@ const jour = (days) => {
     ],
   });
   assert.strictEqual(objets.status, 201, JSON.stringify(objets.body));
-  const objRow = await rowOf(objets.body.id, 'chiffrage');
+  const objRow = await rowOf(objets.body.id, 'demande_chiffrage');
   assert.strictEqual(objRow.quantity, 31);
   assert.match(objRow.description, /TROTEC : Gravure logo 5 cm/);
   assert.match(objRow.description, /UV : Panneau entrée/);
@@ -291,7 +291,7 @@ const jour = (days) => {
     description: 'Le client repasse mardi avec son logo vectorisé.',
   });
   assert.strictEqual(simple.status, 201, JSON.stringify(simple.body));
-  const simpleRow = await rowOf(simple.body.id, 'demande');
+  const simpleRow = await rowOf(simple.body.id, 'demande_chiffrage');
   assert.strictEqual(simpleRow.product, 'Devis 40 polos brodés');
   assert.strictEqual(simpleRow.quantity, null, 'aucune pièce comptée sans produit');
   assert.match(simpleRow.description, /Objet : Devis 40 polos brodés/);
@@ -310,7 +310,7 @@ const jour = (days) => {
   });
   assert.strictEqual(melange.status, 201, JSON.stringify(melange.body));
   assert.strictEqual(melange.body.commande.quantite, 80);
-  const melRow = await rowOf(melange.body.id, 'chiffrage');
+  const melRow = await rowOf(melange.body.id, 'demande_chiffrage');
   const ordre = ['Tasses', 'Textile', 'Objets'].map((t) => melRow.description.indexOf(`\n${t}\n`));
   assert.ok(ordre[0] >= 0 && ordre[0] < ordre[1] && ordre[1] < ordre[2], 'tasses, puis textile, puis objets');
   assert.match(melRow.description, /Paiement : payé \(CB\)/);
@@ -353,7 +353,7 @@ const jour = (days) => {
   assert.strictEqual(gc.deadline, jour(0));
   assert.strictEqual(gc.delai.id, 'jour_j');
   assert.strictEqual(gc.delai.majoration, 20);
-  const grilleRow = await rowOf(grille.body.id, 'chiffrage');
+  const grilleRow = await rowOf(grille.body.id, 'demande_chiffrage');
   assert.match(grilleRow.description, /XS×2 · M×5 · 2XL×3/);
   assert.match(grilleRow.description, /Col rond, coupe large/);
   assert.match(grilleRow.description, /Délai : Jour J \(\+20 %\)/);
@@ -361,7 +361,7 @@ const jour = (days) => {
   // 18. La maquette n'est plus un état de la fiche : plus de ligne « Maquette »
   //     dans le récapitulatif, même si un ancien poste l'envoie encore.
   const sansMaq = await post({ ...iguana, maquette: true });
-  assert.doesNotMatch((await rowOf(sansMaq.body.id, 'chiffrage')).description, /Maquette/);
+  assert.doesNotMatch((await rowOf(sansMaq.body.id, 'demande_chiffrage')).description, /Maquette/);
 
   console.log('✓ commande : contact pro/perso, demande simple, tasses/textile/objets, grille de tailles, délais, paiement, annuaire et refus OK');
   process.exit(0);

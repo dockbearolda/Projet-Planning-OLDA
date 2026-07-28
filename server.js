@@ -391,7 +391,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 
   // position par défaut : place la nouvelle ligne en bas de son étape.
   if (!cols.includes('position')) {
-    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
+    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande_chiffrage';
     const { rows } = await pool.query(
       'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [stage],
     );

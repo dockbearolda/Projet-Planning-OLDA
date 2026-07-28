@@ -57,7 +57,7 @@ delete process.env.APP_PASSWORD;
   // 1.2 Sans destination (ancien corps) : celle du catalogue, comme avant.
   r = await call('POST', '/api/commande', fiche());
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'chiffrage');
+  assert.strictEqual(r.body.commande.stage, 'demande_chiffrage');
   assert.strictEqual(r.body.commande.subStage, 'a_chiffrer');
 
   // 1.3 Destination choisie : c'est elle qui l'emporte sur l'habitude.
@@ -74,22 +74,22 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(r.status, 201);
   assert.strictEqual(r.body.commande.subStage, null);
 
-  // 1.5 Une famille sans sous-étape du tout (Demande) reste accessible.
-  r = await call('POST', '/api/commande', fiche({ stage: 'demande' }));
+  // 1.5 Une famille visée sans préciser sa sous-étape : « à préciser » est valide.
+  r = await call('POST', '/api/commande', fiche({ stage: 'demande_chiffrage' }));
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'demande');
+  assert.strictEqual(r.body.commande.stage, 'demande_chiffrage');
 
   // 1.6 Refus : étape inconnue, et sous-étape étrangère à la famille visée.
   r = await call('POST', '/api/commande', fiche({ stage: 'nulle_part' }));
   assert.strictEqual(r.status, 400, 'étape inconnue refusée');
-  r = await call('POST', '/api/commande', fiche({ stage: 'demande', subStage: 'a_commander' }));
+  r = await call('POST', '/api/commande', fiche({ stage: 'demande_chiffrage', subStage: 'a_commander' }));
   assert.strictEqual(r.status, 400, 'sous-étape étrangère à la famille refusée');
   r = await call('POST', '/api/commande', fiche({ stage: 'preparation', subStage: 'prod_uv' }));
   assert.strictEqual(r.status, 400, 'sous-étape d\'une autre famille refusée');
 
   // 1.7 Le numéro saisi au comptoir arrive sur la ligne : c'est lui qui décide
   // si la pastille WhatsApp s'affiche.
-  rows = (await call('GET', '/api/requests?stage=demande')).body;
+  rows = (await call('GET', '/api/requests?stage=demande_chiffrage')).body;
   const ligne = rows.find((x) => x.billing_company === 'Hôtel Mercure');
   assert.strictEqual(ligne.contact_phone, '0690 66 24 00',
     'le WhatsApp du client suit la commande');
