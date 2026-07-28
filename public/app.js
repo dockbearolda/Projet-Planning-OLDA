@@ -1910,6 +1910,37 @@ function renderLigneDetail() {
     body.appendChild(ficheSection);
   }
 
+  // --- Suivi -------------------------------------------------------------------
+  // Reprise en lecture seule des colonnes de pilotage de la grille : on montre
+  // ce qui est posé, on ne le modifie pas ici (l'édition reste dans le tableau).
+  const suiviSection = document.createElement('section');
+  suiviSection.className = 'ld-section';
+  const suiviTitle = document.createElement('p');
+  suiviTitle.className = 'ld-section-title';
+  suiviTitle.textContent = 'Suivi';
+  suiviSection.appendChild(suiviTitle);
+
+  const addSuiviKv = (label, value) => {
+    const kv = document.createElement('div');
+    kv.className = 'ld-kv';
+    const k = document.createElement('span'); k.textContent = label;
+    const v = document.createElement('span'); v.textContent = value;
+    kv.append(k, v);
+    suiviSection.appendChild(kv);
+  };
+  addSuiviKv('Prix', r.project_value != null ? `${Number(r.project_value).toFixed(2)} €` : '—');
+  const dd = parseDeadline(r.deadline);
+  addSuiviKv('Échéance', dd ? dd.toLocaleDateString('fr-FR') : '—');
+  // Sous-étape et État suivent la grille : rien à afficher là où la colonne
+  // correspondante est vide (famille sans sous-étapes, aucune alerte posée).
+  if (familyHasSub(r.stage)) {
+    addSuiviKv('Sous-étape', (r.sub_stage && SUB_LABEL[r.sub_stage]) || 'à préciser');
+  }
+  if (FLAG_BY_VALUE[r.flag]) {
+    addSuiviKv('État', FLAG_BY_VALUE[r.flag].label + (r.flag_reason ? ` — ${r.flag_reason}` : ''));
+  }
+  body.appendChild(suiviSection);
+
   ligneDrawerCard.appendChild(body);
 }
 
