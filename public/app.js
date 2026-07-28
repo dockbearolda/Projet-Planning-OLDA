@@ -1756,6 +1756,50 @@ function renderLigneDetail() {
 
   const body = document.createElement('div');
   body.className = 'ld-body';
+
+  // --- Contact ---------------------------------------------------------------
+  const contactSection = document.createElement('section');
+  contactSection.className = 'ld-section';
+  const contactTitle = document.createElement('p');
+  contactTitle.className = 'ld-section-title';
+  contactTitle.textContent = 'Contact';
+  contactSection.appendChild(contactTitle);
+  const contactRows = [
+    ['Référent', r.contact_referent],
+    ['Téléphone', r.contact_phone],
+    ['Email', r.contact_email],
+  ];
+  let hasContact = false;
+  for (const [label, value] of contactRows) {
+    if (!value) continue;
+    hasContact = true;
+    const kv = document.createElement('div');
+    kv.className = 'ld-kv';
+    const k = document.createElement('span'); k.textContent = label;
+    const v = document.createElement('span'); v.textContent = value;
+    kv.append(k, v);
+    contactSection.appendChild(kv);
+  }
+  if (!hasContact) {
+    const empty = document.createElement('p');
+    empty.className = 'ld-empty';
+    empty.textContent = 'Aucun contact renseigné.';
+    contactSection.appendChild(empty);
+  }
+  body.appendChild(contactSection);
+
+  // --- Documents ---------------------------------------------------------------
+  const docsSection = document.createElement('section');
+  docsSection.className = 'ld-section';
+  const docsTitle = document.createElement('p');
+  docsTitle.className = 'ld-section-title';
+  docsTitle.textContent = 'Documents';
+  const docsRow = document.createElement('div');
+  docsRow.className = 'ld-docs';
+  docsRow.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
+  docsSection.append(docsTitle, docsRow);
+  body.appendChild(docsSection);
+
   ligneDrawerCard.appendChild(body);
 }
 
