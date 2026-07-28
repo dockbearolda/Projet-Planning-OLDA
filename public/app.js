@@ -4050,6 +4050,9 @@ function initBrandReflection() {
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
+const $viewCommande = document.getElementById('viewCommande');
+const $viewDemande = document.getElementById('viewDemande');
+const $commande = document.getElementById('commande');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
@@ -4057,9 +4060,13 @@ const $reglages = document.getElementById('reglages');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
-// 'planning' | 'dashboard' | 'clients' | 'reglages' | 'projet'
+// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages' | 'projet'
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
+// La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
+// la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
+let commandeNature = 'demande';
+let commandeModule = null;
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 // Si elle vit dans une catégorie promue en onglet (Fiverr, À commander), c'est
@@ -4093,6 +4100,28 @@ const dashboard = createDashboard({
 // deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
 // contredire — « #dashboard » affiché sur le planning, et retour au dashboard
 // au premier rechargement.
+// La Prise de commande (catalogue textile, annuaire client) est chargée au
+// premier passage sur la vue, puis montée une bonne fois : les bascules
+// suivantes ne sont qu'un changement de classe — instantanées, et la saisie en
+// cours est conservée. La nature (demande / commande) lui est poussée dès
+// qu'elle est prête.
+let commandeLoading = null;
+function mountCommande() {
+  if (!$commande) return;
+  if (!commandeLoading) {
+    commandeLoading = import('./commande.js')
+      .then((m) => { commandeModule = m; return m.initCommande($commande); })
+      .then(() => commandeModule.setNature(commandeNature))
+      .catch((err) => {
+        commandeLoading = null;             // rechargeable au prochain essai
+        commandeModule = null;
+        console.error('Prise de commande : chargement impossible', err);
+      });
+  } else if (commandeModule) {
+    commandeModule.setNature(commandeNature);
+  }
+}
+
 // La Base clients (CRM) : liste + fiche éditable + notes. Module lourd (rendu
 // complet), chargé au premier passage puis monté ; les visites suivantes
 // rafraîchissent seulement les données (un client a pu être créé à la commande).
@@ -4171,6 +4200,11 @@ function setViewMode(mode) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
   }
+  // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
+  // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
+  const onIntake = mode === 'commande';
+  if ($viewDemande) $viewDemande.classList.toggle('active', onIntake && commandeNature === 'demande');
+  if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
   // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
@@ -4180,10 +4214,12 @@ function setViewMode(mode) {
   closeLigneDetail();
 
   const dash = mode === 'dashboard';
+  const commande = mode === 'commande';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
+  if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($projet) $projet.hidden = !projet;
@@ -4194,6 +4230,7 @@ function setViewMode(mode) {
   document.body.classList.toggle('view-comptoir', mode === 'projet');
 
   if (dash) dashboard.show(); else dashboard.hide();
+  if (commande) mountCommande();
   if (clients) mountClients();
   if (reglages) mountReglages();
   if (projet) mountProjet();
@@ -4203,11 +4240,12 @@ function setViewMode(mode) {
   }
 }
 
-// Un hash = une vue. « Nouveau Projet » est la seule porte d'entrée : les
-// anciens raccourcis #demande / #commande n'existent plus et retombent donc sur
-// le planning, comme n'importe quel hash inconnu.
+// #demande et #commande ouvrent la MÊME vue de saisie, avec une nature
+// différente. Nouveau Projet reste la porte d'entrée conseillée (client, prix,
+// délai obligatoire) ; la prise de commande détaillée sert quand il faut le
+// détail atelier : tailles, emplacements, technique.
 const VIEWS = {
-  '#dashboard': 'dashboard',
+  '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
@@ -4215,7 +4253,11 @@ const VIEWS = {
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
+  if (mode === 'commande') commandeNature = h === '#commande' ? 'commande' : 'demande';
   setViewMode(mode);
+  // Changer de nature SANS changer de vue (#demande ↔ #commande) : setViewMode a
+  // pris le raccourci « même vue », on pousse donc la nature à la main.
+  if (mode === 'commande' && commandeModule) commandeModule.setNature(commandeNature);
   // Onglet Fiverr / À commander : la grille doit pointer sur LEUR catégorie.
   // On ne recharge que si elle affiche autre chose (revenir sur l'onglet déjà
   // ouvert ne doit pas vider la grille sous les yeux). Au tout premier passage
