@@ -126,7 +126,35 @@ for (const [family, list] of Object.entries(db.SUB_STAGES)) {
   assert.strictEqual(owners.production, 'Julien', 'un slug inchangé garde son pilote');
   assert.strictEqual(owners.prepa_fichiers, undefined, 'l’ancienne clé ne traîne pas');
 
-  // 7. Idempotence : un employé déplace une ligne à la main, un redémarrage ne
+  // 7. RÉGRESSION (vue en prod le 28/07/2026) : une commande ARCHIVÉE doit
+  //    rester archivée. `migrateStagesToLinear` rejouait ses renommages à chaque
+  //    démarrage et `archive` était encore une de ses clés : la ligne devenait
+  //    `termine_archive` AVANT la bascule vers les 5 familles, qui ne la
+  //    reconnaissait plus — elle finissait en « Paiement à contrôler », donc de
+  //    retour dans les listes actives. On rejoue ici la séquence complète, dans
+  //    l'ordre réel de init().
+  const { rows: arch } = await db.pool.query(
+    'INSERT INTO requests (stage, sub_stage, priority, client_type, description) VALUES ($1,$2,2,$3,$4) RETURNING id',
+    ['archive', null, 'pro', 'dossier archivé'],
+  );
+  const archId = arch[0].id;
+  await db.pool.query("DELETE FROM app_meta WHERE key IN ('stage_model_linear', 'stage_model_v3')");
+  await db.migrateStagesToLinear();
+  await db.migrateFamiliesToFive();
+  await db.repairOrphanStages();
+  const archPos = await posOf(archId);
+  assert.strictEqual(archPos.stage, 'paiement', 'un dossier archivé reste dans Paiement & clôture');
+  assert.strictEqual(archPos.sub_stage, 'archive',
+    'un dossier archivé reste ARCHIVÉ, il ne repart pas en « Paiement à contrôler »');
+
+  // La garde tient : un deuxième démarrage ne rejoue plus les renommages
+  // linéaires, donc plus aucune ligne ne peut être renvoyée sur un ancien slug.
+  await db.migrateStagesToLinear();
+  const archApres = await posOf(archId);
+  assert.strictEqual(archApres.stage, 'paiement', 'redémarrage : la famille ne bouge plus');
+  assert.strictEqual(archApres.sub_stage, 'archive', 'redémarrage : la sous-étape ne bouge plus');
+
+  // 8. Idempotence : un employé déplace une ligne à la main, un redémarrage ne
   //    doit PAS la remettre où la migration l'avait posée.
   const cobaye = ids[0].id;
   await db.pool.query(
