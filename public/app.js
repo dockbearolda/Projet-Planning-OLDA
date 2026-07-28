@@ -3860,6 +3860,11 @@ function setViewMode(mode) {
   if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
+  // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
+  // part donc pas tout seul quand on change de vue (y compris via le bouton
+  // Retour du navigateur ou le balayage depuis le bord sur tablette), et il
+  // resterait posé par-dessus le Dashboard, scrim compris.
+  closeLigneDetail();
 
   const dash = mode === 'dashboard';
   const commande = mode === 'commande';
