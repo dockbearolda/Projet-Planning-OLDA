@@ -1717,12 +1717,8 @@ function renderLigneDetailIfOpen() {
   renderLigneDetail();
 }
 
-// Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
-// archivé à la création de la commande, jamais retouché après). Deux formats
-// possibles selon le flux de création — cf. server.js buildCommande/buildProjet.
-// Retourne `null` si `fiche` est absent ou d'un format non reconnu (ligne créée
-// à la main dans la grille, ou ancienne fiche v1) : la section est alors
-// masquée, sans erreur.
+// Un article du détail produit : un titre, puis ses sous-lignes (les valeurs
+// vides sont ignorées, pour ne jamais afficher de ligne creuse).
 function ficheLigneEl(titre, sousLignes) {
   const box = document.createElement('div');
   box.className = 'ld-fiche-item';
@@ -1768,7 +1764,8 @@ function ficheItemsCommandeAtelier(fiche) {
         l.note || null,
         ...(l.zones || []).map((z) => {
           const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-          const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null].filter(Boolean).join(' · ') || z.consigne || '';
+          const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null]
+            .filter(Boolean).join(' · ') || z.consigne || '';
           return `${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
         }),
       ],
@@ -1803,6 +1800,13 @@ function ficheItemsProjetSimple(fiche) {
   });
 }
 
+// Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
+// archivé à la création de la commande, jamais retouché après). Deux formats
+// possibles selon le flux de création — cf. server.js buildCommande/buildProjet.
+// Retourne `null` si `fiche` est absent ou d'un `kind` non reconnu (ligne créée
+// à la main dans la grille) ; une fiche de commande v1, qui porte bien le
+// `kind` mais pas les tableaux attendus, renvoie `[]`. Dans les deux cas
+// l'appelant masque la section, sans erreur.
 function ficheItems(fiche) {
   if (!fiche || typeof fiche !== 'object') return null;
   if (fiche.kind === 'commande-atelier') return ficheItemsCommandeAtelier(fiche);
