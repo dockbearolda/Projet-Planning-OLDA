@@ -127,14 +127,15 @@
 .proj-quick__fields { align-self: stretch; display: grid; grid-template-columns: 1fr; gap: 4px 20px; }
 @media (min-width: 720px) { .proj-quick__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 980px) { .proj-quick__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* `.cl-f` (clients.css) empile label/champ depuis #ecf7133 — bien pour le
-   tiroir Base Clients (colonne unique, étroite). Ici l'écran est contraint à
-   NE JAMAIS scroller (voir .proj-body) et la fiche pro affiche jusqu'à 10
-   champs : le label reste à côté du champ pour diviser par ~2 la hauteur de
-   chaque ligne. Largeur dispo par colonne (grille de 2 ou 3 colonnes, max
-   1080px) largement suffisante, pas de retour du problème de troncature
-   WhatsApp qui visait le tiroir (plus étroit, une seule colonne). */
-.proj-quick__fields .cl-f { grid-template-columns: 132px 1fr; align-items: center; gap: 6px 10px; padding: 4px 0; }
+/* `.cl-f` (clients.css) empile déjà label/champ depuis #ecf7133 — on garde
+   cet empilement ici (contrairement à un essai précédent qui mettait le
+   label à côté du champ sur 132px fixes : à 2-3 colonnes, .proj-client
+   plafonne à 640px de large donc chaque colonne ne fait que ~190-290px,
+   et 132px de label n'y laissait plus que des miettes pour le champ —
+   inputs quasi invisibles). La grille 2-3 colonnes ci-dessus suffit à elle
+   seule à éviter le scroll (10 champs sur 3-4 lignes au lieu de 10), sans
+   avoir besoin de comprimer chaque ligne individuellement. */
+.proj-quick__fields .cl-f { border-bottom: none; gap: 2px; padding: 4px 0; }
 .proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
 .proj-input--sm { min-height: 48px; }
 .proj-seg { display: flex; gap: 4px; border: 1px solid var(--border); border-radius: 14px; padding: 3px; }
