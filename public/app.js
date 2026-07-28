@@ -1817,6 +1817,7 @@ function cellLigneDetailButton(r) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     openLigneDetail(r.id);
+    btn.blur();
   });
   return btn;
 }
