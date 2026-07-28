@@ -11,7 +11,8 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 ## Fonctionnalités
 
-- Sidebar pipeline : **8 familles** (grandes étapes), compteurs live.
+- Sidebar pipeline : **5 familles** (Demande & chiffrage, Préparation du projet,
+  Production, Facturation & remise au client, Paiement & clôture), compteurs live.
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
   qu'on ouvre le plus souvent, ont quitté le rail pour un **onglet** de la barre
   du haut — sans quitter le pipeline (flux, compteurs, puces inchangés).
@@ -21,9 +22,8 @@ modules natifs, aucun build, aucun framework, aucun bundler).
   texte se règle dans l'onglet **Réglages** (jetons `{client}`, `{commande}`,
   `{date}`) ; le numéro est mis au format international selon son préfixe
   (0690/0691 → +590, 0696/0697 → +596, 0694 → +594, 0692/0693 → +262, sinon +33).
-- **Sous-étape** en puce inline (précise l'action en cours), affichée uniquement
-  pour les familles qui en ont (Chiffrage, Préparation, Production, Facturation,
-  Terminé). Changer de famille en glissant remet la sous-étape à zéro.
+- **Sous-étape** en puce inline (précise l'action en cours) : les cinq familles
+  en ont toutes. Changer de famille en glissant remet la sous-étape à zéro.
 - **Espace Responsable** sur chaque ligne : le PILOTE et le RÉFÉRENT du projet.
   Les deux affichent le nom EFFECTIF — celui posé à la main, sinon le nom « de
   base » de la catégorie (puce en pointillés). N'importe quel collaborateur peut
@@ -160,13 +160,14 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
-| GET | `/api/commande/catalog` | Catalogue Prise de commande (natures, familles, délais, vêtements, tailles, tasses, objets, typos, zones, techniques, options de tasse, statuts et modes de paiement) **+ `pipeline`** : familles et sous-étapes, pour le choix de la destination. |
-| POST | `/api/commande` | Enregistre une prise de commande atelier → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). |
+| GET | `/api/pipeline` | Familles et leurs sous-étapes, pour le choix de la destination dans Nouveau Projet. |
+| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. |
 | GET | `/api/settings/whatsapp` | `{ message }` — le texte « commande prête » réglé par le patron. |
 | PUT | `/api/settings/whatsapp` | Remplace ce texte (`{ message }`, 1000 caractères max), diffusé en SSE. |
-| POST | `/api/commande/zones` | Ajoute un emplacement d'impression (`{ label }`) et renvoie la liste complète. |
-| DELETE | `/api/commande/zones/:id` | Retire un emplacement ajouté au comptoir (ceux du catalogue sont figés). |
-| GET | `/api/clients` | Annuaire client déduit des commandes déjà saisies (auto-complétion). |
+| GET | `/api/clients` | Base clients complète (auto-complétion + fiche). |
+| GET | `/api/clients/secteurs` | Liste des secteurs d'activité proposés à la saisie. |
+| POST | `/api/clients/secteurs` | Ajoute un secteur (`{ label }`), idempotent sur la casse et les accents. |
+| DELETE | `/api/clients/secteurs/:label` | Retire un secteur de la liste proposée (les fiches qui le portent le gardent). |
 
 Validation serveur : `stage` ∈ familles (+ `fiverr`) ; `sub_stage` ∈ sous-étapes
 connues ou null ; `responsable` ∈ liste connue ou null ; `priority` ∈ {1,2,3} ;
@@ -177,133 +178,74 @@ code HTTP adapté.
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
-## Prise de commande — `/#demande` et `/#commande`
+## Nouveau Projet — `/#nouveau-projet`
 
-Le **premier pas du client** : la fiche qu'on remplit au comptoir, EN FACE DE
-LUI. La contrainte de conception est un chrono — **30 à 45 secondes**, client
-debout devant le comptoir. Tout en découle : des puces de 44 px qu'on tape au
-lieu de menus qu'on déroule, des valeurs par défaut déjà justes, et rien à
-l'écran tant qu'on n'en a pas besoin. Aucun prix (le chiffrage est une étape du
-planning).
+La **seule porte d'entrée** de l'application : toute commande y naît. Le flux
+comptoir, EN FACE DU CLIENT, façon caisse SumUp — client, puis panier, puis
+prix. La contrainte de conception est un chrono : client debout devant le
+comptoir. D'où des tuiles de 44 px qu'on tape au lieu de menus qu'on déroule.
 
-Deux entrées **en tête du menu**, l'une pour une *Demande* (à chiffrer), l'autre
-pour une *Commande* (déjà validée par le client). Elles ouvrent la **même fiche**
-— la nature est décidée par le lien cliqué, pas par un réglage dans l'écran.
+Un projet est un **panier** : plusieurs produits de types différents (une tasse,
+un polo, une plaque) pour un même client et un seul enregistrement. La tasse a
+sa grille de prix détaillée (catalogue `tarifs-tasse`, recalculée côté serveur,
+jamais reçue du client) ; les autres types sont sommaires — description et prix
+manuel.
 
-La nature est conservée dans `requests.order_kind` et rappelée par un badge sur
-la ligne du planning. La fiche se lit dans l'ordre où ça se dit.
+### Le client
+
+Recherche dans la base, ou création à la volée. Le formulaire de création montre
+la fiche **complète** selon la nature : 4 champs pour un particulier (prénom,
+nom, WhatsApp, e-mail), la fiche PRO entière sinon (voir « Base clients »).
+
+Trois automatismes y évitent la ressaisie :
+
+- **Ville → Pays + Code postal.** Les six territoires desservis sont proposés en
+  liste déroulante à saisie libre ; en choisir un remplit pays et code postal.
+  Une valeur tapée à la main n'est jamais écrasée.
+- **Casse imposée** en quittant le champ : prénom en initiales (`Jean-Marc`),
+  nom en majuscules (`DUPONT`).
+- **Le tiret** `-` veut dire « je n'ai pas l'info » : le champ passe pour rempli
+  et part vide en base. Refusé sur l'identité (société, nom, prénom), où un
+  client nommé « - » serait introuvable.
+
+### Le délai est obligatoire
+
+Aucun raccourci n'est pré-coché. Cinq raccourcis (Jour J +20 %, sous 3 jours
++10 %, 5 / 10 / 15 jours) **ou** une date précise au calendrier — jamais les
+deux. L'enregistrement reste bloqué tant que rien n'est choisi, et le motif du
+blocage est écrit à l'écran. C'est ce qui garantit une date butoir sur chaque
+ligne du planning. Une date précise n'applique aucune majoration : on ne facture
+pas l'urgence d'une date que le client a lui-même fixée au large.
+
+### Le prix : TTC saisi, HT calculé
+
+`requests.project_value` porte le **TTC** — le prix que le client paie, et celui
+qu'on tape au comptoir. Le **HT n'est jamais stocké** : il vaut TTC ÷ (1 + TGCA),
+avec le taux réglé dans Réglages, et s'affiche sous le prix dans la grille, dans
+le tiroir de détail et sous le total du comptoir.
+
+### Le paiement
+
+Cinq informations, dans le même bloc au comptoir et dans le tiroir de détail :
+*acompte demandé*, *acompte versé* (+ la somme exacte, qui n'apparaît qu'une
+fois l'acompte encaissé), *payé / soldé*, et le **mode** (CB / Espèces /
+Virement / Chèque).
+
+Chaque interrupteur a **trois** états en base — oui, non, et jamais renseigné.
+Une ligne que personne n'a touchée reste « non renseigné » : elle ne doit pas se
+lire « non payé ».
 
 ### La dernière question : où l'enregistrer ?
 
-« Enregistrer » n'envoie rien tout seul : il **demande d'abord où la fiche
-atterrit**, à chaque saisie. Tout le pipeline s'affiche (familles + sous-étapes,
-Fiverr compris) ; la destination habituelle de la nature choisie — Demande →
-*Demande*, Commande → *Commande · À chiffrer* — est marquée **habituel** et
-placée en tête. **Taper une destination enregistre aussitôt** : un seul geste,
-comme le reste de la fiche, mais un geste conscient. L'écran de confirmation
-redit où la commande est partie.
+« Enregistrer » n'envoie rien tout seul : il **demande d'abord où le projet
+atterrit**. Tout le pipeline s'affiche (familles + sous-étapes, Fiverr compris).
+Taper une destination enregistre aussitôt ; l'écran de confirmation redit où la
+commande est partie, prix TTC et HT compris.
 
 Le serveur revalide : une sous-étape étrangère à la famille visée est refusée
 (400) plutôt que rangée n'importe où. Un corps sans destination retombe sur
-celle du catalogue — les appels existants continuent de marcher.
-
-### La page ne défile pas
-
-Deux zones, pas deux colonnes :
-
-- **en haut, un bandeau** qui se lit de gauche à droite — qui, quoi, pour quand,
-  payé comment. Ses champs sont courts : trois rangées suffisent ;
-- **en bas, les produits, sur toute la largeur**, parce que leurs lignes ont six
-  colonnes à aligner. C'est la **seule zone qui défile**.
-
-On empile donc autant de produits qu'on veut sans jamais perdre de vue le nom du
-client, l'échéance ni le bouton d'enregistrement. Sous 900 px (tablette
-portrait, téléphone) le bandeau s'empile et la page redevient défilante, comme
-n'importe quel formulaire mobile.
-
-Une ligne de produit = **une rangée de champs**, sans aucun libellé : la rangée
-d'en-tête nomme les colonnes une fois pour toute la famille, comme dans un
-tableur. Le bouton d'ajout vit dans le bandeau de la famille plutôt qu'en pied
-de tableau : une rangée gagnée par famille. Un **emplacement d'impression
-choisi perd sa puce et prend sa ligne** (son étiquette, puis sa consigne), et
-le « ＋ » qui en ajoute un second se loge en bout de la dernière consigne —
-rien n'occupe de la hauteur tant qu'on ne l'a pas demandé.
-
-Repère : sur un Galaxy Tab A9+ en paysage (1280×800), **une tasse et un textile
-entièrement remplis tiennent sans défiler du tout**.
-
-Quand le panneau devient trop étroit pour aligner six colonnes (**requête de
-conteneur**, pas de média : le seuil porte sur la largeur du panneau, pas de la
-fenêtre), la ligne se replie et les placeholders reprennent le relais. D'où leur
-formulation : « anse à droite : logo… » redit la convention au lieu de donner un
-simple exemple.
-
-### 1 — Contact : PRO ou PERSO
-
-Deux jeux de champs **exclusifs**, pour ne jamais demander un « prénom » à un
-hôtel ni une « société » à un particulier :
-
-| PRO | PERSO |
-|---|---|
-| Nom de facturation · Contact · WhatsApp · Email | Prénom · Nom · WhatsApp |
-
-Le nom qui fait foi partout ailleurs (colonne « Client » du planning, base
-clients) est le **nom de facturation** pour un pro, **« Prénom Nom »** pour un
-particulier. La nature suit le client dans sa fiche (`clients.client_type`).
-
-**Auto-complétion** : taper « Igua » propose « Iguana (Discover) » avec son
-contact et son numéro ; l'annuaire ne propose que des pros en mode pro, que des
-particuliers en mode perso. Rapprochement insensible à la casse, aux accents et
-à la ponctuation. La reprise ne remplit que les champs restés vides, puis pose
-le curseur sur l'objet — le client identifié, la suite c'est ce qu'il vient
-chercher. Un client absent est **créé automatiquement** à l'enregistrement.
-
-### 2 — La demande
-
-**Objet** (le titre du dossier), **description** libre facultative, et le
-**délai d'un seul tap** : *Sous 3 jours (+10 %)* · *5 jours* · *10 jours* ·
-*15 jours*, plus un champ date pour viser un jour précis. Par défaut **5 jours**,
-jamais « sans échéance ». La majoration du délai express voyage dans la fiche,
-donc le chiffrage la voit.
-
-À ce stade la fiche est déjà enregistrable : c'est la **demande simple**, celle
-qui suffit quand le client est pressé (« Devis 40 polos brodés, il repasse
-mardi »). Les produits ne sont détaillés que si on les détaille.
-
-### 3 — Produits : trois familles, dépliées à la demande
-
-| Famille | Ce qu'on saisit |
-|---|---|
-| **Tasses** | Qté · référence · coloris · **Face 1 (anse à droite)** et **Face 2 (anse à gauche)** · options (*Logo OLDA*, *Texte personnalisé*, *Logo client*) · infos de personnalisation · typo · remarques |
-| **Textile** | Qté · vêtement · réf. OLDA ou fournisseur · coloris · taille · **placements** (Cœur, Dos, Avant, Manche Dr, Manche Ga, Poitrine — les six sur une rangée, les autres derrière « ＋ 6 ») avec la **consigne libre** de chacun |
-| **Objets** | Qté · réf. objet · **TROTEC / UV / Autres** · info sur la personnalisation |
-
-Les puces de placement portent un libellé **court** (« Manche Dr ») pour tenir
-sur une seule rangée ; la fiche, elle, garde le nom entier (« Manche droite »).
-La convention d'anse des tasses est **dans l'en-tête de colonne et dans le
-placeholder** : c'est elle qui évite d'imprimer le visuel du mauvais côté. Une
-fiche peut mêler les trois
-familles ; le total de pièces les additionne. « Dupliquer » reprend la ligne ET
-son marquage : la même impression sur une autre taille, en un tap. Une ligne
-qu'on n'a pas remplie part en silence à l'enregistrement — un tap de trop sur
-« Ajouter » ne réclame rien. La technique d'impression du textile est une
-décision de production, pas de la prise : on ne la demande pas ici.
-
-### 4 — Paiement
-
-Sur la rangée du bas du bandeau, à côté de l'échéance :
-**Non payé / Acompte payé / Payé**, puis le **mode** (CB / Espèces) — qui
-n'apparaît qu'une fois quelque chose à encaisser, et qui s'efface si on
-repasse à « non payé » (jamais de « CB » trompeur sur une commande impayée).
-Sur la même ligne, les deux réflexes d'atelier : *Article en boîte*,
-*Maquette à faire*.
-
-Le détail structuré est conservé dans `requests.fiche` (jsonb, discriminant
-`kind: 'commande-atelier'`, `version: 2`) ; `requests.description` en porte le
-résumé lisible — contact, objet, chaque famille, délai, paiement — donc la
-grille n'a jamais besoin de lire ce JSON. Le catalogue vit dans `catalog.json`,
-section `commande` — seul endroit à modifier pour ajouter un vêtement, une
-taille, un délai ou une option de tasse.
+celle qu'implique la nature (`demande` → *Demande reçue*, `commande` →
+*À chiffrer*).
 
 ## Navigation — une seule page, plusieurs vues
 
@@ -312,14 +254,11 @@ d'un même document**, pas des pages. Passer de l'une à l'autre ne recharge
 rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
 
-Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`, `#demande`,
-`#commande`, `#clients`, `#reglages`, plus `#fiverr` et `#a-commander`. La
+Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`,
+`#nouveau-projet`, `#clients`, `#reglages`, plus `#fiverr` et `#a-commander`. La
 navigation, dans la barre du haut, n'est faite que de liens — cliquer change le
 hash, le hash change la vue. Chaque écran est donc partageable par son URL et le
 bouton « Retour » du navigateur fonctionne.
-`#demande` et `#commande` ouvrent la même vue de saisie, seule la nature diffère
-(poussée au module par `setNature`) — d'où deux liens distincts en tête du menu.
-
 `#fiverr` et `#a-commander` restent des vues de **planning** : même grille, même
 en-tête, seule la catégorie est imposée et le rail s'efface (l'onglet le
 remplace). Revenir sur `#planning` depuis l'une d'elles repart du début du
@@ -328,32 +267,33 @@ deux catégories ne quittent PAS le modèle : `FLOW`, les compteurs, la puce de
 sous-étape et les commandes déjà posées sont inchangés — seul l'affichage du
 rail les saute (`PROMOTED` dans `app.js`).
 
-Le bouton « Nouvelle commande » de la barre du haut ne crée une ligne que dans
-la grille : il est donc masqué hors du Planning, où son résultat serait
-invisible.
+Il n'existe **aucun autre moyen de créer une ligne** que Nouveau Projet : ni
+onglet de saisie, ni bouton qui ajoute une ligne vide dans une étape. Une
+commande naît avec son client, son prix et sa date butoir, ou elle ne naît pas.
 
-`/fiche` redirige (301) vers `/#commande` : les raccourcis déjà posés sur les
-écrans de l'atelier continuent de marcher.
+`/fiche` redirige (301) vers `/#nouveau-projet` : les raccourcis déjà posés sur
+les écrans de l'atelier continuent de marcher. Les anciens `#demande` et
+`#commande` retombent sur le planning, comme tout hash inconnu.
 
-Le module de la Prise de commande (`commande.js`, catalogue produits + annuaire
-client) n'est chargé qu'au **premier** passage sur la vue : le planning ne paie
-rien tant qu'on ne prend pas de commande. Sa feuille de style est entièrement
-scopée sous `#commande`, pour qu'aucune règle ne puisse fuir sur les autres
-vues.
+Le module Nouveau Projet (`projet.js`) n'est chargé qu'au **premier** passage
+sur la vue : le planning ne paie rien tant qu'on ne prend pas de commande.
 
 ### Le catalogue vit dans `catalog.json`
 
-C'est le SEUL endroit à modifier pour ajouter un vêtement, une taille, une
-référence de tasse, un délai, une option de tasse ou une technique. Les
-**emplacements d'impression**, eux, se
-complètent aussi depuis la fiche (« + Emplacement ») : la zone créée est
-stockée en base (`app_meta.commande_zones`) et rejoint la liste de tous les
-postes, sans redéploiement. Les zones du catalogue restent figées ; seules
-celles ajoutées au comptoir se retirent.
+Trois listes de référence seulement : la **nature** d'une ligne (demande à
+chiffrer / commande validée), les **délais** raccourcis avec leur majoration, et
+les **modes de paiement**. C'est le seul endroit à modifier pour les ajuster —
+le serveur revalide tout ce que le poste de saisie envoie. Le fichier n'est lu
+qu'**au démarrage** : après une modification, il faut redémarrer le serveur.
 
-Le détail structuré est conservé dans `requests.fiche` (jsonb) ;
+Les **secteurs d'activité**, eux, vivent en base
+(`app_meta.client_secteurs`) et se complètent depuis Base clients, sans
+redéploiement.
+
+Le détail structuré d'un projet est conservé dans `requests.fiche` (jsonb) ;
 `requests.description` en porte en parallèle un résumé lisible, donc la grille
-n'a jamais besoin de lire ce JSON.
+n'a jamais besoin de lire ce JSON. Les fiches enregistrées par l'ancienne prise
+de commande (supprimée) restent lisibles dans le tiroir de détail.
 
 ## Réglages — `/#reglages`
 
@@ -389,16 +329,16 @@ pastille** du tout, plutôt que d'ouvrir une conversation avec un inconnu.
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
-├── catalog.json      catalogue Prise de commande (source unique)
+├── catalog.json      natures, délais et modes de paiement (source unique)
 ├── public/
-│   ├── index.html    coquille + les vues (planning, dashboard, commande, clients, réglages)
+│   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
-│   ├── commande.css  vue Prise de commande, scopée sous #commande
-│   ├── commande.js   état, articles, zones, annuaire client, destination, envoi
+│   ├── projet.css    vue Nouveau Projet, scopée sous #nouveau-projet
+│   ├── projet.js     client, panier, délai, paiement, destination, envoi
 │   ├── clients.css   vue Base clients, scopée sous #clients
-│   ├── clients.js    liste, fiche éditable, notes
+│   ├── clients.js    liste, fiche éditable, notes, secteurs, villes
 │   └── reglages.js   vue Réglages (message WhatsApp « commande prête »)
 ├── .env.example
 └── README.md
@@ -406,21 +346,31 @@ pastille** du tout, plutôt que d'ouvrir une conversation avec un inconnu.
 
 ## Modèle de données — table `requests`
 
-`id` (uuid), `stage` (slug de la FAMILLE, 8 valeurs + `fiverr`), `sub_stage`
+`id` (uuid), `stage` (slug de la FAMILLE, 5 valeurs + `fiverr`), `sub_stage`
 (slug de la SOUS-FAMILLE ou null), `order_kind` (nature posée à la prise :
-`demande` / `commande` / null pour une ligne créée à la main), `responsable`
-(Loïc / Mélina / Charlie / Opérateur / À attribuer), `priority` (1–3), `client_type`
+`demande` / `commande` / null pour une ligne ancienne), `responsable`
+(Loïc / Mélina / Charlie / Julien / À attribuer), `priority` (1–3), `client_type`
 (pro/perso/asso/revendeur), `billing_company`, `contact_referent`, `quantity`,
-`product`, `project_value` (numeric), `description`, `deadline` (date), `status`
-(sous-statut libre, distinct du `stage`), `flag` (`bloque` / `a_voir` / null),
-`flag_reason` (motif libre de l'alerte), `position` (tri manuel), `created_at`,
-`updated_at`.
+`product`, `project_value` (numeric — le **TTC**), `description`, `deadline`
+(date), `status` (sous-statut libre, distinct du `stage`), `flag`
+(`bloque` / `a_voir` / null), `flag_reason` (motif libre de l'alerte),
+`position` (tri manuel), `created_at`, `updated_at`.
 
-Le passage de l'ancien pipeline linéaire (20 étapes) au modèle « familles » se
-fait par une migration non destructive au démarrage (`migrateStagesToFamilies`
-dans `db.js`), protégée par un flag `app_meta.stage_model = 'families'` pour ne
-s'exécuter qu'une fois. Le détail des anciennes étapes est conservé dans
-`sub_stage`, ce qui rend la bascule réversible.
+**Suivi du paiement** : `acompte_demande`, `acompte_verse` et `paye` (booléens à
+trois états — `null` = jamais renseigné, et surtout pas « non »),
+`acompte_montant` (numeric, la somme exacte encaissée) et `paiement_mode`
+(`cb` / `especes` / `virement` / `cheque`).
+
+Deux migrations non destructives se jouent au démarrage, chacune **une seule
+fois** sous sa propre garde `app_meta` : le pipeline linéaire (20 étapes) vers
+les 8 familles (`migrateStagesToFamilies`, garde `stage_model = 'families'`),
+puis les 8 familles vers les **5** familles actuelles
+(`migrateFamiliesToFive`, garde `stage_model_v3 = '1'`). Les deux gardes sont
+distinctes à dessein : partager la clé ferait rejouer la première à chaque
+démarrage, et son `UPDATE … WHERE stage = 'facturation'` écraserait la
+sous-étape de toutes les lignes en facturation. La table de correspondance est
+documentée dans `db.js` (`V2_TO_V3`) et couverte par
+`test/pipeline-migration.test.js`.
 
 `jours_restant` n'est jamais stocké : il est calculé à l'affichage
 (`deadline − aujourd'hui`).
