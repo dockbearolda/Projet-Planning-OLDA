@@ -4028,3 +4028,75 @@ body.wall-open { overflow: hidden; }
   .reg-status { flex-basis: 100%; margin-right: 0; }
   .reg-btn { flex: 1; }
 }
+
+/* --- Side bar détail de ligne (planning) -----------------------------------
+   Calqué sur .cl-drawer de clients.css (même recette : scrim + carte glissante
+   à droite, mêmes durées/easing), mais classes dédiées : deux fonctionnalités
+   indépendantes qui ne doivent pas partager leurs noms de classe. */
+.ligne-drawer { position: fixed; inset: 0; z-index: 70; }
+.ligne-drawer[hidden] { display: none; }
+.ligne-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .42);
+  animation: ldScrim var(--dur-2, .18s) var(--ease, ease) both;
+}
+@keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
+.ligne-drawer__card {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(468px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, .22);
+  animation: ldSlide var(--dur-3, .24s) var(--ease, ease) both;
+}
+@keyframes ldSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
+
+.ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.ld-head__titles { flex: 1; min-width: 0; }
+.ld-head__title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-head__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-head__badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.ld-badge { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; background: var(--border-soft); color: var(--text-2); }
+.ld-close { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--text-2); border-radius: 10px; cursor: pointer; }
+.ld-close:hover { background: var(--state-hover); color: var(--text-1); }
+
+.ld-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 24px; -webkit-overflow-scrolling: touch; }
+.ld-section { margin: 16px 0; }
+.ld-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 0 0 8px; }
+.ld-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; color: var(--text-1); }
+.ld-kv span:first-child { color: var(--text-2); }
+.ld-docs { display: flex; gap: 6px; }
+.ld-empty { font-size: 12.5px; color: var(--text-3); font-style: italic; }
+
+.ld-fiche-item { padding: 8px 10px; border-radius: 8px; background: var(--border-soft); margin-bottom: 8px; }
+.ld-fiche-item__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); }
+.ld-fiche-item__sub { margin: 3px 0 0; font-size: 12px; color: var(--text-2); padding-left: 10px; }
+
+.ld-notes {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-1);
+  background: var(--surface);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.ld-notes:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
+.ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
+.ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
+
+@media (max-width: 720px) {
+  .ligne-drawer__card { width: 100vw; }
+}

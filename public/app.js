@@ -583,6 +583,7 @@ function applySortAndRender() {
   lastRendered = sorted;
   renderRows(sorted);
   applySearchAndCounts();
+  renderLigneDetailIfOpen();
 }
 
 function cmpDeadline(a, b) {
@@ -1236,6 +1237,7 @@ function cellDossier(r) {
   line.appendChild(cellPdfSlot(r, 'devis'));
   line.appendChild(cellPdfSlot(r, 'facture'));
   line.appendChild(cellPdfSlot(r, 'bat'));
+  line.appendChild(cellLigneDetailButton(r));
   const pdfWa = cellPdfWhatsapp(r);
   if (pdfWa) line.appendChild(pdfWa);
   stack.appendChild(line);
@@ -1304,6 +1306,11 @@ function batIcon() {
     'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
     'M8 12l2.5 2.5L16 9',
   ]);
+}
+
+// Détail : chevron — « voir le détail complet de cette ligne ».
+function detailIcon() {
+  return strokeIcon(['M9 6l6 6-6 6']);
 }
 
 // Libellés pour les infobulles des emplacements PDF de la ligne.
@@ -1653,6 +1660,121 @@ function cellDeadline(r) {
 
   showBadge();
   return td;
+}
+
+// --- Side bar détail de ligne -----------------------------------------------
+// Panneau à droite, calqué sur le tiroir de clients.js (.cl-drawer) : mêmes
+// jetons CSS que la grille, classes dédiées (.ligne-drawer) pour ne pas
+// mélanger deux fonctionnalités indépendantes. Une seule instance, montée au
+// premier clic ; son contenu est entièrement reconstruit à chaque ouverture
+// ou re-synchronisation — jamais de référence figée à un objet `r` : `rows`
+// est remplacé (pas muté) à chaque poll/SSE (cf. renderRows), donc on stocke
+// seulement l'id et on refait `rows.find(...)` à chaque rendu.
+let ligneDrawerEl = null;
+let ligneDrawerCard = null;
+let ligneDrawerId = null; // id (string) de la ligne affichée, ou null si fermé
+
+function ensureLigneDrawer() {
+  if (ligneDrawerEl) return;
+  ligneDrawerEl = document.createElement('div');
+  ligneDrawerEl.className = 'ligne-drawer';
+  ligneDrawerEl.hidden = true;
+  const scrim = document.createElement('div');
+  scrim.className = 'ligne-drawer__scrim';
+  scrim.addEventListener('click', closeLigneDetail);
+  ligneDrawerCard = document.createElement('aside');
+  ligneDrawerCard.className = 'ligne-drawer__card';
+  ligneDrawerCard.setAttribute('role', 'dialog');
+  ligneDrawerCard.setAttribute('aria-modal', 'true');
+  ligneDrawerCard.setAttribute('aria-label', 'Détail de la commande');
+  ligneDrawerEl.append(scrim, ligneDrawerCard);
+  document.body.appendChild(ligneDrawerEl);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && ligneDrawerId) closeLigneDetail();
+  });
+}
+
+function openLigneDetail(id) {
+  ensureLigneDrawer();
+  ligneDrawerId = String(id);
+  ligneDrawerEl.hidden = false;
+  renderLigneDetail();
+}
+
+function closeLigneDetail() {
+  if (!ligneDrawerEl) return;
+  ligneDrawerId = null;
+  ligneDrawerEl.hidden = true;
+}
+
+// Rappelée après CHAQUE (re)rendu de la grille (poll, SSE, tri, sauvegarde
+// locale) : la side bar se re-synchronise depuis `rows`, et se ferme si la
+// ligne a quitté la vue courante (déplacée vers une autre étape, supprimée).
+function renderLigneDetailIfOpen() {
+  if (!ligneDrawerId) return;
+  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  if (!r) { closeLigneDetail(); return; }
+  renderLigneDetail();
+}
+
+function renderLigneDetail() {
+  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  if (!r) { closeLigneDetail(); return; }
+  ligneDrawerCard.replaceChildren();
+
+  const head = document.createElement('header');
+  head.className = 'ld-head';
+
+  const titles = document.createElement('div');
+  titles.className = 'ld-head__titles';
+  const title = document.createElement('h2');
+  title.className = 'ld-head__title';
+  title.textContent = r.billing_company || r.contact_referent || '— sans dossier';
+  const sub = document.createElement('p');
+  sub.className = 'ld-head__sub';
+  sub.textContent = r.product || '—';
+  const badges = document.createElement('div');
+  badges.className = 'ld-head__badges';
+  const typeBadge = document.createElement('span');
+  typeBadge.className = 'ld-badge';
+  typeBadge.textContent = CLIENT_TYPE_LABEL[r.client_type] || CLIENT_TYPES[0].label;
+  const prioBadge = document.createElement('span');
+  prioBadge.className = 'ld-badge';
+  prioBadge.textContent = PRIORITY_LEVELS[prioBand(r)].label;
+  badges.append(typeBadge, prioBadge);
+  titles.append(title, sub, badges);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'ld-close';
+  close.setAttribute('aria-label', 'Fermer le détail');
+  close.appendChild(strokeIcon(['M18 6L6 18', 'M6 6l12 12']));
+  close.addEventListener('click', closeLigneDetail);
+
+  head.append(titles, close);
+  ligneDrawerCard.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'ld-body';
+  ligneDrawerCard.appendChild(body);
+}
+
+// Bouton « voir détails » : rejoint le cluster documents de la cellule
+// Dossier. Son propre `stopPropagation` suffit — aucun handler n'est posé
+// sur <tr>, donc le reste de la ligne garde exactement son comportement
+// d'édition inline actuel.
+function cellLigneDetailButton(r) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pdf-btn ligne-detail-btn';
+  attachTip(btn, 'Voir le détail de la ligne');
+  btn.setAttribute('aria-label', 'Voir le détail de la ligne');
+  btn.appendChild(detailIcon());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openLigneDetail(r.id);
+  });
+  return btn;
 }
 
 // --- Infobulles maison -----------------------------------------------------
