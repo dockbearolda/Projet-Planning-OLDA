@@ -4,7 +4,10 @@
 // dans une section vide (même principe que clients.js / reglages.js), chargé
 // à la demande par app.js.
 
-import { fieldRow, fieldsForNature, wireCreateValidation, SECTEURS_SUGGERES } from './clients.js';
+import {
+  fieldRow, fieldsForNature, wireCreateValidation, wireVilleDefaults,
+  registerSecteurDatalist, loadSecteurs, valeurSaisie, VILLES,
+} from './clients.js';
 
 // Secteurs prédéfinis (Base Clients) : le champ `secteur` référence le
 // datalist `cl-dl-secteurs`, construit par clients.js dans SON propre DOM.
@@ -13,6 +16,7 @@ import { fieldRow, fieldsForNature, wireCreateValidation, SECTEURS_SUGGERES } fr
 // aucune suggestion n'apparaît. Id distinct pour ne pas dupliquer `cl-dl-secteurs`
 // si les deux vues finissent montées en même temps.
 const PROJ_SECTEURS_DL_ID = 'proj-dl-secteurs';
+const PROJ_VILLES_DL_ID = 'proj-dl-villes';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -253,10 +257,13 @@ function renderClientPage(body) {
 
     const fieldsWrap = el('div', 'proj-quick__fields');
     for (const f of fieldsForNature(nature)) {
-      const field = f.key === 'secteur' ? { ...f, list: PROJ_SECTEURS_DL_ID } : f;
-      fieldsWrap.appendChild(fieldRow(field, ''));
+      const local = { secteur: PROJ_SECTEURS_DL_ID, ville: PROJ_VILLES_DL_ID }[f.key];
+      fieldsWrap.appendChild(fieldRow(local ? { ...f, list: local } : f, ''));
     }
     quickForm.appendChild(fieldsWrap);
+    // Choisir une ville remplit pays et code postal (sans jamais écraser une
+    // valeur tapée à la main).
+    wireVilleDefaults(fieldsWrap);
     const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
 
     const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
@@ -269,7 +276,7 @@ function renderClientPage(body) {
     wireCreateValidation(fieldsWrap, createBtn, async () => {
       createBtn.disabled = true;
       const draft = { client_type: nature };
-      for (const i of inputs) draft[i.dataset.key] = i.value.trim();
+      for (const i of inputs) draft[i.dataset.key] = valeurSaisie(i.dataset.key, i.value);
       // `entreprise` reste la colonne obligatoire côté serveur et sert à la
       // recherche/l'affichage : pour un particulier, on la dérive du prénom +
       // nom plutôt que de la demander une deuxième fois.
@@ -812,8 +819,7 @@ function renderTotalBar() {
 // --- Destination + enregistrement --------------------------------------------
 async function loadPipeline() {
   if (PIPELINE) return PIPELINE;
-  const catalog = await api('GET', '/api/commande/catalog');
-  PIPELINE = catalog.pipeline;
+  PIPELINE = await api('GET', '/api/pipeline');
   return PIPELINE;
 }
 
@@ -944,8 +950,13 @@ function buildStatic() {
   page.append(head, bodyEl);
   const dlSecteurs = el('datalist');
   dlSecteurs.id = PROJ_SECTEURS_DL_ID;
-  dlSecteurs.append(...SECTEURS_SUGGERES.map((s) => new Option(s)));
-  ROOT.replaceChildren(page, dlSecteurs);
+  // La liste des secteurs vit en base : on s'abonne plutôt que de la recopier,
+  // pour qu'un secteur ajouté depuis Base clients apparaisse ici aussitôt.
+  registerSecteurDatalist(dlSecteurs);
+  const dlVilles = el('datalist');
+  dlVilles.id = PROJ_VILLES_DL_ID;
+  dlVilles.append(...VILLES.map((v) => new Option(v.label)));
+  ROOT.replaceChildren(page, dlSecteurs, dlVilles);
 }
 
 let mounted = false;
@@ -958,6 +969,7 @@ export async function initProjet(root) {
     [CLIENTS, TARIFS, TARIFS_PARAMS] = await Promise.all([
       api('GET', '/api/clients'), api('GET', '/api/tarifs-tasse'), api('GET', '/api/tarifs-tasse/parametres'),
     ]);
+    await loadSecteurs();
   } catch (_) { /* silencieux : les pages suivantes gèrent une liste vide */ }
   render();
 }

@@ -122,38 +122,40 @@ delete process.env.APP_PASSWORD;
   const fiche2 = await j('GET', `/api/clients/${id}`);
   assert.strictEqual(fiche2.body.notes.length, 1);
 
-  // 5. Création automatique à la prise de commande, sans doublon.
+  // 5. Création automatique à l'enregistrement d'un projet, sans doublon.
   const before = (await j('GET', '/api/clients')).body.length;
   const nouveauClient = 'Chez Testeur ' + Math.floor(seeded.body.length);
   const cmd = {
     kind: 'commande',
     client: { societe: nouveauClient, contact: 'Paul', telephone: '0690 12 34 56', type: 'pro' },
-    articles: [{ vetement: 'T-shirt', quantite: 3, zones: [] }],
+    lignes: [{ type: 'textile', quantite: 3, description: '3 t-shirts', prixTtcManuel: 60 }],
+    delai: 'j5',
   };
-  const c1 = await j('POST', '/api/commande', cmd);
+  const c1 = await j('POST', '/api/projets', cmd);
   assert.strictEqual(c1.status, 201, JSON.stringify(c1.body));
   const after1 = await j('GET', '/api/clients');
   assert.strictEqual(after1.body.length, before + 1, 'un nouveau client créé');
   const auto = after1.body.find((c) => c.entreprise === nouveauClient);
-  assert.ok(auto, 'le client de la commande est dans la base');
+  assert.ok(auto, 'le client du projet est dans la base');
   assert.strictEqual(auto.nom, 'Paul');
   assert.strictEqual(auto.telephone, '0690 12 34 56');
-  assert.strictEqual(auto.client_type, 'pro', 'la nature pro de la commande suit le client');
+  assert.strictEqual(auto.client_type, 'pro', 'la nature pro du projet suit le client');
   assert.ok(auto.commandes >= 1, 'la commande est comptée');
 
-  // Une 2e commande du MÊME client (casse différente) ne crée pas de doublon.
-  await j('POST', '/api/commande', { ...cmd, client: { ...cmd.client, societe: nouveauClient.toUpperCase() } });
+  // Un 2e projet du MÊME client (casse différente) ne crée pas de doublon.
+  await j('POST', '/api/projets', { ...cmd, client: { ...cmd.client, societe: nouveauClient.toUpperCase() } });
   const after2 = await j('GET', '/api/clients');
   assert.strictEqual(after2.body.length, before + 1, 'pas de doublon malgré la casse');
   const autoBis = after2.body.find((c) => c.entreprise === nouveauClient);
   assert.ok(autoBis.commandes >= 2, 'le compteur suit les commandes');
 
-  // Une commande PERSO crée un client perso dans la base (la nature suit).
+  // Un projet PERSO crée un client perso dans la base (la nature suit).
   const persoName = 'Particulier Testeur ' + Math.floor(seeded.body.length);
-  const cmdPerso = await j('POST', '/api/commande', {
+  const cmdPerso = await j('POST', '/api/projets', {
     kind: 'demande',
     client: { societe: persoName, contact: 'Sophie', type: 'perso' },
-    articles: [{ vetement: 'Sweat', quantite: 1, zones: [] }],
+    lignes: [{ type: 'textile', quantite: 1, description: '1 sweat', prixTtcManuel: 40 }],
+    delai: 'j5',
   });
   assert.strictEqual(cmdPerso.status, 201, JSON.stringify(cmdPerso.body));
   const autoPerso = (await j('GET', '/api/clients')).body.find((c) => c.entreprise === persoName);
@@ -170,12 +172,15 @@ delete process.env.APP_PASSWORD;
   //    + identifiant lisible généré côté serveur.
   const proEnrichi = await j('POST', '/api/clients', {
     entreprise: 'SARL Evelyne', raison_sociale: 'SARL EVELYNE', code_postal: '97150',
-    ville: 'Saint-Martin', pays: 'Saint-Martin', secteur: 'Hôtel / Restaurant',
+    ville: 'SAINT-MARTIN', pays: 'France', adresse: '12 rue de la Liberté, Marigot',
+    secteur: 'Hôtel / Restaurant',
     referent_prenom: 'Cédric', prenom: 'Evelyne', client_type: 'revendeur',
   });
   assert.strictEqual(proEnrichi.status, 201, JSON.stringify(proEnrichi.body));
   assert.strictEqual(proEnrichi.body.raison_sociale, 'SARL EVELYNE');
   assert.strictEqual(proEnrichi.body.code_postal, '97150');
+  assert.strictEqual(proEnrichi.body.adresse, '12 rue de la Liberté, Marigot',
+    'l’adresse est acceptée et relue telle quelle');
   assert.strictEqual(proEnrichi.body.prenom, 'Evelyne');
   assert.strictEqual(proEnrichi.body.secteur, 'Hôtel / Restaurant');
   assert.strictEqual(proEnrichi.body.client_type, 'revendeur', 'nature étendue acceptée');
@@ -203,7 +208,43 @@ delete process.env.APP_PASSWORD;
   const codeN3 = Number.parseInt(proEnrichi3.body.code.slice('CLI-PRO-'.length), 10);
   assert.ok(codeN3 > codeN2, 'le code n\'est jamais réutilisé après suppression');
 
-  console.log('✓ base clients : seed, CRUD, notes, création auto à la commande et dédoublonnage OK');
+  // L'adresse se modifie comme le reste de la fiche.
+  const majAdresse = await j('PATCH', `/api/clients/${proEnrichi.body.id}`, { adresse: 'Baie Nettlé, lot 4' });
+  assert.strictEqual(majAdresse.status, 200);
+  assert.strictEqual(majAdresse.body.adresse, 'Baie Nettlé, lot 4');
+
+  // 8. SECTEURS D'ACTIVITÉ : liste modifiable, plus une constante du code.
+  const sect0 = await j('GET', '/api/clients/secteurs');
+  assert.strictEqual(sect0.status, 200);
+  assert.ok(Array.isArray(sect0.body) && sect0.body.length >= 20,
+    'la liste est amorcée avec les secteurs connus, pas vide');
+  assert.ok(sect0.body.includes('Boutique'));
+
+  const ajout = await j('POST', '/api/clients/secteurs', { label: 'Yachting' });
+  assert.strictEqual(ajout.status, 201, JSON.stringify(ajout.body));
+  assert.ok(ajout.body.includes('Yachting'), 'le secteur ajouté est dans la liste');
+
+  // Idempotent, casse et accents compris : « yachting » n'en crée pas un second.
+  const doublon = await j('POST', '/api/clients/secteurs', { label: 'yachting' });
+  assert.strictEqual(doublon.body.filter((x) => x.toLowerCase() === 'yachting').length, 1,
+    'pas de doublon sur la casse');
+  assert.strictEqual((await j('POST', '/api/clients/secteurs', { label: '   ' })).status, 400,
+    'un libellé vide est refusé');
+
+  // Un secteur retiré de la LISTE ne disparaît pas des FICHES qui le portent :
+  // la valeur y est recopiée, jamais référencée.
+  await j('POST', '/api/clients/secteurs', { label: 'Éphémère' });
+  const fichePorteuse = await j('POST', '/api/clients', { entreprise: 'Client Éphémère', secteur: 'Éphémère' });
+  const apresRetrait = await j('DELETE', '/api/clients/secteurs/' + encodeURIComponent('Éphémère'));
+  assert.ok(!apresRetrait.body.includes('Éphémère'), 'le secteur quitte la liste');
+  const relue = await j('GET', `/api/clients/${fichePorteuse.body.id}`);
+  assert.strictEqual(relue.body.secteur, 'Éphémère', 'la fiche garde son secteur');
+
+  // La liste survit au redémarrage : elle est en base, pas en mémoire.
+  const sectRelue = await j('GET', '/api/clients/secteurs');
+  assert.ok(sectRelue.body.includes('Yachting'), 'l’ajout est bien persisté');
+
+  console.log('✓ base clients : seed, CRUD, notes, adresse, secteurs modifiables et dédoublonnage OK');
   process.exit(0);
 })().catch((err) => {
   console.error(err);

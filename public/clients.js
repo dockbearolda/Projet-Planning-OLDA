@@ -27,20 +27,59 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 // Champs éditables de la fiche (ordre d'affichage). `list` = suggestions
 // (datalist) construites depuis les valeurs déjà présentes dans la base.
 export const FIELDS = [
-  { key: 'entreprise', label: 'Société', icon: 'apartment', ph: '', required: true },
-  { key: 'raison_sociale', label: 'Raison sociale', icon: 'gavel', ph: '' },
+  { key: 'entreprise', label: 'Nom entreprise', icon: 'apartment', ph: '', required: true },
+  { key: 'raison_sociale', label: 'Raison sociale EBP', icon: 'gavel', ph: '' },
   { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
-  { key: 'nom', label: 'Nom', icon: 'person', ph: '' },
-  { key: 'prenom', label: 'Prénom', icon: 'badge', ph: '' },
-  { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: '' },
+  { key: 'nom', label: 'Nom', icon: 'person', ph: '', casse: 'majuscules' },
+  { key: 'prenom', label: 'Prénom', icon: 'badge', ph: '', casse: 'initiales' },
+  { key: 'referent_prenom', label: 'Référent (prénom)', icon: 'badge', ph: '', casse: 'initiales' },
   { key: 'secteur', label: 'Secteur d’activité', icon: 'work', ph: '', list: 'cl-dl-secteurs' },
+  { key: 'adresse', label: 'Adresse', icon: 'home_pin', ph: '' },
   { key: 'zone', label: 'Localisation', icon: 'location_on', ph: '', list: 'cl-dl-zones' },
-  { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '' },
-  { key: 'ville', label: 'Ville', icon: 'location_city', ph: '' },
+  { key: 'ville', label: 'Ville', icon: 'location_city', ph: '', list: 'cl-dl-villes' },
   { key: 'pays', label: 'Pays', icon: 'public', ph: '' },
+  { key: 'code_postal', label: 'Code postal', icon: 'markunread_mailbox', ph: '' },
   { key: 'telephone', label: 'WhatsApp', icon: 'call', ph: '', type: 'tel', inputmode: 'tel' },
   { key: 'email', label: 'E-mail', icon: 'mail', ph: '', type: 'email', inputmode: 'email' },
 ];
+
+// Territoires desservis par l'atelier. Liste déroulante à SAISIE LIBRE (input +
+// datalist) : ce sont les six qui reviennent tous les jours, pas une liste
+// fermée — on peut taper n'importe quelle autre ville.
+// Choisir l'une d'elles remplit Pays et Code postal (voir `applyVilleDefaults`).
+// Sint Maarten n'utilise pas de code postal : le champ reste vide, pas rempli
+// d'une valeur inventée.
+export const VILLES = [
+  { label: 'SAINT-MARTIN', pays: 'France', code_postal: '97150' },
+  { label: 'SINT MAARTEN', pays: 'Sint Maarten', code_postal: '' },
+  { label: 'SAINT-BARTHÉLEMY', pays: 'France', code_postal: '97133' },
+  { label: 'ANGUILLA', pays: 'Anguilla', code_postal: 'AI-2640' },
+  { label: 'GUADELOUPE', pays: 'France', code_postal: '97100' },
+  { label: 'MARTINIQUE', pays: 'France', code_postal: '97200' },
+];
+const villeByLabel = (v) => VILLES.find((x) => fold(x.label) === fold(String(v || '').trim())) || null;
+
+// Casse imposée à la saisie : « DUPONT » pour un nom, « Jean-Marc » pour un
+// prénom. Appliquée au blur seulement — jamais pendant la frappe, sinon le
+// curseur saute et corriger devient pénible.
+function applyCasse(mode, raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return '';
+  if (mode === 'majuscules') return s.toLocaleUpperCase('fr-FR');
+  // Initiales : chaque mot, y compris après un tiret ou une apostrophe
+  // (« jean-marc o'brien » → « Jean-Marc O'Brien »).
+  return s.toLocaleLowerCase('fr-FR').replace(
+    /(^|[\s\-'’])(\p{L})/gu,
+    (_, sep, letter) => sep + letter.toLocaleUpperCase('fr-FR'),
+  );
+}
+
+// Le TIRET veut dire « je n'ai pas l'info » : il fait passer l'étape et part
+// vide au serveur. Interdit sur l'identité (société, nom, prénom) — un client
+// nommé « - » ne se retrouve jamais dans la base.
+const TIRET_INTERDIT = new Set(['entreprise', 'nom', 'prenom']);
+export const estTiret = (v) => String(v == null ? '' : v).trim() === '-';
+export const valeurSaisie = (key, v) => (estTiret(v) && !TIRET_INTERDIT.has(key) ? '' : String(v == null ? '' : v).trim());
 
 // Champs affichés à la CRÉATION (et à l'édition) selon la nature du client.
 // `code` (identifiant serveur) est géré à part : jamais dans ces listes, montré
@@ -48,9 +87,11 @@ export const FIELDS = [
 // Hôtel…") n'est plus proposé dans les formulaires — redondant avec Secteur —
 // mais la colonne reste lisible pour les fiches qui en ont déjà une.
 export const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'];
+// Ordre demandé par le patron : l'identité, puis l'adresse complète (la ville
+// entraîne pays et code postal), puis le contact.
 export const PRO_FIELDS = [
-  'entreprise', 'raison_sociale', 'zone', 'code_postal', 'ville', 'pays',
-  'referent_prenom', 'telephone', 'secteur', 'email',
+  'entreprise', 'raison_sociale', 'adresse', 'ville', 'pays', 'code_postal',
+  'zone', 'secteur', 'referent_prenom', 'telephone', 'email',
 ];
 
 export function fieldsForNature(nat) {
@@ -58,15 +99,56 @@ export function fieldsForNature(nat) {
   return keys.map((k) => FIELDS.find((f) => f.key === k));
 }
 
-// Secteurs suggérés (classeur patron « CRM OLDA CREATION CLIENTS », onglet
-// « Liste Secteurs ») : liste de référence, saisie libre autorisée comme le
-// reste du catalogue.
-export const SECTEURS_SUGGERES = [
+// Secteurs d'activité : la liste vit EN BASE (app_meta.client_secteurs), le
+// patron l'ajuste depuis Base clients. Ce cache est partagé avec Nouveau Projet
+// pour que les deux formulaires proposent exactement la même chose. La valeur
+// de départ est le repli quand l'appel échoue — pas la référence.
+export let SECTEURS = [
   'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
   'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
   'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',
   'Administration', 'Autre',
 ];
+
+// Tous les datalists « secteur » montés dans la page (Base clients ET Nouveau
+// Projet, chargés indépendamment) : un ajout doit apparaître dans les deux sans
+// recharger l'application.
+const SECTEUR_DATALISTS = new Set();
+
+export function registerSecteurDatalist(dl) {
+  SECTEUR_DATALISTS.add(dl);
+  dl.replaceChildren(...SECTEURS.map((s) => new Option(s)));
+}
+
+function paintSecteurs() {
+  for (const dl of SECTEUR_DATALISTS) {
+    if (dl.isConnected) dl.replaceChildren(...SECTEURS.map((s) => new Option(s)));
+    else SECTEUR_DATALISTS.delete(dl);
+  }
+}
+
+export async function loadSecteurs() {
+  try {
+    const list = await api('GET', '/api/clients/secteurs');
+    if (Array.isArray(list) && list.length) SECTEURS = list;
+  } catch (_) { /* silencieux : on garde la liste connue */ }
+  paintSecteurs();
+  return SECTEURS;
+}
+
+export async function addSecteur(label) {
+  const list = await api('POST', '/api/clients/secteurs', { label });
+  if (Array.isArray(list)) SECTEURS = list;
+  paintSecteurs();
+  return SECTEURS;
+}
+
+export async function removeSecteur(label) {
+  const list = await api('DELETE', `/api/clients/secteurs/${encodeURIComponent(label)}`);
+  if (Array.isArray(list)) SECTEURS = list;
+  paintSecteurs();
+  return SECTEURS;
+}
 
 const NOTE_KINDS = [
   { id: 'note', label: 'Note', icon: 'sticky_note_2' },
@@ -199,7 +281,16 @@ function buildStatic() {
   nw.id = 'cl-new';
   nw.append(ic('add'), el('span', null, 'Nouveau'));
 
-  head.append(brand, search, natWrap, sortWrap, nw);
+  // Gestion de la liste des secteurs d'activité : elle vit en base, on l'ajuste
+  // ici plutôt que dans le code.
+  // Classe DISTINCTE de .cl-sort__btn : le tri capte tous les clics de sa
+  // classe en premier, il aurait avalé celui-ci (et posé sort = undefined).
+  const secBtn = el('button', 'cl-tool');
+  secBtn.type = 'button';
+  secBtn.id = 'cl-secteurs-btn';
+  secBtn.append(ic('work'), el('span', null, 'Secteurs'));
+
+  head.append(brand, search, natWrap, sortWrap, secBtn, nw);
 
   const list = el('div', 'cl-list');
   list.id = 'cl-list';
@@ -209,11 +300,14 @@ function buildStatic() {
 
   view.append(head, list, empty);
 
-  // Suggestions type / zone (remplies au rendu) + secteur (liste fixe du patron).
+  // Suggestions type / zone (remplies au rendu), secteur (liste modifiable en
+  // base) et ville (les six territoires desservis, saisie libre autorisée).
   const dlT = el('datalist'); dlT.id = 'cl-dl-types';
   const dlZ = el('datalist'); dlZ.id = 'cl-dl-zones';
   const dlS = el('datalist'); dlS.id = 'cl-dl-secteurs';
-  dlS.append(...SECTEURS_SUGGERES.map((s) => new Option(s)));
+  registerSecteurDatalist(dlS);
+  const dlV = el('datalist'); dlV.id = 'cl-dl-villes';
+  dlV.append(...VILLES.map((v) => new Option(v.label)));
 
   // Tiroir (fiche), overlay plein écran.
   const drawerEl = el('div', 'cl-drawer');
@@ -232,7 +326,12 @@ function buildStatic() {
   toastEl.setAttribute('role', 'status');
   toastEl.setAttribute('aria-live', 'polite');
 
-  ROOT.append(view, dlT, dlZ, dlS, drawerEl, toastEl);
+  // Panneau des secteurs (overlay), monté une fois, rempli à l'ouverture.
+  const secPanel = el('div', 'cl-secteurs');
+  secPanel.id = 'cl-secteurs';
+  secPanel.hidden = true;
+
+  ROOT.append(view, dlT, dlZ, dlS, dlV, drawerEl, secPanel, toastEl);
 }
 
 // --- Liste -----------------------------------------------------------------
@@ -321,6 +420,10 @@ function renderList() {
 // « 06 90 66 24 00 ») en conservant la position du curseur, pour ne pas gêner
 // la saisie en cours de numéro.
 function formatPhoneAsTyped(input) {
+  // Le tiret « je n'ai pas l'info » n'est pas un numéro : le groupeur de
+  // chiffres l'effacerait, et le champ ne pourrait jamais être marqué comme
+  // volontairement vide.
+  if (estTiret(input.value)) return;
   const pos = input.selectionStart ?? input.value.length;
   const digitsBefore = input.value.slice(0, pos).replace(/\D/g, '').length;
   input.value = groupDigits(input.value);
@@ -349,11 +452,62 @@ export function fieldRow(field, value, opts) {
   input.id = id;
   lab.setAttribute('for', id);
   if (field.type === 'tel') input.addEventListener('input', () => formatPhoneAsTyped(input));
+  // Casse imposée en quittant le champ (NOM en majuscules, Prénom en initiales).
+  // Un tiret « je n'ai pas l'info » traverse tel quel, sans être transformé.
+  if (field.casse) {
+    input.addEventListener('blur', () => {
+      if (estTiret(input.value)) return;
+      const next = applyCasse(field.casse, input.value);
+      if (next !== input.value) {
+        input.value = next;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+  }
   row.append(lab, input);
   if (field.key === 'entreprise') input.classList.add('cl-f__input--strong');
   // Identifiant lisible : généré par le serveur à la création, jamais modifiable.
   if (field.key === 'code') { input.readOnly = true; input.classList.add('cl-f__input--readonly'); }
   return row;
+}
+
+// Choisir une ville remplit Pays et Code postal. Règle de NON-ÉCRASEMENT : on
+// n'écrit que dans un champ vide, ou qui contient encore ce que la ville
+// PRÉCÉDENTE y avait mis. Une valeur tapée à la main n'est jamais perdue, et les
+// deux champs restent modifiables ensuite.
+// Branché sur un jeu de champs déjà rendu (fiche complète ou quick-form) ;
+// `onFilled` prévient l'appelant pour qu'il enregistre, s'il enregistre en place.
+export function wireVilleDefaults(fieldsWrap, onFilled) {
+  const byKey = (k) => fieldsWrap.querySelector(`.cl-f__input[data-key="${k}"]`);
+  const ville = byKey('ville');
+  if (!ville) return;
+  // Ce que la ville a rempli la dernière fois : la seule chose qu'on s'autorise
+  // à écraser, en plus du vide.
+  let pose = villeByLabel(ville.value);
+
+  const apply = () => {
+    const v = villeByLabel(ville.value);
+    if (!v) { pose = null; return; }   // ville libre : on ne devine rien
+    let touched = false;
+    for (const key of ['pays', 'code_postal']) {
+      const champ = byKey(key);
+      if (!champ) continue;
+      const actuel = champ.value.trim();
+      const ancien = pose ? pose[key] : '';
+      if (actuel !== '' && actuel !== ancien) continue;   // saisie manuelle : intouchable
+      if (actuel === v[key]) continue;
+      champ.value = v[key];
+      champ.classList.remove('cl-f__input--missing');
+      champ.dispatchEvent(new Event('change', { bubbles: true }));
+      touched = true;
+    }
+    pose = v;
+    if (touched && onFilled) onFilled();
+  };
+
+  // `change` couvre le clic dans la liste déroulante, `blur` la saisie au clavier.
+  ville.addEventListener('change', apply);
+  ville.addEventListener('blur', apply);
 }
 
 // Validation partagée par le tiroir Base Clients ET le quick-form Nouveau
@@ -484,6 +638,10 @@ function renderDrawer() {
   const tintClass = cur === 'perso' ? 'cl-fields__group--perso' : 'cl-fields__group--pro';
   const fieldGroup = el('div', `cl-fields__group ${tintClass}`);
   for (const f of fieldsForNature(cur)) fieldGroup.append(fieldRow(f, c[f.key]));
+  // Choisir une ville remplit pays et code postal. En mode édition, le `change`
+  // émis par le remplissage passe par l'écouteur de la fiche : les deux champs
+  // s'enregistrent tout seuls, sans code de sauvegarde en double ici.
+  wireVilleDefaults(fieldGroup);
   fields.append(fieldGroup);
   bodyScroll.append(fields);
 
@@ -593,8 +751,8 @@ function openNew() {
     id: null, mode: 'create',
     draft: {
       entreprise: '', raison_sociale: '', nom: '', prenom: '', referent_prenom: '',
-      client_type: 'pro', type: '', secteur: '', zone: '', code_postal: '', ville: '', pays: '',
-      telephone: '', email: '',
+      client_type: 'pro', type: '', secteur: '', zone: '', adresse: '',
+      code_postal: '', ville: '', pays: '', telephone: '', email: '',
     },
     notes: [],
   };
@@ -662,7 +820,7 @@ async function createClient() {
   const shown = fieldsForNature(nat);
   for (const f of shown) {
     const input = $(`#cl-f-${f.key}`);
-    if (input) draft[f.key] = input.value.trim();
+    if (input) draft[f.key] = valeurSaisie(f.key, input.value);
   }
   // `entreprise` reste la colonne obligatoire côté serveur : pour un
   // particulier, on la dérive du prénom + nom plutôt que de la demander une
@@ -754,6 +912,7 @@ function wire() {
     if (segBtn) return setNature(segBtn.dataset.nature);
 
     if (t.closest('#cl-new')) return openNew();
+    if (t.closest('#cl-secteurs-btn')) return openSecteurs();
     if (t.closest('#cl-q-clear')) { query = ''; $('#cl-q').value = ''; $('#cl-q').focus(); return renderList(); }
     if (t.closest('#cl-close') || t.closest('#cl-close-2') || t.closest('#cl-drawer-scrim')) return closeDrawer();
     if (t.closest('#cl-del')) return deleteClient();
@@ -778,16 +937,112 @@ function wire() {
   // Édition en place : on enregistre à la validation (blur ou Entrée).
   ROOT.addEventListener('change', (e) => {
     if (e.target.classList && e.target.classList.contains('cl-f__input') && drawer && drawer.mode === 'edit') {
-      saveField(e.target.dataset.key, e.target.value);
+      saveField(e.target.dataset.key, valeurSaisie(e.target.dataset.key, e.target.value));
     }
   });
   ROOT.addEventListener('keydown', (e) => {
+    const secOuvert = $('#cl-secteurs') && !$('#cl-secteurs').hidden;
+    if (e.key === 'Escape' && secOuvert) { e.preventDefault(); return closeSecteurs(); }
     if (e.key === 'Escape' && drawer) { e.preventDefault(); return closeDrawer(); }
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('cl-f__input')) {
       e.preventDefault();
       e.target.blur();
     }
   });
+}
+
+// --- Secteurs d'activité : gestion de la liste -----------------------------
+// Un panneau simple : la liste, une croix par secteur, un champ pour en ajouter.
+// Retirer un secteur ne touche AUCUNE fiche — la valeur y est recopiée, pas
+// référencée : les clients « Boutique » restent « Boutique ».
+function renderSecteursPanel() {
+  const panel = $('#cl-secteurs');
+  if (!panel || panel.hidden) return;
+  panel.replaceChildren();
+
+  const scrim = el('div', 'cl-secteurs__scrim');
+  scrim.addEventListener('click', closeSecteurs);
+
+  const card = el('div', 'cl-secteurs__card');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+  card.setAttribute('aria-label', 'Secteurs d’activité');
+
+  const head = el('div', 'cl-secteurs__head');
+  head.append(el('h3', 'cl-secteurs__title', 'Secteurs d’activité'));
+  const close = el('button', 'cl-secteurs__close');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Fermer');
+  close.append(ic('close'));
+  close.addEventListener('click', closeSecteurs);
+  head.append(close);
+  card.append(head);
+
+  card.append(el('p', 'cl-secteurs__hint',
+    'Ces secteurs sont proposés à la saisie d’une fiche. En retirer un ne change aucune fiche déjà remplie.'));
+
+  const list = el('div', 'cl-secteurs__list');
+  for (const sec of SECTEURS) {
+    const chip = el('span', 'cl-secteurs__chip');
+    chip.append(el('span', null, sec));
+    const del = el('button', 'cl-secteurs__del');
+    del.type = 'button';
+    del.setAttribute('aria-label', `Retirer ${sec}`);
+    del.append(ic('close'));
+    del.addEventListener('click', async () => {
+      del.disabled = true;
+      try {
+        await removeSecteur(sec);
+        renderSecteursPanel();
+      } catch (err) {
+        del.disabled = false;
+        toast(err.message || 'Suppression impossible.');
+      }
+    });
+    chip.append(del);
+    list.append(chip);
+  }
+  card.append(list);
+
+  const addRow = el('form', 'cl-secteurs__add');
+  const input = el('input', 'cl-f__input');
+  input.type = 'text';
+  input.placeholder = 'Ajouter un secteur…';
+  input.setAttribute('aria-label', 'Nouveau secteur d’activité');
+  const addBtn = el('button', 'cl-btn cl-btn--primary', 'Ajouter');
+  addBtn.type = 'submit';
+  addRow.append(input, addBtn);
+  addRow.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const label = input.value.trim();
+    if (!label) return;
+    addBtn.disabled = true;
+    try {
+      await addSecteur(label);
+      renderSecteursPanel();
+      $('#cl-secteurs .cl-secteurs__add .cl-f__input').focus();
+    } catch (err) {
+      addBtn.disabled = false;
+      toast(err.message || 'Ajout impossible.');
+    }
+  });
+  card.append(addRow);
+
+  panel.append(scrim, card);
+}
+
+function openSecteurs() {
+  const panel = $('#cl-secteurs');
+  if (!panel) return;
+  panel.hidden = false;
+  renderSecteursPanel();
+}
+
+function closeSecteurs() {
+  const panel = $('#cl-secteurs');
+  if (!panel) return;
+  panel.hidden = true;
+  panel.replaceChildren();
 }
 
 // --- Chargement ------------------------------------------------------------
@@ -814,7 +1069,7 @@ export async function initClients(root) {
   buildStatic();
   wire();
   mounted = true;
-  await load();
+  await Promise.all([load(), loadSecteurs()]);
 }
 
 // Rappelé par app.js à chaque retour sur la vue : un client a pu être créé

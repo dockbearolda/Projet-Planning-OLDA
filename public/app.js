@@ -237,7 +237,6 @@ const $rows = document.getElementById('rows');
 const $empty = document.getElementById('empty');
 const $stageTitle = document.getElementById('stageTitle');
 const $stageCount = document.getElementById('stageCount');
-const $btnNew = document.getElementById('btnNew');
 const $stageLink = document.getElementById('stageLink');
 const $stageLinkLabel = document.getElementById('stageLinkLabel');
 const $stageDesc = document.getElementById('stageDesc');
@@ -2845,29 +2844,6 @@ function patchRow(r, body) {
   return api('PATCH', `/api/requests/${r.id}`, body);
 }
 
-// Construit une ligne brouillon optimiste (tous champs vides) pour l'étape
-// courante.
-function makeOptimisticRow() {
-  const maxPos = rows.reduce((m, r) => Math.max(m, r.position ?? 0), 0);
-  const now = new Date().toISOString();
-  return {
-    id: `tmp-${++tmpSeq}`,
-    stage: currentStage,
-    // Créée depuis une sous-catégorie → elle en hérite (sinon la ligne
-    // n'apparaîtrait pas dans la vue filtrée où on vient de la créer).
-    sub_stage: currentSub, responsable: null, referent: null,
-    order_kind: null,
-    flag: null, flag_reason: null,
-    priority: 1, client_type: 'pro',
-    billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
-    quantity: null, product: null, color: null, project_value: null,
-    description: null, deadline: null,
-    position: maxPos + 1000,
-    devis_name: null, bat_name: null, facture_name: null,
-    created_at: now, updated_at: now,
-  };
-}
-
 // Remplace l'id temporaire par l'id réel renvoyé par le serveur — dans `rows`,
 // dans le <tr> (data-id) et dans le renderer incrémental (rowEls) — sans jamais
 // reconstruire la ligne (on préserve le focus / la saisie en cours). Puis envoie
@@ -2907,40 +2883,6 @@ function finalizeCreate(tmpId, created) {
     });
   }
 }
-
-// Crée une commande adaptée à la vue courante, en optimiste : la ligne brouillon
-// apparaît et reçoit le focus immédiatement, le POST suit en arrière-plan.
-function createForCurrentView() {
-  const r = makeOptimisticRow();
-  const tmpId = r.id;
-  const viewSlug = currentStage; // figé : la vue peut changer avant la réponse
-  const viewSub = currentSub;    // sous-catégorie éventuelle, figée de même
-  rows.push(r);
-  pendingCreates.set(tmpId, { patch: {} });
-  applySortAndRender();
-  bumpCount(viewSlug, +1);
-
-  const tr = $rows.querySelector(`tr[data-id="${tmpId}"]`);
-  if (tr) {
-    tr.scrollIntoView({ block: 'nearest' });
-    const firstInput = tr.querySelector('.client-company, .cell-input');
-    if (firstInput) firstInput.focus();
-  }
-
-  api('POST', '/api/requests', viewSub ? { stage: viewSlug, sub_stage: viewSub } : { stage: viewSlug })
-    .then((created) => finalizeCreate(tmpId, created))
-    .catch((err) => {
-      pendingCreates.delete(tmpId);
-      cancelledCreates.delete(tmpId);
-      rows = rows.filter((x) => x.id !== tmpId);
-      applySortAndRender();
-      bumpCount(viewSlug, -1);
-      reportError(err);
-      loadCounts().catch(() => {}); // valeur exacte (un loadCounts concurrent a pu déjà corriger)
-    });
-}
-
-$btnNew.addEventListener('click', () => createForCurrentView());
 
 // --- Suppression (optimiste) ----------------------------------------------
 function removeRow(r) {
@@ -4108,9 +4050,6 @@ function initBrandReflection() {
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
-const $viewCommande = document.getElementById('viewCommande');
-const $viewDemande = document.getElementById('viewDemande');
-const $commande = document.getElementById('commande');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
@@ -4118,13 +4057,9 @@ const $reglages = document.getElementById('reglages');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
-// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages' | 'projet'
+// 'planning' | 'dashboard' | 'clients' | 'reglages' | 'projet'
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
-// La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
-// la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
-let commandeNature = 'demande';
-let commandeModule = null;
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 // Si elle vit dans une catégorie promue en onglet (Fiverr, À commander), c'est
@@ -4158,28 +4093,6 @@ const dashboard = createDashboard({
 // deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
 // contredire — « #dashboard » affiché sur le planning, et retour au dashboard
 // au premier rechargement.
-// La Prise de commande (catalogue textile, annuaire client) est chargée au
-// premier passage sur la vue, puis montée une bonne fois : les bascules
-// suivantes ne sont qu'un changement de classe — instantanées, et la saisie en
-// cours est conservée. La nature (demande / commande) lui est poussée dès
-// qu'elle est prête.
-let commandeLoading = null;
-function mountCommande() {
-  if (!$commande) return;
-  if (!commandeLoading) {
-    commandeLoading = import('./commande.js')
-      .then((m) => { commandeModule = m; return m.initCommande($commande); })
-      .then(() => commandeModule.setNature(commandeNature))
-      .catch((err) => {
-        commandeLoading = null;             // rechargeable au prochain essai
-        commandeModule = null;
-        console.error('Prise de commande : chargement impossible', err);
-      });
-  } else if (commandeModule) {
-    commandeModule.setNature(commandeNature);
-  }
-}
-
 // La Base clients (CRM) : liste + fiche éditable + notes. Module lourd (rendu
 // complet), chargé au premier passage puis monté ; les visites suivantes
 // rafraîchissent seulement les données (un client a pu être créé à la commande).
@@ -4258,11 +4171,6 @@ function setViewMode(mode) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
   }
-  // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
-  // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
-  const onIntake = mode === 'commande';
-  if ($viewDemande) $viewDemande.classList.toggle('active', onIntake && commandeNature === 'demande');
-  if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
   // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
@@ -4272,12 +4180,10 @@ function setViewMode(mode) {
   closeLigneDetail();
 
   const dash = mode === 'dashboard';
-  const commande = mode === 'commande';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
-  if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($projet) $projet.hidden = !projet;
@@ -4288,7 +4194,6 @@ function setViewMode(mode) {
   document.body.classList.toggle('view-comptoir', mode === 'projet');
 
   if (dash) dashboard.show(); else dashboard.hide();
-  if (commande) mountCommande();
   if (clients) mountClients();
   if (reglages) mountReglages();
   if (projet) mountProjet();
@@ -4298,9 +4203,11 @@ function setViewMode(mode) {
   }
 }
 
-// #demande et #commande ouvrent la MÊME vue, avec une nature différente.
+// Un hash = une vue. « Nouveau Projet » est la seule porte d'entrée : les
+// anciens raccourcis #demande / #commande n'existent plus et retombent donc sur
+// le planning, comme n'importe quel hash inconnu.
 const VIEWS = {
-  '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
+  '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
@@ -4308,11 +4215,7 @@ const VIEWS = {
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
-  if (mode === 'commande') commandeNature = h === '#commande' ? 'commande' : 'demande';
   setViewMode(mode);
-  // Changer de nature SANS changer de vue (#demande ↔ #commande) : setViewMode a
-  // pris le raccourci « même vue », on pousse donc la nature à la main.
-  if (mode === 'commande' && commandeModule) commandeModule.setNature(commandeNature);
   // Onglet Fiverr / À commander : la grille doit pointer sur LEUR catégorie.
   // On ne recharge que si elle affiche autre chose (revenir sur l'onglet déjà
   // ouvert ne doit pas vider la grille sous les yeux). Au tout premier passage

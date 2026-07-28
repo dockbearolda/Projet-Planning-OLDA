@@ -13,7 +13,7 @@ const { Pool, types } = require('pg');
 types.setTypeParser(types.builtins.DATE, (v) => v);
 
 // Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) :
-//   - la FAMILLE (requests.stage) dit OÙ en est le projet — 8 grandes étapes,
+//   - la FAMILLE (requests.stage) dit OÙ en est le projet — 5 grandes étapes,
 //     affichées dans la barre latérale gauche ;
 //   - la SOUS-FAMILLE (requests.sub_stage) précise CE QUI SE PASSE MAINTENANT —
 //     choisie en ligne sur la commande (puce), uniquement pour les familles qui
@@ -29,7 +29,7 @@ const FAMILIES = [
   { slug: 'paiement', label: 'Paiement & clôture' },
 ];
 
-// Catégorie spéciale conservée hors des 8 familles : sous-traitance graphiste
+// Catégorie spéciale conservée hors des 5 familles : sous-traitance graphiste
 // (outil de devis + « Envoyer vers Fiverr »). Épinglée en bas de la sidebar.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
@@ -114,7 +114,7 @@ const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
 // dans requests.flag_reason (« BLOQUÉE — attente BAT client »).
 const FLAGS = ['bloque', 'a_voir'];
 
-// NATURE de la ligne, tranchée dès la prise de commande (requests.order_kind) :
+// NATURE de la ligne, tranchée à l'enregistrement (requests.order_kind) :
 // une DEMANDE est à chiffrer (devis à faire), une COMMANDE est déjà validée par
 // le client. null = ligne créée avant l'existence du champ, ou saisie à la main
 // dans la grille : on n'invente pas la nature à sa place.
@@ -871,91 +871,60 @@ async function setTarifsTasseParametres(p) {
   return clean;
 }
 
-// --- Emplacements d'impression ajoutés au comptoir ---------------------------
-// Le catalogue couvre les zones courantes (cœur, dos, manches…), mais l'atelier
-// en croise toujours une nouvelle : « Nuque », « Bas du dos », un flanc de sac.
-// La fiche de prise de commande permet donc d'en créer une à la volée ; elle est
-// stockée ici (app_meta.commande_zones, tableau JSON) et rejoint la liste de
-// TOUS les postes, sans redéploiement ni migration.
-// Les zones du catalogue, elles, ne passent jamais par là : elles sont figées.
-const ZONE_LABEL_MAX = 40;
-// Même convention d'identifiant que le catalogue (« haut_dos », « manche_g ») :
-// le front applique la même règle pour afficher la zone sans attendre le serveur.
-const zoneSlug = (s) => slugify(s).replace(/-/g, '_');
+// ---------------------------------------------------------------------------
+// Secteurs d'activité de la base clients (app_meta.client_secteurs).
+// La liste vient du classeur patron « CRM OLDA CREATION CLIENTS », mais elle
+// n'est plus figée dans le code : elle s'ajoute et se retranche depuis Base
+// clients. Un secteur retranché ne disparaît PAS des fiches qui le portent —
+// `clients.secteur` en garde une copie, jamais relue dans cette liste.
+// Down : DELETE FROM app_meta WHERE key = 'client_secteurs' (la liste repart
+// des valeurs d'amorçage ci-dessous).
+const SECTEURS_AMORCE = [
+  'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
+  'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
+  'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',
+  'Administration', 'Autre',
+];
+const SECTEUR_LABEL_MAX = 60;
+// Rapprochement insensible à la casse et aux accents : « hotel » et « Hôtel »
+// sont le même secteur, on n'en crée pas deux.
+const secteurKey = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-async function getCommandeZones() {
-  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones'");
-  if (!rows[0]) return [];
+async function writeSecteurs(list) {
+  await pool.query("DELETE FROM app_meta WHERE key = 'client_secteurs'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('client_secteurs', $1)", [JSON.stringify(list)]);
+  return list;
+}
+
+// Première lecture : la clé est écrite avec la liste connue, pour que le patron
+// parte de ses 20 secteurs et non d'une page blanche.
+async function getClientSecteurs() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'client_secteurs'");
+  if (!rows[0]) return writeSecteurs(SECTEURS_AMORCE);
   try {
     const parsed = JSON.parse(rows[0].value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((z) => z && typeof z === 'object' && z.id && z.label)
-      .map((z) => ({ id: String(z.id), label: String(z.label) }));
+    if (!Array.isArray(parsed)) return writeSecteurs(SECTEURS_AMORCE);
+    return parsed.filter((s) => typeof s === 'string' && s.trim() !== '');
   } catch (_) {
-    return [];
+    return writeSecteurs(SECTEURS_AMORCE);
   }
 }
 
-// Ajoute une zone. `reserved` = les zones du catalogue, qu'on ne double jamais.
-// Renvoie { id, zone, zones } ; `zone` est l'existante si le libellé retombe sur
-// une zone déjà ajoutée (« Nuque » deux fois = une seule zone), et null si c'est
-// une zone du catalogue (rien à créer, l'appelant l'a déjà). Le rapprochement se
-// fait sur l'identifiant ET sur le libellé normalisé : « Avant gauche » retrouve
-// la zone `avant_g` du catalogue plutôt que d'en créer une jumelle.
-async function addCommandeZone(label, reserved = []) {
-  const clean = String(label == null ? '' : label).trim().slice(0, ZONE_LABEL_MAX);
-  const id = zoneSlug(clean);
-  if (!clean || !id) return null;
-
-  const zones = await getCommandeZones();
-  const same = (z) => z.id === id || zoneSlug(z.label) === id;
-  const cat = reserved.find(same);
-  if (cat) return { id: cat.id, zone: null, zones };
-  const known = zones.find(same);
-  if (known) return { id: known.id, zone: known, zones };
-
-  const next = [...zones, { id, label: clean }];
-  const value = JSON.stringify(next);
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [value]);
-  return { id, zone: next[next.length - 1], zones: next };
+// Idempotent : rajouter « hotel » quand « Hôtel » existe ne crée rien.
+// Renvoie null si le libellé est vide (rien à créer, l'appelant le signale).
+async function addClientSecteur(label) {
+  const clean = String(label == null ? '' : label).trim().slice(0, SECTEUR_LABEL_MAX);
+  if (!clean) return null;
+  const list = await getClientSecteurs();
+  if (list.some((s) => secteurKey(s) === secteurKey(clean))) return list;
+  return writeSecteurs([...list, clean]);
 }
 
-// Retire une zone ajoutée au comptoir (une faute de frappe se corrige). Les
-// commandes déjà enregistrées gardent leur marquage : le libellé y est recopié
-// au moment de l'enregistrement, pas relu dans cette liste.
-async function removeCommandeZone(id) {
-  const zones = await getCommandeZones();
-  const next = zones.filter((z) => z.id !== id);
-  if (next.length === zones.length) return zones;
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [JSON.stringify(next)]);
-  return next;
-}
-
-// Un emplacement du CATALOGUE (figé dans catalog.json) ne se supprime pas —
-// mais un poste peut vouloir le masquer (inutile pour son activité). On garde
-// la liste des identifiants masqués à part (app_meta.commande_zones_masquees) :
-// le catalogue lui-même ne bouge pas, on filtre juste ce qu'on en sert.
-async function getHiddenCommandeZones() {
-  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones_masquees'");
-  if (!rows[0]) return [];
-  try {
-    const parsed = JSON.parse(rows[0].value);
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-async function hideCommandeZone(id) {
-  const hidden = await getHiddenCommandeZones();
-  if (hidden.includes(id)) return hidden;
-  const next = [...hidden, id];
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones_masquees'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones_masquees', $1)", [JSON.stringify(next)]);
-  return next;
+async function removeClientSecteur(label) {
+  const list = await getClientSecteurs();
+  const next = list.filter((s) => secteurKey(s) !== secteurKey(label));
+  return next.length === list.length ? list : writeSecteurs(next);
 }
 
 // --- Message WhatsApp « commande prête » -------------------------------------
@@ -996,7 +965,6 @@ module.exports = {
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
-  getCommandeZones, addCommandeZone, removeCommandeZone,
-  getHiddenCommandeZones, hideCommandeZone,
+  SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
 };

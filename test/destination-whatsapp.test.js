@@ -3,7 +3,8 @@
 // Vérifie deux ajouts, sur le vrai serveur Express + base en mémoire :
 //   1. la DESTINATION choisie au comptoir (« Où l'enregistrer ? ») est bien celle
 //      qui atterrit dans le planning, et une sous-étape étrangère à la famille
-//      est refusée plutôt que silencieusement rangée n'importe où ;
+//      est refusée plutôt que silencieusement rangée n'importe où (Nouveau
+//      Projet est la seule porte d'entrée depuis la suppression de Commande) ;
 //   2. le MESSAGE WhatsApp « commande prête », réglé par le patron : valeur par
 //      défaut, enregistrement, message vidé assumé et refus des corps invalides.
 
@@ -37,54 +38,56 @@ delete process.env.APP_PASSWORD;
   const fiche = (extra) => ({
     kind: 'commande',
     client: { type: 'pro', facturation: 'Hôtel Mercure', whatsapp: '0690 66 24 00' },
-    objet: '30 polos brodés',
+    lignes: [{ type: 'textile', quantite: 30, description: '30 polos brodés', prixTtcManuel: 600 }],
+    delai: 'j5',
     ...extra,
   });
 
   // === 1. Destination ======================================================
 
-  // 1.1 Le catalogue sert le pipeline : sans lui, le poste de saisie ne pourrait
+  // 1.1 Le serveur sert le pipeline : sans lui, le poste de saisie ne pourrait
   // pas proposer les destinations.
-  let r = await call('GET', '/api/commande/catalog');
+  let r = await call('GET', '/api/pipeline');
   assert.strictEqual(r.status, 200);
-  const prepa = r.body.pipeline.find((f) => f.slug === 'preparation');
-  assert.ok(prepa, 'le catalogue expose le pipeline');
+  const prepa = r.body.find((f) => f.slug === 'preparation');
+  assert.ok(prepa, 'le serveur expose le pipeline');
   assert.ok(prepa.subs.some((s) => s.slug === 'a_commander'),
     'chaque famille porte ses sous-étapes');
-  assert.ok(r.body.pipeline.some((f) => f.slug === 'fiverr'),
+  assert.ok(r.body.some((f) => f.slug === 'fiverr'),
     'Fiverr reste une destination possible');
 
-  // 1.2 Sans destination (ancien corps) : celle du catalogue, comme avant.
-  r = await call('POST', '/api/commande', fiche());
+  // 1.2 Sans destination explicite : celle que la nature implique (une commande
+  // validée atterrit sur « À chiffrer »).
+  r = await call('POST', '/api/projets', fiche());
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'demande_chiffrage');
-  assert.strictEqual(r.body.commande.subStage, 'a_chiffrer');
+  assert.strictEqual(r.body.projet.stage, 'demande_chiffrage');
+  assert.strictEqual(r.body.projet.subStage, 'a_chiffrer');
 
   // 1.3 Destination choisie : c'est elle qui l'emporte sur l'habitude.
-  r = await call('POST', '/api/commande', fiche({ stage: 'preparation', subStage: 'a_commander' }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: 'a_commander' }));
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'preparation');
-  assert.strictEqual(r.body.commande.subStage, 'a_commander');
+  assert.strictEqual(r.body.projet.stage, 'preparation');
+  assert.strictEqual(r.body.projet.subStage, 'a_commander');
   let rows = (await call('GET', '/api/requests?stage=preparation')).body;
   assert.ok(rows.some((x) => x.billing_company === 'Hôtel Mercure' && x.sub_stage === 'a_commander'),
     'la ligne est bien rangée où on l\'a demandé');
 
   // 1.4 Famille SANS préciser la sous-étape : position valide (« à préciser »).
-  r = await call('POST', '/api/commande', fiche({ stage: 'preparation', subStage: null }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: null }));
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.subStage, null);
+  assert.strictEqual(r.body.projet.subStage, null);
 
   // 1.5 Une famille visée sans préciser sa sous-étape : « à préciser » est valide.
-  r = await call('POST', '/api/commande', fiche({ stage: 'demande_chiffrage' }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'demande_chiffrage' }));
   assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.commande.stage, 'demande_chiffrage');
+  assert.strictEqual(r.body.projet.stage, 'demande_chiffrage');
 
   // 1.6 Refus : étape inconnue, et sous-étape étrangère à la famille visée.
-  r = await call('POST', '/api/commande', fiche({ stage: 'nulle_part' }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'nulle_part' }));
   assert.strictEqual(r.status, 400, 'étape inconnue refusée');
-  r = await call('POST', '/api/commande', fiche({ stage: 'demande_chiffrage', subStage: 'a_commander' }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'demande_chiffrage', subStage: 'a_commander' }));
   assert.strictEqual(r.status, 400, 'sous-étape étrangère à la famille refusée');
-  r = await call('POST', '/api/commande', fiche({ stage: 'preparation', subStage: 'prod_uv' }));
+  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: 'prod_uv' }));
   assert.strictEqual(r.status, 400, 'sous-étape d\'une autre famille refusée');
 
   // 1.7 Le numéro saisi au comptoir arrive sur la ligne : c'est lui qui décide
