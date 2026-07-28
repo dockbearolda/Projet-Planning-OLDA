@@ -24,6 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="clients.css" />
+  <link rel="stylesheet" href="commande.css" />
   <link rel="stylesheet" href="projet.css" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
@@ -55,6 +56,14 @@
         <a class="nav-switch-btn nav-switch-btn--projet" id="viewProjet" href="#nouveau-projet">
           <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
           <span class="nav-switch-label">Nouveau Projet</span>
+        </a>
+        <a class="nav-switch-btn nav-switch-btn--intake" id="viewDemande" href="#demande">
+          <span class="material-symbols-outlined" aria-hidden="true">help</span>
+          <span class="nav-switch-label">Demande</span>
+        </a>
+        <a class="nav-switch-btn nav-switch-btn--intake" id="viewCommande" href="#commande">
+          <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+          <span class="nav-switch-label">Commande</span>
         </a>
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
           <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
@@ -225,6 +234,184 @@
              reglages.js, chargé au premier affichage. -->
         <section class="reglages" id="reglages" hidden aria-label="Réglages"></section>
 
+        <!-- Onglet Prise de commande : le PREMIER PAS du client. La fiche qu'on
+             remplit au comptoir, EN FACE DE LUI — elle doit se remplir en 30 à
+             45 secondes. Deux zones, pas deux colonnes :
+               - EN HAUT un BANDEAU qui se lit de gauche à droite — qui, quoi,
+                 pour quand, payé comment. Trois rangées, jamais plus.
+               - EN BAS les PRODUITS, sur TOUTE la largeur : c'est là qu'on
+                 empile, donc c'est là qu'il faut de la place. Quand les lignes
+                 débordent, c'est la PAGE qui défile ; la barre du haut (avec
+                 « Enregistrer ») reste épinglée sous les yeux.
+             Le bandeau prend la largeur parce que ses champs sont courts et les
+             lignes de produits, elles, ont six colonnes à aligner.
+             La NATURE (demande / commande) est décidée par l'entrée du menu
+             (deux liens distincts), pas par un réglage ici. Le balisage est là
+             dès le départ ; le module (commande.js) n'est chargé qu'au premier
+             affichage. -->
+        <section class="cmd" id="commande" hidden aria-label="Prise de commande">
+          <header class="cmd-bar">
+            <span class="cmd-bar__ic material-symbols-outlined" aria-hidden="true">edit_note</span>
+            <div class="cmd-bar__titles">
+              <h2 class="cmd-bar__title" id="cmd-title">Demande</h2>
+              <p class="cmd-bar__sub" id="cmd-sub"></p>
+            </div>
+            <div class="cmd-bar__actions">
+              <a class="cmd-btn" href="#planning">Annuler</a>
+              <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-save">Enregistrer</button>
+            </div>
+          </header>
+
+          <div class="cmd-body">
+            <div class="cmd-head">
+              <!-- QUI. Pro ou perso : deux jeux de champs exclusifs, pour ne
+                   jamais demander un « prénom » à un hôtel ni une « société » à
+                   un particulier. -->
+              <div class="cmd-row">
+                <!-- Le bandeau s'annonce comme les produits s'annoncent : même
+                     capitale, même place. « CLIENT » d'un côté, « PRODUITS » de
+                     l'autre — on sait dans quelle bulle on écrit sans réfléchir. -->
+                <div class="cmd-field cmd-field--nature">
+                  <span class="cmd-inline__t" id="cmd-nature-label">Client</span>
+                  <div class="cmd-seg" id="cmd-nature" role="radiogroup" aria-labelledby="cmd-nature-label">
+                    <button class="cmd-seg__btn is-on" type="button" data-nature="pro" role="radio" aria-checked="true">Pro</button>
+                    <button class="cmd-seg__btn" type="button" data-nature="perso" role="radio" aria-checked="false">Perso</button>
+                  </div>
+                </div>
+
+                <div class="cmd-grid cmd-grid--pro" id="cmd-pro">
+                  <div class="cmd-field cmd-field--nom cmd-auto">
+                    <label class="cmd-label" for="cmd-facturation">Nom de facturation</label>
+                    <input class="cmd-input" id="cmd-facturation" type="text" placeholder="Iguana (Discover)"
+                           autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                           aria-controls="cmd-auto-pro" />
+                    <ul class="cmd-auto__list" id="cmd-auto-pro" role="listbox" aria-label="Clients connus" hidden></ul>
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-contact">Contact</label>
+                    <input class="cmd-input" id="cmd-contact" type="text" placeholder="Jérôme" autocomplete="off" />
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-whatsapp">WhatsApp</label>
+                    <input class="cmd-input" id="cmd-whatsapp" type="tel" inputmode="tel" placeholder="06 90 66 24 00" autocomplete="off" />
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-email">Email</label>
+                    <input class="cmd-input" id="cmd-email" type="email" inputmode="email" placeholder="jerome@iguana.fr" autocomplete="off" />
+                  </div>
+                </div>
+
+                <div class="cmd-grid cmd-grid--perso" id="cmd-perso" hidden>
+                  <div class="cmd-field cmd-field--nom cmd-auto">
+                    <label class="cmd-label" for="cmd-prenom">Prénom</label>
+                    <input class="cmd-input" id="cmd-prenom" type="text" placeholder="Marie"
+                           autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+                           aria-controls="cmd-auto-perso" />
+                    <ul class="cmd-auto__list" id="cmd-auto-perso" role="listbox" aria-label="Clients connus" hidden></ul>
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-nom">Nom</label>
+                    <input class="cmd-input" id="cmd-nom" type="text" placeholder="Dupont" autocomplete="off" />
+                  </div>
+                  <div class="cmd-field">
+                    <label class="cmd-label" for="cmd-whatsapp-perso">WhatsApp</label>
+                    <input class="cmd-input" id="cmd-whatsapp-perso" type="tel" inputmode="tel" placeholder="06 90 99 88 77" autocomplete="off" />
+                  </div>
+                </div>
+              </div>
+              <p class="cmd-hint" id="cmd-client-known" hidden></p>
+
+              <!-- QUOI. Un seul champ « Objet / note » : le titre du dossier,
+                   qui part en colonne « Description » du planning quand rien
+                   n'est détaillé. Le détail, lui, vit désormais SOUS chaque
+                   produit (une description par ligne). -->
+              <div class="cmd-row">
+                <div class="cmd-field cmd-field--objet">
+                  <label class="cmd-label" for="cmd-objet">Objet / note <span class="cmd-label__opt">facultatif si un produit est ajouté</span></label>
+                  <input class="cmd-input" id="cmd-objet" type="text"
+                         placeholder="20 t-shirts équipe · Devis 40 polos brodés · le client repasse mardi…" autocomplete="off" />
+                </div>
+                <div class="cmd-opts">
+                  <button class="cmd-optswitch" type="button" id="cmd-boite" role="switch" aria-checked="false">
+                    <span class="cmd-optswitch__box" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
+                    <span>En boîte</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- POUR QUAND, ET PAYÉ COMMENT. Deux groupes de puces sur une
+                   rangée : aucun menu à dérouler, tout se tape du doigt. -->
+              <div class="cmd-row cmd-row--bas">
+                <div class="cmd-inline">
+                  <span class="cmd-inline__t" id="cmd-delai-label">Pour le</span>
+                  <div class="cmd-chips cmd-chips--delai" id="cmd-delais" role="radiogroup" aria-labelledby="cmd-delai-label"></div>
+                  <input class="cmd-input cmd-input--date" id="cmd-deadline" type="date" aria-label="Date souhaitée précise" />
+                </div>
+                <div class="cmd-inline">
+                  <span class="cmd-inline__t" id="cmd-pay-label">Paiement</span>
+                  <div class="cmd-chips" id="cmd-pay-statut" role="radiogroup" aria-labelledby="cmd-pay-label"></div>
+                  <div class="cmd-chips cmd-chips--mode" id="cmd-pay-mode" role="radiogroup" aria-label="Mode de paiement" hidden></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- LES PRODUITS, sur toute la largeur. Rien n'est ouvert par
+                 défaut : on tape la famille concernée et son bloc apparaît,
+                 déjà prêt à recevoir une ligne. Seule cette zone défile. -->
+            <div class="cmd-prods">
+              <div class="cmd-prods__bar">
+                <span class="cmd-prods__t">Produits</span>
+                <div class="cmd-chips cmd-chips--fam" id="cmd-familles"></div>
+              </div>
+              <div class="cmd-fams" id="cmd-fams"></div>
+            </div>
+          </div>
+
+          <!-- Listes de suggestion : saisie libre autorisée, le catalogue ne fait
+               que proposer (une grille fournisseur exotique ne doit pas bloquer). -->
+          <datalist id="cmd-dl-vetements"></datalist>
+          <datalist id="cmd-dl-tailles"></datalist>
+          <datalist id="cmd-dl-tasses"></datalist>
+          <datalist id="cmd-dl-objets"></datalist>
+          <datalist id="cmd-dl-typos"></datalist>
+
+          <div class="cmd-toast" id="cmd-toast" role="status" aria-live="polite"></div>
+
+          <!-- DERNIÈRE ÉTAPE, obligatoire : où la fiche atterrit dans le
+               planning. On ne l'enregistre jamais « quelque part par défaut »
+               sans le dire — la question est posée à chaque saisie, et taper
+               une destination enregistre aussitôt (un seul geste, pas de
+               double confirmation au comptoir). La destination habituelle de
+               la nature choisie est marquée, en tête de liste. -->
+          <div class="cmd-dest" id="cmd-dest" hidden>
+            <div class="cmd-dest__card" role="dialog" aria-modal="true" aria-labelledby="cmd-dest-title">
+              <button class="cmd-dest__close" id="cmd-dest-close" type="button" aria-label="Revenir à la fiche">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+              <p class="cmd-dest__eyebrow">Dernière étape</p>
+              <h3 class="cmd-dest__title" id="cmd-dest-title">Où l'enregistrer ?</h3>
+              <p class="cmd-dest__sub" id="cmd-dest-sub"></p>
+              <div class="cmd-dest__list" id="cmd-dest-list"></div>
+            </div>
+          </div>
+
+          <div class="cmd-done" id="cmd-done" hidden>
+            <div class="cmd-done__card" role="dialog" aria-modal="true" aria-labelledby="cmd-done-title">
+              <div class="cmd-done__check"><span class="material-symbols-outlined">check</span></div>
+              <p class="cmd-done__title" id="cmd-done-title">Enregistré</p>
+              <p class="cmd-done__sub" id="cmd-done-sub"></p>
+              <div class="cmd-done__actions">
+                <a class="cmd-btn" href="#planning">Voir le planning</a>
+                <button class="cmd-btn cmd-btn--primary" type="button" id="cmd-done-new">Nouvelle saisie</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Onglet Nouveau Projet : LE flux comptoir (client → type → produit →
+             prix), ultra-minimal, façon caisse. Entièrement rendu par JS
+             (projet.js, chargé au premier affichage) — même principe que
+             Base clients / Réglages. -->
         <!-- Onglet Nouveau Projet : LE flux comptoir (client → type → produit →
              prix), ultra-minimal, façon caisse. Entièrement rendu par JS
              (projet.js, chargé au premier affichage) — même principe que
