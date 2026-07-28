@@ -1942,6 +1942,35 @@ function renderLigneDetail() {
   }
   body.appendChild(suiviSection);
 
+  // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
+  const notesSection = document.createElement('section');
+  notesSection.className = 'ld-section';
+  const notesTitle = document.createElement('p');
+  notesTitle.className = 'ld-section-title';
+  notesTitle.textContent = 'Notes';
+  const notes = document.createElement('textarea');
+  notes.className = 'ld-notes';
+  notes.value = r.description ?? '';
+  notes.placeholder = '+ Ajouter une note';
+  let lastSentNotes = r.description ?? '';
+  notes.addEventListener('blur', () => {
+    const val = notes.value === '' ? null : notes.value;
+    if ((val ?? '') === (lastSentNotes ?? '')) return;
+    const prev = r.description;
+    r.description = val;
+    lastSentNotes = notes.value;
+    patchRow(r, { description: val })
+      .then(() => { invalidateRowCache(r.id); applySortAndRender(); })
+      .catch((err) => {
+        r.description = prev;
+        notes.value = prev ?? '';
+        lastSentNotes = prev ?? '';
+        reportError(err);
+      });
+  });
+  notesSection.append(notesTitle, notes);
+  body.appendChild(notesSection);
+
   ligneDrawerCard.appendChild(body);
 }
 
