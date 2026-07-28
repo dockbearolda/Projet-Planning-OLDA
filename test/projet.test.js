@@ -231,6 +231,175 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual((await patch({ acompte_montant: -5 })).status, 400, 'acompte négatif refusé');
   assert.strictEqual((await patch({ paye: 'peut-être' })).status, 400, 'booléen fantaisiste refusé');
 
+  // 14. TEXTILE DÉTAILLÉ : la grille de tailles DONNE la quantité (on ne la
+  //     redemande pas), les deux faces marquées sont résolues depuis le
+  //     catalogue, et le prix est UNITAIRE (× quantité).
+  const textileDetaille = await call('POST', '/api/projets', {
+    kind: 'commande',
+    client: { societe: 'Beach Bar', type: 'pro' },
+    lignes: [{
+      type: 'textile',
+      designation: 'Polo', reference: 'PL-450', coloris: 'Noir',
+      tailles: [{ taille: 'M', quantite: 4 }, { taille: 'L', quantite: 6 }, { taille: 'XL', quantite: 0 }],
+      faces: {
+        avant: { emplacement: 'coeur', typeLogo: 'logo_client', referenceLogo: 'LOGO-2024.ai', couleurMarquage: 'Blanc' },
+        arriere: { emplacement: '', typeLogo: 'texte', referenceLogo: 'ignoré' },
+      },
+      remarque: 'Coutures renforcées',
+      prixUnitaireTtc: 18.72,
+    }],
+    delai: 'j5',
+  });
+  assert.strictEqual(textileDetaille.status, 201, JSON.stringify(textileDetaille.body));
+  const lt = textileDetaille.body.projet.lignes[0];
+  assert.strictEqual(lt.quantite, 10, 'la quantité est la SOMME de la grille (4 + 6), pas le champ quantite');
+  assert.deepStrictEqual(lt.tailles, [{ taille: 'M', quantite: 4 }, { taille: 'L', quantite: 6 }],
+    'une taille à zéro ne part pas dans la fiche');
+  assert.strictEqual(lt.designation, 'Polo');
+  assert.strictEqual(lt.reference, 'PL-450');
+  assert.strictEqual(lt.faces.length, 1, 'une face sans emplacement n’est pas retenue');
+  assert.strictEqual(lt.faces[0].face, 'avant');
+  assert.strictEqual(lt.faces[0].emplacement.label, 'Cœur');
+  assert.strictEqual(lt.faces[0].typeLogo.label, 'Logo client');
+  assert.strictEqual(lt.faces[0].referenceLogo, 'LOGO-2024.ai');
+  assert.strictEqual(lt.faces[0].couleurMarquage, 'Blanc');
+  assert.strictEqual(lt.prixUnitaireTtc, 18.72);
+  assert.strictEqual(lt.prixUnitaireHt, 18, 'le HT unitaire se déduit du TTC (÷ 1,04)');
+  assert.strictEqual(textileDetaille.body.projet.prixTotalTtc, 187.2, 'prix unitaire × quantité');
+  assert.match(lt.description, /^10 × Polo — réf\. PL-450 · Noir · M×4 · L×6$/);
+  // Le résumé de la grille ne double PAS la quantité (« 10 × 10 × Polo »).
+  const rowTextile = (await (await fetch(`${base}/api/requests?stage=demande_chiffrage`)).json())
+    .find((x) => x.id === textileDetaille.body.id);
+  assert.strictEqual(rowTextile.product, '10 × Polo');
+
+  // Un emplacement inconnu ne casse rien : la face est simplement ignorée,
+  // plutôt que d'enregistrer une consigne à moitié posée.
+  const faceInconnue = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'Beach Bar', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'textile', designation: 'T-shirt', quantite: 2, prixUnitaireTtc: 10, faces: { avant: { emplacement: 'nimporte-quoi' } } }],
+  });
+  assert.strictEqual(faceInconnue.status, 201, JSON.stringify(faceInconnue.body));
+  assert.strictEqual(faceInconnue.body.projet.lignes[0].faces.length, 0);
+
+  // 15. AUTRES / PLAQUE SIGNALÉTIQUE : la fiche de fabrication complète.
+  const autres = await call('POST', '/api/projets', {
+    kind: 'commande',
+    client: { societe: 'Mairie', type: 'pro' },
+    lignes: [{
+      type: 'signaletique', quantite: 2,
+      designation: 'Enseigne vitrine', explication: 'Lettrage découpé, pose comprise',
+      matiere: 'PVC 5 mm', format: '120 × 40 cm', methode: 'Découpe laser + peinture',
+      prixUnitaireTtc: 260,
+    }],
+    delai: 'j10',
+  });
+  assert.strictEqual(autres.status, 201, JSON.stringify(autres.body));
+  const la = autres.body.projet.lignes[0];
+  assert.strictEqual(la.matiere, 'PVC 5 mm');
+  assert.strictEqual(la.format, '120 × 40 cm');
+  assert.strictEqual(la.methode, 'Découpe laser + peinture');
+  assert.strictEqual(la.explication, 'Lettrage découpé, pose comprise');
+  assert.strictEqual(autres.body.projet.prixTotalTtc, 520, '2 × 260');
+
+  // 16. PRIX TASSE ÉCRASÉ : la grille propose, le comptoir décide. Le coût de
+  //     revient, lui, reste celui de la grille (une remise ne change pas ce que
+  //     la tasse coûte à produire) — la marge doit donc baisser.
+  const tasseCatalogue = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'Prix Catalogue', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'tasse', quantite: 2, produitId: produit.id, face1Id: faceLogoAjout.id }],
+  });
+  assert.strictEqual(tasseCatalogue.body.projet.prixTotalTtc, 36, 'sans prix saisi : 2 × (10 + 8) du catalogue');
+  assert.strictEqual(tasseCatalogue.body.projet.lignes[0].prixCatalogue, true);
+
+  const tasseRemise = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'Prix Négocié', type: 'pro' }, delai: 'j5',
+    lignes: [{
+      type: 'tasse', quantite: 2, produitId: produit.id, face1Id: faceLogoAjout.id,
+      prixUnitaireTtc: 12,
+      face1Texte: 'OLDA — Grand Case', face2Texte: 'Logo client', dessousTexte: 'Fait à Saint-Martin',
+      typo: 'Bebas Neue', remarque: 'Emballage cadeau',
+    }],
+  });
+  assert.strictEqual(tasseRemise.body.projet.prixTotalTtc, 24, 'le prix saisi l’emporte sur la grille');
+  const ltas = tasseRemise.body.projet.lignes[0];
+  assert.strictEqual(ltas.prixCatalogue, false);
+  assert.strictEqual(ltas.face1Texte, 'OLDA — Grand Case', 'ce qu’on GRAVE est distinct de l’option facturée');
+  assert.strictEqual(ltas.dessousTexte, 'Fait à Saint-Martin');
+  assert.strictEqual(ltas.typo, 'Bebas Neue');
+  assert.strictEqual(ltas.remarque, 'Emballage cadeau');
+  assert.ok(tasseRemise.body.projet.margeHt < tasseCatalogue.body.projet.margeHt,
+    'un prix négocié plus bas réduit la marge — le coût de revient ne bouge pas');
+
+  // 17. STATUT DE PAIEMENT : un seul choix au comptoir, projeté sur les colonnes
+  //     du planning (qui restent la source de vérité de la grille).
+  const colonnes = async (paiement) => {
+    const res = await call('POST', '/api/projets', {
+      kind: 'commande', client: { societe: 'Statuts SARL', type: 'pro' }, delai: 'j5',
+      lignes: [{ type: 'autres', quantite: 1, designation: 'bâche', prixUnitaireTtc: 500 }],
+      paiement,
+    });
+    assert.strictEqual(res.status, 201, JSON.stringify(res.body));
+    const ligne2 = (await (await fetch(`${base}/api/requests?stage=demande_chiffrage`)).json())
+      .find((x) => x.id === res.body.id);
+    return { ligne: ligne2, projet: res.body.projet };
+  };
+
+  let vue = await colonnes({ statut: 'acompte_recu', acompteMontant: 150, modeAcompte: 'especes' });
+  assert.strictEqual(vue.ligne.acompte_demande, true);
+  assert.strictEqual(vue.ligne.acompte_verse, true);
+  assert.strictEqual(vue.ligne.paye, false);
+  assert.strictEqual(Number(vue.ligne.acompte_montant), 150);
+  assert.strictEqual(vue.ligne.paiement_mode, 'especes');
+  assert.strictEqual(vue.projet.paiement.statut.label, 'Acompte reçu');
+  assert.strictEqual(vue.projet.paiement.modeAcompte.id, 'especes');
+
+  vue = await colonnes({ statut: 'paye', modeFinal: 'cb', modeAcompte: 'especes' });
+  assert.strictEqual(vue.ligne.paye, true);
+  assert.strictEqual(vue.ligne.acompte_demande, null, 'payé ne dit rien de l’acompte : on n’invente pas');
+  assert.strictEqual(vue.ligne.paiement_mode, 'cb', 'la colonne unique porte le mode le plus avancé (final)');
+  assert.strictEqual(vue.projet.paiement.modeAcompte.id, 'especes', 'les deux modes restent dans la fiche');
+
+  vue = await colonnes({ statut: 'a_encaisser' });
+  assert.strictEqual(vue.ligne.acompte_demande, false);
+  assert.strictEqual(vue.ligne.acompte_verse, false);
+  assert.strictEqual(vue.ligne.paye, false);
+
+  vue = await colonnes({ statut: 'non_demande' });
+  assert.strictEqual(vue.ligne.acompte_demande, null, '« non demandé » n’affirme rien sur les colonnes');
+  assert.strictEqual(vue.ligne.paye, null);
+
+  // Un montant d'acompte sans acompte reçu ne veut rien dire : il est ignoré.
+  vue = await colonnes({ statut: 'acompte_demande', acompteMontant: 999 });
+  assert.strictEqual(vue.projet.paiement.acompteMontant, null);
+
+  // Statut inconnu → on ne se prononce pas, plutôt que de le stocker tel quel.
+  vue = await colonnes({ statut: 'plus_tard' });
+  assert.strictEqual(vue.projet.paiement.statut, null);
+  assert.strictEqual(vue.ligne.paye, null);
+
+  // 18. REFUS : une fiche de production sans désignation n'est pas exploitable
+  //     en atelier — mieux vaut la refuser que produire à l'aveugle.
+  const sansDesignation = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'X', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'textile', quantite: 3, prixUnitaireTtc: 10 }],
+  });
+  assert.strictEqual(sansDesignation.status, 400);
+  assert.match(sansDesignation.body.error, /désignation du produit/);
+
+  const autresSansDesignation = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'X', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'autres', quantite: 1, matiere: 'bois', prixUnitaireTtc: 10 }],
+  });
+  assert.strictEqual(autresSansDesignation.status, 400);
+  assert.match(autresSansDesignation.body.error, /désignation du projet/);
+
+  const prixNegatif = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'X', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'autres', quantite: 1, designation: 'plaque', prixUnitaireTtc: -3 }],
+  });
+  assert.strictEqual(prixNegatif.status, 400);
+
   console.log('✓ nouveau projet : prix serveur, HT/TTC, délai obligatoire, paiement, panier mixte et refus OK');
+  console.log('✓ nouveau projet : fiches détaillées textile / tasse / autres, prix unitaire et statuts de paiement OK');
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });

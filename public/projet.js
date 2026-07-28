@@ -58,17 +58,32 @@ const state = {
   margeVisible: false,
 };
 
-// Suivi du paiement d'un projet. `null` = pas encore renseigné : au comptoir on
-// ne sait pas toujours, et « on ne sait pas » ne doit pas s'enregistrer comme
-// « non ». Le montant n'a de sens que si l'acompte est versé.
+// Suivi du paiement d'un projet : UN statut, plus ce qu'il implique. `null` =
+// pas encore renseigné — au comptoir on ne sait pas toujours, et « on ne sait
+// pas » ne doit pas s'enregistrer comme « non ».
 function newPaiement() {
-  return { acompteDemande: null, acompteVerse: null, acompteMontant: '', paye: null, mode: null };
+  return { statut: null, acompteMontant: '', modeAcompte: null, modeFinal: null };
 }
 
 let CLIENTS = [];
 let TARIFS = [];
 let TARIFS_PARAMS = { tauxHoraireMo: 25, tauxHoraireMachine: 25, tgca: 0.04 };
 let PIPELINE = null;   // chargé à la demande (familles + sous-étapes)
+
+// Catalogue partagé avec la Saisie détaillée (vêtements, tailles, emplacements,
+// typos, types de logo) : on s'y branche plutôt que de recopier ces listes, pour
+// qu'un emplacement ajouté au comptoir apparaisse ici aussitôt. Valeurs de repli
+// pour que le formulaire reste utilisable si l'appel échoue.
+let CAT = {
+  vetements: [], taillesGrille: ['XS', 'S', 'M', 'L', 'XL', '2XL'], zones: [], typos: [], typeLogos: [],
+};
+
+// Les deux faces marquables d'un textile (miroir de PROJET_FACES_TEXTILE côté
+// serveur, qui valide).
+const FACES_TEXTILE = [
+  { id: 'avant', label: 'Face avant' },
+  { id: 'arriere', label: 'Face arrière' },
+];
 
 async function api(method, path, body) {
   const res = await fetch(path, {
@@ -105,6 +120,16 @@ const PAIEMENT_MODES = [
   { id: 'especes', label: 'Espèces' },
   { id: 'virement', label: 'Virement' },
   { id: 'cheque', label: 'Chèque' },
+];
+
+// Où en est l'argent, en UN choix (miroir de PROJET_PAY_STATUTS côté serveur,
+// qui en fait la projection sur les colonnes du planning).
+const PAIEMENT_STATUTS = [
+  { id: 'non_demande', label: 'Non demandé' },
+  { id: 'acompte_demande', label: 'Acompte demandé' },
+  { id: 'acompte_recu', label: 'Acompte reçu' },
+  { id: 'a_encaisser', label: 'À encaisser' },
+  { id: 'paye', label: 'Payé' },
 ];
 
 // --- Rendu : dispatcher --------------------------------------------------------
@@ -337,20 +362,74 @@ function renderMainPage(body) {
 function tarifsByCat(cat) { return TARIFS.filter((t) => t.categorie === cat && t.actif); }
 function tarifById(id) { return TARIFS.find((t) => t.id === id); }
 
+// Chaque famille a sa propre fiche de production. `prixUnitaireTtc` vide = « pas
+// encore saisi » : pour la tasse, la grille tarifaire fait alors foi.
+const uid = () => Math.random().toString(36).slice(2);
+
 function newTasseLigne() {
   return {
-    uid: Math.random().toString(36).slice(2), quantite: 1,
-    produitId: '', coloris: '', face1Id: '', face2Id: '', dessousId: '', batId: '', remarque: '',
+    uid: uid(), quantite: 1,
+    produitId: '', coloris: '', face1Id: '', face2Id: '', dessousId: '', batId: '',
+    face1Texte: '', face2Texte: '', dessousTexte: '', typo: '', remarque: '',
+    prixUnitaireTtc: '',
   };
 }
-function newSommaireLigne() {
-  return { uid: Math.random().toString(36).slice(2), quantite: 1, description: '', prixTtcManuel: '' };
+function newTextileLigne() {
+  return {
+    uid: uid(), quantite: 1,
+    designation: '', reference: '', coloris: '', colorisAutre: false,
+    // Grille de tailles : { 'M': '4', 'L': '6' }. Les tailles hors grille
+    // s'ajoutent à la demande dans `taillesLibres`.
+    tailles: {}, taillesLibres: [],
+    faces: { avant: newFaceTextile(), arriere: newFaceTextile() },
+    remarque: '', prixUnitaireTtc: '',
+  };
+}
+// `plus` : les emplacements secondaires sont-ils dépliés ? Replié par défaut —
+// 12 puces par face noieraient les 6 emplacements réellement courants.
+function newFaceTextile() {
+  return { emplacement: '', typeLogo: '', referenceLogo: '', couleurMarquage: '', plus: false };
+}
+function newAutresLigne() {
+  return {
+    uid: uid(), quantite: 1,
+    designation: '', explication: '', matiere: '', format: '', methode: '',
+    prixUnitaireTtc: '',
+  };
+}
+function newLigne(typeId) {
+  if (typeId === 'tasse') return newTasseLigne();
+  if (typeId === 'textile') return newTextileLigne();
+  return newAutresLigne();
 }
 
-function calcLigneTasseTtc(l) {
+// Quantité d'un textile : la SOMME de sa grille de tailles. Sans aucune taille
+// chiffrée, la ligne garde sa quantité saisie au stepper.
+function quantiteTextile(l) {
+  const total = [...Object.values(l.tailles), ...l.taillesLibres.map((t) => t.quantite)]
+    .reduce((s, v) => s + (Number.parseInt(v, 10) || 0), 0);
+  return total > 0 ? total : (Number(l.quantite) || 1);
+}
+function quantiteItem(item) {
+  return item.type === 'textile' ? quantiteTextile(item) : (Number(item.quantite) || 1);
+}
+
+// Prix unitaire PROPOSÉ par la grille tarifaire (tasse uniquement) : produit +
+// options retenues. Les autres familles n'ont pas de grille — le comptoir saisit.
+function catalogueUnitaireTtc(l) {
   const ids = [l.produitId, l.face1Id, l.face2Id, l.dessousId, l.batId];
-  const total = ids.reduce((s, id) => { const a = tarifById(id); return s + (a ? a.prixVenteTtc : 0); }, 0);
-  return (Number(l.quantite) || 0) * total;
+  return ids.reduce((s, id) => { const a = tarifById(id); return s + (a ? a.prixVenteTtc : 0); }, 0);
+}
+
+// Prix unitaire RETENU : celui que l'employé a saisi s'il en a saisi un, sinon
+// celui de la grille. Écrire un prix à la main l'emporte toujours (remise
+// négociée, cas particulier) — le coût de revient, lui, reste celui de la grille.
+function prixUnitaireTtc(item) {
+  if (item.prixUnitaireTtc !== '' && item.prixUnitaireTtc != null) {
+    const n = Number(item.prixUnitaireTtc);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return item.type === 'tasse' ? catalogueUnitaireTtc(item) : 0;
 }
 function calcLigneTasseRevient(l) {
   const ids = [l.produitId, l.face1Id, l.face2Id, l.dessousId, l.batId];
@@ -366,19 +445,36 @@ function calcLigneTasseRevient(l) {
 
 // --- Panier : prix, description, rendu -------------------------------------------
 function calcItemTtc(item) {
-  return item.type === 'tasse' ? calcLigneTasseTtc(item) : (Number(item.prixTtcManuel) || 0);
+  return Math.round(quantiteItem(item) * prixUnitaireTtc(item) * 100) / 100;
 }
 function calcItemRevient(item) {
   return item.type === 'tasse' ? calcLigneTasseRevient(item) : 0;
 }
+
+// Les tailles d'un textile, en une ligne : « M×4 · L×6 ».
+function taillesTexte(l) {
+  const cases = CAT.taillesGrille
+    .map((t) => ({ taille: t, quantite: Number.parseInt(l.tailles[t], 10) || 0 }))
+    .filter((t) => t.quantite > 0);
+  const libres = l.taillesLibres
+    .map((t) => ({ taille: (t.taille || '').trim(), quantite: Number.parseInt(t.quantite, 10) || 0 }))
+    .filter((t) => t.taille && t.quantite > 0);
+  return [...cases, ...libres].map((t) => `${t.taille}×${t.quantite}`).join(' · ');
+}
+
 function describeItem(item) {
+  const q = quantiteItem(item);
   if (item.type === 'tasse') {
     const produit = tarifById(item.produitId);
     const opts = [item.face1Id, item.face2Id, item.dessousId].map(tarifById)
       .filter((a) => a && a.designation !== 'Aucune').map((a) => a.designation);
-    return `${item.quantite} × ${produit ? produit.designation : 'Tasse'}${item.coloris ? ` (${item.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
+    return `${q} × ${produit ? produit.designation : 'Tasse'}${item.coloris ? ` (${item.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
   }
-  return `${item.quantite} × ${item.description || '—'}`;
+  if (item.type === 'textile') {
+    const id = [item.reference && `réf. ${item.reference}`, item.coloris, taillesTexte(item)].filter(Boolean).join(' · ');
+    return `${q} × ${item.designation || 'Textile'}${id ? ` — ${id}` : ''}`;
+  }
+  return `${q} × ${item.designation || '—'}`;
 }
 
 // Un délai est choisi dès qu'un raccourci OU une date précise est posé.
@@ -454,7 +550,7 @@ function renderPanier(main) {
 // --- Formulaire d'ajout d'un produit au panier ------------------------------------
 function startAdding(typeId) {
   state.addingType = typeId;
-  state.addingLigne = typeId === 'tasse' ? newTasseLigne() : newSommaireLigne();
+  state.addingLigne = newLigne(typeId);
   state.customOpen = false;
   render();
 }
@@ -464,11 +560,12 @@ function cancelAdding() {
 }
 function confirmAdd() {
   const l = state.addingLigne;
-  if (state.addingType === 'tasse') {
-    if (!l.produitId) { window.alert('Choisis un type de tasse.'); return; }
-  } else if (!l.description.trim()) {
-    window.alert('Ajoute une description.'); return;
-  }
+  const manque = {
+    tasse: () => (!l.produitId ? 'Choisis un type de tasse.' : ''),
+    textile: () => (!l.designation.trim() ? 'Indique la désignation du produit (T-shirt, Polo…).' : ''),
+  }[state.addingType] || (() => (!l.designation.trim() ? 'Indique la désignation du projet.' : ''));
+  const message = manque();
+  if (message) { window.alert(message); return; }
   state.panier.push({ ...l, type: state.addingType });
   state.addingType = null; state.addingLigne = null;
   render();
@@ -561,6 +658,234 @@ function colorSwatches(l) {
   return box;
 }
 
+// Champ texte étiqueté. Pas de re-rendu à la frappe (le curseur sauterait) :
+// l'état est posé à chaque touche, l'écran se recalcule au blur si besoin.
+function textField(label, get, set, opts = {}) {
+  const box = el('label', 'proj-field');
+  box.append(el('span', 'proj-field__label', label));
+  const input = el(opts.multiline ? 'textarea' : 'input', `proj-input${opts.multiline ? ' proj-input--area' : ''}`);
+  if (opts.multiline) input.rows = opts.rows || 3;
+  if (opts.placeholder) input.placeholder = opts.placeholder;
+  if (opts.list) input.setAttribute('list', opts.list);
+  if (opts.maxLength) input.maxLength = opts.maxLength;
+  input.value = get() || '';
+  input.addEventListener('input', () => set(input.value));
+  box.append(input);
+  return box;
+}
+
+// Prix unitaire : HT et TGCA côte à côte, liés par le taux des Réglages. Taper
+// dans l'un remplit l'autre en direct — sans re-rendu, pour ne pas éjecter le
+// curseur du champ en cours de frappe. Le TTC reste la valeur stockée ; le HT
+// n'est qu'une vue.
+function prixFields(l, type) {
+  const taux = 1 + (TARIFS_PARAMS.tgca || 0);
+  const cents = (v) => Math.round(v * 100) / 100;
+  const g = groupBox('Prix unitaire');
+  const row = el('div', 'proj-prix');
+
+  const champ = (label, cls) => {
+    const box = el('label', `proj-field proj-field--prix${cls ? ` ${cls}` : ''}`);
+    box.append(el('span', 'proj-field__label', label));
+    const input = el('input', 'proj-input proj-input--lg');
+    input.type = 'number'; input.min = '0'; input.step = '0.01'; input.inputMode = 'decimal';
+    input.placeholder = '0,00';
+    box.append(input);
+    return { box, input };
+  };
+  const ht = champ('HT (€)');
+  const ttc = champ('TGCA — TTC (€)', 'proj-field--prix-ttc');
+
+  const unitaire = prixUnitaireTtc({ ...l, type });
+  const saisi = l.prixUnitaireTtc !== '' && l.prixUnitaireTtc != null;
+  // Tasse : tant que rien n'est saisi, les champs MONTRENT le prix du catalogue
+  // (grisé) plutôt que de rester vides — l'employé voit ce qu'il va facturer.
+  ttc.input.value = saisi ? l.prixUnitaireTtc : (unitaire ? unitaire.toFixed(2) : '');
+  ht.input.value = unitaire ? cents(unitaire / taux).toFixed(2) : '';
+  if (!saisi && unitaire) { ttc.input.classList.add('is-catalogue'); ht.input.classList.add('is-catalogue'); }
+
+  ttc.input.addEventListener('input', () => {
+    l.prixUnitaireTtc = ttc.input.value;
+    const n = Number(ttc.input.value);
+    ht.input.value = Number.isFinite(n) && ttc.input.value !== '' ? cents(n / taux).toFixed(2) : '';
+    ttc.input.classList.remove('is-catalogue'); ht.input.classList.remove('is-catalogue');
+  });
+  ht.input.addEventListener('input', () => {
+    const n = Number(ht.input.value);
+    const val = Number.isFinite(n) && ht.input.value !== '' ? cents(n * taux) : '';
+    l.prixUnitaireTtc = val === '' ? '' : String(val);
+    ttc.input.value = val === '' ? '' : val.toFixed(2);
+    ttc.input.classList.remove('is-catalogue'); ht.input.classList.remove('is-catalogue');
+  });
+  // Le total de la ligne ne se recalcule qu'une fois la frappe terminée.
+  ttc.input.addEventListener('change', renderCurrentPage);
+  ht.input.addEventListener('change', renderCurrentPage);
+
+  row.append(ht.box, ttc.box);
+  g.append(row);
+
+  // Retour au prix du catalogue, seulement quand il y a un catalogue et qu'on
+  // s'en est écarté : sinon le bouton n'a rien à défaire.
+  if (type === 'tasse' && saisi && catalogueUnitaireTtc(l)) {
+    const reset = el('button', 'proj-prix__reset');
+    reset.type = 'button';
+    reset.append(ic('undo'), el('span', null, `Prix du catalogue (${catalogueUnitaireTtc(l).toFixed(2)} €)`));
+    reset.addEventListener('click', () => { l.prixUnitaireTtc = ''; renderCurrentPage(); });
+    g.append(reset);
+  }
+  return g;
+}
+
+// GRILLE DE TAILLES : une case chiffrable par taille, la quantité de la ligne en
+// est la somme. Les tailles hors grille (« 3XL », « 8 ans ») s'ajoutent à la
+// demande. Comme dans la Saisie détaillée : on ne redemande pas un « Qté » qui
+// pourrait contredire la grille.
+function sizeGrid(l) {
+  const g = groupBox('Tailles');
+  const grille = el('div', 'proj-sizes');
+  for (const t of ['Taille unique', ...CAT.taillesGrille]) {
+    const box = el('label', 'proj-size');
+    box.append(el('span', 'proj-size__label', t));
+    const input = el('input', 'proj-size__qty');
+    input.inputMode = 'numeric';
+    input.value = l.tailles[t] || '';
+    input.setAttribute('aria-label', `Quantité taille ${t}`);
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D+/g, '').slice(0, 4);
+      input.value = digits;
+      if (digits) l.tailles[t] = digits; else delete l.tailles[t];
+    });
+    input.addEventListener('change', renderCurrentPage);
+    box.append(input);
+    grille.append(box);
+  }
+  g.append(grille);
+
+  l.taillesLibres.forEach((libre, i) => {
+    const row = el('div', 'proj-size-libre');
+    const nom = el('input', 'proj-input');
+    nom.placeholder = 'Autre taille (3XL, 8 ans…)';
+    nom.value = libre.taille;
+    nom.maxLength = 20;
+    nom.addEventListener('input', () => { libre.taille = nom.value; });
+    const qty = el('input', 'proj-size__qty');
+    qty.inputMode = 'numeric';
+    qty.value = libre.quantite;
+    qty.setAttribute('aria-label', 'Quantité de cette taille');
+    qty.addEventListener('input', () => { libre.quantite = qty.value.replace(/\D+/g, '').slice(0, 4); });
+    qty.addEventListener('change', renderCurrentPage);
+    const rm = el('button', 'proj-size-libre__del');
+    rm.type = 'button';
+    rm.setAttribute('aria-label', 'Retirer cette taille');
+    rm.append(ic('close'));
+    rm.addEventListener('click', () => { l.taillesLibres.splice(i, 1); renderCurrentPage(); });
+    row.append(nom, qty, rm);
+    g.append(row);
+  });
+
+  const add = el('button', 'proj-choice proj-choice--add');
+  add.type = 'button';
+  add.append(ic('add'), el('span', 'proj-choice__txt', 'Autre taille'));
+  add.addEventListener('click', () => { l.taillesLibres.push({ taille: '', quantite: '' }); renderCurrentPage(); });
+  g.append(add);
+
+  g.append(el('p', 'proj-sizes__total', `Quantité totale : ${quantiteTextile(l)}`));
+  return g;
+}
+
+// UNE FACE marquée : où, quoi, quelle référence, quelle couleur. Repliée tant
+// qu'aucun emplacement n'est choisi — un textile sans marquage reste une saisie
+// de 3 champs, pas un formulaire de 11.
+function faceFields(l, face) {
+  const f = l.faces[face.id];
+  const g = groupBox(face.label);
+  // Les emplacements courants d'abord (`principal`), le reste derrière un tap :
+  // au comptoir on vise Cœur ou Dos neuf fois sur dix. Un emplacement déjà
+  // choisi reste visible même s'il est secondaire.
+  const visibles = CAT.zones.filter((z) => z.principal || f.plus || z.id === f.emplacement);
+  const zones = visibles.map((z) => ({ id: z.id, designation: z.label }));
+  const chips = choiceChips([{ id: '', designation: 'Aucun marquage' }, ...zones], f.emplacement, (v) => {
+    f.emplacement = f.emplacement === v ? '' : v;
+  }, { none: true, noneDesign: 'Aucun marquage' });
+  if (visibles.length < CAT.zones.length) {
+    const plus = el('button', 'proj-choice proj-choice--plus');
+    plus.type = 'button';
+    plus.append(ic('more_horiz'), el('span', 'proj-choice__txt', 'Autres emplacements'));
+    plus.addEventListener('click', () => { f.plus = true; renderCurrentPage(); });
+    chips.append(plus);
+  }
+  g.append(chips);
+
+  if (f.emplacement) {
+    const detail = el('div', 'proj-face');
+    const types = CAT.typeLogos.map((t) => ({ id: t.id, designation: t.label }));
+    const gType = el('div', 'proj-field');
+    gType.append(el('span', 'proj-field__label', 'Type de logo'));
+    gType.append(choiceChips(types, f.typeLogo, (v) => { f.typeLogo = f.typeLogo === v ? '' : v; }));
+    detail.append(gType);
+    detail.append(textField('Référence logo', () => f.referenceLogo, (v) => { f.referenceLogo = v; },
+      { placeholder: 'LOGO-2024.ai, fichier client…' }));
+    detail.append(textField('Couleur de marquage', () => f.couleurMarquage, (v) => { f.couleurMarquage = v; },
+      { placeholder: 'Blanc, or, noir…' }));
+    g.append(detail);
+  }
+  return g;
+}
+
+function renderTextileFields(l) {
+  const card = el('div', 'proj-form');
+
+  const gDes = groupBox('Produit');
+  gDes.append(textField('Désignation produit', () => l.designation, (v) => { l.designation = v; },
+    { placeholder: 'T-shirt, Polo, Sweat…', list: 'proj-dl-vetements' }));
+  gDes.append(textField('Référence', () => l.reference, (v) => { l.reference = v; },
+    { placeholder: 'Référence fournisseur' }));
+  card.append(gDes);
+
+  const gCol = groupBox('Couleurs');
+  gCol.append(colorSwatches(l));
+  card.append(gCol);
+
+  card.append(sizeGrid(l));
+
+  for (const face of FACES_TEXTILE) card.append(faceFields(l, face));
+
+  const gRem = groupBox('Remarques');
+  gRem.append(textField('', () => l.remarque, (v) => { l.remarque = v; },
+    { multiline: true, placeholder: 'Coutures renforcées, lavage à froid…' }));
+  card.append(gRem);
+
+  card.append(prixFields(l, 'textile'));
+  return card;
+}
+
+function renderAutresFields(l, type) {
+  const card = el('div', 'proj-form');
+
+  const gDes = groupBox('Projet');
+  gDes.append(textField('Désignation projet', () => l.designation, (v) => { l.designation = v; },
+    { placeholder: 'Enseigne vitrine, trophée gravé…' }));
+  gDes.append(textField('Explication du projet', () => l.explication, (v) => { l.explication = v; },
+    { multiline: true, placeholder: 'Ce que le client veut, en clair…' }));
+  card.append(gDes);
+
+  const gFab = groupBox('Fabrication');
+  gFab.append(textField('Matière à utiliser', () => l.matiere, (v) => { l.matiere = v; },
+    { placeholder: 'PVC 5 mm, bois, alu…' }));
+  gFab.append(textField('Format', () => l.format, (v) => { l.format = v; },
+    { placeholder: '120 × 40 cm, A4…' }));
+  gFab.append(textField('Méthode de production', () => l.methode, (v) => { l.methode = v; },
+    { placeholder: 'Découpe laser, UV, gravure…' }));
+  card.append(gFab);
+
+  const gQty = groupBox('Quantité');
+  gQty.append(qtyStepper(() => l.quantite, (n) => { l.quantite = n; }));
+  card.append(gQty);
+
+  card.append(prixFields(l, type));
+  return card;
+}
+
 function renderTasseFields(l) {
   const card = el('div', 'proj-form');
 
@@ -590,23 +915,42 @@ function renderTasseFields(l) {
     gToggle.append(openBtn);
     card.append(gToggle);
   } else {
-    const gF1 = groupBox('Face 1 · anse à droite');
+    // Les puces disent ce qu'on FACTURE (l'option tarifée), le champ texte dit
+    // ce qu'on GRAVE (le contenu exact à passer en machine).
+    const gF1 = groupBox('Face 01 · anse à droite');
     gF1.append(choiceChips(tarifsByCat('face'), l.face1Id, (v) => { l.face1Id = v; }, { none: true }));
+    gF1.append(textField('Logo ou texte à graver', () => l.face1Texte, (v) => { l.face1Texte = v; },
+      { placeholder: 'OLDA — Grand Case' }));
     card.append(gF1);
 
-    const gF2 = groupBox('Face 2 · anse à gauche');
+    const gF2 = groupBox('Face 02 · anse à gauche');
     gF2.append(choiceChips(tarifsByCat('face'), l.face2Id, (v) => { l.face2Id = v; }, { none: true }));
+    gF2.append(textField('Logo ou texte à graver', () => l.face2Texte, (v) => { l.face2Texte = v; },
+      { placeholder: 'Logo client, prénom…' }));
     card.append(gF2);
 
     const gDs = groupBox('Dessous');
     gDs.append(choiceChips(tarifsByCat('dessous'), l.dessousId, (v) => { l.dessousId = v; }, { none: true }));
+    gDs.append(textField('Logo à graver', () => l.dessousTexte, (v) => { l.dessousTexte = v; },
+      { placeholder: 'Petit logo, date…' }));
     card.append(gDs);
 
-    const gBat = groupBox('BAT avant production');
+    const gTypo = groupBox('Typo utilisée');
+    gTypo.append(textField('', () => l.typo, (v) => { l.typo = v; },
+      { placeholder: 'Bebas Neue, typo du logo…', list: 'proj-dl-typos' }));
+    card.append(gTypo);
+
+    const gBat = groupBox('BAT à confirmer avant production');
     gBat.append(choiceChips(tarifsByCat('bat'), l.batId, (v) => { l.batId = v; }, { none: true, noneDesign: 'Non', duo: true }));
     card.append(gBat);
   }
 
+  const gRem = groupBox('Remarques');
+  gRem.append(textField('', () => l.remarque, (v) => { l.remarque = v; },
+    { multiline: true, placeholder: 'Emballage cadeau, livraison sur place…' }));
+  card.append(gRem);
+
+  card.append(prixFields(l, 'tasse'));
   return card;
 }
 
@@ -617,34 +961,9 @@ function renderAddForm(main) {
   main.append(back, el('h3', 'proj-step__title', typeLabel(state.addingType)));
 
   const l = state.addingLigne;
-  if (state.addingType === 'tasse') {
-    main.append(renderTasseFields(l));
-  } else {
-    const card = el('div', 'proj-form');
-    const gDesc = groupBox('Description');
-    const desc = el('textarea', 'proj-textarea');
-    desc.placeholder = '5 polos brodés équipe, taille M à XL…';
-    desc.value = l.description;
-    desc.rows = 3;
-    desc.addEventListener('input', () => { l.description = desc.value; });
-    gDesc.append(desc);
-    card.append(gDesc);
-
-    const gQty = groupBox('Quantité');
-    gQty.append(qtyStepper(() => l.quantite, (n) => { l.quantite = n; }));
-    card.append(gQty);
-
-    const gPrix = groupBox('Prix TTC (€)');
-    const prix = el('input', 'proj-input proj-input--lg');
-    prix.type = 'number'; prix.min = '0'; prix.step = '0.01'; prix.inputMode = 'decimal';
-    prix.placeholder = '0,00';
-    prix.value = l.prixTtcManuel;
-    prix.addEventListener('input', () => { l.prixTtcManuel = prix.value; });
-    prix.addEventListener('change', renderCurrentPage);
-    gPrix.append(prix);
-    card.append(gPrix);
-    main.append(card);
-  }
+  if (state.addingType === 'tasse') main.append(renderTasseFields(l));
+  else if (state.addingType === 'textile') main.append(renderTextileFields(l));
+  else main.append(renderAutresFields(l, state.addingType));
 
   // CTA façon caisse : barre collée en bas, prix de la ligne + gros bouton
   // pleine largeur — jamais un petit bouton perdu sous le formulaire.
@@ -718,53 +1037,49 @@ function renderDelai() {
   return g;
 }
 
-// Bloc paiement : ce qu'on sait de l'argent au moment de la prise. Chaque
-// interrupteur a trois états — oui / non / pas encore renseigné — parce qu'au
-// comptoir « je ne sais pas » ne doit pas s'enregistrer comme « non ».
-function triToggle(label, get, set) {
-  const b = el('button', `proj-choice${get() === true ? ' is-on' : ''}`);
-  b.type = 'button';
-  b.setAttribute('role', 'switch');
-  b.setAttribute('aria-checked', String(get() === true));
-  b.append(el('span', 'proj-choice__txt', label));
-  if (get() === true) b.append(ic('check', 'proj-choice__ic'));
-  b.addEventListener('click', () => { set(get() === true ? null : true); renderCurrentPage(); });
-  return b;
-}
-
+// Bloc paiement : ce qu'on sait de l'argent au moment de la prise, pour TOUT le
+// panier — on encaisse une fois. Un seul statut, et seulement les champs qu'il
+// rend pertinents : demander le mode du solde alors que rien n'est payé n'a
+// pas de sens au comptoir.
 function renderPaiement() {
   const p = state.paiement;
   const box = el('div', 'proj-delai');
 
-  const g = groupBox('Paiement');
-  const row = el('div', 'proj-choices');
-  row.append(
-    triToggle('Acompte demandé', () => p.acompteDemande, (v) => { p.acompteDemande = v; }),
-    triToggle('Acompte versé', () => p.acompteVerse, (v) => {
-      p.acompteVerse = v;
-      if (v !== true) p.acompteMontant = '';   // pas d'acompte versé, pas de somme
-    }),
-    triToggle('Payé / soldé', () => p.paye, (v) => { p.paye = v; }),
-  );
-  g.append(row);
-
-  // La somme exacte n'a de sens qu'une fois l'acompte encaissé.
-  if (p.acompteVerse === true) {
-    const montant = el('input', 'proj-input proj-input--lg');
-    montant.type = 'number'; montant.min = '0'; montant.step = '0.01'; montant.inputMode = 'decimal';
-    montant.placeholder = 'Somme versée (€)';
-    montant.setAttribute('aria-label', 'Somme exacte de l’acompte en euros');
-    montant.value = p.acompteMontant;
-    montant.addEventListener('input', () => { p.acompteMontant = montant.value; });
-    g.append(montant);
-  }
+  const g = groupBox('Statut du paiement');
+  g.append(segBar(PAIEMENT_STATUTS, p.statut, (id) => {
+    p.statut = p.statut === id ? null : id;   // re-cliquer revient à « non renseigné »
+    if (p.statut !== 'acompte_recu') { p.acompteMontant = ''; p.modeAcompte = null; }
+    if (p.statut !== 'paye') p.modeFinal = null;
+  }, 5));
   box.append(g);
 
-  const gMode = groupBox('Mode de paiement');
-  gMode.append(segBar(PAIEMENT_MODES, p.mode, (id) => {
-    p.mode = p.mode === id ? null : id;   // re-cliquer retire le mode
-  }, 4));
-  box.append(gMode);
+  // La somme exacte et le mode de l'acompte n'ont de sens qu'une fois l'acompte
+  // encaissé.
+  if (p.statut === 'acompte_recu') {
+    const gAc = groupBox('Montant TTC de l’acompte reçu');
+    const montant = el('input', 'proj-input proj-input--lg');
+    montant.type = 'number'; montant.min = '0'; montant.step = '0.01'; montant.inputMode = 'decimal';
+    montant.placeholder = 'Somme reçue (€)';
+    montant.setAttribute('aria-label', 'Montant TTC de l’acompte reçu, en euros');
+    montant.value = p.acompteMontant;
+    montant.addEventListener('input', () => { p.acompteMontant = montant.value; });
+    gAc.append(montant);
+    box.append(gAc);
+
+    const gMode = groupBox('Mode de paiement de l’acompte');
+    gMode.append(segBar(PAIEMENT_MODES, p.modeAcompte, (id) => {
+      p.modeAcompte = p.modeAcompte === id ? null : id;
+    }, 4));
+    box.append(gMode);
+  }
+
+  if (p.statut === 'paye') {
+    const gFinal = groupBox('Mode de paiement final');
+    gFinal.append(segBar(PAIEMENT_MODES, p.modeFinal, (id) => {
+      p.modeFinal = p.modeFinal === id ? null : id;
+    }, 4));
+    box.append(gFinal);
+  }
   return box;
 }
 
@@ -823,6 +1138,51 @@ async function loadPipeline() {
   return PIPELINE;
 }
 
+// Une ligne du panier → ce que le serveur attend. Le prix unitaire n'est envoyé
+// que s'il a été saisi : sans lui, le serveur applique la grille tarifaire
+// (tasse) plutôt qu'un zéro venu du client.
+function ligneToPayload(item) {
+  const base = { type: item.type, quantite: quantiteItem(item) };
+  if (item.prixUnitaireTtc !== '' && item.prixUnitaireTtc != null) {
+    base.prixUnitaireTtc = Number(item.prixUnitaireTtc);
+  }
+  if (item.type === 'tasse') {
+    return {
+      ...base,
+      produitId: item.produitId, coloris: item.coloris,
+      face1Id: item.face1Id, face2Id: item.face2Id, dessousId: item.dessousId, batId: item.batId,
+      face1Texte: item.face1Texte, face2Texte: item.face2Texte, dessousTexte: item.dessousTexte,
+      typo: item.typo, remarque: item.remarque,
+    };
+  }
+  if (item.type === 'textile') {
+    const tailles = [
+      ...CAT.taillesGrille.concat('Taille unique')
+        .map((t) => ({ taille: t, quantite: Number.parseInt(item.tailles[t], 10) || 0 })),
+      ...item.taillesLibres.map((t) => ({ taille: (t.taille || '').trim(), quantite: Number.parseInt(t.quantite, 10) || 0 })),
+    ].filter((t) => t.taille && t.quantite > 0);
+    const faces = {};
+    for (const face of FACES_TEXTILE) {
+      const f = item.faces[face.id];
+      if (!f.emplacement) continue;   // une face sans emplacement n'est pas une consigne
+      faces[face.id] = {
+        emplacement: f.emplacement, typeLogo: f.typeLogo,
+        referenceLogo: f.referenceLogo, couleurMarquage: f.couleurMarquage,
+      };
+    }
+    return {
+      ...base,
+      designation: item.designation, reference: item.reference, coloris: item.coloris,
+      tailles, faces, remarque: item.remarque,
+    };
+  }
+  return {
+    ...base,
+    designation: item.designation, explication: item.explication,
+    matiere: item.matiere, format: item.format, methode: item.methode,
+  };
+}
+
 function buildPayload(kind, dest) {
   const nomParts = (state.client.nom || state.client.entreprise || '').split(' ');
   return {
@@ -830,18 +1190,15 @@ function buildPayload(kind, dest) {
     client: state.client.type === 'perso'
       ? { type: 'perso', prenom: nomParts[0] || '', nom: nomParts.slice(1).join(' '), societe: state.client.entreprise, whatsapp: state.client.telephone, email: state.client.email }
       : { type: 'pro', facturation: state.client.entreprise, contact: state.client.nom, whatsapp: state.client.telephone, email: state.client.email },
-    lignes: state.panier.map((item) => (item.type === 'tasse'
-      ? { type: item.type, quantite: item.quantite, produitId: item.produitId, coloris: item.coloris, face1Id: item.face1Id, face2Id: item.face2Id, dessousId: item.dessousId, batId: item.batId, remarque: item.remarque }
-      : { type: item.type, quantite: item.quantite, description: item.description, prixTtcManuel: Number(item.prixTtcManuel) || 0 })),
+    lignes: state.panier.map(ligneToPayload),
     // Un seul des deux part : un raccourci OU une date précise.
     delai: state.delai || undefined,
     deadline: state.deadline || undefined,
     paiement: {
-      acompteDemande: state.paiement.acompteDemande,
-      acompteVerse: state.paiement.acompteVerse,
+      statut: state.paiement.statut,
       acompteMontant: state.paiement.acompteMontant === '' ? null : Number(state.paiement.acompteMontant),
-      paye: state.paiement.paye,
-      mode: state.paiement.mode,
+      modeAcompte: state.paiement.modeAcompte,
+      modeFinal: state.paiement.modeFinal,
     },
     stage: dest ? dest.stage : undefined,
     subStage: dest ? dest.subStage : undefined,
@@ -956,7 +1313,18 @@ function buildStatic() {
   const dlVilles = el('datalist');
   dlVilles.id = PROJ_VILLES_DL_ID;
   dlVilles.append(...VILLES.map((v) => new Option(v.label)));
-  ROOT.replaceChildren(page, dlSecteurs, dlVilles);
+  // Suggestions du catalogue partagé (vêtements, typos) : remplies par
+  // `remplirCatalogueDatalists` une fois le catalogue chargé.
+  const dlVetements = el('datalist');
+  dlVetements.id = 'proj-dl-vetements';
+  const dlTypos = el('datalist');
+  dlTypos.id = 'proj-dl-typos';
+  ROOT.replaceChildren(page, dlSecteurs, dlVilles, dlVetements, dlTypos);
+}
+
+function remplirCatalogueDatalists() {
+  $('#proj-dl-vetements').replaceChildren(...CAT.vetements.map((v) => new Option(v)));
+  $('#proj-dl-typos').replaceChildren(...CAT.typos.map((t) => new Option(t)));
 }
 
 let mounted = false;
@@ -966,9 +1334,13 @@ export async function initProjet(root) {
   mounted = true;
   buildStatic();
   try {
-    [CLIENTS, TARIFS, TARIFS_PARAMS] = await Promise.all([
+    let cat;
+    [CLIENTS, TARIFS, TARIFS_PARAMS, cat] = await Promise.all([
       api('GET', '/api/clients'), api('GET', '/api/tarifs-tasse'), api('GET', '/api/tarifs-tasse/parametres'),
+      api('GET', '/api/commande/catalog'),
     ]);
+    CAT = { ...CAT, ...cat };
+    remplirCatalogueDatalists();
     await loadSecteurs();
   } catch (_) { /* silencieux : les pages suivantes gèrent une liste vide */ }
   render();

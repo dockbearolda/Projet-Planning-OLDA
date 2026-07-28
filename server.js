@@ -824,6 +824,7 @@ const COM_TASSE_OPT_BY_ID = new Map(COM.tasseOptions.map((o) => [o.id, o]));
 const COM_OBJ_TECH_BY_ID = new Map(COM.objetTechniques.map((t) => [t.id, t]));
 const COM_PAY_STATUT_BY_ID = new Map(COM.paiementStatuts.map((p) => [p.id, p]));
 const COM_PAY_MODE_BY_ID = new Map(COM.paiementModes.map((p) => [p.id, p]));
+const COM_TYPE_LOGO_BY_ID = new Map(COM.typeLogos.map((t) => [t.id, t]));
 // Modes acceptés par requests.paiement_mode. Défini ici, à côté du catalogue qui
 // en est la source ; validateField le lit à la requête, donc bien après le
 // chargement du module.
@@ -837,13 +838,25 @@ const DELAI_DEFAUT = COM_DELAI_BY_ID.get(COM.delaiDefaut) || COM.delais[0];
 // Tasse / T-shirt / Goodies / Signalétique / Reprise Graphique / Autre, réduits
 // aux 4 que le patron a validés pour Nouveau Projet). Seule la tasse a une
 // grille de prix détaillée ; les autres restent sommaires (prix manuel).
+// Les 4 types de projet. `forme` désigne le CONSTRUCTEUR de ligne à employer :
+// chaque famille a désormais sa propre fiche de production (cf. spec
+// « Nouveau Projet — champs détaillés par famille »). « Autres » et « Plaque
+// signalétique » partagent la même : désignation, explication, matière, format,
+// méthode de production.
 const PROJET_TYPES = [
-  { id: 'tasse', label: 'Tasse', detaille: true },
-  { id: 'textile', label: 'Textile', detaille: false },
-  { id: 'autres', label: 'Autres', detaille: false },
-  { id: 'signaletique', label: 'Plaque signalétique', detaille: false },
+  { id: 'tasse', label: 'Tasse', forme: 'tasse' },
+  { id: 'textile', label: 'Textile', forme: 'textile' },
+  { id: 'autres', label: 'Autres', forme: 'autres' },
+  { id: 'signaletique', label: 'Plaque signalétique', forme: 'autres' },
 ];
 const PROJET_TYPE_BY_ID = new Map(PROJET_TYPES.map((t) => [t.id, t]));
+// Les deux faces marquables d'un textile. L'ordre fait foi à l'affichage.
+const PROJET_FACES_TEXTILE = [
+  { id: 'avant', label: 'Face avant' },
+  { id: 'arriere', label: 'Face arrière' },
+];
+const PROJET_TAILLES_MAX = 16;     // grille (7 cases) + quelques tailles libres
+const TAILLE_MAX = 20;             // « Taille unique », « 3XL », « 12 ans »…
 const PROJET_LIGNES_MAX = 30;
 
 // Longueurs bornées : ces textes finissent dans une cellule de grille, pas dans
@@ -1225,11 +1238,51 @@ function buildDestination(b, type) {
 }
 
 // --- NOUVEAU PROJET -----------------------------------------------------------
-// Le flux comptoir ultra-minimal : client → type de projet → lignes → prix.
-// Contrairement à buildCommande (familles mélangées, options en chips), un
-// projet a UN SEUL type, et pour la tasse chaque ligne référence des ids du
-// catalogue tarifs (jamais un prix envoyé par le client — toujours recalculé
-// depuis `tarifsById` chargé juste avant l'appel).
+// Le flux comptoir : client → panier de produits → prix. Chaque famille a sa
+// propre fiche de production (tasse, textile, autres/signalétique), construite
+// par la fonction correspondante ci-dessous. Pour la tasse, les options
+// référencent des ids du catalogue tarifs (jamais un prix envoyé par le client
+// — toujours recalculé depuis `tarifsById` chargé juste avant l'appel) ; le
+// prix unitaire, lui, peut être écrasé au comptoir.
+
+// Prix d'une ligne, en TTC. Le TTC est la RÉFÉRENCE : le HT s'en déduit avec le
+// taux TGCA du moment, il n'est jamais lu depuis la requête. Deux formes
+// acceptées :
+//   - UNITAIRE (actuelle) : `prixUnitaireTtc`, multiplié par la quantité.
+//   - HISTORIQUE : `prixTtcManuel`, qui portait le TOTAL de la ligne.
+// `defautUnitaireTtc` (tasse) sert quand le comptoir n'a rien saisi : le prix
+// calculé depuis la grille tarifaire fait alors foi.
+function readPrixLigne(raw, quantite, where, defautUnitaireTtc) {
+  const l = raw && typeof raw === 'object' ? raw : {};
+  const cents = (v) => Math.round(v * 100) / 100;
+  const positif = (v) => Number.isFinite(v) && v >= 0;
+
+  const unitaire = Number(l.prixUnitaireTtc);
+  const total = Number(l.prixTtcManuel);
+  let prixUnitaireTtc;
+  let prixLigneTtc;
+  if (l.prixUnitaireTtc != null && l.prixUnitaireTtc !== '') {
+    if (!positif(unitaire)) return { error: `${where} : prix unitaire TTC invalide` };
+    prixUnitaireTtc = cents(unitaire);
+    prixLigneTtc = cents(prixUnitaireTtc * quantite);
+  } else if (l.prixTtcManuel != null && l.prixTtcManuel !== '') {
+    if (!positif(total)) return { error: `${where} : prix TTC invalide` };
+    prixLigneTtc = cents(total);
+    prixUnitaireTtc = cents(prixLigneTtc / quantite);
+  } else if (defautUnitaireTtc != null) {
+    prixUnitaireTtc = cents(defautUnitaireTtc);
+    prixLigneTtc = cents(prixUnitaireTtc * quantite);
+  } else {
+    return { error: `${where} : prix TTC invalide` };
+  }
+  return {
+    prixUnitaireTtc,
+    prixUnitaireHt: cents(prixUnitaireTtc / (1 + PROJET_TGCA)),
+    prixLigneTtc,
+    // Trace : le prix vient-il de la grille tarifaire ou de la main de l'employé ?
+    prixCatalogue: defautUnitaireTtc != null && prixUnitaireTtc === cents(defautUnitaireTtc),
+  };
+}
 
 // Ligne TASSE : résout produit/face1/face2/dessous/bat depuis le catalogue.
 // Renvoie { ligne, prixLigneTtc, prixRevientLigne } ou { error }.
@@ -1262,11 +1315,27 @@ function buildLigneTasse(raw, index, tarifsById) {
   const remarque = trimOrNull(l.remarque);
   if (remarque && remarque.length > REMARQUE_MAX) return { error: `${where} : remarque trop longue` };
 
+  // Ce qu'on GRAVE, à côté de ce qu'on FACTURE : la puce tarifée dit l'option
+  // vendue (« Texte personnalisé simple », 6 €), ces textes disent le contenu
+  // exact à passer en machine (« OLDA — Grand Case »).
+  const textes = {};
+  for (const [champ, quoi] of [['face1Texte', 'texte de la face 1'], ['face2Texte', 'texte de la face 2'],
+    ['dessousTexte', 'texte du dessous'], ['typo', 'typo']]) {
+    const t = readTexte(l[champ], where, quoi, TEXTE_MAX);
+    if (t.error) return { error: t.error };
+    textes[champ] = t.value;
+  }
+
   const parts = [produit.article, face1.article, face2.article, dessous.article, bat.article].filter(Boolean);
-  const prixUnitaireTtc = parts.reduce((s, a) => s + a.prixVenteTtc, 0);
+  const catalogueTtc = parts.reduce((s, a) => s + a.prixVenteTtc, 0);
   const prixAchatUnitaire = parts.reduce((s, a) => s + a.prixAchat, 0);
   const tempsMoUnitaire = parts.reduce((s, a) => s + a.tempsMoMin, 0);
   const tempsMachineUnitaire = parts.reduce((s, a) => s + a.tempsMachineMin, 0);
+  // La grille tarifaire propose ; le comptoir peut écraser (remise négociée,
+  // cas particulier). Le COÛT DE REVIENT, lui, reste celui de la grille : un
+  // prix de vente négocié ne change pas ce que la tasse coûte à produire.
+  const prix = readPrixLigne(l, q.quantite, where, catalogueTtc);
+  if (prix.error) return { error: prix.error };
 
   const asRef = (a) => (a ? { id: a.id, label: a.designation, prixTtc: a.prixVenteTtc } : null);
   return {
@@ -1274,34 +1343,144 @@ function buildLigneTasse(raw, index, tarifsById) {
       quantite: q.quantite,
       produit: asRef(produit.article), coloris,
       face1: asRef(face1.article), face2: asRef(face2.article), dessous: asRef(dessous.article),
+      face1Texte: textes.face1Texte, face2Texte: textes.face2Texte, dessousTexte: textes.dessousTexte,
+      typo: textes.typo,
       bat: bat.article ? bat.article.designation === 'Oui' : false,
       remarque,
+      prixUnitaireTtc: prix.prixUnitaireTtc, prixUnitaireHt: prix.prixUnitaireHt,
+      prixCatalogue: prix.prixCatalogue,
       description: null, prixTtcManuel: null,
     },
-    prixLigneTtc: q.quantite * prixUnitaireTtc,
+    prixLigneTtc: prix.prixLigneTtc,
     prixRevientLigne: q.quantite * (prixAchatUnitaire + (tempsMoUnitaire / 60) * PROJET_TAUX_MO
       + (tempsMachineUnitaire / 60) * PROJET_TAUX_MACHINE),
   };
 }
 
-// Ligne SOMMAIRE (textile / autres / signalétique) : description + prix manuel.
-function buildLigneSommaire(raw, index) {
-  const where = `Ligne ${index + 1}`;
+// GRILLE DE TAILLES d'un textile : une quantité par taille (Taille unique, XS…2XL
+// et tailles libres). La quantité de la ligne en est la SOMME — on ne redemande
+// pas un « Qté » qui pourrait la contredire. Une grille vide est acceptée :
+// `quantite` prend alors le relais (demande dont les tailles se préciseront).
+function readTailles(raw, where) {
+  if (!Array.isArray(raw)) return { tailles: [] };
+  if (raw.length > PROJET_TAILLES_MAX) return { error: `${where} : trop de tailles (${PROJET_TAILLES_MAX} maximum)` };
+  const tailles = [];
+  for (const t of raw) {
+    const cell = t && typeof t === 'object' ? t : {};
+    const taille = trimOrNull(cell.taille);
+    if (!taille) continue;
+    if (taille.length > TAILLE_MAX) return { error: `${where} : nom de taille trop long` };
+    const n = Number.parseInt(cell.quantite, 10);
+    if (!Number.isInteger(n) || n < 1) continue;      // une taille à zéro ne part pas
+    if (n > 9999) return { error: `${where} : quantité invalide pour la taille ${taille}` };
+    tailles.push({ taille, quantite: n });
+  }
+  return { tailles };
+}
+
+// UNE FACE marquée d'un textile (avant / arrière) : où, quoi, quelle référence,
+// quelle couleur. Une face sans emplacement n'est pas retenue — l'atelier ne
+// doit jamais lire une consigne à moitié posée.
+function readFaceTextile(raw, face, where) {
+  const f = raw && typeof raw === 'object' ? raw : {};
+  const zone = zoneById(f.emplacement);
+  if (!zone) return { face: null };
+  const typeLogo = COM_TYPE_LOGO_BY_ID.get(f.typeLogo) || null;
+  const ref = readTexte(f.referenceLogo, where, `référence logo (${face.label.toLowerCase()})`, TEXTE_MAX);
+  if (ref.error) return { error: ref.error };
+  const couleur = readTexte(f.couleurMarquage, where, `couleur de marquage (${face.label.toLowerCase()})`, COULEUR_MAX);
+  if (couleur.error) return { error: couleur.error };
+  return {
+    face: {
+      face: face.id, faceLabel: face.label,
+      emplacement: { id: zone.id, label: zone.label },
+      typeLogo: typeLogo ? { id: typeLogo.id, label: typeLogo.label } : null,
+      referenceLogo: ref.value, couleurMarquage: couleur.value,
+    },
+  };
+}
+
+// Ligne TEXTILE : le vêtement, sa grille de tailles, ses deux faces marquées.
+function buildLigneTextile(raw, index) {
+  const where = `Textile ${index + 1}`;
+  const l = raw && typeof raw === 'object' ? raw : {};
+
+  const grille = readTailles(l.tailles, where);
+  if (grille.error) return { error: grille.error };
+  const totalTailles = grille.tailles.reduce((s, t) => s + t.quantite, 0);
+  const q = totalTailles > 0 ? { quantite: totalTailles } : readQuantite(l.quantite, where);
+  if (q.error) return { error: q.error };
+
+  const designation = readTexte(l.designation ?? l.description, where, 'désignation produit', VETEMENT_MAX);
+  if (designation.error) return { error: designation.error };
+  if (!designation.value) return { error: `${where} : la désignation du produit est vide` };
+  const reference = readTexte(l.reference, where, 'référence', REF_MAX);
+  if (reference.error) return { error: reference.error };
+  const coloris = readTexte(l.coloris, where, 'couleur', COULEUR_MAX);
+  if (coloris.error) return { error: coloris.error };
+  const remarque = readTexte(l.remarque, where, 'remarque', REMARQUE_MAX);
+  if (remarque.error) return { error: remarque.error };
+
+  const faces = [];
+  for (const face of PROJET_FACES_TEXTILE) {
+    const built = readFaceTextile((l.faces || {})[face.id], face, where);
+    if (built.error) return { error: built.error };
+    if (built.face) faces.push(built.face);
+  }
+
+  const prix = readPrixLigne(l, q.quantite, where, null);
+  if (prix.error) return { error: prix.error };
+
+  const tailleTxt = grille.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ');
+  const identite = [reference.value && `réf. ${reference.value}`, coloris.value, tailleTxt].filter(Boolean).join(' · ');
+  return {
+    ligne: {
+      quantite: q.quantite,
+      designation: designation.value, reference: reference.value, coloris: coloris.value,
+      tailles: grille.tailles, faces, remarque: remarque.value,
+      prixUnitaireTtc: prix.prixUnitaireTtc, prixUnitaireHt: prix.prixUnitaireHt,
+      // Résumé lisible : c'est lui qui alimente la grille du planning et la
+      // recherche, comme la « description » des fiches d'avant.
+      description: `${q.quantite} × ${designation.value}${identite ? ` — ${identite}` : ''}`,
+      produit: null, face1: null, face2: null, dessous: null, bat: false, prixTtcManuel: null,
+    },
+    prixLigneTtc: prix.prixLigneTtc,
+    prixRevientLigne: 0,
+  };
+}
+
+// Ligne AUTRES / PLAQUE SIGNALÉTIQUE : un projet décrit à la main (désignation,
+// explication, matière, format, méthode de production).
+function buildLigneAutres(raw, index, typeLabel) {
+  const where = `${typeLabel} ${index + 1}`;
   const l = raw && typeof raw === 'object' ? raw : {};
   const q = readQuantite(l.quantite, where);
   if (q.error) return { error: q.error };
-  const description = trimOrNull(l.description);
-  if (!description) return { error: `${where} : la description est vide` };
-  if (description.length > DESCRIPTION_MAX) return { error: `${where} : description trop longue` };
-  const prix = Number(l.prixTtcManuel);
-  if (!Number.isFinite(prix) || prix < 0) return { error: `${where} : prix TTC invalide` };
+
+  const designation = readTexte(l.designation ?? l.description, where, 'désignation du projet', OBJET_MAX);
+  if (designation.error) return { error: designation.error };
+  if (!designation.value) return { error: `${where} : la désignation du projet est vide` };
+  const champs = {};
+  for (const [champ, quoi, max] of [['explication', 'explication du projet', DESCRIPTION_MAX],
+    ['matiere', 'matière', TEXTE_MAX], ['format', 'format', TEXTE_MAX],
+    ['methode', 'méthode de production', TEXTE_MAX]]) {
+    const t = readTexte(l[champ], where, quoi, max);
+    if (t.error) return { error: t.error };
+    champs[champ] = t.value;
+  }
+
+  const prix = readPrixLigne(l, q.quantite, where, null);
+  if (prix.error) return { error: prix.error };
 
   return {
     ligne: {
-      quantite: q.quantite, description, prixTtcManuel: Math.round(prix * 100) / 100,
-      produit: null, coloris: null, face1: null, face2: null, dessous: null, bat: false, remarque: null,
+      quantite: q.quantite, designation: designation.value, ...champs,
+      prixUnitaireTtc: prix.prixUnitaireTtc, prixUnitaireHt: prix.prixUnitaireHt,
+      description: `${q.quantite} × ${designation.value}`,
+      produit: null, coloris: null, face1: null, face2: null, dessous: null, bat: false,
+      remarque: null, prixTtcManuel: null,
     },
-    prixLigneTtc: Math.round(prix * 100) / 100,
+    prixLigneTtc: prix.prixLigneTtc,
     prixRevientLigne: 0,
   };
 }
@@ -1314,25 +1493,65 @@ let PROJET_TAUX_MO = 25;
 let PROJET_TAUX_MACHINE = 25;
 let PROJET_TGCA = 0.04;
 
-// Suivi du paiement envoyé par le comptoir. Chaque information est FACULTATIVE
-// et vaut null tant qu'elle n'est pas renseignée : au comptoir on ne sait pas
-// toujours, et « on ne sait pas » ne doit pas s'enregistrer comme « non ».
-// Le montant n'a de sens que si l'acompte est versé — sinon il est ignoré.
+// Où en est l'argent du projet, en UN choix. `demande`/`verse`/`paye` est la
+// PROJECTION du statut sur les colonnes du planning (requests.acompte_demande,
+// acompte_verse, paye), qui restent la source de vérité de la grille, du
+// dashboard et du tiroir. `null` = « on ne se prononce pas » : au comptoir on ne
+// sait pas toujours, et « on ne sait pas » ne doit pas s'enregistrer comme « non ».
+const PROJET_PAY_STATUTS = [
+  { id: 'non_demande', label: 'Non demandé', demande: null, verse: null, paye: null },
+  { id: 'acompte_demande', label: 'Acompte demandé', demande: true, verse: false, paye: false },
+  { id: 'acompte_recu', label: 'Acompte reçu', demande: true, verse: true, paye: false },
+  { id: 'a_encaisser', label: 'Paiement à encaisser', demande: false, verse: false, paye: false },
+  { id: 'paye', label: 'Payé', demande: null, verse: null, paye: true },
+];
+const PROJET_PAY_STATUT_BY_ID = new Map(PROJET_PAY_STATUTS.map((s) => [s.id, s]));
+
+// Suivi du paiement envoyé par le comptoir. Tout est FACULTATIF : sans statut
+// choisi, rien n'est affirmé.
+// Deux formes acceptées, parce qu'un poste dont l'onglet est resté ouvert peut
+// encore poster l'ancienne (le JS n'est pas versionné, cf. incident du cache
+// navigateur) :
+//   - STATUT (actuelle) : `statut` + `modeAcompte` / `modeFinal`.
+//   - HISTORIQUE : trois booléens `acompteDemande` / `acompteVerse` / `paye`
+//     + un `mode` unique. Le statut équivalent est déduit.
+// Le montant n'a de sens que si l'acompte est reçu — sinon il est ignoré.
 function readPaiement(raw) {
   const p = raw && typeof raw === 'object' ? raw : {};
   const bool = (v) => (v === true || v === false ? v : null);
-  const acompteVerse = bool(p.acompteVerse);
+  const ref = (m) => { const x = COM_PAY_MODE_BY_ID.get(m); return x ? { id: x.id, label: x.label } : null; };
+
+  const statut = PROJET_PAY_STATUT_BY_ID.get(p.statut) || deduireStatut(p);
+  const modeAcompte = ref(p.modeAcompte);
+  const modeFinal = ref(p.modeFinal);
+  // La colonne `paiement_mode` est unique : elle porte le mode le plus avancé
+  // connu. Les deux restent intacts dans la fiche.
+  const mode = modeFinal || modeAcompte || ref(p.mode);
+
   const montant = Number(p.acompteMontant);
-  const mode = COM_PAY_MODE_BY_ID.get(p.mode) || null;
+  const acompteRecu = statut ? statut.id === 'acompte_recu' : bool(p.acompteVerse) === true;
   return {
-    acompteDemande: bool(p.acompteDemande),
-    acompteVerse,
-    acompteMontant: acompteVerse && Number.isFinite(montant) && montant >= 0
+    statut: statut ? { id: statut.id, label: statut.label } : null,
+    acompteMontant: acompteRecu && Number.isFinite(montant) && montant >= 0
       ? Math.round(montant * 100) / 100
       : null,
-    paye: bool(p.paye),
-    mode: mode ? { id: mode.id, label: mode.label } : null,
+    modeAcompte,
+    modeFinal,
+    // Projection sur les colonnes du planning.
+    acompteDemande: statut ? statut.demande : bool(p.acompteDemande),
+    acompteVerse: statut ? statut.verse : bool(p.acompteVerse),
+    paye: statut ? statut.paye : bool(p.paye),
+    mode,
   };
+}
+
+// Ancienne forme (trois booléens) → le statut qui lui correspond, pour que les
+// fiches gardent toutes le même vocabulaire. Rien de coché = pas de statut.
+function deduireStatut(p) {
+  if (p.paye === true) return PROJET_PAY_STATUT_BY_ID.get('paye');
+  if (p.acompteVerse === true) return PROJET_PAY_STATUT_BY_ID.get('acompte_recu');
+  if (p.acompteDemande === true) return PROJET_PAY_STATUT_BY_ID.get('acompte_demande');
+  return null;
 }
 
 // Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
@@ -1362,9 +1581,10 @@ function buildProjet(body, tarifsById) {
     const raw = rawLignes[i] && typeof rawLignes[i] === 'object' ? rawLignes[i] : {};
     const type = PROJET_TYPE_BY_ID.get(raw.type);
     if (!type) return { error: `Produit ${i + 1} : type de projet inconnu (${raw.type})` };
-    const built = type.detaille
-      ? buildLigneTasse(raw, i, tarifsById)
-      : buildLigneSommaire(raw, i);
+    let built;
+    if (type.forme === 'tasse') built = buildLigneTasse(raw, i, tarifsById);
+    else if (type.forme === 'textile') built = buildLigneTextile(raw, i);
+    else built = buildLigneAutres(raw, i, type.label);
     if (built.error) return { error: built.error };
     built.ligne.type = { id: type.id, label: type.label };
     lignes.push(built.ligne);
@@ -1403,7 +1623,9 @@ function buildProjet(body, tarifsById) {
 
   const projet = {
     kind: 'projet-simple',
-    version: 3,        // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement
+    // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement ;
+    // v4 = fiche de production détaillée par famille + prix unitaire HT/TTC
+    version: 4,
     client,
     lignes,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
@@ -1424,9 +1646,11 @@ function buildProjet(body, tarifsById) {
       const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
       return `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
     }
-    return `${l.quantite} × ${l.description}`;
+    // `description` porte déjà « 10 × Polo — réf. … » : la préfixer une seconde
+    // fois par la quantité donnerait « 10 × 10 × Polo ».
+    return l.description;
   };
-  const noms = lignes.map((l) => (l.produit ? l.produit.label : l.description));
+  const noms = lignes.map((l) => (l.produit ? l.produit.label : (l.designation || l.description)));
   const uniqNoms = [...new Set(noms)];
   const produitResume = lignes.length === 1
     ? `${lignes[0].quantite} × ${noms[0]}`
@@ -1436,10 +1660,8 @@ function buildProjet(body, tarifsById) {
   // Ligne « argent » du résumé : elle ne dit que ce qui est réellement connu,
   // pour qu'on ne lise jamais « non payé » là où personne n'a rien renseigné.
   const etatPaiement = [
-    paiement.paye === true ? 'soldé' : null,
-    paiement.acompteVerse === true
-      ? `acompte versé${paiement.acompteMontant != null ? ` ${paiement.acompteMontant.toFixed(2)} €` : ''}`
-      : paiement.acompteDemande === true ? 'acompte demandé' : null,
+    paiement.statut ? paiement.statut.label.toLowerCase() : null,
+    paiement.acompteMontant != null ? `${paiement.acompteMontant.toFixed(2)} €` : null,
     paiement.mode ? paiement.mode.label : null,
   ].filter(Boolean).join(' · ');
   const resume = [
