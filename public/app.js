@@ -1235,6 +1235,7 @@ function cellDossier(r) {
   line.appendChild(cellWhatsapp(r));
   line.appendChild(cellPdfSlot(r, 'devis'));
   line.appendChild(cellPdfSlot(r, 'facture'));
+  line.appendChild(cellPdfSlot(r, 'bat'));
   const pdfWa = cellPdfWhatsapp(r);
   if (pdfWa) line.appendChild(pdfWa);
   stack.appendChild(line);
@@ -1297,10 +1298,19 @@ function factureIcon() {
   ]);
 }
 
-// Libellés pour les infobulles des deux emplacements PDF de la ligne.
+// BAT (Bon À Tirer) : un sceau avec un check — la validation avant production.
+function batIcon() {
+  return strokeIcon([
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+    'M8 12l2.5 2.5L16 9',
+  ]);
+}
+
+// Libellés pour les infobulles des emplacements PDF de la ligne.
 const PDF_SLOT_LABELS = {
   devis: { noun: 'devis', withArticle: 'le devis' },
   facture: { noun: 'facture', withArticle: 'la facture' },
+  bat: { noun: 'BAT', withArticle: 'le BAT' },
 };
 
 // PUT brut (pas de JSON) : `api()` ne convient pas, il JSON.stringify toujours
@@ -1333,10 +1343,10 @@ function sendPdf(r, kind, filename) {
   if (lien) window.open(lien, '_blank', 'noopener,noreferrer');
 }
 
-const PDF_SLOT_ICON = { devis: devisIcon, facture: factureIcon };
+const PDF_SLOT_ICON = { devis: devisIcon, facture: factureIcon, bat: batIcon };
 
-// Pastille PDF à deux états, pour `devis` et `facture` (mêmes règles, icône
-// propre à chaque type — cf. PDF_SLOT_ICON) :
+// Pastille PDF à deux états, pour `devis`, `facture` et `bat` (mêmes règles,
+// icône propre à chaque type — cf. PDF_SLOT_ICON) :
 //  - vide   : icône neutre, clic → sélecteur de fichier → upload immédiat.
 //  - remplie : icône accentuée, clic → ouvre le PDF dans un nouvel onglet pour
 //    le visualiser ; une petite croix apparaît au survol pour retirer le
