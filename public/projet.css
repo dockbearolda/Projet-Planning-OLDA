@@ -114,6 +114,10 @@
 .proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
 .proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .proj-btn:disabled { opacity: .6; cursor: default; }
+/* Un champ obligatoire laissé vide n'empêche plus la création (voir
+   wireCreateValidation, clients.js) : un 1er clic incomplet arme cet état
+   « confirmer quand même » à la place de bloquer le bouton. */
+.proj-btn--primary.is-confirm { background: var(--st-cours); border-color: var(--st-cours); }
 
 .proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
 .proj-quick[hidden] { display: none; }

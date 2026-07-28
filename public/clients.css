@@ -229,13 +229,6 @@
 .cl-fields__group--pro { border-left-color: var(--st-demande); background: var(--st-demande-bg); }
 .cl-fields__group--perso { border-left-color: var(--st-archive); background: var(--st-archive-bg); }
 
-.cl-fields__hint {
-  margin: 10px 2px 0;
-  font-size: 13px;
-  color: var(--text-2);
-}
-.cl-fields__hint--warn { color: var(--st-cours); font-weight: 600; }
-.cl-fields__hint--ok { color: var(--st-livree); font-weight: 600; }
 .cl-card__sub {
   font-size: 13px;
   color: var(--text-2);
@@ -493,6 +486,11 @@
 .cl-btn--primary { border-color: var(--primary); background: var(--primary); color: #fff; }
 .cl-btn--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .cl-btn--primary:disabled { opacity: .6; cursor: default; }
+/* Un champ obligatoire laissé vide n'empêche plus la création (voir
+   wireCreateValidation, clients.js) : un 1er clic incomplet arme cet état
+   « confirmer quand même » à la place de bloquer le bouton. */
+.cl-btn--primary.is-confirm { border-color: var(--st-cours); background: var(--st-cours); }
+.cl-btn--primary.is-confirm:hover { background: var(--st-cours); border-color: var(--st-cours); }
 
 /* --- Toast --- */
 .cl-toast {
