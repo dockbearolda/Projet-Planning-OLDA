@@ -248,6 +248,11 @@ comme **rempli** (l'étape passe) et part **vide** au serveur (donc `null` en ba
 Exception : `entreprise`, `nom`, `prenom` — l'identité ne peut pas être un tiret, sinon on
 crée un client nommé « - » qu'on ne retrouvera jamais.
 
+Le champ WhatsApp demande un traitement à part : son formateur de numéro
+(`formatPhoneAsTyped`) ne garde que les chiffres et effaçait donc le tiret à la frappe,
+rendant ce champ le seul impossible à marquer « je n'ai pas l'info ». Il laisse désormais
+passer un tiret seul.
+
 ### 5.2 Casse automatique
 
 Au sortir du champ (`blur`), dans le formulaire de Nouveau Projet **et** dans la fiche
@@ -314,9 +319,12 @@ La liste `SECTEURS_SUGGERES`, aujourd'hui figée dans `clients.js`, devient une 
   secteurs actuels — la liste connue n'est pas perdue ;
 - API : `GET /api/clients/secteurs`, `POST /api/clients/secteurs { label }` (idempotent
   sur le libellé normalisé), `DELETE /api/clients/secteurs/:label` ;
-- interface : gestion depuis **Base clients** (ajout / retrait dans le panneau de la
-  liste), et le datalist des deux formulaires est alimenté par l'API au lieu de la
-  constante.
+- interface : un bouton **Secteurs** dans l'en-tête de Base clients ouvre un panneau —
+  la liste en pastilles avec une croix chacune, plus un champ d'ajout. Le bouton porte sa
+  propre classe (`cl-tool`) et non celle des boutons de tri : la délégation de clic teste
+  `.cl-sort__btn` en premier et aurait avalé le clic ;
+- les datalists des deux formulaires (Base clients et Nouveau Projet, chargés
+  indépendamment) s'abonnent à la liste : un ajout apparaît dans les deux sans recharger.
 
 Un secteur retiré de la liste **ne disparaît pas des fiches** qui le portent : la valeur est
 recopiée dans `clients.secteur`, jamais relue dans la liste.
@@ -352,8 +360,11 @@ re-rend le bon jeu de champs. Rien à construire — à vérifier au passage, pa
 ### Ce qui reste, impérativement
 
 - `buildClient` : partagé avec `buildProjet`, il reste.
-- `GET /api/commande/catalog` : Nouveau Projet en tire le pipeline, les délais, les statuts
-  et modes de paiement. La route reste, allégée de ce que plus personne ne lit.
+- Le **pipeline** servi au poste de saisie. À l'implémentation, `GET
+  /api/commande/catalog` s'est révélé n'avoir plus qu'un seul lecteur (`loadPipeline` dans
+  `projet.js`, qui n'en lisait que `pipeline`) : il est donc remplacé par
+  `GET /api/pipeline`, qui renvoie directement les familles et leurs sous-étapes. Les
+  délais et modes de paiement restent lus côté serveur depuis `catalog.json`.
 - **La lecture des `fiche` déjà en base** : les commandes enregistrées par l'ancien écran
   portent un JSON produit par `buildCommande`, que le tiroir de détail reconstitue
   (`ficheItems()`). Ce code de **lecture** n'est pas touché — on supprime la saisie, pas
