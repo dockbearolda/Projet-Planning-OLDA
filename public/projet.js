@@ -244,20 +244,14 @@ function renderClientPage(body) {
     quickForm.appendChild(fieldsWrap);
     const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
 
-    const hint = el('p', 'cl-fields__hint');
-    quickForm.appendChild(hint);
-
     const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
     createBtn.type = 'button';
     quickForm.appendChild(createBtn);
 
-    // Tous les champs affichés sont obligatoires : le bouton reste désactivé
-    // et la ligne d'état nomme précisément ce qui manque (perso comme pro).
-    wireCreateValidation(fieldsWrap, createBtn, hint);
-
-    createBtn.addEventListener('click', async () => {
-      const missing = inputs.find((i) => !i.value.trim());
-      if (missing) { missing.focus(); return; }
+    // Le bouton reste cliquable même incomplet : wireCreateValidation gère la
+    // confirmation « créer quand même » (voir clients.js) plutôt que de
+    // bloquer purement et simplement la création.
+    wireCreateValidation(fieldsWrap, createBtn, async () => {
       createBtn.disabled = true;
       const draft = { client_type: nature };
       for (const i of inputs) draft[i.dataset.key] = i.value.trim();

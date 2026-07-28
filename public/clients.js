@@ -356,39 +356,47 @@ export function fieldRow(field, value, opts) {
   return row;
 }
 
-// Validation "tout rempli" partagée par le tiroir Base Clients ET le
-// quick-form Nouveau Projet : bouton bloqué tant qu'il manque un champ,
-// ligne d'état qui nomme précisément ce qui manque, et surlignage d'un champ
-// laissé vide au blur (jamais au chargement — le formulaire est vide par
-// défaut, on ne veut pas tout voir rouge à l'ouverture).
-export function wireCreateValidation(fieldsWrap, submitBtn, hintEl) {
+// Validation partagée par le tiroir Base Clients ET le quick-form Nouveau
+// Projet : les champs vides restent surlignés au blur (jamais au chargement)
+// pour que tout continue à se lire comme obligatoire, mais le bouton ne
+// bloque jamais la création. Un 1er clic avec des champs vides arme une
+// confirmation (le bouton change de libellé/couleur quelques secondes) ;
+// un 2e clic — ou le même clic une fois tout rempli — déclenche `onSubmit`.
+export function wireCreateValidation(fieldsWrap, submitBtn, onSubmit) {
   const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
-  const labelOf = (input) => {
-    const row = input.closest('.cl-f');
-    const labelSpan = row && row.querySelector('.cl-f__label').lastElementChild;
-    return labelSpan ? labelSpan.textContent : '';
+  const idleLabel = submitBtn.textContent;
+  let armed = false;
+  let armTimer = null;
+
+  const disarm = () => {
+    if (!armed) return;
+    armed = false;
+    clearTimeout(armTimer);
+    submitBtn.textContent = idleLabel;
+    submitBtn.classList.remove('is-confirm');
   };
-  const refresh = () => {
-    const missing = inputs.filter((i) => !i.value.trim());
-    submitBtn.disabled = missing.length > 0;
-    for (const i of inputs) {
-      if (i.value.trim()) i.classList.remove('cl-f__input--missing');
-    }
-    if (missing.length === 0) {
-      hintEl.textContent = 'Prêt à créer.';
-      hintEl.className = 'cl-fields__hint cl-fields__hint--ok';
-    } else {
-      hintEl.textContent = `Il manque : ${missing.map(labelOf).join(', ')}`;
-      hintEl.className = 'cl-fields__hint cl-fields__hint--warn';
-    }
-  };
+
   for (const i of inputs) {
-    i.addEventListener('input', refresh);
+    i.addEventListener('input', () => {
+      disarm();
+      if (i.value.trim()) i.classList.remove('cl-f__input--missing');
+    });
     i.addEventListener('blur', () => {
       if (!i.value.trim()) i.classList.add('cl-f__input--missing');
     });
   }
-  refresh();
+
+  submitBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const missing = inputs.filter((i) => !i.value.trim());
+    if (missing.length === 0 || armed) { disarm(); onSubmit(); return; }
+    for (const i of missing) i.classList.add('cl-f__input--missing');
+    armed = true;
+    submitBtn.textContent = 'Créer quand même';
+    submitBtn.classList.add('is-confirm');
+    armTimer = setTimeout(disarm, 5000);
+  });
 }
 
 function noteEl(n) {
@@ -477,11 +485,6 @@ function renderDrawer() {
   const fieldGroup = el('div', `cl-fields__group ${tintClass}`);
   for (const f of fieldsForNature(cur)) fieldGroup.append(fieldRow(f, c[f.key]));
   fields.append(fieldGroup);
-  let hint = null;
-  if (creating) {
-    hint = el('p', 'cl-fields__hint');
-    fields.append(hint);
-  }
   bodyScroll.append(fields);
 
   // Actions rapides : appeler / écrire (fiche existante seulement).
@@ -558,7 +561,7 @@ function renderDrawer() {
     create.id = 'cl-create';
     foot.append(cancel, create);
     card.append(foot);
-    wireCreateValidation(fieldGroup, create, hint);
+    wireCreateValidation(fieldGroup, create, createClient);
     setTimeout(() => {
       const first = fieldGroup.querySelector('.cl-f__input');
       if (first) first.focus();
@@ -661,13 +664,6 @@ async function createClient() {
     const input = $(`#cl-f-${f.key}`);
     if (input) draft[f.key] = input.value.trim();
   }
-  const missing = shown.find((f) => !draft[f.key]);
-  if (missing) {
-    toast('Merci de remplir tous les champs.');
-    const e = $(`#cl-f-${missing.key}`);
-    if (e) e.focus();
-    return;
-  }
   // `entreprise` reste la colonne obligatoire côté serveur : pour un
   // particulier, on la dérive du prénom + nom plutôt que de la demander une
   // deuxième fois (même logique que le quick-form Nouveau Projet).
@@ -761,7 +757,6 @@ function wire() {
     if (t.closest('#cl-q-clear')) { query = ''; $('#cl-q').value = ''; $('#cl-q').focus(); return renderList(); }
     if (t.closest('#cl-close') || t.closest('#cl-close-2') || t.closest('#cl-drawer-scrim')) return closeDrawer();
     if (t.closest('#cl-del')) return deleteClient();
-    if (t.closest('#cl-create')) return createClient();
     if (t.closest('#cl-note-add')) return addNote();
 
     const kindBtn = t.closest('.cl-kind');
