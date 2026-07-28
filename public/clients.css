@@ -215,8 +215,10 @@
 .cl-nature--perso { color: var(--st-archive); background: var(--st-archive-bg); }
 
 /* Teinte légère façon SumUp autour du GROUPE de champs (pas la puce Nature
-   elle-même, pas chaque case) — vert Particulier, ambre Pro/Revendeur/Asso.
-   Réutilise la palette d'étapes existante, aucune nouvelle couleur. */
+   elle-même, pas chaque case) — bleu Pro/Revendeur/Asso, gris Particulier.
+   Mêmes tokens que la puce Nature (.cl-nature--pro/--perso ci-dessus) et le
+   quick-form Nouveau Projet (.proj-quick--pro/--perso), aucune nouvelle
+   couleur. */
 .cl-fields__group {
   display: flex;
   flex-direction: column;
@@ -224,8 +226,8 @@
   padding: 2px 12px;
   border-left: 3px solid transparent;
 }
-.cl-fields__group--pro { border-left-color: var(--st-cours); background: var(--st-cours-bg); }
-.cl-fields__group--perso { border-left-color: var(--st-livree); background: var(--st-livree-bg); }
+.cl-fields__group--pro { border-left-color: var(--st-demande); background: var(--st-demande-bg); }
+.cl-fields__group--perso { border-left-color: var(--st-archive); background: var(--st-archive-bg); }
 
 .cl-fields__hint {
   margin: 10px 2px 0;

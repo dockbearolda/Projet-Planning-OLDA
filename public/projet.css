@@ -117,10 +117,11 @@
 
 .proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
 .proj-quick[hidden] { display: none; }
-/* Teinte légère façon SumUp : vert Particulier, ambre Pro/Revendeur/Asso —
-   même palette que la fiche complète (Base Clients), zéro nouvelle couleur. */
-.proj-quick--perso { border-left-color: var(--st-livree); background: var(--st-livree-bg); }
-.proj-quick--pro { border-left-color: var(--st-cours); background: var(--st-cours-bg); }
+/* Teinte légère façon SumUp : gris Particulier, bleu Pro/Revendeur/Asso —
+   même palette que la fiche complète (Base Clients) et la puce Nature,
+   zéro nouvelle couleur. */
+.proj-quick--perso { border-left-color: var(--st-archive); background: var(--st-archive-bg); }
+.proj-quick--pro { border-left-color: var(--st-demande); background: var(--st-demande-bg); }
 /* Une colonne (mobile, tablette portrait) ; 2 colonnes au-dessus de 720px ;
    3 au-dessus de 980px (desktop large) — la fiche pro (10 champs) tient sur
    4 lignes au lieu de 5, ce qu'il faut pour ne jamais scroller ici. */
