@@ -85,6 +85,14 @@
       { "id": "texte", "label": "Texte personnalisé" },
       { "id": "logo_client", "label": "Logo client" }
     ],
+    "typeLogos": [
+      { "id": "logo_client", "label": "Logo client" },
+      { "id": "logo_olda", "label": "Logo OLDA" },
+      { "id": "texte", "label": "Texte" },
+      { "id": "qr_code", "label": "QR code" },
+      { "id": "photo", "label": "Photo" },
+      { "id": "autre", "label": "Autre" }
+    ],
     "objetTechniques": [
       { "id": "trotec", "label": "TROTEC" },
       { "id": "uv", "label": "UV" },

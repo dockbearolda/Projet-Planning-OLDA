@@ -1969,22 +1969,55 @@ function ficheItemsCommandeAtelier(fiche) {
 }
 
 // Flux « Nouveau Projet » (panier multi-type), fiche.kind = 'projet-simple'.
-// `l.bat` est l'option catalogue tarifée (server.js:1206, 1226) — à NE PAS
+// `l.bat` est l'option catalogue tarifée (server.js buildLigneTasse) — à NE PAS
 // confondre avec la pièce jointe BAT (documents) : badge texte distinct.
+// Depuis la v4, chaque famille porte sa fiche de production : on rend ce que
+// l'atelier doit lire pour produire, pas seulement le nom du produit.
 function ficheItemsProjetSimple(fiche) {
   return (fiche.lignes || []).map((l) => {
+    const prix = l.prixUnitaireTtc != null
+      ? `${Number(l.prixUnitaireTtc).toFixed(2)} € TTC / unité`
+      : null;
     if (l.produit) {
       const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
       return ficheLigneEl(
         `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}`,
         [
           opts.length ? opts.join(', ') : null,
+          l.face1Texte ? `Face 01 (anse à droite) : ${l.face1Texte}` : null,
+          l.face2Texte ? `Face 02 (anse à gauche) : ${l.face2Texte}` : null,
+          l.dessousTexte ? `Dessous : ${l.dessousTexte}` : null,
+          l.typo ? `Typo : ${l.typo}` : null,
           l.remarque ? `Remarque : ${l.remarque}` : null,
-          l.bat ? '★ BAT inclus (option catalogue)' : null,
+          l.bat ? '★ BAT à confirmer avant production' : null,
+          prix,
         ],
       );
     }
-    return ficheLigneEl(`${l.quantite} × ${l.description}`, []);
+    // Depuis la v4, `description` est un résumé complet qui commence par la
+    // quantité (« 10 × Polo — réf. … ») ; avant, elle ne portait que le texte
+    // libre saisi, qu'il fallait préfixer. `designation` distingue les deux.
+    const titre = l.designation ? l.description : `${l.quantite} × ${l.description}`;
+    // Textile : les faces marquées, une sous-ligne chacune. Le titre porte déjà
+    // référence, couleur et grille de tailles.
+    if (l.faces || l.tailles) {
+      return ficheLigneEl(titre, [
+        ...(l.faces || []).map((f) => [
+          f.faceLabel, f.emplacement && f.emplacement.label,
+          f.typeLogo && f.typeLogo.label, f.referenceLogo, f.couleurMarquage,
+        ].filter(Boolean).join(' · ')),
+        l.remarque ? `Remarque : ${l.remarque}` : null,
+        prix,
+      ]);
+    }
+    // Autres / Plaque signalétique.
+    return ficheLigneEl(titre, [
+      l.explication || null,
+      l.matiere ? `Matière : ${l.matiere}` : null,
+      l.format ? `Format : ${l.format}` : null,
+      l.methode ? `Production : ${l.methode}` : null,
+      prix,
+    ]);
   });
 }
 
