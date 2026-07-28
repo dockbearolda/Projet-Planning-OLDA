@@ -1717,6 +1717,16 @@ function renderLigneDetailIfOpen() {
   renderLigneDetail();
 }
 
+// Une ligne « libellé / valeur » du détail (sections Contact et Suivi).
+function ldKv(label, value) {
+  const kv = document.createElement('div');
+  kv.className = 'ld-kv';
+  const k = document.createElement('span'); k.textContent = label;
+  const v = document.createElement('span'); v.textContent = value;
+  kv.append(k, v);
+  return kv;
+}
+
 // Un article du détail produit : un titre, puis ses sous-lignes (les valeurs
 // vides sont ignorées, pour ne jamais afficher de ligne creuse).
 function ficheLigneEl(titre, sousLignes) {
@@ -1870,12 +1880,7 @@ function renderLigneDetail() {
   for (const [label, value] of contactRows) {
     if (!value) continue;
     hasContact = true;
-    const kv = document.createElement('div');
-    kv.className = 'ld-kv';
-    const k = document.createElement('span'); k.textContent = label;
-    const v = document.createElement('span'); v.textContent = value;
-    kv.append(k, v);
-    contactSection.appendChild(kv);
+    contactSection.appendChild(ldKv(label, value));
   }
   if (!hasContact) {
     const empty = document.createElement('p');
@@ -1920,24 +1925,20 @@ function renderLigneDetail() {
   suiviTitle.textContent = 'Suivi';
   suiviSection.appendChild(suiviTitle);
 
-  const addSuiviKv = (label, value) => {
-    const kv = document.createElement('div');
-    kv.className = 'ld-kv';
-    const k = document.createElement('span'); k.textContent = label;
-    const v = document.createElement('span'); v.textContent = value;
-    kv.append(k, v);
-    suiviSection.appendChild(kv);
-  };
-  addSuiviKv('Prix', r.project_value != null ? `${Number(r.project_value).toFixed(2)} €` : '—');
+  // `project_value` arrive en NUMERIC (donc en texte via le driver) : on le
+  // convertit, et on retombe sur « — » si ce n'est pas un nombre exploitable
+  // plutôt que d'afficher « NaN € ». 0 reste une valeur légitime → 0,00 €.
+  const prix = Number(r.project_value);
+  suiviSection.appendChild(ldKv('Prix', r.project_value != null && Number.isFinite(prix) ? eur(prix) : '—'));
   const dd = parseDeadline(r.deadline);
-  addSuiviKv('Échéance', dd ? dd.toLocaleDateString('fr-FR') : '—');
+  suiviSection.appendChild(ldKv('Échéance', dd ? dd.toLocaleDateString('fr-FR') : '—'));
   // Sous-étape et État suivent la grille : rien à afficher là où la colonne
   // correspondante est vide (famille sans sous-étapes, aucune alerte posée).
   if (familyHasSub(r.stage)) {
-    addSuiviKv('Sous-étape', (r.sub_stage && SUB_LABEL[r.sub_stage]) || 'à préciser');
+    suiviSection.appendChild(ldKv('Sous-étape', (r.sub_stage && SUB_LABEL[r.sub_stage]) || 'à préciser'));
   }
   if (FLAG_BY_VALUE[r.flag]) {
-    addSuiviKv('État', FLAG_BY_VALUE[r.flag].label + (r.flag_reason ? ` — ${r.flag_reason}` : ''));
+    suiviSection.appendChild(ldKv('État', FLAG_BY_VALUE[r.flag].label + (r.flag_reason ? ` — ${r.flag_reason}` : '')));
   }
   body.appendChild(suiviSection);
 

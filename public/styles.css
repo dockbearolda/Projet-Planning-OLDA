@@ -4071,6 +4071,10 @@ body.wall-open { overflow: hidden; }
 .ld-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 0 0 8px; }
 .ld-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; color: var(--text-1); }
 .ld-kv span:first-child { color: var(--text-2); }
+/* Valeurs longues (motif de flag jusqu'à 240 car., email) : elles se replient
+   dans le panneau au lieu d'imposer leur min-content et de créer un scroll
+   horizontal dans .ld-body. */
+.ld-kv span:last-child { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .ld-docs { display: flex; gap: 6px; }
 .ld-empty { font-size: 12.5px; color: var(--text-3); font-style: italic; }
 
