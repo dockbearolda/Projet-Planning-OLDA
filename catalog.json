@@ -107,7 +107,9 @@
     ],
     "paiementModes": [
       { "id": "cb", "label": "CB" },
-      { "id": "especes", "label": "Espèces" }
+      { "id": "especes", "label": "Espèces" },
+      { "id": "virement", "label": "Virement" },
+      { "id": "cheque", "label": "Chèque" }
     ],
     "consigneMax": 160,
     "articlesMax": 40

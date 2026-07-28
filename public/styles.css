@@ -1509,11 +1509,24 @@ tr:hover .handle { color: var(--text-2); }
 .grid.no-sub th.col-sub,
 .grid.no-sub td.col-sub-cell { display: none; }
 
-/* Colonne « Prix » masquée hors des étapes où elle est réellement remplie
-   (Commande, Facturation) : inutile de l'afficher en Demande, Production… */
+/* Colonne « Prix TTC » masquée hors des étapes où elle est réellement remplie
+   (chiffrage, facturation, paiement) : inutile de l'afficher en Production… */
 .grid.no-price col[data-col="price"],
 .grid.no-price th.col-price,
 .grid.no-price td.col-price-cell { display: none; }
+
+/* Le HT sous le prix : une mention de contrôle, pas une deuxième valeur à lire.
+   Vide tant que la ligne n'a pas de prix, donc la cellule ne bouge pas. */
+.col-price-cell { text-align: right; }
+.cell-price-ht {
+  display: block;
+  padding-inline-end: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
 
 /* Menu déroulant réutilisable (type / responsable / sous-étape) */
 .menu-pop {
@@ -4200,6 +4213,41 @@ body.wall-open { overflow: hidden; }
   font-size: 12.5px;
   color: var(--text-2);
 }
+
+/* Valeur en lecture seule (le HT déduit du TTC) : alignée comme un champ, mais
+   sans cadre ni interaction — rien à y modifier, c'est un calcul. */
+.ld-value {
+  padding: 7px 10px;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ld-value--muted { color: var(--text-2); }
+
+/* Interrupteur du bloc Paiement : trois états lisibles — Oui (allumé), Non,
+   et « — » quand personne ne s'est encore prononcé. */
+.ld-toggle {
+  min-width: 64px;
+  min-height: 32px;
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.ld-toggle:hover { border-color: var(--primary); color: var(--primary); }
+.ld-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.ld-toggle.is-on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.ld-toggle.is-on:hover { filter: brightness(1.05); color: #fff; }
 
 /* Puces réutilisées de la grille : elles y portent les marges de leur cellule,
    inutiles ici (la rangée .ld-field gère l'espacement). */

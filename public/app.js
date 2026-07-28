@@ -107,6 +107,15 @@ const CLIENT_TYPES = [
 ];
 const CLIENT_TYPE_LABEL = Object.fromEntries(CLIENT_TYPES.map((t) => [t.value, t.label]));
 
+// Modes de paiement (miroir de catalog.json → commande.paiementModes, que le
+// serveur valide). Une commande peut n'en porter aucun : « non précisé ».
+const PAIEMENT_MODES = [
+  { id: 'cb', label: 'CB' },
+  { id: 'especes', label: 'Espèces' },
+  { id: 'virement', label: 'Virement' },
+  { id: 'cheque', label: 'Chèque' },
+];
+
 // --- Alerte de commande (requests.flag / flag_reason) ----------------------
 // N'importe quel collaborateur pose l'alerte depuis la colonne « État » : la
 // commande est BLOQUÉE (elle n'avance plus, on dit pourquoi) ou À VOIR (elle
@@ -197,6 +206,29 @@ async function loadCategoryConfig() {
     catOwners = owners && typeof owners === 'object' ? owners : {};
     catRefs = refs && typeof refs === 'object' ? refs : {};
   } catch (_) { /* silencieux */ }
+}
+
+// --- Prix : le TTC est saisi, le HT se déduit ------------------------------
+// `project_value` porte le TTC — c'est le prix que le client paie, et celui
+// qu'on tape au comptoir. Le HT n'est jamais stocké : il vaut TTC ÷ (1 + TGCA),
+// avec le taux réglé dans Réglages (jamais une constante en dur). 4 % en repli
+// si l'appel échoue : la grille reste utilisable, avec le taux d'usage local.
+let TGCA = 0.04;
+
+async function loadTgca() {
+  try {
+    const p = await api('GET', '/api/tarifs-tasse/parametres');
+    if (p && Number.isFinite(Number(p.tgca))) TGCA = Number(p.tgca);
+  } catch (_) { /* silencieux : on garde le taux par défaut */ }
+}
+
+const htFromTtc = (ttc) => (Number.isFinite(Number(ttc)) ? Number(ttc) / (1 + TGCA) : null);
+
+// « HT : 230,77 € » — la mention discrète qui accompagne chaque TTC affiché.
+// Renvoie '' si la ligne n'a pas de prix : rien à déduire, donc rien à écrire.
+function htLabel(ttc) {
+  const ht = htFromTtc(ttc);
+  return ht == null ? '' : `HT : ${formatMoney(Math.round(ht * 100) / 100)}`;
 }
 
 // --- Sélecteurs ------------------------------------------------------------
@@ -1530,8 +1562,9 @@ function cellDescription(r) {
   return td;
 }
 
-// Prix : montant HT de la commande. Une ligne sans prix ne peut pas ENTRER dans la
-// zone Devis à envoyer → Archivé (voir blockedByPrice plus bas) — affiché ici pour
+// Prix : montant TTC de la commande — celui que le client paie. Le HT s'affiche
+// dessous, calculé, jamais saisi. Une ligne sans prix ne peut pas ENTRER dans la
+// zone Devis envoyé → Archivé (voir blockedByPrice plus bas) — affiché ici pour
 // que la saisie se fasse tôt, pas au moment du glisser-déposer.
 function cellPrice(r) {
   const td = document.createElement('td');
@@ -1543,6 +1576,12 @@ function cellPrice(r) {
   price.inputMode = 'decimal';
   price.value = r.project_value != null ? String(r.project_value) : '';
   price.placeholder = '—';
+
+  const ht = document.createElement('span');
+  ht.className = 'cell-price-ht';
+  const refreshHt = () => { ht.textContent = htLabel(r.project_value); };
+  refreshHt();
+
   bindInline(
     price, r, 'project_value',
     (raw) => {
@@ -1556,8 +1595,15 @@ function cellPrice(r) {
       return Number.isNaN(n) ? raw : n.toFixed(2);
     },
   );
+  // Le HT suit la frappe : on voit tout de suite ce que la remise donne hors
+  // taxe, sans attendre l'enregistrement de la cellule.
+  price.addEventListener('input', () => {
+    const n = parseFloat(price.value.trim().replace(',', '.'));
+    ht.textContent = price.value.trim() === '' || Number.isNaN(n) ? '' : htLabel(n);
+  });
+  price.addEventListener('blur', refreshHt);
 
-  td.appendChild(price);
+  td.append(price, ht);
   return td;
 }
 
@@ -2161,13 +2207,13 @@ function renderLigneDetail() {
   suiviSection.appendChild(ldRow('Référent équipe', refChip));
 
   // Prix : saisi comme dans la colonne PRIX (virgule acceptée, arrondi à
-  // 2 décimales en quittant le champ). Toujours affiché ici — c'est lui qui
-  // débloque le passage en Devis à envoyer / Facturation.
-  suiviSection.appendChild(ldRow('Prix (€)', ldInput(r, 'project_value', {
+  // 2 décimales en quittant le champ). C'est le TTC — le prix que le client
+  // paie — et c'est lui qui débloque le passage en Devis envoyé / Facturation.
+  const prixInput = ldInput(r, 'project_value', {
     num: true,
     inputMode: 'decimal',
     placeholder: '—',
-    ariaLabel: 'Prix de la commande en euros',
+    ariaLabel: 'Prix TTC de la commande en euros',
     value: r.project_value != null ? String(r.project_value) : '',
     transform: (raw) => {
       const t = raw.trim();
@@ -2179,7 +2225,20 @@ function renderLigneDetail() {
       const n = parseFloat(t.replace(',', '.'));
       return Number.isNaN(n) ? raw : n.toFixed(2);
     },
-  })));
+  });
+  suiviSection.appendChild(ldRow('Prix TTC (€)', prixInput));
+
+  // Le HT, juste en dessous : déduit du TTC, jamais saisi, et recalculé pendant
+  // la frappe pour qu'on voie l'effet d'une remise sans quitter le champ.
+  const htLine = document.createElement('span');
+  htLine.className = 'ld-value ld-value--muted';
+  const refreshHtLine = () => {
+    const n = parseFloat(prixInput.value.trim().replace(',', '.'));
+    htLine.textContent = prixInput.value.trim() === '' || Number.isNaN(n) ? '—' : htLabel(n);
+  };
+  refreshHtLine();
+  prixInput.addEventListener('input', refreshHtLine);
+  suiviSection.appendChild(ldRow('Hors taxe', htLine));
 
   // Échéance : le tiroir a la place d'afficher la date en clair, tout en gardant
   // le code couleur de la grille (vert / orange / rouge).
@@ -2249,6 +2308,76 @@ function renderLigneDetail() {
     suiviSection.appendChild(ldRow('Motif', reasonChip));
   }
   body.appendChild(suiviSection);
+
+  // --- Paiement ---------------------------------------------------------------
+  // Les cinq informations que le patron veut voir d'un coup d'œil. Chaque
+  // interrupteur a TROIS états possibles en base — oui / non / jamais renseigné —
+  // mais deux seulement au clic : on bascule entre vrai et faux, et une ligne
+  // jamais touchée reste « non renseigné » plutôt que d'affirmer « non payé ».
+  const payeSection = document.createElement('section');
+  payeSection.className = 'ld-section';
+  const payeTitle = document.createElement('p');
+  payeTitle.className = 'ld-section-title';
+  payeTitle.textContent = 'Paiement';
+  payeSection.appendChild(payeTitle);
+
+  const payToggle = (field, label) => ldChip(
+    (b) => {
+      const on = r[field] === true;
+      b.className = `ld-toggle${on ? ' is-on' : ''}`;
+      b.setAttribute('role', 'switch');
+      b.setAttribute('aria-checked', String(on));
+      b.textContent = on ? 'Oui' : (r[field] === false ? 'Non' : '—');
+      attachTip(b, on ? `retirer « ${label} »` : `marquer « ${label} »`);
+    },
+    () => ldPatch(r, { [field]: r[field] !== true }),
+  );
+
+  payeSection.appendChild(ldRow('Acompte demandé', payToggle('acompte_demande', 'acompte demandé')));
+  payeSection.appendChild(ldRow('Acompte versé', payToggle('acompte_verse', 'acompte versé')));
+
+  // Le montant ne s'affiche QUE si l'acompte est versé : tant qu'il ne l'est
+  // pas, il n'y a pas de somme exacte à noter.
+  if (r.acompte_verse === true) {
+    payeSection.appendChild(ldRow('Somme versée (€)', ldInput(r, 'acompte_montant', {
+      num: true,
+      inputMode: 'decimal',
+      placeholder: '—',
+      ariaLabel: 'Somme exacte de l’acompte en euros',
+      value: r.acompte_montant != null ? String(r.acompte_montant) : '',
+      transform: (raw) => {
+        const t = raw.trim();
+        return t === '' ? null : parseFloat(t.replace(',', '.'));
+      },
+      normalize: (raw) => {
+        const t = raw.trim();
+        if (t === '') return '';
+        const n = parseFloat(t.replace(',', '.'));
+        return Number.isNaN(n) ? raw : n.toFixed(2);
+      },
+    })));
+  }
+
+  payeSection.appendChild(ldRow('Payé / soldé', payToggle('paye', 'payé')));
+
+  const modeChip = ldChip(
+    (b) => {
+      const m = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
+      b.className = 'sub-chip' + (m ? '' : ' empty');
+      b.textContent = m ? m.label : '+ mode';
+      attachTip(b, 'mode de paiement');
+    },
+    (b) => {
+      const items = PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }));
+      items.push({ value: null, label: 'Non précisé', muted: true });
+      openMenu(b, items, r.paiement_mode ?? null, (val) => {
+        if ((val ?? null) === (r.paiement_mode ?? null)) return;
+        ldPatch(r, { paiement_mode: val });
+      });
+    },
+  );
+  payeSection.appendChild(ldRow('Mode', modeChip));
+  body.appendChild(payeSection);
 
   // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
   const notesSection = document.createElement('section');
@@ -4219,7 +4348,7 @@ async function start() {
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
   // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis sautent.
-  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage()]);
+  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage(), loadTgca()]);
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
   updateStageHelp();

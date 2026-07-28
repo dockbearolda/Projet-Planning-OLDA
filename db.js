@@ -175,6 +175,24 @@ async function init() {
     await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS fiche jsonb');
   } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
 
+  // Migration : SUIVI DU PAIEMENT sur une commande. Cinq informations que le
+  // patron veut voir d'un coup d'œil : l'acompte a-t-il été demandé, a-t-il été
+  // versé, pour quelle somme exacte, le projet est-il soldé, et par quel moyen.
+  // Toutes nullables et sans valeur par défaut : une ligne d'avant cette
+  // migration n'affirme rien plutôt que d'affirmer « non payé » à tort.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS <col> pour chacune.
+  for (const [col, type] of [
+    ['acompte_demande', 'boolean'],
+    ['acompte_verse', 'boolean'],
+    ['acompte_montant', 'numeric(12,2)'],
+    ['paye', 'boolean'],
+    ['paiement_mode', 'text'],
+  ]) {
+    try {
+      await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
   // Migration : NATURE pro / perso sur la base clients (distincte du `type`
   // métier libre). Les clients déjà présents viennent tous de la base PRO
   // rapatriée → on les marque 'pro'. Nouveaux clients perso saisis au comptoir.

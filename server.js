@@ -69,10 +69,22 @@ const PATCHABLE = [
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason',
+  'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
 ];
+
+// Champs booléens du suivi de paiement. null = on ne se prononce pas (une ligne
+// jamais renseignée n'affirme pas « non payé »).
+const PAIEMENT_FLAGS = new Set(['acompte_demande', 'acompte_verse', 'paye']);
 
 function validateField(key, value) {
   if (value === null || value === undefined) return { ok: true, value: null };
+  if (PAIEMENT_FLAGS.has(key)) {
+    if (typeof value === 'boolean') return { ok: true, value };
+    const s = String(value).trim().toLowerCase();
+    if (s === '' ) return { ok: true, value: null };
+    if (s === 'true' || s === 'false') return { ok: true, value: s === 'true' };
+    return { ok: false, error: `${key} doit être un booléen` };
+  }
   switch (key) {
     case 'stage':
       if (!STAGE_SLUGS.includes(value)) return { ok: false, error: `stage invalide: ${value}` };
@@ -134,6 +146,19 @@ function validateField(key, value) {
       const n = Number(value);
       if (Number.isNaN(n)) return { ok: false, error: 'project_value doit être numérique' };
       return { ok: true, value: n };
+    }
+    case 'acompte_montant': {
+      if (value === '') return { ok: true, value: null };
+      const n = Number(value);
+      if (Number.isNaN(n)) return { ok: false, error: 'acompte_montant doit être numérique' };
+      if (n < 0) return { ok: false, error: 'acompte_montant ne peut pas être négatif' };
+      return { ok: true, value: Math.round(n * 100) / 100 };
+    }
+    case 'paiement_mode': {
+      const s = String(value).trim();
+      if (s === '') return { ok: true, value: null };
+      if (!PAIEMENT_MODE_SET.has(s)) return { ok: false, error: `mode de paiement invalide : ${s}` };
+      return { ok: true, value: s };
     }
     case 'position': {
       const n = Number(value);
@@ -787,6 +812,10 @@ const COM_TASSE_OPT_BY_ID = new Map(COM.tasseOptions.map((o) => [o.id, o]));
 const COM_OBJ_TECH_BY_ID = new Map(COM.objetTechniques.map((t) => [t.id, t]));
 const COM_PAY_STATUT_BY_ID = new Map(COM.paiementStatuts.map((p) => [p.id, p]));
 const COM_PAY_MODE_BY_ID = new Map(COM.paiementModes.map((p) => [p.id, p]));
+// Modes acceptés par requests.paiement_mode. Défini ici, à côté du catalogue qui
+// en est la source ; validateField le lit à la requête, donc bien après le
+// chargement du module.
+const PAIEMENT_MODE_SET = new Set(COM.paiementModes.map((p) => p.id));
 const COM_FACE_BY_ID = new Map(COM.faces.map((f) => [f.id, f]));
 // Délai retenu quand la fiche n'en porte aucun : la règle maison, jamais
 // « sans échéance ».
@@ -1263,6 +1292,27 @@ let PROJET_TAUX_MO = 25;
 let PROJET_TAUX_MACHINE = 25;
 let PROJET_TGCA = 0.04;
 
+// Suivi du paiement envoyé par le comptoir. Chaque information est FACULTATIVE
+// et vaut null tant qu'elle n'est pas renseignée : au comptoir on ne sait pas
+// toujours, et « on ne sait pas » ne doit pas s'enregistrer comme « non ».
+// Le montant n'a de sens que si l'acompte est versé — sinon il est ignoré.
+function readPaiement(raw) {
+  const p = raw && typeof raw === 'object' ? raw : {};
+  const bool = (v) => (v === true || v === false ? v : null);
+  const acompteVerse = bool(p.acompteVerse);
+  const montant = Number(p.acompteMontant);
+  const mode = COM_PAY_MODE_BY_ID.get(p.mode) || null;
+  return {
+    acompteDemande: bool(p.acompteDemande),
+    acompteVerse,
+    acompteMontant: acompteVerse && Number.isFinite(montant) && montant >= 0
+      ? Math.round(montant * 100) / 100
+      : null,
+    paye: bool(p.paye),
+    mode: mode ? { id: mode.id, label: mode.label } : null,
+  };
+}
+
 // Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
 // tasse, un polo, une plaque…), pour un seul client et un seul enregistrement
 // — façon caisse SumUp, on encaisse tout d'un coup. Chaque ligne du panier
@@ -1300,26 +1350,45 @@ function buildProjet(body, tarifsById) {
     prixRevientTotal += built.prixRevientLigne;
   }
 
+  // DÉLAI OBLIGATOIRE : soit un raccourci du catalogue (qui porte sa majoration),
+  // soit une date précise choisie au calendrier (jamais de majoration — on ne
+  // facture pas l'urgence d'une date que le client a lui-même fixée au large).
+  // Aucun défaut silencieux : sans l'un ni l'autre, la fiche est refusée, pour
+  // qu'aucune ligne n'entre au planning sans date butoir.
   const delaiChoisi = COM_DELAI_BY_ID.get(b.delai) || null;
-  const delai = delaiChoisi || DELAI_DEFAUT;
+  const dateChoisie = isDay(b.deadline) ? b.deadline : null;
+  if (!delaiChoisi && !dateChoisie) {
+    return { error: 'le délai est obligatoire : choisis un raccourci ou une date précise' };
+  }
+  const delai = delaiChoisi || { id: 'date', label: `Pour le ${dateChoisie}`, jours: 0, majoration: 0 };
   prixTotalTtc = prixTotalTtc * (1 + (delai.majoration || 0) / 100);
   prixTotalTtc = Math.round(prixTotalTtc * 100) / 100;
 
-  const deadline = todayPlus(delai.jours);
+  // La date précise l'emporte : c'est une échéance dictée par le client, pas un
+  // J+n calculé.
+  const deadline = dateChoisie || todayPlus(delai.jours);
   const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
   const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
 
   const venteHt = prixTotalTtc / (1 + PROJET_TGCA);
   const margeHt = Math.round((venteHt - prixRevientTotal) * 100) / 100;
+  // Le HT n'est jamais stocké : il se déduit du TTC et du taux TGCA du moment.
+  // On le renvoie quand même à l'écran de confirmation, pour éviter que chaque
+  // vue le recalcule avec un taux qu'elle aurait deviné.
+  const prixTotalHt = Math.round(venteHt * 100) / 100;
+
+  const paiement = readPaiement(b.paiement);
 
   const projet = {
     kind: 'projet-simple',
-    version: 2,        // v1 = un type unique par projet ; v2 = panier multi-type
+    version: 3,        // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement
     client,
     lignes,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
     prixTotalTtc,
+    prixTotalHt,
     margeHt,
+    paiement,
     deadline,
     priority,
     stage: dest.stage,
@@ -1342,12 +1411,22 @@ function buildProjet(body, tarifsById) {
     : `${quantite} pièces — ${uniqNoms.slice(0, 3).join(', ')}${uniqNoms.length > 3 ? '…' : ''}`;
 
   const typesPresents = [...new Set(lignes.map((l) => l.type.label))];
+  // Ligne « argent » du résumé : elle ne dit que ce qui est réellement connu,
+  // pour qu'on ne lise jamais « non payé » là où personne n'a rien renseigné.
+  const etatPaiement = [
+    paiement.paye === true ? 'soldé' : null,
+    paiement.acompteVerse === true
+      ? `acompte versé${paiement.acompteMontant != null ? ` ${paiement.acompteMontant.toFixed(2)} €` : ''}`
+      : paiement.acompteDemande === true ? 'acompte demandé' : null,
+    paiement.mode ? paiement.mode.label : null,
+  ].filter(Boolean).join(' · ');
   const resume = [
     `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
     ...lignes.map(detailLigneTexte),
     `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
-    `Prix TTC : ${prixTotalTtc.toFixed(2)} €`,
-  ].join('\n');
+    `Prix : ${prixTotalTtc.toFixed(2)} € TTC (${prixTotalHt.toFixed(2)} € HT)`,
+    etatPaiement ? `Paiement : ${etatPaiement}` : null,
+  ].filter(Boolean).join('\n');
 
   return { projet, resume, produit: produitResume };
 }
@@ -1569,14 +1648,19 @@ app.post('/api/projets', asyncH(async (req, res) => {
   const { rows } = await pool.query(
     `INSERT INTO requests
        (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
-        contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value,
+        acompte_demande, acompte_verse, acompte_montant, paye, paiement_mode)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
      RETURNING *`,
     [
       projet.stage, projet.subStage, 'commande', projet.priority, projet.client.type,
       projet.client.societe, projet.client.contact, projet.client.telephone, projet.client.email,
       projet.quantite, produit, resume, projet.deadline, posRows[0].pos,
+      // `project_value` porte le TTC : c'est le prix que le client paie, et
+      // c'est lui qu'on saisit au comptoir. Le HT s'en déduit à l'affichage.
       JSON.stringify(projet), projet.prixTotalTtc,
+      projet.paiement.acompteDemande, projet.paiement.acompteVerse, projet.paiement.acompteMontant,
+      projet.paiement.paye, projet.paiement.mode ? projet.paiement.mode.id : null,
     ],
   );
 

@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS requests (
   description     text,
   deadline        date,
   status          text,
+  -- SUIVI DU PAIEMENT (null = on ne se prononce pas). `acompte_montant` est la
+  -- somme réellement encaissée ; `project_value` reste le total TTC du projet.
+  acompte_demande boolean,
+  acompte_verse   boolean,
+  acompte_montant numeric(12,2),
+  paye            boolean,
+  paiement_mode   text,                              -- 'cb' / 'especes' / 'virement' / 'cheque'
   flag            text,                              -- ALERTE : null / 'bloque' / 'a_voir' (posée par n'importe quel collaborateur)
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
