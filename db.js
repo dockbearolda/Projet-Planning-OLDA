@@ -298,6 +298,19 @@ const STAGE_MIGRATION = {
 };
 
 async function migrateStagesToLinear() {
+  // GARDE D'IDEMPOTENCE. Sans elle, cette bascule rejouait ses renommages à
+  // CHAQUE démarrage — et ses anciens slugs finissent par se recouper avec les
+  // modèles suivants. C'est exactement ce qui est arrivé au passage aux 5
+  // familles : `archive` était encore une clé de STAGE_MIGRATION, donc la seule
+  // commande archivée est devenue `termine_archive` juste avant la nouvelle
+  // migration, qui ne l'a plus reconnue — elle a fini en « Paiement à
+  // contrôler » au lieu d'« Archivé ».
+  // Down : DELETE FROM app_meta WHERE key = 'stage_model_linear'.
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model_linear'");
+    if (rows[0] && rows[0].value === '1') return;
+  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+
   // 1) Commandes en phase « production » (modèle multi-machines) : on choisit
   //    l'étape prod correspondant au secteur porté (priorité TROTEC > DTF >
   //    Pressage > UV ; sinon « Préparation production »).
@@ -321,11 +334,12 @@ async function migrateStagesToLinear() {
     await pool.query('UPDATE requests SET stage = $1 WHERE stage = $2', [to, from]);
   }
 
-  // 3) Aligne la valeur par défaut de la colonne sur la première étape linéaire.
-  //    (migrateStagesToFamilies la repositionnera ensuite sur 'demande'.)
-  try {
-    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'nouvelle_demande'");
-  } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
+  // 3) Pose le flag (upsert manuel, compatible pg-mem). La valeur par défaut de
+  //    la colonne n'est plus touchée ici : les deux bascules suivantes la
+  //    reposent de toute façon, et l'aligner sur un slug linéaire entre-temps
+  //    n'apportait rien.
+  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model_linear'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model_linear', '1')");
 }
 
 // Bascule du pipeline LINÉAIRE (20 étapes à plat) vers le modèle « FAMILLES »
@@ -359,7 +373,11 @@ const STAGE_TO_FAMILY = {
   montage_nettoyage:        ['production', 'montage_finition'],
   finitions_qualite:        ['production', 'controle_emballage'],
   facturation:              ['facturation', 'facturation_a_faire'],
-  termine_archive:          ['termine', null],
+  // `termine_archive` veut dire « terminé ET archivé » : il vise la famille
+  // Archivé, pas Terminé. Le faire atterrir sur `termine` renvoyait ensuite,
+  // dans le modèle à 5 familles, un dossier archivé vers « Paiement à
+  // contrôler » — donc de retour dans les listes actives du patron.
+  termine_archive:          ['archive', null],
   bloque:                   ['attente_client', null],
   fiverr:                   ['fiverr', null],
 };
@@ -956,7 +974,7 @@ async function setWhatsappMessage(text) {
 }
 
 module.exports = {
-  pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive,
+  pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
