@@ -583,6 +583,7 @@ function applySortAndRender() {
   lastRendered = sorted;
   renderRows(sorted);
   applySearchAndCounts();
+  renderLigneDetailIfOpen();
 }
 
 function cmpDeadline(a, b) {
@@ -1227,17 +1228,26 @@ function cellDossier(r) {
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
   syncTitleOnOverflow(company);
 
-  // Le nom du dossier et la pastille WhatsApp sur la MÊME ligne : le numéro
-  // appartient au client, il se lit juste à côté de son nom.
   const line = document.createElement('div');
   line.className = 'client-line';
   line.appendChild(company);
-  line.appendChild(cellWhatsapp(r));
-  line.appendChild(cellPdfSlot(r, 'devis'));
-  line.appendChild(cellPdfSlot(r, 'facture'));
+
+  // Les pastilles sur leur PROPRE rangée, sous le nom (cf. .client-docs) : à
+  // cinq ou six elles occupent 172 à 204 px incompressibles, alors que le nom se
+  // réduit jusqu'à zéro. Sur la même rangée, c'était donc toujours le nom qui
+  // disparaissait — et le cluster sortait quand même de la cellule pour
+  // recouvrir la colonne voisine.
+  const docs = document.createElement('div');
+  docs.className = 'client-docs';
+  docs.appendChild(cellWhatsapp(r));
+  docs.appendChild(cellPdfSlot(r, 'devis'));
+  docs.appendChild(cellPdfSlot(r, 'facture'));
+  docs.appendChild(cellPdfSlot(r, 'bat'));
+  docs.appendChild(cellLigneDetailButton(r));
   const pdfWa = cellPdfWhatsapp(r);
-  if (pdfWa) line.appendChild(pdfWa);
-  stack.appendChild(line);
+  if (pdfWa) docs.appendChild(pdfWa);
+
+  stack.append(line, docs);
   td.appendChild(stack);
   return td;
 }
@@ -1297,10 +1307,24 @@ function factureIcon() {
   ]);
 }
 
-// Libellés pour les infobulles des deux emplacements PDF de la ligne.
+// BAT (Bon À Tirer) : un sceau avec un check — la validation avant production.
+function batIcon() {
+  return strokeIcon([
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+    'M8 12l2.5 2.5L16 9',
+  ]);
+}
+
+// Détail : chevron — « voir le détail complet de cette ligne ».
+function detailIcon() {
+  return strokeIcon(['M9 6l6 6-6 6']);
+}
+
+// Libellés pour les infobulles des emplacements PDF de la ligne.
 const PDF_SLOT_LABELS = {
   devis: { noun: 'devis', withArticle: 'le devis' },
   facture: { noun: 'facture', withArticle: 'la facture' },
+  bat: { noun: 'BAT', withArticle: 'le BAT' },
 };
 
 // PUT brut (pas de JSON) : `api()` ne convient pas, il JSON.stringify toujours
@@ -1333,10 +1357,10 @@ function sendPdf(r, kind, filename) {
   if (lien) window.open(lien, '_blank', 'noopener,noreferrer');
 }
 
-const PDF_SLOT_ICON = { devis: devisIcon, facture: factureIcon };
+const PDF_SLOT_ICON = { devis: devisIcon, facture: factureIcon, bat: batIcon };
 
-// Pastille PDF à deux états, pour `devis` et `facture` (mêmes règles, icône
-// propre à chaque type — cf. PDF_SLOT_ICON) :
+// Pastille PDF à deux états, pour `devis`, `facture` et `bat` (mêmes règles,
+// icône propre à chaque type — cf. PDF_SLOT_ICON) :
 //  - vide   : icône neutre, clic → sélecteur de fichier → upload immédiat.
 //  - remplie : icône accentuée, clic → ouvre le PDF dans un nouvel onglet pour
 //    le visualiser ; une petite croix apparaît au survol pour retirer le
@@ -1643,6 +1667,373 @@ function cellDeadline(r) {
 
   showBadge();
   return td;
+}
+
+// --- Side bar détail de ligne -----------------------------------------------
+// Panneau à droite, calqué sur le tiroir de clients.js (.cl-drawer) : mêmes
+// jetons CSS que la grille, classes dédiées (.ligne-drawer) pour ne pas
+// mélanger deux fonctionnalités indépendantes. Une seule instance, montée au
+// premier clic ; son contenu est entièrement reconstruit à chaque ouverture
+// ou re-synchronisation — jamais de référence figée à un objet `r` : `rows`
+// est remplacé (pas muté) à chaque poll/SSE (cf. renderRows), donc on stocke
+// seulement l'id et on refait `rows.find(...)` à chaque rendu.
+let ligneDrawerEl = null;
+let ligneDrawerCard = null;
+let ligneDrawerId = null; // id (string) de la ligne affichée, ou null si fermé
+
+function ensureLigneDrawer() {
+  if (ligneDrawerEl) return;
+  ligneDrawerEl = document.createElement('div');
+  ligneDrawerEl.className = 'ligne-drawer';
+  ligneDrawerEl.hidden = true;
+  const scrim = document.createElement('div');
+  scrim.className = 'ligne-drawer__scrim';
+  scrim.addEventListener('click', closeLigneDetail);
+  ligneDrawerCard = document.createElement('aside');
+  ligneDrawerCard.className = 'ligne-drawer__card';
+  ligneDrawerCard.setAttribute('role', 'dialog');
+  ligneDrawerCard.setAttribute('aria-modal', 'true');
+  ligneDrawerCard.setAttribute('aria-label', 'Détail de la commande');
+  ligneDrawerEl.append(scrim, ligneDrawerCard);
+  document.body.appendChild(ligneDrawerEl);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && ligneDrawerId) closeLigneDetail();
+  });
+}
+
+function openLigneDetail(id) {
+  ensureLigneDrawer();
+  ligneDrawerId = String(id);
+  ligneDrawerEl.hidden = false;
+  // Le corps du tiroir précédent est encore monté (closeLigneDetail masque, ne
+  // vide pas) et le navigateur lui rend sa position de scroll dès qu'il
+  // redevient visible : on la remet à zéro APRÈS l'affichage — sinon la remise
+  // à zéro tombe sur un élément sans boîte de défilement et reste sans effet —
+  // pour que renderLigneDetail n'aille pas reporter le scroll d'une AUTRE ligne
+  // sur celle qu'on ouvre.
+  const oldBody = ligneDrawerCard.querySelector('.ld-body');
+  if (oldBody) oldBody.scrollTop = 0;
+  renderLigneDetail();
+}
+
+function closeLigneDetail() {
+  if (!ligneDrawerEl) return;
+  ligneDrawerId = null;
+  ligneDrawerEl.hidden = true;
+}
+
+// Rappelée après CHAQUE (re)rendu de la grille (poll, SSE, tri, sauvegarde
+// locale) : la side bar se re-synchronise depuis `rows`, et se ferme si la
+// ligne a quitté la vue courante (déplacée vers une autre étape, supprimée).
+function renderLigneDetailIfOpen() {
+  if (!ligneDrawerId) return;
+  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  // La fermeture passe AVANT la garde : un tiroir ouvert sur une ligne qui a
+  // quitté la vue doit se fermer même si le focus est resté dedans.
+  if (!r) { closeLigneDetail(); return; }
+  if (isDrawerBusy()) return;
+  renderLigneDetail();
+}
+
+// Vrai si le tiroir ne doit pas être reconstruit : focus d'édition à l'intérieur
+// (même protection que isRowBusy pour une ligne de la grille). Sans elle, un
+// rendu déclenché par un tiers — ex. `category-owners` en SSE, qui appelle
+// applySortAndRender() sans passer par la garde isInteracting() de poll() —
+// remplacerait le <textarea> des Notes et effacerait la saisie non sauvegardée.
+// On se limite aux champs de saisie, comme isInteracting() : c'est ce qui
+// garantit que poll() s'arrête AVANT d'avoir consommé lastRowsSig. Geler aussi
+// sur un bouton ou un lien qui garde le focus laisserait le tiroir périmé pour
+// de bon — poll() aurait avalé le changement sans jamais le rendre.
+function isDrawerBusy() {
+  if (!ligneDrawerCard) return false;
+  const ae = document.activeElement;
+  if (!ae || !ligneDrawerCard.contains(ae)) return false;
+  return ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT';
+}
+
+// Une ligne « libellé / valeur » du détail (sections Contact et Suivi).
+function ldKv(label, value) {
+  const kv = document.createElement('div');
+  kv.className = 'ld-kv';
+  const k = document.createElement('span'); k.textContent = label;
+  const v = document.createElement('span'); v.textContent = value;
+  kv.append(k, v);
+  return kv;
+}
+
+// Un article du détail produit : un titre, puis ses sous-lignes (les valeurs
+// vides sont ignorées, pour ne jamais afficher de ligne creuse).
+function ficheLigneEl(titre, sousLignes) {
+  const box = document.createElement('div');
+  box.className = 'ld-fiche-item';
+  const t = document.createElement('p');
+  t.className = 'ld-fiche-item__title';
+  t.textContent = titre;
+  box.appendChild(t);
+  for (const s of sousLignes) {
+    if (!s) continue;
+    const p = document.createElement('p');
+    p.className = 'ld-fiche-item__sub';
+    p.textContent = s;
+    box.appendChild(p);
+  }
+  return box;
+}
+
+// Flux « Commande » (tasses / textiles / objets), fiche.kind = 'commande-atelier'.
+// Mêmes champs que detailLigne() côté serveur (server.js:1115-1153), rendus en
+// HTML structuré plutôt qu'en texte à flèches « ↳ ».
+function ficheItemsCommandeAtelier(fiche) {
+  const items = [];
+  for (const l of fiche.tasses || []) {
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`,
+      [
+        ...(l.faces || []).map((f) => `${f.label} (${f.hint}) : ${f.visuel}`),
+        (l.options || []).length ? l.options.map((o) => o.label).join(' · ') : null,
+        l.typo ? `Typo : ${l.typo}` : null,
+        l.infos || null,
+        l.remarque ? `Remarque : ${l.remarque}` : null,
+      ],
+    ));
+  }
+  for (const l of fiche.textiles || []) {
+    const tailleTxt = (l.tailles && l.tailles.length)
+      ? l.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ')
+      : (l.taille ? `taille ${l.taille}` : '');
+    const id = [l.ref && `réf. ${l.ref}`, l.couleur, tailleTxt].filter(Boolean).join(' · ');
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`,
+      [
+        l.note || null,
+        ...(l.zones || []).map((z) => {
+          const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
+          const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null]
+            .filter(Boolean).join(' · ') || z.consigne || '';
+          return `${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
+        }),
+      ],
+    ));
+  }
+  for (const l of fiche.objets || []) {
+    items.push(ficheLigneEl(
+      `${l.quantite} × ${l.ref}`,
+      [l.techniqueLabel ? `${l.techniqueLabel}${l.infos ? ` : ${l.infos}` : ''}` : (l.infos || null)],
+    ));
+  }
+  return items;
+}
+
+// Flux « Nouveau Projet » (panier multi-type), fiche.kind = 'projet-simple'.
+// `l.bat` est l'option catalogue tarifée (server.js:1206, 1226) — à NE PAS
+// confondre avec la pièce jointe BAT (documents) : badge texte distinct.
+function ficheItemsProjetSimple(fiche) {
+  return (fiche.lignes || []).map((l) => {
+    if (l.produit) {
+      const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
+      return ficheLigneEl(
+        `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}`,
+        [
+          opts.length ? opts.join(', ') : null,
+          l.remarque ? `Remarque : ${l.remarque}` : null,
+          l.bat ? '★ BAT inclus (option catalogue)' : null,
+        ],
+      );
+    }
+    return ficheLigneEl(`${l.quantite} × ${l.description}`, []);
+  });
+}
+
+// Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
+// archivé à la création de la commande, jamais retouché après). Deux formats
+// possibles selon le flux de création — cf. server.js buildCommande/buildProjet.
+// Retourne `null` si `fiche` est absent ou d'un `kind` non reconnu (ligne créée
+// à la main dans la grille) ; une fiche de commande v1, qui porte bien le
+// `kind` mais pas les tableaux attendus, renvoie `[]`. Dans les deux cas
+// l'appelant masque la section, sans erreur.
+function ficheItems(fiche) {
+  if (!fiche || typeof fiche !== 'object') return null;
+  if (fiche.kind === 'commande-atelier') return ficheItemsCommandeAtelier(fiche);
+  if (fiche.kind === 'projet-simple') return ficheItemsProjetSimple(fiche);
+  return null;
+}
+
+function renderLigneDetail() {
+  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  if (!r) { closeLigneDetail(); return; }
+  // `.ld-body` est le conteneur scrollable, et replaceChildren() le détruit :
+  // on relève sa position pour la reposer sur le corps reconstruit, sinon le
+  // panneau remonte en haut à chaque sauvegarde alors que les Notes sont tout
+  // en bas. Le navigateur borne lui-même la valeur au scroll réellement
+  // disponible, donc un contenu plus court retombe naturellement.
+  const oldBody = ligneDrawerCard.querySelector('.ld-body');
+  const prevScrollTop = oldBody ? oldBody.scrollTop : 0;
+  ligneDrawerCard.replaceChildren();
+
+  const head = document.createElement('header');
+  head.className = 'ld-head';
+
+  const titles = document.createElement('div');
+  titles.className = 'ld-head__titles';
+  const title = document.createElement('h2');
+  title.className = 'ld-head__title';
+  title.textContent = r.billing_company || r.contact_referent || '— sans dossier';
+  const sub = document.createElement('p');
+  sub.className = 'ld-head__sub';
+  sub.textContent = r.product || '—';
+  const badges = document.createElement('div');
+  badges.className = 'ld-head__badges';
+  const typeBadge = document.createElement('span');
+  typeBadge.className = 'ld-badge';
+  typeBadge.textContent = CLIENT_TYPE_LABEL[r.client_type] || CLIENT_TYPES[0].label;
+  const prioBadge = document.createElement('span');
+  prioBadge.className = 'ld-badge';
+  prioBadge.textContent = PRIORITY_LEVELS[prioBand(r)].label;
+  badges.append(typeBadge, prioBadge);
+  titles.append(title, sub, badges);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'ld-close';
+  close.setAttribute('aria-label', 'Fermer le détail');
+  close.appendChild(strokeIcon(['M18 6L6 18', 'M6 6l12 12']));
+  close.addEventListener('click', closeLigneDetail);
+
+  head.append(titles, close);
+  ligneDrawerCard.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'ld-body';
+
+  // --- Contact ---------------------------------------------------------------
+  const contactSection = document.createElement('section');
+  contactSection.className = 'ld-section';
+  const contactTitle = document.createElement('p');
+  contactTitle.className = 'ld-section-title';
+  contactTitle.textContent = 'Contact';
+  contactSection.appendChild(contactTitle);
+  const contactRows = [
+    ['Référent', r.contact_referent],
+    ['Téléphone', r.contact_phone],
+    ['Email', r.contact_email],
+  ];
+  let hasContact = false;
+  for (const [label, value] of contactRows) {
+    if (!value) continue;
+    hasContact = true;
+    contactSection.appendChild(ldKv(label, value));
+  }
+  if (!hasContact) {
+    const empty = document.createElement('p');
+    empty.className = 'ld-empty';
+    empty.textContent = 'Aucun contact renseigné.';
+    contactSection.appendChild(empty);
+  }
+  body.appendChild(contactSection);
+
+  // --- Documents ---------------------------------------------------------------
+  const docsSection = document.createElement('section');
+  docsSection.className = 'ld-section';
+  const docsTitle = document.createElement('p');
+  docsTitle.className = 'ld-section-title';
+  docsTitle.textContent = 'Documents';
+  const docsRow = document.createElement('div');
+  docsRow.className = 'ld-docs';
+  docsRow.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
+  docsSection.append(docsTitle, docsRow);
+  body.appendChild(docsSection);
+
+  // --- Détail produit (structuré, depuis fiche) -------------------------------
+  const items = ficheItems(r.fiche);
+  if (items && items.length) {
+    const ficheSection = document.createElement('section');
+    ficheSection.className = 'ld-section';
+    const ficheTitle = document.createElement('p');
+    ficheTitle.className = 'ld-section-title';
+    ficheTitle.textContent = 'Détail produit';
+    ficheSection.appendChild(ficheTitle);
+    for (const it of items) ficheSection.appendChild(it);
+    body.appendChild(ficheSection);
+  }
+
+  // --- Suivi -------------------------------------------------------------------
+  // Reprise en lecture seule des colonnes de pilotage de la grille : on montre
+  // ce qui est posé, on ne le modifie pas ici (l'édition reste dans le tableau).
+  const suiviSection = document.createElement('section');
+  suiviSection.className = 'ld-section';
+  const suiviTitle = document.createElement('p');
+  suiviTitle.className = 'ld-section-title';
+  suiviTitle.textContent = 'Suivi';
+  suiviSection.appendChild(suiviTitle);
+
+  // `project_value` arrive en NUMERIC (donc en texte via le driver) : on le
+  // convertit, et on retombe sur « — » si ce n'est pas un nombre exploitable
+  // plutôt que d'afficher « NaN € ». 0 reste une valeur légitime → 0,00 €.
+  const prix = Number(r.project_value);
+  suiviSection.appendChild(ldKv('Prix', r.project_value != null && Number.isFinite(prix) ? eur(prix) : '—'));
+  const dd = parseDeadline(r.deadline);
+  suiviSection.appendChild(ldKv('Échéance', dd ? dd.toLocaleDateString('fr-FR') : '—'));
+  // Sous-étape et État suivent la grille : rien à afficher là où la colonne
+  // correspondante est vide (famille sans sous-étapes, aucune alerte posée).
+  if (familyHasSub(r.stage)) {
+    suiviSection.appendChild(ldKv('Sous-étape', (r.sub_stage && SUB_LABEL[r.sub_stage]) || 'à préciser'));
+  }
+  if (FLAG_BY_VALUE[r.flag]) {
+    suiviSection.appendChild(ldKv('État', FLAG_BY_VALUE[r.flag].label + (r.flag_reason ? ` — ${r.flag_reason}` : '')));
+  }
+  body.appendChild(suiviSection);
+
+  // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
+  const notesSection = document.createElement('section');
+  notesSection.className = 'ld-section';
+  const notesTitle = document.createElement('p');
+  notesTitle.className = 'ld-section-title';
+  notesTitle.textContent = 'Notes';
+  const notes = document.createElement('textarea');
+  notes.className = 'ld-notes';
+  notes.setAttribute('aria-label', 'Notes');
+  notes.value = r.description ?? '';
+  notes.placeholder = '+ Ajouter une note';
+  let lastSentNotes = r.description ?? '';
+  notes.addEventListener('blur', () => {
+    const val = notes.value === '' ? null : notes.value;
+    if ((val ?? '') === (lastSentNotes ?? '')) return;
+    const prev = r.description;
+    r.description = val;
+    lastSentNotes = notes.value;
+    patchRow(r, { description: val })
+      .then(() => { invalidateRowCache(r.id); applySortAndRender(); })
+      .catch((err) => {
+        r.description = prev;
+        notes.value = prev ?? '';
+        lastSentNotes = prev ?? '';
+        reportError(err);
+      });
+  });
+  notesSection.append(notesTitle, notes);
+  body.appendChild(notesSection);
+
+  ligneDrawerCard.appendChild(body);
+  body.scrollTop = prevScrollTop;
+}
+
+// Bouton « voir détails » : rejoint le cluster documents de la cellule
+// Dossier. Son propre `stopPropagation` suffit — aucun handler n'est posé
+// sur <tr>, donc le reste de la ligne garde exactement son comportement
+// d'édition inline actuel.
+function cellLigneDetailButton(r) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pdf-btn ligne-detail-btn';
+  attachTip(btn, 'Voir le détail de la ligne');
+  btn.setAttribute('aria-label', 'Voir le détail de la ligne');
+  btn.appendChild(detailIcon());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openLigneDetail(r.id);
+    btn.blur();
+  });
+  return btn;
 }
 
 // --- Infobulles maison -----------------------------------------------------
@@ -3469,6 +3860,11 @@ function setViewMode(mode) {
   if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
+  // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
+  // part donc pas tout seul quand on change de vue (y compris via le bouton
+  // Retour du navigateur ou le balayage depuis le bord sur tablette), et il
+  // resterait posé par-dessus le Dashboard, scrim compris.
+  closeLigneDetail();
 
   const dash = mode === 'dashboard';
   const commande = mode === 'commande';

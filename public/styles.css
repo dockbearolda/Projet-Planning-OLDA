@@ -1155,10 +1155,31 @@ tr:hover .handle { color: var(--text-2); }
   text-overflow: ellipsis;
 }
 
-/* Le nom du dossier et la pastille WhatsApp partagent une rangée : le champ
-   prend la place restante, la pastille reste collée au bout du nom. */
-.client-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+/* Le nom du dossier occupe toute la 1re rangée de la cellule. */
+.client-line { display: flex; align-items: center; min-width: 0; }
 .client-line .client-company { flex: 1 1 auto; min-width: 0; }
+
+/* Les pastilles du dossier (WhatsApp, devis, facture, BAT, détail, envoi PDF)
+   tiennent leur PROPRE rangée, sous le nom. Elles pèsent 204 px
+   INCOMPRESSIBLES à six (6 × 24 px + marges + écarts + le retrait
+   d'alignement ; 172 px à cinq), alors que le
+   nom, lui, se réduit jusqu'à zéro : côte à côte sur la même rangée, c'est
+   toujours le nom qui payait — il tombait à 0 px de texte visible dès que la
+   colonne descendait sous ~190 px (soit toutes les étapes sauf Demande en
+   1280×800) et le cluster débordait quand même sur la colonne voisine
+   (+97 px mesurés en Commande / Facturation). Deux rangées : le nom garde
+   toute la largeur, les pastilles aussi.
+   Aucun coût en hauteur : --row-h vaut 76 px, les deux rangées (~32 + 24)
+   y tiennent sans faire grandir la ligne.
+   `flex-wrap` = filet de sécurité : la largeur de colonne est réglable à la
+   main (poignée d'en-tête), et un cluster trop large doit passer à la ligne
+   plutôt que recouvrir la colonne voisine.
+   Le retrait de 14 px aligne les pastilles sur le texte du nom (même padding
+   que .client-company).
+   `gap: 2px` : l'écart d'origine, à conserver tel quel. Les zones tactiles de
+   44 px (::after) se chevauchent déjà entre pastilles voisines ; resserrer de
+   2 px mangeait la croix « retirer » de la pastille précédente. */
+.client-docs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-left: 14px; }
 
 /* Pastille WhatsApp : seulement sur les lignes dont le client a laissé un
    numéro. Un clic ouvre la conversation avec le message déjà écrit (réglé dans
@@ -1258,6 +1279,18 @@ tr:hover .handle { color: var(--text-2); }
   cursor: pointer;
   padding: 0;
 }
+/* Le slot survolé passe AU-DESSUS de ses voisins, sinon la croix est inatteignable.
+   Chaque pastille étale une zone tactile de 44 px (.pdf-btn::after, inset -10px)
+   pour un pas de seulement 32 px : deux zones voisines se recouvrent de 12 px, et
+   c'est le frère SUIVANT dans le DOM qui se peint dessus. La croix, en
+   `position: absolute` sans z-index, se faisait donc recouvrir sur sa moitié
+   droite — son centre renvoyait le voisin : cliquer sur la croix du BAT ouvrait
+   le panneau de détail (chevron) au lieu de retirer le fichier.
+   L'empilement se résout ENTRE FRÈRES, au niveau du slot : un z-index posé sur la
+   seule croix ne changerait rien, c'est le slot lui-même qu'il faut remonter.
+   `z-index: 1` reste sous l'en-tête collant du tableau (z-index 2) et ne peut pas
+   sortir de .grid-wrap, qui crée son propre contexte d'empilement. */
+.pdf-slot:hover { z-index: 1; }
 .pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
 
 /* Type Pro / Perso : pastille */
@@ -1969,7 +2002,7 @@ tr:hover .handle { color: var(--text-2); }
 
 /* colonnes largeurs */
 /* En table-layout: fixed, seule la largeur des colonnes « puce » est fixée ;
-   les 3 colonnes texte (client / description / infos) n'ont PAS de largeur et se
+   les 2 colonnes texte (description / infos) n'ont PAS de largeur et se
    partagent équitablement l'espace restant → la grille s'adapte à la fenêtre. */
 .col-handle { width: 44px; }
 .col-type { width: 66px; }
@@ -1979,6 +2012,24 @@ tr:hover .handle { color: var(--text-2); }
 .col-sub { width: 140px; }
 .col-deadline { width: 124px; }
 .col-del { width: 116px; }
+/* « Nom du Dossier » ne peut plus être élastique : sa rangée de pastilles est
+   incompressible (204 px à six pastilles). Élastique, elle tombait à 85 px sur les étapes qui
+   affichent Prix ET Sous-étape, et le cluster sortait de la cellule. 210 px =
+   les pastilles + une marge, et le nom dispose de la même largeur au-dessus. */
+.col-client { width: 210px; }
+
+/* Plancher de largeur de la grille, par jeu de colonnes affichées.
+   Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a
+   plus la place, la grille DÉFILE horizontalement au lieu de tasser les
+   colonnes de texte. « Nom du Dossier » étant maintenant fixe (210 px), sans
+   ces planchers ce sont Description et Infos qui absorbaient tout le manque
+   (27 px sur les étapes qui montrent Prix + Sous-étape : illisible).
+   Calcul : colonnes fixes + 210 (dossier) + ~92 (priorité) + 2 × 110 (texte).
+   `:not(.manual-cols)` : dès que l'utilisateur règle ses largeurs à la main,
+   c'est lui qui décide (cf. .grid.manual-cols { min-width: 0 }). */
+.grid:not(.manual-cols):not(.no-sub) { min-width: 1270px; }
+.grid:not(.manual-cols):not(.no-price) { min-width: 1220px; }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: 1360px; }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
@@ -4027,4 +4078,93 @@ body.wall-open { overflow: hidden; }
   .reg-actions { flex-wrap: wrap; }
   .reg-status { flex-basis: 100%; margin-right: 0; }
   .reg-btn { flex: 1; }
+}
+
+/* --- Side bar détail de ligne (planning) -----------------------------------
+   Calqué sur .cl-drawer de clients.css (même recette : scrim + carte glissante
+   à droite, mêmes durées/easing), mais classes dédiées : deux fonctionnalités
+   indépendantes qui ne doivent pas partager leurs noms de classe. */
+.ligne-drawer { position: fixed; inset: 0; z-index: 70; }
+.ligne-drawer[hidden] { display: none; }
+.ligne-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .42);
+  animation: ldScrim var(--dur-2, .18s) var(--ease, ease) both;
+}
+@keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
+.ligne-drawer__card {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(468px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, .22);
+  animation: ldSlide var(--dur-3, .24s) var(--ease, ease) both;
+}
+@keyframes ldSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
+
+.ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.ld-head__titles { flex: 1; min-width: 0; }
+.ld-head__title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-head__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-head__badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.ld-badge { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; background: var(--border-soft); color: var(--text-2); }
+.ld-close { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--text-2); border-radius: 10px; cursor: pointer; }
+.ld-close:hover { background: var(--state-hover); color: var(--text-1); }
+
+.ld-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 24px; -webkit-overflow-scrolling: touch; }
+.ld-section { margin: 16px 0; }
+.ld-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 0 0 8px; }
+.ld-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; color: var(--text-1); }
+.ld-kv span:first-child { color: var(--text-2); }
+/* Valeurs longues (motif de flag jusqu'à 240 car., email) : elles se replient
+   dans le panneau au lieu d'imposer leur min-content et de créer un scroll
+   horizontal dans .ld-body. */
+.ld-kv span:last-child { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.ld-docs { display: flex; gap: 6px; }
+.ld-empty { font-size: 12.5px; color: var(--text-3); font-style: italic; }
+
+.ld-fiche-item { padding: 8px 10px; border-radius: 8px; background: var(--border-soft); margin-bottom: 8px; }
+.ld-fiche-item__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); }
+.ld-fiche-item__sub { margin: 3px 0 0; font-size: 12px; color: var(--text-2); padding-left: 10px; }
+
+.ld-notes {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-1);
+  background: var(--surface);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.ld-notes:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
+.ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
+.ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
+
+@media (max-width: 720px) {
+  .ligne-drawer__card { width: 100vw; }
+}
+
+/* Optimisation tactile du tiroir — même patron que le bloc `(pointer: coarse)`
+   plus haut (surcharge des tailles au doigt, apparence à la souris inchangée).
+   Bloc séparé et placé ICI parce que le bloc historique est écrit AVANT les
+   règles `.ld-*` : à spécificité égale, les déclarations de base gagnaient et la
+   surcharge tactile serait restée lettre morte (vérifié : `.ld-close` restait à
+   36 px). */
+@media (pointer: coarse) {
+  /* Plancher de cible tactile 44 px (au lieu de 36). */
+  .ld-close { width: 44px; height: 44px; }
+  /* Sous 16 px, iOS zoome sur le champ à la mise au point. */
+  .ld-notes { font-size: 16px; }
 }
