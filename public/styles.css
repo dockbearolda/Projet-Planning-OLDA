@@ -4110,24 +4110,14 @@ body.wall-open { overflow: hidden; }
 
 .ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
 .ld-head__titles { flex: 1; min-width: 0; }
-.ld-head__title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ld-head__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ld-head__badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.ld-badge { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; background: var(--border-soft); color: var(--text-2); }
 .ld-close { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--text-2); border-radius: 10px; cursor: pointer; }
 .ld-close:hover { background: var(--state-hover); color: var(--text-1); }
 
 .ld-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 24px; -webkit-overflow-scrolling: touch; }
 .ld-section { margin: 16px 0; }
 .ld-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 0 0 8px; }
-.ld-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; color: var(--text-1); }
-.ld-kv span:first-child { color: var(--text-2); }
-/* Valeurs longues (motif de flag jusqu'à 240 car., email) : elles se replient
-   dans le panneau au lieu d'imposer leur min-content et de créer un scroll
-   horizontal dans .ld-body. */
-.ld-kv span:last-child { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .ld-docs { display: flex; gap: 6px; }
-.ld-empty { font-size: 12.5px; color: var(--text-3); font-style: italic; }
 
 .ld-fiche-item { padding: 8px 10px; border-radius: 8px; background: var(--border-soft); margin-bottom: 8px; }
 .ld-fiche-item__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); }
@@ -4148,6 +4138,83 @@ body.wall-open { overflow: hidden; }
 }
 .ld-notes:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
+/* --- Tiroir éditable ------------------------------------------------------
+   Le tiroir n'est pas une fiche de lecture : chaque rangée porte un contrôle
+   (champ ou puce) qui enregistre sur place. Le libellé garde sa largeur à
+   gauche, le contrôle prend le reste à droite — même lecture qu'un couple
+   libellé/valeur, mais modifiable. */
+.ld-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  font-size: 13px;
+}
+.ld-field__label { flex-shrink: 0; color: var(--text-2); }
+/* Le contrôle ne doit jamais imposer son min-content : sans ça un email ou un
+   motif long crée un défilement horizontal dans .ld-body. */
+.ld-field > :last-child { min-width: 0; }
+
+/* Champ texte : discret au repos (on lit la fiche), cadre net au survol et au
+   focus (on la modifie). Aligné à droite comme l'était la valeur. */
+.ld-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-1);
+  text-align: right;
+  text-overflow: ellipsis;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.ld-input::placeholder { color: var(--text-3); }
+.ld-input:hover { background: var(--state-hover); }
+.ld-input:focus { outline: none; background: var(--surface); border-color: var(--primary); }
+.ld-input.num { font-variant-numeric: tabular-nums; }
+
+/* Titre et sous-titre de l'en-tête : mêmes tailles qu'avant en <h2>/<p>. Le
+   décalage à gauche compense le rembourrage du champ, pour que le texte reste
+   aligné sur le bord du panneau tant qu'on ne le survole pas ; à droite le
+   champ s'arrête net sur le conteneur, sinon il passerait SOUS le bouton de
+   fermeture et lui volerait ses clics. */
+.ld-input--title,
+.ld-input--sub {
+  width: calc(100% + 9px);
+  margin-inline-start: -9px;
+  text-align: left;
+}
+.ld-input--title {
+  margin-block: -5px;
+  padding: 4px 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.ld-input--sub {
+  margin-block: 1px 0;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* Puces réutilisées de la grille : elles y portent les marges de leur cellule,
+   inutiles ici (la rangée .ld-field gère l'espacement). */
+.ld-field .resp-chip,
+.ld-field .ref-chip,
+.ld-field .sub-chip,
+.ld-field .flag-chip,
+.ld-field .flag-reason,
+.ld-field .deadline-badge { margin: 0; }
+.ld-resp-chip { padding: 4px 12px; max-width: 100%; }
+/* Étape et motif peuvent être longs : ils se replient au lieu de pousser le
+   libellé hors du panneau. */
+.ld-stage-chip { max-width: 66%; white-space: normal; text-align: right; }
+.ld-reason { max-width: 66%; text-align: right; }
+
 /* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
 .ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
 .ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
@@ -4166,5 +4233,16 @@ body.wall-open { overflow: hidden; }
   /* Plancher de cible tactile 44 px (au lieu de 36). */
   .ld-close { width: 44px; height: 44px; }
   /* Sous 16 px, iOS zoome sur le champ à la mise au point. */
-  .ld-notes { font-size: 16px; }
+  .ld-notes,
+  .ld-input { font-size: 16px; }
+  .ld-field { min-height: 48px; }
+  .ld-input { padding: 11px 12px; }
+  .ld-input--title { font-size: 19px; }
+  .ld-input--sub { font-size: 14px; }
+  /* Les puces du tiroir tapent aussi dans les 44 px. */
+  .ld-field .resp-chip,
+  .ld-field .ref-chip,
+  .ld-field .sub-chip,
+  .ld-field .flag-chip,
+  .ld-field .deadline-badge { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
 }

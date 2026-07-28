@@ -554,7 +554,12 @@ function belongsToCurrentView(r) {
 }
 
 // --- Tri -------------------------------------------------------------------
-function applySortAndRender() {
+// `syncDrawer: false` rend la grille SANS reconstruire la side bar de détail.
+// Réservé aux sauvegardes d'un champ de saisie DU tiroir : le champ affiche
+// déjà ce qu'on vient d'y taper, et le reconstruire démonterait la puce sur
+// laquelle l'utilisateur est peut-être en train de cliquer (le clic tomberait
+// dans le vide entre le `mousedown` qui a déclenché la sauvegarde et le `click`).
+function applySortAndRender({ syncDrawer = true } = {}) {
   // `rows` contient TOUTE la famille ; si une sous-catégorie est active, on ne
   // rend que les commandes qui en relèvent (filtre instantané, côté client).
   const base = currentSub === null
@@ -583,7 +588,7 @@ function applySortAndRender() {
   lastRendered = sorted;
   renderRows(sorted);
   applySearchAndCounts();
-  renderLigneDetailIfOpen();
+  if (syncDrawer) renderLigneDetailIfOpen();
 }
 
 function cmpDeadline(a, b) {
@@ -1744,21 +1749,107 @@ function renderLigneDetailIfOpen() {
 // garantit que poll() s'arrête AVANT d'avoir consommé lastRowsSig. Geler aussi
 // sur un bouton ou un lien qui garde le focus laisserait le tiroir périmé pour
 // de bon — poll() aurait avalé le changement sans jamais le rendre.
+// Un menu / calendrier ouvert compte aussi : il est ancré à une puce du tiroir,
+// que la reconstruction démonterait sous le popup (même règle qu'isInteracting).
+// Ces popups sont transitoires — clic dehors ou Échap les ferme — donc le tiroir
+// ne peut pas rester gelé.
 function isDrawerBusy() {
   if (!ligneDrawerCard) return false;
+  if (openMenuEl || openCalendar) return true;
   const ae = document.activeElement;
   if (!ae || !ligneDrawerCard.contains(ae)) return false;
   return ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT';
 }
 
-// Une ligne « libellé / valeur » du détail (sections Contact et Suivi).
-function ldKv(label, value) {
-  const kv = document.createElement('div');
-  kv.className = 'ld-kv';
-  const k = document.createElement('span'); k.textContent = label;
-  const v = document.createElement('span'); v.textContent = value;
-  kv.append(k, v);
-  return kv;
+// --- Champs éditables du tiroir --------------------------------------------
+// Le tiroir n'est pas une fiche de lecture : TOUT ce qu'il affiche se modifie
+// sur place, avec exactement les mêmes contrôles que la grille (même bindInline,
+// mêmes menus, même calendrier) — donc les mêmes validations côté serveur.
+
+// Une rangée « libellé / contrôle » : le libellé à gauche, le champ ou la puce
+// modifiable à droite.
+function ldRow(label, control) {
+  const row = document.createElement('div');
+  row.className = 'ld-field';
+  const k = document.createElement('span');
+  k.className = 'ld-field__label';
+  k.textContent = label;
+  row.append(k, control);
+  return row;
+}
+
+// Après une modification faite DANS le tiroir : la grille affiche les mêmes
+// valeurs (nom, prix, priorité, échéance…) et le tri peut déplacer la ligne —
+// on périme sa signature et on re-rend.
+// `syncDrawer` distingue les deux origines : une puce (menu, calendrier) doit
+// se relire depuis `r`, donc le tiroir se reconstruit ; un champ de saisie
+// affiche déjà la valeur tapée et n'a rien à reconstruire (cf. applySortAndRender).
+function ldRefresh(r, syncDrawer = true) {
+  invalidateRowCache(r.id);
+  applySortAndRender({ syncDrawer });
+}
+
+// PATCH optimiste d'un champ choisi dans un menu du tiroir (rollback + resync
+// gérés par patch()).
+function ldPatch(r, body) {
+  patch(r, body, () => {
+    Object.assign(r, body);
+    ldRefresh(r);
+  });
+}
+
+// Champ texte du tiroir : même contrat que dans la grille — Entrée valide,
+// Échap annule, quitter le champ enregistre.
+function ldInput(r, field, opts = {}) {
+  const input = document.createElement('input');
+  input.className = 'ld-input' + (opts.num ? ' num' : '');
+  input.type = opts.type || 'text';
+  if (opts.inputMode) input.inputMode = opts.inputMode;
+  input.value = opts.value != null ? opts.value : (r[field] ?? '');
+  input.placeholder = opts.placeholder || '—';
+  input.setAttribute('aria-label', opts.ariaLabel || field);
+  bindInline(
+    input, r, field,
+    opts.transform || ((v) => (v === '' ? null : v)),
+    opts.normalize,
+    () => ldRefresh(r, false),
+  );
+  return input;
+}
+
+// Puce cliquable du tiroir : `render` réécrit libellé + classe depuis `r`,
+// `open` ouvre le menu (ou le popover) au clic.
+function ldChip(render, open) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  render(btn);
+  btn.addEventListener('click', (e) => { e.stopPropagation(); open(btn); });
+  return btn;
+}
+
+// Toutes les places possibles d'une commande, à plat : une entrée par
+// sous-étape (c'est le niveau où une ligne atterrit vraiment), une entrée par
+// famille quand elle n'en a pas. Même granularité que les cibles du rail au
+// glisser-déposer — d'où la clé « famille/sous-étape » comparable à `r`.
+function stageDestinations() {
+  const out = [];
+  for (const f of STAGES) {
+    const subs = SUB_STAGES[f.slug];
+    if (subs && subs.length) {
+      for (const s of subs) {
+        out.push({ value: `${f.slug}/${s.slug}`, label: `${f.label} › ${s.label}`, stage: f.slug, sub: s.slug });
+      }
+    } else {
+      out.push({ value: `${f.slug}/`, label: f.label, stage: f.slug, sub: null });
+    }
+  }
+  return out;
+}
+
+function stageDestinationLabel(stage, sub) {
+  const family = STAGE_LABEL[stage] || stage;
+  if (sub && SUB_LABEL[sub]) return `${family} › ${SUB_LABEL[sub]}`;
+  return familyHasSub(stage) ? `${family} › à préciser` : family;
 }
 
 // Un article du détail produit : un titre, puis ses sous-lignes (les valeurs
@@ -1875,20 +1966,53 @@ function renderLigneDetail() {
 
   const titles = document.createElement('div');
   titles.className = 'ld-head__titles';
-  const title = document.createElement('h2');
-  title.className = 'ld-head__title';
-  title.textContent = r.billing_company || r.contact_referent || '— sans dossier';
-  const sub = document.createElement('p');
-  sub.className = 'ld-head__sub';
-  sub.textContent = r.product || '—';
+
+  // Nom du dossier et description : les deux champs texte de la ligne, avec la
+  // même mise en forme automatique des noms que dans la grille.
+  const title = ldInput(r, 'billing_company', {
+    placeholder: 'nom du dossier',
+    normalize: capitalizeName,
+    ariaLabel: 'Nom du dossier client',
+  });
+  title.className += ' ld-input--title';
+  const sub = ldInput(r, 'product', {
+    placeholder: 'description',
+    normalize: capitalizeName,
+    ariaLabel: 'Description',
+  });
+  sub.className += ' ld-input--sub';
+
   const badges = document.createElement('div');
   badges.className = 'ld-head__badges';
-  const typeBadge = document.createElement('span');
-  typeBadge.className = 'ld-badge';
-  typeBadge.textContent = CLIENT_TYPE_LABEL[r.client_type] || CLIENT_TYPES[0].label;
-  const prioBadge = document.createElement('span');
-  prioBadge.className = 'ld-badge';
-  prioBadge.textContent = PRIORITY_LEVELS[prioBand(r)].label;
+  // Type de client et priorité : mêmes puces colorées, mêmes menus que les
+  // colonnes TYPE et PRIORITÉ du tableau.
+  const typeBadge = ldChip(
+    (b) => {
+      const t = CLIENT_TYPES.find((x) => x.value === r.client_type) || CLIENT_TYPES[0];
+      b.className = 'type-tag ' + t.cls;
+      b.textContent = t.label;
+      attachTip(b, 'changer le type de client');
+    },
+    (b) => openMenu(b, CLIENT_TYPES.map((t) => ({ value: t.value, label: t.label })), r.client_type, (val) => {
+      if (val === r.client_type) return;
+      ldPatch(r, { client_type: val });
+    }),
+  );
+  const prioBadge = ldChip(
+    (b) => {
+      const lvl = PRIORITY_LEVELS[prioBand(r)];
+      b.className = 'prio-tag ' + lvl.cls;
+      b.textContent = lvl.label;
+      attachTip(b, 'changer la priorité');
+    },
+    (b) => {
+      const cur = prioBand(r);
+      openMenu(b, [3, 2, 1].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })), cur, (val) => {
+        if (val === cur) return;
+        ldPatch(r, { priority: val });
+      });
+    },
+  );
   badges.append(typeBadge, prioBadge);
   titles.append(title, sub, badges);
 
@@ -1912,23 +2036,17 @@ function renderLigneDetail() {
   contactTitle.className = 'ld-section-title';
   contactTitle.textContent = 'Contact';
   contactSection.appendChild(contactTitle);
-  const contactRows = [
-    ['Référent', r.contact_referent],
-    ['Téléphone', r.contact_phone],
-    ['Email', r.contact_email],
-  ];
-  let hasContact = false;
-  for (const [label, value] of contactRows) {
-    if (!value) continue;
-    hasContact = true;
-    contactSection.appendChild(ldKv(label, value));
-  }
-  if (!hasContact) {
-    const empty = document.createElement('p');
-    empty.className = 'ld-empty';
-    empty.textContent = 'Aucun contact renseigné.';
-    contactSection.appendChild(empty);
-  }
+  // Les trois champs restent affichés même vides : c'est ici qu'on les remplit
+  // (le tiroir est le seul endroit où le téléphone et l'email se saisissent).
+  contactSection.appendChild(ldRow('Référent', ldInput(r, 'contact_referent', {
+    placeholder: 'nom du contact', normalize: capitalizeName, ariaLabel: 'Référent client',
+  })));
+  contactSection.appendChild(ldRow('Téléphone', ldInput(r, 'contact_phone', {
+    type: 'tel', inputMode: 'tel', placeholder: '06 12 34 56 78', ariaLabel: 'Téléphone du client',
+  })));
+  contactSection.appendChild(ldRow('Email', ldInput(r, 'contact_email', {
+    type: 'email', inputMode: 'email', placeholder: 'client@exemple.fr', ariaLabel: 'Email du client',
+  })));
   body.appendChild(contactSection);
 
   // --- Documents ---------------------------------------------------------------
@@ -1957,8 +2075,9 @@ function renderLigneDetail() {
   }
 
   // --- Suivi -------------------------------------------------------------------
-  // Reprise en lecture seule des colonnes de pilotage de la grille : on montre
-  // ce qui est posé, on ne le modifie pas ici (l'édition reste dans le tableau).
+  // Toutes les colonnes de pilotage de la grille, éditables ici avec les mêmes
+  // contrôles : puce + menu pour les listes fermées, calendrier pour l'échéance,
+  // champ libre pour le prix.
   const suiviSection = document.createElement('section');
   suiviSection.className = 'ld-section';
   const suiviTitle = document.createElement('p');
@@ -1966,20 +2085,160 @@ function renderLigneDetail() {
   suiviTitle.textContent = 'Suivi';
   suiviSection.appendChild(suiviTitle);
 
-  // `project_value` arrive en NUMERIC (donc en texte via le driver) : on le
-  // convertit, et on retombe sur « — » si ce n'est pas un nombre exploitable
-  // plutôt que d'afficher « NaN € ». 0 reste une valeur légitime → 0,00 €.
-  const prix = Number(r.project_value);
-  suiviSection.appendChild(ldKv('Prix', r.project_value != null && Number.isFinite(prix) ? eur(prix) : '—'));
-  const dd = parseDeadline(r.deadline);
-  suiviSection.appendChild(ldKv('Échéance', dd ? dd.toLocaleDateString('fr-FR') : '—'));
-  // Sous-étape et État suivent la grille : rien à afficher là où la colonne
-  // correspondante est vide (famille sans sous-étapes, aucune alerte posée).
-  if (familyHasSub(r.stage)) {
-    suiviSection.appendChild(ldKv('Sous-étape', (r.sub_stage && SUB_LABEL[r.sub_stage]) || 'à préciser'));
-  }
+  // Étape : une seule puce pour la famille ET la sous-étape, puisque c'est le
+  // couple qui définit la place de la ligne. Le déplacement passe par
+  // moveToStage — mêmes compteurs, même rollback que le glisser-déposer.
+  const stageChip = ldChip(
+    (b) => {
+      b.className = 'sub-chip ld-stage-chip';
+      b.textContent = stageDestinationLabel(r.stage, r.sub_stage ?? null);
+      attachTip(b, 'déplacer la commande dans le pipeline');
+    },
+    (b) => {
+      const dests = stageDestinations();
+      const items = dests.map((d) => ({
+        value: d.value,
+        label: d.label,
+        muted: blockedByPrice(r, d.stage, d.sub),
+      }));
+      openMenu(b, items, `${r.stage}/${r.sub_stage ?? ''}`, (val) => {
+        const d = dests.find((x) => x.value === val);
+        if (!d) return;
+        if (d.stage === r.stage && d.sub === (r.sub_stage ?? null)) return;
+        if (blockedByPrice(r, d.stage, d.sub)) { showToast(priceBlockMessage(d.stage, d.sub)); return; }
+        moveToStage(r, d.stage, d.sub);
+      });
+    },
+  );
+  suiviSection.appendChild(ldRow('Étape', stageChip));
+
+  // Pilote et référent : mêmes listes que la colonne RESPONSABLE, « Par défaut »
+  // compris (le nom de base de la catégorie reprend alors la main).
+  const pilotChip = ldChip(
+    (b) => {
+      const who = effectivePilot(r);
+      b.className = 'resp-chip ld-resp-chip' + (who && !isManualPilot(r) ? ' auto' : '') + (who ? '' : ' empty');
+      b.textContent = who || 'Non défini';
+      attachTip(b, 'assigner le pilote');
+    },
+    (b) => {
+      const base = ownerOf(r.stage, r.sub_stage);
+      const items = RESPONSABLES.map((n) => ({ value: n, label: n }));
+      items.push({ value: null, label: base ? `Par défaut (${base})` : 'Aucun', muted: true });
+      openMenu(b, items, r.responsable ?? null, (val) => {
+        if ((val ?? null) === (r.responsable ?? null)) return;
+        ldPatch(r, { responsable: val });
+      });
+    },
+  );
+  suiviSection.appendChild(ldRow('Pilote', pilotChip));
+
+  const refChip = ldChip(
+    (b) => {
+      const who = effectiveReferents(r);
+      b.className = 'ref-chip ld-resp-chip' + (who.length && !isManualReferent(r) ? ' auto' : '') + (who.length ? '' : ' empty');
+      b.textContent = who.length ? who.join(', ') : '+ référent';
+      attachTip(b, 'changer le référent');
+    },
+    (b) => {
+      const base = referentsOf(r.stage, r.sub_stage);
+      const items = EMPLOYEES.map((n) => ({ value: n, label: n }));
+      items.push({ value: null, label: base.length ? `Par défaut (${base.join(', ')})` : 'Aucun', muted: true });
+      openMenu(b, items, r.referent ?? null, (val) => {
+        if ((val ?? null) === (r.referent ?? null)) return;
+        ldPatch(r, { referent: val });
+      });
+    },
+  );
+  suiviSection.appendChild(ldRow('Référent équipe', refChip));
+
+  // Prix : saisi comme dans la colonne PRIX (virgule acceptée, arrondi à
+  // 2 décimales en quittant le champ). Toujours affiché ici — c'est lui qui
+  // débloque le passage en Devis à envoyer / Facturation.
+  suiviSection.appendChild(ldRow('Prix (€)', ldInput(r, 'project_value', {
+    num: true,
+    inputMode: 'decimal',
+    placeholder: '—',
+    ariaLabel: 'Prix de la commande en euros',
+    value: r.project_value != null ? String(r.project_value) : '',
+    transform: (raw) => {
+      const t = raw.trim();
+      return t === '' ? null : parseFloat(t.replace(',', '.'));
+    },
+    normalize: (raw) => {
+      const t = raw.trim();
+      if (t === '') return '';
+      const n = parseFloat(t.replace(',', '.'));
+      return Number.isNaN(n) ? raw : n.toFixed(2);
+    },
+  })));
+
+  // Échéance : le tiroir a la place d'afficher la date en clair, tout en gardant
+  // le code couleur de la grille (vert / orange / rouge).
+  const deadlineChip = ldChip(
+    (b) => {
+      const d = daysLeft(r.deadline);
+      const dd = parseDeadline(r.deadline);
+      if (r.deadline == null || d === null) {
+        b.className = 'deadline-badge empty';
+        b.textContent = 'Date souhaitée';
+        attachTip(b, 'cliquer pour choisir une date');
+      } else {
+        const cls = d > 0 ? (d <= 7 ? 'orange' : 'green') : (d === 0 ? 'orange' : 'red');
+        b.className = `deadline-badge ${cls}`;
+        b.textContent = dd.toLocaleDateString('fr-FR');
+        attachTip(b, d < 0 ? `En retard de ${-d} j` : (d === 0 ? "Aujourd'hui" : `Dans ${d} j`));
+      }
+    },
+    (b) => {
+      if (openCalendar) { closeCalendar(); return; }
+      showDeadlineCalendar(r, b, (val) => {
+        // Le calendrier ne se ferme qu'APRÈS ce rappel : sans ça, isDrawerBusy()
+        // verrait encore un popup ouvert et refuserait de re-rendre le tiroir.
+        closeCalendar();
+        if (val === (r.deadline || null)) return;
+        ldPatch(r, { deadline: val });
+      });
+    },
+  );
+  suiviSection.appendChild(ldRow('Échéance', deadlineChip));
+
+  // État : l'alerte posée sur la commande, motif compris — choisir une alerte
+  // enchaîne sur la saisie du motif, comme dans la colonne ÉTAT.
+  const saveFlag = (flag, motif) => {
+    const bodyPatch = { flag: flag ?? null, flag_reason: flag ? (motif || null) : null };
+    if (bodyPatch.flag === (r.flag ?? null) && bodyPatch.flag_reason === (r.flag_reason ?? null)) return;
+    ldPatch(r, bodyPatch);
+  };
+  const flagChip = ldChip(
+    (b) => {
+      const f = FLAG_BY_VALUE[r.flag];
+      b.className = 'flag-chip ' + (f ? f.cls : 'empty');
+      b.textContent = f ? f.label : '+ état';
+      attachTip(b, f ? 'changer l’alerte' : 'signaler : BLOQUÉE (avec motif) ou À VOIR');
+    },
+    (b) => {
+      const items = FLAGS.map((f) => ({ value: f.value, label: f.label }));
+      items.push({ value: null, label: 'Rien à signaler', muted: true });
+      openMenu(b, items, r.flag ?? null, (val) => {
+        if (!val) return saveFlag(null, null);
+        openReasonPrompt(b, FLAG_BY_VALUE[val].label, r.flag_reason || '', (motif) => saveFlag(val, motif));
+      });
+    },
+  );
+  suiviSection.appendChild(ldRow('État', flagChip));
+  // Le motif n'existe qu'avec une alerte : sur sa propre rangée, il a la place
+  // de s'afficher en entier (jusqu'à 240 caractères).
   if (FLAG_BY_VALUE[r.flag]) {
-    suiviSection.appendChild(ldKv('État', FLAG_BY_VALUE[r.flag].label + (r.flag_reason ? ` — ${r.flag_reason}` : '')));
+    const reasonChip = ldChip(
+      (b) => {
+        b.className = 'flag-reason ld-reason' + (r.flag_reason ? '' : ' empty');
+        b.textContent = r.flag_reason || '+ motif';
+        attachTip(b, 'préciser le motif');
+      },
+      (b) => openReasonPrompt(b, FLAG_BY_VALUE[r.flag].label, r.flag_reason || '', (motif) => saveFlag(r.flag, motif)),
+    );
+    suiviSection.appendChild(ldRow('Motif', reasonChip));
   }
   body.appendChild(suiviSection);
 
@@ -2002,7 +2261,7 @@ function renderLigneDetail() {
     r.description = val;
     lastSentNotes = notes.value;
     patchRow(r, { description: val })
-      .then(() => { invalidateRowCache(r.id); applySortAndRender(); })
+      .then(() => ldRefresh(r, false))
       .catch((err) => {
         r.description = prev;
         notes.value = prev ?? '';
@@ -2359,7 +2618,10 @@ function capitalizeName(s) {
 // --- Édition inline générique (texte/nombre) ------------------------------
 // `normalize` (optionnel) range la valeur saisie avant l'enregistrement et la
 // réécrit dans le champ (ex. capitalizeName pour les noms / projets).
-function bindInline(input, r, field, transform, normalize) {
+// `onSaved` (optionnel) est rappelé après un enregistrement réussi : la grille
+// s'auto-suffit (le champ édité EST celui affiché), le tiroir de détail s'en
+// sert pour recaler la ligne correspondante du tableau.
+function bindInline(input, r, field, transform, normalize, onSaved) {
   let lastSent = r[field] ?? '';
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -2385,9 +2647,11 @@ function bindInline(input, r, field, transform, normalize) {
     const prev = r[field];
     r[field] = val;
     lastSent = raw;
-    patchRow(r, { [field]: val }).catch((err) => {
-      r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
-    });
+    patchRow(r, { [field]: val })
+      .then(() => { if (onSaved) onSaved(); })
+      .catch((err) => {
+        r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
+      });
   });
 }
 
