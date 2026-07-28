@@ -1733,10 +1733,15 @@ function renderLigneDetailIfOpen() {
 // rendu déclenché par un tiers — ex. `category-owners` en SSE, qui appelle
 // applySortAndRender() sans passer par la garde isInteracting() de poll() —
 // remplacerait le <textarea> des Notes et effacerait la saisie non sauvegardée.
+// On se limite aux champs de saisie, comme isInteracting() : c'est ce qui
+// garantit que poll() s'arrête AVANT d'avoir consommé lastRowsSig. Geler aussi
+// sur un bouton ou un lien qui garde le focus laisserait le tiroir périmé pour
+// de bon — poll() aurait avalé le changement sans jamais le rendre.
 function isDrawerBusy() {
   if (!ligneDrawerCard) return false;
   const ae = document.activeElement;
-  return !!(ae && ligneDrawerCard.contains(ae));
+  if (!ae || !ligneDrawerCard.contains(ae)) return false;
+  return ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT';
 }
 
 // Une ligne « libellé / valeur » du détail (sections Contact et Suivi).
@@ -1979,6 +1984,7 @@ function renderLigneDetail() {
   notesTitle.textContent = 'Notes';
   const notes = document.createElement('textarea');
   notes.className = 'ld-notes';
+  notes.setAttribute('aria-label', 'Notes');
   notes.value = r.description ?? '';
   notes.placeholder = '+ Ajouter une note';
   let lastSentNotes = r.description ?? '';
@@ -2001,7 +2007,7 @@ function renderLigneDetail() {
   body.appendChild(notesSection);
 
   ligneDrawerCard.appendChild(body);
-  if (prevScrollTop) body.scrollTop = prevScrollTop;
+  body.scrollTop = prevScrollTop;
 }
 
 // Bouton « voir détails » : rejoint le cluster documents de la cellule
