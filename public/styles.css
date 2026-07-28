@@ -1279,6 +1279,18 @@ tr:hover .handle { color: var(--text-2); }
   cursor: pointer;
   padding: 0;
 }
+/* Le slot survolé passe AU-DESSUS de ses voisins, sinon la croix est inatteignable.
+   Chaque pastille étale une zone tactile de 44 px (.pdf-btn::after, inset -10px)
+   pour un pas de seulement 32 px : deux zones voisines se recouvrent de 12 px, et
+   c'est le frère SUIVANT dans le DOM qui se peint dessus. La croix, en
+   `position: absolute` sans z-index, se faisait donc recouvrir sur sa moitié
+   droite — son centre renvoyait le voisin : cliquer sur la croix du BAT ouvrait
+   le panneau de détail (chevron) au lieu de retirer le fichier.
+   L'empilement se résout ENTRE FRÈRES, au niveau du slot : un z-index posé sur la
+   seule croix ne changerait rien, c'est le slot lui-même qu'il faut remonter.
+   `z-index: 1` reste sous l'en-tête collant du tableau (z-index 2) et ne peut pas
+   sortir de .grid-wrap, qui crée son propre contexte d'empilement. */
+.pdf-slot:hover { z-index: 1; }
 .pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
 
 /* Type Pro / Perso : pastille */
@@ -4142,4 +4154,17 @@ body.wall-open { overflow: hidden; }
 
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }
+}
+
+/* Optimisation tactile du tiroir — même patron que le bloc `(pointer: coarse)`
+   plus haut (surcharge des tailles au doigt, apparence à la souris inchangée).
+   Bloc séparé et placé ICI parce que le bloc historique est écrit AVANT les
+   règles `.ld-*` : à spécificité égale, les déclarations de base gagnaient et la
+   surcharge tactile serait restée lettre morte (vérifié : `.ld-close` restait à
+   36 px). */
+@media (pointer: coarse) {
+  /* Plancher de cible tactile 44 px (au lieu de 36). */
+  .ld-close { width: 44px; height: 44px; }
+  /* Sous 16 px, iOS zoome sur le champ à la mise au point. */
+  .ld-notes { font-size: 16px; }
 }
