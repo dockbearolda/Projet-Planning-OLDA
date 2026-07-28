@@ -19,8 +19,7 @@ const {
   getMachines, setMachines,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
-  getCommandeZones, addCommandeZone, removeCommandeZone,
-  getHiddenCommandeZones, hideCommandeZone,
+  getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
@@ -69,10 +68,22 @@ const PATCHABLE = [
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason',
+  'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
 ];
+
+// Champs booléens du suivi de paiement. null = on ne se prononce pas (une ligne
+// jamais renseignée n'affirme pas « non payé »).
+const PAIEMENT_FLAGS = new Set(['acompte_demande', 'acompte_verse', 'paye']);
 
 function validateField(key, value) {
   if (value === null || value === undefined) return { ok: true, value: null };
+  if (PAIEMENT_FLAGS.has(key)) {
+    if (typeof value === 'boolean') return { ok: true, value };
+    const s = String(value).trim().toLowerCase();
+    if (s === '' ) return { ok: true, value: null };
+    if (s === 'true' || s === 'false') return { ok: true, value: s === 'true' };
+    return { ok: false, error: `${key} doit être un booléen` };
+  }
   switch (key) {
     case 'stage':
       if (!STAGE_SLUGS.includes(value)) return { ok: false, error: `stage invalide: ${value}` };
@@ -134,6 +145,19 @@ function validateField(key, value) {
       const n = Number(value);
       if (Number.isNaN(n)) return { ok: false, error: 'project_value doit être numérique' };
       return { ok: true, value: n };
+    }
+    case 'acompte_montant': {
+      if (value === '') return { ok: true, value: null };
+      const n = Number(value);
+      if (Number.isNaN(n)) return { ok: false, error: 'acompte_montant doit être numérique' };
+      if (n < 0) return { ok: false, error: 'acompte_montant ne peut pas être négatif' };
+      return { ok: true, value: Math.round(n * 100) / 100 };
+    }
+    case 'paiement_mode': {
+      const s = String(value).trim();
+      if (s === '') return { ok: true, value: null };
+      if (!PAIEMENT_MODE_SET.has(s)) return { ok: false, error: `mode de paiement invalide : ${s}` };
+      return { ok: true, value: s };
     }
     case 'position': {
       const n = Number(value);
@@ -391,7 +415,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 
   // position par défaut : place la nouvelle ligne en bas de son étape.
   if (!cols.includes('position')) {
-    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande';
+    const stage = body.stage && STAGE_SLUGS.includes(body.stage) ? body.stage : 'demande_chiffrage';
     const { rows } = await pool.query(
       'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [stage],
     );
@@ -574,7 +598,7 @@ const CLIENT_MAX = {
   entreprise: 120, nom: 80, type: 60, zone: 60,
   email: 160, telephone: 40,
   raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
-  prenom: 80,
+  prenom: 80, adresse: 200,
 };
 const CLIENT_FIELDS = [...Object.keys(CLIENT_MAX), 'client_type'];
 // La nature du client (pro/perso/asso/revendeur) partage désormais la MÊME liste
@@ -628,6 +652,24 @@ app.get('/api/clients', asyncH(async (req, res) => {
   }));
   list.sort((a, b) => a.entreprise.localeCompare(b.entreprise, 'fr'));
   res.json(list);
+}));
+
+// Secteurs d'activité : liste MODIFIABLE (le patron ajoute et retranche depuis
+// Base clients), pas une constante du code. Déclarées avant `/api/clients/:id`
+// pour qu'« secteurs » ne soit pas pris pour un identifiant de client.
+app.get('/api/clients/secteurs', asyncH(async (req, res) => {
+  res.json(await getClientSecteurs());
+}));
+
+app.post('/api/clients/secteurs', asyncH(async (req, res) => {
+  const label = req.body && req.body.label;
+  const list = await addClientSecteur(label);
+  if (!list) return res.status(400).json({ error: 'libellé de secteur vide' });
+  res.status(201).json(list);
+}));
+
+app.delete('/api/clients/secteurs/:label', asyncH(async (req, res) => {
+  res.json(await removeClientSecteur(req.params.label));
 }));
 
 // GET /api/clients/:id → une fiche + sa timeline de notes (récent en premier).
@@ -764,33 +806,21 @@ async function upsertClientFromCommande(cl) {
 }
 
 // ---------------------------------------------------------------------------
-// Prise de commande atelier — POST /api/commande
-// La saisie du comptoir, EN FACE DU CLIENT : elle doit tenir en 30 à 45 secondes.
-// On tranche DEMANDE ou COMMANDE dès le départ, puis :
-//   - le CONTACT, en deux formes exclusives — PRO (nom de facturation, contact,
-//     WhatsApp, email) ou PERSO (prénom, nom, WhatsApp) ;
-//   - la DEMANDE : objet, description, délai choisi d'un tap (3 / 5 / 10 / 15 j) ;
-//   - les PRODUITS, en trois familles indépendantes qu'on n'ouvre que si besoin :
-//     TASSES (réf, coloris, face 1 anse à droite / face 2 anse à gauche, options,
-//     typo), TEXTILE (réf, coloris, taille, placements + consignes) et
-//     OBJETS (réf, TROTEC / UV / autre, info de personnalisation) ;
-//   - le PAIEMENT : non payé / acompte / payé, et le mode (CB / espèces).
-// Le catalogue (`catalog.commande`) est la source unique des listes ; le serveur
-// revalide tout ce que le poste de saisie envoie.
+// Listes de référence de la prise de projet (catalog.json).
+// Depuis que Nouveau Projet est la seule porte d'entrée, il n'en reste que
+// trois : la NATURE de la ligne (demande à chiffrer / commande validée), les
+// DÉLAIS raccourcis avec leur majoration, et les MODES de paiement.
+// Le catalogue est la source unique ; le serveur revalide tout ce que le poste
+// de saisie envoie, et ne lui fait jamais confiance sur les prix.
 // ---------------------------------------------------------------------------
 const COM = CATALOG.commande;
 const COM_TYPE_BY_ID = new Map(COM.types.map((t) => [t.id, t]));
-const COM_ZONE_BY_ID = new Map(COM.zones.map((z) => [z.id, z]));
-const COM_TECH_BY_ID = new Map(COM.techniques.map((t) => [t.id, t]));
 const COM_DELAI_BY_ID = new Map(COM.delais.map((d) => [d.id, d]));
-const COM_TASSE_OPT_BY_ID = new Map(COM.tasseOptions.map((o) => [o.id, o]));
-const COM_OBJ_TECH_BY_ID = new Map(COM.objetTechniques.map((t) => [t.id, t]));
-const COM_PAY_STATUT_BY_ID = new Map(COM.paiementStatuts.map((p) => [p.id, p]));
 const COM_PAY_MODE_BY_ID = new Map(COM.paiementModes.map((p) => [p.id, p]));
-const COM_FACE_BY_ID = new Map(COM.faces.map((f) => [f.id, f]));
-// Délai retenu quand la fiche n'en porte aucun : la règle maison, jamais
-// « sans échéance ».
-const DELAI_DEFAUT = COM_DELAI_BY_ID.get(COM.delaiDefaut) || COM.delais[0];
+// Modes acceptés par requests.paiement_mode. Défini ici, à côté du catalogue qui
+// en est la source ; validateField le lit à la requête, donc bien après le
+// chargement du module.
+const PAIEMENT_MODE_SET = new Set(COM.paiementModes.map((p) => p.id));
 
 // Les 4 types de projet (classeur « CRM TASSES OLDA », onglet Création Projet :
 // Tasse / T-shirt / Goodies / Signalétique / Reprise Graphique / Autre, réduits
@@ -807,73 +837,17 @@ const PROJET_LIGNES_MAX = 30;
 
 // Longueurs bornées : ces textes finissent dans une cellule de grille, pas dans
 // un traitement de texte.
-const VETEMENT_MAX = 80;
-const REF_MAX = 40;
-const COULEUR_MAX = 40;
 const REMARQUE_MAX = 400;
-const OBJET_MAX = 140;          // objet de la demande (titre d'une ligne du planning)
-const DESCRIPTION_MAX = 1200;   // description libre de la demande
-const TEXTE_MAX = 200;          // face de tasse, typo, info de personnalisation…
+const DESCRIPTION_MAX = 1200;   // description libre d'une ligne du panier
+const TEXTE_MAX = 200;          // coloris d'une tasse, info de personnalisation…
 
-// Emplacements d'impression ajoutés au comptoir (base), en plus de ceux du
-// catalogue. Gardés en MÉMOIRE pour que la validation d'un article reste
-// synchrone ; la base n'est relue qu'au démarrage et à chaque ajout / retrait.
-let CUSTOM_ZONES = [];
-// Emplacements du catalogue masqués (inutiles pour ce poste) : le catalogue
-// n'est pas modifié, on filtre juste ce qu'on en sert.
-let HIDDEN_ZONES = [];
-// `custom: true` distingue les zones effaçables (ajoutées) de celles du
-// catalogue, que la fiche ne propose pas de retirer.
-const allZones = () => [
-  ...COM.zones.filter((z) => !HIDDEN_ZONES.includes(z.id)),
-  ...CUSTOM_ZONES.map((z) => ({ ...z, custom: true })),
-];
-const zoneById = (id) => COM_ZONE_BY_ID.get(id) || CUSTOM_ZONES.find((z) => z.id === id) || null;
-async function loadCommandeZones() {
-  CUSTOM_ZONES = await getCommandeZones();
-  HIDDEN_ZONES = await getHiddenCommandeZones();
-}
-
-// Le poste de saisie demande OÙ enregistrer avant de valider : il lui faut donc
-// le pipeline complet (familles + sous-étapes), servi ici plutôt que recopié
-// dans le module — une étape ajoutée en base apparaît dans le choix sans
-// retoucher le front.
+// Nouveau Projet demande OÙ enregistrer avant de valider : il lui faut donc le
+// pipeline complet (familles + sous-étapes), servi ici plutôt que recopié dans
+// le module — une étape ajoutée en base apparaît dans le choix sans retoucher
+// le front.
 const PIPELINE = STAGES.map((s) => ({ ...s, subs: SUB_STAGES[s.slug] || [] }));
 
-app.get('/api/commande/catalog', (req, res) => {
-  res.json({
-    ...COM, zones: allZones(), employes: RESPONSABLES, clientTypes: CLIENT_TYPES, pipeline: PIPELINE,
-  });
-});
-
-// POST /api/commande/zones { label } → crée l'emplacement et renvoie la liste
-// complète. Idempotent : deux fois « Nuque » ne fait qu'une zone.
-app.post('/api/commande/zones', asyncH(async (req, res) => {
-  const label = req.body && req.body.label;
-  const added = await addCommandeZone(label, COM.zones);
-  if (!added) return res.status(400).json({ error: 'libellé d\'emplacement vide' });
-  CUSTOM_ZONES = added.zones;
-  // On rend la zone telle qu'elle figure dans la liste servie — y compris quand
-  // le libellé retombe sur une zone du CATALOGUE : le poste de saisie n'a pas à
-  // connaître la nuance, il la coche et c'est tout.
-  const zones = allZones();
-  res.status(201).json({ zone: zones.find((z) => z.id === added.id) || null, zones });
-}));
-
-// DELETE /api/commande/zones/:id → retire un emplacement inutile de la liste
-// proposée. Une zone du catalogue est MASQUÉE (catalog.json ne bouge pas) ;
-// une zone ajoutée au comptoir est supprimée pour de bon. Dans les deux cas,
-// les commandes déjà enregistrées gardent leur marquage (le libellé y est
-// recopié à l'enregistrement, pas relu dans cette liste).
-app.delete('/api/commande/zones/:id', asyncH(async (req, res) => {
-  const id = String(req.params.id || '');
-  if (COM_ZONE_BY_ID.has(id)) {
-    HIDDEN_ZONES = await hideCommandeZone(id);
-  } else {
-    CUSTOM_ZONES = await removeCommandeZone(id);
-  }
-  res.json({ zones: allZones() });
-}));
+app.get('/api/pipeline', (req, res) => res.json(PIPELINE));
 
 // Quantité d'une ligne : « Qté identique », le nombre de pièces rigoureusement
 // semblables. Toujours au moins 1 — une ligne sans pièce n'existe pas.
@@ -885,14 +859,6 @@ function readQuantite(raw, where) {
   return { quantite };
 }
 
-// Un texte libre borné (face de tasse, typo, remarque…). Renvoie { value } ou
-// { error } — jamais d'exception, l'appelant remonte le message tel quel.
-function readTexte(raw, where, quoi, max) {
-  const value = trimOrNull(raw);
-  if (value && value.length > max) return { error: `${where} : ${quoi} trop long` };
-  return { value };
-}
-
 // TEXTILE — le vêtement, sa GRILLE DE TAILLES et ses placements (ex-« article »).
 // Le catalogue ne fait que proposer : une taille de grille fournisseur exotique
 // passe telle quelle. Deux formats acceptés :
@@ -901,174 +867,6 @@ function readTexte(raw, where, quoi, max) {
 //     sont ignorées. Une ligne sans aucune quantité reste valable (demande dont
 //     les tailles se préciseront plus tard).
 //   - HISTORIQUE : `taille` (une seule) + `quantite` (pièces identiques).
-function buildTextile(raw, index) {
-  const where = `Textile ${index + 1}`;
-  const a = raw && typeof raw === 'object' ? raw : {};
-
-  const vetement = trimOrNull(a.vetement);
-  if (!vetement) return { error: `${where} : le type de vêtement est vide` };
-  if (vetement.length > VETEMENT_MAX) return { error: `${where} : type de vêtement trop long` };
-
-  // Grille de tailles OU taille unique historique.
-  let taille = trimOrNull(a.taille);
-  let tailles = [];
-  let quantite;
-  if (Array.isArray(a.tailles) && a.tailles.length) {
-    for (const rt of a.tailles) {
-      const lab = trimOrNull(rt && rt.taille);
-      if (!lab) continue;
-      if (lab.length > 24) return { error: `${where} : taille trop longue` };
-      const n = Number.parseInt(rt && rt.quantite, 10);
-      if (!Number.isInteger(n) || n < 0 || n > 9999) {
-        return { error: `${where} — ${lab} : quantité invalide (0 à 9999)` };
-      }
-      if (n > 0) tailles.push({ taille: lab, quantite: n });
-    }
-    quantite = tailles.reduce((s, t) => s + t.quantite, 0);
-    taille = null;                       // le détail vit désormais dans `tailles`
-  } else {
-    if (taille && taille.length > 24) return { error: `${where} : taille trop longue` };
-    const q = readQuantite(a.quantite, where);
-    if (q.error) return { error: q.error };
-    quantite = q.quantite;
-  }
-
-  const note = readTexte(a.note, where, 'description', REMARQUE_MAX);
-  if (note.error) return { error: note.error };
-
-  const ref = trimOrNull(a.ref);
-  if (ref && ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
-  const couleur = trimOrNull(a.couleur);
-  if (couleur && couleur.length > COULEUR_MAX) return { error: `${where} : couleur trop longue` };
-
-  const zones = [];
-  const rawZones = Array.isArray(a.zones) ? a.zones : [];
-  for (const rz of rawZones) {
-    const zone = zoneById(rz && rz.zone);
-    if (!zone) return { error: `${where} : zone d'impression inconnue` };
-    if (zones.some((z) => z.zone === zone.id)) {
-      return { error: `${where} : la zone « ${zone.label} » est posée deux fois` };
-    }
-    const logo = trimOrNull(rz.logo);
-    if (logo && logo.length > COM.consigneMax) {
-      return { error: `${where} — ${zone.label} : logo trop long (${COM.consigneMax} caractères maximum)` };
-    }
-    const couleurZone = trimOrNull(rz.couleur);
-    if (couleurZone && couleurZone.length > COULEUR_MAX) {
-      return { error: `${where} — ${zone.label} : couleur du logo trop longue` };
-    }
-    let largeur = null;
-    if (rz.largeur !== undefined && rz.largeur !== null && rz.largeur !== '') {
-      const n = Number.parseInt(rz.largeur, 10);
-      if (!Number.isInteger(n) || n < 1 || n > 999) {
-        return { error: `${where} — ${zone.label} : largeur du logo invalide (1 à 999 cm)` };
-      }
-      largeur = n;
-    }
-    const tech = COM_TECH_BY_ID.get(rz.technique) || COM.techniques[0];
-    zones.push({
-      zone: zone.id,
-      zoneLabel: zone.label,
-      logo,
-      couleur: couleurZone,
-      largeur,
-      technique: tech.id,
-      techniqueLabel: tech.label,
-    });
-  }
-
-  return {
-    ligne: {
-      famille: 'textile',
-      vetement, ref, couleur, note: note.value,
-      taille: taille || null, tailles, quantite, zones,
-    },
-  };
-}
-
-// TASSE — la référence, le coloris, et SURTOUT les deux faces : l'atelier
-// imprime face 1 anse à droite, face 2 anse à gauche. Sans cette convention le
-// visuel se retrouve à l'envers pour un gaucher.
-function buildTasse(raw, index) {
-  const where = `Tasse ${index + 1}`;
-  const a = raw && typeof raw === 'object' ? raw : {};
-
-  const ref = trimOrNull(a.ref);
-  if (!ref) return { error: `${where} : la référence de tasse est vide` };
-  if (ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
-
-  const q = readQuantite(a.quantite, where);
-  if (q.error) return { error: q.error };
-
-  const couleur = trimOrNull(a.couleur);
-  if (couleur && couleur.length > COULEUR_MAX) return { error: `${where} : coloris trop long` };
-
-  const faces = [];
-  for (const f of COM.faces) {
-    const t = readTexte(a[f.id], where, `visuel de la ${f.label.toLowerCase()}`, TEXTE_MAX);
-    if (t.error) return { error: t.error };
-    if (t.value) faces.push({ face: f.id, label: f.label, hint: f.hint, visuel: t.value });
-  }
-
-  // Options cochées (logo OLDA, texte personnalisé, logo client) : rien
-  // d'obligatoire, mais pas d'identifiant inventé non plus.
-  const options = [];
-  for (const id of Array.isArray(a.options) ? a.options : []) {
-    const opt = COM_TASSE_OPT_BY_ID.get(id);
-    if (!opt) return { error: `${where} : option inconnue` };
-    if (!options.some((o) => o.id === opt.id)) options.push({ id: opt.id, label: opt.label });
-  }
-
-  const infos = readTexte(a.infos, where, 'information de personnalisation', TEXTE_MAX);
-  if (infos.error) return { error: infos.error };
-  const typo = readTexte(a.typo, where, 'typo', TEXTE_MAX);
-  if (typo.error) return { error: typo.error };
-  const remarque = readTexte(a.remarque, where, 'remarque', REMARQUE_MAX);
-  if (remarque.error) return { error: remarque.error };
-
-  return {
-    ligne: {
-      famille: 'tasse',
-      ref, couleur, quantite: q.quantite, faces, options,
-      infos: infos.value, typo: typo.value, remarque: remarque.value,
-    },
-  };
-}
-
-// OBJET — tout le reste (gourde, plaque, trophée…). Ce qui compte à l'atelier,
-// c'est PAR QUELLE MACHINE ça passe : TROTEC, UV, ou autre chose à préciser.
-function buildObjet(raw, index) {
-  const where = `Objet ${index + 1}`;
-  const a = raw && typeof raw === 'object' ? raw : {};
-
-  const ref = trimOrNull(a.ref);
-  if (!ref) return { error: `${where} : la référence d'objet est vide` };
-  if (ref.length > REF_MAX) return { error: `${where} : référence trop longue` };
-
-  const q = readQuantite(a.quantite, where);
-  if (q.error) return { error: q.error };
-
-  const tech = COM_OBJ_TECH_BY_ID.get(a.technique) || null;
-  if (a.technique && !tech) return { error: `${where} : type de personnalisation inconnu` };
-
-  const infos = readTexte(a.infos, where, 'information de personnalisation', TEXTE_MAX);
-  if (infos.error) return { error: infos.error };
-
-  return {
-    ligne: {
-      famille: 'objet',
-      ref, quantite: q.quantite,
-      technique: tech ? tech.id : null,
-      techniqueLabel: tech ? tech.label : null,
-      infos: infos.value,
-    },
-  };
-}
-
-// Le CONTACT, en deux formes exclusives. `societe` est le nom qui fait foi
-// partout ailleurs (colonne du planning, base clients) : le nom de facturation
-// pour un pro, « Prénom Nom » pour un particulier.
-// Les anciens noms de champs (societe / contact / telephone) restent acceptés.
 function buildClient(raw) {
   const c = raw && typeof raw === 'object' ? raw : {};
   const type = CLIENT_TYPE_SET.has(c.type) ? c.type : 'pro';
@@ -1104,52 +902,6 @@ function buildClient(raw) {
       contact, whatsapp, telephone: whatsapp, email,
     },
   };
-}
-
-// Nom lisible d'une ligne, quelle que soit sa famille — sert à la colonne
-// « Description » du planning (« 20 × Tasse blanche 33 cl »).
-const nomLigne = (l) => (l.famille === 'textile' ? l.vetement : l.ref);
-
-// Le détail d'une ligne, en clair, pour la colonne « Infos » : ce que l'atelier
-// doit lire sans jamais ouvrir le JSON ni rappeler le comptoir.
-function detailLigne(l) {
-  if (l.famille === 'textile') {
-    // Grille de tailles (XS×2 · M×5…) ou taille unique historique.
-    const tailleTxt = (l.tailles && l.tailles.length)
-      ? l.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ')
-      : (l.taille ? `taille ${l.taille}` : '');
-    const id = [l.ref && `réf. ${l.ref}`, l.couleur, tailleTxt]
-      .filter(Boolean).join(' · ');
-    const tete = `• ${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`;
-    return [
-      tete,
-      ...(l.note ? [`   ↳ ${l.note}`] : []),
-      ...l.zones.map((z) => {
-        const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-        // `consigne` : anciennes fiches (avant le détail logo/couleur/largeur),
-        // gardées lisibles telles qu'enregistrées.
-        const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null]
-          .filter(Boolean).join(' · ') || z.consigne || '';
-        return `   ↳ ${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
-      }),
-    ].join('\n');
-  }
-  if (l.famille === 'tasse') {
-    const tete = `• ${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`;
-    const suite = [
-      ...l.faces.map((f) => `   ↳ ${f.label} (${f.hint}) : ${f.visuel}`),
-      l.options.length ? `   ↳ ${l.options.map((o) => o.label).join(' · ')}` : null,
-      l.typo ? `   ↳ Typo : ${l.typo}` : null,
-      l.infos ? `   ↳ ${l.infos}` : null,
-      l.remarque ? `   ↳ Remarque : ${l.remarque}` : null,
-    ].filter(Boolean);
-    return [tete, ...suite].join('\n');
-  }
-  const tete = `• ${l.quantite} × ${l.ref}`;
-  const suite = [
-    l.techniqueLabel ? `   ↳ ${l.techniqueLabel}${l.infos ? ` : ${l.infos}` : ''}` : (l.infos ? `   ↳ ${l.infos}` : null),
-  ].filter(Boolean);
-  return [tete, ...suite].join('\n');
 }
 
 // Destination retenue pour la fiche : { stage, subStage } ou { error }.
@@ -1263,6 +1015,27 @@ let PROJET_TAUX_MO = 25;
 let PROJET_TAUX_MACHINE = 25;
 let PROJET_TGCA = 0.04;
 
+// Suivi du paiement envoyé par le comptoir. Chaque information est FACULTATIVE
+// et vaut null tant qu'elle n'est pas renseignée : au comptoir on ne sait pas
+// toujours, et « on ne sait pas » ne doit pas s'enregistrer comme « non ».
+// Le montant n'a de sens que si l'acompte est versé — sinon il est ignoré.
+function readPaiement(raw) {
+  const p = raw && typeof raw === 'object' ? raw : {};
+  const bool = (v) => (v === true || v === false ? v : null);
+  const acompteVerse = bool(p.acompteVerse);
+  const montant = Number(p.acompteMontant);
+  const mode = COM_PAY_MODE_BY_ID.get(p.mode) || null;
+  return {
+    acompteDemande: bool(p.acompteDemande),
+    acompteVerse,
+    acompteMontant: acompteVerse && Number.isFinite(montant) && montant >= 0
+      ? Math.round(montant * 100) / 100
+      : null,
+    paye: bool(p.paye),
+    mode: mode ? { id: mode.id, label: mode.label } : null,
+  };
+}
+
 // Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
 // tasse, un polo, une plaque…), pour un seul client et un seul enregistrement
 // — façon caisse SumUp, on encaisse tout d'un coup. Chaque ligne du panier
@@ -1300,26 +1073,45 @@ function buildProjet(body, tarifsById) {
     prixRevientTotal += built.prixRevientLigne;
   }
 
+  // DÉLAI OBLIGATOIRE : soit un raccourci du catalogue (qui porte sa majoration),
+  // soit une date précise choisie au calendrier (jamais de majoration — on ne
+  // facture pas l'urgence d'une date que le client a lui-même fixée au large).
+  // Aucun défaut silencieux : sans l'un ni l'autre, la fiche est refusée, pour
+  // qu'aucune ligne n'entre au planning sans date butoir.
   const delaiChoisi = COM_DELAI_BY_ID.get(b.delai) || null;
-  const delai = delaiChoisi || DELAI_DEFAUT;
+  const dateChoisie = isDay(b.deadline) ? b.deadline : null;
+  if (!delaiChoisi && !dateChoisie) {
+    return { error: 'le délai est obligatoire : choisis un raccourci ou une date précise' };
+  }
+  const delai = delaiChoisi || { id: 'date', label: `Pour le ${dateChoisie}`, jours: 0, majoration: 0 };
   prixTotalTtc = prixTotalTtc * (1 + (delai.majoration || 0) / 100);
   prixTotalTtc = Math.round(prixTotalTtc * 100) / 100;
 
-  const deadline = todayPlus(delai.jours);
+  // La date précise l'emporte : c'est une échéance dictée par le client, pas un
+  // J+n calculé.
+  const deadline = dateChoisie || todayPlus(delai.jours);
   const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
   const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
 
   const venteHt = prixTotalTtc / (1 + PROJET_TGCA);
   const margeHt = Math.round((venteHt - prixRevientTotal) * 100) / 100;
+  // Le HT n'est jamais stocké : il se déduit du TTC et du taux TGCA du moment.
+  // On le renvoie quand même à l'écran de confirmation, pour éviter que chaque
+  // vue le recalcule avec un taux qu'elle aurait deviné.
+  const prixTotalHt = Math.round(venteHt * 100) / 100;
+
+  const paiement = readPaiement(b.paiement);
 
   const projet = {
     kind: 'projet-simple',
-    version: 2,        // v1 = un type unique par projet ; v2 = panier multi-type
+    version: 3,        // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement
     client,
     lignes,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
     prixTotalTtc,
+    prixTotalHt,
     margeHt,
+    paiement,
     deadline,
     priority,
     stage: dest.stage,
@@ -1342,215 +1134,26 @@ function buildProjet(body, tarifsById) {
     : `${quantite} pièces — ${uniqNoms.slice(0, 3).join(', ')}${uniqNoms.length > 3 ? '…' : ''}`;
 
   const typesPresents = [...new Set(lignes.map((l) => l.type.label))];
+  // Ligne « argent » du résumé : elle ne dit que ce qui est réellement connu,
+  // pour qu'on ne lise jamais « non payé » là où personne n'a rien renseigné.
+  const etatPaiement = [
+    paiement.paye === true ? 'soldé' : null,
+    paiement.acompteVerse === true
+      ? `acompte versé${paiement.acompteMontant != null ? ` ${paiement.acompteMontant.toFixed(2)} €` : ''}`
+      : paiement.acompteDemande === true ? 'acompte demandé' : null,
+    paiement.mode ? paiement.mode.label : null,
+  ].filter(Boolean).join(' · ');
   const resume = [
     `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
     ...lignes.map(detailLigneTexte),
     `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
-    `Prix TTC : ${prixTotalTtc.toFixed(2)} €`,
-  ].join('\n');
+    `Prix : ${prixTotalTtc.toFixed(2)} € TTC (${prixTotalHt.toFixed(2)} € HT)`,
+    etatPaiement ? `Paiement : ${etatPaiement}` : null,
+  ].filter(Boolean).join('\n');
 
   return { projet, resume, produit: produitResume };
 }
 
-// Reconstruit une prise de commande à partir du corps reçu. Fonction pure :
-// aucune écriture, elle renvoie { commande, resume, produit } ou { error }.
-function buildCommande(body) {
-  const b = body && typeof body === 'object' ? body : {};
-
-  const type = COM_TYPE_BY_ID.get(b.kind);
-  if (!type) return { error: `nature inconnue : ${b.kind} (demande ou commande)` };
-
-  // OÙ la fiche atterrit dans le planning. Le poste de saisie le demande
-  // TOUJOURS avant d'enregistrer (« Où l'enregistrer ? ») ; la nature ne fait
-  // plus que proposer la destination habituelle. Un corps sans destination
-  // (ancien client, script) retombe donc sur celle du catalogue.
-  const dest = buildDestination(b, type);
-  if (dest.error) return { error: dest.error };
-
-  const who = buildClient(b.client);
-  if (who.error) return { error: who.error };
-  const { client } = who;
-
-  // La DEMANDE SIMPLE : de quoi enregistrer en dix secondes une affaire qu'on
-  // détaillera plus tard (« Devis 40 polos brodés »), sans ouvrir une famille.
-  const objet = trimOrNull(b.objet);
-  if (objet && objet.length > OBJET_MAX) return { error: 'objet de la demande trop long' };
-  const description = trimOrNull(b.description);
-  if (description && description.length > DESCRIPTION_MAX) return { error: 'description trop longue' };
-
-  // Trois familles, chacune facultative. `articles` (ancien nom) = le textile.
-  const rawTextiles = Array.isArray(b.textiles) ? b.textiles
-    : (Array.isArray(b.articles) ? b.articles : []);
-  const sources = [
-    ['tasses', Array.isArray(b.tasses) ? b.tasses : [], buildTasse],
-    ['textiles', rawTextiles, buildTextile],
-    ['objets', Array.isArray(b.objets) ? b.objets : [], buildObjet],
-  ];
-  const total = sources.reduce((s, [, raw]) => s + raw.length, 0);
-  if (total === 0 && !objet) {
-    return { error: 'ni objet ni produit : la commande est vide' };
-  }
-  if (total > COM.articlesMax) {
-    return { error: `trop de lignes (${COM.articlesMax} maximum)` };
-  }
-
-  const produits = { tasses: [], textiles: [], objets: [] };
-  for (const [cle, raw, build] of sources) {
-    for (let i = 0; i < raw.length; i += 1) {
-      const built = build(raw[i], i);
-      if (built.error) return { error: built.error };
-      produits[cle].push(built.ligne);
-    }
-  }
-  const lignes = [...produits.tasses, ...produits.textiles, ...produits.objets];
-
-  const paie = b.paiement && typeof b.paiement === 'object' ? b.paiement : {};
-  const statut = COM_PAY_STATUT_BY_ID.get(paie.statut) || COM.paiementStatuts[0];
-  // Le mode ne veut rien dire tant que rien n'est encaissé : on ne l'invente pas.
-  const modeBrut = statut.id === 'non_paye' ? null : COM_PAY_MODE_BY_ID.get(paie.mode);
-  const paiement = {
-    statut: { id: statut.id, label: statut.label },
-    mode: modeBrut ? { id: modeBrut.id, label: modeBrut.label } : null,
-  };
-
-  const remarque = trimOrNull(b.remarque);
-  if (remarque && remarque.length > REMARQUE_MAX) return { error: 'remarque trop longue' };
-
-  // Délai et date sont deux façons de dire la même chose. Le délai TAPÉ fait
-  // foi (il porte sa majoration : « sous 3 jours, +10 % ») ; à défaut, une date
-  // choisie à la main s'impose seule ; sans rien, la règle maison s'applique —
-  // jamais « sans échéance ».
-  const delaiChoisi = COM_DELAI_BY_ID.get(b.delai) || null;
-  const dateChoisie = isDay(b.deadline) ? b.deadline : null;
-  const delai = delaiChoisi || (dateChoisie ? null : DELAI_DEFAUT);
-  const deadline = delaiChoisi
-    ? (dateChoisie || todayPlus(delaiChoisi.jours))
-    : (dateChoisie || todayPlus(DELAI_DEFAUT.jours));
-
-  const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
-  const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
-
-  const commande = {
-    kind: 'commande-atelier',        // discriminant : identifie ce JSON dans requests.fiche
-    version: 2,                      // v1 = { articles } sans objet ni paiement
-    type: { id: type.id, label: type.label },
-    client,
-    objet,
-    description,
-    tasses: produits.tasses,
-    textiles: produits.textiles,
-    objets: produits.objets,
-    articles: produits.textiles,     // alias historique : le textile s'appelait « articles »
-    paiement,
-    delai: delai
-      ? { id: delai.id, label: delai.label, jours: delai.jours, majoration: delai.majoration || 0 }
-      : null,                        // date choisie à la main : pas de délai type
-    enBoite: b.enBoite === true,
-    remarque,
-    deadline,
-    priority,
-    vendeuse: RESPONSABLE_SET.has(b.vendeuse) ? b.vendeuse : 'À attribuer',
-    referent: RESPONSABLE_SET.has(b.referent) && b.referent !== 'À attribuer' ? b.referent : null,
-    stage: dest.stage,
-    subStage: dest.subStage,
-    quantite,
-    createdAt: new Date().toISOString(),
-  };
-
-  // Colonne « Description » de la grille : de quoi reconnaître la commande d'un
-  // coup d'œil, sans ouvrir le détail. Une demande sans produit affiche son objet.
-  const noms = [...new Set(lignes.map(nomLigne))];
-  let produit;
-  if (lignes.length === 0) produit = objet;
-  else if (lignes.length === 1) produit = `${lignes[0].quantite} × ${noms[0]}`;
-  else produit = `${quantite} pièces — ${noms.slice(0, 3).join(', ')}${noms.length > 3 ? '…' : ''}`;
-
-  // Colonne « Infos » : le détail lisible, pour que la grille n'ait jamais à
-  // lire le JSON. Une famille vide ne laisse aucune trace.
-  const bloc = (titre, ls) => (ls.length ? [titre, ...ls.map(detailLigne)] : []);
-
-  const contact = [
-    client.contact,
-    client.whatsapp && `WhatsApp ${client.whatsapp}`,
-    client.email,
-  ].filter(Boolean).join(' · ');
-
-  const etats = [
-    `Article en boîte : ${commande.enBoite ? 'oui' : 'non'}`,
-    `Paiement : ${paiement.statut.label.toLowerCase()}${paiement.mode ? ` (${paiement.mode.label})` : ''}`,
-  ].join(' · ');
-
-  const resume = [
-    `${type.label.toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
-    ...(contact ? [`Contact : ${contact}`] : []),
-    ...(objet ? [`Objet : ${objet}`] : []),
-    ...(description ? [description] : []),
-    ...bloc('Tasses', produits.tasses),
-    ...bloc('Textile', produits.textiles),
-    ...bloc('Objets', produits.objets),
-    // La date a sa colonne : on n'écrit ici que le délai TYPE, pour sa
-    // majoration (« sous 3 jours, +10 % ») que le chiffrage doit voir.
-    ...(delai ? [`Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`] : []),
-    etats,
-    ...(remarque ? [`Remarque : ${remarque}`] : []),
-  ].join('\n');
-
-  return { commande, resume, produit };
-}
-
-// POST /api/commande → crée la demande / commande dans le planning.
-app.post('/api/commande', asyncH(async (req, res) => {
-  const built = buildCommande(req.body || {});
-  if (built.error) return res.status(400).json({ error: built.error });
-  const { commande, resume, produit } = built;
-
-  const { rows: posRows } = await pool.query(
-    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [commande.stage],
-  );
-
-  const { rows } = await pool.query(
-    `INSERT INTO requests
-       (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
-        contact_phone, contact_email, quantity, product, color, description, deadline,
-        responsable, referent, position, fiche)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-     RETURNING *`,
-    [
-      commande.stage,
-      commande.subStage,
-      commande.type.id,
-      commande.priority,
-      commande.client.type,
-      commande.client.societe,
-      commande.client.contact,
-      commande.client.telephone,
-      commande.client.email,
-      commande.quantite || null,      // demande simple : aucune pièce comptée
-      produit,
-      // Colonne « Coloris » : le premier renseigné, toutes familles confondues
-      // (une demande simple, sans produit, la laisse vide).
-      [...commande.tasses, ...commande.textiles].map((l) => l.couleur).find(Boolean) || null,
-      resume,
-      commande.deadline,
-      commande.vendeuse,
-      commande.referent,
-      posRows[0].pos,
-      JSON.stringify(commande),
-    ],
-  );
-
-  // « Si c'est un nouveau client, on crée sa fiche » : la base clients se
-  // remplit toute seule à la prise de commande, sans jamais dédoublonner un
-  // client déjà connu.
-  await upsertClientFromCommande(commande.client);
-
-  broadcast({ kind: 'create', stages: [commande.stage] });
-  res.status(201).json({ id: rows[0].id, commande });
-}));
-
-// POST /api/projets → crée un Nouveau Projet (comptoir ultra-minimal). Recharge
-// systématiquement le catalogue tarifs + paramètres AVANT de construire, pour
-// ne jamais calculer avec des prix périmés.
 app.post('/api/projets', asyncH(async (req, res) => {
   const [articles, parametres] = await Promise.all([getTarifsTasseArticles(), getTarifsTasseParametres()]);
   PROJET_TAUX_MO = parametres.tauxHoraireMo;
@@ -1569,14 +1172,19 @@ app.post('/api/projets', asyncH(async (req, res) => {
   const { rows } = await pool.query(
     `INSERT INTO requests
        (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
-        contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value,
+        acompte_demande, acompte_verse, acompte_montant, paye, paiement_mode)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
      RETURNING *`,
     [
       projet.stage, projet.subStage, 'commande', projet.priority, projet.client.type,
       projet.client.societe, projet.client.contact, projet.client.telephone, projet.client.email,
       projet.quantite, produit, resume, projet.deadline, posRows[0].pos,
+      // `project_value` porte le TTC : c'est le prix que le client paie, et
+      // c'est lui qu'on saisit au comptoir. Le HT s'en déduit à l'affichage.
       JSON.stringify(projet), projet.prixTotalTtc,
+      projet.paiement.acompteDemande, projet.paiement.acompteVerse, projet.paiement.acompteMontant,
+      projet.paiement.paye, projet.paiement.mode ? projet.paiement.mode.id : null,
     ],
   );
 
@@ -1592,14 +1200,13 @@ app.post('/api/projets', asyncH(async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 // L'ancienne adresse de la fiche reste valide (raccourcis déjà posés sur les
-// écrans) : elle renvoie sur la prise de commande de l'application.
-app.get('/fiche', (req, res) => res.redirect(301, '/#commande'));
+// écrans) : elle renvoie sur Nouveau Projet, la seule porte d'entrée.
+app.get('/fiche', (req, res) => res.redirect(301, '/#nouveau-projet'));
 
 // ---------------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------------
 init()
-  .then(loadCommandeZones)
   .then(() => {
     // `__server` est exposé pour les tests (PORT=0 → port libre, adresse lue au
     // moment où le serveur écoute). En production rien ne le lit.

@@ -1,6 +1,6 @@
 'use strict';
 
-// Vérifie la règle de blocage prix à l'entrée dans la zone Devis à envoyer → Archivé
+// Vérifie la règle de blocage prix à l'entrée dans la zone Devis envoyé → Archivé
 // (glisser-déposer et flèche « étape suivante »). Comme test/next-flow-step.test.js,
 // on extrait le VRAI bloc source de public/app.js (entre les deux bornes ci-dessous)
 // plutôt que d'en recopier la logique : une régression dans app.js fait donc échouer
@@ -49,28 +49,28 @@ assert.strictEqual(hasPrice({ project_value: undefined }), false, 'prix absent (
 assert.strictEqual(hasPrice({ project_value: 0 }), true, 'prix à 0€ est valide');
 assert.strictEqual(hasPrice({ project_value: 45.5 }), true, 'prix positif valide');
 
-// 2. Sans prix, entrer dans la sous-étape Devis à envoyer depuis Chiffrage en cours
-//    est bloqué : c'est le premier point d'entrée de la zone.
+// 2. Sans prix, entrer dans la sous-étape « Devis envoyé » depuis Chiffrage en
+//    cours est bloqué : c'est le premier point d'entrée de la zone.
 assert.strictEqual(
-  blockedByPrice({ stage: 'chiffrage', sub_stage: 'chiffrage_en_cours', project_value: null }, 'chiffrage', 'devis_a_envoyer'),
+  blockedByPrice({ stage: 'demande_chiffrage', sub_stage: 'chiffrage_en_cours', project_value: null }, 'demande_chiffrage', 'devis_envoye'),
   true,
-  'sans prix, entrer en Devis à envoyer est bloqué',
+  'sans prix, envoyer le devis est bloqué',
 );
 
-// 3. Les sous-étapes de Chiffrage AVANT Devis à envoyer ne demandent pas de prix.
+// 3. Les sous-étapes de chiffrage AVANT l'envoi du devis ne demandent pas de prix.
 assert.strictEqual(
-  blockedByPrice({ stage: 'chiffrage', sub_stage: 'a_chiffrer', project_value: null }, 'chiffrage', 'chiffrage_en_cours'),
+  blockedByPrice({ stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', project_value: null }, 'demande_chiffrage', 'chiffrage_en_cours'),
   false,
   'avancer vers Chiffrage en cours ne demande pas de prix',
 );
 
-// 4. Sans prix, entrer dans n'importe quelle famille après Commande/Chiffrage est
-//    bloqué (Attente Client, Préparation, Production, Facturation, Terminé, Archivé).
-for (const targetStage of ['attente_client', 'preparation', 'production', 'facturation', 'termine', 'archive']) {
+// 4. Sans prix, entrer dans n'importe quelle famille après Demande & chiffrage
+//    est bloqué (Préparation, Production, Facturation, Paiement & clôture).
+for (const targetStage of ['preparation', 'production', 'facturation', 'paiement']) {
   assert.strictEqual(
-    blockedByPrice({ stage: 'demande', project_value: null }, targetStage, null),
+    blockedByPrice({ stage: 'demande_chiffrage', sub_stage: 'demande_recue', project_value: null }, targetStage, null),
     true,
-    `sans prix, entrer en ${targetStage} depuis Demande est bloqué`,
+    `sans prix, entrer en ${targetStage} depuis Demande reçue est bloqué`,
   );
 }
 
@@ -100,27 +100,27 @@ assert.strictEqual(
   'avancer de Production vers Facturation, déjà dans la zone, n’est jamais bloqué',
 );
 assert.strictEqual(
-  blockedByPrice({ stage: 'facturation', project_value: null }, 'chiffrage', 'devis_a_envoyer'),
+  blockedByPrice({ stage: 'facturation', project_value: null }, 'demande_chiffrage', 'devis_envoye'),
   false,
-  'revenir en arrière dans la zone (jusqu’à Devis à envoyer) n’est jamais bloqué',
+  'revenir en arrière dans la zone (jusqu’à Devis envoyé) n’est jamais bloqué',
 );
 
-// 7. Cible avant la zone (Demande, ou Chiffrage hors Devis à envoyer) : jamais
-//    bloqué par le prix, y compris en reculant depuis la zone.
+// 7. Cible avant la zone (les 4 premières sous-étapes de Demande & chiffrage) :
+//    jamais bloqué par le prix, y compris en reculant depuis la zone.
 assert.strictEqual(
-  blockedByPrice({ stage: 'facturation', project_value: null }, 'chiffrage', 'chiffrage_en_cours'),
+  blockedByPrice({ stage: 'facturation', project_value: null }, 'demande_chiffrage', 'chiffrage_en_cours'),
   false,
   'sortir de la zone vers l’arrière n’est jamais bloqué par le prix',
 );
 assert.strictEqual(
-  blockedByPrice({ stage: 'demande', project_value: null }, 'demande', null),
+  blockedByPrice({ stage: 'demande_chiffrage', sub_stage: 'demande_recue', project_value: null }, 'demande_chiffrage', 'demande_a_qualifier'),
   false,
   'rester avant la zone n’est jamais bloqué par le prix',
 );
 
 // 8. Le message est généré dynamiquement à partir de la cible (réutilisé par la
 //    bulle et le toast).
-assert.strictEqual(priceBlockMessage('chiffrage', 'devis_a_envoyer'), 'Sans prix, impossible de passer en Devis à envoyer.');
-assert.strictEqual(priceBlockMessage('facturation', null), 'Sans prix, impossible de passer en Facturation / Retrait.');
+assert.strictEqual(priceBlockMessage('demande_chiffrage', 'devis_envoye'), 'Sans prix, impossible de passer en Tarif / Devis envoyé – Attente client.');
+assert.strictEqual(priceBlockMessage('facturation', null), 'Sans prix, impossible de passer en Facturation & remise au client.');
 
-console.log('✓ price-block : hasPrice/blockedByPrice couvrent la zone Devis à envoyer → Archivé, prix null/0/positif et entrée vs mouvement interne');
+console.log('✓ price-block : hasPrice/blockedByPrice couvrent la zone Devis envoyé → Archivé, prix null/0/positif et entrée vs mouvement interne');

@@ -528,3 +528,51 @@
   .cl-f--nature { gap: 6px; padding: 10px 0; }
   .cl-f__label { text-transform: none; }
 }
+
+/* --- Secteurs d'activité : gestion de la liste ------------------------------
+   Un panneau court, ouvert depuis l'en-tête : la liste vit en base, on l'ajuste
+   ici plutôt que dans le code. Retirer un secteur ne touche aucune fiche. */
+.cl-secteurs { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.cl-secteurs__scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.cl-secteurs__card {
+  position: relative; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+  background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-pop); padding: 22px;
+}
+.cl-secteurs__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cl-secteurs__title { margin: 0; font-size: 18px; font-weight: 700; }
+.cl-secteurs__close { border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; padding: 6px; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
+.cl-secteurs__hint { margin: 6px 0 14px; font-size: 13px; color: var(--text-2); }
+.cl-secteurs__list { display: flex; flex-wrap: wrap; gap: 8px; }
+.cl-secteurs__chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border); border-radius: 999px; font-size: 13.5px; background: var(--surface);
+}
+.cl-secteurs__del {
+  display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  border: 0; border-radius: 50%; background: none; color: var(--text-3); cursor: pointer;
+}
+.cl-secteurs__del:hover { background: var(--state-hover); color: var(--danger, #d64541); }
+.cl-secteurs__del .material-symbols-outlined { font-size: 17px; }
+.cl-secteurs__add { display: flex; gap: 8px; margin-top: 16px; }
+.cl-secteurs__add .cl-f__input { flex: 1; }
+/* Doigt : les croix restent atteignables sans viser au pixel près. */
+@media (pointer: coarse) {
+  .cl-secteurs__del { width: 36px; height: 36px; }
+  .cl-secteurs__chip { padding: 8px 8px 8px 14px; }
+}
+
+/* Bouton d'outil de l'en-tête (gestion des secteurs) : même gabarit que les
+   boutons de tri, mais sa propre classe — le tri intercepte tous les clics de
+   la sienne. */
+.cl-tool {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.cl-tool:hover { border-color: var(--primary); color: var(--primary); }
+.cl-tool:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.cl-tool .material-symbols-outlined { font-size: 19px; }
+@media (pointer: coarse) { .cl-tool { min-height: 44px; } }

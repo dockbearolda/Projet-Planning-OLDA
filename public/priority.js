@@ -26,7 +26,13 @@ export const STAGNATION_CAP_DAYS = 7;
 export const NEUTRAL_IMPORTANCE = 3;
 
 // Familles hors du « à faire maintenant » : rien à pousser (fin de flux / hors flux).
-export const INACTIVE_STAGES = new Set(['termine', 'archive', 'fiverr']);
+// « Paiement & clôture » couvre l'ancien Terminé + Archivé : la commande est
+// partie chez le client, il ne reste plus de travail d'atelier à pousser.
+export const INACTIVE_STAGES = new Set(['paiement', 'fiverr']);
+
+// Positions « la balle est dans le camp du client » : le devis est parti, ou le
+// BAT attend sa validation. Rien à pousser tant qu'il n'a pas répondu.
+export const WAITING_SUBS = new Set(['devis_envoye', 'bat_envoye']);
 
 // Sous-étape de PRODUCTION → machine (signal le plus sûr : on est déjà au poste).
 export const SUBSTAGE_MACHINE = {
@@ -175,7 +181,7 @@ export function rankRequests(rows, machinesList, opts) {
   for (const r of rows || []) {
     if (!r || INACTIVE_STAGES.has(r.stage)) continue;
     if (r.flag === 'bloque') { blocked.push(r); continue; }
-    if (r.stage === 'attente_client') { waiting.push(r); continue; }
+    if (WAITING_SUBS.has(r.sub_stage)) { waiting.push(r); continue; }
     const meta = scoreRequest(r, { now, machines, weights });
     queue.push({ r, score: meta.score, reasons: reasonsFor(meta), meta });
   }

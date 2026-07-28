@@ -13,25 +13,23 @@ const { Pool, types } = require('pg');
 types.setTypeParser(types.builtins.DATE, (v) => v);
 
 // Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) :
-//   - la FAMILLE (requests.stage) dit OÙ en est le projet — 8 grandes étapes,
+//   - la FAMILLE (requests.stage) dit OÙ en est le projet — 5 grandes étapes,
 //     affichées dans la barre latérale gauche ;
 //   - la SOUS-FAMILLE (requests.sub_stage) précise CE QUI SE PASSE MAINTENANT —
 //     choisie en ligne sur la commande (puce), uniquement pour les familles qui
 //     en ont. « 1 projet = 1 seule place. »
 const FAMILIES = [
-  { slug: 'demande', label: 'Demande' },
-  // Ex-« Chiffrage / Devis » : c'est là qu'atterrit une COMMANDE validée prise
-  // au comptoir (le devis/chiffrage reste à faire, mais le client a dit oui).
-  { slug: 'chiffrage', label: 'Commande' },
-  { slug: 'attente_client', label: 'Attente Client' },
-  { slug: 'preparation', label: 'Préparation' },
+  // Reçu, qualifié, chiffré, devis envoyé, devis validé : tout le commercial
+  // avant que l'atelier ne touche quoi que ce soit.
+  { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
+  { slug: 'preparation', label: 'Préparation du projet' },
   { slug: 'production', label: 'Production' },
-  { slug: 'facturation', label: 'Facturation / Retrait' },
-  { slug: 'termine', label: 'Terminé' },
-  { slug: 'archive', label: 'Archivé' },
+  { slug: 'facturation', label: 'Facturation & remise au client' },
+  // Le dossier est parti chez le client : reste l'argent, puis l'archive.
+  { slug: 'paiement', label: 'Paiement & clôture' },
 ];
 
-// Catégorie spéciale conservée hors des 8 familles : sous-traitance graphiste
+// Catégorie spéciale conservée hors des 5 familles : sous-traitance graphiste
 // (outil de devis + « Envoyer vers Fiverr »). Épinglée en bas de la sidebar.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
@@ -41,35 +39,49 @@ const SPECIAL = [
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
 
-// Sous-familles par famille (slug → libellé). Une famille absente d'ici n'a pas
-// de sous-étape (Demande, Attente Client, Archivé, Fiverr).
+// Sous-familles par famille (slug → libellé). Seul Fiverr n'en a pas : les 5
+// familles décrivent toutes une suite d'actions précises.
+// « À commander » et « Attente marchandise » se glissent entre la validation de
+// l'acompte et « Prêt à produire » : on valide l'argent, on commande la
+// marchandise, on la reçoit, alors seulement la production peut démarrer.
 const SUB_STAGES = {
-  chiffrage: [
+  demande_chiffrage: [
+    { slug: 'demande_recue', label: 'Demande reçue' },
+    { slug: 'demande_a_qualifier', label: 'Demande à qualifier' },
     { slug: 'a_chiffrer', label: 'À chiffrer' },
     { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
-    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+    { slug: 'devis_envoye', label: 'Tarif / Devis envoyé – Attente client' },
+    { slug: 'devis_valide', label: 'Devis validé' },
   ],
   preparation: [
-    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'prepa_produits', label: 'Préparation des produits' },
+    { slug: 'prepa_bat', label: 'Préparation du BAT' },
+    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    { slug: 'bat_valide', label: 'BAT validé' },
+    { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
     { slug: 'attente_marchandise', label: 'Attente marchandise' },
     { slug: 'pret_a_produire', label: 'Prêt à produire' },
   ],
   production: [
     { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'decoupe_dtf', label: 'Découpe & Contrôle DTF' },
     { slug: 'prod_pressage', label: 'Pressage' },
     { slug: 'prod_trotec', label: 'Production Trotec' },
     { slug: 'prod_uv', label: 'Production UV' },
     { slug: 'montage_finition', label: 'Montage / Finition' },
-    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+    { slug: 'controle_emballage', label: 'Contrôle & Emballage' },
   ],
   facturation: [
     { slug: 'facturation_a_faire', label: 'Facturation à faire' },
-    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+    { slug: 'client_a_prevenir', label: 'Client à prévenir' },
+    { slug: 'client_prevenu', label: 'Client prévenu – Attente retrait' },
+    { slug: 'commande_recuperee', label: 'Commande récupérée' },
   ],
-  termine: [
-    { slug: 'attente_paiement', label: 'Attente paiement' },
-    { slug: 'solde', label: 'Soldé' },
+  paiement: [
+    { slug: 'paiement_a_controler', label: 'Paiement à contrôler' },
+    { slug: 'paiement_valide', label: 'Paiement validé / Soldé' },
+    { slug: 'archive', label: 'Archivé' },
   ],
 };
 
@@ -102,7 +114,7 @@ const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
 // dans requests.flag_reason (« BLOQUÉE — attente BAT client »).
 const FLAGS = ['bloque', 'a_voir'];
 
-// NATURE de la ligne, tranchée dès la prise de commande (requests.order_kind) :
+// NATURE de la ligne, tranchée à l'enregistrement (requests.order_kind) :
 // une DEMANDE est à chiffrer (devis à faire), une COMMANDE est déjà validée par
 // le client. null = ligne créée avant l'existence du champ, ou saisie à la main
 // dans la grille : on n'invente pas la nature à sa place.
@@ -163,6 +175,24 @@ async function init() {
     await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS fiche jsonb');
   } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
 
+  // Migration : SUIVI DU PAIEMENT sur une commande. Cinq informations que le
+  // patron veut voir d'un coup d'œil : l'acompte a-t-il été demandé, a-t-il été
+  // versé, pour quelle somme exacte, le projet est-il soldé, et par quel moyen.
+  // Toutes nullables et sans valeur par défaut : une ligne d'avant cette
+  // migration n'affirme rien plutôt que d'affirmer « non payé » à tort.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS <col> pour chacune.
+  for (const [col, type] of [
+    ['acompte_demande', 'boolean'],
+    ['acompte_verse', 'boolean'],
+    ['acompte_montant', 'numeric(12,2)'],
+    ['paye', 'boolean'],
+    ['paiement_mode', 'text'],
+  ]) {
+    try {
+      await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
   // Migration : NATURE pro / perso sur la base clients (distincte du `type`
   // métier libre). Les clients déjà présents viennent tous de la base PRO
   // rapatriée → on les marque 'pro'. Nouveaux clients perso saisis au comptoir.
@@ -198,6 +228,10 @@ async function init() {
   // Puis bascule du modèle linéaire vers le modèle « familles » à 2 niveaux.
   // Non destructif, exécuté UNE seule fois (garde app_meta).
   await migrateStagesToFamilies();
+
+  // Enfin, regroupement des 8 familles en 5 (liste d'étapes du patron).
+  // Non destructif, exécuté UNE seule fois (garde app_meta séparée).
+  await migrateFamiliesToFive();
 
   // Filet de sécurité : réaligne toute ligne restée sur un ancien slug malgré la
   // garde ci-dessus (import / restauration de sauvegarde). Idempotent.
@@ -360,6 +394,113 @@ async function migrateStagesToFamilies() {
   await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model', 'families')");
 }
 
+// Bascule du modèle « 8 familles » (v2) vers le modèle « 5 FAMILLES » (v3), la
+// liste d'étapes écrite par le patron le 28/07/2026.
+//
+// Clé de correspondance : `famille/sous-étape` (sous-étape vide = la famille
+// sans puce). `famille/*` sert de repli pour toute sous-étape non listée.
+// Une position ABSENTE de cette table ne bouge pas : Préparation (sauf
+// prepa_fichiers), Production, Facturation à faire et Fiverr gardent leurs
+// slugs, donc la grande majorité des lignes n'est même pas réécrite.
+const V2_TO_V3 = {
+  'demande/*': ['demande_chiffrage', 'demande_recue'],
+  'chiffrage/': ['demande_chiffrage', 'a_chiffrer'],
+  'chiffrage/a_chiffrer': ['demande_chiffrage', 'a_chiffrer'],
+  'chiffrage/chiffrage_en_cours': ['demande_chiffrage', 'chiffrage_en_cours'],
+  'chiffrage/devis_a_envoyer': ['demande_chiffrage', 'devis_envoye'],
+  'chiffrage/*': ['demande_chiffrage', 'a_chiffrer'],
+  'attente_client/*': ['demande_chiffrage', 'devis_envoye'],
+  'preparation/prepa_fichiers': ['preparation', 'prepa_produits'],
+  'facturation/pret_retrait': ['facturation', 'client_prevenu'],
+  'termine/attente_paiement': ['paiement', 'paiement_a_controler'],
+  'termine/solde': ['paiement', 'paiement_valide'],
+  'termine/*': ['paiement', 'paiement_a_controler'],
+  'archive/*': ['paiement', 'archive'],
+};
+
+// Position v2 → position v3, ou null si rien ne change. Exportée : le test de
+// migration l'exerce directement, sans passer par une base.
+function toFiveFamilies(stage, sub) {
+  const key = `${stage}/${sub ?? ''}`;
+  return V2_TO_V3[key] || V2_TO_V3[`${stage}/*`] || null;
+}
+
+// Garde d'idempotence SÉPARÉE de `stage_model` : cette clé-là doit garder la
+// valeur 'families', sinon migrateStagesToFamilies se rejouerait à chaque
+// démarrage et son UPDATE « WHERE stage = 'facturation' » écraserait la
+// sous-étape de toutes les lignes en facturation.
+//
+// Down : appliquer V2_TO_V3 à l'envers (demande_recue/demande_a_qualifier →
+// demande, devis_envoye → attente_client, prepa_produits → prepa_fichiers,
+// client_prevenu → facturation/pret_retrait, paiement/* → termine et archive),
+// puis DELETE FROM app_meta WHERE key = 'stage_model_v3'.
+async function migrateFamiliesToFive() {
+  try {
+    await pool.query("ALTER TABLE requests ALTER COLUMN stage SET DEFAULT 'demande_chiffrage'");
+  } catch (_) { /* pg-mem local : défaut déjà posé par le schéma */ }
+
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model_v3'");
+    if (rows[0] && rows[0].value === '1') return;
+  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+
+  const { rows: all } = await pool.query('SELECT id, stage, sub_stage FROM requests');
+  let moved = 0;
+  for (const r of all) {
+    const next = toFiveFamilies(r.stage, r.sub_stage ?? null);
+    if (!next) continue;
+    await pool.query('UPDATE requests SET stage = $1, sub_stage = $2 WHERE id = $3', [next[0], next[1], r.id]);
+    moved += 1;
+  }
+  if (moved) console.log(`ℹ  Pipeline : ${moved} commande(s) reclassée(s) dans les 5 familles.`);
+
+  await renameCategorySettingKeys();
+
+  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model_v3'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model_v3', '1')");
+}
+
+// Les pilotes et référents PAR DÉFAUT sont réglés par étape (app_meta
+// category_owners / category_referents, clé = slug). Cinq sous-étapes changent
+// simplement de nom : sans ce report, le patron verrait ses réglages disparaître
+// sans comprendre pourquoi.
+//
+// Seules les correspondances 1 pour 1 sont reportées. Les anciennes FAMILLES
+// (demande, chiffrage, attente_client → une seule famille aujourd'hui) sont
+// laissées telles quelles : trois réglages différents ne peuvent pas fusionner
+// sans en écraser deux, autant que le patron retranche lui-même.
+const SETTING_KEY_RENAMES = {
+  prepa_fichiers: 'prepa_produits',
+  devis_a_envoyer: 'devis_envoye',
+  pret_retrait: 'client_prevenu',
+  attente_paiement: 'paiement_a_controler',
+  solde: 'paiement_valide',
+};
+
+async function renameCategorySettingKeys() {
+  for (const key of ['category_owners', 'category_referents']) {
+    const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [key]);
+    if (!rows[0]) continue;
+    let map;
+    try {
+      map = JSON.parse(rows[0].value);
+    } catch (_) { continue; }
+    if (!map || typeof map !== 'object') continue;
+
+    let changed = false;
+    for (const [from, to] of Object.entries(SETTING_KEY_RENAMES)) {
+      // Un réglage déjà posé sur le nouveau slug fait foi : on ne l'écrase pas.
+      if (map[from] === undefined || map[to] !== undefined) continue;
+      map[to] = map[from];
+      delete map[from];
+      changed = true;
+    }
+    if (!changed) continue;
+    await pool.query('DELETE FROM app_meta WHERE key = $1', [key]);
+    await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [key, JSON.stringify(map)]);
+  }
+}
+
 // Réparation AUTO-CICATRISANTE (idempotente, non destructive). Certaines lignes
 // portent un `stage` resté sur un ANCIEN slug (linéaire ou multi-machines :
 // « prod_trotec », « preparation_production », « nouvelle_demande »…) jamais
@@ -387,13 +528,23 @@ async function repairOrphanStages() {
       // stage='preparation_production' mais sub_stage='prod_trotec' est bien une
       // commande de production Trotec, pas une préparation fichiers).
       family = SUB_TO_FAMILY[sub];
-    } else if (STAGE_TO_FAMILY[r.stage]) {
-      [family, sub] = STAGE_TO_FAMILY[r.stage];
     } else {
-      // Slug totalement inconnu : on la renvoie en tête de pipeline plutôt que de
-      // la laisser invisible dans la sidebar.
-      family = 'demande';
-      sub = null;
+      // Deux modèles peuvent précéder celui-ci : le linéaire (20 étapes à plat)
+      // et les 8 familles. On les traverse dans l'ordre — linéaire → v2 → v3 —
+      // pour qu'un slug très ancien retombe quand même sur sa place actuelle.
+      const [v2Stage, v2Sub] = STAGE_TO_FAMILY[r.stage] || [r.stage, sub];
+      const v3 = toFiveFamilies(v2Stage, v2Sub);
+      if (v3) {
+        [family, sub] = v3;
+      } else if (STAGE_SLUGS.includes(v2Stage)) {
+        family = v2Stage;
+        sub = v2Sub;
+      } else {
+        // Slug totalement inconnu : on la renvoie en tête de pipeline plutôt que
+        // de la laisser invisible dans la sidebar.
+        family = 'demande_chiffrage';
+        sub = 'demande_recue';
+      }
     }
     await pool.query('UPDATE requests SET stage = $1, sub_stage = $2 WHERE id = $3', [family, sub, r.id]);
   }
@@ -412,19 +563,19 @@ async function seed() {
 
   const samples = [
     {
-      stage: 'demande', sub_stage: null, responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
+      stage: 'demande_chiffrage', sub_stage: 'demande_recue', responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
       billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', quantity: 50,
       product: '50 t-shirts staff', color: 'Noir', project_value: 850,
       description: 'Tee-shirts équipe — gros devis', deadline: inDays(3), position: 1000,
     },
     {
-      stage: 'demande', sub_stage: null, responsable: 'À attribuer', priority: 1, client_type: 'perso',
+      stage: 'demande_chiffrage', sub_stage: 'demande_a_qualifier', responsable: 'À attribuer', priority: 1, client_type: 'perso',
       billing_company: 'Alessandro', contact_referent: 'Alessandro', quantity: 1,
       product: 'Impression plexi A3', project_value: 30, description: 'Photo à vérifier',
       deadline: inDays(1), position: 2000,
     },
     {
-      stage: 'chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
+      stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
       billing_company: 'Saint-Barth Store', contact_referent: 'Coach Bernard', quantity: 120,
       product: 'Collection été', project_value: 1450, description: 'Maillots saison 2026',
       deadline: inDays(8), position: 1000,
@@ -458,7 +609,7 @@ async function seed() {
     {
       // Sans date et ancienne (> 7 j) : illustre le vieillissement « À planifier »
       // du dashboard (badge orange, remonte au-dessus des « Sans date » récentes).
-      stage: 'preparation', sub_stage: 'prepa_fichiers', priority: 1, client_type: 'perso',
+      stage: 'preparation', sub_stage: 'prepa_produits', priority: 1, client_type: 'perso',
       billing_company: 'Atelier Broderie Sud', contact_referent: 'Mme Costa', quantity: 6,
       product: 'Casquettes brodées', project_value: 120, description: 'Client pas pressé — à planifier',
       deadline: null, position: 3000, created_days_ago: 9,
@@ -720,91 +871,60 @@ async function setTarifsTasseParametres(p) {
   return clean;
 }
 
-// --- Emplacements d'impression ajoutés au comptoir ---------------------------
-// Le catalogue couvre les zones courantes (cœur, dos, manches…), mais l'atelier
-// en croise toujours une nouvelle : « Nuque », « Bas du dos », un flanc de sac.
-// La fiche de prise de commande permet donc d'en créer une à la volée ; elle est
-// stockée ici (app_meta.commande_zones, tableau JSON) et rejoint la liste de
-// TOUS les postes, sans redéploiement ni migration.
-// Les zones du catalogue, elles, ne passent jamais par là : elles sont figées.
-const ZONE_LABEL_MAX = 40;
-// Même convention d'identifiant que le catalogue (« haut_dos », « manche_g ») :
-// le front applique la même règle pour afficher la zone sans attendre le serveur.
-const zoneSlug = (s) => slugify(s).replace(/-/g, '_');
+// ---------------------------------------------------------------------------
+// Secteurs d'activité de la base clients (app_meta.client_secteurs).
+// La liste vient du classeur patron « CRM OLDA CREATION CLIENTS », mais elle
+// n'est plus figée dans le code : elle s'ajoute et se retranche depuis Base
+// clients. Un secteur retranché ne disparaît PAS des fiches qui le portent —
+// `clients.secteur` en garde une copie, jamais relue dans cette liste.
+// Down : DELETE FROM app_meta WHERE key = 'client_secteurs' (la liste repart
+// des valeurs d'amorçage ci-dessous).
+const SECTEURS_AMORCE = [
+  'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
+  'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
+  'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',
+  'Administration', 'Autre',
+];
+const SECTEUR_LABEL_MAX = 60;
+// Rapprochement insensible à la casse et aux accents : « hotel » et « Hôtel »
+// sont le même secteur, on n'en crée pas deux.
+const secteurKey = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-async function getCommandeZones() {
-  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones'");
-  if (!rows[0]) return [];
+async function writeSecteurs(list) {
+  await pool.query("DELETE FROM app_meta WHERE key = 'client_secteurs'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('client_secteurs', $1)", [JSON.stringify(list)]);
+  return list;
+}
+
+// Première lecture : la clé est écrite avec la liste connue, pour que le patron
+// parte de ses 20 secteurs et non d'une page blanche.
+async function getClientSecteurs() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'client_secteurs'");
+  if (!rows[0]) return writeSecteurs(SECTEURS_AMORCE);
   try {
     const parsed = JSON.parse(rows[0].value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((z) => z && typeof z === 'object' && z.id && z.label)
-      .map((z) => ({ id: String(z.id), label: String(z.label) }));
+    if (!Array.isArray(parsed)) return writeSecteurs(SECTEURS_AMORCE);
+    return parsed.filter((s) => typeof s === 'string' && s.trim() !== '');
   } catch (_) {
-    return [];
+    return writeSecteurs(SECTEURS_AMORCE);
   }
 }
 
-// Ajoute une zone. `reserved` = les zones du catalogue, qu'on ne double jamais.
-// Renvoie { id, zone, zones } ; `zone` est l'existante si le libellé retombe sur
-// une zone déjà ajoutée (« Nuque » deux fois = une seule zone), et null si c'est
-// une zone du catalogue (rien à créer, l'appelant l'a déjà). Le rapprochement se
-// fait sur l'identifiant ET sur le libellé normalisé : « Avant gauche » retrouve
-// la zone `avant_g` du catalogue plutôt que d'en créer une jumelle.
-async function addCommandeZone(label, reserved = []) {
-  const clean = String(label == null ? '' : label).trim().slice(0, ZONE_LABEL_MAX);
-  const id = zoneSlug(clean);
-  if (!clean || !id) return null;
-
-  const zones = await getCommandeZones();
-  const same = (z) => z.id === id || zoneSlug(z.label) === id;
-  const cat = reserved.find(same);
-  if (cat) return { id: cat.id, zone: null, zones };
-  const known = zones.find(same);
-  if (known) return { id: known.id, zone: known, zones };
-
-  const next = [...zones, { id, label: clean }];
-  const value = JSON.stringify(next);
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [value]);
-  return { id, zone: next[next.length - 1], zones: next };
+// Idempotent : rajouter « hotel » quand « Hôtel » existe ne crée rien.
+// Renvoie null si le libellé est vide (rien à créer, l'appelant le signale).
+async function addClientSecteur(label) {
+  const clean = String(label == null ? '' : label).trim().slice(0, SECTEUR_LABEL_MAX);
+  if (!clean) return null;
+  const list = await getClientSecteurs();
+  if (list.some((s) => secteurKey(s) === secteurKey(clean))) return list;
+  return writeSecteurs([...list, clean]);
 }
 
-// Retire une zone ajoutée au comptoir (une faute de frappe se corrige). Les
-// commandes déjà enregistrées gardent leur marquage : le libellé y est recopié
-// au moment de l'enregistrement, pas relu dans cette liste.
-async function removeCommandeZone(id) {
-  const zones = await getCommandeZones();
-  const next = zones.filter((z) => z.id !== id);
-  if (next.length === zones.length) return zones;
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [JSON.stringify(next)]);
-  return next;
-}
-
-// Un emplacement du CATALOGUE (figé dans catalog.json) ne se supprime pas —
-// mais un poste peut vouloir le masquer (inutile pour son activité). On garde
-// la liste des identifiants masqués à part (app_meta.commande_zones_masquees) :
-// le catalogue lui-même ne bouge pas, on filtre juste ce qu'on en sert.
-async function getHiddenCommandeZones() {
-  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones_masquees'");
-  if (!rows[0]) return [];
-  try {
-    const parsed = JSON.parse(rows[0].value);
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-async function hideCommandeZone(id) {
-  const hidden = await getHiddenCommandeZones();
-  if (hidden.includes(id)) return hidden;
-  const next = [...hidden, id];
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones_masquees'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones_masquees', $1)", [JSON.stringify(next)]);
-  return next;
+async function removeClientSecteur(label) {
+  const list = await getClientSecteurs();
+  const next = list.filter((s) => secteurKey(s) !== secteurKey(label));
+  return next.length === list.length ? list : writeSecteurs(next);
 }
 
 // --- Message WhatsApp « commande prête » -------------------------------------
@@ -836,7 +956,7 @@ async function setWhatsappMessage(text) {
 }
 
 module.exports = {
-  pool, init, repairOrphanStages,
+  pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -845,7 +965,6 @@ module.exports = {
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
-  getCommandeZones, addCommandeZone, removeCommandeZone,
-  getHiddenCommandeZones, hideCommandeZone,
+  SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
 };

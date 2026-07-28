@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS requests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage           text NOT NULL DEFAULT 'demande',   -- FAMILLE (8 grandes étapes + fiverr)
+  stage           text NOT NULL DEFAULT 'demande_chiffrage',   -- FAMILLE (5 grandes étapes + fiverr)
   sub_stage       text,                              -- SOUS-FAMILLE (précise l'action en cours ; null si la famille n'en a pas)
   order_kind      text,                              -- NATURE tranchée à la prise : 'demande' (à chiffrer) / 'commande' (validée) ; null = ancienne ligne
   responsable     text,                              -- PILOTE : qui pilote le projet (Loïc / Charlie / Mélina / Julien / À attribuer)
@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS requests (
   description     text,
   deadline        date,
   status          text,
+  -- SUIVI DU PAIEMENT (null = on ne se prononce pas). `acompte_montant` est la
+  -- somme réellement encaissée ; `project_value` reste le total TTC du projet.
+  acompte_demande boolean,
+  acompte_verse   boolean,
+  acompte_montant numeric(12,2),
+  paye            boolean,
+  paiement_mode   text,                              -- 'cb' / 'especes' / 'virement' / 'cheque'
   flag            text,                              -- ALERTE : null / 'bloque' / 'a_voir' (posée par n'importe quel collaborateur)
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,

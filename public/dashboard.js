@@ -28,8 +28,8 @@ export function createDashboard(deps) {
   } = deps;
 
   // --- Constantes métier ---------------------------------------------------
-  // Familles « actives » du point du jour (Terminé / Archivé / Fiverr exclus).
-  const ACTIVE_FAMILIES = ['demande', 'chiffrage', 'attente_client', 'preparation', 'production', 'facturation'];
+  // Familles « actives » du point du jour (Paiement & clôture / Fiverr exclus).
+  const ACTIVE_FAMILIES = ['demande_chiffrage', 'preparation', 'production', 'facturation'];
   const ACTIVE_SET = new Set(ACTIVE_FAMILIES);
 
   // Couleur d'avatar : même bleu pour tout le monde (charte du point du jour).
@@ -44,19 +44,25 @@ export function createDashboard(deps) {
   // Prochaine action dérivée de la sous-catégorie (sinon de la famille) : la
   // ligne « quoi faire maintenant » des grandes cartes et du panneau détail.
   const NEXT_ACTION = {
-    demande: 'Qualifier la demande et classer l’intérêt commercial',
-    chiffrage: 'Chiffrer la demande',
+    demande_chiffrage: 'Qualifier la demande et la chiffrer',
+    demande_recue: 'Prendre connaissance de la demande et la classer',
+    demande_a_qualifier: 'Qualifier la demande et classer l’intérêt commercial',
     a_chiffrer: 'Calculer le prix et préparer le devis',
     chiffrage_en_cours: 'Finaliser le chiffrage en cours',
-    devis_a_envoyer: 'Envoyer le devis au client',
-    attente_client: 'Relancer le client',
+    devis_envoye: 'Relancer le client sur le devis envoyé',
+    devis_valide: 'Lancer la préparation du projet',
     preparation: 'Préparer le dossier pour la production',
-    prepa_fichiers: 'Préparer les fichiers et les produits',
+    prepa_produits: 'Préparer les produits et les fichiers',
+    prepa_bat: 'Réaliser le BAT',
+    bat_envoye: 'Relancer le client sur le BAT',
+    bat_valide: 'Enchaîner sur les conditions de paiement',
+    validation_acompte: 'Valider l’acompte et les conditions de paiement',
     a_commander: 'Passer la commande fournisseur',
     attente_marchandise: 'Suivre la réception de la marchandise',
     pret_a_produire: 'Lancer la production',
     production: 'Préciser le poste de production',
     prod_dtf: 'Imprimer le DTF',
+    decoupe_dtf: 'Découper et contrôler le DTF',
     prod_pressage: 'Presser les textiles',
     prod_trotec: 'Lancer la découpe / gravure Trotec',
     prod_uv: 'Imprimer en UV',
@@ -64,7 +70,9 @@ export function createDashboard(deps) {
     controle_emballage: 'Contrôler et emballer la commande',
     facturation: 'Facturer et organiser le retrait',
     facturation_a_faire: 'Éditer et envoyer la facture',
-    pret_retrait: 'Prévenir le client pour le retrait',
+    client_a_prevenir: 'Prévenir le client que c’est prêt',
+    client_prevenu: 'Attendre le retrait par le client',
+    commande_recuperee: 'Contrôler le paiement',
   };
 
   // --- État ----------------------------------------------------------------
@@ -184,6 +192,10 @@ export function createDashboard(deps) {
   // BLOQUÉE = elle n'avance plus et on sait pourquoi, À VOIR = quelqu'un doit
   // y jeter un œil. C'est ce qu'on regarde en premier au point du matin.
   const FLAG_LABEL = { bloque: 'BLOQUÉE', a_voir: 'À VOIR' };
+  // « Attente client » n'est plus une famille : c'est la position du dossier —
+  // devis parti, ou BAT parti — tant que le client n'a pas répondu.
+  const isWaitingClient = (r) => r.sub_stage === 'devis_envoye' || r.sub_stage === 'bat_envoye';
+
   const isBlocked = (r) => r.flag === 'bloque';
 
   function kpis() {
@@ -192,7 +204,7 @@ export function createDashboard(deps) {
       late: act.filter((r) => urgency(r).band === 0).length,
       blocked: act.filter(isBlocked).length,
       soon: act.filter((r) => urgency(r).band === 1).length,
-      waiting: act.filter((r) => r.stage === 'attente_client').length,
+      waiting: act.filter(isWaitingClient).length,
       active: act.length,
     };
   }
@@ -202,7 +214,7 @@ export function createDashboard(deps) {
     late: (r) => urgency(r).band === 0,
     blocked: isBlocked,
     soon: (r) => urgency(r).band === 1,
-    waiting: (r) => r.stage === 'attente_client',
+    waiting: isWaitingClient,
     active: () => true,
   };
   const KPI_LABEL = { late: 'En retard', blocked: 'Bloquées', soon: 'Échéance proche', waiting: 'Attente client', active: 'Commandes actives' };
@@ -444,7 +456,7 @@ export function createDashboard(deps) {
     };
     // « À faire » : la file commune, en tête. Point rouge s'il y a du retard.
     const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque'
-      && r.stage !== 'attente_client' && urgency(r).band === 0);
+      && !isWaitingClient(r) && urgency(r).band === 0);
     const todo = mkTab('todo', 'À faire', todoLate);
     todo.addEventListener('click', () => { activeTab = 'todo'; renderHead(); renderBody(); });
 
@@ -901,17 +913,18 @@ export function createDashboard(deps) {
     });
   }
 
-  // Marquer traité : clôt la commande (famille Terminé) → elle sort de toutes
-  // les vues actives et « Commandes actives » décrémente.
+  // Marquer traité : clôt la commande (famille « Paiement & clôture », sur
+  // « Paiement à contrôler ») → elle sort de toutes les vues actives et
+  // « Commandes actives » décrémente.
   function markDone(r) {
     const prev = { stage: r.stage, sub_stage: r.sub_stage };
-    r.stage = 'termine';
-    r.sub_stage = null;
+    r.stage = 'paiement';
+    r.sub_stage = 'paiement_a_controler';
     logActivity(`${clientName(r)} — marquée traitée ✓`, '#16A34A');
     closeDetail();
     renderAll();
     showToast(`${clientName(r)} — marquée traitée ✓`);
-    api('PATCH', `/api/requests/${r.id}`, { stage: 'termine', sub_stage: null }).catch(() => {
+    api('PATCH', `/api/requests/${r.id}`, { stage: 'paiement', sub_stage: 'paiement_a_controler' }).catch(() => {
       Object.assign(r, prev);
       renderAll();
       showToast('Échec — la commande n’a pas été clôturée');
@@ -942,7 +955,7 @@ export function createDashboard(deps) {
         continue;
       }
       const wasActive = ACTIVE_SET.has(o.stage);
-      if (r.stage === 'termine' && o.stage !== 'termine' && wasActive) {
+      if (r.stage === 'paiement' && o.stage !== 'paiement' && wasActive) {
         logActivity(`${clientName(r)} — marquée traitée ✓`, '#16A34A');
         continue;
       }

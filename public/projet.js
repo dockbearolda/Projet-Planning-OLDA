@@ -4,7 +4,10 @@
 // dans une section vide (même principe que clients.js / reglages.js), chargé
 // à la demande par app.js.
 
-import { fieldRow, fieldsForNature, wireCreateValidation, SECTEURS_SUGGERES } from './clients.js';
+import {
+  fieldRow, fieldsForNature, wireCreateValidation, wireVilleDefaults,
+  registerSecteurDatalist, loadSecteurs, valeurSaisie, VILLES,
+} from './clients.js';
 
 // Secteurs prédéfinis (Base Clients) : le champ `secteur` référence le
 // datalist `cl-dl-secteurs`, construit par clients.js dans SON propre DOM.
@@ -13,6 +16,7 @@ import { fieldRow, fieldsForNature, wireCreateValidation, SECTEURS_SUGGERES } fr
 // aucune suggestion n'apparaît. Id distinct pour ne pas dupliquer `cl-dl-secteurs`
 // si les deux vues finissent montées en même temps.
 const PROJ_SECTEURS_DL_ID = 'proj-dl-secteurs';
+const PROJ_VILLES_DL_ID = 'proj-dl-villes';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -44,10 +48,22 @@ const state = {
   addingType: null,       // type en cours de configuration (formulaire ouvert), null = fermé
   addingLigne: null,      // brouillon de la ligne en cours d'ajout
   customOpen: false,      // marquage (faces/dessous/BAT) déplié ? réduit la densité par défaut
-  delai: 'j5',
-  paiement: 'non_paye',
+  // DÉLAI OBLIGATOIRE : rien n'est pré-coché, l'enregistrement est bloqué tant
+  // qu'on n'a pas tranché — c'est ce qui garantit une date butoir sur CHAQUE
+  // ligne du planning. Soit un raccourci (`delai`), soit une date précise
+  // (`deadline`, « aaaa-mm-jj ») ; jamais les deux.
+  delai: null,
+  deadline: '',
+  paiement: newPaiement(),
   margeVisible: false,
 };
+
+// Suivi du paiement d'un projet. `null` = pas encore renseigné : au comptoir on
+// ne sait pas toujours, et « on ne sait pas » ne doit pas s'enregistrer comme
+// « non ». Le montant n'a de sens que si l'acompte est versé.
+function newPaiement() {
+  return { acompteDemande: null, acompteVerse: null, acompteMontant: '', paye: null, mode: null };
+}
 
 let CLIENTS = [];
 let TARIFS = [];
@@ -82,10 +98,13 @@ const DELAIS = [
   { id: 'j15', label: '15 jours', majoration: 0 },
 ];
 
-const PAIEMENT_STATUTS = [
-  { id: 'non_paye', label: 'Non payé' },
-  { id: 'acompte', label: 'Acompte payé' },
-  { id: 'paye', label: 'Payé' },
+// Modes de paiement (miroir de catalog.json → commande.paiementModes, que le
+// serveur valide).
+const PAIEMENT_MODES = [
+  { id: 'cb', label: 'CB' },
+  { id: 'especes', label: 'Espèces' },
+  { id: 'virement', label: 'Virement' },
+  { id: 'cheque', label: 'Chèque' },
 ];
 
 // --- Rendu : dispatcher --------------------------------------------------------
@@ -152,7 +171,7 @@ function goToClient(client) {
 // Repart chercher un AUTRE client : sort de 'main' complètement.
 function changeClient() {
   state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
-  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
+  state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
   render();
 }
 
@@ -161,7 +180,7 @@ function changeClient() {
 // rechercher une deuxième fois.
 function resetPanier() {
   state.panier = []; state.addingType = null; state.addingLigne = null;
-  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
+  state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
   render();
 }
 
@@ -238,10 +257,13 @@ function renderClientPage(body) {
 
     const fieldsWrap = el('div', 'proj-quick__fields');
     for (const f of fieldsForNature(nature)) {
-      const field = f.key === 'secteur' ? { ...f, list: PROJ_SECTEURS_DL_ID } : f;
-      fieldsWrap.appendChild(fieldRow(field, ''));
+      const local = { secteur: PROJ_SECTEURS_DL_ID, ville: PROJ_VILLES_DL_ID }[f.key];
+      fieldsWrap.appendChild(fieldRow(local ? { ...f, list: local } : f, ''));
     }
     quickForm.appendChild(fieldsWrap);
+    // Choisir une ville remplit pays et code postal (sans jamais écraser une
+    // valeur tapée à la main).
+    wireVilleDefaults(fieldsWrap);
     const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
 
     const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
@@ -254,7 +276,7 @@ function renderClientPage(body) {
     wireCreateValidation(fieldsWrap, createBtn, async () => {
       createBtn.disabled = true;
       const draft = { client_type: nature };
-      for (const i of inputs) draft[i.dataset.key] = i.value.trim();
+      for (const i of inputs) draft[i.dataset.key] = valeurSaisie(i.dataset.key, i.value);
       // `entreprise` reste la colonne obligatoire côté serveur et sert à la
       // recherche/l'affichage : pour un particulier, on la dérive du prénom +
       // nom plutôt que de la demander une deuxième fois.
@@ -359,10 +381,20 @@ function describeItem(item) {
   return `${item.quantite} × ${item.description || '—'}`;
 }
 
+// Un délai est choisi dès qu'un raccourci OU une date précise est posé.
+const delaiChoisi = () => !!state.delai || !!state.deadline;
+
 function totalTtc() {
   const base = state.panier.reduce((s, item) => s + calcItemTtc(item), 0);
-  const delai = DELAIS.find((d) => d.id === state.delai) || DELAIS[2];
-  return Math.round(base * (1 + delai.majoration / 100) * 100) / 100;
+  // Une date précise ne majore rien : on ne facture pas l'urgence d'une date
+  // que le client a lui-même fixée au large.
+  const delai = DELAIS.find((d) => d.id === state.delai);
+  return Math.round(base * (1 + (delai ? delai.majoration : 0) / 100) * 100) / 100;
+}
+
+// Le HT se déduit du TTC (taux TGCA des réglages), il n'est jamais saisi.
+function totalHt() {
+  return Math.round((totalTtc() / (1 + TARIFS_PARAMS.tgca)) * 100) / 100;
 }
 function totalRevient() {
   return state.panier.reduce((s, item) => s + calcItemRevient(item), 0);
@@ -412,7 +444,10 @@ function renderPanier(main) {
   tilesWrap.append(grid);
   main.append(tilesWrap);
 
-  main.append(renderDelaiPaiement());
+  const delaiBox = el('div', 'proj-delai');
+  delaiBox.append(renderDelai());
+  main.append(delaiBox);
+  main.append(renderPaiement());
   main.append(renderTotalBar());
 }
 
@@ -643,14 +678,93 @@ function segBar(items, activeId, onPick, cols) {
   return seg;
 }
 
-function renderDelaiPaiement() {
+// Date civile LOCALE du jour, « aaaa-mm-jj ». `toISOString()` bascule en UTC :
+// à l'ouest de Greenwich (l'atelier est aux Antilles) il rend déjà la date du
+// lendemain en soirée. Le serveur calcule pareil.
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Délai OBLIGATOIRE : aucun raccourci n'est pré-coché, et une 6ᵉ tuile ouvre un
+// calendrier pour viser un jour exact (« le 14, pour le mariage »). Choisir
+// l'un efface l'autre : une commande a une seule date butoir.
+function renderDelai() {
+  const g = groupBox('Pour quand ? (obligatoire)');
+  const options = [...DELAIS, { id: 'date', label: 'Date précise' }];
+  const actif = state.deadline ? 'date' : state.delai;
+  g.append(segBar(options, actif, (id) => {
+    if (id === 'date') {
+      state.delai = null;
+      if (!state.deadline) state.deadline = todayISO();
+    } else {
+      state.delai = id;
+      state.deadline = '';
+    }
+  }, 6));
+
+  if (state.deadline) {
+    const input = el('input', 'proj-input proj-input--lg');
+    input.type = 'date';
+    input.min = todayISO();
+    input.value = state.deadline;
+    input.setAttribute('aria-label', 'Date butoir du projet');
+    input.addEventListener('change', () => {
+      state.deadline = input.value;
+      renderCurrentPage();
+    });
+    g.append(input);
+  }
+  return g;
+}
+
+// Bloc paiement : ce qu'on sait de l'argent au moment de la prise. Chaque
+// interrupteur a trois états — oui / non / pas encore renseigné — parce qu'au
+// comptoir « je ne sais pas » ne doit pas s'enregistrer comme « non ».
+function triToggle(label, get, set) {
+  const b = el('button', `proj-choice${get() === true ? ' is-on' : ''}`);
+  b.type = 'button';
+  b.setAttribute('role', 'switch');
+  b.setAttribute('aria-checked', String(get() === true));
+  b.append(el('span', 'proj-choice__txt', label));
+  if (get() === true) b.append(ic('check', 'proj-choice__ic'));
+  b.addEventListener('click', () => { set(get() === true ? null : true); renderCurrentPage(); });
+  return b;
+}
+
+function renderPaiement() {
+  const p = state.paiement;
   const box = el('div', 'proj-delai');
-  const gD = groupBox('Pour le');
-  gD.append(segBar(DELAIS, state.delai, (id) => { state.delai = id; }, 5));
-  box.append(gD);
-  const gP = groupBox('Paiement');
-  gP.append(segBar(PAIEMENT_STATUTS, state.paiement, (id) => { state.paiement = id; }, 3));
-  box.append(gP);
+
+  const g = groupBox('Paiement');
+  const row = el('div', 'proj-choices');
+  row.append(
+    triToggle('Acompte demandé', () => p.acompteDemande, (v) => { p.acompteDemande = v; }),
+    triToggle('Acompte versé', () => p.acompteVerse, (v) => {
+      p.acompteVerse = v;
+      if (v !== true) p.acompteMontant = '';   // pas d'acompte versé, pas de somme
+    }),
+    triToggle('Payé / soldé', () => p.paye, (v) => { p.paye = v; }),
+  );
+  g.append(row);
+
+  // La somme exacte n'a de sens qu'une fois l'acompte encaissé.
+  if (p.acompteVerse === true) {
+    const montant = el('input', 'proj-input proj-input--lg');
+    montant.type = 'number'; montant.min = '0'; montant.step = '0.01'; montant.inputMode = 'decimal';
+    montant.placeholder = 'Somme versée (€)';
+    montant.setAttribute('aria-label', 'Somme exacte de l’acompte en euros');
+    montant.value = p.acompteMontant;
+    montant.addEventListener('input', () => { p.acompteMontant = montant.value; });
+    g.append(montant);
+  }
+  box.append(g);
+
+  const gMode = groupBox('Mode de paiement');
+  gMode.append(segBar(PAIEMENT_MODES, p.mode, (id) => {
+    p.mode = p.mode === id ? null : id;   // re-cliquer retire le mode
+  }, 4));
+  box.append(gMode);
   return box;
 }
 
@@ -672,6 +786,10 @@ function renderTotalBar() {
   row.append(el('span', 'proj-total__value', `${totalTtc().toFixed(2)} €`));
   bar.append(row);
 
+  // Le HT sous le total : la distinction que le patron veut voir, sans jamais
+  // avoir à la saisir deux fois.
+  bar.append(el('p', 'proj-total__ht', `dont ${totalHt().toFixed(2)} € HT`));
+
   if (state.margeVisible) {
     const venteHt = totalTtc() / (1 + TARIFS_PARAMS.tgca);
     const marge = Math.round((venteHt - totalRevient()) * 100) / 100;
@@ -683,19 +801,25 @@ function renderTotalBar() {
     bar.append(margeBox);
   }
 
+  // Enregistrer est bloqué tant qu'il manque le panier OU le délai. Le motif
+  // s'écrit à l'écran : un bouton grisé sans explication se lit comme un bug.
+  const manque = state.panier.length === 0
+    ? 'Ajoute au moins un produit.'
+    : (!delaiChoisi() ? 'Choisis un délai ou une date précise.' : '');
+
   const saveBtn = el('button', 'proj-btn proj-btn--primary proj-btn--cta', 'Enregistrer');
   saveBtn.type = 'button';
-  saveBtn.disabled = state.panier.length === 0;
+  saveBtn.disabled = !!manque;
   saveBtn.addEventListener('click', () => { openDestinationPopup(); });
   bar.append(saveBtn);
+  if (manque) bar.append(el('p', 'proj-total__manque', manque));
   return bar;
 }
 
 // --- Destination + enregistrement --------------------------------------------
 async function loadPipeline() {
   if (PIPELINE) return PIPELINE;
-  const catalog = await api('GET', '/api/commande/catalog');
-  PIPELINE = catalog.pipeline;
+  PIPELINE = await api('GET', '/api/pipeline');
   return PIPELINE;
 }
 
@@ -709,8 +833,16 @@ function buildPayload(kind, dest) {
     lignes: state.panier.map((item) => (item.type === 'tasse'
       ? { type: item.type, quantite: item.quantite, produitId: item.produitId, coloris: item.coloris, face1Id: item.face1Id, face2Id: item.face2Id, dessousId: item.dessousId, batId: item.batId, remarque: item.remarque }
       : { type: item.type, quantite: item.quantite, description: item.description, prixTtcManuel: Number(item.prixTtcManuel) || 0 })),
-    delai: state.delai,
-    paiement: { statut: state.paiement },
+    // Un seul des deux part : un raccourci OU une date précise.
+    delai: state.delai || undefined,
+    deadline: state.deadline || undefined,
+    paiement: {
+      acompteDemande: state.paiement.acompteDemande,
+      acompteVerse: state.paiement.acompteVerse,
+      acompteMontant: state.paiement.acompteMontant === '' ? null : Number(state.paiement.acompteMontant),
+      paye: state.paiement.paye,
+      mode: state.paiement.mode,
+    },
     stage: dest ? dest.stage : undefined,
     subStage: dest ? dest.subStage : undefined,
   };
@@ -780,7 +912,7 @@ function showConfirmation(created) {
   card.append(
     checkWrap,
     el('p', 'proj-done__title', 'Projet enregistré'),
-    el('p', 'proj-done__sub', `${created.projet.prixTotalTtc.toFixed(2)} € TTC — ${created.projet.client.societe}`),
+    el('p', 'proj-done__sub', `${created.projet.prixTotalTtc.toFixed(2)} € TTC (${created.projet.prixTotalHt.toFixed(2)} € HT) — ${created.projet.client.societe}`),
   );
   // Action la PLUS fréquente au comptoir : le même client repart sur un
   // nouveau panier (tasses ET textile dans la même visite) — mise en avant,
@@ -818,8 +950,13 @@ function buildStatic() {
   page.append(head, bodyEl);
   const dlSecteurs = el('datalist');
   dlSecteurs.id = PROJ_SECTEURS_DL_ID;
-  dlSecteurs.append(...SECTEURS_SUGGERES.map((s) => new Option(s)));
-  ROOT.replaceChildren(page, dlSecteurs);
+  // La liste des secteurs vit en base : on s'abonne plutôt que de la recopier,
+  // pour qu'un secteur ajouté depuis Base clients apparaisse ici aussitôt.
+  registerSecteurDatalist(dlSecteurs);
+  const dlVilles = el('datalist');
+  dlVilles.id = PROJ_VILLES_DL_ID;
+  dlVilles.append(...VILLES.map((v) => new Option(v.label)));
+  ROOT.replaceChildren(page, dlSecteurs, dlVilles);
 }
 
 let mounted = false;
@@ -832,6 +969,7 @@ export async function initProjet(root) {
     [CLIENTS, TARIFS, TARIFS_PARAMS] = await Promise.all([
       api('GET', '/api/clients'), api('GET', '/api/tarifs-tasse'), api('GET', '/api/tarifs-tasse/parametres'),
     ]);
+    await loadSecteurs();
   } catch (_) { /* silencieux : les pages suivantes gèrent une liste vide */ }
   render();
 }
@@ -842,6 +980,6 @@ export async function initProjet(root) {
 export function resetProjet() {
   if (!mounted) return;
   state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
-  state.delai = 'j5'; state.paiement = 'non_paye'; state.margeVisible = false;
+  state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
   render();
 }

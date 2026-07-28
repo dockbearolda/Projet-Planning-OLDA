@@ -226,16 +226,26 @@
 .proj-swatch.is-on .proj-swatch__label { color: var(--primary); }
 .proj-swatch-input { margin-top: 10px; width: 100%; }
 
+.proj-choice__ic { font-size: 20px; margin-inline-start: 6px; }
 .proj-input--lg { min-height: 56px; font-size: 20px; font-weight: 700; border-radius: 16px; max-width: 220px; }
 .proj-textarea { width: 100%; min-height: 44px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; resize: vertical; background: var(--surface); color: var(--text-1); }
 
 /* Délai + paiement : boutons segmentés pleine largeur, un choix clair. */
 .proj-delai { margin: 10px 0 0; }
 .proj-segbar { display: grid; gap: 8px; width: 100%; }
+.proj-segbar--cols6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .proj-segbar--cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.proj-segbar--cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .proj-segbar--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Tablette portrait et paysage : 6 colonnes deviennent illisibles bien avant le
+   téléphone — on retombe sur 3, cibles tactiles préservées. */
+@media (max-width: 1000px) {
+  .proj-segbar--cols6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 620px) {
-  .proj-segbar--cols5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .proj-segbar--cols6,
+  .proj-segbar--cols5,
+  .proj-segbar--cols4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .proj-segbar__btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -257,6 +267,10 @@
 .proj-marge-toggle:hover { opacity: 1; }
 .proj-marge-toggle__ic { font-size: 20px; }
 .proj-marge { display: flex; gap: 14px; font-size: 14px; color: var(--text-2); }
+/* Le HT sous le total : la distinction HT/TTC, sans voler la vedette au TTC. */
+.proj-total__ht { margin: -4px 0 0; text-align: right; font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* Pourquoi « Enregistrer » est grisé : dit à l'écran, jamais laissé à deviner. */
+.proj-total__manque { margin: 0; text-align: center; font-size: 13.5px; color: var(--text-2); }
 .proj-btn--cta { width: 100%; justify-content: center; min-height: 58px; border-radius: var(--radius-lg); font-size: 17.5px; font-weight: 700; box-shadow: var(--shadow-1); }
 
 /* --- Destination + confirmation ------------------------------------------------ */

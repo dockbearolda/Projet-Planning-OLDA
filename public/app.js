@@ -12,55 +12,63 @@ import { whatsappLink } from './whatsapp.js';
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
 // la ligne) précise CE QUI SE PASSE MAINTENANT. « 1 projet = 1 seule place. »
-// 8 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
+// 5 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
 const FAMILIES = [
-  { slug: 'demande', label: 'Demande' },
-  { slug: 'chiffrage', label: 'Commande' },
-  { slug: 'attente_client', label: 'Attente Client' },
-  { slug: 'preparation', label: 'Préparation' },
+  { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
+  { slug: 'preparation', label: 'Préparation du projet' },
   { slug: 'production', label: 'Production' },
-  { slug: 'facturation', label: 'Facturation / Retrait' },
-  { slug: 'termine', label: 'Terminé' },
-  { slug: 'archive', label: 'Archivé' },
+  { slug: 'facturation', label: 'Facturation & remise au client' },
+  { slug: 'paiement', label: 'Paiement & clôture' },
 ];
-// Catégorie spéciale (sous-traitance graphiste), hors des 8 familles.
+// Catégorie spéciale (sous-traitance graphiste), hors des 5 familles.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
 ];
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
-// Colonne « Prix » : n'a de sens que là où le prix se remplit réellement
-// (devis en Commande, montant à Facturation) — masquée ailleurs.
-const PRICE_VISIBLE_STAGES = new Set(['chiffrage', 'facturation']);
+// Colonne « Prix TTC » : n'a de sens que là où le prix se remplit réellement
+// (chiffrage, montant à facturer, contrôle du paiement) — masquée ailleurs.
+const PRICE_VISIBLE_STAGES = new Set(['demande_chiffrage', 'facturation', 'paiement']);
 
 // Sous-étapes par famille (miroir de db.js). Une famille absente = pas de puce.
 const SUB_STAGES = {
-  chiffrage: [
+  demande_chiffrage: [
+    { slug: 'demande_recue', label: 'Demande reçue' },
+    { slug: 'demande_a_qualifier', label: 'Demande à qualifier' },
     { slug: 'a_chiffrer', label: 'À chiffrer' },
     { slug: 'chiffrage_en_cours', label: 'Chiffrage en cours' },
-    { slug: 'devis_a_envoyer', label: 'Devis à envoyer' },
+    { slug: 'devis_envoye', label: 'Tarif / Devis envoyé – Attente client' },
+    { slug: 'devis_valide', label: 'Devis validé' },
   ],
   preparation: [
-    { slug: 'prepa_fichiers', label: 'Préparation fichiers & produits' },
+    { slug: 'prepa_produits', label: 'Préparation des produits' },
+    { slug: 'prepa_bat', label: 'Préparation du BAT' },
+    { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    { slug: 'bat_valide', label: 'BAT validé' },
+    { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
     { slug: 'attente_marchandise', label: 'Attente marchandise' },
     { slug: 'pret_a_produire', label: 'Prêt à produire' },
   ],
   production: [
     { slug: 'prod_dtf', label: 'Production DTF' },
+    { slug: 'decoupe_dtf', label: 'Découpe & Contrôle DTF' },
     { slug: 'prod_pressage', label: 'Pressage' },
     { slug: 'prod_trotec', label: 'Production Trotec' },
     { slug: 'prod_uv', label: 'Production UV' },
     { slug: 'montage_finition', label: 'Montage / Finition' },
-    { slug: 'controle_emballage', label: 'Contrôle & emballage' },
+    { slug: 'controle_emballage', label: 'Contrôle & Emballage' },
   ],
   facturation: [
     { slug: 'facturation_a_faire', label: 'Facturation à faire' },
-    { slug: 'pret_retrait', label: 'Prêt client / Attente retrait' },
+    { slug: 'client_a_prevenir', label: 'Client à prévenir' },
+    { slug: 'client_prevenu', label: 'Client prévenu – Attente retrait' },
+    { slug: 'commande_recuperee', label: 'Commande récupérée' },
   ],
-  termine: [
-    { slug: 'attente_paiement', label: 'Attente paiement' },
-    { slug: 'solde', label: 'Soldé' },
+  paiement: [
+    { slug: 'paiement_a_controler', label: 'Paiement à contrôler' },
+    { slug: 'paiement_valide', label: 'Paiement validé / Soldé' },
+    { slug: 'archive', label: 'Archivé' },
   ],
 };
 // Libellé d'une sous-étape par son slug (toutes familles confondues).
@@ -99,6 +107,15 @@ const CLIENT_TYPES = [
 ];
 const CLIENT_TYPE_LABEL = Object.fromEntries(CLIENT_TYPES.map((t) => [t.value, t.label]));
 
+// Modes de paiement (miroir de catalog.json → commande.paiementModes, que le
+// serveur valide). Une commande peut n'en porter aucun : « non précisé ».
+const PAIEMENT_MODES = [
+  { id: 'cb', label: 'CB' },
+  { id: 'especes', label: 'Espèces' },
+  { id: 'virement', label: 'Virement' },
+  { id: 'cheque', label: 'Chèque' },
+];
+
 // --- Alerte de commande (requests.flag / flag_reason) ----------------------
 // N'importe quel collaborateur pose l'alerte depuis la colonne « État » : la
 // commande est BLOQUÉE (elle n'avance plus, on dit pourquoi) ou À VOIR (elle
@@ -121,7 +138,7 @@ const SEND_TARGETS = [
 ];
 
 // --- État applicatif -------------------------------------------------------
-let currentStage = 'demande';
+let currentStage = 'demande_chiffrage';
 let currentSub = null;         // sous-catégorie active (null = toute la famille)
 let rows = [];                 // demandes de l'étape courante
 let counts = {};               // compteurs par étape
@@ -191,13 +208,35 @@ async function loadCategoryConfig() {
   } catch (_) { /* silencieux */ }
 }
 
+// --- Prix : le TTC est saisi, le HT se déduit ------------------------------
+// `project_value` porte le TTC — c'est le prix que le client paie, et celui
+// qu'on tape au comptoir. Le HT n'est jamais stocké : il vaut TTC ÷ (1 + TGCA),
+// avec le taux réglé dans Réglages (jamais une constante en dur). 4 % en repli
+// si l'appel échoue : la grille reste utilisable, avec le taux d'usage local.
+let TGCA = 0.04;
+
+async function loadTgca() {
+  try {
+    const p = await api('GET', '/api/tarifs-tasse/parametres');
+    if (p && Number.isFinite(Number(p.tgca))) TGCA = Number(p.tgca);
+  } catch (_) { /* silencieux : on garde le taux par défaut */ }
+}
+
+const htFromTtc = (ttc) => (Number.isFinite(Number(ttc)) ? Number(ttc) / (1 + TGCA) : null);
+
+// « HT : 230,77 € » — la mention discrète qui accompagne chaque TTC affiché.
+// Renvoie '' si la ligne n'a pas de prix : rien à déduire, donc rien à écrire.
+function htLabel(ttc) {
+  const ht = htFromTtc(ttc);
+  return ht == null ? '' : `HT : ${formatMoney(Math.round(ht * 100) / 100)}`;
+}
+
 // --- Sélecteurs ------------------------------------------------------------
 const $stages = document.getElementById('stages');
 const $rows = document.getElementById('rows');
 const $empty = document.getElementById('empty');
 const $stageTitle = document.getElementById('stageTitle');
 const $stageCount = document.getElementById('stageCount');
-const $btnNew = document.getElementById('btnNew');
 const $stageLink = document.getElementById('stageLink');
 const $stageLinkLabel = document.getElementById('stageLinkLabel');
 const $stageDesc = document.getElementById('stageDesc');
@@ -1522,8 +1561,9 @@ function cellDescription(r) {
   return td;
 }
 
-// Prix : montant HT de la commande. Une ligne sans prix ne peut pas ENTRER dans la
-// zone Devis à envoyer → Archivé (voir blockedByPrice plus bas) — affiché ici pour
+// Prix : montant TTC de la commande — celui que le client paie. Le HT s'affiche
+// dessous, calculé, jamais saisi. Une ligne sans prix ne peut pas ENTRER dans la
+// zone Devis envoyé → Archivé (voir blockedByPrice plus bas) — affiché ici pour
 // que la saisie se fasse tôt, pas au moment du glisser-déposer.
 function cellPrice(r) {
   const td = document.createElement('td');
@@ -1535,6 +1575,12 @@ function cellPrice(r) {
   price.inputMode = 'decimal';
   price.value = r.project_value != null ? String(r.project_value) : '';
   price.placeholder = '—';
+
+  const ht = document.createElement('span');
+  ht.className = 'cell-price-ht';
+  const refreshHt = () => { ht.textContent = htLabel(r.project_value); };
+  refreshHt();
+
   bindInline(
     price, r, 'project_value',
     (raw) => {
@@ -1548,8 +1594,15 @@ function cellPrice(r) {
       return Number.isNaN(n) ? raw : n.toFixed(2);
     },
   );
+  // Le HT suit la frappe : on voit tout de suite ce que la remise donne hors
+  // taxe, sans attendre l'enregistrement de la cellule.
+  price.addEventListener('input', () => {
+    const n = parseFloat(price.value.trim().replace(',', '.'));
+    ht.textContent = price.value.trim() === '' || Number.isNaN(n) ? '' : htLabel(n);
+  });
+  price.addEventListener('blur', refreshHt);
 
-  td.appendChild(price);
+  td.append(price, ht);
   return td;
 }
 
@@ -2153,13 +2206,13 @@ function renderLigneDetail() {
   suiviSection.appendChild(ldRow('Référent équipe', refChip));
 
   // Prix : saisi comme dans la colonne PRIX (virgule acceptée, arrondi à
-  // 2 décimales en quittant le champ). Toujours affiché ici — c'est lui qui
-  // débloque le passage en Devis à envoyer / Facturation.
-  suiviSection.appendChild(ldRow('Prix (€)', ldInput(r, 'project_value', {
+  // 2 décimales en quittant le champ). C'est le TTC — le prix que le client
+  // paie — et c'est lui qui débloque le passage en Devis envoyé / Facturation.
+  const prixInput = ldInput(r, 'project_value', {
     num: true,
     inputMode: 'decimal',
     placeholder: '—',
-    ariaLabel: 'Prix de la commande en euros',
+    ariaLabel: 'Prix TTC de la commande en euros',
     value: r.project_value != null ? String(r.project_value) : '',
     transform: (raw) => {
       const t = raw.trim();
@@ -2171,7 +2224,20 @@ function renderLigneDetail() {
       const n = parseFloat(t.replace(',', '.'));
       return Number.isNaN(n) ? raw : n.toFixed(2);
     },
-  })));
+  });
+  suiviSection.appendChild(ldRow('Prix TTC (€)', prixInput));
+
+  // Le HT, juste en dessous : déduit du TTC, jamais saisi, et recalculé pendant
+  // la frappe pour qu'on voie l'effet d'une remise sans quitter le champ.
+  const htLine = document.createElement('span');
+  htLine.className = 'ld-value ld-value--muted';
+  const refreshHtLine = () => {
+    const n = parseFloat(prixInput.value.trim().replace(',', '.'));
+    htLine.textContent = prixInput.value.trim() === '' || Number.isNaN(n) ? '—' : htLabel(n);
+  };
+  refreshHtLine();
+  prixInput.addEventListener('input', refreshHtLine);
+  suiviSection.appendChild(ldRow('Hors taxe', htLine));
 
   // Échéance : le tiroir a la place d'afficher la date en clair, tout en gardant
   // le code couleur de la grille (vert / orange / rouge).
@@ -2241,6 +2307,76 @@ function renderLigneDetail() {
     suiviSection.appendChild(ldRow('Motif', reasonChip));
   }
   body.appendChild(suiviSection);
+
+  // --- Paiement ---------------------------------------------------------------
+  // Les cinq informations que le patron veut voir d'un coup d'œil. Chaque
+  // interrupteur a TROIS états possibles en base — oui / non / jamais renseigné —
+  // mais deux seulement au clic : on bascule entre vrai et faux, et une ligne
+  // jamais touchée reste « non renseigné » plutôt que d'affirmer « non payé ».
+  const payeSection = document.createElement('section');
+  payeSection.className = 'ld-section';
+  const payeTitle = document.createElement('p');
+  payeTitle.className = 'ld-section-title';
+  payeTitle.textContent = 'Paiement';
+  payeSection.appendChild(payeTitle);
+
+  const payToggle = (field, label) => ldChip(
+    (b) => {
+      const on = r[field] === true;
+      b.className = `ld-toggle${on ? ' is-on' : ''}`;
+      b.setAttribute('role', 'switch');
+      b.setAttribute('aria-checked', String(on));
+      b.textContent = on ? 'Oui' : (r[field] === false ? 'Non' : '—');
+      attachTip(b, on ? `retirer « ${label} »` : `marquer « ${label} »`);
+    },
+    () => ldPatch(r, { [field]: r[field] !== true }),
+  );
+
+  payeSection.appendChild(ldRow('Acompte demandé', payToggle('acompte_demande', 'acompte demandé')));
+  payeSection.appendChild(ldRow('Acompte versé', payToggle('acompte_verse', 'acompte versé')));
+
+  // Le montant ne s'affiche QUE si l'acompte est versé : tant qu'il ne l'est
+  // pas, il n'y a pas de somme exacte à noter.
+  if (r.acompte_verse === true) {
+    payeSection.appendChild(ldRow('Somme versée (€)', ldInput(r, 'acompte_montant', {
+      num: true,
+      inputMode: 'decimal',
+      placeholder: '—',
+      ariaLabel: 'Somme exacte de l’acompte en euros',
+      value: r.acompte_montant != null ? String(r.acompte_montant) : '',
+      transform: (raw) => {
+        const t = raw.trim();
+        return t === '' ? null : parseFloat(t.replace(',', '.'));
+      },
+      normalize: (raw) => {
+        const t = raw.trim();
+        if (t === '') return '';
+        const n = parseFloat(t.replace(',', '.'));
+        return Number.isNaN(n) ? raw : n.toFixed(2);
+      },
+    })));
+  }
+
+  payeSection.appendChild(ldRow('Payé / soldé', payToggle('paye', 'payé')));
+
+  const modeChip = ldChip(
+    (b) => {
+      const m = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
+      b.className = 'sub-chip' + (m ? '' : ' empty');
+      b.textContent = m ? m.label : '+ mode';
+      attachTip(b, 'mode de paiement');
+    },
+    (b) => {
+      const items = PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }));
+      items.push({ value: null, label: 'Non précisé', muted: true });
+      openMenu(b, items, r.paiement_mode ?? null, (val) => {
+        if ((val ?? null) === (r.paiement_mode ?? null)) return;
+        ldPatch(r, { paiement_mode: val });
+      });
+    },
+  );
+  payeSection.appendChild(ldRow('Mode', modeChip));
+  body.appendChild(payeSection);
 
   // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
   const notesSection = document.createElement('section');
@@ -2708,29 +2844,6 @@ function patchRow(r, body) {
   return api('PATCH', `/api/requests/${r.id}`, body);
 }
 
-// Construit une ligne brouillon optimiste (tous champs vides) pour l'étape
-// courante.
-function makeOptimisticRow() {
-  const maxPos = rows.reduce((m, r) => Math.max(m, r.position ?? 0), 0);
-  const now = new Date().toISOString();
-  return {
-    id: `tmp-${++tmpSeq}`,
-    stage: currentStage,
-    // Créée depuis une sous-catégorie → elle en hérite (sinon la ligne
-    // n'apparaîtrait pas dans la vue filtrée où on vient de la créer).
-    sub_stage: currentSub, responsable: null, referent: null,
-    order_kind: null,
-    flag: null, flag_reason: null,
-    priority: 1, client_type: 'pro',
-    billing_company: null, contact_referent: null, contact_phone: null, contact_email: null,
-    quantity: null, product: null, color: null, project_value: null,
-    description: null, deadline: null,
-    position: maxPos + 1000,
-    devis_name: null, bat_name: null, facture_name: null,
-    created_at: now, updated_at: now,
-  };
-}
-
 // Remplace l'id temporaire par l'id réel renvoyé par le serveur — dans `rows`,
 // dans le <tr> (data-id) et dans le renderer incrémental (rowEls) — sans jamais
 // reconstruire la ligne (on préserve le focus / la saisie en cours). Puis envoie
@@ -2770,40 +2883,6 @@ function finalizeCreate(tmpId, created) {
     });
   }
 }
-
-// Crée une commande adaptée à la vue courante, en optimiste : la ligne brouillon
-// apparaît et reçoit le focus immédiatement, le POST suit en arrière-plan.
-function createForCurrentView() {
-  const r = makeOptimisticRow();
-  const tmpId = r.id;
-  const viewSlug = currentStage; // figé : la vue peut changer avant la réponse
-  const viewSub = currentSub;    // sous-catégorie éventuelle, figée de même
-  rows.push(r);
-  pendingCreates.set(tmpId, { patch: {} });
-  applySortAndRender();
-  bumpCount(viewSlug, +1);
-
-  const tr = $rows.querySelector(`tr[data-id="${tmpId}"]`);
-  if (tr) {
-    tr.scrollIntoView({ block: 'nearest' });
-    const firstInput = tr.querySelector('.client-company, .cell-input');
-    if (firstInput) firstInput.focus();
-  }
-
-  api('POST', '/api/requests', viewSub ? { stage: viewSlug, sub_stage: viewSub } : { stage: viewSlug })
-    .then((created) => finalizeCreate(tmpId, created))
-    .catch((err) => {
-      pendingCreates.delete(tmpId);
-      cancelledCreates.delete(tmpId);
-      rows = rows.filter((x) => x.id !== tmpId);
-      applySortAndRender();
-      bumpCount(viewSlug, -1);
-      reportError(err);
-      loadCounts().catch(() => {}); // valeur exacte (un loadCounts concurrent a pu déjà corriger)
-    });
-}
-
-$btnNew.addEventListener('click', () => createForCurrentView());
 
 // --- Suppression (optimiste) ----------------------------------------------
 function removeRow(r) {
@@ -2992,11 +3071,15 @@ function hasPrice(r) {
   return r.project_value != null;
 }
 
+// La zone s'ouvre au moment où le tarif part chez le client : les deux dernières
+// sous-étapes de « Demande & chiffrage », puis toutes les familles suivantes.
+const PRICE_ZONE_SUBS = new Set(['devis_envoye', 'devis_valide']);
+
 function inPriceZone(stage, sub) {
-  if (stage === 'chiffrage') return sub === 'devis_a_envoyer';
+  if (stage === 'demande_chiffrage') return PRICE_ZONE_SUBS.has(sub);
   const idx = STAGE_ORDER[stage];
-  const chiffrageIdx = STAGE_ORDER.chiffrage;
-  return idx != null && chiffrageIdx != null && idx > chiffrageIdx;
+  const firstIdx = STAGE_ORDER.demande_chiffrage;
+  return idx != null && firstIdx != null && idx > firstIdx;
 }
 
 function blockedByPrice(r, targetStage, targetSub = null) {
@@ -3006,7 +3089,7 @@ function blockedByPrice(r, targetStage, targetSub = null) {
 }
 
 function priceBlockMessage(targetStage, targetSub) {
-  const label = targetStage === 'chiffrage' && targetSub
+  const label = targetStage === 'demande_chiffrage' && targetSub
     ? SUB_LABEL[targetSub]
     : STAGE_LABEL[targetStage];
   return `Sans prix, impossible de passer en ${label}.`;
@@ -3967,9 +4050,6 @@ function initBrandReflection() {
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
 const $viewDashboard = document.getElementById('viewDashboard');
-const $viewCommande = document.getElementById('viewCommande');
-const $viewDemande = document.getElementById('viewDemande');
-const $commande = document.getElementById('commande');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
@@ -3977,13 +4057,9 @@ const $reglages = document.getElementById('reglages');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
-// 'planning' | 'dashboard' | 'commande' | 'clients' | 'reglages' | 'projet'
+// 'planning' | 'dashboard' | 'clients' | 'reglages' | 'projet'
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
-// La vue « Prise de commande » sert DEUX entrées de menu (#demande / #commande) :
-// la nature est décidée par le lien cliqué, pas par un réglage dans la fiche.
-let commandeNature = 'demande';
-let commandeModule = null;
 
 // Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
 // Si elle vit dans une catégorie promue en onglet (Fiverr, À commander), c'est
@@ -4017,28 +4093,6 @@ const dashboard = createDashboard({
 // deux pilotes (des boutons ET le hash) laissait l'URL et l'écran se
 // contredire — « #dashboard » affiché sur le planning, et retour au dashboard
 // au premier rechargement.
-// La Prise de commande (catalogue textile, annuaire client) est chargée au
-// premier passage sur la vue, puis montée une bonne fois : les bascules
-// suivantes ne sont qu'un changement de classe — instantanées, et la saisie en
-// cours est conservée. La nature (demande / commande) lui est poussée dès
-// qu'elle est prête.
-let commandeLoading = null;
-function mountCommande() {
-  if (!$commande) return;
-  if (!commandeLoading) {
-    commandeLoading = import('./commande.js')
-      .then((m) => { commandeModule = m; return m.initCommande($commande); })
-      .then(() => commandeModule.setNature(commandeNature))
-      .catch((err) => {
-        commandeLoading = null;             // rechargeable au prochain essai
-        commandeModule = null;
-        console.error('Prise de commande : chargement impossible', err);
-      });
-  } else if (commandeModule) {
-    commandeModule.setNature(commandeNature);
-  }
-}
-
 // La Base clients (CRM) : liste + fiche éditable + notes. Module lourd (rendu
 // complet), chargé au premier passage puis monté ; les visites suivantes
 // rafraîchissent seulement les données (un client a pu être créé à la commande).
@@ -4117,11 +4171,6 @@ function setViewMode(mode) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
   }
-  // Les deux entrées de saisie s'allument selon la NATURE courante, pas juste
-  // selon la vue : sur #commande c'est « Commande », sur #demande « Demande ».
-  const onIntake = mode === 'commande';
-  if ($viewDemande) $viewDemande.classList.toggle('active', onIntake && commandeNature === 'demande');
-  if ($viewCommande) $viewCommande.classList.toggle('active', onIntake && commandeNature === 'commande');
   if (mode === viewMode) return;
   viewMode = mode;
   // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
@@ -4131,12 +4180,10 @@ function setViewMode(mode) {
   closeLigneDetail();
 
   const dash = mode === 'dashboard';
-  const commande = mode === 'commande';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
-  if ($commande) $commande.hidden = !commande;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($projet) $projet.hidden = !projet;
@@ -4147,7 +4194,6 @@ function setViewMode(mode) {
   document.body.classList.toggle('view-comptoir', mode === 'projet');
 
   if (dash) dashboard.show(); else dashboard.hide();
-  if (commande) mountCommande();
   if (clients) mountClients();
   if (reglages) mountReglages();
   if (projet) mountProjet();
@@ -4157,9 +4203,11 @@ function setViewMode(mode) {
   }
 }
 
-// #demande et #commande ouvrent la MÊME vue, avec une nature différente.
+// Un hash = une vue. « Nouveau Projet » est la seule porte d'entrée : les
+// anciens raccourcis #demande / #commande n'existent plus et retombent donc sur
+// le planning, comme n'importe quel hash inconnu.
 const VIEWS = {
-  '#dashboard': 'dashboard', '#demande': 'commande', '#commande': 'commande',
+  '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
@@ -4167,11 +4215,7 @@ const VIEWS = {
 function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
-  if (mode === 'commande') commandeNature = h === '#commande' ? 'commande' : 'demande';
   setViewMode(mode);
-  // Changer de nature SANS changer de vue (#demande ↔ #commande) : setViewMode a
-  // pris le raccourci « même vue », on pousse donc la nature à la main.
-  if (mode === 'commande' && commandeModule) commandeModule.setNature(commandeNature);
   // Onglet Fiverr / À commander : la grille doit pointer sur LEUR catégorie.
   // On ne recharge que si elle affiche autre chose (revenir sur l'onglet déjà
   // ouvert ne doit pas vider la grille sous les yeux). Au tout premier passage
@@ -4207,7 +4251,7 @@ async function start() {
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
   // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis sautent.
-  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage()]);
+  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage(), loadTgca()]);
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
   updateStageHelp();

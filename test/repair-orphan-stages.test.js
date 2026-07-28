@@ -14,7 +14,7 @@ const db = require('../db');
 
 // État orphelin reproduisant EXACTEMENT la distribution observée en prod.
 const ORPHANS = [
-  { stage: 'nouvelle_demande', sub_stage: null, n: 8, wantStage: 'demande', wantSub: null },
+  { stage: 'nouvelle_demande', sub_stage: null, n: 8, wantStage: 'demande_chiffrage', wantSub: 'demande_recue' },
   { stage: 'prod_trotec', sub_stage: 'prod_trotec', n: 6, wantStage: 'production', wantSub: 'prod_trotec' },
   { stage: 'prod_trotec', sub_stage: 'montage_finition', n: 1, wantStage: 'production', wantSub: 'montage_finition' },
   { stage: 'prod_dtf', sub_stage: 'prod_pressage', n: 1, wantStage: 'production', wantSub: 'prod_pressage' },
