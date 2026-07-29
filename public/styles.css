@@ -2352,7 +2352,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .topbar { flex-wrap: wrap; row-gap: 8px; }
   .brand { order: 0; }
   .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
-  #btnNew { order: 2; }
   .topbar-right { order: 3; }
   .nav-switch {
     order: 4;
@@ -2387,7 +2386,9 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .nav-switch { gap: 2px; }
   .nav-switch-label { display: none; }
   .nav-switch-btn { padding: 8px; }
-  #viewCommande { padding-right: 8px; margin-right: 4px; }
+  /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
+     fichier et gagnerait à spécificité égale. */
+  #viewProjet { padding-right: 8px; margin-right: 4px; }
   .btn-primary-label { display: none; }
   .topbar .btn-primary { padding: 10px; }
 }
@@ -2415,7 +2416,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
      ne prend plus toute la ligne). */
   .topbar { flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
   .grid-search { order: 1; width: auto; flex: 1 1 100px; min-width: 0; max-width: none; }
-  #btnNew { order: 2; }
   .topbar-right { order: 3; }
   .nav-switch {
     order: 4;
@@ -2428,7 +2428,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   }
   .nav-switch-btn { flex: 0 0 auto; padding: 8px 12px; }
   .nav-switch-label { display: inline; }
-  #viewCommande { padding-right: 12px; margin-right: 6px; }
+  #viewProjet { padding-right: 12px; margin-right: 6px; }
   /* rail empilé au-dessus de la zone de travail : pas de poignée horizontale */
   .sidebar-resizer { display: none; }
   .sidebar {
@@ -2575,20 +2575,19 @@ button, a, .stage, .prio-pill, .deadline-badge,
    texte gras — plus par un aplat plein en permanence, qui rivalisait avec le
    VRAI bouton d'action de l'écran (Enregistrer la commande, etc.). Un seul
    remplissage plein par écran : celui de l'action, jamais celui de la nav. */
-.nav-switch-btn--projet { font-weight: 600; }
+/* Nouveau Projet ouvre la marche et reste SEUL à créer : un filet le détache des
+   onglets qui ne font que consulter (même grammaire que Réglages, à l'autre bout). */
+.nav-switch-btn--projet {
+  font-weight: 600;
+  margin-right: 6px;
+  padding-right: 14px;
+  border-right: 1px solid var(--border-soft);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
 .nav-switch-btn--projet .material-symbols-outlined { color: var(--primary); }
 .nav-switch-btn--projet.active { background: transparent; color: var(--text-1); }
 .nav-switch-btn--projet.active .material-symbols-outlined { color: var(--primary); }
-
-/* Les deux entrées de saisie (Demande / Commande) sont le premier pas : un peu
-   plus présentes, et détachées du reste par un filet vertical. */
-.nav-switch-btn--intake {
-  color: var(--text-1);
-  background: var(--surface-hover);
-}
-.nav-switch-btn--intake .material-symbols-outlined { color: var(--primary); }
-/* Filet à droite de la 2e entrée de saisie (Commande), pour la détacher du reste. */
-#viewCommande { margin-right: 6px; padding-right: 14px; border-right: 1px solid var(--border-soft); border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
 /* Réglages ferme la marche, détaché lui aussi : on n'y va pas pour travailler,
    on y va pour régler l'outil. */
@@ -2639,7 +2638,6 @@ body.view-focus .sidebar-resizer { display: none; }
 
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
-body.view-plein #btnNew { display: none !important; }
 
 /* `view-comptoir` (Nouveau Projet) : poste de vente, devant le client — il ne
    doit voir QUE l'étape en cours, jamais la nav du back-office (Dashboard,

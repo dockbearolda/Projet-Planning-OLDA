@@ -249,7 +249,7 @@ celle qu'implique la nature (`demande` → *Demande reçue*, `commande` →
 
 ## Navigation — une seule page, plusieurs vues
 
-Planning, Dashboard, Prise de commande, Base clients et Réglages sont **des vues
+Planning, Dashboard, Nouveau Projet, Base clients et Réglages sont **des vues
 d'un même document**, pas des pages. Passer de l'une à l'autre ne recharge
 rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
@@ -280,11 +280,17 @@ sur la vue : le planning ne paie rien tant qu'on ne prend pas de commande.
 
 ### Le catalogue vit dans `catalog.json`
 
-Trois listes de référence seulement : la **nature** d'une ligne (demande à
-chiffrer / commande validée), les **délais** raccourcis avec leur majoration, et
-les **modes de paiement**. C'est le seul endroit à modifier pour les ajuster —
-le serveur revalide tout ce que le poste de saisie envoie. Le fichier n'est lu
-qu'**au démarrage** : après une modification, il faut redémarrer le serveur.
+Des listes de référence, rien d'autre. Ce que le **serveur** revalide : la
+**nature** d'une ligne (demande à chiffrer / commande validée), les **délais**
+raccourcis avec leur majoration, les **modes de paiement**, les **emplacements**
+de marquage et les **types de logo**. Ce que **Nouveau Projet** y puise pour
+proposer sans imposer : les **vêtements**, la **grille de tailles** et les
+**typos** — le comptoir peut toujours taper autre chose.
+
+Le fichier ne contient plus que ce qui a un lecteur : une entrée sans lecteur
+n'est pas de la configuration, c'est du décor. C'est le seul endroit à modifier
+pour ajuster ces listes, et il n'est lu qu'**au démarrage** : après une
+modification, il faut redémarrer le serveur.
 
 Les **secteurs d'activité**, eux, vivent en base
 (`app_meta.client_secteurs`) et se complètent depuis Base clients, sans

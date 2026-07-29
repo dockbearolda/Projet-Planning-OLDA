@@ -62,7 +62,7 @@ const villeByLabel = (v) => VILLES.find((x) => fold(x.label) === fold(String(v |
 // Casse imposée à la saisie : « DUPONT » pour un nom, « Jean-Marc » pour un
 // prénom. Appliquée au blur seulement — jamais pendant la frappe, sinon le
 // curseur saute et corriger devient pénible.
-function applyCasse(mode, raw) {
+export function applyCasse(mode, raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return '';
   if (mode === 'majuscules') return s.toLocaleUpperCase('fr-FR');
@@ -419,7 +419,7 @@ function renderList() {
 // Reformate un champ téléphone à la frappe (chiffres groupés par deux, comme
 // « 06 90 66 24 00 ») en conservant la position du curseur, pour ne pas gêner
 // la saisie en cours de numéro.
-function formatPhoneAsTyped(input) {
+export function formatPhoneAsTyped(input) {
   // Le tiret « je n'ai pas l'info » n'est pas un numéro : le groupeur de
   // chiffres l'effacerait, et le champ ne pourrait jamais être marqué comme
   // volontairement vide.
@@ -475,10 +475,13 @@ export function fieldRow(field, value, opts) {
 // n'écrit que dans un champ vide, ou qui contient encore ce que la ville
 // PRÉCÉDENTE y avait mis. Une valeur tapée à la main n'est jamais perdue, et les
 // deux champs restent modifiables ensuite.
-// Branché sur un jeu de champs déjà rendu (fiche complète ou quick-form) ;
-// `onFilled` prévient l'appelant pour qu'il enregistre, s'il enregistre en place.
-export function wireVilleDefaults(fieldsWrap, onFilled) {
-  const byKey = (k) => fieldsWrap.querySelector(`.cl-f__input[data-key="${k}"]`);
+// Branché sur un jeu de champs déjà rendu (fiche complète ou formulaire de
+// création) ; `onFilled` prévient l'appelant pour qu'il enregistre, s'il
+// enregistre en place. `sel` laisse un formulaire au balisage différent (Nouveau
+// Projet) réutiliser la règle de non-écrasement plutôt que d'en recopier une
+// deuxième, forcément divergente à la longue.
+export function wireVilleDefaults(fieldsWrap, onFilled, sel = '.cl-f__input') {
+  const byKey = (k) => fieldsWrap.querySelector(`${sel}[data-key="${k}"]`);
   const ville = byKey('ville');
   if (!ville) return;
   // Ce que la ville a rempli la dernière fois : la seule chose qu'on s'autorise

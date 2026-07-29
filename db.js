@@ -890,17 +890,11 @@ async function setTarifsTasseParametres(p) {
 }
 
 // --- Emplacements d'impression ajoutés au comptoir ---------------------------
-// Le catalogue couvre les zones courantes (cœur, dos, manches…), mais l'atelier
-// en croise toujours une nouvelle : « Nuque », « Bas du dos », un flanc de sac.
-// La fiche de prise de commande permet donc d'en créer une à la volée ; elle est
-// stockée ici (app_meta.commande_zones, tableau JSON) et rejoint la liste de
-// TOUS les postes, sans redéploiement ni migration.
-// Les zones du catalogue, elles, ne passent jamais par là : elles sont figées.
-const ZONE_LABEL_MAX = 40;
-// Même convention d'identifiant que le catalogue (« haut_dos », « manche_g ») :
-// le front applique la même règle pour afficher la zone sans attendre le serveur.
-const zoneSlug = (s) => slugify(s).replace(/-/g, '_');
-
+// Zones créées à la volée du temps de l'ancienne prise de commande détaillée
+// (app_meta.commande_zones) et zones du catalogue qu'un poste avait masquées
+// (app_meta.commande_zones_masquees). Plus rien ne les ALIMENTE depuis que
+// Nouveau Projet est la seule porte d'entrée, mais on continue de les LIRE : les
+// emplacements déjà créés restent proposés, les masqués restent masqués.
 async function getCommandeZones() {
   const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'commande_zones'");
   if (!rows[0]) return [];
@@ -913,43 +907,6 @@ async function getCommandeZones() {
   } catch (_) {
     return [];
   }
-}
-
-// Ajoute une zone. `reserved` = les zones du catalogue, qu'on ne double jamais.
-// Renvoie { id, zone, zones } ; `zone` est l'existante si le libellé retombe sur
-// une zone déjà ajoutée (« Nuque » deux fois = une seule zone), et null si c'est
-// une zone du catalogue (rien à créer, l'appelant l'a déjà). Le rapprochement se
-// fait sur l'identifiant ET sur le libellé normalisé : « Avant gauche » retrouve
-// la zone `avant_g` du catalogue plutôt que d'en créer une jumelle.
-async function addCommandeZone(label, reserved = []) {
-  const clean = String(label == null ? '' : label).trim().slice(0, ZONE_LABEL_MAX);
-  const id = zoneSlug(clean);
-  if (!clean || !id) return null;
-
-  const zones = await getCommandeZones();
-  const same = (z) => z.id === id || zoneSlug(z.label) === id;
-  const cat = reserved.find(same);
-  if (cat) return { id: cat.id, zone: null, zones };
-  const known = zones.find(same);
-  if (known) return { id: known.id, zone: known, zones };
-
-  const next = [...zones, { id, label: clean }];
-  const value = JSON.stringify(next);
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [value]);
-  return { id, zone: next[next.length - 1], zones: next };
-}
-
-// Retire une zone ajoutée au comptoir (une faute de frappe se corrige). Les
-// commandes déjà enregistrées gardent leur marquage : le libellé y est recopié
-// au moment de l'enregistrement, pas relu dans cette liste.
-async function removeCommandeZone(id) {
-  const zones = await getCommandeZones();
-  const next = zones.filter((z) => z.id !== id);
-  if (next.length === zones.length) return zones;
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones', $1)", [JSON.stringify(next)]);
-  return next;
 }
 
 // Un emplacement du CATALOGUE (figé dans catalog.json) ne se supprime pas —
@@ -965,15 +922,6 @@ async function getHiddenCommandeZones() {
   } catch (_) {
     return [];
   }
-}
-
-async function hideCommandeZone(id) {
-  const hidden = await getHiddenCommandeZones();
-  if (hidden.includes(id)) return hidden;
-  const next = [...hidden, id];
-  await pool.query("DELETE FROM app_meta WHERE key = 'commande_zones_masquees'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('commande_zones_masquees', $1)", [JSON.stringify(next)]);
-  return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -1070,8 +1018,7 @@ module.exports = {
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
-  getCommandeZones, addCommandeZone, removeCommandeZone,
-  getHiddenCommandeZones, hideCommandeZone,
+  getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
 };

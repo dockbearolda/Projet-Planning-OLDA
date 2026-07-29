@@ -5,7 +5,7 @@
 // à la demande par app.js.
 
 import {
-  fieldRow, fieldsForNature, wireCreateValidation, wireVilleDefaults,
+  wireVilleDefaults, applyCasse, formatPhoneAsTyped,
   registerSecteurDatalist, loadSecteurs, valeurSaisie, VILLES,
 } from './clients.js';
 
@@ -48,6 +48,12 @@ const state = {
   addingType: null,       // type en cours de configuration (formulaire ouvert), null = fermé
   addingLigne: null,      // brouillon de la ligne en cours d'ajout
   customOpen: false,      // marquage (faces/dessous/BAT) déplié ? réduit la densité par défaut
+  // Écran « Nouveau client » (étape 1). Le brouillon et l'état du bloc replié
+  // vivent ICI, pas dans le DOM : basculer Pro ↔ Particulier re-rend le
+  // formulaire, et ce qui est déjà tapé ne doit pas partir avec.
+  clientForm: null,           // null = recherche ; 'pro' | 'perso' = formulaire ouvert
+  clientDraft: {},            // { [clé envoyée à l'API]: valeur tapée }
+  clientErreur: null,         // clé du champ en erreur, une seule à la fois
   // DÉLAI OBLIGATOIRE : rien n'est pré-coché, l'enregistrement est bloqué tant
   // qu'on n'a pas tranché — c'est ce qui garantit une date butoir sur CHAQUE
   // ligne du planning. Soit un raccourci (`delai`), soit une date précise
@@ -161,7 +167,28 @@ function renderStepper() {
   });
 }
 
+// L'en-tête annonce l'écran courant. Sur « Nouveau client », le titre prend la
+// place de la marque (avec un sur-titre discret qui rappelle le flux) et le
+// stepper file à droite : on lit d'abord ce qu'on est en train de faire.
+function renderBar() {
+  const brand = $('#proj-bar-brand');
+  if (!brand) return;
+  const nc = state.page === 'client' && !!state.clientForm;
+  const page = ROOT.querySelector('.proj-page');
+  if (page) page.classList.toggle('is-nouveau-client', nc);
+  brand.replaceChildren();
+  if (nc) {
+    brand.append(
+      el('p', 'proj-bar__over', 'NOUVEAU PROJET'),
+      el('h2', 'proj-bar__title proj-bar__title--nc', 'Nouveau client'),
+    );
+    return;
+  }
+  brand.append(ic('bolt', 'proj-bar__ic'), el('h2', 'proj-bar__title', 'Nouveau Projet'));
+}
+
 function render() {
+  renderBar();
   renderStepper();
   const body = $('#proj-body');
   if (!body) return;
@@ -210,6 +237,11 @@ function resetPanier() {
 }
 
 function renderClientPage(body) {
+  if (state.clientForm) return renderNouveauClient(body);
+  return renderClientSearch(body);
+}
+
+function renderClientSearch(body) {
   body.replaceChildren();
   const wrap = el('div', 'proj-client');
   wrap.append(el('h3', 'proj-step__title', 'Quel client ?'));
@@ -232,10 +264,6 @@ function renderClientPage(body) {
 
   const results = el('div', 'proj-client__results');
   wrap.append(results);
-
-  const quickForm = el('div', 'proj-quick');
-  quickForm.hidden = true;
-  wrap.append(quickForm);
 
   const pick = (c) => {
     const nature = c.client_type === 'perso' ? 'perso' : 'pro';
@@ -263,67 +291,243 @@ function renderClientPage(body) {
   input.addEventListener('input', renderResults);
   renderResults();
 
-  const renderQuickForm = (nature) => {
-    quickForm.hidden = false;
-    quickForm.replaceChildren();
-    const seg = el('div', 'proj-seg');
-    for (const n of [{ id: 'pro', label: 'Pro' }, { id: 'perso', label: 'Perso' }]) {
-      const b = el('button', `proj-seg__btn${n.id === nature ? ' is-on' : ''}`, n.label);
-      b.type = 'button';
-      b.addEventListener('click', () => renderQuickForm(n.id));
-      seg.appendChild(b);
-    }
-    quickForm.appendChild(seg);
-
-    // Teinte légère façon SumUp : vert Particulier, ambre Pro — même palette
-    // que la fiche complète (Base Clients).
-    quickForm.classList.toggle('proj-quick--perso', nature === 'perso');
-    quickForm.classList.toggle('proj-quick--pro', nature !== 'perso');
-
-    const fieldsWrap = el('div', 'proj-quick__fields');
-    for (const f of fieldsForNature(nature)) {
-      const local = { secteur: PROJ_SECTEURS_DL_ID, ville: PROJ_VILLES_DL_ID }[f.key];
-      fieldsWrap.appendChild(fieldRow(local ? { ...f, list: local } : f, ''));
-    }
-    quickForm.appendChild(fieldsWrap);
-    // Choisir une ville remplit pays et code postal (sans jamais écraser une
-    // valeur tapée à la main).
-    wireVilleDefaults(fieldsWrap);
-    const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
-
-    const createBtn = el('button', 'proj-btn proj-btn--primary', 'Créer et continuer');
-    createBtn.type = 'button';
-    quickForm.appendChild(createBtn);
-
-    // Le bouton reste cliquable même incomplet : wireCreateValidation gère la
-    // confirmation « créer quand même » (voir clients.js) plutôt que de
-    // bloquer purement et simplement la création.
-    wireCreateValidation(fieldsWrap, createBtn, async () => {
-      createBtn.disabled = true;
-      const draft = { client_type: nature };
-      for (const i of inputs) draft[i.dataset.key] = valeurSaisie(i.dataset.key, i.value);
-      // `entreprise` reste la colonne obligatoire côté serveur et sert à la
-      // recherche/l'affichage : pour un particulier, on la dérive du prénom +
-      // nom plutôt que de la demander une deuxième fois.
-      if (nature === 'perso') draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
-      try {
-        const created = await api('POST', '/api/clients', draft);
-        CLIENTS.push(created);
-        goToClient({
-          id: created.id, entreprise: created.entreprise, nom: created.nom,
-          telephone: created.telephone, email: created.email, type: nature,
-        });
-      } catch (err) {
-        createBtn.disabled = false;
-        window.alert(err.message || 'Création impossible');
-      }
-    });
-    inputs[0].focus();
-  };
-  newBtn.addEventListener('click', () => renderQuickForm('pro'));
+  newBtn.addEventListener('click', () => {
+    state.clientForm = 'pro';
+    state.clientDraft = {};
+    state.clientErreur = null;
+    render();
+  });
 
   body.appendChild(wrap);
   input.focus();
+}
+
+// --- Écran « Nouveau client » ----------------------------------------------------
+// UNE colonne, trois champs à l'ouverture, le reste replié : le comptoir crée
+// une fiche en trois frappes et complète l'adresse plus tard s'il l'a. Les clés
+// (`entreprise`, `telephone`, `referent_prenom`…) sont celles que l'API attend,
+// inchangées — c'est l'écran qu'on refait, pas le contrat.
+const NC_IDENTITE = {
+  pro: { key: 'entreprise', label: 'Nom de l’entreprise', ph: '100% Villas' },
+  // Le particulier saisit son nom en UNE ligne (trois champs à l'écran, pas
+  // quatre) ; `prenom` et `nom` sont reconstitués à l'enregistrement.
+  perso: { key: 'nom_complet', label: 'Nom et prénom', ph: 'Jean Dupont' },
+};
+const NC_CONTACT = [
+  { key: 'telephone', label: 'Téléphone (WhatsApp)', ph: '06 42 26 69 49', type: 'tel', inputmode: 'tel' },
+  { key: 'email', label: 'E-mail', ph: 'contact@entreprise.fr', type: 'email', inputmode: 'email' },
+];
+// Section « Adresse et détails » : toujours visible, jamais bloquante. `pleine`
+// = le champ prend la largeur de la carte (une adresse ou une raison sociale
+// n'a rien à faire dans une demi-colonne).
+const NC_DETAILS = [
+  { key: 'adresse', label: 'Adresse', ph: '12 rue de la République', pleine: true },
+  { key: 'ville', label: 'Ville', ph: 'Saint-Martin', list: PROJ_VILLES_DL_ID, demi: true },
+  { key: 'code_postal', label: 'Code postal', ph: '97150', demi: true },
+  { key: 'secteur', label: 'Secteur d’activité', ph: 'Hôtellerie, BTP…', list: PROJ_SECTEURS_DL_ID },
+  { key: 'referent_prenom', label: 'Référent', ph: 'Marie', casse: 'initiales' },
+  { key: 'raison_sociale', label: 'Raison sociale EBP', ph: 'SARL 100 % Villas' },
+];
+
+// Les clés que la nature courante a le droit d'envoyer. Le brouillon, lui,
+// garde TOUT ce qui a été tapé (basculer Pro ↔ Particulier ne doit rien faire
+// perdre) : sans ce filtre, une adresse saisie côté Pro partirait sur la fiche
+// d'un particulier qui n'en a jamais eu.
+function ncKeys(nature) {
+  const contact = NC_CONTACT.map((f) => f.key);
+  if (nature === 'perso') return new Set(contact);
+  return new Set([NC_IDENTITE.pro.key, ...contact, ...NC_DETAILS.map((f) => f.key)]);
+}
+
+// Un champ = son étiquette (casse normale, pas d'icône), son champ toujours
+// bordé, et la place du message d'erreur juste dessous.
+function ncField(f, { requis = false } = {}) {
+  const row = el('div', 'pjc-f');
+  const lab = el('label', 'pjc-f__label');
+  // Le texte de l'étiquette vit dans UN seul enfant : l'étiquette elle-même est
+  // une boîte de hauteur fixe qui le colle en bas (voir .pjc-f__label), pour que
+  // tous les champs d'une même ligne démarrent au même niveau, qu'une étiquette
+  // tienne sur une ligne ou sur deux.
+  const txt = el('span', 'pjc-f__labeltxt', f.label);
+  if (!requis) txt.append(el('span', 'pjc-f__opt', ' — optionnel'));
+  lab.append(txt);
+  const input = el('input', 'pjc-input');
+  input.type = f.type || 'text';
+  if (f.inputmode) input.inputMode = f.inputmode;
+  if (f.list) input.setAttribute('list', f.list);
+  input.placeholder = f.ph || '';
+  input.autocomplete = 'off';
+  input.dataset.key = f.key;
+  input.value = state.clientDraft[f.key] || '';
+  input.id = `pjc-f-${f.key}`;
+  lab.setAttribute('for', input.id);
+
+  // Le brouillon suit la frappe : basculer Pro ↔ Particulier ou déplier les
+  // détails re-rend le formulaire sans rien perdre.
+  input.addEventListener('input', () => {
+    // Le regroupement des chiffres passe AVANT la mise au brouillon : c'est le
+    // numéro affiché qu'on garde, pas celui d'avant reformatage.
+    if (f.type === 'tel') formatPhoneAsTyped(input);
+    state.clientDraft[f.key] = input.value;
+    // « L'erreur s'efface dès la première frappe » : on ne laisse jamais un
+    // cadre rouge sur un champ qu'on est en train de corriger.
+    if (state.clientErreur === f.key) {
+      state.clientErreur = null;
+      row.classList.remove('is-error');
+      const msg = row.querySelector('.pjc-f__err');
+      if (msg) msg.remove();
+    }
+  });
+  // Le code postal posé par le choix d'une ville arrive par `change`, pas par
+  // la frappe : sans ça il s'afficherait sans jamais rejoindre le brouillon.
+  input.addEventListener('change', () => { state.clientDraft[f.key] = input.value; });
+  if (f.casse) {
+    input.addEventListener('blur', () => {
+      const next = applyCasse(f.casse, input.value);
+      if (next !== input.value) { input.value = next; state.clientDraft[f.key] = next; }
+    });
+  }
+
+  row.append(lab, input);
+  if (f.pleine) row.classList.add('pjc-f--pleine');
+  if (state.clientErreur === f.key) {
+    row.classList.add('is-error');
+    const err = el('p', 'pjc-f__err');
+    err.append(el('span', 'pjc-f__err-dot', '!'), el('span', null, `${f.label} est obligatoire.`));
+    row.append(err);
+  }
+  return row;
+}
+
+function renderNouveauClient(body) {
+  const nature = state.clientForm;
+  body.replaceChildren();
+  const screen = el('div', 'pjc-screen');
+  const card = el('form', 'pjc-card');
+  card.noValidate = true;
+  const champs = el('div', 'pjc-card__body');
+
+  // Pro / Particulier : deux jeux de champs, pas deux formulaires. Seule
+  // l'identité change de nom.
+  const seg = el('div', 'pjc-seg');
+  for (const n of [{ id: 'pro', label: 'Pro' }, { id: 'perso', label: 'Particulier' }]) {
+    const b = el('button', `pjc-seg__btn${n.id === nature ? ' is-on' : ''}`, n.label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (state.clientForm === n.id) return;
+      state.clientForm = n.id;
+      state.clientErreur = null;
+      render();
+    });
+    seg.appendChild(b);
+  }
+  champs.append(seg);
+
+  const identite = NC_IDENTITE[nature];
+  const idRow = ncField(identite, { requis: true });
+  idRow.classList.add('pjc-f--pleine');
+  champs.append(idRow);
+  // Téléphone et e-mail côte à côte : deux coordonnées courtes, une seule ligne.
+  for (const f of NC_CONTACT) champs.append(ncField(f));
+
+  // Le particulier n'a ni adresse ni facturation dans sa fiche : rien à lui
+  // montrer ici, la section resterait vide.
+  if (nature === 'pro') {
+    const bloc = el('section', 'pjc-more');
+    const tete = el('div', 'pjc-more__head');
+    tete.append(
+      el('h3', 'pjc-more__title', 'Adresse et détails'),
+      el('p', 'pjc-more__sub', 'Adresse, secteur, référent, facturation.'),
+    );
+    bloc.append(tete);
+
+    const grille = el('div', 'pjc-more__fields');
+    // Ville et code postal partagent une ligne : deux informations d'une même
+    // adresse, la seconde tient en 150px.
+    let paire = null;
+    for (const f of NC_DETAILS) {
+      const row = ncField(f);
+      if (f.demi) {
+        if (!paire) { paire = el('div', 'pjc-pair'); grille.append(paire); }
+        paire.append(row);
+      } else {
+        paire = null;
+        grille.append(row);
+      }
+    }
+    bloc.append(grille);
+    // Choisir une ville connue remplit le code postal, sans jamais écraser
+    // une valeur tapée à la main.
+    wireVilleDefaults(grille, null, '.pjc-input');
+    champs.append(bloc);
+  }
+
+  card.append(champs);
+
+  const actions = el('div', 'pjc-actions');
+  const createBtn = el('button', 'pjc-btn pjc-btn--primary', 'Créer et continuer');
+  createBtn.type = 'submit';
+  const annuler = el('button', 'pjc-btn pjc-btn--ghost', 'Annuler');
+  annuler.type = 'button';
+  annuler.addEventListener('click', () => {
+    state.clientForm = null;
+    state.clientErreur = null;
+    render();
+  });
+  actions.append(createBtn, annuler);
+  card.append(actions);
+
+  card.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const identiteSaisie = String(state.clientDraft[identite.key] || '').trim();
+    if (!identiteSaisie) {
+      state.clientErreur = identite.key;
+      render();
+      const champ = $(`#pjc-f-${identite.key}`);
+      if (champ) champ.focus();
+      return;
+    }
+    createBtn.disabled = true;
+    const autorisees = ncKeys(nature);
+    const draft = { client_type: nature };
+    for (const [key, val] of Object.entries(state.clientDraft)) {
+      if (autorisees.has(key)) draft[key] = valeurSaisie(key, val);
+    }
+    // Le pays ne se demande plus (il se déduit de la ville) mais il continue
+    // de s'enregistrer : sans ça la colonne se viderait en silence pour tous
+    // les clients créés ici, et la fiche complète s'ouvrirait incomplète.
+    const villeConnue = VILLES.find((v) => fold(v.label) === fold(draft.ville || ''));
+    if (villeConnue) draft.pays = villeConnue.pays;
+    if (nature === 'perso') {
+      // Un particulier tape « Prénom Nom » ; la base, elle, garde les deux
+      // séparés (et leur casse : Jean / DUPONT). Un seul mot = un nom.
+      const mots = identiteSaisie.split(/\s+/);
+      draft.prenom = mots.length > 1 ? applyCasse('initiales', mots[0]) : '';
+      draft.nom = applyCasse('majuscules', (mots.length > 1 ? mots.slice(1) : mots).join(' '));
+      // `entreprise` reste la colonne obligatoire côté serveur et sert à la
+      // recherche/l'affichage : pour un particulier, on la dérive du prénom +
+      // nom plutôt que de la demander une deuxième fois.
+      draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
+    }
+    try {
+      const created = await api('POST', '/api/clients', draft);
+      CLIENTS.push(created);
+      state.clientForm = null;
+      state.clientDraft = {};
+        goToClient({
+        id: created.id, entreprise: created.entreprise, nom: created.nom,
+        telephone: created.telephone, email: created.email, type: nature,
+      });
+    } catch (err) {
+      createBtn.disabled = false;
+      window.alert(err.message || 'Création impossible');
+    }
+  });
+
+  screen.append(card);
+  body.appendChild(screen);
+  const premier = $(`#pjc-f-${identite.key}`);
+  if (premier) premier.focus();
 }
 
 // --- Colonne de gauche : client épinglé ------------------------------------------
@@ -1297,8 +1501,9 @@ function showConfirmation(created) {
 function buildStatic() {
   const page = el('div', 'proj-page');
   const head = el('header', 'proj-bar');
-  head.append(ic('bolt', 'proj-bar__ic'));
-  head.append(el('h2', 'proj-bar__title', 'Nouveau Projet'));
+  const brand = el('div', 'proj-bar__brand');
+  brand.id = 'proj-bar-brand';
+  head.append(brand);
   const stepper = el('div', 'proj-stepper');
   stepper.id = 'proj-stepper';
   head.append(stepper);
@@ -1353,5 +1558,6 @@ export function resetProjet() {
   if (!mounted) return;
   state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
+  state.clientForm = null; state.clientDraft = {}; state.clientErreur = null;
   render();
 }

@@ -13,8 +13,24 @@
    ombres légères — voir --radius-lg / --shadow-1 utilisés partout ci-dessous. */
 .proj-page { --radius-lg: 18px; display: flex; flex-direction: column; height: 100%; min-height: 0; font-size: 16px; }
 .proj-bar { display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.proj-bar__brand { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; }
 .proj-bar__ic { font-size: 24px; color: var(--primary); flex: 0 0 auto; }
 .proj-bar__title { margin: 0; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
+/* Écran « Nouveau client » : le titre de l'écran passe devant la marque, le
+   sur-titre garde le fil du flux, et le stepper cesse d'être centré — il
+   accompagne le titre au lieu de le concurrencer. */
+.proj-page.is-nouveau-client .proj-bar__brand { display: block; }
+.proj-bar__over { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--nc-over, #8b93a5); }
+.proj-bar__title--nc { font-size: 26px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
+.proj-page.is-nouveau-client .proj-stepper { flex: 1; justify-content: flex-end; }
+/* La carte se pose sur un fond de page légèrement gris : c'est lui qui la
+   détache, pas un liseré de couleur. Largeur libérée — c'est la carte (620px)
+   qui borne le contenu, plus la colonne de travail. */
+.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0 20px; background: #f6f7f9; }
+:root[data-theme="dark"] .proj-page.is-nouveau-client .proj-body { background: var(--bg); }
+@media (max-width: 560px) {
+  .proj-bar__title--nc { font-size: 22px; }
+}
 /* .work (parent) a overflow:hidden — c'est ici, sur .proj-body, qu'il faut
    son propre scroll. Sans le min-height:0 + overflow-y, un contenu plus haut
    que la fenêtre (fréquent sur Windows/Chrome, barre d'outils plus haute
@@ -114,38 +130,165 @@
 .proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
 .proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .proj-btn:disabled { opacity: .6; cursor: default; }
-/* Un champ obligatoire laissé vide n'empêche plus la création (voir
-   wireCreateValidation, clients.js) : un 1er clic incomplet arme cet état
-   « confirmer quand même » à la place de bloquer le bouton. */
-.proj-btn--primary.is-confirm { background: var(--st-cours); border-color: var(--st-cours); }
-
-.proj-quick { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid transparent; border-radius: var(--radius-lg); }
-.proj-quick[hidden] { display: none; }
-/* Teinte légère façon SumUp : gris Particulier, bleu Pro/Revendeur/Asso —
-   même palette que la fiche complète (Base Clients) et la puce Nature,
-   zéro nouvelle couleur. */
-.proj-quick--perso { border-left-color: var(--st-archive); background: var(--st-archive-bg); }
-.proj-quick--pro { border-left-color: var(--st-demande); background: var(--st-demande-bg); }
-/* Une colonne (mobile, tablette portrait) ; 2 colonnes au-dessus de 720px ;
-   3 au-dessus de 980px (desktop large) — la fiche pro (10 champs) tient sur
-   4 lignes au lieu de 5, ce qu'il faut pour ne jamais scroller ici. */
-.proj-quick__fields { align-self: stretch; display: grid; grid-template-columns: 1fr; gap: 4px 20px; }
-@media (min-width: 720px) { .proj-quick__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 980px) { .proj-quick__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* `.cl-f` (clients.css) empile déjà label/champ depuis #ecf7133 — on garde
-   cet empilement ici (contrairement à un essai précédent qui mettait le
-   label à côté du champ sur 132px fixes : à 2-3 colonnes, .proj-client
-   plafonne à 640px de large donc chaque colonne ne fait que ~190-290px,
-   et 132px de label n'y laissait plus que des miettes pour le champ —
-   inputs quasi invisibles). La grille 2-3 colonnes ci-dessus suffit à elle
-   seule à éviter le scroll (10 champs sur 3-4 lignes au lieu de 10), sans
-   avoir besoin de comprimer chaque ligne individuellement. */
-.proj-quick__fields .cl-f { border-bottom: none; gap: 2px; padding: 4px 0; }
 .proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
 .proj-input--sm { min-height: 48px; }
-.proj-seg { display: flex; gap: 4px; border: 1px solid var(--border); border-radius: 14px; padding: 3px; }
-.proj-seg__btn { min-height: 40px; padding: 0 14px; border: 0; border-radius: 11px; background: transparent; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; color: var(--text-2); }
-.proj-seg__btn.is-on { background: var(--primary-soft); color: var(--primary); }
+
+/* --- Écran « Nouveau client » (étape 1) ------------------------------------------
+   Une CARTE, une COLONNE, trois champs. Le reste se déplie si on l'a. Les
+   valeurs sont posées en dur ici (et non prises aux jetons de l'app) parce que
+   c'est une maquette validée au pixel ; le thème sombre les rebascule plus bas
+   sur les jetons, pour ne pas rendre l'écran illisible la nuit. */
+.pjc-screen {
+  --nc-page: #f6f7f9;
+  --nc-card: #fff;
+  --nc-border: #eceef2;
+  --nc-field-border: #dfe3eb;
+  --nc-label: #3d4453;
+  --nc-opt: #9aa1b1;
+  --nc-ph: #a6adbb;
+  --nc-over: #8b93a5;
+  --nc-title: #111420;
+  --nc-accent: #2b46f0;
+  --nc-accent-hover: #2038d6;
+  --nc-accent-active: #1b30bd;
+  --nc-error: #d2263b;
+  --nc-error-bg: #fff6f7;
+  --nc-track: #f2f4f8;
+  --nc-muted: #6b7385;
+  --nc-sep: #f0f2f6;
+  --nc-more-bg: #f7f8fb;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 28px 0 40px;
+}
+.pjc-card {
+  width: 100%; max-width: 860px; background: var(--nc-card);
+  border: 1px solid var(--nc-border); border-radius: 22px;
+  box-shadow: 0 1px 2px rgba(17, 20, 32, .04), 0 12px 32px -18px rgba(17, 20, 32, .18);
+}
+/* DEUX colonnes, pas trois : la fiche entière est visible d'un coup (plus rien
+   n'est replié) sans que le formulaire s'étire sur deux écrans. Une colonne
+   fait ici ~390px — le double de l'ancienne grille à trois colonnes, celle qui
+   rendait les champs illisibles. Ce qui est long (identité, adresse, raison
+   sociale) reprend la pleine largeur. */
+/* `align-items: start` : un champ en erreur porte un message SOUS lui et grandit ;
+   sans ça il étirerait ses voisins et décalerait leurs champs. */
+.pjc-card__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; padding: 32px 32px 28px; align-items: start; }
+.pjc-f--pleine, .pjc-seg, .pjc-more { grid-column: 1 / -1; }
+@media (max-width: 700px) {
+  .pjc-card__body { grid-template-columns: 1fr; }
+}
+
+/* Champ : l'étiquette se lit en casse normale, le contour est TOUJOURS visible
+   (un champ sans bordure ne se voit pas — c'est ce qui a motivé cette refonte). */
+.pjc-f { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+/* TOUS les champs d'une même ligne démarrent au même niveau. L'étiquette est une
+   boîte de hauteur fixe (deux lignes) qui colle son texte en bas : qu'elle tienne
+   sur une ligne (« Ville ») ou sur deux (« Code postal — optionnel » dans ses
+   150px), le champ dessous est toujours à la même hauteur. Le surplus part
+   au-dessus de l'étiquette, là où il passe pour de l'air. */
+.pjc-f__label {
+  display: flex; align-items: flex-end; min-height: 36px;
+  font-size: 13.5px; font-weight: 600; color: var(--nc-label);
+}
+.pjc-f__labeltxt { display: block; }
+.pjc-f__opt { font-weight: 500; color: var(--nc-opt); }
+.pjc-input {
+  height: 50px; padding: 0 14px; width: 100%;
+  border: 1.5px solid var(--nc-field-border); border-radius: 12px;
+  background: var(--nc-card); color: var(--nc-title);
+  font: inherit; font-size: 15px; outline: none;
+  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+.pjc-input::placeholder { color: var(--nc-ph); }
+.pjc-input:focus { border-color: var(--nc-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
+/* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
+.pjc-f.is-error .pjc-input { border-color: var(--nc-error); background: var(--nc-error-bg); }
+.pjc-f.is-error .pjc-input:focus { box-shadow: 0 0 0 3px rgba(210, 38, 59, .14); }
+.pjc-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--nc-error); }
+.pjc-f__err-dot {
+  flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--nc-error); color: #fff; font-size: 10px; font-weight: 800;
+}
+
+/* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne. */
+.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: start; }
+@media (max-width: 420px) { .pjc-pair { grid-template-columns: 1fr; } }
+
+/* Pro / Particulier : une piste, un curseur blanc. Le reste du formulaire ne
+   bouge pas — seule l'étiquette d'identité change. */
+.pjc-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--nc-track); border-radius: 12px; }
+.pjc-seg__btn {
+  min-height: 44px; border: 0; border-radius: 9px; background: transparent;
+  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--nc-muted); cursor: pointer;
+}
+.pjc-seg__btn.is-on { background: var(--nc-card); color: var(--nc-title); box-shadow: 0 1px 3px rgba(17, 20, 32, .10); }
+
+/* « Adresse et détails » : une SECTION, plus un tiroir. Tout est là dès
+   l'ouverture ; le fond légèrement teinté suffit à dire que c'est le second
+   temps de la saisie, sans rien cacher. */
+.pjc-more { border: 1px solid var(--nc-border); border-radius: 16px; background: var(--nc-more-bg); }
+.pjc-more__head { padding: 20px 22px 4px; }
+.pjc-more__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--nc-title); }
+.pjc-more__sub { margin: 3px 0 0; font-size: 13px; color: var(--nc-muted); }
+.pjc-more__fields {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px; padding: 18px 22px 22px; align-items: start;
+}
+/* La paire ville/code postal tient dans UNE colonne (1fr / 150px à l'intérieur) :
+   étalée sur toute la largeur, le code postal laissait un grand vide à sa
+   gauche. Elle s'aligne ainsi avec le champ d'à côté. */
+.pjc-more__fields > .pjc-f--pleine { grid-column: 1 / -1; }
+@media (max-width: 700px) {
+  .pjc-more__fields { grid-template-columns: 1fr; }
+}
+
+/* La zone d'action se détache du formulaire : on a fini de saisir, on décide. */
+.pjc-actions { display: flex; flex-direction: column; gap: 6px; padding: 20px 32px 26px; border-top: 1px solid var(--nc-sep); }
+.pjc-btn { width: 100%; border: 0; border-radius: 14px; font: inherit; cursor: pointer; }
+.pjc-btn--primary {
+  height: 54px; background: var(--nc-accent); color: #fff; font-size: 16px; font-weight: 700;
+  transition: background-color .12s ease;
+}
+.pjc-btn--primary:hover:not(:disabled) { background: var(--nc-accent-hover); }
+.pjc-btn--primary:active:not(:disabled) { background: var(--nc-accent-active); }
+.pjc-btn--primary:disabled { opacity: .6; cursor: default; }
+.pjc-btn--ghost { height: 44px; background: none; color: var(--nc-muted); font-size: 15px; font-weight: 600; }
+.pjc-btn--ghost:hover { color: var(--nc-title); }
+
+@media (max-width: 560px) {
+  .pjc-screen { padding: 16px 0 28px; }
+  .pjc-card__body { padding: 22px 18px 18px; }
+  .pjc-more__head { padding: 16px 16px 2px; }
+  .pjc-more__fields { padding: 14px 16px 18px; }
+  .pjc-actions { padding: 18px 18px 20px; }
+  /* 15px est la valeur de la maquette, et c'est ce qu'on voit au comptoir.
+     Sous 16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la
+     dézoome jamais : sur téléphone seulement, le champ passe donc à 16px. */
+  .pjc-input { font-size: 16px; }
+}
+
+/* Thème sombre : mêmes formes, jetons de l'app à la place des valeurs claires.
+   L'accent reste le bleu de la maquette — c'est l'action, elle doit rester
+   reconnaissable d'un thème à l'autre. */
+:root[data-theme="dark"] .pjc-screen {
+  --nc-page: var(--bg);
+  --nc-card: var(--surface);
+  --nc-border: var(--border-soft);
+  --nc-field-border: var(--border);
+  --nc-label: var(--text-1);
+  --nc-opt: var(--text-2);
+  --nc-ph: var(--text-2);
+  --nc-over: var(--text-2);
+  --nc-title: var(--text-1);
+  --nc-error-bg: rgba(210, 38, 59, .14);
+  --nc-track: var(--surface-hover);
+  --nc-muted: var(--text-2);
+  --nc-sep: var(--border-soft);
+  --nc-more-bg: var(--surface-hover);
+}
 
 /* --- Tuiles de type (colonne de droite) ---------------------------------------- */
 /* Grosses tuiles carrées façon catégories SumUp : icône dans un cercle bleu
