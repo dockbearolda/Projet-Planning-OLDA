@@ -71,6 +71,14 @@
   --shadow-2: 0 8px 24px rgba(0, 0, 0, .05);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, .25);
 
+  /* bandeau de famille du rail — gris ardoise, pas l'encre pure : le plein
+     noir écrasait le reste de l'écran. Assez sombre pour rester un vrai
+     bandeau (blanc dessus à 10,4:1), assez doux pour ne pas cogner. Cran
+     « strong » = survol / famille active. */
+  --rail-head-bg: #374151;
+  --rail-head-bg-strong: #1f2937;
+  --rail-head-fg: #fff;
+
   --scrollbar: #d1d5db;
   --scrollbar-hover: #9ca3af;
 
@@ -153,6 +161,12 @@
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, .4);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, .55);
+
+  /* En sombre le bandeau reste inversé (clair sur fond sombre) mais sort du
+     blanc quasi pur, qui éblouissait autant que le noir en thème clair. */
+  --rail-head-bg: #d1d5db;
+  --rail-head-bg-strong: #f3f4f6;
+  --rail-head-fg: #111827;
 
   --scrollbar: #4b5563;
   --scrollbar-hover: #6b7280;
@@ -522,10 +536,11 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 
 /* Grand titre de ZONE — BARRE PLEINE. Demande de la direction : les familles
-   doivent sauter aux yeux depuis l'atelier, pas se deviner. On assume donc le
-   bandeau plein encre + majuscules + gras : c'est LA catégorie, on ne la rate
-   pas. La couleur reste dans la charte (accent encre, texte --on-primary) —
-   aucune teinte n'entre par cette porte.
+   doivent sauter aux yeux depuis l'atelier, pas se deviner. D'où le bandeau
+   plein + majuscules + gras : c'est LA catégorie, on ne la rate pas. Le fond
+   est un gris ARDOISE (--rail-head-bg), pas l'encre pure : à cinq bandeaux
+   par écran, le noir plein écrasait tout le reste. Aucune teinte n'entre par
+   cette porte — que du gris de la charte.
    Reste cliquable (afficher toute la famille) et se lit comme un EN-TÊTE —
    d'où le verrouillage du dépôt dessus quand la zone a des sous-catégories
    (voir stageAcceptsDrop). */
@@ -534,8 +549,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   margin: 0 -3px 3px;
   border-radius: 0;
   padding: 11px 14px;
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--rail-head-bg);
+  color: var(--rail-head-fg);
 }
 .stage-zone:not(.has-sub) .stage.zone-head {
   margin: 0;
@@ -543,19 +558,18 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .stage.zone-head .stage-label {
   font-weight: 700;
-  color: var(--on-primary);
+  color: var(--rail-head-fg);
   font-size: 13px;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-/* Survol / actif : on ne peut plus éclaircir un fond déjà plein — on le
-   pousse au noir pur (clair) ou on l'éclaircit (sombre) via --primary-hover.
-   Toutes les barres étant à l'encre, l'état ACTIF ne peut pas se jouer sur la
-   teinte de fond : il se marque par un TAQUET clair collé au bord gauche,
-   repérable d'un coup d'œil sur un rail de cinq bandeaux identiques. */
-.stage.zone-head:hover { background: var(--primary-hover); }
-.stage.zone-head.active { background: var(--primary-hover); }
-.stage.zone-head.active .stage-label { color: var(--on-primary); }
+/* Survol / actif : on ne peut pas éclaircir un fond déjà plein — on l'assombrit
+   d'un cran (--rail-head-bg-strong). Le fond ne suffit pas à porter l'état
+   ACTIF sur un rail de cinq bandeaux quasi identiques : c'est le TAQUET clair
+   collé au bord gauche qui le dit. */
+.stage.zone-head:hover { background: var(--rail-head-bg-strong); }
+.stage.zone-head.active { background: var(--rail-head-bg-strong); }
+.stage.zone-head.active .stage-label { color: var(--rail-head-fg); }
 .stage.zone-head::before {
   content: "";
   position: absolute;
@@ -563,38 +577,38 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   top: 0;
   bottom: 0;
   width: 6px;
-  background: var(--on-primary);
+  background: var(--rail-head-fg);
   opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
 .stage.zone-head.active::before { opacity: 1; }
-/* barre inversée (cible de dépôt) : le taquet doit repasser à l'encre */
-.stage.zone-head.drop-target::before { background: var(--primary); }
-/* Compteur posé SUR l'encre : pastille inversée, lisible de loin. */
+/* barre inversée (cible de dépôt) : le taquet doit repasser au gris foncé */
+.stage.zone-head.drop-target::before { background: var(--rail-head-bg-strong); }
+/* Compteur posé SUR le bandeau : pastille inversée, lisible de loin. */
 .stage.zone-head .stage-count {
-  color: var(--on-primary);
+  color: var(--rail-head-fg);
   font-weight: 700;
   font-size: 12.5px;
 }
 .stage.zone-head .stage-count.has-items {
-  background: var(--on-primary);
-  color: var(--primary);
+  background: var(--rail-head-fg);
+  color: var(--rail-head-bg-strong);
 }
 /* Cibles de glisser-déposer sur un bandeau plein : les fonds tonals de
-   `.stage.drop-target` / `.drop-blocked` disparaîtraient sous l'encre. On
-   INVERSE la barre pour « déposer ici », on la passe en rouge de la charte
+   `.stage.drop-target` / `.drop-blocked` disparaîtraient sous le gris foncé.
+   On INVERSE la barre pour « déposer ici », on la passe en rouge de la charte
    pour « refusé ». (Un en-tête de famille à sous-catégories n'est jamais une
    cible valide — voir stageAcceptsDrop — mais il peut être refusé.) */
 .stage.zone-head.drop-target {
-  background: var(--on-primary);
-  color: var(--primary);
-  box-shadow: inset 0 0 0 2px var(--primary);
+  background: var(--rail-head-fg);
+  color: var(--rail-head-bg-strong);
+  box-shadow: inset 0 0 0 2px var(--rail-head-bg-strong);
 }
-.stage.zone-head.drop-target .stage-label { color: var(--primary); }
-.stage.zone-head.drop-target .stage-count { color: var(--primary); }
+.stage.zone-head.drop-target .stage-label { color: var(--rail-head-bg-strong); }
+.stage.zone-head.drop-target .stage-count { color: var(--rail-head-bg-strong); }
 .stage.zone-head.drop-target .stage-count.has-items {
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--rail-head-bg-strong);
+  color: var(--rail-head-fg);
 }
 .stage.zone-head.drop-blocked {
   background: var(--st-bloque-bg);
@@ -660,9 +674,9 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .stage.zone-head.is-empty .stage-label,
 .stage.zone-head.active.is-empty .stage-label {
   font-weight: 700;
-  color: var(--on-primary);
+  color: var(--rail-head-fg);
 }
-.stage.zone-head.is-empty .stage-count { color: var(--on-primary); }
+.stage.zone-head.is-empty .stage-count { color: var(--rail-head-fg); }
 
 /* Une SOUS-CATÉGORIE vide ne se met plus en sourdine deux fois. Elle cumulait
    `opacity: .55` ET la couleur --text-2 : le libellé tombait autour de 2,3:1
