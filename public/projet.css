@@ -244,11 +244,6 @@
   white-space: nowrap;
 }
 
-.pjc-hint {
-  color: var(--text-2);
-  font-size: 12px;
-}
-
 /* La place du message d'erreur est réservée même quand il n'y a pas d'erreur :
    l'apparition d'un message ne décale jamais le champ suivant. */
 .pjc-error {
