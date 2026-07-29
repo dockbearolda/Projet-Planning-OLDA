@@ -32,8 +32,11 @@ export function createDashboard(deps) {
   const ACTIVE_FAMILIES = ['demande_chiffrage', 'preparation', 'production', 'facturation'];
   const ACTIVE_SET = new Set(ACTIVE_FAMILIES);
 
-  // Couleur d'avatar : même bleu pour tout le monde (charte du point du jour).
-  const AVATAR = { 'Loïc': '#2563EB', 'Charlie': '#2563EB', 'Mélina': '#2563EB', 'Julien': '#2563EB' };
+  // Couleur d'avatar : l'accent de la charte pour tout le monde. On passe par
+  // le jeton CSS, pas par une valeur figée — sinon l'avatar reste sombre en
+  // thème sombre, où l'accent s'éclaircit.
+  const AVATAR_DEFAULT = 'var(--text-3)';
+  const AVATAR = { 'Loïc': 'var(--primary)', 'Charlie': 'var(--primary)', 'Mélina': 'var(--primary)', 'Julien': 'var(--primary)' };
 
   // Une commande « Sans date » vieillit : au bout de 7 jours elle devient
   // « À planifier » (badge orange, remonte dans le tri). Jamais comptée en retard.
@@ -243,7 +246,7 @@ export function createDashboard(deps) {
   }
   function avatarEl(name, cls) {
     const a = el('span', 'pj-avatar' + (cls ? ' ' + cls : ''), name ? name.charAt(0).toUpperCase() : '?');
-    a.style.setProperty('--av', AVATAR[name] || '#94A3B8');
+    a.style.setProperty('--av', AVATAR[name] || AVATAR_DEFAULT);
     if (name) attachTip(a, name);
     return a;
   }
@@ -856,7 +859,7 @@ export function createDashboard(deps) {
     const owner = ownerOf(fam.slug, sub ? sub.slug : null);
     if (owner) {
       const dot = el('span', 'dd-pill-av', owner.charAt(0).toUpperCase());
-      dot.style.setProperty('--av', AVATAR[owner] || '#94A3B8');
+      dot.style.setProperty('--av', AVATAR[owner] || AVATAR_DEFAULT);
       b.appendChild(dot);
     }
     b.appendChild(el('span', null, label));
@@ -902,7 +905,7 @@ export function createDashboard(deps) {
     const prev = { flag: r.flag, flag_reason: r.flag_reason };
     r.flag = null;
     r.flag_reason = null;
-    logActivity(`${clientName(r)} — alerte levée ✓`, '#16A34A');
+    logActivity(`${clientName(r)} — alerte levée ✓`, 'var(--success)');
     renderAll();
     showToast(`${clientName(r)} — alerte levée ✓`);
     api('PATCH', `/api/requests/${r.id}`, { flag: null }).catch(() => {
@@ -920,7 +923,7 @@ export function createDashboard(deps) {
     const prev = { stage: r.stage, sub_stage: r.sub_stage };
     r.stage = 'paiement';
     r.sub_stage = 'paiement_a_controler';
-    logActivity(`${clientName(r)} — marquée traitée ✓`, '#16A34A');
+    logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
     closeDetail();
     renderAll();
     showToast(`${clientName(r)} — marquée traitée ✓`);
@@ -956,7 +959,7 @@ export function createDashboard(deps) {
       }
       const wasActive = ACTIVE_SET.has(o.stage);
       if (r.stage === 'paiement' && o.stage !== 'paiement' && wasActive) {
-        logActivity(`${clientName(r)} — marquée traitée ✓`, '#16A34A');
+        logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
         continue;
       }
       if (!isActive(r) && !wasActive) continue;
@@ -1242,7 +1245,7 @@ export function createDashboard(deps) {
         chip.type = 'button';
         chip.setAttribute('aria-pressed', on ? 'true' : 'false');
         const av = el('span', 'cat-ref-av', who.charAt(0).toUpperCase());
-        av.style.setProperty('--av', AVATAR[who] || '#94A3B8');
+        av.style.setProperty('--av', AVATAR[who] || AVATAR_DEFAULT);
         chip.append(av, el('span', null, who));
         chip.addEventListener('click', () => {
           const cur = new Set(catRefs[slug] || []);

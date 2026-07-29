@@ -327,6 +327,46 @@ l'indicatif se déduit du préfixe (`0690`/`0691` → +590, `0696`/`0697` → +5
 (`+590…`, `00590…`) passe tel quel ; un numéro illisible **n'affiche pas de
 pastille** du tout, plutôt que d'ouvrir une conversation avec un inconnu.
 
+## Charte graphique
+
+**Une seule charte pour toute l'application**, validée par la direction. Toutes
+les valeurs vivent dans le `:root` de `public/styles.css` ; le reste du code
+n'utilise QUE des jetons (`var(--…)`). Aucune couleur en dur, nulle part.
+
+| Rôle | Jeton | Clair | Sombre |
+| --- | --- | --- | --- |
+| Fond de page | `--bg` | `#f5f6f8` | `#111827` |
+| Surface (carte, ligne) | `--surface` | `#ffffff` | `#1f2937` |
+| Texte principal | `--text-1` | `#1f2937` | `#f3f4f6` |
+| Texte secondaire | `--text-2` | `#6b7280` | `#9ca3af` |
+| Liseré | `--border` | `#d1d5db` | `#374151` |
+| Accent (action) | `--primary` | `#111827` | `#f3f4f6` |
+| Encre SUR l'accent | `--on-primary` | `#ffffff` | `#111827` |
+
+Trois règles, dans cet ordre :
+
+1. **La couleur ne signale qu'un état.** Rouge `--danger` (problème), vert
+   `--success` (fait), ambre `--warning` (attention). Tout le reste est gris —
+   une icône décorative colorée laisse croire à un statut.
+2. **Un seul accent**, l'encre quasi noire. Jamais de couleur par famille, par
+   personne ou par catégorie.
+3. **Toujours passer par un jeton.** En particulier `--on-primary` : l'accent
+   s'inverse en thème sombre, un `color: #fff` en dur y devient illisible. Même
+   chose pour l'encre posée sur un fond sémantique → `var(--surface)`.
+
+Le reste : police `Arial, Helvetica, sans-serif` (police système — plus aucune
+webfont de texte à télécharger, seules les icônes Material Symbols restent),
+cartes en `--radius-card` (14 px), champs et boutons en `--radius` (9 px), et
+trois élévations (`--shadow-1` carte, `--shadow-2` flottant, `--shadow-pop`
+modale).
+
+Deux exceptions assumées, toutes deux hors interface :
+
+- `.wall` (écran mural de l'atelier) reprend la **variante sombre** de la charte
+  quel que soit le thème de l'app — c'est ce qui le rend lisible à distance.
+- Les pastilles de coloris textile (`COLORIS` dans `projet.js`) sont de vraies
+  couleurs de vêtement, pas du design.
+
 ## Structure
 
 ```

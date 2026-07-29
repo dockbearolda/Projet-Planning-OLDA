@@ -20,14 +20,13 @@
    sur-titre garde le fil du flux, et le stepper cesse d'être centré — il
    accompagne le titre au lieu de le concurrencer. */
 .proj-page.is-nouveau-client .proj-bar__brand { display: block; }
-.proj-bar__over { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--nc-over, #8b93a5); }
+.proj-bar__over { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--nc-over, var(--text-2)); }
 .proj-bar__title--nc { font-size: 26px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
 .proj-page.is-nouveau-client .proj-stepper { flex: 1; justify-content: flex-end; }
 /* La carte se pose sur un fond de page légèrement gris : c'est lui qui la
    détache, pas un liseré de couleur. Largeur libérée — c'est la carte (620px)
    qui borne le contenu, plus la colonne de travail. */
-.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0 20px; background: #f6f7f9; }
-:root[data-theme="dark"] .proj-page.is-nouveau-client .proj-body { background: var(--bg); }
+.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0 20px; background: var(--bg); }
 @media (max-width: 560px) {
   .proj-bar__title--nc { font-size: 22px; }
 }
@@ -58,7 +57,7 @@
 .proj-stepper__label { font-size: 15px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .proj-stepper__step.is-current .proj-stepper__dot { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 .proj-stepper__step.is-current .proj-stepper__label { color: var(--text-1); }
-.proj-stepper__step.is-done .proj-stepper__dot { border-color: var(--primary); background: var(--primary); color: #fff; }
+.proj-stepper__step.is-done .proj-stepper__dot { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
 .proj-stepper__step.is-done .proj-stepper__label { color: var(--text-1); }
 .proj-stepper__line { flex: 0 1 40px; height: 2px; background: var(--border); }
 .proj-stepper__line.is-done { background: var(--primary); }
@@ -128,36 +127,35 @@
 
 .proj-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-1); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
-.proj-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.proj-btn--primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .proj-btn:disabled { opacity: .6; cursor: default; }
 .proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
 .proj-input--sm { min-height: 48px; }
 
 /* --- Écran « Nouveau client » (étape 1) ------------------------------------------
    Une CARTE, une COLONNE, trois champs. Le reste se déplie si on l'a. Les
-   valeurs sont posées en dur ici (et non prises aux jetons de l'app) parce que
-   c'est une maquette validée au pixel ; le thème sombre les rebascule plus bas
-   sur les jetons, pour ne pas rendre l'écran illisible la nuit. */
+   valeurs ne sont QUE des alias des jetons de l'app : la charte est unique,
+   l'écran hérite donc du thème sombre sans bloc de rebascule dédié. */
 .pjc-screen {
-  --nc-page: #f6f7f9;
-  --nc-card: #fff;
-  --nc-border: #eceef2;
-  --nc-field-border: #dfe3eb;
-  --nc-label: #3d4453;
-  --nc-opt: #9aa1b1;
-  --nc-ph: #a6adbb;
-  --nc-over: #8b93a5;
-  --nc-title: #111420;
-  --nc-accent: #2b46f0;
-  --nc-accent-hover: #2038d6;
-  --nc-accent-active: #1b30bd;
-  --nc-error: #d2263b;
-  --nc-error-bg: #fff6f7;
-  --nc-track: #f2f4f8;
-  --nc-muted: #6b7385;
-  --nc-sep: #f0f2f6;
-  --nc-more-bg: #f7f8fb;
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --nc-page: var(--bg);
+  --nc-card: var(--surface);
+  --nc-border: var(--border-soft);
+  --nc-field-border: var(--border);
+  --nc-label: var(--text-1);
+  --nc-opt: var(--text-2);
+  --nc-ph: var(--text-3);
+  --nc-over: var(--text-2);
+  --nc-title: var(--text-1);
+  --nc-accent: var(--primary);
+  --nc-accent-hover: var(--primary-hover);
+  --nc-accent-active: var(--primary-hover);
+  --nc-error: var(--danger);
+  --nc-error-bg: var(--danger-bg);
+  --nc-track: var(--surface-hover);
+  --nc-muted: var(--text-2);
+  --nc-sep: var(--border-soft);
+  --nc-more-bg: var(--surface-hover);
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   display: flex; justify-content: center; align-items: flex-start;
   padding: 28px 0 40px;
@@ -198,12 +196,12 @@
 .pjc-input:focus { border-color: var(--nc-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
 /* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
 .pjc-f.is-error .pjc-input { border-color: var(--nc-error); background: var(--nc-error-bg); }
-.pjc-f.is-error .pjc-input:focus { box-shadow: 0 0 0 3px rgba(210, 38, 59, .14); }
+.pjc-f.is-error .pjc-input:focus { box-shadow: 0 0 0 3px var(--danger-line); }
 .pjc-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--nc-error); }
 .pjc-f__err-dot {
   flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--nc-error); color: #fff; font-size: 10px; font-weight: 800;
+  background: var(--nc-error); color: var(--surface); font-size: 10px; font-weight: 800;
 }
 
 /* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne. */
@@ -233,7 +231,7 @@
 .pjc-actions { display: flex; flex-direction: column; gap: 6px; padding: 20px 32px 26px; border-top: 1px solid var(--nc-sep); }
 .pjc-btn { width: 100%; border: 0; border-radius: 14px; font: inherit; cursor: pointer; }
 .pjc-btn--primary {
-  height: 54px; background: var(--nc-accent); color: #fff; font-size: 16px; font-weight: 700;
+  height: 54px; background: var(--nc-accent); color: var(--on-primary); font-size: 16px; font-weight: 700;
   transition: background-color .12s ease;
 }
 .pjc-btn--primary:hover:not(:disabled) { background: var(--nc-accent-hover); }
@@ -252,26 +250,6 @@
      Sous 16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la
      dézoome jamais : sur téléphone seulement, le champ passe donc à 16px. */
   .pjc-input { font-size: 16px; }
-}
-
-/* Thème sombre : mêmes formes, jetons de l'app à la place des valeurs claires.
-   L'accent reste le bleu de la maquette — c'est l'action, elle doit rester
-   reconnaissable d'un thème à l'autre. */
-:root[data-theme="dark"] .pjc-screen {
-  --nc-page: var(--bg);
-  --nc-card: var(--surface);
-  --nc-border: var(--border-soft);
-  --nc-field-border: var(--border);
-  --nc-label: var(--text-1);
-  --nc-opt: var(--text-2);
-  --nc-ph: var(--text-2);
-  --nc-over: var(--text-2);
-  --nc-title: var(--text-1);
-  --nc-error-bg: rgba(210, 38, 59, .14);
-  --nc-track: var(--surface-hover);
-  --nc-muted: var(--text-2);
-  --nc-sep: var(--border-soft);
-  --nc-more-bg: var(--surface-hover);
 }
 
 /* --- Tuiles de type (colonne de droite) ---------------------------------------- */
@@ -305,7 +283,7 @@
 .proj-cart-item__desc { font-size: 16px; color: var(--text-1); overflow-wrap: break-word; }
 .proj-cart-item__prix { font-weight: 700; font-size: 16px; color: var(--text-1); white-space: nowrap; }
 .proj-cart-item__del { flex: 0 0 36px; min-height: 36px; border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.proj-cart-item__del:hover { color: var(--danger, #d33); }
+.proj-cart-item__del:hover { color: var(--danger); }
 .proj-addmore__title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-2); }
 
 /* --- Formulaire d'ajout d'un produit ---------------------------------------------- */
@@ -399,7 +377,7 @@
   width: 44px; height: 44px; flex: 0 0 auto; border: 0; border-radius: 12px; background: none;
   color: var(--text-3); cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.proj-size-libre__del:hover { color: var(--danger, #d64541); background: var(--surface-hover); }
+.proj-size-libre__del:hover { color: var(--danger); background: var(--surface-hover); }
 .proj-sizes__total { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: var(--text-2); }
 
 /* Détail d'une face marquée : n'apparaît qu'une fois l'emplacement choisi. */
@@ -455,30 +433,29 @@
 /* --- Écran Textile (étape 2 — Produits) ------------------------------------------
    Une CARTE par bloc sur un fond légèrement gris, une colonne récapitulative
    collante à droite, une barre d'action fixe en bas. Mêmes valeurs que l'écran
-   « Nouveau client » (maquette validée au pixel, jetons de l'app rebasculés
-   plus bas pour le thème sombre) : c'est le même poste, ce doit être la même
-   main sous les doigts. */
+   « Nouveau client », dont il reprend les alias de jetons : c'est le même
+   poste, ce doit être la même main sous les doigts. */
 .tx-screen {
-  --tx-page: #f6f7f9;
-  --tx-card: #fff;
-  --tx-border: #eceef2;
-  --tx-field-border: #dfe3eb;
-  --tx-label: #3d4453;
-  --tx-opt: #9aa1b1;
-  --tx-ph: #a6adbb;
-  --tx-title: #111420;
-  --tx-accent: #2b46f0;
-  --tx-accent-soft: #eef1fe;
-  --tx-chip-border: #e3e6ed;
-  --tx-error: #d2263b;
-  --tx-error-bg: #fff6f7;
-  --tx-muted: #6b7385;
-  --tx-empty-bg: #f7f8fb;
-  --tx-dashed: #d7dbe4;
-  --tx-ro-bg: #f4f6f9;
-  --tx-fill-bg: #f8f9ff;
-  --tx-bar-bg: rgba(255, 255, 255, .94);
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --tx-page: var(--bg);
+  --tx-card: var(--surface);
+  --tx-border: var(--border-soft);
+  --tx-field-border: var(--border);
+  --tx-label: var(--text-1);
+  --tx-opt: var(--text-2);
+  --tx-ph: var(--text-3);
+  --tx-title: var(--text-1);
+  --tx-accent: var(--primary);
+  --tx-accent-soft: var(--primary-soft);
+  --tx-chip-border: var(--border);
+  --tx-error: var(--danger);
+  --tx-error-bg: var(--danger-bg);
+  --tx-muted: var(--text-2);
+  --tx-empty-bg: var(--surface-hover);
+  --tx-dashed: var(--border);
+  --tx-ro-bg: var(--surface-hover);
+  --tx-fill-bg: var(--primary-soft);
+  --tx-bar-bg: color-mix(in srgb, var(--surface) 94%, transparent);
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   color: var(--tx-title);
   /* La barre d'action est FIXE : sans cette réserve, elle recouvrait les
@@ -527,12 +504,12 @@
 .tx-input--ro:focus { border-color: var(--tx-field-border); box-shadow: none; }
 /* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
 .tx-f.is-error .tx-input { border-color: var(--tx-error); background: var(--tx-error-bg); }
-.tx-f.is-error .tx-input:focus { box-shadow: 0 0 0 3px rgba(210, 38, 59, .14); }
+.tx-f.is-error .tx-input:focus { box-shadow: 0 0 0 3px var(--danger-line); }
 .tx-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--tx-error); }
 .tx-f__err-dot {
   flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--tx-error); color: #fff; font-size: 10px; font-weight: 800;
+  background: var(--tx-error); color: var(--surface); font-size: 10px; font-weight: 800;
 }
 
 /* Puces de choix : 40px de haut, l'état sélectionné se voit sans survol. */
@@ -628,25 +605,25 @@
   padding: 14px 24px; padding-bottom: calc(14px + env(safe-area-inset-bottom));
   background: var(--tx-bar-bg, rgba(255, 255, 255, .94));
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  border-top: 1px solid #eceef2;
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  border-top: 1px solid var(--tx-border);
+  font-family: var(--font);
 }
 .tx-bar__prix { display: flex; flex-direction: column; gap: 1px; flex: 0 0 auto; }
-.tx-bar__label { font-size: 13px; color: #6b7385; }
+.tx-bar__label { font-size: 13px; color: var(--tx-muted); }
 .tx-bar__chiffres { display: flex; align-items: baseline; gap: 10px; }
-.tx-bar__amount { font-size: 24px; font-weight: 800; color: #111420; font-variant-numeric: tabular-nums; }
+.tx-bar__amount { font-size: 24px; font-weight: 800; color: var(--tx-title); font-variant-numeric: tabular-nums; }
 /* Le panier et le total du projet sont en TTC : on le garde sous les yeux, en
    second, pour qu'aucun des deux chiffres ne surprenne à l'étape suivante. */
-.tx-bar__ttc { font-size: 13px; font-weight: 600; color: #6b7385; font-variant-numeric: tabular-nums; }
+.tx-bar__ttc { font-size: 13px; font-weight: 600; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
 .tx-bar__btn {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 54px; border: 0; border-radius: 14px; background: #2b46f0; color: #fff;
+  height: 54px; border: 0; border-radius: 14px; background: var(--tx-accent); color: var(--on-primary);
   font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  font-family: var(--font);
   transition: background-color .12s ease;
 }
-.tx-bar__btn:hover { background: #2038d6; }
-.tx-bar__btn:active { background: #1b30bd; }
+.tx-bar__btn:hover { background: var(--primary-hover); }
+.tx-bar__btn:active { background: var(--primary-hover); }
 
 /* Tablette portrait et téléphone : la colonne récapitulative repasse au-dessus
    du formulaire (elle rappelle le client, elle ne doit pas manger la largeur
@@ -672,42 +649,6 @@
      les champs repassent à 16px. */
   .tx-input, .tx-size__qty { font-size: 16px; }
 }
-
-/* Thème sombre : mêmes formes, jetons de l'app à la place des valeurs claires.
-   L'accent reste le bleu de la maquette — c'est l'action, elle doit rester
-   reconnaissable d'un thème à l'autre. */
-:root[data-theme="dark"] .tx-screen {
-  --tx-page: var(--bg);
-  --tx-card: var(--surface);
-  --tx-border: var(--border-soft);
-  --tx-field-border: var(--border);
-  --tx-label: var(--text-1);
-  --tx-opt: var(--text-2);
-  --tx-ph: var(--text-2);
-  --tx-title: var(--text-1);
-  /* Le bleu de la maquette est trop sombre pour du TEXTE sur fond sombre : les
-     libellés et contours prennent l'accent clair de l'app. Le bouton d'action,
-     lui, garde le bleu plein (texte blanc dessus) — c'est LA couleur d'action,
-     elle doit rester la même d'un thème à l'autre. */
-  --tx-accent: var(--primary);
-  --tx-accent-soft: rgba(154, 172, 255, .18);
-  --tx-chip-border: var(--border);
-  --tx-error-bg: rgba(210, 38, 59, .14);
-  --tx-muted: var(--text-2);
-  --tx-empty-bg: var(--surface-hover);
-  --tx-dashed: var(--border);
-  --tx-ro-bg: var(--surface-hover);
-  --tx-fill-bg: rgba(154, 172, 255, .14);
-}
-:root[data-theme="dark"] .tx-input:focus,
-:root[data-theme="dark"] .tx-size__qty:focus { box-shadow: 0 0 0 3px rgba(154, 172, 255, .22); }
-:root[data-theme="dark"] .tx-bar {
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border-top-color: var(--border-soft);
-}
-:root[data-theme="dark"] .tx-bar__amount { color: var(--text-1); }
-:root[data-theme="dark"] .tx-bar__label,
-:root[data-theme="dark"] .tx-bar__ttc { color: var(--text-2); }
 
 /* --- Destination + confirmation ------------------------------------------------ */
 .proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }

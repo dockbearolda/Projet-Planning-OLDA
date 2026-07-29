@@ -1,7 +1,9 @@
 /* ===========================================================================
-   Planning OLDA — façon caisse SumUp
-   Inter + Material Symbols · un seul accent indigo (#3b5bff) · fond neutre,
-   badges gris sauf état vraiment critique.
+   Planning OLDA — charte maison (validée par la direction)
+   Arial/Helvetica + Material Symbols · fond gris neutre #f5f6f8, cartes
+   blanches liserées, accent = encre quasi noire #111827.
+   La couleur ne sert QU'À l'état : rouge #b91c1c (danger), vert #166534
+   (succès), ambre #854d0e (attention). Tout le reste est gris.
    Thème clair / sombre (auto + bascule), élévation au scroll, ripple.
    Épuré, clair, rapide à remplir (PC / tablette / mobile).
    =========================================================================== */
@@ -9,56 +11,68 @@
 :root {
   color-scheme: light;
 
-  /* surfaces — gris neutre unique (façon SumUp) : plus de teinte bleutée en
-     fond, le bleu est réservé au SEUL accent (--primary) ci-dessous. */
-  --bg: #fafafa;                     /* fond général */
+  /* surfaces — gris neutre unique : le fond détache les cartes blanches,
+     aucune teinte colorée n'entre dans les surfaces. */
+  --bg: #f5f6f8;                     /* fond général */
   --surface: #fff;
-  --surface-hover: #f6f6f7;          /* survol générique (boutons, etc.) */
+  --surface-hover: #eef2f7;          /* survol générique (boutons, etc.) */
   --row-alt: #f5f6f8;                /* bande paire des lignes (zébrage) */
-  --row-hover: #eef0f3;              /* survol de ligne, plus marqué que le zébrage */
-  --row-line: #e4e5e9;              /* filet de séparation entre lignes */
-  --field-focus: #f4f5f7;            /* fond d'un champ au focus */
-  --search-bg: #f1f2f5;              /* pilule de recherche au repos */
-  --search-bg-hover: #e9ebee;
+  --row-hover: #eef2f7;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #e5e7eb;              /* filet de séparation entre lignes */
+  --field-focus: #f5f6f8;            /* fond d'un champ au focus */
+  --search-bg: #eef2f7;              /* pilule de recherche au repos */
+  --search-bg-hover: #e2e8f0;
   --chip-on-tonal: #fff;             /* pastille compteur sur pilule active */
-  --zone-bg: #f4f5f7;                /* fond doux d'une zone (famille + sous-cat) */
+  --zone-bg: #f5f6f8;                /* fond doux d'une zone (famille + sous-cat) */
 
   /* texte */
-  --text-1: #1f1f1f;                 /* principal */
-  --text-2: #5f6368;                 /* secondaire / en-têtes */
-  --text-3: #80868b;                 /* atténué */
+  --text-1: #1f2937;                 /* principal */
+  --text-2: #6b7280;                 /* secondaire / en-têtes */
+  --text-3: #9ca3af;                 /* atténué */
 
   /* bordures fines */
-  --border: #e4e4e7;
-  --border-soft: #eeeef0;
-  --card-border: #e7e7ea;            /* liseré des cartes */
+  --border: #d1d5db;
+  --border-soft: #e5e7eb;
+  --card-border: #d1d5db;            /* liseré des cartes */
 
   /* couches d'état (hover / press) façon Material */
-  --state-hover: rgba(31, 31, 31, .05);
-  --state-press: rgba(31, 31, 31, .09);
+  --state-hover: rgba(17, 24, 39, .05);
+  --state-press: rgba(17, 24, 39, .09);
 
-  /* accent — bleu/indigo unique, seule couleur vive de l'app (façon SumUp) */
-  --primary: #3b5bff;
-  --primary-hover: #2f49e0;
-  --primary-rgb: 59, 91, 255;
-  --primary-soft: #e8ecff;           /* pilule active / fond accent clair */
-  --primary-soft-hover: #dce2ff;
+  /* accent — encre quasi noire, seule couleur d'action de l'app */
+  --primary: #111827;
+  --primary-hover: #000;
+  --primary-rgb: 17, 24, 39;
+  --on-primary: #fff;                /* texte / icône posé SUR l'accent plein */
+  --primary-soft: #eef2f7;           /* pilule active / fond accent clair */
+  --primary-soft-hover: #e2e8f0;
 
-  /* palette d'étapes (texte / fond) */
-  --st-demande: #4a72b8;   --st-demande-bg: #e8effb;
-  --st-cours:   #b26a00;   --st-cours-bg:   #fdf3dc;
-  --st-livree:  #1e8e3e;   --st-livree-bg:  #e6f4ea;
-  --st-facture: #0d818d;   --st-facture-bg: #e0f6f9;
-  --st-archive: #5f6368;   --st-archive-bg: #f1f3f4;
-  --st-bloque:  #d3392e;   --st-bloque-bg:  #fdeae8;
+  /* sémantique — les SEULES couleurs de la charte */
+  --danger:  #b91c1c;   --danger-bg:  #fef2f2;   --danger-line:  #fecaca;
+  --success: #166534;   --success-bg: #ecfdf3;   --success-line: #bbf7d0;
+  --warning: #854d0e;   --warning-bg: #fefce8;   --warning-line: #fde68a;
+  /* deux crans d'ambre en plus : l'échelle d'urgence du point du jour a
+     besoin de trois niveaux lisibles (retard / bientôt / à planifier) sans
+     sortir de la famille ambre de la charte. */
+  --warning-deep: #713f12;           /* le plus appuyé */
+  --warning-2:    #a16207;           /* le plus clair — « à planifier » */
 
-  /* élévations */
-  --shadow-1: 0 1px 2px rgba(23, 35, 61, .06), 0 1px 3px rgba(23, 35, 61, .08);
-  --shadow-2: 0 1px 2px rgba(23, 35, 61, .08), 0 3px 10px rgba(23, 35, 61, .1);
-  --shadow-pop: 0 4px 8px rgba(23, 35, 61, .1), 0 12px 32px rgba(23, 35, 61, .16);
+  /* palette d'étapes (texte / fond) : gris par défaut, couleur seulement
+     quand l'étape porte un sens d'état (en cours / livrée / bloquée). */
+  --st-demande: #4b5563;   --st-demande-bg: #eef2f7;
+  --st-cours:   #854d0e;   --st-cours-bg:   #fefce8;
+  --st-livree:  #166534;   --st-livree-bg:  #ecfdf3;
+  --st-facture: #111827;   --st-facture-bg: #e5e7eb;
+  --st-archive: #6b7280;   --st-archive-bg: #f3f4f6;
+  --st-bloque:  #b91c1c;   --st-bloque-bg:  #fef2f2;
 
-  --scrollbar: #ccd2dc;
-  --scrollbar-hover: #b4bcc9;
+  /* élévations — les trois niveaux de la charte (carte / flottant / modale) */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .05);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, .05);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .25);
+
+  --scrollbar: #d1d5db;
+  --scrollbar-hover: #9ca3af;
 
   /* mouvement Material */
   --ease: cubic-bezier(.2, 0, 0, 1);
@@ -67,65 +81,81 @@
   --dur-3: .32s;
 
   /* infobulle : surface inversée façon Material (plain tooltip) */
-  --tip-bg: #303134;
-  --tip-fg: #f1f3f4;
+  --tip-bg: #1f2937;
+  --tip-fg: #f5f6f8;
 
-  --radius-card: 16px;
-  --radius: 10px;
+  --radius-card: 14px;
+  --radius: 9px;
   --row-h: 76px;
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font: Arial, Helvetica, sans-serif;
 }
 
-/* ---------------------------------------------------------------- Thème sombre */
-:root[data-theme="dark"] {
+/* ---------------------------------------------------------------- Thème sombre
+   Même charte, retournée : l'accent encre devient encre claire, d'où
+   --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent
+   clair serait illisible — toujours passer par le token).
+
+   `.wall` (écran mural de l'atelier) est dans le même sélecteur à dessein :
+   il doit rester sombre quel que soit le thème de l'app — c'est ce qui le rend
+   lisible à distance — mais avec les gris de la charte, pas une palette bleu
+   nuit à lui. Un seul jeu de couleurs, deux contextes. */
+:root[data-theme="dark"],
+.wall {
   color-scheme: dark;
 
-  --bg: #131314;
-  --surface: #1e1f20;
-  --surface-hover: #26282d;
-  --row-alt: #26282c;                /* bande paire des lignes (zébrage) */
-  --row-hover: #303338;              /* survol de ligne, plus marqué que le zébrage */
-  --row-line: #35373b;               /* filet de séparation entre lignes */
-  --field-focus: #26282d;
-  --search-bg: #282a2d;
-  --search-bg-hover: #303236;
-  --chip-on-tonal: #1e1f20;
-  --zone-bg: #26282c;                /* fond doux d'une zone (famille + sous-cat) */
+  --bg: #111827;
+  --surface: #1f2937;
+  --surface-hover: #2b3546;
+  --row-alt: #1a2331;                /* bande paire des lignes (zébrage) */
+  --row-hover: #2b3546;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #374151;               /* filet de séparation entre lignes */
+  --field-focus: #2b3546;
+  --search-bg: #29323f;
+  --search-bg-hover: #374151;
+  --chip-on-tonal: #111827;
+  --zone-bg: #1a2331;                /* fond doux d'une zone (famille + sous-cat) */
 
-  --text-1: #e3e3e3;
-  --text-2: #9aa0a6;
-  --text-3: #767a80;
+  --text-1: #f3f4f6;
+  --text-2: #9ca3af;
+  --text-3: #6b7280;
 
-  --border: #37393c;
-  --border-soft: #2a2c2f;
-  --card-border: #2c2e31;
+  --border: #374151;
+  --border-soft: #2b3441;
+  --card-border: #374151;
 
-  --state-hover: rgba(227, 227, 227, .06);
-  --state-press: rgba(227, 227, 227, .1);
+  --state-hover: rgba(243, 244, 246, .06);
+  --state-press: rgba(243, 244, 246, .1);
 
   /* infobulle : la surface inversée s'inverse aussi en sombre */
-  --tip-bg: #e3e3e3;
-  --tip-fg: #1f1f1f;
+  --tip-bg: #f3f4f6;
+  --tip-fg: #111827;
 
-  --primary: #9aacff;
-  --primary-hover: #b3bfff;
-  --primary-rgb: 154, 172, 255;
-  --primary-soft: #28305c;
-  --primary-soft-hover: #333c72;
+  --primary: #f3f4f6;
+  --primary-hover: #fff;
+  --primary-rgb: 243, 244, 246;
+  --on-primary: #111827;
+  --primary-soft: #374151;
+  --primary-soft-hover: #4b5563;
 
-  --st-demande: #a3c1f5;   --st-demande-bg: #2b3b55;
-  --st-cours:   #f2b25c;   --st-cours-bg:   #3d2f14;
-  --st-livree:  #81c995;   --st-livree-bg:  #1d3626;
-  --st-facture: #7bd2de;   --st-facture-bg: #163a40;
-  --st-archive: #9aa0a6;   --st-archive-bg: #2b2d30;
-  --st-bloque:  #f28b82;   --st-bloque-bg:  #42211d;
+  --danger:  #fca5a5;   --danger-bg:  rgba(185, 28, 28, .2);   --danger-line:  rgba(185, 28, 28, .5);
+  --success: #86efac;   --success-bg: rgba(22, 101, 52, .25);  --success-line: rgba(22, 101, 52, .55);
+  --warning: #fcd34d;   --warning-bg: rgba(133, 77, 14, .25);  --warning-line: rgba(133, 77, 14, .55);
+  --warning-deep: #fef3c7;
+  --warning-2:    #fde68a;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .3);
-  --shadow-2: 0 1px 3px rgba(0, 0, 0, .4), 0 4px 12px rgba(0, 0, 0, .35);
-  --shadow-pop: 0 4px 10px rgba(0, 0, 0, .45), 0 14px 36px rgba(0, 0, 0, .5);
+  --st-demande: #d1d5db;   --st-demande-bg: #2b3546;
+  --st-cours:   #fcd34d;   --st-cours-bg:   #3a2f14;
+  --st-livree:  #86efac;   --st-livree-bg:  #14301f;
+  --st-facture: #f3f4f6;   --st-facture-bg: #374151;
+  --st-archive: #9ca3af;   --st-archive-bg: #262f3c;
+  --st-bloque:  #fca5a5;   --st-bloque-bg:  #3a1c1c;
 
-  --scrollbar: #45474b;
-  --scrollbar-hover: #55585d;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, .4);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .55);
+
+  --scrollbar: #4b5563;
+  --scrollbar-hover: #6b7280;
 }
 
 * { box-sizing: border-box; }
@@ -228,13 +258,10 @@ body {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, var(--primary) 0%, var(--primary-hover) 100%);
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18),
-              0 1px 2px rgba(23, 35, 61, .18),
-              0 1px 3px rgba(var(--primary-rgb), .3);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-1);
 }
-:root[data-theme="dark"] .brand-logo { color: #17233d; }
 .brand-logo-svg { width: 26px; height: 26px; display: block; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .brand-title {
@@ -604,7 +631,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   flex-shrink: 0;
   white-space: nowrap;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 10px 20px 10px 15px;
@@ -615,7 +642,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   box-shadow: var(--shadow-1);
   transition: box-shadow var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform .08s var(--ease);
 }
-.btn-primary .material-symbols-outlined { font-size: 20px; color: #fff; font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+.btn-primary .material-symbols-outlined { font-size: 20px; color: var(--on-primary); font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
 .btn-primary:hover { box-shadow: var(--shadow-2); background: var(--primary-hover); }
 .btn-primary:active { transform: scale(.98); }
 .btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .25); }
@@ -923,7 +950,7 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 /* élévation de l'en-tête quand la grille est scrollée */
 .grid-wrap.is-scrolled thead th {
-  box-shadow: 0 1px 0 var(--border), 0 4px 10px rgba(23, 35, 61, .07);
+  box-shadow: 0 1px 0 var(--border), var(--shadow-2);
 }
 :root[data-theme="dark"] .grid-wrap.is-scrolled thead th {
   box-shadow: 0 1px 0 var(--border), 0 4px 12px rgba(0, 0, 0, .4);
@@ -1604,7 +1631,7 @@ tr:hover .handle { color: var(--text-2); }
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), filter var(--dur-1) var(--ease);
 }
 .reason-btn:hover { background: var(--state-hover); color: var(--text-1); }
-.reason-btn.primary { border-color: transparent; background: var(--primary); color: #fff; }
+.reason-btn.primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
 .reason-btn.primary:hover { filter: brightness(1.06); }
 .reason-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
@@ -2762,7 +2789,7 @@ body.view-comptoir .grid-search { display: none !important; }
   justify-content: center;
   border-radius: 50%;
   /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
-     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 12px;
@@ -2773,55 +2800,36 @@ body.view-comptoir .grid-search { display: none !important; }
 .cat-ref-chip.on .cat-ref-av { opacity: 1; }
 
 /* ===========================================================================
-   POINT DU JOUR — dashboard refondu (design system dédié, scopé)
-   Manrope · fond #F3F5F8 · cartes blanches, bordure gauche = urgence.
+   POINT DU JOUR — dashboard
+   Plus de design system parallèle : les tokens --pj-* ne sont QUE des alias
+   de la charte (voir :root tout en haut). Un seul jeu de couleurs pour toute
+   l'app, et le thème sombre suit tout seul — d'où la disparition du bloc
+   [data-theme="dark"] qui doublait ces valeurs à la main.
    Cibles : Galaxy Tab paysage 1280×800 + desktop. Tout vient du planning.
    =========================================================================== */
 .dashboard, .dd-panel, .pj-feed, .wall {
   /* surfaces & texte */
-  --pj-bg: #F3F5F8;
-  --pj-surface: #FFFFFF;
-  --pj-border: #E5E9F0;
-  --pj-border-soft: #EEF1F6;
-  --pj-ink: #0F172A;
-  --pj-ink-2: #475569;
-  --pj-ink-3: #64748B;
-  --pj-ink-4: #94A3B8;
-  --pj-accent: #2563EB;
-  /* urgences */
-  --pj-late: #DC2626;      --pj-late-bg: #FEF2F2;
-  --pj-soon: #D97706;      --pj-soon-deep: #B45309;  --pj-soon-bg: #FEF7E8;
-  --pj-plan: #F59E0B;      --pj-plan-deep: #C2410C;  --pj-plan-bg: #FFF7ED;
-  --pj-neutral: #94A3B8;   --pj-neutral-bg: #F1F5F9;
+  --pj-bg: var(--bg);
+  --pj-surface: var(--surface);
+  --pj-border: var(--border);
+  --pj-border-soft: var(--border-soft);
+  --pj-ink: var(--text-1);
+  --pj-ink-2: var(--text-2);
+  --pj-ink-3: var(--text-2);
+  --pj-ink-4: var(--text-3);
+  --pj-accent: var(--primary);
+  /* urgences : trois crans de la famille ambre + le rouge pour le retard */
+  --pj-late: var(--danger);       --pj-late-bg: var(--danger-bg);
+  --pj-soon: var(--warning);      --pj-soon-deep: var(--warning-deep);  --pj-soon-bg: var(--warning-bg);
+  --pj-plan: var(--warning-2);    --pj-plan-deep: var(--warning);       --pj-plan-bg: var(--warning-bg);
+  --pj-neutral: var(--text-3);    --pj-neutral-bg: var(--zone-bg);
   /* détails */
-  --pj-star: #F59E0B;      --pj-star-off: #D8DEE7;
-  --pj-chip-ink: #1D4ED8;  --pj-chip-bg: #EFF4FE;
-  --pj-green: #16A34A;     --pj-green-ink: #15803D;  --pj-green-bg: #F0FDF4;  --pj-green-line: #BBF7D0;
-  --pj-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 6px 18px rgba(15, 23, 42, .07);
-  --pj-font: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pj-star: var(--primary);      --pj-star-off: var(--border);
+  --pj-chip-ink: var(--text-1);   --pj-chip-bg: var(--primary-soft);
+  --pj-green: var(--success);     --pj-green-ink: var(--success);  --pj-green-bg: var(--success-bg);  --pj-green-line: var(--success-line);
+  --pj-shadow: var(--shadow-2);
+  --pj-font: var(--font);
   font-family: var(--pj-font);
-}
-
-/* Thème sombre de l'app : mêmes teintes d'urgence, surfaces assombries. */
-:root[data-theme="dark"] .dashboard,
-:root[data-theme="dark"] .dd-panel,
-:root[data-theme="dark"] .pj-feed {
-  --pj-bg: #12161F;
-  --pj-surface: #1C222E;
-  --pj-border: #2A3242;
-  --pj-border-soft: #222A38;
-  --pj-ink: #E7ECF5;
-  --pj-ink-2: #A9B3C4;
-  --pj-ink-3: #8792A5;
-  --pj-ink-4: #5F6B80;
-  --pj-late: #F87171;      --pj-late-bg: rgba(220, 38, 38, .16);
-  --pj-soon: #FBBF24;      --pj-soon-deep: #FBBF24;  --pj-soon-bg: rgba(217, 119, 6, .15);
-  --pj-plan: #FBBF24;      --pj-plan-deep: #FB923C;  --pj-plan-bg: rgba(245, 158, 11, .13);
-  --pj-neutral: #8792A5;   --pj-neutral-bg: #242C3A;
-  --pj-star-off: #3A4354;
-  --pj-chip-ink: #93B4FF;  --pj-chip-bg: #20304E;
-  --pj-green: #22C55E;     --pj-green-ink: #4ADE80;  --pj-green-bg: rgba(34, 197, 94, .12);  --pj-green-line: rgba(74, 222, 128, .35);
-  --pj-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
 }
 
 .dashboard { background: var(--pj-bg); color: var(--pj-ink); }
@@ -2925,7 +2933,9 @@ body.view-comptoir .grid-search { display: none !important; }
   justify-content: center;
   border-radius: 99px;
   background: var(--pj-late);
-  color: #fff;
+  /* le remplissage sémantique s'inverse avec le thème : l'encre posée dessus
+     doit donc être la surface, jamais un blanc en dur. */
+  color: var(--surface);
   font-size: 11px;
   font-weight: 800;
 }
@@ -3226,7 +3236,7 @@ body.view-comptoir .grid-search { display: none !important; }
   flex-shrink: 0;
   border-radius: 50%;
   /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
-     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 12px;
@@ -3472,7 +3482,7 @@ body.view-comptoir .grid-search { display: none !important; }
   flex-shrink: 0;
   border-radius: 50%;
   /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
-     client) — plus doux qu'un rond plein #2563EB/blanc, cohérent partout. */
+     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 10px;
@@ -3536,7 +3546,9 @@ body.view-comptoir .grid-search { display: none !important; }
   flex: 1;
   border: 0;
   background: var(--pj-green);
-  color: #fff;
+  /* le remplissage sémantique s'inverse avec le thème : l'encre posée dessus
+     doit donc être la surface, jamais un blanc en dur. */
+  color: var(--surface);
 }
 .dd-done:hover { filter: brightness(1.06); }
 .dd-done .material-symbols-outlined { font-size: 20px; }
@@ -3579,8 +3591,8 @@ body.view-comptoir .grid-search { display: none !important; }
   z-index: 200;
   display: flex;
   flex-direction: column;
-  background: #0B1220;
-  color: #E2E8F0;
+  background: var(--bg);
+  color: var(--text-1);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 body.wall-open { overflow: hidden; }
@@ -3591,7 +3603,7 @@ body.wall-open { overflow: hidden; }
   flex-shrink: 0;
   padding: 16px 28px 12px;
 }
-.wall-logo { display: inline-flex; width: 32px; height: 32px; color: #E2E8F0; }
+.wall-logo { display: inline-flex; width: 32px; height: 32px; color: var(--text-1); }
 .wall-logo svg { width: 100%; height: 100%; }
 .wall-title { font-size: 17px; font-weight: 800; letter-spacing: .01em; }
 .wall-clock {
@@ -3620,23 +3632,23 @@ body.wall-open { overflow: hidden; }
   height: 9px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: #1E2A44;
+  background: var(--border);
   transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
-.wall-dot.active::after { background: #E2E8F0; transform: translate(-50%, -50%) scale(1.25); }
+.wall-dot.active::after { background: var(--text-1); transform: translate(-50%, -50%) scale(1.25); }
 .wall-quit {
   min-height: 44px;
   padding: 0 18px;
-  border: 1px solid #1E2A44;
+  border: 1px solid var(--border);
   border-radius: 99px;
   background: transparent;
-  color: #94A3B8;
+  color: var(--text-2);
   font: inherit;
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
 }
-.wall-quit:hover { color: #E2E8F0; border-color: #334A77; }
+.wall-quit:hover { color: var(--text-1); border-color: var(--text-3); }
 
 .wall-screens { position: relative; flex: 1; min-height: 0; }
 .wall-screen {
@@ -3664,7 +3676,7 @@ body.wall-open { overflow: hidden; }
   align-items: center;
   gap: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #1E2A44;
+  border-bottom: 1px solid var(--border);
 }
 .wall-col-head .pj-avatar.wall-av { width: 34px; height: 34px; font-size: 15px; }
 .wall-col-name {
@@ -3680,9 +3692,9 @@ body.wall-open { overflow: hidden; }
   min-width: 26px;
   padding: 2px 9px;
   border-radius: 99px;
-  background: #111B2E;
-  border: 1px solid #1E2A44;
-  color: #94A3B8;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
   font-size: 13px;
   font-weight: 800;
   text-align: center;
@@ -3694,14 +3706,14 @@ body.wall-open { overflow: hidden; }
   gap: 5px;
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid #1E2A44;
-  border-left: 3px solid #33415E;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-3);
   border-radius: 12px;
-  background: #111B2E;
+  background: var(--surface);
 }
-.wall-card.u-late { border-left-color: #DC2626; }
-.wall-card.u-soon { border-left-color: #D97706; }
-.wall-card.u-plan { border-left-color: #F59E0B; }
+.wall-card.u-late { border-left-color: var(--danger); }
+.wall-card.u-soon { border-left-color: var(--warning); }
+.wall-card.u-plan { border-left-color: var(--warning-2); }
 .wall-card-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .wall-card-client {
   flex: 1;
@@ -3711,7 +3723,7 @@ body.wall-open { overflow: hidden; }
   white-space: nowrap;
   font-size: 17px;
   font-weight: 800;
-  color: #F1F5F9;
+  color: var(--text-1);
 }
 .wall-card-article {
   margin: 0;
@@ -3720,38 +3732,38 @@ body.wall-open { overflow: hidden; }
   white-space: nowrap;
   font-size: 13.5px;
   font-weight: 600;
-  color: #94A3B8;
+  color: var(--text-2);
 }
 .wall-free {
   padding: 18px 14px;
-  border: 1.5px dashed rgba(74, 222, 128, .35);
+  border: 1.5px dashed var(--success-line);
   border-radius: 12px;
-  background: rgba(34, 197, 94, .1);
-  color: #4ADE80;
+  background: var(--success-bg);
+  color: var(--success);
   font-size: 16px;
   font-weight: 800;
   text-align: center;
 }
-.wall-more { font-size: 13px; font-weight: 700; color: #64748B; text-align: center; padding: 2px 0; }
+.wall-more { font-size: 13px; font-weight: 700; color: var(--text-3); text-align: center; padding: 2px 0; }
 
 /* Badges en mode mural : mêmes teintes, fonds translucides lisibles de loin. */
 .wall .pj-badge { font-size: 13px; padding: 4px 12px; }
-.wall .pj-badge.u-late { background: rgba(220, 38, 38, .18); color: #F87171; }
-.wall .pj-badge.u-soon { background: rgba(217, 119, 6, .18); color: #FBBF24; }
-.wall .pj-badge.u-plan { background: rgba(245, 158, 11, .16); color: #FB923C; }
-.wall .pj-badge.u-ok, .wall .pj-badge.u-none { background: #1A2436; color: #8296B4; }
-.wall .pj-star { font-size: 15px; color: #33415E; }
-.wall .pj-star.on { color: #F59E0B; }
+.wall .pj-badge.u-late { background: var(--danger-bg); color: var(--danger); }
+.wall .pj-badge.u-soon { background: var(--warning-bg); color: var(--warning); }
+.wall .pj-badge.u-plan { background: var(--warning-bg); color: var(--warning-2); }
+.wall .pj-badge.u-ok, .wall .pj-badge.u-none { background: var(--zone-bg); color: var(--text-2); }
+.wall .pj-star { font-size: 15px; color: var(--border); }
+.wall .pj-star.on { color: var(--primary); }
 
 .wall-b-title { margin: 4px 0 16px; font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
 .wall-b-empty {
   margin: 40px auto;
   max-width: 480px;
   padding: 28px;
-  border: 1.5px dashed rgba(74, 222, 128, .35);
+  border: 1.5px dashed var(--success-line);
   border-radius: 16px;
-  background: rgba(34, 197, 94, .1);
-  color: #4ADE80;
+  background: var(--success-bg);
+  color: var(--success);
   font-size: 20px;
   font-weight: 800;
   text-align: center;
@@ -3763,13 +3775,13 @@ body.wall-open { overflow: hidden; }
   gap: 18px;
   min-width: 0;
   padding: 14px 20px;
-  border: 1px solid #1E2A44;
-  border-left: 3px solid #33415E;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-3);
   border-radius: 14px;
-  background: #111B2E;
+  background: var(--surface);
 }
-.wall-row.u-late { border-left-color: #DC2626; }
-.wall-row.u-plan { border-left-color: #F59E0B; }
+.wall-row.u-late { border-left-color: var(--danger); }
+.wall-row.u-plan { border-left-color: var(--warning-2); }
 .wall-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .wall-row-client {
   overflow: hidden;
@@ -3777,7 +3789,7 @@ body.wall-open { overflow: hidden; }
   white-space: nowrap;
   font-size: 19px;
   font-weight: 800;
-  color: #F1F5F9;
+  color: var(--text-1);
 }
 .wall-row-article {
   overflow: hidden;
@@ -3785,11 +3797,11 @@ body.wall-open { overflow: hidden; }
   white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
-  color: #94A3B8;
+  color: var(--text-2);
 }
 .wall-row-who { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
 .wall-row-who .pj-avatar { width: 30px; height: 30px; font-size: 13px; }
-.wall-row-name { font-size: 15px; font-weight: 700; color: #CBD5E1; }
+.wall-row-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
 
 /* ------------------------------------------------ À faire maintenant (file) */
 .pj-todo { display: flex; flex-direction: column; gap: 22px; }
@@ -3862,7 +3874,7 @@ body.wall-open { overflow: hidden; }
 }
 
 /* Motif de priorité sur l'écran mural (sous l'article). */
-.wall-row-why { font-size: 13px; font-weight: 700; color: #FBBF24; }
+.wall-row-why { font-size: 13px; font-weight: 700; color: var(--warning); }
 
 /* ------------------------------------------------ Réglages Machines */
 .mac-card { width: min(640px, 100%); }
@@ -3994,7 +4006,9 @@ body.wall-open { overflow: hidden; }
   gap: 16px;
 }
 .reg-card__head { display: flex; align-items: flex-start; gap: 12px; }
-.reg-card__ic { font-size: 22px; color: var(--st-livree); }
+/* Icône de section : décorative, donc grise. Dans la charte la couleur ne
+   signale qu'un état — un vert ici laisserait croire à un statut « OK ». */
+.reg-card__ic { font-size: 22px; color: var(--text-2); }
 .reg-card__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-1); }
 .reg-card__desc { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
 
@@ -4067,7 +4081,7 @@ body.wall-open { overflow: hidden; }
 }
 .reg-btn:hover:not(:disabled) { background: var(--state-hover); }
 .reg-btn:disabled { opacity: .45; cursor: default; }
-.reg-btn--primary { border-color: transparent; background: var(--primary); color: #fff; }
+.reg-btn--primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
 .reg-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
 
 .reg-tarif-cat { margin: 18px 0 8px; font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
@@ -4078,7 +4092,7 @@ body.wall-open { overflow: hidden; }
 .reg-tarif-input--num { flex: 0 0 90px; text-align: right; }
 .reg-tarif-toggle, .reg-tarif-del { flex: 0 0 36px; min-height: 36px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .reg-tarif-toggle.is-on { color: var(--primary); }
-.reg-tarif-del:hover { color: var(--danger, #d33); }
+.reg-tarif-del:hover { color: var(--danger); }
 .reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: 38px; padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: 13px; cursor: pointer; }
 .reg-tarif-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
 .reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-2); }
@@ -4243,9 +4257,9 @@ body.wall-open { overflow: hidden; }
 .ld-toggle.is-on {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
-.ld-toggle.is-on:hover { filter: brightness(1.05); color: #fff; }
+.ld-toggle.is-on:hover { filter: brightness(1.05); color: var(--on-primary); }
 
 /* Puces réutilisées de la grille : elles y portent les marges de leur cellule,
    inutiles ici (la rangée .ld-field gère l'espacement). */
