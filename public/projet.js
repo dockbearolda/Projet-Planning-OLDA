@@ -5,9 +5,10 @@
 // à la demande par app.js.
 
 import {
-  wireVilleDefaults, applyCasse,
+  wireVilleDefaults, applyCasse, formatPhoneAsTyped,
   loadSecteurs, addSecteur, SECTEURS, VILLES,
 } from './clients.js';
+import { groupDigits, whatsappNumber } from './whatsapp.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -343,49 +344,39 @@ const NC_CHAMPS = {
 };
 
 const NC_TEL_EXEMPLE = '06 90 47 97 88';
-const NC_TEL_HINT = `Espaces acceptés. Exemple : ${NC_TEL_EXEMPLE}`;
 
-// --- Numéro WhatsApp : les règles de la maquette --------------------------------
-// Au comptoir on lit un numéro local (« 06 90 47 97 88 ») ; WhatsApp, lui, veut
-// l'indicatif 590 en tête. On affiche le premier, on valide sur le second.
-const ncCleanPhone = (v) => String(v == null ? '' : v).replace(/[^\d+]/g, '');
+// --- Numéro WhatsApp -------------------------------------------------------------
+// TOUS les numéros passent : 0690 des Antilles, 06/07 de métropole, fixe, +1 de
+// Sint Maarten ou d'Anguilla, indicatif inconnu. Le champ reste obligatoire (son
+// étoile), mais le seul refus est « ce n'est pas un numéro du tout ». Une règle
+// de format plus fine bloquerait le comptoir devant un client bien réel — c'est
+// arrivé, on ne le refait pas.
+const ncValidPhone = (v) => /\d/.test(String(v == null ? '' : v));
 
-function ncNormalizeWhatsapp(value) {
-  let phone = ncCleanPhone(value).replace(/\+/g, '');
-  if (phone.startsWith('00')) phone = phone.slice(2);
-  if (phone.startsWith('590')) return phone;
-  if (phone.startsWith('0')) return `590${phone.slice(1)}`;
-  if (phone.startsWith('690') || phone.startsWith('691')) return `590${phone}`;
-  return phone;
-}
+// Un numéro annoncé comme international (« + » ou « 00 » en tête) est laissé
+// EXACTEMENT tel qu'il a été tapé : regrouper ses chiffres par deux couperait
+// l'indicatif du pays en plein milieu (« +33 14 26 85 30 0 »), illisible. Le
+// comptoir recopie ce que le client lui donne, on n'y touche pas.
+const ncEstInternational = (v) => /^(\+|00)/.test(String(v == null ? '' : v).trim());
 
+// L'affichage local : « 06 90 47 97 88 ». Un numéro écrit avec l'indicatif du
+// pays collé devant (590690479788) revient à sa forme locale — c'est le même
+// numéro, pas un chiffre de perdu.
 function ncFormatLocalPhone(value) {
-  let phone = ncCleanPhone(value).replace(/\+/g, '');
-  if (phone.startsWith('590')) phone = `0${phone.slice(3)}`;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) return digits.replace(/(\d{2})(?=\d)/g, '$1 ');
-  return String(value == null ? '' : value).trim();
+  const brut = String(value == null ? '' : value).trim();
+  if (ncEstInternational(brut)) return brut;
+  const chiffres = brut.replace(/\D/g, '');
+  if (/^590\d{9}$/.test(chiffres)) return groupDigits(`0${chiffres.slice(3)}`);
+  return groupDigits(brut);
 }
 
-// Regroupement par deux pendant la frappe. Le curseur est remis là où il était
-// (au chiffre près) : sans ça, corriger un chiffre au milieu du numéro renvoie
-// la saisie en fin de champ à chaque touche.
-function ncFormatPhoneWhileTyping(input) {
-  const pos = input.selectionStart ?? input.value.length;
-  const avant = input.value.slice(0, pos).replace(/\D/g, '').length;
-  let digits = input.value.replace(/\D/g, '');
-  if (digits.startsWith('590') && digits.length >= 12) digits = `0${digits.slice(3)}`;
-  input.value = digits.slice(0, 10).replace(/(\d{2})(?=\d)/g, '$1 ');
-  let vus = 0;
-  let i = 0;
-  while (i < input.value.length && vus < avant) {
-    if (/\d/.test(input.value[i])) vus++;
-    i++;
-  }
-  input.setSelectionRange(i, i);
-}
+// Le numéro tel que WhatsApp le veut (indicatif pays compris) — sert à
+// reconnaître deux fiches qui portent le MÊME numéro écrit différemment.
+// `whatsappNumber` connaît déjà tous les préfixes (Antilles, Guyane, Réunion,
+// métropole) et est testé ; un numéro qu'il ne sait pas lire est comparé sur
+// ses chiffres bruts, ce qui suffit à repérer un doublon.
+const ncNormalizeWhatsapp = (v) => whatsappNumber(v) || String(v == null ? '' : v).replace(/\D/g, '');
 
-const ncValidPhone = (v) => /^590(690|691)\d{6}$/.test(ncNormalizeWhatsapp(v));
 const ncValidEmail = (v) => !String(v).trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
 
 // La liste des secteurs vit en base (le patron l'ajuste depuis Base clients) :
@@ -421,14 +412,19 @@ function ncField(f, nature, refs) {
     if (f.autocomplete) control.autocomplete = f.autocomplete;
     if (f.tel) {
       control.placeholder = NC_TEL_EXEMPLE;
-      control.addEventListener('input', () => ncFormatPhoneWhileTyping(control));
+      // Regroupement par deux à la frappe, curseur conservé (règle partagée avec
+      // Base clients). Un numéro international se tape tel quel, sans être
+      // regroupé : dès le « + » ou le « 00 », on n'y touche plus.
+      control.addEventListener('input', () => {
+        if (!ncEstInternational(control.value)) formatPhoneAsTyped(control);
+      });
       control.addEventListener('blur', () => { control.value = ncFormatLocalPhone(control.value); });
       const row = el('div', 'pjc-phone-row');
       const formater = el('button', 'pjc-secondary-btn', 'Formater');
       formater.type = 'button';
       formater.addEventListener('click', () => { control.value = ncFormatLocalPhone(control.value); });
       row.append(control, formater);
-      wrap.append(row, el('div', 'pjc-hint', NC_TEL_HINT));
+      wrap.append(row);
     } else {
       wrap.append(control);
     }
@@ -635,7 +631,10 @@ function renderNouveauClient(body) {
     const whatsapp = lu('telephone');
     const email = lu('email');
     let valide = true;
-    if (!ncValidPhone(whatsapp)) {
+    if (!whatsapp) {
+      poserErreur(f.telephone, 'Le numéro WhatsApp est obligatoire.');
+      valide = false;
+    } else if (!ncValidPhone(whatsapp)) {
       poserErreur(f.telephone, `Numéro WhatsApp invalide. Exemple : ${NC_TEL_EXEMPLE}.`);
       valide = false;
     }
