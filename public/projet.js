@@ -739,6 +739,12 @@ function renderPanier(main) {
   tilesWrap.append(grid);
   main.append(tilesWrap);
 
+  // Panier vide : la page s'arrête aux tuiles. Demander « pour quand ? » et le
+  // paiement avant de savoir QUOI produire n'a pas de sens au comptoir, et un
+  // total à 0,00 € sous un bouton grisé n'apprend rien de plus que les tuiles.
+  // Les trois blocs reviennent dès le premier produit ajouté.
+  if (vide) return;
+
   const delaiBox = el('div', 'proj-delai');
   delaiBox.append(renderDelai());
   main.append(delaiBox);
