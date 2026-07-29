@@ -5,18 +5,9 @@
 // à la demande par app.js.
 
 import {
-  wireVilleDefaults, applyCasse, formatPhoneAsTyped,
-  registerSecteurDatalist, loadSecteurs, valeurSaisie, VILLES,
+  wireVilleDefaults, applyCasse,
+  loadSecteurs, addSecteur, SECTEURS, VILLES,
 } from './clients.js';
-
-// Secteurs prédéfinis (Base Clients) : le champ `secteur` référence le
-// datalist `cl-dl-secteurs`, construit par clients.js dans SON propre DOM.
-// Nouveau Projet est chargé indépendamment (et peut être visité avant Base
-// Clients) : sans ce datalist local, l'attribut `list` pointe dans le vide et
-// aucune suggestion n'apparaît. Id distinct pour ne pas dupliquer `cl-dl-secteurs`
-// si les deux vues finissent montées en même temps.
-const PROJ_SECTEURS_DL_ID = 'proj-dl-secteurs';
-const PROJ_VILLES_DL_ID = 'proj-dl-villes';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -48,12 +39,10 @@ const state = {
   addingType: null,       // type en cours de configuration (formulaire ouvert), null = fermé
   addingLigne: null,      // brouillon de la ligne en cours d'ajout
   customOpen: false,      // marquage (faces/dessous/BAT) déplié ? réduit la densité par défaut
-  // Écran « Nouveau client » (étape 1). Le brouillon et l'état du bloc replié
-  // vivent ICI, pas dans le DOM : basculer Pro ↔ Particulier re-rend le
-  // formulaire, et ce qui est déjà tapé ne doit pas partir avec.
+  // Écran « Nouveau client » (étape 1) : quel onglet est affiché. Les deux jeux
+  // de champs vivent ensemble dans le DOM (on bascule sans re-rendre), donc ce
+  // qui est déjà tapé reste là — pas de brouillon à tenir dans l'état.
   clientForm: null,           // null = recherche ; 'pro' | 'perso' = formulaire ouvert
-  clientDraft: {},            // { [clé envoyée à l'API]: valeur tapée }
-  clientErreur: null,         // clé du champ en erreur, une seule à la fois
   // DÉLAI OBLIGATOIRE : rien n'est pré-coché, l'enregistrement est bloqué tant
   // qu'on n'a pas tranché — c'est ce qui garantit une date butoir sur CHAQUE
   // ligne du planning. Soit un raccourci (`delai`), soit une date précise
@@ -189,28 +178,19 @@ function renderStepper() {
   });
 }
 
-// L'en-tête annonce l'écran courant. Sur « Nouveau client », le titre prend la
-// place de la marque (avec un sur-titre discret qui rappelle le flux) et le
-// stepper file à droite : on lit d'abord ce qu'on est en train de faire.
+// L'en-tête annonce le flux. Sur « Nouveau client », l'écran porte son PROPRE
+// titre (celui de la maquette) : la barre garde la marque, sans le répéter.
 function renderBar() {
   const brand = $('#proj-bar-brand');
   if (!brand) return;
-  const nc = state.page === 'client' && !!state.clientForm;
   const page = ROOT.querySelector('.proj-page');
   if (page) {
-    page.classList.toggle('is-nouveau-client', nc);
+    page.classList.toggle('is-nouveau-client', state.page === 'client' && !!state.clientForm);
     // Écran Textile : fond de page légèrement gris, ce sont les cartes
     // blanches qui portent le contenu (même principe que Nouveau client).
     page.classList.toggle('is-textile', state.page === 'main' && state.addingType === 'textile');
   }
   brand.replaceChildren();
-  if (nc) {
-    brand.append(
-      el('p', 'proj-bar__over', 'NOUVEAU PROJET'),
-      el('h2', 'proj-bar__title proj-bar__title--nc', 'Nouveau client'),
-    );
-    return;
-  }
   brand.append(ic('bolt', 'proj-bar__ic'), el('h2', 'proj-bar__title', 'Nouveau Projet'));
 }
 
@@ -318,10 +298,9 @@ function renderClientSearch(body) {
   input.addEventListener('input', renderResults);
   renderResults();
 
+  // La maquette ouvre sur « Particulier » : c'est l'onglet actif au chargement.
   newBtn.addEventListener('click', () => {
-    state.clientForm = 'pro';
-    state.clientDraft = {};
-    state.clientErreur = null;
+    state.clientForm = 'perso';
     render();
   });
 
@@ -330,225 +309,442 @@ function renderClientSearch(body) {
 }
 
 // --- Écran « Nouveau client » ----------------------------------------------------
-// UNE colonne, trois champs à l'ouverture, le reste replié : le comptoir crée
-// une fiche en trois frappes et complète l'adresse plus tard s'il l'a. Les clés
-// (`entreprise`, `telephone`, `referent_prenom`…) sont celles que l'API attend,
-// inchangées — c'est l'écran qu'on refait, pas le contrat.
-const NC_IDENTITE = {
-  pro: { key: 'entreprise', label: 'Nom de l’entreprise', ph: '100% Villas' },
-  // Le particulier saisit son nom en UNE ligne (trois champs à l'écran, pas
-  // quatre) ; `prenom` et `nom` sont reconstitués à l'enregistrement.
-  perso: { key: 'nom_complet', label: 'Nom et prénom', ph: 'Jean Dupont' },
-};
-const NC_CONTACT = [
-  { key: 'telephone', label: 'Téléphone (WhatsApp)', ph: '06 42 26 69 49', type: 'tel', inputmode: 'tel' },
-  { key: 'email', label: 'E-mail', ph: 'contact@entreprise.fr', type: 'email', inputmode: 'email' },
-];
-// Section « Adresse et détails » : toujours visible, jamais bloquante. `demi` =
-// ville et code postal, la SEULE paire à partager une ligne — deux morceaux
-// d'une même adresse. Tout le reste descend un champ par ligne.
-const NC_DETAILS = [
-  { key: 'ville', label: 'Ville', ph: 'Saint-Martin', list: PROJ_VILLES_DL_ID, demi: true },
-  { key: 'code_postal', label: 'Code postal', ph: '97150', demi: true },
-  { key: 'secteur', label: 'Secteur d’activité', ph: 'Hôtellerie, BTP…', list: PROJ_SECTEURS_DL_ID },
-  { key: 'referent_prenom', label: 'Référent', ph: 'Marie', casse: 'initiales' },
-  { key: 'raison_sociale', label: 'Raison sociale EBP', ph: 'SARL 100 % Villas' },
-];
+// Transcription de la maquette validée par le patron, à l'identique : un titre
+// de page, UNE carte, deux onglets (Particulier / Professionnel), les étiquettes
+// en gras et l'étoile rouge sur les champs obligatoires. Les deux jeux de champs
+// vivent ensemble dans le DOM et se montrent/se cachent — basculer d'un onglet à
+// l'autre ne fait donc rien perdre de ce qui est déjà tapé. Les clés envoyées à
+// l'API (`entreprise`, `telephone`, `referent_prenom`…) sont inchangées : c'est
+// l'écran qu'on refait, pas le contrat.
 
-// Les clés que la nature courante a le droit d'envoyer. Le brouillon, lui,
-// garde TOUT ce qui a été tapé (basculer Pro ↔ Particulier ne doit rien faire
-// perdre) : sans ce filtre, une adresse saisie côté Pro partirait sur la fiche
-// d'un particulier qui n'en a jamais eu.
-function ncKeys(nature) {
-  const contact = NC_CONTACT.map((f) => f.key);
-  if (nature === 'perso') return new Set(contact);
-  return new Set([NC_IDENTITE.pro.key, ...contact, ...NC_DETAILS.map((f) => f.key)]);
+// `full` = le champ prend la ligne entière (la grille en fait deux par ligne).
+// `err` = la maquette réserve la place d'un message sous ce champ, et seulement
+// sous celui-là : Adresse, Ville et Code postal n'en ont pas, cette absence fait
+// partie du calage vertical.
+const NC_CHAMPS = {
+  perso: [
+    { titre: 'Informations du particulier' },
+    { key: 'nom_complet', label: 'Prénom Nom', requis: true, full: true, err: true, autocomplete: 'name' },
+    { key: 'telephone', label: 'WhatsApp', requis: true, err: true, tel: true },
+    { key: 'email', label: 'Email', type: 'email', err: true, autocomplete: 'email' },
+  ],
+  pro: [
+    { titre: 'Informations entreprise' },
+    { key: 'raison_sociale', label: 'Raison sociale EBP', requis: true, full: true, err: true },
+    { key: 'adresse', label: 'Adresse', full: true, autocomplete: 'street-address' },
+    { key: 'ville', label: 'Ville', autocomplete: 'address-level2' },
+    { key: 'code_postal', label: 'Code postal', autocomplete: 'postal-code' },
+    { key: 'secteur', label: 'Secteur d’activité', requis: true, full: true, err: true, secteur: true },
+    { titre: 'Contact principal' },
+    { key: 'referent_prenom', label: 'Prénom Contact', requis: true, err: true },
+    { key: 'telephone', label: 'WhatsApp', requis: true, err: true, tel: true },
+    { key: 'email', label: 'Email', type: 'email', full: true, err: true },
+  ],
+};
+
+const NC_TEL_EXEMPLE = '06 90 47 97 88';
+const NC_TEL_HINT = `Espaces acceptés. Exemple : ${NC_TEL_EXEMPLE}`;
+
+// --- Numéro WhatsApp : les règles de la maquette --------------------------------
+// Au comptoir on lit un numéro local (« 06 90 47 97 88 ») ; WhatsApp, lui, veut
+// l'indicatif 590 en tête. On affiche le premier, on valide sur le second.
+const ncCleanPhone = (v) => String(v == null ? '' : v).replace(/[^\d+]/g, '');
+
+function ncNormalizeWhatsapp(value) {
+  let phone = ncCleanPhone(value).replace(/\+/g, '');
+  if (phone.startsWith('00')) phone = phone.slice(2);
+  if (phone.startsWith('590')) return phone;
+  if (phone.startsWith('0')) return `590${phone.slice(1)}`;
+  if (phone.startsWith('690') || phone.startsWith('691')) return `590${phone}`;
+  return phone;
 }
 
-// Un champ = son étiquette (casse normale, pas d'icône), son champ toujours
-// bordé, et la place du message d'erreur juste dessous.
-function ncField(f, { requis = false } = {}) {
-  const row = el('div', 'pjc-f');
-  const lab = el('label', 'pjc-f__label');
-  // Le texte de l'étiquette vit dans UN seul enfant : l'étiquette elle-même est
-  // une boîte de hauteur fixe qui le colle en bas (voir .pjc-f__label), pour que
-  // tous les champs d'une même ligne démarrent au même niveau, qu'une étiquette
-  // tienne sur une ligne ou sur deux.
-  const txt = el('span', 'pjc-f__labeltxt', f.label);
-  if (!requis) txt.append(el('span', 'pjc-f__opt', ' — optionnel'));
-  lab.append(txt);
-  const input = el('input', 'pjc-input');
-  input.type = f.type || 'text';
-  if (f.inputmode) input.inputMode = f.inputmode;
-  if (f.list) input.setAttribute('list', f.list);
-  input.placeholder = f.ph || '';
-  input.autocomplete = 'off';
-  input.dataset.key = f.key;
-  input.value = state.clientDraft[f.key] || '';
-  input.id = `pjc-f-${f.key}`;
-  lab.setAttribute('for', input.id);
+function ncFormatLocalPhone(value) {
+  let phone = ncCleanPhone(value).replace(/\+/g, '');
+  if (phone.startsWith('590')) phone = `0${phone.slice(3)}`;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return digits.replace(/(\d{2})(?=\d)/g, '$1 ');
+  return String(value == null ? '' : value).trim();
+}
 
-  // Le brouillon suit la frappe : basculer Pro ↔ Particulier ou déplier les
-  // détails re-rend le formulaire sans rien perdre.
-  input.addEventListener('input', () => {
-    // Le regroupement des chiffres passe AVANT la mise au brouillon : c'est le
-    // numéro affiché qu'on garde, pas celui d'avant reformatage.
-    if (f.type === 'tel') formatPhoneAsTyped(input);
-    state.clientDraft[f.key] = input.value;
-    // « L'erreur s'efface dès la première frappe » : on ne laisse jamais un
-    // cadre rouge sur un champ qu'on est en train de corriger.
-    if (state.clientErreur === f.key) {
-      state.clientErreur = null;
-      row.classList.remove('is-error');
-      const msg = row.querySelector('.pjc-f__err');
-      if (msg) msg.remove();
+// Regroupement par deux pendant la frappe. Le curseur est remis là où il était
+// (au chiffre près) : sans ça, corriger un chiffre au milieu du numéro renvoie
+// la saisie en fin de champ à chaque touche.
+function ncFormatPhoneWhileTyping(input) {
+  const pos = input.selectionStart ?? input.value.length;
+  const avant = input.value.slice(0, pos).replace(/\D/g, '').length;
+  let digits = input.value.replace(/\D/g, '');
+  if (digits.startsWith('590') && digits.length >= 12) digits = `0${digits.slice(3)}`;
+  input.value = digits.slice(0, 10).replace(/(\d{2})(?=\d)/g, '$1 ');
+  let vus = 0;
+  let i = 0;
+  while (i < input.value.length && vus < avant) {
+    if (/\d/.test(input.value[i])) vus++;
+    i++;
+  }
+  input.setSelectionRange(i, i);
+}
+
+const ncValidPhone = (v) => /^590(690|691)\d{6}$/.test(ncNormalizeWhatsapp(v));
+const ncValidEmail = (v) => !String(v).trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
+
+// La liste des secteurs vit en base (le patron l'ajuste depuis Base clients) :
+// on la repeint à chaque ajout plutôt que de la recopier ici.
+function ncPeindreSecteurs(select, selected = '') {
+  select.replaceChildren(new Option('Sélectionner un secteur', ''));
+  for (const s of SECTEURS) select.append(new Option(s, s, false, s === selected));
+}
+
+// Un champ de la maquette : l'étiquette (avec son étoile si le champ est
+// obligatoire), le contrôle, l'aide éventuelle, puis la place du message
+// d'erreur. `refs` collecte les contrôles pour la validation et l'envoi.
+function ncField(f, nature, refs) {
+  const wrap = el('div', `pjc-field${f.full ? ' pjc-field--full' : ''}`);
+  const id = `pjc-${nature}-${f.key}`;
+  const label = el('label', f.requis ? 'pjc-required' : null, f.label);
+  label.htmlFor = id;
+  wrap.append(label);
+
+  let control;
+  if (f.secteur) {
+    control = el('select');
+    ncPeindreSecteurs(control);
+    const row = el('div', 'pjc-sector-row');
+    const ajouter = el('button', 'pjc-secondary-btn', '+ Créer un secteur');
+    ajouter.type = 'button';
+    ajouter.addEventListener('click', ncOuvrirDialogSecteur);
+    row.append(control, ajouter);
+    wrap.append(row);
+  } else {
+    control = el('input');
+    control.type = f.type || (f.tel ? 'tel' : 'text');
+    if (f.autocomplete) control.autocomplete = f.autocomplete;
+    if (f.tel) {
+      control.placeholder = NC_TEL_EXEMPLE;
+      control.addEventListener('input', () => ncFormatPhoneWhileTyping(control));
+      control.addEventListener('blur', () => { control.value = ncFormatLocalPhone(control.value); });
+      const row = el('div', 'pjc-phone-row');
+      const formater = el('button', 'pjc-secondary-btn', 'Formater');
+      formater.type = 'button';
+      formater.addEventListener('click', () => { control.value = ncFormatLocalPhone(control.value); });
+      row.append(control, formater);
+      wrap.append(row, el('div', 'pjc-hint', NC_TEL_HINT));
+    } else {
+      wrap.append(control);
+    }
+  }
+  control.id = id;
+  control.name = id;
+  // `data-key` : la règle « une ville connue remplit le code postal » se branche
+  // dessus (wireVilleDefaults), au lieu d'en recopier une deuxième ici.
+  control.dataset.key = f.key;
+  if (f.err) wrap.append(el('div', 'pjc-error'));
+  refs[f.key] = control;
+  return wrap;
+}
+
+// Un jeu de champs (Particulier ou Professionnel) : les titres de section
+// coupent la grille, chaque titre en ouvre une nouvelle.
+function ncBloc(nature, refs) {
+  const bloc = el('div');
+  let grille = null;
+  for (const f of NC_CHAMPS[nature]) {
+    if (f.titre) {
+      bloc.append(el('h2', 'pjc-section-title', f.titre));
+      grille = el('div', 'pjc-grid');
+      bloc.append(grille);
+      continue;
+    }
+    grille.append(ncField(f, nature, refs));
+  }
+  return bloc;
+}
+
+// Boîte « Créer un secteur » : même dialogue que la maquette, branché sur la
+// vraie liste (POST /api/clients/secteurs) pour que le secteur créé ici
+// apparaisse aussi dans Base clients.
+function ncOuvrirDialogSecteur() {
+  const dlg = $('#pjc-sector-dialog');
+  const champ = $('#pjc-new-sector');
+  const err = $('#pjc-new-sector-error');
+  champ.value = '';
+  err.textContent = '';
+  dlg.showModal();
+  champ.focus();
+}
+
+function ncDialogSecteur(select) {
+  const dlg = el('dialog', 'pjc-dialog');
+  dlg.id = 'pjc-sector-dialog';
+  const corps = el('div', 'pjc-dialog-body');
+  corps.append(el('h2', null, 'Créer un secteur'));
+  const champWrap = el('div', 'pjc-field');
+  const label = el('label', null, 'Nom du secteur');
+  label.htmlFor = 'pjc-new-sector';
+  const input = el('input');
+  input.type = 'text';
+  input.id = 'pjc-new-sector';
+  const err = el('div', 'pjc-error');
+  err.id = 'pjc-new-sector-error';
+  champWrap.append(label, input, err);
+  corps.append(champWrap);
+
+  const actions = el('div', 'pjc-dialog-actions');
+  const annuler = el('button', 'pjc-btn pjc-btn--outline', 'Annuler');
+  annuler.type = 'button';
+  annuler.addEventListener('click', () => dlg.close());
+  const ajouter = el('button', 'pjc-btn pjc-btn--primary', 'Ajouter');
+  ajouter.type = 'button';
+  ajouter.addEventListener('click', async () => {
+    const value = input.value.trim();
+    if (!value) { err.textContent = 'Indiquez le nom du secteur.'; return; }
+    if (SECTEURS.some((s) => fold(s) === fold(value))) {
+      err.textContent = 'Ce secteur existe déjà.';
+      return;
+    }
+    ajouter.disabled = true;
+    try {
+      await addSecteur(value);
+      ncPeindreSecteurs(select, value);
+      dlg.close();
+    } catch (_) {
+      err.textContent = 'Ajout impossible.';
+    } finally {
+      ajouter.disabled = false;
     }
   });
-  // Le code postal posé par le choix d'une ville arrive par `change`, pas par
-  // la frappe : sans ça il s'afficherait sans jamais rejoindre le brouillon.
-  input.addEventListener('change', () => { state.clientDraft[f.key] = input.value; });
-  if (f.casse) {
-    input.addEventListener('blur', () => {
-      const next = applyCasse(f.casse, input.value);
-      if (next !== input.value) { input.value = next; state.clientDraft[f.key] = next; }
-    });
-  }
+  actions.append(annuler, ajouter);
+  corps.append(actions);
+  dlg.append(corps);
+  return dlg;
+}
 
-  row.append(lab, input);
-  if (state.clientErreur === f.key) {
-    row.classList.add('is-error');
-    const err = el('p', 'pjc-f__err');
-    err.append(el('span', 'pjc-f__err-dot', '!'), el('span', null, `${f.label} est obligatoire.`));
-    row.append(err);
-  }
-  return row;
+// Un client déjà en base porte-t-il le même numéro, le même e-mail ou la même
+// société ? On prévient AVANT de créer un doublon ; un second clic sur le même
+// bouton confirme (« Vérifiez avant de créer un doublon » — parfois c'est bien
+// un nouveau client, et le comptoir ne doit jamais rester bloqué).
+function ncDoublon({ whatsapp, email, entreprise }) {
+  return CLIENTS.find((c) => {
+    const memeTel = whatsapp && ncNormalizeWhatsapp(c.telephone) === whatsapp;
+    const memeMail = email && c.email && c.email.toLowerCase() === email.toLowerCase();
+    const memeSociete = entreprise && c.entreprise
+      && c.entreprise.toLowerCase() === entreprise.toLowerCase();
+    return memeTel || memeMail || memeSociete;
+  });
 }
 
 function renderNouveauClient(body) {
-  const nature = state.clientForm;
   body.replaceChildren();
-  const screen = el('div', 'pjc-screen');
-  const card = el('form', 'pjc-card');
-  card.noValidate = true;
-  const champs = el('div', 'pjc-card__body');
+  const page = el('div', 'pjc-page');
 
-  // Pro / Particulier : deux jeux de champs, pas deux formulaires. Seule
-  // l'identité change de nom.
-  const seg = el('div', 'pjc-seg');
-  for (const n of [{ id: 'pro', label: 'Pro' }, { id: 'perso', label: 'Particulier' }]) {
-    const b = el('button', `pjc-seg__btn${n.id === nature ? ' is-on' : ''}`, n.label);
+  const entete = el('header', 'pjc-header');
+  entete.append(
+    el('h1', null, 'Nouveau client'),
+    el('p', null, 'Création d’un client particulier ou professionnel — Atelier OLDA'),
+  );
+  page.append(entete);
+
+  const card = el('section', 'pjc-card');
+
+  const onglets = {};
+  const switcher = el('div', 'pjc-type-switch');
+  for (const t of [{ id: 'perso', label: 'Particulier' }, { id: 'pro', label: 'Professionnel' }]) {
+    const b = el('button', 'pjc-type-button', t.label);
     b.type = 'button';
-    b.addEventListener('click', () => {
-      if (state.clientForm === n.id) return;
-      state.clientForm = n.id;
-      state.clientErreur = null;
-      render();
-    });
-    seg.appendChild(b);
+    b.addEventListener('click', () => setNature(t.id));
+    onglets[t.id] = b;
+    switcher.append(b);
   }
-  champs.append(seg);
+  card.append(switcher);
 
-  const identite = NC_IDENTITE[nature];
-  champs.append(ncField(identite, { requis: true }));
-  for (const f of NC_CONTACT) champs.append(ncField(f));
+  const form = el('form');
+  form.noValidate = true;
+  const refs = { perso: {}, pro: {} };
+  const blocs = {
+    perso: ncBloc('perso', refs.perso),
+    pro: ncBloc('pro', refs.pro),
+  };
+  form.append(blocs.perso, blocs.pro);
+  // Choisir une ville connue remplit le code postal, sans jamais écraser une
+  // valeur tapée à la main.
+  wireVilleDefaults(blocs.pro, null, 'input');
 
-  // Le particulier n'a ni adresse ni facturation dans sa fiche : rien à lui
-  // montrer ici, la section resterait vide.
-  if (nature === 'pro') {
-    const bloc = el('section', 'pjc-more');
-    const tete = el('div', 'pjc-more__head');
-    tete.append(
-      el('h3', 'pjc-more__title', 'Adresse et détails'),
-      el('p', 'pjc-more__sub', 'Ville, secteur, référent, facturation.'),
-    );
-    bloc.append(tete);
-
-    const grille = el('div', 'pjc-more__fields');
-    // Ville et code postal partagent une ligne : deux informations d'une même
-    // adresse, la seconde tient en 150px.
-    let paire = null;
-    for (const f of NC_DETAILS) {
-      const row = ncField(f);
-      if (f.demi) {
-        if (!paire) { paire = el('div', 'pjc-pair'); grille.append(paire); }
-        paire.append(row);
-      } else {
-        paire = null;
-        grille.append(row);
-      }
-    }
-    bloc.append(grille);
-    // Choisir une ville connue remplit le code postal, sans jamais écraser
-    // une valeur tapée à la main.
-    wireVilleDefaults(grille, null, '.pjc-input');
-    champs.append(bloc);
-  }
-
-  card.append(champs);
+  const avertissement = el('div', 'pjc-warning');
+  const succes = el('div', 'pjc-success');
+  form.append(avertissement, succes);
 
   const actions = el('div', 'pjc-actions');
-  const createBtn = el('button', 'pjc-btn pjc-btn--primary', 'Créer et continuer');
-  createBtn.type = 'submit';
-  const annuler = el('button', 'pjc-btn pjc-btn--ghost', 'Annuler');
+  const annuler = el('button', 'pjc-btn pjc-btn--outline', 'Annuler');
   annuler.type = 'button';
+  const enregistrer = el('button', 'pjc-btn pjc-btn--outline', 'Enregistrer');
+  enregistrer.type = 'submit';
+  const enregistrerProjet = el('button', 'pjc-btn pjc-btn--primary', 'Enregistrer et créer un projet');
+  enregistrerProjet.type = 'submit';
+  actions.append(annuler, enregistrer, enregistrerProjet);
+  form.append(actions);
+  card.append(form);
+  page.append(card, ncDialogSecteur(refs.pro.secteur));
+
+  // --- Onglets ------------------------------------------------------------
+  // Le doublon déjà signalé : un second clic sur le même bouton confirme la
+  // création plutôt que de re-signaler indéfiniment.
+  let doublonConfirme = null;
+
+  const effacerMessages = () => {
+    for (const e of page.querySelectorAll('.pjc-error')) e.textContent = '';
+    avertissement.style.display = 'none';
+    succes.style.display = 'none';
+    doublonConfirme = null;
+  };
+  function setNature(id) {
+    state.clientForm = id;
+    for (const [key, btn] of Object.entries(onglets)) btn.classList.toggle('is-active', key === id);
+    blocs.perso.classList.toggle('pjc-hidden', id !== 'perso');
+    blocs.pro.classList.toggle('pjc-hidden', id !== 'pro');
+    effacerMessages();
+  }
+
+  const errFor = (control) => {
+    const zone = control.closest('.pjc-field');
+    return zone ? zone.querySelector('.pjc-error') : null;
+  };
+  const poserErreur = (control, message) => {
+    const zone = errFor(control);
+    if (zone) zone.textContent = message;
+  };
+
   annuler.addEventListener('click', () => {
     state.clientForm = null;
-    state.clientErreur = null;
     render();
   });
-  actions.append(createBtn, annuler);
-  card.append(actions);
 
-  card.addEventListener('submit', async (e) => {
+  let action = 'save';
+  for (const b of [enregistrer, enregistrerProjet]) {
+    b.addEventListener('click', () => { action = b === enregistrerProjet ? 'save-project' : 'save'; });
+  }
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const identiteSaisie = String(state.clientDraft[identite.key] || '').trim();
-    if (!identiteSaisie) {
-      state.clientErreur = identite.key;
-      render();
-      const champ = $(`#pjc-f-${identite.key}`);
-      if (champ) champ.focus();
+    const nature = state.clientForm;
+    const f = refs[nature];
+    const lu = (key) => String((f[key] && f[key].value) || '').trim();
+    for (const zone of page.querySelectorAll('.pjc-error')) zone.textContent = '';
+    avertissement.style.display = 'none';
+    succes.style.display = 'none';
+
+    const whatsapp = lu('telephone');
+    const email = lu('email');
+    let valide = true;
+    if (!ncValidPhone(whatsapp)) {
+      poserErreur(f.telephone, `Numéro WhatsApp invalide. Exemple : ${NC_TEL_EXEMPLE}.`);
+      valide = false;
+    }
+    if (!ncValidEmail(email)) {
+      poserErreur(f.email, 'Adresse e-mail invalide.');
+      valide = false;
+    }
+
+    let draft = { client_type: nature, telephone: ncFormatLocalPhone(whatsapp), email };
+    if (nature === 'perso') {
+      const identite = lu('nom_complet');
+      if (!identite) {
+        poserErreur(f.nom_complet, 'Le prénom et le nom sont obligatoires.');
+        valide = false;
+      }
+      // Le comptoir tape « Prénom Nom » ; la base garde les deux séparés (et
+      // leur casse : Jean / DUPONT). Un seul mot = un nom.
+      const mots = identite.split(/\s+/);
+      const prenom = mots.length > 1 ? applyCasse('initiales', mots[0]) : '';
+      const nom = applyCasse('majuscules', (mots.length > 1 ? mots.slice(1) : mots).join(' '));
+      // `entreprise` reste la colonne obligatoire côté serveur et sert à la
+      // recherche : pour un particulier, on la dérive du prénom + nom plutôt
+      // que de la demander une deuxième fois.
+      draft = { ...draft, prenom, nom, entreprise: `${prenom} ${nom}`.trim() };
+    } else {
+      const raisonSociale = lu('raison_sociale');
+      if (!raisonSociale) {
+        poserErreur(f.raison_sociale, 'La raison sociale EBP est obligatoire.');
+        valide = false;
+      }
+      if (!lu('secteur')) {
+        poserErreur(f.secteur, 'Sélectionnez un secteur d’activité.');
+        valide = false;
+      }
+      if (!lu('referent_prenom')) {
+        poserErreur(f.referent_prenom, 'Le prénom du contact est obligatoire.');
+        valide = false;
+      }
+      draft = {
+        ...draft,
+        // La maquette ne demande qu'UN nom de société, celui d'EBP : il remplit
+        // les deux colonnes (`entreprise` porte la recherche et l'affichage,
+        // `raison_sociale` la facturation).
+        entreprise: raisonSociale,
+        raison_sociale: raisonSociale,
+        adresse: lu('adresse'),
+        ville: lu('ville'),
+        code_postal: lu('code_postal'),
+        secteur: lu('secteur'),
+        referent_prenom: lu('referent_prenom'),
+      };
+      // Le pays ne se demande plus (il se déduit de la ville) mais il continue
+      // de s'enregistrer : sans ça la colonne se viderait en silence pour tous
+      // les clients créés ici.
+      const villeConnue = VILLES.find((v) => fold(v.label) === fold(draft.ville));
+      if (villeConnue) draft.pays = villeConnue.pays;
+    }
+    if (!valide) return;
+
+    const signature = `${nature}|${draft.entreprise}|${whatsapp}|${email}`;
+    if (doublonConfirme !== signature) {
+      const jumeau = ncDoublon({
+        whatsapp: ncNormalizeWhatsapp(whatsapp), email, entreprise: draft.entreprise,
+      });
+      if (jumeau) {
+        const label = jumeau.client_type === 'perso' ? (jumeau.nom || jumeau.entreprise) : jumeau.entreprise;
+        avertissement.textContent = `Attention : un client similaire existe déjà (${label}). Vérifiez avant de créer un doublon.`;
+        avertissement.style.display = 'block';
+        doublonConfirme = signature;
+        return;
+      }
+    }
+
+    enregistrer.disabled = true;
+    enregistrerProjet.disabled = true;
+    let cree;
+    try {
+      cree = await api('POST', '/api/clients', draft);
+    } catch (err) {
+      enregistrer.disabled = false;
+      enregistrerProjet.disabled = false;
+      window.alert(err.message || 'Création impossible');
       return;
     }
-    createBtn.disabled = true;
-    const autorisees = ncKeys(nature);
-    const draft = { client_type: nature };
-    for (const [key, val] of Object.entries(state.clientDraft)) {
-      if (autorisees.has(key)) draft[key] = valeurSaisie(key, val);
+    CLIENTS.push(cree);
+    succes.textContent = action === 'save-project'
+      ? 'Client enregistré. Redirection vers la création d’un projet…'
+      : 'Client enregistré avec succès.';
+    succes.style.display = 'block';
+
+    if (action === 'save-project') {
+      setTimeout(() => goToClient({
+        id: cree.id, entreprise: cree.entreprise, nom: cree.nom,
+        telephone: cree.telephone, email: cree.email, type: nature,
+      }), 800);
+      return;
     }
-    // Le pays ne se demande plus (il se déduit de la ville) mais il continue
-    // de s'enregistrer : sans ça la colonne se viderait en silence pour tous
-    // les clients créés ici, et la fiche complète s'ouvrirait incomplète.
-    const villeConnue = VILLES.find((v) => fold(v.label) === fold(draft.ville || ''));
-    if (villeConnue) draft.pays = villeConnue.pays;
-    if (nature === 'perso') {
-      // Un particulier tape « Prénom Nom » ; la base, elle, garde les deux
-      // séparés (et leur casse : Jean / DUPONT). Un seul mot = un nom.
-      const mots = identiteSaisie.split(/\s+/);
-      draft.prenom = mots.length > 1 ? applyCasse('initiales', mots[0]) : '';
-      draft.nom = applyCasse('majuscules', (mots.length > 1 ? mots.slice(1) : mots).join(' '));
-      // `entreprise` reste la colonne obligatoire côté serveur et sert à la
-      // recherche/l'affichage : pour un particulier, on la dérive du prénom +
-      // nom plutôt que de la demander une deuxième fois.
-      draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
-    }
-    try {
-      const created = await api('POST', '/api/clients', draft);
-      CLIENTS.push(created);
-      state.clientForm = null;
-      state.clientDraft = {};
-        goToClient({
-        id: created.id, entreprise: created.entreprise, nom: created.nom,
-        telephone: created.telephone, email: created.email, type: nature,
-      });
-    } catch (err) {
-      createBtn.disabled = false;
-      window.alert(err.message || 'Création impossible');
-    }
+    // « Enregistrer » seul : la fiche est créée, le comptoir en enchaîne une
+    // autre — le formulaire repart vierge sur le même onglet.
+    enregistrer.disabled = false;
+    enregistrerProjet.disabled = false;
+    form.reset();
+    ncPeindreSecteurs(refs.pro.secteur);
+    doublonConfirme = null;
   });
 
-  screen.append(card);
-  body.appendChild(screen);
-  const premier = $(`#pjc-f-${identite.key}`);
+  setNature(state.clientForm);
+  body.appendChild(page);
+  const premier = refs[state.clientForm][state.clientForm === 'perso' ? 'nom_complet' : 'raison_sociale'];
   if (premier) premier.focus();
 }
 
@@ -1913,21 +2109,13 @@ function buildStatic() {
   const bodyEl = el('div', 'proj-body', '');
   bodyEl.id = 'proj-body';
   page.append(head, bodyEl);
-  const dlSecteurs = el('datalist');
-  dlSecteurs.id = PROJ_SECTEURS_DL_ID;
-  // La liste des secteurs vit en base : on s'abonne plutôt que de la recopier,
-  // pour qu'un secteur ajouté depuis Base clients apparaisse ici aussitôt.
-  registerSecteurDatalist(dlSecteurs);
-  const dlVilles = el('datalist');
-  dlVilles.id = PROJ_VILLES_DL_ID;
-  dlVilles.append(...VILLES.map((v) => new Option(v.label)));
   // Suggestions du catalogue partagé (vêtements, typos) : remplies par
   // `remplirCatalogueDatalists` une fois le catalogue chargé.
   const dlVetements = el('datalist');
   dlVetements.id = 'proj-dl-vetements';
   const dlTypos = el('datalist');
   dlTypos.id = 'proj-dl-typos';
-  ROOT.replaceChildren(page, dlSecteurs, dlVilles, dlVetements, dlTypos);
+  ROOT.replaceChildren(page, dlVetements, dlTypos);
 }
 
 function remplirCatalogueDatalists() {
@@ -1961,6 +2149,6 @@ export function resetProjet() {
   if (!mounted) return;
   state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
-  state.clientForm = null; state.clientDraft = {}; state.clientErreur = null;
+  state.clientForm = null;
   render();
 }

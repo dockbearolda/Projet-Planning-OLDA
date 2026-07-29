@@ -16,20 +16,11 @@
 .proj-bar__brand { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; }
 .proj-bar__ic { font-size: 24px; color: var(--primary); flex: 0 0 auto; }
 .proj-bar__title { margin: 0; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
-/* Écran « Nouveau client » : le titre de l'écran passe devant la marque, le
-   sur-titre garde le fil du flux, et le stepper cesse d'être centré — il
-   accompagne le titre au lieu de le concurrencer. */
-.proj-page.is-nouveau-client .proj-bar__brand { display: block; }
-.proj-bar__over { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--nc-over, var(--text-2)); }
-.proj-bar__title--nc { font-size: 26px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
+/* Écran « Nouveau client » : le stepper cesse d'être centré (il accompagne la
+   marque au lieu de la concurrencer), et la zone de travail rend la main —
+   c'est la page de la maquette, avec ses propres marges, qui borne le contenu. */
 .proj-page.is-nouveau-client .proj-stepper { flex: 1; justify-content: flex-end; }
-/* La carte se pose sur un fond de page légèrement gris : c'est lui qui la
-   détache, pas un liseré de couleur. Largeur libérée — c'est la carte (620px)
-   qui borne le contenu, plus la colonne de travail. */
-.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0 20px; background: var(--bg); }
-@media (max-width: 560px) {
-  .proj-bar__title--nc { font-size: 22px; }
-}
+.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0; background: var(--bg); }
 /* .work (parent) a overflow:hidden — c'est ici, sur .proj-body, qu'il faut
    son propre scroll. Sans le min-height:0 + overflow-y, un contenu plus haut
    que la fenêtre (fréquent sur Windows/Chrome, barre d'outils plus haute
@@ -133,123 +124,234 @@
 .proj-input--sm { min-height: 48px; }
 
 /* --- Écran « Nouveau client » (étape 1) ------------------------------------------
-   Une CARTE, une COLONNE, trois champs. Le reste se déplie si on l'a. Les
-   valeurs ne sont QUE des alias des jetons de l'app : la charte est unique,
-   l'écran hérite donc du thème sombre sans bloc de rebascule dédié. */
-.pjc-screen {
-  --nc-page: var(--bg);
-  --nc-card: var(--surface);
-  --nc-border: var(--border-soft);
-  --nc-field-border: var(--border);
-  --nc-label: var(--text-1);
-  --nc-opt: var(--text-2);
-  --nc-ph: var(--text-3);
-  --nc-over: var(--text-2);
-  --nc-title: var(--text-1);
-  --nc-accent: var(--primary);
-  --nc-accent-hover: var(--primary-hover);
-  --nc-accent-active: var(--primary-hover);
-  --nc-error: var(--danger);
-  --nc-error-bg: var(--danger-bg);
-  --nc-track: var(--surface-hover);
-  --nc-muted: var(--text-2);
-  --nc-sep: var(--border-soft);
-  --nc-more-bg: var(--surface-hover);
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
-  display: flex; justify-content: center; align-items: flex-start;
-  padding: 28px 0 40px;
+   Transcription de la maquette validée par le patron, valeur pour valeur. Les
+   jetons employés ici portent EXACTEMENT les couleurs de la maquette
+   (--bg #f5f6f8, --surface #fff, --text-1 #1f2937, --text-2 #6b7280,
+   --border #d1d5db, --primary #111827, --danger #b91c1c…) : on les nomme plutôt
+   que de les recopier en dur, pour que l'écran suive le thème sombre sans
+   deuxième palette à tenir à jour.
+   Les boutons et les champs n'imposent PAS de police : ils gardent celle du
+   navigateur, comme dans la maquette — c'est ce qui donne son rendu aux onglets
+   et aux boutons d'action. */
+.pjc-page {
+  max-width: 980px;
+  margin: 32px auto;
+  padding: 0 16px 40px;
+  font-size: 16px;
+  color: var(--text-1);
 }
+
+.pjc-header { margin-bottom: 20px; }
+.pjc-header h1 { margin: 0 0 6px; font-size: 30px; font-weight: 700; }
+.pjc-header p { margin: 0; color: var(--text-2); }
+
 .pjc-card {
-  width: 100%; max-width: 720px; background: var(--nc-card);
-  border: 1px solid var(--nc-border); border-radius: 22px;
-  box-shadow: 0 1px 2px rgba(17, 20, 32, .04), 0 12px 32px -18px rgba(17, 20, 32, .18);
-}
-/* UNE information par ligne. On descend le formulaire sans jamais chercher où se
-   trouve le champ suivant : c'est ça qui rend la saisie rapide au comptoir, pas
-   le nombre de champs visibles d'un coup. La carte reste large (720px) pour
-   l'air, pas pour y empiler des colonnes. */
-.pjc-card__body { display: flex; flex-direction: column; gap: 20px; padding: 32px 32px 28px; }
-
-/* Champ : l'étiquette se lit en casse normale, le contour est TOUJOURS visible
-   (un champ sans bordure ne se voit pas — c'est ce qui a motivé cette refonte). */
-.pjc-f { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-/* TOUS les champs d'une même ligne démarrent au même niveau. L'étiquette est une
-   boîte de hauteur fixe (deux lignes) qui colle son texte en bas : qu'elle tienne
-   sur une ligne (« Ville ») ou sur deux (« Code postal — optionnel » dans ses
-   150px), le champ dessous est toujours à la même hauteur. Le surplus part
-   au-dessus de l'étiquette, là où il passe pour de l'air. */
-.pjc-f__label {
-  display: flex; align-items: flex-end; min-height: 36px;
-  font-size: 13.5px; font-weight: 600; color: var(--nc-label);
-}
-.pjc-f__labeltxt { display: block; }
-.pjc-f__opt { font-weight: 500; color: var(--nc-opt); }
-.pjc-input {
-  height: 50px; padding: 0 14px; width: 100%;
-  border: 1.5px solid var(--nc-field-border); border-radius: 12px;
-  background: var(--nc-card); color: var(--nc-title);
-  font: inherit; font-size: 15px; outline: none;
-  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
-}
-.pjc-input::placeholder { color: var(--nc-ph); }
-.pjc-input:focus { border-color: var(--nc-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
-/* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
-.pjc-f.is-error .pjc-input { border-color: var(--nc-error); background: var(--nc-error-bg); }
-.pjc-f.is-error .pjc-input:focus { box-shadow: 0 0 0 3px var(--danger-line); }
-.pjc-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--nc-error); }
-.pjc-f__err-dot {
-  flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--nc-error); color: var(--surface); font-size: 10px; font-weight: 800;
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .05);
 }
 
-/* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne. */
-.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: start; }
-@media (max-width: 420px) { .pjc-pair { grid-template-columns: 1fr; } }
-
-/* Pro / Particulier : une piste, un curseur blanc. Le reste du formulaire ne
-   bouge pas — seule l'étiquette d'identité change. */
-.pjc-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--nc-track); border-radius: 12px; }
-.pjc-seg__btn {
-  min-height: 44px; border: 0; border-radius: 9px; background: transparent;
-  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--nc-muted); cursor: pointer;
+/* Particulier / Professionnel : deux boutons de même largeur, l'actif en encre
+   pleine. Rien ne bouge ailleurs — seuls les champs dessous changent. */
+.pjc-type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
 }
-.pjc-seg__btn.is-on { background: var(--nc-card); color: var(--nc-title); box-shadow: 0 1px 3px rgba(17, 20, 32, .10); }
+.pjc-type-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s ease;
+}
+.pjc-type-button.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
 
-/* « Adresse et détails » : une SECTION, plus un tiroir. Tout est là dès
-   l'ouverture ; le fond légèrement teinté suffit à dire que c'est le second
-   temps de la saisie, sans rien cacher. */
-.pjc-more { border: 1px solid var(--nc-border); border-radius: 16px; background: var(--nc-more-bg); }
-.pjc-more__head { padding: 20px 22px 4px; }
-.pjc-more__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--nc-title); }
-.pjc-more__sub { margin: 3px 0 0; font-size: 13px; color: var(--nc-muted); }
-/* Même règle ici : un champ par ligne, du haut vers le bas. */
-.pjc-more__fields { display: flex; flex-direction: column; gap: 20px; padding: 18px 22px 22px; }
+.pjc-section-title {
+  margin: 22px 0 14px;
+  font-size: 18px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
 
-/* La zone d'action se détache du formulaire : on a fini de saisir, on décide. */
-.pjc-actions { display: flex; flex-direction: column; gap: 6px; padding: 20px 32px 26px; border-top: 1px solid var(--nc-sep); }
-.pjc-btn { width: 100%; border: 0; border-radius: 14px; font: inherit; cursor: pointer; }
+.pjc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pjc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.pjc-field--full { grid-column: 1 / -1; }
+
+.pjc-card label,
+.pjc-dialog label {
+  font-weight: 700;
+  font-size: 14px;
+}
+/* L'étoile rouge des champs obligatoires : elle appartient à l'étiquette, pas
+   au texte — un champ qui cesse d'être obligatoire perd sa classe, rien d'autre. */
+.pjc-required::after {
+  content: " *";
+  color: var(--danger);
+}
+
+.pjc-card input,
+.pjc-card select,
+.pjc-dialog input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 15px;
+  background: var(--surface);
+}
+.pjc-card input:focus,
+.pjc-card select:focus,
+.pjc-dialog input:focus {
+  outline: 2px solid rgba(var(--primary-rgb), .13);
+  border-color: var(--primary);
+}
+
+.pjc-phone-row,
+.pjc-sector-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.pjc-secondary-btn {
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  border-radius: 9px;
+  padding: 0 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pjc-hint {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* La place du message d'erreur est réservée même quand il n'y a pas d'erreur :
+   l'apparition d'un message ne décale jamais le champ suivant. */
+.pjc-error {
+  color: var(--danger);
+  font-size: 13px;
+  min-height: 16px;
+}
+
+.pjc-success {
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-line);
+  padding: 12px;
+  border-radius: 9px;
+  margin-top: 18px;
+  display: none;
+}
+
+.pjc-warning {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-line);
+  padding: 12px;
+  border-radius: 9px;
+  margin-top: 18px;
+  display: none;
+}
+
+.pjc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.pjc-btn {
+  border-radius: 9px;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+}
 .pjc-btn--primary {
-  height: 54px; background: var(--nc-accent); color: var(--on-primary); font-size: 16px; font-weight: 700;
-  transition: background-color .12s ease;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
 }
-.pjc-btn--primary:hover:not(:disabled) { background: var(--nc-accent-hover); }
-.pjc-btn--primary:active:not(:disabled) { background: var(--nc-accent-active); }
-.pjc-btn--primary:disabled { opacity: .6; cursor: default; }
-.pjc-btn--ghost { height: 44px; background: none; color: var(--nc-muted); font-size: 15px; font-weight: 600; }
-.pjc-btn--ghost:hover { color: var(--nc-title); }
+.pjc-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+.pjc-btn--outline {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+}
+.pjc-btn:disabled { opacity: .6; cursor: default; }
 
+.pjc-hidden { display: none !important; }
+
+/* Onglet au repos, bouton « Formater » et champs de saisie gardent la couleur
+   par défaut du navigateur (le noir de la maquette) : c'est elle qu'on voit à
+   l'écran en clair. En sombre, ce noir deviendrait illisible sur fond foncé —
+   d'où ce seul rattrapage, réservé au thème sombre. */
+:root[data-theme="dark"] .pjc-type-button,
+:root[data-theme="dark"] .pjc-secondary-btn,
+:root[data-theme="dark"] .pjc-card input,
+:root[data-theme="dark"] .pjc-card select,
+:root[data-theme="dark"] .pjc-dialog input { color: var(--text-1); }
+:root[data-theme="dark"] .pjc-type-button.is-active { color: var(--on-primary); }
+
+.pjc-dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  width: min(420px, calc(100% - 30px));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
+  background: var(--surface);
+  color: var(--text-1);
+}
+.pjc-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.pjc-dialog-body { padding: 22px; }
+/* Le titre garde les valeurs par défaut du navigateur (24px, gras, .83em de
+   marge) : c'est ce que fait la maquette, et c'est ce qu'on voit à l'écran. */
+.pjc-dialog-body h2 { margin: .83em 0; font-size: 24px; font-weight: 700; }
+.pjc-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 720px) {
+  .pjc-grid { grid-template-columns: 1fr; }
+  .pjc-field--full { grid-column: auto; }
+  .pjc-type-switch { grid-template-columns: 1fr; }
+  .pjc-phone-row, .pjc-sector-row { grid-template-columns: 1fr; }
+  .pjc-actions { flex-direction: column; }
+  .pjc-actions .pjc-btn { width: 100%; }
+}
+/* 15px est la valeur de la maquette, et c'est ce qu'on voit au comptoir. Sous
+   16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la dézoome
+   jamais : sur téléphone seulement, les champs passent donc à 16px. */
 @media (max-width: 560px) {
-  .pjc-screen { padding: 16px 0 28px; }
-  .pjc-card__body { padding: 22px 18px 18px; }
-  .pjc-more__head { padding: 16px 16px 2px; }
-  .pjc-more__fields { padding: 14px 16px 18px; }
-  .pjc-actions { padding: 18px 18px 20px; }
-  /* 15px est la valeur de la maquette, et c'est ce qu'on voit au comptoir.
-     Sous 16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la
-     dézoome jamais : sur téléphone seulement, le champ passe donc à 16px. */
-  .pjc-input { font-size: 16px; }
+  .pjc-card input, .pjc-card select, .pjc-dialog input { font-size: 16px; }
 }
 
 /* --- Tuiles de type (colonne de droite) ---------------------------------------- */
