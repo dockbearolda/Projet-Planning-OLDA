@@ -452,6 +452,263 @@
 .proj-total__manque { margin: 0; text-align: center; font-size: 13.5px; color: var(--text-2); }
 .proj-btn--cta { width: 100%; justify-content: center; min-height: 58px; border-radius: var(--radius-lg); font-size: 17.5px; font-weight: 700; box-shadow: var(--shadow-1); }
 
+/* --- Écran Textile (étape 2 — Produits) ------------------------------------------
+   Une CARTE par bloc sur un fond légèrement gris, une colonne récapitulative
+   collante à droite, une barre d'action fixe en bas. Mêmes valeurs que l'écran
+   « Nouveau client » (maquette validée au pixel, jetons de l'app rebasculés
+   plus bas pour le thème sombre) : c'est le même poste, ce doit être la même
+   main sous les doigts. */
+.tx-screen {
+  --tx-page: #f6f7f9;
+  --tx-card: #fff;
+  --tx-border: #eceef2;
+  --tx-field-border: #dfe3eb;
+  --tx-label: #3d4453;
+  --tx-opt: #9aa1b1;
+  --tx-ph: #a6adbb;
+  --tx-title: #111420;
+  --tx-accent: #2b46f0;
+  --tx-accent-soft: #eef1fe;
+  --tx-chip-border: #e3e6ed;
+  --tx-error: #d2263b;
+  --tx-error-bg: #fff6f7;
+  --tx-muted: #6b7385;
+  --tx-empty-bg: #f7f8fb;
+  --tx-dashed: #d7dbe4;
+  --tx-ro-bg: #f4f6f9;
+  --tx-fill-bg: #f8f9ff;
+  --tx-bar-bg: rgba(255, 255, 255, .94);
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--tx-title);
+  /* La barre d'action est FIXE : sans cette réserve, elle recouvrait les
+     derniers champs du formulaire (le bug qu'on corrige ici). */
+  padding-bottom: 140px;
+}
+.proj-page.is-textile .proj-body { background: var(--tx-page); max-width: none; }
+:root[data-theme="dark"] .proj-page.is-textile .proj-body { background: var(--bg); }
+
+.tx-layout { display: flex; align-items: flex-start; gap: 24px; max-width: 1080px; margin: 0 auto; }
+.tx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.tx-back { align-self: flex-start; border: 0; background: none; color: var(--tx-muted); font: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
+.tx-back:hover { color: var(--tx-accent); }
+.tx-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.01em; color: var(--tx-title); }
+
+/* Une carte = un bloc. Titre en casse normale : les en-têtes gris en
+   MAJUSCULES pesaient plus lourd que les champs qu'ils annonçaient. */
+.tx-card {
+  display: flex; flex-direction: column; gap: 16px;
+  background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 18px;
+  padding: 22px 24px;
+}
+.tx-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tx-card__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--tx-title); }
+.tx-card__aside { font-size: 13px; font-weight: 600; color: var(--tx-muted); white-space: nowrap; }
+.tx-card__aside--fort { color: var(--tx-accent); }
+.tx-card__hint { margin: -8px 0 0; font-size: 13px; color: var(--tx-muted); }
+.tx-card__note { margin: -4px 0 0; font-size: 12.5px; color: var(--tx-opt); }
+
+/* Champ : contour TOUJOURS visible, étiquette en casse normale. */
+.tx-f { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.tx-f__label { display: flex; align-items: baseline; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--tx-label); }
+.tx-f__opt { font-weight: 500; color: var(--tx-opt); }
+.tx-input {
+  height: 50px; padding: 0 14px; width: 100%;
+  border: 1.5px solid var(--tx-field-border); border-radius: 12px;
+  background: var(--tx-card); color: var(--tx-title);
+  font: inherit; font-size: 15px; outline: none;
+  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+.tx-input::placeholder { color: var(--tx-ph); }
+.tx-input:focus { border-color: var(--tx-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
+.tx-input--area { height: auto; min-height: 92px; padding: 12px 14px; line-height: 1.45; resize: vertical; }
+/* Le TTC se DÉDUIT du HT : il se lit, il ne se tape pas. */
+.tx-input--ro { background: var(--tx-ro-bg); color: var(--tx-muted); font-weight: 700; cursor: default; }
+.tx-input--ro:focus { border-color: var(--tx-field-border); box-shadow: none; }
+/* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
+.tx-f.is-error .tx-input { border-color: var(--tx-error); background: var(--tx-error-bg); }
+.tx-f.is-error .tx-input:focus { box-shadow: 0 0 0 3px rgba(210, 38, 59, .14); }
+.tx-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--tx-error); }
+.tx-f__err-dot {
+  flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--tx-error); color: #fff; font-size: 10px; font-weight: 800;
+}
+
+/* Puces de choix : 40px de haut, l'état sélectionné se voit sans survol. */
+.tx-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tx-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
+  border: 1px solid var(--tx-chip-border); border-radius: 10px; background: var(--tx-card);
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--tx-label); cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
+}
+.tx-chip:hover { border-color: var(--tx-accent); }
+.tx-chip.is-on { background: var(--tx-accent-soft); border-color: var(--tx-accent); color: var(--tx-accent); }
+/* La pastille ne fait que confirmer le nom : 16px suffisent, 44px écrasaient
+   le libellé qu'on lit réellement. */
+.tx-chip__dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(17, 20, 32, .14); flex: 0 0 auto; }
+
+/* Grille de tailles : autant de cases que la largeur en accepte. */
+.tx-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
+.tx-size { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tx-size__label { font-size: 12px; font-weight: 700; color: var(--tx-label); overflow-wrap: anywhere; }
+.tx-size__qty {
+  height: 46px; width: 100%; text-align: center;
+  border: 1.5px solid var(--tx-field-border); border-radius: 12px;
+  background: var(--tx-card); color: var(--tx-title);
+  font: inherit; font-size: 16px; font-weight: 700; outline: none;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.tx-size__qty::placeholder { color: var(--tx-ph); font-weight: 600; }
+.tx-size__qty:focus { border-color: var(--tx-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
+/* Une case remplie se repère d'un coup d'œil dans la grille. */
+.tx-size__qty.is-filled { border-color: var(--tx-accent); background: var(--tx-fill-bg); }
+.tx-size-libre { display: flex; align-items: flex-end; gap: 10px; }
+.tx-size-libre .tx-input { flex: 1; }
+.tx-size-libre .tx-size { flex: 0 0 88px; }
+.tx-size-libre__del {
+  flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none;
+  color: var(--tx-opt); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.tx-size-libre__del:hover { color: var(--tx-error); background: var(--tx-empty-bg); }
+
+/* Bouton d'ajout : pleine largeur, pointillé — il ouvre, il ne valide pas. */
+.tx-add {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 46px; padding: 0 16px;
+  border: 1.5px dashed var(--tx-dashed); border-radius: 12px; background: none;
+  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--tx-accent); cursor: pointer;
+}
+.tx-add:hover { border-color: var(--tx-accent); background: var(--tx-accent-soft); }
+.tx-add .material-symbols-outlined { font-size: 20px; }
+.tx-add--inline { min-height: 44px; }
+
+/* Face non marquée : un état complet, pas un formulaire à moitié rempli. */
+.tx-empty { border-radius: 14px; background: var(--tx-empty-bg); padding: 18px 20px; }
+.tx-empty__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--tx-title); }
+.tx-empty__sub { margin: 3px 0 0; font-size: 13px; color: var(--tx-muted); }
+
+/* Prix : HT saisi à gauche, TTC calculé à droite. */
+.tx-prix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tx-input--prix { font-size: 17px; font-weight: 700; }
+
+/* --- Colonne récapitulative collante --------------------------------------- */
+.tx-side { flex: 0 0 300px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px; }
+.tx-client { background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 16px; padding: 16px; }
+.tx-client__row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tx-client__av {
+  flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%;
+  background: var(--tx-accent-soft); color: var(--tx-accent);
+  display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800;
+}
+.tx-client__info { min-width: 0; }
+.tx-client__name { margin: 0; font-size: 15px; font-weight: 700; color: var(--tx-title); overflow-wrap: break-word; }
+.tx-client__meta { margin: 1px 0 0; font-size: 13px; color: var(--tx-muted); }
+.tx-client__change {
+  width: 100%; min-height: 44px; margin-top: 14px; padding: 0 12px;
+  border: 1px solid var(--tx-chip-border); border-radius: 12px; background: none;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--tx-muted); cursor: pointer;
+}
+.tx-client__change:hover { color: var(--tx-accent); border-color: var(--tx-accent); }
+
+.tx-recap { background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 16px; padding: 18px 16px; }
+.tx-recap__title { margin: 0 0 14px; font-size: 13px; font-weight: 700; color: var(--tx-title); }
+.tx-recap__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--tx-border); }
+.tx-recap__row:first-of-type { border-top: 0; padding-top: 0; }
+.tx-recap__key { flex: 0 0 auto; font-size: 13px; color: var(--tx-muted); }
+.tx-recap__val { font-size: 13.5px; font-weight: 600; color: var(--tx-title); text-align: right; overflow-wrap: anywhere; }
+.tx-recap__mks { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; text-align: right; }
+.tx-recap__mk { font-size: 13px; font-weight: 600; color: var(--tx-title); overflow-wrap: anywhere; }
+
+/* --- Barre d'action fixe ---------------------------------------------------- */
+.tx-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 20px;
+  padding: 14px 24px; padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: var(--tx-bar-bg, rgba(255, 255, 255, .94));
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-top: 1px solid #eceef2;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+}
+.tx-bar__prix { display: flex; flex-direction: column; gap: 1px; flex: 0 0 auto; }
+.tx-bar__label { font-size: 13px; color: #6b7385; }
+.tx-bar__chiffres { display: flex; align-items: baseline; gap: 10px; }
+.tx-bar__amount { font-size: 24px; font-weight: 800; color: #111420; font-variant-numeric: tabular-nums; }
+/* Le panier et le total du projet sont en TTC : on le garde sous les yeux, en
+   second, pour qu'aucun des deux chiffres ne surprenne à l'étape suivante. */
+.tx-bar__ttc { font-size: 13px; font-weight: 600; color: #6b7385; font-variant-numeric: tabular-nums; }
+.tx-bar__btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 54px; border: 0; border-radius: 14px; background: #2b46f0; color: #fff;
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  transition: background-color .12s ease;
+}
+.tx-bar__btn:hover { background: #2038d6; }
+.tx-bar__btn:active { background: #1b30bd; }
+
+/* Tablette portrait et téléphone : la colonne récapitulative repasse au-dessus
+   du formulaire (elle rappelle le client, elle ne doit pas manger la largeur
+   de saisie), et la barre d'action empile ses deux blocs. */
+@media (max-width: 900px) {
+  .tx-layout { flex-direction: column; }
+  /* `order` et pas un déplacement dans le DOM : la fiche client passe AVANT le
+     formulaire (on doit savoir pour qui on saisit), sans dupliquer le rendu. */
+  .tx-side { flex: 0 0 auto; width: 100%; position: static; order: -1; }
+  /* Le récapitulatif n'a plus rien à récapituler quand le formulaire est juste
+     dessous : il ne ferait que repousser la saisie hors de l'écran. */
+  .tx-recap { display: none; }
+  .tx-client__row { align-items: center; }
+}
+@media (max-width: 560px) {
+  .tx-card { padding: 18px 16px; }
+  .tx-title { font-size: 22px; }
+  .tx-prix { grid-template-columns: minmax(0, 1fr); }
+  .tx-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .tx-bar__prix { flex-direction: row; align-items: baseline; justify-content: space-between; }
+  /* 15px est la valeur de la maquette. Sous 16px, Safari iOS ZOOME la page dès
+     qu'on touche un champ et ne la dézoome jamais : sur téléphone seulement,
+     les champs repassent à 16px. */
+  .tx-input, .tx-size__qty { font-size: 16px; }
+}
+
+/* Thème sombre : mêmes formes, jetons de l'app à la place des valeurs claires.
+   L'accent reste le bleu de la maquette — c'est l'action, elle doit rester
+   reconnaissable d'un thème à l'autre. */
+:root[data-theme="dark"] .tx-screen {
+  --tx-page: var(--bg);
+  --tx-card: var(--surface);
+  --tx-border: var(--border-soft);
+  --tx-field-border: var(--border);
+  --tx-label: var(--text-1);
+  --tx-opt: var(--text-2);
+  --tx-ph: var(--text-2);
+  --tx-title: var(--text-1);
+  /* Le bleu de la maquette est trop sombre pour du TEXTE sur fond sombre : les
+     libellés et contours prennent l'accent clair de l'app. Le bouton d'action,
+     lui, garde le bleu plein (texte blanc dessus) — c'est LA couleur d'action,
+     elle doit rester la même d'un thème à l'autre. */
+  --tx-accent: var(--primary);
+  --tx-accent-soft: rgba(154, 172, 255, .18);
+  --tx-chip-border: var(--border);
+  --tx-error-bg: rgba(210, 38, 59, .14);
+  --tx-muted: var(--text-2);
+  --tx-empty-bg: var(--surface-hover);
+  --tx-dashed: var(--border);
+  --tx-ro-bg: var(--surface-hover);
+  --tx-fill-bg: rgba(154, 172, 255, .14);
+}
+:root[data-theme="dark"] .tx-input:focus,
+:root[data-theme="dark"] .tx-size__qty:focus { box-shadow: 0 0 0 3px rgba(154, 172, 255, .22); }
+:root[data-theme="dark"] .tx-bar {
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-top-color: var(--border-soft);
+}
+:root[data-theme="dark"] .tx-bar__amount { color: var(--text-1); }
+:root[data-theme="dark"] .tx-bar__label,
+:root[data-theme="dark"] .tx-bar__ttc { color: var(--text-2); }
+
 /* --- Destination + confirmation ------------------------------------------------ */
 .proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
 .proj-dest-card, .proj-done-card { position: relative; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-pop); padding: 28px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; }

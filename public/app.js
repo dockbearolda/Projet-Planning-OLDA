@@ -2004,6 +2004,9 @@ function ficheItemsProjetSimple(fiche) {
       return ficheLigneEl(titre, [
         ...(l.faces || []).map((f) => [
           f.faceLabel, f.emplacement && f.emplacement.label,
+          // `technique` n'existe pas sur les fiches archivées avant sa mise en
+          // place : la sous-ligne se contente alors de ce qu'elle a.
+          f.technique && f.technique.label,
           f.typeLogo && f.typeLogo.label, f.referenceLogo, f.couleurMarquage,
         ].filter(Boolean).join(' · ')),
         l.remarque ? `Remarque : ${l.remarque}` : null,
