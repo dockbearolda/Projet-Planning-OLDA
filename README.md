@@ -247,6 +247,36 @@ Le serveur revalide : une sous-étape étrangère à la famille visée est refus
 celle qu'implique la nature (`demande` → *Demande reçue*, `commande` →
 *À chiffrer*).
 
+## Colonnes du planning — le rail de droite
+
+Le bouton **« Colonnes »**, en haut de la grille, ouvre un rail à droite où
+chacun compose son écran. Un clic retire une colonne : elle quitte la grille et
+descend dans **« Retirées »**, juste en dessous — elle reste **sous les yeux**,
+et le même clic la remet. C'est le point important : rien ne disparaît dans un
+menu qu'il faudrait rouvrir pour savoir ce qui manque. « Tout réafficher »
+remet tout d'un coup.
+
+Trois règles :
+
+- **« Nom du dossier client » est verrouillée** (cadenas). C'est elle qui
+  identifie la ligne : sans elle, la grille n'est plus lisible.
+- Le choix est **global et local au poste** (`localStorage`, clé
+  `olda_cols_v1`) — c'est un réglage de poste, pas un paramètre de navigation :
+  il ne suit donc pas d'un ordinateur à l'autre.
+- Il se **cumule** avec les masquages automatiques par étape (« Prix TTC »
+  hors chiffrage/facturation, « Sous-étape » sur les familles qui n'en ont
+  pas). Une colonne cochée mais que l'étape courante ne remplit jamais porte
+  la mention **« vide ici »** dans le rail, pour qu'on ne la croie pas cassée.
+
+Le rail se replie (bouton en haut à droite du rail, ou re-clic sur
+« Colonnes »), et cet état est retenu. Sous 900 px de large — tablette portrait,
+téléphone — il passe **sous** la grille en bandeau horizontal plutôt que de
+manger la moitié de la largeur utile.
+
+Le plancher de largeur de la grille suit : chaque colonne retirée le baisse
+d'autant (`--cols-off`), sinon le tableau continuerait de défiler
+horizontalement alors qu'on vient justement de lui faire de la place.
+
 ## Navigation — une seule page, plusieurs vues
 
 Planning, Dashboard, Nouveau Projet, Base clients et Réglages sont **des vues
@@ -326,6 +356,46 @@ l'indicatif se déduit du préfixe (`0690`/`0691` → +590, `0696`/`0697` → +5
 `0694` → +594, `0692`/`0693` → +262, sinon +33). Un numéro déjà international
 (`+590…`, `00590…`) passe tel quel ; un numéro illisible **n'affiche pas de
 pastille** du tout, plutôt que d'ouvrir une conversation avec un inconnu.
+
+## Charte graphique
+
+**Une seule charte pour toute l'application**, validée par la direction. Toutes
+les valeurs vivent dans le `:root` de `public/styles.css` ; le reste du code
+n'utilise QUE des jetons (`var(--…)`). Aucune couleur en dur, nulle part.
+
+| Rôle | Jeton | Clair | Sombre |
+| --- | --- | --- | --- |
+| Fond de page | `--bg` | `#f5f6f8` | `#111827` |
+| Surface (carte, ligne) | `--surface` | `#ffffff` | `#1f2937` |
+| Texte principal | `--text-1` | `#1f2937` | `#f3f4f6` |
+| Texte secondaire | `--text-2` | `#6b7280` | `#9ca3af` |
+| Liseré | `--border` | `#d1d5db` | `#374151` |
+| Accent (action) | `--primary` | `#111827` | `#f3f4f6` |
+| Encre SUR l'accent | `--on-primary` | `#ffffff` | `#111827` |
+
+Trois règles, dans cet ordre :
+
+1. **La couleur ne signale qu'un état.** Rouge `--danger` (problème), vert
+   `--success` (fait), ambre `--warning` (attention). Tout le reste est gris —
+   une icône décorative colorée laisse croire à un statut.
+2. **Un seul accent**, l'encre quasi noire. Jamais de couleur par famille, par
+   personne ou par catégorie.
+3. **Toujours passer par un jeton.** En particulier `--on-primary` : l'accent
+   s'inverse en thème sombre, un `color: #fff` en dur y devient illisible. Même
+   chose pour l'encre posée sur un fond sémantique → `var(--surface)`.
+
+Le reste : police `Arial, Helvetica, sans-serif` (police système — plus aucune
+webfont de texte à télécharger, seules les icônes Material Symbols restent),
+cartes en `--radius-card` (14 px), champs et boutons en `--radius` (9 px), et
+trois élévations (`--shadow-1` carte, `--shadow-2` flottant, `--shadow-pop`
+modale).
+
+Deux exceptions assumées, toutes deux hors interface :
+
+- `.wall` (écran mural de l'atelier) reprend la **variante sombre** de la charte
+  quel que soit le thème de l'app — c'est ce qui le rend lisible à distance.
+- Les pastilles de coloris textile (`COLORIS` dans `projet.js`) sont de vraies
+  couleurs de vêtement, pas du design.
 
 ## Structure
 

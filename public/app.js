@@ -566,6 +566,9 @@ async function loadRows() {
   lastRowsSig = signature(rows);
   updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
   updatePriceColVisibility(slug);
+  // La mention « vide ici » du rail dépend de l'étape : elle se recalcule ici,
+  // en même temps que les deux règles automatiques ci-dessus.
+  renderColbar();
   applySortAndRender();
 }
 
@@ -3345,7 +3348,11 @@ function updateSortArrows() {
 // Chaque catégorie mémorise ses propres largeurs (localStorage, par appareil).
 // Tant qu'aucune colonne n'a été réglée à la main, la répartition reste celle
 // du navigateur.
-const COLW_KEY = 'olda_col_widths_v5';
+// v6 : le <colgroup> a été remis dans l'ordre réel des colonnes (« flag » était
+// en 5e position). Les largeurs enregistrées en v5 étaient rangées sous les
+// mauvais noms — on repart d'une clé neuve plutôt que de les réappliquer de
+// travers.
+const COLW_KEY = 'olda_col_widths_v6';
 const COL_MIN = 36; // largeur plancher en px, toutes colonnes
 const $grid = document.getElementById('grid');
 const COL_ELS = [...document.querySelectorAll('#grid colgroup col')];
@@ -3360,6 +3367,156 @@ const COL_DEFAULTS = {
 
 let colWidths = {};
 try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } catch (_) { colWidths = {}; }
+
+// --- Choix des colonnes affichées : rail de droite --------------------------
+// Le patron compose son écran. Une colonne retirée descend dans « Retirées »
+// et RESTE affichée dans le rail — c'est ce qui permet de la remettre d'un
+// clic sans aller chercher un menu.
+//
+// Le choix est GLOBAL (pas par étape) : c'est un réglage de poste, pas un
+// paramètre de navigation. Il se cumule avec les règles automatiques
+// .no-sub / .no-price, qui elles restent par étape — cocher « Prix TTC » ne
+// le fait donc pas apparaître en Production, où il est toujours vide. Le rail
+// l'écrit noir sur blanc (voir la mention « vide ici ») pour qu'on ne croie
+// pas à un bug.
+const COLS_KEY = 'olda_cols_v1';
+// `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
+// posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
+// la masquer en plus du choix manuel.
+const PLANNING_COLS = [
+  { key: 'stars',       label: 'Priorité' },
+  { key: 'client_type', label: 'Type' },
+  { key: 'responsable', label: 'Responsable' },
+  { key: 'client',      label: 'Nom du dossier client', locked: true },
+  { key: 'product',     label: 'Description' },
+  { key: 'price',       label: 'Prix TTC', auto: (slug) => !PRICE_VISIBLE_STAGES.has(slug) },
+  { key: 'sub_stage',   label: 'Sous-étape', auto: (slug) => !familyHasSub(slug) },
+  { key: 'description', label: 'Infos' },
+  { key: 'deadline',    label: 'Date souhaitée' },
+  { key: 'flag',        label: 'État' },
+];
+
+let hiddenCols = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '[]');
+  if (Array.isArray(saved)) {
+    // On ne garde que des clés connues et jamais une colonne verrouillée :
+    // un localStorage d'une version précédente ne doit pas pouvoir faire
+    // disparaître l'identité de la ligne.
+    const off = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) => c.key));
+    hiddenCols = new Set(saved.filter((k) => off.has(k)));
+  }
+} catch (_) { hiddenCols = new Set(); }
+
+function saveHiddenCols() {
+  try { localStorage.setItem(COLS_KEY, JSON.stringify([...hiddenCols])); } catch (_) {}
+}
+
+// Pose une classe `off-<clé>` par colonne retirée (règles dans styles.css) et
+// publie la largeur totale ainsi libérée dans `--cols-off`. Les planchers de
+// largeur du CSS la retranchent : sans ça la grille garderait son plancher
+// « toutes colonnes » et continuerait de défiler horizontalement alors qu'on
+// vient justement de lui faire de la place.
+function applyColVisibility() {
+  if (!$grid) return;
+  let off = 0;
+  for (const c of PLANNING_COLS) {
+    const cache = hiddenCols.has(c.key);
+    $grid.classList.toggle('off-' + c.key, cache);
+    if (cache) off += COL_DEFAULTS[c.key] || 0;
+  }
+  $grid.style.setProperty('--cols-off', off + 'px');
+}
+
+const $colbar = document.getElementById('colbar');
+const $colbarOn = document.getElementById('colbarOn');
+const $colbarOff = document.getElementById('colbarOff');
+const $colbarOffLegend = document.getElementById('colbarOffLegend');
+const $colbarOffEmpty = document.getElementById('colbarOffEmpty');
+const $colbarReset = document.getElementById('colbarReset');
+const $colbarOpen = document.getElementById('colbarOpen');
+
+function colbarItem(col) {
+  const on = !hiddenCols.has(col.key);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'colbar-item ' + (on ? 'is-on' : 'is-off') + (col.locked ? ' is-locked' : '');
+
+  const ic = document.createElement('span');
+  ic.className = 'material-symbols-outlined colbar-item__ic';
+  ic.setAttribute('aria-hidden', 'true');
+  ic.textContent = col.locked ? 'lock' : on ? 'check_box' : 'check_box_outline_blank';
+  btn.appendChild(ic);
+
+  const label = document.createElement('span');
+  label.className = 'colbar-item__label';
+  label.textContent = col.label;
+  btn.appendChild(label);
+
+  if (col.locked) {
+    // `aria-disabled` plutôt que `disabled` : un bouton désactivé ne reçoit
+    // plus d'événements de survol, donc l'infobulle qui EXPLIQUE pourquoi il
+    // ne bouge pas ne s'afficherait jamais.
+    btn.setAttribute('aria-disabled', 'true');
+    attachTip(btn, 'Toujours affichée : c’est elle qui identifie la ligne.');
+  } else if (on && col.auto && col.auto(currentStage)) {
+    // Cochée mais masquée par la règle automatique de l'étape courante.
+    const note = document.createElement('span');
+    note.className = 'colbar-item__note';
+    note.textContent = 'vide ici';
+    btn.appendChild(note);
+    attachTip(btn, 'Affichée, mais cette étape ne la remplit jamais — elle réapparaît sur les étapes concernées.');
+  }
+
+  if (!col.locked) {
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.addEventListener('click', () => {
+      if (hiddenCols.has(col.key)) hiddenCols.delete(col.key);
+      else hiddenCols.add(col.key);
+      saveHiddenCols();
+      applyColVisibility();
+      renderColbar();
+    });
+  }
+  return btn;
+}
+
+function renderColbar() {
+  if (!$colbarOn || !$colbarOff) return;
+  $colbarOn.replaceChildren();
+  $colbarOff.replaceChildren();
+  for (const col of PLANNING_COLS) {
+    (hiddenCols.has(col.key) ? $colbarOff : $colbarOn).appendChild(colbarItem(col));
+  }
+  const rien = hiddenCols.size === 0;
+  $colbarOffLegend.hidden = rien;
+  $colbarOffEmpty.hidden = !rien;
+  $colbarReset.hidden = rien;
+}
+
+function setColbarOpen(open) {
+  if (!$colbar || !$colbarOpen) return;
+  $colbar.hidden = !open;
+  $colbarOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+  try { localStorage.setItem('olda_colbar_open', open ? '1' : '0'); } catch (_) {}
+}
+
+function initColbar() {
+  if (!$colbar) return;
+  applyColVisibility();
+  renderColbar();
+  let open = true;
+  try { open = localStorage.getItem('olda_colbar_open') !== '0'; } catch (_) {}
+  setColbarOpen(open);
+  $colbarOpen.addEventListener('click', () => setColbarOpen($colbar.hidden));
+  document.getElementById('colbarClose').addEventListener('click', () => setColbarOpen(false));
+  $colbarReset.addEventListener('click', () => {
+    hiddenCols.clear();
+    saveHiddenCols();
+    applyColVisibility();
+    renderColbar();
+  });
+}
 
 function saveColWidths() {
   try { localStorage.setItem(COLW_KEY, JSON.stringify(colWidths)); } catch (_) {}
@@ -4283,6 +4440,7 @@ async function start() {
   renderSidebar();
   attachColResizers();
   attachStarsHeaderTip();
+  initColbar();
   updateSubColVisibility(currentStage);
   updatePriceColVisibility(currentStage);
   applyColWidths();
