@@ -172,7 +172,9 @@
    fait ici ~390px — le double de l'ancienne grille à trois colonnes, celle qui
    rendait les champs illisibles. Ce qui est long (identité, adresse, raison
    sociale) reprend la pleine largeur. */
-.pjc-card__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; padding: 32px 32px 28px; }
+/* `align-items: start` : un champ en erreur porte un message SOUS lui et grandit ;
+   sans ça il étirerait ses voisins et décalerait leurs champs. */
+.pjc-card__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; padding: 32px 32px 28px; align-items: start; }
 .pjc-f--pleine, .pjc-seg, .pjc-more { grid-column: 1 / -1; }
 @media (max-width: 700px) {
   .pjc-card__body { grid-template-columns: 1fr; }
@@ -181,7 +183,16 @@
 /* Champ : l'étiquette se lit en casse normale, le contour est TOUJOURS visible
    (un champ sans bordure ne se voit pas — c'est ce qui a motivé cette refonte). */
 .pjc-f { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.pjc-f__label { font-size: 13.5px; font-weight: 600; color: var(--nc-label); }
+/* TOUS les champs d'une même ligne démarrent au même niveau. L'étiquette est une
+   boîte de hauteur fixe (deux lignes) qui colle son texte en bas : qu'elle tienne
+   sur une ligne (« Ville ») ou sur deux (« Code postal — optionnel » dans ses
+   150px), le champ dessous est toujours à la même hauteur. Le surplus part
+   au-dessus de l'étiquette, là où il passe pour de l'air. */
+.pjc-f__label {
+  display: flex; align-items: flex-end; min-height: 36px;
+  font-size: 13.5px; font-weight: 600; color: var(--nc-label);
+}
+.pjc-f__labeltxt { display: block; }
 .pjc-f__opt { font-weight: 500; color: var(--nc-opt); }
 .pjc-input {
   height: 50px; padding: 0 14px; width: 100%;
@@ -202,12 +213,8 @@
   background: var(--nc-error); color: #fff; font-size: 10px; font-weight: 800;
 }
 
-/* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne.
-   « Code postal — optionnel » passe sur deux lignes dans ses 150px : les deux
-   colonnes s'étirent donc à la même hauteur, étiquette collée en haut et champ
-   collé en bas — sinon la paire s'affiche en escalier. */
-.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: stretch; }
-.pjc-pair .pjc-f { justify-content: space-between; }
+/* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne. */
+.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: start; }
 @media (max-width: 420px) { .pjc-pair { grid-template-columns: 1fr; } }
 
 /* Pro / Particulier : une piste, un curseur blanc. Le reste du formulaire ne
@@ -228,7 +235,7 @@
 .pjc-more__sub { margin: 3px 0 0; font-size: 13px; color: var(--nc-muted); }
 .pjc-more__fields {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 24px; padding: 18px 22px 22px;
+  gap: 20px 24px; padding: 18px 22px 22px; align-items: start;
 }
 /* La paire ville/code postal tient dans UNE colonne (1fr / 150px à l'intérieur) :
    étalée sur toute la largeur, le code postal laissait un grand vide à sa

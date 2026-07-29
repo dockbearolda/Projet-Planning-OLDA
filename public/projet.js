@@ -344,8 +344,13 @@ function ncKeys(nature) {
 function ncField(f, { requis = false } = {}) {
   const row = el('div', 'pjc-f');
   const lab = el('label', 'pjc-f__label');
-  lab.append(el('span', null, f.label));
-  if (!requis) lab.append(el('span', 'pjc-f__opt', ' — optionnel'));
+  // Le texte de l'étiquette vit dans UN seul enfant : l'étiquette elle-même est
+  // une boîte de hauteur fixe qui le colle en bas (voir .pjc-f__label), pour que
+  // tous les champs d'une même ligne démarrent au même niveau, qu'une étiquette
+  // tienne sur une ligne ou sur deux.
+  const txt = el('span', 'pjc-f__labeltxt', f.label);
+  if (!requis) txt.append(el('span', 'pjc-f__opt', ' — optionnel'));
+  lab.append(txt);
   const input = el('input', 'pjc-input');
   input.type = f.type || 'text';
   if (f.inputmode) input.inputMode = f.inputmode;
