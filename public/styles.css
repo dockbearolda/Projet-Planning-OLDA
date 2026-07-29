@@ -465,12 +465,16 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    le groupe se voit comme une SECTION, pas comme une teinte qui s'estompe.
    `overflow: hidden` + pas de padding en haut : l'en-tête de famille vient
    coiffer la carte bord à bord (voir .stage.zone-head). */
+/* Pas d'`overflow: hidden` ici : il clipperait le bandeau au bord INTÉRIEUR du
+   liseré, laissant un filet clair de 1px tout autour et des coins rognés — le
+   bandeau avait l'air de ne pas remplir la carte. Le bandeau déborde donc sur
+   le liseré (marges négatives, voir .stage.zone-head) et porte lui-même les
+   coins arrondis du haut. */
 .stage-zone.has-sub {
   background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 0 3px 3px;
-  overflow: hidden;
   box-shadow: var(--shadow-1);
 }
 
@@ -545,9 +549,11 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    d'où le verrouillage du dépôt dessus quand la zone a des sous-catégories
    (voir stageAcceptsDrop). */
 .stage.zone-head {
-  /* coiffe la carte bord à bord : annule le padding latéral de .stage-zone */
-  margin: 0 -3px 3px;
-  border-radius: 0;
+  /* Coiffe la carte jusqu'à l'ARÊTE : -4px de côté = 3px de padding + 1px de
+     liseré, -1px en haut = le liseré. Le bandeau recouvre donc le liseré au
+     lieu de s'arrêter dessous, et reprend le rayon 12px de la carte en haut. */
+  margin: -1px -4px 3px;
+  border-radius: 12px 12px 0 0;
   padding: 11px 14px;
   background: var(--rail-head-bg);
   color: var(--rail-head-fg);
