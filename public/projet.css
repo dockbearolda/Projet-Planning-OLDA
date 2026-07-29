@@ -163,11 +163,20 @@
   padding: 28px 0 40px;
 }
 .pjc-card {
-  width: 100%; max-width: 620px; background: var(--nc-card);
-  border: 1px solid var(--nc-border); border-radius: 18px;
+  width: 100%; max-width: 860px; background: var(--nc-card);
+  border: 1px solid var(--nc-border); border-radius: 22px;
   box-shadow: 0 1px 2px rgba(17, 20, 32, .04), 0 12px 32px -18px rgba(17, 20, 32, .18);
 }
-.pjc-card__body { display: flex; flex-direction: column; gap: 18px; padding: 26px 26px 24px; }
+/* DEUX colonnes, pas trois : la fiche entière est visible d'un coup (plus rien
+   n'est replié) sans que le formulaire s'étire sur deux écrans. Une colonne
+   fait ici ~390px — le double de l'ancienne grille à trois colonnes, celle qui
+   rendait les champs illisibles. Ce qui est long (identité, adresse, raison
+   sociale) reprend la pleine largeur. */
+.pjc-card__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; padding: 32px 32px 28px; }
+.pjc-f--pleine, .pjc-seg, .pjc-more { grid-column: 1 / -1; }
+@media (max-width: 700px) {
+  .pjc-card__body { grid-template-columns: 1fr; }
+}
 
 /* Champ : l'étiquette se lit en casse normale, le contour est TOUJOURS visible
    (un champ sans bordure ne se voit pas — c'est ce qui a motivé cette refonte). */
@@ -194,9 +203,11 @@
 }
 
 /* Ville + code postal : deux morceaux d'une même adresse, donc une seule ligne.
-   `align-items: end` aligne les deux CHAMPS même quand l'étiquette de droite
-   passe sur deux lignes dans ses 150px — sinon ils se décalent l'un de l'autre. */
-.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: end; }
+   « Code postal — optionnel » passe sur deux lignes dans ses 150px : les deux
+   colonnes s'étirent donc à la même hauteur, étiquette collée en haut et champ
+   collé en bas — sinon la paire s'affiche en escalier. */
+.pjc-pair { display: grid; grid-template-columns: 1fr 150px; gap: 14px; align-items: stretch; }
+.pjc-pair .pjc-f { justify-content: space-between; }
 @media (max-width: 420px) { .pjc-pair { grid-template-columns: 1fr; } }
 
 /* Pro / Particulier : une piste, un curseur blanc. Le reste du formulaire ne
@@ -208,22 +219,27 @@
 }
 .pjc-seg__btn.is-on { background: var(--nc-card); color: var(--nc-title); box-shadow: 0 1px 3px rgba(17, 20, 32, .10); }
 
-/* Divulgation progressive : à l'ouverture on ne voit que l'essentiel, le reste
-   s'annonce sans s'imposer. */
-.pjc-more { border: 1px solid var(--nc-border); border-radius: 12px; background: var(--nc-more-bg); }
-.pjc-more__head {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%;
-  min-height: 44px; padding: 14px 16px; border: 0; background: none; border-radius: 12px;
-  font: inherit; text-align: left; cursor: pointer;
+/* « Adresse et détails » : une SECTION, plus un tiroir. Tout est là dès
+   l'ouverture ; le fond légèrement teinté suffit à dire que c'est le second
+   temps de la saisie, sans rien cacher. */
+.pjc-more { border: 1px solid var(--nc-border); border-radius: 16px; background: var(--nc-more-bg); }
+.pjc-more__head { padding: 20px 22px 4px; }
+.pjc-more__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--nc-title); }
+.pjc-more__sub { margin: 3px 0 0; font-size: 13px; color: var(--nc-muted); }
+.pjc-more__fields {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px; padding: 18px 22px 22px;
 }
-.pjc-more__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pjc-more__title { font-size: 14.5px; font-weight: 700; color: var(--nc-title); }
-.pjc-more__sub { font-size: 13px; color: var(--nc-muted); }
-.pjc-more__act { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: var(--nc-accent); }
-.pjc-more__fields { display: flex; flex-direction: column; gap: 18px; padding: 2px 16px 18px; }
+/* La paire ville/code postal tient dans UNE colonne (1fr / 150px à l'intérieur) :
+   étalée sur toute la largeur, le code postal laissait un grand vide à sa
+   gauche. Elle s'aligne ainsi avec le champ d'à côté. */
+.pjc-more__fields > .pjc-f--pleine { grid-column: 1 / -1; }
+@media (max-width: 700px) {
+  .pjc-more__fields { grid-template-columns: 1fr; }
+}
 
 /* La zone d'action se détache du formulaire : on a fini de saisir, on décide. */
-.pjc-actions { display: flex; flex-direction: column; gap: 6px; padding: 18px 26px 22px; border-top: 1px solid var(--nc-sep); }
+.pjc-actions { display: flex; flex-direction: column; gap: 6px; padding: 20px 32px 26px; border-top: 1px solid var(--nc-sep); }
 .pjc-btn { width: 100%; border: 0; border-radius: 14px; font: inherit; cursor: pointer; }
 .pjc-btn--primary {
   height: 54px; background: var(--nc-accent); color: #fff; font-size: 16px; font-weight: 700;
@@ -237,8 +253,10 @@
 
 @media (max-width: 560px) {
   .pjc-screen { padding: 16px 0 28px; }
-  .pjc-card__body { padding: 20px 18px 18px; }
-  .pjc-actions { padding: 16px 18px 18px; }
+  .pjc-card__body { padding: 22px 18px 18px; }
+  .pjc-more__head { padding: 16px 16px 2px; }
+  .pjc-more__fields { padding: 14px 16px 18px; }
+  .pjc-actions { padding: 18px 18px 20px; }
   /* 15px est la valeur de la maquette, et c'est ce qu'on voit au comptoir.
      Sous 16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la
      dézoome jamais : sur téléphone seulement, le champ passe donc à 16px. */

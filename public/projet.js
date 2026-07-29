@@ -53,7 +53,6 @@ const state = {
   // formulaire, et ce qui est déjà tapé ne doit pas partir avec.
   clientForm: null,           // null = recherche ; 'pro' | 'perso' = formulaire ouvert
   clientDraft: {},            // { [clé envoyée à l'API]: valeur tapée }
-  clientDetailsOpen: false,   // bloc « Adresse et détails » déplié ?
   clientErreur: null,         // clé du champ en erreur, une seule à la fois
   // DÉLAI OBLIGATOIRE : rien n'est pré-coché, l'enregistrement est bloqué tant
   // qu'on n'a pas tranché — c'est ce qui garantit une date butoir sur CHAQUE
@@ -295,7 +294,6 @@ function renderClientSearch(body) {
   newBtn.addEventListener('click', () => {
     state.clientForm = 'pro';
     state.clientDraft = {};
-    state.clientDetailsOpen = false;
     state.clientErreur = null;
     render();
   });
@@ -319,9 +317,11 @@ const NC_CONTACT = [
   { key: 'telephone', label: 'Téléphone (WhatsApp)', ph: '06 42 26 69 49', type: 'tel', inputmode: 'tel' },
   { key: 'email', label: 'E-mail', ph: 'contact@entreprise.fr', type: 'email', inputmode: 'email' },
 ];
-// Repliés derrière « Adresse et détails » : utiles, jamais bloquants.
+// Section « Adresse et détails » : toujours visible, jamais bloquante. `pleine`
+// = le champ prend la largeur de la carte (une adresse ou une raison sociale
+// n'a rien à faire dans une demi-colonne).
 const NC_DETAILS = [
-  { key: 'adresse', label: 'Adresse', ph: '12 rue de la République' },
+  { key: 'adresse', label: 'Adresse', ph: '12 rue de la République', pleine: true },
   { key: 'ville', label: 'Ville', ph: 'Saint-Martin', list: PROJ_VILLES_DL_ID, demi: true },
   { key: 'code_postal', label: 'Code postal', ph: '97150', demi: true },
   { key: 'secteur', label: 'Secteur d’activité', ph: 'Hôtellerie, BTP…', list: PROJ_SECTEURS_DL_ID },
@@ -384,7 +384,7 @@ function ncField(f, { requis = false } = {}) {
   }
 
   row.append(lab, input);
-  if (f.demi) row.classList.add('pjc-f--demi');
+  if (f.pleine) row.classList.add('pjc-f--pleine');
   if (state.clientErreur === f.key) {
     row.classList.add('is-error');
     const err = el('p', 'pjc-f__err');
@@ -419,48 +419,41 @@ function renderNouveauClient(body) {
   champs.append(seg);
 
   const identite = NC_IDENTITE[nature];
-  champs.append(ncField(identite, { requis: true }));
+  const idRow = ncField(identite, { requis: true });
+  idRow.classList.add('pjc-f--pleine');
+  champs.append(idRow);
+  // Téléphone et e-mail côte à côte : deux coordonnées courtes, une seule ligne.
   for (const f of NC_CONTACT) champs.append(ncField(f));
 
-  // Le particulier n'a ni adresse ni facturation dans sa fiche : pas de bloc
-  // replié à lui montrer, il resterait vide.
+  // Le particulier n'a ni adresse ni facturation dans sa fiche : rien à lui
+  // montrer ici, la section resterait vide.
   if (nature === 'pro') {
-    const bloc = el('div', 'pjc-more');
-    const tete = el('button', 'pjc-more__head');
-    tete.type = 'button';
-    tete.setAttribute('aria-expanded', String(state.clientDetailsOpen));
-    const txt = el('span', 'pjc-more__txt');
-    txt.append(
-      el('span', 'pjc-more__title', 'Adresse et détails'),
-      el('span', 'pjc-more__sub', 'Adresse, secteur, référent, facturation.'),
+    const bloc = el('section', 'pjc-more');
+    const tete = el('div', 'pjc-more__head');
+    tete.append(
+      el('h3', 'pjc-more__title', 'Adresse et détails'),
+      el('p', 'pjc-more__sub', 'Adresse, secteur, référent, facturation.'),
     );
-    tete.append(txt, el('span', 'pjc-more__act', state.clientDetailsOpen ? 'Masquer' : 'Ajouter'));
-    tete.addEventListener('click', () => {
-      state.clientDetailsOpen = !state.clientDetailsOpen;
-      render();
-    });
     bloc.append(tete);
 
-    if (state.clientDetailsOpen) {
-      const grille = el('div', 'pjc-more__fields');
-      // Ville et code postal partagent une ligne : deux informations d'une même
-      // adresse, la seconde tient en 150px.
-      let paire = null;
-      for (const f of NC_DETAILS) {
-        const row = ncField(f);
-        if (f.demi) {
-          if (!paire) { paire = el('div', 'pjc-pair'); grille.append(paire); }
-          paire.append(row);
-        } else {
-          paire = null;
-          grille.append(row);
-        }
+    const grille = el('div', 'pjc-more__fields');
+    // Ville et code postal partagent une ligne : deux informations d'une même
+    // adresse, la seconde tient en 150px.
+    let paire = null;
+    for (const f of NC_DETAILS) {
+      const row = ncField(f);
+      if (f.demi) {
+        if (!paire) { paire = el('div', 'pjc-pair'); grille.append(paire); }
+        paire.append(row);
+      } else {
+        paire = null;
+        grille.append(row);
       }
-      bloc.append(grille);
-      // Choisir une ville connue remplit le code postal, sans jamais écraser
-      // une valeur tapée à la main.
-      wireVilleDefaults(grille, null, '.pjc-input');
     }
+    bloc.append(grille);
+    // Choisir une ville connue remplit le code postal, sans jamais écraser
+    // une valeur tapée à la main.
+    wireVilleDefaults(grille, null, '.pjc-input');
     champs.append(bloc);
   }
 
@@ -516,8 +509,7 @@ function renderNouveauClient(body) {
       CLIENTS.push(created);
       state.clientForm = null;
       state.clientDraft = {};
-      state.clientDetailsOpen = false;
-      goToClient({
+        goToClient({
         id: created.id, entreprise: created.entreprise, nom: created.nom,
         telephone: created.telephone, email: created.email, type: nature,
       });
@@ -1561,6 +1553,6 @@ export function resetProjet() {
   if (!mounted) return;
   state.page = 'client'; state.client = null; state.panier = []; state.addingType = null; state.addingLigne = null;
   state.delai = null; state.deadline = ''; state.paiement = newPaiement(); state.margeVisible = false;
-  state.clientForm = null; state.clientDraft = {}; state.clientDetailsOpen = false; state.clientErreur = null;
+  state.clientForm = null; state.clientDraft = {}; state.clientErreur = null;
   render();
 }
