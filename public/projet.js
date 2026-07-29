@@ -321,7 +321,6 @@ const NC_CONTACT = [
 // ville et code postal, la SEULE paire à partager une ligne — deux morceaux
 // d'une même adresse. Tout le reste descend un champ par ligne.
 const NC_DETAILS = [
-  { key: 'adresse', label: 'Adresse', ph: '12 rue de la République' },
   { key: 'ville', label: 'Ville', ph: 'Saint-Martin', list: PROJ_VILLES_DL_ID, demi: true },
   { key: 'code_postal', label: 'Code postal', ph: '97150', demi: true },
   { key: 'secteur', label: 'Secteur d’activité', ph: 'Hôtellerie, BTP…', list: PROJ_SECTEURS_DL_ID },
@@ -433,7 +432,7 @@ function renderNouveauClient(body) {
     const tete = el('div', 'pjc-more__head');
     tete.append(
       el('h3', 'pjc-more__title', 'Adresse et détails'),
-      el('p', 'pjc-more__sub', 'Adresse, secteur, référent, facturation.'),
+      el('p', 'pjc-more__sub', 'Ville, secteur, référent, facturation.'),
     );
     bloc.append(tete);
 
