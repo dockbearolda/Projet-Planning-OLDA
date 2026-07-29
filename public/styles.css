@@ -458,7 +458,9 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    les compter). À l'intérieur d'une zone, l'en-tête et ses sous-catégories
    restent très serrés : on lit d'abord « où en est le projet » (la zone),
    puis le détail. */
-.stages { padding: 6px 8px 10px; display: flex; flex-direction: column; gap: 16px; }
+/* Aucun padding latéral : c'est lui qui laissait 8px de blanc de chaque côté du
+   bandeau de famille. Les zones traversent donc le rail d'un bord à l'autre. */
+.stages { padding: 6px 0 10px; display: flex; flex-direction: column; gap: 16px; }
 .stage-zone { display: flex; flex-direction: column; gap: 1px; }
 /* Une zone à sous-catégories devient une vraie petite carte (fond + liseré +
    ombre légère, même grammaire que .work) plutôt qu'un simple fond tonal :
@@ -472,8 +474,12 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    coins arrondis du haut. */
 .stage-zone.has-sub {
   background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  /* Liseré haut/bas seulement : un liseré latéral rendrait à nouveau le bandeau
+     plus étroit que le rail. La zone se lit toujours comme une SECTION grâce au
+     fond + l'ombre + les 16px qui la séparent de la suivante. */
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
   padding: 0 3px 3px;
   box-shadow: var(--shadow-1);
 }
@@ -549,18 +555,20 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    d'où le verrouillage du dépôt dessus quand la zone a des sous-catégories
    (voir stageAcceptsDrop). */
 .stage.zone-head {
-  /* Coiffe la carte jusqu'à l'ARÊTE : -4px de côté = 3px de padding + 1px de
-     liseré, -1px en haut = le liseré. Le bandeau recouvre donc le liseré au
-     lieu de s'arrêter dessous, et reprend le rayon 12px de la carte en haut. */
-  margin: -1px -4px 3px;
-  border-radius: 12px 12px 0 0;
+  /* Traverse le rail D'UN BORD À L'AUTRE : -3px de côté annule le padding de la
+     zone, -1px en haut recouvre le liseré. Plus aucun blanc autour du bandeau —
+     c'est ce qui faisait dire « ça ne va pas au bout ». */
+  margin: -1px -3px 3px;
+  border-radius: 0;
   padding: 11px 14px;
   background: var(--rail-head-bg);
   color: var(--rail-head-fg);
 }
+/* Famille sans sous-catégorie : même bandeau pleine largeur, pas de pastille
+   arrondie qui flotterait au milieu du rail. */
 .stage-zone:not(.has-sub) .stage.zone-head {
   margin: 0;
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 .stage.zone-head .stage-label {
   font-weight: 700;
