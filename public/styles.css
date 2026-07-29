@@ -1396,13 +1396,20 @@ tr:hover .handle { color: var(--text-2); }
 }
 .pdf-btn--empty:hover { background: color-mix(in srgb, var(--text-3) 22%, transparent); }
 
-/* Remplie : même gris neutre que les autres icônes d'action — un seul set,
-   une seule couleur, l'accent reste réservé aux états vraiment critiques. */
+/* Remplie : vert. Le fichier attaché est un ÉTAT (le devis existe, le BAT est
+   fait), pas une simple décoration — c'est précisément le cas où la charte
+   autorise la couleur. Sur une ligne de planning, la rangée de pastilles se lit
+   alors d'un coup d'œil : gris = il manque, vert = c'est fait. Le liseré
+   (box-shadow inset, pas `border` : pas de décalage de gabarit avec l'état vide)
+   détache la pastille du fond blanc, que le vert pâle seul ne suffit pas à
+   trancher à 24 px. Teintes issues des tokens sémantiques : elles se
+   ré-attribuent seules en thème sombre. */
 .pdf-btn--filled {
-  color: var(--text-2);
-  background: var(--border-soft);
+  color: var(--success);
+  background: var(--success-bg);
+  box-shadow: inset 0 0 0 1px var(--success-line);
 }
-.pdf-btn--filled:hover { background: var(--state-hover); color: var(--text-1); }
+.pdf-btn--filled:hover { background: color-mix(in srgb, var(--success) 18%, var(--success-bg)); }
 
 /* Croix de retrait : cachée par défaut, révélée au survol du slot. Geste
    souris uniquement (comme les infobulles) — pas d'équivalent tactile dans
@@ -4413,21 +4420,53 @@ body.wall-open { overflow: hidden; }
 }
 @keyframes ldSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
 
-.ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+/* L'en-tête reste blanc et posé sur le gris du corps, comme le bandeau de
+   l'écran Nouveau Projet au-dessus de sa page grise. */
+.ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .ld-head__titles { flex: 1; min-width: 0; }
-.ld-head__badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.ld-head__badges { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .ld-close { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--text-2); border-radius: 10px; cursor: pointer; }
 .ld-close:hover { background: var(--state-hover); color: var(--text-1); }
 
-.ld-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 24px; -webkit-overflow-scrolling: touch; }
-.ld-section { margin: 16px 0; }
-.ld-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 0 0 8px; }
+/* Le corps prend le gris de page (--bg) et chaque section devient une carte
+   blanche : c'est la composition de tout le reste de l'app (écran Nouveau
+   client, Réglages) — fond gris, contenu en cartes. Sur un corps blanc, les
+   cartes auraient été invisibles. */
+.ld-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 14px 24px;
+  background: var(--bg);
+  -webkit-overflow-scrolling: touch;
+}
+.ld-section {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.ld-section:last-child { margin-bottom: 0; }
+/* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
+   la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
+   au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
+.ld-section-title {
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+}
 .ld-docs { display: flex; gap: 6px; }
 
-.ld-fiche-item { padding: 8px 10px; border-radius: 8px; background: var(--border-soft); margin-bottom: 8px; }
+.ld-fiche-item { padding: 8px 10px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
 .ld-fiche-item__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); }
 .ld-fiche-item__sub { margin: 3px 0 0; font-size: 12px; color: var(--text-2); padding-left: 10px; }
 
+/* Même recette de champ que .pjc-card textarea/input : cadre visible au repos. */
 .ld-notes {
   width: 100%;
   min-height: 140px;
@@ -4435,55 +4474,67 @@ body.wall-open { overflow: hidden; }
   border-radius: var(--radius);
   padding: 10px 12px;
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--text-1);
   background: var(--surface);
   resize: vertical;
   box-sizing: border-box;
 }
-.ld-notes:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ld-notes:focus { outline: 2px solid rgba(var(--primary-rgb), .13); border-color: var(--primary); }
 
 /* --- Tiroir éditable ------------------------------------------------------
    Le tiroir n'est pas une fiche de lecture : chaque rangée porte un contrôle
-   (champ ou puce) qui enregistre sur place. Le libellé garde sa largeur à
-   gauche, le contrôle prend le reste à droite — même lecture qu'un couple
-   libellé/valeur, mais modifiable. */
+   (champ ou puce) qui enregistre sur place.
+   Le couple se lit EMPILÉ — étiquette grasse au-dessus, contrôle en dessous —
+   comme partout ailleurs dans l'app (.pjc-field de l'écran Nouveau client,
+   .cl-f du tiroir Base clients). L'ancien libellé-à-gauche / valeur-à-droite
+   n'existait qu'ici, et c'est ce qui faisait lire ce panneau comme une pièce
+   rapportée. */
 .ld-field {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 40px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   font-size: 13px;
 }
-.ld-field__label { flex-shrink: 0; color: var(--text-2); }
+.ld-field + .ld-field { margin-top: 14px; }
+.ld-field__label { font-size: 13.5px; font-weight: 700; color: var(--text-1); }
 /* Le contrôle ne doit jamais imposer son min-content : sans ça un email ou un
    motif long crée un défilement horizontal dans .ld-body. */
 .ld-field > :last-child { min-width: 0; }
+/* Empilés, seuls les champs de saisie prennent toute la largeur : une puce ou
+   un interrupteur étiré sur 400 px n'aurait plus l'air cliquable. */
+.ld-field > button,
+.ld-field > .ld-value,
+.ld-field > .flag-reason { align-self: flex-start; max-width: 100%; }
 
-/* Champ texte : discret au repos (on lit la fiche), cadre net au survol et au
-   focus (on la modifie). Aligné à droite comme l'était la valeur. */
+/* Champ texte : recette de .pjc-card input, à l'identique — cadre visible au
+   repos, encre au focus. Le tiroir se remplit autant qu'il se lit ; un champ
+   invisible tant qu'on ne le survole pas ne se voyait pas au doigt. */
 .ld-input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  padding: 7px 10px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 12px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-1);
-  text-align: right;
   text-overflow: ellipsis;
+  box-sizing: border-box;
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .ld-input::placeholder { color: var(--text-3); }
-.ld-input:hover { background: var(--state-hover); }
-.ld-input:focus { outline: none; background: var(--surface); border-color: var(--primary); }
+.ld-input:hover { border-color: var(--text-3); }
+.ld-input:focus { outline: 2px solid rgba(var(--primary-rgb), .13); border-color: var(--primary); }
 .ld-input.num { font-variant-numeric: tabular-nums; }
 
-/* Titre et sous-titre de l'en-tête : mêmes tailles qu'avant en <h2>/<p>. Le
-   décalage à gauche compense le rembourrage du champ, pour que le texte reste
+/* Titre et sous-titre de l'en-tête : c'est le titre du panneau, pas une rangée
+   de formulaire — il garde donc le rendu texte de .pjc-header (30/700 ramené à
+   l'échelle d'un panneau de 468 px) et PERD le cadre que .ld-input pose
+   maintenant au repos ; le cadre revient au survol et au focus, pour qu'on voie
+   quand même que ça se modifie.
+   Le décalage à gauche compense le rembourrage du champ, pour que le texte reste
    aligné sur le bord du panneau tant qu'on ne le survole pas ; à droite le
    champ s'arrête net sur le conteneur, sinon il passerait SOUS le bouton de
    fermeture et lui volerait ses clics. */
@@ -4491,27 +4542,30 @@ body.wall-open { overflow: hidden; }
 .ld-input--sub {
   width: calc(100% + 9px);
   margin-inline-start: -9px;
-  text-align: left;
+  border-color: transparent;
+  background: transparent;
 }
+.ld-input--title:hover,
+.ld-input--sub:hover { border-color: var(--border); background: var(--surface); }
 .ld-input--title {
   margin-block: -5px;
   padding: 4px 8px;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
 }
 .ld-input--sub {
-  margin-block: 1px 0;
+  margin-block: 2px 0;
   padding: 3px 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-2);
 }
 
-/* Valeur en lecture seule (le HT déduit du TTC) : alignée comme un champ, mais
-   sans cadre ni interaction — rien à y modifier, c'est un calcul. */
+/* Valeur en lecture seule (le HT déduit du TTC) : calée sur le rembourrage d'un
+   champ pour rester dans l'alignement de la colonne, mais sans cadre ni
+   interaction — rien à y modifier, c'est un calcul. */
 .ld-value {
-  padding: 7px 10px;
-  font-size: 13px;
-  text-align: right;
+  padding: 10px 0;
+  font-size: 14.5px;
   font-variant-numeric: tabular-nums;
 }
 .ld-value--muted { color: var(--text-2); }
@@ -4550,10 +4604,12 @@ body.wall-open { overflow: hidden; }
 .ld-field .flag-reason,
 .ld-field .deadline-badge { margin: 0; }
 .ld-resp-chip { padding: 4px 12px; max-width: 100%; }
-/* Étape et motif peuvent être longs : ils se replient au lieu de pousser le
-   libellé hors du panneau. */
-.ld-stage-chip { max-width: 66%; white-space: normal; text-align: right; }
-.ld-reason { max-width: 66%; text-align: right; }
+/* Étape et motif peuvent être longs : ils se replient au lieu de déborder du
+   panneau. Empilés sous leur étiquette, ils disposent de toute la largeur — le
+   bornage à 66 % et l'alignement à droite de l'ancienne rangée n'ont plus lieu
+   d'être. */
+.ld-stage-chip { max-width: 100%; white-space: normal; text-align: left; }
+.ld-reason { max-width: 100%; text-align: left; }
 
 /* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
 .ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
@@ -4575,9 +4631,12 @@ body.wall-open { overflow: hidden; }
   /* Sous 16 px, iOS zoome sur le champ à la mise au point. */
   .ld-notes,
   .ld-input { font-size: 16px; }
-  .ld-field { min-height: 48px; }
+  /* Les rangées sont empilées : c'est le CHAMP qui doit tenir les 44 px, pas la
+     rangée (elle porte en plus son étiquette, et un min-height là ne ferait
+     qu'ajouter du vide sous le contrôle). */
+  .ld-field .ld-input { min-height: 48px; }
   .ld-input { padding: 11px 12px; }
-  .ld-input--title { font-size: 19px; }
+  .ld-input--title { font-size: 21px; }
   .ld-input--sub { font-size: 14px; }
   /* Les puces du tiroir tapent aussi dans les 44 px. */
   .ld-field .resp-chip,
