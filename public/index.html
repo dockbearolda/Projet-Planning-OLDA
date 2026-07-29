@@ -133,6 +133,10 @@
             </div>
           </div>
           <div class="work-head-right">
+            <button class="help-btn colbar-open" id="colbarOpen" type="button" aria-expanded="true" aria-controls="colbar">
+              <span class="material-symbols-outlined help-btn-ic" aria-hidden="true">view_column</span>
+              <span class="help-btn-label">Colonnes</span>
+            </button>
             <button class="help-btn" id="stageHelp" type="button" hidden aria-haspopup="dialog">
               <span class="material-symbols-outlined help-btn-ic" aria-hidden="true">help</span>
               <span class="help-btn-label">Guide</span>
@@ -176,20 +180,29 @@
           </div>
         </div>
 
+        <!-- La grille et le rail des colonnes partagent une rangée : le tableau
+             prend la place restante, le rail garde sa largeur. -->
+        <div class="grid-area" id="gridArea">
         <div class="grid-wrap">
           <table class="grid" id="grid">
+            <!-- L'ORDRE de ce colgroup doit suivre exactement celui du <thead>
+                 et des cellules construites par buildRow() : un <col> agit sur
+                 la colonne de MÊME RANG, son data-col n'est qu'une étiquette.
+                 « flag » était placé en 5e position alors que la colonne État
+                 est l'avant-dernière — les sélecteurs de masquage visaient donc
+                 la mauvaise colonne. -->
             <colgroup>
               <col data-col="handle" />
               <col data-col="stars" />
               <col data-col="client_type" />
               <col data-col="responsable" />
-              <col data-col="flag" />
               <col data-col="client" />
               <col data-col="product" />
               <col data-col="price" />
               <col data-col="sub_stage" />
               <col data-col="description" />
               <col data-col="deadline" />
+              <col data-col="flag" />
               <col data-col="del" />
             </colgroup>
             <thead>
@@ -211,6 +224,32 @@
             <tbody id="rows"></tbody>
           </table>
           <div class="grid-empty" id="empty" hidden>Aucune commande à cette étape.</div>
+        </div>
+
+          <!-- Rail des colonnes : ce qui est à l'écran en haut, ce qui en a été
+               retiré juste en dessous — les colonnes masquées restent SOUS LES
+               YEUX, on les remet d'un clic. Rempli par app.js. -->
+          <aside class="colbar" id="colbar" aria-label="Colonnes du planning">
+            <div class="colbar-head">
+              <h2 class="colbar-title">Colonnes</h2>
+              <button class="colbar-close" id="colbarClose" type="button" aria-label="Masquer le rail des colonnes">
+                <span class="material-symbols-outlined" aria-hidden="true">right_panel_close</span>
+              </button>
+            </div>
+            <div class="colbar-scroll">
+              <p class="colbar-legend">Sur l’écran</p>
+              <div class="colbar-list" id="colbarOn"></div>
+            </div>
+            <!-- Bloc « Retirées » ÉPINGLÉ, hors de la zone qui défile : c'est
+                 tout l'intérêt du rail, ces colonnes doivent rester sous les
+                 yeux sans avoir à faire défiler quoi que ce soit. -->
+            <div class="colbar-off">
+              <p class="colbar-legend" id="colbarOffLegend">Retirées</p>
+              <div class="colbar-list" id="colbarOff"></div>
+              <p class="colbar-empty" id="colbarOffEmpty">Toutes les colonnes sont affichées.</p>
+            </div>
+            <button class="colbar-reset" id="colbarReset" type="button">Tout réafficher</button>
+          </aside>
         </div>
 
         <!-- Onglet Dashboard : « ce que chacun a à faire ce matin ». Rendu par JS

@@ -247,6 +247,36 @@ Le serveur revalide : une sous-étape étrangère à la famille visée est refus
 celle qu'implique la nature (`demande` → *Demande reçue*, `commande` →
 *À chiffrer*).
 
+## Colonnes du planning — le rail de droite
+
+Le bouton **« Colonnes »**, en haut de la grille, ouvre un rail à droite où
+chacun compose son écran. Un clic retire une colonne : elle quitte la grille et
+descend dans **« Retirées »**, juste en dessous — elle reste **sous les yeux**,
+et le même clic la remet. C'est le point important : rien ne disparaît dans un
+menu qu'il faudrait rouvrir pour savoir ce qui manque. « Tout réafficher »
+remet tout d'un coup.
+
+Trois règles :
+
+- **« Nom du dossier client » est verrouillée** (cadenas). C'est elle qui
+  identifie la ligne : sans elle, la grille n'est plus lisible.
+- Le choix est **global et local au poste** (`localStorage`, clé
+  `olda_cols_v1`) — c'est un réglage de poste, pas un paramètre de navigation :
+  il ne suit donc pas d'un ordinateur à l'autre.
+- Il se **cumule** avec les masquages automatiques par étape (« Prix TTC »
+  hors chiffrage/facturation, « Sous-étape » sur les familles qui n'en ont
+  pas). Une colonne cochée mais que l'étape courante ne remplit jamais porte
+  la mention **« vide ici »** dans le rail, pour qu'on ne la croie pas cassée.
+
+Le rail se replie (bouton en haut à droite du rail, ou re-clic sur
+« Colonnes »), et cet état est retenu. Sous 900 px de large — tablette portrait,
+téléphone — il passe **sous** la grille en bandeau horizontal plutôt que de
+manger la moitié de la largeur utile.
+
+Le plancher de largeur de la grille suit : chaque colonne retirée le baisse
+d'autant (`--cols-off`), sinon le tableau continuerait de défiler
+horizontalement alors qu'on vient justement de lui faire de la place.
+
 ## Navigation — une seule page, plusieurs vues
 
 Planning, Dashboard, Nouveau Projet, Base clients et Réglages sont **des vues

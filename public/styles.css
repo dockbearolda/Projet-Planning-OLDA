@@ -1542,6 +1542,162 @@ tr:hover .handle { color: var(--text-2); }
 .grid.no-price th.col-price,
 .grid.no-price td.col-price-cell { display: none; }
 
+/* Colonnes retirées À LA MAIN depuis le rail de droite (voir PLANNING_COLS
+   dans app.js). Une classe `off-<clé>` par colonne posée sur la grille : même
+   patron que .no-sub / .no-price ci-dessus, qui restent les règles AUTOMATIQUES
+   par étape. Les deux se cumulent — le choix du rail ne rouvre pas une colonne
+   que l'étape courante ne remplit pas. */
+.grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
+.grid.off-client_type col[data-col="client_type"], .grid.off-client_type .col-type,
+.grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
+.grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
+.grid.off-price       col[data-col="price"],       .grid.off-price       th.col-price,    .grid.off-price       td.col-price-cell,
+.grid.off-sub_stage   col[data-col="sub_stage"],   .grid.off-sub_stage   th.col-sub,      .grid.off-sub_stage   td.col-sub-cell,
+.grid.off-description col[data-col="description"], .grid.off-description th.col-infos,    .grid.off-description td.col-infos-cell,
+.grid.off-deadline    col[data-col="deadline"],    .grid.off-deadline    th.col-deadline, .grid.off-deadline    td.col-deadline-cell,
+.grid.off-flag        col[data-col="flag"],        .grid.off-flag        th.col-flag,     .grid.off-flag        td.col-flag-cell { display: none; }
+
+/* ------------------------------------------------ Rail des colonnes (droite)
+   Le patron compose son écran : il retire une colonne d'un clic, elle descend
+   dans « Retirées » et RESTE sous ses yeux — il la remet du même geste. */
+.grid-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+/* La grille garde le scroll ; sans min-width:0 elle refuserait de se comprimer
+   pour laisser la place au rail. */
+.grid-area > .grid-wrap { min-width: 0; }
+
+.colbar {
+  flex: 0 0 208px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+.colbar[hidden] { display: none; }
+.colbar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px 10px 16px;
+}
+.colbar-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-1); }
+.colbar-close {
+  margin-left: auto;
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.colbar-close:hover { background: var(--state-hover); color: var(--text-1); }
+.colbar-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.colbar-close .material-symbols-outlined { font-size: 20px; }
+
+.colbar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; }
+/* Le bloc « Retirées » ne défile pas avec le reste : il garde sa place en bas,
+   et c'est LUI qui se comprime (jusqu'à son propre scroll) quand la liste du
+   haut est longue. */
+.colbar-off {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: 45%;
+  padding: 0 12px 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.colbar-legend {
+  margin: 10px 0 6px 4px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.colbar-legend[hidden], .colbar-empty[hidden] { display: none; }
+.colbar-empty { margin: 2px 4px; font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+.colbar-list { display: flex; flex-direction: column; gap: 4px; }
+
+/* Une entrée = une colonne. 44 px de haut : c'est tapé au doigt sur la
+   tablette de l'atelier, pas seulement cliqué à la souris. */
+.colbar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.colbar-item:hover { background: var(--state-hover); }
+.colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.colbar-item__ic { flex: 0 0 auto; font-size: 19px; color: var(--text-3); }
+.colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Sur l'écran : liseré plein + coche. Retirée : pointillé et texte atténué —
+   la différence se voit sans lire, même de loin. */
+.colbar-item.is-on { border-color: var(--border); background: var(--surface); }
+.colbar-item.is-on .colbar-item__ic { color: var(--primary); }
+.colbar-item.is-off { border-style: dashed; border-color: var(--border); color: var(--text-2); }
+
+/* Colonne verrouillée (l'identité de la ligne) : ni bouton, ni curseur main. */
+.colbar-item.is-locked { cursor: default; background: transparent; border-color: var(--border-soft); }
+.colbar-item.is-locked:hover { background: transparent; }
+
+/* Sélectionnée mais vide à cette étape (règle automatique .no-sub/.no-price) :
+   on le DIT, sinon le patron coche une colonne et ne la voit pas apparaître. */
+.colbar-item__note {
+  flex: 0 0 auto;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .03em; text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.colbar-reset {
+  flex: 0 0 auto;
+  min-height: 44px;
+  margin: 0 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.colbar-reset:hover { background: var(--surface-hover); }
+.colbar-reset:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.colbar-reset[hidden] { display: none; }
+
+/* Le bouton d'en-tête montre l'état du rail : enfoncé = rail ouvert. */
+.colbar-open[aria-expanded="true"] { background: var(--primary-soft); border-color: var(--primary-soft); color: var(--text-1); }
+
+/* Tablette portrait et téléphone : le rail passe SOUS la grille en bandeau
+   horizontal — en colonne il mangerait la moitié de la largeur utile. */
+@media (max-width: 900px) {
+  .grid-area { flex-direction: column; }
+  .colbar {
+    flex: 0 0 auto;
+    max-height: 40vh;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .colbar-list { flex-direction: row; flex-wrap: wrap; }
+  .colbar-item { width: auto; }
+}
+
 /* Le HT sous le prix : une mention de contrôle, pas une deuxième valeur à lire.
    Vide tant que la ligne n'a pas de prix, donc la cellule ne bouge pas. */
 .col-price-cell { text-align: right; }
@@ -2066,10 +2222,16 @@ tr:hover .handle { color: var(--text-2); }
    (27 px sur les étapes qui montrent Prix + Sous-étape : illisible).
    Calcul : colonnes fixes + 210 (dossier) + ~92 (priorité) + 2 × 110 (texte).
    `:not(.manual-cols)` : dès que l'utilisateur règle ses largeurs à la main,
-   c'est lui qui décide (cf. .grid.manual-cols { min-width: 0 }). */
-.grid:not(.manual-cols):not(.no-sub) { min-width: 1270px; }
-.grid:not(.manual-cols):not(.no-price) { min-width: 1220px; }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: 1360px; }
+   c'est lui qui décide (cf. .grid.manual-cols { min-width: 0 }).
+   `--cols-off` : largeur totale des colonnes retirées à la main depuis le rail
+   de droite (posée par applyColVisibility). On la RETRANCHE au lieu de
+   recalculer un plancher de zéro, pour que le réglage fin ci-dessus reste
+   valable — retirer une colonne de 210 px baisse le plancher de 210 px, point.
+   Sans ça, retirer trois colonnes laissait la grille défiler horizontalement
+   alors qu'on venait justement de lui faire de la place. */
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1270px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1220px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1360px - var(--cols-off, 0px)); }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
