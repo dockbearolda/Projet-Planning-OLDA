@@ -339,20 +339,14 @@
   margin-top: 18px;
 }
 
-@media (max-width: 720px) {
-  .pjc-grid { grid-template-columns: 1fr; }
-  .pjc-field--full { grid-column: auto; }
-  .pjc-type-switch { grid-template-columns: 1fr; }
-  .pjc-phone-row, .pjc-sector-row { grid-template-columns: 1fr; }
-  .pjc-actions { flex-direction: column; }
-  .pjc-actions .pjc-btn { width: 100%; }
-}
-/* 15px est la valeur de la maquette, et c'est ce qu'on voit au comptoir. Sous
-   16px, Safari iOS ZOOME la page dès qu'on touche un champ et ne la dézoome
-   jamais : sur téléphone seulement, les champs passent donc à 16px. */
-@media (max-width: 560px) {
-  .pjc-card input, .pjc-card select, .pjc-dialog input { font-size: 16px; }
-}
+/* PAS de bascule « une colonne » : l'écran garde la MÊME mise en page à toutes
+   les largeurs. Le repli téléphone de la maquette (720px) transformait le
+   formulaire dès qu'on le regardait dans un panneau étroit — deux onglets
+   empilés, « Formater » passé sous le champ — alors que les postes visés
+   (Chrome PC, Galaxy Tab A9+ en 1280×800 ou 800×1280) sont toujours larges.
+   Les colonnes se resserrent, elles ne se replient pas : `minmax(0, 1fr)` sur
+   la grille et `1fr auto` sur les paires champ+bouton laissent le contenu
+   rétrécir sans jamais déborder en largeur. */
 
 /* --- Tuiles de type (colonne de droite) ---------------------------------------- */
 /* Grosses tuiles carrées façon catégories SumUp : icône dans un cercle bleu
