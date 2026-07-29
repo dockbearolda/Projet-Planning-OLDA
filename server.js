@@ -820,6 +820,9 @@ const COM_ZONE_BY_ID = new Map(COM.zones.map((z) => [z.id, z]));
 const COM_DELAI_BY_ID = new Map(COM.delais.map((d) => [d.id, d]));
 const COM_PAY_MODE_BY_ID = new Map(COM.paiementModes.map((p) => [p.id, p]));
 const COM_TYPE_LOGO_BY_ID = new Map(COM.typeLogos.map((t) => [t.id, t]));
+// Techniques de marquage d'un textile (sérigraphie, broderie, DTF, flex) : le
+// COMMENT, quand l'emplacement dit le OÙ. Chaque marquage porte les deux.
+const COM_TECHNIQUE_BY_ID = new Map((COM.techniques || []).map((t) => [t.id, t]));
 // Modes acceptés par requests.paiement_mode. Défini ici, à côté du catalogue qui
 // en est la source ; validateField le lit à la requête, donc bien après le
 // chargement du module.
@@ -855,6 +858,9 @@ const PROJET_LIGNES_MAX = 30;
 const VETEMENT_MAX = 80;
 const REF_MAX = 40;
 const COULEUR_MAX = 40;
+// Un textile part souvent en PLUSIEURS coloris sur la même ligne (« Blanc,
+// Noir, Bleu roi ») : le champ reçoit une liste, pas une teinte.
+const COLORIS_LISTE_MAX = 160;
 const REMARQUE_MAX = 400;
 const OBJET_MAX = 140;          // objet de la demande (titre d'une ligne du planning)
 const DESCRIPTION_MAX = 1200;   // description libre de la demande
@@ -1129,6 +1135,7 @@ function readFaceTextile(raw, face, where) {
   const f = raw && typeof raw === 'object' ? raw : {};
   const zone = zoneById(f.emplacement);
   if (!zone) return { face: null };
+  const technique = COM_TECHNIQUE_BY_ID.get(f.technique) || null;
   const typeLogo = COM_TYPE_LOGO_BY_ID.get(f.typeLogo) || null;
   const ref = readTexte(f.referenceLogo, where, `référence logo (${face.label.toLowerCase()})`, TEXTE_MAX);
   if (ref.error) return { error: ref.error };
@@ -1138,6 +1145,9 @@ function readFaceTextile(raw, face, where) {
     face: {
       face: face.id, faceLabel: face.label,
       emplacement: { id: zone.id, label: zone.label },
+      // Le COMMENT du marquage (sérigraphie, broderie, DTF, flex) : c'est lui
+      // qui dit à l'atelier quelle machine sort, l'emplacement ne dit que le OÙ.
+      technique: technique ? { id: technique.id, label: technique.label } : null,
       typeLogo: typeLogo ? { id: typeLogo.id, label: typeLogo.label } : null,
       referenceLogo: ref.value, couleurMarquage: couleur.value,
     },
@@ -1160,7 +1170,7 @@ function buildLigneTextile(raw, index) {
   if (!designation.value) return { error: `${where} : la désignation du produit est vide` };
   const reference = readTexte(l.reference, where, 'référence', REF_MAX);
   if (reference.error) return { error: reference.error };
-  const coloris = readTexte(l.coloris, where, 'couleur', COULEUR_MAX);
+  const coloris = readTexte(l.coloris, where, 'couleur', COLORIS_LISTE_MAX);
   if (coloris.error) return { error: coloris.error };
   const remarque = readTexte(l.remarque, where, 'remarque', REMARQUE_MAX);
   if (remarque.error) return { error: remarque.error };

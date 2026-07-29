@@ -48,6 +48,12 @@
       { "id": "arriere", "label": "Arrière" },
       { "id": "cote", "label": "Côté" }
     ],
+    "techniques": [
+      { "id": "serigraphie", "label": "Sérigraphie" },
+      { "id": "broderie", "label": "Broderie" },
+      { "id": "dtf", "label": "DTF" },
+      { "id": "flex", "label": "Flex" }
+    ],
     "typeLogos": [
       { "id": "logo_client", "label": "Logo client" },
       { "id": "logo_olda", "label": "Logo OLDA" },

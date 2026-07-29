@@ -239,11 +239,16 @@ delete process.env.APP_PASSWORD;
     client: { societe: 'Beach Bar', type: 'pro' },
     lignes: [{
       type: 'textile',
-      designation: 'Polo', reference: 'PL-450', coloris: 'Noir',
+      // Un textile part souvent en plusieurs coloris sur la même ligne : le
+      // champ reçoit la liste telle que le comptoir l'a composée.
+      designation: 'Polo', reference: 'PL-450', coloris: 'Noir, Blanc, Bleu roi',
       tailles: [{ taille: 'M', quantite: 4 }, { taille: 'L', quantite: 6 }, { taille: 'XL', quantite: 0 }],
       faces: {
-        avant: { emplacement: 'coeur', typeLogo: 'logo_client', referenceLogo: 'LOGO-2024.ai', couleurMarquage: 'Blanc' },
-        arriere: { emplacement: '', typeLogo: 'texte', referenceLogo: 'ignoré' },
+        avant: {
+          emplacement: 'coeur', technique: 'broderie', typeLogo: 'logo_client',
+          referenceLogo: 'LOGO-2024.ai', couleurMarquage: 'Blanc',
+        },
+        arriere: { emplacement: '', technique: 'dtf', typeLogo: 'texte', referenceLogo: 'ignoré' },
       },
       remarque: 'Coutures renforcées',
       prixUnitaireTtc: 18.72,
@@ -260,13 +265,14 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(lt.faces.length, 1, 'une face sans emplacement n’est pas retenue');
   assert.strictEqual(lt.faces[0].face, 'avant');
   assert.strictEqual(lt.faces[0].emplacement.label, 'Cœur');
+  assert.strictEqual(lt.faces[0].technique.label, 'Broderie', 'la technique de marquage est résolue depuis le catalogue');
   assert.strictEqual(lt.faces[0].typeLogo.label, 'Logo client');
   assert.strictEqual(lt.faces[0].referenceLogo, 'LOGO-2024.ai');
   assert.strictEqual(lt.faces[0].couleurMarquage, 'Blanc');
   assert.strictEqual(lt.prixUnitaireTtc, 18.72);
   assert.strictEqual(lt.prixUnitaireHt, 18, 'le HT unitaire se déduit du TTC (÷ 1,04)');
   assert.strictEqual(textileDetaille.body.projet.prixTotalTtc, 187.2, 'prix unitaire × quantité');
-  assert.match(lt.description, /^10 × Polo — réf\. PL-450 · Noir · M×4 · L×6$/);
+  assert.match(lt.description, /^10 × Polo — réf\. PL-450 · Noir, Blanc, Bleu roi · M×4 · L×6$/);
   // Le résumé de la grille ne double PAS la quantité (« 10 × 10 × Polo »).
   const rowTextile = (await (await fetch(`${base}/api/requests?stage=demande_chiffrage`)).json())
     .find((x) => x.id === textileDetaille.body.id);

@@ -85,11 +85,33 @@ let CAT = {
 };
 
 // Les deux faces marquables d'un textile (miroir de PROJET_FACES_TEXTILE côté
-// serveur, qui valide).
+// serveur, qui valide). Chaque face ne propose QUE ses propres emplacements :
+// proposer « Dos » sous « Face avant », comme avant, faisait deux rangées
+// identiques dont l'une mentait. Leur union couvre les emplacements courants,
+// chacun sous la face où il se trouve vraiment.
 const FACES_TEXTILE = [
-  { id: 'avant', label: 'Face avant' },
-  { id: 'arriere', label: 'Face arrière' },
+  { id: 'avant', label: 'Face avant', zones: ['poitrine', 'coeur', 'manche_g', 'manche_d'] },
+  { id: 'arriere', label: 'Face arrière', zones: ['dos', 'haut_dos', 'capuche'] },
 ];
+// Comment le marquage est posé. Miroir de catalog.json → commande.techniques.
+const TX_TECHNIQUES = [
+  { id: 'serigraphie', label: 'Sérigraphie' },
+  { id: 'broderie', label: 'Broderie' },
+  { id: 'dtf', label: 'DTF' },
+  { id: 'flex', label: 'Flex' },
+];
+// Libellés repris du catalogue partagé quand il est chargé (c'est LUI que le
+// serveur valide) ; les valeurs en dur ne servent que de repli si l'appel échoue.
+const TX_ZONES_REPLI = {
+  poitrine: 'Poitrine', coeur: 'Cœur', manche_g: 'Manche gauche',
+  manche_d: 'Manche droite', dos: 'Dos', haut_dos: 'Haut du dos', capuche: 'Capuche',
+};
+const txZones = (face) => face.zones.map((id) => {
+  const zone = CAT.zones.find((z) => z.id === id);
+  return { id, label: zone ? zone.label : (TX_ZONES_REPLI[id] || id) };
+});
+const txTechniques = () => (CAT.techniques && CAT.techniques.length ? CAT.techniques : TX_TECHNIQUES);
+const txTypeLogos = () => (CAT.typeLogos && CAT.typeLogos.length ? CAT.typeLogos : []);
 
 async function api(method, path, body) {
   const res = await fetch(path, {
@@ -175,7 +197,12 @@ function renderBar() {
   if (!brand) return;
   const nc = state.page === 'client' && !!state.clientForm;
   const page = ROOT.querySelector('.proj-page');
-  if (page) page.classList.toggle('is-nouveau-client', nc);
+  if (page) {
+    page.classList.toggle('is-nouveau-client', nc);
+    // Écran Textile : fond de page légèrement gris, ce sont les cartes
+    // blanches qui portent le contenu (même principe que Nouveau client).
+    page.classList.toggle('is-textile', state.page === 'main' && state.addingType === 'textile');
+  }
   brand.replaceChildren();
   if (nc) {
     brand.append(
@@ -548,6 +575,9 @@ function renderClientSidebar() {
 
 function renderMainPage(body) {
   body.replaceChildren();
+  // L'écran Textile a sa propre mise en page : le client y est déjà, dans la
+  // colonne récapitulative de droite — pas de sidebar de gauche en plus.
+  if (state.addingType === 'textile') return renderTextileScreen(body);
   const layout = el('div', 'proj-layout');
   layout.append(renderClientSidebar());
   const main = el('div', 'proj-main');
@@ -576,18 +606,22 @@ function newTasseLigne() {
 function newTextileLigne() {
   return {
     uid: uid(), quantite: 1,
-    designation: '', reference: '', coloris: '', colorisAutre: false,
+    designation: '', reference: '',
+    // Plusieurs coloris pour un même modèle (12 polos : 6 blancs, 6 noirs).
+    // `colorisLibre` recueille les teintes hors palette, sans les imposer.
+    coloris: [], colorisAutre: false, colorisLibre: '',
     // Grille de tailles : { 'M': '4', 'L': '6' }. Les tailles hors grille
     // s'ajoutent à la demande dans `taillesLibres`.
     tailles: {}, taillesLibres: [],
     faces: { avant: newFaceTextile(), arriere: newFaceTextile() },
     remarque: '', prixUnitaireTtc: '',
+    erreur: null,          // clé du champ fautif, une seule à la fois
   };
 }
-// `plus` : les emplacements secondaires sont-ils dépliés ? Replié par défaut —
-// 12 puces par face noieraient les 6 emplacements réellement courants.
+// Une face reste vide tant qu'aucun emplacement n'est choisi : un textile livré
+// vierge est un état complet, pas un formulaire à moitié rempli.
 function newFaceTextile() {
-  return { emplacement: '', typeLogo: '', referenceLogo: '', couleurMarquage: '', plus: false };
+  return { emplacement: '', technique: '', typeLogo: '', referenceLogo: '', couleurMarquage: '' };
 }
 function newAutresLigne() {
   return {
@@ -602,13 +636,26 @@ function newLigne(typeId) {
   return newAutresLigne();
 }
 
-// Quantité d'un textile : la SOMME de sa grille de tailles. Sans aucune taille
-// chiffrée, la ligne garde sa quantité saisie au stepper.
+// Quantité d'un textile : la SOMME de sa grille de tailles, sans repli. Une
+// grille vide vaut 0 et l'écran l'affiche — c'est le total qui a menti jusqu'ici
+// (« Quantité totale : 1 » sur un formulaire où rien n'était chiffré).
+// Une taille libre CHIFFRÉE MAIS PAS NOMMÉE ne compte pas : elle ne part pas
+// dans la fiche (cf. `ligneToPayload`), et un total qui la compterait afficherait
+// une quantité que la commande n'enregistrerait jamais.
 function quantiteTextile(l) {
-  const total = [...Object.values(l.tailles), ...l.taillesLibres.map((t) => t.quantite)]
-    .reduce((s, v) => s + (Number.parseInt(v, 10) || 0), 0);
-  return total > 0 ? total : (Number(l.quantite) || 1);
+  return [
+    ...Object.values(l.tailles),
+    ...l.taillesLibres.filter((t) => (t.taille || '').trim()).map((t) => t.quantite),
+  ].reduce((s, v) => s + (Number.parseInt(v, 10) || 0), 0);
 }
+
+// Les coloris d'un textile en UNE chaîne : c'est ce que lit l'atelier, et c'est
+// la forme que la fiche de production stocke.
+function colorisTexte(l) {
+  const libre = (l.colorisAutre ? l.colorisLibre : '').trim();
+  return [...(l.coloris || []), libre].filter(Boolean).join(', ');
+}
+const colorisCount = (l) => (l.coloris || []).length + ((l.colorisAutre && l.colorisLibre.trim()) ? 1 : 0);
 function quantiteItem(item) {
   return item.type === 'textile' ? quantiteTextile(item) : (Number(item.quantite) || 1);
 }
@@ -670,7 +717,8 @@ function describeItem(item) {
     return `${q} × ${produit ? produit.designation : 'Tasse'}${item.coloris ? ` (${item.coloris})` : ''}${opts.length ? ` — ${opts.join(', ')}` : ''}`;
   }
   if (item.type === 'textile') {
-    const id = [item.reference && `réf. ${item.reference}`, item.coloris, taillesTexte(item)].filter(Boolean).join(' · ');
+    const id = [item.reference && `réf. ${item.reference}`, colorisTexte(item), taillesTexte(item)]
+      .filter(Boolean).join(' · ');
     return `${q} × ${item.designation || 'Textile'}${id ? ` — ${id}` : ''}`;
   }
   return `${q} × ${item.designation || '—'}`;
@@ -765,12 +813,19 @@ function cancelAdding() {
 }
 function confirmAdd() {
   const l = state.addingLigne;
-  const manque = {
-    tasse: () => (!l.produitId ? 'Choisis un type de tasse.' : ''),
-    textile: () => (!l.designation.trim() ? 'Indique la désignation du produit (T-shirt, Polo…).' : ''),
-  }[state.addingType] || (() => (!l.designation.trim() ? 'Indique la désignation du projet.' : ''));
-  const message = manque();
-  if (message) { window.alert(message); return; }
+  // Textile : le motif du refus s'écrit SOUS le champ fautif (comme l'écran
+  // Nouveau client), jamais dans une alerte qu'on referme sans savoir où aller.
+  if (state.addingType === 'textile') {
+    l.erreur = !l.designation.trim() ? 'designation'
+      : (quantiteTextile(l) < 1 ? 'tailles' : null);
+    if (l.erreur) { renderCurrentPage(); return; }
+  } else {
+    const manque = {
+      tasse: () => (!l.produitId ? 'Choisis un type de tasse.' : ''),
+    }[state.addingType] || (() => (!l.designation.trim() ? 'Indique la désignation du projet.' : ''));
+    const message = manque();
+    if (message) { window.alert(message); return; }
+  }
   state.panier.push({ ...l, type: state.addingType });
   state.addingType = null; state.addingLigne = null;
   render();
@@ -940,128 +995,476 @@ function prixFields(l, type) {
   }
   return g;
 }
+// =============================================================================
+// ÉCRAN TEXTILE (étape 2 — Produits)
+// Une carte blanche par bloc — Produit, Coloris, Tailles, Face avant, Face
+// arrière, Remarques, Prix, Paiement — plutôt qu'un seul long formulaire à
+// en-têtes gris : on sait toujours de quoi on parle. Le client et le
+// récapitulatif vivent dans une colonne collante à droite, le prix et
+// « Ajouter au panier » dans une barre fixe en bas. Champs et typographie
+// repris de l'écran « Nouveau client » (contour permanent, étiquette en casse
+// normale) : c'est le même poste, ce doit être la même main.
+// =============================================================================
 
-// GRILLE DE TAILLES : une case chiffrable par taille, la quantité de la ligne en
-// est la somme. Les tailles hors grille (« 3XL », « 8 ans ») s'ajoutent à la
-// demande. Comme dans la Saisie détaillée : on ne redemande pas un « Qté » qui
-// pourrait contredire la grille.
-function sizeGrid(l) {
-  const g = groupBox('Tailles');
-  const grille = el('div', 'proj-sizes');
-  for (const t of ['Taille unique', ...CAT.taillesGrille]) {
-    const box = el('label', 'proj-size');
-    box.append(el('span', 'proj-size__label', t));
-    const input = el('input', 'proj-size__qty');
-    input.inputMode = 'numeric';
-    input.value = l.tailles[t] || '';
-    input.setAttribute('aria-label', `Quantité taille ${t}`);
-    input.addEventListener('input', () => {
-      const digits = input.value.replace(/\D+/g, '').slice(0, 4);
-      input.value = digits;
-      if (digits) l.tailles[t] = digits; else delete l.tailles[t];
-    });
-    input.addEventListener('change', renderCurrentPage);
-    box.append(input);
-    grille.append(box);
+// Nœuds recalculés à la frappe. Re-rendre l'écran à chaque touche ferait sauter
+// le curseur hors du champ ; on repeint donc les seuls textes qui dépendent de
+// la saisie (quantité, récapitulatif, prix de la ligne).
+const txLive = {};
+
+const txTaux = () => 1 + (TARIFS_PARAMS.tgca || 0);
+
+// Le HT est ce que l'employé SAISIT ; `prixUnitaireTtc` reste la valeur stockée
+// (contrat serveur), le HT n'en est que la lecture.
+function txPrixHt(l) {
+  const ttc = Number(l.prixUnitaireTtc);
+  if (l.prixUnitaireTtc === '' || l.prixUnitaireTtc == null || !Number.isFinite(ttc)) return 0;
+  return ttc / txTaux();
+}
+
+function txRefresh() {
+  const l = state.addingLigne;
+  if (!l || state.addingType !== 'textile') return;
+  const q = quantiteTextile(l);
+  const ht = txPrixHt(l);
+  const pieces = (n) => `${n} pièce${n > 1 ? 's' : ''}`;
+  const set = (node, texte) => { if (node) node.textContent = texte; };
+
+  set(txLive.qty, q > 0 ? pieces(q) : 'Aucune pièce');
+  const nb = colorisCount(l);
+  set(txLive.colorisCount, nb ? `${nb} sélectionné${nb > 1 ? 's' : ''}` : '');
+  set(txLive.recapProduit, l.designation.trim() || '—');
+  set(txLive.recapColoris, colorisTexte(l) || '—');
+  set(txLive.recapQty, q > 0 ? pieces(q) : '—');
+  if (txLive.recapMarquages) {
+    const liste = txMarquagesTexte(l);
+    txLive.recapMarquages.replaceChildren(
+      ...(liste.length
+        ? liste.map((t) => el('span', 'tx-recap__mk', t))
+        : [el('span', 'tx-recap__val', 'Aucun')]),
+    );
   }
-  g.append(grille);
+  set(txLive.barAmount, `${(ht * q).toFixed(2)} €`);
+  set(txLive.barTtc, `${(ht * q * txTaux()).toFixed(2)} € TTC`);
+}
 
+// « Face avant · Cœur · Broderie », pour le récapitulatif.
+function txMarquagesTexte(l) {
+  const techs = txTechniques();
+  const logos = txTypeLogos();
+  const nom = (liste, id) => (liste.find((x) => x.id === id) || {}).label || '';
+  return FACES_TEXTILE
+    .filter((face) => l.faces[face.id].emplacement)
+    .map((face) => {
+      const f = l.faces[face.id];
+      return [face.label, nom(txZones(face), f.emplacement), nom(techs, f.technique), nom(logos, f.typeLogo)]
+        .filter(Boolean).join(' · ');
+    });
+}
+
+// --- Briques de l'écran ------------------------------------------------------
+// Une carte = un bloc. `aside` reçoit le repère de droite (compteur de coloris,
+// quantité totale) : l'information qui qualifie le bloc reste sur son titre.
+function txCard(titre, aside, aide) {
+  const card = el('section', 'tx-card');
+  const head = el('div', 'tx-card__head');
+  head.append(el('h4', 'tx-card__title', titre));
+  if (aside) head.append(aside);
+  card.append(head);
+  if (aide) card.append(el('p', 'tx-card__hint', aide));
+  return card;
+}
+
+// Champ texte : contour TOUJOURS visible, étiquette en casse normale,
+// « — optionnel » discret, message d'erreur SOUS le champ. Pas de re-rendu à la
+// frappe — l'état est posé à chaque touche, seuls les totaux se repeignent.
+function txField(label, get, set, opts = {}) {
+  const box = el('label', `tx-f${opts.erreur ? ' is-error' : ''}`);
+  const lab = el('span', 'tx-f__label');
+  lab.append(el('span', 'tx-f__labeltxt', label));
+  if (opts.optionnel) lab.append(el('span', 'tx-f__opt', '— optionnel'));
+  box.append(lab);
+  const input = el(opts.multiline ? 'textarea' : 'input', `tx-input${opts.multiline ? ' tx-input--area' : ''}`);
+  if (opts.multiline) input.rows = opts.rows || 3;
+  if (opts.placeholder) input.placeholder = opts.placeholder;
+  if (opts.list) input.setAttribute('list', opts.list);
+  if (opts.maxLength) input.maxLength = opts.maxLength;
+  input.value = get() || '';
+  input.addEventListener('input', () => { set(input.value); txRefresh(); });
+  box.append(input);
+  if (opts.erreur) box.append(txErreur(opts.erreur));
+  return box;
+}
+
+function txErreur(message) {
+  const p = el('p', 'tx-f__err');
+  p.append(el('span', 'tx-f__err-dot', '!'), el('span', null, message));
+  return p;
+}
+
+// Puce de choix : une option = un bouton de 40px, l'état sélectionné se voit
+// (fond et texte bleus), pas seulement au survol.
+function txChip(label, actif, onPick, dot) {
+  const b = el('button', `tx-chip${actif ? ' is-on' : ''}${dot ? ' tx-chip--color' : ''}`);
+  b.type = 'button';
+  b.setAttribute('aria-pressed', actif ? 'true' : 'false');
+  if (dot) {
+    const pastille = el('span', 'tx-chip__dot');
+    pastille.style.background = dot;
+    b.append(pastille);
+  }
+  b.append(el('span', 'tx-chip__txt', label));
+  b.addEventListener('click', onPick);
+  return b;
+}
+
+// Groupe de puces à choix UNIQUE, sous une étiquette. Re-cliquer désélectionne :
+// « je me suis trompé » ne doit pas obliger à recharger la ligne.
+function txChoix(label, options, valeur, onPick) {
+  const g = el('div', 'tx-f');
+  g.append(el('span', 'tx-f__label', label));
+  const wrap = el('div', 'tx-chips');
+  for (const o of options) {
+    wrap.append(txChip(o.label, valeur === o.id, () => {
+      onPick(valeur === o.id ? '' : o.id);
+      renderCurrentPage();
+    }));
+  }
+  g.append(wrap);
+  return g;
+}
+
+// --- Carte « Produit » -------------------------------------------------------
+function txProduitCard(l) {
+  const card = txCard('Produit');
+  card.append(txField('Désignation produit', () => l.designation, (v) => { l.designation = v; }, {
+    placeholder: 'T-shirt, Polo, Sweat…',
+    list: 'proj-dl-vetements',
+    maxLength: 80,
+    erreur: l.erreur === 'designation' ? 'Indique la désignation du produit (T-shirt, Polo…).' : null,
+  }));
+  card.append(txField('Référence', () => l.reference, (v) => { l.reference = v; }, {
+    placeholder: 'Référence fournisseur', optionnel: true, maxLength: 40,
+  }));
+  return card;
+}
+
+// --- Carte « Coloris » -------------------------------------------------------
+// Multi-sélection : un même modèle part souvent en plusieurs teintes (6 blancs,
+// 6 noirs). La pastille ne fait que 16px — c'est le NOM qu'on lit, la couleur
+// ne sert qu'à le confirmer.
+function txColorisCard(l) {
+  const compteur = el('span', 'tx-card__aside');
+  txLive.colorisCount = compteur;
+  const card = txCard('Coloris', compteur);
+
+  const wrap = el('div', 'tx-chips');
+  for (const c of COLORIS) {
+    const actif = l.coloris.includes(c.label);
+    wrap.append(txChip(c.label, actif, () => {
+      l.coloris = actif ? l.coloris.filter((x) => x !== c.label) : [...l.coloris, c.label];
+      renderCurrentPage();
+    }, c.hex));
+  }
+  // « Autre » n'est pas une couleur : c'est une puce texte qui ouvre la saisie
+  // libre — plus de pastille dégradée qui ferait croire à une teinte.
+  wrap.append(txChip('Autre', l.colorisAutre, () => {
+    l.colorisAutre = !l.colorisAutre;
+    if (!l.colorisAutre) l.colorisLibre = '';
+    renderCurrentPage();
+  }));
+  card.append(wrap);
+
+  if (l.colorisAutre) {
+    card.append(txField('Coloris personnalisé', () => l.colorisLibre, (v) => { l.colorisLibre = v; }, {
+      placeholder: 'Bleu roi, sable, bordeaux…', maxLength: 40,
+    }));
+  }
+  return card;
+}
+
+// --- Carte « Tailles et quantités » ------------------------------------------
+// La quantité de la ligne EST la somme de la grille : on ne redemande pas une
+// « Qté » qui pourrait la contredire (c'est elle qui affichait « 1 » sur un
+// formulaire où rien n'était chiffré). Le total se recalcule à la frappe.
+function txTaillesCard(l) {
+  const total = el('span', 'tx-card__aside tx-card__aside--fort');
+  txLive.qty = total;
+  const card = txCard('Tailles et quantités', total,
+    'Saisis une quantité sur les tailles concernées, laisse les autres vides.');
+
+  const grille = el('div', 'tx-sizes');
+  for (const t of ['Taille unique', ...CAT.taillesGrille]) {
+    grille.append(txSizeCell(t, () => l.tailles[t] || '', (v) => {
+      if (v) l.tailles[t] = v; else delete l.tailles[t];
+    }));
+  }
+  card.append(grille);
+
+  // Tailles hors grille (« 3XL », « 8 ans ») : ajoutées à la demande, pas
+  // imposées à tout le monde.
   l.taillesLibres.forEach((libre, i) => {
-    const row = el('div', 'proj-size-libre');
-    const nom = el('input', 'proj-input');
+    const row = el('div', 'tx-size-libre');
+    const nom = el('input', 'tx-input');
     nom.placeholder = 'Autre taille (3XL, 8 ans…)';
     nom.value = libre.taille;
     nom.maxLength = 20;
-    nom.addEventListener('input', () => { libre.taille = nom.value; });
-    const qty = el('input', 'proj-size__qty');
-    qty.inputMode = 'numeric';
-    qty.value = libre.quantite;
-    qty.setAttribute('aria-label', 'Quantité de cette taille');
-    qty.addEventListener('input', () => { libre.quantite = qty.value.replace(/\D+/g, '').slice(0, 4); });
-    qty.addEventListener('change', renderCurrentPage);
-    const rm = el('button', 'proj-size-libre__del');
+    nom.setAttribute('aria-label', 'Nom de cette taille');
+    // Le total dépend du NOM autant que du chiffre : sans nom, la taille ne
+    // part pas — l'écran doit le refléter dès la frappe.
+    nom.addEventListener('input', () => { libre.taille = nom.value; txRefresh(); });
+    const rm = el('button', 'tx-size-libre__del');
     rm.type = 'button';
     rm.setAttribute('aria-label', 'Retirer cette taille');
     rm.append(ic('close'));
     rm.addEventListener('click', () => { l.taillesLibres.splice(i, 1); renderCurrentPage(); });
-    row.append(nom, qty, rm);
-    g.append(row);
+    row.append(nom, txSizeCell(null, () => libre.quantite, (v) => { libre.quantite = v; }), rm);
+    card.append(row);
   });
 
-  const add = el('button', 'proj-choice proj-choice--add');
+  const add = el('button', 'tx-add tx-add--inline');
   add.type = 'button';
-  add.append(ic('add'), el('span', 'proj-choice__txt', 'Autre taille'));
+  add.append(ic('add'), el('span', null, 'Autre taille'));
   add.addEventListener('click', () => { l.taillesLibres.push({ taille: '', quantite: '' }); renderCurrentPage(); });
-  g.append(add);
+  card.append(add);
 
-  g.append(el('p', 'proj-sizes__total', `Quantité totale : ${quantiteTextile(l)}`));
-  return g;
-}
-
-// UNE FACE marquée : où, quoi, quelle référence, quelle couleur. Repliée tant
-// qu'aucun emplacement n'est choisi — un textile sans marquage reste une saisie
-// de 3 champs, pas un formulaire de 11.
-function faceFields(l, face) {
-  const f = l.faces[face.id];
-  const g = groupBox(face.label);
-  // Les emplacements courants d'abord (`principal`), le reste derrière un tap :
-  // au comptoir on vise Cœur ou Dos neuf fois sur dix. Un emplacement déjà
-  // choisi reste visible même s'il est secondaire.
-  const visibles = CAT.zones.filter((z) => z.principal || f.plus || z.id === f.emplacement);
-  const zones = visibles.map((z) => ({ id: z.id, designation: z.label }));
-  const chips = choiceChips([{ id: '', designation: 'Aucun marquage' }, ...zones], f.emplacement, (v) => {
-    f.emplacement = f.emplacement === v ? '' : v;
-  }, { none: true, noneDesign: 'Aucun marquage' });
-  if (visibles.length < CAT.zones.length) {
-    const plus = el('button', 'proj-choice proj-choice--plus');
-    plus.type = 'button';
-    plus.append(ic('more_horiz'), el('span', 'proj-choice__txt', 'Autres emplacements'));
-    plus.addEventListener('click', () => { f.plus = true; renderCurrentPage(); });
-    chips.append(plus);
+  if (l.erreur === 'tailles') {
+    card.append(txErreur('Indique au moins une quantité : c’est elle qui fait la quantité de la ligne.'));
   }
-  g.append(chips);
-
-  if (f.emplacement) {
-    const detail = el('div', 'proj-face');
-    const types = CAT.typeLogos.map((t) => ({ id: t.id, designation: t.label }));
-    const gType = el('div', 'proj-field');
-    gType.append(el('span', 'proj-field__label', 'Type de logo'));
-    gType.append(choiceChips(types, f.typeLogo, (v) => { f.typeLogo = f.typeLogo === v ? '' : v; }));
-    detail.append(gType);
-    detail.append(textField('Référence logo', () => f.referenceLogo, (v) => { f.referenceLogo = v; },
-      { placeholder: 'LOGO-2024.ai, fichier client…' }));
-    detail.append(textField('Couleur de marquage', () => f.couleurMarquage, (v) => { f.couleurMarquage = v; },
-      { placeholder: 'Blanc, or, noir…' }));
-    g.append(detail);
-  }
-  return g;
-}
-
-function renderTextileFields(l) {
-  const card = el('div', 'proj-form');
-
-  const gDes = groupBox('Produit');
-  gDes.append(textField('Désignation produit', () => l.designation, (v) => { l.designation = v; },
-    { placeholder: 'T-shirt, Polo, Sweat…', list: 'proj-dl-vetements' }));
-  gDes.append(textField('Référence', () => l.reference, (v) => { l.reference = v; },
-    { placeholder: 'Référence fournisseur' }));
-  card.append(gDes);
-
-  const gCol = groupBox('Couleurs');
-  gCol.append(colorSwatches(l));
-  card.append(gCol);
-
-  card.append(sizeGrid(l));
-
-  for (const face of FACES_TEXTILE) card.append(faceFields(l, face));
-
-  const gRem = groupBox('Remarques');
-  gRem.append(textField('', () => l.remarque, (v) => { l.remarque = v; },
-    { multiline: true, placeholder: 'Coutures renforcées, lavage à froid…' }));
-  card.append(gRem);
-
-  card.append(prixFields(l, 'textile'));
   return card;
+}
+
+// Une case de la grille : l'étiquette au-dessus, le chiffre dessous. Une case
+// remplie se repère d'un coup d'œil (contour et fond bleus).
+function txSizeCell(label, get, set) {
+  const box = el('label', 'tx-size');
+  if (label) box.append(el('span', 'tx-size__label', label));
+  const input = el('input', `tx-size__qty${get() ? ' is-filled' : ''}`);
+  input.inputMode = 'numeric';
+  input.placeholder = '0';
+  input.value = get();
+  input.setAttribute('aria-label', label ? `Quantité taille ${label}` : 'Quantité de cette taille');
+  input.addEventListener('input', () => {
+    // Filtre numérique : une lettre tapée au comptoir ne doit jamais entrer
+    // dans un champ dont dépend la quantité facturée.
+    input.value = input.value.replace(/\D+/g, '').slice(0, 4);
+    set(input.value);
+    input.classList.toggle('is-filled', !!input.value);
+    txRefresh();
+  });
+  box.append(input);
+  return box;
+}
+
+// --- Cartes « Face avant » / « Face arrière » --------------------------------
+// Le détail (technique, logo, référence, couleur) n'apparaît qu'une fois
+// l'emplacement choisi : une face non marquée reste une seule ligne de puces,
+// pas cinq champs vides à faire défiler.
+function txFaceCard(l, face) {
+  const f = l.faces[face.id];
+  const etat = el('span', 'tx-card__aside');
+  etat.textContent = f.emplacement ? 'Marquée' : 'Non marquée';
+  const card = txCard(face.label, etat);
+
+  card.append(txChoix('Emplacement', txZones(face), f.emplacement, (v) => { f.emplacement = v; }));
+
+  // Rien de coché n'est PAS un oubli : on l'écrit, plutôt que de pré-cocher un
+  // emplacement dont personne n'a parlé.
+  if (!f.emplacement) {
+    const vide = el('div', 'tx-empty');
+    vide.append(
+      el('p', 'tx-empty__title', 'Aucun marquage'),
+      el('p', 'tx-empty__sub', `Cette face sera livrée vierge.`),
+    );
+    card.append(vide);
+    return card;
+  }
+
+  card.append(txChoix('Technique', txTechniques(), f.technique, (v) => { f.technique = v; }));
+  card.append(txChoix('Type de logo', txTypeLogos(), f.typeLogo, (v) => { f.typeLogo = v; }));
+  card.append(txField('Référence logo', () => f.referenceLogo, (v) => { f.referenceLogo = v; }, {
+    placeholder: 'LOGO-2024.ai, fichier client…', optionnel: true, maxLength: 200,
+  }));
+  card.append(txField('Couleur de marquage', () => f.couleurMarquage, (v) => { f.couleurMarquage = v; }, {
+    placeholder: 'Blanc, or, noir…', optionnel: true, maxLength: 40,
+  }));
+  return card;
+}
+
+// --- Carte « Remarques » -----------------------------------------------------
+function txRemarquesCard(l) {
+  const card = txCard('Remarques');
+  card.append(txField('Consignes pour l’atelier', () => l.remarque, (v) => { l.remarque = v; }, {
+    multiline: true, optionnel: true, maxLength: 400,
+    placeholder: 'Coutures renforcées, lavage à froid, emballage séparé…',
+  }));
+  return card;
+}
+
+// --- Carte « Prix » ----------------------------------------------------------
+// UN seul champ libre : le HT. Le TTC s'en déduit (TGCA des Réglages) et reste
+// en lecture seule — deux champs libres finissaient par se contredire.
+function txPrixCard(l) {
+  const card = txCard('Prix');
+  const row = el('div', 'tx-prix');
+
+  const htBox = el('label', 'tx-f');
+  htBox.append(el('span', 'tx-f__label', 'Prix unitaire HT (€)'));
+  const ht = el('input', 'tx-input tx-input--prix');
+  ht.type = 'number'; ht.min = '0'; ht.step = '0.01'; ht.inputMode = 'decimal';
+  ht.placeholder = '0,00';
+  const htActuel = txPrixHt(l);
+  ht.value = htActuel ? htActuel.toFixed(2) : '';
+  htBox.append(ht);
+
+  const ttcBox = el('label', 'tx-f');
+  const ttcLab = el('span', 'tx-f__label');
+  ttcLab.append(el('span', 'tx-f__labeltxt', 'Prix unitaire TGCA (€)'), el('span', 'tx-f__opt', 'calculé'));
+  ttcBox.append(ttcLab);
+  const ttc = el('input', 'tx-input tx-input--prix tx-input--ro');
+  ttc.readOnly = true;
+  ttc.tabIndex = -1;
+  ttc.setAttribute('aria-label', 'Prix unitaire TTC, calculé automatiquement');
+  ttc.value = htActuel ? (htActuel * txTaux()).toFixed(2) : '';
+  ttcBox.append(ttc);
+
+  ht.addEventListener('input', () => {
+    const n = Number(ht.value);
+    // On stocke le TTC EXACT (le serveur arrondit) : arrondir ici ferait
+    // dériver le HT qu'on vient de taper au retour de la fiche.
+    const valide = ht.value !== '' && Number.isFinite(n) && n >= 0;
+    l.prixUnitaireTtc = valide ? String(n * txTaux()) : '';
+    ttc.value = valide ? (n * txTaux()).toFixed(2) : '';
+    txRefresh();
+  });
+
+  row.append(htBox, ttcBox);
+  card.append(row);
+  card.append(el('p', 'tx-card__note',
+    `TGCA ${String((TARIFS_PARAMS.tgca || 0) * 100).replace('.', ',')} % — le TTC suit le HT, il ne se saisit pas.`));
+  return card;
+}
+
+// --- Carte « Paiement » ------------------------------------------------------
+// MÊME état que le bloc paiement du panier (`state.paiement`) : un projet =
+// un encaissement, qu'on prenne 20 polos ou 20 polos + 10 tasses. La fiche
+// textile le montre pour qu'on puisse tout renseigner d'un trait, sans jamais
+// pouvoir contredire ce qui sera enregistré.
+function txPaiementCard() {
+  const p = state.paiement;
+  const card = txCard('Paiement', null, 'Vaut pour tout le projet, pas seulement pour cette ligne.');
+
+  card.append(txChoix('Statut du paiement', PAIEMENT_STATUTS, p.statut, (v) => {
+    p.statut = v;
+    if (p.statut !== 'acompte_recu') { p.acompteMontant = ''; p.modeAcompte = null; }
+    if (p.statut !== 'paye') p.modeFinal = null;
+  }));
+
+  // La somme et le mode de l'acompte n'ont de sens qu'une fois l'acompte
+  // encaissé ; le mode final, qu'une fois le solde payé.
+  if (p.statut === 'acompte_recu') {
+    const box = el('label', 'tx-f');
+    box.append(el('span', 'tx-f__label', 'Montant TTC de l’acompte reçu (€)'));
+    const montant = el('input', 'tx-input tx-input--prix');
+    montant.type = 'number'; montant.min = '0'; montant.step = '0.01'; montant.inputMode = 'decimal';
+    montant.placeholder = '0,00';
+    montant.value = p.acompteMontant;
+    montant.addEventListener('input', () => { p.acompteMontant = montant.value; });
+    box.append(montant);
+    card.append(box);
+    card.append(txChoix('Mode de paiement de l’acompte', PAIEMENT_MODES, p.modeAcompte, (v) => { p.modeAcompte = v || null; }));
+  }
+  if (p.statut === 'paye') {
+    card.append(txChoix('Mode de paiement final', PAIEMENT_MODES, p.modeFinal, (v) => { p.modeFinal = v || null; }));
+  }
+  return card;
+}
+
+// --- Colonne de droite : client + récapitulatif ------------------------------
+// Le client tient en une fiche compacte (il est déjà choisi, on le rappelle),
+// et le récapitulatif dit ce qui partira au panier — sans avoir à remonter le
+// formulaire pour vérifier.
+function txSideColumn() {
+  const side = el('aside', 'tx-side');
+  const c = state.client;
+
+  const fiche = el('div', 'tx-client');
+  const ligne = el('div', 'tx-client__row');
+  ligne.append(el('div', 'tx-client__av', (clientLabel(c).trim()[0] || '?').toUpperCase()));
+  const info = el('div', 'tx-client__info');
+  info.append(el('p', 'tx-client__name', clientLabel(c)));
+  const meta = [c.type === 'perso' ? 'Particulier' : 'Pro', c.telephone].filter(Boolean).join(' · ');
+  if (meta) info.append(el('p', 'tx-client__meta', meta));
+  ligne.append(info);
+  fiche.append(ligne);
+  const change = el('button', 'tx-client__change', 'Changer de client');
+  change.type = 'button';
+  change.addEventListener('click', changeClient);
+  fiche.append(change);
+  side.append(fiche);
+
+  const recap = el('div', 'tx-recap');
+  recap.append(el('p', 'tx-recap__title', 'Récapitulatif de la ligne'));
+  txLive.recapProduit = txRecapRow(recap, 'Produit');
+  txLive.recapColoris = txRecapRow(recap, 'Coloris');
+  txLive.recapQty = txRecapRow(recap, 'Quantité');
+  txLive.recapMarquages = txRecapRow(recap, 'Marquages', true);
+  side.append(recap);
+  return side;
+}
+
+function txRecapRow(parent, label, liste) {
+  const row = el('div', 'tx-recap__row');
+  row.append(el('span', 'tx-recap__key', label));
+  const val = el(liste ? 'div' : 'span', liste ? 'tx-recap__mks' : 'tx-recap__val', liste ? null : '—');
+  row.append(val);
+  parent.append(row);
+  return val;
+}
+
+// --- Barre d'action fixe -----------------------------------------------------
+// Toujours visible, jamais à chercher au bas d'un formulaire long. Le contenu
+// réserve la hauteur qu'elle occupe (cf. .tx-screen) — jusqu'ici elle recouvrait
+// les derniers champs.
+function txActionBar() {
+  const bar = el('div', 'tx-bar');
+  const prix = el('div', 'tx-bar__prix');
+  prix.append(el('span', 'tx-bar__label', 'Prix de cette ligne'));
+  const chiffres = el('div', 'tx-bar__chiffres');
+  txLive.barAmount = el('span', 'tx-bar__amount', '0.00 €');
+  txLive.barTtc = el('span', 'tx-bar__ttc', '0.00 € TTC');
+  chiffres.append(txLive.barAmount, txLive.barTtc);
+  prix.append(chiffres);
+  bar.append(prix);
+
+  const btn = el('button', 'tx-bar__btn');
+  btn.type = 'button';
+  btn.append(ic('add'), el('span', null, 'Ajouter au panier'));
+  btn.addEventListener('click', confirmAdd);
+  bar.append(btn);
+  return bar;
+}
+
+// --- Montage de l'écran ------------------------------------------------------
+function renderTextileScreen(body) {
+  const l = state.addingLigne;
+  for (const k of Object.keys(txLive)) delete txLive[k];
+
+  const screen = el('div', 'tx-screen');
+  const layout = el('div', 'tx-layout');
+
+  const main = el('div', 'tx-main');
+  const back = el('button', 'tx-back', '← Annuler');
+  back.type = 'button';
+  back.addEventListener('click', cancelAdding);
+  main.append(back, el('h3', 'tx-title', 'Textile'));
+  main.append(txProduitCard(l), txColorisCard(l), txTaillesCard(l));
+  for (const face of FACES_TEXTILE) main.append(txFaceCard(l, face));
+  main.append(txRemarquesCard(l), txPrixCard(l), txPaiementCard());
+
+  layout.append(main, txSideColumn());
+  screen.append(layout);
+  body.replaceChildren(screen, txActionBar());
+  txRefresh();
 }
 
 function renderAutresFields(l, type) {
@@ -1167,7 +1570,6 @@ function renderAddForm(main) {
 
   const l = state.addingLigne;
   if (state.addingType === 'tasse') main.append(renderTasseFields(l));
-  else if (state.addingType === 'textile') main.append(renderTextileFields(l));
   else main.append(renderAutresFields(l, state.addingType));
 
   // CTA façon caisse : barre collée en bas, prix de la ligne + gros bouton
@@ -1371,13 +1773,13 @@ function ligneToPayload(item) {
       const f = item.faces[face.id];
       if (!f.emplacement) continue;   // une face sans emplacement n'est pas une consigne
       faces[face.id] = {
-        emplacement: f.emplacement, typeLogo: f.typeLogo,
+        emplacement: f.emplacement, technique: f.technique, typeLogo: f.typeLogo,
         referenceLogo: f.referenceLogo, couleurMarquage: f.couleurMarquage,
       };
     }
     return {
       ...base,
-      designation: item.designation, reference: item.reference, coloris: item.coloris,
+      designation: item.designation, reference: item.reference, coloris: colorisTexte(item),
       tailles, faces, remarque: item.remarque,
     };
   }
