@@ -225,7 +225,12 @@ async function loadTgca() {
   } catch (_) { /* silencieux : on garde le taux par défaut */ }
 }
 
-const htFromTtc = (ttc) => (Number.isFinite(Number(ttc)) ? Number(ttc) / (1 + TGCA) : null);
+// `Number(null)` vaut 0 : sans le test d'absence, une ligne SANS prix affichait
+// « HT : 0 € » — et une demande de devis, qui n'a par définition pas encore de
+// prix, se serait lue comme un projet à zéro euro.
+const htFromTtc = (ttc) => (ttc != null && ttc !== '' && Number.isFinite(Number(ttc))
+  ? Number(ttc) / (1 + TGCA)
+  : null);
 
 // « HT : 230,77 € » — la mention discrète qui accompagne chaque TTC affiché.
 // Renvoie '' si la ligne n'a pas de prix : rien à déduire, donc rien à écrire.
@@ -2065,13 +2070,18 @@ function ficheItemsProjetSimple(fiche) {
         prix,
       ]);
     }
-    // Autres / Plaque signalétique.
+    // Autres / Plaque signalétique. `categorie` vient de la demande de devis :
+    // le client demande une famille (Textile, Goodies…) bien avant qu'un article
+    // du catalogue soit choisi. Le titre porte déjà référence et couleur.
     return ficheLigneEl(titre, [
+      l.categorie ? `Catégorie : ${l.categorie}` : null,
       l.explication || null,
       l.matiere ? `Matière : ${l.matiere}` : null,
       l.format ? `Format : ${l.format}` : null,
       l.methode ? `Production : ${l.methode}` : null,
-      prix,
+      // Une demande de devis n'a pas encore de prix : c'est précisément ce
+      // qu'on doit chiffrer. On le DIT, plutôt que de ne rien afficher.
+      prix || (fiche.orderKind === 'demande' ? 'Prix : à chiffrer' : null),
     ]);
   });
 }
@@ -4376,13 +4386,15 @@ function mountReglages() {
 }
 
 // Nouveau Projet : même principe que Base clients / Réglages (module lourd,
-// chargé au premier passage, monté une bonne fois).
+// chargé au premier passage, monté une bonne fois). `nouveau-projet.js` est
+// l'aiguillage des deux flux du comptoir — vente directe et demande de devis —
+// et ne charge le JS d'un flux qu'au premier passage dessus.
 let projetLoading = null;
 let projetModule = null;
 function mountProjet() {
   if (!$projet) return;
   if (!projetLoading) {
-    projetLoading = import('./projet.js')
+    projetLoading = import('./nouveau-projet.js')
       .then((m) => { projetModule = m; return m.initProjet($projet); })
       .catch((err) => {
         projetLoading = null;

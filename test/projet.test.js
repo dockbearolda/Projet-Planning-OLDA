@@ -445,7 +445,7 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(vente.body.projet.heureSouhaitee, '12:00');
   assert.strictEqual(vente.body.projet.noteInterne, 'Client pressé, prévenir Marie');
   assert.strictEqual(vente.body.projet.retraitImmediat, true);
-  assert.strictEqual(vente.body.projet.version, 5);
+  assert.strictEqual(vente.body.projet.version, 6);
   // La DATE demandée l'emporte sur le J+3 du raccourci : c'est le client qui la
   // fixe, le raccourci ne sert qu'à porter la majoration.
   assert.strictEqual(vente.body.projet.deadline, '2026-12-24');

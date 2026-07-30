@@ -20,55 +20,25 @@
 //   - COULEUR : l'accent est l'encre noire de la charte, pas le vert.
 //
 // Rendu entièrement par JS dans une section vide (même principe que clients.js /
-// reglages.js), chargé à la demande par app.js. Le DOM des quatre étapes est
-// construit UNE fois puis montré / caché comme dans la maquette : ce qui est
-// tapé dans un champ y reste quand on va et vient entre les étapes.
+// reglages.js), chargé à la demande par nouveau-projet.js. Le DOM des quatre
+// étapes est construit UNE fois puis montré / caché comme dans la maquette : ce
+// qui est tapé dans un champ y reste quand on va et vient entre les étapes.
+//
+// L'en-tête noir n'est PAS construit ici : il appartient à nouveau-projet.js,
+// qui coiffe les deux flux du comptoir (vente directe / demande de devis) et
+// porte le sélecteur qui passe de l'un à l'autre.
 
 import {
-  wireVilleDefaults, applyCasse, formatPhoneAsTyped,
-  loadSecteurs, SECTEURS, VILLES,
-} from './clients.js';
-import { groupDigits, whatsappNumber } from './whatsapp.js';
+  el, champ, input, select, carte, bouton, titreEtape,
+  effacerErreurs as effacerErreursDe, erreurChamp as erreurChampDe, effacerErreurALaFrappe,
+  cents, money, todayISO, formatDate, heureTexte, api,
+  metaClient, payloadClient, creerSelecteurClient,
+} from './comptoir.js';
+import { whatsappNumber } from './whatsapp.js';
 
 let ROOT = null;
+let CLIENT = null;    // sélecteur de client partagé (comptoir.js)
 const $ = (sel) => ROOT.querySelector(sel);
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-};
-const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-
-async function api(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
-  return data;
-}
-
-// --- Chiffres et dates ------------------------------------------------------
-// `cents` arrondit comme le serveur (readPrixLigne) : c'est ce qui garantit que
-// le total du ticket remis au client est au centime près celui enregistré au
-// planning.
-const cents = (v) => Math.round((Number(v) || 0) * 100) / 100;
-const money = (v) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(Number(v) || 0);
-const todayISO = () => {
-  const d = new Date();
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
-const formatDate = (iso) => {
-  if (!iso) return '';
-  const [y, m, d] = String(iso).split('-');
-  return `${d}/${m}/${y}`;
-};
-const heureTexte = (hhmm) => String(hhmm || '').replace(':', 'h');
 
 // --- Catalogue et paramètres ------------------------------------------------
 // Le taux de TGCA vient des réglages du patron (le serveur recalcule TOUT avec
@@ -77,7 +47,6 @@ let TGCA = 0.04;
 // « Appliquer la TGCA de 4 % » — le taux affiché est celui des réglages, pas une
 // constante recopiée dans le texte du bouton.
 const texteTgca = () => `Appliquer la TGCA de ${String(Math.round(TGCA * 1000) / 10).replace('.', ',')} %`;
-let CLIENTS = [];
 // Familles + sous-étapes du planning, chargées à la demande pour la question
 // « où l'enregistrer ? ». C'est le serveur qui les sert (/api/pipeline) : une
 // étape ajoutée en base apparaît sans retoucher le front.
@@ -117,8 +86,7 @@ const state = {
   etape: 'articles',
   articles: [],          // { nom, quantite, prixSaisi, typePrix, taxe, unitTtc, totalTtc, description }
   enEdition: -1,         // index de l'article en cours de modification, -1 = aucun
-  client: null,          // fiche retenue, normalisée par clientVue()
-  natureClient: 'perso', // onglet du formulaire de création
+  client: null,          // fiche retenue, telle que la rend le sélecteur partagé
   paiementTexte: '',     // « Espèces — donné 30,00 €, monnaie 4,70 € »
   numero: '',            // numéro du ticket, réservé au premier article
   ligneId: null,         // id de la ligne créée au planning (pour la déplacer)
@@ -142,23 +110,10 @@ function afficherEtape(nom) {
   $('#vd-container').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ===========================================================================
 // Messages d'erreur : le champ passe en rouge, le message se pose dessous
-// ===========================================================================
-function effacerErreurs() {
-  for (const n of ROOT.querySelectorAll('.vd-invalid')) n.classList.remove('vd-invalid');
-  for (const n of ROOT.querySelectorAll('.vd-error-msg')) n.remove();
-}
-
-function erreurChamp(id, message) {
-  const champ = $(`#${id}`);
-  champ.classList.add('vd-invalid');
-  const msg = el('div', 'vd-error-msg', message);
-  champ.insertAdjacentElement('afterend', msg);
-  champ.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  champ.focus();
-  return false;
-}
+// (implémentation partagée, cf. comptoir.js).
+const effacerErreurs = () => effacerErreursDe(ROOT);
+const erreurChamp = (id, message) => erreurChampDe(ROOT, id, message);
 
 // ===========================================================================
 // Étape 1 — Articles
@@ -334,225 +289,12 @@ function validerAvantClient() {
 // ===========================================================================
 // Étape 2 — Client (vraie base clients)
 // ===========================================================================
-// Comment s'appelle ce client : « Prénom NOM » pour un particulier — le nom seul
-// ne suffit pas à le reconnaître, et c'est ce texte qui remplit la colonne
-// Client du planning —, la société pour un pro. Les deux champs séparés de la
-// fiche font foi ; une fiche ancienne n'en a pas, `entreprise` vaut alors déjà
-// « Prénom Nom ». On ne réordonne jamais ses mots : le dédoublonnage compare
-// cette chaîne.
-function nomClient(row) {
-  if (!row) return '—';
-  if ((row.client_type || 'pro') === 'perso') {
-    return [row.prenom, row.nom].filter(Boolean).join(' ') || row.entreprise || '—';
-  }
-  return row.entreprise || '—';
-}
-
-function clientVue(row) {
-  const perso = (row.client_type || 'pro') === 'perso';
-  return {
-    id: row.id,
-    clientType: row.client_type || 'pro',
-    perso,
-    nom: nomClient(row),
-    contact: perso ? null : (row.referent_prenom || null),
-    telephone: row.telephone || '',
-    email: row.email || '',
-    prenom: row.prenom || '',
-    nomFamille: row.nom || '',
-  };
-}
-
-function metaClient(c) {
-  return [
-    c.contact ? `Contact : ${c.contact}` : null,
-    c.telephone ? `WhatsApp : ${c.telephone}` : null,
-    c.email || null,
-  ].filter(Boolean).join(' • ');
-}
-
-function chercherClients() {
-  const q = fold($('#vd-client-search').value).trim();
-  const box = $('#vd-client-results');
-  box.replaceChildren();
-  if (!q) return;
-  const chiffres = q.replace(/\D/g, '');
-  const trouves = CLIENTS.filter((row) => {
-    const foin = fold([row.entreprise, row.nom, row.prenom, row.referent_prenom, row.telephone, row.email]
-      .filter(Boolean).join(' '));
-    const tel = String(row.telephone || '').replace(/\D/g, '');
-    return foin.includes(q) || (chiffres && tel.includes(chiffres));
-  }).slice(0, 8);
-
-  if (!trouves.length) {
-    box.append(el('div', 'vd-notice', 'Aucun client trouvé. Tu peux en créer un nouveau.'));
-    return;
-  }
-  for (const row of trouves) {
-    const c = clientVue(row);
-    const carte = el('div', 'vd-client-result');
-    const tete = el('div', 'vd-client-head');
-    const gauche = el('div');
-    gauche.append(el('b', null, c.nom), el('div', 'vd-help', metaClient(c)));
-    const ajouter = el('button', 'vd-btn vd-btn--primary', 'Ajouter à la commande');
-    ajouter.type = 'button';
-    ajouter.addEventListener('click', () => retenirClient(c));
-    tete.append(gauche, ajouter);
-    carte.append(tete);
-    box.append(carte);
-  }
-}
-
-function retenirClient(c) {
-  state.client = c;
-  $('#vd-selected-name').textContent = c.nom;
-  $('#vd-selected-meta').textContent = metaClient(c);
-  $('#vd-selected-card').classList.remove('vd-hidden');
-  $('#vd-client-search-wrap').classList.add('vd-hidden');
-  $('#vd-notfound').classList.add('vd-hidden');
-  $('#vd-create-box').classList.add('vd-hidden');
-  $('#vd-to-payment').classList.remove('vd-hidden');
-  $('#vd-selected-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function oublierClient() {
-  state.client = null;
-  $('#vd-selected-card').classList.add('vd-hidden');
-  $('#vd-client-search-wrap').classList.remove('vd-hidden');
-  $('#vd-notfound').classList.remove('vd-hidden');
-  $('#vd-to-payment').classList.add('vd-hidden');
-  $('#vd-client-search').value = '';
-  $('#vd-client-results').replaceChildren();
-  $('#vd-client-search').focus();
-}
-
-// TOUS les numéros passent : 0690 des Antilles, 06/07 de métropole, fixe, +1 de
-// Sint Maarten, indicatif inconnu. Le champ reste obligatoire, mais le seul refus
-// est « ce n'est pas un numéro du tout » — une règle de format plus fine a déjà
-// bloqué le comptoir devant un client bien réel.
-const telValide = (v) => /\d/.test(String(v == null ? '' : v));
-const estInternational = (v) => /^(\+|00)/.test(String(v == null ? '' : v).trim());
-function formaterTel(value) {
-  const brut = String(value == null ? '' : value).trim();
-  if (estInternational(brut)) return brut;   // l'indicatif pays ne se coupe pas
-  const chiffres = brut.replace(/\D/g, '');
-  if (/^590\d{9}$/.test(chiffres)) return groupDigits(`0${chiffres.slice(3)}`);
-  return groupDigits(brut);
-}
-const emailValide = (v) => !String(v).trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
-const telNormalise = (v) => whatsappNumber(v) || String(v == null ? '' : v).replace(/\D/g, '');
-
-// Un client déjà en base porte-t-il le même numéro, le même e-mail ou le même
-// nom ? On prévient AVANT de créer un doublon ; un second clic sur le même
-// bouton confirme — parfois c'est bien un nouveau client, et le comptoir ne doit
-// jamais rester bloqué.
-let doublonConfirme = null;
-function chercherDoublon({ telephone, email, entreprise }) {
-  return CLIENTS.find((c) => {
-    const memeTel = telephone && telNormalise(c.telephone) === telephone;
-    const memeMail = email && c.email && c.email.toLowerCase() === email.toLowerCase();
-    const memeNom = entreprise && c.entreprise && c.entreprise.toLowerCase() === entreprise.toLowerCase();
-    return memeTel || memeMail || memeNom;
-  });
-}
-
-function basculerNature(nature) {
-  state.natureClient = nature;
-  $('#vd-choose-perso').classList.toggle('is-active', nature === 'perso');
-  $('#vd-choose-pro').classList.toggle('is-active', nature === 'pro');
-  $('#vd-form-perso').classList.toggle('vd-hidden', nature !== 'perso');
-  $('#vd-form-pro').classList.toggle('vd-hidden', nature !== 'pro');
-  effacerErreurs();
-  $('#vd-create-warning').classList.add('vd-hidden');
-  doublonConfirme = null;
-}
-
-function peindreSecteurs() {
-  const select = $('#vd-pro-secteur');
-  const garde = select.value;
-  select.replaceChildren(new Option('Choisir un secteur', ''));
-  for (const s of SECTEURS) select.append(new Option(s, s, false, s === garde));
-}
-
-async function creerClient() {
-  effacerErreurs();
-  $('#vd-create-warning').classList.add('vd-hidden');
-  const perso = state.natureClient === 'perso';
-  const lu = (id) => $(`#${id}`).value.trim();
-
-  const telId = perso ? 'vd-perso-tel' : 'vd-pro-tel';
-  const emailId = perso ? 'vd-perso-email' : 'vd-pro-email';
-  const telephone = lu(telId);
-  const email = lu(emailId);
-
-  let draft;
-  if (perso) {
-    if (!lu('vd-perso-nom')) return erreurChamp('vd-perso-nom', 'Renseigne le prénom et le nom.');
-    if (!telValide(telephone)) return erreurChamp(telId, 'Renseigne un numéro WhatsApp.');
-    if (!emailValide(email)) return erreurChamp(emailId, 'Adresse e-mail invalide.');
-    // Le comptoir tape « Prénom Nom » ; la base garde les deux séparés (et leur
-    // casse : Jean / DUPONT). Un seul mot = un nom.
-    const mots = lu('vd-perso-nom').split(/\s+/);
-    const prenom = mots.length > 1 ? applyCasse('initiales', mots[0]) : '';
-    const nom = applyCasse('majuscules', (mots.length > 1 ? mots.slice(1) : mots).join(' '));
-    draft = {
-      client_type: 'perso', prenom, nom,
-      // `entreprise` est la colonne obligatoire côté serveur et porte la
-      // recherche : pour un particulier elle vaut « Prénom NOM ».
-      entreprise: `${prenom} ${nom}`.trim(),
-      telephone: formaterTel(telephone), email,
-    };
-  } else {
-    if (!lu('vd-pro-societe')) return erreurChamp('vd-pro-societe', 'Renseigne la raison sociale.');
-    if (!lu('vd-pro-secteur')) return erreurChamp('vd-pro-secteur', 'Choisis le secteur d’activité.');
-    if (!lu('vd-pro-contact')) return erreurChamp('vd-pro-contact', 'Renseigne le contact.');
-    if (!telValide(telephone)) return erreurChamp(telId, 'Renseigne un numéro WhatsApp.');
-    if (!emailValide(email)) return erreurChamp(emailId, 'Adresse e-mail invalide.');
-    draft = {
-      client_type: 'pro',
-      // La maquette ne demande qu'UN nom de société : il remplit les deux
-      // colonnes (`entreprise` porte la recherche et l'affichage,
-      // `raison_sociale` la facturation).
-      entreprise: lu('vd-pro-societe'),
-      raison_sociale: lu('vd-pro-societe'),
-      secteur: lu('vd-pro-secteur'),
-      referent_prenom: lu('vd-pro-contact'),
-      telephone: formaterTel(telephone), email,
-      adresse: lu('vd-pro-adresse'), ville: lu('vd-pro-ville'), code_postal: lu('vd-pro-cp'),
-    };
-    // Le pays ne se demande pas (il se déduit de la ville) mais il s'enregistre :
-    // sans ça la colonne se viderait en silence pour tous les clients créés ici.
-    const connue = VILLES.find((v) => fold(v.label) === fold(draft.ville));
-    if (connue) draft.pays = connue.pays;
-  }
-
-  const signature = `${draft.client_type}|${draft.entreprise}|${telephone}|${email}`;
-  if (doublonConfirme !== signature) {
-    const jumeau = chercherDoublon({
-      telephone: telNormalise(telephone), email, entreprise: draft.entreprise,
-    });
-    if (jumeau) {
-      const avert = $('#vd-create-warning');
-      avert.textContent = `Attention : un client similaire existe déjà (${nomClient(jumeau)}). Vérifie avant de créer un doublon — clique à nouveau pour créer quand même.`;
-      avert.classList.remove('vd-hidden');
-      avert.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      doublonConfirme = signature;
-      return;
-    }
-  }
-
-  const bouton = $('#vd-create-btn');
-  bouton.disabled = true;
-  try {
-    const cree = await api('POST', '/api/clients', draft);
-    CLIENTS.push(cree);
-    doublonConfirme = null;
-    retenirClient(clientVue(cree));
-  } catch (err) {
-    window.alert(err.message || 'Création impossible');
-  } finally {
-    bouton.disabled = false;
-  }
+// Toute la recherche / création vit dans comptoir.js : c'est le MÊME sélecteur
+// que la demande de devis, donc la même façon de chercher, le même
+// avertissement de doublon et le même format de numéro d'un flux à l'autre.
+function surChangementClient(client) {
+  state.client = client;
+  $('#vd-to-payment').classList.toggle('vd-hidden', !client);
 }
 
 // ===========================================================================
@@ -622,27 +364,6 @@ function articleVersLigne(a) {
   };
 }
 
-function payloadClient() {
-  const c = state.client;
-  if (c.perso) {
-    // Particulier : le prénom ET le nom partent séparément — c'est leur
-    // concaténation qui remplit la colonne Client du planning. Les DEUX ou
-    // AUCUN : envoyer un nom sans prénom afficherait « DUPONT » tout court.
-    // Sans les deux, `societe` (déjà « Prénom NOM ») fait foi côté serveur.
-    const prenom = (c.prenom || '').trim();
-    const nomFamille = (c.nomFamille || '').trim();
-    const identite = prenom && nomFamille ? { prenom, nom: nomFamille } : {};
-    return {
-      type: 'perso', ...identite, societe: c.nom,
-      whatsapp: c.telephone, email: c.email,
-    };
-  }
-  return {
-    type: c.clientType, facturation: c.nom, contact: c.contact,
-    whatsapp: c.telephone, email: c.email,
-  };
-}
-
 function payloadCommande(dest) {
   const t = totaux();
   const mode = modeParLabel(modeChoisi());
@@ -650,7 +371,7 @@ function payloadCommande(dest) {
   return {
     kind: 'commande',
     numero: state.numero,
-    client: payloadClient(),
+    client: payloadClient(state.client),
     lignes: state.articles.map(articleVersLigne),
     // La date précise l'emporte pour l'échéance ; le raccourci ne sert qu'à
     // porter la majoration, que le serveur applique lui-même.
@@ -1006,15 +727,7 @@ function nouvelleVente() {
   $('#vd-mix-cash').value = '';
   $('#vd-instant').checked = false;
   ROOT.querySelector('input[name="vd-pay"][value="Carte bancaire"]').checked = true;
-  for (const id of ['vd-perso-nom', 'vd-perso-tel', 'vd-perso-email', 'vd-pro-societe',
-    'vd-pro-contact', 'vd-pro-tel', 'vd-pro-email', 'vd-pro-adresse', 'vd-pro-ville', 'vd-pro-cp']) {
-    $(`#${id}`).value = '';
-  }
-  $('#vd-pro-secteur').value = '';
-  $('#vd-create-box').classList.add('vd-hidden');
-  $('#vd-create-warning').classList.add('vd-hidden');
-  basculerNature('perso');
-  oublierClient();
+  CLIENT.reset();
   majZonesPaiement();
   majMonnaie();
   majAideDelai();
@@ -1024,58 +737,8 @@ function nouvelleVente() {
 }
 
 // ===========================================================================
-// Construction du DOM (une fois)
+// Construction du DOM (une fois) — briques communes dans comptoir.js
 // ===========================================================================
-function champ(label, control, opts = {}) {
-  const wrap = el('div', 'vd-field');
-  const lab = el('label', null, label);
-  lab.htmlFor = control.id;
-  wrap.append(lab, control);
-  if (opts.aide) {
-    const aide = el('div', 'vd-help');
-    aide.id = opts.aide;
-    wrap.append(aide);
-  }
-  return wrap;
-}
-
-function input(id, type, placeholder, attrs = {}) {
-  const n = el('input');
-  n.id = id;
-  n.type = type;
-  if (placeholder) n.placeholder = placeholder;
-  Object.assign(n, attrs);
-  return n;
-}
-
-function select(id, options, values) {
-  const n = el('select');
-  n.id = id;
-  options.forEach((label, i) => n.append(new Option(label, values ? values[i] : label)));
-  return n;
-}
-
-function carte(...enfants) {
-  const c = el('section', 'vd-card');
-  c.append(...enfants);
-  return c;
-}
-
-function titreEtape(titre, refId) {
-  const tete = el('div', 'vd-stage-title');
-  const ref = el('div', 'vd-order-ref', '—');
-  ref.id = refId;
-  tete.append(el('h2', null, titre), ref);
-  return tete;
-}
-
-function bouton(id, label, cls = 'vd-btn') {
-  const b = el('button', cls, label);
-  b.id = id;
-  b.type = 'button';
-  return b;
-}
-
 function sectionArticles() {
   const section = el('section');
   section.id = 'vd-section-articles';
@@ -1172,96 +835,12 @@ function sectionClient() {
   const section = el('section', 'vd-hidden');
   section.id = 'vd-section-client';
 
-  const recherche = champ('Rechercher un client existant', input('vd-client-search', 'text', 'Nom, société, WhatsApp ou partie du numéro', { autocomplete: 'off' }));
-  recherche.id = 'vd-client-search-wrap';
-  const resultats = el('div', 'vd-client-results');
-  resultats.id = 'vd-client-results';
-  recherche.append(resultats);
-
-  // Client retenu
-  const retenu = el('div', 'vd-item vd-selected vd-hidden');
-  retenu.id = 'vd-selected-card';
-  const tete = el('div', 'vd-client-head');
-  const gauche = el('div');
-  const nom = el('h3', null, '');
-  nom.id = 'vd-selected-name';
-  const meta = el('div', 'vd-help');
-  meta.id = 'vd-selected-meta';
-  gauche.append(el('span', 'vd-badge vd-badge--on', '✓ Client ajouté à cette commande'), nom, meta);
-  tete.append(gauche, bouton('vd-change-client', 'Changer'));
-  retenu.append(tete);
-
-  // « Le client n'existe pas encore ? »
-  const absent = el('div', 'vd-notice');
-  absent.id = 'vd-notfound';
-  absent.append(
-    el('b', null, 'Le client n’existe pas encore ?'),
-    el('div', 'vd-help', 'Crée sa fiche puis ajoute-la directement à cette commande.'),
-    bouton('vd-show-create', '+ Créer un nouveau client', 'vd-btn vd-btn--primary'),
-  );
-
-  // Formulaire de création
-  const creation = el('div', 'vd-hidden');
-  creation.id = 'vd-create-box';
-  creation.append(el('h3', null, 'Créer un nouveau client'));
-  const choix = el('div', 'vd-choice-grid');
-  const perso = bouton('vd-choose-perso', '', 'vd-choice is-active');
-  perso.append(el('b', null, 'Particulier'), el('div', 'vd-help', 'Nom, WhatsApp et e-mail.'));
-  const pro = bouton('vd-choose-pro', '', 'vd-choice');
-  pro.append(el('b', null, 'Professionnel'), el('div', 'vd-help', 'Société, secteur, contact et coordonnées.'));
-  choix.append(perso, pro);
-  creation.append(choix);
-
-  const formPerso = el('div');
-  formPerso.id = 'vd-form-perso';
-  formPerso.style.marginTop = '16px';
-  const duoPerso = el('div', 'vd-grid');
-  duoPerso.append(
-    champ('Prénom et nom *', input('vd-perso-nom', 'text', 'Ex. Jean Dupont', { autocomplete: 'off' })),
-    champ('WhatsApp *', input('vd-perso-tel', 'tel', 'Ex. 06 90 47 97 88', { inputMode: 'tel', autocomplete: 'off' })),
-  );
-  formPerso.append(duoPerso, champ('E-mail', input('vd-perso-email', 'email', 'client@email.com', { autocomplete: 'off' })));
-
-  const formPro = el('div', 'vd-hidden');
-  formPro.id = 'vd-form-pro';
-  formPro.style.marginTop = '16px';
-  // La liste des secteurs vit en base (le patron l'ajuste depuis Base clients) :
-  // les deux formulaires proposent donc exactement la même chose, et « Autre »
-  // évite que le comptoir se retrouve bloqué devant un métier absent.
-  const duoPro = el('div', 'vd-grid');
-  duoPro.append(
-    champ('Raison sociale *', input('vd-pro-societe', 'text', 'Ex. Hôtel Exemple', { autocomplete: 'off' })),
-    champ('Secteur d’activité *', select('vd-pro-secteur', ['Choisir un secteur'], [''])),
-  );
-  const trioPro = el('div', 'vd-grid-3');
-  trioPro.append(
-    champ('Contact *', input('vd-pro-contact', 'text', 'Ex. Marie', { autocomplete: 'off' })),
-    champ('WhatsApp *', input('vd-pro-tel', 'tel', 'Ex. 06 90 47 97 88', { inputMode: 'tel', autocomplete: 'off' })),
-    champ('E-mail', input('vd-pro-email', 'email', 'contact@entreprise.com', { autocomplete: 'off' })),
-  );
-  const trioAdresse = el('div', 'vd-grid-3');
-  const ville = input('vd-pro-ville', 'text', 'Saint-Martin', { autocomplete: 'off' });
-  ville.dataset.key = 'ville';
-  const cp = input('vd-pro-cp', 'text', '97150', { autocomplete: 'off' });
-  cp.dataset.key = 'code_postal';
-  trioAdresse.append(
-    champ('Adresse', input('vd-pro-adresse', 'text', null, { autocomplete: 'off' })),
-    champ('Ville', ville),
-    champ('Code postal', cp),
-  );
-  formPro.append(duoPro, trioPro, trioAdresse);
-
-  // Classe à part, PAS `vd-error-msg` : `effacerErreurs()` retire du DOM tous les
-  // messages d'erreur (ils sont créés à la volée sous les champs). L'avertissement
-  // de doublon, lui, est un élément permanent qu'on montre et cache.
-  const avert = el('div', 'vd-warning vd-hidden');
-  avert.id = 'vd-create-warning';
-  const actionsCreation = el('div', 'vd-actions');
-  actionsCreation.append(
-    bouton('vd-create-btn', 'Créer et ajouter à cette commande', 'vd-btn vd-btn--primary'),
-    bouton('vd-cancel-create', 'Annuler'),
-  );
-  creation.append(formPerso, formPro, avert, actionsCreation);
+  CLIENT = creerSelecteurClient({
+    prefix: 'vd',
+    labelAjouter: 'Ajouter à la commande',
+    labelCreer: 'Créer et ajouter à cette commande',
+    onChange: surChangementClient,
+  });
 
   const bas = el('div', 'vd-actions');
   bas.style.marginTop = '18px';
@@ -1269,7 +848,7 @@ function sectionClient() {
   versPaiement.classList.add('vd-hidden');
   bas.append(versPaiement, bouton('vd-back-articles', '← Retour aux articles'));
 
-  section.append(carte(titreEtape('2. Client', 'vd-ref-client'), recherche, retenu, absent, creation, bas));
+  section.append(carte(titreEtape('2. Client', 'vd-ref-client'), CLIENT.element, bas));
   return section;
 }
 
@@ -1430,9 +1009,6 @@ function sectionTicket() {
 function construire() {
   const page = el('div', 'vd-page');
 
-  const entete = el('header', 'vd-header');
-  entete.append(el('h1', null, 'ATELIER OLDA — Vente directe'), el('p', null, 'Articles → Client → Paiement → Ticket'));
-
   const container = el('div', 'vd-container');
   container.id = 'vd-container';
 
@@ -1445,7 +1021,7 @@ function construire() {
   stepper.classList.add('vd-no-print');
 
   container.append(stepper, sectionArticles(), sectionClient(), sectionPaiement(), sectionTicket());
-  page.append(entete, container);
+  page.append(container);
   ROOT.replaceChildren(page);
 }
 
@@ -1463,39 +1039,12 @@ function brancher() {
   $('#vd-goto-client').addEventListener('click', () => {
     if (!validerAvantClient()) return;
     afficherEtape('client');
-    $('#vd-client-search').focus();
+    CLIENT.focus();
   });
 
-  // Étape 2
-  $('#vd-client-search').addEventListener('input', chercherClients);
-  $('#vd-change-client').addEventListener('click', oublierClient);
-  $('#vd-show-create').addEventListener('click', () => {
-    $('#vd-create-box').classList.remove('vd-hidden');
-    $('#vd-notfound').classList.add('vd-hidden');
-    $(`#vd-${state.natureClient === 'perso' ? 'perso-nom' : 'pro-societe'}`).focus();
-  });
-  $('#vd-cancel-create').addEventListener('click', () => {
-    $('#vd-create-box').classList.add('vd-hidden');
-    $('#vd-notfound').classList.remove('vd-hidden');
-    effacerErreurs();
-  });
-  $('#vd-choose-perso').addEventListener('click', () => basculerNature('perso'));
-  $('#vd-choose-pro').addEventListener('click', () => basculerNature('pro'));
-  $('#vd-create-btn').addEventListener('click', creerClient);
+  // Étape 2 — la recherche / création est câblée par le sélecteur partagé.
   $('#vd-to-payment').addEventListener('click', ouvrirPaiement);
   $('#vd-back-articles').addEventListener('click', () => afficherEtape('articles'));
-
-  // Regroupement des chiffres à la frappe (règle partagée avec Base clients) ;
-  // un numéro international se tape tel quel, sans être regroupé.
-  for (const id of ['vd-perso-tel', 'vd-pro-tel']) {
-    const champTel = $(`#${id}`);
-    champTel.addEventListener('input', () => {
-      if (!estInternational(champTel.value)) formatPhoneAsTyped(champTel);
-    });
-    champTel.addEventListener('blur', () => { champTel.value = formaterTel(champTel.value); });
-  }
-  // Une ville connue remplit le code postal, sans jamais écraser une saisie.
-  wireVilleDefaults($('#vd-form-pro'), null, 'input');
 
   // Étape 3
   for (const radio of ROOT.querySelectorAll('input[name="vd-pay"]')) {
@@ -1522,14 +1071,7 @@ function brancher() {
     nouvelleVente();
   });
 
-  // Un champ qu'on corrige efface son erreur : le rouge ne survit pas à la
-  // frappe qui le répare.
-  ROOT.addEventListener('input', (e) => {
-    if (!e.target.classList.contains('vd-invalid')) return;
-    e.target.classList.remove('vd-invalid');
-    const suivant = e.target.nextElementSibling;
-    if (suivant && suivant.classList.contains('vd-error-msg')) suivant.remove();
-  });
+  effacerErreurALaFrappe(ROOT);
 }
 
 function peindreSuggestions() {
@@ -1549,19 +1091,16 @@ export async function initProjet(root) {
   peindreResume();
   peindreSuggestions();
   try {
-    const [clients, parametres, catalogue] = await Promise.all([
-      api('GET', '/api/clients'),
+    const [parametres, catalogue] = await Promise.all([
       api('GET', '/api/tarifs-tasse/parametres'),
       api('GET', '/api/commande/catalog'),
+      CLIENT.charger(),
     ]);
-    CLIENTS = clients;
     if (parametres && Number.isFinite(Number(parametres.tgca))) TGCA = Number(parametres.tgca);
     const vetements = (catalogue && catalogue.vetements) || [];
     SUGGESTIONS = [...new Set([...ARTICLES_SUGGERES, ...vetements])];
     peindreSuggestions();
     $('#vd-tax-text').textContent = texteTgca();
-    await loadSecteurs();
-    peindreSecteurs();
   } catch (_) { /* silencieux : la recherche part d'une liste vide, la saisie reste possible */ }
 }
 
@@ -1573,8 +1112,6 @@ export async function resetProjet() {
   if (!monte) return;
   nouvelleVente();
   try {
-    CLIENTS = await api('GET', '/api/clients');
-    await loadSecteurs();
-    peindreSecteurs();
+    await CLIENT.charger();
   } catch (_) { /* la liste précédente reste utilisable */ }
 }

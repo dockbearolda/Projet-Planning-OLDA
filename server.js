@@ -1011,7 +1011,11 @@ function buildDestination(b, type) {
 //   - HISTORIQUE : `prixTtcManuel`, qui portait le TOTAL de la ligne.
 // `defautUnitaireTtc` (tasse) sert quand le comptoir n'a rien saisi : le prix
 // calculé depuis la grille tarifaire fait alors foi.
-function readPrixLigne(raw, quantite, where, defautUnitaireTtc) {
+// `prixFacultatif` (demande de devis) : une demande arrive PAR DÉFINITION sans
+// prix — c'est justement ce qu'Atelier OLDA doit chiffrer. La ligne vaut alors
+// `null`, jamais 0 : « pas encore chiffré » et « gratuit » ne se confondent pas
+// dans la colonne Prix TTC du planning.
+function readPrixLigne(raw, quantite, where, defautUnitaireTtc, prixFacultatif) {
   const l = raw && typeof raw === 'object' ? raw : {};
   const cents = (v) => Math.round(v * 100) / 100;
   const positif = (v) => Number.isFinite(v) && v >= 0;
@@ -1031,6 +1035,8 @@ function readPrixLigne(raw, quantite, where, defautUnitaireTtc) {
   } else if (defautUnitaireTtc != null) {
     prixUnitaireTtc = cents(defautUnitaireTtc);
     prixLigneTtc = cents(prixUnitaireTtc * quantite);
+  } else if (prixFacultatif) {
+    return { prixUnitaireTtc: null, prixUnitaireHt: null, prixLigneTtc: 0, prixCatalogue: false };
   } else {
     return { error: `${where} : prix TTC invalide` };
   }
@@ -1164,7 +1170,7 @@ function readFaceTextile(raw, face, where) {
 }
 
 // Ligne TEXTILE : le vêtement, sa grille de tailles, ses deux faces marquées.
-function buildLigneTextile(raw, index) {
+function buildLigneTextile(raw, index, prixFacultatif) {
   const where = `Textile ${index + 1}`;
   const l = raw && typeof raw === 'object' ? raw : {};
 
@@ -1191,7 +1197,7 @@ function buildLigneTextile(raw, index) {
     if (built.face) faces.push(built.face);
   }
 
-  const prix = readPrixLigne(l, q.quantite, where, null);
+  const prix = readPrixLigne(l, q.quantite, where, null, prixFacultatif);
   if (prix.error) return { error: prix.error };
 
   const tailleTxt = grille.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ');
@@ -1214,7 +1220,10 @@ function buildLigneTextile(raw, index) {
 
 // Ligne AUTRES / PLAQUE SIGNALÉTIQUE : un projet décrit à la main (désignation,
 // explication, matière, format, méthode de production).
-function buildLigneAutres(raw, index, typeLabel) {
+// `categorie`, `reference` et `couleur` viennent de la DEMANDE DE DEVIS : le
+// client demande « des NS300 noirs, catégorie Textile » bien avant qu'un article
+// du catalogue soit choisi. Facultatifs — la vente directe ne les envoie pas.
+function buildLigneAutres(raw, index, typeLabel, prixFacultatif) {
   const where = `${typeLabel} ${index + 1}`;
   const l = raw && typeof raw === 'object' ? raw : {};
   const q = readQuantite(l.quantite, where);
@@ -1226,20 +1235,27 @@ function buildLigneAutres(raw, index, typeLabel) {
   const champs = {};
   for (const [champ, quoi, max] of [['explication', 'explication du projet', DESCRIPTION_MAX],
     ['matiere', 'matière', TEXTE_MAX], ['format', 'format', TEXTE_MAX],
-    ['methode', 'méthode de production', TEXTE_MAX]]) {
+    ['methode', 'méthode de production', TEXTE_MAX],
+    ['categorie', 'catégorie', TEXTE_MAX], ['reference', 'référence', TEXTE_MAX],
+    ['couleur', 'couleur', TEXTE_MAX]]) {
     const t = readTexte(l[champ], where, quoi, max);
     if (t.error) return { error: t.error };
     champs[champ] = t.value;
   }
 
-  const prix = readPrixLigne(l, q.quantite, where, null);
+  const prix = readPrixLigne(l, q.quantite, where, null, prixFacultatif);
   if (prix.error) return { error: prix.error };
 
+  // Ce que la grille du planning et la recherche liront : la désignation, puis
+  // ce qui distingue vraiment la demande (référence demandée, couleur).
+  const identite = [
+    champs.reference && `réf. ${champs.reference}`, champs.couleur,
+  ].filter(Boolean).join(' · ');
   return {
     ligne: {
       quantite: q.quantite, designation: designation.value, ...champs,
       prixUnitaireTtc: prix.prixUnitaireTtc, prixUnitaireHt: prix.prixUnitaireHt,
-      description: `${q.quantite} × ${designation.value}`,
+      description: `${q.quantite} × ${designation.value}${identite ? ` — ${identite}` : ''}`,
       produit: null, coloris: null, face1: null, face2: null, dessous: null, bat: false,
       remarque: null, prixTtcManuel: null,
     },
@@ -1317,6 +1333,70 @@ function deduireStatut(p) {
   return null;
 }
 
+// --- DEMANDE DE DEVIS ---------------------------------------------------------
+// Le BRIEF que la vendeuse recueille au comptoir ou au téléphone : qui a pris la
+// demande, par quel canal, ce que le client veut obtenir, et surtout OÙ EN EST LE
+// DOSSIER (logo reçu ou pas, vectorisation, informations encore attendues).
+// Rien n'est obligatoire ici — c'est le front qui exige ce qu'il faut avant de
+// laisser passer ; le serveur borne les textes et refuse les valeurs inventées.
+// Tout est facultatif côté serveur pour que la vente directe, qui n'envoie pas
+// de brief, continue de passer sans rien changer.
+const DEMANDE_ETATS = new Map([
+  ['recu', 'Informations reçues'],
+  ['partiel', 'Informations reçues partiellement'],
+  ['attente', 'En attente d’informations'],
+]);
+const DEMANDE_SUITES = new Map([
+  ['devis', 'Devis à faire'],
+  ['attente', 'Attendre les informations du client'],
+]);
+
+function readDemande(raw) {
+  if (!raw || typeof raw !== 'object') return { demande: null };
+  const textes = {};
+  for (const [champ, quoi, max] of [
+    ['prisePar', 'personne qui a pris la demande', TEXTE_MAX],
+    ['canal', 'canal d’entrée', TEXTE_MAX],
+    ['objet', 'objet du projet', TEXTE_MAX],
+    ['description', 'description du projet', DESCRIPTION_MAX],
+    ['contraintes', 'contraintes du projet', DESCRIPTION_MAX],
+    ['logoType', 'type de logo', TEXTE_MAX],
+    ['logoStatut', 'statut du logo', TEXTE_MAX],
+    ['vectorisation', 'reprise de vectorisation', TEXTE_MAX],
+    ['maquette', 'maquette / fichier numérique', TEXTE_MAX],
+    ['transmisPar', 'mode de transmission', TEXTE_MAX],
+    ['attenduPar', 'mode de transmission attendu', TEXTE_MAX],
+    ['attendu', 'informations attendues', DESCRIPTION_MAX],
+    ['recus', 'éléments reçus du client', DESCRIPTION_MAX],
+    ['aVerifier', 'points à contrôler', DESCRIPTION_MAX],
+  ]) {
+    const t = readTexte(raw[champ], 'Demande', quoi, max);
+    if (t.error) return { error: t.error };
+    textes[champ] = t.value;
+  }
+
+  if (raw.etat != null && raw.etat !== '' && !DEMANDE_ETATS.has(raw.etat)) {
+    return { error: `état du dossier inconnu : ${raw.etat}` };
+  }
+  if (raw.suite != null && raw.suite !== '' && !DEMANDE_SUITES.has(raw.suite)) {
+    return { error: `suite à donner inconnue : ${raw.suite}` };
+  }
+  // Le budget est INDICATIF : ce que le client a annoncé, jamais un prix. Il ne
+  // remplit donc pas `project_value` — c'est le chiffrage qui le fera.
+  const budget = Number(raw.budget);
+  const budgetOk = raw.budget != null && raw.budget !== '' && Number.isFinite(budget) && budget >= 0;
+
+  return {
+    demande: {
+      ...textes,
+      priseLe: isDay(raw.priseLe) ? raw.priseLe : null,
+      etat: DEMANDE_ETATS.has(raw.etat) ? { id: raw.etat, label: DEMANDE_ETATS.get(raw.etat) } : null,
+      suite: DEMANDE_SUITES.has(raw.suite) ? { id: raw.suite, label: DEMANDE_SUITES.get(raw.suite) } : null,
+      budget: budgetOk ? Math.round(budget * 100) / 100 : null,
+    },
+  };
+}
+
 // Un projet est un PANIER : plusieurs produits, de types DIFFÉRENTS (une
 // tasse, un polo, une plaque…), pour un seul client et un seul enregistrement
 // — façon caisse SumUp, on encaisse tout d'un coup. Chaque ligne du panier
@@ -1337,6 +1417,10 @@ function buildProjet(body, tarifsById) {
   if (rawLignes.length === 0) return { error: 'un projet doit contenir au moins un produit' };
   if (rawLignes.length > PROJET_LIGNES_MAX) return { error: `trop de produits (${PROJET_LIGNES_MAX} maximum)` };
 
+  // Une DEMANDE arrive sans prix — c'est ce qu'Atelier OLDA doit chiffrer. Une
+  // COMMANDE, elle, est déjà chiffrée : le prix y reste obligatoire.
+  const prixFacultatif = orderType.id === 'demande';
+
   const lignes = [];
   let prixTotalTtc = 0;
   let prixRevientTotal = 0;
@@ -1346,8 +1430,8 @@ function buildProjet(body, tarifsById) {
     if (!type) return { error: `Produit ${i + 1} : type de projet inconnu (${raw.type})` };
     let built;
     if (type.forme === 'tasse') built = buildLigneTasse(raw, i, tarifsById);
-    else if (type.forme === 'textile') built = buildLigneTextile(raw, i);
-    else built = buildLigneAutres(raw, i, type.label);
+    else if (type.forme === 'textile') built = buildLigneTextile(raw, i, prixFacultatif);
+    else built = buildLigneAutres(raw, i, type.label, prixFacultatif);
     if (built.error) return { error: built.error };
     built.ligne.type = { id: type.id, label: type.label };
     lignes.push(built.ligne);
@@ -1366,8 +1450,12 @@ function buildProjet(body, tarifsById) {
     return { error: 'le délai est obligatoire : choisis un raccourci ou une date précise' };
   }
   const delai = delaiChoisi || { id: 'date', label: `Pour le ${dateChoisie}`, jours: 0, majoration: 0 };
+  // AUCUNE ligne chiffrée (demande de devis) : le projet vaut `null`, pas 0 —
+  // la colonne Prix TTC du planning reste vide jusqu'au chiffrage, au lieu
+  // d'annoncer un projet à 0,00 €.
+  const nonChiffre = lignes.every((l) => l.prixUnitaireTtc == null);
   prixTotalTtc = prixTotalTtc * (1 + (delai.majoration || 0) / 100);
-  prixTotalTtc = Math.round(prixTotalTtc * 100) / 100;
+  prixTotalTtc = nonChiffre ? null : Math.round(prixTotalTtc * 100) / 100;
 
   // La date précise l'emporte : c'est une échéance dictée par le client, pas un
   // J+n calculé.
@@ -1389,27 +1477,37 @@ function buildProjet(body, tarifsById) {
   // faire retirer. C'est le comptoir qui le sait, personne d'autre.
   const retraitImmediat = b.retraitImmediat === true;
 
-  const venteHt = prixTotalTtc / (1 + PROJET_TGCA);
-  const margeHt = Math.round((venteHt - prixRevientTotal) * 100) / 100;
+  const venteHt = nonChiffre ? null : prixTotalTtc / (1 + PROJET_TGCA);
+  const margeHt = nonChiffre ? null : Math.round((venteHt - prixRevientTotal) * 100) / 100;
   // Le HT n'est jamais stocké : il se déduit du TTC et du taux TGCA du moment.
   // On le renvoie quand même à l'écran de confirmation, pour éviter que chaque
   // vue le recalcule avec un taux qu'elle aurait deviné.
-  const prixTotalHt = Math.round(venteHt * 100) / 100;
+  const prixTotalHt = nonChiffre ? null : Math.round(venteHt * 100) / 100;
 
   const paiement = readPaiement(b.paiement);
+  // Le PILOTE de la ligne. La vente directe n'en désigne pas ; la demande de
+  // devis, si : celle qui a pris la demande la suit jusqu'au devis.
+  const responsable = RESPONSABLE_SET.has(b.responsable) ? b.responsable : null;
+
+  const brief = readDemande(b.demande);
+  if (brief.error) return { error: brief.error };
 
   const projet = {
     kind: 'projet-simple',
     // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement ;
     // v4 = fiche de production détaillée par famille + prix unitaire HT/TTC ;
-    // v5 = vente directe (numéro de ticket, heure de retrait, note interne)
-    version: 5,
+    // v5 = vente directe (numéro de ticket, heure de retrait, note interne) ;
+    // v6 = demande de devis (brief client, contrôle du dossier, prix non chiffré)
+    version: 6,
+    orderKind: orderType.id,
     numero: ticket.value,
     client,
     lignes,
+    demande: brief.demande,
     heureSouhaitee: heure,
     noteInterne: note.value,
     retraitImmediat,
+    responsable,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
     prixTotalTtc,
     prixTotalHt,
@@ -1446,15 +1544,39 @@ function buildProjet(body, tarifsById) {
     paiement.acompteMontant != null ? `${paiement.acompteMontant.toFixed(2)} €` : null,
     paiement.mode ? paiement.mode.label : null,
   ].filter(Boolean).join(' · ');
+  // Le brief de la demande de devis, en clair : c'est ce que lira celui qui
+  // chiffrera, et il doit pouvoir le faire sans rappeler le client.
+  const d = brief.demande;
+  const lignesDemande = d ? [
+    [d.prisePar && `Demande prise par ${d.prisePar}`, d.canal && `via ${d.canal}`,
+      d.priseLe && `le ${d.priseLe}`].filter(Boolean).join(' ') || null,
+    d.objet ? `Objet : ${d.objet}` : null,
+    d.budget != null ? `Budget indicatif : ${d.budget.toFixed(2)} €` : null,
+    d.description ? `Projet : ${d.description}` : null,
+    d.contraintes ? `À garder en tête : ${d.contraintes}` : null,
+    d.etat ? `Dossier : ${d.etat.label}` : null,
+    d.logoType ? `Logo : ${d.logoType}${d.logoStatut ? ` (${d.logoStatut})` : ''}` : null,
+    d.vectorisation ? `Vectorisation : ${d.vectorisation}` : null,
+    d.maquette ? `Maquette : ${d.maquette}` : null,
+    d.transmisPar ? `Informations transmises par ${d.transmisPar}` : null,
+    d.recus ? `Reçu du client : ${d.recus}` : null,
+    d.attendu ? `Encore attendu${d.attenduPar ? ` (par ${d.attenduPar})` : ''} : ${d.attendu}` : null,
+    d.aVerifier ? `À contrôler : ${d.aVerifier}` : null,
+    d.suite ? `Suite à donner : ${d.suite.label}` : null,
+  ].filter(Boolean) : [];
+
   const resume = [
     `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
-    ticket.value ? `Ticket : ${ticket.value}` : null,
+    ticket.value ? `${prixFacultatif ? 'Demande' : 'Ticket'} : ${ticket.value}` : null,
     ...lignes.map(detailLigneTexte),
     `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
-    heure ? `Retrait souhaité : le ${deadline} à ${heure.replace(':', 'h')}` : null,
+    // Au comptoir l'heure est celle du RETRAIT ; sur une demande de devis, ce
+    // n'est qu'un souhait du client — on ne lui promet pas un retrait.
+    heure ? `${prixFacultatif ? 'Souhaité' : 'Retrait souhaité'} : le ${deadline} à ${heure.replace(':', 'h')}` : null,
     retraitImmediat ? 'Le client est reparti avec sa commande.' : null,
-    `Prix : ${prixTotalTtc.toFixed(2)} € TTC (${prixTotalHt.toFixed(2)} € HT)`,
+    nonChiffre ? 'Prix : à chiffrer' : `Prix : ${prixTotalTtc.toFixed(2)} € TTC (${prixTotalHt.toFixed(2)} € HT)`,
     etatPaiement ? `Paiement : ${etatPaiement}` : null,
+    ...lignesDemande,
     note.value ? `Note interne : ${note.value}` : null,
   ].filter(Boolean).join('\n');
 
@@ -1481,13 +1603,15 @@ app.post('/api/projets', asyncH(async (req, res) => {
 
   const { rows } = await pool.query(
     `INSERT INTO requests
-       (stage, sub_stage, order_kind, priority, client_type, billing_company, contact_referent,
+       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company, contact_referent,
         contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value,
         acompte_demande, acompte_verse, acompte_montant, paye, paiement_mode)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
      RETURNING *`,
     [
-      projet.stage, projet.subStage, 'commande', projet.priority, projet.client.type,
+      // La NATURE tranchée à la prise : une demande de devis entre en
+      // « demande » (à chiffrer), une vente directe en « commande » (validée).
+      projet.stage, projet.subStage, projet.orderKind, projet.responsable, projet.priority, projet.client.type,
       projet.client.societe, projet.client.contact, projet.client.telephone, projet.client.email,
       projet.quantite, produit, resume, projet.deadline, posRows[0].pos,
       // `project_value` porte le TTC : c'est le prix que le client paie, et
@@ -1512,18 +1636,29 @@ app.post('/api/projets', asyncH(async (req, res) => {
 // Le jour est celui du POSTE (`jour`, aaaa-mm-jj) : le conteneur tourne en UTC,
 // il basculerait au lendemain dès 20 h à Saint-Martin.
 app.post('/api/vente/numero', asyncH(async (req, res) => {
-  const body = req.body || {};
+  const r = await reserverNumeroDuJour('vente', req.body || {});
+  res.status(201).json(r);
+}));
+
+// POST /api/devis/numero → même compteur, même garantie, pour la DEMANDE DE
+// DEVIS : « DEV-26.07.30-001 ». Deux séries distinctes et deux clés app_meta
+// distinctes — une demande et une vente du même jour ne se disputent pas un
+// rang, et le préfixe dit du premier coup d'œil ce qu'on a en main.
+app.post('/api/devis/numero', asyncH(async (req, res) => {
+  const r = await reserverNumeroDuJour('devis', req.body || {});
+  res.status(201).json({ ...r, numero: `DEV-${r.numero}` });
+}));
+
+async function reserverNumeroDuJour(serie, body) {
   const jour = isDay(body.jour) ? body.jour : todayPlus(0);
   const [y, m, d] = jour.split('-');
-  const metaKey = `vente_seq_${y}${m}${d}`;
+  const metaKey = `${serie}_seq_${y}${m}${d}`;
   const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
   const rang = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
   await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
   await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(rang)]);
-  res.status(201).json({
-    numero: `${y.slice(2)}.${m}.${d}-${String(rang).padStart(3, '0')}`, jour, rang,
-  });
-}));
+  return { numero: `${y.slice(2)}.${m}.${d}-${String(rang).padStart(3, '0')}`, jour, rang };
+}
 
 // ---------------------------------------------------------------------------
 // Statique + SPA
