@@ -154,6 +154,10 @@
 .vd-page .vd-pay-option input { width: auto; min-height: 0; }
 .vd-page .vd-pay-option:has(input:checked) { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
 
+/* Montant encaissé sur l'écran final : le ticket n'étant plus affiché, c'est le
+   dernier rappel du total à l'écran. */
+.vd-pay-total { margin: 8px 0 0; font-size: 18px; }
+
 /* --- « Où poser la ligne dans le planning ? » -----------------------------
    LE geste par lequel la vendeuse fait entrer la vente dans l'atelier, posé
    APRÈS le ticket. Carte à filet d'encre épais : on ne peut pas la manquer en
@@ -216,8 +220,13 @@
 }
 
 /* --- Impression du ticket -------------------------------------------------
+   Le ticket ne s'affiche PAS à l'écran : il part à l'imprimante, en fichier ou
+   sur WhatsApp, personne ne le lit sur la tablette. Il reste dans le DOM (c'est
+   lui qu'imprime le navigateur) mais hors de la vue.
    `vd-print` est posée sur <body> le temps de l'impression : tout l'écran
    disparaît sauf le ticket, qui part au format 80 mm de la caisse. */
+.vd-print-only { display: none; }
+
 @media print {
   body.vd-print { background: #fff; }
   body.vd-print .topbar,
@@ -225,6 +234,7 @@
   body.vd-print .vd-header,
   body.vd-print .vd-stepper,
   body.vd-print .vd-no-print { display: none !important; }
+  body.vd-print .vd-print-only { display: block !important; }
   /* Les conteneurs bornent la hauteur et coupent le débordement à l'écran :
      à l'impression ils doivent laisser passer toute la hauteur du ticket. */
   body.vd-print .shell,

@@ -265,13 +265,20 @@ suivante sous le bouton de validation, pour que personne ne la découvre.
 ### 4. Le ticket
 
 « Valider le paiement » **enregistre d'abord la commande au planning**
-(`POST /api/projets`) et n'affiche le ticket qu'une fois l'enregistrement
+(`POST /api/projets`) et ne passe à l'écran suivant qu'une fois l'enregistrement
 confirmé — sans quoi on remettrait au client un ticket dont l'atelier n'a jamais
 entendu parler.
 
-Le ticket s'**imprime** (80 mm, tout le reste de l'écran disparaît), se
-**télécharge** en `.txt`, et part sur **WhatsApp** avec le message déjà écrit —
-rien ne s'envoie tout seul, c'est l'employé qui appuie sur Envoyer.
+Le ticket s'**imprime** (80 mm), se **télécharge** en `.txt`, et part sur
+**WhatsApp** avec le message déjà écrit — rien ne s'envoie tout seul, c'est
+l'employé qui appuie sur Envoyer.
+
+**Il n'est PAS affiché à l'écran** : il part à l'imprimante, en fichier ou sur
+WhatsApp, personne ne le lit sur la tablette. Il reste dans le DOM (c'est lui
+qu'imprime le navigateur, classe `.vd-print-only` : masqué à l'écran, rendu en
+`@media print`), et l'écran garde ce qui sert à ce moment-là — le numéro, le
+paiement avec la monnaie à rendre, le **total encaissé**, et la question du
+planning ci-dessous.
 
 ### 5. Où poser la ligne dans le planning ?
 
@@ -279,7 +286,7 @@ rien ne s'envoie tout seul, c'est l'employé qui appuie sur Envoyer.
 pour ça qu'il vient APRÈS le ticket : le client a son ticket en main, la ligne
 existe déjà, il reste à dire à quelle étape elle attend.
 
-La carte s'affiche en haut de l'écran du ticket, filet d'encre à gauche, et
+La carte occupe l'écran du ticket (qui, lui, ne s'affiche pas), filet d'encre à gauche, et
 propose **tout le pipeline** (familles + sous-étapes, Fiverr compris, servi par
 `/api/pipeline` — une étape ajoutée en base apparaît sans retoucher le front).
 *Préparation → Prêt à produire* est proposé en premier, marqué « le plus

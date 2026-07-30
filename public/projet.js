@@ -719,10 +719,15 @@ async function enregistrerCommande() {
   state.emportee = emportee;
   state.destinationPosee = emportee;   // emportée : la place est déjà la bonne
 
+  // Le ticket n'étant plus affiché, le montant encaissé se lit ICI : c'est le
+  // dernier endroit où l'écran le rappelle, monnaie à rendre comprise.
+  const total = el('p', 'vd-pay-total');
+  total.append(document.createTextNode('Total encaissé : '), el('b', null, money(totaux().total)));
   $('#vd-pay-status').replaceChildren(
     document.createTextNode('Paiement enregistré pour la commande '),
     el('b', null, state.numero),
     document.createTextNode(` — ${state.paiementTexte}.`),
+    total,
   );
   peindreDestination();
   remplirTicket();
@@ -1411,8 +1416,13 @@ function sectionTicket() {
     el('div', 'vd-center', 'Merci pour votre confiance'),
     el('div', 'vd-center', 'L’équipe Atelier OLDA'),
   );
+  // Le ticket n'est PAS affiché à l'écran : il part à l'imprimante, en fichier ou
+  // sur WhatsApp, et personne ne le lit sur la tablette. Il reste donc dans le
+  // DOM (c'est lui qu'imprime le navigateur, et `remplirTicket` le remplit),
+  // mais visible uniquement à l'impression. L'écran garde ce qui sert vraiment à
+  // ce moment-là : la commande est passée, et où poser la ligne au planning.
   const carteTicket = carte(ticket);
-  carteTicket.classList.add('vd-ticket-card');
+  carteTicket.classList.add('vd-ticket-card', 'vd-print-only');
   section.append(carteTicket);
   return section;
 }
