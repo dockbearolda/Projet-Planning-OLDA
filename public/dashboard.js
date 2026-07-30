@@ -18,7 +18,7 @@
 // (/api/category-referents) : les référents effectifs d'une commande sont son
 // `referent` s'il a été saisi à la main, sinon ceux de sa catégorie.
 
-import { rankRequests } from './priority.js';
+import { rankRequests, WAITING_SUBS, WAITING_REASON } from './priority.js';
 
 export function createDashboard(deps) {
   const {
@@ -74,7 +74,7 @@ export function createDashboard(deps) {
     facturation: 'Facturer et organiser le retrait',
     facturation_a_faire: 'Éditer et envoyer la facture',
     client_a_prevenir: 'Prévenir le client que c’est prêt',
-    client_prevenu: 'Attendre le retrait par le client',
+    client_prevenu: 'Relancer le client pour qu’il vienne la récupérer',
     commande_recuperee: 'Contrôler le paiement',
   };
 
@@ -196,15 +196,23 @@ export function createDashboard(deps) {
   // y jeter un œil. C'est ce qu'on regarde en premier au point du matin.
   const FLAG_LABEL = { bloque: 'BLOQUÉE', a_voir: 'À VOIR' };
   // « Attente client » n'est plus une famille : c'est la position du dossier —
-  // devis parti, ou BAT parti — tant que le client n'a pas répondu.
-  const isWaitingClient = (r) => r.sub_stage === 'devis_envoye' || r.sub_stage === 'bat_envoye';
+  // devis parti, BAT parti, ou commande finie qui attend son retrait — tant que
+  // le client n'a pas bougé. UNE seule définition, partagée avec le moteur de
+  // priorité : le KPI et le bac « à relancer » doivent parler des mêmes lignes.
+  const isWaitingClient = (r) => WAITING_SUBS.has(r.sub_stage);
 
   const isBlocked = (r) => r.flag === 'bloque';
+
+  // « En retard » = L'ATELIER est en retard. Une commande dont la balle est chez
+  // le client (devis/BAT partis, ou finie et pas encore récupérée) a beau avoir
+  // dépassé sa date, ce n'est plus notre retard : elle est comptée en « Attente
+  // client », pas ici — sinon le compteur du matin gonfle avec du travail fait.
+  const isLate = (r) => urgency(r).band === 0 && !isWaitingClient(r);
 
   function kpis() {
     const act = rows.filter(isActive);
     return {
-      late: act.filter((r) => urgency(r).band === 0).length,
+      late: act.filter(isLate).length,
       blocked: act.filter(isBlocked).length,
       soon: act.filter((r) => urgency(r).band === 1).length,
       waiting: act.filter(isWaitingClient).length,
@@ -214,7 +222,7 @@ export function createDashboard(deps) {
 
   // --- Filtres (KPI + recherche) : estompe les cartes non concernées -------
   const KPI_PRED = {
-    late: (r) => urgency(r).band === 0,
+    late: isLate,
     blocked: isBlocked,
     soon: (r) => urgency(r).band === 1,
     waiting: isWaitingClient,
@@ -458,12 +466,11 @@ export function createDashboard(deps) {
       return b;
     };
     // « À faire » : la file commune, en tête. Point rouge s'il y a du retard.
-    const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque'
-      && !isWaitingClient(r) && urgency(r).band === 0);
+    const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque' && isLate(r));
     const todo = mkTab('todo', 'À faire', todoLate);
     todo.addEventListener('click', () => { activeTab = 'todo'; renderHead(); renderBody(); });
 
-    const hasLate = (who) => who && dayList(who).some((r) => urgency(r).band === 0);
+    const hasLate = (who) => who && dayList(who).some(isLate);
     for (const who of EMPLOYEES) {
       const t = mkTab(who, who, hasLate(who));
       t.addEventListener('click', () => { activeTab = who; renderHead(); renderBody(); });
@@ -478,7 +485,7 @@ export function createDashboard(deps) {
     for (const who of EMPLOYEES) {
       const col = el('section', 'pj-col');
       const day = dayList(who);
-      const late = day.filter((r) => urgency(r).band === 0).length;
+      const late = day.filter(isLate).length;
 
       const head = el('button', 'pj-col-head');
       head.type = 'button';
@@ -578,8 +585,14 @@ export function createDashboard(deps) {
   // Rang · étoiles · client · article · POURQUOI · pilote. Un clic ouvre le
   // détail (mêmes actions : envoyer vers, marquer traité). `who` filtre à une
   // personne (vue perso) ; sinon toute l'équipe.
+  // On classe UNIQUEMENT les familles actives — la même liste que les KPI, les
+  // colonnes et les vues perso. Le moteur a bien sa propre garde, mais elle
+  // nomme ce qu'il faut EXCLURE : une position inconnue de lui (slug hérité
+  // d'une bascule de pipeline, famille ajoutée demain) passerait au travers et
+  // se retrouverait à réclamer du travail ici, invisible partout ailleurs.
   function rankFor(who) {
-    const base = who ? rows.filter((r) => effectivePilot(r) === who || effectiveReferents(r).includes(who)) : rows;
+    const base = rows.filter((r) => isActive(r)
+      && (!who || effectivePilot(r) === who || effectiveReferents(r).includes(who)));
     return rankRequests(base, machines, { now: Date.now() });
   }
 
@@ -629,7 +642,9 @@ export function createDashboard(deps) {
       el('span', 'pj-card-client', clientName(r)),
       el('span', 'pj-card-article', articleOf(r)),
     );
-    const why = kind === 'bloque' ? (r.flag_reason || 'Sans motif précisé') : 'En attente d’une réponse du client';
+    const why = kind === 'bloque'
+      ? (r.flag_reason || 'Sans motif précisé')
+      : (WAITING_REASON[r.sub_stage] || 'En attente d’une réponse du client');
     row.appendChild(el('span', 'pj-hold-why', why));
     b.appendChild(row);
     b.addEventListener('click', () => openDetail(r.id));
@@ -1151,7 +1166,7 @@ export function createDashboard(deps) {
     const b = $wallScreens[1];
     b.replaceChildren();
     b.appendChild(el('h2', 'wall-b-title', 'À faire maintenant'));
-    const ranked = rankRequests(rows, machines, { now: Date.now() }).queue;
+    const ranked = rankFor().queue;
     if (!ranked.length) {
       b.appendChild(el('p', 'wall-b-empty', 'Rien à lancer — tout roule.'));
     } else {

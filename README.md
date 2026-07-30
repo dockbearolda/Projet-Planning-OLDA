@@ -91,6 +91,21 @@ Une commande **BLOQUÉE / À VOIR** porte son bandeau d'alerte (motif compris) s
 sa carte, et l'alerte se **lève d'un tap** depuis le panneau détail : c'est la
 manœuvre du point du matin. La poser (avec motif) se fait depuis le Planning.
 
+### « À faire maintenant » ≠ « à relancer »
+
+Trois positions veulent dire **la balle est chez le client** (`WAITING_SUBS`,
+`public/priority.js`) : *Tarif / Devis envoyé*, *BAT envoyé* et ***Client prévenu
+– Attente retrait*** — cette dernière voulant dire que la commande est FINIE et
+n'attend plus que d'être récupérée. Elles sortent de la file « À faire
+maintenant » vers le bac **« À débloquer / relancer »**, chacune avec son motif
+(on ne relance pas de la même façon un devis sans réponse et une commande posée
+sur l'étagère).
+
+Elles comptent en **« Attente client »**, jamais en **« En retard »** : ce
+compteur-là dit que *l'atelier* est en retard. Sans cette règle, une commande
+terminée dont la date promise est passée squattait la tête du point du matin —
+le patron se voyait réclamer du travail fait depuis des jours.
+
 ## Démarrage local
 
 Prérequis : Node 18+. **Aucune installation de PostgreSQL n'est nécessaire pour
