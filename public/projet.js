@@ -78,6 +78,10 @@ let TGCA = 0.04;
 // constante recopiée dans le texte du bouton.
 const texteTgca = () => `Appliquer la TGCA de ${String(Math.round(TGCA * 1000) / 10).replace('.', ',')} %`;
 let CLIENTS = [];
+// Familles + sous-étapes du planning, chargées à la demande pour la question
+// « où l'enregistrer ? ». C'est le serveur qui les sert (/api/pipeline) : une
+// étape ajoutée en base apparaît sans retoucher le front.
+let PIPELINE = null;
 // Suggestions de la maquette, complétées par le catalogue partagé (vêtements) :
 // une liste déroulante ne contraint rien, elle fait gagner des frappes.
 const ARTICLES_SUGGERES = [
@@ -117,6 +121,10 @@ const state = {
   natureClient: 'perso', // onglet du formulaire de création
   paiementTexte: '',     // « Espèces — donné 30,00 €, monnaie 4,70 € »
   numero: '',            // numéro du ticket, réservé au premier article
+  ligneId: null,         // id de la ligne créée au planning (pour la déplacer)
+  destination: null,     // où elle est posée : { stage, subStage, label }
+  destinationPosee: false, // la vendeuse a-t-elle tranché l'étape ?
+  emportee: false,       // le client est-il reparti avec sa commande ?
 };
 
 // ===========================================================================
@@ -635,11 +643,10 @@ function payloadClient() {
   };
 }
 
-function payloadCommande() {
+function payloadCommande(dest) {
   const t = totaux();
   const mode = modeParLabel(modeChoisi());
   const emportee = $('#vd-instant').checked;
-  const dest = emportee ? DEST_EMPORTEE : DEST_A_PRODUIRE;
   return {
     kind: 'commande',
     numero: state.numero,
@@ -684,32 +691,139 @@ async function validerPaiement() {
   } else {
     state.paiementTexte = label;
   }
+  return enregistrerCommande();
+}
 
-  // Le ticket ne s'affiche qu'une fois la commande DANS le planning : sans ça on
-  // remettrait au client un ticket dont l'atelier n'a jamais entendu parler.
+// La commande entre au planning AVANT que le ticket s'affiche : sans ça on
+// remettrait au client un ticket dont l'atelier n'a jamais entendu parler. Elle
+// se pose d'abord à la place la plus probable ; la vendeuse dit ensuite, sur
+// l'écran du ticket, où elle doit vraiment aller.
+// Le client repart avec sa commande → rien à produire ni à faire retirer, la
+// place est connue (Facturation à faire) et la question ne se pose pas.
+async function enregistrerCommande() {
+  const emportee = $('#vd-instant').checked;
+  const dest = emportee ? DEST_EMPORTEE : DEST_A_PRODUIRE;
   const bouton = $('#vd-validate-pay');
   bouton.disabled = true;
-  const emportee = $('#vd-instant').checked;
+  let cree;
   try {
-    await api('POST', '/api/projets', payloadCommande());
+    cree = await api('POST', '/api/projets', payloadCommande(dest));
   } catch (err) {
     window.alert(err.message || 'Enregistrement impossible');
     return false;
   } finally {
     bouton.disabled = false;
   }
-  const dest = emportee ? DEST_EMPORTEE : DEST_A_PRODUIRE;
-  const etat = $('#vd-pay-status');
-  etat.replaceChildren();
-  etat.append(
+  state.ligneId = cree.id;
+  state.destination = dest;
+  state.emportee = emportee;
+  state.destinationPosee = emportee;   // emportée : la place est déjà la bonne
+
+  $('#vd-pay-status').replaceChildren(
     document.createTextNode('Paiement enregistré pour la commande '),
     el('b', null, state.numero),
     document.createTextNode(` — ${state.paiementTexte}.`),
   );
-  etat.append(el('div', 'vd-help', `Enregistré au planning : ${dest.label}.`));
+  peindreDestination();
   remplirTicket();
   afficherEtape('ticket');
   return true;
+}
+
+// L'annonce sur l'écran Paiement : la vendeuse sait qu'après le ticket il lui
+// restera à poser la ligne. Le client repart avec sa commande → la place est
+// connue, la question ne se pose pas, l'annonce disparaît.
+function majAnnonceDestination() {
+  const champ = $('#vd-instant');
+  const annonce = $('#vd-dest-hint');
+  if (!champ || !annonce) return;
+  annonce.classList.toggle('vd-hidden', champ.checked);
+}
+
+// --- « Où poser la ligne dans le planning ? » ---------------------------------
+// LE geste par lequel la vendeuse fait entrer la vente dans l'atelier. Il vient
+// APRÈS le ticket : le client a son ticket en main, la ligne existe déjà, il
+// reste à dire à quelle étape elle attend. Tout le pipeline (familles +
+// sous-étapes) vient du serveur (/api/pipeline) : une étape ajoutée en base
+// apparaît ici sans retoucher le front.
+async function chargerPipeline() {
+  if (PIPELINE) return PIPELINE;
+  PIPELINE = await api('GET', '/api/pipeline');
+  return PIPELINE;
+}
+
+function peindreDestination() {
+  const carteDest = $('#vd-dest-card');
+  // Commande emportée : aucune question, on annonce juste où elle est partie.
+  if (state.destinationPosee) {
+    carteDest.classList.add('vd-dest-card--done');
+    carteDest.replaceChildren(
+      el('p', 'vd-dest__eyebrow', 'Ligne posée au planning'),
+      el('p', 'vd-dest__title', state.destination.label),
+      el('p', 'vd-dest__hint', state.emportee
+        ? 'Le client est reparti avec sa commande : il n’y a plus rien à produire, il reste la facture.'
+        : 'La commande attend à cette étape. Elle se déplace ensuite depuis le planning, comme n’importe quelle ligne.'),
+    );
+    return;
+  }
+
+  carteDest.classList.remove('vd-dest-card--done');
+  carteDest.replaceChildren(
+    el('p', 'vd-dest__eyebrow', 'Dernière étape — obligatoire'),
+    el('p', 'vd-dest__title', 'Où poser cette ligne dans le planning ?'),
+    el('p', 'vd-dest__hint', `La commande est enregistrée en « ${DEST_A_PRODUIRE.label} ». Choisis l’étape où elle doit attendre.`),
+  );
+  const liste = el('div', 'vd-dest__list');
+  carteDest.append(liste);
+  liste.append(el('p', 'vd-dest__loading', 'Chargement des étapes…'));
+
+  chargerPipeline().then((pipeline) => {
+    liste.replaceChildren();
+    const item = (label, dest, defaut) => {
+      const b = el('button', `vd-dest__item${defaut ? ' is-default' : ''}`);
+      b.type = 'button';
+      b.append(el('span', null, label));
+      if (defaut) b.append(el('span', 'vd-dest__badge', 'Le plus courant'));
+      b.addEventListener('click', () => poserLigne(dest));
+      return b;
+    };
+    liste.append(item(DEST_A_PRODUIRE.label, DEST_A_PRODUIRE, true));
+    for (const fam of pipeline) {
+      if (fam.subs && fam.subs.length) {
+        liste.append(el('p', 'vd-dest__family', fam.label));
+        for (const sub of fam.subs) {
+          liste.append(item(sub.label, { stage: fam.slug, subStage: sub.slug, label: `${fam.label} — ${sub.label}` }));
+        }
+      } else {
+        liste.append(el('p', 'vd-dest__family', fam.label));
+        liste.append(item(fam.label, { stage: fam.slug, subStage: null, label: fam.label }));
+      }
+    }
+  }).catch(() => {
+    liste.replaceChildren(el('p', 'vd-dest__loading',
+      `Liste des étapes injoignable. La commande reste en « ${DEST_A_PRODUIRE.label} » — déplace-la depuis le planning.`));
+  });
+}
+
+// La ligne existe déjà : on la DÉPLACE à l'étape choisie (stage + sous-étape).
+async function poserLigne(dest) {
+  if (dest.stage === state.destination.stage && dest.subStage === state.destination.subStage) {
+    state.destinationPosee = true;
+    peindreDestination();
+    return;
+  }
+  const boutons = [...ROOT.querySelectorAll('#vd-dest-card .vd-dest__item')];
+  for (const b of boutons) b.disabled = true;
+  try {
+    await api('PATCH', `/api/requests/${state.ligneId}`, { stage: dest.stage, sub_stage: dest.subStage });
+  } catch (err) {
+    window.alert(err.message || 'Déplacement impossible');
+    for (const b of boutons) b.disabled = false;
+    return;
+  }
+  state.destination = dest;
+  state.destinationPosee = true;
+  peindreDestination();
 }
 
 // ===========================================================================
@@ -864,7 +978,12 @@ function nouvelleVente() {
   state.client = null;
   state.paiementTexte = '';
   state.numero = '';
+  state.ligneId = null;
+  state.destination = null;
+  state.destinationPosee = false;
+  state.emportee = false;
   peindreNumero();
+  majAnnonceDestination();
   sortirDeLEdition();
   effacerErreurs();
   $('#vd-name').value = '';
@@ -1203,6 +1322,14 @@ function sectionPaiement() {
   emportee.style.margin = '14px 0';
   emportee.append(input('vd-instant', 'checkbox'), el('span', null, 'Le client repart immédiatement avec sa commande'));
 
+  // La vendeuse sait AVANT de valider qu'il lui restera à dire où la ligne se
+  // pose dans le planning : c'est ce geste qui la fait entrer dans l'atelier.
+  // L'annonce disparaît quand le client repart avec sa commande — la place est
+  // alors connue, la question ne se pose pas.
+  const annonce = el('p', 'vd-help vd-next-step');
+  annonce.id = 'vd-dest-hint';
+  annonce.append(document.createTextNode('Après le ticket : '), el('b', null, 'où poser la ligne dans le planning ?'));
+
   const actions = el('div', 'vd-actions');
   actions.append(
     bouton('vd-validate-pay', 'Valider le paiement', 'vd-btn vd-btn--primary vd-btn--full'),
@@ -1211,7 +1338,7 @@ function sectionPaiement() {
 
   section.append(carte(
     titreEtape('3. Paiement', 'vd-ref-paiement'),
-    client, du, options, zoneEspeces, zoneMixte, emportee, actions,
+    client, du, options, zoneEspeces, zoneMixte, emportee, annonce, actions,
   ));
   return section;
 }
@@ -1242,6 +1369,14 @@ function sectionTicket() {
   const entete = carte(el('h2', null, '✔ Commande terminée'), etat, actions);
   entete.classList.add('vd-success', 'vd-no-print');
   section.append(entete);
+
+  // La question du planning vient APRÈS le ticket : le client a son ticket en
+  // main, la vendeuse pose alors la ligne à l'étape où elle doit attendre.
+  // Remplie par peindreDestination().
+  const dest = carte();
+  dest.id = 'vd-dest-card';
+  dest.classList.add('vd-dest-card', 'vd-no-print');
+  section.append(dest);
 
   const ticket = el('div', 'vd-ticket');
   ticket.id = 'vd-ticket';
@@ -1361,12 +1496,21 @@ function brancher() {
   $('#vd-mix-cash').addEventListener('input', () => majMixte('especes'));
   $('#vd-validate-pay').addEventListener('click', validerPaiement);
   $('#vd-back-client').addEventListener('click', () => afficherEtape('client'));
+  $('#vd-instant').addEventListener('change', majAnnonceDestination);
 
   // Étape 4
   $('#vd-print').addEventListener('click', imprimerTicket);
   $('#vd-download').addEventListener('click', telechargerTicket);
   $('#vd-whatsapp').addEventListener('click', envoyerWhatsApp);
-  $('#vd-new-sale').addEventListener('click', nouvelleVente);
+  // Passer à la vente suivante sans avoir posé la ligne la laisserait à la place
+  // par défaut : on le dit, plutôt que de le laisser filer en silence.
+  $('#vd-new-sale').addEventListener('click', () => {
+    if (state.ligneId && !state.destinationPosee) {
+      const ok = window.confirm(`Tu n’as pas choisi l’étape du planning : la commande ${state.numero} reste en « ${DEST_A_PRODUIRE.label} ». Continuer quand même ?`);
+      if (!ok) return;
+    }
+    nouvelleVente();
+  });
 
   // Un champ qu'on corrige efface son erreur : le rouge ne survit pas à la
   // frappe qui le répare.
