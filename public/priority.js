@@ -30,9 +30,26 @@ export const NEUTRAL_IMPORTANCE = 3;
 // partie chez le client, il ne reste plus de travail d'atelier à pousser.
 export const INACTIVE_STAGES = new Set(['paiement', 'fiverr']);
 
-// Positions « la balle est dans le camp du client » : le devis est parti, ou le
-// BAT attend sa validation. Rien à pousser tant qu'il n'a pas répondu.
-export const WAITING_SUBS = new Set(['devis_envoye', 'bat_envoye']);
+// Positions « la balle est dans le camp du client » : le devis est parti, le BAT
+// attend sa validation, ou la commande est FINIE et le client doit venir la
+// chercher. Rien à pousser à l'atelier tant qu'il n'a pas bougé — mais tout à
+// relancer, d'où le bac dédié.
+//
+// `client_prevenu` a longtemps manqué à cette liste : la commande terminée
+// restait dans « À faire maintenant », et son échéance dépassée la plaçait EN
+// TÊTE du point du matin. Le patron voyait donc réclamer, en premier, des
+// commandes finies depuis des jours. Le libellé de la position le disait déjà :
+// « Client prévenu – Attente retrait ».
+export const WAITING_SUBS = new Set(['devis_envoye', 'bat_envoye', 'client_prevenu']);
+
+// Motif affiché sur la carte du bac « à relancer » : on n'attend pas la même
+// chose selon la position, et « en attente d'une réponse » serait faux pour une
+// commande qui n'attend qu'un client venant la récupérer.
+export const WAITING_REASON = {
+  devis_envoye: 'Devis envoyé — en attente de la réponse du client',
+  bat_envoye: 'BAT envoyé — en attente de la validation du client',
+  client_prevenu: 'Terminée — le client doit venir la récupérer',
+};
 
 // Sous-étape de PRODUCTION → machine (signal le plus sûr : on est déjà au poste).
 export const SUBSTAGE_MACHINE = {

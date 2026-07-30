@@ -71,13 +71,33 @@ assert.strictEqual(daysUntil('pas une date', NOW), null, 'date invalide = null')
     mk({ id: 'bloq', stage: 'production', flag: 'bloque' }),
     mk({ id: 'attente', stage: 'demande_chiffrage', sub_stage: 'devis_envoye' }),
     mk({ id: 'bloq_attente', stage: 'demande_chiffrage', sub_stage: 'devis_envoye', flag: 'bloque' }),
+    mk({ id: 'retrait', stage: 'facturation', sub_stage: 'client_prevenu' }),
   ];
   const { queue, blocked, waiting } = rank(rows);
   assert.deepStrictEqual(ids(queue), ['file'], 'seule la ligne active reste dans la file');
   assert.deepStrictEqual(rids(blocked).sort(), ['bloq', 'bloq_attente'],
     'toute ligne bloquée va au bac « à débloquer », même en attente client');
-  assert.deepStrictEqual(rids(waiting), ['attente'],
+  assert.deepStrictEqual(rids(waiting).sort(), ['attente', 'retrait'],
     'attente client (non bloquée) va au bac « à relancer »');
+}
+
+// 1 bis. RÉGRESSION (30/07/2026) : « Client prévenu – Attente retrait » veut dire
+//    que le travail d'atelier est FINI et que la commande attend sur l'étagère.
+//    Elle passait quand même dans « À faire maintenant », et son échéance
+//    dépassée la propulsait EN TÊTE de la liste du matin — le patron se voyait
+//    réclamer des commandes terminées depuis des jours (3 des 10 « En retard »
+//    de la prod ce jour-là). Sa place est le bac « à relancer », avec le devis
+//    et le BAT partis : dans les trois cas la balle est chez le client.
+{
+  const rows = [
+    mk({ id: 'fini_attend_retrait', stage: 'facturation', sub_stage: 'client_prevenu', deadline: '2026-07-01', priority: 3 }),
+    mk({ id: 'vrai_travail', stage: 'production', sub_stage: 'prod_pressage', deadline: '2026-07-24' }),
+  ];
+  const { queue, waiting } = rank(rows);
+  assert.deepStrictEqual(ids(queue), ['vrai_travail'],
+    'une commande finie qui attend son retrait ne réclame pas de travail d’atelier');
+  assert.deepStrictEqual(rids(waiting), ['fini_attend_retrait'],
+    'elle part au bac « à relancer » : c’est le client qu’il faut rappeler');
 }
 
 // 2. Échéance : en retard > aujourd'hui > bientôt > lointain (tout le reste égal).
