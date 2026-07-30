@@ -26,10 +26,50 @@
 
 /* --- Aiguillage des deux flux (nouveau-projet.js) --------------------------
    La barre de navigation principale est masquée sur cet écran
-   (body.view-comptoir) : ce sélecteur est la SEULE façon de passer d'un flux à
-   l'autre. Il vit donc dans l'en-tête noir, en pleine cible tactile, pas en
-   petit lien discret. */
+   (body.view-comptoir) : ces commandes sont les SEULES à disposition. Elles
+   vivent donc en pleine cible tactile, jamais en petit lien discret. */
 .np-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* --- Accueil : « Que fait le client aujourd'hui ? » -------------------------
+   Deux tuiles, une par flux. C'est la première question que la vendeuse pose au
+   client ; l'écran la pose avec elle, plutôt que d'ouvrir un flux au hasard.
+   Tuiles hautes et centrées : on les vise du pouce sans lire. */
+.np-home {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 6px; padding: 32px 18px 48px; text-align: center;
+  font-family: Arial, Helvetica, sans-serif; background: #f3f4f5; color: #1f2328;
+}
+.np-home[hidden] { display: none; }
+.np-home h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+.np-home__lead { margin: 0 0 22px; font-size: 17px; color: #697077; }
+.np-home__grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
+  width: 100%; max-width: 760px;
+}
+.np-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 30px 22px 26px; cursor: pointer; text-align: center;
+  border: 1px solid #d9dde1; border-radius: 18px; background: #fff;
+  font: inherit; color: inherit; box-shadow: 0 2px 9px rgba(0, 0, 0, .05);
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.np-tile:hover { transform: translateY(-2px); border-color: #111827; box-shadow: 0 10px 24px rgba(0, 0, 0, .10); }
+.np-tile:active { transform: translateY(0); }
+.np-tile:focus-visible { outline: 3px solid rgba(17, 24, 39, .25); outline-offset: 2px; }
+/* Le rond d'encre : c'est LUI qu'on reconnaît de loin, pas le texte. */
+.np-tile__icon {
+  display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
+  background: #111827; color: #fff;
+}
+.np-tile__icon .material-symbols-outlined { font-size: 40px; }
+.np-tile strong { font-size: 21px; font-weight: 700; }
+.np-tile small { font-size: 15px; line-height: 1.45; color: #697077; max-width: 30ch; }
+.np-tile__steps {
+  margin-top: 4px; padding-top: 12px; border-top: 1px solid #eceff1; width: 100%;
+  font-size: 12px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: #8b9198;
+}
 .np-header {
   display: flex; justify-content: space-between; align-items: center;
   gap: 16px; flex-wrap: wrap;
@@ -42,7 +82,13 @@
 }
 .np-switch-btn:hover { border-color: #fff; color: #fff; }
 .np-switch-btn.is-active { background: #fff; border-color: #fff; color: #111; }
+/* « Changer » ramène aux deux tuiles. Volontairement plus discret que les deux
+   flux : c'est une porte de sortie, pas un troisième choix. */
+.np-switch-btn--home { display: inline-flex; align-items: center; gap: 6px; padding-left: 14px; }
+.np-switch-btn--home .material-symbols-outlined { font-size: 19px; }
+.np-header[hidden] { display: none; }
 .np-panes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.np-panes[hidden] { display: none; }
 .np-pane { flex: 1; min-height: 0; }
 .np-pane[hidden] { display: none; }
 
@@ -50,6 +96,14 @@
   .np-header { align-items: flex-start; }
   .np-switch { width: 100%; }
   .np-switch-btn { flex: 1; padding: 11px 10px; }
+  .np-switch-btn--home { justify-content: center; }
+  /* Une tuile par ligne : sur 375 px, deux colonnes les rendraient illisibles. */
+  .np-home { justify-content: flex-start; padding: 24px 14px 40px; }
+  .np-home h1 { font-size: 25px; }
+  .np-home__grid { grid-template-columns: 1fr; gap: 14px; }
+  .np-tile { padding: 24px 18px 22px; }
+  .np-tile__icon { width: 64px; height: 64px; }
+  .np-tile__icon .material-symbols-outlined { font-size: 34px; }
 }
 
 .vd-page {
