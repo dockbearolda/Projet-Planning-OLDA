@@ -799,9 +799,14 @@ async function upsertClientFromCommande(cl) {
   // La nature pro/perso choisie au comptoir suit le client dans sa fiche ;
   // toute autre valeur (asso/revendeur d'une commande) retombe sur 'pro'.
   const nature = cl.type === 'perso' ? 'perso' : 'pro';
+  // Un particulier a un prénom ET un nom : les deux vont dans sa fiche, sinon
+  // elle naîtrait à moitié vide et la prochaine commande n'aurait plus que
+  // `entreprise` pour retrouver son identité. Un pro n'a qu'un contact.
+  const nom = nature === 'perso' ? trimOrNull(cl.nom) : trimOrNull(cl.contact);
+  const prenom = nature === 'perso' ? trimOrNull(cl.prenom) : null;
   await pool.query(
-    'INSERT INTO clients (entreprise, nom, telephone, email, client_type) VALUES ($1,$2,$3,$4,$5)',
-    [entreprise, trimOrNull(cl.contact), trimOrNull(cl.telephone), trimOrNull(cl.email), nature],
+    'INSERT INTO clients (entreprise, nom, prenom, telephone, email, client_type) VALUES ($1,$2,$3,$4,$5,$6)',
+    [entreprise, nom, prenom, trimOrNull(cl.telephone), trimOrNull(cl.email), nature],
   );
   broadcast({ kind: 'client' });
 }

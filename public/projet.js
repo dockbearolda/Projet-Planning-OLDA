@@ -205,16 +205,28 @@ function render() {
 }
 function renderCurrentPage() { render(); }
 
+// Comment s'appelle ce client : « Prénom NOM » pour un particulier — le nom seul
+// ne suffit pas à le reconnaître, et c'est ce texte qui remplit la colonne
+// Client du planning —, la société pour un pro. Accepte indifféremment une fiche
+// de la base (`client_type`) et le client épinglé de l'écran (`type`).
+// Une fiche ancienne n'a ni prénom ni nom séparés : `entreprise` fait alors foi,
+// elle vaut déjà « Prénom Nom ».
+function nomAffiche(c) {
+  if (!c) return '';
+  const nature = c.client_type || c.type;
+  if (nature === 'perso') return [c.prenom, c.nom].filter(Boolean).join(' ') || c.entreprise || '';
+  return c.entreprise || '';
+}
+
 function clientLabel(c) {
-  if (!c) return '—';
-  return c.type === 'perso' ? ([c.nom].filter(Boolean).join(' ') || c.entreprise) : c.entreprise;
+  return nomAffiche(c) || '—';
 }
 
 // --- Page 1 : client ------------------------------------------------------------
 function matchClients(query) {
   const q = fold(query).trim();
   if (!q) return [];
-  return CLIENTS.filter((c) => fold(c.client_type === 'perso' ? c.nom : c.entreprise).includes(q)
+  return CLIENTS.filter((c) => fold(nomAffiche(c)).includes(q)
       || fold(c.entreprise).includes(q) || fold(c.telephone).includes(q))
     .slice(0, 8);
 }
@@ -276,8 +288,10 @@ function renderClientSearch(body) {
   const pick = (c) => {
     const nature = c.client_type === 'perso' ? 'perso' : 'pro';
     goToClient({
-      id: c.id, entreprise: c.entreprise, nom: c.nom, telephone: c.telephone,
-      email: c.email, type: nature,
+      // `prenom` voyage avec le client : sans lui, la commande n'emporterait que
+      // le nom de famille et le planning afficherait « DUPONT » tout court.
+      id: c.id, entreprise: c.entreprise, prenom: c.prenom, nom: c.nom,
+      telephone: c.telephone, email: c.email, type: nature,
     });
   };
 
@@ -289,7 +303,7 @@ function renderClientSearch(body) {
       item.type = 'button';
       const nature = c.client_type === 'perso' ? 'perso' : 'pro';
       item.append(
-        el('span', 'proj-client__name', c.client_type === 'perso' ? (c.nom || c.entreprise) : c.entreprise),
+        el('span', 'proj-client__name', nomAffiche(c)),
         el('span', 'proj-client__meta', [c.telephone, nature === 'perso' ? 'Particulier' : 'Pro'].filter(Boolean).join(' · ')),
       );
       item.addEventListener('click', () => pick(c));
@@ -700,8 +714,7 @@ function renderNouveauClient(body) {
         whatsapp: ncNormalizeWhatsapp(whatsapp), email, entreprise: draft.entreprise,
       });
       if (jumeau) {
-        const label = jumeau.client_type === 'perso' ? (jumeau.nom || jumeau.entreprise) : jumeau.entreprise;
-        avertissement.textContent = `Attention : un client similaire existe déjà (${label}). Vérifiez avant de créer un doublon.`;
+        avertissement.textContent = `Attention : un client similaire existe déjà (${nomAffiche(jumeau)}). Vérifiez avant de créer un doublon.`;
         avertissement.style.display = 'block';
         doublonConfirme = signature;
         return;
@@ -727,7 +740,7 @@ function renderNouveauClient(body) {
 
     if (action === 'save-project') {
       setTimeout(() => goToClient({
-        id: cree.id, entreprise: cree.entreprise, nom: cree.nom,
+        id: cree.id, entreprise: cree.entreprise, prenom: cree.prenom, nom: cree.nom,
         telephone: cree.telephone, email: cree.email, type: nature,
       }), 800);
       return;
@@ -1986,12 +1999,20 @@ function ligneToPayload(item) {
 }
 
 function buildPayload(kind, dest) {
-  const nomParts = (state.client.nom || state.client.entreprise || '').split(' ');
+  const c = state.client;
+  // Particulier : le prénom ET le nom partent séparément — c'est leur
+  // concaténation qui remplit la colonne Client du planning. Les deux ou aucun :
+  // une fiche ancienne n'a ni l'un ni l'autre, `societe` (déjà « Prénom Nom »)
+  // fait alors foi côté serveur. Envoyer un nom sans prénom afficherait
+  // « DUPONT » tout court.
+  const prenom = (c.prenom || '').trim();
+  const nom = (c.nom || '').trim();
+  const identite = prenom && nom ? { prenom, nom } : {};
   return {
     kind,
-    client: state.client.type === 'perso'
-      ? { type: 'perso', prenom: nomParts[0] || '', nom: nomParts.slice(1).join(' '), societe: state.client.entreprise, whatsapp: state.client.telephone, email: state.client.email }
-      : { type: 'pro', facturation: state.client.entreprise, contact: state.client.nom, whatsapp: state.client.telephone, email: state.client.email },
+    client: c.type === 'perso'
+      ? { type: 'perso', ...identite, societe: c.entreprise, whatsapp: c.telephone, email: c.email }
+      : { type: 'pro', facturation: c.entreprise, contact: c.nom, whatsapp: c.telephone, email: c.email },
     lignes: state.panier.map(ligneToPayload),
     // Un seul des deux part : un raccourci OU une date précise.
     delai: state.delai || undefined,
