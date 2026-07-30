@@ -1302,7 +1302,41 @@ tr:hover .handle { color: var(--text-2); }
 
 /* Le nom du dossier occupe toute la 1re rangée de la cellule. */
 .client-line { display: flex; align-items: center; min-width: 0; }
-.client-line .client-company { flex: 1 1 auto; min-width: 0; }
+.client-line .client-name { flex: 1 1 auto; min-width: 0; position: relative; }
+.client-name .client-company { width: 100%; }
+
+/* Nom d'un PARTICULIER : « Jean DUPONT » — prénom en graisse normale, NOM DE
+   FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la colonne). Un
+   <input> ne portant qu'une seule graisse, cette vue se superpose au champ,
+   au pixel près (mêmes marges, même fonte) ; elle ne prend pas le clic, donc
+   la cellule reste un champ texte ordinaire — un clic pose le curseur, la vue
+   s'efface et la saisie se fait sur le texte brut « Prénom NOM ».
+   Montée SEULEMENT quand les deux parties sont lisibles (classe .is-split) :
+   une société, un nom seul ou un champ vide s'affichent tels quels.
+   Bloc et non flex : le texte reste UN SEUL flux, donc l'espace entre le
+   prénom et le nom survit (un flex l'aurait rogné, « Jean-MarcDUPONT ») et la
+   troncature en « … » fonctionne comme dans le champ. L'alignement vertical
+   vient des mêmes marges et de la même interligne (`normal`) que le champ. */
+.client-company-view {
+  position: absolute;
+  inset: 0;
+  display: none;
+  padding: 6px 14px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.client-company-view b { font-weight: 700; }
+.client-name.is-split .client-company-view { display: block; }
+.client-name.is-split .client-company { color: transparent; }
+/* Focus : le champ reprend sa couleur, la vue s'efface — on édite « Prénom NOM ». */
+.client-name.is-split .client-company:focus { color: var(--text-1); }
+.client-name.is-split:focus-within .client-company-view { display: none; }
 
 /* Les pastilles du dossier (WhatsApp, devis, facture, BAT, détail, envoi PDF)
    tiennent leur PROPRE rangée, sous le nom. Elles pèsent 204 px
@@ -2804,7 +2838,10 @@ button, a, .stage, .prio-pill, .deadline-badge,
     align-items: center;
     justify-content: center;
   }
-  .client-stack .client-company { font-size: 16px; }
+  /* La vue « Prénom NOM » se superpose au champ : même corps, sinon les deux
+     textes ne se recouvrent plus au pixel près. */
+  .client-stack .client-company,
+  .client-company-view { font-size: 16px; }
   .del-btn,
   .dup-btn { width: 40px; height: 40px; }
   .send-btn { width: 40px; height: 40px; }

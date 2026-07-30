@@ -162,6 +162,30 @@ delete process.env.APP_PASSWORD;
   assert.ok(autoPerso, 'le client perso est dans la base');
   assert.strictEqual(autoPerso.client_type, 'perso', 'la nature perso suit le client');
 
+  // Un particulier commandé avec prénom + nom séparés : la colonne Client du
+  // planning porte « Prénom NOM » — jamais le nom de famille tout seul —, et sa
+  // fiche naît complète (les deux champs remplis, pas seulement `entreprise`).
+  const suffixe = Math.floor(seeded.body.length);
+  const cmdIdentite = await j('POST', '/api/projets', {
+    kind: 'demande',
+    client: { type: 'perso', prenom: 'Jean-Marc', nom: `DUPONT${suffixe}`, whatsapp: '0690 11 22 33' },
+    lignes: [{ type: 'textile', quantite: 1, description: '1 polo', prixTtcManuel: 30 }],
+    delai: 'j5',
+  });
+  assert.strictEqual(cmdIdentite.status, 201, JSON.stringify(cmdIdentite.body));
+  assert.strictEqual(
+    cmdIdentite.body.projet.client.societe, `Jean-Marc DUPONT${suffixe}`,
+    'le nom du dossier porte le prénom ET le nom',
+  );
+  const ligneIdentite = (await j('GET', '/api/requests')).body
+    .find((r) => r.billing_company === `Jean-Marc DUPONT${suffixe}`);
+  assert.ok(ligneIdentite, 'la ligne du planning affiche « Prénom NOM »');
+  const ficheIdentite = (await j('GET', '/api/clients')).body
+    .find((c) => c.entreprise === `Jean-Marc DUPONT${suffixe}`);
+  assert.ok(ficheIdentite, 'la fiche du particulier est créée');
+  assert.strictEqual(ficheIdentite.prenom, 'Jean-Marc', 'le prénom est enregistré dans la fiche');
+  assert.strictEqual(ficheIdentite.nom, `DUPONT${suffixe}`, 'le nom est enregistré dans la fiche');
+
   // 6. Suppression du client (et de ses notes).
   const del = await j('DELETE', `/api/clients/${id}`);
   assert.strictEqual(del.status, 204);

@@ -8,6 +8,8 @@ import { STEP_GUIDE } from './guide.js';
 import { createDashboard } from './dashboard.js';
 // WhatsApp « commande prête » : numéro au format international + message rempli.
 import { whatsappLink } from './whatsapp.js';
+// Nom d'un particulier : où s'arrête le prénom, où commence le NOM de famille.
+import { splitPersoName } from './nom-client.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -1042,7 +1044,15 @@ function cellType(r) {
     e.stopPropagation();
     openMenu(type, CLIENT_TYPES.map((t) => ({ value: t.value, label: t.label })), r.client_type, (val) => {
       if (val === r.client_type) return;
-      patch(r, { client_type: val }, () => { r.client_type = val; renderType(); });
+      patch(r, { client_type: val }, () => {
+        r.client_type = val;
+        renderType();
+        // Seul un PARTICULIER lit son nom en deux graisses : la cellule voisine
+        // doit suivre le changement de type sans attendre un rechargement.
+        const tr = type.closest('tr');
+        const box = tr && tr.querySelector('.client-name');
+        if (box) paintClientName(box, val);
+      });
     });
   });
   td.appendChild(type);
@@ -1259,6 +1269,27 @@ function cellSubStage(r) {
   return td;
 }
 
+// (Re)peint la vue « Prénom NOM » superposée au champ du nom de dossier. `box`
+// est le conteneur .client-name : il porte le champ ET la vue. Un particulier se
+// lit prénom en graisse normale + NOM DE FAMILLE EN GRAS (c'est le nom qu'on
+// cherche en balayant la colonne) ; une société garde son nom d'un seul bloc.
+function paintClientName(box, clientType) {
+  const input = box.querySelector('.client-company');
+  const view = box.querySelector('.client-company-view');
+  if (!input || !view) return;
+  const { prenom, nom } = clientType === 'perso'
+    ? splitPersoName(input.value)
+    : { prenom: '', nom: '' };
+  // Rien à couper en deux graisses (société, nom seul, champ vide) : le champ
+  // s'affiche tel quel et la vue reste vide.
+  const deuxParts = !!(prenom && nom);
+  box.classList.toggle('is-split', deuxParts);
+  if (!deuxParts) { view.replaceChildren(); return; }
+  const famille = document.createElement('b');
+  famille.textContent = nom;
+  view.replaceChildren(document.createTextNode(`${prenom} `), famille);
+}
+
 // Nom du dossier client : champ principal éditable. Le référent, le téléphone et
 // l'email restent saisissables via le popover contact (icône de la 1re colonne).
 function cellDossier(r) {
@@ -1272,12 +1303,29 @@ function cellDossier(r) {
   company.type = 'text';
   company.value = r.billing_company ?? '';
   company.placeholder = 'nom du dossier';
+
+  // Un <input> ne porte qu'UNE graisse : pour lire « Jean DUPONT » avec le nom
+  // en gras, une vue formatée se superpose au champ et s'efface dès qu'il prend
+  // le focus. La saisie, elle, reste un champ texte ordinaire.
+  const name = document.createElement('div');
+  name.className = 'client-name';
+  const view = document.createElement('div');
+  view.className = 'client-company-view';
+  view.setAttribute('aria-hidden', 'true');   // le champ porte déjà la valeur
+  name.append(company, view);
+
+  const peindre = () => paintClientName(name, r.client_type);
   bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
+  // Écouteurs posés APRÈS bindInline : son propre `blur` range la casse en
+  // premier, la vue se repeint donc sur la valeur définitive.
+  company.addEventListener('input', peindre);
+  company.addEventListener('blur', peindre);
+  peindre();
   syncTitleOnOverflow(company);
 
   const line = document.createElement('div');
   line.className = 'client-line';
-  line.appendChild(company);
+  line.appendChild(name);
 
   // Les pastilles sur leur PROPRE rangée, sous le nom (cf. .client-docs) : à
   // cinq ou six elles occupent 172 à 204 px incompressibles, alors que le nom se
