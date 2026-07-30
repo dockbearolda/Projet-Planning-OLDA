@@ -13,8 +13,9 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 - **Vente directe** (onglet « Nouveau Projet »), la seule porte d'entrée : le
   comptoir en quatre étapes — **Articles → Client → Paiement → Ticket** — avec
-  ticket numéroté à imprimer / télécharger / envoyer sur WhatsApp, et
-  enregistrement direct au planning.
+  ticket numéroté à imprimer / télécharger / envoyer sur WhatsApp. Une fois le
+  ticket remis, la vendeuse **pose la ligne à l'étape du planning** de son choix
+  (sauf si le client repart avec sa commande : la place est alors connue).
 - Sidebar pipeline : **5 familles** (Demande & chiffrage, Préparation du projet,
   Production, Facturation & remise au client, Paiement & clôture), compteurs live.
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
@@ -255,22 +256,43 @@ Les cinq modes de la maquette, et ce qu'ils veulent dire pour le planning :
 | Mixte (CB + espèces, réparti automatiquement) | payé | `mixte` |
 | Paiement au retrait | à encaisser | — |
 
-La case **« le client repart immédiatement avec sa commande »** décide où la
-vente atterrit : rien à produire ni à faire retirer, reste la facture à établir
-(*Facturation → Facturation à faire*). Sinon la vente part en *Préparation →
-Prêt à produire* : le comptoir a déjà chiffré et encaissé, il n'y a rien à
-chiffrer.
+La case **« le client repart immédiatement avec sa commande »** décide de la
+suite : rien à produire ni à faire retirer, la ligne va en *Facturation →
+Facturation à faire* et **aucune question n'est posée**. Sinon l'écran du ticket
+demandera où poser la ligne (voir plus bas). L'écran annonce cette étape
+suivante sous le bouton de validation, pour que personne ne la découvre.
 
 ### 4. Le ticket
 
 « Valider le paiement » **enregistre d'abord la commande au planning**
 (`POST /api/projets`) et n'affiche le ticket qu'une fois l'enregistrement
 confirmé — sans quoi on remettrait au client un ticket dont l'atelier n'a jamais
-entendu parler. L'écran redit où la commande est partie.
+entendu parler.
 
 Le ticket s'**imprime** (80 mm, tout le reste de l'écran disparaît), se
 **télécharge** en `.txt`, et part sur **WhatsApp** avec le message déjà écrit —
 rien ne s'envoie tout seul, c'est l'employé qui appuie sur Envoyer.
+
+### 5. Où poser la ligne dans le planning ?
+
+**Le geste par lequel la vendeuse fait entrer la vente dans l'atelier**, et c'est
+pour ça qu'il vient APRÈS le ticket : le client a son ticket en main, la ligne
+existe déjà, il reste à dire à quelle étape elle attend.
+
+La carte s'affiche en haut de l'écran du ticket, filet d'encre à gauche, et
+propose **tout le pipeline** (familles + sous-étapes, Fiverr compris, servi par
+`/api/pipeline` — une étape ajoutée en base apparaît sans retoucher le front).
+*Préparation → Prêt à produire* est proposé en premier, marqué « le plus
+courant » : un seul tap dans le cas habituel, rien n'est caché pour autant.
+
+Choisir une étape **déplace la ligne** (`PATCH /api/requests/:id` avec `stage` +
+`sub_stage`), puis la carte annonce où elle est posée. La commande étant déjà
+enregistrée, une question laissée sans réponse ne perd rien : la ligne reste à la
+place par défaut — et « Nouvelle commande » le dit avant de passer à la vente
+suivante, plutôt que de laisser filer en silence.
+
+Une seule exception, déjà dite : le client qui repart avec sa commande. Sa place
+est connue, la carte se contente de l'annoncer.
 
 ### Le numéro de ticket
 

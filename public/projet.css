@@ -154,6 +154,41 @@
 .vd-page .vd-pay-option input { width: auto; min-height: 0; }
 .vd-page .vd-pay-option:has(input:checked) { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
 
+/* --- « Où poser la ligne dans le planning ? » -----------------------------
+   LE geste par lequel la vendeuse fait entrer la vente dans l'atelier, posé
+   APRÈS le ticket. Carte à filet d'encre épais : on ne peut pas la manquer en
+   descendant vers le ticket. Une fois l'étape choisie, la même carte annonce
+   où la ligne est partie (`--done`), sans plus rien à taper. */
+.vd-dest-card { border: 2px solid var(--vd-accent); border-left-width: 6px; }
+.vd-dest-card--done { border-color: var(--vd-border); border-left: 6px solid var(--vd-accent); background: var(--vd-accent-soft); }
+.vd-dest__eyebrow {
+  margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--vd-accent);
+}
+.vd-dest__title { margin: 6px 0 0; font-size: 21px; font-weight: 700; }
+.vd-dest__hint { margin: 6px 0 0; font-size: 15px; color: var(--vd-muted); line-height: 1.4; }
+.vd-dest__loading { margin: 14px 0 0; font-size: 15px; color: var(--vd-muted); }
+/* La liste défile DANS la carte : tout le pipeline y passe sans repousser le
+   ticket hors de l'écran. */
+.vd-dest__list { margin-top: 14px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+.vd-dest__family {
+  margin: 16px 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--vd-muted);
+}
+.vd-dest__family:first-child { margin-top: 0; }
+.vd-dest__item {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  width: 100%; text-align: left; min-height: 48px; padding: 12px 14px; margin-bottom: 8px;
+  border: 1px solid var(--vd-border); border-radius: 10px; background: #fff;
+  font: inherit; font-size: 16px; font-weight: 600; color: inherit; cursor: pointer;
+}
+.vd-dest__item:hover { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
+.vd-dest__item.is-default { border-color: var(--vd-accent); border-width: 2px; }
+.vd-dest__item:disabled { opacity: .5; cursor: not-allowed; }
+.vd-dest__badge { font-size: 13px; font-weight: 700; color: var(--vd-accent); white-space: nowrap; }
+/* Annonce de l'étape suivante, sur l'écran Paiement. */
+.vd-next-step { margin: 0 0 12px; padding-left: 10px; border-left: 3px solid var(--vd-accent); }
+
 /* --- Commande terminée + ticket ------------------------------------------- */
 .vd-success { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
 .vd-ticket {
