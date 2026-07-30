@@ -11,6 +11,10 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 ## Fonctionnalités
 
+- **Vente directe** (onglet « Nouveau Projet »), la seule porte d'entrée : le
+  comptoir en quatre étapes — **Articles → Client → Paiement → Ticket** — avec
+  ticket numéroté à imprimer / télécharger / envoyer sur WhatsApp, et
+  enregistrement direct au planning.
 - Sidebar pipeline : **5 familles** (Demande & chiffrage, Préparation du projet,
   Production, Facturation & remise au client, Paiement & clôture), compteurs live.
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
@@ -160,8 +164,9 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
-| GET | `/api/pipeline` | Familles et leurs sous-étapes, pour le choix de la destination dans Nouveau Projet. |
-| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. |
+| GET | `/api/pipeline` | Familles et leurs sous-étapes (destination d'une commande). |
+| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. |
+| POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
 | GET | `/api/settings/whatsapp` | `{ message }` — le texte « commande prête » réglé par le patron. |
 | PUT | `/api/settings/whatsapp` | Remplace ce texte (`{ message }`, 1000 caractères max), diffusé en SSE. |
 | GET | `/api/clients` | Base clients complète (auto-complétion + fiche). |
@@ -178,74 +183,108 @@ code HTTP adapté.
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
-## Nouveau Projet — `/#nouveau-projet`
+## Nouveau Projet — `/#nouveau-projet` : la vente directe
 
-La **seule porte d'entrée** de l'application : toute commande y naît. Le flux
-comptoir, EN FACE DU CLIENT, façon caisse SumUp — client, puis panier, puis
-prix. La contrainte de conception est un chrono : client debout devant le
-comptoir. D'où des tuiles de 44 px qu'on tape au lieu de menus qu'on déroule.
+La **seule porte d'entrée** de l'application : toute commande y naît. C'est
+l'écran de **vente directe** dessiné par le patron, repris à l'identique —
+quatre étapes en face du client, façon caisse : **Articles → Client → Paiement →
+Ticket**. La contrainte de conception est un chrono : client debout devant le
+comptoir. D'où des cibles de 44 px et des champs à 16 px (en dessous, iOS zoome
+sur le champ dès qu'on le touche).
 
-Un projet est un **panier** : plusieurs produits de types différents (une tasse,
-un polo, une plaque) pour un même client et un seul enregistrement. La tasse a
-sa grille de prix détaillée (catalogue `tarifs-tasse`, recalculée côté serveur,
-jamais reçue du client) ; les autres types sont sommaires — description et prix
-manuel.
+Le DOM des quatre étapes est construit **une fois** puis montré / caché : aller
+et venir entre les étapes ne fait rien perdre de ce qui est déjà tapé.
 
-### Le client
+### 1. Articles
 
-Recherche dans la base, ou création à la volée. Le formulaire de création montre
-la fiche **complète** selon la nature : 4 champs pour un particulier (prénom,
-nom, WhatsApp, e-mail), la fiche PRO entière sinon (voir « Base clients »).
+Un article = un nom (liste de suggestions, saisie libre), une quantité, un prix
+unitaire, le sens de ce prix (**TTC** ou **HT**), la TGCA, et une **description
+de production** — ce que l'atelier doit lire pour produire (« Logo cœur, logo dos
+30 cm, tailles S x2 / M x5, impression DTF »). Plusieurs articles peuvent
+s'empiler dans la même vente, chacun modifiable ou supprimable.
 
-Trois automatismes y évitent la ressaisie :
+Prix saisi **HT** + TGCA cochée : le prix client est le HT majoré du taux réglé
+dans Réglages. TGCA décochée : le prix saisi **est** le prix client, quel que
+soit l'intitulé — c'est la règle de la maquette.
 
-- **Ville → Pays + Code postal.** Les six territoires desservis sont proposés en
-  liste déroulante à saisie libre ; en choisir un remplit pays et code postal.
-  Une valeur tapée à la main n'est jamais écrasée.
-- **Casse imposée** en quittant le champ : prénom en initiales (`Jean-Marc`),
-  nom en majuscules (`DUPONT`).
-- **Le tiret** `-` veut dire « je n'ai pas l'info » : le champ passe pour rempli
-  et part vide en base. Refusé sur l'identité (société, nom, prénom), où un
-  client nommé « - » serait introuvable.
+La **date** et l'**heure souhaitées** valent pour la vente entière, pas par
+article. Le délai porte sa majoration, annoncée sous le champ : jour même (ou
+date passée) **+20 %**, moins de trois jours **+10 %**, au-delà rien. Ce sont les
+deux raccourcis du catalogue (`jour_j`, `express`) : c'est le **serveur** qui
+applique la majoration, l'écran ne fait que l'annoncer — et il l'annonce au
+centime près (même arrondi, appliqué au total, une seule fois), sinon le client
+paierait un centime de plus que la ligne du planning n'en réclame.
 
-### Le délai est obligatoire
+La **note interne OLDA** ne part jamais sur le ticket du client : elle rejoint la
+colonne Infos de la ligne du planning.
 
-Aucun raccourci n'est pré-coché. Cinq raccourcis (Jour J +20 %, sous 3 jours
-+10 %, 5 / 10 / 15 jours) **ou** une date précise au calendrier — jamais les
-deux. L'enregistrement reste bloqué tant que rien n'est choisi, et le motif du
-blocage est écrit à l'écran. C'est ce qui garantit une date butoir sur chaque
-ligne du planning. Une date précise n'applique aucune majoration : on ne facture
-pas l'urgence d'une date que le client a lui-même fixée au large.
+### 2. Le client — la vraie base
 
-### Le prix : TTC saisi, HT calculé
+La recherche interroge la **base clients** (nom, société, contact, e-mail,
+WhatsApp ou fragment de numéro) ; la création écrit **dedans** (`POST
+/api/clients`), pas dans un coin du navigateur : le comptoir et Base clients ne
+peuvent pas se contredire. Deux formulaires, comme sur la maquette —
+*Particulier* (prénom + nom, WhatsApp, e-mail) ou *Professionnel* (raison
+sociale, secteur, contact, coordonnées, adresse).
 
-`requests.project_value` porte le **TTC** — le prix que le client paie, et celui
-qu'on tape au comptoir. Le **HT n'est jamais stocké** : il vaut TTC ÷ (1 + TGCA),
-avec le taux réglé dans Réglages, et s'affiche sous le prix dans la grille, dans
-le tiroir de détail et sous le total du comptoir.
+Trois automatismes évitent la ressaisie :
 
-### Le paiement
+- **Ville → Code postal + Pays** : une ville connue les remplit ; une valeur
+  tapée à la main n'est jamais écrasée.
+- **Casse imposée** : prénom en initiales (`Jean-Marc`), nom en majuscules
+  (`DUPONT`). Pour un particulier, `entreprise` porte « Prénom NOM » en un seul
+  texte — c'est ce nom qui fait foi partout ailleurs, on ne réordonne jamais ses
+  mots (le dédoublonnage compare cette chaîne).
+- **Numéro WhatsApp** : regroupé par deux à la frappe, laissé tel quel s'il est
+  international. **Tout numéro contenant un chiffre est accepté** — une règle de
+  format plus fine a déjà bloqué le comptoir devant un client bien réel.
 
-Cinq informations, dans le même bloc au comptoir et dans le tiroir de détail :
-*acompte demandé*, *acompte versé* (+ la somme exacte, qui n'apparaît qu'une
-fois l'acompte encaissé), *payé / soldé*, et le **mode** (CB / Espèces /
-Virement / Chèque).
+Un client déjà en base avec le même numéro, e-mail ou nom déclenche un
+**avertissement**, pas un refus : un second clic crée quand même. Parfois c'est
+bien un nouveau client, et le comptoir ne doit jamais rester bloqué.
 
-Chaque interrupteur a **trois** états en base — oui, non, et jamais renseigné.
-Une ligne que personne n'a touchée reste « non renseigné » : elle ne doit pas se
-lire « non payé ».
+### 3. Le paiement
 
-### La dernière question : où l'enregistrer ?
+Les cinq modes de la maquette, et ce qu'ils veulent dire pour le planning :
 
-« Enregistrer » n'envoie rien tout seul : il **demande d'abord où le projet
-atterrit**. Tout le pipeline s'affiche (familles + sous-étapes, Fiverr compris).
-Taper une destination enregistre aussitôt ; l'écran de confirmation redit où la
-commande est partie, prix TTC et HT compris.
+| Au comptoir | Statut enregistré | Mode |
+|---|---|---|
+| Carte bancaire | payé | `cb` |
+| Espèces (+ monnaie à rendre) | payé | `especes` |
+| Virement | payé | `virement` |
+| Mixte (CB + espèces, réparti automatiquement) | payé | `mixte` |
+| Paiement au retrait | à encaisser | — |
 
-Le serveur revalide : une sous-étape étrangère à la famille visée est refusée
-(400) plutôt que rangée n'importe où. Un corps sans destination retombe sur
-celle qu'implique la nature (`demande` → *Demande reçue*, `commande` →
-*À chiffrer*).
+La case **« le client repart immédiatement avec sa commande »** décide où la
+vente atterrit : rien à produire ni à faire retirer, reste la facture à établir
+(*Facturation → Facturation à faire*). Sinon la vente part en *Préparation →
+Prêt à produire* : le comptoir a déjà chiffré et encaissé, il n'y a rien à
+chiffrer.
+
+### 4. Le ticket
+
+« Valider le paiement » **enregistre d'abord la commande au planning**
+(`POST /api/projets`) et n'affiche le ticket qu'une fois l'enregistrement
+confirmé — sans quoi on remettrait au client un ticket dont l'atelier n'a jamais
+entendu parler. L'écran redit où la commande est partie.
+
+Le ticket s'**imprime** (80 mm, tout le reste de l'écran disparaît), se
+**télécharge** en `.txt`, et part sur **WhatsApp** avec le message déjà écrit —
+rien ne s'envoie tout seul, c'est l'employé qui appuie sur Envoyer.
+
+### Le numéro de ticket
+
+Format du patron : `26.07.30-001` — année, mois, jour, puis le rang de la vente
+**dans la journée**. Le compteur vit côté serveur (`POST /api/vente/numero`, clé
+`app_meta`), pas dans le navigateur : deux comptoirs qui encaissent en même temps
+ne peuvent pas remettre le même numéro à deux clients. Le jour est celui du
+**poste** (le conteneur tourne en UTC, il basculerait au lendemain dès 20 h à
+Saint-Martin).
+
+Le numéro est réservé au **premier article ajouté**, pas à l'ouverture de
+l'écran : un numéro attribué n'est jamais réutilisé, et ouvrir l'onglet pour rien
+ne doit pas faire un trou dans la numérotation. Si le compteur est injoignable,
+le poste retombe sur son rang local plutôt que de bloquer la vente.
 
 ## Colonnes du planning — le rail de droite
 
@@ -411,8 +450,8 @@ Deux exceptions assumées, toutes deux hors interface :
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
-│   ├── projet.css    vue Nouveau Projet, scopée sous #nouveau-projet
-│   ├── projet.js     client, panier, délai, paiement, destination, envoi
+│   ├── projet.css    vue Vente directe, scopée sous #nouveau-projet (.vd-*)
+│   ├── projet.js     vente directe : articles, client, paiement, ticket
 │   ├── clients.css   vue Base clients, scopée sous #clients
 │   ├── clients.js    liste, fiche éditable, notes, secteurs, villes
 │   └── reglages.js   vue Réglages (message WhatsApp « commande prête »)
