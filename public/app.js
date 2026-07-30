@@ -116,6 +116,7 @@ const PAIEMENT_MODES = [
   { id: 'especes', label: 'Espèces' },
   { id: 'virement', label: 'Virement' },
   { id: 'cheque', label: 'Chèque' },
+  { id: 'mixte', label: 'Mixte (CB + espèces)' },
 ];
 
 // --- Alerte de commande (requests.flag / flag_reason) ----------------------

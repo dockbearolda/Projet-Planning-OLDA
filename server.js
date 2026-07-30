@@ -565,6 +565,9 @@ const isDay = (s) => {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 };
 
+// Heure de retrait de la vente directe, « HH:MM » sur 24 h.
+const isHeure = (s) => typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+
 // Date civile LOCALE à J+n. `toISOString()` bascule en UTC : à l'ouest de
 // Greenwich (l'atelier est aux Antilles) il rend déjà la date du lendemain en
 // soirée, et le délai « 7 jours » en vaudrait 8. Le front calcule pareil.
@@ -867,6 +870,7 @@ const COULEUR_MAX = 40;
 // Noir, Bleu roi ») : le champ reçoit une liste, pas une teinte.
 const COLORIS_LISTE_MAX = 160;
 const REMARQUE_MAX = 400;
+const TICKET_MAX = 24;          // « 26.07.30-001 » — numéro du ticket de caisse
 const OBJET_MAX = 140;          // objet de la demande (titre d'une ligne du planning)
 const DESCRIPTION_MAX = 1200;   // description libre de la demande
 const TEXTE_MAX = 200;          // face de tasse, typo, info de personnalisation…
@@ -1371,6 +1375,20 @@ function buildProjet(body, tarifsById) {
   const priority = Math.min(3, Math.max(1, Number.parseInt(b.priority, 10) || 1));
   const quantite = lignes.reduce((s, l) => s + l.quantite, 0);
 
+  // Vente directe (comptoir) : l'HEURE de retrait, la note interne et le numéro
+  // du ticket remis au client. Facultatifs — les autres flux n'en ont pas.
+  const heure = isHeure(b.heureSouhaitee) ? b.heureSouhaitee : null;
+  if (b.heureSouhaitee != null && b.heureSouhaitee !== '' && !heure) {
+    return { error: `heure souhaitée invalide : ${b.heureSouhaitee}` };
+  }
+  const note = readTexte(b.noteInterne, 'Note interne', 'note interne', DESCRIPTION_MAX);
+  if (note.error) return { error: note.error };
+  const ticket = readTexte(b.numero, 'Ticket', 'numéro de ticket', TICKET_MAX);
+  if (ticket.error) return { error: ticket.error };
+  // Le client est reparti avec sa commande : il n'y a plus rien à produire ni à
+  // faire retirer. C'est le comptoir qui le sait, personne d'autre.
+  const retraitImmediat = b.retraitImmediat === true;
+
   const venteHt = prixTotalTtc / (1 + PROJET_TGCA);
   const margeHt = Math.round((venteHt - prixRevientTotal) * 100) / 100;
   // Le HT n'est jamais stocké : il se déduit du TTC et du taux TGCA du moment.
@@ -1383,10 +1401,15 @@ function buildProjet(body, tarifsById) {
   const projet = {
     kind: 'projet-simple',
     // v1 = type unique ; v2 = panier multi-type ; v3 = suivi paiement ;
-    // v4 = fiche de production détaillée par famille + prix unitaire HT/TTC
-    version: 4,
+    // v4 = fiche de production détaillée par famille + prix unitaire HT/TTC ;
+    // v5 = vente directe (numéro de ticket, heure de retrait, note interne)
+    version: 5,
+    numero: ticket.value,
     client,
     lignes,
+    heureSouhaitee: heure,
+    noteInterne: note.value,
+    retraitImmediat,
     delai: { id: delai.id, label: delai.label, majoration: delai.majoration || 0 },
     prixTotalTtc,
     prixTotalHt,
@@ -1425,10 +1448,14 @@ function buildProjet(body, tarifsById) {
   ].filter(Boolean).join(' · ');
   const resume = [
     `${typesPresents.join(' + ').toUpperCase()} — ${client.societe}${client.type === 'perso' ? ' (perso)' : ''}`,
+    ticket.value ? `Ticket : ${ticket.value}` : null,
     ...lignes.map(detailLigneTexte),
     `Délai : ${delai.label}${delai.majoration ? ` (+${delai.majoration} %)` : ''}`,
+    heure ? `Retrait souhaité : le ${deadline} à ${heure.replace(':', 'h')}` : null,
+    retraitImmediat ? 'Le client est reparti avec sa commande.' : null,
     `Prix : ${prixTotalTtc.toFixed(2)} € TTC (${prixTotalHt.toFixed(2)} € HT)`,
     etatPaiement ? `Paiement : ${etatPaiement}` : null,
+    note.value ? `Note interne : ${note.value}` : null,
   ].filter(Boolean).join('\n');
 
   return { projet, resume, produit: produitResume };
@@ -1475,6 +1502,27 @@ app.post('/api/projets', asyncH(async (req, res) => {
 
   broadcast({ kind: 'create', stages: [projet.stage] });
   res.status(201).json({ id: rows[0].id, projet });
+}));
+
+// POST /api/vente/numero → réserve le numéro du ticket de vente directe,
+// « 26.07.30-001 » : deux chiffres d'année, mois, jour, puis le rang de la vente
+// DANS LA JOURNÉE. Le compteur vit en app_meta (même principe que les codes
+// clients) : deux comptoirs qui encaissent en même temps ne peuvent pas remettre
+// le même numéro au client, et un numéro attribué n'est jamais réutilisé.
+// Le jour est celui du POSTE (`jour`, aaaa-mm-jj) : le conteneur tourne en UTC,
+// il basculerait au lendemain dès 20 h à Saint-Martin.
+app.post('/api/vente/numero', asyncH(async (req, res) => {
+  const body = req.body || {};
+  const jour = isDay(body.jour) ? body.jour : todayPlus(0);
+  const [y, m, d] = jour.split('-');
+  const metaKey = `vente_seq_${y}${m}${d}`;
+  const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
+  const rang = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
+  await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
+  await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(rang)]);
+  res.status(201).json({
+    numero: `${y.slice(2)}.${m}.${d}-${String(rang).padStart(3, '0')}`, jour, rang,
+  });
 }));
 
 // ---------------------------------------------------------------------------

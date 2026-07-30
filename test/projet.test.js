@@ -405,7 +405,89 @@ delete process.env.APP_PASSWORD;
   });
   assert.strictEqual(prixNegatif.status, 400);
 
+  // 19. VENTE DIRECTE (écran comptoir du patron) : un ticket numéroté, une heure
+  //     de retrait, une note interne, le client qui repart avec sa commande.
+  //     Le total du ticket doit être AU CENTIME celui enregistré au planning :
+  //     l'écran majore comme le serveur (majoration appliquée au total, un seul
+  //     arrondi), sinon le client paie un centime de plus que la ligne du
+  //     planning n'en réclame.
+  const num1 = await call('POST', '/api/vente/numero', { jour: '2026-07-30' });
+  assert.strictEqual(num1.status, 201, JSON.stringify(num1.body));
+  assert.strictEqual(num1.body.numero, '26.07.30-001');
+  const num2 = await call('POST', '/api/vente/numero', { jour: '2026-07-30' });
+  assert.strictEqual(num2.body.numero, '26.07.30-002', 'le rang du jour avance : deux postes ne peuvent pas remettre le même ticket');
+  const num3 = await call('POST', '/api/vente/numero', { jour: '2026-07-31' });
+  assert.strictEqual(num3.body.numero, '26.07.31-001', 'chaque journée repart à 001');
+  // Jour absent ou illisible : le serveur prend le sien plutôt que de refuser —
+  // le comptoir ne s'arrête pas pour une horloge.
+  const numSansJour = await call('POST', '/api/vente/numero', {});
+  assert.strictEqual(numSansJour.status, 201);
+  assert.match(numSansJour.body.numero, /^\d\d\.\d\d\.\d\d-\d{3}$/);
+
+  const vente = await call('POST', '/api/projets', {
+    kind: 'commande',
+    numero: '26.07.30-001',
+    client: { type: 'perso', prenom: 'Jean', nom: 'DUPONT', whatsapp: '0690479788' },
+    // 23,00 € TTC l'unité, livraison demandée pour le lendemain → +10 %.
+    lignes: [{ type: 'autres', quantite: 1, designation: 'Tee-shirt personnalisé', explication: 'Logo cœur, DTF', prixUnitaireTtc: 23 }],
+    deadline: '2026-12-24',
+    delai: 'express',
+    heureSouhaitee: '12:00',
+    noteInterne: 'Client pressé, prévenir Marie',
+    retraitImmediat: true,
+    priority: 2,
+    paiement: { statut: 'paye', modeFinal: 'mixte' },
+    stage: 'facturation', subStage: 'facturation_a_faire',
+  });
+  assert.strictEqual(vente.status, 201, JSON.stringify(vente.body));
+  assert.strictEqual(vente.body.projet.prixTotalTtc, 25.3, '23 € + 10 % express = 25,30 € — le total du ticket');
+  assert.strictEqual(vente.body.projet.numero, '26.07.30-001');
+  assert.strictEqual(vente.body.projet.heureSouhaitee, '12:00');
+  assert.strictEqual(vente.body.projet.noteInterne, 'Client pressé, prévenir Marie');
+  assert.strictEqual(vente.body.projet.retraitImmediat, true);
+  assert.strictEqual(vente.body.projet.version, 5);
+  // La DATE demandée l'emporte sur le J+3 du raccourci : c'est le client qui la
+  // fixe, le raccourci ne sert qu'à porter la majoration.
+  assert.strictEqual(vente.body.projet.deadline, '2026-12-24');
+  assert.strictEqual(vente.body.projet.client.societe, 'Jean DUPONT');
+  assert.strictEqual(vente.body.projet.stage, 'facturation');
+  assert.strictEqual(vente.body.projet.subStage, 'facturation_a_faire');
+  assert.strictEqual(vente.body.projet.paiement.mode.id, 'mixte', 'le mixte CB + espèces est un mode du catalogue');
+
+  const ligneVente = (await (await fetch(`${base}/api/requests?stage=facturation`)).json())
+    .find((x) => x.id === vente.body.id);
+  assert.ok(ligneVente, 'la vente directe apparaît bien au planning');
+  assert.strictEqual(Number(ligneVente.project_value), 25.3);
+  assert.strictEqual(ligneVente.paye, true);
+  assert.strictEqual(ligneVente.priority, 2);
+  // Ce que l'atelier lit dans la colonne Infos : le ticket, l'heure de retrait,
+  // le fait que la marchandise est partie, et la note interne.
+  assert.match(ligneVente.description, /Ticket : 26\.07\.30-001/);
+  assert.match(ligneVente.description, /Retrait souhaité : le 2026-12-24 à 12h00/);
+  assert.match(ligneVente.description, /Le client est reparti avec sa commande\./);
+  assert.match(ligneVente.description, /Note interne : Client pressé, prévenir Marie/);
+
+  // Une heure illisible est refusée plutôt que rangée telle quelle : « 25:99 »
+  // sur un ticket de retrait ne veut rien dire.
+  const heureFausse = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'X', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'autres', quantite: 1, designation: 'plaque', prixUnitaireTtc: 10 }],
+    heureSouhaitee: '25:99',
+  });
+  assert.strictEqual(heureFausse.status, 400);
+  assert.match(heureFausse.body.error, /heure souhaitée invalide/);
+
+  // Sans vente directe, rien de tout ça n'encombre la fiche.
+  const sansComptoir = await call('POST', '/api/projets', {
+    kind: 'commande', client: { societe: 'X', type: 'pro' }, delai: 'j5',
+    lignes: [{ type: 'autres', quantite: 1, designation: 'plaque', prixUnitaireTtc: 10 }],
+  });
+  assert.strictEqual(sansComptoir.body.projet.numero, null);
+  assert.strictEqual(sansComptoir.body.projet.heureSouhaitee, null);
+  assert.strictEqual(sansComptoir.body.projet.retraitImmediat, false);
+
   console.log('✓ nouveau projet : prix serveur, HT/TTC, délai obligatoire, paiement, panier mixte et refus OK');
   console.log('✓ nouveau projet : fiches détaillées textile / tasse / autres, prix unitaire et statuts de paiement OK');
+  console.log('✓ vente directe : numéro de ticket par jour, heure de retrait, note interne, retrait immédiat et total au centime OK');
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });

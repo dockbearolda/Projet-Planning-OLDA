@@ -1,759 +1,206 @@
-/* Nouveau Projet — Atelier OLDA
-   Flux comptoir ultra-minimal : client → type → produit → prix, façon caisse. */
+/* Nouveau Projet — Atelier OLDA : VENTE DIRECTE
+   Transcription de la maquette du patron (« Atelier OLDA — Vente directe »,
+   flux complet) : Articles → Client → Paiement → Ticket. Une maquette, quatre
+   étapes, un ticket de caisse à la fin.
 
-/* Sans ce `display` de base, [hidden] ne peut pas faire effet et .proj-page
-   (height:100%) n'a rien de concret à remplir — même pattern que .clients
-   dans clients.css. Sans lui, la section grandit à la taille de son contenu
-   au lieu de se caler sur .work, et le scroll interne de .proj-body plus bas
-   ne peut jamais s'activer. */
+   Deux écarts assumés par rapport au fichier de la maquette :
+     - l'ACCENT est l'encre noire de la charte (#111827), pas le vert : c'est la
+       consigne (« la couleur ne doit pas être verte mais noire ») ;
+     - les champs sont à 16px et les cibles tactiles à 44px minimum (règle
+       maison : en dessous de 16px, iOS zoome sur le champ au focus).
+
+   Tout est préfixé `.vd-` (vente directe) et vit sous `.vd-page` : la maquette
+   stylait des balises nues (input, button, h2, hr…), ce qui aurait débordé sur
+   le reste de l'application. */
+
+/* Sans ce `display` de base, [hidden] ne peut pas faire effet et .vd-page
+   (height:100%) n'a rien de concret à remplir — même pattern que .clients dans
+   clients.css. Sans lui, la section grandit à la taille de son contenu au lieu
+   de se caler sur .work, et le scroll interne plus bas ne s'active jamais. */
 .proj:not([hidden]) { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 
-/* Style global du flux comptoir : texte jamais sous 16px (lu/tapé vite en
-   boutique), un seul accent bleu (var(--primary)), coins très arrondis,
-   ombres légères — voir --radius-lg / --shadow-1 utilisés partout ci-dessous. */
-.proj-page { --radius-lg: 18px; display: flex; flex-direction: column; height: 100%; min-height: 0; font-size: 16px; }
-.proj-bar { display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
-.proj-bar__brand { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; }
-.proj-bar__ic { font-size: 24px; color: var(--primary); flex: 0 0 auto; }
-.proj-bar__title { margin: 0; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
-/* Écran « Nouveau client » : le stepper cesse d'être centré (il accompagne la
-   marque au lieu de la concurrencer), et la zone de travail rend la main —
-   c'est la page de la maquette, avec ses propres marges, qui borne le contenu. */
-.proj-page.is-nouveau-client .proj-stepper { flex: 1; justify-content: flex-end; }
-.proj-page.is-nouveau-client .proj-body { max-width: none; padding: 0; background: var(--bg); }
-/* .work (parent) a overflow:hidden — c'est ici, sur .proj-body, qu'il faut
-   son propre scroll. Sans le min-height:0 + overflow-y, un contenu plus haut
-   que la fenêtre (fréquent sur Windows/Chrome, barre d'outils plus haute
-   qu'un Mac) déborde en silence et le sticky de la barre du bas (.proj-total,
-   plus bas, enfant direct de .proj-body) reste figé à sa position de flux —
-   il recouvre alors la section Paiement au lieu de coller au bas d'une zone
-   qui défile. */
-.proj-body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; max-width: 1080px; margin: 0 auto; width: 100%; }
-.proj-body > .proj-client {
-  max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
-  min-height: 55vh; justify-content: center; text-align: center;
+.vd-page {
+  --vd-accent: #111827;        /* encre de la charte : boutons, étape en cours */
+  --vd-accent-dark: #000000;   /* survol */
+  --vd-accent-soft: #eef0f4;   /* fond léger (client retenu, commande terminée) */
+  --vd-bg: #f3f4f5;
+  --vd-card: #ffffff;
+  --vd-border: #d9dde1;
+  --vd-text: #1f2328;
+  --vd-muted: #697077;
+  --vd-danger: #c62828;
+  --vd-danger-soft: #fff0f0;
+  --vd-radius: 14px;
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--vd-bg);
+  color: var(--vd-text);
 }
-.proj-step__title { margin: 0 0 16px; font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
-.proj-todo { color: var(--text-2); font-style: italic; font-size: 16px; }
+.vd-page *, .vd-page *::before, .vd-page *::after { box-sizing: border-box; }
+.vd-hidden { display: none !important; }
 
-/* --- Barre de progression (remplace le fil texte) ------------------------------ */
-.proj-stepper { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
-.proj-stepper__step { display: flex; align-items: center; gap: 8px; }
-.proj-stepper__dot {
-  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; border: 2px solid var(--border); color: var(--text-2); background: var(--surface);
-  flex: 0 0 auto;
-}
-.proj-stepper__dot .material-symbols-outlined { font-size: 16px; }
-.proj-stepper__label { font-size: 15px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
-.proj-stepper__step.is-current .proj-stepper__dot { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
-.proj-stepper__step.is-current .proj-stepper__label { color: var(--text-1); }
-.proj-stepper__step.is-done .proj-stepper__dot { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
-.proj-stepper__step.is-done .proj-stepper__label { color: var(--text-1); }
-.proj-stepper__line { flex: 0 1 40px; height: 2px; background: var(--border); }
-.proj-stepper__line.is-done { background: var(--primary); }
-@media (max-width: 640px) {
-  .proj-stepper__label { display: none; }
-  .proj-stepper__line { flex-basis: 20px; }
+/* --- En-tête de la maquette ------------------------------------------------ */
+.vd-header { background: #111; color: #fff; padding: 18px 24px; flex: 0 0 auto; }
+.vd-header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+.vd-header p { margin: 6px 0 0; color: #ddd; font-size: 15px; }
+
+/* .work (parent) a overflow:hidden — c'est ici qu'il faut le scroll propre à
+   l'écran, sinon un contenu plus haut que la fenêtre déborde en silence. */
+.vd-container {
+  flex: 1; min-height: 0; overflow-y: auto;
+  width: 100%; max-width: 1160px; margin: 0 auto; padding: 24px 18px 50px;
 }
 
-/* Question centrée dans la colonne de droite (tuiles de type) : le client
-   reste dans la sidebar. Pas de min-height ici — le délai/paiement/total
-   s'affichent toujours juste en dessous, un min-height fixe les pousserait
-   hors de l'écran et forcerait un scroll vertical qu'on ne veut pas
-   (façon SumUp : tout tient sur un seul écran, sans barre de scroll). */
-.proj-center { display: flex; flex-direction: column; align-items: center; text-align: center; }
-
-.proj-back { align-self: flex-start; margin-bottom: 10px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
-.proj-back:hover { color: var(--primary); }
-
-/* --- Colonne client épinglée + colonne produit --------------------------------- */
-.proj-layout { display: flex; align-items: flex-start; gap: 28px; }
-.proj-sidebar {
-  flex: 0 0 220px;
-  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
-  padding: 20px 16px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
-  background: var(--surface); box-shadow: var(--shadow-1); position: sticky; top: 20px;
+/* --- Fil des 4 étapes ----------------------------------------------------- */
+.vd-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+.vd-step {
+  padding: 14px 12px; text-align: center; background: #e4e6e8; border-radius: 9px;
+  font-weight: 700; font-size: 15px; color: #62676d;
 }
-.proj-sidebar__av {
-  flex: 0 0 52px;
-  width: 52px; height: 52px; border-radius: 50%; background: var(--primary-soft); color: var(--primary);
-  display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; margin-bottom: 6px;
-}
-.proj-sidebar__info { min-width: 0; }
-.proj-sidebar__name { margin: 0; font-weight: 700; font-size: 16px; color: var(--text-1); overflow-wrap: break-word; }
-.proj-sidebar__meta { margin: 0; font-size: 14px; color: var(--text-2); }
-.proj-sidebar__change { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.proj-sidebar__change:hover { color: var(--primary); border-color: var(--primary-soft); }
-.proj-main { flex: 1; min-width: 0; }
+.vd-step.is-active { background: var(--vd-accent); color: #fff; }
+.vd-step.is-done { background: var(--vd-accent-soft); color: var(--vd-accent); }
 
-@media (max-width: 720px) {
-  .proj-layout { flex-direction: column; }
-  .proj-sidebar {
-    flex: 0 0 auto; width: 100%; flex-wrap: wrap; flex-direction: row; align-items: center;
-    justify-content: flex-start; text-align: left; position: static; gap: 10px 12px;
+/* --- Cartes --------------------------------------------------------------- */
+.vd-card {
+  background: var(--vd-card); border: 1px solid var(--vd-border); border-radius: var(--vd-radius);
+  padding: 20px; margin-bottom: 18px; box-shadow: 0 2px 9px rgba(0, 0, 0, .05);
+}
+.vd-page h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
+.vd-page h3 { margin: 18px 0 12px; font-size: 18px; font-weight: 700; }
+.vd-stage-title { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 16px; }
+.vd-stage-title h2 { margin: 0; }
+.vd-order-ref {
+  font-size: 15px; font-weight: 800; background: #111; color: #fff;
+  padding: 8px 11px; border-radius: 8px; white-space: nowrap;
+}
+
+/* --- Champs --------------------------------------------------------------- */
+.vd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.vd-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.vd-field { margin-bottom: 14px; }
+.vd-page label { display: block; font-weight: 700; margin-bottom: 7px; font-size: 15px; }
+.vd-page input, .vd-page select, .vd-page textarea {
+  width: 100%; border: 1px solid #bcc2c8; border-radius: 9px; padding: 12px;
+  /* 16px : en dessous, iOS zoome sur le champ dès qu'on le touche. */
+  font-size: 16px; font-family: inherit; color: inherit; background: #fff; min-height: 44px;
+}
+.vd-page textarea { min-height: 95px; resize: vertical; }
+.vd-page input:focus, .vd-page select:focus, .vd-page textarea:focus {
+  outline: 3px solid rgba(17, 24, 39, .13); border-color: var(--vd-accent);
+}
+.vd-page input[readonly] { background: #f5f6f8; color: var(--vd-muted); }
+.vd-invalid { border: 2px solid var(--vd-danger) !important; background: var(--vd-danger-soft) !important; }
+.vd-error-msg { color: var(--vd-danger); font-size: 14px; font-weight: 700; margin-top: 5px; }
+/* Avertissement de doublon : ce n'est pas un refus, c'est un « vérifie avant de
+   créer ». Élément permanent, donc distinct des messages d'erreur que
+   `effacerErreurs()` retire du DOM. */
+.vd-warning {
+  margin: 14px 0; padding: 12px 14px; border-radius: 9px;
+  border: 1px solid var(--vd-danger); background: var(--vd-danger-soft);
+  color: var(--vd-danger); font-size: 15px; font-weight: 700;
+}
+.vd-help { font-size: 14px; color: var(--vd-muted); margin-top: 5px; line-height: 1.4; }
+/* `.vd-page` en tête : ces classes sont posées sur des <label>, et
+   `.vd-page label { display: block }` plus haut l'emporterait sur une classe
+   seule (même spécificité de classe, un type de plus). Sans ça la case à cocher
+   se colle à son texte au lieu de s'aligner avec lui. */
+.vd-page .vd-inline-check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
+.vd-page .vd-inline-check input { width: auto; min-height: 0; }
+
+/* --- Boutons -------------------------------------------------------------- */
+.vd-actions, .vd-footer-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.vd-btn {
+  border: 0; border-radius: 9px; padding: 12px 16px; min-height: 44px;
+  font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+  background: #eceff1; color: #222;
+}
+.vd-btn--primary { background: var(--vd-accent); color: #fff; }
+.vd-btn--primary:hover { background: var(--vd-accent-dark); }
+.vd-btn--full { width: 100%; font-size: 17px; padding: 15px; }
+.vd-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --- Résumé et totaux ----------------------------------------------------- */
+.vd-summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 16px; }
+.vd-summary-total { font-size: 18px; font-weight: 800; border-bottom: 0; }
+
+/* --- Article du panier / résultat de recherche client --------------------- */
+.vd-item, .vd-client-result {
+  border: 1px solid var(--vd-border); border-radius: 11px; padding: 14px; margin-bottom: 10px; background: #fff;
+}
+.vd-item-head, .vd-client-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.vd-badge { display: inline-block; border-radius: 999px; padding: 5px 9px; background: #eceff1; font-size: 13px; font-weight: 700; }
+.vd-badge--on { background: var(--vd-accent-soft); color: var(--vd-accent); }
+.vd-notice { background: #f7f8f9; border: 1px dashed #bfc4c9; border-radius: 11px; padding: 15px; }
+.vd-selected { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
+.vd-client-results { margin-top: 10px; }
+
+/* Particulier / Professionnel : deux grandes cibles, pas un menu déroulant. */
+.vd-choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.vd-choice {
+  background: #f2f3f4; text-align: left; border: 2px solid transparent; border-radius: 9px;
+  padding: 14px; font-family: inherit; font-size: 15px; cursor: pointer; color: inherit;
+}
+.vd-choice.is-active { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
+.vd-choice b { display: block; font-size: 16px; }
+.vd-choice .vd-help { margin-top: 4px; }
+
+/* --- Paiement ------------------------------------------------------------- */
+/* Idem : posé sur un <label>, donc préfixé pour passer devant `.vd-page label`. */
+.vd-page .vd-pay-option {
+  display: flex; gap: 10px; align-items: center; padding: 14px;
+  border: 1px solid var(--vd-border); border-radius: 9px; margin-bottom: 9px;
+  font-weight: 700; font-size: 16px; min-height: 44px; cursor: pointer;
+}
+.vd-page .vd-pay-option input { width: auto; min-height: 0; }
+.vd-page .vd-pay-option:has(input:checked) { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
+
+/* --- Commande terminée + ticket ------------------------------------------- */
+.vd-success { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
+.vd-ticket {
+  width: 380px; max-width: 100%; margin: 0 auto; background: #fff;
+  border: 1px dashed #aaa; padding: 22px; font-family: "Courier New", monospace; font-size: 15px;
+}
+.vd-ticket h2 { text-align: center; margin: 0 0 4px; }
+.vd-ticket .vd-center { text-align: center; }
+.vd-ticket-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 4px 0; }
+.vd-ticket-product { margin: 8px 0; }
+.vd-ticket-product-line { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.vd-ticket hr { border: 0; border-top: 1px dashed #777; margin: 12px 0; }
+
+/* Note interne : filet à gauche, jamais sur le ticket du client. */
+.vd-internal { border-left: 5px solid #333; }
+.vd-internal-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.vd-lock { font-size: 14px; color: #555; }
+
+@media (max-width: 760px) {
+  .vd-grid, .vd-grid-3, .vd-choice-grid { grid-template-columns: 1fr; }
+  .vd-stepper { grid-template-columns: 1fr 1fr; }
+  .vd-ticket { width: 100%; }
+  .vd-header { padding: 14px 16px; }
+  .vd-container { padding: 16px 12px 40px; }
+}
+
+/* --- Impression du ticket -------------------------------------------------
+   `vd-print` est posée sur <body> le temps de l'impression : tout l'écran
+   disparaît sauf le ticket, qui part au format 80 mm de la caisse. */
+@media print {
+  body.vd-print { background: #fff; }
+  body.vd-print .topbar,
+  body.vd-print .topbar-filet,
+  body.vd-print .vd-header,
+  body.vd-print .vd-stepper,
+  body.vd-print .vd-no-print { display: none !important; }
+  /* Les conteneurs bornent la hauteur et coupent le débordement à l'écran :
+     à l'impression ils doivent laisser passer toute la hauteur du ticket. */
+  body.vd-print .shell,
+  body.vd-print .app,
+  body.vd-print .work,
+  body.vd-print .proj:not([hidden]),
+  body.vd-print .vd-page,
+  body.vd-print .vd-container {
+    display: block !important; overflow: visible !important;
+    height: auto !important; max-height: none !important; padding: 0 !important; margin: 0 !important;
   }
-  .proj-sidebar__av { margin-bottom: 0; }
-  .proj-sidebar__info { flex: 1 1 auto; }
-  .proj-sidebar__change { flex: 1 1 100%; margin-top: 0; justify-content: center; }
+  body.vd-print .vd-ticket-card { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  body.vd-print .vd-ticket { border: 0; width: 80mm; }
 }
-
-/* --- Page client ------------------------------------------------------------ */
-/* Recherche + « Nouveau client » en grand format comptoir (~60px, coins bien
-   ronds) : c'est le premier geste de chaque encaissement, il doit se viser
-   au doigt sans regarder. */
-.proj-client__row { display: flex; gap: 12px; margin-bottom: 16px; }
-.proj-search { flex: 1; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 18px; padding: 0 18px; background: var(--surface); }
-.proj-search:focus-within { border-color: var(--primary); }
-.proj-search__ic { color: var(--text-2); font-size: 24px; }
-.proj-search__input { flex: 1; border: 0; background: transparent; padding: 17px 0; font: inherit; font-size: 18px; color: var(--text-1); outline: none; }
-.proj-client__row .proj-btn { min-height: 60px; border-radius: 18px; padding: 0 22px; font-size: 16px; }
-.proj-client__row .proj-btn .material-symbols-outlined { font-size: 22px; }
-.proj-client__results { display: flex; flex-direction: column; gap: 6px; }
-
-.proj-client__item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer; text-align: left; }
-.proj-client__item:hover { background: var(--surface-hover); }
-.proj-client__name { font-weight: 600; font-size: 16px; color: var(--text-1); }
-.proj-client__meta { font-size: 14px; color: var(--text-2); }
-
-.proj-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-1); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.proj-btn--ghost { color: var(--primary); border-color: var(--primary-soft); }
-.proj-btn--primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.proj-btn:disabled { opacity: .6; cursor: default; }
-.proj-input { flex: 1 1 180px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text-1); }
-.proj-input--sm { min-height: 48px; }
-
-/* --- Écran « Nouveau client » (étape 1) ------------------------------------------
-   Transcription de la maquette validée par le patron, valeur pour valeur. Les
-   jetons employés ici portent EXACTEMENT les couleurs de la maquette
-   (--bg #f5f6f8, --surface #fff, --text-1 #1f2937, --text-2 #6b7280,
-   --border #d1d5db, --primary #111827, --danger #b91c1c…) : on les nomme plutôt
-   que de les recopier en dur, pour que l'écran suive le thème sombre sans
-   deuxième palette à tenir à jour.
-   Les boutons et les champs n'imposent PAS de police : ils gardent celle du
-   navigateur, comme dans la maquette — c'est ce qui donne son rendu aux onglets
-   et aux boutons d'action. */
-.pjc-page {
-  max-width: 980px;
-  margin: 32px auto;
-  padding: 0 16px 40px;
-  font-size: 16px;
-  color: var(--text-1);
-}
-
-.pjc-header { margin-bottom: 20px; }
-.pjc-header h1 { margin: 0 0 6px; font-size: 30px; font-weight: 700; }
-.pjc-header p { margin: 0; color: var(--text-2); }
-
-.pjc-card {
-  display: block;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 24px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .05);
-}
-
-/* Particulier / Professionnel : deux boutons de même largeur, l'actif en encre
-   pleine. Rien ne bouge ailleurs — seuls les champs dessous changent. */
-.pjc-type-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-.pjc-type-button {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 10px;
-  padding: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: .2s ease;
-}
-.pjc-type-button.is-active {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
-}
-
-.pjc-section-title {
-  margin: 22px 0 14px;
-  font-size: 18px;
-  font-weight: 700;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-}
-
-.pjc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.pjc-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.pjc-field--full { grid-column: 1 / -1; }
-
-.pjc-card label,
-.pjc-dialog label {
-  font-weight: 700;
-  font-size: 14px;
-}
-/* L'étoile rouge des champs obligatoires : elle appartient à l'étiquette, pas
-   au texte — un champ qui cesse d'être obligatoire perd sa classe, rien d'autre. */
-.pjc-required::after {
-  content: " *";
-  color: var(--danger);
-}
-
-.pjc-card input,
-.pjc-card select,
-.pjc-dialog input {
-  width: 100%;
-  padding: 12px 13px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  font-size: 15px;
-  background: var(--surface);
-}
-.pjc-card input:focus,
-.pjc-card select:focus,
-.pjc-dialog input:focus {
-  outline: 2px solid rgba(var(--primary-rgb), .13);
-  border-color: var(--primary);
-}
-
-.pjc-phone-row,
-.pjc-sector-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-}
-
-.pjc-secondary-btn {
-  border: 1px solid var(--border);
-  background: var(--surface-hover);
-  border-radius: 9px;
-  padding: 0 14px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-/* La place du message d'erreur est réservée même quand il n'y a pas d'erreur :
-   l'apparition d'un message ne décale jamais le champ suivant. */
-.pjc-error {
-  color: var(--danger);
-  font-size: 13px;
-  min-height: 16px;
-}
-
-.pjc-success {
-  color: var(--success);
-  background: var(--success-bg);
-  border: 1px solid var(--success-line);
-  padding: 12px;
-  border-radius: 9px;
-  margin-top: 18px;
-  display: none;
-}
-
-.pjc-warning {
-  color: var(--warning);
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-line);
-  padding: 12px;
-  border-radius: 9px;
-  margin-top: 18px;
-  display: none;
-}
-
-.pjc-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 26px;
-}
-
-.pjc-btn {
-  border-radius: 9px;
-  padding: 12px 16px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 14px;
-}
-.pjc-btn--primary {
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: var(--on-primary);
-}
-.pjc-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
-.pjc-btn--outline {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-1);
-}
-.pjc-btn:disabled { opacity: .6; cursor: default; }
-
-.pjc-hidden { display: none !important; }
-
-/* Onglet au repos, bouton « Formater » et champs de saisie gardent la couleur
-   par défaut du navigateur (le noir de la maquette) : c'est elle qu'on voit à
-   l'écran en clair. En sombre, ce noir deviendrait illisible sur fond foncé —
-   d'où ce seul rattrapage, réservé au thème sombre. */
-:root[data-theme="dark"] .pjc-type-button,
-:root[data-theme="dark"] .pjc-secondary-btn,
-:root[data-theme="dark"] .pjc-card input,
-:root[data-theme="dark"] .pjc-card select,
-:root[data-theme="dark"] .pjc-dialog input { color: var(--text-1); }
-:root[data-theme="dark"] .pjc-type-button.is-active { color: var(--on-primary); }
-
-.pjc-dialog {
-  border: none;
-  border-radius: 12px;
-  padding: 0;
-  width: min(420px, calc(100% - 30px));
-  box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
-  background: var(--surface);
-  color: var(--text-1);
-}
-.pjc-dialog::backdrop { background: rgba(0, 0, 0, .45); }
-.pjc-dialog-body { padding: 22px; }
-/* Le titre garde les valeurs par défaut du navigateur (24px, gras, .83em de
-   marge) : c'est ce que fait la maquette, et c'est ce qu'on voit à l'écran. */
-.pjc-dialog-body h2 { margin: .83em 0; font-size: 24px; font-weight: 700; }
-.pjc-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-/* PAS de bascule « une colonne » : l'écran garde la MÊME mise en page à toutes
-   les largeurs. Le repli téléphone de la maquette (720px) transformait le
-   formulaire dès qu'on le regardait dans un panneau étroit — deux onglets
-   empilés, « Formater » passé sous le champ — alors que les postes visés
-   (Chrome PC, Galaxy Tab A9+ en 1280×800 ou 800×1280) sont toujours larges.
-   Les colonnes se resserrent, elles ne se replient pas : `minmax(0, 1fr)` sur
-   la grille et `1fr auto` sur les paires champ+bouton laissent le contenu
-   rétrécir sans jamais déborder en largeur. */
-
-/* --- Tuiles de type (colonne de droite) ---------------------------------------- */
-/* Grosses tuiles carrées façon catégories SumUp : icône dans un cercle bleu
-   (accent UNIQUE de l'app, jamais une couleur par famille), texte lisible de
-   loin, grille aérée, ombre légère au repos. */
-/* minmax(0, 1fr) : sans lui, l'aspect-ratio des tuiles transfère leur hauteur
-   en largeur minimale et la grille déborde du conteneur. */
-.proj-type__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 700px; }
-@media (min-width: 900px) { .proj-type__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
-.proj-tile {
-  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; padding: 14px 10px; border: 1px solid var(--border); border-radius: 22px;
-  background: var(--surface); box-shadow: var(--shadow-1); cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-}
-.proj-tile:hover { background: var(--surface-hover); border-color: var(--primary-soft); transform: translateY(-2px); box-shadow: var(--shadow-2); }
-.proj-tile__circle {
-  width: 56px; height: 56px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--primary-soft); color: var(--primary);
-}
-.proj-tile__ic { font-size: 30px; }
-.proj-tile__label { font-weight: 700; font-size: 17px; text-align: center; color: var(--text-1); }
-
-/* --- Panier (colonne de droite) -------------------------------------------------- */
-.proj-lignes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
-.proj-cart-item { display: flex; align-items: center; gap: 12px; padding: 14px; min-height: 44px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-1); }
-.proj-cart-item__info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-.proj-cart-item__type { font-size: 12.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--primary); }
-.proj-cart-item__desc { font-size: 16px; color: var(--text-1); overflow-wrap: break-word; }
-.proj-cart-item__prix { font-weight: 700; font-size: 16px; color: var(--text-1); white-space: nowrap; }
-.proj-cart-item__del { flex: 0 0 36px; min-height: 36px; border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.proj-cart-item__del:hover { color: var(--danger); }
-.proj-addmore__title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-2); }
-
-/* --- Formulaire d'ajout d'un produit ---------------------------------------------- */
-/* Suite de choix visuels : un groupe = un titre + de gros boutons tactiles.
-   Aucun <select> — tout se choisit au doigt, l'option active saute aux yeux. */
-.proj-form { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-1); }
-.proj-group { margin: 0 0 18px; }
-.proj-group__label { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
-
-.proj-choices { display: flex; flex-wrap: wrap; gap: 10px; }
-.proj-choice {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 18px;
-  border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface);
-  font: inherit; font-size: 16px; font-weight: 600; color: var(--text-1); cursor: pointer;
-}
-.proj-choice:hover { background: var(--surface-hover); border-color: var(--primary-soft); }
-.proj-choice.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
-.proj-choice__prix { font-size: 13.5px; font-weight: 700; color: var(--text-2); }
-.proj-choice.is-on .proj-choice__prix { color: var(--primary); }
-.proj-choices--duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.proj-choices--duo .proj-choice { justify-content: center; }
-/* Bouton « + Ajouter un marquage » : réduit le nombre d'éléments visibles par
-   défaut (un objectif = une action) — les 4 groupes de personnalisation ne
-   s'affichent qu'après ce tap. */
-.proj-choice--add { width: 100%; justify-content: center; border-style: dashed; color: var(--primary); }
-/* « Autres emplacements » : déplie les zones secondaires, sans peser autant
-   qu'un choix réel — bordure pointillée, texte discret. */
-.proj-choice--plus { border-style: dashed; color: var(--text-2); }
-.proj-choice--plus .material-symbols-outlined { font-size: 20px; }
-
-.proj-stepq { display: flex; align-items: center; gap: 12px; }
-.proj-stepq__btn {
-  width: 56px; height: 56px; border: 1.5px solid var(--border); border-radius: 16px;
-  background: var(--surface); color: var(--text-1); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.proj-stepq__btn:hover { border-color: var(--primary); color: var(--primary); background: var(--surface-hover); }
-.proj-stepq__btn .material-symbols-outlined { font-size: 26px; }
-.proj-stepq__val { width: 88px; height: 56px; text-align: center; font: inherit; font-size: 20px; font-weight: 700; border: 1.5px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text-1); }
-
-/* Coloris : pastilles neutres (identité de la couleur elle-même), le SEUL
-   accent bleu de l'app reste réservé à l'état sélectionné (outline). */
-.proj-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
-.proj-swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; padding: 4px; border: 0; border-radius: 12px; background: none; font: inherit; cursor: pointer; }
-.proj-swatch__dot { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); }
-.proj-swatch__dot--autre { background: conic-gradient(#d64541, #f4c542, #10b981, #3b82f6, #ec6fa9, #d64541); }
-.proj-swatch.is-on .proj-swatch__dot { outline: 3px solid var(--primary); outline-offset: 2px; }
-.proj-swatch__label { font-size: 13.5px; font-weight: 600; color: var(--text-2); }
-.proj-swatch.is-on .proj-swatch__label { color: var(--primary); }
-.proj-swatch-input { margin-top: 10px; width: 100%; }
-
-.proj-choice__ic { font-size: 20px; margin-inline-start: 6px; }
-.proj-input--lg { min-height: 56px; font-size: 20px; font-weight: 700; border-radius: 16px; max-width: 220px; }
-.proj-input--area { min-height: 88px; padding: 12px 14px; line-height: 1.45; resize: vertical; }
-
-/* Champ étiqueté : l'étiquette au-dessus, le champ pleine largeur dessous.
-   Deux par ligne sur grand écran, une seule dès la tablette portrait. */
-.proj-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
-.proj-field:last-child { margin-bottom: 0; }
-.proj-field__label:empty { display: none; }
-.proj-field__label { font-size: 13.5px; font-weight: 600; color: var(--text-2); }
-.proj-field .proj-input { flex: 0 0 auto; width: 100%; }
-
-/* Prix unitaire : HT et TGCA côte à côte, liés. Le prix encore issu du
-   catalogue s'affiche en gris — il se voit comme une proposition, pas comme
-   une saisie de l'employé. */
-.proj-prix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.proj-prix .proj-field { margin: 0; }
-.proj-prix .proj-input--lg { max-width: none; }
-.proj-input.is-catalogue { color: var(--text-3); font-weight: 600; }
-.proj-prix__reset {
-  display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; min-height: 44px;
-  padding: 0 14px; border: 1px dashed var(--border); border-radius: 12px; background: none;
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--text-2); cursor: pointer;
-}
-.proj-prix__reset:hover { border-color: var(--primary); color: var(--primary); }
-.proj-prix__reset .material-symbols-outlined { font-size: 19px; }
-
-/* Grille de tailles : une case chiffrable par taille, la quantité de la ligne
-   en est la somme (comme la Saisie détaillée). Cases >= 44px au doigt. */
-.proj-sizes { display: flex; flex-wrap: wrap; gap: 10px; }
-.proj-size { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.proj-size__label { font-size: 12.5px; font-weight: 700; letter-spacing: .03em; color: var(--text-2); }
-.proj-size__qty {
-  width: 62px; height: 52px; text-align: center; font: inherit; font-size: 18px; font-weight: 700;
-  border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-1);
-}
-.proj-size__qty:focus { border-color: var(--primary); outline: none; }
-.proj-size-libre { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.proj-size-libre__del {
-  width: 44px; height: 44px; flex: 0 0 auto; border: 0; border-radius: 12px; background: none;
-  color: var(--text-3); cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.proj-size-libre__del:hover { color: var(--danger); background: var(--surface-hover); }
-.proj-sizes__total { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: var(--text-2); }
-
-/* Détail d'une face marquée : n'apparaît qu'une fois l'emplacement choisi. */
-.proj-face { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
-
-@media (max-width: 820px) {
-  .proj-prix { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* Délai + paiement : boutons segmentés pleine largeur, un choix clair. */
-.proj-delai { margin: 10px 0 0; }
-.proj-segbar { display: grid; gap: 8px; width: 100%; }
-.proj-segbar--cols6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.proj-segbar--cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.proj-segbar--cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.proj-segbar--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-/* Tablette portrait et paysage : 6 colonnes deviennent illisibles bien avant le
-   téléphone — on retombe sur 3, cibles tactiles préservées. */
-@media (max-width: 1000px) {
-  .proj-segbar--cols6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 620px) {
-  .proj-segbar--cols6,
-  .proj-segbar--cols5,
-  .proj-segbar--cols4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-.proj-segbar__btn {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-height: 56px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 14px;
-  background: var(--surface); font: inherit; font-size: 15.5px; font-weight: 600; color: var(--text-2);
-  cursor: pointer; text-align: center;
-}
-.proj-segbar__btn:hover { background: var(--surface-hover); }
-.proj-segbar__btn.is-on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
-.proj-segbar__sub { font-size: 12.5px; font-weight: 700; opacity: .75; }
-
-/* Barre du bas façon caisse : total en gros, CTA pleine largeur toujours
-   visible. La marge (info interne) reste derrière une icône discrète. */
-.proj-total { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 8px; padding: 6px 20px 10px; margin: 8px -20px -20px; background: var(--surface); border-top: 1px solid var(--border-soft); }
-.proj-total__row { display: flex; align-items: baseline; gap: 12px; }
-.proj-total__label { color: var(--text-2); font-size: 15px; margin-left: auto; }
-.proj-total__value { font-size: 28px; font-weight: 800; color: var(--text-1); }
-.proj-marge-toggle { align-self: center; display: inline-flex; align-items: center; border: 0; background: none; color: var(--text-2); cursor: pointer; opacity: .4; padding: 6px; }
-.proj-marge-toggle:hover { opacity: 1; }
-.proj-marge-toggle__ic { font-size: 20px; }
-.proj-marge { display: flex; gap: 14px; font-size: 14px; color: var(--text-2); }
-/* Le HT sous le total : la distinction HT/TTC, sans voler la vedette au TTC. */
-.proj-total__ht { margin: -4px 0 0; text-align: right; font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-/* Pourquoi « Enregistrer » est grisé : dit à l'écran, jamais laissé à deviner. */
-.proj-total__manque { margin: 0; text-align: center; font-size: 13.5px; color: var(--text-2); }
-.proj-btn--cta { width: 100%; justify-content: center; min-height: 58px; border-radius: var(--radius-lg); font-size: 17.5px; font-weight: 700; box-shadow: var(--shadow-1); }
-
-/* --- Écran Textile (étape 2 — Produits) ------------------------------------------
-   Une CARTE par bloc sur un fond légèrement gris, une colonne récapitulative
-   collante à droite, une barre d'action fixe en bas. Mêmes valeurs que l'écran
-   « Nouveau client », dont il reprend les alias de jetons : c'est le même
-   poste, ce doit être la même main sous les doigts. */
-.tx-screen {
-  --tx-page: var(--bg);
-  --tx-card: var(--surface);
-  --tx-border: var(--border-soft);
-  --tx-field-border: var(--border);
-  --tx-label: var(--text-1);
-  --tx-opt: var(--text-2);
-  --tx-ph: var(--text-3);
-  --tx-title: var(--text-1);
-  --tx-accent: var(--primary);
-  --tx-accent-soft: var(--primary-soft);
-  --tx-chip-border: var(--border);
-  --tx-error: var(--danger);
-  --tx-error-bg: var(--danger-bg);
-  --tx-muted: var(--text-2);
-  --tx-empty-bg: var(--surface-hover);
-  --tx-dashed: var(--border);
-  --tx-ro-bg: var(--surface-hover);
-  --tx-fill-bg: var(--primary-soft);
-  --tx-bar-bg: color-mix(in srgb, var(--surface) 94%, transparent);
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
-  color: var(--tx-title);
-  /* La barre d'action est FIXE : sans cette réserve, elle recouvrait les
-     derniers champs du formulaire (le bug qu'on corrige ici). */
-  padding-bottom: 140px;
-}
-.proj-page.is-textile .proj-body { background: var(--tx-page); max-width: none; }
-:root[data-theme="dark"] .proj-page.is-textile .proj-body { background: var(--bg); }
-
-.tx-layout { display: flex; align-items: flex-start; gap: 24px; max-width: 1080px; margin: 0 auto; }
-.tx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-.tx-back { align-self: flex-start; border: 0; background: none; color: var(--tx-muted); font: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
-.tx-back:hover { color: var(--tx-accent); }
-.tx-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.01em; color: var(--tx-title); }
-
-/* Une carte = un bloc. Titre en casse normale : les en-têtes gris en
-   MAJUSCULES pesaient plus lourd que les champs qu'ils annonçaient. */
-.tx-card {
-  display: flex; flex-direction: column; gap: 16px;
-  background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 18px;
-  padding: 22px 24px;
-}
-.tx-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.tx-card__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--tx-title); }
-.tx-card__aside { font-size: 13px; font-weight: 600; color: var(--tx-muted); white-space: nowrap; }
-.tx-card__aside--fort { color: var(--tx-accent); }
-.tx-card__hint { margin: -8px 0 0; font-size: 13px; color: var(--tx-muted); }
-.tx-card__note { margin: -4px 0 0; font-size: 12.5px; color: var(--tx-opt); }
-
-/* Champ : contour TOUJOURS visible, étiquette en casse normale. */
-.tx-f { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.tx-f__label { display: flex; align-items: baseline; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--tx-label); }
-.tx-f__opt { font-weight: 500; color: var(--tx-opt); }
-.tx-input {
-  height: 50px; padding: 0 14px; width: 100%;
-  border: 1.5px solid var(--tx-field-border); border-radius: 12px;
-  background: var(--tx-card); color: var(--tx-title);
-  font: inherit; font-size: 15px; outline: none;
-  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
-}
-.tx-input::placeholder { color: var(--tx-ph); }
-.tx-input:focus { border-color: var(--tx-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
-.tx-input--area { height: auto; min-height: 92px; padding: 12px 14px; line-height: 1.45; resize: vertical; }
-/* Le TTC se DÉDUIT du HT : il se lit, il ne se tape pas. */
-.tx-input--ro { background: var(--tx-ro-bg); color: var(--tx-muted); font-weight: 700; cursor: default; }
-.tx-input--ro:focus { border-color: var(--tx-field-border); box-shadow: none; }
-/* Jamais de cadre rouge muet : la bordure et le message arrivent ensemble. */
-.tx-f.is-error .tx-input { border-color: var(--tx-error); background: var(--tx-error-bg); }
-.tx-f.is-error .tx-input:focus { box-shadow: 0 0 0 3px var(--danger-line); }
-.tx-f__err { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--tx-error); }
-.tx-f__err-dot {
-  flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--tx-error); color: var(--surface); font-size: 10px; font-weight: 800;
-}
-
-/* Puces de choix : 40px de haut, l'état sélectionné se voit sans survol. */
-.tx-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.tx-chip {
-  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
-  border: 1px solid var(--tx-chip-border); border-radius: 10px; background: var(--tx-card);
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--tx-label); cursor: pointer;
-  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
-}
-.tx-chip:hover { border-color: var(--tx-accent); }
-.tx-chip.is-on { background: var(--tx-accent-soft); border-color: var(--tx-accent); color: var(--tx-accent); }
-/* La pastille ne fait que confirmer le nom : 16px suffisent, 44px écrasaient
-   le libellé qu'on lit réellement. */
-.tx-chip__dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(17, 20, 32, .14); flex: 0 0 auto; }
-
-/* Grille de tailles : autant de cases que la largeur en accepte. */
-.tx-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
-.tx-size { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.tx-size__label { font-size: 12px; font-weight: 700; color: var(--tx-label); overflow-wrap: anywhere; }
-.tx-size__qty {
-  height: 46px; width: 100%; text-align: center;
-  border: 1.5px solid var(--tx-field-border); border-radius: 12px;
-  background: var(--tx-card); color: var(--tx-title);
-  font: inherit; font-size: 16px; font-weight: 700; outline: none;
-  transition: border-color .12s ease, background-color .12s ease;
-}
-.tx-size__qty::placeholder { color: var(--tx-ph); font-weight: 600; }
-.tx-size__qty:focus { border-color: var(--tx-accent); box-shadow: 0 0 0 3px rgba(43, 70, 240, .14); }
-/* Une case remplie se repère d'un coup d'œil dans la grille. */
-.tx-size__qty.is-filled { border-color: var(--tx-accent); background: var(--tx-fill-bg); }
-.tx-size-libre { display: flex; align-items: flex-end; gap: 10px; }
-.tx-size-libre .tx-input { flex: 1; }
-.tx-size-libre .tx-size { flex: 0 0 88px; }
-.tx-size-libre__del {
-  flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none;
-  color: var(--tx-opt); cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.tx-size-libre__del:hover { color: var(--tx-error); background: var(--tx-empty-bg); }
-
-/* Bouton d'ajout : pleine largeur, pointillé — il ouvre, il ne valide pas. */
-.tx-add {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; min-height: 46px; padding: 0 16px;
-  border: 1.5px dashed var(--tx-dashed); border-radius: 12px; background: none;
-  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--tx-accent); cursor: pointer;
-}
-.tx-add:hover { border-color: var(--tx-accent); background: var(--tx-accent-soft); }
-.tx-add .material-symbols-outlined { font-size: 20px; }
-.tx-add--inline { min-height: 44px; }
-
-/* Face non marquée : un état complet, pas un formulaire à moitié rempli. */
-.tx-empty { border-radius: 14px; background: var(--tx-empty-bg); padding: 18px 20px; }
-.tx-empty__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--tx-title); }
-.tx-empty__sub { margin: 3px 0 0; font-size: 13px; color: var(--tx-muted); }
-
-/* Prix : HT saisi à gauche, TTC calculé à droite. */
-.tx-prix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.tx-input--prix { font-size: 17px; font-weight: 700; }
-
-/* --- Colonne récapitulative collante --------------------------------------- */
-.tx-side { flex: 0 0 300px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px; }
-.tx-client { background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 16px; padding: 16px; }
-.tx-client__row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.tx-client__av {
-  flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%;
-  background: var(--tx-accent-soft); color: var(--tx-accent);
-  display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800;
-}
-.tx-client__info { min-width: 0; }
-.tx-client__name { margin: 0; font-size: 15px; font-weight: 700; color: var(--tx-title); overflow-wrap: break-word; }
-.tx-client__meta { margin: 1px 0 0; font-size: 13px; color: var(--tx-muted); }
-.tx-client__change {
-  width: 100%; min-height: 44px; margin-top: 14px; padding: 0 12px;
-  border: 1px solid var(--tx-chip-border); border-radius: 12px; background: none;
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--tx-muted); cursor: pointer;
-}
-.tx-client__change:hover { color: var(--tx-accent); border-color: var(--tx-accent); }
-
-.tx-recap { background: var(--tx-card); border: 1px solid var(--tx-border); border-radius: 16px; padding: 18px 16px; }
-.tx-recap__title { margin: 0 0 14px; font-size: 13px; font-weight: 700; color: var(--tx-title); }
-.tx-recap__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--tx-border); }
-.tx-recap__row:first-of-type { border-top: 0; padding-top: 0; }
-.tx-recap__key { flex: 0 0 auto; font-size: 13px; color: var(--tx-muted); }
-.tx-recap__val { font-size: 13.5px; font-weight: 600; color: var(--tx-title); text-align: right; overflow-wrap: anywhere; }
-.tx-recap__mks { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; text-align: right; }
-.tx-recap__mk { font-size: 13px; font-weight: 600; color: var(--tx-title); overflow-wrap: anywhere; }
-
-/* --- Barre d'action fixe ---------------------------------------------------- */
-.tx-bar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: flex; align-items: center; gap: 20px;
-  padding: 14px 24px; padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  background: var(--tx-bar-bg, rgba(255, 255, 255, .94));
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  border-top: 1px solid var(--tx-border);
-  font-family: var(--font);
-}
-.tx-bar__prix { display: flex; flex-direction: column; gap: 1px; flex: 0 0 auto; }
-.tx-bar__label { font-size: 13px; color: var(--tx-muted); }
-.tx-bar__chiffres { display: flex; align-items: baseline; gap: 10px; }
-.tx-bar__amount { font-size: 24px; font-weight: 800; color: var(--tx-title); font-variant-numeric: tabular-nums; }
-/* Le panier et le total du projet sont en TTC : on le garde sous les yeux, en
-   second, pour qu'aucun des deux chiffres ne surprenne à l'étape suivante. */
-.tx-bar__ttc { font-size: 13px; font-weight: 600; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
-.tx-bar__btn {
-  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 54px; border: 0; border-radius: 14px; background: var(--tx-accent); color: var(--on-primary);
-  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-  font-family: var(--font);
-  transition: background-color .12s ease;
-}
-.tx-bar__btn:hover { background: var(--primary-hover); }
-.tx-bar__btn:active { background: var(--primary-hover); }
-
-/* Tablette portrait et téléphone : la colonne récapitulative repasse au-dessus
-   du formulaire (elle rappelle le client, elle ne doit pas manger la largeur
-   de saisie), et la barre d'action empile ses deux blocs. */
-@media (max-width: 900px) {
-  .tx-layout { flex-direction: column; }
-  /* `order` et pas un déplacement dans le DOM : la fiche client passe AVANT le
-     formulaire (on doit savoir pour qui on saisit), sans dupliquer le rendu. */
-  .tx-side { flex: 0 0 auto; width: 100%; position: static; order: -1; }
-  /* Le récapitulatif n'a plus rien à récapituler quand le formulaire est juste
-     dessous : il ne ferait que repousser la saisie hors de l'écran. */
-  .tx-recap { display: none; }
-  .tx-client__row { align-items: center; }
-}
-@media (max-width: 560px) {
-  .tx-card { padding: 18px 16px; }
-  .tx-title { font-size: 22px; }
-  .tx-prix { grid-template-columns: minmax(0, 1fr); }
-  .tx-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-  .tx-bar__prix { flex-direction: row; align-items: baseline; justify-content: space-between; }
-  /* 15px est la valeur de la maquette. Sous 16px, Safari iOS ZOOME la page dès
-     qu'on touche un champ et ne la dézoome jamais : sur téléphone seulement,
-     les champs repassent à 16px. */
-  .tx-input, .tx-size__qty { font-size: 16px; }
-}
-
-/* --- Destination + confirmation ------------------------------------------------ */
-.proj-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
-.proj-dest-card, .proj-done-card { position: relative; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-pop); padding: 28px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; }
-.proj-dest__eyebrow { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
-.proj-dest__title { margin: 4px 0 16px; font-size: 21px; font-weight: 800; }
-.proj-dest__list { display: flex; flex-direction: column; gap: 6px; }
-.proj-dest__item { min-height: 48px; padding: 0 16px; border: 1px solid var(--border-soft); border-radius: 14px; background: var(--surface); text-align: left; font: inherit; font-size: 16px; cursor: pointer; }
-.proj-dest__item:hover { background: var(--surface-hover); }
-.proj-dest__close { position: absolute; top: 14px; right: 14px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
-
-.proj-done-card { text-align: center; }
-.proj-done__check { width: 56px; height: 56px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 30px; }
-.proj-done__title { font-size: 21px; font-weight: 800; margin: 0 0 4px; }
-.proj-done__sub { color: var(--text-2); font-size: 16px; margin: 0 0 20px; }
-.proj-done__actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.proj-btn--wide { width: 100%; justify-content: center; margin-bottom: 14px; }
