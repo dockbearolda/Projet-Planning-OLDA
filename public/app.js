@@ -2117,6 +2117,245 @@ function ficheItems(fiche) {
   return null;
 }
 
+// --- La fiche projet : ce que l'écran du patron appelle « la bulle » ---------
+
+function ldActionBtn(icone, label, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ld-act';
+  const i = document.createElement('span');
+  i.className = 'material-symbols-outlined';
+  i.setAttribute('aria-hidden', 'true');
+  i.textContent = icone;
+  const t = document.createElement('span');
+  t.className = 'ld-act-label';
+  t.textContent = label;
+  b.append(i, t);
+  b.setAttribute('aria-label', label);
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// Une section de la fiche, prête à recevoir son contenu.
+function ldSection(titre, pleineLargeur) {
+  const s = document.createElement('section');
+  s.className = 'ld-section' + (pleineLargeur ? ' ld-section--full' : '');
+  const t = document.createElement('p');
+  t.className = 'ld-section-title';
+  t.textContent = titre;
+  s.appendChild(t);
+  return s;
+}
+
+// Même règle de rapprochement que le serveur (clientKey) : insensible à la
+// casse, aux accents et à la ponctuation. « Coco Beach » et « coco-beach »
+// sont LE MÊME client.
+const clientKeyLocal = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Une échéance en français sur un document destiné à un humain. `deadline` est
+// une chaîne « aaaa-mm-jj », mais une base de test la rend en ISO complet : on
+// coupe avant de découper, plutôt que de dater le récapitulatif en anglais.
+function dateFr(iso) {
+  const m = String(iso || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
+}
+
+// Le récapitulatif en TEXTE, tel qu'il s'imprime et se télécharge. Reconstruit
+// à la demande depuis la ligne ET sa fiche : il porte donc les corrections
+// faites depuis, pas l'état du jour de la prise.
+function recapTexte(r) {
+  const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
+  const lignes = [
+    'ATELIER OLDA — RÉCAPITULATIF PROJET',
+    '',
+    f.ref ? `Référence : ${f.ref}` : null,
+    f.source ? `Origine : ${f.source}` : null,
+    `Client : ${r.billing_company || '—'}`,
+    `Projet : ${r.product || '—'}`,
+    `Étape : ${stageDestinationLabel(r.stage, r.sub_stage ?? null)}`,
+    `Responsable : ${r.responsable || 'À attribuer'}`,
+    r.referent ? `Référent : ${r.referent}` : null,
+    `Date souhaitée : ${dateFr(r.deadline)}${f.heureSouhaitee ? ` à ${f.heureSouhaitee.replace(':', 'h')}` : ''}`,
+    // Une demande n'a pas de prix : on le DIT, on n'écrit pas « 0,00 € ».
+    `Prix TTC : ${r.project_value == null ? 'à chiffrer' : eur(Number(r.project_value))}`,
+    f.production ? `Production : ${f.production}` : null,
+  ].filter(Boolean);
+
+  const bloc = (titre, liste) => {
+    if (!Array.isArray(liste) || !liste.length) return;
+    lignes.push('', titre.toUpperCase());
+    for (const l of liste) lignes.push(`${l.k} : ${l.v}`);
+  };
+  bloc('Client', f.client);
+  bloc(f.source === 'Demande de devis' ? 'Demande' : 'Vente', f.details);
+  return lignes.join('\n');
+}
+
+function telechargerRecap(r) {
+  const nom = `Recap_${(r.fiche && r.fiche.ref) || r.billing_company || 'projet'}`.replace(/[^\w.-]+/g, '_');
+  // Le BOM en tête : sans lui, Excel et le Bloc-notes de Windows affichent les
+  // accents en charabia — et ce fichier finit souvent sur un poste Windows.
+  const blob = new Blob([`﻿${recapTexte(r).replace(/\n/g, '\r\n')}`], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${nom}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('Récapitulatif téléchargé');
+}
+
+// Impression : on n'imprime PAS l'application (la grille, le rail et la fiche
+// telle qu'elle est à l'écran donneraient une feuille illisible). On compose
+// une page propre dans un cadre hors écran, on l'imprime, on le retire. Un
+// cadre plutôt qu'une fenêtre : aucun bloqueur de pop-up ne peut l'empêcher.
+function imprimerRecap(r) {
+  const cadre = document.createElement('iframe');
+  cadre.setAttribute('aria-hidden', 'true');
+  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;height:1000px;border:0';
+  document.body.appendChild(cadre);
+  const d = cadre.contentDocument;
+  d.title = `${r.billing_company || 'Projet'} — ${r.product || ''}`.trim();
+  const style = d.createElement('style');
+  style.textContent = 'body{font:13px/1.55 Arial,Helvetica,sans-serif;margin:28px;color:#111}'
+    + 'pre{white-space:pre-wrap;font:inherit;margin:0}';
+  d.head.appendChild(style);
+  const pre = d.createElement('pre');
+  pre.textContent = recapTexte(r);
+  d.body.appendChild(pre);
+  cadre.contentWindow.focus();
+  cadre.contentWindow.print();
+  setTimeout(() => cadre.remove(), 1000);
+}
+
+// DÉTAIL COMPLET, MODIFIABLE. Le récapitulatif du comptoir, ligne à ligne :
+// libellé figé (il vient du parcours), valeur éditable. On n'enregistre qu'au
+// bouton — corriger dix lignes ne doit pas faire dix allers-retours réseau, et
+// tant qu'on n'a pas validé, rien n'a bougé en base.
+function ldSectionDetail(r) {
+  const f = r.fiche;
+  const groupes = [
+    { cle: 'client', titre: 'Client', lignes: Array.isArray(f.client) ? f.client : [] },
+    {
+      cle: 'details',
+      titre: f.source === 'Demande de devis' ? 'Demande' : 'Vente',
+      lignes: Array.isArray(f.details) ? f.details : [],
+    },
+  ].filter((g) => g.lignes.length);
+  if (!groupes.length) return null;
+
+  const section = ldSection('Détail complet de la demande enregistrée — tout est modifiable', true);
+  const champs = { client: [], details: [] };
+
+  for (const g of groupes) {
+    if (groupes.length > 1) {
+      const st = document.createElement('p');
+      st.className = 'ld-fiche-item__title';
+      st.style.margin = '10px 0 4px';
+      st.textContent = g.titre;
+      section.appendChild(st);
+    }
+    for (const l of g.lignes) {
+      const ligne = document.createElement('div');
+      ligne.className = 'ld-detail-line';
+      const k = document.createElement('span');
+      k.textContent = l.k;
+      // Une valeur longue ou sur plusieurs lignes mérite une zone de texte :
+      // une description de production ne se relit pas dans un champ d'une ligne.
+      const longue = String(l.v || '').length > 60 || String(l.v || '').includes('\n');
+      const champ = document.createElement(longue ? 'textarea' : 'input');
+      champ.className = 'ld-detail-input';
+      if (longue) champ.rows = 3;
+      champ.value = l.v == null ? '' : l.v;
+      champ.setAttribute('aria-label', l.k);
+      champs[g.cle].push(champ);
+      ligne.append(k, champ);
+      section.appendChild(ligne);
+    }
+  }
+
+  const pied = document.createElement('div');
+  pied.className = 'ld-detail-save';
+  const etat = document.createElement('span');
+  etat.className = 'ld-detail-state';
+  const enregistrer = document.createElement('button');
+  enregistrer.type = 'button';
+  enregistrer.className = 'ld-act';
+  enregistrer.textContent = 'Enregistrer les corrections';
+  enregistrer.addEventListener('click', async () => {
+    enregistrer.disabled = true;
+    etat.textContent = 'Enregistrement…';
+    try {
+      const res = await fetch(`/api/requests/${r.id}/fiche`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client: champs.client.map((c) => c.value),
+          details: champs.details.map((c) => c.value),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `erreur ${res.status}`);
+      const maj = await res.json();
+      Object.assign(r, maj);
+      showToast('Détail mis à jour');
+      renderLigneDetailIfOpen();
+    } catch (err) {
+      etat.textContent = `Échec : ${err.message}`;
+      enregistrer.disabled = false;
+    }
+  });
+  pied.append(etat, enregistrer);
+  section.appendChild(pied);
+  return section;
+}
+
+// HISTORIQUE DU CLIENT : les autres commandes du même dossier. « On a déjà fait
+// quoi pour eux ? » est la question qu'on pose au téléphone, et la réponse doit
+// être sous les yeux, pas à chercher dans la grille.
+function ldSectionHistoriqueClient(r) {
+  const cle = clientKeyLocal(r.billing_company);
+  if (!cle) return null;
+  const autres = rows
+    .filter((x) => String(x.id) !== String(r.id) && clientKeyLocal(x.billing_company) === cle)
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+  const section = ldSection(`Historique du client (${autres.length})`, true);
+  if (!autres.length) {
+    const p = document.createElement('p');
+    p.className = 'ld-empty';
+    // La grille ne porte que l'étape affichée : on ne prétend pas connaître
+    // tout l'historique du client, on dit ce qu'on voit.
+    p.textContent = 'Aucune autre commande de ce client à cette étape.';
+    section.appendChild(p);
+    return section;
+  }
+  for (const x of autres) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ld-hist';
+    const main = document.createElement('span');
+    main.className = 'ld-hist__main';
+    const t = document.createElement('span');
+    t.className = 'ld-hist__title';
+    t.textContent = x.product || 'Sans description';
+    const s = document.createElement('span');
+    s.className = 'ld-hist__sub';
+    s.textContent = stageDestinationLabel(x.stage, x.sub_stage ?? null);
+    main.append(t, s);
+    const v = document.createElement('span');
+    v.className = 'ld-hist__value';
+    v.textContent = x.project_value == null ? 'à chiffrer' : eur(Number(x.project_value));
+    b.append(main, v);
+    b.addEventListener('click', () => openLigneDetail(x.id));
+    section.appendChild(b);
+  }
+  return section;
+}
+
 function renderLigneDetail() {
   const r = rows.find((x) => String(x.id) === ligneDrawerId);
   if (!r) { closeLigneDetail(); return; }
@@ -2191,7 +2430,19 @@ function renderLigneDetail() {
   close.appendChild(strokeIcon(['M18 6L6 18', 'M6 6l12 12']));
   close.addEventListener('click', closeLigneDetail);
 
-  head.append(titles, close);
+  // Imprimer / Télécharger le récapitulatif : les deux gestes de l'écran du
+  // patron. Le client réclame « ce qu'on avait dit », l'atelier veut la fiche
+  // au mur — dans les deux cas on sort le récapitulatif tel qu'il est
+  // AUJOURD'HUI, corrections comprises.
+  const actions = document.createElement('div');
+  actions.className = 'ld-head__actions';
+  actions.append(
+    ldActionBtn('print', 'Imprimer', () => imprimerRecap(r)),
+    ldActionBtn('download', 'Télécharger', () => telechargerRecap(r)),
+    close,
+  );
+
+  head.append(titles, actions);
   ligneDrawerCard.appendChild(head);
 
   const body = document.createElement('div');
@@ -2229,17 +2480,20 @@ function renderLigneDetail() {
   docsSection.append(docsTitle, docsRow);
   body.appendChild(docsSection);
 
-  // --- Détail produit (structuré, depuis fiche) -------------------------------
-  const items = ficheItems(r.fiche);
-  if (items && items.length) {
-    const ficheSection = document.createElement('section');
-    ficheSection.className = 'ld-section';
-    const ficheTitle = document.createElement('p');
-    ficheTitle.className = 'ld-section-title';
-    ficheTitle.textContent = 'Détail produit';
-    ficheSection.appendChild(ficheTitle);
-    for (const it of items) ficheSection.appendChild(it);
-    body.appendChild(ficheSection);
+  // --- Détail (structuré, depuis fiche) ---------------------------------------
+  // Une commande du comptoir porte le récapitulatif complet, ligne à ligne :
+  // on le rend MODIFIABLE, c'est ici qu'on corrige une quantité ou une taille.
+  // Les fiches des anciens flux gardent leur affichage en lecture.
+  if (r.fiche && r.fiche.kind === 'comptoir-v17') {
+    const detail = ldSectionDetail(r);
+    if (detail) body.appendChild(detail);
+  } else {
+    const items = ficheItems(r.fiche);
+    if (items && items.length) {
+      const ficheSection = ldSection('Détail produit', true);
+      for (const it of items) ficheSection.appendChild(it);
+      body.appendChild(ficheSection);
+    }
   }
 
   // --- Suivi -------------------------------------------------------------------
@@ -2495,7 +2749,7 @@ function renderLigneDetail() {
 
   // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
   const notesSection = document.createElement('section');
-  notesSection.className = 'ld-section';
+  notesSection.className = 'ld-section ld-section--full';
   const notesTitle = document.createElement('p');
   notesTitle.className = 'ld-section-title';
   notesTitle.textContent = 'Notes';
@@ -2523,20 +2777,26 @@ function renderLigneDetail() {
   notesSection.append(notesTitle, notes);
   body.appendChild(notesSection);
 
+  // --- Historique du client ----------------------------------------------------
+  const histo = ldSectionHistoriqueClient(r);
+  if (histo) body.appendChild(histo);
+
   ligneDrawerCard.appendChild(body);
   body.scrollTop = prevScrollTop;
 }
 
-// Bouton « voir détails » : rejoint le cluster documents de la cellule
-// Dossier. Son propre `stopPropagation` suffit — aucun handler n'est posé
-// sur <tr>, donc le reste de la ligne garde exactement son comportement
-// d'édition inline actuel.
+// Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
+// cellule Dossier. C'est LUI qui ouvre la bulle récapitulative — comme le ↗ de
+// chaque carte dans l'écran du patron. Son propre `stopPropagation` suffit :
+// aucun handler n'est posé sur <tr>, donc le reste de la ligne garde son
+// édition inline (cliquer une cellule la corrige, ça ne doit pas ouvrir une
+// fiche par-dessus les doigts).
 function cellLigneDetailButton(r) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'pdf-btn ligne-detail-btn';
-  attachTip(btn, 'Voir le détail de la ligne');
-  btn.setAttribute('aria-label', 'Voir le détail de la ligne');
+  attachTip(btn, 'Ouvrir la fiche projet');
+  btn.setAttribute('aria-label', 'Ouvrir la fiche projet');
   btn.appendChild(detailIcon());
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
