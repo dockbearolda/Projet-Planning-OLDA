@@ -1,0 +1,2325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<title>Atelier OLDA — Demande de devis V20 Téléchargements contrôlés</title>
+<style>
+:root{--green:#142e54;--green-dark:#142e54;--green-soft:#eef2f7;--orange:#c46a00;--orange-soft:#fff6e8;--red:#bd2424;--red-soft:#fff0f0;--bg:#f3f4f5;--card:#fff;--border:#d8dde2;--text:#202428;--muted:#6d747b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text)}header{background:#111;color:#fff;padding:18px 24px}header h1{margin:0;font-size:23px}header p{margin:6px 0 0;color:#ddd}.container{max-width:1260px;margin:22px auto;padding:0 18px 55px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}.sidebar{position:sticky;top:16px}.stepper{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:18px}.step{background:#e3e6e8;border-radius:9px;padding:10px 7px;text-align:center;font-size:12px;font-weight:800;color:#626970}.step.active{background:var(--green);color:#fff}.step.done{background:#e2e8f0;color:var(--green-dark)}.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:17px;box-shadow:0 2px 8px rgba(0,0,0,.05)}.hidden{display:none!important}h2{margin:0 0 16px;font-size:21px}h3{margin:18px 0 12px}.stage-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.ref{background:#111;color:#fff;padding:8px 11px;border-radius:8px;font-weight:800;white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.field{margin-bottom:14px}label{display:block;font-weight:700;margin-bottom:7px}input,select,textarea{width:100%;border:1px solid #bcc2c8;border-radius:9px;padding:11px 12px;font-size:15px;background:#fff}textarea{min-height:95px;resize:vertical}input:focus,select:focus,textarea:focus{outline:3px solid rgba(20,46,84,.13);border-color:var(--green)}.invalid{border:2px solid var(--red)!important;background:var(--red-soft)!important}.error{color:var(--red);font-size:13px;font-weight:700;margin-top:5px}.help{color:var(--muted);font-size:13px;line-height:1.4;margin-top:5px}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}button{border:0;border-radius:9px;padding:11px 15px;font-weight:800;font-size:14px;cursor:pointer}button.primary{background:var(--green);color:#fff}button.primary:hover{background:var(--green-dark)}button.secondary{background:#edf0f2;color:#222}button.danger{background:#ffe6e6;color:var(--red)}button.whatsapp{background:#25D366;color:#083118}button.full{width:100%;font-size:16px;padding:14px}.notice{background:#f7f8f9;border:1px dashed #bfc5ca;border-radius:11px;padding:14px}.notice.orange{background:var(--orange-soft);border-color:#e7bb7e}.notice.green{background:var(--green-soft);border-color:#87c6a3}.check-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.check-card{display:flex;align-items:center;gap:9px;background:#f5f6f7;border:1px solid var(--border);border-radius:9px;padding:11px;font-weight:700}.check-card input{width:auto}.need-card,.result,.quote-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#eceff1}.badge.green{background:#e2e8f0;color:var(--green-dark)}.badge.orange{background:#ffe8c6;color:#8a4b00}.summary-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #eee}.summary-row.total{font-size:18px;font-weight:900;border-bottom:0}.progress{height:12px;background:#e4e6e8;border-radius:999px;overflow:hidden}.progress>div{height:100%;background:var(--green);width:0;transition:.25s}.status-list{margin:10px 0 0;padding-left:19px;font-size:14px;line-height:1.55}.sidebar .big-ref{font-size:20px;font-weight:900}.sidebar .status{font-weight:800;color:var(--orange)}.choice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.choice{background:#f3f4f5;border:2px solid transparent;text-align:left}.choice.active{border-color:var(--green);background:var(--green-soft)}.selected-client{border:2px solid #2e8b57;background:var(--green-soft)}.quote-box{border:1px solid #bbb;border-radius:12px;padding:18px;background:#fff}.quote-title{text-align:center;margin-bottom:14px}.quote-line{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 0;border-bottom:1px solid #eee}.quote-total{font-size:19px;font-weight:900}.pill-wrap{display:flex;gap:8px;flex-wrap:wrap}.pill{background:#edf0f2;border-radius:999px;padding:7px 10px;font-size:13px;font-weight:800}@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;order:-1}.stepper{grid-template-columns:repeat(4,1fr)}}@media(max-width:700px){.grid,.grid-3,.check-grid,.choice-grid{grid-template-columns:1fr}.stepper{grid-template-columns:repeat(2,1fr)}}@media print{body{background:#fff}header,.stepper,.sidebar,.no-print,.card:not(#finalCard){display:none!important}#step7,#finalCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}}
+
+.priority-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:8px}
+.priority-card{border:1px solid #d9dee7;background:#fff;border-radius:12px;padding:16px;text-align:left;cursor:pointer;transition:.18s ease;display:flex;flex-direction:column;gap:6px;min-height:125px}
+.priority-card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.priority-card.active{border:2px solid #111827;background:#f7f8fa}
+.priority-stars{font-size:22px;line-height:1}
+.priority-card strong{font-size:15px}
+.priority-card small{font-size:12px;line-height:1.45;color:#667085}
+@media(max-width:760px){.priority-grid{grid-template-columns:1fr}}
+
+
+.priority-field.priority-error{border:2px solid #dc2626;border-radius:14px;padding:14px;background:#fff7f7}
+.priority-field.priority-error>label{color:#dc2626}
+.priority-field.priority-error .priority-card{border-color:#f0a3a3}
+.field-error{margin-top:10px;color:#dc2626;font-size:13px;font-weight:700}
+.field-error.hidden{display:none}
+
+
+.client-quick-list{display:grid;gap:10px;max-height:360px;overflow:auto;margin-top:10px}
+.client-item{border:1px solid #d9dee7;background:#fff;border-radius:12px;padding:13px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:.15s ease}
+.client-item:hover{border-color:#111827;transform:translateY(-1px)}
+.client-item.active{border:2px solid #111827;background:#f7f8fa}
+.client-main{display:flex;flex-direction:column;gap:3px}
+.client-main strong{font-size:14px}
+.client-meta{font-size:12px;color:#667085}
+.client-type{font-size:11px;font-weight:700;padding:5px 8px;border-radius:999px;background:#eef2f6;white-space:nowrap}
+
+
+.client-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px}
+.client-action-card{border:1px solid #d9dee7;background:#fff;border-radius:12px;padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:105px;transition:.15s ease}
+.client-action-card:hover{border-color:#111827;transform:translateY(-1px)}
+.client-action-card.active{border:2px solid #111827;background:#f7f8fa}
+.client-action-card strong{font-size:14px}
+.client-action-card small{font-size:12px;line-height:1.45;color:#667085}
+#clientNextActionBlock.action-error{border:2px solid #dc2626;border-radius:14px;padding:14px;background:#fff7f7}
+#clientNextActionBlock.action-error>label{color:#dc2626}
+@media(max-width:760px){.client-action-grid{grid-template-columns:1fr}}
+
+
+.step-validation-error{
+  border:2px solid #dc2626 !important;
+  background:#fff7f7 !important;
+  border-radius:14px;
+  padding:12px;
+}
+.step-validation-error label,
+.step-validation-error .field-title{
+  color:#dc2626 !important;
+}
+.validation-summary{
+  border:2px solid #dc2626;
+  background:#fff7f7;
+  color:#991b1b;
+  border-radius:12px;
+  padding:12px 14px;
+  margin:12px 0;
+  font-size:13px;
+  line-height:1.45;
+}
+
+
+.ticket-pro{background:#fff;border:1px solid #d0d5dd;border-radius:18px;padding:28px;box-shadow:0 8px 30px rgba(16,24,40,.08)}
+.ticket-header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding-bottom:20px;border-bottom:2px solid #101828;margin-bottom:22px}
+.ticket-brand h2{margin:0;font-size:24px;letter-spacing:.02em}.ticket-brand p{margin:5px 0 0;color:#667085;font-size:13px}
+.ticket-ref{text-align:right}.ticket-ref strong{display:block;font-size:18px}.ticket-ref span{font-size:12px;color:#667085}
+.ticket-section{margin-top:24px}.ticket-section h3{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:#344054}
+.ticket-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
+.ticket-info{border-bottom:1px solid #eaecf0;padding:9px 0 11px}.ticket-info span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#667085;margin-bottom:4px}
+.ticket-info strong{display:block;font-size:14px;color:#101828;line-height:1.4}.ticket-needs .quote-card{border:1px solid #eaecf0;border-radius:12px;padding:14px;margin-bottom:10px;background:#fcfcfd}
+.ticket-footer{margin-top:28px;padding-top:16px;border-top:1px solid #d0d5dd;font-size:11px;color:#667085;display:flex;justify-content:space-between;gap:16px}
+@media(max-width:760px){.ticket-grid{grid-template-columns:1fr}.ticket-header{flex-direction:column}.ticket-ref{text-align:left}.ticket-pro{padding:18px}}
+@media print{body *{visibility:hidden!important}#ticketArea,#ticketArea *{visibility:visible!important}#ticketArea{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:none;padding:18mm}}
+
+
+.download-status{margin-top:14px;border-radius:12px;padding:13px 15px;font-size:13px;font-weight:700;line-height:1.5}
+.download-status.error{display:block!important;border:2px solid #dc2626;background:#fff1f2;color:#991b1b}
+.download-status.success{display:block!important;border:1px solid #16a34a;background:#f0fdf4;color:#142e54}
+.download-blocked{border:2px solid #dc2626!important;background:#fff1f2!important;color:#991b1b!important}
+.ticket-field-error{border:2px solid #dc2626!important;background:#fff1f2!important;border-radius:10px;padding:8px!important}
+
+
+/* Navigation tablette toujours accessible */
+.quote-tablet-nav{
+  position:sticky;bottom:0;z-index:120;
+  background:rgba(255,255,255,.97);
+  border:1px solid #d9dee7;border-radius:14px;
+  box-shadow:0 -4px 18px rgba(16,24,40,.10);
+  padding:12px;margin:18px auto 0;
+  display:flex;justify-content:space-between;gap:10px
+}
+.quote-tablet-nav button{min-height:48px;padding:12px 18px;font-size:15px}
+.quote-tablet-nav .nav-fill{flex:1}
+@media(max-width:760px){
+  body{padding-bottom:88px}
+  .quote-tablet-nav{position:fixed;left:10px;right:10px;bottom:10px;margin:0}
+  .quote-tablet-nav button{flex:1}
+}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body{font-family:'Manrope',Arial,sans-serif!important}
+header{background:#1c3d6e!important;padding:22px 26px!important}
+header p{color:#c3cede!important}
+.card{border-radius:16px!important;border-color:#e4e8ee!important;box-shadow:0 4px 18px rgba(16,24,40,.06)!important}
+button{border-radius:10px!important}
+input,select,textarea{border-radius:10px!important}
+.step{border-radius:999px!important}
+.step.active{background:#1c3d6e!important;box-shadow:0 6px 16px rgba(20,46,84,.28)}
+.client-item,.priority-card,.client-action-card,.need-card{border-radius:12px!important}
+.quote-tablet-nav{border-radius:16px!important;backdrop-filter:blur(6px)}
+</style>
+
+<style>
+.primary{background:#1c3d6e}
+.primary:hover{background:#142e54}
+</style>
+<style>
+/* ---- Esprit SumUp : épuré, pilules, contrastes nets ---- */
+body{background:#f7f8fa!important}
+button{font-weight:800}
+.primary,.secondary,.danger,.whatsapp{border-radius:999px!important;padding:13px 22px!important}
+.primary{background:#1c3d6e!important;box-shadow:0 2px 10px rgba(20,46,84,.18)}
+.primary:hover{background:#142e54!important;box-shadow:0 4px 16px rgba(20,46,84,.25)}
+.secondary{background:#fff!important;border:1.5px solid #d7dce3!important;color:#142e54!important}
+.secondary:hover{border-color:#142e54!important}
+.card{border:1px solid #eef0f3!important;box-shadow:0 1px 3px rgba(20,46,84,.05)!important;padding:24px!important}
+input,select,textarea{border:1.5px solid #d7dce3!important;padding:13px 14px!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(48,100,232,.15)!important;border-color:#3064e8!important}
+label{font-weight:800;font-size:13.5px}
+h2{letter-spacing:-.01em}
+</style>
+<style>#progressBar{transition:width .7s cubic-bezier(.2,.8,.2,1)}</style>
+</head>
+<body>
+<script>
+(function(){
+  var eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
+  function animate(el,to,fmt){
+    var from=el.__rollVal!=null?el.__rollVal:0;
+    el.__rollVal=to;
+    if(from===to){el.textContent=fmt(to);return;}
+    if(el.__rollRaf)cancelAnimationFrame(el.__rollRaf);
+    var start=null,dur=700;
+    function step(ts){
+      if(!start)start=ts;
+      var t=Math.min(1,(ts-start)/dur);
+      var e=1-Math.pow(1-t,3);
+      el.textContent=fmt(from+(to-from)*e);
+      if(t<1)el.__rollRaf=requestAnimationFrame(step);
+    }
+    el.__rollRaf=requestAnimationFrame(step);
+  }
+  window.rollMoney=function(el,v){if(el)animate(el,Number(v)||0,function(x){return eur.format(x)});};
+  window.rollInt=function(el,v,suffix){if(el)animate(el,Number(v)||0,function(x){return Math.round(x).toLocaleString("fr-FR")+(suffix||"")});};
+})();
+</script>
+<header><h1>ATELIER OLDA — Demande de devis</h1><p>Le client exprime ses besoins, puis Atelier OLDA construit le projet et choisit les articles adaptés.</p></header>
+<div class="container">
+<div class="stepper no-print"><div class="step active">1. Demande</div><div class="step">2. Besoins</div><div class="step">3. Projet</div><div class="step">4. Contrôle</div><div class="step">5. Client</div><div class="step hidden">Chiffrage</div><div class="step">6. Récapitulatif</div></div>
+<div class="layout"><main>
+<section id="step1"><div class="card"><div class="stage-head"><h2>1. Nouvelle demande</h2><div class="ref ref-display">—</div></div><div class="grid-3"><div class="field"><label>Date du jour</label><input id="requestDateDisplay" type="text" readonly value="30/07/2026"><input id="requestDate" type="hidden"></div><div class="field"><label>Demande prise par *</label><select id="salesperson"><option value="">Choisir</option><option>Loïc</option><option>Mélina</option><option>Charlie</option><option>Julien</option></select></div><div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div></div><button class="primary full" onclick="goStep(2)">Recueillir les besoins →</button></div></section>
+
+<section id="step2" class="hidden"><div class="card"><div class="stage-head"><h2>2. Recueil des besoins</h2><div class="ref ref-display">—</div></div><div class="notice orange">Renseigne ce que le client demande. Les informations facultatives peuvent être complétées plus tard.</div><h3 id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions"><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter ce besoin</button><button id="cancelNeedBtn" class="secondary hidden" onclick="cancelNeedEdit()">Annuler la modification</button></div></div><div class="card"><div class="row-between"><h2>Besoins enregistrés</h2><span class="badge" id="needCount">0 besoin</span></div><div id="needsDisplay"><p class="help">Aucun besoin ajouté.</p></div></div><div class="card"><div class="actions"><button class="secondary" onclick="showStep(1)">← Retour</button><button class="primary" onclick="goStep(3)">Construire le projet →</button></div></div></section>
+
+<section id="step3" class="hidden"><div class="card"><div class="stage-head"><h2>3. Construction du projet</h2><div class="ref ref-display">—</div></div><div class="notice green">Le projet est construit à partir des besoins enregistrés. Le titre proposé reste modifiable.</div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"><div class="help">Ex. Uniformes et objets promotionnels — Restaurant La Terrasse</div></div>
+<div class="field priority-field" id="projectPriorityField">
+  <label id="projectPriorityLabel">Priorité du projet *</label>
+  <div class="priority-grid" id="projectPriorityGroup">
+    <button type="button" class="priority-card" data-priority="1" onclick="selectProjectPriority(1)">
+      <span class="priority-stars">⭐</span>
+      <strong>Projet simple</strong>
+      <small>Petit projet, faible montant ou peu d’enjeu.</small>
+    </button>
+    <button type="button" class="priority-card" data-priority="2" onclick="selectProjectPriority(2)">
+      <span class="priority-stars">⭐⭐</span>
+      <strong>Projet intéressant</strong>
+      <small>Bon potentiel, à suivre rapidement.</small>
+    </button>
+    <button type="button" class="priority-card" data-priority="3" onclick="selectProjectPriority(3)">
+      <span class="priority-stars">⭐⭐⭐</span>
+      <strong>Projet prioritaire</strong>
+      <small>Projet urgent, stratégique ou à fort potentiel.</small>
+    </button>
+  </div>
+  <input type="hidden" id="projectPriority" value="">
+  <div class="field-error hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
+</div>
+<div class="grid"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:8px"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime"><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div><div class="actions"><button class="secondary" onclick="showStep(2)">← Retour</button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+
+
+<section id="step4" class="hidden">
+  <div class="card">
+    <div class="stage-head">
+      <h2>4. Contrôle du dossier</h2>
+      <div class="ref ref-display">—</div>
+    </div>
+
+    <div class="field">
+      <label>État des informations du client *</label>
+      <select id="controlStatus" onchange="toggleControlStatus(); updateControl()">
+        <option value="" selected disabled hidden>Sélectionner une option</option>
+        <option value="received">Informations reçues</option>
+        <option value="partial">Informations reçues partiellement</option>
+        <option value="waiting">En attente d’informations</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Type de logo</label>
+        <select id="clientLogoStatus" onchange="updateControl()">
+          <option selected>Pas de besoin</option>
+          <option>Logo OLDA</option>
+          <option>Logo client vectorisé</option>
+          <option>Logo client non vectorisé</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Statut du logo</label>
+        <select id="logoReceptionStatus" onchange="updateControl()">
+          <option value="" selected disabled hidden>Sélectionner une option</option>
+          <option>Reçu</option>
+          <option>En attente de réception</option>
+          <option>En cours de création client</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Reprise de vectorisation</label>
+      <select id="vectorizationStatus" onchange="updateControl()">
+        <option selected>Pas de besoin</option>
+        <option>À chiffrer</option>
+        <option>À faire</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Maquette / fichier numérique</label>
+        <select id="oldaMockupStatus" onchange="updateControl()">
+          <option selected>Non nécessaire</option>
+          <option>À prévoir</option>
+          <option>À faire</option>
+          <option>En cours</option>
+          <option>Terminée</option>
+        </select>
+      </div>
+
+      <div class="field" id="receivedViaField">
+        <label>Informations transmises par</label>
+        <select id="informationReceivedVia" onchange="toggleNewTransmissionMethod('informationReceivedVia','newInformationReceivedVia'); updateControl()">
+          <option value="" selected disabled hidden>Sélectionner une option</option>
+          <option>WhatsApp</option>
+          <option>Email</option>
+          <option value="__new__">+ Créer un nouveau</option>
+        </select>
+        <input id="newInformationReceivedVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
+      </div>
+    </div>
+
+    <div id="waitingInformationBox" class="notice orange hidden">
+      <h3 style="margin-top:0">Informations encore attendues</h3>
+      <div class="grid">
+        <div class="field">
+          <label>Transmission prévue par *</label>
+          <select id="expectedInformationVia" onchange="toggleNewTransmissionMethod('expectedInformationVia','newExpectedInformationVia'); updateControl()">
+            <option value="" selected disabled hidden>Sélectionner une option</option>
+            <option>WhatsApp</option>
+            <option>Email</option>
+            <option value="__new__">+ Créer un nouveau</option>
+          </select>
+          <input id="newExpectedInformationVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
+        </div>
+        <div class="field">
+          <label>Informations que le client doit transmettre *</label>
+          <textarea id="expectedInformation" rows="4" placeholder="Ex. logo, texte exact, photos, tailles, dimensions, quantité définitive..." oninput="updateControl()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Éléments reçus du client</label>
+      <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Points à contrôler ou à compléter</label>
+      <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
+    </div>
+
+    <div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
+
+    <div class="actions" style="margin-top:16px">
+      <button class="secondary" onclick="showStep(3)">← Retour</button>
+      <button class="primary" onclick="goStep(5)">Choisir le client →</button>
+    </div>
+  </div>
+</section>
+
+
+<section id="step5" class="hidden">
+  <div class="card">
+    <div class="stage-head">
+      <h2>5. Client</h2>
+      <div class="ref ref-display">—</div>
+    </div>
+
+    <div class="field">
+      <label>Rechercher un client existant *</label>
+      <input id="clientSearch" type="search" placeholder="Nom, entreprise, téléphone ou e-mail..." oninput="filterClientList()">
+      <div class="help" style="margin-top:6px">Clique directement sur un client pour l’associer à la demande.</div>
+    </div>
+
+    <div id="clientQuickList" class="client-quick-list"></div>
+
+    <div class="actions" style="margin-top:12px;justify-content:flex-start">
+      <button type="button" class="secondary" onclick="showNewClientForm()">+ Créer un nouveau client</button>
+    </div>
+
+    <div id="newClientForm" class="notice hidden" style="margin-top:16px">
+      <h3 style="margin-top:0">Nouveau client</h3>
+      <div class="grid">
+        <div class="field">
+          <label>Type de client *</label>
+          <select id="newClientType" onchange="updateClientTypeFields()">
+            <option value="" selected disabled hidden>Sélectionner une option</option>
+            <option>Particulier</option>
+            <option>Professionnel</option>
+            <option>Association</option>
+            <option>Revendeur</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="newClientNameLabel">Nom du client *</label>
+          <input id="newClientName" placeholder="Ex. Hôtel Grand Case Beach Club">
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label>WhatsApp *</label>
+          <input id="newClientPhone" inputmode="numeric" autocomplete="tel" maxlength="14" placeholder="Ex. 06 90 12 34 56" oninput="formatPhoneInput(this)" onblur="validatePhoneField(this)"><div id="newClientPhoneHelp" class="help"></div>
+        </div>
+        <div class="field">
+          <label id="newClientEmailLabel">E-mail</label>
+          <input id="newClientEmail" type="email" placeholder="Ex. contact@entreprise.com">
+        </div>
+      </div>
+
+      <div id="newClientProFields" class="hidden">
+        <div class="notice green" style="margin:4px 0 14px">Client professionnel, association ou revendeur : toutes les informations de suivi et de facturation sont à enregistrer.</div>
+        <div class="grid">
+          <div class="field">
+            <label>Personne à contacter *</label>
+            <input id="newClientContact" placeholder="Ex. Marie Durand">
+          </div>
+          <div class="field">
+            <label>Fonction du contact</label>
+            <input id="newClientContactRole" placeholder="Ex. Responsable communication">
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label>Secteur d'activité *</label>
+            <select id="newClientSector">
+              <option value="" selected disabled hidden>Sélectionner une option</option>
+              <option>Hôtel</option>
+              <option>Restaurant</option>
+              <option>Bar</option>
+              <option>Boutique</option>
+              <option>Agence immobilière</option>
+              <option>Conciergerie</option>
+              <option>Villa de location</option>
+              <option>Nautisme</option>
+              <option>BTP</option>
+              <option>Artisan</option>
+              <option>Événementiel</option>
+              <option>Association</option>
+              <option>École</option>
+              <option>Salle de sport</option>
+              <option>Santé</option>
+              <option>Tourisme</option>
+              <option>Transport</option>
+              <option>Administration</option>
+              <option>Autre</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Second contact / fixe</label>
+            <input id="newClientPhone2" placeholder="Ex. 05 90 12 34 56">
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="field">
+            <label>Adresse</label>
+            <input id="newClientAddress" placeholder="Adresse de facturation">
+          </div>
+          <div class="field">
+            <label>Ville</label>
+            <input id="newClientCity" placeholder="Ex. Saint-Martin">
+          </div>
+          <div class="field">
+            <label>Code postal</label>
+            <input id="newClientPostal" placeholder="97150">
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" style="justify-content:flex-start">
+        <button type="button" class="primary" onclick="createAndSelectClient()">Créer et sélectionner</button>
+        <button type="button" class="secondary" onclick="hideNewClientForm()">Annuler</button>
+      </div>
+    </div>
+
+    <div id="selectedClientCard" class="notice green hidden" style="margin-top:16px"></div>
+
+    <div id="clientNextActionBlock" class="field hidden" style="margin-top:16px">
+      <label>Suite souhaitée pour ce client *</label>
+      <div class="client-action-grid">
+        <button type="button" class="client-action-card" data-action="quote" onclick="selectClientNextAction('quote')">
+          <strong>Devis à faire</strong>
+          <small>Le dossier est suffisamment complet pour préparer le devis.</small>
+        </button>
+        <button type="button" class="client-action-card" data-action="waiting" onclick="selectClientNextAction('waiting')">
+          <strong>Attendre les informations du client</strong>
+          <small>Il manque encore des éléments avant de pouvoir préparer le devis.</small>
+        </button>
+      </div>
+      <input type="hidden" id="clientNextAction" value="">
+      <div class="field-error hidden" id="clientNextActionError">⚠ Sélectionne la suite à donner à cette demande.</div>
+    </div>
+
+    <div id="step5ValidationSummary" class="validation-summary hidden"></div>
+
+    <div class="actions" style="margin-top:16px">
+      <button class="secondary" onclick="showStep(4)">← Retour</button>
+      <button class="primary" onclick="openRecapFromStep5()">Voir le récapitulatif →</button>
+    </div>
+  </div>
+</section>
+
+<section id="step6" class="hidden"></section>
+
+
+<section id="step7" class="hidden">
+  <div class="card success no-print">
+    <h2>✅ Demande enregistrée</h2>
+    <p id="recapStatus"></p>
+    <p><b>Les informations de la demande restent modifiables à tout moment.</b></p>
+
+    <div class="footer-actions">
+      <button class="secondary" onclick="printRecapTicket()">🖨️ Imprimer le ticket</button>
+      <button id="downloadPdfBtn" class="secondary" onclick="openRecapExport()">⬇️ Télécharger le ticket</button>
+      <button class="whatsapp" onclick="sendWhatsApp()">💬 Envoyer sur WhatsApp</button>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="primary" onclick="newRequest()">Nouvelle demande</button>
+      <button class="secondary" onclick="saveDraft()">💾 Enregistrer</button>
+    </div>
+    <div id="downloadStatus" class="download-status hidden"></div>
+  </div>
+
+  <div id="finalCard">
+    <div id="ticketArea">
+      <div class="ticket" id="ticketPrintable">
+        <div class="ticket-head">
+          <h2>ATELIER OLDA</h2>
+          <div>Ticket de commande — Saint-Martin</div>
+        </div>
+        <div class="ticket-body">
+          <div class="ticket-section-label">Informations de commande</div>
+          <div class="ticket-client-box">
+            <div id="ticketOrder"></div>
+            <div id="ticketDate" style="margin-top:4px;font-size:12px;color:#667085"></div>
+            <div id="ticketClient" style="margin-top:7px"></div>
+            <div id="ticketClientDetails" class="ticket-details"></div>
+            <div id="ticketPickup" class="ticket-pickup"></div>
+          </div>
+
+          <div class="ticket-section-label">Articles et suppléments</div>
+          <div id="ticketProducts"></div>
+
+          <div class="ticket-section-label">Informations complémentaires</div>
+          <div id="ticketExtraDetails" class="ticket-details"></div>
+
+          <div class="ticket-total-line">
+            <span>Total commande TTC</span>
+            <span id="ticketTTC"></span>
+          </div>
+
+          <div class="ticket-payment-line">
+            <span>Paiement</span>
+            <strong id="ticketPayment"></strong>
+          </div>
+
+          <div class="ticket-preview-actions">
+            <button class="secondary" onclick="printRecapTicket()">🖨️ Imprimer</button>
+            <button class="primary" onclick="openRecapExport()">⬇️ Télécharger</button>
+          </div>
+        </div>
+        <div class="ticket-footer">Merci pour votre confiance — L'équipe Atelier OLDA</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main><aside class="sidebar"><div class="card"><h3>PROJET</h3><div class="big-ref ref-display">—</div><div class="help" id="sideTitle">Titre à construire</div><hr><div><b>Statut</b></div><div class="status" id="sideStatus">Nouvelle demande</div><hr><div class="row-between"><b>Progression</b><span id="progressText">0 %</span></div><div class="progress"><div id="progressBar"></div></div><h3 style="margin-top:16px">Informations manquantes</h3><ul id="missingList" class="status-list"></ul></div><div class="card"><h3>Résumé rapide</h3><div class="summary-row"><span>Besoins</span><b id="sideNeedCount">0</b></div><div class="summary-row"><span>Quantité totale</span><b id="sideQty">0</b></div><div class="summary-row"><span>Familles</span><b id="sideCategories">—</b></div><div class="summary-row"><span>Client</span><b id="sideClient">Non renseigné</b></div><div class="summary-row total"><span>Total TTC</span><b id="sideTotal">—</b></div></div></aside></div></div>
+<script>
+const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0),todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)},formatDate=iso=>{if(!iso)return'—';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`},esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])),normalize=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+let currentStep=1,needs=[],editingNeed=-1,selectedClient=null,clientType='person';
+// Reliquat d'un ancien écran de recherche : l'étape 5 travaille sur
+// `clientDirectory`. Laissé vide plutôt que rempli d'exemples.
+let clients=[];
+function makeRef(){const d=new Date(),yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),key=`olda-devis-v2-${yy}${mm}${dd}`,n=(Number(localStorage.getItem(key))||0)+1;localStorage.setItem(key,n);return`DEV-${yy}.${mm}.${dd}-${String(n).padStart(3,'0')}`}let reference=makeRef();
+function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error').forEach(e=>e.remove())}function fail(id,msg){const el=$(id);el.classList.add('invalid');const d=document.createElement('div');d.className='error';d.textContent=msg;el.insertAdjacentElement('afterend',d);el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();return false}
+document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
+function showStep(n){currentStep=n;for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach((el,i)=>{el.classList.toggle('active',i===n-1);el.classList.toggle('done',i<n-1)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
+function validateStep(n){clearErrors();if(n===1){if(!$('salesperson').value)return fail('salesperson','Choisis la personne qui prend la demande.');if(!$('source').value)return fail('source','Choisis le canal d’entrée.')}if(n===2&&!needs.length)return fail('needCategory','Ajoute au moins un besoin.');if(n===3){if(!$('projectTitle').value.trim())return fail('projectTitle','Renseigne le titre du projet.');if(!$('projectGoal').value)return fail('projectGoal','Choisis l’objectif.');if(!$('projectPriority').value){showProjectPriorityError();return false;}if(!$('projectDescription').value.trim())return fail('projectDescription','Décris le projet.')}if(n===4){
+  if(!$('controlStatus').value)return fail('controlStatus','Indique l’état des informations du client.');
+  if($('controlStatus').value==='waiting'){
+    if(!transmissionValue('expectedInformationVia','newExpectedInformationVia'))return fail($('expectedInformationVia').value==='__new__'?'newExpectedInformationVia':'expectedInformationVia','Indique comment le client doit transmettre les informations.');
+    if(!$('expectedInformation').value.trim())return fail('expectedInformation','Indique les informations encore attendues.');
+  }
+}
+if(n===5&&!validateStep5ForRecap())return false;if(n===6){const a=needs.find(n=>!n.solution?.trim());if(a)return fail(`solution-${needs.indexOf(a)}`,'Renseigne l’article proposé.');const b=needs.find(n=>!Number.isFinite(n.unitHT));if(b)return fail(`price-${needs.indexOf(b)}`,'Renseigne le prix unitaire HT.');if($('quoteDelay')&&!$('quoteDelay').value.trim())return fail('quoteDelay','Renseigne le délai annoncé.')}return true}
+function clearStep5Validation(){
+  $('step5ValidationSummary').classList.add('hidden');
+  $('step5ValidationSummary').innerHTML='';
+  ['clientSearch','selectedClientCard','clientNextActionBlock'].forEach(id=>{
+    const el=$(id);
+    if(el)el.classList.remove('step-validation-error');
+  });
+}
+
+function markStep5Error(id,message){
+  const el=$(id);
+  if(el)el.classList.add('step-validation-error');
+  return message;
+}
+
+function validateStep5ForRecap(){
+  clearStep5Validation();
+  const errors=[];
+
+  if(!selectedClient){
+    errors.push(markStep5Error('clientSearch','Sélectionne ou crée un client.'));
+  }else{
+    const phone=selectedClient.phone||'';
+    if(!isValidLocalPhone(phone)){
+      errors.push(markStep5Error('selectedClientCard','Le client sélectionné doit avoir un numéro complet de 10 chiffres.'));
+    }
+  }
+
+  if(!$('clientNextAction').value){
+    errors.push(markStep5Error('clientNextActionBlock','Choisis « Devis à faire » ou « Attendre les informations du client ».'));
+  }
+
+  if(errors.length){
+    const summary=$('step5ValidationSummary');
+    summary.innerHTML='<b>Impossible d’ouvrir le récapitulatif :</b><br>• '+errors.join('<br>• ');
+    summary.classList.remove('hidden');
+
+    const firstError=document.querySelector('#step5 .step-validation-error');
+    if(firstError)firstError.scrollIntoView({behavior:'smooth',block:'center'});
+    return false;
+  }
+  return true;
+}
+
+function openRecapFromStep5(){
+  if(!validateStep5ForRecap())return;
+  showStep(7);
+  fillFinal();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goStep(next){if(validateStep(next-1))showStep(next)}
+function selectProjectPriority(level){
+  $('projectPriority').value=String(level);
+  document.querySelectorAll('.priority-card').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.priority===String(level));
+  });
+  clearProjectPriorityError();
+  updateSidebar();
+}
+function showProjectPriorityError(){
+  $('projectPriorityField').classList.add('priority-error');
+  $('projectPriorityError').classList.remove('hidden');
+  $('projectPriorityGroup').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function clearProjectPriorityError(){
+  $('projectPriorityField').classList.remove('priority-error');
+  $('projectPriorityError').classList.add('hidden');
+}
+function updateDesiredDate(){const choice=$('desiredDelay').value;$('desiredDate').classList.toggle('hidden',choice!=='custom');if(['5','10','15'].includes(choice)){const d=new Date();d.setDate(d.getDate()+Number(choice));$('desiredDate').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}else if(choice===''){ $('desiredDate').value=''}updateSidebar()}function toggleNewProjectGoal(){$('newProjectGoal').classList.toggle('hidden',$('projectGoal').value!=='__new__');if($('projectGoal').value==='__new__')$('newProjectGoal').focus();updateSidebar()}function projectGoalValue(){return $('projectGoal').value==='__new__'?$('newProjectGoal').value.trim():$('projectGoal').value}function selectedNeedCategory(){return $('needCategory').value==='__new__'?$('newCategory').value.trim():$('needCategory').value}function toggleNewCategory(){$('newCategory').classList.toggle('hidden',$('needCategory').value!=='__new__');if($('needCategory').value==='__new__')$('newCategory').focus()}function saveNeed(){clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
+function editNeed(i){const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';$('needFormTitle').textContent=`Modifier le besoin n°${i+1}`;$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').classList.remove('hidden')}
+function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;$('saveNeedBtn').textContent='Ajouter ce besoin';$('cancelNeedBtn').classList.add('hidden')}
+function deleteNeed(i){needs.splice(i,1);renderNeeds();updateSidebar()}
+function renderNeeds(){$('needCount').textContent=`${needs.length} besoin${needs.length>1?'s':''}`;$('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>`<div class="need-card"><div class="row-between"><div><span class="badge green">${esc(n.category)}</span><h3>${esc(n.label)}</h3><div class="help"><b>${n.qty} unité(s)</b>${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help">${esc(n.comment)}</div>`:''}</div><span class="badge">${n.qty} u.</span></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div>`).join(''):'<p class="help">Aucun besoin ajouté.</p>';$('needFormTitle').textContent=`Besoin n°${needs.length+1}`}
+function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){$('categoryPills').innerHTML=categories().map(c=>`<span class="pill">${esc(c)}</span>`).join('');if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();if(!$('projectDescription').value.trim())$('projectDescription').value=`Le client souhaite ${needs.map(n=>`${n.qty} ${n.label}`).join(', ')}.`}
+function getMissing(){const m=[];if(!$('salesperson').value)m.push('Collaborateur non renseigné');if(!needs.length)m.push('Aucun besoin enregistré');if(!$('projectTitle').value.trim())m.push('Titre du projet manquant');if(!projectGoalValue())m.push('Objet du projet manquant');if(!$('projectPriority').value)m.push('Priorité du projet manquante');if(!$('projectDescription').value.trim())m.push('Description générale manquante');if(!$('controlStatus').value)m.push('Contrôle du dossier non renseigné');if(selectedClient&&!$('clientNextAction').value)m.push('Suite à donner au client non renseignée');if(!selectedClient)m.push('Client non renseigné');return m}function toggleNewTransmissionMethod(selectId,inputId){
+  const show=$(selectId).value==='__new__';
+  $(inputId).classList.toggle('hidden',!show);
+  if(show)$(inputId).focus();
+}
+function transmissionValue(selectId,inputId){
+  return $(selectId).value==='__new__'?$(inputId).value.trim():$(selectId).value;
+}
+function toggleControlStatus(){
+  const status=$('controlStatus').value;
+  $('waitingInformationBox').classList.toggle('hidden',status!=='waiting');
+  $('receivedViaField').classList.toggle('hidden',status==='waiting');
+}
+function updateControl(){
+  const status=$('controlStatus').value;
+  const labels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:'En attente d’informations'};
+  const details=[];
+  if($('clientLogoStatus').value)details.push(`Type de logo : ${$('clientLogoStatus').value}`);if($('logoReceptionStatus').value)details.push(`Statut du logo : ${$('logoReceptionStatus').value}`);
+  if($('vectorizationStatus').value)details.push(`Vectorisation : ${$('vectorizationStatus').value}`);
+  if($('oldaMockupStatus').value)details.push(`Maquette / fichier numérique : ${$('oldaMockupStatus').value}`);
+  if(status!=='waiting'&&transmissionValue('informationReceivedVia','newInformationReceivedVia'))details.push(`Transmission : ${transmissionValue('informationReceivedVia','newInformationReceivedVia')}`);
+  if(status==='waiting'&&transmissionValue('expectedInformationVia','newExpectedInformationVia'))details.push(`Transmission prévue : ${transmissionValue('expectedInformationVia','newExpectedInformationVia')}`);
+  if(status==='waiting'&&$('expectedInformation').value.trim())details.push(`À recevoir : ${$('expectedInformation').value.trim()}`);
+  const complete=status&&!(status==='waiting'&&(!transmissionValue('expectedInformationVia','newExpectedInformationVia')||!$('expectedInformation').value.trim()));
+  $('controlBox').className=`notice ${complete?(status==='received'?'green':'orange'):'orange'}`;
+  $('controlBox').innerHTML=status
+    ? `<b>${labels[status]}</b>${details.length?`<ul>${details.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`
+    : 'Renseigne l’état des informations reçues.';
+  updateSidebar();
+}
+
+
+function phoneDigits(value){
+  return String(value||'').replace(/\D/g,'').slice(0,10);
+}
+function formatFrenchPhone(value){
+  const digits=phoneDigits(value);
+  return digits.replace(/(\d{2})(?=\d)/g,'$1 ').trim();
+}
+function formatPhoneInput(input){
+  const digits=phoneDigits(input.value);
+  input.value=formatFrenchPhone(digits);
+  const help=$('newClientPhoneHelp');
+  input.classList.remove('invalid');
+  if(digits.length===0){
+    help.textContent='';
+    help.style.color='';
+  }else if(digits.length<10){
+    help.textContent=`Il manque ${10-digits.length} chiffre${10-digits.length>1?'s':''}.`;
+    help.style.color='#b42318';
+  }else{
+    help.textContent='Numéro complet.';
+    help.style.color='#142e54';
+  }
+}
+function validatePhoneField(input){
+  const digits=phoneDigits(input.value);
+  if(digits.length!==10){
+    input.classList.add('invalid');
+    formatPhoneInput(input);
+    return false;
+  }
+  input.classList.remove('invalid');
+  return true;
+}
+function isValidLocalPhone(value){
+  return phoneDigits(value).length===10;
+}
+
+// LA VRAIE BASE CLIENTS. Vide au départ : `pont.js` la remplit depuis
+// GET /api/clients dès l'ouverture de l'écran. Un client créé ici entre dans la
+// base au moment où la demande part au planning (upsert serveur).
+const clientDirectory=[];
+
+function filterClientList(){
+  const q=($('clientSearch').value||'').trim().toLowerCase();
+  const results=clientDirectory.filter(c=>[c.name,c.phone,c.email,c.type].join(' ').toLowerCase().includes(q));
+  renderClientQuickList(results);
+}
+
+function renderClientQuickList(list=clientDirectory){
+  const box=$('clientQuickList');
+  if(!list.length){
+    box.innerHTML='<div class="notice orange">Aucun client trouvé. Tu peux créer un nouveau client.</div>';
+    return;
+  }
+  box.innerHTML=list.map(c=>`
+    <div class="client-item ${selectedClient&&selectedClient.id===c.id?'active':''}" onclick="selectExistingClient('${c.id}')">
+      <div class="client-main">
+        <strong>${esc(c.name)}</strong>
+        <span class="client-meta">${esc(c.phone||'Téléphone non renseigné')}${c.email?` • ${esc(c.email)}`:''}</span>
+      </div>
+      <span class="client-type">${esc(c.type)}</span>
+    </div>`).join('');
+}
+
+function selectExistingClient(id){clearStep5Validation();
+  selectedClient=clientDirectory.find(c=>c.id===id)||null;
+  resetClientNextAction();
+  showClientNextAction();
+  renderClientQuickList(clientDirectory.filter(c=>[c.name,c.phone,c.email,c.type].join(' ').toLowerCase().includes(($('clientSearch').value||'').trim().toLowerCase())));
+  renderSelectedClient();
+  updateSidebar();
+}
+
+function renderSelectedClient(){
+  const box=$('selectedClientCard');
+  if(!selectedClient){box.classList.add('hidden');box.innerHTML='';$('clientNextActionBlock').classList.add('hidden');return;}showClientNextAction();
+  box.classList.remove('hidden');
+  box.innerHTML=`<b>Client sélectionné</b><br>${esc(selectedClient.name)}<br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
+}
+
+function showNewClientForm(){$('newClientForm').classList.remove('hidden');$('newClientName').focus()}
+function hideNewClientForm(){$('newClientForm').classList.add('hidden')}
+
+function createAndSelectClient(){clearStep5Validation();
+  if(!$('newClientType').value)return fail('newClientType','Choisis le type de client.');
+  if(!$('newClientName').value.trim())return fail('newClientName','Renseigne le nom du client.');
+  if(!isValidLocalPhone($('newClientPhone').value)){
+    validatePhoneField($('newClientPhone'));
+    return fail('newClientPhone','Le numéro doit contenir exactement 10 chiffres.');
+  }
+  const client={
+    id:'c'+Date.now(),
+    type:$('newClientType').value,
+    name:$('newClientName').value.trim(),
+    phone:formatFrenchPhone($('newClientPhone').value),
+    email:$('newClientEmail').value.trim()
+  };
+  clientDirectory.unshift(client);
+  selectedClient=client;
+  resetClientNextAction();
+  showClientNextAction();
+  $('clientSearch').value=client.name;
+  hideNewClientForm();
+  renderClientQuickList();
+  renderSelectedClient();
+  updateSidebar();
+}
+
+
+function selectClientNextAction(action){clearStep5Validation();
+  $('clientNextAction').value=action;
+  document.querySelectorAll('.client-action-card').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.action===action);
+  });
+  clearClientNextActionError();
+  updateSidebar();
+}
+
+function showClientNextAction(){
+  $('clientNextActionBlock').classList.remove('hidden');
+}
+
+function resetClientNextAction(){
+  $('clientNextAction').value='';
+  document.querySelectorAll('.client-action-card').forEach(btn=>btn.classList.remove('active'));
+  clearClientNextActionError();
+}
+
+function showClientNextActionError(){
+  $('clientNextActionBlock').classList.add('action-error');
+  $('clientNextActionError').classList.remove('hidden');
+  $('clientNextActionBlock').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function clearClientNextActionError(){
+  $('clientNextActionBlock').classList.remove('action-error');
+  $('clientNextActionError').classList.add('hidden');
+}
+
+function clientName(c){return c?(c.company||c.name||'Client'):'Client'}function clientMeta(c){return[c.type==='Professionnel'&&c.contact?`Contact : ${c.contact}`:'',c.phone?`WhatsApp : ${c.phone}`:'',c.email||''].filter(Boolean).join(' • ')}
+$('clientSearch').addEventListener('input',()=>{if(!$('clientResults'))return;const q=normalize($('clientSearch').value);if(!q){$('clientResults').innerHTML='';return}const r=clients.filter(c=>normalize([c.name,c.company,c.contact,c.phone,c.email].filter(Boolean).join(' ')).includes(q)).slice(0,8);$('clientResults').innerHTML=r.length?r.map(c=>`<div class="result"><div class="row-between"><div><b>${esc(clientName(c))}</b><div class="help">${esc(clientMeta(c))}</div></div><button class="primary" onclick="selectClient('${c.id}')">Associer</button></div></div>`).join(''):'<div class="notice">Aucun client trouvé.</div>'});
+function selectClient(id){selectedClient=clients.find(c=>c.id===id)||null;if(!selectedClient)return;$('selectedClientName').textContent=clientName(selectedClient);$('selectedClientMeta').textContent=clientMeta(selectedClient);$('selectedClientCard').classList.remove('hidden');$('searchArea').classList.add('hidden');$('clientCreation').classList.add('hidden');$('toPricingBtn').classList.remove('hidden');updateSidebar()}function clearClient(){selectedClient=null;$('selectedClientCard').classList.add('hidden');$('searchArea').classList.remove('hidden');$('toPricingBtn').classList.add('hidden');$('clientSearch').value='';$('clientResults').innerHTML='';updateSidebar()}function openClientCreation(){$('clientCreation').classList.remove('hidden');$('searchArea').classList.add('hidden')}function closeClientCreation(){$('clientCreation').classList.add('hidden');$('searchArea').classList.remove('hidden')}function chooseClientType(t){clientType=t;$('personChoice').classList.toggle('active',t==='person');$('proChoice').classList.toggle('active',t==='pro');$('personForm').classList.toggle('hidden',t!=='person');$('proForm').classList.toggle('hidden',t!=='pro')}function validPhone(v){const d=String(v||'').replace(/\D/g,'');return d.length>=9&&d.length<=12}
+function createClient(){clearErrors();let c;if(clientType==='person'){if(!$('personName').value.trim())return fail('personName','Renseigne le nom.');if(!validPhone($('personPhone').value))return fail('personPhone','Renseigne un WhatsApp valide.');c={id:`C${Date.now()}`,type:'Particulier',name:$('personName').value.trim(),phone:$('personPhone').value.trim(),email:$('personEmail').value.trim()}}else{if(!$('companyName').value.trim())return fail('companyName','Renseigne la société.');if(!$('companySector').value)return fail('companySector','Choisis le secteur.');if(!$('companyContact').value.trim())return fail('companyContact','Renseigne le contact.');if(!validPhone($('companyPhone').value))return fail('companyPhone','Renseigne un WhatsApp valide.');c={id:`C${Date.now()}`,type:'Professionnel',company:$('companyName').value.trim(),sector:$('companySector').value,contact:$('companyContact').value.trim(),phone:$('companyPhone').value.trim(),email:$('companyEmail').value.trim(),address:$('companyAddress').value.trim(),city:$('companyCity').value.trim(),postal:$('companyPostal').value.trim()}}clients.push(c);localStorage.setItem('oldaDevisClients',JSON.stringify(clients));selectClient(c.id)}
+function renderPricing(){$('pricingNeeds').innerHTML=needs.map((n,i)=>`<div class="quote-card"><div class="row-between"><div><span class="badge orange">Besoin client</span><h3>${esc(n.label)}</h3><div class="help">${n.qty} unité(s) • ${esc(n.category)}${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div></div></div><div class="grid-3" style="margin-top:12px"><div class="field"><label>Article proposé par Atelier OLDA *</label><input id="solution-${i}" value="${esc(n.solution)}" placeholder="Ex. NS300 tee-shirt premium" oninput="setPricing(${i},'solution',this.value)"></div><div class="field"><label>Référence / variante</label><input value="${esc(n.reference)}" placeholder="Ex. NS300 Black" oninput="setPricing(${i},'reference',this.value)"></div><div class="field"><label>Prix unitaire HT *</label><input id="price-${i}" type="number" min="0" step="0.01" value="${Number.isFinite(n.unitHT)?n.unitHT:''}" oninput="setPricing(${i},'unitHT',this.value)"></div></div><div class="summary-row total"><span>Total HT de cette ligne</span><b>${money(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0)}</b></div></div>`).join('')}
+function setPricing(i,k,v){needs[i][k]=k==='unitHT'?(v===''?NaN:Number(v)):v;renderPricing();calculateQuote()}function quoteTotals(){const subtotal=needs.reduce((s,n)=>s+(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0),0),transport=Number($('transport')?.value)||0,discount=Number($('discount')?.value)||0,ht=Math.max(0,subtotal+transport-discount),rate=(Number($('taxRate')?.value)||0)/100,tax=ht*rate,ttc=ht+tax,dep=ttc*((Number($('depositPercent')?.value)||0)/100);return{subtotal,transport,discount,ht,tax,ttc,dep}}function calculateQuote(){const t=quoteTotals();setTextSafe('subtotalHT',money(t.subtotal));setTextSafe('transportHT',money(t.transport));setTextSafe('discountHT',money(t.discount));setTextSafe('taxAmount',money(t.tax));setTextSafe('totalTTC',money(t.ttc));setTextSafe('depositAmount',money(t.dep));updateSidebar()}['transport','discount','taxRate','depositPercent'].forEach(id=>$(id)?.addEventListener('input',calculateQuote));
+function completion(){const c=[!!$('salesperson').value,!!$('source').value,needs.length>0,!!$('projectTitle').value.trim(),!!projectGoalValue(),!!$('projectPriority').value,!!$('projectDescription').value.trim(),!!$('controlStatus').value,!!selectedClient,!!$('clientNextAction').value];return Math.round(c.filter(Boolean).length/c.length*100)}function updateSidebar(){const p=completion(),m=getMissing();$('sideTitle').textContent=$('projectTitle').value.trim()||suggestedTitle()||'Titre à construire';$('sideNeedCount').textContent=needs.length;rollInt($('sideQty'),needs.reduce((s,n)=>s+n.qty,0));$('sideCategories').textContent=categories().join(', ')||'—';$('sideClient').textContent=selectedClient?clientName(selectedClient):'Non renseigné';(function(){var t=quoteTotals().ttc;if(t)rollMoney($('sideTotal'),t);else $('sideTotal').textContent='—';})();rollInt($('progressText'),p,' %');$('progressBar').style.width=`${p}%`;$('missingList').innerHTML=(m.length?m:['Aucune information principale manquante']).map(x=>`<li>${esc(x)}</li>`).join('');$('sideStatus').textContent=['Nouvelle demande','Recueil des besoins','Construction du projet','Contrôle du dossier','Client à sélectionner','','Récapitulatif prêt'][currentStep-1]}
+document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));$('newProjectGoal').addEventListener('input',updateSidebar);toggleControlStatus();updateControl();renderClientQuickList();
+function setTextSafe(id,value){const el=$(id);if(el)el.textContent=value;}
+function setHtmlSafe(id,value){const el=$(id);if(el)el.innerHTML=value;}
+function fillFinal(){
+  setTextSafe('finalRef',reference);
+  setTextSafe('finalDate',formatDate($('requestDate').value));
+  setTextSafe('finalProject',$('projectTitle').value||'—');
+  setTextSafe('finalClient',selectedClient?clientName(selectedClient):'—');
+  setTextSafe('finalDesired',`${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'}${$('desiredTime').value?` à ${$('desiredTime').value.replace(':','h')}`:''}`);
+  const priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
+  setTextSafe('finalPriority',priorityLabels[$('projectPriority').value]||'—');
+  const clientActionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+  setTextSafe('finalClientNextAction',clientActionLabels[$('clientNextAction').value]||'—');
+  setHtmlSafe('finalNeeds',needs.map(n=>`
+    <div class="quote-card">
+      <div class="row-between">
+        <div>
+          <b>${esc(n.label)}</b>
+          <div class="help">${n.qty} unité(s) • ${esc(n.category)}${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • ${esc(n.productionType)}`:''}</div>
+          ${n.comment?`<div style="margin-top:7px">${esc(n.comment)}</div>`:''}
+        </div>
+      </div>
+    </div>`).join(''));
+  const controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
+  const details=[];
+  details.push(`<div class="quote-line"><span>État du dossier</span><b>${esc(controlLabels[$('controlStatus').value]||'—')}</b></div>`);
+  if($('clientLogoStatus').value)details.push(`<div class="quote-line"><span>Logo</span><span>${esc($('clientLogoStatus').value)}</span></div>`);
+  if($('logoReceptionStatus').value)details.push(`<div class="quote-line"><span>Statut du logo</span><span>${esc($('logoReceptionStatus').value)}</span></div>`);
+  if($('vectorizationStatus').value)details.push(`<div class="quote-line"><span>Vectorisation</span><span>${esc($('vectorizationStatus').value)}</span></div>`);
+  if($('expectedInformation').value.trim())details.push(`<div class="quote-line"><span>Informations attendues</span><span>${esc($('expectedInformation').value.trim())}</span></div>`);
+  if($('finalControl'))$('finalControl').innerHTML=details.join('');
+}
+function recapText(){
+  const actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+  const priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
+  const lines=[
+    'ATELIER OLDA — RÉCAPITULATIF DE DEMANDE',
+    `Référence : ${reference}`,
+    `Date : ${formatDate($('requestDate').value)}`,
+    `Projet : ${$('projectTitle').value||'—'}`,
+    `Client : ${selectedClient?clientName(selectedClient):'—'}`,
+    `WhatsApp : ${selectedClient?.phone||'—'}`,
+    `Date souhaitée : ${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'} ${$('desiredTime').value||''}`,
+    `Priorité : ${priorityLabels[$('projectPriority').value]||'—'}`,
+    `Suite à donner : ${actionLabels[$('clientNextAction').value]||'—'}`,
+    '',
+    'BESOINS EXPRIMÉS',
+    ...needs.map(n=>`- ${n.qty} × ${n.label} (${n.category})${n.requestedRef?` — Réf. ${n.requestedRef}`:''}${n.color?` — ${n.color}`:''}${n.productionType?` — Production ${n.productionType}`:''}${n.comment?`
+  Informations : ${n.comment}`:''}`),
+    '',
+    'CONTRÔLE DU DOSSIER',
+    `État : ${({received:'Informations reçues',partial:'Reçues partiellement',waiting:"En attente d'informations"})[$('controlStatus').value]||'—'}`,
+    `Logo : ${$('clientLogoStatus').value||'—'}`,
+    `Statut du logo : ${$('logoReceptionStatus').value||'—'}`,
+    `Vectorisation : ${$('vectorizationStatus').value||'—'}`,
+    $('expectedInformation').value.trim()?`Informations attendues : ${$('expectedInformation').value.trim()}`:''
+  ];
+  return lines.filter((line,index)=>line!==''||lines[index-1]!=='').join('\n');
+}
+function clearDownloadErrors(){
+  const status=$('downloadStatus');
+  status.className='download-status hidden';
+  status.innerHTML='';
+  ['downloadPdfBtn','downloadTxtBtn'].forEach(id=>{
+    const el=$(id);
+    if(el)el.classList.remove('download-blocked');
+  });
+  document.querySelectorAll('.ticket-field-error').forEach(el=>el.classList.remove('ticket-field-error'));
+}
+
+function showDownloadError(buttonId,message,fieldIds=[]){
+  const button=$(buttonId);
+  if(button)button.classList.add('download-blocked');
+  fieldIds.forEach(id=>{
+    const el=$(id);
+    if(!el)return;
+    const target=el.closest('.ticket-info, .ticket-section, .quote-card')||el;
+    target.classList.add('ticket-field-error');
+  });
+  const status=$('downloadStatus');
+  status.className='download-status error';
+  status.innerHTML=`⚠ ${message}`;
+  status.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function showDownloadSuccess(message){
+  const status=$('downloadStatus');
+  status.className='download-status success';
+  status.textContent=`✓ ${message}`;
+}
+
+function validateRecapDownload(buttonId){
+  clearDownloadErrors();
+  const errors=[];
+  const fields=[];
+
+  if(!reference){
+    errors.push('La référence de la demande est absente.');
+    fields.push('finalRef');
+  }
+  if(!$('projectTitle').value.trim()){
+    errors.push('Le nom du projet est absent.');
+    fields.push('finalProject');
+  }
+  if(!selectedClient){
+    errors.push('Aucun client n’est sélectionné.');
+    fields.push('finalClient');
+  }
+  if(!needs.length){
+    errors.push('Aucun besoin n’est enregistré.');
+    fields.push('finalNeeds');
+  }
+  if(!$('clientNextAction').value){
+    errors.push('La suite à donner au client n’est pas renseignée.');
+    fields.push('finalClientNextAction');
+  }
+
+  if(errors.length){
+    showDownloadError(buttonId,'Téléchargement bloqué :<br>• '+errors.join('<br>• '),fields);
+    return false;
+  }
+  return true;
+}
+
+function safeFileName(extension){
+  const base=(reference||'Demande_Atelier_OLDA')
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g,'-')
+    .replace(/\s+/g,'_');
+  return `${base}.${extension}`;
+}
+
+function triggerBlobDownload(blob,fileName){
+  try{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=fileName;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{
+      a.remove();
+      URL.revokeObjectURL(url);
+    },1000);
+    return true;
+  }catch(error){
+    console.error(error);
+    return false;
+  }
+}
+
+function downloadRecapTXT(){
+  if(!validateRecapDownload('downloadTxtBtn'))return;
+  try{
+    const content=recapText();
+    if(!content.trim()){
+      showDownloadError('downloadTxtBtn','Le ticket TXT est vide. Recharge la page puis réessaie.',['finalCard']);
+      return;
+    }
+    const blob=new Blob(['\uFEFF'+content],{type:'text/plain;charset=utf-8'});
+    if(!triggerBlobDownload(blob,safeFileName('txt'))){
+      throw new Error('Le navigateur a bloqué le téléchargement.');
+    }
+    showDownloadSuccess('Le ticket TXT a été téléchargé.');
+  }catch(error){
+    console.error(error);
+    showDownloadError('downloadTxtBtn',`Le téléchargement TXT a échoué : ${error.message||'erreur inconnue'}.`,['finalCard']);
+  }
+}
+
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(s=>s.src===src);
+    if(existing){
+      if(window.jspdf&&window.jspdf.jsPDF)return resolve();
+      existing.addEventListener('load',resolve,{once:true});
+      existing.addEventListener('error',reject,{once:true});
+      return;
+    }
+    const script=document.createElement('script');
+    script.src=src;
+    script.onload=resolve;
+    script.onerror=reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureJsPDF(){
+  if(window.jspdf&&window.jspdf.jsPDF)return true;
+  const sources=[
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  ];
+  for(const src of sources){
+    try{
+      await loadScriptOnce(src);
+      if(window.jspdf&&window.jspdf.jsPDF)return true;
+    }catch(error){
+      console.warn('Échec chargement PDF',src,error);
+    }
+  }
+  return false;
+}
+
+async function downloadRecapPDF(){
+  if(!validateRecapDownload('downloadPdfBtn'))return;
+
+  const button=$('downloadPdfBtn');
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent='Création du PDF…';
+
+  try{
+    const ready=await ensureJsPDF();
+    if(!ready){
+      showDownloadError(
+        'downloadPdfBtn',
+        'Le module PDF est bloqué par la connexion ou le navigateur. Utilise « Imprimer », puis choisis « Enregistrer au format PDF ».',
+        ['finalCard']
+      );
+      return;
+    }
+
+    fillFinal();
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const margin=16;
+    const pageWidth=210;
+    const usable=pageWidth-(margin*2);
+    let y=18;
+
+    function ensureSpace(height=10){
+      if(y+height>280){
+        doc.addPage();
+        y=18;
+      }
+    }
+    function addText(text,size=10,bold=false,spacing=5){
+      ensureSpace(spacing+5);
+      doc.setFont('helvetica',bold?'bold':'normal');
+      doc.setFontSize(size);
+      const lines=doc.splitTextToSize(String(text||'—'),usable);
+      doc.text(lines,margin,y);
+      y+=lines.length*spacing;
+    }
+    function addSection(title){
+      y+=3;
+      ensureSpace(12);
+      doc.setDrawColor(180);
+      doc.line(margin,y,pageWidth-margin,y);
+      y+=7;
+      addText(title,11,true,7);
+    }
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(18);
+    doc.text('ATELIER OLDA',margin,y);
+    y+=8;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text('Fiche récapitulative de demande client',margin,y);
+    y+=7;
+
+    addSection('INFORMATIONS GÉNÉRALES');
+    addText(`Référence : ${reference}`,10,true);
+    addText(`Date : ${formatDate($('requestDate').value)}`);
+    addText(`Projet : ${$('projectTitle').value||'—'}`);
+    addText(`Client : ${selectedClient?clientName(selectedClient):'—'}`);
+    addText(`Téléphone : ${selectedClient?.phone||'—'}`);
+    addText(`Date souhaitée : ${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'} ${$('desiredTime').value||''}`);
+
+    const priorities={'1':'Projet simple','2':'Projet intéressant','3':'Projet prioritaire'};
+    const actions={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+    addText(`Priorité : ${priorities[$('projectPriority').value]||'—'}`);
+    addText(`Suite à donner : ${actions[$('clientNextAction').value]||'—'}`);
+
+    addSection('BESOINS EXPRIMÉS');
+    needs.forEach((n,i)=>{
+      addText(`${i+1}. ${n.qty} x ${n.label}`,10,true,6);
+      addText(`Catégorie : ${n.category}${n.requestedRef?` | Réf. ${n.requestedRef}`:''}${n.color?` | Couleur ${n.color}`:''}${n.productionType?` | Production ${n.productionType}`:''}`,9,false,5);
+      if(n.comment)addText(`Informations : ${n.comment}`,9,false,5);
+      y+=2;
+    });
+
+    addSection('CONTRÔLE DU DOSSIER');
+    addText(`État : ${({received:'Informations reçues',partial:'Reçues partiellement',waiting:"En attente d'informations"})[$('controlStatus').value]||'—'}`);
+    addText(`Logo : ${$('clientLogoStatus').value||'—'}`);
+    addText(`Statut du logo : ${$('logoReceptionStatus').value||'—'}`);
+    addText(`Vectorisation : ${$('vectorizationStatus').value||'—'}`);
+    if($('oldaMockupStatus')){
+      addText(`Maquette / fichier numérique : ${$('oldaMockupStatus').value||'—'}`);
+    }
+    if($('expectedInformation').value.trim()){
+      addText(`Informations attendues : ${$('expectedInformation').value.trim()}`);
+    }
+
+    doc.save(safeFileName('pdf'));
+    showDownloadSuccess('Le ticket PDF a été téléchargé.');
+  }catch(error){
+    console.error(error);
+    showDownloadError(
+      'downloadPdfBtn',
+      `La création du PDF a échoué : ${error.message||'erreur inconnue'}. Utilise « Imprimer » puis « Enregistrer au format PDF ».`,
+      ['finalCard']
+    );
+  }finally{
+    button.disabled=false;
+    button.textContent=original;
+  }
+}
+
+function normalizePhone(p){
+  let d=phoneDigits(p);
+  if(d.startsWith('0')&&d.length===10)d='590'+d.slice(1);
+  return d;
+}
+function sendWhatsApp(){
+  if(!selectedClient){alert('Sélectionne d’abord un client.');return;}
+  if(!isValidLocalPhone(selectedClient.phone)){
+    alert('Le client doit avoir un numéro WhatsApp complet de 10 chiffres.');
+    showStep(5);
+    return;
+  }
+  const msg=`Bonjour ${clientName(selectedClient)},
+
+Voici le récapitulatif de votre demande Atelier OLDA :
+
+${recapText()}
+
+L’équipe Atelier OLDA`;
+  window.open(`https://wa.me/${normalizePhone(selectedClient.phone)}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+function saveDraft(){const d={reference,needs,selectedClient,fields:{}};document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.id)d.fields[el.id]=el.type==='checkbox'?el.checked:el.value});localStorage.setItem(`oldaDraft-${reference}`,JSON.stringify(d));alert(`Brouillon ${reference} enregistré sur cet appareil.`)}function newRequest(){if(confirm('Créer une nouvelle demande ?'))location.reload()}
+$('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLocaleDateString('fr-FR');document.querySelectorAll('.ref-display').forEach(el=>el.textContent=reference);renderNeeds();updateSidebar();
+</script>
+<script>
+(function(){
+  function pick(id){ return document.getElementById(id); }
+  function val(id){ return pick(id)?.value || pick(id)?.textContent || ""; }
+  function addPlanningButton(){
+    if(document.getElementById("oldaCreatePlanningBtn")) return;
+    const actions=document.querySelector("#step7 .actions");
+    if(!actions) return;
+    const btn=document.createElement("button");
+    btn.id="oldaCreatePlanningBtn";
+    btn.className="primary";
+    btn.textContent="📅 Créer dans le planning";
+    btn.onclick=function(){
+      const pr=val("projectPriority")||"2";
+      const next=val("clientNextAction");
+      const selected = window.selectedClient || null;
+      const clientName = selected ? (selected.company||selected.name||selected.contact||"Client") : (val("finalClient")||"Client");
+      const needs=(window.needs||[]).map(n=>`${n.qty} x ${n.label}`).join(" • ");
+      const production=(window.needs||[]).map(n=>n.productionType).filter(Boolean).join(" + ");
+      const payload={
+        source:"Demande de devis",
+        ref:(window.reference||val("finalRef")||("DEV-"+Date.now())),
+        client:clientName,
+        name:val("projectTitle")||needs||"Demande de devis",
+        responsible:val("salesperson")||"Non défini",
+        due:val("desiredDate")||new Date().toISOString().slice(0,10),
+        priority:String(pr),
+        stage:"demande",
+        status:next==="waiting" ? "Demande à qualifier" : "À chiffrer",
+        production:production||"À définir",
+        comment:val("projectConstraints")||val("missingNotes")||"",
+        amount:null,
+        checks:{
+          products:false,
+          bat:val("oldaMockupStatus")==="Terminée",
+          files:val("controlStatus")==="received",
+          qty:true,
+          payment:false
+        }
+      };
+      parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},"*");
+    };
+    actions.appendChild(btn);
+    // Le bouton naît avec un payload MINIMAL ; le vrai (client structuré, brief
+    // complet) est posé par patchPlanningButton, plus bas dans la page. On
+    // l'appelle tout de suite plutôt que d'attendre son scrutateur toutes les
+    // 400 ms — sinon un clic rapide part au planning avec la fiche pauvre.
+    if(window.patchPlanningButton) window.patchPlanningButton();
+  }
+  const observer=new MutationObserver(addPlanningButton);
+  observer.observe(document.body,{subtree:true,attributes:true,childList:true});
+  addPlanningButton();
+})();
+</script>
+
+
+<style>
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
+.req{color:#dc2626;font-weight:900;margin-left:2px}
+.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:292px;font-family:inherit;user-select:none}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-title{font-weight:800;font-size:15px;color:#142e54}
+.dp-nav{display:flex;gap:4px}
+.dp-nav button{width:34px;height:34px;border:0;border-radius:50%;background:transparent;font-size:17px;cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
+.dp-nav button:hover{background:#f1f5f9}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.dp-dow{font-size:11px;font-weight:800;color:#94a3b8;padding:6px 0}
+.dp-day{width:34px;height:34px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#1f2937;display:grid;place-items:center;padding:0}
+.dp-day:hover{background:#eef1f5}
+.dp-day.other{color:#c2cad6}
+.dp-day.today{outline:1.5px solid #142e54;outline-offset:-1.5px}
+.dp-day.sel{background:#1c3d6e;color:#fff}
+.dp-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.dp-foot button{border:0;background:transparent;color:#142e54;font-weight:800;cursor:pointer;padding:8px 10px;border-radius:8px}
+.dp-foot button:hover{background:#f1f5f9}
+</style>
+<script>
+(function(){
+  var MONTHS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  var DOWS=["L","M","M","J","V","S","D"];
+  var pop=null,target=null,vy=0,vm=0;
+  function iso(y,m,d){return y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+  function close(){if(pop){pop.remove();pop=null;target=null;}}
+  function render(){
+    var sel=target.value||"";
+    var today=new Date();var tIso=iso(today.getFullYear(),today.getMonth(),today.getDate());
+    var first=new Date(vy,vm,1);var startDow=(first.getDay()+6)%7;
+    var dim=new Date(vy,vm+1,0).getDate();var dimPrev=new Date(vy,vm,0).getDate();
+    var h='<div class="dp-head"><div class="dp-title">'+MONTHS[vm]+' '+vy+'</div><div class="dp-nav"><button type="button" data-nav="-1">‹</button><button type="button" data-nav="1">›</button></div></div><div class="dp-grid">';
+    for(var i=0;i<7;i++)h+='<div class="dp-dow">'+DOWS[i]+'</div>';
+    var cells=Math.ceil((startDow+dim)/7)*7;
+    for(var c=0;c<cells;c++){
+      var d=c-startDow+1,cm=vm,other=false;
+      if(d<1){d=dimPrev+d;cm=vm-1;other=true;}
+      else if(d>dim){d=d-dim;cm=vm+1;other=true;}
+      var dt=new Date(vy,cm,d);var v=iso(dt.getFullYear(),dt.getMonth(),dt.getDate());
+      var cls="dp-day"+(other?" other":"")+(v===tIso?" today":"")+(v===sel?" sel":"");
+      h+='<button type="button" class="'+cls+'" data-v="'+v+'">'+d+'</button>';
+    }
+    h+='</div><div class="dp-foot"><button type="button" data-today="1">Aujourd&#39;hui</button></div>';
+    pop.innerHTML=h;
+  }
+  function setVal(v){
+    target.value=v;
+    target.dispatchEvent(new Event("input",{bubbles:true}));
+    target.dispatchEvent(new Event("change",{bubbles:true}));
+    close();
+  }
+  function open(inp){
+    close();target=inp;
+    var base=inp.value?new Date(inp.value+"T12:00:00"):new Date();
+    vy=base.getFullYear();vm=base.getMonth();
+    pop=document.createElement("div");pop.className="dp-pop";
+    document.body.appendChild(pop);render();
+    var r=inp.getBoundingClientRect();
+    var left=Math.min(r.left+window.scrollX,window.scrollX+document.documentElement.clientWidth-306);
+    pop.style.left=Math.max(8,left)+"px";
+    pop.style.top=(r.bottom+window.scrollY+6)+"px";
+    pop.addEventListener("click",function(e){
+      var b=e.target.closest("button");if(!b)return;
+      if(b.dataset.nav){vm+=Number(b.dataset.nav);if(vm<0){vm=11;vy--;}if(vm>11){vm=0;vy++;}render();return;}
+      if(b.dataset.today){var t=new Date();setVal(iso(t.getFullYear(),t.getMonth(),t.getDate()));return;}
+      if(b.dataset.v)setVal(b.dataset.v);
+    });
+  }
+  document.addEventListener("mousedown",function(e){
+    var inp=e.target.closest?e.target.closest('input[type=date]'):null;
+    if(inp&&!inp.disabled){e.preventDefault();inp.blur();open(inp);return;}
+    if(pop&&!pop.contains(e.target))close();
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")close();});
+  document.querySelectorAll("label").forEach(function(l){
+    if(/\*\s*$/.test(l.textContent)&&!l.querySelector(".req")){
+      l.innerHTML=l.innerHTML.replace(/\s*\*\s*$/,' <span class="req">*</span>');
+    }
+  });
+  window.__attachCap=function(ids){
+    ids.forEach(function(id){
+      var el=document.getElementById(id);if(!el)return;
+      el.addEventListener("input",function(){
+        var pos=this.selectionStart;
+        var v=this.value.replace(/(^|[\s\-'])([a-zà-öø-ÿ])/g,function(m,a,b){return a+b.toUpperCase();});
+        if(v!==this.value){this.value=v;try{this.setSelectionRange(pos,pos);}catch(e){}}
+      });
+    });
+  };
+})();
+</script>
+<script>__attachCap(["newClientName","personName","companyContact","companyName"]);</script>
+<style>
+.footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:800px){.footer-actions{grid-template-columns:1fr}}
+/* Règles reprises à l'identique du ticket de la vente directe (référence) */
+.ticket{max-width:390px;margin:20px auto;background:#fff;border:1px dashed #888;padding:20px;font-family:"Courier New",monospace}
+.ticket h2{text-align:center;margin-bottom:4px}
+.ticket-row{display:flex;justify-content:space-between;gap:10px;margin:6px 0}
+.ticket hr{border:0;border-top:1px dashed #777;margin:12px 0}
+.ticket-note{white-space:pre-wrap}
+@media print{
+#ticketArea,#ticketArea *{visibility:visible}
+#ticketArea{position:absolute;left:0;top:0;width:100%;display:block!important}
+.ticket{border:none;max-width:80mm}
+}
+#ticketArea{
+  max-width:620px;
+  margin:0 auto 24px;
+}
+.ticket{
+  border:1px solid #d5dae2;
+  border-radius:18px;
+  overflow:hidden;
+  padding:0!important;
+  background:#fff;
+  box-shadow:0 12px 35px rgba(16,24,40,.09);
+}
+.ticket-head{
+  padding:22px;
+  background:#111827;
+  color:#fff;
+  text-align:center;
+}
+.ticket-head h2{margin:0 0 5px;font-size:23px}
+.ticket-head div{font-size:12px;opacity:.82}
+.ticket-body{padding:20px}
+.ticket-client-box{
+  padding:12px 14px;
+  background:#f5f7fa;
+  border-radius:10px;
+  font-weight:800;
+  margin-bottom:16px;
+}
+.ticket-section-label{
+  margin:15px 0 8px;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+  color:#667085;
+  font-weight:900;
+}
+.ticket-product{
+  padding:13px 0;
+  border-bottom:1px solid #eaecf0;
+}
+.ticket-product-main,
+.ticket-extra-line,
+.ticket-total-line,
+.ticket-payment-line{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:14px;
+  align-items:start;
+}
+.ticket-product-name{font-size:15px;font-weight:900}
+.ticket-product-description{margin-top:4px;font-size:12px;color:#667085}
+.ticket-product-price{font-weight:900;white-space:nowrap}
+.ticket-extra-line{
+  margin:8px 0 0 14px;
+  padding:8px 10px;
+  border-left:3px solid #f59e0b;
+  background:#fffbeb;
+  border-radius:0 8px 8px 0;
+  font-size:13px;
+}
+.ticket-extra-price{font-weight:900}
+.ticket-total-line{
+  margin-top:18px;
+  padding-top:15px;
+  border-top:2px solid #111827;
+  font-size:21px;
+  font-weight:950;
+}
+.ticket-payment-line{
+  margin-top:13px;
+  font-size:13px;
+}
+.ticket-footer{
+  padding:14px 18px;
+  background:#f5f7fa;
+  color:#667085;
+  text-align:center;
+  font-size:11px;
+}
+.ticket-preview-actions{
+  display:flex;
+  gap:9px;
+  flex-wrap:wrap;
+  margin-top:17px;
+}
+.ticket-preview-actions button{min-height:44px}
+.ticket-export-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(16,24,40,.52);
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.ticket-export-overlay.show{display:flex}
+.ticket-export-dialog{
+  width:min(430px,94vw);
+  border-radius:17px;
+  background:#fff;
+  padding:22px;
+  box-shadow:0 25px 70px rgba(16,24,40,.30);
+}
+.ticket-export-dialog h3{margin:0 0 6px;font-size:21px}
+.ticket-export-dialog p{margin:0 0 17px;color:#667085}
+.ticket-export-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.ticket-export-buttons button{
+  min-height:52px;
+  border-radius:11px;
+  font-size:14px;
+  font-weight:900;
+}
+.ticket-export-cancel{
+  width:100%;
+  margin-top:10px;
+}
+@media(max-width:600px){
+.ticket-export-buttons{grid-template-columns:1fr}
+}
+@media print{
+#ticketArea,#ticketArea *{visibility:visible!important}
+#ticketArea{
+    position:absolute;
+    left:0;top:0;
+    width:100%;
+    max-width:none;
+    margin:0;
+  }
+.ticket-preview-actions{display:none!important}
+.ticket{box-shadow:none;border:0}
+}
+.ticket{
+  max-width:700px;
+  margin:0 auto;
+}
+.ticket-head{
+  padding:26px 24px;
+}
+.ticket-head h2{
+  font-size:28px;
+  letter-spacing:.04em;
+}
+.ticket-head div{
+  font-size:14px;
+}
+.ticket-body{
+  padding:24px;
+}
+.ticket-client-box{
+  padding:16px 18px;
+  font-size:16px;
+  line-height:1.55;
+  border:1px solid #d9dee7;
+}
+.ticket-section-label{
+  margin:20px 0 10px;
+  font-size:12px;
+  letter-spacing:.12em;
+}
+.ticket-product{
+  padding:18px 0;
+}
+.ticket-product-name{
+  font-size:19px;
+  line-height:1.35;
+}
+.ticket-product-description{
+  margin-top:6px;
+  font-size:14px;
+  line-height:1.5;
+  color:#475467;
+}
+.ticket-product-price{
+  font-size:18px;
+}
+.ticket-extra-line{
+  margin:10px 0 0 16px;
+  padding:10px 12px;
+  font-size:15px;
+  line-height:1.4;
+}
+.ticket-extra-price{
+  font-size:15px;
+}
+.ticket-total-line{
+  margin-top:22px;
+  padding-top:18px;
+  font-size:24px;
+}
+.ticket-payment-line{
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:10px;
+  background:#f5f7fa;
+  font-size:15px;
+}
+.ticket-footer{
+  padding:17px 20px;
+  font-size:13px;
+}
+.ticket-preview-actions{
+  margin-top:20px;
+}
+.ticket-preview-actions button{
+  min-height:48px;
+  padding:12px 18px;
+  font-size:14px;
+}
+@media print{
+#ticketArea{
+    padding:0;
+  }
+.ticket{
+    max-width:none;
+    font-size:14px;
+  }
+.ticket-head{
+    padding:20px;
+  }
+.ticket-head h2{
+    font-size:25px;
+  }
+.ticket-body{
+    padding:20px;
+  }
+.ticket-product-name{
+    font-size:18px;
+  }
+.ticket-product-description{
+    font-size:13px;
+  }
+.ticket-total-line{
+    font-size:22px;
+  }
+}
+.ticket,
+.ticket-body,
+.ticket-client-box,
+.ticket-product,
+.ticket-product-main,
+.ticket-extra-line,
+.ticket-total-line,
+.ticket-payment-line{
+  color:#111827!important;
+}
+.ticket-head{
+  background:#000!important;
+  color:#fff!important;
+}
+.ticket-head h2,
+.ticket-head div{
+  color:#fff!important;
+  opacity:1!important;
+}
+.ticket-client-box{
+  background:#f2f2f2!important;
+  border-color:#b8b8b8!important;
+}
+.ticket-client-box,
+.ticket-client-box *{
+  color:#111!important;
+}
+.ticket-section-label{
+  color:#111!important;
+  font-weight:950!important;
+}
+.ticket-product-name{
+  color:#000!important;
+  font-weight:950!important;
+}
+.ticket-product-description{
+  color:#222!important;
+  font-weight:600!important;
+}
+.ticket-product-price{
+  color:#000!important;
+  font-weight:950!important;
+}
+.ticket-extra-line{
+  background:#fff4d6!important;
+  border-left-color:#111!important;
+  color:#111!important;
+}
+.ticket-extra-line *,
+.ticket-extra-price{
+  color:#111!important;
+  font-weight:900!important;
+}
+.ticket-total-line{
+  color:#000!important;
+  border-top-color:#000!important;
+  font-weight:950!important;
+}
+.ticket-payment-line{
+  background:#ececec!important;
+  color:#111!important;
+}
+.ticket-payment-line strong{
+  color:#000!important;
+}
+.ticket-footer{
+  background:#ececec!important;
+  color:#111!important;
+  font-weight:700!important;
+}
+@media print{
+.ticket,
+  .ticket *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+.ticket-product-description,
+  .ticket-footer,
+  .ticket-section-label{
+    color:#111!important;
+  }
+}
+.ticket-pickup{
+  margin-top:10px;
+  padding-top:9px;
+  border-top:1px solid #777;
+  color:#000;
+  font-size:15px;
+  font-weight:900;
+}
+@media print{
+.ticket{
+    border:1px solid #555!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    background:#fff!important;
+  }
+.ticket-head{
+    padding:12px 14px!important;
+    background:#fff!important;
+    color:#000!important;
+    border-bottom:2px solid #000!important;
+  }
+.ticket-head h2,
+  .ticket-head div{
+    color:#000!important;
+  }
+.ticket-head h2{
+    font-size:22px!important;
+  }
+.ticket-body{
+    padding:14px!important;
+    background:#fff!important;
+  }
+.ticket-client-box,
+  .ticket-payment-line,
+  .ticket-extra-line,
+  .ticket-footer{
+    background:#fff!important;
+  }
+.ticket-client-box{
+    border:1px solid #777!important;
+  }
+.ticket-extra-line{
+    border:1px solid #777!important;
+    border-left:3px solid #000!important;
+  }
+.ticket-product{
+    border-bottom:1px solid #777!important;
+  }
+.ticket-total-line{
+    border-top:2px solid #000!important;
+  }
+.ticket-payment-line{
+    border:1px solid #777!important;
+  }
+.ticket-footer{
+    border-top:1px solid #777!important;
+    color:#000!important;
+  }
+.ticket,
+  .ticket *{
+    color:#000!important;
+    text-shadow:none!important;
+    -webkit-print-color-adjust:economy!important;
+    print-color-adjust:economy!important;
+  }
+}
+#ticketArea .ticket-details{font-size:12.5px;font-weight:600;line-height:1.5;color:#344054;margin-top:8px}
+#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
+#ticketArea .ticket-details .tl span{color:#667085;font-weight:700;font-size:12px}
+#ticketArea .ticket-details .tl strong{color:#101828;font-weight:700;font-size:12.5px;white-space:pre-line}
+#ticketArea .ticket-client-box{font-size:14px!important}
+#ticketArea #ticketClient{font-size:15px}
+#ticketArea #ticketOrder{font-size:14px}
+#ticketArea #ticketPickup{font-size:13px}
+#ticketArea .ticket-product-description{white-space:pre-line}
+@media print{
+  body *{visibility:hidden!important}
+  #ticketArea,#ticketArea *{visibility:visible!important}
+  #ticketArea{position:absolute;left:0;top:0;width:100%;max-width:none;margin:0}
+  .ticket{box-shadow:none;border:0}
+  .ticket-preview-actions{display:none!important}
+}
+</style>
+<script>
+(function(){
+  var PRO_TYPES=['Professionnel','Association','Revendeur'];
+  var esc2=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]});};
+
+
+  /* Contrôle du format de l'e-mail : arobase + nom de domaine + extension */
+  window.isValidEmail=function(value){
+    var v=String(value||'').trim();
+    return /^[^\s@,;]+@[^\s@,;]+\.[a-zA-Z]{2,}$/.test(v);
+  };
+  window.attachEmailCheck=function(id,helpId){
+    var input=document.getElementById(id);
+    if(!input||input.__mailBound)return;
+    input.__mailBound=true;
+    var help=helpId?document.getElementById(helpId):null;
+    if(!help){
+      help=document.createElement('div');
+      help.className='help';
+      help.style.marginTop='5px';
+      input.insertAdjacentElement('afterend',help);
+    }
+    var paint=function(){
+      var v=input.value.trim();
+      if(!v){input.classList.remove('invalid');input.style.borderColor='';help.textContent='';help.style.color='';return;}
+      if(window.isValidEmail(v)){
+        input.classList.remove('invalid');
+        [input.nextElementSibling,input.previousElementSibling,help.nextElementSibling].forEach(function(n){
+          if(n&&n.classList&&n.classList.contains('error'))n.remove();
+        });
+        input.style.borderColor='#1c7c4a';
+        help.textContent='✓ Adresse e-mail valide';
+        help.style.color='#1c7c4a';
+      }else{
+        input.classList.add('invalid');
+        input.style.borderColor='#c62828';
+        help.textContent="⚠ Adresse incomplète : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).";
+        help.style.color='#c62828';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__mailPaint=paint;
+  };
+
+  window.updateClientTypeFields=function(){
+    var t=document.getElementById('newClientType').value;
+    var pro=PRO_TYPES.indexOf(t)>-1;
+    document.getElementById('newClientProFields').classList.toggle('hidden',!pro);
+    document.getElementById('newClientNameLabel').textContent=pro?(t==='Association'?'Nom de l’association *':'Raison sociale *'):'Nom et prénom du client *';
+    document.getElementById('newClientEmailLabel').textContent=pro?'E-mail *':'E-mail';
+  };
+
+  window.editSelectedClientInfo=function(){
+    if(!selectedClient)return;
+    window.__editingClientId=selectedClient.id;
+    var f=document.getElementById('newClientForm');
+    f.classList.remove('hidden');
+    var set=function(id,val){var e=document.getElementById(id);if(e)e.value=val||'';};
+    document.getElementById('newClientType').value=selectedClient.type||'';
+    window.updateClientTypeFields();
+    set('newClientName',selectedClient.name);
+    set('newClientPhone',selectedClient.phone);
+    set('newClientEmail',selectedClient.email);
+    set('newClientContact',selectedClient.contact);
+    set('newClientContactRole',selectedClient.contactRole);
+    set('newClientPhone2',selectedClient.phone2);
+    set('newClientAddress',selectedClient.address);
+    set('newClientCity',selectedClient.city);
+    set('newClientPostal',selectedClient.postal);
+    if(selectedClient.sector)document.getElementById('newClientSector').value=selectedClient.sector;
+    document.getElementById('newClientName').focus();
+  };
+  var originalShowNewClientForm=window.showNewClientForm;
+  window.showNewClientForm=function(){
+    window.__editingClientId=null;
+    ['newClientName','newClientPhone','newClientEmail','newClientContact','newClientContactRole','newClientPhone2','newClientAddress','newClientCity','newClientPostal'].forEach(function(id){
+      var e=document.getElementById(id);if(e)e.value='';
+    });
+    document.getElementById('newClientType').value='';
+    window.updateClientTypeFields();
+    originalShowNewClientForm();
+  };
+
+  window.createAndSelectClient=function(){
+    clearStep5Validation();
+    var type=document.getElementById('newClientType').value;
+    if(!type)return fail('newClientType','Choisis le type de client.');
+    if(!document.getElementById('newClientName').value.trim())return fail('newClientName','Renseigne le nom du client.');
+    if(!isValidLocalPhone(document.getElementById('newClientPhone').value)){
+      validatePhoneField(document.getElementById('newClientPhone'));
+      return fail('newClientPhone','Le numéro doit contenir exactement 10 chiffres.');
+    }
+    var mail=document.getElementById('newClientEmail').value.trim();
+    if(mail&&!window.isValidEmail(mail)){
+      document.getElementById('newClientEmail').__mailPaint&&document.getElementById('newClientEmail').__mailPaint();
+      return fail('newClientEmail','Adresse e-mail invalide : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).');
+    }
+    var pro=PRO_TYPES.indexOf(type)>-1;
+    if(pro){
+      if(!document.getElementById('newClientContact').value.trim())return fail('newClientContact','Renseigne la personne à contacter.');
+      if(!document.getElementById('newClientEmail').value.trim())return fail('newClientEmail','L’e-mail est obligatoire pour ce type de client.');
+      if(!document.getElementById('newClientSector').value)return fail('newClientSector','Choisis le secteur d’activité.');
+    }
+    var v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+    var client={
+      id:'c'+Date.now(),
+      type:type,
+      name:v('newClientName'),
+      phone:formatFrenchPhone(document.getElementById('newClientPhone').value),
+      email:v('newClientEmail')
+    };
+    if(pro){
+      client.contact=v('newClientContact');
+      client.contactRole=v('newClientContactRole');
+      client.sector=v('newClientSector')||document.getElementById('newClientSector').value;
+      client.phone2=v('newClientPhone2');
+      client.address=v('newClientAddress');
+      client.city=v('newClientCity');
+      client.postal=v('newClientPostal');
+    }
+    if(window.__editingClientId){
+      var existing=clientDirectory.filter(function(c){return c.id===window.__editingClientId;})[0];
+      if(existing){
+        ['contact','contactRole','sector','phone2','address','city','postal'].forEach(function(k){delete existing[k];});
+        Object.keys(client).forEach(function(k){if(k!=='id')existing[k]=client[k];});
+        client=existing;
+      }
+      window.__editingClientId=null;
+    }else{
+      clientDirectory.unshift(client);
+    }
+    selectedClient=client;
+    window.selectedClient=client;
+    resetClientNextAction();
+    showClientNextAction();
+    document.getElementById('clientSearch').value=client.name;
+    hideNewClientForm();
+    renderClientQuickList();
+    renderSelectedClient();
+    updateSidebar();
+  };
+
+  window.clientInfoLines=function(c){
+    if(!c)return [];
+    var lines=[['Type de client',c.type||'—']];
+    if(c.contact)lines.push(['Personne à contacter',c.contact+(c.contactRole?' ('+c.contactRole+')':'')]);
+    lines.push(['WhatsApp',c.phone||'Non renseigné']);
+    if(c.phone2)lines.push(['Second contact',c.phone2]);
+    lines.push(['E-mail',c.email||'Non renseigné']);
+    if(c.sector)lines.push(['Secteur',c.sector]);
+    var adr=[c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+    if(adr)lines.push(['Adresse',adr]);
+    return lines;
+  };
+
+  window.renderSelectedClient=function(){
+    var box=document.getElementById('selectedClientCard');
+    if(!selectedClient){box.classList.add('hidden');box.innerHTML='';document.getElementById('clientNextActionBlock').classList.add('hidden');return;}
+    showClientNextAction();
+    box.classList.remove('hidden');
+    box.innerHTML='<b>Client sélectionné</b><br><span style="font-size:17px;font-weight:900">'+esc2(selectedClient.name)+'</span>'+
+      '<div class="help" style="margin-top:6px;line-height:1.6">'+window.clientInfoLines(selectedClient).map(function(l){return '<b>'+esc2(l[0])+'</b> : '+esc2(l[1]);}).join('<br>')+'</div>'+
+      '<div class="actions" style="margin-top:10px;justify-content:flex-start"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
+  };
+
+  function tl(k,v){return '<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(v||'—')+'</strong></div>';}
+  function val(id){var el=document.getElementById(id);return el?el.value:'';}
+
+  window.transmissionLabel=function(selectId,newId){
+    try{return transmissionValue(selectId,newId)||'';}catch(e){
+      var s=val(selectId);return s==='__new__'?val(newId):s;
+    }
+  };
+
+  window.fillFinal=function(){
+    var st=document.getElementById('recapStatus');
+    if(st)st.textContent='Demande '+reference+' — '+((needs||[]).length)+' besoin(s) enregistré(s) pour '+(selectedClient?clientName(selectedClient):'le client')+'.';
+    var priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
+    var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+    var controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
+
+    document.getElementById('ticketOrder').textContent='Commande : '+reference;
+    document.getElementById('ticketDate').textContent=new Date().toLocaleString('fr-FR');
+    document.getElementById('ticketClient').textContent='Client : '+(selectedClient?clientName(selectedClient):'—');
+    document.getElementById('ticketClientDetails').innerHTML=window.clientInfoLines(selectedClient).map(function(l){return tl(l[0],l[1]);}).join('');
+    var desired=(val('desiredDelay')?formatDate(val('desiredDate')):'Non précisée')+(val('desiredTime')?' à '+val('desiredTime').replace(':','h'):'');
+    document.getElementById('ticketPickup').textContent='Récupération prévue : '+desired;
+
+    var extra=[
+      tl('Titre du projet',val('projectTitle')),
+      tl('Objet du projet',(typeof projectGoalValue==='function'?projectGoalValue():val('projectGoal'))),
+      tl('Priorité',priorityLabels[val('projectPriority')]||'—'),
+      tl('Demande prise par',val('salesperson')),
+      tl('Canal d’entrée',val('source')),
+      tl('Description générale',val('projectDescription')),
+      tl('Décisions / contraintes',val('projectConstraints'))
+    ];
+
+    document.getElementById('ticketProducts').innerHTML=(needs||[]).map(function(n){
+      var meta=[n.category,n.requestedRef?'Réf. '+n.requestedRef:'',n.color?'Couleur : '+n.color:'',n.productionType?'Production : '+n.productionType:''].filter(Boolean).join(' / ');
+      var body=[meta,n.comment||''].filter(Boolean).join('\n');
+      return '<div class="ticket-product"><div class="ticket-product-main"><div>'+
+        '<div class="ticket-product-name">'+esc2(n.label)+' — Quantité : '+n.qty+'</div>'+
+        '<div class="ticket-product-description">'+esc2(body)+'</div>'+
+        '</div><div class="ticket-product-price">'+(Number.isFinite(n.unitHT)?money(n.unitHT*n.qty):'À chiffrer')+'</div></div></div>';
+    }).join('')||'<div class="ticket-details">Aucun besoin enregistré.</div>';
+
+    extra.push(tl('État du dossier',controlLabels[val('controlStatus')]||'—'));
+    var control=[
+      tl('Type de logo',val('clientLogoStatus')),
+      tl('Statut du logo',val('logoReceptionStatus')),
+      tl('Vectorisation',val('vectorizationStatus')),
+      tl('Maquette / fichier',val('oldaMockupStatus')),
+      tl('Informations transmises par',window.transmissionLabel('informationReceivedVia','newInformationReceivedVia'))
+    ];
+    if(val('controlStatus')==='waiting'){
+      control.push(tl('Transmission prévue par',window.transmissionLabel('expectedInformationVia','newExpectedInformationVia')));
+      control.push(tl('Informations attendues',val('expectedInformation')));
+    }
+    if(val('receivedElements').trim())control.push(tl('Éléments reçus du client',val('receivedElements')));
+    if(val('missingNotes').trim())control.push(tl('Points à contrôler',val('missingNotes')));
+    document.getElementById('ticketExtraDetails').innerHTML=extra.concat(control).join('');
+
+    document.getElementById('ticketTTC').textContent=val('projectBudget')?money(val('projectBudget')):'À chiffrer';
+    var overlay=document.getElementById('ticketExportOverlay');
+    if(overlay&&!overlay.__bound){overlay.__bound=true;overlay.addEventListener('click',function(e){if(e.target===this)closeRecapExport();});}
+    document.getElementById('ticketPayment').textContent=(actionLabels[val('clientNextAction')]||'—')+' (devis)';
+  };
+
+  window.recapLines=function(){
+    var priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
+    var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+    var controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
+    var d=function(x){var t=String(x==null?'':x).trim();return t?t:'—';};
+    var c=selectedClient||{};
+    var out=[
+      ['Type de dossier','Demande de devis'],
+      ['Référence',d(reference)],
+      ['Date de la demande',d(formatDate(val('requestDate')))],
+      ['Demande prise par',d(val('salesperson'))],
+      ['Canal d’entrée',d(val('source'))],
+      ['Client',d(c.name)],
+      ['Type de client',d(c.type)],
+      ['Personne à contacter',d(c.contact)],
+      ['Fonction du contact',d(c.contactRole)],
+      ['WhatsApp',d(c.phone)],
+      ['Second contact',d(c.phone2)],
+      ['E-mail',d(c.email)],
+      ['Secteur',d(c.sector)],
+      ['Adresse',d([c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — '))],
+      ['Titre du projet',d(val('projectTitle'))],
+      ['Objet du projet',d(typeof projectGoalValue==='function'?projectGoalValue():val('projectGoal'))],
+      ['Priorité',d(priorityLabels[val('projectPriority')])],
+      ['Date souhaitée',d(val('desiredDelay')?formatDate(val('desiredDate')):'Non précisée')],
+      ['Heure souhaitée',d(val('desiredTime'))],
+      ['Budget indicatif',val('projectBudget')?money(val('projectBudget')):'À chiffrer'],
+      ['Description générale',d(val('projectDescription'))],
+      ['Décisions / contraintes',d(val('projectConstraints'))],
+      ['Nombre de besoins',String((needs||[]).length)],
+      ['Quantité totale',String((needs||[]).reduce(function(t,n){return t+Number(n.qty||0);},0))]
+    ];
+    (needs||[]).forEach(function(n,i){
+      var no='Besoin '+(i+1)+' — ';
+      out.push([no+'Désignation',d(n.label)]);
+      out.push([no+'Quantité',d(n.qty)]);
+      out.push([no+'Catégorie',d(n.category)]);
+      out.push([no+'Référence',d(n.requestedRef)]);
+      out.push([no+'Couleur',d(n.color)]);
+      out.push([no+'Production',d(n.productionType)]);
+      out.push([no+'Informations importantes',d(n.comment)]);
+      out.push([no+'Article proposé',d(n.solution)]);
+      out.push([no+'Prix unitaire HT',Number.isFinite(n.unitHT)?money(n.unitHT):'À chiffrer']);
+    });
+    out.push(['État du dossier',d(controlLabels[val('controlStatus')])]);
+    out.push(['Type de logo',d(val('clientLogoStatus'))]);
+    out.push(['Statut du logo',d(val('logoReceptionStatus'))]);
+    out.push(['Vectorisation',d(val('vectorizationStatus'))]);
+    out.push(['Maquette / fichier',d(val('oldaMockupStatus'))]);
+    out.push(['Informations transmises par',d(window.transmissionLabel('informationReceivedVia','newInformationReceivedVia'))]);
+    out.push(['Transmission prévue par',d(window.transmissionLabel('expectedInformationVia','newExpectedInformationVia'))]);
+    out.push(['Informations attendues',d(val('expectedInformation'))]);
+    out.push(['Éléments reçus du client',d(val('receivedElements'))]);
+    out.push(['Points à contrôler',d(val('missingNotes'))]);
+    out.push(['Suite à donner',d(actionLabels[val('clientNextAction')])]);
+    return out;
+  };
+
+  window.recapText=function(){
+    return ['ATELIER OLDA — RÉCAPITULATIF DE DEMANDE',''].concat(
+      window.recapLines().map(function(l){return l[0]+' : '+l[1];})
+    ).join('\n');
+  };
+
+  window.printRecapTicket=function(){
+    fillFinal();
+    window.print();
+  };
+  window.openRecapExport=function(){
+    if(typeof validateRecapDownload==='function'&&!validateRecapDownload('downloadPdfBtn'))return;
+    fillFinal();
+    document.getElementById('ticketExportOverlay').classList.add('show');
+  };
+  window.closeRecapExport=function(){
+    document.getElementById('ticketExportOverlay').classList.remove('show');
+  };
+  window.exportRecapPDF=function(){
+    window.closeRecapExport();
+    window.printRecapTicket();
+  };
+  window.exportRecapTXT=function(){
+    window.closeRecapExport();
+    if(typeof downloadRecapTXT==='function')downloadRecapTXT();
+  };
+
+  /* Bouton retour sur le récapitulatif (la barre du bas a été supprimée) */
+  function addBackButton(){
+    var actions=document.querySelector('#step7 .actions');
+    if(!actions||document.getElementById('recapBackBtn'))return;
+    var b=document.createElement('button');
+    b.id='recapBackBtn';b.className='secondary';b.textContent='← Retour';
+    b.onclick=function(){showStep(5);};
+    actions.insertBefore(b,actions.firstChild);
+  }
+
+  /* Le planning reçoit l’intégralité des informations saisies */
+  function patchPlanningButton(){
+    var btn=document.getElementById('oldaCreatePlanningBtn');
+    if(!btn||btn.__oldaPatched)return;
+    btn.__oldaPatched=true;
+    btn.onclick=function(){
+      var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
+      var needsLabel=(needs||[]).map(function(n){return n.qty+' x '+n.label;}).join(' • ');
+      var production=(needs||[]).map(function(n){return n.productionType;}).filter(Boolean).join(' + ');
+      var comment=(needs||[]).map(function(n){return n.comment;}).filter(Boolean).join(' | ');
+      var payload={
+        source:'Demande de devis',
+        ref:reference,
+        client:selectedClient?clientName(selectedClient):(val('clientSearch')||'Client'),
+        name:val('projectTitle')||needsLabel||'Demande de devis',
+        responsible:val('salesperson')||'Non défini',
+        due:val('desiredDate')||new Date().toISOString().slice(0,10),
+        priority:val('projectPriority')||'2',
+        stage:'demande',
+        status:val('clientNextAction')==='waiting'?'Demande à qualifier':'À chiffrer',
+        production:production||'À définir',
+        comment:[val('projectConstraints'),val('missingNotes'),comment].filter(Boolean).join(' | '),
+        // UNE DEMANDE N'A PAS DE PRIX : c'est précisément ce qu'on doit
+        // chiffrer. `amount` reste null — surtout pas 0, qui se lirait
+        // « gratuit » dans la colonne Prix du planning. Le budget annoncé par
+        // le client est une INDICATION, il vit à côté et n'est jamais un prix.
+        amount:null,
+        budgetIndicatif:val('projectBudget')?Number(val('projectBudget')):null,
+        dueTime:val('desiredTime')||'14:00',
+        clientId:selectedClient?selectedClient.id:'',
+        client_info:window.clientInfoLines(selectedClient),
+        details:window.recapLines(),
+        recap:window.recapText(),
+        checks:{products:false,bat:val('oldaMockupStatus')==='Terminée',files:val('controlStatus')==='received',qty:true,payment:false},
+        // --- Ce que le PLANNING lit en clair plutôt que dans du texte ---
+        clientObj:selectedClient||null,
+        quantity:(needs||[]).reduce(function(t,n){return t+(Number(n.qty)||0);},0),
+        canal:val('source')||'',
+        suite:actionLabels[val('clientNextAction')]||''
+      };
+      parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},'*');
+    };
+  }
+  // Exposé pour que le bouton soit gréé DÈS sa création (cf. addPlanningButton).
+  window.patchPlanningButton=patchPlanningButton;
+
+
+  (function(){
+    function attachAll(){
+      var list=document.querySelectorAll('input[type=email], input[id*="mail" i]');
+      Array.prototype.forEach.call(list,function(input){
+        if(input.id&&!input.__mailBound)window.attachEmailCheck(input.id);
+      });
+    }
+    attachAll();
+    setInterval(attachAll,800);
+    document.addEventListener('submit',function(e){e.preventDefault();},true);
+  })();
+  (function(){
+    var t=document.getElementById('desiredTime');
+    if(t&&!t.value)t.value='14:00';
+    document.addEventListener('change',function(){
+      var el=document.getElementById('desiredTime');
+      if(el&&!el.value)el.value='14:00';
+    },true);
+  })();
+  window.attachEmailCheck('newClientEmail');
+  setInterval(function(){addBackButton();patchPlanningButton();},400);
+  addBackButton();patchPlanningButton();
+})();
+</script>
+<div id="ticketExportOverlay" class="ticket-export-overlay">
+  <div class="ticket-export-dialog">
+    <h3>Télécharger le ticket</h3>
+    <p>Choisis le format souhaité.</p>
+    <div class="ticket-export-buttons">
+      <button class="primary" onclick="exportRecapPDF()">PDF</button>
+      <button class="secondary" onclick="exportRecapTXT()">TXT</button>
+    </div>
+    <button class="secondary ticket-export-cancel" onclick="closeRecapExport()">Annuler</button>
+  </div>
+</div>
+<style>
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.55}
+.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.live-check ul{margin:7px 0 0;padding-left:18px}
+.live-check li{margin:3px 0;font-weight:600}
+button.blocked{opacity:.45;cursor:not-allowed}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
+.dup-warn button{margin-top:9px}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
+.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
+.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.wa-link{color:#12603a;font-weight:900;text-decoration:none;border-bottom:1px solid #9fc9ae}
+</style>
+<script>
+(function(){
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9@.]/g,'');};
+
+  /* 1 — WhatsApp cliquable */
+  window.waHref=function(phone){
+    var d=String(phone||'').replace(/\D/g,'');
+    if(d.length===10&&d.charAt(0)==='0')d='590'+d.slice(1);
+    return 'https://wa.me/'+d;
+  };
+  var baseInfoLines=window.clientInfoLines;
+  window.clientInfoLines=function(c){return baseInfoLines(c);};
+
+  var baseRenderSelected=window.renderSelectedClient;
+  window.renderSelectedClient=function(){
+    baseRenderSelected();
+    var box=el('selectedClientCard');
+    if(!box||!selectedClient||!selectedClient.phone)return;
+    var help=box.querySelector('.help');
+    if(!help)return;
+    help.innerHTML=help.innerHTML.replace(
+      selectedClient.phone,
+      '<a class="wa-link" target="_blank" href="'+window.waHref(selectedClient.phone)+'">'+selectedClient.phone+' ↗</a>'
+    );
+  };
+
+  /* 2 — Détection de doublon client */
+  function findDuplicate(name,phone,mail){
+    var n=norm(name),p=String(phone||'').replace(/\D/g,''),m=norm(mail);
+    return clientDirectory.filter(function(c){
+      if(window.__editingClientId&&c.id===window.__editingClientId)return false;
+      var cp=String(c.phone||'').replace(/\D/g,'');
+      return (n&&norm(c.name)===n)||(p&&cp&&cp===p)||(m&&c.email&&norm(c.email)===m);
+    })[0]||null;
+  }
+  var baseCreate=window.createAndSelectClient;
+  window.createAndSelectClient=function(){
+    if(!window.__editingClientId){
+      var dup=findDuplicate(v('newClientName'),v('newClientPhone'),v('newClientEmail'));
+      if(dup&&!window.__dupConfirmed){
+        var box=el('newClientDuplicate')||document.createElement('div');
+        box.id='newClientDuplicate';
+        box.className='dup-warn';
+        box.innerHTML='⚠ Ce client semble déjà enregistré : <b>'+dup.name+'</b>'+
+          (dup.phone?' — '+dup.phone:'')+(dup.email?' — '+dup.email:'')+
+          '<div class="actions" style="justify-content:flex-start;margin-top:9px">'+
+          '<button type="button" class="primary" onclick="useExistingDuplicate(\''+dup.id+'\')">Utiliser cette fiche</button>'+
+          '<button type="button" class="secondary" onclick="forceCreateClient()">Créer quand même</button></div>';
+        el('newClientForm').appendChild(box);
+        return;
+      }
+    }
+    window.__dupConfirmed=false;
+    var old=el('newClientDuplicate');
+    if(old)old.remove();
+    return baseCreate();
+  };
+  window.useExistingDuplicate=function(id){
+    var old=el('newClientDuplicate');
+    if(old)old.remove();
+    hideNewClientForm();
+    selectExistingClient(id);
+  };
+  window.forceCreateClient=function(){
+    window.__dupConfirmed=true;
+    window.createAndSelectClient();
+  };
+
+  /* 6 — Contrôle du délai souhaité (atelier ouvert du lundi au vendredi, 9h–18h) */
+  function isWorkingDay(d){var x=d.getDay();return x>=1&&x<=5;}
+  function nextWorkingDay(d){var x=new Date(d);do{x.setDate(x.getDate()+1);}while(!isWorkingDay(x));return x;}
+  function addWorkingDays(from,n){var x=new Date(from);for(var i=0;i<n;i++)x=nextWorkingDay(x);return x;}
+  function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function frOf(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'});}
+
+  window.checkDesiredDate=function(){
+    var box=el('desiredDateWarning');
+    if(!box){
+      box=document.createElement('div');
+      box.id='desiredDateWarning';
+      box.className='delay-warn ok';
+      var host=el('desiredDate')&&el('desiredDate').parentNode;
+      if(!host)return;
+      host.appendChild(box);
+    }
+    var iso=v('desiredDate');
+    if(!iso){box.style.display='none';return;}
+    box.style.display='block';
+    var d=new Date(iso+'T12:00:00');
+    var mini=addWorkingDays(new Date(),3);
+    if(!isWorkingDay(d)){
+      var alt=nextWorkingDay(d);
+      box.className='delay-warn bad';
+      box.innerHTML='⚠ L’atelier est fermé le week-end. Première date possible : <b>'+frOf(alt)+'</b> '+
+        '<button type="button" class="secondary" style="margin-left:8px" onclick="applyDesiredDate(\''+isoOf(alt)+'\')">Utiliser cette date</button>';
+      return;
+    }
+    if(d<mini){
+      box.className='delay-warn warn';
+      box.innerHTML='⚠ Délai très court : moins de 3 jours ouvrés de production. Date confortable : <b>'+frOf(mini)+'</b> '+
+        '<button type="button" class="secondary" style="margin-left:8px" onclick="applyDesiredDate(\''+isoOf(mini)+'\')">Utiliser cette date</button>';
+      return;
+    }
+    box.className='delay-warn ok';
+    box.textContent='✓ Date compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
+  };
+  window.applyDesiredDate=function(iso){
+    el('desiredDelay').value='custom';
+    el('desiredDate').classList.remove('hidden');
+    el('desiredDate').value=iso;
+    window.checkDesiredDate();
+    updateSidebar();
+  };
+
+  /* 3 — Contrôle en direct des informations obligatoires */
+  var STEPS={
+    1:function(){var m=[];if(!v('salesperson'))m.push('Demande prise par');if(!v('source'))m.push('Canal d’entrée');return m;},
+    2:function(){return needs.length?[]:['Au moins un besoin enregistré'];},
+    3:function(){var m=[];if(!v('projectTitle'))m.push('Titre du projet');
+      var goal=(typeof projectGoalValue==='function')?projectGoalValue():v('projectGoal');
+      if(!goal)m.push('Objet du projet');
+      if(!v('projectPriority'))m.push('Priorité du projet');
+      if(!v('projectDescription'))m.push('Description générale');return m;},
+    4:function(){var m=[];if(!v('controlStatus'))m.push('État des informations du client');
+      if(v('controlStatus')==='waiting'){
+        if(!window.transmissionLabel('expectedInformationVia','newExpectedInformationVia'))m.push('Transmission prévue par');
+        if(!v('expectedInformation'))m.push('Informations que le client doit transmettre');
+      }return m;},
+    5:function(){var m=[];if(!selectedClient)m.push('Client sélectionné');if(!v('clientNextAction'))m.push('Suite souhaitée pour ce client');return m;}
+  };
+
+  function nextButtonOf(n){
+    var sec=el('step'+n);
+    if(!sec)return null;
+    var btns=[].slice.call(sec.querySelectorAll('button.primary'));
+    return btns.filter(function(b){
+      var a=b.getAttribute('onclick')||'';
+      return a.indexOf('goStep')>-1||a.indexOf('openRecapFromStep5')>-1;
+    })[0]||null;
+  }
+
+  function refreshLive(){
+    for(var n=1;n<=5;n++){
+      var btn=nextButtonOf(n);
+      if(!btn)continue;
+      var missing=STEPS[n]();
+      var box=el('liveCheck'+n);
+      if(!box){
+        box=document.createElement('div');
+        box.id='liveCheck'+n;
+        box.className='live-check';
+        btn.parentNode.insertBefore(box,btn);
+      }
+      if(missing.length){
+        box.className='live-check todo';
+        box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+        btn.classList.add('blocked');
+        btn.disabled=true;
+      }else{
+        box.className='live-check ok';
+        box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
+        btn.classList.remove('blocked');
+        btn.disabled=false;
+      }
+    }
+    if(currentStep===3)window.checkDesiredDate();
+  }
+
+  /* 5 — Récapitulatif : dossier prêt ou éléments manquants */
+  function refreshRecapBanner(){
+    var host=el('step7');
+    if(!host||host.classList.contains('hidden'))return;
+    var box=el('recapReadyBanner');
+    if(!box){
+      box=document.createElement('div');
+      box.id='recapReadyBanner';
+      box.className='live-check ok';
+      var card=host.querySelector('.card');
+      var actions=card&&card.querySelector('.actions');
+      if(!card)return;
+      card.insertBefore(box,actions||card.firstChild);
+    }
+    var missing=[];
+    for(var n=1;n<=5;n++)missing=missing.concat(STEPS[n]());
+    if(!v('desiredDate'))missing.push('Date souhaitée de récupération');
+    if(!v('projectBudget'))missing.push('Budget indicatif (facultatif mais conseillé)');
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ Dossier incomplet — à compléter avant envoi :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Dossier complet — le ticket peut être imprimé, envoyé au client et créé dans le planning.';
+    }
+  }
+
+  document.addEventListener('input',function(){refreshLive();},true);
+  document.addEventListener('change',function(){refreshLive();window.checkDesiredDate();},true);
+  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+
+})();
+</script>
+<!-- Le pont avec le CRM : base clients réelle et référence du jour réservée
+     côté serveur. Chargé en DERNIER, une fois tout le reste en place. -->
+<script src="pont.js"></script>
+</body></html>

@@ -2086,9 +2086,25 @@ function ficheItemsProjetSimple(fiche) {
   });
 }
 
+// Flux « Nouveau Projet » du comptoir (public/comptoir/*.html), fiche.kind =
+// 'comptoir-v17'. Le parcours a déjà mis son dossier en forme pour le ticket :
+// des paires libellé / valeur, dans l'ordre où la vendeuse les a saisies. On les
+// rend TELLES QUELLES — deux blocs, le client puis le dossier. Réinterpréter
+// serait une occasion de perdre une ligne à chaque nouvelle version de l'écran.
+function ficheItemsComptoir(fiche) {
+  const bloc = (titre, lignes) => (lignes && lignes.length
+    ? [ficheLigneEl(titre, lignes.map((l) => `${l.k} : ${l.v}`))]
+    : []);
+  return [
+    ...bloc('Client', fiche.client),
+    ...bloc(fiche.source === 'Demande de devis' ? 'Demande' : 'Vente', fiche.details),
+  ];
+}
+
 // Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
-// archivé à la création de la commande, jamais retouché après). Deux formats
-// possibles selon le flux de création — cf. server.js buildCommande/buildProjet.
+// archivé à la création de la commande, jamais retouché après). Trois formats
+// possibles selon le flux de création — cf. server.js buildCommande/buildProjet
+// et POST /api/comptoir/projet.
 // Retourne `null` si `fiche` est absent ou d'un `kind` non reconnu (ligne créée
 // à la main dans la grille) ; une fiche de commande v1, qui porte bien le
 // `kind` mais pas les tableaux attendus, renvoie `[]`. Dans les deux cas
@@ -2097,6 +2113,7 @@ function ficheItems(fiche) {
   if (!fiche || typeof fiche !== 'object') return null;
   if (fiche.kind === 'commande-atelier') return ficheItemsCommandeAtelier(fiche);
   if (fiche.kind === 'projet-simple') return ficheItemsProjetSimple(fiche);
+  if (fiche.kind === 'comptoir-v17') return ficheItemsComptoir(fiche);
   return null;
 }
 
@@ -4407,6 +4424,16 @@ function mountProjet() {
     projetModule.resetProjet();
   }
 }
+
+// Le comptoir vient d'enregistrer un dossier : le planning s'ouvre SUR LUI,
+// à son étape, plutôt que là où la grille était restée. La vendeuse voit sa
+// ligne apparaître — c'est la preuve que la commande est bien passée.
+// (La grille elle-même se recharge seule : le serveur diffuse la création.)
+window.addEventListener('olda:projet-cree', (e) => {
+  const { stage, sub } = e.detail || {};
+  location.hash = '#planning';
+  if (stage) selectStage(stage, sub || null);
+});
 
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
 // en-tête. Seul le rail s'efface (l'onglet le remplace).

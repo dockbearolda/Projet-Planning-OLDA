@@ -1,27 +1,19 @@
 /* Nouveau Projet — Atelier OLDA : VENTE DIRECTE + DEMANDE DE DEVIS
-   Deux flux vivent sous cet écran, coiffés par le même en-tête noir et le même
-   sélecteur (`.np-`) :
-     - VENTE DIRECTE : Articles → Client → Paiement → Ticket. Une maquette,
-       quatre étapes, un ticket de caisse à la fin.
-     - DEMANDE DE DEVIS (`.dv-`) : Demande → Besoins → Projet → Contrôle →
-       Client → Récapitulatif. Aucun prix, une fiche à imprimer à la fin.
-   Les deux partagent tout le vocabulaire visuel `.vd-` ci-dessous (cartes,
-   champs, boutons, fil des étapes) : une seule charte, deux parcours.
+   Deux parcours vivent sous cet écran :
+     - VENTE DIRECTE : Articles → Client → Paiement → Ticket.
+     - DEMANDE DE DEVIS : Demande → Besoins → Projet → Contrôle → Client →
+       Récapitulatif. Aucun prix : c'est ce qu'on doit chiffrer.
 
-   Deux écarts assumés par rapport au fichier de la maquette :
-     - l'ACCENT est l'encre noire de la charte (#111827), pas le vert : c'est la
-       consigne (« la couleur ne doit pas être verte mais noire ») ;
-     - les champs sont à 16px et les cibles tactiles à 44px minimum (règle
-       maison : en dessous de 16px, iOS zoome sur le champ au focus).
+   Les deux parcours sont des PAGES À PART (public/comptoir/*.html) affichées
+   dans un cadre : ce sont les écrans validés par le patron, repris tels quels.
+   Ils apportent donc leur propre habillage — cette feuille n'habille QUE la
+   coquille de l'hôte (`.np-`) : l'accueil à deux tuiles, la barre de bascule et
+   le cadre lui-même. */
 
-   Tout est préfixé `.vd-` (vente directe) et vit sous `.vd-page` : la maquette
-   stylait des balises nues (input, button, h2, hr…), ce qui aurait débordé sur
-   le reste de l'application. */
-
-/* Sans ce `display` de base, [hidden] ne peut pas faire effet et .vd-page
+/* Sans ce `display` de base, [hidden] ne peut pas faire effet et .np-shell
    (height:100%) n'a rien de concret à remplir — même pattern que .clients dans
    clients.css. Sans lui, la section grandit à la taille de son contenu au lieu
-   de se caler sur .work, et le scroll interne plus bas ne s'active jamais. */
+   de se caler sur .work, et le cadre n'a plus de hauteur. */
 .proj:not([hidden]) { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 
 /* --- Aiguillage des deux flux (nouveau-projet.js) --------------------------
@@ -70,33 +62,55 @@
   font-size: 12px; font-weight: 700; letter-spacing: .03em;
   text-transform: uppercase; color: #8b9198;
 }
-.np-header {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 16px; flex-wrap: wrap;
+/* --- Barre de bascule : la SEULE commande de l'hôte au-dessus du parcours ----
+   Volontairement mince et claire : le parcours porte déjà son propre en-tête
+   noir avec son titre, deux bandeaux sombres empilés mangeraient la hauteur
+   utile de la tablette (800 px en paysage). Elle ne sert qu'à changer d'avis. */
+.np-bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 8px 16px;
+  background: #fff; border-bottom: 1px solid #d9dde1;
+  font-family: Arial, Helvetica, sans-serif;
 }
-.np-switch { display: flex; gap: 8px; flex-wrap: wrap; }
-.np-switch-btn {
-  border: 1px solid #4a4f56; border-radius: 999px; padding: 11px 18px; min-height: 44px;
-  background: transparent; color: #ddd;
+.np-bar[hidden] { display: none; }
+.np-bar-home {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 44px; padding: 10px 16px 10px 13px;
+  border: 1px solid #d9dde1; border-radius: 999px; background: #fff; color: #1f2328;
   font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
-.np-switch-btn:hover { border-color: #fff; color: #fff; }
-.np-switch-btn.is-active { background: #fff; border-color: #fff; color: #111; }
-/* « Changer » ramène aux deux tuiles. Volontairement plus discret que les deux
-   flux : c'est une porte de sortie, pas un troisième choix. */
-.np-switch-btn--home { display: inline-flex; align-items: center; gap: 6px; padding-left: 14px; }
-.np-switch-btn--home .material-symbols-outlined { font-size: 19px; }
-.np-header[hidden] { display: none; }
-.np-panes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.np-panes[hidden] { display: none; }
-.np-pane { flex: 1; min-height: 0; }
-.np-pane[hidden] { display: none; }
+.np-bar-home:hover { border-color: #111827; background: #f3f4f5; }
+.np-bar-home .material-symbols-outlined { font-size: 19px; }
+.np-switch { display: flex; gap: 8px; flex-wrap: wrap; }
+.np-switch-btn {
+  border: 1px solid #d9dde1; border-radius: 999px; padding: 10px 18px; min-height: 44px;
+  background: #fff; color: #697077;
+  font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.np-switch-btn:hover { border-color: #111827; color: #1f2328; }
+.np-switch-btn.is-active { background: #111827; border-color: #111827; color: #fff; }
+
+/* Un dossier qui ne part pas au planning se DIT : la vendeuse a le client
+   devant elle, elle ne doit pas découvrir la perte le lendemain. */
+.np-erreur {
+  flex: 0 0 auto; margin: 0; padding: 13px 16px;
+  background: #fff0f0; border-bottom: 1px solid #f0c2c2; color: #a01b1b;
+  font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700;
+}
+.np-erreur[hidden] { display: none; }
+
+/* Le parcours lui-même : un document à part, qui prend toute la place restante. */
+.np-frames { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.np-frames[hidden] { display: none; }
+.np-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f3f4f5; }
+.np-frame[hidden] { display: none; }
 
 @media (max-width: 760px) {
-  .np-header { align-items: flex-start; }
-  .np-switch { width: 100%; }
-  .np-switch-btn { flex: 1; padding: 11px 10px; }
-  .np-switch-btn--home { justify-content: center; }
+  .np-bar { gap: 8px; padding: 8px 12px; }
+  .np-bar-home, .np-switch { flex: 1 1 100%; }
+  .np-bar-home { justify-content: center; }
+  .np-switch-btn { flex: 1; padding: 10px 8px; }
   /* Une tuile par ligne : sur 375 px, deux colonnes les rendraient illisibles. */
   .np-home { justify-content: flex-start; padding: 24px 14px 40px; }
   .np-home h1 { font-size: 25px; }
@@ -104,317 +118,4 @@
   .np-tile { padding: 24px 18px 22px; }
   .np-tile__icon { width: 64px; height: 64px; }
   .np-tile__icon .material-symbols-outlined { font-size: 34px; }
-}
-
-.vd-page {
-  --vd-accent: #111827;        /* encre de la charte : boutons, étape en cours */
-  --vd-accent-dark: #000000;   /* survol */
-  --vd-accent-soft: #eef0f4;   /* fond léger (client retenu, commande terminée) */
-  --vd-bg: #f3f4f5;
-  --vd-card: #ffffff;
-  --vd-border: #d9dde1;
-  --vd-text: #1f2328;
-  --vd-muted: #697077;
-  --vd-danger: #c62828;
-  --vd-danger-soft: #fff0f0;
-  --vd-radius: 14px;
-  display: flex; flex-direction: column; height: 100%; min-height: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: var(--vd-bg);
-  color: var(--vd-text);
-}
-.vd-page *, .vd-page *::before, .vd-page *::after { box-sizing: border-box; }
-.vd-hidden { display: none !important; }
-
-/* --- En-tête de la maquette ------------------------------------------------ */
-.vd-header { background: #111; color: #fff; padding: 18px 24px; flex: 0 0 auto; }
-.vd-header h1 { margin: 0; font-size: 22px; font-weight: 700; }
-.vd-header p { margin: 6px 0 0; color: #ddd; font-size: 15px; }
-
-/* .work (parent) a overflow:hidden — c'est ici qu'il faut le scroll propre à
-   l'écran, sinon un contenu plus haut que la fenêtre déborde en silence. */
-.vd-container {
-  flex: 1; min-height: 0; overflow-y: auto;
-  width: 100%; max-width: 1160px; margin: 0 auto; padding: 24px 18px 50px;
-}
-
-/* --- Fil des 4 étapes ----------------------------------------------------- */
-.vd-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
-.vd-step {
-  padding: 14px 12px; text-align: center; background: #e4e6e8; border-radius: 9px;
-  font-weight: 700; font-size: 15px; color: #62676d;
-}
-.vd-step.is-active { background: var(--vd-accent); color: #fff; }
-.vd-step.is-done { background: var(--vd-accent-soft); color: var(--vd-accent); }
-
-/* --- Cartes --------------------------------------------------------------- */
-.vd-card {
-  background: var(--vd-card); border: 1px solid var(--vd-border); border-radius: var(--vd-radius);
-  padding: 20px; margin-bottom: 18px; box-shadow: 0 2px 9px rgba(0, 0, 0, .05);
-}
-.vd-page h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
-.vd-page h3 { margin: 18px 0 12px; font-size: 18px; font-weight: 700; }
-.vd-stage-title { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 16px; }
-.vd-stage-title h2 { margin: 0; }
-.vd-order-ref {
-  font-size: 15px; font-weight: 800; background: #111; color: #fff;
-  padding: 8px 11px; border-radius: 8px; white-space: nowrap;
-}
-
-/* --- Champs --------------------------------------------------------------- */
-.vd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.vd-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.vd-field { margin-bottom: 14px; }
-.vd-page label { display: block; font-weight: 700; margin-bottom: 7px; font-size: 15px; }
-.vd-page input, .vd-page select, .vd-page textarea {
-  width: 100%; border: 1px solid #bcc2c8; border-radius: 9px; padding: 12px;
-  /* 16px : en dessous, iOS zoome sur le champ dès qu'on le touche. */
-  font-size: 16px; font-family: inherit; color: inherit; background: #fff; min-height: 44px;
-}
-.vd-page textarea { min-height: 95px; resize: vertical; }
-.vd-page input:focus, .vd-page select:focus, .vd-page textarea:focus {
-  outline: 3px solid rgba(17, 24, 39, .13); border-color: var(--vd-accent);
-}
-.vd-page input[readonly] { background: #f5f6f8; color: var(--vd-muted); }
-.vd-invalid { border: 2px solid var(--vd-danger) !important; background: var(--vd-danger-soft) !important; }
-.vd-error-msg { color: var(--vd-danger); font-size: 14px; font-weight: 700; margin-top: 5px; }
-/* Avertissement de doublon : ce n'est pas un refus, c'est un « vérifie avant de
-   créer ». Élément permanent, donc distinct des messages d'erreur que
-   `effacerErreurs()` retire du DOM. */
-.vd-warning {
-  margin: 14px 0; padding: 12px 14px; border-radius: 9px;
-  border: 1px solid var(--vd-danger); background: var(--vd-danger-soft);
-  color: var(--vd-danger); font-size: 15px; font-weight: 700;
-}
-.vd-help { font-size: 14px; color: var(--vd-muted); margin-top: 5px; line-height: 1.4; }
-/* `.vd-page` en tête : ces classes sont posées sur des <label>, et
-   `.vd-page label { display: block }` plus haut l'emporterait sur une classe
-   seule (même spécificité de classe, un type de plus). Sans ça la case à cocher
-   se colle à son texte au lieu de s'aligner avec lui. */
-.vd-page .vd-inline-check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
-.vd-page .vd-inline-check input { width: auto; min-height: 0; }
-
-/* --- Boutons -------------------------------------------------------------- */
-.vd-actions, .vd-footer-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.vd-btn {
-  border: 0; border-radius: 9px; padding: 12px 16px; min-height: 44px;
-  font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
-  background: #eceff1; color: #222;
-}
-.vd-btn--primary { background: var(--vd-accent); color: #fff; }
-.vd-btn--primary:hover { background: var(--vd-accent-dark); }
-.vd-btn--full { width: 100%; font-size: 17px; padding: 15px; }
-.vd-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-/* --- Résumé et totaux ----------------------------------------------------- */
-.vd-summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 16px; }
-.vd-summary-total { font-size: 18px; font-weight: 800; border-bottom: 0; }
-
-/* --- Article du panier / résultat de recherche client --------------------- */
-.vd-item, .vd-client-result {
-  border: 1px solid var(--vd-border); border-radius: 11px; padding: 14px; margin-bottom: 10px; background: #fff;
-}
-.vd-item-head, .vd-client-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.vd-badge { display: inline-block; border-radius: 999px; padding: 5px 9px; background: #eceff1; font-size: 13px; font-weight: 700; }
-.vd-badge--on { background: var(--vd-accent-soft); color: var(--vd-accent); }
-.vd-notice { background: #f7f8f9; border: 1px dashed #bfc4c9; border-radius: 11px; padding: 15px; }
-.vd-selected { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
-.vd-client-results { margin-top: 10px; }
-
-/* Particulier / Professionnel : deux grandes cibles, pas un menu déroulant. */
-.vd-choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.vd-choice {
-  background: #f2f3f4; text-align: left; border: 2px solid transparent; border-radius: 9px;
-  padding: 14px; font-family: inherit; font-size: 15px; cursor: pointer; color: inherit;
-}
-.vd-choice.is-active { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
-.vd-choice b { display: block; font-size: 16px; }
-.vd-choice .vd-help { margin-top: 4px; }
-
-/* --- Paiement ------------------------------------------------------------- */
-/* Idem : posé sur un <label>, donc préfixé pour passer devant `.vd-page label`. */
-.vd-page .vd-pay-option {
-  display: flex; gap: 10px; align-items: center; padding: 14px;
-  border: 1px solid var(--vd-border); border-radius: 9px; margin-bottom: 9px;
-  font-weight: 700; font-size: 16px; min-height: 44px; cursor: pointer;
-}
-.vd-page .vd-pay-option input { width: auto; min-height: 0; }
-.vd-page .vd-pay-option:has(input:checked) { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
-
-/* Montant encaissé sur l'écran final : le ticket n'étant plus affiché, c'est le
-   dernier rappel du total à l'écran. */
-.vd-pay-total { margin: 8px 0 0; font-size: 18px; }
-
-/* --- « Où poser la ligne dans le planning ? » -----------------------------
-   LE geste par lequel la vendeuse fait entrer la vente dans l'atelier, posé
-   APRÈS le ticket. Carte à filet d'encre épais : on ne peut pas la manquer en
-   descendant vers le ticket. Une fois l'étape choisie, la même carte annonce
-   où la ligne est partie (`--done`), sans plus rien à taper. */
-.vd-dest-card { border: 2px solid var(--vd-accent); border-left-width: 6px; }
-.vd-dest-card--done { border-color: var(--vd-border); border-left: 6px solid var(--vd-accent); background: var(--vd-accent-soft); }
-.vd-dest__eyebrow {
-  margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--vd-accent);
-}
-.vd-dest__title { margin: 6px 0 0; font-size: 21px; font-weight: 700; }
-.vd-dest__hint { margin: 6px 0 0; font-size: 15px; color: var(--vd-muted); line-height: 1.4; }
-.vd-dest__loading { margin: 14px 0 0; font-size: 15px; color: var(--vd-muted); }
-/* La liste défile DANS la carte : tout le pipeline y passe sans repousser le
-   ticket hors de l'écran. */
-.vd-dest__list { margin-top: 14px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
-.vd-dest__family {
-  margin: 16px 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--vd-muted);
-}
-.vd-dest__family:first-child { margin-top: 0; }
-.vd-dest__item {
-  display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  width: 100%; text-align: left; min-height: 48px; padding: 12px 14px; margin-bottom: 8px;
-  border: 1px solid var(--vd-border); border-radius: 10px; background: #fff;
-  font: inherit; font-size: 16px; font-weight: 600; color: inherit; cursor: pointer;
-}
-.vd-dest__item:hover { border-color: var(--vd-accent); background: var(--vd-accent-soft); }
-.vd-dest__item.is-default { border-color: var(--vd-accent); border-width: 2px; }
-.vd-dest__item:disabled { opacity: .5; cursor: not-allowed; }
-.vd-dest__badge { font-size: 13px; font-weight: 700; color: var(--vd-accent); white-space: nowrap; }
-/* Annonce de l'étape suivante, sur l'écran Paiement. */
-.vd-next-step { margin: 0 0 12px; padding-left: 10px; border-left: 3px solid var(--vd-accent); }
-
-/* --- Commande terminée + ticket ------------------------------------------- */
-.vd-success { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
-.vd-ticket {
-  width: 380px; max-width: 100%; margin: 0 auto; background: #fff;
-  border: 1px dashed #aaa; padding: 22px; font-family: "Courier New", monospace; font-size: 15px;
-}
-.vd-ticket h2 { text-align: center; margin: 0 0 4px; }
-.vd-ticket .vd-center { text-align: center; }
-.vd-ticket-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 4px 0; }
-.vd-ticket-product { margin: 8px 0; }
-.vd-ticket-product-line { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
-.vd-ticket hr { border: 0; border-top: 1px dashed #777; margin: 12px 0; }
-
-/* Note interne : filet à gauche, jamais sur le ticket du client. */
-.vd-internal { border-left: 5px solid #333; }
-.vd-internal-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.vd-lock { font-size: 14px; color: #555; }
-
-/* ===========================================================================
-   DEMANDE DE DEVIS (devis.js)
-   Six étapes au lieu de quatre, aucun prix, et une fiche récapitulative qui se
-   RELIT (contrairement au ticket de caisse, qui ne fait que s'imprimer) : c'est
-   le brief que l'équipe reprendra pour chiffrer.
-   =========================================================================== */
-.dv-stepper { grid-template-columns: repeat(6, 1fr); }
-.dv-stepper .vd-step { font-size: 14px; padding: 12px 8px; }
-
-/* Familles concernées : ce que les besoins ont produit, en un coup d'œil. */
-.dv-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-
-/* Priorité et suite à donner : des DÉCISIONS, donc de grandes cibles lisibles
-   plutôt qu'un menu déroulant qu'on déplie devant le client. */
-.dv-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.dv-choice-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.dv-card-choice {
-  display: flex; flex-direction: column; gap: 6px; text-align: left;
-  min-height: 96px; padding: 16px; cursor: pointer;
-  border: 1px solid var(--vd-border); border-radius: 12px; background: #fff;
-  font: inherit; color: inherit;
-}
-.dv-card-choice:hover { border-color: var(--vd-accent); }
-.dv-card-choice.is-active { border: 2px solid var(--vd-accent); background: var(--vd-accent-soft); }
-.dv-card-choice__mark { font-size: 20px; line-height: 1; }
-.dv-card-choice strong { font-size: 16px; }
-.dv-card-choice small { font-size: 14px; line-height: 1.4; color: var(--vd-muted); }
-/* Décision non prise alors qu'on essaie d'avancer : le bloc entier vire au
-   rouge — il n'y a pas de « champ » à souligner, c'est le choix qui manque. */
-.dv-choice-error {
-  border: 2px solid var(--vd-danger); border-radius: 14px;
-  padding: 14px; background: var(--vd-danger-soft);
-}
-.dv-choice-error > label { color: var(--vd-danger); }
-
-.dv-control-list { margin: 10px 0 0; padding-left: 20px; line-height: 1.6; }
-
-/* --- Fiche récapitulative --------------------------------------------------- */
-.dv-sheet { background: #fff; }
-.dv-sheet__head {
-  display: flex; justify-content: space-between; gap: 20px; align-items: flex-start;
-  padding-bottom: 18px; border-bottom: 2px solid var(--vd-accent);
-}
-.dv-sheet__head h2 { margin: 0; font-size: 23px; }
-.dv-sheet__head p { margin: 5px 0 0; color: var(--vd-muted); font-size: 14px; }
-.dv-sheet__ref { text-align: right; }
-.dv-sheet__ref strong { display: block; font-size: 18px; }
-.dv-sheet__ref span { font-size: 13px; color: var(--vd-muted); }
-.dv-sheet__section { margin-top: 22px; }
-.dv-sheet__section h3 {
-  margin: 0 0 12px; font-size: 14px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: .06em; color: var(--vd-muted);
-}
-.dv-sheet__foot {
-  margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--vd-border);
-  font-size: 12px; color: var(--vd-muted);
-}
-.dv-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; }
-.dv-info { border-bottom: 1px solid #eef0f2; padding: 8px 0 10px; }
-.dv-info span {
-  display: block; font-size: 11px; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--vd-muted); margin-bottom: 4px;
-}
-.dv-info strong { display: block; font-size: 15px; line-height: 1.4; }
-.dv-final-card {
-  border: 1px solid var(--vd-border); border-radius: 11px;
-  padding: 13px; margin-bottom: 10px; background: #fcfcfd; font-size: 15px;
-}
-
-@media (max-width: 760px) {
-  .vd-grid, .vd-grid-3, .vd-choice-grid, .vd-choice-grid--3,
-  .dv-choice-grid, .dv-choice-grid--3, .dv-info-grid { grid-template-columns: 1fr; }
-  .vd-stepper, .dv-stepper { grid-template-columns: 1fr 1fr; }
-  .vd-ticket { width: 100%; }
-  .vd-header { padding: 14px 16px; }
-  .vd-container { padding: 16px 12px 40px; }
-  .dv-sheet__head { flex-direction: column; }
-  .dv-sheet__ref { text-align: left; }
-  /* La référence ne se coupe pas (white-space: nowrap) : sur 375 px elle
-     écraserait le titre de l'étape mot par mot. Elle passe donc dessous. */
-  .vd-stage-title { flex-direction: column; align-items: flex-start; gap: 10px; }
-}
-
-/* --- Impression du ticket -------------------------------------------------
-   Le ticket ne s'affiche PAS à l'écran : il part à l'imprimante, en fichier ou
-   sur WhatsApp, personne ne le lit sur la tablette. Il reste dans le DOM (c'est
-   lui qu'imprime le navigateur) mais hors de la vue.
-   `vd-print` est posée sur <body> le temps de l'impression : tout l'écran
-   disparaît sauf le ticket, qui part au format 80 mm de la caisse. */
-.vd-print-only { display: none; }
-
-@media print {
-  body.vd-print { background: #fff; }
-  body.vd-print .topbar,
-  body.vd-print .topbar-filet,
-  body.vd-print .vd-header,
-  body.vd-print .np-header,
-  body.vd-print .vd-stepper,
-  body.vd-print .vd-no-print { display: none !important; }
-  body.vd-print .vd-print-only { display: block !important; }
-  /* Les conteneurs bornent la hauteur et coupent le débordement à l'écran :
-     à l'impression ils doivent laisser passer toute la hauteur du document.
-     Le flux qui n'est PAS affiché reste `hidden` : il ne s'imprime pas. */
-  body.vd-print .shell,
-  body.vd-print .app,
-  body.vd-print .work,
-  body.vd-print .proj:not([hidden]),
-  body.vd-print .np-shell,
-  body.vd-print .np-panes,
-  body.vd-print .np-pane:not([hidden]),
-  body.vd-print .vd-page,
-  body.vd-print .vd-container {
-    display: block !important; overflow: visible !important;
-    height: auto !important; max-height: none !important; padding: 0 !important; margin: 0 !important;
-  }
-  body.vd-print .vd-ticket-card { border: 0; box-shadow: none; padding: 0; margin: 0; }
-  body.vd-print .vd-ticket { border: 0; width: 80mm; }
-  /* La fiche de demande s'imprime en pleine page A4, pas au format caisse. */
-  body.vd-print .dv-sheet-card { border: 0; box-shadow: none; padding: 0; margin: 0; }
 }

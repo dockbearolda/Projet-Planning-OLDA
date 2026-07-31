@@ -11,11 +11,13 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 
 ## Fonctionnalités
 
-- **Vente directe** (onglet « Nouveau Projet »), la seule porte d'entrée : le
-  comptoir en quatre étapes — **Articles → Client → Paiement → Ticket** — avec
-  ticket numéroté à imprimer / télécharger / envoyer sur WhatsApp. Une fois le
-  ticket remis, la vendeuse **pose la ligne à l'étape du planning** de son choix
-  (sauf si le client repart avec sa commande : la place est alors connue).
+- **Nouveau Projet**, la seule porte d'entrée, en **deux parcours** entre
+  lesquels la vendeuse choisit d'un tap : la **vente directe** (Articles →
+  Client → Paiement → Ticket, ticket numéroté à imprimer / télécharger / envoyer
+  sur WhatsApp) et la **demande de devis** (Demande → Besoins → Projet →
+  Contrôle → Client → Récapitulatif, **sans prix** — c'est ce qu'on doit
+  chiffrer). Les deux écrans sont ceux du patron, repris tels quels, et versent
+  au planning l'**intégralité** du dossier saisi.
 - Sidebar pipeline : **5 familles** (Demande & chiffrage, Préparation du projet,
   Production, Facturation & remise au client, Paiement & clôture), compteurs live.
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
@@ -181,8 +183,10 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande. |
 | GET | `/api/pipeline` | Familles et leurs sous-étapes (destination d'une commande). |
-| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. |
+| POST | `/api/comptoir/projet` | **Le dossier d'un des deux parcours du comptoir** → crée la ligne dans le planning (`stage` + `sub_stage` retrouvée par son libellé), remplit la fiche client et archive le récapitulatif complet dans `fiche`. Répond `{ id, stage, subStage }`. Refuse seulement un dossier sans nom de client. |
+| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron ; conservé le temps de confirmer qu'on n'y revient pas. |
 | POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
+| POST | `/api/devis/numero` | Même compteur, série distincte, pour une demande de devis (`DEV-26.07.30-001`). |
 | GET | `/api/settings/whatsapp` | `{ message }` — le texte « commande prête » réglé par le patron. |
 | PUT | `/api/settings/whatsapp` | Remplace ce texte (`{ message }`, 1000 caractères max), diffusé en SSE. |
 | GET | `/api/clients` | Base clients complète (auto-complétion + fiche). |
@@ -199,137 +203,107 @@ code HTTP adapté.
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
 
-## Nouveau Projet — `/#nouveau-projet` : la vente directe
+## Nouveau Projet — `/#nouveau-projet` : les deux parcours du comptoir
 
-La **seule porte d'entrée** de l'application : toute commande y naît. C'est
-l'écran de **vente directe** dessiné par le patron, repris à l'identique —
-quatre étapes en face du client, façon caisse : **Articles → Client → Paiement →
-Ticket**. La contrainte de conception est un chrono : client debout devant le
-comptoir. D'où des cibles de 44 px et des champs à 16 px (en dessous, iOS zoome
-sur le champ dès qu'on le touche).
+La **seule porte d'entrée** de l'application : toute affaire y naît. Un tap sur
+l'onglet ouvre d'abord **le choix**, deux grandes tuiles, parce qu'une seule
+question sépare les deux parcours — *le client paie-t-il maintenant ?*
 
-Le DOM des quatre étapes est construit **une fois** puis montré / caché : aller
-et venir entre les étapes ne fait rien perdre de ce qui est déjà tapé.
-
-### 1. Articles
-
-Un article = un nom (liste de suggestions, saisie libre), une quantité, un prix
-unitaire, le sens de ce prix (**TTC** ou **HT**), la TGCA, et une **description
-de production** — ce que l'atelier doit lire pour produire (« Logo cœur, logo dos
-30 cm, tailles S x2 / M x5, impression DTF »). Plusieurs articles peuvent
-s'empiler dans la même vente, chacun modifiable ou supprimable.
-
-Prix saisi **HT** + TGCA cochée : le prix client est le HT majoré du taux réglé
-dans Réglages. TGCA décochée : le prix saisi **est** le prix client, quel que
-soit l'intitulé — c'est la règle de la maquette.
-
-La **date** et l'**heure souhaitées** valent pour la vente entière, pas par
-article. Le délai porte sa majoration, annoncée sous le champ : jour même (ou
-date passée) **+20 %**, moins de trois jours **+10 %**, au-delà rien. Ce sont les
-deux raccourcis du catalogue (`jour_j`, `express`) : c'est le **serveur** qui
-applique la majoration, l'écran ne fait que l'annoncer — et il l'annonce au
-centime près (même arrondi, appliqué au total, une seule fois), sinon le client
-paierait un centime de plus que la ligne du planning n'en réclame.
-
-La **note interne OLDA** ne part jamais sur le ticket du client : elle rejoint la
-colonne Infos de la ligne du planning.
-
-### 2. Le client — la vraie base
-
-La recherche interroge la **base clients** (nom, société, contact, e-mail,
-WhatsApp ou fragment de numéro) ; la création écrit **dedans** (`POST
-/api/clients`), pas dans un coin du navigateur : le comptoir et Base clients ne
-peuvent pas se contredire. Deux formulaires, comme sur la maquette —
-*Particulier* (prénom + nom, WhatsApp, e-mail) ou *Professionnel* (raison
-sociale, secteur, contact, coordonnées, adresse).
-
-Trois automatismes évitent la ressaisie :
-
-- **Ville → Code postal + Pays** : une ville connue les remplit ; une valeur
-  tapée à la main n'est jamais écrasée.
-- **Casse imposée** : prénom en initiales (`Jean-Marc`), nom en majuscules
-  (`DUPONT`). Pour un particulier, `entreprise` porte « Prénom NOM » en un seul
-  texte — c'est ce nom qui fait foi partout ailleurs, on ne réordonne jamais ses
-  mots (le dédoublonnage compare cette chaîne).
-- **Numéro WhatsApp** : regroupé par deux à la frappe, laissé tel quel s'il est
-  international. **Tout numéro contenant un chiffre est accepté** — une règle de
-  format plus fine a déjà bloqué le comptoir devant un client bien réel.
-
-Un client déjà en base avec le même numéro, e-mail ou nom déclenche un
-**avertissement**, pas un refus : un second clic crée quand même. Parfois c'est
-bien un nouveau client, et le comptoir ne doit jamais rester bloqué.
-
-### 3. Le paiement
-
-Les cinq modes de la maquette, et ce qu'ils veulent dire pour le planning :
-
-| Au comptoir | Statut enregistré | Mode |
+| | Vente directe | Demande de devis |
 |---|---|---|
-| Carte bancaire | payé | `cb` |
-| Espèces (+ monnaie à rendre) | payé | `especes` |
-| Virement | payé | `virement` |
-| Mixte (CB + espèces, réparti automatiquement) | payé | `mixte` |
-| Paiement au retrait | à encaisser | — |
+| La situation | Le client est là, le prix est connu : il paie et repart avec son ticket. | Le client demande un prix : on note son besoin, Atelier OLDA chiffrera. |
+| Les étapes | Articles → Client → Paiement → Ticket | Demande → Besoins → Projet → Contrôle → Client → Récapitulatif |
+| Entre au planning | **Préparation du projet**, chiffrée et encaissée (ou **Facturation → Commande récupérée** si le client repart avec) | **Demande & chiffrage**, **sans prix**, avec tout le brief |
+| Nature (`order_kind`) | `commande` | `demande` |
 
-La case **« le client repart immédiatement avec sa commande »** décide de la
-suite : rien à produire ni à faire retirer, la ligne va en *Facturation →
-Facturation à faire* et **aucune question n'est posée**. Sinon l'écran du ticket
-demandera où poser la ligne (voir plus bas). L'écran annonce cette étape
-suivante sous le bouton de validation, pour que personne ne la découvre.
+### Les parcours sont des pages à part
 
-### 4. Le ticket
+`public/comptoir/vente-directe.html` et `public/comptoir/demande-devis.html`
+sont les écrans **dessinés et validés par le patron**, repris tels quels et
+affichés dans un cadre (`<iframe>`) sous l'onglet. Ce n'est pas un détail
+d'implémentation, c'est le choix qui tient tout le reste :
 
-« Valider le paiement » **enregistre d'abord la commande au planning**
-(`POST /api/projets`) et ne passe à l'écran suivant qu'une fois l'enregistrement
-confirmé — sans quoi on remettrait au client un ticket dont l'atelier n'a jamais
-entendu parler.
+- ces écrans stylent des **balises nues** (`button`, `input`, `h2`, `hr`…) ;
+  inline dans le CRM, ils déborderaient sur le planning ;
+- ils se **réécrivent entièrement** d'une version à l'autre (V15, V17…) : une
+  nouvelle version se pose en **remplaçant un fichier**, pas en retraduisant un
+  parcours à la main — et une retraduction, c'est une occasion de perdre un
+  champ à chaque fois ;
+- ce que le patron a validé est **exactement** ce qui tourne.
 
-Le ticket s'**imprime** (80 mm), se **télécharge** en `.txt`, et part sur
-**WhatsApp** avec le message déjà écrit — rien ne s'envoie tout seul, c'est
-l'employé qui appuie sur Envoyer.
+Le parcours ne connaît **aucune adresse d'API**. Il recueille un dossier complet
+et, quand la vendeuse tape **« Créer dans le planning »**, le poste à la fenêtre
+parente (`postMessage` `OLDA_CREATE_PROJECT`). C'est `nouveau-projet.js` qui
+écoute — en n'acceptant que ses propres cadres, sur sa propre origine —, appelle
+l'API, puis **saute au planning sur la ligne qui vient de naître**.
 
-**Il n'est PAS affiché à l'écran** : il part à l'imprimante, en fichier ou sur
-WhatsApp, personne ne le lit sur la tablette. Il reste dans le DOM (c'est lui
-qu'imprime le navigateur, classe `.vd-print-only` : masqué à l'écran, rendu en
-`@media print`), et l'écran garde ce qui sert à ce moment-là — le numéro, le
-paiement avec la monnaie à rendre, le **total encaissé**, et la question du
-planning ci-dessous.
+Un échec d'enregistrement s'**affiche** au-dessus du parcours et le laisse
+intact : la vendeuse a le client devant elle, elle retape sur le bouton. Un
+double tap ne crée qu'une ligne.
 
-### 5. Où poser la ligne dans le planning ?
+### Ce que le CRM branche dans les parcours (`comptoir/pont.js`)
 
-**Le geste par lequel la vendeuse fait entrer la vente dans l'atelier**, et c'est
-pour ça qu'il vient APRÈS le ticket : le client a son ticket en main, la ligne
-existe déjà, il reste à dire à quelle étape elle attend.
+Deux choses seulement, celles qui ne peuvent pas vivre dans un écran isolé :
 
-La carte occupe l'écran du ticket (qui, lui, ne s'affiche pas), filet d'encre à gauche, et
-propose **tout le pipeline** (familles + sous-étapes, Fiverr compris, servi par
-`/api/pipeline` — une étape ajoutée en base apparaît sans retoucher le front).
-*Préparation → Prêt à produire* est proposé en premier, marqué « le plus
-courant » : un seul tap dans le cas habituel, rien n'est caché pour autant.
+- **La base clients réelle.** La recherche du parcours est remplie depuis
+  `GET /api/clients` : la vendeuse cherche dans les clients de l'atelier, pas
+  dans un jeu d'exemple. Un client créé pendant le parcours entre dans la base
+  au moment où le dossier part au planning (upsert serveur, dédoublonnage sur le
+  nom).
+- **Le numéro du jour.** Réservé **au premier article** (vente) ou **au premier
+  besoin** (demande), jamais à l'ouverture de l'écran : un numéro attribué n'est
+  jamais réutilisé, et ouvrir l'onglet pour rien ne doit pas faire un trou dans
+  la numérotation des tickets remis aux clients. Tant qu'il n'est pas réservé, la
+  demande affiche « — » plutôt qu'un numéro provisoire que la vendeuse pourrait
+  annoncer au client. Si le compteur est injoignable, le poste retombe sur son
+  rang local plutôt que de bloquer la vente.
 
-Choisir une étape **déplace la ligne** (`PATCH /api/requests/:id` avec `stage` +
-`sub_stage`), puis la carte annonce où elle est posée. La commande étant déjà
-enregistrée, une question laissée sans réponse ne perd rien : la ligne reste à la
-place par défaut — et « Nouvelle commande » le dit avant de passer à la vente
-suivante, plutôt que de laisser filer en silence.
+Format du patron : `26.07.30-001` pour un ticket de vente, `DEV-26.07.30-001`
+pour une demande — année, mois, jour, puis le rang **dans la journée**. Le
+compteur vit côté serveur (clé `app_meta`), pas dans le navigateur : deux
+comptoirs qui encaissent en même temps ne peuvent pas remettre le même numéro à
+deux clients. Le jour est celui du **poste** (le conteneur tourne en UTC, il
+basculerait au lendemain dès 20 h à Saint-Martin).
 
-Une seule exception, déjà dite : le client qui repart avec sa commande. Sa place
-est connue, la carte se contente de l'annoncer.
+### Le dossier arrive ENTIER au planning (`POST /api/comptoir/projet`)
 
-### Le numéro de ticket
+Ce qui rentre dans une colonne y va (client, prix, échéance, priorité, étape,
+paiement) ; **tout le reste est archivé dans `fiche`** — le récapitulatif du
+parcours, ligne à ligne, tel qu'il s'imprime. C'est lui que rouvre le tiroir de
+la commande, sous « Détail produit » : articles, prix unitaires, TGCA, totaux,
+mode de paiement, heure de retrait, description de production, coordonnées du
+client, points à contrôler. **Rien de ce que la vendeuse a saisi ne se perd.**
 
-Format du patron : `26.07.30-001` — année, mois, jour, puis le rang de la vente
-**dans la journée**. Le compteur vit côté serveur (`POST /api/vente/numero`, clé
-`app_meta`), pas dans le navigateur : deux comptoirs qui encaissent en même temps
-ne peuvent pas remettre le même numéro à deux clients. Le jour est celui du
-**poste** (le conteneur tourne en UTC, il basculerait au lendemain dès 20 h à
-Saint-Martin).
+| Ce que le parcours envoie | Où ça atterrit |
+|---|---|
+| `stage` + `status` (le libellé affiché) | `stage` (famille) + `sub_stage`, retrouvée par son libellé |
+| `clientObj` | `billing_company`, `client_type`, `contact_referent`, `contact_phone`, `contact_email` — et la fiche de la base clients |
+| `amount` (vente uniquement) | `project_value` (le **TTC**) |
+| `paiement` | `paye` + `paiement_mode` (`cb` / `especes` / `virement` / `mixte`) |
+| `recap` | colonne **Infos** de la ligne |
+| `details`, `client_info`, `checks`, `budgetIndicatif`… | `fiche` (jsonb), rendu dans le tiroir |
 
-Le numéro est réservé au **premier article ajouté**, pas à l'ouverture de
-l'écran : un numéro attribué n'est jamais réutilisé, et ouvrir l'onglet pour rien
-ne doit pas faire un trou dans la numérotation. Si le compteur est injoignable,
-le poste retombe sur son rang local plutôt que de bloquer la vente.
+**Une demande de devis n'a pas de prix** : `project_value` reste `null` —
+surtout pas `0`, qui se lirait « gratuit » dans la colonne Prix alors que c'est
+précisément ce qu'il faut chiffrer. Le **budget indicatif** annoncé par le client
+est gardé à côté, dans la fiche ; il ne devient jamais un prix.
 
+Rien de ce qui vient du parcours ne peut **bloquer** l'enregistrement, sauf un
+dossier sans nom de client (la ligne serait anonyme au planning). Un libellé
+d'étape qu'une nouvelle version aurait renommé pose la ligne dans sa famille,
+sous-étape « à préciser » ; une date impossible retombe sur aujourd'hui. Refuser
+laisserait la vendeuse avec un client encaissé et rien au planning.
+
+### Repartir net entre deux clients
+
+Un tap sur « Nouveau Projet » dans la barre du haut revient **toujours** au
+choix, avec deux parcours vierges : les deux cadres sont rechargés, pas
+seulement celui qu'on affichait. Au comptoir on ne cherche jamais un brouillon
+abandonné entre deux clients. Même chose après un enregistrement réussi.
+
+La barre de navigation principale est masquée sur cet écran
+(`body.view-comptoir`) : devant le client, il ne reste que le parcours en cours
+et le bouton **« Changer de parcours »**. Le logo OLDA ramène au planning.
 ## Colonnes du planning — le rail de droite
 
 Le bouton **« Colonnes »**, en haut de la grille, ouvre un rail à droite où
@@ -388,8 +362,10 @@ commande naît avec son client, son prix et sa date butoir, ou elle ne naît pas
 les écrans de l'atelier continuent de marcher. Les anciens `#demande` et
 `#commande` retombent sur le planning, comme tout hash inconnu.
 
-Le module Nouveau Projet (`projet.js`) n'est chargé qu'au **premier** passage
-sur la vue : le planning ne paie rien tant qu'on ne prend pas de commande.
+L'aiguillage Nouveau Projet (`nouveau-projet.js`) n'est chargé qu'au **premier**
+passage sur la vue, et le document d'un parcours qu'au premier passage **sur ce
+parcours** : le planning ne paie rien tant qu'on ne prend pas de commande, et
+l'accueil à deux tuiles ne coûte rien du tout.
 
 ### Le catalogue vit dans `catalog.json`
 
@@ -473,12 +449,14 @@ cartes en `--radius-card` (14 px), champs et boutons en `--radius` (9 px), et
 trois élévations (`--shadow-1` carte, `--shadow-2` flottant, `--shadow-pop`
 modale).
 
-Deux exceptions assumées, toutes deux hors interface :
+Deux exceptions assumées :
 
 - `.wall` (écran mural de l'atelier) reprend la **variante sombre** de la charte
   quel que soit le thème de l'app — c'est ce qui le rend lisible à distance.
-- Les pastilles de coloris textile (`COLORIS` dans `projet.js`) sont de vraies
-  couleurs de vêtement, pas du design.
+- Les **parcours du comptoir** (`public/comptoir/`) gardent l'habillage du
+  fichier du patron : ce sont ses écrans, validés tels quels, dans leur propre
+  document. La charte du CRM habille la coquille autour (accueil, barre de
+  bascule), pas l'intérieur du parcours.
 
 ## Structure
 
@@ -494,8 +472,12 @@ Deux exceptions assumées, toutes deux hors interface :
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
-│   ├── projet.css    vue Vente directe, scopée sous #nouveau-projet (.vd-*)
-│   ├── projet.js     vente directe : articles, client, paiement, ticket
+│   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
+│   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning
+│   ├── comptoir/         LES ÉCRANS DU PATRON, repris tels quels
+│   │   ├── vente-directe.html   Articles → Client → Paiement → Ticket
+│   │   ├── demande-devis.html   Demande → Besoins → Projet → Contrôle → Client → Récap
+│   │   └── pont.js              base clients réelle + numéro du jour réservé côté serveur
 │   ├── clients.css   vue Base clients, scopée sous #clients
 │   ├── clients.js    liste, fiche éditable, notes, secteurs, villes
 │   └── reglages.js   vue Réglages (message WhatsApp « commande prête »)
