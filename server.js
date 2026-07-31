@@ -476,10 +476,7 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
 app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
   const { rows } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  const fiche = rows[0].fiche;
-  if (!fiche || fiche.kind !== 'comptoir-v17') {
-    return res.status(400).json({ error: 'cette commande n’a pas de détail modifiable' });
-  }
+  const fiche = rows[0].fiche && typeof rows[0].fiche === 'object' ? rows[0].fiche : {};
 
   const b = req.body && typeof req.body === 'object' ? req.body : {};
   // Une valeur vidée devient « — » plutôt que rien : le récapitulatif imprimé
@@ -490,11 +487,22 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
       typeof valeurs[i] === 'string' ? { ...l, v: borner(valeurs[i], 600) || '—' } : l
     ));
   };
-  const majFiche = {
-    ...fiche,
-    client: corriger(fiche.client, b.client),
-    details: corriger(fiche.details, b.details),
-  };
+  const majFiche = { ...fiche };
+  // Le récapitulatif ligne à ligne n'existe que sur une commande du comptoir :
+  // ailleurs il n'y a rien à corriger, et on ne va pas en inventer un.
+  if (fiche.kind === 'comptoir-v17') {
+    majFiche.client = corriger(fiche.client, b.client);
+    majFiche.details = corriger(fiche.details, b.details);
+  } else if (Array.isArray(b.client) || Array.isArray(b.details)) {
+    return res.status(400).json({ error: 'cette commande n’a pas de détail modifiable' });
+  }
+  // L'heure de retrait (elle commande le calcul du délai de production) et le
+  // secteur de production se corrigent en revanche sur N'IMPORTE QUELLE ligne,
+  // y compris une ligne créée à la main : la fiche les affiche pour tout le
+  // monde, ils doivent s'enregistrer pour tout le monde. `undefined` = le poste
+  // n'y touche pas.
+  if ('heureSouhaitee' in b) majFiche.heureSouhaitee = isHeure(b.heureSouhaitee) ? b.heureSouhaitee : null;
+  if ('production' in b) majFiche.production = borner(b.production, 200);
 
   const { rows: maj } = await pool.query(
     'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',

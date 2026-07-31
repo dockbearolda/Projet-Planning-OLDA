@@ -2379,17 +2379,6 @@ function ldActionBtn(icone, label, onClick) {
   return b;
 }
 
-// Une section de la fiche, prête à recevoir son contenu.
-function ldSection(titre, pleineLargeur) {
-  const s = document.createElement('section');
-  s.className = 'ld-section' + (pleineLargeur ? ' ld-section--full' : '');
-  const t = document.createElement('p');
-  t.className = 'ld-section-title';
-  t.textContent = titre;
-  s.appendChild(t);
-  return s;
-}
-
 // Même règle de rapprochement que le serveur (clientKey) : insensible à la
 // casse, aux accents et à la ponctuation. « Coco Beach » et « coco-beach »
 // sont LE MÊME client.
@@ -2479,7 +2468,7 @@ function imprimerRecap(r) {
 // libellé figé (il vient du parcours), valeur éditable. On n'enregistre qu'au
 // bouton — corriger dix lignes ne doit pas faire dix allers-retours réseau, et
 // tant qu'on n'a pas validé, rien n'a bougé en base.
-function ldSectionDetail(r) {
+function ldBlocDetail(r) {
   const f = r.fiche;
   const groupes = [
     { cle: 'client', titre: 'Client', lignes: Array.isArray(f.client) ? f.client : [] },
@@ -2491,7 +2480,12 @@ function ldSectionDetail(r) {
   ].filter((g) => g.lignes.length);
   if (!groupes.length) return null;
 
-  const section = ldSection('Détail complet de la demande enregistrée — tout est modifiable', true);
+  const total = groupes.reduce((n, g) => n + g.lignes.length, 0);
+  const section = ldVolet(
+    'Détail complet de la demande enregistrée',
+    `${total} ligne${total > 1 ? 's' : ''} — tout est modifiable`,
+    null, true,
+  );
   const champs = { client: [], details: [] };
 
   for (const g of groupes) {
@@ -2521,52 +2515,22 @@ function ldSectionDetail(r) {
     }
   }
 
-  const pied = document.createElement('div');
-  pied.className = 'ld-detail-save';
-  const etat = document.createElement('span');
-  etat.className = 'ld-detail-state';
-  const enregistrer = document.createElement('button');
-  enregistrer.type = 'button';
-  enregistrer.className = 'ld-act';
-  enregistrer.textContent = 'Enregistrer les corrections';
-  enregistrer.addEventListener('click', async () => {
-    enregistrer.disabled = true;
-    etat.textContent = 'Enregistrement…';
-    try {
-      const res = await fetch(`/api/requests/${r.id}/fiche`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client: champs.client.map((c) => c.value),
-          details: champs.details.map((c) => c.value),
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `erreur ${res.status}`);
-      const maj = await res.json();
-      Object.assign(r, maj);
-      showToast('Détail mis à jour');
-      renderLigneDetailIfOpen();
-    } catch (err) {
-      etat.textContent = `Échec : ${err.message}`;
-      enregistrer.disabled = false;
-    }
-  });
-  pied.append(etat, enregistrer);
-  section.appendChild(pied);
-  return section;
+  // Pas de bouton ici : le détail s'enregistre avec le reste de la fiche, par
+  // le bouton du bas. Un seul geste pour l'employé.
+  return { box: section, champs };
 }
 
 // HISTORIQUE DU CLIENT : les autres commandes du même dossier. « On a déjà fait
 // quoi pour eux ? » est la question qu'on pose au téléphone, et la réponse doit
 // être sous les yeux, pas à chercher dans la grille.
-function ldSectionHistoriqueClient(r) {
+function ldBlocHistoriqueClient(r) {
   const cle = clientKeyLocal(r.billing_company);
   if (!cle) return null;
   const autres = rows
     .filter((x) => String(x.id) !== String(r.id) && clientKeyLocal(x.billing_company) === cle)
     .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 
-  const section = ldSection(`Historique du client (${autres.length})`, true);
+  const section = ldBox(`Historique du client (${autres.length})`, null, true);
   if (!autres.length) {
     const p = document.createElement('p');
     p.className = 'ld-empty';
@@ -2599,84 +2563,144 @@ function ldSectionHistoriqueClient(r) {
   return section;
 }
 
+// ===========================================================================
+// LA FICHE PROJET — « la bulle », telle que l'écran du patron la dessine
+// ===========================================================================
+// Une carte du planning ne dit que l'essentiel ; la fiche dit TOUT, et tout y
+// est modifiable. Elle se lit en encadrés à deux colonnes : chaque encadré
+// porte un libellé en capitales et son contenu.
+//
+// La fiche suit le modèle « je corrige, puis j'enregistre » : les champs se
+// tapent librement et rien ne part avant le bouton du bas. C'est la règle de
+// l'écran validé, et elle vaut mieux ici qu'une sauvegarde à chaque frappe —
+// on relit une fiche entière avant de la valider.
+
+function ldBox(label, contenu, pleine) {
+  const box = document.createElement('section');
+  box.className = 'ld-box' + (pleine ? ' ld-box--full' : '');
+  const k = document.createElement('p');
+  k.className = 'ld-k';
+  k.textContent = label;
+  box.append(k);
+  for (const c of [].concat(contenu)) if (c) box.append(c);
+  return box;
+}
+
+// UN VOLET : tout ce qui se MODIFIE est replié par défaut.
+// La fiche s'ouvre donc en lecture — on la parcourt d'un coup d'œil sans risquer
+// de retoucher un champ au passage. Le volet fermé montre le libellé ET la
+// valeur du moment : on lit sans ouvrir, on n'ouvre que pour changer.
+// `<details>` natif : ça marche au clavier, ça s'imprime déplié si besoin, et
+// aucun script ne pilote l'ouverture.
+function ldVolet(label, apercu, contenu, pleine) {
+  const volet = document.createElement('details');
+  volet.className = 'ld-box ld-volet' + (pleine ? ' ld-box--full' : '');
+  const tete = document.createElement('summary');
+  tete.className = 'ld-volet__tete';
+  const textes = document.createElement('span');
+  textes.className = 'ld-volet__textes';
+  const k = document.createElement('span');
+  k.className = 'ld-k';
+  k.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'ld-volet__apercu';
+  v.textContent = apercu == null || apercu === '' ? '—' : String(apercu);
+  textes.append(k, v);
+  const chevron = document.createElement('span');
+  chevron.className = 'material-symbols-outlined ld-volet__chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = 'expand_more';
+  tete.append(textes, chevron);
+  volet.append(tete);
+  for (const c of [].concat(contenu)) if (c) volet.append(c);
+  return volet;
+}
+
+// Valeur en lecture seule (étape courante, échéance calculée…).
+function ldValeur(texte) {
+  const p = document.createElement('p');
+  p.className = 'ld-v';
+  p.textContent = texte;
+  return p;
+}
+
+function ldChamp(valeur, opts = {}) {
+  const el = document.createElement(opts.multi ? 'textarea' : 'input');
+  el.className = 'ld-ctl';
+  if (opts.multi) el.rows = opts.rows || 3;
+  else el.type = opts.type || 'text';
+  if (opts.inputMode) el.inputMode = opts.inputMode;
+  if (opts.step) el.step = opts.step;
+  if (opts.placeholder) el.placeholder = opts.placeholder;
+  el.value = valeur == null ? '' : valeur;
+  if (opts.label) el.setAttribute('aria-label', opts.label);
+  return el;
+}
+
+function ldSelect(options, valeur, label) {
+  const s = document.createElement('select');
+  s.className = 'ld-ctl';
+  if (label) s.setAttribute('aria-label', label);
+  for (const o of options) {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    if (String(o.value) === String(valeur)) opt.selected = true;
+    s.append(opt);
+  }
+  return s;
+}
+
+// Toutes les places possibles du pipeline, « Famille › Sous-étape ». Une
+// famille sans sous-étape est une destination à elle seule.
+function placesDuPipeline() {
+  const places = [];
+  for (const f of STAGES) {
+    const subs = SUB_STAGES[f.slug] || [];
+    if (!subs.length) { places.push({ value: `${f.slug}|`, label: f.label }); continue; }
+    places.push({ value: `${f.slug}|`, label: `${f.label} › à préciser` });
+    for (const s of subs) places.push({ value: `${f.slug}|${s.slug}`, label: `${f.label} › ${s.label}` });
+  }
+  return places;
+}
+
 function renderLigneDetail() {
   const r = rows.find((x) => String(x.id) === ligneDrawerId);
   if (!r) { closeLigneDetail(); return; }
-  // `.ld-body` est le conteneur scrollable, et replaceChildren() le détruit :
-  // on relève sa position pour la reposer sur le corps reconstruit, sinon le
-  // panneau remonte en haut à chaque sauvegarde alors que les Notes sont tout
-  // en bas. Le navigateur borne lui-même la valeur au scroll réellement
+  // `.ld-body` est le conteneur qui défile, et replaceChildren() le détruit :
+  // on relève sa position pour la reposer sur le corps reconstruit, sinon la
+  // fiche remonte en haut à chaque enregistrement alors qu'on travaillait tout
+  // en bas. Le navigateur borne lui-même la valeur au défilement réellement
   // disponible, donc un contenu plus court retombe naturellement.
   const oldBody = ligneDrawerCard.querySelector('.ld-body');
   const prevScrollTop = oldBody ? oldBody.scrollTop : 0;
   ligneDrawerCard.replaceChildren();
 
+  const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
+  const delai = tempsRestant(r.deadline, fiche.heureSouhaitee);
+
+  // --- En-tête ---------------------------------------------------------------
   const head = document.createElement('header');
   head.className = 'ld-head';
 
   const titles = document.createElement('div');
   titles.className = 'ld-head__titles';
-
-  // Nom du dossier et description : les deux champs texte de la ligne, avec la
-  // même mise en forme automatique des noms que dans la grille.
-  const title = ldInput(r, 'billing_company', {
-    placeholder: 'nom du dossier',
-    normalize: capitalizeName,
-    ariaLabel: 'Nom du dossier client',
-  });
-  title.className += ' ld-input--title';
-  const sub = ldInput(r, 'product', {
-    placeholder: 'description',
-    normalize: capitalizeName,
-    ariaLabel: 'Description',
-  });
-  sub.className += ' ld-input--sub';
-
-  const badges = document.createElement('div');
-  badges.className = 'ld-head__badges';
-  // Type de client et priorité : mêmes puces colorées, mêmes menus que les
-  // colonnes TYPE et PRIORITÉ du tableau.
-  const typeBadge = ldChip(
-    (b) => {
-      const t = CLIENT_TYPES.find((x) => x.value === r.client_type) || CLIENT_TYPES[0];
-      b.className = 'type-tag ' + t.cls;
-      b.textContent = t.label;
-      attachTip(b, 'changer le type de client');
-    },
-    (b) => openMenu(b, CLIENT_TYPES.map((t) => ({ value: t.value, label: t.label })), r.client_type, (val) => {
-      if (val === r.client_type) return;
-      ldPatch(r, { client_type: val });
-    }),
-  );
-  const prioBadge = ldChip(
-    (b) => {
-      const lvl = PRIORITY_LEVELS[prioBand(r)];
-      b.className = 'prio-tag ' + lvl.cls;
-      b.textContent = lvl.label;
-      attachTip(b, 'changer la priorité');
-    },
-    (b) => {
-      const cur = prioBand(r);
-      openMenu(b, [3, 2, 1].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })), cur, (val) => {
-        if (val === cur) return;
-        ldPatch(r, { priority: val });
-      });
-    },
-  );
-  badges.append(typeBadge, prioBadge);
-  titles.append(title, sub, badges);
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'ld-eyebrow';
+  eyebrow.textContent = [fiche.ref, fiche.source].filter(Boolean).join(' • ')
+    || stageDestinationLabel(r.stage, r.sub_stage ?? null);
+  const titre = document.createElement('h2');
+  titre.className = 'ld-title';
+  titre.textContent = [r.billing_company || 'Sans nom', r.product].filter(Boolean).join(' — ');
+  titles.append(eyebrow, titre);
 
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'ld-close';
-  close.setAttribute('aria-label', 'Fermer le détail');
+  close.setAttribute('aria-label', 'Fermer la fiche');
   close.appendChild(strokeIcon(['M18 6L6 18', 'M6 6l12 12']));
   close.addEventListener('click', closeLigneDetail);
 
-  // Imprimer / Télécharger le récapitulatif : les deux gestes de l'écran du
-  // patron. Le client réclame « ce qu'on avait dit », l'atelier veut la fiche
-  // au mur — dans les deux cas on sort le récapitulatif tel qu'il est
-  // AUJOURD'HUI, corrections comprises.
   const actions = document.createElement('div');
   actions.className = 'ld-head__actions';
   actions.append(
@@ -2684,293 +2708,83 @@ function renderLigneDetail() {
     ldActionBtn('download', 'Télécharger', () => telechargerRecap(r)),
     close,
   );
-
   head.append(titles, actions);
   ligneDrawerCard.appendChild(head);
 
+  // --- Corps ------------------------------------------------------------------
   const body = document.createElement('div');
   body.className = 'ld-body';
 
-  // --- Contact ---------------------------------------------------------------
-  const contactSection = document.createElement('section');
-  contactSection.className = 'ld-section';
-  const contactTitle = document.createElement('p');
-  contactTitle.className = 'ld-section-title';
-  contactTitle.textContent = 'Contact';
-  contactSection.appendChild(contactTitle);
-  // Les trois champs restent affichés même vides : c'est ici qu'on les remplit
-  // (le tiroir est le seul endroit où le téléphone et l'email se saisissent).
-  contactSection.appendChild(ldRow('Référent', ldInput(r, 'contact_referent', {
-    placeholder: 'nom du contact', normalize: capitalizeName, ariaLabel: 'Référent client',
-  })));
-  contactSection.appendChild(ldRow('Téléphone', ldInput(r, 'contact_phone', {
-    type: 'tel', inputMode: 'tel', placeholder: '06 12 34 56 78', ariaLabel: 'Téléphone du client',
-  })));
-  contactSection.appendChild(ldRow('Email', ldInput(r, 'contact_email', {
-    type: 'email', inputMode: 'email', placeholder: 'client@exemple.fr', ariaLabel: 'Email du client',
-  })));
-  body.appendChild(contactSection);
-
-  // --- Documents ---------------------------------------------------------------
-  const docsSection = document.createElement('section');
-  docsSection.className = 'ld-section';
-  const docsTitle = document.createElement('p');
-  docsTitle.className = 'ld-section-title';
-  docsTitle.textContent = 'Documents';
-  const docsRow = document.createElement('div');
-  docsRow.className = 'ld-docs';
-  docsRow.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
-  docsSection.append(docsTitle, docsRow);
-  body.appendChild(docsSection);
-
-  // --- Détail (structuré, depuis fiche) ---------------------------------------
-  // Une commande du comptoir porte le récapitulatif complet, ligne à ligne :
-  // on le rend MODIFIABLE, c'est ici qu'on corrige une quantité ou une taille.
-  // Les fiches des anciens flux gardent leur affichage en lecture.
-  if (r.fiche && r.fiche.kind === 'comptoir-v17') {
-    const detail = ldSectionDetail(r);
-    if (detail) body.appendChild(detail);
-  } else {
-    const items = ficheItems(r.fiche);
-    if (items && items.length) {
-      const ficheSection = ldSection('Détail produit', true);
-      for (const it of items) ficheSection.appendChild(it);
-      body.appendChild(ficheSection);
-    }
-  }
-
-  // --- Suivi -------------------------------------------------------------------
-  // Toutes les colonnes de pilotage de la grille, éditables ici avec les mêmes
-  // contrôles : puce + menu pour les listes fermées, calendrier pour l'échéance,
-  // champ libre pour le prix.
-  const suiviSection = document.createElement('section');
-  suiviSection.className = 'ld-section';
-  const suiviTitle = document.createElement('p');
-  suiviTitle.className = 'ld-section-title';
-  suiviTitle.textContent = 'Suivi';
-  suiviSection.appendChild(suiviTitle);
-
-  // Étape : une seule puce pour la famille ET la sous-étape, puisque c'est le
-  // couple qui définit la place de la ligne. Le déplacement passe par
-  // moveToStage — mêmes compteurs, même rollback que le glisser-déposer.
-  const stageChip = ldChip(
-    (b) => {
-      b.className = 'sub-chip ld-stage-chip';
-      b.textContent = stageDestinationLabel(r.stage, r.sub_stage ?? null);
-      attachTip(b, 'déplacer la commande dans le pipeline');
-    },
-    (b) => {
-      const dests = stageDestinations();
-      const items = dests.map((d) => ({
-        value: d.value,
-        label: d.label,
-        muted: blockedByPrice(r, d.stage, d.sub),
-      }));
-      openMenu(b, items, `${r.stage}/${r.sub_stage ?? ''}`, (val) => {
-        const d = dests.find((x) => x.value === val);
-        if (!d) return;
-        if (d.stage === r.stage && d.sub === (r.sub_stage ?? null)) return;
-        if (blockedByPrice(r, d.stage, d.sub)) { showToast(priceBlockMessage(d.stage, d.sub)); return; }
-        moveToStage(r, d.stage, d.sub);
-      });
-    },
+  const cClient = ldChamp(r.billing_company, { label: 'Client' });
+  const cProjet = ldChamp(r.product, { label: 'Projet' });
+  const cPriorite = ldSelect(
+    [3, 2, 1].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })),
+    prioBand(r), 'Priorité',
   );
-  suiviSection.appendChild(ldRow('Étape', stageChip));
-
-  // Pilote et référent : mêmes listes que la colonne RESPONSABLE, « Par défaut »
-  // compris (le nom de base de la catégorie reprend alors la main).
-  const pilotChip = ldChip(
-    (b) => {
-      const who = effectivePilot(r);
-      b.className = 'resp-chip ld-resp-chip' + (who && !isManualPilot(r) ? ' auto' : '') + (who ? '' : ' empty');
-      b.textContent = who || 'Non défini';
-      attachTip(b, 'assigner le pilote');
-    },
-    (b) => {
-      const base = ownerOf(r.stage, r.sub_stage);
-      const items = RESPONSABLES.map((n) => ({ value: n, label: n }));
-      items.push({ value: null, label: base ? `Par défaut (${base})` : 'Aucun', muted: true });
-      openMenu(b, items, r.responsable ?? null, (val) => {
-        if ((val ?? null) === (r.responsable ?? null)) return;
-        ldPatch(r, { responsable: val });
-      });
-    },
-  );
-  suiviSection.appendChild(ldRow('Pilote', pilotChip));
-
-  const refChip = ldChip(
-    (b) => {
-      const who = effectiveReferents(r);
-      b.className = 'ref-chip ld-resp-chip' + (who.length && !isManualReferent(r) ? ' auto' : '') + (who.length ? '' : ' empty');
-      b.textContent = who.length ? who.join(', ') : '+ référent';
-      attachTip(b, 'changer le référent');
-    },
-    (b) => {
-      const base = referentsOf(r.stage, r.sub_stage);
-      const items = EMPLOYEES.map((n) => ({ value: n, label: n }));
-      items.push({ value: null, label: base.length ? `Par défaut (${base.join(', ')})` : 'Aucun', muted: true });
-      openMenu(b, items, r.referent ?? null, (val) => {
-        if ((val ?? null) === (r.referent ?? null)) return;
-        ldPatch(r, { referent: val });
-      });
-    },
-  );
-  suiviSection.appendChild(ldRow('Référent équipe', refChip));
-
-  // Prix : saisi comme dans la colonne PRIX (virgule acceptée, arrondi à
-  // 2 décimales en quittant le champ). C'est le TTC — le prix que le client
-  // paie — et c'est lui qui débloque le passage en Devis envoyé / Facturation.
-  const prixInput = ldInput(r, 'project_value', {
-    num: true,
-    inputMode: 'decimal',
-    placeholder: '—',
-    ariaLabel: 'Prix TTC de la commande en euros',
-    value: r.project_value != null ? String(r.project_value) : '',
-    transform: (raw) => {
-      const t = raw.trim();
-      return t === '' ? null : parseFloat(t.replace(',', '.'));
-    },
-    normalize: (raw) => {
-      const t = raw.trim();
-      if (t === '') return '';
-      const n = parseFloat(t.replace(',', '.'));
-      return Number.isNaN(n) ? raw : n.toFixed(2);
-    },
+  const cDate = ldChamp(String(r.deadline || '').slice(0, 10), { type: 'date', label: 'Date de remise' });
+  const cHeure = ldChamp(fiche.heureSouhaitee || '14:00', { type: 'time', label: 'Heure de remise' });
+  const cPrix = ldChamp(r.project_value == null ? '' : r.project_value, {
+    type: 'number', step: '0.01', inputMode: 'decimal',
+    placeholder: 'à chiffrer', label: 'Valeur TTC',
   });
-  suiviSection.appendChild(ldRow('Prix TTC (€)', prixInput));
+  const cProduction = ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' });
+  const cInfos = ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' });
 
-  // Le HT, juste en dessous : déduit du TTC, jamais saisi, et recalculé pendant
-  // la frappe pour qu'on voie l'effet d'une remise sans quitter le champ.
-  const htLine = document.createElement('span');
-  htLine.className = 'ld-value ld-value--muted';
-  const refreshHtLine = () => {
-    const n = parseFloat(prixInput.value.trim().replace(',', '.'));
-    htLine.textContent = prixInput.value.trim() === '' || Number.isNaN(n) ? '—' : htLabel(n);
-  };
-  refreshHtLine();
-  prixInput.addEventListener('input', refreshHtLine);
-  suiviSection.appendChild(ldRow('Hors taxe', htLine));
+  const remise = document.createElement('div');
+  remise.className = 'ld-duo';
+  remise.append(cDate, cHeure);
 
-  // Échéance : le tiroir a la place d'afficher la date en clair, tout en gardant
-  // le code couleur de la grille (vert / orange / rouge).
-  const deadlineChip = ldChip(
-    (b) => {
-      const d = daysLeft(r.deadline);
-      const dd = parseDeadline(r.deadline);
-      if (r.deadline == null || d === null) {
-        b.className = 'deadline-badge empty';
-        b.textContent = 'Date souhaitée';
-        attachTip(b, 'cliquer pour choisir une date');
-      } else {
-        const cls = d > 0 ? (d <= 7 ? 'orange' : 'green') : (d === 0 ? 'orange' : 'red');
-        b.className = `deadline-badge ${cls}`;
-        b.textContent = dd.toLocaleDateString('fr-FR');
-        attachTip(b, d < 0 ? `En retard de ${-d} j` : (d === 0 ? "Aujourd'hui" : `Dans ${d} j`));
-      }
-    },
-    (b) => {
-      if (openCalendar) { closeCalendar(); return; }
-      showDeadlineCalendar(r, b, (val) => {
-        // Le calendrier ne se ferme qu'APRÈS ce rappel : sans ça, isDrawerBusy()
-        // verrait encore un popup ouvert et refuserait de re-rendre le tiroir.
-        closeCalendar();
-        if (val === (r.deadline || null)) return;
-        ldPatch(r, { deadline: val });
-      });
-    },
+  // Les deux encadrés en LECTURE (étape, échéance) restent ouverts : il n'y a
+  // rien à y modifier, les replier ne ferait que cacher une information.
+  const heureLue = fiche.heureSouhaitee ? ` à ${fiche.heureSouhaitee.replace(':', 'h')}` : '';
+  body.append(
+    ldVolet('Client', r.billing_company, cClient),
+    ldVolet('Projet', r.product, cProjet),
+    ldBox('Étape actuelle', ldValeur(stageDestinationLabel(r.stage, r.sub_stage ?? null))),
+    ldVolet('Priorité', PRIORITY_LEVELS[prioBand(r)].label, cPriorite),
+    ldVolet('Remise au client', `${dateFr(r.deadline)}${heureLue}`, remise),
+    ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
+    ldVolet('Valeur TTC', r.project_value == null ? 'À chiffrer' : eur(Number(r.project_value)), cPrix),
+    ldVolet('Production', fiche.production || 'À définir', cProduction),
+    ldVolet(
+      'Informations / commentaire',
+      (r.description || '').split('\n').filter(Boolean)[0] || '—',
+      cInfos, true,
+    ),
   );
-  suiviSection.appendChild(ldRow('Échéance', deadlineChip));
 
-  // État : l'alerte posée sur la commande, motif compris — choisir une alerte
-  // enchaîne sur la saisie du motif, comme dans la colonne ÉTAT.
-  const saveFlag = (flag, motif) => {
-    const bodyPatch = { flag: flag ?? null, flag_reason: flag ? (motif || null) : null };
-    if (bodyPatch.flag === (r.flag ?? null) && bodyPatch.flag_reason === (r.flag_reason ?? null)) return;
-    ldPatch(r, bodyPatch);
-  };
-  const flagChip = ldChip(
-    (b) => {
-      const f = FLAG_BY_VALUE[r.flag];
-      b.className = 'flag-chip ' + (f ? f.cls : 'empty');
-      b.textContent = f ? f.label : '+ état';
-      attachTip(b, f ? 'changer l’alerte' : 'signaler : BLOQUÉE (avec motif) ou À VOIR');
-    },
-    (b) => {
-      const items = FLAGS.map((f) => ({ value: f.value, label: f.label }));
-      items.push({ value: null, label: 'Rien à signaler', muted: true });
-      openMenu(b, items, r.flag ?? null, (val) => {
-        if (!val) return saveFlag(null, null);
-        openReasonPrompt(b, FLAG_BY_VALUE[val].label, r.flag_reason || '', (motif) => saveFlag(val, motif));
-      });
-    },
-  );
-  suiviSection.appendChild(ldRow('État', flagChip));
-  // Le motif n'existe qu'avec une alerte : sur sa propre rangée, il a la place
-  // de s'afficher en entier (jusqu'à 240 caractères).
-  if (FLAG_BY_VALUE[r.flag]) {
-    const reasonChip = ldChip(
-      (b) => {
-        b.className = 'flag-reason ld-reason' + (r.flag_reason ? '' : ' empty');
-        b.textContent = r.flag_reason || '+ motif';
-        attachTip(b, 'préciser le motif');
-      },
-      (b) => openReasonPrompt(b, FLAG_BY_VALUE[r.flag].label, r.flag_reason || '', (motif) => saveFlag(r.flag, motif)),
-    );
-    suiviSection.appendChild(ldRow('Motif', reasonChip));
-  }
-  body.appendChild(suiviSection);
+  // --- Documents et paiement : deux encadrés en plus de l'écran du patron -----
+  // Les pièces jointes (devis, facture, BAT) et le suivi du paiement n'existent
+  // que dans le CRM. Les retirer pour « coller à la maquette » ferait perdre
+  // des fonctions dont l'atelier se sert : ils prennent leur place ici.
+  const docs = document.createElement('div');
+  docs.className = 'ld-docs';
+  docs.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
+  const nomsDocs = ['devis', 'facture', 'bat'].filter((k) => r[`${k}_name`]);
+  body.append(ldVolet(
+    'Documents',
+    nomsDocs.length ? `${nomsDocs.length} document${nomsDocs.length > 1 ? 's' : ''}` : 'Aucun',
+    docs, true,
+  ));
 
-  // --- Paiement ---------------------------------------------------------------
-  // Les cinq informations que le patron veut voir d'un coup d'œil. Chaque
-  // interrupteur a TROIS états possibles en base — oui / non / jamais renseigné —
-  // mais deux seulement au clic : on bascule entre vrai et faux, et une ligne
-  // jamais touchée reste « non renseigné » plutôt que d'affirmer « non payé ».
-  const payeSection = document.createElement('section');
-  payeSection.className = 'ld-section';
-  const payeTitle = document.createElement('p');
-  payeTitle.className = 'ld-section-title';
-  payeTitle.textContent = 'Paiement';
-  payeSection.appendChild(payeTitle);
-
-  const payToggle = (field, label) => ldChip(
+  const paiement = document.createElement('div');
+  paiement.className = 'ld-pay';
+  const bascule = (champ, libelle) => ldChip(
     (b) => {
-      const on = r[field] === true;
+      const on = r[champ] === true;
       b.className = `ld-toggle${on ? ' is-on' : ''}`;
       b.setAttribute('role', 'switch');
       b.setAttribute('aria-checked', String(on));
-      b.textContent = on ? 'Oui' : (r[field] === false ? 'Non' : '—');
-      attachTip(b, on ? `retirer « ${label} »` : `marquer « ${label} »`);
+      b.textContent = on ? 'Oui' : (r[champ] === false ? 'Non' : '—');
+      attachTip(b, on ? `retirer « ${libelle} »` : `marquer « ${libelle} »`);
     },
-    () => ldPatch(r, { [field]: r[field] !== true }),
+    () => ldPatch(r, { [champ]: r[champ] !== true }),
   );
-
-  payeSection.appendChild(ldRow('Acompte demandé', payToggle('acompte_demande', 'acompte demandé')));
-  payeSection.appendChild(ldRow('Acompte versé', payToggle('acompte_verse', 'acompte versé')));
-
-  // Le montant ne s'affiche QUE si l'acompte est versé : tant qu'il ne l'est
-  // pas, il n'y a pas de somme exacte à noter.
-  if (r.acompte_verse === true) {
-    payeSection.appendChild(ldRow('Somme versée (€)', ldInput(r, 'acompte_montant', {
-      num: true,
-      inputMode: 'decimal',
-      placeholder: '—',
-      ariaLabel: 'Somme exacte de l’acompte en euros',
-      value: r.acompte_montant != null ? String(r.acompte_montant) : '',
-      transform: (raw) => {
-        const t = raw.trim();
-        return t === '' ? null : parseFloat(t.replace(',', '.'));
-      },
-      normalize: (raw) => {
-        const t = raw.trim();
-        if (t === '') return '';
-        const n = parseFloat(t.replace(',', '.'));
-        return Number.isNaN(n) ? raw : n.toFixed(2);
-      },
-    })));
-  }
-
-  payeSection.appendChild(ldRow('Payé / soldé', payToggle('paye', 'payé')));
-
+  paiement.append(
+    ldRow('Acompte demandé', bascule('acompte_demande', 'acompte demandé')),
+    ldRow('Acompte versé', bascule('acompte_verse', 'acompte versé')),
+    ldRow('Payé / soldé', bascule('paye', 'payé')),
+  );
   const modeChip = ldChip(
     (b) => {
       const m = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
@@ -2987,45 +2801,150 @@ function renderLigneDetail() {
       });
     },
   );
-  payeSection.appendChild(ldRow('Mode', modeChip));
-  body.appendChild(payeSection);
+  paiement.append(ldRow('Mode', modeChip));
+  // Replié, le volet dit l'essentiel : est-ce payé, et comment.
+  const modeLu = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
+  const apercuPaiement = [
+    r.paye === true ? 'Payé' : r.acompte_verse === true ? 'Acompte versé' : r.paye === false ? 'À encaisser' : null,
+    modeLu ? modeLu.label : null,
+  ].filter(Boolean).join(' · ') || 'Non renseigné';
+  body.append(ldVolet('Paiement', apercuPaiement, paiement, true));
 
-  // --- Notes (= colonne Infos, éditée ici plus confortablement) ---------------
-  const notesSection = document.createElement('section');
-  notesSection.className = 'ld-section ld-section--full';
-  const notesTitle = document.createElement('p');
-  notesTitle.className = 'ld-section-title';
-  notesTitle.textContent = 'Notes';
-  const notes = document.createElement('textarea');
-  notes.className = 'ld-notes';
-  notes.setAttribute('aria-label', 'Notes');
-  notes.value = r.description ?? '';
-  notes.placeholder = '+ Ajouter une note';
-  let lastSentNotes = r.description ?? '';
-  notes.addEventListener('blur', () => {
-    const val = notes.value === '' ? null : notes.value;
-    if ((val ?? '') === (lastSentNotes ?? '')) return;
-    const prev = r.description;
-    r.description = val;
-    lastSentNotes = notes.value;
-    patchRow(r, { description: val })
-      .then(() => ldRefresh(r, false))
-      .catch((err) => {
-        r.description = prev;
-        notes.value = prev ?? '';
-        lastSentNotes = prev ?? '';
-        reportError(err);
-      });
-  });
-  notesSection.append(notesTitle, notes);
-  body.appendChild(notesSection);
+  // --- Historique --------------------------------------------------------------
+  // L'application ne tient pas de journal des modifications : on affiche ce
+  // qu'on sait vraiment, la naissance de la ligne et sa dernière retouche,
+  // plutôt qu'un historique inventé.
+  const histoLignes = [
+    fiche.creeLe || r.created_at ? `Créée le ${horodatageFr(fiche.creeLe || r.created_at)}${fiche.source ? ` depuis ${fiche.source}` : ''}` : null,
+    r.updated_at ? `Dernière modification le ${horodatageFr(r.updated_at)}` : null,
+  ].filter(Boolean);
+  body.append(ldBox('Historique', histoLignes.map(ldValeur), true));
 
-  // --- Historique du client ----------------------------------------------------
-  const histo = ldSectionHistoriqueClient(r);
-  if (histo) body.appendChild(histo);
+  // --- Détail complet, modifiable ----------------------------------------------
+  let champsDetail = null;
+  if (fiche.kind === 'comptoir-v17') {
+    const bloc = ldBlocDetail(r);
+    if (bloc) { champsDetail = bloc.champs; body.append(bloc.box); }
+  } else {
+    const items = ficheItems(r.fiche);
+    body.append(ldBox(
+      'Détail complet',
+      items && items.length ? items : ldValeur('Cette commande a été créée avant l’enregistrement du détail complet.'),
+      true,
+    ));
+  }
+
+  // --- Historique du client -----------------------------------------------------
+  const histoClient = ldBlocHistoriqueClient(r);
+  if (histoClient) body.append(histoClient);
 
   ligneDrawerCard.appendChild(body);
+
+  // --- Pied : où va la ligne, qui la suit, et on enregistre --------------------
+  const pied = document.createElement('footer');
+  pied.className = 'ld-foot';
+  const cPlace = ldSelect(placesDuPipeline(), `${r.stage}|${r.sub_stage || ''}`, 'Étape de la commande');
+  const cReferent = ldSelect(
+    [{ value: '', label: 'Référent : personne' }, ...EMPLOYEES.map((n) => ({ value: n, label: `Référent : ${n}` }))],
+    r.referent || '', 'Référent',
+  );
+  const enregistrer = document.createElement('button');
+  enregistrer.type = 'button';
+  enregistrer.className = 'ld-save';
+  enregistrer.textContent = 'Enregistrer les modifications';
+  const note = ldChamp('', {
+    multi: true, rows: 2,
+    placeholder: 'Ajouter une note de production, une information client ou un point de contrôle…',
+    label: 'Ajouter une note',
+  });
+  note.className += ' ld-note';
+
+  enregistrer.addEventListener('click', async () => {
+    enregistrer.disabled = true;
+    const ancien = enregistrer.textContent;
+    enregistrer.textContent = 'Enregistrement…';
+    try {
+      await enregistrerFiche(r, {
+        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cProduction, cInfos,
+        cPlace, cReferent, note, champsDetail,
+      });
+      showToast('Fiche enregistrée');
+      ldRefresh(r);
+      applySortAndRender();
+    } catch (err) {
+      reportError(err);
+    } finally {
+      enregistrer.disabled = false;
+      enregistrer.textContent = ancien;
+    }
+  });
+
+  const barre = document.createElement('div');
+  barre.className = 'ld-foot__row';
+  barre.append(cPlace, cReferent, enregistrer);
+  pied.append(barre, note);
+  ligneDrawerCard.appendChild(pied);
+
   body.scrollTop = prevScrollTop;
+}
+
+const horodatageFr = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('fr-FR');
+};
+
+// Applique en une fois tout ce que la fiche a modifié : les colonnes de la
+// ligne, la place dans le pipeline, le détail du comptoir, et la note ajoutée.
+// Un seul geste pour l'employé, un aller-retour par nature de donnée.
+async function enregistrerFiche(r, c) {
+  const nombre = (v) => {
+    const t = String(v == null ? '' : v).trim().replace(',', '.');
+    if (t === '') return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const texte = (v) => {
+    const t = String(v == null ? '' : v).trim();
+    return t === '' ? null : t;
+  };
+
+  // La note s'AJOUTE aux informations, elle ne les remplace pas : on n'efface
+  // jamais ce qu'un collègue avait écrit.
+  const noteAjoutee = texte(c.note.value);
+  const infos = texte(c.cInfos.value);
+  const description = noteAjoutee
+    ? [infos, `${horodatageFr(new Date().toISOString())} — ${noteAjoutee}`].filter(Boolean).join('\n')
+    : infos;
+
+  const [stage, sub] = c.cPlace.value.split('|');
+  const corps = {
+    billing_company: texte(c.cClient.value),
+    product: texte(c.cProjet.value),
+    priority: Number(c.cPriorite.value),
+    deadline: texte(c.cDate.value),
+    project_value: nombre(c.cPrix.value),
+    description,
+    referent: c.cReferent.value || null,
+    stage,
+    sub_stage: sub || null,
+  };
+  const maj = await api('PATCH', `/api/requests/${r.id}`, corps);
+  Object.assign(r, maj);
+
+  // L'heure de retrait, le secteur de production et le détail du comptoir
+  // vivent dans `fiche` : seconde route, qui ne touche qu'aux valeurs et jamais
+  // aux libellés.
+  const corpsFiche = {
+    heureSouhaitee: texte(c.cHeure.value),
+    production: texte(c.cProduction.value),
+  };
+  if (c.champsDetail) {
+    corpsFiche.client = c.champsDetail.client.map((x) => x.value);
+    corpsFiche.details = c.champsDetail.details.map((x) => x.value);
+  }
+  const majFiche = await api('PATCH', `/api/requests/${r.id}/fiche`, corpsFiche);
+  Object.assign(r, majFiche);
+  await loadCounts();
 }
 
 // Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
