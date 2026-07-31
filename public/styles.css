@@ -277,24 +277,6 @@ body {
   box-shadow: var(--shadow-1);
 }
 .brand-logo-svg { width: 26px; height: 26px; display: block; }
-.brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-.brand-title {
-  font-size: 16.5px;
-  font-weight: 500;
-  color: var(--text-1);
-  letter-spacing: -.1px;
-  white-space: nowrap;
-}
-.brand-sub {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.brand-sub .today-dow { text-transform: capitalize; }
-.brand-sub .today-dow::after { content: ' · '; color: var(--text-3); }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -1030,6 +1012,11 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   overflow: auto;
   transform: translateZ(0);
   contain: layout paint;
+  /* Les cartes se calent sur la place RÉELLEMENT disponible (viewport moins
+     rail d'étapes moins rail « Colonnes ») : une media query viewport ne la
+     connaît pas — sur tablette 1280 px avec le rail Colonnes ouvert, les
+     actions de chaque carte partaient sous le rail, hors d'atteinte. */
+  container-type: inline-size;
 }
 
 /* --- PLANNING ÉPURÉ : une carte par projet ---------------------------------
@@ -1057,8 +1044,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard:hover { border-color: var(--text-2); box-shadow: var(--shadow-2); }
 .pcard.is-hidden { display: none; }
 /* Le filet de gauche dit l'urgence AVANT qu'on ait lu quoi que ce soit. */
-.pcard--retard { border-left: 4px solid var(--danger, #b42318); }
-.pcard--urgent { border-left: 4px solid #c46a00; }
+.pcard--retard { border-left: 4px solid var(--danger); }
+.pcard--urgent { border-left: 4px solid var(--warning-2); }
 .pcard--calme { border-left: 4px solid var(--text-1); }
 .pcard__label {
   margin: 0 0 4px;
@@ -1075,8 +1062,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   font-size: 11px; font-weight: 700; color: var(--text-2);
 }
 .pcard__delai { font-size: 15px; font-weight: 800; line-height: 1.15; }
-.pcard__delai--retard { color: var(--danger, #b42318); }
-.pcard__delai--urgent { color: #c46a00; }
+.pcard__delai--retard { color: var(--danger); }
+.pcard__delai--urgent { color: var(--warning-2); }
 .pcard__sub { margin-top: 4px; font-size: 10px; color: var(--text-2); }
 .pcard__value { font-size: 17px; font-weight: 800; white-space: nowrap; color: var(--text-1); }
 .pcard__value--vide { font-size: 13px; font-weight: 700; color: var(--text-2); }
@@ -1094,32 +1081,48 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard__ref-name { margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-2); }
 .pcard__open {
   display: grid; place-items: center;
-  width: 40px; height: 40px; border-radius: 999px;
+  width: 44px; height: 44px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
   cursor: pointer;
 }
 .pcard__open:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
-/* Ouvrir + supprimer : la colonne d'actions de la carte. Les deux cibles restent
-   à 40 px et visibles en permanence — au comptoir on est au doigt, rien ne doit
+/* Poignée + ouvrir + supprimer : la colonne d'actions de la carte. Cibles à
+   44 px et visibles en permanence — au comptoir on est au doigt, rien ne doit
    dépendre du survol. */
 .pcard__actions { display: flex; align-items: center; gap: 8px; }
+/* La poignée est la SEULE zone de la carte en `touch-action: none` : c'est par
+   elle qu'on glisse au doigt, tout le reste de la surface fait défiler la
+   liste. (À la souris, toute la carte reste saisissable — cf. attachDrag.) */
+.pcard__handle {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 999px;
+  color: var(--text-3);
+  cursor: grab;
+  touch-action: none;
+  transition: color var(--dur-1) var(--ease);
+}
+.pcard__handle svg { width: 18px; height: 18px; }
+.pcard:hover .pcard__handle { color: var(--text-2); }
 .pcard__del {
   display: grid; place-items: center;
-  width: 40px; height: 40px; border-radius: 999px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-3, var(--text-2));
+  width: 44px; height: 44px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-3);
   cursor: pointer;
 }
 .pcard__del:hover { background: var(--st-bloque-bg); border-color: transparent; color: var(--st-bloque); }
 .pcard__del:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.pcard__grip { cursor: grab; touch-action: none; }
+.pcard__grip { cursor: grab; }
 .pcard.dragging { opacity: .35; }
 
-@media (max-width: 1100px) {
+/* Sous ~1040 px de conteneur, les planchers fixes (150+240+190+180 px…) ne
+   tiennent plus : colonnes proportionnelles, qui se compriment sans pousser
+   les actions hors de vue. */
+@container (max-width: 1040px) {
   .pcard { grid-template-columns: 1fr 1.5fr 1fr .8fr auto; }
 }
-/* Sous 780 px, quatre colonnes deviennent illisibles : chaque bloc prend la
-   ligne, le bouton fiche reste à droite du nom du client. */
-@media (max-width: 780px) {
+/* Sous ~720 px de conteneur, quatre colonnes deviennent illisibles : chaque
+   bloc prend la ligne, les actions restent à droite du nom du client. */
+@container (max-width: 720px) {
   .pcard { grid-template-columns: 1fr auto; }
   .pcard > div:nth-child(2), .pcard > div:nth-child(3), .pcard > div:nth-child(4) { grid-column: 1 / -1; }
 }
@@ -1191,6 +1194,17 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 #rows.stage-enter tr:nth-child(7)  { animation-delay: .132s; }
 #rows.stage-enter tr:nth-child(8)  { animation-delay: .154s; }
 #rows.stage-enter tr:nth-child(n+9) { animation-delay: .17s; }
+/* La MÊME entrée pour la vue épurée : au changement d'étape, les cartes se
+   posent avec le fondu décalé des lignes — un seul geste visuel, deux vues. */
+#cards.stage-enter .pcard { animation: rowIn .26s var(--ease) both; }
+#cards.stage-enter .pcard:nth-child(2)  { animation-delay: .022s; }
+#cards.stage-enter .pcard:nth-child(3)  { animation-delay: .044s; }
+#cards.stage-enter .pcard:nth-child(4)  { animation-delay: .066s; }
+#cards.stage-enter .pcard:nth-child(5)  { animation-delay: .088s; }
+#cards.stage-enter .pcard:nth-child(6)  { animation-delay: .11s; }
+#cards.stage-enter .pcard:nth-child(7)  { animation-delay: .132s; }
+#cards.stage-enter .pcard:nth-child(8)  { animation-delay: .154s; }
+#cards.stage-enter .pcard:nth-child(n+9) { animation-delay: .17s; }
 @keyframes rowIn {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1346,31 +1360,6 @@ tr:hover .handle { color: var(--text-2); }
 .prio-pill.p1 { color: var(--st-livree); background: var(--st-livree-bg); }
 .prio-pill.p2 { color: var(--st-cours); background: var(--st-cours-bg); }
 .prio-pill.p3 { color: var(--st-bloque); background: var(--st-bloque-bg); }
-
-.grid tbody tr.prio-bar-p1 td:first-child { box-shadow: inset 4px 0 0 0 var(--st-livree); }
-.grid tbody tr.prio-bar-p2 td:first-child { box-shadow: inset 4px 0 0 0 var(--st-cours); }
-.grid tbody tr.prio-bar-p3 td:first-child { box-shadow: inset 4px 0 0 0 var(--st-bloque); }
-
-.grid tbody tr.prio-group td {
-  padding: 0;
-  height: auto;
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--bg);
-}
-.grid tbody tr.prio-group:hover td { background: var(--bg); }
-.prio-group-inner { display: flex; align-items: center; gap: 8px; padding: 7px 16px; }
-.prio-group-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
-.prio-group.p1 .prio-group-dot { background: var(--st-livree); }
-.prio-group.p2 .prio-group-dot { background: var(--st-cours); }
-.prio-group.p3 .prio-group-dot { background: var(--st-bloque); }
-.prio-group-label {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text-2);
-}
-.prio-group-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 /* Nom du dossier client */
 .col-client-cell { padding: 0; vertical-align: middle; }
@@ -2124,9 +2113,6 @@ tr:hover .handle { color: var(--text-2); }
   from { opacity: 0; transform: translateY(-2px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .tip { animation: none; }
-}
 
 /* ===========================================================================
    Recherche GLOBALE — palette « Spotlight »
@@ -2309,15 +2295,6 @@ tr:hover .handle { color: var(--text-2); }
   font-size: 13.5px;
 }
 
-/* Ligne mise en évidence à l'arrivée par un saut depuis la recherche. */
-.grid tbody tr.row-flash td {
-  animation: rowFlash 1.8s var(--ease);
-}
-@keyframes rowFlash {
-  0%, 30% { background: var(--primary-soft); }
-  100% { background: transparent; }
-}
-
 @media (max-width: 820px) {
   /* Le panneau est positionné par JS (sous le champ) ; ici on ajuste seulement
      la densité tactile et la hauteur max. */
@@ -2326,10 +2303,6 @@ tr:hover .handle { color: var(--text-2); }
   .search-palette-item { padding: 13px 12px; }
   .spi-title { font-size: 15px; }
   .spi-sub, .spi-deadline { font-size: 12.5px; padding: 5px 11px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .search-palette-panel { transition: none; }
-  .grid tbody tr.row-flash td { animation: none; }
 }
 
 /* Calendrier d'échéance (popup) */
@@ -2772,6 +2745,9 @@ button, a, .stage, .prio-pill, .deadline-badge,
 }
 .grid tbody tr.row-flash { animation: rowFlash 1.6s ease-out; }
 .grid tbody tr.row-flash td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+/* Même mise en évidence sur la vue épurée : la carte flashe comme une ligne
+   (l'animation rend la main au fond de la carte une fois jouée). */
+.pcard.row-flash { animation: rowFlash 1.6s ease-out; }
 
 /* =========================================================================
    Responsive
@@ -2807,7 +2783,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
   /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
      la place aux onglets et à la recherche. */
   .topbar { gap: 10px; }
-  .brand-text { display: none; }
   /* +240 px depuis l'ajout des colonnes « État » et « → », pour que les 3 colonnes
      de texte gardent la même largeur plancher qu'avant (~104 px) : sans ça elles
      se tassent au lieu de laisser la grille défiler horizontalement. */
@@ -2895,7 +2870,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
 
   .grid tbody td { height: max(var(--row-h), 56px); }
   .cell, .cell-input { min-height: max(var(--row-h), 56px); height: max(var(--row-h), 56px); }
-  .grid tbody tr.prio-group td { height: auto; }
 
   .cell-input { font-size: 16px; }
 

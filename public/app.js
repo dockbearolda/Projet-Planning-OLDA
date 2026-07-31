@@ -450,15 +450,18 @@ function renderSidebar() {
   });
 }
 
-// Rejoue l'animation d'entrée des lignes (léger fondu décalé) au changement d'étape.
+// Rejoue l'animation d'entrée (léger fondu décalé) au changement d'étape — sur
+// la vue réellement affichée : le tableau OU les cartes, même geste visuel.
 let stageEnterTimer = null;
 function playStageEnter() {
-  if (!$rows) return;
+  const host = modeCartes() ? $cards : $rows;
+  if (!host) return;
   $rows.classList.remove('stage-enter');
-  void $rows.offsetWidth; // relance l'animation CSS
-  $rows.classList.add('stage-enter');
+  $cards.classList.remove('stage-enter');
+  void host.offsetWidth; // relance l'animation CSS
+  host.classList.add('stage-enter');
   clearTimeout(stageEnterTimer);
-  stageEnterTimer = setTimeout(() => $rows.classList.remove('stage-enter'), 600);
+  stageEnterTimer = setTimeout(() => host.classList.remove('stage-enter'), 600);
 }
 
 // Masque la colonne « Sous-étape » quand la famille courante n'a pas de
@@ -482,8 +485,11 @@ function updatePriceColVisibility(slug) {
 function clearGrid() {
   for (const [, entry] of rowEls) entry.tr.remove();
   rowEls.clear();
-  for (const [, g] of groupEls) g.remove();
-  groupEls.clear();
+  // Les DEUX vues se vident : la vue épurée (cartes) est celle par défaut, et
+  // laisser les cartes de l'ancienne famille à l'écran pendant le chargement
+  // serait exactement le « glitch » que cette fonction existe pour empêcher.
+  for (const [, carte] of cardEls) carte.el.remove();
+  cardEls.clear();
   rows = [];
   lastRendered = [];
   lastRowsSig = '';
@@ -763,28 +769,6 @@ function cmp(a, b, key) {
 // jamais reconstruite (isRowBusy).
 const rowEls = new Map(); // id (string) -> { tr, sig }
 const cardEls = new Map(); // id (string) -> { el, sig } — vue épurée (cartes)
-const groupEls = new Map(); // bande de priorité (1..3) -> <tr> en-tête de groupe
-
-// En-tête de groupe de priorité : bandeau « ● Haute · 3 » couvrant toute la
-// largeur. Réutilisé d'un rendu à l'autre (le total est posé par applySearchAndCounts).
-function buildGroupHeader(band) {
-  const lvl = PRIORITY_LEVELS[band] || PRIORITY_LEVELS[1];
-  const tr = document.createElement('tr');
-  tr.className = `prio-group ${lvl.cls}`;
-  const td = document.createElement('td');
-  td.colSpan = COL_KEYS.length;
-  td.innerHTML = '<div class="prio-group-inner">' +
-    '<span class="prio-group-dot" aria-hidden="true"></span>' +
-    `<span class="prio-group-label">${escapeHtml(lvl.label)}</span>` +
-    '<span class="prio-group-count"></span></div>';
-  tr.appendChild(td);
-  return tr;
-}
-function ensureGroupHeader(band) {
-  let g = groupEls.get(band);
-  if (!g) { g = buildGroupHeader(band); groupEls.set(band, g); }
-  return g;
-}
 
 // Force la reconstruction des lignes au prochain rendu. renderRows() ne remonte
 // une ligne que si son `updated_at` a bougé ; or l'affichage dépend aussi de
@@ -898,6 +882,23 @@ const bandeUrgence = (d) => (d.retard ? 'retard' : d.heures <= 16 ? 'urgent' : '
 
 const initiales = (nom) => String(nom || '').split(/\s+/).map((m) => m[0] || '').join('').slice(0, 2).toUpperCase();
 
+// Les six points de préhension (même dessin que la poignée du tableau).
+function gripIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [cx, cy] of [[5, 3], [11, 3], [5, 8], [11, 8], [5, 13], [11, 13]]) {
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', cx);
+    c.setAttribute('cy', cy);
+    c.setAttribute('r', '1.4');
+    svg.appendChild(c);
+  }
+  return svg;
+}
+
 function pcardBloc(label, ...enfants) {
   const d = document.createElement('div');
   const l = document.createElement('p');
@@ -1010,9 +1011,17 @@ function buildCard(r) {
     'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6']));
   suppr.addEventListener('click', (ev) => { ev.stopPropagation(); removeRow(r); });
 
+  // Poignée de prise TACTILE : au doigt, c'est par elle (et elle seule) que la
+  // carte se glisse — le reste de la surface fait défiler la liste. À la
+  // souris, toute la carte reste saisissable (cf. attachDrag).
+  const prise = document.createElement('div');
+  prise.className = 'pcard__handle';
+  prise.setAttribute('aria-hidden', 'true');
+  prise.appendChild(gripIcon());
+
   const actions = document.createElement('div');
   actions.className = 'pcard__actions';
-  actions.append(ouvrir, suppr);
+  actions.append(prise, ouvrir, suppr);
 
   carte.append(
     blocClient,
@@ -1065,9 +1074,6 @@ function renderRows(data) {
   // Vue épurée : une carte par projet, le tableau reste monté mais masqué.
   if (modeCartes()) { renderCards(data); return; }
 
-  // Planning simplifié : plus de colonne priorité, donc plus de regroupement par
-  // bande. On affiche toujours une liste à plat (tri par urgence puis échéance).
-  const grouping = false;
   const wanted = new Set(data.map((r) => String(r.id)));
 
   // 1. Retirer les <tr> de données dont l'id n'est plus présent dans la liste voulue.
@@ -1075,20 +1081,10 @@ function renderRows(data) {
     if (!wanted.has(id)) { entry.tr.remove(); rowEls.delete(id); }
   }
 
-  // 2. Construire la séquence ordonnée des nœuds (en-têtes de groupe + lignes),
-  //    en créant / reconstruisant / réutilisant les lignes au passage.
+  // 2. Construire la séquence ordonnée des lignes, en créant / reconstruisant /
+  //    réutilisant chacune au passage.
   const order = [];
-  const usedGroups = new Set();
-  let curBand = null;
   for (const r of data) {
-    if (grouping) {
-      const band = prioBand(r);
-      if (band !== curBand) {
-        curBand = band;
-        order.push(ensureGroupHeader(band));
-        usedGroups.add(band);
-      }
-    }
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = rowEls.get(id);
@@ -1104,12 +1100,7 @@ function renderRows(data) {
     order.push(entry.tr);
   }
 
-  // 3. Retirer les en-têtes de groupe inutilisés à ce rendu.
-  for (const [band, g] of groupEls) {
-    if (!usedGroups.has(band)) { g.remove(); groupEls.delete(band); }
-  }
-
-  // 4. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
+  // 3. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
   //    cours de drag : sa position est pilotée à la main).
   let prev = null;
   for (const node of order) {
@@ -1140,25 +1131,13 @@ function isRowBusy(tr) {
 function applySearchAndCounts() {
   const q = fold(gridQuery.trim());
   let visible = 0;
-  const bandVisible = { 1: 0, 2: 0, 3: 0 };
   const cartes = modeCartes();
   for (const r of lastRendered) {
     const entry = cartes ? cardEls.get(String(r.id)) : rowEls.get(String(r.id));
     if (!entry) continue;
     const match = !q || isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
     (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
-    if (match) {
-      visible++;
-      bandVisible[prioBand(r)]++;
-    }
-  }
-  // En-têtes de groupe : on masque une bande vide (après filtre) et on affiche le
-  // total des lignes visibles de la bande.
-  for (const [band, g] of groupEls) {
-    const n = bandVisible[band] || 0;
-    g.classList.toggle('is-hidden', n === 0);
-    const c = g.querySelector('.prio-group-count');
-    if (c) c.textContent = `· ${n}`;
+    if (match) visible++;
   }
   $empty.hidden = visible > 0;
   if (visible === 0) {
@@ -1230,7 +1209,7 @@ function buildRow(r) {
     const grip = document.createElement('div');
     grip.className = 'handle';
     attachTip(grip, 'glisser pour déplacer');
-    grip.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/><circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/><circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/></svg>';
+    grip.appendChild(gripIcon());
     handleCell.appendChild(grip);
     attachDrag(grip, tr, r);
   }
@@ -3599,6 +3578,12 @@ function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.target !== handle && e.target.closest && e.target.closest(ZONE_CLIQUABLE)) return;
+    // Au doigt / stylet, une CARTE ne se saisit que par sa poignée : le reste de
+    // sa surface reste libre pour faire défiler la liste (elle occupe tout
+    // l'écran du planning, un `touch-action: none` global y bloquait le
+    // défilement). À la souris, toute la carte demeure zone de prise.
+    if (e.pointerType !== 'mouse' && handle.classList.contains('pcard')
+        && !(e.target.closest && e.target.closest('.pcard__handle'))) return;
     e.preventDefault();
     dragState = {
       id: r.id, r, tr, handle,
@@ -3724,6 +3709,11 @@ async function onDragEnd(e) {
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
   hideTip();
   dragState = null;
+
+  // Geste ANNULÉ par le système (défilement natif qui prend la main, alerte,
+  // bascule d'application sur tablette…) : rien ne se dépose, rien ne s'écrit —
+  // la grille reprend simplement son ordre trié.
+  if (e.type === 'pointercancel') { applySortAndRender(); return; }
 
   // Ligne encore en cours de création (id temporaire, ex. duplication non
   // brouillon) : on ne peut pas la déplacer / réordonner tant que son id réel
@@ -3853,9 +3843,6 @@ document.getElementById('ordreReset')?.addEventListener('click', () => {
   renderOrdreReset();
   applySortAndRender();
 });
-
-// Conservé pour compat : le dépôt sidebar est géré par elementFromPoint ci-dessus.
-function attachDrop() { /* géré via Pointer Events */ }
 
 // auto-scroll vertical quand le doigt approche des bords de la grille
 function autoScroll(y) {
@@ -4597,11 +4584,29 @@ function setActive(i) {
   if (cur) cur.el.scrollIntoView({ block: 'nearest' });
 }
 
+// Met en évidence la ligne (tableau) OU la carte (vue épurée) après un saut :
+// défilement au centre + bref flash. Partagé par la recherche globale et le
+// dashboard — la vue par défaut étant les cartes, viser seulement le <tr>
+// laissait le saut « muet » la plupart du temps.
+function revealRow(id) {
+  const entry = modeCartes() ? cardEls.get(String(id)) : rowEls.get(String(id));
+  const el = entry ? (entry.tr || entry.el) : null;
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.remove('row-flash');
+  void el.offsetWidth; // relance l'animation même si déjà posée
+  el.classList.add('row-flash');
+  setTimeout(() => el.isConnected && el.classList.remove('row-flash'), 1800);
+}
+
 // Saute vers la commande choisie : ouvre sa catégorie (et sa sous-étape), ferme
 // la palette, met la ligne brièvement en évidence.
 async function jumpToResult(r) {
   closePalette();
-  if ($gridSearchInput) $gridSearchInput.blur();
+  // La recherche a rempli son office : on la vide, sinon la grille d'arrivée
+  // resterait filtrée sur la requête et semblerait amputée de ses lignes.
+  if ($gridSearchInput) { $gridSearchInput.value = ''; $gridSearchInput.blur(); }
+  setGridQuery('');
   // On cherche dans TOUT le planning, y compris depuis la prise de commande, le
   // dashboard ou la base clients. Si on n'est pas déjà sur le planning, on y
   // revient AVANT de pointer la ligne — sinon la cible reste cachée derrière la
@@ -4615,14 +4620,7 @@ async function jumpToResult(r) {
   }
   const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
   await selectStage(r.stage, sub);
-  const entry = rowEls.get(String(r.id));
-  if (entry && entry.tr) {
-    entry.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    entry.tr.classList.remove('row-flash');
-    void entry.tr.offsetWidth; // relance l'animation même si déjà posée
-    entry.tr.classList.add('row-flash');
-    setTimeout(() => entry.tr && entry.tr.classList.remove('row-flash'), 1800);
-  }
+  revealRow(r.id);
 }
 
 function setGridQuery(v) {
@@ -4712,8 +4710,8 @@ if ($fullscreenToggle && document.documentElement.requestFullscreen) {
     const on = !!document.fullscreenElement;
     const ic = $fullscreenToggle.querySelector('.material-symbols-outlined');
     if (ic) ic.textContent = on ? 'fullscreen_exit' : 'fullscreen';
+    // attachTip pose déjà l'aria-label (le bouton n'a pas de `title`).
     attachTip($fullscreenToggle, on ? 'Quitter le plein écran' : 'Plein écran');
-    $fullscreenToggle.setAttribute('aria-label', $fullscreenToggle.title);
   };
   $fullscreenToggle.addEventListener('click', () => {
     if (document.fullscreenElement) {
@@ -4798,40 +4796,6 @@ if ($shell && $sidebarResizer) {
   });
 }
 
-// --- Init ------------------------------------------------------------------
-// Date du jour affichée en haut à gauche : jour de la semaine + date complète.
-function setTodayDate() {
-  const el = document.getElementById('todayDate');
-  if (!el) return;
-  const now = new Date();
-  const dow = now.toLocaleDateString('fr-FR', { weekday: 'long' });
-  const date = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-  el.replaceChildren();
-  const a = document.createElement('span');
-  a.className = 'today-dow';
-  a.textContent = dow.charAt(0).toUpperCase() + dow.slice(1);
-  const b = document.createElement('span');
-  b.className = 'today-date';
-  b.textContent = date;
-  el.append(a, b);
-}
-
-// Reflet spéculaire dynamique du logo : le halo lumineux suit le pointeur.
-function initBrandReflection() {
-  const tile = document.getElementById('brandLogo');
-  if (!tile) return;
-  if (window.matchMedia('(hover: none)').matches) return; // inutile au tactile
-  tile.addEventListener('pointermove', (e) => {
-    const r = tile.getBoundingClientRect();
-    tile.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-    tile.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
-  });
-  tile.addEventListener('pointerleave', () => {
-    tile.style.setProperty('--mx', '50%');
-    tile.style.setProperty('--my', '8%');
-  });
-}
-
 // ===========================================================================
 // ONGLET DASHBOARD — « Point du jour » (module dédié : dashboard.js)
 // ===========================================================================
@@ -4863,14 +4827,7 @@ async function jumpToPlanning(r) {
   const promoted = PROMOTED.find((p) => p.stage === r.stage && p.sub === sub);
   setViewMode(promoted ? promoted.view : 'planning');
   await selectStage(r.stage, sub);
-  const entry = rowEls.get(String(r.id));
-  if (entry && entry.tr) {
-    entry.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    entry.tr.classList.remove('row-flash');
-    void entry.tr.offsetWidth;
-    entry.tr.classList.add('row-flash');
-    setTimeout(() => entry.tr && entry.tr.classList.remove('row-flash'), 1800);
-  }
+  revealRow(r.id);
 }
 
 const dashboard = createDashboard({
@@ -5047,8 +5004,6 @@ window.addEventListener('hashchange', applyHash);
 applyHash();
 
 async function start() {
-  setTodayDate();
-  initBrandReflection();
   renderSidebar();
   attachColResizers();
   attachStarsHeaderTip();

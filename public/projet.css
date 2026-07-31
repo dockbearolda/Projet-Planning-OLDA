@@ -29,12 +29,16 @@
 .np-home {
   flex: 1; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; justify-content: center; align-items: center;
+  /* `safe` : si le contenu dépasse la hauteur (tablette en paysage), le
+     centrage bascule en haut au lieu de ROGNER le titre hors de la zone de
+     défilement. Les navigateurs qui l'ignorent gardent le centrage simple. */
+  justify-content: safe center;
   gap: 6px; padding: 32px 18px 48px; text-align: center;
-  font-family: Arial, Helvetica, sans-serif; background: #f3f4f5; color: #1f2328;
+  font-family: var(--font); background: var(--bg); color: var(--text-1);
 }
 .np-home[hidden] { display: none; }
 .np-home h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
-.np-home__lead { margin: 0 0 22px; font-size: 17px; color: #697077; }
+.np-home__lead { margin: 0 0 22px; font-size: 17px; color: var(--text-2); }
 .np-home__grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
   width: 100%; max-width: 760px;
@@ -42,25 +46,26 @@
 .np-tile {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 30px 22px 26px; cursor: pointer; text-align: center;
-  border: 1px solid #d9dde1; border-radius: 18px; background: #fff;
-  font: inherit; color: inherit; box-shadow: 0 2px 9px rgba(0, 0, 0, .05);
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  font: inherit; color: inherit; box-shadow: var(--shadow-1);
+  transition: transform var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
 }
-.np-tile:hover { transform: translateY(-2px); border-color: #111827; box-shadow: 0 10px 24px rgba(0, 0, 0, .10); }
+.np-tile:hover { transform: translateY(-2px); border-color: var(--primary); box-shadow: var(--shadow-2); }
 .np-tile:active { transform: translateY(0); }
-.np-tile:focus-visible { outline: 3px solid rgba(17, 24, 39, .25); outline-offset: 2px; }
+.np-tile:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .25); outline-offset: 2px; }
 /* Le rond d'encre : c'est LUI qu'on reconnaît de loin, pas le texte. */
 .np-tile__icon {
   display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
-  background: #111827; color: #fff;
+  background: var(--primary); color: var(--on-primary);
 }
 .np-tile__icon .material-symbols-outlined { font-size: 40px; }
 .np-tile strong { font-size: 21px; font-weight: 700; }
-.np-tile small { font-size: 15px; line-height: 1.45; color: #697077; max-width: 30ch; }
+.np-tile small { font-size: 15px; line-height: 1.45; color: var(--text-2); max-width: 30ch; }
 .np-tile__steps {
-  margin-top: 4px; padding-top: 12px; border-top: 1px solid #eceff1; width: 100%;
+  margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border-soft); width: 100%;
   font-size: 12px; font-weight: 700; letter-spacing: .03em;
-  text-transform: uppercase; color: #8b9198;
+  text-transform: uppercase; color: var(--text-3);
 }
 /* --- Barre de bascule : la SEULE commande de l'hôte au-dessus du parcours ----
    Volontairement mince et claire : le parcours porte déjà son propre en-tête
@@ -70,37 +75,39 @@
   flex: 0 0 auto;
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; padding: 8px 16px;
-  background: #fff; border-bottom: 1px solid #d9dde1;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  font-family: var(--font);
 }
 .np-bar[hidden] { display: none; }
 .np-bar-home {
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 44px; padding: 10px 16px 10px 13px;
-  border: 1px solid #d9dde1; border-radius: 999px; background: #fff; color: #1f2328;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-1);
   font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
-.np-bar-home:hover { border-color: #111827; background: #f3f4f5; }
+.np-bar-home:hover { border-color: var(--primary); background: var(--surface-hover); }
 .np-bar-home .material-symbols-outlined { font-size: 19px; }
 .np-switch { display: flex; gap: 8px; flex-wrap: wrap; }
 .np-switch-btn {
-  border: 1px solid #d9dde1; border-radius: 999px; padding: 10px 18px; min-height: 44px;
-  background: #fff; color: #697077;
+  border: 1px solid var(--border); border-radius: 999px; padding: 10px 18px; min-height: 44px;
+  background: var(--surface); color: var(--text-2);
   font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
-.np-switch-btn:hover { border-color: #111827; color: #1f2328; }
-.np-switch-btn.is-active { background: #111827; border-color: #111827; color: #fff; }
+.np-switch-btn:hover { border-color: var(--primary); color: var(--text-1); }
+.np-switch-btn.is-active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 
 /* Un dossier qui ne part pas au planning se DIT : la vendeuse a le client
    devant elle, elle ne doit pas découvrir la perte le lendemain. */
 .np-erreur {
   flex: 0 0 auto; margin: 0; padding: 13px 16px;
-  background: #fff0f0; border-bottom: 1px solid #f0c2c2; color: #a01b1b;
-  font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700;
+  background: var(--danger-bg); border-bottom: 1px solid var(--danger-line); color: var(--danger);
+  font-family: var(--font); font-size: 15px; font-weight: 700;
 }
 .np-erreur[hidden] { display: none; }
 
-/* Le parcours lui-même : un document à part, qui prend toute la place restante. */
+/* Le parcours lui-même : un document à part, qui prend toute la place restante.
+   Le fond reste CLAIR quel que soit le thème : les écrans du comptoir chargés
+   dedans sont clairs, un fond sombre flasherait le temps du chargement. */
 .np-frames { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .np-frames[hidden] { display: none; }
 .np-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f3f4f5; }

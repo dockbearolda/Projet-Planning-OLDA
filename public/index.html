@@ -21,8 +21,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- La charte est en Arial/Helvetica (police système) : plus rien à
-       télécharger côté texte. Seules les icônes restent une webfont. -->
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap" rel="stylesheet" />
+       télécharger côté texte. Seules les icônes restent une webfont — réduite
+       aux seuls axes réellement utilisés (opsz 24, graisses 400-500, FILL 0,
+       GRAD 0) : le fichier est plusieurs fois plus léger que la plage complète.
+       `display=block` : une icône qui n'est pas prête ne doit JAMAIS s'afficher
+       en toutes lettres (« dashboard », « search »…) le temps du chargement. -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..500,0,0&display=block" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="clients.css" />
   <link rel="stylesheet" href="projet.css" />
