@@ -1,0 +1,3017 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<title>Atelier OLDA — Vente directe complète</title>
+<style>
+:root{
+  --green:#142e54; --green-dark:#142e54; --bg:#f3f4f5; --card:#fff;
+  --border:#d9d9d9; --text:#1f1f1f; --muted:#6b6b6b; --danger:#c62828;
+}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0}
+header{background:#111;color:#fff;padding:18px 24px}
+header h1{margin:0;font-size:22px}
+header p{margin:6px 0 0;color:#ddd}
+.container{max-width:1180px;margin:24px auto;padding:0 18px 40px}
+.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.step{padding:11px;text-align:center;background:#e5e5e5;border-radius:8px;font-weight:700}
+.step.active{background:var(--green);color:#fff}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+h2{margin-top:0;font-size:20px}
+h3{margin-top:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.field{margin-bottom:14px}
+label{display:block;font-weight:700;margin-bottom:6px}
+input,select,textarea{width:100%;padding:11px;border:1px solid #bdbdbd;border-radius:8px;font-size:15px;background:#fff}
+textarea{min-height:110px;resize:vertical}
+input.invalid,select.invalid,textarea.invalid{border:2px solid var(--danger);background:#fff7f7}
+.help{font-size:12px;color:var(--muted);margin-top:5px}
+button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}
+.primary{background:var(--green);color:#fff}
+.primary:hover{background:var(--green-dark)}
+.secondary{background:#ececec;color:#111}
+.danger{background:#fff0f0;color:#9d0000;border:1px solid #e6bcbc}
+.whatsapp{background:#25D366;color:#fff}
+.full{width:100%}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.product-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;background:#fafafa}
+.product-top{display:flex;justify-content:space-between;gap:12px}
+.product-title{font-weight:700}
+.product-description{white-space:pre-wrap;color:#444;margin-top:8px}
+.summary-row{display:flex;justify-content:space-between;gap:12px;margin:9px 0}
+.summary-total{font-size:22px;font-weight:700;border-top:1px solid #ccc;padding-top:12px}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#eee}
+.badge.green{background:#e2e8f0;color:#142e54}
+.badge.orange{background:#fff1d6;color:#875500}
+.internal{border:2px solid #222;background:#fff}
+.internal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.lock{background:#222;color:#fff;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700}
+.hidden{display:none!important}
+.payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:400}
+.payment-option input,.inline-check input{width:auto}
+.inline-check{display:flex;align-items:center;gap:8px;font-weight:400;margin:14px 0}
+.success{background:#eef2f7;border:1px solid #9fb0c9;border-radius:10px;padding:15px}
+.ticket{max-width:390px;margin:20px auto;background:#fff;border:1px dashed #888;padding:20px;font-family:"Courier New",monospace}
+.ticket h2{text-align:center;margin-bottom:4px}
+.center{text-align:center}
+.ticket-row{display:flex;justify-content:space-between;gap:10px;margin:6px 0}
+.ticket hr{border:0;border-top:1px dashed #777;margin:12px 0}
+.ticket-note{white-space:pre-wrap}
+.footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:800px){
+  .grid,.grid-3,.footer-actions,.stepper{grid-template-columns:1fr}
+}
+@media print{
+  body *{visibility:hidden}
+  #ticketArea,#ticketArea *{visibility:visible}
+  #ticketArea{position:absolute;left:0;top:0;width:100%;display:block!important}
+  .ticket{border:none;max-width:80mm}
+}
+
+.client-search-wrap{position:relative}
+.client-results{margin-top:10px;display:grid;gap:10px}
+.client-result{border:1px solid var(--border);border-radius:10px;padding:14px;background:#fafafa;display:flex;justify-content:space-between;gap:14px;align-items:center}
+.client-result-main{min-width:0}
+.client-result-name{font-weight:700;margin-bottom:4px}
+.client-result-meta{font-size:13px;color:var(--muted);line-height:1.4}
+.client-selected{border:2px solid var(--green);background:#f4f6fa}
+.client-selected .badge{margin-bottom:8px}
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice-card{border:2px solid var(--border);border-radius:10px;padding:16px;background:#fff;cursor:pointer;text-align:left}
+.choice-card.active{border-color:var(--green);background:#f4f6fa}
+.notice{padding:12px 14px;border-radius:10px;background:#fff7e8;border:1px solid #efd29b;margin:12px 0}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal{width:min(520px,100%);background:#fff;border-radius:12px;padding:22px;box-shadow:0 12px 35px rgba(0,0,0,.25)}
+@media(max-width:800px){
+  .client-result,.choice-grid{grid-template-columns:1fr;display:grid}
+}
+
+
+/* Parcours tablette bloc par bloc */
+.sale-panel-hidden{display:none!important}
+.tablet-wizard-nav{
+  position:sticky;bottom:0;z-index:100;margin:18px auto 0;
+  max-width:1100px;background:rgba(255,255,255,.97);
+  border:1px solid #d9dee7;border-radius:14px;
+  box-shadow:0 -4px 18px rgba(16,24,40,.10);
+  padding:12px;display:flex;justify-content:space-between;gap:10px
+}
+.tablet-wizard-nav button{min-height:48px;padding:12px 18px;font-size:15px}
+.tablet-wizard-nav .wizard-spacer{flex:1}
+@media(max-width:760px){
+  .container{padding-bottom:12px}
+  .tablet-wizard-nav{position:fixed;left:10px;right:10px;bottom:10px;margin:0}
+  body{padding-bottom:88px}
+  .tablet-wizard-nav button{flex:1}
+}
+/* Sur un téléphone, deux boutons côte à côte n'ont plus la place : « Valider les
+   articles et continuer → » se replie sur cinq lignes et la barre devient une
+   pastille illisible. On les empile, pleine largeur, une ligne chacun. */
+@media(max-width:560px){
+  .tablet-wizard-nav{flex-wrap:wrap}
+  .tablet-wizard-nav button{flex:1 1 100%}
+  .tablet-wizard-nav .wizard-spacer{display:none}
+  body{padding-bottom:150px}
+}
+
+
+/* Masque les anciens boutons de navigation pour ne garder qu'une action claire */
+#goToClientBtn,
+#continueToPaymentBtn,
+#backToArticlesBtn{
+  display:none!important;
+}
+
+
+/* V10 — Vente directe reprise propre */
+#payButton{display:none!important}
+
+#selectedClientCard{
+  border:2px solid #142e54!important;
+  background:#f4f6fa!important;
+  box-shadow:0 0 0 4px rgba(20,46,84,.10)!important;
+  padding:18px!important;
+}
+#selectedClientCard .badge{
+  display:inline-flex;
+  align-items:center;
+  margin-bottom:10px;
+  padding:7px 11px;
+  font-size:12px;
+  letter-spacing:.04em;
+}
+#selectedClientName{
+  font-size:21px;
+  font-weight:900;
+  color:#142e54;
+  margin-bottom:5px;
+}
+#selectedClientMeta{
+  font-size:14px;
+  color:#475467;
+  line-height:1.5;
+}
+.client-result.selected-result{
+  border:2px solid #142e54;
+  background:#f4f6fa;
+}
+
+/* Aperçu du ticket */
+#ticketArea{
+  max-width:620px;
+  margin:0 auto 24px;
+}
+.ticket{
+  border:1px solid #d5dae2;
+  border-radius:18px;
+  overflow:hidden;
+  padding:0!important;
+  background:#fff;
+  box-shadow:0 12px 35px rgba(16,24,40,.09);
+}
+.ticket-head{
+  padding:22px;
+  background:#111827;
+  color:#fff;
+  text-align:center;
+}
+.ticket-head h2{margin:0 0 5px;font-size:23px}
+.ticket-head div{font-size:12px;opacity:.82}
+.ticket-body{padding:20px}
+.ticket-client-box{
+  padding:12px 14px;
+  background:#f5f7fa;
+  border-radius:10px;
+  font-weight:800;
+  margin-bottom:16px;
+}
+.ticket-section-label{
+  margin:15px 0 8px;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+  color:#667085;
+  font-weight:900;
+}
+.ticket-product{
+  padding:13px 0;
+  border-bottom:1px solid #eaecf0;
+}
+.ticket-product-main,
+.ticket-extra-line,
+.ticket-total-line,
+.ticket-payment-line{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:14px;
+  align-items:start;
+}
+.ticket-product-name{font-size:15px;font-weight:900}
+.ticket-product-description{margin-top:4px;font-size:12px;color:#667085}
+.ticket-product-price{font-weight:900;white-space:nowrap}
+.ticket-extra-line{
+  margin:8px 0 0 14px;
+  padding:8px 10px;
+  border-left:3px solid #f59e0b;
+  background:#fffbeb;
+  border-radius:0 8px 8px 0;
+  font-size:13px;
+}
+.ticket-extra-price{font-weight:900}
+.ticket-total-line{
+  margin-top:18px;
+  padding-top:15px;
+  border-top:2px solid #111827;
+  font-size:21px;
+  font-weight:950;
+}
+.ticket-payment-line{
+  margin-top:13px;
+  font-size:13px;
+}
+.ticket-footer{
+  padding:14px 18px;
+  background:#f5f7fa;
+  color:#667085;
+  text-align:center;
+  font-size:11px;
+}
+.ticket-preview-actions{
+  display:flex;
+  gap:9px;
+  flex-wrap:wrap;
+  margin-top:17px;
+}
+.ticket-preview-actions button{min-height:44px}
+
+/* Fenêtre du choix d'export */
+.ticket-export-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(16,24,40,.52);
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.ticket-export-overlay.show{display:flex}
+.ticket-export-dialog{
+  width:min(430px,94vw);
+  border-radius:17px;
+  background:#fff;
+  padding:22px;
+  box-shadow:0 25px 70px rgba(16,24,40,.30);
+}
+.ticket-export-dialog h3{margin:0 0 6px;font-size:21px}
+.ticket-export-dialog p{margin:0 0 17px;color:#667085}
+.ticket-export-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.ticket-export-buttons button{
+  min-height:52px;
+  border-radius:11px;
+  font-size:14px;
+  font-weight:900;
+}
+.ticket-export-cancel{
+  width:100%;
+  margin-top:10px;
+}
+
+@media(max-width:600px){
+  .ticket-export-buttons{grid-template-columns:1fr}
+}
+@media print{
+  body *{visibility:hidden!important}
+  #ticketArea,#ticketArea *{visibility:visible!important}
+  #ticketArea{
+    position:absolute;
+    left:0;top:0;
+    width:100%;
+    max-width:none;
+    margin:0;
+  }
+  .ticket-preview-actions{display:none!important}
+  .ticket{box-shadow:none;border:0}
+}
+
+
+/* V10.1 — Ticket identique, mais plus lisible pour le service */
+.ticket{
+  max-width:700px;
+  margin:0 auto;
+}
+.ticket-head{
+  padding:26px 24px;
+}
+.ticket-head h2{
+  font-size:28px;
+  letter-spacing:.04em;
+}
+.ticket-head div{
+  font-size:14px;
+}
+.ticket-body{
+  padding:24px;
+}
+.ticket-client-box{
+  padding:16px 18px;
+  font-size:16px;
+  line-height:1.55;
+  border:1px solid #d9dee7;
+}
+.ticket-section-label{
+  margin:20px 0 10px;
+  font-size:12px;
+  letter-spacing:.12em;
+}
+.ticket-product{
+  padding:18px 0;
+}
+.ticket-product-name{
+  font-size:19px;
+  line-height:1.35;
+}
+.ticket-product-description{
+  margin-top:6px;
+  font-size:14px;
+  line-height:1.5;
+  color:#475467;
+}
+.ticket-product-price{
+  font-size:18px;
+}
+.ticket-extra-line{
+  margin:10px 0 0 16px;
+  padding:10px 12px;
+  font-size:15px;
+  line-height:1.4;
+}
+.ticket-extra-price{
+  font-size:15px;
+}
+.ticket-total-line{
+  margin-top:22px;
+  padding-top:18px;
+  font-size:24px;
+}
+.ticket-payment-line{
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:10px;
+  background:#f5f7fa;
+  font-size:15px;
+}
+.ticket-footer{
+  padding:17px 20px;
+  font-size:13px;
+}
+.ticket-preview-actions{
+  margin-top:20px;
+}
+.ticket-preview-actions button{
+  min-height:48px;
+  padding:12px 18px;
+  font-size:14px;
+}
+@media print{
+  #ticketArea{
+    padding:0;
+  }
+  .ticket{
+    max-width:none;
+    font-size:14px;
+  }
+  .ticket-head{
+    padding:20px;
+  }
+  .ticket-head h2{
+    font-size:25px;
+  }
+  .ticket-body{
+    padding:20px;
+  }
+  .ticket-product-name{
+    font-size:18px;
+  }
+  .ticket-product-description{
+    font-size:13px;
+  }
+  .ticket-total-line{
+    font-size:22px;
+  }
+}
+
+
+/* V10.2 — Contraste renforcé du ticket */
+.ticket,
+.ticket-body,
+.ticket-client-box,
+.ticket-product,
+.ticket-product-main,
+.ticket-extra-line,
+.ticket-total-line,
+.ticket-payment-line{
+  color:#111827!important;
+}
+
+.ticket-head{
+  background:#000!important;
+  color:#fff!important;
+}
+
+.ticket-head h2,
+.ticket-head div{
+  color:#fff!important;
+  opacity:1!important;
+}
+
+.ticket-client-box{
+  background:#f2f2f2!important;
+  border-color:#b8b8b8!important;
+}
+
+.ticket-client-box,
+.ticket-client-box *{
+  color:#111!important;
+}
+
+.ticket-section-label{
+  color:#111!important;
+  font-weight:950!important;
+}
+
+.ticket-product-name{
+  color:#000!important;
+  font-weight:950!important;
+}
+
+.ticket-product-description{
+  color:#222!important;
+  font-weight:600!important;
+}
+
+.ticket-product-price{
+  color:#000!important;
+  font-weight:950!important;
+}
+
+.ticket-extra-line{
+  background:#fff4d6!important;
+  border-left-color:#111!important;
+  color:#111!important;
+}
+
+.ticket-extra-line *,
+.ticket-extra-price{
+  color:#111!important;
+  font-weight:900!important;
+}
+
+.ticket-total-line{
+  color:#000!important;
+  border-top-color:#000!important;
+  font-weight:950!important;
+}
+
+.ticket-payment-line{
+  background:#ececec!important;
+  color:#111!important;
+}
+
+.ticket-payment-line strong{
+  color:#000!important;
+}
+
+.ticket-footer{
+  background:#ececec!important;
+  color:#111!important;
+  font-weight:700!important;
+}
+
+@media print{
+  .ticket,
+  .ticket *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+  .ticket-product-description,
+  .ticket-footer,
+  .ticket-section-label{
+    color:#111!important;
+  }
+}
+
+
+/* V10.3 — Date/heure de retrait et impression économique */
+.pickup-card{
+  margin:18px 0;
+  padding:16px;
+  border:1px solid #b9c0ca;
+  border-radius:12px;
+  background:#fff;
+}
+.pickup-card h3{
+  margin:0 0 4px;
+  color:#111;
+  font-size:17px;
+}
+.pickup-help{
+  margin:0 0 13px;
+  color:#333;
+  font-size:13px;
+}
+.pickup-summary{
+  margin-top:10px;
+  padding:10px 12px;
+  border-left:4px solid #111;
+  background:#f5f5f5;
+  color:#111;
+  font-weight:800;
+}
+.ticket-pickup{
+  margin-top:10px;
+  padding-top:9px;
+  border-top:1px solid #777;
+  color:#000;
+  font-size:15px;
+  font-weight:900;
+}
+
+/* L'écran reste confortable, mais l'impression consomme très peu d'encre. */
+@media print{
+  @page{
+    margin:8mm;
+  }
+
+  body{
+    background:#fff!important;
+  }
+
+  .ticket{
+    border:1px solid #555!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    background:#fff!important;
+  }
+
+  .ticket-head{
+    padding:12px 14px!important;
+    background:#fff!important;
+    color:#000!important;
+    border-bottom:2px solid #000!important;
+  }
+
+  .ticket-head h2,
+  .ticket-head div{
+    color:#000!important;
+  }
+
+  .ticket-head h2{
+    font-size:22px!important;
+  }
+
+  .ticket-body{
+    padding:14px!important;
+    background:#fff!important;
+  }
+
+  .ticket-client-box,
+  .ticket-payment-line,
+  .ticket-extra-line,
+  .ticket-footer{
+    background:#fff!important;
+  }
+
+  .ticket-client-box{
+    border:1px solid #777!important;
+  }
+
+  .ticket-extra-line{
+    border:1px solid #777!important;
+    border-left:3px solid #000!important;
+  }
+
+  .ticket-product{
+    border-bottom:1px solid #777!important;
+  }
+
+  .ticket-total-line{
+    border-top:2px solid #000!important;
+  }
+
+  .ticket-payment-line{
+    border:1px solid #777!important;
+  }
+
+  .ticket-footer{
+    border-top:1px solid #777!important;
+    color:#000!important;
+  }
+
+  .ticket,
+  .ticket *{
+    color:#000!important;
+    text-shadow:none!important;
+    -webkit-print-color-adjust:economy!important;
+    print-color-adjust:economy!important;
+  }
+}
+
+</style>
+<style>
+body{font-family:'Manrope',Arial,sans-serif!important}
+header{background:#1c3d6e!important;padding:22px 26px!important}
+header h1{letter-spacing:-.01em}
+header p{color:#c3cede!important}
+.card{border-radius:16px!important;border-color:#e4e8ee!important;box-shadow:0 4px 18px rgba(16,24,40,.06)!important}
+button{border-radius:10px!important}
+input,select,textarea{border-radius:10px!important;border-color:#cfd6de!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(20,46,84,.14);border-color:#142e54!important}
+.stepper{gap:10px!important}
+.step{border-radius:999px!important;background:#e9eeeb!important;color:#5c6b63}
+.step.active{background:#1c3d6e!important;color:#fff!important;box-shadow:0 6px 16px rgba(20,46,84,.28)}
+.product-card,.client-result{border-radius:12px!important}
+.tablet-wizard-nav{border-radius:16px!important;backdrop-filter:blur(6px)}
+</style>
+
+<style>
+.primary{background:#1c3d6e}
+.primary:hover{background:#142e54}
+</style>
+<style>
+/* ---- Esprit SumUp : épuré, pilules, contrastes nets ---- */
+body{background:#f7f8fa!important}
+button{font-weight:800}
+.primary,.secondary,.danger,.whatsapp{border-radius:999px!important;padding:13px 22px!important}
+.primary{background:#1c3d6e!important;box-shadow:0 2px 10px rgba(20,46,84,.18)}
+.primary:hover{background:#142e54!important;box-shadow:0 4px 16px rgba(20,46,84,.25)}
+.secondary{background:#fff!important;border:1.5px solid #d7dce3!important;color:#142e54!important}
+.secondary:hover{border-color:#142e54!important}
+.card{border:1px solid #eef0f3!important;box-shadow:0 1px 3px rgba(20,46,84,.05)!important;padding:24px!important}
+input,select,textarea{border:1.5px solid #d7dce3!important;padding:13px 14px!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(48,100,232,.15)!important;border-color:#3064e8!important}
+label{font-weight:800;font-size:13.5px}
+h2{letter-spacing:-.01em}
+</style>
+</head>
+<body>
+<script>
+(function(){
+  var eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
+  function animate(el,to,fmt){
+    var from=el.__rollVal!=null?el.__rollVal:0;
+    el.__rollVal=to;
+    if(from===to){el.textContent=fmt(to);return;}
+    if(el.__rollRaf)cancelAnimationFrame(el.__rollRaf);
+    var start=null,dur=700;
+    function step(ts){
+      if(!start)start=ts;
+      var t=Math.min(1,(ts-start)/dur);
+      var e=1-Math.pow(1-t,3);
+      el.textContent=fmt(from+(to-from)*e);
+      if(t<1)el.__rollRaf=requestAnimationFrame(step);
+    }
+    el.__rollRaf=requestAnimationFrame(step);
+  }
+  window.rollMoney=function(el,v){if(el)animate(el,Number(v)||0,function(x){return eur.format(x)});};
+  window.rollInt=function(el,v,suffix){if(el)animate(el,Number(v)||0,function(x){return Math.round(x).toLocaleString("fr-FR")+(suffix||"")});};
+})();
+</script>
+<header>
+  <h1>ATELIER OLDA — Vente directe</h1>
+  <p>Articles, client, paiement, ticket et envoi WhatsApp</p>
+</header>
+
+<div class="container">
+  <div class="stepper">
+    <div class="step active">1. Articles</div>
+    <div class="step">2. Client</div>
+    <div class="step">3. Paiement</div>
+    <div class="step">4. Ticket</div>
+  </div>
+
+  <div class="card">
+    <h2>1. Ajouter un article</h2>
+    <div class="grid-3">
+      <div class="field">
+        <label for="productName">Article *</label>
+        <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
+        <datalist id="productsList">
+          <option value="Tee-shirt personnalisé">
+          <option value="Sweat personnalisé">
+          <option value="Casquette personnalisée">
+          <option value="Tasse personnalisée">
+          <option value="Gourde personnalisée">
+          <option value="Porte-clés personnalisé">
+          <option value="Plaque gravée">
+        </datalist>
+      </div>
+      <div class="field">
+        <label for="quantity">Quantité *</label>
+        <input id="quantity" type="number" min="1" step="1" placeholder="Ex. 10">
+      </div>
+      <div class="field">
+        <label for="unitPrice">Prix unitaire *</label>
+        <input id="unitPrice" type="number" min="0" step="0.01" placeholder="0,00">
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="priceType">Prix saisi</label>
+        <select id="priceType">
+          <option value="TTC">TTC</option>
+          <option value="HT">HT</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Taxe</label>
+        <label class="inline-check"><input id="applyTax" type="checkbox" checked> Appliquer la taxe de 4 %</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="productDescription">Description de production *</label>
+      <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="orderDate">Date de commande *</label>
+        <input id="orderDate" type="date">
+      </div>
+      <div class="field">
+        <label for="deliveryDelay">Date souhaitée *</label>
+        <select id="deliveryDelay" onchange="updateDeliveryDateFromDelay()">
+          <option value="5">Dans 5 jours</option>
+          <option value="10">Dans 10 jours</option>
+          <option value="15" selected>Dans 15 jours</option>
+          <option value="custom">Choisir une date</option>
+        </select>
+        <input id="deliveryDate" class="hidden" type="date" style="margin-top:8px" onchange="updateDeadlineInfo()">
+        <div id="deadlineInfo" class="help"></div>
+
+        <label for="deliveryTime" style="margin-top:12px">Heure souhaitée *</label>
+        <select id="deliveryTime">
+          <option value="09:00">09:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00" selected>14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+          <option value="17:00">17:00</option>
+        </select>
+        <div class="help">Horaires disponibles de 09:00 à 17:00 — 14:00 par défaut.</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="saveProductBtn" class="primary">Ajouter l'article</button>
+      <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Articles de la commande</h2>
+      <div id="productList"><p class="help">Aucun article ajouté.</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Résumé TTC</h2>
+      <div id="summaryLines">
+        <p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>
+      </div>
+      <div class="summary-row summary-total" style="margin-top:16px">
+        <span>TOTAL À ENCAISSER</span>
+        <span id="summaryTTC">0,00 €</span>
+      </div>
+      <div class="help">Tous les montants affichés dans ce résumé sont TTC.</div>
+
+      <!-- Calculs conservés en interne, mais masqués à l'écran -->
+      <span id="summaryHT" class="hidden">0,00 €</span>
+      <span id="summaryTax" class="hidden">0,00 €</span>
+      <span id="summarySurcharge" class="hidden">0,00 €</span>
+    </div>
+  </div>
+
+  <div class="card internal">
+    <div class="internal-head">
+      <h2>Note interne OLDA</h2>
+      <span class="lock">🔒 Interne uniquement</span>
+    </div>
+    <textarea id="internalNote" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
+    
+  </div>
+
+  <div class="card">
+    <button id="goToClientBtn" class="primary full">Passer au paiement →</button>
+  </div>
+
+  <div class="card hidden" id="clientSection">
+    <h2>2. Associer le client</h2>
+
+    <div class="field client-search-wrap">
+      <label for="clientSearch">Rechercher un client existant</label>
+      <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
+      
+      <div id="clientResults" class="client-results"></div>
+    </div>
+
+    <div id="selectedClientCard" class="product-card client-selected hidden">
+      <span class="badge green">✓ Client sélectionné</span>
+      <div class="client-result-name" id="selectedClientName"></div>
+      <div class="client-result-meta" id="selectedClientMeta"></div>
+      <div class="actions" style="margin-top:10px">
+        <button id="changeClientBtn" class="secondary">Changer de client</button>
+        <button id="editSelectedClientBtn" class="secondary">Modifier le client</button>
+      </div>
+    </div>
+
+    <div id="clientNotFoundBox" class="notice">
+      <b>Le client n'existe pas encore ?</b>
+      <div class="help" style="margin:6px 0 10px">Crée la fiche puis elle sera automatiquement sélectionnée pour cette commande.</div>
+      <button id="showCreateClientBtn" class="primary">+ Créer un nouveau client</button>
+    </div>
+
+    <div id="createClientBox" class="hidden">
+      <h3>Créer un nouveau client</h3>
+
+      <div class="choice-grid" style="grid-template-columns:repeat(2,1fr)">
+        <button id="chooseIndividualBtn" class="choice-card active" type="button">
+          <b>Particulier</b>
+          <div class="help" style="margin-top:4px">Nom, WhatsApp, e-mail facultatif.</div>
+        </button>
+        <button id="chooseProfessionalBtn" class="choice-card" type="button">
+          <b>Professionnel</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+        <button id="chooseAssociationBtn" class="choice-card" type="button">
+          <b>Association</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+        <button id="chooseResellerBtn" class="choice-card" type="button">
+          <b>Revendeur</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+      </div>
+
+      <div id="individualForm" style="margin-top:16px">
+        <div class="grid">
+          <div class="field">
+            <label for="newIndividualName">Prénom et nom *</label>
+            <input id="newIndividualName" placeholder="Ex. Jean Dupont">
+          </div>
+          <div class="field">
+            <label for="newIndividualPhone">WhatsApp *</label>
+            <input id="newIndividualPhone" placeholder="Ex. 06 90 47 97 88">
+          </div>
+        </div>
+        <div class="field">
+          <label for="newIndividualEmail">E-mail (facultatif)</label>
+          <input id="newIndividualEmail" type="email" placeholder="client@email.com">
+        </div>
+      </div>
+
+      <div id="professionalForm" class="hidden" style="margin-top:16px">
+        <div class="grid">
+          <div class="field">
+            <label id="companyNameLabel" for="newCompanyName">Raison sociale EBP *</label>
+            <input id="newCompanyName" placeholder="Ex. Hôtel Exemple">
+          </div>
+          <div class="field">
+            <label for="newCompanySector">Secteur d'activité *</label>
+            <select id="newCompanySector">
+              <option value="">Choisir un secteur</option>
+              <option>Hôtel</option>
+              <option>Restaurant</option>
+              <option>Bar</option>
+              <option>Boutique</option>
+              <option>Agence immobilière</option>
+              <option>Conciergerie</option>
+              <option>Villa de location</option>
+              <option>Nautisme</option>
+              <option>BTP</option>
+              <option>Artisan</option>
+              <option>Événementiel</option>
+              <option>Association</option>
+              <option>École</option>
+              <option>Salle de sport</option>
+              <option>Santé</option>
+              <option>Tourisme</option>
+              <option>Transport</option>
+              <option>Administration</option>
+              <option>Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyAddress">Adresse</label>
+            <input id="newCompanyAddress" placeholder="Adresse">
+          </div>
+          <div class="field">
+            <label for="newCompanyCity">Ville</label>
+            <input id="newCompanyCity" placeholder="Ex. Saint-Martin">
+          </div>
+          <div class="field">
+            <label for="newCompanyPostal">Code postal</label>
+            <input id="newCompanyPostal" placeholder="97150">
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyContact">Prénom contact *</label>
+            <input id="newCompanyContact" placeholder="Ex. Marie">
+          </div>
+          <div class="field">
+            <label for="newCompanyPhone">WhatsApp *</label>
+            <input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88">
+          </div>
+          <div class="field">
+            <label for="newCompanyEmail">E-mail *</label>
+            <input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com">
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyContactRole">Fonction du contact</label>
+            <input id="newCompanyContactRole" placeholder="Ex. Responsable communication">
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="createAndSelectClientBtn" class="primary">Créer et sélectionner ce client</button>
+        <button id="cancelCreateClientBtn" class="secondary">Annuler</button>
+      </div>
+    </div>
+
+    <input id="clientName" type="hidden">
+    <input id="clientPhone" type="hidden">
+    <input id="clientEmail" type="hidden">
+    <input id="clientType" type="hidden">
+    <input id="clientId" type="hidden">
+    <input id="counterSale" type="hidden" value="false">
+        <input id="orderNumber" type="hidden">
+
+    <div class="actions" style="margin-top:18px">
+      <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
+      <button id="backToArticlesBtn" class="secondary">← Retour aux articles</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="paymentSection">
+    <h2>3. Paiement</h2>
+    <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
+
+    <label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Espèces"> Espèces</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Virement"> Virement</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Mixte"> Mixte</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
+
+    <div id="cashZone" class="card hidden">
+      <div class="field">
+        <label for="cashGiven">Montant donné par le client</label>
+        <input id="cashGiven" type="number" min="0" step="0.01">
+      </div>
+      <div class="summary-row"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div>
+    </div>
+
+    <div id="mixZone" class="grid card hidden">
+      <div class="field">
+        <label for="mixCard">Carte bancaire</label>
+        <input id="mixCard" type="number" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label for="mixCash">Espèces</label>
+        <input id="mixCash" type="number" min="0" step="0.01">
+      </div>
+    </div>
+
+    <label class="inline-check">
+      <input id="instantDelivery" type="checkbox">
+      Le client repart immédiatement avec sa commande
+    </label>
+
+    <button id="payButton" class="primary full">Encaisser le paiement</button>
+  </div>
+
+  <div id="paymentSuccess" class="card success hidden">
+    <h2>✅ Commande enregistrée</h2>
+    <p id="paymentStatus"></p>
+    <p><b>La note interne OLDA reste modifiable à tout moment.</b></p>
+
+    <div class="footer-actions">
+      <button id="printTicketBtn" class="secondary">🖨️ Imprimer le ticket</button>
+      <button id="downloadTicketBtn" class="secondary">⬇️ Télécharger le ticket</button>
+      <button id="sendWhatsAppBtn" class="whatsapp">💬 Envoyer sur WhatsApp</button>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button id="newSaleBtn" class="primary">Nouvelle vente</button>
+      <button id="homeBtn" class="secondary">Retour accueil</button>
+    </div>
+  </div>
+
+  
+<div id="ticketArea" class="hidden">
+  <div class="ticket">
+    <div class="ticket-head">
+      <h2>ATELIER OLDA</h2>
+      <div>Ticket de commande — Saint-Martin</div>
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-section-label">Informations de commande</div>
+      <div class="ticket-client-box">
+        <div id="ticketOrder"></div>
+        <div id="ticketDate" style="margin-top:4px;font-size:12px;color:#667085"></div>
+        <div id="ticketClient" style="margin-top:7px"></div>
+        <div id="ticketClientDetails" class="ticket-details"></div>
+        <div id="ticketPickup" class="ticket-pickup"></div>
+      </div>
+
+      <div class="ticket-section-label">Articles et suppléments</div>
+      <div id="ticketProducts"></div>
+
+      <div class="ticket-section-label">Informations complémentaires</div>
+      <div id="ticketExtraDetails" class="ticket-details"></div>
+
+      <div class="ticket-total-line">
+        <span>Total commande TTC</span>
+        <span id="ticketTTC"></span>
+      </div>
+
+      <div class="ticket-payment-line">
+        <span>Paiement</span>
+        <strong id="ticketPayment"></strong>
+      </div>
+
+      <div class="ticket-preview-actions">
+        <button id="ticketPrintPreviewBtn" class="secondary">🖨️ Imprimer</button>
+        <button id="ticketDownloadPreviewBtn" class="primary">⬇️ Télécharger</button>
+      </div>
+    </div>
+    <div class="ticket-footer">Merci pour votre confiance — L'équipe Atelier OLDA</div>
+  </div>
+</div>
+
+<div id="ticketExportOverlay" class="ticket-export-overlay">
+  <div class="ticket-export-dialog">
+    <h3>Télécharger le ticket</h3>
+    <p>Choisis le format souhaité.</p>
+    <div class="ticket-export-buttons">
+      <button id="ticketPdfBtn" class="primary">PDF</button>
+      <button id="ticketTxtBtn" class="secondary">TXT</button>
+    </div>
+    <button id="ticketExportCancelBtn" class="secondary ticket-export-cancel">Annuler</button>
+  </div>
+</div>
+
+<script>
+const products = [];
+
+// LA VRAIE BASE CLIENTS. Le tableau part vide et `pont.js` le remplit depuis
+// GET /api/clients au chargement de l'écran : la vendeuse cherche dans les
+// clients de l'atelier, pas dans un jeu d'exemple. Un client créé ici entre
+// dans la base au moment où le projet part au planning (upsert serveur).
+const clients = [];
+
+let selectedClient = null;
+let createClientType = "Particulier";
+let editIndex = null;
+let lastTotals = {ht:0,tax:0,surcharge:0,ttc:0};
+const euro = new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
+
+function isoDate(date){ return date.toISOString().slice(0,10); }
+function addBusinessDays(date, days){
+  const d = new Date(date);
+  let added = 0;
+  while(added < days){
+    d.setDate(d.getDate()+1);
+    if(d.getDay() !== 0 && d.getDay() !== 6) added++;
+  }
+  return d;
+}
+function businessDaysBetween(start,end){
+  const a=new Date(start), b=new Date(end);
+  let count=0, d=new Date(a);
+  while(d < b){
+    d.setDate(d.getDate()+1);
+    if(d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  return count;
+}
+function formatPhoneInput(value){
+  const digits=String(value||"").replace(/\D/g,"").slice(0,10);
+  return digits.replace(/(\d{2})(?=\d)/g,"$1 ").trim();
+}
+
+function normalizeSearch(value){
+  return String(value||"")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]/g,"");
+}
+
+function clientDisplayName(client){
+  return client.type==="Professionnel" ? client.company : client.name;
+}
+
+function clientMeta(client){
+  if(client.type==="Professionnel"){
+    return [
+      client.contact ? "Contact : "+client.contact : "",
+      client.phone ? "WhatsApp : "+client.phone : "",
+      client.email || "",
+      client.sector || ""
+    ].filter(Boolean).join(" • ");
+  }
+  return [
+    client.phone ? "WhatsApp : "+client.phone : "",
+    client.email || "",
+    client.type
+  ].filter(Boolean).join(" • ");
+}
+
+function updateStepper(activeIndex){
+  document.querySelectorAll(".stepper .step").forEach((step,index)=>{
+    step.classList.toggle("active",index<=activeIndex);
+  });
+}
+
+function renderClientResults(){
+  const query=document.getElementById("clientSearch").value.trim();
+  const box=document.getElementById("clientResults");
+
+  if(!query){
+    box.innerHTML="";
+    return;
+  }
+
+  const normalized=normalizeSearch(query);
+  const results=clients.filter(client=>{
+    const haystack=normalizeSearch([
+      client.name,
+      client.company,
+      client.contact,
+      client.phone,
+      client.email
+    ].filter(Boolean).join(" "));
+    return haystack.includes(normalized);
+  });
+
+  if(results.length===0){
+    box.innerHTML='<div class="help">Aucun client trouvé. Tu peux créer une nouvelle fiche ci-dessous.</div>';
+    return;
+  }
+
+  box.innerHTML=results.map(client=>`
+    <div class="client-result">
+      <div class="client-result-main">
+        <div class="client-result-name">${escapeHtml(clientDisplayName(client))}</div>
+        <div class="client-result-meta">${escapeHtml(clientMeta(client))}</div>
+      </div>
+      <button class="primary select-client-btn" data-client-id="${client.id}">Sélectionner</button>
+    </div>
+  `).join("");
+
+  box.querySelectorAll(".select-client-btn").forEach(button=>{
+    button.addEventListener("click",()=>selectClientById(button.dataset.clientId));
+  });
+}
+
+function selectClientById(id){
+  const client=clients.find(item=>item.id===id);
+  if(!client) return;
+
+  selectedClient=client;
+  document.getElementById("clientId").value=client.id;
+  document.getElementById("clientType").value=client.type;
+  document.getElementById("clientName").value=clientDisplayName(client);
+  document.getElementById("clientPhone").value=client.phone||"";
+  document.getElementById("clientEmail").value=client.email||"";
+  document.getElementById("counterSale").value="false";
+
+  document.getElementById("selectedClientName").textContent=
+    "✓ "+clientDisplayName(client);
+  document.getElementById("selectedClientMeta").textContent=
+    clientMeta(client)+" • Bien associé à cette vente";
+  document.getElementById("selectedClientCard").classList.remove("hidden");
+
+  document.getElementById("clientResults").innerHTML="";
+  document.getElementById("clientSearch").value="";
+  document.getElementById("createClientBox").classList.add("hidden");
+}
+function clearSelectedClient(){
+  selectedClient=null;
+  ["clientId","clientType","clientName","clientPhone","clientEmail"].forEach(id=>{
+    document.getElementById(id).value="";
+  });
+  document.getElementById("counterSale").value="false";
+  document.getElementById("selectedClientCard").classList.add("hidden");
+  document.getElementById("clientSearch").focus();
+}
+
+function showCreateClient(){
+  document.getElementById("createClientBox").classList.remove("hidden");
+  document.getElementById("selectedClientCard").classList.add("hidden");
+  clearSelectedClient();
+  document.getElementById("newIndividualName").focus();
+}
+
+function setCreateClientType(type){
+  createClientType=type;
+  const individual=type==="Particulier";
+  document.getElementById("individualForm").classList.toggle("hidden",!individual);
+  document.getElementById("professionalForm").classList.toggle("hidden",individual);
+  document.getElementById("chooseIndividualBtn").classList.toggle("active",individual);
+  document.getElementById("chooseProfessionalBtn").classList.toggle("active",!individual);
+}
+
+function createAndSelectClient(){
+  let client;
+
+  if(createClientType==="Particulier"){
+    if(!requireFields(["newIndividualName","newIndividualPhone"])){
+      alert("Ajoute le prénom, le nom et le WhatsApp.");
+      return;
+    }
+    client={
+      id:"CLI-"+String(clients.length+1).padStart(3,"0"),
+      type:"Particulier",
+      name:document.getElementById("newIndividualName").value.trim(),
+      phone:document.getElementById("newIndividualPhone").value.trim(),
+      email:document.getElementById("newIndividualEmail").value.trim()
+    };
+  }else{
+    if(!requireFields(["newCompanyName","newCompanySector","newCompanyContact","newCompanyPhone"])){
+      alert("Ajoute la raison sociale, le secteur, le contact et le WhatsApp.");
+      return;
+    }
+    client={
+      id:"CLI-"+String(clients.length+1).padStart(3,"0"),
+      type:"Professionnel",
+      company:document.getElementById("newCompanyName").value.trim(),
+      sector:document.getElementById("newCompanySector").value,
+      address:document.getElementById("newCompanyAddress").value.trim(),
+      city:document.getElementById("newCompanyCity").value.trim(),
+      postal:document.getElementById("newCompanyPostal").value.trim(),
+      contact:document.getElementById("newCompanyContact").value.trim(),
+      phone:document.getElementById("newCompanyPhone").value.trim(),
+      email:document.getElementById("newCompanyEmail").value.trim()
+    };
+  }
+
+  clients.push(client);
+  selectClientById(client.id);
+  resetCreateClientForm();
+}
+
+function resetCreateClientForm(){
+  [
+    "newIndividualName","newIndividualPhone","newIndividualEmail",
+    "newCompanyName","newCompanyAddress","newCompanyCity","newCompanyPostal",
+    "newCompanyContact","newCompanyPhone","newCompanyEmail"
+  ].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("newCompanySector").value="";
+  setCreateClientType("Particulier");
+}
+
+function editSelectedClient(){
+  if(!selectedClient) return;
+
+  showCreateClient();
+  setCreateClientType(selectedClient.type);
+
+  if(selectedClient.type==="Particulier"){
+    document.getElementById("newIndividualName").value=selectedClient.name||"";
+    document.getElementById("newIndividualPhone").value=selectedClient.phone||"";
+    document.getElementById("newIndividualEmail").value=selectedClient.email||"";
+  }else{
+    document.getElementById("newCompanyName").value=selectedClient.company||"";
+    document.getElementById("newCompanySector").value=selectedClient.sector||"";
+    document.getElementById("newCompanyAddress").value=selectedClient.address||"";
+    document.getElementById("newCompanyCity").value=selectedClient.city||"";
+    document.getElementById("newCompanyPostal").value=selectedClient.postal||"";
+    document.getElementById("newCompanyContact").value=selectedClient.contact||"";
+    document.getElementById("newCompanyPhone").value=selectedClient.phone||"";
+    document.getElementById("newCompanyEmail").value=selectedClient.email||"";
+  }
+}
+
+function generateOrderNumber(){
+  const now=new Date();
+  const stamp=now.getFullYear().toString().slice(-2)+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0");
+  const random=Math.floor(Math.random()*900+100);
+  return `VD-${stamp}-${random}`;
+}
+function init(){
+  const today=new Date();
+  document.getElementById("orderDate").value=isoDate(today);
+  document.getElementById("deliveryDelay").value="15";
+  updateDeliveryDateFromDelay();
+  document.getElementById("orderNumber").value=generateOrderNumber();
+
+
+  updateDeadlineInfo();
+  updatePaymentZones();
+  updateStepper(0);
+}
+function cleanInvalid(el){ el.classList.remove("invalid"); }
+function requireFields(ids){
+  let ok=true, first=null;
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    const val=String(el.value||"").trim();
+    if(!val || (el.type==="number" && Number(val)<=0)){
+      el.classList.add("invalid"); ok=false; if(!first) first=el;
+    } else cleanInvalid(el);
+  });
+  if(first) first.focus();
+  return ok;
+}
+
+function updateDeliveryDateFromDelay(){
+  const delay=document.getElementById("deliveryDelay").value;
+  const dateInput=document.getElementById("deliveryDate");
+  const orderValue=document.getElementById("orderDate").value;
+  const base=orderValue ? new Date(orderValue+"T00:00:00") : new Date();
+
+  if(delay==="custom"){
+    dateInput.classList.remove("hidden");
+    if(!dateInput.value){
+      dateInput.value=isoDate(base);
+    }
+  }else{
+    dateInput.classList.add("hidden");
+    const target=new Date(base);
+    target.setDate(target.getDate()+Number(delay));
+    dateInput.value=isoDate(target);
+  }
+  updateDeadlineInfo();
+}
+
+function deliveryDelayLabel(){
+  const select=document.getElementById("deliveryDelay");
+  if(select.value==="custom"){
+    const value=document.getElementById("deliveryDate").value;
+    return value ? new Date(value+"T00:00:00").toLocaleDateString("fr-FR") : "Date personnalisée";
+  }
+  return "Dans "+select.value+" jours";
+}
+
+function getDeadlineRate(){
+  const delay=document.getElementById("deliveryDelay").value;
+  if(delay==="5") return 0.20;
+  if(delay==="10") return 0.10;
+  if(delay==="15") return 0;
+  const order=document.getElementById("orderDate").value;
+  const delivery=document.getElementById("deliveryDate").value;
+  if(!order || !delivery) return 0;
+  const days=businessDaysBetween(order,delivery);
+  if(days<=5) return 0.20;
+  if(days<=10) return 0.10;
+  return 0;
+}
+function updateDeadlineInfo(){
+  const rate=getDeadlineRate();
+  const delay=document.getElementById("deliveryDelay").value;
+  let text;
+  if(delay==="5") text="🔴 5 jours : urgent — supplément de 20 %";
+  else if(delay==="10") text="🟠 10 jours : prioritaire — supplément de 10 %";
+  else if(delay==="15") text="🟢 15 jours : délai standard — aucun supplément";
+  else text=rate===0.20 ? "🔴 Date personnalisée urgente — supplément de 20 %" :
+             rate===0.10 ? "🟠 Date personnalisée prioritaire — supplément de 10 %" :
+             "🟢 Date personnalisée standard — aucun supplément";
+  document.getElementById("deadlineInfo").textContent=text;
+}
+function productFromForm(){
+  const qty=Number(document.getElementById("quantity").value);
+  const price=Number(document.getElementById("unitPrice").value);
+  const priceType=document.getElementById("priceType").value;
+  const taxApplied=document.getElementById("applyTax").checked;
+  let unitHT, unitTTC;
+  if(priceType==="HT"){
+    unitHT=price;
+    unitTTC=taxApplied ? price*1.04 : price;
+  } else {
+    unitTTC=price;
+    unitHT=taxApplied ? price/1.04 : price;
+  }
+  const baseHT=unitHT*qty;
+  const rate=getDeadlineRate();
+  const surcharge=baseHT*rate;
+  const taxableHT=baseHT+surcharge;
+  const tax=taxApplied ? taxableHT*0.04 : 0;
+  const totalTTC=taxableHT+tax;
+  return {
+    name:document.getElementById("productName").value.trim(),
+    qty, price, priceType, taxApplied,
+    description:document.getElementById("productDescription").value.trim(),
+    orderDate:document.getElementById("orderDate").value,
+    deliveryDate:document.getElementById("deliveryDate").value,
+    deliveryTime:document.getElementById("deliveryTime").value,
+    baseHT,surcharge,tax,totalTTC,rate
+  };
+}
+function saveProduct(){
+  if(!requireFields(["productName","quantity","unitPrice","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
+  const delivery=new Date(document.getElementById("deliveryDate").value);
+  if(delivery.getDay()===0 || delivery.getDay()===6){
+    alert("La date de livraison doit être un jour ouvré.");
+    document.getElementById("deliveryDate").classList.add("invalid");
+    return;
+  }
+  const item=productFromForm();
+  if(editIndex===null) products.push(item); else products[editIndex]=item;
+  resetProductForm();
+  renderProducts();
+}
+function resetProductForm(){
+  document.getElementById("productName").value="";
+  document.getElementById("quantity").value="";
+  document.getElementById("unitPrice").value="";
+  document.getElementById("productDescription").value="";
+  document.getElementById("priceType").value="TTC";
+  document.getElementById("applyTax").checked=true;
+  editIndex=null;
+  document.getElementById("saveProductBtn").textContent="Ajouter l'article";
+  document.getElementById("cancelEditBtn").classList.add("hidden");
+}
+function editProduct(index){
+  const p=products[index];
+  editIndex=index;
+  document.getElementById("productName").value=p.name;
+  document.getElementById("quantity").value=p.qty;
+  document.getElementById("unitPrice").value=p.price;
+  document.getElementById("priceType").value=p.priceType;
+  document.getElementById("applyTax").checked=p.taxApplied;
+  document.getElementById("productDescription").value=p.description;
+  document.getElementById("orderDate").value=p.orderDate;
+  document.getElementById("deliveryDate").value=p.deliveryDate;
+  document.getElementById("deliveryTime").value=p.deliveryTime||"14:00";
+  document.getElementById("saveProductBtn").textContent="Enregistrer les modifications";
+  document.getElementById("cancelEditBtn").classList.remove("hidden");
+  const desc=document.getElementById("productDescription");
+  window.scrollTo({top:desc.getBoundingClientRect().top+window.scrollY-150,behavior:"smooth"});
+  desc.focus();
+}
+function deleteProduct(index){
+  if(confirm("Supprimer cet article ?")){
+    products.splice(index,1);
+    renderProducts();
+  }
+}
+function renderProducts(){
+  const box=document.getElementById("productList");
+  if(products.length===0){
+    box.innerHTML='<p class="help">Aucun article ajouté.</p>';
+  } else {
+    box.innerHTML=products.map((p,i)=>`
+      <div class="product-card">
+        <div class="product-top">
+          <div>
+            <div class="product-title">${escapeHtml(p.name)} × ${p.qty}</div>
+            <span class="badge ${p.rate ? "orange":"green"}">${p.rate ? "Supplément "+(p.rate*100)+" %":"Délai standard"}</span>
+          </div>
+          <b>${euro.format(p.totalTTC)} TTC</b>
+        </div>
+        <div class="product-description">${escapeHtml(p.description)}</div>
+        <div class="help">Récupération : ${new Date(p.deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")} à ${p.deliveryTime||"14:00"}</div>
+        <div class="actions" style="margin-top:10px">
+          <button class="secondary" onclick="editProduct(${i})">✏️ Modifier</button>
+          <button class="danger" onclick="deleteProduct(${i})">🗑️ Supprimer</button>
+        </div>
+      </div>`).join("");
+  }
+  calculateTotals();
+}
+function calculateTotals(){
+  const totals=products.reduce((a,p)=>({
+    ht:a.ht+p.baseHT,
+    tax:a.tax+p.tax,
+    surcharge:a.surcharge+p.surcharge,
+    ttc:a.ttc+p.totalTTC
+  }),{ht:0,tax:0,surcharge:0,ttc:0});
+  lastTotals=totals;
+  document.getElementById("summaryHT").textContent=euro.format(totals.ht);
+  document.getElementById("summaryTax").textContent=euro.format(totals.tax);
+  document.getElementById("summarySurcharge").textContent=euro.format(totals.surcharge);
+  rollMoney(document.getElementById("summaryTTC"),totals.ttc);
+
+  const summaryLines=document.getElementById("summaryLines");
+  if(products.length===0){
+    summaryLines.innerHTML='<p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>';
+  }else{
+    const articleLines = products.map(p=>{
+      const articleTTC = p.totalTTC - (p.surcharge * (p.taxApplied ? 1.04 : 1));
+      return `
+        <div class="summary-row">
+          <span>${escapeHtml(p.name)} × ${p.qty}</span>
+          <b>${euro.format(articleTTC)}</b>
+        </div>
+      `;
+    }).join("");
+
+    const expressTTC = products.reduce((sum,p)=>sum + (p.surcharge * (p.taxApplied ? 1.04 : 1)),0);
+    const expressRates = [...new Set(products.filter(p=>p.rate>0).map(p=>p.rate))];
+    let expressLabel = "Supplément express";
+    if(expressRates.length===1){
+      expressLabel = expressRates[0]===0.20 ? "Supplément urgence (+20 %)" : "Supplément express (+10 %)";
+    }else if(expressRates.length>1){
+      expressLabel = "Suppléments express / urgence";
+    }
+
+    const expressLine = expressTTC>0 ? `
+      <div class="summary-row">
+        <span>${expressLabel}</span>
+        <b>${euro.format(expressTTC)}</b>
+      </div>
+    ` : "";
+
+    summaryLines.innerHTML = articleLines + expressLine;
+  }
+
+  if(!document.getElementById("amountDueVal"))document.getElementById("amountDue").innerHTML='<span>TOTAL À ENCAISSER</span><span id="amountDueVal">0,00 €</span>';
+  rollMoney(document.getElementById("amountDueVal"),totals.ttc);
+  updateCashChange();
+}
+function selectedPayment(){ return document.querySelector('input[name="payment"]:checked').value; }
+function updatePaymentZones(){
+  const mode=selectedPayment();
+  document.getElementById("cashZone").classList.toggle("hidden",mode!=="Espèces");
+  document.getElementById("mixZone").classList.toggle("hidden",mode!=="Mixte");
+}
+function updateCashChange(){
+  const change=Math.max(0,Number(document.getElementById("cashGiven").value||0)-lastTotals.ttc);
+  rollMoney(document.getElementById("cashChange"),change);
+}
+function validatePayment(){
+  if(!selectedClient){
+    alert("Aucun client n'est associé à la commande.");
+    return false;
+  }
+  if(products.length===0){
+    alert("Ajoute au moins un article avant de passer au paiement.");
+    return false;
+  }
+  const mode=selectedPayment();
+  if(mode==="Espèces" && Number(document.getElementById("cashGiven").value||0)<lastTotals.ttc){
+    alert("Le montant donné par le client est insuffisant.");
+    return false;
+  }
+  if(mode==="Mixte"){
+    const total=Number(document.getElementById("mixCard").value||0)+Number(document.getElementById("mixCash").value||0);
+    if(Math.abs(total-lastTotals.ttc)>0.01){
+      alert("Le total du paiement mixte doit être égal au total TTC.");
+      return false;
+    }
+  }
+  return true;
+}
+
+function goToClient(){
+  if(products.length===0){
+    alert("Ajoute au moins un article avant de passer au paiement.");
+    return;
+  }
+  document.getElementById("clientSection").classList.remove("hidden");
+  document.getElementById("paymentSection").classList.add("hidden");
+  updateStepper(1);
+  document.getElementById("clientSection").scrollIntoView({behavior:"smooth"});
+}
+
+function continueToPayment(){
+  if(!selectedClient){
+    alert("Sélectionne un client ou crée une nouvelle fiche avant de continuer.");
+    document.getElementById("clientSearch").focus();
+    return;
+  }
+  document.getElementById("paymentSection").classList.remove("hidden");
+  updateStepper(2);
+  document.getElementById("paymentSection").scrollIntoView({behavior:"smooth"});
+}
+
+function backToArticles(){
+  document.getElementById("clientSection").classList.add("hidden");
+  document.getElementById("paymentSection").classList.add("hidden");
+  updateStepper(0);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function processPayment(){
+  if(!validatePayment()) return false;
+
+  fillTicket();
+  const mode=selectedPayment();
+  const immediate=document.getElementById("instantDelivery").checked;
+  const paid=mode!=="Paiement au retrait";
+
+  document.getElementById("paymentStatus").textContent=
+    immediate
+      ? `Commande validée${paid?", paiement enregistré":""} et terminée : le client repart avec sa commande.`
+      : `Commande validée${paid?", paiement enregistré":""} et envoyée en production.`;
+
+  document.getElementById("paymentSuccess").classList.remove("hidden");
+  document.getElementById("ticketArea").classList.remove("hidden");
+  updateStepper(3);
+  return true;
+}
+function fillTicket(){
+  document.getElementById("ticketOrder").textContent=
+    "Commande : "+document.getElementById("orderNumber").value;
+  document.getElementById("ticketDate").textContent=
+    new Date().toLocaleString("fr-FR");
+  document.getElementById("ticketClient").textContent=
+    "Client : "+document.getElementById("clientName").value.trim();
+
+  const referenceProduct=products[0];
+  const pickupDate=referenceProduct ? referenceProduct.deliveryDate : "";
+  const pickupTime=referenceProduct ? (referenceProduct.deliveryTime||"14:00") : "";
+  const pickupDateLabel=pickupDate
+    ? new Date(pickupDate+"T12:00:00").toLocaleDateString("fr-FR")
+    : "Non renseignée";
+  document.getElementById("ticketPickup").textContent=
+    "Récupération prévue : "+pickupDateLabel+
+    (pickupTime ? " à "+pickupTime : "");
+
+  document.getElementById("ticketProducts").innerHTML=products.map(p=>{
+    const qty=Number(p.qty||1);
+
+    // Prix de l'article seul, sans le supplément express.
+    let baseTTC;
+    if(p.priceType==="TTC"){
+      baseTTC=Number(p.price||0)*qty;
+    }else{
+      const baseHT=Number(p.price||0)*qty;
+      baseTTC=p.taxApplied ? baseHT*1.04 : baseHT;
+    }
+
+    // Le supplément est calculé et affiché sur sa propre ligne.
+    const supplementTTC=
+      Number(p.surcharge||0)*(p.taxApplied ? 1.04 : 1);
+
+    return `
+      <div class="ticket-product">
+        <div class="ticket-product-main">
+          <div>
+            <div class="ticket-product-name">${escapeHtml(p.name)} — Quantité : ${qty}</div>
+            <div class="ticket-product-description">${escapeHtml(p.description||"")}</div>
+          </div>
+          <div class="ticket-product-price">${euro.format(baseTTC)}</div>
+        </div>
+
+        ${supplementTTC>0 ? `
+          <div class="ticket-extra-line">
+            <span>Supplément express</span>
+            <span class="ticket-extra-price">${euro.format(supplementTTC)}</span>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("ticketTTC").textContent=euro.format(lastTotals.ttc);
+  document.getElementById("ticketPayment").textContent=selectedPayment();
+}
+function printTicket(){
+  fillTicket();
+  const ticket=document.getElementById("ticketArea");
+  ticket.classList.remove("hidden");
+  window.print();
+}
+function downloadTicket(){
+  fillTicket();
+  document.getElementById("ticketExportOverlay").classList.add("show");
+}
+function normalizePhone(phone){ return phone.replace(/[^\d]/g,""); }
+function sendWhatsApp(){
+  const phone=normalizePhone(document.getElementById("clientPhone").value);
+  if(!phone){
+    alert("Ajoute le numéro WhatsApp du client.");
+    document.getElementById("clientPhone").focus();
+    return;
+  }
+  const client=document.getElementById("clientName").value.trim();
+  const detail=products.map(p=>`• ${p.name} x ${p.qty}\n${p.description}\nTotal : ${euro.format(p.totalTTC)}`).join("\n\n");
+  const message=`Bonjour ${client},
+
+Voici le détail de votre commande Atelier OLDA :
+
+Commande : ${document.getElementById("orderNumber").value}
+
+${detail}
+
+Total TTC : ${euro.format(lastTotals.ttc)}
+Paiement : ${selectedPayment()}
+
+Merci pour votre confiance,
+L'équipe Atelier OLDA`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,"_blank");
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+document.getElementById("saveProductBtn").addEventListener("click",saveProduct);
+document.getElementById("cancelEditBtn").addEventListener("click",resetProductForm);
+document.getElementById("orderDate").addEventListener("change",updateDeliveryDateFromDelay);
+document.querySelectorAll('input[name="payment"]').forEach(r=>r.addEventListener("change",updatePaymentZones));
+document.getElementById("cashGiven").addEventListener("input",updateCashChange);
+document.getElementById("goToClientBtn").addEventListener("click",goToClient);
+document.getElementById("continueToPaymentBtn").addEventListener("click",continueToPayment);
+document.getElementById("backToArticlesBtn").addEventListener("click",backToArticles);
+
+document.getElementById("clientSearch").addEventListener("input",renderClientResults);
+document.getElementById("showCreateClientBtn").addEventListener("click",showCreateClient);
+document.getElementById("cancelCreateClientBtn").addEventListener("click",()=>{
+  document.getElementById("createClientBox").classList.add("hidden");
+  resetCreateClientForm();
+});
+document.getElementById("chooseIndividualBtn").addEventListener("click",()=>setCreateClientType("Particulier"));
+document.getElementById("chooseProfessionalBtn").addEventListener("click",()=>setCreateClientType("Professionnel"));
+document.getElementById("createAndSelectClientBtn").addEventListener("click",createAndSelectClient);
+document.getElementById("changeClientBtn").addEventListener("click",clearSelectedClient);
+document.getElementById("editSelectedClientBtn").addEventListener("click",editSelectedClient);
+
+["newIndividualPhone","newCompanyPhone"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",function(){
+    this.value=formatPhoneInput(this.value);
+  });
+});
+
+document.getElementById("newCompanyCity").addEventListener("input",function(){
+  if(normalizeSearch(this.value)==="saintmartin"){
+    document.getElementById("newCompanyPostal").value="97150";
+  }
+});
+document.getElementById("newCompanyPostal").addEventListener("input",function(){
+  if(this.value.trim()==="97150"){
+    document.getElementById("newCompanyCity").value="Saint-Martin";
+  }
+});
+
+document.getElementById("payButton").addEventListener("click",processPayment);
+document.getElementById("printTicketBtn").addEventListener("click",printTicket);
+document.getElementById("downloadTicketBtn").addEventListener("click",downloadTicket);
+document.getElementById("sendWhatsAppBtn").addEventListener("click",sendWhatsApp);
+document.getElementById("newSaleBtn").addEventListener("click",()=>location.reload());
+document.getElementById("homeBtn").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
+
+// Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
+["productName","quantity","unitPrice"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();saveProduct();}
+  });
+});
+document.getElementById("clientSearch").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const btns=document.querySelectorAll("#clientResults .select-client-btn");
+    if(btns.length===1)btns[0].click();
+  }
+});
+
+init();
+renderProducts();
+</script>
+
+<script>
+(function(){
+  function pick(id){ return document.getElementById(id); }
+  function text(id){ return pick(id)?.value || pick(id)?.textContent || ""; }
+  function addPlanningButton(){
+    if(document.getElementById("oldaCreatePlanningBtn")) return;
+    const host=document.querySelector("#paymentSuccess .actions") || document.querySelector("#paymentSuccess .footer-actions");
+    if(!host) return;
+    const btn=document.createElement("button");
+    btn.id="oldaCreatePlanningBtn";
+    btn.className="primary";
+    btn.textContent="📅 Créer dans le planning";
+    btn.style.marginTop="10px";
+    btn.onclick=function(){
+      const selected = window.selectedClient || null;
+      const productNames = (typeof products!=="undefined"?products:[]).map(p=>`${p.qty} x ${p.name}`).join(" • ");
+      const production = (typeof products!=="undefined"?products:[]).map(p=>p.description).filter(Boolean).join(" | ");
+      const payload={
+        source:"Vente directe",
+        ref:text("orderNumber") || text("ticketOrder") || ("VD-"+Date.now()),
+        client:selected ? (selected.company||selected.name||selected.contact||"Client") : (text("clientName")||"Client"),
+        name:productNames || "Vente directe",
+        responsible:"Non défini",
+        due:text("deliveryDate") || new Date().toISOString().slice(0,10),
+        priority:(pick("deliveryDelay")?.value==="5" ? "3" : pick("deliveryDelay")?.value==="10" ? "2" : "1"),
+        stage:(pick("instantDelivery")?.checked ? "facturation" : "preparation"),
+        status:(pick("instantDelivery")?.checked ? "Commande récupérée" : "Préparation des produits"),
+        production:production || "À définir",
+        comment:[`Délai souhaité : ${deliveryDelayLabel()}`,text("internalNote")].filter(Boolean).join(" | "),
+        amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
+        checks:{products:true,bat:false,files:true,qty:true,payment:!document.querySelector('input[name="payment"][value="Paiement au retrait"]')?.checked}
+      };
+      parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},"*");
+    };
+    host.appendChild(btn);
+    // Le bouton naît ici avec un payload MINIMAL ; le vrai (client structuré,
+    // récapitulatif complet, paiement) est posé par patchPlanningButton, plus
+    // bas dans la page. On l'appelle tout de suite plutôt que d'attendre son
+    // scrutateur toutes les 400 ms : sans ça, une vendeuse rapide part au
+    // planning avec la fiche pauvre.
+    if(window.patchPlanningButton) window.patchPlanningButton();
+  }
+  const observer=new MutationObserver(addPlanningButton);
+  observer.observe(document.body,{subtree:true,attributes:true,childList:true});
+  addPlanningButton();
+})();
+</script>
+
+
+
+
+<script>
+(function(){
+  function getBaseTTC(p){
+    const qty=Number(p.qty||1);
+    if(p.priceType==="TTC") return Number(p.price||0)*qty;
+    const ht=Number(p.price||0)*qty;
+    return p.taxApplied ? ht*1.04 : ht;
+  }
+
+  function getSupplementTTC(p){
+    return Number(p.surcharge||0)*(p.taxApplied ? 1.04 : 1);
+  }
+
+  function closeExportChoice(){
+    document.getElementById("ticketExportOverlay").classList.remove("show");
+  }
+
+  function exportTXT(){
+    fillTicket();
+
+    const lines=[
+      "ATELIER OLDA",
+      "Saint-Martin",
+      "TICKET DE COMMANDE",
+      "--------------------------------",
+      "Commande : "+document.getElementById("orderNumber").value,
+      "Date : "+new Date().toLocaleString("fr-FR"),
+      "Client : "+document.getElementById("clientName").value.trim(),
+      "Récupération prévue : "+
+        (products[0] && products[0].deliveryDate
+          ? new Date(products[0].deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")
+          : "Non renseignée")+
+        " à "+(products[0] ? (products[0].deliveryTime||"14:00") : ""),
+      "--------------------------------"
+    ];
+
+    products.forEach(p=>{
+      lines.push(`${p.name} × ${p.qty}`);
+      if(p.description) lines.push(p.description);
+      lines.push(`Article : ${euro.format(getBaseTTC(p))}`);
+
+      const supplement=getSupplementTTC(p);
+      if(supplement>0){
+        lines.push(`+ Supplément express : ${euro.format(supplement)}`);
+      }
+      lines.push("");
+    });
+
+    lines.push("--------------------------------");
+    lines.push("TOTAL COMMANDE TTC : "+euro.format(lastTotals.ttc));
+    lines.push("Paiement : "+selectedPayment());
+    lines.push("--------------------------------");
+    lines.push("Merci pour votre confiance");
+    lines.push("L'équipe Atelier OLDA");
+
+    const blob=new Blob(
+      ["\ufeff"+lines.join("\r\n")],
+      {type:"text/plain;charset=utf-8"}
+    );
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=
+      `Ticket_Atelier_OLDA_${document.getElementById("orderNumber").value}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    closeExportChoice();
+  }
+
+  function exportPDF(){
+    // L'utilisateur choisit ensuite « Enregistrer au format PDF »
+    // dans la fenêtre native d'impression de sa tablette ou de son ordinateur.
+    closeExportChoice();
+    printTicket();
+  }
+
+  document.getElementById("ticketPrintPreviewBtn")
+    .addEventListener("click",printTicket);
+  document.getElementById("ticketDownloadPreviewBtn")
+    .addEventListener("click",downloadTicket);
+  document.getElementById("ticketPdfBtn")
+    .addEventListener("click",exportPDF);
+  document.getElementById("ticketTxtBtn")
+    .addEventListener("click",exportTXT);
+  document.getElementById("ticketExportCancelBtn")
+    .addEventListener("click",closeExportChoice);
+
+  document.getElementById("ticketExportOverlay")
+    .addEventListener("click",function(event){
+      if(event.target===this) closeExportChoice();
+    });
+})();
+</script>
+
+
+<script>
+(function(){
+  let currentSaleStep=1;
+  const container=document.querySelector(".container");
+  const children=[...container.children];
+  const stepper=children.find(el=>el.classList.contains("stepper"));
+  const client=document.getElementById("clientSection");
+  const payment=document.getElementById("paymentSection");
+  const success=document.getElementById("paymentSuccess");
+  const ticket=document.getElementById("ticketArea");
+  const clientIndex=children.indexOf(client);
+
+  children
+    .filter((el,index)=>el!==stepper && index>0 && index<clientIndex)
+    .forEach(el=>el.dataset.saleStep="1");
+
+  client.dataset.saleStep="2";
+  payment.dataset.saleStep="3";
+  success.dataset.saleStep="4";
+  ticket.dataset.saleStep="4";
+
+  const nav=document.createElement("div");
+  nav.className="tablet-wizard-nav";
+  nav.innerHTML=`
+    <button id="saleBack" class="secondary">← Retour</button>
+    <div class="wizard-spacer"></div>
+    <button id="saleNext" class="primary">
+      Valider et passer à l'étape suivante →
+    </button>
+  `;
+  container.appendChild(nav);
+
+  function displayStep(step){
+    currentSaleStep=Math.max(1,Math.min(4,step));
+
+    document.querySelectorAll("[data-sale-step]").forEach(el=>{
+      const visible=Number(el.dataset.saleStep)===currentSaleStep;
+      el.classList.toggle("sale-panel-hidden",!visible);
+      if(visible) el.classList.remove("hidden");
+    });
+
+    updateStepper(currentSaleStep-1);
+
+    document.getElementById("saleBack").style.visibility=
+      currentSaleStep===1 ? "hidden" : "visible";
+
+    const labels={
+      1:"Valider les articles et continuer →",
+      2:"Valider le client et continuer →",
+      3:"Valider la commande et le paiement →",
+      4:"Nouvelle vente"
+    };
+    document.getElementById("saleNext").textContent=labels[currentSaleStep];
+
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  document.getElementById("saleBack").addEventListener("click",()=>{
+    if(currentSaleStep>1) displayStep(currentSaleStep-1);
+  });
+
+  document.getElementById("saleNext").addEventListener("click",()=>{
+    if(currentSaleStep===1){
+      if(products.length===0){
+        alert("Ajoute puis enregistre au moins un article avant de continuer.");
+        return;
+      }
+      displayStep(2);
+      return;
+    }
+
+    if(currentSaleStep===2){
+      if(!selectedClient){
+        alert("Sélectionne un client. Le cadre vert doit apparaître avant de continuer.");
+        document.getElementById("clientSearch").focus();
+        return;
+      }
+      displayStep(3);
+      return;
+    }
+
+    if(currentSaleStep===3){
+      if(processPayment()){
+        displayStep(4);
+      }
+      return;
+    }
+
+    location.reload();
+  });
+
+  window.showSaleWizardStep=displayStep;
+  displayStep(1);
+})();
+</script>
+
+
+
+
+
+<script>
+(function(){
+  const instantDelivery=document.getElementById("instantDelivery");
+  const deliveryDelay=document.getElementById("deliveryDelay");
+  const deliveryDate=document.getElementById("deliveryDate");
+  const deliveryTime=document.getElementById("deliveryTime");
+
+  function localDateValue(date){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,"0");
+    const d=String(date.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function closestFullHour(date){
+    let hour=date.getHours();
+    if(date.getMinutes()>0) hour+=1;
+    hour=Math.max(9,Math.min(17,hour));
+    return `${String(hour).padStart(2,"0")}:00`;
+  }
+
+  if(!deliveryTime.value){
+    deliveryTime.value="14:00";
+  }
+
+  instantDelivery.addEventListener("change",function(){
+    if(this.checked){
+      const now=new Date();
+      deliveryDelay.value="custom";
+      deliveryDate.classList.remove("hidden");
+      deliveryDate.value=localDateValue(now);
+      deliveryTime.value=closestFullHour(now);
+      updateDeadlineInfo();
+    }
+  });
+})();
+</script>
+
+<style>
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
+.req{color:#dc2626;font-weight:900;margin-left:2px}
+.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:292px;font-family:inherit;user-select:none}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-title{font-weight:800;font-size:15px;color:#142e54}
+.dp-nav{display:flex;gap:4px}
+.dp-nav button{width:34px;height:34px;border:0;border-radius:50%;background:transparent;font-size:17px;cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
+.dp-nav button:hover{background:#f1f5f9}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.dp-dow{font-size:11px;font-weight:800;color:#94a3b8;padding:6px 0}
+.dp-day{width:34px;height:34px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#1f2937;display:grid;place-items:center;padding:0}
+.dp-day:hover{background:#eef1f5}
+.dp-day.other{color:#c2cad6}
+.dp-day.today{outline:1.5px solid #142e54;outline-offset:-1.5px}
+.dp-day.sel{background:#1c3d6e;color:#fff}
+.dp-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.dp-foot button{border:0;background:transparent;color:#142e54;font-weight:800;cursor:pointer;padding:8px 10px;border-radius:8px}
+.dp-foot button:hover{background:#f1f5f9}
+</style>
+<script>
+(function(){
+  var MONTHS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  var DOWS=["L","M","M","J","V","S","D"];
+  var pop=null,target=null,vy=0,vm=0;
+  function iso(y,m,d){return y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+  function close(){if(pop){pop.remove();pop=null;target=null;}}
+  function render(){
+    var sel=target.value||"";
+    var today=new Date();var tIso=iso(today.getFullYear(),today.getMonth(),today.getDate());
+    var first=new Date(vy,vm,1);var startDow=(first.getDay()+6)%7;
+    var dim=new Date(vy,vm+1,0).getDate();var dimPrev=new Date(vy,vm,0).getDate();
+    var h='<div class="dp-head"><div class="dp-title">'+MONTHS[vm]+' '+vy+'</div><div class="dp-nav"><button type="button" data-nav="-1">‹</button><button type="button" data-nav="1">›</button></div></div><div class="dp-grid">';
+    for(var i=0;i<7;i++)h+='<div class="dp-dow">'+DOWS[i]+'</div>';
+    var cells=Math.ceil((startDow+dim)/7)*7;
+    for(var c=0;c<cells;c++){
+      var d=c-startDow+1,cm=vm,other=false;
+      if(d<1){d=dimPrev+d;cm=vm-1;other=true;}
+      else if(d>dim){d=d-dim;cm=vm+1;other=true;}
+      var dt=new Date(vy,cm,d);var v=iso(dt.getFullYear(),dt.getMonth(),dt.getDate());
+      var cls="dp-day"+(other?" other":"")+(v===tIso?" today":"")+(v===sel?" sel":"");
+      h+='<button type="button" class="'+cls+'" data-v="'+v+'">'+d+'</button>';
+    }
+    h+='</div><div class="dp-foot"><button type="button" data-today="1">Aujourd&#39;hui</button></div>';
+    pop.innerHTML=h;
+  }
+  function setVal(v){
+    target.value=v;
+    target.dispatchEvent(new Event("input",{bubbles:true}));
+    target.dispatchEvent(new Event("change",{bubbles:true}));
+    close();
+  }
+  function open(inp){
+    close();target=inp;
+    var base=inp.value?new Date(inp.value+"T12:00:00"):new Date();
+    vy=base.getFullYear();vm=base.getMonth();
+    pop=document.createElement("div");pop.className="dp-pop";
+    document.body.appendChild(pop);render();
+    var r=inp.getBoundingClientRect();
+    var left=Math.min(r.left+window.scrollX,window.scrollX+document.documentElement.clientWidth-306);
+    pop.style.left=Math.max(8,left)+"px";
+    pop.style.top=(r.bottom+window.scrollY+6)+"px";
+    pop.addEventListener("click",function(e){
+      var b=e.target.closest("button");if(!b)return;
+      if(b.dataset.nav){vm+=Number(b.dataset.nav);if(vm<0){vm=11;vy--;}if(vm>11){vm=0;vy++;}render();return;}
+      if(b.dataset.today){var t=new Date();setVal(iso(t.getFullYear(),t.getMonth(),t.getDate()));return;}
+      if(b.dataset.v)setVal(b.dataset.v);
+    });
+  }
+  document.addEventListener("mousedown",function(e){
+    var inp=e.target.closest?e.target.closest('input[type=date]'):null;
+    if(inp&&!inp.disabled){e.preventDefault();inp.blur();open(inp);return;}
+    if(pop&&!pop.contains(e.target))close();
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")close();});
+  document.querySelectorAll("label").forEach(function(l){
+    if(/\*\s*$/.test(l.textContent)&&!l.querySelector(".req")){
+      l.innerHTML=l.innerHTML.replace(/\s*\*\s*$/,' <span class="req">*</span>');
+    }
+  });
+  window.__attachCap=function(ids){
+    ids.forEach(function(id){
+      var el=document.getElementById(id);if(!el)return;
+      el.addEventListener("input",function(){
+        var pos=this.selectionStart;
+        var v=this.value.replace(/(^|[\s\-'])([a-zà-öø-ÿ])/g,function(m,a,b){return a+b.toUpperCase();});
+        if(v!==this.value){this.value=v;try{this.setSelectionRange(pos,pos);}catch(e){}}
+      });
+    });
+  };
+})();
+</script>
+<script>__attachCap(["newIndividualName","newCompanyContact","newCompanyCity","newCompanyName"]);</script>
+<style>
+#ticketArea .ticket-details{font-size:12.5px;font-weight:600;line-height:1.5;color:#344054;margin-top:8px}
+#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
+#ticketArea .ticket-details .tl span{color:#667085;font-weight:700;font-size:12px}
+#ticketArea .ticket-details .tl strong{color:#101828;font-weight:700;font-size:12.5px;white-space:pre-line}
+#ticketArea .ticket-client-box{font-size:14px!important}
+#ticketArea #ticketClient{font-size:15px}
+#ticketArea #ticketOrder{font-size:14px}
+#ticketArea #ticketPickup{font-size:13px}
+#ticketArea .ticket-product-description{white-space:pre-line}
+</style>
+<script>
+(function(){
+  var PRO_TYPES=['Professionnel','Association','Revendeur'];
+  var esc2=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]});};
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  function tl(k,val){return '<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(val||'—')+'</strong></div>';}
+
+
+  /* Contrôle du format de l'e-mail : arobase + nom de domaine + extension */
+  window.isValidEmail=function(value){
+    var v=String(value||'').trim();
+    return /^[^\s@,;]+@[^\s@,;]+\.[a-zA-Z]{2,}$/.test(v);
+  };
+  window.attachEmailCheck=function(id,helpId){
+    var input=document.getElementById(id);
+    if(!input||input.__mailBound)return;
+    input.__mailBound=true;
+    var help=helpId?document.getElementById(helpId):null;
+    if(!help){
+      help=document.createElement('div');
+      help.className='help';
+      help.style.marginTop='5px';
+      input.insertAdjacentElement('afterend',help);
+    }
+    var paint=function(){
+      var v=input.value.trim();
+      if(!v){input.classList.remove('invalid');input.style.borderColor='';help.textContent='';help.style.color='';return;}
+      if(window.isValidEmail(v)){
+        input.classList.remove('invalid');
+        [input.nextElementSibling,input.previousElementSibling,help.nextElementSibling].forEach(function(n){
+          if(n&&n.classList&&n.classList.contains('error'))n.remove();
+        });
+        input.style.borderColor='#1c7c4a';
+        help.textContent='✓ Adresse e-mail valide';
+        help.style.color='#1c7c4a';
+      }else{
+        input.classList.add('invalid');
+        input.style.borderColor='#c62828';
+        help.textContent="⚠ Adresse incomplète : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).";
+        help.style.color='#c62828';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__mailPaint=paint;
+  };
+
+  window.clientInfoLines=function(c){
+    if(!c)return [];
+    var lines=[['Type de client',c.type||'—'],['Nom / société',c.company||c.name||'—']];
+    if(c.contact)lines.push(['Personne à contacter',c.contact+(c.contactRole?' ('+c.contactRole+')':'')]);
+    lines.push(['WhatsApp',c.phone||'Non renseigné']);
+    lines.push(['E-mail',c.email||'Non renseigné']);
+    if(c.sector)lines.push(['Secteur',c.sector]);
+    var adr=[c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+    if(adr)lines.push(['Adresse',adr]);
+    return lines;
+  };
+
+  /* Type de client : Particulier léger, Pro / Association / Revendeur complet */
+  window.setCreateClientType=function(type){
+    createClientType=type;
+    var individual=type==='Particulier';
+    el('individualForm').classList.toggle('hidden',!individual);
+    el('professionalForm').classList.toggle('hidden',individual);
+    [['chooseIndividualBtn','Particulier'],['chooseProfessionalBtn','Professionnel'],['chooseAssociationBtn','Association'],['chooseResellerBtn','Revendeur']].forEach(function(pair){
+      var b=el(pair[0]);
+      if(b)b.classList.toggle('active',type===pair[1]);
+    });
+    var label=el('companyNameLabel');
+    if(label)label.textContent=type==='Association'?'Nom de l’association *':(type==='Revendeur'?'Raison sociale du revendeur *':'Raison sociale EBP *');
+  };
+
+  var originalShowCreate=window.showCreateClient;
+  window.showCreateClient=function(){
+    window.__editingClientId=null;
+    originalShowCreate();
+  };
+
+  window.createAndSelectClient=function(){
+    var client;
+    if(createClientType==='Particulier'){
+      if(!requireFields(['newIndividualName','newIndividualPhone'])){
+        alert('Ajoute le prénom, le nom et le WhatsApp.');
+        return;
+      }
+      var mailP=v('newIndividualEmail');
+      if(mailP&&!window.isValidEmail(mailP)){
+        el('newIndividualEmail').__mailPaint&&el('newIndividualEmail').__mailPaint();
+        el('newIndividualEmail').focus();
+        alert("Adresse e-mail invalide : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).");
+        return;
+      }
+      client={
+        id:'CLI-'+String(clients.length+1).padStart(3,'0'),
+        type:'Particulier',
+        name:v('newIndividualName'),
+        phone:v('newIndividualPhone'),
+        email:v('newIndividualEmail')
+      };
+    }else{
+      if(!requireFields(['newCompanyName','newCompanySector','newCompanyContact','newCompanyPhone','newCompanyEmail'])){
+        alert('Pour un client professionnel, association ou revendeur : raison sociale, secteur, personne à contacter, WhatsApp et e-mail sont obligatoires.');
+        return;
+      }
+      if(!window.isValidEmail(v('newCompanyEmail'))){
+        el('newCompanyEmail').__mailPaint&&el('newCompanyEmail').__mailPaint();
+        el('newCompanyEmail').focus();
+        alert("Adresse e-mail invalide : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).");
+        return;
+      }
+      client={
+        id:'CLI-'+String(clients.length+1).padStart(3,'0'),
+        type:createClientType||'Professionnel',
+        company:v('newCompanyName'),
+        sector:v('newCompanySector'),
+        address:v('newCompanyAddress'),
+        city:v('newCompanyCity'),
+        postal:v('newCompanyPostal'),
+        contact:v('newCompanyContact'),
+        contactRole:v('newCompanyContactRole'),
+        phone:v('newCompanyPhone'),
+        email:v('newCompanyEmail'),
+        siret:'',
+        billing:''
+      };
+    }
+    if(window.__editingClientId){
+      var existing=clients.filter(function(c){return c.id===window.__editingClientId;})[0];
+      if(existing){
+        ['name','company','contact','contactRole','sector','address','city','postal'].forEach(function(k){delete existing[k];});
+        Object.keys(client).forEach(function(k){if(k!=='id')existing[k]=client[k];});
+        client=existing;
+      }
+      window.__editingClientId=null;
+    }else{
+      clients.push(client);
+    }
+    selectClientById(client.id);
+    resetCreateClientForm();
+  };
+
+  var originalReset=window.resetCreateClientForm;
+  window.resetCreateClientForm=function(){
+    ['newCompanyContactRole'].forEach(function(id){var e=el(id);if(e)e.value='';});
+    originalReset();
+  };
+
+  window.editSelectedClient=function(){
+    var c=selectedClient;
+    if(!c)return;
+    el('createClientBox').classList.remove('hidden');
+    el('selectedClientCard').classList.add('hidden');
+    window.__editingClientId=c.id;
+    setCreateClientType(c.type||'Particulier');
+    var set=function(id,val){var e=el(id);if(e)e.value=val||'';};
+    if((c.type||'Particulier')==='Particulier'){
+      set('newIndividualName',c.name);
+      set('newIndividualPhone',c.phone);
+      set('newIndividualEmail',c.email);
+      el('newIndividualName').focus();
+    }else{
+      set('newCompanyName',c.company||c.name);
+      set('newCompanySector',c.sector);
+      set('newCompanyAddress',c.address);
+      set('newCompanyCity',c.city);
+      set('newCompanyPostal',c.postal);
+      set('newCompanyContact',c.contact);
+      set('newCompanyContactRole',c.contactRole);
+      set('newCompanyPhone',c.phone);
+      set('newCompanyEmail',c.email);
+      el('newCompanyName').focus();
+    }
+  };
+
+  /* Ticket : toutes les informations saisies apparaissent */
+  var originalFill=window.fillTicket;
+  window.fillTicket=function(){
+    originalFill();
+    var box=el('ticketClientDetails');
+    if(box){
+      var lines=window.clientInfoLines(selectedClient);
+      if(!lines.length){
+        lines=[['Type de client',v('clientType')||'Client comptoir'],['WhatsApp',v('clientPhone')||'Non renseigné'],['E-mail',v('clientEmail')||'Non renseigné']];
+      }
+      box.innerHTML=lines.map(function(l){return tl(l[0],l[1]);}).join('');
+    }
+    var extra=el('ticketExtraDetails');
+    if(extra){
+      var rows=[tl('Délai souhaité',(typeof deliveryDelayLabel==='function'?deliveryDelayLabel():''))];
+      if(v('internalNote'))rows.push(tl('Note interne OLDA',v('internalNote')));
+      extra.innerHTML=rows.join('');
+    }
+  };
+
+  window.saleRecapLines=function(){
+    var d=function(x){var t=String(x==null?'':x).trim();return t?t:'—';};
+    var c=selectedClient||{};
+    var p0=(typeof products!=="undefined"?products:[])[0]||{};
+    var mode=(document.querySelector('input[name="payment"]:checked')||{}).value||'';
+    var out=[
+      ['Type de dossier','Vente directe'],
+      ['Commande',d(v('orderNumber'))],
+      ['Date de la vente',new Date().toLocaleString('fr-FR')],
+      ['Date de commande',d(v('orderDate')?new Date(v('orderDate')+'T12:00:00').toLocaleDateString('fr-FR'):'')],
+      ['Client',d(c.company||c.name||v('clientName'))],
+      ['Type de client',d(c.type||v('clientType'))],
+      ['Personne à contacter',d(c.contact)],
+      ['Fonction du contact',d(c.contactRole)],
+      ['WhatsApp',d(c.phone||v('clientPhone'))],
+      ['E-mail',d(c.email||v('clientEmail'))],
+      ['Secteur',d(c.sector)],
+      ['Adresse',d([c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — '))],
+      ['Récupération prévue',d((p0.deliveryDate?new Date(p0.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p0.deliveryTime?' à '+p0.deliveryTime:''))],
+      ['Délai souhaité',d(typeof deliveryDelayLabel==='function'?deliveryDelayLabel():'')],
+      ['Nombre d’articles',String((typeof products!=="undefined"?products:[]).length)],
+      ['Quantité totale',String((typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+Number(p.qty||0);},0))]
+    ];
+    (typeof products!=="undefined"?products:[]).forEach(function(p,i){
+      var no='Article '+(i+1)+' — ';
+      out.push([no+'Désignation',d(p.name)]);
+      out.push([no+'Quantité',d(p.qty)]);
+      out.push([no+'Prix unitaire',d(euro.format(Number(p.price||0))+' '+(p.priceType||''))]);
+      out.push([no+'Taxe 4 %',p.taxApplied?'Appliquée':'Non appliquée']);
+      out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
+      out.push([no+'Total TTC',euro.format(Number(p.totalTTC||0))]);
+      out.push([no+'Description de production',d(p.description)]);
+      out.push([no+'Récupération',d((p.deliveryDate?new Date(p.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p.deliveryTime?' à '+p.deliveryTime:''))]);
+    });
+    out.push(['Total HT',euro.format((typeof lastTotals!=="undefined"?lastTotals.ht:0)||0)]);
+    out.push(['Taxe',euro.format((typeof lastTotals!=="undefined"?lastTotals.tax:0)||0)]);
+    out.push(['Suppléments',euro.format((typeof lastTotals!=="undefined"?lastTotals.surcharge:0)||0)]);
+    out.push(['Total TTC',euro.format((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0)]);
+    out.push(['Paiement',d(mode||(typeof selectedPayment==='function'?selectedPayment():''))]);
+    if(mode==='Espèces'){
+      out.push(['Montant donné',d(v('cashGiven')?euro.format(Number(v('cashGiven'))):'')]);
+      out.push(['Monnaie rendue',d(el('cashChange')?el('cashChange').textContent:'')]);
+    }
+    if(mode==='Mixte'){
+      out.push(['Part carte',d(v('mixCard')?euro.format(Number(v('mixCard'))):'')]);
+      out.push(['Part espèces',d(v('mixCash')?euro.format(Number(v('mixCash'))):'')]);
+    }
+    out.push(['Client repart immédiatement',(el('instantDelivery')&&el('instantDelivery').checked)?'Oui':'Non']);
+    out.push(['Note interne OLDA',d(v('internalNote'))]);
+    return out;
+  };
+
+  // Le mode de paiement coché, tel que le planning le connaît (catalog.json).
+  // « Paiement au retrait » n'est PAS un mode : c'est l'absence d'encaissement,
+  // donc pas de mode et `paye` à faux.
+  var MODES_PLANNING={'Carte bancaire':'cb','Espèces':'especes','Virement':'virement','Mixte':'mixte'};
+  function modeCoche(){
+    var r=document.querySelector('input[name="payment"]:checked');
+    return r?r.value:'';
+  }
+
+  function patchPlanningButton(){
+    var btn=el('oldaCreatePlanningBtn');
+    if(!btn||btn.__oldaPatched)return;
+    btn.__oldaPatched=true;
+    btn.onclick=function(){
+      var productNames=(typeof products!=="undefined"?products:[]).map(function(p){return p.qty+' x '+p.name;}).join(' • ');
+      var production=(typeof products!=="undefined"?products:[]).map(function(p){return p.description;}).filter(Boolean).join(' | ');
+      var instant=el('instantDelivery')&&el('instantDelivery').checked;
+      var mode=modeCoche();
+      var payload={
+        source:'Vente directe',
+        ref:v('orderNumber')||('VD-'+Date.now()),
+        client:selectedClient?(selectedClient.company||selectedClient.name):(v('clientName')||'Client'),
+        name:productNames||'Vente directe',
+        responsible:'Non défini',
+        due:(el('deliveryDate')&&el('deliveryDate').value)||new Date().toISOString().slice(0,10),
+        priority:(el('deliveryDelay')&&el('deliveryDelay').value==='5')?'3':((el('deliveryDelay')&&el('deliveryDelay').value==='10')?'2':'1'),
+        stage:instant?'facturation':'preparation',
+        status:instant?'Commande récupérée':'Préparation des produits',
+        production:production||'À définir',
+        comment:[(typeof deliveryDelayLabel==='function'?'Délai souhaité : '+deliveryDelayLabel():''),v('internalNote')].filter(Boolean).join(' | '),
+        amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
+        dueTime:((typeof products!=="undefined"?products:[])[0]||{}).deliveryTime||v('deliveryTime')||'14:00',
+        clientId:selectedClient?selectedClient.id:'',
+        client_info:window.clientInfoLines(selectedClient),
+        details:window.saleRecapLines(),
+        recap:['ATELIER OLDA — RÉCAPITULATIF DE VENTE DIRECTE',''].concat(window.saleRecapLines().map(function(l){return l[0]+' : '+l[1];})).join('\n'),
+        checks:{products:true,bat:false,files:true,qty:true,payment:mode!=='Paiement au retrait'},
+        // --- Ce que le PLANNING a besoin de lire en clair, pas dans du texte ---
+        // La fiche client complète : le planning en tire le type (pro / perso),
+        // la personne à contacter, le WhatsApp et l'e-mail — sans les relire
+        // dans les lignes du récapitulatif.
+        clientObj:selectedClient||{
+          type:v('clientType')||'Particulier',
+          name:v('clientName'),
+          phone:v('clientPhone'),
+          email:v('clientEmail')
+        },
+        quantity:(typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+(Number(p.qty)||0);},0),
+        paiement:{
+          modeLabel:mode,
+          mode:MODES_PLANNING[mode]||null,
+          paye:!!mode&&mode!=='Paiement au retrait',
+          retraitImmediat:!!instant
+        }
+      };
+      parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},'*');
+    };
+  }
+  // Exposé pour que le bouton soit gréé DÈS sa création (cf. addPlanningButton).
+  window.patchPlanningButton=patchPlanningButton;
+
+  (function(){
+    function attachAll(){
+      var list=document.querySelectorAll('input[type=email], input[id*="mail" i]');
+      Array.prototype.forEach.call(list,function(input){
+        if(input.id&&!input.__mailBound)window.attachEmailCheck(input.id);
+      });
+    }
+    attachAll();
+    setInterval(attachAll,800);
+    document.addEventListener('submit',function(e){e.preventDefault();},true);
+  })();
+  window.attachEmailCheck('newIndividualEmail');
+  window.attachEmailCheck('newCompanyEmail');
+  setInterval(patchPlanningButton,400);
+  patchPlanningButton();
+
+  [['chooseIndividualBtn','Particulier'],['chooseProfessionalBtn','Professionnel'],['chooseAssociationBtn','Association'],['chooseResellerBtn','Revendeur']].forEach(function(pair){
+    var b=el(pair[0]);
+    if(b)b.addEventListener('click',function(){setCreateClientType(pair[1]);});
+  });
+})();
+</script>
+<style>
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.55}
+.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.live-check ul{margin:7px 0 0;padding-left:18px}
+.live-check li{margin:3px 0;font-weight:600}
+button.blocked{opacity:.45;cursor:not-allowed}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
+.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
+.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.wa-link{color:#12603a;font-weight:900;text-decoration:none;border-bottom:1px solid #9fc9ae}
+</style>
+<script>
+(function(){
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9@.]/g,'');};
+  function digits(s){return String(s||'').replace(/\D/g,'');}
+
+  /* 1 — WhatsApp : format, contrôle des 10 chiffres, lien cliquable */
+  window.waHref=function(phone){
+    var d=digits(phone);
+    if(d.length===10&&d.charAt(0)==='0')d='590'+d.slice(1);
+    return 'https://wa.me/'+d;
+  };
+  function attachPhoneCheck(id){
+    var input=el(id);
+    if(!input||input.__phoneBound)return;
+    input.__phoneBound=true;
+    var help=document.createElement('div');
+    help.className='help';
+    help.style.marginTop='5px';
+    input.insertAdjacentElement('afterend',help);
+    var paint=function(){
+      var d=digits(input.value);
+      if(!d){input.style.borderColor='';help.textContent='';return;}
+      if(d.length===10){
+        input.style.borderColor='#1c7c4a';
+        help.style.color='#1c7c4a';
+        help.textContent='✓ Numéro valide';
+      }else{
+        input.style.borderColor='#c62828';
+        help.style.color='#c62828';
+        help.textContent='⚠ Le numéro doit contenir 10 chiffres ('+d.length+' saisi'+(d.length>1?'s':'')+').';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__phonePaint=paint;
+  }
+  attachPhoneCheck('newIndividualPhone');
+  attachPhoneCheck('newCompanyPhone');
+
+  var baseSelect=window.selectClientById;
+  window.selectClientById=function(id){
+    baseSelect(id);
+    var meta=el('selectedClientMeta');
+    if(meta&&selectedClient&&selectedClient.phone){
+      meta.innerHTML=meta.textContent.replace(
+        selectedClient.phone,
+        '<a class="wa-link" target="_blank" href="'+window.waHref(selectedClient.phone)+'">'+selectedClient.phone+' ↗</a>'
+      );
+    }
+  };
+
+  /* 2 — Détection de doublon client */
+  function findDuplicate(){
+    var name=createClientType==='Particulier'?v('newIndividualName'):v('newCompanyName');
+    var phone=digits(createClientType==='Particulier'?v('newIndividualPhone'):v('newCompanyPhone'));
+    var mail=norm(createClientType==='Particulier'?v('newIndividualEmail'):v('newCompanyEmail'));
+    var n=norm(name);
+    return clients.filter(function(c){
+      if(window.__editingClientId&&c.id===window.__editingClientId)return false;
+      return (n&&(norm(c.name)===n||norm(c.company)===n))||
+             (phone&&digits(c.phone)===phone)||
+             (mail&&c.email&&norm(c.email)===mail);
+    })[0]||null;
+  }
+  var baseCreate=window.createAndSelectClient;
+  window.createAndSelectClient=function(){
+    if(!window.__editingClientId&&!window.__dupConfirmed){
+      var d=findDuplicate();
+      if(d){
+        var box=el('clientDuplicateWarn')||document.createElement('div');
+        box.id='clientDuplicateWarn';
+        box.className='dup-warn';
+        var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
+        box.innerHTML='⚠ Ce client semble déjà enregistré : <b>'+label+'</b>'+
+          '<div class="actions" style="justify-content:flex-start;margin-top:9px">'+
+          '<button type="button" class="primary" onclick="useExistingDuplicate(\''+d.id+'\')">Utiliser cette fiche</button>'+
+          '<button type="button" class="secondary" onclick="forceCreateClient()">Créer quand même</button></div>';
+        el('createClientBox').appendChild(box);
+        return;
+      }
+    }
+    window.__dupConfirmed=false;
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    return baseCreate();
+  };
+  window.useExistingDuplicate=function(id){
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    el('createClientBox').classList.add('hidden');
+    selectClientById(id);
+  };
+  window.forceCreateClient=function(){
+    window.__dupConfirmed=true;
+    window.createAndSelectClient();
+  };
+
+  /* 6 — Contrôle du délai (atelier ouvert du lundi au vendredi, 9h–18h) */
+  function isWorkingDay(d){var x=d.getDay();return x>=1&&x<=5;}
+  function nextWorkingDay(d){var x=new Date(d);do{x.setDate(x.getDate()+1);}while(!isWorkingDay(x));return x;}
+  function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function frOf(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'});}
+
+  window.checkDeliveryDate=function(){
+    var input=el('deliveryDate');
+    if(!input)return;
+    var box=el('deliveryDateWarning');
+    if(!box){
+      box=document.createElement('div');
+      box.id='deliveryDateWarning';
+      box.className='delay-warn ok';
+      input.parentNode.appendChild(box);
+    }
+    var iso=v('deliveryDate');
+    if(!iso||input.classList.contains('hidden')){box.style.display='none';return;}
+    box.style.display='block';
+    var d=new Date(iso+'T12:00:00');
+    if(!isWorkingDay(d)){
+      var alt=nextWorkingDay(d);
+      box.className='delay-warn bad';
+      box.innerHTML='⚠ L’atelier est fermé le week-end. Première récupération possible : <b>'+frOf(alt)+'</b>'+
+        ' <button type="button" class="secondary" style="margin-left:8px" onclick="applyDeliveryDate(\''+isoOf(alt)+'\')">Utiliser cette date</button>';
+      return;
+    }
+    var time=v('deliveryTime')||'14:00';
+    if(time<='09:00'){
+      var prev=new Date(d);
+      do{prev.setDate(prev.getDate()-1);}while(!isWorkingDay(prev));
+      box.className='delay-warn warn';
+      box.innerHTML='⏱ Récupération à 9h00 : la commande doit être <b>terminée le '+frOf(prev)+' avant 18h00</b>.';
+      return;
+    }
+    box.className='delay-warn ok';
+    box.textContent='✓ Créneau compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
+  };
+  window.applyDeliveryDate=function(iso){
+    el('deliveryDelay').value='custom';
+    el('deliveryDate').classList.remove('hidden');
+    el('deliveryDate').value=iso;
+    if(typeof updateDeadlineInfo==='function')updateDeadlineInfo();
+    window.checkDeliveryDate();
+  };
+
+  /* 3 — Contrôle en direct des informations obligatoires */
+  function missingForStep(step){
+    var m=[];
+    if(step===1){
+      if(!products.length){
+        m.push('Au moins un article enregistré');
+        if(!v('productName'))m.push('Article');
+        if(!v('quantity'))m.push('Quantité');
+        if(!v('unitPrice'))m.push('Prix unitaire');
+        if(!v('productDescription'))m.push('Description de production');
+        if(!v('deliveryDate'))m.push('Date souhaitée');
+      }
+    }
+    if(step===2&&!selectedClient)m.push('Client associé à la vente');
+    if(step===3){
+      var mode=(document.querySelector('input[name="payment"]:checked')||{}).value;
+      if(!mode)m.push('Mode de paiement');
+      if(mode==='Espèces'&&Number(v('cashGiven'))<Number((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0))m.push('Montant donné par le client');
+      if(mode==='Mixte'&&(Number(v('mixCard'))+Number(v('mixCash')))<=0)m.push('Répartition carte / espèces');
+    }
+    return m;
+  }
+
+  function refreshLive(){
+    var btn=el('saleNext');
+    if(!btn)return;
+    var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
+    if(step>=4){
+      var old=el('liveCheckSale');
+      if(old)old.remove();
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+      return;
+    }
+    var missing=missingForStep(step);
+    var box=el('liveCheckSale');
+    if(!box){
+      box=document.createElement('div');
+      box.id='liveCheckSale';
+      box.className='live-check';
+      box.style.margin='0 0 10px';
+      btn.parentNode.parentNode.insertBefore(box,btn.parentNode);
+    }
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+      btn.classList.add('blocked');
+      btn.disabled=true;
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+    }
+  }
+
+  /* 5 — Ticket : bandeau dossier complet / éléments manquants */
+  function refreshRecapBanner(){
+    var host=el('paymentSuccess');
+    if(!host||host.classList.contains('hidden'))return;
+    var box=el('saleReadyBanner');
+    if(!box){
+      box=document.createElement('div');
+      box.id='saleReadyBanner';
+      box.className='live-check ok';
+      host.insertBefore(box,host.querySelector('.footer-actions'));
+    }
+    var missing=[];
+    if(!selectedClient)missing.push('Fiche client complète');
+    else{
+      if(!selectedClient.phone)missing.push('WhatsApp du client');
+      if(!selectedClient.email&&selectedClient.type!=='Particulier')missing.push('E-mail du client');
+    }
+    if(!products.length)missing.push('Articles de la commande');
+    if(!v('internalNote'))missing.push('Note interne OLDA (facultative mais conseillée)');
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ À compléter avant transmission :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Dossier complet — ticket prêt à imprimer, envoyer et créer dans le planning.';
+    }
+  }
+
+  document.addEventListener('input',function(){refreshLive();},true);
+  document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
+  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+})();
+</script>
+<style>
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.55}
+.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.live-check ul{margin:7px 0 0;padding-left:18px}
+.live-check li{margin:3px 0;font-weight:600}
+button.blocked{opacity:.45;cursor:not-allowed}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
+.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
+.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
+.wa-link{color:#12603a;font-weight:900;text-decoration:none;border-bottom:1px solid #9fc9ae}
+</style>
+<script>
+(function(){
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9@.]/g,'');};
+  function digits(s){return String(s||'').replace(/\D/g,'');}
+
+  /* 1 — WhatsApp : format, contrôle des 10 chiffres, lien cliquable */
+  window.waHref=function(phone){
+    var d=digits(phone);
+    if(d.length===10&&d.charAt(0)==='0')d='590'+d.slice(1);
+    return 'https://wa.me/'+d;
+  };
+  function attachPhoneCheck(id){
+    var input=el(id);
+    if(!input||input.__phoneBound)return;
+    input.__phoneBound=true;
+    var help=document.createElement('div');
+    help.className='help';
+    help.style.marginTop='5px';
+    input.insertAdjacentElement('afterend',help);
+    var paint=function(){
+      var d=digits(input.value);
+      if(!d){input.style.borderColor='';help.textContent='';return;}
+      if(d.length===10){
+        input.style.borderColor='#1c7c4a';
+        help.style.color='#1c7c4a';
+        help.textContent='✓ Numéro valide';
+      }else{
+        input.style.borderColor='#c62828';
+        help.style.color='#c62828';
+        help.textContent='⚠ Le numéro doit contenir 10 chiffres ('+d.length+' saisi'+(d.length>1?'s':'')+').';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__phonePaint=paint;
+  }
+  attachPhoneCheck('newIndividualPhone');
+  attachPhoneCheck('newCompanyPhone');
+
+  var baseSelect=window.selectClientById;
+  window.selectClientById=function(id){
+    baseSelect(id);
+    var meta=el('selectedClientMeta');
+    if(meta&&selectedClient&&selectedClient.phone){
+      meta.innerHTML=meta.textContent.replace(
+        selectedClient.phone,
+        '<a class="wa-link" target="_blank" href="'+window.waHref(selectedClient.phone)+'">'+selectedClient.phone+' ↗</a>'
+      );
+    }
+  };
+
+  /* 2 — Détection de doublon client */
+  function findDuplicate(){
+    var name=createClientType==='Particulier'?v('newIndividualName'):v('newCompanyName');
+    var phone=digits(createClientType==='Particulier'?v('newIndividualPhone'):v('newCompanyPhone'));
+    var mail=norm(createClientType==='Particulier'?v('newIndividualEmail'):v('newCompanyEmail'));
+    var n=norm(name);
+    return clients.filter(function(c){
+      if(window.__editingClientId&&c.id===window.__editingClientId)return false;
+      return (n&&(norm(c.name)===n||norm(c.company)===n))||
+             (phone&&digits(c.phone)===phone)||
+             (mail&&c.email&&norm(c.email)===mail);
+    })[0]||null;
+  }
+  var baseCreate=window.createAndSelectClient;
+  window.createAndSelectClient=function(){
+    if(!window.__editingClientId&&!window.__dupConfirmed){
+      var d=findDuplicate();
+      if(d){
+        var box=el('clientDuplicateWarn')||document.createElement('div');
+        box.id='clientDuplicateWarn';
+        box.className='dup-warn';
+        var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
+        box.innerHTML='⚠ Ce client semble déjà enregistré : <b>'+label+'</b>'+
+          '<div class="actions" style="justify-content:flex-start;margin-top:9px">'+
+          '<button type="button" class="primary" onclick="useExistingDuplicate(\''+d.id+'\')">Utiliser cette fiche</button>'+
+          '<button type="button" class="secondary" onclick="forceCreateClient()">Créer quand même</button></div>';
+        el('createClientBox').appendChild(box);
+        return;
+      }
+    }
+    window.__dupConfirmed=false;
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    return baseCreate();
+  };
+  window.useExistingDuplicate=function(id){
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    el('createClientBox').classList.add('hidden');
+    selectClientById(id);
+  };
+  window.forceCreateClient=function(){
+    window.__dupConfirmed=true;
+    window.createAndSelectClient();
+  };
+
+  /* 6 — Contrôle du délai (atelier ouvert du lundi au vendredi, 9h–18h) */
+  function isWorkingDay(d){var x=d.getDay();return x>=1&&x<=5;}
+  function nextWorkingDay(d){var x=new Date(d);do{x.setDate(x.getDate()+1);}while(!isWorkingDay(x));return x;}
+  function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function frOf(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'});}
+
+  window.checkDeliveryDate=function(){
+    var input=el('deliveryDate');
+    if(!input)return;
+    var box=el('deliveryDateWarning');
+    if(!box){
+      box=document.createElement('div');
+      box.id='deliveryDateWarning';
+      box.className='delay-warn ok';
+      input.parentNode.appendChild(box);
+    }
+    var iso=v('deliveryDate');
+    if(!iso||input.classList.contains('hidden')){box.style.display='none';return;}
+    box.style.display='block';
+    var d=new Date(iso+'T12:00:00');
+    if(!isWorkingDay(d)){
+      var alt=nextWorkingDay(d);
+      box.className='delay-warn bad';
+      box.innerHTML='⚠ L’atelier est fermé le week-end. Première récupération possible : <b>'+frOf(alt)+'</b>'+
+        ' <button type="button" class="secondary" style="margin-left:8px" onclick="applyDeliveryDate(\''+isoOf(alt)+'\')">Utiliser cette date</button>';
+      return;
+    }
+    var time=v('deliveryTime')||'14:00';
+    if(time<='09:00'){
+      var prev=new Date(d);
+      do{prev.setDate(prev.getDate()-1);}while(!isWorkingDay(prev));
+      box.className='delay-warn warn';
+      box.innerHTML='⏱ Récupération à 9h00 : la commande doit être <b>terminée le '+frOf(prev)+' avant 18h00</b>.';
+      return;
+    }
+    box.className='delay-warn ok';
+    box.textContent='✓ Créneau compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
+  };
+  window.applyDeliveryDate=function(iso){
+    el('deliveryDelay').value='custom';
+    el('deliveryDate').classList.remove('hidden');
+    el('deliveryDate').value=iso;
+    if(typeof updateDeadlineInfo==='function')updateDeadlineInfo();
+    window.checkDeliveryDate();
+  };
+
+  /* 3 — Contrôle en direct des informations obligatoires */
+  function missingForStep(step){
+    var m=[];
+    if(step===1){
+      if(!products.length){
+        m.push('Au moins un article enregistré');
+        if(!v('productName'))m.push('Article');
+        if(!v('quantity'))m.push('Quantité');
+        if(!v('unitPrice'))m.push('Prix unitaire');
+        if(!v('productDescription'))m.push('Description de production');
+        if(!v('deliveryDate'))m.push('Date souhaitée');
+      }
+    }
+    if(step===2&&!selectedClient)m.push('Client associé à la vente');
+    if(step===3){
+      var mode=(document.querySelector('input[name="payment"]:checked')||{}).value;
+      if(!mode)m.push('Mode de paiement');
+      if(mode==='Espèces'&&Number(v('cashGiven'))<Number((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0))m.push('Montant donné par le client');
+      if(mode==='Mixte'&&(Number(v('mixCard'))+Number(v('mixCash')))<=0)m.push('Répartition carte / espèces');
+    }
+    return m;
+  }
+
+  function refreshLive(){
+    var btn=el('saleNext');
+    if(!btn)return;
+    var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
+    if(step>=4){
+      var old=el('liveCheckSale');
+      if(old)old.remove();
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+      return;
+    }
+    var missing=missingForStep(step);
+    var box=el('liveCheckSale');
+    if(!box){
+      box=document.createElement('div');
+      box.id='liveCheckSale';
+      box.className='live-check';
+      box.style.margin='0 0 10px';
+      btn.parentNode.parentNode.insertBefore(box,btn.parentNode);
+    }
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+      btn.classList.add('blocked');
+      btn.disabled=true;
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+    }
+  }
+
+  /* 5 — Ticket : bandeau dossier complet / éléments manquants */
+  function refreshRecapBanner(){
+    var host=el('paymentSuccess');
+    if(!host||host.classList.contains('hidden'))return;
+    var box=el('saleReadyBanner');
+    if(!box){
+      box=document.createElement('div');
+      box.id='saleReadyBanner';
+      box.className='live-check ok';
+      host.insertBefore(box,host.querySelector('.footer-actions'));
+    }
+    var missing=[];
+    if(!selectedClient)missing.push('Fiche client complète');
+    else{
+      if(!selectedClient.phone)missing.push('WhatsApp du client');
+      if(!selectedClient.email&&selectedClient.type!=='Particulier')missing.push('E-mail du client');
+    }
+    if(!products.length)missing.push('Articles de la commande');
+    if(!v('internalNote'))missing.push('Note interne OLDA (facultative mais conseillée)');
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ À compléter avant transmission :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Dossier complet — ticket prêt à imprimer, envoyer et créer dans le planning.';
+    }
+  }
+
+  document.addEventListener('input',function(){refreshLive();},true);
+  document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
+  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+})();
+</script>
+<!-- Le pont avec le CRM : base clients réelle et numéro de ticket du jour
+     réservé côté serveur. Chargé en DERNIER, une fois tout le reste en place. -->
+<script src="pont.js"></script>
+</body>
+</html>

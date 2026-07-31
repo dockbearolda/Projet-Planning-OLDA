@@ -1628,6 +1628,160 @@ app.post('/api/projets', asyncH(async (req, res) => {
   res.status(201).json({ id: rows[0].id, projet });
 }));
 
+// ---------------------------------------------------------------------------
+// COMPTOIR — les deux parcours validés par le patron (public/comptoir/*.html).
+// ---------------------------------------------------------------------------
+// Ces écrans ne connaissent RIEN du planning : ils recueillent un dossier
+// complet et le postent tel quel. C'est ici qu'il devient une ligne de planning.
+// Tout ce qui n'entre pas dans une colonne est conservé dans `fiche` : le
+// récapitulatif complet, ligne à ligne, s'ouvre depuis le tiroir de la commande.
+// Rien de ce que la vendeuse a saisi ne se perd en route.
+
+// L'étape que nomme le parcours → la FAMILLE du planning.
+const COMPTOIR_FAMILLE = {
+  demande: 'demande_chiffrage',
+  preparation: 'preparation',
+  production: 'production',
+  facturation: 'facturation',
+  cloture: 'paiement',
+};
+// La sous-étape est donnée par son LIBELLÉ (« Préparation des produits ») :
+// c'est ce que le parcours affiche à la vendeuse. On la retrouve par son texte,
+// dans sa famille — un libellé inconnu laisse la sous-étape à préciser plutôt
+// que de refuser la commande.
+const SOUS_ETAPE_PAR_LIBELLE = new Map(
+  Object.entries(SUB_STAGES).flatMap(
+    ([famille, subs]) => subs.map((s) => [`${famille}|${s.label.toLowerCase()}`, s.slug]),
+  ),
+);
+// La nature du client telle que l'écran la nomme → celle du planning.
+const COMPTOIR_CLIENT_TYPE = {
+  particulier: 'perso',
+  professionnel: 'pro',
+  association: 'asso',
+  revendeur: 'revendeur',
+};
+
+const borner = (v, max) => {
+  const s = trimOrNull(v);
+  if (s === null) return null;
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+};
+
+// Prix : seule une VENTE en a un. Une demande de devis vaut null — surtout pas
+// 0, qui se lit « gratuit » dans la colonne Prix alors qu'il faut le chiffrer.
+function prixComptoir(brut) {
+  if (brut == null || brut === '') return null;
+  const n = Number(brut);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+}
+
+// « Prénom NOM » d'un particulier : le texte ENTIER reste le nom du dossier
+// (c'est lui qui sert de clé de rapprochement, on n'y touche pas). On en tire
+// seulement le prénom et le nom pour remplir la fiche de la base clients.
+function couperNomPerso(nomComplet) {
+  const mots = String(nomComplet || '').trim().split(/\s+/).filter(Boolean);
+  if (mots.length < 2) return { prenom: null, nom: mots[0] || null };
+  return { prenom: mots[0], nom: mots.slice(1).join(' ') };
+}
+
+// POST /api/comptoir/projet → enregistre le dossier d'un des deux parcours.
+app.post('/api/comptoir/projet', asyncH(async (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+
+  // NATURE : une vente directe est une commande validée et payée ; une demande
+  // de devis reste à chiffrer. C'est cette différence qui commande tout le reste.
+  const estDemande = b.source === 'Demande de devis';
+  const famille = COMPTOIR_FAMILLE[b.stage] || (estDemande ? 'demande_chiffrage' : 'preparation');
+  const sousEtape = SOUS_ETAPE_PAR_LIBELLE.get(`${famille}|${String(b.status || '').toLowerCase()}`) || null;
+
+  const cl = b.clientObj && typeof b.clientObj === 'object' ? b.clientObj : {};
+  const nomDossier = borner(cl.company || cl.name || b.client, 120);
+  if (!nomDossier) return res.status(400).json({ error: 'le nom du client est requis' });
+  const clientType = COMPTOIR_CLIENT_TYPE[String(cl.type || '').toLowerCase()] || 'pro';
+
+  const responsable = RESPONSABLE_SET.has(b.responsible) ? b.responsible : 'À attribuer';
+  const priorite = [1, 2, 3].includes(Number(b.priority)) ? Number(b.priority) : 1;
+  const quantite = Number.isInteger(Number(b.quantity)) && Number(b.quantity) > 0 ? Number(b.quantity) : null;
+  const deadline = isDay(b.due) ? b.due : todayPlus(0);
+  const valeur = estDemande ? null : prixComptoir(b.amount);
+
+  const pay = b.paiement && typeof b.paiement === 'object' ? b.paiement : {};
+  const mode = PAIEMENT_MODE_SET.has(pay.mode) ? pay.mode : null;
+
+  // `fiche` archive le dossier ENTIER, tel que le parcours l'a produit : c'est
+  // lui que le tiroir du planning rouvre, ligne à ligne. Jamais retouché ensuite.
+  const fiche = {
+    kind: 'comptoir-v17',
+    source: estDemande ? 'Demande de devis' : 'Vente directe',
+    ref: borner(b.ref, 40),
+    creeLe: new Date().toISOString(),
+    heureSouhaitee: isHeure(b.dueTime) ? b.dueTime : null,
+    production: borner(b.production, 200),
+    commentaire: borner(b.comment, DESCRIPTION_MAX),
+    budgetIndicatif: prixComptoir(b.budgetIndicatif),
+    canal: borner(b.canal, 60),
+    suite: borner(b.suite, 120),
+    paiement: { ...pay, mode },
+    controles: b.checks && typeof b.checks === 'object' ? b.checks : null,
+    // Les deux blocs de libellé/valeur que le parcours a construits pour le
+    // ticket : le client d'un côté, le dossier de l'autre.
+    client: lignesLibelleValeur(b.client_info),
+    details: lignesLibelleValeur(b.details),
+  };
+
+  // La colonne « Infos » du planning : le récapitulatif tel qu'il est imprimé.
+  const description = borner(b.recap, DESCRIPTION_MAX)
+    || borner(b.comment, DESCRIPTION_MAX);
+
+  const { rows: posRows } = await pool.query(
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+  );
+
+  const { rows } = await pool.query(
+    `INSERT INTO requests
+       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+        contact_referent, contact_phone, contact_email, quantity, product, description,
+        deadline, position, fiche, project_value, paye, paiement_mode)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     RETURNING id`,
+    [
+      famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
+      clientType, nomDossier,
+      borner(cl.contact, 120), borner(cl.phone, 40), borner(cl.email, 160),
+      quantite, borner(b.name, OBJET_MAX), description,
+      deadline, posRows[0].pos, JSON.stringify(fiche), valeur,
+      // Un paiement n'existe que sur une vente : une demande ne se prononce pas.
+      estDemande ? null : !!pay.paye, estDemande ? null : mode,
+    ],
+  );
+
+  const perso = clientType === 'perso' ? couperNomPerso(nomDossier) : null;
+  await upsertClientFromCommande({
+    societe: nomDossier,
+    type: clientType,
+    contact: trimOrNull(cl.contact),
+    nom: perso ? perso.nom : null,
+    prenom: perso ? perso.prenom : null,
+    telephone: trimOrNull(cl.phone),
+    email: trimOrNull(cl.email),
+  });
+
+  broadcast({ kind: 'create', stages: [famille] });
+  res.status(201).json({ id: rows[0].id, stage: famille, subStage: sousEtape });
+}));
+
+// Les récapitulatifs du comptoir arrivent en paires [libellé, valeur]. On les
+// range en objets et on jette tout ce qui n'a pas cette forme : la fiche est
+// affichée telle quelle dans le tiroir, elle ne doit contenir que du texte.
+function lignesLibelleValeur(brut) {
+  if (!Array.isArray(brut)) return [];
+  return brut
+    .filter((l) => Array.isArray(l) && l.length >= 2)
+    .map((l) => ({ k: borner(l[0], 120), v: borner(l[1], 600) }))
+    .filter((l) => l.k && l.v);
+}
+
 // POST /api/vente/numero → réserve le numéro du ticket de vente directe,
 // « 26.07.30-001 » : deux chiffres d'année, mois, jour, puis le rang de la vente
 // DANS LA JOURNÉE. Le compteur vit en app_meta (même principe que les codes

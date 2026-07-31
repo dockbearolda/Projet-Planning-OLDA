@@ -4,91 +4,59 @@
 // façons d'entrer, et une seule question les sépare — le client paie-t-il
 // maintenant ?
 //
-//   VENTE DIRECTE (projet.js) : le client est devant le comptoir, on connaît le
-//     prix, il paie, il repart avec un ticket. La commande entre au planning
-//     déjà chiffrée et encaissée.
-//   DEMANDE DE DEVIS (devis.js) : le client demande un prix. Rien n'est chiffré,
-//     rien n'est encaissé. La demande entre au planning en « Demande &
-//     chiffrage » avec tout le brief, pour que celui qui chiffrera n'ait pas à
-//     rappeler le client.
+//   VENTE DIRECTE : le client est devant le comptoir, on connaît le prix, il
+//     paie, il repart avec son ticket. La commande entre au planning déjà
+//     chiffrée et encaissée.
+//   DEMANDE DE DEVIS : le client demande un prix. Rien n'est chiffré, rien
+//     n'est encaissé. La demande entre au planning en « Demande & chiffrage »
+//     avec tout le brief, pour que celui qui chiffrera n'ait pas à rappeler le
+//     client.
 //
-// Un tap sur l'onglet ouvre donc D'ABORD le CHOIX : deux grandes tuiles, une par
-// flux. Rien ne s'ouvre tant que la vendeuse n'a pas dit ce qu'elle fait — c'est
-// la première question qu'elle pose au client, l'écran la pose avec elle.
-// Une fois dans un flux, le sélecteur de l'en-tête permet de passer à l'autre
-// sans repasser par l'accueil ; « Changer » y ramène.
+// Un tap sur l'onglet ouvre donc D'ABORD le CHOIX : deux grandes tuiles, une
+// par flux. Rien ne s'ouvre tant que la vendeuse n'a pas dit ce qu'elle fait —
+// c'est la première question qu'elle pose au client, l'écran la pose avec elle.
 //
-// Ce module ne fait QUE l'aiguillage : l'accueil, l'en-tête noir (titre +
-// sous-titre du flux courant), le sélecteur, et le chargement à la demande du
-// module correspondant. La barre de navigation principale est masquée sur cet
-// écran (body.view-comptoir) : ces commandes sont les seules à disposition.
+// LES DEUX PARCOURS SONT DES PAGES À PART (public/comptoir/*.html), affichées
+// ici dans un cadre. Ce sont les écrans validés par le patron, repris tels
+// quels : ils stylent des balises nues (button, input, h2…) et se réécrivent
+// entièrement d'une version à l'autre. Les isoler dans leur propre document,
+// c'est garantir qu'ils ne débordent jamais sur le CRM et qu'une nouvelle
+// version se pose en remplaçant un fichier — pas en retraduisant un parcours.
+//
+// Ce module ne fait donc QUE trois choses :
+//   1. l'accueil (les deux tuiles) et la bascule d'un flux à l'autre ;
+//   2. l'écoute du message que le parcours envoie quand la vendeuse tape
+//      « Créer dans le planning » ;
+//   3. l'appel à l'API et le saut vers la ligne fraîchement créée.
+// Le parcours, lui, ne connaît aucune adresse d'API : il produit un dossier
+// complet, l'hôte l'enregistre.
 
 const FLUX = [
   {
     id: 'vente',
     label: 'Vente directe',
     icone: 'point_of_sale',
-    titre: 'ATELIER OLDA — Vente directe',
-    sous: 'Articles → Client → Paiement → Ticket',
+    src: 'comptoir/vente-directe.html',
     // Ce que la vendeuse doit reconnaître en un coup d'œil : la SITUATION, pas
     // la mécanique de l'écran.
     quand: 'Le client est là, le prix est connu : il paie et repart avec son ticket.',
-    charger: () => import('./projet.js'),
-    init: 'initProjet',
-    reset: 'resetProjet',
+    etapes: 'Articles → Client → Paiement → Ticket',
   },
   {
     id: 'devis',
     label: 'Demande de devis',
     icone: 'request_quote',
-    titre: 'ATELIER OLDA — Demande de devis',
-    sous: 'Demande → Besoins → Projet → Contrôle → Client → Récapitulatif',
+    src: 'comptoir/demande-devis.html',
     quand: 'Le client demande un prix : on note son besoin, Atelier OLDA chiffrera.',
-    charger: () => import('./devis.js'),
-    init: 'initDevis',
-    reset: 'resetDevis',
+    etapes: 'Demande → Besoins → Projet → Contrôle → Client → Récapitulatif',
   },
 ];
 
 let ROOT = null;
-// Un module par flux, chargé au premier affichage et monté une seule fois —
-// même principe que Base clients / Réglages. Tant qu'un flux n'a pas été ouvert,
-// son JS n'est même pas téléchargé : l'accueil, lui, ne coûte rien.
-const charges = new Map();   // id → { module, pret: Promise }
+let courant = null;        // id du flux affiché, null sur l'accueil
+let enCours = false;       // un enregistrement est en vol : on n'en lance pas deux
 
-const paneDe = (flux) => ROOT.querySelector(`#np-pane-${flux.id}`);
-
-function monter(flux) {
-  if (charges.has(flux.id)) return charges.get(flux.id).pret;
-  const entree = { module: null, pret: null };
-  entree.pret = flux.charger()
-    .then((m) => { entree.module = m; return m[flux.init](paneDe(flux)); })
-    .catch((err) => {
-      charges.delete(flux.id);
-      console.error(`Nouveau Projet : chargement de « ${flux.label} » impossible`, err);
-    });
-  charges.set(flux.id, entree);
-  return entree.pret;
-}
-
-// `id` vaut null sur l'accueil : aucun flux ouvert, aucun en-tête de flux.
-function afficher(id) {
-  const flux = FLUX.find((f) => f.id === id) || null;
-  ROOT.querySelector('#np-home').hidden = !!flux;
-  ROOT.querySelector('#np-header').hidden = !flux;
-  ROOT.querySelector('#np-panes').hidden = !flux;
-  for (const f of FLUX) paneDe(f).hidden = !flux || f.id !== flux.id;
-  if (!flux) return;
-
-  ROOT.querySelector('#np-title').textContent = flux.titre;
-  ROOT.querySelector('#np-subtitle').textContent = flux.sous;
-  for (const f of FLUX) {
-    const b = ROOT.querySelector(`#np-switch-${f.id}`);
-    b.classList.toggle('is-active', f.id === flux.id);
-    b.setAttribute('aria-pressed', String(f.id === flux.id));
-  }
-  monter(flux);
-}
+const cadreDe = (id) => ROOT.querySelector(`#np-frame-${id}`);
 
 function icone(nom) {
   const i = document.createElement('span');
@@ -96,6 +64,67 @@ function icone(nom) {
   i.setAttribute('aria-hidden', 'true');
   i.textContent = nom;
   return i;
+}
+
+// --- Affichage ---------------------------------------------------------------
+// `id` vaut null sur l'accueil : aucun parcours ouvert, aucune barre de flux.
+function afficher(id) {
+  const flux = FLUX.find((f) => f.id === id) || null;
+  courant = flux ? flux.id : null;
+  ROOT.querySelector('#np-home').hidden = !!flux;
+  ROOT.querySelector('#np-bar').hidden = !flux;
+  ROOT.querySelector('#np-frames').hidden = !flux;
+  masquerErreur();
+
+  for (const f of FLUX) {
+    const cadre = cadreDe(f.id);
+    cadre.hidden = !flux || f.id !== flux.id;
+    // Chargement à la demande : tant qu'un parcours n'a pas été ouvert, son
+    // document n'est même pas téléchargé.
+    if (!cadre.hidden && !cadre.src) cadre.src = f.src;
+    const b = ROOT.querySelector(`#np-switch-${f.id}`);
+    b.classList.toggle('is-active', !!flux && f.id === flux.id);
+    b.setAttribute('aria-pressed', String(!!flux && f.id === flux.id));
+  }
+  // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
+  // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
+  if (flux) rafraichirClients(flux.id);
+}
+
+function rafraichirClients(id) {
+  const cadre = cadreDe(id);
+  const w = cadre && cadre.contentWindow;
+  if (w && typeof w.oldaRafraichirClients === 'function') w.oldaRafraichirClients();
+}
+
+// Repartir de zéro sur un parcours : on recharge son document. Un formulaire à
+// moitié rempli par le client précédent n'a rien à faire devant le suivant.
+// `location.replace` plutôt que `reload` : le parcours réserve un numéro de
+// ticket à chaque chargement, on ne veut pas non plus qu'un « Précédent » du
+// navigateur ramène le dossier du client d'avant. Un parcours jamais ouvert n'a
+// pas de document : rien à recharger.
+function reinitialiser(id) {
+  const cadre = cadreDe(id);
+  if (!cadre || !cadre.getAttribute('src')) return;
+  try {
+    cadre.contentWindow.location.replace(cadre.src);
+  } catch (err) {
+    cadre.src = cadre.getAttribute('src');
+  }
+}
+
+// --- Erreur d'enregistrement -------------------------------------------------
+// Un dossier qui ne part pas au planning ne doit JAMAIS disparaître en silence :
+// la vendeuse a le client devant elle. On le dit, et on laisse le parcours
+// intact pour qu'elle retape sur le bouton une fois le problème passé.
+function montrerErreur(message) {
+  const box = ROOT.querySelector('#np-erreur');
+  box.textContent = `Enregistrement impossible : ${message}. Le dossier est intact — réessaie.`;
+  box.hidden = false;
+}
+function masquerErreur() {
+  const box = ROOT.querySelector('#np-erreur');
+  if (box) box.hidden = true;
 }
 
 // --- Accueil : les deux tuiles -----------------------------------------------
@@ -129,7 +158,7 @@ function construireAccueil() {
     quand.textContent = f.quand;
     const etapes = document.createElement('span');
     etapes.className = 'np-tile__steps';
-    etapes.textContent = f.sous;
+    etapes.textContent = f.etapes;
 
     tuile.append(rond, nom, quand, etapes);
     tuile.addEventListener('click', () => afficher(f.id));
@@ -139,18 +168,23 @@ function construireAccueil() {
   return home;
 }
 
-function construireEntete() {
-  const entete = document.createElement('header');
-  entete.className = 'vd-header np-header';
-  entete.id = 'np-header';
-  entete.hidden = true;
+// --- Barre de flux : la seule commande de l'hôte au-dessus du parcours -------
+// Volontairement mince : le parcours porte déjà son propre en-tête noir avec son
+// titre. Cette barre ne sert qu'à changer d'avis — on ne la fait pas concurrencer
+// l'écran de saisie.
+function construireBarre() {
+  const barre = document.createElement('div');
+  barre.className = 'np-bar';
+  barre.id = 'np-bar';
+  barre.hidden = true;
 
-  const textes = document.createElement('div');
-  const titre = document.createElement('h1');
-  titre.id = 'np-title';
-  const sous = document.createElement('p');
-  sous.id = 'np-subtitle';
-  textes.append(titre, sous);
+  const retour = document.createElement('button');
+  retour.type = 'button';
+  retour.className = 'np-bar-home';
+  retour.id = 'np-home-btn';
+  retour.append(icone('grid_view'));
+  retour.append(document.createTextNode('Changer de parcours'));
+  retour.addEventListener('click', () => afficher(null));
 
   const bascule = document.createElement('div');
   bascule.className = 'np-switch';
@@ -165,62 +199,104 @@ function construireEntete() {
     b.addEventListener('click', () => afficher(f.id));
     bascule.append(b);
   }
-  // Retour à l'accueil : la vendeuse s'est trompée de flux, ou elle veut juste
-  // revoir les deux choix. Rien n'est perdu — chaque flux garde sa saisie.
-  const retour = document.createElement('button');
-  retour.type = 'button';
-  retour.className = 'np-switch-btn np-switch-btn--home';
-  retour.id = 'np-home-btn';
-  retour.append(icone('grid_view'));
-  retour.append(document.createTextNode('Changer'));
-  retour.addEventListener('click', () => afficher(null));
-  bascule.append(retour);
 
-  entete.append(textes, bascule);
-  return entete;
+  barre.append(retour, bascule);
+  return barre;
 }
 
 function construire() {
   const shell = document.createElement('div');
   shell.className = 'np-shell';
 
-  const panes = document.createElement('div');
-  panes.className = 'np-panes';
-  panes.id = 'np-panes';
-  panes.hidden = true;
+  const erreur = document.createElement('p');
+  erreur.className = 'np-erreur';
+  erreur.id = 'np-erreur';
+  erreur.setAttribute('role', 'alert');
+  erreur.hidden = true;
+
+  const cadres = document.createElement('div');
+  cadres.className = 'np-frames';
+  cadres.id = 'np-frames';
+  cadres.hidden = true;
   for (const f of FLUX) {
-    const pane = document.createElement('div');
-    pane.className = 'np-pane';
-    pane.id = `np-pane-${f.id}`;
-    pane.hidden = true;
-    panes.append(pane);
+    const cadre = document.createElement('iframe');
+    cadre.className = 'np-frame';
+    cadre.id = `np-frame-${f.id}`;
+    cadre.title = f.label;
+    cadre.hidden = true;
+    cadres.append(cadre);
   }
 
-  shell.append(construireAccueil(), construireEntete(), panes);
+  shell.append(construireAccueil(), construireBarre(), erreur, cadres);
   ROOT.replaceChildren(shell);
 }
 
-let monteShell = false;
+// --- Le pont avec le planning ------------------------------------------------
+// Le parcours poste `OLDA_CREATE_PROJECT` avec TOUT ce qu'il a recueilli. On ne
+// fait confiance qu'à un message venant de NOS cadres, sur NOTRE origine : le
+// reste est ignoré sans bruit (une page tierce ne crée pas de commande).
+function estUnDesNotres(source) {
+  return FLUX.some((f) => {
+    const cadre = cadreDe(f.id);
+    return cadre && cadre.contentWindow === source;
+  });
+}
+
+async function enregistrer(payload) {
+  // Double tap sur « Créer dans le planning » = une seule ligne au planning.
+  if (enCours) return;
+  enCours = true;
+  masquerErreur();
+  try {
+    const res = await fetch('/api/comptoir/projet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `erreur ${res.status}`);
+
+    // On file au planning, SUR la ligne qui vient de naître. Le parcours, lui,
+    // reste EN L'ÉTAT : son écran de fin porte encore le ticket à imprimer, à
+    // télécharger ou à envoyer sur WhatsApp, et la vendeuse y revient parfois
+    // après avoir vérifié la ligne. La remise à neuf attend le prochain passage
+    // sur l'onglet (resetProjet), c'est-à-dire le client suivant.
+    window.dispatchEvent(new CustomEvent('olda:projet-cree', {
+      detail: { stage: data.stage, sub: data.subStage || null },
+    }));
+  } catch (err) {
+    montrerErreur(err.message);
+  } finally {
+    enCours = false;
+  }
+}
+
+function auMessage(e) {
+  if (e.origin !== window.location.origin) return;
+  if (!estUnDesNotres(e.source)) return;
+  const msg = e.data;
+  if (!msg || msg.type !== 'OLDA_CREATE_PROJECT' || !msg.payload) return;
+  enregistrer(msg.payload);
+}
+
+// --- Montage -----------------------------------------------------------------
+let monte = false;
 export async function initProjet(root) {
-  if (monteShell) return;
+  if (monte) return;
   ROOT = root;
-  monteShell = true;
+  monte = true;
   construire();
   afficher(null);
+  window.addEventListener('message', auMessage);
 }
 
 // Un tap sur « Nouveau Projet » dans la nav revient TOUJOURS au choix, avec deux
-// fiches vierges : comptoir = on repart net, on ne cherche jamais un brouillon
-// abandonné entre deux clients. Les deux flux sont remis à zéro, pas seulement
-// celui qu'on affichait — celui qu'on laisse derrière ne doit pas ressurgir à
-// moitié rempli au prochain passage.
+// parcours vierges : comptoir = on repart net, on ne cherche jamais un brouillon
+// abandonné entre deux clients. Les DEUX sont remis à zéro, pas seulement celui
+// qu'on affichait — celui qu'on laisse derrière ne doit pas ressurgir à moitié
+// rempli au prochain passage.
 export async function resetProjet() {
-  if (!monteShell) return;
+  if (!monte) return;
   afficher(null);
-  for (const flux of FLUX) {
-    const entree = charges.get(flux.id);
-    if (!entree) continue;
-    await entree.pret;
-    if (entree.module && entree.module[flux.reset]) entree.module[flux.reset]();
-  }
+  for (const f of FLUX) reinitialiser(f.id);
 }

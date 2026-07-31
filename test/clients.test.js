@@ -103,6 +103,12 @@ delete process.env.APP_PASSWORD;
   const n1 = await j('POST', `/api/clients/${id}/notes`, { kind: 'appel', body: 'Rappeler lundi' });
   assert.strictEqual(n1.status, 201);
   assert.strictEqual(n1.body.kind, 'appel');
+  // La timeline est triée sur `created_at`. Postgres l'horodate à la
+  // microseconde, mais la base en mémoire des tests s'arrête à la milliseconde :
+  // deux notes postées coup sur coup y partagent la même heure et le tri
+  // devient un tirage au sort. On les sépare pour tester l'ORDRE, pas la
+  // résolution de l'horloge.
+  await new Promise((r) => setTimeout(r, 5));
   const n2 = await j('POST', `/api/clients/${id}/notes`, { kind: 'bidon', body: 'Devis envoyé' });
   assert.strictEqual(n2.status, 201);
   assert.strictEqual(n2.body.kind, 'note', 'un kind inconnu retombe sur « note »');
