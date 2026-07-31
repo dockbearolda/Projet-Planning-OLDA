@@ -4429,33 +4429,41 @@ body.wall-open { overflow: hidden; }
   .reg-btn { flex: 1; }
 }
 
-/* --- Side bar détail de ligne (planning) -----------------------------------
-   Calqué sur .cl-drawer de clients.css (même recette : scrim + carte glissante
-   à droite, mêmes durées/easing), mais classes dédiées : deux fonctionnalités
-   indépendantes qui ne doivent pas partager leurs noms de classe. */
-.ligne-drawer { position: fixed; inset: 0; z-index: 70; }
+/* --- Fiche projet (planning) -----------------------------------------------
+   LA BULLE : un clic sur une ligne du planning ouvre son récapitulatif complet,
+   au centre de l'écran, comme dans l'écran du patron (`.project-sheet`). Elle
+   était auparavant un tiroir collé à droite ; posée au centre, elle peut être
+   large — c'est une FICHE, pas une barre latérale, et son « Détail complet »
+   tient sur deux colonnes au lieu de défiler sur un fil. */
+.ligne-drawer { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .ligne-drawer[hidden] { display: none; }
 .ligne-drawer__scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, .42);
+  background: rgba(16, 24, 40, .45);
   animation: ldScrim var(--dur-2, .18s) var(--ease, ease) both;
 }
 @keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
 .ligne-drawer__card {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: min(468px, 100vw);
+  position: relative;
+  width: min(980px, 96vw);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-left: 1px solid var(--border);
-  box-shadow: -18px 0 48px rgba(0, 0, 0, .22);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(16, 24, 40, .30);
   animation: ldSlide var(--dur-3, .24s) var(--ease, ease) both;
 }
-@keyframes ldSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
+@keyframes ldSlide { from { transform: translateY(14px) scale(.99); opacity: .4; } to { transform: none; opacity: 1; } }
+/* Téléphone : la fiche prend tout l'écran, une marge de bulle ne servirait
+   qu'à rétrécir un contenu déjà à l'étroit. */
+@media (max-width: 700px) {
+  .ligne-drawer { padding: 0; }
+  .ligne-drawer__card { width: 100vw; max-height: 100vh; height: 100%; border: 0; border-radius: 0; }
+}
 
 /* L'en-tête reste blanc et posé sur le gris du corps, comme le bandeau de
    l'écran Nouveau Projet au-dessus de sa page grise. */
@@ -4469,6 +4477,9 @@ body.wall-open { overflow: hidden; }
    blanche : c'est la composition de tout le reste de l'app (écran Nouveau
    client, Réglages) — fond gris, contenu en cartes. Sur un corps blanc, les
    cartes auraient été invisibles. */
+/* La fiche étant large, le corps se lit sur DEUX colonnes — comme la
+   `.sheet-grid` de l'écran du patron. Les sections qui portent du texte long
+   (détail complet, notes, historique) reprennent la pleine largeur. */
 .ld-body {
   flex: 1;
   min-height: 0;
@@ -4476,16 +4487,23 @@ body.wall-open { overflow: hidden; }
   padding: 14px 14px 24px;
   background: var(--bg);
   -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-content: start;
+}
+@media (max-width: 760px) {
+  .ld-body { grid-template-columns: 1fr; }
 }
 .ld-section {
-  margin: 0 0 14px;
+  margin: 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-2);
 }
-.ld-section:last-child { margin-bottom: 0; }
+.ld-section--full { grid-column: 1 / -1; }
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
@@ -4498,6 +4516,77 @@ body.wall-open { overflow: hidden; }
   color: var(--text-1);
 }
 .ld-docs { display: flex; gap: 6px; }
+
+/* Imprimer / Télécharger le récapitulatif : les deux gestes de l'écran du
+   patron. Ils vivent dans l'en-tête, à côté de la croix. */
+.ld-head__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ld-act {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text-1);
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.ld-act:hover { background: var(--state-hover); border-color: var(--text-2); }
+.ld-act .material-symbols-outlined { font-size: 18px; }
+@media (max-width: 700px) { .ld-act-label { display: none; } }
+
+/* DÉTAIL COMPLET DE LA DEMANDE — tout est modifiable.
+   Le récapitulatif que le comptoir a enregistré, ligne à ligne. Ce n'est pas
+   une archive en lecture seule : une quantité change, une taille se précise,
+   et c'est ICI qu'on le corrige — sinon la correction ne vit que dans la tête
+   de celui qui l'a apprise. */
+.ld-detail-line {
+  display: grid;
+  grid-template-columns: minmax(150px, 240px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.ld-detail-line:last-child { border-bottom: 0; }
+.ld-detail-line > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  padding-top: 9px;
+}
+.ld-detail-input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text-1);
+  resize: vertical;
+}
+.ld-detail-input:focus { outline: 2px solid var(--focus, rgba(17, 24, 39, .25)); outline-offset: 1px; }
+.ld-detail-save { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.ld-detail-state { font-size: 12px; font-weight: 700; color: var(--text-2); align-self: center; }
+@media (max-width: 620px) {
+  .ld-detail-line { grid-template-columns: 1fr; }
+  .ld-detail-line > span { padding-top: 0; }
+}
+
+/* Historique du client : les autres commandes du même dossier. Cliquables —
+   « on a déjà fait quoi pour eux ? » est la question qu'on pose au téléphone. */
+.ld-hist {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 10px; margin-bottom: 8px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  background: var(--bg); color: inherit; font: inherit; cursor: pointer;
+}
+.ld-hist:last-child { margin-bottom: 0; }
+.ld-hist:hover { border-color: var(--text-2); background: var(--state-hover); }
+.ld-hist__main { min-width: 0; }
+.ld-hist__title { display: block; font-size: 13px; font-weight: 700; color: var(--text-1); }
+.ld-hist__sub { display: block; margin-top: 2px; font-size: 12px; color: var(--text-2); }
+.ld-hist__value { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.ld-empty { margin: 0; font-size: 13px; color: var(--text-2); }
 
 .ld-fiche-item { padding: 8px 10px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
 .ld-fiche-item__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-1); }

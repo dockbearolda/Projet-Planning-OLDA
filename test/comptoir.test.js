@@ -218,7 +218,43 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(attente.body.subStage, 'demande_a_qualifier');
 
   // -------------------------------------------------------------------------
-  // 5. CE QUI NE DOIT PAS CASSER LE COMPTOIR. Une nouvelle version de l'écran
+  // 5. LA FICHE SE CORRIGE. Le récapitulatif enregistré à la prise n'est pas
+  //    une archive morte : une quantité change, une taille se précise. On
+  //    corrige la VALEUR, jamais le libellé — et une valeur vidée devient « — »
+  //    pour que la ligne reste visible sur le récapitulatif imprimé.
+  // -------------------------------------------------------------------------
+  const avantCorrection = await ligneDe(vente.body.id);
+  assert.strictEqual(avantCorrection.fiche.details[1].v, 'Polo brodé');
+
+  const corrige = await call('PATCH', `/api/requests/${vente.body.id}/fiche`, {
+    client: ['Professionnel', '0690999999'],
+    details: ['26.07.31-001', 'Polo brodé bicolore', 'ligne en trop, ignorée'],
+  });
+  assert.strictEqual(corrige.status, 200, JSON.stringify(corrige.body));
+
+  const apresCorrection = await ligneDe(vente.body.id);
+  assert.strictEqual(apresCorrection.fiche.details[1].v, 'Polo brodé bicolore', 'la valeur corrigée est en base');
+  assert.strictEqual(apresCorrection.fiche.details[1].k, 'Article 1 — Désignation', 'le libellé vient du parcours, il ne se réécrit pas');
+  assert.strictEqual(apresCorrection.fiche.client[1].v, '0690999999');
+  assert.strictEqual(apresCorrection.fiche.details.length, 2, 'une valeur en trop n’ajoute pas de ligne');
+  assert.strictEqual(apresCorrection.fiche.ref, '26.07.31-001', 'le reste de la fiche est intact');
+  assert.strictEqual(apresCorrection.fiche.paiement.mode, 'cb');
+
+  // Vider une valeur ne fait pas disparaître la ligne du récapitulatif.
+  await call('PATCH', `/api/requests/${vente.body.id}/fiche`, { details: ['26.07.31-001', '   '] });
+  assert.strictEqual((await ligneDe(vente.body.id)).fiche.details[1].v, '—');
+
+  // Une ligne créée à la main dans la grille n'a pas de détail à corriger.
+  const sansFiche = await call('POST', '/api/requests', { billing_company: 'Ligne manuelle' });
+  const refus = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { details: ['x'] });
+  assert.strictEqual(refus.status, 400);
+  assert.match(refus.body.error, /pas de détail modifiable/);
+
+  const introuvable = await call('PATCH', '/api/requests/00000000-0000-4000-8000-000000000000/fiche', { details: [] });
+  assert.strictEqual(introuvable.status, 404);
+
+  // -------------------------------------------------------------------------
+  // 6. CE QUI NE DOIT PAS CASSER LE COMPTOIR. Une nouvelle version de l'écran
   //    peut renommer une étape : la commande entre quand même, sous-étape « à
   //    préciser ». Refuser l'enregistrement laisserait la vendeuse avec un
   //    client encaissé et rien au planning.

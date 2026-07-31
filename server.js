@@ -465,6 +465,45 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   res.json(rows[0]);
 }));
 
+// PATCH /api/requests/:id/fiche → corrige le DÉTAIL COMPLET d'une commande du
+// comptoir (le récapitulatif enregistré à la prise). Une quantité change, une
+// taille se précise, un numéro de téléphone était faux : ça se corrige sur la
+// fiche, sinon la correction ne vit que dans la tête de celui qui l'a apprise.
+//
+// On accepte UNIQUEMENT des valeurs, par position (`{ client: [...], details:
+// [...] }`) : les libellés viennent du parcours et ne se réécrivent pas, et
+// personne ne peut glisser n'importe quel JSON dans `fiche` par cette porte.
+app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
+  const { rows } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  const fiche = rows[0].fiche;
+  if (!fiche || fiche.kind !== 'comptoir-v17') {
+    return res.status(400).json({ error: 'cette commande n’a pas de détail modifiable' });
+  }
+
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  // Une valeur vidée devient « — » plutôt que rien : le récapitulatif imprimé
+  // garde sa ligne, et on voit que le champ a été vidé exprès.
+  const corriger = (lignes, valeurs) => {
+    if (!Array.isArray(lignes) || !Array.isArray(valeurs)) return lignes;
+    return lignes.map((l, i) => (
+      typeof valeurs[i] === 'string' ? { ...l, v: borner(valeurs[i], 600) || '—' } : l
+    ));
+  };
+  const majFiche = {
+    ...fiche,
+    client: corriger(fiche.client, b.client),
+    details: corriger(fiche.details, b.details),
+  };
+
+  const { rows: maj } = await pool.query(
+    'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
+    [JSON.stringify(majFiche), req.params.id],
+  );
+  broadcast({ kind: 'update', stages: [maj[0].stage] });
+  res.json(maj[0]);
+}));
+
 // DELETE /api/requests/:id
 app.delete('/api/requests/:id', asyncH(async (req, res) => {
   // Supprime d'abord les PDF + secteurs rattachés (cascade gérée côté applicatif
