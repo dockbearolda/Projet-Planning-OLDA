@@ -223,6 +223,12 @@
             </thead>
             <tbody id="rows"></tbody>
           </table>
+
+          <!-- Vue ÉPURÉE (par défaut) : une carte par projet, comme l'écran du
+               patron. Client, projet, délai de production restant, montant —
+               le reste s'ouvre d'un clic sur la fiche. Le tableau ci-dessus
+               reprend la main dès qu'on rallume une colonne dans le rail. -->
+          <div class="cards" id="cards" hidden></div>
           <div class="grid-empty" id="empty" hidden>Aucune commande à cette étape.</div>
         </div>
 
@@ -238,6 +244,11 @@
             </div>
             <div class="colbar-scroll">
               <p class="colbar-legend">Sur l’écran</p>
+              <!-- Vue épurée : la ligne se lit sans colonne, ce bloc n'a rien à
+                   montrer. On dit pourquoi plutôt que de laisser un vide. -->
+              <p class="colbar-empty" id="colbarOnNote" hidden>
+                Le planning est en fiches épurées. Rallume une colonne ci-dessous pour revenir au tableau.
+              </p>
               <div class="colbar-list" id="colbarOn"></div>
             </div>
             <!-- Bloc « Retirées » ÉPINGLÉ, hors de la zone qui défile : c'est

@@ -242,6 +242,7 @@ function htLabel(ttc) {
 // --- Sélecteurs ------------------------------------------------------------
 const $stages = document.getElementById('stages');
 const $rows = document.getElementById('rows');
+const $cards = document.getElementById('cards');
 const $empty = document.getElementById('empty');
 const $stageTitle = document.getElementById('stageTitle');
 const $stageCount = document.getElementById('stageCount');
@@ -723,6 +724,7 @@ function cmp(a, b, key) {
 // les lignes réellement hors-position. La ligne en cours d'édition ou de drag n'est
 // jamais reconstruite (isRowBusy).
 const rowEls = new Map(); // id (string) -> { tr, sig }
+const cardEls = new Map(); // id (string) -> { el, sig } — vue épurée (cartes)
 const groupEls = new Map(); // bande de priorité (1..3) -> <tr> en-tête de groupe
 
 // En-tête de groupe de priorité : bandeau « ● Haute · 3 » couvrant toute la
@@ -759,7 +761,246 @@ function invalidateRowCache(id) {
   for (const [, entry] of rowEls) entry.sig = '';
 }
 
+// ===========================================================================
+// PLANNING ÉPURÉ — une carte par projet
+// ===========================================================================
+// La vue par défaut, reprise de l'écran du patron. Une ligne du planning ne
+// répond qu'à quatre questions : POUR QUI, QUOI, COMBIEN DE TEMPS IL RESTE,
+// COMBIEN. Le reste — coordonnées, détail complet, paiement, documents — vit
+// dans la fiche, à un clic. Le tableau complet n'a pas disparu : il revient dès
+// qu'on rallume une colonne dans le rail « Colonnes ».
+
+// L'atelier est ouvert du lundi au vendredi, 9h → 18h. Le délai affiché ne
+// compte QUE ces heures-là : « 2 jours » un vendredi soir ne veut rien dire si
+// on les compte en jours calendaires.
+const OUVERTURE = 9;
+const FERMETURE = 18;
+const estJourOuvre = (d) => d.getDay() >= 1 && d.getDay() <= 5;
+const aLHeure = (d, h) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x; };
+
+// L'instant de remise au client. Sans heure connue, 14h : le milieu d'après-midi
+// est l'heure de retrait la plus courante au comptoir.
+function momentRemise(jour, heure) {
+  const j = String(jour || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) return null;
+  const h = /^\d{1,2}:\d{2}$/.test(heure || '') ? (heure.length === 4 ? `0${heure}` : heure) : '14:00';
+  const d = new Date(`${j}T${h}:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Le dernier moment OUVRÉ utile avant la remise. Une récupération le lundi à 9h
+// doit donc être terminée le vendredi à 18h — c'est ça, la vraie échéance de
+// production, et c'est elle qu'on affiche.
+function echeanceProduction(jour, heure) {
+  const remise = momentRemise(jour, heure);
+  if (!remise) return null;
+  let x = new Date(remise);
+  for (let i = 0; i < 30; i++) {
+    if (estJourOuvre(x)) {
+      const ouvre = aLHeure(x, OUVERTURE);
+      const ferme = aLHeure(x, FERMETURE);
+      if (x > ferme) return ferme;
+      if (x > ouvre) return x;
+    }
+    x = aLHeure(new Date(x.getFullYear(), x.getMonth(), x.getDate() - 1), FERMETURE);
+  }
+  return remise;
+}
+
+function minutesOuvrees(de, a) {
+  if (a <= de) return 0;
+  let total = 0;
+  let curseur = new Date(de);
+  for (let i = 0; i < 400 && curseur < a; i++) {
+    if (estJourOuvre(curseur)) {
+      const ouvre = aLHeure(curseur, OUVERTURE);
+      const ferme = aLHeure(curseur, FERMETURE);
+      const debut = curseur > ouvre ? curseur : ouvre;
+      const fin = ferme < a ? ferme : a;
+      if (fin > debut) total += (fin - debut) / 60000;
+    }
+    curseur = aLHeure(new Date(curseur.getFullYear(), curseur.getMonth(), curseur.getDate() + 1), 0);
+  }
+  return Math.floor(total);
+}
+
+const etiquetteEcheance = (d) => (d
+  ? `${d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })} `
+    + `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`
+  : '—');
+
+// Le temps de production RESTANT, en heures ouvrées.
+function tempsRestant(jour, heure) {
+  const echeance = echeanceProduction(jour, heure);
+  if (!echeance) return { texte: 'Non défini', heures: Infinity, retard: false, echeanceTexte: '—' };
+  const maintenant = new Date();
+  if (echeance <= maintenant) {
+    return { texte: 'Échéance dépassée', heures: 0, retard: true, echeanceTexte: etiquetteEcheance(echeance) };
+  }
+  const heures = Math.floor(minutesOuvrees(maintenant, echeance) / 60);
+  const jours = Math.floor(heures / (FERMETURE - OUVERTURE));
+  const reste = heures - jours * (FERMETURE - OUVERTURE);
+  let texte = '';
+  if (jours > 0) texte += `${jours} jour${jours > 1 ? 's' : ''} ouvré${jours > 1 ? 's' : ''}`;
+  if (reste > 0) texte += `${texte ? ' et ' : ''}${reste} heure${reste > 1 ? 's' : ''}`;
+  if (!texte) texte = 'Moins d’une heure';
+  return { texte, heures, retard: false, echeanceTexte: etiquetteEcheance(echeance) };
+}
+
+// Moins de deux jours ouvrés restants = urgent. Au-delà, la commande est calme.
+const bandeUrgence = (d) => (d.retard ? 'retard' : d.heures <= 16 ? 'urgent' : 'calme');
+
+const initiales = (nom) => String(nom || '').split(/\s+/).map((m) => m[0] || '').join('').slice(0, 2).toUpperCase();
+
+function pcardBloc(label, ...enfants) {
+  const d = document.createElement('div');
+  const l = document.createElement('p');
+  l.className = 'pcard__label';
+  l.textContent = label;
+  d.append(l, ...enfants);
+  return d;
+}
+
+function buildCard(r) {
+  const carte = document.createElement('article');
+  carte.dataset.id = r.id;
+  const delai = tempsRestant(r.deadline, r.fiche && r.fiche.heureSouhaitee);
+  const bande = bandeUrgence(delai);
+  carte.className = `pcard pcard--${bande}`;
+
+  // 1. POUR QUI — le nom du dossier, et la référence du ticket dessous.
+  const client = document.createElement('div');
+  client.className = 'pcard__client';
+  client.textContent = r.billing_company || 'Sans nom';
+  const ref = document.createElement('div');
+  ref.className = 'pcard__ref';
+  ref.textContent = (r.fiche && r.fiche.ref) || '';
+  const blocClient = pcardBloc('Client', client);
+  if (ref.textContent) blocClient.appendChild(ref);
+
+  // 2. QUOI — la description, puis les deux puces qui situent la commande.
+  const nom = document.createElement('div');
+  nom.className = 'pcard__name';
+  nom.textContent = r.product || 'Sans description';
+  const meta = document.createElement('div');
+  meta.className = 'pcard__meta';
+  const puce = (texte) => {
+    const s = document.createElement('span');
+    s.className = 'pcard__pill';
+    s.textContent = texte;
+    return s;
+  };
+  meta.appendChild(puce(PRIORITY_LEVELS[prioBand(r)].label));
+  meta.appendChild(puce(stageDestinationLabel(r.stage, r.sub_stage ?? null)));
+  if (r.flag) meta.appendChild(puce(r.flag === 'bloque' ? 'Bloquée' : 'À voir'));
+
+  // 3. COMBIEN DE TEMPS IL RESTE — la seule question que le tableau ne posait
+  //    nulle part, alors que c'est celle qui décide de l'ordre de la journée.
+  const delaiEl = document.createElement('div');
+  delaiEl.className = 'pcard__delai' + (bande === 'calme' ? '' : ` pcard__delai--${bande}`);
+  delaiEl.textContent = delai.texte;
+  const remise = document.createElement('div');
+  remise.className = 'pcard__sub';
+  const heure = r.fiche && r.fiche.heureSouhaitee ? ` à ${r.fiche.heureSouhaitee.replace(':', 'h')}` : '';
+  remise.textContent = `Remise client : ${dateFr(r.deadline)}${heure}`;
+  const cible = document.createElement('div');
+  cible.className = 'pcard__sub';
+  cible.textContent = `À terminer avant ${delai.echeanceTexte}`;
+
+  // 4. COMBIEN — le TTC, et le référent qu'on change d'un clic.
+  const montant = document.createElement('div');
+  if (r.project_value == null) {
+    montant.className = 'pcard__value pcard__value--vide';
+    montant.textContent = 'À chiffrer';
+  } else {
+    montant.className = 'pcard__value';
+    montant.textContent = eur(Number(r.project_value));
+  }
+  const refs = document.createElement('div');
+  refs.className = 'pcard__refs';
+  const nomRef = document.createElement('div');
+  nomRef.className = 'pcard__ref-name';
+  const effectif = () => r.referent || r.responsable || 'Non attribué';
+  nomRef.textContent = `Référent : ${effectif()}`;
+  for (const e of EMPLOYEES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pcard__ref-btn' + (r.referent === e ? ' is-on' : '');
+    b.textContent = initiales(e);
+    b.setAttribute('aria-label', `Référent : ${e}`);
+    attachTip(b, e);
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      // Re-cliquer sur le référent en place le retire : c'est le même geste
+      // pour attribuer et pour désattribuer, personne n'a à chercher comment.
+      const valeur = r.referent === e ? null : e;
+      patch(r, { referent: valeur }, () => {
+        r.referent = valeur;
+        applySortAndRender();
+      });
+    });
+    refs.append(b);
+  }
+
+  const ouvrir = document.createElement('button');
+  ouvrir.type = 'button';
+  ouvrir.className = 'pcard__open';
+  ouvrir.setAttribute('aria-label', 'Ouvrir la fiche projet');
+  attachTip(ouvrir, 'Ouvrir la fiche projet');
+  ouvrir.appendChild(strokeIcon(['M7 17L17 7', 'M9 7h8v8']));
+  ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
+
+  carte.append(
+    blocClient,
+    pcardBloc('Projet', nom, meta),
+    pcardBloc('Délai de production restant', delaiEl, remise, cible),
+    pcardBloc('TTC', montant, refs, nomRef),
+    ouvrir,
+  );
+
+  // La carte se glisse sur le rail pour changer d'étape, comme une ligne du
+  // tableau. On saisit la carte elle-même : elle n'a pas de poignée, tout son
+  // fond est zone de prise (hors boutons, qui arrêtent l'évènement).
+  carte.classList.add('pcard__grip');
+  attachDrag(carte, carte, r);
+  return carte;
+}
+
+function renderCards(data) {
+  const voulus = new Set(data.map((r) => String(r.id)));
+  for (const [id, entry] of cardEls) {
+    if (!voulus.has(id)) { entry.el.remove(); cardEls.delete(id); }
+  }
+  const ordre = [];
+  for (const r of data) {
+    const id = String(r.id);
+    const sig = `${r.id}:${r.updated_at}`;
+    let entry = cardEls.get(id);
+    if (!entry) {
+      entry = { el: buildCard(r), sig };
+      cardEls.set(id, entry);
+    } else if (entry.sig !== sig && !entry.el.classList.contains('dragging')) {
+      const el = buildCard(r);
+      entry.el.replaceWith(el);
+      entry.el = el;
+      entry.sig = sig;
+    }
+    ordre.push(entry.el);
+  }
+  let prev = null;
+  for (const node of ordre) {
+    if (!node.classList.contains('dragging')) {
+      const attendu = prev ? prev.nextSibling : $cards.firstChild;
+      if (node !== attendu) $cards.insertBefore(node, attendu);
+    }
+    prev = node;
+  }
+}
+
 function renderRows(data) {
+  // Vue épurée : une carte par projet, le tableau reste monté mais masqué.
+  if (modeCartes()) { renderCards(data); return; }
+
   // Planning simplifié : plus de colonne priorité, donc plus de regroupement par
   // bande. On affiche toujours une liste à plat (tri par urgence puis échéance).
   const grouping = false;
@@ -836,11 +1077,12 @@ function applySearchAndCounts() {
   const q = fold(gridQuery.trim());
   let visible = 0;
   const bandVisible = { 1: 0, 2: 0, 3: 0 };
+  const cartes = modeCartes();
   for (const r of lastRendered) {
-    const entry = rowEls.get(String(r.id));
+    const entry = cartes ? cardEls.get(String(r.id)) : rowEls.get(String(r.id));
     if (!entry) continue;
     const match = !q || isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
-    entry.tr.classList.toggle('is-hidden', !match);
+    (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
     if (match) {
       visible++;
       bandVisible[prioBand(r)]++;
@@ -870,6 +1112,7 @@ function applySearchAndCounts() {
 // parce que la recherche masque des lignes (.is-hidden) et le drag les réordonne :
 // le zébrage doit suivre les lignes réellement affichées, pas leur index brut.
 function paintZebra() {
+  if (modeCartes()) return;      // les cartes sont déjà détachées les unes des autres
   let i = 0;
   for (const tr of $rows.children) {
     if (tr.dataset.id == null || tr.classList.contains('is-hidden')) continue;
@@ -3502,10 +3745,11 @@ function updateDragTarget() {
       blockedEl = stageEl;
     }
   } else {
-    // réordonnancement vertical dans la grille
-    const after = getDragAfterElement($rows, y);
-    if (after == null) $rows.appendChild(dragState.tr);
-    else if (after !== dragState.tr) $rows.insertBefore(dragState.tr, after);
+    // réordonnancement vertical dans la vue courante (tableau ou cartes)
+    const liste = listeCourante();
+    const after = getDragAfterElement(liste, y);
+    if (after == null) liste.appendChild(dragState.tr);
+    else if (after !== dragState.tr) liste.insertBefore(dragState.tr, after);
     paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
   }
   if (blockedEl !== priceBlockedEl) {
@@ -3613,7 +3857,7 @@ function moveToStage(r, slug, targetSub = null) {
 }
 
 async function commitReorder(r) {
-  const siblings = [...$rows.querySelectorAll('tr[data-id]:not(.is-hidden)')];
+  const siblings = [...listeCourante().querySelectorAll('[data-id]:not(.is-hidden)')];
   const idx = siblings.findIndex((el) => el.dataset.id === r.id);
   const posOf = (el) => el ? (rows.find((x) => x.id === el.dataset.id)?.position ?? null) : null;
   const pPrev = posOf(siblings[idx - 1]);
@@ -3647,8 +3891,12 @@ function autoScroll(y) {
   else if (y > rect.bottom - margin) wrap.scrollTop += 14;
 }
 
+// Le conteneur de la vue affichée : le corps du tableau, ou la liste de cartes.
+// Réordonner, c'est le même geste dans les deux — seul le conteneur change.
+const listeCourante = () => (modeCartes() ? $cards : $rows);
+
 function getDragAfterElement(container, y) {
-  const els = [...container.querySelectorAll('tr[data-id]:not(.dragging):not(.is-hidden)')];
+  const els = [...container.querySelectorAll('[data-id]:not(.dragging):not(.is-hidden)')];
   return els.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -3715,7 +3963,10 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 // le fait donc pas apparaître en Production, où il est toujours vide. Le rail
 // l'écrit noir sur blanc (voir la mention « vide ici ») pour qu'on ne croie
 // pas à un bug.
-const COLS_KEY = 'olda_cols_v1';
+// `v2` : nouvelle clé volontairement, pour que TOUS les postes repartent sur la
+// vue épurée. Un poste qui avait réglé ses colonnes en v1 aurait sinon gardé son
+// tableau, et l'écran validé par le patron ne serait apparu nulle part.
+const COLS_KEY = 'olda_cols_v2';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
 // posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
 // la masquer en plus du choix manuel.
@@ -3732,17 +3983,26 @@ const PLANNING_COLS = [
   { key: 'flag',        label: 'État' },
 ];
 
-let hiddenCols = new Set();
+// Colonnes qu'on peut éteindre (toutes sauf l'identité de la ligne).
+const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) => c.key));
+
+// PAR DÉFAUT, TOUT EST RANGÉ : le planning s'ouvre sur les cartes épurées. Les
+// colonnes ne sont pas perdues, elles attendent dans le rail « Colonnes » — en
+// rallumer une ramène le tableau avec elle.
+let hiddenCols = new Set(COLS_ETEIGNABLES);
 try {
-  const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '[]');
-  if (Array.isArray(saved)) {
-    // On ne garde que des clés connues et jamais une colonne verrouillée :
-    // un localStorage d'une version précédente ne doit pas pouvoir faire
-    // disparaître l'identité de la ligne.
-    const off = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) => c.key));
-    hiddenCols = new Set(saved.filter((k) => off.has(k)));
-  }
-} catch (_) { hiddenCols = new Set(); }
+  const saved = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
+  // On ne garde que des clés connues et jamais une colonne verrouillée : un
+  // localStorage d'une version précédente ne doit pas pouvoir faire disparaître
+  // l'identité de la ligne.
+  if (Array.isArray(saved)) hiddenCols = new Set(saved.filter((k) => COLS_ETEIGNABLES.has(k)));
+} catch (_) { hiddenCols = new Set(COLS_ETEIGNABLES); }
+
+// VUE ÉPURÉE tant qu'aucune colonne n'est allumée. C'est la même commande pour
+// les deux vues : le rail « Colonnes » dit ce qu'on veut voir, et le planning
+// passe des cartes au tableau dès qu'on lui demande une colonne.
+const modeCartes = () => COLS_ETEIGNABLES.size > 0
+  && [...COLS_ETEIGNABLES].every((k) => hiddenCols.has(k));
 
 function saveHiddenCols() {
   try { localStorage.setItem(COLS_KEY, JSON.stringify([...hiddenCols])); } catch (_) {}
@@ -3755,6 +4015,12 @@ function saveHiddenCols() {
 // vient justement de lui faire de la place.
 function applyColVisibility() {
   if (!$grid) return;
+  // Une seule des deux vues est montée à la fois : le tableau garderait sinon
+  // son en-tête collant au-dessus des cartes.
+  const cartes = modeCartes();
+  $grid.hidden = cartes;
+  if ($cards) $cards.hidden = !cartes;
+  document.body.classList.toggle('view-cartes', cartes);
   let off = 0;
   for (const c of PLANNING_COLS) {
     const cache = hiddenCols.has(c.key);
@@ -3769,6 +4035,7 @@ const $colbarOn = document.getElementById('colbarOn');
 const $colbarOff = document.getElementById('colbarOff');
 const $colbarOffLegend = document.getElementById('colbarOffLegend');
 const $colbarOffEmpty = document.getElementById('colbarOffEmpty');
+const $colbarOnNote = document.getElementById('colbarOnNote');
 const $colbarReset = document.getElementById('colbarReset');
 const $colbarOpen = document.getElementById('colbarOpen');
 
@@ -3807,11 +4074,16 @@ function colbarItem(col) {
   if (!col.locked) {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.addEventListener('click', () => {
+      const avant = modeCartes();
       if (hiddenCols.has(col.key)) hiddenCols.delete(col.key);
       else hiddenCols.add(col.key);
       saveHiddenCols();
       applyColVisibility();
       renderColbar();
+      // Rallumer la première colonne fait revenir le tableau, tout éteindre
+      // ramène les cartes : dans les deux cas la vue affichée est vide tant
+      // qu'on ne l'a pas construite.
+      if (modeCartes() !== avant) applySortAndRender();
     });
   }
   return btn;
@@ -3827,7 +4099,14 @@ function renderColbar() {
   const rien = hiddenCols.size === 0;
   $colbarOffLegend.hidden = rien;
   $colbarOffEmpty.hidden = !rien;
-  $colbarReset.hidden = rien;
+  // Le bouton reste TOUJOURS disponible : sur les cartes il sert à tout
+  // rallumer, sur le tableau à tout ranger. Il n'y a pas d'état sans issue.
+  $colbarReset.hidden = false;
+  $colbarReset.textContent = modeCartes() ? 'Afficher le tableau complet' : 'Revenir aux cartes';
+  // Sur les cartes, « Sur l'écran » n'a que la colonne verrouillée à montrer :
+  // on dit ce qui se passe plutôt que de laisser une liste presque vide.
+  $colbarOn.hidden = modeCartes();
+  if ($colbarOnNote) $colbarOnNote.hidden = !modeCartes();
 }
 
 function setColbarOpen(open) {
@@ -3846,11 +4125,16 @@ function initColbar() {
   setColbarOpen(open);
   $colbarOpen.addEventListener('click', () => setColbarOpen($colbar.hidden));
   document.getElementById('colbarClose').addEventListener('click', () => setColbarOpen(false));
+  // « Tout réafficher » ramène le tableau complet ; « Tout ranger » repose le
+  // planning sur ses cartes épurées. Le même bouton, dans les deux sens : on ne
+  // se retrouve jamais coincé dans une vue.
   $colbarReset.addEventListener('click', () => {
-    hiddenCols.clear();
+    if (modeCartes()) hiddenCols.clear();
+    else for (const k of COLS_ETEIGNABLES) hiddenCols.add(k);
     saveHiddenCols();
     applyColVisibility();
     renderColbar();
+    applySortAndRender();
   });
 }
 
