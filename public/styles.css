@@ -4584,6 +4584,85 @@ body.wall-open { overflow: hidden; }
   box-shadow: var(--shadow-2);
 }
 .ld-section--full { grid-column: 1 / -1; }
+
+/* --- Encadrés de la fiche, comme sur l'écran du patron ---------------------
+   Petit libellé en capitales, puis le contenu. Deux colonnes ; les encadrés qui
+   portent du texte long prennent toute la largeur. */
+.ld-box {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.ld-box--full { grid-column: 1 / -1; }
+.ld-k {
+  margin: 0 0 8px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3, var(--text-2));
+}
+.ld-v { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--text-1); white-space: pre-wrap; }
+.ld-v:last-child { margin-bottom: 0; }
+/* 16 px sur les champs : en dessous, iOS zoome sur le champ au focus.
+   `.ld-ctl` et non `.ld-field` : cette dernière habille déjà les LIGNES
+   libellé/valeur du bloc paiement, elle ne doit pas devenir un champ. */
+.ld-ctl {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit; font-size: 16px;
+  resize: vertical;
+}
+.ld-ctl:focus { outline: 2px solid var(--focus, rgba(17, 24, 39, .25)); outline-offset: 1px; }
+.ld-duo { display: flex; gap: 8px; }
+.ld-duo .ld-ctl { min-width: 0; }
+.ld-pay { display: grid; gap: 6px; }
+/* Dans la fiche, une ligne de paiement se lit d'un trait : libellé à gauche,
+   interrupteur à droite. Sans ça elle reprend l'habillage « carte » du tiroir
+   d'origine et le bloc devient trois fois trop haut. */
+.ld-pay .ld-field {
+  display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 40px; padding: 6px 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  background: var(--bg);
+}
+.ld-pay .ld-field__label { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+
+.ld-eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--text-2);
+}
+.ld-title { margin: 0; font-size: 21px; font-weight: 800; color: var(--text-1); }
+
+/* --- Pied de la fiche : où va la ligne, qui la suit, et on enregistre -------
+   Épinglé sous le contenu qui défile : la commande d'enregistrement ne doit
+   jamais être « quelque part plus bas ». */
+.ld-foot {
+  flex: 0 0 auto;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.ld-foot__row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ld-foot__row .ld-ctl { flex: 1 1 180px; width: auto; }
+.ld-save {
+  flex: 0 0 auto;
+  min-height: 44px; padding: 11px 18px;
+  border: 1px solid var(--text-1); border-radius: var(--radius);
+  background: var(--text-1); color: var(--surface);
+  font: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+}
+.ld-save:hover:not(:disabled) { background: #000; }
+.ld-save:disabled { opacity: .55; cursor: default; }
+.ld-note { margin-top: 10px; }
+@media (max-width: 620px) {
+  .ld-foot__row .ld-ctl, .ld-save { flex: 1 1 100%; }
+}
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */

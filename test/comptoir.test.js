@@ -244,11 +244,30 @@ delete process.env.APP_PASSWORD;
   await call('PATCH', `/api/requests/${vente.body.id}/fiche`, { details: ['26.07.31-001', '   '] });
   assert.strictEqual((await ligneDe(vente.body.id)).fiche.details[1].v, '—');
 
-  // Une ligne créée à la main dans la grille n'a pas de détail à corriger.
+  // L'heure de retrait et le secteur de production se corrigent sur N'IMPORTE
+  // QUELLE ligne : la fiche les affiche pour tout le monde, ils doivent
+  // s'enregistrer pour tout le monde.
   const sansFiche = await call('POST', '/api/requests', { billing_company: 'Ligne manuelle' });
+  const simple = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, {
+    heureSouhaitee: '16:30', production: 'DTF',
+  });
+  assert.strictEqual(simple.status, 200, JSON.stringify(simple.body));
+  assert.strictEqual(simple.body.fiche.heureSouhaitee, '16:30');
+  assert.strictEqual(simple.body.fiche.production, 'DTF');
+
+  // Une heure impossible ne s'enregistre pas : elle fausserait le délai affiché.
+  const heureFausse = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { heureSouhaitee: '99:99' });
+  assert.strictEqual(heureFausse.body.fiche.heureSouhaitee, null);
+
+  // En revanche une ligne créée à la main n'a pas de récapitulatif à corriger.
   const refus = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { details: ['x'] });
   assert.strictEqual(refus.status, 400);
   assert.match(refus.body.error, /pas de détail modifiable/);
+
+  // L'heure corrigée depuis la fiche remonte bien sur une commande du comptoir.
+  const heureComptoir = await call('PATCH', `/api/requests/${vente.body.id}/fiche`, { heureSouhaitee: '09:30' });
+  assert.strictEqual(heureComptoir.body.fiche.heureSouhaitee, '09:30');
+  assert.strictEqual(heureComptoir.body.fiche.ref, '26.07.31-001', 'le reste de la fiche est intact');
 
   const introuvable = await call('PATCH', '/api/requests/00000000-0000-4000-8000-000000000000/fiche', { details: [] });
   assert.strictEqual(introuvable.status, 404);
