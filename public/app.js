@@ -3618,9 +3618,17 @@ let dragState = null;
 // pour ne rafraîchir la bulle qu'au changement de cible, pas à chaque frame de survol.
 let priceBlockedEl = null;
 
+// Sur une carte du planning, toute la surface est saisissable : la poignée EST
+// la carte. Mais elle porte aussi des boutons (référent, ouvrir la fiche), et
+// `preventDefault()` sur `pointerdown` supprime les évènements souris de
+// compatibilité — donc le `click` qui suit. Sans cette garde, aucun bouton posé
+// sur une zone de prise ne répondrait plus.
+const ZONE_CLIQUABLE = 'button, a, input, select, textarea, [role="button"]';
+
 function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target !== handle && e.target.closest && e.target.closest(ZONE_CLIQUABLE)) return;
     e.preventDefault();
     dragState = {
       id: r.id, r, tr, handle,
