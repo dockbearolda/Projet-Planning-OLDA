@@ -2480,7 +2480,12 @@ function ldBlocDetail(r) {
   ].filter((g) => g.lignes.length);
   if (!groupes.length) return null;
 
-  const section = ldBox('Détail complet de la demande enregistrée — tout est modifiable', null, true);
+  const total = groupes.reduce((n, g) => n + g.lignes.length, 0);
+  const section = ldVolet(
+    'Détail complet de la demande enregistrée',
+    `${total} ligne${total > 1 ? 's' : ''} — tout est modifiable`,
+    null, true,
+  );
   const champs = { client: [], details: [] };
 
   for (const g of groupes) {
@@ -2579,6 +2584,36 @@ function ldBox(label, contenu, pleine) {
   box.append(k);
   for (const c of [].concat(contenu)) if (c) box.append(c);
   return box;
+}
+
+// UN VOLET : tout ce qui se MODIFIE est replié par défaut.
+// La fiche s'ouvre donc en lecture — on la parcourt d'un coup d'œil sans risquer
+// de retoucher un champ au passage. Le volet fermé montre le libellé ET la
+// valeur du moment : on lit sans ouvrir, on n'ouvre que pour changer.
+// `<details>` natif : ça marche au clavier, ça s'imprime déplié si besoin, et
+// aucun script ne pilote l'ouverture.
+function ldVolet(label, apercu, contenu, pleine) {
+  const volet = document.createElement('details');
+  volet.className = 'ld-box ld-volet' + (pleine ? ' ld-box--full' : '');
+  const tete = document.createElement('summary');
+  tete.className = 'ld-volet__tete';
+  const textes = document.createElement('span');
+  textes.className = 'ld-volet__textes';
+  const k = document.createElement('span');
+  k.className = 'ld-k';
+  k.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'ld-volet__apercu';
+  v.textContent = apercu == null || apercu === '' ? '—' : String(apercu);
+  textes.append(k, v);
+  const chevron = document.createElement('span');
+  chevron.className = 'material-symbols-outlined ld-volet__chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = 'expand_more';
+  tete.append(textes, chevron);
+  volet.append(tete);
+  for (const c of [].concat(contenu)) if (c) volet.append(c);
+  return volet;
 }
 
 // Valeur en lecture seule (étape courante, échéance calculée…).
@@ -2699,16 +2734,23 @@ function renderLigneDetail() {
   remise.className = 'ld-duo';
   remise.append(cDate, cHeure);
 
+  // Les deux encadrés en LECTURE (étape, échéance) restent ouverts : il n'y a
+  // rien à y modifier, les replier ne ferait que cacher une information.
+  const heureLue = fiche.heureSouhaitee ? ` à ${fiche.heureSouhaitee.replace(':', 'h')}` : '';
   body.append(
-    ldBox('Client', cClient),
-    ldBox('Projet', cProjet),
+    ldVolet('Client', r.billing_company, cClient),
+    ldVolet('Projet', r.product, cProjet),
     ldBox('Étape actuelle', ldValeur(stageDestinationLabel(r.stage, r.sub_stage ?? null))),
-    ldBox('Priorité', cPriorite),
-    ldBox('Remise au client', remise),
+    ldVolet('Priorité', PRIORITY_LEVELS[prioBand(r)].label, cPriorite),
+    ldVolet('Remise au client', `${dateFr(r.deadline)}${heureLue}`, remise),
     ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
-    ldBox('Valeur TTC', cPrix),
-    ldBox('Production', cProduction),
-    ldBox('Informations / commentaire', cInfos, true),
+    ldVolet('Valeur TTC', r.project_value == null ? 'À chiffrer' : eur(Number(r.project_value)), cPrix),
+    ldVolet('Production', fiche.production || 'À définir', cProduction),
+    ldVolet(
+      'Informations / commentaire',
+      (r.description || '').split('\n').filter(Boolean)[0] || '—',
+      cInfos, true,
+    ),
   );
 
   // --- Documents et paiement : deux encadrés en plus de l'écran du patron -----
@@ -2718,7 +2760,12 @@ function renderLigneDetail() {
   const docs = document.createElement('div');
   docs.className = 'ld-docs';
   docs.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
-  body.append(ldBox('Documents', docs, true));
+  const nomsDocs = ['devis', 'facture', 'bat'].filter((k) => r[`${k}_name`]);
+  body.append(ldVolet(
+    'Documents',
+    nomsDocs.length ? `${nomsDocs.length} document${nomsDocs.length > 1 ? 's' : ''}` : 'Aucun',
+    docs, true,
+  ));
 
   const paiement = document.createElement('div');
   paiement.className = 'ld-pay';
@@ -2755,7 +2802,13 @@ function renderLigneDetail() {
     },
   );
   paiement.append(ldRow('Mode', modeChip));
-  body.append(ldBox('Paiement', paiement, true));
+  // Replié, le volet dit l'essentiel : est-ce payé, et comment.
+  const modeLu = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
+  const apercuPaiement = [
+    r.paye === true ? 'Payé' : r.acompte_verse === true ? 'Acompte versé' : r.paye === false ? 'À encaisser' : null,
+    modeLu ? modeLu.label : null,
+  ].filter(Boolean).join(' · ') || 'Non renseigné';
+  body.append(ldVolet('Paiement', apercuPaiement, paiement, true));
 
   // --- Historique --------------------------------------------------------------
   // L'application ne tient pas de journal des modifications : on affiche ce
