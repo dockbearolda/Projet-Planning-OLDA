@@ -1926,9 +1926,8 @@ function cellDescription(r) {
 }
 
 // Prix : montant TTC de la commande — celui que le client paie. Le HT s'affiche
-// dessous, calculé, jamais saisi. Une ligne sans prix ne peut pas ENTRER dans la
-// zone Devis envoyé → Archivé (voir blockedByPrice plus bas) — affiché ici pour
-// que la saisie se fasse tôt, pas au moment du glisser-déposer.
+// dessous, calculé, jamais saisi. Vide tant que rien n'est chiffré : le prix ne
+// conditionne plus aucun déplacement de ligne, il ne fait que renseigner.
 function cellPrice(r) {
   const td = document.createElement('td');
   td.className = 'col-price-cell';
@@ -3588,9 +3587,6 @@ function copyToStage(r, slug) {
 // Fonctionne au doigt sur tablette : le DnD HTML5 ne se déclenche pas au tactile,
 // on utilise donc les Pointer Events (souris, doigt et stylet unifiés).
 let dragState = null;
-// Cible Facturation actuellement affichée comme refusée (classe + bulle visibles),
-// pour ne rafraîchir la bulle qu'au changement de cible, pas à chaque frame de survol.
-let priceBlockedEl = null;
 
 // Sur une carte du planning, toute la surface est saisissable : la poignée EST
 // la carte. Mais elle porte aussi des boutons (référent, ouvrir la fiche), et
@@ -3658,42 +3654,13 @@ function onDragMove(e) {
   if (!dragState.raf) dragState.raf = requestAnimationFrame(updateDragTarget);
 }
 
-// --- Blocage prix : zone « Devis à envoyer » → Archivé (glisser-déposer + étape
-// suivante) ------------------------------------------------------------------
-// Le devis fixe le prix : une commande sans prix ne peut pas ENTRER dans cette
-// zone (sous-étape Devis à envoyer, ou toute famille après Commande/Chiffrage —
-// Attente Client, Préparation, Production, Facturation, Terminé, Archivé) depuis
-// une position en dehors. Une fois la ligne dans la zone, tous les mouvements
-// internes (réordonner, changer de sous-étape, revenir en arrière dans la zone)
-// restent toujours possibles, même si le prix venait à manquer entre-temps : la
-// règle ne verrouille que l'ENTRÉE, jamais les mouvements internes.
-function hasPrice(r) {
-  return r.project_value != null;
-}
-
-// La zone s'ouvre au moment où le tarif part chez le client : les deux dernières
-// sous-étapes de « Demande & chiffrage », puis toutes les familles suivantes.
-const PRICE_ZONE_SUBS = new Set(['devis_envoye', 'devis_valide']);
-
-function inPriceZone(stage, sub) {
-  if (stage === 'demande_chiffrage') return PRICE_ZONE_SUBS.has(sub);
-  const idx = STAGE_ORDER[stage];
-  const firstIdx = STAGE_ORDER.demande_chiffrage;
-  return idx != null && firstIdx != null && idx > firstIdx;
-}
-
-function blockedByPrice(r, targetStage, targetSub = null) {
-  if (hasPrice(r)) return false;
-  if (!inPriceZone(targetStage, targetSub)) return false;
-  return !inPriceZone(r.stage, r.sub_stage ?? null);
-}
-
-function priceBlockMessage(targetStage, targetSub) {
-  const label = targetStage === 'demande_chiffrage' && targetSub
-    ? SUB_LABEL[targetSub]
-    : STAGE_LABEL[targetStage];
-  return `Sans prix, impossible de passer en ${label}.`;
-}
+// LE PRIX NE COMMANDE PLUS LE DÉPLACEMENT. Une commande sans montant était
+// refusée à l'entrée de « Devis envoyé », « Devis validé » et de toutes les
+// familles suivantes — la cible virait au rouge et l'écran répondait « Sans
+// prix, impossible de passer en Facturation ». Règle levée le 31/07/2026 : une
+// ligne se déplace où l'on veut, chiffrée ou non, et c'est l'atelier qui décide
+// de l'ordre de son travail, pas le champ prix. Le prix reste évidemment
+// nécessaire pour facturer — simplement, il ne barre plus la route.
 
 // Une entrée du rail accepte-t-elle qu'on y DÉPOSE la ligne `r` ?
 // Un GRAND TITRE qui a des sous-catégories n'est JAMAIS une cible : la ligne doit
@@ -3705,7 +3672,6 @@ function stageAcceptsDrop(stageEl, r) {
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
   const sub = isSub ? stageEl.dataset.sub : null;
-  if (blockedByPrice(r, slug, sub)) return false;            // pas de prix : entrée refusée
   return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
 }
 
@@ -3728,27 +3694,12 @@ function updateDragTarget() {
   const x = dragState.lastX, y = dragState.lastY;
   const el = document.elementFromPoint(x, y);
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
-  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
   const stageEl = el && el.closest ? el.closest('.stage') : null;
-  let blockedEl = null;
   if (stageEl) {
-    const stageSub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
-    if (stageAcceptsDrop(stageEl, dragState.r)) {
-      stageEl.classList.add('drop-target');
-    } else if (blockedByPrice(dragState.r, stageEl.dataset.slug, stageSub)) {
-      stageEl.classList.add('drop-blocked');
-      blockedEl = stageEl;
-    }
+    if (stageAcceptsDrop(stageEl, dragState.r)) stageEl.classList.add('drop-target');
   } else {
     // réordonnancement vertical dans la vue courante (tableau ou cartes)
     placerDansLaListe(dragState.tr, y);
-  }
-  if (blockedEl !== priceBlockedEl) {
-    priceBlockedEl = blockedEl;
-    if (blockedEl) {
-      const sub = blockedEl.dataset.sub != null ? blockedEl.dataset.sub : null;
-      showTip(blockedEl, priceBlockMessage(blockedEl.dataset.slug, sub));
-    } else hideTip();
   }
   autoScroll(y);
 }
@@ -3771,9 +3722,7 @@ async function onDragEnd(e) {
   ds.tr.classList.remove('dragging');
   document.body.classList.remove('dragging-active');
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
-  document.querySelectorAll('.stage.drop-blocked').forEach((s) => s.classList.remove('drop-blocked'));
   hideTip();
-  priceBlockedEl = null;
   dragState = null;
 
   // Ligne encore en cours de création (id temporaire, ex. duplication non
@@ -3795,13 +3744,10 @@ async function onDragEnd(e) {
       const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
       await moveToStage(ds.r, slug, sub);
     } else {
+      // Le seul refus qui reste : un grand titre à sous-catégories. On guide
+      // vers une sous-catégorie plutôt que de laisser la ligne « à préciser ».
       if (stageEl.dataset.sub == null && familyHasSub(stageEl.dataset.slug)) {
         showToast('Dépose la ligne sur une sous-catégorie, pas sur le titre.');
-      } else {
-        const sub = stageEl.dataset.sub != null ? stageEl.dataset.sub : null;
-        if (blockedByPrice(ds.r, stageEl.dataset.slug, sub)) {
-          showToast(priceBlockMessage(stageEl.dataset.slug, sub));
-        }
       }
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }

@@ -538,12 +538,6 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   box-shadow: inset 0 0 0 1.5px var(--primary);
   color: var(--primary);
 }
-.stage.drop-blocked {
-  background: color-mix(in srgb, var(--st-bloque-bg) 45%, var(--surface));
-  box-shadow: inset 0 0 0 1.5px var(--st-bloque);
-  color: var(--st-bloque);
-  cursor: not-allowed;
-}
 
 /* Grand titre de ZONE — BARRE PLEINE. Demande de la direction : les familles
    doivent sauter aux yeux depuis l'atelier, pas se deviner. D'où le bandeau
@@ -608,11 +602,9 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   background: var(--rail-head-fg);
   color: var(--rail-head-bg-strong);
 }
-/* Cibles de glisser-déposer sur un bandeau plein : les fonds tonals de
-   `.stage.drop-target` / `.drop-blocked` disparaîtraient sous le gris foncé.
-   On INVERSE la barre pour « déposer ici », on la passe en rouge de la charte
-   pour « refusé ». (Un en-tête de famille à sous-catégories n'est jamais une
-   cible valide — voir stageAcceptsDrop — mais il peut être refusé.) */
+/* Cible de glisser-déposer sur un bandeau plein : le fond tonal de
+   `.stage.drop-target` disparaîtrait sous le gris foncé. On INVERSE donc la
+   barre pour dire « déposer ici ». */
 .stage.zone-head.drop-target {
   background: var(--rail-head-fg);
   color: var(--rail-head-bg-strong);
@@ -623,17 +615,6 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .stage.zone-head.drop-target .stage-count.has-items {
   background: var(--rail-head-bg-strong);
   color: var(--rail-head-fg);
-}
-.stage.zone-head.drop-blocked {
-  background: var(--st-bloque-bg);
-  color: var(--st-bloque);
-  box-shadow: inset 0 0 0 2px var(--st-bloque);
-}
-.stage.zone-head.drop-blocked .stage-label { color: var(--st-bloque); }
-.stage.zone-head.drop-blocked .stage-count,
-.stage.zone-head.drop-blocked .stage-count.has-items {
-  background: transparent;
-  color: var(--st-bloque);
 }
 
 /* Sous-catégories : déroulées sous leur famille (miroir de la « Vue Étapes »).
