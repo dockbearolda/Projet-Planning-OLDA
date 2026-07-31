@@ -130,6 +130,12 @@
             <div class="work-title">
               <h1 id="stageTitle">Commande</h1>
               <span class="work-count" id="stageCount"></span>
+              <!-- Apparaît UNIQUEMENT quand l'étape a été rangée à la main : sans
+                   lui, on entrerait dans l'ordre manuel sans jamais pouvoir en
+                   sortir. -->
+              <button class="ordre-reset" id="ordreReset" type="button" hidden>
+                Ordre manuel · revenir au tri par urgence
+              </button>
             </div>
           </div>
           <div class="work-head-right">

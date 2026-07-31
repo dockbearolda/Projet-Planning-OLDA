@@ -662,6 +662,31 @@ input:focus,select:focus,textarea:focus{outline:3px solid rgba(48,100,232,.15)!i
 label{font-weight:800;font-size:13.5px}
 h2{letter-spacing:-.01em}
 </style>
+<style>
+/* ---- Barème express : discret sous la ligne de supplément ----
+   Un lien, pas un bouton d'action : on ne règle pas le barème à chaque vente,
+   mais quand on en a besoin il est là, sous les yeux, pas dans un autre écran.
+   Cible tactile gardée à 44 px de haut malgré l'apparence de lien. */
+.bareme-open{
+  display:inline-flex;align-items:center;min-height:44px;
+  margin-top:2px;padding:0;border:0;background:none;
+  color:#5b6472;font-size:12.5px;font-weight:700;text-decoration:underline;
+  text-underline-offset:3px;cursor:pointer;
+}
+.bareme-open:hover{color:#142e54}
+.bareme{margin-top:6px;padding:14px;border:1.5px solid #d7dce3;border-radius:14px;background:#fff}
+.bareme.hidden{display:none}
+.bareme-grid{display:grid;gap:10px}
+.bareme-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+.bareme-grid label span{display:flex;align-items:center;gap:6px;font-weight:800;color:#5b6472}
+/* 16 px minimum : en dessous, iOS zoome sur le champ à la mise au point. */
+.bareme-grid input{width:88px;text-align:right;font-size:16px!important;padding:9px 10px!important}
+.bareme-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.bareme-actions button{padding:11px 18px!important;font-size:13.5px}
+.bareme-msg{margin:10px 0 0;font-size:12.5px;font-weight:700;min-height:1em}
+.bareme-msg.ok{color:#12603a}
+.bareme-msg.ko{color:#9d0000}
+</style>
 </head>
 <body>
 <script>
@@ -759,6 +784,21 @@ h2{letter-spacing:-.01em}
         </select>
         <input id="deliveryDate" class="hidden" type="date" style="margin-top:8px" onchange="updateDeadlineInfo()">
         <div id="deadlineInfo" class="help"></div>
+        <!-- Barème express : réglable ici, là où le supplément s'affiche. -->
+        <button type="button" id="baremeOpen" class="bareme-open">Modifier le barème</button>
+        <div id="baremeBox" class="bareme hidden">
+          <div class="bareme-grid">
+            <label>Dans 5 jours<span><input id="bareme-j5" type="number" min="0" max="100" step="1"> %</span></label>
+            <label>Dans 10 jours<span><input id="bareme-j10" type="number" min="0" max="100" step="1"> %</span></label>
+            <label>Dans 15 jours<span><input id="bareme-j15" type="number" min="0" max="100" step="1"> %</span></label>
+          </div>
+          <p class="help">Vaut aussi pour une date choisie au calendrier : ≤ 5 jours ouvrés, ≤ 10, au-delà.</p>
+          <div class="bareme-actions">
+            <button type="button" id="baremeSave" class="primary">Enregistrer</button>
+            <button type="button" id="baremeCancel" class="secondary">Annuler</button>
+          </div>
+          <p id="baremeMsg" class="bareme-msg" role="status"></p>
+        </div>
 
         <label for="deliveryTime" style="margin-top:12px">Heure souhaitée *</label>
         <select id="deliveryTime">
@@ -1376,30 +1416,46 @@ function deliveryDelayLabel(){
   return "Dans "+select.value+" jours";
 }
 
+// BARÈME DES SUPPLÉMENTS EXPRESS — voir la section « Barème express » en bas de
+// page. Les taux ne sont plus écrits ici : ils viennent du serveur et se règlent
+// depuis l'écran. Les valeurs ci-dessous ne servent que tant que le barème n'est
+// pas arrivé (première frappe avant la fin du chargement).
+window.OLDA_SUPPLEMENTS = window.OLDA_SUPPLEMENTS || { j5:20, j10:10, j15:0 };
+function tauxPalier(palier){
+  const v = Number(window.OLDA_SUPPLEMENTS[palier]);
+  return Number.isFinite(v) ? v/100 : 0;
+}
 function getDeadlineRate(){
   const delay=document.getElementById("deliveryDelay").value;
-  if(delay==="5") return 0.20;
-  if(delay==="10") return 0.10;
-  if(delay==="15") return 0;
+  if(delay==="5") return tauxPalier("j5");
+  if(delay==="10") return tauxPalier("j10");
+  if(delay==="15") return tauxPalier("j15");
   const order=document.getElementById("orderDate").value;
   const delivery=document.getElementById("deliveryDate").value;
   if(!order || !delivery) return 0;
+  // Une date choisie au calendrier retombe sur le même barème, en jours ouvrés.
   const days=businessDaysBetween(order,delivery);
-  if(days<=5) return 0.20;
-  if(days<=10) return 0.10;
-  return 0;
+  if(days<=5) return tauxPalier("j5");
+  if(days<=10) return tauxPalier("j10");
+  return tauxPalier("j15");
+}
+// Le pourcentage AFFICHÉ suit le barème : l'écrire en dur mentirait dès la
+// première modification.
+function pourcent(rate){
+  return String(Math.round(rate*1000)/10).replace(".",",");
 }
 function updateDeadlineInfo(){
   const rate=getDeadlineRate();
   const delay=document.getElementById("deliveryDelay").value;
-  let text;
-  if(delay==="5") text="🔴 5 jours : urgent — supplément de 20 %";
-  else if(delay==="10") text="🟠 10 jours : prioritaire — supplément de 10 %";
-  else if(delay==="15") text="🟢 15 jours : délai standard — aucun supplément";
-  else text=rate===0.20 ? "🔴 Date personnalisée urgente — supplément de 20 %" :
-             rate===0.10 ? "🟠 Date personnalisée prioritaire — supplément de 10 %" :
-             "🟢 Date personnalisée standard — aucun supplément";
-  document.getElementById("deadlineInfo").textContent=text;
+  const quoi = delay==="5" ? "5 jours : urgent"
+    : delay==="10" ? "10 jours : prioritaire"
+    : delay==="15" ? "15 jours : délai standard"
+    : "Date personnalisée";
+  // La pastille dit le NIVEAU de supplément, plus le palier : à barème modifié,
+  // « 15 jours » peut très bien être devenu payant.
+  const puce = rate>=0.20 ? "🔴" : rate>0 ? "🟠" : "🟢";
+  const suffixe = rate>0 ? " — supplément de "+pourcent(rate)+" %" : " — aucun supplément";
+  document.getElementById("deadlineInfo").textContent = puce+" "+quoi+suffixe;
 }
 function productFromForm(){
   const qty=Number(document.getElementById("quantity").value);
@@ -1533,7 +1589,8 @@ function calculateTotals(){
     const expressRates = [...new Set(products.filter(p=>p.rate>0).map(p=>p.rate))];
     let expressLabel = "Supplément express";
     if(expressRates.length===1){
-      expressLabel = expressRates[0]===0.20 ? "Supplément urgence (+20 %)" : "Supplément express (+10 %)";
+      const r = expressRates[0];
+      expressLabel = (r>=0.20 ? "Supplément urgence (+" : "Supplément express (+")+pourcent(r)+" %)";
     }else if(expressRates.length>1){
       expressLabel = "Suppléments express / urgence";
     }
@@ -3008,6 +3065,106 @@ button.blocked{opacity:.45;cursor:not-allowed}
   document.addEventListener('input',function(){refreshLive();},true);
   document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
   setInterval(function(){refreshLive();refreshRecapBanner();},600);
+})();
+</script>
+<!-- ====================================================================== -->
+<!-- BARÈME EXPRESS — le seul endroit de cet écran qui parle au serveur pour
+     autre chose qu'un client ou un ticket.
+
+     Le supplément d'urgence est une décision commerciale, pas une constante :
+     il bouge avec la charge de l'atelier. Il vit donc en base (app_meta), se
+     règle ici même sous la ligne qui l'annonce, et vaut aussitôt pour tous les
+     postes. `getDeadlineRate()` (plus haut) ne lit plus que ce barème.
+
+     Bloc isolé À DESSEIN : quand une nouvelle version de cet écran arrive du
+     patron, c'est cette section + les trois retouches balisées « barème » qu'il
+     faut reporter, rien d'autre. -->
+<script>
+(function(){
+  const CHAMPS = { j5:"bareme-j5", j10:"bareme-j10", j15:"bareme-j15" };
+  const el = (id) => document.getElementById(id);
+  const box = () => el("baremeBox");
+
+  function message(texte, ok){
+    const m = el("baremeMsg");
+    if(!m) return;
+    m.textContent = texte || "";
+    m.className = "bareme-msg" + (texte ? (ok ? " ok" : " ko") : "");
+  }
+
+  // Recopie le barème courant dans les champs. Appelé à chaque ouverture : on ne
+  // veut jamais éditer par-dessus une valeur qu'un autre poste a changée entre-temps.
+  function remplir(){
+    for(const [cle, id] of Object.entries(CHAMPS)){
+      const champ = el(id);
+      if(champ) champ.value = window.OLDA_SUPPLEMENTS[cle];
+    }
+    message("");
+  }
+
+  // Tout ce que le barème touche à l'écran : la ligne de délai, les badges des
+  // articles déjà saisis et le total. Un article ajouté AVANT la modification
+  // garde son taux (c'est le prix annoncé au client) — seul le prochain suit le
+  // nouveau barème.
+  function rafraichir(){
+    if(typeof updateDeadlineInfo === "function") updateDeadlineInfo();
+  }
+
+  async function charger(){
+    try{
+      const r = await fetch("/api/supplements-express");
+      if(!r.ok) return;                       // barème par défaut : l'écran reste utilisable
+      const data = await r.json();
+      if(data && typeof data === "object") window.OLDA_SUPPLEMENTS = data;
+      rafraichir();
+    }catch(_){ /* hors ligne : on garde les valeurs par défaut */ }
+  }
+
+  async function enregistrer(){
+    const envoi = {};
+    for(const [cle, id] of Object.entries(CHAMPS)){
+      const brut = String((el(id)||{}).value ?? "").trim().replace(",",".");
+      const n = Number(brut);
+      if(brut === "" || !Number.isFinite(n) || n < 0 || n > 100){
+        message("Chaque palier attend un pourcentage entre 0 et 100.", false);
+        return;
+      }
+      envoi[cle] = n;
+    }
+    message("Enregistrement…", true);
+    try{
+      const r = await fetch("/api/supplements-express", {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(envoi),
+      });
+      const data = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.error || ("erreur "+r.status));
+      window.OLDA_SUPPLEMENTS = data;
+      rafraichir();
+      message("Barème enregistré — il vaut pour tous les postes.", true);
+    }catch(err){
+      // Jamais d'échec muet : la vendeuse croirait le nouveau barème appliqué.
+      message("Enregistrement impossible : "+err.message+". Le barème n'a pas changé.", false);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    const ouvrir = el("baremeOpen");
+    if(!ouvrir || !box()) return;
+    ouvrir.addEventListener("click", function(){
+      const ferme = box().classList.contains("hidden");
+      if(ferme) remplir();
+      box().classList.toggle("hidden", !ferme);
+      ouvrir.textContent = ferme ? "Fermer le barème" : "Modifier le barème";
+    });
+    el("baremeCancel")?.addEventListener("click", function(){
+      box().classList.add("hidden");
+      ouvrir.textContent = "Modifier le barème";
+    });
+    el("baremeSave")?.addEventListener("click", enregistrer);
+    charger();
+  });
 })();
 </script>
 <!-- Le pont avec le CRM : base clients réelle et numéro de ticket du jour
