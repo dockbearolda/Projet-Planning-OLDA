@@ -19,6 +19,7 @@ const {
   getMachines, setMachines,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
+  getSupplementsExpress, setSupplementsExpress,
   getCommandeZones, getHiddenCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
@@ -322,6 +323,35 @@ app.put('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
   }
   const saved = await setTarifsTasseParametres(body);
   broadcast({ kind: 'tarifs-tasse' });
+  res.json(saved);
+}));
+
+// SUPPLÉMENTS EXPRESS de la vente directe, par palier de délai (en pourcents).
+// Réglage commercial, pas constante de code : il se change au comptoir, depuis
+// l'écran, et vaut aussitôt pour tous les postes (d'où le SSE).
+// GET → { j5, j10, j15 } · PUT { j5, j10, j15 } → barème retenu.
+app.get('/api/supplements-express', asyncH(async (req, res) => {
+  res.json(await getSupplementsExpress());
+}));
+
+app.put('/api/supplements-express', asyncH(async (req, res) => {
+  const body = req.body || {};
+  for (const key of ['j5', 'j10', 'j15']) {
+    if (!(key in body)) continue;   // palier non envoyé = palier inchangé
+    const brut = body[key];
+    // `Number(null)` et `Number('')` valent 0 : sans ce garde-fou, un champ vide
+    // s'enregistrerait comme « 0 % » — le supplément disparaîtrait du ticket
+    // sans que personne n'ait demandé la gratuité.
+    const n = brut === null || brut === '' ? NaN : Number(brut);
+    // Un taux hors [0, 100] est une faute de frappe, pas une intention : on la
+    // renvoie à l'écran plutôt que de la retomber en silence sur l'ancienne
+    // valeur — la vendeuse croirait avoir enregistré son nouveau barème.
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      return res.status(400).json({ error: `${key} : pourcentage attendu entre 0 et 100` });
+    }
+  }
+  const saved = await setSupplementsExpress(body);
+  broadcast({ kind: 'supplements-express' });
   res.json(saved);
 }));
 

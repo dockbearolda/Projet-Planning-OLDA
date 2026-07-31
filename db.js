@@ -889,6 +889,57 @@ async function setTarifsTasseParametres(p) {
   return clean;
 }
 
+// --- Suppléments express (vente directe) -------------------------------------
+// Le supplément d'urgence facturé au comptoir, par palier de délai. Ce n'est pas
+// une constante de code : c'est une décision commerciale, elle change au gré de
+// la charge de l'atelier et de la saison. Elle vit donc en base, modifiable
+// depuis l'écran, sans redéploiement.
+//
+// Les trois paliers correspondent aux trois choix de l'écran de vente directe.
+// Une date choisie au calendrier retombe sur le même barème, en JOURS OUVRÉS :
+// ≤ 5 → j5, ≤ 10 → j10, au-delà → j15. Valeurs en POURCENTS (20 = +20 %).
+const DEFAULT_SUPPLEMENTS_EXPRESS = { j5: 20, j10: 10, j15: 0 };
+
+async function getSupplementsExpress() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'supplements_express'");
+  if (!rows[0]) return { ...DEFAULT_SUPPLEMENTS_EXPRESS };
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return parsed && typeof parsed === 'object'
+      ? { ...DEFAULT_SUPPLEMENTS_EXPRESS, ...parsed }
+      : { ...DEFAULT_SUPPLEMENTS_EXPRESS };
+  } catch (_) {
+    return { ...DEFAULT_SUPPLEMENTS_EXPRESS };
+  }
+}
+
+async function setSupplementsExpress(p) {
+  const src = p && typeof p === 'object' ? p : {};
+  // On repart du barème EN PLACE, pas des valeurs d'usine : un palier absent de
+  // l'envoi doit rester ce qu'il était. Corriger « 10 jours » ne doit pas
+  // remettre « 5 jours » à sa valeur d'origine dans le dos de la vendeuse.
+  const actuel = await getSupplementsExpress();
+  // Un taux se saisit à la main, sur une tablette, entre deux clients : on borne
+  // à 0–100 % et on arrondit au dixième plutôt que d'accepter une faute de frappe
+  // qui facturerait « +2000 % » au client suivant.
+  // `null` / '' ne valent PAS 0 ici (Number les y ramènerait) : ils veulent dire
+  // « rien envoyé », donc on garde la valeur en place.
+  const taux = (v, def) => {
+    const n = v === null || v === '' ? NaN : Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return def;
+    return Math.round(n * 10) / 10;
+  };
+  const clean = {
+    j5: taux(src.j5, actuel.j5),
+    j10: taux(src.j10, actuel.j10),
+    j15: taux(src.j15, actuel.j15),
+  };
+  const value = JSON.stringify(clean);
+  await pool.query("DELETE FROM app_meta WHERE key = 'supplements_express'");
+  await pool.query("INSERT INTO app_meta (key, value) VALUES ('supplements_express', $1)", [value]);
+  return clean;
+}
+
 // --- Emplacements d'impression ajoutés au comptoir ---------------------------
 // Zones créées à la volée du temps de l'ancienne prise de commande détaillée
 // (app_meta.commande_zones) et zones du catalogue qu'un poste avait masquées
@@ -1018,6 +1069,7 @@ module.exports = {
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
+  DEFAULT_SUPPLEMENTS_EXPRESS, getSupplementsExpress, setSupplementsExpress,
   getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
