@@ -1034,6 +1034,86 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   transform: translateZ(0);
   contain: layout paint;
 }
+
+/* --- PLANNING ÉPURÉ : une carte par projet ---------------------------------
+   La vue par défaut, reprise de l'écran du patron. Une ligne du planning ne
+   répond qu'à quatre questions — POUR QUI, QUOI, COMBIEN DE TEMPS IL RESTE,
+   COMBIEN — et tout le reste s'ouvre d'un clic sur la fiche. Le tableau
+   complet n'a pas disparu : il revient dès qu'on rallume une colonne dans le
+   rail « Colonnes ». */
+.cards { display: grid; gap: 8px; padding: 4px 2px 30px; }
+.cards[hidden] { display: none; }
+.pcard {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.05fr) minmax(240px, 1.9fr) 190px 180px auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-1);
+  transition: background var(--dur-1, .12s) var(--ease, ease),
+              border-color var(--dur-1, .12s) var(--ease, ease),
+              box-shadow var(--dur-1, .12s) var(--ease, ease);
+}
+.pcard:hover { border-color: var(--text-2); box-shadow: var(--shadow-2); }
+.pcard.is-hidden { display: none; }
+/* Le filet de gauche dit l'urgence AVANT qu'on ait lu quoi que ce soit. */
+.pcard--retard { border-left: 4px solid var(--danger, #b42318); }
+.pcard--urgent { border-left: 4px solid #c46a00; }
+.pcard--calme { border-left: 4px solid var(--text-1); }
+.pcard__label {
+  margin: 0 0 4px;
+  font-size: 9px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3, var(--text-2));
+}
+.pcard__client { font-size: 15px; font-weight: 800; line-height: 1.2; color: var(--text-1); }
+.pcard__ref { margin-top: 3px; font-size: 10px; color: var(--text-2); }
+.pcard__name { font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-1); }
+.pcard__meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.pcard__pill {
+  display: inline-block; padding: 4px 7px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border-soft);
+  font-size: 11px; font-weight: 700; color: var(--text-2);
+}
+.pcard__delai { font-size: 15px; font-weight: 800; line-height: 1.15; }
+.pcard__delai--retard { color: var(--danger, #b42318); }
+.pcard__delai--urgent { color: #c46a00; }
+.pcard__sub { margin-top: 4px; font-size: 10px; color: var(--text-2); }
+.pcard__value { font-size: 17px; font-weight: 800; white-space: nowrap; color: var(--text-1); }
+.pcard__value--vide { font-size: 13px; font-weight: 700; color: var(--text-2); }
+/* Changer de référent en un clic : les initiales de chaque employé. C'est le
+   geste le plus fréquent du planning, il ne mérite pas un menu. */
+.pcard__refs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.pcard__ref-btn {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface);
+  font: inherit; font-size: 11px; font-weight: 800; color: var(--text-2); cursor: pointer;
+}
+.pcard__ref-btn:hover { border-color: var(--text-2); background: var(--state-hover); }
+.pcard__ref-btn.is-on { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
+.pcard__ref-name { margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-2); }
+.pcard__open {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  cursor: pointer;
+}
+.pcard__open:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
+.pcard__grip { cursor: grab; touch-action: none; }
+.pcard.dragging { opacity: .35; }
+
+@media (max-width: 1100px) {
+  .pcard { grid-template-columns: 1fr 1.5fr 1fr .8fr auto; }
+}
+/* Sous 780 px, quatre colonnes deviennent illisibles : chaque bloc prend la
+   ligne, le bouton fiche reste à droite du nom du client. */
+@media (max-width: 780px) {
+  .pcard { grid-template-columns: 1fr auto; }
+  .pcard > div:nth-child(2), .pcard > div:nth-child(3), .pcard > div:nth-child(4) { grid-column: 1 / -1; }
+}
 .grid {
   border-collapse: collapse;
   /* Largeur FIXE et fluide : les colonnes « puce » ont une largeur fixe, les

@@ -304,22 +304,50 @@ abandonné entre deux clients. Même chose après un enregistrement réussi.
 La barre de navigation principale est masquée sur cet écran
 (`body.view-comptoir`) : devant le client, il ne reste que le parcours en cours
 et le bouton **« Changer de parcours »**. Le logo OLDA ramène au planning.
-## Colonnes du planning — le rail de droite
+## Le planning — fiches épurées par défaut
 
-Le bouton **« Colonnes »**, en haut de la grille, ouvre un rail à droite où
-chacun compose son écran. Un clic retire une colonne : elle quitte la grille et
-descend dans **« Retirées »**, juste en dessous — elle reste **sous les yeux**,
-et le même clic la remet. C'est le point important : rien ne disparaît dans un
-menu qu'il faudrait rouvrir pour savoir ce qui manque. « Tout réafficher »
-remet tout d'un coup.
+Le planning s'ouvre sur les **fiches** de l'écran du patron : une carte par
+projet, qui ne répond qu'à quatre questions.
+
+| | Ce qu'on lit |
+|---|---|
+| **Client** | le nom du dossier, et la référence du ticket dessous |
+| **Projet** | la description, puis deux puces : priorité et étape courante |
+| **Délai de production restant** | en **heures ouvrées** (lun–ven, 9h→18h), la remise client, et « à terminer avant … » |
+| **TTC** | le montant — ou « À chiffrer » —, les initiales des quatre employés pour changer de référent d'un clic, et le référent en place |
+
+Le **délai restant** est le seul chiffre qui n'existait nulle part avant, et
+c'est celui qui décide de l'ordre de la journée. Il ne compte que les heures
+ouvrées : une remise le lundi à 9h doit être **terminée le vendredi à 18h**, pas
+« dans 3 jours ». Un filet coloré à gauche de la carte dit l'urgence avant même
+qu'on ait lu : rouge en retard, orange sous deux jours ouvrés, encre au-delà.
+
+Le reste — coordonnées, détail complet, paiement, documents, notes — s'ouvre
+d'un clic sur le **↗** de la carte, dans la fiche projet (voir plus bas). La
+carte se **glisse sur le rail des étapes** comme une ligne de tableau.
+
+### Le rail « Colonnes » — le tableau complet est rangé, pas perdu
+
+Le bouton **« Colonnes »** ouvre un rail à droite. Sur les fiches, toutes les
+colonnes du tableau y attendent dans **« Retirées »** : en rallumer une **ramène
+le tableau** avec elle. Le bouton du bas fait l'aller-retour dans les deux sens
+(« Afficher le tableau complet » / « Revenir aux cartes ») : on ne se retrouve
+jamais coincé dans une vue.
+
+Une fois dans le tableau, le rail reprend son rôle habituel : un clic retire une
+colonne, elle descend dans « Retirées » — elle reste **sous les yeux**, et le
+même clic la remet. Rien ne disparaît dans un menu qu'il faudrait rouvrir pour
+savoir ce qui manque.
 
 Trois règles :
 
 - **« Nom du dossier client » est verrouillée** (cadenas). C'est elle qui
   identifie la ligne : sans elle, la grille n'est plus lisible.
 - Le choix est **global et local au poste** (`localStorage`, clé
-  `olda_cols_v1`) — c'est un réglage de poste, pas un paramètre de navigation :
-  il ne suit donc pas d'un ordinateur à l'autre.
+  `olda_cols_v2`) — c'est un réglage de poste, pas un paramètre de navigation :
+  il ne suit donc pas d'un ordinateur à l'autre. La clé porte un `v2` :
+  l'ancienne (`v1`) est ignorée, pour qu'un poste qui avait réglé ses colonnes
+  reparte lui aussi sur les fiches.
 - Il se **cumule** avec les masquages automatiques par étape (« Prix TTC »
   hors chiffrage/facturation, « Sous-étape » sur les familles qui n'en ont
   pas). Une colonne cochée mais que l'étape courante ne remplit jamais porte
