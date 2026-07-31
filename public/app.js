@@ -578,6 +578,7 @@ async function loadRows() {
   // La mention « vide ici » du rail dépend de l'étape : elle se recalcule ici,
   // en même temps que les deux règles automatiques ci-dessus.
   renderColbar();
+  renderOrdreReset(); // l'ordre manuel est propre à l'étape : le bouton la suit
   applySortAndRender();
 }
 
@@ -605,6 +606,39 @@ function belongsToCurrentView(r) {
 }
 
 // --- Tri -------------------------------------------------------------------
+// ORDRE MANUEL, PAR ÉTAPE. Le planning s'ouvre sur un tri automatique (priorité,
+// puis urgence) : c'est le bon défaut, personne n'a rien à ranger le premier
+// jour. Mais dès qu'on glisse une carte dans la liste, on prend une décision que
+// le rendu suivant n'a pas le droit d'effacer — c'était le bug : la carte
+// revenait toujours à sa place, l'ordre n'étant jamais lu depuis `position`.
+//
+// Le basculement se fait DONC étape par étape, et seulement au premier
+// glissement : une étape que personne n'a rangée garde son tri automatique. Sans
+// ça, passer tout le planning en ordre manuel le rebattrait d'un coup dans
+// l'ordre de création — les urgences ne seraient plus en tête.
+const ORDRE_KEY = 'olda.ordre-manuel';
+let ordreManuel = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(ORDRE_KEY) || '[]');
+  if (Array.isArray(saved)) ordreManuel = new Set(saved.filter((s) => typeof s === 'string'));
+} catch (_) { ordreManuel = new Set(); }
+
+function saveOrdreManuel() {
+  try { localStorage.setItem(ORDRE_KEY, JSON.stringify([...ordreManuel])); } catch (_) {}
+}
+
+// Tri automatique : priorité décroissante, puis les urgences en tête, puis
+// l'échéance la plus proche. Sert de tri par défaut ET de départage dans l'ordre
+// manuel.
+function cmpAuto(a, b) {
+  const pa = prioBand(a), pb = prioBand(b);
+  if (pa !== pb) return pb - pa;
+  const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
+  if ((ua !== null) !== (ub !== null)) return ua !== null ? -1 : 1;
+  if (ua !== null && ub !== null) return ua - ub;
+  return cmpDeadline(a.deadline, b.deadline);
+}
+
 // `syncDrawer: false` rend la grille SANS reconstruire la side bar de détail.
 // Réservé aux sauvegardes d'un champ de saisie DU tiroir : le champ affiche
 // déjà ce qu'on vient d'y taper, et le reconstruire démonterait la puce sur
@@ -619,19 +653,23 @@ function applySortAndRender({ syncDrawer = true } = {}) {
   const sorted = [...base];
   if (sort.key) {
     sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
+  } else if (ordreManuel.has(currentStage)) {
+    // L'ÉTAPE A ÉTÉ RANGÉE À LA MAIN : c'est cet ordre-là qui fait foi. Une carte
+    // qu'on déplace doit rester où on l'a posée — sinon le geste ment. Le tri
+    // automatique ne départage plus que les positions à égalité (lignes créées
+    // avant le premier rangement, qui partagent la même valeur).
+    sorted.sort((a, b) => {
+      const qa = a.position ?? Number.POSITIVE_INFINITY;
+      const qb = b.position ?? Number.POSITIVE_INFINITY;
+      if (qa !== qb) return qa - qb;
+      return cmpAuto(a, b);
+    });
   } else {
     // tri par défaut : groupé par PRIORITÉ (Haute → Moyenne → Basse) pour que les
     // bandes soient contiguës (en-têtes de groupe). À l'intérieur d'une bande, les
     // commandes urgentes (échéance ≤ 1 jour, aujourd'hui ou dépassée) remontent en
     // tête, la plus urgente d'abord, puis échéance la plus proche.
-    sorted.sort((a, b) => {
-      const pa = prioBand(a), pb = prioBand(b);
-      if (pa !== pb) return pb - pa;
-      const ua = urgentDaysLeft(a), ub = urgentDaysLeft(b);
-      if ((ua !== null) !== (ub !== null)) return ua !== null ? -1 : 1;
-      if (ua !== null && ub !== null) return ua - ub;
-      return cmpDeadline(a.deadline, b.deadline);
-    });
+    sorted.sort(cmpAuto);
   }
   // Rendu incrémental : on monte / réutilise TOUTES les lignes de l'étape. Le
   // filtre de recherche se fait ensuite par masquage CSS (aucune reconstruction
@@ -752,13 +790,21 @@ function ensureGroupHeader(band) {
 // une ligne que si son `updated_at` a bougé ; or l'affichage dépend aussi de
 // données EXTÉRIEURES à la ligne (pilote / référent de base d'une catégorie).
 // Quand cette config change, on périme les signatures pour tout recalculer.
+// Périme le rendu mémorisé d'une ligne pour forcer sa reconstruction. Les DEUX
+// vues sont concernées : la signature ne porte que `updated_at`, or un
+// changement optimiste (glisser vers une autre sous-étape) modifie la donnée
+// locale sans toucher cette date. Oublier les cartes ici, c'est laisser une
+// carte afficher son ancienne sous-étape jusqu'au prochain aller-retour serveur.
 function invalidateRowCache(id) {
   if (id != null) {
     const entry = rowEls.get(String(id));
     if (entry) entry.sig = '';
+    const carte = cardEls.get(String(id));
+    if (carte) carte.sig = '';
     return;
   }
   for (const [, entry] of rowEls) entry.sig = '';
+  for (const [, carte] of cardEls) carte.sig = '';
 }
 
 // ===========================================================================
@@ -950,12 +996,30 @@ function buildCard(r) {
   ouvrir.appendChild(strokeIcon(['M7 17L17 7', 'M9 7h8v8']));
   ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
 
+  // SUPPRIMER. La corbeille n'existait que sur le tableau complet — or le
+  // planning s'ouvre sur les cartes : sans elle, une commande entrée par erreur
+  // ne pouvait plus sortir du planning. Toujours visible (pas de survol : au
+  // comptoir on est au doigt), et le geste passe par la même confirmation que
+  // sur le tableau.
+  const suppr = document.createElement('button');
+  suppr.type = 'button';
+  suppr.className = 'pcard__del';
+  suppr.setAttribute('aria-label', 'Supprimer cette commande');
+  attachTip(suppr, 'Supprimer cette commande');
+  suppr.appendChild(strokeIcon(['M3 6h18', 'M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2',
+    'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6']));
+  suppr.addEventListener('click', (ev) => { ev.stopPropagation(); removeRow(r); });
+
+  const actions = document.createElement('div');
+  actions.className = 'pcard__actions';
+  actions.append(ouvrir, suppr);
+
   carte.append(
     blocClient,
     pcardBloc('Projet', nom, meta),
     pcardBloc('Délai de production restant', delaiEl, remise, cible),
     pcardBloc('TTC', montant, refs, nomRef),
-    ouvrir,
+    actions,
   );
 
   // La carte se glisse sur le rail pour changer d'étape, comme une ligne du
@@ -3645,6 +3709,19 @@ function stageAcceptsDrop(stageEl, r) {
   return slug !== r.stage || sub !== (r.sub_stage ?? null); // exclut la place actuelle
 }
 
+// Pose l'élément glissé à la hauteur `y` dans la liste affichée. Appelé pendant
+// le geste (à chaque frame) ET une dernière fois à la dépose : le suivi en vol
+// passe par requestAnimationFrame, que `onDragEnd` annule — sur un geste rapide
+// (une pichenette au doigt, ou deux évènements collés), aucune frame n'a le
+// temps de tourner et le placement final serait tout simplement perdu.
+function placerDansLaListe(el, y) {
+  const liste = listeCourante();
+  const after = getDragAfterElement(liste, y, el);
+  if (after == null) liste.appendChild(el);
+  else if (after !== el) liste.insertBefore(el, after);
+  paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
+}
+
 function updateDragTarget() {
   if (!dragState) return;
   dragState.raf = 0;
@@ -3664,11 +3741,7 @@ function updateDragTarget() {
     }
   } else {
     // réordonnancement vertical dans la vue courante (tableau ou cartes)
-    const liste = listeCourante();
-    const after = getDragAfterElement(liste, y);
-    if (after == null) liste.appendChild(dragState.tr);
-    else if (after !== dragState.tr) liste.insertBefore(dragState.tr, after);
-    paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
+    placerDansLaListe(dragState.tr, y);
   }
   if (blockedEl !== priceBlockedEl) {
     priceBlockedEl = blockedEl;
@@ -3733,7 +3806,12 @@ async function onDragEnd(e) {
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }
   } else {
-    await commitReorder(ds.r); // déposé dans la grille → réordonnancement
+    // Déposé dans la grille → réordonnancement. On rejoue le placement à la
+    // position exacte du relâchement avant de l'écrire : c'est là que le geste
+    // se termine, et c'est la seule lecture dont on soit certain qu'elle ait eu
+    // lieu (le suivi en vol peut n'avoir jamais tourné, cf. placerDansLaListe).
+    placerDansLaListe(ds.tr, e.clientY);
+    await commitReorder(ds.r);
   }
 }
 
@@ -3774,27 +3852,61 @@ function moveToStage(r, slug, targetSub = null) {
   });
 }
 
+// Le glissement est terminé : le DOM porte l'ordre voulu, on l'écrit dans la
+// donnée. On RENUMÉROTE toute la liste visible (1000, 2000, 3000…) au lieu
+// d'intercaler la seule ligne déplacée : avant le premier rangement, les lignes
+// d'une étape partagent souvent la même `position` (chaque flux de création
+// repart de MAX+1000 sans jamais réordonner), et une position calculée « entre
+// deux voisins » à égalité retombe exactement sur la valeur de départ — le geste
+// était alors perdu en silence. Une étape tient quelques dizaines de lignes :
+// tout renuméroter coûte quelques PATCH, une seule fois par déplacement.
 async function commitReorder(r) {
   const siblings = [...listeCourante().querySelectorAll('[data-id]:not(.is-hidden)')];
-  const idx = siblings.findIndex((el) => el.dataset.id === r.id);
-  const posOf = (el) => el ? (rows.find((x) => x.id === el.dataset.id)?.position ?? null) : null;
-  const pPrev = posOf(siblings[idx - 1]);
-  const pNext = posOf(siblings[idx + 1]);
-  let newPos;
-  if (pPrev == null && pNext == null) newPos = 1000;
-  else if (pPrev == null) newPos = pNext - 1000;
-  else if (pNext == null) newPos = pPrev + 1000;
-  else newPos = (pPrev + pNext) / 2;
-  const prevPos = r.position;
-  if (newPos === prevPos) return;
-  r.position = newPos;
+  if (!siblings.length) return;
+
+  const cibles = [];
+  siblings.forEach((el, i) => {
+    const ligne = rows.find((x) => String(x.id) === el.dataset.id);
+    if (!ligne) return;
+    const voulue = (i + 1) * 1000;
+    if (ligne.position !== voulue) cibles.push({ ligne, voulue, avant: ligne.position });
+  });
+
+  // Premier rangement de cette étape : à partir de maintenant, c'est la main qui
+  // décide de l'ordre ici. Posé AVANT le rendu, pour que la ligne ne revienne
+  // pas à sa place le temps de l'aller-retour serveur.
+  const premierRangement = !ordreManuel.has(currentStage);
+  if (premierRangement) { ordreManuel.add(currentStage); saveOrdreManuel(); renderOrdreReset(); }
+  if (!cibles.length) return;
+
+  for (const c of cibles) c.ligne.position = c.voulue;
+  lastRowsSig = signature(rows);
+  applySortAndRender();
+
   try {
-    await api('PATCH', `/api/requests/${r.id}`, { position: newPos });
-    sort = { key: null, dir: 1 };
-    rows.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    lastRowsSig = signature(rows);
-  } catch (err) { r.position = prevPos; reportError(err); loadRows(); }
+    await Promise.all(cibles.map((c) => api('PATCH', `/api/requests/${c.ligne.id}`, { position: c.voulue })));
+  } catch (err) {
+    for (const c of cibles) c.ligne.position = c.avant;
+    if (premierRangement) { ordreManuel.delete(currentStage); saveOrdreManuel(); renderOrdreReset(); }
+    applySortAndRender();
+    reportError(err);
+    loadRows().catch(() => {});
+  }
 }
+
+// Le retour au tri automatique. Le bouton n'existe que sur une étape rangée à la
+// main : ailleurs il n'aurait rien à annuler.
+function renderOrdreReset() {
+  const b = document.getElementById('ordreReset');
+  if (b) b.hidden = !ordreManuel.has(currentStage);
+}
+
+document.getElementById('ordreReset')?.addEventListener('click', () => {
+  ordreManuel.delete(currentStage);
+  saveOrdreManuel();
+  renderOrdreReset();
+  applySortAndRender();
+});
 
 // Conservé pour compat : le dépôt sidebar est géré par elementFromPoint ci-dessus.
 function attachDrop() { /* géré via Pointer Events */ }
@@ -3813,8 +3925,12 @@ function autoScroll(y) {
 // Réordonner, c'est le même geste dans les deux — seul le conteneur change.
 const listeCourante = () => (modeCartes() ? $cards : $rows);
 
-function getDragAfterElement(container, y) {
-  const els = [...container.querySelectorAll('[data-id]:not(.dragging):not(.is-hidden)')];
+// `exclu` : l'élément en cours de déplacement. Pendant le geste il porte la
+// classe `.dragging` et le sélecteur suffit ; à la dépose elle a déjà été
+// retirée, et sans cet argument l'élément se prendrait lui-même pour repère.
+function getDragAfterElement(container, y, exclu = null) {
+  const els = [...container.querySelectorAll('[data-id]:not(.dragging):not(.is-hidden)')]
+    .filter((el) => el !== exclu);
   return els.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;

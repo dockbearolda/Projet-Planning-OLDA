@@ -737,6 +737,22 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    11px en-tête) : la hiérarchie se lit à la taille, pas seulement au poids. */
 .work-title h1 { font-size: 24px; font-weight: 600; letter-spacing: -.2px; margin: 0; color: var(--text-1); white-space: nowrap; }
 .work-count { font-size: 13px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Signale que l'étape est rangée à la main, ET fait le chemin inverse. Discret :
+   c'est un état, pas une action qu'on cherche. */
+.ordre-reset {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ordre-reset:hover { color: var(--text-1); border-color: var(--text-2); }
+.ordre-reset[hidden] { display: none; }
 
 /* Bouton primaire : un seul style dans toute l'app, accent plein + texte
    blanc — c'est LE bouton d'action de l'écran (Nouvelle commande…). */
@@ -1102,6 +1118,18 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   cursor: pointer;
 }
 .pcard__open:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
+/* Ouvrir + supprimer : la colonne d'actions de la carte. Les deux cibles restent
+   à 40 px et visibles en permanence — au comptoir on est au doigt, rien ne doit
+   dépendre du survol. */
+.pcard__actions { display: flex; align-items: center; gap: 8px; }
+.pcard__del {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-3, var(--text-2));
+  cursor: pointer;
+}
+.pcard__del:hover { background: var(--st-bloque-bg); border-color: transparent; color: var(--st-bloque); }
+.pcard__del:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .pcard__grip { cursor: grab; touch-action: none; }
 .pcard.dragging { opacity: .35; }
 
