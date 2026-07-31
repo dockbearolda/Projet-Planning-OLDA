@@ -2734,23 +2734,19 @@ function renderLigneDetail() {
   remise.className = 'ld-duo';
   remise.append(cDate, cHeure);
 
-  // Les deux encadrés en LECTURE (étape, échéance) restent ouverts : il n'y a
-  // rien à y modifier, les replier ne ferait que cacher une information.
-  const heureLue = fiche.heureSouhaitee ? ` à ${fiche.heureSouhaitee.replace(':', 'h')}` : '';
+  // Les champs de tête restent SOUS LES YEUX, comme sur l'écran du patron : ce
+  // sont ceux qu'on corrige au téléphone, avec le client en ligne. Seuls les
+  // deux longs pavés du bas se replient (voir plus loin).
   body.append(
-    ldVolet('Client', r.billing_company, cClient),
-    ldVolet('Projet', r.product, cProjet),
+    ldBox('Client', cClient),
+    ldBox('Projet', cProjet),
     ldBox('Étape actuelle', ldValeur(stageDestinationLabel(r.stage, r.sub_stage ?? null))),
-    ldVolet('Priorité', PRIORITY_LEVELS[prioBand(r)].label, cPriorite),
-    ldVolet('Remise au client', `${dateFr(r.deadline)}${heureLue}`, remise),
+    ldBox('Priorité', cPriorite),
+    ldBox('Remise au client', remise),
     ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
-    ldVolet('Valeur TTC', r.project_value == null ? 'À chiffrer' : eur(Number(r.project_value)), cPrix),
-    ldVolet('Production', fiche.production || 'À définir', cProduction),
-    ldVolet(
-      'Informations / commentaire',
-      (r.description || '').split('\n').filter(Boolean)[0] || '—',
-      cInfos, true,
-    ),
+    ldBox('Valeur TTC', cPrix),
+    ldBox('Production', cProduction),
+    ldBox('Informations / commentaire', cInfos, true),
   );
 
   // --- Documents et paiement : deux encadrés en plus de l'écran du patron -----
@@ -2760,12 +2756,7 @@ function renderLigneDetail() {
   const docs = document.createElement('div');
   docs.className = 'ld-docs';
   docs.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
-  const nomsDocs = ['devis', 'facture', 'bat'].filter((k) => r[`${k}_name`]);
-  body.append(ldVolet(
-    'Documents',
-    nomsDocs.length ? `${nomsDocs.length} document${nomsDocs.length > 1 ? 's' : ''}` : 'Aucun',
-    docs, true,
-  ));
+  body.append(ldBox('Documents', docs, true));
 
   const paiement = document.createElement('div');
   paiement.className = 'ld-pay';
@@ -2802,33 +2793,33 @@ function renderLigneDetail() {
     },
   );
   paiement.append(ldRow('Mode', modeChip));
-  // Replié, le volet dit l'essentiel : est-ce payé, et comment.
-  const modeLu = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
-  const apercuPaiement = [
-    r.paye === true ? 'Payé' : r.acompte_verse === true ? 'Acompte versé' : r.paye === false ? 'À encaisser' : null,
-    modeLu ? modeLu.label : null,
-  ].filter(Boolean).join(' · ') || 'Non renseigné';
-  body.append(ldVolet('Paiement', apercuPaiement, paiement, true));
+  body.append(ldBox('Paiement', paiement, true));
 
-  // --- Historique --------------------------------------------------------------
+  // --- Historique (replié) ------------------------------------------------------
   // L'application ne tient pas de journal des modifications : on affiche ce
   // qu'on sait vraiment, la naissance de la ligne et sa dernière retouche,
   // plutôt qu'un historique inventé.
+  // Replié comme le détail complet : c'est un pavé qu'on consulte de temps en
+  // temps, pas une information de travail. Déplié en permanence, il repousserait
+  // les champs qu'on corrige vraiment hors de l'écran.
   const histoLignes = [
     fiche.creeLe || r.created_at ? `Créée le ${horodatageFr(fiche.creeLe || r.created_at)}${fiche.source ? ` depuis ${fiche.source}` : ''}` : null,
     r.updated_at ? `Dernière modification le ${horodatageFr(r.updated_at)}` : null,
   ].filter(Boolean);
-  body.append(ldBox('Historique', histoLignes.map(ldValeur), true));
+  body.append(ldVolet('Historique', histoLignes[0] || '—', histoLignes.map(ldValeur), true));
 
-  // --- Détail complet, modifiable ----------------------------------------------
+  // --- Détail complet, modifiable, replié ---------------------------------------
+  // Le récapitulatif du comptoir fait des dizaines de lignes : déplié, il pousse
+  // tout le reste de la fiche hors de l'écran. On l'ouvre quand on en a besoin.
   let champsDetail = null;
   if (fiche.kind === 'comptoir-v17') {
     const bloc = ldBlocDetail(r);
     if (bloc) { champsDetail = bloc.champs; body.append(bloc.box); }
   } else {
     const items = ficheItems(r.fiche);
-    body.append(ldBox(
+    body.append(ldVolet(
       'Détail complet',
+      items && items.length ? `${items.length} article${items.length > 1 ? 's' : ''}` : 'Non enregistré',
       items && items.length ? items : ldValeur('Cette commande a été créée avant l’enregistrement du détail complet.'),
       true,
     ));
