@@ -188,9 +188,18 @@ body {
   transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
 
-/* Icônes Material Symbols */
+/* Icônes Material Symbols.
+   Chaque icône est un MOT écrit en toutes lettres (« view_kanban », « search »)
+   que la police transforme en glyphe. Tant qu'elle n'est pas chargée, ce mot
+   occupe sa largeur en Arial — invisible grâce à `display=block`, mais bien
+   présent : toute la barre du haut se recompactait d'un coup à l'arrivée de la
+   police. On réserve donc la place du glyphe dès le départ (`width: 1em`), et
+   ce qui dépasse est masqué : plus aucun décalage au chargement. */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
+  width: 1em;
+  overflow: hidden;
+  flex-shrink: 0;
   font-weight: normal;
   font-style: normal;
   line-height: 1;
@@ -1553,6 +1562,21 @@ tr:hover .handle { color: var(--text-2); }
 .pdf-slot:hover { z-index: 1; }
 .pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
 
+/* Au DOIGT il n'y a pas de survol : la croix restait donc inatteignable, et
+   retirer un devis ou un BAT déposé par erreur était impossible depuis la
+   tablette — qui est pourtant le poste principal. On la montre en permanence,
+   assez grande pour être visée, et le slot est remonté d'office puisque
+   aucun survol ne viendra le faire. */
+@media (pointer: coarse) {
+  .pdf-slot { z-index: 1; }
+  .pdf-btn__remove {
+    display: inline-flex;
+    width: 24px; height: 24px;
+    top: -9px; right: -6px;
+    font-size: 15px;
+  }
+}
+
 /* Type Pro / Perso : pastille */
 .type-tag {
   position: relative;
@@ -2873,7 +2897,20 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .col-infos-cell { height: auto; }
   .product-stack .product-name { min-height: 44px; height: auto; }
   .product-desc { min-height: 0; height: auto; font-size: 14px; }
-  .desc-toggle { width: 32px; height: 32px; }
+  .desc-toggle { width: 44px; height: 44px; }
+  .flag-reason { min-height: 44px; }
+
+  /* Tout champ de saisie fait au moins 16 px : en dessous, iOS zoome à la mise
+     au point et la page reste décalée ensuite. */
+  .grid-search-input,
+  .cat-row-select,
+  .mac-name, .mac-dur,
+  .reg-tarif-input { font-size: 16px; }
+
+  /* Étoiles de priorité du panneau détail : 34 px, en dessous de la règle. */
+  .dd-star { width: 44px; height: 44px; }
+  .pj-search-clear { width: 44px; height: 44px; }
+  .pj-tab { min-height: 44px; }
 
   .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .deadline-badge,
@@ -3229,7 +3266,7 @@ body.view-comptoir .grid-search { display: none !important; }
 .pj-feed button:focus-visible,
 .pj-search-input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .4);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .35);
 }
 
 /* ------------------------------------------------ Header sticky « Point du jour » */
@@ -3409,8 +3446,8 @@ body.view-comptoir .grid-search { display: none !important; }
   padding: 13px 15px;
   border-radius: 12px;
 }
-.dd-flag.f-bloque { background: var(--pj-late-bg); border: 1px solid rgba(220, 38, 38, .25); }
-.dd-flag.f-a-voir { background: var(--pj-soon-bg); border: 1px solid rgba(217, 119, 6, .25); }
+.dd-flag.f-bloque { background: var(--pj-late-bg); border: 1px solid var(--danger-line); }
+.dd-flag.f-a-voir { background: var(--pj-soon-bg); border: 1px solid var(--warning-line); }
 .dd-flag > .material-symbols-outlined { font-size: 20px; flex-shrink: 0; }
 .dd-flag.f-bloque > .material-symbols-outlined { color: var(--pj-late); }
 .dd-flag.f-a-voir > .material-symbols-outlined { color: var(--pj-soon); }
@@ -3893,7 +3930,7 @@ body.view-comptoir .grid-search { display: none !important; }
   gap: 10px;
   margin-top: 18px;
   padding: 13px 15px;
-  border: 1px solid rgba(217, 119, 6, .25);
+  border: 1px solid var(--warning-line);
   border-radius: 12px;
   background: var(--pj-soon-bg);
 }
@@ -4425,7 +4462,7 @@ textarea.ld-ctl { font-weight: 600; }
 .ld-eyebrow {
   margin: 0 0 2px;
   font-size: 11px; font-weight: 700; letter-spacing: .04em;
-  color: #667085;
+  color: var(--text-2);
 }
 .ld-title { margin: 0; font-size: 21px; font-weight: 800; color: #101828; }
 
@@ -4466,9 +4503,6 @@ textarea.ld-ctl { font-weight: 600; }
 :root[data-theme="dark"] .ld-volet__tete:hover { background: var(--state-hover); }
 :root[data-theme="dark"] .ld-foot { background: var(--surface); border-color: var(--border); }
 :root[data-theme="dark"] .ld-pay .ld-field { background: var(--bg); border-color: var(--border); }
-@media (max-width: 620px) {
-  .ld-foot__row .ld-ctl, .ld-save { flex: 1 1 100%; }
-}
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
@@ -4507,12 +4541,12 @@ textarea.ld-ctl { font-weight: 600; }
   gap: 12px;
   align-items: start;
   padding: 9px 0;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--border);
 }
 .ld-detail-line:last-child { border-bottom: 0; }
 .ld-detail-line > span {
   font-size: 11px; font-weight: 800; letter-spacing: .06em;
-  text-transform: uppercase; color: #98a2b3;
+  text-transform: uppercase; color: var(--text-3);
   padding-top: 12px;
 }
 .ld-detail-input {
