@@ -30,7 +30,11 @@ async function api(method, path, body) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // Le statut AVANT le corps : une page d'erreur du proxy (HTML) faisait échouer
+  // l'analyse JSON d'abord, et l'écran affichait « Unexpected token < » au lieu
+  // de « Erreur 502 ».
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
   if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
   return data;
 }
@@ -181,7 +185,10 @@ function sync() {
 // Message de statut passager (« Enregistré »), effacé tout seul.
 let statusTimer = null;
 function flash(text, cls = '') {
-  const s = $('.reg-status');
+  // Une sauvegarde différée peut aboutir alors que l'écran n'est plus monté :
+  // il n'y a alors plus rien à informer, et surtout rien à faire tomber.
+  const s = ROOT && $('.reg-status');
+  if (!s) return;
   s.textContent = text;
   s.className = `reg-status${cls ? ` ${cls}` : ''}`;
   clearTimeout(statusTimer);
@@ -226,15 +233,70 @@ async function save() {
 
 // --- Tarifs tasse -------------------------------------------------------------
 let tarifsSaveTimer = null;
+
+// Le serveur renvoie SES objets (normalisés) après enregistrement. Les remplacer
+// d'un bloc laissait les lignes déjà affichées accrochées aux ANCIENS objets :
+// la correction suivante partait dans le vide (l'écran montrait pourtant la
+// nouvelle valeur), le bouton supprimer ne trouvait plus sa ligne, et le
+// bouton actif/inactif revenait en arrière tout seul. On réconcilie donc EN
+// PLACE tant que la liste a la même forme.
+function reconcilierTarifs(recu) {
+  if (!Array.isArray(recu)) return false;
+  if (recu.length !== tarifsArticles.length) {
+    tarifsArticles = recu;
+    return true; // forme différente : il faut re-dessiner la liste
+  }
+  recu.forEach((neuf, i) => Object.assign(tarifsArticles[i], neuf));
+  return false;
+}
+
 async function saveTarifs() {
   clearTimeout(tarifsSaveTimer);
-  tarifsSaveTimer = setTimeout(async () => {
-    try { tarifsArticles = await api('PUT', '/api/tarifs-tasse', tarifsArticles); } catch (_) { /* réessayé au prochain changement */ }
-  }, 400);
+  tarifsSaveTimer = setTimeout(envoyerTarifs, 400);
 }
+
+async function envoyerTarifs() {
+  clearTimeout(tarifsSaveTimer);
+  tarifsSaveTimer = null;
+  try {
+    const recu = await api('PUT', '/api/tarifs-tasse', tarifsArticles);
+    if (reconcilierTarifs(recu)) renderTarifs();
+    flash('Tarifs enregistrés', 'is-ok');
+  } catch (_) {
+    // Un échec muet laissait le patron partir en croyant son prix enregistré —
+    // et la vente directe continuait à calculer avec l'ancien.
+    flash('Tarifs NON enregistrés — vérifie la connexion', 'is-ko');
+  }
+}
+
 async function saveTarifsParams() {
-  try { tarifsParams = await api('PUT', '/api/tarifs-tasse/parametres', tarifsParams); } catch (_) { /* réessayé au prochain changement */ }
+  try {
+    tarifsParams = await api('PUT', '/api/tarifs-tasse/parametres', tarifsParams);
+    flash('Réglages enregistrés', 'is-ok');
+  } catch (_) {
+    flash('Réglages NON enregistrés — vérifie la connexion', 'is-ko');
+  }
 }
+
+// Quitter la page pendant les 400 ms d'attente perdait la dernière correction
+// sans le dire. `keepalive` laisse la requête partir même si l'onglet se ferme.
+function flusherTarifs() {
+  if (tarifsSaveTimer == null) return;
+  clearTimeout(tarifsSaveTimer);
+  tarifsSaveTimer = null;
+  try {
+    fetch('/api/tarifs-tasse', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tarifsArticles),
+      keepalive: true,
+    });
+  } catch (_) { /* dernier recours : on ne peut rien faire de plus */ }
+}
+window.addEventListener('pagehide', flusherTarifs);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flusherTarifs();
+});
 
 function tarifRow(a) {
   const row = el('div', 'reg-tarif-row');
@@ -326,11 +388,18 @@ export async function refreshReglages() {
   if (!ROOT) return;
   const ta = $('#reg-wa-message');
   const dirty = ta && ta.value !== saved;
+  let messageRelu = false;
   try {
-    const data = await (await fetch('/api/settings/whatsapp')).json();
-    saved = typeof data.message === 'string' ? data.message : '';
+    // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le
+    // mot de passe) donnait `data.message === undefined` → le textarea se
+    // VIDAIT, et le patron croyait son message perdu.
+    const res = await fetch('/api/settings/whatsapp');
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data.message === 'string') { saved = data.message; messageRelu = true; }
+    }
   } catch (_) { /* silencieux : on garde ce qu'on affiche déjà */ }
-  if (ta && !dirty) ta.value = saved;
+  if (ta && !dirty && messageRelu) ta.value = saved;
   sync();
 
   try {
