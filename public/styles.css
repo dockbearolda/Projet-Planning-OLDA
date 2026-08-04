@@ -103,12 +103,8 @@
    --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent
    clair serait illisible — toujours passer par le token).
 
-   `.wall` (écran mural de l'atelier) est dans le même sélecteur à dessein :
-   il doit rester sombre quel que soit le thème de l'app — c'est ce qui le rend
-   lisible à distance — mais avec les gris de la charte, pas une palette bleu
-   nuit à lui. Un seul jeu de couleurs, deux contextes. */
-:root[data-theme="dark"],
-.wall {
+   Une seule palette sombre, dérivée des gris de la charte. */
+:root[data-theme="dark"] {
   color-scheme: dark;
 
   --bg: #111827;
@@ -3197,7 +3193,7 @@ body.view-comptoir .grid-search { display: none !important; }
    [data-theme="dark"] qui doublait ces valeurs à la main.
    Cibles : Galaxy Tab paysage 1280×800 + desktop. Tout vient du planning.
    =========================================================================== */
-.dashboard, .dd-panel, .pj-feed, .wall {
+.dashboard, .dd-panel, .pj-feed {
   /* surfaces & texte */
   --pj-bg: var(--bg);
   --pj-surface: var(--surface);
@@ -3226,11 +3222,11 @@ body.view-comptoir .grid-search { display: none !important; }
 .dashboard button { font-family: inherit; }
 
 /* L'attribut hidden doit gagner même sur les éléments qui portent un display. */
-.dashboard [hidden], .dd-panel [hidden], .pj-feed [hidden], .wall [hidden] { display: none !important; }
+.dashboard [hidden], .dd-panel [hidden], .pj-feed [hidden] { display: none !important; }
 
 /* Focus clavier visibles partout dans le point du jour. */
 .dashboard button:focus-visible, .dd-panel button:focus-visible,
-.pj-feed button:focus-visible, .wall button:focus-visible,
+.pj-feed button:focus-visible,
 .pj-search-input:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, .4);
@@ -3974,225 +3970,6 @@ body.view-comptoir .grid-search { display: none !important; }
 .pj-feed-text { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--pj-ink); overflow-wrap: anywhere; }
 .pj-feed-time { flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: var(--pj-ink-4); font-variant-numeric: tabular-nums; }
 
-/* ------------------------------------------------ Écran mural (mode atelier) */
-.wall {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  color: var(--text-1);
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-body.wall-open { overflow: hidden; }
-.wall-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-  padding: 16px 28px 12px;
-}
-.wall-logo { display: inline-flex; width: 32px; height: 32px; color: var(--text-1); }
-.wall-logo svg { width: 100%; height: 100%; }
-.wall-title { font-size: 17px; font-weight: 800; letter-spacing: .01em; }
-.wall-clock {
-  margin-left: auto;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: .02em;
-  font-variant-numeric: tabular-nums;
-}
-.wall-dots { display: flex; gap: 2px; }
-.wall-dot {
-  width: 34px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  position: relative;
-}
-.wall-dot::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--border);
-  transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
-}
-.wall-dot.active::after { background: var(--text-1); transform: translate(-50%, -50%) scale(1.25); }
-.wall-quit {
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  background: transparent;
-  color: var(--text-2);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.wall-quit:hover { color: var(--text-1); border-color: var(--text-3); }
-
-.wall-screens { position: relative; flex: 1; min-height: 0; }
-.wall-screen {
-  position: absolute;
-  inset: 0;
-  padding: 8px 28px 24px;
-  opacity: 0;
-  transform: translateY(10px);
-  pointer-events: none;
-  transition: opacity .5s var(--ease), transform .5s var(--ease);
-  overflow: hidden;
-}
-.wall-screen.active { opacity: 1; transform: none; pointer-events: auto; }
-
-.wall-board {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  height: 100%;
-  align-items: start;
-}
-.wall-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.wall-col-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.wall-col-head .pj-avatar.wall-av { width: 34px; height: 34px; font-size: 15px; }
-.wall-col-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 20px;
-  font-weight: 800;
-}
-.wall-col-count {
-  margin-left: auto;
-  min-width: 26px;
-  padding: 2px 9px;
-  border-radius: 99px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 800;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.wall-card {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--text-3);
-  border-radius: 12px;
-  background: var(--surface);
-}
-.wall-card.u-late { border-left-color: var(--danger); }
-.wall-card.u-soon { border-left-color: var(--warning); }
-.wall-card.u-plan { border-left-color: var(--warning-2); }
-.wall-card-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.wall-card-client {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 17px;
-  font-weight: 800;
-  color: var(--text-1);
-}
-.wall-card-article {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.wall-free {
-  padding: 18px 14px;
-  border: 1.5px dashed var(--success-line);
-  border-radius: 12px;
-  background: var(--success-bg);
-  color: var(--success);
-  font-size: 16px;
-  font-weight: 800;
-  text-align: center;
-}
-.wall-more { font-size: 13px; font-weight: 700; color: var(--text-3); text-align: center; padding: 2px 0; }
-
-/* Badges en mode mural : mêmes teintes, fonds translucides lisibles de loin. */
-.wall .pj-badge { font-size: 13px; padding: 4px 12px; }
-.wall .pj-badge.u-late { background: var(--danger-bg); color: var(--danger); }
-.wall .pj-badge.u-soon { background: var(--warning-bg); color: var(--warning); }
-.wall .pj-badge.u-plan { background: var(--warning-bg); color: var(--warning-2); }
-.wall .pj-badge.u-ok, .wall .pj-badge.u-none { background: var(--zone-bg); color: var(--text-2); }
-.wall .pj-star { font-size: 15px; color: var(--border); }
-.wall .pj-star.on { color: var(--primary); }
-
-.wall-b-title { margin: 4px 0 16px; font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
-.wall-b-empty {
-  margin: 40px auto;
-  max-width: 480px;
-  padding: 28px;
-  border: 1.5px dashed var(--success-line);
-  border-radius: 16px;
-  background: var(--success-bg);
-  color: var(--success);
-  font-size: 20px;
-  font-weight: 800;
-  text-align: center;
-}
-.wall-b-list { display: flex; flex-direction: column; gap: 12px; }
-.wall-row {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  min-width: 0;
-  padding: 14px 20px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--text-3);
-  border-radius: 14px;
-  background: var(--surface);
-}
-.wall-row.u-late { border-left-color: var(--danger); }
-.wall-row.u-plan { border-left-color: var(--warning-2); }
-.wall-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.wall-row-client {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 19px;
-  font-weight: 800;
-  color: var(--text-1);
-}
-.wall-row-article {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.wall-row-who { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
-.wall-row-who .pj-avatar { width: 30px; height: 30px; font-size: 13px; }
-.wall-row-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
-
 /* ------------------------------------------------ À faire maintenant (file) */
 .pj-todo { display: flex; flex-direction: column; gap: 22px; }
 .pj-todo-sec { display: flex; flex-direction: column; }
@@ -4263,8 +4040,6 @@ body.wall-open { overflow: hidden; }
   color: var(--pj-ink-3);
 }
 
-/* Motif de priorité sur l'écran mural (sous l'article). */
-.wall-row-why { font-size: 13px; font-weight: 700; color: var(--warning); }
 
 /* ------------------------------------------------ Réglages Machines */
 .mac-card { width: min(640px, 100%); }
@@ -4333,7 +4108,6 @@ body.wall-open { overflow: hidden; }
 @media (max-width: 1100px) {
   .pj-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pj-person { grid-template-columns: 1fr; }
-  .wall-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
   .pj-head-row { flex-wrap: wrap; }

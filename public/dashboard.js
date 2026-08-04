@@ -84,6 +84,11 @@ export function createDashboard(deps) {
   let catRefs = {};             // { slugCatégorie: [employés] } (référents par défaut)
   let machines = [];            // [{ slug, name, importance, minutesPerUnit }] (réglages patron)
   let loaded = false;
+  // Vrai quand le TOUT premier chargement a échoué : l'écran le dit, et une
+  // nouvelle tentative est programmée (rien d'autre ne la déclencherait —
+  // le temps réel peut rester silencieux des heures).
+  let premierChargementKo = false;
+  let repriseTimer = null;
 
   // 'todo' (à faire maintenant) | 'team' | prénom.
   let activeTab = 'todo';
@@ -136,8 +141,17 @@ export function createDashboard(deps) {
   // retard → échéance proche → daté lointain → à planifier → sans date récent.
   // `sort` affine à l'intérieur d'une bande. Mémoïsé par objet ligne (WeakMap
   // auto-invalidée à chaque refresh : la deadline ne bouge pas en optimiste).
-  const urgCache = new WeakMap();
+  let urgCache = new WeakMap();
+  // Le jour civil auquel le cache a été calculé. Une tablette laissée allumée
+  // toute la nuit sans activité affichait encore « Demain » au matin sur une
+  // commande devenue « Aujourd'hui » : rien ne recalculait au passage de minuit.
+  let urgJour = jourCivil();
+  function jourCivil() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
   function urgency(r) {
+    if (urgJour !== jourCivil()) { urgCache = new WeakMap(); urgJour = jourCivil(); }
     let u = urgCache.get(r);
     if (u) return u;
     const d = daysLeft(r.deadline);
@@ -230,7 +244,13 @@ export function createDashboard(deps) {
   };
   const KPI_LABEL = { late: 'En retard', blocked: 'Bloquées', soon: 'Échéance proche', waiting: 'Attente client', active: 'Commandes actives' };
 
-  const DASH_SEARCH_FIELDS = ['billing_company', 'contact_referent', 'product', 'description', 'flag_reason'];
+  // Mêmes champs que la recherche du planning (SEARCH_FIELDS dans app.js) :
+  // chercher un numéro de téléphone trouvait la commande sur le planning et
+  // rien sur le point du jour — même requête, deux verdicts opposés.
+  const DASH_SEARCH_FIELDS = [
+    'billing_company', 'contact_referent', 'product', 'color', 'description',
+    'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason',
+  ];
   function matchesSearch(r) {
     if (!searchQuery) return true;
     const tokens = fold(searchQuery).split(/\s+/).filter(Boolean);
@@ -293,14 +313,6 @@ export function createDashboard(deps) {
   function nextActionOf(r) {
     return NEXT_ACTION[r.sub_stage] || NEXT_ACTION[r.stage] || 'Faire avancer le dossier';
   }
-  // Le logo OLDA du header est réutilisé tel quel (clone du SVG de la topbar).
-  function logoEl(cls) {
-    const src = document.querySelector('.brand-logo-svg');
-    const w = el('span', cls);
-    if (src) w.appendChild(src.cloneNode(true));
-    w.setAttribute('aria-hidden', 'true');
-    return w;
-  }
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
   // --- Cartes --------------------------------------------------------------
@@ -355,10 +367,15 @@ export function createDashboard(deps) {
     $searchInput.placeholder = 'Filtrer le point du jour';
     $searchInput.setAttribute('aria-label', 'Filtrer les commandes affichées');
     $searchInput.autocomplete = 'off';
+    // Rendu différé de quelques dizaines de millisecondes : `renderBody()`
+    // reconstruit tout le point du jour, et le faire à chaque caractère
+    // hachait la frappe sur la tablette.
+    let rechercheTimer = null;
     $searchInput.addEventListener('input', () => {
       searchQuery = $searchInput.value.trim();
       $searchClear.hidden = !searchQuery;
-      renderBody();
+      clearTimeout(rechercheTimer);
+      rechercheTimer = setTimeout(renderBody, 120);
     });
     $searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && searchQuery) { e.stopPropagation(); $searchInput.value = ''; searchQuery = ''; $searchClear.hidden = true; renderBody(); }
@@ -528,6 +545,12 @@ export function createDashboard(deps) {
     } else {
       const list = el('div', 'pj-todo-list');
       mine.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
+      // L'en-tête annonce le total, la liste s'arrête à 10 : sans cette
+      // mention, on lisait « 14 » au-dessus de 10 cartes sans comprendre où
+      // étaient passées les quatre autres.
+      if (queue.length > mine.length) {
+        list.appendChild(el('p', 'pj-empty', `+ ${queue.length - mine.length} autre${queue.length - mine.length > 1 ? 's' : ''} — voir le planning`));
+      }
       main.appendChild(list);
     }
     wrap.appendChild(main);
@@ -571,7 +594,15 @@ export function createDashboard(deps) {
   function renderBody() {
     if (!$body) return;
     $body.replaceChildren();
-    if (!loaded) { $body.appendChild(el('p', 'pj-empty', 'Chargement du planning…')); return; }
+    if (!loaded) {
+      // Tant que rien n'est chargé, on distingue « ça arrive » de « ça n'arrive
+      // pas » : sinon un premier chargement en échec laissait « Chargement… »
+      // à l'écran pour toujours, sans message ni nouvelle tentative.
+      $body.appendChild(el('p', 'pj-empty', premierChargementKo
+        ? 'Chargement impossible — nouvelle tentative dans quelques secondes.'
+        : 'Chargement du planning…'));
+      return;
+    }
     if (activeTab === 'todo') {
       $body.appendChild(buildTodoView());
     } else if (activeTab === 'team') {
@@ -691,7 +722,6 @@ export function createDashboard(deps) {
     renderHead();
     renderBody();
     renderDetailIfOpen();
-    if (wallEl) renderWallContent();
   }
 
   // --- Panneau détail (slide-over droit 420px) -----------------------------
@@ -1044,154 +1074,6 @@ export function createDashboard(deps) {
     activityEl.classList.remove('open');
   }
 
-  // --- Écran mural (mode atelier) ------------------------------------------
-  // Plein écran sombre sans chrome, rotation A/B toutes les 20 s :
-  //   A = 4 colonnes équipe condensées · B = « Retards & à planifier ».
-  // Données rafraîchies en continu (renderWallContent rejoué à chaque refresh).
-  const WALL_ROTATE_MS = 20000;
-  let wallEl = null, wallScreen = 0, wallRotateTimer = 0, wallClockTimer = 0;
-  let $wallClock = null, $wallScreens = [], $wallDots = [];
-
-  function openWall() {
-    if (wallEl) return;
-    wallEl = el('div', 'wall');
-
-    const head = el('header', 'wall-head');
-    head.appendChild(logoEl('wall-logo'));
-    head.appendChild(el('span', 'wall-title', 'Écran atelier'));
-    $wallClock = el('span', 'wall-clock');
-    head.appendChild($wallClock);
-    const dots = el('div', 'wall-dots');
-    $wallDots = [0, 1].map((i) => {
-      const d = el('button', 'wall-dot');
-      d.type = 'button';
-      d.setAttribute('aria-label', i === 0 ? 'Écran équipe' : 'Écran à faire');
-      d.addEventListener('click', () => setWallScreen(i, true));
-      dots.appendChild(d);
-      return d;
-    });
-    head.appendChild(dots);
-    const quit = el('button', 'wall-quit', 'Quitter');
-    quit.type = 'button';
-    quit.addEventListener('click', closeWall);
-    head.appendChild(quit);
-    wallEl.appendChild(head);
-
-    const screens = el('div', 'wall-screens');
-    $wallScreens = [el('div', 'wall-screen wall-a'), el('div', 'wall-screen wall-b')];
-    screens.append($wallScreens[0], $wallScreens[1]);
-    wallEl.appendChild(screens);
-
-    document.body.appendChild(wallEl);
-    document.body.classList.add('wall-open');
-    renderWallContent();
-    updateWallClock();
-    setWallScreen(0, false);
-
-    wallClockTimer = setInterval(updateWallClock, 1000);
-    wallRotateTimer = setInterval(() => setWallScreen(1 - wallScreen, false), WALL_ROTATE_MS);
-    document.addEventListener('keydown', onWallKey);
-    document.addEventListener('fullscreenchange', onWallFullscreenChange);
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
-    }
-  }
-
-  function closeWall() {
-    if (!wallEl) return;
-    clearInterval(wallClockTimer);
-    clearInterval(wallRotateTimer);
-    wallClockTimer = wallRotateTimer = 0;
-    document.removeEventListener('keydown', onWallKey);
-    document.removeEventListener('fullscreenchange', onWallFullscreenChange);
-    wallEl.remove();
-    wallEl = null;
-    document.body.classList.remove('wall-open');
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  }
-
-  function onWallKey(e) { if (e.key === 'Escape') closeWall(); }
-  // Sortie du plein écran navigateur (geste système) → on quitte le mode mural.
-  function onWallFullscreenChange() { if (!document.fullscreenElement && wallEl) closeWall(); }
-
-  // Choix d'écran ; un choix MANUEL (tap sur un dot) repart pour 20 s pleines.
-  function setWallScreen(i, manual) {
-    wallScreen = i;
-    $wallScreens.forEach((s, k) => s.classList.toggle('active', k === i));
-    $wallDots.forEach((d, k) => d.classList.toggle('active', k === i));
-    if (manual) {
-      clearInterval(wallRotateTimer);
-      wallRotateTimer = setInterval(() => setWallScreen(1 - wallScreen, false), WALL_ROTATE_MS);
-    }
-  }
-
-  function updateWallClock() {
-    if ($wallClock) $wallClock.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function wallCard(r) {
-    const u = urgency(r);
-    const c = el('div', `wall-card u-${u.cls}`);
-    const top = el('div', 'wall-card-top');
-    top.append(el('span', 'wall-card-client', clientName(r)), el('span', `pj-badge u-${u.cls}`, u.label));
-    c.appendChild(top);
-    c.appendChild(el('p', 'wall-card-article', articleOf(r)));
-    return c;
-  }
-
-  function renderWallContent() {
-    if (!wallEl) return;
-    // Écran A : l'équipe en 4 colonnes condensées (max 4 cartes par personne).
-    const a = $wallScreens[0];
-    a.replaceChildren();
-    const board = el('div', 'wall-board');
-    for (const who of EMPLOYEES) {
-      const col = el('div', 'wall-col');
-      const day = dayList(who);
-      const head = el('div', 'wall-col-head');
-      head.append(avatarEl(who, 'wall-av'), el('span', 'wall-col-name', who), el('span', 'wall-col-count', String(day.length)));
-      col.appendChild(head);
-      if (!day.length) {
-        col.appendChild(el('div', 'wall-free', 'Disponible'));
-      } else {
-        for (const r of day.slice(0, 4)) col.appendChild(wallCard(r));
-        if (day.length > 4) col.appendChild(el('div', 'wall-more', `+ ${day.length - 4} autres`));
-      }
-      board.appendChild(col);
-    }
-    a.appendChild(board);
-
-    // Écran B : la file « À faire maintenant » du moteur, en grandes lignes
-    // lisibles à 3 m, avec le premier motif (« En retard de 2 j »…).
-    const b = $wallScreens[1];
-    b.replaceChildren();
-    b.appendChild(el('h2', 'wall-b-title', 'À faire maintenant'));
-    const ranked = rankFor().queue;
-    if (!ranked.length) {
-      b.appendChild(el('p', 'wall-b-empty', 'Rien à lancer — tout roule.'));
-    } else {
-      const list = el('div', 'wall-b-list');
-      for (const item of ranked.slice(0, 8)) {
-        const r = item.r;
-        const u = urgency(r);
-        const line = el('div', `wall-row u-${u.cls}`);
-        line.appendChild(starsEl(r));
-        const main = el('div', 'wall-row-main');
-        main.append(el('span', 'wall-row-client', clientName(r)), el('span', 'wall-row-article', articleOf(r)));
-        if (item.reasons && item.reasons.length) main.appendChild(el('span', 'wall-row-why', item.reasons[0]));
-        line.appendChild(main);
-        line.appendChild(el('span', `pj-badge u-${u.cls}`, u.label));
-        const pilot = effectivePilot(r);
-        const who = el('span', 'wall-row-who');
-        who.append(avatarEl(pilot), el('span', 'wall-row-name', pilot || 'À attribuer'));
-        line.appendChild(who);
-        list.appendChild(line);
-      }
-      if (ranked.length > 8) list.appendChild(el('div', 'wall-more', `+ ${ranked.length - 8} autres`));
-      b.appendChild(list);
-    }
-  }
-
   // --- Attribution des catégories (config du patron, conservée) ------------
   let configOpen = false;
 
@@ -1201,8 +1083,14 @@ export function createDashboard(deps) {
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
 
+    // L'écouteur Échap se retire dans TOUS les cas de fermeture. Posé sur
+    // `document` et retiré seulement par lui-même, il restait accroché à
+    // chaque fermeture par la croix ou par le fond — une journée de réglages
+    // en accumulait des dizaines.
+    const surEchap = (e) => { if (e.key === 'Escape' && configOpen) close(); };
     const close = () => {
       configOpen = false;
+      document.removeEventListener('keydown', surEchap);
       overlay.classList.remove('open');
       setTimeout(() => overlay.remove(), 180);
     };
@@ -1295,9 +1183,7 @@ export function createDashboard(deps) {
     document.body.appendChild(overlay);
     configOpen = true;
     requestAnimationFrame(() => overlay.classList.add('open'));
-    document.addEventListener('keydown', function esc(e) {
-      if (e.key === 'Escape' && configOpen) { close(); document.removeEventListener('keydown', esc); }
-    });
+    document.addEventListener('keydown', surEchap);
   }
 
   // --- Réglages « Machines » (config du patron) ----------------------------
@@ -1311,7 +1197,14 @@ export function createDashboard(deps) {
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
 
-    const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 180); };
+    // Même précaution que pour l'attribution : l'écouteur Échap part avec la
+    // fenêtre, quelle que soit la façon dont on l'a fermée.
+    const surEchap = (e) => { if (e.key === 'Escape') close(); };
+    const close = () => {
+      document.removeEventListener('keydown', surEchap);
+      overlay.classList.remove('open');
+      setTimeout(() => overlay.remove(), 180);
+    };
 
     const closeBtn = el('button', 'cat-close');
     closeBtn.type = 'button';
@@ -1329,7 +1222,19 @@ export function createDashboard(deps) {
 
     const save = () => {
       api('PUT', '/api/machines', work)
-        .then((saved) => { machines = Array.isArray(saved) ? saved : []; renderAll(); })
+        .then((saved) => {
+          machines = Array.isArray(saved) ? saved : [];
+          // La copie de travail se recale sur ce que le serveur a VRAIMENT
+          // retenu : il déduplique les machines de même nom, et la seconde
+          // restait sinon affichée dans la fenêtre alors qu'elle n'existait
+          // plus — on la réenvoyait à chaque enregistrement suivant.
+          if (machines.length !== work.length) {
+            work.length = 0;
+            machines.forEach((m) => work.push({ ...m }));
+            renderRows();
+          }
+          renderAll();
+        })
         .catch(() => { showToast('Échec de l’enregistrement des machines'); refresh(); });
     };
 
@@ -1412,9 +1317,7 @@ export function createDashboard(deps) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('open'));
-    document.addEventListener('keydown', function esc(e) {
-      if (e.key === 'Escape' && document.body.contains(overlay)) { close(); document.removeEventListener('keydown', esc); }
-    });
+    document.addEventListener('keydown', surEchap);
   }
 
   // --- Données -------------------------------------------------------------
@@ -1441,10 +1344,20 @@ export function createDashboard(deps) {
       catRefs = refs && typeof refs === 'object' ? refs : {};
       machines = Array.isArray(macs) ? macs : [];
       loaded = true;
+      premierChargementKo = false;
       renderAll();
     } catch (_) {
       // Serveur injoignable : on garde l'affichage courant, le prochain
-      // évènement SSE / retour de visibilité retentera.
+      // évènement SSE / retour de visibilité retentera. Mais si RIEN n'a
+      // jamais été chargé, il n'y a rien à garder et personne ne retentera :
+      // on le dit à l'écran et on reprogramme nous-mêmes un essai.
+      if (!loaded) {
+        premierChargementKo = true;
+        renderBody();
+        if (!repriseTimer) {
+          repriseTimer = setTimeout(() => { repriseTimer = null; refresh(); }, 5000);
+        }
+      }
     } finally {
       refreshing = false;
       if (refreshQueued) { refreshQueued = false; refresh(); }
@@ -1469,7 +1382,6 @@ export function createDashboard(deps) {
   function hide() {
     closeDetail();
     closeActivity();
-    closeWall(); // quitter l'onglet nettoie les timers du mode mural
   }
 
   // Appelé par app.js à chaque évènement temps réel (SSE ou filet de polling).
