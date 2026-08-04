@@ -41,6 +41,10 @@ delete process.env.APP_PASSWORD;
     return { status: res.status, body: await res.json() };
   };
   const ligneDe = async (id) => (await call('GET', '/api/requests')).body.find((r) => r.id === id);
+  // La LISTE ne transporte qu'un résumé de la fiche (elle repart à chaque
+  // rafraîchissement, vers chaque poste). Le détail complet se lit sur la
+  // commande elle-même — c'est ce que fait le tiroir du planning.
+  const detailDe = async (id) => (await call('GET', `/api/requests/${id}`)).body;
 
   // -------------------------------------------------------------------------
   // 1. VENTE DIRECTE — le client paie et repart plus tard : la commande entre
@@ -98,16 +102,27 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(lVente.responsable, 'À attribuer', '« Non défini » n’est pas un employé : la ligne attend son pilote');
   assert.match(lVente.description, /RÉCAPITULATIF DE VENTE DIRECTE/, 'la colonne Infos porte le récapitulatif imprimé');
 
-  // La fiche archive le dossier ENTIER : c'est elle que rouvre le tiroir.
+  // Ce que la LISTE transporte : juste de quoi dessiner la ligne (numéro de
+  // ticket, heure de retrait). Le récapitulatif ligne à ligne pèse plusieurs
+  // kilo-octets et repartait vers chaque poste à chaque rafraîchissement.
   assert.strictEqual(lVente.fiche.kind, 'comptoir-v17');
-  assert.strictEqual(lVente.fiche.source, 'Vente directe');
   assert.strictEqual(lVente.fiche.ref, '26.07.31-001');
   assert.strictEqual(lVente.fiche.heureSouhaitee, '14:00');
-  assert.strictEqual(lVente.fiche.production, 'Broderie');
-  assert.deepStrictEqual(lVente.fiche.client[0], { k: 'Type de client', v: 'Professionnel' });
-  assert.deepStrictEqual(lVente.fiche.details[0], { k: 'Commande', v: '26.07.31-001' });
-  assert.strictEqual(lVente.fiche.controles.payment, true);
-  assert.strictEqual(lVente.fiche.paiement.modeLabel, 'Carte bancaire');
+  assert.strictEqual(lVente.fiche.fichePartielle, true, 'la liste annonce qu’elle ne porte qu’un résumé');
+  assert.strictEqual(lVente.fiche.details, undefined, 'le détail ne voyage pas dans la liste');
+  assert.strictEqual(lVente.fiche.client, undefined);
+
+  // La fiche archive le dossier ENTIER : c'est elle que rouvre le tiroir.
+  const dVente = await detailDe(vente.body.id);
+  assert.strictEqual(dVente.fiche.kind, 'comptoir-v17');
+  assert.strictEqual(dVente.fiche.source, 'Vente directe');
+  assert.strictEqual(dVente.fiche.ref, '26.07.31-001');
+  assert.strictEqual(dVente.fiche.heureSouhaitee, '14:00');
+  assert.strictEqual(dVente.fiche.production, 'Broderie');
+  assert.deepStrictEqual(dVente.fiche.client[0], { k: 'Type de client', v: 'Professionnel' });
+  assert.deepStrictEqual(dVente.fiche.details[0], { k: 'Commande', v: '26.07.31-001' });
+  assert.strictEqual(dVente.fiche.controles.payment, true);
+  assert.strictEqual(dVente.fiche.paiement.modeLabel, 'Carte bancaire');
 
   // Le client est entré dans la base au passage : la prochaine vente le trouve.
   const clients = (await call('GET', '/api/clients')).body;
@@ -184,14 +199,15 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(demande.body.subStage, 'a_chiffrer');
 
   const lDemande = await ligneDe(demande.body.id);
+  const dDemande = await detailDe(demande.body.id);
   assert.strictEqual(lDemande.project_value, null, 'la colonne Prix TTC reste VIDE, pas à 0,00 €');
   assert.strictEqual(lDemande.order_kind, 'demande');
   assert.strictEqual(lDemande.paye, null, 'une demande ne se prononce pas sur le paiement');
   assert.strictEqual(lDemande.paiement_mode, null);
   assert.strictEqual(lDemande.responsable, 'Mélina', 'celle qui a pris la demande la pilote');
-  assert.strictEqual(lDemande.fiche.budgetIndicatif, 1500, 'le budget annoncé est gardé, à côté du prix');
-  assert.strictEqual(lDemande.fiche.canal, 'WhatsApp');
-  assert.strictEqual(lDemande.fiche.suite, 'Devis à faire');
+  assert.strictEqual(dDemande.fiche.budgetIndicatif, 1500, 'le budget annoncé est gardé, à côté du prix');
+  assert.strictEqual(dDemande.fiche.canal, 'WhatsApp');
+  assert.strictEqual(dDemande.fiche.suite, 'Devis à faire');
 
   // Un montant envoyé par erreur sur une demande ne devient JAMAIS un prix.
   const demandeChiffree = await call('POST', '/api/comptoir/projet', {
@@ -223,7 +239,7 @@ delete process.env.APP_PASSWORD;
   //    corrige la VALEUR, jamais le libellé — et une valeur vidée devient « — »
   //    pour que la ligne reste visible sur le récapitulatif imprimé.
   // -------------------------------------------------------------------------
-  const avantCorrection = await ligneDe(vente.body.id);
+  const avantCorrection = await detailDe(vente.body.id);
   assert.strictEqual(avantCorrection.fiche.details[1].v, 'Polo brodé');
 
   const corrige = await call('PATCH', `/api/requests/${vente.body.id}/fiche`, {
@@ -232,7 +248,7 @@ delete process.env.APP_PASSWORD;
   });
   assert.strictEqual(corrige.status, 200, JSON.stringify(corrige.body));
 
-  const apresCorrection = await ligneDe(vente.body.id);
+  const apresCorrection = await detailDe(vente.body.id);
   assert.strictEqual(apresCorrection.fiche.details[1].v, 'Polo brodé bicolore', 'la valeur corrigée est en base');
   assert.strictEqual(apresCorrection.fiche.details[1].k, 'Article 1 — Désignation', 'le libellé vient du parcours, il ne se réécrit pas');
   assert.strictEqual(apresCorrection.fiche.client[1].v, '0690999999');
@@ -242,7 +258,7 @@ delete process.env.APP_PASSWORD;
 
   // Vider une valeur ne fait pas disparaître la ligne du récapitulatif.
   await call('PATCH', `/api/requests/${vente.body.id}/fiche`, { details: ['26.07.31-001', '   '] });
-  assert.strictEqual((await ligneDe(vente.body.id)).fiche.details[1].v, '—');
+  assert.strictEqual((await detailDe(vente.body.id)).fiche.details[1].v, '—');
 
   // L'heure de retrait et le secteur de production se corrigent sur N'IMPORTE
   // QUELLE ligne : la fiche les affiche pour tout le monde, ils doivent
@@ -256,8 +272,16 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(simple.body.fiche.production, 'DTF');
 
   // Une heure impossible ne s'enregistre pas : elle fausserait le délai affiché.
+  // Elle n'EFFACE pas non plus celle qui était déjà posée — une faute de frappe
+  // (« 14h00 ») supprimait l'heure de retrait sans que personne le voie.
   const heureFausse = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { heureSouhaitee: '99:99' });
-  assert.strictEqual(heureFausse.body.fiche.heureSouhaitee, null);
+  assert.strictEqual(heureFausse.status, 400, JSON.stringify(heureFausse.body));
+  assert.strictEqual((await detailDe(sansFiche.body.id)).fiche.heureSouhaitee, '16:30',
+    'l’heure déjà posée survit à une saisie invalide');
+
+  // Vider explicitement le champ, en revanche, retire bien l'heure.
+  const heureVidee = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { heureSouhaitee: '' });
+  assert.strictEqual(heureVidee.body.fiche.heureSouhaitee, null);
 
   // En revanche une ligne créée à la main n'a pas de récapitulatif à corriger.
   const refus = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { details: ['x'] });

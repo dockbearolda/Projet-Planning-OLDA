@@ -34,8 +34,12 @@ export function whatsappNumber(raw) {
     const found = MOBILE_INDICATIFS.find(([re]) => re.test(digits));
     return `${found ? found[1] : '33'}${digits.slice(1)}`;
   }
-  // International sans « + » (590690662400) ou format local inhabituel : on ne
-  // devine pas, on garde les chiffres tels quels s'ils sont plausibles.
+  // International sans « + » (590690662400) : un indicatif pays connu en tête
+  // suffit à le reconnaître. Un numéro qui COMMENCE PAR 0 sans avoir la forme
+  // française, lui, n'est pas lisible — c'est une faute de frappe (un chiffre
+  // en trop). Le laisser passer tel quel donnait « wa.me/06906624000 », que
+  // WhatsApp ouvre sur un inconnu : exactement ce qu'on veut éviter.
+  if (digits.startsWith('0')) return null;
   return digits.length >= 10 ? digits : null;
 }
 

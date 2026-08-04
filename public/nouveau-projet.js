@@ -126,6 +126,15 @@ function masquerErreur() {
   const box = ROOT.querySelector('#np-erreur');
   if (box) box.hidden = true;
 }
+// Pendant l'envoi, la vendeuse doit voir qu'il se passe quelque chose : sans
+// ce signe, un réseau lent donnait un écran muet, elle retapait sur le bouton
+// et croyait le dossier perdu.
+function montrerEnvoi() {
+  const box = ROOT.querySelector('#np-erreur');
+  if (!box) return;
+  box.textContent = 'Enregistrement au planning…';
+  box.hidden = false;
+}
 
 // --- Accueil : les deux tuiles -----------------------------------------------
 function construireAccueil() {
@@ -246,15 +255,21 @@ async function enregistrer(payload) {
   // Double tap sur « Créer dans le planning » = une seule ligne au planning.
   if (enCours) return;
   enCours = true;
-  masquerErreur();
+  montrerEnvoi();
+  // Une requête sans limite de temps peut rester en suspens indéfiniment sur un
+  // wifi d'atelier capricieux : l'écran restait muet, sans erreur ni succès.
+  const minuteur = new AbortController();
+  const stop = setTimeout(() => minuteur.abort(), 20000);
   try {
     const res = await fetch('/api/comptoir/projet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: minuteur.signal,
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `erreur ${res.status}`);
+    masquerErreur();
 
     // On file au planning, SUR la ligne qui vient de naître. Le parcours, lui,
     // reste EN L'ÉTAT : son écran de fin porte encore le ticket à imprimer, à
@@ -265,8 +280,9 @@ async function enregistrer(payload) {
       detail: { id: data.id, stage: data.stage, sub: data.subStage || null },
     }));
   } catch (err) {
-    montrerErreur(err.message);
+    montrerErreur(err.name === 'AbortError' ? 'le serveur ne répond pas' : err.message);
   } finally {
+    clearTimeout(stop);
     enCours = false;
   }
 }

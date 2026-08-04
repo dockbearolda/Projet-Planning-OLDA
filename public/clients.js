@@ -79,7 +79,14 @@ export function applyCasse(mode, raw) {
 // nommé « - » ne se retrouve jamais dans la base.
 const TIRET_INTERDIT = new Set(['entreprise', 'nom', 'prenom']);
 export const estTiret = (v) => String(v == null ? '' : v).trim() === '-';
-export const valeurSaisie = (key, v) => (estTiret(v) && !TIRET_INTERDIT.has(key) ? '' : String(v == null ? '' : v).trim());
+// Sur l'IDENTITÉ, le tiret ne vaut pas davantage : il ne reste pas non plus
+// tel quel. Il partait en base, et « - » (ou « - - » pour un particulier)
+// devenait le nom du dossier — clé de rapprochement vide, fiche impossible à
+// retrouver, auto-complétion polluée.
+export const valeurSaisie = (key, v) => (estTiret(v) ? '' : String(v == null ? '' : v).trim());
+// Un champ d'identité rempli d'un tiret est donc VIDE au regard de la saisie :
+// c'est ce que voit la validation, qui le surligne comme manquant.
+export const champVide = (key, v) => valeurSaisie(key, v) === '';
 
 // Champs affichés à la CRÉATION (et à l'édition) selon la nature du client.
 // `code` (identifiant serveur) est géré à part : jamais dans ces listes, montré
@@ -186,7 +193,11 @@ async function api(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // Le statut AVANT le corps : une page d'erreur du proxy (HTML) faisait échouer
+  // l'analyse JSON d'abord, et le message affiché devenait « Unexpected token
+  // '<' » au lieu de « Erreur 502 ».
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
   if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
   return data;
 }
@@ -209,7 +220,6 @@ function ago(iso) {
   const h = Math.floor(mins / 60);
   if (h < 24) return `il y a ${h} h`;
   const d = Math.floor(h / 24);
-  if (d === 0) return "aujourd'hui";
   if (d === 1) return 'hier';
   if (d < 31) return `il y a ${d} j`;
   const mo = Math.floor(d / 30);
@@ -533,20 +543,24 @@ export function wireCreateValidation(fieldsWrap, submitBtn, onSubmit) {
     submitBtn.classList.remove('is-confirm');
   };
 
+  // `champVide` et pas `value.trim()` : un tiret dans un champ d'identité ne
+  // remplit rien, il doit se surligner comme un champ laissé vide.
+  const vide = (i) => champVide(i.dataset.key || '', i.value);
+
   for (const i of inputs) {
     i.addEventListener('input', () => {
       disarm();
-      if (i.value.trim()) i.classList.remove('cl-f__input--missing');
+      if (!vide(i)) i.classList.remove('cl-f__input--missing');
     });
     i.addEventListener('blur', () => {
-      if (!i.value.trim()) i.classList.add('cl-f__input--missing');
+      if (vide(i)) i.classList.add('cl-f__input--missing');
     });
   }
 
   submitBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const missing = inputs.filter((i) => !i.value.trim());
+    const missing = inputs.filter(vide);
     if (missing.length === 0 || armed) { disarm(); onSubmit(); return; }
     for (const i of missing) i.classList.add('cl-f__input--missing');
     armed = true;
@@ -799,7 +813,8 @@ async function saveField(key, raw) {
 async function setNature(value) {
   if (!drawer) return;
   const nat = nature(value);
-  const unchanged = nature(drawer.draft.client_type) === nat;
+  const avant = nature(drawer.draft.client_type);
+  const unchanged = avant === nat;
   drawer.draft.client_type = nat;
   // La liste de champs affichée dépend de la nature : on re-render tout de
   // suite (création ET édition), avant même le PATCH réseau en édition.
@@ -812,6 +827,12 @@ async function setNature(value) {
     if (i >= 0) LIST[i] = { ...LIST[i], ...updated };
     renderList();
   } catch (err) {
+    // La nature avait été posée à l'écran AVANT le PATCH (elle commande la
+    // liste des champs). Si le serveur refuse, on revient à celle d'avant :
+    // sinon la fiche affichait des champs « Particulier » sur un client resté
+    // « Professionnel » en base, et l'édition suivante partait de ce mensonge.
+    drawer.draft.client_type = avant;
+    renderDrawer();
     toast(err.message || 'Modification refusée.');
   }
 }
@@ -829,6 +850,12 @@ async function createClient() {
   // particulier, on la dérive du prénom + nom plutôt que de la demander une
   // deuxième fois (même logique que le quick-form Nouveau Projet).
   if (nat === 'perso') draft.entreprise = `${draft.prenom} ${draft.nom}`.trim();
+  // Dernier verrou avant l'envoi : sans nom, la fiche n'a pas d'identité et
+  // rien ne permettra plus de la rapprocher d'une commande.
+  if (!draft.entreprise) {
+    toast(nat === 'perso' ? 'Il faut au moins un prénom ou un nom.' : 'Il faut le nom de la société.');
+    return;
+  }
   const btn = $('#cl-create');
   if (btn) { btn.disabled = true; btn.textContent = 'Création…'; }
   try {
@@ -932,9 +959,16 @@ function wire() {
     if (delNote) return deleteNote(delNote.dataset.noteId);
   });
 
-  // Recherche.
+  // Recherche. Le rendu est différé de quelques dizaines de millisecondes : à
+  // chaque caractère, `renderList()` refabrique TOUTES les cartes de la base
+  // (plusieurs centaines), ce qui hachait la frappe sur la tablette.
+  let rechercheTimer = null;
   ROOT.addEventListener('input', (e) => {
-    if (e.target.id === 'cl-q') { query = e.target.value; renderList(); }
+    if (e.target.id === 'cl-q') {
+      query = e.target.value;
+      clearTimeout(rechercheTimer);
+      rechercheTimer = setTimeout(renderList, 120);
+    }
   });
 
   // Édition en place : on enregistre à la validation (blur ou Entrée).
@@ -1050,12 +1084,20 @@ function closeSecteurs() {
 
 // --- Chargement ------------------------------------------------------------
 async function load() {
+  let recue = null;
   try {
-    LIST = await api('GET', '/api/clients');
+    recue = await api('GET', '/api/clients');
   } catch (err) {
-    LIST = [];
     toast('Base clients indisponible.');
   }
+  // Un échec réseau ne doit RIEN effacer : `load()` est rappelé à chaque retour
+  // sur la vue, et vider la liste faisait aussi disparaître la fiche en cours
+  // d'édition (elle n'était plus trouvée dans une liste vide).
+  if (!recue) {
+    if (LIST.length === 0) renderList(); // rien n'a jamais été chargé : état vide assumé
+    return;
+  }
+  LIST = recue;
   renderList();
   // Si une fiche est ouverte, on la resynchronise avec la liste rechargée.
   if (drawer && drawer.id) {

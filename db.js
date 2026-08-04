@@ -150,6 +150,18 @@ if (process.env.DATABASE_URL) {
   console.log('ℹ  Mode local : base en mémoire (pg-mem). Données non persistantes.');
 }
 
+// Écrit un réglage en UNE requête. En DELETE puis INSERT, la clé n'existait
+// plus pendant un court instant : une lecture simultanée retombait sur les
+// valeurs d'usine (un barème express remis à 20/10/0, par exemple), et deux
+// écritures entrelacées violaient la clé primaire — 500 sur un réglage valide.
+async function poserMeta(key, value) {
+  await pool.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [key, value],
+  );
+}
+
 // Migration automatique au démarrage : crée le schéma + seed si vide.
 async function init() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
@@ -275,8 +287,7 @@ async function seedClients() {
     if (list.length) console.log(`ℹ  Base clients : ${list.length} clients pros importés.`);
   }
 
-  await pool.query("DELETE FROM app_meta WHERE key = 'clients_seeded'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('clients_seeded', '1')");
+  await poserMeta('clients_seeded', '1');
 }
 
 // Correspondance ancien slug d'étape → nouveau (planning linéaire). Réversible :
@@ -309,7 +320,14 @@ async function migrateStagesToLinear() {
   try {
     const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model_linear'");
     if (rows[0] && rows[0].value === '1') return;
-  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+  } catch (err) {
+    // On ne tolère QUE « la table n'existe pas » (42P01, base très ancienne).
+    // Le catch fourre-tout précédent avalait aussi les pannes passagères : une
+    // seule erreur de lecture au démarrage et la migration se rejouait sur une
+    // base DÉJÀ migrée, écrasant les sous-étapes en place. C'est le mécanisme
+    // exact des deux incidents de pipeline.
+    if (err.code !== '42P01') throw err;
+  }
 
   // 1) Commandes en phase « production » (modèle multi-machines) : on choisit
   //    l'étape prod correspondant au secteur porté (priorité TROTEC > DTF >
@@ -338,8 +356,7 @@ async function migrateStagesToLinear() {
   //    la colonne n'est plus touchée ici : les deux bascules suivantes la
   //    reposent de toute façon, et l'aligner sur un slug linéaire entre-temps
   //    n'apportait rien.
-  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model_linear'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model_linear', '1')");
+  await poserMeta('stage_model_linear', '1');
 }
 
 // Bascule du pipeline LINÉAIRE (20 étapes à plat) vers le modèle « FAMILLES »
@@ -396,7 +413,14 @@ async function migrateStagesToFamilies() {
   try {
     const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model'");
     if (rows[0] && rows[0].value === 'families') return;
-  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+  } catch (err) {
+    // On ne tolère QUE « la table n'existe pas » (42P01, base très ancienne).
+    // Le catch fourre-tout précédent avalait aussi les pannes passagères : une
+    // seule erreur de lecture au démarrage et la migration se rejouait sur une
+    // base DÉJÀ migrée, écrasant les sous-étapes en place. C'est le mécanisme
+    // exact des deux incidents de pipeline.
+    if (err.code !== '42P01') throw err;
+  }
 
   for (const [from, [family, sub]] of Object.entries(STAGE_TO_FAMILY)) {
     // On ne fixe sub_stage QUE lors de cette bascule initiale ; la garde app_meta
@@ -408,8 +432,7 @@ async function migrateStagesToFamilies() {
   }
 
   // Pose le flag (upsert manuel, compatible pg-mem).
-  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model', 'families')");
+  await poserMeta('stage_model', 'families');
 }
 
 // Bascule du modèle « 8 familles » (v2) vers le modèle « 5 FAMILLES » (v3), la
@@ -460,7 +483,14 @@ async function migrateFamiliesToFive() {
   try {
     const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'stage_model_v3'");
     if (rows[0] && rows[0].value === '1') return;
-  } catch (_) { /* table app_meta absente (base très ancienne) : on tente quand même */ }
+  } catch (err) {
+    // On ne tolère QUE « la table n'existe pas » (42P01, base très ancienne).
+    // Le catch fourre-tout précédent avalait aussi les pannes passagères : une
+    // seule erreur de lecture au démarrage et la migration se rejouait sur une
+    // base DÉJÀ migrée, écrasant les sous-étapes en place. C'est le mécanisme
+    // exact des deux incidents de pipeline.
+    if (err.code !== '42P01') throw err;
+  }
 
   const { rows: all } = await pool.query('SELECT id, stage, sub_stage FROM requests');
   let moved = 0;
@@ -474,8 +504,7 @@ async function migrateFamiliesToFive() {
 
   await renameCategorySettingKeys();
 
-  await pool.query("DELETE FROM app_meta WHERE key = 'stage_model_v3'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('stage_model_v3', '1')");
+  await poserMeta('stage_model_v3', '1');
 }
 
 // Les pilotes et référents PAR DÉFAUT sont réglés par étape (app_meta
@@ -514,8 +543,7 @@ async function renameCategorySettingKeys() {
       changed = true;
     }
     if (!changed) continue;
-    await pool.query('DELETE FROM app_meta WHERE key = $1', [key]);
-    await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [key, JSON.stringify(map)]);
+    await poserMeta(key, JSON.stringify(map));
   }
 }
 
@@ -677,8 +705,7 @@ async function setCategoryOwners(map) {
     if (validSlugs.has(slug) && employeeSet.has(who)) clean[slug] = who;
   }
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'category_owners'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('category_owners', $1)", [value]);
+  await poserMeta('category_owners', value);
   return clean;
 }
 
@@ -710,8 +737,7 @@ async function setCategoryReferents(map) {
     if (who.length) clean[slug] = who;   // liste vide = pas de référent → omise
   }
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'category_referents'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('category_referents', $1)", [value]);
+  await poserMeta('category_referents', value);
   return clean;
 }
 
@@ -782,8 +808,7 @@ async function setMachines(list) {
     clean.push(m);
   }
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'machines'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('machines', $1)", [value]);
+  await poserMeta('machines', value);
   return clean;
 }
 
@@ -859,8 +884,7 @@ async function setTarifsTasseArticles(list) {
   const raw = Array.isArray(list) ? list : [];
   const clean = raw.map(cleanTarifTasseArticle).filter(Boolean);
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'tarifs_tasse_articles'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('tarifs_tasse_articles', $1)", [value]);
+  await poserMeta('tarifs_tasse_articles', value);
   return clean;
 }
 
@@ -884,8 +908,7 @@ async function setTarifsTasseParametres(p) {
     tgca: num(src.tgca, DEFAULT_TARIFS_TASSE_PARAMETRES.tgca),
   };
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'tarifs_tasse_parametres'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('tarifs_tasse_parametres', $1)", [value]);
+  await poserMeta('tarifs_tasse_parametres', value);
   return clean;
 }
 
@@ -935,8 +958,7 @@ async function setSupplementsExpress(p) {
     j15: taux(src.j15, actuel.j15),
   };
   const value = JSON.stringify(clean);
-  await pool.query("DELETE FROM app_meta WHERE key = 'supplements_express'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('supplements_express', $1)", [value]);
+  await poserMeta('supplements_express', value);
   return clean;
 }
 
@@ -996,8 +1018,7 @@ const secteurKey = (s) => String(s == null ? '' : s)
   .normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 async function writeSecteurs(list) {
-  await pool.query("DELETE FROM app_meta WHERE key = 'client_secteurs'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('client_secteurs', $1)", [JSON.stringify(list)]);
+  await poserMeta('client_secteurs', JSON.stringify(list));
   return list;
 }
 
@@ -1054,8 +1075,7 @@ async function getWhatsappMessage() {
 
 async function setWhatsappMessage(text) {
   const clean = String(text == null ? '' : text).slice(0, WHATSAPP_MESSAGE_MAX);
-  await pool.query("DELETE FROM app_meta WHERE key = 'whatsapp_message'");
-  await pool.query("INSERT INTO app_meta (key, value) VALUES ('whatsapp_message', $1)", [clean]);
+  await poserMeta('whatsapp_message', clean);
   return clean;
 }
 
