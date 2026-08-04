@@ -12,6 +12,7 @@ try {
 
 const path = require('path');
 const express = require('express');
+const compression = require('compression');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -37,6 +38,13 @@ const PORT = process.env.PORT || 3000;
 
 // Railway place un proxy devant le service.
 app.set('trust proxy', 1);
+// gzip : app.js + styles.css pèsent ~400 Ko à nu, ~4× moins compressés — c'est
+// le premier levier du « LCP < 2,5 s en 4G » (Railway ne compresse pas seul).
+// JAMAIS sur le flux SSE : la compression mettrait les évènements en tampon et
+// le « temps réel » arriverait par paquets tardifs.
+app.use(compression({
+  filter: (req, res) => req.path !== '/api/stream' && compression.filter(req, res),
+}));
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
