@@ -256,8 +256,16 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(simple.body.fiche.production, 'DTF');
 
   // Une heure impossible ne s'enregistre pas : elle fausserait le délai affiché.
+  // Elle n'EFFACE pas non plus celle qui était déjà posée — une faute de frappe
+  // (« 14h00 ») supprimait l'heure de retrait sans que personne le voie.
   const heureFausse = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { heureSouhaitee: '99:99' });
-  assert.strictEqual(heureFausse.body.fiche.heureSouhaitee, null);
+  assert.strictEqual(heureFausse.status, 400, JSON.stringify(heureFausse.body));
+  assert.strictEqual((await ligneDe(sansFiche.body.id)).fiche.heureSouhaitee, '16:30',
+    'l’heure déjà posée survit à une saisie invalide');
+
+  // Vider explicitement le champ, en revanche, retire bien l'heure.
+  const heureVidee = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { heureSouhaitee: '' });
+  assert.strictEqual(heureVidee.body.fiche.heureSouhaitee, null);
 
   // En revanche une ligne créée à la main n'a pas de récapitulatif à corriger.
   const refus = await call('PATCH', `/api/requests/${sansFiche.body.id}/fiche`, { details: ['x'] });

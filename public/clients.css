@@ -533,6 +533,10 @@
    Un panneau court, ouvert depuis l'en-tête : la liste vit en base, on l'ajuste
    ici plutôt que dans le code. Retirer un secteur ne touche aucune fiche. */
 .cl-secteurs { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
+/* Sans cette ligne, le `display: flex` ci-dessus l'emporte sur `[hidden]` : le
+   panneau reste posé, invisible mais plein écran, et avale TOUS les taps de la
+   Base clients (plus une fiche ne s'ouvre). Même précaution que `.cl-drawer`. */
+.cl-secteurs[hidden] { display: none; }
 .cl-secteurs__scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
 .cl-secteurs__card {
   position: relative; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;

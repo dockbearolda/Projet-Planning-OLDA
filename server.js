@@ -52,6 +52,14 @@ app.use(express.json());
 // ---------------------------------------------------------------------------
 const APP_PASSWORD = process.env.APP_PASSWORD;
 
+// Comparaison à temps constant. `timingSafeEqual` exige deux tampons de MÊME
+// longueur : on compare donc les empreintes, qui font toujours 32 octets.
+function memeSecret(a, b) {
+  const crypto = require('crypto');
+  const h = (s) => crypto.createHash('sha256').update(String(s), 'utf8').digest();
+  return crypto.timingSafeEqual(h(a), h(b));
+}
+
 function basicAuth(req, res, next) {
   if (!APP_PASSWORD) return next(); // dev local : accès ouvert
 
@@ -61,14 +69,28 @@ function basicAuth(req, res, next) {
     const decoded = Buffer.from(encoded, 'base64').toString('utf8');
     const idx = decoded.indexOf(':');
     const password = idx >= 0 ? decoded.slice(idx + 1) : decoded;
-    // L'identifiant est ignoré, seul le mot de passe partagé compte.
-    if (password === APP_PASSWORD) return next();
+    // L'identifiant est ignoré, seul le mot de passe partagé compte. Comparaison
+    // à temps constant : un `===` s'arrête au premier caractère faux et laisse
+    // deviner le mot de passe lettre à lettre en chronométrant les réponses.
+    if (memeSecret(password, APP_PASSWORD)) return next();
   }
   res.set('WWW-Authenticate', 'Basic realm="Planning OLDA", charset="UTF-8"');
   return res.status(401).send('Authentification requise.');
 }
 
 app.use(basicAuth);
+
+// Tout `:id` de l'API désigne un UUID. Une valeur d'une autre forme (raccourci
+// périmé, faute de frappe, lien collé de travers) n'est pas une panne : c'est
+// une ressource qui n'existe pas. Sans ce filtre, PostgreSQL tombait sur une
+// erreur de conversion et l'écran recevait un 500 « Erreur serveur ».
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+for (const nom of ['id', 'noteId']) {
+  app.param(nom, (req, res, next, value) => {
+    if (!UUID_RE.test(value)) return res.status(404).json({ error: 'Ressource introuvable' });
+    next();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,6 +106,12 @@ const PATCHABLE = [
 // Champs booléens du suivi de paiement. null = on ne se prononce pas (une ligne
 // jamais renseignée n'affirme pas « non payé »).
 const PAIEMENT_FLAGS = new Set(['acompte_demande', 'acompte_verse', 'paye']);
+
+// Longueur maximale des textes libres de la grille : ces valeurs vivent dans
+// une cellule, pas dans un traitement de texte (mêmes bornes que le comptoir).
+const TEXTE_LIBRE_MAX = {
+  billing_company: 120, contact_referent: 120, product: 140, color: 60, description: 1200,
+};
 
 function validateField(key, value) {
   if (value === null || value === undefined) return { ok: true, value: null };
@@ -171,11 +199,19 @@ function validateField(key, value) {
     }
     case 'position': {
       const n = Number(value);
-      if (Number.isNaN(n)) return { ok: false, error: 'position doit être numérique' };
+      // `Number.isFinite` et pas seulement `isNaN` : `Infinity` passait, et
+      // comme la position par défaut vaut MAX(position)+1000, TOUTES les lignes
+      // créées ensuite dans cette étape héritaient d'`Infinity` — ordre manuel
+      // définitivement figé, irréparable depuis l'écran.
+      if (!Number.isFinite(n)) return { ok: false, error: 'position doit être numérique' };
       return { ok: true, value: n };
     }
     case 'deadline': {
       if (value === '') return { ok: true, value: null };
+      // Une date bien formée mais inexistante (« 2026-02-30 ») partait telle
+      // quelle vers la colonne `date` : erreur PostgreSQL, donc 500 au lieu du
+      // 400 qui dit à l'écran ce qui ne va pas.
+      if (!isDay(value)) return { ok: false, error: `date invalide : ${value}` };
       return { ok: true, value };
     }
     case 'contact_phone': {
@@ -188,8 +224,16 @@ function validateField(key, value) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return { ok: false, error: 'email invalide' };
       return { ok: true, value: s };
     }
-    default:
-      return { ok: true, value };
+    default: {
+      // Textes libres de la grille : bornés comme partout ailleurs, et TOUJOURS
+      // ramenés à du texte. Un objet envoyé ici finissait en « [object Object] »
+      // dans la colonne, ou faisait tomber le driver en 500.
+      const max = TEXTE_LIBRE_MAX[key];
+      if (max == null) return { ok: true, value };
+      if (typeof value === 'object') return { ok: false, error: `${key} doit être du texte` };
+      const s = String(value).trim();
+      return { ok: true, value: s === '' ? null : s.slice(0, max) };
+    }
   }
 }
 
@@ -205,7 +249,15 @@ function normalizeFlagBody(body) {
 function asyncH(fn) {
   return (req, res) => fn(req, res).catch((err) => {
     console.error(err);
-    res.status(500).json({ error: 'Erreur serveur', detail: err.message });
+    // Un identifiant mal formé dans l'URL (`/api/clients/abc`) n'est pas une
+    // panne : c'est une ressource qui n'existe pas. 404 plutôt que 500, sinon
+    // le moindre lien périmé remonte comme une alerte serveur.
+    if (err && err.code === '22P02') {
+      return res.status(404).json({ error: 'Ressource introuvable' });
+    }
+    // Le détail (noms de tables, contraintes) reste dans les logs du serveur :
+    // il n'a rien à faire dans le navigateur.
+    res.status(500).json({ error: 'Erreur serveur' });
   });
 }
 
@@ -539,7 +591,16 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
   // y compris une ligne créée à la main : la fiche les affiche pour tout le
   // monde, ils doivent s'enregistrer pour tout le monde. `undefined` = le poste
   // n'y touche pas.
-  if ('heureSouhaitee' in b) majFiche.heureSouhaitee = isHeure(b.heureSouhaitee) ? b.heureSouhaitee : null;
+  if ('heureSouhaitee' in b) {
+    // Une heure mal formée (« 14h00 ») EFFAÇAIT l'heure de retrait sans rien
+    // dire, alors que la même valeur est refusée à la prise de commande. On
+    // refuse ici aussi : seul un champ explicitement vidé remet à null.
+    const vide = b.heureSouhaitee == null || b.heureSouhaitee === '';
+    if (!vide && !isHeure(b.heureSouhaitee)) {
+      return res.status(400).json({ error: `heure souhaitée invalide : ${b.heureSouhaitee}` });
+    }
+    majFiche.heureSouhaitee = vide ? null : b.heureSouhaitee;
+  }
   if ('production' in b) majFiche.production = borner(b.production, 200);
 
   const { rows: maj } = await pool.query(
@@ -552,12 +613,15 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
 
 // DELETE /api/requests/:id
 app.delete('/api/requests/:id', asyncH(async (req, res) => {
-  // Supprime d'abord les PDF + secteurs rattachés (cascade gérée côté applicatif
-  // pour rester compatible avec pg-mem en local).
-  await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
-  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
+  // La COMMANDE part en premier. Dans l'ordre inverse, une panne au milieu de
+  // la cascade détruisait définitivement les PDF (devis, BAT, facture) d'une
+  // commande qui, elle, restait au planning. Ici le pire cas laisse des pièces
+  // orphelines, invisibles et sans conséquence.
   const { rowCount } = await pool.query('DELETE FROM requests WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  // Cascade côté applicatif (pg-mem ne gère pas les clés étrangères en local).
+  await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
+  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
   broadcast({ kind: 'delete' });
   res.status(204).end();
 }));
@@ -585,6 +649,12 @@ app.put('/api/requests/:id/pdf/:kind',
     if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
     const buf = req.body;
     if (!Buffer.isBuffer(buf) || buf.length === 0) return res.status(400).json({ error: 'PDF vide' });
+    // Un vrai PDF commence par « %PDF- ». Sans ce contrôle, n'importe quel
+    // fichier de 12 Mo entrait en base (encodé base64, soit +33 % de poids) et
+    // s'ouvrait ensuite sur une page blanche chez celui qui le consultait.
+    if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      return res.status(400).json({ error: 'ce fichier n’est pas un PDF' });
+    }
 
     const exists = await pool.query('SELECT 1 FROM requests WHERE id = $1', [id]);
     if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
@@ -593,10 +663,14 @@ app.put('/api/requests/:id/pdf/:kind',
     if (!filename) filename = `${kind}.pdf`;
     const data = buf.toString('base64');
 
-    // upsert manuel (compatible pg-mem) : delete + insert sur (request_id, kind).
-    await pool.query('DELETE FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind]);
+    // Upsert atomique sur la clé (request_id, kind). En delete + insert, deux
+    // envois simultanés du même emplacement se marchaient dessus : le second
+    // violait la clé primaire et renvoyait 500 sur un dépôt pourtant valide.
     await pool.query(
-      'INSERT INTO attachments (request_id, kind, filename, data, updated_at) VALUES ($1, $2, $3, $4, now())',
+      `INSERT INTO attachments (request_id, kind, filename, data, updated_at)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT (request_id, kind)
+       DO UPDATE SET filename = EXCLUDED.filename, data = EXCLUDED.data, updated_at = now()`,
       [id, kind, filename, data],
     );
     const stage = await touchRequest(id);
@@ -653,13 +727,28 @@ const isDay = (s) => {
 // Heure de retrait de la vente directe, « HH:MM » sur 24 h.
 const isHeure = (s) => typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
-// Date civile LOCALE à J+n. `toISOString()` bascule en UTC : à l'ouest de
-// Greenwich (l'atelier est aux Antilles) il rend déjà la date du lendemain en
-// soirée, et le délai « 7 jours » en vaudrait 8. Le front calcule pareil.
+// Fuseau de l'ATELIER (Saint-Martin, UTC−4 toute l'année, pas d'heure d'été).
+// Il ne suffit pas de dire « date locale » : en production le conteneur tourne
+// en UTC, donc `new Date()` y bascule au LENDEMAIN dès 20 h à l'atelier. Une
+// vente prise à 20 h 30 datait alors du jour suivant — échéance décalée d'un
+// jour, et numéro de ticket ouvrant la série du lendemain.
+const ATELIER_TZ = process.env.ATELIER_TZ || 'America/Marigot';
+// `en-CA` formate en aaaa-mm-jj, exactement la forme attendue par la colonne.
+const FORMAT_JOUR_ATELIER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ATELIER_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+// Date civile de l'atelier, aujourd'hui.
+const jourAtelier = () => FORMAT_JOUR_ATELIER.format(new Date());
+
+// Date civile de l'atelier à J+n. Le décalage se fait à midi UTC sur la date
+// déjà ramenée au fuseau : aucun risque de retomber sur la veille en chemin.
 function todayPlus(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const base = jourAtelier();
+  if (!days) return base;
+  const d = new Date(`${base}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -780,10 +869,15 @@ async function nextClientCode(clientType) {
   const perso = clientType === 'perso';
   const prefix = perso ? 'CLI-PERSO-' : 'CLI-PRO-';
   const metaKey = perso ? 'client_code_seq_perso' : 'client_code_seq_pro';
-  const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
-  const next = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
-  await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
-  await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(next)]);
+  // Incrément atomique (même raison qu'au ticket de vente) : deux fiches créées
+  // en même temps sur deux postes ne peuvent plus porter le même code.
+  const { rows } = await pool.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
+     RETURNING value`,
+    [metaKey],
+  );
+  const next = Number.parseInt(rows[0].value, 10);
   return `${prefix}${String(next).padStart(4, '0')}`;
 }
 
@@ -841,9 +935,11 @@ app.patch('/api/clients/:id', asyncH(async (req, res) => {
 
 // DELETE /api/clients/:id → supprime le client et ses notes (cascade applicative).
 app.delete('/api/clients/:id', asyncH(async (req, res) => {
-  await pool.query('DELETE FROM client_notes WHERE client_id = $1', [req.params.id]);
+  // La fiche d'abord, ses notes ensuite : si la suppression échoue en chemin,
+  // on ne veut pas d'un client vivant dont l'historique a disparu.
   const { rowCount } = await pool.query('DELETE FROM clients WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Client introuvable' });
+  await pool.query('DELETE FROM client_notes WHERE client_id = $1', [req.params.id]);
   broadcast({ kind: 'client' });
   res.status(204).end();
 }));
@@ -878,6 +974,19 @@ app.delete('/api/clients/:id/notes/:noteId', asyncH(async (req, res) => {
 // Crée le client dans la base s'il n'y est pas encore (rapprochement normalisé
 // sur le nom de société). Appelé à chaque prise de commande : « si c'est un
 // nouveau client, on crée sa fiche ». Ne touche jamais un client déjà présent.
+// Enrober l'appel : la fiche client est un CONFORT (elle se recrée à la
+// commande suivante), la vente est de l'argent. Si la création de la fiche
+// échoue APRÈS l'insertion de la ligne, l'écran ne doit pas annoncer un échec
+// pour une vente qui, elle, est bien enregistrée : la vendeuse revalidait, et
+// la vente entrait deux fois.
+async function upsertClientSansBloquer(cl) {
+  try {
+    await upsertClientFromCommande(cl);
+  } catch (err) {
+    console.error('Fiche client non créée (la commande, elle, est enregistrée) :', err);
+  }
+}
+
 async function upsertClientFromCommande(cl) {
   const entreprise = trimOrNull(cl && cl.societe);
   if (!entreprise) return;
@@ -1707,7 +1816,7 @@ app.post('/api/projets', asyncH(async (req, res) => {
     ],
   );
 
-  await upsertClientFromCommande(projet.client);
+  await upsertClientSansBloquer(projet.client);
 
   broadcast({ kind: 'create', stages: [projet.stage] });
   res.status(201).json({ id: rows[0].id, projet });
@@ -1788,8 +1897,28 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   const responsable = RESPONSABLE_SET.has(b.responsible) ? b.responsible : 'À attribuer';
   const priorite = [1, 2, 3].includes(Number(b.priority)) ? Number(b.priority) : 1;
   const quantite = Number.isInteger(Number(b.quantity)) && Number(b.quantity) > 0 ? Number(b.quantity) : null;
-  const deadline = isDay(b.due) ? b.due : todayPlus(0);
+  // Une DEMANDE de devis sans date souhaitée n'a pas d'échéance : la dater du
+  // jour la faisait paraître en retard dès le lendemain alors que personne n'a
+  // rien promis au client. Une VENTE, elle, garde le jour même par défaut.
+  const deadline = isDay(b.due) ? b.due : (estDemande ? null : todayPlus(0));
   const valeur = estDemande ? null : prixComptoir(b.amount);
+
+  // IDEMPOTENCE. Le réseau de la tablette peut avaler la RÉPONSE d'un envoi qui
+  // a pourtant abouti : l'écran annonce un échec, la vendeuse réessaie, et la
+  // vente entrait une seconde fois au planning sous le même numéro de ticket.
+  // Ce numéro est unique par jour : s'il est déjà en base, on rend la ligne
+  // existante au lieu d'en créer une jumelle.
+  const ref = borner(b.ref, 40);
+  if (ref) {
+    const { rows: deja } = await pool.query(
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [ref],
+    );
+    if (deja.length) {
+      return res.json({
+        id: deja[0].id, stage: deja[0].stage, subStage: deja[0].sub_stage, dejaEnregistre: true,
+      });
+    }
+  }
 
   const pay = b.paiement && typeof b.paiement === 'object' ? b.paiement : {};
   const mode = PAIEMENT_MODE_SET.has(pay.mode) ? pay.mode : null;
@@ -1799,7 +1928,7 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   const fiche = {
     kind: 'comptoir-v17',
     source: estDemande ? 'Demande de devis' : 'Vente directe',
-    ref: borner(b.ref, 40),
+    ref,
     creeLe: new Date().toISOString(),
     heureSouhaitee: isHeure(b.dueTime) ? b.dueTime : null,
     production: borner(b.production, 200),
@@ -1842,7 +1971,7 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   );
 
   const perso = clientType === 'perso' ? couperNomPerso(nomDossier) : null;
-  await upsertClientFromCommande({
+  await upsertClientSansBloquer({
     societe: nomDossier,
     type: clientType,
     contact: trimOrNull(cl.contact),
@@ -1892,10 +2021,17 @@ async function reserverNumeroDuJour(serie, body) {
   const jour = isDay(body.jour) ? body.jour : todayPlus(0);
   const [y, m, d] = jour.split('-');
   const metaKey = `${serie}_seq_${y}${m}${d}`;
-  const { rows } = await pool.query('SELECT value FROM app_meta WHERE key = $1', [metaKey]);
-  const rang = (rows[0] ? Number.parseInt(rows[0].value, 10) || 0 : 0) + 1;
-  await pool.query('DELETE FROM app_meta WHERE key = $1', [metaKey]);
-  await pool.query('INSERT INTO app_meta (key, value) VALUES ($1, $2)', [metaKey, String(rang)]);
+  // UNE seule requête, atomique : PostgreSQL sérialise les écritures sur la
+  // même clé. En lecture-puis-écriture (SELECT, DELETE, INSERT), deux comptoirs
+  // qui encaissaient dans la même fraction de seconde lisaient la même valeur
+  // et remettaient le MÊME numéro de ticket à deux clients différents.
+  const { rows } = await pool.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
+     RETURNING value`,
+    [metaKey],
+  );
+  const rang = Number.parseInt(rows[0].value, 10);
   return { numero: `${y.slice(2)}.${m}.${d}-${String(rang).padStart(3, '0')}`, jour, rang };
 }
 
@@ -1909,7 +2045,9 @@ async function reserverNumeroDuJour(serie, body) {
 // passage aux 5 familles.
 // `no-cache` ne désactive pas le cache : il impose de le revalider. Quand rien
 // n'a changé, le serveur répond 304 sans renvoyer le fichier.
-const NO_CACHE = /\.(html|js|css|webmanifest)$/;
+// Le SVG en fait partie : c'est le logo, servi aussi comme icône de la PWA.
+// Sans en-tête, un poste gardait l'ancien plusieurs heures après un changement.
+const NO_CACHE = /\.(html|js|css|webmanifest|svg)$/;
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (NO_CACHE.test(filePath)) res.setHeader('Cache-Control', 'no-cache');

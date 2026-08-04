@@ -3032,6 +3032,9 @@ button, a, .stage, .prio-pill, .deadline-badge,
    Les deux replient le rail : la zone de travail prend toute la largeur. */
 body.view-plein .work-head,
 body.view-plein .grid-wrap,
+/* Le rail des colonnes ne pilote que la grille du planning : hors planning il
+   n'a rien à régler et se superposait à l'en-tête de la Base clients. */
+body.view-plein .colbar,
 body.view-plein .fiverr-tool { display: none !important; }
 
 body.view-plein .shell,
