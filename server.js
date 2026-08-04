@@ -449,6 +449,24 @@ const SELECT = `SELECT r.*,
   LEFT JOIN attachments af ON af.request_id = r.id AND af.kind = 'facture'`;
 const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
 
+// La LISTE ne transporte de la fiche que ce que la grille affiche vraiment :
+// le numéro de ticket et l'heure de retrait. Le reste — le récapitulatif ligne
+// à ligne du comptoir, les contrôles, le paiement — pèse plusieurs kilo-octets
+// PAR COMMANDE et repartait à chaque rafraîchissement, vers chaque poste, alors
+// que seule la fiche ouverte en a besoin. Elle se charge donc à l'ouverture du
+// tiroir (GET /api/requests/:id).
+const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee'];
+function allegerFiche(row) {
+  const f = row.fiche;
+  if (!f || typeof f !== 'object') return row;
+  const court = {};
+  for (const k of FICHE_LISTE) if (f[k] !== undefined) court[k] = f[k];
+  // `fichePartielle` dit au front que ce n'est qu'un résumé : il sait alors
+  // qu'il doit aller chercher le détail avant d'ouvrir la fiche.
+  court.fichePartielle = true;
+  return { ...row, fiche: court };
+}
+
 // GET /api/requests?stage=<étape>   → commandes de cette étape
 // GET /api/requests                 → toutes
 app.get('/api/requests', asyncH(async (req, res) => {
@@ -462,7 +480,16 @@ app.get('/api/requests', asyncH(async (req, res) => {
       `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
     );
   }
-  res.json(result.rows);
+  res.json(result.rows.map(allegerFiche));
+}));
+
+// GET /api/requests/:id → UNE commande, fiche COMPLÈTE. C'est ce que le tiroir
+// de détail et le récapitulatif imprimable vont chercher : le détail n'est
+// chargé que pour la ligne qu'on ouvre, jamais pour les centaines d'autres.
+app.get('/api/requests/:id', asyncH(async (req, res) => {
+  const { rows } = await pool.query(`${SELECT} WHERE r.id = $1`, [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  res.json(rows[0]);
 }));
 
 // GET /api/counts → { slug: n, ... } : objet plat mêlant FAMILLES et SOUS-FAMILLES

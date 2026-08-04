@@ -2136,10 +2136,48 @@ function ensureLigneDrawer() {
   });
 }
 
+// La liste ne transporte qu'un RÉSUMÉ de la fiche (voir server.js) : le détail
+// complet — récapitulatif ligne à ligne du comptoir, contrôles, paiement — ne
+// se charge que pour la ligne qu'on ouvre. On le garde ici, car chaque
+// rafraîchissement remplace les objets de `rows` par des versions allégées.
+const fichesCompletes = new Map(); // id (string) -> fiche complète
+
+// Recolle la fiche complète sur la ligne si on l'a déjà chargée.
+function completerFiche(r) {
+  if (!r || !r.fiche || !r.fiche.fichePartielle) return r;
+  const pleine = fichesCompletes.get(String(r.id));
+  if (pleine) r.fiche = pleine;
+  return r;
+}
+
+async function chargerFicheComplete(id) {
+  const cle = String(id);
+  if (fichesCompletes.has(cle)) return fichesCompletes.get(cle);
+  const complet = await api('GET', `/api/requests/${cle}`);
+  const fiche = complet && complet.fiche && typeof complet.fiche === 'object' ? complet.fiche : {};
+  fichesCompletes.set(cle, fiche);
+  const r = rows.find((x) => String(x.id) === cle);
+  if (r) r.fiche = fiche;
+  return fiche;
+}
+
 function openLigneDetail(id) {
   ensureLigneDrawer();
   ligneDrawerId = String(id);
   ligneDrawerEl.hidden = false;
+  // Chargement du détail en tâche de fond : le tiroir s'ouvre TOUT DE SUITE
+  // avec ce que la grille connaît déjà (client, projet, prix, échéance), et le
+  // récapitulatif complet s'y ajoute dès qu'il arrive. Personne n'attend
+  // devant un écran vide.
+  chargerFicheComplete(id)
+    .then(() => { if (ligneDrawerId === String(id)) renderLigneDetail(); })
+    .catch((err) => {
+      // Le tiroir reste utilisable sans le récapitulatif, mais on ne le passe
+      // pas sous silence : sinon un détail manquant ressemble à un détail
+      // « jamais enregistré », et personne ne cherche plus loin.
+      console.warn('Détail de la commande non chargé :', err);
+      showToast('Détail complet indisponible — vérifie la connexion.');
+    });
   // Le corps du tiroir précédent est encore monté (closeLigneDetail masque, ne
   // vide pas) et le navigateur lui rend sa position de scroll dès qu'il
   // redevient visible : on la remet à zéro APRÈS l'affichage — sinon la remise
@@ -2162,7 +2200,7 @@ function closeLigneDetail() {
 // ligne a quitté la vue courante (déplacée vers une autre étape, supprimée).
 function renderLigneDetailIfOpen() {
   if (!ligneDrawerId) return;
-  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  const r = completerFiche(rows.find((x) => String(x.id) === ligneDrawerId));
   // La fermeture passe AVANT la garde : un tiroir ouvert sur une ligne qui a
   // quitté la vue doit se fermer même si le focus est resté dedans.
   if (!r) { closeLigneDetail(); return; }
@@ -2483,7 +2521,10 @@ function recapTexte(r) {
   return lignes.join('\n');
 }
 
-function telechargerRecap(r) {
+async function telechargerRecap(r) {
+  // Le récapitulatif se compose depuis la fiche COMPLÈTE : si elle n'est pas
+  // encore arrivée, on l'attend plutôt que d'écrire un fichier amputé.
+  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
   const nom = `Recap_${(r.fiche && r.fiche.ref) || r.billing_company || 'projet'}`.replace(/[^\w.-]+/g, '_');
   // Le BOM en tête : sans lui, Excel et le Bloc-notes de Windows affichent les
   // accents en charabia — et ce fichier finit souvent sur un poste Windows.
@@ -2503,7 +2544,10 @@ function telechargerRecap(r) {
 // telle qu'elle est à l'écran donneraient une feuille illisible). On compose
 // une page propre dans un cadre hors écran, on l'imprime, on le retire. Un
 // cadre plutôt qu'une fenêtre : aucun bloqueur de pop-up ne peut l'empêcher.
-function imprimerRecap(r) {
+async function imprimerRecap(r) {
+  // Même raison qu'au téléchargement : on n'imprime pas un récapitulatif dont
+  // le détail n'est pas encore arrivé.
+  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
   const cadre = document.createElement('iframe');
   cadre.setAttribute('aria-hidden', 'true');
   cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;height:1000px;border:0';
@@ -2723,7 +2767,7 @@ function placesDuPipeline() {
 }
 
 function renderLigneDetail() {
-  const r = rows.find((x) => String(x.id) === ligneDrawerId);
+  const r = completerFiche(rows.find((x) => String(x.id) === ligneDrawerId));
   if (!r) { closeLigneDetail(); return; }
   // `.ld-body` est le conteneur qui défile, et replaceChildren() le détruit :
   // on relève sa position pour la reposer sur le corps reconstruit, sinon la
@@ -2874,7 +2918,11 @@ function renderLigneDetail() {
   // Le récapitulatif du comptoir fait des dizaines de lignes : déplié, il pousse
   // tout le reste de la fiche hors de l'écran. On l'ouvre quand on en a besoin.
   let champsDetail = null;
-  if (fiche.kind === 'comptoir-v17') {
+  if (fiche.fichePartielle) {
+    // Le détail arrive dans un instant (voir openLigneDetail) : on l'annonce
+    // plutôt que d'afficher « non enregistré », qui serait faux.
+    body.append(ldVolet('Détail complet', 'Chargement…', ldValeur('Un instant…'), true));
+  } else if (fiche.kind === 'comptoir-v17') {
     const bloc = ldBlocDetail(r);
     if (bloc) { champsDetail = bloc.champs; body.append(bloc.box); }
   } else {
