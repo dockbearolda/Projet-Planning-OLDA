@@ -525,7 +525,12 @@ function currentViewLabel() {
   return STAGE_LABEL[currentStage];
 }
 
-async function selectStage(slug, sub = null) {
+// `forcerRelecture` : la ligne visée vient d'être créée côté serveur et n'est
+// donc PAS dans le cache local. Sans ce drapeau, le raccourci « même famille »
+// ci-dessous se contentait de re-dessiner ce qu'on avait déjà — la nouvelle
+// ligne n'y était pas, `revealRow` ne trouvait rien, et la vendeuse ne voyait
+// rien apparaître (le cas le plus courant : elle était déjà sur cette famille).
+async function selectStage(slug, sub = null, forcerRelecture = false) {
   const sameFamily = slug === currentStage;
   syncTabForStage(slug, sub ?? null);
   currentStage = slug;
@@ -540,13 +545,27 @@ async function selectStage(slug, sub = null) {
   paintSidebarActive();
   // Changer de sous-catégorie DANS la même famille ne recharge rien : les lignes
   // de la famille sont déjà en mémoire, on ne fait que re-filtrer (instantané).
-  if (sameFamily && lastRowsSig !== '') {
+  if (sameFamily && lastRowsSig !== '' && !forcerRelecture) {
     applySortAndRender();
     playStageEnter();
     return;
   }
-  clearGrid();
-  await loadRows();
+  // Relecture forcée : on garde la grille à l'écran (pas de `clearGrid`), sinon
+  // elle clignoterait alors qu'on est déjà au bon endroit.
+  if (!sameFamily) clearGrid();
+  try {
+    await loadRows();
+  } catch (_) {
+    // Wi-Fi coupé une seconde : la grille restait VIDE et muette, sans le
+    // moindre message — le même symptôme visuel qu'une panne grave. On le dit,
+    // et le temps réel remettra les lignes dès que la liaison revient.
+    if (currentStage === slug) {
+      $empty.hidden = false;
+      $empty.textContent = 'Connexion perdue — les commandes réapparaîtront dès le retour du réseau.';
+      toast('Chargement impossible : vérifie la connexion.');
+    }
+    return;
+  }
   // Anime l'entrée des VRAIES lignes, seulement si cette sélection est toujours
   // celle affichée (un clic plus récent a pu prendre le relais entre-temps).
   if (currentStage === slug) playStageEnter();
@@ -770,6 +789,17 @@ function cmp(a, b, key) {
 const rowEls = new Map(); // id (string) -> { tr, sig }
 const cardEls = new Map(); // id (string) -> { el, sig } — vue épurée (cartes)
 
+// Anti double-tap sur les boutons qui CRÉENT quelque chose (dupliquer, envoyer
+// vers une autre catégorie) : au doigt, un appui appuyé se lit souvent comme
+// deux clics, et on se retrouvait avec deux copies de la commande. Le bouton
+// est rendu inerte le temps que la création parte.
+function armerUneFois(bouton, ms = 700) {
+  if (bouton.dataset.enCours === '1') return false;
+  bouton.dataset.enCours = '1';
+  setTimeout(() => { delete bouton.dataset.enCours; }, ms);
+  return true;
+}
+
 // Force la reconstruction des lignes au prochain rendu. renderRows() ne remonte
 // une ligne que si son `updated_at` a bougé ; or l'affichage dépend aussi de
 // données EXTÉRIEURES à la ligne (pilote / référent de base d'une catégorie).
@@ -983,6 +1013,11 @@ function buildCard(r) {
       const valeur = r.referent === e ? null : e;
       patch(r, { referent: valeur }, () => {
         r.referent = valeur;
+        // Sans invalidation, la carte n'est PAS reconstruite : sa signature
+        // repose sur `updated_at`, que le serveur seul fait bouger. Le clic
+        // restait donc sans effet visible pendant un aller-retour réseau — on
+        // re-tapait, et le second tap annulait l'attribution.
+        invalidateRowCache(r.id);
         applySortAndRender();
       });
     });
@@ -1250,7 +1285,7 @@ function buildRow(r) {
       attachTip(send, `Envoyer vers ${t.label}`);
       send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
       send.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg><span>${escapeHtml(t.label)}</span>`;
-      send.addEventListener('click', () => copyToStage(r, t.slug));
+      send.addEventListener('click', () => { if (armerUneFois(send)) copyToStage(r, t.slug); });
       tdDel.appendChild(send);
     }
   }
@@ -1260,7 +1295,7 @@ function buildRow(r) {
   attachTip(dup, 'Dupliquer cette commande');
   dup.setAttribute('aria-label', 'Dupliquer cette commande');
   dup.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
-  dup.addEventListener('click', () => duplicateRow(r));
+  dup.addEventListener('click', () => { if (armerUneFois(dup)) duplicateRow(r); });
   const del = document.createElement('button');
   del.className = 'del-btn';
   del.type = 'button';
@@ -2222,25 +2257,6 @@ function ldChip(render, open) {
   return btn;
 }
 
-// Toutes les places possibles d'une commande, à plat : une entrée par
-// sous-étape (c'est le niveau où une ligne atterrit vraiment), une entrée par
-// famille quand elle n'en a pas. Même granularité que les cibles du rail au
-// glisser-déposer — d'où la clé « famille/sous-étape » comparable à `r`.
-function stageDestinations() {
-  const out = [];
-  for (const f of STAGES) {
-    const subs = SUB_STAGES[f.slug];
-    if (subs && subs.length) {
-      for (const s of subs) {
-        out.push({ value: `${f.slug}/${s.slug}`, label: `${f.label} › ${s.label}`, stage: f.slug, sub: s.slug });
-      }
-    } else {
-      out.push({ value: `${f.slug}/`, label: f.label, stage: f.slug, sub: null });
-    }
-  }
-  return out;
-}
-
 function stageDestinationLabel(stage, sub) {
   const family = STAGE_LABEL[stage] || stage;
   if (sub && SUB_LABEL[sub]) return `${family} › ${SUB_LABEL[sub]}`;
@@ -2764,7 +2780,11 @@ function renderLigneDetail() {
     prioBand(r), 'Priorité',
   );
   const cDate = ldChamp(String(r.deadline || '').slice(0, 10), { type: 'date', label: 'Date de remise' });
-  const cHeure = ldChamp(fiche.heureSouhaitee || '14:00', { type: 'time', label: 'Heure de remise' });
+  // Pas de 14:00 pré-rempli : ouvrir puis enregistrer une fiche gravait alors
+  // une heure de remise que le client n'avait jamais demandée, et la carte
+  // l'annonçait ensuite comme une promesse (« Remise client : … à 14h00 »).
+  // Le calcul du délai, lui, prend déjà 14 h par défaut de son côté.
+  const cHeure = ldChamp(fiche.heureSouhaitee || '', { type: 'time', label: 'Heure de remise' });
   const cPrix = ldChamp(r.project_value == null ? '' : r.project_value, {
     type: 'number', step: '0.01', inputMode: 'decimal',
     placeholder: 'à chiffrer', label: 'Valeur TTC',
@@ -3191,7 +3211,14 @@ function closeCalendar() {
 function onCalDocDown(e) {
   if (openCalendar && !openCalendar.contains(e.target) && !e.target.closest('.deadline-badge')) closeCalendar();
 }
-function onCalKey(e) { if (e.key === 'Escape') closeCalendar(); }
+// `stopPropagation` : sans lui, l'Échap qui ferme le calendrier remontait aussi
+// jusqu'au tiroir de la fiche, et les deux se fermaient d'un coup — on perdait
+// la fiche entière pour avoir voulu refermer un calendrier.
+function onCalKey(e) {
+  if (e.key !== 'Escape') return;
+  e.stopPropagation();
+  closeCalendar();
+}
 
 function showDeadlineCalendar(r, anchor, onPick) {
   closeCalendar();
@@ -3376,7 +3403,11 @@ function patch(r, body, applyOptimistic) {
   applyOptimistic();
   patchRow(r, body).catch((err) => {
     reportError(err);
-    loadRows(); // resync en cas d'échec
+    // Resynchronisation : la valeur posée en optimiste n'a PAS été enregistrée,
+    // il ne faut pas la laisser à l'écran comme si elle l'était. Et si même la
+    // relecture échoue (réseau toujours coupé), on ne laisse pas filer un rejet
+    // non traité — le message d'erreur ci-dessus a déjà prévenu.
+    loadRows().catch(() => {});
   });
 }
 
@@ -3584,6 +3615,9 @@ function attachDrag(handle, tr, r) {
     // défilement). À la souris, toute la carte demeure zone de prise.
     if (e.pointerType !== 'mouse' && handle.classList.contains('pcard')
         && !(e.target.closest && e.target.closest('.pcard__handle'))) return;
+    // Un glisser est déjà en cours avec un autre doigt : on ne l'écrase pas.
+    // Sinon son fantôme, plus référencé par personne, restait collé à l'écran.
+    if (dragState) return;
     e.preventDefault();
     dragState = {
       id: r.id, r, tr, handle,
@@ -3620,6 +3654,10 @@ function beginDrag() {
 
 function onDragMove(e) {
   if (!dragState) return;
+  // Un SEUL doigt pilote le glisser : celui qui l'a commencé. Sur la tablette,
+  // la paume ou le pouce posé à côté produit ses propres évènements — ils
+  // déplaçaient le fantôme et pouvaient déposer la carte ailleurs.
+  if (e.pointerId !== dragState.pointerId) return;
   const dx = e.clientX - dragState.startX;
   const dy = e.clientY - dragState.startY;
   if (!dragState.active) {
@@ -3691,6 +3729,11 @@ function updateDragTarget() {
 
 async function onDragEnd(e) {
   if (!dragState) return;
+  // Seul le doigt qui a commencé le glisser peut le terminer. Sans ce filtre,
+  // le simple fait de lever un AUTRE doigt (paume posée sur la dalle) déposait
+  // la commande là où CE doigt-là se trouvait — un dépôt fantôme, parfois sur
+  // une entrée du rail, donc un changement d'étape que personne n'a demandé.
+  if (e.pointerId !== dragState.pointerId) return;
   const ds = dragState;
   if (ds.raf) cancelAnimationFrame(ds.raf);
   window.removeEventListener('pointermove', onDragMove);
@@ -3913,7 +3956,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
   handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, product: 220,
-  price: 92, sub_stage: 170, next: 56, description: 210, deadline: 136, del: 200,
+  price: 92, sub_stage: 170, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};
@@ -4116,12 +4159,17 @@ function applyColWidths() {
   const w = colWidths[currentStage];
   if (w) {
     let sum = 0;
+    // On LIT d'abord toutes les visibilités, on ÉCRIT ensuite les largeurs.
+    // Entrelacées, ces deux opérations forçaient le navigateur à recalculer la
+    // mise en page à chaque colonne — douze fois par rendu, et à chaque
+    // mouvement du doigt pendant le redimensionnement d'une colonne.
+    // Une colonne masquée (display:none) ne compte pas dans la largeur fixe,
+    // sinon les colonnes visibles s'étirent pour absorber l'espace fantôme.
+    const visibles = COL_ELS.map((col) => getComputedStyle(col).display !== 'none');
     COL_ELS.forEach((col, i) => {
       const px = Math.max(COL_MIN, Math.round(w[COL_KEYS[i]] || COL_DEFAULTS[COL_KEYS[i]] || COL_MIN));
       col.style.width = px + 'px';
-      // Une colonne masquée (display:none) ne compte pas dans la largeur fixe,
-      // sinon les colonnes visibles s'étirent pour absorber l'espace fantôme.
-      if (getComputedStyle(col).display !== 'none') sum += px;
+      if (visibles[i]) sum += px;
     });
     $grid.classList.add('manual-cols');
     $grid.style.width = sum + 'px';
@@ -4156,7 +4204,7 @@ function attachStarsHeaderTip() {
 function attachColResizers() {
   document.querySelectorAll('#grid thead th').forEach((th, i) => {
     const key = COL_KEYS[i];
-    if (key === 'del' || key === 'next') return; // colonnes d'actions : pas de poignée
+    if (key === 'del') return; // colonne d'actions : pas de poignée
     const h = document.createElement('span');
     h.className = 'col-resizer';
     attachTip(h, 'glisser pour régler la largeur');
@@ -4256,7 +4304,15 @@ async function poll() {
   try {
     await loadCounts(); // compteurs sidebar : toujours sûrs à rafraîchir
     if (isInteracting()) return; // ne pas perturber une saisie / un glisser
-    const fresh = await api('GET', `/api/requests?stage=${encodeURIComponent(currentStage)}`);
+    // Même garde que `loadRows` : on note l'étape demandée ET le jeton de
+    // chargement AVANT la requête. Sans ça, une réponse partie pour la famille
+    // A qui revient après un clic sur la famille B écrasait la grille avec les
+    // lignes de A — affichées sous l'entête de B, et resservies ensuite par le
+    // raccourci « même famille » de selectStage.
+    const slug = currentStage;
+    const token = loadToken;
+    const fresh = await api('GET', `/api/requests?stage=${encodeURIComponent(slug)}`);
+    if (slug !== currentStage || token !== loadToken) return; // sélection dépassée
     const sig = signature(fresh);
     if (sig !== lastRowsSig) {
       rows = fresh;
@@ -4629,6 +4685,10 @@ function setGridQuery(v) {
   gridQuery = next;
   syncSearchUI();
   runSearch();
+  // La grille masque ses lignes par `.is-hidden` selon la même requête. Vider
+  // le champ par la croix fermait la palette mais laissait la grille filtrée
+  // (et parfois « Aucune commande ne correspond ») jusqu'au prochain rendu.
+  applySearchAndCounts();
 }
 
 if ($gridSearchInput) {
@@ -4914,7 +4974,7 @@ window.addEventListener('olda:projet-cree', async (e) => {
   const { id, stage, sub } = e.detail || {};
   location.hash = '#planning';
   if (!stage) return;
-  await selectStage(stage, sub || null);
+  await selectStage(stage, sub || null, true);
   if (id) revealRow(id);
 });
 
@@ -5005,11 +5065,18 @@ function applyHash() {
 window.addEventListener('hashchange', applyHash);
 applyHash();
 
+// Échafaudage de l'écran : posé UNE seule fois. Une reprise après coupure
+// réseau ne doit pas reconstruire le rail ni rattacher une seconde fois les
+// écouteurs de redimensionnement des colonnes.
+let echafaudagePose = false;
 async function start() {
-  renderSidebar();
-  attachColResizers();
-  attachStarsHeaderTip();
-  initColbar();
+  if (!echafaudagePose) {
+    echafaudagePose = true;
+    renderSidebar();
+    attachColResizers();
+    attachStarsHeaderTip();
+    initColbar();
+  }
   updateSubColVisibility(currentStage);
   updatePriceColVisibility(currentStage);
   applyColWidths();
@@ -5029,4 +5096,14 @@ async function start() {
   startRealtime();
 }
 
-start().catch(reportError);
+// Un seul échec réseau au démarrage laissait l'application MORTE : `booted`
+// restait faux, le temps réel n'était jamais lancé, et seul un rechargement
+// manuel s'en sortait. On réessaie, en espaçant les tentatives.
+function demarrerAvecReprise(essai = 0) {
+  start().catch((err) => {
+    reportError(err);
+    const attente = Math.min(15000, 1500 * (essai + 1));
+    setTimeout(() => demarrerAvecReprise(essai + 1), attente);
+  });
+}
+demarrerAvecReprise();
