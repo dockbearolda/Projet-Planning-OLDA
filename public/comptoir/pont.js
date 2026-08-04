@@ -48,11 +48,21 @@
   //   `name` = ce qu'on affiche (raison sociale, ou « Prénom NOM » d'un
   //   particulier) ; `company` n'est posé que pour un pro, c'est ce qui
   //   distingue les deux natures dans les écrans.
+  // La NATURE telle que la nomme l'écran du comptoir. Tout ramener à
+  // « Professionnel » faisait repartir une association ou un revendeur en pro
+  // sur la ligne de planning, alors que sa fiche, elle, disait le contraire.
+  const NATURE_ECRAN = {
+    perso: 'Particulier',
+    asso: 'Association',
+    revendeur: 'Revendeur',
+    pro: 'Professionnel',
+  };
+
   function versEcran(c) {
     const pro = c.client_type !== 'perso';
     const fiche = {
       id: c.id,
-      type: pro ? 'Professionnel' : 'Particulier',
+      type: NATURE_ECRAN[c.client_type] || 'Professionnel',
       name: c.entreprise || '',
       phone: c.telephone || '',
       email: c.email || '',

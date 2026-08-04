@@ -27,7 +27,7 @@ h3{margin-top:0}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .field{margin-bottom:14px}
 label{display:block;font-weight:700;margin-bottom:6px}
-input,select,textarea{width:100%;padding:11px;border:1px solid #bdbdbd;border-radius:8px;font-size:15px;background:#fff}
+input,select,textarea{width:100%;padding:11px;border:1px solid #bdbdbd;border-radius:8px;font-size:16px;background:#fff}
 textarea{min-height:110px;resize:vertical}
 input.invalid,select.invalid,textarea.invalid{border:2px solid var(--danger);background:#fff7f7}
 .help{font-size:12px;color:var(--muted);margin-top:5px}
@@ -1137,7 +1137,10 @@ let editIndex = null;
 let lastTotals = {ht:0,tax:0,surcharge:0,ttc:0};
 const euro = new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
 
-function isoDate(date){ return date.toISOString().slice(0,10); }
+/* Date civile LOCALE (celle de la tablette, donc celle de l'atelier).
+   `toISOString()` seul bascule en UTC : aux Antilles il rend déjà la date du
+   LENDEMAIN dès 20 h, et la vente du soir partait datée du jour suivant. */
+function isoDate(date){ const d=new Date(date); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function addBusinessDays(date, days){
   const d = new Date(date);
   let added = 0;
@@ -1827,7 +1830,10 @@ document.getElementById("payButton").addEventListener("click",processPayment);
 document.getElementById("printTicketBtn").addEventListener("click",printTicket);
 document.getElementById("downloadTicketBtn").addEventListener("click",downloadTicket);
 document.getElementById("sendWhatsAppBtn").addEventListener("click",sendWhatsApp);
-document.getElementById("newSaleBtn").addEventListener("click",()=>location.reload());
+document.getElementById("newSaleBtn").addEventListener("click",()=>{
+  // Même garde que le bouton de bas d'écran : rien ne s'efface sans un oui.
+  if(confirm("Commencer une nouvelle vente ? L'écran actuel sera effacé.")) location.reload();
+});
 document.getElementById("homeBtn").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
 
 // Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
@@ -1870,7 +1876,7 @@ renderProducts();
         client:selected ? (selected.company||selected.name||selected.contact||"Client") : (text("clientName")||"Client"),
         name:productNames || "Vente directe",
         responsible:"Non défini",
-        due:text("deliveryDate") || new Date().toISOString().slice(0,10),
+        due:text("deliveryDate") || isoDate(new Date()),
         priority:(pick("deliveryDelay")?.value==="5" ? "3" : pick("deliveryDelay")?.value==="10" ? "2" : "1"),
         stage:(pick("instantDelivery")?.checked ? "facturation" : "preparation"),
         status:(pick("instantDelivery")?.checked ? "Commande récupérée" : "Préparation des produits"),
@@ -1879,7 +1885,7 @@ renderProducts();
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
         checks:{products:true,bat:false,files:true,qty:true,payment:!document.querySelector('input[name="payment"][value="Paiement au retrait"]')?.checked}
       };
-      parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},"*");
+      parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},location.origin);
     };
     host.appendChild(btn);
     // Le bouton naît ici avec un payload MINIMAL ; le vrai (client structuré,
@@ -2027,8 +2033,16 @@ renderProducts();
   `;
   container.appendChild(nav);
 
+  // Le bouton de bas d'écran occupe la MÊME place à toutes les étapes, et à
+  // l'étape 4 il recharge la page. Un double-tap sur « Valider la commande et
+  // le paiement » (étape 3 → 4, instantané) faisait donc partir le second tap
+  // sur le rechargement : articles, client et paiement effacés avant même
+  // l'impression du ticket. On désarme le bouton un court instant après chaque
+  // changement d'étape.
+  var etapeChangeeLe=0;
   function displayStep(step){
     currentSaleStep=Math.max(1,Math.min(4,step));
+    etapeChangeeLe=Date.now();
 
     document.querySelectorAll("[data-sale-step]").forEach(el=>{
       const visible=Number(el.dataset.saleStep)===currentSaleStep;
@@ -2057,6 +2071,9 @@ renderProducts();
   });
 
   document.getElementById("saleNext").addEventListener("click",()=>{
+    // Deuxième tap d'un double-tap : l'étape vient de changer sous le doigt.
+    if(Date.now()-etapeChangeeLe<800) return;
+
     if(currentSaleStep===1){
       if(products.length===0){
         alert("Ajoute puis enregistre au moins un article avant de continuer.");
@@ -2083,7 +2100,10 @@ renderProducts();
       return;
     }
 
-    location.reload();
+    // Étape 4 : la vente est finie. On confirme avant d'effacer l'écran — le
+    // ticket, le lien WhatsApp et le bouton « Créer dans le planning » y sont
+    // encore. Le parcours « demande de devis » confirme déjà de la même façon.
+    if(confirm("Commencer une nouvelle vente ? L'écran actuel sera effacé.")) location.reload();
   });
 
   window.showSaleWizardStep=displayStep;
@@ -2139,15 +2159,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
 select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
 .req{color:#dc2626;font-weight:900;margin-left:2px}
-.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:292px;font-family:inherit;user-select:none}
+.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
 .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .dp-title{font-weight:800;font-size:15px;color:#142e54}
 .dp-nav{display:flex;gap:4px}
-.dp-nav button{width:34px;height:34px;border:0;border-radius:50%;background:transparent;font-size:17px;cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
+.dp-nav button{width:44px;height:44px;border:0;border-radius:50%;background:transparent;font-size:17px;cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
 .dp-nav button:hover{background:#f1f5f9}
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
 .dp-dow{font-size:11px;font-weight:800;color:#94a3b8;padding:6px 0}
-.dp-day{width:34px;height:34px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#1f2937;display:grid;place-items:center;padding:0}
+.dp-day{width:44px;height:44px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#1f2937;display:grid;place-items:center;padding:0}
 .dp-day:hover{background:#eef1f5}
 .dp-day.other{color:#c2cad6}
 .dp-day.today{outline:1.5px solid #142e54;outline-offset:-1.5px}
@@ -2512,7 +2532,13 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         client:selectedClient?(selectedClient.company||selectedClient.name):(v('clientName')||'Client'),
         name:productNames||'Vente directe',
         responsible:'Non défini',
-        due:(el('deliveryDate')&&el('deliveryDate').value)||new Date().toISOString().slice(0,10),
+        /* L'échéance envoyée au planning est celle du PREMIER article — c'est
+           celle qu'annonce le ticket remis au client, et `dueTime` juste
+           dessous vient déjà du même article. Auparavant on prenait la valeur
+           courante du formulaire (le dernier article saisi) : sur un panier à
+           plusieurs dates, le planning recevait une date que le client n'avait
+           jamais vue. */
+        due:((typeof products!=="undefined"?products:[])[0]||{}).deliveryDate||(el('deliveryDate')&&el('deliveryDate').value)||isoDate(new Date()),
         priority:(el('deliveryDelay')&&el('deliveryDelay').value==='5')?'3':((el('deliveryDelay')&&el('deliveryDelay').value==='10')?'2':'1'),
         stage:instant?'facturation':'preparation',
         status:instant?'Commande récupérée':'Préparation des produits',
@@ -2543,7 +2569,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
           retraitImmediat:!!instant
         }
       };
-      parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},'*');
+      parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},location.origin);
     };
   }
   // Exposé pour que le bouton soit gréé DÈS sa création (cf. addPlanningButton).
@@ -2631,10 +2657,23 @@ button.blocked{opacity:.45;cursor:not-allowed}
     baseSelect(id);
     var meta=el('selectedClientMeta');
     if(meta&&selectedClient&&selectedClient.phone){
-      meta.innerHTML=meta.textContent.replace(
-        selectedClient.phone,
-        '<a class="wa-link" target="_blank" href="'+window.waHref(selectedClient.phone)+'">'+selectedClient.phone+' ↗</a>'
-      );
+      /* Le texte de la fiche est reconstruit par le DOM, jamais réinjecté en
+         HTML : il contient des champs libres de la base clients (contact,
+         e-mail), et repasser par innerHTML les faisait interpréter comme du
+         balisage — une fiche piégée s'exécutait à chaque sélection. */
+      var texte=meta.textContent;
+      var coupe=texte.indexOf(selectedClient.phone);
+      if(coupe>=0){
+        var lien=document.createElement('a');
+        lien.className='wa-link';
+        lien.target='_blank';
+        lien.href=window.waHref(selectedClient.phone);
+        lien.textContent=selectedClient.phone+' ↗';
+        meta.textContent='';
+        meta.appendChild(document.createTextNode(texte.slice(0,coupe)));
+        meta.appendChild(lien);
+        meta.appendChild(document.createTextNode(texte.slice(coupe+selectedClient.phone.length)));
+      }
     }
   };
 
@@ -2660,258 +2699,29 @@ button.blocked{opacity:.45;cursor:not-allowed}
         box.id='clientDuplicateWarn';
         box.className='dup-warn';
         var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
-        box.innerHTML='⚠ Ce client semble déjà enregistré : <b>'+label+'</b>'+
-          '<div class="actions" style="justify-content:flex-start;margin-top:9px">'+
-          '<button type="button" class="primary" onclick="useExistingDuplicate(\''+d.id+'\')">Utiliser cette fiche</button>'+
-          '<button type="button" class="secondary" onclick="forceCreateClient()">Créer quand même</button></div>';
-        el('createClientBox').appendChild(box);
-        return;
-      }
-    }
-    window.__dupConfirmed=false;
-    var old=el('clientDuplicateWarn');
-    if(old)old.remove();
-    return baseCreate();
-  };
-  window.useExistingDuplicate=function(id){
-    var old=el('clientDuplicateWarn');
-    if(old)old.remove();
-    el('createClientBox').classList.add('hidden');
-    selectClientById(id);
-  };
-  window.forceCreateClient=function(){
-    window.__dupConfirmed=true;
-    window.createAndSelectClient();
-  };
-
-  /* 6 — Contrôle du délai (atelier ouvert du lundi au vendredi, 9h–18h) */
-  function isWorkingDay(d){var x=d.getDay();return x>=1&&x<=5;}
-  function nextWorkingDay(d){var x=new Date(d);do{x.setDate(x.getDate()+1);}while(!isWorkingDay(x));return x;}
-  function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  function frOf(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'});}
-
-  window.checkDeliveryDate=function(){
-    var input=el('deliveryDate');
-    if(!input)return;
-    var box=el('deliveryDateWarning');
-    if(!box){
-      box=document.createElement('div');
-      box.id='deliveryDateWarning';
-      box.className='delay-warn ok';
-      input.parentNode.appendChild(box);
-    }
-    var iso=v('deliveryDate');
-    if(!iso||input.classList.contains('hidden')){box.style.display='none';return;}
-    box.style.display='block';
-    var d=new Date(iso+'T12:00:00');
-    if(!isWorkingDay(d)){
-      var alt=nextWorkingDay(d);
-      box.className='delay-warn bad';
-      box.innerHTML='⚠ L’atelier est fermé le week-end. Première récupération possible : <b>'+frOf(alt)+'</b>'+
-        ' <button type="button" class="secondary" style="margin-left:8px" onclick="applyDeliveryDate(\''+isoOf(alt)+'\')">Utiliser cette date</button>';
-      return;
-    }
-    var time=v('deliveryTime')||'14:00';
-    if(time<='09:00'){
-      var prev=new Date(d);
-      do{prev.setDate(prev.getDate()-1);}while(!isWorkingDay(prev));
-      box.className='delay-warn warn';
-      box.innerHTML='⏱ Récupération à 9h00 : la commande doit être <b>terminée le '+frOf(prev)+' avant 18h00</b>.';
-      return;
-    }
-    box.className='delay-warn ok';
-    box.textContent='✓ Créneau compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
-  };
-  window.applyDeliveryDate=function(iso){
-    el('deliveryDelay').value='custom';
-    el('deliveryDate').classList.remove('hidden');
-    el('deliveryDate').value=iso;
-    if(typeof updateDeadlineInfo==='function')updateDeadlineInfo();
-    window.checkDeliveryDate();
-  };
-
-  /* 3 — Contrôle en direct des informations obligatoires */
-  function missingForStep(step){
-    var m=[];
-    if(step===1){
-      if(!products.length){
-        m.push('Au moins un article enregistré');
-        if(!v('productName'))m.push('Article');
-        if(!v('quantity'))m.push('Quantité');
-        if(!v('unitPrice'))m.push('Prix unitaire');
-        if(!v('productDescription'))m.push('Description de production');
-        if(!v('deliveryDate'))m.push('Date souhaitée');
-      }
-    }
-    if(step===2&&!selectedClient)m.push('Client associé à la vente');
-    if(step===3){
-      var mode=(document.querySelector('input[name="payment"]:checked')||{}).value;
-      if(!mode)m.push('Mode de paiement');
-      if(mode==='Espèces'&&Number(v('cashGiven'))<Number((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0))m.push('Montant donné par le client');
-      if(mode==='Mixte'&&(Number(v('mixCard'))+Number(v('mixCash')))<=0)m.push('Répartition carte / espèces');
-    }
-    return m;
-  }
-
-  function refreshLive(){
-    var btn=el('saleNext');
-    if(!btn)return;
-    var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
-    if(step>=4){
-      var old=el('liveCheckSale');
-      if(old)old.remove();
-      btn.classList.remove('blocked');
-      btn.disabled=false;
-      return;
-    }
-    var missing=missingForStep(step);
-    var box=el('liveCheckSale');
-    if(!box){
-      box=document.createElement('div');
-      box.id='liveCheckSale';
-      box.className='live-check';
-      box.style.margin='0 0 10px';
-      btn.parentNode.parentNode.insertBefore(box,btn.parentNode);
-    }
-    if(missing.length){
-      box.className='live-check todo';
-      box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-      btn.classList.add('blocked');
-      btn.disabled=true;
-    }else{
-      box.className='live-check ok';
-      box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
-      btn.classList.remove('blocked');
-      btn.disabled=false;
-    }
-  }
-
-  /* 5 — Ticket : bandeau dossier complet / éléments manquants */
-  function refreshRecapBanner(){
-    var host=el('paymentSuccess');
-    if(!host||host.classList.contains('hidden'))return;
-    var box=el('saleReadyBanner');
-    if(!box){
-      box=document.createElement('div');
-      box.id='saleReadyBanner';
-      box.className='live-check ok';
-      host.insertBefore(box,host.querySelector('.footer-actions'));
-    }
-    var missing=[];
-    if(!selectedClient)missing.push('Fiche client complète');
-    else{
-      if(!selectedClient.phone)missing.push('WhatsApp du client');
-      if(!selectedClient.email&&selectedClient.type!=='Particulier')missing.push('E-mail du client');
-    }
-    if(!products.length)missing.push('Articles de la commande');
-    if(!v('internalNote'))missing.push('Note interne OLDA (facultative mais conseillée)');
-    if(missing.length){
-      box.className='live-check todo';
-      box.innerHTML='⚠ À compléter avant transmission :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-    }else{
-      box.className='live-check ok';
-      box.textContent='✓ Dossier complet — ticket prêt à imprimer, envoyer et créer dans le planning.';
-    }
-  }
-
-  document.addEventListener('input',function(){refreshLive();},true);
-  document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
-  setInterval(function(){refreshLive();refreshRecapBanner();},600);
-})();
-</script>
-<style>
-.live-check{margin:14px 0 0;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.55}
-.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
-.live-check ul{margin:7px 0 0;padding-left:18px}
-.live-check li{margin:3px 0;font-weight:600}
-button.blocked{opacity:.45;cursor:not-allowed}
-.dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
-.delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
-.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
-.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
-.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.wa-link{color:#12603a;font-weight:900;text-decoration:none;border-bottom:1px solid #9fc9ae}
-</style>
-<script>
-(function(){
-  function el(id){return document.getElementById(id);}
-  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
-  var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9@.]/g,'');};
-  function digits(s){return String(s||'').replace(/\D/g,'');}
-
-  /* 1 — WhatsApp : format, contrôle des 10 chiffres, lien cliquable */
-  window.waHref=function(phone){
-    var d=digits(phone);
-    if(d.length===10&&d.charAt(0)==='0')d='590'+d.slice(1);
-    return 'https://wa.me/'+d;
-  };
-  function attachPhoneCheck(id){
-    var input=el(id);
-    if(!input||input.__phoneBound)return;
-    input.__phoneBound=true;
-    var help=document.createElement('div');
-    help.className='help';
-    help.style.marginTop='5px';
-    input.insertAdjacentElement('afterend',help);
-    var paint=function(){
-      var d=digits(input.value);
-      if(!d){input.style.borderColor='';help.textContent='';return;}
-      if(d.length===10){
-        input.style.borderColor='#1c7c4a';
-        help.style.color='#1c7c4a';
-        help.textContent='✓ Numéro valide';
-      }else{
-        input.style.borderColor='#c62828';
-        help.style.color='#c62828';
-        help.textContent='⚠ Le numéro doit contenir 10 chiffres ('+d.length+' saisi'+(d.length>1?'s':'')+').';
-      }
-    };
-    input.addEventListener('input',paint);
-    input.addEventListener('blur',paint);
-    input.__phonePaint=paint;
-  }
-  attachPhoneCheck('newIndividualPhone');
-  attachPhoneCheck('newCompanyPhone');
-
-  var baseSelect=window.selectClientById;
-  window.selectClientById=function(id){
-    baseSelect(id);
-    var meta=el('selectedClientMeta');
-    if(meta&&selectedClient&&selectedClient.phone){
-      meta.innerHTML=meta.textContent.replace(
-        selectedClient.phone,
-        '<a class="wa-link" target="_blank" href="'+window.waHref(selectedClient.phone)+'">'+selectedClient.phone+' ↗</a>'
-      );
-    }
-  };
-
-  /* 2 — Détection de doublon client */
-  function findDuplicate(){
-    var name=createClientType==='Particulier'?v('newIndividualName'):v('newCompanyName');
-    var phone=digits(createClientType==='Particulier'?v('newIndividualPhone'):v('newCompanyPhone'));
-    var mail=norm(createClientType==='Particulier'?v('newIndividualEmail'):v('newCompanyEmail'));
-    var n=norm(name);
-    return clients.filter(function(c){
-      if(window.__editingClientId&&c.id===window.__editingClientId)return false;
-      return (n&&(norm(c.name)===n||norm(c.company)===n))||
-             (phone&&digits(c.phone)===phone)||
-             (mail&&c.email&&norm(c.email)===mail);
-    })[0]||null;
-  }
-  var baseCreate=window.createAndSelectClient;
-  window.createAndSelectClient=function(){
-    if(!window.__editingClientId&&!window.__dupConfirmed){
-      var d=findDuplicate();
-      if(d){
-        var box=el('clientDuplicateWarn')||document.createElement('div');
-        box.id='clientDuplicateWarn';
-        box.className='dup-warn';
-        var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
-        box.innerHTML='⚠ Ce client semble déjà enregistré : <b>'+label+'</b>'+
-          '<div class="actions" style="justify-content:flex-start;margin-top:9px">'+
-          '<button type="button" class="primary" onclick="useExistingDuplicate(\''+d.id+'\')">Utiliser cette fiche</button>'+
-          '<button type="button" class="secondary" onclick="forceCreateClient()">Créer quand même</button></div>';
+        /* Construit par le DOM : le libellé vient de champs libres de la base
+           clients, et concaténé dans du HTML une fiche piégée s'exécutait ici. */
+        box.textContent='⚠ Ce client semble déjà enregistré : ';
+        var fort=document.createElement('b');
+        fort.textContent=label;
+        box.appendChild(fort);
+        var actions=document.createElement('div');
+        actions.className='actions';
+        actions.style.justifyContent='flex-start';
+        actions.style.marginTop='9px';
+        var bUtiliser=document.createElement('button');
+        bUtiliser.type='button';
+        bUtiliser.className='primary';
+        bUtiliser.textContent='Utiliser cette fiche';
+        bUtiliser.addEventListener('click',function(){window.useExistingDuplicate(d.id);});
+        var bForcer=document.createElement('button');
+        bForcer.type='button';
+        bForcer.className='secondary';
+        bForcer.textContent='Créer quand même';
+        bForcer.addEventListener('click',function(){window.forceCreateClient();});
+        actions.appendChild(bUtiliser);
+        actions.appendChild(bForcer);
+        box.appendChild(actions);
         el('createClientBox').appendChild(box);
         return;
       }
