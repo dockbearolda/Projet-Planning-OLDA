@@ -4907,13 +4907,15 @@ function mountProjet() {
 }
 
 // Le comptoir vient d'enregistrer un dossier : le planning s'ouvre SUR LUI,
-// à son étape, plutôt que là où la grille était restée. La vendeuse voit sa
-// ligne apparaître — c'est la preuve que la commande est bien passée.
-// (La grille elle-même se recharge seule : le serveur diffuse la création.)
-window.addEventListener('olda:projet-cree', (e) => {
-  const { stage, sub } = e.detail || {};
+// à son étape, ET DÉFILE JUSQU'À SA LIGNE (flash de repère). Sans ce défilement,
+// une étape passée en ordre manuel fait naître la ligne TOUT EN BAS de la
+// liste : la vendeuse ne voyait rien apparaître et ressaisissait la commande.
+window.addEventListener('olda:projet-cree', async (e) => {
+  const { id, stage, sub } = e.detail || {};
   location.hash = '#planning';
-  if (stage) selectStage(stage, sub || null);
+  if (!stage) return;
+  await selectStage(stage, sub || null);
+  if (id) revealRow(id);
 });
 
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même

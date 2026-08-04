@@ -262,7 +262,7 @@ async function enregistrer(payload) {
     // après avoir vérifié la ligne. La remise à neuf attend le prochain passage
     // sur l'onglet (resetProjet), c'est-à-dire le client suivant.
     window.dispatchEvent(new CustomEvent('olda:projet-cree', {
-      detail: { stage: data.stage, sub: data.subStage || null },
+      detail: { id: data.id, stage: data.stage, sub: data.subStage || null },
     }));
   } catch (err) {
     montrerErreur(err.message);

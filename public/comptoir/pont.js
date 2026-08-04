@@ -155,6 +155,32 @@
   masquerRef();
   guetterPremiereLigne();
 
+  // --- 3. Filet : l'écran ouvert SANS le CRM autour -------------------------
+  // Dans le CRM, « Créer dans le planning » poste `OLDA_CREATE_PROJECT` à la
+  // fenêtre parente, qui appelle l'API. Ouvert en direct (ancien favori, onglet
+  // sur le fichier), parent = la page elle-même : le message ne rejoignait
+  // PERSONNE et la vente n'entrait jamais au planning — sans erreur, sans bruit.
+  // Ici, on rattrape ce message orphelin et on appelle l'API nous-mêmes, avec
+  // un retour VISIBLE dans les deux sens : la vendeuse sait, toujours.
+  let envoiEnCours = false;
+  if (window.parent === window) {
+    window.addEventListener('message', async (e) => {
+      if (e.source !== window) return; // seul le message que la page s'adresse
+      const msg = e.data;
+      if (!msg || msg.type !== 'OLDA_CREATE_PROJECT' || !msg.payload) return;
+      if (envoiEnCours) return; // double tap = une seule ligne
+      envoiEnCours = true;
+      try {
+        await api('POST', '/api/comptoir/projet', msg.payload);
+        alert('Commande enregistrée au planning ✔');
+      } catch (err) {
+        alert(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
+      } finally {
+        envoiEnCours = false;
+      }
+    });
+  }
+
   // L'hôte réaffiche l'écran pour un nouveau client : la base a pu bouger
   // entre-temps (un client créé depuis l'onglet Base clients).
   window.oldaRafraichirClients = () => chargerClients().catch(raterEnSilence('base clients indisponible'));
