@@ -266,14 +266,18 @@ async function init() {
   // avec l'historique. Créés ici plutôt que dans schema.sql : ce sont des index
   // sur EXPRESSION, que pg-mem (base locale de test) ne sait pas construire.
   // Down : DROP INDEX IF EXISTS idx_requests_fiche_ref, idx_requests_fiche_empreinte;
-  for (const [nom, expr] of [
-    ['idx_requests_fiche_ref', "((fiche->>'ref'))"],
-    ['idx_requests_fiche_empreinte', "((fiche->>'empreinte'))"],
-  ]) {
-    try {
-      await pool.query(`CREATE INDEX IF NOT EXISTS ${nom} ON requests ${expr}`);
-    } catch (_) { /* pg-mem local : pas d'index sur expression, sans conséquence */ }
-  }
+  try {
+    await pool.query("CREATE INDEX IF NOT EXISTS idx_requests_fiche_ref ON requests ((fiche->>'ref'))");
+  } catch (_) { /* pg-mem local : pas d'index sur expression, sans conséquence */ }
+
+  // L'EMPREINTE, elle, est UNIQUE — et c'est la base qui le garantit, pas le
+  // code. Le serveur lisait l'empreinte puis insérait : deux envois du MÊME
+  // dossier partis en même temps (la tablette rame, la vendeuse tape deux fois)
+  // passaient tous les deux la lecture et créaient deux commandes portant le
+  // même numéro de ticket. Une lecture-puis-écriture ne peut pas trancher ça ;
+  // une contrainte, si. Les lignes d'avant l'empreinte valent NULL, et Postgres
+  // autorise autant de NULL qu'il veut dans un index unique : elles ne gênent pas.
+  await creerIndexUniqueEmpreinte();
 
   // Migration vers le planning linéaire : convertit les anciens slugs d'étape
   // (dont la phase « production » multi-machines) vers la liste linéaire.
@@ -299,8 +303,194 @@ async function init() {
     await seed();
   }
 
+  // Clé de rapprochement du client, RANGÉE EN COLONNE. Elle se calculait en JS
+  // à chaque prise de commande, ce qui obligeait à charger TOUTE la table pour
+  // savoir si un client existait déjà — et laissait deux postes créer la même
+  // fiche en même temps, la lecture ne bloquant rien.
+  // AVANT l'import : celui-ci renseigne désormais la colonne lui-même.
+  await migrerCleClient();
+
   // Base clients : import initial des clients pros rapatriés de l'ancienne app.
   await seedClients();
+
+  // Identifiant lisible pour les fiches qui n'en ont pas — après l'import, pour
+  // que les clients rapatriés en reçoivent un eux aussi.
+  await rattraperCodesClients();
+
+  // Ménage : table créée à chaque démarrage et jamais utilisée.
+  await retirerTableStatuses();
+}
+
+// La table `statuses` était recréée à chaque démarrage sans qu'aucune ligne de
+// code ne la lise ni ne l'écrive. On la retire — mais SEULEMENT si elle est
+// vide. Si une base contient quoi que ce soit dedans (import, essai, version
+// plus ancienne), on n'y touche pas : ce n'est pas au démarrage du service de
+// décider de supprimer des données que personne n'a regardées.
+// Down : voir le DDL conservé dans schema.sql.
+async function retirerTableStatuses() {
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM statuses');
+    if (rows[0].n > 0) {
+      console.log(`ℹ  Table « statuses » conservée : elle contient ${rows[0].n} ligne(s).`);
+      return;
+    }
+    await pool.query('DROP TABLE statuses');
+  } catch (err) {
+    // La table n'existe plus : c'est exactement ce qu'on voulait. Postgres le
+    // dit par le code 42P01, pg-mem seulement par le message — les deux comptent.
+    const absente = (err && err.code === '42P01')
+      || /does not exist|n'existe pas/i.test((err && err.message) || '');
+    if (absente) return;
+    console.error('Table « statuses » non retirée (sans conséquence) :', err.message);
+  }
+}
+
+// Colonne `cle` + unicité sur la base clients.
+// Down : DROP INDEX IF EXISTS idx_clients_cle; ALTER TABLE clients DROP COLUMN IF EXISTS cle;
+//        DELETE FROM app_meta WHERE key = 'clients_cle_v1';
+async function migrerCleClient() {
+  try {
+    await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS cle text');
+  } catch (_) { /* déjà là */ }
+
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'clients_cle_v1'");
+  if (!(meta[0] && meta[0].value === '1')) {
+    // Garde PROPRE à cette migration (deux incidents sont venus d'une garde
+    // partagée). On remplit la clé en JS : la normalisation retire les accents
+    // et la ponctuation, ce qu'aucune fonction native disponible ne fait ici.
+    const { rows } = await pool.query('SELECT id, entreprise FROM clients WHERE cle IS NULL');
+    for (const c of rows) {
+      await pool.query('UPDATE clients SET cle = $1 WHERE id = $2', [clientKey(c.entreprise), c.id]);
+    }
+    if (rows.length) console.log(`ℹ  Base clients : ${rows.length} clé(s) de rapprochement posée(s).`);
+    await poserMeta('clients_cle_v1', '1');
+  }
+
+  // Même prudence que pour l'empreinte : si la base contient déjà deux fiches
+  // pour le même client, on ne choisit pas à la place du patron — une des deux
+  // porte peut-être des notes ou un historique d'appels. On le dit, en NOMMANT
+  // les sociétés concernées pour que la fusion prenne deux minutes depuis Base
+  // clients, et on garde un index simple : il suffit déjà à supprimer le
+  // balayage complet de la table à chaque prise de commande.
+  try {
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_cle ON clients (cle)');
+  } catch (err) {
+    if (err && err.code === '23505') {
+      let noms = '';
+      try {
+        const { rows } = await pool.query(`
+          SELECT entreprise, COUNT(*)::int AS n FROM clients
+           GROUP BY cle, entreprise HAVING COUNT(*) > 1 ORDER BY entreprise LIMIT 20`);
+        noms = rows.map((r) => `${r.entreprise} ×${r.n}`).join(', ');
+      } catch (_) { /* l'aperçu est un confort */ }
+      console.error(
+        '⚠  Base clients : des fiches font double emploi, l\'unicité n\'a PAS été',
+        'posée (rien n\'a été supprimé). À fusionner depuis Base clients.',
+        noms ? `Concernées : ${noms}.` : '',
+      );
+    }
+    try {
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_cle ON clients (cle)');
+    } catch (_) { /* pg-mem : sans conséquence, la table est petite */ }
+  }
+}
+
+// Les clients nés d'une prise de commande n'avaient PAS de code : la création
+// manuelle en attribuait un (« CLI-PRO-0007 »), pas l'automatique. La base du
+// patron avait donc deux sortes de fiches, dont la majorité sans repère lisible.
+// On rattrape les manquantes, dans l'ordre où elles ont été créées, avec le même
+// compteur que les nouvelles — aucun numéro n'est réutilisé.
+// Down : UPDATE clients SET code = NULL WHERE ... ; DELETE FROM app_meta WHERE key = 'clients_codes_v1';
+async function rattraperCodesClients() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'clients_codes_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+  const { rows } = await pool.query(
+    "SELECT id, client_type FROM clients WHERE code IS NULL OR code = '' ORDER BY created_at ASC, id ASC",
+  );
+  for (const c of rows) {
+    await pool.query('UPDATE clients SET code = $1 WHERE id = $2', [await nextClientCode(c.client_type), c.id]);
+  }
+  if (rows.length) console.log(`ℹ  Base clients : ${rows.length} code(s) attribué(s).`);
+  await poserMeta('clients_codes_v1', '1');
+}
+
+// Clé de rapprochement d'un client : insensible à la casse, aux accents et à la
+// ponctuation, pour que « Iguana (Discover) » et « iguana discover » soient LE
+// MÊME client. Elle vit ici parce que la base s'en sert aussi (colonne `cle`).
+// ATTENTION : elle ne normalise pas l'ORDRE des mots — « Prénom NOM » et
+// « NOM Prénom » sont deux clés distinctes. C'est pour ça que le nom d'un
+// particulier se stocke toujours dans le même ordre.
+const clientKey = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Identifiant lisible « CLI-PRO-0007 » / « CLI-PERSO-0007 » : un repère visuel
+// pour le patron (comme dans son classeur), pas un UUID. Compteur persistant en
+// app_meta (jamais dérivé des lignes existantes) : un numéro attribué n'est
+// JAMAIS réutilisé, même si le client qui le portait est supprimé ensuite.
+// Incrément atomique : deux fiches créées en même temps sur deux postes ne
+// peuvent pas porter le même code.
+async function nextClientCode(clientType) {
+  const perso = clientType === 'perso';
+  const prefix = perso ? 'CLI-PERSO-' : 'CLI-PRO-';
+  const metaKey = perso ? 'client_code_seq_perso' : 'client_code_seq_pro';
+  const { rows } = await pool.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
+     RETURNING value`,
+    [metaKey],
+  );
+  return `${prefix}${String(Number.parseInt(rows[0].value, 10)).padStart(4, '0')}`;
+}
+
+// Pose la contrainte d'unicité sur l'empreinte du dossier comptoir.
+//
+// Une base qui tourne déjà peut contenir des doublons nés du bug qu'on corrige.
+// L'index refuse alors de se créer. Deux choses qu'on ne fait PAS dans ce cas :
+//   - laisser l'erreur remonter, qui empêcherait le service de démarrer et
+//     fermerait le comptoir pour une migration de confort ;
+//   - supprimer les lignes en trop toutes seules au démarrage. Ce sont des
+//     COMMANDES. Deux dossiers identiques peuvent aussi être deux vraies ventes
+//     (les mêmes 12 mugs, commandés deux fois le même jour) et personne ne doit
+//     découvrir après coup qu'un serveur a tranché à sa place.
+// On retombe donc sur un index simple, et on écrit dans les logs de quoi aller
+// regarder. La file du serveur, elle, empêche déjà tout NOUVEAU doublon.
+// Down : DROP INDEX IF EXISTS idx_requests_fiche_empreinte;
+//        CREATE INDEX idx_requests_fiche_empreinte ON requests ((fiche->>'empreinte'));
+async function creerIndexUniqueEmpreinte() {
+  const creer = async (unique) => pool.query(
+    `CREATE ${unique ? 'UNIQUE ' : ''}INDEX IF NOT EXISTS idx_requests_fiche_empreinte
+     ON requests ((fiche->>'empreinte'))`,
+  );
+  try {
+    await creer(true);
+    return;
+  } catch (err) {
+    // Tout ce qui n'est pas « il y a déjà des doublons » n'a rien à voir avec
+    // cette migration : pg-mem, en local, ne construit simplement aucun index
+    // sur expression. La sérialisation côté serveur suffit là-bas.
+    if (!err || err.code !== '23505') return;
+  }
+
+  let apercu = '';
+  try {
+    const { rows } = await pool.query(`
+      SELECT fiche->>'ref' AS ref, COUNT(*)::int AS n
+        FROM requests
+       WHERE fiche->>'empreinte' IS NOT NULL
+       GROUP BY fiche->>'empreinte', fiche->>'ref'
+      HAVING COUNT(*) > 1
+       ORDER BY n DESC LIMIT 10`);
+    apercu = rows.map((r) => `${r.ref || '(sans réf)'} ×${r.n}`).join(', ');
+  } catch (_) { /* l'aperçu est un confort, son absence ne change rien */ }
+
+  console.error(
+    '⚠  Dossiers comptoir en double détectés : la contrainte d\'unicité n\'a PAS',
+    'été posée (aucune donnée n\'a été touchée). Les nouveaux doublons sont déjà',
+    'empêchés par la file du serveur ; ceux-ci sont à trancher à la main.',
+    apercu ? `Tickets concernés : ${apercu}.` : '',
+  );
+  try { await creer(false); } catch (_) { /* même l'index simple : sans conséquence */ }
 }
 
 // Import initial de la base clients professionnelle (clients-seed.json). Joué
@@ -317,17 +507,32 @@ async function seedClients() {
     try {
       list = JSON.parse(fs.readFileSync(path.join(__dirname, 'clients-seed.json'), 'utf8'));
     } catch (_) { list = []; }
+    // Le fichier d'import contient neuf sociétés EN DOUBLE (« Sima », « Blue
+    // Martini », « Le Martin »…) : elles sont entrées deux fois dans la base du
+    // patron, et s'y affichaient depuis, l'une sous l'autre. On importe donc par
+    // clé de rapprochement — la première fiche gagne, la seconde est ignorée.
+    const vues = new Set();
+    let ignores = 0;
+    let importes = 0;
     for (const c of list) {
       const entreprise = String(c.entreprise || '').trim();
       if (!entreprise) continue;
+      const cle = clientKey(entreprise);
+      if (vues.has(cle)) { ignores += 1; continue; }
+      vues.add(cle);
       const g = (v) => { const s = String(v == null ? '' : v).trim(); return s === '' ? null : s; };
       await pool.query(
-        `INSERT INTO clients (entreprise, nom, fonction, type, zone, email, telephone, adresse)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [entreprise, g(c.nom), g(c.fonction), g(c.type), g(c.zone), g(c.email), g(c.telephone), g(c.adresse)],
+        `INSERT INTO clients (entreprise, nom, fonction, type, zone, email, telephone, adresse, cle)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [entreprise, g(c.nom), g(c.fonction), g(c.type), g(c.zone), g(c.email), g(c.telephone),
+          g(c.adresse), cle],
       );
+      importes += 1;
     }
-    if (list.length) console.log(`ℹ  Base clients : ${list.length} clients pros importés.`);
+    if (importes) {
+      console.log(`ℹ  Base clients : ${importes} clients pros importés`
+        + `${ignores ? ` (${ignores} doublon(s) du fichier ignoré(s))` : ''}.`);
+    }
   }
 
   await poserMeta('clients_seeded', '1');
@@ -1169,6 +1374,10 @@ const JOURNAL_FIELDS = {
   responsable: 'Pilote',
   referent: 'Référent',
   paye: 'Payé',
+  // Le DÉTAIL de la fiche comptoir ne vit pas dans une colonne : ces deux-là
+  // sont écrits par `logFicheChange`, pas par la comparaison de colonnes.
+  fiche_heure: 'Heure de retrait',
+  fiche_detail: 'Détail de la fiche',
 };
 const JOURNAL_MAX = 40; // ce qu'on renvoie à la fiche : la vie récente suffit
 
@@ -1203,6 +1412,54 @@ async function logRequestChanges(requestId, avant, apres) {
   }
 }
 
+// Journalise une correction du DÉTAIL de la fiche comptoir.
+//
+// Le PATCH ordinaire compare les colonnes ; la fiche, elle, est un JSON — ses
+// corrections ne laissaient donc AUCUNE trace. Une quantité rectifiée, une heure
+// de retrait déplacée : l'« Historique » de la commande restait muet, et
+// personne ne pouvait dire ce qui avait bougé, ni quand.
+//
+// On ne recopie pas le JSON dans le journal (illisible, et il grossirait la
+// table pour rien) : on écrit CE QUI A CHANGÉ. L'heure de retrait a son propre
+// libellé — c'est elle qui commande le délai de production, elle mérite d'être
+// lue d'un coup d'œil ; le reste se résume au nombre de lignes rectifiées.
+async function logFicheChange(requestId, avant, apres) {
+  const lignes = [];
+  const heureAvant = avant && avant.heureSouhaitee ? String(avant.heureSouhaitee) : null;
+  const heureApres = apres && apres.heureSouhaitee ? String(apres.heureSouhaitee) : null;
+  if (heureAvant !== heureApres) {
+    lignes.push({ field: 'fiche_heure', before: heureAvant, after: heureApres });
+  }
+
+  const valeurs = (f, cle) => (Array.isArray(f && f[cle]) ? f[cle] : []).map((l) => (l && l.v) || '');
+  let corrigees = 0;
+  for (const cle of ['client', 'details']) {
+    const a = valeurs(avant, cle);
+    const b = valeurs(apres, cle);
+    for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+      if ((a[i] ?? '') !== (b[i] ?? '')) corrigees += 1;
+    }
+  }
+  if (corrigees) {
+    lignes.push({
+      field: 'fiche_detail', before: null,
+      after: `${corrigees} ligne${corrigees > 1 ? 's' : ''} corrigée${corrigees > 1 ? 's' : ''}`,
+    });
+  }
+  if (!lignes.length) return;
+
+  try {
+    for (const l of lignes) {
+      await pool.query(
+        'INSERT INTO request_events (request_id, field, value_before, value_after) VALUES ($1, $2, $3, $4)',
+        [requestId, l.field, l.before, l.after],
+      );
+    }
+  } catch (err) {
+    console.error('journal des modifications (fiche) :', err.message);
+  }
+}
+
 async function getRequestJournal(requestId) {
   const { rows } = await pool.query(
     'SELECT field, value_before, value_after, created_at FROM request_events WHERE request_id = $1 ORDER BY created_at DESC, field ASC',
@@ -1226,5 +1483,6 @@ module.exports = {
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
-  JOURNAL_FIELDS, logRequestChanges, getRequestJournal,
+  JOURNAL_FIELDS, logRequestChanges, logFicheChange, getRequestJournal,
+  clientKey, nextClientCode,
 };

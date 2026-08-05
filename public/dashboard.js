@@ -1332,27 +1332,58 @@ export function createDashboard(deps) {
 
   // --- Données -------------------------------------------------------------
   let refreshing = false, refreshQueued = false;
+  // Horodatage rendu par le SERVEUR au dernier passage : on lui redemande « ce
+  // qui a bougé depuis ». Jamais l'horloge du poste — deux montres qui divergent
+  // d'une seconde suffiraient à faire sauter une modification.
+  let derniereSynchro = null;
+  // La config (attributions, machines) ne bouge que quand le patron y touche :
+  // elle ne se recharge donc plus à chaque commande déplacée, mais seulement à
+  // l'évènement qui la concerne. C'étaient trois requêtes sur quatre.
+  let configARecharger = true;
+
+  async function chargerConfig() {
+    const [own, refs, macs] = await Promise.all([
+      api('GET', '/api/category-owners'),
+      api('GET', '/api/category-referents'),
+      api('GET', '/api/machines'),
+    ]);
+    owners = own && typeof own === 'object' ? own : {};
+    catRefs = refs && typeof refs === 'object' ? refs : {};
+    machines = Array.isArray(macs) ? macs : [];
+    configARecharger = false;
+  }
+
+  // Reconstruit le planning à partir de ce que le serveur vient d'envoyer :
+  // `ids` donne la composition et l'ordre exacts (donc les suppressions), les
+  // lignes reçues remplacent celles qu'on avait, le reste est déjà en mémoire.
+  function fusionner(synthese) {
+    const connues = new Map(rows.map((r) => [String(r.id), r]));
+    for (const l of synthese.lignes || []) connues.set(String(l.id), l);
+    return (synthese.ids || []).map((id) => connues.get(String(id))).filter(Boolean);
+  }
 
   async function refresh() {
     if (refreshing) { refreshQueued = true; return; }
     refreshing = true;
     try {
-      const [reqs, own, refs, macs] = await Promise.all([
-        api('GET', '/api/requests'),
-        api('GET', '/api/category-owners'),
-        api('GET', '/api/category-referents'),
-        api('GET', '/api/machines'),
-      ]);
-      const fresh = Array.isArray(reqs) ? reqs : [];
+      // On ne redemande QUE ce qui a changé. Avant, chaque évènement temps réel
+      // — le glisser-déposer d'une collègue, une pastille posée à l'autre bout
+      // de l'atelier — faisait retélécharger le planning entier à chaque poste.
+      const synthese = await api('GET', derniereSynchro
+        ? `/api/requests/synthese?depuis=${encodeURIComponent(derniereSynchro)}`
+        : '/api/requests/synthese');
+      if (configARecharger) await chargerConfig();
+
+      const fresh = fusionner(synthese);
       // Diff pour le fil d'activité (seulement après le premier chargement).
       if (loaded) {
         const oldById = new Map(rows.map((r) => [String(r.id), r]));
         diffIntoActivity(oldById, fresh);
       }
       rows = fresh;
-      owners = own && typeof own === 'object' ? own : {};
-      catRefs = refs && typeof refs === 'object' ? refs : {};
-      machines = Array.isArray(macs) ? macs : [];
+      // Posé APRÈS coup : si quoi que ce soit au-dessus avait échoué, on
+      // redemanderait à partir du même point plutôt que de sauter un intervalle.
+      derniereSynchro = synthese.jusqua || derniereSynchro;
       loaded = true;
       premierChargementKo = false;
       renderAll();
@@ -1405,7 +1436,13 @@ export function createDashboard(deps) {
   // chaque évènement d'un collègue : on programme un seul rattrapage. Le cache
   // reste frais à la demi-minute près, ce qui suffit largement au fil
   // d'activité et aux badges.
-  function notifyChange() {
+  // `kind` = la nature de l'évènement temps réel. Seuls ceux qui touchent la
+  // configuration du patron obligent à la relire ; le planning, lui, se
+  // rattrape tout seul par sa synthèse incrémentale.
+  const KINDS_CONFIG = new Set(['category-owners', 'category-referents', 'machines']);
+
+  function notifyChange(kind) {
+    if (KINDS_CONFIG.has(kind)) configARecharger = true;
     if (visible) { refresh(); return; }
     if (veilleTimer) return;                       // rattrapage déjà programmé
     const attente = Math.max(0, REFRESH_FOND_MS - (Date.now() - dernierRefresh));

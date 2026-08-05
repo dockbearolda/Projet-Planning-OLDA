@@ -76,16 +76,16 @@ CREATE TABLE IF NOT EXISTS production_sectors (
 CREATE INDEX IF NOT EXISTS idx_prodsec_sector  ON production_sectors (sector, done);
 CREATE INDEX IF NOT EXISTS idx_prodsec_request ON production_sectors (request_id);
 
--- États de commande (liste éditable : créés / supprimés depuis le menu d'état).
--- Le champ requests.status stocke le LIBELLÉ ; la couleur est retrouvée ici par
--- libellé. Une commande dont l'état a été supprimé garde son texte (sans couleur).
-CREATE TABLE IF NOT EXISTS statuses (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  label      text NOT NULL,
-  color      text NOT NULL,                 -- couleur hex « #rrggbb »
-  position   double precision,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+-- La table `statuses` (liste d'états colorés éditable) a vécu ici. Elle a été
+-- créée à chaque démarrage sans qu'AUCUNE ligne de code ne l'ait jamais lue ni
+-- écrite : l'état d'une commande est porté par `requests.flag` / `flag_reason`
+-- depuis le passage aux 5 familles. Retirée du schéma, et supprimée au
+-- démarrage UNIQUEMENT si elle est vide (voir db.js).
+-- Down :
+--   CREATE TABLE IF NOT EXISTS statuses (
+--     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), label text NOT NULL,
+--     color text NOT NULL, position double precision,
+--     created_at timestamptz NOT NULL DEFAULT now());
 
 -- Base clients professionnelle (CRM). Rapatriée de l'ancienne app « Base clients »
 -- (Next.js) pour vivre DANS le planning : la prise de commande y puise ses

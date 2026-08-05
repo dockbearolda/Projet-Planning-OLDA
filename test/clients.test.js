@@ -36,7 +36,13 @@ delete process.env.APP_PASSWORD;
   const seeded = await j('GET', '/api/clients');
   assert.strictEqual(seeded.status, 200);
   assert.ok(Array.isArray(seeded.body), 'liste attendue');
-  assert.ok(seeded.body.length >= 80, `base pré-remplie attendue, reçu ${seeded.body.length}`);
+  assert.ok(seeded.body.length >= 70, `base pré-remplie attendue, reçu ${seeded.body.length}`);
+  // …et SANS DOUBLON. Le fichier d'import contient neuf sociétés en double
+  // (« Sima », « Blue Martini », « Le Martin »…) : elles entraient telles quelles
+  // et s'affichaient deux fois dans la base du patron. L'import se fait
+  // désormais par clé de rapprochement, chaque société n'entre qu'une fois.
+  const clesSeed = seeded.body.map((c) => c.entreprise.toLowerCase().trim());
+  assert.strictEqual(new Set(clesSeed).size, clesSeed.length, 'aucune société en double à l\'import');
   const villas = seeded.body.find((c) => /100% Villas/.test(c.entreprise));
   assert.ok(villas, '100% Villas doit être dans le seed');
   assert.strictEqual(villas.zone, 'Baie Nettle');

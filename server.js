@@ -25,7 +25,8 @@ const {
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
-  logRequestChanges, getRequestJournal,
+  logRequestChanges, logFicheChange, getRequestJournal,
+  clientKey, nextClientCode,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -62,8 +63,45 @@ function memeSecret(a, b) {
   return crypto.timingSafeEqual(h(a), h(b));
 }
 
+// TENTATIVES RATÉES, PAR ADRESSE. L'application n'a qu'UN mot de passe, partagé
+// par tout l'atelier : il ne change jamais et personne ne peut le révoquer poste
+// par poste. Sans compteur, rien n'empêchait de l'essayer en boucle, aussi vite
+// que le serveur sait répondre. On ne verrouille pas le compte (ce serait offrir
+// à n'importe qui le moyen de fermer le comptoir) : on ralentit, puis on refuse
+// pendant quelques minutes l'adresse qui insiste.
+const AUTH_ESSAIS_MAX = 10;          // au-delà, l'adresse attend
+const AUTH_FENETRE_MS = 10 * 60000;  // les échecs s'oublient après 10 minutes
+const echecsAuth = new Map();        // ip -> { n, jusqua }
+
+function auditEchec(ip) {
+  const maintenant = Date.now();
+  const e = echecsAuth.get(ip);
+  if (!e || maintenant > e.jusqua) echecsAuth.set(ip, { n: 1, jusqua: maintenant + AUTH_FENETRE_MS });
+  else { e.n += 1; e.jusqua = maintenant + AUTH_FENETRE_MS; }
+  // La table ne grossit pas indéfiniment : on balaie les entrées périmées dès
+  // qu'elle dépasse une taille qui n'a plus rien d'un atelier.
+  if (echecsAuth.size > 1000) {
+    for (const [cle, v] of echecsAuth) if (maintenant > v.jusqua) echecsAuth.delete(cle);
+  }
+}
+
+function tropDEssais(ip) {
+  const e = echecsAuth.get(ip);
+  if (!e) return false;
+  if (Date.now() > e.jusqua) { echecsAuth.delete(ip); return false; }
+  return e.n >= AUTH_ESSAIS_MAX;
+}
+
 function basicAuth(req, res, next) {
   if (!APP_PASSWORD) return next(); // dev local : accès ouvert
+
+  const ip = req.ip || 'inconnue';
+  // Adresse déjà à la porte : on ne compare même plus, et le compteur ne monte
+  // pas — insister ne rallonge pas la peine, mais ne l'écourte pas non plus.
+  if (tropDEssais(ip)) {
+    res.set('Retry-After', '600');
+    return res.status(429).send('Trop de tentatives. Réessayez dans quelques minutes.');
+  }
 
   const header = req.headers.authorization || '';
   const [scheme, encoded] = header.split(' ');
@@ -74,7 +112,17 @@ function basicAuth(req, res, next) {
     // L'identifiant est ignoré, seul le mot de passe partagé compte. Comparaison
     // à temps constant : un `===` s'arrête au premier caractère faux et laisse
     // deviner le mot de passe lettre à lettre en chronométrant les réponses.
-    if (memeSecret(password, APP_PASSWORD)) return next();
+    if (memeSecret(password, APP_PASSWORD)) {
+      echecsAuth.delete(ip); // un poste qui rentre repart d'une ardoise vierge
+      return next();
+    }
+    // Un mot de passe FAUX se compte. Un en-tête absent, non : c'est le premier
+    // appel de tout navigateur, avant même que la fenêtre de saisie s'ouvre.
+    auditEchec(ip);
+    if (tropDEssais(ip)) {
+      res.set('Retry-After', '600');
+      return res.status(429).send('Trop de tentatives. Réessayez dans quelques minutes.');
+    }
   }
   res.set('WWW-Authenticate', 'Basic realm="Planning OLDA", charset="UTF-8"');
   return res.status(401).send('Authentification requise.');
@@ -266,6 +314,26 @@ function verifierCoherenceEtape(body, stageActuel) {
   return null;
 }
 
+// CHANGER DE FAMILLE EFFACE LA SOUS-ÉTAPE — même règle qu'à la copie : on ne
+// transporte pas « Production UV » dans « Facturation ».
+//
+// Le contrôle ci-dessus ne se déclenche que si l'appelant parle de la
+// sous-étape. Un `PATCH { stage: 'facturation' }` tout seul passait donc au
+// travers et laissait `sub_stage = 'prod_uv'` sur une ligne devenue
+// « Facturation ». Deux dégâts, tous les deux silencieux :
+//   - `/api/counts` compte les sous-étapes indépendamment des familles : le
+//     rail affichait « Production UV — 1 commande », on cliquait, la liste
+//     était vide. Un badge fantôme que rien ne pouvait éteindre.
+//   - la ligne ne relevait plus d'aucune vue cohérente du rail.
+// L'écran envoie toujours les deux champs ; ce filet vaut pour tout le reste —
+// une fiche restée ouverte, un raccourci, un poste sur une vieille version.
+function effacerSousEtapeSiChangementDeFamille(body, stageActuel) {
+  if (!('stage' in body) || !body.stage) return body;
+  if ('sub_stage' in body) return body;              // l'appelant a tranché
+  if (body.stage === stageActuel) return body;       // même famille : rien ne bouge
+  return { ...body, sub_stage: null };
+}
+
 function asyncH(fn) {
   return (req, res) => fn(req, res).catch((err) => {
     console.error(err);
@@ -287,8 +355,20 @@ function asyncH(fn) {
 // « change » à chaque création / modification / suppression. Aucune dépendance.
 // ---------------------------------------------------------------------------
 const sseClients = new Set();
+// Un poste = une connexion. L'atelier en compte une dizaine, le patron une ou
+// deux de plus : le plafond n'est pas là pour rationner, il est là pour qu'un
+// client qui rouvrirait le flux en boucle (bug d'onglet, script) ne finisse pas
+// par tenir toute la mémoire du serveur.
+const SSE_CLIENTS_MAX = 100;
+// Au-delà, le poste ne lit plus assez vite : ses évènements s'empilent dans la
+// mémoire du serveur. Un poste éteint sans que le TCP l'ait signalé fait
+// exactement ça, en silence, jusqu'à ce que le conteneur manque de mémoire.
+const SSE_TAMPON_MAX = 512 * 1024;
 
 app.get('/api/stream', (req, res) => {
+  if (sseClients.size >= SSE_CLIENTS_MAX) {
+    return res.status(503).json({ error: 'Trop de connexions temps réel' });
+  }
   res.set({
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -300,16 +380,37 @@ app.get('/api/stream', (req, res) => {
 
   sseClients.add(res);
   // heartbeat pour traverser les proxies (Railway) sans timeout
-  const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch (_) {} }, 25000);
+  const ping = setInterval(() => { if (!ecrireSse(res, ': ping\n\n')) clearInterval(ping); }, 25000);
 
   req.on('close', () => { clearInterval(ping); sseClients.delete(res); });
+  return undefined;
 });
+
+// Écrit sur un flux, et le lâche s'il ne suit plus. Renvoie false quand le
+// client a été retiré. `res.write` ne lève RIEN quand le destinataire ne lit
+// pas : il accepte, met en tampon, et le tampon grandit indéfiniment. C'est
+// `writableLength` qu'il faut regarder, pas l'exception qui ne viendra pas.
+function ecrireSse(res, frame) {
+  try {
+    if (res.writableEnded || res.destroyed) { sseClients.delete(res); return false; }
+    if (res.writableLength > SSE_TAMPON_MAX) {
+      sseClients.delete(res);
+      res.end();
+      return false;
+    }
+    res.write(frame);
+    return true;
+  } catch (_) {
+    sseClients.delete(res);
+    return false;
+  }
+}
 
 function broadcast(payload) {
   const frame = `event: change\ndata: ${JSON.stringify(payload || {})}\n\n`;
-  for (const res of sseClients) {
-    try { res.write(frame); } catch (_) { sseClients.delete(res); }
-  }
+  // Copie de la liste : `ecrireSse` retire les flux morts au passage, et on ne
+  // modifie pas l'ensemble qu'on est en train de parcourir.
+  for (const res of [...sseClients]) ecrireSse(res, frame);
 }
 
 // ---------------------------------------------------------------------------
@@ -488,6 +589,11 @@ const SELECT = `SELECT r.*,
   LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'
   LEFT JOIN attachments af ON af.request_id = r.id AND af.kind = 'facture'`;
 const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
+// Le MÊME ordre, exactement à l'envers. Il sert à prendre la FIN d'une étape
+// sans la lire en entier : on trie à rebours, on coupe, on remet à l'endroit.
+// Écrit en toutes lettres plutôt que dérivé de `ORDER` par substitution : deux
+// tris qui doivent rester le miroir l'un de l'autre se lisent côte à côte.
+const ORDER_INVERSE = 'ORDER BY r.position DESC NULLS FIRST, r.priority ASC, r.deadline DESC NULLS FIRST, r.created_at DESC';
 
 // La LISTE ne transporte de la fiche que ce que la grille affiche vraiment :
 // le numéro de ticket et l'heure de retrait. Le reste — le récapitulatif ligne
@@ -507,20 +613,114 @@ function allegerFiche(row) {
   return { ...row, fiche: court };
 }
 
-// GET /api/requests?stage=<étape>   → commandes de cette étape
-// GET /api/requests                 → toutes
+// PLAFOND DE LA LISTE. Aucune commande ne quitte jamais le planning : « Paiement
+// & clôture » est la dernière étape, et tout ce qui s'y termine y reste. La
+// grille montait donc TOUTES les lignes de l'étape dans la page — une par une,
+// avec leurs cellules, leurs écouteurs et leur poignée de glisser. Ça tient à
+// deux cents lignes ; à deux mille, la tablette du comptoir se fige.
+//
+// On rend donc, par défaut, la FIN de la liste : les commandes récentes, celles
+// qu'on vient consulter. `?tout=1` lève le plafond quand on cherche vraiment
+// dans l'historique — l'écran propose le bouton dès qu'il manque quelque chose.
+const LISTE_MAX = 400;
+
+// Une lecture bornée renvoie UN élément de plus que le plafond : c'est ainsi que
+// l'écran sait qu'il en reste, sans avoir à compter la table (même procédé que
+// la recherche globale).
+function bornerListe(rows) {
+  const complet = rows.length <= LISTE_MAX;
+  return { lignes: complet ? rows : rows.slice(0, LISTE_MAX), complet };
+}
+
+// GET /api/requests?stage=<étape>   → commandes de cette étape (les LISTE_MAX
+//                                     dernières, sauf ?tout=1)
+// GET /api/requests                 → toutes les étapes, même plafond
+//
+// L'en-tête `X-Liste-Tronquee` dit à l'écran qu'il n'a pas tout : le corps reste
+// un simple tableau, que tous les appelants savent déjà lire.
 app.get('/api/requests', asyncH(async (req, res) => {
   const { stage } = req.query;
-  let result;
+  const tout = req.query.tout === '1';
+  let rows;
+
   if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
-    result = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]);
+    if (tout) {
+      ({ rows } = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]));
+    } else {
+      // On prend la fin de la liste — donc on trie À L'ENVERS pour la couper,
+      // puis on remet l'ordre d'affichage. Prendre les premières aurait donné
+      // les plus anciennes : exactement celles que personne ne vient voir.
+      const r = await pool.query(
+        `${SELECT} WHERE r.stage = $1 ${ORDER_INVERSE} LIMIT $2`, [stage, LISTE_MAX + 1],
+      );
+      const { lignes, complet } = bornerListe(r.rows);
+      rows = lignes.reverse();
+      if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
+    }
   } else {
-    result = await pool.query(
-      `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`,
-    );
+    const toutesEtapes = `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`;
+    if (tout) {
+      ({ rows } = await pool.query(toutesEtapes));
+    } else {
+      const r = await pool.query(`${toutesEtapes} LIMIT $1`, [LISTE_MAX + 1]);
+      const { lignes, complet } = bornerListe(r.rows);
+      rows = lignes;
+      if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
+    }
   }
-  res.json(result.rows.map(allegerFiche));
+
+  res.json(rows.map(allegerFiche));
+}));
+
+// GET /api/requests/synthese[?depuis=<ISO>] → CE QUI A CHANGÉ, et rien d'autre.
+//
+// Le Point du jour retéléchargeait TOUT le planning — toutes les commandes,
+// depuis toujours — à chaque évènement temps réel, sur chaque poste. Un simple
+// glisser-déposer chez une vendeuse déclenchait donc, chez tous les autres, le
+// téléchargement de l'historique complet. C'est le « ça rame » qui restait après
+// avoir mis les évènements en lot : on avait supprimé la rafale d'évènements,
+// pas le poids de ce que chacun allait rechercher derrière.
+//
+// L'écran a besoin de l'ensemble du planning pour ses compteurs — mais pas de le
+// RETÉLÉCHARGER. On rend donc :
+//   - `ids`      : tous les identifiants, dans l'ordre. C'est ce qui permet de
+//                  repérer une commande supprimée (elle n'y est plus) sans
+//                  tenir de registre des suppressions. ~40 octets par ligne.
+//   - `lignes`   : les commandes modifiées depuis `depuis`, en entier.
+//   - `jusqua`   : l'horodatage à renvoyer au prochain appel. Il vient du
+//                  SERVEUR, jamais de l'horloge du poste : deux montres qui
+//                  divergent d'une seconde suffiraient à sauter une modification.
+// Sans `depuis`, c'est un premier chargement : tout part, comme avant.
+const SYNTHESE_CHAMPS = `r.id, r.stage, r.sub_stage, r.order_kind, r.responsable, r.referent,
+  r.priority, r.client_type, r.billing_company, r.contact_referent, r.contact_phone,
+  r.quantity, r.product, r.color, r.project_value, r.description, r.deadline,
+  r.flag, r.flag_reason, r.paye, r.acompte_verse, r.created_at, r.updated_at`;
+
+app.get('/api/requests/synthese', asyncH(async (req, res) => {
+  const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
+  // L'horloge de référence est celle de la base, prise AVANT la lecture : une
+  // écriture qui tomberait pendant la requête sera reprise au tour suivant
+  // plutôt que sautée. Mieux vaut renvoyer deux fois une ligne que zéro fois.
+  const { rows: horloge } = await pool.query('SELECT now() AS maintenant');
+  const jusqua = horloge[0].maintenant;
+
+  const { rows: ids } = await pool.query(
+    'SELECT id FROM requests ORDER BY stage, position ASC NULLS LAST, created_at ASC',
+  );
+
+  let lignes;
+  if (depuis) {
+    const { rows } = await pool.query(
+      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 ${ORDER}`, [depuis],
+    );
+    lignes = rows;
+  } else {
+    const { rows } = await pool.query(`SELECT ${SYNTHESE_CHAMPS} FROM requests r ${ORDER}`);
+    lignes = rows;
+  }
+
+  res.json({ jusqua, ids: ids.map((r) => r.id), lignes });
 }));
 
 // GET /api/requests/recherche?q=…  → LA RECHERCHE GLOBALE (palette « Spotlight »).
@@ -753,7 +953,19 @@ app.patch('/api/requests/positions', asyncH(async (req, res) => {
 
 // PATCH /api/requests/:id → met à jour un ou plusieurs champs
 app.patch('/api/requests/:id', asyncH(async (req, res) => {
-  const body = normalizeFlagBody(req.body || {});
+  // On relit la ligne AVANT toute chose : elle sert à trois usages — savoir si
+  // la famille change (pour remettre la sous-étape à zéro), vérifier que la
+  // sous-étape demandée relève bien de cette famille, et fournir l'« avant » du
+  // journal des modifications.
+  const { rows: avant } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
+  if (avant.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+
+  const body = effacerSousEtapeSiChangementDeFamille(
+    normalizeFlagBody(req.body || {}), avant[0].stage,
+  );
+  const incoherence = verifierCoherenceEtape(body, avant[0].stage);
+  if (incoherence) return res.status(400).json({ error: incoherence });
+
   const sets = [];
   const params = [];
   let i = 1;
@@ -768,14 +980,6 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   }
 
   if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
-
-  // On relit la ligne AVANT d'écrire : elle sert à deux choses — vérifier que la
-  // sous-étape demandée relève bien de la famille où la commande se trouve, et
-  // fournir l'« avant » du journal des modifications.
-  const { rows: avant } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
-  if (avant.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  const incoherence = verifierCoherenceEtape(body, avant[0].stage);
-  if (incoherence) return res.status(400).json({ error: incoherence });
 
   sets.push('updated_at = now()');
   params.push(req.params.id);
@@ -845,6 +1049,11 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
     'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
     [JSON.stringify(majFiche), req.params.id],
   );
+  // Une correction de fiche est une modification de la commande comme une autre :
+  // elle a sa ligne dans l'« Historique ». Sans ça, une quantité rectifiée ou
+  // une heure de retrait déplacée ne laissait aucune trace, et personne ne
+  // pouvait dire ce qui avait bougé sur le dossier.
+  await logFicheChange(req.params.id, fiche, majFiche);
   broadcast({ kind: 'update', stages: [maj[0].stage] });
   res.json(maj[0]);
 }));
@@ -997,11 +1206,8 @@ function todayPlus(days) {
 // y crée automatiquement le client absent ; la fiche est éditable en place.
 // ---------------------------------------------------------------------------
 
-// Clé de rapprochement : insensible à la casse, aux accents et à la ponctuation,
-// pour que « Iguana (Discover) » et « iguana discover » soient LE MÊME client.
-const clientKey = (s) => String(s)
-  .normalize('NFD').replace(/\p{Diacritic}/gu, '')
-  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// `clientKey` (clé de rapprochement) vient de db.js : la base la range désormais
+// en colonne, les deux doivent donc la calculer exactement pareil.
 
 const trimOrNull = (v) => {
   const s = String(v == null ? '' : v).trim();
@@ -1100,25 +1306,9 @@ app.get('/api/clients/:id', asyncH(async (req, res) => {
   res.json({ ...rows[0], notes, commandes: counts.get(clientKey(rows[0].entreprise)) || 0 });
 }));
 
-// Identifiant lisible « CLI-PRO-0007 » / « CLI-PERSO-0007 » : un repère visuel
-// pour le patron (comme dans son classeur), pas un UUID. Compteur persistant en
-// app_meta (jamais dérivé des lignes existantes) : un numéro attribué n'est
-// JAMAIS réutilisé, même si le client qui le portait est supprimé ensuite.
-async function nextClientCode(clientType) {
-  const perso = clientType === 'perso';
-  const prefix = perso ? 'CLI-PERSO-' : 'CLI-PRO-';
-  const metaKey = perso ? 'client_code_seq_perso' : 'client_code_seq_pro';
-  // Incrément atomique (même raison qu'au ticket de vente) : deux fiches créées
-  // en même temps sur deux postes ne peuvent plus porter le même code.
-  const { rows } = await pool.query(
-    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
-     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
-     RETURNING value`,
-    [metaKey],
-  );
-  const next = Number.parseInt(rows[0].value, 10);
-  return `${prefix}${String(next).padStart(4, '0')}`;
-}
+// `nextClientCode` (compteur « CLI-PRO-0007 ») vient de db.js : la migration qui
+// rattrape les codes manquants s'en sert aussi, et il ne doit exister qu'UN seul
+// compteur — deux fiches ne peuvent pas porter le même numéro.
 
 // POST /api/clients → crée un client. Seule l'entreprise est obligatoire.
 app.post('/api/clients', asyncH(async (req, res) => {
@@ -1136,11 +1326,25 @@ app.post('/api/clients', asyncH(async (req, res) => {
   if (!cols.includes('entreprise') || params[cols.indexOf('entreprise')] == null) {
     return res.status(400).json({ error: 'le nom de la société est requis' });
   }
+  const entreprise = params[cols.indexOf('entreprise')];
   const clientType = cols.includes('client_type') ? params[cols.indexOf('client_type')] : 'pro';
   cols.push('code'); vals.push(`$${i++}`); params.push(await nextClientCode(clientType));
-  const { rows } = await pool.query(
-    `INSERT INTO clients (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
-  );
+  // La clé de rapprochement suit TOUJOURS le nom de société : c'est elle qui
+  // porte l'unicité de la fiche, elle ne peut pas être laissée à la traîne.
+  cols.push('cle'); vals.push(`$${i++}`); params.push(clientKey(entreprise));
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `INSERT INTO clients (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
+    ));
+  } catch (err) {
+    // Ce client existe déjà (à la casse et aux accents près). Le dire plutôt que
+    // d'en créer une seconde fiche que personne ne saurait plus départager.
+    if (err && err.code === '23505') {
+      return res.status(409).json({ error: `« ${entreprise} » est déjà dans la base clients` });
+    }
+    throw err;
+  }
   broadcast({ kind: 'client' });
   res.status(201).json(rows[0]);
 }));
@@ -1160,13 +1364,25 @@ app.patch('/api/clients/:id', asyncH(async (req, res) => {
       return res.status(400).json({ error: 'le nom de la société est requis' });
     }
     sets.push(`${key} = $${i++}`); params.push(v.value);
+    // Renommer la société déplace le client : sa clé de rapprochement doit
+    // suivre dans le même mouvement, sinon la prise de commande continuerait de
+    // le retrouver sous son ancien nom — et en créerait une seconde fiche.
+    if (key === 'entreprise') { sets.push(`cle = $${i++}`); params.push(clientKey(v.value)); }
   }
   if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
   sets.push('updated_at = now()');
   params.push(req.params.id);
-  const { rows } = await pool.query(
-    `UPDATE clients SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`, params,
-  );
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `UPDATE clients SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`, params,
+    ));
+  } catch (err) {
+    if (err && err.code === '23505') {
+      return res.status(409).json({ error: 'une autre fiche porte déjà ce nom de société' });
+    }
+    throw err;
+  }
   if (rows.length === 0) return res.status(404).json({ error: 'Client introuvable' });
   broadcast({ kind: 'client' });
   res.json(rows[0]);
@@ -1229,9 +1445,13 @@ async function upsertClientSansBloquer(cl) {
 async function upsertClientFromCommande(cl) {
   const entreprise = trimOrNull(cl && cl.societe);
   if (!entreprise) return;
+  // Recherche PAR CLÉ, en base. On chargeait toute la table pour comparer en
+  // JS : le coût montait avec le fichier client, et surtout deux postes qui
+  // prenaient une commande du même nouveau client en même temps lisaient tous
+  // les deux « pas encore là » et créaient chacun leur fiche.
   const key = clientKey(entreprise);
-  const { rows } = await pool.query('SELECT entreprise FROM clients');
-  if (rows.some((r) => clientKey(r.entreprise) === key)) return;
+  const { rowCount } = await pool.query('SELECT 1 FROM clients WHERE cle = $1 LIMIT 1', [key]);
+  if (rowCount) return;
   // La nature pro/perso choisie au comptoir suit le client dans sa fiche ;
   // toute autre valeur (asso/revendeur d'une commande) retombe sur 'pro'.
   const nature = cl.type === 'perso' ? 'perso' : 'pro';
@@ -1240,10 +1460,23 @@ async function upsertClientFromCommande(cl) {
   // `entreprise` pour retrouver son identité. Un pro n'a qu'un contact.
   const nom = nature === 'perso' ? trimOrNull(cl.nom) : trimOrNull(cl.contact);
   const prenom = nature === 'perso' ? trimOrNull(cl.prenom) : null;
-  await pool.query(
-    'INSERT INTO clients (entreprise, nom, prenom, telephone, email, client_type) VALUES ($1,$2,$3,$4,$5,$6)',
-    [entreprise, nom, prenom, trimOrNull(cl.telephone), trimOrNull(cl.email), nature],
-  );
+  try {
+    await pool.query(
+      `INSERT INTO clients (entreprise, nom, prenom, telephone, email, client_type, code, cle)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      // Le CODE aussi. Une fiche née d'une prise de commande n'en recevait
+      // aucun, alors que la création manuelle en attribuait un : le fichier du
+      // patron avait deux sortes de clients, et la majorité — ceux qui viennent
+      // du comptoir — n'avait aucun repère lisible.
+      [entreprise, nom, prenom, trimOrNull(cl.telephone), trimOrNull(cl.email), nature,
+        await nextClientCode(nature), key],
+    );
+  } catch (err) {
+    // Un autre poste vient de créer la même fiche entre notre lecture et notre
+    // écriture : c'est exactement ce qu'on voulait, il n'y en a qu'une.
+    if (err && err.code === '23505') return;
+    throw err;
+  }
   broadcast({ kind: 'client' });
 }
 
@@ -2168,8 +2401,28 @@ function couperNomPerso(nomComplet) {
   return { prenom: mots[0], nom: mots.slice(1).join(' ') };
 }
 
+// UN DOSSIER À LA FOIS. Toute la prise de commande du comptoir — reconnaître un
+// renvoi, trouver une référence libre, insérer la ligne — est une suite de
+// lectures suivies d'écritures. Lancées en parallèle, ces suites se marchent
+// dessus : deux envois du MÊME dossier partis ensemble (la tablette rame, la
+// vendeuse tape deux fois) trouvaient tous les deux la base vide de leur
+// empreinte, et la vente entrait DEUX FOIS sous le même numéro de ticket.
+//
+// On les fait donc passer une par une. Le comptoir enregistre quelques dossiers
+// par heure et chacun prend quelques millisecondes : la file ne se voit pas.
+// C'est le seul endroit de l'application où l'ordre d'arrivée décide de ce qui
+// est écrit — ailleurs, chaque requête touche sa propre ligne.
+let fileComptoir = Promise.resolve();
+function unDossierALaFois(travail) {
+  // On chaîne sur la fin de la précédente, quoi qu'il lui soit arrivé : un
+  // dossier en erreur ne doit pas bloquer la file derrière lui.
+  const tour = fileComptoir.then(travail, travail);
+  fileComptoir = tour.then(() => {}, () => {});
+  return tour;
+}
+
 // POST /api/comptoir/projet → enregistre le dossier d'un des deux parcours.
-app.post('/api/comptoir/projet', asyncH(async (req, res) => {
+app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(async () => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
 
   // NATURE : une vente directe est une commande validée et payée ; une demande
@@ -2286,23 +2539,39 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
     'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
   );
 
-  const { rows } = await pool.query(
-    `INSERT INTO requests
-       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
-        contact_referent, contact_phone, contact_email, quantity, product, description,
-        deadline, position, fiche, project_value, paye, paiement_mode)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-     RETURNING id`,
-    [
-      famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
-      clientType, nomDossier,
-      borner(cl.contact, 120), borner(cl.phone, 40), borner(cl.email, 160),
-      quantite, borner(b.name, OBJET_MAX), description,
-      deadline, posRows[0].pos, JSON.stringify(fiche), valeur,
-      // Un paiement n'existe que sur une vente : une demande ne se prononce pas.
-      estDemande ? null : !!pay.paye, estDemande ? null : mode,
-    ],
-  );
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `INSERT INTO requests
+         (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+          contact_referent, contact_phone, contact_email, quantity, product, description,
+          deadline, position, fiche, project_value, paye, paiement_mode)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       RETURNING id`,
+      [
+        famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
+        clientType, nomDossier,
+        borner(cl.contact, 120), borner(cl.phone, 40), borner(cl.email, 160),
+        quantite, borner(b.name, OBJET_MAX), description,
+        deadline, posRows[0].pos, JSON.stringify(fiche), valeur,
+        // Un paiement n'existe que sur une vente : une demande ne se prononce pas.
+        estDemande ? null : !!pay.paye, estDemande ? null : mode,
+      ],
+    ));
+  } catch (err) {
+    // La base vient de refuser un dossier dont l'empreinte existe déjà : c'est
+    // le MÊME dossier, arrivé deux fois. La file ci-dessus l'empêche déjà au
+    // sein d'un serveur ; ce rattrapage vaut pour le jour où il y en aurait
+    // deux. On rend la ligne d'origine — exactement ce que la vendeuse attend.
+    if (!err || err.code !== '23505') throw err;
+    const { rows: dejaLa } = await pool.query(
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinte],
+    );
+    if (!dejaLa.length) throw err;
+    return res.json({
+      id: dejaLa[0].id, stage: dejaLa[0].stage, subStage: dejaLa[0].sub_stage, dejaEnregistre: true,
+    });
+  }
 
   const perso = clientType === 'perso' ? couperNomPerso(nomDossier) : null;
   await upsertClientSansBloquer({
@@ -2323,7 +2592,7 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
     // plus le bon numéro.
     ...(refModifiee ? { refModifiee } : {}),
   });
-}));
+})));
 
 // Les récapitulatifs du comptoir arrivent en paires [libellé, valeur]. On les
 // range en objets et on jette tout ce qui n'a pas cette forme : la fiche est

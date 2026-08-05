@@ -741,6 +741,26 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .ordre-reset:hover { color: var(--text-1); border-color: var(--text-2); }
 .ordre-reset[hidden] { display: none; }
+/* Au doigt, 32 px ne s'attrapent pas : l'outil vit sur la tablette du comptoir,
+   et ces deux boutons (revenir au tri, tout afficher) s'y touchent comme le
+   reste. Sur un écran à souris, la pastille garde sa discrétion. */
+@media (pointer: coarse) {
+  .ordre-reset { min-height: 44px; padding: 4px 14px; }
+}
+
+/* Pied de liste : « on ne t'a pas tout montré, voilà comment voir le reste ».
+   Même discrétion que le bandeau d'ordre manuel — c'est un état, pas une alerte. */
+.liste-suite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 12px 18px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.liste-suite[hidden] { display: none; }
 
 /* Bouton primaire : un seul style dans toute l'app, accent plein + texte
    blanc — c'est LE bouton d'action de l'écran (Nouvelle commande…). */

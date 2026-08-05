@@ -570,6 +570,9 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
     playStageEnter();
     return;
   }
+  // « Tout afficher » vaut pour L'ÉTAPE où on l'a demandé : on ne traîne pas
+  // l'historique complet de la clôture derrière soi en changeant de famille.
+  if (!sameFamily) { toutAfficher = false; listeTronqueeA = 0; renderListeSuite(); }
   // Relecture forcée : on garde la grille à l'écran (pas de `clearGrid`), sinon
   // elle clignoterait alors qu'on est déjà au bon endroit.
   if (!sameFamily) clearGrid();
@@ -612,12 +615,71 @@ async function loadCounts() {
 // réponse de la sélection la plus récente. Sinon une requête lente (ancienne famille)
 // pourrait écraser une famille sélectionnée depuis → « bug d'affichage » à l'arrivée.
 let loadToken = 0;
+
+// LA LISTE N'EST PAS TOUJOURS ENTIÈRE. Aucune commande ne quitte le planning :
+// « Paiement & clôture » garde tout l'historique, et monter des milliers de
+// lignes dans la page finit par figer la tablette. Le serveur ne rend donc que
+// la fin de la liste ; ce drapeau dit qu'on a demandé le reste, et il retombe
+// dès qu'on change d'étape (l'historique d'une étape ne regarde pas la suivante).
+let toutAfficher = false;
+let listeTronqueeA = 0;   // 0 = on a bien tout ; sinon le plafond appliqué
+
+function urlListe(slug) {
+  const base = `/api/requests?stage=${encodeURIComponent(slug)}`;
+  return toutAfficher ? `${base}&tout=1` : base;
+}
+
+// Même chose qu'`api('GET', …)`, mais on garde l'en-tête qui dit si le serveur a
+// coupé. Le corps reste un simple tableau : rien d'autre n'a besoin de changer.
+async function chargerListe(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).error || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  const plafond = Number(res.headers.get('X-Liste-Tronquee') || 0);
+  return { lignes: await res.json(), plafond: Number.isFinite(plafond) ? plafond : 0 };
+}
+
+function renderListeSuite() {
+  const bloc = document.getElementById('listeSuite');
+  if (!bloc) return;
+  bloc.hidden = !listeTronqueeA;
+  if (!listeTronqueeA) return;
+  const texte = document.getElementById('listeSuiteTexte');
+  if (texte) texte.textContent = `${listeTronqueeA} commandes les plus récentes affichées.`;
+}
+
+(function () {
+  const btn = document.getElementById('listeSuiteTout');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    toutAfficher = true;
+    btn.disabled = true;
+    btn.textContent = 'Chargement…';
+    try {
+      await loadRows();
+    } catch (err) {
+      // Échec : on ne laisse pas l'employé devant un bouton qui a l'air d'avoir
+      // marché. Il redevient cliquable, et la liste courte reste à l'écran.
+      toutAfficher = false;
+      reportError(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Tout afficher';
+    }
+  });
+}());
+
 async function loadRows() {
   const slug = currentStage;
   const token = ++loadToken;
-  const data = await api('GET', `/api/requests?stage=${encodeURIComponent(slug)}`);
+  const { lignes: data, plafond } = await chargerListe(urlListe(slug));
   if (token !== loadToken || slug !== currentStage) return; // sélection dépassée
   rows = data;
+  listeTronqueeA = plafond;
+  renderListeSuite();
   lastRowsSig = signature(rows);
   updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
   updatePriceColVisibility(slug);
@@ -3885,15 +3947,40 @@ function syncTitleOnOverflow(input) {
 }
 
 // --- PATCH générique optimiste --------------------------------------------
+// La valeur s'affiche AVANT la réponse du serveur — c'est ce qui rend l'outil
+// vif au doigt. Mais si l'enregistrement échoue, elle doit repartir, ICI et
+// tout de suite.
+//
+// On s'en remettait à `loadRows()` pour ça. Or c'est précisément quand le
+// réseau est coupé que le PATCH échoue — et la relecture échouait donc avec
+// lui : la valeur refusée restait à l'écran. Pire, `rows` gardait la mutation
+// alors que `lastRowsSig` n'avait pas bougé : au retour du réseau, `poll()`
+// comparait les signatures, les trouvait identiques et ne redessinait jamais.
+// La tablette affichait indéfiniment une priorité, un pilote ou une ALERTE
+// « BLOQUÉE » que personne n'avait enregistrés, et que le poste d'à côté ne
+// voyait pas.
+//
+// On mémorise donc l'état d'avant pour les seuls champs qu'on touche, et on le
+// remet en place sans rien demander au réseau. La relecture ne sert plus qu'à
+// récupérer, quand elle le peut, ce qu'un collègue aurait changé entre-temps.
 function patch(r, body, applyOptimistic) {
+  const avant = {};
+  for (const cle of Object.keys(body)) avant[cle] = r[cle];
   applyOptimistic();
   patchRow(r, body).catch((err) => {
+    Object.assign(r, avant);
+    // La ligne est reconstruite à partir de `r` : les puces peintes à la main
+    // par `applyOptimistic` (priorité, type, pilote, alerte…) reviennent avec.
+    invalidateRowCache(r.id);
+    // La signature suit la donnée rétablie, sinon le prochain `poll()` croirait
+    // la grille à jour et laisserait l'écran sur un état qui n'existe pas.
+    lastRowsSig = signature(rows);
+    applySortAndRender();
     reportError(err);
-    // Resynchronisation : la valeur posée en optimiste n'a PAS été enregistrée,
-    // il ne faut pas la laisser à l'écran comme si elle l'était. Et si même la
-    // relecture échoue (réseau toujours coupé), on ne laisse pas filer un rejet
-    // non traité — le message d'erreur ci-dessus a déjà prévenu.
-    loadRows().catch(() => {});
+    // Puis, si le serveur répond de nouveau, on récupère au passage ce qu'un
+    // collègue aurait changé pendant ce temps. Silencieux : le rollback
+    // ci-dessus a déjà remis l'écran d'aplomb, et l'erreur a déjà été dite.
+    resyncAfterRollback();
   });
 }
 
@@ -4921,12 +5008,16 @@ async function poll() {
     // raccourci « même famille » de selectStage.
     const slug = currentStage;
     const token = loadToken;
-    const fresh = await api('GET', `/api/requests?stage=${encodeURIComponent(slug)}`);
+    // Même URL que `loadRows` : si l'employé a demandé l'historique entier, le
+    // rafraîchissement de fond ne doit pas le lui reprendre sous les doigts.
+    const { lignes: fresh, plafond } = await chargerListe(urlListe(slug));
     if (slug !== currentStage || token !== loadToken) return; // sélection dépassée
     const sig = signature(fresh);
     if (sig !== lastRowsSig) {
       rows = fresh;
       lastRowsSig = sig;
+      listeTronqueeA = plafond;
+      renderListeSuite();
       applySortAndRender();
     }
   } catch (_) { /* silencieux : on réessaiera au prochain cycle */ }
@@ -4966,7 +5057,9 @@ function onStreamChange(e) {
   streamDebounce = setTimeout(() => {
     // Le Point du jour garde son cache à jour même masqué (fil d'activité,
     // badges, écran mural) — mais à un rythme de fond, pas à chaque évènement.
-    dashboard.notifyChange();
+    // On lui passe la NATURE de l'évènement : lui seul sait s'il doit relire la
+    // configuration du patron ou se contenter de sa synthèse incrémentale.
+    dashboard.notifyChange(kind);
     if (isPlanningMode(viewMode)) poll();
   }, 120);
 }
