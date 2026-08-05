@@ -44,6 +44,20 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value text
 );
 
+-- Journal des modifications d'une commande : une ligne par champ suivi qui a
+-- changé (étape, état, prix, échéance…). Ce que l'application NE sait PAS, c'est
+-- QUI a fait le changement : elle n'a qu'un mot de passe commun, pas de compte
+-- par employé. Down : DROP TABLE request_events;
+CREATE TABLE IF NOT EXISTS request_events (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id   uuid NOT NULL,
+  field        text NOT NULL,             -- nom de colonne suivi (voir JOURNAL_FIELDS)
+  value_before text,
+  value_after  text,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_request_events_request ON request_events (request_id, created_at DESC);
+
 -- Index pour le tri/filtre par étape
 CREATE INDEX IF NOT EXISTS idx_requests_stage ON requests (stage);
 CREATE INDEX IF NOT EXISTS idx_requests_stage_sort ON requests (stage, priority DESC, deadline ASC);

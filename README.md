@@ -181,7 +181,10 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | GET | `/api/stages` | Liste ordonnée des étapes (libellé + slug). |
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
-| DELETE | `/api/requests/:id` | Supprime une demande. |
+| DELETE | `/api/requests/:id` | Supprime une demande (avec ses PDF, ses secteurs et son journal). |
+| GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
+| GET | `/api/ordre-manuel` | `[<slugÉtape>, ...]` — les étapes rangées à la main. |
+| PUT | `/api/ordre-manuel` | Remplace cette liste, diffusée en SSE. |
 | GET | `/api/pipeline` | Familles et leurs sous-étapes (destination d'une commande). |
 | POST | `/api/comptoir/projet` | **Le dossier d'un des deux parcours du comptoir** → crée la ligne dans le planning (`stage` + `sub_stage` retrouvée par son libellé), remplit la fiche client et archive le récapitulatif complet dans `fiche`. Répond `{ id, stage, subStage }`. Refuse seulement un dossier sans nom de client. |
 | POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron ; conservé le temps de confirmer qu'on n'y revient pas. |
@@ -202,6 +205,24 @@ code HTTP adapté.
 
 **Règle du motif** : lever l'alerte (`flag: null`) efface `flag_reason`, même si
 l'appelant ne l'envoie pas — jamais de motif orphelin sur une commande débloquée.
+
+**Cohérence étape / sous-étape** : une sous-étape n'appartient qu'à une famille.
+Poser `prod_uv` sur une commande en facturation est refusé (400), que la paire
+arrive ensemble ou que seule la sous-étape soit envoyée (elle est alors comparée
+à l'étape en base). `sub_stage: null` — « à préciser » — reste toujours valide.
+
+**Ordre manuel** : glisser une carte réécrit les `position` en base, donc pour
+tous les postes. La décision « cette étape est rangée à la main » vit au même
+endroit (`app_meta.ordre_manuel`) et non dans le localStorage d'une tablette —
+sinon une vendeuse range sa liste et le poste d'à côté n'en voit rien. Un
+réordonnancement renumérote **toute la famille** (1000, 2000, 3000…), pas
+seulement les lignes visibles : la vue peut être filtrée par la recherche ou
+restreinte à une sous-étape, et laisser les autres sur leurs anciennes valeurs
+créait des positions en double.
+
+**Journal** : l'application n'a qu'un mot de passe commun à l'atelier — elle
+enregistre donc CE QUI a changé, pas QUI l'a fait. Identifier chaque employé est
+un choix d'architecture (comptes, sessions), pas un correctif.
 
 ## Nouveau Projet — `/#nouveau-projet` : les deux parcours du comptoir
 

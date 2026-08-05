@@ -1079,6 +1079,95 @@ async function setWhatsappMessage(text) {
   return clean;
 }
 
+// --- Étapes rangées à la main (ordre manuel) ---------------------------------
+// Glisser une carte réécrit les `position` en base : le geste vaut donc pour
+// TOUS les postes. Or la décision « cette étape est rangée à la main » vivait,
+// elle, dans le localStorage de chaque tablette — une vendeuse rangeait sa
+// liste et la tablette d'à côté ne bougeait pas, jusqu'au jour où un geste
+// accidentel la faisait basculer et rebattait tout d'un coup. La décision
+// rejoint donc l'endroit où vivent ses effets : la base.
+// Down : DELETE FROM app_meta WHERE key = 'ordre_manuel'.
+async function getOrdreManuel() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'ordre_manuel'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return [];
+  try {
+    const list = JSON.parse(rows[0].value);
+    return Array.isArray(list) ? list.filter((s) => STAGE_SLUGS.includes(s)) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function setOrdreManuel(list) {
+  const clean = Array.isArray(list)
+    ? [...new Set(list.filter((s) => STAGE_SLUGS.includes(s)))]
+    : [];
+  await poserMeta('ordre_manuel', JSON.stringify(clean));
+  return clean;
+}
+
+// --- Journal des modifications ----------------------------------------------
+// « Qui a déplacé ça ? » n'avait aucune réponse : la fiche ne connaissait que la
+// naissance de la ligne et sa dernière retouche. On enregistre désormais CE QUI
+// a changé, et quand — pas QUI, l'application n'ayant qu'un mot de passe commun
+// (identifier chaque employé est un choix d'architecture, pas un correctif).
+//
+// On ne journalise que les champs qui racontent la vie de la commande. La
+// `position` en est exclue : un seul glisser en réécrit une dizaine, et le
+// journal se remplirait de bruit au lieu d'être lisible.
+const JOURNAL_FIELDS = {
+  stage: 'Étape',
+  sub_stage: 'Sous-étape',
+  flag: 'État',
+  flag_reason: 'Motif',
+  priority: 'Priorité',
+  project_value: 'Prix TTC',
+  deadline: 'Date souhaitée',
+  responsable: 'Pilote',
+  referent: 'Référent',
+  paye: 'Payé',
+};
+const JOURNAL_MAX = 40; // ce qu'on renvoie à la fiche : la vie récente suffit
+
+// Compare l'avant / l'après et écrit une ligne de journal par champ suivi qui a
+// réellement bougé. Silencieux en cas d'échec : un journal indisponible ne doit
+// jamais faire échouer l'enregistrement que l'employé vient de demander.
+// `deadline` est une colonne `date` : le pilote la rend en objet Date, dont le
+// `String()` donne « Wed Aug 05 2026 … ». Le journal doit garder la forme ISO,
+// seule relisible par la fiche (et par un humain qui ouvre la table).
+const enTexte = (v) => {
+  if (v == null) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.toISOString().slice(0, 10);
+  return String(v);
+};
+
+async function logRequestChanges(requestId, avant, apres) {
+  if (!avant || !apres) return;
+  const memeValeur = (a, b) => (enTexte(a) ?? '') === (enTexte(b) ?? '');
+  const lignes = Object.keys(JOURNAL_FIELDS)
+    .filter((k) => k in apres && !memeValeur(avant[k], apres[k]))
+    .map((k) => ({ field: k, before: enTexte(avant[k]), after: enTexte(apres[k]) }));
+  if (!lignes.length) return;
+  try {
+    for (const l of lignes) {
+      await pool.query(
+        'INSERT INTO request_events (request_id, field, value_before, value_after) VALUES ($1, $2, $3, $4)',
+        [requestId, l.field, l.before, l.after],
+      );
+    }
+  } catch (err) {
+    console.error('journal des modifications :', err.message);
+  }
+}
+
+async function getRequestJournal(requestId) {
+  const { rows } = await pool.query(
+    'SELECT field, value_before, value_after, created_at FROM request_events WHERE request_id = $1 ORDER BY created_at DESC, field ASC',
+    [requestId],
+  );
+  return rows.slice(0, JOURNAL_MAX);
+}
+
 module.exports = {
   pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
@@ -1093,4 +1182,6 @@ module.exports = {
   getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
+  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
+  JOURNAL_FIELDS, logRequestChanges, getRequestJournal,
 };
