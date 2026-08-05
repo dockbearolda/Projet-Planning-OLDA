@@ -1,0 +1,94 @@
+// ===========================================================================
+// Service worker — la coquille de l'application, disponible hors ligne
+// ===========================================================================
+// Ce que ce fichier apporte, et rien de plus : l'atelier ouvre le planning en
+// une fraction de seconde même sur un Wi-Fi capricieux, et Chrome accepte enfin
+// d'INSTALLER l'application sur la tablette (un manifeste seul ne suffit pas :
+// il faut un service worker qui réponde aux requêtes).
+//
+// RÈGLE ABSOLUE : LE RÉSEAU GAGNE TOUJOURS.
+// L'application n'a aucune étape de build — un déploiement remplace les
+// fichiers en place. Un cache qui servirait d'abord sa copie rejouerait
+// exactement l'incident du 28/07 : un poste gardait l'ancien JS et la grille
+// paraissait vide. On ne sert donc le cache que lorsque le réseau a ÉCHOUÉ, et
+// on remplace la copie à chaque réponse fraîche.
+//
+// Ce qui n'est JAMAIS mis en cache :
+//   - tout /api/ (données vivantes, et /api/stream est un flux qui ne se ferme
+//     pas — le mettre en cache bloquerait le temps réel) ;
+//   - tout ce qui n'est pas un GET ;
+//   - toute réponse qui n'est pas un 200 de notre propre origine (la prod est
+//     derrière un Basic Auth : mémoriser un 401 condamnerait le poste).
+
+const CACHE = 'olda-coquille-v1';
+
+// La coquille : ce qu'il faut pour AFFICHER l'application. Les données, elles,
+// viennent du réseau — hors ligne, on montre l'écran et son message d'erreur,
+// jamais un planning inventé.
+const COQUILLE = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/clients.css',
+  '/projet.css',
+  '/app.js',
+  '/dashboard.js',
+  '/guide.js',
+  '/priority.js',
+  '/whatsapp.js',
+  '/nom-client.js',
+  '/olda-logo.svg',
+  '/manifest.webmanifest',
+];
+
+self.addEventListener('install', (e) => {
+  // `addAll` échoue en bloc si UN fichier manque : on met en cache un par un
+  // pour qu'un renommage n'empêche pas l'installation de tout le reste.
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await Promise.all(COQUILLE.map((url) => cache.add(url).catch(() => {})));
+    // La nouvelle version prend la main tout de suite : on ne laisse pas un
+    // ancien worker servir l'ancienne coquille jusqu'à la fermeture des onglets.
+    self.skipWaiting();
+  })());
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    const noms = await caches.keys();
+    await Promise.all(noms.filter((n) => n !== CACHE).map((n) => caches.delete(n)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  e.respondWith((async () => {
+    try {
+      const reseau = await fetch(req);
+      // On ne mémorise qu'une vraie réponse à nous. Un 401 (Basic Auth), une
+      // redirection ou une erreur serveur ne doivent jamais être resservis.
+      if (reseau && reseau.status === 200 && reseau.type === 'basic') {
+        const copie = reseau.clone();
+        caches.open(CACHE).then((c) => c.put(req, copie)).catch(() => {});
+      }
+      return reseau;
+    } catch (_) {
+      // Réseau tombé : on sert la dernière coquille connue.
+      const enCache = await caches.match(req);
+      if (enCache) return enCache;
+      // Une navigation sans correspondance exacte (un #hash, une sous-route)
+      // retombe sur la page d'accueil, qui EST l'application.
+      if (req.mode === 'navigate') {
+        const accueil = await caches.match('/index.html') || await caches.match('/');
+        if (accueil) return accueil;
+      }
+      return new Response('Hors ligne', { status: 503, statusText: 'Hors ligne' });
+    }
+  })());
+});

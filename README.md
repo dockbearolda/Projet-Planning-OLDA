@@ -59,6 +59,14 @@ modules natifs, aucun build, aucun framework, aucun bundler).
 - Tri par défaut (priorité desc, échéance asc) + tri par en-têtes cliquables.
 - Création / suppression de demandes.
 - Accès protégé par mot de passe partagé (Basic Auth).
+- **Installable sur la tablette et ouverture hors ligne** (`public/sw.js`) : le
+  service worker met de côté la coquille de l'application (HTML, CSS, JS,
+  icônes). Le planning s'ouvre instantanément et affiche son écran même sans
+  réseau, avec un message qui dit pourquoi la liste est vide et une reprise
+  automatique dès le retour de la liaison. **Le réseau garde toujours la
+  priorité** : le cache ne sert qu'en cas d'échec, un déploiement s'applique
+  donc immédiatement (cf. l'incident du 28/07 où un poste gardait l'ancien JS).
+  Rien de `/api/` n'est mis en cache — les données viennent toujours du serveur.
 
 ## Dashboard « Point du jour »
 
@@ -180,6 +188,7 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | GET | `/api/counts` | `{ <slug>: <nombre>, ... }` pour les compteurs. |
 | GET | `/api/stages` | Liste ordonnée des étapes (libellé + slug). |
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
+| POST | `/api/requests/:id/copie` | **Recopie une commande** (« Dupliquer », « Envoyer vers Fiverr »), dans une autre famille si `{ stage }` est fourni. La copie emporte `fiche` — le récapitulatif du comptoir, donc tout ce que l'atelier doit lire pour produire. Ne se copient PAS : le numéro de ticket (`fiche.ref`, il identifie UNE prise de commande), l'alerte en cours et les pièces jointes. La copie se fait ici et non côté navigateur : la liste ne transporte qu'un résumé de `fiche`, et `fiche` n'est pas un champ écrivable par PATCH. |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande (avec ses PDF, ses secteurs et son journal). |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
@@ -520,6 +529,7 @@ Deux exceptions assumées :
 │   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
+│   ├── sw.js         service worker : coquille hors ligne, réseau prioritaire
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning

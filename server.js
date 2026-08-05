@@ -597,6 +597,69 @@ app.post('/api/requests', asyncH(async (req, res) => {
   res.status(201).json(rows[0]);
 }));
 
+// POST /api/requests/:id/copie → recopie une commande (« Dupliquer », « Envoyer
+// vers Fiverr »), éventuellement dans une autre famille (`{ stage }`).
+//
+// La copie se fait ICI et pas côté navigateur : le front renvoyait champ par
+// champ ce qu'il avait à l'écran, or la liste ne transporte qu'un RÉSUMÉ de
+// `fiche` (voir allegerFiche) et `fiche` n'est pas — volontairement — un champ
+// que l'on peut écrire par PATCH. La copie repartait donc sans le récapitulatif
+// du comptoir : l'atelier héritait d'une commande vide de tout ce qu'il doit
+// produire (articles, tailles, faces marquées, heure de retrait).
+//
+// Ce qui ne se copie PAS : les pièces jointes (devis / BAT / facture appartiennent
+// au dossier d'origine), l'alerte (`flag` / `flag_reason` — une copie repart d'une
+// page blanche) et le numéro de ticket `fiche.ref`, qui identifie UNE prise de
+// commande au comptoir : deux lignes ne peuvent pas revendiquer le même.
+const COPIABLE = PATCHABLE.filter((k) => !['position', 'flag', 'flag_reason'].includes(k));
+
+app.post('/api/requests/:id/copie', asyncH(async (req, res) => {
+  const { rows: src } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
+  if (src.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  const source = src[0];
+
+  const stage = req.body && req.body.stage ? req.body.stage : source.stage;
+  if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
+  // Changer de famille invalide la sous-étape : on ne transporte pas
+  // « Production UV » dans « Facturation ».
+  const subStage = stage === source.stage ? source.sub_stage : null;
+
+  const cols = [];
+  const vals = [];
+  const params = [];
+  let i = 1;
+  const poser = (col, valeur) => { cols.push(col); vals.push(`$${i++}`); params.push(valeur); };
+
+  for (const key of COPIABLE) {
+    if (key === 'stage' || key === 'sub_stage') continue;
+    poser(key, source[key] ?? null);
+  }
+  poser('stage', stage);
+  poser('sub_stage', subStage);
+
+  // Selon le pilote (Postgres / pg-mem), une colonne JSON revient en objet ou
+  // en texte : on accepte les deux plutôt que de perdre le détail sur l'un.
+  let fiche = source.fiche;
+  if (typeof fiche === 'string') {
+    try { fiche = JSON.parse(fiche); } catch (_) { fiche = null; }
+  }
+  if (fiche && typeof fiche === 'object') {
+    const { ref, ...reste } = fiche;
+    poser('fiche', JSON.stringify(reste));
+  }
+
+  const { rows: pos } = await pool.query(
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [stage],
+  );
+  poser('position', pos[0].pos);
+
+  const { rows } = await pool.query(
+    `INSERT INTO requests (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`, params,
+  );
+  broadcast({ kind: 'create', stages: [rows[0].stage] });
+  res.status(201).json(allegerFiche(rows[0]));
+}));
+
 // PATCH /api/requests/:id → met à jour un ou plusieurs champs
 app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const body = normalizeFlagBody(req.body || {});

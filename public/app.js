@@ -405,7 +405,12 @@ function buildStageEl(family, sub) {
   const isSub = !!sub;
   const slug = family.slug;
   const countKey = isSub ? sub.slug : slug;
-  const el = document.createElement('div');
+  // Un VRAI bouton, pas un <div> cliquable : le rail est la navigation
+  // principale de l'outil et il n'était atteignable ni au clavier (aucune de
+  // ses 32 entrées n'était focusable) ni par un lecteur d'écran. `type=button`
+  // pour qu'il ne valide jamais un formulaire par mégarde.
+  const el = document.createElement('button');
+  el.type = 'button';
   el.className = 'stage' + (isSub ? ' substage' : '');
   el.dataset.slug = slug;
   if (isSub) el.dataset.sub = sub.slug;
@@ -422,6 +427,9 @@ function buildStageEl(family, sub) {
   count.className = 'stage-count' + (n > 0 ? ' has-items' : '');
   count.textContent = n;
   el.append(label, count);
+  // Le compteur fait partie du nom accessible : « À chiffrer, 9 commandes ».
+  el.setAttribute('aria-label', `${label.textContent} — ${n} commande${n > 1 ? 's' : ''}`);
+  if (active) el.setAttribute('aria-current', 'true');
   el.addEventListener('click', () => selectStage(slug, isSub ? sub.slug : null));
   return el;
 }
@@ -505,7 +513,16 @@ function paintSidebarActive() {
       ? (el.dataset.slug === currentStage && el.dataset.sub === currentSub)
       : (el.dataset.slug === currentStage && (el.dataset.sub != null ? false : currentSub === null));
     el.classList.toggle('active', on);
+    if (on) el.setAttribute('aria-current', 'true');
+    else el.removeAttribute('aria-current');
   });
+}
+
+// Nom accessible d'une entrée du rail : le libellé ET son compteur, pour qu'un
+// lecteur d'écran annonce « À chiffrer — 9 commandes » d'un seul tenant.
+function syncStageLabel(el, n) {
+  const label = el.querySelector('.stage-label');
+  if (label) el.setAttribute('aria-label', `${label.textContent} — ${n} commande${n > 1 ? 's' : ''}`);
 }
 
 // L'onglet allumé et la grille affichée ne doivent jamais se contredire :
@@ -562,7 +579,7 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
     if (currentStage === slug) {
       $empty.hidden = false;
       $empty.textContent = 'Connexion perdue — les commandes réapparaîtront dès le retour du réseau.';
-      toast('Chargement impossible : vérifie la connexion.');
+      showToast('Chargement impossible : vérifie la connexion.');
     }
     return;
   }
@@ -584,6 +601,7 @@ async function loadCounts() {
       c.classList.toggle('has-items', n > 0);
     }
     el.classList.toggle('is-empty', n === 0);
+    syncStageLabel(el, n);
   });
 }
 
@@ -619,6 +637,7 @@ function bumpCount(slug, delta) {
   const c = el.querySelector('.stage-count');
   if (c) { c.textContent = n; c.classList.toggle('has-items', n > 0); }
   el.classList.toggle('is-empty', n === 0);
+  syncStageLabel(el, n);
 }
 
 // Vrai si la commande appartient à la vue actuellement affichée (même critère que
@@ -1002,7 +1021,12 @@ function buildCard(r) {
     return s;
   };
   meta.appendChild(puce(PRIORITY_LEVELS[prioBand(r)].label));
-  meta.appendChild(puce(stageDestinationLabel(r.stage, r.sub_stage ?? null)));
+  // On est DÉJÀ dans cette famille (son nom coiffe l'écran) : répéter
+  // « Demande & chiffrage › » sur chaque carte n'apprend rien et vole la place
+  // de la seule information neuve, la sous-étape.
+  meta.appendChild(puce(r.stage === currentStage
+    ? (SUB_LABEL[r.sub_stage] || (familyHasSub(r.stage) ? 'à préciser' : STAGE_LABEL[r.stage]))
+    : stageDestinationLabel(r.stage, r.sub_stage ?? null)));
   if (r.flag) {
     const pf = puce(FLAG_BY_VALUE[r.flag] ? FLAG_BY_VALUE[r.flag].label : 'À voir');
     pf.classList.add('pcard__pill--' + (r.flag === 'bloque' ? 'bloque' : 'a-voir'));
@@ -1019,15 +1043,26 @@ function buildCard(r) {
   // 3. COMBIEN DE TEMPS IL RESTE — la seule question que le tableau ne posait
   //    nulle part, alors que c'est celle qui décide de l'ordre de la journée.
   const delaiEl = document.createElement('div');
-  delaiEl.className = 'pcard__delai' + (bande === 'calme' ? '' : ` pcard__delai--${bande}`);
-  delaiEl.textContent = delai.texte;
   const remise = document.createElement('div');
   remise.className = 'pcard__sub';
   const heure = r.fiche && r.fiche.heureSouhaitee ? ` à ${r.fiche.heureSouhaitee.replace(':', 'h')}` : '';
   remise.textContent = `Remise client : ${dateFr(r.deadline)}${heure}`;
   const cible = document.createElement('div');
   cible.className = 'pcard__sub';
-  cible.textContent = `À terminer avant ${delai.echeanceTexte}`;
+
+  // Le délai restant suit l'HORLOGE, pas la donnée : on le réécrit sur place à
+  // chaque minute (voir rafraichirTemps) plutôt que de reconstruire la carte —
+  // reconstruire, c'était refaire tout le DOM du planning une fois par minute.
+  const majDelai = () => {
+    const d = tempsRestant(r.deadline, r.fiche && r.fiche.heureSouhaitee);
+    const b = bandeUrgence(d);
+    for (const x of ['retard', 'urgent', 'calme']) carte.classList.toggle(`pcard--${x}`, x === b);
+    delaiEl.className = 'pcard__delai' + (b === 'calme' ? '' : ` pcard__delai--${b}`);
+    delaiEl.textContent = d.texte;
+    cible.textContent = `À terminer avant ${d.echeanceTexte}`;
+  };
+  majDelai();
+  carte.__majTemps = majDelai;
 
   // 4. COMBIEN — le TTC, et le référent qu'on change d'un clic.
   const montant = document.createElement('div');
@@ -1230,7 +1265,7 @@ function applySearchAndCounts() {
   for (const r of lastRendered) {
     const entry = cartes ? cardEls.get(String(r.id)) : rowEls.get(String(r.id));
     if (!entry) continue;
-    const match = !q || isDraftRow(r) || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
+    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
     (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
     if (match) visible++;
   }
@@ -1265,49 +1300,34 @@ function applyEmptyCols() {
   applyColWidths();
 }
 
-// Une ligne est un « brouillon d'ajout » tant qu'aucun champ de contenu n'est
-// renseigné : on l'affiche alors comme un formulaire, pas comme une donnée.
-function isDraftRow(r) {
-  const fields = ['billing_company', 'product', 'description', 'deadline'];
-  return fields.every((k) => r[k] === null || r[k] === undefined || r[k] === '');
-}
+// LA « LIGNE BROUILLON » N'EXISTE PLUS. Elle datait de l'époque où l'on créait
+// une ligne vide directement dans la grille : depuis que Nouveau Projet est la
+// seule porte d'entrée, plus rien n'en crée. Le code restant, lui, frappait de
+// vraies commandes : un dossier du comptoir sans nom, sans description, sans
+// note ni date cochait le test « brouillon » et perdait sa poignée, sa
+// priorité, ses boutons dupliquer / supprimer — et disparaissait de la
+// recherche globale. Toute ligne est désormais une ligne.
 
 function buildRow(r) {
   const tr = document.createElement('tr');
   tr.dataset.id = r.id;
-  const draft = isDraftRow(r);
-  if (draft) tr.classList.add('is-draft');
   // Teinte d'alerte posée ici : cellFlag() ne peut pas atteindre le <tr> tant que
   // sa cellule n'est pas montée (elle la remet à jour aux changements suivants).
   if (r.flag === 'bloque') tr.classList.add('is-bloque');
   else if (r.flag === 'a_voir') tr.classList.add('is-a-voir');
 
-  // début de ligne : poignée draggable (ou bouton « + Ajouter » si brouillon)
-  // + icône contact discret (téléphone / email), sans modifier le reste.
+  // début de ligne : poignée draggable + icône contact discret
+  // (téléphone / email), sans modifier le reste.
   const tdHandle = document.createElement('td');
   tdHandle.className = 'col-handle';
   const handleCell = document.createElement('div');
   handleCell.className = 'handle-cell';
-  if (draft) {
-    const add = document.createElement('button');
-    add.className = 'add-btn';
-    add.type = 'button';
-    attachTip(add, 'Ajouter — remplir cette ligne');
-    add.setAttribute('aria-label', 'Ajouter une commande');
-    add.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
-    add.addEventListener('click', () => {
-      const first = tr.querySelector('.client-company');
-      if (first) first.focus();
-    });
-    handleCell.appendChild(add);
-  } else {
-    const grip = document.createElement('div');
-    grip.className = 'handle';
-    attachTip(grip, 'glisser pour déplacer');
-    grip.appendChild(gripIcon());
-    handleCell.appendChild(grip);
-    attachDrag(grip, tr, r);
-  }
+  const grip = document.createElement('div');
+  grip.className = 'handle';
+  attachTip(grip, 'glisser pour déplacer');
+  grip.appendChild(gripIcon());
+  handleCell.appendChild(grip);
+  attachDrag(grip, tr, r);
   tdHandle.appendChild(handleCell);
   tr.appendChild(tdHandle);
 
@@ -1336,18 +1356,21 @@ function buildRow(r) {
   // supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
-  if (!draft) {
-    for (const t of SEND_TARGETS) {
-      if (t.slug === r.stage) continue; // déjà dans cette catégorie
-      const send = document.createElement('button');
-      send.className = 'send-btn';
-      send.type = 'button';
-      attachTip(send, `Envoyer vers ${t.label}`);
-      send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
-      send.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg><span>${escapeHtml(t.label)}</span>`;
-      send.addEventListener('click', () => { if (armerUneFois(send)) copyToStage(r, t.slug); });
-      tdDel.appendChild(send);
-    }
+  for (const t of SEND_TARGETS) {
+    if (t.slug === r.stage) continue; // déjà dans cette catégorie
+    const send = document.createElement('button');
+    send.className = 'send-btn';
+    send.type = 'button';
+    attachTip(send, `Envoyer vers ${t.label}`);
+    send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
+    const fleche = strokeIcon(['M5 12h13', 'M13 6l6 6-6 6']);
+    fleche.setAttribute('width', '13');
+    fleche.setAttribute('height', '13');
+    const nom = document.createElement('span');
+    nom.textContent = t.label;
+    send.append(fleche, nom);
+    send.addEventListener('click', () => { if (armerUneFois(send)) copyToStage(r, t.slug); });
+    tdDel.appendChild(send);
   }
   const dup = document.createElement('button');
   dup.className = 'dup-btn';
@@ -1392,7 +1415,6 @@ function prioBand(r) {
 function cellStars(r) {
   const td = document.createElement('td');
   td.className = 'col-stars-cell';
-  if (isDraftRow(r)) return td; // pas de priorité sur la ligne brouillon
   const tag = document.createElement('button');
   tag.type = 'button';
   const renderTag = () => {
@@ -2099,6 +2121,7 @@ function cellInfos(r) {
   desc.rows = 1;
   desc.value = r.description ?? '';
   desc.placeholder = '+ Ajouter une note';
+  desc.setAttribute('aria-label', 'Infos — note libre sur la commande');
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -2127,7 +2150,10 @@ function cellInfos(r) {
       desc.style.height = '';
     }
     // Repliée + texte tronqué : l'infobulle donne la note complète au survol.
-    attachTip(desc, desc.value.trim() ? desc.value : 'cliquer pour ajouter une note');
+    // `title` et non `attachTip` : attachTip pose aussi un `aria-label`, et le
+    // lecteur d'écran annonçait alors le CONTENU du champ en guise d'étiquette
+    // (« Vérifier la taille des logos, zone de saisie ») au lieu de son rôle.
+    desc.title = desc.value.trim() ? desc.value : 'cliquer pour ajouter une note';
   };
 
   toggle.addEventListener('click', (e) => { e.stopPropagation(); open = !open; sync(); });
@@ -2202,6 +2228,9 @@ function cellDeadline(r) {
   }
 
   showBadge();
+  // Le badge est RELATIF à aujourd'hui (« 4 j », « En retard 1 j ») : il se
+  // repeint à chaque minute sans reconstruire la ligne (voir rafraichirTemps).
+  td.__majTemps = showBadge;
   return td;
 }
 
@@ -2235,6 +2264,32 @@ function ensureLigneDrawer() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && ligneDrawerId) closeLigneDetail();
   });
+  // La fiche se DÉCLARE modale (`aria-modal`) : la tabulation doit donc y
+  // rester. Sans ce filet, Tab repartait derrière le voile, dans un planning
+  // qu'on ne voit plus mais dont les champs restaient modifiables.
+  ligneDrawerEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || !ligneDrawerId) return;
+    const cibles = [...ligneDrawerCard.querySelectorAll(
+      'a[href], button:not([disabled]), input, select, textarea, summary, [tabindex]:not([tabindex="-1"])',
+    )].filter((el) => el.offsetParent !== null || el === document.activeElement);
+    if (!cibles.length) return;
+    const premier = cibles[0];
+    const dernier = cibles[cibles.length - 1];
+    if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier.focus(); }
+    else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier.focus(); }
+  });
+}
+
+// Ce qui avait le focus avant l'ouverture de la fiche : on le lui rend à la
+// fermeture, sinon le clavier repart du haut de la page à chaque consultation.
+let ldFocusAvant = null;
+
+// Le fond ne doit être ni cliquable ni tabulable pendant qu'une fiche est
+// ouverte. `inert` fait les deux (et le retire de l'arbre d'accessibilité) ;
+// il est ignoré sans dommage sur un navigateur qui ne le connaît pas.
+function figerLeFond(fige) {
+  const shell = document.querySelector('.shell');
+  if (shell) shell.inert = fige;
 }
 
 // La liste ne transporte qu'un RÉSUMÉ de la fiche (voir server.js) : le détail
@@ -2262,19 +2317,56 @@ async function chargerFicheComplete(id) {
   return fiche;
 }
 
+// Le serveur vient de nous rendre une commande AVEC sa fiche complète (réponse
+// d'un PATCH) : c'est elle qui fait foi désormais. Sans cette mise à jour, le
+// cache gardait la version chargée à l'ouverture du tiroir et `completerFiche`
+// la reposait au premier rafraîchissement temps réel — la correction qu'on
+// venait d'enregistrer (heure de retrait, détail du comptoir) disparaissait de
+// la fiche ~150 ms après l'avoir validée.
+function memoriserFiche(ligne) {
+  if (!ligne || !ligne.id) return;
+  const f = ligne.fiche;
+  if (!f || typeof f !== 'object' || f.fichePartielle) return;
+  fichesCompletes.set(String(ligne.id), f);
+}
+
+// Un AUTRE poste a touché au planning : notre copie du détail peut être périmée
+// (le temps réel ne transporte que le résumé). On oublie ce qu'on a mis de côté
+// et, si une fiche est ouverte, on va rechercher SON détail — une seule requête,
+// pour la seule commande qu'on regarde.
+function rafraichirFichesApresChangement() {
+  fichesCompletes.clear();
+  if (!ligneDrawerId) return;
+  const id = ligneDrawerId;
+  chargerFicheComplete(id)
+    .then(() => { if (ligneDrawerId === id) renderLigneDetailIfOpen(); })
+    .catch(() => { /* silencieux : la fiche reste utilisable avec ce qu'elle a */ });
+}
+
 function openLigneDetail(id) {
   ensureLigneDrawer();
   // On ouvre une fiche : rien de ce qui a été tapé dans la précédente n'a à
   // suivre. (Un enregistrement réussi nettoie déjà, mais on peut aussi fermer.)
   if (ligneDrawerId !== String(id)) ldOublierSaisie();
+  const premiereOuverture = !ligneDrawerId;
+  if (premiereOuverture) ldFocusAvant = document.activeElement;
   ligneDrawerId = String(id);
   ligneDrawerEl.hidden = false;
+  figerLeFond(true);
   // Chargement du détail en tâche de fond : le tiroir s'ouvre TOUT DE SUITE
   // avec ce que la grille connaît déjà (client, projet, prix, échéance), et le
   // récapitulatif complet s'y ajoute dès qu'il arrive. Personne n'attend
   // devant un écran vide.
   chargerFicheComplete(id)
-    .then(() => { if (ligneDrawerId === String(id)) renderLigneDetail(); })
+    .then(() => {
+      if (ligneDrawerId !== String(id)) return;
+      renderLigneDetail();
+      // Ce second rendu remplace le corps de la fiche : s'il a emporté
+      // l'élément qui avait le focus (le bouton Fermer posé à l'ouverture) et
+      // que personne d'autre ne l'a pris entre-temps, on le repose. Sinon le
+      // clavier se retrouve sur <body>, hors de la fiche qui se dit modale.
+      if (document.activeElement === document.body) focusFiche();
+    })
     .catch((err) => {
       // Le tiroir reste utilisable sans le récapitulatif, mais on ne le passe
       // pas sous silence : sinon un détail manquant ressemble à un détail
@@ -2291,13 +2383,27 @@ function openLigneDetail(id) {
   const oldBody = ligneDrawerCard.querySelector('.ld-body');
   if (oldBody) oldBody.scrollTop = 0;
   renderLigneDetail();
+  // Le clavier entre dans la fiche — mais SEULEMENT à l'ouverture : reposer le
+  // focus à chaque re-rendu (temps réel) arracherait le curseur du champ en
+  // cours de saisie.
+  focusFiche();
+}
+
+// Pose le focus sur le bouton Fermer de la fiche : le premier arrêt du clavier
+// à l'intérieur du panneau.
+function focusFiche() {
+  const fermer = ligneDrawerCard && ligneDrawerCard.querySelector('.ld-close');
+  if (fermer) fermer.focus();
 }
 
 function closeLigneDetail() {
   if (!ligneDrawerEl) return;
   ligneDrawerId = null;
   ligneDrawerEl.hidden = true;
+  figerLeFond(false);
   ldOublierSaisie();
+  if (ldFocusAvant && ldFocusAvant.isConnected && ldFocusAvant.focus) ldFocusAvant.focus();
+  ldFocusAvant = null;
 }
 
 // Rappelée après CHAQUE (re)rendu de la grille (poll, SSE, tri, sauvegarde
@@ -2396,11 +2502,24 @@ function ldSuivi(cle, el, valeur) {
 }
 
 // Avant de tout reconstruire : on relève ce qui a été tapé et pas enregistré.
+//
+// UNE CORRECTION EST UN ÉCART À CE QU'ON A RENDU — encore faut-il qu'on ait
+// rendu quelque chose. `ldValeursRendues` est vidé par `ldOublierSaisie()`
+// (ouverture d'une AUTRE commande, fermeture, enregistrement réussi) ; sans la
+// garde ci-dessous, la capture qui suit comparait alors les champs de la fiche
+// PRÉCÉDENTE — encore montée à l'écran — à du vide, prenait tout pour une
+// correction en cours, et `ldAppliquerSaisie()` la reposait sur la commande
+// qu'on vient d'ouvrir. Ouvrir deux fiches à la suite remplissait la seconde
+// avec le dossier de la première, et « Enregistrer » écrasait pour de bon le
+// client, le projet, le prix, l'échéance et l'étape. Une clé absente de
+// `ldValeursRendues` = ce contrôle n'appartient pas au rendu courant : il n'y a
+// rien à en retenir.
 function ldCapturerSaisie() {
   if (!ligneDrawerCard) return;
   for (const el of ligneDrawerCard.querySelectorAll('[data-ld-key]')) {
     const cle = el.dataset.ldKey;
-    if (String(el.value) !== (ldValeursRendues[cle] ?? '')) ldSaisieEnCours[cle] = el.value;
+    if (!(cle in ldValeursRendues)) continue;
+    if (String(el.value) !== ldValeursRendues[cle]) ldSaisieEnCours[cle] = el.value;
   }
 }
 
@@ -3308,6 +3427,7 @@ async function enregistrerFiche(r, c) {
   if (Object.keys(corps).length) {
     const maj = await api('PATCH', `/api/requests/${r.id}`, corps);
     Object.assign(r, maj);
+    memoriserFiche(maj);
     touche = true;
   }
 
@@ -3330,6 +3450,7 @@ async function enregistrerFiche(r, c) {
   if (Object.keys(corpsFiche).length) {
     const majFiche = await api('PATCH', `/api/requests/${r.id}/fiche`, corpsFiche);
     Object.assign(r, majFiche);
+    memoriserFiche(majFiche);
     touche = true;
   }
 
@@ -3825,8 +3946,13 @@ function finalizeCreate(tmpId, created) {
 }
 
 // --- Suppression (optimiste) ----------------------------------------------
-function removeRow(r) {
-  if (!confirm('Supprimer cette commande définitivement ?')) return;
+async function removeRow(r) {
+  const quoi = [r.billing_company, r.product].filter(Boolean).join(' — ') || 'cette commande';
+  const ok = await confirmerAction(
+    'Supprimer cette commande ?',
+    `${quoi} sera retirée du planning définitivement.`,
+  );
+  if (!ok) return;
   // Ligne pas encore créée côté serveur : on l'enlève localement et on marque
   // l'id temporaire — si son POST de création est encore en vol, finalizeCreate
   // supprimera la commande orpheline à la réponse.
@@ -3854,34 +3980,13 @@ function removeRow(r) {
   });
 }
 
-// Construit le corps de copie d'une commande (tous les champs sauf la position,
-// recalculée en bas de l'étape cible). Les PDF ne sont pas recopiés.
-function copyBody(r, stage) {
-  return {
-    stage: stage || r.stage,
-    // On ne transporte la sous-étape que si la commande reste dans sa famille
-    // (une copie « Envoyer vers … » change de famille → sous-étape repartie à zéro).
-    sub_stage: (!stage || stage === r.stage) ? (r.sub_stage ?? null) : null,
-    // La nature (demande / commande) est une propriété du dossier, pas de sa
-    // place dans le flux : une copie la garde, où qu'on l'envoie.
-    order_kind: r.order_kind ?? null,
-    responsable: r.responsable ?? null,
-    referent: r.referent ?? null,
-    priority: r.priority,
-    client_type: r.client_type,
-    billing_company: r.billing_company,
-    contact_referent: r.contact_referent,
-    contact_phone: r.contact_phone,
-    contact_email: r.contact_email,
-    quantity: r.quantity,
-    product: r.product,
-    color: r.color,
-    project_value: r.project_value,
-    description: r.description,
-    deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
-    // `flag` / `flag_reason` volontairement NON copiés : une copie repart d'une
-    // page blanche, elle n'hérite pas du blocage de l'originale.
-  };
+// LA COPIE SE FAIT CÔTÉ SERVEUR (POST /api/requests/:id/copie). Le navigateur
+// renvoyait champ par champ ce qu'il avait à l'écran — or la grille ne reçoit
+// qu'un RÉSUMÉ de `fiche` : la copie repartait sans le récapitulatif du
+// comptoir, donc sans rien de ce que l'atelier doit produire. Le serveur, lui,
+// a la ligne complète sous la main.
+function copierCommande(r, stage) {
+  return api('POST', `/api/requests/${r.id}/copie`, stage ? { stage } : {});
 }
 
 // Duplique une commande (optimiste) : la copie reste dans la même étape et
@@ -3892,11 +3997,12 @@ function duplicateRow(r) {
   const tmpId = `tmp-${++tmpSeq}`;
   const copy = {
     ...r, id: tmpId, devis_name: null, bat_name: null, facture_name: null,
+    flag: null, flag_reason: null,
     position: maxPos + 1000, created_at: now, updated_at: now,
   };
   // La copie n'apparaît dans la grille que si elle relève bien de la vue courante.
   if (!belongsToCurrentView(copy)) {
-    api('POST', '/api/requests', copyBody(r)).catch(reportError);
+    copierCommande(r).catch(reportError);
     return;
   }
   const viewSlug = currentStage;
@@ -3904,9 +4010,11 @@ function duplicateRow(r) {
   pendingCreates.set(tmpId, { patch: {} });
   applySortAndRender();
   bumpCount(viewSlug, +1);
-  const tr = $rows.querySelector(`tr[data-id="${tmpId}"]`);
-  if (tr) tr.scrollIntoView({ block: 'nearest' });
-  api('POST', '/api/requests', copyBody(r))
+  // La vue par défaut est en CARTES : viser le <tr> ne trouvait rien, et la
+  // copie naissait hors écran sans que personne ne la voie apparaître.
+  const nouveau = listeCourante().querySelector(`[data-id="${tmpId}"]`);
+  if (nouveau) nouveau.scrollIntoView({ block: 'nearest' });
+  copierCommande(r)
     .then((created) => finalizeCreate(tmpId, created))
     .catch((err) => {
       pendingCreates.delete(tmpId);
@@ -3925,7 +4033,7 @@ function duplicateRow(r) {
 function copyToStage(r, slug) {
   bumpCount(slug, +1);
   showToast(`Copié vers ${STAGE_LABEL[slug] || slug}`);
-  api('POST', '/api/requests', copyBody(r, slug)).catch((err) => {
+  copierCommande(r, slug).catch((err) => {
     bumpCount(slug, -1);
     reportError(err);
     loadCounts().catch(() => {}); // valeur exacte (un loadCounts concurrent a pu déjà corriger)
@@ -4481,20 +4589,33 @@ function renderColbar() {
   if ($colbarOnNote) $colbarOnNote.hidden = !modeCartes();
 }
 
-function setColbarOpen(open) {
+// `memoriser` : on n'enregistre QUE le geste de l'utilisateur. Enregistrer aussi
+// l'état calculé au démarrage figeait le tout premier écran ouvert : un passage
+// sur un grand moniteur décidait pour la tablette, et le rail se rouvrait en
+// paysage comme en portrait alors que personne ne l'avait demandé.
+function setColbarOpen(open, memoriser = true) {
   if (!$colbar || !$colbarOpen) return;
   $colbar.hidden = !open;
   $colbarOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
-  try { localStorage.setItem('olda_colbar_open', open ? '1' : '0'); } catch (_) {}
+  if (memoriser) {
+    try { localStorage.setItem('olda_colbar_open', open ? '1' : '0'); } catch (_) {}
+  }
 }
 
 function initColbar() {
   if (!$colbar) return;
   applyColVisibility();
   renderColbar();
-  let open = true;
-  try { open = localStorage.getItem('olda_colbar_open') !== '0'; } catch (_) {}
-  setColbarOpen(open);
+  // Le rail des colonnes coûte 208 px de largeur (ou, sur tablette, un panneau
+  // posé sur la grille) : il ne s'ouvre de lui-même que sur un écran assez
+  // large pour l'absorber. Sur la tablette de l'atelier, le planning s'ouvre en
+  // pleine largeur et le rail attend derrière son bouton « Colonnes ».
+  let open = window.innerWidth >= 1400;
+  try {
+    const memo = localStorage.getItem('olda_colbar_open');
+    if (memo !== null) open = memo !== '0'; // un choix explicite fait toujours foi
+  } catch (_) {}
+  setColbarOpen(open, false);
   $colbarOpen.addEventListener('click', () => setColbarOpen($colbar.hidden));
   document.getElementById('colbarClose').addEventListener('click', () => setColbarOpen(false));
   // « Tout réafficher » ramène le tableau complet ; « Tout ranger » repose le
@@ -4611,17 +4732,85 @@ function formatMoney(v) {
   return num + ' €';
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
+// « Failed to fetch », « NetworkError when attempting to fetch resource » : le
+// navigateur parle anglais et technique. L'atelier, lui, doit juste savoir que
+// le réseau est tombé et que ça va revenir.
+function estPanneReseau(err) {
+  const m = String((err && err.message) || '');
+  return err instanceof TypeError
+    || /failed to fetch|networkerror|load failed|network request failed/i.test(m);
 }
 
 function reportError(err) {
   console.error(err);
   // signal discret et non bloquant
+  if (estPanneReseau(err)) { showToast('Connexion perdue — on réessaie tout seul.'); return; }
   const msg = (err && err.message) ? err.message : 'Erreur réseau';
   showToast(msg);
+}
+
+// --- Demande de confirmation ------------------------------------------------
+// `confirm()` ouvre la boîte grise du système : hors charte, minuscule au doigt
+// sur la tablette, et elle GÈLE le thread — le planning ne se rafraîchit plus
+// tant qu'elle est à l'écran. On pose la même question avec les composants de
+// l'app : grandes cibles, Échap / fond pour annuler, focus sur « Annuler » (on
+// ne confirme jamais une suppression par inadvertance en tapant Entrée).
+function confirmerAction(titre, texte, libelleOk = 'Supprimer') {
+  return new Promise((resolve) => {
+    const focusAvant = document.activeElement;
+    const fond = document.createElement('div');
+    fond.className = 'ask';
+    const carte = document.createElement('div');
+    carte.className = 'ask__card';
+    carte.setAttribute('role', 'alertdialog');
+    carte.setAttribute('aria-modal', 'true');
+
+    const h = document.createElement('h2');
+    h.className = 'ask__title';
+    h.textContent = titre;
+    const p = document.createElement('p');
+    p.className = 'ask__text';
+    p.textContent = texte;
+    carte.setAttribute('aria-label', `${titre}. ${texte}`);
+
+    const actions = document.createElement('div');
+    actions.className = 'ask__actions';
+    const annuler = document.createElement('button');
+    annuler.type = 'button';
+    annuler.className = 'ask__btn';
+    annuler.textContent = 'Annuler';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'ask__btn ask__btn--danger';
+    ok.textContent = libelleOk;
+    actions.append(annuler, ok);
+    carte.append(h, p, actions);
+    fond.append(carte);
+    document.body.append(fond);
+
+    let fini = false;
+    const fermer = (reponse) => {
+      if (fini) return;
+      fini = true;
+      document.removeEventListener('keydown', onKey, true);
+      fond.remove();
+      if (focusAvant && focusAvant.isConnected && focusAvant.focus) focusAvant.focus();
+      resolve(reponse);
+    };
+    // Tabulation retenue dans la boîte : sans ça, le focus repart derrière le
+    // voile et on répond à une question qu'on ne voit plus.
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermer(false); return; }
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      (document.activeElement === annuler ? ok : annuler).focus();
+    }
+    document.addEventListener('keydown', onKey, true);
+    annuler.addEventListener('click', () => fermer(false));
+    ok.addEventListener('click', () => fermer(true));
+    fond.addEventListener('click', (e) => { if (e.target === fond) fermer(false); });
+    requestAnimationFrame(() => { fond.classList.add('open'); annuler.focus(); });
+  });
 }
 
 let toastTimer = null;
@@ -4671,13 +4860,44 @@ function isInteracting() {
 // rouge, et le tri par urgence ne la faisait pas remonter. On repasse dessus
 // chaque minute, sans jamais interrompre une saisie ni un glisser.
 const TICK_TEMPS_MS = 60000;
+// Le jour affiché lors du dernier passage : le TRI par urgence, lui, ne dépend
+// que du nombre de jours restants — il ne peut donc changer qu'au passage de
+// minuit, pas à chaque minute.
+let dernierJourRendu = new Date().toDateString();
+
 function rafraichirTemps() {
   if (document.hidden || !booted) return;
   if (isInteracting()) return;
-  invalidateRowCache();
-  // Le tiroir n'est PAS reconstruit ici : il porte peut-être une correction non
-  // encore enregistrée, et son propre affichage ne dépend pas de la minute.
-  applySortAndRender({ syncDrawer: false });
+
+  // MINUIT : les échéances changent de bande (« 1 j » devient « Aujourd'hui »,
+  // « Aujourd'hui » devient « En retard ») et l'ordre du planning avec elles.
+  // C'est le seul moment où il faut vraiment tout recalculer.
+  const jour = new Date().toDateString();
+  if (jour !== dernierJourRendu) {
+    dernierJourRendu = jour;
+    invalidateRowCache();
+    // Le tiroir n'est PAS reconstruit ici : il porte peut-être une correction
+    // non encore enregistrée, et son affichage ne dépend pas de la minute.
+    applySortAndRender({ syncDrawer: false });
+    return;
+  }
+
+  // Le reste du temps, seul le TEXTE du délai bouge. On le réécrit sur place :
+  // reconstruire chaque carte (buildCard + attachDrag + attachTip, et jusqu'à
+  // 400 itérations de calcul d'heures ouvrées par ligne) une fois par minute
+  // secouait tout le planning sur une tablette ouverte depuis le matin.
+  const cartes = modeCartes();
+  const entrees = cartes ? cardEls : rowEls;
+  for (const [, e] of entrees) {
+    const el = cartes ? e.el : e.tr;
+    if (!el || !el.isConnected) continue;
+    if (cartes) {
+      if (el.__majTemps) el.__majTemps();
+    } else {
+      const td = el.querySelector('.col-deadline-cell');
+      if (td && td.__majTemps) td.__majTemps();
+    }
+  }
 }
 
 function signature(list) {
@@ -4729,6 +4949,9 @@ function onStreamChange(e) {
   if (kind === 'ordre-manuel') {
     loadOrdreManuel().then(() => { renderOrdreReset(); applySortAndRender(); });
   }
+  // Le détail complet mis de côté peut avoir été corrigé ailleurs : on le relit
+  // pour la seule fiche ouverte (voir rafraichirFichesApresChangement).
+  rafraichirFichesApresChangement();
   // Le planning a changé côté serveur → le cache global de recherche est périmé.
   // On l'invalide. Le rechargement, lui, ATTEND : `/api/requests` sans filtre
   // renvoie tout le planning, et le relancer à chaque événement pendant qu'un
@@ -4927,7 +5150,7 @@ function runSearch() {
   }
   const tokens = fold(raw).split(/\s+/).filter(Boolean);
   const hits = allRows
-    .filter((r) => !isDraftRow(r) && matchRow(r, tokens))
+    .filter((r) => matchRow(r, tokens))
     .sort((a, b) => {
       const sa = STAGE_ORDER[a.stage] ?? 99, sb = STAGE_ORDER[b.stage] ?? 99;
       if (sa !== sb) return sa - sb;
@@ -5483,15 +5706,22 @@ async function start() {
   updateSubColVisibility(currentStage);
   updatePriceColVisibility(currentStage);
   applyColWidths();
-  // Les noms « de base » (pilote + référents par catégorie) doivent être connus
-  // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis sautent.
-  await Promise.all([
-    loadCategoryConfig(), loadCounts(), loadWhatsappMessage(), loadTgca(), loadOrdreManuel(),
-  ]);
+  // L'EN-TÊTE NE DÉPEND D'AUCUN RÉSEAU : on le pose avant tout appel. Hors
+  // ligne (le service worker sert la coquille), l'écran affichait sinon le
+  // titre de repli du HTML — « Commande » — au lieu de l'étape en cours.
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
   updateStageHelp();
   updateFiverrTool(currentStage);
+  // Les noms « de base » (pilote + référents par catégorie) doivent être connus
+  // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis
+  // sautent. Aucun de ces appels n'est vital : un compteur manquant ne doit pas
+  // empêcher le planning de s'afficher — seul `loadRows` fait foi (son échec
+  // déclenche la reprise, voir demarrerAvecReprise).
+  await Promise.all([
+    loadCategoryConfig(), loadCounts().catch(() => {}), loadWhatsappMessage(),
+    loadTgca(), loadOrdreManuel(),
+  ]);
   await loadRows();
   lastRowsSig = signature(rows);
   // À partir d'ici la grille est montée : les changements d'onglet peuvent la
@@ -5501,12 +5731,37 @@ async function start() {
   startRealtime();
 }
 
+// --- Installation sur la tablette + ouverture hors ligne ---------------------
+// Le manifeste seul ne suffit pas : sans service worker, Chrome ne propose
+// jamais « Installer l'application », et une coupure réseau au démarrage laisse
+// un écran blanc. Le nôtre ne fait QUE mettre la coquille de côté — le réseau
+// garde toujours la priorité (voir sw.js), un déploiement s'applique donc
+// immédiatement comme aujourd'hui.
+if ('serviceWorker' in navigator) {
+  // Après le premier rendu : l'enregistrement ne doit pas disputer la bande
+  // passante au chargement du planning.
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker non enregistré :', err);
+    });
+  });
+}
+
 // Un seul échec réseau au démarrage laissait l'application MORTE : `booted`
 // restait faux, le temps réel n'était jamais lancé, et seul un rechargement
 // manuel s'en sortait. On réessaie, en espaçant les tentatives.
 function demarrerAvecReprise(essai = 0) {
   start().catch((err) => {
     reportError(err);
+    // Le service worker a servi la coquille : l'écran est là, mais vide. On DIT
+    // pourquoi — un planning vide sans explication se lit comme « tout a
+    // disparu », et c'est le moment où quelqu'un ressaisit une commande.
+    if ($empty) {
+      $empty.hidden = false;
+      $empty.textContent = essai === 0
+        ? 'Connexion au serveur perdue — les commandes réapparaîtront dès le retour du réseau.'
+        : `Toujours hors ligne — nouvelle tentative (${essai + 1})…`;
+    }
     const attente = Math.min(15000, 1500 * (essai + 1));
     setTimeout(() => demarrerAvecReprise(essai + 1), attente);
   });
