@@ -84,6 +84,53 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(memeTicket.length, 1, 'une seule ligne au planning pour un seul encaissement');
 
   // -------------------------------------------------------------------------
+  // 3 bis. …MAIS une référence déjà prise ne prouve pas qu'il s'agit du même
+  //    dossier. Quand le compteur du serveur est injoignable, chaque écran se
+  //    donne une référence de secours tirée d'un compteur LOCAL qui repart à 1
+  //    chaque matin : deux postes hors réseau tombaient sur la MÊME. Le second
+  //    dossier était alors jeté EN SILENCE — l'écran annonçait un succès et
+  //    sautait sur la ligne de la collègue. C'est le scénario des dossiers
+  //    perdus des 03-04/08. Il doit désormais VIVRE, sous une autre référence.
+  // -------------------------------------------------------------------------
+  const autreDossier = await call('POST', '/api/comptoir/projet', {
+    ...vente,
+    client: 'Autre Cliente', clientObj: { company: 'Autre Cliente', type: 'Professionnel' },
+    name: 'Mugs', quantity: 12, amount: 240,
+  });
+  assert.strictEqual(autreDossier.status, 201, 'un dossier DIFFÉRENT n’est jamais avalé');
+  assert.notStrictEqual(autreDossier.body.id, premier.body.id, 'et ce n’est pas la ligne de la collègue');
+  assert.strictEqual(autreDossier.body.refModifiee, '26.08.04-777-2',
+    'il prend une référence distincte, et le dit pour qu’on corrige le ticket');
+
+  const apresCollision = (await call('GET', '/api/requests')).body;
+  const ligneSauvee = apresCollision.find((r) => r.id === autreDossier.body.id);
+  assert.strictEqual(ligneSauvee.billing_company, 'Autre Cliente', 'le bon dossier, avec son bon client');
+  assert.strictEqual(ligneSauvee.fiche.ref, '26.08.04-777-2');
+  assert.strictEqual(
+    apresCollision.filter((r) => r.fiche && r.fiche.ref === '26.08.04-777').length, 1,
+    'la première ligne n’a pas bougé',
+  );
+
+  // Et le RENVOI de ce second dossier reste idempotent : il retrouve SA ligne,
+  // pas celle de la première, malgré la référence d'origine identique.
+  const rejeuSecond = await call('POST', '/api/comptoir/projet', {
+    ...vente,
+    client: 'Autre Cliente', clientObj: { company: 'Autre Cliente', type: 'Professionnel' },
+    name: 'Mugs', quantity: 12, amount: 240,
+  });
+  assert.strictEqual(rejeuSecond.body.id, autreDossier.body.id,
+    'le rejeu du second dossier retrouve SA ligne');
+  assert.strictEqual(rejeuSecond.body.dejaEnregistre, true);
+
+  // Un montant illisible n'est plus « pas de prix » : c'est une faute de frappe,
+  // et une vente sans montant ne se découvre qu'à la facturation.
+  const montantIllisible = await call('POST', '/api/comptoir/projet', {
+    source: 'Vente directe', ref: '26.08.04-999', client: 'Faute Frappe',
+    clientObj: { company: 'Faute Frappe' }, name: 'Polo', amount: '12,50 €',
+  });
+  assert.strictEqual(montantIllisible.status, 400, 'un montant illisible est refusé, pas effacé');
+
+  // -------------------------------------------------------------------------
   // 4. Une DEMANDE de devis sans date souhaitée n'a pas d'échéance : la dater
   //    du jour la faisait paraître en retard dès le lendemain.
   // -------------------------------------------------------------------------

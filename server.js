@@ -523,6 +523,45 @@ app.get('/api/requests', asyncH(async (req, res) => {
   res.json(result.rows.map(allegerFiche));
 }));
 
+// GET /api/requests/recherche?q=…  → LA RECHERCHE GLOBALE (palette « Spotlight »).
+//
+// Elle se faisait dans le navigateur : à la première frappe, le poste
+// TÉLÉCHARGEAIT TOUT LE PLANNING — archives comprises, donc une liste qui ne
+// cesse de grossir, à vie — pour filtrer dessus en mémoire. C'est le serveur qui
+// filtre désormais, et il ne renvoie qu'une page de résultats.
+//
+// Mêmes champs et même règle qu'à l'écran : tous les jetons doivent apparaître,
+// sans distinction de casse ni d'accent (« melina » trouve « Mélina »).
+const RECHERCHE_CHAMPS = ['billing_company', 'contact_referent', 'product', 'color', 'description',
+  'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason'];
+const RECHERCHE_MAX = 60;      // miroir de PALETTE_MAX côté écran
+const RECHERCHE_JETONS_MAX = 8;
+// `unaccent` est une extension, pas toujours installée (et absente de la base
+// locale de test) : `translate` fait le même travail sur les lettres qui nous
+// concernent, partout.
+const ACCENTS = 'àâäáãåçéèêëíìîïñóòôöõùúûüýÿ';
+const SANS_ACCENTS = 'aaaaaaceeeeiiiinooooouuuuyy';
+const FOIN_RECHERCHE = `translate(lower(concat_ws(' ', ${RECHERCHE_CHAMPS.map((c) => `r.${c}`).join(', ')})), '${ACCENTS}', '${SANS_ACCENTS}')`;
+
+const replier = (s) => String(s == null ? '' : s).toLowerCase()
+  .normalize('NFD').replace(/\p{Diacritic}/gu, '');
+// `strpos`, et surtout PAS `LIKE` : `%` et `_` y sont des jokers, et un client
+// nommé « 100 % Coton » se cherche tel quel. Les échapper marchait, mais faisait
+// dépendre le résultat des règles d'échappement du moteur — ce qui n'est pas la
+// même chose d'une base à l'autre. Une recherche de sous-chaîne n'a pas de
+// jokers du tout : rien à échapper, donc rien qui puisse diverger.
+app.get('/api/requests/recherche', asyncH(async (req, res) => {
+  const jetons = replier(req.query.q).split(/\s+/).filter(Boolean).slice(0, RECHERCHE_JETONS_MAX);
+  if (!jetons.length) return res.json([]);
+  const params = [...jetons];
+  const conditions = jetons.map((_, i) => `strpos(${FOIN_RECHERCHE}, $${i + 1}) > 0`).join(' AND ');
+  params.push(RECHERCHE_MAX + 1); // un de plus : l'écran sait dire « affine »
+  const { rows } = await pool.query(
+    `${SELECT} WHERE ${conditions} ORDER BY r.updated_at DESC LIMIT $${params.length}`, params,
+  );
+  res.json(rows.map(allegerFiche));
+}));
+
 // GET /api/requests/:id → UNE commande, fiche COMPLÈTE. C'est ce que le tiroir
 // de détail et le récapitulatif imprimable vont chercher : le détail n'est
 // chargé que pour la ligne qu'on ouvre, jamais pour les centaines d'autres.
@@ -658,6 +697,58 @@ app.post('/api/requests/:id/copie', asyncH(async (req, res) => {
   );
   broadcast({ kind: 'create', stages: [rows[0].stage] });
   res.status(201).json(allegerFiche(rows[0]));
+}));
+
+// PATCH /api/requests/positions → RANGE TOUTE UNE ÉTAPE EN UNE FOIS.
+// Corps : [{ id, position }, …]
+//
+// Glisser une seule carte renumérote toute la famille (voir commitReorder) : le
+// navigateur envoyait donc un PATCH PAR LIGNE. Sur une étape de quarante
+// commandes, un geste produisait quarante requêtes, quarante écritures, et
+// surtout QUARANTE ÉVÈNEMENTS temps réel — que chaque poste connecté payait en
+// rechargeant sa grille, son dashboard et la fiche ouverte. C'était le « ça
+// rame » de la tablette : un geste, une tempête.
+// Ici : une requête, une transaction, UN seul évènement.
+const REORDER_MAX = 500; // une étape n'en tient pas tant ; au-delà c'est une erreur
+app.patch('/api/requests/positions', asyncH(async (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : null;
+  if (!list) return res.status(400).json({ error: 'Tableau [{ id, position }] attendu' });
+  if (list.length === 0) return res.json({ misAJour: 0 });
+  if (list.length > REORDER_MAX) return res.status(400).json({ error: `trop de lignes (${REORDER_MAX} maximum)` });
+
+  for (const item of list) {
+    if (!item || typeof item !== 'object') return res.status(400).json({ error: '{ id, position } attendu' });
+    if (!UUID_RE.test(String(item.id))) return res.status(400).json({ error: `identifiant invalide : ${item.id}` });
+    const v = validateField('position', item.position);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+  }
+
+  // TOUT ou RIEN. En écritures indépendantes, une panne au milieu laissait la
+  // moitié de l'étape renumérotée et l'autre sur ses anciennes valeurs : un
+  // ordre mélangé que personne ne pouvait plus démêler à la main.
+  const client = await pool.connect();
+  const etapes = new Set();
+  try {
+    await client.query('BEGIN');
+    for (const item of list) {
+      const { rows } = await client.query(
+        'UPDATE requests SET position = $1, updated_at = now() WHERE id = $2 RETURNING stage',
+        [Number(item.position), item.id],
+      );
+      if (rows[0]) etapes.add(rows[0].stage);
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // La `position` n'est pas journalisée (un seul glisser en réécrit une dizaine,
+  // le journal se remplirait de bruit) — même règle qu'au PATCH unitaire.
+  broadcast({ kind: 'update', stages: [...etapes] });
+  res.json({ misAJour: list.length });
 }));
 
 // PATCH /api/requests/:id → met à jour un ou plusieurs champs
@@ -2012,10 +2103,60 @@ const borner = (v, max) => {
 
 // Prix : seule une VENTE en a un. Une demande de devis vaut null — surtout pas
 // 0, qui se lit « gratuit » dans la colonne Prix alors qu'il faut le chiffrer.
+// Un montant ILLISIBLE n'est pas « pas de prix » : c'est une faute de frappe. On
+// la renvoie à l'écran ({ error }) plutôt que d'enregistrer une vente sans
+// montant, que personne ne remarque avant la facturation.
 function prixComptoir(brut) {
-  if (brut == null || brut === '') return null;
+  if (brut == null || brut === '') return { valeur: null };
   const n = Number(brut);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+  if (!Number.isFinite(n) || n < 0) return { error: `montant invalide : ${brut}` };
+  return { valeur: Math.round(n * 100) / 100 };
+}
+
+// EMPREINTE DU DOSSIER — ce qui distingue une commande d'une autre, sans l'heure
+// ni rien de ce qui change d'un envoi à l'autre. Elle sert à trancher, quand une
+// référence est déjà en base, entre les deux seules explications possibles :
+//   - le MÊME dossier renvoyé (le réseau avait avalé la réponse) → on rend la
+//     ligne existante, c'est exactement ce qu'on veut ;
+//   - un AUTRE dossier qui porte la même référence (deux postes hors réseau se
+//     donnent tous deux « DEV-26.08.05-001 ») → jusqu'ici il était jeté EN
+//     SILENCE, l'écran annonçant un succès. Il doit vivre, sous une autre
+//     référence.
+// La RÉFÉRENCE DEMANDÉE en fait partie : sans elle, deux ventes rigoureusement
+// identiques du même jour au même client (les mêmes 12 mugs commandés deux fois)
+// partageraient une empreinte, et la seconde serait avalée. Un renvoi, lui,
+// reposte exactement le même corps — référence comprise.
+function empreinteDossier(b, ref, nomDossier, valeur, quantite) {
+  const detail = (l) => (Array.isArray(l) ? l.map((x) => (Array.isArray(x) ? x.join('=') : '')).join('|') : '');
+  // Séparateur explicite entre les champs : collés bout à bout, « AB » + « C »
+  // et « A » + « BC » donneraient la même empreinte — donc deux dossiers
+  // distincts pris l'un pour l'autre.
+  const brut = [
+    String(ref || ''), String(nomDossier || ''),
+    valeur == null ? '' : String(valeur), quantite == null ? '' : String(quantite),
+    String(b.source || ''), String(b.name || ''), String(b.recap || ''), String(b.comment || ''),
+    detail(b.client_info), detail(b.details),
+  ].join('\u001f');
+  return require('crypto').createHash('sha256').update(brut, 'utf8').digest('hex').slice(0, 32);
+}
+
+// Une référence libre, à partir de celle demandée. On ne renvoie JAMAIS null :
+// le seul but de cette fonction est qu'un dossier puisse naître, et une ligne
+// sans référence est une ligne qu'on ne sait plus relier à son ticket. Après
+// quelques essais lisibles (« -2 », « -3 »…), on tranche avec l'horodatage.
+async function refDisponible(ref) {
+  // On raccourcit la base pour que le suffixe tienne dans les 40 caractères de
+  // la colonne : `borner` y ajouterait des points de suspension, qui n'ont rien
+  // à faire dans un numéro de ticket (et pourraient re-collisionner).
+  const base = String(ref).slice(0, 30);
+  for (let i = 2; i <= 20; i += 1) {
+    const essai = `${base}-${i}`;
+    const { rowCount } = await pool.query(
+      "SELECT 1 FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [essai],
+    );
+    if (rowCount === 0) return essai;
+  }
+  return `${base}-${Date.now().toString(36).toUpperCase()}`;
 }
 
 // « Prénom NOM » d'un particulier : le texte ENTIER reste le nom du dossier
@@ -2049,22 +2190,58 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   // jour la faisait paraître en retard dès le lendemain alors que personne n'a
   // rien promis au client. Une VENTE, elle, garde le jour même par défaut.
   const deadline = isDay(b.due) ? b.due : (estDemande ? null : todayPlus(0));
-  const valeur = estDemande ? null : prixComptoir(b.amount);
+  const prix = estDemande ? { valeur: null } : prixComptoir(b.amount);
+  if (prix.error) return res.status(400).json({ error: prix.error });
+  const valeur = prix.valeur;
 
   // IDEMPOTENCE. Le réseau de la tablette peut avaler la RÉPONSE d'un envoi qui
   // a pourtant abouti : l'écran annonce un échec, la vendeuse réessaie, et la
   // vente entrait une seconde fois au planning sous le même numéro de ticket.
-  // Ce numéro est unique par jour : s'il est déjà en base, on rend la ligne
-  // existante au lieu d'en créer une jumelle.
+  // On rend alors la ligne existante au lieu d'en créer une jumelle.
+  //
+  // MAIS une référence déjà en base ne prouve pas qu'il s'agit du même dossier :
+  // quand le compteur du serveur est injoignable, chaque écran se donne une
+  // référence de secours, et deux postes hors réseau tombaient sur la MÊME.
+  // Le second dossier était alors jeté sans un mot, l'écran annonçant un succès
+  // et sautant sur la ligne de la collègue. On compare donc l'empreinte du
+  // dossier avant de conclure.
+  //
+  // C'est donc l'EMPREINTE, pas la référence, qui identifie un dossier. On la
+  // cherche en premier : elle reconnaît un renvoi même quand la ligne d'origine
+  // a fini sous une autre référence (cas de la collision ci-dessous).
   const ref = borner(b.ref, 40);
+  const empreinte = empreinteDossier(b, ref, nomDossier, valeur, quantite);
+  let refFinale = ref;
+  let refModifiee = null;
   if (ref) {
-    const { rows: deja } = await pool.query(
-      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [ref],
+    const { rows: memeDossier } = await pool.query(
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinte],
     );
-    if (deja.length) {
+    if (memeDossier.length) {
       return res.json({
-        id: deja[0].id, stage: deja[0].stage, subStage: deja[0].sub_stage, dejaEnregistre: true,
+        id: memeDossier[0].id, stage: memeDossier[0].stage, subStage: memeDossier[0].sub_stage,
+        dejaEnregistre: true,
       });
+    }
+
+    const { rows: memeRef } = await pool.query(
+      "SELECT id, stage, sub_stage, fiche->>'empreinte' AS empreinte FROM requests WHERE fiche->>'ref' = $1 LIMIT 1",
+      [ref],
+    );
+    if (memeRef.length) {
+      // Ligne d'AVANT l'empreinte : on ne peut pas comparer. On garde l'ancien
+      // comportement (dédoublonnage) — ces références-là ont toutes été
+      // attribuées par le compteur du serveur, elles ne collisionnent pas.
+      if (memeRef[0].empreinte == null) {
+        return res.json({
+          id: memeRef[0].id, stage: memeRef[0].stage, subStage: memeRef[0].sub_stage, dejaEnregistre: true,
+        });
+      }
+      // Un AUTRE dossier porte cette référence : celui-ci vit quand même, sous
+      // une référence distincte. C'est le ticket du client qu'il faudra corriger
+      // — pas le dossier qu'il faut perdre.
+      refFinale = await refDisponible(ref);
+      refModifiee = refFinale;
     }
   }
 
@@ -2076,12 +2253,21 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   const fiche = {
     kind: 'comptoir-v17',
     source: estDemande ? 'Demande de devis' : 'Vente directe',
-    ref,
+    ref: refFinale,
+    // Ce qui permettra de reconnaître un RENVOI de ce dossier précis, plus tard,
+    // sans le confondre avec un autre qui porterait la même référence.
+    empreinte,
+    // La référence telle qu'elle figure sur le ticket déjà remis au client,
+    // quand on a dû en changer : sinon plus personne ne peut relier les deux.
+    refTicket: refModifiee ? ref : undefined,
     creeLe: new Date().toISOString(),
     heureSouhaitee: isHeure(b.dueTime) ? b.dueTime : null,
     production: borner(b.production, 200),
     commentaire: borner(b.comment, DESCRIPTION_MAX),
-    budgetIndicatif: prixComptoir(b.budgetIndicatif),
+    // Le budget est INDICATIF : ce que le client a annoncé de vive voix. Illisible
+    // ou absent, il ne vaut rien — et surtout il ne fait pas échouer la prise de
+    // commande, contrairement au MONTANT de la vente (contrôlé plus haut).
+    budgetIndicatif: prixComptoir(b.budgetIndicatif).valeur ?? null,
     canal: borner(b.canal, 60),
     suite: borner(b.suite, 120),
     paiement: { ...pay, mode },
@@ -2130,7 +2316,13 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => {
   });
 
   broadcast({ kind: 'create', stages: [famille] });
-  res.status(201).json({ id: rows[0].id, stage: famille, subStage: sousEtape });
+  res.status(201).json({
+    id: rows[0].id, stage: famille, subStage: sousEtape,
+    // Renseigné UNIQUEMENT quand la référence du ticket était déjà prise par une
+    // autre commande : l'écran doit le dire, le ticket remis au client ne porte
+    // plus le bon numéro.
+    ...(refModifiee ? { refModifiee } : {}),
+  });
 }));
 
 // Les récapitulatifs du comptoir arrivent en paires [libellé, valeur]. On les
@@ -2195,7 +2387,10 @@ async function reserverNumeroDuJour(serie, body) {
 // n'a changé, le serveur répond 304 sans renvoyer le fichier.
 // Le SVG en fait partie : c'est le logo, servi aussi comme icône de la PWA.
 // Sans en-tête, un poste gardait l'ancien plusieurs heures après un changement.
-const NO_CACHE = /\.(html|js|css|webmanifest|svg)$/;
+// La police d'icônes en fait partie pour la même raison que le reste : elle
+// porte un nom fixe, et le jour où l'on y ajoute un glyphe, aucun poste ne doit
+// rester des heures sur l'ancienne. Revalider 16 Ko coûte un 304, rien de plus.
+const NO_CACHE = /\.(html|js|css|webmanifest|svg|woff2)$/;
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (NO_CACHE.test(filePath)) res.setHeader('Cache-Control', 'no-cache');

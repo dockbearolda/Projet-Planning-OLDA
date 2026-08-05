@@ -120,11 +120,41 @@ function reinitialiser(id) {
 function montrerErreur(message) {
   const box = ROOT.querySelector('#np-erreur');
   box.textContent = `Enregistrement impossible : ${message}. Le dossier est intact — réessaie.`;
+  box.classList.remove('np-erreur--info');
   box.hidden = false;
 }
 function masquerErreur() {
   const box = ROOT.querySelector('#np-erreur');
   if (box) box.hidden = true;
+}
+// Une issue qui n'est PAS un échec, mais qui n'est pas non plus le simple
+// « c'est enregistré » : le message reste à l'écran, sans l'habit d'une erreur.
+function montrerAvis(message) {
+  const box = ROOT.querySelector('#np-erreur');
+  if (!box) return;
+  box.textContent = message;
+  box.classList.add('np-erreur--info');
+  box.hidden = false;
+}
+
+// Ce que le serveur a réellement fait. Trois issues, trois phrases :
+//   - la ligne est née → rien à dire, on file au planning ;
+//   - c'était le MÊME dossier renvoyé (le réseau avait avalé la réponse d'un
+//     envoi abouti) → rien n'a été créé en double, et c'est très bien ;
+//   - une AUTRE commande portait déjà cette référence → celle-ci en a pris une
+//     autre, donc le ticket déjà remis au client ne dit plus la vérité.
+// Annoncer les trois de la même façon, c'était laisser croire à un
+// enregistrement là où, dans le troisième cas, on sautait sur la ligne d'une
+// collègue et le dossier de la vendeuse n'existait nulle part.
+function avisEnregistrement(data) {
+  if (data.dejaEnregistre) {
+    return 'Ce dossier était déjà au planning : l’envoi précédent avait bien abouti. Rien n’a été créé en double.';
+  }
+  if (data.refModifiee) {
+    return `Enregistré — mais la référence du ticket était déjà prise par une AUTRE commande. `
+      + `Ce dossier porte désormais « ${data.refModifiee} » : corrige le numéro sur le ticket remis au client.`;
+  }
+  return null;
 }
 // Pendant l'envoi, la vendeuse doit voir qu'il se passe quelque chose : sans
 // ce signe, un réseau lent donnait un écran muet, elle retapait sur le bouton
@@ -269,7 +299,14 @@ async function enregistrer(payload) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `erreur ${res.status}`);
-    masquerErreur();
+    const avis = avisEnregistrement(data);
+    if (avis) montrerAvis(avis); else masquerErreur();
+
+    // LA RÉFÉRENCE A CHANGÉ : le ticket déjà remis au client ne porte plus le bon
+    // numéro, et c'est à corriger maintenant. On reste donc sur l'écran, message
+    // affiché — sauter au planning emporterait l'avertissement hors de vue, et
+    // c'est exactement le genre de détail qu'on ne retrouve plus après.
+    if (data.refModifiee) return;
 
     // On file au planning, SUR la ligne qui vient de naître. Le parcours, lui,
     // reste EN L'ÉTAT : son écran de fin porte encore le ticket à imprimer, à
@@ -277,7 +314,7 @@ async function enregistrer(payload) {
     // après avoir vérifié la ligne. La remise à neuf attend le prochain passage
     // sur l'onglet (resetProjet), c'est-à-dire le client suivant.
     window.dispatchEvent(new CustomEvent('olda:projet-cree', {
-      detail: { id: data.id, stage: data.stage, sub: data.subStage || null },
+      detail: { id: data.id, stage: data.stage, sub: data.subStage || null, avis },
     }));
   } catch (err) {
     montrerErreur(err.name === 'AbortError' ? 'le serveur ne répond pas' : err.message);

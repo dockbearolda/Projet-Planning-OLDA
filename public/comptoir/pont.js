@@ -42,6 +42,34 @@
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   };
 
+  // --- Le POSTE ---------------------------------------------------------------
+  // Les deux écrans se donnent une référence de secours quand le compteur du
+  // serveur est injoignable — et ils la tirent d'un compteur LOCAL qui repart à
+  // 1 chaque matin. Deux tablettes hors réseau produisaient donc la MÊME
+  // référence (« DEV-26.08.05-001 »), et le serveur, la prenant pour un renvoi
+  // du même dossier, gardait la première et jetait la seconde sans un mot.
+  // On marque donc chaque référence de secours du poste qui l'a émise : deux
+  // tablettes ne peuvent plus se disputer un numéro, même sans réseau.
+  const POSTE_KEY = 'olda.poste';
+  let posteMemo = null;
+  function poste() {
+    if (posteMemo) return posteMemo;
+    let id = null;
+    try { id = localStorage.getItem(POSTE_KEY); } catch (_) { /* stockage refusé */ }
+    if (!id || !/^[A-Z0-9]{3}$/.test(id)) {
+      id = Math.floor(Math.random() * 46656).toString(36).toUpperCase().padStart(3, '0');
+      try { localStorage.setItem(POSTE_KEY, id); } catch (_) { /* on garde en mémoire */ }
+    }
+    posteMemo = id;
+    return id;
+  }
+  // Une référence déjà marquée ne l'est pas deux fois (l'écran peut se recharger).
+  const marquerPoste = (ref) => {
+    const s = String(ref || '').trim();
+    if (!s) return s;
+    return s.endsWith(`-${poste()}`) ? s : `${s}-${poste()}`;
+  };
+
   // --- 1. La base clients ---------------------------------------------------
   // Une fiche de la base (colonnes du CRM) vue par l'écran du comptoir. Les
   // deux écrans lisent les mêmes clés, on les sert donc toutes :
@@ -114,6 +142,14 @@
     if (r && r.numero) champ.value = r.numero;
   }
 
+  // Le numéro de secours que la page s'est donnée à son chargement porte, lui
+  // aussi, la marque du poste — sinon deux tablettes hors réseau tirent le même
+  // « VD-260805-417 » sur un coup de dé à 1 chance sur 900.
+  function marquerNumeroVenteDeSecours() {
+    const champ = document.getElementById('orderNumber');
+    if (champ && champ.value) champ.value = marquerPoste(champ.value);
+  }
+
   // DEMANDE DE DEVIS : « DEV-26.07.31-001 ». `reference` est la variable que
   // toute la page relit (bandeaux d'étape, récapitulatif, message au planning),
   // donc on la réécrit ET on rafraîchit les bandeaux déjà dessinés.
@@ -127,7 +163,7 @@
   }
   function masquerRef() {
     if (typeof reference === 'undefined') return;
-    refSecours = reference;
+    refSecours = marquerPoste(reference);
     reference = '';
     peindreRef();
   }
@@ -148,21 +184,33 @@
 
   const raterEnSilence = (quoi) => (err) => console.warn(`Comptoir : ${quoi} — ${err.message}`);
 
+  // Scrutation bornée : un écran ouvert puis laissé de côté toute la journée ne
+  // doit pas garder une minuterie qui tourne dans le vide. Deux heures couvrent
+  // très largement la prise d'une commande au comptoir ; au-delà, la page a été
+  // abandonnée et le prochain client repartira d'un document neuf (resetProjet).
+  const VEILLE_MS = 400;
+  const VEILLE_MAX = 2 * 60 * 60 * 1000;
   function guetterPremiereLigne() {
     let reserve = false;
+    let ecoule = 0;
     const veille = setInterval(() => {
       if (reserve) return;
+      ecoule += VEILLE_MS;
       const vente = premierArticle();
-      if (!vente && !premierBesoin()) return;
+      if (!vente && !premierBesoin()) {
+        if (ecoule >= VEILLE_MAX) clearInterval(veille);
+        return;
+      }
       reserve = true;
       clearInterval(veille);
       (vente ? numeroVente() : numeroDevis())
         .catch(raterEnSilence('numéro du jour indisponible — numéro de secours conservé'));
-    }, 400);
+    }, VEILLE_MS);
   }
 
   chargerClients().catch(raterEnSilence('base clients indisponible'));
   masquerRef();
+  marquerNumeroVenteDeSecours();
   guetterPremiereLigne();
 
   // --- 3. Filet : l'écran ouvert SANS le CRM autour -------------------------
@@ -172,6 +220,22 @@
   // PERSONNE et la vente n'entrait jamais au planning — sans erreur, sans bruit.
   // Ici, on rattrape ce message orphelin et on appelle l'API nous-mêmes, avec
   // un retour VISIBLE dans les deux sens : la vendeuse sait, toujours.
+  // Ce que le serveur a réellement fait, en clair. Trois issues, trois phrases :
+  // la ligne est née ; c'était le MÊME dossier renvoyé (rien de créé, et c'est
+  // très bien) ; ou une AUTRE commande portait déjà cette référence et celle-ci
+  // a dû en prendre une autre — auquel cas le ticket remis au client ne dit plus
+  // la vérité, et il faut le savoir tout de suite.
+  function messageEnregistrement(data) {
+    const d = data && typeof data === 'object' ? data : {};
+    if (d.dejaEnregistre) {
+      return 'Ce dossier était déjà au planning : l’envoi précédent avait abouti.\nRien n’a été créé en double.';
+    }
+    if (d.refModifiee) {
+      return `Commande enregistrée au planning ✔\n\nATTENTION : la référence du ticket était déjà prise par une AUTRE commande.\nCelle-ci est enregistrée sous « ${d.refModifiee} ».\nCorrige le numéro sur le ticket remis au client.`;
+    }
+    return 'Commande enregistrée au planning ✔';
+  }
+
   let envoiEnCours = false;
   if (window.parent === window) {
     window.addEventListener('message', async (e) => {
@@ -181,8 +245,13 @@
       if (envoiEnCours) return; // double tap = une seule ligne
       envoiEnCours = true;
       try {
-        await api('POST', '/api/comptoir/projet', msg.payload);
-        alert('Commande enregistrée au planning ✔');
+        const data = await api('POST', '/api/comptoir/projet', msg.payload);
+        // Le serveur ne dit pas seulement « c'est passé » : il dit AUSSI quand
+        // il a reconnu un renvoi du même dossier, et quand il a dû changer la
+        // référence parce qu'un autre dossier la portait déjà. Annoncer les
+        // trois cas de la même façon, c'était laisser croire à un enregistrement
+        // là où rien n'avait été créé.
+        alert(messageEnregistrement(data));
       } catch (err) {
         alert(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
       } finally {
