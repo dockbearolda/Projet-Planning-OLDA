@@ -471,14 +471,22 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   box-shadow: var(--shadow-1);
 }
 
+/* Entrée du rail : un <button> (le rail est la navigation principale, il doit
+   s'atteindre au clavier), remis à plat pour se dessiner comme avant. */
 .stage {
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  margin: 0;
   padding: 9px 14px;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   color: var(--text-1);
   user-select: none;
@@ -1238,36 +1246,9 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Ligne brouillon : formulaire d'ajout */
-.grid tbody tr.is-draft,
-.grid tbody tr.is-draft:hover { background: var(--primary-soft); }
-.grid tbody tr.is-draft td {
-  border-top: 1px dashed rgba(var(--primary-rgb), .4);
-  border-bottom: 1px dashed rgba(var(--primary-rgb), .4);
-}
-.grid tbody tr.is-draft td:first-child { border-left: 1px dashed rgba(var(--primary-rgb), .4); }
-.grid tbody tr.is-draft td:last-child { border-right: 1px dashed rgba(var(--primary-rgb), .4); }
-.grid tbody tr.is-draft .cell-input::placeholder,
-.grid tbody tr.is-draft .cell-display.placeholder { color: var(--text-3); }
-
-/* bouton « + » en début de ligne brouillon */
-.add-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  margin: 9px auto;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: var(--primary);
-  color: var(--chip-on-tonal);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
-}
-.add-btn:hover { background: var(--primary-hover); transform: scale(1.08); }
-.add-btn:active { transform: scale(.96); }
+/* (La « ligne brouillon » et son bouton « + » ont été retirés : depuis que
+   Nouveau Projet est la seule porte d'entrée, plus rien ne crée de ligne vide,
+   et le test frappait de vraies commandes du comptoir — cf. buildRow.) */
 
 /* cellules éditables en ligne : bordure invisible, fond transparent */
 .cell {
@@ -1964,15 +1945,27 @@ tr:hover .handle { color: var(--text-2); }
 /* Le bouton d'en-tête montre l'état du rail : enfoncé = rail ouvert. */
 .colbar-open[aria-expanded="true"] { background: var(--primary-soft); border-color: var(--primary-soft); color: var(--text-1); }
 
-/* Tablette portrait et téléphone : le rail passe SOUS la grille en bandeau
-   horizontal — en colonne il mangerait la moitié de la largeur utile. */
+/* Tablette portrait et téléphone : le rail des colonnes devient un PANNEAU
+   POSÉ SUR la grille, ancré en bas, et non plus un bandeau empilé dessous.
+   Empilé, il mangeait la moitié inférieure de l'écran en portrait (800×1280) et
+   tronquait la deuxième carte — pour un réglage qu'on ouvre une fois par mois.
+   Posé dessus, le planning garde toute sa hauteur ; on referme d'un geste. */
 @media (max-width: 900px) {
-  .grid-area { flex-direction: column; }
+  .grid-area { position: relative; }
   .colbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
     flex: 0 0 auto;
-    max-height: 40vh;
+    max-height: min(52vh, 420px);
+    padding-bottom: env(safe-area-inset-bottom);
     border-left: 0;
     border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    background: var(--surface);
+    box-shadow: 0 -12px 32px rgba(16, 24, 40, .16);
   }
   .colbar-list { flex-direction: row; flex-wrap: wrap; }
   .colbar-item { width: auto; }
@@ -2724,6 +2717,65 @@ input[type="date"].cell-input { color: var(--text-1); }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* --------------------------------------------------- Demande de confirmation
+   Remplace le `confirm()` du système : aux couleurs de l'app, lisible au doigt
+   (cibles à 44 px), et sans geler le planning derrière elle. */
+.ask {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16, 24, 40, .45);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.ask.open { opacity: 1; }
+.ask__card {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-pop);
+  transform: translateY(8px) scale(.99);
+  transition: transform var(--dur-2) var(--ease);
+}
+.ask.open .ask__card { transform: none; }
+.ask__title { margin: 0 0 8px; font-size: 17px; font-weight: 800; color: var(--text-1); }
+.ask__text { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.ask__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.ask__btn {
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.ask__btn:hover { background: var(--state-hover); }
+.ask__btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .35); }
+/* L'action destructrice porte la seule couleur de l'écran : rouge = danger.
+   Teinte FIXE (et non `--st-bloque`, qui s'éclaircit en thème sombre pour
+   servir de couleur de TEXTE) : elle doit rester lisible en blanc dans les
+   deux thèmes. */
+.ask__btn--danger {
+  border-color: transparent;
+  background: #c2261c;
+  color: #fff;
+}
+.ask__btn--danger:hover { background: #a41f16; }
+@media (max-width: 480px) {
+  .ask__actions { flex-direction: column-reverse; }
+  .ask__btn { width: 100%; }
+}
+
 /* ---------------------------------------------------------------- Ripple Material */
 .ripple {
   position: absolute;
@@ -2837,10 +2889,18 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
   .grid-search { max-width: none; }
-  /* barre du haut serrée : onglets réduits à leur icône, bouton à l'icône « + ». */
+  /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
+     perd pas son nom. Sept pictogrammes muets (Fiverr, À commander, Base
+     clients, Réglages…) ne se devinent pas — et au doigt il n'y a pas de survol
+     pour révéler une infobulle. */
   .nav-switch { gap: 2px; }
-  .nav-switch-label { display: none; }
-  .nav-switch-btn { padding: 8px; }
+  .nav-switch-btn {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 44px;
+    padding: 6px 8px;
+  }
+  .nav-switch-label { font-size: 10px; line-height: 1.15; max-width: 76px; }
   /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
      fichier et gagnerait à spécificité égale. */
   #viewProjet { padding-right: 8px; margin-right: 4px; }
@@ -4532,6 +4592,16 @@ textarea.ld-ctl { font-weight: 600; }
 :root[data-theme="dark"] .ld-ctl { background: var(--bg); border-color: var(--border); color: var(--text-1); }
 :root[data-theme="dark"] .ld-volet__tete:hover { background: var(--state-hover); }
 :root[data-theme="dark"] .ld-foot { background: var(--surface); border-color: var(--border); }
+/* Le bouton principal de la fiche était posé en dur à l'encre (#111827) : sur
+   un pied de fiche lui-même sombre, il disparaissait — « Enregistrer les
+   modifications » se lisait comme du texte, plus comme un bouton. En thème
+   sombre c'est l'inverse qu'il faut : une pastille CLAIRE sur fond sombre. */
+:root[data-theme="dark"] .ld-save {
+  background: var(--text-1);
+  border-color: var(--text-1);
+  color: var(--bg);
+}
+:root[data-theme="dark"] .ld-save:hover:not(:disabled) { background: #fff; border-color: #fff; }
 :root[data-theme="dark"] .ld-pay .ld-field { background: var(--bg); border-color: var(--border); }
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
