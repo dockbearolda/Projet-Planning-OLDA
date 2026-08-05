@@ -137,6 +137,63 @@ delete process.env.APP_PASSWORD;
   r = await call('GET', `/api/requests/${jid}/journal`);
   assert.deepStrictEqual(r.body, [], 'le journal part avec la commande');
 
+  // -------------------------------------------------------------------------
+  // RANGER UNE ÉTAPE EN UN SEUL ENVOI. Glisser une carte renumérote toute la
+  // famille : en PATCH unitaires, un geste produisait autant de requêtes ET
+  // d'évènements temps réel qu'il y a de lignes — que chaque poste connecté
+  // payait en rechargeant sa grille, son dashboard et sa fiche ouverte.
+  // -------------------------------------------------------------------------
+  const lot = [];
+  for (let i = 0; i < 5; i += 1) {
+    const c = await call('POST', '/api/requests', { billing_company: `Rangement ${i}`, stage: 'production' });
+    lot.push(c.body.id);
+  }
+  const inverse = [...lot].reverse().map((id, i) => ({ id, position: (i + 1) * 1000 }));
+  r = await call('PATCH', '/api/requests/positions', inverse);
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.misAJour, 5, 'les cinq lignes sont rangées en un seul envoi');
+
+  r = await call('GET', '/api/requests?stage=production');
+  const rangees = r.body.filter((x) => lot.includes(x.id)).map((x) => x.id);
+  assert.deepStrictEqual(rangees, [...lot].reverse(), 'et l’ordre demandé est bien celui obtenu');
+
+  // TOUT ou RIEN : une ligne fautive dans le lot n'en range aucune. En écritures
+  // indépendantes, la moitié de l'étape restait sur ses anciennes valeurs — un
+  // ordre mélangé que personne ne pouvait plus démêler à la main.
+  r = await call('PATCH', '/api/requests/positions', [
+    { id: lot[0], position: 42 }, { id: lot[1], position: 'Infinity' },
+  ]);
+  assert.strictEqual(r.status, 400, 'une position invalide fait refuser tout le lot');
+  r = await call('GET', '/api/requests?stage=production');
+  assert.strictEqual(r.body.find((x) => x.id === lot[0]).position, 5000,
+    'et rien n’a bougé, pas même la ligne valide qui précédait');
+
+  r = await call('PATCH', '/api/requests/positions', [{ id: 'pas-un-uuid', position: 1 }]);
+  assert.strictEqual(r.status, 400, 'un identifiant mal formé est refusé, pas un 500');
+
+  // -------------------------------------------------------------------------
+  // RECHERCHE GLOBALE CÔTÉ SERVEUR. Elle se faisait dans le navigateur, qui
+  // TÉLÉCHARGEAIT tout le planning — archives comprises — à la première frappe.
+  // Mêmes règles qu'avant : tous les jetons, sans casse ni accent.
+  // -------------------------------------------------------------------------
+  await call('POST', '/api/requests', { billing_company: 'Hôtel Beauséjour', product: 'Polos brodés' });
+  await call('POST', '/api/requests', { billing_company: '100 % Coton', product: 'Tee-shirts' });
+
+  const cherche = async (q) => (await call('GET', `/api/requests/recherche?q=${encodeURIComponent(q)}`))
+    .body.map((x) => x.billing_company);
+
+  assert.deepStrictEqual(await cherche('beausejour'), ['Hôtel Beauséjour'],
+    'sans accent ni majuscule, on trouve quand même');
+  assert.deepStrictEqual(await cherche('beausejour polos'), ['Hôtel Beauséjour'],
+    'tous les jetons doivent être présents, dans n’importe quel champ');
+  assert.deepStrictEqual(await cherche('beausejour xyzzy'), [],
+    'un jeton absent suffit à écarter la commande');
+  // `%` et `_` sont les jokers de LIKE : un client qui s'appelle « 100 % Coton »
+  // se cherche tel quel, il ne devient pas un motif qui ramène tout le planning.
+  assert.deepStrictEqual(await cherche('100 %'), ['100 % Coton']);
+  assert.deepStrictEqual(await cherche('_'), [], 'le souligné n’est pas un joker non plus');
+  assert.deepStrictEqual(await cherche('   '), [], 'une recherche vide ne ramène rien');
+
   console.log('✓ audit planning : cohérence étape/sous-étape, ordre manuel partagé, journal OK');
   process.exit(0);
 })().catch((err) => {

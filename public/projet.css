@@ -104,6 +104,13 @@
   font-family: var(--font); font-size: 15px; font-weight: 700;
 }
 .np-erreur[hidden] { display: none; }
+/* Le dossier EST enregistré, mais pas comme la vendeuse le croit : un renvoi
+   reconnu, ou une référence qui a dû changer parce qu'un autre dossier la
+   portait déjà. Ce n'est pas une panne — on n'en prend donc pas la couleur —
+   mais ça reste à l'écran tant qu'on n'a pas changé de parcours. */
+.np-erreur--info {
+  background: var(--warning-bg); border-bottom-color: var(--warning-line); color: var(--warning);
+}
 
 /* Le parcours lui-même : un document à part, qui prend toute la place restante.
    Le fond reste CLAIR quel que soit le thème : les écrans du comptoir chargés

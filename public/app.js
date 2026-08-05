@@ -10,6 +10,9 @@ import { createDashboard } from './dashboard.js';
 import { whatsappLink } from './whatsapp.js';
 // Nom d'un particulier : où s'arrête le prénom, où commence le NOM de famille.
 import { splitPersoName } from './nom-client.js';
+// La boîte de confirmation de l'app (jamais celle du système) — partagée avec
+// la Base clients, qui en a besoin pour la suppression d'une fiche.
+import { confirmerAction } from './confirmer.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -1182,7 +1185,7 @@ function renderCards(data) {
     if (!entry) {
       entry = { el: buildCard(r), sig };
       cardEls.set(id, entry);
-    } else if (entry.sig !== sig && !entry.el.classList.contains('dragging')) {
+    } else if (entry.sig !== sig && !estPrise(entry.el)) {
       const el = buildCard(r);
       entry.el.replaceWith(el);
       entry.el = el;
@@ -1192,13 +1195,25 @@ function renderCards(data) {
   }
   let prev = null;
   for (const node of ordre) {
-    if (!node.classList.contains('dragging')) {
+    if (!estPrise(node)) {
       const attendu = prev ? prev.nextSibling : $cards.firstChild;
       if (node !== attendu) $cards.insertBefore(node, attendu);
     }
     prev = node;
   }
 }
+
+// Une ligne qu'on NE TOUCHE PAS pendant un rendu : soit elle est en train d'être
+// glissée, soit un doigt vient de s'y poser et le geste n'a pas encore décidé
+// s'il en était un. Les deux comptent — c'est la seconde qui manquait.
+//
+// La marque « prise » n'a de valeur QUE tant qu'un geste est réellement en
+// cours. Si le `pointerup` ne parvient jamais (bascule d'application au milieu
+// d'un geste, sur tablette), la classe reste posée sur la carte : sans cette
+// garde, la ligne serait figée pour de bon — jamais reconstruite, elle
+// afficherait indéfiniment ce qu'elle montrait à cet instant-là.
+const estPrise = (el) => !!el && (el.classList.contains('dragging')
+  || (!!dragState && el.classList.contains('prise-en-cours')));
 
 function renderRows(data) {
   // Vue épurée : une carte par projet, le tableau reste monté mais masqué.
@@ -1234,7 +1249,7 @@ function renderRows(data) {
   //    cours de drag : sa position est pilotée à la main).
   let prev = null;
   for (const node of order) {
-    if (!node.classList.contains('dragging')) {
+    if (!estPrise(node)) {
       const expectedNext = prev ? prev.nextSibling : $rows.firstChild;
       if (node !== expectedNext) $rows.insertBefore(node, expectedNext);
     }
@@ -1249,7 +1264,7 @@ function renderRows(data) {
 // ou drag en cours. On la réutilise alors intacte (on ne perd ni la saisie ni le drag).
 function isRowBusy(tr) {
   if (!tr) return false;
-  if (tr.classList.contains('dragging')) return true;
+  if (estPrise(tr)) return true;
   const ae = document.activeElement;
   return !!(ae && tr.contains(ae));
 }
@@ -2334,13 +2349,24 @@ function memoriserFiche(ligne) {
 // (le temps réel ne transporte que le résumé). On oublie ce qu'on a mis de côté
 // et, si une fiche est ouverte, on va rechercher SON détail — une seule requête,
 // pour la seule commande qu'on regarde.
+// La relecture est DIFFÉRÉE et coalescée, comme le rafraîchissement de la
+// grille : une rafale d'évènements (un collègue qui range une étape) déclenchait
+// autant de `GET /api/requests/:id` qu'il y avait d'évènements, tous en vol en
+// même temps, pour la même fiche.
+let ficheDebounce = null;
+const FICHE_DEBOUNCE_MS = 150;
+
 function rafraichirFichesApresChangement() {
   fichesCompletes.clear();
   if (!ligneDrawerId) return;
-  const id = ligneDrawerId;
-  chargerFicheComplete(id)
-    .then(() => { if (ligneDrawerId === id) renderLigneDetailIfOpen(); })
-    .catch(() => { /* silencieux : la fiche reste utilisable avec ce qu'elle a */ });
+  clearTimeout(ficheDebounce);
+  ficheDebounce = setTimeout(() => {
+    const id = ligneDrawerId;
+    if (!id) return;
+    chargerFicheComplete(id)
+      .then(() => { if (ligneDrawerId === id) renderLigneDetailIfOpen(); })
+      .catch(() => { /* silencieux : la fiche reste utilisable avec ce qu'elle a */ });
+  }, FICHE_DEBOUNCE_MS);
 }
 
 function openLigneDetail(id) {
@@ -4066,6 +4092,15 @@ function attachDrag(handle, tr, r) {
     // Sinon son fantôme, plus référencé par personne, restait collé à l'écran.
     if (dragState) return;
     e.preventDefault();
+    // LA LIGNE EST PRISE DÈS MAINTENANT — pas au franchissement du seuil.
+    // La classe `dragging`, elle, n'arrive qu'avec `beginDrag()` : entre le
+    // doigt posé et les 8 px, la ligne n'était protégée par RIEN. Qu'un collègue
+    // modifie quoi que ce soit pendant cette fraction de seconde, et le rendu
+    // temps réel remplaçait la carte sous le doigt : `tr` pointait alors sur un
+    // nœud détaché, le fantôme partait se coller en haut à gauche, et la dépose
+    // RÉINSÉRAIT ce nœud orphelin — deux cartes pour la même commande, et un
+    // ordre manuel corrompu (le même identifiant compté deux fois).
+    tr.classList.add('prise-en-cours');
     dragState = {
       id: r.id, r, tr, handle,
       startX: e.clientX, startY: e.clientY,
@@ -4095,8 +4130,10 @@ function beginDrag() {
   ghost.style.width = rect.width + 'px';
   document.body.appendChild(ghost);
   dragState.ghost = ghost;
+  dragState.wrap = document.querySelector('.grid-wrap');
   tr.classList.add('dragging');
   document.body.classList.add('dragging-active');
+  if (!defilementRaf) defilementRaf = requestAnimationFrame(boucleDefilement);
 }
 
 function onDragMove(e) {
@@ -4183,10 +4220,16 @@ async function onDragEnd(e) {
   if (e.pointerId !== dragState.pointerId) return;
   const ds = dragState;
   if (ds.raf) cancelAnimationFrame(ds.raf);
+  if (defilementRaf) { cancelAnimationFrame(defilementRaf); defilementRaf = 0; }
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointerup', onDragEnd);
   window.removeEventListener('pointercancel', onDragEnd);
   try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
+  // La ligne cesse d'être « prise » quoi qu'il arrive ensuite — y compris sur
+  // un simple tap, qui sort juste en dessous. L'oublier là, c'était figer la
+  // ligne : jamais reconstruite, elle gardait indéfiniment ce qu'elle affichait
+  // au moment du tap, sans plus jamais suivre le temps réel.
+  ds.tr.classList.remove('prise-en-cours');
 
   if (!ds.active) { dragState = null; return; } // simple clic, pas un drag
 
@@ -4329,7 +4372,13 @@ async function commitReorder(r) {
   applySortAndRender();
 
   try {
-    await Promise.all(cibles.map((c) => api('PATCH', `/api/requests/${c.ligne.id}`, { position: c.voulue })));
+    // UNE requête pour toute l'étape, pas une par ligne. En PATCH unitaires, un
+    // seul glisser dans une étape de quarante commandes produisait quarante
+    // requêtes ET quarante évènements temps réel — que chaque poste connecté
+    // payait en rechargeant sa grille, son dashboard et sa fiche ouverte. Le
+    // serveur range tout d'un bloc (transaction) et ne prévient qu'une fois.
+    await api('PATCH', '/api/requests/positions',
+      cibles.map((c) => ({ id: c.ligne.id, position: c.voulue })));
   } catch (err) {
     for (const c of cibles) c.ligne.position = c.avant;
     if (premierRangement) {
@@ -4357,14 +4406,30 @@ document.getElementById('ordreReset')?.addEventListener('click', () => {
   applySortAndRender();
 });
 
-// auto-scroll vertical quand le doigt approche des bords de la grille
+// Auto-défilement vertical quand le doigt approche des bords de la grille.
+// Renvoie vrai si la liste a RÉELLEMENT bougé (butée haute / basse : elle ne
+// bouge plus, inutile de recalculer la cible de dépose derrière).
 function autoScroll(y) {
-  const wrap = document.querySelector('.grid-wrap');
-  if (!wrap) return;
+  const wrap = dragState && dragState.wrap ? dragState.wrap : document.querySelector('.grid-wrap');
+  if (!wrap) return false;
   const rect = wrap.getBoundingClientRect();
   const margin = 64;
+  const avant = wrap.scrollTop;
   if (y < rect.top + margin) wrap.scrollTop -= 14;
   else if (y > rect.bottom - margin) wrap.scrollTop += 14;
+  return wrap.scrollTop !== avant;
+}
+
+// L'auto-défilement ne suivait QUE les évènements de mouvement : doigt immobile
+// en bas de l'écran, plus rien ne défilait. Il fallait frétiller pour descendre
+// — et sur une longue liste, personne ne devine qu'il faut frétiller. C'est donc
+// une boucle à part, qui tourne pendant le glisser et s'arrête avec lui.
+let defilementRaf = 0;
+function boucleDefilement() {
+  if (!dragState || !dragState.active) { defilementRaf = 0; return; }
+  // La liste a glissé sous le doigt : la place de dépose n'est plus la même.
+  if (autoScroll(dragState.lastY)) updateDragTarget();
+  defilementRaf = requestAnimationFrame(boucleDefilement);
 }
 
 // Le conteneur de la vue affichée : le corps du tableau, ou la liste de cartes.
@@ -4750,68 +4815,7 @@ function reportError(err) {
 }
 
 // --- Demande de confirmation ------------------------------------------------
-// `confirm()` ouvre la boîte grise du système : hors charte, minuscule au doigt
-// sur la tablette, et elle GÈLE le thread — le planning ne se rafraîchit plus
-// tant qu'elle est à l'écran. On pose la même question avec les composants de
-// l'app : grandes cibles, Échap / fond pour annuler, focus sur « Annuler » (on
-// ne confirme jamais une suppression par inadvertance en tapant Entrée).
-function confirmerAction(titre, texte, libelleOk = 'Supprimer') {
-  return new Promise((resolve) => {
-    const focusAvant = document.activeElement;
-    const fond = document.createElement('div');
-    fond.className = 'ask';
-    const carte = document.createElement('div');
-    carte.className = 'ask__card';
-    carte.setAttribute('role', 'alertdialog');
-    carte.setAttribute('aria-modal', 'true');
-
-    const h = document.createElement('h2');
-    h.className = 'ask__title';
-    h.textContent = titre;
-    const p = document.createElement('p');
-    p.className = 'ask__text';
-    p.textContent = texte;
-    carte.setAttribute('aria-label', `${titre}. ${texte}`);
-
-    const actions = document.createElement('div');
-    actions.className = 'ask__actions';
-    const annuler = document.createElement('button');
-    annuler.type = 'button';
-    annuler.className = 'ask__btn';
-    annuler.textContent = 'Annuler';
-    const ok = document.createElement('button');
-    ok.type = 'button';
-    ok.className = 'ask__btn ask__btn--danger';
-    ok.textContent = libelleOk;
-    actions.append(annuler, ok);
-    carte.append(h, p, actions);
-    fond.append(carte);
-    document.body.append(fond);
-
-    let fini = false;
-    const fermer = (reponse) => {
-      if (fini) return;
-      fini = true;
-      document.removeEventListener('keydown', onKey, true);
-      fond.remove();
-      if (focusAvant && focusAvant.isConnected && focusAvant.focus) focusAvant.focus();
-      resolve(reponse);
-    };
-    // Tabulation retenue dans la boîte : sans ça, le focus repart derrière le
-    // voile et on répond à une question qu'on ne voit plus.
-    function onKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermer(false); return; }
-      if (e.key !== 'Tab') return;
-      e.preventDefault();
-      (document.activeElement === annuler ? ok : annuler).focus();
-    }
-    document.addEventListener('keydown', onKey, true);
-    annuler.addEventListener('click', () => fermer(false));
-    ok.addEventListener('click', () => fermer(true));
-    fond.addEventListener('click', (e) => { if (e.target === fond) fermer(false); });
-    requestAnimationFrame(() => { fond.classList.add('open'); annuler.focus(); });
-  });
-}
+// Voir confirmer.js : la boîte est partagée avec la Base clients.
 
 let toastTimer = null;
 function showToast(text) {
@@ -4952,23 +4956,16 @@ function onStreamChange(e) {
   // Le détail complet mis de côté peut avoir été corrigé ailleurs : on le relit
   // pour la seule fiche ouverte (voir rafraichirFichesApresChangement).
   rafraichirFichesApresChangement();
-  // Le planning a changé côté serveur → le cache global de recherche est périmé.
-  // On l'invalide. Le rechargement, lui, ATTEND : `/api/requests` sans filtre
-  // renvoie tout le planning, et le relancer à chaque événement pendant qu'un
-  // collègue travaille faisait re-télécharger l'ensemble en boucle sous les
-  // doigts de celui qui cherche.
-  allRows = null;
-  if (paletteOpen) {
-    clearTimeout(allRowsDebounce);
-    allRowsDebounce = setTimeout(() => {
-      if (paletteOpen) loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
-    }, ALL_ROWS_DEBOUNCE_MS);
-  }
+  // Le planning a changé côté serveur : si une recherche est ouverte, ses
+  // résultats sont peut-être périmés. On la relance — c'est désormais UNE requête
+  // qui rend une page de résultats, plus le planning entier retéléchargé en
+  // boucle sous les doigts de celui qui cherche.
+  if (paletteOpen) runSearch();
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(() => {
-    // Le dashboard maintient son cache en continu (fil d'activité, badges,
-    // écran mural), même quand on est sur le Planning.
+    // Le Point du jour garde son cache à jour même masqué (fil d'activité,
+    // badges, écran mural) — mais à un rythme de fond, pas à chaque évènement.
     dashboard.notifyChange();
     if (isPlanningMode(viewMode)) poll();
   }, 120);
@@ -5028,19 +5025,19 @@ function syncSearchUI() {
 // planning qui correspondent, groupées par étape. Un clic (ou ↵) saute vers la
 // commande dans sa catégorie et la met brièvement en évidence.
 //
-// Données : on charge TOUT le planning une fois (cache `allRows`) à la première
-// frappe, puis on l'invalide au moindre changement temps réel (SSE) pour rester
-// juste sans re-fetch à chaque touche.
+// Données : C'EST LE SERVEUR QUI CHERCHE. On téléchargeait TOUT le planning à la
+// première frappe — archives comprises, donc une liste qui ne cesse de grossir,
+// à vie — pour filtrer dessus en mémoire. On envoie désormais la requête, et le
+// serveur ne renvoie qu'une page de résultats (voir GET /api/requests/recherche).
 
 const $palette = document.getElementById('searchPalette');
 const $paletteScrim = document.getElementById('searchPaletteScrim');
 const $paletteResults = document.getElementById('searchPaletteResults');
 const $paletteCount = document.getElementById('searchPaletteCount');
 
-let allRows = null;           // cache de toutes les commandes (tous stages)
-let allRowsPromise = null;    // fetch en cours (dédup)
-let allRowsDebounce = null;   // rechargement différé (cf. onStreamChange)
-const ALL_ROWS_DEBOUNCE_MS = 1000;
+let rechercheDebounce = null; // frappe en cours : on attend qu'elle se pose
+let rechercheToken = 0;       // ne rend que la réponse de la DERNIÈRE requête
+const RECHERCHE_DEBOUNCE_MS = 180;
 let paletteOpen = false;
 let paletteItems = [];        // résultats plats, dans l'ordre affiché
 let paletteActive = -1;       // index surligné (navigation clavier)
@@ -5049,21 +5046,18 @@ const PALETTE_MAX = 60;       // plafond d'affichage (au-delà : « affinez »)
 // Ordre d'affichage des groupes = ordre du pipeline (familles puis spécial).
 const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.slug, i]));
 
-// Recharge le cache global depuis le serveur (une requête, dédupliquée).
-function loadAllRows() {
-  if (allRowsPromise) return allRowsPromise;
-  allRowsPromise = api('GET', '/api/requests')
-    .then((data) => { allRows = data; return data; })
-    .finally(() => { allRowsPromise = null; });
-  return allRowsPromise;
+// Interroge le serveur. Le jeton écarte les réponses dépassées : sur une frappe
+// rapide, celle de « po » peut revenir APRÈS celle de « polo » et réafficher les
+// résultats d'avant sous les doigts de celui qui cherche.
+function rechercheServeur(texte) {
+  const token = ++rechercheToken;
+  return api('GET', `/api/requests/recherche?q=${encodeURIComponent(texte)}`)
+    .then((data) => (token === rechercheToken ? (Array.isArray(data) ? data : []) : null));
 }
 
-// Découpe la requête en jetons (espaces) ; une commande matche si CHAQUE jeton
-// est présent dans l'un de ses champs cherchés (accent- et casse-insensible).
-function matchRow(r, tokens) {
-  const hay = ' ' + SEARCH_FIELDS.map((f) => fold(r[f])).join(' ') + ' ';
-  return tokens.every((t) => hay.includes(t));
-}
+// Le filtrage jeton par jeton vit désormais côté serveur (même règle : chaque
+// jeton doit apparaître dans l'un des champs cherchés, sans distinction de casse
+// ni d'accent). Les jetons restent utiles ici pour SOULIGNER les occurrences.
 
 // Ajoute `text` à `parent` en soulignant (<mark>) les occurrences des jetons.
 // Accent-sensible (suffisant visuellement) ; construit des nœuds DOM, pas d'HTML.
@@ -5137,26 +5131,41 @@ function closePalette() {
   setTimeout(() => { if (!paletteOpen) $palette.hidden = true; }, 200);
 }
 
-// (Re)calcule et rend les résultats à partir de la requête courante.
+// (Re)demande les résultats au serveur et les rend. La frappe est amortie : une
+// requête par mot tapé, pas par touche.
 function runSearch() {
   const raw = gridQuery.trim();
   if (!raw) { closePalette(); return; }
   openPalette();
-  // Cache vide → on lance le chargement et on ré-affiche à l'arrivée.
-  if (!allRows) {
-    renderPaletteLoading();
-    loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
-    return;
-  }
+  clearTimeout(rechercheDebounce);
+  rechercheDebounce = setTimeout(() => lancerRecherche(raw), RECHERCHE_DEBOUNCE_MS);
+}
+
+function lancerRecherche(raw) {
+  if (!paletteOpen) return;
+  // On n'efface pas les résultats précédents pendant l'attente : la liste ne
+  // doit pas clignoter à chaque mot. « Recherche… » n'apparaît que si l'on n'a
+  // encore rien à montrer.
+  if (!paletteItems.length) renderPaletteLoading();
   const tokens = fold(raw).split(/\s+/).filter(Boolean);
-  const hits = allRows
-    .filter((r) => matchRow(r, tokens))
-    .sort((a, b) => {
-      const sa = STAGE_ORDER[a.stage] ?? 99, sb = STAGE_ORDER[b.stage] ?? 99;
-      if (sa !== sb) return sa - sb;
-      return cmpDeadline(a.deadline, b.deadline);
+  rechercheServeur(raw)
+    .then((hits) => {
+      if (hits === null || !paletteOpen) return; // réponse dépassée / palette fermée
+      // Le serveur rend les plus récemment touchées d'abord (c'est ce qui décide
+      // de la page servie) ; l'écran, lui, les regroupe par étape du pipeline.
+      hits.sort((a, b) => {
+        const sa = STAGE_ORDER[a.stage] ?? 99, sb = STAGE_ORDER[b.stage] ?? 99;
+        if (sa !== sb) return sa - sb;
+        return cmpDeadline(a.deadline, b.deadline);
+      });
+      renderPaletteResults(hits, tokens);
+    })
+    .catch(() => {
+      if (!paletteOpen) return;
+      clearPalette();
+      $paletteCount.textContent = '';
+      paletteMessage('Recherche indisponible — vérifie la connexion.');
     });
-  renderPaletteResults(hits, tokens);
 }
 
 function clearPalette() {
@@ -5187,10 +5196,12 @@ function renderPaletteResults(hits, tokens) {
     return;
   }
 
+  // Le serveur en renvoie UN de plus que ce qu'on affiche : c'est ainsi qu'on
+  // sait qu'il y en a d'autres, sans lui faire compter tout le planning.
   const total = hits.length;
   const shown = hits.slice(0, PALETTE_MAX);
   $paletteCount.textContent = total > PALETTE_MAX
-    ? `${PALETTE_MAX} sur ${total} résultats`
+    ? `${PALETTE_MAX} premiers résultats — affine ta recherche`
     : `${total} résultat${total > 1 ? 's' : ''}`;
 
   let curStage = null;
@@ -5597,8 +5608,12 @@ function mountProjet() {
 // une étape passée en ordre manuel fait naître la ligne TOUT EN BAS de la
 // liste : la vendeuse ne voyait rien apparaître et ressaisissait la commande.
 window.addEventListener('olda:projet-cree', async (e) => {
-  const { id, stage, sub } = e.detail || {};
+  const { id, stage, sub, avis } = e.detail || {};
   location.hash = '#planning';
+  // Le serveur a reconnu un RENVOI du même dossier : rien n'a été créé, et la
+  // ligne vers laquelle on saute est celle de l'envoi précédent. On le dit —
+  // sans ça, la vendeuse compte une commande de plus qu'il n'y en a.
+  if (avis) showToast(avis);
   if (!stage) return;
   await selectStage(stage, sub || null, true);
   if (id) revealRow(id);

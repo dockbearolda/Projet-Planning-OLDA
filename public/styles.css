@@ -195,6 +195,18 @@ body {
    présent : toute la barre du haut se recompactait d'un coup à l'arrivée de la
    police. On réserve donc la place du glyphe dès le départ (`width: 1em`), et
    ce qui dépasse est masqué : plus aucun décalage au chargement. */
+/* La police d'icônes, SERVIE PAR NOUS (voir index.html). `block` : une icône
+   pas encore prête ne doit jamais s'afficher en toutes lettres (« dashboard »,
+   « search »…) — et comme le fichier est local, l'attente se compte en
+   millisecondes, y compris au premier chargement d'une tablette. */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: block;
+  src: url('olda-icones.woff2') format('woff2');
+}
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   width: 1em;

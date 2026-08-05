@@ -89,6 +89,16 @@ export function createDashboard(deps) {
   // le temps réel peut rester silencieux des heures).
   let premierChargementKo = false;
   let repriseTimer = null;
+  // Le Point du jour est-il SOUS LES YEUX ? Il garde son cache à jour même
+  // masqué (fil d'activité, badges, écran mural), mais pas au même rythme :
+  // affiché, il suit le temps réel au plus près ; en fond, il se contente d'un
+  // rafraîchissement de temps en temps. Chaque passage coûte quatre requêtes
+  // dont le PLANNING ENTIER — sur le poste qui range une étape, c'était payé à
+  // chaque évènement pour un écran que personne ne regardait.
+  let visible = false;
+  let dernierRefresh = 0;
+  let veilleTimer = null;
+  const REFRESH_FOND_MS = 30000;
 
   // 'todo' (à faire maintenant) | 'team' | prénom.
   let activeTab = 'todo';
@@ -1360,6 +1370,7 @@ export function createDashboard(deps) {
       }
     } finally {
       refreshing = false;
+      dernierRefresh = Date.now();
       if (refreshQueued) { refreshQueued = false; refresh(); }
     }
   }
@@ -1376,17 +1387,29 @@ export function createDashboard(deps) {
   }
 
   function show() {
+    visible = true;
+    clearTimeout(veilleTimer);
+    veilleTimer = null;
     refresh();
   }
 
   function hide() {
+    visible = false;
     closeDetail();
     closeActivity();
   }
 
   // Appelé par app.js à chaque évènement temps réel (SSE ou filet de polling).
+  // AFFICHÉ, on suit le temps réel au plus près : c'est la promesse de l'écran.
+  // MASQUÉ, on ne rejoue pas quatre requêtes — dont le planning entier — à
+  // chaque évènement d'un collègue : on programme un seul rattrapage. Le cache
+  // reste frais à la demi-minute près, ce qui suffit largement au fil
+  // d'activité et aux badges.
   function notifyChange() {
-    refresh();
+    if (visible) { refresh(); return; }
+    if (veilleTimer) return;                       // rattrapage déjà programmé
+    const attente = Math.max(0, REFRESH_FOND_MS - (Date.now() - dernierRefresh));
+    veilleTimer = setTimeout(() => { veilleTimer = null; refresh(); }, attente);
   }
 
   return { start, show, hide, notifyChange };

@@ -145,6 +145,34 @@ if (process.env.DATABASE_URL) {
     name: 'gen_random_uuid', returns: 'uuid', impure: true,
     implementation: () => '00000000-0000-4000-8000-' + hex(++seq),
   });
+  // pg-mem n'implémente que très peu de fonctions natives. On lui apprend
+  // celles dont la RECHERCHE GLOBALE se sert, pour que la base locale se
+  // comporte comme PostgreSQL : sans elles, le test passait à côté du chemin
+  // réellement servi en production.
+  mem.public.registerFunction({
+    name: 'translate', args: ['text', 'text', 'text'], returns: 'text',
+    implementation: (s, de, vers) => {
+      if (s == null) return null;
+      let out = '';
+      for (const c of String(s)) {
+        const i = String(de || '').indexOf(c);
+        // Un caractère listé dans `de` sans équivalent dans `vers` est SUPPRIMÉ :
+        // c'est la règle de PostgreSQL, pas un oubli.
+        out += i === -1 ? c : (String(vers || '')[i] ?? '');
+      }
+      return out;
+    },
+  });
+  mem.public.registerFunction({
+    name: 'concat_ws', args: ['text', 'text'], returns: 'text', allowNullArguments: true,
+    implementation: (sep, ...parts) => parts.filter((p) => p != null).join(sep == null ? '' : sep),
+  });
+  mem.public.registerFunction({
+    name: 'strpos', args: ['text', 'text'], returns: 'int',
+    implementation: (foin, aiguille) => (foin == null || aiguille == null
+      ? null
+      : String(foin).indexOf(String(aiguille)) + 1),
+  });
   const MemPg = mem.adapters.createPg();
   pool = new MemPg.Pool();
   console.log('ℹ  Mode local : base en mémoire (pg-mem). Données non persistantes.');
@@ -231,6 +259,21 @@ async function init() {
   // Down : UPDATE requests SET responsable='Opérateur' WHERE responsable='À attribuer'
   // (non rejouable à l'identique, mais aucune donnée n'est perdue).
   await pool.query("UPDATE requests SET responsable = 'À attribuer' WHERE responsable = 'Opérateur'");
+
+  // Index sur les deux clés d'idempotence du comptoir. Elles vivent DANS le
+  // JSON de la fiche (pas dans une colonne) : sans index, chaque prise de
+  // commande balayait toute la table `requests` — deux fois — et le coût montait
+  // avec l'historique. Créés ici plutôt que dans schema.sql : ce sont des index
+  // sur EXPRESSION, que pg-mem (base locale de test) ne sait pas construire.
+  // Down : DROP INDEX IF EXISTS idx_requests_fiche_ref, idx_requests_fiche_empreinte;
+  for (const [nom, expr] of [
+    ['idx_requests_fiche_ref', "((fiche->>'ref'))"],
+    ['idx_requests_fiche_empreinte', "((fiche->>'empreinte'))"],
+  ]) {
+    try {
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${nom} ON requests ${expr}`);
+    } catch (_) { /* pg-mem local : pas d'index sur expression, sans conséquence */ }
+  }
 
   // Migration vers le planning linéaire : convertit les anciens slugs d'étape
   // (dont la phase « production » multi-machines) vers la liste linéaire.

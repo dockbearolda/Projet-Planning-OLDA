@@ -20,11 +20,16 @@
 //   - toute réponse qui n'est pas un 200 de notre propre origine (la prod est
 //     derrière un Basic Auth : mémoriser un 401 condamnerait le poste).
 
-const CACHE = 'olda-coquille-v1';
+const CACHE = 'olda-coquille-v2';
 
 // La coquille : ce qu'il faut pour AFFICHER l'application. Les données, elles,
 // viennent du réseau — hors ligne, on montre l'écran et son message d'erreur,
 // jamais un planning inventé.
+//
+// TOUT ce que l'écran peut demander doit y figurer. Il y manquait les trois
+// modules chargés à la demande (Nouveau Projet, Base clients, Réglages) et les
+// deux écrans du comptoir : hors ligne, l'application s'ouvrait bien… mais ces
+// onglets-là étaient morts — dont Nouveau Projet, la seule porte d'entrée.
 const COQUILLE = [
   '/',
   '/index.html',
@@ -37,7 +42,20 @@ const COQUILLE = [
   '/priority.js',
   '/whatsapp.js',
   '/nom-client.js',
+  '/confirmer.js',
+  // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être
+  // tombé entre l'ouverture de l'application et le tap sur l'onglet.
+  '/nouveau-projet.js',
+  '/clients.js',
+  '/reglages.js',
+  // Les deux parcours du comptoir, affichés dans un cadre par Nouveau Projet.
+  '/comptoir/vente-directe.html',
+  '/comptoir/demande-devis.html',
+  '/comptoir/pont.js',
   '/olda-logo.svg',
+  // La police d'icônes : sans elle, toute la barre de navigation se réduit à la
+  // première lettre de chaque icône.
+  '/olda-icones.woff2',
   '/manifest.webmanifest',
 ];
 

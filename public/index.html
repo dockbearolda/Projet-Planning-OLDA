@@ -18,15 +18,18 @@
       document.documentElement.dataset.theme = t;
     } catch (e) {}
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- La charte est en Arial/Helvetica (police système) : plus rien à
-       télécharger côté texte. Seules les icônes restent une webfont — réduite
-       aux seuls axes réellement utilisés (opsz 24, graisses 400-500, FILL 0,
-       GRAD 0) : le fichier est plusieurs fois plus léger que la plage complète.
-       `display=block` : une icône qui n'est pas prête ne doit JAMAIS s'afficher
-       en toutes lettres (« dashboard », « search »…) le temps du chargement. -->
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..500,0,0&display=block" rel="stylesheet" />
+       télécharger côté texte. Seules les icônes restent une webfont, et elle est
+       DÉSORMAIS CHEZ NOUS (`olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes
+       réellement employés). Elle venait de Google Fonts : deux `preconnect` puis
+       une feuille de style BLOQUANT LE RENDU sur un autre domaine, soit une
+       chaîne DNS → TLS → CSS → police avant le premier pixel — depuis
+       Saint-Martin, en 4G, c'était payé cash sur l'ouverture. Et le service
+       worker ne pouvant pas mettre en cache un autre domaine, hors ligne toute
+       la barre de navigation se réduisait à la première lettre de chaque icône
+       (« d », « s », « c »…). Servie par nous, elle est mise de côté comme le
+       reste de la coquille. -->
+  <link rel="preload" href="olda-icones.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="clients.css" />
   <link rel="stylesheet" href="projet.css" />
@@ -39,6 +42,7 @@
   <link rel="modulepreload" href="guide.js" />
   <link rel="modulepreload" href="whatsapp.js" />
   <link rel="modulepreload" href="nom-client.js" />
+  <link rel="modulepreload" href="confirmer.js" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>

@@ -8,6 +8,10 @@
 // retour ne fait que rafraîchir les données (un client a pu naître d'une commande).
 
 import { groupDigits } from './whatsapp.js';
+// La boîte de confirmation de l'application. `window.confirm()` ouvrait la boîte
+// grise du système : hors charte, minuscule au doigt sur la tablette, et elle
+// GÈLE le thread — le planning ne se rafraîchit plus tant qu'elle est à l'écran.
+import { confirmerAction } from './confirmer.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -873,7 +877,11 @@ async function createClient() {
 async function deleteClient() {
   if (!drawer || drawer.mode !== 'edit') return;
   const c = drawer.draft;
-  if (!window.confirm(`Supprimer définitivement « ${c.entreprise} » et ses notes ?`)) return;
+  const ok = await confirmerAction(
+    'Supprimer cette fiche client ?',
+    `« ${c.entreprise} » et tout son historique de notes seront retirés définitivement.`,
+  );
+  if (!ok) return;
   try {
     await api('DELETE', `/api/clients/${drawer.id}`);
     LIST = LIST.filter((x) => x.id !== drawer.id);
