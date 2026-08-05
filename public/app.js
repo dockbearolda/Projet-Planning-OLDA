@@ -641,6 +641,14 @@ function belongsToCurrentView(r) {
 // glissement : une étape que personne n'a rangée garde son tri automatique. Sans
 // ça, passer tout le planning en ordre manuel le rebattrait d'un coup dans
 // l'ordre de création — les urgences ne seraient plus en tête.
+//
+// La décision est PARTAGÉE, comme ses effets. Glisser une carte réécrit les
+// `position` en base, donc pour tout le monde ; garder « cette étape est rangée
+// à la main » dans le localStorage de chaque tablette faisait diverger les
+// postes — une vendeuse rangeait sa liste, la tablette d'à côté ne bougeait pas,
+// puis basculait un jour d'un coup sur un geste accidentel. Le localStorage ne
+// sert plus que de cache d'amorçage (pas de saut à l'ouverture) ; la référence
+// est le serveur (voir /api/ordre-manuel).
 const ORDRE_KEY = 'olda.ordre-manuel';
 let ordreManuel = new Set();
 try {
@@ -648,8 +656,27 @@ try {
   if (Array.isArray(saved)) ordreManuel = new Set(saved.filter((s) => typeof s === 'string'));
 } catch (_) { ordreManuel = new Set(); }
 
-function saveOrdreManuel() {
+function saveOrdreManuelLocal() {
   try { localStorage.setItem(ORDRE_KEY, JSON.stringify([...ordreManuel])); } catch (_) {}
+}
+
+// Publie la décision pour tous les postes. Renvoie une promesse : l'appelant
+// (commitReorder) sait ainsi revenir en arrière si l'écriture échoue.
+function saveOrdreManuel() {
+  saveOrdreManuelLocal();
+  return api('PUT', '/api/ordre-manuel', [...ordreManuel]);
+}
+
+// Relit la liste partagée. Silencieux en cas d'échec : on garde le dernier état
+// connu plutôt que de rebattre la grille sur une panne réseau.
+async function loadOrdreManuel() {
+  try {
+    const list = await api('GET', '/api/ordre-manuel');
+    if (Array.isArray(list)) {
+      ordreManuel = new Set(list.filter((s) => typeof s === 'string'));
+      saveOrdreManuelLocal();
+    }
+  } catch (_) { /* silencieux */ }
 }
 
 // Tri automatique : priorité décroissante, puis les urgences en tête, puis
@@ -669,33 +696,40 @@ function cmpAuto(a, b) {
 // déjà ce qu'on vient d'y taper, et le reconstruire démonterait la puce sur
 // laquelle l'utilisateur est peut-être en train de cliquer (le clic tomberait
 // dans le vide entre le `mousedown` qui a déclenché la sauvegarde et le `click`).
-function applySortAndRender({ syncDrawer = true } = {}) {
-  // `rows` contient TOUTE la famille ; si une sous-catégorie est active, on ne
-  // rend que les commandes qui en relèvent (filtre instantané, côté client).
-  const base = currentSub === null
-    ? rows
-    : rows.filter((r) => (r.sub_stage ?? null) === currentSub);
-  const sorted = [...base];
-  if (sort.key) {
-    sorted.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
-  } else if (ordreManuel.has(currentStage)) {
+// L'ordre dans lequel la FAMILLE ENTIÈRE est rangée — sous-catégories comprises,
+// qu'elles soient affichées ou non. La grille en montre une tranche (filtre de
+// sous-catégorie), mais le réordonnancement a besoin de la séquence complète
+// pour ne pas laisser d'ancienne position derrière lui (cf. commitReorder).
+function ordreFamille() {
+  const liste = [...rows];
+  if (sort.key) return liste.sort((a, b) => cmp(a, b, sort.key) * sort.dir);
+  if (ordreManuel.has(currentStage)) {
     // L'ÉTAPE A ÉTÉ RANGÉE À LA MAIN : c'est cet ordre-là qui fait foi. Une carte
     // qu'on déplace doit rester où on l'a posée — sinon le geste ment. Le tri
     // automatique ne départage plus que les positions à égalité (lignes créées
     // avant le premier rangement, qui partagent la même valeur).
-    sorted.sort((a, b) => {
+    return liste.sort((a, b) => {
       const qa = a.position ?? Number.POSITIVE_INFINITY;
       const qb = b.position ?? Number.POSITIVE_INFINITY;
       if (qa !== qb) return qa - qb;
       return cmpAuto(a, b);
     });
-  } else {
-    // tri par défaut : groupé par PRIORITÉ (Haute → Moyenne → Basse) pour que les
-    // bandes soient contiguës (en-têtes de groupe). À l'intérieur d'une bande, les
-    // commandes urgentes (échéance ≤ 1 jour, aujourd'hui ou dépassée) remontent en
-    // tête, la plus urgente d'abord, puis échéance la plus proche.
-    sorted.sort(cmpAuto);
   }
+  // tri par défaut : groupé par PRIORITÉ (Haute → Moyenne → Basse) pour que les
+  // bandes soient contiguës (en-têtes de groupe). À l'intérieur d'une bande, les
+  // commandes urgentes (échéance ≤ 1 jour, aujourd'hui ou dépassée) remontent en
+  // tête, la plus urgente d'abord, puis échéance la plus proche.
+  return liste.sort(cmpAuto);
+}
+
+function applySortAndRender({ syncDrawer = true } = {}) {
+  // `rows` contient TOUTE la famille ; si une sous-catégorie est active, on ne
+  // rend que les commandes qui en relèvent (filtre instantané, côté client).
+  // On trie AVANT de filtrer : la tranche affichée est donc toujours une
+  // sous-séquence exacte de l'ordre de la famille, et commitReorder peut y
+  // replacer les lignes déplacées sans déranger les autres.
+  const sorted = ordreFamille()
+    .filter((r) => currentSub === null || (r.sub_stage ?? null) === currentSub);
   // Rendu incrémental : on monte / réutilise TOUTES les lignes de l'étape. Le
   // filtre de recherche se fait ensuite par masquage CSS (aucune reconstruction
   // par frappe) — cf. applySearchAndCounts.
@@ -969,7 +1003,18 @@ function buildCard(r) {
   };
   meta.appendChild(puce(PRIORITY_LEVELS[prioBand(r)].label));
   meta.appendChild(puce(stageDestinationLabel(r.stage, r.sub_stage ?? null)));
-  if (r.flag) meta.appendChild(puce(r.flag === 'bloque' ? 'Bloquée' : 'À voir'));
+  if (r.flag) {
+    const pf = puce(FLAG_BY_VALUE[r.flag] ? FLAG_BY_VALUE[r.flag].label : 'À voir');
+    pf.classList.add('pcard__pill--' + (r.flag === 'bloque' ? 'bloque' : 'a-voir'));
+    meta.appendChild(pf);
+  }
+  // LE MOTIF, PAS SEULEMENT LA PASTILLE. « Bloquée » sans le pourquoi oblige à
+  // ouvrir la fiche pour comprendre — ou, avant, à rallumer une colonne du
+  // tableau, ce que personne ne devine. La raison se lit sur la carte.
+  const motif = document.createElement('div');
+  motif.className = 'pcard__motif';
+  motif.textContent = r.flag_reason || '';
+  motif.hidden = !(r.flag && r.flag_reason);
 
   // 3. COMBIEN DE TEMPS IL RESTE — la seule question que le tableau ne posait
   //    nulle part, alors que c'est celle qui décide de l'ordre de la journée.
@@ -997,8 +1042,23 @@ function buildCard(r) {
   refs.className = 'pcard__refs';
   const nomRef = document.createElement('div');
   nomRef.className = 'pcard__ref-name';
-  const effectif = () => r.referent || r.responsable || 'Non attribué';
-  nomRef.textContent = `Référent : ${effectif()}`;
+  // Le nom EFFECTIF, comme dans le tableau : celui posé à la main sur la ligne,
+  // sinon le référent (ou le pilote) PAR DÉFAUT de la catégorie. La carte lisait
+  // la colonne brute et annonçait « Non attribué » sur des commandes que le
+  // tableau, lui, montrait bien nommées — la règle du patron (« aucune commande
+  // n'est anonyme ») était donc fausse sur la vue par défaut.
+  const nomEffectif = () => {
+    const manuels = isManualReferent(r) ? [r.referent] : [];
+    if (manuels.length) return { qui: manuels.join(', '), auto: false };
+    const base = referentsOf(r.stage, r.sub_stage);
+    if (base.length) return { qui: base.join(', '), auto: true };
+    const pilote = effectivePilot(r);
+    return pilote ? { qui: pilote, auto: !isManualPilot(r) } : { qui: 'Non attribué', auto: false };
+  };
+  const eff = nomEffectif();
+  nomRef.textContent = `Référent : ${eff.qui}`;
+  nomRef.classList.toggle('is-auto', eff.auto);
+  if (eff.auto) attachTip(nomRef, 'Nom par défaut de la catégorie — appuyer sur une initiale pour en nommer un autre');
   for (const e of EMPLOYEES) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1060,7 +1120,7 @@ function buildCard(r) {
 
   carte.append(
     blocClient,
-    pcardBloc('Projet', nom, meta),
+    pcardBloc('Projet', nom, meta, motif),
     pcardBloc('Délai de production restant', delaiEl, remise, cible),
     pcardBloc('TTC', montant, refs, nomRef),
     actions,
@@ -1358,6 +1418,13 @@ function cellStars(r) {
 function cellType(r) {
   const td = document.createElement('td');
   td.className = 'col-type';
+  td.appendChild(typeControl(r));
+  return td;
+}
+
+// La puce de type, détachée de sa cellule — la fiche projet la réutilise (elle
+// n'existait que dans le tableau complet, donc nulle part sur la vue par défaut).
+function typeControl(r) {
   const type = document.createElement('button');
   type.type = 'button';
   const renderType = () => {
@@ -1382,8 +1449,7 @@ function cellType(r) {
       });
     });
   });
-  td.appendChild(type);
-  return td;
+  return type;
 }
 
 // Espace RESPONSABLE : QUI pilote le projet (puce principale) et QUI en est le
@@ -1395,6 +1461,14 @@ function cellType(r) {
 function cellResponsable(r) {
   const td = document.createElement('td');
   td.className = 'col-resp-cell';
+  td.appendChild(respControl(r));
+  return td;
+}
+
+// Pilote + référent, détachés de leur cellule : la fiche projet les réutilise.
+// Le PILOTE, en particulier, n'était modifiable que depuis le tableau complet —
+// donc inaccessible sur la vue par défaut, où seul le référent se change.
+function respControl(r) {
   const stack = document.createElement('div');
   stack.className = 'resp-stack';
 
@@ -1450,7 +1524,13 @@ function cellResponsable(r) {
     items.push({ value: null, label: base ? `Par défaut (${base})` : 'Aucun', muted: true });
     openMenu(pilot, items, r.responsable ?? null, (val) => {
       if ((val ?? null) === (r.responsable ?? null)) return;
-      patch(r, { responsable: val }, () => { r.responsable = val; renderPilot(); });
+      patch(r, { responsable: val }, () => {
+        r.responsable = val;
+        renderPilot();
+        // La carte affiche elle aussi un nom effectif : elle doit se remonter.
+        invalidateRowCache(r.id);
+        applySortAndRender();
+      });
     });
   });
 
@@ -1478,13 +1558,17 @@ function cellResponsable(r) {
     items.push({ value: null, label: base.length ? `Par défaut (${base.join(', ')})` : 'Aucun', muted: true });
     openMenu(ref, items, r.referent ?? null, (val) => {
       if ((val ?? null) === (r.referent ?? null)) return;
-      patch(r, { referent: val }, () => { r.referent = val; renderRef(); });
+      patch(r, { referent: val }, () => {
+        r.referent = val;
+        renderRef();
+        invalidateRowCache(r.id);
+        applySortAndRender();
+      });
     });
   });
 
   stack.append(pilot, ref);
-  td.appendChild(stack);
-  return td;
+  return stack;
 }
 
 // Colonne ÉTAT : l'alerte que n'importe qui pose sur la commande — BLOQUÉE
@@ -1493,6 +1577,16 @@ function cellResponsable(r) {
 function cellFlag(r) {
   const td = document.createElement('td');
   td.className = 'col-flag-cell';
+  td.appendChild(flagControl(r, td));
+  return td;
+}
+
+// Le contrôle d'alerte lui-même, détaché de sa cellule : la fiche projet s'en
+// sert telle quelle. Sans ça, poser ou lever un blocage n'était possible que
+// dans le tableau complet — donc invisible depuis la vue par défaut (cartes),
+// où l'on voyait « Bloquée » sans pouvoir ni savoir pourquoi ni y remédier.
+// `hote` sert à retrouver la ligne du tableau à teinter (null dans la fiche).
+function flagControl(r, hote) {
   const stack = document.createElement('div');
   stack.className = 'flag-stack';
 
@@ -1520,7 +1614,7 @@ function cellFlag(r) {
       reason.hidden = true;
     }
     // La ligne entière se teinte : une commande bloquée doit sauter aux yeux.
-    const tr = td.closest('tr');
+    const tr = hote && hote.closest ? hote.closest('tr') : null;
     if (tr) {
       tr.classList.toggle('is-bloque', r.flag === 'bloque');
       tr.classList.toggle('is-a-voir', r.flag === 'a_voir');
@@ -1531,7 +1625,15 @@ function cellFlag(r) {
   const save = (flag, motif) => {
     const body = { flag: flag ?? null, flag_reason: flag ? (motif || null) : null };
     if (body.flag === (r.flag ?? null) && body.flag_reason === (r.flag_reason ?? null)) return;
-    patch(r, body, () => { r.flag = body.flag; r.flag_reason = body.flag_reason; render(); });
+    patch(r, body, () => {
+      r.flag = body.flag;
+      r.flag_reason = body.flag_reason;
+      render();
+      // La carte porte désormais la pastille ET le motif : elle doit se remonter,
+      // que l'alerte ait été posée depuis le tableau ou depuis la fiche.
+      invalidateRowCache(r.id);
+      applySortAndRender();
+    });
   };
 
   render();
@@ -1552,8 +1654,7 @@ function cellFlag(r) {
   });
 
   stack.append(btn, reason);
-  td.appendChild(stack);
-  return td;
+  return stack;
 }
 
 // Sous-étape : précise ce qui se passe MAINTENANT dans la famille. Puce
@@ -2163,6 +2264,9 @@ async function chargerFicheComplete(id) {
 
 function openLigneDetail(id) {
   ensureLigneDrawer();
+  // On ouvre une fiche : rien de ce qui a été tapé dans la précédente n'a à
+  // suivre. (Un enregistrement réussi nettoie déjà, mais on peut aussi fermer.)
+  if (ligneDrawerId !== String(id)) ldOublierSaisie();
   ligneDrawerId = String(id);
   ligneDrawerEl.hidden = false;
   // Chargement du détail en tâche de fond : le tiroir s'ouvre TOUT DE SUITE
@@ -2193,6 +2297,7 @@ function closeLigneDetail() {
   if (!ligneDrawerEl) return;
   ligneDrawerId = null;
   ligneDrawerEl.hidden = true;
+  ldOublierSaisie();
 }
 
 // Rappelée après CHAQUE (re)rendu de la grille (poll, SSE, tri, sauvegarde
@@ -2266,24 +2371,50 @@ function ldPatch(r, body) {
   });
 }
 
-// Champ texte du tiroir : même contrat que dans la grille — Entrée valide,
-// Échap annule, quitter le champ enregistre.
-function ldInput(r, field, opts = {}) {
-  const input = document.createElement('input');
-  input.className = 'ld-input' + (opts.num ? ' num' : '');
-  input.type = opts.type || 'text';
-  if (opts.inputMode) input.inputMode = opts.inputMode;
-  input.value = opts.value != null ? opts.value : (r[field] ?? '');
-  input.placeholder = opts.placeholder || '—';
-  input.setAttribute('aria-label', opts.ariaLabel || field);
-  bindInline(
-    input, r, field,
-    opts.transform || ((v) => (v === '' ? null : v)),
-    opts.normalize,
-    () => ldRefresh(r, false),
-  );
-  return input;
+// --- La saisie en cours dans la fiche ---------------------------------------
+// La fiche est un FORMULAIRE : rien ne part avant « Enregistrer ». Or elle se
+// reconstruit entièrement dès qu'un autre poste touche au planning (SSE). Deux
+// dégâts, tous les deux silencieux : ce qu'on venait de taper disparaissait, et
+// « Enregistrer » renvoyait les valeurs d'origine — écrasant au passage ce que
+// le collègue venait de changer.
+// On mémorise donc, pour chaque contrôle, LA VALEUR TELLE QU'ELLE A ÉTÉ RENDUE.
+// La différence avec ce qu'affiche le contrôle, c'est exactement la correction
+// de l'employé : elle survit aux reconstructions, et elle seule part au serveur.
+let ldValeursRendues = {};   // { clé: valeur au moment du rendu }
+let ldSaisieEnCours = {};    // { clé: valeur tapée, non encore enregistrée }
+
+function ldOublierSaisie() {
+  ldValeursRendues = {};
+  ldSaisieEnCours = {};
 }
+
+// Déclare un contrôle et la valeur avec laquelle il vient d'être rempli.
+function ldSuivi(cle, el, valeur) {
+  el.dataset.ldKey = cle;
+  ldValeursRendues[cle] = valeur == null ? '' : String(valeur);
+  return el;
+}
+
+// Avant de tout reconstruire : on relève ce qui a été tapé et pas enregistré.
+function ldCapturerSaisie() {
+  if (!ligneDrawerCard) return;
+  for (const el of ligneDrawerCard.querySelectorAll('[data-ld-key]')) {
+    const cle = el.dataset.ldKey;
+    if (String(el.value) !== (ldValeursRendues[cle] ?? '')) ldSaisieEnCours[cle] = el.value;
+  }
+}
+
+// Après reconstruction : on repose les corrections en cours par-dessus.
+function ldAppliquerSaisie() {
+  if (!ligneDrawerCard) return;
+  for (const el of ligneDrawerCard.querySelectorAll('[data-ld-key]')) {
+    const cle = el.dataset.ldKey;
+    if (cle in ldSaisieEnCours) el.value = ldSaisieEnCours[cle];
+  }
+}
+
+// Vrai si ce contrôle porte une valeur différente de celle qui a été rendue.
+const ldModifie = (el) => !!el && String(el.value) !== (ldValeursRendues[el.dataset.ldKey] ?? '');
 
 // Puce cliquable du tiroir : `render` réécrit libellé + classe depuis `r`,
 // `open` ouvre le menu (ou le popover) au clic.
@@ -2471,7 +2602,10 @@ function ldActionBtn(icone, label, onClick) {
   t.textContent = label;
   b.append(i, t);
   b.setAttribute('aria-label', label);
-  b.addEventListener('click', onClick);
+  // Le bouton lui-même est passé au gestionnaire : les actions qui CRÉENT
+  // quelque chose (dupliquer, envoyer vers) doivent pouvoir se désarmer le temps
+  // que la création parte, sinon un appui appuyé au doigt fait deux copies.
+  b.addEventListener('click', (e) => onClick(b, e));
   return b;
 }
 
@@ -2611,6 +2745,7 @@ function ldBlocDetail(r) {
       if (longue) champ.rows = 3;
       champ.value = l.v == null ? '' : l.v;
       champ.setAttribute('aria-label', l.k);
+      ldSuivi(`detail:${g.cle}:${champs[g.cle].length}`, champ, l.v);
       champs[g.cle].push(champ);
       ligne.append(k, champ);
       section.appendChild(ligne);
@@ -2755,12 +2890,23 @@ function ldSelect(options, valeur, label) {
 
 // Toutes les places possibles du pipeline, « Famille › Sous-étape ». Une
 // famille sans sous-étape est une destination à elle seule.
-function placesDuPipeline() {
+//
+// « Famille › à préciser » n'est PAS proposée : le glisser-déposer la refuse
+// déjà (« Dépose la ligne sur une sous-catégorie, pas sur le titre »), et une
+// commande qui atterrit là n'apparaît sous AUCUNE entrée du rail — on ne la
+// retrouve qu'en cliquant le grand titre. La fiche ne doit pas être la porte
+// dérobée d'un état qu'on a fermé partout ailleurs.
+// Seule exception : la place ACTUELLE de la commande. Une ligne déjà « à
+// préciser » doit retrouver sa valeur dans la liste, sinon le sélecteur
+// afficherait la première option et l'enregistrement la déplacerait toute seule.
+function placesDuPipeline(placeActuelle) {
   const places = [];
   for (const f of STAGES) {
     const subs = SUB_STAGES[f.slug] || [];
     if (!subs.length) { places.push({ value: `${f.slug}|`, label: f.label }); continue; }
-    places.push({ value: `${f.slug}|`, label: `${f.label} › à préciser` });
+    if (placeActuelle === `${f.slug}|`) {
+      places.push({ value: `${f.slug}|`, label: `${f.label} › à préciser` });
+    }
     for (const s of subs) places.push({ value: `${f.slug}|${s.slug}`, label: `${f.label} › ${s.label}` });
   }
   return places;
@@ -2769,6 +2915,9 @@ function placesDuPipeline() {
 function renderLigneDetail() {
   const r = completerFiche(rows.find((x) => String(x.id) === ligneDrawerId));
   if (!r) { closeLigneDetail(); return; }
+  // Ce que l'employé a tapé sans l'enregistrer doit traverser la reconstruction.
+  ldCapturerSaisie();
+  ldValeursRendues = {};
   // `.ld-body` est le conteneur qui défile, et replaceChildren() le détruit :
   // on relève sa position pour la reposer sur le corps reconstruit, sinon la
   // fiche remonte en haut à chaque enregistrement alors qu'on travaillait tout
@@ -2805,6 +2954,21 @@ function renderLigneDetail() {
 
   const actions = document.createElement('div');
   actions.className = 'ld-head__actions';
+  // Dupliquer et « Envoyer vers Fiverr » n'existaient que dans le tableau
+  // complet : depuis les cartes (la vue par défaut), il n'y avait aucun moyen de
+  // recopier une commande. Ils rejoignent la fiche, où l'on ouvre la ligne.
+  const dupliquer = ldActionBtn('content_copy', 'Dupliquer', (b) => {
+    if (!armerUneFois(b)) return;
+    duplicateRow(r);
+    showToast('Commande dupliquée');
+  });
+  actions.append(dupliquer);
+  for (const t of SEND_TARGETS) {
+    if (t.slug === r.stage) continue; // déjà dans cette catégorie
+    actions.append(ldActionBtn('send', `Vers ${t.label}`, (b) => {
+      if (armerUneFois(b)) copyToStage(r, t.slug);
+    }));
+  }
   actions.append(
     ldActionBtn('print', 'Imprimer', () => imprimerRecap(r)),
     ldActionBtn('download', 'Télécharger', () => telechargerRecap(r)),
@@ -2817,36 +2981,63 @@ function renderLigneDetail() {
   const body = document.createElement('div');
   body.className = 'ld-body';
 
-  const cClient = ldChamp(r.billing_company, { label: 'Client' });
-  const cProjet = ldChamp(r.product, { label: 'Projet' });
-  const cPriorite = ldSelect(
+  const cClient = ldSuivi('client', ldChamp(r.billing_company, { label: 'Client' }), r.billing_company);
+  const cProjet = ldSuivi('projet', ldChamp(r.product, { label: 'Projet' }), r.product);
+  const cPriorite = ldSuivi('priorite', ldSelect(
     [3, 2, 1].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })),
     prioBand(r), 'Priorité',
-  );
-  const cDate = ldChamp(String(r.deadline || '').slice(0, 10), { type: 'date', label: 'Date de remise' });
+  ), prioBand(r));
+  const dateIso = String(r.deadline || '').slice(0, 10);
+  const cDate = ldSuivi('date', ldChamp(dateIso, { type: 'date', label: 'Date de remise' }), dateIso);
   // Pas de 14:00 pré-rempli : ouvrir puis enregistrer une fiche gravait alors
   // une heure de remise que le client n'avait jamais demandée, et la carte
   // l'annonçait ensuite comme une promesse (« Remise client : … à 14h00 »).
   // Le calcul du délai, lui, prend déjà 14 h par défaut de son côté.
-  const cHeure = ldChamp(fiche.heureSouhaitee || '', { type: 'time', label: 'Heure de remise' });
-  const cPrix = ldChamp(r.project_value == null ? '' : r.project_value, {
+  const cHeure = ldSuivi('heure',
+    ldChamp(fiche.heureSouhaitee || '', { type: 'time', label: 'Heure de remise' }),
+    fiche.heureSouhaitee || '');
+  const cPrix = ldSuivi('prix', ldChamp(r.project_value == null ? '' : r.project_value, {
     type: 'number', step: '0.01', inputMode: 'decimal',
     placeholder: 'à chiffrer', label: 'Valeur TTC',
-  });
-  const cProduction = ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' });
-  const cInfos = ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' });
+  }), r.project_value == null ? '' : r.project_value);
+  const cProduction = ldSuivi('production',
+    ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' }), fiche.production);
+  const cInfos = ldSuivi('infos',
+    ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' }), r.description);
+  // Téléphone et e-mail ne vivaient que dans un popover du tableau complet :
+  // depuis les cartes, on ne pouvait ni les lire, ni les corriger, ni prévenir
+  // le client. Ils rejoignent la fiche, avec la pastille WhatsApp.
+  const cTel = ldSuivi('tel',
+    ldChamp(r.contact_phone, { type: 'tel', inputMode: 'tel', placeholder: 'téléphone', label: 'Téléphone' }),
+    r.contact_phone);
+  const cEmail = ldSuivi('email',
+    ldChamp(r.contact_email, { type: 'email', inputMode: 'email', placeholder: 'e-mail', label: 'E-mail' }),
+    r.contact_email);
 
   const remise = document.createElement('div');
   remise.className = 'ld-duo';
   remise.append(cDate, cHeure);
+
+  const contact = document.createElement('div');
+  contact.className = 'ld-duo';
+  contact.append(cTel, cEmail);
+  const contactBloc = document.createElement('div');
+  contactBloc.append(contact, cellWhatsapp(r));
 
   // Les champs de tête restent SOUS LES YEUX, comme sur l'écran du patron : ce
   // sont ceux qu'on corrige au téléphone, avec le client en ligne. Seuls les
   // deux longs pavés du bas se replient (voir plus loin).
   body.append(
     ldBox('Client', cClient),
+    ldBox('Type de client', typeControl(r)),
+    ldBox('Contact', contactBloc),
     ldBox('Projet', cProjet),
     ldBox('Étape actuelle', ldValeur(stageDestinationLabel(r.stage, r.sub_stage ?? null))),
+    // L'ALERTE, ENFIN ACCESSIBLE. Sur les cartes on lisait « Bloquée » sans
+    // pouvoir savoir pourquoi ni y remédier : le contrôle n'existait que dans le
+    // tableau complet, qui est éteint par défaut. Il est ici, avec son motif.
+    ldBox('État', flagControl(r, null)),
+    ldBox('Qui suit', respControl(r)),
     ldBox('Priorité', cPriorite),
     ldBox('Remise au client', remise),
     ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
@@ -2912,7 +3103,18 @@ function renderLigneDetail() {
     fiche.creeLe || r.created_at ? `Créée le ${horodatageFr(fiche.creeLe || r.created_at)}${fiche.source ? ` depuis ${fiche.source}` : ''}` : null,
     r.updated_at ? `Dernière modification le ${horodatageFr(r.updated_at)}` : null,
   ].filter(Boolean);
-  body.append(ldVolet('Historique', histoLignes[0] || '—', histoLignes.map(ldValeur), true));
+  const histoBox = document.createElement('div');
+  histoBox.className = 'ld-journal';
+  histoBox.append(...histoLignes.map(ldValeur));
+  // Le journal des modifications (étape, état, prix, échéance…) arrive du
+  // serveur : on annonce l'attente plutôt que d'afficher un vide qui se lirait
+  // comme « rien n'a jamais bougé ».
+  const journalEl = document.createElement('div');
+  journalEl.className = 'ld-journal__liste';
+  journalEl.appendChild(ldValeur('Chargement du journal…'));
+  histoBox.appendChild(journalEl);
+  body.append(ldVolet('Historique', histoLignes[0] || '—', [histoBox], true));
+  chargerJournal(r.id, journalEl);
 
   // --- Détail complet, modifiable, replié ---------------------------------------
   // Le récapitulatif du comptoir fait des dizaines de lignes : déplié, il pousse
@@ -2944,11 +3146,13 @@ function renderLigneDetail() {
   // --- Pied : où va la ligne, qui la suit, et on enregistre --------------------
   const pied = document.createElement('footer');
   pied.className = 'ld-foot';
-  const cPlace = ldSelect(placesDuPipeline(), `${r.stage}|${r.sub_stage || ''}`, 'Étape de la commande');
-  const cReferent = ldSelect(
+  const placeActuelle = `${r.stage}|${r.sub_stage || ''}`;
+  const cPlace = ldSuivi('place',
+    ldSelect(placesDuPipeline(placeActuelle), placeActuelle, 'Étape de la commande'), placeActuelle);
+  const cReferent = ldSuivi('referent', ldSelect(
     [{ value: '', label: 'Référent : personne' }, ...EMPLOYEES.map((n) => ({ value: n, label: `Référent : ${n}` }))],
     r.referent || '', 'Référent',
-  );
+  ), r.referent || '');
   const enregistrer = document.createElement('button');
   enregistrer.type = 'button';
   enregistrer.className = 'ld-save';
@@ -2959,19 +3163,19 @@ function renderLigneDetail() {
     label: 'Ajouter une note',
   });
   note.className += ' ld-note';
+  ldSuivi('note', note, '');
 
   enregistrer.addEventListener('click', async () => {
     enregistrer.disabled = true;
     const ancien = enregistrer.textContent;
     enregistrer.textContent = 'Enregistrement…';
     try {
-      await enregistrerFiche(r, {
+      const modifie = await enregistrerFiche(r, {
         cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cProduction, cInfos,
-        cPlace, cReferent, note, champsDetail,
+        cTel, cEmail, cPlace, cReferent, note, champsDetail,
       });
-      showToast('Fiche enregistrée');
+      showToast(modifie ? 'Fiche enregistrée' : 'Rien à enregistrer — aucune modification');
       ldRefresh(r);
-      applySortAndRender();
     } catch (err) {
       reportError(err);
     } finally {
@@ -2986,7 +3190,64 @@ function renderLigneDetail() {
   pied.append(barre, note);
   ligneDrawerCard.appendChild(pied);
 
+  // Les corrections tapées et pas encore enregistrées reviennent par-dessus les
+  // valeurs fraîchement rendues : une reconstruction ne fait plus perdre la
+  // saisie en cours.
+  ldAppliquerSaisie();
+
   body.scrollTop = prevScrollTop;
+}
+
+// Libellés du journal (miroir de JOURNAL_FIELDS côté serveur) et mise en mots
+// des valeurs brutes : « production » ne veut rien dire dans une fiche, « Étape :
+// Préparation du projet » si.
+const JOURNAL_LABELS = {
+  stage: 'Étape', sub_stage: 'Sous-étape', flag: 'État', flag_reason: 'Motif',
+  priority: 'Priorité', project_value: 'Prix TTC', deadline: 'Date souhaitée',
+  responsable: 'Pilote', referent: 'Référent', paye: 'Payé',
+};
+
+function journalValeur(field, brut) {
+  if (brut == null || brut === '') return '—';
+  if (field === 'stage') return STAGE_LABEL[brut] || brut;
+  if (field === 'sub_stage') return SUB_LABEL[brut] || brut;
+  if (field === 'flag') return FLAG_BY_VALUE[brut] ? FLAG_BY_VALUE[brut].label : brut;
+  if (field === 'priority') return PRIORITY_LEVELS[brut] ? PRIORITY_LEVELS[brut].label : brut;
+  // Même écriture que sur les cartes (centimes toujours affichés) : « 99,5 € »
+  // dans un journal de prix se lit comme une valeur tronquée.
+  if (field === 'project_value') {
+    const n = Number(brut);
+    return Number.isFinite(n) ? eur(n) : String(brut);
+  }
+  if (field === 'deadline') return dateFr(brut);
+  if (field === 'paye') return brut === 'true' ? 'oui' : 'non';
+  return String(brut);
+}
+
+// Va chercher ce qui a changé sur cette commande et l'écrit dans l'Historique.
+// Ce que l'application NE SAIT PAS, c'est QUI : elle n'a qu'un mot de passe
+// commun à tout l'atelier. On l'écrit noir sur blanc plutôt que de laisser
+// croire à un oubli.
+async function chargerJournal(id, hote) {
+  let lignes = [];
+  try {
+    lignes = await api('GET', `/api/requests/${id}/journal`);
+  } catch (_) {
+    hote.replaceChildren(ldValeur('Journal indisponible — vérifie la connexion.'));
+    return;
+  }
+  if (!hote.isConnected) return;
+  if (!Array.isArray(lignes) || !lignes.length) {
+    hote.replaceChildren(ldValeur('Aucune modification enregistrée depuis la mise en service du journal.'));
+    return;
+  }
+  const items = lignes.map((l) => ldValeur(
+    `${horodatageFr(l.created_at)} — ${JOURNAL_LABELS[l.field] || l.field} : `
+    + `${journalValeur(l.field, l.value_before)} → ${journalValeur(l.field, l.value_after)}`,
+  ));
+  const note = ldValeur('L’application n’a qu’un mot de passe commun : elle enregistre ce qui a changé, pas qui l’a fait.');
+  note.className += ' ld-journal__note';
+  hote.replaceChildren(...items, note);
 }
 
 const horodatageFr = (iso) => {
@@ -3009,43 +3270,73 @@ async function enregistrerFiche(r, c) {
     return t === '' ? null : t;
   };
 
-  // La note s'AJOUTE aux informations, elle ne les remplace pas : on n'efface
-  // jamais ce qu'un collègue avait écrit.
-  const noteAjoutee = texte(c.note.value);
-  const infos = texte(c.cInfos.value);
-  const description = noteAjoutee
-    ? [infos, `${horodatageFr(new Date().toISOString())} — ${noteAjoutee}`].filter(Boolean).join('\n')
-    : infos;
+  // ON N'ENVOIE QUE CE QUI A CHANGÉ. La fiche renvoyait tout son formulaire d'un
+  // bloc : ouvrir une commande, la laisser deux minutes à l'écran et cliquer
+  // « Enregistrer » remettait alors les valeurs d'origine par-dessus le travail
+  // d'un collègue — y compris l'étape, si l'atelier venait de faire avancer la
+  // commande. Chaque contrôle est comparé à la valeur avec laquelle il a été
+  // rendu (voir ldSuivi) : ce qu'on n'a pas touché ne part pas.
+  const corps = {};
+  if (ldModifie(c.cClient)) corps.billing_company = texte(c.cClient.value);
+  if (ldModifie(c.cProjet)) corps.product = texte(c.cProjet.value);
+  if (ldModifie(c.cPriorite)) corps.priority = Number(c.cPriorite.value);
+  if (ldModifie(c.cDate)) corps.deadline = texte(c.cDate.value);
+  if (ldModifie(c.cPrix)) corps.project_value = nombre(c.cPrix.value);
+  if (ldModifie(c.cTel)) corps.contact_phone = texte(c.cTel.value);
+  if (ldModifie(c.cEmail)) corps.contact_email = texte(c.cEmail.value);
+  if (ldModifie(c.cReferent)) corps.referent = c.cReferent.value || null;
+  if (ldModifie(c.cPlace)) {
+    const [stage, sub] = c.cPlace.value.split('|');
+    corps.stage = stage;
+    corps.sub_stage = sub || null;
+  }
 
-  const [stage, sub] = c.cPlace.value.split('|');
-  const corps = {
-    billing_company: texte(c.cClient.value),
-    product: texte(c.cProjet.value),
-    priority: Number(c.cPriorite.value),
-    deadline: texte(c.cDate.value),
-    project_value: nombre(c.cPrix.value),
-    description,
-    referent: c.cReferent.value || null,
-    stage,
-    sub_stage: sub || null,
-  };
-  const maj = await api('PATCH', `/api/requests/${r.id}`, corps);
-  Object.assign(r, maj);
+  // La note s'AJOUTE aux informations, elle ne les remplace pas : on n'efface
+  // jamais ce qu'un collègue avait écrit. Si le pavé d'infos n'a pas été touché,
+  // on repart de sa valeur À JOUR (celle de la ligne) et non de ce que la fiche
+  // affichait — c'est là que se perdait la note d'un collègue.
+  const noteAjoutee = texte(c.note.value);
+  const infosModifiees = ldModifie(c.cInfos);
+  if (infosModifiees || noteAjoutee) {
+    const base = infosModifiees ? texte(c.cInfos.value) : texte(r.description);
+    corps.description = noteAjoutee
+      ? [base, `${horodatageFr(new Date().toISOString())} — ${noteAjoutee}`].filter(Boolean).join('\n')
+      : base;
+  }
+
+  let touche = false;
+  if (Object.keys(corps).length) {
+    const maj = await api('PATCH', `/api/requests/${r.id}`, corps);
+    Object.assign(r, maj);
+    touche = true;
+  }
 
   // L'heure de retrait, le secteur de production et le détail du comptoir
   // vivent dans `fiche` : seconde route, qui ne touche qu'aux valeurs et jamais
   // aux libellés.
-  const corpsFiche = {
-    heureSouhaitee: texte(c.cHeure.value),
-    production: texte(c.cProduction.value),
-  };
+  const corpsFiche = {};
+  if (ldModifie(c.cHeure)) corpsFiche.heureSouhaitee = texte(c.cHeure.value);
+  if (ldModifie(c.cProduction)) corpsFiche.production = texte(c.cProduction.value);
   if (c.champsDetail) {
-    corpsFiche.client = c.champsDetail.client.map((x) => x.value);
-    corpsFiche.details = c.champsDetail.details.map((x) => x.value);
+    const detail = [...c.champsDetail.client, ...c.champsDetail.details];
+    // Le récapitulatif s'envoie par positions : dès qu'UNE ligne bouge, on
+    // renvoie les deux listes complètes — mais telles qu'elles sont à l'écran,
+    // donc déjà recalées sur la dernière version connue de la fiche.
+    if (detail.some(ldModifie)) {
+      corpsFiche.client = c.champsDetail.client.map((x) => x.value);
+      corpsFiche.details = c.champsDetail.details.map((x) => x.value);
+    }
   }
-  const majFiche = await api('PATCH', `/api/requests/${r.id}/fiche`, corpsFiche);
-  Object.assign(r, majFiche);
-  await loadCounts();
+  if (Object.keys(corpsFiche).length) {
+    const majFiche = await api('PATCH', `/api/requests/${r.id}/fiche`, corpsFiche);
+    Object.assign(r, majFiche);
+    touche = true;
+  }
+
+  // Tout est parti : la saisie en cours n'a plus lieu d'être conservée.
+  ldOublierSaisie();
+  if (touche) await loadCounts();
+  return touche;
 }
 
 // Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
@@ -3888,13 +4179,32 @@ function moveToStage(r, slug, targetSub = null) {
 // était alors perdu en silence. Une étape tient quelques dizaines de lignes :
 // tout renuméroter coûte quelques PATCH, une seule fois par déplacement.
 async function commitReorder(r) {
-  const siblings = [...listeCourante().querySelectorAll('[data-id]:not(.is-hidden)')];
-  if (!siblings.length) return;
+  const affichees = [...listeCourante().querySelectorAll('[data-id]:not(.is-hidden)')]
+    .map((el) => el.dataset.id);
+  if (!affichees.length) return;
+
+  // ON RENUMÉROTE TOUTE LA FAMILLE, pas seulement ce qui est sous les yeux. La
+  // vue peut être filtrée (recherche en cours) ou restreinte à une sous-étape :
+  // numéroter 1000, 2000, 3000… les seules lignes visibles laissait toutes les
+  // autres sur leurs anciennes valeurs — donc des positions en double, et un
+  // ordre mélangé dès qu'on effaçait la recherche ou qu'on revenait sur la
+  // famille entière.
+  const visibles = new Set(affichees);
+  const parId = new Map(rows.map((x) => [String(x.id), x]));
+  // Séquence de départ = l'ordre de la famille AVANT le geste (l'étape n'est pas
+  // encore marquée « rangée à la main » au premier glissement : ordreFamille
+  // renvoie donc bien le tri qui était à l'écran).
+  const depart = ordreFamille();
+  // On rejoue cette séquence en remplaçant, à chaque emplacement tenu par une
+  // ligne visible, celle que le geste vient d'y poser. Les lignes hors écran
+  // gardent ainsi exactement leur rang dans l'ensemble.
+  let k = 0;
+  const finale = depart.map((ligne) => (
+    visibles.has(String(ligne.id)) ? (parId.get(affichees[k++]) || ligne) : ligne
+  ));
 
   const cibles = [];
-  siblings.forEach((el, i) => {
-    const ligne = rows.find((x) => String(x.id) === el.dataset.id);
-    if (!ligne) return;
+  finale.forEach((ligne, i) => {
     const voulue = (i + 1) * 1000;
     if (ligne.position !== voulue) cibles.push({ ligne, voulue, avant: ligne.position });
   });
@@ -3903,7 +4213,7 @@ async function commitReorder(r) {
   // décide de l'ordre ici. Posé AVANT le rendu, pour que la ligne ne revienne
   // pas à sa place le temps de l'aller-retour serveur.
   const premierRangement = !ordreManuel.has(currentStage);
-  if (premierRangement) { ordreManuel.add(currentStage); saveOrdreManuel(); renderOrdreReset(); }
+  if (premierRangement) { ordreManuel.add(currentStage); saveOrdreManuel().catch(reportError); renderOrdreReset(); }
   if (!cibles.length) return;
 
   for (const c of cibles) c.ligne.position = c.voulue;
@@ -3914,7 +4224,11 @@ async function commitReorder(r) {
     await Promise.all(cibles.map((c) => api('PATCH', `/api/requests/${c.ligne.id}`, { position: c.voulue })));
   } catch (err) {
     for (const c of cibles) c.ligne.position = c.avant;
-    if (premierRangement) { ordreManuel.delete(currentStage); saveOrdreManuel(); renderOrdreReset(); }
+    if (premierRangement) {
+      ordreManuel.delete(currentStage);
+      saveOrdreManuel().catch(() => {});
+      renderOrdreReset();
+    }
     applySortAndRender();
     reportError(err);
     loadRows().catch(() => {});
@@ -3930,7 +4244,7 @@ function renderOrdreReset() {
 
 document.getElementById('ordreReset')?.addEventListener('click', () => {
   ordreManuel.delete(currentStage);
-  saveOrdreManuel();
+  saveOrdreManuel().catch(reportError);
   renderOrdreReset();
   applySortAndRender();
 });
@@ -4333,13 +4647,37 @@ const POLL_MS = 8000; // filet de sécurité uniquement ; le temps réel passe p
 let lastRowsSig = '';
 
 // Vrai si l'utilisateur est en train d'éditer / glisser → on ne touche pas à la grille.
+// La saisie doit être DANS LA GRILLE : c'est elle, et elle seule, qu'un re-rendu
+// écraserait. Compter n'importe quel champ de la page gelait le planning du
+// poste dès qu'on laissait le curseur dans la recherche de la barre du haut —
+// les compteurs du rail continuaient de bouger, eux, et l'écran se contredisait.
+// Le tiroir de détail a sa propre garde (isDrawerBusy) et conserve désormais les
+// valeurs en cours de saisie à travers un re-rendu (voir renderLigneDetail).
 function isInteracting() {
   if (dragState) return true;
   if (openCalendar) return true; // popup ancré à un badge de la grille
   if (openMenuEl) return true;   // menu (type / responsable / sous-étape) ouvert
   const ae = document.activeElement;
-  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return true;
-  return false;
+  if (!ae) return false;
+  if (ae.tagName !== 'INPUT' && ae.tagName !== 'SELECT' && ae.tagName !== 'TEXTAREA') return false;
+  return !!(($rows && $rows.contains(ae)) || ($cards && $cards.contains(ae)));
+}
+
+// --- Le temps qui passe ------------------------------------------------------
+// Délais restants, badges d'échéance et couleurs d'urgence sont calculés AU
+// MONTAGE de la ligne — et une ligne n'est remontée que si sa donnée change. Sur
+// une tablette ouverte depuis le matin, tout cela restait donc figé sur l'heure
+// du petit-déjeuner : une commande qui passait en retard ne virait jamais au
+// rouge, et le tri par urgence ne la faisait pas remonter. On repasse dessus
+// chaque minute, sans jamais interrompre une saisie ni un glisser.
+const TICK_TEMPS_MS = 60000;
+function rafraichirTemps() {
+  if (document.hidden || !booted) return;
+  if (isInteracting()) return;
+  invalidateRowCache();
+  // Le tiroir n'est PAS reconstruit ici : il porte peut-être une correction non
+  // encore enregistrée, et son propre affichage ne dépend pas de la minute.
+  applySortAndRender({ syncDrawer: false });
 }
 
 function signature(list) {
@@ -4386,10 +4724,23 @@ function onStreamChange(e) {
   // Le patron vient de réécrire le message WhatsApp : les pastilles des lignes
   // doivent ouvrir le NOUVEAU texte, sans recharger la page.
   if (kind === 'settings') loadWhatsappMessage();
+  // Une étape vient d'être rangée (ou dérangée) par un autre poste : la décision
+  // est partagée, l'ordre affiché ici doit suivre.
+  if (kind === 'ordre-manuel') {
+    loadOrdreManuel().then(() => { renderOrdreReset(); applySortAndRender(); });
+  }
   // Le planning a changé côté serveur → le cache global de recherche est périmé.
-  // On l'invalide, et si la palette est ouverte on recharge + ré-affiche.
+  // On l'invalide. Le rechargement, lui, ATTEND : `/api/requests` sans filtre
+  // renvoie tout le planning, et le relancer à chaque événement pendant qu'un
+  // collègue travaille faisait re-télécharger l'ensemble en boucle sous les
+  // doigts de celui qui cherche.
   allRows = null;
-  if (paletteOpen) loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
+  if (paletteOpen) {
+    clearTimeout(allRowsDebounce);
+    allRowsDebounce = setTimeout(() => {
+      if (paletteOpen) loadAllRows().then(() => { if (paletteOpen) runSearch(); }).catch(() => {});
+    }, ALL_ROWS_DEBOUNCE_MS);
+  }
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(() => {
@@ -4413,9 +4764,11 @@ function startRealtime() {
   connectStream();
   // filet de sécurité : si le flux est coupé, on revient à un poll lent
   setInterval(() => { if (!streamAlive) { poll(); dashboard.notifyChange(); } }, POLL_MS);
+  // les délais affichés suivent l'horloge, pas seulement les données
+  setInterval(rafraichirTemps, TICK_TEMPS_MS);
   // rafraîchit immédiatement quand on revient sur l'onglet / réveille la tablette
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { poll(); dashboard.notifyChange(); }
+    if (!document.hidden) { poll(); rafraichirTemps(); dashboard.notifyChange(); }
   });
 }
 
@@ -4463,6 +4816,8 @@ const $paletteCount = document.getElementById('searchPaletteCount');
 
 let allRows = null;           // cache de toutes les commandes (tous stages)
 let allRowsPromise = null;    // fetch en cours (dédup)
+let allRowsDebounce = null;   // rechargement différé (cf. onStreamChange)
+const ALL_ROWS_DEBOUNCE_MS = 1000;
 let paletteOpen = false;
 let paletteItems = [];        // résultats plats, dans l'ordre affiché
 let paletteActive = -1;       // index surligné (navigation clavier)
@@ -5130,7 +5485,9 @@ async function start() {
   applyColWidths();
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
   // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis sautent.
-  await Promise.all([loadCategoryConfig(), loadCounts(), loadWhatsappMessage(), loadTgca()]);
+  await Promise.all([
+    loadCategoryConfig(), loadCounts(), loadWhatsappMessage(), loadTgca(), loadOrdreManuel(),
+  ]);
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
   updateStageHelp();

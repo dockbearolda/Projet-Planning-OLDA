@@ -24,6 +24,8 @@ const {
   getCommandeZones, getHiddenCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
+  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
+  logRequestChanges, getRequestJournal,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
@@ -246,6 +248,24 @@ function normalizeFlagBody(body) {
   return raw === '' ? { ...body, flag_reason: null } : body;
 }
 
+// Une sous-étape appartient à UNE famille et à une seule. Poser « Production UV »
+// sur une commande en Facturation n'a aucun sens : le glisser-déposer l'interdit
+// déjà à l'écran, mais rien ne le rattrapait côté serveur — une fiche restée
+// ouverte pendant qu'un collègue déplaçait la ligne pouvait écrire la paire
+// incohérente, et la commande disparaissait alors de toutes les vues du rail.
+// `stageActuel` = l'étape de la ligne en base (PATCH), ou celle du corps (POST).
+function verifierCoherenceEtape(body, stageActuel) {
+  if (!('sub_stage' in body)) return null;
+  const sub = body.sub_stage;
+  if (sub == null || sub === '') return null;
+  const famille = 'stage' in body && body.stage ? body.stage : stageActuel;
+  if (!famille) return null;
+  if (SUB_TO_FAMILY[sub] !== famille) {
+    return `sous-étape « ${sub} » incompatible avec l'étape « ${famille} »`;
+  }
+  return null;
+}
+
 function asyncH(fn) {
   return (req, res) => fn(req, res).catch((err) => {
     console.error(err);
@@ -437,6 +457,26 @@ app.put('/api/settings/whatsapp', asyncH(async (req, res) => {
   res.json({ message });
 }));
 
+// ÉTAPES RANGÉES À LA MAIN. Glisser une carte réécrit les `position` en base :
+// le geste vaut pour tous les postes. La décision « cette étape est rangée à la
+// main » doit donc l'être aussi — sinon une vendeuse range sa liste et la
+// tablette d'à côté n'en voit rien, jusqu'à basculer un jour d'un coup.
+// GET → [slugÉtape, ...] · PUT [slugÉtape, ...] → liste retenue, diffusée en SSE.
+app.get('/api/ordre-manuel', asyncH(async (req, res) => {
+  res.json(await getOrdreManuel());
+}));
+
+app.put('/api/ordre-manuel', asyncH(async (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Tableau de slugs d\'étape attendu' });
+  }
+  const inconnu = req.body.find((s) => !STAGE_SLUGS.includes(s));
+  if (inconnu !== undefined) return res.status(400).json({ error: `étape invalide: ${inconnu}` });
+  const saved = await setOrdreManuel(req.body);
+  broadcast({ kind: 'ordre-manuel' });
+  res.json(saved);
+}));
+
 // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
 // grille et le temps réel restent légers.
 const SELECT = `SELECT r.*,
@@ -516,6 +556,8 @@ app.get('/api/counts', asyncH(async (req, res) => {
 // POST /api/requests → crée (corps partiel autorisé)
 app.post('/api/requests', asyncH(async (req, res) => {
   const body = normalizeFlagBody(req.body || {});
+  const incoherence = verifierCoherenceEtape(body, body.stage || 'demande_chiffrage');
+  if (incoherence) return res.status(400).json({ error: incoherence });
   const cols = [];
   const vals = [];
   const params = [];
@@ -573,13 +615,28 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
 
   if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
 
+  // On relit la ligne AVANT d'écrire : elle sert à deux choses — vérifier que la
+  // sous-étape demandée relève bien de la famille où la commande se trouve, et
+  // fournir l'« avant » du journal des modifications.
+  const { rows: avant } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
+  if (avant.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  const incoherence = verifierCoherenceEtape(body, avant[0].stage);
+  if (incoherence) return res.status(400).json({ error: incoherence });
+
   sets.push('updated_at = now()');
   params.push(req.params.id);
   const query = `UPDATE requests SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`;
   const { rows } = await pool.query(query, params);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  await logRequestChanges(req.params.id, avant[0], rows[0]);
   broadcast({ kind: 'update', stages: [rows[0].stage] });
   res.json(rows[0]);
+}));
+
+// GET /api/requests/:id/journal → ce qui a changé sur cette commande, du plus
+// récent au plus ancien. La fiche l'affiche dans « Historique ».
+app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
+  res.json(await getRequestJournal(req.params.id));
 }));
 
 // PATCH /api/requests/:id/fiche → corrige le DÉTAIL COMPLET d'une commande du
@@ -649,6 +706,7 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
   // Cascade côté applicatif (pg-mem ne gère pas les clés étrangères en local).
   await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
   await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
+  await pool.query('DELETE FROM request_events WHERE request_id = $1', [req.params.id]);
   broadcast({ kind: 'delete' });
   res.status(204).end();
 }));

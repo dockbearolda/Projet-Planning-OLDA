@@ -1066,6 +1066,18 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   background: var(--bg); border: 1px solid var(--border-soft);
   font-size: 11px; font-weight: 700; color: var(--text-2);
 }
+/* L'alerte se lit sur la carte, couleur comprise : « Bloquée » ne doit pas avoir
+   l'air d'une étiquette parmi d'autres. */
+.pcard__pill--bloque { background: var(--st-bloque-bg); border-color: transparent; color: var(--st-bloque); }
+/* « À voir » est un statut, pas une urgence de date : palette neutre de l'accent,
+   comme .flag-chip.a-voir — le rouge reste réservé à ce qui bloque. */
+.pcard__pill--a-voir { background: var(--primary); border-color: transparent; color: var(--surface); }
+/* Le MOTIF du blocage : la seule information qui dit quoi faire. */
+.pcard__motif {
+  margin-top: 6px; padding-left: 8px;
+  border-left: 2px solid var(--st-bloque);
+  font-size: 11.5px; line-height: 1.35; color: var(--text-2);
+}
 .pcard__delai { font-size: 15px; font-weight: 800; line-height: 1.15; }
 .pcard__delai--retard { color: var(--danger); }
 .pcard__delai--urgent { color: var(--warning-2); }
@@ -1084,6 +1096,9 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard__ref-btn:hover { border-color: var(--text-2); background: var(--state-hover); }
 .pcard__ref-btn.is-on { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .pcard__ref-name { margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-2); }
+/* Nom hérité de la catégorie (pas posé sur la ligne) : même liseré pointillé que
+   la puce du tableau, pour qu'on voie d'un coup d'œil ce qui est automatique. */
+.pcard__ref-name.is-auto { border-bottom: 1px dashed var(--border); display: inline-block; }
 .pcard__open {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
@@ -1124,6 +1139,14 @@ body.sidebar-resizing * { cursor: col-resize !important; }
    les actions hors de vue. */
 @container (max-width: 1040px) {
   .pcard { grid-template-columns: 1fr 1.5fr 1fr .8fr auto; }
+}
+/* Attribuer le référent est LE geste le plus fréquent du planning, et il se fait
+   au doigt : 30 px et 4 px d'écart, on visait à côté — et taper le référent déjà
+   en place le RETIRE (le bouton est une bascule). Plancher de la charte au
+   tactile, comme toutes les autres cibles de la carte. */
+@media (pointer: coarse) {
+  .pcard__refs { gap: 8px; }
+  .pcard__ref-btn { width: 44px; height: 44px; font-size: 13px; }
 }
 /* Sous ~720 px de conteneur, quatre colonnes deviennent illisibles : chaque
    bloc prend la ligne, les actions restent à droite du nom du client. */
@@ -4417,6 +4440,13 @@ body.view-comptoir .grid-search { display: none !important; }
 textarea.ld-ctl { font-weight: 600; }
 .ld-ctl:focus { outline: 3px solid rgba(17, 24, 39, .15); border-color: #101828; }
 .ld-duo { display: flex; gap: 8px; }
+/* Journal des modifications, dans le volet Historique : une ligne par
+   changement, la plus récente en haut. */
+.ld-journal__liste { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eef0f3; }
+.ld-journal__liste .ld-v { font-size: 12.5px; font-weight: 600; color: #4b5565; }
+.ld-journal__note { margin-top: 8px; font-size: 11.5px; font-weight: 500; font-style: italic; color: #697586; }
+/* La pastille WhatsApp sous les deux champs de contact. */
+.ld-duo + .wa-btn { margin-top: 8px; }
 .ld-duo .ld-ctl { min-width: 0; }
 .ld-pay { display: grid; gap: 6px; }
 /* Dans la fiche, une ligne de paiement se lit d'un trait : libellé à gauche,
