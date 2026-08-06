@@ -253,6 +253,13 @@
                reprend la main dès qu'on rallume une colonne dans le rail. -->
           <div class="cards" id="cards" hidden></div>
           <div class="grid-empty" id="empty" hidden>Aucune commande à cette étape.</div>
+          <!-- Aucune commande ne quitte jamais le planning : l'étape de clôture
+               accumule tout l'historique. On n'en montre que la fin ; ce pied de
+               liste dit ce qui manque et va chercher le reste à la demande. -->
+          <div class="liste-suite" id="listeSuite" hidden>
+            <span id="listeSuiteTexte"></span>
+            <button class="ordre-reset" id="listeSuiteTout" type="button">Tout afficher</button>
+          </div>
         </div>
 
           <!-- Rail des colonnes : ce qui est à l'écran en haut, ce qui en a été

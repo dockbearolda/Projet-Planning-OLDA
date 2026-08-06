@@ -79,7 +79,19 @@ export function machineOf(r) {
   if (!r) return null;
   if (SUBSTAGE_MACHINE[r.sub_stage]) return SUBSTAGE_MACHINE[r.sub_stage];
   const fiche = r.fiche;
-  if (fiche && Array.isArray(fiche.articles)) {
+  if (!fiche) return null;
+  // La liste transporte les techniques déjà mises à plat (voir allegerFiche
+  // côté serveur) : c'est la SEULE forme que le dashboard reçoit. On cherchait
+  // auparavant dans `fiche.articles`, que ni les trois flux de saisie ni la
+  // liste allégée ne produisent — la branche ne se déclenchait donc jamais.
+  if (Array.isArray(fiche.techniques)) {
+    for (const t of fiche.techniques) {
+      if (TECHNIQUE_MACHINE[t]) return TECHNIQUE_MACHINE[t];
+    }
+  }
+  // Forme complète (fiche ouverte, ou ancienne archive) : on descend jusqu'aux
+  // zones marquées.
+  if (Array.isArray(fiche.articles)) {
     for (const a of fiche.articles) {
       for (const z of (a && a.zones) || []) {
         if (z && TECHNIQUE_MACHINE[z.technique]) return TECHNIQUE_MACHINE[z.technique];
