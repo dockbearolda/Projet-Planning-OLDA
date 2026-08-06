@@ -16,6 +16,9 @@ import { confirmerAction } from './confirmer.js';
 // `fetch` avec une fin : sans minuteur, une requête partie sur un réseau qui
 // décroche n'échoue jamais et laisse le bouton (ou l'écran) figé pour la journée.
 import { fetchBorne, DELAI_ENVOI } from './reseau.js';
+// LE TICKET du client — celui que la vendeuse imprime au comptoir, réimprimable
+// à l'identique depuis n'importe quelle ligne du planning.
+import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -1286,7 +1289,24 @@ function buildCard(r) {
 
   const actions = document.createElement('div');
   actions.className = 'pcard__actions';
-  actions.append(prise, ouvrir, suppr);
+  // LE TICKET, SUR LA LIGNE. Le client revient au comptoir avec son papier : il
+  // fallait ouvrir la fiche, faire défiler, et le bouton d'impression sortait
+  // alors le dossier de travail sur une feuille A4. Il est ici, à côté de
+  // « ouvrir » — un appui, le ticket s'affiche, un second l'imprime.
+  // Seulement sur les dossiers nés au comptoir : une ligne saisie à la main
+  // n'a jamais eu de ticket, le bouton mentirait.
+  if (aUnTicket(r)) {
+    const tk = document.createElement('button');
+    tk.type = 'button';
+    tk.className = 'pcard__ticket';
+    tk.setAttribute('aria-label', 'Voir le ticket du client');
+    attachTip(tk, 'Voir et imprimer le ticket');
+    tk.appendChild(strokeIcon(LD_ICONES.ticket));
+    tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
+    actions.append(prise, tk, ouvrir, suppr);
+  } else {
+    actions.append(prise, ouvrir, suppr);
+  }
 
   carte.append(
     blocClient,
@@ -1563,7 +1583,7 @@ function applySearchAndCounts() {
   let visible = 0;
   const cartes = modeCartes();
   for (const r of lastRendered) {
-    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
+    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q)) || refsTicket(r).includes(q);
     // LE COMPTEUR PORTE SUR LA DONNÉE, pas sur ce qui est déjà monté. Une longue
     // liste se pose par tranches (voir TRANCHE_RENDU) : compter les seules
     // lignes présentes dans le DOM aurait affiché « 80 commandes », puis 160,
@@ -2091,6 +2111,12 @@ function cellDossier(r) {
   // recouvrir la colonne voisine.
   const docs = document.createElement('div');
   docs.className = 'client-docs';
+  // LE NUMÉRO DU TICKET, SUR LA LIGNE. Le tableau ne le montrait nulle part —
+  // seule la carte l'affichait — alors que c'est le seul repère que le client
+  // rapporte au comptoir. Il se LIT ici (on le compare au papier qu'on tient)
+  // et il s'APPUIE : le ticket s'affiche, prêt à réimprimer.
+  const tk = cellTicket(r);
+  if (tk) docs.appendChild(tk);
   docs.appendChild(cellWhatsapp(r));
   docs.appendChild(cellPdfSlot(r, 'devis'));
   docs.appendChild(cellPdfSlot(r, 'facture'));
@@ -3057,14 +3083,38 @@ function ficheItems(fiche) {
 
 // --- La fiche projet : ce que l'écran du patron appelle « la bulle » ---------
 
+// Les DESSINS de la barre d'actions de la fiche. La police d'icônes de l'app
+// est un sous-ensemble auto-hébergé de 91 glyphes : `print`, `download`,
+// `content_copy` et `send` n'en font pas partie, et un nom absent de la police
+// s'affiche en TEXTE — tronqué à 1 em par `.material-symbols-outlined`, donc
+// réduit à sa première lettre. Ces quatre boutons montraient « p », « d », « c »
+// et « s », et sous 700 px (où le libellé s'efface) c'était tout ce qu'il en
+// restait. On les dessine, plutôt que d'alourdir la police pour quatre traits.
+const LD_ICONES = {
+  imprimer: ['M6 9V3h12v6', 'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2', 'M6 14h12v7H6z'],
+  telecharger: ['M12 3v12', 'M7 11l5 5 5-5', 'M4 20h16'],
+  dupliquer: ['M9 9h11v11H9z', 'M5 15V5a2 2 0 0 1 2-2h10'],
+  envoyer: ['M5 12h13', 'M13 6l6 6-6 6'],
+  ticket: ['M4 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M4 19h16', 'M8 9h8', 'M8 12.5h5'],
+};
+
+// `icone` : une clé de LD_ICONES (dessinée) ou un nom de glyphe présent dans la
+// police auto-hébergée.
 function ldActionBtn(icone, label, onClick) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'ld-act';
-  const i = document.createElement('span');
-  i.className = 'material-symbols-outlined';
-  i.setAttribute('aria-hidden', 'true');
-  i.textContent = icone;
+  let i;
+  if (LD_ICONES[icone]) {
+    i = strokeIcon(LD_ICONES[icone]);
+    i.setAttribute('width', '17');
+    i.setAttribute('height', '17');
+  } else {
+    i = document.createElement('span');
+    i.className = 'material-symbols-outlined';
+    i.setAttribute('aria-hidden', 'true');
+    i.textContent = icone;
+  }
   const t = document.createElement('span');
   t.className = 'ld-act-label';
   t.textContent = label;
@@ -3142,30 +3192,165 @@ async function telechargerRecap(r) {
   showToast('Récapitulatif téléchargé');
 }
 
+// ===========================================================================
+// LE TICKET DU CLIENT — retrouver, revoir, réimprimer
+// ===========================================================================
+// « Imprimer » sortait le RÉCAPITULATIF COMPLET : une feuille A4 avec le
+// secteur d'activité, l'adresse de facturation, le total HT, la taxe de 4 %,
+// les points à contrôler et la note interne OLDA. Le client, lui, repart avec
+// un TICKET — et c'est ce ticket-là qu'on doit pouvoir ressortir quand il
+// revient au comptoir. Le récapitulatif complet reste disponible, mais en
+// TÉLÉCHARGEMENT : c'est un document de travail, pas un papier client.
+
+// Un dossier né au comptoir porte une référence de ticket. Une ligne créée à la
+// main dans la grille, non : elle n'a jamais eu de papier remis à personne, et
+// le bouton n'apparaît pas dessus.
+// `fiche.ref` et `fiche.kind` survivent à l'allègement de la liste
+// (FICHE_LISTE côté serveur) : la décision se prend sans charger le détail.
+function aUnTicket(r) {
+  const f = r && r.fiche;
+  return !!(f && typeof f === 'object' && (f.ref || f.kind === 'comptoir-v17'));
+}
+
+// La fiche COMPLÈTE d'abord : la liste ne transporte pas le détail article par
+// article, et un ticket sans ses articles ne vaut pas le papier.
+async function ticketDeLaLigne(r) {
+  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
+  return modeleTicket(r);
+}
+
 // Impression : on n'imprime PAS l'application (la grille, le rail et la fiche
 // telle qu'elle est à l'écran donneraient une feuille illisible). On compose
 // une page propre dans un cadre hors écran, on l'imprime, on le retire. Un
 // cadre plutôt qu'une fenêtre : aucun bloqueur de pop-up ne peut l'empêcher.
-async function imprimerRecap(r) {
-  // Même raison qu'au téléchargement : on n'imprime pas un récapitulatif dont
-  // le détail n'est pas encore arrivé.
-  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
+//
+// Pas de `@page { size: … }` : on laisse le papier de l'imprimante décider.
+// Forcer un format de 80 mm ferait mettre le ticket à l'échelle du A4 par le
+// navigateur — un ticket géant sur toute la largeur de la feuille. Le ticket
+// garde donc sa taille réelle : étroit et découpable sur une feuille ordinaire,
+// pleine laize sur une imprimante à tickets.
+function imprimerModele(t, titre) {
   const cadre = document.createElement('iframe');
   cadre.setAttribute('aria-hidden', 'true');
-  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;height:1000px;border:0';
+  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px;height:1000px;border:0';
   document.body.appendChild(cadre);
   const d = cadre.contentDocument;
-  d.title = `${r.billing_company || 'Projet'} — ${r.product || ''}`.trim();
+  d.title = titre;
   const style = d.createElement('style');
-  style.textContent = 'body{font:13px/1.55 Arial,Helvetica,sans-serif;margin:28px;color:#111}'
-    + 'pre{white-space:pre-wrap;font:inherit;margin:0}';
+  style.textContent = `@page{margin:8mm}body{margin:0;background:#fff}${CSS_TICKET}`;
   d.head.appendChild(style);
-  const pre = d.createElement('pre');
-  pre.textContent = recapTexte(r);
-  d.body.appendChild(pre);
+  d.body.appendChild(dessinerTicket(t, d));
   cadre.contentWindow.focus();
   cadre.contentWindow.print();
   setTimeout(() => cadre.remove(), 1000);
+}
+
+async function imprimerTicket(r) {
+  const t = await ticketDeLaLigne(r);
+  imprimerModele(t, `Ticket ${t.ref || r.billing_company || ''}`.trim());
+}
+
+// La feuille du ticket est posée dans la page à la PREMIÈRE ouverture, et pas
+// recopiée dans styles.css : c'est la même chaîne que reçoit le cadre
+// d'impression, donc l'aperçu ne peut pas dériver de ce qui sort sur le papier.
+function poserStyleTicket() {
+  if (document.getElementById('tk-style')) return;
+  const s = document.createElement('style');
+  s.id = 'tk-style';
+  s.textContent = CSS_TICKET;
+  document.head.appendChild(s);
+}
+
+// L'APERÇU. Le client revient avec son ticket : on veut relire ce qu'il a
+// commandé sans passer par l'imprimante — et sur la tablette du comptoir, c'est
+// souvent tout ce dont on a besoin. Le ticket s'affiche exactement comme il
+// s'imprimera, avec l'impression à un doigt de là.
+//
+// UNE SEULE BOÎTE À LA FOIS. La fiche complète s'attend (un aller-retour
+// réseau) : au doigt, on tape deux fois avant qu'elle n'arrive, et deux
+// aperçus s'empilaient — il fallait fermer deux fois pour revenir à la grille.
+let ticketOuvert = false;
+
+async function ouvrirTicket(r) {
+  if (ticketOuvert) return;
+  ticketOuvert = true;
+  poserStyleTicket();
+  let t;
+  try {
+    t = await ticketDeLaLigne(r);
+  } catch (err) {
+    ticketOuvert = false;
+    throw err;
+  }
+  const focusAvant = document.activeElement;
+  const fond = document.createElement('div');
+  fond.className = 'tk-modal';
+  const carte = document.createElement('div');
+  carte.className = 'tk-modal__card';
+  carte.setAttribute('role', 'dialog');
+  carte.setAttribute('aria-modal', 'true');
+  carte.setAttribute('aria-label', `${t.titre}${t.ref ? ` ${t.ref}` : ''}`);
+
+  const feuille = document.createElement('div');
+  feuille.className = 'tk-modal__paper';
+  feuille.appendChild(dessinerTicket(t, document));
+
+  const actions = document.createElement('div');
+  actions.className = 'tk-modal__actions';
+  const fermer = document.createElement('button');
+  fermer.type = 'button';
+  fermer.className = 'ask__btn';
+  fermer.textContent = 'Fermer';
+  const copier = document.createElement('button');
+  copier.type = 'button';
+  copier.className = 'ask__btn';
+  copier.textContent = 'Copier le texte';
+  const imprimer = document.createElement('button');
+  imprimer.type = 'button';
+  imprimer.className = 'ask__btn tk-modal__print';
+  imprimer.textContent = 'Imprimer le ticket';
+  actions.append(fermer, copier, imprimer);
+  carte.append(feuille, actions);
+  fond.append(carte);
+  document.body.append(fond);
+
+  let fini = false;
+  const partir = () => {
+    if (fini) return;
+    fini = true;
+    ticketOuvert = false;
+    document.removeEventListener('keydown', onKey, true);
+    fond.remove();
+    if (focusAvant && focusAvant.isConnected && focusAvant.focus) focusAvant.focus();
+  };
+  // Tabulation retenue dans la boîte, comme la confirmation de l'app : sans ça
+  // le focus repart derrière le voile, sur une grille qu'on ne voit plus.
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); partir(); return; }
+    if (e.key !== 'Tab') return;
+    const cibles = [fermer, copier, imprimer];
+    const i = cibles.indexOf(document.activeElement);
+    e.preventDefault();
+    cibles[(i + (e.shiftKey ? cibles.length - 1 : 1) + cibles.length) % cibles.length].focus();
+  }
+  document.addEventListener('keydown', onKey, true);
+  fermer.addEventListener('click', partir);
+  copier.addEventListener('click', () => {
+    // Le ticket en texte : c'est ce qu'on colle dans un WhatsApp au client qui
+    // demande « c'était quoi déjà, ma commande ? ».
+    const texte = ticketTexte(t);
+    const dit = () => showToast('Ticket copié');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texte).then(dit, () => showToast('Copie refusée par le navigateur'));
+    } else {
+      showToast('Copie indisponible sur ce poste');
+    }
+  });
+  imprimer.addEventListener('click', () => {
+    imprimerModele(t, `Ticket ${t.ref || r.billing_company || ''}`.trim());
+  });
+  fond.addEventListener('click', (e) => { if (e.target === fond) partir(); });
+  requestAnimationFrame(() => { fond.classList.add('open'); imprimer.focus(); });
 }
 
 // DÉTAIL COMPLET, MODIFIABLE. Le récapitulatif du comptoir, ligne à ligne :
@@ -3425,7 +3610,7 @@ function renderLigneDetail() {
   // Dupliquer et « Envoyer vers Fiverr » n'existaient que dans le tableau
   // complet : depuis les cartes (la vue par défaut), il n'y avait aucun moyen de
   // recopier une commande. Ils rejoignent la fiche, où l'on ouvre la ligne.
-  const dupliquer = ldActionBtn('content_copy', 'Dupliquer', (b) => {
+  const dupliquer = ldActionBtn('dupliquer', 'Dupliquer', (b) => {
     if (!armerUneFois(b)) return;
     duplicateRow(r);
     showToast('Commande dupliquée');
@@ -3433,13 +3618,18 @@ function renderLigneDetail() {
   actions.append(dupliquer);
   for (const t of SEND_TARGETS) {
     if (t.slug === r.stage) continue; // déjà dans cette catégorie
-    actions.append(ldActionBtn('send', `Vers ${t.label}`, (b) => {
+    actions.append(ldActionBtn('envoyer', `Vers ${t.label}`, (b) => {
       if (armerUneFois(b)) copyToStage(r, t.slug);
     }));
   }
   actions.append(
-    ldActionBtn('print', 'Imprimer', () => imprimerRecap(r)),
-    ldActionBtn('download', 'Télécharger', () => telechargerRecap(r)),
+    // LE TICKET D'ABORD. C'est le papier du client, celui qu'on ressort quand
+    // il revient au comptoir. Le récapitulatif complet — l'adresse, le total
+    // HT, la taxe, la note interne — reste à portée, mais en téléchargement :
+    // c'est un document de travail, il n'a jamais eu à sortir sur l'imprimante.
+    ...(aUnTicket(r) ? [ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r))] : []),
+    ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
+    ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
     close,
   );
   head.append(titles, actions);
@@ -3815,6 +4005,30 @@ async function enregistrerFiche(r, c) {
 // aucun handler n'est posé sur <tr>, donc le reste de la ligne garde son
 // édition inline (cliquer une cellule la corrige, ça ne doit pas ouvrir une
 // fiche par-dessus les doigts).
+// La pastille TICKET de la ligne du tableau. Même gabarit que ses voisines
+// (24 px visuels, 44 px de zone tactile) : la rangée de pastilles ne gagne pas
+// une seconde ligne, et la grille garde sa densité. Le NUMÉRO, lui, tient dans
+// l'infobulle et dans le nom accessible — il se lit en entier sur le ticket
+// qu'un appui fait apparaître, et sur la carte, qui l'affiche déjà en clair.
+// Rien sur une ligne saisie à la main : elle n'a jamais eu de ticket.
+function cellTicket(r) {
+  if (!aUnTicket(r)) return null;
+  const ref = (r.fiche && r.fiche.ref) || '';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pdf-btn ticket-chip';
+  const libelle = ref ? `Ticket ${ref}` : 'Ticket du client';
+  attachTip(btn, `${libelle} — voir et imprimer`);
+  btn.setAttribute('aria-label', `${libelle} — voir et imprimer`);
+  btn.appendChild(strokeIcon(LD_ICONES.ticket));
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ouvrirTicket(r);
+    btn.blur();
+  });
+  return btn;
+}
+
 function cellLigneDetailButton(r) {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -5560,6 +5774,19 @@ function fold(s) {
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// LE NUMÉRO DU TICKET SE CHERCHE. C'est le seul repère que le client rapporte
+// au comptoir — « 26.08.06-003 », lu sur son papier — et c'était justement le
+// seul champ que ni la recherche de la grille ni la recherche globale ne
+// regardaient : taper ce numéro ne rendait rien. Il vit dans la fiche, que la
+// liste transporte allégée (FICHE_LISTE côté serveur garde `ref`).
+// `refTicket` compte tout autant : c'est le numéro imprimé sur le papier déjà
+// remis, quand le dossier a dû être enregistré sous un autre.
+function refsTicket(r) {
+  const f = r && r.fiche;
+  if (!f || typeof f !== 'object') return '';
+  return fold([f.ref, f.refTicket].filter(Boolean).join(' '));
+}
+
 const $gridSearch = document.getElementById('gridSearch');
 const $gridSearchInput = document.getElementById('gridSearchInput');
 const $gridSearchClear = document.getElementById('gridSearchClear');
@@ -5794,6 +6021,17 @@ function buildPaletteItem(r, tokens, idx) {
   const t = document.createElement('div');
   t.className = 'spi-title';
   appendHighlighted(t, title, tokens);
+  // LA RÉFÉRENCE DU TICKET, sur le résultat. On cherche désormais par ce numéro
+  // (c'est le seul repère que le client rapporte) : il doit se LIRE sur la
+  // ligne trouvée, sinon on ne sait pas laquelle des trois « Coco Beach » est
+  // celle du papier qu'on tient.
+  const ref = r.fiche && typeof r.fiche === 'object' ? (r.fiche.ref || '') : '';
+  if (ref) {
+    const rf = document.createElement('span');
+    rf.className = 'spi-ref';
+    appendHighlighted(rf, ref, tokens);
+    t.append(' ', rf);
+  }
   main.appendChild(t);
   if (desc) {
     const d = document.createElement('div');

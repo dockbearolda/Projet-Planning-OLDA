@@ -481,19 +481,23 @@ function bloc(src, signature) {
   const posEntry = compteur.indexOf('const entry =');
   assert.ok(posMatch > 0 && posEntry > posMatch, 'on compte avant de regarder si la ligne est montée');
 
+  const replier = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
   const sable = {
     gridQuery: '',
     lastRendered: [
       { id: '1', billing_company: 'Hôtel Esmeralda' },
       { id: '2', billing_company: 'Ocean Dive' },
-      { id: '3', billing_company: 'Esmeralda Beach' },
+      { id: '3', billing_company: 'Esmeralda Beach', fiche: { ref: '26.08.06-042' } },
     ],
     // Une seule carte montée sur trois : on est au milieu du rendu par tranches.
     cardEls: new Map([['1', { el: { classList: { toggle() {} } } }]]),
     rowEls: new Map(),
     modeCartes: () => true,
     SEARCH_FIELDS: ['billing_company'],
-    fold: (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''),
+    fold: replier,
+    // Le numéro du ticket entre lui aussi dans le filtre (voir refsTicket) :
+    // c'est le repère que le client rapporte au comptoir.
+    refsTicket: (r) => (r.fiche ? replier([r.fiche.ref, r.fiche.refTicket].filter(Boolean).join(' ')) : ''),
     paintZebra: () => {},
     $empty: { hidden: false, textContent: '' },
     $stageCount: { textContent: '' },
@@ -511,6 +515,10 @@ function bloc(src, signature) {
     sable.$stageCount.textContent, '2 commandes',
     'et le filtre porte lui aussi sur la donnée entière',
   );
+  // Le numéro lu sur le ticket du client filtre la grille comme un nom.
+  sable.gridQuery = '06-042';
+  sable.compter();
+  assert.strictEqual(sable.$stageCount.textContent, '1 commande');
 
   // `content-visibility: auto` a été essayé sur les cartes, mesuré, et RETIRÉ :
   // sur une liste de cette forme, le travail différé retombe pendant le
