@@ -1409,7 +1409,15 @@ export function createDashboard(deps) {
       // Diff pour le fil d'activité (seulement après le premier chargement).
       if (loaded) {
         const oldById = new Map(rows.map((r) => [String(r.id), r]));
-        diffIntoActivity(oldById, fresh);
+        // LES COMMANDES QUI VIENNENT DE QUITTER LE BORD. La synthèse ne porte
+        // que les familles vivantes : une commande passée en « Paiement &
+        // clôture » n'est plus dans `fresh` et s'évaporerait du fil, alors que
+        // c'est justement l'évènement à annoncer (« marquée traitée ✓ »). Le
+        // serveur nous l'envoie quand même dans `lignes` ; on la donne au diff,
+        // sans la remettre dans le tableau.
+        const auBord = new Set(fresh.map((r) => String(r.id)));
+        const parties = (synthese.lignes || []).filter((l) => !auBord.has(String(l.id)));
+        diffIntoActivity(oldById, [...fresh, ...parties]);
       }
       rows = fresh;
       // Posés APRÈS coup : si quoi que ce soit au-dessus avait échoué, on

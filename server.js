@@ -613,7 +613,7 @@ app.put('/api/ordre-manuel', asyncH(async (req, res) => {
 const COLONNES_REQUEST = [
   'id', 'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority',
   'client_type', 'billing_company', 'contact_referent', 'contact_phone', 'contact_email',
-  'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'status',
+  'quantity', 'product', 'color', 'project_value', 'description', 'deadline',
   'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
   'flag', 'flag_reason', 'position', 'fiche', 'created_at', 'updated_at',
 ];
@@ -714,47 +714,73 @@ function allegerFiche(row) {
 // deux cents lignes ; à deux mille, la tablette du comptoir se fige.
 //
 // On rend donc, par défaut, la FIN de la liste : les commandes récentes, celles
-// qu'on vient consulter. `?tout=1` lève le plafond quand on cherche vraiment
-// dans l'historique — l'écran propose le bouton dès qu'il manque quelque chose.
+// qu'on vient consulter.
 const LISTE_MAX = 400;
+
+// ET LE PLAFOND NE SAUTE PLUS D'UN COUP. `?tout=1` rendait l'archive ENTIÈRE —
+// mille deux cents lignes, cinquante mille nœuds montés dans la page d'une
+// tablette, et un défilement qui reste poussif ensuite pour la journée. L'écran
+// demande maintenant un palier de plus (`?max=800`, puis 1200…) : il en montre
+// davantage quand on le lui demande, sans jamais tout avaler.
+// `?tout=1` reste servi — un onglet resté ouvert sur le JS d'avant le
+// déploiement peut encore l'envoyer, et l'export d'un poste tiers s'en sert.
+const HAUT_PLAFOND = 5000;
+
+function plafondDemande(query) {
+  if (query.tout === '1') return null;                 // ancienne forme : sans plafond
+  const n = Number(query.max);
+  if (!Number.isFinite(n) || n <= LISTE_MAX) return LISTE_MAX;
+  // On arrondit au palier : l'écran raisonne en « 400 de plus », le serveur ne
+  // doit pas se retrouver à servir des tranches de taille arbitraire.
+  return Math.min(Math.ceil(n / LISTE_MAX) * LISTE_MAX, HAUT_PLAFOND);
+}
 
 // Une lecture bornée renvoie UN élément de plus que le plafond : c'est ainsi que
 // l'écran sait qu'il en reste, sans avoir à compter la table (même procédé que
 // la recherche globale).
-function bornerListe(rows) {
-  const complet = rows.length <= LISTE_MAX;
-  return { lignes: complet ? rows : rows.slice(0, LISTE_MAX), complet };
+function bornerListe(rows, plafond) {
+  const complet = rows.length <= plafond;
+  return { lignes: complet ? rows : rows.slice(0, plafond), complet };
 }
 
-// GET /api/requests?stage=<étape>   → commandes de cette étape (les LISTE_MAX
-//                                     dernières, sauf ?tout=1)
+// GET /api/requests?stage=<étape>[&max=N] → commandes de cette étape (les N
+//                                     dernières, N par paliers de 400)
 // GET /api/requests                 → toutes les étapes, même plafond
 //
-// L'en-tête `X-Liste-Tronquee` dit à l'écran qu'il n'a pas tout : le corps reste
-// un simple tableau, que tous les appelants savent déjà lire.
+// L'en-tête `X-Liste-Tronquee` dit à l'écran COMBIEN il a reçu quand la liste
+// est coupée, et `X-Liste-Total` combien il y en a en tout : sans ce second
+// chiffre, le pied de liste ne pouvait qu'annoncer « il en reste » sans jamais
+// dire combien — donc sans qu'on sache si un clic de plus suffit. Le corps
+// reste un simple tableau, que tous les appelants savent déjà lire.
 app.get('/api/requests', asyncH(async (req, res) => {
   const { stage } = req.query;
-  const tout = req.query.tout === '1';
+  const plafond = plafondDemande(req.query);
   let rows;
 
   if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
-    if (tout) {
+    if (plafond === null) {
       ({ rows } = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]));
     } else {
       // On prend la fin de la liste — donc on trie À L'ENVERS pour la couper,
       // puis on remet l'ordre d'affichage. Prendre les premières aurait donné
       // les plus anciennes : exactement celles que personne ne vient voir.
       const r = await pool.query(
-        `${SELECT} WHERE r.stage = $1 ${ORDER_INVERSE} LIMIT $2`, [stage, LISTE_MAX + 1],
+        `${SELECT} WHERE r.stage = $1 ${ORDER_INVERSE} LIMIT $2`, [stage, plafond + 1],
       );
-      const { lignes, complet } = bornerListe(r.rows);
+      const { lignes, complet } = bornerListe(r.rows, plafond);
       rows = lignes.reverse();
-      if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
+      if (!complet) {
+        res.set('X-Liste-Tronquee', String(plafond));
+        const { rows: n } = await pool.query(
+          'SELECT COUNT(*)::int AS n FROM requests WHERE stage = $1', [stage],
+        );
+        res.set('X-Liste-Total', String(n[0].n));
+      }
     }
   } else {
     const parEtape = 'r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
-    if (tout) {
+    if (plafond === null) {
       ({ rows } = await pool.query(`${SELECT} ORDER BY ${parEtape}`));
     } else {
       // MÊME RÈGLE QUE PAR ÉTAPE : on rend la FIN de la liste. Le plafond
@@ -764,10 +790,14 @@ app.get('/api/requests', asyncH(async (req, res) => {
       // « préparation » n'apparaissaient tout simplement jamais. Un appelant
       // sans `?stage=` recevait une réponse amputée sans rien qui le dise.
       const parEtapeInverse = 'r.stage DESC, r.position DESC NULLS FIRST, r.priority ASC, r.deadline DESC NULLS FIRST, r.created_at DESC';
-      const r = await pool.query(`${SELECT} ORDER BY ${parEtapeInverse} LIMIT $1`, [LISTE_MAX + 1]);
-      const { lignes, complet } = bornerListe(r.rows);
+      const r = await pool.query(`${SELECT} ORDER BY ${parEtapeInverse} LIMIT $1`, [plafond + 1]);
+      const { lignes, complet } = bornerListe(r.rows, plafond);
       rows = lignes.reverse();
-      if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
+      if (!complet) {
+        res.set('X-Liste-Tronquee', String(plafond));
+        const { rows: n } = await pool.query('SELECT COUNT(*)::int AS n FROM requests');
+        res.set('X-Liste-Total', String(n[0].n));
+      }
     }
   }
 
@@ -833,6 +863,19 @@ function allegerSynthese(row) {
 const empreinteIds = (ids) => require('crypto')
   .createHash('sha1').update(ids.join(','), 'utf8').digest('hex').slice(0, 16);
 
+// CE QUE LE POINT DU JOUR REGARDE, ET RIEN DE PLUS. Son écran ne parle que des
+// quatre familles vivantes : « ce que chacun a à faire ce matin ». Tout ce qui
+// est en « Paiement & clôture » ou en Fiverr, il l'ignore déjà, ligne par ligne
+// (`isActive`, côté dashboard) — mais le serveur le lui envoyait quand même.
+// Or c'est l'archive qui pèse, et elle seule grossit : à 1 500 commandes le
+// premier chargement faisait 1 Mo, dont 800 Ko d'historique que personne ne
+// regarde, et ça ne pouvait qu'empirer.
+// Cette liste doit rester le MIROIR d'`ACTIVE_FAMILIES` (dashboard.js) : une
+// famille ajoutée là-bas et oubliée ici serait vide sur le Point du jour, sans
+// message ni erreur — un test compare les deux.
+const SYNTHESE_FAMILLES = ['demande_chiffrage', 'preparation', 'production', 'facturation'];
+const SYNTHESE_FILTRE = `r.stage IN (${SYNTHESE_FAMILLES.map((s) => `'${s}'`).join(', ')})`;
+
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
   // `depuis` part droit dans une comparaison de timestamp : mal formé, Postgres
@@ -848,7 +891,8 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const jusqua = horloge[0].maintenant;
 
   const { rows: idRows } = await pool.query(
-    'SELECT id FROM requests ORDER BY stage, position ASC NULLS LAST, created_at ASC',
+    `SELECT id FROM requests r WHERE ${SYNTHESE_FILTRE}
+     ORDER BY stage, position ASC NULLS LAST, created_at ASC`,
   );
   const ids = idRows.map((r) => r.id);
   const empreinte = empreinteIds(ids);
@@ -859,12 +903,21 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
 
   let lignes;
   if (borne) {
+    // LES LIGNES QUI VIENNENT DE QUITTER LE BORD PARTENT AUSSI. Elles ne sont
+    // plus dans `ids`, donc elles disparaîtront du tableau — mais le fil
+    // d'activité doit pouvoir dire « marquée traitée ✓ » plutôt que de les voir
+    // s'évaporer. On ne filtre donc PAS sur la famille dans la mise à jour
+    // incrémentale : ce qui a bougé depuis `depuis` est toujours peu de chose.
     const { rows } = await pool.query(
       `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 ${ORDER}`, [borne],
     );
     lignes = rows;
   } else {
-    const { rows } = await pool.query(`SELECT ${SYNTHESE_CHAMPS} FROM requests r ${ORDER}`);
+    // Premier chargement : il n'y a rien à comparer, donc rien à dire sur ce qui
+    // a quitté le bord. On s'en tient à ce que l'écran affiche.
+    const { rows } = await pool.query(
+      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE ${SYNTHESE_FILTRE} ${ORDER}`,
+    );
     lignes = rows;
   }
 
@@ -1265,7 +1318,11 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
   if (partie.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   // Cascade côté applicatif (pg-mem ne gère pas les clés étrangères en local).
   await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
-  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
+  // `production_sectors` est retirée des bases où elle est vide (voir
+  // retirerTableProductionSectors) : absente, il n'y a rien à nettoyer — et une
+  // table manquante ne doit pas transformer une suppression en « Erreur serveur ».
+  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id])
+    .catch(() => {});
   await pool.query('DELETE FROM request_events WHERE request_id = $1', [req.params.id]);
   broadcast({ kind: 'delete', stages: [partie[0].stage] });
   res.status(204).end();

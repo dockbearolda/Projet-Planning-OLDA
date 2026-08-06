@@ -187,8 +187,9 @@ function bloc(src, signature) {
   // La ligne visée est toujours montée ici : le repli « hors des 400 dernières »
   // a son propre test (audit-2026-08-06-soir).
   contexte.revealRow = (rid) => { contexte.journal.push(`pointe:${rid}`); return true; };
-  contexte.toutAfficher = false;
-  contexte.loadRows = async () => { contexte.journal.push('liste:tout'); };
+  // La ligne visée est toujours montée dans ce test-ci : la fiche hors liste ne
+  // sert jamais, mais elle doit exister dans le bac à sable.
+  contexte.ouvrirFicheHorsListe = async (rid) => { contexte.journal.push(`fiche:${rid}`); };
   contexte.showToast = (t) => { contexte.journal.push(`toast:${t}`); };
   contexte.location = { hash: '#dashboard' };
   contexte.history = { replaceState: (_a, _b, h) => { contexte.location.hash = h; } };

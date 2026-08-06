@@ -72,6 +72,7 @@ function bloc(src, signature) {
     return {
       status: res.status,
       tronque: res.headers.get('X-Liste-Tronquee'),
+      total: res.headers.get('X-Liste-Total'),
       body: res.status === 204 ? null : await res.json(),
     };
   };
@@ -166,6 +167,52 @@ function bloc(src, signature) {
     assert.ok(declarees.has(c), `colonne « ${c} » absente de COLONNES_REQUEST : elle ne serait plus servie`);
   }
 
+  // =========================================================================
+  // 7. Le poids mort part — mais seulement s'il est VIDE
+  // =========================================================================
+  // `production_sectors` et `requests.status` datent du modèle d'avant les
+  // familles : recréés à chaque démarrage, jamais lus. Retirés — sauf si une
+  // base contient encore quelque chose dedans : ce n'est pas au démarrage du
+  // service de décider de jeter des données que personne n'a regardées.
+  const DB = lire('db.js');
+  const SQL = lire('schema.sql');
+  for (const [fonction, compte] of [
+    ['async function retirerTableProductionSectors() {', 'FROM production_sectors'],
+    ['async function retirerColonneStatus() {', 'FROM requests WHERE status IS NOT NULL'],
+  ]) {
+    const corps = bloc(DB, fonction);
+    assert.ok(corps.includes(compte), `${fonction} compte ce qu'il y a avant de retirer`);
+    assert.ok(
+      corps.indexOf('rows[0].n > 0') < corps.indexOf('DROP'),
+      `${fonction} ne retire rien tant qu'il reste une ligne`,
+    );
+    assert.match(corps, /Down :|console\.log/, `${fonction} dit ce qu'il a conservé`);
+  }
+  // Sans les commentaires : le DDL de retour arrière (« Down ») cite forcément
+  // ce qu'on vérifie avoir disparu.
+  const SQL_ACTIF = SQL.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
+  assert.ok(!/^\s*status\s+text,/m.test(SQL_ACTIF), 'la colonne `status` ne se crée plus');
+  assert.ok(
+    !/CREATE TABLE IF NOT EXISTS production_sectors/.test(SQL_ACTIF),
+    'la table `production_sectors` ne se crée plus',
+  );
+  // Les deux derniers points qui la touchaient encore doivent survivre à son
+  // absence : une table manquante ne doit transformer ni un démarrage ni une
+  // suppression de commande en panne.
+  assert.match(
+    SRV, /DELETE FROM production_sectors WHERE request_id = \$1', \[req\.params\.id\]\)\s*\n\s*\.catch/,
+    'la cascade de suppression tolère la table retirée',
+  );
+  assert.match(
+    DB, /SELECT sector FROM production_sectors[\s\S]{0,120}\.then\(\(x\) => x\.rows, \(\) => \[\]\)/,
+    'et la vieille migration aussi',
+  );
+  const suppr = await call('POST', '/api/requests', { stage: 'production', billing_company: 'À supprimer' });
+  assert.strictEqual(
+    (await call('DELETE', `/api/requests/${suppr.body.id}`)).status, 204,
+    'supprimer une commande marche toujours sans la table',
+  );
+
   // La synthèse du Point du jour porte la même règle.
   const chSynthese = SRV.slice(SRV.indexOf('const SYNTHESE_CHAMPS'), SRV.indexOf('function allegerSynthese'));
   assert.ok(
@@ -253,6 +300,112 @@ function bloc(src, signature) {
   );
 
   // =========================================================================
+  // 5. Le plafond de la liste monte PAR PALIERS, il ne saute plus d'un coup
+  // =========================================================================
+  const bourrage = [];
+  for (let i = 0; i < 950; i += 1) {
+    bourrage.push(call('POST', '/api/requests', {
+      stage: 'paiement', sub_stage: 'archive', billing_company: `Archive ${i}`, priority: 1,
+    }));
+    if (bourrage.length >= 40) await Promise.all(bourrage.splice(0));
+  }
+  await Promise.all(bourrage);
+
+  const palier1 = await call('GET', '/api/requests?stage=paiement');
+  assert.strictEqual(palier1.body.length, 400, 'par défaut, les 400 dernières');
+  assert.strictEqual(palier1.tronque, '400', 'et l’écran sait que c’est coupé');
+  assert.strictEqual(
+    palier1.total, '950',
+    'AVEC le nombre total : sans lui, le pied de liste ne peut que dire « il en reste » '
+    + 'sans jamais dire combien — donc sans qu’on sache si un clic de plus suffit',
+  );
+
+  const palier2 = await call('GET', '/api/requests?stage=paiement&max=800');
+  assert.strictEqual(palier2.body.length, 800, 'un palier de plus en rend 800, pas les 950');
+  assert.strictEqual(palier2.tronque, '800');
+  // Le palier suivant EMBOÎTE le précédent : ce sont bien les mêmes commandes,
+  // plus les anciennes. Une pagination qui décalerait la fenêtre ferait
+  // disparaître des lignes de l'écran à chaque clic.
+  const fin1 = palier1.body.map((r) => r.id).join(',');
+  assert.ok(
+    palier2.body.map((r) => r.id).join(',').endsWith(fin1),
+    'le palier suivant ajoute les plus ANCIENNES en tête et garde les précédentes',
+  );
+
+  const palier3 = await call('GET', '/api/requests?stage=paiement&max=1200');
+  assert.strictEqual(palier3.body.length, 950, 'au bout, tout y est');
+  assert.strictEqual(palier3.tronque, null, 'et plus rien ne dit que c’est coupé');
+
+  // Une valeur farfelue ne fait pas tomber le serveur ni sauter le plafond.
+  const farfelu = await call('GET', '/api/requests?stage=paiement&max=abc');
+  assert.strictEqual(farfelu.body.length, 400, 'un plafond illisible retombe sur le palier de base');
+  const enorme = await call('GET', '/api/requests?stage=paiement&max=99999999');
+  assert.ok(enorme.body.length <= 5000, 'et un plafond démesuré reste borné');
+
+  // Côté écran : le palier, pas le tout-ou-rien.
+  assert.match(APP, /const PALIER_LISTE = 400;/, 'l’écran raisonne en paliers');
+  assert.match(APP, /&max=\$\{plafondListe\}/, 'et demande explicitement son plafond');
+  const bouton = bloc(APP, "  btn.addEventListener('click', async () => {");
+  assert.match(bouton, /plafondListe \+= PALIER_LISTE;/, '« afficher plus » ajoute UN palier');
+  assert.match(
+    bouton, /plafondListe = avant;/,
+    'et le rend si le chargement échoue — sinon l’écran croirait afficher plus qu’il n’a',
+  );
+
+  // =========================================================================
+  // 6. Le Point du jour ne reçoit plus l'archive
+  // =========================================================================
+  const pj = await call('GET', '/api/requests/synthese');
+  const famillesRendues = new Set(pj.body.lignes.map((l) => l.stage));
+  assert.ok(!famillesRendues.has('paiement'), 'l’archive ne part plus au Point du jour');
+  assert.ok(!famillesRendues.has('fiverr'), 'Fiverr non plus — l’écran l’ignore déjà ligne par ligne');
+  assert.ok(famillesRendues.has('production'), 'les familles vivantes, si');
+  const idsPj = new Set(pj.body.ids);
+  assert.ok(
+    !pj.body.lignes.some((l) => l.stage === 'paiement' && idsPj.has(l.id)),
+    'et la composition ne les liste pas non plus',
+  );
+
+  // La liste des familles doit rester le MIROIR de celle du dashboard : une
+  // famille ajoutée là-bas et oubliée ici serait vide À L'ÉCRAN, sans message.
+  const famillesServeur = SRV.match(/const SYNTHESE_FAMILLES = \[([^\]]+)\]/)[1]
+    .match(/'([a-z_]+)'/g).map((s) => s.slice(1, -1)).sort();
+  const famillesEcran = DASH.match(/const ACTIVE_FAMILIES = \[([^\]]+)\]/)[1]
+    .match(/'([a-z_]+)'/g).map((s) => s.slice(1, -1)).sort();
+  assert.deepStrictEqual(
+    famillesServeur, famillesEcran,
+    'SYNTHESE_FAMILLES (serveur) et ACTIVE_FAMILIES (Point du jour) doivent dire la même chose',
+  );
+
+  // MAIS une commande qui QUITTE le bord doit continuer d'arriver : c'est elle
+  // que le fil d'activité annonce « marquée traitée ✓ ». Elle n'est plus dans
+  // `ids`, elle est quand même dans `lignes`.
+  const vivante = (await call('GET', '/api/requests?stage=production')).body[0];
+  const avantSortie = await call('GET', '/api/requests/synthese');
+  assert.strictEqual(
+    (await call('PATCH', `/api/requests/${vivante.id}`, {
+      stage: 'paiement', sub_stage: 'paiement_a_controler',
+    })).status, 200,
+  );
+  const apresSortie = await call(
+    'GET', `/api/requests/synthese?depuis=${encodeURIComponent(avantSortie.body.jusqua)}`,
+  );
+  assert.ok(
+    apresSortie.body.lignes.some((l) => l.id === vivante.id && l.stage === 'paiement'),
+    'la commande qui vient de quitter le bord est bien envoyée — sinon elle s’évaporerait '
+    + 'du fil d’activité au lieu d’y être annoncée « marquée traitée »',
+  );
+  assert.ok(
+    !apresSortie.body.ids || !apresSortie.body.ids.includes(vivante.id),
+    'mais elle ne fait plus partie du tableau',
+  );
+  const fusion = bloc(DASH, '  async function refresh() {');
+  assert.match(
+    fusion, /const parties = \(synthese\.lignes \|\| \[\]\)\.filter/,
+    'et l’écran donne bien ces sorties au fil d’activité',
+  );
+
+  // =========================================================================
   // 4. `GET /api/requests` sans étape rend la FIN de la liste
   // =========================================================================
   const paquet = [];
@@ -311,10 +464,15 @@ function bloc(src, signature) {
     saut.indexOf('await listeMontee;') < saut.indexOf('if (revealRow(id)) return;'),
     'le saut attend la fin du rendu AVANT de chercher la ligne',
   );
+  // Et il ne charge PLUS l'archive entière pour montrer une ligne : il ouvre la
+  // fiche. Monter mille deux cents commandes pour en faire clignoter une, c'est
+  // exactement ce qui laissait le planning lourd pour le reste de la journée.
+  assert.match(saut, /await ouvrirFicheHorsListe\(id\)/, 'la commande hors liste s’ouvre par sa fiche');
   assert.ok(
-    (saut.match(/await listeMontee;/g) || []).length >= 2,
-    'y compris après avoir levé le plafond — c’est là que la liste est la plus longue',
+    !/toutAfficher/.test(saut) && !/loadRows\(\)/.test(saut),
+    'le saut ne relit plus l’étape sans plafond',
   );
+  assert.ok(!/toutAfficher/.test(APP), '« tout afficher » a disparu de l’écran au profit des paliers');
 
   // Le compteur d'étape porte sur la DONNÉE : compter les seules lignes déjà
   // dans le DOM afficherait « 80 commandes », puis 160, puis 240…

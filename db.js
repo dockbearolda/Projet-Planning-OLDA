@@ -319,6 +319,9 @@ async function init() {
 
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
+  // Même règle pour les deux autres reliquats : on ne retire QUE ce qui est vide.
+  await retirerTableProductionSectors();
+  await retirerColonneStatus();
 }
 
 // La table `statuses` était recréée à chaque démarrage sans qu'aucune ligne de
@@ -342,6 +345,56 @@ async function retirerTableStatuses() {
       || /does not exist|n'existe pas/i.test((err && err.message) || '');
     if (absente) return;
     console.error('Table « statuses » non retirée (sans conséquence) :', err.message);
+  }
+}
+
+// `production_sectors` datait du pipeline linéaire : depuis le passage aux
+// 5 familles, la production se lit dans `sub_stage` et plus AUCUNE requête de
+// l'application n'y touche — sauf une vieille migration, elle-même gardée par
+// `app_meta`, et la cascade de suppression d'une commande. Elle est recréée à
+// chaque démarrage par `schema.sql` pour rien.
+// Même prudence qu'ailleurs : on ne retire que si elle est VIDE. Une base qui
+// contiendrait encore des secteurs (atelier resté sur une vieille version, essai
+// jamais nettoyé) la garde, et la migration continue de la lire.
+// Down : voir le DDL conservé dans schema.sql.
+async function retirerTableProductionSectors() {
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM production_sectors');
+    if (rows[0].n > 0) {
+      console.log(`ℹ  Table « production_sectors » conservée : ${rows[0].n} ligne(s) dedans.`);
+      return;
+    }
+    await pool.query('DROP TABLE production_sectors');
+  } catch (err) {
+    const absente = (err && err.code === '42P01')
+      || /does not exist|n'existe pas/i.test((err && err.message) || '');
+    if (absente) return;
+    console.error('Table « production_sectors » non retirée (sans conséquence) :', err.message);
+  }
+}
+
+// `requests.status` est un reliquat du modèle d'avant les familles : plus
+// personne ne l'écrit ni ne la lit (l'état d'une commande vit dans `stage` /
+// `sub_stage`, son alerte dans `flag`). Elle repartait pourtant vers chaque
+// poste, sur chaque ligne, à chaque rafraîchissement.
+// On ne la supprime QUE si elle est vide partout : une colonne qui porte encore
+// quelque chose n'est pas au démarrage du service de décider de la jeter.
+// Down : ALTER TABLE requests ADD COLUMN IF NOT EXISTS status text;
+async function retirerColonneStatus() {
+  try {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM requests WHERE status IS NOT NULL',
+    );
+    if (rows[0].n > 0) {
+      console.log(`ℹ  Colonne « requests.status » conservée : ${rows[0].n} ligne(s) la renseignent.`);
+      return;
+    }
+    await pool.query('ALTER TABLE requests DROP COLUMN status');
+  } catch (err) {
+    const absente = (err && err.code === '42703')
+      || /does not exist|n'existe pas|column/i.test((err && err.message) || '');
+    if (absente) return;
+    console.error('Colonne « requests.status » non retirée (sans conséquence) :', err.message);
   }
 }
 
@@ -582,9 +635,13 @@ async function migrateStagesToLinear() {
   //    Pressage > UV ; sinon « Préparation production »).
   const { rows: prod } = await pool.query("SELECT id FROM requests WHERE stage = 'production'");
   for (const r of prod) {
-    const { rows: secs } = await pool.query(
+    // `production_sectors` est retirée des bases où elle est vide (voir
+    // retirerTableProductionSectors). Absente, il n'y a simplement aucun secteur
+    // à lire : ce n'est pas une panne, et ça ne doit pas faire échouer un
+    // démarrage.
+    const secs = await pool.query(
       'SELECT sector FROM production_sectors WHERE request_id = $1', [r.id],
-    );
+    ).then((x) => x.rows, () => []);
     const have = new Set(secs.map((s) => s.sector));
     let target = 'preparation_production';
     if (have.has('prod_trotec')) target = 'prod_trotec';
