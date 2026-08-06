@@ -1407,6 +1407,16 @@ export function createDashboard(deps) {
   }
 
   // --- API publique --------------------------------------------------------
+  // Monte l'écran, SANS aller chercher la moindre donnée.
+  // La synthèse est incrémentale ENSUITE, mais la PREMIÈRE rend le planning
+  // entier — toutes les étapes, archives comprises. Et elle partait à
+  // l'ouverture de CHAQUE poste, y compris ceux qui n'allaient jamais sur le
+  // Point du jour : sur 400 lignes de test, 334 Ko, soit plus de 80 % de tout
+  // ce que l'application téléchargeait pour s'ouvrir. Payé cash sur l'ouverture
+  // d'une tablette en 4G depuis Saint-Martin, pour un écran que personne ne
+  // regardait. Le premier chargement attend donc le premier affichage (voir
+  // `show`) ; d'ici là l'écran annonce « Chargement… », ce qui est exactement
+  // ce qui se passera au tap sur l'onglet.
   function start() {
     root.replaceChildren();
     root.appendChild(buildHead());
@@ -1414,7 +1424,6 @@ export function createDashboard(deps) {
     root.appendChild($body);
     renderHead();
     renderBody();
-    refresh();
   }
 
   function show() {
@@ -1436,13 +1445,25 @@ export function createDashboard(deps) {
   // chaque évènement d'un collègue : on programme un seul rattrapage. Le cache
   // reste frais à la demi-minute près, ce qui suffit largement au fil
   // d'activité et aux badges.
-  // `kind` = la nature de l'évènement temps réel. Seuls ceux qui touchent la
+  // `kind` = la nature de l’évènement temps réel. Seuls ceux qui touchent la
   // configuration du patron obligent à la relire ; le planning, lui, se
   // rattrape tout seul par sa synthèse incrémentale.
   const KINDS_CONFIG = new Set(['category-owners', 'category-referents', 'machines']);
 
   function notifyChange(kind) {
+    // La config à relire se NOTE avant toute sortie : si l’on ne rafraîchit pas
+    // tout de suite (écran masqué, onglet en veille), le prochain passage la
+    // reprendra — sinon un réglage du patron serait perdu pour ce poste.
     if (KINDS_CONFIG.has(kind)) configARecharger = true;
+    // Jamais ouvert, et pas à l’écran : il n’y a pas de cache à tenir à jour, et
+    // personne ne regarde. La toute première synthèse rend le planning ENTIER —
+    // on ne la paie pas à l’ouverture de chaque poste, le premier `show()` s’en
+    // charge.
+    if (!loaded && !visible) return;
+    // Onglet du navigateur en arrière-plan, ou tablette écran éteint : c’est
+    // l’état d’une tablette d’atelier la moitié de la journée. Le retour de
+    // visibilité déclenche déjà un rafraîchissement (voir startRealtime).
+    if (document.hidden) return;
     if (visible) { refresh(); return; }
     if (veilleTimer) return;                       // rattrapage déjà programmé
     const attente = Math.max(0, REFRESH_FOND_MS - (Date.now() - dernierRefresh));

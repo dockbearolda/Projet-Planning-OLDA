@@ -5394,19 +5394,11 @@ async function jumpToResult(r) {
   if ($gridSearchInput) { $gridSearchInput.value = ''; $gridSearchInput.blur(); }
   setGridQuery('');
   // On cherche dans TOUT le planning, y compris depuis la prise de commande, le
-  // dashboard ou la base clients. Si on n'est pas déjà sur le planning, on y
-  // revient AVANT de pointer la ligne — sinon la cible reste cachée derrière la
-  // vue courante et le clic semble « ne rien faire ». On bascule la vue tout de
-  // suite (le hashchange est asynchrone) et on aligne le hash sans le relancer.
-  if (viewMode !== 'planning') {
-    setViewMode('planning');
-    if (location.hash && location.hash !== '#planning') {
-      history.replaceState(null, '', '#planning');
-    }
-  }
-  const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
-  await selectStage(r.stage, sub);
-  revealRow(r.id);
+  // dashboard ou la base clients : on ouvre donc la vue qui montre vraiment la
+  // commande — l'onglet promu (Fiverr, À commander) quand elle y vit, le
+  // Planning sinon — avant de pointer la ligne. Sans ça la cible reste cachée
+  // derrière la vue courante, et le clic semble « ne rien faire ».
+  await ouvrirCommandeAuPlanning({ id: r.id, stage: r.stage, sub: r.sub_stage });
 }
 
 function setGridQuery(v) {
@@ -5608,17 +5600,41 @@ const $projet = document.getElementById('nouveau-projet');
 // | 'fiverr' | 'a_commander' (les deux catégories promues en onglet)
 let viewMode = 'planning';
 
-// Saut vers une commande : bascule sur le Planning, l'ouvre et la surligne.
-// Si elle vit dans une catégorie promue en onglet (Fiverr, À commander), c'est
-// SON onglet qu'on ouvre : sinon on afficherait une grille dont l'onglet allumé
-// et le rail ne parlent pas.
-async function jumpToPlanning(r) {
-  const sub = r.sub_stage && SUB_LABEL[r.sub_stage] ? r.sub_stage : null;
-  const promoted = PROMOTED.find((p) => p.stage === r.stage && p.sub === sub);
-  setViewMode(promoted ? promoted.view : 'planning');
-  await selectStage(r.stage, sub);
-  revealRow(r.id);
+// OUVRIR LE PLANNING SUR UNE COMMANDE — le seul chemin.
+//
+// Trois entrées y mènent : la recherche globale, le « Ouvrir dans le planning »
+// du Point du jour, et le retour du comptoir après enregistrement. Chacune
+// basculait la vue à sa façon, et deux d'entre elles laissaient l'URL derrière :
+//
+//   - le Point du jour posait la vue Planning en GARDANT « #dashboard » dans
+//     l'URL. Retaper sur l'onglet Dashboard ne changeait alors plus rien — le
+//     hash y était déjà, aucun `hashchange` ne partait : l'onglet restait mort
+//     tant qu'on n'était pas passé par un autre. Or « Ouvrir dans le planning »
+//     est justement le geste du point du matin, fait vingt fois de suite.
+//
+//   - le comptoir écrivait `location.hash = '#planning'`, dont le `hashchange`
+//     tombait AU MILIEU du chargement de l'étape. Sur un dossier rangé en
+//     « Préparation › À commander » — une catégorie promue en onglet —
+//     `applyHash` croyait devoir rattraper une grille égarée et renvoyait sur
+//     « Demande & chiffrage » : la vendeuse ne voyait PAS la ligne qu'elle
+//     venait d'enregistrer, et c'est exactement le moment où l'on ressaisit.
+//
+// Ici : on choisit la vue (l'onglet promu s'il en existe un pour cette place),
+// on aligne l'URL avec `replaceState` — qui ne déclenche AUCUN `hashchange`,
+// donc aucune course — puis on charge l'étape et on pointe la ligne.
+async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = false) {
+  const sousEtape = sub && SUB_LABEL[sub] ? sub : null;
+  const promoted = PROMOTED.find((p) => p.stage === stage && p.sub === sousEtape);
+  const vue = promoted ? promoted.view : 'planning';
+  const hash = promoted ? promoted.hash : '#planning';
+  setViewMode(vue);
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+  await selectStage(stage, sousEtape, forcerRelecture);
+  if (id) revealRow(id);
 }
+
+// Saut depuis le Point du jour (« Ouvrir dans le planning »).
+const jumpToPlanning = (r) => ouvrirCommandeAuPlanning({ id: r.id, stage: r.stage, sub: r.sub_stage });
 
 const dashboard = createDashboard({
   root: $dashboard,
@@ -5702,14 +5718,15 @@ function mountProjet() {
 // liste : la vendeuse ne voyait rien apparaître et ressaisissait la commande.
 window.addEventListener('olda:projet-cree', async (e) => {
   const { id, stage, sub, avis } = e.detail || {};
-  location.hash = '#planning';
   // Le serveur a reconnu un RENVOI du même dossier : rien n'a été créé, et la
   // ligne vers laquelle on saute est celle de l'envoi précédent. On le dit —
   // sans ça, la vendeuse compte une commande de plus qu'il n'y en a.
   if (avis) showToast(avis);
-  if (!stage) return;
-  await selectStage(stage, sub || null, true);
-  if (id) revealRow(id);
+  if (!stage) { location.hash = '#planning'; return; }
+  // `true` : la ligne vient de naître côté serveur, elle n'est pas dans le cache
+  // local — sans relecture forcée, le raccourci « même famille » redessinerait
+  // ce qu'on avait déjà et rien n'apparaîtrait à l'écran.
+  await ouvrirCommandeAuPlanning({ id, stage, sub }, true);
 });
 
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
