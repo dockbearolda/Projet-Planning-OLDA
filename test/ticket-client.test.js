@@ -387,11 +387,59 @@ const DEMANDE = {
   // Le ticket s'atteint depuis LA LIGNE, dans les deux vues.
   assert.ok(/carte\.append|pcard__ticket/.test(APP));
   assert.ok(/tk\.className = 'pcard__ticket'/.test(APP), 'la carte doit porter le bouton ticket');
-  assert.ok(/const tk = cellTicket\(r\)/.test(APP), 'la ligne du tableau doit porter la pastille ticket');
+  assert.ok(/tr\.appendChild\(cellTicket\(r\)\)/.test(APP),
+    'la ligne du tableau doit porter sa colonne ticket');
 
-  // La pastille n'apparaît que là où un ticket a réellement existé.
+  // Le bouton n'agit que là où un ticket a réellement existé.
   assert.ok(/function aUnTicket\(r\)/.test(APP));
-  assert.ok(/if \(!aUnTicket\(r\)\) return null;/.test(APP));
+  assert.ok(/if \(aUnTicket\(r\)\) \{/.test(APP));
+
+  // -------------------------------------------------------------------------
+  // 6 bis. LE TICKET EN COLONNE — affichable ou non, et sans décaler le reste
+  // -------------------------------------------------------------------------
+  const HTML = lire('index.html');
+  const CSS = lire('styles.css');
+
+  // Une VRAIE colonne du tableau : <col>, <th> et <td> au même rang. L'ordre
+  // compte — un <col> agit sur la colonne de même rang, pas sur son data-col.
+  const rangCol = (cle) => HTML.indexOf(`<col data-col="${cle}"`);
+  assert.ok(rangCol('ticket') > rangCol('client') && rangCol('ticket') < rangCol('product'),
+    'le <col> ticket doit se placer entre client et product');
+  const thead = HTML.match(/<thead>[\s\S]*?<\/thead>/)[0];
+  assert.ok(thead.indexOf('col-ticket') > thead.indexOf('col-client')
+    && thead.indexOf('col-ticket') < thead.indexOf('col-product'),
+  'le <th> ticket doit suivre le même ordre que le colgroup');
+  const corps = APP.match(/function buildRow\(r\)[\s\S]*?\n\}/)[0];
+  assert.ok(corps.indexOf('cellTicket(r)') > corps.indexOf('cellDossier(r)')
+    && corps.indexOf('cellTicket(r)') < corps.indexOf('cellDescription(r)'),
+  'buildRow doit poser la cellule ticket au même rang que son <col>');
+
+  // Elle se retire depuis le rail « Colonnes », comme les autres.
+  assert.ok(/\{ key: 'ticket',\s+label: '[^']+', surCarte: true \}/.test(APP),
+    'le ticket doit figurer dans PLANNING_COLS');
+  assert.ok(/\.grid\.off-ticket\s+col\[data-col="ticket"\]/.test(CSS),
+    'la règle de masquage off-ticket doit exister');
+
+  // …mais SANS faire basculer les cartes vers le tableau : le ticket vit dans
+  // les deux vues, c'est ce que dit `surCarte` (cf. COLS_TABLEAU).
+  assert.ok(/const COLS_TABLEAU = new Set\(\s*\n\s*PLANNING_COLS\.filter\(\(c\) => !c\.locked && !c\.surCarte\)/.test(APP),
+    'COLS_TABLEAU doit exclure les colonnes présentes sur la carte');
+  assert.ok(/const modeCartes = \(\) => COLS_TABLEAU\.size > 0/.test(APP),
+    'la bascule cartes/tableau ne doit regarder que les colonnes du tableau');
+  assert.ok(/cards-off-ticket/.test(APP) && /body\.cards-off-ticket \.pcard__ticket \{ display: none/.test(CSS),
+    'retirer la colonne doit aussi ranger le bouton de la carte');
+
+  // ALIGNEMENT. La carte est sa propre grille : une colonne dimensionnée par
+  // son CONTENU décale toutes les autres d'une ligne à l'autre. La colonne
+  // d'actions a donc une largeur arrêtée, et la place du ticket est tenue même
+  // sur une ligne qui n'en a pas.
+  assert.ok(/--pcard-actions: 200px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
+  assert.ok(!/grid-template-columns:[^;]*\bauto;/.test(CSS.match(/\.pcard \{[\s\S]*?\n\}/)[0]),
+    'aucune piste `auto` dans la grille de la carte : elle dépendrait du contenu');
+  assert.ok(/pcard__ticket pcard__ticket--vide/.test(APP),
+    'une ligne sans ticket doit garder l’emplacement réservé');
+  assert.ok(/body\.cards-off-ticket \.pcard \{ --pcard-actions: 148px; \}/.test(CSS),
+    'ticket rangé : la colonne d’actions se resserre pour toutes les cartes ensemble');
 
   // UN SEUL APERÇU À LA FOIS. La fiche complète s'attend (un aller-retour
   // réseau) : au doigt on tape deux fois avant qu'elle n'arrive, et deux

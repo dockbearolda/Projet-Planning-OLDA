@@ -937,6 +937,13 @@ function cmp(a, b, key) {
   if (key === 'flag') {
     return (FLAG_RANK[va] ?? 2) - (FLAG_RANK[vb] ?? 2);
   }
+  if (key === 'ticket') {
+    // Le numéro du ticket est chronologique (« 26.08.06-002 ») : le trier range
+    // la file dans l'ordre où le comptoir a servi. Les lignes saisies à la main
+    // n'en ont pas — elles se regroupent en fin de tri, jamais entremêlées.
+    va = (a.fiche && a.fiche.ref) || '￿';
+    vb = (b.fiche && b.fiche.ref) || '￿';
+  }
   if (key === 'priority' || key === 'quantity' || key === 'project_value') {
     va = va == null ? -Infinity : Number(va);
     vb = vb == null ? -Infinity : Number(vb);
@@ -1106,12 +1113,22 @@ function gripIcon() {
   return svg;
 }
 
+// Un bloc de la carte : son intitulé, puis son contenu dans UN SEUL enfant.
+// Ce corps n'est pas décoratif : il donne au bloc deux rangées exactement, ce
+// qui lui permet de se caler sur celles de la carte (`grid-template-rows:
+// subgrid`, cf. styles.css). Sans lui, un intitulé qui passe à la ligne — « Délai
+// de production restant » sur la tablette — décalait vers le bas la valeur qu'il
+// coiffe, et les quatre valeurs de la carte ne se lisaient plus sur une rangée.
 function pcardBloc(label, ...enfants) {
   const d = document.createElement('div');
+  d.className = 'pcard__bloc';
   const l = document.createElement('p');
   l.className = 'pcard__label';
   l.textContent = label;
-  d.append(l, ...enfants);
+  const corps = document.createElement('div');
+  corps.className = 'pcard__corps';
+  corps.append(...enfants);
+  d.append(l, corps);
   return d;
 }
 
@@ -1129,8 +1146,9 @@ function buildCard(r) {
   const ref = document.createElement('div');
   ref.className = 'pcard__ref';
   ref.textContent = (r.fiche && r.fiche.ref) || '';
-  const blocClient = pcardBloc('Client', client);
-  if (ref.textContent) blocClient.appendChild(ref);
+  const blocClient = ref.textContent
+    ? pcardBloc('Client', client, ref)
+    : pcardBloc('Client', client);
 
   // 2. QUOI — la description, puis les deux puces qui situent la commande.
   const nom = document.createElement('div');
@@ -1293,25 +1311,38 @@ function buildCard(r) {
   // fallait ouvrir la fiche, faire défiler, et le bouton d'impression sortait
   // alors le dossier de travail sur une feuille A4. Il est ici, à côté de
   // « ouvrir » — un appui, le ticket s'affiche, un second l'imprime.
-  // Seulement sur les dossiers nés au comptoir : une ligne saisie à la main
-  // n'a jamais eu de ticket, le bouton mentirait.
+  //
+  // SA PLACE EST TOUJOURS RÉSERVÉE, même sur une ligne saisie à la main qui n'a
+  // jamais eu de papier : le bouton n'y paraît pas, mais son emplacement reste.
+  // Sans ça, la colonne d'actions mesurait 200 px sur les dossiers du comptoir
+  // et 148 px sur les autres — et comme c'est elle qui borne la carte, TOUTES
+  // les colonnes se décalaient de 52 px d'une ligne à l'autre.
+  let tk;
   if (aUnTicket(r)) {
-    const tk = document.createElement('button');
+    tk = document.createElement('button');
     tk.type = 'button';
     tk.className = 'pcard__ticket';
     tk.setAttribute('aria-label', 'Voir le ticket du client');
     attachTip(tk, 'Voir et imprimer le ticket');
     tk.appendChild(strokeIcon(LD_ICONES.ticket));
     tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
-    actions.append(prise, tk, ouvrir, suppr);
   } else {
-    actions.append(prise, ouvrir, suppr);
+    tk = document.createElement('span');
+    tk.className = 'pcard__ticket pcard__ticket--vide';
+    tk.setAttribute('aria-hidden', 'true');
   }
+  actions.append(prise, tk, ouvrir, suppr);
 
+  // « Délai restant » et non « Délai de production restant » : les intitulés
+  // forment UNE rangée partagée (cf. .pcard__bloc), donc le plus long les
+  // grandit tous. Sur la tablette, sa colonne fait ~112 px : les trois lignes
+  // qu'il y prenait coûtaient 44 px de haut à CHAQUE carte, soit deux commandes
+  // de moins par écran. Le bloc dit déjà « Remise client » et « À terminer
+  // avant » juste en dessous : il n'y a pas d'autre délai possible.
   carte.append(
     blocClient,
     pcardBloc('Projet', nom, meta, motif),
-    pcardBloc('Délai de production restant', delaiEl, remise, cible),
+    pcardBloc('Délai restant', delaiEl, remise, cible),
     pcardBloc('TTC', montant, refs, nomRef),
     actions,
   );
@@ -1664,6 +1695,8 @@ function buildRow(r) {
   tr.appendChild(cellResponsable(r));
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
+  // ticket : le numéro du papier remis au client, en clair et réimprimable
+  tr.appendChild(cellTicket(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
   // prix : montant HT — une ligne sans prix ne peut pas entrer en Facturation
@@ -2111,12 +2144,10 @@ function cellDossier(r) {
   // recouvrir la colonne voisine.
   const docs = document.createElement('div');
   docs.className = 'client-docs';
-  // LE NUMÉRO DU TICKET, SUR LA LIGNE. Le tableau ne le montrait nulle part —
-  // seule la carte l'affichait — alors que c'est le seul repère que le client
-  // rapporte au comptoir. Il se LIT ici (on le compare au papier qu'on tient)
-  // et il s'APPUIE : le ticket s'affiche, prêt à réimprimer.
-  const tk = cellTicket(r);
-  if (tk) docs.appendChild(tk);
+  // Le ticket A SA PROPRE COLONNE (cf. cellTicket) : dans ce cluster, il ne
+  // paraissait que sur les dossiers du comptoir et décalait d'une pastille
+  // toute la rangée des lignes saisies à la main — WhatsApp, devis, facture et
+  // BAT ne tombaient pas au même endroit d'une ligne à l'autre.
   docs.appendChild(cellWhatsapp(r));
   docs.appendChild(cellPdfSlot(r, 'devis'));
   docs.appendChild(cellPdfSlot(r, 'facture'));
@@ -4005,28 +4036,46 @@ async function enregistrerFiche(r, c) {
 // aucun handler n'est posé sur <tr>, donc le reste de la ligne garde son
 // édition inline (cliquer une cellule la corrige, ça ne doit pas ouvrir une
 // fiche par-dessus les doigts).
-// La pastille TICKET de la ligne du tableau. Même gabarit que ses voisines
-// (24 px visuels, 44 px de zone tactile) : la rangée de pastilles ne gagne pas
-// une seconde ligne, et la grille garde sa densité. Le NUMÉRO, lui, tient dans
-// l'infobulle et dans le nom accessible — il se lit en entier sur le ticket
-// qu'un appui fait apparaître, et sur la carte, qui l'affiche déjà en clair.
-// Rien sur une ligne saisie à la main : elle n'a jamais eu de ticket.
+// LA COLONNE TICKET. Elle a d'abord vécu en pastille dans le cluster de la
+// cellule Dossier — deux défauts, l'un de fond, l'autre de forme :
+//   - le NUMÉRO n'y tenait pas (24 px), alors que c'est justement ce que le
+//     client rapporte au comptoir et ce qu'on veut comparer à son papier ;
+//   - une pastille présente sur les seules lignes du comptoir décalait d'un
+//     cran toute la rangée de ses voisines sur les lignes saisies à la main.
+// En colonne, le numéro se lit en clair, tout tombe au même endroit d'une ligne
+// à l'autre, et la colonne se retire d'un clic depuis le rail comme les autres.
+// Une ligne née à la main n'a jamais eu de ticket : sa cellule reste vide.
 function cellTicket(r) {
-  if (!aUnTicket(r)) return null;
+  const td = document.createElement('td');
+  td.className = 'col-ticket-cell';
+  if (!aUnTicket(r)) {
+    const vide = document.createElement('span');
+    vide.className = 'ticket-cell ticket-cell--vide';
+    vide.textContent = '—';
+    vide.setAttribute('aria-hidden', 'true'); // rien à annoncer : pas de ticket
+    td.appendChild(vide);
+    return td;
+  }
   const ref = (r.fiche && r.fiche.ref) || '';
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'pdf-btn ticket-chip';
+  btn.className = 'ticket-cell';
   const libelle = ref ? `Ticket ${ref}` : 'Ticket du client';
   attachTip(btn, `${libelle} — voir et imprimer`);
   btn.setAttribute('aria-label', `${libelle} — voir et imprimer`);
-  btn.appendChild(strokeIcon(LD_ICONES.ticket));
+  const no = document.createElement('span');
+  no.className = 'ticket-cell__no';
+  // Sans numéro (dossier du comptoir d'avant la référence), le libellé dit
+  // quand même qu'il y a un papier à ressortir.
+  no.textContent = ref || 'Ticket';
+  btn.append(strokeIcon(LD_ICONES.ticket), no);
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     ouvrirTicket(r);
     btn.blur();
   });
-  return btn;
+  td.appendChild(btn);
+  return td;
 }
 
 function cellLigneDetailButton(r) {
@@ -5142,8 +5191,8 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, product: 220,
-  price: 92, sub_stage: 170, description: 210, deadline: 136, del: 200,
+  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, ticket: 162,
+  product: 220, price: 92, sub_stage: 170, description: 210, deadline: 136, del: 200,
 };
 
 let colWidths = {};
@@ -5166,12 +5215,15 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 const COLS_KEY = 'olda_cols_v2';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
 // posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
-// la masquer en plus du choix manuel.
+// la masquer en plus du choix manuel. `surCarte` = colonne qui existe DANS LES
+// DEUX VUES (le ticket : une colonne du tableau, un bouton sur la carte) — la
+// retirer ne fait donc pas basculer d'une vue à l'autre.
 const PLANNING_COLS = [
   { key: 'stars',       label: 'Priorité' },
   { key: 'client_type', label: 'Type' },
   { key: 'responsable', label: 'Responsable' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
+  { key: 'ticket',      label: 'Ticket du client', surCarte: true },
   { key: 'product',     label: 'Description' },
   { key: 'price',       label: 'Prix TTC', auto: (slug) => !PRICE_VISIBLE_STAGES.has(slug) },
   { key: 'sub_stage',   label: 'Sous-étape', auto: (slug) => !familyHasSub(slug) },
@@ -5182,24 +5234,33 @@ const PLANNING_COLS = [
 
 // Colonnes qu'on peut éteindre (toutes sauf l'identité de la ligne).
 const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) => c.key));
+// Celles qui n'existent QUE dans le tableau : ce sont elles, et elles seules,
+// qui décident de la vue (cf. modeCartes). Le ticket en est exclu — le retirer
+// sur les cartes doit retirer le bouton, pas rappeler le tableau complet.
+const COLS_TABLEAU = new Set(
+  PLANNING_COLS.filter((c) => !c.locked && !c.surCarte).map((c) => c.key),
+);
 
-// PAR DÉFAUT, TOUT EST RANGÉ : le planning s'ouvre sur les cartes épurées. Les
-// colonnes ne sont pas perdues, elles attendent dans le rail « Colonnes » — en
-// rallumer une ramène le tableau avec elle.
-let hiddenCols = new Set(COLS_ETEIGNABLES);
+// PAR DÉFAUT, TOUT EST RANGÉ SAUF LE TICKET : le planning s'ouvre sur les
+// cartes épurées, et le ticket du client reste à portée de doigt (c'est le seul
+// repère que le client rapporte au comptoir). Les autres colonnes ne sont pas
+// perdues, elles attendent dans le rail « Colonnes » — en rallumer une ramène le
+// tableau avec elle.
+let hiddenCols = new Set(COLS_TABLEAU);
 try {
   const saved = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
   // On ne garde que des clés connues et jamais une colonne verrouillée : un
   // localStorage d'une version précédente ne doit pas pouvoir faire disparaître
-  // l'identité de la ligne.
+  // l'identité de la ligne. Un réglage enregistré avant l'arrivée du ticket ne
+  // le nomme pas : il reste donc allumé, comme il l'était.
   if (Array.isArray(saved)) hiddenCols = new Set(saved.filter((k) => COLS_ETEIGNABLES.has(k)));
-} catch (_) { hiddenCols = new Set(COLS_ETEIGNABLES); }
+} catch (_) { hiddenCols = new Set(COLS_TABLEAU); }
 
-// VUE ÉPURÉE tant qu'aucune colonne n'est allumée. C'est la même commande pour
-// les deux vues : le rail « Colonnes » dit ce qu'on veut voir, et le planning
-// passe des cartes au tableau dès qu'on lui demande une colonne.
-const modeCartes = () => COLS_ETEIGNABLES.size > 0
-  && [...COLS_ETEIGNABLES].every((k) => hiddenCols.has(k));
+// VUE ÉPURÉE tant qu'aucune colonne DU TABLEAU n'est allumée. C'est la même
+// commande pour les deux vues : le rail « Colonnes » dit ce qu'on veut voir, et
+// le planning passe des cartes au tableau dès qu'on lui demande une colonne.
+const modeCartes = () => COLS_TABLEAU.size > 0
+  && [...COLS_TABLEAU].every((k) => hiddenCols.has(k));
 
 function saveHiddenCols() {
   try { localStorage.setItem(COLS_KEY, JSON.stringify([...hiddenCols])); } catch (_) {}
@@ -5225,6 +5286,11 @@ function applyColVisibility() {
     if (cache) off += COL_DEFAULTS[c.key] || 0;
   }
   $grid.style.setProperty('--cols-off', off + 'px');
+  // Le ticket vit AUSSI sur la carte : la même case le range des deux côtés.
+  // Par le CSS et non par un rendu — la place du bouton reste réservée sur
+  // toutes les cartes, c'est ce qui garde leurs colonnes alignées (cf. la
+  // largeur --pcard-actions dans styles.css).
+  document.body.classList.toggle('cards-off-ticket', hiddenCols.has('ticket'));
 }
 
 const $colbar = document.getElementById('colbar');
@@ -5300,9 +5366,10 @@ function renderColbar() {
   // rallumer, sur le tableau à tout ranger. Il n'y a pas d'état sans issue.
   $colbarReset.hidden = false;
   $colbarReset.textContent = modeCartes() ? 'Afficher le tableau complet' : 'Revenir aux cartes';
-  // Sur les cartes, « Sur l'écran » n'a que la colonne verrouillée à montrer :
-  // on dit ce qui se passe plutôt que de laisser une liste presque vide.
-  $colbarOn.hidden = modeCartes();
+  // « Sur l'écran » reste MONTÉ même sur les cartes : le ticket s'y règle (il
+  // existe dans les deux vues), et le masquer rendait sa case introuvable.
+  // La note explique juste au-dessus pourquoi la liste est si courte.
+  $colbarOn.hidden = false;
   if ($colbarOnNote) $colbarOnNote.hidden = !modeCartes();
 }
 
@@ -5339,8 +5406,11 @@ function initColbar() {
   // planning sur ses cartes épurées. Le même bouton, dans les deux sens : on ne
   // se retrouve jamais coincé dans une vue.
   $colbarReset.addEventListener('click', () => {
+    // « Revenir aux cartes » ne range QUE les colonnes du tableau : le ticket
+    // reste comme on l'a laissé, sinon le bouton du papier client disparaîtrait
+    // des fiches sans que personne l'ait demandé.
     if (modeCartes()) hiddenCols.clear();
-    else for (const k of COLS_ETEIGNABLES) hiddenCols.add(k);
+    else for (const k of COLS_TABLEAU) hiddenCols.add(k);
     saveHiddenCols();
     applyColVisibility();
     renderColbar();
