@@ -1184,6 +1184,19 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 }
 .pcard__handle svg { width: 18px; height: 18px; }
 .pcard:hover .pcard__handle { color: var(--text-2); }
+/* LE TICKET DU CLIENT, sur la carte. Il ne s'atteignait que par la fiche — et
+   le bouton d'impression y sortait le dossier de travail sur une feuille A4.
+   Ici, à côté de « ouvrir » : un appui montre le ticket, un second l'imprime.
+   N'apparaît que sur les dossiers nés au comptoir (cf. aUnTicket). */
+.pcard__ticket {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  cursor: pointer;
+}
+.pcard__ticket:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
+.pcard__ticket:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.pcard__ticket svg { width: 18px; height: 18px; }
 .pcard__del {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
@@ -2377,7 +2390,18 @@ tr:hover .handle { color: var(--text-2); }
   text-overflow: ellipsis;
   margin-top: 1px;
 }
+/* Le NUMÉRO DU TICKET, à côté du nom du dossier. On cherche désormais par ce
+   numéro (le seul repère que le client rapporte) : il doit se lire sur le
+   résultat, sinon on ne sait pas laquelle des trois « Coco Beach » est celle du
+   papier qu'on tient. Discret : c'est un repère, pas le titre. */
+.spi-ref {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
 .spi-title mark,
+.spi-ref mark,
 .spi-desc mark {
   background: rgba(var(--primary-rgb), .28);
   color: inherit;
@@ -2865,6 +2889,65 @@ input[type="date"].cell-input { color: var(--text-1); }
 @media (max-width: 480px) {
   .ask__actions { flex-direction: column-reverse; }
   .ask__btn { width: 100%; }
+}
+
+/* --------------------------------------------------- Le TICKET du client
+   Ce que la vendeuse a imprimé au comptoir et remis au client, réaffiché tel
+   quel depuis n'importe quelle ligne du planning. Le dessin du ticket lui-même
+   vit dans ticket.js (CSS_TICKET) : la MÊME chaîne sert l'aperçu et le cadre
+   d'impression, on ne peut donc pas voir autre chose que ce qui sortira.
+   Ici, seulement la boîte autour.
+
+   La feuille reste BLANCHE en thème sombre : c'est du papier, et l'imprimante
+   ne connaît que le noir sur blanc. */
+.tk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16, 24, 40, .45);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.tk-modal.open { opacity: 1; }
+.tk-modal__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(420px, 100%);
+  max-height: min(88vh, 900px);
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-pop);
+  transform: translateY(8px) scale(.99);
+  transition: transform var(--dur-2) var(--ease);
+}
+.tk-modal.open .tk-modal__card { transform: none; }
+/* Un ticket long (dix articles) défile DANS la feuille : sans ça la boîte
+   poussait ses boutons hors de l'écran, et sur la tablette du comptoir on ne
+   pouvait plus l'imprimer ni la fermer. */
+.tk-modal__paper {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+}
+.tk-modal__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.tk-modal__print {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.tk-modal__print:hover { background: var(--primary-hover); }
+@media (max-width: 480px) {
+  .tk-modal__actions { flex-direction: column-reverse; }
+  .tk-modal__actions .ask__btn { width: 100%; }
 }
 
 /* ---------------------------------------------------------------- Ripple Material */
@@ -4966,6 +5049,19 @@ textarea.ld-ctl { font-weight: 600; }
 /* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
 .ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
 .ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
+
+/* Pastille TICKET : le papier remis au client, réaffichable et réimprimable
+   depuis la ligne. Même gabarit que ses voisines (24 px, zone tactile 44 px via
+   `.pdf-btn::after`) pour que la rangée ne prenne pas une seconde ligne.
+   Encadrée plutôt que teintée : le vert des pastilles PDF dit « le document
+   existe », et un ticket existe TOUJOURS là où la pastille apparaît — reprendre
+   ce vert brouillerait la lecture d'un coup d'œil de la rangée. */
+.ticket-chip {
+  color: var(--text-1);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.ticket-chip:hover { background: var(--primary-soft); color: var(--primary); }
 
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }

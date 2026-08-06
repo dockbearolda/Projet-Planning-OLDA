@@ -940,6 +940,13 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
 // sans distinction de casse ni d'accent (« melina » trouve « Mélina »).
 const RECHERCHE_CHAMPS = ['billing_company', 'contact_referent', 'product', 'color', 'description',
   'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason'];
+// LE NUMÉRO DU TICKET. C'est ce que le client rapporte au comptoir, et c'était
+// le seul repère qu'aucune recherche ne regardait : taper « 26.08.06-003 » ne
+// rendait rien, alors que ce numéro est écrit sur son papier. Il vit dans le
+// JSON de la fiche, d'où l'extraction ici plutôt qu'une colonne dans la liste.
+// `refTicket` est la référence du ticket DÉJÀ REMIS quand le dossier a dû être
+// enregistré sous une autre : c'est celle que le client a en main.
+const RECHERCHE_FICHE = ["r.fiche->>'ref'", "r.fiche->>'refTicket'"];
 const RECHERCHE_MAX = 60;      // miroir de PALETTE_MAX côté écran
 const RECHERCHE_JETONS_MAX = 8;
 // `unaccent` est une extension, pas toujours installée (et absente de la base
@@ -947,7 +954,9 @@ const RECHERCHE_JETONS_MAX = 8;
 // concernent, partout.
 const ACCENTS = 'àâäáãåçéèêëíìîïñóòôöõùúûüýÿ';
 const SANS_ACCENTS = 'aaaaaaceeeeiiiinooooouuuuyy';
-const FOIN_RECHERCHE = `translate(lower(concat_ws(' ', ${RECHERCHE_CHAMPS.map((c) => `r.${c}`).join(', ')})), '${ACCENTS}', '${SANS_ACCENTS}')`;
+const FOIN_RECHERCHE = `translate(lower(concat_ws(' ', ${[
+  ...RECHERCHE_CHAMPS.map((c) => `r.${c}`), ...RECHERCHE_FICHE,
+].join(', ')})), '${ACCENTS}', '${SANS_ACCENTS}')`;
 
 const replier = (s) => String(s == null ? '' : s).toLowerCase()
   .normalize('NFD').replace(/\p{Diacritic}/gu, '');

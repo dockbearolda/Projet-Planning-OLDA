@@ -23,6 +23,18 @@ modules natifs, aucun build, aucun framework, aucun bundler).
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
   qu'on ouvre le plus souvent, ont quitté le rail pour un **onglet** de la barre
   du haut — sans quitter le pipeline (flux, compteurs, puces inchangés).
+- **Le ticket du client, retrouvable sur la ligne.** Une vente directe et une
+  demande de devis remettent un ticket au comptoir. Toute ligne née là-bas porte
+  désormais une **pastille ticket** (carte et tableau) : un appui le réaffiche à
+  l'identique, un second l'imprime. Il se cherche aussi par son **numéro** —
+  celui que le client rapporte sur son papier — dans la recherche de la grille
+  comme dans la recherche globale. Le ticket est **reconstruit** depuis la ligne
+  et sa fiche : la ligne fait foi pour ce qui se corrige après la vente (heure de
+  retrait, montant, paiement), la fiche pour ce qui a été vendu. Il ne porte que
+  ce qui figure sur le papier du client — ni secteur, ni adresse de facturation,
+  ni total HT, ni taxe, ni **note interne OLDA**. Le récapitulatif complet, lui,
+  reste à disposition dans la fiche, en **téléchargement** : c'est un document de
+  travail, il n'a jamais eu à sortir sur l'imprimante.
 - **Pastille WhatsApp** sur toute ligne dont le client a laissé un numéro : un
   clic ouvre la conversation avec le message « votre commande est prête » déjà
   écrit. Rien ne part tout seul, c'est l'employé qui appuie sur Envoyer. Le
@@ -191,6 +203,7 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests/:id/copie` | **Recopie une commande** (« Dupliquer », « Envoyer vers Fiverr »), dans une autre famille si `{ stage }` est fourni. La copie emporte `fiche` — le récapitulatif du comptoir, donc tout ce que l'atelier doit lire pour produire. Ne se copient PAS : le numéro de ticket (`fiche.ref`, il identifie UNE prise de commande), l'alerte en cours et les pièces jointes. La copie se fait ici et non côté navigateur : la liste ne transporte qu'un résumé de `fiche`, et `fiche` n'est pas un champ écrivable par PATCH. |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | DELETE | `/api/requests/:id` | Supprime une demande (avec ses PDF, ses secteurs et son journal). |
+| GET | `/api/requests/recherche?q=…` | **La recherche globale**, faite par le serveur (une page de résultats, pas tout le planning). Tous les jetons doivent apparaître, sans distinction de casse ni d'accent. Cherche dans le dossier, le référent, la description, les contacts, l'alerte — **et le numéro du ticket** (`fiche.ref`, plus `fiche.refTicket` quand le papier remis au client porte un autre numéro) : c'est le seul repère que le client rapporte au comptoir. |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
 | GET | `/api/ordre-manuel` | `[<slugÉtape>, ...]` — les étapes rangées à la main. |
 | PUT | `/api/ordre-manuel` | `{ etape, range }` — ne touche QUE cette étape, le serveur fusionne avec ce que les autres postes ont décidé et rend la liste à jour. Diffusé en SSE. Envoyer la liste entière (ancienne forme, toujours acceptée pour un onglet resté ouvert sur le JS d'avant) impose aux autres la vision qu'on avait AVANT leur geste : deux vendeuses rangeant deux étapes dans la même minute, et la seconde effaçait la décision de la première. |
@@ -355,6 +368,11 @@ qu'on ait lu : rouge en retard, orange sous deux jours ouvrés, encre au-delà.
 Le reste — coordonnées, détail complet, paiement, documents, notes — s'ouvre
 d'un clic sur le **↗** de la carte, dans la fiche projet (voir plus bas). La
 carte se **glisse sur le rail des étapes** comme une ligne de tableau.
+
+Sur un dossier né au comptoir, un bouton de plus précède le **↗** : le **ticket
+du client**, celui qu'il a en main. Un appui l'affiche tel qu'il s'imprimera, un
+second l'imprime. Sur le tableau, il prend la forme d'une **pastille** dans la
+rangée du dossier, à côté de WhatsApp et des PDF.
 
 ### Le rail « Colonnes » — le tableau complet est rangé, pas perdu
 
@@ -530,6 +548,7 @@ Deux exceptions assumées :
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── sw.js         service worker : coquille hors ligne, réseau prioritaire
+│   ├── ticket.js     le TICKET du client, reconstruit depuis la ligne (règles pures)
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning
