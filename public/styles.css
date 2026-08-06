@@ -2693,11 +2693,9 @@ tr:hover .handle { color: var(--text-2); }
    affichent Prix ET Sous-étape, et le cluster sortait de la cellule. 210 px =
    les pastilles + une marge, et le nom dispose de la même largeur au-dessus. */
 .col-client { width: 210px; }
-/* Ticket : largeur MESURÉE sur le plus long numéro que produit le comptoir,
-   « DEV-26.08.05-001 » (16 signes) — 116 px de texte, plus l'icône, l'écart et
-   les marges. Un numéro tronqué ne se compare pas au papier que le client
-   tend : c'est tout ce qu'on lui demande, il se lit en entier. */
-.col-ticket { width: 162px; }
+/* Ticket : une icône, pas un numéro (cf. cellTicket) — la largeur d'une
+   pastille et ses marges, comme les autres colonnes à puce. */
+.col-ticket { width: 64px; }
 
 /* Plancher de largeur de la grille, par jeu de colonnes affichées.
    Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a
@@ -2714,11 +2712,11 @@ tr:hover .handle { color: var(--text-2); }
    valable — retirer une colonne de 210 px baisse le plancher de 210 px, point.
    Sans ça, retirer trois colonnes laissait la grille défiler horizontalement
    alors qu'on venait justement de lui faire de la place.
-   Les trois valeurs comptent la colonne Ticket (162 px) : elle est allumée par
+   Les trois valeurs comptent la colonne Ticket (64 px) : elle est allumée par
    défaut, et `--cols-off` la retranche dès qu'on la retire du rail. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1432px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1382px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1522px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1334px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1284px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1424px - var(--cols-off, 0px)); }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
@@ -3324,8 +3322,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .col-flag { width: 148px; }
   /* Le numéro du ticket s'APPUIE (il rouvre le papier du client) : plancher de
      la charte, comme toutes les cibles de la ligne. */
-  .ticket-cell { min-height: 44px; padding: 8px 11px; font-size: 13px; }
-  .col-ticket { width: 172px; }
+  .ticket-cell { width: 44px; height: 44px; }
+  .col-ticket { width: 76px; }
   .menu-item { padding: 12px 14px; font-size: 15px; }
   .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
   .type-tag,
@@ -5166,8 +5164,6 @@ textarea.ld-ctl { font-weight: 600; }
 .ld-reason { max-width: 100%; text-align: left; }
 
 /* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
-.ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
-.ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
 
 /* COLONNE TICKET : le numéro du papier remis au client, en clair et
    réimprimable depuis la ligne. Il vivait en pastille dans le cluster de la
@@ -5176,27 +5172,19 @@ textarea.ld-ctl { font-weight: 600; }
    le numéro se lit, et chaque ligne le porte au même endroit.
    Encadré plutôt que teinté : le vert des pastilles PDF dit « le document
    existe » — le reprendre ici brouillerait cette lecture. */
-.col-ticket-cell { padding: 0 8px 0 14px; vertical-align: middle; }
+.col-ticket-cell { padding: 0 8px; vertical-align: middle; text-align: center; }
 .ticket-cell {
-  display: inline-flex; align-items: center; gap: 6px;
-  max-width: 100%;
-  min-height: 30px; padding: 4px 9px;
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px;
   border: 0; border-radius: 999px;
   background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
   font: inherit; font-size: 12.5px; font-weight: 700;
-  /* Chiffres à chasse fixe : les numéros se comparent en colonne, chiffre sous
-     chiffre, comme sur le papier qu'on tient à côté de l'écran. */
-  font-variant-numeric: tabular-nums;
   color: var(--text-1);
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .ticket-cell:hover { background: var(--primary-soft); color: var(--primary); }
 .ticket-cell:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.ticket-cell svg { flex: none; }
-/* Le numéro se tronque plutôt que de pousser la colonne : il se lit en entier
-   dans l'infobulle et sur le ticket qu'un appui fait apparaître. */
-.ticket-cell__no { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Ligne saisie à la main : aucun papier n'a été remis, la case reste muette. */
 .ticket-cell--vide {
   box-shadow: none; background: none; color: var(--text-3, var(--text-2));
