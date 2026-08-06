@@ -9,6 +9,10 @@
 // Chargé À LA DEMANDE par app.js au premier passage sur la vue ; chaque retour
 // relit la valeur enregistrée (un autre poste a pu la changer entre-temps).
 
+// Sans minuteur, un enregistrement de réglage parti sur un réseau qui décroche
+// laisse le bouton désactivé et « Enregistrement… » à l'écran, indéfiniment.
+import { fetchBorne } from './reseau.js';
+
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -24,7 +28,7 @@ const ic = (name, cls) => {
 };
 
 async function api(method, path, body) {
-  const res = await fetch(path, {
+  const res = await fetchBorne(path, {
     method,
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -214,7 +218,7 @@ async function save() {
   $('#reg-wa-save').disabled = true;
   flash('Enregistrement…');
   try {
-    const res = await fetch('/api/settings/whatsapp', {
+    const res = await fetchBorne('/api/settings/whatsapp', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
@@ -393,7 +397,7 @@ export async function refreshReglages() {
     // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le
     // mot de passe) donnait `data.message === undefined` → le textarea se
     // VIDAIT, et le patron croyait son message perdu.
-    const res = await fetch('/api/settings/whatsapp');
+    const res = await fetchBorne('/api/settings/whatsapp');
     if (res.ok) {
       const data = await res.json();
       if (typeof data.message === 'string') { saved = data.message; messageRelu = true; }

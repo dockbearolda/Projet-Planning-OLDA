@@ -13,6 +13,9 @@ import { splitPersoName } from './nom-client.js';
 // La boîte de confirmation de l'app (jamais celle du système) — partagée avec
 // la Base clients, qui en a besoin pour la suppression d'une fiche.
 import { confirmerAction } from './confirmer.js';
+// `fetch` avec une fin : sans minuteur, une requête partie sur un réseau qui
+// décroche n'échoue jamais et laisse le bouton (ou l'écran) figé pour la journée.
+import { fetchBorne, DELAI_ENVOI } from './reseau.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -391,7 +394,7 @@ async function api(method, url, body) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(url, opts);
+  const res = await fetchBorne(url, opts);
   if (!res.ok) {
     let detail = res.statusText;
     try { detail = (await res.json()).error || detail; } catch (_) {}
@@ -632,7 +635,7 @@ function urlListe(slug) {
 // Même chose qu'`api('GET', …)`, mais on garde l'en-tête qui dit si le serveur a
 // coupé. Le corps reste un simple tableau : rien d'autre n'a besoin de changer.
 async function chargerListe(url) {
-  const res = await fetch(url);
+  const res = await fetchBorne(url);
   if (!res.ok) {
     let detail = res.statusText;
     try { detail = (await res.json()).error || detail; } catch (_) {}
@@ -746,9 +749,22 @@ function saveOrdreManuelLocal() {
 
 // Publie la décision pour tous les postes. Renvoie une promesse : l'appelant
 // (commitReorder) sait ainsi revenir en arrière si l'écriture échoue.
-function saveOrdreManuel() {
+//
+// On n'envoie QUE l'étape qu'on vient de ranger (ou de dé-ranger). Envoyer la
+// liste entière revenait à imposer aux autres postes la vision qu'on avait
+// AVANT leur geste : une vendeuse rangeait « Production », une autre rangeait
+// « Demande & chiffrage » dans la même minute, et la seconde effaçait la
+// décision de la première — l'étape retombait en tri automatique sous les yeux
+// de celle qui venait de la ranger. Le serveur fusionne, et nous renvoie la
+// liste à jour : on l'adopte plutôt que de garder la nôtre.
+function saveOrdreManuel(etape, range) {
   saveOrdreManuelLocal();
-  return api('PUT', '/api/ordre-manuel', [...ordreManuel]);
+  return api('PUT', '/api/ordre-manuel', { etape, range }).then((liste) => {
+    if (!Array.isArray(liste)) return;
+    ordreManuel = new Set(liste.filter((s) => typeof s === 'string'));
+    saveOrdreManuelLocal();
+    renderOrdreReset();
+  });
 }
 
 // Relit la liste partagée. Silencieux en cas d'échec : on garde le dernier état
@@ -1953,7 +1969,11 @@ const PDF_SLOT_LABELS = {
 // le corps. Le serveur lit le corps quel que soit son Content-Type.
 async function uploadPdf(requestId, kind, file) {
   const url = `/api/requests/${requestId}/pdf/${kind}?name=${encodeURIComponent(file.name)}`;
-  const res = await fetch(url, { method: 'PUT', body: await file.arrayBuffer() });
+  // Délai d'ENVOI, plus large : un PDF de plusieurs mégaoctets sur la connexion
+  // de l'atelier met légitimement du temps à monter.
+  const res = await fetchBorne(
+    url, { method: 'PUT', body: await file.arrayBuffer() }, DELAI_ENVOI,
+  );
   if (!res.ok) {
     let detail = res.statusText;
     try { detail = (await res.json()).error || detail; } catch (_) {}
@@ -4450,8 +4470,16 @@ async function commitReorder(r) {
   // Premier rangement de cette étape : à partir de maintenant, c'est la main qui
   // décide de l'ordre ici. Posé AVANT le rendu, pour que la ligne ne revienne
   // pas à sa place le temps de l'aller-retour serveur.
-  const premierRangement = !ordreManuel.has(currentStage);
-  if (premierRangement) { ordreManuel.add(currentStage); saveOrdreManuel().catch(reportError); renderOrdreReset(); }
+  // L'étape est retenue MAINTENANT : le retour en arrière (plus bas) part après
+  // un aller-retour serveur, et le doigt a pu changer d'étape entre-temps —
+  // `currentStage` désignerait alors la mauvaise.
+  const etapeRangee = currentStage;
+  const premierRangement = !ordreManuel.has(etapeRangee);
+  if (premierRangement) {
+    ordreManuel.add(etapeRangee);
+    saveOrdreManuel(etapeRangee, true).catch(reportError);
+    renderOrdreReset();
+  }
   if (!cibles.length) return;
 
   for (const c of cibles) c.ligne.position = c.voulue;
@@ -4469,8 +4497,8 @@ async function commitReorder(r) {
   } catch (err) {
     for (const c of cibles) c.ligne.position = c.avant;
     if (premierRangement) {
-      ordreManuel.delete(currentStage);
-      saveOrdreManuel().catch(() => {});
+      ordreManuel.delete(etapeRangee);
+      saveOrdreManuel(etapeRangee, false).catch(() => {});
       renderOrdreReset();
     }
     applySortAndRender();
@@ -4487,8 +4515,9 @@ function renderOrdreReset() {
 }
 
 document.getElementById('ordreReset')?.addEventListener('click', () => {
-  ordreManuel.delete(currentStage);
-  saveOrdreManuel().catch(reportError);
+  const etape = currentStage;
+  ordreManuel.delete(etape);
+  saveOrdreManuel(etape, false).catch(reportError);
   renderOrdreReset();
   applySortAndRender();
 });
@@ -4887,10 +4916,14 @@ function formatMoney(v) {
 // « Failed to fetch », « NetworkError when attempting to fetch resource » : le
 // navigateur parle anglais et technique. L'atelier, lui, doit juste savoir que
 // le réseau est tombé et que ça va revenir.
+// Un serveur qui ne répond plus (minuteur de `fetchBorne`) tient la même place
+// ici qu'un réseau tombé : rien n'est parti, ça reviendra, et la conduite à
+// tenir est la même.
 function estPanneReseau(err) {
   const m = String((err && err.message) || '');
   return err instanceof TypeError
-    || /failed to fetch|networkerror|load failed|network request failed/i.test(m);
+    || /failed to fetch|networkerror|load failed|network request failed/i.test(m)
+    || /serveur ne répond pas/i.test(m);
 }
 
 function reportError(err) {
@@ -5105,13 +5138,41 @@ function onStreamChange(e) {
   }, 120);
 }
 
+let stream = null;
+let streamReprise = null;
+let streamEssais = 0;
+
+// LE NAVIGATEUR NE ROUVRE PAS TOUJOURS LE FLUX TOUT SEUL. Sur une coupure réseau
+// il repasse en `CONNECTING` et retente : c'est le cas qu'on connaissait. Mais
+// quand le serveur répond AUTRE CHOSE qu'un flux — 503 du plafond de connexions,
+// 401 quand le mot de passe partagé n'est plus envoyé, page d'erreur d'un proxy
+// Railway — il passe en `CLOSED` et RENONCE définitivement. Plus personne ne
+// rouvrait : la tablette finissait la journée (et les suivantes, elle ne se
+// recharge jamais) sur le filet de sécurité à 8 secondes, sans que rien ne le
+// signale. On rouvre donc nous-mêmes, en espaçant : si le serveur refuse, ce
+// n'est pas en insistant toutes les secondes qu'on l'aidera.
+function reprendreStream() {
+  if (streamReprise) return;                       // reprise déjà programmée
+  streamEssais = Math.min(streamEssais + 1, 5);
+  const attente = Math.min(3000 * (2 ** (streamEssais - 1)), 60000);
+  streamReprise = setTimeout(() => { streamReprise = null; connectStream(); }, attente);
+}
+
 function connectStream() {
+  clearTimeout(streamReprise);
+  streamReprise = null;
   try {
+    if (stream) stream.close();                    // jamais deux flux à la fois
     const es = new EventSource('/api/stream');
+    stream = es;
     es.addEventListener('change', onStreamChange);
-    es.onopen = () => { streamAlive = true; };
-    es.onerror = () => { streamAlive = false; /* EventSource se reconnecte seul */ };
-  } catch (_) { streamAlive = false; }
+    es.onopen = () => { streamAlive = true; streamEssais = 0; };
+    es.onerror = () => {
+      streamAlive = false;
+      // CONNECTING : le navigateur retente seul, on le laisse faire.
+      if (es.readyState === EventSource.CLOSED) reprendreStream();
+    };
+  } catch (_) { streamAlive = false; reprendreStream(); }
 }
 
 function startRealtime() {
@@ -5122,7 +5183,14 @@ function startRealtime() {
   setInterval(rafraichirTemps, TICK_TEMPS_MS);
   // rafraîchit immédiatement quand on revient sur l'onglet / réveille la tablette
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { poll(); rafraichirTemps(); dashboard.notifyChange(); }
+    if (document.hidden) return;
+    poll(); rafraichirTemps(); dashboard.notifyChange();
+    // On reprend la tablette en main : c'est le moment de retrouver le temps
+    // réel tout de suite, sans attendre la fin de l'espacement.
+    if (!streamAlive && stream && stream.readyState === EventSource.CLOSED) {
+      streamEssais = 0;
+      connectStream();
+    }
   });
 }
 

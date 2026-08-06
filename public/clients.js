@@ -12,6 +12,9 @@ import { groupDigits } from './whatsapp.js';
 // grise du système : hors charte, minuscule au doigt sur la tablette, et elle
 // GÈLE le thread — le planning ne se rafraîchit plus tant qu'elle est à l'écran.
 import { confirmerAction } from './confirmer.js';
+// Un enregistrement de fiche client ne doit pas rester en suspens : sans
+// minuteur, le bouton « Enregistrer » se désarme et ne se réarme jamais.
+import { fetchBorne } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -191,7 +194,7 @@ let noteKind = 'note';
 
 // --- API -------------------------------------------------------------------
 async function api(method, path, body) {
-  const res = await fetch(path, {
+  const res = await fetchBorne(path, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

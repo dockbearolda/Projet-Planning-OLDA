@@ -24,7 +24,7 @@ const {
   getCommandeZones, getHiddenCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
-  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
+  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   logRequestChanges, logFicheChange, getRequestJournal,
   clientKey, nextClientCode,
 } = require('./db');
@@ -576,15 +576,33 @@ app.get('/api/ordre-manuel', asyncH(async (req, res) => {
   res.json(await getOrdreManuel());
 }));
 
+// PUT { etape, range } → ne touche QUE cette étape, le serveur fusionne avec ce
+// que les autres postes ont décidé (voir basculerOrdreManuel).
+// PUT [slug, …]        → ancienne forme, remplacement intégral. Elle ne subsiste
+//                        que pour l'onglet resté ouvert sur le JS d'avant le
+//                        déploiement : le fichier garde son nom, donc une
+//                        tablette peut encore l'envoyer pendant quelques minutes.
 app.put('/api/ordre-manuel', asyncH(async (req, res) => {
-  if (!Array.isArray(req.body)) {
-    return res.status(400).json({ error: 'Tableau de slugs d\'étape attendu' });
+  const b = req.body;
+  if (b && !Array.isArray(b) && typeof b === 'object' && 'etape' in b) {
+    if (!STAGE_SLUGS.includes(b.etape)) {
+      return res.status(400).json({ error: `étape invalide: ${b.etape}` });
+    }
+    if (typeof b.range !== 'boolean') {
+      return res.status(400).json({ error: 'Champ « range » (booléen) attendu' });
+    }
+    const fusionne = await basculerOrdreManuel(b.etape, b.range);
+    broadcast({ kind: 'ordre-manuel' });
+    return res.json(fusionne);
   }
-  const inconnu = req.body.find((s) => !STAGE_SLUGS.includes(s));
+  if (!Array.isArray(b)) {
+    return res.status(400).json({ error: '{ etape, range } ou tableau de slugs attendu' });
+  }
+  const inconnu = b.find((s) => !STAGE_SLUGS.includes(s));
   if (inconnu !== undefined) return res.status(400).json({ error: `étape invalide: ${inconnu}` });
-  const saved = await setOrdreManuel(req.body);
+  const saved = await setOrdreManuel(b);
   broadcast({ kind: 'ordre-manuel' });
-  res.json(saved);
+  return res.json(saved);
 }));
 
 // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
@@ -759,6 +777,12 @@ function allegerSynthese(row) {
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
+  // `depuis` part droit dans une comparaison de timestamp : mal formé, Postgres
+  // lève, et le Point du jour recevait « Erreur serveur » — donc plus aucune
+  // mise à jour, sur un écran dont c'est la seule raison d'être. Une borne
+  // illisible n'est pas une panne : c'est qu'on ne sait plus depuis quand, et la
+  // réponse juste est de tout renvoyer plutôt que de ne rien renvoyer.
+  const borne = depuis && Number.isFinite(Date.parse(depuis)) ? depuis : null;
   // L'horloge de référence est celle de la base, prise AVANT la lecture : une
   // écriture qui tomberait pendant la requête sera reprise au tour suivant
   // plutôt que sautée. Mieux vaut renvoyer deux fois une ligne que zéro fois.
@@ -770,9 +794,9 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
   );
 
   let lignes;
-  if (depuis) {
+  if (borne) {
     const { rows } = await pool.query(
-      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 ${ORDER}`, [depuis],
+      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 ${ORDER}`, [borne],
     );
     lignes = rows;
   } else {
@@ -1072,12 +1096,29 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
 // On accepte UNIQUEMENT des valeurs, par position (`{ client: [...], details:
 // [...] }`) : les libellés viennent du parcours et ne se réécrivent pas, et
 // personne ne peut glisser n'importe quel JSON dans `fiche` par cette porte.
+//
+// LA FICHE SE RÉÉCRIT EN ENTIER À CHAQUE CORRECTION — c'est un seul `jsonb`, pas
+// une colonne par champ. Lue puis réécrite hors transaction, deux postes qui
+// corrigent le MÊME dossier en même temps s'effaçaient donc l'un l'autre en
+// silence : l'atelier rectifie l'heure de retrait pendant que le comptoir
+// rectifie une quantité, chacun est parti de la fiche d'AVANT, et le dernier
+// enregistré remet l'autre correction à sa valeur initiale. Rien à l'écran,
+// rien dans le journal — la correction avait bien été « enregistrée ».
+// On prend donc la ligne (`FOR UPDATE`) le temps de la relire et de la
+// réécrire : le second poste attend, repart de la fiche corrigée, et les deux
+// corrections tiennent.
 app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
-  const { rows } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [req.params.id]);
-  if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  const fiche = rows[0].fiche && typeof rows[0].fiche === 'object' ? rows[0].fiche : {};
-
   const b = req.body && typeof req.body === 'object' ? req.body : {};
+  // Ce qui se juge SANS la fiche stockée se juge avant de prendre le verrou :
+  // une saisie invalide ne doit pas faire patienter le poste d'à côté.
+  // Une heure mal formée (« 14h00 ») EFFAÇAIT l'heure de retrait sans rien
+  // dire, alors que la même valeur est refusée à la prise de commande. On
+  // refuse ici aussi : seul un champ explicitement vidé remet à null.
+  const heureVide = b.heureSouhaitee == null || b.heureSouhaitee === '';
+  if ('heureSouhaitee' in b && !heureVide && !isHeure(b.heureSouhaitee)) {
+    return res.status(400).json({ error: `heure souhaitée invalide : ${b.heureSouhaitee}` });
+  }
+
   // Une valeur vidée devient « — » plutôt que rien : le récapitulatif imprimé
   // garde sa ligne, et on voit que le champ a été vidé exprès.
   const corriger = (lignes, valeurs) => {
@@ -1086,43 +1127,58 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
       typeof valeurs[i] === 'string' ? { ...l, v: borner(valeurs[i], 600) || '—' } : l
     ));
   };
-  const majFiche = { ...fiche };
-  // Le récapitulatif ligne à ligne n'existe que sur une commande du comptoir :
-  // ailleurs il n'y a rien à corriger, et on ne va pas en inventer un.
-  if (fiche.kind === 'comptoir-v17') {
-    majFiche.client = corriger(fiche.client, b.client);
-    majFiche.details = corriger(fiche.details, b.details);
-  } else if (Array.isArray(b.client) || Array.isArray(b.details)) {
-    return res.status(400).json({ error: 'cette commande n’a pas de détail modifiable' });
-  }
-  // L'heure de retrait (elle commande le calcul du délai de production) et le
-  // secteur de production se corrigent en revanche sur N'IMPORTE QUELLE ligne,
-  // y compris une ligne créée à la main : la fiche les affiche pour tout le
-  // monde, ils doivent s'enregistrer pour tout le monde. `undefined` = le poste
-  // n'y touche pas.
-  if ('heureSouhaitee' in b) {
-    // Une heure mal formée (« 14h00 ») EFFAÇAIT l'heure de retrait sans rien
-    // dire, alors que la même valeur est refusée à la prise de commande. On
-    // refuse ici aussi : seul un champ explicitement vidé remet à null.
-    const vide = b.heureSouhaitee == null || b.heureSouhaitee === '';
-    if (!vide && !isHeure(b.heureSouhaitee)) {
-      return res.status(400).json({ error: `heure souhaitée invalide : ${b.heureSouhaitee}` });
-    }
-    majFiche.heureSouhaitee = vide ? null : b.heureSouhaitee;
-  }
-  if ('production' in b) majFiche.production = borner(b.production, 200);
 
-  const { rows: maj } = await pool.query(
-    'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
-    [JSON.stringify(majFiche), req.params.id],
-  );
+  const client = await pool.connect();
+  let issue;
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      'SELECT fiche FROM requests WHERE id = $1 FOR UPDATE', [req.params.id],
+    );
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+    const fiche = rows[0].fiche && typeof rows[0].fiche === 'object' ? rows[0].fiche : {};
+
+    const majFiche = { ...fiche };
+    // Le récapitulatif ligne à ligne n'existe que sur une commande du comptoir :
+    // ailleurs il n'y a rien à corriger, et on ne va pas en inventer un.
+    if (fiche.kind === 'comptoir-v17') {
+      majFiche.client = corriger(fiche.client, b.client);
+      majFiche.details = corriger(fiche.details, b.details);
+    } else if (Array.isArray(b.client) || Array.isArray(b.details)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'cette commande n’a pas de détail modifiable' });
+    }
+    // L'heure de retrait (elle commande le calcul du délai de production) et le
+    // secteur de production se corrigent en revanche sur N'IMPORTE QUELLE ligne,
+    // y compris une ligne créée à la main : la fiche les affiche pour tout le
+    // monde, ils doivent s'enregistrer pour tout le monde. `undefined` = le poste
+    // n'y touche pas.
+    if ('heureSouhaitee' in b) majFiche.heureSouhaitee = heureVide ? null : b.heureSouhaitee;
+    if ('production' in b) majFiche.production = borner(b.production, 200);
+
+    const { rows: maj } = await client.query(
+      'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
+      [JSON.stringify(majFiche), req.params.id],
+    );
+    await client.query('COMMIT');
+    issue = { ligne: maj[0], avant: fiche, apres: majFiche };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
   // Une correction de fiche est une modification de la commande comme une autre :
   // elle a sa ligne dans l'« Historique ». Sans ça, une quantité rectifiée ou
   // une heure de retrait déplacée ne laissait aucune trace, et personne ne
   // pouvait dire ce qui avait bougé sur le dossier.
-  await logFicheChange(req.params.id, fiche, majFiche);
-  broadcast({ kind: 'update', stages: [maj[0].stage] });
-  res.json(maj[0]);
+  await logFicheChange(req.params.id, issue.avant, issue.apres);
+  broadcast({ kind: 'update', stages: [issue.ligne.stage] });
+  return res.json(issue.ligne);
 }));
 
 // DELETE /api/requests/:id

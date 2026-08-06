@@ -1354,6 +1354,49 @@ async function setOrdreManuel(list) {
   return clean;
 }
 
+// UNE ÉTAPE À LA FOIS, et le serveur fusionne. La liste partie de chaque poste
+// était la liste ENTIÈRE telle que ce poste la connaissait : une vendeuse range
+// « Production » pendant qu'une autre range « Demande & chiffrage », chacune
+// envoie sa vision d'avant, et la seconde écrase la décision de la première.
+// L'étape rangée retombait alors en tri automatique sous les yeux de celle qui
+// venait de la ranger — les `position` en base, elles, étaient bien écrites : le
+// geste avait « marché » puis s'était défait tout seul.
+// La ligne d'`app_meta` est donc prise (`FOR UPDATE`) le temps de la relire et
+// de la réécrire, et on ne touche QUE l'étape nommée.
+async function basculerOrdreManuel(etape, range) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // `FOR UPDATE` ne verrouille que des lignes existantes : au tout premier
+    // rangement il n'y en a aucune, et deux postes passeraient de front. On
+    // sème donc la ligne avant de la prendre.
+    await client.query(
+      "INSERT INTO app_meta (key, value) VALUES ('ordre_manuel', '[]') ON CONFLICT (key) DO NOTHING",
+    );
+    const { rows } = await client.query(
+      "SELECT value FROM app_meta WHERE key = 'ordre_manuel' FOR UPDATE",
+    );
+    let connues = [];
+    try {
+      const lu = JSON.parse(rows[0] && rows[0].value);
+      if (Array.isArray(lu)) connues = lu.filter((s) => STAGE_SLUGS.includes(s));
+    } catch (_) { connues = []; }
+    const set = new Set(connues);
+    if (range) set.add(etape); else set.delete(etape);
+    const clean = [...set];
+    await client.query(
+      "UPDATE app_meta SET value = $1 WHERE key = 'ordre_manuel'", [JSON.stringify(clean)],
+    );
+    await client.query('COMMIT');
+    return clean;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // --- Journal des modifications ----------------------------------------------
 // « Qui a déplacé ça ? » n'avait aucune réponse : la fiche ne connaissait que la
 // naissance de la ligne et sa dernière retouche. On enregistre désormais CE QUI
@@ -1488,7 +1531,7 @@ module.exports = {
   getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
-  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel,
+  SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, getRequestJournal,
   clientKey, nextClientCode,
 };
