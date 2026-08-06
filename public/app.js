@@ -2148,11 +2148,16 @@ function cellDossier(r) {
   // paraissait que sur les dossiers du comptoir et décalait d'une pastille
   // toute la rangée des lignes saisies à la main — WhatsApp, devis, facture et
   // BAT ne tombaient pas au même endroit d'une ligne à l'autre.
+  //
+  // Plus de pastille « ouvrir la fiche » non plus : dans le tableau elle faisait
+  // doublon. Tout ce que la fiche montre de la ligne se corrige DÉJÀ ici, en
+  // place — nom, description, prix, sous-étape, infos, échéance, état, type,
+  // priorité, qui suit — et ses documents sont les trois pastilles voisines.
+  // Elle reste à un appui sur la carte (le ↗), qui est la vue par défaut.
   docs.appendChild(cellWhatsapp(r));
   docs.appendChild(cellPdfSlot(r, 'devis'));
   docs.appendChild(cellPdfSlot(r, 'facture'));
   docs.appendChild(cellPdfSlot(r, 'bat'));
-  docs.appendChild(cellLigneDetailButton(r));
   const pdfWa = cellPdfWhatsapp(r);
   if (pdfWa) docs.appendChild(pdfWa);
 
@@ -2222,11 +2227,6 @@ function batIcon() {
     'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
     'M8 12l2.5 2.5L16 9',
   ]);
-}
-
-// Détail : chevron — « voir le détail complet de cette ligne ».
-function detailIcon() {
-  return strokeIcon(['M9 6l6 6-6 6']);
 }
 
 // Libellés pour les infobulles des emplacements PDF de la ligne.
@@ -4036,15 +4036,17 @@ async function enregistrerFiche(r, c) {
 // aucun handler n'est posé sur <tr>, donc le reste de la ligne garde son
 // édition inline (cliquer une cellule la corrige, ça ne doit pas ouvrir une
 // fiche par-dessus les doigts).
-// LA COLONNE TICKET. Elle a d'abord vécu en pastille dans le cluster de la
-// cellule Dossier — deux défauts, l'un de fond, l'autre de forme :
-//   - le NUMÉRO n'y tenait pas (24 px), alors que c'est justement ce que le
-//     client rapporte au comptoir et ce qu'on veut comparer à son papier ;
-//   - une pastille présente sur les seules lignes du comptoir décalait d'un
-//     cran toute la rangée de ses voisines sur les lignes saisies à la main.
-// En colonne, le numéro se lit en clair, tout tombe au même endroit d'une ligne
-// à l'autre, et la colonne se retire d'un clic depuis le rail comme les autres.
-// Une ligne née à la main n'a jamais eu de ticket : sa cellule reste vide.
+// LA COLONNE TICKET — UNE ICÔNE, RIEN D'AUTRE. Elle a d'abord vécu en pastille
+// dans le cluster de la cellule Dossier, où elle n'apparaissait que sur les
+// dossiers du comptoir : elle décalait alors d'un cran toute la rangée de ses
+// voisines sur les lignes saisies à la main. En colonne, tout tombe au même
+// endroit d'une ligne à l'autre, et elle se retire d'un clic depuis le rail.
+//
+// Le NUMÉRO ne s'écrit pas dans la case : il tenait en 162 px de colonne pour
+// une information qu'on ne lit qu'au moment de comparer avec le papier du
+// client. Il est dans l'infobulle et dans le nom accessible, et en toutes
+// lettres sur le ticket qu'un appui fait apparaître — ainsi que sur la carte.
+// Une ligne née à la main n'a jamais eu de ticket : sa case reste muette.
 function cellTicket(r) {
   const td = document.createElement('td');
   td.className = 'col-ticket-cell';
@@ -4063,12 +4065,7 @@ function cellTicket(r) {
   const libelle = ref ? `Ticket ${ref}` : 'Ticket du client';
   attachTip(btn, `${libelle} — voir et imprimer`);
   btn.setAttribute('aria-label', `${libelle} — voir et imprimer`);
-  const no = document.createElement('span');
-  no.className = 'ticket-cell__no';
-  // Sans numéro (dossier du comptoir d'avant la référence), le libellé dit
-  // quand même qu'il y a un papier à ressortir.
-  no.textContent = ref || 'Ticket';
-  btn.append(strokeIcon(LD_ICONES.ticket), no);
+  btn.appendChild(strokeIcon(LD_ICONES.ticket));
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     ouvrirTicket(r);
@@ -4076,21 +4073,6 @@ function cellTicket(r) {
   });
   td.appendChild(btn);
   return td;
-}
-
-function cellLigneDetailButton(r) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'pdf-btn ligne-detail-btn';
-  attachTip(btn, 'Ouvrir la fiche projet');
-  btn.setAttribute('aria-label', 'Ouvrir la fiche projet');
-  btn.appendChild(detailIcon());
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openLigneDetail(r.id);
-    btn.blur();
-  });
-  return btn;
 }
 
 // --- Infobulles maison -----------------------------------------------------
@@ -5191,7 +5173,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
-  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, ticket: 162,
+  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, ticket: 64,
   product: 220, price: 92, sub_stage: 170, description: 210, deadline: 136, del: 200,
 };
 
