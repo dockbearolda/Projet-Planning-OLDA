@@ -344,7 +344,14 @@
   padding: 9px 10px;
   border-radius: 9px;
   min-width: 0;
-  transition: background var(--dur-2, .18s) var(--ease, ease), border-color var(--dur-2, .18s) var(--ease, ease);
+  /* `box-shadow` compris : c'est lui qui porte l'anneau de focus ET la mise en
+     évidence d'un champ resté vide. Sans transition, le rouge du champ manquant
+     apparaissait d'un bloc à la sortie du champ — le geste le plus fréquent de
+     la saisie client. */
+  transition: background var(--dur-2, .18s) var(--ease, ease),
+              border-color var(--dur-2, .18s) var(--ease, ease),
+              box-shadow var(--dur-2, .18s) var(--ease, ease),
+              color var(--dur-2, .18s) var(--ease, ease);
 }
 /* Nature pro/perso dans la fiche : segmented (bouton), pas champ texte. */
 .cl-seg {
