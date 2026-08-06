@@ -1376,6 +1376,16 @@ export function createDashboard(deps) {
   }
 
   // --- API publique --------------------------------------------------------
+  // Monte l'écran, SANS aller chercher la moindre donnée.
+  // `refresh()` télécharge le PLANNING ENTIER — toutes les étapes, archives
+  // comprises, donc une liste qui ne cesse de grossir — et il partait à
+  // l'ouverture de CHAQUE poste, y compris ceux qui n'allaient jamais sur le
+  // Point du jour. Sur 400 lignes de test c'était déjà 334 Ko, soit plus de
+  // 80 % de tout ce que l'application téléchargeait pour s'ouvrir : payé cash
+  // sur l'ouverture d'une tablette en 4G depuis Saint-Martin, pour un écran que
+  // personne ne regardait. Le premier chargement attend donc le premier
+  // affichage (voir `show`) ; d'ici là l'écran annonce « Chargement… », ce qui
+  // est exactement ce qui se passera au tap sur l'onglet.
   function start() {
     root.replaceChildren();
     root.appendChild(buildHead());
@@ -1383,7 +1393,6 @@ export function createDashboard(deps) {
     root.appendChild($body);
     renderHead();
     renderBody();
-    refresh();
   }
 
   function show() {
@@ -1406,6 +1415,17 @@ export function createDashboard(deps) {
   // reste frais à la demi-minute près, ce qui suffit largement au fil
   // d'activité et aux badges.
   function notifyChange() {
+    // Jamais ouvert, et pas à l'écran : il n'y a pas de cache à tenir à jour, et
+    // personne ne regarde. On ne va pas chercher le planning entier pour ça —
+    // le premier `show()` s'en charge.
+    if (!loaded && !visible) return;
+    // Onglet du navigateur en arrière-plan, ou tablette écran éteint : c'est
+    // l'état d'une tablette d'atelier la moitié de la journée. Rejouer quatre
+    // requêtes — dont le planning entier — à chaque geste d'un collègue, c'était
+    // des dizaines de mégaoctets par jour sur le wifi du comptoir pour un écran
+    // que personne n'a sous les yeux. Le retour de visibilité déclenche déjà un
+    // rafraîchissement (voir startRealtime dans app.js).
+    if (document.hidden) return;
     if (visible) { refresh(); return; }
     if (veilleTimer) return;                       // rattrapage déjà programmé
     const attente = Math.max(0, REFRESH_FOND_MS - (Date.now() - dernierRefresh));

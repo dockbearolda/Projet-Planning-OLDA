@@ -2977,6 +2977,15 @@ button, a, .stage, .prio-pill, .deadline-badge,
 
   .grid-search-kbd { display: none; }
 
+  /* LA NAVIGATION ELLE-MÊME passait sous le plancher de 44 px : les onglets de
+     la barre du haut à 40 px, les grands titres du rail à 42. Ce sont pourtant
+     les cibles qu'on tape le plus souvent de la journée, au doigt, sur une
+     tablette posée au comptoir — et dans le rail les entrées se touchent, donc
+     viser 2 px à côté ouvre l'étape voisine sans qu'on s'en aperçoive. Les
+     sous-catégories, elles, tenaient déjà les 44 px. */
+  .nav-switch-btn { min-height: 44px; }
+  .stage { min-height: 44px; }
+
   .handle,
   .del-btn,
   .send-btn,

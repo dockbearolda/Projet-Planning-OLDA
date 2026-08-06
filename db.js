@@ -1203,12 +1203,18 @@ async function logRequestChanges(requestId, avant, apres) {
   }
 }
 
+// La fiche n'affiche que la vie récente : on coupe DANS LA REQUÊTE, pas après.
+// À lire toute la table pour n'en garder que quarante lignes, une commande
+// retouchée pendant des semaines faisait remonter son historique entier à
+// chaque ouverture du tiroir — et le tiroir se rouvre à chaque évènement temps
+// réel (voir rafraichirFichesApresChangement).
 async function getRequestJournal(requestId) {
   const { rows } = await pool.query(
-    'SELECT field, value_before, value_after, created_at FROM request_events WHERE request_id = $1 ORDER BY created_at DESC, field ASC',
-    [requestId],
+    `SELECT field, value_before, value_after, created_at FROM request_events
+     WHERE request_id = $1 ORDER BY created_at DESC, field ASC LIMIT $2`,
+    [requestId, JOURNAL_MAX],
   );
-  return rows.slice(0, JOURNAL_MAX);
+  return rows;
 }
 
 module.exports = {

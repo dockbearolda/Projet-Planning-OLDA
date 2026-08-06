@@ -115,8 +115,17 @@ const TEXTE_LIBRE_MAX = {
   billing_company: 120, contact_referent: 120, product: 140, color: 60, description: 1200,
 };
 
+// Colonnes que le schéma déclare NOT NULL. La sortie rapide « rien à valider »
+// ci-dessous les laissait passer à null : PostgreSQL refusait l'écriture et
+// l'écran recevait un 500 « Erreur serveur » — un message technique, après avoir
+// déjà posé la valeur en optimiste, là où il attendait un refus qui explique.
+const NON_VIDES = new Set(['stage', 'priority']);
+
 function validateField(key, value) {
-  if (value === null || value === undefined) return { ok: true, value: null };
+  if (value === null || value === undefined) {
+    if (NON_VIDES.has(key)) return { ok: false, error: `${key} ne peut pas être vide` };
+    return { ok: true, value: null };
+  }
   if (PAIEMENT_FLAGS.has(key)) {
     if (typeof value === 'boolean') return { ok: true, value };
     const s = String(value).trim().toLowerCase();
@@ -496,11 +505,40 @@ const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline A
 // que seule la fiche ouverte en a besoin. Elle se charge donc à l'ouverture du
 // tiroir (GET /api/requests/:id).
 const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee'];
+
+// LES TECHNIQUES DE MARQUAGE, en clair : « dtf », « uv », « laser »…
+// Le moteur de priorité s'en sert pour rattacher une commande à sa machine AVANT
+// qu'elle n'arrive en production, et faire compter l'importance d'un poste
+// goulot dès le chiffrage (voir machineOf dans priority.js). Il les cherchait
+// dans `fiche.articles`, un tableau qu'aucun des trois flux n'a jamais produit
+// — et que l'allègement ci-dessous aurait de toute façon retiré. La pondération
+// « machine » ne pesait donc QUE sur les commandes déjà rangées dans une
+// sous-étape de production : jamais avant, contrairement à ce qu'annonçait le
+// code. On les extrait ici, une fois, dans la seule forme que la liste transporte.
+function techniquesDeLaFiche(f) {
+  const vues = new Set();
+  const poser = (t) => {
+    const id = t && typeof t === 'object' ? t.id : t;
+    if (typeof id === 'string' && id && id !== 'a_definir') vues.add(id);
+  };
+  // Flux « commande atelier » (et l'ancienne forme `articles`) : zones du textile.
+  for (const l of [...(f.textiles || []), ...(f.articles || [])]) {
+    for (const z of (l && l.zones) || []) poser(z && z.technique);
+  }
+  // Flux « Nouveau Projet » : faces marquées de chaque ligne du panier.
+  for (const l of f.lignes || []) {
+    for (const face of (l && l.faces) || []) poser(face && face.technique);
+  }
+  return [...vues];
+}
+
 function allegerFiche(row) {
   const f = row.fiche;
   if (!f || typeof f !== 'object') return row;
   const court = {};
   for (const k of FICHE_LISTE) if (f[k] !== undefined) court[k] = f[k];
+  const techniques = techniquesDeLaFiche(f);
+  if (techniques.length) court.techniques = techniques;
   // `fichePartielle` dit au front que ce n'est qu'un résumé : il sait alors
   // qu'il doit aller chercher le détail avant d'ouvrir la fiche.
   court.fichePartielle = true;
@@ -776,6 +814,20 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   if (avant.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   const incoherence = verifierCoherenceEtape(body, avant[0].stage);
   if (incoherence) return res.status(400).json({ error: incoherence });
+
+  // CHANGER DE FAMILLE INVALIDE LA SOUS-ÉTAPE, même quand l'appelant ne dit rien
+  // d'elle. La garde ci-dessus ne se déclenche que si `sub_stage` est DANS le
+  // corps : un PATCH qui ne portait que `{ stage }` laissait donc « Production
+  // UV » sur une commande passée en Facturation. La ligne comptait alors dans
+  // DEUX entrées du rail — le total de sa nouvelle famille ET le compteur d'une
+  // sous-étape de l'ancienne — et la pastille annonçait un dossier de plus que
+  // ce que la grille montrait en cliquant dessus. Même règle qu'à la copie
+  // (POST /copie) et qu'au glisser-déposer.
+  if ('stage' in body && !('sub_stage' in body)
+      && body.stage !== avant[0].stage && avant[0].sub_stage != null) {
+    sets.push(`sub_stage = $${i++}`);
+    params.push(null);
+  }
 
   sets.push('updated_at = now()');
   params.push(req.params.id);
