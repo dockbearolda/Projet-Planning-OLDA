@@ -1078,9 +1078,29 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .cards[hidden] { display: none; }
 .pcard {
   display: grid;
-  grid-template-columns: minmax(150px, 1.05fr) minmax(240px, 1.9fr) 190px 180px auto;
-  gap: 14px;
-  align-items: center;
+  /* ALIGNEMENT — chaque carte est sa PROPRE grille : deux cartes ne tombent au
+     même endroit que si aucune de leurs colonnes ne dépend de son contenu. La
+     dernière valait `auto` : 200 px avec le bouton ticket, 148 px sans, et les
+     quatre colonnes de texte se partageaient le reste — d'où un décalage
+     mesuré de 12 px (Projet), 30 px (Délai), 42 px (TTC) et 52 px (actions)
+     entre une ligne du comptoir et une ligne saisie à la main, dans la même
+     file. Les actions ont donc une largeur ARRÊTÉE, la même pour toutes.
+     `--pcard-refs` : largeur exacte des pastilles de référent (voir plus bas).
+     La colonne TTC ne peut pas descendre en dessous, sinon elles s'empilent. */
+  --pcard-actions: 200px;                     /* poignée + ticket + ouvrir + supprimer */
+  grid-template-columns:
+    minmax(150px, 1.05fr) minmax(240px, 1.9fr) 190px minmax(var(--pcard-refs), 180px) var(--pcard-actions);
+  /* DEUX RANGÉES, partagées par les quatre blocs : les intitulés dans la
+     première, les valeurs dans la seconde (cf. .pcard__bloc). Les blocs n'ont
+     pas la même hauteur — le client tient en deux lignes, le TTC en quatre — et
+     centrés, leurs intitulés (CLIENT, PROJET, DÉLAI…, TTC) s'étageaient sur
+     43 px DANS LA MÊME CARTE : elle se lisait en escalier. */
+  grid-template-rows: auto auto;
+  /* Écart NUL entre les deux rangées : les blocs reprennent celles de la carte,
+     un écart s'y glisserait donc entre chaque intitulé et sa valeur (en plus des
+     4 px de .pcard__label). 14 px seulement entre les colonnes. */
+  gap: 0 14px;
+  align-items: start;
   padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1105,6 +1125,22 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard--retard { border-left: 4px solid var(--danger); }
 .pcard--urgent { border-left: 4px solid var(--warning-2); }
 .pcard--calme { border-left: 4px solid var(--text-1); }
+/* Chaque bloc reprend les DEUX rangées de la carte : son intitulé se pose dans
+   la première, sa valeur dans la seconde. C'est ce qui fait tenir les quatre
+   valeurs sur une même ligne alors que « Délai de production restant » passe à
+   la ligne sur la tablette et que « TTC » tient en un mot.
+   Repli sans `subgrid` (navigateur ancien) : deux rangées ordinaires — les
+   intitulés restent alignés en haut, la valeur suit son propre intitulé. */
+.pcard__bloc { display: grid; grid-template-rows: auto auto; grid-row: span 2; min-width: 0; }
+@supports (grid-template-rows: subgrid) {
+  .pcard__bloc { grid-template-rows: subgrid; }
+}
+/* `min-width: 0` : sans lui, un nom de dossier d'un seul tenant impose sa
+   largeur minimale à la colonne et pousse les suivantes hors de la carte.
+   `overflow-wrap: anywhere` : et sans lui, il déborde par-dessus la voisine —
+   un nom de société de 60 signes sans espace sortait de 171 px sur le
+   téléphone. Un mot ne se coupe que s'il ne tient pas, jamais autrement. */
+.pcard__corps { min-width: 0; overflow-wrap: anywhere; }
 .pcard__label {
   margin: 0 0 4px;
   font-size: 9px; font-weight: 800; letter-spacing: .08em;
@@ -1138,11 +1174,29 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard__value { font-size: 17px; font-weight: 800; white-space: nowrap; color: var(--text-1); }
 .pcard__value--vide { font-size: 13px; font-weight: 700; color: var(--text-2); }
 /* Changer de référent en un clic : les initiales de chaque employé. C'est le
-   geste le plus fréquent du planning, il ne mérite pas un menu. */
-.pcard__refs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+   geste le plus fréquent du planning, il ne mérite pas un menu.
+   GRILLE, plus une rangée qui déborde : en `flex-wrap`, le nombre de pastilles
+   par rangée dépendait de la largeur restante — donc du contenu de la carte.
+   Deux cartes voisines n'avaient ni la même hauteur ni les mêmes pastilles au
+   même endroit. Ici le nombre de colonnes est ARRÊTÉ, et .pcard en déduit la
+   largeur plancher de la colonne TTC (--pcard-refs) : la rangée ne peut plus
+   se retrouver à l'étroit. */
+.pcard {
+  --ref-taille: 30px;
+  --ref-ecart: 4px;
+  --ref-cols: 4;
+  --pcard-refs: calc(var(--ref-cols) * var(--ref-taille)
+                     + (var(--ref-cols) - 1) * var(--ref-ecart));
+}
+.pcard__refs {
+  display: grid;
+  grid-template-columns: repeat(var(--ref-cols), var(--ref-taille));
+  gap: var(--ref-ecart);
+  margin-top: 5px;
+}
 .pcard__ref-btn {
   display: grid; place-items: center;
-  width: 30px; height: 30px; border-radius: 50%;
+  width: var(--ref-taille); height: var(--ref-taille); border-radius: 50%;
   border: 1px solid var(--border); background: var(--surface);
   font: inherit; font-size: 11px; font-weight: 800; color: var(--text-2); cursor: pointer;
 }
@@ -1167,10 +1221,23 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   cursor: pointer;
 }
 .pcard__open:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
-/* Poignée + ouvrir + supprimer : la colonne d'actions de la carte. Cibles à
-   44 px et visibles en permanence — au comptoir on est au doigt, rien ne doit
-   dépendre du survol. */
-.pcard__actions { display: flex; align-items: center; gap: 8px; }
+/* Poignée + ticket + ouvrir + supprimer : la colonne d'actions de la carte.
+   Cibles à 44 px et visibles en permanence — au comptoir on est au doigt, rien
+   ne doit dépendre du survol.
+   QUATRE EMPLACEMENTS FIXES, pas une rangée souple : « ouvrir » et « supprimer »
+   doivent tomber au même pixel sur toutes les cartes, qu'il y ait un ticket ou
+   non. 4 × 44 + 3 × 8 = 200 px, la valeur de --pcard-actions. */
+.pcard__actions {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  gap: 8px;
+  align-items: center;
+  /* Seul bloc à rester centré quand les autres se calent en haut : la rangée de
+     boutons doit tenir le milieu de la carte, pas s'accrocher à son bord. Elle
+     enjambe les deux rangées (intitulés + valeurs) pour ça. */
+  grid-row: span 2;
+  align-self: center;
+}
 /* La poignée est la SEULE zone de la carte en `touch-action: none` : c'est par
    elle qu'on glisse au doigt, tout le reste de la surface fait défiler la
    liste. (À la souris, toute la carte reste saisissable — cf. attachDrag.) */
@@ -1187,7 +1254,8 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 /* LE TICKET DU CLIENT, sur la carte. Il ne s'atteignait que par la fiche — et
    le bouton d'impression y sortait le dossier de travail sur une feuille A4.
    Ici, à côté de « ouvrir » : un appui montre le ticket, un second l'imprime.
-   N'apparaît que sur les dossiers nés au comptoir (cf. aUnTicket). */
+   N'apparaît que sur les dossiers nés au comptoir (cf. aUnTicket) — mais sa
+   PLACE est tenue sur toutes les cartes, sans quoi les colonnes se décalent. */
 .pcard__ticket {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
@@ -1197,6 +1265,14 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .pcard__ticket:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .pcard__ticket:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .pcard__ticket svg { width: 18px; height: 18px; }
+/* L'emplacement réservé d'une ligne sans ticket : il occupe la place, il ne se
+   voit pas et il ne se touche pas. */
+.pcard__ticket--vide { border-color: transparent; background: none; cursor: default; }
+/* Ticket retiré depuis le rail « Colonnes » : la case disparaît des DEUX vues,
+   et la colonne d'actions se resserre d'autant — toutes les cartes ensemble. */
+body.cards-off-ticket .pcard { --pcard-actions: 148px; }
+body.cards-off-ticket .pcard__actions { grid-template-columns: repeat(3, 44px); }
+body.cards-off-ticket .pcard__ticket { display: none; }
 .pcard__del {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
@@ -1210,23 +1286,54 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 
 /* Sous ~1040 px de conteneur, les planchers fixes (150+240+190+180 px…) ne
    tiennent plus : colonnes proportionnelles, qui se compriment sans pousser
-   les actions hors de vue. */
+   les actions hors de vue. Les actions et le plancher des pastilles, eux,
+   gardent leur largeur : c'est ce qui tient l'alignement d'une carte à
+   l'autre. `minmax(0, …)` sur les colonnes de texte, sinon leur contenu
+   (une description sans espace) les empêche de se comprimer. */
 @container (max-width: 1040px) {
-  .pcard { grid-template-columns: 1fr 1.5fr 1fr .8fr auto; }
+  .pcard {
+    grid-template-columns:
+      minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr)
+      minmax(var(--pcard-refs), .8fr) var(--pcard-actions);
+    /* Deux pastilles par rangée : quatre en réclament 132 px, qu'il faudrait
+       prendre aux colonnes de texte — et c'est « Délai de production restant »
+       qui les paie, sur trois lignes. */
+    --ref-cols: 2;
+  }
 }
 /* Attribuer le référent est LE geste le plus fréquent du planning, et il se fait
    au doigt : 30 px et 4 px d'écart, on visait à côté — et taper le référent déjà
    en place le RETIRE (le bouton est une bascule). Plancher de la charte au
-   tactile, comme toutes les autres cibles de la carte. */
+   tactile, comme toutes les autres cibles de la carte.
+   DEUX PAR RANGÉE au doigt, et c'est mesuré : quatre pastilles de 44 px
+   réclament 200 px, que la colonne TTC n'a jamais sur la tablette (≈ 92 px en
+   paysage). Elles s'y empilaient une par ligne — quatre rangées, une carte de
+   295 px au lieu de 159. En 2 × 2 elles tiennent dans 96 px, la carte retrouve
+   sa hauteur et toutes les cartes gardent la même. */
 @media (pointer: coarse) {
-  .pcard__refs { gap: 8px; }
-  .pcard__ref-btn { width: 44px; height: 44px; font-size: 13px; }
+  .pcard { --ref-taille: 44px; --ref-ecart: 8px; --ref-cols: 2; }
+  .pcard__ref-btn { font-size: 13px; }
 }
 /* Sous ~720 px de conteneur, quatre colonnes deviennent illisibles : chaque
    bloc prend la ligne, les actions restent à droite du nom du client. */
 @container (max-width: 720px) {
-  .pcard { grid-template-columns: 1fr auto; }
+  .pcard {
+    grid-template-columns: minmax(0, 1fr) var(--pcard-actions);
+    /* Une seule colonne pour le texte : les pastilles de référent reprennent
+       leur rangée complète, il y a la place. */
+    --ref-cols: 4;
+  }
   .pcard > div:nth-child(2), .pcard > div:nth-child(3), .pcard > div:nth-child(4) { grid-column: 1 / -1; }
+  /* Les blocs sont empilés : il n'y a plus de rangée d'intitulés à partager,
+     chacun reprend son flux — et l'écart entre rangées redevient celui qui les
+     sépare les uns des autres. */
+  .pcard { row-gap: 14px; }
+  .pcard__bloc { display: block; grid-row: auto; }
+  /* PLACÉES, pas laissées au fil du DOM : les blocs qui prennent toute la
+     largeur poussent le curseur de la grille, et les actions tombaient sous la
+     carte, en débordant de leur colonne. Leur place est à droite du nom du
+     client — c'est celle qu'on vise du pouce. */
+  .pcard__actions { grid-row: 1; grid-column: 2; }
 }
 .grid {
   border-collapse: collapse;
@@ -1909,6 +2016,7 @@ tr:hover .handle { color: var(--text-2); }
    par étape. Les deux se cumulent — le choix du rail ne rouvre pas une colonne
    que l'étape courante ne remplit pas. */
 .grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
+.grid.off-ticket      col[data-col="ticket"],      .grid.off-ticket      th.col-ticket,   .grid.off-ticket      td.col-ticket-cell,
 .grid.off-client_type col[data-col="client_type"], .grid.off-client_type .col-type,
 .grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
 .grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
@@ -2585,6 +2693,11 @@ tr:hover .handle { color: var(--text-2); }
    affichent Prix ET Sous-étape, et le cluster sortait de la cellule. 210 px =
    les pastilles + une marge, et le nom dispose de la même largeur au-dessus. */
 .col-client { width: 210px; }
+/* Ticket : largeur MESURÉE sur le plus long numéro que produit le comptoir,
+   « DEV-26.08.05-001 » (16 signes) — 116 px de texte, plus l'icône, l'écart et
+   les marges. Un numéro tronqué ne se compare pas au papier que le client
+   tend : c'est tout ce qu'on lui demande, il se lit en entier. */
+.col-ticket { width: 162px; }
 
 /* Plancher de largeur de la grille, par jeu de colonnes affichées.
    Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a
@@ -2600,10 +2713,12 @@ tr:hover .handle { color: var(--text-2); }
    recalculer un plancher de zéro, pour que le réglage fin ci-dessus reste
    valable — retirer une colonne de 210 px baisse le plancher de 210 px, point.
    Sans ça, retirer trois colonnes laissait la grille défiler horizontalement
-   alors qu'on venait justement de lui faire de la place. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1270px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1220px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1360px - var(--cols-off, 0px)); }
+   alors qu'on venait justement de lui faire de la place.
+   Les trois valeurs comptent la colonne Ticket (162 px) : elle est allumée par
+   défaut, et `--cols-off` la retranche dès qu'on la retire du rail. */
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1432px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1382px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1522px - var(--cols-off, 0px)); }
 
 .grid thead th.col-type { text-align: center; }
 .grid tbody td.col-type { text-align: center; vertical-align: middle; }
@@ -3207,6 +3322,10 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .flag-chip { min-height: 44px; padding: 8px 14px; font-size: 12.5px; }
   .flag-reason { min-height: 32px; padding: 4px 12px; font-size: 12.5px; }
   .col-flag { width: 148px; }
+  /* Le numéro du ticket s'APPUIE (il rouvre le papier du client) : plancher de
+     la charte, comme toutes les cibles de la ligne. */
+  .ticket-cell { min-height: 44px; padding: 8px 11px; font-size: 13px; }
+  .col-ticket { width: 172px; }
   .menu-item { padding: 12px 14px; font-size: 15px; }
   .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
   .type-tag,
@@ -5050,18 +5169,39 @@ textarea.ld-ctl { font-weight: 600; }
 .ligne-detail-btn { color: var(--primary); background: color-mix(in srgb, var(--primary) 16%, transparent); }
 .ligne-detail-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
 
-/* Pastille TICKET : le papier remis au client, réaffichable et réimprimable
-   depuis la ligne. Même gabarit que ses voisines (24 px, zone tactile 44 px via
-   `.pdf-btn::after`) pour que la rangée ne prenne pas une seconde ligne.
-   Encadrée plutôt que teintée : le vert des pastilles PDF dit « le document
-   existe », et un ticket existe TOUJOURS là où la pastille apparaît — reprendre
-   ce vert brouillerait la lecture d'un coup d'œil de la rangée. */
-.ticket-chip {
+/* COLONNE TICKET : le numéro du papier remis au client, en clair et
+   réimprimable depuis la ligne. Il vivait en pastille dans le cluster de la
+   cellule Dossier — 24 px, donc sans le numéro, et absent des lignes saisies à
+   la main, ce qui décalait d'un cran toute la rangée de pastilles. En colonne,
+   le numéro se lit, et chaque ligne le porte au même endroit.
+   Encadré plutôt que teinté : le vert des pastilles PDF dit « le document
+   existe » — le reprendre ici brouillerait cette lecture. */
+.col-ticket-cell { padding: 0 8px 0 14px; vertical-align: middle; }
+.ticket-cell {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 100%;
+  min-height: 30px; padding: 4px 9px;
+  border: 0; border-radius: 999px;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  /* Chiffres à chasse fixe : les numéros se comparent en colonne, chiffre sous
+     chiffre, comme sur le papier qu'on tient à côté de l'écran. */
+  font-variant-numeric: tabular-nums;
   color: var(--text-1);
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.ticket-chip:hover { background: var(--primary-soft); color: var(--primary); }
+.ticket-cell:hover { background: var(--primary-soft); color: var(--primary); }
+.ticket-cell:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.ticket-cell svg { flex: none; }
+/* Le numéro se tronque plutôt que de pousser la colonne : il se lit en entier
+   dans l'infobulle et sur le ticket qu'un appui fait apparaître. */
+.ticket-cell__no { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Ligne saisie à la main : aucun papier n'a été remis, la case reste muette. */
+.ticket-cell--vide {
+  box-shadow: none; background: none; color: var(--text-3, var(--text-2));
+  font-weight: 600; cursor: default;
+}
 
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }
