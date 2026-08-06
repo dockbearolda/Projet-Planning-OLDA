@@ -20,6 +20,12 @@
 //   - toute réponse qui n'est pas un 200 de notre propre origine (la prod est
 //     derrière un Basic Auth : mémoriser un 401 condamnerait le poste).
 
+// LE NOM NE CHANGE PAS QUAND ON AJOUTE UN FICHIER À LA COQUILLE. `activate`
+// supprime tout cache portant un autre nom : renommer alors qu'un poste est
+// hors ligne effacerait la coquille complète pour la remplacer par une coquille
+// vide (l'installation ne peut rien télécharger), et l'application ne s'ouvrirait
+// plus du tout. En gardant le nom, l'installation se contente d'AJOUTER le
+// fichier manquant quand le réseau est là, et ne casse rien quand il ne l'est pas.
 const CACHE = 'olda-coquille-v2';
 
 // La coquille : ce qu'il faut pour AFFICHER l'application. Les données, elles,
@@ -43,6 +49,9 @@ const COQUILLE = [
   '/whatsapp.js',
   '/nom-client.js',
   '/confirmer.js',
+  // Importé par app.js, clients.js ET reglages.js : absent du cache, l'import
+  // échoue hors ligne et c'est l'application ENTIÈRE qui ne s'ouvre plus.
+  '/reseau.js',
   // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être
   // tombé entre l'ouverture de l'application et le tap sur l'onglet.
   '/nouveau-projet.js',

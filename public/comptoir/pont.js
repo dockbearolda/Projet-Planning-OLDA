@@ -25,14 +25,27 @@
 // ne peut pas SAISIR bloquerait le comptoir.
 
 (function () {
+  // Minuteur : sur un wifi qui décroche, `fetch` n'échoue jamais — il attend.
+  // Ici c'est la réservation d'un numéro de ticket au moment où le client est
+  // devant le comptoir : mieux vaut une erreur au bout de 15 s (l'écran bascule
+  // alors sur son numéro de secours) qu'un écran qui ne rend jamais la main.
+  // Ce fichier est chargé en script simple par les deux écrans du patron : il ne
+  // peut pas importer `reseau.js`, d'où le minuteur écrit ici.
   const api = async (method, url, body) => {
-    const res = await fetch(url, {
-      method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
-    return res.json();
+    const minuteur = new AbortController();
+    const stop = setTimeout(() => minuteur.abort(), 15000);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: minuteur.signal,
+      });
+      if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(stop);
+    }
   };
 
   // Le jour du POSTE, pas celui du serveur : le conteneur tourne en UTC, il
