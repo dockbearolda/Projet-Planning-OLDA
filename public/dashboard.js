@@ -637,6 +637,11 @@ export function createDashboard(deps) {
     return rankRequests(base, machines, { now: Date.now() });
   }
 
+  // Nombre de cartes réellement MONTÉES dans la file d'équipe. Le classement,
+  // lui, porte toujours sur toute la file : c'est l'affichage qu'on borne, pas
+  // le calcul — le compteur de l'entête continue d'annoncer le total.
+  const TODO_MAX = 50;
+
   function buildTodoCard(item, index) {
     const { r, reasons } = item;
     const u = urgency(r);
@@ -706,8 +711,20 @@ export function createDashboard(deps) {
       main.appendChild(el('p', 'pj-empty', 'Rien à lancer — tout est à jour.'));
     } else {
       const list = el('div', 'pj-todo-list');
-      queue.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
+      // La file est CLASSÉE : au-delà des premières, on ne lit plus, on fait
+      // défiler. Elle montait pourtant une carte par commande active du
+      // planning — des centaines, reconstruites à chaque évènement temps réel,
+      // sur une tablette. La vue perso plafonne à 10 et la grille du planning à
+      // 400 depuis longtemps ; celle-ci n'avait aucun plafond.
+      const montrees = queue.slice(0, TODO_MAX);
+      montrees.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
       main.appendChild(list);
+      // Un plafond muet se lit « il n'y a que ça » : on dit ce qu'on ne montre pas.
+      if (queue.length > TODO_MAX) {
+        main.appendChild(el('p', 'pj-empty',
+          `${TODO_MAX} premières commandes de la file — ${queue.length - TODO_MAX} autres suivent, `
+          + 'moins urgentes.'));
+      }
     }
     wrap.appendChild(main);
 
@@ -1445,16 +1462,18 @@ export function createDashboard(deps) {
   // chaque évènement d'un collègue : on programme un seul rattrapage. Le cache
   // reste frais à la demi-minute près, ce qui suffit largement au fil
   // d'activité et aux badges.
-  // `kind` = la nature de l’évènement temps réel. Seuls ceux qui touchent la
-  // configuration du patron obligent à la relire ; le planning, lui, se
-  // rattrape tout seul par sa synthèse incrémentale.
+  // `kinds` = la nature des évènements temps réel de la rafale (un seul nom ou
+  // une liste). Seuls ceux qui touchent la configuration du patron obligent à
+  // la relire ; le planning, lui, se rattrape tout seul par sa synthèse
+  // incrémentale.
   const KINDS_CONFIG = new Set(['category-owners', 'category-referents', 'machines']);
 
-  function notifyChange(kind) {
+  function notifyChange(kinds) {
     // La config à relire se NOTE avant toute sortie : si l’on ne rafraîchit pas
     // tout de suite (écran masqué, onglet en veille), le prochain passage la
     // reprendra — sinon un réglage du patron serait perdu pour ce poste.
-    if (KINDS_CONFIG.has(kind)) configARecharger = true;
+    const liste = Array.isArray(kinds) ? kinds : [kinds];
+    if (liste.some((k) => KINDS_CONFIG.has(k))) configARecharger = true;
     // Jamais ouvert, et pas à l’écran : il n’y a pas de cache à tenir à jour, et
     // personne ne regarde. La toute première synthèse rend le planning ENTIER —
     // on ne la paie pas à l’ouverture de chaque poste, le premier `show()` s’en

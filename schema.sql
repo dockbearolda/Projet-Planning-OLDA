@@ -61,6 +61,13 @@ CREATE INDEX IF NOT EXISTS idx_request_events_request ON request_events (request
 -- Index pour le tri/filtre par étape
 CREATE INDEX IF NOT EXISTS idx_requests_stage ON requests (stage);
 CREATE INDEX IF NOT EXISTS idx_requests_stage_sort ON requests (stage, priority DESC, deadline ASC);
+-- `updated_at` est lu à chaque évènement temps réel, par chaque poste : c'est
+-- sur lui que porte la synthèse incrémentale du Point du jour
+-- (WHERE updated_at >= …) et le classement de la recherche globale. Sans index,
+-- chacune de ces lectures parcourt toute la table — et la table ne fait que
+-- grossir, aucune commande ne quittant jamais le planning.
+-- Down : DROP INDEX IF EXISTS idx_requests_updated;
+CREATE INDEX IF NOT EXISTS idx_requests_updated ON requests (updated_at);
 
 -- Secteurs de production rattachés à une commande (relation 1 commande ↔ N machines).
 -- Une commande en production (stage = 'production') porte une ligne par secteur
