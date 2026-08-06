@@ -51,6 +51,9 @@
   --danger:  #b91c1c;   --danger-bg:  #fef2f2;   --danger-line:  #fecaca;
   --success: #166534;   --success-bg: #ecfdf3;   --success-line: #bbf7d0;
   --warning: #854d0e;   --warning-bg: #fefce8;   --warning-line: #fde68a;
+  /* Le vert en composantes : l'anneau « enregistré » s'éteint en fondu, il lui
+     faut donc une opacité variable — impossible à partir du seul #166534. */
+  --success-rgb: 22, 101, 52;
   /* deux crans d'ambre en plus : l'échelle d'urgence du point du jour a
      besoin de trois niveaux lisibles (retard / bientôt / à planifier) sans
      sortir de la famille ambre de la charte. */
@@ -144,6 +147,7 @@
   --danger:  #fca5a5;   --danger-bg:  rgba(185, 28, 28, .2);   --danger-line:  rgba(185, 28, 28, .5);
   --success: #86efac;   --success-bg: rgba(22, 101, 52, .25);  --success-line: rgba(22, 101, 52, .55);
   --warning: #fcd34d;   --warning-bg: rgba(133, 77, 14, .25);  --warning-line: rgba(133, 77, 14, .55);
+  --success-rgb: 134, 239, 172;
   --warning-deep: #fef3c7;
   --warning-2:    #fde68a;
 
@@ -1134,6 +1138,14 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   font: inherit; font-size: 11px; font-weight: 800; color: var(--text-2); cursor: pointer;
 }
 .pcard__ref-btn:hover { border-color: var(--text-2); background: var(--state-hover); }
+/* La pastille bascule attribué / non attribué SUR PLACE (cf. majRefs) : le
+   changement se fond au lieu de claquer. */
+.pcard__ref-btn,
+.pcard__pill {
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
 .pcard__ref-btn.is-on { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .pcard__ref-name { margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-2); }
 /* Nom hérité de la catégorie (pas posé sur la ligne) : même liseré pointillé que
@@ -1243,6 +1255,12 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   padding: 0;
   vertical-align: middle;
   height: var(--row-h);
+  /* LA TEINTE D'ALERTE EST PEINTE SUR LA CELLULE, PAS SUR LA LIGNE (voir
+     .is-bloque / .is-a-voir plus bas) : la transition posée sur le <tr> ne la
+     concernait donc pas et la couleur claquait d'un coup. Elle se pose ici,
+     avec le liseré de tête de ligne, pour que poser ou lever un blocage se
+     fonde au lieu de sauter à l'écran. */
+  transition: background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
 .grid tbody tr { transition: background var(--dur-1) var(--ease); }
 /* Zébrage : une ligne sur deux (parmi les lignes VISIBLES, cf. paintZebra dans
@@ -1365,7 +1383,13 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 600;
   cursor: pointer;
   border: 0;
-  transition: filter var(--dur-1) var(--ease);
+  /* `filter` seul ne couvrait que le survol : quand la puce CHANGE D'ÉTAT
+     (priorité, type, pilote, sous-étape, échéance), c'est le fond et l'encre
+     qui bougent — et ils claquaient. On les fond aussi. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .prio-tag:hover { filter: brightness(.97); }
 .prio-tag:focus-visible {
@@ -1393,7 +1417,11 @@ tr:hover .handle { color: var(--text-2); }
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: filter var(--dur-1) var(--ease);
+  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .prio-pill:hover { filter: brightness(.97); }
 .prio-pill:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
@@ -1627,7 +1655,11 @@ tr:hover .handle { color: var(--text-2); }
   text-transform: uppercase;
   cursor: pointer;
   border: 0;
-  transition: filter var(--dur-1) var(--ease);
+  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .type-tag:hover { filter: brightness(.97); }
 /* Un seul accent dans l'app : le type de client (Pro/Perso/Asso/Revendeur)
@@ -1656,7 +1688,11 @@ tr:hover .handle { color: var(--text-2); }
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: filter var(--dur-1) var(--ease);
+  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .resp-chip:hover { filter: brightness(.97); }
 .resp-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
@@ -1739,7 +1775,13 @@ tr:hover .handle { color: var(--text-2); }
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  transition: filter var(--dur-1) var(--ease), background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  /* Même durée que la teinte de la ligne (--dur-2) : la puce et le fond de la
+     ligne changent ENSEMBLE quand on pose ou lève un blocage. À deux vitesses
+     différentes, le geste se voyait en deux temps. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .flag-chip:hover { filter: brightness(.97); }
 .flag-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
@@ -1810,7 +1852,11 @@ tr:hover .handle { color: var(--text-2); }
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: filter var(--dur-1) var(--ease);
+  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .sub-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub-chip:hover { filter: brightness(.97); }
@@ -2114,7 +2160,11 @@ tr:hover .handle { color: var(--text-2); }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
-  transition: filter var(--dur-1) var(--ease);
+  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
+  transition: filter var(--dur-1) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 .deadline-badge:not(.empty)::before {
   content: '';
@@ -2865,6 +2915,24 @@ button, a, .stage, .prio-pill, .deadline-badge,
 
 /* Recherche : masquage des lignes hors-filtre (instantané, DOM préservé) */
 #rows tr.is-hidden { display: none; }
+
+/* « C'EST ENREGISTRÉ. » La valeur s'affiche AVANT la réponse du serveur (patch
+   optimiste) : à l'écran, une modification partie et une modification acceptée
+   se ressemblaient trait pour trait. Sur une tablette au fond de l'atelier, le
+   doute coûte cher — c'est toute l'histoire des dossiers perdus en silence.
+   Quand le serveur confirme, la puce touchée pousse un halo vert qui s'éteint
+   en fondu : discret, jamais bloquant, et vert = état (charte), pas décoration.
+   Rien ne clignote si l'enregistrement échoue — c'est le rollback qui parle.
+
+   Halo en `outline` et non en `box-shadow` : la plupart de ces puces coupent à
+   ras (`overflow: hidden`, posé pour contenir l'onde du ripple), ce qui aurait
+   tronqué une ombre au carré. Le contour, lui, se peint HORS de la boîte et
+   n'est jamais rogné — et il suit l'arrondi de la pilule. */
+@keyframes okRing {
+  from { outline-color: rgba(var(--success-rgb), .5); outline-offset: 0; }
+  to   { outline-color: rgba(var(--success-rgb), 0); outline-offset: 6px; }
+}
+.is-saved { outline: 2px solid transparent; animation: okRing .75s var(--ease) both; }
 
 @keyframes rowFlash {
   0% { background: rgba(var(--primary-rgb), .18); }

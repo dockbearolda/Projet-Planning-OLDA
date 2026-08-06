@@ -943,12 +943,21 @@ function armerUneFois(bouton, ms = 700) {
 // changement optimiste (glisser vers une autre sous-étape) modifie la donnée
 // locale sans toucher cette date. Oublier les cartes ici, c'est laisser une
 // carte afficher son ancienne sous-étape jusqu'au prochain aller-retour serveur.
-function invalidateRowCache(id) {
+//
+// `surPlace` est l'élément qu'on vient de repeindre à la main (la puce sur
+// laquelle on a appuyé). La vue qui le contient est déjà juste : la périmer la
+// ferait reconstruire pour rien — et une ligne reconstruite est une ligne NEUVE,
+// qui s'affiche directement à son état final. Tout le fondu de couleur qu'on
+// vient de déclencher part à la poubelle avec l'ancien nœud, en même temps que
+// le survol et l'onde du ripple en cours. C'est précisément ce qui faisait
+// claquer les couleurs d'alerte au lieu de les fondre.
+function invalidateRowCache(id, surPlace = null) {
   if (id != null) {
+    const dedans = (el) => !!(surPlace && el && el.contains(surPlace));
     const entry = rowEls.get(String(id));
-    if (entry) entry.sig = '';
+    if (entry && !dedans(entry.tr)) entry.sig = '';
     const carte = cardEls.get(String(id));
-    if (carte) carte.sig = '';
+    if (carte && !dedans(carte.el)) carte.sig = '';
     return;
   }
   for (const [, entry] of rowEls) entry.sig = '';
@@ -1171,14 +1180,25 @@ function buildCard(r) {
     const pilote = effectivePilot(r);
     return pilote ? { qui: pilote, auto: !isManualPilot(r) } : { qui: 'Non attribué', auto: false };
   };
-  const eff = nomEffectif();
-  nomRef.textContent = `Référent : ${eff.qui}`;
-  nomRef.classList.toggle('is-auto', eff.auto);
-  if (eff.auto) attachTip(nomRef, 'Nom par défaut de la catégorie — appuyer sur une initiale pour en nommer un autre');
+  // Le bloc référent se repeint SUR PLACE. Il se contentait d'être construit une
+  // fois, si bien qu'attribuer un référent obligeait à reconstruire la carte
+  // entière : la pastille sautait d'un état à l'autre sans fondu, l'onde du
+  // ripple était jetée en cours de route, et sur une file de 400 cartes on
+  // refaisait tout un article de DOM pour un simple appui.
+  const majRefs = () => {
+    const eff = nomEffectif();
+    nomRef.textContent = `Référent : ${eff.qui}`;
+    nomRef.classList.toggle('is-auto', eff.auto);
+    attachTip(nomRef, eff.auto
+      ? 'Nom par défaut de la catégorie — appuyer sur une initiale pour en nommer un autre'
+      : `Référent : ${eff.qui}`);
+    for (const b of refs.children) b.classList.toggle('is-on', b.dataset.employe === r.referent);
+  };
   for (const e of EMPLOYEES) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'pcard__ref-btn' + (r.referent === e ? ' is-on' : '');
+    b.className = 'pcard__ref-btn';
+    b.dataset.employe = e;
     b.textContent = initiales(e);
     b.setAttribute('aria-label', `Référent : ${e}`);
     attachTip(b, e);
@@ -1189,16 +1209,19 @@ function buildCard(r) {
       const valeur = r.referent === e ? null : e;
       patch(r, { referent: valeur }, () => {
         r.referent = valeur;
-        // Sans invalidation, la carte n'est PAS reconstruite : sa signature
-        // repose sur `updated_at`, que le serveur seul fait bouger. Le clic
-        // restait donc sans effet visible pendant un aller-retour réseau — on
-        // re-tapait, et le second tap annulait l'attribution.
-        invalidateRowCache(r.id);
+        // La pastille suit le doigt tout de suite. Elle ne le faisait pas : la
+        // signature de la carte repose sur `updated_at`, que le serveur seul
+        // fait bouger — le clic restait sans effet visible pendant un
+        // aller-retour réseau, on re-tapait, et le second tap annulait tout.
+        majRefs();
+        // La LIGNE du tableau, elle, n'a pas été repeinte : elle se périme.
+        invalidateRowCache(r.id, b);
         applySortAndRender();
-      });
+      }, b);
     });
     refs.append(b);
   }
+  majRefs();
 
   const ouvrir = document.createElement('button');
   ouvrir.type = 'button';
@@ -1250,6 +1273,78 @@ function buildCard(r) {
   return carte;
 }
 
+// --- Réordonnancement animé (FLIP) ------------------------------------------
+// Changer une priorité ou une échéance DÉPLACE la commande dans la file. Jusque
+// là elle se téléportait : entre deux images, la ligne n'était plus au même
+// endroit, et celles qu'elle pousse non plus. À l'atelier, on relisait l'écran
+// pour retrouver ce qu'on venait de toucher.
+//
+// On mesure donc où chaque ligne se trouve AVANT de la déplacer, puis on la
+// ramène visuellement à son point de départ pour la laisser glisser jusqu'à sa
+// nouvelle place. Rien que du `transform` : ni relayout ni repaint, le
+// compositeur suffit — c'est ce qui tient les 60 images/seconde sur la tablette.
+const DUREE_REORDRE = 220;
+
+// Interrogé à chaque rendu qui réordonne : on garde la requête média une fois
+// pour toutes plutôt que d'en créer une neuve à chaque fois.
+const REQUETE_MOUVEMENT = window.matchMedia
+  ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+const mouvementReduit = () => !!(REQUETE_MOUVEMENT && REQUETE_MOUVEMENT.matches);
+
+// Est-ce que la mise en ordre va réellement bouger quelque chose ? La plupart
+// des rendus ne déplacent rien (une valeur change, l'ordre tient) : on évite
+// alors les deux mesures de position, qui forcent chacune un calcul de mise en
+// page.
+function ordreChange(ordre, hote) {
+  let prev = null;
+  for (const node of ordre) {
+    if (!estPrise(node)) {
+      const attendu = prev ? prev.nextSibling : hote.firstChild;
+      if (node !== attendu) return true;
+    }
+    prev = node;
+  }
+  return false;
+}
+
+// On ne mesure que ce qui est à l'écran : sur une étape de 400 lignes, relever
+// la position de tout le tableau coûterait plus cher que le saut qu'on efface.
+function mesurerVisibles(hote) {
+  const positions = new Map();
+  if (!hote) return positions;
+  const bas = (window.innerHeight || 800) + 200;
+  for (const el of hote.children) {
+    if (el.classList.contains('is-hidden')) continue;
+    const y = el.getBoundingClientRect().top;
+    if (y < -200 || y > bas) continue;
+    positions.set(el, y);
+  }
+  return positions;
+}
+
+function animerReordonnancement(positions) {
+  for (const [el, avant] of positions) {
+    if (!el.isConnected || typeof el.animate !== 'function') continue;
+    const delta = avant - el.getBoundingClientRect().top;
+    // Moins d'1 px : rien n'a bougé. Plus de 2000 : la ligne vient d'ailleurs
+    // (changement d'étape, filtre levé) — la faire traverser l'écran serait du
+    // bruit, pas du lien.
+    if (Math.abs(delta) < 1 || Math.abs(delta) > 2000) continue;
+    el.animate(
+      [{ transform: `translateY(${delta}px)` }, { transform: 'none' }],
+      { duration: DUREE_REORDRE, easing: 'cubic-bezier(.2, 0, 0, 1)' },
+    );
+  }
+}
+
+// Positions à retenir avant de remettre les nœuds en ordre — `null` quand il n'y
+// a rien à animer (glisser en cours : le geste pilote déjà les positions à la
+// main, et une animation par-dessus lutterait contre le doigt).
+function avantReordonnancement(ordre, hote) {
+  if (dragState || mouvementReduit() || !ordreChange(ordre, hote)) return null;
+  return mesurerVisibles(hote);
+}
+
 function renderCards(data) {
   const voulus = new Set(data.map((r) => String(r.id)));
   for (const [id, entry] of cardEls) {
@@ -1271,6 +1366,7 @@ function renderCards(data) {
     }
     ordre.push(entry.el);
   }
+  const positions = avantReordonnancement(ordre, $cards);
   let prev = null;
   for (const node of ordre) {
     if (!estPrise(node)) {
@@ -1279,6 +1375,7 @@ function renderCards(data) {
     }
     prev = node;
   }
+  if (positions) animerReordonnancement(positions);
 }
 
 // Une ligne qu'on NE TOUCHE PAS pendant un rendu : soit elle est en train d'être
@@ -1324,7 +1421,9 @@ function renderRows(data) {
   }
 
   // 3. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
-  //    cours de drag : sa position est pilotée à la main).
+  //    cours de drag : sa position est pilotée à la main). Les lignes qui
+  //    changent de rang y glissent au lieu de sauter (cf. FLIP plus haut).
+  const positions = avantReordonnancement(order, $rows);
   let prev = null;
   for (const node of order) {
     if (!estPrise(node)) {
@@ -1333,6 +1432,7 @@ function renderRows(data) {
     }
     prev = node;
   }
+  if (positions) animerReordonnancement(positions);
 
   applyEmptyCols();
   updateSortArrows();
@@ -1522,7 +1622,7 @@ function cellStars(r) {
     const cur = prioBand(r);
     openMenu(tag, [1, 2, 3].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })), cur, (val) => {
       if (val === cur) return;
-      patch(r, { priority: val }, () => { r.priority = val; renderTag(); });
+      patch(r, { priority: val }, () => { r.priority = val; renderTag(); }, tag);
     });
   });
   td.appendChild(tag);
@@ -1561,7 +1661,7 @@ function typeControl(r) {
         const tr = type.closest('tr');
         const box = tr && tr.querySelector('.client-name');
         if (box) paintClientName(box, val);
-      });
+      }, type);
     });
   });
   return type;
@@ -1643,9 +1743,10 @@ function respControl(r) {
         r.responsable = val;
         renderPilot();
         // La carte affiche elle aussi un nom effectif : elle doit se remonter.
-        invalidateRowCache(r.id);
+        // La vue qui porte la puce qu'on vient de repeindre, elle, reste en place.
+        invalidateRowCache(r.id, pilot);
         applySortAndRender();
-      });
+      }, pilot);
     });
   });
 
@@ -1676,9 +1777,9 @@ function respControl(r) {
       patch(r, { referent: val }, () => {
         r.referent = val;
         renderRef();
-        invalidateRowCache(r.id);
+        invalidateRowCache(r.id, ref);
         applySortAndRender();
-      });
+      }, ref);
     });
   });
 
@@ -1745,10 +1846,12 @@ function flagControl(r, hote) {
       r.flag_reason = body.flag_reason;
       render();
       // La carte porte désormais la pastille ET le motif : elle doit se remonter,
-      // que l'alerte ait été posée depuis le tableau ou depuis la fiche.
-      invalidateRowCache(r.id);
+      // que l'alerte ait été posée depuis le tableau ou depuis la fiche. La LIGNE
+      // du tableau, elle, vient d'être repeinte sur place par `render()` (puce +
+      // teinte de fond) : la reconstruire jetterait le fondu qu'on déclenche.
+      invalidateRowCache(r.id, btn);
       applySortAndRender();
-    });
+    }, btn);
   };
 
   render();
@@ -1805,7 +1908,7 @@ function cellSubStage(r) {
         // Si on filtre sur une sous-catégorie, la ligne peut sortir/entrer de la
         // vue courante : on re-filtre. Les pastilles se recalent au prochain SSE.
         if (currentSub !== null) applySortAndRender();
-      });
+      }, btn);
     });
   });
   td.appendChild(btn);
@@ -3983,11 +4086,21 @@ function syncTitleOnOverflow(input) {
 // On mémorise donc l'état d'avant pour les seuls champs qu'on touche, et on le
 // remet en place sans rien demander au réseau. La relecture ne sert plus qu'à
 // récupérer, quand elle le peut, ce qu'un collègue aurait changé entre-temps.
-function patch(r, body, applyOptimistic) {
+//
+// `cible` (facultatif) est la puce sur laquelle le doigt vient d'appuyer : elle
+// pousse un halo vert quand le serveur confirme. Sans elle, rien ne distingue à
+// l'écran une modification PARTIE d'une modification ACCEPTÉE.
+function patch(r, body, applyOptimistic, cible = null) {
   const avant = {};
   for (const cle of Object.keys(body)) avant[cle] = r[cle];
   applyOptimistic();
-  patchRow(r, body).catch((err) => {
+  // `then(succès, échec)` et NON `then(...).catch(...)` : avec un `.catch` en
+  // bout de chaîne, la moindre erreur du code de succès aurait déclenché le
+  // rollback — on aurait effacé de l'écran une valeur pourtant enregistrée.
+  patchRow(r, body).then((recu) => {
+    confirmerVisuellement(cible);
+    absorberReponse(r, recu);
+  }, (err) => {
     Object.assign(r, avant);
     // La ligne est reconstruite à partir de `r` : les puces peintes à la main
     // par `applyOptimistic` (priorité, type, pilote, alerte…) reviennent avec.
@@ -4002,6 +4115,73 @@ function patch(r, body, applyOptimistic) {
     // ci-dessus a déjà remis l'écran d'aplomb, et l'erreur a déjà été dite.
     resyncAfterRollback();
   });
+}
+
+// Halo vert « c'est enregistré » sur la puce touchée (voir .is-saved en CSS).
+// On retire la classe avant de la reposer : deux appuis coup sur coup doivent
+// rejouer l'animation, pas la laisser figée sur le premier.
+function confirmerVisuellement(cible) {
+  if (!cible || !cible.classList || !cible.isConnected) return;
+  cible.classList.remove('is-saved');
+  void cible.offsetWidth; // force le redémarrage de l'animation
+  cible.classList.add('is-saved');
+  setTimeout(() => cible.classList.remove('is-saved'), 800);
+}
+
+// Deux valeurs venues du serveur et de nous se comparent en texte : `1` et `'1'`
+// disent la même priorité, `null` et `''` la même absence.
+const memeValeur = (a, b) => (a == null ? '' : String(a)) === (b == null ? '' : String(b));
+
+// CE QUE LE SERVEUR RENVOIE APRÈS UN PATCH ACCEPTÉ.
+//
+// On jetait sa réponse. Résultat : `updated_at` restait à sa vieille valeur en
+// local, l'évènement SSE déclenché par notre propre modification faisait relire
+// la liste, la signature ne collait plus — et `renderRows` RECONSTRUISAIT de
+// fond en comble la ligne qu'on venait de toucher, ~150 ms après le doigt.
+// Toute transition de couleur en cours était jetée avec l'ancien <tr> (un nœud
+// neuf s'affiche directement à l'état final : plus rien à animer), le survol
+// tombait, l'onde du ripple sautait, et sur la tablette la grille entière
+// clignotait dès que deux personnes travaillaient en même temps.
+//
+// On adopte donc la ligne renvoyée. Si le serveur dit exactement ce que
+// `applyOptimistic` a déjà peint, l'écran est DÉJÀ juste : on aligne seulement
+// la signature et plus personne ne remonte le DOM. S'il diverge (sous-étape
+// remise à zéro par un changement de famille, valeur normalisée), c'est LUI qui
+// a raison et la ligne se reconstruit — comme avant.
+function absorberReponse(r, recu) {
+  // Pas de réponse : modification mise en file derrière une création (patchRow
+  // rend `null`). Rien à adopter, et surtout pas de signature à figer.
+  if (!recu || typeof recu !== 'object' || recu.id == null) return;
+  if (String(recu.id) !== String(r.id)) return;   // la ligne a changé d'identité entre-temps
+  let divergence = false;
+  for (const cle of Object.keys(recu)) {
+    if (cle === 'updated_at') continue;
+    if (!memeValeur(recu[cle], r[cle])) divergence = true;
+    r[cle] = recu[cle];
+  }
+  r.updated_at = recu.updated_at;
+  // Sans ça, le `poll()` que notre propre évènement SSE déclenche trouverait la
+  // grille périmée et redessinerait tout.
+  lastRowsSig = signature(rows);
+  if (divergence) invalidateRowCache(r.id);
+  else marquerRenduAJour(r);
+  // On repasse quand même par le tri : changer une priorité ou une échéance
+  // DÉPLACE la ligne, et c'est `poll()` qui s'en chargeait jusqu'ici. Le
+  // déplacement est désormais animé (cf. animerReordonnancement).
+  applySortAndRender();
+}
+
+// Aligne la signature mémorisée du rendu sur la donnée courante : la ligne ne
+// sera pas remontée au prochain rendu. Seule la vue AFFICHÉE peut être déclarée
+// à jour — l'autre n'a pas été repeinte par `applyOptimistic`, on la périme.
+function marquerRenduAJour(r) {
+  const id = String(r.id);
+  const sig = `${r.id}:${r.updated_at}`;
+  const cartes = modeCartes();
+  const ligne = rowEls.get(id);
+  if (ligne) ligne.sig = cartes ? '' : sig;
+  const carte = cardEls.get(id);
+  if (carte) carte.sig = cartes ? sig : '';
 }
 
 // --- Création / sauvegardes optimistes ------------------------------------
@@ -5035,12 +5215,45 @@ function signature(list) {
 // chaque poste, à chaque geste de n'importe qui, y compris à l'autre bout du
 // pipeline. C'est ce qui restait de l'amplification réseau après la mise en lot
 // des évènements.
+
+// UN RAFRAÎCHISSEMENT NE SE PERD PLUS EN ROUTE. `poll()` renonçait purement et
+// simplement quand on avait un menu ouvert, un champ sous le curseur ou une
+// carte au bout du doigt — et PERSONNE ne le relançait. Or depuis le passage au
+// temps réel, le filet de sécurité à 8 secondes ne tourne QUE si le flux SSE est
+// coupé : la modification d'un collègue tombée pendant ces quelques secondes
+// restait invisible jusqu'à ce que quelqu'un d'autre touche à quelque chose. Sur
+// deux postes qui travaillent la même étape, ça se compte en minutes d'écart.
+// On retient donc qu'il reste à relire, et on relit dès que les mains sont
+// libres. La grille n'est jamais dérangée pendant le geste, elle rattrape après.
+let relectureEnAttente = false;
+let relectureTimer = null;
+
+function differerRelecture() {
+  relectureEnAttente = true;
+  if (relectureTimer) return;
+  relectureTimer = setInterval(() => {
+    if (isInteracting() && !document.hidden) return;   // mains encore prises
+    clearInterval(relectureTimer);
+    relectureTimer = null;
+    // Onglet passé en arrière-plan : `poll()` en ressortirait aussitôt. Le
+    // retour sur l'onglet relit déjà de lui-même (visibilitychange) — et
+    // `relectureEnAttente` reste vrai en attendant.
+    if (document.hidden) return;
+    // Une relecture a pu aboutir entre-temps (le geste s'est interrompu, un
+    // autre évènement est passé) : inutile de redemander la liste au serveur.
+    if (!relectureEnAttente) return;
+    relectureEnAttente = false;
+    poll();
+  }, 400);
+}
+
 async function poll({ listeAussi = true } = {}) {
   if (document.hidden) return; // onglet en arrière-plan : on économise
   try {
     await loadCounts(); // compteurs sidebar : toujours sûrs à rafraîchir
     if (!listeAussi) return;
-    if (isInteracting()) return; // ne pas perturber une saisie / un glisser
+    if (isInteracting()) { differerRelecture(); return; } // on relira après le geste
+    relectureEnAttente = false;
     // Même garde que `loadRows` : on note l'étape demandée ET le jeton de
     // chargement AVANT la requête. Sans ça, une réponse partie pour la famille
     // A qui revient après un clic sur la famille B écrasait la grille avec les
