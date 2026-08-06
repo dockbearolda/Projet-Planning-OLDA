@@ -192,6 +192,9 @@ function bloc(src, signature) {
   contexte.showToast = (t) => { contexte.journal.push(`toast:${t}`); };
   contexte.location = { hash: '#dashboard' };
   contexte.history = { replaceState: (_a, _b, h) => { contexte.location.hash = h; } };
+  // La liste se monte par tranches ; le saut l'attend avant de conclure (voir
+  // TRANCHE_RENDU dans app.js). Ici elle est toujours prête.
+  contexte.listeMontee = Promise.resolve();
   vm.createContext(contexte);
   vm.runInContext(
     `${bloc(APP, 'async function ouvrirCommandeAuPlanning(')}

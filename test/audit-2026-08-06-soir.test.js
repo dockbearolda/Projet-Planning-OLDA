@@ -179,6 +179,10 @@ function bloc(src, signature) {
     rows: [{ id: 'deja-la' }],
     toutAfficher: false,
     showToast: (t) => contexte.journal.push(`toast:${t}`),
+    // La liste se monte par tranches : le saut attend qu'elle soit posée avant
+    // de conclure quoi que ce soit (voir TRANCHE_RENDU dans app.js). Ici elle
+    // l'est toujours — ce test-ci porte sur le plafond, pas sur le rendu.
+    listeMontee: Promise.resolve(),
   };
   contexte.setViewMode = (m) => { contexte.journal.push(`vue:${m}`); };
   contexte.selectStage = async (slug, sub) => { contexte.journal.push(`etape:${slug}|${sub || ''}`); };

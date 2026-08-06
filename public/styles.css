@@ -1089,6 +1089,15 @@ body.sidebar-resizing * { cursor: col-resize !important; }
   transition: background var(--dur-1, .12s) var(--ease, ease),
               border-color var(--dur-1, .12s) var(--ease, ease),
               box-shadow var(--dur-1, .12s) var(--ease, ease);
+  /* PAS de `content-visibility: auto` ici, et c'est mesuré. L'idée était bonne
+     sur le papier — ne pas dessiner les cartes hors écran — mais sur une liste
+     de cette forme elle coûte plus qu'elle ne rapporte : le travail différé
+     retombe PENDANT le défilement, image par image. Relevé sur un processeur
+     ralenti au niveau de la tablette (1 200 cartes) : 72 ms par image contre
+     52 sans. Et la hauteur présumée gonflait la liste de 44 % — la barre de
+     défilement mentait sous le doigt. Ce qui bloquait vraiment le poste, c'était
+     la CONSTRUCTION de la liste ; elle se fait désormais par tranches
+     (TRANCHE_RENDU dans app.js). */
 }
 .pcard:hover { border-color: var(--text-2); box-shadow: var(--shadow-2); }
 .pcard.is-hidden { display: none; }

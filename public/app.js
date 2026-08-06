@@ -835,6 +835,8 @@ function applySortAndRender({ syncDrawer = true } = {}) {
   // par frappe) — cf. applySearchAndCounts.
   lastRendered = sorted;
   renderRows(sorted);
+  // Plus rien en attente : la liste est entière à l'écran (voir listeMontee).
+  if (!suiteRendu) marquerRenduAcheve();
   applySearchAndCounts();
   if (syncDrawer) renderLigneDetailIfOpen();
 }
@@ -1345,20 +1347,85 @@ function avantReordonnancement(ordre, hote) {
   return mesurerVisibles(hote);
 }
 
+// ===========================================================================
+// LE FIL PRINCIPAL NE SE BLOQUE PLUS POUR CONSTRUIRE UNE LISTE
+// ===========================================================================
+// Ouvrir « Paiement & clôture » monte 400 lignes d'un coup ; retrouver une
+// commande archivée par la recherche lève le plafond et en monte plus de mille.
+// Chacune coûte une quarantaine de nœuds, ses écouteurs, ses infobulles et son
+// calcul d'heures ouvrées. Mesuré sur 1 200 commandes : UNE SEULE tâche d'une
+// seconde sur un ordinateur de bureau — donc plusieurs secondes sur la tablette
+// de l'atelier, pendant lesquelles RIEN ne répond : ni le défilement, ni un tap,
+// ni la barre de recherche. C'est le « ça rame » que l'on voit encore.
+//
+// On construit donc une première tranche — largement de quoi remplir l'écran —
+// puis on rend la main au navigateur avant de poser la suivante. L'employé a sa
+// liste tout de suite et peut s'en servir pendant que la fin se pose derrière.
+// Les lignes déjà montées ne comptent pas dans la tranche : un rafraîchissement
+// ordinaire (une valeur qui change) reste, comme avant, en un seul passage.
+const TRANCHE_RENDU = 40;
+let suiteRendu = null;
+
+// LA LISTE EST-ELLE ENTIÈREMENT MONTÉE ? Presque tout se moque de la réponse —
+// on défile, on tape, on lit. Mais pointer une commande retrouvée par la
+// recherche a besoin que SA ligne existe, et elle peut être à la millième
+// place : sans cette attente, l'écran conclurait « cette commande n'est plus à
+// cette étape » alors qu'elle est simplement en train de se poser.
+let rendreFini = null;
+let listeMontee = Promise.resolve();
+
+function marquerRenduEnCours() {
+  if (rendreFini) return;
+  listeMontee = new Promise((resoudre) => { rendreFini = resoudre; });
+}
+
+function marquerRenduAcheve() {
+  if (!rendreFini) return;
+  const resoudre = rendreFini;
+  rendreFini = null;
+  resoudre();
+}
+
+function planifierSuiteRendu() {
+  marquerRenduEnCours();
+  if (suiteRendu) return;
+  // `setTimeout` et non `requestAnimationFrame` : sur un onglet en arrière-plan
+  // (tablette écran éteint), rAF est mis en pause et la liste resterait à
+  // moitié montée jusqu'au retour — or c'est justement là qu'on a le temps.
+  suiteRendu = setTimeout(() => {
+    suiteRendu = null;
+    // On repart de la liste DÉJÀ triée. Repasser par `applySortAndRender`
+    // referait le tri ET le filtre à chaque tranche — le prix fixe de la liste
+    // entière, autant de fois qu'il y a de tranches. Et l'ordre pourrait
+    // changer au milieu du remplissage, sous les yeux de l'employé.
+    // Le tiroir n'est pas resynchronisé non plus : il porte peut-être une
+    // correction en cours de saisie, et la suite du rendu ne le concerne pas.
+    renderRows(lastRendered);
+    if (!suiteRendu) marquerRenduAcheve();
+    applySearchAndCounts();
+  }, 0);
+}
+
 function renderCards(data) {
   const voulus = new Set(data.map((r) => String(r.id)));
   for (const [id, entry] of cardEls) {
     if (!voulus.has(id)) { entry.el.remove(); cardEls.delete(id); }
   }
   const ordre = [];
+  let budget = TRANCHE_RENDU;
+  let reste = false;
   for (const r of data) {
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = cardEls.get(id);
     if (!entry) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       entry = { el: buildCard(r), sig };
       cardEls.set(id, entry);
     } else if (entry.sig !== sig && !estPrise(entry.el)) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       const el = buildCard(r);
       entry.el.replaceWith(el);
       entry.el = el;
@@ -1366,7 +1433,10 @@ function renderCards(data) {
     }
     ordre.push(entry.el);
   }
-  const positions = avantReordonnancement(ordre, $cards);
+  // Tant que la liste se remplit, les cartes déjà posées « bougent » à chaque
+  // tranche : les faire glisser à chaque fois serait du bruit, pas du lien. On
+  // n'anime que le passage final, celui qui range vraiment.
+  const positions = reste ? null : avantReordonnancement(ordre, $cards);
   let prev = null;
   for (const node of ordre) {
     if (!estPrise(node)) {
@@ -1376,6 +1446,7 @@ function renderCards(data) {
     prev = node;
   }
   if (positions) animerReordonnancement(positions);
+  if (reste) planifierSuiteRendu();
 }
 
 // Une ligne qu'on NE TOUCHE PAS pendant un rendu : soit elle est en train d'être
@@ -1402,16 +1473,22 @@ function renderRows(data) {
   }
 
   // 2. Construire la séquence ordonnée des lignes, en créant / reconstruisant /
-  //    réutilisant chacune au passage.
+  //    réutilisant chacune au passage. Par TRANCHES : voir TRANCHE_RENDU.
   const order = [];
+  let budget = TRANCHE_RENDU;
+  let reste = false;
   for (const r of data) {
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = rowEls.get(id);
     if (!entry) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       entry = { tr: buildRow(r), sig };
       rowEls.set(id, entry);
     } else if (entry.sig !== sig && !isRowBusy(entry.tr)) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       const tr = buildRow(r);
       entry.tr.replaceWith(tr);
       entry.tr = tr;
@@ -1423,7 +1500,7 @@ function renderRows(data) {
   // 3. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
   //    cours de drag : sa position est pilotée à la main). Les lignes qui
   //    changent de rang y glissent au lieu de sauter (cf. FLIP plus haut).
-  const positions = avantReordonnancement(order, $rows);
+  const positions = reste ? null : avantReordonnancement(order, $rows);
   let prev = null;
   for (const node of order) {
     if (!estPrise(node)) {
@@ -1433,6 +1510,7 @@ function renderRows(data) {
     prev = node;
   }
   if (positions) animerReordonnancement(positions);
+  if (reste) planifierSuiteRendu();
 
   applyEmptyCols();
   updateSortArrows();
@@ -1456,11 +1534,15 @@ function applySearchAndCounts() {
   let visible = 0;
   const cartes = modeCartes();
   for (const r of lastRendered) {
+    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
+    // LE COMPTEUR PORTE SUR LA DONNÉE, pas sur ce qui est déjà monté. Une longue
+    // liste se pose par tranches (voir TRANCHE_RENDU) : compter les seules
+    // lignes présentes dans le DOM aurait affiché « 80 commandes », puis 160,
+    // puis 240… sur un écran dont c'est justement le chiffre qu'on vient lire.
+    if (match) visible++;
     const entry = cartes ? cardEls.get(String(r.id)) : rowEls.get(String(r.id));
     if (!entry) continue;
-    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
     (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
-    if (match) visible++;
   }
   $empty.hidden = visible > 0;
   if (visible === 0) {
@@ -5965,12 +6047,17 @@ async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = fa
   // qui ne la contient pas. Le saut ne montrait rien, ne disait rien, et le
   // dossier passait pour perdu. On lève donc le plafond de CETTE étape, une
   // fois, et on retente.
+  // La liste se pose par tranches : la ligne visée peut être à la millième
+  // place et n'exister dans le DOM que dans quelques dizaines de millisecondes.
+  // On attend qu'elle soit montée plutôt que de conclure qu'elle a disparu.
+  await listeMontee;
   if (revealRow(id)) return;
   if (!toutAfficher) {
     toutAfficher = true;
     try {
       await loadRows();
     } catch (_) { /* selectStage a déjà posé le message de perte de réseau */ }
+    await listeMontee;
     if (revealRow(id)) return;
   }
   // Toujours rien alors qu'on a tout chargé : la ligne a changé d'étape ou

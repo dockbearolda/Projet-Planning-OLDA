@@ -605,16 +605,54 @@ app.put('/api/ordre-manuel', asyncH(async (req, res) => {
   return res.json(saved);
 }));
 
+// Toutes les colonnes de `requests`, écrites une à une. `r.*` serait plus court,
+// mais il ramènerait la fiche ENTIÈRE et annulerait l'allègement ci-dessous.
+// Une colonne ajoutée au schéma et oubliée ici disparaîtrait de la liste sans
+// bruit : un test la compare à `information_schema` pour que ça ne puisse pas
+// arriver.
+const COLONNES_REQUEST = [
+  'id', 'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority',
+  'client_type', 'billing_company', 'contact_referent', 'contact_phone', 'contact_email',
+  'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'status',
+  'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
+  'flag', 'flag_reason', 'position', 'fiche', 'created_at', 'updated_at',
+];
+
+// LA LISTE NE LIT PLUS LA FICHE ENTIÈRE. `allegerFiche` n'en garde que quatre
+// champs et les techniques : tout le reste — le récapitulatif ligne à ligne du
+// comptoir, les contrôles, le paiement — était lu sur le disque par Postgres,
+// sérialisé, transporté jusqu'à Node et analysé… pour être jeté à la ligne
+// suivante. Une vraie fiche de vente pèse 3,6 Ko, dont 3,2 Ko de `client` +
+// `details` : sur les 400 lignes d'une étape, ce sont 1,4 Mo lus pour en servir
+// 330 Ko — à chaque rafraîchissement, pour chaque poste. On les retire donc DANS
+// LA REQUÊTE, là où ça ne coûte rien.
+// `techniquesDeLaFiche` ne lit que `textiles` / `articles` / `lignes` : aucune
+// des clés retirées ici n'est nécessaire à la grille.
+const FICHE_JETEE = ['client', 'details', 'controles', 'paiement'];
+const FICHE_ALLEGEE_SQL = `(r.fiche ${FICHE_JETEE.map((k) => `- '${k}'`).join(' ')}) AS fiche`;
+const CHAMPS_LISTE = [
+  ...COLONNES_REQUEST.filter((c) => c !== 'fiche').map((c) => `r.${c}`),
+  FICHE_ALLEGEE_SQL,
+].join(', ');
+
 // On expose seulement le nom de fichier des PDF (jamais les blobs) afin que la
 // grille et le temps réel restent légers.
-const SELECT = `SELECT r.*,
-    ad.filename AS devis_name,
-    ab.filename AS bat_name,
-    af.filename AS facture_name
-  FROM requests r
+const JOINTURES_PDF = `FROM requests r
   LEFT JOIN attachments ad ON ad.request_id = r.id AND ad.kind = 'devis'
   LEFT JOIN attachments ab ON ab.request_id = r.id AND ab.kind = 'bat'
   LEFT JOIN attachments af ON af.request_id = r.id AND af.kind = 'facture'`;
+const NOMS_PDF = `ad.filename AS devis_name,
+    ab.filename AS bat_name,
+    af.filename AS facture_name`;
+
+const SELECT = `SELECT ${CHAMPS_LISTE},
+    ${NOMS_PDF}
+  ${JOINTURES_PDF}`;
+// La MÊME lecture, fiche comprise : le tiroir de détail et le récapitulatif
+// imprimable en ont besoin, et eux ne portent que sur UNE ligne.
+const SELECT_COMPLET = `SELECT r.*,
+    ${NOMS_PDF}
+  ${JOINTURES_PDF}`;
 const ORDER = 'ORDER BY r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
 // Le MÊME ordre, exactement à l'envers. Il sert à prendre la FIN d'une étape
 // sans la lire en entier : on trie à rebours, on coupe, on remet à l'endroit.
@@ -715,13 +753,20 @@ app.get('/api/requests', asyncH(async (req, res) => {
       if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
     }
   } else {
-    const toutesEtapes = `${SELECT} ORDER BY r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC`;
+    const parEtape = 'r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
     if (tout) {
-      ({ rows } = await pool.query(toutesEtapes));
+      ({ rows } = await pool.query(`${SELECT} ORDER BY ${parEtape}`));
     } else {
-      const r = await pool.query(`${toutesEtapes} LIMIT $1`, [LISTE_MAX + 1]);
+      // MÊME RÈGLE QUE PAR ÉTAPE : on rend la FIN de la liste. Le plafond
+      // s'appliquait ici sur l'ordre normal, donc sur les PREMIÈRES lignes —
+      // classées par étape, alphabétiquement : « demande_chiffrage » et
+      // « facturation » remplissaient les 400 places et « production »,
+      // « préparation » n'apparaissaient tout simplement jamais. Un appelant
+      // sans `?stage=` recevait une réponse amputée sans rien qui le dise.
+      const parEtapeInverse = 'r.stage DESC, r.position DESC NULLS FIRST, r.priority ASC, r.deadline DESC NULLS FIRST, r.created_at DESC';
+      const r = await pool.query(`${SELECT} ORDER BY ${parEtapeInverse} LIMIT $1`, [LISTE_MAX + 1]);
       const { lignes, complet } = bornerListe(r.rows);
-      rows = lignes;
+      rows = lignes.reverse();
       if (!complet) res.set('X-Liste-Tronquee', String(LISTE_MAX));
     }
   }
@@ -763,7 +808,8 @@ app.get('/api/requests', asyncH(async (req, res) => {
 const SYNTHESE_CHAMPS = `r.id, r.stage, r.sub_stage, r.order_kind, r.responsable, r.referent,
   r.priority, r.client_type, r.billing_company, r.contact_referent, r.contact_phone,
   r.contact_email, r.quantity, r.product, r.color, r.project_value, r.description, r.deadline,
-  r.flag, r.flag_reason, r.paye, r.acompte_verse, r.created_at, r.updated_at, r.fiche`;
+  r.flag, r.flag_reason, r.paye, r.acompte_verse, r.created_at, r.updated_at,
+  ${FICHE_ALLEGEE_SQL}`;
 
 // La fiche quitte la ligne, ses techniques restent. Une commande sans technique
 // connue ne se voit pas inventer de fiche : `machineOf` doit pouvoir répondre
@@ -774,6 +820,18 @@ function allegerSynthese(row) {
   if (!techniques.length) return reste;
   return { ...reste, fiche: { techniques, fichePartielle: true } };
 }
+
+// L'EMPREINTE DE LA COMPOSITION. `ids` dit quelles commandes existent et dans
+// quel ordre — c'est ce qui permet de repérer une suppression sans tenir de
+// registre. Mais la composition ne bouge QUE quand une ligne naît, meurt ou
+// change de place, alors que la liste repartait ENTIÈRE à chaque évènement : sur
+// 1 500 commandes, 60 Ko d'identifiants rigoureusement identiques, vers chaque
+// poste, pour la moindre pastille posée à l'autre bout de l'atelier. Et ça ne
+// fait que grossir, aucune commande ne quittant jamais le planning.
+// Le poste renvoie donc l'empreinte qu'il a reçue ; tant qu'elle correspond, on
+// ne réexpédie pas la liste — il garde celle qu'il a déjà.
+const empreinteIds = (ids) => require('crypto')
+  .createHash('sha1').update(ids.join(','), 'utf8').digest('hex').slice(0, 16);
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
@@ -789,9 +847,15 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const { rows: horloge } = await pool.query('SELECT now() AS maintenant');
   const jusqua = horloge[0].maintenant;
 
-  const { rows: ids } = await pool.query(
+  const { rows: idRows } = await pool.query(
     'SELECT id FROM requests ORDER BY stage, position ASC NULLS LAST, created_at ASC',
   );
+  const ids = idRows.map((r) => r.id);
+  const empreinte = empreinteIds(ids);
+  // Même composition qu'au dernier passage de CE poste : il la connaît déjà.
+  // Absente de la réponse, elle vaut « rien n'a changé de ce côté-là » — le
+  // poste garde sa liste (voir fusionner, côté Point du jour).
+  const memeComposition = req.query.empreinte === empreinte;
 
   let lignes;
   if (borne) {
@@ -804,7 +868,12 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
     lignes = rows;
   }
 
-  res.json({ jusqua, ids: ids.map((r) => r.id), lignes: lignes.map(allegerSynthese) });
+  res.json({
+    jusqua,
+    empreinte,
+    ...(memeComposition ? {} : { ids }),
+    lignes: lignes.map(allegerSynthese),
+  });
 }));
 
 // GET /api/requests/recherche?q=…  → LA RECHERCHE GLOBALE (palette « Spotlight »).
@@ -850,7 +919,7 @@ app.get('/api/requests/recherche', asyncH(async (req, res) => {
 // de détail et le récapitulatif imprimable vont chercher : le détail n'est
 // chargé que pour la ligne qu'on ouvre, jamais pour les centaines d'autres.
 app.get('/api/requests/:id', asyncH(async (req, res) => {
-  const { rows } = await pool.query(`${SELECT} WHERE r.id = $1`, [req.params.id]);
+  const { rows } = await pool.query(`${SELECT_COMPLET} WHERE r.id = $1`, [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   res.json(rows[0]);
 }));
