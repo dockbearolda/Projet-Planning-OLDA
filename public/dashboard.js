@@ -1370,13 +1370,25 @@ export function createDashboard(deps) {
     configARecharger = false;
   }
 
+  // L'empreinte de la COMPOSITION rendue au dernier passage. On la renvoie au
+  // serveur : tant qu'elle correspond, il n'a pas à réexpédier la liste des
+  // identifiants — 60 Ko rigoureusement identiques sur 1 500 commandes, à
+  // chaque évènement, sur chaque poste, et qui ne font que grossir.
+  let empreinteIds = null;
+  // L'ordre et la composition tels qu'on les connaît. Sans `ids` dans la
+  // réponse, c'est LUI qui fait foi.
+  let ordreIds = [];
+
   // Reconstruit le planning à partir de ce que le serveur vient d'envoyer :
   // `ids` donne la composition et l'ordre exacts (donc les suppressions), les
   // lignes reçues remplacent celles qu'on avait, le reste est déjà en mémoire.
+  // `ids` ABSENT ne veut pas dire « plus aucune commande » : il veut dire « rien
+  // n'a bougé de ce côté-là ». On garde alors l'ordre du dernier passage.
   function fusionner(synthese) {
     const connues = new Map(rows.map((r) => [String(r.id), r]));
     for (const l of synthese.lignes || []) connues.set(String(l.id), l);
-    return (synthese.ids || []).map((id) => connues.get(String(id))).filter(Boolean);
+    if (Array.isArray(synthese.ids)) ordreIds = synthese.ids.map(String);
+    return ordreIds.map((id) => connues.get(id)).filter(Boolean);
   }
 
   async function refresh() {
@@ -1386,21 +1398,36 @@ export function createDashboard(deps) {
       // On ne redemande QUE ce qui a changé. Avant, chaque évènement temps réel
       // — le glisser-déposer d'une collègue, une pastille posée à l'autre bout
       // de l'atelier — faisait retélécharger le planning entier à chaque poste.
-      const synthese = await api('GET', derniereSynchro
-        ? `/api/requests/synthese?depuis=${encodeURIComponent(derniereSynchro)}`
-        : '/api/requests/synthese');
+      const parametres = new URLSearchParams();
+      if (derniereSynchro) parametres.set('depuis', derniereSynchro);
+      if (empreinteIds) parametres.set('empreinte', empreinteIds);
+      const q = parametres.toString();
+      const synthese = await api('GET', `/api/requests/synthese${q ? `?${q}` : ''}`);
       if (configARecharger) await chargerConfig();
 
       const fresh = fusionner(synthese);
       // Diff pour le fil d'activité (seulement après le premier chargement).
       if (loaded) {
         const oldById = new Map(rows.map((r) => [String(r.id), r]));
-        diffIntoActivity(oldById, fresh);
+        // LES COMMANDES QUI VIENNENT DE QUITTER LE BORD. La synthèse ne porte
+        // que les familles vivantes : une commande passée en « Paiement &
+        // clôture » n'est plus dans `fresh` et s'évaporerait du fil, alors que
+        // c'est justement l'évènement à annoncer (« marquée traitée ✓ »). Le
+        // serveur nous l'envoie quand même dans `lignes` ; on la donne au diff,
+        // sans la remettre dans le tableau.
+        const auBord = new Set(fresh.map((r) => String(r.id)));
+        const parties = (synthese.lignes || []).filter((l) => !auBord.has(String(l.id)));
+        diffIntoActivity(oldById, [...fresh, ...parties]);
       }
       rows = fresh;
-      // Posé APRÈS coup : si quoi que ce soit au-dessus avait échoué, on
+      // Posés APRÈS coup : si quoi que ce soit au-dessus avait échoué, on
       // redemanderait à partir du même point plutôt que de sauter un intervalle.
       derniereSynchro = synthese.jusqua || derniereSynchro;
+      // L'empreinte ne se retient QUE si l'on a effectivement rangé la
+      // composition qu'elle décrit : la garder après un échec ferait croire au
+      // serveur qu'on connaît une liste qu'on n'a jamais reçue, et une
+      // suppression resterait à l'écran pour toujours.
+      empreinteIds = synthese.empreinte || null;
       loaded = true;
       premierChargementKo = false;
       renderAll();

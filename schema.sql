@@ -21,7 +21,13 @@ CREATE TABLE IF NOT EXISTS requests (
   project_value   numeric(12,2),
   description     text,
   deadline        date,
-  status          text,
+  -- La colonne `status` a vécu ici. Reliquat du modèle d'avant les familles :
+  -- l'état d'une commande vit dans `stage` / `sub_stage`, son alerte dans
+  -- `flag`. Plus personne ne l'écrivait ni ne la lisait, et elle repartait
+  -- pourtant vers chaque poste, sur chaque ligne, à chaque rafraîchissement.
+  -- Retirée du schéma, et supprimée au démarrage UNIQUEMENT si elle est vide
+  -- partout (voir retirerColonneStatus dans db.js).
+  -- Down : ALTER TABLE requests ADD COLUMN IF NOT EXISTS status text;
   -- SUIVI DU PAIEMENT (null = on ne se prononce pas). `acompte_montant` est la
   -- somme réellement encaissée ; `project_value` reste le total TTC du projet.
   acompte_demande boolean,
@@ -69,19 +75,20 @@ CREATE INDEX IF NOT EXISTS idx_requests_stage_sort ON requests (stage, priority 
 -- Down : DROP INDEX IF EXISTS idx_requests_updated;
 CREATE INDEX IF NOT EXISTS idx_requests_updated ON requests (updated_at);
 
--- Secteurs de production rattachés à une commande (relation 1 commande ↔ N machines).
--- Une commande en production (stage = 'production') porte une ligne par secteur
--- qu'elle doit traverser ; « done » = cette machine a fait sa part.
-CREATE TABLE IF NOT EXISTS production_sectors (
-  request_id  uuid    NOT NULL,
-  sector      text    NOT NULL,
-  done        boolean NOT NULL DEFAULT false,
-  position    double precision,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (request_id, sector)
-);
-CREATE INDEX IF NOT EXISTS idx_prodsec_sector  ON production_sectors (sector, done);
-CREATE INDEX IF NOT EXISTS idx_prodsec_request ON production_sectors (request_id);
+-- La table `production_sectors` (1 commande ↔ N machines) a vécu ici. Elle
+-- datait du pipeline linéaire : depuis le passage aux 5 familles, la production
+-- se lit dans `sub_stage` et plus aucune requête de l'application ne la touche —
+-- seule une vieille migration la consulte encore, et elle tolère son absence.
+-- Retirée du schéma, et supprimée au démarrage UNIQUEMENT si elle est vide
+-- (voir retirerTableProductionSectors dans db.js).
+-- Down :
+--   CREATE TABLE IF NOT EXISTS production_sectors (
+--     request_id uuid NOT NULL, sector text NOT NULL,
+--     done boolean NOT NULL DEFAULT false, position double precision,
+--     created_at timestamptz NOT NULL DEFAULT now(),
+--     PRIMARY KEY (request_id, sector));
+--   CREATE INDEX idx_prodsec_sector  ON production_sectors (sector, done);
+--   CREATE INDEX idx_prodsec_request ON production_sectors (request_id);
 
 -- La table `statuses` (liste d'états colorés éditable) a vécu ici. Elle a été
 -- créée à chaque démarrage sans qu'AUCUNE ligne de code ne l'ait jamais lue ni

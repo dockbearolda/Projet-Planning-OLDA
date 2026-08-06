@@ -167,28 +167,36 @@ function bloc(src, signature) {
   const complete = await call('GET', '/api/requests?stage=paiement&tout=1');
   assert.ok(
     complete.body.some((r) => r.id === idVieille),
-    'et « tout afficher » la ramène — c’est le repli que le saut doit déclencher',
+    'et une lecture sans plafond la ramène — la commande n’est pas perdue',
   );
 
-  // L'écran : le saut lève le plafond quand la ligne visée n'est pas montée.
+  // L'écran : la commande hors liste reste JOIGNABLE. La façon de la joindre a
+  // changé le 06/08 — on chargeait toute l'étape (mille deux cents lignes
+  // montées dans la page d'une tablette, pour en faire clignoter une), on ouvre
+  // désormais SA fiche directement. Ce qui compte ici est inchangé : elle ne
+  // doit jamais passer pour perdue.
   const APP = lire('app.js');
   const contexte = {
     SUB_LABEL: { prod_uv: 'Production UV' },
     PROMOTED: [],
     journal: [],
     rows: [{ id: 'deja-la' }],
-    toutAfficher: false,
+    presentes: new Set(['deja-la', 'hors-plafond']),   // ce que le serveur connaît
     showToast: (t) => contexte.journal.push(`toast:${t}`),
+    // La liste se monte par tranches : le saut attend qu'elle soit posée avant
+    // de conclure quoi que ce soit (voir TRANCHE_RENDU dans app.js). Ici elle
+    // l'est toujours — ce test-ci porte sur le plafond, pas sur le rendu.
+    listeMontee: Promise.resolve(),
   };
   contexte.setViewMode = (m) => { contexte.journal.push(`vue:${m}`); };
   contexte.selectStage = async (slug, sub) => { contexte.journal.push(`etape:${slug}|${sub || ''}`); };
-  contexte.loadRows = async () => {
-    contexte.journal.push(`liste:${contexte.toutAfficher ? 'tout' : 'plafonnee'}`);
-    contexte.rows = [...contexte.rows, { id: 'hors-plafond' }];
-  };
   contexte.revealRow = (rid) => {
     contexte.journal.push(`pointe:${rid}`);
     return contexte.rows.some((r) => String(r.id) === String(rid));
+  };
+  contexte.ouvrirFicheHorsListe = async (rid) => {
+    if (!contexte.presentes.has(String(rid))) throw new Error('introuvable');
+    contexte.journal.push(`fiche:${rid}`);
   };
   contexte.location = { hash: '#planning' };
   contexte.history = { replaceState: (_a, _b, h) => { contexte.location.hash = h; } };
@@ -199,37 +207,37 @@ function bloc(src, signature) {
     contexte,
   );
 
-  // Ligne déjà montée : rien de plus à charger.
+  // Ligne déjà montée : rien de plus à charger, et surtout pas la fiche.
   await contexte.ouvrir({ id: 'deja-la', stage: 'production', sub: 'prod_uv' });
   assert.ok(
-    !contexte.journal.some((l) => l.startsWith('liste:')),
-    'une ligne déjà à l’écran ne déclenche aucun rechargement',
+    !contexte.journal.some((l) => l.startsWith('fiche:')),
+    'une ligne déjà à l’écran s’ouvre là où elle est',
   );
 
-  // Ligne hors du plafond : on lève le plafond, une fois, puis on la pointe.
+  // Ligne hors du plafond : sa fiche s'ouvre, SANS charger l'archive.
   contexte.journal.length = 0;
-  contexte.toutAfficher = false;
   contexte.rows = [{ id: 'deja-la' }];
   await contexte.ouvrir({ id: 'hors-plafond', stage: 'paiement', sub: null });
   assert.deepStrictEqual(
     contexte.journal,
     // On tente d'abord la grille en place — c'est gratuit et c'est le cas
-    // courant. C'est l'ÉCHEC de cette tentative qui lève le plafond.
-    ['vue:planning', 'etape:paiement|', 'pointe:hors-plafond', 'liste:tout', 'pointe:hors-plafond'],
-    'la commande introuvable dans la liste plafonnée déclenche la lecture complète, puis le saut',
+    // courant. C'est l'ÉCHEC de cette tentative qui ouvre la fiche.
+    ['vue:planning', 'etape:paiement|', 'pointe:hors-plafond', 'fiche:hors-plafond'],
+    'la commande hors de la liste plafonnée s’ouvre par sa fiche, sans monter l’archive',
   );
-  assert.strictEqual(contexte.toutAfficher, true, 'le plafond est levé pour cette étape');
+  assert.ok(
+    !contexte.journal.some((l) => l.startsWith('toast:')),
+    'et rien ne laisse croire qu’elle a disparu',
+  );
 
-  // Introuvable même après tout avoir chargé : on le DIT, on ne laisse pas
+  // Introuvable même en la demandant nommément : on le DIT, on ne laisse pas
   // l'employé devant une grille muette (c'est là qu'on ressaisit un dossier).
   contexte.journal.length = 0;
-  contexte.toutAfficher = false;
   contexte.rows = [{ id: 'deja-la' }];
-  contexte.loadRows = async () => { contexte.journal.push('liste:tout'); };
   await contexte.ouvrir({ id: 'disparue', stage: 'paiement', sub: null });
   assert.ok(
     contexte.journal.some((l) => l.startsWith('toast:')),
-    'une commande introuvable jusqu’au bout est signalée à l’écran',
+    'une commande vraiment introuvable est signalée à l’écran',
   );
 
   // =========================================================================

@@ -575,7 +575,7 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   }
   // « Tout afficher » vaut pour L'ÉTAPE où on l'a demandé : on ne traîne pas
   // l'historique complet de la clôture derrière soi en changeant de famille.
-  if (!sameFamily) { toutAfficher = false; listeTronqueeA = 0; renderListeSuite(); }
+  if (!sameFamily) { plafondListe = PALIER_LISTE; listeTronqueeA = 0; listeTotal = 0; renderListeSuite(); }
   // Relecture forcée : on garde la grille à l'écran (pas de `clearGrid`), sinon
   // elle clignoterait alors qu'on est déjà au bon endroit.
   if (!sameFamily) clearGrid();
@@ -621,19 +621,27 @@ let loadToken = 0;
 
 // LA LISTE N'EST PAS TOUJOURS ENTIÈRE. Aucune commande ne quitte le planning :
 // « Paiement & clôture » garde tout l'historique, et monter des milliers de
-// lignes dans la page finit par figer la tablette. Le serveur ne rend donc que
-// la fin de la liste ; ce drapeau dit qu'on a demandé le reste, et il retombe
-// dès qu'on change d'étape (l'historique d'une étape ne regarde pas la suivante).
-let toutAfficher = false;
-let listeTronqueeA = 0;   // 0 = on a bien tout ; sinon le plafond appliqué
+// lignes dans la page finit par figer la tablette.
+//
+// ON EN DEMANDE DONC UN PALIER À LA FOIS. « Tout afficher » sautait d'un coup à
+// l'archive complète : mille deux cents lignes montées dans la page, et un
+// planning qui reste lourd pour le reste de la journée — alors qu'on cherchait
+// UNE commande. Le bouton en ajoute maintenant quatre cents, autant de fois
+// qu'il le faut, et l'employé voit combien il en reste.
+// Le palier retombe dès qu'on change d'étape : l'historique d'une étape ne
+// regarde pas la suivante.
+const PALIER_LISTE = 400;
+let plafondListe = PALIER_LISTE;
+let listeTronqueeA = 0;   // 0 = on a bien tout ; sinon le nombre affiché
+let listeTotal = 0;       // combien l'étape en compte en tout (quand c'est coupé)
 
 function urlListe(slug) {
-  const base = `/api/requests?stage=${encodeURIComponent(slug)}`;
-  return toutAfficher ? `${base}&tout=1` : base;
+  return `/api/requests?stage=${encodeURIComponent(slug)}&max=${plafondListe}`;
 }
 
-// Même chose qu'`api('GET', …)`, mais on garde l'en-tête qui dit si le serveur a
-// coupé. Le corps reste un simple tableau : rien d'autre n'a besoin de changer.
+// Même chose qu'`api('GET', …)`, mais on garde les en-têtes qui disent si le
+// serveur a coupé, et à combien. Le corps reste un simple tableau : rien
+// d'autre n'a besoin de changer.
 async function chargerListe(url) {
   const res = await fetchBorne(url);
   if (!res.ok) {
@@ -642,7 +650,12 @@ async function chargerListe(url) {
     throw new Error(detail);
   }
   const plafond = Number(res.headers.get('X-Liste-Tronquee') || 0);
-  return { lignes: await res.json(), plafond: Number.isFinite(plafond) ? plafond : 0 };
+  const total = Number(res.headers.get('X-Liste-Total') || 0);
+  return {
+    lignes: await res.json(),
+    plafond: Number.isFinite(plafond) ? plafond : 0,
+    total: Number.isFinite(total) ? total : 0,
+  };
 }
 
 function renderListeSuite() {
@@ -651,14 +664,29 @@ function renderListeSuite() {
   bloc.hidden = !listeTronqueeA;
   if (!listeTronqueeA) return;
   const texte = document.getElementById('listeSuiteTexte');
-  if (texte) texte.textContent = `${listeTronqueeA} commandes les plus récentes affichées.`;
+  // On dit ce qu'on montre ET sur combien : « 400 des 1 200 » se lit d'un coup
+  // d'œil, là où « 400 affichées » laissait croire qu'il en manquait peut-être
+  // deux. Sans le total (vieux serveur), on s'en tient à ce qu'on sait.
+  if (texte) {
+    texte.textContent = listeTotal > listeTronqueeA
+      ? `${listeTronqueeA} des ${listeTotal} commandes — les plus récentes.`
+      : `${listeTronqueeA} commandes les plus récentes affichées.`;
+  }
+  const btn = document.getElementById('listeSuiteTout');
+  if (btn && !btn.disabled) {
+    const reste = listeTotal > listeTronqueeA ? listeTotal - listeTronqueeA : 0;
+    btn.textContent = reste && reste <= PALIER_LISTE
+      ? `Afficher les ${reste} dernières`
+      : `Afficher ${PALIER_LISTE} de plus`;
+  }
 }
 
 (function () {
   const btn = document.getElementById('listeSuiteTout');
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    toutAfficher = true;
+    const avant = plafondListe;
+    plafondListe += PALIER_LISTE;
     btn.disabled = true;
     btn.textContent = 'Chargement…';
     try {
@@ -666,11 +694,11 @@ function renderListeSuite() {
     } catch (err) {
       // Échec : on ne laisse pas l'employé devant un bouton qui a l'air d'avoir
       // marché. Il redevient cliquable, et la liste courte reste à l'écran.
-      toutAfficher = false;
+      plafondListe = avant;
       reportError(err);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Tout afficher';
+      renderListeSuite();
     }
   });
 }());
@@ -678,10 +706,11 @@ function renderListeSuite() {
 async function loadRows() {
   const slug = currentStage;
   const token = ++loadToken;
-  const { lignes: data, plafond } = await chargerListe(urlListe(slug));
+  const { lignes: data, plafond, total } = await chargerListe(urlListe(slug));
   if (token !== loadToken || slug !== currentStage) return; // sélection dépassée
   rows = data;
   listeTronqueeA = plafond;
+  listeTotal = total;
   renderListeSuite();
   lastRowsSig = signature(rows);
   updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
@@ -835,6 +864,8 @@ function applySortAndRender({ syncDrawer = true } = {}) {
   // par frappe) — cf. applySearchAndCounts.
   lastRendered = sorted;
   renderRows(sorted);
+  // Plus rien en attente : la liste est entière à l'écran (voir listeMontee).
+  if (!suiteRendu) marquerRenduAcheve();
   applySearchAndCounts();
   if (syncDrawer) renderLigneDetailIfOpen();
 }
@@ -1345,20 +1376,85 @@ function avantReordonnancement(ordre, hote) {
   return mesurerVisibles(hote);
 }
 
+// ===========================================================================
+// LE FIL PRINCIPAL NE SE BLOQUE PLUS POUR CONSTRUIRE UNE LISTE
+// ===========================================================================
+// Ouvrir « Paiement & clôture » monte 400 lignes d'un coup ; retrouver une
+// commande archivée par la recherche lève le plafond et en monte plus de mille.
+// Chacune coûte une quarantaine de nœuds, ses écouteurs, ses infobulles et son
+// calcul d'heures ouvrées. Mesuré sur 1 200 commandes : UNE SEULE tâche d'une
+// seconde sur un ordinateur de bureau — donc plusieurs secondes sur la tablette
+// de l'atelier, pendant lesquelles RIEN ne répond : ni le défilement, ni un tap,
+// ni la barre de recherche. C'est le « ça rame » que l'on voit encore.
+//
+// On construit donc une première tranche — largement de quoi remplir l'écran —
+// puis on rend la main au navigateur avant de poser la suivante. L'employé a sa
+// liste tout de suite et peut s'en servir pendant que la fin se pose derrière.
+// Les lignes déjà montées ne comptent pas dans la tranche : un rafraîchissement
+// ordinaire (une valeur qui change) reste, comme avant, en un seul passage.
+const TRANCHE_RENDU = 40;
+let suiteRendu = null;
+
+// LA LISTE EST-ELLE ENTIÈREMENT MONTÉE ? Presque tout se moque de la réponse —
+// on défile, on tape, on lit. Mais pointer une commande retrouvée par la
+// recherche a besoin que SA ligne existe, et elle peut être à la millième
+// place : sans cette attente, l'écran conclurait « cette commande n'est plus à
+// cette étape » alors qu'elle est simplement en train de se poser.
+let rendreFini = null;
+let listeMontee = Promise.resolve();
+
+function marquerRenduEnCours() {
+  if (rendreFini) return;
+  listeMontee = new Promise((resoudre) => { rendreFini = resoudre; });
+}
+
+function marquerRenduAcheve() {
+  if (!rendreFini) return;
+  const resoudre = rendreFini;
+  rendreFini = null;
+  resoudre();
+}
+
+function planifierSuiteRendu() {
+  marquerRenduEnCours();
+  if (suiteRendu) return;
+  // `setTimeout` et non `requestAnimationFrame` : sur un onglet en arrière-plan
+  // (tablette écran éteint), rAF est mis en pause et la liste resterait à
+  // moitié montée jusqu'au retour — or c'est justement là qu'on a le temps.
+  suiteRendu = setTimeout(() => {
+    suiteRendu = null;
+    // On repart de la liste DÉJÀ triée. Repasser par `applySortAndRender`
+    // referait le tri ET le filtre à chaque tranche — le prix fixe de la liste
+    // entière, autant de fois qu'il y a de tranches. Et l'ordre pourrait
+    // changer au milieu du remplissage, sous les yeux de l'employé.
+    // Le tiroir n'est pas resynchronisé non plus : il porte peut-être une
+    // correction en cours de saisie, et la suite du rendu ne le concerne pas.
+    renderRows(lastRendered);
+    if (!suiteRendu) marquerRenduAcheve();
+    applySearchAndCounts();
+  }, 0);
+}
+
 function renderCards(data) {
   const voulus = new Set(data.map((r) => String(r.id)));
   for (const [id, entry] of cardEls) {
     if (!voulus.has(id)) { entry.el.remove(); cardEls.delete(id); }
   }
   const ordre = [];
+  let budget = TRANCHE_RENDU;
+  let reste = false;
   for (const r of data) {
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = cardEls.get(id);
     if (!entry) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       entry = { el: buildCard(r), sig };
       cardEls.set(id, entry);
     } else if (entry.sig !== sig && !estPrise(entry.el)) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       const el = buildCard(r);
       entry.el.replaceWith(el);
       entry.el = el;
@@ -1366,7 +1462,10 @@ function renderCards(data) {
     }
     ordre.push(entry.el);
   }
-  const positions = avantReordonnancement(ordre, $cards);
+  // Tant que la liste se remplit, les cartes déjà posées « bougent » à chaque
+  // tranche : les faire glisser à chaque fois serait du bruit, pas du lien. On
+  // n'anime que le passage final, celui qui range vraiment.
+  const positions = reste ? null : avantReordonnancement(ordre, $cards);
   let prev = null;
   for (const node of ordre) {
     if (!estPrise(node)) {
@@ -1376,6 +1475,7 @@ function renderCards(data) {
     prev = node;
   }
   if (positions) animerReordonnancement(positions);
+  if (reste) planifierSuiteRendu();
 }
 
 // Une ligne qu'on NE TOUCHE PAS pendant un rendu : soit elle est en train d'être
@@ -1402,16 +1502,22 @@ function renderRows(data) {
   }
 
   // 2. Construire la séquence ordonnée des lignes, en créant / reconstruisant /
-  //    réutilisant chacune au passage.
+  //    réutilisant chacune au passage. Par TRANCHES : voir TRANCHE_RENDU.
   const order = [];
+  let budget = TRANCHE_RENDU;
+  let reste = false;
   for (const r of data) {
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = rowEls.get(id);
     if (!entry) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       entry = { tr: buildRow(r), sig };
       rowEls.set(id, entry);
     } else if (entry.sig !== sig && !isRowBusy(entry.tr)) {
+      if (budget <= 0) { reste = true; break; }
+      budget -= 1;
       const tr = buildRow(r);
       entry.tr.replaceWith(tr);
       entry.tr = tr;
@@ -1423,7 +1529,7 @@ function renderRows(data) {
   // 3. Replacer tous les nœuds dans l'ordre voulu (sans déplacer une ligne en
   //    cours de drag : sa position est pilotée à la main). Les lignes qui
   //    changent de rang y glissent au lieu de sauter (cf. FLIP plus haut).
-  const positions = avantReordonnancement(order, $rows);
+  const positions = reste ? null : avantReordonnancement(order, $rows);
   let prev = null;
   for (const node of order) {
     if (!estPrise(node)) {
@@ -1433,6 +1539,7 @@ function renderRows(data) {
     prev = node;
   }
   if (positions) animerReordonnancement(positions);
+  if (reste) planifierSuiteRendu();
 
   applyEmptyCols();
   updateSortArrows();
@@ -1456,11 +1563,15 @@ function applySearchAndCounts() {
   let visible = 0;
   const cartes = modeCartes();
   for (const r of lastRendered) {
+    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
+    // LE COMPTEUR PORTE SUR LA DONNÉE, pas sur ce qui est déjà monté. Une longue
+    // liste se pose par tranches (voir TRANCHE_RENDU) : compter les seules
+    // lignes présentes dans le DOM aurait affiché « 80 commandes », puis 160,
+    // puis 240… sur un écran dont c'est justement le chiffre qu'on vient lire.
+    if (match) visible++;
     const entry = cartes ? cardEls.get(String(r.id)) : rowEls.get(String(r.id));
     if (!entry) continue;
-    const match = !q || SEARCH_FIELDS.some((f) => fold(r[f]).includes(q));
     (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
-    if (match) visible++;
   }
   $empty.hidden = visible > 0;
   if (visible === 0) {
@@ -2446,6 +2557,25 @@ let ligneDrawerEl = null;
 let ligneDrawerCard = null;
 let ligneDrawerId = null; // id (string) de la ligne affichée, ou null si fermé
 
+// LA COMMANDE OUVERTE N'EST PAS TOUJOURS DANS LA LISTE. Un vieux dossier
+// retrouvé par la recherche globale vit hors des 400 dernières de son étape :
+// on ne charge plus l'archive entière pour l'afficher (c'est ce qui figeait la
+// tablette), on garde SA ligne à part. Sans ça, `rows.find` ne la trouverait pas
+// et le tiroir se refermerait tout seul au premier rafraîchissement.
+let ligneHorsListe = null;
+
+const ligneDuTiroir = () => rows.find((x) => String(x.id) === ligneDrawerId)
+  || (ligneHorsListe && String(ligneHorsListe.id) === ligneDrawerId ? ligneHorsListe : null);
+
+// Va chercher UNE commande et ouvre sa fiche, sans toucher à la grille.
+async function ouvrirFicheHorsListe(id) {
+  const ligne = await api('GET', `/api/requests/${id}`);
+  ligneHorsListe = ligne;
+  memoriserFiche(ligne);        // la réponse porte déjà la fiche complète
+  openLigneDetail(ligne.id);
+  showToast('Commande hors de la liste affichée — ouverte depuis la recherche.');
+}
+
 function ensureLigneDrawer() {
   if (ligneDrawerEl) return;
   ligneDrawerEl = document.createElement('div');
@@ -2514,6 +2644,11 @@ async function chargerFicheComplete(id) {
   fichesCompletes.set(cle, fiche);
   const r = rows.find((x) => String(x.id) === cle);
   if (r) r.fiche = fiche;
+  // La commande ouverte hors de la liste ne passe par aucun rafraîchissement de
+  // grille : cette réponse est la SEULE occasion de remettre sa ligne à jour.
+  // Sans ça, la fiche d'un vieux dossier resterait sur les valeurs qu'elle avait
+  // à l'ouverture, même après qu'un collègue les a corrigées.
+  if (ligneHorsListe && String(ligneHorsListe.id) === cle) ligneHorsListe = complet;
   return fiche;
 }
 
@@ -2610,6 +2745,9 @@ function focusFiche() {
 function closeLigneDetail() {
   if (!ligneDrawerEl) return;
   ligneDrawerId = null;
+  // La commande tenue à part n'a plus de raison d'être : elle n'appartient pas à
+  // la liste et rien d'autre ne la lit.
+  ligneHorsListe = null;
   ligneDrawerEl.hidden = true;
   figerLeFond(false);
   ldOublierSaisie();
@@ -2622,7 +2760,7 @@ function closeLigneDetail() {
 // ligne a quitté la vue courante (déplacée vers une autre étape, supprimée).
 function renderLigneDetailIfOpen() {
   if (!ligneDrawerId) return;
-  const r = completerFiche(rows.find((x) => String(x.id) === ligneDrawerId));
+  const r = completerFiche(ligneDuTiroir());
   // La fermeture passe AVANT la garde : un tiroir ouvert sur une ligne qui a
   // quitté la vue doit se fermer même si le focus est resté dedans.
   if (!r) { closeLigneDetail(); return; }
@@ -3243,7 +3381,7 @@ function placesDuPipeline(placeActuelle) {
 }
 
 function renderLigneDetail() {
-  const r = completerFiche(rows.find((x) => String(x.id) === ligneDrawerId));
+  const r = completerFiche(ligneDuTiroir());
   if (!r) { closeLigneDetail(); return; }
   // Ce que l'employé a tapé sans l'enregistrer doit traverser la reconstruction.
   ldCapturerSaisie();
@@ -4266,6 +4404,10 @@ async function removeRow(r) {
     `${quoi} sera retirée du planning définitivement.`,
   );
   if (!ok) return;
+  // La commande ouverte HORS de la liste ne peut pas « disparaître de la
+  // grille » : elle n'y est pas. On ferme sa fiche, sinon on resterait devant un
+  // dossier supprimé, en apparence intact.
+  if (ligneHorsListe && String(ligneHorsListe.id) === String(r.id)) closeLigneDetail();
   // Ligne pas encore créée côté serveur : on l'enlève localement et on marque
   // l'id temporaire — si son POST de création est encore en vol, finalizeCreate
   // supprimera la commande orpheline à la réponse.
@@ -5261,15 +5403,16 @@ async function poll({ listeAussi = true } = {}) {
     // raccourci « même famille » de selectStage.
     const slug = currentStage;
     const token = loadToken;
-    // Même URL que `loadRows` : si l'employé a demandé l'historique entier, le
+    // Même URL que `loadRows` : si l'employé a demandé un palier de plus, le
     // rafraîchissement de fond ne doit pas le lui reprendre sous les doigts.
-    const { lignes: fresh, plafond } = await chargerListe(urlListe(slug));
+    const { lignes: fresh, plafond, total } = await chargerListe(urlListe(slug));
     if (slug !== currentStage || token !== loadToken) return; // sélection dépassée
     const sig = signature(fresh);
     if (sig !== lastRowsSig) {
       rows = fresh;
       lastRowsSig = sig;
       listeTronqueeA = plafond;
+      listeTotal = total;
       renderListeSuite();
       applySortAndRender();
     }
@@ -5961,22 +6104,27 @@ async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = fa
   // LA COMMANDE PEUT ÊTRE HORS DE LA LISTE CHARGÉE. Le serveur ne rend que les
   // 400 dernières lignes d'une étape, et « Paiement & clôture » garde tout
   // l'historique : une commande retrouvée par la recherche globale — c'est
-  // précisément pour les anciennes qu'on cherche — atterrissait dans une grille
-  // qui ne la contient pas. Le saut ne montrait rien, ne disait rien, et le
-  // dossier passait pour perdu. On lève donc le plafond de CETTE étape, une
-  // fois, et on retente.
+  // précisément pour les anciennes qu'on cherche — atterrit dans une grille qui
+  // ne la contient pas.
+  // La liste se pose par tranches : la ligne visée peut être en bas de la page
+  // et n'exister dans le DOM que dans quelques dizaines de millisecondes. On
+  // attend qu'elle soit montée plutôt que de conclure qu'elle a disparu.
+  await listeMontee;
   if (revealRow(id)) return;
-  if (!toutAfficher) {
-    toutAfficher = true;
-    try {
-      await loadRows();
-    } catch (_) { /* selectStage a déjà posé le message de perte de réseau */ }
-    if (revealRow(id)) return;
-  }
-  // Toujours rien alors qu'on a tout chargé : la ligne a changé d'étape ou
-  // vient d'être supprimée par un collègue. On le dit — une grille muette se
-  // lit « le dossier a disparu », et c'est le moment où quelqu'un le ressaisit.
-  showToast('Cette commande n’est plus à cette étape — elle vient d’être déplacée ou supprimée.');
+
+  // ON N'AVALE PLUS L'ARCHIVE POUR MONTRER UNE LIGNE. On chargeait alors TOUTE
+  // l'étape — mille deux cents commandes montées dans la page d'une tablette —
+  // pour faire clignoter une ligne au milieu, et le planning restait lourd
+  // ensuite. Or ce que l'employé veut, quand il ouvre un vieux dossier depuis la
+  // recherche, c'est LE DOSSIER : on ouvre sa fiche, tout de suite, et on le dit.
+  try {
+    await ouvrirFicheHorsListe(id);
+    return;
+  } catch (_) { /* la commande n'existe plus, ou le réseau est tombé */ }
+  // Introuvable même en la demandant nommément : elle vient d'être supprimée par
+  // un collègue. On le dit — une grille muette se lit « le dossier a disparu »,
+  // et c'est le moment où quelqu'un le ressaisit.
+  showToast('Cette commande n’existe plus — elle vient d’être supprimée.');
 }
 
 // Saut depuis le Point du jour (« Ouvrir dans le planning »).
