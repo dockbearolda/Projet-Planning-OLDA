@@ -3043,7 +3043,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .resp-chip.empty { padding: 8px 14px; }
   .resp-ini { width: 26px; height: 26px; font-size: 12px; }
   .sub-chip { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
-  .ref-chip { min-height: 40px; padding: 8px 12px; font-size: 13px; }
+  .ref-chip { min-height: 44px; padding: 8px 12px; font-size: 13px; }
   .flag-chip { min-height: 44px; padding: 8px 14px; font-size: 12.5px; }
   .flag-reason { min-height: 32px; padding: 4px 12px; font-size: 12.5px; }
   .col-flag { width: 148px; }
@@ -3051,7 +3051,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .reason-btn { min-height: 44px; padding: 10px 18px; font-size: 15px; }
   .type-tag,
   .prio-tag {
-    min-height: 40px;
+    min-height: 44px;
     padding: 6px 14px;
     font-size: 12px;
     display: inline-flex;
@@ -3062,14 +3062,24 @@ button, a, .stage, .prio-pill, .deadline-badge,
      textes ne se recouvrent plus au pixel près. */
   .client-stack .client-company,
   .client-company-view { font-size: 16px; }
+  /* SUPPRIMER et DUPLIQUER se touchent, en bout de ligne, et l'un des deux est
+     irréversible. À 40 px ils passaient sous le plancher de la charte : deux
+     millimètres à côté et l'on efface une commande au lieu de la copier. */
   .del-btn,
-  .dup-btn { width: 40px; height: 40px; }
-  .send-btn { width: 40px; height: 40px; }
-  .col-del { width: 140px; }
+  .dup-btn { width: 44px; height: 44px; }
+  .send-btn { width: 44px; height: 44px; }
+  .col-del { width: 156px; }
 
+  /* Les deux boutons de l'entête de grille (Colonnes, Guide) et la fermeture du
+     rail des colonnes tenaient 40 et 32 px : ils n'étaient pas dans la règle. */
+  .help-btn { min-height: 44px; }
+  .colbar-close { width: 44px; height: 44px; }
+
+  /* Le calendrier se tape entièrement au doigt : ses jours faisaient 40 px, et
+     un jour raté, c'est une échéance fausse. 7 × 44 = 308, la largeur du bloc. */
   .cal-pop { width: 308px; padding: 14px; }
-  .cal-day { height: 40px; font-size: 15px; }
-  .cal-nav { width: 40px; height: 40px; }
+  .cal-day { height: 44px; font-size: 15px; }
+  .cal-nav { width: 44px; height: 44px; }
   .cal-foot-btn { padding: 12px 8px; font-size: 14px; }
   .cal-quick-btn { padding: 12px 6px; font-size: 14px; }
   .cal-dow span { font-size: 12px; }

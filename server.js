@@ -730,10 +730,32 @@ app.get('/api/requests', asyncH(async (req, res) => {
 //                  SERVEUR, jamais de l'horloge du poste : deux montres qui
 //                  divergent d'une seconde suffiraient à sauter une modification.
 // Sans `depuis`, c'est un premier chargement : tout part, comme avant.
+//
+// LES CHAMPS SONT CEUX QUE LE POINT DU JOUR LIT, tous ceux-là et pas d'autres.
+// Il en manquait deux, et les deux manquaient EN SILENCE :
+//   - `contact_email` : sa recherche le cherche (même liste de champs que le
+//     planning, c'était tout l'objet d'un correctif précédent). Absent d'ici,
+//     chercher une adresse trouvait la commande au planning et rien ici.
+//   - la TECHNIQUE de marquage : le moteur de priorité s'en sert pour rattacher
+//     une commande à sa machine avant qu'elle n'arrive en production. La liste
+//     a appris à la transporter à plat (voir allegerFiche) le jour même où le
+//     Point du jour a cessé de lire la liste : la pondération « machine » n'a
+//     donc jamais rien pesé. On ne remonte pas `fiche` pour autant — plusieurs
+//     kilo-octets par commande pour une poignée de mots.
 const SYNTHESE_CHAMPS = `r.id, r.stage, r.sub_stage, r.order_kind, r.responsable, r.referent,
   r.priority, r.client_type, r.billing_company, r.contact_referent, r.contact_phone,
-  r.quantity, r.product, r.color, r.project_value, r.description, r.deadline,
-  r.flag, r.flag_reason, r.paye, r.acompte_verse, r.created_at, r.updated_at`;
+  r.contact_email, r.quantity, r.product, r.color, r.project_value, r.description, r.deadline,
+  r.flag, r.flag_reason, r.paye, r.acompte_verse, r.created_at, r.updated_at, r.fiche`;
+
+// La fiche quitte la ligne, ses techniques restent. Une commande sans technique
+// connue ne se voit pas inventer de fiche : `machineOf` doit pouvoir répondre
+// « aucune machine » plutôt que de fouiller un objet vide.
+function allegerSynthese(row) {
+  const { fiche, ...reste } = row;
+  const techniques = fiche && typeof fiche === 'object' ? techniquesDeLaFiche(fiche) : [];
+  if (!techniques.length) return reste;
+  return { ...reste, fiche: { techniques, fichePartielle: true } };
+}
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
@@ -758,7 +780,7 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
     lignes = rows;
   }
 
-  res.json({ jusqua, ids: ids.map((r) => r.id), lignes });
+  res.json({ jusqua, ids: ids.map((r) => r.id), lignes: lignes.map(allegerSynthese) });
 }));
 
 // GET /api/requests/recherche?q=…  → LA RECHERCHE GLOBALE (palette « Spotlight »).
@@ -1025,7 +1047,14 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const { rows } = await pool.query(query, params);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   await logRequestChanges(req.params.id, avant[0], rows[0]);
-  broadcast({ kind: 'update', stages: [rows[0].stage] });
+  // LES DEUX ÉTAPES quand la ligne change de famille. L'évènement ne nommait
+  // que la nouvelle : le poste qui regardait l'ANCIENNE n'avait aucune raison
+  // de relire sa grille et gardait la ligne à l'écran, dans une famille qu'elle
+  // a quittée. Tant que chaque poste retéléchargeait tout à chaque évènement,
+  // ça ne se voyait pas ; maintenant que l'écran écoute ce champ, c'est lui qui
+  // décide — il doit donc être exact.
+  const etapes = [...new Set([avant[0].stage, rows[0].stage])];
+  broadcast({ kind: 'update', stages: etapes });
   res.json(rows[0]);
 }));
 
@@ -1102,13 +1131,18 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
   // la cascade détruisait définitivement les PDF (devis, BAT, facture) d'une
   // commande qui, elle, restait au planning. Ici le pire cas laisse des pièces
   // orphelines, invisibles et sans conséquence.
-  const { rowCount } = await pool.query('DELETE FROM requests WHERE id = $1', [req.params.id]);
-  if (rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  // `RETURNING stage` : l'évènement doit dire OÙ la ligne vivait, sinon les
+  // postes ne savent pas si la grille qu'ils affichent vient de perdre une
+  // ligne — et, faute de mieux, ils relisent tous la leur.
+  const { rows: partie } = await pool.query(
+    'DELETE FROM requests WHERE id = $1 RETURNING stage', [req.params.id],
+  );
+  if (partie.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   // Cascade côté applicatif (pg-mem ne gère pas les clés étrangères en local).
   await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
   await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id]);
   await pool.query('DELETE FROM request_events WHERE request_id = $1', [req.params.id]);
-  broadcast({ kind: 'delete' });
+  broadcast({ kind: 'delete', stages: [partie[0].stage] });
   res.status(204).end();
 }));
 

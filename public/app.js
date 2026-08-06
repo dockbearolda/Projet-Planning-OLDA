@@ -4996,10 +4996,17 @@ function signature(list) {
   return list.map((r) => `${r.id}:${r.updated_at}`).join('|') + '#' + list.length;
 }
 
-async function poll() {
+// `listeAussi: false` ne rafraîchit QUE les compteurs du rail. C'est le cas
+// quand l'évènement temps réel ne touche pas la famille affichée : la grille
+// n'a alors rien à relire, et relire coûtait la liste ENTIÈRE de l'étape — à
+// chaque poste, à chaque geste de n'importe qui, y compris à l'autre bout du
+// pipeline. C'est ce qui restait de l'amplification réseau après la mise en lot
+// des évènements.
+async function poll({ listeAussi = true } = {}) {
   if (document.hidden) return; // onglet en arrière-plan : on économise
   try {
     await loadCounts(); // compteurs sidebar : toujours sûrs à rafraîchir
+    if (!listeAussi) return;
     if (isInteracting()) return; // ne pas perturber une saisie / un glisser
     // Même garde que `loadRows` : on note l'étape demandée ET le jeton de
     // chargement AVANT la requête. Sans ça, une réponse partie pour la famille
@@ -5028,11 +5035,38 @@ async function poll() {
 let streamAlive = false;
 let streamDebounce = null;
 
+// CE QUE LA RAFALE OBLIGE À REFAIRE. Les évènements arrivent par paquets — un
+// collègue qui range une étape, un dossier qui naît au comptoir — et on ne les
+// traite qu'une fois, 120 ms plus tard. Ce qu'on retient de chacun doit donc se
+// CUMULER : ne garder que le dernier ferait sauter la modification arrivée
+// 50 ms plus tôt sur la famille qu'on regarde, et perdrait le réglage du patron
+// coalescé derrière une commande déplacée.
+const rafale = { etapes: new Set(), toutes: false, natures: new Set() };
+
+function noterEvenement(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  if (p.kind) rafale.natures.add(p.kind);
+  // Un évènement qui ne nomme aucune étape ne dit pas « aucune » : il dit
+  // « on ne sait pas ». Le seul sens sûr de l'erreur est de relire.
+  if (!Array.isArray(p.stages) || !p.stages.length) rafale.toutes = true;
+  else for (const s of p.stages) rafale.etapes.add(s);
+}
+
+function viderRafale() {
+  const vue = { etapes: rafale.etapes, toutes: rafale.toutes, natures: [...rafale.natures] };
+  rafale.etapes = new Set();
+  rafale.toutes = false;
+  rafale.natures = new Set();
+  return vue;
+}
+
 function onStreamChange(e) {
   // Le patron vient de changer l'attribution des catégories : les pilotes et
   // référents « de base » affichés sur les lignes doivent suivre immédiatement.
-  let kind = null;
-  try { kind = JSON.parse(e && e.data ? e.data : '{}').kind; } catch (_) {}
+  let payload = {};
+  try { payload = JSON.parse(e && e.data ? e.data : '{}') || {}; } catch (_) { payload = {}; }
+  const kind = payload.kind || null;
+  noterEvenement(payload);
   if (kind === 'category-owners' || kind === 'category-referents') {
     loadCategoryConfig().then(() => { invalidateRowCache(); applySortAndRender(); });
   }
@@ -5055,12 +5089,19 @@ function onStreamChange(e) {
   // coalesce les rafales (plusieurs modifs quasi simultanées) en un seul refresh
   clearTimeout(streamDebounce);
   streamDebounce = setTimeout(() => {
+    const { etapes, toutes, natures } = viderRafale();
     // Le Point du jour garde son cache à jour même masqué (fil d'activité,
     // badges, écran mural) — mais à un rythme de fond, pas à chaque évènement.
-    // On lui passe la NATURE de l'évènement : lui seul sait s'il doit relire la
-    // configuration du patron ou se contenter de sa synthèse incrémentale.
-    dashboard.notifyChange(kind);
-    if (isPlanningMode(viewMode)) poll();
+    // On lui passe la NATURE des évènements de la rafale : lui seul sait s'il
+    // doit relire la configuration du patron ou se contenter de sa synthèse
+    // incrémentale.
+    dashboard.notifyChange(natures);
+    // LA GRILLE NE SE RELIT QUE SI LA FAMILLE AFFICHÉE EST CONCERNÉE. Le
+    // serveur nomme les étapes touchées ; on ne les lisait pas, et un simple
+    // glisser en Production faisait retélécharger sa liste entière au poste qui
+    // regardait « Demande & chiffrage ». Les compteurs du rail, eux, se
+    // rafraîchissent toujours : ils portent sur tout le pipeline.
+    if (isPlanningMode(viewMode)) poll({ listeAussi: toutes || etapes.has(currentStage) });
   }, 120);
 }
 
@@ -5374,15 +5415,19 @@ function setActive(i) {
 // défilement au centre + bref flash. Partagé par la recherche globale et le
 // dashboard — la vue par défaut étant les cartes, viser seulement le <tr>
 // laissait le saut « muet » la plupart du temps.
+// Renvoie VRAI si la ligne était bien montée. L'appelant en a besoin : une
+// commande absente de la grille n'est pas une anomalie d'affichage, c'est une
+// commande qu'on n'a pas chargée (voir ouvrirCommandeAuPlanning).
 function revealRow(id) {
   const entry = modeCartes() ? cardEls.get(String(id)) : rowEls.get(String(id));
   const el = entry ? (entry.tr || entry.el) : null;
-  if (!el) return;
+  if (!el) return false;
   el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   el.classList.remove('row-flash');
   void el.offsetWidth; // relance l'animation même si déjà posée
   el.classList.add('row-flash');
   setTimeout(() => el.isConnected && el.classList.remove('row-flash'), 1800);
+  return true;
 }
 
 // Saute vers la commande choisie : ouvre sa catégorie (et sa sous-étape), ferme
@@ -5630,7 +5675,27 @@ async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = fa
   setViewMode(vue);
   if (location.hash !== hash) history.replaceState(null, '', hash);
   await selectStage(stage, sousEtape, forcerRelecture);
-  if (id) revealRow(id);
+  if (!id) return;
+
+  // LA COMMANDE PEUT ÊTRE HORS DE LA LISTE CHARGÉE. Le serveur ne rend que les
+  // 400 dernières lignes d'une étape, et « Paiement & clôture » garde tout
+  // l'historique : une commande retrouvée par la recherche globale — c'est
+  // précisément pour les anciennes qu'on cherche — atterrissait dans une grille
+  // qui ne la contient pas. Le saut ne montrait rien, ne disait rien, et le
+  // dossier passait pour perdu. On lève donc le plafond de CETTE étape, une
+  // fois, et on retente.
+  if (revealRow(id)) return;
+  if (!toutAfficher) {
+    toutAfficher = true;
+    try {
+      await loadRows();
+    } catch (_) { /* selectStage a déjà posé le message de perte de réseau */ }
+    if (revealRow(id)) return;
+  }
+  // Toujours rien alors qu'on a tout chargé : la ligne a changé d'étape ou
+  // vient d'être supprimée par un collègue. On le dit — une grille muette se
+  // lit « le dossier a disparu », et c'est le moment où quelqu'un le ressaisit.
+  showToast('Cette commande n’est plus à cette étape — elle vient d’être déplacée ou supprimée.');
 }
 
 // Saut depuis le Point du jour (« Ouvrir dans le planning »).

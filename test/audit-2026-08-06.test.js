@@ -184,7 +184,12 @@ function bloc(src, signature) {
   contexte.selectStage = async (slug, sub, forcer) => {
     contexte.journal.push(`etape:${slug}|${sub || ''}${forcer ? '|forcee' : ''}`);
   };
-  contexte.revealRow = (rid) => { contexte.journal.push(`pointe:${rid}`); };
+  // La ligne visée est toujours montée ici : le repli « hors des 400 dernières »
+  // a son propre test (audit-2026-08-06-soir).
+  contexte.revealRow = (rid) => { contexte.journal.push(`pointe:${rid}`); return true; };
+  contexte.toutAfficher = false;
+  contexte.loadRows = async () => { contexte.journal.push('liste:tout'); };
+  contexte.showToast = (t) => { contexte.journal.push(`toast:${t}`); };
   contexte.location = { hash: '#dashboard' };
   contexte.history = { replaceState: (_a, _b, h) => { contexte.location.hash = h; } };
   vm.createContext(contexte);
@@ -240,7 +245,7 @@ function bloc(src, signature) {
   const start = bloc(DASH, '  function start() {');
   assert.ok(!/\brefresh\(\)/.test(start), 'start() ne déclenche plus le chargement du planning entier');
 
-  const notify = bloc(DASH, '  function notifyChange(kind) {');
+  const notify = bloc(DASH, '  function notifyChange(kinds) {');
   const bacDash = {
     loaded: false, visible: false, veilleTimer: null, dernierRefresh: 0,
     configARecharger: false,
