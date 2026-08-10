@@ -47,6 +47,9 @@ const COQUILLE = [
   '/guide.js',
   '/priority.js',
   '/whatsapp.js',
+  // Importé statiquement par app.js (glisser un document vers WhatsApp) : absent
+  // du cache, l'import échoue hors ligne et le planning ne s'ouvre plus.
+  '/documents.js',
   '/nom-client.js',
   '/confirmer.js',
   // Importé par app.js, clients.js ET reglages.js : absent du cache, l'import
