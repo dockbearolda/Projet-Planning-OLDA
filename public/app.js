@@ -144,9 +144,12 @@ const STAGE_LINKS = {
   fiverr: { url: 'https://fr.fiverr.com/', label: 'Ouvrir Fiverr' },
 };
 
-// Cibles d'envoi rapide proposées sur chaque ligne (boutons « → … »).
+// Cibles d'envoi rapide proposées sur chaque ligne. `icone` : le dessin de la
+// DESTINATION (cf. fiverrIcon) — une flèche ne dit que le geste, et sur une
+// ligne qui en porte déjà une pour « ouvrir », deux flèches ne se distinguent
+// pas. Une cible sans `icone` retombe sur la flèche générique.
 const SEND_TARGETS = [
-  { slug: 'fiverr', label: 'Fiverr' },
+  { slug: 'fiverr', label: 'Fiverr', icone: () => fiverrIcon() },
 ];
 
 // --- État applicatif -------------------------------------------------------
@@ -1278,9 +1281,8 @@ function buildCard(r) {
   const ouvrir = document.createElement('button');
   ouvrir.type = 'button';
   ouvrir.className = 'pcard__open';
-  ouvrir.setAttribute('aria-label', 'Ouvrir la fiche projet');
-  attachTip(ouvrir, 'Ouvrir la fiche projet');
-  ouvrir.appendChild(strokeIcon(['M7 17L17 7', 'M9 7h8v8']));
+  attachTip(ouvrir, 'Ouvrir la fiche : tout le dossier');
+  ouvrir.appendChild(dossierIcon());
   ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
 
   // SUPPRIMER. La corbeille n'existait que sur le tableau complet — or le
@@ -1709,10 +1711,24 @@ function buildRow(r) {
   tr.appendChild(cellDeadline(r));
   // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
   tr.appendChild(cellFlag(r));
-  // actions de fin de ligne : envoyer vers (Fiverr) + dupliquer +
-  // supprimer (révélées au survol)
+  // actions de fin de ligne : OUVRIR (toujours là) + envoyer vers (Fiverr) +
+  // dupliquer + supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
+
+  // OUVRIR LA LIGNE. Le tableau complet n'avait AUCUN moyen d'ouvrir la fiche :
+  // les cartes avaient leur bouton, le tableau non — on y voyait onze colonnes
+  // tronquées sans jamais pouvoir lire le dossier entier. Premier de la file, et
+  // le seul de la colonne à ne pas dépendre du survol : sur la tablette du
+  // comptoir il n'y a pas de souris, un bouton qui attend un survol n'existe pas.
+  const ouvrir = document.createElement('button');
+  ouvrir.className = 'open-btn';
+  ouvrir.type = 'button';
+  attachTip(ouvrir, 'Ouvrir la fiche : tout le dossier');
+  ouvrir.appendChild(dossierIcon());
+  ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
+  tdDel.appendChild(ouvrir);
+
   for (const t of SEND_TARGETS) {
     if (t.slug === r.stage) continue; // déjà dans cette catégorie
     const send = document.createElement('button');
@@ -1720,12 +1736,10 @@ function buildRow(r) {
     send.type = 'button';
     attachTip(send, `Envoyer vers ${t.label}`);
     send.setAttribute('aria-label', `Envoyer vers ${t.label}`);
-    const fleche = strokeIcon(['M5 12h13', 'M13 6l6 6-6 6']);
-    fleche.setAttribute('width', '13');
-    fleche.setAttribute('height', '13');
+    const marque = t.icone ? t.icone() : strokeIcon(['M5 12h13', 'M13 6l6 6-6 6']);
     const nom = document.createElement('span');
     nom.textContent = t.label;
-    send.append(fleche, nom);
+    send.append(marque, nom);
     send.addEventListener('click', () => { if (armerUneFois(send)) copyToStage(r, t.slug); });
     tdDel.appendChild(send);
   }
@@ -2198,6 +2212,48 @@ function strokeIcon(paths) {
 function whatsappIcon() {
   return strokeIcon([
     'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z',
+  ]);
+}
+
+// FIVERR : la marque, pas une flèche. « Envoyer vers Fiverr » s'annonçait par
+// une flèche « → » — le geste (envoyer) mais jamais la DESTINATION, et sur une
+// ligne où l'autre flèche (« ↗ ») ouvrait la fiche, les deux se confondaient.
+// Ici c'est le badge de Fiverr : carré arrondi plein et « fi » réservé dedans,
+// le seul dessin qu'on reconnaisse du premier coup d'œil.
+// MONOCHROME (`currentColor`) et non le vert de la marque : dans cet écran le
+// vert dit « livrée » (--st-livree). Une pastille verte au bout d'une ligne se
+// lirait comme un état, pas comme une destination — la forme suffit.
+function fiverrIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(NS, 'path');
+  // Un seul tracé : le carré, puis les contre-formes du « f » et du « i »
+  // (`evenodd` les évide au lieu de les remplir).
+  path.setAttribute('d', [
+    'M6 2h12a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z',
+    'M6.6 10.4h2.6V9.3c0-2.2 1.5-3.6 3.7-3.6h1.6v2.4h-1.2c-.9 0-1.4.5-1.4 1.3v1h2.4v2.3h-2.4V19H9.2v-6.3H6.6z',
+    'M15.9 12.7h1.9V19h-1.9z',
+    'M15.9 5.8h1.9v2.1h-1.9z',
+  ].join(''));
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('fill-rule', 'evenodd');
+  svg.appendChild(path);
+  return svg;
+}
+
+// OUVRIR LA LIGNE : un dossier qui s'ouvre. C'était une flèche sortante
+// (« ↗ »), qui dit « ça part ailleurs » — or rien ne part, on ouvre. Le mot du
+// comptoir est déjà le bon (« le dossier client ») : le dessin le reprend, et
+// il ne ressemble à aucun autre bouton de la ligne (ni au ticket, ni aux PDF,
+// ni à la corbeille).
+function dossierIcon() {
+  return strokeIcon([
+    'M3 8a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1',
+    'M3 8v10a2 2 0 0 0 2 2h13a2 2 0 0 0 1.9-1.4L22 11H8.4a2 2 0 0 0-1.9 1.4L3 20',
   ]);
 }
 
@@ -3129,14 +3185,19 @@ const LD_ICONES = {
   ticket: ['M4 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M4 19h16', 'M8 9h8', 'M8 12.5h5'],
 };
 
-// `icone` : une clé de LD_ICONES (dessinée) ou un nom de glyphe présent dans la
-// police auto-hébergée.
+// `icone` : une fonction qui rend un SVG (une marque, cf. fiverrIcon), une clé
+// de LD_ICONES (dessinée au trait) ou un nom de glyphe présent dans la police
+// auto-hébergée.
 function ldActionBtn(icone, label, onClick) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'ld-act';
   let i;
-  if (LD_ICONES[icone]) {
+  if (typeof icone === 'function') {
+    i = icone();
+    i.setAttribute('width', '17');
+    i.setAttribute('height', '17');
+  } else if (LD_ICONES[icone]) {
     i = strokeIcon(LD_ICONES[icone]);
     i.setAttribute('width', '17');
     i.setAttribute('height', '17');
@@ -3649,7 +3710,7 @@ function renderLigneDetail() {
   actions.append(dupliquer);
   for (const t of SEND_TARGETS) {
     if (t.slug === r.stage) continue; // déjà dans cette catégorie
-    actions.append(ldActionBtn('envoyer', `Vers ${t.label}`, (b) => {
+    actions.append(ldActionBtn(t.icone || 'envoyer', `Vers ${t.label}`, (b) => {
       if (armerUneFois(b)) copyToStage(r, t.slug);
     }));
   }

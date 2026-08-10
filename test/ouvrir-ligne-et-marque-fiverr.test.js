@@ -1,0 +1,149 @@
+'use strict';
+
+// OUVRIR LA LIGNE, ET LA MARQUE FIVERR À LA PLACE DE LA FLÈCHE.
+//
+// Deux plaintes du patron, le même jour, sur le même bout d'écran :
+//
+//   1. « Envoyer vers Fiverr » s'annonçait par une flèche « → ». La flèche dit
+//      le GESTE (ça part), jamais la DESTINATION — et la ligne portait déjà une
+//      autre flèche (« ↗ ») pour ouvrir la fiche. Deux flèches côte à côte, dont
+//      l'une recopie la commande ailleurs : c'est le bouton qu'on presse par
+//      erreur. Il faut la marque, reconnaissable du premier coup d'œil.
+//
+//   2. « Il faut OBLIGATOIREMENT une icône qui permet d'ouvrir la ligne et de
+//      voir toutes les indications à l'intérieur. » Le tableau complet n'en avait
+//      AUCUNE : les cartes avaient leur bouton, le tableau non. Onze colonnes
+//      tronquées, et pas un moyen de lire le dossier entier.
+//
+// Ce fichier lit les VRAIS fichiers servis (aucune copie) et vérifie que les
+// deux corrections tiennent : la marque là où on envoie, le dossier là où on
+// ouvre, dans les DEUX vues.
+
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
+const APP = lire('app.js');
+const CSS = lire('styles.css');
+const HTML = lire('index.html');
+
+// ===========================================================================
+// 1. LA MARQUE FIVERR, PAS UNE FLÈCHE
+// ===========================================================================
+
+// L'icône est DESSINÉE, pas prise dans la police d'icônes : `olda-icones.woff2`
+// est un sous-ensemble figé, et un nom absent s'y affiche en texte tronqué à sa
+// première lettre — sans erreur, sans carré vide, sans rien qui prévienne.
+assert.ok(/function fiverrIcon\(\) \{/.test(APP), 'fiverrIcon() doit exister');
+const ICONE = APP.match(/function fiverrIcon\(\)[\s\S]*?\n\}/)[0];
+assert.ok(/createElementNS/.test(ICONE) && !/material-symbols/.test(ICONE),
+  'la marque Fiverr doit être un SVG dessiné, pas une ligature de la police');
+
+// MONOCHROME. Dans cet écran la couleur dit un ÉTAT (--st-livree est vert) :
+// une pastille au vert de la marque (#1DBF73) se lirait « livrée » au bout
+// d'une ligne. La forme du badge porte seule la reconnaissance.
+assert.ok(/fill', 'currentColor'/.test(ICONE),
+  'la marque Fiverr doit suivre currentColor');
+assert.ok(!/#1[dD][bB][fF]73|#1dbf73/.test(APP + CSS + HTML),
+  'aucun vert de marque en dur : le vert de cet écran veut dire « livrée »');
+
+// La cible d'envoi porte sa propre marque, et le code retombe sur la flèche
+// générique pour une destination qui n'en aurait pas.
+assert.ok(/\{ slug: 'fiverr', label: 'Fiverr', icone: \(\) => fiverrIcon\(\) \}/.test(APP),
+  'SEND_TARGETS doit associer Fiverr à sa marque');
+assert.ok(/const marque = t\.icone \? t\.icone\(\) : strokeIcon\(\['M5 12h13'/.test(APP),
+  'la ligne doit poser la marque de la cible, la flèche seulement en repli');
+
+// La même règle dans la fiche : le bouton « Vers Fiverr » de l'en-tête portait
+// la flèche `LD_ICONES.envoyer`, c'est le bouton que le patron voit le plus.
+assert.ok(/ldActionBtn\(t\.icone \|\| 'envoyer', `Vers \$\{t\.label\}`/.test(APP),
+  'la fiche doit elle aussi montrer la marque de la destination');
+assert.ok(/if \(typeof icone === 'function'\) \{/.test(APP),
+  'ldActionBtn doit accepter une icône dessinée à la demande');
+
+// L'ONGLET Fiverr du bandeau porte LE MÊME dessin : c'est ce qui fait
+// comprendre que le bouton de la ligne mène à cet onglet-là. Les deux tracés
+// doivent rester identiques — sinon ils divergent en silence.
+// Dans app.js le tracé est écrit en morceaux (un par contre-forme) puis
+// recollé ; dans le HTML il tient en un seul attribut `d`. On recolle avant de
+// comparer, sinon on comparerait deux mises en forme, pas deux dessins.
+const traceApp = (ICONE.match(/'(M[^']+)'/g) || []).map((s) => s.slice(1, -1)).join('');
+const traceHtml = (HTML.match(/id="viewFiverr"[\s\S]*?<path[^>]*\sd="([^"]+)"/) || [])[1];
+assert.ok(traceApp.length > 100, 'le tracé du badge doit être lisible dans fiverrIcon()');
+assert.strictEqual(traceHtml, traceApp,
+  'l’onglet Fiverr doit reprendre exactement le tracé de fiverrIcon()');
+assert.ok(!/id="viewFiverr"[\s\S]{0,200}material-symbols-outlined/.test(HTML),
+  'l’onglet Fiverr ne doit plus afficher le glyphe « draw »');
+
+// ===========================================================================
+// 2. OUVRIR LA LIGNE — DANS LES DEUX VUES
+// ===========================================================================
+
+assert.ok(/function dossierIcon\(\) \{/.test(APP), 'dossierIcon() doit exister');
+
+// LA CARTE. Elle avait déjà son bouton, mais dessiné en flèche sortante — le
+// dessin de « ça part ailleurs », alors que rien ne part.
+const CARTE = APP.match(/ouvrir\.className = 'pcard__open'[\s\S]*?openLigneDetail\(r\.id\);/)[0];
+assert.ok(/ouvrir\.appendChild\(dossierIcon\(\)\)/.test(CARTE),
+  'la carte doit ouvrir sur un dossier, plus sur une flèche sortante');
+assert.ok(!/'M7 17L17 7'/.test(APP), 'la flèche sortante ne doit plus exister nulle part');
+
+// LA LIGNE DU TABLEAU. Elle n'avait rien : `openLigneDetail` n'était appelée
+// que depuis les cartes, la fiche elle-même et la recherche.
+const LIGNE = APP.match(/function buildRow\(r\)[\s\S]*?\n\}/)[0];
+assert.ok(/ouvrir\.className = 'open-btn'/.test(LIGNE),
+  'la ligne du tableau doit porter son bouton d’ouverture');
+assert.ok(/ouvrir\.appendChild\(dossierIcon\(\)\)/.test(LIGNE),
+  'et le même dessin que la carte');
+assert.ok(/openLigneDetail\(r\.id\)/.test(LIGNE),
+  'il doit ouvrir la fiche de SA ligne');
+// Premier de la file : c'est le geste qui donne accès à tout le reste.
+assert.ok(LIGNE.indexOf("'open-btn'") < LIGNE.indexOf("'send-btn'")
+  && LIGNE.indexOf("'open-btn'") < LIGNE.indexOf("'del-btn'"),
+'« ouvrir » doit précéder envoyer / dupliquer / supprimer');
+
+// Le même libellé des deux côtés : c'est le même geste.
+const libelles = APP.match(/attachTip\((?:ouvrir), '([^']+)'\)/g) || [];
+assert.strictEqual(libelles.length, 2, 'les deux vues doivent nommer le geste');
+assert.strictEqual(libelles[0], libelles[1],
+  'carte et tableau doivent annoncer la MÊME chose');
+
+// ===========================================================================
+// 3. « OUVRIR » NE DÉPEND PAS DU SURVOL
+// ===========================================================================
+// Les autres actions de la colonne n'apparaissent qu'au survol. Sur la tablette
+// du comptoir il n'y a pas de souris : un bouton qui attend un survol n'existe
+// pas. Celui-là est toujours là.
+const REGLE_OPEN = CSS.match(/\n\.open-btn \{[\s\S]*?\n\}/)[0];
+assert.ok(!/opacity:\s*0/.test(REGLE_OPEN),
+  '.open-btn ne doit jamais partir de opacity: 0');
+assert.ok(/tr:hover \.send-btn \{ opacity: 1; \}/.test(CSS),
+  'le contraste est voulu : les autres actions, elles, restent au survol');
+
+// ===========================================================================
+// 4. LA COLONNE D'ACTIONS TIENT SES QUATRE BOUTONS
+// ===========================================================================
+// Elle en portait trois. Sans élargir, le quatrième débordait sur « État » —
+// et les planchers de largeur de la grille étaient calculés avec l'ancienne
+// valeur : ce sont Description et Infos qui auraient payé le bouton.
+const largeurCol = Number(CSS.match(/\.col-del \{ width: (\d+)px; \}/)[1]);
+const boutons = 34 + 4 + 34 + 4 + 34 + 34; // ouvrir + Fiverr + dupliquer + supprimer
+assert.ok(largeurCol >= boutons + 8, `.col-del (${largeurCol}px) doit tenir ses quatre boutons`);
+
+// Au doigt les boutons passent à 44 px (charte tactile) : la colonne suit. Le
+// bloc tactile déclare les deux, l'un après l'autre — c'est celui-là qu'on lit,
+// pas le premier `.col-del` venu.
+assert.ok(/\.open-btn \{ width: 44px; height: 44px; \}/.test(CSS),
+  '« ouvrir » doit lui aussi respecter le plancher tactile de 44 px');
+const tactile = CSS.match(/\.open-btn \{ width: 44px; height: 44px; \}[\s\S]{0,400}?\.col-del \{ width: (\d+)px; \}/);
+assert.ok(tactile && Number(tactile[1]) >= 44 * 4 + 4 + 4 + 8,
+  'la largeur tactile de .col-del doit tenir quatre cibles de 44 px');
+
+// Les planchers de la grille ont bougé d'autant que la colonne (116 → 158).
+for (const [avant, apres] of [[1334, 1376], [1284, 1326], [1424, 1466]]) {
+  assert.ok(CSS.includes(`min-width: calc(${apres}px - var(--cols-off, 0px))`),
+    `le plancher ${avant} doit avoir suivi l’élargissement de la colonne d’actions`);
+}
+
+console.log('✓ planning : la marque Fiverr remplace la flèche, la ligne s’ouvre dans les deux vues OK');
