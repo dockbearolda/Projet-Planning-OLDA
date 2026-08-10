@@ -8,6 +8,9 @@ import { STEP_GUIDE } from './guide.js';
 import { createDashboard } from './dashboard.js';
 // WhatsApp « commande prête » : numéro au format international + message rempli.
 import { whatsappLink } from './whatsapp.js';
+// Glisser un devis / une facture / un BAT de la ligne vers la conversation
+// WhatsApp : nom présentable du fichier + charge utile attendue par Chrome.
+import { nomDocument, chargeGlisser } from './documents.js';
 // Nom d'un particulier : où s'arrête le prénom, où commence le NOM de famille.
 import { splitPersoName } from './nom-client.js';
 // La boîte de confirmation de l'app (jamais celle du système) — partagée avec
@@ -2386,8 +2389,32 @@ function cellPdfSlot(r, kind) {
   btn.target = '_blank';
   btn.rel = 'noopener noreferrer';
   const labelCap = label.noun.charAt(0).toUpperCase() + label.noun.slice(1);
-  attachTip(btn, `${labelCap} : ${filename} — clic pour visualiser`);
+  attachTip(btn, `${labelCap} : ${filename} — clic pour visualiser, glisser vers WhatsApp pour l’envoyer`);
   btn.appendChild(icon());
+
+  // GLISSER LA PASTILLE JUSQU'À WHATSAPP. La vendeuse attrape le document sur
+  // la ligne et le lâche dans la conversation ouverte à côté : Chrome télécharge
+  // le PDF pendant le déplacement et le remet à l'application au lâcher, en
+  // pièce jointe. Plus de détour par le dossier Téléchargements, plus de bouton
+  // « joindre » à aller chercher.
+  //
+  // Le copier-coller, qui serait le geste attendu, est IMPOSSIBLE : le
+  // presse-papier des navigateurs refuse « application/pdf » (cf. documents.js).
+  //
+  // `btn.href` est déjà absolue — la propriété d'un <a> résout toujours
+  // l'adresse — et c'est ce qu'exige la charge utile. Le nom d'origine du
+  // fichier (« scan_0012.pdf ») est remplacé par un nom présentable : c'est
+  // celui que le CLIENT lira dans sa conversation.
+  //
+  // Aucun conflit avec le réordonnancement des lignes : celui-ci est branché sur
+  // sa poignée de début de ligne, en évènements pointeur, pas sur la rangée.
+  btn.addEventListener('dragstart', (e) => {
+    const charge = chargeGlisser(nomDocument(kind, r.billing_company), btn.href);
+    if (!charge || !e.dataTransfer) return; // on laisse le glisser par défaut
+    e.dataTransfer.setData('DownloadURL', charge);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+
   wrap.appendChild(btn);
 
   const remove = document.createElement('button');

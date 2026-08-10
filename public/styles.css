@@ -1725,6 +1725,15 @@ tr:hover .handle { color: var(--text-2); }
 }
 .pdf-btn--filled:hover { background: color-mix(in srgb, var(--success) 18%, var(--success-bg)); }
 
+/* Remplie, elle S'ATTRAPE : on la glisse depuis la ligne jusqu'à la conversation
+   WhatsApp ouverte à côté, et le PDF y arrive en pièce jointe (cf. documents.js).
+   Le curseur est le seul indice qu'on peut le faire — rien, dans une pastille
+   ronde de 24 px, ne l'annonce ; l'infobulle le dit en toutes lettres pour le
+   reste. Il remplace le `pointer` hérité de .pdf-btn : le clic (visualiser)
+   reste l'évidence, c'est le glisser qui a besoin d'être signalé. */
+.pdf-btn--filled { cursor: grab; }
+.pdf-btn--filled:active { cursor: grabbing; }
+
 /* Croix de retrait : cachée par défaut, révélée au survol du slot. Geste
    souris uniquement (comme les infobulles) — pas d'équivalent tactile dans
    cette version, cohérent avec l'usage PC/Mac visé par cette fonctionnalité
