@@ -2692,8 +2692,8 @@ tr:hover .handle { color: var(--text-2); }
 .col-sub { width: 140px; }
 .col-deadline { width: 124px; }
 /* Quatre boutons depuis que « Ouvrir la fiche » a rejoint la file, contre trois
-   avant : 34+4 (ouvrir) + 34+4 (Fiverr) + 34 + 34 + 8 = 152, plus la même
-   petite réserve qu'avant. */
+   avant : 4 × 34 + 3 × 4 (le `gap` de .row-actions) + 8 de marge = 156, plus la
+   même petite réserve qu'avant. */
 .col-del { width: 158px; }
 /* « Nom du Dossier » ne peut plus être élastique : sa rangée de pastilles est
    incompressible (204 px à six pastilles). Élastique, elle tombait à 85 px sur les étapes qui
@@ -2842,6 +2842,29 @@ body.col-resizing * { cursor: col-resize !important; }
    gauche sans gêner ; OUVRIR, elle, est toujours là (voir .open-btn). */
 .col-del { white-space: nowrap; text-align: right; padding-right: 8px; }
 
+/* LA RANGÉE D'ACTIONS. Les quatre boutons étaient posés en `inline-flex` dans
+   la cellule : ils se calaient donc sur la LIGNE DE TEXTE, et pas de la même
+   façon — « ouvrir » et Fiverr au milieu (`vertical-align: middle`), dupliquer
+   et supprimer sur la base. Pire, la base d'une boîte `inline-flex` se déduit
+   de son contenu : les dessins de dupliquer (15 px) et de supprimer (16 px)
+   n'étant pas de la même taille, ces deux-là ne tombaient pas non plus au même
+   pixel. Trois hauteurs pour quatre boutons.
+   Une rangée flex les centre TOUS, quelle que soit la taille du dessin, et le
+   `gap` tient l'écart à leur place — plus de marge par bouton, qui laissait un
+   trou de travers dès qu'une action manquait. Le <div> reste DANS la cellule :
+   un `display: flex` posé sur le <td> lui-même le sortirait du tableau et la
+   colonne ne suivrait plus son <col>. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  /* La marge de droite se pose ICI et pas sur le <td> : `.grid tbody td` écrit
+     un `padding` raccourci plus spécifique, qui écrasait le `padding-right` de
+     .col-del — la corbeille touchait le bord de la grille. */
+  padding-right: 8px;
+}
+
 /* OUVRIR LA FICHE, depuis le tableau complet. Seule action de la colonne à ne
    PAS attendre le survol : la tablette du comptoir n'a pas de souris, et c'est
    le geste qui donne accès à tout le reste du dossier. Même gabarit que
@@ -2850,6 +2873,7 @@ body.col-resizing * { cursor: col-resize !important; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-2);
@@ -2857,12 +2881,13 @@ body.col-resizing * { cursor: col-resize !important; }
   width: 34px;
   height: 34px;
   padding: 0;
-  margin-right: 4px;
-  vertical-align: middle;
   border-radius: 50%;
   transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.open-btn svg { display: block; width: 17px; height: 17px; }
+/* 16 px comme les trois autres dessins de la rangée : des tailles inégales se
+   lisent elles aussi comme un défaut d'alignement, même quand les boutons sont
+   au bon endroit. */
+.open-btn svg { display: block; width: 16px; height: 16px; }
 .open-btn:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .open-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
@@ -2872,7 +2897,7 @@ body.col-resizing * { cursor: col-resize !important; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  vertical-align: middle;
+  flex: 0 0 auto;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-2);
@@ -2880,7 +2905,6 @@ body.col-resizing * { cursor: col-resize !important; }
   opacity: 0;
   height: 28px;
   padding: 0 10px;
-  margin-right: 4px;
   border-radius: 999px;
   font-family: inherit;
   font-size: 11.5px;
@@ -2914,6 +2938,7 @@ tr:hover .send-btn { opacity: 1; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   border: 0;
   background: transparent;
   color: var(--text-3);
@@ -3394,8 +3419,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .dup-btn { width: 44px; height: 44px; }
   .send-btn { width: 44px; height: 44px; }
   .open-btn { width: 44px; height: 44px; }
-  /* 44+4 (ouvrir) + 44+4 (Fiverr) + 44 + 44 + 8 de marge = 192. */
-  .col-del { width: 196px; }
+  /* 4 × 44 + 3 × 4 (le `gap` de .row-actions) + 8 de marge = 196. */
+  .col-del { width: 200px; }
 
   /* Les deux boutons de l'entête de grille (Colonnes, Guide) et la fermeture du
      rail des colonnes tenaient 40 et 32 px : ils n'étaient pas dans la règle. */

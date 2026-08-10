@@ -122,14 +122,49 @@ assert.ok(/tr:hover \.send-btn \{ opacity: 1; \}/.test(CSS),
   'le contraste est voulu : les autres actions, elles, restent au survol');
 
 // ===========================================================================
-// 4. LA COLONNE D'ACTIONS TIENT SES QUATRE BOUTONS
+// 4. LES QUATRE BOUTONS SONT ALIGNÉS
 // ===========================================================================
-// Elle en portait trois. Sans élargir, le quatrième débordait sur « État » —
-// et les planchers de largeur de la grille étaient calculés avec l'ancienne
-// valeur : ce sont Description et Infos qui auraient payé le bouton.
+// Ils étaient posés en `inline-flex` DIRECTEMENT dans la cellule, donc calés sur
+// la ligne de texte — et pas de la même façon : « ouvrir » et Fiverr au milieu
+// (`vertical-align: middle`), dupliquer et supprimer sur la BASE. Or la base
+// d'une boîte `inline-flex` se déduit de son contenu : leurs dessins faisant
+// 15 et 16 px, ces deux-là ne tombaient même pas au même pixel. Mesuré : trois
+// hauteurs pour quatre boutons (31,8 / 28,0 / 27,5).
+assert.ok(/actions\.className = 'row-actions'/.test(LIGNE),
+  'la cellule doit porter une rangée .row-actions');
+assert.ok(/tdDel\.appendChild\(actions\)/.test(LIGNE),
+  'la rangée vit DANS le <td> : un display:flex sur le <td> le sortirait du tableau');
+for (const b of ['ouvrir', 'send', 'dup', 'del']) {
+  assert.ok(new RegExp(`actions\\.appendChild\\(${b}\\)`).test(LIGNE),
+    `« ${b} » doit être posé dans la rangée, pas dans la cellule`);
+  assert.ok(!new RegExp(`tdDel\\.appendChild\\(${b}\\)`).test(LIGNE),
+    `« ${b} » ne doit plus être posé directement dans la cellule`);
+}
+const RANGEE = CSS.match(/\n\.row-actions \{[\s\S]*?\n\}/)[0];
+assert.ok(/display: flex/.test(RANGEE) && /align-items: center/.test(RANGEE),
+  '.row-actions doit centrer ses boutons');
+const ecart = Number(RANGEE.match(/gap: (\d+)px/)[1]);
+const margeDroite = Number(RANGEE.match(/padding-right: (\d+)px/)[1]);
+
+// Plus aucun calage ni marge PAR BOUTON : c'est exactement ce qui les décalait,
+// et une marge par bouton laisse un trou de travers dès qu'une action manque
+// (le bouton Fiverr disparaît sur une ligne déjà chez lui).
+for (const sel of ['.open-btn', '.send-btn', '.del-btn,\n.dup-btn']) {
+  const regle = CSS.match(new RegExp(`\\n${sel.replace(/[.]/g, '\\.')} \\{[\\s\\S]*?\\n\\}`))[0];
+  assert.ok(!/vertical-align/.test(regle),
+    `${sel} ne doit plus se caler sur la ligne de texte`);
+  assert.ok(!/margin-right/.test(regle),
+    `${sel} ne doit plus porter sa propre marge — c'est le rôle du gap`);
+}
+
+// ---------------------------------------------------------------------------
+// …et la colonne les tient. Elle en portait trois : sans élargir, le quatrième
+// débordait sur « État », et les planchers de largeur de la grille étaient
+// calculés avec l'ancienne valeur — Description et Infos auraient payé le bouton.
 const largeurCol = Number(CSS.match(/\.col-del \{ width: (\d+)px; \}/)[1]);
-const boutons = 34 + 4 + 34 + 4 + 34 + 34; // ouvrir + Fiverr + dupliquer + supprimer
-assert.ok(largeurCol >= boutons + 8, `.col-del (${largeurCol}px) doit tenir ses quatre boutons`);
+const rangee = (cible) => 4 * cible + 3 * ecart + margeDroite;
+assert.ok(largeurCol >= rangee(34),
+  `.col-del (${largeurCol}px) doit tenir ${rangee(34)}px de rangée`);
 
 // Au doigt les boutons passent à 44 px (charte tactile) : la colonne suit. Le
 // bloc tactile déclare les deux, l'un après l'autre — c'est celui-là qu'on lit,
@@ -137,8 +172,15 @@ assert.ok(largeurCol >= boutons + 8, `.col-del (${largeurCol}px) doit tenir ses 
 assert.ok(/\.open-btn \{ width: 44px; height: 44px; \}/.test(CSS),
   '« ouvrir » doit lui aussi respecter le plancher tactile de 44 px');
 const tactile = CSS.match(/\.open-btn \{ width: 44px; height: 44px; \}[\s\S]{0,400}?\.col-del \{ width: (\d+)px; \}/);
-assert.ok(tactile && Number(tactile[1]) >= 44 * 4 + 4 + 4 + 8,
-  'la largeur tactile de .col-del doit tenir quatre cibles de 44 px');
+assert.ok(tactile && Number(tactile[1]) >= rangee(44),
+  `la largeur tactile de .col-del doit tenir ${rangee(44)}px de rangée`);
+
+// La marge de droite se pose sur la rangée et PAS sur le <td> : `.grid tbody td`
+// écrit un `padding` raccourci plus spécifique qui écrasait celui de .col-del —
+// la corbeille touchait le bord de la grille.
+assert.ok(/\.col-del \{ white-space: nowrap; text-align: right; padding-right: 8px; \}/.test(CSS)
+  && margeDroite > 0,
+'la marge de droite doit vivre sur .row-actions, que rien n’écrase');
 
 // Les planchers de la grille ont bougé d'autant que la colonne (116 → 158).
 for (const [avant, apres] of [[1334, 1376], [1284, 1326], [1424, 1466]]) {

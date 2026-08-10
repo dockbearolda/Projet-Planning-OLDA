@@ -1715,6 +1715,17 @@ function buildRow(r) {
   // dupliquer + supprimer (révélées au survol)
   const tdDel = document.createElement('td');
   tdDel.className = 'col-del';
+  // UNE RANGÉE, PAS QUATRE BOUTONS POSÉS CÔTE À CÔTE. Empilés en `inline-flex`
+  // dans la cellule, ils se calaient sur la ligne de texte : « ouvrir » et
+  // Fiverr au milieu (`vertical-align: middle`), dupliquer et supprimer sur la
+  // BASE — et cette base dépend de la taille du dessin qu'ils contiennent, si
+  // bien que les deux derniers ne tombaient même pas au même pixel. Trois
+  // hauteurs différentes sur quatre boutons. Une rangée flex les centre tous,
+  // quel que soit leur contenu, et l'écart vient du `gap` : plus une marge par
+  // bouton à tenir à jour (l'envoi disparaît quand la ligne est déjà chez lui).
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+  tdDel.appendChild(actions);
 
   // OUVRIR LA LIGNE. Le tableau complet n'avait AUCUN moyen d'ouvrir la fiche :
   // les cartes avaient leur bouton, le tableau non — on y voyait onze colonnes
@@ -1727,7 +1738,7 @@ function buildRow(r) {
   attachTip(ouvrir, 'Ouvrir la fiche : tout le dossier');
   ouvrir.appendChild(dossierIcon());
   ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
-  tdDel.appendChild(ouvrir);
+  actions.appendChild(ouvrir);
 
   for (const t of SEND_TARGETS) {
     if (t.slug === r.stage) continue; // déjà dans cette catégorie
@@ -1741,14 +1752,14 @@ function buildRow(r) {
     nom.textContent = t.label;
     send.append(marque, nom);
     send.addEventListener('click', () => { if (armerUneFois(send)) copyToStage(r, t.slug); });
-    tdDel.appendChild(send);
+    actions.appendChild(send);
   }
   const dup = document.createElement('button');
   dup.className = 'dup-btn';
   dup.type = 'button';
   attachTip(dup, 'Dupliquer cette commande');
   dup.setAttribute('aria-label', 'Dupliquer cette commande');
-  dup.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  dup.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   dup.addEventListener('click', () => { if (armerUneFois(dup)) duplicateRow(r); });
   const del = document.createElement('button');
   del.className = 'del-btn';
@@ -1757,8 +1768,8 @@ function buildRow(r) {
   del.setAttribute('aria-label', 'Supprimer cette commande');
   del.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
   del.addEventListener('click', () => removeRow(r));
-  tdDel.appendChild(dup);
-  tdDel.appendChild(del);
+  actions.appendChild(dup);
+  actions.appendChild(del);
   tr.appendChild(tdDel);
 
   return tr;
