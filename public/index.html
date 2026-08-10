@@ -87,8 +87,12 @@
              qu'on ouvre le plus souvent dans la journée, elles méritent un
              onglet à elles plutôt qu'une ligne perdue au milieu du pipeline.
              Elles ouvrent le planning, filtré sur leur catégorie. -->
+        <!-- La MARQUE, pas un stylo : c'est le même badge que le bouton
+             « Envoyer vers Fiverr » des lignes du planning — on reconnaît d'un
+             coup d'œil que l'un mène à l'autre. Tracé identique à fiverrIcon()
+             dans app.js. -->
         <a class="nav-switch-btn" id="viewFiverr" href="#fiverr">
-          <span class="material-symbols-outlined" aria-hidden="true">draw</span>
+          <svg class="nav-switch-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6 2h12a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4zM6.6 10.4h2.6V9.3c0-2.2 1.5-3.6 3.7-3.6h1.6v2.4h-1.2c-.9 0-1.4.5-1.4 1.3v1h2.4v2.3h-2.4V19H9.2v-6.3H6.6zM15.9 12.7h1.9V19h-1.9zM15.9 5.8h1.9v2.1h-1.9z"/></svg>
           <span class="nav-switch-label">Fiverr</span>
         </a>
         <a class="nav-switch-btn" id="viewACommander" href="#a-commander">
