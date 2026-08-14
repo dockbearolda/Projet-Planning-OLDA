@@ -29,7 +29,7 @@ export function createDashboard(deps) {
 
   // --- Constantes métier ---------------------------------------------------
   // Familles « actives » du point du jour (Paiement & clôture / Fiverr exclus).
-  const ACTIVE_FAMILIES = ['demande_chiffrage', 'preparation', 'production', 'facturation'];
+  const ACTIVE_FAMILIES = ['arrivee_comptoir', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
   const ACTIVE_SET = new Set(ACTIVE_FAMILIES);
 
   // Couleur d'avatar : l'accent de la charte pour tout le monde. On passe par

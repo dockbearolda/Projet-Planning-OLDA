@@ -19,6 +19,13 @@ types.setTypeParser(types.builtins.DATE, (v) => v);
 //     choisie en ligne sur la commande (puce), uniquement pour les familles qui
 //     en ont. « 1 projet = 1 seule place. »
 const FAMILIES = [
+  // LE SUR-DOSSIER DU COMPTOIR, en tête de toutes les familles. TOUT ce que la
+  // vendeuse enregistre arrive ici, vente comme demande de devis, et nulle part
+  // ailleurs : elle enchaîne cinq clients sans rien classer, puis revient au
+  // planning et range chaque dossier dans sa famille.
+  // Elle n'a PAS de sous-étapes : un dossier qui n'a pas encore été rangé n'est
+  // à aucune étape de travail — c'est précisément ce qu'il faut voir.
+  { slug: 'arrivee_comptoir', label: 'Arrivées comptoir' },
   // Reçu, qualifié, chiffré, devis envoyé, devis validé : tout le commercial
   // avant que l'atelier ne touche quoi que ce soit.
   { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
@@ -39,8 +46,10 @@ const SPECIAL = [
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
 
-// Sous-familles par famille (slug → libellé). Seul Fiverr n'en a pas : les 5
-// familles décrivent toutes une suite d'actions précises.
+// Sous-familles par famille (slug → libellé). « Arrivées comptoir » et Fiverr
+// n'en ont pas : la première est un sur-dossier d'attente (le dossier n'est à
+// aucune étape de travail tant qu'il n'est pas rangé), le second est une
+// sous-traitance. Les 5 autres décrivent une suite d'actions précises.
 // « À commander » et « Attente marchandise » se glissent entre la validation de
 // l'acompte et « Prêt à produire » : on valide l'argent, on commande la
 // marchandise, on la reçoit, alors seulement la production peut démarrer.

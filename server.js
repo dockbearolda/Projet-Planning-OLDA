@@ -666,7 +666,10 @@ const ORDER_INVERSE = 'ORDER BY r.position DESC NULLS FIRST, r.priority ASC, r.d
 // PAR COMMANDE et repartait à chaque rafraîchissement, vers chaque poste, alors
 // que seule la fiche ouverte en a besoin. Elle se charge donc à l'ouverture du
 // tiroir (GET /api/requests/:id).
-const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee'];
+// `destination` : la famille (et la sous-étape) que la vendeuse a désignées au
+// comptoir. Le dossier n'y va pas tout seul — il attend dans « Arrivées
+// comptoir » — mais la grille en a besoin pour offrir le rangement en UN geste.
+const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination'];
 
 // LES TECHNIQUES DE MARQUAGE, en clair : « dtf », « uv », « laser »…
 // Le moteur de priorité s'en sert pour rattacher une commande à sa machine AVANT
@@ -873,7 +876,7 @@ const empreinteIds = (ids) => require('crypto')
 // Cette liste doit rester le MIROIR d'`ACTIVE_FAMILIES` (dashboard.js) : une
 // famille ajoutée là-bas et oubliée ici serait vide sur le Point du jour, sans
 // message ni erreur — un test compare les deux.
-const SYNTHESE_FAMILLES = ['demande_chiffrage', 'preparation', 'production', 'facturation'];
+const SYNTHESE_FAMILLES = ['arrivee_comptoir', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
 const SYNTHESE_FILTRE = `r.stage IN (${SYNTHESE_FAMILLES.map((s) => `'${s}'`).join(', ')})`;
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
@@ -2691,8 +2694,15 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   // NATURE : une vente directe est une commande validée et payée ; une demande
   // de devis reste à chiffrer. C'est cette différence qui commande tout le reste.
   const estDemande = b.source === 'Demande de devis';
-  const famille = COMPTOIR_FAMILLE[b.stage] || (estDemande ? 'demande_chiffrage' : 'preparation');
-  const sousEtape = SOUS_ETAPE_PAR_LIBELLE.get(`${famille}|${String(b.status || '').toLowerCase()}`) || null;
+  // CE QUE LE PARCOURS A DÉSIGNÉ — la famille où ce dossier finira. Il n'y va
+  // PAS tout de suite : tout ce qui sort du comptoir atterrit dans le
+  // sur-dossier « Arrivées comptoir », en tête du planning. La vendeuse
+  // enchaîne ses clients, puis revient ranger. On garde donc la destination
+  // dans la fiche, pour que le rangement se fasse d'un seul geste.
+  const destination = COMPTOIR_FAMILLE[b.stage] || (estDemande ? 'demande_chiffrage' : 'preparation');
+  const destinationSous = SOUS_ETAPE_PAR_LIBELLE.get(`${destination}|${String(b.status || '').toLowerCase()}`) || null;
+  const famille = 'arrivee_comptoir';
+  const sousEtape = null;
 
   const cl = b.clientObj && typeof b.clientObj === 'object' ? b.clientObj : {};
   const nomDossier = borner(cl.company || cl.name || b.client, 120);
@@ -2777,6 +2787,9 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
     // quand on a dû en changer : sinon plus personne ne peut relier les deux.
     refTicket: refModifiee ? ref : undefined,
     creeLe: new Date().toISOString(),
+    // Là où ce dossier doit être rangé, tel que le parcours l'a désigné. La
+    // grille en fait un bouton : « Ranger dans Préparation du projet ».
+    destination: { stage: destination, subStage: destinationSous },
     heureSouhaitee: isHeure(b.dueTime) ? b.dueTime : null,
     production: borner(b.production, 200),
     commentaire: borner(b.comment, DESCRIPTION_MAX),
@@ -2850,6 +2863,9 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   broadcast({ kind: 'create', stages: [famille] });
   res.status(201).json({
     id: rows[0].id, stage: famille, subStage: sousEtape,
+    // Où le dossier ATTEND (`stage`) et où il DOIT aller (`destination`) : deux
+    // choses différentes depuis que tout le comptoir passe par le sur-dossier.
+    destination: { stage: destination, subStage: destinationSous },
     // Renseigné UNIQUEMENT quand la référence du ticket était déjà prise par une
     // autre commande : l'écran doit le dire, le ticket remis au client ne porte
     // plus le bon numéro.

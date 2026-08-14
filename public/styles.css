@@ -5299,3 +5299,65 @@ textarea.ld-ctl { font-weight: 600; }
   .ld-field .flag-chip,
   .ld-field .deadline-badge { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
 }
+
+/* ===========================================================================
+   RANGER UN DOSSIER DU COMPTOIR
+   ===========================================================================
+   « Arrivées comptoir » est un sur-dossier d'attente : la vendeuse enchaîne
+   cinq clients sans rien classer, puis revient au planning et range. Cette
+   famille n'a donc pas de sous-étape — sa cellule (et sa puce, sur la carte)
+   porte le SEUL geste qui l'y attend.
+   Ce n'est pas une étiquette qui décrit, c'est un bouton qui fait : il prend
+   l'encre pleine, là où la puce de sous-étape reste grise. La couleur dit un
+   état — « ce dossier n'est pas encore à sa place ».
+   Il occupe EXACTEMENT la place de ce qu'il remplace : rien ne se décale quand
+   une ligne quitte la file. */
+.ranger-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--surface);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease);
+}
+.ranger-chip:hover { filter: brightness(1.15); }
+.ranger-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* Destination inconnue (dossier d'avant le sur-dossier) : on n'invente pas un
+   ordre, on renvoie sur la fiche — donc l'habit d'un champ à remplir. */
+.ranger-chip--vide {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px dashed var(--border);
+  font-weight: 500;
+}
+.ranger-chip--vide:hover { border-color: var(--primary); color: var(--primary); filter: none; }
+/* Sur la carte, il reprend le gabarit de la puce qu'il remplace. */
+.pcard__meta .ranger-chip { margin: 0; padding: 4px 9px; font-size: 11px; }
+/* Tablette : on range au doigt, cinq dossiers d'affilée. */
+@media (pointer: coarse) {
+  .ranger-chip { min-height: 44px; padding-left: 16px; padding-right: 16px; }
+  .pcard__meta .ranger-chip { min-height: 44px; }
+}
+
+/* LE SUR-DOSSIER SE VOIT DEPUIS N'IMPORTE QUELLE FAMILLE. Il est en tête du
+   rail, et son compteur ne se lit pas comme les autres : ce ne sont pas des
+   commandes en cours, ce sont des dossiers que PERSONNE n'a encore rangés.
+   Réglé en CSS sur le slug plutôt qu'en JS : les compteurs se repeignent à
+   trois endroits (montage, /api/counts, mise à jour optimiste), et une teinte
+   posée à la main aurait fini par en manquer un. */
+.stage[data-slug="arrivee_comptoir"] .stage-count.has-items {
+  background: var(--primary);
+  color: var(--surface);
+}
