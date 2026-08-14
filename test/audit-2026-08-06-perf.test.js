@@ -109,12 +109,18 @@ function bloc(src, signature) {
   assert.strictEqual(cree.status, 201, JSON.stringify(cree.body));
   const idComptoir = cree.body.id;
 
-  const listePrepa = await call('GET', '/api/requests?stage=preparation');
-  const enListe = listePrepa.body.find((r) => r.id === idComptoir);
+  // Le comptoir dépose tout dans le sur-dossier « À trier » : c'est
+  // là que la ligne se lit tant que personne ne l'a rangée.
+  const listeATrier = await call('GET', '/api/requests?stage=a_trier');
+  const enListe = listeATrier.body.find((r) => r.id === idComptoir);
   assert.ok(enListe, 'la commande du comptoir est bien dans la liste de son étape');
   // Ce que la grille affiche vraiment est là…
   assert.strictEqual(enListe.fiche.ref, 'AUDIT-PERF-001', 'le numéro de ticket voyage');
   assert.strictEqual(enListe.fiche.heureSouhaitee, '14:00', 'l’heure de retrait aussi');
+  // …y compris la famille où il faudra le ranger : c'est elle qui fait le
+  // bouton « Ranger dans… », donc elle DOIT survivre à l'allègement de la fiche.
+  assert.deepStrictEqual(enListe.fiche.destination, { stage: 'preparation', subStage: 'pret_a_produire' },
+    'la destination désignée au comptoir voyage dans la liste');
   assert.strictEqual(enListe.fiche.fichePartielle, true, 'et l’écran sait que ce n’est qu’un résumé');
   // …et le récapitulatif ligne à ligne, jamais.
   assert.strictEqual(enListe.fiche.details, undefined, 'le récapitulatif ne voyage pas dans la liste');

@@ -80,8 +80,14 @@ delete process.env.APP_PASSWORD;
     paiement: { modeLabel: 'Carte bancaire', mode: 'cb', paye: true, retraitImmediat: false },
   });
   assert.strictEqual(vente.status, 201, JSON.stringify(vente.body));
-  assert.strictEqual(vente.body.stage, 'preparation');
-  assert.strictEqual(vente.body.subStage, 'prepa_produits', 'le libellé de l’écran retrouve sa sous-étape');
+  // TOUT LE COMPTOIR ARRIVE DANS LE SUR-DOSSIER. La vendeuse enchaîne ses
+  // clients sans rien classer ; le rangement est un geste à part, au planning.
+  assert.strictEqual(vente.body.stage, 'a_trier');
+  assert.strictEqual(vente.body.subStage, null, 'un dossier non rangé n’est à aucune étape de travail');
+  // La famille désignée au comptoir n'est pas perdue pour autant : elle voyage
+  // avec le dossier, et c'est elle qui fera le bouton « Ranger dans… ».
+  assert.deepStrictEqual(vente.body.destination, { stage: 'preparation', subStage: 'prepa_produits' },
+    'le libellé de l’écran retrouve sa sous-étape');
 
   const lVente = await ligneDe(vente.body.id);
   assert.ok(lVente, 'la vente est au planning');
@@ -151,8 +157,8 @@ delete process.env.APP_PASSWORD;
     paiement: { modeLabel: 'Espèces', mode: 'especes', paye: true, retraitImmediat: true },
   });
   assert.strictEqual(emporte.status, 201, JSON.stringify(emporte.body));
-  assert.strictEqual(emporte.body.stage, 'facturation');
-  assert.strictEqual(emporte.body.subStage, 'commande_recuperee');
+  assert.strictEqual(emporte.body.stage, 'a_trier');
+  assert.deepStrictEqual(emporte.body.destination, { stage: 'facturation', subStage: 'commande_recuperee' });
 
   const lEmporte = await ligneDe(emporte.body.id);
   assert.strictEqual(lEmporte.client_type, 'perso');
@@ -195,8 +201,8 @@ delete process.env.APP_PASSWORD;
     checks: { products: false, bat: false, files: true, qty: true, payment: false },
   });
   assert.strictEqual(demande.status, 201, JSON.stringify(demande.body));
-  assert.strictEqual(demande.body.stage, 'demande_chiffrage');
-  assert.strictEqual(demande.body.subStage, 'a_chiffrer');
+  assert.strictEqual(demande.body.stage, 'a_trier');
+  assert.deepStrictEqual(demande.body.destination, { stage: 'demande_chiffrage', subStage: 'a_chiffrer' });
 
   const lDemande = await ligneDe(demande.body.id);
   const dDemande = await detailDe(demande.body.id);
@@ -231,7 +237,7 @@ delete process.env.APP_PASSWORD;
     stage: 'demande',
     status: 'Demande à qualifier',
   });
-  assert.strictEqual(attente.body.subStage, 'demande_a_qualifier');
+  assert.strictEqual(attente.body.destination.subStage, 'demande_a_qualifier');
 
   // -------------------------------------------------------------------------
   // 5. LA FICHE SE CORRIGE. Le récapitulatif enregistré à la prise n'est pas
@@ -311,8 +317,8 @@ delete process.env.APP_PASSWORD;
     amount: 120,
   });
   assert.strictEqual(libelleInconnu.status, 201);
-  assert.strictEqual(libelleInconnu.body.stage, 'preparation');
-  assert.strictEqual(libelleInconnu.body.subStage, null, 'famille connue, sous-étape à préciser');
+  assert.deepStrictEqual(libelleInconnu.body.destination, { stage: 'preparation', subStage: null },
+    'famille connue, sous-étape à préciser');
 
   const etapeInconnue = await call('POST', '/api/comptoir/projet', {
     source: 'Demande de devis',
@@ -321,7 +327,7 @@ delete process.env.APP_PASSWORD;
     stage: 'nulle_part',
     status: 'À chiffrer',
   });
-  assert.strictEqual(etapeInconnue.body.stage, 'demande_chiffrage', 'une demande retombe sur son étape naturelle');
+  assert.strictEqual(etapeInconnue.body.destination.stage, 'demande_chiffrage', 'une demande retombe sur son étape naturelle');
 
   const dateBidon = await call('POST', '/api/comptoir/projet', {
     source: 'Vente directe',

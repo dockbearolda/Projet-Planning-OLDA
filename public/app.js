@@ -25,12 +25,18 @@ import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.
 // la ligne) précise CE QUI SE PASSE MAINTENANT. « 1 projet = 1 seule place. »
 // 5 familles au lieu de 20 étapes → barre latérale nettement plus lisible/aérée.
 const FAMILIES = [
+  // Le sur-dossier du comptoir, en tête : tout ce que la vendeuse enregistre
+  // arrive ici et y attend d'être rangé. Sans sous-étapes (miroir de db.js).
+  { slug: 'a_trier', label: 'À trier' },
   { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
   { slug: 'preparation', label: 'Préparation du projet' },
   { slug: 'production', label: 'Production' },
   { slug: 'facturation', label: 'Facturation & remise au client' },
   { slug: 'paiement', label: 'Paiement & clôture' },
 ];
+// LE SUR-DOSSIER. Nommé une fois, lu partout : c'est la seule famille où l'on
+// range plutôt que de travailler.
+const A_TRIER = 'a_trier';
 // Catégorie spéciale (sous-traitance graphiste), hors des 5 familles.
 const SPECIAL = [
   { slug: 'fiverr', label: 'Fiverr' },
@@ -39,7 +45,10 @@ const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.slug, s.label]));
 // Colonne « Prix TTC » : n'a de sens que là où le prix se remplit réellement
 // (chiffrage, montant à facturer, contrôle du paiement) — masquée ailleurs.
-const PRICE_VISIBLE_STAGES = new Set(['demande_chiffrage', 'facturation', 'paiement']);
+// « À trier » en fait partie : une vente directe y arrive DÉJÀ
+// encaissée, et le montant est ce qui distingue le plus vite une vente d'une
+// demande quand on range cinq dossiers à la suite.
+const PRICE_VISIBLE_STAGES = new Set([A_TRIER, 'demande_chiffrage', 'facturation', 'paiement']);
 
 // Sous-étapes par famille (miroir de db.js). Une famille absente = pas de puce.
 const SUB_STAGES = {
@@ -1169,9 +1178,13 @@ function buildCard(r) {
   // On est DÉJÀ dans cette famille (son nom coiffe l'écran) : répéter
   // « Demande & chiffrage › » sur chaque carte n'apprend rien et vole la place
   // de la seule information neuve, la sous-étape.
-  meta.appendChild(puce(r.stage === currentStage
-    ? (SUB_LABEL[r.sub_stage] || (familyHasSub(r.stage) ? 'à préciser' : STAGE_LABEL[r.stage]))
-    : stageDestinationLabel(r.stage, r.sub_stage ?? null)));
+  // À TRIER : à la place de la puce qui SITUE, le bouton qui RANGE.
+  // Même emplacement, même gabarit — la file ne se décale pas d'un pixel.
+  meta.appendChild(r.stage === A_TRIER && currentStage === A_TRIER
+    ? boutonRanger(r)
+    : puce(r.stage === currentStage
+      ? (SUB_LABEL[r.sub_stage] || (familyHasSub(r.stage) ? 'à préciser' : STAGE_LABEL[r.stage]))
+      : stageDestinationLabel(r.stage, r.sub_stage ?? null)));
   if (r.flag) {
     const pf = puce(FLAG_BY_VALUE[r.flag] ? FLAG_BY_VALUE[r.flag].label : 'À voir');
     pf.classList.add('pcard__pill--' + (r.flag === 'bloque' ? 'bloque' : 'a-voir'));
@@ -2067,9 +2080,59 @@ function flagControl(r, hote) {
 // Sous-étape : précise ce qui se passe MAINTENANT dans la famille. Puce
 // cliquable ; menu des sous-familles de la famille + « Aucune ». Rien à afficher
 // (et colonne masquée par CSS) pour les familles sans sous-étapes.
+// LE RANGEMENT D'UN DOSSIER DU COMPTOIR.
+// ===========================================================================
+// « À trier » est un sur-dossier d'attente : la vendeuse enchaîne ses
+// clients sans rien classer, puis revient au planning et range. Le parcours du
+// comptoir a DÉJÀ désigné la famille (elle a dit si le client repartait avec sa
+// commande, si c'était une demande à chiffrer…), et le serveur l'a gardée dans
+// `fiche.destination`. Ranger, c'est donc UN tap : cinq dossiers, cinq gestes.
+// Pour une autre famille, on ouvre la fiche — son sélecteur « Famille ›
+// Sous-étape » couvre tout le pipeline, et il est déjà là.
+function destinationDe(r) {
+  const d = r && r.fiche && typeof r.fiche === 'object' ? r.fiche.destination : null;
+  const stage = d && typeof d === 'object' ? d.stage : null;
+  if (!stage || !STAGE_LABEL[stage] || stage === A_TRIER) return null;
+  return { stage, sub: d.subStage && SUB_LABEL[d.subStage] ? d.subStage : null };
+}
+
+// UNE seule classe pour les deux vues (`ranger-chip`) : c'est la feuille de
+// style qui l'habille en cellule de tableau ou en puce de carte. Il prend
+// EXACTEMENT la place de ce qu'il remplace — une piste qui apparaîtrait sur
+// certaines lignes seulement décalerait toute la file des cartes.
+function boutonRanger(r) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  const dest = destinationDe(r);
+  if (!dest) {
+    // Rien de désigné : un dossier d'avant le sur-dossier, ou une destination
+    // devenue inconnue. On ne devine pas — on renvoie sur la fiche.
+    btn.className = 'ranger-chip ranger-chip--vide';
+    btn.textContent = 'à ranger';
+    attachTip(btn, 'Ouvre la fiche pour choisir la famille');
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openLigneDetail(r.id); });
+    return btn;
+  }
+  const ou = STAGE_LABEL[dest.stage] + (dest.sub ? ` › ${SUB_LABEL[dest.sub]}` : '');
+  btn.className = 'ranger-chip';
+  btn.textContent = `Ranger dans ${STAGE_LABEL[dest.stage]}`;
+  attachTip(btn, `Ranger dans « ${ou} » — pour une autre famille, ouvre la fiche`);
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Un doigt qui rebondit sur la tablette ne range pas deux fois : la ligne
+    // aurait déjà quitté la vue, et le second tap partirait dans le vide.
+    if (!armerUneFois(btn)) return;
+    moveToStage(r, dest.stage, dest.sub);
+    showToast(`Rangé dans ${ou}.`);
+  });
+  return btn;
+}
+
 function cellSubStage(r) {
   const td = document.createElement('td');
   td.className = 'col-sub-cell';
+  // Le sur-dossier n'a pas de sous-étape : sa cellule ne PRÉCISE pas, elle RANGE.
+  if (r.stage === A_TRIER) { td.appendChild(boutonRanger(r)); return td; }
   const subs = SUB_STAGES[r.stage];
   if (!subs || !subs.length) return td;
   const btn = document.createElement('button');

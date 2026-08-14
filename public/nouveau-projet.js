@@ -281,11 +281,24 @@ function estUnDesNotres(source) {
   });
 }
 
-async function enregistrer(payload) {
+// Renvoie au parcours ce que le serveur a répondu. Sans ce retour, l'écran de
+// la vendeuse ne peut RIEN dire de son propre dossier : le message d'échec vit
+// ici, AU-DESSUS du cadre, donc hors de vue sur la tablette — et c'est par ce
+// trou que des dossiers sont partis sans que personne ne s'en aperçoive.
+function repondreAuParcours(source, ok, message) {
+  if (!source || typeof source.postMessage !== 'function') return;
+  source.postMessage({ type: 'OLDA_PROJET_RESULT', ok, message }, window.location.origin);
+}
+
+// `auto` : l'envoi n'est pas un geste de la vendeuse, c'est le parcours qui
+// enregistre son dossier dès qu'il est complet (voir le filet de pont.js). On
+// ne l'emporte donc PAS sur la ligne du planning : elle a le ticket du client
+// à l'écran, et il lui reste à l'imprimer.
+async function enregistrer(payload, { auto = false, source = null } = {}) {
   // Double tap sur « Créer dans le planning » = une seule ligne au planning.
   if (enCours) return;
   enCours = true;
-  montrerEnvoi();
+  if (!auto) montrerEnvoi();
   // Une requête sans limite de temps peut rester en suspens indéfiniment sur un
   // wifi d'atelier capricieux : l'écran restait muet, sans erreur ni succès.
   const minuteur = new AbortController();
@@ -301,6 +314,11 @@ async function enregistrer(payload) {
     if (!res.ok) throw new Error(data.error || `erreur ${res.status}`);
     const avis = avisEnregistrement(data);
     if (avis) montrerAvis(avis); else masquerErreur();
+    repondreAuParcours(source, true, avis || '');
+
+    // Envoi automatique : la ligne est née, le parcours l'affiche lui-même. On
+    // laisse la vendeuse sur son ticket.
+    if (auto) return;
 
     // LA RÉFÉRENCE A CHANGÉ : le ticket déjà remis au client ne porte plus le bon
     // numéro, et c'est à corriger maintenant. On reste donc sur l'écran, message
@@ -317,19 +335,38 @@ async function enregistrer(payload) {
       detail: { id: data.id, stage: data.stage, sub: data.subStage || null, avis },
     }));
   } catch (err) {
-    montrerErreur(err.name === 'AbortError' ? 'le serveur ne répond pas' : err.message);
+    const raison = err.name === 'AbortError' ? 'le serveur ne répond pas' : err.message;
+    montrerErreur(raison);
+    repondreAuParcours(source, false, raison);
   } finally {
     clearTimeout(stop);
     enCours = false;
   }
 }
 
+// Le parcours annonce un envoi AUTOMATIQUE juste avant de poster son dossier :
+// deux messages, dans cet ordre, vers la même fenêtre. Le drapeau ne vaut que
+// pour l'envoi qui suit — un envoi tapé par la vendeuse, lui, saute au planning
+// comme avant.
+let prochainEnvoiAutomatique = false;
+
 function auMessage(e) {
   if (e.origin !== window.location.origin) return;
   if (!estUnDesNotres(e.source)) return;
   const msg = e.data;
-  if (!msg || msg.type !== 'OLDA_CREATE_PROJECT' || !msg.payload) return;
-  enregistrer(msg.payload);
+  if (!msg) return;
+  if (msg.type === 'OLDA_ENVOI_AUTOMATIQUE') {
+    prochainEnvoiAutomatique = true;
+    // Le dossier suit dans la foulée (même tâche). S'il ne venait pas, le
+    // drapeau ne doit pas rester armé et priver le PROCHAIN envoi — tapé par la
+    // vendeuse, celui-là — de son saut vers la ligne.
+    setTimeout(() => { prochainEnvoiAutomatique = false; }, 0);
+    return;
+  }
+  if (msg.type !== 'OLDA_CREATE_PROJECT' || !msg.payload) return;
+  const auto = prochainEnvoiAutomatique;
+  prochainEnvoiAutomatique = false;
+  enregistrer(msg.payload, { auto, source: e.source });
 }
 
 // --- Montage -----------------------------------------------------------------

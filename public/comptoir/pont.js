@@ -15,14 +15,19 @@
 //      jamais remettre le même numéro au client : le compteur vit en base
 //      (POST /api/vente/numero · /api/devis/numero), pas dans le navigateur.
 //
-// Le reste — l'envoi au planning — passe par le message `OLDA_CREATE_PROJECT`
-// que la page poste déjà à la fenêtre parente ; c'est `nouveau-projet.js` qui
+//   3. LE FILET. L'écran de fin annonce « ✅ enregistrée » alors que rien n'est
+//      parti, et le seul bouton qui enregistre vraiment est greffé en dernier,
+//      APRÈS ceux qui effacent le dossier. On envoie donc le dossier dès que
+//      cet écran s'affiche, et on dit à la vendeuse où il en est (section 4).
+//
+// L'envoi au planning lui-même passe par le message `OLDA_CREATE_PROJECT` que
+// la page poste déjà à la fenêtre parente ; c'est `nouveau-projet.js` qui
 // l'écoute et appelle l'API. L'écran n'a donc aucune adresse d'API à connaître.
 //
 // Tout est en « si ça rate, on continue » : sans réseau, l'écran reste
 // utilisable avec sa recherche vide et son numéro de secours. Une vente qui ne
-// part pas au planning se voit (message d'erreur côté hôte) ; une vente qu'on
-// ne peut pas SAISIR bloquerait le comptoir.
+// part pas au planning se voit — dans l'écran même, pas seulement dans le
+// bandeau de l'hôte ; une vente qu'on ne peut pas SAISIR bloquerait le comptoir.
 
 (function () {
   // Minuteur : sur un wifi qui décroche, `fetch` n'échoue jamais — il attend.
@@ -264,14 +269,319 @@
         // référence parce qu'un autre dossier la portait déjà. Annoncer les
         // trois cas de la même façon, c'était laisser croire à un enregistrement
         // là où rien n'avait été créé.
-        alert(messageEnregistrement(data));
+        resultatEnvoi(true, messageEnregistrement(data));
+        // Un envoi AUTOMATIQUE ne s'annonce pas par une boîte de dialogue : la
+        // vendeuse est en train d'imprimer le ticket du client, un `alert` lui
+        // barre l'écran pour dire ce que le bandeau dit déjà.
+        if (!envoiAutomatique) alert(messageEnregistrement(data));
       } catch (err) {
-        alert(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
+        resultatEnvoi(false, err.message);
+        if (!envoiAutomatique) alert(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
       } finally {
         envoiEnCours = false;
       }
     });
+  } else {
+    // Dans le CRM, c'est l'hôte qui appelle l'API : lui seul sait ce qu'elle a
+    // répondu. Il nous le renvoie, sinon l'écran de la vendeuse ne peut RIEN
+    // dire de son propre dossier — c'est précisément le trou par lequel les
+    // dossiers partaient sans que personne ne s'en aperçoive.
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin) return;
+      const m = e.data;
+      if (!m || m.type !== 'OLDA_PROJET_RESULT') return;
+      resultatEnvoi(!!m.ok, m.message || '');
+    });
   }
+
+  // --- 4. LE FILET : le dossier n'attend plus un dernier bouton --------------
+  // L'écran de fin des deux parcours annonce « ✅ Demande enregistrée » /
+  // « ✅ Commande enregistrée » ALORS QUE RIEN n'est parti au planning : à cet
+  // instant le dossier n'existe que dans cet onglet. La seule action qui
+  // l'enregistre vraiment — « 📅 Créer dans le planning » — est greffée EN
+  // DERNIER, après « Nouvelle demande » / « Nouvelle vente » (qui rechargent la
+  // page et effacent tout) et, côté devis, après « 💾 Enregistrer » (qui écrit
+  // un brouillon dans le navigateur que RIEN ne relit jamais, en annonçant
+  // « Brouillon enregistré »).
+  //
+  // Une vendeuse qui imprime le ticket, le remet au client et enchaîne perd
+  // donc le dossier — sans message, sans trace, et sans que la recherche du
+  // planning puisse le retrouver puisqu'il n'a jamais existé. C'est ce qui
+  // s'est passé le 13/08 : numéro de devis réservé côté serveur
+  // (`app_meta.devis_seq_20260813`), aucune ligne au planning, une cliente
+  // introuvable le lendemain.
+  //
+  // Trois corrections, ici et pas dans les écrans du patron :
+  //   1. dès que l'écran de fin s'affiche, le dossier part au planning TOUT
+  //      SEUL — l'écran dit déjà « enregistrée », on le rend vrai ;
+  //   2. un bandeau DANS l'écran dit où en est ce dossier, avec un bouton pour
+  //      réessayer (le message d'erreur de l'hôte, lui, vit au-dessus du cadre,
+  //      donc hors de vue sur la tablette) ;
+  //   3. les boutons qui EFFACENT le dossier préviennent tant qu'il n'est pas
+  //      au planning.
+
+  // Les deux écrans de fin, chacun repéré par son identifiant, tous deux
+  // masqués par la classe `hidden` de la page.
+  const ECRANS_FINAUX = ['step7', 'paymentSuccess'];
+  function ecranFinal() {
+    for (const id of ECRANS_FINAUX) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains('hidden')) return el;
+    }
+    return null;
+  }
+
+  // attente → envoi → ok | echec. `ok` est le seul état où le dossier existe
+  // ailleurs que dans cet onglet.
+  let etatEnvoi = 'attente';
+  let envoiAutomatique = false;
+  let abandonAssume = false;
+
+  const STYLE_ETAT = `
+    .olda-etat{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+      margin:0 0 14px;padding:14px 16px;border-radius:14px;
+      font:700 15px/1.35 inherit;border:2px solid transparent}
+    .olda-etat__texte{flex:1 1 220px;white-space:pre-line}
+    .olda-etat--envoi{background:#f5f6f8;color:#111827;border-color:#d7dae0}
+    .olda-etat--ok{background:#e9f7ef;color:#0b5c34;border-color:#0b5c34}
+    .olda-etat--echec{background:#fdecea;color:#8f1d14;border-color:#8f1d14}
+    .olda-etat__reessai{min-height:44px;padding:0 18px;border-radius:12px;
+      border:0;background:#8f1d14;color:#fff;font:700 15px/44px inherit;
+      cursor:pointer}
+  `;
+  function poserStyle() {
+    if (document.getElementById('olda-etat-style')) return;
+    const s = document.createElement('style');
+    s.id = 'olda-etat-style';
+    s.textContent = STYLE_ETAT;
+    document.head.appendChild(s);
+  }
+
+  // Le bandeau vit EN TÊTE de l'écran de fin : c'est la première chose lue, et
+  // il suit l'écran s'il change (les deux parcours réaffichent leur carte).
+  function bandeau() {
+    const ecran = ecranFinal();
+    if (!ecran) return null;
+    poserStyle();
+    let el = document.getElementById('olda-etat-planning');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'olda-etat-planning';
+      el.setAttribute('role', 'status');
+      const texte = document.createElement('span');
+      texte.className = 'olda-etat__texte';
+      const reessai = document.createElement('button');
+      reessai.type = 'button';
+      reessai.className = 'olda-etat__reessai';
+      reessai.textContent = 'Réessayer l’enregistrement';
+      reessai.addEventListener('click', () => envoyerAuPlanning(false));
+      el.append(texte, reessai);
+    }
+    if (el.parentNode !== ecran || ecran.firstChild !== el) ecran.insertBefore(el, ecran.firstChild);
+    return el;
+  }
+
+  const PHRASES = {
+    attente: 'Ce dossier n’est pas encore au planning.',
+    envoi: 'Enregistrement au planning…',
+    // On dit AUSSI où il est. Tout ce qui sort du comptoir attend désormais
+    // dans « À trier », en tête du planning : la vendeuse enchaîne
+    // ses clients, puis range les dossiers d'un geste chacun.
+    ok: '✔ Ce dossier est au planning, dans « À trier ».',
+    echec: '⚠ Ce dossier n’est PAS au planning.',
+  };
+  let dernierPeint = '';
+  let dernierDetail = '';
+  function peindreEtat(nouveau) {
+    // `null` vaut « garde ce que tu disais » : le guet repasse à chaque mutation
+    // de la page pour ré-ancrer le bandeau, et il ne doit pas effacer au passage
+    // la RAISON d'un échec — la seule chose utile à lire dans le bandeau rouge.
+    if (nouveau != null) dernierDetail = nouveau;
+    const detail = dernierDetail;
+    const el = bandeau();
+    if (!el) return;
+    // Le guet repasse toutes les 400 ms : on ne réécrit que ce qui change,
+    // sinon on remonte le même texte sous les yeux de la vendeuse en boucle.
+    const signature = `${etatEnvoi}${detail}`;
+    if (signature === dernierPeint) return;
+    dernierPeint = signature;
+    el.className = `olda-etat olda-etat--${etatEnvoi === 'ok' ? 'ok' : etatEnvoi === 'echec' ? 'echec' : 'envoi'}`;
+    el.firstChild.textContent = detail ? `${PHRASES[etatEnvoi]}\n${detail}` : PHRASES[etatEnvoi];
+    el.lastChild.hidden = etatEnvoi !== 'echec' && etatEnvoi !== 'attente';
+    // Le bouton greffé par l'écran ne peut plus dire « Créer » une fois la
+    // ligne créée : elle l'est, et le retaper ne crée rien (l'empreinte du
+    // dossier le fait reconnaître). On le dit plutôt que de le laisser mentir.
+    const btn = document.getElementById('oldaCreatePlanningBtn');
+    if (btn && etatEnvoi === 'ok') {
+      btn.disabled = true;
+      btn.textContent = '📅 Déjà au planning';
+    }
+  }
+
+  function resultatEnvoi(ok, message) {
+    etatEnvoi = ok ? 'ok' : 'echec';
+    envoiAutomatique = false;
+    // Même en cas de succès, le serveur a parfois quelque chose d'URGENT à dire :
+    // « la référence était déjà prise, ce dossier porte désormais un autre
+    // numéro » — donc le ticket entre les mains du client est faux. Cette
+    // phrase-là doit être dans l'écran, pas seulement dans le bandeau de l'hôte
+    // qui, sur la tablette en paysage, est au-dessus du cadre et hors de vue.
+    peindreEtat(message || '');
+  }
+
+  // Le payload appartient à l'écran : il est construit par le bouton que la
+  // page se greffe (`patchPlanningButton`), avec TOUT ce que le parcours a
+  // recueilli. On ne le retranscrit pas — on presse son bouton.
+  function envoyerAuPlanning(auto) {
+    if (etatEnvoi === 'envoi' || etatEnvoi === 'ok') return;
+    if (typeof window.patchPlanningButton === 'function') window.patchPlanningButton();
+    const btn = document.getElementById('oldaCreatePlanningBtn');
+    if (!btn) {
+      etatEnvoi = 'echec';
+      peindreEtat('Le bouton « Créer dans le planning » est introuvable sur cet écran.');
+      return;
+    }
+    etatEnvoi = 'envoi';
+    envoiAutomatique = !!auto;
+    peindreEtat('');
+    // L'hôte saute sur la ligne créée — parfait quand c'est la vendeuse qui l'a
+    // demandé, désastreux quand c'est automatique : elle a le ticket du client
+    // à l'écran et se retrouverait au planning sans l'avoir imprimé.
+    if (window.parent !== window && auto) {
+      parent.postMessage({ type: 'OLDA_ENVOI_AUTOMATIQUE' }, location.origin);
+    }
+    btn.click();
+  }
+
+  // L'écran de fin vient de s'afficher : le dossier est complet (le devis a
+  // passé ses contrôles, la vente a été encaissée). Il part.
+  let finalVu = false;
+  function guetterEcranFinal() {
+    const ecran = ecranFinal();
+    if (!ecran) { finalVu = false; return; }
+    // Le repassage ne fait que RÉ-ANCRER le bandeau (les deux parcours
+    // reconstruisent leur carte) : `null` = « garde ce que tu disais ». Écraser
+    // le détail effaçait la raison de l'échec — précisément ce qu'il faut lire.
+    if (finalVu) { peindreEtat(null); return; }
+    finalVu = true;
+    peindreEtat('');
+    envoyerAuPlanning(true);
+  }
+
+  // « 💾 Enregistrer » (écran devis) écrivait un brouillon dans le navigateur
+  // que RIEN ne relit — jamais — et annonçait « Brouillon enregistré » : la
+  // vendeuse repartait convaincue d'avoir sauvegardé son dossier. On le
+  // rebranche sur le seul enregistrement qui existe.
+  function rebrancherBoutonBrouillon() {
+    const b = document.querySelector('[onclick^="saveDraft"]');
+    if (!b || b.__oldaRebranche) return;
+    b.__oldaRebranche = true;
+    b.removeAttribute('onclick');
+    b.onclick = null;
+    b.textContent = '💾 Enregistrer au planning';
+    b.addEventListener('click', () => envoyerAuPlanning(false));
+  }
+
+  // Les boutons qui EFFACENT le dossier : « Nouvelle demande » et « Nouvelle
+  // vente » rechargent la page, « Retour accueil » quitte l'écran de fin. Tant
+  // que le dossier n'est pas au planning, ils le perdent pour de bon. On ne les
+  // bloque pas — une vendeuse doit pouvoir abandonner un dossier — on lui dit
+  // ce qu'elle est en train de faire.
+  const DESTRUCTEURS = '#newSaleBtn, #homeBtn, [onclick^="newRequest"]';
+  document.addEventListener('click', (e) => {
+    const cible = e.target && e.target.closest ? e.target.closest(DESTRUCTEURS) : null;
+    if (!cible) return;
+    if (abandonAssume) return;
+    if (!ecranFinal() || etatEnvoi === 'ok') return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const perdre = window.confirm(
+      'Ce dossier n’est PAS enregistré au planning.\n\n'
+      + 'Si tu continues, il sera perdu : personne ne pourra le retrouver, ni par la recherche, ni autrement.\n\n'
+      + 'OK = continuer quand même · Annuler = rester (bouton « Réessayer » en haut de l’écran)',
+    );
+    if (!perdre) return;
+    // Le geste est assumé : on le rejoue tel quel, et le garde-fou de fermeture
+    // se tait lui aussi. Si l'écran demande sa propre confirmation et qu'elle
+    // l'annule, la page reste : le drapeau retombe au tour de boucle suivant.
+    abandonAssume = true;
+    cible.click();
+    setTimeout(() => { abandonAssume = false; }, 0);
+  }, true);
+
+  // Dernier garde-fou : fermer l'onglet ou recharger le CRM emporte, lui aussi,
+  // un dossier qui n'est pas parti.
+  window.addEventListener('beforeunload', (e) => {
+    if (!ecranFinal() || etatEnvoi === 'ok' || abandonAssume) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  // Les brouillons déjà écrits par l'ancien bouton dorment dans ce navigateur
+  // et rien ne les relit : ce sont peut-être des dossiers jamais arrivés au
+  // planning. On les montre plutôt que de les laisser mourir avec le cache.
+  function montrerBrouillonsOublies() {
+    let cles = [];
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('oldaDraft-')) cles.push(k);
+      }
+    } catch (_) { return; } // stockage refusé : rien à montrer
+    if (!cles.length) return;
+    poserStyle();
+    const box = document.createElement('div');
+    box.className = 'olda-etat olda-etat--echec';
+    box.style.margin = '12px';
+    const texte = document.createElement('span');
+    texte.className = 'olda-etat__texte';
+    texte.textContent = `${cles.length} brouillon(s) enregistré(s) sur CETTE tablette et jamais envoyés au planning : `
+      + `${cles.map((k) => k.replace('oldaDraft-', '')).join(', ')}. `
+      + 'Ouvre-les pour recopier le dossier, puis efface-les.';
+    const voir = document.createElement('button');
+    voir.type = 'button';
+    voir.className = 'olda-etat__reessai';
+    voir.textContent = 'Voir le contenu';
+    voir.addEventListener('click', () => {
+      const tout = cles.map((k) => {
+        let d = {};
+        try { d = JSON.parse(localStorage.getItem(k)) || {}; } catch (_) { /* illisible */ }
+        const client = d.selectedClient ? (d.selectedClient.company || d.selectedClient.name || '') : '';
+        const besoins = (d.needs || []).map((n) => `${n.qty} x ${n.label}`).join(' • ');
+        const champs = Object.entries(d.fields || {})
+          .filter(([, v]) => v !== '' && v !== false && v != null)
+          .map(([c, v]) => `  ${c} : ${v}`).join('\n');
+        return `${k.replace('oldaDraft-', '')}\nClient : ${client || '—'}\nBesoins : ${besoins || '—'}\n${champs}`;
+      }).join('\n\n———\n\n');
+      window.alert(tout);
+    });
+    const effacer = document.createElement('button');
+    effacer.type = 'button';
+    effacer.className = 'olda-etat__reessai';
+    effacer.textContent = 'Effacer';
+    effacer.addEventListener('click', () => {
+      if (!window.confirm('Effacer ces brouillons de cette tablette ?')) return;
+      for (const k of cles) { try { localStorage.removeItem(k); } catch (_) { /* rien à faire */ } }
+      cles = [];
+      box.remove();
+    });
+    box.append(texte, voir, effacer);
+    document.body.insertBefore(box, document.body.firstChild);
+  }
+
+  // On guette le CHANGEMENT, pas l'horloge : les deux écrans démasquent leur
+  // carte de fin en retirant une classe, un observateur le voit à l'instant
+  // même. Un `setInterval` suffirait presque — mais un navigateur bride ses
+  // minuteurs à ~1 s dès que l'onglet passe au second plan, et l'envoi du
+  // dossier ne doit pas dépendre de ça. La scrutation reste en second rideau,
+  // pour ce qui ne passe pas par une mutation (et parce que les écrans
+  // regreffent leurs propres boutons toutes les 400 ms).
+  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); });
+  veilleur.observe(document.body, { subtree: true, attributes: true, childList: true });
+  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); }, VEILLE_MS);
+  guetterEcranFinal();
+  rebrancherBoutonBrouillon();
+  montrerBrouillonsOublies();
 
   // L'hôte réaffiche l'écran pour un nouveau client : la base a pu bouger
   // entre-temps (un client créé depuis l'onglet Base clients).
