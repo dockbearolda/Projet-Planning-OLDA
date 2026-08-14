@@ -78,7 +78,7 @@ delete process.env.APP_PASSWORD;
   assert.ok(a.body.dejaEnregistre || b.body.dejaEnregistre, 'le second envoi doit se dire déjà enregistré');
 
   // Le dossier attend dans le sur-dossier du comptoir : c'est là qu'on compte.
-  const enAttente = await call('GET', '/api/requests?stage=arrivee_comptoir');
+  const enAttente = await call('GET', '/api/requests?stage=a_trier');
   const jumelles = enAttente.body.filter((r) => r.billing_company === 'Doublon Test SARL');
   assert.strictEqual(jumelles.length, 1, `une seule ligne attendue, reçu ${jumelles.length}`);
   assert.strictEqual(jumelles[0].fiche.ref, '26.08.05-101', 'le numéro de ticket est conservé');

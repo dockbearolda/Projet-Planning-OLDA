@@ -385,9 +385,9 @@
     attente: 'Ce dossier n’est pas encore au planning.',
     envoi: 'Enregistrement au planning…',
     // On dit AUSSI où il est. Tout ce qui sort du comptoir attend désormais
-    // dans « Arrivées comptoir », en tête du planning : la vendeuse enchaîne
+    // dans « À trier », en tête du planning : la vendeuse enchaîne
     // ses clients, puis range les dossiers d'un geste chacun.
-    ok: '✔ Ce dossier est au planning, dans « Arrivées comptoir ».',
+    ok: '✔ Ce dossier est au planning, dans « À trier ».',
     echec: '⚠ Ce dossier n’est PAS au planning.',
   };
   let dernierPeint = '';

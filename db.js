@@ -25,7 +25,7 @@ const FAMILIES = [
   // planning et range chaque dossier dans sa famille.
   // Elle n'a PAS de sous-étapes : un dossier qui n'a pas encore été rangé n'est
   // à aucune étape de travail — c'est précisément ce qu'il faut voir.
-  { slug: 'arrivee_comptoir', label: 'Arrivées comptoir' },
+  { slug: 'a_trier', label: 'À trier' },
   // Reçu, qualifié, chiffré, devis envoyé, devis validé : tout le commercial
   // avant que l'atelier ne touche quoi que ce soit.
   { slug: 'demande_chiffrage', label: 'Demande & chiffrage' },
@@ -46,7 +46,7 @@ const SPECIAL = [
 const STAGES = [...FAMILIES, ...SPECIAL];
 const STAGE_SLUGS = STAGES.map((s) => s.slug);
 
-// Sous-familles par famille (slug → libellé). « Arrivées comptoir » et Fiverr
+// Sous-familles par famille (slug → libellé). « À trier » et Fiverr
 // n'en ont pas : la première est un sur-dossier d'attente (le dossier n'est à
 // aucune étape de travail tant qu'il n'est pas rangé), le second est une
 // sous-traitance. Les 5 autres décrivent une suite d'actions précises.

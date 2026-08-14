@@ -876,7 +876,7 @@ const empreinteIds = (ids) => require('crypto')
 // Cette liste doit rester le MIROIR d'`ACTIVE_FAMILIES` (dashboard.js) : une
 // famille ajoutée là-bas et oubliée ici serait vide sur le Point du jour, sans
 // message ni erreur — un test compare les deux.
-const SYNTHESE_FAMILLES = ['arrivee_comptoir', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
+const SYNTHESE_FAMILLES = ['a_trier', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
 const SYNTHESE_FILTRE = `r.stage IN (${SYNTHESE_FAMILLES.map((s) => `'${s}'`).join(', ')})`;
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
@@ -2696,12 +2696,12 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   const estDemande = b.source === 'Demande de devis';
   // CE QUE LE PARCOURS A DÉSIGNÉ — la famille où ce dossier finira. Il n'y va
   // PAS tout de suite : tout ce qui sort du comptoir atterrit dans le
-  // sur-dossier « Arrivées comptoir », en tête du planning. La vendeuse
+  // sur-dossier « À trier », en tête du planning. La vendeuse
   // enchaîne ses clients, puis revient ranger. On garde donc la destination
   // dans la fiche, pour que le rangement se fasse d'un seul geste.
   const destination = COMPTOIR_FAMILLE[b.stage] || (estDemande ? 'demande_chiffrage' : 'preparation');
   const destinationSous = SOUS_ETAPE_PAR_LIBELLE.get(`${destination}|${String(b.status || '').toLowerCase()}`) || null;
-  const famille = 'arrivee_comptoir';
+  const famille = 'a_trier';
   const sousEtape = null;
 
   const cl = b.clientObj && typeof b.clientObj === 'object' ? b.clientObj : {};

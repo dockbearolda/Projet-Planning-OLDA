@@ -5303,7 +5303,7 @@ textarea.ld-ctl { font-weight: 600; }
 /* ===========================================================================
    RANGER UN DOSSIER DU COMPTOIR
    ===========================================================================
-   « Arrivées comptoir » est un sur-dossier d'attente : la vendeuse enchaîne
+   « À trier » est un sur-dossier d'attente : la vendeuse enchaîne
    cinq clients sans rien classer, puis revient au planning et range. Cette
    famille n'a donc pas de sous-étape — sa cellule (et sa puce, sur la carte)
    porte le SEUL geste qui l'y attend.
@@ -5357,7 +5357,7 @@ textarea.ld-ctl { font-weight: 600; }
    Réglé en CSS sur le slug plutôt qu'en JS : les compteurs se repeignent à
    trois endroits (montage, /api/counts, mise à jour optimiste), et une teinte
    posée à la main aurait fini par en manquer un. */
-.stage[data-slug="arrivee_comptoir"] .stage-count.has-items {
+.stage[data-slug="a_trier"] .stage-count.has-items {
   background: var(--primary);
   color: var(--surface);
 }

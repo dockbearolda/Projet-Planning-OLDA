@@ -82,7 +82,7 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(vente.status, 201, JSON.stringify(vente.body));
   // TOUT LE COMPTOIR ARRIVE DANS LE SUR-DOSSIER. La vendeuse enchaîne ses
   // clients sans rien classer ; le rangement est un geste à part, au planning.
-  assert.strictEqual(vente.body.stage, 'arrivee_comptoir');
+  assert.strictEqual(vente.body.stage, 'a_trier');
   assert.strictEqual(vente.body.subStage, null, 'un dossier non rangé n’est à aucune étape de travail');
   // La famille désignée au comptoir n'est pas perdue pour autant : elle voyage
   // avec le dossier, et c'est elle qui fera le bouton « Ranger dans… ».
@@ -157,7 +157,7 @@ delete process.env.APP_PASSWORD;
     paiement: { modeLabel: 'Espèces', mode: 'especes', paye: true, retraitImmediat: true },
   });
   assert.strictEqual(emporte.status, 201, JSON.stringify(emporte.body));
-  assert.strictEqual(emporte.body.stage, 'arrivee_comptoir');
+  assert.strictEqual(emporte.body.stage, 'a_trier');
   assert.deepStrictEqual(emporte.body.destination, { stage: 'facturation', subStage: 'commande_recuperee' });
 
   const lEmporte = await ligneDe(emporte.body.id);
@@ -201,7 +201,7 @@ delete process.env.APP_PASSWORD;
     checks: { products: false, bat: false, files: true, qty: true, payment: false },
   });
   assert.strictEqual(demande.status, 201, JSON.stringify(demande.body));
-  assert.strictEqual(demande.body.stage, 'arrivee_comptoir');
+  assert.strictEqual(demande.body.stage, 'a_trier');
   assert.deepStrictEqual(demande.body.destination, { stage: 'demande_chiffrage', subStage: 'a_chiffrer' });
 
   const lDemande = await ligneDe(demande.body.id);

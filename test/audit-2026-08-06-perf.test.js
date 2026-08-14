@@ -109,10 +109,10 @@ function bloc(src, signature) {
   assert.strictEqual(cree.status, 201, JSON.stringify(cree.body));
   const idComptoir = cree.body.id;
 
-  // Le comptoir dépose tout dans le sur-dossier « Arrivées comptoir » : c'est
+  // Le comptoir dépose tout dans le sur-dossier « À trier » : c'est
   // là que la ligne se lit tant que personne ne l'a rangée.
-  const listeArrivees = await call('GET', '/api/requests?stage=arrivee_comptoir');
-  const enListe = listeArrivees.body.find((r) => r.id === idComptoir);
+  const listeATrier = await call('GET', '/api/requests?stage=a_trier');
+  const enListe = listeATrier.body.find((r) => r.id === idComptoir);
   assert.ok(enListe, 'la commande du comptoir est bien dans la liste de son étape');
   // Ce que la grille affiche vraiment est là…
   assert.strictEqual(enListe.fiche.ref, 'AUDIT-PERF-001', 'le numéro de ticket voyage');

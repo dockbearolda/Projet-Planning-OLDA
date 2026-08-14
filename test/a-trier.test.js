@@ -1,6 +1,6 @@
 'use strict';
 
-// LE SUR-DOSSIER « ARRIVÉES COMPTOIR ».
+// LE SUR-DOSSIER « À TRIER ».
 // ===========================================================================
 // Demande du patron, 14/08 : « je veux que 100 % des commandes qui arrivent sur
 // la page de fin s'ajoutent automatiquement dans un sur-dossier tout en haut du
@@ -43,39 +43,39 @@ const DASH = lire('public/dashboard.js');
 // 1. LA FAMILLE : EN TÊTE, ET SANS SOUS-ÉTAPE
 // ===========================================================================
 const { STAGES, STAGE_SLUGS, SUB_STAGES } = require('../db');
-assert.strictEqual(STAGES[0].slug, 'arrivee_comptoir',
+assert.strictEqual(STAGES[0].slug, 'a_trier',
   'le sur-dossier doit être la PREMIÈRE famille : « tout en haut du planning »');
-assert.strictEqual(SUB_STAGES.arrivee_comptoir, undefined,
+assert.strictEqual(SUB_STAGES.a_trier, undefined,
   'un dossier non rangé n’est à aucune étape de travail : pas de sous-étapes');
-assert.ok(STAGE_SLUGS.includes('arrivee_comptoir'));
+assert.ok(STAGE_SLUGS.includes('a_trier'));
 
 // Le rail de l'écran est un MIROIR de db.js : une famille présente d'un côté et
 // absente de l'autre, c'est une catégorie qu'on ne peut plus atteindre.
 const famillesEcran = APP.match(/const FAMILIES = \[([\s\S]*?)\n\];/)[1]
   .match(/slug: '([a-z_]+)'/g).map((m) => m.slice(7, -1));
-assert.strictEqual(famillesEcran[0], 'arrivee_comptoir', 'l’écran doit la placer en tête, lui aussi');
+assert.strictEqual(famillesEcran[0], 'a_trier', 'l’écran doit la placer en tête, lui aussi');
 assert.deepStrictEqual(famillesEcran, STAGES.filter((s) => s.slug !== 'fiverr').map((s) => s.slug),
   'les familles de l’écran et celles du serveur doivent dire la même chose');
 
 // Le Point du jour ne regarde qu'une liste de familles : celle qu'il ignore est
 // vide EN SILENCE, sans message ni erreur.
-assert.ok(/const SYNTHESE_FAMILLES = \['arrivee_comptoir'/.test(SERVEUR),
+assert.ok(/const SYNTHESE_FAMILLES = \['a_trier'/.test(SERVEUR),
   'la synthèse doit porter le sur-dossier');
-assert.ok(/const ACTIVE_FAMILIES = \['arrivee_comptoir'/.test(DASH),
+assert.ok(/const ACTIVE_FAMILIES = \['a_trier'/.test(DASH),
   'le Point du jour doit regarder le sur-dossier');
 
 // ===========================================================================
 // 2. L'ÉCRAN : UN BOUTON QUI RANGE, À LA PLACE DE CE QU'IL REMPLACE
 // ===========================================================================
-assert.ok(/const ARRIVEES = 'arrivee_comptoir';/.test(APP), 'le sur-dossier se nomme une fois');
+assert.ok(/const A_TRIER = 'a_trier';/.test(APP), 'le sur-dossier se nomme une fois');
 
 // Tableau : la cellule « sous-étape » — vide pour une famille qui n'en a pas —
 // porte le bouton. Carte : la deuxième puce. Dans les deux cas, l'élément
 // EXISTE DÉJÀ : une piste qui n'apparaîtrait que sur certaines lignes décalerait
 // toute la file (c'est arrivé, cf. la rangée d'actions de la ligne).
-assert.ok(/if \(r\.stage === ARRIVEES\) \{ td\.appendChild\(boutonRanger\(r\)\); return td; \}/.test(APP),
+assert.ok(/if \(r\.stage === A_TRIER\) \{ td\.appendChild\(boutonRanger\(r\)\); return td; \}/.test(APP),
   'la cellule sous-étape du tableau doit porter le rangement');
-assert.ok(/meta\.appendChild\(r\.stage === ARRIVEES && currentStage === ARRIVEES\s*\n\s*\? boutonRanger\(r\)/.test(APP),
+assert.ok(/meta\.appendChild\(r\.stage === A_TRIER && currentStage === A_TRIER\s*\n\s*\? boutonRanger\(r\)/.test(APP),
   'la puce de la carte doit porter le rangement');
 
 // UN tap = rangé. La destination vient du comptoir, pas d'un menu à fouiller.
@@ -99,7 +99,7 @@ assert.ok(/background: var\(--primary\)/.test(REGLE) && !/#[0-9a-fA-F]{3,6}/.tes
   'le bouton suit la charte, aucune couleur en dur');
 // Le compteur du rail se repeint à trois endroits : sa teinte se règle en CSS,
 // pas à la main — sinon l'un des trois finit par l'oublier.
-assert.ok(/\.stage\[data-slug="arrivee_comptoir"\] \.stage-count\.has-items/.test(CSS),
+assert.ok(/\.stage\[data-slug="a_trier"\] \.stage-count\.has-items/.test(CSS),
   'le compteur du sur-dossier doit se distinguer, en CSS');
 
 // La fiche doit pouvoir RAMENER une commande dans le sur-dossier (erreur de
@@ -158,7 +158,7 @@ delete process.env.APP_PASSWORD;
     assert.strictEqual(r.status, 201, JSON.stringify(r.body));
     // 100 % DES DOSSIERS, sans exception : même une vente déjà encaissée passe
     // par le tri. C'est le prix de « rien n'entre au planning sans être vu ».
-    assert.strictEqual(r.body.stage, 'arrivee_comptoir', `${c.nom} doit attendre dans le sur-dossier`);
+    assert.strictEqual(r.body.stage, 'a_trier', `${c.nom} doit attendre dans le sur-dossier`);
     assert.strictEqual(r.body.subStage, null, `${c.nom} n’est à aucune étape de travail`);
     assert.deepStrictEqual(r.body.destination, { stage: c.dest[0], subStage: c.dest[1] },
       `${c.nom} garde la famille désignée au comptoir`);
@@ -166,7 +166,7 @@ delete process.env.APP_PASSWORD;
   }
 
   // Les cinq sont là, ensemble, dans le sur-dossier.
-  const tri = await call('GET', '/api/requests?stage=arrivee_comptoir');
+  const tri = await call('GET', '/api/requests?stage=a_trier');
   for (const c of crees) {
     const ligne = tri.body.find((r) => r.id === c.id);
     assert.ok(ligne, `${c.nom} doit être dans la liste du sur-dossier`);
@@ -177,7 +177,7 @@ delete process.env.APP_PASSWORD;
     assert.strictEqual(ligne.sub_stage, null);
   }
   const compteurs = await call('GET', '/api/counts');
-  assert.ok(compteurs.body.arrivee_comptoir >= 5, 'le rail doit compter les dossiers en attente');
+  assert.ok(compteurs.body.a_trier >= 5, 'le rail doit compter les dossiers en attente');
 
   // LE RANGEMENT — un déplacement, rien de plus : c'est ce que fait le bouton.
   for (const c of crees) {
@@ -191,7 +191,7 @@ delete process.env.APP_PASSWORD;
   }
 
   // Le sur-dossier est vide, et le planning a tout récupéré.
-  const apres = await call('GET', '/api/requests?stage=arrivee_comptoir');
+  const apres = await call('GET', '/api/requests?stage=a_trier');
   assert.strictEqual(apres.body.filter((r) => crees.some((c) => c.id === r.id)).length, 0,
     'une fois rangés, les dossiers ont quitté le sur-dossier');
 
@@ -200,6 +200,6 @@ delete process.env.APP_PASSWORD;
   const cherche = await call('GET', '/api/requests/recherche?q=TRI-26.08.14-003');
   assert.strictEqual(cherche.body.length, 1, 'le numéro du ticket retrouve le dossier');
 
-  console.log('✓ arrivées comptoir : tout arrive dans le sur-dossier, se range en un geste, et rien ne se perd');
+  console.log('✓ à trier : tout arrive dans le sur-dossier, se range en un geste, et rien ne se perd');
   process.exit(0);
 })();
