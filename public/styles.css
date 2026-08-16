@@ -3727,11 +3727,26 @@ body.view-comptoir .grid-search { display: none !important; }
 
 /* ===========================================================================
    POINT DU JOUR — dashboard
-   Plus de design system parallèle : les tokens --pj-* ne sont QUE des alias
-   de la charte (voir :root tout en haut). Un seul jeu de couleurs pour toute
-   l'app, et le thème sombre suit tout seul — d'où la disparition du bloc
-   [data-theme="dark"] qui doublait ces valeurs à la main.
-   Cibles : Galaxy Tab paysage 1280×800 + desktop. Tout vient du planning.
+   Une console d'atelier, pas une galerie de cartes : on la lit debout, de loin,
+   pendant le point du matin. Trois partis pris qui tiennent tout le reste :
+
+     1. LA COULEUR NE DIT QU'UN ÉTAT. Rouge = retard ou blocage, ambre = ça
+        arrive, un dégradé d'encre = position dans la chaîne. Tout le reste est
+        gris. Une explication (« pourquoi cette ligne est là ») est du TEXTE,
+        jamais une pastille colorée — sinon elle parle la même langue qu'une
+        alerte et l'écran devient un sapin de Noël.
+     2. UN SEUL ACCENT PAR ZONE. Le nom du client dans une ligne, le chiffre
+        d'un compteur qui n'est pas à zéro, le titre d'une section. Quand tout
+        est en gras, plus rien n'est en gras — c'était le défaut principal.
+     3. DES COLONNES QUI TOMBENT AU MÊME ENDROIT. La file et le bac sont des
+        grilles à pistes FIXES : l'œil descend une colonne au lieu de relire
+        chaque carte. Jamais de piste `auto` — un élément absent d'une ligne
+        décalerait toute la file (même piège que la carte du planning).
+
+   Les tokens --pj-* ne sont que des alias de la charte (voir :root tout en
+   haut) : un seul jeu de couleurs pour l'app, le thème sombre suit tout seul.
+   Cibles : Galaxy Tab paysage 1280×800 (mode d'usage principal), portrait
+   800×1280, desktop, iPhone.
    =========================================================================== */
 .dashboard, .dd-panel, .pj-feed {
   /* surfaces & texte */
@@ -3755,7 +3770,41 @@ body.view-comptoir .grid-search { display: none !important; }
   --pj-green: var(--success);     --pj-green-ink: var(--success);  --pj-green-bg: var(--success-bg);  --pj-green-line: var(--success-line);
   --pj-shadow: var(--shadow-2);
   --pj-font: var(--font);
+
+  /* Dégradé de la jauge de charge : UNE seule teinte (l'encre), du clair au
+     foncé, dans l'ordre du pipeline — entrée à gauche, sortie à droite. C'est
+     une échelle ordonnée, donc la clarté suffit à l'encoder ; aucune couleur
+     n'est dépensée, et chaque segment porte son chiffre + sa légende (jamais
+     la teinte seule pour identifier une étape). */
+  --pj-pal-1: #d1d5db;
+  --pj-pal-2: #9ca3af;
+  --pj-pal-3: #6b7280;
+  --pj-pal-4: #4b5563;
+  --pj-pal-5: #1f2937;
+
+  /* Les pistes de la grille des lignes, nommées une fois : l'entête de
+     colonnes et les lignes DOIVENT partager exactement la même définition. */
+  --pj-c-rank: 30px;
+  --pj-c-prio: 34px;
+  --pj-c-pos: 168px;
+  --pj-c-why: 224px;
+  --pj-c-due: 96px;
+  --pj-c-pilot: 132px;
+  --pj-c-tag: 78px;
+
   font-family: var(--pj-font);
+}
+
+/* En thème sombre la jauge doit se détacher de la surface sombre : la même
+   échelle, retournée (l'étape la plus avancée reste la plus contrastée). */
+:root[data-theme="dark"] .dashboard,
+:root[data-theme="dark"] .dd-panel,
+:root[data-theme="dark"] .pj-feed {
+  --pj-pal-1: #4b5563;
+  --pj-pal-2: #6b7280;
+  --pj-pal-3: #9ca3af;
+  --pj-pal-4: #cbd5e1;
+  --pj-pal-5: #f1f5f9;
 }
 
 .dashboard { background: var(--pj-bg); color: var(--pj-ink); }
@@ -3772,11 +3821,11 @@ body.view-comptoir .grid-search { display: none !important; }
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .35);
 }
 
-/* ------------------------------------------------ Header sticky « Point du jour » */
+/* ------------------------------------------------ En-tête « Point du jour » */
 .pj-head {
   flex-shrink: 0;
   padding: 14px 22px 0;
-  background: var(--pj-bg);
+  background: var(--pj-surface);
   border-bottom: 1px solid var(--pj-border);
 }
 .pj-head-row {
@@ -3785,22 +3834,39 @@ body.view-comptoir .grid-search { display: none !important; }
   gap: 12px;
   min-width: 0;
 }
+
+/* Titre + date : un écran lu chaque matin dit de quel matin il parle. */
+.pj-title { min-width: 0; margin-right: auto; }
+.pj-title-h {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+  color: var(--pj-ink);
+}
+.pj-title-d {
+  margin: 1px 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pj-ink-3);
+}
+
 .pj-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: 0 1 300px;
   min-width: 140px;
-  max-width: 360px;
   min-height: 44px;
-  padding: 0 8px 0 14px;
-  margin-left: auto;
-  background: var(--pj-surface);
+  padding: 0 6px 0 12px;
+  background: var(--pj-bg);
   border: 1px solid var(--pj-border);
   border-radius: 99px;
+  transition: border-color var(--dur-1) var(--ease);
 }
 .pj-search:focus-within { border-color: var(--pj-accent); }
-.pj-search .material-symbols-outlined { font-size: 20px; color: var(--pj-ink-4); }
+.pj-search .material-symbols-outlined { font-size: 19px; color: var(--pj-ink-4); }
 .pj-search-input {
   flex: 1;
   min-width: 0;
@@ -3808,23 +3874,28 @@ body.view-comptoir .grid-search { display: none !important; }
   background: none;
   font: inherit;
   font-size: 16px; /* pas de zoom iOS */
-  font-weight: 600;
+  font-weight: 500;
   color: var(--pj-ink);
 }
-.pj-search-input::placeholder { color: var(--pj-ink-4); font-weight: 500; }
+.pj-search-input::placeholder { color: var(--pj-ink-4); font-weight: 400; }
 .pj-search-input:focus { outline: none; }
 .pj-search-input:focus-visible { box-shadow: none; }
 .pj-search-clear {
+  position: relative;
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
   border: 0;
   border-radius: 50%;
   background: var(--pj-neutral-bg);
   color: var(--pj-ink-3);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
 }
+/* La pastille reste petite (elle vit DANS la pilule de recherche) mais sa zone
+   sensible fait bien 44 px : au doigt, on vise la croix, pas le pixel. */
+.pj-search-clear::after { content: ""; position: absolute; inset: -6px; }
 
 .pj-tool {
   position: relative;
@@ -3832,27 +3903,27 @@ body.view-comptoir .grid-search { display: none !important; }
   align-items: center;
   gap: 7px;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 14px;
   flex-shrink: 0;
   border: 1px solid var(--pj-border);
   border-radius: 99px;
   background: var(--pj-surface);
   color: var(--pj-ink-2);
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.pj-tool:hover { border-color: var(--pj-accent); color: var(--pj-accent); box-shadow: var(--pj-shadow); }
-.pj-tool .material-symbols-outlined { font-size: 20px; }
+.pj-tool:hover { border-color: var(--pj-accent); color: var(--pj-ink); background: var(--pj-bg); }
+.pj-tool .material-symbols-outlined { font-size: 19px; }
 .pj-tool--icon { width: 44px; padding: 0; justify-content: center; }
 .pj-tool-badge {
   position: absolute;
   top: -4px;
   right: -4px;
-  min-width: 19px;
-  height: 19px;
+  min-width: 18px;
+  height: 18px;
   padding: 0 5px;
   display: inline-flex;
   align-items: center;
@@ -3862,83 +3933,669 @@ body.view-comptoir .grid-search { display: none !important; }
   /* le remplissage sémantique s'inverse avec le thème : l'encre posée dessus
      doit donc être la surface, jamais un blanc en dur. */
   color: var(--surface);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
 }
 
-/* KPI cliquables : un clic filtre toutes les vues (estompe le reste). */
-.pj-kpis {
+/* ---------------------------------------- Bandeau d'état : alarmes + charge */
+.pj-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 22px;
+  padding: 13px 0 3px;
+}
+
+/* UN bloc segmenté, pas quatre cartes flottantes : ça se lit comme une rangée
+   d'instruments. Les filets intérieurs remplacent les bordures individuelles. */
+.pj-stats {
   display: flex;
   align-items: stretch;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 0 2px;
+  border: 1px solid var(--pj-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--pj-surface);
 }
-.pj-kpi {
+.pj-stat {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0;
-  min-width: 118px;
-  min-height: 54px;
-  padding: 7px 16px 8px;
-  border: 1px solid var(--pj-border);
-  border-radius: 12px;
-  background: var(--pj-surface);
+  justify-content: center;
+  gap: 1px;
+  min-width: 116px;
+  min-height: 62px;
+  padding: 8px 16px;
+  border: 0;
+  border-left: 1px solid var(--pj-border-soft);
+  background: none;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease);
 }
-.pj-kpi:hover { transform: translateY(-1px); box-shadow: var(--pj-shadow); }
-.pj-kpi.active { border-color: var(--pj-accent); box-shadow: 0 0 0 1px var(--pj-accent), var(--pj-shadow); }
-.pj-kpi-n {
-  font-size: 22px;
+.pj-stat:first-child { border-left: 0; }
+.pj-stat:hover:not(:disabled) { background: var(--pj-bg); }
+.pj-stat-n {
+  font-size: 26px;
   font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -.02em;
+  line-height: 1.05;
+  letter-spacing: -.03em;
   font-variant-numeric: tabular-nums;
   color: var(--pj-ink);
 }
-.pj-kpi-l {
+.pj-stat-l {
   font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  font-weight: 600;
+  letter-spacing: .02em;
   color: var(--pj-ink-3);
   white-space: nowrap;
 }
-.pj-kpi.k-late .pj-kpi-n { color: var(--pj-late); }
-.pj-kpi.k-blocked .pj-kpi-n { color: var(--pj-late); }
-.pj-kpi.k-soon .pj-kpi-n { color: var(--pj-soon); }
-.pj-kpi.k-waiting .pj-kpi-n { color: var(--pj-accent); }
+/* La couleur ne s'allume QUE sur une alarme réelle. */
+.pj-stat.k-late .pj-stat-n, .pj-stat.k-blocked .pj-stat-n { color: var(--pj-late); }
+.pj-stat.k-soon .pj-stat-n { color: var(--pj-soon); }
 
-/* --- Alerte de commande (BLOQUÉE / À VOIR) au point du jour --------------- */
-/* Bandeau sur la carte : c'est ce qu'on doit lire avant l'article. */
-.pj-flag {
+/* Zéro = rien à signaler : le compteur s'éteint (gris, léger, non cliquable).
+   C'est ce qui permet de balayer la rangée sans la lire — seuls les chiffres
+   qui ne sont pas nuls accrochent l'œil. */
+.pj-stat.is-zero .pj-stat-n { color: var(--pj-ink-4); font-weight: 500; }
+.pj-stat.is-zero .pj-stat-l { color: var(--pj-ink-4); }
+.pj-stat:disabled { cursor: default; }
+.pj-stat.active {
+  background: var(--pj-ink);
+}
+.pj-stat.active .pj-stat-n, .pj-stat.active .pj-stat-l { color: var(--pj-bg); }
+
+/* ---------------------------------------- Jauge de charge par étape */
+.pj-charge {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 8px 0 2px;
-  padding: 7px 10px;
-  border-radius: 9px;
-  border-left: 3px solid currentColor;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 0;
 }
-.pj-flag.f-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
-.pj-flag.f-a-voir { background: var(--pj-soon-bg); color: var(--pj-soon-deep, var(--pj-soon)); }
-.pj-flag-tag { font-size: 10px; font-weight: 800; letter-spacing: .07em; }
-.pj-flag-why {
-  font-size: 12.5px;
+.pj-charge-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.pj-charge-t {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--pj-ink-3);
+  white-space: nowrap;
+}
+.pj-charge-n {
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  color: var(--pj-ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-charge-bar {
+  display: flex;
+  gap: 2px;                      /* le filet de surface entre deux segments */
+  height: 10px;
+  min-width: 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pj-charge-seg {
+  min-width: 3px;
+  flex-basis: 0;
+  background: var(--pj-pal-1);
+}
+.pj-charge-seg[style*="--pal: 2"] { background: var(--pj-pal-2); }
+.pj-charge-seg[style*="--pal: 3"] { background: var(--pj-pal-3); }
+.pj-charge-seg[style*="--pal: 4"] { background: var(--pj-pal-4); }
+.pj-charge-seg[style*="--pal: 5"] { background: var(--pj-pal-5); }
+.pj-charge-vide {
+  flex: 1;
+  background: var(--pj-neutral-bg);
+  border-radius: 4px;
+}
+.pj-charge-leg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  min-width: 0;
+}
+.pj-charge-lg { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.pj-charge-lg-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--pj-pal-1);
+}
+.pj-charge-lg[style*="--pal: 2"] .pj-charge-lg-dot { background: var(--pj-pal-2); }
+.pj-charge-lg[style*="--pal: 3"] .pj-charge-lg-dot { background: var(--pj-pal-3); }
+.pj-charge-lg[style*="--pal: 4"] .pj-charge-lg-dot { background: var(--pj-pal-4); }
+.pj-charge-lg[style*="--pal: 5"] .pj-charge-lg-dot { background: var(--pj-pal-5); }
+/* La légende porte les VALEURS (le barreau ne montre qu'une proportion) : le
+   chiffre y est donc en encre pleine, jamais posé sur un gris moyen. */
+.pj-charge-lg-t {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--pj-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-charge-lg-n {
+  font-size: 12.5px;
+  font-weight: 800;
   color: var(--pj-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chip « Filtre : … ✕ » (annule le filtre actif). */
+.pj-filterchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin-top: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--pj-ink);
+  color: var(--pj-bg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pj-filterchip-x { font-size: 12px; opacity: .7; }
+
+/* ------------------------------------------------ Onglets */
+.pj-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 10px 0 0;
+}
+/* Onglets ancrés sur le filet du bas : la vue active est physiquement reliée
+   au contenu qu'elle affiche, au lieu de flotter au-dessus. */
+.pj-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--pj-ink-3);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.pj-tab:hover { color: var(--pj-ink); }
+.pj-tab.active { color: var(--pj-ink); font-weight: 800; border-bottom-color: var(--pj-ink); }
+.pj-tab-n {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--pj-neutral-bg);
+  color: var(--pj-ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pj-tab.active .pj-tab-n { background: var(--pj-ink); color: var(--pj-bg); }
+.pj-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pj-late);
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------ Corps défilant */
+.pj-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 22px 36px;
+}
+.pj-empty {
+  margin: 0;
+  padding: 15px 16px;
+  border: 1px dashed var(--pj-border);
+  border-radius: 10px;
+  color: var(--pj-ink-4);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------ En-tête de section */
+.pj-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.pj-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--pj-ink);
+  white-space: nowrap;
+}
+.pj-section-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--pj-ink);
+  color: var(--pj-bg);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* Le filet qui court jusqu'au bord : il découpe l'écran sans peser. */
+.pj-section-rule { flex: 1; height: 1px; min-width: 12px; background: var(--pj-border-soft); }
+.pj-section-hint {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--pj-ink-4);
+  white-space: nowrap;
+}
+
+/* ===========================================================================
+   LA GRILLE DES LIGNES — file « À faire » et bac « À débloquer »
+   Pistes FIXES, partagées par l'entête de colonnes et les lignes. Aucune piste
+   `auto` : une ligne sans « pourquoi » ou sans pilote garde ses colonnes en
+   place au lieu de décaler toute la file.
+   =========================================================================== */
+/* La grille se replie sur la largeur de SA LISTE, pas sur celle de la fenêtre :
+   la même file s'affiche pleine largeur dans « À faire » et dans une colonne
+   de 60 % en vue personne. Réglée à la fenêtre, la colonne « Client & projet »
+   s'écrasait à zéro dans la vue personne — le nom du client disparaissait
+   purement et simplement alors que la fenêtre, elle, était large. */
+.pj-todo-list, .pj-hold-list { container-type: inline-size; }
+
+.pj-row-head, .pj-row {
+  display: grid;
+  grid-template-columns:
+    var(--pj-c-rank)
+    var(--pj-c-prio)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    var(--pj-c-why)
+    var(--pj-c-due)
+    var(--pj-c-pilot);
+  align-items: center;
+  gap: 0 12px;
+}
+/* Le bac n'a ni rang ni priorité : une pastille d'état les remplace. */
+.pj-row--hold, .pj-hold-list .pj-row-head {
+  grid-template-columns:
+    var(--pj-c-tag)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    var(--pj-c-why)
+    var(--pj-c-due)
+    var(--pj-c-pilot);
+}
+
+/* CHAQUE cellule est placée explicitement, jamais laissée à l'auto-placement.
+   Dès qu'un élément descend d'une ligne, la répartition automatique remplit
+   les trous restés libres à sa gauche : l'échéance et le pilote se
+   retrouvaient sous le rang, en bas à gauche de la ligne. Placer, c'est dire
+   à la fois LA COLONNE et LA LIGNE. */
+.pj-row > .pj-row-rank  { grid-area: 1 / 1; }
+.pj-row > .pj-stars     { grid-area: 1 / 2; }
+.pj-row > .pj-row-who   { grid-area: 1 / 3; }
+.pj-row > .pj-pos       { grid-area: 1 / 4; }
+.pj-row > .pj-row-why   { grid-area: 1 / 5; }
+.pj-row > .pj-badge     { grid-area: 1 / 6; }
+.pj-row > .pj-pilot     { grid-area: 1 / 7; }
+.pj-row > .pj-flag      { grid-area: 2 / 3 / auto / -1; margin-top: 7px; }
+
+.pj-row--hold > .pj-hold-tag { grid-area: 1 / 1; }
+.pj-row--hold > .pj-row-who  { grid-area: 1 / 2; }
+.pj-row--hold > .pj-pos      { grid-area: 1 / 3; }
+.pj-row--hold > .pj-row-why  { grid-area: 1 / 4; }
+.pj-row--hold > .pj-badge    { grid-area: 1 / 5; }
+.pj-row--hold > .pj-pilot    { grid-area: 1 / 6; }
+.pj-row--hold > .pj-flag     { grid-area: 2 / 2 / auto / -1; margin-top: 7px; }
+
+/* Repli, dans l'ordre inverse de l'utilité : « pourquoi », puis l'étape, puis
+   le pilote descendent sous le client. Le rang, le client et l'échéance ne
+   quittent JAMAIS la première ligne — c'est le trio qu'on lit en balayant. */
+@container (max-width: 800px) {
+  .pj-row-head, .pj-row {
+    grid-template-columns:
+      var(--pj-c-rank) var(--pj-c-prio) minmax(0, 1fr) var(--pj-c-pos) var(--pj-c-due) var(--pj-c-pilot);
+  }
+  .pj-row--hold, .pj-hold-list .pj-row-head {
+    grid-template-columns: var(--pj-c-tag) minmax(0, 1fr) var(--pj-c-pos) var(--pj-c-due) var(--pj-c-pilot);
+  }
+  .pj-row-head-c.c-why { display: none; }
+
+  .pj-row > .pj-badge   { grid-area: 1 / 5; }
+  .pj-row > .pj-pilot   { grid-area: 1 / 6; }
+  .pj-row > .pj-row-why { grid-area: 2 / 3 / auto / -1; margin-top: 5px; -webkit-line-clamp: 1; }
+  .pj-row > .pj-flag    { grid-area: 3 / 3 / auto / -1; }
+
+  .pj-row--hold > .pj-badge   { grid-area: 1 / 4; }
+  .pj-row--hold > .pj-pilot   { grid-area: 1 / 5; }
+  .pj-row--hold > .pj-row-why { grid-area: 2 / 2 / auto / -1; margin-top: 5px; -webkit-line-clamp: 1; }
+  .pj-row--hold > .pj-flag    { grid-area: 3 / 2 / auto / -1; }
+}
+
+@container (max-width: 580px) {
+  .pj-row-head, .pj-row {
+    grid-template-columns: var(--pj-c-rank) var(--pj-c-prio) minmax(0, 1fr) var(--pj-c-due) var(--pj-c-pilot);
+  }
+  .pj-row--hold, .pj-hold-list .pj-row-head {
+    grid-template-columns: var(--pj-c-tag) minmax(0, 1fr) var(--pj-c-due) var(--pj-c-pilot);
+  }
+  .pj-row-head-c.c-pos { display: none; }
+  /* Repliée sous le client, l'étape se remet à plat : « Production · Pressage ». */
+  .pj-pos { flex-direction: row; align-items: baseline; gap: 7px; margin-top: 4px; }
+
+  .pj-row > .pj-badge   { grid-area: 1 / 4; }
+  .pj-row > .pj-pilot   { grid-area: 1 / 5; }
+  .pj-row > .pj-pos     { grid-area: 2 / 3 / auto / -1; }
+  .pj-row > .pj-row-why { grid-area: 3 / 3 / auto / -1; margin-top: 3px; }
+  .pj-row > .pj-flag    { grid-area: 4 / 3 / auto / -1; }
+
+  .pj-row--hold > .pj-badge   { grid-area: 1 / 3; }
+  .pj-row--hold > .pj-pilot   { grid-area: 1 / 4; }
+  .pj-row--hold > .pj-pos     { grid-area: 2 / 2 / auto / -1; }
+  .pj-row--hold > .pj-row-why { grid-area: 3 / 2 / auto / -1; margin-top: 3px; }
+  .pj-row--hold > .pj-flag    { grid-area: 4 / 2 / auto / -1; }
+}
+
+/* Téléphone : la ligne devient une fiche empilée sur DEUX colonnes seulement —
+   le repère à gauche, tout le reste à droite. Garder l'échéance sur la même
+   ligne que le client ne laissait plus que ~110 px au nom : « Auto-écol… ».
+   Un nom de client tronqué, c'est la seule chose qu'on ne peut pas se
+   permettre de couper. */
+/* Téléphone : la ligne devient une fiche. Le repère à gauche, le client et son
+   échéance sur la première ligne, le reste empilé dessous. Ici le nom du
+   client se REPLIE sur deux lignes au lieu d'être coupé — c'est la seule
+   donnée qu'on ne peut pas se permettre de tronquer, et à 375 px il ne reste
+   pas de quoi l'écrire sur une seule. */
+@container (max-width: 440px) {
+  .pj-row-head { display: none; }
+  .pj-row, .pj-row--hold { --pj-c-due: 84px; align-items: start; }
+  .pj-row { grid-template-columns: var(--pj-c-rank) minmax(0, 1fr) var(--pj-c-due); }
+  .pj-row--hold { grid-template-columns: var(--pj-c-tag) minmax(0, 1fr) var(--pj-c-due); }
+
+  /* La jauge de priorité s'efface : le RANG la porte déjà (la file est classée),
+     et une priorité haute est nommée en toutes lettres dans le « pourquoi ». */
+  .pj-row > .pj-stars { display: none; }
+
+  .pj-card-client {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+  }
+
+  .pj-row > .pj-row-who { grid-area: 1 / 2; }
+  .pj-row > .pj-badge   { grid-area: 1 / 3; }
+  .pj-row > .pj-pos     { grid-area: 2 / 2 / auto / -1; margin-top: 6px; }
+  .pj-row > .pj-row-why { grid-area: 3 / 2 / auto / -1; }
+  .pj-row > .pj-pilot   { grid-area: 4 / 2 / auto / -1; margin-top: 6px; }
+  .pj-row > .pj-flag    { grid-area: 5 / 1 / auto / -1; }
+
+  .pj-row--hold > .pj-row-who { grid-area: 1 / 2; }
+  .pj-row--hold > .pj-badge   { grid-area: 1 / 3; }
+  .pj-row--hold > .pj-pos     { grid-area: 2 / 2 / auto / -1; margin-top: 6px; }
+  .pj-row--hold > .pj-row-why { grid-area: 3 / 2 / auto / -1; }
+  .pj-row--hold > .pj-pilot   { grid-area: 4 / 2 / auto / -1; margin-top: 6px; }
+  .pj-row--hold > .pj-flag    { grid-area: 5 / 1 / auto / -1; }
+
+  /* Les cellules de gauche se calent sur la PREMIÈRE ligne du client, pas au
+     milieu d'une fiche de cinq rangs. */
+  .pj-row > .pj-row-rank, .pj-row--hold > .pj-hold-tag { margin-top: 2px; }
+}
+
+.pj-row-head {
+  padding: 0 13px 7px;
+  border-bottom: 1px solid var(--pj-border-soft);
+  margin-bottom: 7px;
+}
+.pj-row-head-c {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-row-head-c.c-due { text-align: right; }
+
+/* ------------------------------------------------ Cartes & lignes commande */
+.pj-card {
+  position: relative;
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--pj-border-soft);
+  border-radius: 10px;
+  background: var(--pj-surface);
+  color: var(--pj-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), opacity var(--dur-2) var(--ease);
+}
+.pj-card:hover { border-color: var(--pj-border); box-shadow: var(--pj-shadow); }
+.pj-card.is-dim { opacity: .28; }
+
+/* L'ARÊTE D'URGENCE : un vrai bloc collé au bord gauche, pas un liseré de 3 px
+   noyé dans la bordure. C'est le seul repère lisible à un mètre de la tablette,
+   posée sur l'établi. Absente quand il n'y a rien à signaler. */
+.pj-card::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  bottom: -1px;
+  width: 4px;
+  border-radius: 10px 0 0 10px;
+  background: transparent;
+}
+.pj-card.u-late::before { background: var(--pj-late); }
+.pj-card.u-soon::before { background: var(--pj-soon); }
+.pj-card.u-plan::before { background: var(--pj-plan); }
+/* Une alerte prime sur l'échéance : bloquée, c'est rouge quoi qu'il arrive. */
+.pj-card.is-bloque::before { background: var(--pj-late); }
+.pj-card.is-a-voir::before { background: var(--pj-soon); }
+
+.pj-row { min-height: 62px; padding: 9px 13px 9px 15px; }
+.pj-row-rank {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pj-ink-4);
+}
+.pj-row-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pj-row-why {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--pj-ink-3);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* Carte entière marquée : liseré latéral, visible même sur l'écran mural. */
-.pj-card.is-bloque { box-shadow: inset 3px 0 0 0 var(--pj-late); }
-.pj-card.is-a-voir { box-shadow: inset 3px 0 0 0 var(--pj-soon); }
-.pj-card-row .pj-flag { flex-direction: row; margin: 0; padding: 3px 8px; border-left-width: 2px; }
+/* La colonne échéance s'aligne à DROITE : les durées se comparent alors d'un
+   coup d'œil vertical, comme une colonne de chiffres. */
+.pj-row > .pj-badge { justify-self: end; }
+.pj-row > .pj-flag { grid-column: 3 / -1; margin-top: 7px; }
+.pj-row--hold > .pj-flag { grid-column: 2 / -1; }
+
+.pj-card-client {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--pj-ink);
+}
+.pj-card-article {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pj-ink-3);
+}
+
+/* Position dans la chaîne, deux étages : l'étape précise, la famille en rappel. */
+.pj-pos { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pj-pos-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--pj-ink);
+}
+.pj-pos-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  color: var(--pj-ink-4);
+}
+
+.pj-pilot { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.pj-pilot-n {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pj-ink-2);
+}
+.pj-pilot.is-none .pj-pilot-n { color: var(--pj-ink-4); font-weight: 500; font-style: italic; }
+
+.pj-badge {
+  justify-self: end;
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  color: var(--pj-ink-3);
+}
+/* Seuls les états qui appellent une action se remplissent. « Dans 8 j » et
+   « Sans date » restent du texte gris : ce ne sont pas des alarmes. */
+.pj-badge.u-late { background: var(--pj-late-bg); color: var(--pj-late); font-weight: 800; }
+.pj-badge.u-soon { background: var(--pj-soon-bg); color: var(--pj-soon-deep); font-weight: 800; }
+.pj-badge.u-plan { background: var(--pj-plan-bg); color: var(--pj-plan-deep); }
+.pj-badge.u-none, .pj-badge.u-ok { color: var(--pj-ink-4); font-weight: 500; }
+
+/* Priorité : trois barres, pas trois étoiles. Une jauge se lit d'un coup à
+   distance là où trois glyphes ★ se brouillent, et ça ne crie pas. */
+.pj-stars { display: inline-flex; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.pj-star {
+  width: 4px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--pj-star-off);
+  font-size: 0;                 /* le glyphe ★/☆ du DOM ne s'affiche pas */
+  line-height: 0;
+  color: transparent;
+}
+.pj-star.on { background: var(--pj-star); }
+.pj-stars .pj-star:nth-child(2) { height: 11px; }
+.pj-stars .pj-star:nth-child(3) { height: 14px; }
+.pj-stars.mini .pj-star { width: 3px; height: 6px; }
+.pj-stars.mini .pj-star:nth-child(2) { height: 8px; }
+.pj-stars.mini .pj-star:nth-child(3) { height: 10px; }
+
+.pj-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+/* --- Alerte de commande (Bloquée / À voir) ------------------------------- */
+.pj-flag {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 9px;
+  border-radius: 7px;
+}
+.pj-flag.f-bloque { background: var(--pj-late-bg); }
+.pj-flag.f-a-voir { background: var(--pj-soon-bg); }
+.pj-flag-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.pj-flag.f-bloque .pj-flag-tag { color: var(--pj-late); }
+.pj-flag.f-a-voir .pj-flag-tag { color: var(--pj-soon-deep); }
+.pj-flag-why {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--pj-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* En colonne d'équipe la place manque en largeur mais pas en hauteur : le
+   motif se replie sur deux lignes plutôt que de finir en « … ». Un blocage
+   dont on ne lit pas la raison ne sert à rien. */
+.pj-card--board .pj-flag { align-items: flex-start; flex-direction: column; gap: 2px; }
+.pj-card--board .pj-flag-why {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 
 /* Encart du panneau détail : l'alerte s'y lève d'un tap. */
 .dd-flag {
@@ -3960,10 +4617,11 @@ body.view-comptoir .grid-search { display: none !important; }
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .07em;
+  text-transform: uppercase;
 }
 .dd-flag.f-bloque .dd-flag-tag { color: var(--pj-late); }
 .dd-flag.f-a-voir .dd-flag-tag { color: var(--pj-soon-deep, var(--pj-soon)); }
-.dd-flag-why { margin: 3px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--pj-ink); }
+.dd-flag-why { margin: 3px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--pj-ink); }
 .dd-flag-clear {
   display: inline-flex;
   align-items: center;
@@ -3982,220 +4640,35 @@ body.view-comptoir .grid-search { display: none !important; }
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .dd-flag-clear .material-symbols-outlined { font-size: 18px; }
-.dd-flag-clear:hover { border-color: var(--pj-accent); background: var(--pj-surface-2, var(--pj-surface)); }
-.pj-filterchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: center;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--pj-chip-ink);
-  border-radius: 99px;
-  background: var(--pj-chip-bg);
-  color: var(--pj-chip-ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.pj-filterchip-x { font-size: 12px; }
+.dd-flag-clear:hover { border-color: var(--pj-accent); background: var(--pj-bg); }
 
-/* Onglets (pills) : JE SUIS · employés · Équipe. */
-.pj-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding: 10px 0 12px;
-}
-.pj-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 17px;
-  border: 0;
-  border-radius: 99px;
-  background: transparent;
-  color: var(--pj-ink-2);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.pj-tab:hover { background: var(--pj-surface); color: var(--pj-ink); }
-.pj-tab.active { background: var(--pj-ink); color: var(--pj-bg); }
-.pj-tab-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--pj-late);
-  flex-shrink: 0;
-}
-
-/* ------------------------------------------------ Corps défilant */
-.pj-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px 22px 36px;
-}
-.pj-empty {
-  margin: 0;
-  padding: 16px 18px;
-  border: 1.5px dashed var(--pj-border);
-  border-radius: 12px;
-  color: var(--pj-ink-4);
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-/* ------------------------------------------------ Cartes commande */
-.pj-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--pj-border);
-  border-left: 3px solid var(--pj-star-off);
-  border-radius: 12px;
-  background: var(--pj-surface);
-  color: var(--pj-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: box-shadow var(--dur-1) var(--ease), transform var(--dur-1) var(--ease), opacity var(--dur-2) var(--ease);
-}
-.pj-card:hover { box-shadow: var(--pj-shadow); transform: translateY(-1px); }
-.pj-card.u-late { border-left-color: var(--pj-late); }
-.pj-card.u-soon { border-left-color: var(--pj-soon); }
-.pj-card.u-plan { border-left-color: var(--pj-plan); }
-.pj-card.is-dim { opacity: .22; }
-
-.pj-card-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.pj-card-client {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -.01em;
-}
-.pj-card-article {
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--pj-ink-3);
-}
-.pj-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.pj-chips { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; }
-.pj-chip {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--pj-chip-bg);
-  color: var(--pj-chip-ink);
-  font-size: 10.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pj-chip.sub { background: var(--pj-neutral-bg); color: var(--pj-ink-2); }
-.pj-role {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: .05em;
-  color: var(--pj-ink-4);
-}
-.pj-role.role-pilote, .pj-role.role-both { color: var(--pj-accent); }
-
-.pj-badge {
-  flex-shrink: 0;
-  padding: 3px 9px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  background: var(--pj-neutral-bg);
-  color: var(--pj-ink-3);
-}
-.pj-badge.u-late { background: var(--pj-late-bg); color: var(--pj-late); }
-.pj-badge.u-soon { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
-.pj-badge.u-plan { background: var(--pj-plan-bg); color: var(--pj-plan-deep); }
-.pj-badge.u-none { background: var(--pj-neutral-bg); color: var(--pj-neutral); }
-
-.pj-stars { display: inline-flex; flex-shrink: 0; gap: 1px; }
-.pj-star { font-size: 13px; line-height: 1; color: var(--pj-star-off); }
-.pj-star.on { color: var(--pj-star); }
-.pj-stars.mini .pj-star { font-size: 11px; }
-
-.pj-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
-     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-/* ------------------------------------------------ Vue Équipe : 4 colonnes égales */
+/* ------------------------------------------------ Vue Équipe : 4 colonnes */
 .pj-board {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
-.pj-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.pj-col { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .pj-col-head {
   display: flex;
-  align-items: center;
-  gap: 9px;
+  flex-direction: column;
+  gap: 7px;
   min-width: 0;
-  min-height: 48px;
-  padding: 8px 12px;
-  border: 1px solid var(--pj-border);
-  border-radius: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--pj-border-soft);
+  border-radius: 10px;
   background: var(--pj-surface);
   font: inherit;
   cursor: pointer;
   text-align: left;
-  transition: box-shadow var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
 }
-.pj-col-head:hover { box-shadow: var(--pj-shadow); transform: translateY(-1px); }
-.pj-col-head .pj-avatar { width: 30px; height: 30px; font-size: 13.5px; }
+.pj-col-head:hover { border-color: var(--pj-border); box-shadow: var(--pj-shadow); }
+.pj-col-line { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.pj-col-head .pj-avatar { width: 28px; height: 28px; font-size: 12.5px; }
 .pj-col-name {
-  flex-shrink: 1;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4204,81 +4677,118 @@ body.view-comptoir .grid-search { display: none !important; }
   font-weight: 800;
   color: var(--pj-ink);
 }
-.pj-col-late {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--pj-late-bg);
-  color: var(--pj-late);
-  font-size: 10.5px;
-  font-weight: 800;
-  white-space: nowrap;
-}
 .pj-col-count {
-  margin-left: auto;
   flex-shrink: 0;
-  min-width: 24px;
-  padding: 2px 7px;
-  border-radius: 99px;
-  background: var(--pj-neutral-bg);
-  color: var(--pj-ink-3);
-  font-size: 11.5px;
+  font-size: 17px;
   font-weight: 800;
-  text-align: center;
+  color: var(--pj-ink);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
 }
-.pj-col-cards { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* Jauge de charge : la part du plus chargé de l'équipe. C'est ce qui répond à
+   « qui est débordé ? » — quatre colonnes de hauteurs différentes ne le disent
+   pas, elles dépendent de la place à l'écran. */
+.pj-col-load {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--pj-neutral-bg);
+  overflow: hidden;
+}
+.pj-col-load-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  background: var(--pj-ink-4);
+}
+/* La fraction en retard passe PAR-DESSUS le remplissage neutre. */
+.pj-col-load-late {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  border-radius: 3px;
+  background: var(--pj-late);
+}
+.pj-col-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--pj-ink-4);
+}
+.pj-col-sub.is-late { color: var(--pj-late); font-weight: 700; }
+
+.pj-col-cards { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pj-card--board { display: flex; flex-direction: column; gap: 5px; }
+.pj-card--board .pj-card-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.pj-card--board .pj-card-client { flex: 1; font-size: 13.5px; }
+.pj-card--board .pj-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 1px;
+}
+.pj-card--board .pj-pos { flex: 1; }
 .pj-free {
-  padding: 18px 14px;
-  border: 1.5px dashed var(--pj-green-line);
-  border-radius: 12px;
-  background: var(--pj-green-bg);
-  color: var(--pj-green-ink);
-  font-size: 12.5px;
-  font-weight: 700;
+  padding: 15px 12px;
+  border: 1px dashed var(--pj-border);
+  border-radius: 10px;
+  color: var(--pj-ink-4);
+  font-size: 12px;
+  font-weight: 500;
   text-align: center;
   line-height: 1.45;
 }
 
+.pj-role {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+.pj-role.role-pilote, .pj-role.role-both { color: var(--pj-ink-2); }
+
 /* ------------------------------------------------ Vue personne */
+/* La file d'abord : elle porte la grille complète, la colonne de droite n'a
+   que des lignes compactes. 2:1 laisse à la file la largeur qu'il lui faut
+   pour garder ses sept colonnes sur un 1280. */
 .pj-person {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 18px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 22px;
   align-items: start;
 }
 .pj-person-main, .pj-person-side { min-width: 0; }
 .pj-person-side { display: flex; flex-direction: column; gap: 20px; }
 .pj-section { min-width: 0; }
-.pj-section-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.pj-section-head .material-symbols-outlined { font-size: 20px; color: var(--pj-accent); }
-.pj-section-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -.01em;
-  color: var(--pj-ink);
-}
-.pj-section-count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 99px;
-  background: var(--pj-neutral-bg);
-  color: var(--pj-ink-3);
-  font-size: 11.5px;
-  font-weight: 800;
-  text-align: center;
-}
-.pj-mini-list { display: flex; flex-direction: column; gap: 7px; }
-.pj-card--mini { padding: 10px 13px; min-height: 44px; justify-content: center; }
-.pj-card-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.pj-card-row .pj-card-client { flex: 0 1 auto; max-width: 45%; font-size: 13px; }
+.pj-mini-list { display: flex; flex-direction: column; gap: 6px; }
+.pj-card--mini { padding: 9px 13px; min-height: 46px; display: flex; flex-direction: column; gap: 5px; }
+.pj-card-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.pj-card-row .pj-card-client { flex: 0 1 auto; max-width: 52%; font-size: 13px; }
 .pj-card-row .pj-card-article { flex: 1; }
+.pj-card-row .pj-badge { justify-self: auto; }
+
+/* ------------------------------------------------ À faire maintenant (file) */
+.pj-todo { display: flex; flex-direction: column; gap: 24px; }
+.pj-todo-sec { display: flex; flex-direction: column; }
+.pj-todo-list, .pj-hold-list { display: flex; flex-direction: column; gap: 6px; }
+.pj-todo-hold { margin-top: 2px; }
+.pj-hold-tag {
+  align-self: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+}
+.pj-hold-tag.t-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-hold-tag.t-attente { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
+.pj-row--hold.is-attente::before { background: var(--pj-soon); }
 
 /* ------------------------------------------------ Slide-over détail (420px) */
 .dd-scrim {
@@ -4299,7 +4809,7 @@ body.view-comptoir .grid-search { display: none !important; }
   z-index: 130;
   display: flex;
   flex-direction: column;
-  width: min(420px, 100vw);
+  width: min(430px, 100vw);
   background: var(--pj-surface);
   color: var(--pj-ink);
   box-shadow: -18px 0 48px rgba(15, 23, 42, .18);
@@ -4329,73 +4839,109 @@ body.view-comptoir .grid-search { display: none !important; }
 }
 .dd-close:hover { background: var(--pj-neutral-bg); color: var(--pj-ink); }
 
-.dd-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--pj-border-soft); }
-.dd-stars { display: flex; gap: 2px; margin-bottom: 6px; }
+.dd-head { padding: 20px 22px 15px; border-bottom: 1px solid var(--pj-border-soft); }
+/* Ici les étoiles se RÈGLENT : le glyphe reste, c'est l'affordance connue. */
+.dd-stars { display: flex; gap: 2px; margin: 0 0 8px -6px; }
 .dd-star {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 8px;
   background: none;
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1;
   color: var(--pj-star-off);
   cursor: pointer;
-  transition: transform var(--dur-1) var(--ease);
+  transition: transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .dd-star.on { color: var(--pj-star); }
-.dd-star:hover { transform: scale(1.15); }
+.dd-star:hover { transform: scale(1.12); }
 .dd-client {
-  margin: 0 34px 2px 0;
+  margin: 0 34px 3px 0;
   font-size: 20px;
   font-weight: 800;
-  letter-spacing: -.015em;
+  letter-spacing: -.02em;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
-.dd-article { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; color: var(--pj-ink-2); }
+.dd-article { margin: 0 0 11px; font-size: 13.5px; font-weight: 500; color: var(--pj-ink-2); }
 .dd-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
-.dd-badges .pj-badge { font-size: 12px; padding: 4px 11px; }
+.dd-badges .pj-badge { font-size: 12.5px; padding: 4px 10px; justify-self: auto; }
 
-.dd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 22px 16px; }
+.dd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 22px 18px; }
 .dd-sec-title {
-  margin: 0 0 10px;
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--pj-ink-3);
-}
-.dd-group { margin-bottom: 12px; }
-.dd-group-title {
-  margin: 0 0 6px;
+  display: block;
+  margin: 0 0 8px;
   font-size: 10.5px;
   font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+
+/* Prochaine action : la consigne, en tête du panneau. Une barre d'encre à
+   gauche, pas un encart ambre — ce n'est pas une alerte, c'est l'instruction. */
+.dd-next {
+  margin-bottom: 18px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--pj-ink);
+}
+.dd-next-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+.dd-next-text { margin: 4px 0 0; font-size: 15.5px; font-weight: 700; color: var(--pj-ink); line-height: 1.35; }
+
+/* Position actuelle : d'où l'on part, avant de dire où l'envoyer. */
+.dd-pos { margin-bottom: 18px; }
+.dd-pos-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 13.5px;
+}
+.dd-pos-fam { font-weight: 500; color: var(--pj-ink-3); }
+.dd-pos-sep { color: var(--pj-ink-4); }
+.dd-pos-sub { font-weight: 800; color: var(--pj-ink); }
+
+.dd-group { margin-bottom: 14px; }
+.dd-group-title {
+  margin: 0 0 7px;
+  font-size: 10.5px;
+  font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--pj-ink-4);
 }
-.dd-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.dd-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .dd-pill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 13px;
   border: 1px solid var(--pj-border);
   border-radius: 99px;
   background: var(--pj-surface);
   color: var(--pj-ink-2);
   font: inherit;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.dd-pill:hover { border-color: var(--pj-accent); color: var(--pj-accent); background: var(--pj-chip-bg); }
+.dd-pill:hover { border-color: var(--pj-accent); color: var(--pj-ink); background: var(--pj-bg); }
 .dd-pill.current {
   background: var(--pj-ink);
   border-color: var(--pj-ink);
   color: var(--pj-bg);
+  font-weight: 800;
   cursor: default;
 }
 .dd-pill-av {
@@ -4407,46 +4953,25 @@ body.view-comptoir .grid-search { display: none !important; }
   margin-left: -4px;
   flex-shrink: 0;
   border-radius: 50%;
-  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
-     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 10px;
   font-weight: 800;
 }
+.dd-pill.current .dd-pill-av { background: var(--pj-bg); color: var(--pj-ink); }
 
-.dd-team { margin: 18px 0 0; }
-.dd-team-line { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.dd-team { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--pj-border-soft); }
+.dd-team-line { display: flex; flex-wrap: wrap; gap: 10px 20px; }
 .dd-team-who { display: inline-flex; align-items: center; gap: 8px; }
-.dd-team-name { font-size: 13.5px; font-weight: 800; }
+.dd-team-name { font-size: 13.5px; font-weight: 700; }
 .dd-team-tag {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--pj-ink-4);
 }
-.dd-team-none { font-size: 13px; font-weight: 600; color: var(--pj-ink-4); }
-
-.dd-next {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
-  padding: 13px 15px;
-  border: 1px solid var(--warning-line);
-  border-radius: 12px;
-  background: var(--pj-soon-bg);
-}
-.dd-next .material-symbols-outlined { font-size: 20px; color: var(--pj-soon); flex-shrink: 0; }
-.dd-next-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--pj-soon-deep);
-}
-.dd-next-text { margin: 3px 0 0; font-size: 13.5px; font-weight: 700; color: var(--pj-ink); line-height: 1.4; }
+.dd-team-none { font-size: 13px; font-weight: 500; color: var(--pj-ink-4); }
 
 .dd-foot {
   display: flex;
@@ -4461,10 +4986,10 @@ body.view-comptoir .grid-search { display: none !important; }
   justify-content: center;
   gap: 7px;
   min-height: 48px;
-  border-radius: 12px;
+  border-radius: 10px;
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   transition: filter var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
@@ -4484,12 +5009,12 @@ body.view-comptoir .grid-search { display: none !important; }
   background: var(--pj-surface);
   color: var(--pj-ink-2);
 }
-.dd-open:hover { background: var(--pj-neutral-bg); color: var(--pj-ink); }
+.dd-open:hover { background: var(--pj-bg); color: var(--pj-ink); }
 .dd-open .material-symbols-outlined { font-size: 18px; }
 
 /* ------------------------------------------------ Fil d'activité */
 .pj-feed { width: min(400px, 100vw); }
-.pj-feed-title { margin: 0; padding: 22px 22px 12px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.pj-feed-title { margin: 0; padding: 22px 22px 12px; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
 .pj-feed-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 22px; }
 .pj-feed .pj-empty { margin-top: 6px; }
 .pj-feed-item {
@@ -4500,86 +5025,15 @@ body.view-comptoir .grid-search { display: none !important; }
   border-bottom: 1px solid var(--pj-border-soft);
 }
 .pj-feed-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   margin-top: 5px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--dot, var(--pj-accent));
 }
-.pj-feed-text { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--pj-ink); overflow-wrap: anywhere; }
-.pj-feed-time { flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: var(--pj-ink-4); font-variant-numeric: tabular-nums; }
-
-/* ------------------------------------------------ À faire maintenant (file) */
-.pj-todo { display: flex; flex-direction: column; gap: 22px; }
-.pj-todo-sec { display: flex; flex-direction: column; }
-.pj-todo-list { display: flex; flex-direction: column; gap: 8px; }
-
-/* Carte de file : rang à gauche, contenu + « pourquoi » à droite. */
-.pj-todo-card { flex-direction: row; align-items: stretch; gap: 12px; padding: 11px 13px 11px 11px; }
-.pj-todo-rank {
-  flex-shrink: 0;
-  align-self: center;
-  min-width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 7px;
-  border-radius: 8px;
-  background: var(--pj-neutral-bg);
-  color: var(--pj-ink-3);
-  font-size: 13px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.pj-todo-card.u-late .pj-todo-rank { background: var(--pj-late-bg); color: var(--pj-late); }
-.pj-todo-card.u-soon .pj-todo-rank { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
-.pj-todo-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-
-.pj-todo-why { display: flex; flex-wrap: wrap; gap: 6px; }
-.pj-todo-why-chip {
-  padding: 2px 9px;
-  border-radius: 99px;
-  background: var(--pj-soon-bg);
-  color: var(--pj-soon-deep);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.5;
-}
-/* Le motif le plus fort (échéance) en tête, teinté « accent ». */
-.pj-todo-why-chip:first-child { background: var(--pj-chip-bg); color: var(--pj-chip-ink); }
-.pj-todo-pilot { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
-.pj-todo-pilot-name { font-size: 12px; font-weight: 700; color: var(--pj-ink-2); }
-
-/* Bac « à débloquer / relancer » : ce qui attend quelqu'un d'autre. */
-.pj-todo-hold { margin-top: 2px; }
-.pj-hold-list { display: flex; flex-direction: column; gap: 7px; }
-.pj-hold-card { border-left-color: var(--pj-neutral); }
-.pj-hold-card.is-bloque { border-left-color: var(--pj-late); }
-.pj-hold-card.is-attente { border-left-color: var(--pj-soon); }
-.pj-hold-card .pj-card-row { flex-wrap: wrap; row-gap: 4px; }
-.pj-hold-tag {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .04em;
-}
-.pj-hold-tag.t-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
-.pj-hold-tag.t-attente { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
-.pj-hold-why {
-  flex-basis: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--pj-ink-3);
-}
-
+.pj-feed-text { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.45; color: var(--pj-ink); overflow-wrap: anywhere; }
+.pj-feed-time { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--pj-ink-4); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------ Réglages Machines */
 .mac-card { width: min(640px, 100%); }
@@ -4612,8 +5066,8 @@ body.view-comptoir .grid-search { display: none !important; }
 .mac-remove {
   flex-shrink: 0;
   align-self: flex-end;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4644,33 +5098,76 @@ body.view-comptoir .grid-search { display: none !important; }
 }
 .mac-add:hover { background: var(--surface-hover); border-color: var(--pj-accent); }
 
-/* ------------------------------------------------ Responsive Point du jour */
+/* ===========================================================================
+   RESPONSIVE — les paliers suivent les vraies dalles, pas des rondeurs.
+   Les colonnes de la grille se replient dans l'ordre inverse de leur utilité :
+   « pourquoi » passe sous le client, puis l'étape, puis le pilote.
+   =========================================================================== */
+
+/* Galaxy Tab paysage (~1280×800) : le mode d'usage principal. On resserre le
+   chrome pour rendre des lignes au corps de l'écran — en rognant les MARGES,
+   jamais les cibles : c'est précisément l'écran qu'on touche au doigt, les
+   44 px des onglets et des outils y sont intouchables. */
+@media (min-width: 1101px) and (max-height: 860px) {
+  .pj-head { padding-top: 10px; }
+  .pj-strip { padding: 10px 0 2px; }
+  .pj-stat { min-height: 56px; padding: 6px 14px; }
+  .pj-stat-n { font-size: 23px; }
+  .pj-tabs { padding-top: 6px; }
+  .pj-body { padding: 14px 22px 30px; }
+  .pj-row { min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+}
+
+/* Sous 1280 : la colonne « pourquoi » se resserre avant de tomber. */
+@media (max-width: 1279px) {
+  .dashboard, .dd-panel, .pj-feed { --pj-c-why: 176px; --pj-c-pos: 150px; --pj-c-pilot: 120px; }
+}
+
+/* Tablette portrait (800×1280) & petits desktops : le « pourquoi » descend
+   sous le client, sur sa propre ligne. Les autres colonnes tiennent. */
+/* Tablette portrait (800×1280) & petits desktops. Le repli des LIGNES est
+   géré par les requêtes de conteneur plus haut : ici on ne touche qu'aux
+   dispositions de page. */
 @media (max-width: 1100px) {
   .pj-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pj-person { grid-template-columns: 1fr; }
+  .pj-person { grid-template-columns: minmax(0, 1fr); }
+  .pj-strip { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .pj-stats { width: 100%; }
+  .pj-stat { flex: 1; min-width: 0; }
 }
+
+/* Sous 900 : la barre d'outils se réduit aux icônes, la recherche prend sa
+   propre ligne. */
 @media (max-width: 900px) {
+  /* Le titre GARDE sa ligne avec les outils (il pousse encore, via son
+     margin-right: auto) ; c'est la recherche qui passe dessous. Mis à
+     `1 1 100%`, le titre reléguait les trois outils sur une ligne à eux,
+     orphelins en haut à gauche. */
   .pj-head-row { flex-wrap: wrap; }
-  .pj-search { order: 10; flex-basis: 100%; max-width: none; margin-left: 0; }
+  .pj-search { order: 10; flex: 1 1 100%; }
   .pj-tool-label { display: none; }
   .pj-tool { width: 44px; padding: 0; justify-content: center; }
 }
+
+/* iPhone (390-430) : une colonne partout, compteurs sur deux rangs. */
 @media (max-width: 700px) {
   .pj-head { padding: 12px 14px 0; }
-  .pj-kpis { display: grid; grid-template-columns: 1fr 1fr; }
-  .pj-kpi { min-width: 0; }
   .pj-body { padding: 14px 14px 30px; }
-  .pj-board { grid-template-columns: 1fr; }
+  .pj-board { grid-template-columns: minmax(0, 1fr); }
+  .pj-stats { flex-wrap: wrap; }
+  .pj-stat { flex: 1 1 45%; border-top: 1px solid var(--pj-border-soft); }
+  .pj-stat:nth-child(-n+2) { border-top: 0; }
+  .pj-stat:nth-child(odd) { border-left: 0; }
+
   .dd-foot { flex-wrap: wrap; }
   .dd-open { flex: 1; }
 }
-/* Galaxy Tab paysage (~1280×800) : densité resserrée, rien de coupé. */
-@media (min-width: 1101px) and (max-height: 830px) {
-  .pj-head { padding-top: 10px; }
-  .pj-kpis { padding: 8px 0 2px; }
-  .pj-tabs { padding: 8px 0 10px; }
-  .pj-body { padding-top: 12px; }
+
+/* Écrans très larges : le contenu ne s'étire pas à l'infini. */
+@media (min-width: 1900px) {
+  .pj-head > *, .pj-body > * { max-width: 1800px; margin-inline: auto; }
 }
+
 
 /* ===========================================================================
    Onglet RÉGLAGES — ce que le patron règle une fois pour tout l'atelier.
