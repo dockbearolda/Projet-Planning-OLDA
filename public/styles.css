@@ -3101,6 +3101,16 @@ input[type="date"].cell-input { color: var(--text-1); }
   background: #fff;
   border: 1px solid var(--border-soft);
 }
+/* Le ticket s'ouvre MODIFIABLE : sans un mot, on croit lire un aperçu et on ne
+   touche à rien. La phrase est sous la feuille, pas dessus — on regarde d'abord
+   le papier. */
+.tk-modal__aide {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-2);
+  text-align: center;
+}
 .tk-modal__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .tk-modal__print {
   border-color: transparent;
@@ -5287,6 +5297,23 @@ textarea.ld-ctl { font-weight: 600; }
 }
 .ticket-cell:hover { background: var(--primary-soft); color: var(--primary); }
 .ticket-cell:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* CE DOSSIER PARLE À L'ATELIER. Le point dit qu'une consigne de production a
+   été écrite sur le ticket — sans lui, il faudrait ouvrir chaque ticket pour
+   savoir lequel en porte une. Posé en `position: absolute` dans une case de
+   taille fixe : il ne pousse rien, la colonne garde la même largeur d'une ligne
+   à l'autre (c'est toute l'histoire de la rangée d'actions des cartes). */
+.ticket-cell--consigne { position: relative; }
+.ticket-cell--consigne::after,
+.pcard__ticket--consigne::after {
+  content: '';
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 9px; height: 9px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.pcard__ticket--consigne { position: relative; }
 /* Ligne saisie à la main : aucun papier n'a été remis, la case reste muette. */
 .ticket-cell--vide {
   box-shadow: none; background: none; color: var(--text-3, var(--text-2));

@@ -1516,6 +1516,7 @@ const JOURNAL_FIELDS = {
   // sont écrits par `logFicheChange`, pas par la comparaison de colonnes.
   fiche_heure: 'Heure de retrait',
   fiche_detail: 'Détail de la fiche',
+  fiche_atelier: 'Consigne atelier',
 };
 const JOURNAL_MAX = 40; // ce qu'on renvoie à la fiche : la vie récente suffit
 
@@ -1567,6 +1568,14 @@ async function logFicheChange(requestId, avant, apres) {
   const heureApres = apres && apres.heureSouhaitee ? String(apres.heureSouhaitee) : null;
   if (heureAvant !== heureApres) {
     lignes.push({ field: 'fiche_heure', before: heureAvant, after: heureApres });
+  }
+
+  // LA CONSIGNE POUR L'ATELIER a sa propre ligne d'historique : c'est elle qui
+  // dit ce qu'il faut produire, et « qui a écrit ça, et quand ? » est la
+  // première question posée quand la pièce ne correspond pas au ticket.
+  const consigne = (f) => (f && f.atelier ? String(f.atelier) : null);
+  if (consigne(avant) !== consigne(apres)) {
+    lignes.push({ field: 'fiche_atelier', before: consigne(avant), after: consigne(apres) });
   }
 
   const valeurs = (f, cle) => (Array.isArray(f && f[cle]) ? f[cle] : []).map((l) => (l && l.v) || '');
