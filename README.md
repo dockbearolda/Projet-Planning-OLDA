@@ -23,10 +23,26 @@ modules natifs, aucun build, aucun framework, aucun bundler).
   « 1 projet = 1 seule place. » **Fiverr** et **À commander**, les deux listes
   qu'on ouvre le plus souvent, ont quitté le rail pour un **onglet** de la barre
   du haut — sans quitter le pipeline (flux, compteurs, puces inchangés).
-- **Le ticket du client, retrouvable sur la ligne.** Une vente directe et une
-  demande de devis remettent un ticket au comptoir. Toute ligne née là-bas porte
-  désormais une **pastille ticket** (carte et tableau) : un appui le réaffiche à
-  l'identique, un second l'imprime. Il se cherche aussi par son **numéro** —
+- **Le ticket du client, retrouvable ET corrigeable sur la ligne.** Une vente
+  directe et une demande de devis remettent un ticket au comptoir. Toute ligne
+  née là-bas porte une **pastille ticket** (carte et tableau) : un appui le
+  réaffiche à l'identique — **déjà modifiable** — un autre l'imprime. On corrige
+  dedans, à l'endroit exact où la valeur s'imprimera : le **numéro de téléphone**
+  faux, la date et l'heure de retrait, le montant, le paiement, la désignation,
+  la quantité et **ce qu'on produit**, article par article. Pas de bouton
+  « Enregistrer » : un champ quitté est un champ enregistré, comme dans la
+  grille — et « Fermer » comme « Imprimer » commettent d'abord ce qui est encore
+  en cours de frappe. Seule la **référence** ne se retape pas (c'est la clé du
+  dossier) : à côté d'elle, un champ note le **numéro du papier** quand il en
+  porte un autre.
+- **« Pour l'atelier », sur le ticket.** Un cadre en bas du ticket porte la
+  consigne de production — « logo poitrine gauche 8 cm », « appeler avant de
+  couper ». Elle **s'imprime avec le ticket**, c'est-à-dire sur le papier qui
+  suit le dossier jusqu'à la machine ; elle se relit dans la fiche ; elle laisse
+  une ligne d'**historique** ; et un **point** sur la pastille dit, d'un coup
+  d'œil sur la grille, quels dossiers en portent une. Elle ne se confond pas avec
+  la **note interne OLDA** du comptoir, qui reste au dossier de travail et
+  n'atteint jamais le papier. Il se cherche aussi par son **numéro** —
   celui que le client rapporte sur son papier — dans la recherche de la grille
   comme dans la recherche globale. Le ticket est **reconstruit** depuis la ligne
   et sa fiche : la ligne fait foi pour ce qui se corrige après la vente (heure de
@@ -202,6 +218,7 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | POST | `/api/requests/:id/copie` | **Recopie une commande** (« Dupliquer », « Envoyer vers Fiverr »), dans une autre famille si `{ stage }` est fourni. La copie emporte `fiche` — le récapitulatif du comptoir, donc tout ce que l'atelier doit lire pour produire. Ne se copient PAS : le numéro de ticket (`fiche.ref`, il identifie UNE prise de commande), l'alerte en cours et les pièces jointes. La copie se fait ici et non côté navigateur : la liste ne transporte qu'un résumé de `fiche`, et `fiche` n'est pas un champ écrivable par PATCH. |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
+| PATCH | `/api/requests/:id/fiche` | **Corrige la fiche** : le récapitulatif du comptoir par **position** (`{ client: [], details: [] }` — les libellés viennent du parcours et ne se réécrivent pas ; une case non remplie n'est pas touchée, donc deux postes qui corrigent deux articles ne s'effacent pas), l'heure de retrait, le secteur de production, la **consigne pour l'atelier** (`atelier`, 500 caractères) et le **numéro du papier remis au client** (`refTicket`). La ligne est prise `FOR UPDATE` le temps de la relire et de la réécrire. `fiche.ref` n'est **jamais** modifiable par cette porte. |
 | DELETE | `/api/requests/:id` | Supprime une demande (avec ses PDF, ses secteurs et son journal). |
 | GET | `/api/requests/recherche?q=…` | **La recherche globale**, faite par le serveur (une page de résultats, pas tout le planning). Tous les jetons doivent apparaître, sans distinction de casse ni d'accent. Cherche dans le dossier, le référent, la description, les contacts, l'alerte — **et le numéro du ticket** (`fiche.ref`, plus `fiche.refTicket` quand le papier remis au client porte un autre numéro) : c'est le seul repère que le client rapporte au comptoir. |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
@@ -370,9 +387,10 @@ d'un clic sur le **↗** de la carte, dans la fiche projet (voir plus bas). La
 carte se **glisse sur le rail des étapes** comme une ligne de tableau.
 
 Sur un dossier né au comptoir, un bouton de plus précède le **↗** : le **ticket
-du client**, celui qu'il a en main. Un appui l'affiche tel qu'il s'imprimera, un
-second l'imprime. Sur le tableau, il prend la forme d'une **pastille** dans la
-rangée du dossier, à côté de WhatsApp et des PDF.
+du client**, celui qu'il a en main. Un appui l'affiche tel qu'il s'imprimera —
+et **déjà corrigeable**, champ par champ, avec le cadre « Pour l'atelier » en
+bas. Un **point** sur la pastille signale qu'une consigne y a été écrite. Sur le
+tableau, le ticket a sa propre **colonne**, réglable depuis le rail.
 
 ### Le rail « Colonnes » — le tableau complet est rangé, pas perdu
 
