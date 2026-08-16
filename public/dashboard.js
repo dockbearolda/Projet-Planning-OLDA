@@ -89,6 +89,7 @@ export function createDashboard(deps) {
   // le temps réel peut rester silencieux des heures).
   let premierChargementKo = false;
   let repriseTimer = null;
+  let repriseEssais = 0;
   // Le Point du jour est-il SOUS LES YEUX ? Il garde son cache à jour même
   // masqué (fil d'activité, badges, écran mural), mais pas au même rythme :
   // affiché, il suit le temps réel au plus près ; en fond, il se contente d'un
@@ -198,7 +199,13 @@ export function createDashboard(deps) {
   const refereeing = (who) => rows.filter((r) => isActive(r) && effectiveReferents(r).includes(who));
 
   // Cartes d'une personne (pilote OU référent, dédupliquées), triées.
+  // MÉMOÏSÉ le temps d'un repeint (vidé par renderAll) : l'entête, la vue
+  // Équipe et le fil la redemandent pour les mêmes données.
+  const listesParPersonne = new Map(); // who -> liste triée
+  function invaliderListes() { listesParPersonne.clear(); }
   function dayList(who) {
+    const memo = listesParPersonne.get(who);
+    if (memo) return memo;
     const seen = new Set();
     const out = [];
     for (const r of [...piloting(who), ...refereeing(who)]) {
@@ -206,7 +213,9 @@ export function createDashboard(deps) {
       seen.add(r.id);
       out.push(r);
     }
-    return sortCards(out);
+    const triee = sortCards(out);
+    listesParPersonne.set(who, triee);
+    return triee;
   }
 
   function roleOf(r, who) {
@@ -261,12 +270,20 @@ export function createDashboard(deps) {
     'billing_company', 'contact_referent', 'product', 'color', 'description',
     'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason',
   ];
+  // Les jetons de la requête se découpent UNE fois par requête, pas une fois
+  // par ligne : `fold` (minuscules + accents) est la brique la plus appelée du
+  // rendu, et la vue Équipe la payait 12 fois par ligne et par frappe.
+  let jetonsPour = null;
+  let jetonsRecherche = [];
   function matchesSearch(r) {
     if (!searchQuery) return true;
-    const tokens = fold(searchQuery).split(/\s+/).filter(Boolean);
+    if (searchQuery !== jetonsPour) {
+      jetonsPour = searchQuery;
+      jetonsRecherche = fold(searchQuery).split(/\s+/).filter(Boolean);
+    }
     const hay = DASH_SEARCH_FIELDS.map((f) => fold(r[f])).join(' ')
       + ' ' + fold(effectivePilot(r)) + ' ' + fold(effectiveReferents(r).join(' '));
-    return tokens.every((t) => hay.includes(t));
+    return jetonsRecherche.every((t) => hay.includes(t));
   }
   const isDimmed = (r) => (kpiFilter && !KPI_PRED[kpiFilter](r)) || !matchesSearch(r);
 
@@ -746,6 +763,11 @@ export function createDashboard(deps) {
 
   function renderAll() {
     if (!$head) return;
+    // Les listes par personne se recalculent une fois par repeint : l'entête
+    // (points rouges), la vue Équipe et la vue personne relisaient chacune la
+    // même file — jusqu'à deux balayages + un tri complet du planning PAR
+    // EMPLOYÉ et PAR APPEL, plusieurs fois par rafraîchissement.
+    invaliderListes();
     renderHead();
     renderBody();
     renderDetailIfOpen();
@@ -783,11 +805,27 @@ export function createDashboard(deps) {
     detailEl.classList.remove('open');
   }
 
+  // Repeint différé tant que la souris est SUR le panneau : le reconstruire
+  // (replaceChildren) sous le pointeur démonte la pastille en plein clic, tue
+  // la transition en cours et laisse l'infobulle orpheline. Poste souris
+  // uniquement : au doigt, `:hover` colle après le tap et différerait pour rien.
+  const POINTEUR_SOURIS = matchMedia('(hover: hover)');
+  let detailDiffere = false;
   function renderDetailIfOpen() {
     if (!detailId) return;
     const r = rows.find((x) => String(x.id) === detailId);
     // La commande a été traitée / supprimée entre-temps : on referme.
     if (!r || !isActive(r)) { closeDetail(); return; }
+    if (POINTEUR_SOURIS.matches && detailEl && detailEl.matches(':hover')) {
+      if (!detailDiffere) {
+        detailDiffere = true;
+        detailEl.addEventListener('pointerleave', () => {
+          detailDiffere = false;
+          if (detailId) renderDetailIfOpen();
+        }, { once: true });
+      }
+      return;
+    }
     renderDetail();
   }
 
@@ -1010,11 +1048,21 @@ export function createDashboard(deps) {
   // --- Fil d'activité « Ce qui a bougé » -----------------------------------
   let activityEl = null, activityScrim = null, activityOpen = false, $activityList = null;
 
+  // L'entête (badge « non lus », onglets) se repeint UNE fois par rafale : un
+  // rafraîchissement qui diffe vingt lignes appelait vingt fois renderHead —
+  // vingt reconstructions de la barre d'onglets pour un badge qui ne fait
+  // qu'incrémenter. La micro-tâche part après la rafale entière.
+  let entetePrevue = false;
+  function planifierEntete() {
+    if (entetePrevue) return;
+    entetePrevue = true;
+    queueMicrotask(() => { entetePrevue = false; if ($head) renderHead(); });
+  }
   function logActivity(text, color) {
     activity.unshift({ ts: Date.now(), text, color: color || 'var(--pj-accent)' });
     if (activity.length > 80) activity.length = 80;
     if (activityOpen) renderActivityList();
-    else { unseen++; if ($head) renderHead(); }
+    else { unseen++; planifierEntete(); }
   }
 
   // Diff entre l'ancien cache et le nouveau : alimente le fil avec ce qui a
@@ -1105,6 +1153,10 @@ export function createDashboard(deps) {
   let configOpen = false;
 
   function openConfig() {
+    // Garde de réentrance : deux taps rapides sur l'engrenage empilaient deux
+    // fenêtres — Échap fermait la première (invisible), posait configOpen à
+    // faux, et l'Échap de la seconde ne répondait plus jamais.
+    if (configOpen) return;
     const overlay = el('div', 'cat-overlay');
     const card = el('div', 'cat-card');
     card.setAttribute('role', 'dialog');
@@ -1113,8 +1165,8 @@ export function createDashboard(deps) {
     // L'écouteur Échap se retire dans TOUS les cas de fermeture. Posé sur
     // `document` et retiré seulement par lui-même, il restait accroché à
     // chaque fermeture par la croix ou par le fond — une journée de réglages
-    // en accumulait des dizaines.
-    const surEchap = (e) => { if (e.key === 'Escape' && configOpen) close(); };
+    // en accumulait des dizaines. Chaque fenêtre ne ferme QU'ELLE-MÊME.
+    const surEchap = (e) => { if (e.key === 'Escape') close(); };
     const close = () => {
       configOpen = false;
       document.removeEventListener('keydown', surEchap);
@@ -1218,7 +1270,12 @@ export function createDashboard(deps) {
   // dans « À faire maintenant ») et DURÉE de fabrication (min/pièce, facultative).
   // On édite une copie de travail et on enregistre l'ensemble à chaque change ;
   // le SSE resynchronise les autres postes.
+  let machinesOpen = false;
   function openMachines() {
+    // Même garde de réentrance que l'attribution : un tap répété n'empile pas
+    // deux fenêtres (et deux écouteurs Échap) l'une sur l'autre.
+    if (machinesOpen) return;
+    machinesOpen = true;
     const overlay = el('div', 'cat-overlay');
     const card = el('div', 'cat-card mac-card');
     card.setAttribute('role', 'dialog');
@@ -1228,6 +1285,7 @@ export function createDashboard(deps) {
     // fenêtre, quelle que soit la façon dont on l'a fermée.
     const surEchap = (e) => { if (e.key === 'Escape') close(); };
     const close = () => {
+      machinesOpen = false;
       document.removeEventListener('keydown', surEchap);
       overlay.classList.remove('open');
       setTimeout(() => overlay.remove(), 180);
@@ -1402,8 +1460,12 @@ export function createDashboard(deps) {
       if (derniereSynchro) parametres.set('depuis', derniereSynchro);
       if (empreinteIds) parametres.set('empreinte', empreinteIds);
       const q = parametres.toString();
+      // Synthèse et configuration sont indépendantes : en série, chaque
+      // rafraîchissement qui devait relire un réglage payait deux temps
+      // d'attente réseau au lieu d'un.
+      const enVol = configARecharger ? chargerConfig() : null;
       const synthese = await api('GET', `/api/requests/synthese${q ? `?${q}` : ''}`);
-      if (configARecharger) await chargerConfig();
+      if (enVol) await enVol;
 
       const fresh = fusionner(synthese);
       // Diff pour le fil d'activité (seulement après le premier chargement).
@@ -1430,6 +1492,7 @@ export function createDashboard(deps) {
       empreinteIds = synthese.empreinte || null;
       loaded = true;
       premierChargementKo = false;
+      repriseEssais = 0;
       renderAll();
     } catch (_) {
       // Serveur injoignable : on garde l'affichage courant, le prochain
@@ -1439,8 +1502,14 @@ export function createDashboard(deps) {
       if (!loaded) {
         premierChargementKo = true;
         renderBody();
+        // En ESPAÇANT les tentatives : le premier chargement rend le planning
+        // entier, et le redemander toutes les 5 secondes à un serveur déjà à
+        // terre — indéfiniment, même une fois l'onglet quitté (voir hide) —
+        // c'était l'inverse d'un filet.
         if (!repriseTimer) {
-          repriseTimer = setTimeout(() => { repriseTimer = null; refresh(); }, 5000);
+          repriseEssais = Math.min(repriseEssais + 1, 5);
+          const attente = Math.min(5000 * (2 ** (repriseEssais - 1)), 60000);
+          repriseTimer = setTimeout(() => { repriseTimer = null; refresh(); }, attente);
         }
       }
     } finally {
@@ -1474,6 +1543,10 @@ export function createDashboard(deps) {
     visible = true;
     clearTimeout(veilleTimer);
     veilleTimer = null;
+    // Le cache vient d'être rafraîchi (rattrapage de fond, ou aller-retour
+    // d'onglet en quelques secondes) : on repeint avec ce qu'on a au lieu de
+    // redemander la synthèse à chaque bascule Planning ↔ Dashboard.
+    if (loaded && Date.now() - dernierRefresh < 15000) { renderAll(); return; }
     refresh();
   }
 
@@ -1481,6 +1554,11 @@ export function createDashboard(deps) {
     visible = false;
     closeDetail();
     closeActivity();
+    // La reprise du premier chargement s'arrête avec l'onglet : on ne
+    // redemande pas le planning entier en boucle pour un écran quitté.
+    // Le prochain passage sur l'onglet relance (show → refresh).
+    clearTimeout(repriseTimer);
+    repriseTimer = null;
   }
 
   // Appelé par app.js à chaque évènement temps réel (SSE ou filet de polling).

@@ -254,16 +254,34 @@
     return 'Commande enregistrée au planning ✔';
   }
 
+  // Une panne de LIAISON (réseau tombé, minuteur échu) se distingue d'un refus
+  // du serveur : la première se retente toute seule, le second non — renvoyer
+  // un dossier invalide donnerait la même erreur trois secondes plus tard.
+  const estPanneLiaison = (err) => !!err
+    && (err.name === 'AbortError' || err instanceof TypeError);
+
   let envoiEnCours = false;
   if (window.parent === window) {
     window.addEventListener('message', async (e) => {
       if (e.source !== window) return; // seul le message que la page s'adresse
+      if (e.origin !== location.origin) return; // même verrou explicite qu'en iframe
       const msg = e.data;
       if (!msg || msg.type !== 'OLDA_CREATE_PROJECT' || !msg.payload) return;
       if (envoiEnCours) return; // double tap = une seule ligne
       envoiEnCours = true;
       try {
-        const data = await api('POST', '/api/comptoir/projet', msg.payload);
+        let data;
+        try {
+          data = await api('POST', '/api/comptoir/projet', msg.payload);
+        } catch (err1) {
+          // Le wifi de l'atelier décroche par à-coups de quelques secondes —
+          // exactement la durée d'une impression de ticket. UNE relance
+          // automatique avant de déranger la vendeuse : l'empreinte du dossier
+          // garantit côté serveur qu'un doublon est impossible.
+          if (!estPanneLiaison(err1)) throw err1;
+          await new Promise((r) => setTimeout(r, 3000));
+          data = await api('POST', '/api/comptoir/projet', msg.payload);
+        }
         // Le serveur ne dit pas seulement « c'est passé » : il dit AUSSI quand
         // il a reconnu un renvoi du même dossier, et quand il a dû changer la
         // référence parce qu'un autre dossier la portait déjà. Annoncer les
@@ -288,6 +306,11 @@
     // dossiers partaient sans que personne ne s'en aperçoive.
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin) return;
+      // Seul L'HÔTE a le droit de dire « c'est au planning » : sans ce verrou,
+      // n'importe quelle fenêtre de même origine (l'iframe voisine, un autre
+      // onglet) pouvait peindre « ✔ » sur un dossier jamais parti — et éteindre
+      // du même coup le bouton Réessayer et le garde-fou de fermeture.
+      if (e.source !== window.parent) return;
       const m = e.data;
       if (!m || m.type !== 'OLDA_PROJET_RESULT') return;
       resultatEnvoi(!!m.ok, m.message || '');
@@ -419,6 +442,8 @@
   }
 
   function resultatEnvoi(ok, message) {
+    clearTimeout(minuteurEnvoi);
+    minuteurEnvoi = null;
     etatEnvoi = ok ? 'ok' : 'echec';
     envoiAutomatique = false;
     // Même en cas de succès, le serveur a parfois quelque chose d'URGENT à dire :
@@ -432,11 +457,24 @@
   // Le payload appartient à l'écran : il est construit par le bouton que la
   // page se greffe (`patchPlanningButton`), avec TOUT ce que le parcours a
   // recueilli. On ne le retranscrit pas — on presse son bouton.
+  //
+  // LE CHIEN DE GARDE. L'état « envoi » s'en remettait entièrement au retour
+  // d'un message : si rien ne revenait JAMAIS (bouton regreffé dont le clic
+  // tombe dans le vide, hôte qui jette le message, gestionnaire de la page qui
+  // abandonne sans mot dire), le bandeau restait sur « Enregistrement… » pour
+  // toujours — SANS bouton Réessayer (masqué hors échec), et avec le garde-fou
+  // de fermeture qui empêchait même de quitter l'écran. Le dossier qu'on
+  // protège restait prisonnier de sa protection.
+  const ENVOI_MAX_MS = 25000;
+  let minuteurEnvoi = null;
+
   function envoyerAuPlanning(auto) {
     if (etatEnvoi === 'envoi' || etatEnvoi === 'ok') return;
     if (typeof window.patchPlanningButton === 'function') window.patchPlanningButton();
     const btn = document.getElementById('oldaCreatePlanningBtn');
-    if (!btn) {
+    // `isConnected` : les écrans regreffent leurs boutons sur leur propre
+    // minuteur — cliquer un nœud détaché ne poste rien, sans erreur.
+    if (!btn || !btn.isConnected) {
       etatEnvoi = 'echec';
       peindreEtat('Le bouton « Créer dans le planning » est introuvable sur cet écran.');
       return;
@@ -444,6 +482,13 @@
     etatEnvoi = 'envoi';
     envoiAutomatique = !!auto;
     peindreEtat('');
+    clearTimeout(minuteurEnvoi);
+    minuteurEnvoi = setTimeout(() => {
+      minuteurEnvoi = null;
+      if (etatEnvoi !== 'envoi') return;
+      etatEnvoi = 'echec';
+      peindreEtat('Aucune réponse — le réseau a peut-être décroché. Réessaie.');
+    }, ENVOI_MAX_MS);
     // L'hôte saute sur la ligne créée — parfait quand c'est la vendeuse qui l'a
     // demandé, désastreux quand c'est automatique : elle a le ticket du client
     // à l'écran et se retrouverait au planning sans l'avoir imprimé.
@@ -472,9 +517,17 @@
   // que RIEN ne relit — jamais — et annonçait « Brouillon enregistré » : la
   // vendeuse repartait convaincue d'avoir sauvegardé son dossier. On le
   // rebranche sur le seul enregistrement qui existe.
+  // Le nœud rebranché est mémorisé : tant qu'il est vivant, on ne repaie pas le
+  // sélecteur d'attribut par préfixe (le plus lent qui soit, non indexable) —
+  // qui tournait ici plusieurs fois par seconde, sur un document de 126 Ko.
+  let boutonBrouillon = null;
   function rebrancherBoutonBrouillon() {
+    if (boutonBrouillon && boutonBrouillon.isConnected) return;
+    boutonBrouillon = null;
     const b = document.querySelector('[onclick^="saveDraft"]');
-    if (!b || b.__oldaRebranche) return;
+    if (!b) return;
+    boutonBrouillon = b;
+    if (b.__oldaRebranche) return;
     b.__oldaRebranche = true;
     b.removeAttribute('onclick');
     b.onclick = null;
@@ -577,7 +630,14 @@
   // pour ce qui ne passe pas par une mutation (et parce que les écrans
   // regreffent leurs propres boutons toutes les 400 ms).
   const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); });
-  veilleur.observe(document.body, { subtree: true, attributes: true, childList: true });
+  // `attributeFilter` : le guet ne réagit qu'à la classe — c'est elle (`hidden`)
+  // qui démasque l'écran de fin. Sans le filtre, CHAQUE changement d'attribut
+  // du document (les minuteurs des écrans en produisent plusieurs par seconde)
+  // rejouait les deux contrôles. `childList` reste entier : le bouton brouillon
+  // et la carte de fin sont régulièrement regreffés en tant que nœuds.
+  veilleur.observe(document.body, {
+    subtree: true, childList: true, attributes: true, attributeFilter: ['class'],
+  });
   setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); }, VEILLE_MS);
   guetterEcranFinal();
   rebrancherBoutonBrouillon();

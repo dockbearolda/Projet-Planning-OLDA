@@ -389,7 +389,9 @@ body {
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 0 6px; flex-shrink: 0;
 }
-.grid-search.has-value .grid-search-kbd { display: none; }
+/* `visibility` et non `display:none` : le badge garde sa place, la pilule de
+   recherche ne se recompacte pas à la première frappe (décalage évité). */
+.grid-search.has-value .grid-search-kbd { visibility: hidden; }
 
 /* ---------------------------------------------------------------- App = rail + travail */
 /* Zone de travail : simple conteneur de la carte `.work` (le rail et la poignée
@@ -431,8 +433,16 @@ body {
 }
 .sidebar-resizer:hover::before,
 .sidebar-resizer.active::before { opacity: 1; background: var(--primary); }
+/* Pendant un geste (redimensionner, glisser), le curseur du <body> fait foi et
+   les zones survolées cessent d'être des cibles de hit-test : leurs propres
+   curseurs ne reprennent pas la main. L'ancien `body.X * { cursor … }` forçait
+   un recalcul de style de TOUT le document (sélecteur universel non indexable)
+   au début ET à la fin de chaque geste — le doigt payait deux gels complets.
+   La poignée, elle, tient la capture du pointeur : le hit-test ne la concerne
+   plus. */
 body.sidebar-resizing { user-select: none; cursor: col-resize; }
-body.sidebar-resizing * { cursor: col-resize !important; }
+body.sidebar-resizing .sidebar,
+body.sidebar-resizing .grid-wrap { pointer-events: none; }
 
 /* ---------------------------------------------------------------- Sidebar (rail)
    Sous la barre du haut, à gauche (posée par la grille du .shell). Ne porte plus
@@ -1059,7 +1069,6 @@ body.sidebar-resizing * { cursor: col-resize !important; }
 .grid-wrap {
   flex: 1;
   overflow: auto;
-  transform: translateZ(0);
   contain: layout paint;
   /* Les cartes se calent sur la place RÉELLEMENT disponible (viewport moins
      rail d'étapes moins rail « Colonnes ») : une media query viewport ne la
@@ -1369,14 +1378,13 @@ body.cards-off-ticket .pcard__ticket { display: none; }
   padding: 14px 20px;
   white-space: nowrap;
   user-select: none;
-  transition: box-shadow var(--dur-2) var(--ease);
 }
-/* élévation de l'en-tête quand la grille est scrollée */
+/* Séparation de l'en-tête quand la grille est scrollée : un filet net, pas une
+   ombre floutée — au premier pixel de défilement, l'ancienne élévation
+   (var(--shadow-2), flou de 24 px) repeignait les 13 cellules collantes pendant
+   200 ms, en plein milieu du geste de scroll. */
 .grid-wrap.is-scrolled thead th {
-  box-shadow: 0 1px 0 var(--border), var(--shadow-2);
-}
-:root[data-theme="dark"] .grid-wrap.is-scrolled thead th {
-  box-shadow: 0 1px 0 var(--border), 0 4px 12px rgba(0, 0, 0, .4);
+  box-shadow: 0 1px 0 var(--border);
 }
 .grid thead th.num { text-align: right; }
 .grid thead th.sortable { cursor: pointer; transition: color var(--dur-1) var(--ease); }
@@ -1392,7 +1400,13 @@ body.cards-off-ticket .pcard__ticket { display: none; }
      .is-bloque / .is-a-voir plus bas) : la transition posée sur le <tr> ne la
      concernait donc pas et la couleur claquait d'un coup. Elle se pose ici,
      avec le liseré de tête de ligne, pour que poser ou lever un blocage se
-     fonde au lieu de sauter à l'écran. */
+     fonde au lieu de sauter à l'écran. Le liseré (box-shadow inset) n'existe
+     que sur la PREMIÈRE cellule des lignes alertées : sa transition vit là-bas,
+     pas sur les 5 000 cellules d'une longue étape. */
+  transition: background-color var(--dur-2) var(--ease);
+}
+.grid tbody tr.is-bloque > td:first-child,
+.grid tbody tr.is-a-voir > td:first-child {
   transition: background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
 .grid tbody tr { transition: background var(--dur-1) var(--ease); }
@@ -1403,27 +1417,14 @@ body.cards-off-ticket .pcard__ticket { display: none; }
 .grid tbody tr:hover { background: var(--row-hover); }
 .grid tbody tr.dragging { opacity: .4; }
 
-/* entrée en scène des lignes au changement d'étape (léger, rapide) */
-#rows.stage-enter tr { animation: rowIn .26s var(--ease) both; }
-#rows.stage-enter tr:nth-child(2)  { animation-delay: .022s; }
-#rows.stage-enter tr:nth-child(3)  { animation-delay: .044s; }
-#rows.stage-enter tr:nth-child(4)  { animation-delay: .066s; }
-#rows.stage-enter tr:nth-child(5)  { animation-delay: .088s; }
-#rows.stage-enter tr:nth-child(6)  { animation-delay: .11s; }
-#rows.stage-enter tr:nth-child(7)  { animation-delay: .132s; }
-#rows.stage-enter tr:nth-child(8)  { animation-delay: .154s; }
-#rows.stage-enter tr:nth-child(n+9) { animation-delay: .17s; }
-/* La MÊME entrée pour la vue épurée : au changement d'étape, les cartes se
-   posent avec le fondu décalé des lignes — un seul geste visuel, deux vues. */
-#cards.stage-enter .pcard { animation: rowIn .26s var(--ease) both; }
-#cards.stage-enter .pcard:nth-child(2)  { animation-delay: .022s; }
-#cards.stage-enter .pcard:nth-child(3)  { animation-delay: .044s; }
-#cards.stage-enter .pcard:nth-child(4)  { animation-delay: .066s; }
-#cards.stage-enter .pcard:nth-child(5)  { animation-delay: .088s; }
-#cards.stage-enter .pcard:nth-child(6)  { animation-delay: .11s; }
-#cards.stage-enter .pcard:nth-child(7)  { animation-delay: .132s; }
-#cards.stage-enter .pcard:nth-child(8)  { animation-delay: .154s; }
-#cards.stage-enter .pcard:nth-child(n+9) { animation-delay: .17s; }
+/* Entrée en scène au changement d'étape (léger, rapide). La classe et le délai
+   sont posés PAR LE JS sur les ~12 premières lignes visibles (playStageEnter) :
+   les règles `:nth-child` qui vivaient ici faisaient démarrer jusqu'à 392
+   animations de repaint d'un coup sur une longue étape, et leur simple présence
+   (règles positionnelles) forçait le navigateur à réévaluer les frères suivants
+   à chaque insertBefore d'un tri ou d'un glisser. Une seule règle, sans
+   position : le tableau et les cartes partagent le même geste visuel. */
+.row-enter { animation: rowIn .26s var(--ease) both; }
 @keyframes rowIn {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1474,8 +1475,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .cell-display { cursor: text; }
 .cell-display.placeholder { color: var(--text-3); }
 
-/* poignée de glisser */
-.col-handle { width: 48px; }
+/* poignée de glisser (largeur : voir .col-handle plus bas, avec ses voisines) */
 .handle-cell {
   display: flex;
   align-items: center;
@@ -1498,7 +1498,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .handle:active { cursor: grabbing; }
 .handle svg { width: 18px; height: 18px; }
-tr:hover .handle { color: var(--text-2); }
+.grid tbody tr:hover .handle { color: var(--text-2); }
 
 /* Priorité, attribuable par ligne : badge texte (Basse/Moyenne/Haute),
    remplace les étoiles ★☆☆ — plus lisible d'un coup d'œil, même patron que
@@ -1531,37 +1531,6 @@ tr:hover .handle { color: var(--text-2); }
 }
 .prio-tag.p1, .prio-tag.p2 { color: var(--text-2); background: var(--border-soft); }
 .prio-tag.p3 { color: var(--primary); background: var(--primary-soft); }
-
-/* priorité — pastilles (grouping désactivé mais styles conservés) */
-.col-priority { width: 118px; }
-.prio-pill {
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 8px 14px;
-  padding: 7px 13px;
-  min-height: 36px;
-  border-radius: 999px;
-  border: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
-  transition: filter var(--dur-1) var(--ease),
-              background-color var(--dur-2) var(--ease),
-              border-color var(--dur-2) var(--ease),
-              color var(--dur-2) var(--ease);
-}
-.prio-pill:hover { filter: brightness(.97); }
-.prio-pill:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.prio-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
-.prio-pill.p1 { color: var(--st-livree); background: var(--st-livree-bg); }
-.prio-pill.p2 { color: var(--st-cours); background: var(--st-cours-bg); }
-.prio-pill.p3 { color: var(--st-bloque); background: var(--st-bloque-bg); }
 
 /* Nom du dossier client */
 .col-client-cell { padding: 0; vertical-align: middle; }
@@ -1964,8 +1933,13 @@ tr:hover .handle { color: var(--text-2); }
 .grid tbody tr.is-a-voir > td { background: color-mix(in srgb, var(--primary-soft) 62%, var(--surface)); }
 .grid tbody tr.is-bloque > td:first-child { box-shadow: inset 4px 0 0 0 var(--st-bloque); }
 .grid tbody tr.is-a-voir > td:first-child { box-shadow: inset 4px 0 0 0 var(--primary); }
-.grid tbody tr.is-bloque:hover > td,
-.grid tbody tr.is-a-voir:hover > td { filter: brightness(.98); }
+/* Survol d'une ligne alertée : la teinte fonce d'un cran par le MÊME color-mix
+   que la teinte de repos. Le `filter: brightness()` qui vivait ici faisait de
+   chacune des 13 cellules sa propre surface de rendu — créées puis détruites à
+   chaque franchissement de ligne, tout un balayage de souris en payait des
+   centaines. */
+.grid tbody tr.is-bloque:hover > td { background: color-mix(in srgb, var(--st-bloque-bg) 74%, var(--surface)); }
+.grid tbody tr.is-a-voir:hover > td { background: color-mix(in srgb, var(--primary-soft) 74%, var(--surface)); }
 
 /* Sous-étape : puce tonale neutre précisant l'action en cours dans la famille */
 .col-sub-cell { padding: 0; vertical-align: middle; }
@@ -2466,7 +2440,9 @@ tr:hover .handle { color: var(--text-2); }
   letter-spacing: .5px;
   text-transform: uppercase;
   color: var(--text-3);
-  background: linear-gradient(var(--surface) 70%, transparent);
+  /* Fond PLAT : un dégradé sur un élément collant est re-rasterisé à chaque
+     image de défilement de la liste de résultats. */
+  background: var(--surface);
 }
 
 .search-palette-item {
@@ -2796,7 +2772,10 @@ tr:hover .handle { color: var(--text-2); }
 .desc-toggle:hover { background: var(--primary-soft); color: var(--primary); }
 .desc-toggle svg { width: 15px; height: 15px; display: block; transition: transform var(--dur-2) var(--ease); }
 .desc-toggle.open svg { transform: rotate(180deg); }
-.desc-toggle[hidden] { display: none; }
+/* Le chevron garde sa place quand il n'a rien à déplier : son apparition
+   recalait sinon la largeur du champ voisin à chaque note qui passe (ou non)
+   sur deux lignes. */
+.desc-toggle[hidden] { display: flex; visibility: hidden; }
 /* Case Infos vide : on garde le textarea visible (placeholder « infos ») pour
    qu'un collaborateur puisse cliquer dedans et saisir une note. Avant, la ligne
    passait en display:none quand vide → case non cliquable sur desktop, donc
@@ -2832,8 +2811,10 @@ tr:hover .handle { color: var(--text-2); }
 .grid thead th:hover .col-resizer::after { opacity: 1; }
 .col-resizer:hover::after,
 .col-resizer.active::after { background: var(--primary); opacity: 1; }
-body.col-resizing { user-select: none; }
-body.col-resizing * { cursor: col-resize !important; }
+/* Même règle que .sidebar-resizing : curseur sur le body, hit-test suspendu
+   (la poignée garde la capture du pointeur, elle ne dépend pas du hit-test). */
+body.col-resizing { user-select: none; cursor: col-resize; }
+body.col-resizing .grid-wrap { pointer-events: none; }
 @media (pointer: coarse) { .col-resizer { width: 18px; } }
 
 /* actions de fin de ligne : ouvrir / envoyer / dupliquer / supprimer.
@@ -2891,46 +2872,34 @@ body.col-resizing * { cursor: col-resize !important; }
 .open-btn:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .open-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
+/* Ni contour ni pilule depuis que l'icône est le BADGE de la destination
+   (cf. fiverrIcon) : un carré plein dans un cercle bordé faisait boîte dans une
+   boîte, et le bouton pesait plus lourd que ses voisins. Même gabarit que
+   dupliquer / supprimer — la rangée d'actions se lit d'un seul trait.
+   (Les deux blocs historiques — pilule bordée, puis rond — sont fusionnés :
+   l'ancien était réécrit déclaration par déclaration, du poids mort servi.) */
 .send-btn {
   position: relative;
   overflow: hidden;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   flex: 0 0 auto;
-  border: 1px solid var(--border);
+  border: 0;
   background: transparent;
-  color: var(--text-2);
+  color: var(--text-3);
   cursor: pointer;
   opacity: 0;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
 .send-btn svg { display: block; }
 /* Libellé masqué : le bouton « Envoyer vers Fiverr » reste une icône compacte
    (l'infobulle / aria-label conserve le sens) pour tenir dans la colonne actions. */
 .send-btn span { display: none; }
-/* Ni contour ni pilule depuis que l'icône est le BADGE de la destination
-   (cf. fiverrIcon) : un carré plein dans un cercle bordé faisait boîte dans une
-   boîte, et le bouton pesait plus lourd que ses voisins. Même gabarit que
-   dupliquer / supprimer — la rangée d'actions se lit d'un seul trait. */
-.send-btn {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  color: var(--text-3);
-}
-tr:hover .send-btn { opacity: 1; }
 .send-btn:hover { color: var(--primary); background: var(--primary-soft); }
 .send-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .del-btn,
@@ -2952,8 +2921,16 @@ tr:hover .send-btn { opacity: 1; }
 }
 .del-btn svg,
 .dup-btn svg { display: block; }
-tr:hover .del-btn,
-tr:hover .dup-btn { opacity: 1; }
+/* Révélés au survol de la ligne — et INERTES tant qu'ils sont invisibles : un
+   bouton à opacity 0 restait cliquable et tabulable, « Supprimer » compris.
+   Sélecteurs bornés à `.grid tbody` : écrits `tr:hover …`, ils marquaient tous
+   les <tr> du document comme sensibles au survol. Au clavier, le focus rend le
+   bouton visible (sinon on tabulait sur du vide). */
+.send-btn, .del-btn, .dup-btn { pointer-events: none; }
+.grid tbody tr:hover .send-btn,
+.grid tbody tr:hover .del-btn,
+.grid tbody tr:hover .dup-btn { opacity: 1; pointer-events: auto; }
+.send-btn:focus-visible, .del-btn:focus-visible, .dup-btn:focus-visible { opacity: 1; }
 .dup-btn:hover { color: var(--primary); background: var(--primary-soft); }
 .del-btn:hover { color: var(--st-bloque); background: var(--st-bloque-bg); }
 
@@ -3170,15 +3147,33 @@ input[type="date"].cell-input { color: var(--text-1); }
   text-overflow: ellipsis;
   opacity: .98;
 }
+/* Pendant un glisser : curseur du body, et la liste survolée cesse d'être une
+   cible de hit-test (le dépôt dans la liste se calcule sur la hauteur du
+   pointeur, pas sur l'élément dessous ; le rail, lui, reste une cible — c'est
+   là qu'on dépose pour changer d'étape). Bonus : plus aucun `:hover` de ligne
+   ne se déclenche sous la carte en vol. */
 body.dragging-active { cursor: grabbing; }
-body.dragging-active * { cursor: grabbing !important; }
+body.dragging-active .grid-wrap { pointer-events: none; }
 
 .grid-wrap, .sidebar {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+/* Arrivé en bout de course dans un panneau, le défilement ne se propage pas à
+   la page derrière — le classique « le fond bouge sous la modale » au trackpad. */
+.pj-body, .dd-scroll, .ld-body, .menu-pop, .search-palette-results,
+.guide-card, .tk-modal__paper, .colbar-scroll, .cat-list, .reglages {
+  overscroll-behavior: contain;
+}
+/* La place de la barre de défilement est RÉSERVÉE : sans ça, chaque frappe dans
+   la recherche faisait apparaître / disparaître la barre (12 px), et les treize
+   colonnes du tableau se recalaient à chaque caractère — un décalage de mise en
+   page sur l'écran principal, au rythme de la saisie. */
+.grid-wrap, .pj-body, .ld-body, .dd-scroll, .search-palette-results, .colbar-scroll {
+  scrollbar-gutter: stable;
+}
 
-button, a, .stage, .prio-pill, .deadline-badge,
+button, a, .stage, .deadline-badge,
 .type-tag, .empty-field, .cal-day, .desc-toggle {
   touch-action: manipulation;
 }
@@ -3189,6 +3184,17 @@ button, a, .stage, .prio-pill, .deadline-badge,
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* Bascule clair / sombre : les transitions se taisent le temps d'une image
+   (classe posée par applyTheme). Re-colorer la grille entière — cellules,
+   puces, badges portent tous une transition de couleur — lançait des milliers
+   de fondus simultanés sur un seul clic. Même patron que le bloc
+   prefers-reduced-motion ci-dessus. */
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition: none !important;
 }
 
 /* Recherche : masquage des lignes hors-filtre (instantané, DOM préservé) */
@@ -3355,7 +3361,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .handle,
   .del-btn,
   .send-btn,
-  .dup-btn { opacity: 1 !important; }
+  .dup-btn { opacity: 1 !important; pointer-events: auto !important; }
   .handle { color: var(--text-2); }
 
   .grid tbody td { height: max(var(--row-h), 56px); }
@@ -3368,7 +3374,8 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .product-stack .product-name { min-height: 44px; height: auto; }
   .product-desc { min-height: 0; height: auto; font-size: 14px; }
   .desc-toggle { width: 44px; height: 44px; }
-  .flag-reason { min-height: 44px; }
+  /* (.flag-reason : sa taille tactile est réglée plus bas, avec les puces —
+     deux règles contradictoires cohabitaient dans ce même bloc.) */
 
   /* Tout champ de saisie fait au moins 16 px : en dessous, iOS zoome à la mise
      au point et la page reste décalée ensuite. */
@@ -3382,7 +3389,6 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .pj-search-clear { width: 44px; height: 44px; }
   .pj-tab { min-height: 44px; }
 
-  .prio-pill { padding: 10px 15px; font-size: 14px; min-height: 44px; }
   .deadline-badge,
   .empty-field { padding: 8px 14px; font-size: 13.5px; min-height: 44px; }
   .resp-chip { min-height: 44px; padding: 5px 14px 5px 5px; font-size: 14px; }
@@ -3439,9 +3445,7 @@ button, a, .stage, .prio-pill, .deadline-badge,
   .stage { padding: 12px 16px; }
   .stage-label { font-size: 14.5px; }
 
-  /* Onglets de navigation : cible tactile plancher 44 px. */
-  .nav-switch-btn { min-height: 44px; }
-
+  /* (.nav-switch-btn : plancher 44 px déjà posé plus haut dans ce bloc.) */
   .btn-primary { padding: 12px 20px 12px 16px; font-size: 15px; }
   .icon-btn { width: 46px; height: 46px; }
 }
@@ -4904,7 +4908,11 @@ body.view-comptoir .grid-search { display: none !important; }
   resize: vertical;
 }
 textarea.ld-ctl { font-weight: 600; }
-.ld-ctl:focus { outline: 3px solid rgba(17, 24, 39, .15); border-color: #101828; }
+/* rgba(var(--primary-rgb)) et non l'encre en dur : en clair c'est LA MÊME
+   couleur (17,24,39), en sombre le jeton s'inverse — l'anneau de saisie était
+   noir sur fond noir, plus aucun repère de champ actif dans la fiche. */
+.ld-ctl:focus { outline: 3px solid rgba(var(--primary-rgb), .15); border-color: var(--primary); }
+:root[data-theme="dark"] .ld-ctl:focus { outline-color: rgba(var(--primary-rgb), .35); }
 .ld-duo { display: flex; gap: 8px; }
 /* Journal des modifications, dans le volet Historique : une ligne par
    changement, la plus récente en haut. */
@@ -4938,7 +4946,7 @@ textarea.ld-ctl { font-weight: 600; }
 }
 .ld-volet__tete::-webkit-details-marker { display: none; }
 .ld-volet__tete:hover { background: #f4f6fa; }
-.ld-volet__tete:focus-visible { outline: 3px solid rgba(17, 24, 39, .2); outline-offset: -2px; }
+.ld-volet__tete:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .2); outline-offset: -2px; }
 .ld-volet__textes { min-width: 0; }
 .ld-volet__textes .ld-k { margin: 0 0 4px; display: block; }
 .ld-volet__apercu {
@@ -5009,6 +5017,19 @@ textarea.ld-ctl { font-weight: 600; }
 }
 :root[data-theme="dark"] .ld-save:hover:not(:disabled) { background: #fff; border-color: #fff; }
 :root[data-theme="dark"] .ld-pay .ld-field { background: var(--bg); border-color: var(--border); }
+/* Les filets et les gris posés en dur pour l'écran clair : en sombre, le filet
+   #eef0f3 barrait la fiche d'un trait blanc et les gris moyens (#697586,
+   #667085) tombaient sous 2,1:1 de contraste — illisibles. */
+:root[data-theme="dark"] .ld-journal__liste,
+:root[data-theme="dark"] .ld-volet[open] > .ld-volet__tete { border-color: var(--border-soft); }
+:root[data-theme="dark"] .ld-journal__liste .ld-v { color: var(--text-2); }
+:root[data-theme="dark"] .ld-journal__note,
+:root[data-theme="dark"] .ld-pay .ld-field__label { color: var(--text-2); }
+/* Les grandes ombres portées gardaient leur alpha « clair » : le panneau ne se
+   détachait plus du fond sombre. */
+:root[data-theme="dark"] .ligne-drawer__card { box-shadow: 0 24px 70px rgba(0, 0, 0, .6); }
+:root[data-theme="dark"] .dd-panel,
+:root[data-theme="dark"] .pj-feed { box-shadow: -18px 0 48px rgba(0, 0, 0, .5); }
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
@@ -5067,7 +5088,10 @@ textarea.ld-ctl { font-weight: 600; }
   color: var(--text-1);
   resize: vertical;
 }
-.ld-detail-input:focus { outline: 2px solid var(--focus, rgba(17, 24, 39, .25)); outline-offset: 1px; }
+/* `--focus` n'existait nulle part : le repli noir s'appliquait dans LES DEUX
+   thèmes — invisible en sombre. Même jeton inversible que les autres anneaux. */
+.ld-detail-input:focus { outline: 2px solid rgba(var(--primary-rgb), .25); outline-offset: 1px; }
+:root[data-theme="dark"] .ld-detail-input:focus { outline-color: rgba(var(--primary-rgb), .4); }
 .ld-detail-save { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .ld-detail-state { font-size: 12px; font-weight: 700; color: var(--text-2); align-self: center; }
 @media (max-width: 620px) {
@@ -5361,3 +5385,38 @@ textarea.ld-ctl { font-weight: 600; }
   background: var(--primary);
   color: var(--surface);
 }
+
+/* ------------------------------------------------------- Finitions desktop
+   Le poste souris est un poste à part entière : chaque commande répond au
+   survol, et la navigation au clavier se VOIT. */
+
+/* Filet de sécurité clavier : tout bouton sans anneau de focus dédié reçoit
+   celui de la charte (les règles spécifiques existantes, plus précises,
+   gardent la main). */
+button:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+}
+.grid thead th.sortable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+/* Réponses au survol qui manquaient : ces commandes étaient cliquables sans
+   jamais le dire à la souris. */
+.search-palette-item:hover { background: var(--state-hover); }
+.pj-search-clear:hover,
+.pj-filterchip:hover,
+.cat-row-select:hover,
+.mac-imp:hover,
+.reg-tarif-add:hover,
+.reg-tarif-toggle:hover { background: var(--state-hover); }
+.pdf-btn__remove:hover { color: var(--st-bloque); background: var(--st-bloque-bg); }
+
+/* La carte du planning se saisit PARTOUT à la souris (cf. attachDrag) : le
+   curseur l'annonce, au lieu de le réserver à la poignée tactile. */
+.pcard { cursor: grab; }
+.pcard.dragging { cursor: grabbing; }
+.pcard button, .pcard a { cursor: pointer; }

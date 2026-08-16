@@ -142,6 +142,23 @@ if (process.env.DATABASE_URL) {
     connectionString: process.env.DATABASE_URL,
     // SSL requis côté Railway en production.
     ssl: isProd ? { rejectUnauthorized: false } : false,
+    // TOUTE REQUÊTE A UNE FIN — la règle du navigateur (reseau.js) vaut pour le
+    // serveur. Sans ces bornes, un Postgres qui décroche (bascule Railway,
+    // réseau interne) laissait `pool.connect()` et chaque requête pendre à
+    // l'infini : les 10 clients du pool se remplissaient de requêtes mortes et
+    // l'application entière se figeait, sans erreur, jusqu'au redémarrage.
+    max: 10,
+    connectionTimeoutMillis: 5000,  // obtenir un client du pool
+    idleTimeoutMillis: 30000,       // rendre les clients inutilisés
+    query_timeout: 15000,           // côté pilote : la promesse échoue
+    statement_timeout: 15000,       // côté Postgres : la requête est tuée
+  });
+  // Un client INACTIF du pool peut mourir tout seul (redémarrage de Postgres,
+  // coupure réseau) : `pg` émet alors 'error' sur le pool, et un EventEmitter
+  // sans écouteur 'error'... TERMINE LE PROCESSUS. C'était le crash le plus
+  // probable en production — sans aucune requête en cours pour l'expliquer.
+  pool.on('error', (err) => {
+    console.error('Client PostgreSQL inactif perdu (reconnexion au prochain usage) :', err.message);
   });
 } else {
   // Fallback local zéro-config.
@@ -278,6 +295,18 @@ async function init() {
   try {
     await pool.query("CREATE INDEX IF NOT EXISTS idx_requests_fiche_ref ON requests ((fiche->>'ref'))");
   } catch (_) { /* pg-mem local : pas d'index sur expression, sans conséquence */ }
+
+  // L'ORDRE DE LA LISTE, indexé. /api/requests trie par (position NULLS LAST,
+  // priority DESC, deadline, created_at) — or l'index existant commence par
+  // priority : Postgres filtrait par étape puis TRIAIT TOUTE L'ÉTAPE à chaque
+  // affichage, y compris l'archive de clôture que le LIMIT 401 aurait épargnée.
+  // Avec l'index aligné sur l'ORDER BY, la lecture s'arrête au plafond — et le
+  // même index, parcouru à rebours, sert ORDER_INVERSE (son miroir exact).
+  // Down : DROP INDEX IF EXISTS idx_requests_liste;
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_requests_liste
+      ON requests (stage, position ASC NULLS LAST, priority DESC, deadline ASC NULLS LAST, created_at ASC)`);
+  } catch (_) { /* pg-mem local : options d'index partiellement gérées, sans conséquence */ }
 
   // L'EMPREINTE, elle, est UNIQUE — et c'est la base qui le garantit, pas le
   // code. Le serveur lisait l'empreinte puis insérait : deux envois du MÊME

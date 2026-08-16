@@ -48,7 +48,12 @@ app.set('trust proxy', 1);
 app.use(compression({
   filter: (req, res) => req.path !== '/api/stream' && compression.filter(req, res),
 }));
-app.use(express.json());
+// 1 Mo et non les 100 Ko par défaut : un dossier du comptoir transporte le
+// récapitulatif complet, la fiche client et jusqu'à trente lignes d'articles.
+// Au-delà de 100 Ko, Express répondait 413 en PAGE HTML — le parcours affichait
+// une erreur illisible et la vente était perdue, exactement le genre de dossier
+// évaporé qu'on a déjà payé (voir l'écran de fin du comptoir).
+app.use(express.json({ limit: '1mb' }));
 
 // ---------------------------------------------------------------------------
 // Basic Auth (mot de passe partagé). Si APP_PASSWORD est absent → accès ouvert.
@@ -490,14 +495,19 @@ app.get('/api/tarifs-tasse', asyncH(async (req, res) => {
   res.json(await getTarifsTasseArticles());
 }));
 
-app.put('/api/tarifs-tasse', asyncH(async (req, res) => {
+const enregistrerTarifsTasse = asyncH(async (req, res) => {
   if (!Array.isArray(req.body)) {
     return res.status(400).json({ error: 'Tableau d\'articles attendu' });
   }
   const saved = await setTarifsTasseArticles(req.body);
   broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
-}));
+});
+app.put('/api/tarifs-tasse', enregistrerTarifsTasse);
+// POST accepté aussi : c'est la seule méthode que `navigator.sendBeacon` sait
+// émettre, et c'est lui qui sauve la dernière correction quand on ferme
+// l'onglet Réglages avant la fin du délai d'enregistrement (voir reglages.js).
+app.post('/api/tarifs-tasse', enregistrerTarifsTasse);
 
 // Paramètres globaux du calcul (taux horaires MO/machine, TGCA).
 app.get('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
@@ -999,12 +1009,14 @@ app.get('/api/counts', asyncH(async (req, res) => {
   for (const s of STAGE_SLUGS) counts[s] = 0;
   for (const s of SUB_SLUGS) counts[s] = 0;
 
-  const { rows: byStage } = await pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage');
+  // Les deux agrégats sont indépendants : en série, chaque poste payait deux
+  // allers-retours Postgres à CHAQUE évènement temps réel (loadCounts est
+  // systématique dans le poll). En parallèle, un seul temps d'attente.
+  const [{ rows: byStage }, { rows: bySub }] = await Promise.all([
+    pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage'),
+    pool.query('SELECT sub_stage, COUNT(*)::int AS n FROM requests WHERE sub_stage IS NOT NULL GROUP BY sub_stage'),
+  ]);
   for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
-
-  const { rows: bySub } = await pool.query(
-    'SELECT sub_stage, COUNT(*)::int AS n FROM requests WHERE sub_stage IS NOT NULL GROUP BY sub_stage',
-  );
   for (const r of bySub) if (SUB_SLUGS.has(r.sub_stage)) counts[r.sub_stage] = r.n;
 
   res.json(counts);
@@ -1141,26 +1153,30 @@ app.patch('/api/requests/positions', asyncH(async (req, res) => {
     if (!v.ok) return res.status(400).json({ error: v.error });
   }
 
-  // TOUT ou RIEN. En écritures indépendantes, une panne au milieu laissait la
-  // moitié de l'étape renumérotée et l'autre sur ses anciennes valeurs : un
-  // ordre mélangé que personne ne pouvait plus démêler à la main.
-  const client = await pool.connect();
+  // TOUT ou RIEN, et surtout EN UNE SEULE REQUÊTE. La transaction faisait un
+  // aller-retour SQL par ligne : sur une étape de quatre cents commandes, le
+  // verrou restait tenu plusieurs centaines de millisecondes, pendant
+  // lesquelles toute écriture concurrente sur ces lignes attendait — le poste
+  // d'à côté « ramait » exactement le temps du rangement du voisin. Un seul
+  // UPDATE à CASE tient le verrou le temps d'une requête, pas d'une boucle.
+  // (La forme `FROM (VALUES …)` est plus élégante, mais pg-mem — la base des
+  // tests — y rend RETURNING vide : le CASE se comporte, lui, à l'identique
+  // sur les deux moteurs.)
   const etapes = new Set();
-  try {
-    await client.query('BEGIN');
-    for (const item of list) {
-      const { rows } = await client.query(
-        'UPDATE requests SET position = $1, updated_at = now() WHERE id = $2 RETURNING stage',
-        [Number(item.position), item.id],
-      );
-      if (rows[0]) etapes.add(rows[0].stage);
-    }
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
+  {
+    const params = [];
+    const cas = list.map((item) => {
+      params.push(item.id, Number(item.position));
+      return `WHEN $${params.length - 1}::uuid THEN $${params.length}::int`;
+    });
+    const ids = list.map((item, i) => `$${params.length + i + 1}::uuid`);
+    params.push(...list.map((item) => item.id));
+    const { rows } = await pool.query(
+      `UPDATE requests SET position = CASE id ${cas.join(' ')} END, updated_at = now()
+       WHERE id IN (${ids.join(', ')}) RETURNING stage`,
+      params,
+    );
+    for (const r of rows) etapes.add(r.stage);
   }
 
   // La `position` n'est pas journalisée (un seul glisser en réécrit une dizaine,
@@ -1513,13 +1529,17 @@ function validateClientField(key, value) {
 // normalisé sur le nom de société). Sert la pastille « 3 commandes au planning »
 // de l'auto-complétion et de la fiche. Table petite : agrégation en JS.
 async function commandeCountByClientKey() {
+  // GROUP BY côté Postgres : on ne remonte qu'une ligne par nom distinct (des
+  // dizaines) au lieu d'une par commande (des milliers, l'archive ne se vide
+  // jamais). Le rapprochement normalisé (clientKey) reste en JS : deux
+  // graphies du même client s'additionnent ici.
   const { rows } = await pool.query(
-    'SELECT billing_company FROM requests WHERE billing_company IS NOT NULL',
+    'SELECT billing_company, COUNT(*)::int AS n FROM requests WHERE billing_company IS NOT NULL GROUP BY billing_company',
   );
   const counts = new Map();
   for (const r of rows) {
     const key = clientKey(r.billing_company);
-    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    if (key) counts.set(key, (counts.get(key) || 0) + r.n);
   }
   return counts;
 }
@@ -2679,11 +2699,21 @@ function couperNomPerso(nomComplet) {
 // C'est le seul endroit de l'application où l'ordre d'arrivée décide de ce qui
 // est écrit — ailleurs, chaque requête touche sa propre ligne.
 let fileComptoir = Promise.resolve();
+// La file avance QUOI QU'IL ARRIVE. Un dossier en erreur ne bloque pas les
+// suivants (le `then(travail, travail)`), mais un dossier qui ne REPOND JAMAIS
+// — une requête Postgres suspendue avant que les délais du pool n'existent —
+// les bloquait tous : le comptoir fermait sans message, pour la journée. Le
+// minuteur ne coupe pas le travail en cours (les délais du pool s'en chargent),
+// il libère la file pour le client suivant.
+const COMPTOIR_TOUR_MAX_MS = 30000;
 function unDossierALaFois(travail) {
-  // On chaîne sur la fin de la précédente, quoi qu'il lui soit arrivé : un
-  // dossier en erreur ne doit pas bloquer la file derrière lui.
   const tour = fileComptoir.then(travail, travail);
-  fileComptoir = tour.then(() => {}, () => {});
+  const laisserPasser = new Promise((done) => {
+    const minuteur = setTimeout(done, COMPTOIR_TOUR_MAX_MS);
+    tour.then(() => { clearTimeout(minuteur); done(); },
+      () => { clearTimeout(minuteur); done(); });
+  });
+  fileComptoir = laisserPasser;
   return tour;
 }
 
@@ -2952,6 +2982,23 @@ app.get('/', (req, res) => {
 // écrans) : elle renvoie sur Nouveau Projet, la seule porte d'entrée.
 app.get('/fiche', (req, res) => res.redirect(301, '/#nouveau-projet'));
 
+// FILET FINAL : les erreurs levées AVANT les routes répondent en JSON.
+// `asyncH` couvre les gestionnaires ; mais un corps JSON malformé (tablette qui
+// décroche en plein envoi) ou trop gros fait lever `express.json()` lui-même —
+// et sans ce filet, Express répondait une PAGE HTML que le parcours du comptoir
+// tentait de lire comme du JSON : message illisible, dossier perdu.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err && Number.isInteger(err.status) ? err.status : 500;
+  if (status >= 500) console.error(err);
+  const messages = {
+    400: 'Envoi illisible — réessaie.',
+    413: 'Dossier trop volumineux pour être envoyé.',
+  };
+  res.status(status).json({ error: messages[status] || 'Erreur serveur' });
+});
+
 // ---------------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------------
@@ -2964,6 +3011,13 @@ init()
       console.log(`Planning OLDA — en écoute sur le port ${app.__server.address().port}`);
       if (!APP_PASSWORD) console.log('⚠  APP_PASSWORD non défini : accès ouvert (mode dev).');
     });
+    // Node ferme par défaut une connexion inactive après 5 s ; le proxy Railway,
+    // lui, la réutilise volontiers plus tard. Quand il retombe sur une connexion
+    // que l'origine vient de fermer, le poste reçoit un 502 sporadique — le
+    // genre de « ça a raté une fois, réessaie » qu'on ne sait jamais expliquer.
+    // On tient la connexion PLUS LONGTEMPS que le proxy, et l'en-tête suit.
+    app.__server.keepAliveTimeout = 65000;
+    app.__server.headersTimeout = 66000;
   })
   .catch((err) => {
     console.error('Échec de l\'initialisation de la base :', err);

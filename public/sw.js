@@ -76,7 +76,15 @@ self.addEventListener('install', (e) => {
   // pour qu'un renommage n'empêche pas l'installation de tout le reste.
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await Promise.all(COQUILLE.map((url) => cache.add(url).catch(() => {})));
+    const resultats = await Promise.all(
+      COQUILLE.map((url) => cache.add(url).then(() => null, () => url)),
+    );
+    // Un trou dans la coquille ne se voit que le jour où le poste est hors
+    // ligne — c'est-à-dire au pire moment. On le dit au moins dans la console.
+    const manquants = resultats.filter(Boolean);
+    if (manquants.length) {
+      console.warn(`Coquille hors ligne incomplète — ${manquants.length} fichier(s) non mis de côté :`, manquants.join(', '));
+    }
     // La nouvelle version prend la main tout de suite : on ne laisse pas un
     // ancien worker servir l'ancienne coquille jusqu'à la fermeture des onglets.
     self.skipWaiting();
@@ -87,6 +95,14 @@ self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const noms = await caches.keys();
     await Promise.all(noms.filter((n) => n !== CACHE).map((n) => caches.delete(n)));
+    // Ménage des entrées HORS coquille accumulées par les versions qui
+    // mémorisaient toute réponse 200 : elles ne seront plus jamais resservies
+    // ni rafraîchies, autant rendre la place.
+    const cache = await caches.open(CACHE);
+    for (const req of await cache.keys()) {
+      const chemin = new URL(req.url).pathname;
+      if (!COQUILLE.includes(chemin)) await cache.delete(req);
+    }
     await self.clients.claim();
   })());
 });
@@ -101,11 +117,25 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     try {
       const reseau = await fetch(req);
-      // On ne mémorise qu'une vraie réponse à nous. Un 401 (Basic Auth), une
-      // redirection ou une erreur serveur ne doivent jamais être resservis.
-      if (reseau && reseau.status === 200 && reseau.type === 'basic') {
+      // On ne mémorise qu'une vraie réponse à nous — ET seulement un fichier de
+      // la coquille. Sans cette liste, TOUTE réponse 200 de l'origine entrait
+      // dans un cache qui ne se purge jamais (le nom ne change pas, voir plus
+      // haut) : sur une tablette jamais réinstallée, il dérivait vers le quota,
+      // après quoi chaque écriture échouait en silence — la coquille cessait de
+      // se rafraîchir sans que rien ne le signale.
+      if (reseau && reseau.status === 200 && reseau.type === 'basic'
+          && COQUILLE.includes(url.pathname)) {
         const copie = reseau.clone();
-        caches.open(CACHE).then((c) => c.put(req, copie)).catch(() => {});
+        // `waitUntil` : sans lui, Chrome peut endormir le worker dès la réponse
+        // rendue et abandonner l'écriture — la copie de secours restait vieille.
+        e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copie)).catch(() => {}));
+      }
+      // Le proxy devant la prod peut répondre 502/503 SANS que `fetch` ne lève :
+      // sur une navigation, on préfère la dernière coquille connue à sa page
+      // d'erreur — l'application, elle, sait dire « hors ligne » proprement.
+      if (req.mode === 'navigate' && reseau && reseau.status >= 500) {
+        const secours = await caches.match('/index.html') || await caches.match('/');
+        if (secours) return secours;
       }
       return reseau;
     } catch (_) {
