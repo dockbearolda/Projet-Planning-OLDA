@@ -174,7 +174,11 @@ const DEMANDE = {
   // `plat` : les objets nés dans le vm ont un autre `Object.prototype` que
   // celui du test, et `deepStrictEqual` refuse de les comparer.
   const plat = (o) => JSON.parse(JSON.stringify(o));
-  assert.deepStrictEqual(plat(tv.lignes[0]), {
+  // `ou` n'est pas du contenu : c'est l'ADRESSE d'écriture de chaque valeur,
+  // vérifiée à part (voir ticket-edition.test.js). Le papier, lui, ne porte que
+  // ce qui suit.
+  const sansAdresse = (a) => { const { ou, ...reste } = plat(a); return reste; };
+  assert.deepStrictEqual(sansAdresse(tv.lignes[0]), {
     designation: 'Polo brodé',
     qte: '2',
     detail: 'Broderie poitrine, fil or',

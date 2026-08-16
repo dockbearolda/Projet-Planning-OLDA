@@ -1354,8 +1354,10 @@ function buildCard(r) {
     tk = document.createElement('button');
     tk.type = 'button';
     tk.className = 'pcard__ticket';
-    tk.setAttribute('aria-label', 'Voir le ticket du client');
-    attachTip(tk, 'Voir et imprimer le ticket');
+    if (consigneAtelier(r)) tk.classList.add('pcard__ticket--consigne');
+    tk.setAttribute('aria-label', `Ticket du client — corriger et imprimer${
+      consigneAtelier(r) ? ' · consigne pour l’atelier' : ''}`);
+    attachTip(tk, infobulleTicket(r));
     tk.appendChild(strokeIcon(LD_ICONES.ticket));
     tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
   } else {
@@ -3404,6 +3406,26 @@ function aUnTicket(r) {
   return !!(f && typeof f === 'object' && (f.ref || f.kind === 'comptoir-v17'));
 }
 
+// LA CONSIGNE ÉCRITE POUR L'ATELIER, si la ligne en porte une. Elle voyage dans
+// la liste allégée (FICHE_LISTE côté serveur) : la grille marque donc d'un point
+// les dossiers qui parlent à l'atelier sans aller ouvrir une seule fiche.
+function consigneAtelier(r) {
+  const f = r && r.fiche;
+  return f && typeof f === 'object' ? String(f.atelier || '').trim() : '';
+}
+
+// Ce que dit la pastille du ticket, dans les deux vues. La consigne y figure
+// tronquée : au survol on veut savoir CE QU'ELLE DIT, pas ouvrir le ticket pour
+// s'apercevoir qu'elle ne concernait pas ce qu'on cherchait.
+function infobulleTicket(r) {
+  const ref = (r.fiche && r.fiche.ref) || '';
+  const quoi = `${ref ? `Ticket ${ref}` : 'Ticket du client'} — corriger et imprimer`;
+  const consigne = consigneAtelier(r);
+  if (!consigne) return quoi;
+  const court = consigne.length > 70 ? `${consigne.slice(0, 69)}…` : consigne;
+  return `${quoi} · atelier : ${court.replace(/\s*\n\s*/g, ' ')}`;
+}
+
 // La fiche COMPLÈTE d'abord : la liste ne transporte pas le détail article par
 // article, et un ticket sans ses articles ne vaut pas le papier.
 async function ticketDeLaLigne(r) {
@@ -3453,11 +3475,259 @@ function poserStyleTicket() {
   document.head.appendChild(s);
 }
 
-// L'APERÇU. Le client revient avec son ticket : on veut relire ce qu'il a
-// commandé sans passer par l'imprimante — et sur la tablette du comptoir, c'est
-// souvent tout ce dont on a besoin. Le ticket s'affiche exactement comme il
-// s'imprimera, avec l'impression à un doigt de là.
+// ===========================================================================
+// LE TICKET SE CORRIGE — sur la ligne, dans le ticket lui-même
+// ===========================================================================
+// L'APERÇU sert d'abord à relire : le client revient avec son papier, et sur la
+// tablette du comptoir c'est souvent tout ce dont on a besoin. Il s'affiche donc
+// exactement comme il s'imprimera, avec l'impression à un doigt de là.
 //
+// Mais « un appui, le ticket s'affiche », et il n'y avait rien à en faire
+// d'autre que l'imprimer. Or c'est justement le papier qu'on a sous les yeux
+// quand le client rappelle : son numéro était faux, il ajoute une précision, et
+// surtout l'atelier a besoin d'une consigne pour produire. Il fallait fermer l'aperçu,
+// ouvrir la fiche, dérouler le récapitulatif, retrouver la bonne ligne,
+// enregistrer. Le ticket s'ouvre donc DÉJÀ modifiable : on tape dedans, à
+// l'endroit exact où la valeur s'imprimera.
+//
+// PAS DE BOUTON « ENREGISTRER ». C'est la règle de la GRILLE (une cellule
+// quittée est une cellule enregistrée), pas celle de la fiche (« je corrige
+// tout, puis je valide ») : ici on vient rectifier UNE chose, vite, debout au
+// comptoir. Chaque champ part quand on le quitte — et « Fermer » comme
+// « Imprimer » commettent d'abord ce qui est encore en cours de frappe, pour
+// qu'aucun geste ne puisse perdre une consigne.
+
+// OÙ S'ÉCRIT UNE VALEUR DU TICKET — trois adresses, une route chacune :
+//   `ligne`   → une colonne de la commande (client, téléphone, échéance, prix)
+//   `fiche`   → une clé du JSON de la fiche (heure de retrait, consigne atelier)
+//   `details` → UNE position du récapitulatif figé du comptoir
+// Le récapitulatif se corrige par POSITION, et on n'envoie QUE l'indice touché :
+// les autres cases partent vides, et le serveur ne réécrit que les chaînes (cf.
+// `corriger` dans server.js). Deux postes qui rectifient deux articles du même
+// dossier ne s'effacent donc pas l'un l'autre.
+function corpsTicket(cible, valeur) {
+  if (cible.ou === 'ligne') return { fiche: false, corps: { [cible.col]: valeur } };
+  if (cible.ou === 'fiche') return { fiche: true, corps: { [cible.cle]: valeur } };
+  const positions = [];
+  positions[cible.i] = String(valeur == null ? '' : valeur);
+  return { fiche: true, corps: { details: positions } };
+}
+
+// Une correction part tout de suite, et la réponse fait foi : elle porte la
+// ligne ENTIÈRE, fiche comprise, donc l'impression qui suit sort le ticket
+// corrigé. On remet aussi à jour la ligne de la grille — l'objet de `rows` a pu
+// être remplacé par un rafraîchissement pendant qu'on tapait.
+async function envoyerTicket(r, cible, valeur) {
+  const { fiche, corps } = corpsTicket(cible, valeur);
+  const maj = fiche
+    ? await api('PATCH', `/api/requests/${r.id}/fiche`, corps)
+    : await patchRow(r, corps);
+  if (maj) {
+    Object.assign(r, maj);
+    memoriserFiche(maj);
+    const vivante = rows.find((x) => String(x.id) === String(r.id));
+    if (vivante && vivante !== r) Object.assign(vivante, maj);
+  }
+  return maj;
+}
+
+// L'ÉDITEUR que reçoit `dessinerTicket` : pour chaque valeur du ticket, il rend
+// le champ qui l'écrit là où elle vit. Il empile dans `champs` de quoi commettre
+// la frappe en cours, l'annuler, et retrouver le contrôle qui a le focus.
+function editeurTicket(r, champs) {
+  const texteOuNull = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    return s === '' ? null : s;
+  };
+  // Un montant ILLISIBLE n'est pas « pas de montant » : c'est une faute de
+  // frappe. On refuse (`undefined`) plutôt que d'effacer en silence le prix
+  // d'une vente — c'est déjà la règle du comptoir (cf. prixComptoir, serveur).
+  const montantOuNull = (v) => {
+    const s = String(v == null ? '' : v).replace(/[\s€]/g, '').replace(',', '.').trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : undefined;
+  };
+
+  const marquerEnregistre = (ctrl) => {
+    ctrl.classList.remove('is-saved');
+    void ctrl.offsetWidth; // relance l'animation quand la même case repart deux fois
+    ctrl.classList.add('is-saved');
+  };
+
+  // Branche un contrôle sur son adresse d'écriture. `sauver()` ne fait rien tant
+  // que la valeur n'a pas bougé : on peut l'appeler à chaque perte de focus, à
+  // la fermeture ET à l'impression sans multiplier les requêtes.
+  const brancher = (ctrl, cible, lire) => {
+    let envoye = lire();
+    let affiche = ctrl.type === 'checkbox' ? ctrl.checked : ctrl.value;
+    const remettre = (v) => { if (ctrl.type === 'checkbox') ctrl.checked = v; else ctrl.value = v; };
+    const sauver = () => {
+      const v = lire();
+      if (v === undefined) { // saisie refusée : on rend la valeur d'avant
+        remettre(affiche);
+        showToast('Montant illisible — rien n’a été changé');
+        return Promise.resolve();
+      }
+      if (v === envoye) return Promise.resolve();
+      const envoyeAvant = envoye;
+      const afficheAvant = affiche;
+      envoye = v;
+      affiche = ctrl.type === 'checkbox' ? ctrl.checked : ctrl.value;
+      return envoyerTicket(r, cible, v).then(
+        () => marquerEnregistre(ctrl),
+        (err) => {
+          envoye = envoyeAvant;
+          affiche = afficheAvant;
+          remettre(afficheAvant);
+          reportError(err);
+        },
+      );
+    };
+    ctrl.addEventListener('change', sauver);
+    ctrl.addEventListener('blur', sauver);
+    champs.push({ ctrl, sauver, annuler: () => remettre(affiche) });
+    return ctrl;
+  };
+
+  const champ = (tag, valeur, o) => {
+    const c = document.createElement(tag);
+    c.className = o.cls ? `tk__champ ${o.cls}` : 'tk__champ';
+    if (o.type) c.type = o.type;
+    if (o.mode) c.inputMode = o.mode;
+    if (o.rows) c.rows = o.rows;
+    if (o.placeholder) c.placeholder = o.placeholder;
+    c.value = valeur == null ? '' : String(valeur);
+    c.setAttribute('aria-label', o.label);
+    return c;
+  };
+
+  const boite = (cls, ...noeuds) => {
+    const d = document.createElement('div');
+    d.className = cls;
+    d.append(...noeuds);
+    return d;
+  };
+
+  // Un champ de texte branché sur une COLONNE de la ligne : le cas le plus
+  // courant (client, contact, téléphone).
+  const surLaLigne = (col, valeur, o) => {
+    const c = champ('input', valeur, o);
+    return brancher(c, { ou: 'ligne', col }, () => texteOuNull(c.value));
+  };
+
+  return (cle, txt, cible) => {
+    switch (cle) {
+      // Le numéro du PAPIER remis au client : il ne diffère de la référence que
+      // si celle-ci a dû changer, mais c'est le seul repère que le client
+      // rapporte — sans lui, plus personne ne relie son ticket au dossier.
+      case 'refTicket': {
+        const c = champ('input', txt, {
+          label: 'Numéro du ticket remis au client',
+          placeholder: 'si le papier porte un autre numéro',
+        });
+        return brancher(c, { ou: 'fiche', cle: 'refTicket' }, () => texteOuNull(c.value));
+      }
+      case 'client':
+        return surLaLigne('billing_company', txt, { label: 'Client' });
+      case 'contact':
+        return surLaLigne('contact_referent', txt, {
+          label: 'Personne à contacter', placeholder: 'personne à contacter',
+        });
+      // « Erreur de numéro » : celui-là se corrige plus souvent que tous les
+      // autres, et il ne se corrigeait que dans la fiche, deux écrans plus loin.
+      case 'tel':
+        return surLaLigne('contact_phone', txt, {
+          type: 'tel', mode: 'tel', label: 'Téléphone', placeholder: 'téléphone',
+        });
+      // LA REMISE : une date (colonne de la ligne) et une heure (clé de la
+      // fiche — c'est elle qui commande le calcul du délai de production).
+      case 'remise': {
+        const jour = champ('input', String(r.deadline || '').slice(0, 10), {
+          type: 'date', cls: 'tk__jour', label: 'Date de remise',
+        });
+        brancher(jour, { ou: 'ligne', col: 'deadline' }, () => texteOuNull(jour.value));
+        const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
+        const heure = champ('input', f.heureSouhaitee || '', {
+          type: 'time', cls: 'tk__heure', label: 'Heure de remise',
+        });
+        brancher(heure, { ou: 'fiche', cle: 'heureSouhaitee' }, () => texteOuNull(heure.value));
+        return boite('tk__remise-champs', jour, heure);
+      }
+      case 'total': {
+        // « À chiffrer » n'est pas un prix : sur une demande de devis le champ
+        // part vide plutôt que de faire effacer ces deux mots avant de taper.
+        // Avec ses centimes, comme sur le papier : « 148,5 » dans un champ de
+        // prix, on se demande s'il manque un chiffre.
+        const brut = r.project_value == null ? '' : Number(r.project_value).toFixed(2).replace('.', ',');
+        const c = champ('input', brut, {
+          mode: 'decimal', cls: 'tk__montant', label: 'Montant', placeholder: 'à chiffrer',
+        });
+        brancher(c, { ou: 'ligne', col: 'project_value' }, () => montantOuNull(c.value));
+        const euro = document.createElement('span');
+        euro.textContent = '€';
+        return boite('tk__euro', c, euro);
+      }
+      // Le solde se règle souvent AU RETRAIT, le ticket à la main : c'est ici
+      // qu'on le note, pas trois écrans plus loin dans la fiche.
+      case 'paiement': {
+        const sel = document.createElement('select');
+        sel.className = 'tk__champ';
+        sel.setAttribute('aria-label', 'Mode de paiement');
+        for (const o of [{ id: '', label: 'à régler' }, ...PAIEMENT_MODES]) {
+          const opt = document.createElement('option');
+          opt.value = o.id;
+          opt.textContent = o.label;
+          sel.append(opt);
+        }
+        sel.value = r.paiement_mode || '';
+        brancher(sel, { ou: 'ligne', col: 'paiement_mode' }, () => texteOuNull(sel.value));
+        const bascule = document.createElement('input');
+        bascule.type = 'checkbox';
+        bascule.checked = r.paye === true;
+        bascule.setAttribute('aria-label', 'Payé');
+        brancher(bascule, { ou: 'ligne', col: 'paye' }, () => bascule.checked);
+        const lab = document.createElement('label');
+        lab.className = 'tk__paye';
+        lab.append(bascule, document.createTextNode('payé'));
+        return boite('tk__paie', sel, lab);
+      }
+      // POUR L'ATELIER — la raison d'être de tout ceci. Toujours offerte, même
+      // vide : c'est en la voyant vide qu'on pense à la remplir.
+      case 'atelier': {
+        const c = champ('textarea', txt, {
+          rows: 3, label: 'Consigne pour l’atelier',
+          placeholder: 'ce qu’il faut savoir pour produire (emplacement, taille, matière, à vérifier…)',
+        });
+        return brancher(c, { ou: 'fiche', cle: 'atelier' }, () => texteOuNull(c.value));
+      }
+      default: {
+        // Les valeurs d'un ARTICLE. Sans adresse d'écriture — le détail d'un
+        // besoin de devis résume trois champs — la valeur reste du texte : mieux
+        // vaut ne rien offrir qu'un champ qui n'enregistre rien.
+        if (!cible) {
+          const s = document.createElement('span');
+          s.textContent = txt;
+          return s;
+        }
+        const o = {
+          qte: { cls: 'tk__qte', mode: 'numeric', label: 'Quantité' },
+          designation: { label: 'Désignation de l’article' },
+          prix: { mode: 'decimal', label: 'Prix de l’article' },
+          detail: {
+            tag: 'textarea', rows: 2, label: 'Ce qu’on produit',
+            placeholder: '+ précision pour l’atelier',
+          },
+        }[cle] || { label: cle };
+        const c = champ(o.tag || 'input', txt, o);
+        // Une valeur du récapitulatif est une CHAÎNE, pas une valeur typée : on
+        // renvoie ce qui est tapé, vide compris (le serveur le note « — »).
+        return brancher(c, cible, () => c.value.trim());
+      }
+    }
+  };
+}
+
 // UNE SEULE BOÎTE À LA FOIS. La fiche complète s'attend (un aller-retour
 // réseau) : au doigt, on tape deux fois avant qu'elle n'arrive, et deux
 // aperçus s'empilaient — il fallait fermer deux fois pour revenir à la grille.
@@ -3481,11 +3751,21 @@ async function ouvrirTicket(r) {
   carte.className = 'tk-modal__card';
   carte.setAttribute('role', 'dialog');
   carte.setAttribute('aria-modal', 'true');
-  carte.setAttribute('aria-label', `${t.titre}${t.ref ? ` ${t.ref}` : ''}`);
+  carte.setAttribute('aria-label', `${t.titre}${t.ref ? ` ${t.ref}` : ''} — corriger et imprimer`);
 
+  // Les champs du ticket, dans l'ordre où ils sont dessinés. `commettre()`
+  // envoie ce qui est encore en cours de frappe : la fermeture et l'impression
+  // passent par lui, donc aucune consigne ne se perd faute d'avoir quitté un
+  // champ — et il ne coûte rien quand rien n'a bougé.
+  const champs = [];
   const feuille = document.createElement('div');
   feuille.className = 'tk-modal__paper';
-  feuille.appendChild(dessinerTicket(t, document));
+  feuille.appendChild(dessinerTicket(t, document, editeurTicket(r, champs)));
+  const commettre = () => Promise.all(champs.map((c) => c.sauver()));
+
+  const aide = document.createElement('p');
+  aide.className = 'tk-modal__aide';
+  aide.textContent = 'Touchez une valeur pour la corriger : c’est enregistré en la quittant.';
 
   const actions = document.createElement('div');
   actions.className = 'tk-modal__actions';
@@ -3502,7 +3782,7 @@ async function ouvrirTicket(r) {
   imprimer.className = 'ask__btn tk-modal__print';
   imprimer.textContent = 'Imprimer le ticket';
   actions.append(fermer, copier, imprimer);
-  carte.append(feuille, actions);
+  carte.append(feuille, aide, actions);
   fond.append(carte);
   document.body.append(fond);
 
@@ -3512,15 +3792,38 @@ async function ouvrirTicket(r) {
     fini = true;
     ticketOuvert = false;
     document.removeEventListener('keydown', onKey, true);
+    // On commet AVANT de retirer la boîte, mais on ne l'attend pas : la lecture
+    // des champs est immédiate (rien ne se perd), et le ticket se referme sans
+    // faire patienter devant un aller-retour réseau.
+    commettre();
     fond.remove();
     if (focusAvant && focusAvant.isConnected && focusAvant.focus) focusAvant.focus();
   };
   // Tabulation retenue dans la boîte, comme la confirmation de l'app : sans ça
-  // le focus repart derrière le voile, sur une grille qu'on ne voit plus.
+  // le focus repart derrière le voile, sur une grille qu'on ne voit plus. Elle
+  // parcourt maintenant AUSSI les champs du ticket — au clavier, on corrige une
+  // ligne après l'autre sans jamais quitter le papier.
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); partir(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      // Dans un champ, Échap annule la frappe en cours (la règle de la grille) ;
+      // ailleurs, il ferme le ticket.
+      const encours = champs.find((c) => c.ctrl === document.activeElement);
+      if (encours) { encours.annuler(); encours.ctrl.blur(); return; }
+      partir();
+      return;
+    }
+    // Entrée sur une ligne du ticket = « c'est bon » : ça enregistre et ça rend
+    // la main, sans fermer — on corrige souvent deux choses de suite.
+    if (e.key === 'Enter' && carte.contains(document.activeElement)
+        && document.activeElement.tagName === 'INPUT') {
+      e.preventDefault();
+      document.activeElement.blur();
+      return;
+    }
     if (e.key !== 'Tab') return;
-    const cibles = [fermer, copier, imprimer];
+    const cibles = [...carte.querySelectorAll('input, textarea, select, button')];
     const i = cibles.indexOf(document.activeElement);
     e.preventDefault();
     cibles[(i + (e.shiftKey ? cibles.length - 1 : 1) + cibles.length) % cibles.length].focus();
@@ -3529,17 +3832,26 @@ async function ouvrirTicket(r) {
   fermer.addEventListener('click', partir);
   copier.addEventListener('click', () => {
     // Le ticket en texte : c'est ce qu'on colle dans un WhatsApp au client qui
-    // demande « c'était quoi déjà, ma commande ? ».
-    const texte = ticketTexte(t);
+    // demande « c'était quoi déjà, ma commande ? ». Refait à l'instant du clic,
+    // corrections comprises.
     const dit = () => showToast('Ticket copié');
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(texte).then(dit, () => showToast('Copie refusée par le navigateur'));
-    } else {
-      showToast('Copie indisponible sur ce poste');
-    }
+    commettre().then(() => {
+      const texte = ticketTexte(modeleTicket(r));
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texte).then(dit, () => showToast('Copie refusée par le navigateur'));
+      } else {
+        showToast('Copie indisponible sur ce poste');
+      }
+    });
   });
   imprimer.addEventListener('click', () => {
-    imprimerModele(t, `Ticket ${t.ref || r.billing_company || ''}`.trim());
+    // Le modèle est REFAIT au moment d'imprimer : chaque correction a remis la
+    // ligne à jour, donc le papier qui sort est celui qu'on vient de relire —
+    // et jamais celui d'il y a deux minutes, à l'ouverture de la boîte.
+    commettre().then(() => {
+      const frais = modeleTicket(r);
+      imprimerModele(frais, `Ticket ${frais.ref || r.billing_company || ''}`.trim());
+    });
   });
   fond.addEventListener('click', (e) => { if (e.target === fond) partir(); });
   requestAnimationFrame(() => { fond.classList.add('open'); imprimer.focus(); });
@@ -3852,6 +4164,15 @@ function renderLigneDetail() {
   }), r.project_value == null ? '' : r.project_value);
   const cProduction = ldSuivi('production',
     ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' }), fiche.production);
+  // LA MÊME CONSIGNE QUE SUR LE TICKET. Elle s'écrit surtout depuis le ticket
+  // ouvert sur la ligne (c'est le geste rapide), mais la fiche est l'endroit où
+  // l'on relit TOUT un dossier : une consigne qui n'y figurerait pas serait une
+  // consigne qu'on ne retrouve qu'en imprimant.
+  const cAtelier = ldSuivi('atelier',
+    ldChamp(fiche.atelier, {
+      multi: true, rows: 2, label: 'Consigne pour l’atelier',
+      placeholder: 'Ce qu’il faut savoir pour produire — s’imprime sur le ticket',
+    }), fiche.atelier);
   const cInfos = ldSuivi('infos',
     ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' }), r.description);
   // Téléphone et e-mail ne vivaient que dans un popover du tableau complet :
@@ -3893,6 +4214,7 @@ function renderLigneDetail() {
     ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
     ldBox('Valeur TTC', cPrix),
     ldBox('Production', cProduction),
+    ldBox('Pour l’atelier — s’imprime sur le ticket', cAtelier, true),
     ldBox('Informations / commentaire', cInfos, true),
   );
 
@@ -4021,7 +4343,7 @@ function renderLigneDetail() {
     enregistrer.textContent = 'Enregistrement…';
     try {
       const modifie = await enregistrerFiche(r, {
-        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cProduction, cInfos,
+        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cProduction, cAtelier, cInfos,
         cTel, cEmail, cPlace, cReferent, note, champsDetail,
       });
       showToast(modifie ? 'Fiche enregistrée' : 'Rien à enregistrer — aucune modification');
@@ -4168,6 +4490,7 @@ async function enregistrerFiche(r, c) {
   const corpsFiche = {};
   if (ldModifie(c.cHeure)) corpsFiche.heureSouhaitee = texte(c.cHeure.value);
   if (ldModifie(c.cProduction)) corpsFiche.production = texte(c.cProduction.value);
+  if (ldModifie(c.cAtelier)) corpsFiche.atelier = texte(c.cAtelier.value);
   if (c.champsDetail) {
     const detail = [...c.champsDetail.client, ...c.champsDetail.details];
     // Le récapitulatif s'envoie par positions : dès qu'UNE ligne bouge, on
@@ -4224,8 +4547,14 @@ function cellTicket(r) {
   btn.type = 'button';
   btn.className = 'ticket-cell';
   const libelle = ref ? `Ticket ${ref}` : 'Ticket du client';
-  attachTip(btn, `${libelle} — voir et imprimer`);
-  btn.setAttribute('aria-label', `${libelle} — voir et imprimer`);
+  const consigne = consigneAtelier(r);
+  // Un point sur la pastille : ce dossier porte une consigne pour l'atelier.
+  // Le point ne prend AUCUNE place (il se peint hors de la boîte) — la colonne
+  // garde donc la même largeur sur toutes les lignes.
+  if (consigne) btn.classList.add('ticket-cell--consigne');
+  attachTip(btn, infobulleTicket(r));
+  btn.setAttribute('aria-label',
+    `${libelle} — corriger et imprimer${consigne ? ' · consigne pour l’atelier' : ''}`);
   btn.appendChild(strokeIcon(LD_ICONES.ticket));
   btn.addEventListener('click', (e) => {
     e.stopPropagation();

@@ -679,7 +679,11 @@ const ORDER_INVERSE = 'ORDER BY r.position DESC NULLS FIRST, r.priority ASC, r.d
 // `destination` : la famille (et la sous-étape) que la vendeuse a désignées au
 // comptoir. Le dossier n'y va pas tout seul — il attend dans « Arrivées
 // comptoir » — mais la grille en a besoin pour offrir le rangement en UN geste.
-const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination'];
+// `atelier` : la consigne de production écrite depuis le ticket. Elle est
+// courte (500 caractères au plus) et la grille en a besoin pour marquer d'un
+// point les lignes qui en portent une — sinon il faudrait ouvrir chaque fiche
+// pour savoir laquelle parle à l'atelier.
+const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination', 'atelier'];
 
 // LES TECHNIQUES DE MARQUAGE, en clair : « dtf », « uv », « laser »…
 // Le moteur de priorité s'en sert pour rattacher une commande à sa machine AVANT
@@ -1308,6 +1312,15 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
     // n'y touche pas.
     if ('heureSouhaitee' in b) majFiche.heureSouhaitee = heureVide ? null : b.heureSouhaitee;
     if ('production' in b) majFiche.production = borner(b.production, 200);
+    // LA CONSIGNE POUR L'ATELIER, écrite depuis le ticket ouvert sur la ligne.
+    // Elle s'imprime avec lui : c'est le papier qui suit le dossier jusqu'à la
+    // machine. Bornée court — c'est une consigne, pas un cahier des charges.
+    if ('atelier' in b) majFiche.atelier = borner(b.atelier, 500);
+    // Le numéro du PAPIER remis au client, quand il ne porte pas la référence
+    // du dossier (deux postes hors réseau se sont donné le même numéro de
+    // secours, l'un a dû changer). `ref`, elle, ne se retape JAMAIS : c'est la
+    // clé du dossier — la recherche et l'idempotence de la prise s'y appuient.
+    if ('refTicket' in b) majFiche.refTicket = borner(b.refTicket, 40);
 
     const { rows: maj } = await client.query(
       'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
