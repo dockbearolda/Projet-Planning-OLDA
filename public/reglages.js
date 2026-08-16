@@ -283,19 +283,26 @@ async function saveTarifsParams() {
 }
 
 // Quitter la page pendant les 400 ms d'attente perdait la dernière correction
-// sans le dire. `keepalive` laisse la requête partir même si l'onglet se ferme.
+// sans le dire. `sendBeacon` est l'outil prévu pour ça : l'envoi survit à la
+// fermeture de l'onglet ET n'a pas de promesse à rejeter — le `fetch` nu
+// d'avant levait un « Uncaught (in promise) » à chaque pagehide hors ligne.
 function flusherTarifs() {
   if (tarifsSaveTimer == null) return;
   clearTimeout(tarifsSaveTimer);
   tarifsSaveTimer = null;
+  const corps = JSON.stringify(tarifsArticles);
+  try {
+    const blob = new Blob([corps], { type: 'application/json' });
+    if (navigator.sendBeacon && navigator.sendBeacon('/api/tarifs-tasse', blob)) return;
+  } catch (_) { /* on retombe sur le fetch keepalive ci-dessous */ }
   try {
     fetch('/api/tarifs-tasse', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tarifsArticles),
+      body: corps,
       keepalive: true,
-    });
-  } catch (_) { /* dernier recours : on ne peut rien faire de plus */ }
+    }).catch(() => { /* dernier recours : rien de plus à faire l'onglet fermé */ });
+  } catch (_) { /* idem */ }
 }
 window.addEventListener('pagehide', flusherTarifs);
 document.addEventListener('visibilitychange', () => {
@@ -393,24 +400,29 @@ export async function refreshReglages() {
   const ta = $('#reg-wa-message');
   const dirty = ta && ta.value !== saved;
   let messageRelu = false;
+  // Les trois lectures sont indépendantes : en série, chaque retour sur
+  // l'onglet payait trois temps d'attente réseau bout à bout.
+  const [resMessage, articles, params] = await Promise.all([
+    fetchBorne('/api/settings/whatsapp').catch(() => null),
+    api('GET', '/api/tarifs-tasse').catch(() => null),
+    api('GET', '/api/tarifs-tasse/parametres').catch(() => null),
+  ]);
   try {
     // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le
     // mot de passe) donnait `data.message === undefined` → le textarea se
     // VIDAIT, et le patron croyait son message perdu.
-    const res = await fetchBorne('/api/settings/whatsapp');
-    if (res.ok) {
-      const data = await res.json();
+    if (resMessage && resMessage.ok) {
+      const data = await resMessage.json();
       if (typeof data.message === 'string') { saved = data.message; messageRelu = true; }
     }
   } catch (_) { /* silencieux : on garde ce qu'on affiche déjà */ }
   if (ta && !dirty && messageRelu) ta.value = saved;
   sync();
 
-  try {
-    tarifsArticles = await api('GET', '/api/tarifs-tasse');
-    tarifsParams = await api('GET', '/api/tarifs-tasse/parametres');
-    renderTarifs();
-  } catch (_) { /* on garde ce qui est déjà affiché */ }
+  // Un échec laisse ce qui est déjà affiché, comme avant.
+  if (Array.isArray(articles)) tarifsArticles = articles;
+  if (params && typeof params === 'object') tarifsParams = params;
+  if (articles || params) renderTarifs();
 }
 
 let mounted = false;

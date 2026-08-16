@@ -118,7 +118,10 @@ assert.strictEqual(libelles[0], libelles[1],
 const REGLE_OPEN = CSS.match(/\n\.open-btn \{[\s\S]*?\n\}/)[0];
 assert.ok(!/opacity:\s*0/.test(REGLE_OPEN),
   '.open-btn ne doit jamais partir de opacity: 0');
-assert.ok(/tr:hover \.send-btn \{ opacity: 1; \}/.test(CSS),
+// Le sélecteur est borné à `.grid tbody` (un `tr:hover` nu marquait tous les
+// <tr> du document comme sensibles au survol) et la révélation rend aussi les
+// boutons cliquables (`pointer-events`) : invisibles, ils ne le sont pas.
+assert.ok(/\.grid tbody tr:hover \.send-btn,\n\.grid tbody tr:hover \.del-btn,\n\.grid tbody tr:hover \.dup-btn \{ opacity: 1; pointer-events: auto; \}/.test(CSS),
   'le contraste est voulu : les autres actions, elles, restent au survol');
 
 // ===========================================================================

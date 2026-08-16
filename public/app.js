@@ -481,16 +481,33 @@ function renderSidebar() {
 
 // Rejoue l'animation d'entrée (léger fondu décalé) au changement d'étape — sur
 // la vue réellement affichée : le tableau OU les cartes, même geste visuel.
+// SEULES LES PREMIÈRES LIGNES s'animent, par une classe posée ici : la règle
+// CSS `.stage-enter tr:nth-child(…)` faisait démarrer 392 animations de
+// repaint au même instant sur une étape de 400 lignes, et sa simple présence
+// (règle positionnelle) forçait le navigateur à réévaluer le style de tous les
+// frères suivants à CHAQUE insertBefore d'un tri ou d'un glisser.
 let stageEnterTimer = null;
+const STAGE_ENTER_MAX = 12; // au-delà, la ligne naît sous le pli : personne ne la voit entrer
+function retirerRowEnter() {
+  for (const el of document.querySelectorAll('.row-enter')) {
+    el.classList.remove('row-enter');
+    el.style.animationDelay = '';
+  }
+}
 function playStageEnter() {
   const host = modeCartes() ? $cards : $rows;
   if (!host) return;
-  $rows.classList.remove('stage-enter');
-  $cards.classList.remove('stage-enter');
+  retirerRowEnter();
   void host.offsetWidth; // relance l'animation CSS
-  host.classList.add('stage-enter');
+  let i = 0;
+  for (const el of host.children) {
+    if (el.classList.contains('is-hidden')) continue;
+    el.classList.add('row-enter');
+    el.style.animationDelay = `${Math.min(i, 7) * 22}ms`;
+    if (++i >= STAGE_ENTER_MAX) break;
+  }
   clearTimeout(stageEnterTimer);
-  stageEnterTimer = setTimeout(() => host.classList.remove('stage-enter'), 600);
+  stageEnterTimer = setTimeout(retirerRowEnter, 600);
 }
 
 // Masque la colonne « Sous-étape » quand la famille courante n'a pas de
@@ -1388,20 +1405,26 @@ const REQUETE_MOUVEMENT = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 const mouvementReduit = () => !!(REQUETE_MOUVEMENT && REQUETE_MOUVEMENT.matches);
 
-// Est-ce que la mise en ordre va réellement bouger quelque chose ? La plupart
-// des rendus ne déplacent rien (une valeur change, l'ordre tient) : on évite
-// alors les deux mesures de position, qui forcent chacune un calcul de mise en
-// page.
+// Est-ce que la mise en ordre va réellement bouger quelque chose — et combien ?
+// La plupart des rendus ne déplacent rien (une valeur change, l'ordre tient) :
+// on évite alors les deux mesures de position, qui forcent chacune un calcul de
+// mise en page. Et quand PRESQUE TOUT bouge (tri par en-tête : la liste entière
+// se rebat), on renvoie le compte pour que l'appelant renonce à l'animation —
+// faire glisser quatre cents lignes en même temps coûte deux mises en page
+// forcées d'une table complète (~200 ms figées au clic) pour un effet qui se
+// lit comme du bruit, pas comme un lien.
+const FLIP_MAX_DEPLACES = 16;
 function ordreChange(ordre, hote) {
+  let deplaces = 0;
   let prev = null;
   for (const node of ordre) {
     if (!estPrise(node)) {
       const attendu = prev ? prev.nextSibling : hote.firstChild;
-      if (node !== attendu) return true;
+      if (node !== attendu && ++deplaces > FLIP_MAX_DEPLACES) return deplaces;
     }
     prev = node;
   }
-  return false;
+  return deplaces;
 }
 
 // On ne mesure que ce qui est à l'écran : sur une étape de 400 lignes, relever
@@ -1436,9 +1459,12 @@ function animerReordonnancement(positions) {
 
 // Positions à retenir avant de remettre les nœuds en ordre — `null` quand il n'y
 // a rien à animer (glisser en cours : le geste pilote déjà les positions à la
-// main, et une animation par-dessus lutterait contre le doigt).
+// main, et une animation par-dessus lutterait contre le doigt) ou quand le
+// rebattement est massif (tri par en-tête : on pose le nouvel ordre d'un coup).
 function avantReordonnancement(ordre, hote) {
-  if (dragState || mouvementReduit() || !ordreChange(ordre, hote)) return null;
+  if (dragState || mouvementReduit()) return null;
+  const deplaces = ordreChange(ordre, hote);
+  if (deplaces === 0 || deplaces > FLIP_MAX_DEPLACES) return null;
   return mesurerVisibles(hote);
 }
 
@@ -5270,11 +5296,19 @@ function getDragAfterElement(container, y, exclu = null) {
 
 // --- Tri par en-têtes -------------------------------------------------------
 document.querySelectorAll('th.sortable').forEach((th) => {
-  th.addEventListener('click', () => {
+  // Un <th> n'est pas focusable : sans tabindex, le tri des colonnes était le
+  // seul geste du tableau inatteignable au clavier sur le poste du patron.
+  th.tabIndex = 0;
+  th.setAttribute('role', 'button');
+  const trier = () => {
     const key = th.dataset.sort;
     if (sort.key === key) sort.dir *= -1;
     else sort = { key, dir: 1 };
     applySortAndRender();
+  };
+  th.addEventListener('click', trier);
+  th.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trier(); }
   });
 });
 
@@ -6356,12 +6390,22 @@ if ($app) $app.classList.add('density-confort');
 const THEME_KEY = 'olda_theme';
 const $themeToggle = document.getElementById('themeToggle');
 function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
+  const root = document.documentElement;
+  // Les transitions se taisent LE TEMPS DE LA BASCULE (voir .theme-switching en
+  // CSS) : changer le thème re-colore la grille entière — cellules, puces,
+  // badges — et chacun portant une transition de couleur, un seul clic lançait
+  // des milliers de fondus simultanés : l'écran « ramait » précisément sur le
+  // geste censé être un simple interrupteur.
+  root.classList.add('theme-switching');
+  root.dataset.theme = t;
   if ($themeToggle) {
     const ic = $themeToggle.querySelector('.material-symbols-outlined');
     if (ic) ic.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
     attachTip($themeToggle, t === 'dark' ? 'Passer en clair' : 'Passer en sombre');
   }
+  // Deux images : la première applique les nouvelles couleurs sans transition,
+  // la seconde rend la parole aux fondus pour tous les gestes suivants.
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
 }
 applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 if ($themeToggle) {
@@ -6416,7 +6460,7 @@ if ($gridWrap) {
 // --- Ripple Material -----------------------------------------------------------
 // Onde discrète au toucher/clic sur les surfaces interactives en pilule.
 const RIPPLE_SELECTOR = '.stage, .btn-primary, .cal-foot-btn, .send-btn, .stage-link, ' +
-  '.type-tag, .deadline-badge, .prio-pill, .resp-chip, .sub-chip, .menu-item';
+  '.type-tag, .deadline-badge, .resp-chip, .sub-chip, .menu-item';
 document.addEventListener('pointerdown', (e) => {
   const host = e.target.closest(RIPPLE_SELECTOR);
   if (!host) return;

@@ -88,8 +88,18 @@ function afficher(id) {
   }
   // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
   // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
-  if (flux) rafraichirClients(flux.id);
+  if (flux) {
+    fluxTouches.add(flux.id);
+    rafraichirClients(flux.id);
+  }
 }
+
+// Les parcours AFFICHÉS depuis la dernière remise à neuf : eux seuls ont pu
+// être salis par une saisie. Les autres sont restés vierges — les recharger
+// quand même coûtait, à CHAQUE tap sur l'onglet, ~120 Ko de HTML re-analysé et
+// un téléchargement complet de la base clients pour un écran que personne
+// n'avait ouvert.
+const fluxTouches = new Set();
 
 function rafraichirClients(id) {
   const cadre = cadreDe(id);
@@ -296,7 +306,14 @@ function repondreAuParcours(source, ok, message) {
 // à l'écran, et il lui reste à l'imprimer.
 async function enregistrer(payload, { auto = false, source = null } = {}) {
   // Double tap sur « Créer dans le planning » = une seule ligne au planning.
-  if (enCours) return;
+  // MAIS ON RÉPOND : jeter le message sans un mot laissait l'écran émetteur
+  // sur « Enregistrement au planning… » pour toujours — sans bouton Réessayer,
+  // et avec le garde-fou de fermeture armé. Le dossier qu'on protégeait
+  // restait prisonnier de sa protection.
+  if (enCours) {
+    repondreAuParcours(source, false, 'un envoi est déjà en cours — réessaie dans un instant');
+    return;
+  }
   enCours = true;
   if (!auto) montrerEnvoi();
   // Une requête sans limite de temps peut rester en suspens indéfiniment sur un
@@ -382,11 +399,14 @@ export async function initProjet(root) {
 
 // Un tap sur « Nouveau Projet » dans la nav revient TOUJOURS au choix, avec deux
 // parcours vierges : comptoir = on repart net, on ne cherche jamais un brouillon
-// abandonné entre deux clients. Les DEUX sont remis à zéro, pas seulement celui
-// qu'on affichait — celui qu'on laisse derrière ne doit pas ressurgir à moitié
-// rempli au prochain passage.
+// abandonné entre deux clients. Sont remis à zéro TOUS les parcours affichés
+// depuis la dernière remise à neuf (voir fluxTouches) — un parcours resté
+// caché n'a pas pu être sali, le recharger ne ferait que payer deux fois.
 export async function resetProjet() {
   if (!monte) return;
   afficher(null);
-  for (const f of FLUX) reinitialiser(f.id);
+  for (const f of FLUX) {
+    if (fluxTouches.has(f.id)) reinitialiser(f.id);
+  }
+  fluxTouches.clear();
 }

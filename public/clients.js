@@ -352,9 +352,18 @@ function buildStatic() {
 }
 
 // --- Liste -----------------------------------------------------------------
+// Un SEUL comparateur français, construit une fois : `localeCompare(…, 'fr')`
+// re-instancie la collation Intl à chaque comparaison — sur un tri complet de
+// la base à chaque frappe, c'était la ligne la plus chaude de l'onglet.
+const COLLATEUR_FR = new Intl.Collator('fr');
+
+// Les datalists (types, zones) ne bougent qu'avec les DONNÉES, pas avec la
+// frappe : elles se refaisaient pourtant à chaque rendu — deux Set sur toute la
+// base et deux tris Intl par caractère tapé. On les reconstruit sur demande
+// explicite (chargement, enregistrement), voir majSuggestions().
 function suggestions() {
-  const types = [...new Set(LIST.map((c) => c.type).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
-  const zones = [...new Set(LIST.map((c) => c.zone).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const types = [...new Set(LIST.map((c) => c.type).filter(Boolean))].sort(COLLATEUR_FR.compare);
+  const zones = [...new Set(LIST.map((c) => c.zone).filter(Boolean))].sort(COLLATEUR_FR.compare);
   $('#cl-dl-types').replaceChildren(...types.map((t) => new Option(t)));
   $('#cl-dl-zones').replaceChildren(...zones.map((z) => new Option(z)));
 }
@@ -372,7 +381,7 @@ function filtered() {
   }
   list = [...list];
   if (sort === 'recent') list.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
-  else list.sort((a, b) => a.entreprise.localeCompare(b.entreprise, 'fr'));
+  else list.sort((a, b) => COLLATEUR_FR.compare(a.entreprise, b.entreprise));
   return list;
 }
 
@@ -416,8 +425,6 @@ function card(c) {
 }
 
 function renderList() {
-  suggestions();
-
   const list = filtered();
   $('#cl-list').replaceChildren(...list.map(card));
   $('#cl-empty').hidden = list.length > 0;
@@ -802,6 +809,8 @@ async function saveField(key, raw) {
     // Reflète dans la liste locale sans tout recharger.
     const i = LIST.findIndex((c) => c.id === drawer.id);
     if (i >= 0) LIST[i] = { ...LIST[i], ...updated };
+    // Un type ou une zone modifiés alimentent l'auto-complétion des fiches.
+    if (key === 'type' || key === 'zone') suggestions();
     renderList();
     // Met à jour l'en-tête du tiroir (titre/sous-titre) sans casser le focus.
     const av = $('.cl-dh__av'); if (av) av.textContent = initials(drawer.draft.entreprise) || '+';
@@ -868,7 +877,12 @@ async function createClient() {
   try {
     const created = await api('POST', '/api/clients', draft);
     LIST.push({ ...created, notes_count: 0, commandes: 0 });
-    await openClient(created.id);
+    suggestions();
+    // La réponse du POST EST la fiche : on ouvre avec elle, sans repasser par
+    // `openClient` qui redemandait au serveur ce qu'il venait de nous rendre
+    // (une fiche neuve n'a encore ni note ni commande à aller chercher).
+    drawer = { id: created.id, mode: 'edit', draft: { ...created }, notes: [] };
+    renderDrawer();
     renderList();
     toast('Client créé.');
   } catch (err) {
@@ -1109,6 +1123,7 @@ async function load() {
     return;
   }
   LIST = recue;
+  suggestions();   // les datalists suivent les données, pas la frappe
   renderList();
   // Si une fiche est ouverte, on la resynchronise avec la liste rechargée.
   if (drawer && drawer.id) {
@@ -1130,7 +1145,17 @@ export async function initClients(root) {
 
 // Rappelé par app.js à chaque retour sur la vue : un client a pu être créé
 // depuis une prise de commande, ou modifié depuis un autre poste.
+// Garde en vol + petit délai de grâce : basculer d'onglet en aller-retour
+// rapide ne retélécharge pas deux fois toute la base.
+let refreshEnVol = null;
+let dernierLoad = 0;
 export async function refreshClients() {
   if (!mounted) return;
-  await load();
+  if (refreshEnVol) return refreshEnVol;
+  if (Date.now() - dernierLoad < 3000) return;
+  refreshEnVol = load().finally(() => {
+    refreshEnVol = null;
+    dernierLoad = Date.now();
+  });
+  return refreshEnVol;
 }

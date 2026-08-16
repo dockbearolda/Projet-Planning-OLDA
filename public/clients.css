@@ -8,7 +8,8 @@
   height: 100%;
   overflow: hidden;
 }
-.clients * { box-sizing: border-box; }
+/* (box-sizing : hérité du réglage global de styles.css — le doublon universel
+   `.clients *` coûtait un second passage de sélecteur sur tout l'onglet.) */
 .clients button { font-family: inherit; }
 .clients button:focus-visible,
 .clients input:focus-visible,
@@ -157,8 +158,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 .cl-card {
   display: flex;
@@ -282,6 +284,9 @@
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: -18px 0 48px rgba(0, 0, 0, .22);
+}
+:root[data-theme="dark"] .cl-drawer__card {
+  box-shadow: -18px 0 48px rgba(0, 0, 0, .55);
   animation: clSlide var(--dur-3, .24s) var(--ease, ease) both;
 }
 @keyframes clSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
@@ -609,3 +614,10 @@
   .cl-composer__add { min-height: 44px; }
   .cl-secteurs__del { width: 44px; height: 44px; }
 }
+
+/* Réponses au survol qui manquaient (poste souris) : tri, filtres de nature,
+   fermeture du panneau secteurs. */
+.cl-sort__btn:hover,
+.cl-filter__btn:hover,
+.cl-kind:hover,
+.cl-secteurs__close:hover { background: var(--state-hover); }
