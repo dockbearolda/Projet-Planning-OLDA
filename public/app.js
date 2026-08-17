@@ -1344,27 +1344,21 @@ function buildCard(r) {
   // alors le dossier de travail sur une feuille A4. Il est ici, à côté de
   // « ouvrir » — un appui, le ticket s'affiche, un second l'imprime.
   //
-  // SA PLACE EST TOUJOURS RÉSERVÉE, même sur une ligne saisie à la main qui n'a
-  // jamais eu de papier : le bouton n'y paraît pas, mais son emplacement reste.
-  // Sans ça, la colonne d'actions mesurait 200 px sur les dossiers du comptoir
-  // et 148 px sur les autres — et comme c'est elle qui borne la carte, TOUTES
-  // les colonnes se décalaient de 52 px d'une ligne à l'autre.
-  let tk;
-  if (aUnTicket(r)) {
-    tk = document.createElement('button');
-    tk.type = 'button';
-    tk.className = 'pcard__ticket';
-    if (consigneAtelier(r)) tk.classList.add('pcard__ticket--consigne');
-    tk.setAttribute('aria-label', `Ticket atelier — corriger et imprimer${
-      consigneAtelier(r) ? ' · consigne pour l’atelier' : ''}`);
-    attachTip(tk, infobulleTicket(r));
-    tk.appendChild(strokeIcon(LD_ICONES.ticket));
-    tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
-  } else {
-    tk = document.createElement('span');
-    tk.className = 'pcard__ticket pcard__ticket--vide';
-    tk.setAttribute('aria-hidden', 'true');
-  }
+  // SUR TOUTES LES LIGNES. Le bouton ne paraissait que sur les dossiers nés au
+  // comptoir — c'était logique tant qu'il sortait le papier du CLIENT : une
+  // ligne tapée à la main n'en avait jamais eu. Depuis qu'il sort le papier de
+  // l'ATELIER, la question n'est plus « d'où vient ce dossier » mais « qui va le
+  // produire » : une ligne saisie à la main se fabrique comme les autres, et son
+  // ticket se bâtit sur ce que la ligne sait (cf. modeleTicket).
+  const tk = document.createElement('button');
+  tk.type = 'button';
+  tk.className = 'pcard__ticket';
+  if (consigneAtelier(r)) tk.classList.add('pcard__ticket--consigne');
+  tk.setAttribute('aria-label', `Ticket atelier — corriger et imprimer${
+    consigneAtelier(r) ? ' · consigne pour l’atelier' : ''}`);
+  attachTip(tk, infobulleTicket(r));
+  tk.appendChild(strokeIcon(LD_ICONES.ticket));
+  tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
   actions.append(prise, tk, ouvrir, suppr);
 
   // « Délai restant » et non « Délai de production restant » : les intitulés
@@ -3416,16 +3410,6 @@ async function telechargerRecap(r) {
 // L'ARGENT N'EST PLUS DESSUS. Ni prix, ni total, ni paiement : ça se corrige
 // toujours, mais sur la ligne du planning et dans la fiche, là où ça vit.
 
-// Un dossier né au comptoir porte une référence de ticket. Une ligne créée à la
-// main dans la grille, non : elle n'a jamais eu de papier remis à personne, et
-// le bouton n'apparaît pas dessus.
-// `fiche.ref` et `fiche.kind` survivent à l'allègement de la liste
-// (FICHE_LISTE côté serveur) : la décision se prend sans charger le détail.
-function aUnTicket(r) {
-  const f = r && r.fiche;
-  return !!(f && typeof f === 'object' && (f.ref || f.kind === 'comptoir-v17'));
-}
-
 // LA CONSIGNE ÉCRITE POUR L'ATELIER, si la ligne en porte une. Elle voyage dans
 // la liste allégée (FICHE_LISTE côté serveur) : la grille marque donc d'un point
 // les dossiers qui parlent à l'atelier sans aller ouvrir une seule fiche.
@@ -4125,7 +4109,7 @@ function renderLigneDetail() {
     // dossier à l'établi. Le récapitulatif complet — l'adresse, le total HT, la
     // taxe, la note interne — reste à portée, mais en téléchargement : c'est un
     // document de travail, il n'a jamais eu à sortir sur l'imprimante.
-    ...(aUnTicket(r) ? [ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r))] : []),
+    ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r)),
     ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
     ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
     close,
@@ -4524,18 +4508,11 @@ async function enregistrerFiche(r, c) {
 // une information qu'on ne lit qu'au moment de comparer avec le papier du
 // client. Il est dans l'infobulle et dans le nom accessible, et en toutes
 // lettres sur le ticket qu'un appui fait apparaître — ainsi que sur la carte.
-// Une ligne née à la main n'a jamais eu de ticket : sa case reste muette.
+// TOUTES les lignes en ont un : ce papier dit ce qu'il y a à produire, et une
+// ligne tapée à la main se produit comme celles du comptoir.
 function cellTicket(r) {
   const td = document.createElement('td');
   td.className = 'col-ticket-cell';
-  if (!aUnTicket(r)) {
-    const vide = document.createElement('span');
-    vide.className = 'ticket-cell ticket-cell--vide';
-    vide.textContent = '—';
-    vide.setAttribute('aria-hidden', 'true'); // rien à annoncer : pas de ticket
-    td.appendChild(vide);
-    return td;
-  }
   const ref = (r.fiche && r.fiche.ref) || '';
   const btn = document.createElement('button');
   btn.type = 'button';

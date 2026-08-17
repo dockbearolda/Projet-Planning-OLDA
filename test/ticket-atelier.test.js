@@ -404,6 +404,7 @@ const DEMANDE = {
   // 6. LE BRANCHEMENT DANS L'ÉCRAN
   // =========================================================================
   const APP = lire('app.js');
+  const CSS_APP = lire('styles.css');
 
   // Le bouton « Imprimer » de la fiche sort le TICKET, plus le récapitulatif.
   assert.ok(/ldActionBtn\('imprimer', 'Imprimer', \(\) => imprimerTicket\(r\)\)/.test(APP),
@@ -419,9 +420,31 @@ const DEMANDE = {
   assert.ok(/tr\.appendChild\(cellTicket\(r\)\)/.test(APP),
     'la ligne du tableau doit porter sa colonne ticket');
 
-  // Le bouton n'agit que là où un ticket a réellement existé.
-  assert.ok(/function aUnTicket\(r\)/.test(APP));
-  assert.ok(/if \(aUnTicket\(r\)\) \{/.test(APP));
+  // SUR TOUTES LES LIGNES. Le bouton ne paraissait que sur les dossiers nés au
+  // comptoir : logique tant qu'il sortait le papier du CLIENT — une ligne tapée
+  // à la main n'en avait jamais eu. Depuis qu'il sort le papier de l'ATELIER, la
+  // question n'est plus d'où vient le dossier mais qui va le produire.
+  assert.ok(!/aUnTicket/.test(APP), 'plus de garde « né au comptoir » sur le ticket');
+  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(APP),
+    'plus d’emplacement muet : chaque ligne a son bouton');
+  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(CSS_APP),
+    'et plus de règle de style pour un emplacement qui n’existe plus');
+  // Le bouton de la fiche n'est plus conditionnel non plus.
+  assert.ok(/ldActionBtn\('ticket', 'Ticket', \(\) => ouvrirTicket\(r\)\),/.test(APP),
+    'la fiche doit offrir le ticket sur toutes les lignes');
+
+  // ET IL SE BÂTIT VRAIMENT sur une ligne sans récapitulatif du comptoir : la
+  // désignation et la quantité viennent des COLONNES, la production de la fiche.
+  const aLaMain = modeleTicket({
+    billing_company: 'Passage rapide', product: 'Bâche 2 m', quantity: 1,
+    deadline: '2026-08-09', fiche: { production: 'Impression UV', atelier: 'Œillets tous les 50 cm' },
+  });
+  assert.strictEqual(aLaMain.lignes.length, 1);
+  assert.strictEqual(aLaMain.lignes[0].designation, 'Bâche 2 m');
+  assert.strictEqual(aLaMain.lignes[0].detail, 'Impression UV');
+  assert.strictEqual(aLaMain.atelier, 'Œillets tous les 50 cm');
+  const papierMain = ticketTexte(aLaMain);
+  assert.ok(papierMain.includes('1 x Bâche 2 m') && papierMain.includes("POUR L'ATELIER"));
 
   // -------------------------------------------------------------------------
   // 6 bis. LE TICKET EN COLONNE — affichable ou non, et sans décaler le reste
@@ -460,13 +483,11 @@ const DEMANDE = {
 
   // ALIGNEMENT. La carte est sa propre grille : une colonne dimensionnée par
   // son CONTENU décale toutes les autres d'une ligne à l'autre. La colonne
-  // d'actions a donc une largeur arrêtée, et la place du ticket est tenue même
-  // sur une ligne qui n'en a pas.
+  // d'actions garde donc une largeur arrêtée — et le bouton étant désormais sur
+  // toutes les lignes, plus rien ne peut la faire varier de l'une à l'autre.
   assert.ok(/--pcard-actions: 200px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
   assert.ok(!/grid-template-columns:[^;]*\bauto;/.test(CSS.match(/\.pcard \{[\s\S]*?\n\}/)[0]),
     'aucune piste `auto` dans la grille de la carte : elle dépendrait du contenu');
-  assert.ok(/pcard__ticket pcard__ticket--vide/.test(APP),
-    'une ligne sans ticket doit garder l’emplacement réservé');
   assert.ok(/body\.cards-off-ticket \.pcard \{ --pcard-actions: 148px; \}/.test(CSS),
     'ticket rangé : la colonne d’actions se resserre pour toutes les cartes ensemble');
 
