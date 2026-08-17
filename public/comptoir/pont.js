@@ -5,8 +5,8 @@
 // `vente-directe.html` et `demande-devis.html` sont les écrans validés par le
 // patron, repris tels quels. Ils ne connaissent rien du CRM : ils savent
 // afficher un parcours et produire un récapitulatif. Ce fichier — chargé en
-// dernier dans les deux pages — leur branche les deux seules choses qui ne
-// peuvent PAS vivre dans un écran isolé :
+// dernier dans les deux pages — leur branche ce qui ne peut PAS vivre dans un
+// écran isolé, ou ce qui ne doit pas repartir au prochain remplacement :
 //
 //   1. LA BASE CLIENTS. La vendeuse doit chercher dans les clients de
 //      l'atelier, pas dans un jeu d'exemple. On remplit le tableau de l'écran
@@ -19,6 +19,10 @@
 //      parti, et le seul bouton qui enregistre vraiment est greffé en dernier,
 //      APRÈS ceux qui effacent le dossier. On envoie donc le dossier dès que
 //      cet écran s'affiche, et on dit à la vendeuse où il en est (section 4).
+//   4. LE PAPIER. Le ticket imprimé part à l'atelier avec le dossier : la
+//      vendeuse a demandé qu'il cesse d'imprimer ce que personne n'y lit. Les
+//      lignes retirées le sont à l'AFFICHAGE — la fiche envoyée au planning,
+//      elle, garde tout.
 //
 // L'envoi au planning lui-même passe par le message `OLDA_CREATE_PROJECT` que
 // la page poste déjà à la fenêtre parente ; c'est `nouveau-projet.js` qui
@@ -621,6 +625,92 @@
     box.append(texte, voir, effacer);
     document.body.insertBefore(box, document.body.firstChild);
   }
+
+  // --- LE PAPIER --------------------------------------------------------------
+  // Ce que la vendeuse imprime et qui part à l'atelier avec le dossier. Les deux
+  // écrans remplissent ce ticket chacun de leur côté (`fillTicket` pour la
+  // vente, `fillFinal` pour la demande) ; on repasse derrière eux pour retirer
+  // du PAPIER ce qui n'y sert à personne.
+  //
+  // ON RETIRE DE L'AFFICHAGE, JAMAIS DE LA SOURCE. `clientInfoLines` alimente
+  // aussi le dossier envoyé au planning (`client_info`) et la carte du client à
+  // l'écran : filtrer à la source appauvrirait la fiche du CRM pour un choix de
+  // mise en page. On coupe donc dans les lignes DÉJÀ DESSINÉES.
+  //
+  // Et c'est ici, pas dans les écrans : une nouvelle version d'un écran du
+  // patron se pose en remplaçant le fichier, elle réimprimerait tout.
+
+  // Les deux écrans écrivent « Non renseigné » ou « — » plutôt que rien. Sur le
+  // papier, une ligne qui dit qu'il n'y a rien à dire est une ligne de trop.
+  const RIEN_A_DIRE = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    return s === '' || s === '—' || s === 'Non renseigné' || s === 'Non renseignée';
+  };
+
+  // CE QUI RESTE SUR LE PAPIER, ligne par ligne. Pur : c'est la règle, pas le
+  // DOM — elle se relit et s'éprouve sans navigateur.
+  function surLePapier(libelle, valeur) {
+    // Le nom du client s'imprimait DEUX FOIS : en tête du bloc (« Client : … »)
+    // et en ligne « Nom / société » juste dessous. On garde la tête.
+    if (libelle === 'Nom / société') return false;
+    // Une adresse e-mail qu'on n'a pas ne s'imprime pas.
+    if (libelle === 'E-mail') return !RIEN_A_DIRE(valeur);
+    // Le délai souhaité redit à sa façon la « Récupération prévue » imprimée en
+    // tête : deux façons de dire quand, c'en est une de trop.
+    if (libelle === 'Délai souhaité') return false;
+    return true;
+  }
+
+  // Une ligne du ticket, telle que les deux écrans la dessinent :
+  // `<div class="tl"><span>libellé</span><strong>valeur</strong></div>`.
+  function elaguer(id) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    for (const tl of [...box.querySelectorAll('.tl')]) {
+      const k = tl.querySelector('span');
+      const v = tl.querySelector('strong');
+      if (!surLePapier(k ? k.textContent.trim() : '', v ? v.textContent.trim() : '')) tl.remove();
+    }
+  }
+
+  // Le ticket part à l'atelier avec le dossier : il n'a pas de formule de
+  // politesse à porter.
+  function retirerPied() {
+    const pied = document.querySelector('.ticket-footer');
+    if (pied) pied.remove();
+  }
+
+  // `titreNumero` : « Commande : 26.08.17-004 » ne dit pas ce qu'est ce nombre.
+  // La vendeuse et l'atelier y lisent un NUMÉRO — et l'écran des devis n'annonce
+  // pas une commande.
+  function allegerTicket(titreNumero) {
+    const num = document.getElementById('ticketOrder');
+    if (num) num.textContent = num.textContent.replace(/^\s*Commande\s*:/, `${titreNumero} :`);
+    elaguer('ticketClientDetails');
+    elaguer('ticketExtraDetails');
+    retirerPied();
+  }
+
+  // On se greffe SUR le remplissage de l'écran, sans le refaire : il garde la
+  // main sur ce qu'il imprime, on ne fait qu'en retirer des lignes. Un écran qui
+  // n'existe pas sur cette page (l'autre parcours) ne se greffe pas.
+  function grefferSurLeTicket(nom, titreNumero) {
+    const original = window[nom];
+    if (typeof original !== 'function' || original.__oldaPapier) return;
+    const greffe = function greffePapier(...args) {
+      const rendu = original.apply(this, args);
+      // Un ticket qui s'imprime avec une ligne de trop vaut mieux qu'un ticket
+      // qui ne s'imprime pas : l'élagage ne prend jamais le parcours avec lui.
+      try { allegerTicket(titreNumero); } catch (_) { /* le papier reste imprimable tel quel */ }
+      return rendu;
+    };
+    greffe.__oldaPapier = true;
+    window[nom] = greffe;
+  }
+
+  grefferSurLeTicket('fillTicket', 'Numéro de commande');
+  grefferSurLeTicket('fillFinal', 'Numéro de la demande');
+  retirerPied();
 
   // On guette le CHANGEMENT, pas l'horloge : les deux écrans démasquent leur
   // carte de fin en retirant une classe, un observateur le voit à l'instant
