@@ -713,7 +713,6 @@ h2{letter-spacing:-.01em}
 </script>
 <header>
   <h1>ATELIER OLDA — Vente directe</h1>
-  <p>Articles, client, paiement, ticket et envoi WhatsApp</p>
 </header>
 
 <div class="container">
@@ -726,7 +725,7 @@ h2{letter-spacing:-.01em}
 
   <div class="card">
     <h2>1. Ajouter un article</h2>
-    <div class="grid-3">
+    <div class="grid">
       <div class="field">
         <label for="productName">Article *</label>
         <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
@@ -744,23 +743,16 @@ h2{letter-spacing:-.01em}
         <label for="quantity">Quantité *</label>
         <input id="quantity" type="number" min="1" step="1" placeholder="Ex. 10">
       </div>
-      <div class="field">
-        <label for="unitPrice">Prix unitaire *</label>
-        <input id="unitPrice" type="number" min="0" step="0.01" placeholder="0,00">
-      </div>
     </div>
 
     <div class="grid">
       <div class="field">
-        <label for="priceType">Prix saisi</label>
-        <select id="priceType">
-          <option value="TTC">TTC</option>
-          <option value="HT">HT</option>
-        </select>
+        <label for="articlePrice">Prix article *</label>
+        <input id="articlePrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
       <div class="field">
-        <label>Taxe</label>
-        <label class="inline-check"><input id="applyTax" type="checkbox" checked> Appliquer la taxe de 4 %</label>
+        <label for="customPrice">Prix personnalisation *</label>
+        <input id="customPrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
     </div>
 
@@ -1462,17 +1454,21 @@ function updateDeadlineInfo(){
 }
 function productFromForm(){
   const qty=Number(document.getElementById("quantity").value);
-  const price=Number(document.getElementById("unitPrice").value);
-  const priceType=document.getElementById("priceType").value;
-  const taxApplied=document.getElementById("applyTax").checked;
-  let unitHT, unitTTC;
-  if(priceType==="HT"){
-    unitHT=price;
-    unitTTC=taxApplied ? price*1.04 : price;
-  } else {
-    unitTTC=price;
-    unitHT=taxApplied ? price/1.04 : price;
-  }
+  // DEUX PRIX SAISIS, UN SEUL PRIX DE VENTE : l'objet d'un côté, le travail
+  // dessus de l'autre. Le client paie la somme des deux — le détail ne sert
+  // qu'à l'atelier, il ne figure pas sur le papier qu'on lui remet.
+  const priceArticle=Number(document.getElementById("articlePrice").value)||0;
+  const priceCustom=Number(document.getElementById("customPrice").value)||0;
+  const price=priceArticle+priceCustom;
+  // Le sélecteur TTC/HT et la case « taxe » ont disparu de l'écran : on fige
+  // ce qu'ils affichaient par défaut, et qui est la seule pratique du comptoir
+  // — un prix TTC, taxe de 4 % comprise. Le montant encaissé est donc, au
+  // centime près, celui que la vendeuse a tapé. Les deux valeurs restent
+  // écrites dans l'article : le récapitulatif, le ticket et les exports les
+  // lisent, et un dossier doit dire sous quel régime il a été chiffré.
+  const priceType="TTC";
+  const taxApplied=true;
+  const unitHT=price/1.04;
   const baseHT=unitHT*qty;
   const rate=getDeadlineRate();
   const surcharge=baseHT*rate;
@@ -1481,7 +1477,7 @@ function productFromForm(){
   const totalTTC=taxableHT+tax;
   return {
     name:document.getElementById("productName").value.trim(),
-    qty, price, priceType, taxApplied,
+    qty, price, priceArticle, priceCustom, priceType, taxApplied,
     description:document.getElementById("productDescription").value.trim(),
     orderDate:document.getElementById("orderDate").value,
     deliveryDate:document.getElementById("deliveryDate").value,
@@ -1489,8 +1485,23 @@ function productFromForm(){
     baseHT,surcharge,tax,totalTTC,rate
   };
 }
+// Un prix se répartit entre l'objet et le travail, et l'une des deux parts peut
+// être nulle : le client qui apporte son propre t-shirt ne paie que la
+// personnalisation, et l'article revendu tel quel n'en porte aucune. Exiger les
+// deux bloquerait des ventes réelles. Ce qui ne peut pas être nul, c'est le
+// TOTAL — sinon on encaisserait zéro.
+function requirePrice(){
+  const a=document.getElementById("articlePrice");
+  const c=document.getElementById("customPrice");
+  if((Number(a.value)||0)+(Number(c.value)||0)>0){ cleanInvalid(a); cleanInvalid(c); return true; }
+  a.classList.add("invalid"); c.classList.add("invalid");
+  alert("Indique un prix : celui de l'article, celui de la personnalisation, ou les deux.");
+  a.focus();
+  return false;
+}
 function saveProduct(){
-  if(!requireFields(["productName","quantity","unitPrice","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
+  if(!requireFields(["productName","quantity","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
+  if(!requirePrice()) return;
   const delivery=new Date(document.getElementById("deliveryDate").value);
   if(delivery.getDay()===0 || delivery.getDay()===6){
     alert("La date de livraison doit être un jour ouvré.");
@@ -1505,10 +1516,9 @@ function saveProduct(){
 function resetProductForm(){
   document.getElementById("productName").value="";
   document.getElementById("quantity").value="";
-  document.getElementById("unitPrice").value="";
+  document.getElementById("articlePrice").value="";
+  document.getElementById("customPrice").value="";
   document.getElementById("productDescription").value="";
-  document.getElementById("priceType").value="TTC";
-  document.getElementById("applyTax").checked=true;
   editIndex=null;
   document.getElementById("saveProductBtn").textContent="Ajouter l'article";
   document.getElementById("cancelEditBtn").classList.add("hidden");
@@ -1518,9 +1528,8 @@ function editProduct(index){
   editIndex=index;
   document.getElementById("productName").value=p.name;
   document.getElementById("quantity").value=p.qty;
-  document.getElementById("unitPrice").value=p.price;
-  document.getElementById("priceType").value=p.priceType;
-  document.getElementById("applyTax").checked=p.taxApplied;
+  document.getElementById("articlePrice").value=p.priceArticle;
+  document.getElementById("customPrice").value=p.priceCustom;
   document.getElementById("productDescription").value=p.description;
   document.getElementById("orderDate").value=p.orderDate;
   document.getElementById("deliveryDate").value=p.deliveryDate;
@@ -1837,7 +1846,7 @@ document.getElementById("newSaleBtn").addEventListener("click",()=>{
 document.getElementById("homeBtn").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
 
 // Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
-["productName","quantity","unitPrice"].forEach(id=>{
+["productName","quantity","articlePrice","customPrice"].forEach(id=>{
   document.getElementById(id).addEventListener("keydown",e=>{
     if(e.key==="Enter"){e.preventDefault();saveProduct();}
   });
@@ -2483,8 +2492,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       var no='Article '+(i+1)+' — ';
       out.push([no+'Désignation',d(p.name)]);
       out.push([no+'Quantité',d(p.qty)]);
-      out.push([no+'Prix unitaire',d(euro.format(Number(p.price||0))+' '+(p.priceType||''))]);
-      out.push([no+'Taxe 4 %',p.taxApplied?'Appliquée':'Non appliquée']);
+      out.push([no+'Prix article',d(euro.format(Number(p.priceArticle||0)))]);
+      out.push([no+'Prix personnalisation',d(euro.format(Number(p.priceCustom||0)))]);
       out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
       out.push([no+'Total TTC',euro.format(Number(p.totalTTC||0))]);
       out.push([no+'Description de production',d(p.description)]);
@@ -2796,7 +2805,7 @@ button.blocked{opacity:.45;cursor:not-allowed}
         m.push('Au moins un article enregistré');
         if(!v('productName'))m.push('Article');
         if(!v('quantity'))m.push('Quantité');
-        if(!v('unitPrice'))m.push('Prix unitaire');
+        if((Number(v('articlePrice'))||0)+(Number(v('customPrice'))||0)<=0)m.push('Prix');
         if(!v('productDescription'))m.push('Description de production');
         if(!v('deliveryDate'))m.push('Date souhaitée');
       }

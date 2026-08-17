@@ -87,16 +87,16 @@ const VENTE = {
       { k: 'Quantité totale', v: '3' },
       { k: 'Article 1 — Désignation', v: 'Polo brodé' },
       { k: 'Article 1 — Quantité', v: '2' },
-      { k: 'Article 1 — Prix unitaire', v: '55,00 € HT' },
-      { k: 'Article 1 — Taxe 4 %', v: 'Appliquée' },
+      { k: 'Article 1 — Prix article', v: '30,00 €' },
+      { k: 'Article 1 — Prix personnalisation', v: '25,00 €' },
       { k: 'Article 1 — Supplément express', v: '12,00 €' },
       { k: 'Article 1 — Total TTC', v: '126,40 €' },
       { k: 'Article 1 — Description de production', v: 'Broderie poitrine, fil or' },
       { k: 'Article 1 — Récupération', v: '07/08/2026 à 14:00' },
       { k: 'Article 2 — Désignation', v: 'Tasse personnalisée' },
       { k: 'Article 2 — Quantité', v: '1' },
-      { k: 'Article 2 — Prix unitaire', v: '22,10 € TTC' },
-      { k: 'Article 2 — Taxe 4 %', v: 'Non appliquée' },
+      { k: 'Article 2 — Prix article', v: '12,10 €' },
+      { k: 'Article 2 — Prix personnalisation', v: '10,00 €' },
       { k: 'Article 2 — Supplément express', v: '0,00 €' },
       { k: 'Article 2 — Total TTC', v: '22,10 €' },
       { k: 'Article 2 — Description de production', v: 'Sublimation logo' },
@@ -202,7 +202,9 @@ const DEMANDE = {
     'Marigot',
     'Total',                   // l'argent, sous toutes ses formes
     'Taxe',
-    'Prix unitaire',
+    'Prix unitaire',        // le libellé des dossiers d'avant, encore en base
+    'Prix article',         // et les deux qui l'ont remplacé depuis que le prix
+    'Prix personnalisation',// se saisit en deux parts au comptoir
     'Supplément',
     'Paiement',
     'Carte bancaire',
