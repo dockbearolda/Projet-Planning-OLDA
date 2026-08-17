@@ -209,6 +209,10 @@ const DEMANDE = {
     'Carte bancaire',
     '148,50',
     '126,40',
+    '26.08.06-003',         // la référence du dossier : ce papier va à l'établi,
+                            // pas au classement — un identifiant n'y fait rien
+                            // produire. Elle reste DANS le modèle (titre de la
+                            // fenêtre d'impression, libellé de la carte).
     'E-mail',
     'contact@cocobeach.example',
     'Fonction du contact',
@@ -222,7 +226,7 @@ const DEMANDE = {
   assert.ok(!papier.includes('€'), `aucun montant ne doit figurer sur le ticket :\n${papier}`);
 
   // …et ce qui DOIT y être : quoi, combien, pour quand, pour qui, comment.
-  for (const attendu of ['ATELIER OLDA', 'TICKET ATELIER', '26.08.06-003', 'Coco Beach',
+  for (const attendu of ['ATELIER OLDA', 'TICKET ATELIER', 'Coco Beach',
     'Mélina', '0690 66 24 00', 'À RETIRER LE 07/08/2026 à 16h30',
     '2 x Polo brodé', 'Broderie poitrine, fil or', '1 x Tasse personnalisée']) {
     assert.ok(papier.includes(attendu), `le ticket doit porter « ${attendu} » :\n${papier}`);
@@ -326,7 +330,9 @@ const DEMANDE = {
   const papierAncien = ticketTexte(ancien);
   assert.ok(!papierAncien.includes('remis au client'));
   assert.ok(!papierAncien.includes('26.08.06-003'), 'l’ancien numéro de papier ne s’imprime nulle part');
-  assert.ok(papierAncien.includes('26.08.06-004'), 'la référence du dossier, elle, reste en tête')
+  // Ni l'ancien numéro, ni celui du dossier : AUCUN numéro ne va à l'établi.
+  assert.ok(!papierAncien.includes('26.08.06-004'), 'la référence du dossier non plus');
+  assert.strictEqual(ancien.ref, '26.08.06-004', 'elle reste dans le modèle, pour nommer l’impression')
 
   // Rien ne casse sur une entrée absurde : l'aperçu doit s'ouvrir, toujours.
   for (const vide of [null, undefined, {}, { fiche: 'pas un objet' }]) {

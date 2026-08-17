@@ -626,6 +626,236 @@
     document.body.insertBefore(box, document.body.firstChild);
   }
 
+  // --- L'INDICATIF DU PAYS ----------------------------------------------------
+  // Saint-Martin est une île FRONTIÈRE. Le côté français (+590) et le côté
+  // néerlandais (+1721) se croisent au comptoir toute la journée, et les clients
+  // de passage arrivent des États-Unis, d'Anguilla ou de métropole. Les deux
+  // écrans, eux, ne savaient écrire qu'un plan français à dix chiffres : ils
+  // TRONQUAIENT au-delà et affichaient « il manque des chiffres » sur un numéro
+  // de Philipsburg parfaitement valide.
+  //
+  // Greffé ICI, pas dans les écrans : une nouvelle version d'un écran du patron
+  // se pose en remplaçant le fichier, elle repartirait sans l'indicatif.
+
+  // La longueur locale attendue se DÉDUIT du découpage : une seule vérité par
+  // pays, pas un nombre à tenir d'accord avec un format.
+  const PAYS_TEL = [
+    { code: '590', nom: 'Saint-Martin · Guadeloupe', groupes: [3, 2, 2, 2] },
+    { code: '1721', nom: 'Sint Maarten (côté néerlandais)', groupes: [3, 4] },
+    { code: '33', nom: 'France métropole', groupes: [1, 2, 2, 2, 2] },
+    { code: '596', nom: 'Martinique', groupes: [3, 2, 2, 2] },
+    { code: '594', nom: 'Guyane', groupes: [3, 2, 2, 2] },
+    { code: '1264', nom: 'Anguilla', groupes: [3, 4] },
+    { code: '1', nom: 'États-Unis · Canada', groupes: [3, 3, 4] },
+    { code: '31', nom: 'Pays-Bas', groupes: [1, 2, 2, 2, 2] },
+  ];
+  const PAYS_TEL_DEFAUT = '590';
+
+  const telChiffres = (v) => String(v == null ? '' : v).replace(/\D/g, '');
+  const telPays = (code) => PAYS_TEL.find((p) => p.code === code) || null;
+  const telLongueur = (p) => p.groupes.reduce((t, n) => t + n, 0);
+
+  // « 690662400 » → « 690 66 24 00 ». On s'arrête à ce qui est tapé : un numéro
+  // en cours de frappe ne doit pas se voir compléter de blancs.
+  function telGrouper(code, local) {
+    const p = telPays(code);
+    let reste = telChiffres(local);
+    if (!p) return reste;
+    const morceaux = [];
+    for (const n of p.groupes) {
+      if (!reste) break;
+      morceaux.push(reste.slice(0, n));
+      reste = reste.slice(n);
+    }
+    if (reste) morceaux.push(reste);
+    return morceaux.join(' ');
+  }
+
+  // Ce qui part en base. Le « + » compte : `whatsappNumber()` (public/whatsapp.js)
+  // comme les deux écrans y lisent « c'est déjà international, ne devine rien ».
+  function telAssembler(code, local) {
+    const l = telChiffres(local);
+    return l ? `+${code} ${telGrouper(code, l)}` : '';
+  }
+
+  // L'opération inverse, pour rouvrir une fiche déjà enregistrée. Le plus LONG
+  // indicatif gagne — « 1721 » avant « 1 » — sinon un numéro de Sint Maarten
+  // repartirait en américain, avec quatre chiffres de trop dans sa partie locale.
+  function telDecouper(valeur) {
+    const d = telChiffres(valeur);
+    if (!d) return { code: PAYS_TEL_DEFAUT, local: '' };
+    // Les numéros déjà en base sont au format local français (« 0690 66 24 00 ») :
+    // l'indicatif s'y devine au préfixe mobile, comme le fait le planning.
+    if (/^0\d{9}$/.test(d)) {
+      const dom = [['0690', '590'], ['0691', '590'], ['0696', '596'],
+        ['0697', '596'], ['0694', '594']].find(([prefixe]) => d.startsWith(prefixe));
+      return { code: dom ? dom[1] : '33', local: d.slice(1) };
+    }
+    const code = PAYS_TEL.map((p) => p.code)
+      .sort((a, b) => b.length - a.length)
+      .find((c) => d.startsWith(c) && d.length > c.length);
+    return code ? { code, local: d.slice(code.length) } : { code: PAYS_TEL_DEFAUT, local: d };
+  }
+
+  // Complet = la partie locale a exactement la longueur du pays choisi.
+  function telComplet(code, local) {
+    const p = telPays(code);
+    return !!p && telChiffres(local).length === telLongueur(p);
+  }
+  // --- fin des règles du téléphone --------------------------------------------
+
+  const CHAMPS_TEL = ['newCompanyPhone', 'newIndividualPhone', 'newClientPhone', 'newClientPhone2'];
+
+  const STYLE_TEL = `
+.olda-tel{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.olda-tel__pays{flex:1 1 150px;min-width:120px;min-height:44px}
+.olda-tel__local{flex:1 1 160px;min-width:132px;min-height:44px}
+@media(max-width:560px){.olda-tel__pays,.olda-tel__local{flex:1 1 100%}}
+`;
+
+  function poserStyleTel() {
+    if (document.getElementById('olda-tel-style')) return;
+    const s = document.createElement('style');
+    s.id = 'olda-tel-style';
+    s.textContent = STYLE_TEL;
+    document.head.appendChild(s);
+  }
+
+  function grefferIndicatif(id) {
+    const original = document.getElementById(id);
+    if (!original || original.dataset.oldaTel === 'oui') return;
+    poserStyleTel();
+
+    // Les écrans reformatent et contrôlent le numéro à CHAQUE frappe, pour un
+    // plan français à dix chiffres. Un clone n'emporte aucun de leurs écouteurs,
+    // et les attributs `oninput` / `onblur` partent avec l'original.
+    const cache = original.cloneNode(false);
+    cache.removeAttribute('oninput');
+    cache.removeAttribute('onblur');
+    cache.removeAttribute('maxlength');
+    cache.removeAttribute('placeholder');
+    cache.type = 'hidden';
+    cache.dataset.oldaTel = 'oui';
+
+    const boite = document.createElement('div');
+    boite.className = 'olda-tel';
+
+    const select = document.createElement('select');
+    select.className = 'olda-tel__pays';
+    select.setAttribute('aria-label', 'Indicatif du pays');
+    for (const p of PAYS_TEL) {
+      const o = document.createElement('option');
+      o.value = p.code;
+      o.textContent = `+${p.code} · ${p.nom}`;
+      select.append(o);
+    }
+
+    const local = document.createElement('input');
+    local.className = 'olda-tel__local';
+    local.type = 'tel';
+    local.inputMode = 'tel';
+    local.setAttribute('aria-label', 'Numéro sans l’indicatif');
+
+    original.replaceWith(boite);
+    boite.append(select, local, cache);
+
+    // Les deux écrans posent déjà une ligne d'aide sous le champ : on écrit
+    // dedans plutôt que d'en empiler une seconde.
+    let aide = boite.nextElementSibling;
+    if (!aide || !aide.classList || !aide.classList.contains('help')) {
+      aide = document.createElement('div');
+      aide.className = 'help';
+      boite.insertAdjacentElement('afterend', aide);
+    }
+
+    function peindre() {
+      const p = telPays(select.value);
+      const attendu = p ? telLongueur(p) : 0;
+      local.placeholder = p ? telGrouper(p.code, '0'.repeat(attendu)).replace(/0/g, '_') : '';
+      local.value = telGrouper(select.value, local.value);
+      const n = telChiffres(local.value).length;
+      cache.value = telAssembler(select.value, local.value);
+      cache.dataset.oldaVu = cache.value;
+      if (!n) {
+        local.style.borderColor = '';
+        aide.textContent = '';
+        return;
+      }
+      if (telComplet(select.value, local.value)) {
+        local.style.borderColor = '#1c7c4a';
+        aide.style.color = '#1c7c4a';
+        aide.textContent = `✓ ${cache.value}`;
+      } else {
+        local.style.borderColor = '#c62828';
+        aide.style.color = '#c62828';
+        const manque = attendu - n;
+        aide.textContent = manque > 0
+          ? `⚠ Il manque ${manque} chiffre${manque > 1 ? 's' : ''} pour ce pays.`
+          : `⚠ ${-manque} chiffre${-manque > 1 ? 's' : ''} de trop pour ce pays.`;
+      }
+    }
+
+    // La fiche rouverte pour correction, ou vidée après création : l'écran écrit
+    // dans le champ caché sans prévenir. On le relit et on se remet d'accord.
+    function relire() {
+      if (cache.value === cache.dataset.oldaVu) return;
+      const { code, local: l } = telDecouper(cache.value);
+      select.value = telPays(code) ? code : PAYS_TEL_DEFAUT;
+      local.value = telGrouper(select.value, l);
+      peindre();
+    }
+
+    select.addEventListener('change', peindre);
+    local.addEventListener('input', peindre);
+    local.addEventListener('blur', peindre);
+    boite.__oldaRelire = relire;
+    relire();
+    peindre();
+  }
+
+  // TOUT L'ÉCRAN DES DEVIS PASSE PAR `phoneDigits`, QUI TRONQUE À DIX CHIFFRES.
+  // C'est l'hypothèse française, enfouie : au-delà de dix, les chiffres en trop
+  // sont jetés en silence. Trois fonctions en héritent, et chacune casse
+  // autrement sur un numéro international :
+  //
+  //   · `isValidLocalPhone` refuse le numéro (onze chiffres pour Sint Maarten) ;
+  //   · `formatFrenchPhone` l'ÉCRIT TRONQUÉ en base — « +1721 520 1234 »
+  //     devenait « 17 21 52 01 23 », un numéro qui n'existe pas ;
+  //   · `normalizePhone` bâtit l'adresse wa.me avec ces dix chiffres — la
+  //     conversation s'ouvrait sur un inconnu.
+  //
+  // On les relaie : un numéro DÉJÀ international (il commence par « + ») passe
+  // tel quel, le reste continue de suivre la règle locale — les fiches d'avant
+  // sont toutes au format français, elles ne doivent rien changer.
+  const estInternational = (v) => String(v == null ? '' : v).trim().startsWith('+');
+
+  function relayer(nom, quand) {
+    const base = window[nom];
+    if (typeof base !== 'function' || base.__oldaTel) return;
+    const relais = function oldaRelaisTel(valeur, ...reste) {
+      if (estInternational(valeur)) return quand(valeur);
+      return base.call(this, valeur, ...reste);
+    };
+    relais.__oldaTel = true;
+    window[nom] = relais;
+  }
+
+  function relayerValidation() {
+    // E.164 : huit chiffres au minimum, indicatif compris.
+    relayer('isValidLocalPhone', (v) => telChiffres(v).length >= 8);
+    // Ce qui s'écrit en base, et ce qui part vers wa.me : on ne retouche rien.
+    relayer('formatFrenchPhone', (v) => String(v).trim());
+    relayer('normalizePhone', (v) => telChiffres(v));
+  }
+
+  function grefferLesIndicatifs() {
+    CHAMPS_TEL.forEach(grefferIndicatif);
+    relayerValidation();
+    for (const boite of document.querySelectorAll('.olda-tel')) {
+      if (boite.__oldaRelire) boite.__oldaRelire();
+    }
+  }
+
   // --- LE PAPIER --------------------------------------------------------------
   // Ce que la vendeuse imprime et qui part à l'atelier avec le dossier. Les deux
   // écrans remplissent ce ticket chacun de leur côté (`fillTicket` pour la
@@ -680,12 +910,13 @@
     if (pied) pied.remove();
   }
 
-  // `titreNumero` : « Commande : 26.08.17-004 » ne dit pas ce qu'est ce nombre.
-  // La vendeuse et l'atelier y lisent un NUMÉRO — et l'écran des devis n'annonce
-  // pas une commande.
-  function allegerTicket(titreNumero) {
+  // LE NUMÉRO NE S'IMPRIME PLUS. Ce papier va à l'établi : celui qui produit y
+  // cherche quoi faire, pour qui et pour quand, pas un identifiant de dossier.
+  // La référence reste ÉCRITE par l'écran (`#ticketOrder` garde son texte, et
+  // c'est elle qui part au planning) — elle quitte l'affichage, pas la source.
+  function allegerTicket() {
     const num = document.getElementById('ticketOrder');
-    if (num) num.textContent = num.textContent.replace(/^\s*Commande\s*:/, `${titreNumero} :`);
+    if (num) num.remove();
     elaguer('ticketClientDetails');
     elaguer('ticketExtraDetails');
     retirerPied();
@@ -694,22 +925,22 @@
   // On se greffe SUR le remplissage de l'écran, sans le refaire : il garde la
   // main sur ce qu'il imprime, on ne fait qu'en retirer des lignes. Un écran qui
   // n'existe pas sur cette page (l'autre parcours) ne se greffe pas.
-  function grefferSurLeTicket(nom, titreNumero) {
+  function grefferSurLeTicket(nom) {
     const original = window[nom];
     if (typeof original !== 'function' || original.__oldaPapier) return;
     const greffe = function greffePapier(...args) {
       const rendu = original.apply(this, args);
       // Un ticket qui s'imprime avec une ligne de trop vaut mieux qu'un ticket
       // qui ne s'imprime pas : l'élagage ne prend jamais le parcours avec lui.
-      try { allegerTicket(titreNumero); } catch (_) { /* le papier reste imprimable tel quel */ }
+      try { allegerTicket(); } catch (_) { /* le papier reste imprimable tel quel */ }
       return rendu;
     };
     greffe.__oldaPapier = true;
     window[nom] = greffe;
   }
 
-  grefferSurLeTicket('fillTicket', 'Numéro de commande');
-  grefferSurLeTicket('fillFinal', 'Numéro de la demande');
+  grefferSurLeTicket('fillTicket');
+  grefferSurLeTicket('fillFinal');
   retirerPied();
 
   // On guette le CHANGEMENT, pas l'horloge : les deux écrans démasquent leur
@@ -719,7 +950,7 @@
   // dossier ne doit pas dépendre de ça. La scrutation reste en second rideau,
   // pour ce qui ne passe pas par une mutation (et parce que les écrans
   // regreffent leurs propres boutons toutes les 400 ms).
-  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); });
+  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); });
   // `attributeFilter` : le guet ne réagit qu'à la classe — c'est elle (`hidden`)
   // qui démasque l'écran de fin. Sans le filtre, CHAQUE changement d'attribut
   // du document (les minuteurs des écrans en produisent plusieurs par seconde)
@@ -728,8 +959,9 @@
   veilleur.observe(document.body, {
     subtree: true, childList: true, attributes: true, attributeFilter: ['class'],
   });
-  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); }, VEILLE_MS);
+  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); }, VEILLE_MS);
   guetterEcranFinal();
+  grefferLesIndicatifs();
   rebrancherBoutonBrouillon();
   montrerBrouillonsOublies();
 
