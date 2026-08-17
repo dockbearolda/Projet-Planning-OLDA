@@ -1229,11 +1229,12 @@ export function createDashboard(deps) {
     const target = sub ? SUB_LABEL[sub] : STAGE_LABEL[stage];
     let msg = `${clientName(r)} → ${target}`;
     if (before !== after) msg += ` · pilote ${before || 'À attribuer'} → ${after || 'À attribuer'}`;
-    logActivity(msg, AVATAR[after] || 'var(--pj-accent)');
+    const trace = logActivity(msg, AVATAR[after] || 'var(--pj-accent)');
     renderAll();
     showToast(msg);
     api('PATCH', `/api/requests/${r.id}`, { stage, sub_stage: sub }).catch(() => {
       Object.assign(r, prev);
+      retirerActivite(trace);
       renderAll();
       showToast(`Échec de l’envoi — ${clientName(r)} reste en ${STAGE_LABEL[prev.stage]}`);
       refresh();
@@ -1246,11 +1247,12 @@ export function createDashboard(deps) {
     const prev = { flag: r.flag, flag_reason: r.flag_reason };
     r.flag = null;
     r.flag_reason = null;
-    logActivity(`${clientName(r)} — alerte levée ✓`, 'var(--success)');
+    const trace = logActivity(`${clientName(r)} — alerte levée ✓`, 'var(--success)');
     renderAll();
     showToast(`${clientName(r)} — alerte levée ✓`);
     api('PATCH', `/api/requests/${r.id}`, { flag: null }).catch(() => {
       Object.assign(r, prev);
+      retirerActivite(trace);
       renderAll();
       showToast('Échec — l’alerte est toujours là');
       refresh();
@@ -1264,12 +1266,13 @@ export function createDashboard(deps) {
     const prev = { stage: r.stage, sub_stage: r.sub_stage };
     r.stage = 'paiement';
     r.sub_stage = 'paiement_a_controler';
-    logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
+    const trace = logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
     closeDetail();
     renderAll();
     showToast(`${clientName(r)} — marquée traitée ✓`);
     api('PATCH', `/api/requests/${r.id}`, { stage: 'paiement', sub_stage: 'paiement_a_controler' }).catch(() => {
       Object.assign(r, prev);
+      retirerActivite(trace);
       renderAll();
       showToast('Échec — la commande n’a pas été clôturée');
       refresh();
@@ -1290,10 +1293,29 @@ export function createDashboard(deps) {
     queueMicrotask(() => { entetePrevue = false; if ($head) renderHead(); });
   }
   function logActivity(text, color) {
-    activity.unshift({ ts: Date.now(), text, color: color || 'var(--pj-accent)' });
+    const ligne = { ts: Date.now(), text, color: color || 'var(--pj-accent)' };
+    activity.unshift(ligne);
     if (activity.length > 80) activity.length = 80;
     if (activityOpen) renderActivityList();
     else { unseen++; planifierEntete(); }
+    return ligne;
+  }
+
+  // L'ENTRÉE SE RETIRE QUAND L'ÉCRITURE EST RETOMBÉE. Les trois gestes du
+  // Point du jour (envoyer, lever l'alerte, marquer traitée) écrivent au fil
+  // AVANT la réponse du serveur — c'est ce qui les rend vifs. Mais quand le
+  // PATCH échouait, on remettait la commande en place, on le disait dans un
+  // message… et la ligne « Untel → Production » restait au fil. Or « Ce qui a
+  // bougé » est ce que le patron lit pour savoir ce qui s'est passé : il y
+  // trouvait un évènement qui n'a jamais eu lieu, longtemps après la
+  // disparition du message d'échec.
+  function retirerActivite(ligne) {
+    if (!ligne) return;
+    const i = activity.indexOf(ligne);
+    if (i < 0) return;                       // déjà sortie par le plafond de 80
+    activity.splice(i, 1);
+    if (activityOpen) renderActivityList();
+    else { unseen = Math.max(0, unseen - 1); planifierEntete(); }
   }
 
   // Diff entre l'ancien cache et le nouveau : alimente le fil avec ce qui a

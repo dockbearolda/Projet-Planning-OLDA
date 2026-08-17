@@ -451,8 +451,18 @@ const DEMANDE = {
   // grille. Le verrou se relâche à la fermeture ET si le chargement échoue,
   // sinon un réseau tombé condamnerait le bouton pour la journée.
   assert.ok(/if \(ticketOuvert\) return;\s*\n\s*ticketOuvert = true;/.test(APP));
-  assert.ok(/catch \(err\) \{\s*\n\s*ticketOuvert = false;\s*\n\s*throw err;/.test(APP));
   assert.ok(/fini = true;\s*\n\s*ticketOuvert = false;/.test(APP));
+
+  // ET L'ÉCHEC SE DIT. Le verrou se relâchait bien, mais l'erreur repartait en
+  // `throw` — or aucun appelant n'attend cette promesse (pastille du tableau,
+  // pastille de la carte, bouton de la fiche sont tous des gestionnaires de
+  // clic). Taper sur le ticket ne produisait alors RIEN du tout : ni papier, ni
+  // message. On le rapporte.
+  const ouvre = APP.match(/async function ouvrirTicket\(r\) \{[\s\S]*?\n\}/);
+  assert.ok(ouvre, 'ouvrirTicket est introuvable');
+  assert.ok(/catch \(err\) \{[\s\S]*?ticketOuvert = false;[\s\S]*?reportError\(err\);[\s\S]*?return;/.test(ouvre[0]),
+    'un ticket qui ne peut pas s’ouvrir doit relâcher le verrou ET le dire');
+  assert.ok(!/throw err;/.test(ouvre[0]), 'plus de promesse rejetée que personne n’attrape');
 
   // L'aperçu et l'impression partagent la MÊME feuille de style : ce qu'on voit
   // à l'écran est ce qui sort de l'imprimante.

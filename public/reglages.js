@@ -311,24 +311,39 @@ document.addEventListener('visibilitychange', () => {
 
 function tarifRow(a) {
   const row = el('div', 'reg-tarif-row');
+  // CHAQUE CASE DIT CE QU'ELLE EST. Trois champs nus par ligne, sur une
+  // trentaine de lignes : deux montants qui se ressemblent, un intitulé, une
+  // bascule et une corbeille — tous SANS nom. Rien n'annonçait lequel des deux
+  // nombres était l'achat, et la corbeille (une icône seule, avec son glyphe
+  // marqué `aria-hidden`) n'avait aucun nom du tout. On les nomme, et on les
+  // nomme AVEC l'article : « Supprimer » seul, trente fois de suite, ne dit pas
+  // quelle ligne on va perdre.
+  const quoi = () => (String(a.designation || '').trim() || 'cet article');
   const desig = el('input', 'reg-tarif-input reg-tarif-input--nom');
   desig.value = a.designation; desig.placeholder = 'Désignation';
+  desig.setAttribute('aria-label', 'Désignation de l’article');
   desig.addEventListener('change', () => { a.designation = desig.value; saveTarifs(); });
   const achat = el('input', 'reg-tarif-input reg-tarif-input--num');
   achat.type = 'number'; achat.step = '0.01'; achat.min = '0'; achat.value = a.prixAchat;
   achat.title = 'Prix d’achat';
+  achat.setAttribute('aria-label', `Prix d’achat — ${quoi()}`);
   achat.addEventListener('change', () => { a.prixAchat = Number(achat.value) || 0; saveTarifs(); });
   const prix = el('input', 'reg-tarif-input reg-tarif-input--num');
   prix.type = 'number'; prix.step = '0.01'; prix.min = '0'; prix.value = a.prixVenteTtc;
   prix.title = 'Prix de vente TTC';
+  prix.setAttribute('aria-label', `Prix de vente TTC — ${quoi()}`);
   prix.addEventListener('change', () => { a.prixVenteTtc = Number(prix.value) || 0; saveTarifs(); });
   const actif = el('button', `reg-tarif-toggle${a.actif ? ' is-on' : ''}`);
   actif.type = 'button';
   actif.title = a.actif ? 'Actif — cliquer pour désactiver' : 'Inactif — cliquer pour activer';
+  actif.setAttribute('aria-label',
+    `${quoi()} : ${a.actif ? 'actif, appuyer pour désactiver' : 'inactif, appuyer pour activer'}`);
   actif.append(ic(a.actif ? 'visibility' : 'visibility_off'));
   actif.addEventListener('click', () => { a.actif = !a.actif; saveTarifs(); renderTarifs(); });
   const del = el('button', 'reg-tarif-del');
   del.type = 'button';
+  del.title = 'Supprimer cette ligne de tarif';
+  del.setAttribute('aria-label', `Supprimer ${quoi()}`);
   del.append(ic('delete'));
   del.addEventListener('click', () => {
     tarifsArticles = tarifsArticles.filter((x) => x !== a);
