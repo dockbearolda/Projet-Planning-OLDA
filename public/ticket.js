@@ -1,30 +1,28 @@
 // ===========================================================================
-// LE TICKET — celui qu'on remet au client, réimprimable depuis le planning
+// LE TICKET DE L'ATELIER — celui qui part avec le dossier à l'établi
 // ===========================================================================
-// Une vente directe et une demande de devis naissent au comptoir
-// (public/comptoir/*.html), où la vendeuse imprime un ticket et le remet au
-// client. Le planning, lui, n'en gardait aucune trace imprimable : son bouton
-// « Imprimer » sortait le RÉCAPITULATIF COMPLET — une feuille A4 portant le
-// secteur d'activité, l'adresse de facturation, la taxe de 4 %, le total HT,
-// les points à contrôler et jusqu'à la note interne OLDA. Autrement dit : le
-// dossier de travail de l'atelier, pas le ticket du client.
+// La ligne du planning sortait le ticket du CLIENT : son papier, ses prix, son
+// total, son mode de règlement. Or ON NE REMET AUCUN TICKET AU CLIENT — le
+// papier qui sort au comptoir suit le travail jusqu'à l'établi. C'est celui-là
+// qu'on doit pouvoir ressortir depuis le planning : quoi produire, combien,
+// pour quand, pour qui, et ce qu'il faut savoir avant de couper.
 //
-// Ce module reconstruit LE TICKET, et rien d'autre. Il ne lit pas le
-// récapitulatif tel quel : il en extrait les seules lignes qui figurent sur le
-// papier remis au comptoir, et laisse tomber tout le reste.
+// CE TICKET NE PORTE PAS D'ARGENT. Ni prix d'article, ni supplément, ni total,
+// ni paiement : l'établi n'a rien à en faire, et une feuille qui traîne sur un
+// plan de travail n'a pas à annoncer ce que le client a payé. Tout ça reste sur
+// la ligne du planning et dans la fiche, où ça se corrige déjà.
 //
 // DEUX SOURCES, DEUX RÔLES :
 //   - la LIGNE (`r`) fait foi pour ce qui se corrige après la vente — le nom du
-//     client, la date de retrait, l'heure, le montant, le paiement. Un ticket
-//     réimprimé porte donc les corrections, jamais l'état du jour de la prise.
+//     client, la personne à joindre, la date de retrait, l'heure.
 //   - la FICHE (`r.fiche`) fait foi pour ce qui a été VENDU : le détail article
 //     par article, figé à la création et jamais retouché.
 //
-// LE TICKET SE CORRIGE. Un numéro faux, une info oubliée, une consigne pour
-// l'atelier : ça se rattrape sur la ligne du planning, dans le ticket lui-même
-// (cf. `dessinerTicket(t, doc, editeur)`). Le modèle porte donc, pour chaque
-// valeur, l'ADRESSE où elle se réécrit — colonne de la ligne, clé de la fiche,
-// ou position dans le récapitulatif du comptoir.
+// LE TICKET SE CORRIGE. Une quantité fausse, une consigne oubliée, une taille
+// qu'on précise à la dernière minute : ça se rattrape sur la ligne du planning,
+// dans le ticket lui-même (cf. `dessinerTicket(t, doc, editeur)`). Le modèle
+// porte donc, pour chaque valeur, l'ADRESSE où elle se réécrit — colonne de la
+// ligne, clé de la fiche, ou position dans le récapitulatif du comptoir.
 //
 // Aucun DOM ici en dehors de `dessinerTicket` : le modèle est une fonction
 // pure, c'est ce qui le rend testable hors navigateur.
@@ -42,18 +40,9 @@ const texte = (v) => {
 // Le tiret est un tiret CADRATIN (—), celui que produisent les deux écrans.
 const RE_POSTE = /^(Article|Besoin)\s+(\d+)\s+—\s+(.+)$/;
 
-// Un euro déjà formaté par le comptoir (« 48,00 € ») se recopie tel quel ; un
-// nombre de la ligne se formate ici. Même rendu dans les deux cas.
-export const euroTicket = (n) => `${Number(n).toFixed(2).replace('.', ',')} €`;
-
-// Un montant du comptoir qui ne vaut rien : « 0,00 € » sur un supplément
-// absent, c'est une ligne de plus sur le ticket pour dire qu'il ne s'est rien
-// passé.
-const montantNul = (s) => !texte(s) || /^0([.,]0+)?\s*€?$/.test(texte(s));
-
 // La date civile de l'ATELIER (Saint-Martin, UTC−4). `creeLe` est un instant
 // UTC : à 20 h 30 au comptoir, un affichage naïf le daterait du lendemain — et
-// le ticket réimprimé ne porterait plus la date de celui remis au client.
+// le ticket réimprimé ne porterait plus la date de la prise.
 const JOUR_ATELIER = new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'America/Marigot', day: '2-digit', month: '2-digit', year: 'numeric',
 });
@@ -72,11 +61,10 @@ function dateFr(iso) {
 
 const heureFr = (h) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(h || '')) ? String(h).replace(':', 'h') : '');
 
-// LE PANIER, extrait du récapitulatif du comptoir. Tout ce qui n'est pas un
-// poste — le secteur, l'adresse, le total HT, la note interne — reste où il
-// est : c'est le dossier de travail, il n'a rien à faire sur le papier client.
+// LE TRAVAIL, extrait du récapitulatif du comptoir. Tout ce qui n'est pas un
+// poste — le secteur, l'adresse, les totaux, la note interne — reste où il est.
 // Les postes se regroupent par NUMÉRO plutôt que par position, pour qu'une
-// ligne manquante ne décale pas tout le panier.
+// ligne manquante ne décale pas tout.
 // Chaque valeur garde l'INDICE de sa ligne dans `fiche.details`. Sans lui, un
 // ticket corrigé à l'écran ne saurait pas OÙ réécrire ce qu'on vient de taper :
 // le récapitulatif du comptoir se rectifie par POSITION (PATCH …/fiche), jamais
@@ -101,37 +89,32 @@ function postesDuPanier(details) {
 const vDe = (c) => (c ? c.v : '');
 const ouDe = (c) => (c ? { ou: 'details', i: c.i } : null);
 
-// Les articles VENDUS, tels qu'ils figurent sur le ticket : la désignation, la
-// quantité, ce qu'on va produire, le prix. Ni le prix unitaire, ni la taxe, ni
-// la mention « Taxe 4 % appliquée » — le client lit un total, pas un calcul.
+// LES ARTICLES À PRODUIRE : ce qu'on fabrique, en quelle quantité, et comment.
+// Le prix unitaire, le supplément express, la taxe et le total TTC restent au
+// dossier — l'établi ne les lit pas.
 function articlesVente(postes) {
   return postes.map((p) => ({
     designation: vDe(p['Désignation']),
     qte: vDe(p['Quantité']),
     detail: vDe(p['Description de production']),
-    prix: vDe(p['Total TTC']),
-    supplement: montantNul(vDe(p['Supplément express'])) ? '' : vDe(p['Supplément express']),
     // `ou` ne s'imprime pas : c'est l'adresse d'écriture de chaque valeur, pour
-    // l'aperçu qui se corrige sur place. Le supplément express n'y figure pas —
-    // il est CALCULÉ par le comptoir, il se corrige par le prix, pas à la main.
+    // l'aperçu qui se corrige sur place.
     ou: {
       designation: ouDe(p['Désignation']),
       qte: ouDe(p['Quantité']),
       detail: ouDe(p['Description de production']),
-      prix: ouDe(p['Total TTC']),
     },
   })).filter((a) => a.designation);
 }
 
-// Les BESOINS d'une demande de devis. Rien n'est encore chiffré : ce qui compte
-// sur le papier, c'est ce que le client a demandé, pas ce qu'on en fera.
+// Les BESOINS d'une demande de devis. Rien n'est encore décidé, mais l'atelier
+// peut avoir à préparer une maquette : ce qui compte, c'est ce que le client a
+// demandé — la catégorie, la couleur, le mode de production.
 function besoinsDemande(postes) {
   return postes.map((p) => ({
     designation: vDe(p['Désignation']),
     qte: vDe(p['Quantité']),
     detail: [p['Catégorie'], p['Couleur'], p['Production']].map(vDe).filter(Boolean).join(' · '),
-    prix: '',
-    supplement: '',
     // Le détail d'un besoin est un RÉSUMÉ de trois champs (catégorie, couleur,
     // production) : il ne se réécrit pas d'un bloc. Ce qu'on a à dire à
     // l'atelier sur une demande se met dans le bloc « Pour l'atelier ».
@@ -139,24 +122,8 @@ function besoinsDemande(postes) {
       designation: ouDe(p['Désignation']),
       qte: ouDe(p['Quantité']),
       detail: null,
-      prix: null,
     },
   })).filter((b) => b.designation);
-}
-
-// Le paiement tel que la LIGNE le porte, et elle seule. Le comptoir le pose à
-// la création (colonnes `paye` / `paiement_mode`), le planning le corrige
-// ensuite : retomber sur le mode figé dans le récapitulatif ferait réapparaître
-// sur le ticket un règlement que quelqu'un venait justement d'effacer.
-const MODE_LABEL = {
-  cb: 'Carte bancaire', especes: 'Espèces', virement: 'Virement',
-  cheque: 'Chèque', mixte: 'Mixte (CB + espèces)',
-};
-
-function paiementTicket(r) {
-  const mode = MODE_LABEL[r.paiement_mode] || '';
-  if (r.paye === true) return mode ? `${mode} — payé` : 'Payé';
-  return mode ? `${mode} — à régler` : 'À régler au retrait';
 }
 
 // LE MODÈLE DU TICKET. Pur : mêmes entrées, mêmes sorties, aucun DOM.
@@ -168,8 +135,8 @@ export function modeleTicket(r) {
   const demande = f.source === 'Demande de devis' || l.order_kind === 'demande';
   const postes = postesDuPanier(f.details);
 
-  // Le détail figé n'existe que sur un dossier du comptoir. Une ligne créée à
-  // la main dans la grille n'a pas de panier : son ticket porte alors ce que la
+  // Le détail figé n'existe que sur un dossier du comptoir. Une ligne créée à la
+  // main dans la grille n'a pas de panier : son ticket porte alors ce que la
   // ligne sait — la description et la quantité. Mieux qu'un ticket vide.
   const lignes = demande ? besoinsDemande(postes) : articlesVente(postes);
   if (!lignes.length && texte(l.product)) {
@@ -177,7 +144,6 @@ export function modeleTicket(r) {
       designation: texte(l.product),
       qte: l.quantity == null ? '' : String(l.quantity),
       detail: texte(f.production),
-      prix: '', supplement: '',
       // Pas de récapitulatif figé ici : la désignation et la quantité sont des
       // COLONNES de la ligne, la production vit dans la fiche. Le ticket se
       // corrige donc aussi sur un dossier saisi à la main.
@@ -185,7 +151,6 @@ export function modeleTicket(r) {
         designation: { ou: 'ligne', col: 'product' },
         qte: { ou: 'ligne', col: 'quantity' },
         detail: { ou: 'fiche', cle: 'production' },
-        prix: null,
       },
     });
   }
@@ -195,28 +160,21 @@ export function modeleTicket(r) {
 
   return {
     demande,
-    titre: demande ? 'Demande de devis' : 'Ticket de commande',
-    // La référence est LA clé : c'est ce que le client lit sur son papier et ce
-    // qu'on retape pour retrouver le dossier.
+    titre: 'Ticket atelier',
+    // La référence est LA clé : c'est elle qui relie ce papier au dossier.
     ref: texte(f.ref),
-    // Quand deux postes hors réseau se sont donné la même référence, le dossier
-    // a été enregistré sous une AUTRE : le ticket déjà remis porte l'ancienne,
-    // et sans ce rappel plus personne ne peut relier les deux.
-    refTicket: texte(f.refTicket),
     date: dateCreation(f.creeLe),
+    // POUR QUI. Le nom sur l'établi, et de quoi joindre quelqu'un : « appeler
+    // avant de couper » ne sert à rien sans le numéro.
     client: texte(l.billing_company),
     contact: texte(l.contact_referent),
     tel: texte(l.contact_phone),
-    // Sur une vente c'est le RETRAIT ; sur une demande, la date de réponse
-    // souhaitée. Deux promesses différentes, deux libellés.
+    // POUR QUAND. Sur une vente c'est le RETRAIT ; sur une demande, la date de
+    // réponse souhaitée. Deux promesses différentes, deux libellés.
     remiseLabel: demande ? 'Réponse souhaitée' : 'À retirer le',
     remise: jour ? `${jour}${heure ? ` à ${heure}` : ''}` : '',
+    // QUOI ET COMBIEN, avec ce qu'on en fait.
     lignes,
-    totalLabel: demande ? 'Montant' : 'Total TTC',
-    total: l.project_value == null ? 'À chiffrer' : euroTicket(Number(l.project_value)),
-    // Une demande n'encaisse rien : afficher « À régler au retrait » sur un
-    // devis promettrait un retrait que personne n'a convenu.
-    paiement: demande ? '' : paiementTicket(l),
     // POUR L'ATELIER — la consigne de production, écrite après coup depuis le
     // planning. Elle ne vient PAS du comptoir : ni la note interne OLDA
     // (« client difficile »), ni les points à contrôler ne la remplissent — ces
@@ -233,7 +191,6 @@ export function ticketTexte(t) {
   const sep = '--------------------------------';
   const out = ['ATELIER OLDA', 'Saint-Martin', t.titre.toUpperCase(), sep];
   if (t.ref) out.push(`${t.demande ? 'Référence' : 'Commande'} : ${t.ref}`);
-  if (t.refTicket) out.push(`Ticket remis au client : ${t.refTicket}`);
   if (t.date) out.push(`Le ${t.date}`);
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
@@ -242,15 +199,12 @@ export function ticketTexte(t) {
   if (t.lignes.length) {
     out.push(sep);
     for (const a of t.lignes) {
-      out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}${a.prix ? `   ${a.prix}` : ''}`);
+      out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}`);
       if (a.detail) out.push(`  ${a.detail}`);
-      if (a.supplement) out.push(`  Supplément express   ${a.supplement}`);
     }
   }
   if (t.atelier) out.push(sep, "POUR L'ATELIER", t.atelier);
-  out.push(sep, `${t.totalLabel.toUpperCase()} : ${t.total}`);
-  if (t.paiement) out.push(`Paiement : ${t.paiement}`);
-  out.push(sep, 'Merci pour votre confiance', "L'équipe Atelier OLDA");
+  out.push(sep, "L'équipe Atelier OLDA");
   return out.join('\n');
 }
 
@@ -279,15 +233,11 @@ export const CSS_TICKET = `
   .tk__remise { margin: 0; font-size: 13px; font-weight: 800; text-align: center;
                 text-transform: uppercase; }
   .tk__art { margin: 7px 0; }
-  .tk__art-tete { display: flex; justify-content: space-between; gap: 8px; }
+  .tk__art-tete { display: flex; gap: 8px; }
   .tk__art-nom { font-weight: 700; }
-  .tk__art-prix { font-weight: 700; white-space: nowrap; }
-  .tk__art-detail { margin: 2px 0 0; font-size: 11px; white-space: pre-line; }
-  .tk__art-sup { display: flex; justify-content: space-between; gap: 8px;
-                 margin: 2px 0 0 8px; font-size: 11px; }
-  .tk__total { display: flex; justify-content: space-between; gap: 8px;
-               font-size: 15px; font-weight: 800; }
-  .tk__paiement { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0 0; }
+  /* CE QU'ON PRODUIT : sur un ticket d'atelier, c'est la ligne qu'on lit en
+     premier — pas une mention en petit sous le nom de l'article. */
+  .tk__art-detail { margin: 2px 0 0; font-size: 12px; white-space: pre-line; }
   .tk__pied { margin: 8px 0 0; font-size: 11px; text-align: center; }
 
   /* POUR L'ATELIER — un cadre plein, qu'on ne confond avec aucun article.
@@ -314,31 +264,19 @@ export const CSS_TICKET = `
   .tk__champ::placeholder { color: #9aa0a6; font-style: italic; }
   .tk__champ:focus { outline: 0; border-bottom-color: #000; background: #f0f1f3; }
   .tk--edit .tk__champ { min-height: 34px; }
-  .tk--edit .tk__ligne, .tk--edit .tk__total, .tk--edit .tk__paiement { align-items: center; }
+  .tk--edit .tk__ligne { align-items: center; }
   .tk--edit .tk__ligne span:first-child { flex: 0 0 62px; }
-  /* La quantité, le prix : deux champs courts sur la même rangée que le nom de
-     l'article. Ils gardent une cible d'au moins 44 px de large au doigt. */
+  /* La quantité : un champ court sur la même rangée que le nom de l'article.
+     Il garde une cible d'au moins 44 px de large au doigt. */
   .tk--edit .tk__art-tete { align-items: center; gap: 6px; }
   .tk--edit .tk__art-nom { display: flex; align-items: center; gap: 4px; flex: 1 1 auto; }
   .tk__qte { flex: 0 0 46px; text-align: center; }
   .tk__x { flex: 0 0 auto; }
-  .tk--edit .tk__art-prix { flex: 0 0 88px; }
-  .tk--edit .tk__art-prix .tk__champ { text-align: right; }
   /* La remise, c'est UNE promesse : le jour et l'heure se lisent côte à côte,
      comme ils s'impriment (« À retirer le 20/08/2026 à 16h30 »). */
   .tk__remise-champs { display: flex; align-items: center; gap: 6px; }
   .tk__jour { flex: 1 1 auto; }
   .tk__heure { flex: 0 0 84px; }
-  .tk__euro { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
-  .tk--edit .tk__total .tk__euro { flex: 0 0 116px; }
-  .tk--edit .tk__total .tk__euro .tk__champ { text-align: right; }
-  /* Le paiement tient sur SA ligne : le mode s'étire, « payé » garde sa place.
-     Sans borne, la case à cocher sortait du ticket par la droite. */
-  .tk__paie { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
-  .tk__paie select { flex: 1 1 auto; min-width: 0; }
-  .tk__paye { display: flex; align-items: center; gap: 4px; white-space: nowrap;
-              font-size: 11px; }
-  .tk__paye input { width: 20px; height: 20px; margin: 0; accent-color: #000; }
   .tk--edit .tk__atelier { padding: 6px 7px; }
   .tk__atelier-txt .tk__champ { resize: vertical; }
   .tk--edit .tk__atelier-txt .tk__champ { min-height: 66px; }
@@ -352,8 +290,6 @@ export const CSS_TICKET = `
     .tk__champ { font-size: 16px; }
     .tk--edit .tk__champ { min-height: 44px; }
     .tk--edit .tk__heure { flex: 0 0 108px; }
-    .tk__paye { min-height: 44px; padding: 0 4px; font-size: 12px; }
-    .tk__paye input { width: 24px; height: 24px; }
   }
 `;
 
@@ -389,16 +325,9 @@ export function dessinerTicket(t, doc, editeur) {
   );
 
   // LA RÉFÉRENCE NE SE RETAPE PAS : c'est la clé du dossier (recherche,
-  // idempotence de la prise au comptoir). Ce qui se corrige, c'est le numéro du
-  // PAPIER que le client a en main quand il ne correspond pas — le seul repère
-  // qu'il rapporte au comptoir. Sa ligne n'apparaît sur le papier que si elle
-  // est remplie ; en correction, elle est toujours offerte.
+  // idempotence de la prise au comptoir). Aucun papier ne part chez le client —
+  // ce numéro-là ne sert qu'à relier CE ticket à SON dossier.
   if (t.ref) tk.append(el('div', 'tk__ref', t.ref));
-  if (t.refTicket || editeur) {
-    const p = el('p', 'tk__note');
-    p.append(el('span', null, 'Ticket remis au client : '), val('refTicket', t.refTicket));
-    tk.append(p);
-  }
   if (t.date) tk.append(el('p', 'tk__note', `Le ${t.date}`));
   tk.append(sep());
 
@@ -427,10 +356,7 @@ export function dessinerTicket(t, doc, editeur) {
       } else {
         nom.textContent = `${a.qte ? `${a.qte} × ` : ''}${a.designation}`;
       }
-      const prix = el('div', 'tk__art-prix');
-      if (editeur) prix.append(val('prix', a.prix, a.ou && a.ou.prix));
-      else prix.textContent = a.prix;
-      tete.append(nom, prix);
+      tete.append(nom);
       art.append(tete);
       // CE QU'ON PRODUIT, article par article — la ligne que l'atelier lit en
       // premier. En correction elle est offerte même vide : c'est là qu'on
@@ -441,14 +367,12 @@ export function dessinerTicket(t, doc, editeur) {
         else det.textContent = a.detail;
         art.append(det);
       }
-      if (a.supplement) art.append(duo('tk__art-sup', 'Supplément express', a.supplement));
       tk.append(art);
     }
   }
 
-  // POUR L'ATELIER — entre ce qu'on produit et ce que ça coûte. Celui qui
-  // fabrique lit le panier puis la consigne : il n'a pas à descendre sous le
-  // total, ni à retourner le papier, pour savoir ce qu'on attend de lui.
+  // POUR L'ATELIER — sous ce qu'on produit, en dernier et dans son cadre. Celui
+  // qui fabrique lit le travail puis la consigne, sans retourner le papier.
   if (t.atelier || editeur) {
     const box = el('div', 'tk__atelier');
     const txt = el('p', 'tk__atelier-txt');
@@ -457,16 +381,6 @@ export function dessinerTicket(t, doc, editeur) {
     tk.append(sep(), box);
   }
 
-  tk.append(sep(), duo('tk__total', t.totalLabel, val('total', t.total)));
-  // Une demande de devis n'encaisse rien : pas de ligne de paiement, pas même
-  // un champ pour en poser une.
-  if (t.paiement || (editeur && !t.demande)) {
-    tk.append(duo('tk__paiement', 'Paiement', val('paiement', t.paiement)));
-  }
-  tk.append(
-    sep(),
-    el('p', 'tk__pied', 'Merci pour votre confiance'),
-    el('p', 'tk__pied', "L'équipe Atelier OLDA"),
-  );
+  tk.append(sep(), el('p', 'tk__pied', "L'équipe Atelier OLDA"));
   return tk;
 }

@@ -52,7 +52,7 @@ const COQUILLE = [
   // Importé par app.js, clients.js ET reglages.js : absent du cache, l'import
   // échoue hors ligne et c'est l'application ENTIÈRE qui ne s'ouvre plus.
   '/reseau.js',
-  // Le ticket du client, importé statiquement par app.js — même règle : absent
+  // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',
   // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être

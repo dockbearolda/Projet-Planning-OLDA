@@ -302,8 +302,8 @@ function repondreAuParcours(source, ok, message) {
 
 // `auto` : l'envoi n'est pas un geste de la vendeuse, c'est le parcours qui
 // enregistre son dossier dès qu'il est complet (voir le filet de pont.js). On
-// ne l'emporte donc PAS sur la ligne du planning : elle a le ticket du client
-// à l'écran, et il lui reste à l'imprimer.
+// ne l'emporte donc PAS sur la ligne du planning : elle a le ticket à l'écran,
+// et il lui reste à l'imprimer.
 async function enregistrer(payload, { auto = false, source = null } = {}) {
   // Double tap sur « Créer dans le planning » = une seule ligne au planning.
   // MAIS ON RÉPOND : jeter le message sans un mot laissait l'écran émetteur

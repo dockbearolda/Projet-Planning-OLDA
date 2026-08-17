@@ -1264,11 +1264,11 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 }
 .pcard__handle svg { width: 18px; height: 18px; }
 .pcard:hover .pcard__handle { color: var(--text-2); }
-/* LE TICKET DU CLIENT, sur la carte. Il ne s'atteignait que par la fiche — et
+/* LE TICKET DE L'ATELIER, sur la carte. Il ne s'atteignait que par la fiche — et
    le bouton d'impression y sortait le dossier de travail sur une feuille A4.
    Ici, à côté de « ouvrir » : un appui montre le ticket, un second l'imprime.
-   N'apparaît que sur les dossiers nés au comptoir (cf. aUnTicket) — mais sa
-   PLACE est tenue sur toutes les cartes, sans quoi les colonnes se décalent. */
+   Sur TOUTES les cartes : ce papier dit ce qu'il y a à produire, et une ligne
+   tapée à la main se produit comme celles du comptoir. */
 .pcard__ticket {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
@@ -1278,9 +1278,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .pcard__ticket:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
 .pcard__ticket:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .pcard__ticket svg { width: 18px; height: 18px; }
-/* L'emplacement réservé d'une ligne sans ticket : il occupe la place, il ne se
-   voit pas et il ne se touche pas. */
-.pcard__ticket--vide { border-color: transparent; background: none; cursor: default; }
 /* Ticket retiré depuis le rail « Colonnes » : la case disparaît des DEUX vues,
    et la colonne d'actions se resserre d'autant — toutes les cartes ensemble. */
 body.cards-off-ticket .pcard { --pcard-actions: 148px; }
@@ -5831,12 +5828,6 @@ textarea.ld-ctl { font-weight: 600; }
   box-shadow: 0 0 0 2px var(--surface);
 }
 .pcard__ticket--consigne { position: relative; }
-/* Ligne saisie à la main : aucun papier n'a été remis, la case reste muette. */
-.ticket-cell--vide {
-  box-shadow: none; background: none; color: var(--text-3, var(--text-2));
-  font-weight: 600; cursor: default;
-}
-
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }
 }

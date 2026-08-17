@@ -1,18 +1,19 @@
 'use strict';
 
-// LE TICKET DU CLIENT — retrouvable sur la ligne, imprimable tel quel.
+// LE TICKET DE L'ATELIER — celui qui part avec le dossier à l'établi.
 //
-// Ce que le comptoir remet au client est un TICKET. Le planning, lui, n'en
-// gardait aucune trace imprimable : son bouton « Imprimer » sortait le
-// RÉCAPITULATIF COMPLET sur une feuille A4 — secteur d'activité, adresse de
-// facturation, total HT, taxe de 4 %, points à contrôler et note interne OLDA.
-// Autrement dit le dossier de travail de l'atelier, pas le papier du client.
+// La ligne du planning sortait le ticket du CLIENT : son papier, ses prix, son
+// total, son mode de règlement. Personne ne s'en sert — le client repart avec
+// le sien, imprimé au comptoir. Ce qu'on ressort depuis le planning, c'est le
+// papier qui suit le travail : quoi produire, combien, pour quand, pour qui, et
+// ce qu'il faut savoir avant de couper.
 //
 // Ce fichier vérifie, là où elles vivent :
 //   1. LE MODÈLE DU TICKET (public/ticket.js, fonctions pures) — ce qu'il
-//      garde, et surtout ce qu'il JETTE.
-//   2. LA LIGNE FAIT FOI pour ce qui se corrige après la vente (retrait,
-//      montant, paiement) ; la FICHE fait foi pour ce qui a été vendu.
+//      garde, et surtout ce qu'il JETTE : à commencer par TOUT L'ARGENT.
+//   2. LA LIGNE FAIT FOI pour ce qui se corrige après la vente (le retrait, le
+//      client, la personne à joindre) ; la FICHE fait foi pour ce qui a été
+//      vendu.
 //   3. LA RECHERCHE PAR NUMÉRO DE TICKET — le seul repère que le client
 //      rapporte au comptoir, et le seul champ qu'aucune recherche ne regardait.
 //   4. LE BRANCHEMENT dans l'écran : le bouton d'impression sort le TICKET, la
@@ -157,19 +158,19 @@ const DEMANDE = {
 
 (async () => {
   // =========================================================================
-  // 1. LE TICKET NE PORTE QUE CE QUI EST SUR LE PAPIER DU CLIENT
+  // 1. LE TICKET NE PORTE QUE CE QUI SERT À PRODUIRE
   // =========================================================================
   const tv = modeleTicket(VENTE);
 
   assert.strictEqual(tv.demande, false);
-  assert.strictEqual(tv.titre, 'Ticket de commande');
+  assert.strictEqual(tv.titre, 'Ticket atelier');
   assert.strictEqual(tv.ref, '26.08.06-003');
   assert.strictEqual(tv.client, 'Coco Beach');
   assert.strictEqual(tv.contact, 'Mélina');
   assert.strictEqual(tv.tel, '0690 66 24 00');
 
-  // Les articles VENDUS, dans l'ordre, avec ce que le client lit : la
-  // désignation, la quantité, ce qu'on produit, le prix.
+  // Les articles à PRODUIRE, dans l'ordre, avec ce que l'établi lit : la
+  // désignation, la quantité, ce qu'on en fait. Rien d'autre.
   assert.strictEqual(tv.lignes.length, 2);
   // `plat` : les objets nés dans le vm ont un autre `Object.prototype` que
   // celui du test, et `deepStrictEqual` refuse de les comparer.
@@ -182,28 +183,31 @@ const DEMANDE = {
     designation: 'Polo brodé',
     qte: '2',
     detail: 'Broderie poitrine, fil or',
-    prix: '126,40 €',
-    supplement: '12,00 €',
   });
-  // Un supplément à zéro n'est pas une ligne : c'est un supplément qui
-  // n'existe pas. Il encombrait le ticket pour dire qu'il ne s'est rien passé.
-  assert.strictEqual(tv.lignes[1].supplement, '');
   assert.strictEqual(tv.lignes[1].designation, 'Tasse personnalisée');
+  // Le prix et le supplément express ne sont plus des CHAMPS du modèle : pas
+  // « vides », absents. Un champ vide se remplit un jour par mégarde.
+  assert.strictEqual(tv.lignes[0].prix, undefined);
+  assert.strictEqual(tv.lignes[0].supplement, undefined);
 
-  // CE QUI DOIT AVOIR DISPARU. C'est la plainte du patron, mot pour mot : « ça
-  // imprime une feuille avec trop d'infos ». On le vérifie sur le texte du
-  // ticket, seul endroit où tout ce qu'il porte est réuni.
+  // CE QUI DOIT AVOIR DISPARU. On le vérifie sur le TEXTE du ticket, seul
+  // endroit où tout ce qu'il porte est réuni.
   const papier = ticketTexte(tv);
   for (const interdit of [
-    'Note interne',            // la note de l'atelier, JAMAIS sur un ticket client
+    'Note interne',            // la note du dossier, jamais sur un papier d'atelier
     'Client difficile',        // son contenu, tout autant
     'Secteur',                 // le secteur d'activité
     'Restauration',
     'Adresse',                 // l'adresse de facturation
     'Marigot',
-    'Total HT',                // le client paie un TTC, il ne lit pas un calcul
+    'Total',                   // l'argent, sous toutes ses formes
     'Taxe',
     'Prix unitaire',
+    'Supplément',
+    'Paiement',
+    'Carte bancaire',
+    '148,50',
+    '126,40',
     'E-mail',
     'contact@cocobeach.example',
     'Fonction du contact',
@@ -212,29 +216,49 @@ const DEMANDE = {
   ]) {
     assert.ok(!papier.includes(interdit), `le ticket ne doit plus porter « ${interdit} » :\n${papier}`);
   }
-  // …et ce qui DOIT y être.
-  for (const attendu of ['ATELIER OLDA', '26.08.06-003', 'Coco Beach', 'Polo brodé',
-    '2 x Polo brodé', 'Broderie poitrine, fil or', 'Supplément express', '148,50 €']) {
+  // PAS UN SEUL EURO. Le contrôle qui tient tout seul : peu importe par où
+  // l'argent essaierait de revenir, il porte ce signe.
+  assert.ok(!papier.includes('€'), `aucun montant ne doit figurer sur le ticket :\n${papier}`);
+
+  // …et ce qui DOIT y être : quoi, combien, pour quand, pour qui, comment.
+  for (const attendu of ['ATELIER OLDA', 'TICKET ATELIER', '26.08.06-003', 'Coco Beach',
+    'Mélina', '0690 66 24 00', 'À RETIRER LE 07/08/2026 à 16h30',
+    '2 x Polo brodé', 'Broderie poitrine, fil or', '1 x Tasse personnalisée']) {
     assert.ok(papier.includes(attendu), `le ticket doit porter « ${attendu} » :\n${papier}`);
   }
+
+  // LA CONSIGNE DE L'ATELIER, dans son cadre — la raison d'être du papier.
+  const avecConsigne = modeleTicket({
+    ...VENTE, fiche: { ...VENTE.fiche, atelier: 'Logo poitrine gauche 8 cm — appeler avant de couper' },
+  });
+  assert.strictEqual(avecConsigne.atelier, 'Logo poitrine gauche 8 cm — appeler avant de couper');
+  const avecCadre = ticketTexte(avecConsigne);
+  assert.ok(avecCadre.includes("POUR L'ATELIER"));
+  assert.ok(avecCadre.includes('appeler avant de couper'));
 
   // =========================================================================
   // 2. LA LIGNE FAIT FOI pour ce qui se corrige après la vente
   // =========================================================================
   // Le récapitulatif figé annonce une récupération le 07/08 à 14:00 ; la ligne,
   // elle, a été corrigée depuis (16:30). Un ticket réimprimé doit porter la
-  // correction, sinon on remet au client un papier que l'atelier ne tiendra pas.
+  // correction, sinon l'atelier produit pour une heure que personne ne tiendra.
   assert.strictEqual(tv.remiseLabel, 'À retirer le');
   assert.strictEqual(tv.remise, '07/08/2026 à 16h30');
-  assert.strictEqual(tv.total, '148,50 €');
-  assert.strictEqual(tv.paiement, 'Carte bancaire — payé');
 
-  const nonPaye = modeleTicket({ ...VENTE, paye: false, paiement_mode: null });
-  assert.strictEqual(nonPaye.paiement, 'À régler au retrait');
-
-  const corrigee = modeleTicket({ ...VENTE, project_value: 160, deadline: '2026-08-11' });
-  assert.strictEqual(corrigee.total, '160,00 €');
+  const corrigee = modeleTicket({
+    ...VENTE, deadline: '2026-08-11', billing_company: 'Coco Beach Bar', contact_phone: '0690 00 11 22',
+  });
   assert.strictEqual(corrigee.remise, '11/08/2026 à 16h30');
+  // Le récapitulatif figé dit encore « Coco Beach » et l'ancien numéro : c'est
+  // la LIGNE qui fait foi pour tout ce qui se corrige après la vente.
+  assert.strictEqual(corrigee.client, 'Coco Beach Bar');
+  assert.strictEqual(corrigee.tel, '0690 00 11 22');
+
+  // L'ARGENT N'EST PLUS UN CHAMP DU MODÈLE. Le montant de la ligne ne remonte
+  // nulle part sur ce papier, même quand il existe.
+  assert.strictEqual(tv.total, undefined);
+  assert.strictEqual(tv.totalLabel, undefined);
+  assert.strictEqual(tv.paiement, undefined);
 
   // LA DATE DE LA VENTE EST CELLE DE L'ATELIER. `creeLe` est un instant UTC :
   // pris à 21 h 12 à Saint-Martin, il tombe au 07/08 en UTC. Un ticket daté du
@@ -246,16 +270,13 @@ const DEMANDE = {
   // =========================================================================
   const td = modeleTicket(DEMANDE);
   assert.strictEqual(td.demande, true);
-  assert.strictEqual(td.titre, 'Demande de devis');
+  // Même papier, même titre : ce qui change, c'est la PROMESSE — on ne retire
+  // pas une demande, on y répond.
+  assert.strictEqual(td.titre, 'Ticket atelier');
   assert.strictEqual(td.ref, 'DEV-26.08.06-002');
   assert.strictEqual(td.remiseLabel, 'Réponse souhaitée');
   assert.strictEqual(td.remise, '20/08/2026');
-  // Rien n'est chiffré : on le DIT. `project_value` est NULL, jamais 0 — écrire
-  // « 0,00 € » sur un devis, c'est promettre la gratuité.
-  assert.strictEqual(td.total, 'À chiffrer');
-  assert.strictEqual(td.totalLabel, 'Montant');
-  // Une demande n'encaisse rien : pas de ligne de paiement du tout.
-  assert.strictEqual(td.paiement, '');
+  assert.ok(!ticketTexte(td).includes('€'), 'un devis non chiffré n’annonce surtout aucun montant');
 
   assert.strictEqual(td.lignes.length, 1);
   assert.strictEqual(td.lignes[0].designation, 'Panneau dibond');
@@ -280,7 +301,6 @@ const DEMANDE = {
   assert.strictEqual(main.lignes.length, 1);
   assert.strictEqual(main.lignes[0].designation, 'Bâche 2 m');
   assert.strictEqual(main.ref, '');
-  assert.strictEqual(main.total, '60,00 €');
 
   // Le placeholder « — » du comptoir ne se recopie pas : un ticket qui annonce
   // « Contact : — » n'apprend rien à personne.
@@ -292,24 +312,29 @@ const DEMANDE = {
   assert.strictEqual(sansContact.remise, '');
   assert.ok(!ticketTexte(sansContact).includes('Contact'));
 
-  // Une référence qu'il a fallu changer (deux postes hors réseau, même numéro
-  // de secours) : le ticket DÉJÀ REMIS porte l'ancienne, et sans ce rappel plus
-  // personne ne peut relier le papier du client au dossier du planning.
-  const collision = modeleTicket({
+  // ON NE REMET AUCUN TICKET AU CLIENT. Les vieux dossiers portent encore un
+  // `refTicket` — le numéro du papier remis à l'époque où on en remettait un.
+  // Le ticket de l'atelier ne le sort pas : il ne parle qu'à l'établi, et une
+  // ligne de plus sur un papier de travail est une question de plus.
+  const ancien = modeleTicket({
     ...VENTE,
     fiche: { ...VENTE.fiche, ref: '26.08.06-004', refTicket: '26.08.06-003' },
   });
-  assert.strictEqual(collision.ref, '26.08.06-004');
-  assert.ok(ticketTexte(collision).includes('Ticket remis au client : 26.08.06-003'));
+  assert.strictEqual(ancien.ref, '26.08.06-004');
+  assert.strictEqual(ancien.refTicket, undefined, 'le modèle ne porte plus ce champ du tout');
+  const papierAncien = ticketTexte(ancien);
+  assert.ok(!papierAncien.includes('remis au client'));
+  assert.ok(!papierAncien.includes('26.08.06-003'), 'l’ancien numéro de papier ne s’imprime nulle part');
+  assert.ok(papierAncien.includes('26.08.06-004'), 'la référence du dossier, elle, reste en tête')
 
   // Rien ne casse sur une entrée absurde : l'aperçu doit s'ouvrir, toujours.
   for (const vide of [null, undefined, {}, { fiche: 'pas un objet' }]) {
     const t = modeleTicket(vide);
     assert.strictEqual(typeof ticketTexte(t), 'string');
-    assert.strictEqual(t.total, 'À chiffrer');
+    assert.strictEqual(t.lignes.length, 0);   // (deepStrictEqual refuse un tableau né dans le vm)
   }
 
-  console.log('✓ ticket : contenu du papier client, ligne qui fait foi, devis et cas limites OK');
+  console.log('✓ ticket atelier : ce qui sert à produire, l’argent en moins, ligne qui fait foi OK');
 
   // =========================================================================
   // 5. LA RECHERCHE TROUVE UN DOSSIER PAR SON NUMÉRO DE TICKET
@@ -379,6 +404,7 @@ const DEMANDE = {
   // 6. LE BRANCHEMENT DANS L'ÉCRAN
   // =========================================================================
   const APP = lire('app.js');
+  const CSS_APP = lire('styles.css');
 
   // Le bouton « Imprimer » de la fiche sort le TICKET, plus le récapitulatif.
   assert.ok(/ldActionBtn\('imprimer', 'Imprimer', \(\) => imprimerTicket\(r\)\)/.test(APP),
@@ -394,9 +420,31 @@ const DEMANDE = {
   assert.ok(/tr\.appendChild\(cellTicket\(r\)\)/.test(APP),
     'la ligne du tableau doit porter sa colonne ticket');
 
-  // Le bouton n'agit que là où un ticket a réellement existé.
-  assert.ok(/function aUnTicket\(r\)/.test(APP));
-  assert.ok(/if \(aUnTicket\(r\)\) \{/.test(APP));
+  // SUR TOUTES LES LIGNES. Le bouton ne paraissait que sur les dossiers nés au
+  // comptoir : logique tant qu'il sortait le papier du CLIENT — une ligne tapée
+  // à la main n'en avait jamais eu. Depuis qu'il sort le papier de l'ATELIER, la
+  // question n'est plus d'où vient le dossier mais qui va le produire.
+  assert.ok(!/aUnTicket/.test(APP), 'plus de garde « né au comptoir » sur le ticket');
+  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(APP),
+    'plus d’emplacement muet : chaque ligne a son bouton');
+  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(CSS_APP),
+    'et plus de règle de style pour un emplacement qui n’existe plus');
+  // Le bouton de la fiche n'est plus conditionnel non plus.
+  assert.ok(/ldActionBtn\('ticket', 'Ticket', \(\) => ouvrirTicket\(r\)\),/.test(APP),
+    'la fiche doit offrir le ticket sur toutes les lignes');
+
+  // ET IL SE BÂTIT VRAIMENT sur une ligne sans récapitulatif du comptoir : la
+  // désignation et la quantité viennent des COLONNES, la production de la fiche.
+  const aLaMain = modeleTicket({
+    billing_company: 'Passage rapide', product: 'Bâche 2 m', quantity: 1,
+    deadline: '2026-08-09', fiche: { production: 'Impression UV', atelier: 'Œillets tous les 50 cm' },
+  });
+  assert.strictEqual(aLaMain.lignes.length, 1);
+  assert.strictEqual(aLaMain.lignes[0].designation, 'Bâche 2 m');
+  assert.strictEqual(aLaMain.lignes[0].detail, 'Impression UV');
+  assert.strictEqual(aLaMain.atelier, 'Œillets tous les 50 cm');
+  const papierMain = ticketTexte(aLaMain);
+  assert.ok(papierMain.includes('1 x Bâche 2 m') && papierMain.includes("POUR L'ATELIER"));
 
   // -------------------------------------------------------------------------
   // 6 bis. LE TICKET EN COLONNE — affichable ou non, et sans décaler le reste
@@ -435,13 +483,11 @@ const DEMANDE = {
 
   // ALIGNEMENT. La carte est sa propre grille : une colonne dimensionnée par
   // son CONTENU décale toutes les autres d'une ligne à l'autre. La colonne
-  // d'actions a donc une largeur arrêtée, et la place du ticket est tenue même
-  // sur une ligne qui n'en a pas.
+  // d'actions garde donc une largeur arrêtée — et le bouton étant désormais sur
+  // toutes les lignes, plus rien ne peut la faire varier de l'une à l'autre.
   assert.ok(/--pcard-actions: 200px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
   assert.ok(!/grid-template-columns:[^;]*\bauto;/.test(CSS.match(/\.pcard \{[\s\S]*?\n\}/)[0]),
     'aucune piste `auto` dans la grille de la carte : elle dépendrait du contenu');
-  assert.ok(/pcard__ticket pcard__ticket--vide/.test(APP),
-    'une ligne sans ticket doit garder l’emplacement réservé');
   assert.ok(/body\.cards-off-ticket \.pcard \{ --pcard-actions: 148px; \}/.test(CSS),
     'ticket rangé : la colonne d’actions se resserre pour toutes les cartes ensemble');
 
