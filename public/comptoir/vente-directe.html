@@ -1036,28 +1036,18 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <label class="inline-check">
-      <input id="instantDelivery" type="checkbox">
-      Le client repart immédiatement avec sa commande
-    </label>
-
     <button id="payButton" class="primary full">Encaisser le paiement</button>
   </div>
 
   <div id="paymentSuccess" class="card success hidden">
-    <h2>✅ Commande enregistrée</h2>
-    <p id="paymentStatus"></p>
     <p><b>La note interne OLDA reste modifiable à tout moment.</b></p>
 
     <div class="footer-actions">
-      <button id="printTicketBtn" class="secondary">🖨️ Imprimer le ticket</button>
-      <button id="downloadTicketBtn" class="secondary">⬇️ Télécharger le ticket</button>
       <button id="sendWhatsAppBtn" class="whatsapp">💬 Envoyer sur WhatsApp</button>
     </div>
-    <div class="actions" style="margin-top:14px">
-      <button id="newSaleBtn" class="primary">Nouvelle vente</button>
-      <button id="homeBtn" class="secondary">Retour accueil</button>
-    </div>
+    <!-- Vide à l'écran : c'est ici que `addPlanningButton()` greffe le bouton
+         d'envoi au planning, que le pont presse. Il est masqué, pas retiré. -->
+    <div class="actions" style="margin-top:14px"></div>
   </div>
 
   
@@ -1697,15 +1687,6 @@ function processPayment(){
   if(!validatePayment()) return false;
 
   fillTicket();
-  const mode=selectedPayment();
-  const immediate=document.getElementById("instantDelivery").checked;
-  const paid=mode!=="Paiement au retrait";
-
-  document.getElementById("paymentStatus").textContent=
-    immediate
-      ? `Commande validée${paid?", paiement enregistré":""} et terminée : le client repart avec sa commande.`
-      : `Commande validée${paid?", paiement enregistré":""} et envoyée en production.`;
-
   document.getElementById("paymentSuccess").classList.remove("hidden");
   document.getElementById("ticketArea").classList.remove("hidden");
   updateStepper(3);
@@ -1846,14 +1827,7 @@ document.getElementById("newCompanyPostal").addEventListener("input",function(){
 });
 
 document.getElementById("payButton").addEventListener("click",processPayment);
-document.getElementById("printTicketBtn").addEventListener("click",printTicket);
-document.getElementById("downloadTicketBtn").addEventListener("click",downloadTicket);
 document.getElementById("sendWhatsAppBtn").addEventListener("click",sendWhatsApp);
-document.getElementById("newSaleBtn").addEventListener("click",()=>{
-  // Même garde que le bouton de bas d'écran : rien ne s'efface sans un oui.
-  if(confirm("Commencer une nouvelle vente ? L'écran actuel sera effacé.")) location.reload();
-});
-document.getElementById("homeBtn").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
 
 // Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
 ["productName","quantity","articlePrice","customPrice"].forEach(id=>{
@@ -1886,7 +1860,11 @@ renderProducts();
     if(!host) return;
     const btn=document.createElement("button");
     btn.id="oldaCreatePlanningBtn";
-    btn.className="primary";
+    // MASQUÉ, PAS SUPPRIMÉ. C'est ce bouton que `pont.js` presse pour envoyer
+    // le dossier au planning (`btn.click()`, après avoir vérifié `isConnected`).
+    // Le retirer du DOM ne cacherait pas une commande : elle n'arriverait plus
+    // nulle part. Il quitte l'écran, il reste la mécanique.
+    btn.className="primary hidden";
     btn.textContent="📅 Créer dans le planning";
     btn.style.marginTop="10px";
     btn.onclick=function(){
@@ -1901,8 +1879,8 @@ renderProducts();
         responsible:"Non défini",
         due:text("deliveryDate") || isoDate(new Date()),
         priority:window.prioritePourDate(text("deliveryDate")),
-        stage:(pick("instantDelivery")?.checked ? "facturation" : "preparation"),
-        status:(pick("instantDelivery")?.checked ? "Commande récupérée" : "Préparation des produits"),
+        stage:"preparation",
+        status:"Préparation des produits",
         production:production || "À définir",
         comment:[`Délai souhaité : ${deliveryDelayLabel()}`,text("internalNote")].filter(Boolean).join(" | "),
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
@@ -2140,7 +2118,6 @@ renderProducts();
 
 <script>
 (function(){
-  const instantDelivery=document.getElementById("instantDelivery");
   const deliveryDate=document.getElementById("deliveryDate");
   const deliveryTime=document.getElementById("deliveryTime");
 
@@ -2162,14 +2139,6 @@ renderProducts();
     deliveryTime.value="14:00";
   }
 
-  instantDelivery.addEventListener("change",function(){
-    if(this.checked){
-      const now=new Date();
-      deliveryDate.value=localDateValue(now);
-      deliveryTime.value=closestFullHour(now);
-      updateDeadlineInfo();
-    }
-  });
 })();
 </script>
 
@@ -2523,7 +2492,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       out.push(['Part carte',d(v('mixCard')?euro.format(Number(v('mixCard'))):'')]);
       out.push(['Part espèces',d(v('mixCash')?euro.format(Number(v('mixCash'))):'')]);
     }
-    out.push(['Client repart immédiatement',(el('instantDelivery')&&el('instantDelivery').checked)?'Oui':'Non']);
     out.push(['Note interne OLDA',d(v('internalNote'))]);
     return out;
   };
@@ -2544,7 +2512,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     btn.onclick=function(){
       var productNames=(typeof products!=="undefined"?products:[]).map(function(p){return p.qty+' x '+p.name;}).join(' • ');
       var production=(typeof products!=="undefined"?products:[]).map(function(p){return p.description;}).filter(Boolean).join(' | ');
-      var instant=el('instantDelivery')&&el('instantDelivery').checked;
       /* `due` et `priority` doivent décrire la MÊME date, d'où cette variable :
          l'échéance envoyée et l'urgence facturée ne peuvent pas diverger. */
       var dueIso=((typeof products!=="undefined"?products:[])[0]||{}).deliveryDate
@@ -2564,8 +2531,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
            jamais vue. */
         due:dueIso,
         priority:window.prioritePourDate(dueIso),
-        stage:instant?'facturation':'preparation',
-        status:instant?'Commande récupérée':'Préparation des produits',
+        stage:'preparation',
+        status:'Préparation des produits',
         production:production||'À définir',
         comment:[(typeof deliveryDelayLabel==='function'?'Délai souhaité : '+deliveryDelayLabel():''),v('internalNote')].filter(Boolean).join(' | '),
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
@@ -2590,7 +2557,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
           modeLabel:mode,
           mode:MODES_PLANNING[mode]||null,
           paye:!!mode&&mode!=='Paiement au retrait',
-          retraitImmediat:!!instant
+          retraitImmediat:false
         }
       };
       parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},location.origin);
@@ -2846,8 +2813,13 @@ button.blocked{opacity:.45;cursor:not-allowed}
   function refreshLive(){
     var btn=el('saleNext');
     if(!btn)return;
+    // L'écran de fin n'a plus rien à contrôler : le bandeau de l'étape 3 y
+    // restait affiché, à répéter « tout est renseigné » sous une commande déjà
+    // encaissée et déjà partie au planning. Il garde son rôle aux étapes 1 à 3,
+    // où il dit ce qui manque et bloque le bouton « suivant ».
+    var fini=el('paymentSuccess')&&!el('paymentSuccess').classList.contains('hidden');
     var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
-    if(step>=4){
+    if(fini||step>=4){
       var old=el('liveCheckSale');
       if(old)old.remove();
       btn.classList.remove('blocked');
@@ -2876,37 +2848,9 @@ button.blocked{opacity:.45;cursor:not-allowed}
     }
   }
 
-  /* 5 — Ticket : bandeau dossier complet / éléments manquants */
-  function refreshRecapBanner(){
-    var host=el('paymentSuccess');
-    if(!host||host.classList.contains('hidden'))return;
-    var box=el('saleReadyBanner');
-    if(!box){
-      box=document.createElement('div');
-      box.id='saleReadyBanner';
-      box.className='live-check ok';
-      host.insertBefore(box,host.querySelector('.footer-actions'));
-    }
-    var missing=[];
-    if(!selectedClient)missing.push('Fiche client complète');
-    else{
-      if(!selectedClient.phone)missing.push('WhatsApp du client');
-      if(!selectedClient.email&&selectedClient.type!=='Particulier')missing.push('E-mail du client');
-    }
-    if(!products.length)missing.push('Articles de la commande');
-    if(!v('internalNote'))missing.push('Note interne OLDA (facultative mais conseillée)');
-    if(missing.length){
-      box.className='live-check todo';
-      box.innerHTML='⚠ À compléter avant transmission :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-    }else{
-      box.className='live-check ok';
-      box.textContent='✓ Dossier complet — ticket prêt à imprimer, envoyer et créer dans le planning.';
-    }
-  }
-
   document.addEventListener('input',function(){refreshLive();},true);
   document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
-  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+  setInterval(function(){refreshLive();},600);
 })();
 </script>
 <!-- ====================================================================== -->

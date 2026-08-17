@@ -105,7 +105,6 @@ const VENTE = {
       { k: 'Suppléments', v: '12,00 €' },
       { k: 'Total TTC', v: '148,50 €' },
       { k: 'Paiement', v: 'Carte bancaire' },
-      { k: 'Client repart immédiatement', v: 'Non' },
       { k: 'Note interne OLDA', v: 'Client difficile, ne rien promettre avant le BAT' },
     ],
   },
