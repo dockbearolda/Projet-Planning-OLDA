@@ -85,17 +85,15 @@ const VENTE = {
   // Le récapitulatif du comptoir se corrige par POSITION (les libellés viennent
   // du parcours et ne se réécrivent pas) : chaque valeur du ticket porte donc
   // l'indice de SA ligne dans `fiche.details`. Un indice faux corrigerait la
-  // quantité d'un article en croyant corriger le prix de l'autre.
+  // quantité d'un article en croyant corriger celle de l'autre.
   assert.deepStrictEqual(JSON.parse(JSON.stringify(t.lignes[0].ou)), {
     designation: { ou: 'details', i: 1 },
     qte: { ou: 'details', i: 2 },
-    prix: { ou: 'details', i: 3 },
     detail: { ou: 'details', i: 4 },
   });
   assert.deepStrictEqual(JSON.parse(JSON.stringify(t.lignes[1].ou)), {
     designation: { ou: 'details', i: 5 },
     qte: { ou: 'details', i: 6 },
-    prix: { ou: 'details', i: 7 },
     detail: { ou: 'details', i: 8 },
   });
   // L'indice pointe bien sur la ligne dont on lit la valeur.
@@ -132,7 +130,6 @@ const VENTE = {
     designation: { ou: 'ligne', col: 'product' },
     qte: { ou: 'ligne', col: 'quantity' },
     detail: { ou: 'fiche', cle: 'production' },
-    prix: null,
   });
 
   // LE DÉTAIL D'UN BESOIN DE DEVIS résume trois champs (catégorie, couleur,
@@ -171,11 +168,12 @@ const VENTE = {
   const papier = ticketTexte(avecConsigne);
   assert.ok(papier.includes("POUR L'ATELIER"));
   assert.ok(papier.includes('Logo poitrine gauche 8 cm — appeler avant de couper'));
-  // Elle se lit AVANT le total : celui qui fabrique n'a pas à descendre sous le
-  // prix, ni à retourner le papier, pour savoir ce qu'on attend de lui.
-  assert.ok(papier.indexOf("POUR L'ATELIER") < papier.indexOf('TOTAL TTC'));
+  // Elle se lit APRÈS le travail : d'abord ce qu'on produit, puis ce qu'il faut
+  // savoir pour le produire — et sans jamais retourner le papier.
+  assert.ok(papier.indexOf('Polo brodé') < papier.indexOf("POUR L'ATELIER"));
+  assert.ok(papier.indexOf("POUR L'ATELIER") < papier.indexOf("L'équipe Atelier OLDA"));
   // Et elle n'a pas fait disparaître le reste au passage.
-  assert.ok(papier.includes('Polo brodé') && papier.includes('148,50 €'));
+  assert.ok(papier.includes('Polo brodé') && papier.includes('Broderie poitrine'));
 
   console.log('✓ ticket modifiable : la consigne atelier s’imprime, la note interne jamais');
 
@@ -184,7 +182,7 @@ const VENTE = {
   // =========================================================================
   // Le MÊME dessin sert l'aperçu et l'imprimante — c'est ce qui garantit qu'on
   // corrige le ticket qui sortira. L'impression, elle, n'appelle jamais
-  // l'éditeur : un ticket client ne porte pas de cases à remplir.
+  // l'éditeur : un papier d'atelier ne porte pas de cases à remplir.
   const faireDoc = () => ({
     createElement: (tag) => ({
       tag, className: '', textContent: '', enfants: [],
@@ -221,9 +219,15 @@ const VENTE = {
     c.className = 'tk__champ';
     return c;
   });
-  for (const attendu of ['refTicket', 'client', 'tel', 'remise', 'total', 'paiement', 'atelier',
-    'qte', 'designation', 'prix', 'detail']) {
+  for (const attendu of ['refTicket', 'client', 'contact', 'tel', 'remise', 'atelier',
+    'qte', 'designation', 'detail']) {
     assert.ok(vus.includes(attendu), `« ${attendu} » doit être corrigeable dans l’aperçu`);
+  }
+  // L'ARGENT N'EST PLUS OFFERT DU TOUT. Pas un champ vide qu'on remplirait par
+  // mégarde : aucune case. Le prix et le règlement se corrigent sur la ligne du
+  // planning et dans la fiche, là où ils vivent.
+  for (const parti of ['total', 'paiement', 'prix', 'supplement']) {
+    assert.ok(!vus.includes(parti), `« ${parti} » n’a plus à figurer sur un ticket d’atelier`);
   }
   assert.ok(balises(aLEcran).includes('input'));
   // La RÉFÉRENCE n'est pas dans la liste : c'est la clé du dossier (recherche,
@@ -231,12 +235,12 @@ const VENTE = {
   assert.ok(!vus.includes('ref'));
   assert.ok(texteDe(aLEcran).includes('26.08.06-003'), 'la référence reste lisible, en toutes lettres');
 
-  // Une demande de devis n'encaisse rien : pas de ligne de paiement, pas même
-  // un champ pour en poser une.
+  // Une demande de devis suit la même règle, et garde sa consigne : l'atelier
+  // peut avoir une maquette à préparer avant que rien ne soit chiffré.
   const vusDevis = [];
   const docD = faireDoc();
   dessinerTicket(devis, docD, (cle) => { vusDevis.push(cle); return docD.createElement('input'); });
-  assert.ok(!vusDevis.includes('paiement'));
+  for (const parti of ['total', 'paiement', 'prix']) assert.ok(!vusDevis.includes(parti));
   assert.ok(vusDevis.includes('atelier'), 'une demande aussi peut porter une consigne');
 
   console.log('✓ ticket modifiable : champs à l’écran, aucun sur le papier');

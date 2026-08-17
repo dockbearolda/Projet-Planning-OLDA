@@ -1355,7 +1355,7 @@ function buildCard(r) {
     tk.type = 'button';
     tk.className = 'pcard__ticket';
     if (consigneAtelier(r)) tk.classList.add('pcard__ticket--consigne');
-    tk.setAttribute('aria-label', `Ticket du client — corriger et imprimer${
+    tk.setAttribute('aria-label', `Ticket atelier — corriger et imprimer${
       consigneAtelier(r) ? ' · consigne pour l’atelier' : ''}`);
     attachTip(tk, infobulleTicket(r));
     tk.appendChild(strokeIcon(LD_ICONES.ticket));
@@ -3405,14 +3405,16 @@ async function telechargerRecap(r) {
 }
 
 // ===========================================================================
-// LE TICKET DU CLIENT — retrouver, revoir, réimprimer
+// LE TICKET DE L'ATELIER — le ressortir depuis la ligne, le corriger, l'imprimer
 // ===========================================================================
-// « Imprimer » sortait le RÉCAPITULATIF COMPLET : une feuille A4 avec le
-// secteur d'activité, l'adresse de facturation, le total HT, la taxe de 4 %,
-// les points à contrôler et la note interne OLDA. Le client, lui, repart avec
-// un TICKET — et c'est ce ticket-là qu'on doit pouvoir ressortir quand il
-// revient au comptoir. Le récapitulatif complet reste disponible, mais en
-// TÉLÉCHARGEMENT : c'est un document de travail, pas un papier client.
+// La ligne sortait le ticket du CLIENT : son papier, ses prix, son total, son
+// mode de règlement. Personne ne s'en sert — le client repart avec le sien,
+// imprimé au comptoir. Ce qu'on a besoin de ressortir depuis le planning, c'est
+// le papier qui suit le travail jusqu'à l'établi : quoi produire, combien, pour
+// quand, pour qui, et ce qu'il faut savoir avant de couper.
+//
+// L'ARGENT N'EST PLUS DESSUS. Ni prix, ni total, ni paiement : ça se corrige
+// toujours, mais sur la ligne du planning et dans la fiche, là où ça vit.
 
 // Un dossier né au comptoir porte une référence de ticket. Une ligne créée à la
 // main dans la grille, non : elle n'a jamais eu de papier remis à personne, et
@@ -3437,7 +3439,7 @@ function consigneAtelier(r) {
 // s'apercevoir qu'elle ne concernait pas ce qu'on cherchait.
 function infobulleTicket(r) {
   const ref = (r.fiche && r.fiche.ref) || '';
-  const quoi = `${ref ? `Ticket ${ref}` : 'Ticket du client'} — corriger et imprimer`;
+  const quoi = `${ref ? `Ticket atelier ${ref}` : 'Ticket atelier'} — corriger et imprimer`;
   const consigne = consigneAtelier(r);
   if (!consigne) return quoi;
   const court = consigne.length > 70 ? `${consigne.slice(0, 69)}…` : consigne;
@@ -3498,7 +3500,7 @@ function imprimerModele(t, titre) {
 
 async function imprimerTicket(r) {
   const t = await ticketDeLaLigne(r);
-  imprimerModele(t, `Ticket ${t.ref || r.billing_company || ''}`.trim());
+  imprimerModele(t, `Ticket atelier ${t.ref || r.billing_company || ''}`.trim());
 }
 
 // La feuille du ticket est posée dans la page à la PREMIÈRE ouverture, et pas
@@ -3576,16 +3578,6 @@ function editeurTicket(r, champs) {
     const s = String(v == null ? '' : v).trim();
     return s === '' ? null : s;
   };
-  // Un montant ILLISIBLE n'est pas « pas de montant » : c'est une faute de
-  // frappe. On refuse (`undefined`) plutôt que d'effacer en silence le prix
-  // d'une vente — c'est déjà la règle du comptoir (cf. prixComptoir, serveur).
-  const montantOuNull = (v) => {
-    const s = String(v == null ? '' : v).replace(/[\s€]/g, '').replace(',', '.').trim();
-    if (s === '') return null;
-    const n = Number(s);
-    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : undefined;
-  };
-
   const marquerEnregistre = (ctrl) => {
     ctrl.classList.remove('is-saved');
     void ctrl.offsetWidth; // relance l'animation quand la même case repart deux fois
@@ -3611,20 +3603,15 @@ function editeurTicket(r, champs) {
   // la fermeture ET à l'impression sans multiplier les requêtes.
   const brancher = (ctrl, cible, lire) => {
     let envoye = lire();
-    let affiche = ctrl.type === 'checkbox' ? ctrl.checked : ctrl.value;
-    const remettre = (v) => { if (ctrl.type === 'checkbox') ctrl.checked = v; else ctrl.value = v; };
+    let affiche = ctrl.value;
+    const remettre = (v) => { ctrl.value = v; };
     const sauver = () => {
       const v = lire();
-      if (v === undefined) { // saisie refusée : on rend la valeur d'avant
-        remettre(affiche);
-        showToast('Montant illisible — rien n’a été changé');
-        return Promise.resolve();
-      }
       if (v === envoye) return Promise.resolve();
       const envoyeAvant = envoye;
       const afficheAvant = affiche;
       envoye = v;
-      affiche = ctrl.type === 'checkbox' ? ctrl.checked : ctrl.value;
+      affiche = ctrl.value;
       return aLaSuite(() => envoyerTicket(r, cible, v)).then(
         () => marquerEnregistre(ctrl),
         (err) => {
@@ -3705,44 +3692,6 @@ function editeurTicket(r, champs) {
         brancher(heure, { ou: 'fiche', cle: 'heureSouhaitee' }, () => texteOuNull(heure.value));
         return boite('tk__remise-champs', jour, heure);
       }
-      case 'total': {
-        // « À chiffrer » n'est pas un prix : sur une demande de devis le champ
-        // part vide plutôt que de faire effacer ces deux mots avant de taper.
-        // Avec ses centimes, comme sur le papier : « 148,5 » dans un champ de
-        // prix, on se demande s'il manque un chiffre.
-        const brut = r.project_value == null ? '' : Number(r.project_value).toFixed(2).replace('.', ',');
-        const c = champ('input', brut, {
-          mode: 'decimal', cls: 'tk__montant', label: 'Montant', placeholder: 'à chiffrer',
-        });
-        brancher(c, { ou: 'ligne', col: 'project_value' }, () => montantOuNull(c.value));
-        const euro = document.createElement('span');
-        euro.textContent = '€';
-        return boite('tk__euro', c, euro);
-      }
-      // Le solde se règle souvent AU RETRAIT, le ticket à la main : c'est ici
-      // qu'on le note, pas trois écrans plus loin dans la fiche.
-      case 'paiement': {
-        const sel = document.createElement('select');
-        sel.className = 'tk__champ';
-        sel.setAttribute('aria-label', 'Mode de paiement');
-        for (const o of [{ id: '', label: 'à régler' }, ...PAIEMENT_MODES]) {
-          const opt = document.createElement('option');
-          opt.value = o.id;
-          opt.textContent = o.label;
-          sel.append(opt);
-        }
-        sel.value = r.paiement_mode || '';
-        brancher(sel, { ou: 'ligne', col: 'paiement_mode' }, () => texteOuNull(sel.value));
-        const bascule = document.createElement('input');
-        bascule.type = 'checkbox';
-        bascule.checked = r.paye === true;
-        bascule.setAttribute('aria-label', 'Payé');
-        brancher(bascule, { ou: 'ligne', col: 'paye' }, () => bascule.checked);
-        const lab = document.createElement('label');
-        lab.className = 'tk__paye';
-        lab.append(bascule, document.createTextNode('payé'));
-        return boite('tk__paie', sel, lab);
-      }
       // POUR L'ATELIER — la raison d'être de tout ceci. Toujours offerte, même
       // vide : c'est en la voyant vide qu'on pense à la remplir.
       case 'atelier': {
@@ -3764,7 +3713,6 @@ function editeurTicket(r, champs) {
         const o = {
           qte: { cls: 'tk__qte', mode: 'numeric', label: 'Quantité' },
           designation: { label: 'Désignation de l’article' },
-          prix: { mode: 'decimal', label: 'Prix de l’article' },
           detail: {
             tag: 'textarea', rows: 2, label: 'Ce qu’on produit',
             placeholder: '+ précision pour l’atelier',
@@ -4602,7 +4550,7 @@ function cellTicket(r) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'ticket-cell';
-  const libelle = ref ? `Ticket ${ref}` : 'Ticket du client';
+  const libelle = ref ? `Ticket atelier ${ref}` : 'Ticket atelier';
   const consigne = consigneAtelier(r);
   // Un point sur la pastille : ce dossier porte une consigne pour l'atelier.
   // Le point ne prend AUCUNE place (il se peint hors de la boîte) — la colonne
@@ -5776,7 +5724,7 @@ const PLANNING_COLS = [
   { key: 'client_type', label: 'Type' },
   { key: 'responsable', label: 'Responsable' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
-  { key: 'ticket',      label: 'Ticket du client', surCarte: true },
+  { key: 'ticket',      label: 'Ticket atelier', surCarte: true },
   { key: 'product',     label: 'Description' },
   { key: 'price',       label: 'Prix TTC', auto: (slug) => !PRICE_VISIBLE_STAGES.has(slug) },
   { key: 'sub_stage',   label: 'Sous-étape', auto: (slug) => !familyHasSub(slug) },
@@ -5795,7 +5743,7 @@ const COLS_TABLEAU = new Set(
 );
 
 // PAR DÉFAUT, TOUT EST RANGÉ SAUF LE TICKET : le planning s'ouvre sur les
-// cartes épurées, et le ticket du client reste à portée de doigt (c'est le seul
+// cartes épurées, et le ticket de l'atelier reste à portée de doigt (c'est le seul
 // repère que le client rapporte au comptoir). Les autres colonnes ne sont pas
 // perdues, elles attendent dans le rail « Colonnes » — en rallumer une ramène le
 // tableau avec elle.

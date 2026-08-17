@@ -1264,7 +1264,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 }
 .pcard__handle svg { width: 18px; height: 18px; }
 .pcard:hover .pcard__handle { color: var(--text-2); }
-/* LE TICKET DU CLIENT, sur la carte. Il ne s'atteignait que par la fiche — et
+/* LE TICKET DE L'ATELIER, sur la carte. Il ne s'atteignait que par la fiche — et
    le bouton d'impression y sortait le dossier de travail sur une feuille A4.
    Ici, à côté de « ouvrir » : un appui montre le ticket, un second l'imprime.
    N'apparaît que sur les dossiers nés au comptoir (cf. aUnTicket) — mais sa
