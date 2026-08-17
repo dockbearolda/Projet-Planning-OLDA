@@ -3031,6 +3031,19 @@ init()
     // On tient la connexion PLUS LONGTEMPS que le proxy, et l'en-tête suit.
     app.__server.keepAliveTimeout = 65000;
     app.__server.headersTimeout = 66000;
+    // UN PORT DÉJÀ PRIS N'EST PAS UN PLANTAGE. Sans écouteur, Node relançait
+    // l'évènement `error` en exception et l'atelier recevait vingt lignes de
+    // pile pour dire « tu l'as déjà lancé ». On le dit en une phrase, avec la
+    // sortie.
+    app.__server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`✗ Le port ${PORT} est déjà occupé — Planning OLDA tourne probablement déjà.`);
+        console.error(`  Ferme l'autre fenêtre, ou lance celui-ci ailleurs :  PORT=3001 npm start`);
+        process.exit(1);
+      }
+      console.error('Erreur du serveur :', err);
+      process.exit(1);
+    });
   })
   .catch((err) => {
     console.error('Échec de l\'initialisation de la base :', err);

@@ -1925,6 +1925,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .flag-reason:hover { color: var(--primary); }
 .flag-reason:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); border-radius: 6px; }
 .flag-reason.empty { color: var(--text-3, var(--text-2)); opacity: .7; }
+/* RIEN À SIGNALER : le motif n'existe pas, il ne doit pas occuper de place.
+   `display: -webkit-box` ci-dessus ÉCRASE l'attribut `hidden` que pose
+   flagControl : sur chaque ligne sans alerte restait un bouton vide, sans nom
+   accessible, haut de 3 px — et de 32 px au doigt (règle tactile plus bas),
+   soit une zone morte sous la puce d'état sur toute la colonne, plus une
+   tabulation morte par ligne. Contrairement au chevron des notes
+   (`.desc-toggle[hidden]`, qui garde SA place exprès), il n'y a ici aucune
+   largeur à réserver : la puce d'état est seule dans sa colonne. */
+.flag-reason[hidden] { display: none; }
 
 /* Ligne entière teintée + liseré en tête de ligne : une commande bloquée doit
    sauter aux yeux depuis le fond de l'atelier, sans lire la colonne État. La
@@ -3393,6 +3402,17 @@ button, a, .stage, .deadline-badge,
   .cat-row-select,
   .mac-name, .mac-dur,
   .reg-tarif-input { font-size: 16px; }
+
+  /* LES RÉGLAGES AUSSI SE TOUCHENT. Le patron y règle ses tarifs de tasse
+     depuis la tablette du comptoir — trente lignes de trois champs collés, une
+     bascule et une corbeille. Tout y était sous le plancher de la charte (40,
+     38, 36 et 32 px) : la corbeille tombait à un demi-doigt du champ de prix
+     voisin, avec une SUPPRESSION au bout. */
+  .reg-tarif-input { min-height: 44px; }
+  .reg-tarif-toggle,
+  .reg-tarif-del { flex-basis: 44px; min-width: 44px; min-height: 44px; }
+  .reg-tarif-add { min-height: 44px; }
+  .reg-jeton { min-height: 44px; }
 
   /* Étoiles de priorité du panneau détail : 34 px, en dessous de la règle. */
   .dd-star { width: 44px; height: 44px; }

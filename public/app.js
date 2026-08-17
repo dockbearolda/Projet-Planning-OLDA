@@ -2229,6 +2229,7 @@ function cellDossier(r) {
   company.type = 'text';
   company.value = r.billing_company ?? '';
   company.placeholder = 'nom du dossier';
+  company.setAttribute('aria-label', 'Nom du dossier client');
 
   // Un <input> ne porte qu'UNE graisse : pour lire « Jean DUPONT » avec le nom
   // en gras, une vue formatée se superpose au champ et s'efface dès qu'il prend
@@ -2580,6 +2581,11 @@ function cellDescription(r) {
   name.type = 'text';
   name.value = r.product ?? '';
   name.placeholder = 'description';
+  // Le `<th>` de la colonne ne nomme PAS le champ qu'elle contient : au clavier
+  // comme au lecteur d'écran, ces trois cellules du tableau (dossier, projet,
+  // prix) s'annonçaient « zone de texte », sans dire laquelle — et le prix, dont
+  // l'indication de saisie est un tiret, ne disait rigoureusement rien.
+  name.setAttribute('aria-label', 'Projet — description de la commande');
   bindInline(name, r, 'product', (v) => v === '' ? null : v, capitalizeName);
   syncTitleOnOverflow(name);
 
@@ -2599,8 +2605,13 @@ function cellPrice(r) {
   price.className = 'cell-input num cell-price';
   price.type = 'text';
   price.inputMode = 'decimal';
-  price.value = r.project_value != null ? String(r.project_value) : '';
+  // LE MONTANT S'ÉCRIT EN FRANÇAIS, ici comme sur la carte, le ticket et la
+  // fiche : « 88,80 » et non « 88.8 ». La cellule était la seule à rendre le
+  // nombre brut de la base, puis à le ranger avec un POINT en le quittant —
+  // dans un outil dont tout le reste affiche une virgule et deux décimales.
+  price.value = r.project_value != null ? Number(r.project_value).toFixed(2).replace('.', ',') : '';
   price.placeholder = '—';
+  price.setAttribute('aria-label', 'Prix TTC de la commande, en euros');
 
   const ht = document.createElement('span');
   ht.className = 'cell-price-ht';
@@ -2617,7 +2628,7 @@ function cellPrice(r) {
       const t = raw.trim();
       if (t === '') return '';
       const n = parseFloat(t.replace(',', '.'));
-      return Number.isNaN(n) ? raw : n.toFixed(2);
+      return Number.isNaN(n) ? raw : n.toFixed(2).replace('.', ',');
     },
   );
   // Le HT suit la frappe : on voit tout de suite ce que la remise donne hors
@@ -3368,9 +3379,16 @@ function recapTexte(r) {
 }
 
 async function telechargerRecap(r) {
-  // Le récapitulatif se compose depuis la fiche COMPLÈTE : si elle n'est pas
-  // encore arrivée, on l'attend plutôt que d'écrire un fichier amputé.
-  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
+  // Le récapitulatif se compose depuis la fiche COMPLÈTE. Si elle n'arrive pas,
+  // on ne descend PAS un fichier amputé : il finirait imprimé ou envoyé, et il
+  // aurait l'air complet. Même règle que le ticket.
+  try {
+    await chargerFicheComplete(r.id);
+    completerFiche(r);
+  } catch (_) {
+    reportError(new Error('Détail de la commande indisponible — vérifie la connexion, puis retélécharge.'));
+    return;
+  }
   const nom = `Recap_${(r.fiche && r.fiche.ref) || r.billing_company || 'projet'}`.replace(/[^\w.-]+/g, '_');
   // Le BOM en tête : sans lui, Excel et le Bloc-notes de Windows affichent les
   // accents en charabia — et ce fichier finit souvent sur un poste Windows.
@@ -3426,10 +3444,29 @@ function infobulleTicket(r) {
   return `${quoi} · atelier : ${court.replace(/\s*\n\s*/g, ' ')}`;
 }
 
-// La fiche COMPLÈTE d'abord : la liste ne transporte pas le détail article par
-// article, et un ticket sans ses articles ne vaut pas le papier.
+// LA FICHE COMPLÈTE D'ABORD — ET RIEN NE S'IMPRIME SANS ELLE.
+// La liste ne transporte qu'un RÉSUMÉ de la fiche (FICHE_LISTE côté serveur) :
+// ni les articles, ni les quantités, ni les prix ligne à ligne, ni la date de
+// prise. Cet appel avalait son échec (`.catch(() => {})`) : réseau tombé, le
+// modèle retombait sur la seule description de la ligne et sortait un ticket à
+// UN article, sans date — un papier FAUX, remis au client, sans que rien à
+// l'écran ne le signale. C'est exactement le cas normal sur la tablette du
+// comptoir. On refuse donc, et `ouvrirTicket` le dit.
+const TICKET_SANS_DETAIL = 'Détail de la commande indisponible — vérifie la connexion, puis rouvre le ticket.';
+
 async function ticketDeLaLigne(r) {
-  await chargerFicheComplete(r.id).then(() => completerFiche(r)).catch(() => {});
+  // On REQUALIFIE la panne : « Connexion perdue — on réessaie tout seul » (le
+  // message maison des erreurs réseau) serait faux ici, rien ne rouvrira le
+  // ticket. Ce qu'il faut dire, c'est quoi refaire.
+  try {
+    await chargerFicheComplete(r.id);
+  } catch (_) {
+    throw new Error(TICKET_SANS_DETAIL);
+  }
+  completerFiche(r);
+  // Le serveur a répondu, mais avec un résumé (réponse d'une autre route, cache
+  // périmé) : mieux vaut ne rien imprimer qu'un ticket amputé qui a l'air vrai.
+  if (r.fiche && r.fiche.fichePartielle) throw new Error(TICKET_SANS_DETAIL);
   return modeleTicket(r);
 }
 
@@ -3555,6 +3592,20 @@ function editeurTicket(r, champs) {
     ctrl.classList.add('is-saved');
   };
 
+  // UNE SEULE ÉCRITURE À LA FOIS. Chaque champ s'enregistre en le quittant, et
+  // « Imprimer » / « Copier » commettent d'un bloc ce qui reste : deux
+  // corrections pouvaient donc voler ensemble. Or CHAQUE réponse rapporte la
+  // ligne entière et l'écrase dans `r` — c'était donc la dernière ARRIVÉE qui
+  // gagnait, pas la dernière écrite. Sur le wifi de l'atelier, le papier
+  // pouvait sortir avec la valeur d'AVANT la correction qu'on venait de taper.
+  // La file remet l'ordre des réponses sur l'ordre de la frappe.
+  let file = Promise.resolve();
+  const aLaSuite = (travail) => {
+    const suite = file.then(travail, travail);
+    file = suite.catch(() => {});   // un échec ne bloque pas la correction suivante
+    return suite;
+  };
+
   // Branche un contrôle sur son adresse d'écriture. `sauver()` ne fait rien tant
   // que la valeur n'a pas bougé : on peut l'appeler à chaque perte de focus, à
   // la fermeture ET à l'impression sans multiplier les requêtes.
@@ -3574,7 +3625,7 @@ function editeurTicket(r, champs) {
       const afficheAvant = affiche;
       envoye = v;
       affiche = ctrl.type === 'checkbox' ? ctrl.checked : ctrl.value;
-      return envoyerTicket(r, cible, v).then(
+      return aLaSuite(() => envoyerTicket(r, cible, v)).then(
         () => marquerEnregistre(ctrl),
         (err) => {
           envoye = envoyeAvant;
@@ -3742,7 +3793,12 @@ async function ouvrirTicket(r) {
     t = await ticketDeLaLigne(r);
   } catch (err) {
     ticketOuvert = false;
-    throw err;
+    // On le DIT plutôt que de laisser une promesse rejetée dans la console :
+    // aucun appelant (la pastille du tableau, celle de la carte, le bouton de
+    // la fiche) n'attend cette promesse. Sans ce message, taper sur le ticket
+    // ne produisait tout simplement RIEN — et on retape.
+    reportError(err);
+    return;
   }
   const focusAvant = document.activeElement;
   const fond = document.createElement('div');
@@ -4921,11 +4977,28 @@ function bindInline(input, r, field, transform, normalize, onSaved) {
     if (val !== null && typeof val === 'number' && Number.isNaN(val)) {
       input.value = r[field] ?? ''; return;
     }
+    // RIEN N'A CHANGÉ POUR DE VRAI : on ne réveille pas les autres postes.
+    // La comparaison portait sur le TEXTE tapé, pas sur la valeur : une ligne
+    // reconstruite (temps réel) réaffiche « 88.8 », que `normalize` range en
+    // « 88,80 » — deux écritures différentes du MÊME montant. Traverser la
+    // colonne des prix à la tabulation partait donc en un PATCH par ligne, dont
+    // chacun bousculait `updated_at` et faisait relire la ligne à tous les
+    // postes connectés. Idem pour un nom que `capitalizeName` recase.
+    if (memeValeur(val, r[field])) { lastSent = raw; return; }
     const prev = r[field];
     r[field] = val;
     lastSent = raw;
     patchRow(r, { [field]: val })
-      .then(() => { if (onSaved) onSaved(); })
+      .then(() => {
+        // MÊME HALO QUE LES PUCES. Le prix, le nom du dossier, la description
+        // et les notes s'écrivent AU CLAVIER, en optimiste : à l'écran, une
+        // valeur partie et une valeur acceptée se ressemblaient trait pour
+        // trait — alors que la priorité, l'alerte ou le pilote, eux, poussaient
+        // leur halo vert depuis `patch()`. Ce sont pourtant les champs où l'on
+        // tape un montant avant de refermer la tablette.
+        confirmerVisuellement(input);
+        if (onSaved) onSaved();
+      })
       .catch((err) => {
         r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
       });
