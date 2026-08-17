@@ -190,7 +190,6 @@ export function modeleTicket(r) {
 export function ticketTexte(t) {
   const sep = '--------------------------------';
   const out = ['ATELIER OLDA', 'Saint-Martin', t.titre.toUpperCase(), sep];
-  if (t.ref) out.push(`${t.demande ? 'Référence' : 'Commande'} : ${t.ref}`);
   if (t.date) out.push(`Le ${t.date}`);
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
@@ -226,7 +225,6 @@ export const CSS_TICKET = `
   .tk__titre { margin: 2px 0 0; font-size: 12px; font-weight: 700; text-align: center;
                text-transform: uppercase; letter-spacing: .08em; }
   .tk__sep { border: 0; border-top: 1px dashed #000; margin: 8px 0; }
-  .tk__ref { font-size: 15px; font-weight: 800; text-align: center; letter-spacing: .02em; }
   .tk__note { margin: 3px 0 0; font-size: 11px; text-align: center; font-weight: 700; }
   .tk__ligne { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
   .tk__ligne span:first-child { color: #000; }
@@ -324,10 +322,10 @@ export function dessinerTicket(t, doc, editeur) {
     sep(),
   );
 
-  // LA RÉFÉRENCE NE SE RETAPE PAS : c'est la clé du dossier (recherche,
-  // idempotence de la prise au comptoir). Aucun papier ne part chez le client —
-  // ce numéro-là ne sert qu'à relier CE ticket à SON dossier.
-  if (t.ref) tk.append(el('div', 'tk__ref', t.ref));
+  // LA RÉFÉRENCE NE S'IMPRIME PAS. Elle reste dans le modèle — le titre de la
+  // fenêtre d'impression et le libellé de la carte s'en servent pour dire DE
+  // QUEL dossier ce papier parle — mais le papier lui-même va à l'établi, et un
+  // identifiant de dossier n'y fait rien produire.
   if (t.date) tk.append(el('p', 'tk__note', `Le ${t.date}`));
   tk.append(sep());
 

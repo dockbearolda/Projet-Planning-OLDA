@@ -230,10 +230,12 @@ const VENTE = {
     assert.ok(!vus.includes(parti), `« ${parti} » n’a plus à figurer sur un ticket d’atelier`);
   }
   assert.ok(balises(aLEcran).includes('input'));
-  // La RÉFÉRENCE n'est pas dans la liste : c'est la clé du dossier (recherche,
-  // idempotence de la prise au comptoir), elle ne se retape pas.
+  // La RÉFÉRENCE n'est ni corrigeable ni imprimée : elle ne se retape pas — c'est
+  // la clé du dossier (recherche, idempotence de la prise au comptoir) — et elle
+  // ne figure plus sur le papier, qui va à l'établi et non au classement.
   assert.ok(!vus.includes('ref'));
-  assert.ok(texteDe(aLEcran).includes('26.08.06-003'), 'la référence reste lisible, en toutes lettres');
+  assert.ok(!texteDe(aLEcran).includes('26.08.06-003'),
+    'la référence ne s’affiche plus sur l’aperçu du ticket d’atelier');
 
   // Une demande de devis suit la même règle, et garde sa consigne : l'atelier
   // peut avoir une maquette à préparer avant que rien ne soit chiffré.

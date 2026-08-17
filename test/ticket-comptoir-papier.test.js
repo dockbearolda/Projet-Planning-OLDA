@@ -6,7 +6,9 @@
 // a demandé qu'il cesse d'imprimer ce que personne n'y lit :
 //
 //   1. « Commande : 26.08.17-004 » ne dit pas ce qu'est ce nombre → il devient
-//      « Numéro de commande » (« Numéro de la demande » sur l'écran des devis,
+//      « Numéro de commande » — puis, depuis le 17/08, plus rien du tout : ce
+//      papier va à l'établi, et un identifiant de dossier n'y fait rien
+//      produire. (Ancien libellé côté devis : « Numéro de la demande »,
 //      qui n'annonce aucune commande) ;
 //   2. le nom du client s'imprimait DEUX FOIS — en tête (« Client : … ») puis
 //      en ligne « Nom / société » juste dessous → on garde la tête ;
@@ -67,7 +69,11 @@ function comptoirEnMiniature() {
   const pied = { partie: false };
   pied.remove = () => { pied.partie = true; };
   const noeuds = {
-    ticketOrder: { textContent: 'Commande : 26.08.17-004' },
+    ticketOrder: (() => {
+      const n = { textContent: 'Commande : 26.08.17-004', partie: false };
+      n.remove = () => { n.partie = true; };
+      return n;
+    })(),
     ticketClientDetails: boite([
       ligne('Type de client', 'Professionnel'),
       ligne('Nom / société', 'Restaurant Le Ti Coin Créole'),
@@ -98,10 +104,11 @@ function comptoirEnMiniature() {
 
 {
   const { bac, noeuds, pied } = comptoirEnMiniature();
-  bac.allegerTicket('Numéro de commande');
+  bac.allegerTicket();
 
-  // 1. Le numéro dit enfin ce qu'il est — et il garde sa valeur au passage.
-  assert.strictEqual(noeuds.ticketOrder.textContent, 'Numéro de commande : 26.08.17-004');
+  // 1. Le numéro s'en va tout entier.
+  assert.ok(noeuds.ticketOrder.partie,
+    'le numéro de commande quitte le papier qui part à l’atelier');
 
   // 2 et 3. Le doublon du nom part, l'e-mail RENSEIGNÉ reste.
   const restant = noeuds.ticketClientDetails.querySelectorAll().map((l) => l.k);
@@ -142,10 +149,10 @@ function comptoirEnMiniature() {
 // ===========================================================================
 // L'écran de la vente annonce une commande, celui des devis une demande : le
 // même mot sur les deux papiers ferait mentir l'un des deux.
-assert.ok(/grefferSurLeTicket\('fillTicket', 'Numéro de commande'\)/.test(PONT),
-  'l’écran de vente imprime « Numéro de commande »');
-assert.ok(/grefferSurLeTicket\('fillFinal', 'Numéro de la demande'\)/.test(PONT),
-  'l’écran des devis n’annonce aucune commande : « Numéro de la demande »');
+assert.ok(/grefferSurLeTicket\('fillTicket'\)/.test(PONT),
+  'le papier de la vente passe par l’élagage');
+assert.ok(/grefferSurLeTicket\('fillFinal'\)/.test(PONT),
+  'le papier du devis passe par le même élagage');
 
 // La greffe enveloppe, elle ne réécrit pas : l'écran garde la main sur ce
 // qu'il imprime, on ne fait qu'en retirer des lignes.
