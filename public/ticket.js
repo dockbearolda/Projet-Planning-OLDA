@@ -2,10 +2,10 @@
 // LE TICKET DE L'ATELIER — celui qui part avec le dossier à l'établi
 // ===========================================================================
 // La ligne du planning sortait le ticket du CLIENT : son papier, ses prix, son
-// total, son mode de règlement. Personne ne s'en sert. Le client repart avec le
-// sien, imprimé au comptoir ; ce qu'on a besoin de ressortir depuis le
-// planning, c'est le papier qui suit le travail : quoi produire, combien, pour
-// quand, pour qui, et ce qu'il faut savoir avant de couper.
+// total, son mode de règlement. Or ON NE REMET AUCUN TICKET AU CLIENT — le
+// papier qui sort au comptoir suit le travail jusqu'à l'établi. C'est celui-là
+// qu'on doit pouvoir ressortir depuis le planning : quoi produire, combien,
+// pour quand, pour qui, et ce qu'il faut savoir avant de couper.
 //
 // CE TICKET NE PORTE PAS D'ARGENT. Ni prix d'article, ni supplément, ni total,
 // ni paiement : l'établi n'a rien à en faire, et une feuille qui traîne sur un
@@ -163,12 +163,6 @@ export function modeleTicket(r) {
     titre: 'Ticket atelier',
     // La référence est LA clé : c'est elle qui relie ce papier au dossier.
     ref: texte(f.ref),
-    // Quand deux postes hors réseau se sont donné la même référence, le dossier
-    // a été enregistré sous une AUTRE : le ticket déjà remis au client porte
-    // l'ancienne, et sans ce rappel plus personne ne peut relier les deux. Il ne
-    // s'imprime que s'il est rempli — mais il reste corrigeable, ici et nulle
-    // part ailleurs.
-    refTicket: texte(f.refTicket),
     date: dateCreation(f.creeLe),
     // POUR QUI. Le nom sur l'établi, et de quoi joindre quelqu'un : « appeler
     // avant de couper » ne sert à rien sans le numéro.
@@ -197,7 +191,6 @@ export function ticketTexte(t) {
   const sep = '--------------------------------';
   const out = ['ATELIER OLDA', 'Saint-Martin', t.titre.toUpperCase(), sep];
   if (t.ref) out.push(`${t.demande ? 'Référence' : 'Commande'} : ${t.ref}`);
-  if (t.refTicket) out.push(`Ticket remis au client : ${t.refTicket}`);
   if (t.date) out.push(`Le ${t.date}`);
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
@@ -332,16 +325,9 @@ export function dessinerTicket(t, doc, editeur) {
   );
 
   // LA RÉFÉRENCE NE SE RETAPE PAS : c'est la clé du dossier (recherche,
-  // idempotence de la prise au comptoir). Ce qui se corrige, c'est le numéro du
-  // PAPIER que le client a en main quand il ne correspond pas — le seul repère
-  // qu'il rapporte au comptoir. Sa ligne n'apparaît sur le papier que si elle
-  // est remplie ; en correction, elle est toujours offerte.
+  // idempotence de la prise au comptoir). Aucun papier ne part chez le client —
+  // ce numéro-là ne sert qu'à relier CE ticket à SON dossier.
   if (t.ref) tk.append(el('div', 'tk__ref', t.ref));
-  if (t.refTicket || editeur) {
-    const p = el('p', 'tk__note');
-    p.append(el('span', null, 'Ticket remis au client : '), val('refTicket', t.refTicket));
-    tk.append(p);
-  }
   if (t.date) tk.append(el('p', 'tk__note', `Le ${t.date}`));
   tk.append(sep());
 

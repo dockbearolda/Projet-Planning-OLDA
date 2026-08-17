@@ -1738,7 +1738,7 @@ function buildRow(r) {
   tr.appendChild(cellResponsable(r));
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
-  // ticket : le numéro du papier remis au client, en clair et réimprimable
+  // ticket : le numéro du dossier, en clair, et son papier d'atelier réimprimable
   tr.appendChild(cellTicket(r));
   // description : ce qui est produit (ancien champ « produit »)
   tr.appendChild(cellDescription(r));
@@ -3408,10 +3408,10 @@ async function telechargerRecap(r) {
 // LE TICKET DE L'ATELIER — le ressortir depuis la ligne, le corriger, l'imprimer
 // ===========================================================================
 // La ligne sortait le ticket du CLIENT : son papier, ses prix, son total, son
-// mode de règlement. Personne ne s'en sert — le client repart avec le sien,
-// imprimé au comptoir. Ce qu'on a besoin de ressortir depuis le planning, c'est
-// le papier qui suit le travail jusqu'à l'établi : quoi produire, combien, pour
-// quand, pour qui, et ce qu'il faut savoir avant de couper.
+// mode de règlement. Or ON NE REMET AUCUN TICKET AU CLIENT — le papier qui sort
+// au comptoir suit le travail jusqu'à l'établi. C'est celui-là qu'on ressort
+// depuis le planning : quoi produire, combien, pour quand, pour qui, et ce
+// qu'il faut savoir avant de couper.
 //
 // L'ARGENT N'EST PLUS DESSUS. Ni prix, ni total, ni paiement : ça se corrige
 // toujours, mais sur la ligne du planning et dans la fiche, là où ça vit.
@@ -3451,7 +3451,7 @@ function infobulleTicket(r) {
 // ni les articles, ni les quantités, ni les prix ligne à ligne, ni la date de
 // prise. Cet appel avalait son échec (`.catch(() => {})`) : réseau tombé, le
 // modèle retombait sur la seule description de la ligne et sortait un ticket à
-// UN article, sans date — un papier FAUX, remis au client, sans que rien à
+// UN article, sans date — un papier FAUX, parti à l'atelier, sans que rien à
 // l'écran ne le signale. C'est exactement le cas normal sur la tablette du
 // comptoir. On refuse donc, et `ouvrirTicket` le dit.
 const TICKET_SANS_DETAIL = 'Détail de la commande indisponible — vérifie la connexion, puis rouvre le ticket.';
@@ -3656,16 +3656,6 @@ function editeurTicket(r, champs) {
 
   return (cle, txt, cible) => {
     switch (cle) {
-      // Le numéro du PAPIER remis au client : il ne diffère de la référence que
-      // si celle-ci a dû changer, mais c'est le seul repère que le client
-      // rapporte — sans lui, plus personne ne relie son ticket au dossier.
-      case 'refTicket': {
-        const c = champ('input', txt, {
-          label: 'Numéro du ticket remis au client',
-          placeholder: 'si le papier porte un autre numéro',
-        });
-        return brancher(c, { ou: 'fiche', cle: 'refTicket' }, () => texteOuNull(c.value));
-      }
       case 'client':
         return surLaLigne('billing_company', txt, { label: 'Client' });
       case 'contact':
@@ -4131,10 +4121,10 @@ function renderLigneDetail() {
     }));
   }
   actions.append(
-    // LE TICKET D'ABORD. C'est le papier du client, celui qu'on ressort quand
-    // il revient au comptoir. Le récapitulatif complet — l'adresse, le total
-    // HT, la taxe, la note interne — reste à portée, mais en téléchargement :
-    // c'est un document de travail, il n'a jamais eu à sortir sur l'imprimante.
+    // LE TICKET D'ABORD. C'est le papier de l'atelier, celui qui part avec le
+    // dossier à l'établi. Le récapitulatif complet — l'adresse, le total HT, la
+    // taxe, la note interne — reste à portée, mais en téléchargement : c'est un
+    // document de travail, il n'a jamais eu à sortir sur l'imprimante.
     ...(aUnTicket(r) ? [ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r))] : []),
     ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
     ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
@@ -6345,13 +6335,13 @@ function fold(s) {
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-// LE NUMÉRO DU TICKET SE CHERCHE. C'est le seul repère que le client rapporte
-// au comptoir — « 26.08.06-003 », lu sur son papier — et c'était justement le
-// seul champ que ni la recherche de la grille ni la recherche globale ne
-// regardaient : taper ce numéro ne rendait rien. Il vit dans la fiche, que la
+// LE NUMÉRO DU TICKET SE CHERCHE. « 26.08.06-003 » : c'est par là qu'on
+// retrouve un dossier quand on a son papier sous les yeux, et c'était justement
+// le seul champ que ni la recherche de la grille ni la recherche globale ne
+// regardaient — taper ce numéro ne rendait rien. Il vit dans la fiche, que la
 // liste transporte allégée (FICHE_LISTE côté serveur garde `ref`).
-// `refTicket` compte tout autant : c'est le numéro imprimé sur le papier déjà
-// remis, quand le dossier a dû être enregistré sous un autre.
+// `refTicket` reste cherché pour les vieux dossiers : plus rien ne l'écrit
+// depuis qu'aucun papier ne part chez le client, mais ceux d'avant le portent.
 function refsTicket(r) {
   const f = r && r.fiche;
   if (!f || typeof f !== 'object') return '';

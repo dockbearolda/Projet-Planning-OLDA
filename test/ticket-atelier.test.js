@@ -312,15 +312,20 @@ const DEMANDE = {
   assert.strictEqual(sansContact.remise, '');
   assert.ok(!ticketTexte(sansContact).includes('Contact'));
 
-  // Une référence qu'il a fallu changer (deux postes hors réseau, même numéro
-  // de secours) : le ticket DÉJÀ REMIS porte l'ancienne, et sans ce rappel plus
-  // personne ne peut relier le papier du client au dossier du planning.
-  const collision = modeleTicket({
+  // ON NE REMET AUCUN TICKET AU CLIENT. Les vieux dossiers portent encore un
+  // `refTicket` — le numéro du papier remis à l'époque où on en remettait un.
+  // Le ticket de l'atelier ne le sort pas : il ne parle qu'à l'établi, et une
+  // ligne de plus sur un papier de travail est une question de plus.
+  const ancien = modeleTicket({
     ...VENTE,
     fiche: { ...VENTE.fiche, ref: '26.08.06-004', refTicket: '26.08.06-003' },
   });
-  assert.strictEqual(collision.ref, '26.08.06-004');
-  assert.ok(ticketTexte(collision).includes('Ticket remis au client : 26.08.06-003'));
+  assert.strictEqual(ancien.ref, '26.08.06-004');
+  assert.strictEqual(ancien.refTicket, undefined, 'le modèle ne porte plus ce champ du tout');
+  const papierAncien = ticketTexte(ancien);
+  assert.ok(!papierAncien.includes('remis au client'));
+  assert.ok(!papierAncien.includes('26.08.06-003'), 'l’ancien numéro de papier ne s’imprime nulle part');
+  assert.ok(papierAncien.includes('26.08.06-004'), 'la référence du dossier, elle, reste en tête')
 
   // Rien ne casse sur une entrée absurde : l'aperçu doit s'ouvrir, toujours.
   for (const vide of [null, undefined, {}, { fiche: 'pas un objet' }]) {

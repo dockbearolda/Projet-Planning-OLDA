@@ -204,9 +204,9 @@ const VENTE = {
     assert.ok(!balisesPapier.includes(interdite), `le papier ne doit porter aucun ${interdite}`);
   }
   assert.ok(texteDe(surPapier).includes("Pour l'atelier"));
-  // Sans numéro de papier distinct, la ligne « Ticket remis au client » n'existe
-  // pas : une ligne vide sur un ticket, c'est une question de plus au comptoir.
-  assert.ok(!texteDe(surPapier).includes('Ticket remis au client'));
+  // On ne remet aucun ticket au client : la ligne « Ticket remis au client »
+  // n'existe plus, ni sur le papier ni en correction.
+  assert.ok(!texteDe(surPapier).includes('remis au client'));
 
   // Avec l'éditeur, TOUTES les valeurs corrigeables deviennent des champs — y
   // compris celles qui sont vides (le numéro du papier, la consigne atelier) :
@@ -219,14 +219,14 @@ const VENTE = {
     c.className = 'tk__champ';
     return c;
   });
-  for (const attendu of ['refTicket', 'client', 'contact', 'tel', 'remise', 'atelier',
+  for (const attendu of ['client', 'contact', 'tel', 'remise', 'atelier',
     'qte', 'designation', 'detail']) {
     assert.ok(vus.includes(attendu), `« ${attendu} » doit être corrigeable dans l’aperçu`);
   }
   // L'ARGENT N'EST PLUS OFFERT DU TOUT. Pas un champ vide qu'on remplirait par
   // mégarde : aucune case. Le prix et le règlement se corrigent sur la ligne du
   // planning et dans la fiche, là où ils vivent.
-  for (const parti of ['total', 'paiement', 'prix', 'supplement']) {
+  for (const parti of ['total', 'paiement', 'prix', 'supplement', 'refTicket']) {
     assert.ok(!vus.includes(parti), `« ${parti} » n’a plus à figurer sur un ticket d’atelier`);
   }
   assert.ok(balises(aLEcran).includes('input'));
@@ -313,10 +313,11 @@ const VENTE = {
   assert.strictEqual(consigne.body.fiche.details.length, detailsEnBase.length);
   assert.strictEqual(consigne.body.fiche.ref, '26.08.16-100');
 
-  // Le numéro du PAPIER que le client a en main, quand il ne porte pas la
-  // référence du dossier (deux postes hors réseau, même numéro de secours).
-  const papierClient = await call('PATCH', `/api/requests/${id}/fiche`, { refTicket: '26.08.16-099' });
-  assert.strictEqual(papierClient.body.fiche.refTicket, '26.08.16-099');
+  // Un vieux dossier peut porter un `refTicket` — le numéro du papier remis à
+  // l'époque où on en remettait un. La route l'accepte toujours ; ce qui compte
+  // ici, c'est que le ticket de l'atelier ne le sorte JAMAIS (plus bas).
+  const vieuxPapier = await call('PATCH', `/api/requests/${id}/fiche`, { refTicket: '26.08.16-099' });
+  assert.strictEqual(vieuxPapier.body.fiche.refTicket, '26.08.16-099');
 
   // LA RÉFÉRENCE NE SE RETAPE PAS par cette porte : la recherche du comptoir et
   // l'idempotence de la prise s'appuient dessus. Ce qu'on envoie est ignoré.
@@ -361,7 +362,9 @@ const VENTE = {
   const rejoue = ticketTexte(modeleTicket(apres.body));
   assert.ok(rejoue.includes('Broderie poitrine GAUCHE, 8 cm'));
   assert.ok(rejoue.includes('Logo DEUX faces'));
-  assert.ok(rejoue.includes('Ticket remis au client : 26.08.16-099'));
+  // …et le numéro du papier d'autrefois reste au dossier, hors du ticket.
+  assert.strictEqual(apres.body.fiche.refTicket, '26.08.16-099');
+  assert.ok(!rejoue.includes('26.08.16-099'), 'aucun numéro de papier client sur le ticket d’atelier');
 
   console.log('✓ ticket modifiable : une correction par position n’efface pas la voisine');
 
