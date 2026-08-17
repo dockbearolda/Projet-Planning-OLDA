@@ -228,6 +228,46 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(ticketDuJour.body.jour, aujourdhuiAtelier,
     'la série du jour est celle de l’atelier');
 
+  // Le MÊME piège, côté tablette. `new Date("2026-08-24")` est minuit UTC, donc
+  // dimanche 20 h à Saint-Martin : un contrôle « est-ce un jour ouvré ? » lisait
+  // la VEILLE — il refusait tous les lundis et laissait passer tous les samedis.
+  // Une date civile se lit à une heure épinglée, jamais à sec.
+  //
+  // La règle porte sur les dates qui viennent du FORMULAIRE ou d'un article
+  // enregistré (`deliveryDate`, `orderDate`, `.value`) : ce sont celles qu'on
+  // lit pour en tirer un jour de la semaine ou un affichage.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  // L'argument d'un `new Date(...)`, parenthèses imbriquées comprises —
+  // `document.getElementById("x").value` en contient, et une expression
+  // régulière naïve s'y arrête au mauvais endroit.
+  const argDeNewDate = (src, ouvrante) => {
+    let profondeur = 0;
+    for (let j = ouvrante; j < src.length; j += 1) {
+      if (src[j] === '(') profondeur += 1;
+      else if (src[j] === ')') {
+        profondeur -= 1;
+        if (profondeur === 0) return src.slice(ouvrante + 1, j);
+      }
+    }
+    return '';
+  };
+  for (const ecran of ['vente-directe.html', 'demande-devis.html']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'comptoir', ecran), 'utf8');
+    let vus = 0;
+    for (const m of src.matchAll(/new Date\s*\(/g)) {
+      const arg = argDeNewDate(src, m.index + m[0].length - 1);
+      if (!arg.trim() || !/deliveryDate|orderDate|\.value/.test(arg)) continue;
+      vus += 1;
+      assert.ok(/T\d{2}:/.test(arg),
+        `${ecran} : une date civile se lit à une heure épinglée — « new Date(${arg}) » `
+        + 'lit minuit UTC, soit la veille à Saint-Martin');
+    }
+    if (ecran === 'vente-directe.html') {
+      assert.ok(vus > 0, 'la règle doit trouver des dates à contrôler, sinon elle ne prouve rien');
+    }
+  }
+
   console.log('✓ robustesse : compteurs atomiques, idempotence, validations, PDF et fuseau atelier OK');
   process.exit(0);
 })().catch((err) => {

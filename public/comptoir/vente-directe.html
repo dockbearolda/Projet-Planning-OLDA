@@ -713,7 +713,6 @@ h2{letter-spacing:-.01em}
 </script>
 <header>
   <h1>ATELIER OLDA — Vente directe</h1>
-  <p>Articles, client, paiement, ticket et envoi WhatsApp</p>
 </header>
 
 <div class="container">
@@ -726,7 +725,7 @@ h2{letter-spacing:-.01em}
 
   <div class="card">
     <h2>1. Ajouter un article</h2>
-    <div class="grid-3">
+    <div class="grid">
       <div class="field">
         <label for="productName">Article *</label>
         <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
@@ -744,23 +743,16 @@ h2{letter-spacing:-.01em}
         <label for="quantity">Quantité *</label>
         <input id="quantity" type="number" min="1" step="1" placeholder="Ex. 10">
       </div>
-      <div class="field">
-        <label for="unitPrice">Prix unitaire *</label>
-        <input id="unitPrice" type="number" min="0" step="0.01" placeholder="0,00">
-      </div>
     </div>
 
     <div class="grid">
       <div class="field">
-        <label for="priceType">Prix saisi</label>
-        <select id="priceType">
-          <option value="TTC">TTC</option>
-          <option value="HT">HT</option>
-        </select>
+        <label for="articlePrice">Prix article *</label>
+        <input id="articlePrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
       <div class="field">
-        <label>Taxe</label>
-        <label class="inline-check"><input id="applyTax" type="checkbox" checked> Appliquer la taxe de 4 %</label>
+        <label for="customPrice">Prix personnalisation *</label>
+        <input id="customPrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
     </div>
 
@@ -775,14 +767,15 @@ h2{letter-spacing:-.01em}
         <input id="orderDate" type="date">
       </div>
       <div class="field">
-        <label for="deliveryDelay">Date souhaitée *</label>
-        <select id="deliveryDelay" onchange="updateDeliveryDateFromDelay()">
-          <option value="5">Dans 5 jours</option>
-          <option value="10">Dans 10 jours</option>
-          <option value="15" selected>Dans 15 jours</option>
-          <option value="custom">Choisir une date</option>
-        </select>
-        <input id="deliveryDate" class="hidden" type="date" style="margin-top:8px" onchange="updateDeadlineInfo()">
+        <label for="deliveryDate">Date souhaitée *</label>
+        <input id="deliveryDate" type="date" onchange="updateDeadlineInfo()">
+        <!-- Les trois paliers ne sont plus un choix : ce sont des RACCOURCIS qui
+             posent une date dans le calendrier au-dessus. -->
+        <div class="delay-quick">
+          <button type="button" class="delay-chip" data-jours="5">Dans 5 jours</button>
+          <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
+          <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
+        </div>
         <div id="deadlineInfo" class="help"></div>
         <!-- Barème express : réglable ici, là où le supplément s'affiche. -->
         <button type="button" id="baremeOpen" class="bareme-open">Modifier le barème</button>
@@ -812,7 +805,6 @@ h2{letter-spacing:-.01em}
           <option value="16:00">16:00</option>
           <option value="17:00">17:00</option>
         </select>
-        <div class="help">Horaires disponibles de 09:00 à 17:00 — 14:00 par défaut.</div>
       </div>
     </div>
 
@@ -1044,28 +1036,18 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <label class="inline-check">
-      <input id="instantDelivery" type="checkbox">
-      Le client repart immédiatement avec sa commande
-    </label>
-
     <button id="payButton" class="primary full">Encaisser le paiement</button>
   </div>
 
   <div id="paymentSuccess" class="card success hidden">
-    <h2>✅ Commande enregistrée</h2>
-    <p id="paymentStatus"></p>
     <p><b>La note interne OLDA reste modifiable à tout moment.</b></p>
 
     <div class="footer-actions">
-      <button id="printTicketBtn" class="secondary">🖨️ Imprimer le ticket</button>
-      <button id="downloadTicketBtn" class="secondary">⬇️ Télécharger le ticket</button>
       <button id="sendWhatsAppBtn" class="whatsapp">💬 Envoyer sur WhatsApp</button>
     </div>
-    <div class="actions" style="margin-top:14px">
-      <button id="newSaleBtn" class="primary">Nouvelle vente</button>
-      <button id="homeBtn" class="secondary">Retour accueil</button>
-    </div>
+    <!-- Vide à l'écran : c'est ici que `addPlanningButton()` greffe le bouton
+         d'envoi au planning, que le pont presse. Il est masqué, pas retiré. -->
+    <div class="actions" style="margin-top:14px"></div>
   </div>
 
   
@@ -1367,8 +1349,7 @@ function generateOrderNumber(){
 function init(){
   const today=new Date();
   document.getElementById("orderDate").value=isoDate(today);
-  document.getElementById("deliveryDelay").value="15";
-  updateDeliveryDateFromDelay();
+  setDeliveryInDays(15);
   document.getElementById("orderNumber").value=generateOrderNumber();
 
 
@@ -1390,34 +1371,46 @@ function requireFields(ids){
   return ok;
 }
 
-function updateDeliveryDateFromDelay(){
-  const delay=document.getElementById("deliveryDelay").value;
-  const dateInput=document.getElementById("deliveryDate");
+// LA DATE FAIT FOI, ET ELLE SEULE. Le palier — donc le supplément express et
+// la priorité envoyée au planning — se DÉDUIT de l'écart en jours ouvrés entre
+// la commande et la récupération. Un palier retenu à côté de la date, c'était
+// deux vérités pour un seul fait : la date déplacée à la main au calendrier
+// gardait le supplément du palier d'avant.
+function setDeliveryInDays(jours){
   const orderValue=document.getElementById("orderDate").value;
-  const base=orderValue ? new Date(orderValue+"T00:00:00") : new Date();
-
-  if(delay==="custom"){
-    dateInput.classList.remove("hidden");
-    if(!dateInput.value){
-      dateInput.value=isoDate(base);
-    }
-  }else{
-    dateInput.classList.add("hidden");
-    const target=new Date(base);
-    target.setDate(target.getDate()+Number(delay));
-    dateInput.value=isoDate(target);
-  }
+  const target=orderValue ? new Date(orderValue+"T00:00:00") : new Date();
+  target.setDate(target.getDate()+Number(jours));
+  document.getElementById("deliveryDate").value=isoDate(target);
   updateDeadlineInfo();
+  if(typeof window.checkDeliveryDate==="function") window.checkDeliveryDate();
 }
 
-function deliveryDelayLabel(){
-  const select=document.getElementById("deliveryDelay");
-  if(select.value==="custom"){
-    const value=document.getElementById("deliveryDate").value;
-    return value ? new Date(value+"T00:00:00").toLocaleDateString("fr-FR") : "Date personnalisée";
-  }
-  return "Dans "+select.value+" jours";
+// Le palier de DEUX dates quelconques : c'est ce qui permet de qualifier
+// l'article déjà au panier, pas seulement ce qui est à l'écran.
+function palierDeDates(order,delivery){
+  if(!order || !delivery) return null;
+  const days=businessDaysBetween(order,delivery);
+  return days<=5 ? "j5" : days<=10 ? "j10" : "j15";
 }
+function palierDelai(){
+  return palierDeDates(document.getElementById("orderDate").value,
+                       document.getElementById("deliveryDate").value);
+}
+const LIBELLE_PALIER={
+  j5:"Sous 5 jours ouvrés (urgent)",
+  j10:"Sous 10 jours ouvrés (prioritaire)",
+  j15:"Au-delà de 10 jours ouvrés (standard)"
+};
+function deliveryDelayLabel(){
+  return LIBELLE_PALIER[palierDelai()] || "";
+}
+// La priorité du planning décrit le MÊME écart que le supplément : un dossier
+// facturé en urgence qui arriverait en priorité basse, personne ne le
+// comprendrait.
+window.prioritePourDate=function(iso){
+  const p=palierDeDates(document.getElementById("orderDate").value, iso);
+  return p==="j5" ? "3" : p==="j10" ? "2" : "1";
+};
 
 // BARÈME DES SUPPLÉMENTS EXPRESS — voir la section « Barème express » en bas de
 // page. Les taux ne sont plus écrits ici : ils viennent du serveur et se règlent
@@ -1429,18 +1422,8 @@ function tauxPalier(palier){
   return Number.isFinite(v) ? v/100 : 0;
 }
 function getDeadlineRate(){
-  const delay=document.getElementById("deliveryDelay").value;
-  if(delay==="5") return tauxPalier("j5");
-  if(delay==="10") return tauxPalier("j10");
-  if(delay==="15") return tauxPalier("j15");
-  const order=document.getElementById("orderDate").value;
-  const delivery=document.getElementById("deliveryDate").value;
-  if(!order || !delivery) return 0;
-  // Une date choisie au calendrier retombe sur le même barème, en jours ouvrés.
-  const days=businessDaysBetween(order,delivery);
-  if(days<=5) return tauxPalier("j5");
-  if(days<=10) return tauxPalier("j10");
-  return tauxPalier("j15");
+  const p=palierDelai();
+  return p ? tauxPalier(p) : 0;
 }
 // Le pourcentage AFFICHÉ suit le barème : l'écrire en dur mentirait dès la
 // première modification.
@@ -1449,11 +1432,12 @@ function pourcent(rate){
 }
 function updateDeadlineInfo(){
   const rate=getDeadlineRate();
-  const delay=document.getElementById("deliveryDelay").value;
-  const quoi = delay==="5" ? "5 jours : urgent"
-    : delay==="10" ? "10 jours : prioritaire"
-    : delay==="15" ? "15 jours : délai standard"
-    : "Date personnalisée";
+  const p=palierDelai();
+  if(!p){
+    document.getElementById("deadlineInfo").textContent="Choisis une date de récupération.";
+    return;
+  }
+  const quoi = LIBELLE_PALIER[p];
   // La pastille dit le NIVEAU de supplément, plus le palier : à barème modifié,
   // « 15 jours » peut très bien être devenu payant.
   const puce = rate>=0.20 ? "🔴" : rate>0 ? "🟠" : "🟢";
@@ -1462,17 +1446,21 @@ function updateDeadlineInfo(){
 }
 function productFromForm(){
   const qty=Number(document.getElementById("quantity").value);
-  const price=Number(document.getElementById("unitPrice").value);
-  const priceType=document.getElementById("priceType").value;
-  const taxApplied=document.getElementById("applyTax").checked;
-  let unitHT, unitTTC;
-  if(priceType==="HT"){
-    unitHT=price;
-    unitTTC=taxApplied ? price*1.04 : price;
-  } else {
-    unitTTC=price;
-    unitHT=taxApplied ? price/1.04 : price;
-  }
+  // DEUX PRIX SAISIS, UN SEUL PRIX DE VENTE : l'objet d'un côté, le travail
+  // dessus de l'autre. Le client paie la somme des deux — le détail ne sert
+  // qu'à l'atelier, il ne figure pas sur le papier qu'on lui remet.
+  const priceArticle=Number(document.getElementById("articlePrice").value)||0;
+  const priceCustom=Number(document.getElementById("customPrice").value)||0;
+  const price=priceArticle+priceCustom;
+  // Le sélecteur TTC/HT et la case « taxe » ont disparu de l'écran : on fige
+  // ce qu'ils affichaient par défaut, et qui est la seule pratique du comptoir
+  // — un prix TTC, taxe de 4 % comprise. Le montant encaissé est donc, au
+  // centime près, celui que la vendeuse a tapé. Les deux valeurs restent
+  // écrites dans l'article : le récapitulatif, le ticket et les exports les
+  // lisent, et un dossier doit dire sous quel régime il a été chiffré.
+  const priceType="TTC";
+  const taxApplied=true;
+  const unitHT=price/1.04;
   const baseHT=unitHT*qty;
   const rate=getDeadlineRate();
   const surcharge=baseHT*rate;
@@ -1481,7 +1469,7 @@ function productFromForm(){
   const totalTTC=taxableHT+tax;
   return {
     name:document.getElementById("productName").value.trim(),
-    qty, price, priceType, taxApplied,
+    qty, price, priceArticle, priceCustom, priceType, taxApplied,
     description:document.getElementById("productDescription").value.trim(),
     orderDate:document.getElementById("orderDate").value,
     deliveryDate:document.getElementById("deliveryDate").value,
@@ -1489,9 +1477,29 @@ function productFromForm(){
     baseHT,surcharge,tax,totalTTC,rate
   };
 }
+// Un prix se répartit entre l'objet et le travail, et l'une des deux parts peut
+// être nulle : le client qui apporte son propre t-shirt ne paie que la
+// personnalisation, et l'article revendu tel quel n'en porte aucune. Exiger les
+// deux bloquerait des ventes réelles. Ce qui ne peut pas être nul, c'est le
+// TOTAL — sinon on encaisserait zéro.
+function requirePrice(){
+  const a=document.getElementById("articlePrice");
+  const c=document.getElementById("customPrice");
+  if((Number(a.value)||0)+(Number(c.value)||0)>0){ cleanInvalid(a); cleanInvalid(c); return true; }
+  a.classList.add("invalid"); c.classList.add("invalid");
+  alert("Indique un prix : celui de l'article, celui de la personnalisation, ou les deux.");
+  a.focus();
+  return false;
+}
 function saveProduct(){
-  if(!requireFields(["productName","quantity","unitPrice","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
-  const delivery=new Date(document.getElementById("deliveryDate").value);
+  if(!requireFields(["productName","quantity","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
+  if(!requirePrice()) return;
+  // UNE DATE CIVILE SE LIT À MIDI. `new Date("2026-08-24")` est minuit UTC,
+  // c'est-à-dire dimanche 20 h à Saint-Martin (UTC−4) : le contrôle lisait la
+  // veille et refusait TOUS les lundis, en laissant passer tous les samedis.
+  // Le reste du fichier épingle déjà l'heure ; cette ligne était la seule à ne
+  // pas le faire, et le calendrier désormais en premier la rend permanente.
+  const delivery=new Date(document.getElementById("deliveryDate").value+"T12:00:00");
   if(delivery.getDay()===0 || delivery.getDay()===6){
     alert("La date de livraison doit être un jour ouvré.");
     document.getElementById("deliveryDate").classList.add("invalid");
@@ -1505,10 +1513,9 @@ function saveProduct(){
 function resetProductForm(){
   document.getElementById("productName").value="";
   document.getElementById("quantity").value="";
-  document.getElementById("unitPrice").value="";
+  document.getElementById("articlePrice").value="";
+  document.getElementById("customPrice").value="";
   document.getElementById("productDescription").value="";
-  document.getElementById("priceType").value="TTC";
-  document.getElementById("applyTax").checked=true;
   editIndex=null;
   document.getElementById("saveProductBtn").textContent="Ajouter l'article";
   document.getElementById("cancelEditBtn").classList.add("hidden");
@@ -1518,13 +1525,15 @@ function editProduct(index){
   editIndex=index;
   document.getElementById("productName").value=p.name;
   document.getElementById("quantity").value=p.qty;
-  document.getElementById("unitPrice").value=p.price;
-  document.getElementById("priceType").value=p.priceType;
-  document.getElementById("applyTax").checked=p.taxApplied;
+  document.getElementById("articlePrice").value=p.priceArticle;
+  document.getElementById("customPrice").value=p.priceCustom;
   document.getElementById("productDescription").value=p.description;
   document.getElementById("orderDate").value=p.orderDate;
   document.getElementById("deliveryDate").value=p.deliveryDate;
   document.getElementById("deliveryTime").value=p.deliveryTime||"14:00";
+  // Le palier se lit sur la date : sans ce rappel, la ligne d'information
+  // resterait sur celle de l'article précédent.
+  updateDeadlineInfo();
   document.getElementById("saveProductBtn").textContent="Enregistrer les modifications";
   document.getElementById("cancelEditBtn").classList.remove("hidden");
   const desc=document.getElementById("productDescription");
@@ -1678,15 +1687,6 @@ function processPayment(){
   if(!validatePayment()) return false;
 
   fillTicket();
-  const mode=selectedPayment();
-  const immediate=document.getElementById("instantDelivery").checked;
-  const paid=mode!=="Paiement au retrait";
-
-  document.getElementById("paymentStatus").textContent=
-    immediate
-      ? `Commande validée${paid?", paiement enregistré":""} et terminée : le client repart avec sa commande.`
-      : `Commande validée${paid?", paiement enregistré":""} et envoyée en production.`;
-
   document.getElementById("paymentSuccess").classList.remove("hidden");
   document.getElementById("ticketArea").classList.remove("hidden");
   updateStepper(3);
@@ -1790,7 +1790,7 @@ function escapeHtml(str){
 
 document.getElementById("saveProductBtn").addEventListener("click",saveProduct);
 document.getElementById("cancelEditBtn").addEventListener("click",resetProductForm);
-document.getElementById("orderDate").addEventListener("change",updateDeliveryDateFromDelay);
+document.getElementById("orderDate").addEventListener("change",updateDeadlineInfo);
 document.querySelectorAll('input[name="payment"]').forEach(r=>r.addEventListener("change",updatePaymentZones));
 document.getElementById("cashGiven").addEventListener("input",updateCashChange);
 document.getElementById("goToClientBtn").addEventListener("click",goToClient);
@@ -1827,20 +1827,17 @@ document.getElementById("newCompanyPostal").addEventListener("input",function(){
 });
 
 document.getElementById("payButton").addEventListener("click",processPayment);
-document.getElementById("printTicketBtn").addEventListener("click",printTicket);
-document.getElementById("downloadTicketBtn").addEventListener("click",downloadTicket);
 document.getElementById("sendWhatsAppBtn").addEventListener("click",sendWhatsApp);
-document.getElementById("newSaleBtn").addEventListener("click",()=>{
-  // Même garde que le bouton de bas d'écran : rien ne s'efface sans un oui.
-  if(confirm("Commencer une nouvelle vente ? L'écran actuel sera effacé.")) location.reload();
-});
-document.getElementById("homeBtn").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
 
 // Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
-["productName","quantity","unitPrice"].forEach(id=>{
+["productName","quantity","articlePrice","customPrice"].forEach(id=>{
   document.getElementById(id).addEventListener("keydown",e=>{
     if(e.key==="Enter"){e.preventDefault();saveProduct();}
   });
+});
+// Les raccourcis de délai : ils POSENT une date, ils n'en retiennent aucune.
+document.querySelectorAll(".delay-chip").forEach(b=>{
+  b.addEventListener("click",()=>setDeliveryInDays(b.dataset.jours));
 });
 document.getElementById("clientSearch").addEventListener("keydown",e=>{
   if(e.key==="Enter"){
@@ -1863,7 +1860,11 @@ renderProducts();
     if(!host) return;
     const btn=document.createElement("button");
     btn.id="oldaCreatePlanningBtn";
-    btn.className="primary";
+    // MASQUÉ, PAS SUPPRIMÉ. C'est ce bouton que `pont.js` presse pour envoyer
+    // le dossier au planning (`btn.click()`, après avoir vérifié `isConnected`).
+    // Le retirer du DOM ne cacherait pas une commande : elle n'arriverait plus
+    // nulle part. Il quitte l'écran, il reste la mécanique.
+    btn.className="primary hidden";
     btn.textContent="📅 Créer dans le planning";
     btn.style.marginTop="10px";
     btn.onclick=function(){
@@ -1877,9 +1878,9 @@ renderProducts();
         name:productNames || "Vente directe",
         responsible:"Non défini",
         due:text("deliveryDate") || isoDate(new Date()),
-        priority:(pick("deliveryDelay")?.value==="5" ? "3" : pick("deliveryDelay")?.value==="10" ? "2" : "1"),
-        stage:(pick("instantDelivery")?.checked ? "facturation" : "preparation"),
-        status:(pick("instantDelivery")?.checked ? "Commande récupérée" : "Préparation des produits"),
+        priority:window.prioritePourDate(text("deliveryDate")),
+        stage:"preparation",
+        status:"Préparation des produits",
         production:production || "À définir",
         comment:[`Délai souhaité : ${deliveryDelayLabel()}`,text("internalNote")].filter(Boolean).join(" | "),
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
@@ -2117,8 +2118,6 @@ renderProducts();
 
 <script>
 (function(){
-  const instantDelivery=document.getElementById("instantDelivery");
-  const deliveryDelay=document.getElementById("deliveryDelay");
   const deliveryDate=document.getElementById("deliveryDate");
   const deliveryTime=document.getElementById("deliveryTime");
 
@@ -2140,16 +2139,6 @@ renderProducts();
     deliveryTime.value="14:00";
   }
 
-  instantDelivery.addEventListener("change",function(){
-    if(this.checked){
-      const now=new Date();
-      deliveryDelay.value="custom";
-      deliveryDate.classList.remove("hidden");
-      deliveryDate.value=localDateValue(now);
-      deliveryTime.value=closestFullHour(now);
-      updateDeadlineInfo();
-    }
-  });
 })();
 </script>
 
@@ -2483,8 +2472,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       var no='Article '+(i+1)+' — ';
       out.push([no+'Désignation',d(p.name)]);
       out.push([no+'Quantité',d(p.qty)]);
-      out.push([no+'Prix unitaire',d(euro.format(Number(p.price||0))+' '+(p.priceType||''))]);
-      out.push([no+'Taxe 4 %',p.taxApplied?'Appliquée':'Non appliquée']);
+      out.push([no+'Prix article',d(euro.format(Number(p.priceArticle||0)))]);
+      out.push([no+'Prix personnalisation',d(euro.format(Number(p.priceCustom||0)))]);
       out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
       out.push([no+'Total TTC',euro.format(Number(p.totalTTC||0))]);
       out.push([no+'Description de production',d(p.description)]);
@@ -2503,7 +2492,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       out.push(['Part carte',d(v('mixCard')?euro.format(Number(v('mixCard'))):'')]);
       out.push(['Part espèces',d(v('mixCash')?euro.format(Number(v('mixCash'))):'')]);
     }
-    out.push(['Client repart immédiatement',(el('instantDelivery')&&el('instantDelivery').checked)?'Oui':'Non']);
     out.push(['Note interne OLDA',d(v('internalNote'))]);
     return out;
   };
@@ -2524,7 +2512,10 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     btn.onclick=function(){
       var productNames=(typeof products!=="undefined"?products:[]).map(function(p){return p.qty+' x '+p.name;}).join(' • ');
       var production=(typeof products!=="undefined"?products:[]).map(function(p){return p.description;}).filter(Boolean).join(' | ');
-      var instant=el('instantDelivery')&&el('instantDelivery').checked;
+      /* `due` et `priority` doivent décrire la MÊME date, d'où cette variable :
+         l'échéance envoyée et l'urgence facturée ne peuvent pas diverger. */
+      var dueIso=((typeof products!=="undefined"?products:[])[0]||{}).deliveryDate
+        ||(el('deliveryDate')&&el('deliveryDate').value)||isoDate(new Date());
       var mode=modeCoche();
       var payload={
         source:'Vente directe',
@@ -2538,10 +2529,10 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
            courante du formulaire (le dernier article saisi) : sur un panier à
            plusieurs dates, le planning recevait une date que le client n'avait
            jamais vue. */
-        due:((typeof products!=="undefined"?products:[])[0]||{}).deliveryDate||(el('deliveryDate')&&el('deliveryDate').value)||isoDate(new Date()),
-        priority:(el('deliveryDelay')&&el('deliveryDelay').value==='5')?'3':((el('deliveryDelay')&&el('deliveryDelay').value==='10')?'2':'1'),
-        stage:instant?'facturation':'preparation',
-        status:instant?'Commande récupérée':'Préparation des produits',
+        due:dueIso,
+        priority:window.prioritePourDate(dueIso),
+        stage:'preparation',
+        status:'Préparation des produits',
         production:production||'À définir',
         comment:[(typeof deliveryDelayLabel==='function'?'Délai souhaité : '+deliveryDelayLabel():''),v('internalNote')].filter(Boolean).join(' | '),
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
@@ -2566,7 +2557,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
           modeLabel:mode,
           mode:MODES_PLANNING[mode]||null,
           paye:!!mode&&mode!=='Paiement au retrait',
-          retraitImmediat:!!instant
+          retraitImmediat:false
         }
       };
       parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},location.origin);
@@ -2605,6 +2596,16 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .live-check li{margin:3px 0;font-weight:600}
 button.blocked{opacity:.45;cursor:not-allowed}
 .dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
+/* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
+   remplacent pas. Cibles au doigt de 44 px — l'écran vit sur une tablette. */
+.delay-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.delay-chip{
+  flex:1 1 auto;min-height:44px;padding:11px 14px;
+  border:1.5px solid #d7dce3!important;border-radius:999px!important;
+  background:#fff;color:#142e54;font-size:13.5px;font-weight:700
+}
+.delay-chip:hover{border-color:#142e54!important}
+.delay-chip:active{background:#f2f5fa}
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
 .delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
 .delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
@@ -2759,7 +2760,7 @@ button.blocked{opacity:.45;cursor:not-allowed}
       input.parentNode.appendChild(box);
     }
     var iso=v('deliveryDate');
-    if(!iso||input.classList.contains('hidden')){box.style.display='none';return;}
+    if(!iso){box.style.display='none';return;}
     box.style.display='block';
     var d=new Date(iso+'T12:00:00');
     if(!isWorkingDay(d)){
@@ -2781,8 +2782,6 @@ button.blocked{opacity:.45;cursor:not-allowed}
     box.textContent='✓ Créneau compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
   };
   window.applyDeliveryDate=function(iso){
-    el('deliveryDelay').value='custom';
-    el('deliveryDate').classList.remove('hidden');
     el('deliveryDate').value=iso;
     if(typeof updateDeadlineInfo==='function')updateDeadlineInfo();
     window.checkDeliveryDate();
@@ -2796,7 +2795,7 @@ button.blocked{opacity:.45;cursor:not-allowed}
         m.push('Au moins un article enregistré');
         if(!v('productName'))m.push('Article');
         if(!v('quantity'))m.push('Quantité');
-        if(!v('unitPrice'))m.push('Prix unitaire');
+        if((Number(v('articlePrice'))||0)+(Number(v('customPrice'))||0)<=0)m.push('Prix');
         if(!v('productDescription'))m.push('Description de production');
         if(!v('deliveryDate'))m.push('Date souhaitée');
       }
@@ -2814,8 +2813,13 @@ button.blocked{opacity:.45;cursor:not-allowed}
   function refreshLive(){
     var btn=el('saleNext');
     if(!btn)return;
+    // L'écran de fin n'a plus rien à contrôler : le bandeau de l'étape 3 y
+    // restait affiché, à répéter « tout est renseigné » sous une commande déjà
+    // encaissée et déjà partie au planning. Il garde son rôle aux étapes 1 à 3,
+    // où il dit ce qui manque et bloque le bouton « suivant ».
+    var fini=el('paymentSuccess')&&!el('paymentSuccess').classList.contains('hidden');
     var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
-    if(step>=4){
+    if(fini||step>=4){
       var old=el('liveCheckSale');
       if(old)old.remove();
       btn.classList.remove('blocked');
@@ -2844,37 +2848,9 @@ button.blocked{opacity:.45;cursor:not-allowed}
     }
   }
 
-  /* 5 — Ticket : bandeau dossier complet / éléments manquants */
-  function refreshRecapBanner(){
-    var host=el('paymentSuccess');
-    if(!host||host.classList.contains('hidden'))return;
-    var box=el('saleReadyBanner');
-    if(!box){
-      box=document.createElement('div');
-      box.id='saleReadyBanner';
-      box.className='live-check ok';
-      host.insertBefore(box,host.querySelector('.footer-actions'));
-    }
-    var missing=[];
-    if(!selectedClient)missing.push('Fiche client complète');
-    else{
-      if(!selectedClient.phone)missing.push('WhatsApp du client');
-      if(!selectedClient.email&&selectedClient.type!=='Particulier')missing.push('E-mail du client');
-    }
-    if(!products.length)missing.push('Articles de la commande');
-    if(!v('internalNote'))missing.push('Note interne OLDA (facultative mais conseillée)');
-    if(missing.length){
-      box.className='live-check todo';
-      box.innerHTML='⚠ À compléter avant transmission :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-    }else{
-      box.className='live-check ok';
-      box.textContent='✓ Dossier complet — ticket prêt à imprimer, envoyer et créer dans le planning.';
-    }
-  }
-
   document.addEventListener('input',function(){refreshLive();},true);
   document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
-  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+  setInterval(function(){refreshLive();},600);
 })();
 </script>
 <!-- ====================================================================== -->

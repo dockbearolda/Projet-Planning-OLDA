@@ -15,7 +15,9 @@
 //
 //   1. il annonce « ✅ Demande enregistrée » / « ✅ Commande enregistrée »
 //      ALORS QUE RIEN n'est parti : à cet instant le dossier n'existe que dans
-//      l'onglet ;
+//      l'onglet. Depuis le 17/08, l'écran de VENTE ne l'annonce plus — le
+//      bandeau du pont y est seul à parler, et il ne parle qu'après le
+//      serveur. L'écran de devis, lui, l'annonce toujours ;
 //   2. la seule action qui l'enregistre — « 📅 Créer dans le planning » — est
 //      greffée EN DERNIER, après « Nouvelle demande » / « Nouvelle vente », qui
 //      rechargent la page et effacent tout ;
@@ -44,7 +46,15 @@ const VENTE = lire('comptoir/vente-directe.html');
 // pas, on constate ce qu'ils annoncent — c'est ce qui rend l'envoi automatique
 // légitime plutôt qu'inventé.
 assert.ok(/✅ Demande enregistrée/.test(DEVIS), 'l’écran devis annonce un enregistrement');
-assert.ok(/✅ Commande enregistrée/.test(VENTE), 'l’écran vente annonce un enregistrement');
+// L'écran de vente s'est tu depuis : plus de titre « ✅ Commande enregistrée »
+// ni de phrase d'état. Ce qui rendait l'envoi automatique légitime tient
+// toujours — le dossier n'existe que dans l'onglet tant que rien n'est parti —
+// mais la promesse mensongère, elle, a disparu. On le fige : la réintroduire
+// remettrait un « c'est enregistré » AVANT tout enregistrement.
+assert.ok(!/✅ Commande enregistrée/.test(VENTE),
+  'l’écran vente ne doit plus annoncer un enregistrement qu’il ne fait pas');
+assert.ok(!/id="paymentStatus"/.test(VENTE),
+  'ni le doubler d’une phrase d’état écrite avant l’envoi');
 
 // LE CONTRAT AVEC LES DEUX ÉCRANS. Le filet ne retranscrit pas le parcours : il
 // presse le bouton que la page se greffe, celui qui construit le dossier
