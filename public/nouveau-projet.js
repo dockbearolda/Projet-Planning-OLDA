@@ -37,18 +37,12 @@ const FLUX = [
     label: 'Vente directe',
     icone: 'point_of_sale',
     src: 'comptoir/vente-directe.html',
-    // Ce que la vendeuse doit reconnaître en un coup d'œil : la SITUATION, pas
-    // la mécanique de l'écran.
-    quand: 'Le client est là, le prix est connu : il paie et repart avec son ticket.',
-    etapes: 'Articles → Client → Paiement → Ticket',
   },
   {
     id: 'devis',
     label: 'Demande de devis',
     icone: 'request_quote',
     src: 'comptoir/demande-devis.html',
-    quand: 'Le client demande un prix : on note son besoin, Atelier OLDA chiffrera.',
-    etapes: 'Demande → Besoins → Projet → Contrôle → Client → Récapitulatif',
   },
 ];
 
@@ -184,10 +178,7 @@ function construireAccueil() {
 
   const titre = document.createElement('h1');
   titre.textContent = 'Nouveau projet';
-  const sous = document.createElement('p');
-  sous.className = 'np-home__lead';
-  sous.textContent = 'Que fait le client aujourd’hui ?';
-  home.append(titre, sous);
+  home.append(titre);
 
   const grille = document.createElement('div');
   grille.className = 'np-home__grid';
@@ -203,13 +194,8 @@ function construireAccueil() {
 
     const nom = document.createElement('strong');
     nom.textContent = f.label;
-    const quand = document.createElement('small');
-    quand.textContent = f.quand;
-    const etapes = document.createElement('span');
-    etapes.className = 'np-tile__steps';
-    etapes.textContent = f.etapes;
 
-    tuile.append(rond, nom, quand, etapes);
+    tuile.append(rond, nom);
     tuile.addEventListener('click', () => afficher(f.id));
     grille.append(tuile);
   }

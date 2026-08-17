@@ -38,10 +38,9 @@
 }
 .np-home[hidden] { display: none; }
 .np-home h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
-.np-home__lead { margin: 0 0 22px; font-size: 17px; color: var(--text-2); }
 .np-home__grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
-  width: 100%; max-width: 760px;
+  width: 100%; max-width: 760px; margin-top: 22px;
 }
 .np-tile {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -61,12 +60,6 @@
 }
 .np-tile__icon .material-symbols-outlined { font-size: 40px; }
 .np-tile strong { font-size: 21px; font-weight: 700; }
-.np-tile small { font-size: 15px; line-height: 1.45; color: var(--text-2); max-width: 30ch; }
-.np-tile__steps {
-  margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border-soft); width: 100%;
-  font-size: 12px; font-weight: 700; letter-spacing: .03em;
-  text-transform: uppercase; color: var(--text-3);
-}
 /* --- Barre de bascule : la SEULE commande de l'hôte au-dessus du parcours ----
    Volontairement mince et claire : le parcours porte déjà son propre en-tête
    noir avec son titre, deux bandeaux sombres empilés mangeraient la hauteur
