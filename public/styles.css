@@ -3001,6 +3001,78 @@ input[type="date"].cell-input { color: var(--text-1); }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* --------------------------------------------- « Mise à jour disponible »
+   Ce n'est PAS un toast : le toast s'efface au bout de deux secondes, et il
+   s'effacerait pendant que la vendeuse a le dos tourné. Celle-ci attend son tap.
+   Posée en bas à GAUCHE : le toast occupe le centre (les deux peuvent tomber en
+   même temps), et la colonne de gauche est celle qui ne porte jamais d'action.
+   Sous la boîte de confirmation (1300), au-dessus du reste. */
+.maj {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 420px);
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+.maj.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.maj__ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--text-1);
+}
+.maj__txt { display: flex; flex-direction: column; min-width: 0; }
+.maj__titre { font-size: 13.5px; font-weight: 700; color: var(--text-1); }
+.maj__detail { font-size: 12.5px; line-height: 1.35; color: var(--text-2); }
+/* 44 px de haut : c'est un bouton qu'on tape au doigt, sur une tablette posée
+   à plat et souvent avec les mains occupées. */
+.maj__btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.maj__btn:hover { background: var(--primary-hover); }
+.maj__btn:disabled { opacity: .6; cursor: default; }
+
+/* Téléphone : la bulle prend la largeur plutôt que de se tasser en trois
+   colonnes illisibles, et le bouton passe dessous, pleine largeur. */
+@media (max-width: 560px) {
+  .maj {
+    right: max(16px, env(safe-area-inset-right));
+    max-width: none;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+  }
+  .maj__txt { flex: 1 1 auto; }
+  .maj__btn { flex: 1 0 100%; }
+}
+
 /* --------------------------------------------------- Demande de confirmation
    Remplace le `confirm()` du système : aux couleurs de l'app, lisible au doigt
    (cibles à 44 px), et sans geler le planning derrière elle. */

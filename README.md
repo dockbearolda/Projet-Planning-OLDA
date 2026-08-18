@@ -207,6 +207,35 @@ En production, la connexion `pg` active `ssl: { rejectUnauthorized: false }`, et
 le serveur fait confiance au proxy Railway (`trust proxy`). La Basic Auth
 s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 
+### La mise à jour arrive JUSQU'AUX POSTES — la bulle « Mise à jour disponible »
+
+Déployer ne suffit pas. Une tablette du comptoir est allumée le matin et reste
+des jours entiers sur la page ouverte au premier café : le serveur sert bien la
+nouvelle version, mais le poste continue d'exécuter celle qu'il a chargée, et
+personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
+18/08, on le lui dit :
+
+- **Le serveur calcule une empreinte du contenu de `public/`** au démarrage
+  (`empreinteDuSite`, SHA-1 tronqué). C'est le CONTENU, pas la date de build :
+  un redémarrage de conteneur, ou un correctif qui ne touche que `server.js`,
+  donne la même empreinte — aucun poste n'est dérangé pour un écran identique.
+  Corollaire : un correctif purement serveur n'allume aucune bulle, et c'est
+  voulu, il n'y a rien à recharger.
+- **Elle part à l'ouverture du flux temps réel** (`event: version` sur
+  `/api/stream`). Un déploiement redémarre le conteneur, tous les flux tombent,
+  chaque poste rouvre le sien et reçoit l'empreinte du site qu'il vient de NE PAS
+  recharger. Aucun sondage, aucune requête de plus. `GET /api/version` n'est là
+  que pour les postes dont le flux est mort (503 du plafond, proxy qui a coupé)
+  et pour le réveil d'une tablette.
+- **Le poste propose, il ne décide pas** (`public/maj.js`). Une bulle s'affiche
+  en bas à gauche ; c'est un tap qui recharge. Jamais de rechargement d'office :
+  il tomberait un jour au milieu d'une vente et emporterait le dossier. Si une
+  saisie est en cours — cellule en cours d'édition, tiroir ouvert, parcours du
+  comptoir affiché — le tap demande d'abord confirmation et dit ce qui se perd.
+- La bulle **ne s'efface pas toute seule** (ce n'est pas un toast : il
+  s'effacerait pendant que la vendeuse a le dos tourné) et **s'éteint** si le
+  patron republie la version que le poste exécute déjà.
+
 ## API REST
 
 | Méthode | Route | Description |
@@ -215,6 +244,7 @@ s'applique à toutes les routes dès que `APP_PASSWORD` est défini.
 | GET | `/api/requests` | Toutes les demandes. |
 | GET | `/api/counts` | `{ <slug>: <nombre>, ... }` pour les compteurs. |
 | GET | `/api/stages` | Liste ordonnée des étapes (libellé + slug). |
+| GET | `/api/version` | Empreinte du contenu de `public/`, calculée au démarrage. Le filet de la bulle « mise à jour disponible » pour un poste dont le flux temps réel est mort — le chemin normal est l'évènement `version` envoyé à l'ouverture de `/api/stream`. |
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | POST | `/api/requests/:id/copie` | **Recopie une commande** (« Dupliquer », « Envoyer vers Fiverr »), dans une autre famille si `{ stage }` est fourni. La copie emporte `fiche` — le récapitulatif du comptoir, donc tout ce que l'atelier doit lire pour produire. Ne se copient PAS : le numéro de ticket (`fiche.ref`, il identifie UNE prise de commande), l'alerte en cours et les pièces jointes. La copie se fait ici et non côté navigateur : la liste ne transporte qu'un résumé de `fiche`, et `fiche` n'est pas un champ écrivable par PATCH. |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
@@ -566,6 +596,7 @@ Deux exceptions assumées :
 │   ├── styles.css    design system
 │   ├── app.js        fetch, rendu grille, édition inline, étoiles, drag & drop
 │   ├── sw.js         service worker : coquille hors ligne, réseau prioritaire
+│   ├── maj.js        la bulle « mise à jour disponible » : compare l'empreinte du site et propose de recharger
 │   ├── ticket.js     le TICKET du client, reconstruit depuis la ligne (règles pures)
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
