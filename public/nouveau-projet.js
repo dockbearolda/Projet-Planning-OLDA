@@ -47,7 +47,6 @@ const FLUX = [
 ];
 
 let ROOT = null;
-let courant = null;        // id du flux affiché, null sur l'accueil
 let enCours = false;       // un enregistrement est en vol : on n'en lance pas deux
 
 const cadreDe = (id) => ROOT.querySelector(`#np-frame-${id}`);
@@ -64,7 +63,6 @@ function icone(nom) {
 // `id` vaut null sur l'accueil : aucun parcours ouvert, aucune barre de flux.
 function afficher(id) {
   const flux = FLUX.find((f) => f.id === id) || null;
-  courant = flux ? flux.id : null;
   ROOT.querySelector('#np-home').hidden = !!flux;
   ROOT.querySelector('#np-bar').hidden = !flux;
   ROOT.querySelector('#np-frames').hidden = !flux;

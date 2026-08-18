@@ -673,9 +673,28 @@
 
   // Ce qui part en base. Le « + » compte : `whatsappNumber()` (public/whatsapp.js)
   // comme les deux écrans y lisent « c'est déjà international, ne devine rien ».
+  //
+  // MAIS UN NUMÉRO AU PLAN FRANÇAIS S'ÉCRIT COMME AVANT — « 06 90 66 24 00 »,
+  // pas « +590 690 66 24 00 ». Les fiches déjà en base sont toutes à ce format,
+  // et c'est sur les CHIFFRES du numéro que les deux écrans reconnaissent un
+  // client qu'on connaît déjà : passer tout le monde à l'international faisait
+  // échouer ce rapprochement en silence, et la même personne repartait avec une
+  // SECONDE fiche. (Vérifié : « 06 42 26 69 49 » en base contre « +590 642 26
+  // 69 49 » saisi au comptoir — aucun doublon signalé.)
+  //
+  // Les deux formes désignent de toute façon le même abonné pour wa.me :
+  // `whatsappNumber` déduit l'indicatif du préfixe mobile. Le « + » reste donc à
+  // ce pour quoi il a été ajouté — les numéros réellement étrangers (Sint
+  // Maarten, États-Unis, Anguilla, Pays-Bas), que l'ancien plan à dix chiffres
+  // tronquait.
+  const PAYS_PLAN_FRANCAIS = new Set(['590', '596', '594', '33']);
   function telAssembler(code, local) {
     const l = telChiffres(local);
-    return l ? `+${code} ${telGrouper(code, l)}` : '';
+    if (!l) return '';
+    if (PAYS_PLAN_FRANCAIS.has(code) && l.length === 9) {
+      return `0${l}`.replace(/(\d{2})(?=\d)/g, '$1 ');
+    }
+    return `+${code} ${telGrouper(code, l)}`;
   }
 
   // L'opération inverse, pour rouvrir une fiche déjà enregistrée. Le plus LONG
@@ -685,10 +704,15 @@
     const d = telChiffres(valeur);
     if (!d) return { code: PAYS_TEL_DEFAUT, local: '' };
     // Les numéros déjà en base sont au format local français (« 0690 66 24 00 ») :
-    // l'indicatif s'y devine au préfixe mobile, comme le fait le planning.
+    // l'indicatif s'y devine au préfixe. Les MOBILES d'abord (c'est ce que fait
+    // aussi le planning, cf. whatsapp.js), mais les FIXES comptent autant au
+    // comptoir : « 05 90 87 12 34 » est un fixe de Guadeloupe / Saint-Martin, et
+    // il se rouvrait en « France métropole » — l'indicatif d'un pays voisin
+    // affiché sur la fiche d'un client d'à côté.
     if (/^0\d{9}$/.test(d)) {
-      const dom = [['0690', '590'], ['0691', '590'], ['0696', '596'],
-        ['0697', '596'], ['0694', '594']].find(([prefixe]) => d.startsWith(prefixe));
+      const dom = [['0690', '590'], ['0691', '590'], ['0590', '590'],
+        ['0696', '596'], ['0697', '596'], ['0596', '596'],
+        ['0694', '594'], ['0594', '594']].find(([prefixe]) => d.startsWith(prefixe));
       return { code: dom ? dom[1] : '33', local: d.slice(1) };
     }
     const code = PAYS_TEL.map((p) => p.code)
@@ -840,12 +864,57 @@
     window[nom] = relais;
   }
 
+  // Le même relais, mais SANS condition : pour ce que les écrans se trompent à
+  // faire depuis toujours, pas seulement sur un numéro international.
+  function relayerToujours(nom, faire) {
+    const base = window[nom];
+    if (typeof base !== 'function' || base.__oldaTel) return;
+    const relais = function oldaRelaisTelToujours(valeur, ...reste) {
+      const r = faire(valeur);
+      return r == null ? base.call(this, valeur, ...reste) : r;
+    };
+    relais.__oldaTel = true;
+    window[nom] = relais;
+  }
+
+  // LE NUMÉRO PRÊT POUR wa.me : indicatif du pays suivi de la partie locale.
+  // C'est `telDecouper` qui tranche — le même découpage que le sélecteur, donc
+  // la même vérité pour un numéro saisi et pour une fiche rouverte.
+  // Les deux écrans, eux, préfixent « 590 » à TOUT numéro français à dix
+  // chiffres (`waHref` côté vente, `normalizePhone` côté devis) : un portable
+  // de métropole (« 06 42 26 69 49 ») ouvrait donc une conversation avec
+  // « 590 642 26 69 49 » — un abonné guadeloupéen qui n'a rien demandé.
+  // `null` = on ne sait pas lire ce numéro, l'écran garde la main.
+  function telInternational(v) {
+    const { code, local } = telDecouper(v);
+    if (!telPays(code) || !telComplet(code, local)) return null;
+    return `${code}${local}`;
+  }
+
   function relayerValidation() {
-    // E.164 : huit chiffres au minimum, indicatif compris.
-    relayer('isValidLocalPhone', (v) => telChiffres(v).length >= 8);
-    // Ce qui s'écrit en base, et ce qui part vers wa.me : on ne retouche rien.
+    // LA LONGUEUR ATTENDUE EST CELLE DU PAYS, pas un plancher. « huit chiffres
+    // au minimum » laissait passer un numéro de Sint Maarten amputé de la fin
+    // (« +1721 520 12 » en fait déjà neuf) : l'écran validait, la fiche partait
+    // en base avec un numéro qui n'appelle personne, et l'erreur ne se voyait
+    // qu'au moment de joindre le client. On relit l'indicatif et on exige le
+    // compte exact — le plancher ne sert plus que pour un pays hors de la
+    // liste, où l'on ne sait rien du découpage.
+    relayer('isValidLocalPhone', (v) => {
+      const { code, local } = telDecouper(v);
+      return telPays(code) ? telComplet(code, local) : telChiffres(v).length >= 8;
+    });
+    // Ce qui s'écrit en base : on ne retouche rien.
     relayer('formatFrenchPhone', (v) => String(v).trim());
-    relayer('normalizePhone', (v) => telChiffres(v));
+    // Ce qui part vers wa.me, en revanche, se corrige POUR TOUS LES NUMÉROS :
+    // « 590 » collé devant n'importe quel numéro français est faux dès qu'il
+    // s'agit d'un portable de métropole, et ces fiches-là sont en base depuis
+    // l'import. Les deux écrans ont chacun leur fonction — même erreur, deux
+    // noms.
+    relayerToujours('normalizePhone', telInternational);
+    relayerToujours('waHref', (v) => {
+      const num = telInternational(v);
+      return num ? `https://wa.me/${num}` : null;
+    });
   }
 
   function grefferLesIndicatifs() {
