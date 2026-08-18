@@ -983,9 +983,17 @@
   // cherche quoi faire, pour qui et pour quand, pas un identifiant de dossier.
   // La référence reste ÉCRITE par l'écran (`#ticketOrder` garde son texte, et
   // c'est elle qui part au planning) — elle quitte l'affichage, pas la source.
+  //
+  // MASQUÉ, PAS RETIRÉ. Les deux écrans réécrivent `#ticketOrder` à CHAQUE
+  // remplissage, sans garde : `printTicket()` rappelle `fillTicket()`, qui
+  // mourait sur le nœud disparu AVANT d'atteindre `window.print()`. Le bouton
+  // « Imprimer » ne faisait alors plus rien du tout, sans un mot à l'écran.
+  // On coupe dans l'AFFICHAGE, jamais dans le DOM que l'écran tient à jour.
   function allegerTicket() {
     const num = document.getElementById('ticketOrder');
-    if (num) num.remove();
+    // `display` et non l'attribut `hidden` : il est inconditionnel, et il tient
+    // aussi face au `visibility: visible !important` de la feuille d'impression.
+    if (num) num.style.display = 'none';
     elaguer('ticketClientDetails');
     elaguer('ticketExtraDetails');
     retirerPied();
