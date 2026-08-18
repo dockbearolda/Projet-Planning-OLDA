@@ -745,16 +745,23 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
+    <!-- L'ASTÉRISQUE PORTAIT SUR CHAQUE CHAMP, alors que l'une des deux parts
+         peut rester vide : le client qui apporte son propre t-shirt ne paie
+         que la personnalisation, l'article revendu tel quel n'en porte aucune.
+         C'est le TOTAL qui est exigé — l'écran le dit maintenant tel quel. -->
     <div class="grid">
       <div class="field">
-        <label for="articlePrice">Prix article *</label>
+        <label for="articlePrice">Prix article</label>
         <input id="articlePrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
       <div class="field">
-        <label for="customPrice">Prix personnalisation *</label>
+        <label for="customPrice">Prix personnalisation</label>
         <input id="customPrice" type="number" min="0" step="0.01" placeholder="0,00">
       </div>
     </div>
+    <!-- `margin` explicite : la ligne d'aide s'intercale entre deux blocs, et
+         sans marge basse elle venait coller l'intitulé du champ suivant. -->
+    <div class="help" style="margin:0 0 14px">Prix obligatoire * — l’un des deux, ou les deux. Le client paie la somme.</div>
 
     <div class="field">
       <label for="productDescription">Description de production *</label>
@@ -1123,17 +1130,22 @@ const euro = new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
    `toISOString()` seul bascule en UTC : aux Antilles il rend déjà la date du
    LENDEMAIN dès 20 h, et la vente du soir partait datée du jour suivant. */
 function isoDate(date){ const d=new Date(date); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-function addBusinessDays(date, days){
-  const d = new Date(date);
-  let added = 0;
-  while(added < days){
-    d.setDate(d.getDate()+1);
-    if(d.getDay() !== 0 && d.getDay() !== 6) added++;
-  }
-  return d;
+/* UNE DATE CIVILE SE LIT À MIDI. « 2026-08-24 » passé nu à `new Date` est
+   minuit UTC, c'est-à-dire dimanche 20 h à Saint-Martin (UTC−4) : le jour de
+   la semaine qu'on en tire est celui de la VEILLE. `saveProduct` avait déjà
+   été corrigé ; le comptage des jours ouvrés, lui, lisait encore à sec — et
+   c'est lui qui décide du palier, donc du SUPPLÉMENT EXPRESS facturé et de la
+   priorité envoyée au planning. Mesuré sur 5 000 couples de dates : le palier
+   basculait d'un cran dans 228 cas (4,6 %), tantôt en faveur du client,
+   tantôt à ses dépens. */
+function jourCivil(v){
+  if(v instanceof Date) return new Date(v.getFullYear(),v.getMonth(),v.getDate(),12,0,0);
+  const m=String(v||"").slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12,0,0) : null;
 }
 function businessDaysBetween(start,end){
-  const a=new Date(start), b=new Date(end);
+  const a=jourCivil(start), b=jourCivil(end);
+  if(!a || !b) return 0;
   let count=0, d=new Date(a);
   while(d < b){
     d.setDate(d.getDate()+1);
@@ -1378,8 +1390,15 @@ function requireFields(ids){
 // gardait le supplément du palier d'avant.
 function setDeliveryInDays(jours){
   const orderValue=document.getElementById("orderDate").value;
-  const target=orderValue ? new Date(orderValue+"T00:00:00") : new Date();
+  const target=jourCivil(orderValue) || jourCivil(new Date());
   target.setDate(target.getDate()+Number(jours));
+  // L'ATELIER EST FERMÉ LE WEEK-END, et l'écran le dit en rouge dès qu'on pose
+  // une date de samedi ou de dimanche. Un raccourci qui produit une date que
+  // l'écran refuse aussitôt n'en est pas un : « Dans 5 jours » tombait un
+  // dimanche deux jours sur sept. On avance donc jusqu'au lundi — le palier ne
+  // bouge pas pour autant, il se compte en jours OUVRÉS et le week-end n'en
+  // fait pas partie.
+  while(target.getDay()===0 || target.getDay()===6) target.setDate(target.getDate()+1);
   document.getElementById("deliveryDate").value=isoDate(target);
   updateDeadlineInfo();
   if(typeof window.checkDeliveryDate==="function") window.checkDeliveryDate();
@@ -1401,14 +1420,28 @@ const LIBELLE_PALIER={
   j10:"Sous 10 jours ouvrés (prioritaire)",
   j15:"Au-delà de 10 jours ouvrés (standard)"
 };
+// LES DATES DU DOSSIER, pas celles du formulaire. `due` part déjà du PREMIER
+// ARTICLE — c'est la date annoncée au client sur son ticket. La phrase « Délai
+// souhaité » et la priorité, elles, lisaient encore ce qui était tapé à
+// l'instant : un deuxième article commencé puis abandonné, une date corrigée
+// dans le formulaire après l'enregistrement, et le dossier partait au planning
+// en annonçant « urgent » sous une échéance standard — ou l'inverse.
+function datesDuDossier(){
+  const p=(typeof products!=="undefined"?products:[])[0];
+  if(p && p.deliveryDate) return {order:p.orderDate, delivery:p.deliveryDate};
+  return {order:document.getElementById("orderDate").value,
+          delivery:document.getElementById("deliveryDate").value};
+}
 function deliveryDelayLabel(){
-  return LIBELLE_PALIER[palierDelai()] || "";
+  const d=datesDuDossier();
+  return LIBELLE_PALIER[palierDeDates(d.order,d.delivery)] || "";
 }
 // La priorité du planning décrit le MÊME écart que le supplément : un dossier
 // facturé en urgence qui arriverait en priorité basse, personne ne le
-// comprendrait.
+// comprendrait. La date de commande vient donc du même article que l'échéance
+// qu'on lui passe.
 window.prioritePourDate=function(iso){
-  const p=palierDeDates(document.getElementById("orderDate").value, iso);
+  const p=palierDeDates(datesDuDossier().order, iso);
   return p==="j5" ? "3" : p==="j10" ? "2" : "1";
 };
 

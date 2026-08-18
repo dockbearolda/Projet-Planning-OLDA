@@ -82,9 +82,7 @@ export function applyCasse(mode, raw) {
 }
 
 // Le TIRET veut dire « je n'ai pas l'info » : il fait passer l'étape et part
-// vide au serveur. Interdit sur l'identité (société, nom, prénom) — un client
-// nommé « - » ne se retrouve jamais dans la base.
-const TIRET_INTERDIT = new Set(['entreprise', 'nom', 'prenom']);
+// vide au serveur.
 export const estTiret = (v) => String(v == null ? '' : v).trim() === '-';
 // Sur l'IDENTITÉ, le tiret ne vaut pas davantage : il ne reste pas non plus
 // tel quel. Il partait en base, et « - » (ou « - - » pour un particulier)

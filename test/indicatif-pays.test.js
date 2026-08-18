@@ -57,13 +57,31 @@ assert.strictEqual(new Set(codes).size, codes.length, 'aucun indicatif en double
 // ===========================================================================
 // 2. CE QUI PART EN BASE
 // ===========================================================================
-// Le « + » n'est pas décoratif : `whatsappNumber()` (public/whatsapp.js) y lit
-// « c'est déjà international, ne devine pas l'indicatif au préfixe mobile ».
-assert.strictEqual(telAssembler('590', '690662400'), '+590 690 66 24 00');
+// DEUX RÉGIMES, ET C'EST VOULU.
+//
+// Un numéro au plan français s'écrit COMME AVANT — « 06 90 66 24 00 ». Les
+// fiches déjà en base sont toutes à ce format, et c'est sur les CHIFFRES du
+// numéro que les deux écrans reconnaissent un client qu'on connaît déjà : les
+// passer tous à l'international faisait échouer ce rapprochement en silence
+// (« 06 42 26 69 49 » en base contre « +590 642 26 69 49 » au comptoir), et la
+// même personne repartait avec une SECONDE fiche. Les deux formes désignent de
+// toute façon le même abonné pour wa.me — `whatsappNumber` déduit l'indicatif
+// du préfixe mobile (section 5).
+//
+// Le « + » reste à ce pour quoi il a été ajouté : les numéros réellement
+// étrangers, que l'ancien plan à dix chiffres tronquait. Il n'y est pas
+// décoratif — `whatsappNumber()` y lit « c'est déjà international, ne devine
+// pas l'indicatif au préfixe mobile ».
+assert.strictEqual(telAssembler('590', '690662400'), '06 90 66 24 00');
+assert.strictEqual(telAssembler('33', '612345678'), '06 12 34 56 78');
+assert.strictEqual(telAssembler('596', '696123456'), '06 96 12 34 56');
 assert.strictEqual(telAssembler('1721', '5201234'), '+1721 520 1234');
 assert.strictEqual(telAssembler('1', '3055550142'), '+1 305 555 0142');
-assert.strictEqual(telAssembler('33', '612345678'), '+33 6 12 34 56 78');
+assert.strictEqual(telAssembler('31', '612345678'), '+31 6 12 34 56 78');
 assert.strictEqual(telAssembler('590', ''), '', 'sans numéro, pas d’indicatif tout seul en base');
+// Une frappe INCOMPLÈTE ne prend pas la forme nationale : elle n'a pas encore
+// le compte, et l'écrire « 06 90 66 » la ferait passer pour un numéro local.
+assert.strictEqual(telAssembler('590', '69066'), '+590 690 66');
 
 // Un numéro en cours de frappe se groupe sans se compléter de blancs.
 assert.strictEqual(telGrouper('590', '690'), '690');
@@ -84,6 +102,12 @@ assert.deepStrictEqual(decouper('+590 690 66 24 00'), { code: '590', local: '690
 assert.deepStrictEqual(decouper('0690 66 24 00'), { code: '590', local: '690662400' });
 assert.deepStrictEqual(decouper('0696 12 34 56'), { code: '596', local: '696123456' });
 assert.deepStrictEqual(decouper('06 12 34 56 78'), { code: '33', local: '612345678' });
+// LES FIXES COMPTENT AUTANT que les mobiles au comptoir : « 05 90 87 12 34 »
+// est un fixe de Guadeloupe / Saint-Martin. Lu au seul préfixe mobile, il
+// rouvrait la fiche du voisin d'en face en « France métropole ».
+assert.deepStrictEqual(decouper('05 90 87 12 34'), { code: '590', local: '590871234' });
+assert.deepStrictEqual(decouper('05 96 71 23 45'), { code: '596', local: '596712345' });
+assert.deepStrictEqual(decouper('05 94 29 12 34'), { code: '594', local: '594291234' });
 
 // Rien de lisible : on retombe sur le côté français, sans rien perdre de ce qui
 // était écrit — la vendeuse voit le numéro et corrige le pays d'un geste.
@@ -91,7 +115,8 @@ assert.deepStrictEqual(decouper(''), { code: '590', local: '' });
 assert.deepStrictEqual(decouper(null), { code: '590', local: '' });
 
 // Un aller-retour ne doit rien abîmer : c'est ce que fait la fiche qu'on rouvre.
-for (const numero of ['+590 690 66 24 00', '+1721 520 1234', '+1 305 555 0142', '+33 6 12 34 56 78']) {
+for (const numero of ['06 90 66 24 00', '05 90 87 12 34', '06 12 34 56 78',
+  '+1721 520 1234', '+1 305 555 0142', '+31 6 12 34 56 78']) {
   const { code, local } = decouper(numero);
   assert.strictEqual(telAssembler(code, local), numero, `aller-retour intact pour ${numero}`);
 }
@@ -156,8 +181,11 @@ assert.ok(!telComplet('zzz', '690662400'), 'un pays inconnu ne valide rien');
   assert.ok(/slice\(0, ?10\)/.test(DEVIS),
     'la troncature à dix chiffres est bien la prémisse : si elle disparaît de '
     + 'l’écran, ces relais n’ont plus lieu d’être');
+  // `normalizePhone` est relayée SANS CONDITION (relayerToujours) : elle collait
+  // « 590 » devant tout numéro français à dix chiffres, y compris un portable
+  // de métropole. Les deux autres ne se déclenchent que sur l'international.
   for (const nom of ['isValidLocalPhone', 'formatFrenchPhone', 'normalizePhone']) {
-    assert.ok(new RegExp(`relayer\\('${nom}'`).test(PONT),
+    assert.ok(new RegExp(`relayer(Toujours)?\\('${nom}'`).test(PONT),
       `${nom} doit être relayée : sans elle, un numéro international est tronqué`);
     assert.ok(DEVIS.includes(`function ${nom}(`),
       `${nom} doit exister sur l’écran des devis — sinon le relais ne relaie rien`);

@@ -125,7 +125,6 @@ const CLIENT_TYPES = [
   { value: 'asso', label: 'Asso', cls: 'asso' },
   { value: 'revendeur', label: 'Revendeur', cls: 'revendeur' },
 ];
-const CLIENT_TYPE_LABEL = Object.fromEntries(CLIENT_TYPES.map((t) => [t.value, t.label]));
 
 // Modes de paiement (miroir de catalog.json → commande.paiementModes, que le
 // serveur valide). Une commande peut n'en porter aucun : « non précisé ».
