@@ -11,6 +11,8 @@ try {
 } catch (_) { /* pas de .env : normal en prod */ }
 
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const compression = require('compression');
 const {
@@ -364,6 +366,65 @@ function asyncH(fn) {
 }
 
 // ---------------------------------------------------------------------------
+// VERSION DU SITE — de quoi dire à l'atelier « le patron vient de mettre à jour »
+// ---------------------------------------------------------------------------
+// Une tablette du comptoir ne se recharge JAMAIS d'elle-même : elle reste
+// ouverte des jours entiers sur la page chargée le premier matin. Un
+// déploiement ne l'atteint donc pas — et personne, sur place, n'a de raison de
+// deviner qu'il faudrait recharger. On le lui DIT, elle propose, et c'est un
+// tap qui décide (jamais un rechargement d'office : il emporterait la saisie en
+// cours, et l'atelier a déjà payé assez cher des dossiers perdus).
+//
+// L'EMPREINTE PORTE SUR LE CONTENU DE `public/`, PAS SUR LE DÉPLOIEMENT.
+// C'est toute la différence entre un signal utile et une alerte qu'on apprend à
+// ignorer :
+//   - une date de build ou un numéro de version changerait à CHAQUE
+//     redémarrage — un correctif serveur, un simple redémarrage du conteneur, et
+//     tout l'atelier verrait une bulle pour un site strictement identique ;
+//   - le contenu, lui, ne bouge que si un fichier de l'écran a vraiment changé.
+// Corollaire assumé : une correction qui ne touche que `server.js` ou `db.js`
+// ne fait apparaître aucune bulle. C'est voulu — il n'y a rien à recharger.
+//
+// Calculée UNE fois au démarrage (~1 Mo lu), jamais par requête.
+const VERSION_SITE = empreinteDuSite(path.join(__dirname, 'public'));
+
+function empreinteDuSite(racine) {
+  try {
+    const h = crypto.createHash('sha1');
+    const parcourir = (dossier, prefixe) => {
+      // Trié : `readdir` ne promet aucun ordre, et un ordre qui varie d'un
+      // conteneur à l'autre donnerait une empreinte différente pour des
+      // fichiers identiques — donc une bulle sur chaque déploiement.
+      const entrees = fs.readdirSync(dossier, { withFileTypes: true })
+        .sort((a, b) => (a.name < b.name ? -1 : 1));
+      for (const e of entrees) {
+        const chemin = path.join(dossier, e.name);
+        if (e.isDirectory()) { parcourir(chemin, `${prefixe}${e.name}/`); continue; }
+        if (!e.isFile()) continue;
+        h.update(`${prefixe}${e.name}\0`).update(fs.readFileSync(chemin)).update('\0');
+      }
+    };
+    parcourir(racine, '');
+    return h.digest('hex').slice(0, 12);
+  } catch (err) {
+    // Une empreinte illisible ne doit pas empêcher le serveur de démarrer. On
+    // rend une valeur CONSTANTE : un poste ne verra jamais de fausse mise à
+    // jour, il n'en verra simplement aucune — et la console le dit.
+    console.warn('Version du site incalculable — la bulle « mise à jour » restera muette :', err && err.message);
+    return 'indisponible';
+  }
+}
+
+// Ce que le poste interroge quand son flux temps réel est mort (503 du plafond,
+// proxy qui a coupé) : sans lui, une tablette au flux perdu ne saurait jamais
+// qu'une nouvelle version l'attend. `no-store` et pas `no-cache` : la réponse
+// tient en trente octets, la revalidation coûterait autant que la réponse.
+app.get('/api/version', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ version: VERSION_SITE });
+});
+
+// ---------------------------------------------------------------------------
 // Flux temps réel (SSE) — push instantané façon Google Sheets.
 // Le serveur garde une connexion ouverte par client et diffuse un événement
 // « change » à chaque création / modification / suppression. Aucune dépendance.
@@ -391,6 +452,13 @@ app.get('/api/stream', (req, res) => {
   });
   res.flushHeaders();
   res.write('retry: 3000\n\n'); // reconnexion auto côté navigateur
+  // LA VERSION DU SITE, DÈS L'OUVERTURE DU FLUX — et c'est tout le mécanisme.
+  // Un déploiement redémarre le conteneur : tous les flux tombent, chaque poste
+  // rouvre le sien tout seul (`retry`) et reçoit ici l'empreinte du site QU'IL
+  // VIENT DE NE PAS RECHARGER. Elle a changé → sa bulle s'allume. Aucun sondage,
+  // aucune requête de plus : l'évènement voyage dans la connexion qui existait
+  // déjà, une fois, à l'ouverture.
+  res.write(`event: version\ndata: ${JSON.stringify({ version: VERSION_SITE })}\n\n`);
 
   sseClients.add(res);
   // heartbeat pour traverser les proxies (Railway) sans timeout

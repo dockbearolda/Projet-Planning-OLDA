@@ -19,6 +19,9 @@ import { fetchBorne, DELAI_ENVOI } from './reseau.js';
 // LE TICKET du client — celui que la vendeuse imprime au comptoir, réimprimable
 // à l'identique depuis n'importe quelle ligne du planning.
 import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.js';
+// « Le patron a mis à jour » : une tablette du comptoir ne se recharge jamais
+// d'elle-même, elle exécute donc encore la version d'avant-hier. On lui propose.
+import { noterVersion, surveillerMaj } from './maj.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -6273,6 +6276,12 @@ function connectStream() {
     const es = new EventSource('/api/stream');
     stream = es;
     es.addEventListener('change', onStreamChange);
+    // L'empreinte du site, envoyée à l'ouverture du flux. Un déploiement fait
+    // tomber tous les flux : chaque poste rouvre le sien, reçoit une empreinte
+    // qui n'est plus la sienne, et allume sa bulle. Rien à sonder.
+    es.addEventListener('version', (e) => {
+      try { noterVersion(JSON.parse(e.data).version); } catch (_) { /* trame illisible */ }
+    });
     es.onopen = () => { streamAlive = true; streamEssais = 0; };
     es.onerror = () => {
       streamAlive = false;
@@ -6284,6 +6293,15 @@ function connectStream() {
 
 function startRealtime() {
   connectStream();
+  // La bulle « mise à jour disponible ». `saisieEnCours` est ce qu'on refuse de
+  // jeter sans prévenir : une cellule ou un tiroir en cours d'édition, et
+  // surtout un parcours du comptoir ouvert — c'est là que se perdent les
+  // dossiers. `fluxVivant` évite d'interroger le serveur quand l'évènement du
+  // flux fait déjà le travail.
+  surveillerMaj({
+    saisieEnCours: () => isInteracting() || isDrawerBusy() || comptoirOuvert(),
+    fluxVivant: () => streamAlive,
+  });
   // filet de sécurité : si le flux est coupé, on revient à un poll lent
   setInterval(() => { if (!streamAlive) { poll(); dashboard.notifyChange(); } }, POLL_MS);
   // les délais affichés suivent l'horloge, pas seulement les données
@@ -6989,6 +7007,13 @@ function mountProjet() {
     // jamais sur un brouillon laissé par le passage précédent.
     projetModule.resetProjet();
   }
+}
+
+// Un parcours du comptoir affiché, c'est peut-être une vente à moitié saisie
+// dans le cadre — et le cadre, on ne sait pas le lire d'ici. Tant que le module
+// n'a pas été chargé, personne n'a rien ouvert : il n'y a rien à perdre.
+function comptoirOuvert() {
+  return !!(projetModule && projetModule.parcoursOuvert && projetModule.parcoursOuvert());
 }
 
 // Le comptoir vient d'enregistrer un dossier : le planning s'ouvre SUR LUI,

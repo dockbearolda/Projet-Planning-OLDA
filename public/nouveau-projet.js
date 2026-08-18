@@ -48,6 +48,7 @@ const FLUX = [
 
 let ROOT = null;
 let enCours = false;       // un enregistrement est en vol : on n'en lance pas deux
+let fluxAffiche = null;    // le parcours SOUS LES YEUX, s'il y en a un
 
 const cadreDe = (id) => ROOT.querySelector(`#np-frame-${id}`);
 
@@ -63,6 +64,7 @@ function icone(nom) {
 // `id` vaut null sur l'accueil : aucun parcours ouvert, aucune barre de flux.
 function afficher(id) {
   const flux = FLUX.find((f) => f.id === id) || null;
+  fluxAffiche = flux ? flux.id : null;
   ROOT.querySelector('#np-home').hidden = !!flux;
   ROOT.querySelector('#np-bar').hidden = !flux;
   ROOT.querySelector('#np-frames').hidden = !flux;
@@ -368,6 +370,16 @@ function auMessage(e) {
   const auto = prochainEnvoiAutomatique;
   prochainEnvoiAutomatique = false;
   enregistrer(msg.payload, { auto, source: e.source });
+}
+
+// Un parcours ouvert = une vente ou une demande peut-être en cours de saisie
+// dans le cadre. Le planning s'en sert avant de recharger l'écran pour une mise
+// à jour : ce qui est tapé au comptoir et pas encore parti n'existe nulle part
+// ailleurs. On ne peut pas lire DANS le cadre (il a son propre document) — on
+// répond donc à la seule question qu'on sait trancher d'ici : y a-t-il un
+// parcours à l'écran ?
+export function parcoursOuvert() {
+  return fluxAffiche !== null;
 }
 
 // --- Montage -----------------------------------------------------------------
