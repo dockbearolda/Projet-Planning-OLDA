@@ -70,7 +70,7 @@ function comptoirEnMiniature() {
   pied.remove = () => { pied.partie = true; };
   const noeuds = {
     ticketOrder: (() => {
-      const n = { textContent: 'Commande : 26.08.17-004', partie: false };
+      const n = { textContent: 'Commande : 26.08.17-004', partie: false, style: {} };
       n.remove = () => { n.partie = true; };
       return n;
     })(),
@@ -106,9 +106,16 @@ function comptoirEnMiniature() {
   const { bac, noeuds, pied } = comptoirEnMiniature();
   bac.allegerTicket();
 
-  // 1. Le numéro s'en va tout entier.
-  assert.ok(noeuds.ticketOrder.partie,
-    'le numéro de commande quitte le papier qui part à l’atelier');
+  // 1. Le numéro quitte le PAPIER — sans quitter la page.
+  assert.strictEqual(noeuds.ticketOrder.style.display, 'none',
+    'le numéro de commande ne s’imprime pas sur le papier qui part à l’atelier');
+  // LE NŒUD RESTE. Les deux écrans réécrivent `#ticketOrder` à chaque
+  // remplissage sans vérifier qu'il existe : le retirer tuait le deuxième
+  // appel, donc « Imprimer » — qui refait un remplissage avant d'imprimer.
+  assert.strictEqual(noeuds.ticketOrder.partie, false,
+    'le nœud reste dans la page : les écrans le réécrivent à chaque remplissage');
+  assert.ok(noeuds.ticketOrder.textContent.includes('26.08.17-004'),
+    'et il garde sa valeur — c’est la référence qui part au planning');
 
   // 2 et 3. Le doublon du nom part, l'e-mail RENSEIGNÉ reste.
   const restant = noeuds.ticketClientDetails.querySelectorAll().map((l) => l.k);
@@ -196,6 +203,17 @@ for (const [nom, src] of [['vente-directe', VENTE], ['demande-devis', DEVIS]]) {
 // Le préfixe que l'élagage réécrit. Les deux écrans l'écrivent à la main.
 assert.ok(/ticketOrder"\)\.textContent=\s*"Commande : "\+/.test(VENTE),
   'la vente écrit « Commande : » devant son numéro');
+// POURQUOI L'ÉLAGAGE NE PEUT PAS RETIRER CE NŒUD. Les deux écrans l'écrivent
+// SANS VÉRIFIER qu'il existe, à chaque remplissage. Le retirer une fois tuait
+// tous les remplissages suivants — dont celui que fait « Imprimer » juste avant
+// `window.print()`. Si un jour ces écrans se gardent d'un nœud absent, cette
+// contrainte tombe ; tant qu'ils ne le font pas, on la garde sous les yeux.
+for (const [nom, src] of [['vente-directe', VENTE], ['demande-devis', DEVIS]]) {
+  assert.ok(/getElementById\(['"]ticketOrder['"]\)\.textContent\s*=/.test(src),
+    `${nom} : le remplissage écrit ticketOrder sans garde — l’élagage doit le MASQUER, pas le retirer`);
+}
+assert.ok(!/ticketOrder'\);?\s*\n?\s*if \(num\) num\.remove\(\)/.test(PONT),
+  'l’élagage ne retire pas le nœud du numéro : il le masque');
 assert.ok(/ticketOrder'\)\.textContent='Commande : '\+reference/.test(DEVIS),
   'le devis écrit « Commande : » devant sa référence');
 
