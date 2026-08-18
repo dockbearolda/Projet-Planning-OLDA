@@ -547,15 +547,37 @@ function clearGrid() {
 
 // Surbrillance du rail : une seule entrée active à la fois (famille OU sous-cat).
 function paintSidebarActive() {
+  let active = null;
   document.querySelectorAll('.stage').forEach((el) => {
     const isSub = el.dataset.sub != null;
     const on = isSub
       ? (el.dataset.slug === currentStage && el.dataset.sub === currentSub)
       : (el.dataset.slug === currentStage && (el.dataset.sub != null ? false : currentSub === null));
     el.classList.toggle('active', on);
-    if (on) el.setAttribute('aria-current', 'true');
+    if (on) { active = el; el.setAttribute('aria-current', 'true'); }
     else el.removeAttribute('aria-current');
   });
+  montrerEtapeActive(active);
+}
+
+// LE RAIL DOIT MONTRER OÙ L'ON EST. Il fait 1 858 px pour 679 px de hauteur
+// visible sur la tablette : il défile. Or on n'arrive pas toujours dans le
+// pipeline en cliquant dessus — la recherche globale, le Point du jour et le
+// comptoir ouvrent une étape directement. Mesuré : arrivé sur « Archivé », la
+// seule entrée allumée du rail se trouvait 1 100 px SOUS la zone visible.
+// L'employé voyait donc la bonne liste au-dessus d'un rail qui ne désignait
+// rien, et n'avait aucun moyen de savoir à quelle étape du pipeline il était.
+//
+// `block: 'nearest'` : le plus petit déplacement qui la rend visible — une
+// entrée déjà à l'écran ne bouge pas d'un pixel, et le rail ne se recentre pas
+// à chaque repeinture.
+function montrerEtapeActive(el) {
+  if (!el) return;
+  // JAMAIS pendant un glisser : les entrées du rail sont alors les cibles de
+  // dépose, et les faire coulisser sous le doigt ferait atterrir la commande
+  // dans l'étape voisine.
+  if (dragState) return;
+  el.scrollIntoView({ block: 'nearest', behavior: mouvementReduit() ? 'auto' : 'smooth' });
 }
 
 // Nom accessible d'une entrée du rail : le libellé ET son compteur, pour qu'un
@@ -582,6 +604,24 @@ function currentViewLabel() {
   return STAGE_LABEL[currentStage];
 }
 
+// LA LISTE QU'ON VIENT DE DEMANDER COMMENCE EN HAUT.
+// Changer de FAMILLE vidait la grille : sa hauteur s'effondrait et le
+// navigateur ramenait le défilement à zéro tout seul. Changer de SOUS-ÉTAPE
+// passe par le chemin rapide (les lignes de la famille sont déjà en mémoire, on
+// ne fait que re-filtrer) : la position de défilement, elle, ne bougeait pas.
+// Mesuré : depuis « Production » déroulée à 2 500 px, un tap sur « Production
+// DTF » laissait la liste à 510 px — les cinq premières commandes de l'étape
+// demandée naissaient AU-DESSUS de l'écran. C'est le geste le plus fréquent de
+// la journée, et il donnait à chaque fois l'impression d'avoir raté sa cible.
+//
+// `auto` et non `smooth` : on ne fait pas voyager l'employé à travers une liste
+// qu'il vient de quitter. Le contenu change en même temps — la liste est
+// simplement DÉJÀ en haut quand elle apparaît.
+function remonterLaListe() {
+  const wrap = document.querySelector('.grid-wrap');
+  if (wrap && wrap.scrollTop > 0) wrap.scrollTo({ top: 0, behavior: 'auto' });
+}
+
 // `forcerRelecture` : la ligne visée vient d'être créée côté serveur et n'est
 // donc PAS dans le cache local. Sans ce drapeau, le raccourci « même famille »
 // ci-dessous se contentait de re-dessiner ce qu'on avait déjà — la nouvelle
@@ -604,6 +644,7 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   // de la famille sont déjà en mémoire, on ne fait que re-filtrer (instantané).
   if (sameFamily && lastRowsSig !== '' && !forcerRelecture) {
     applySortAndRender();
+    remonterLaListe();
     playStageEnter();
     return;
   }
@@ -628,7 +669,7 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   }
   // Anime l'entrée des VRAIES lignes, seulement si cette sélection est toujours
   // celle affichée (un clic plus récent a pu prendre le relais entre-temps).
-  if (currentStage === slug) playStageEnter();
+  if (currentStage === slug) { remonterLaListe(); playStageEnter(); }
 }
 
 // --- Chargement données ----------------------------------------------------
@@ -1376,6 +1417,21 @@ function buildCard(r) {
     pcardBloc('TTC', montant, refs, nomRef),
     actions,
   );
+
+  // LA CARTE S'OUVRE QUAND ON LA TOUCHE. Elle fait 146 px de haut et ne
+  // répondait que sur quatre pastilles de 44 px, tout à droite : viser le
+  // dossier lui-même — le geste que tout le monde essaie d'abord — ne faisait
+  // rien du tout. Le corps de la carte ouvre donc la fiche, exactement comme le
+  // bouton « ouvrir » qu'il double.
+  //
+  // Aucun risque d'ouverture pendant un DÉFILEMENT : le navigateur n'émet pas
+  // de `click` quand le doigt a fait glisser la liste. Reste le GLISSER de la
+  // carte, lui suivi à la main — d'où la garde ci-dessous.
+  carte.addEventListener('click', (ev) => {
+    if (ev.target.closest && ev.target.closest(ZONE_CLIQUABLE)) return;
+    if (glisserVientDeFinir()) return;
+    openLigneDetail(r.id);
+  });
 
   // La carte se glisse sur le rail pour changer d'étape, comme une ligne du
   // tableau. On saisit la carte elle-même : elle n'a pas de poignée, tout son
@@ -5232,6 +5288,13 @@ let dragState = null;
 // sur une zone de prise ne répondrait plus.
 const ZONE_CLIQUABLE = 'button, a, input, select, textarea, [role="button"]';
 
+// À la SOURIS, relâcher une carte qu'on vient de déplacer émet aussi un `click`
+// sur elle. Sans cette garde, tout glisser-déposer se terminait par l'ouverture
+// de la fiche du dossier qu'on venait de ranger — par-dessus la liste qu'on
+// voulait justement voir se réordonner.
+let finGlisser = 0;
+const glisserVientDeFinir = () => performance.now() - finGlisser < 300;
+
 function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -5287,6 +5350,12 @@ function beginDrag() {
   dragState.wrap = document.querySelector('.grid-wrap');
   tr.classList.add('dragging');
   document.body.classList.add('dragging-active');
+  // LA CARTE EST EN MAIN — et on le SENT. Au doigt, rien ne distinguait le
+  // moment où la commande se décroche de la liste : le fantôme paraît sous le
+  // doigt, donc caché par lui. Un tic de 12 ms au décrochage, comme les listes
+  // réordonnables du système. Absent d'iOS et de la plupart des ordinateurs :
+  // l'appel est facultatif, jamais une condition de fonctionnement.
+  if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
   if (!defilementRaf) defilementRaf = requestAnimationFrame(boucleDefilement);
 }
 
@@ -5386,6 +5455,7 @@ async function onDragEnd(e) {
   ds.tr.classList.remove('prise-en-cours');
 
   if (!ds.active) { dragState = null; return; } // simple clic, pas un drag
+  finGlisser = performance.now();
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const stageEl = el && el.closest ? el.closest('.stage') : null;
@@ -5572,14 +5642,30 @@ document.getElementById('ordreReset')?.addEventListener('click', () => {
 // Auto-défilement vertical quand le doigt approche des bords de la grille.
 // Renvoie vrai si la liste a RÉELLEMENT bougé (butée haute / basse : elle ne
 // bouge plus, inutile de recalculer la cible de dépose derrière).
+//
+// LA VITESSE SUIT LE DOIGT. Elle était fixe (14 px par image) : sur la tablette,
+// où l'écran ne montre que trois à quatre cartes à la fois, remonter une
+// commande de la fin d'une étape de cinquante demandait de tenir le doigt au
+// bord pendant une dizaine de secondes — sans rien pouvoir viser, puisque la
+// liste passe à la même allure quoi qu'on fasse. Elle est désormais
+// PROPORTIONNELLE à l'enfoncement dans la marge : effleurer le bord fait glisser
+// la liste d'un cran, s'y appuyer franchement la fait défiler vite. C'est le
+// geste des listes du système, et il rend le bord utilisable pour VISER.
+const DEFILEMENT_MIN = 4;    // px par image, au premier pixel de la marge
+const DEFILEMENT_MAX = 30;   // px par image, doigt collé au bord
 function autoScroll(y) {
   const wrap = dragState && dragState.wrap ? dragState.wrap : document.querySelector('.grid-wrap');
   if (!wrap) return false;
   const rect = wrap.getBoundingClientRect();
-  const margin = 64;
+  const marge = 72;
   const avant = wrap.scrollTop;
-  if (y < rect.top + margin) wrap.scrollTop -= 14;
-  else if (y > rect.bottom - margin) wrap.scrollTop += 14;
+  // `part` : 0 au bord intérieur de la marge, 1 au bord de la liste. Mise au
+  // carré pour que la zone lente occupe l'essentiel de la marge — c'est là
+  // qu'on ajuste, la vitesse haute ne sert qu'à traverser.
+  const vitesse = (part) => DEFILEMENT_MIN
+    + (DEFILEMENT_MAX - DEFILEMENT_MIN) * Math.min(1, Math.max(0, part)) ** 2;
+  if (y < rect.top + marge) wrap.scrollTop -= vitesse((rect.top + marge - y) / marge);
+  else if (y > rect.bottom - marge) wrap.scrollTop += vitesse((y - rect.bottom + marge) / marge);
   return wrap.scrollTop !== avant;
 }
 

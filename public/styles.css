@@ -3272,6 +3272,25 @@ button, a, .stage, .deadline-badge,
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+  /* La règle ci-dessus ne coupe que la DURÉE : l'enfoncement à l'appui (voir
+     le bloc « l'appui répond dans la frame ») s'appliquerait toujours, d'un
+     coup — un saut de taille, soit exactement le mouvement qu'on nous demande
+     de retirer. On l'enlève donc pour de bon ; la réponse reste portée par la
+     couleur, qui ne bouge pas. */
+  .pcard__open:active,
+  .pcard__ticket:active,
+  .pcard__del:active,
+  .pcard__ref-btn:active,
+  .send-btn:active,
+  .del-btn:active,
+  .dup-btn:active,
+  .nav-switch-btn:active,
+  .help-btn:active,
+  .stage-link:active,
+  .ordre-reset:active,
+  .colbar-item:active,
+  .menu-item:active,
+  .ld-act:active { transform: none; }
 }
 
 /* Bascule clair / sombre : les transitions se taisent le temps d'une image
@@ -6027,3 +6046,103 @@ summary:focus-visible {
 .pcard { cursor: grab; }
 .pcard.dragging { cursor: grabbing; }
 .pcard button, .pcard a { cursor: pointer; }
+
+/* =========================================================================
+   AU DOIGT, LE SURVOL N'EXISTE PAS — ET ANDROID LE LAISSE COLLÉ
+   =========================================================================
+   Chrome Android applique `:hover` au tap et l'y LAISSE jusqu'au tap suivant
+   ailleurs. Sur la tablette de l'atelier, la dernière carte touchée restait
+   donc éclairée en permanence : elle se lisait comme « celle-ci est
+   sélectionnée » alors que rien ne l'était. Même chose pour l'étape du rail
+   qu'on vient d'ouvrir, qui gardait le fond du survol par-dessus le fond de
+   l'état actif.
+   On borne donc le survol aux appareils qui en ont un — la souris du patron ne
+   perd rien, le doigt ne garde plus de trace. Ce qui remplace le survol au
+   doigt, c'est l'APPUI (bloc suivant) : immédiat, et qui s'efface tout seul. */
+@media (hover: none) {
+  .pcard:hover { border-color: var(--border); box-shadow: var(--shadow-1); }
+  .pcard:hover .pcard__handle { color: var(--text-3); }
+  .pcard__ref-btn:hover { border-color: var(--border); background: var(--surface); }
+  .pcard__ref-btn.is-on:hover { background: var(--text-1); border-color: var(--text-1); }
+  .pcard__open:hover,
+  .pcard__ticket:hover { background: var(--surface); border-color: var(--border); color: var(--text-2); }
+  .pcard__del:hover { background: var(--surface); border-color: var(--border); color: var(--text-3); }
+  .stage:hover { background: transparent; }
+  .stage.active:hover { background: var(--primary-soft); }
+  .stage.zone-head:hover { background: var(--rail-head-bg); }
+  .stage.zone-head.active:hover { background: var(--rail-head-bg-strong); }
+  .stage.is-empty:hover { opacity: .55; }
+  .stage.active.is-empty:hover { opacity: 1; }
+  .grid tbody tr:hover { background: transparent; }
+  .grid tbody tr.row-alt:hover { background: var(--row-alt); }
+  .grid tbody tr:hover .handle { color: var(--text-3); }
+  /* Ligne alertée : sa teinte de repos, pas celle du survol — sinon la dernière
+     ligne bloquée touchée restait plus foncée que ses voisines, et se lisait
+     comme « plus urgente » qu'elles. */
+  .grid tbody tr.is-bloque:hover > td { background: color-mix(in srgb, var(--st-bloque-bg) 62%, var(--surface)); }
+  .grid tbody tr.is-a-voir:hover > td { background: color-mix(in srgb, var(--primary-soft) 62%, var(--surface)); }
+  .nav-switch-btn:hover { background: transparent; color: var(--text-2); }
+  .nav-switch-btn.active:hover { background: transparent; color: var(--text-1); }
+  .icon-btn:hover { background: transparent; color: var(--text-2); }
+  .help-btn:hover { background: transparent; color: var(--text-2); }
+}
+
+/* =========================================================================
+   L'APPUI RÉPOND DANS LA FRAME — pas au retour du serveur
+   =========================================================================
+   Une commande du planning fait un aller-retour réseau : entre le doigt et la
+   réponse, l'écran ne disait RIEN. Sur la tablette on retapait, et deux taps
+   valent deux fois l'action (c'est l'origine des doubles ventes du comptoir).
+   Chaque surface qu'on touche répond donc TOUT DE SUITE, avant même que quoi
+   que ce soit parte : un enfoncement de 6 % sur les pastilles, un fond d'un cran
+   plus dense sur les grandes surfaces. Rien que `transform` et une couleur : le
+   compositeur suffit, la liste garde ses 60 images/seconde même à 400 cartes.
+
+   LA CARTE, elle, ne s'enfonce pas : un `transform` sur elle créerait un bloc
+   conteneur, et c'est exactement ce que l'animation de réordonnancement (FLIP,
+   `el.animate` sur `transform`) pilote au même endroit — les deux se
+   disputeraient la propriété et la carte sauterait au lieu de glisser. Elle
+   répond par sa surface, et cet appui se pose en OMBRE INTERNE plutôt qu'en
+   `background` : `--state-press` est une couleur translucide, et remplacer le
+   fond de la carte y aurait laissé transparaître le gris de la page à la place
+   de sa surface blanche. */
+.pcard:active {
+  border-color: var(--text-2);
+  box-shadow: var(--shadow-1), inset 0 0 0 999px var(--state-press);
+}
+.pcard__open:active,
+.pcard__ticket:active,
+.pcard__del:active,
+.pcard__ref-btn:active { transform: scale(.94); }
+.stage:active { background: var(--state-press); }
+.stage.zone-head:active { background: var(--rail-head-bg-strong); }
+.nav-switch-btn:active,
+.help-btn:active,
+.stage-link:active,
+.ordre-reset:active,
+.colbar-item:active,
+.menu-item:active,
+.ld-act:active { transform: scale(.97); }
+.pcard__open,
+.pcard__ticket,
+.pcard__del,
+.pcard__ref-btn,
+.nav-switch-btn,
+.help-btn,
+.stage-link,
+.ordre-reset,
+.colbar-item,
+.menu-item,
+.ld-act { transition: transform .09s var(--ease), background var(--dur-1) var(--ease),
+            border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+/* Le doigt qui GLISSE une carte n'appuie pas dessus : sans ça, l'enfoncement
+   se posait au début de chaque prise et luttait avec le fantôme. */
+body.dragging-active .pcard:active { border-color: var(--border); }
+
+/* Les boutons de ligne (dupliquer / supprimer / envoyer vers Fiverr) sont déjà
+   montrés en permanence au doigt — ils ne se révèlent au survol que sur un
+   poste à souris (voir le bloc `pointer: coarse` plus haut). Il leur manquait
+   seulement de répondre sous le doigt, comme le reste. */
+.send-btn:active, .del-btn:active, .dup-btn:active { transform: scale(.92); }
+.send-btn, .del-btn, .dup-btn { transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+            background var(--dur-1) var(--ease), transform .09s var(--ease); }
