@@ -32,6 +32,21 @@ const genreSaisie = (g) => (g === "Unisexe" ? "Homme" : g);
 DB.markingColors = ["Multi couleur","Corail","Orange","Beige","Kaki","Jaune","Vert",
   "Vert pastel","Menthe","Bleu clair","Bleu royal","Bleu marine","Lavande",
   "Rose bébé","Rouge","Noir","Blanc","Marron"];
+
+// La teinte de chaque couleur de marquage, pour la montrer dans le menu : un
+// nom seul ne dit pas la différence entre « Vert » et « Vert pastel ».
+// Ce sont des teintes D'AFFICHAGE, approchées à l'œil sur les bobines de
+// l'atelier — pas les codes du fournisseur. Une correction se fait ici, en un
+// seul endroit. « Multi couleur » n'est pas une teinte : elle se montre en
+// dégradé, c'est ce qu'elle veut dire.
+DB.markingColorsHex = {
+  "Multi couleur": "conic-gradient(#d0021b,#f5821f,#ffd400,#009b48,#1e4fa3,#7b4fa3,#d0021b)",
+  "Corail": "#ff6f5e", "Orange": "#f5821f", "Beige": "#d8c3a5", "Kaki": "#6b6a45",
+  "Jaune": "#ffd400", "Vert": "#009b48", "Vert pastel": "#a8d5a2", "Menthe": "#8fd9c0",
+  "Bleu clair": "#66b7e8", "Bleu royal": "#1e4fa3", "Bleu marine": "#1b2a4a",
+  "Lavande": "#b9a7da", "Rose bébé": "#f5b9c8", "Rouge": "#d0021b",
+  "Noir": "#111111", "Blanc": "#ffffff", "Marron": "#6b4423",
+};
 const SIZE_KEYS = ["S","M","L","XL","XXL","other"];
 const SIZE_LABELS = { S:"S", M:"M", L:"L", XL:"XL", XXL:"2XL", other:"Autres" };
 
@@ -46,6 +61,14 @@ function getRef(ref) { return DB.refs.find(r => r.ref === ref); }
 // teintes chinées n'ont pas de code couleur chez le fournisseur.
 // Le nom du coloris reste la clé : c'est lui qui part sur le devis.
 function colorsFor(ref) { return (DB.colors[ref] || []).map(c => c.n); }
+// La teinte d'une couleur de MARQUAGE (l'encre), à ne pas confondre avec celle
+// du textile : deux listes, deux sources.
+function markColorHexFor(nom) {
+  const cle = String(nom || '').trim().toLowerCase();
+  if (!cle) return null;
+  const trouve = Object.keys(DB.markingColorsHex).find(k => k.toLowerCase() === cle);
+  return trouve ? DB.markingColorsHex[trouve] : null;
+}
 function colorHexFor(ref, nom) {
   const cle = String(nom || '').trim().toLowerCase();
   if (!cle) return null;
@@ -239,7 +262,7 @@ window.TextileEngine = {
   PLACEMENTS, SIZE_KEYS, SIZE_LABELS,
   GENRES_SAISIE, GENRE_MOTEUR, FAMILLES_ACCESSOIRE, genreMoteur, genreSaisie,
   num, ceilStep, fmtTime,
-  getRef, colorsFor, colorHexFor,
+  getRef, colorsFor, colorHexFor, markColorHexFor,
   coefFor, thresholdFor, classify, atelierClass,
   calculate,
   roundUpQty, maxFreeForTier, defaultNegotiationSolutions, scenarioMetrics, rankedScenarios,
