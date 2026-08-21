@@ -1,0 +1,282 @@
+'use strict';
+
+// LE CATALOGUE DU COMPTOIR — un produit, une quantité, au panier.
+// ===========================================================================
+// L'étape « Recueil des besoins » n'offrait qu'un formulaire : catégorie,
+// désignation, quantité, référence, couleur, production, commentaire. Pour
+// vendre un porte-clés en bois, la vendeuse remplissait six champs — debout,
+// au comptoir, le client en face. Les objets que l'atelier a EN RAYON sont
+// désormais des LIGNES dans une liste déroulante rangée par famille : elle
+// prend le produit, pose la quantité, ajoute au panier, recommence.
+//
+// CE FICHIER GARDE CE QUI TOMBERAIT EN SILENCE :
+//
+//   1. LE PRODUIT FANTÔME. `Number('')` vaut ZÉRO : « Ajouter au panier »
+//      sans rien choisir posait la PREMIÈRE ligne du catalogue dans le devis
+//      — vu en cliquant, jamais en lisant.
+//   2. LE MÊME PRODUIT REPRIS. Il ajoute ses unités à la ligne qui existe,
+//      il n'en ouvre pas une deuxième : un devis ne part pas avec deux fois
+//      le même article.
+//   3. LA FORME DU BESOIN. Le besoin posé par le catalogue est celui du
+//      formulaire, aux mêmes clés — tout ce qui vit en aval le lit sans rien
+//      savoir du catalogue. Son prix reste ABSENT (`NaN`, pas 0) : une
+//      demande de devis sans prix ne doit pas s'afficher « 0 € ».
+//   4. LA VARIANTE DANS LA LIGNE. Bois/liège, clair/foncé, taille, coloris de
+//      tasse : chaque variante est SA propre ligne du menu. Aucun deuxième
+//      choix à faire, et deux variantes ne se confondent jamais au panier.
+//   5. LA SAISIE MANUELLE. Elle reste EN HAUT : le catalogue ne couvre pas
+//      tout (un textile, une commande spéciale) et rien de ce qui se faisait
+//      avant ne doit devenir plus long à faire. « Modifier » doit rouvrir ce
+//      formulaire replié, sinon le bouton de la liste ne fait rien de visible.
+//
+// Tout se lit dans les sources : ces écrans n'ont ni build ni DOM de test, et
+// une nouvelle version d'un écran du patron se pose en REMPLAÇANT le fichier.
+
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+const DEVIS = lire('public/comptoir/demande-devis.html');
+const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
+
+// --- 1. Le bandeau qui expliquait l'étape a disparu -------------------------
+
+assert.ok(!/Renseigne ce que le client demande/.test(DEVIS),
+  'le bandeau explicatif de l’étape des besoins doit avoir disparu');
+
+// --- 2. Une ligne : produit, quantité, panier -------------------------------
+
+assert.ok(/<select id="catProduit"><\/select>/.test(step2),
+  'le catalogue est une LISTE DÉROULANTE, remplie par le script');
+assert.ok(/id="catQte"[^>]*type="number"[^>]*min="1"/.test(step2),
+  'la quantité se pose à côté du produit');
+assert.ok(/onclick="ajouterAuPanier\(\)"/.test(step2),
+  '« Ajouter au panier » met la ligne dans le devis');
+assert.ok(/id="catStatus"[^>]*aria-live="polite"/.test(step2),
+  'ce qui vient d’être ajouté s’annonce, pas seulement dans la liste du bas');
+
+// La saisie manuelle reste EN HAUT, avant la ligne du catalogue.
+const iManuel = step2.indexOf('id="catManuelBtn"');
+const iForm = step2.indexOf('id="besoinManuel"');
+const iSelect = step2.indexOf('id="catProduit"');
+assert.ok(iManuel > -1 && iForm > iManuel && iSelect > iForm,
+  'la saisie manuelle et son formulaire viennent AVANT la ligne du catalogue');
+assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
+  'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
+assert.ok(/<div id="besoinManuel" class="hidden">[\s\S]*id="needFormTitle"/.test(step2),
+  'le formulaire détaillé est REPLIÉ, pas supprimé');
+assert.ok(/function editNeed\(i\)\{choisirTypeBesoin\('autre'\);basculerSaisieManuelle\(true\);/.test(DEVIS),
+  '« Modifier » doit rouvrir le formulaire replié');
+assert.ok(/function editNeed[\s\S]*?scrollIntoView/.test(DEVIS),
+  '… et l’amener sous les yeux : il s’ouvre en haut, le bouton est en bas de la liste');
+assert.ok(/n===2&&!needs\.length\)return fail\('catProduit'/.test(DEVIS),
+  'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié');
+assert.ok(/if\(editingNeed<0\)\$\('needFormTitle'\)\.textContent/.test(DEVIS),
+  'un ajout au panier ne doit pas effacer « Modifier le besoin n°X »');
+
+// Le doigt : ces trois-là se prennent debout, au comptoir.
+assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button\{min-height:52px\}/.test(DEVIS),
+  'produit, quantité et bouton gardent une cible tactile pleine');
+assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
+  'sur un téléphone la ligne se déplie en trois rangées');
+
+// --- 3. Le catalogue du patron, produit par produit -------------------------
+
+const ATTENDU = {
+  'Art de la table': {
+    'Bouchon Bois': [], 'Coffret à Vin': [], 'Couteau Multi': ['Bois', 'Liège'],
+    'Décapsuleur Bois': [], 'Flasque Bois': ['Clair', 'Foncé'],
+    'Limonadier Bois': ['Clair', 'Foncé'], 'Service à Whisky': [], 'Shaker inox': [],
+    'Dessous de plat Liège': [], 'Dessous de verre Liège': [], 'Plateau Liège': [],
+    'Pelle Bois Aulne': [], 'Planche à découper Aulne': ['Grande', 'Petite'],
+    'Planche bois Acacia': ['Petite', 'Carré', 'Rectangle'],
+  },
+  'Du quotidien': {
+    'Cendrier Liège': [], 'Lot brosse et peigne bois': [], 'Miroir Liège': ['XL', 'Petit'],
+    'Pince à billet': ['Argent', 'Or'], 'Porte Carte Liège': [], 'Porte Monnaie Liège': [],
+    'Porte sac': [], 'Sabot veilleuse bois': [],
+  },
+  Voyage: {
+    'Etui à Passeport Cuir PU': ['Bleu Brume', 'Brun', 'Noir', 'Rose'],
+    'Identificateur Valise Cuir PU': ['Bleu Brume', 'Brun', 'Noir', 'Rose'],
+    'Identificateur Valise Liège': [], 'Identificateur Valise Métal': [],
+  },
+  Gourdes: {
+    'Gourde 500 ml Métal': ['Blanc', 'Noir'],
+    'Gourde 800 ml Métal': ['Blanc', 'Noir', 'Inox'],
+  },
+  'Jeux & loisirs': {
+    Dominos: [], 'Jeux de Cartes': [], Mikado: [], Morpion: [], Yoyo: [], Puzzle: [],
+    'Raquette Bois': [],
+  },
+  Papeterie: {
+    'Bloc Note Liège': ['A5', 'A6'], 'Crayon papier bois': [],
+    'Grand Bloc Note Similicuir A5': ['Bleu'], 'Stylo à bille en bois': [],
+  },
+  'Porte-clés': {
+    'Porte-Clés Bois Tir Bouchon': [], 'Porte-Clés Bois vintage': ['rectangle', 'rond'],
+    'Porte-Clés Décapsuleur': ['Bois', 'Similicuir', 'Acrylique'],
+    'Porte-Clés Flotteur Liège': ['Bleu', 'Marron'],
+  },
+};
+
+// Le bloc du catalogue s'exécute pour de vrai : ce que fait « Ajouter au
+// panier » ne se lit pas dans une expression régulière.
+function bacASable() {
+  const bloc = (DEVIS.match(/\/\* CATALOGUE-COMPTOIR[\s\S]*?\/\* \/CATALOGUE-COMPTOIR \*\//) || [''])[0];
+  assert.ok(bloc, 'le bloc du catalogue doit être délimité dans la page');
+  const faux = (extra) => Object.assign({
+    value: '', innerHTML: '', textContent: '',
+    classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } },
+    querySelector() { return null; }, querySelectorAll() { return []; },
+    setAttribute() {}, focus() {}, scrollIntoView() {},
+  }, extra || {});
+  const els = { catProduit: faux(), catQte: faux({ value: '1' }), catStatus: faux() };
+  const echecs = [];
+  const ctx = {
+    needs: [],
+    $: (id) => (els[id] || (els[id] = faux())),
+    esc: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'),
+    clearErrors() {},
+    fail(id, msg) { echecs.push({ id, msg }); return false; },
+    renderNeeds() {}, updateSidebar() {},
+  };
+  const fabrique = new Function('ctx', `with(ctx){${bloc}
+    return {CATALOGUE,ajouterAuPanier,catCle,lignesCatalogue,remplirSelectCatalogue};}`);
+  return Object.assign(fabrique(ctx), { needs: ctx.needs, els, echecs });
+}
+
+const cat = bacASable();
+const parFamille = new Map(cat.CATALOGUE.map((f) => [f.famille, f]));
+
+for (const [famille, produits] of Object.entries(ATTENDU)) {
+  const f = parFamille.get(famille);
+  assert.ok(f, `la famille « ${famille} » doit être au catalogue`);
+  for (const [nom, variantes] of Object.entries(produits)) {
+    const it = f.items.find((o) => o.n === nom);
+    assert.ok(it, `« ${nom} » doit être au catalogue (${famille})`);
+    assert.deepStrictEqual(it.v || [], variantes,
+      `les variantes de « ${nom} » sont celles du patron`);
+  }
+}
+
+// Les 17 tasses : la couleur du DEHORS, puis celle du DEDANS.
+const tasses = parFamille.get('Tasse céramique 350 ml');
+assert.ok(tasses, 'la famille des tasses doit exister');
+assert.strictEqual(tasses.items.length, 17, 'TC 01 à TC 17 — les dix-sept');
+assert.strictEqual(tasses.items[0].note, 'Rouge / Blanc', 'TC 01 : rouge dehors, blanc dedans');
+assert.strictEqual(tasses.items[16].note, 'Noir / Orange', 'TC 17 : noir dehors, orange dedans');
+assert.ok(tasses.items.every((t) => /^Tasse céramique 350 ml TC \d\d$/.test(t.label)),
+  'la ligne du devis dit « Tasse céramique 350 ml TC 0X » : « TC 0X » seul ne dit rien à l’atelier');
+assert.ok(tasses.items.every((t) => /\(ext\.\).*\(int\.\)/.test(t.color)),
+  'la couleur d’une tasse dit lequel des deux tons est dehors');
+assert.strictEqual(new Set(tasses.items.map((t) => t.color)).size, 17,
+  'deux tasses ne doivent pas porter la même couleur');
+
+// --- 4. Le menu déroulant : des lignes, rangées par famille -----------------
+
+const groupes = cat.lignesCatalogue();
+assert.deepStrictEqual(groupes.map((g) => g.famille),
+  Object.keys(ATTENDU).concat(['Tasse céramique 350 ml']),
+  'les familles du menu sont celles du patron, dans son ordre');
+
+const plat = groupes.flatMap((g) => g.lignes);
+assert.strictEqual(new Set(plat.map((l) => l.famille + '|' + l.texte)).size, plat.length,
+  'deux lignes du menu ne doivent pas porter le même intitulé dans la même famille');
+['Couteau Multi — Bois', 'Couteau Multi — Liège', 'Flasque Bois — Foncé',
+  'Gourde 800 ml Métal — Inox', 'TC 01 — Rouge / Blanc', 'Shaker inox'].forEach((t) => {
+  assert.ok(plat.some((l) => l.texte === t), `« ${t} » doit être une ligne du menu`);
+});
+
+cat.remplirSelectCatalogue();
+const html = cat.els.catProduit.innerHTML;
+assert.ok(/^<option value="">Choisir un produit/.test(html),
+  'le menu s’ouvre sur un choix VIDE : sinon un produit part sans avoir été choisi');
+assert.strictEqual((html.match(/<optgroup /g) || []).length, groupes.length,
+  'chaque famille est un groupe du menu — la vendeuse cherche par famille');
+assert.strictEqual((html.match(/<option value="\d+"/g) || []).length, plat.length,
+  'chaque ligne vendable est une ligne du menu');
+assert.ok(html.includes('<optgroup label="Tasse céramique 350 ml (extérieur / intérieur)">'),
+  'le groupe des tasses dit lequel des deux tons est le dehors');
+
+// --- 5. Ajouter au panier ---------------------------------------------------
+
+const index = (texte) => {
+  const i = plat.findIndex((l) => l.texte === texte);
+  assert.ok(i >= 0, `« ${texte} » doit exister`);
+  return String(i);
+};
+const { catProduit, catQte, catStatus } = cat.els;
+
+// a) Rien de choisi : rien ne part. `Number('')` vaut zéro — sans garde,
+//    c'est « Bouchon Bois » qui se serait invité dans le devis.
+catProduit.value = '';
+cat.ajouterAuPanier();
+assert.strictEqual(cat.needs.length, 0,
+  'sans produit choisi, la première ligne du catalogue ne doit PAS s’ajouter');
+assert.deepStrictEqual(cat.echecs.map((e) => e.id), ['catProduit'],
+  '… et la vendeuse doit voir pourquoi');
+
+// b) Un produit, une quantité.
+catProduit.value = index('Flasque Bois — Clair');
+catQte.value = '3';
+cat.ajouterAuPanier();
+assert.strictEqual(cat.needs.length, 1, 'un produit ajouté = une ligne');
+assert.strictEqual(cat.needs[0].qty, 3, '… avec la quantité demandée');
+assert.strictEqual(catProduit.value, '', 'le menu repart à vide : reprendre la ligne d’avant est le geste qui double un article');
+assert.strictEqual(catQte.value, '1', '… et la quantité repart à 1');
+assert.ok(/Flasque Bois/.test(catStatus.textContent), 'ce qui part au panier s’annonce');
+
+// c) Le même produit repris : des unités, pas une deuxième ligne.
+catProduit.value = index('Flasque Bois — Clair');
+catQte.value = '2';
+cat.ajouterAuPanier();
+assert.strictEqual(cat.needs.length, 1, 'le même produit repris ne rouvre pas de ligne');
+assert.strictEqual(cat.needs[0].qty, 5, '… il ajoute ses unités à la sienne');
+
+// d) Une autre variante est un autre article.
+catProduit.value = index('Flasque Bois — Foncé');
+catQte.value = '1';
+cat.ajouterAuPanier();
+assert.strictEqual(cat.needs.length, 2, 'clair et foncé sont deux lignes');
+assert.deepStrictEqual(cat.needs.map((n) => n.color), ['Clair', 'Foncé'],
+  'la variante choisie est celle qui part sur la ligne');
+
+// e) Quantité effacée d'un doigt : une unité, pas un blocage.
+catProduit.value = index('Shaker inox');
+catQte.value = '';
+cat.ajouterAuPanier();
+assert.strictEqual(cat.needs[2].qty, 1, 'une quantité vide vaut une unité');
+
+// --- 6. Le besoin du catalogue est celui du formulaire ----------------------
+
+const CLES = ['category', 'label', 'qty', 'requestedRef', 'color', 'productionType',
+  'comment', 'solution', 'reference', 'unitHT'];
+assert.deepStrictEqual(Object.keys(cat.needs[0]).sort(), [...CLES].sort(),
+  'le besoin posé par le catalogue a exactement les clés de celui du formulaire');
+const saveNeed = (DEVIS.match(/function saveNeed\(\)\{[\s\S]*?\n/) || [''])[0];
+CLES.forEach((k) => assert.ok(saveNeed.includes(k),
+  `« ${k} » doit rester une clé du besoin écrit à la main`));
+
+assert.ok(Number.isNaN(cat.needs[0].unitHT),
+  'une demande de devis part SANS prix : NaN, jamais 0 — sinon la fiche affiche « 0 € »');
+assert.strictEqual(cat.needs[0].category, 'Art de la table',
+  'la famille sert de catégorie : elle dit plus que « Goodies » trois jours plus tard');
+assert.strictEqual(cat.needs[0].label, 'Flasque Bois', 'la ligne porte le nom du produit');
+
+// La catégorie posée par le catalogue doit exister dans la liste du formulaire,
+// sinon « Modifier » renvoie la vendeuse sur « + Nouvelle catégorie ».
+groupes.forEach((g) => {
+  const opt = g.famille.replace(/&/g, '&amp;');
+  assert.ok(step2.includes(`<option>${opt}</option>`),
+    `« ${g.famille} » doit être une catégorie du formulaire manuel`);
+});
+
+// Rien ne doit venir d'un autre domaine : un poste s'ouvre sans dépendre d'un
+// tiers joignable.
+const barre = (step2.match(/<div class="cat-top"[\s\S]*?<\/div>/) || [''])[0];
+assert.ok(/<svg /.test(barre) && !/<img|fonts\.googleapis|material-symbols/.test(barre),
+  'l’icône de la saisie manuelle est dessinée dans la page');
+
+console.log('✓ catalogue comptoir : un produit, une quantité, au panier — et rien qui parte tout seul');

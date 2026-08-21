@@ -28,6 +28,26 @@
 .besoin-nom{font-size:16px;font-weight:800;line-height:1.2}
 .besoin-note{font-size:13px;font-weight:600;color:var(--muted)}
 @media(max-width:700px){.besoin-type{grid-template-columns:1fr}}
+/* LE CATALOGUE DU COMPTOIR — un produit, une quantité, au panier.
+   Ce que la vendeuse fait cent fois par jour ne passe plus par six champs :
+   elle prend le produit dans la liste (rangée par famille, une ligne par
+   variante — bois/liège, clair/foncé, taille), pose la quantité, ajoute. Elle
+   recommence pour le suivant. Le même produit rajouté n'ouvre pas une
+   deuxième ligne : il ajoute ses unités à celle qui existe.
+   Une famille de plus (le TEXTILE viendra) = un bloc de plus dans CATALOGUE,
+   rien d'autre à toucher.
+   La saisie manuelle reste EN HAUT : le catalogue ne couvre pas tout, et rien
+   de ce qui se faisait avant ne doit devenir plus long à faire. */
+.cat-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.cat-manuel{display:inline-flex;align-items:center;gap:9px;min-height:48px;padding:0 15px;border:1px solid #d9dee7;border-radius:11px;background:#fff;color:var(--text);font-weight:800}
+.cat-manuel.is-on{border:2px solid #111827;background:#f7f8fa;padding:0 14px}
+.cat-manuel svg{width:18px;height:18px;flex:0 0 auto}
+.cat-ligne{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:12px;align-items:end}
+.cat-ligne .field{margin-bottom:0;min-width:0}
+.cat-ligne select,.cat-ligne input,.cat-ligne button{min-height:52px}
+.cat-ligne button{white-space:nowrap}
+.cat-status{min-height:19px;margin:11px 0 0;font-size:13px;font-weight:800;color:var(--valide)}
+@media(max-width:700px){.cat-ligne{grid-template-columns:1fr}.cat-ligne button{width:100%}}
 .priority-stars{font-size:22px;line-height:1}
 .priority-card strong{font-size:15px}
 .priority-card small{font-size:12px;line-height:1.45;color:#667085}
@@ -200,14 +220,18 @@ h2{letter-spacing:-.01em}
      qu'avant — rien à changer en aval. -->
 <section id="step1" class="hidden"><input id="requestDateDisplay" type="hidden"><input id="requestDate" type="hidden"><input id="salesperson" type="hidden" value=""></section>
 
-<section id="step2"><div class="card"><div class="stage-head"><h2>1. Recueil des besoins</h2><div class="ref ref-display">—</div></div><div class="notice orange">Renseigne ce que le client demande. Les informations facultatives peuvent être complétées plus tard.</div><!-- DE QUOI PARLE LE CLIENT ? Deux familles, deux entrées.
+<section id="step2"><div class="card"><div class="stage-head"><h2>1. Recueil des besoins</h2><div class="ref ref-display">—</div></div><!-- DE QUOI PARLE LE CLIENT ? Deux familles, deux entrées.
      Le formulaire dessous est celui d'« AUTRE » — c'est celui qui existe
      depuis toujours. Il reste allumé par défaut : on vient de retirer une
      étape à ce parcours, ce n'est pas pour en rajouter un tap.
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile" id="besoinTuileTextile" data-type="textile" aria-pressed="false" aria-controls="besoinTextileVide" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-note">Bientôt</span></span></button><button type="button" class="besoin-tuile is-on" id="besoinTuileAutre" data-type="autre" aria-pressed="true" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-note">Tout le reste</span></span></button></div><div class="notice hidden" id="besoinTextileVide"><b>Le parcours Textile arrive.</b> Il posera les questions propres au vêtement — tailles, coloris, emplacements de marquage. En attendant, passe par <b>Autre</b> : rien ne se perd, la catégorie « Textile » y est déjà.</div><div id="besoinAutreForm"><h3 id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions"><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter ce besoin</button><button id="cancelNeedBtn" class="secondary hidden" onclick="cancelNeedEdit()">Annuler la modification</button></div></div></div><div class="card"><div class="row-between"><h2>Besoins enregistrés</h2><span class="badge" id="needCount">0 besoin</span></div><div id="needsDisplay"><p class="help">Aucun besoin ajouté.</p></div></div><div class="card"><div class="actions"><button class="primary" onclick="goStep(3)">Construire le projet →</button></div></div></section>
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile" id="besoinTuileTextile" data-type="textile" aria-pressed="false" aria-controls="besoinTextileVide" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-note">Bientôt</span></span></button><button type="button" class="besoin-tuile is-on" id="besoinTuileAutre" data-type="autre" aria-pressed="true" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-note">Tout le reste</span></span></button></div><div class="notice hidden" id="besoinTextileVide"><b>Le parcours Textile arrive.</b> Il posera les questions propres au vêtement — tailles, coloris, emplacements de marquage. En attendant, passe par <b>Autre</b> : rien ne se perd, la catégorie « Textile » y est déjà.</div><div id="besoinAutreForm"><!-- EN HAUT DE LA LISTE : LA SAISIE MANUELLE. Le catalogue ne couvre pas
+     tout (une commande spéciale, un textile, une demande hors stock) et rien
+     de ce qui se faisait avant ne doit devenir plus long à faire. Le
+     formulaire est REPLIÉ, pas supprimé : c’est lui que « Modifier »
+     rouvre, et il porte toujours les champs détaillés. --><div class="cat-top" id="catTop"><button type="button" class="cat-manuel" id="catManuelBtn" aria-expanded="false" aria-controls="besoinManuel" onclick="basculerSaisieManuelle()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="cat-manuel-txt">Saisie manuelle</span></button><span class="help" style="margin:0">Un produit qui n’est pas dans la liste, un textile, une demande spéciale.</span></div><div id="besoinManuel" class="hidden"><h3 id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions"><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter ce besoin</button><button id="cancelNeedBtn" class="secondary hidden" onclick="cancelNeedEdit()">Annuler la modification</button></div></div><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit"></select></div><div class="field"><label for="catQte">Quantité</label><input id="catQte" type="number" min="1" step="1" value="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterAuPanier()">Ajouter au panier</button></div></div><p class="cat-status" id="catStatus" role="status" aria-live="polite"></p></div></div><div class="card"><div class="row-between"><h2>Besoins enregistrés</h2><span class="badge" id="needCount">0 besoin</span></div><div id="needsDisplay"><p class="help">Aucun besoin ajouté.</p></div></div><div class="card"><div class="actions"><button class="primary" onclick="goStep(3)">Construire le projet →</button></div></div></section>
 
 <section id="step3" class="hidden"><div class="card"><div class="stage-head"><h2>2. Construction du projet</h2><div class="ref ref-display">—</div></div><div class="notice green">Le projet est construit à partir des besoins enregistrés. Le titre proposé reste modifiable.</div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"><div class="help">Ex. Uniformes et objets promotionnels — Restaurant La Terrasse</div></div>
 <div class="field priority-field" id="projectPriorityField">
@@ -566,7 +590,7 @@ function makeRef(){const d=new Date(),yy=String(d.getFullYear()).slice(-2),mm=St
 function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error').forEach(e=>e.remove())}function fail(id,msg){const el=$(id);el.classList.add('invalid');const d=document.createElement('div');d.className='error';d.textContent=msg;el.insertAdjacentElement('afterend',d);el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();return false}
 document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
 function showStep(n){currentStep=n;for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
-function validateStep(n){clearErrors();if(n===2&&!needs.length)return fail('needCategory','Ajoute au moins un besoin.');if(n===3){if(!$('projectTitle').value.trim())return fail('projectTitle','Renseigne le titre du projet.');if(!$('projectGoal').value)return fail('projectGoal','Choisis l’objectif.');if(!$('source').value)return fail('source','Choisis le canal d’entrée.');if(!$('projectPriority').value){showProjectPriorityError();return false;}if(!$('projectDescription').value.trim())return fail('projectDescription','Décris le projet.')}if(n===4){
+function validateStep(n){clearErrors();if(n===2&&!needs.length)return fail('catProduit','Ajoute au moins un besoin — choisis un produit et mets-le au panier, ou passe par la saisie manuelle.');if(n===3){if(!$('projectTitle').value.trim())return fail('projectTitle','Renseigne le titre du projet.');if(!$('projectGoal').value)return fail('projectGoal','Choisis l’objectif.');if(!$('source').value)return fail('source','Choisis le canal d’entrée.');if(!$('projectPriority').value){showProjectPriorityError();return false;}if(!$('projectDescription').value.trim())return fail('projectDescription','Décris le projet.')}if(n===4){
   if(!$('controlStatus').value)return fail('controlStatus','Indique l’état des informations du client.');
   if($('controlStatus').value==='waiting'){
     if(!transmissionValue('expectedInformationVia','newExpectedInformationVia'))return fail($('expectedInformationVia').value==='__new__'?'newExpectedInformationVia':'expectedInformationVia','Indique comment le client doit transmettre les informations.');
@@ -651,11 +675,141 @@ if(textile&&editingNeed>=0)cancelNeedEdit();
 $('besoinAutreForm').classList.toggle('hidden',textile);
 $('besoinTextileVide').classList.toggle('hidden',!textile);
 document.querySelectorAll('.besoin-tuile').forEach(b=>{const on=b.dataset.type===type;b.classList.toggle('is-on',on);b.setAttribute('aria-pressed',String(on))})}
+/* CATALOGUE-COMPTOIR — les objets que l'atelier a en rayon, en clair.
+   Un produit se prend dans la liste, une quantité, « Ajouter au panier ».
+   Puis le suivant. Chaque LIGNE du menu est un produit prêt à partir : la
+   variante (bois/liège, clair/foncé, taille, coloris de tasse) est déjà dans
+   la ligne — il n'y a pas de deuxième choix à faire.
+   Ajouter le même produit une deuxième fois n'ouvre pas une deuxième ligne :
+   ses unités s'ajoutent à celle qui existe, sinon le devis part en double.
+   Le besoin produit garde EXACTEMENT la forme de celui du formulaire
+   (category / label / qty / color / …) : le devis, le ticket de l'atelier et
+   la fiche du CRM continuent de le lire sans rien savoir du catalogue.
+   UNE FAMILLE DE PLUS — le TEXTILE viendra — = un bloc de plus ici, rien
+   d'autre à toucher. La famille sert de catégorie : « Art de la table » dit
+   plus que « Goodies » à qui rouvre le dossier trois jours plus tard. */
+const TASSES_350=[['01','Rouge','Blanc'],['02','Orange','Blanc'],['03','Rose','Blanc'],['04','Bleu','Blanc'],['05','Vert','Blanc'],['06','Noir','Blanc'],['07','Blanc','Bleu'],['08','Blanc','Jaune'],['09','Blanc','Orange'],['10','Blanc','Rouge'],['11','Blanc','Vert'],['12','Blanc','Noir'],['13','Noir','Rose'],['14','Noir','Jaune'],['15','Noir','Rouge'],['16','Noir','Vert'],['17','Noir','Orange']];
+const CATALOGUE=[
+{famille:'Art de la table',items:[
+  {n:'Bouchon Bois'},
+  {n:'Coffret à Vin'},
+  {n:'Couteau Multi',v:['Bois','Liège']},
+  {n:'Décapsuleur Bois'},
+  {n:'Flasque Bois',v:['Clair','Foncé']},
+  {n:'Limonadier Bois',v:['Clair','Foncé']},
+  {n:'Service à Whisky'},
+  {n:'Shaker inox'},
+  {n:'Dessous de plat Liège'},
+  {n:'Dessous de verre Liège'},
+  {n:'Plateau Liège'},
+  {n:'Pelle Bois Aulne'},
+  {n:'Planche à découper Aulne',v:['Grande','Petite']},
+  {n:'Planche bois Acacia',v:['Petite','Carré','Rectangle']}]},
+{famille:'Du quotidien',items:[
+  {n:'Cendrier Liège'},
+  {n:'Lot brosse et peigne bois'},
+  {n:'Miroir Liège',v:['XL','Petit']},
+  {n:'Pince à billet',v:['Argent','Or']},
+  {n:'Porte Carte Liège'},
+  {n:'Porte Monnaie Liège'},
+  {n:'Porte sac'},
+  {n:'Sabot veilleuse bois'}]},
+{famille:'Voyage',items:[
+  {n:'Etui à Passeport Cuir PU',v:['Bleu Brume','Brun','Noir','Rose']},
+  {n:'Identificateur Valise Cuir PU',v:['Bleu Brume','Brun','Noir','Rose']},
+  {n:'Identificateur Valise Liège'},
+  {n:'Identificateur Valise Métal'}]},
+{famille:'Gourdes',items:[
+  {n:'Gourde 500 ml Métal',v:['Blanc','Noir']},
+  {n:'Gourde 800 ml Métal',v:['Blanc','Noir','Inox']}]},
+{famille:'Jeux & loisirs',items:[
+  {n:'Dominos'},
+  {n:'Jeux de Cartes'},
+  {n:'Mikado'},
+  {n:'Morpion'},
+  {n:'Yoyo'},
+  {n:'Puzzle'},
+  {n:'Raquette Bois'}]},
+{famille:'Papeterie',items:[
+  {n:'Bloc Note Liège',v:['A5','A6']},
+  {n:'Crayon papier bois'},
+  {n:'Grand Bloc Note Similicuir A5',v:['Bleu']},
+  {n:'Stylo à bille en bois'}]},
+{famille:'Porte-clés',items:[
+  {n:'Porte-Clés Bois Tir Bouchon'},
+  {n:'Porte-Clés Bois vintage',v:['rectangle','rond']},
+  {n:'Porte-Clés Décapsuleur',v:['Bois','Similicuir','Acrylique']},
+  {n:'Porte-Clés Flotteur Liège',v:['Bleu','Marron']}]},
+/* Les tasses : la couleur du DEHORS puis celle du DEDANS. La ligne du devis
+   porte le numéro (TC 01) ET les deux tons — « TC 01 » seul ne dit rien à
+   l'atelier trois jours plus tard. */
+{famille:'Tasse céramique 350 ml',note:'extérieur / intérieur',items:TASSES_350.map(function(t){
+  return {n:'TC '+t[0],note:t[1]+' / '+t[2],
+          label:'Tasse céramique 350 ml TC '+t[0],color:t[1]+' (ext.) / '+t[2]+' (int.)'};})}];
+/* Une ligne du panier se reconnaît à ces trois-là : reprendre le même produit
+   retombe sur la même clé, donc sur la même ligne. */
+function catCle(cat,label,color){return cat+'\u0001'+label+'\u0001'+(color||'')}
+/* Le menu à plat : une entrée par ligne vendable, dans l'ordre des familles. */
+function lignesCatalogue(){
+  const groupes=[];
+  CATALOGUE.forEach(f=>{
+    const lignes=[];
+    f.items.forEach(it=>{
+      const label=it.label||it.n;
+      if(it.v&&it.v.length)it.v.forEach(v=>lignes.push({famille:f.famille,label,color:v,texte:it.n+' — '+v}));
+      else lignes.push({famille:f.famille,label,color:it.color||'',texte:it.note?it.n+' — '+it.note:it.n});
+    });
+    groupes.push({famille:f.famille,note:f.note||'',lignes});
+  });
+  return groupes;
+}
+let CAT_LIGNES=[];
+function remplirSelectCatalogue(){
+  const sel=$('catProduit');if(!sel)return;
+  CAT_LIGNES=[];
+  let html='<option value="">Choisir un produit…</option>';
+  lignesCatalogue().forEach(g=>{
+    html+=`<optgroup label="${esc(g.famille+(g.note?' ('+g.note+')':''))}">`+
+      g.lignes.map(l=>`<option value="${CAT_LIGNES.push(l)-1}">${esc(l.texte)}</option>`).join('')+'</optgroup>';
+  });
+  sel.innerHTML=html;
+}
+function ajouterAuPanier(){
+  clearErrors();
+  const sel=$('catProduit'),champQte=$('catQte');
+  /* `Number('')` vaut ZÉRO : sans cette garde, « Ajouter au panier » sans
+     rien choisir posait la PREMIÈRE ligne du catalogue dans le devis. */
+  const l=sel.value===''?null:CAT_LIGNES[Number(sel.value)];
+  if(!l)return fail('catProduit','Choisis un produit dans la liste.');
+  /* Une quantité vide ou effacée d'un doigt vaut UNE unité : la vendeuse a
+     désigné le produit, elle ne doit pas se battre avec le champ. */
+  const qte=Math.max(1,Math.round(Number(champQte.value)||1));
+  const cle=catCle(l.famille,l.label,l.color);
+  const i=needs.findIndex(n=>catCle(n.category,n.label,n.color||'')===cle);
+  let total;
+  if(i>=0)total=needs[i].qty=(Number(needs[i].qty)||0)+qte;
+  else{total=qte;needs.push({category:l.famille,label:l.label,qty:qte,requestedRef:'',color:l.color,productionType:'',comment:'',solution:'',reference:'',unitHT:NaN})}
+  renderNeeds();updateSidebar();
+  const st=$('catStatus');
+  if(st)st.textContent=`Ajouté au panier : ${qte} × ${l.label}${l.color?' — '+l.color:''}`+(total>qte?` (${total} en tout)`:'');
+  /* On repart à vide : reprendre la ligne précédente en double est le geste
+     qui fait partir un devis avec deux fois le même article. */
+  sel.value='';champQte.value='1';sel.focus();
+}
+function basculerSaisieManuelle(force){
+  const box=$('besoinManuel'),btn=$('catManuelBtn');if(!box||!btn)return;
+  const on=force===undefined?box.classList.contains('hidden'):!!force;
+  box.classList.toggle('hidden',!on);
+  btn.classList.toggle('is-on',on);
+  btn.setAttribute('aria-expanded',String(on));
+  const t=btn.querySelector('.cat-manuel-txt');if(t)t.textContent=on?'Masquer la saisie manuelle':'Saisie manuelle';
+}
+/* /CATALOGUE-COMPTOIR */
 function saveNeed(){clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
-function editNeed(i){choisirTypeBesoin('autre');const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';$('needFormTitle').textContent=`Modifier le besoin n°${i+1}`;$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').classList.remove('hidden')}
+function editNeed(i){choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';$('needFormTitle').textContent=`Modifier le besoin n°${i+1}`;$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').classList.remove('hidden');$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
 function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;$('saveNeedBtn').textContent='Ajouter ce besoin';$('cancelNeedBtn').classList.add('hidden')}
 function deleteNeed(i){needs.splice(i,1);renderNeeds();updateSidebar()}
-function renderNeeds(){$('needCount').textContent=`${needs.length} besoin${needs.length>1?'s':''}`;$('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>`<div class="need-card"><div class="row-between"><div><span class="badge green">${esc(n.category)}</span><h3>${esc(n.label)}</h3><div class="help"><b>${n.qty} unité(s)</b>${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help">${esc(n.comment)}</div>`:''}</div><span class="badge">${n.qty} u.</span></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div>`).join(''):'<p class="help">Aucun besoin ajouté.</p>';$('needFormTitle').textContent=`Besoin n°${needs.length+1}`}
+function renderNeeds(){$('needCount').textContent=`${needs.length} besoin${needs.length>1?'s':''}`;$('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>`<div class="need-card"><div class="row-between"><div><span class="badge green">${esc(n.category)}</span><h3>${esc(n.label)}</h3><div class="help"><b>${n.qty} unité(s)</b>${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help">${esc(n.comment)}</div>`:''}</div><span class="badge">${n.qty} u.</span></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div>`).join(''):'<p class="help">Aucun besoin ajouté.</p>';if(editingNeed<0)$('needFormTitle').textContent=`Besoin n°${needs.length+1}`}
 function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){$('categoryPills').innerHTML=categories().map(c=>`<span class="pill">${esc(c)}</span>`).join('');if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();if(!$('projectDescription').value.trim())$('projectDescription').value=`Le client souhaite ${needs.map(n=>`${n.qty} ${n.label}`).join(', ')}.`}
 function getMissing(){const m=[];if(!$('salesperson').value)m.push('Collaborateur non renseigné');if(!needs.length)m.push('Aucun besoin enregistré');if(!$('projectTitle').value.trim())m.push('Titre du projet manquant');if(!projectGoalValue())m.push('Objet du projet manquant');if(!$('projectPriority').value)m.push('Priorité du projet manquante');if(!$('projectDescription').value.trim())m.push('Description générale manquante');if(!$('controlStatus').value)m.push('Contrôle du dossier non renseigné');if(selectedClient&&!$('clientNextAction').value)m.push('Suite à donner au client non renseignée');if(!selectedClient)m.push('Client non renseigné');return m}function toggleNewTransmissionMethod(selectId,inputId){
   const show=$(selectId).value==='__new__';
@@ -1168,7 +1322,7 @@ L’équipe Atelier OLDA`;
   window.open(`https://wa.me/${normalizePhone(selectedClient.phone)}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 function saveDraft(){const d={reference,needs,selectedClient,fields:{}};document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.id)d.fields[el.id]=el.type==='checkbox'?el.checked:el.value});localStorage.setItem(`oldaDraft-${reference}`,JSON.stringify(d));alert(`Brouillon ${reference} enregistré sur cet appareil.`)}function newRequest(){if(confirm('Créer une nouvelle demande ?'))location.reload()}
-$('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLocaleDateString('fr-FR');document.querySelectorAll('.ref-display').forEach(el=>el.textContent=reference);renderNeeds();updateSidebar();
+$('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLocaleDateString('fr-FR');document.querySelectorAll('.ref-display').forEach(el=>el.textContent=reference);renderNeeds();remplirSelectCatalogue();updateSidebar();
 </script>
 <script>
 (function(){
