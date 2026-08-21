@@ -1440,10 +1440,16 @@ function menuPeindreChamp(etat){
     const p=document.createElement('span');p.className='menu-pastille';p.style.background=choisie.hex;
     declencheur.append(p);
   }
-  const t=document.createElement('span');
-  t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
-  t.textContent=choisie?choisie.texte:'Choisir…';
-  declencheur.append(t);
+  /* UNE OPTION QUI PORTE UNE RÉFÉRENCE SE SUFFIT À ELLE-MÊME dans le champ :
+     « NS401 » identifie l'article, la désignation qui la suivait mangeait la
+     largeur et finissait en points de suspension. Elle est écrite en tête du
+     bloc, et l'infobulle porte toujours les deux. */
+  if(!(choisie&&choisie.jeton)){
+    const t=document.createElement('span');
+    t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
+    t.textContent=choisie?choisie.texte:'Choisir…';
+    declencheur.append(t);
+  }
   /* Le texte est coupé à l'ellipse dans un champ étroit : l'infobulle rend la
      ligne entière sans avoir à rouvrir la liste. */
   declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';

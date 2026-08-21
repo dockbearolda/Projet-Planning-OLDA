@@ -306,7 +306,7 @@ assert.ok(/\.form-num\.is-edit\{color:var\(--orange\)\}/.test(DEVIS),
 // production) et on ne voyait plus où commençait la ligne en cours d’écriture.
 assert.ok(/\.article-bloc\{border:1\.5px solid #d7dce3;border-radius:14px;/.test(DEVIS),
   'l’article en cours de saisie porte un cadre');
-assert.ok(/<div class="article-bloc"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
+assert.ok(/<div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
   && /<div id="besoinManuel" class="hidden article-bloc">/.test(DEVIS),
   'les deux familles de besoin ont le même cadre — « Autre » avait déjà son enveloppe');
 // Le cadre ne pose AUCUN `display` : `#besoinManuel` porte aussi `hidden`,
@@ -400,5 +400,29 @@ assert.ok(/\.menu-jeton\{flex:none;font-size:13px;font-weight:800;/.test(PONT),
 // c'est elle qui identifie l'article.
 assert.ok(/\.menu-option \.menu-jeton\{[^}]*min-width:100px;flex:none\}/.test(PONT),
   'la colonne des références a un plancher, pas une largeur fixe');
+
+
+// --- 11. LA RÉFÉRENCE SEULE DANS LE CHAMP ------------------------------------
+//
+// « NS401 » identifie l'article ; la désignation qui la suivait mangeait la
+// largeur du champ et finissait en points de suspension. Elle s'écrit à côté du
+// numéro de la ligne, où on la lit d'un coup d'œil — et l'infobulle du champ
+// porte toujours les deux.
+assert.ok(/if\(!\(choisie&&choisie\.jeton\)\)\{[\s\S]{0,220}?declencheur\.append\(t\);\s*\}/.test(PONT),
+  'une option qui porte une référence se suffit à elle-même dans le champ');
+assert.ok(/declencheur\.title=choisie&&choisie\.valeur\?\[choisie\.jeton,choisie\.texte\]/.test(PONT),
+  '… l’infobulle, elle, garde la référence ET la désignation');
+assert.ok(/<span class="form-objet" id="txFormObjet"><\/span>/.test(DEVIS),
+  'la désignation a sa place à côté du numéro de la ligne');
+// La liste porte la désignation dans le TEXTE de son option ; un produit libre
+// porte la sienne dans son propre champ.
+assert.ok(/const libre=sel\.value==='__CUSTOM__';[\s\S]{0,200}?\$\('txCustomDesignation'\)\.value\.trim\(\)/.test(DEVIS),
+  'un produit libre affiche la désignation que la vendeuse écrit');
+// Elle s'efface quand plus rien n'est choisi : une désignation qui reste ferait
+// croire à un article encore en cours.
+assert.ok(/: \(o && o\.value \? \(o\.textContent\|\|''\)\.trim\(\) : ''\)/.test(DEVIS),
+  '… et disparaît dès qu’aucune référence n’est choisie');
+assert.ok(/function previewTextile\(\)\{\s*if\(!txReady\(\)\)return;\s*txPoserObjet\(\);/.test(DEVIS),
+  'elle se réécrit sur CHAQUE relecture du formulaire, pas seulement au choix de la référence');
 
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
