@@ -23,6 +23,10 @@
 //      vendeuse a demandé qu'il cesse d'imprimer ce que personne n'y lit. Les
 //      lignes retirées le sont à l'AFFICHAGE — la fiche envoyée au planning,
 //      elle, garde tout.
+//   5. QUI SIGNE. « Demande prise par » était reposé à chaque dossier, dans un
+//      écran d'ouverture qui n'existait que pour lui. La question se pose
+//      désormais UNE fois par appareil, dans le CRM ; on reporte ici le nom
+//      dans le champ que le parcours connaît déjà.
 //
 // L'envoi au planning lui-même passe par le message `OLDA_CREATE_PROJECT` que
 // la page poste déjà à la fenêtre parente ; c'est `nouveau-projet.js` qui
@@ -924,6 +928,46 @@
       if (boite.__oldaRelire) boite.__oldaRelire();
     }
   }
+
+  // --- 5. QUI SIGNE LE DOSSIER ------------------------------------------------
+  // Le nom de la personne au poste est choisi UNE fois dans le CRM (« Qui est
+  // au poste ? », voir ../poste.js) et vit dans `localStorage`. Le cadre du
+  // parcours est sur la même origine : il lit donc le même stockage, sans
+  // message ni API.
+  //
+  // ⚠ La clé est `olda.qui`, PAS `olda.poste` — cette dernière est
+  // l'identifiant à trois caractères de la MACHINE, plus haut dans ce fichier.
+  // Les confondre ferait échouer le `/^[A-Z0-9]{3}$/` du poste, qui tirerait un
+  // nouvel identifiant à chaque chargement en effaçant le prénom au passage :
+  // deux tablettes hors réseau se disputeraient à nouveau une référence.
+  // La clé est réécrite en toutes lettres parce que ce fichier est un script
+  // classique servi tel quel aux écrans du patron : il ne peut pas importer un
+  // module.
+  const QUI_KEY = 'olda.qui';
+
+  function reporterQuiEstAuPoste() {
+    // L'autre parcours (vente directe) n'a pas ce champ : la greffe s'abstient.
+    const champ = document.getElementById('salesperson');
+    if (!champ) return;
+    let nom = '';
+    try { nom = localStorage.getItem(QUI_KEY) || ''; } catch (_) { /* stockage refusé */ }
+    if (!nom || champ.value === nom) return;
+    champ.value = nom;
+    // Le panneau latéral et le contrôle en direct LISENT ce champ. Sans ce
+    // rappel, le dossier serait bien signé mais afficherait « personne au
+    // poste » jusqu'à la prochaine frappe — de quoi croire que ça n'a pas pris.
+    try { window.updateSidebar?.(); } catch (_) { /* le parcours reste utilisable */ }
+  }
+
+  reporterQuiEstAuPoste();
+  // La relève de la journée : le CRM prévient le cadre directement (`storage`
+  // ne se déclenche jamais dans le document qui a écrit), et `storage` couvre
+  // les autres onglets ouverts sur le même poste.
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    if (e.data && e.data.type === 'OLDA_POSTE') reporterQuiEstAuPoste();
+  });
+  window.addEventListener('storage', (e) => { if (e.key === QUI_KEY) reporterQuiEstAuPoste(); });
 
   // --- LE PAPIER --------------------------------------------------------------
   // Ce que la vendeuse imprime et qui part à l'atelier avec le dossier. Les deux

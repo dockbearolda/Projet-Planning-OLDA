@@ -56,6 +56,9 @@ const COQUILLE = [
   // Importé par app.js, clients.js ET reglages.js : absent du cache, l'import
   // échoue hors ligne et c'est l'application ENTIÈRE qui ne s'ouvre plus.
   '/reseau.js',
+  // Importé statiquement par app.js : absent du cache, l'import échoue hors
+  // ligne et le planning ne s'ouvre plus.
+  '/poste.js',
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',

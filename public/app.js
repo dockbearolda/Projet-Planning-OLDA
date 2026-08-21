@@ -22,6 +22,9 @@ import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.
 // « Le patron a mis à jour » : une tablette du comptoir ne se recharge jamais
 // d'elle-même, elle exécute donc encore la version d'avant-hier. On lui propose.
 import { noterVersion, surveillerMaj } from './maj.js';
+// Qui est au poste : le nom affiché en haut à droite, et celui qui signe les
+// demandes prises sur cet appareil (le parcours comptoir le relit).
+import { monterPoste } from './poste.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -7281,4 +7284,9 @@ function demarrerAvecReprise(essai = 0) {
     setTimeout(() => demarrerAvecReprise(essai + 1), attente);
   });
 }
+// QUI EST AU POSTE, avant tout le reste : la question se pose pendant que le
+// planning charge, pas après. Sur un appareil qui s'est déjà nommé, ce montage
+// ne fait qu'écrire le nom dans la barre.
+monterPoste(EMPLOYEES);
+
 demarrerAvecReprise();
