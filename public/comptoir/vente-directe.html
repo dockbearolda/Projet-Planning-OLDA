@@ -10,9 +10,10 @@
    d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
    même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
    un poste s'ouvre sans dépendre d'un tiers joignable.
-   Inter, de la même famille que le caractère de SumUp (Aktiv Grotesk, sous
-   licence payante). Un seul fichier de 48 Ko, graisse variable 100-900. */
-@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('../inter-latin-variable.woff2') format('woff2-variations')}
+   Manrope : celle du patron. Inter, essayée le 21/08, rendait mal sur les
+   Windows de l'atelier — variable non hintée, DirectWrite la sort maigre et
+   sale aux petites tailles. Un fichier de 25 Ko, graisse variable 200-800. */
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../manrope-latin-variable.woff2') format('woff2')}
 </style>
 <title>Atelier OLDA — Vente directe complète</title>
 <style>
@@ -637,7 +638,14 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
 
 </style>
 <style>
-body{font-family:'Inter',Arial,sans-serif!important}
+body{font-family:'Manrope',Arial,sans-serif!important}
+/* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
+   Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
+   zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
+   rien de ce qui les entoure — d'où l'écran bariolé, champ par champ.
+   `inherit` et non un nom en dur : dans le ticket de l'atelier, qui compose en
+   Courier, les champs doivent rester en Courier. */
+input,select,textarea,button{font-family:inherit!important}
 header{background:#1c3d6e!important;padding:22px 26px!important}
 header h1{letter-spacing:-.01em}
 header p{color:#c3cede!important}

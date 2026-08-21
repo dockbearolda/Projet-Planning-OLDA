@@ -26,7 +26,7 @@
 // vide (l'installation ne peut rien télécharger), et l'application ne s'ouvrirait
 // plus du tout. En gardant le nom, l'installation se contente d'AJOUTER le
 // fichier manquant quand le réseau est là, et ne casse rien quand il ne l'est pas.
-const CACHE = 'olda-coquille-v2';
+const CACHE = 'olda-coquille-v3';
 
 // La coquille : ce qu'il faut pour AFFICHER l'application. Les données, elles,
 // viennent du réseau — hors ligne, on montre l'écran et son message d'erreur,
@@ -77,7 +77,7 @@ const COQUILLE = [
   '/olda-icones.woff2',
   // La police de texte. Absente, tout retombe sur Arial : lisible, mais le
   // poste n'a plus la même tête d'une ouverture à l'autre.
-  '/inter-latin-variable.woff2',
+  '/manrope-latin-variable.woff2',
   '/manifest.webmanifest',
 ];
 

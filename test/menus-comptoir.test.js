@@ -198,12 +198,21 @@ assert.ok(/db\.refs\.filter\(r=>r\.genre&&r\.designation&&r\.designation!=='TEST
   // pourquoi Google Fonts est parti a le droit de nommer le domaine.
   assert.ok(!/(href|src|url\()\s*=?\s*["'(]?https?:\/\/fonts\./.test(src),
     `${nom} ne charge plus de police d’un autre domaine`);
-  assert.ok(/url\('\.\.\/inter-latin-variable\.woff2'\)/.test(src), `${nom} sert la police lui-même`);
+  assert.ok(/url\('\.\.\/manrope-latin-variable\.woff2'\)/.test(src), `${nom} sert la police lui-même`);
   assert.ok(/font-display:swap/.test(src), `${nom} affiche le texte tout de suite, Arial fait le relais`);
+  // UN CHAMP N'HÉRITE PAS DE LA POLICE DU CORPS : Chrome impose Arial à un
+  // `input`, un `select` et un `button`, et du MONOSPACE à une zone de texte.
+  // Sans cette règle l'écran est bariolé champ par champ, ce qui saute aux
+  // yeux sur un poste Windows. `inherit` et non un nom en dur : dans le ticket
+  // de l'atelier, qui compose en Courier, les champs restent en Courier.
+  assert.ok(/input,select,textarea,button\{font-family:inherit!important\}/.test(src),
+    `${nom} : champs, listes et boutons prennent la police de la page`);
 });
-assert.ok(fs.existsSync(path.join(RACINE, 'public/inter-latin-variable.woff2')), 'le fichier de police est là');
-assert.ok(fs.existsSync(path.join(RACINE, 'public/inter-LICENCE.txt')), 'sa licence voyage avec lui');
-assert.ok(/'\/inter-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
+assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-latin-variable.woff2')), 'le fichier de police est là');
+// SIL OFL : le texte de licence accompagne le fichier, sinon on ne peut pas
+// le redistribuer.
+assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-LICENCE.txt')), 'la licence de la police voyage avec elle');
+assert.ok(/'\/manrope-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
   'la police est dans la coquille : hors ligne, le poste garde sa tête');
 
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');

@@ -117,10 +117,22 @@ const totaux = source('txRefreshTotals', '');
 assert.ok(/setTextSafe\('txKpi/.test(totaux) && !/\$\('txKpi[^']*'\)\.textContent/.test(totaux),
   'les totaux s’écrivent par `setTextSafe` : un identifiant disparu n’arrête pas les autres');
 
+// La ligne textile porte quatre actions dans 326 px : si un libellé s'allonge
+// ou si le poste zoome, elles passent à la ligne au lieu de se comprimer.
+assert.ok(/\.demande-corps \.need-actions\{[^}]*flex-wrap:wrap/.test(DEVIS),
+  'la rangée d’actions peut passer à la ligne');
+// La négociation s’ouvre depuis la LIGNE : c’est le geste du comptoir, il ne
+// doit pas coûter un détour par le chiffrage.
+assert.ok(/onclick="ouvrirNegociation\(\$\{i\}\)">Négociation/.test(renderNeedsSrc),
+  'la ligne textile porte une bulle « Négociation »');
+const negRaccourci = source('ouvrirNegociation', 'i');
+assert.ok(/articleOuvert=i;negOuvert=i/.test(negRaccourci),
+  'le raccourci ouvre le détail ET déplie la négociation d’un seul geste');
+
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le
 // bouton « Construire le projet » passait sous la ligne de flottaison.
-assert.ok(/\.demande-corps \.need-actions button\{[^}]*padding:5px 12px!important/.test(DEVIS),
+assert.ok(/\.demande-corps \.need-actions button\{[^}]*padding:5px 8px!important/.test(DEVIS),
   'les boutons de la ligne doivent battre le padding !important de la feuille du comptoir');
 
 console.log('✓ demande à droite : catalogue et textile dans une seule liste, prix absent qui se dit, indices qui se referment');
