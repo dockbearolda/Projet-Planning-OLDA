@@ -169,11 +169,16 @@ assert.ok(/gradient/.test(TE.markColorHexFor('Multi couleur')),
 assert.ok(/const hex=TE\(\)\.markColorHexFor\(x\)/.test(DEVIS),
   'chaque couleur de marquage emporte sa teinte dans la liste');
 
-// Sous le seuil, un champ de filtre est du bruit : « Maritime / Chronopost »
-// se lit d'un coup d'œil.
-assert.ok(/MENU_SEUIL_FILTRE = 8/.test(PONT), 'le filtre n’apparaît qu’au-delà d’un seuil');
-assert.ok(/const filtrable=!etat\.libre&&toutes>MENU_SEUIL_FILTRE/.test(PONT),
-  'un menu libre se filtre en tapant dans le champ, pas dans une deuxième case');
+// UNE SEULE RECHERCHE SUR L'ÉCRAN : la référence. C'est la seule liste qu'on
+// ne parcourt pas des yeux. Ailleurs, le champ de filtre est un deuxième champ
+// dans le champ — il se pose à la main, jamais par un seuil qui décide seul.
+assert.ok(!/MENU_SEUIL_FILTRE/.test(PONT), 'plus de seuil qui pose un filtre tout seul');
+assert.ok(/const filtrable=!etat\.libre&&etat\.hote\.hasAttribute\('data-menu-recherche'\)/.test(PONT),
+  'la recherche se déclare, elle ne se devine pas');
+assert.ok((DEVIS.match(/data-menu-recherche/g) || []).length === 1
+  && /<select id="txRef"[^>]*data-menu-recherche/.test(DEVIS),
+  'et une seule liste la porte sur l’écran de devis : la référence');
+assert.ok(!/data-menu-recherche/.test(VENTE), 'aucune sur l’écran de vente directe');
 
 // Le clavier fait tout : le comptoir est un poste PC.
 const touche = bloc(PONT, 'menuTouche');
@@ -225,14 +230,16 @@ assert.ok(/'\/manrope-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RAC
 // panneau, hors de la liste : ni emportée par un filtre, ni repoussée par le
 // défilement.
 
-assert.ok(/if\(avecManuel\)panneau\.append\(\.\.\.\(libre\?\[mention\]:\[manuel,saisie\]\)\);\s*panneau\.append\(tete,liste\)/.test(PONT),
+assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(PONT),
   'la ligne d’ajout manuel est posée AVANT le filtre et la liste — tout en haut du panneau');
 // UN CHAMP LIBRE S'ÉCRIT DÉJÀ : un gros bouton « Saisir autre chose » y est du
 // bruit, il ne lui manque que de le DIRE. Une mention, pas une commande.
-assert.ok(/mention\.className='menu-mention';\s*mention\.textContent='Écris directement dans le champ/.test(PONT),
-  'un champ libre porte une mention discrète, pas un bouton');
-assert.ok(/\.menu-mention\{[^}]*font-size:12px;color:#767d85\}/.test(PONT),
-  'la mention se lit sans se faire remarquer — ni bouton, ni ligne de choix');
+// LA MÊME LIGNE PARTOUT, champ libre compris. Un deuxième message au même
+// endroit, formulé autrement, c'est déjà une hésitation.
+assert.ok(!/menu-mention/.test(PONT),
+  'plus de mention à part dans un champ libre : c’est « + Ajouter » comme ailleurs');
+assert.ok(/if\(!etat\.libre&&!\[\.\.\.hote\.options\]\.some\(o=>o\.value===texte\)\)\{/.test(PONT),
+  'un champ libre porte sa valeur directement — il n’a pas d’options où la ranger');
 assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.menu\.est-saisie \.menu-liste\{display:none\}/.test(PONT),
   'pendant la saisie libre la liste s’efface : une seule façon de répondre à la fois');
 
@@ -260,8 +267,6 @@ assert.ok(/select\.setAttribute\('data-menu-manuel-non', ''\)/.test(PONT),
 // toujours `.value`, il n'a rien de spécial à savoir. Et une deuxième saisie
 // identique réutilise la même option, sinon la liste se remplit de doublons
 // au fil de la journée.
-assert.ok(/if\(!\[\.\.\.hote\.options\]\.some\(o=>o\.value===texte\)\)\{/.test(PONT),
-  'une valeur déjà saisie ne crée pas une deuxième option');
 assert.ok(/menuManuelFermer\(etat\);\s*menuChoisir\(etat,texte\)/.test(PONT),
   'valider choisit la valeur : `change` part, le rouge s’efface, le formulaire suit');
 

@@ -1163,8 +1163,6 @@
   border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:13px;font-weight:700;
   color:#525960;text-align:left;cursor:pointer}
 .menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;color:#111827;outline:none}
-.menu-mention{margin:0;padding:9px 12px;border-bottom:1px solid #eceff2;background:#fafbfc;
-  font-size:12px;color:#767d85}
 .menu-plus{flex:none;font-size:16px;font-weight:800;line-height:1;color:inherit}
 .menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid #eceff2;background:#fafbfc}
 .menu-saisie input{flex:1 1 auto;min-width:0;font-size:15px;padding:9px 11px}
@@ -1203,7 +1201,6 @@
    ligne) et `data-hex` (pastille de teinte). Les <optgroup> deviennent les
    titres de famille. */
 
-  const MENU_SEUIL_FILTRE = 8;   /* en dessous, un champ de filtre est du bruit */
   const menus = new Map();       /* hôte → état, pour retrouver un menu déjà posé */
   let menuRang = 0;              /* de quoi nommer la liste d'un hôte sans id */
 
@@ -1333,14 +1330,11 @@ function menuPoser(hote){
   valider.type='button';valider.textContent='Valider';
   saisie.append(champLibre,valider);
 
-  /* Dans un champ LIBRE, la grosse ligne d'ajout est du bruit : on peut déjà
-     écrire dans le champ. Il ne manque que de le dire — une mention discrète,
-     en tête du panneau, qui ne se clique pas et ne prend pas la place d'un
-     choix. */
-  const mention=document.createElement('p');
-  mention.className='menu-mention';
-  mention.textContent='Écris directement dans le champ pour autre chose.';
-  if(avecManuel)panneau.append(...(libre?[mention]:[manuel,saisie]));
+  /* LA MÊME LIGNE PARTOUT, champ libre compris : un panneau de menu, c'est
+     « + Ajouter » puis la liste, et rien d'autre. La mention qui expliquait
+     qu'on pouvait écrire dans le champ est partie avec — un deuxième message
+     au même endroit, formulé autrement, c'est déjà une hésitation. */
+  if(avecManuel)panneau.append(manuel,saisie);
   panneau.append(tete,liste);
   peau.append(panneau);
 
@@ -1449,9 +1443,12 @@ function menuPeindre(etat){
   etat.vise=Math.min(Math.max(etat.vise,0),vus.length-1);
 
   const toutes=menuOptions(etat.hote).length;
-  /* Sous le seuil, un champ de filtre et un compteur sont du bruit : deux
-     valeurs se lisent d'un coup d'œil. Un menu libre se filtre en tapant. */
-  const filtrable=!etat.libre&&toutes>MENU_SEUIL_FILTRE;
+  /* UNE SEULE RECHERCHE SUR L'ÉCRAN, celle de la référence — c'est la seule
+     liste qu'on ne parcourt pas des yeux. Partout ailleurs le champ de filtre
+     et son compteur sont un deuxième champ dans le champ : on le pose donc à
+     la main, avec `data-menu-recherche`, et jamais par un seuil qui décide
+     tout seul. Un menu libre, lui, se filtre en tapant dans le champ. */
+  const filtrable=!etat.libre&&etat.hote.hasAttribute('data-menu-recherche');
   etat.tete.style.display=filtrable?'':'none';
   if(filtrable)etat.compte.textContent=vus.length===toutes?`${toutes} choix`:`${vus.length} / ${toutes}`;
 
@@ -1523,10 +1520,9 @@ function menuTouche(etat,ev){
 
 /* Un seul geste pour la vendeuse, deux chemins derrière :
    - la liste a déjà son entrée libre gérée par le formulaire → on l'y renvoie ;
-   - sinon ce qui est tapé devient une vraie option de la liste, et le
-     formulaire n'a rien de spécial à savoir : il lit toujours `.value`.
-   Un champ LIBRE, lui, n'a pas de bouton du tout : il s'écrit déjà, une
-   mention discrète le dit et c'est tout. */
+   - sinon ce qui est tapé devient la valeur du champ, et une vraie option de
+     la liste quand c'en est une : le formulaire n'a rien de spécial à savoir,
+     il lit toujours `.value`. */
 function menuManuelOuvrir(etat){
   const renvoi=menuRenvoiManuel(etat.hote);
   if(renvoi!==undefined){menuChoisir(etat,renvoi);return}
@@ -1542,9 +1538,11 @@ function menuManuelValider(etat){
   const texte=etat.champLibre.value.trim();
   if(!texte){etat.champLibre.focus();return}
   const hote=etat.hote;
-  /* Une deuxième saisie identique réutilise son option au lieu d'en empiler
-     une : la liste se remplirait de doublons au fil de la journée. */
-  if(![...hote.options].some(o=>o.value===texte)){
+  /* Un champ libre porte sa valeur directement — il n'a pas d'options où la
+     ranger. Une liste, si : une deuxième saisie identique réutilise la sienne
+     au lieu d'en empiler une, sinon elle se remplit de doublons au fil de la
+     journée. */
+  if(!etat.libre&&![...hote.options].some(o=>o.value===texte)){
     const opt=new Option(texte,texte);
     opt.dataset.manuel='1';
     hote.add(opt,hote.options[0]&&!hote.options[0].value?1:0);
