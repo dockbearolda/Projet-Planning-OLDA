@@ -49,6 +49,8 @@ const INDEX = lire('public/index.html');
 const APP = lire('public/app.js');
 const SW = lire('public/sw.js');
 const STYLES = lire('public/styles.css');
+// Les écrans du patron portent leur style dans le document lui-même.
+const STYLES_DEVIS = DEVIS;
 
 // --- 1. Les deux clés du poste ne se marchent pas dessus --------------------
 
@@ -190,4 +192,49 @@ assert.ok(/\.poste \{[\s\S]*?height: 44px;/.test(STYLES),
 assert.ok(/\.poste-choix-btn \{[\s\S]*?min-height: 64px;/.test(STYLES),
   'les quatre noms se tapent au doigt');
 
-console.log('✓ poste : le nom du poste signe les dossiers, l’étape « Demande » a disparu');
+// --- 8. Les deux familles de besoin -----------------------------------------
+// Le formulaire de recueil est celui d'« AUTRE » — le seul qui ait jamais
+// existé. Le TEXTILE aura le sien (tailles, coloris, emplacements) ; sa tuile
+// est posée maintenant, VIDE, pour que la place qui l'attend se voie.
+
+const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
+assert.ok(/id="besoinTuileTextile"[^>]*data-type="textile"/.test(step2),
+  'l’étape des besoins doit offrir une entrée Textile');
+assert.ok(/id="besoinTuileAutre"[^>]*data-type="autre"/.test(step2),
+  'et une entrée Autre — celle du formulaire actuel');
+assert.ok(/id="besoinTuileAutre"[^>]*class="besoin-tuile is-on"|class="besoin-tuile is-on"[^>]*id="besoinTuileAutre"/.test(step2),
+  '« Autre » reste allumé par défaut : on vient de retirer une étape à ce parcours, pas d’en rajouter un tap');
+assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
+  'le formulaire entier doit tenir dans l’enveloppe qu’on masque — titre et bouton compris');
+assert.ok(/id="besoinTextileVide"/.test(step2) && /parcours Textile arrive/.test(step2),
+  'la tuile Textile ne mène pas à un panneau muet : elle DIT que le parcours arrive');
+
+// Les icônes sont dessinées dans la page. Rien ne vient d'un autre domaine :
+// un poste doit s'ouvrir sans dépendre d'un tiers joignable.
+const tuiles = (step2.match(/<div class="besoin-type"[\s\S]*?<\/div>\s*<div class="notice hidden"/) || [''])[0];
+assert.strictEqual((tuiles.match(/<svg /g) || []).length, 2,
+  'chaque tuile porte son icône en SVG dans la page');
+assert.ok(!/<img|fonts\.googleapis|material-symbols/.test(tuiles),
+  'aucune icône ne doit venir d’un autre domaine ni d’une police externe');
+
+// Basculer sur Textile en pleine modification laisserait « Enregistrer la
+// modification » armé dans un formulaire masqué : le besoin serait réécrit
+// bien plus tard, sans que personne l'ait demandé.
+assert.ok(/if\(textile&&editingNeed>=0\)cancelNeedEdit\(\);/.test(DEVIS),
+  'basculer sur Textile doit rendre une modification en cours à son besoin');
+assert.ok(/function editNeed\(i\)\{choisirTypeBesoin\('autre'\);/.test(DEVIS),
+  '« Modifier » depuis la liste doit rouvrir le formulaire, même en regardant la tuile Textile');
+assert.ok(/b\.setAttribute\('aria-pressed',String\(on\)\)/.test(DEVIS),
+  'la tuile choisie doit s’annoncer, pas seulement se colorer');
+
+// À spécificité égale, c'est la DERNIÈRE règle déclarée qui gagne : la règle
+// étroite doit vivre APRÈS la règle de base, sinon les deux tuiles restent
+// côte à côte à 133 px sur un téléphone.
+const base = STYLES_DEVIS.indexOf('.besoin-type{display:grid');
+const etroit = STYLES_DEVIS.indexOf('@media(max-width:700px){.besoin-type{grid-template-columns:1fr}}');
+assert.ok(base > -1 && etroit > base,
+  'la règle étroite des tuiles doit être déclarée APRÈS la règle de base');
+assert.ok(/\.besoin-tuile\{[^}]*min-height:76px/.test(STYLES_DEVIS),
+  'la tuile est le premier geste de l’étape : elle se prend au doigt');
+
+console.log('✓ poste : le nom du poste signe les dossiers, l’étape « Demande » a disparu, le besoin se choisit');
