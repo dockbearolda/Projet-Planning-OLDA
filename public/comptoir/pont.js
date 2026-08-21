@@ -1139,9 +1139,13 @@
    reste possible, c'est le geste qui change d'intention, pas le champ. */
 .menu>input.est-frappe{cursor:text;caret-color:auto}
 /* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
-.menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
-  font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
-  background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
+/* La référence en GRAS, dans la police de la page. Elle était composée en
+   chasse fixe pour aligner les colonnes ; le patron n'en veut pas — la graisse
+   suffit à la faire ressortir de la désignation qui la suit. Les chiffres
+   gardent leur largeur fixe (tabular-nums), c'est du réglage de chiffres, pas
+   un changement de police. */
+.menu-jeton{flex:none;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;
+  color:#111827;background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
 .menu-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#3b424a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-texte.est-vide{color:#767d85}
 /* Une pastille de couleur EST une information : elle dit la teinte que la
@@ -1164,7 +1168,12 @@
 .menu-groupe:first-child{padding-top:5px}
 .menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
   border-left:3px solid transparent;border-radius:8px;cursor:pointer}
-.menu-option .menu-jeton{background:transparent;padding:0;width:76px;flex:none}
+/* La colonne des références : un PLANCHER, pas une largeur fixe. « PARAGON
+   218T » fait 98 px en Manrope gras et débordait sur la désignation, qui
+   venait s'écrire par-dessus. Le plancher garde les courtes alignées, les
+   longues poussent leur seule ligne — jamais de texte coupé sur une
+   référence, c'est elle qui identifie l'article. */
+.menu-option .menu-jeton{background:transparent;padding:0;min-width:100px;flex:none}
 .menu-option .menu-pastille{align-self:center}
 .menu-option-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#2b3138;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Deux états distincts : le curseur du clavier (gris plein) et le choix en

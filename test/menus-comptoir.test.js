@@ -386,4 +386,19 @@ assert.ok(/\.menu-declencheur\{[^}]*font-size:16px;line-height:1\.375;/.test(PON
     `${nom} : un émoji dans un libellé ne décide plus de la hauteur du bouton`);
 });
 
+
+// --- 10. LA RÉFÉRENCE EST EN GRAS, PAS EN CHASSE FIXE ------------------------
+//
+// Elle était composée en monospace pour aligner les colonnes. Le patron n'en
+// veut pas : la graisse suffit à la détacher de la désignation qui la suit.
+assert.ok(!/font-family:ui-monospace/.test(PONT), 'plus de chasse fixe dans les menus');
+assert.ok(/\.menu-jeton\{flex:none;font-size:13px;font-weight:800;/.test(PONT),
+  'la référence prend la police de la page, en gras');
+// « PARAGON 218T » fait 98 px en Manrope gras : à largeur FIXE, il s'écrivait
+// par-dessus la désignation. Un plancher garde les courtes alignées et laisse
+// les longues pousser leur seule ligne — une référence ne se coupe jamais,
+// c'est elle qui identifie l'article.
+assert.ok(/\.menu-option \.menu-jeton\{[^}]*min-width:100px;flex:none\}/.test(PONT),
+  'la colonne des références a un plancher, pas une largeur fixe');
+
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
