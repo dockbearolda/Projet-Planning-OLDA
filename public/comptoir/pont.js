@@ -774,6 +774,9 @@
     const select = document.createElement('select');
     select.className = 'olda-tel__pays';
     select.setAttribute('aria-label', 'Indicatif du pays');
+    // Un indicatif est un CODE : « 590 » ou rien. Une valeur libre y ferait un
+    // numéro injoignable, et le doublon client ne se verrait plus.
+    select.setAttribute('data-menu-manuel-non', '');
     for (const p of PAYS_TEL) {
       const o = document.createElement('option');
       o.value = p.code;
@@ -1089,9 +1092,30 @@
    couleur qui n'est pas au catalogue). Poste PC : survol, focus, clavier. */
 .menu{position:relative}
 .menu>select,.menu>datalist{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
-.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:8px 12px;
-  border:1px solid #bcc2c8;border-radius:9px;background:#fff;cursor:pointer;text-align:left;
-  font:inherit;font-size:16px;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+/* LE DÉCLENCHEUR EST UN <div> : il ÉCHAPPE au « input,select,textarea{padding:
+   13px 14px!important} » que les deux écrans imposent, et se retrouvait 5 px
+   plus court que l'<input> d'à côté sur la même ligne. Il reprend donc le même
+   rembourrage, la même taille de texte et la même hauteur de ligne — jamais
+   une hauteur en dur : sur un poste où Manrope n'est pas encore arrivée, la
+   ligne de texte rétrécit, et les deux champs doivent rétrécir ENSEMBLE.
+   Hauteur de ligne en RAPPORT et non en « normal » des deux côtés : Chrome ne
+   calcule pas la boîte d'un <input> comme celle d'un <div>, et « normal » les
+   laissait à 22 px contre 20,5. Et comme le déclencheur est une boîte FLEX,
+   sa hauteur vient de ses enfants, pas de sa hauteur de ligne : d'où le
+   min-height calculé — la ligne de texte (1.375em) plus le rembourrage et le
+   trait, exactement la boîte d'un champ voisin, et qui suit la taille du
+   texte si elle change. Le trait, sa couleur et son arrondi viennent
+   de la même règle que les champs voisins — ils étaient plus fins, plus
+   sombres et moins arrondis. */
+.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;
+  min-height:calc(1.375em + 29px);
+  border:1.5px solid #d7dce3;border-radius:10px;background:#fff;cursor:pointer;text-align:left;
+  font:inherit;font-size:16px;line-height:1.375;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+/* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la
+   référence ni la pastille ne doivent la dépasser, sinon le champ regrandit
+   et l'alignement repart. */
+.menu-declencheur .menu-jeton{font-size:12px;line-height:1.35;padding:1px 6px}
+.menu-declencheur .menu-pastille{width:16px;height:16px}
 .menu-declencheur:hover{border-color:#8d959d}
 .menu-declencheur:focus-visible{outline:3px solid rgba(20,46,84,.13);border-color:var(--green)}
 .menu.est-ouvert .menu-declencheur,.menu.est-ouvert>input{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.10)}
@@ -1101,18 +1125,27 @@
    « !important » à contrecœur : les deux écrans imposent déjà
    « input,select,textarea{padding:13px 14px!important} », et sans ça le texte
    saisi passe SOUS le chevron et sous la pastille. */
-.menu>input{padding-right:38px!important}
 .menu>.menu-pastille{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;pointer-events:none}
 .menu.a-pastille>input{padding-left:42px!important}
-.menu-chevron{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:13px;height:13px;
-  color:#767d85;pointer-events:none;transition:transform .14s ease}
-.menu-declencheur .menu-chevron{position:static;transform:none;flex:none}
-.menu.est-ouvert .menu-chevron{transform:translateY(-50%) rotate(180deg)}
-.menu.est-ouvert .menu-declencheur .menu-chevron{transform:rotate(180deg)}
+/* LE DOIGT EST LE CURSEUR DE LA SOURIS, PAS UNE IMAGE POSÉE DANS LE CHAMP.
+   Un champ qui propose un choix se clique — donc la main. Rien dans le champ :
+   ni chevron, ni pictogramme, la place revient au texte saisi. Le déclencheur
+   d'une liste porte déjà son curseur main ; c'est le champ LIBRE qui affichait
+   un curseur de texte et se lisait comme une simple zone de frappe. */
+.menu>input{cursor:pointer;caret-color:transparent}
+/* CLIQUER OUVRE LA LISTE, ÇA NE COMMENCE PAS UNE SAISIE. Le trait clignotant
+   qui apparaissait au clic disait le contraire et ramenait le champ à une
+   zone de frappe ordinaire. Il ne revient qu'à la PREMIÈRE FRAPPE — taper
+   reste possible, c'est le geste qui change d'intention, pas le champ. */
+.menu>input.est-frappe{cursor:text;caret-color:auto}
 /* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
-.menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
-  font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
-  background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
+/* La référence en GRAS, dans la police de la page. Elle était composée en
+   chasse fixe pour aligner les colonnes ; le patron n'en veut pas — la graisse
+   suffit à la faire ressortir de la désignation qui la suit. Les chiffres
+   gardent leur largeur fixe (tabular-nums), c'est du réglage de chiffres, pas
+   un changement de police. */
+.menu-jeton{flex:none;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;
+  color:#111827;background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
 .menu-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#3b424a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-texte.est-vide{color:#767d85}
 /* Une pastille de couleur EST une information : elle dit la teinte que la
@@ -1135,7 +1168,12 @@
 .menu-groupe:first-child{padding-top:5px}
 .menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
   border-left:3px solid transparent;border-radius:8px;cursor:pointer}
-.menu-option .menu-jeton{background:transparent;padding:0;width:76px;flex:none}
+/* La colonne des références : un PLANCHER, pas une largeur fixe. « PARAGON
+   218T » fait 98 px en Manrope gras et débordait sur la désignation, qui
+   venait s'écrire par-dessus. Le plancher garde les courtes alignées, les
+   longues poussent leur seule ligne — jamais de texte coupé sur une
+   référence, c'est elle qui identifie l'article. */
+.menu-option .menu-jeton{background:transparent;padding:0;min-width:100px;flex:none}
 .menu-option .menu-pastille{align-self:center}
 .menu-option-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#2b3138;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Deux états distincts : le curseur du clavier (gris plein) et le choix en
@@ -1144,9 +1182,29 @@
 .menu-option[aria-selected="true"]{border-left-color:#111827;background:#f5f6f8}
 .menu-option[aria-selected="true"] .menu-option-texte{color:#111827;font-weight:700}
 .menu-rien{padding:22px 14px;text-align:center;color:#767d85;font-size:14px}
+/* L'AJOUT MANUEL — la même ligne, au même endroit, dans TOUS les menus.
+   Avant, trois listes portaient leur propre « produit libre » noyé au milieu
+   du catalogue, les autres n'en avaient aucun : on ne savait jamais où
+   chercher. Elle est épinglée AU-DESSUS du filtre, hors de la liste, donc ni
+   emportée par une recherche ni repoussée par le défilement. */
+/* Une ligne, pas une bannière : un « + » et un mot. Elle doit se voir sans
+   se mettre devant la liste — c'est un raccourci, pas la réponse attendue. */
+.menu-manuel{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border:0;
+  border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:13px;font-weight:700;
+  color:#525960;text-align:left;cursor:pointer}
+.menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;color:#111827;outline:none}
+.menu-plus{flex:none;font-size:16px;font-weight:800;line-height:1;color:inherit}
+.menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid #eceff2;background:#fafbfc}
+.menu-saisie input{flex:1 1 auto;min-width:0;font-size:15px;padding:9px 11px}
+.menu-saisie button{flex:none;border:0;border-radius:9px;padding:9px 14px;background:#111827;
+  color:#fff;font:inherit;font-weight:800;cursor:pointer}
+/* Pendant la saisie libre, la liste s'efface : deux façons de répondre à la
+   même question en même temps, c'est une hésitation de plus au comptoir. */
+.menu.est-saisie .menu-saisie{display:flex}
+.menu.est-saisie .menu-manuel,.menu.est-saisie .menu-tete,.menu.est-saisie .menu-liste{display:none}
 /* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
 .menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
-@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-chevron,.menu-declencheur{transition:none}}
+@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-declencheur{transition:none}}
 `;
 
   function poserStyleMenu() {
@@ -1173,23 +1231,22 @@
    ligne) et `data-hex` (pastille de teinte). Les <optgroup> deviennent les
    titres de famille. */
 
-  const MENU_SEUIL_FILTRE = 8;   /* en dessous, un champ de filtre est du bruit */
   const menus = new Map();       /* hôte → état, pour retrouver un menu déjà posé */
   let menuRang = 0;              /* de quoi nommer la liste d'un hôte sans id */
 
-function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
-
-function menuChevron(){
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('class','menu-chevron');
-  svg.setAttribute('viewBox','0 0 12 12');
-  svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
-  svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');
-  svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');
-  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-  p.setAttribute('d','m2.5 4.5 3.5 3.5 3.5-3.5');
-  svg.append(p);return svg;
+/* Cinq listes portaient DÉJÀ leur propre entrée libre, sous trois valeurs
+   conventionnelles différentes. On les reconnaît au lieu de les étiqueter une
+   à une : une liste qui en gagne une demain est prise en charge sans rien
+   changer ici. `data-menu-manuel` reste le moyen de le dire à la main. */
+const MENU_VALEURS_LIBRES=['__new__','__manuel','__CUSTOM__'];
+function menuRenvoiManuel(hote){
+  if(hote.dataset.menuManuel!==undefined)return hote.dataset.menuManuel;
+  if(hote.tagName!=='SELECT')return undefined;
+  const o=[...hote.options].find(o=>MENU_VALEURS_LIBRES.includes(o.value));
+  return o?o.value:undefined;
 }
+
+function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
 
 /* Les options telles qu'elles existent à l'instant T. On les relit à CHAQUE
    ouverture : `txPopulateSelects` et `onTextileRefChange` réécrivent le contenu
@@ -1243,7 +1300,6 @@ function menuPoser(hote){
     }
     hote.setAttribute('autocomplete','off');
     declencheur=hote;
-    peau.append(menuChevron());
   }else{
     declencheur=document.createElement('div');
     declencheur.className='menu-declencheur';
@@ -1277,16 +1333,56 @@ function menuPoser(hote){
   liste.setAttribute('role','listbox');
   liste.id=`${hote.id||'menu'+(++menuRang)}__liste`;
   declencheur.setAttribute('aria-controls',liste.id);
+  /* Une liste dont la valeur est un CODE — un coefficient, un délai en jours,
+     une heure, une clé de barème — porte `data-menu-manuel-non` : `DB.times[x]`
+     rend `{}` pour une valeur inconnue, le prix tomberait à zéro SANS erreur.
+     Une liste qui a déjà son entrée libre gérée par le formulaire porte
+     `data-menu-manuel="<valeur de cette option>"` : la ligne l'y renvoie au
+     lieu d'en inventer une deuxième. */
+  const avecManuel=!hote.hasAttribute('data-menu-manuel-non');
+  const manuel=document.createElement('button');
+  manuel.type='button';
+  manuel.className='menu-manuel';
+  const plus=document.createElement('span');
+  plus.className='menu-plus';plus.setAttribute('aria-hidden','true');plus.textContent='+';
+  const motManuel=hote.dataset.menuManuelTexte||'Ajouter';
+  const mot=document.createElement('span');
+  mot.textContent=motManuel;
+  manuel.append(plus,mot);
+
+  const saisie=document.createElement('div');
+  saisie.className='menu-saisie';
+  const champLibre=document.createElement('input');
+  champLibre.type='text';champLibre.autocomplete='off';
+  champLibre.placeholder='À ajouter…';
+  champLibre.setAttribute('aria-label',motManuel);
+  const valider=document.createElement('button');
+  valider.type='button';valider.textContent='Valider';
+  saisie.append(champLibre,valider);
+
+  /* LA MÊME LIGNE PARTOUT, champ libre compris : un panneau de menu, c'est
+     « + Ajouter » puis la liste, et rien d'autre. La mention qui expliquait
+     qu'on pouvait écrire dans le champ est partie avec — un deuxième message
+     au même endroit, formulé autrement, c'est déjà une hésitation. */
+  if(avecManuel)panneau.append(manuel,saisie);
   panneau.append(tete,liste);
   peau.append(panneau);
 
-  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,vus:[],vise:-1,ouvert:false,filtrer:false};
+  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,
+    avecManuel,manuel,saisie,champLibre,vus:[],vise:-1,ouvert:false,filtrer:false};
   menus.set(hote,etat);
 
   declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
   declencheur.addEventListener('keydown',ev=>menuTouche(etat,ev));
   if(libre){
     hote.addEventListener('input',()=>{etat.filtrer=true;etat.vise=0;if(etat.ouvert)menuPeindre(etat);menuPeindreChamp(etat)});
+    /* Une touche qui écrit rend le trait ; un clic le reprend. `keydown` et
+       non `input` : le trait doit être là AVANT que le caractère ne s'écrive,
+       sinon il apparaît une frappe en retard. */
+    hote.addEventListener('keydown',ev=>{
+      if(ev.key.length===1||ev.key==='Backspace'||ev.key==='Delete')hote.classList.add('est-frappe');
+    });
+    hote.addEventListener('pointerdown',()=>hote.classList.remove('est-frappe'));
   }else{
     filtre.addEventListener('input',()=>{etat.vise=0;menuPeindre(etat)});
     filtre.addEventListener('keydown',ev=>menuTouche(etat,ev));
@@ -1294,6 +1390,12 @@ function menuPoser(hote){
   liste.addEventListener('click',ev=>{
     const li=ev.target.closest('[data-valeur]');
     if(li)menuChoisir(etat,li.dataset.valeur);
+  });
+  manuel.addEventListener('click',()=>menuManuelOuvrir(etat));
+  valider.addEventListener('click',()=>menuManuelValider(etat));
+  champLibre.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();menuManuelValider(etat)}
+    else if(ev.key==='Escape'){ev.preventDefault();menuManuelFermer(etat)}
   });
   /* Le survol déplace le curseur du clavier : sinon la souris éclaire une ligne
      et Entrée en valide une autre. */
@@ -1338,17 +1440,40 @@ function menuPeindreChamp(etat){
     const p=document.createElement('span');p.className='menu-pastille';p.style.background=choisie.hex;
     declencheur.append(p);
   }
-  const t=document.createElement('span');
-  t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
-  t.textContent=choisie?choisie.texte:'Choisir…';
-  declencheur.append(t,menuChevron());
+  /* UNE OPTION QUI PORTE UNE RÉFÉRENCE SE SUFFIT À ELLE-MÊME dans le champ :
+     « NS401 » identifie l'article, la désignation qui la suivait mangeait la
+     largeur et finissait en points de suspension. Elle est écrite en tête du
+     bloc, et l'infobulle porte toujours les deux. */
+  if(!(choisie&&choisie.jeton)){
+    const t=document.createElement('span');
+    t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
+    t.textContent=choisie?choisie.texte:'Choisir…';
+    declencheur.append(t);
+  }
   /* Le texte est coupé à l'ellipse dans un champ étroit : l'infobulle rend la
      ligne entière sans avoir à rouvrir la liste. */
   declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';
 }
 
+/* CE QUI EST RÉELLEMENT PROPOSÉ, relu à chaque ouverture — le formulaire
+   réécrit les options en cours de route. Deux lignes n'en sont pas :
+   - l'entrée libre est déjà épinglée en tête du panneau, elle n'y est pas deux
+     fois ;
+   - « — Choisir une référence — », « Sélectionner une option », « Non
+     précisée »… tant que RIEN n'est choisi, c'est exactement ce que le champ
+     fermé affiche déjà : une ligne de plus qui ne choisit rien. Elle revient
+     dès qu'une vraie valeur est prise, parce qu'elle devient alors le seul
+     chemin de retour — sur « Délai souhaité », « Non précisée » n'est pas un
+     libellé d'attente, c'est une réponse. */
+function menuProposees(etat){
+  const renvoi=menuRenvoiManuel(etat.hote);
+  const rienChoisi=etat.hote.value==='';
+  return menuOptions(etat.hote).filter(o=>
+    (renvoi===undefined||o.valeur!==renvoi) && !(rienChoisi&&o.valeur===''));
+}
+
 function menuFiltrees(etat){
-  const toutes=menuOptions(etat.hote);
+  const toutes=menuProposees(etat);
   /* Un champ libre ne filtre QU'À PARTIR de la première frappe : à l'ouverture
      il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
      valeur-là — cliquer doit montrer toute la liste. */
@@ -1367,10 +1492,15 @@ function menuPeindre(etat){
   etat.vus=vus;
   etat.vise=Math.min(Math.max(etat.vise,0),vus.length-1);
 
-  const toutes=menuOptions(etat.hote).length;
-  /* Sous le seuil, un champ de filtre et un compteur sont du bruit : deux
-     valeurs se lisent d'un coup d'œil. Un menu libre se filtre en tapant. */
-  const filtrable=!etat.libre&&toutes>MENU_SEUIL_FILTRE;
+  /* Le compteur porte sur ce qui est PROPOSÉ, pas sur le contenu brut du
+     <select> : il affichait « 49 / 50 » alors que rien n'était filtré. */
+  const toutes=menuProposees(etat).length;
+  /* UNE SEULE RECHERCHE SUR L'ÉCRAN, celle de la référence — c'est la seule
+     liste qu'on ne parcourt pas des yeux. Partout ailleurs le champ de filtre
+     et son compteur sont un deuxième champ dans le champ : on le pose donc à
+     la main, avec `data-menu-recherche`, et jamais par un seuil qui décide
+     tout seul. Un menu libre, lui, se filtre en tapant dans le champ. */
+  const filtrable=!etat.libre&&etat.hote.hasAttribute('data-menu-recherche');
   etat.tete.style.display=filtrable?'':'none';
   if(filtrable)etat.compte.textContent=vus.length===toutes?`${toutes} choix`:`${vus.length} / ${toutes}`;
 
@@ -1440,6 +1570,39 @@ function menuTouche(etat,ev){
   else if(ev.key==='Tab')menuFermer(etat,false);
 }
 
+/* Un seul geste pour la vendeuse, deux chemins derrière :
+   - la liste a déjà son entrée libre gérée par le formulaire → on l'y renvoie ;
+   - sinon ce qui est tapé devient la valeur du champ, et une vraie option de
+     la liste quand c'en est une : le formulaire n'a rien de spécial à savoir,
+     il lit toujours `.value`. */
+function menuManuelOuvrir(etat){
+  const renvoi=menuRenvoiManuel(etat.hote);
+  if(renvoi!==undefined){menuChoisir(etat,renvoi);return}
+  etat.peau.classList.add('est-saisie');
+  etat.champLibre.value='';
+  etat.champLibre.focus();
+  menuPlacer(etat);
+}
+function menuManuelFermer(etat){
+  etat.peau.classList.remove('est-saisie');
+}
+function menuManuelValider(etat){
+  const texte=etat.champLibre.value.trim();
+  if(!texte){etat.champLibre.focus();return}
+  const hote=etat.hote;
+  /* Un champ libre porte sa valeur directement — il n'a pas d'options où la
+     ranger. Une liste, si : une deuxième saisie identique réutilise la sienne
+     au lieu d'en empiler une, sinon elle se remplit de doublons au fil de la
+     journée. */
+  if(!etat.libre&&![...hote.options].some(o=>o.value===texte)){
+    const opt=new Option(texte,texte);
+    opt.dataset.manuel='1';
+    hote.add(opt,hote.options[0]&&!hote.options[0].value?1:0);
+  }
+  menuManuelFermer(etat);
+  menuChoisir(etat,texte);
+}
+
 function menuOuvrir(etat){
   if(etat.ouvert)return;
   const options=menuOptions(etat.hote);
@@ -1447,6 +1610,7 @@ function menuOuvrir(etat){
   menus.forEach(a=>{if(a!==etat)menuFermer(a,false)});   /* un seul à la fois */
   etat.ouvert=true;
   etat.filtrer=false;   /* on ouvre sur la liste ENTIÈRE */
+  etat.peau.classList.remove('est-saisie');   /* jamais rouvert en cours de frappe */
   etat.peau.classList.add('est-ouvert');
   etat.declencheur.setAttribute('aria-expanded','true');
   if(!etat.libre)etat.filtre.value='';
@@ -1473,12 +1637,15 @@ function menuFermer(etat,rendreFocus){
   if(!etat.ouvert)return;
   etat.ouvert=false;
   etat.peau.classList.remove('est-ouvert');
+  etat.peau.classList.remove('est-saisie');
   etat.declencheur.setAttribute('aria-expanded','false');
   if(rendreFocus)etat.declencheur.focus();
 }
 
 function menuChoisir(etat,valeur){
   etat.hote.value=valeur;
+  /* Une valeur choisie dans la liste n'est pas une saisie : le trait repart. */
+  if(etat.libre)etat.hote.classList.remove('est-frappe');
   menuPeindreChamp(etat);
   menuFermer(etat,true);
   /* Le rouge d'un champ manquant s'efface sur `change` — le <select> visible le

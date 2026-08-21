@@ -73,21 +73,13 @@
 }
 .np-bar[hidden] { display: none; }
 .np-bar-home {
-  display: inline-flex; align-items: center; gap: 7px;
-  min-height: 44px; padding: 10px 16px 10px 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0;
   border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-1);
-  font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  font-family: inherit; cursor: pointer;
 }
 .np-bar-home:hover { border-color: var(--primary); background: var(--surface-hover); }
-.np-bar-home .material-symbols-outlined { font-size: 19px; }
-.np-switch { display: flex; gap: 8px; flex-wrap: wrap; }
-.np-switch-btn {
-  border: 1px solid var(--border); border-radius: 999px; padding: 10px 18px; min-height: 44px;
-  background: var(--surface); color: var(--text-2);
-  font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
-}
-.np-switch-btn:hover { border-color: var(--primary); color: var(--text-1); }
-.np-switch-btn.is-active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.np-bar-home:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* Un dossier qui ne part pas au planning se DIT : la vendeuse a le client
    devant elle, elle ne doit pas découvrir la perte le lendemain. */
@@ -115,9 +107,6 @@
 
 @media (max-width: 760px) {
   .np-bar { gap: 8px; padding: 8px 12px; }
-  .np-bar-home, .np-switch { flex: 1 1 100%; }
-  .np-bar-home { justify-content: center; }
-  .np-switch-btn { flex: 1; padding: 10px 8px; }
   /* Une tuile par ligne : sur 375 px, deux colonnes les rendraient illisibles. */
   .np-home { justify-content: flex-start; padding: 24px 14px 40px; }
   .np-home h1 { font-size: 25px; }

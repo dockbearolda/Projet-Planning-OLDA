@@ -80,7 +80,7 @@ assert.ok(/function cancelNeedEdit\(\)\{[\s\S]*?basculerSaisieManuelle\(false\)\
   '« Fermer » et « Annuler » referment le formulaire');
 assert.ok(/<div id="besoinAutreForm" class="hidden">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
   'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
-assert.ok(/<div id="besoinManuel" class="hidden">[\s\S]*id="needFormTitle"/.test(step2),
+assert.ok(/<div id="besoinManuel" class="hidden[^"]*">[\s\S]*id="needFormTitle"/.test(step2),
   'le formulaire détaillé est REPLIÉ, pas supprimé');
 // Une ligne TEXTILE se remodifie dans son propre formulaire : la router vers
 // « Autre » perdrait tailles, marquage et négociation.
@@ -93,11 +93,11 @@ assert.ok(/function editNeed[\s\S]*?scrollIntoView/.test(DEVIS),
 // affiché — l'exigence n'a pas changé, son application couvre un cas de plus.
 assert.ok(/n===2&&!needs\.length\)return fail\(\$\('besoinAutreForm'\)\.classList\.contains\('hidden'\)\?'txRef':'catProduit'/.test(DEVIS),
   'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié ou masqué');
-assert.ok(/if\(editingNeed<0\)\$\('needFormTitle'\)\.textContent/.test(DEVIS),
+assert.ok(/if\(editingNeed<0\)poserTitreForm\('needFormTitle'/.test(DEVIS),
   'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 
 // Le doigt : ces trois-là se prennent debout, au comptoir.
-assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button\{min-height:52px\}/.test(DEVIS),
+assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button,\.cat-ligne \.menu-declencheur\{min-height:52px\}/.test(DEVIS),
   'produit, quantité et bouton gardent une cible tactile pleine');
 assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
   'sur un téléphone la ligne se déplie en trois rangées');
@@ -381,7 +381,17 @@ cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 1, 'un produit ajouté = une ligne');
 assert.strictEqual(cat.needs[0].qty, 3, '… avec la quantité demandée');
 assert.strictEqual(catProduit.value, '', 'le menu repart à vide : reprendre la ligne d’avant est le geste qui double un article');
-assert.strictEqual(catQte.value, '1', '… et la quantité repart à 1');
+// Le champ repart VIDE depuis le 21/08 (aucun champ ne s'ouvre pré-rempli) —
+// ce qui protège du doublon, c'est qu'il ne garde pas la quantité précédente.
+assert.strictEqual(catQte.value, '', '… et la quantité repart à vide');
+// … et une quantité vide vaut toujours UNE unité : la vendeuse a désigné le
+// produit, elle ne doit pas se battre avec le champ.
+catProduit.value = index('Décapsuleur Bois');
+catQte.value = '';
+cat.ajouterALaDemande();
+assert.strictEqual(cat.needs[cat.needs.length - 1].qty, 1,
+  'une quantité laissée vide vaut une unité, jamais zéro');
+cat.needs.pop();
 
 // c) Le même produit repris : des unités, pas une deuxième ligne.
 catProduit.value = index('Flasque Bois — Clair');

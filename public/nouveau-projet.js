@@ -52,6 +52,30 @@ let fluxAffiche = null;    // le parcours SOUS LES YEUX, s'il y en a un
 
 const cadreDe = (id) => ROOT.querySelector(`#np-frame-${id}`);
 
+/* Une flèche vers la gauche N'EXISTE PAS dans `olda-icones.woff2` : le
+   sous-ensemble figé n'a qu'`arrow_forward` et `chevron_right`, et un nom
+   absent s'affiche en texte tronqué sans la moindre erreur. On la dessine
+   donc au trait, l'idiome déjà en place ailleurs dans l'application. */
+function flecheRetour() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const trait = document.createElementNS(NS, 'path');
+  trait.setAttribute('d', 'M19 12H5');
+  const pointe = document.createElementNS(NS, 'path');
+  pointe.setAttribute('d', 'm11 6-6 6 6 6');
+  svg.append(trait, pointe);
+  return svg;
+}
+
 function icone(nom) {
   const i = document.createElement('span');
   i.className = 'material-symbols-outlined';
@@ -76,9 +100,6 @@ function afficher(id) {
     // Chargement à la demande : tant qu'un parcours n'a pas été ouvert, son
     // document n'est même pas téléchargé.
     if (!cadre.hidden && !cadre.src) cadre.src = f.src;
-    const b = ROOT.querySelector(`#np-switch-${f.id}`);
-    b.classList.toggle('is-active', !!flux && f.id === flux.id);
-    b.setAttribute('aria-pressed', String(!!flux && f.id === flux.id));
   }
   // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
   // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
@@ -217,25 +238,18 @@ function construireBarre() {
   retour.type = 'button';
   retour.className = 'np-bar-home';
   retour.id = 'np-home-btn';
-  retour.append(icone('grid_view'));
-  retour.append(document.createTextNode('Changer de parcours'));
+  /* Une flèche seule : le nom du parcours est déjà écrit à droite, dans la
+     bascule, et l'en-tête noir du parcours a disparu. Le libellé reste porté
+     par le nom accessible et l'infobulle — clavier et survol, les deux seules
+     interactions de ce poste. */
+  retour.setAttribute('aria-label', 'Changer de parcours');
+  retour.title = 'Changer de parcours';
+  retour.append(flecheRetour());
   retour.addEventListener('click', () => afficher(null));
 
-  const bascule = document.createElement('div');
-  bascule.className = 'np-switch';
-  bascule.setAttribute('role', 'group');
-  bascule.setAttribute('aria-label', 'Type de fiche à créer');
-  for (const f of FLUX) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.id = `np-switch-${f.id}`;
-    b.className = 'np-switch-btn';
-    b.textContent = f.label;
-    b.addEventListener('click', () => afficher(f.id));
-    bascule.append(b);
-  }
-
-  barre.append(retour, bascule);
+  /* La bascule « Vente directe / Demande de devis » a été RETIRÉE : on change
+     de parcours par la flèche, qui ramène aux deux tuiles. */
+  barre.append(retour);
   return barre;
 }
 
