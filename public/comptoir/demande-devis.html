@@ -72,10 +72,6 @@
 .need-perso{grid-column:1/-1;min-height:44px;margin-top:2px;border:1px solid #dde2e7;border-radius:9px;padding:9px 11px;font-size:15px;background:#fbfcfd}
 .need-perso:focus{background:#fff}
 @media(max-width:560px){.need-ligne{grid-template-columns:auto minmax(0,1fr)}.need-actions{grid-column:1/-1}.need-actions button{flex:1 1 0}}
-/* La colonne de droite est partie : le parcours prend toute la largeur.
-   Le résumé rapide qui y vivait est retiré lui aussi — on verra plus tard où
-   il se pose. */
-.layout{grid-template-columns:minmax(0,1fr)}
 .priority-stars{font-size:22px;line-height:1}
 .priority-card strong{font-size:15px}
 .priority-card small{font-size:12px;line-height:1.45;color:#667085}
@@ -266,6 +262,84 @@ h2{letter-spacing:-.01em}
 @media(max-width:820px){.tx-sizes{grid-template-columns:repeat(3,minmax(0,1fr))}.tx-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.tx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tx-controls{grid-template-columns:1fr}}
 </style>
+<style>
+/* ---- LA DEMANDE, À DROITE --------------------------------------------------
+   Le client commande trois tasses et deux tee-shirts : les deux s'empilent
+   dans le même panneau, à droite, pendant que la vendeuse travaille à gauche.
+   Ce panneau est COLLANT et se défile tout seul — la liste peut s'allonger
+   sans que le pas suivant (« Construire le projet ») ne parte hors de l'écran.
+
+   Il ne porte QUE la demande : le chiffrage d'un article et sa négociation
+   ont besoin de largeur, ils restent dans la colonne de gauche.
+   On dit « la demande », comme le bouton qui ajoute : le mot de caisse que
+   le patron a refusé en PR #151 ne revient pas par la porte de derrière. */
+.layout{grid-template-columns:minmax(0,1fr) 380px}
+.layout.sans-demande{grid-template-columns:minmax(0,1fr)}
+.layout.sans-demande>.sidebar{display:none}
+/* Rappelée APRÈS la règle du dessus, sinon la colonne de 380 px l'emporterait
+   au moment même où l'écran devient trop étroit pour elle. */
+@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;order:1}}
+
+/* L'aside porte déjà `position:sticky` : un deuxième collage ici ne servirait
+   à rien. Tête et pied sont `flex:0 0 auto` — sans ça le pied RÉTRÉCIT quand la
+   liste s'allonge et « Construire le projet » se fait rogner en silence. */
+.demande-panneau{display:flex;flex-direction:column;max-height:calc(100vh - 32px);background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 6px 20px rgba(17,24,39,.07);overflow:hidden}
+.demande-tete{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px;border-bottom:1px solid var(--border)}
+.demande-tete h2{margin:0;font-size:17px}
+.demande-corps{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 13px}
+.demande-vide{text-align:center;color:var(--muted);padding:26px 14px}
+.demande-vide-ic{display:block;font-size:27px;margin-bottom:9px;opacity:.5}
+.demande-vide b{display:block;color:var(--text);font-size:15px;margin-bottom:5px}
+.demande-vide span{font-size:13px;line-height:1.45}
+
+/* Une ligne = un article. Serrée, mais chaque zone garde sa place : la
+   quantité à gauche, le prix aligné à droite, la personnalisation dessous. */
+.demande-corps .need-ligne{grid-template-columns:auto minmax(0,1fr) auto;gap:8px 10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .16s,box-shadow .16s,background .16s}
+.demande-corps .need-ligne:hover{border-color:#c3ccd6;box-shadow:0 2px 8px rgba(17,24,39,.06)}
+.demande-corps .need-ligne.is-ouvert{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.09)}
+.demande-corps .need-qte{min-width:38px;padding:6px 8px;font-size:13px}
+.demande-corps .need-nom{font-size:14px}
+.demande-corps .need-meta{font-size:11.5px}
+.demande-corps .need-perso{grid-column:1/-1;min-height:36px;margin-top:6px;font-size:13.5px;padding:7px 11px!important}
+/* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait
+   les tablettes, parties au rebut. Des boutons discrets, alignés à droite. */
+.demande-corps .need-actions{grid-column:1/-1;margin-top:7px;gap:6px;justify-content:flex-end}
+/* La feuille « Esprit SumUp » plus haut impose `padding:13px 22px!important`
+   à toutes les pilules : sans `!important` ici, la ligne du panneau garde des
+   boutons de pleine taille et chaque article coûte 45 px de hauteur. */
+.demande-corps .need-actions button{min-height:31px;padding:5px 12px!important;font-size:12px}
+.demande-corps .need-perso:not(:focus):placeholder-shown{background:#fff;border-style:dashed;border-color:#e2e7ec}
+
+/* Le prix tient sur la même rangée que le nom, aligné à droite : c'est la
+   colonne que le client relit, elle ne doit pas se promener d'une ligne à
+   l'autre. Un article pas encore chiffré le DIT — il n'affiche pas 0 €,
+   « pas encore chiffré » et « gratuit » sont deux choses différentes. */
+.demande-prix{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.demande-prix b{display:block;font-size:14px;font-weight:900}
+.demande-prix span{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:1px}
+.demande-prix.a-chiffrer b{font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+
+
+.demande-pied{flex:0 0 auto;border-top:1px solid var(--border);background:#fafbfc;padding:11px 15px 13px}
+.demande-total{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:13px;padding:4px 0}
+.demande-total span{color:var(--muted);font-weight:700}
+.demande-total b{font-variant-numeric:tabular-nums;font-weight:800}
+.demande-total.is-fort{font-size:16px;padding:8px 0 4px;border-top:1px solid #e6e9ed;margin-top:5px}
+.demande-total.is-fort span{color:var(--text);font-weight:800}
+.demande-total.is-fort b{font-weight:900}
+.demande-chiffrage{border-top:1px solid #e6e9ed;margin-top:7px;padding-top:5px}
+.demande-atelier{margin-top:7px;border-top:1px dashed #d9dee4;padding-top:5px}
+.demande-atelier .demande-total{font-size:12.5px;padding:3px 0}
+.demande-pied .full{margin-top:12px}
+.demande-reste{margin:9px 0 0;font-size:12.5px}
+
+/* LE DÉTAIL D'UN ARTICLE, à gauche : le chiffrage et la négociation ont
+   besoin de toute la largeur (les cartes de solutions ne tiennent pas en
+   380 px). La ligne de droite n'est qu'un raccourci vers ce bloc. */
+.detail-tete{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.detail-nom{font-size:17px;font-weight:900;line-height:1.25}
+.detail-meta{font-size:13px;color:var(--muted);font-weight:600;margin-top:3px}
+</style>
 <script src="textile-catalog.js"></script>
 </head>
 <body>
@@ -319,7 +393,10 @@ h2{letter-spacing:-.01em}
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité</label><input id="catQte" type="number" min="1" step="1" value="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><div id="besoinManuel" class="hidden"><h3 id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions"><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter ce besoin</button><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button></div></div></div></div><div class="card"><div class="row-between"><h2>Besoins enregistrés</h2><span class="badge" id="needCount">0 besoin</span></div><div id="needsDisplay"><p class="help">Aucun besoin ajouté.</p></div></div><div class="card hidden" id="sideTextileCard"><h3>Chiffrage textile</h3><div class="summary-row"><span>Pièces</span><b id="txKpiQty">0</b></div><div class="summary-row"><span>Total HT</span><b id="txKpiHT">0,00 €</b></div><div class="summary-row"><span>Total TTC</span><b id="txKpiTTC">0,00 €</b></div><div class="summary-row tx-side-marge"><span>Marge</span><b id="txKpiMargin">0,00 €</b></div><div class="summary-row"><span>Taux de marge</span><b id="txKpiMarginPct">0,0 %</b></div><div class="summary-row"><span>Temps de production</span><b id="txKpiTime">0 h 00</b></div><div class="summary-row"><span>Marge / heure</span><b id="txKpiHour">—</b></div></div><div class="card"><div class="actions"><button class="primary" onclick="goStep(3)">Construire le projet →</button></div></div></section>
+<div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité</label><input id="catQte" type="number" min="1" step="1" value="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><div id="besoinManuel" class="hidden"><h3 id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions"><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter ce besoin</button><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
+     coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
+     Vide et masqué tant qu'aucune ligne n'est ouverte. -->
+<div class="card hidden" id="detailArticle"></div></section>
 
 <section id="step3" class="hidden"><div class="card"><div class="stage-head"><h2>2. Construction du projet</h2><div class="ref ref-display">—</div></div><div class="notice green">Le projet est construit à partir des besoins enregistrés. Le titre proposé reste modifiable.</div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"><div class="help">Ex. Uniformes et objets promotionnels — Restaurant La Terrasse</div></div>
 <div class="field priority-field" id="projectPriorityField">
@@ -667,11 +744,38 @@ h2{letter-spacing:-.01em}
   </div>
 </section>
 
-</main></div>
+</main>
+<!-- LA DEMANDE EN COURS. Trois tasses et deux tee-shirts s'empilent ici, dans
+     l'ordre où la vendeuse les ajoute, quel que soit le formulaire d'origine.
+     Le pied porte les totaux et le pas suivant : la liste peut s'allonger,
+     « Construire le projet » ne part jamais hors de l'écran. -->
+<aside class="sidebar no-print" id="colonneDemande">
+<div class="demande-panneau">
+<div class="demande-tete"><h2>La demande</h2><span class="badge" id="needCount">0 besoin</span></div>
+<div class="demande-corps" id="needsDisplay"></div>
+<div class="demande-pied">
+<div class="demande-total"><span>Articles</span><b id="dmdArticles">0</b></div>
+<div class="demande-total"><span>Pièces</span><b id="dmdPieces">0</b></div>
+<div class="demande-chiffrage hidden" id="sideTextileCard">
+<div class="demande-total"><span>Total HT</span><b id="txKpiHT">0,00 €</b></div>
+<div class="demande-total is-fort"><span>Total TTC</span><b id="txKpiTTC">0,00 €</b></div>
+<!-- Ce que la vendeuse seule lit : ces trois-là ne partent JAMAIS au client
+     (voir txComment). Deux valeurs par rangée pour tenir dans la hauteur. -->
+<div class="demande-atelier">
+<div class="demande-total tx-side-marge"><span>Marge</span><b><span id="txKpiMargin">0,00 €</span> · <span id="txKpiMarginPct">0,0 %</span></b></div>
+<div class="demande-total"><span>Atelier</span><b><span id="txKpiTime">0 h 00</span> · <span id="txKpiHour">—</span> / h</b></div>
+</div>
+</div>
+<p class="help demande-reste hidden" id="dmdAChiffrer"></p>
+<button class="primary full" onclick="goStep(3)">Construire le projet →</button>
+</div>
+</div>
+</aside>
+</div>
 </div>
 <script>
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0),todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)},formatDate=iso=>{if(!iso)return'—';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`},esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])),normalize=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
-let currentStep=2,needs=[]  /* le parcours s'ouvre sur les besoins : l'étape 1 a été retirée */,editingNeed=-1,editingTextile=-1,selectedClient=null,clientType='person';
+let currentStep=2,needs=[]  /* le parcours s'ouvre sur les besoins : l'étape 1 a été retirée */,editingNeed=-1,editingTextile=-1,articleOuvert=-1 /* la ligne de la demande dont le détail est ouvert à gauche */,selectedClient=null,clientType='person';
 // Reliquat d'un ancien écran de recherche : l'étape 5 travaille sur
 // `clientDirectory`. Laissé vide plutôt que rempli d'exemples.
 let clients=[];
@@ -706,7 +810,7 @@ function fail(id,msg){return marquer(id,msg,true)}
    cartes : elle a son propre marquage. */
 function failAll(manques){manques.forEach((m,k)=>m[0]==='__priorite'?showProjectPriorityError(k===0):marquer(m[0],m[1],k===0));return !manques.length}
 document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
-function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
+function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();document.querySelector('.layout').classList.toggle('sans-demande',n!==2);for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
 function validateStep(n){clearErrors();
 if(n===2&&!needs.length)return fail($('besoinAutreForm').classList.contains('hidden')?'txRef':'catProduit','Ajoute au moins un besoin — choisis un produit et ajoute-le à la demande, ou passe par la saisie manuelle.');
 if(n===3){const m=[];
@@ -957,7 +1061,9 @@ function basculerSaisieManuelle(force){
 function saveNeed(){clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
 function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';$('needFormTitle').textContent=`Modifier le besoin n°${i+1}`;$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
 function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;$('saveNeedBtn').textContent='Ajouter ce besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
-function deleteNeed(i){needs.splice(i,1);renderNeeds();updateSidebar()}
+/* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
+   détail d'un AUTRE article, et `negOuvert` négocierait sur celui d'à côté. */
+function deleteNeed(i){needs.splice(i,1);articleOuvert=-1;negOuvert=-1;renderNeeds();updateSidebar()}
 /* Chaque article porte SA personnalisation, sur sa ligne : c'est ce que
    l'atelier grave, brode ou imprime dessus, et ça change d'un article à
    l'autre dans la même demande. Le texte va dans `comment` — le champ que la
@@ -1296,16 +1402,19 @@ function txTotals(){
   const rate=txReady()?txNum($('txTgca').value):0;
   return {qty,ht,tax:ht*rate,ttc:ht*(1+rate),margin,hours,eurH:hours>0?margin/hours:NaN};
 }
+/* Écriture GARDÉE : ces cases vivent dans le panneau de droite, qui a déjà
+   changé de forme deux fois. Un identifiant qui disparaît ne doit pas arrêter
+   le rafraîchissement des six autres. */
 function txRefreshTotals(){
   if(!txReady())return;
   const t=txTotals();
-  $('txKpiQty').textContent=t.qty;
-  $('txKpiHT').textContent=money(t.ht);
-  $('txKpiTTC').textContent=money(t.ttc);
-  $('txKpiMargin').textContent=money(t.margin);
-  $('txKpiMarginPct').textContent=txPct(t.ht>0?t.margin/t.ht:0);
-  $('txKpiTime').textContent=TE().fmtTime(t.hours);
-  $('txKpiHour').textContent=Number.isFinite(t.eurH)?money(t.eurH):'—';
+  setTextSafe('txKpiQty',t.qty);
+  setTextSafe('txKpiHT',money(t.ht));
+  setTextSafe('txKpiTTC',money(t.ttc));
+  setTextSafe('txKpiMargin',money(t.margin));
+  setTextSafe('txKpiMarginPct',txPct(t.ht>0?t.margin/t.ht:0));
+  setTextSafe('txKpiTime',TE().fmtTime(t.hours));
+  setTextSafe('txKpiHour',Number.isFinite(t.eurH)?money(t.eurH):'—');
   $('sideTextileCard').classList.toggle('hidden',!needs.some(n=>n.textile));
 }
 
@@ -1488,46 +1597,92 @@ function negRetenir(i, m){
    et l'entrée en négociation. On DÉCORE la ligne rendue par `renderNeeds`
    plutôt que de la reconstruire : le champ « personnalisation » de la PR #151
    reste en place, et le curseur avec. */
-function decorerTextile(){
-  if(!txReady())return;
-  const hote=$('needsDisplay');
+/* LE DÉTAIL D'UN ARTICLE, DANS LA COLONNE DE GAUCHE.
+   La demande vit à droite, en lignes serrées ; ce qu'un article coûte, ce
+   qu'il laisse et ce qui se négocie dessus a besoin de largeur — les cartes
+   de solutions ne tiennent pas en 380 px. Une seule ligne est ouverte à la
+   fois : `articleOuvert`. */
+function renderDetailArticle(){
+  const hote=$('detailArticle');
   if(!hote)return;
-  needs.forEach((n,i)=>{
-    if(!n.textile)return;
-    const ligne=hote.children[i];
-    if(!ligne||ligne.querySelector('.tx-ligne-chiffrage'))return;
-    const c=txCalc(n.textile);
-    if(!c)return;
+  const i=articleOuvert,n=needs[i];
+  const c=(n&&n.textile&&txReady())?txCalc(n.textile):null;
+  if(!c){hote.replaceChildren();hote.classList.add('hidden');return;}
 
-    const bloc=txEl('div','tx-ligne-chiffrage');
-    const metrics=txEl('div','tx-card-metrics');
-    metrics.append(
-      txMetric('Prix HT / pièce',money(c.sold)),
-      txMetric('Total HT',money(c.total)),
-      txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
-      txMetric('Temps prod.',TE().fmtTime(c.prodHours)),
-      txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
-    );
-    const tete=txEl('div','tx-ligne-tete');
-    const neg=n.textile.negotiation;
-    tete.append(txEl('span',`tx-avis ${c.cls}`,c.avis));
-    if(neg)tete.append(txEl('span','badge', txNum(neg.freeQty)>0
-      ? `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)} + ${txNum(neg.freeQty)} offerte(s)`
-      : `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)}`));
-    const boutons=txEl('div','actions');
-    const dupliquer=txEl('button','secondary','Dupliquer');
-    dupliquer.onclick=()=>duplicateTextileNeed(i);
-    const negocier=txEl('button','secondary',negOuvert===i?'Fermer la négociation':'Le client négocie');
-    negocier.onclick=()=>negBasculer(i);
-    boutons.append(dupliquer,negocier);
-    tete.append(boutons);
+  const tete=txEl('div','detail-tete');
+  const gauche=txEl('div');
+  gauche.append(txEl('div','detail-nom',n.label));
+  gauche.append(txEl('div','detail-meta',
+    [n.requestedRef?`Réf. ${n.requestedRef}`:'',n.color,`${c.qty} pièce${c.qty>1?'s':''}`].filter(Boolean).join(' · ')));
+  const fermer=txEl('button','secondary','Fermer');
+  fermer.onclick=()=>{articleOuvert=-1;negOuvert=-1;renderNeeds()};
+  tete.append(gauche,fermer);
 
-    bloc.append(tete,metrics);
-    if(negOuvert===i)bloc.append(negPanneau(i,n));
-    ligne.append(bloc);
-  });
+  const rang=txEl('div','tx-ligne-tete');
+  rang.append(txEl('span',`tx-avis ${c.cls}`,c.avis));
+  const neg=n.textile.negotiation;
+  if(neg)rang.append(txEl('span','badge', txNum(neg.freeQty)>0
+    ? `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)} + ${txNum(neg.freeQty)} offerte(s)`
+    : `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)}`));
+  const boutons=txEl('div','actions');
+  const modifier=txEl('button','secondary','Modifier l’article');
+  modifier.onclick=()=>editTextileNeed(i);
+  const dupliquer=txEl('button','secondary','Dupliquer');
+  dupliquer.onclick=()=>duplicateTextileNeed(i);
+  const negocier=txEl('button','secondary',negOuvert===i?'Fermer la négociation':'Le client négocie');
+  negocier.onclick=()=>negBasculer(i);
+  boutons.append(modifier,dupliquer,negocier);
+  rang.append(boutons);
+
+  const metrics=txEl('div','tx-card-metrics');
+  metrics.append(
+    txMetric('Prix HT / pièce',money(c.sold)),
+    txMetric('Total HT',money(c.total)),
+    txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
+    txMetric('Temps prod.',TE().fmtTime(c.prodHours)),
+    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
+  );
+
+  const bloc=txEl('div');
+  bloc.append(tete,rang,metrics);
+  if(negOuvert===i)bloc.append(negPanneau(i,n));
+  hote.replaceChildren(bloc);
+  hote.classList.remove('hidden');
 }
-function renderNeeds(){$('needCount').textContent=`${needs.length} besoin${needs.length>1?'s':''}`;$('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>{const detail=[n.category,n.color,n.requestedRef?`Réf. ${n.requestedRef}`:'',n.productionType?`Production ${n.productionType}`:''].filter(Boolean).map(esc).join(' · ');return `<div class="need-ligne"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div>${detail?`<div class="need-meta">${detail}</div>`:''}</div><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`}).join(''):'<p class="help">Aucun besoin ajouté.</p>';if(editingNeed<0)$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;decorerTextile();txRefreshTotals()}
+
+/* Un clic n'importe où sur la ligne ouvre son détail — sauf s'il visait un
+   bouton ou le champ de personnalisation, qui ont déjà leur rôle. Un article
+   qui n'est pas du textile n'a pas de chiffrage : sa modification EST son
+   détail, on rouvre son formulaire. */
+function ouvrirArticle(i,ev){
+  if(ev&&ev.target.closest('button,input,textarea,select'))return;
+  const n=needs[i];
+  if(!n)return;
+  if(!n.textile)return editNeed(i);
+  articleOuvert=(articleOuvert===i)?-1:i;
+  if(articleOuvert<0)negOuvert=-1;
+  renderNeeds();
+  if(articleOuvert>=0)$('detailArticle').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* LA DEMANDE SE MONTE À DROITE. Trois tasses et deux tee-shirts sont deux
+   lignes du MÊME panneau : c'est le seul endroit qui compose une ligne
+   d'article, quel que soit le formulaire qui l'a créée. */
+function renderNeeds(){
+  $('needCount').textContent=`${needs.length} article${needs.length>1?'s':''}`;
+  $('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>{
+    const detail=[n.category,n.color,n.requestedRef?`Réf. ${n.requestedRef}`:'',n.productionType?`Production ${n.productionType}`:''].filter(Boolean).map(esc).join(' · ');
+    /* « Pas encore chiffré » et « gratuit » sont deux choses différentes : une
+       ligne sans prix le DIT, elle n'affiche jamais 0 € — piège `Number(null)`. */
+    const chiffre=Number.isFinite(n.unitHT);
+    const prix=chiffre
+      ? `<b>${money(n.unitHT*n.qty)}</b><span>${money(n.unitHT)} / pièce</span>`
+      : '<b>À chiffrer</b>';
+    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div>${detail?`<div class="need-meta">${detail}</div>`:''}</div><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div><div class="need-actions">${n.textile?`<button class="secondary" onclick="ouvrirArticle(${i})">Chiffrage</button>`:''}<button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`
+  }).join(''):`<div class="demande-vide"><svg class="demande-vide-ic" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5.4 8h13.2l-1.1 11.2a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg><b>Aucun article</b><span>Choisis un produit à gauche : il s’ajoute ici, avec sa quantité.</span></div>`;
+  if(editingNeed<0)$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;
+  renderDetailArticle();txRefreshTotals();updateSidebar();
+}
 /* On écrit dans la liste, on ne la REDESSINE PAS : reconstruire la ligne à
    chaque frappe reprendrait le champ sous les doigts et perdrait le curseur. */
 function setNeedPerso(i,valeur){if(!needs[i])return;needs[i].comment=valeur;updateSidebar()}
@@ -1714,7 +1869,20 @@ function setPricing(i,k,v){needs[i][k]=k==='unitHT'?(v===''?NaN:Number(v)):v;ren
    plus de support à l'écran : elle écrit ce qu'elle TROUVE, et ne casse pas
    de ne rien trouver. Le jour où le résumé revient, il suffit de reposer
    ses identifiants dans la page. */
-function updateSidebar(){const nb=$('sideNeedCount');if(nb)nb.textContent=needs.length;const q=$('sideQty');if(q)rollInt(q,needs.reduce((s,n)=>s+n.qty,0));const f=$('sideCategories');if(f)f.textContent=categories().join(', ')||'—';const c=$('sideClient');if(c)c.textContent=selectedClient?clientName(selectedClient):'Non renseigné';const t=$('sideTotal');if(t){const v=quoteTotals().ttc;if(v)rollMoney(t,v);else t.textContent='—';}}
+/* Le pied du panneau. Elle écrit ce qu'elle TROUVE : `pont.js` et une
+   quinzaine d'endroits l'appellent, et tout l'amorçage s'arrête derrière si
+   elle jette. Les cinq éléments de l'ancienne colonne de droite (référence,
+   client, familles…) ont disparu avec elle — leurs écritures aussi. */
+function updateSidebar(){
+  const a=$('dmdArticles');if(a)a.textContent=needs.length;
+  const p=$('dmdPieces');if(p)p.textContent=needs.reduce((s,n)=>s+(Number(n.qty)||0),0);
+  const reste=needs.filter(n=>!Number.isFinite(n.unitHT)).length;
+  const r=$('dmdAChiffrer');
+  if(r){
+    r.textContent=reste?`${reste} article${reste>1?'s':''} sans prix : le chiffrage viendra après.`:'';
+    r.classList.toggle('hidden',!reste);
+  }
+}
 document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));$('newProjectGoal').addEventListener('input',updateSidebar);toggleControlStatus();updateControl();renderClientQuickList();
 function setTextSafe(id,value){const el=$(id);if(el)el.textContent=value;}
 function setHtmlSafe(id,value){const el=$(id);if(el)el.innerHTML=value;}

@@ -104,7 +104,13 @@ assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.
 
 // La demande se lit en LIGNES, pas en cartes : dix articles tenaient sur trois
 // écrans et la vendeuse ne voyait plus ce qu'elle venait d'ajouter.
-const renderNeedsSrc = (DEVIS.match(/function renderNeeds\(\)\{[\s\S]*?\n/) || [''])[0];
+// `renderNeeds` tient sur plusieurs lignes depuis que la demande est montée
+// dans le panneau de droite : on lit la fonction ENTIÈRE, jusqu'à son
+// accolade en colonne 0. S'arrêter au premier saut de ligne ne lisait plus
+// qu'une signature vide, et toutes les règles ci-dessous passaient à vide.
+const renderNeedsSrc = (DEVIS.match(/function renderNeeds\(\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(/needsDisplay/.test(renderNeedsSrc),
+  'la fonction doit être lue en entier, sinon les règles suivantes ne vérifient rien');
 assert.ok(/need-ligne/.test(renderNeedsSrc) && !/need-card/.test(renderNeedsSrc),
   'chaque article de la demande tient sur une ligne');
 assert.ok(/need-qte[\s\S]*?need-nom/.test(renderNeedsSrc),
@@ -142,13 +148,31 @@ assert.ok(/Personnalisation :<\/b> \$\{esc\(n\.comment\)\}/.test(DEVIS),
 // 320 px et s'échappait dès qu'on descendait. Le résumé rapide qui vivait à
 // côté est retiré lui aussi — on verra plus tard où il se pose.
 
-assert.ok(!/<aside class="sidebar">/.test(DEVIS),
-  'la colonne de droite a disparu : la saisie prend toute la largeur');
+// La colonne de droite est REVENUE le 21/08/2026, sur demande du patron —
+// mais elle ne porte plus la carte « PROJET » d'alors (référence, statut,
+// progression, informations manquantes), qui répétait ce que les étapes
+// disaient déjà. Elle porte LA DEMANDE : les articles ajoutés, leurs totaux,
+// et le pas suivant au pied de la liste.
+assert.ok(/<aside class="sidebar no-print" id="colonneDemande">/.test(DEVIS),
+  'la demande en cours vit dans une colonne de droite');
+assert.ok(/id="needsDisplay"/.test(DEVIS.slice(DEVIS.indexOf('id="colonneDemande"'))),
+  'la liste des articles est DANS ce panneau, pas restée dans la colonne de gauche');
+assert.ok(!/panier/i.test(DEVIS), 'le mot « panier » reste banni : le patron l’a refusé');
 // Retirer un bloc à la main laisse vite un `<` de trop ou de moins : la page
 // affichait « /div › » en clair, en bas, sans la moindre erreur.
 assert.ok(!/(^|[^<])\/div>/.test(DEVIS), 'aucune balise fermante amputée ne traîne dans la page');
-assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
-  'il n’y a plus de colonne à réserver');
+assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\) 380px\}/.test(DEVIS),
+  'la colonne de droite a une largeur réservée');
+// Le panneau ne sert qu'au recueil des besoins : passé cette étape il n'a plus
+// rien à montrer, et la grille doit rendre sa largeur au parcours.
+assert.ok(/\.layout\.sans-demande\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
+  'hors du recueil des besoins, le parcours reprend toute la largeur');
+assert.ok(/classList\.toggle\('sans-demande',n!==2\)/.test(DEVIS),
+  'c’est `showStep` qui pose et retire la colonne');
+// Sans `flex:0 0 auto`, le pied RÉTRÉCIT quand la liste s'allonge : les totaux
+// et « Construire le projet » se font rogner, en silence.
+assert.ok(/\.demande-pied\{flex:0 0 auto/.test(DEVIS),
+  'le pied du panneau ne se laisse pas écraser par la liste');
 ['sideTitle', 'sideStatus', 'sidePrise', 'progressText', 'progressBar', 'missingList',
   'getMissing', 'completion(', 'barre-bas'].forEach((mort) => {
   assert.ok(!DEVIS.includes(mort),
@@ -159,12 +183,12 @@ assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
 // quinzaine d'endroits la déclenchent à chaque frappe. Sans support à l'écran
 // elle ne doit RIEN casser — sinon l'amorçage s'arrête derrière (menu de
 // produits vide, aucun écouteur posé), ce qui s'est produit pour de vrai.
-const majSrc = (DEVIS.match(/function updateSidebar\(\)\{[\s\S]*?\n/) || [''])[0];
+const majSrc = (DEVIS.match(/function updateSidebar\(\)\{[\s\S]*?\n\}/) || [''])[0];
 assert.ok(majSrc, 'le résumé doit rester une fonction nommée : pont.js l’appelle');
 const majFn = new Function('ctx', `with(ctx){${majSrc}
   return updateSidebar}`)({
   $: () => null, needs: [], categories: () => [], selectedClient: null,
-  clientName: () => '', quoteTotals: () => ({ ttc: 0 }), rollInt() {}, rollMoney() {},
+  clientName: () => '', quoteTotals: () => ({ ttc: 0 }),
 });
 assert.doesNotThrow(majFn, 'sans support à l’écran, le résumé ne doit pas casser');
 
