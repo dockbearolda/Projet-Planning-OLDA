@@ -179,6 +179,34 @@ assert.ok(/sizes\.other/.test(retenir) && /manualPrice/.test(retenir),
 assert.ok(/m\.effective/.test(retenir),
   'le prix retenu est le prix moyen par pièce LIVRÉE, sinon les pièces offertes se factureraient');
 
+// LE PRIX DEMANDÉ SE TAPE EN ENTIER. `renderNeeds` remplace tout
+// `needsDisplay` : tant que la frappe le rappelait, le champ repartait à zéro
+// au premier chiffre, le curseur tombait et « 23 » restait bloqué sur « 2 »
+// pendant que les solutions s'ouvraient comme si on avait validé.
+const poser = (DEVIS.match(/function negPoserTarget\(i,\s*valeur\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(poser, 'negPoserTarget doit exister');
+assert.ok(/negResultats-\$\{i\}/.test(poser),
+  'une frappe ne réécrit que les solutions, jamais la ligne qui porte le champ');
+assert.ok(!/^\s*renderNeeds\(\);?$/m.test(poser),
+  'negPoserTarget ne doit pas redessiner la liste à chaque chiffre tapé');
+
+// Le champ se construit UNE fois, les solutions se réécrivent à part : les
+// deux ne peuvent pas vivre dans la même fonction sans reprendre le curseur.
+const panneau = (DEVIS.match(/function negPanneau\(i,\s*n\)\{[\s\S]*?\n\}/) || [''])[0];
+const resultats = (DEVIS.match(/function negRemplirResultats\(hote,\s*i,\s*n\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(resultats, 'les solutions doivent se rendre dans leur propre bloc');
+assert.ok(/negResultats-\$\{i\}/.test(panneau) && /negRemplirResultats\(/.test(panneau),
+  'le panneau accroche un conteneur de solutions identifié par la ligne');
+assert.ok(!/negTarget-\$\{i\}/.test(resultats) && !/createElement\('input'\)/.test(resultats),
+  'le champ ne doit jamais être reconstruit par le rendu des solutions');
+assert.ok(/rankedScenarios/.test(resultats) && !/rankedScenarios/.test(panneau),
+  'seul le bloc des solutions dépend du prix demandé');
+
+// La molette sur un champ nombre change la valeur sans qu'on l'ait tapée : on
+// fait défiler les solutions et le prix demandé bouge tout seul.
+assert.ok(/'wheel'[\s\S]{0,60}blur\(\)/.test(panneau),
+  'la molette ne doit pas modifier le prix demandé');
+
 // Le geste commercial se dit au client ; la marge, non.
 assert.ok(/Geste commercial/.test(DEVIS),
   'les pièces offertes doivent apparaître sur le récapitulatif du client');
