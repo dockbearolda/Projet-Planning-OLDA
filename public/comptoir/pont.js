@@ -737,6 +737,9 @@
   const STYLE_TEL = `
 .olda-tel{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
 .olda-tel__pays{flex:1 1 150px;min-width:120px;min-height:44px}
+/* Là où les menus déroulants sont habillés (demande-devis), c'est la peau
+   qui occupe la place du <select> : sans ça le champ pays s'écrase. */
+.olda-tel>.menu{flex:1 1 150px;min-width:120px}
 .olda-tel__local{flex:1 1 160px;min-width:132px;min-height:44px}
 @media(max-width:560px){.olda-tel__pays,.olda-tel__local{flex:1 1 100%}}
 `;
@@ -1070,8 +1073,429 @@
   // minuteurs à ~1 s dès que l'onglet passe au second plan, et l'envoi du
   // dossier ne doit pas dépendre de ça. La scrutation reste en second rideau,
   // pour ce qui ne passe pas par une mutation (et parce que les écrans
+
+  // ---- LES MENUS DÉROULANTS DES DEUX ÉCRANS ------------------------------
+  // Greffé ici et pas dans une page : les deux écrans du comptoir doivent
+  // avoir les mêmes menus, et un écran remplacé par le patron ne doit pas
+  // emporter le composant avec lui.
+  const STYLE_MENU = `
+/* ---- UN SEUL MODÈLE DE MENU DÉROULANT POUR TOUTE LA PAGE ------------------
+   Le <select> natif ne sait afficher ni deux colonnes, ni deux graisses, ni
+   une pastille de couleur dans une option — et il tronque. Il reste pourtant
+   en place, caché : c'est lui qui porte la valeur, le \`onchange\` et les options
+   que le formulaire écrit à la volée. Ce qui suit n'est qu'une PEAU.
+   Deux variantes, même panneau : le menu fermé (on choisit dans la liste) et
+   le menu libre (le champ reste saisissable — la vendeuse peut écrire une
+   couleur qui n'est pas au catalogue). Poste PC : survol, focus, clavier. */
+.menu{position:relative}
+.menu>select,.menu>datalist{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:8px 12px;
+  border:1px solid #bcc2c8;border-radius:9px;background:#fff;cursor:pointer;text-align:left;
+  font:inherit;font-size:16px;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+.menu-declencheur:hover{border-color:#8d959d}
+.menu-declencheur:focus-visible{outline:3px solid rgba(20,46,84,.13);border-color:var(--green)}
+.menu.est-ouvert .menu-declencheur,.menu.est-ouvert>input{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.10)}
+/* Menu libre : le champ de saisie EST le déclencheur. Le chevron se pose
+   par-dessus, la pastille de teinte à gauche — ni l'un ni l'autre ne prend le
+   clic, il revient au champ, qui ouvre le menu.
+   « !important » à contrecœur : les deux écrans imposent déjà
+   « input,select,textarea{padding:13px 14px!important} », et sans ça le texte
+   saisi passe SOUS le chevron et sous la pastille. */
+.menu>input{padding-right:38px!important}
+.menu>.menu-pastille{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;pointer-events:none}
+.menu.a-pastille>input{padding-left:42px!important}
+.menu-chevron{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:13px;height:13px;
+  color:#767d85;pointer-events:none;transition:transform .14s ease}
+.menu-declencheur .menu-chevron{position:static;transform:none;flex:none}
+.menu.est-ouvert .menu-chevron{transform:translateY(-50%) rotate(180deg)}
+.menu.est-ouvert .menu-declencheur .menu-chevron{transform:rotate(180deg)}
+/* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
+.menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
+  font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
+  background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
+.menu-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#3b424a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-texte.est-vide{color:#767d85}
+/* Une pastille de couleur EST une information : elle dit la teinte que la
+   vendeuse ne devinerait pas d'après « Wet Sand ». */
+.menu-pastille{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid #9aa2aa;box-shadow:inset 0 0 0 1px #fff}
+
+.menu-panneau{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:max(100%,min(560px,80vw));
+  background:#fff;border:1px solid #d5d9de;border-radius:12px;overflow:hidden;display:none;
+  box-shadow:0 14px 34px rgba(17,24,39,.15),0 2px 6px rgba(17,24,39,.06)}
+.menu.est-ouvert .menu-panneau{display:block;animation:menuEntre .13s ease-out}
+@keyframes menuEntre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.menu-tete{display:flex;align-items:center;gap:10px;padding:10px;background:#fafbfc;border-bottom:1px solid #eceff2}
+.menu-tete input{font-size:15px;padding:9px 11px}
+.menu-compte{flex:none;font-size:12px;font-weight:700;color:#767d85;font-variant-numeric:tabular-nums;white-space:nowrap}
+.menu-liste{max-height:326px;overflow-y:auto;margin:0;padding:6px;list-style:none}
+/* Le titre de famille reste collé en haut pendant le défilement : 48
+   références sur 13 familles, sans ça on ne sait plus dans quoi on est. */
+.menu-groupe{position:sticky;top:0;z-index:1;background:#fff;padding:13px 10px 5px;
+  font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#8b9199}
+.menu-groupe:first-child{padding-top:5px}
+.menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
+  border-left:3px solid transparent;border-radius:8px;cursor:pointer}
+.menu-option .menu-jeton{background:transparent;padding:0;width:76px;flex:none}
+.menu-option .menu-pastille{align-self:center}
+.menu-option-texte{flex:1 1 auto;min-width:0;font-size:15px;color:#2b3138;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Deux états distincts : le curseur du clavier (gris plein) et le choix en
+   cours (barre d'encre + texte en gras). Aucune couleur ici n'est décorative. */
+.menu-option.est-vise{background:#eaeef3}
+.menu-option[aria-selected="true"]{border-left-color:#111827;background:#f5f6f8}
+.menu-option[aria-selected="true"] .menu-option-texte{color:#111827;font-weight:700}
+.menu-rien{padding:22px 14px;text-align:center;color:#767d85;font-size:14px}
+/* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
+.menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
+@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-chevron,.menu-declencheur{transition:none}}
+`;
+
+  function poserStyleMenu() {
+    if (document.getElementById('olda-menu-style')) return;
+    const s = document.createElement('style');
+    s.id = 'olda-menu-style';
+    s.textContent = STYLE_MENU;
+    document.head.appendChild(s);
+  }
+
+/* ---- UN SEUL MODÈLE DE MENU DÉROULANT -------------------------------------
+   Le <select> natif ne sait afficher ni deux colonnes, ni deux graisses, ni une
+   pastille de couleur — et il tronque. On l'HABILLE au lieu de le remplacer :
+   il reste dans la page, caché, et garde sa valeur, son `onchange` et les
+   options que le formulaire écrit à la volée. Résultat : rien de ce qui lisait
+   `$('x').value` ne change, et les vingt menus de la page se ressemblent.
+
+   Deux variantes, un seul panneau :
+   - menu FERMÉ  — habille un <select>. La valeur vient de la liste.
+   - menu LIBRE  — habille un <input list="…">. Le champ reste saisissable : la
+     vendeuse peut écrire une couleur qui n'est pas au catalogue.
+
+   Une option porte, au choix : `data-ref` (jeton de référence, en tête de
+   ligne) et `data-hex` (pastille de teinte). Les <optgroup> deviennent les
+   titres de famille. */
+
+  const MENU_SEUIL_FILTRE = 8;   /* en dessous, un champ de filtre est du bruit */
+  const menus = new Map();       /* hôte → état, pour retrouver un menu déjà posé */
+  let menuRang = 0;              /* de quoi nommer la liste d'un hôte sans id */
+
+function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+
+function menuChevron(){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','menu-chevron');
+  svg.setAttribute('viewBox','0 0 12 12');
+  svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');
+  svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d','m2.5 4.5 3.5 3.5 3.5-3.5');
+  svg.append(p);return svg;
+}
+
+/* Les options telles qu'elles existent à l'instant T. On les relit à CHAQUE
+   ouverture : `txPopulateSelects` et `onTextileRefChange` réécrivent le contenu
+   des <select> et des <datalist> en cours de route. */
+function menuOptions(hote){
+  if(hote.tagName==='SELECT'){
+    const sorties=[];
+    [...hote.children].forEach(n=>{
+      if(n.tagName==='OPTGROUP'){
+        [...n.children].forEach(o=>sorties.push(menuOption(o,n.label)));
+      }else if(n.tagName==='OPTION'){
+        sorties.push(menuOption(n,''));
+      }
+    });
+    return sorties;
+  }
+  const source=document.getElementById(hote.getAttribute('list'));
+  return source?[...source.options].map(o=>menuOption(o,'')):[];
+}
+function menuOption(o,groupe){
+  return {
+    valeur:o.value,
+    /* Une option de <datalist> n'a pas de texte : c'est sa valeur qu'on lit. */
+    texte:(o.textContent||'').trim()||o.value,
+    jeton:o.dataset.ref||'',
+    hex:o.dataset.hex||'',
+    groupe,
+  };
+}
+
+function menuPoser(hote){
+  if(menus.has(hote))return menus.get(hote);
+  const libre=hote.tagName!=='SELECT';
+  const peau=document.createElement('div');
+  peau.className='menu';
+  hote.replaceWith(peau);
+  peau.append(hote);
+
+  let declencheur;
+  if(libre){
+    /* Le champ de saisie EST le déclencheur : cliquer ouvre, taper filtre. */
+    declencheur=hote;
+    peau.append(menuChevron());
+  }else{
+    declencheur=document.createElement('div');
+    declencheur.className='menu-declencheur';
+    declencheur.setAttribute('role','combobox');
+    declencheur.setAttribute('tabindex','0');
+    declencheur.setAttribute('aria-haspopup','listbox');
+    declencheur.setAttribute('aria-expanded','false');
+    /* Le <label for="…"> du formulaire vise le <select> caché : on renvoie le
+       nom accessible sur lui pour que le déclencheur s'annonce quand même. */
+    const etiquette=document.querySelector(`label[for="${hote.id}"]`);
+    if(etiquette)declencheur.setAttribute('aria-label',etiquette.textContent.trim());
+    peau.append(declencheur);
+    hote.setAttribute('tabindex','-1');
+    hote.setAttribute('aria-hidden','true');
+  }
+
+  const panneau=document.createElement('div');
+  panneau.className='menu-panneau';
+  const tete=document.createElement('div');
+  tete.className='menu-tete';
+  const filtre=document.createElement('input');
+  filtre.type='text';filtre.autocomplete='off';filtre.spellcheck=false;
+  filtre.className='menu-filtre';
+  filtre.placeholder=hote.dataset.menuFiltre||'Filtrer…';
+  filtre.setAttribute('aria-label','Filtrer la liste');
+  const compte=document.createElement('span');
+  compte.className='menu-compte';
+  tete.append(filtre,compte);
+  const liste=document.createElement('ul');
+  liste.className='menu-liste';
+  liste.setAttribute('role','listbox');
+  liste.id=`${hote.id||'menu'+(++menuRang)}__liste`;
+  declencheur.setAttribute('aria-controls',liste.id);
+  panneau.append(tete,liste);
+  peau.append(panneau);
+
+  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,vus:[],vise:-1,ouvert:false};
+  menus.set(hote,etat);
+
+  declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
+  declencheur.addEventListener('keydown',ev=>menuTouche(etat,ev));
+  if(libre){
+    hote.addEventListener('input',()=>{etat.vise=0;if(etat.ouvert)menuPeindre(etat);menuPeindreChamp(etat)});
+  }else{
+    filtre.addEventListener('input',()=>{etat.vise=0;menuPeindre(etat)});
+    filtre.addEventListener('keydown',ev=>menuTouche(etat,ev));
+  }
+  liste.addEventListener('click',ev=>{
+    const li=ev.target.closest('[data-valeur]');
+    if(li)menuChoisir(etat,li.dataset.valeur);
+  });
+  /* Le survol déplace le curseur du clavier : sinon la souris éclaire une ligne
+     et Entrée en valide une autre. */
+  liste.addEventListener('mousemove',ev=>{
+    const li=ev.target.closest('.menu-option');
+    if(!li)return;
+    const i=Number(li.dataset.rang);
+    if(i!==etat.vise){etat.vise=i;menuPeindreVise(etat,false)}
+  });
+  menuPeindreChamp(etat);
+  return etat;
+}
+
+/* Ce que le champ montre quand le menu est fermé. */
+function menuPeindreChamp(etat){
+  const {hote,libre,declencheur,peau}=etat;
+  if(libre){
+    /* Une pastille à gauche du champ : « Wet Sand » ne dit rien sans la teinte.
+       Elle ne s'allume que sur une correspondance exacte — pas de pastille =
+       coloris hors catalogue, ce qui est une information. */
+    const cle=menuNorm(hote.value).trim();
+    const trouve=cle?menuOptions(hote).find(o=>menuNorm(o.texte).trim()===cle):null;
+    let pastille=peau.querySelector(':scope > .menu-pastille');
+    if(trouve&&trouve.hex){
+      if(!pastille){pastille=document.createElement('span');pastille.className='menu-pastille';
+        pastille.setAttribute('aria-hidden','true');peau.append(pastille)}
+      pastille.style.background=trouve.hex;
+      peau.classList.add('a-pastille');
+    }else{
+      if(pastille)pastille.remove();
+      peau.classList.remove('a-pastille');
+    }
+    return;
+  }
+  const choisie=menuOptions(hote).find(o=>o.valeur===hote.value);
+  declencheur.replaceChildren();
+  if(choisie&&choisie.jeton){
+    const j=document.createElement('span');j.className='menu-jeton';j.textContent=choisie.jeton;
+    declencheur.append(j);
+  }
+  if(choisie&&choisie.hex){
+    const p=document.createElement('span');p.className='menu-pastille';p.style.background=choisie.hex;
+    declencheur.append(p);
+  }
+  const t=document.createElement('span');
+  t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
+  t.textContent=choisie?choisie.texte:'Choisir…';
+  declencheur.append(t,menuChevron());
+  /* Le texte est coupé à l'ellipse dans un champ étroit : l'infobulle rend la
+     ligne entière sans avoir à rouvrir la liste. */
+  declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';
+}
+
+function menuFiltrees(etat){
+  const toutes=menuOptions(etat.hote);
+  const brut=etat.libre?etat.hote.value:etat.filtre.value;
+  const q=menuNorm(brut).trim();
+  if(!q)return toutes;
+  const mots=q.split(/\s+/);
+  return toutes.filter(o=>{
+    const foin=menuNorm(`${o.jeton} ${o.texte} ${o.groupe}`);
+    return mots.every(m=>foin.includes(m));
+  });
+}
+
+function menuPeindre(etat){
+  const vus=menuFiltrees(etat);
+  etat.vus=vus;
+  etat.vise=Math.min(Math.max(etat.vise,0),vus.length-1);
+
+  const toutes=menuOptions(etat.hote).length;
+  /* Sous le seuil, un champ de filtre et un compteur sont du bruit : deux
+     valeurs se lisent d'un coup d'œil. Un menu libre se filtre en tapant. */
+  const filtrable=!etat.libre&&toutes>MENU_SEUIL_FILTRE;
+  etat.tete.style.display=filtrable?'':'none';
+  if(filtrable)etat.compte.textContent=vus.length===toutes?`${toutes} choix`:`${vus.length} / ${toutes}`;
+
+  const noeuds=[];
+  if(!vus.length){
+    const rien=document.createElement('li');
+    rien.className='menu-rien';rien.setAttribute('role','presentation');
+    rien.textContent=etat.libre?'Aucun choix ne correspond — la saisie reste libre.':'Aucun choix ne correspond.';
+    noeuds.push(rien);
+  }
+  let groupe=null;
+  vus.forEach((o,i)=>{
+    if(o.groupe&&o.groupe!==groupe){
+      groupe=o.groupe;
+      const tete=document.createElement('li');
+      tete.className='menu-groupe';tete.setAttribute('role','presentation');tete.textContent=o.groupe;
+      noeuds.push(tete);
+    }
+    const li=document.createElement('li');
+    li.className='menu-option'+(i===etat.vise?' est-vise':'');
+    li.id=`${etat.liste.id}-opt-${i}`;
+    li.dataset.rang=i;
+    li.dataset.valeur=o.valeur;
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected',String(o.valeur===etat.hote.value));
+    if(o.jeton){const j=document.createElement('span');j.className='menu-jeton';j.textContent=o.jeton;li.append(j)}
+    if(o.hex){const p=document.createElement('span');p.className='menu-pastille';p.style.background=o.hex;li.append(p)}
+    const t=document.createElement('span');t.className='menu-option-texte';t.textContent=o.texte;li.append(t);
+    noeuds.push(li);
+  });
+  etat.liste.replaceChildren(...noeuds);
+  menuPeindreVise(etat,true);
+}
+
+function menuPeindreVise(etat,deroule){
+  etat.liste.querySelectorAll('.est-vise').forEach(li=>li.classList.remove('est-vise'));
+  const actif=etat.liste.querySelector(`[data-rang="${etat.vise}"]`);
+  const champ=etat.libre?etat.hote:etat.filtre;
+  if(!actif){champ.removeAttribute('aria-activedescendant');return}
+  actif.classList.add('est-vise');
+  champ.setAttribute('aria-activedescendant',actif.id);
+  if(deroule!==false)actif.scrollIntoView({block:'nearest'});
+}
+
+function menuViser(etat,pas){
+  const n=etat.vus.length;
+  if(!n)return;
+  etat.vise=(etat.vise+pas+n)%n;
+  menuPeindreVise(etat,true);
+}
+
+function menuTouche(etat,ev){
+  if(!etat.ouvert&&(ev.key==='ArrowDown'||ev.key==='Enter'||ev.key===' ')){
+    ev.preventDefault();menuOuvrir(etat);return;
+  }
+  if(ev.key==='ArrowDown'){ev.preventDefault();menuViser(etat,1)}
+  else if(ev.key==='ArrowUp'){ev.preventDefault();menuViser(etat,-1)}
+  else if(ev.key==='Home'){ev.preventDefault();etat.vise=0;menuPeindreVise(etat,true)}
+  else if(ev.key==='End'){ev.preventDefault();etat.vise=etat.vus.length-1;menuPeindreVise(etat,true)}
+  else if(ev.key==='Enter'){
+    const o=etat.vus[etat.vise];
+    /* Menu libre sans ligne visée : Entrée garde ce qui est tapé. */
+    if(o){ev.preventDefault();menuChoisir(etat,o.valeur)}
+    else if(etat.libre)menuFermer(etat,false);
+  }
+  else if(ev.key==='Escape'){ev.preventDefault();menuFermer(etat,true)}
+  else if(ev.key==='Tab')menuFermer(etat,false);
+}
+
+function menuOuvrir(etat){
+  if(etat.ouvert)return;
+  const options=menuOptions(etat.hote);
+  if(!options.length)return;          /* catalogue pas encore chargé */
+  menus.forEach(a=>{if(a!==etat)menuFermer(a,false)});   /* un seul à la fois */
+  etat.ouvert=true;
+  etat.peau.classList.add('est-ouvert');
+  etat.declencheur.setAttribute('aria-expanded','true');
+  if(!etat.libre)etat.filtre.value='';
+  /* On ouvre sur le choix en cours, pas en tête de liste. */
+  etat.vise=Math.max(0,options.findIndex(o=>o.valeur===etat.hote.value));
+  menuPeindre(etat);
+  if(!etat.libre&&etat.tete.style.display!=='none')etat.filtre.focus();
+}
+
+function menuFermer(etat,rendreFocus){
+  if(!etat.ouvert)return;
+  etat.ouvert=false;
+  etat.peau.classList.remove('est-ouvert');
+  etat.declencheur.setAttribute('aria-expanded','false');
+  if(rendreFocus)etat.declencheur.focus();
+}
+
+function menuChoisir(etat,valeur){
+  etat.hote.value=valeur;
+  menuPeindreChamp(etat);
+  menuFermer(etat,true);
+  /* Le rouge d'un champ manquant s'efface sur `change` — le <select> visible le
+     déclenchait tout seul, ici c'est à nous de le dire. Et c'est ce même
+     évènement qui porte les `onchange="…"` du formulaire. */
+  menuEffacerRouge(etat);
+  etat.hote.dispatchEvent(new Event('change',{bubbles:true}));
+  if(etat.libre)etat.hote.dispatchEvent(new Event('input',{bubbles:true}));
+}
+
+function menuEffacerRouge(etat){
+  const cible=etat.peau.classList.contains('invalid')?etat.peau:etat.hote;
+  cible.classList.remove('invalid');
+  const suivant=etat.peau.nextElementSibling;
+  if(suivant&&suivant.classList.contains('error'))suivant.remove();
+}
+
+/* Un clic hors du panneau referme. `pointerdown` et non `click` : le panneau
+   doit partir AVANT que le clic n'atteigne ce qu'il visait derrière. */
+document.addEventListener('pointerdown',ev=>{
+  menus.forEach(etat=>{if(etat.ouvert&&!etat.peau.contains(ev.target))menuFermer(etat,false)});
+});
+
+/* Tous les menus de la page d'un coup — y compris ceux des étapes suivantes,
+   qui existent déjà dans le HTML même s'ils ne sont pas encore à l'écran. */
+  window.menusPoserTous = function menusPoserTous(){
+  document.querySelectorAll('select:not([data-menu-non]),input[list]').forEach(el=>{
+    if(!el.closest('.menu'))menuPoser(el);
+  });
+}
+
+/* Le formulaire réécrit des options en cours de route (catalogue textile,
+   coloris d'une référence, genres d'une famille…) et pose des `.value` par
+   programme — une écriture directe ne déclenche AUCUN évènement. Le champ
+   fermé doit donc être repeint à la main. */
+  window.menuRafraichir = function menuRafraichir(hote){
+  const etat=menus.get(hote);
+  if(!etat)return;
+  menuPeindreChamp(etat);
+  if(etat.ouvert)menuPeindre(etat);
+}
+  window.menusRafraichirTous = function menusRafraichirTous(){menus.forEach(etat=>menuRafraichir(etat.hote))};
+
   // regreffent leurs propres boutons toutes les 400 ms).
-  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); });
+  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); window.menusPoserTous(); });
   // `attributeFilter` : le guet ne réagit qu'à la classe — c'est elle (`hidden`)
   // qui démasque l'écran de fin. Sans le filtre, CHAQUE changement d'attribut
   // du document (les minuteurs des écrans en produisent plusieurs par seconde)
@@ -1080,9 +1504,11 @@
   veilleur.observe(document.body, {
     subtree: true, childList: true, attributes: true, attributeFilter: ['class'],
   });
-  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); }, VEILLE_MS);
+  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); window.menusPoserTous(); }, VEILLE_MS);
   guetterEcranFinal();
   grefferLesIndicatifs();
+  poserStyleMenu();
+  window.menusPoserTous();
   rebrancherBoutonBrouillon();
   montrerBrouillonsOublies();
 
