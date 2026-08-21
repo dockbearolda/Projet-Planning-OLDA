@@ -225,8 +225,14 @@ assert.ok(/'\/manrope-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RAC
 // panneau, hors de la liste : ni emportée par un filtre, ni repoussée par le
 // défilement.
 
-assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(PONT),
+assert.ok(/if\(avecManuel\)panneau\.append\(\.\.\.\(libre\?\[mention\]:\[manuel,saisie\]\)\);\s*panneau\.append\(tete,liste\)/.test(PONT),
   'la ligne d’ajout manuel est posée AVANT le filtre et la liste — tout en haut du panneau');
+// UN CHAMP LIBRE S'ÉCRIT DÉJÀ : un gros bouton « Saisir autre chose » y est du
+// bruit, il ne lui manque que de le DIRE. Une mention, pas une commande.
+assert.ok(/mention\.className='menu-mention';\s*mention\.textContent='Écris directement dans le champ/.test(PONT),
+  'un champ libre porte une mention discrète, pas un bouton');
+assert.ok(/\.menu-mention\{[^}]*font-size:12px;color:#767d85\}/.test(PONT),
+  'la mention se lit sans se faire remarquer — ni bouton, ni ligne de choix');
 assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.menu\.est-saisie \.menu-liste\{display:none\}/.test(PONT),
   'pendant la saisie libre la liste s’efface : une seule façon de répondre à la fois');
 

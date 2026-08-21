@@ -1156,6 +1156,8 @@
   border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:14px;font-weight:800;
   color:#111827;text-align:left;cursor:pointer}
 .menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;outline:none}
+.menu-mention{margin:0;padding:9px 12px;border-bottom:1px solid #eceff2;background:#fafbfc;
+  font-size:12px;color:#767d85}
 .menu-plus{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;
   background:#111827;color:#fff;font-size:15px;font-weight:800;line-height:1}
 .menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid #eceff2;background:#fafbfc}
@@ -1338,7 +1340,14 @@ function menuPoser(hote){
   valider.type='button';valider.textContent='Valider';
   saisie.append(champLibre,valider);
 
-  if(avecManuel)panneau.append(manuel,saisie);
+  /* Dans un champ LIBRE, la grosse ligne d'ajout est du bruit : on peut déjà
+     écrire dans le champ. Il ne manque que de le dire — une mention discrète,
+     en tête du panneau, qui ne se clique pas et ne prend pas la place d'un
+     choix. */
+  const mention=document.createElement('p');
+  mention.className='menu-mention';
+  mention.textContent='Écris directement dans le champ pour autre chose.';
+  if(avecManuel)panneau.append(...(libre?[mention]:[manuel,saisie]));
   panneau.append(tete,liste);
   peau.append(panneau);
 
@@ -1512,15 +1521,15 @@ function menuTouche(etat,ev){
   else if(ev.key==='Tab')menuFermer(etat,false);
 }
 
-/* Un seul geste pour la vendeuse, trois chemins derrière :
+/* Un seul geste pour la vendeuse, deux chemins derrière :
    - la liste a déjà son entrée libre gérée par le formulaire → on l'y renvoie ;
-   - le champ est libre (les coloris) → on lui rend simplement la main ;
    - sinon ce qui est tapé devient une vraie option de la liste, et le
-     formulaire n'a rien de spécial à savoir : il lit toujours `.value`. */
+     formulaire n'a rien de spécial à savoir : il lit toujours `.value`.
+   Un champ LIBRE, lui, n'a pas de bouton du tout : il s'écrit déjà, une
+   mention discrète le dit et c'est tout. */
 function menuManuelOuvrir(etat){
   const renvoi=menuRenvoiManuel(etat.hote);
   if(renvoi!==undefined){menuChoisir(etat,renvoi);return}
-  if(etat.libre){menuFermer(etat,false);etat.hote.focus();etat.hote.select();return}
   etat.peau.classList.add('est-saisie');
   etat.champLibre.value='';
   etat.champLibre.focus();
