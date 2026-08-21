@@ -1104,14 +1104,16 @@
    « !important » à contrecœur : les deux écrans imposent déjà
    « input,select,textarea{padding:13px 14px!important} », et sans ça le texte
    saisi passe SOUS le chevron et sous la pastille. */
-.menu>input{padding-right:38px!important}
+.menu>input{padding-right:40px!important}
 .menu>.menu-pastille{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;pointer-events:none}
 .menu.a-pastille>input{padding-left:42px!important}
-.menu-chevron{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:13px;height:13px;
-  color:#767d85;pointer-events:none;transition:transform .14s ease}
-.menu-declencheur .menu-chevron{position:static;transform:none;flex:none}
-.menu.est-ouvert .menu-chevron{transform:translateY(-50%) rotate(180deg)}
-.menu.est-ouvert .menu-declencheur .menu-chevron{transform:rotate(180deg)}
+/* Un doigt ne se retourne pas quand la liste s'ouvre — à l'envers il ne veut
+   plus rien dire. C'est sa COULEUR qui répond : gris au repos, encre dès que
+   le champ est survolé ou ouvert. */
+.menu-doigt{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:17px;height:17px;
+  color:#8b9199;pointer-events:none;transition:color .14s ease}
+.menu-declencheur .menu-doigt{position:static;transform:none;flex:none}
+.menu:hover .menu-doigt,.menu.est-ouvert .menu-doigt{color:#111827}
 /* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
 .menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
   font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
@@ -1170,7 +1172,7 @@
 .menu.est-saisie .menu-manuel,.menu.est-saisie .menu-tete,.menu.est-saisie .menu-liste{display:none}
 /* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
 .menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
-@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-chevron,.menu-declencheur{transition:none}}
+@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-doigt,.menu-declencheur{transition:none}}
 `;
 
   function poserStyleMenu() {
@@ -1215,16 +1217,27 @@ function menuRenvoiManuel(hote){
 
 function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
 
-function menuChevron(){
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('class','menu-chevron');
-  svg.setAttribute('viewBox','0 0 12 12');
+/* UN DOIGT, PAS UN CHEVRON. Le chevron dit « il y a autre chose en dessous » ;
+   au comptoir la question n'est pas là, c'est « est-ce que ça se clique ? ».
+   Le doigt le dit sans un mot, et le dit pareil sur les vingt-cinq champs. */
+function menuDoigt(){
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('class','menu-doigt');
+  svg.setAttribute('viewBox','0 0 24 24');
   svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
-  svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');
+  svg.setAttribute('stroke-width','1.7');svg.setAttribute('stroke-linecap','round');
   svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');
-  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-  p.setAttribute('d','m2.5 4.5 3.5 3.5 3.5-3.5');
-  svg.append(p);return svg;
+  for(const d of [
+    'M9.2 11.4V5.4a1.7 1.7 0 0 1 3.4 0v5.3',
+    'M12.6 10.7V9.3a1.6 1.6 0 0 1 3.2 0v1.4',
+    'M15.8 10.9v-.8a1.6 1.6 0 0 1 3.2 0v4.6a5.6 5.6 0 0 1-5.6 5.6h-1.5a5.5 5.5 0 0 1-4.2-1.9l-2.9-3.4a1.7 1.7 0 0 1 2.5-2.3l1.9 1.9',
+  ]){
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d',d);
+    svg.append(p);
+  }
+  return svg;
 }
 
 /* Les options telles qu'elles existent à l'instant T. On les relit à CHAQUE
@@ -1279,7 +1292,7 @@ function menuPoser(hote){
     }
     hote.setAttribute('autocomplete','off');
     declencheur=hote;
-    peau.append(menuChevron());
+    peau.append(menuDoigt());
   }else{
     declencheur=document.createElement('div');
     declencheur.className='menu-declencheur';
@@ -1419,7 +1432,7 @@ function menuPeindreChamp(etat){
   const t=document.createElement('span');
   t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
   t.textContent=choisie?choisie.texte:'Choisir…';
-  declencheur.append(t,menuChevron());
+  declencheur.append(t,menuDoigt());
   /* Le texte est coupé à l'ellipse dans un champ étroit : l'infobulle rend la
      ligne entière sans avoir à rouvrir la liste. */
   declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';

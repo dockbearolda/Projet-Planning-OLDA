@@ -294,4 +294,23 @@ assert.ok(/box\.classList\.add\('hidden'\);\s*return;\s*\}\s*box\.classList\.rem
 assert.ok(/Recharge la page\.';\s*\$\('txPreview'\)\.classList\.remove\('hidden'\)/.test(DEVIS),
   'le catalogue qui ne charge pas se dit à l’écran, cadre masqué ou non');
 
+
+// --- 8. UN DOIGT, PAS UN CHEVRON ---------------------------------------------
+//
+// Le chevron répondait à « il y a autre chose en dessous ». Au comptoir la
+// question n'est pas celle-là, c'est « est-ce que ça se clique ? ». Le doigt
+// le dit sans un mot, et le dit pareil sur les vingt-cinq champs.
+assert.ok(!/menu-chevron|menuChevron/.test(PONT),
+  'plus une seule flèche au bout d’un champ qui se déplie');
+assert.ok(/svg\.setAttribute\('class','menu-doigt'\)/.test(PONT),
+  'le composant dessine un doigt');
+assert.ok(/peau\.append\(menuDoigt\(\)\)/.test(PONT) && /declencheur\.append\(t,menuDoigt\(\)\)/.test(PONT),
+  'les deux familles de champ — libre et liste — portent le MÊME repère');
+// Un doigt à l'envers ne veut plus rien dire : c'est la couleur qui répond à
+// l'ouverture, pas une rotation.
+assert.ok(!/\.menu\.est-ouvert[^\n]*rotate\(180deg\)/.test(PONT),
+  'le doigt ne se retourne pas quand la liste s’ouvre');
+assert.ok(/\.menu:hover \.menu-doigt,\.menu\.est-ouvert \.menu-doigt\{color:#111827\}/.test(PONT),
+  'il fonce au survol et à l’ouverture — hover et focus sont les interactions de ce poste');
+
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');

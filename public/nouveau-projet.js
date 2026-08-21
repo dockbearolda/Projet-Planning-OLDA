@@ -100,9 +100,6 @@ function afficher(id) {
     // Chargement à la demande : tant qu'un parcours n'a pas été ouvert, son
     // document n'est même pas téléchargé.
     if (!cadre.hidden && !cadre.src) cadre.src = f.src;
-    const b = ROOT.querySelector(`#np-switch-${f.id}`);
-    b.classList.toggle('is-active', !!flux && f.id === flux.id);
-    b.setAttribute('aria-pressed', String(!!flux && f.id === flux.id));
   }
   // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
   // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
@@ -250,21 +247,9 @@ function construireBarre() {
   retour.append(flecheRetour());
   retour.addEventListener('click', () => afficher(null));
 
-  const bascule = document.createElement('div');
-  bascule.className = 'np-switch';
-  bascule.setAttribute('role', 'group');
-  bascule.setAttribute('aria-label', 'Type de fiche à créer');
-  for (const f of FLUX) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.id = `np-switch-${f.id}`;
-    b.className = 'np-switch-btn';
-    b.textContent = f.label;
-    b.addEventListener('click', () => afficher(f.id));
-    bascule.append(b);
-  }
-
-  barre.append(retour, bascule);
+  /* La bascule « Vente directe / Demande de devis » a été RETIRÉE : on change
+     de parcours par la flèche, qui ramène aux deux tuiles. */
+  barre.append(retour);
   return barre;
 }
 
