@@ -93,7 +93,7 @@ assert.ok(/function editNeed[\s\S]*?scrollIntoView/.test(DEVIS),
 // affiché — l'exigence n'a pas changé, son application couvre un cas de plus.
 assert.ok(/n===2&&!needs\.length\)return fail\(\$\('besoinAutreForm'\)\.classList\.contains\('hidden'\)\?'txRef':'catProduit'/.test(DEVIS),
   'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié ou masqué');
-assert.ok(/if\(editingNeed<0\)\$\('needFormTitle'\)\.textContent/.test(DEVIS),
+assert.ok(/if\(editingNeed<0\)poserTitreForm\('needFormTitle'/.test(DEVIS),
   'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 
 // Le doigt : ces trois-là se prennent debout, au comptoir.

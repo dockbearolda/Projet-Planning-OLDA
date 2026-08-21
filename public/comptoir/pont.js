@@ -774,6 +774,9 @@
     const select = document.createElement('select');
     select.className = 'olda-tel__pays';
     select.setAttribute('aria-label', 'Indicatif du pays');
+    // Un indicatif est un CODE : « 590 » ou rien. Une valeur libre y ferait un
+    // numéro injoignable, et le doublon client ne se verrait plus.
+    select.setAttribute('data-menu-manuel-non', '');
     for (const p of PAYS_TEL) {
       const o = document.createElement('option');
       o.value = p.code;
@@ -1144,6 +1147,25 @@
 .menu-option[aria-selected="true"]{border-left-color:#111827;background:#f5f6f8}
 .menu-option[aria-selected="true"] .menu-option-texte{color:#111827;font-weight:700}
 .menu-rien{padding:22px 14px;text-align:center;color:#767d85;font-size:14px}
+/* L'AJOUT MANUEL — la même ligne, au même endroit, dans TOUS les menus.
+   Avant, trois listes portaient leur propre « produit libre » noyé au milieu
+   du catalogue, les autres n'en avaient aucun : on ne savait jamais où
+   chercher. Elle est épinglée AU-DESSUS du filtre, hors de la liste, donc ni
+   emportée par une recherche ni repoussée par le défilement. */
+.menu-manuel{display:flex;align-items:center;gap:10px;width:100%;padding:12px;border:0;
+  border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:14px;font-weight:800;
+  color:#111827;text-align:left;cursor:pointer}
+.menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;outline:none}
+.menu-plus{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;
+  background:#111827;color:#fff;font-size:15px;font-weight:800;line-height:1}
+.menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid #eceff2;background:#fafbfc}
+.menu-saisie input{flex:1 1 auto;min-width:0;font-size:15px;padding:9px 11px}
+.menu-saisie button{flex:none;border:0;border-radius:9px;padding:9px 14px;background:#111827;
+  color:#fff;font:inherit;font-weight:800;cursor:pointer}
+/* Pendant la saisie libre, la liste s'efface : deux façons de répondre à la
+   même question en même temps, c'est une hésitation de plus au comptoir. */
+.menu.est-saisie .menu-saisie{display:flex}
+.menu.est-saisie .menu-manuel,.menu.est-saisie .menu-tete,.menu.est-saisie .menu-liste{display:none}
 /* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
 .menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
 @media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-chevron,.menu-declencheur{transition:none}}
@@ -1176,6 +1198,18 @@
   const MENU_SEUIL_FILTRE = 8;   /* en dessous, un champ de filtre est du bruit */
   const menus = new Map();       /* hôte → état, pour retrouver un menu déjà posé */
   let menuRang = 0;              /* de quoi nommer la liste d'un hôte sans id */
+
+/* Cinq listes portaient DÉJÀ leur propre entrée libre, sous trois valeurs
+   conventionnelles différentes. On les reconnaît au lieu de les étiqueter une
+   à une : une liste qui en gagne une demain est prise en charge sans rien
+   changer ici. `data-menu-manuel` reste le moyen de le dire à la main. */
+const MENU_VALEURS_LIBRES=['__new__','__manuel','__CUSTOM__'];
+function menuRenvoiManuel(hote){
+  if(hote.dataset.menuManuel!==undefined)return hote.dataset.menuManuel;
+  if(hote.tagName!=='SELECT')return undefined;
+  const o=[...hote.options].find(o=>MENU_VALEURS_LIBRES.includes(o.value));
+  return o?o.value:undefined;
+}
 
 function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
 
@@ -1277,10 +1311,39 @@ function menuPoser(hote){
   liste.setAttribute('role','listbox');
   liste.id=`${hote.id||'menu'+(++menuRang)}__liste`;
   declencheur.setAttribute('aria-controls',liste.id);
+  /* Une liste dont la valeur est un CODE — un coefficient, un délai en jours,
+     une heure, une clé de barème — porte `data-menu-manuel-non` : `DB.times[x]`
+     rend `{}` pour une valeur inconnue, le prix tomberait à zéro SANS erreur.
+     Une liste qui a déjà son entrée libre gérée par le formulaire porte
+     `data-menu-manuel="<valeur de cette option>"` : la ligne l'y renvoie au
+     lieu d'en inventer une deuxième. */
+  const avecManuel=!hote.hasAttribute('data-menu-manuel-non');
+  const manuel=document.createElement('button');
+  manuel.type='button';
+  manuel.className='menu-manuel';
+  const plus=document.createElement('span');
+  plus.className='menu-plus';plus.setAttribute('aria-hidden','true');plus.textContent='+';
+  const motManuel=hote.dataset.menuManuelTexte||'Saisir autre chose…';
+  const mot=document.createElement('span');
+  mot.textContent=motManuel;
+  manuel.append(plus,mot);
+
+  const saisie=document.createElement('div');
+  saisie.className='menu-saisie';
+  const champLibre=document.createElement('input');
+  champLibre.type='text';champLibre.autocomplete='off';
+  champLibre.placeholder='Ce qui n’est pas dans la liste…';
+  champLibre.setAttribute('aria-label',motManuel);
+  const valider=document.createElement('button');
+  valider.type='button';valider.textContent='Valider';
+  saisie.append(champLibre,valider);
+
+  if(avecManuel)panneau.append(manuel,saisie);
   panneau.append(tete,liste);
   peau.append(panneau);
 
-  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,vus:[],vise:-1,ouvert:false,filtrer:false};
+  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,
+    avecManuel,manuel,saisie,champLibre,vus:[],vise:-1,ouvert:false,filtrer:false};
   menus.set(hote,etat);
 
   declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
@@ -1294,6 +1357,12 @@ function menuPoser(hote){
   liste.addEventListener('click',ev=>{
     const li=ev.target.closest('[data-valeur]');
     if(li)menuChoisir(etat,li.dataset.valeur);
+  });
+  manuel.addEventListener('click',()=>menuManuelOuvrir(etat));
+  valider.addEventListener('click',()=>menuManuelValider(etat));
+  champLibre.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();menuManuelValider(etat)}
+    else if(ev.key==='Escape'){ev.preventDefault();menuManuelFermer(etat)}
   });
   /* Le survol déplace le curseur du clavier : sinon la souris éclaire une ligne
      et Entrée en valide une autre. */
@@ -1348,7 +1417,10 @@ function menuPeindreChamp(etat){
 }
 
 function menuFiltrees(etat){
-  const toutes=menuOptions(etat.hote);
+  /* L'option vers laquelle la ligne du haut renvoie ne se montre pas DEUX
+     fois : elle est déjà là, épinglée, en tête du panneau. */
+  const renvoi=menuRenvoiManuel(etat.hote);
+  const toutes=menuOptions(etat.hote).filter(o=>renvoi===undefined||o.valeur!==renvoi);
   /* Un champ libre ne filtre QU'À PARTIR de la première frappe : à l'ouverture
      il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
      valeur-là — cliquer doit montrer toute la liste. */
@@ -1440,6 +1512,38 @@ function menuTouche(etat,ev){
   else if(ev.key==='Tab')menuFermer(etat,false);
 }
 
+/* Un seul geste pour la vendeuse, trois chemins derrière :
+   - la liste a déjà son entrée libre gérée par le formulaire → on l'y renvoie ;
+   - le champ est libre (les coloris) → on lui rend simplement la main ;
+   - sinon ce qui est tapé devient une vraie option de la liste, et le
+     formulaire n'a rien de spécial à savoir : il lit toujours `.value`. */
+function menuManuelOuvrir(etat){
+  const renvoi=menuRenvoiManuel(etat.hote);
+  if(renvoi!==undefined){menuChoisir(etat,renvoi);return}
+  if(etat.libre){menuFermer(etat,false);etat.hote.focus();etat.hote.select();return}
+  etat.peau.classList.add('est-saisie');
+  etat.champLibre.value='';
+  etat.champLibre.focus();
+  menuPlacer(etat);
+}
+function menuManuelFermer(etat){
+  etat.peau.classList.remove('est-saisie');
+}
+function menuManuelValider(etat){
+  const texte=etat.champLibre.value.trim();
+  if(!texte){etat.champLibre.focus();return}
+  const hote=etat.hote;
+  /* Une deuxième saisie identique réutilise son option au lieu d'en empiler
+     une : la liste se remplirait de doublons au fil de la journée. */
+  if(![...hote.options].some(o=>o.value===texte)){
+    const opt=new Option(texte,texte);
+    opt.dataset.manuel='1';
+    hote.add(opt,hote.options[0]&&!hote.options[0].value?1:0);
+  }
+  menuManuelFermer(etat);
+  menuChoisir(etat,texte);
+}
+
 function menuOuvrir(etat){
   if(etat.ouvert)return;
   const options=menuOptions(etat.hote);
@@ -1447,6 +1551,7 @@ function menuOuvrir(etat){
   menus.forEach(a=>{if(a!==etat)menuFermer(a,false)});   /* un seul à la fois */
   etat.ouvert=true;
   etat.filtrer=false;   /* on ouvre sur la liste ENTIÈRE */
+  etat.peau.classList.remove('est-saisie');   /* jamais rouvert en cours de frappe */
   etat.peau.classList.add('est-ouvert');
   etat.declencheur.setAttribute('aria-expanded','true');
   if(!etat.libre)etat.filtre.value='';
@@ -1473,6 +1578,7 @@ function menuFermer(etat,rendreFocus){
   if(!etat.ouvert)return;
   etat.ouvert=false;
   etat.peau.classList.remove('est-ouvert');
+  etat.peau.classList.remove('est-saisie');
   etat.declencheur.setAttribute('aria-expanded','false');
   if(rendreFocus)etat.declencheur.focus();
 }

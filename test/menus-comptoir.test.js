@@ -105,7 +105,7 @@ assert.ok(/\[\$\('txRef'\),\$\('txPrintType'\),\$\('txMarkColor'\)\]\.forEach\(m
 
 // Les options sont relues À CHAQUE ouverture : le formulaire les réécrit en
 // cours de route (coloris d'une référence, genres d'une famille).
-assert.ok(/function menuFiltrees\(etat\)\{\s*const toutes=menuOptions\(etat\.hote\)/.test(PONT),
+assert.ok(/function menuFiltrees\(etat\)\{[\s\S]{0,260}?const toutes=menuOptions\(etat\.hote\)/.test(PONT),
   'la liste se construit sur les options du moment, jamais sur une copie figée');
 
 // --- 4. Les sorties ----------------------------------------------------------
@@ -214,5 +214,78 @@ assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-latin-variable.woff2')
 assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-LICENCE.txt')), 'la licence de la police voyage avec elle');
 assert.ok(/'\/manrope-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
   'la police est dans la coquille : hors ligne, le poste garde sa tête');
+
+
+// --- 5. L'AJOUT MANUEL, À LA MÊME PLACE PARTOUT ------------------------------
+//
+// Cinq listes portaient leur propre entrée libre — sous trois valeurs
+// différentes (« + Saisie manuelle », « ➕ Nouvelle référence », « + Créer un
+// nouveau »), noyée au milieu du catalogue — et les vingt autres n'en avaient
+// aucune. La ligne vit maintenant DANS le composant, épinglée en tête du
+// panneau, hors de la liste : ni emportée par un filtre, ni repoussée par le
+// défilement.
+
+assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(PONT),
+  'la ligne d’ajout manuel est posée AVANT le filtre et la liste — tout en haut du panneau');
+assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.menu\.est-saisie \.menu-liste\{display:none\}/.test(PONT),
+  'pendant la saisie libre la liste s’efface : une seule façon de répondre à la fois');
+
+// L'option libre déjà gérée par le formulaire n'apparaît pas DEUX fois : la
+// ligne du haut y renvoie, et la liste ne la montre plus.
+assert.ok(/const MENU_VALEURS_LIBRES=\['__new__','__manuel','__CUSTOM__'\]/.test(PONT),
+  'les trois valeurs conventionnelles d’entrée libre sont reconnues d’office');
+assert.ok(/const renvoi=menuRenvoiManuel\(etat\.hote\);\s*const toutes=menuOptions\(etat\.hote\)\.filter\(o=>renvoi===undefined\|\|o\.valeur!==renvoi\)/.test(PONT),
+  'l’option vers laquelle la ligne renvoie sort de la liste — sinon elle y est deux fois');
+
+// UNE VALEUR LIBRE NE DOIT JAMAIS DEVENIR UNE CLÉ DE BARÈME. `DB.times[x]` et
+// `DB.printTypes[x]` rendent `{}` pour une valeur inconnue : le marquage
+// tomberait à 0 € SANS erreur, et le devis partirait sous-facturé.
+['txTgca', 'txTransport', 'txGenre', 'txPrintType', 'desiredDelay', 'desiredTime', 'controlStatus']
+  .forEach(id => {
+    assert.ok(new RegExp(`<select id="${id}" data-menu-manuel-non`).test(DEVIS),
+      `${id} porte un CODE, pas un libellé : pas d’ajout manuel`);
+  });
+assert.ok(/<select id="deliveryTime" data-menu-manuel-non/.test(VENTE),
+  'une heure de retrait ne se saisit pas librement');
+assert.ok(/select\.setAttribute\('data-menu-manuel-non', ''\)/.test(PONT),
+  'l’indicatif du pays non plus : « 590 » ou rien');
+
+// Ce qui est tapé devient une option RÉELLE de la liste — le formulaire lit
+// toujours `.value`, il n'a rien de spécial à savoir. Et une deuxième saisie
+// identique réutilise la même option, sinon la liste se remplit de doublons
+// au fil de la journée.
+assert.ok(/if\(!\[\.\.\.hote\.options\]\.some\(o=>o\.value===texte\)\)\{/.test(PONT),
+  'une valeur déjà saisie ne crée pas une deuxième option');
+assert.ok(/menuManuelFermer\(etat\);\s*menuChoisir\(etat,texte\)/.test(PONT),
+  'valider choisit la valeur : `change` part, le rouge s’efface, le formulaire suit');
+
+// Le panneau ne se rouvre jamais en cours de frappe libre, et se referme à plat.
+assert.ok(/etat\.filtrer=false;[^\n]*\n\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(PONT),
+  'ouvrir un menu repart de la liste, jamais du champ libre resté ouvert');
+assert.ok(/etat\.peau\.classList\.remove\('est-ouvert'\);\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(PONT),
+  'fermer un menu referme aussi la saisie libre');
+
+// --- 6. LE NUMÉRO DE LA LIGNE EN COURS ---------------------------------------
+//
+// Six branches écrivaient « Article n°X » / « Modifier l'article n°X ». Le
+// texte et l'état passent maintenant par le même endroit, sinon l'un des deux
+// finit par être oublié dans une des six.
+assert.ok(/function poserTitreForm\(id,texte,enEdition\)\{[\s\S]*?classList\.toggle\('is-edit',!!enEdition\)/.test(DEVIS),
+  'le texte de la bulle et sa couleur se posent ensemble');
+assert.ok(!/\$\('(tx|need)FormTitle'\)\.textContent=/.test(DEVIS),
+  'plus aucune branche n’écrit le titre en direct — elles passeraient à côté de l’état');
+assert.ok(/<h3 class="form-num" id="txFormTitle">/.test(DEVIS) && /<h3 class="form-num" id="needFormTitle">/.test(DEVIS),
+  'les deux formulaires portent la même bulle');
+assert.ok(/\.form-num\.is-edit\{background:var\(--orange\)\}/.test(DEVIS),
+  'la couleur dit l’état : sombre on ajoute, orange on reprend une ligne déjà posée');
+
+// --- 7. LE CADRE DE CHIFFRAGE NE RESTE PAS VIDE ------------------------------
+assert.ok(/<div class="tx-preview hidden" id="txPreview"><\/div>/.test(DEVIS),
+  'le cadre part masqué : sans prix à montrer il n’a rien à dire');
+assert.ok(/box\.classList\.add\('hidden'\);\s*return;\s*\}\s*box\.classList\.remove\('hidden'\)/.test(DEVIS),
+  'il s’efface tant qu’il n’y a pas de prix, et revient dès qu’il y en a un');
+// Un catalogue en échec est une ERREUR, pas une attente : elle doit se voir.
+assert.ok(/Recharge la page\.';\s*\$\('txPreview'\)\.classList\.remove\('hidden'\)/.test(DEVIS),
+  'le catalogue qui ne charge pas se dit à l’écran, cadre masqué ou non');
 
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
