@@ -97,7 +97,7 @@ assert.ok(/if\(editingNeed<0\)poserTitreForm\('needFormTitle'/.test(DEVIS),
   'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 
 // Le doigt : ces trois-là se prennent debout, au comptoir.
-assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button\{min-height:52px\}/.test(DEVIS),
+assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button,\.cat-ligne \.menu-declencheur\{min-height:52px\}/.test(DEVIS),
   'produit, quantité et bouton gardent une cible tactile pleine');
 assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
   'sur un téléphone la ligne se déplie en trois rangées');

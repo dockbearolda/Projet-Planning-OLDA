@@ -1092,9 +1092,30 @@
    couleur qui n'est pas au catalogue). Poste PC : survol, focus, clavier. */
 .menu{position:relative}
 .menu>select,.menu>datalist{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
-.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:8px 12px;
-  border:1px solid #bcc2c8;border-radius:9px;background:#fff;cursor:pointer;text-align:left;
-  font:inherit;font-size:16px;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+/* LE DÉCLENCHEUR EST UN <div> : il ÉCHAPPE au « input,select,textarea{padding:
+   13px 14px!important} » que les deux écrans imposent, et se retrouvait 5 px
+   plus court que l'<input> d'à côté sur la même ligne. Il reprend donc le même
+   rembourrage, la même taille de texte et la même hauteur de ligne — jamais
+   une hauteur en dur : sur un poste où Manrope n'est pas encore arrivée, la
+   ligne de texte rétrécit, et les deux champs doivent rétrécir ENSEMBLE.
+   Hauteur de ligne en RAPPORT et non en « normal » des deux côtés : Chrome ne
+   calcule pas la boîte d'un <input> comme celle d'un <div>, et « normal » les
+   laissait à 22 px contre 20,5. Et comme le déclencheur est une boîte FLEX,
+   sa hauteur vient de ses enfants, pas de sa hauteur de ligne : d'où le
+   min-height calculé — la ligne de texte (1.375em) plus le rembourrage et le
+   trait, exactement la boîte d'un champ voisin, et qui suit la taille du
+   texte si elle change. Le trait, sa couleur et son arrondi viennent
+   de la même règle que les champs voisins — ils étaient plus fins, plus
+   sombres et moins arrondis. */
+.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;
+  min-height:calc(1.375em + 29px);
+  border:1.5px solid #d7dce3;border-radius:10px;background:#fff;cursor:pointer;text-align:left;
+  font:inherit;font-size:16px;line-height:1.375;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+/* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la
+   référence ni la pastille ne doivent la dépasser, sinon le champ regrandit
+   et l'alignement repart. */
+.menu-declencheur .menu-jeton{font-size:12px;line-height:1.35;padding:1px 6px}
+.menu-declencheur .menu-pastille{width:16px;height:16px}
 .menu-declencheur:hover{border-color:#8d959d}
 .menu-declencheur:focus-visible{outline:3px solid rgba(20,46,84,.13);border-color:var(--green)}
 .menu.est-ouvert .menu-declencheur,.menu.est-ouvert>input{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.10)}

@@ -332,4 +332,34 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
 assert.ok(/\.menu-manuel\{[^}]*font-size:13px;font-weight:700;\s*color:#525960/.test(PONT),
   'il se lit sans se mettre devant la liste');
 
+
+// --- 9. DEUX CHAMPS SUR UNE LIGNE ONT LA MÊME BOÎTE --------------------------
+//
+// Le déclencheur d'une liste est un <div> : il ÉCHAPPE au
+// « input,select,textarea{…!important} » que les deux écrans imposent. Il était
+// 5 px plus court que l'<input> d'à côté, avec un trait plus fin (1 px contre
+// 1,5), plus sombre (#bcc2c8 contre #d7dce3) et moins arrondi (9 px contre 10).
+assert.ok(/\.menu-declencheur\{[^}]*padding:13px 14px;\s*min-height:calc\(1\.375em \+ 29px\);/.test(PONT),
+  'le déclencheur reprend le rembourrage des champs, et une hauteur CALCULÉE — jamais en dur');
+assert.ok(/\.menu-declencheur\{[^}]*border:1\.5px solid #d7dce3;border-radius:10px;/.test(PONT),
+  '… le même trait et le même arrondi qu’un champ voisin');
+assert.ok(/\.menu-declencheur\{[^}]*font-size:16px;line-height:1\.375;/.test(PONT),
+  '… et la même hauteur de ligne');
+// EN RAPPORT ET NON EN « normal » : Chrome ne calcule pas la boîte d'un <input>
+// comme celle d'un <div>, « normal » les laissait à 22 px contre 20,5. Un
+// rapport suit la taille du texte et ne dépend pas de la police chargée — sur
+// un poste où Manrope n'est pas encore arrivée, les deux rétrécissent ENSEMBLE.
+[['demande-devis', DEVIS], ['vente-directe', VENTE]].forEach(([nom, src]) => {
+  assert.ok(/input,select,textarea\{border:1\.5px solid #d7dce3!important;padding:13px 14px!important;line-height:1\.375!important\}/.test(src),
+    `${nom} : les champs ont une hauteur de ligne fixée, pas « normal »`);
+  // Un bouton plein et un bouton bordé sur la même rangée : le trait du second
+  // ajoutait 3 px. Le plein porte le même trait, en transparent.
+  assert.ok(/\.primary,\.danger,\.whatsapp\{border:1\.5px solid transparent!important\}/.test(src),
+    `${nom} : bouton plein et bouton bordé ont la même boîte`);
+  // « 💾 Enregistrer » tirait sa hauteur de la police d'émojis : un demi-pixel
+  // de plus que ses voisins.
+  assert.ok(/button\{line-height:1\.375!important\}/.test(src),
+    `${nom} : un émoji dans un libellé ne décide plus de la hauteur du bouton`);
+});
+
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
