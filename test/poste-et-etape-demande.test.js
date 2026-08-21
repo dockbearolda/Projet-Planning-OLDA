@@ -111,7 +111,10 @@ assert.ok(/<select id="source"/.test(step3),
   'le canal d’entrée doit vivre dans l’étape « Construction du projet »');
 assert.strictEqual((DEVIS.match(/<select id="source"/g) || []).length, 1,
   'un seul canal d’entrée dans le document, sinon $(\'source\') désigne le mauvais');
-assert.ok(/if\(!\$\('source'\)\.value\)return fail\('source'/.test(DEVIS),
+// Depuis le 21/08 l'étape ramasse TOUS ses manques avant de rendre la main
+// (les champs virent au rouge ensemble) : le contrôle du canal a changé de
+// forme, pas d'étape.
+assert.ok(/if\(!\$\('source'\)\.value\)m\.push\(\['source'/.test(DEVIS),
   'le canal se contrôle désormais avec le projet');
 assert.ok(!/if\(n===1\)\{/.test(DEVIS),
   'validateStep n’a plus d’étape 1 à valider');

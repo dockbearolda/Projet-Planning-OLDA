@@ -126,6 +126,33 @@ const majFn = new Function('ctx', `with(ctx){${majSrc}
 });
 assert.doesNotThrow(majFn, 'sans support à l’écran, le résumé ne doit pas casser');
 
+// --- Ce qui manque se dit dans le champ, pas dans un panneau ---------------
+// Le panneau « ✓ Toutes les informations obligatoires… / ⚠ À compléter avant
+// de continuer » répétait en vert ce qu'on venait de faire, et surtout il
+// DÉSACTIVAIT le bouton : on ne pouvait donc jamais cliquer pour découvrir
+// quel champ manquait. Le bouton reste actif, et les champs manquants virent
+// au rouge avec leur message dessous.
+
+assert.ok(!/Toutes les informations obligatoires de cette étape/.test(DEVIS),
+  'le panneau vert qui répétait le travail fait a disparu');
+assert.ok(!/liveCheck/.test(DEVIS), 'le panneau par étape ne se construit plus');
+assert.ok(!/btn\.disabled\s*=\s*true/.test(DEVIS),
+  'le bouton « suivant » ne se désactive plus : c’est le clic qui révèle ce qui manque');
+assert.ok(!/button\.blocked\{/.test(DEVIS), 'le style du bouton bloqué part avec lui');
+
+assert.ok(/function failAll\(manques\)/.test(DEVIS),
+  'les manques se marquent TOUS d’un coup, pas un clic par champ');
+assert.strictEqual((DEVIS.match(/return failAll\(m\)/g) || []).length, 3,
+  'les étapes Projet, Contrôle et Tarification marquent chacune tous leurs manques');
+assert.ok(/function marquer\(id,msg,premier\)\{[^}]*classList\.add\('invalid'\)/.test(DEVIS),
+  'un champ qui manque devient rouge');
+assert.ok(/if\(premier\)\{[^}]*scrollIntoView/.test(DEVIS),
+  'seul le premier manque prend le focus et le défilement');
+assert.ok(/if\(premier!==false\)\$\('projectPriorityGroup'\)\.scrollIntoView/.test(DEVIS),
+  'la rangée de priorité ne ramène plus la page à elle quand le focus est ailleurs');
+assert.ok(/\['input','change'\]\.forEach\(ev=>document\.addEventListener/.test(DEVIS),
+  'le rouge s’efface dès que le champ est rempli : le garder ferait douter');
+
 // --- 3. Le catalogue du patron, produit par produit -------------------------
 
 const ATTENDU = {

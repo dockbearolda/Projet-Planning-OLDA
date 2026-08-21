@@ -602,17 +602,54 @@ let currentStep=2,needs=[]  /* le parcours s'ouvre sur les besoins : l'étape 1 
 // `clientDirectory`. Laissé vide plutôt que rempli d'exemples.
 let clients=[];
 function makeRef(){const d=new Date(),yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),key=`olda-devis-v2-${yy}${mm}${dd}`,n=(Number(localStorage.getItem(key))||0)+1;localStorage.setItem(key,n);return`DEV-${yy}.${mm}.${dd}-${String(n).padStart(3,'0')}`}let reference=makeRef();
-function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error').forEach(e=>e.remove())}function fail(id,msg){const el=$(id);el.classList.add('invalid');const d=document.createElement('div');d.className='error';d.textContent=msg;el.insertAdjacentElement('afterend',d);el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();return false}
+function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error').forEach(e=>e.remove())}/* Un champ qui manque devient ROUGE, son message juste dessous. Seul le
+   PREMIER prend le focus et le défilement : on montre où commencer, on ne
+   fait pas sauter la page une fois par champ. */
+/* Le rouge s'efface dès que le champ est rempli : le garder après coup ferait
+   douter quelqu'un qui vient pourtant de le remplir. Un seul écouteur posé sur
+   le document — les champs naissent et meurent au fil des étapes. */
+['input','change'].forEach(ev=>document.addEventListener(ev,e=>{
+  const el=e.target;
+  if(!el||!el.classList||!el.classList.contains('invalid'))return;
+  if(!String(el.value||'').trim())return;
+  el.classList.remove('invalid');
+  const suivant=el.nextElementSibling;
+  if(suivant&&suivant.classList.contains('error'))suivant.remove();
+},true));
+function marquer(id,msg,premier){const el=$(id);if(!el)return false;el.classList.add('invalid');const d=document.createElement('div');d.className='error';d.textContent=msg;el.insertAdjacentElement('afterend',d);if(premier){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus()}return false}
+function fail(id,msg){return marquer(id,msg,true)}
+/* TOUS les manques d'un coup : le panneau qui les listait a disparu, c'est
+   le champ lui-même qui le dit maintenant. Une seule liste à remplir, pas
+   un clic par champ. `__priorite` n'est pas un champ mais une rangée de
+   cartes : elle a son propre marquage. */
+function failAll(manques){manques.forEach((m,k)=>m[0]==='__priorite'?showProjectPriorityError(k===0):marquer(m[0],m[1],k===0));return !manques.length}
 document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
 function showStep(n){currentStep=n;for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
-function validateStep(n){clearErrors();if(n===2&&!needs.length)return fail('catProduit','Ajoute au moins un besoin — choisis un produit et ajoute-le à la demande, ou passe par la saisie manuelle.');if(n===3){if(!$('projectTitle').value.trim())return fail('projectTitle','Renseigne le titre du projet.');if(!$('projectGoal').value)return fail('projectGoal','Choisis l’objectif.');if(!$('source').value)return fail('source','Choisis le canal d’entrée.');if(!$('projectPriority').value){showProjectPriorityError();return false;}if(!$('projectDescription').value.trim())return fail('projectDescription','Décris le projet.')}if(n===4){
-  if(!$('controlStatus').value)return fail('controlStatus','Indique l’état des informations du client.');
-  if($('controlStatus').value==='waiting'){
-    if(!transmissionValue('expectedInformationVia','newExpectedInformationVia'))return fail($('expectedInformationVia').value==='__new__'?'newExpectedInformationVia':'expectedInformationVia','Indique comment le client doit transmettre les informations.');
-    if(!$('expectedInformation').value.trim())return fail('expectedInformation','Indique les informations encore attendues.');
-  }
+function validateStep(n){clearErrors();
+if(n===2&&!needs.length)return fail('catProduit','Ajoute au moins un besoin — choisis un produit et ajoute-le à la demande, ou passe par la saisie manuelle.');
+if(n===3){const m=[];
+  if(!$('projectTitle').value.trim())m.push(['projectTitle','Renseigne le titre du projet.']);
+  if(!$('projectGoal').value)m.push(['projectGoal','Choisis l’objectif.']);
+  if(!$('source').value)m.push(['source','Choisis le canal d’entrée.']);
+  if(!$('projectPriority').value)m.push(['__priorite','']);
+  if(!$('projectDescription').value.trim())m.push(['projectDescription','Décris le projet.']);
+  if(m.length)return failAll(m);
 }
-if(n===5&&!validateStep5ForRecap())return false;if(n===6){const a=needs.find(n=>!n.solution?.trim());if(a)return fail(`solution-${needs.indexOf(a)}`,'Renseigne l’article proposé.');const b=needs.find(n=>!Number.isFinite(n.unitHT));if(b)return fail(`price-${needs.indexOf(b)}`,'Renseigne le prix unitaire HT.');if($('quoteDelay')&&!$('quoteDelay').value.trim())return fail('quoteDelay','Renseigne le délai annoncé.')}return true}
+if(n===4){const m=[];
+  if(!$('controlStatus').value)m.push(['controlStatus','Indique l’état des informations du client.']);
+  if($('controlStatus').value==='waiting'){
+    if(!transmissionValue('expectedInformationVia','newExpectedInformationVia'))m.push([$('expectedInformationVia').value==='__new__'?'newExpectedInformationVia':'expectedInformationVia','Indique comment le client doit transmettre les informations.']);
+    if(!$('expectedInformation').value.trim())m.push(['expectedInformation','Indique les informations encore attendues.']);
+  }
+  if(m.length)return failAll(m);
+}
+if(n===5&&!validateStep5ForRecap())return false;
+if(n===6){const m=[];
+  needs.forEach((x,i)=>{if(!x.solution?.trim())m.push([`solution-${i}`,'Renseigne l’article proposé.']);if(!Number.isFinite(x.unitHT))m.push([`price-${i}`,'Renseigne le prix unitaire HT.'])});
+  if($('quoteDelay')&&!$('quoteDelay').value.trim())m.push(['quoteDelay','Renseigne le délai annoncé.']);
+  if(m.length)return failAll(m);
+}
+return true}
 function clearStep5Validation(){
   $('step5ValidationSummary').classList.add('hidden');
   $('step5ValidationSummary').innerHTML='';
@@ -673,10 +710,13 @@ function selectProjectPriority(level){
   clearProjectPriorityError();
   updateSidebar();
 }
-function showProjectPriorityError(){
+function showProjectPriorityError(premier){
   $('projectPriorityField').classList.add('priority-error');
   $('projectPriorityError').classList.remove('hidden');
-  $('projectPriorityGroup').scrollIntoView({behavior:'smooth',block:'center'});
+  /* Le défilement n'appartient qu'au PREMIER manque : sans ça, la rangée de
+     priorité ramène la page à elle alors que le focus est trois champs plus
+     haut. */
+  if(premier!==false)$('projectPriorityGroup').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function clearProjectPriorityError(){
   $('projectPriorityField').classList.remove('priority-error');
@@ -2328,7 +2368,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
 .live-check ul{margin:7px 0 0;padding-left:18px}
 .live-check li{margin:3px 0;font-weight:600}
-button.blocked{opacity:.45;cursor:not-allowed}
 .dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
 .dup-warn button{margin-top:9px}
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
@@ -2496,40 +2535,13 @@ button.blocked{opacity:.45;cursor:not-allowed}
     5:function(){var m=[];if(!selectedClient)m.push('Client sélectionné');if(!v('clientNextAction'))m.push('Suite souhaitée pour ce client');return m;}
   };
 
-  function nextButtonOf(n){
-    var sec=el('step'+n);
-    if(!sec)return null;
-    var btns=[].slice.call(sec.querySelectorAll('button.primary'));
-    return btns.filter(function(b){
-      var a=b.getAttribute('onclick')||'';
-      return a.indexOf('goStep')>-1||a.indexOf('openRecapFromStep5')>-1;
-    })[0]||null;
-  }
-
+  /* Le panneau « à compléter avant de continuer » a disparu. Il répétait en
+     vert ce que la personne venait de faire, et surtout il DÉSACTIVAIT le
+     bouton : personne ne voyait donc jamais quel champ manquait, il fallait
+     lire une liste et deviner où elle pointait. Le bouton reste actif — au
+     clic, les champs qui manquent virent au ROUGE et le premier prend le
+     focus. Ne reste ici que le contrôle du délai. */
   function refreshLive(){
-    for(var n=1;n<=5;n++){
-      var btn=nextButtonOf(n);
-      if(!btn)continue;
-      var missing=STEPS[n]();
-      var box=el('liveCheck'+n);
-      if(!box){
-        box=document.createElement('div');
-        box.id='liveCheck'+n;
-        box.className='live-check';
-        btn.parentNode.insertBefore(box,btn);
-      }
-      if(missing.length){
-        box.className='live-check todo';
-        box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-        btn.classList.add('blocked');
-        btn.disabled=true;
-      }else{
-        box.className='live-check ok';
-        box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
-        btn.classList.remove('blocked');
-        btn.disabled=false;
-      }
-    }
     if(currentStep===3)window.checkDesiredDate();
   }
 
