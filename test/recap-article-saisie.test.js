@@ -138,18 +138,92 @@ assert.ok(!/need-detail-k"><\/div>/.test(catalogue),
 
 // --- 4. Le bloc sous le formulaire et la fiche disent la MÊME chose ----------
 const apercu = source('previewTextile', '');
-assert.ok(/txSaisieBloc\(d\)/.test(apercu),
+assert.ok(/txDetailsBloc\(d\)/.test(apercu),
   'le bloc sous le formulaire relit la saisie en cours');
 const detail = source('renderDetailArticle', '');
 assert.ok(/txSaisieBloc\(n\.textile\)/.test(detail),
   'la fiche ouverte à gauche relit la saisie de l’article');
+assert.ok(/function txDetailsBloc\(d\)\{[\s\S]*?txSaisieBloc\(d\)/.test(DEVIS),
+  '… et le détail replié porte bien cette même relecture');
 // Le classement de l'atelier (« ⭐ PRIORITÉ OLDA ») ne s'affiche plus du tout :
 // il tenait d'abord dans la valeur — « 436,74 € ⭐ PRIORITÉ OLDA » se lisait
 // d'un bloc — puis en pastille, que le patron a retirée le 21/08. La marge à
 // l'heure reste, c'est le chiffre.
 assert.ok(!/c\.atelier/.test(DEVIS),
   'le classement de l’atelier ne s’affiche nulle part sur l’écran du comptoir');
-assert.ok(/txMetric\('Marge \/ heure'/.test(DEVIS),
-  '… la marge à l’heure, elle, reste une case comme les autres');
+assert.ok(/txKpi\('Marge \/ heure'/.test(DEVIS),
+  '… la marge à l’heure, elle, reste un des quatre chiffres clés');
 
-console.log('✓ récapitulatif : les intitulés des champs, tout ce qui est saisi, rien de ce qui est vide');
+// --- 5. LE RÉCAPITULATIF REFAIT (21/08/2026) --------------------------------
+// Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
+// décomposition du prix dépliable, détail des champs replié, barre d'action
+// collante.
+assert.ok(/txTete\(c\),txKpis\(c\),txJauge\(c\),txDecompo\(d,c\),\.\.\.txAlertes\(d,c\),txDetailsBloc\(d\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : chiffres, marge, prix, alertes, saisie');
+assert.ok(!/tx-avis/.test(DEVIS),
+  'le badge « EXCELLENT — VALIDÉ » a laissé la place à la jauge, ici comme dans la fiche');
+
+// LES DEUX REPÈRES SONT CEUX DU PATRON. Écrits en dur (45 / 60), ils
+// mentiraient dès la dixième pièce : les seuils baissent avec la quantité.
+const jauge = source('txJauge', 'c');
+assert.ok(/TE\(\)\.thresholdFor\(c\.qty\)/.test(jauge) && /seuil=t\.limited/.test(jauge) && /cible=t\.veryGood/.test(jauge),
+  'seuil et cible viennent des seuils par quantité du moteur, jamais d’un nombre écrit en dur');
+assert.ok(/Sous le seuil/.test(jauge) && /Au-dessus du seuil/.test(jauge) && /Au-dessus de la cible/.test(jauge),
+  'la jauge dit lequel des trois états on occupe');
+assert.ok(/Math\.max\(0,Math\.min\(100,c\.mark\*100\)\)/.test(jauge),
+  'une marge négative ne fait pas déborder la jauge');
+
+// Le moteur, lui, place bien 45 % et 60 % à neuf pièces — c'est ce que montre
+// la maquette du patron.
+const TE = (() => {
+  const sandbox = { window: {}, module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(RACINE, 'public/comptoir/textile-catalog.js'), 'utf8'), sandbox);
+  return sandbox.window.TextileEngine;
+})();
+assert.strictEqual(Math.round(TE.thresholdFor(9).limited * 100), 45, 'seuil à 9 pièces');
+assert.strictEqual(Math.round(TE.thresholdFor(9).veryGood * 100), 60, 'cible à 9 pièces');
+assert.ok(TE.thresholdFor(200).limited < TE.thresholdFor(9).limited,
+  'les deux repères baissent quand la quantité monte');
+
+// L'ÉTAT DES DEUX PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
+// chaque touche : sans mémoire, le détail se refermait sous les doigts.
+assert.ok(/let txCalculOuvert=false,txDetailsOuvert=false;/.test(DEVIS),
+  'les deux panneaux dépliables gardent leur état hors du rendu');
+assert.ok(/det\.open=txDetailsOuvert/.test(DEVIS) && /txDetailsOuvert=det\.open/.test(DEVIS),
+  'le détail des champs se rouvre comme on l’avait laissé');
+assert.ok(/det\.open=txCalculOuvert/.test(DEVIS) && /txCalculOuvert=det\.open/.test(DEVIS),
+  'le calcul aussi');
+
+// UNE DIMENSION ÉCRITE DANS LA NOTE ENGAGE LA PRODUCTION.
+const [, motif] = DEVIS.match(/const TX_DIMENSION=(\/.*\/i);/);
+const RE = eval(motif); // eslint-disable-line no-eval
+['Le client veut que le logo avant mesure 120mm', 'marquage 30x40', 'poitrine 12,5 cm', 'dos 20 × 30']
+  .forEach((note) => assert.ok(RE.test(note), `« ${note} » porte une dimension`));
+['Prénom Léa sur la manche', 'urgent pour vendredi', 'logo doré']
+  .forEach((note) => assert.ok(!RE.test(note), `« ${note} » n’en porte pas`));
+
+// LA BARRE D'ACTION. Elle reste visible quand le prix ne l'est pas : c'est par
+// son bouton qu'on apprend quel champ manque.
+assert.ok(/<div class="tx-barre"><span class="tx-barre-objet" id="txBarreObjet">/.test(DEVIS),
+  'la barre d’action porte ce qu’on s’apprête à ajouter');
+assert.ok(/\.tx-barre\{[^}]*position:sticky/.test(DEVIS), 'elle est collée en bas');
+assert.ok(/txBarre\(c\);\s*if\(!c\)\{/.test(apercu),
+  'elle se met à jour AVANT de renoncer : sans prix, elle doit encore parler');
+// Le libellé du bouton vit dans son propre nœud : `textContent` sur le bouton
+// entier effacerait la pastille du raccourci.
+assert.ok(/id="txSaveLabel"/.test(DEVIS) && !/\$\('txSaveBtn'\)\.textContent/.test(DEVIS),
+  'changer le libellé du bouton n’efface pas le raccourci écrit dessus');
+assert.ok(/ev\.key!=='Enter'\|\|!\(ev\.ctrlKey\|\|ev\.metaKey\)/.test(DEVIS),
+  'Ctrl/Cmd + Entrée ajoute l’article sans lâcher le clavier');
+
+// « Ajouter et dupliquer » pose la ligne ET garde la saisie pour la variante.
+const enregistrer = source('saveTextileNeed', 'dupliquer');
+assert.ok(/const pose=editingTextile>=0\?editingTextile:needs\.length-1;/.test(enregistrer)
+  && /if\(dupliquer===true\)duplicateTextileNeed\(pose\)/.test(enregistrer),
+  'le duplicata repart de la ligne qu’on vient de poser, pas d’un indice périmé');
+// … et l'ordre compte : `cancelTextileEdit()` remet `editingTextile` à -1.
+assert.ok(enregistrer.indexOf('const pose=') < enregistrer.indexOf('cancelTextileEdit()'),
+  'l’indice se lit AVANT que le formulaire ne soit remis à zéro');
+
+console.log('✓ récapitulatif : intitulés des champs, jauge seuil/cible, calcul dépliable, barre collante');

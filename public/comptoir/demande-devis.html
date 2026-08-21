@@ -299,37 +299,94 @@ h2{letter-spacing:-.01em}
 .form-objet{min-width:0;font-size:14px;font-weight:600;color:#6d747b;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .form-num.is-edit{color:var(--orange)}
-.tx-preview{border:1px solid #e4e8ee;border-radius:12px;padding:14px 16px;margin:14px 0;background:#fbfcfd}
-.tx-preview-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
-.tx-preview-title{font-weight:800;font-size:15px}
-.tx-metrics{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;font-size:13px}
-.tx-metrics span{color:#6d747b}
-.tx-metrics b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
-.tx-avis{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;white-space:nowrap}
-.tx-avis.good{background:#e2f0e8;color:#1d6f43}
-.tx-avis.warn{background:#fff2dc;color:#8a4b00}
-.tx-avis.bad{background:#fdeaea;color:#a02020}
-/* CE QUE LA VENDEUSE VIENT D'ÉCRIRE, RELU AVEC LES MÊMES INTITULÉS que les
-   champs juste au-dessus. Le récapitulatif ne disait que « K3008 · Coconut
-   Milk · Poitrine + Dos · 2 pièces » : le genre, l'encre, le transport, les
-   tailles et la note — la moitié de la saisie — n'y étaient nulle part, et le
-   reste arrivait en file de points sans dire de quoi il parlait. */
-.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px 18px;margin-top:12px;padding-top:12px;border-top:1px solid #eef0f3}
+/* ---- LE RÉCAPITULATIF DE L'ARTICLE ----------------------------------------
+   Cinq bandes, dans l'ordre où on les lit avant d'ajouter : les quatre
+   chiffres qu'on annonce, la marge située entre son seuil et sa cible, ce qui
+   compose le prix, ce qui reste à faire valider, puis la saisie elle-même —
+   repliée, elle ne sert qu'à la relecture. */
+.tx-preview{border:1px solid #e4e8ee;border-radius:14px;padding:20px 22px;margin:16px 0 0;background:#fff}
+/* Quand le prix s'affiche, le cadre et la barre d'action ne font qu'une carte :
+   le bas du récapitulatif se ferme sur la barre, pas sur du vide. */
+.tx-preview:not(.hidden){border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;padding-bottom:16px}
+.tx-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tx-tete-titre{margin:0;font-size:17px;font-weight:800}
+.tx-tete-info{font-size:13px;font-weight:600;color:var(--muted)}
+/* LES QUATRE CHIFFRES CLÉS. Les deux premiers sont ceux qu'on dit au client ;
+   les deux autres, ce que la ligne coûte à l'atelier. */
+.tx-recap-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 20px;margin-top:16px}
+.tx-recap-kpis>div{min-width:0}
+.tx-recap-kpis span{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tx-recap-kpis b{display:block;margin-top:4px;font-size:27px;font-weight:800;line-height:1.15;
+  color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tx-recap-kpis .is-fort b{font-weight:900;color:#142e54}
+/* LA JAUGE REMPLACE LE BADGE « EXCELLENT — VALIDÉ ». Un mot ne disait ni de
+   combien on était au-dessus, ni ce qu'il restait avant de descendre sous le
+   seuil. Les deux repères viennent des seuils du patron, qui BAISSENT avec la
+   quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
+.tx-jauge{border:1px solid #e4e8ee;border-radius:12px;padding:14px 16px;margin-top:16px;background:#fbfcfd}
+.tx-jauge-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.tx-jauge-tete span{font-size:14px;font-weight:800}
+.tx-jauge-tete b{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+.tx-rail{position:relative;height:10px;border-radius:999px;background:#e3e7ec;margin:11px 0 9px}
+.tx-fil{height:100%;border-radius:999px;background:var(--valide);transition:width .18s ease,background .18s ease}
+.tx-jauge.est-warn .tx-fil{background:var(--orange)}
+.tx-jauge.est-bad .tx-fil{background:var(--red)}
+/* Les deux repères se lisent PAR-DESSUS le remplissage : le seuil en clair, la
+   cible à l'encre. Sans eux, 70 % et 45 % ont la même tête. */
+.tx-tick{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:2px;background:#aeb6bf}
+.tx-tick.is-cible{background:#142e54}
+.tx-jauge-pied{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tx-reperes{display:flex;gap:16px;font-size:12px;font-weight:600;color:var(--muted)}
+.tx-verdict{font-size:12.5px;font-weight:800;color:var(--valide)}
+.tx-jauge.est-warn .tx-verdict{color:var(--orange)}
+.tx-jauge.est-bad .tx-verdict{color:var(--red)}
+/* CE QUI COMPOSE LE PRIX, en pastilles. Le détail du calcul se déplie d'un
+   clic sur la rangée : il sert à répondre « pourquoi ce prix ? », pas à être
+   lu à chaque article. */
+.tx-decompo{margin-top:16px}
+.tx-decompo>summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;cursor:pointer;list-style:none}
+.tx-decompo>summary::-webkit-details-marker{display:none}
+.tx-decompo>summary::marker{content:''}
+.tx-chip{display:inline-flex;gap:7px;align-items:baseline;border:1px solid #dfe4ea;border-radius:999px;
+  padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tx-chip b{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.tx-lien{font-size:13.5px;font-weight:800;color:#142e54;text-decoration:underline}
+.tx-decompo>summary:hover .tx-lien{color:#3064e8}
+.tx-calcul{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;margin-top:14px;padding:14px 16px;
+  border:1px solid #eef0f3;border-radius:12px;background:#fbfcfd;font-size:13px}
+.tx-calcul span{color:var(--muted);font-weight:600}
+.tx-calcul b{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.tx-calcul .is-somme{font-weight:800;color:var(--text)}
+.tx-calcul .is-trait{border-top:1px solid #e4e8ee;padding-top:8px;margin-top:2px}
+/* CE QUI ENGAGE LA PRODUCTION ET QUE PERSONNE NE RELIT ENTRE LE COMPTOIR ET
+   L'ATELIER. La couleur dit un état : ambre = à faire valider avant le devis. */
+.tx-alerte{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:12px 15px;border-radius:11px;
+  background:var(--orange-soft);color:#8a4b00;font-size:13.5px;font-weight:600;line-height:1.45}
+.tx-alerte::before{content:'';flex:none;width:7px;height:7px;margin-top:7px;border-radius:50%;background:currentColor}
+/* LA SAISIE, REPLIÉE. Elle ne sert qu'à relire avant d'ajouter : dépliée en
+   permanence, elle poussait le bouton hors de l'écran. Son état SURVIT à la
+   frappe — le bloc se réécrit à chaque touche, il ne doit pas se refermer
+   sous les doigts. */
+.tx-details{margin-top:16px;padding-top:14px;border-top:1px solid #eef0f3}
+.tx-details>summary{cursor:pointer;font-size:14px;font-weight:800;user-select:none;list-style:none;display:flex;gap:8px;align-items:center}
+.tx-details>summary::-webkit-details-marker{display:none}
+.tx-details>summary::marker{content:''}
+.tx-details>summary::before{content:'▸';color:var(--muted);font-size:12px}
+.tx-details[open]>summary::before{content:'▾'}
+.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:13px 20px;margin-top:14px}
 .tx-saisie>div{min-width:0}
 .tx-saisie span{display:block;font-size:11px;font-weight:800;color:var(--muted)}
 .tx-saisie b{display:block;font-size:14px;font-weight:700;line-height:1.3;margin-top:2px;overflow-wrap:anywhere}
-/* Les chiffres, en grille et non en file : à cinq valeurs, la rangée souple
-   laissait « Marge / heure » passer seule à la ligne, décrochée du reste. Les
-   deux que la vendeuse annonce au client sont les plus grosses. */
-.tx-argent{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px 18px;margin-top:12px}
-.tx-argent>div{min-width:0}
-.tx-argent span{display:block;font-size:11px;font-weight:800;color:var(--muted)}
-.tx-argent b{display:block;font-size:15px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
-.tx-argent .tx-fort b{font-size:20px;font-weight:900}
-.tx-base{color:var(--muted);font-size:12.5px;line-height:1.4;margin-top:10px}
-.tx-card-metrics{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;font-size:13px}
-.tx-card-metrics span{color:#6d747b}
-.tx-card-metrics b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+/* LA BARRE D'ACTION RESTE SOUS LA MAIN. Dix champs et un récapitulatif plus
+   haut, le bouton finissait sous la ligne de flottaison : on ajoutait un
+   article en remontant l'écran. Collée en bas, elle porte aussi CE QU'ON
+   S'APPRÊTE À AJOUTER — le nom, le nombre de pièces, le total. */
+.tx-barre{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:0;padding:14px 22px;background:#fff;border:1px solid #e4e8ee;border-radius:14px}
+.tx-preview:not(.hidden)+.tx-barre{border-top:1px solid #eef0f3;border-top-left-radius:0;border-top-right-radius:0}
+.tx-barre-objet{flex:1 1 220px;min-width:0;font-size:13px;font-weight:600;color:var(--muted)}
+.tx-kbd{margin-left:9px;font-size:11.5px;font-weight:700;opacity:.75;white-space:nowrap}
+@media(max-width:700px){.tx-barre{position:static}}
 @media(max-width:1100px){.tx-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:820px){.tx-sizes{grid-template-columns:repeat(3,minmax(0,1fr))}.tx-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.tx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tx-controls{grid-template-columns:1fr}}
@@ -467,7 +524,7 @@ h2{letter-spacing:-.01em}
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="" selected>Choisir</option><option value="0.04">OUI — 4 %</option><option value="0">NON</option></select></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="actions"><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()">Ajouter cet article</button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="" selected>Choisir</option><option value="0.04">OUI — 4 %</option><option value="0">NON</option></select></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><span class="tx-barre-objet" id="txBarreObjet"></span><button id="txDupBtn" class="secondary" onclick="saveTextileNeed(true)">Ajouter et dupliquer</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter cet article</span><span class="tx-kbd" id="txRaccourci"></span></button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
@@ -1364,12 +1421,6 @@ function txReadForm(){
 function txCalc(d){return txReady()?TE().calculate(d):null}
 function txDisplayRef(d){return d.isCustom?(d.customRef||'NOUVEAU'):d.ref}
 
-function txMetric(label,value,cls){
-  const wrap=txEl('div',cls);
-  wrap.append(txEl('span',null,label),txEl('b',null,value));
-  return wrap;
-}
-
 
 /* CE QUE LA VENDEUSE VIENT D'ÉCRIRE, avec les MÊMES INTITULÉS que les champs
    du formulaire. Le récapitulatif portait « K3008 · Coconut Milk · Poitrine +
@@ -1412,38 +1463,174 @@ function txPoserObjet(){
   $('txFormObjet').textContent=texte;
 }
 
+/* Un repère se lit rond — « Seuil 45 % », pas « 45,0 % ». */
+function txPctCourt(part){return `${Math.round((Number(part)||0)*100)} %`}
+function txNombre(n){return (Number(n)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+/* L'ÉTAT DES DEUX PANNEAUX DÉPLIABLES SURVIT À LA FRAPPE. Le récapitulatif se
+   réécrit à CHAQUE touche : sans mémoire, le détail des champs se refermait
+   sous les doigts dès qu'on corrigeait une taille. */
+let txCalculOuvert=false,txDetailsOuvert=false;
+
+function txTete(c){
+  const t=txEl('div','tx-tete');
+  t.append(txEl('h3','tx-tete-titre','Récapitulatif article'),
+    txEl('span','tx-tete-info',`${c.qty} pièce${c.qty>1?'s':''} · avant ajout au projet`));
+  return t;
+}
+
+/* LES QUATRE CHIFFRES QU'ON LIT EN PREMIER. Les deux de gauche sont ceux qu'on
+   annonce au client, les deux autres ce que la ligne coûte à l'atelier. */
+function txKpi(label,valeur,cls){
+  const cell=txEl('div',cls);
+  cell.append(txEl('span',null,label),txEl('b',null,valeur));
+  return cell;
+}
+function txKpis(c){
+  const g=txEl('div','tx-recap-kpis');
+  g.append(
+    txKpi('Prix HT / pièce',money(c.sold),'is-fort'),
+    txKpi('Total HT',money(c.total),'is-fort'),
+    txKpi('Temps de production',TE().fmtTime(c.prodHours)),
+    txKpi('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—'));
+  return g;
+}
+
+/* LA MARGE, SITUÉE ENTRE SON SEUIL ET SA CIBLE. Le badge « EXCELLENT —
+   VALIDÉ » ne disait ni de combien on était au-dessus, ni ce qu'il restait
+   avant de descendre. Les deux repères sont ceux du patron et BAISSENT avec la
+   quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
+function txJauge(c){
+  const t=TE().thresholdFor(c.qty),seuil=t.limited,cible=t.veryGood;
+  const [etat,verdict]=c.mark<seuil?['bad','Sous le seuil']
+    :c.mark<cible?['warn','Au-dessus du seuil']
+    :['good','Au-dessus de la cible'];
+  const box=txEl('div',`tx-jauge est-${etat}`);
+  const tete=txEl('div','tx-jauge-tete');
+  tete.append(txEl('span',null,'Marge'),txEl('b',null,`${money(c.margin)} · ${txPct(c.mark)}`));
+  const rail=txEl('div','tx-rail'),fil=txEl('div','tx-fil');
+  fil.style.width=`${Math.max(0,Math.min(100,c.mark*100))}%`;
+  const rSeuil=txEl('span','tx-tick'),rCible=txEl('span','tx-tick is-cible');
+  rSeuil.style.left=`${seuil*100}%`;rCible.style.left=`${cible*100}%`;
+  rail.append(fil,rSeuil,rCible);
+  const reperes=txEl('div','tx-reperes');
+  reperes.append(txEl('span',null,`Seuil ${txPctCourt(seuil)}`),txEl('span',null,`Cible ${txPctCourt(cible)}`));
+  const pied=txEl('div','tx-jauge-pied');
+  pied.append(reperes,txEl('b','tx-verdict',verdict));
+  box.append(tete,rail,pied);
+  return box;
+}
+
+/* CE QUI COMPOSE LE PRIX. Les pastilles se lisent d'un coup d'œil ; le calcul
+   complet se déplie d'un clic sur la rangée — il répond à « pourquoi ce
+   prix ? », il n'a pas à être lu à chaque article. */
+function txLigneCalcul(g,libelle,valeur,cls){
+  g.append(txEl('span',cls,libelle),txEl('b',cls,valeur));
+}
+function txCalculBloc(d,c){
+  const g=txEl('div','tx-calcul'),cf=TE().coefFor(c.qty),tr=txNum(TE().DB.transports[d.transport]);
+  txLigneCalcul(g,`Prix d’achat ${txDisplayRef(d)}`,money(c.item.purchase));
+  txLigneCalcul(g,`Transport ${d.transport}`,tr>0?`+ ${money(tr)}`:money(0));
+  txLigneCalcul(g,`Coefficient ${c.qty} pièce${c.qty>1?'s':''}`,`× ${txNombre(cf.textile)}`);
+  txLigneCalcul(g,'Base textile',money(c.baseTextile),'is-somme');
+  txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint),'is-somme');
+  if(txNum(d.markupPercent)>0)txLigneCalcul(g,'Majoration libre',`+ ${txNombre(d.markupPercent)} %`);
+  if(txNum(d.discount)>0)txLigneCalcul(g,'Remise',`− ${txNombre(d.discount)} %`);
+  if(txNum(d.manualPrice)>0)txLigneCalcul(g,'Prix manuel',money(txNum(d.manualPrice)));
+  txLigneCalcul(g,'Arrondi',`au ${money(TE().getSettings().roundStep)} supérieur`);
+  txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'is-trait is-somme');
+  txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total),'is-somme');
+  return g;
+}
+function txDecompo(d,c){
+  const det=txEl('details','tx-decompo');
+  det.open=txCalculOuvert;
+  const sum=txEl('summary');
+  const pastille=(k,v)=>{const e=txEl('span','tx-chip');e.append(txEl('span',null,k),txEl('b',null,v));return e};
+  const tr=txNum(TE().DB.transports[d.transport]),tgca=txNum($('txTgca').value);
+  sum.append(pastille('Textile',money(c.baseTextile)),pastille('Marquage',money(c.basePrint)),
+    pastille('Transport',tr>0?`+${money(tr)}`:'compris'),
+    pastille('TGCA',tgca>0?txPctCourt(tgca):'non'));
+  const lien=txEl('span','tx-lien');
+  const poser=()=>{lien.textContent=det.open?'Masquer le calcul':'Voir le calcul'};
+  poser();
+  det.addEventListener('toggle',()=>{txCalculOuvert=det.open;poser()});
+  sum.append(lien);
+  det.append(sum,txCalculBloc(d,c));
+  return det;
+}
+
+/* CE QUI ENGAGE LA PRODUCTION ET QUI DORT DANS LA NOTE. Une dimension écrite
+   au comptoir (« logo 120 mm », « 30x40 ») décide du fichier d'impression, et
+   personne ne la relit entre la vendeuse et l'atelier. */
+const TX_DIMENSION=/\d+([.,]\d+)?\s*(mm|cm)\b|\d+\s*[x×]\s*\d+/i;
+function txAlertes(d,c){
+  const out=[];
+  if(TX_DIMENSION.test(d.note||''))
+    out.push(txEl('div','tx-alerte','Contrainte technique détectée dans la note (dimension de marquage) — à valider en production avant devis.'));
+  if(txNum(d.manualPrice)>0)
+    out.push(txEl('div','tx-alerte',`Prix manuel appliqué : ${money(c.sold)} la pièce — le calcul ne décide plus du prix.`));
+  return out;
+}
+
+/* LA SAISIE, REPLIÉE : elle ne sert qu'à relire avant d'ajouter. */
+function txDetailsBloc(d){
+  const lignes=txSaisieLignes(d),det=txEl('details','tx-details'),sum=txEl('summary');
+  det.open=txDetailsOuvert;
+  const titre=()=>det.open?'Masquer le détail des champs':`Détail des champs (${lignes.length}) — pour relecture`;
+  sum.textContent=titre();
+  det.addEventListener('toggle',()=>{txDetailsOuvert=det.open;sum.textContent=titre()});
+  det.append(sum,txSaisieBloc(d));
+  return det;
+}
+
+/* CE QU'ON S'APPRÊTE À AJOUTER, écrit dans la barre collante. Sans prix
+   calculable elle dit ce qu'elle attend — mais elle RESTE : c'est par son
+   bouton qu'on apprend quel champ manque. */
+function txBarre(c){
+  const objet=$('txBarreObjet');
+  if(objet)objet.textContent=c
+    ? `${c.item.designation} · ${c.qty} pièce${c.qty>1?'s':''} · ${money(c.total)} HT`
+    : 'Complète les champs obligatoires pour voir le prix.';
+  const dup=$('txDupBtn');
+  if(dup)dup.classList.toggle('hidden',editingTextile>=0||!c);
+}
+
 function previewTextile(){
   if(!txReady())return;
   txPoserObjet();
   const d=txReadForm(),box=$('txPreview');
   const c=txManquants().length?null:txCalc(d);
+  txBarre(c);
   if(!c){
     txFill(box,[]);
     box.classList.add('hidden');
     return;
   }
   box.classList.remove('hidden');
-  const gauche=txEl('div');
-  gauche.append(txEl('div','tx-preview-title',c.item.designation),
-    txEl('div','help',`${c.qty} pièce${c.qty>1?'s':''} · récapitulatif avant ajout`));
-  const head=txEl('div','tx-preview-head');
-  head.append(gauche,txEl('span',`tx-avis ${c.cls}`,c.avis));
-
-  const argent=txEl('div','tx-argent');
-  argent.append(
-    txMetric('Prix HT / pièce',money(c.sold),'tx-fort'),
-    txMetric('Total HT',money(c.total),'tx-fort'),
-    txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
-    txMetric('Temps de production',TE().fmtTime(c.prodHours)),
-    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
-  );
-
-  const base=txEl('div','tx-base',`Base : textile ${money(c.baseTextile)} + marquage ${money(c.basePrint)}`
-    +(txNum(d.manualPrice)>0?' — prix manuel appliqué':''));
-  txFill(box,[head,argent,base,txSaisieBloc(d)]);
+  txFill(box,[txTete(c),txKpis(c),txJauge(c),txDecompo(d,c),...txAlertes(d,c),txDetailsBloc(d)]);
 }
 
-function saveTextileNeed(){
+/* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
+   raccourci s'écrit sur le bouton : celui que personne ne connaît n'existe
+   pas. Le libellé se pose au chargement — la touche n'est pas la même d'un
+   poste à l'autre. */
+(function(){
+  const mac=/Mac|iPhone|iPad/i.test(navigator.platform||navigator.userAgent||'');
+  const pastille=$('txRaccourci');
+  if(pastille)pastille.textContent=mac?'Cmd + Entrée':'Ctrl + Entrée';
+  const form=$('besoinTextileForm');
+  if(form)form.addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter'||!(ev.ctrlKey||ev.metaKey))return;
+    ev.preventDefault();
+    saveTextileNeed();
+  });
+})();
+
+/* `dupliquer` : la ligne est posée ET le formulaire repart avec la même
+   saisie. Une variante — même produit, autre couleur — ne se retape pas en
+   entier. */
+function saveTextileNeed(dupliquer){
   clearErrors();
   if(!txReady())return fail('txRef','Le catalogue textile n’a pas pu être chargé. Recharge la page.');
   const d=txReadForm();
@@ -1468,7 +1655,9 @@ function saveTextileNeed(){
     textile:d,
   };
   editingTextile>=0?needs[editingTextile]=n:needs.push(n);
+  const pose=editingTextile>=0?editingTextile:needs.length-1;
   cancelTextileEdit();renderNeeds();updateSidebar();
+  if(dupliquer===true)duplicateTextileNeed(pose);
 }
 /* Ce texte part dans le récapitulatif ET dans le message WhatsApp envoyé AU
    CLIENT (recapText). Il ne porte donc que ce que le client a commandé :
@@ -1504,7 +1693,7 @@ function editTextileNeed(i){
   editingTextile=i;
   txApplyToForm(needs[i].textile||{});
   poserTitreForm('txFormTitle',`Modifier l’article n°${i+1}`,true);
-  $('txSaveBtn').textContent='Enregistrer la modification';
+  $('txSaveLabel').textContent='Enregistrer la modification';
   $('txCancelBtn').classList.remove('hidden');
   $('txRef').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1513,7 +1702,7 @@ function duplicateTextileNeed(i){
   editingTextile=-1;
   txApplyToForm(needs[i].textile||{});
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
-  $('txSaveBtn').textContent='Ajouter cet article';
+  $('txSaveLabel').textContent='Ajouter cet article';
   $('txCancelBtn').classList.add('hidden');
   $('txRef').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1522,7 +1711,7 @@ function cancelTextileEdit(){
   ['txCustomRef','txCustomPurchase','txCustomDesignation','txColor','txGenre','txTransport','txPrintType','txMarkColor','txNote','txS','txM','txL','txXL','txXXL','txOther','txDiscount','txManualPrice'].forEach(id=>$(id).value='');
   $('txRef').value='';onTextileRefChange();menusRafraichirTous();
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
-  $('txSaveBtn').textContent='Ajouter cet article';
+  $('txSaveLabel').textContent='Ajouter cet article';
   $('txCancelBtn').classList.add('hidden');
   previewTextile();
 }
@@ -1767,7 +1956,6 @@ function renderDetailArticle(){
   tete.append(gauche,fermer);
 
   const rang=txEl('div','tx-ligne-tete');
-  rang.append(txEl('span',`tx-avis ${c.cls}`,c.avis));
   const neg=n.textile.negotiation;
   if(neg)rang.append(txEl('span','badge', txNum(neg.freeQty)>0
     ? `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)} + ${txNum(neg.freeQty)} offerte(s)`
@@ -1782,17 +1970,13 @@ function renderDetailArticle(){
   boutons.append(modifier,dupliquer,negocier);
   rang.append(boutons);
 
-  const metrics=txEl('div','tx-card-metrics tx-argent');
-  metrics.append(
-    txMetric('Prix HT / pièce',money(c.sold),'tx-fort'),
-    txMetric('Total HT',money(c.total),'tx-fort'),
-    txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
-    txMetric('Temps prod.',TE().fmtTime(c.prodHours)),
-    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
-  );
+  /* Les mêmes blocs que le récapitulatif du formulaire : une ligne relue ici
+     ou là-haut doit se lire pareil. */
+  const metrics=txKpis(c);
+  metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,txSaisieBloc(n.textile));
+  bloc.append(tete,rang,metrics,txJauge(c),txDecompo(n.textile,c),...txAlertes(n.textile,c),txSaisieBloc(n.textile));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
