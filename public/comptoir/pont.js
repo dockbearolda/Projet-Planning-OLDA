@@ -1111,7 +1111,12 @@
    ni chevron, ni pictogramme, la place revient au texte saisi. Le déclencheur
    d'une liste porte déjà son curseur main ; c'est le champ LIBRE qui affichait
    un curseur de texte et se lisait comme une simple zone de frappe. */
-.menu>input{cursor:pointer}
+.menu>input{cursor:pointer;caret-color:transparent}
+/* CLIQUER OUVRE LA LISTE, ÇA NE COMMENCE PAS UNE SAISIE. Le trait clignotant
+   qui apparaissait au clic disait le contraire et ramenait le champ à une
+   zone de frappe ordinaire. Il ne revient qu'à la PREMIÈRE FRAPPE — taper
+   reste possible, c'est le geste qui change d'intention, pas le champ. */
+.menu>input.est-frappe{cursor:text;caret-color:auto}
 /* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
 .menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
   font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
@@ -1347,6 +1352,13 @@ function menuPoser(hote){
   declencheur.addEventListener('keydown',ev=>menuTouche(etat,ev));
   if(libre){
     hote.addEventListener('input',()=>{etat.filtrer=true;etat.vise=0;if(etat.ouvert)menuPeindre(etat);menuPeindreChamp(etat)});
+    /* Une touche qui écrit rend le trait ; un clic le reprend. `keydown` et
+       non `input` : le trait doit être là AVANT que le caractère ne s'écrive,
+       sinon il apparaît une frappe en retard. */
+    hote.addEventListener('keydown',ev=>{
+      if(ev.key.length===1||ev.key==='Backspace'||ev.key==='Delete')hote.classList.add('est-frappe');
+    });
+    hote.addEventListener('pointerdown',()=>hote.classList.remove('est-frappe'));
   }else{
     filtre.addEventListener('input',()=>{etat.vise=0;menuPeindre(etat)});
     filtre.addEventListener('keydown',ev=>menuTouche(etat,ev));
@@ -1582,6 +1594,8 @@ function menuFermer(etat,rendreFocus){
 
 function menuChoisir(etat,valeur){
   etat.hote.value=valeur;
+  /* Une valeur choisie dans la liste n'est pas une saisie : le trait repart. */
+  if(etat.libre)etat.hote.classList.remove('est-frappe');
   menuPeindreChamp(etat);
   menuFermer(etat,true);
   /* Le rouge d'un champ manquant s'efface sur `change` — le <select> visible le

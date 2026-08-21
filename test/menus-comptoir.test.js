@@ -306,8 +306,18 @@ assert.ok(!/menu-chevron|menuChevron|menu-doigt|menuDoigt/.test(PONT),
 // le dit au survol. Le déclencheur d'une liste l'avait déjà ; c'est le champ
 // LIBRE qui affichait un curseur de texte et se lisait comme une zone de
 // frappe ordinaire.
-assert.ok(/\.menu>input\{cursor:pointer\}/.test(PONT),
+assert.ok(/\.menu>input\{cursor:pointer;caret-color:transparent\}/.test(PONT),
   'un champ libre qui propose un choix montre la main, pas le curseur de texte');
+// CLIQUER OUVRE, ÇA NE COMMENCE PAS UNE SAISIE. Le trait clignotant ramenait
+// le champ à une zone de frappe alors qu'on venait d'en faire un bouton.
+assert.ok(/\.menu>input\.est-frappe\{cursor:text;caret-color:auto\}/.test(PONT),
+  'le trait ne revient qu’une fois qu’on tape vraiment');
+assert.ok(/hote\.addEventListener\('keydown',ev=>\{\s*if\(ev\.key\.length===1\|\|ev\.key==='Backspace'\|\|ev\.key==='Delete'\)hote\.classList\.add\('est-frappe'\)/.test(PONT),
+  'la première touche rend le trait — sur keydown, sinon il arrive une frappe en retard');
+assert.ok(/hote\.addEventListener\('pointerdown',\(\)=>hote\.classList\.remove\('est-frappe'\)\)/.test(PONT),
+  'un clic le reprend : on revient à « je choisis »');
+assert.ok(/if\(etat\.libre\)etat\.hote\.classList\.remove\('est-frappe'\)/.test(PONT),
+  'une valeur prise dans la liste n’est pas une saisie');
 assert.ok(/\.menu-declencheur\{[^}]*cursor:pointer/.test(PONT),
   'le déclencheur d’une liste aussi');
 // « Saisir autre chose… » barrait le haut du panneau comme une bannière. Un
