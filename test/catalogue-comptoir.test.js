@@ -53,8 +53,8 @@ assert.ok(/id="catQte"[^>]*type="number"[^>]*min="1"/.test(step2),
   'la quantité se pose à côté du produit');
 assert.ok(/onclick="ajouterALaDemande\(\)"/.test(step2),
   '« Ajouter à la demande » met la ligne dans le devis');
-assert.ok(/id="catStatus"[^>]*aria-live="polite"/.test(step2),
-  'ce qui vient d’être ajouté s’annonce, pas seulement dans la liste du bas');
+assert.ok(!/catStatus/.test(DEVIS),
+  'aucun message ne répète l’ajout : la ligne qui apparaît dans la demande EST la confirmation');
 
 // La saisie manuelle reste EN HAUT, avant la ligne du catalogue.
 const iManuel = step2.indexOf('id="catManuelBtn"');
@@ -93,44 +93,38 @@ assert.ok(/editNeed\(\$\{i\}\)/.test(renderNeedsSrc) && /deleteNeed\(\$\{i\}\)/.
 assert.ok(/\.need-actions button\{min-height:44px/.test(DEVIS),
   'les deux boutons gardent leur cible tactile malgré la ligne serrée');
 
-// --- La barre du bas remplace la colonne de droite ------------------------
+// --- La colonne de droite est partie ---------------------------------------
 // La carte « PROJET » répétait la référence (elle est sur l'étape), le statut
 // (le fil des étapes le dit) et la liste de ce qui manque (chaque étape la
-// donne au-dessus de son bouton). Elle poussait la saisie dans un couloir de
-// 320 px et disparaissait dès qu'on descendait.
+// donne au-dessus de son bouton). Elle enfermait la saisie dans un couloir de
+// 320 px et s'échappait dès qu'on descendait. Le résumé rapide qui vivait à
+// côté est retiré lui aussi — on verra plus tard où il se pose.
 
 assert.ok(!/<aside class="sidebar">/.test(DEVIS),
   'la colonne de droite a disparu : la saisie prend toute la largeur');
+// Retirer un bloc à la main laisse vite un `<` de trop ou de moins : la page
+// affichait « /div › » en clair, en bas, sans la moindre erreur.
+assert.ok(!/(^|[^<])\/div>/.test(DEVIS), 'aucune balise fermante amputée ne traîne dans la page');
+assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
+  'il n’y a plus de colonne à réserver');
 ['sideTitle', 'sideStatus', 'sidePrise', 'progressText', 'progressBar', 'missingList',
-  'getMissing', 'completion('].forEach((mort) => {
+  'getMissing', 'completion(', 'barre-bas'].forEach((mort) => {
   assert.ok(!DEVIS.includes(mort),
     `« ${mort} » ne doit laisser ni élément ni code mort derrière lui`);
 });
 
-assert.ok(/<div class="barre-bas no-print" id="barreBas">/.test(DEVIS),
-  'le résumé rapide vit dans une barre en bas');
-// LE PIÈGE : la barre doit exister AVANT le script qui la remplit — sinon
-// `updateSidebar()` casse au chargement et le reste de l'amorçage ne tourne
-// jamais (select vide, aucun écouteur posé).
-assert.ok(DEVIS.indexOf('id="barreBas"') < DEVIS.indexOf('function updateSidebar'),
-  'la barre doit être posée avant le script qui l’écrit');
-
-const majBarre = (DEVIS.match(/function updateSidebar\(\)\{[\s\S]*?\n/) || [''])[0];
-const idsPage = new Set((DEVIS.match(/id="([^"]+)"/g) || []).map((m) => m.slice(4, -1)));
-(majBarre.match(/\$\('([A-Za-z0-9_-]+)'\)/g) || []).forEach((ref) => {
-  const id = ref.slice(3, -2);
-  assert.ok(idsPage.has(id), `le résumé écrit dans « ${id} », qui doit exister dans la page`);
+// LE PIÈGE : `pont.js` appelle `window.updateSidebar()` par son nom, et une
+// quinzaine d'endroits la déclenchent à chaque frappe. Sans support à l'écran
+// elle ne doit RIEN casser — sinon l'amorçage s'arrête derrière (menu de
+// produits vide, aucun écouteur posé), ce qui s'est produit pour de vrai.
+const majSrc = (DEVIS.match(/function updateSidebar\(\)\{[\s\S]*?\n/) || [''])[0];
+assert.ok(majSrc, 'le résumé doit rester une fonction nommée : pont.js l’appelle');
+const majFn = new Function('ctx', `with(ctx){${majSrc}
+  return updateSidebar}`)({
+  $: () => null, needs: [], categories: () => [], selectedClient: null,
+  clientName: () => '', quoteTotals: () => ({ ttc: 0 }), rollInt() {}, rollMoney() {},
 });
-
-assert.ok(/\.barre-bas\{[^}]*position:fixed/.test(DEVIS), 'la barre reste sous les yeux');
-assert.ok(/\.barre-bas\{[^}]*env\(safe-area-inset-bottom\)/.test(DEVIS),
-  'elle respecte la barre système de la tablette');
-assert.ok(/body\{padding-bottom:\d+px\}/.test(DEVIS),
-  'le corps garde la place de la barre : une barre fixe qui recouvre « suivant » est un bouton perdu');
-assert.ok(/@media print\{\.barre-bas\{display:none!important\}/.test(DEVIS),
-  'la barre ne s’imprime pas');
-assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
-  'le parcours occupe toute la largeur, il n’y a plus de colonne à réserver');
+assert.doesNotThrow(majFn, 'sans support à l’écran, le résumé ne doit pas casser');
 
 // --- 3. Le catalogue du patron, produit par produit -------------------------
 
@@ -183,7 +177,7 @@ function bacASable() {
     querySelector() { return null; }, querySelectorAll() { return []; },
     setAttribute() {}, focus() {}, scrollIntoView() {},
   }, extra || {});
-  const els = { catProduit: faux(), catQte: faux({ value: '1' }), catStatus: faux() };
+  const els = { catProduit: faux(), catQte: faux({ value: '1' }) };
   const echecs = [];
   const ctx = {
     needs: [],
@@ -258,7 +252,7 @@ const index = (texte) => {
   assert.ok(i >= 0, `« ${texte} » doit exister`);
   return String(i);
 };
-const { catProduit, catQte, catStatus } = cat.els;
+const { catProduit, catQte } = cat.els;
 
 // a) Rien de choisi : rien ne part. `Number('')` vaut zéro — sans garde,
 //    c'est « Bouchon Bois » qui se serait invité dans le devis.
@@ -277,7 +271,6 @@ assert.strictEqual(cat.needs.length, 1, 'un produit ajouté = une ligne');
 assert.strictEqual(cat.needs[0].qty, 3, '… avec la quantité demandée');
 assert.strictEqual(catProduit.value, '', 'le menu repart à vide : reprendre la ligne d’avant est le geste qui double un article');
 assert.strictEqual(catQte.value, '1', '… et la quantité repart à 1');
-assert.ok(/Flasque Bois/.test(catStatus.textContent), 'ce qui part à la demande s’annonce');
 
 // c) Le même produit repris : des unités, pas une deuxième ligne.
 catProduit.value = index('Flasque Bois — Clair');
