@@ -45,6 +45,7 @@
   <link rel="modulepreload" href="confirmer.js" />
   <link rel="modulepreload" href="ticket.js" />
   <link rel="modulepreload" href="reseau.js" />
+  <link rel="modulepreload" href="poste.js" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
@@ -125,7 +126,14 @@
         <button class="icon-btn" id="themeToggle" type="button" aria-label="Basculer clair / sombre">
           <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
         </button>
-        <span class="avatar" aria-hidden="true">O</span>
+        <!-- QUI EST AU POSTE. Remplace la pastille « O » décorative : le nom
+             affiché ici est celui qui signe les demandes prises sur cet
+             appareil (voir poste.js). Un tap le change — c'est le geste du
+             matin quand on prend la relève. -->
+        <button class="poste is-vide" id="posteBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Dire qui est au poste">
+          <span class="poste-pastille" aria-hidden="true">?</span>
+          <span class="poste-nom">Se nommer</span>
+        </button>
       </div>
     </header>
     <div class="topbar-filet" aria-hidden="true"></div>
