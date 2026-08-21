@@ -309,6 +309,18 @@ assert.strictEqual((html.match(/<option value="\d+"/g) || []).length, plat.lengt
 assert.ok(html.includes('<optgroup label="Tasse céramique 350 ml (extérieur / intérieur)">'),
   'le groupe des tasses dit lequel des deux tons est le dehors');
 
+// Chrome écrit l'intitulé d'un `<optgroup>` en gris italique : au comptoir, à
+// bout de bras, la famille ne se lisait pas. Elle passe en gras à l'encre, le
+// produit reste en écriture normale.
+assert.ok(/#catProduit optgroup\{[^}]*font-weight:800/.test(DEVIS),
+  'la famille se lit en gras dans le menu');
+assert.ok(/#catProduit optgroup\{[^}]*font-style:normal/.test(DEVIS),
+  '… et droite, pas en italique');
+assert.ok(/#catProduit optgroup\{[^}]*color:var\(--text\)/.test(DEVIS),
+  '… à l’encre, pas en gris');
+assert.ok(/#catProduit option\{[^}]*font-weight:400/.test(DEVIS),
+  'le produit, lui, reste en écriture normale');
+
 // --- 5. Ajouter à la demande ---------------------------------------------------
 
 const index = (texte) => {

@@ -42,6 +42,12 @@
 .cat-ligne .field{margin-bottom:0;min-width:0}
 .cat-ligne select,.cat-ligne input,.cat-ligne button{min-height:52px}
 .cat-ligne button{white-space:nowrap}
+/* Le menu des produits : la FAMILLE d'abord, en gras et à l'encre ; le
+   produit dessous, en écriture normale. Chrome rend l'intitulé d'un
+   `<optgroup>` en gris italique — au comptoir, à bout de bras, ça ne se lit
+   pas. Le fond gris clair de la famille sépare les blocs sans trait. */
+#catProduit optgroup{font-weight:800;font-style:normal;font-size:15px;color:var(--text);background:#e9edf1}
+#catProduit option{font-weight:400;font-style:normal;font-size:15px;color:var(--text);background:#fff}
 @media(max-width:700px){.cat-ligne{grid-template-columns:1fr}.cat-ligne button{width:100%}}
 /* LA DEMANDE — une LIGNE par article, pas une carte. Un devis de dix articles
    tenait sur trois écrans : la vendeuse ne voyait plus ce qu'elle venait
