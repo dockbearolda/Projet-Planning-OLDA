@@ -26,6 +26,7 @@ const {
   getCommandeZones, getHiddenCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
+  getReglagesTextile, setReglagesTextile,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   logRequestChanges, logFicheChange, getRequestJournal,
   clientKey, nextClientCode,
@@ -643,6 +644,25 @@ app.put('/api/settings/whatsapp', asyncH(async (req, res) => {
   const message = await setWhatsappMessage(body.message);
   broadcast({ kind: 'settings' });
   res.json({ message });
+}));
+
+// Coûts et cadences qui pilotent le chiffrage textile du comptoir. Ils valent
+// pour l'atelier entier : deux postes ne doivent pas annoncer deux prix pour le
+// même article. Les valeurs hors bornes sont ignorées, pas refusées — un poste
+// resté sur l'ancien JS ne doit pas voir son enregistrement échouer en bloc.
+// GET → réglages · PUT { … } → fusionne avec l'existant, diffusé en SSE.
+app.get('/api/settings/textile', asyncH(async (req, res) => {
+  res.json(await getReglagesTextile());
+}));
+
+app.put('/api/settings/textile', asyncH(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Objet de réglages attendu' });
+  }
+  const reglages = await setReglagesTextile(body);
+  broadcast({ kind: 'settings' });
+  res.json(reglages);
 }));
 
 // ÉTAPES RANGÉES À LA MAIN. Glisser une carte réécrit les `position` en base :
