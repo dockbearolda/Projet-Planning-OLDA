@@ -1333,9 +1333,16 @@ function negBasculer(i){
   renderNeeds();
 }
 function negTargetDe(n){ return txNum((n.textile||{}).negTarget); }
+/* On écrit le prix demandé, on NE REDESSINE PAS la liste : `renderNeeds`
+   remplace tout `needsDisplay`, donc le champ lui-même repartait à chaque
+   frappe. Le curseur tombait après le premier chiffre — « 23 » se figeait
+   à « 2 » et les solutions s'ouvraient comme si la vendeuse avait validé.
+   Seules les solutions, qui vivent SOUS le champ, se réécrivent. */
 function negPoserTarget(i, valeur){
   needs[i].textile.negTarget = valeur;
-  renderNeeds();
+  const hote = document.getElementById(`negResultats-${i}`);
+  if(hote) negRemplirResultats(hote, i, needs[i]);
+  else renderNeeds();
 }
 
 /* Ce que la vendeuse dit au client, en une phrase. Le vocabulaire de l'écran du
@@ -1402,8 +1409,6 @@ function negPanneau(i, n){
     bloc.append(txEl('p', 'help', 'Cette ligne doit être chiffrée avant de négocier.'));
     return bloc;
   }
-  const target = negTargetDe(n);
-
   const haut = txEl('div', 'neg-saisie');
   const champ = txEl('div', 'field');
   const lab = txEl('label', null, 'Prix demandé par le client (HT / pièce)');
@@ -1414,32 +1419,49 @@ function negPanneau(i, n){
   input.value = (n.textile.negTarget ?? '');
   input.placeholder = `Actuellement ${money(c.sold)}`;
   input.oninput = () => negPoserTarget(i, input.value);
+  /* La molette sur un champ nombre change le prix sans qu'on l'ait tapé :
+     la vendeuse fait défiler les solutions et le montant bouge sous elle. */
+  input.addEventListener('wheel', () => input.blur(), { passive: true });
   champ.append(lab, input);
   haut.append(champ);
   haut.append(negLigne('Prix de revient / pièce', money(c.unitProductionCost)));
   haut.append(negLigne('Devis actuel', `${c.qty} × ${money(c.sold)}`));
   bloc.append(haut);
 
+  const resultats = txEl('div', 'neg-resultats');
+  resultats.id = `negResultats-${i}`;
+  negRemplirResultats(resultats, i, n);
+  bloc.append(resultats);
+  return bloc;
+}
+
+/* Tout ce qui dépend du prix demandé, et rien d'autre : ce bloc-là seul se
+   réécrit pendant la frappe, le champ au-dessus ne bouge pas. */
+function negRemplirResultats(hote, i, n){
+  hote.textContent = '';
+  const c = txCalc(n.textile);
+  if(!c) return;
+  const target = negTargetDe(n);
+
   if(!(target>0)){
-    bloc.append(txEl('p', 'help', 'Saisis le prix que le client demande : les solutions apparaissent aussitôt.'));
-    return bloc;
+    hote.append(txEl('p', 'help', 'Saisis le prix que le client demande : les solutions apparaissent aussitôt.'));
+    return;
   }
   if(target >= c.sold){
-    bloc.append(txEl('p', 'help', n.textile.negotiation
+    hote.append(txEl('p', 'help', n.textile.negotiation
       ? `L'accord en place est déjà à ${money(c.sold)} la pièce : le client demande plus cher que ce qu'il paie.`
       : `Ce prix est au-dessus du tarif actuel (${money(c.sold)}) : il n'y a rien à négocier.`));
-    return bloc;
+    return;
   }
 
   const perte = Math.max(0, c.total - c.qty*target);
-  bloc.append(txEl('div', 'neg-rappel',
+  hote.append(txEl('div', 'neg-rappel',
     `S'il obtient ${money(target)} sur ${c.qty} pièces sans contrepartie, l'atelier abandonne ${money(perte)}.`));
 
   const sols = TE().defaultNegotiationSolutions(c, target);
   TE().rankedScenarios(c, sols, target).forEach((r, rang) => {
-    bloc.append(negCarteSolution(i, c, target, r, rang));
+    hote.append(negCarteSolution(i, c, target, r, rang));
   });
-  return bloc;
 }
 
 /* La solution retenue se réécrit dans la SAISIE : les pièces livrées en plus
