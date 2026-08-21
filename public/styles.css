@@ -98,24 +98,27 @@
   --radius-card: 14px;
   --radius: 9px;
   --row-h: 76px;
-  --font: 'Inter', Arial, Helvetica, sans-serif;
+  --font: 'Manrope', Arial, Helvetica, sans-serif;
 }
 
-/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Inter, un caractère de la même famille
-   que celui de SumUp (Aktiv Grotesk, sous licence payante et donc impossible à
-   héberger ici). Un seul fichier de 48 Ko, à graisse variable de 100 à 900 :
-   pas de deuxième requête pour le gras. Sous-ensemble latin — tous les
-   caractères français y sont, « œ » et « € » compris.
+/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Manrope — c'est celle que le patron
+   veut, et Inter, essayée le 21/08, rendait mal sur les Windows de l'atelier
+   (variable non hintée : maigre et sale sous DirectWrite aux petites tailles,
+   alors qu'elle passe très bien sur Mac). Un seul fichier de 25 Ko, à graisse
+   variable de 200 à 800 : pas de deuxième requête pour le gras. Un
+   `font-weight:900` posé dans une règle retombe donc sur 800, comme avant.
+   Sous-ensemble latin — tous les caractères français y sont, « œ » et « € »
+   compris.
    `swap` et non `block` : le texte doit s'afficher tout de suite, Arial fait
    le relais le temps du chargement. Contrairement aux icônes, un mot en Arial
    se lit très bien ; une icône pas encore prête, elle, s'écrit en toutes
    lettres — d'où les deux réglages opposés. */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Manrope';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 200 800;
   font-display: swap;
-  src: url('inter-latin-variable.woff2') format('woff2-variations');
+  src: url('manrope-latin-variable.woff2') format('woff2');
 }
 
 /* ---------------------------------------------------------------- Thème sombre

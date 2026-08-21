@@ -9,9 +9,10 @@
    d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
    même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
    un poste s'ouvre sans dépendre d'un tiers joignable.
-   Inter, de la même famille que le caractère de SumUp (Aktiv Grotesk, sous
-   licence payante). Un seul fichier de 48 Ko, graisse variable 100-900. */
-@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('../inter-latin-variable.woff2') format('woff2-variations')}
+   Manrope : celle du patron. Inter, essayée le 21/08, rendait mal sur les
+   Windows de l'atelier — variable non hintée, DirectWrite la sort maigre et
+   sale aux petites tailles. Un fichier de 25 Ko, graisse variable 200-800. */
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../manrope-latin-variable.woff2') format('woff2')}
 </style>
 <title>Atelier OLDA — Demande de devis V20 Téléchargements contrôlés</title>
 <style>
@@ -171,7 +172,14 @@
      demande (avec ses miroirs), le blocage ne servait a rien. -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-body{font-family:'Inter',Arial,sans-serif!important}
+body{font-family:'Manrope',Arial,sans-serif!important}
+/* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
+   Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
+   zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
+   rien de ce qui les entoure — d'où l'écran bariolé, champ par champ.
+   `inherit` et non un nom en dur : dans le ticket de l'atelier, qui compose en
+   Courier, les champs doivent rester en Courier. */
+input,select,textarea,button{font-family:inherit!important}
 header{background:#1c3d6e!important;padding:22px 26px!important}
 header p{color:#c3cede!important}
 .card{border-radius:16px!important;border-color:#e4e8ee!important;box-shadow:0 4px 18px rgba(16,24,40,.06)!important}
@@ -303,11 +311,11 @@ h2{letter-spacing:-.01em}
 .demande-corps .need-perso{grid-column:1/-1;min-height:36px;margin-top:6px;font-size:13.5px;padding:7px 11px!important}
 /* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait
    les tablettes, parties au rebut. Des boutons discrets, alignés à droite. */
-.demande-corps .need-actions{grid-column:1/-1;margin-top:7px;gap:6px;justify-content:flex-end}
+.demande-corps .need-actions{grid-column:1/-1;margin-top:7px;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 /* La feuille « Esprit SumUp » plus haut impose `padding:13px 22px!important`
    à toutes les pilules : sans `!important` ici, la ligne du panneau garde des
    boutons de pleine taille et chaque article coûte 45 px de hauteur. */
-.demande-corps .need-actions button{min-height:31px;padding:5px 12px!important;font-size:12px}
+.demande-corps .need-actions button{min-height:31px;padding:5px 8px!important;font-size:11.5px;letter-spacing:-.01em}
 .demande-corps .need-perso:not(:focus):placeholder-shown{background:#fff;border-style:dashed;border-color:#e2e7ec}
 
 /* Le prix tient sur la même rangée que le nom, aligné à droite : c'est la
@@ -1665,6 +1673,20 @@ function ouvrirArticle(i,ev){
   if(articleOuvert>=0)$('detailArticle').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+/* Le raccourci de la ligne : « le client trouve ça cher » est le geste le
+   plus courant du comptoir, il ne doit pas coûter un détour par le chiffrage.
+   On ouvre le détail ET la négociation d'un coup. */
+function ouvrirNegociation(i){
+  const n=needs[i];
+  if(!n||!n.textile)return;
+  articleOuvert=i;negOuvert=i;
+  renderNeeds();
+  $('detailArticle').scrollIntoView({behavior:'smooth',block:'nearest'});
+  /* Le champ est là pour être rempli : on y met le curseur tout de suite. */
+  const champ=$(`negTarget-${i}`);
+  if(champ)champ.focus();
+}
+
 /* LA DEMANDE SE MONTE À DROITE. Trois tasses et deux tee-shirts sont deux
    lignes du MÊME panneau : c'est le seul endroit qui compose une ligne
    d'article, quel que soit le formulaire qui l'a créée. */
@@ -1678,7 +1700,7 @@ function renderNeeds(){
     const prix=chiffre
       ? `<b>${money(n.unitHT*n.qty)}</b><span>${money(n.unitHT)} / pièce</span>`
       : '<b>À chiffrer</b>';
-    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div>${detail?`<div class="need-meta">${detail}</div>`:''}</div><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div><div class="need-actions">${n.textile?`<button class="secondary" onclick="ouvrirArticle(${i})">Chiffrage</button>`:''}<button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`
+    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div>${detail?`<div class="need-meta">${detail}</div>`:''}</div><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div><div class="need-actions">${n.textile?`<button class="secondary" onclick="ouvrirNegociation(${i})">Négociation</button><button class="secondary" onclick="ouvrirArticle(${i})">Chiffrage</button>`:''}<button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`
   }).join(''):`<div class="demande-vide"><svg class="demande-vide-ic" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5.4 8h13.2l-1.1 11.2a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg><b>Aucun article</b><span>Choisis un produit à gauche : il s’ajoute ici, avec sa quantité.</span></div>`;
   if(editingNeed<0)$('needFormTitle').textContent=`Besoin n°${needs.length+1}`;
   renderDetailArticle();txRefreshTotals();updateSidebar();
