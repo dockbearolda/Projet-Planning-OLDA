@@ -1104,16 +1104,14 @@
    « !important » à contrecœur : les deux écrans imposent déjà
    « input,select,textarea{padding:13px 14px!important} », et sans ça le texte
    saisi passe SOUS le chevron et sous la pastille. */
-.menu>input{padding-right:40px!important}
 .menu>.menu-pastille{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;pointer-events:none}
 .menu.a-pastille>input{padding-left:42px!important}
-/* Un doigt ne se retourne pas quand la liste s'ouvre — à l'envers il ne veut
-   plus rien dire. C'est sa COULEUR qui répond : gris au repos, encre dès que
-   le champ est survolé ou ouvert. */
-.menu-doigt{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:17px;height:17px;
-  color:#8b9199;pointer-events:none;transition:color .14s ease}
-.menu-declencheur .menu-doigt{position:static;transform:none;flex:none}
-.menu:hover .menu-doigt,.menu.est-ouvert .menu-doigt{color:#111827}
+/* LE DOIGT EST LE CURSEUR DE LA SOURIS, PAS UNE IMAGE POSÉE DANS LE CHAMP.
+   Un champ qui propose un choix se clique — donc la main. Rien dans le champ :
+   ni chevron, ni pictogramme, la place revient au texte saisi. Le déclencheur
+   d'une liste porte déjà son curseur main ; c'est le champ LIBRE qui affichait
+   un curseur de texte et se lisait comme une simple zone de frappe. */
+.menu>input{cursor:pointer}
 /* La référence en chiffres alignés : c'est elle qui ouvre la ligne. */
 .menu-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
   font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
@@ -1154,14 +1152,15 @@
    du catalogue, les autres n'en avaient aucun : on ne savait jamais où
    chercher. Elle est épinglée AU-DESSUS du filtre, hors de la liste, donc ni
    emportée par une recherche ni repoussée par le défilement. */
-.menu-manuel{display:flex;align-items:center;gap:10px;width:100%;padding:12px;border:0;
-  border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:14px;font-weight:800;
-  color:#111827;text-align:left;cursor:pointer}
-.menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;outline:none}
+/* Une ligne, pas une bannière : un « + » et un mot. Elle doit se voir sans
+   se mettre devant la liste — c'est un raccourci, pas la réponse attendue. */
+.menu-manuel{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border:0;
+  border-bottom:1px solid #eceff2;background:#fff;font:inherit;font-size:13px;font-weight:700;
+  color:#525960;text-align:left;cursor:pointer}
+.menu-manuel:hover,.menu-manuel:focus-visible{background:#f5f6f8;color:#111827;outline:none}
 .menu-mention{margin:0;padding:9px 12px;border-bottom:1px solid #eceff2;background:#fafbfc;
   font-size:12px;color:#767d85}
-.menu-plus{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;
-  background:#111827;color:#fff;font-size:15px;font-weight:800;line-height:1}
+.menu-plus{flex:none;font-size:16px;font-weight:800;line-height:1;color:inherit}
 .menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid #eceff2;background:#fafbfc}
 .menu-saisie input{flex:1 1 auto;min-width:0;font-size:15px;padding:9px 11px}
 .menu-saisie button{flex:none;border:0;border-radius:9px;padding:9px 14px;background:#111827;
@@ -1172,7 +1171,7 @@
 .menu.est-saisie .menu-manuel,.menu.est-saisie .menu-tete,.menu.est-saisie .menu-liste{display:none}
 /* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
 .menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
-@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-doigt,.menu-declencheur{transition:none}}
+@media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-declencheur{transition:none}}
 `;
 
   function poserStyleMenu() {
@@ -1216,29 +1215,6 @@ function menuRenvoiManuel(hote){
 }
 
 function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
-
-/* UN DOIGT, PAS UN CHEVRON. Le chevron dit « il y a autre chose en dessous » ;
-   au comptoir la question n'est pas là, c'est « est-ce que ça se clique ? ».
-   Le doigt le dit sans un mot, et le dit pareil sur les vingt-cinq champs. */
-function menuDoigt(){
-  const NS='http://www.w3.org/2000/svg';
-  const svg=document.createElementNS(NS,'svg');
-  svg.setAttribute('class','menu-doigt');
-  svg.setAttribute('viewBox','0 0 24 24');
-  svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
-  svg.setAttribute('stroke-width','1.7');svg.setAttribute('stroke-linecap','round');
-  svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');
-  for(const d of [
-    'M9.2 11.4V5.4a1.7 1.7 0 0 1 3.4 0v5.3',
-    'M12.6 10.7V9.3a1.6 1.6 0 0 1 3.2 0v1.4',
-    'M15.8 10.9v-.8a1.6 1.6 0 0 1 3.2 0v4.6a5.6 5.6 0 0 1-5.6 5.6h-1.5a5.5 5.5 0 0 1-4.2-1.9l-2.9-3.4a1.7 1.7 0 0 1 2.5-2.3l1.9 1.9',
-  ]){
-    const p=document.createElementNS(NS,'path');
-    p.setAttribute('d',d);
-    svg.append(p);
-  }
-  return svg;
-}
 
 /* Les options telles qu'elles existent à l'instant T. On les relit à CHAQUE
    ouverture : `txPopulateSelects` et `onTextileRefChange` réécrivent le contenu
@@ -1292,7 +1268,6 @@ function menuPoser(hote){
     }
     hote.setAttribute('autocomplete','off');
     declencheur=hote;
-    peau.append(menuDoigt());
   }else{
     declencheur=document.createElement('div');
     declencheur.className='menu-declencheur';
@@ -1338,7 +1313,7 @@ function menuPoser(hote){
   manuel.className='menu-manuel';
   const plus=document.createElement('span');
   plus.className='menu-plus';plus.setAttribute('aria-hidden','true');plus.textContent='+';
-  const motManuel=hote.dataset.menuManuelTexte||'Saisir autre chose…';
+  const motManuel=hote.dataset.menuManuelTexte||'Ajouter';
   const mot=document.createElement('span');
   mot.textContent=motManuel;
   manuel.append(plus,mot);
@@ -1347,7 +1322,7 @@ function menuPoser(hote){
   saisie.className='menu-saisie';
   const champLibre=document.createElement('input');
   champLibre.type='text';champLibre.autocomplete='off';
-  champLibre.placeholder='Ce qui n’est pas dans la liste…';
+  champLibre.placeholder='À ajouter…';
   champLibre.setAttribute('aria-label',motManuel);
   const valider=document.createElement('button');
   valider.type='button';valider.textContent='Valider';
@@ -1432,7 +1407,7 @@ function menuPeindreChamp(etat){
   const t=document.createElement('span');
   t.className='menu-texte'+(choisie&&choisie.valeur?'':' est-vide');
   t.textContent=choisie?choisie.texte:'Choisir…';
-  declencheur.append(t,menuDoigt());
+  declencheur.append(t);
   /* Le texte est coupé à l'ellipse dans un champ étroit : l'infobulle rend la
      ligne entière sans avoir à rouvrir la liste. */
   declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';

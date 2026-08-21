@@ -300,17 +300,21 @@ assert.ok(/Recharge la page\.';\s*\$\('txPreview'\)\.classList\.remove\('hidden'
 // Le chevron répondait à « il y a autre chose en dessous ». Au comptoir la
 // question n'est pas celle-là, c'est « est-ce que ça se clique ? ». Le doigt
 // le dit sans un mot, et le dit pareil sur les vingt-cinq champs.
-assert.ok(!/menu-chevron|menuChevron/.test(PONT),
-  'plus une seule flèche au bout d’un champ qui se déplie');
-assert.ok(/svg\.setAttribute\('class','menu-doigt'\)/.test(PONT),
-  'le composant dessine un doigt');
-assert.ok(/peau\.append\(menuDoigt\(\)\)/.test(PONT) && /declencheur\.append\(t,menuDoigt\(\)\)/.test(PONT),
-  'les deux familles de champ — libre et liste — portent le MÊME repère');
-// Un doigt à l'envers ne veut plus rien dire : c'est la couleur qui répond à
-// l'ouverture, pas une rotation.
-assert.ok(!/\.menu\.est-ouvert[^\n]*rotate\(180deg\)/.test(PONT),
-  'le doigt ne se retourne pas quand la liste s’ouvre');
-assert.ok(/\.menu:hover \.menu-doigt,\.menu\.est-ouvert \.menu-doigt\{color:#111827\}/.test(PONT),
-  'il fonce au survol et à l’ouverture — hover et focus sont les interactions de ce poste');
+assert.ok(!/menu-chevron|menuChevron|menu-doigt|menuDoigt/.test(PONT),
+  'RIEN dans le champ : ni flèche, ni pictogramme — la place revient au texte');
+// LE DOIGT EST LE CURSEUR. Un champ qui propose un choix se clique : la main
+// le dit au survol. Le déclencheur d'une liste l'avait déjà ; c'est le champ
+// LIBRE qui affichait un curseur de texte et se lisait comme une zone de
+// frappe ordinaire.
+assert.ok(/\.menu>input\{cursor:pointer\}/.test(PONT),
+  'un champ libre qui propose un choix montre la main, pas le curseur de texte');
+assert.ok(/\.menu-declencheur\{[^}]*cursor:pointer/.test(PONT),
+  'le déclencheur d’une liste aussi');
+// « Saisir autre chose… » barrait le haut du panneau comme une bannière. Un
+// raccourci se montre, il ne passe pas devant la réponse attendue.
+assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
+  'l’ajout manuel tient en un « + » et un mot');
+assert.ok(/\.menu-manuel\{[^}]*font-size:13px;font-weight:700;\s*color:#525960/.test(PONT),
+  'il se lit sans se mettre devant la liste');
 
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
