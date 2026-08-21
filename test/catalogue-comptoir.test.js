@@ -306,8 +306,14 @@ assert.strictEqual((html.match(/<optgroup /g) || []).length, groupes.length,
   'chaque famille est un groupe du menu — la vendeuse cherche par famille');
 assert.strictEqual((html.match(/<option value="\d+"/g) || []).length, plat.length,
   'chaque ligne vendable est une ligne du menu');
-assert.ok(html.includes('<optgroup label="Tasse céramique 350 ml (extérieur / intérieur)">'),
+assert.ok(html.includes('<optgroup label="TASSE CÉRAMIQUE 350 ML (extérieur / intérieur)">'),
   'le groupe des tasses dit lequel des deux tons est le dehors');
+// Sur macOS, Chrome dessine le menu avec le contrôle du système et IGNORE le
+// CSS : la famille ne se distingue que par son TEXTE.
+assert.ok(/label="[A-ZÀ-Ý0-9 '’&-]+(\([^)]*\))?"/.test(html),
+  'la famille s’écrit en capitales : c’est ce qui se lit dans un menu natif');
+assert.strictEqual(cat.CATALOGUE[0].famille, 'Art de la table',
+  '… mais la catégorie posée sur la ligne garde sa casse normale');
 
 // Chrome écrit l'intitulé d'un `<optgroup>` en gris italique : au comptoir, à
 // bout de bras, la famille ne se lisait pas. Elle passe en gras à l'encre, le

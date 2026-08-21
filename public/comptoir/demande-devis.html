@@ -829,7 +829,11 @@ function remplirSelectCatalogue(){
   let html='<option value="">Choisir un produit…</option>'+
     '<option value="__manuel">+ Saisie manuelle — produit hors catalogue</option>';
   lignesCatalogue().forEach(g=>{
-    html+=`<optgroup label="${esc(g.famille+(g.note?' ('+g.note+')':''))}">`+
+    /* LA FAMILLE EN CAPITALES. Sur macOS — le poste du patron — Chrome
+       dessine le menu avec le contrôle du système et IGNORE le CSS : l'encre
+       grasse posée sur `optgroup` n'y change rien, l'intitulé reste gris. Ce
+       qui se lit partout, c'est le texte lui-même. */
+    html+=`<optgroup label="${esc(g.famille.toUpperCase()+(g.note?' ('+g.note+')':''))}">`+
       g.lignes.map(l=>`<option value="${CAT_LIGNES.push(l)-1}">${esc(l.texte)}</option>`).join('')+'</optgroup>';
   });
   sel.innerHTML=html;
