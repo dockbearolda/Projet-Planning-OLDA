@@ -105,7 +105,7 @@ assert.ok(/\[\$\('txRef'\),\$\('txPrintType'\),\$\('txMarkColor'\)\]\.forEach\(m
 
 // Les options sont relues À CHAQUE ouverture : le formulaire les réécrit en
 // cours de route (coloris d'une référence, genres d'une famille).
-assert.ok(/function menuFiltrees\(etat\)\{[\s\S]{0,260}?const toutes=menuOptions\(etat\.hote\)/.test(PONT),
+assert.ok(/function menuProposees\(etat\)\{[\s\S]{0,200}?return menuOptions\(etat\.hote\)\.filter/.test(PONT),
   'la liste se construit sur les options du moment, jamais sur une copie figée');
 
 // --- 4. Les sorties ----------------------------------------------------------
@@ -247,8 +247,20 @@ assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.men
 // ligne du haut y renvoie, et la liste ne la montre plus.
 assert.ok(/const MENU_VALEURS_LIBRES=\['__new__','__manuel','__CUSTOM__'\]/.test(PONT),
   'les trois valeurs conventionnelles d’entrée libre sont reconnues d’office');
-assert.ok(/const renvoi=menuRenvoiManuel\(etat\.hote\);\s*const toutes=menuOptions\(etat\.hote\)\.filter\(o=>renvoi===undefined\|\|o\.valeur!==renvoi\)/.test(PONT),
+assert.ok(/\(renvoi===undefined\|\|o\.valeur!==renvoi\)/.test(PONT),
   'l’option vers laquelle la ligne renvoie sort de la liste — sinon elle y est deux fois');
+// « — Choisir une référence — » en tête de liste, mise en avant comme le choix
+// EN COURS, alors que c'est exactement ce que le champ fermé affiche déjà.
+assert.ok(/const rienChoisi=etat\.hote\.value==='';\s*return menuOptions\(etat\.hote\)\.filter\(o=>\s*\(renvoi===undefined\|\|o\.valeur!==renvoi\) && !\(rienChoisi&&o\.valeur===''\)\)/.test(PONT),
+  'la ligne d’attente ne se propose pas tant que rien n’est choisi…');
+// … mais elle revient ensuite : sur « Délai souhaité », « Non précisée » n'est
+// pas un libellé d'attente, c'est une réponse — et le seul chemin de retour.
+assert.ok(/rienChoisi&&o\.valeur===''/.test(PONT),
+  '… et redevient proposable une fois une vraie valeur prise');
+// Le compteur portait sur le contenu brut du <select> : « 49 / 50 » alors que
+// rien n'était filtré.
+assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(PONT),
+  'le compteur compte ce qui est proposé, pas ce que le <select> contient');
 
 // UNE VALEUR LIBRE NE DOIT JAMAIS DEVENIR UNE CLÉ DE BARÈME. `DB.times[x]` et
 // `DB.printTypes[x]` rendent `{}` pour une valeur inconnue : le marquage

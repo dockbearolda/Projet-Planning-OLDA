@@ -1440,11 +1440,25 @@ function menuPeindreChamp(etat){
   declencheur.title=choisie&&choisie.valeur?[choisie.jeton,choisie.texte].filter(Boolean).join(' — '):'';
 }
 
-function menuFiltrees(etat){
-  /* L'option vers laquelle la ligne du haut renvoie ne se montre pas DEUX
-     fois : elle est déjà là, épinglée, en tête du panneau. */
+/* CE QUI EST RÉELLEMENT PROPOSÉ, relu à chaque ouverture — le formulaire
+   réécrit les options en cours de route. Deux lignes n'en sont pas :
+   - l'entrée libre est déjà épinglée en tête du panneau, elle n'y est pas deux
+     fois ;
+   - « — Choisir une référence — », « Sélectionner une option », « Non
+     précisée »… tant que RIEN n'est choisi, c'est exactement ce que le champ
+     fermé affiche déjà : une ligne de plus qui ne choisit rien. Elle revient
+     dès qu'une vraie valeur est prise, parce qu'elle devient alors le seul
+     chemin de retour — sur « Délai souhaité », « Non précisée » n'est pas un
+     libellé d'attente, c'est une réponse. */
+function menuProposees(etat){
   const renvoi=menuRenvoiManuel(etat.hote);
-  const toutes=menuOptions(etat.hote).filter(o=>renvoi===undefined||o.valeur!==renvoi);
+  const rienChoisi=etat.hote.value==='';
+  return menuOptions(etat.hote).filter(o=>
+    (renvoi===undefined||o.valeur!==renvoi) && !(rienChoisi&&o.valeur===''));
+}
+
+function menuFiltrees(etat){
+  const toutes=menuProposees(etat);
   /* Un champ libre ne filtre QU'À PARTIR de la première frappe : à l'ouverture
      il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
      valeur-là — cliquer doit montrer toute la liste. */
@@ -1463,7 +1477,9 @@ function menuPeindre(etat){
   etat.vus=vus;
   etat.vise=Math.min(Math.max(etat.vise,0),vus.length-1);
 
-  const toutes=menuOptions(etat.hote).length;
+  /* Le compteur porte sur ce qui est PROPOSÉ, pas sur le contenu brut du
+     <select> : il affichait « 49 / 50 » alors que rien n'était filtré. */
+  const toutes=menuProposees(etat).length;
   /* UNE SEULE RECHERCHE SUR L'ÉCRAN, celle de la référence — c'est la seule
      liste qu'on ne parcourt pas des yeux. Partout ailleurs le champ de filtre
      et son compteur sont un deuxième champ dans le champ : on le pose donc à
