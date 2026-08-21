@@ -326,9 +326,6 @@ h2{letter-spacing:-.01em}
 .tx-argent span{display:block;font-size:11px;font-weight:800;color:var(--muted)}
 .tx-argent b{display:block;font-size:15px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
 .tx-argent .tx-fort b{font-size:20px;font-weight:900}
-/* Le classement de l'atelier était collé au chiffre, dans la même valeur :
-   « 436,74 € ⭐ PRIORITÉ OLDA » se lisait comme un seul nombre. */
-.tx-argent .tx-atelier{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;color:#3f4650;background:#eef0f3;border-radius:999px;padding:3px 9px}
 .tx-base{color:var(--muted);font-size:12.5px;line-height:1.4;margin-top:10px}
 .tx-card-metrics{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;font-size:13px}
 .tx-card-metrics span{color:#6d747b}
@@ -1373,15 +1370,6 @@ function txMetric(label,value,cls){
   return wrap;
 }
 
-/* LE CLASSEMENT DE L'ATELIER SE DÉTACHE DU CHIFFRE. « 436,74 € ⭐ PRIORITÉ
-   OLDA » tenait dans une seule valeur : les deux se lisaient d'un bloc, et la
-   mention finissait par passer à la ligne toute seule. */
-function txAtelier(c){
-  const cell=txEl('div');
-  cell.append(txEl('span',null,'Marge / heure'),txEl('b',null,Number.isFinite(c.eurH)?money(c.eurH):'—'));
-  if(c.atelier&&c.atelier!=='—')cell.append(txEl('span','tx-atelier',c.atelier));
-  return cell;
-}
 
 /* CE QUE LA VENDEUSE VIENT D'ÉCRIRE, avec les MÊMES INTITULÉS que les champs
    du formulaire. Le récapitulatif portait « K3008 · Coconut Milk · Poitrine +
@@ -1447,7 +1435,7 @@ function previewTextile(){
     txMetric('Total HT',money(c.total),'tx-fort'),
     txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
     txMetric('Temps de production',TE().fmtTime(c.prodHours)),
-    txAtelier(c)
+    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
   );
 
   const base=txEl('div','tx-base',`Base : textile ${money(c.baseTextile)} + marquage ${money(c.basePrint)}`
@@ -1800,7 +1788,7 @@ function renderDetailArticle(){
     txMetric('Total HT',money(c.total),'tx-fort'),
     txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
     txMetric('Temps prod.',TE().fmtTime(c.prodHours)),
-    txAtelier(c)
+    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
   );
 
   const bloc=txEl('div');

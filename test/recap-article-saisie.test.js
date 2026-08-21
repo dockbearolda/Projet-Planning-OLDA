@@ -143,11 +143,13 @@ assert.ok(/txSaisieBloc\(d\)/.test(apercu),
 const detail = source('renderDetailArticle', '');
 assert.ok(/txSaisieBloc\(n\.textile\)/.test(detail),
   'la fiche ouverte à gauche relit la saisie de l’article');
-// Le classement de l'atelier est une PASTILLE, pas la fin d'un nombre :
-// « 436,74 € ⭐ PRIORITÉ OLDA » se lisait d'un bloc.
-assert.ok(!/money\(c\.eurH\):'—'\} \$\{c\.atelier\}/.test(DEVIS),
-  'le classement de l’atelier ne se colle plus au chiffre');
-assert.ok(/function txAtelier\(c\)\{/.test(DEVIS) && /txEl\('span','tx-atelier',c\.atelier\)/.test(DEVIS),
-  '… il a sa propre pastille');
+// Le classement de l'atelier (« ⭐ PRIORITÉ OLDA ») ne s'affiche plus du tout :
+// il tenait d'abord dans la valeur — « 436,74 € ⭐ PRIORITÉ OLDA » se lisait
+// d'un bloc — puis en pastille, que le patron a retirée le 21/08. La marge à
+// l'heure reste, c'est le chiffre.
+assert.ok(!/c\.atelier/.test(DEVIS),
+  'le classement de l’atelier ne s’affiche nulle part sur l’écran du comptoir');
+assert.ok(/txMetric\('Marge \/ heure'/.test(DEVIS),
+  '… la marge à l’heure, elle, reste une case comme les autres');
 
 console.log('✓ récapitulatif : les intitulés des champs, tout ce qui est saisi, rien de ce qui est vide');
