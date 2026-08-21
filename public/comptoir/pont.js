@@ -1202,7 +1202,13 @@
    même question en même temps, c'est une hésitation de plus au comptoir. */
 .menu.est-saisie .menu-saisie{display:flex}
 .menu.est-saisie .menu-manuel,.menu.est-saisie .menu-tete,.menu.est-saisie .menu-liste{display:none}
-/* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur. */
+/* Un menu fermé n'a pas de champ à rougir : c'est sa peau qui porte l'erreur.
+   Mais .invalid est une règle GÉNÉRALE, écrite pour un <input>, et elle
+   pose son cadre et son fond en !important : sur l'enveloppe — qui n'a
+   aucun arrondi — elle dessinait un SECOND rectangle rouge, à angles droits,
+   autour de la bulle déjà rougie. L'enveloppe porte la classe, la bulle
+   porte le rouge. (Elle gagne : deux classes valent mieux qu'une.) */
+.menu.invalid{border:0!important;background:transparent!important;box-shadow:none!important}
 .menu.invalid .menu-declencheur{border:2px solid var(--red);background:var(--red-soft)}
 @media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-declencheur{transition:none}}
 `;
