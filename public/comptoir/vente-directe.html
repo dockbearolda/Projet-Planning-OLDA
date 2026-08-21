@@ -4,7 +4,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
+   de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
+   d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
+   même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
+   un poste s'ouvre sans dépendre d'un tiers joignable.
+   Inter, de la même famille que le caractère de SumUp (Aktiv Grotesk, sous
+   licence payante). Un seul fichier de 48 Ko, graisse variable 100-900. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('../inter-latin-variable.woff2') format('woff2-variations')}
+</style>
 <title>Atelier OLDA — Vente directe complète</title>
 <style>
 :root{
@@ -628,7 +637,7 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
 
 </style>
 <style>
-body{font-family:'Manrope',Arial,sans-serif!important}
+body{font-family:'Inter',Arial,sans-serif!important}
 header{background:#1c3d6e!important;padding:22px 26px!important}
 header h1{letter-spacing:-.01em}
 header p{color:#c3cede!important}

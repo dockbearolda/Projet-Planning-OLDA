@@ -75,6 +75,9 @@ const COQUILLE = [
   // La police d'icônes : sans elle, toute la barre de navigation se réduit à la
   // première lettre de chaque icône.
   '/olda-icones.woff2',
+  // La police de texte. Absente, tout retombe sur Arial : lisible, mais le
+  // poste n'a plus la même tête d'une ouverture à l'autre.
+  '/inter-latin-variable.woff2',
   '/manifest.webmanifest',
 ];
 
