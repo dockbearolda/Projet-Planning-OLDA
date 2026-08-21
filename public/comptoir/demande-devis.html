@@ -231,7 +231,7 @@ h2{letter-spacing:-.01em}
 .neg-saisie>div:not(.field){font-size:13px}
 .neg-saisie>div:not(.field) span{color:#6d747b;display:block}
 .neg-saisie>div:not(.field) b{font-size:15px;font-variant-numeric:tabular-nums}
-.neg-rappel{background:#fff6e8;border:1px solid #e7bb7e;border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:700;margin-bottom:12px}
+
 .neg-sol{border:1px solid #e4e8ee;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#fff}
 .neg-sol.is-best{border:2px solid #1c3d6e;background:#f7f9fc;padding:13px 15px}
 .neg-sol.is-bad{opacity:.6}
@@ -406,7 +406,7 @@ h2{letter-spacing:-.01em}
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
 
-<section id="step3" class="hidden"><div class="card"><div class="stage-head"><h2>2. Construction du projet</h2><div class="ref ref-display">—</div></div><div class="notice green">Le projet est construit à partir des besoins enregistrés. Le titre proposé reste modifiable.</div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"><div class="help">Ex. Uniformes et objets promotionnels — Restaurant La Terrasse</div></div>
+<section id="step3" class="hidden"><div class="card"><div class="stage-head"><h2>2. Construction du projet</h2><div class="ref ref-display">—</div></div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
 <div class="field priority-field" id="projectPriorityField">
   <label id="projectPriorityLabel">Priorité du projet *</label>
   <div class="priority-grid" id="projectPriorityGroup">
@@ -1570,10 +1570,6 @@ function negRemplirResultats(hote, i, n){
       : `Ce prix est au-dessus du tarif actuel (${money(c.sold)}) : il n'y a rien à négocier.`));
     return;
   }
-
-  const perte = Math.max(0, c.total - c.qty*target);
-  hote.append(txEl('div', 'neg-rappel',
-    `S'il obtient ${money(target)} sur ${c.qty} pièces sans contrepartie, l'atelier abandonne ${money(perte)}.`));
 
   const sols = TE().defaultNegotiationSolutions(c, target);
   TE().rankedScenarios(c, sols, target).forEach((r, rang) => {
