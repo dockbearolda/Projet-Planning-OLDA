@@ -120,10 +120,20 @@ assert.ok(/textileResume:txComment\(d\)/.test(DEVIS) && !/comment:txComment/.tes
   'le détail textile vit à part, jamais dans le champ de personnalisation');
 assert.ok(/if\(n\.textileResume\)out\.push\(\[no\+'Détail textile'/.test(DEVIS),
   '… et descend au récapitulatif sur sa propre ligne');
-// Un champ libre n'a pas d'option « selected » : sans valeur posée, le
-// marquage part au client en « Coeur + Dos () ».
-assert.ok(/if\(!\$\('txMarkColor'\)\.value\)\$\('txMarkColor'\)\.value=db\.markingColors\[0\]/.test(DEVIS),
-  'la couleur de marquage doit avoir une valeur par défaut');
+// Sans valeur posée, le marquage partait au client en « Coeur + Dos () ». Les
+// champs de l'article arrivent VIERGES depuis le 21/08 : ce n'est donc plus une
+// valeur par défaut qui protège, c'est le refus d'ajouter l'article. Trois de
+// ces quatre champs sont en plus des CLÉS DE BARÈME — vides, `DB.transports`,
+// `DB.times` et `DB.printTypes` rendent 0 et {}, et le devis part sous-facturé
+// sans la moindre erreur.
+assert.ok(/const TX_OBLIGATOIRES=\[[\s\S]*?'txTransport'[\s\S]*?'txGenre'[\s\S]*?'txPrintType'[\s\S]*?'txMarkColor'[\s\S]*?\];/.test(DEVIS),
+  'transport, genre, emplacement et couleur de marquage sont obligatoires');
+assert.ok(/const manque=txManquants\(\);\s*if\(manque\.length\)return fail\(manque\[0\]\[0\],manque\[0\]\[1\]\);/.test(DEVIS),
+  '… l’article ne s’ajoute pas tant qu’il en manque un');
+assert.ok(/const c=txManquants\(\)\.length\?null:txCalc\(d\);/.test(DEVIS),
+  '… et AUCUN prix ne s’affiche avant : un marquage à 0 € ne doit jamais se voir');
+assert.ok(!/new Option\(x,x,false,x==='Coeur \+ Dos'\)/.test(DEVIS) && !/value=db\.markingColors\[0\]/.test(DEVIS),
+  'plus aucune valeur posée d’office dans l’article');
 assert.ok(txComment, 'txComment doit exister et ne prendre que la saisie');
 assert.ok(!/c\.mark|txPct|prodHours|c\.margin|c\.sold|costSeries/.test(txComment),
   'le texte envoyé au client ne doit porter ni marge, ni coût, ni temps de production');
