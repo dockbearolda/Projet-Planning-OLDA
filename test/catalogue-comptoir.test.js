@@ -1,17 +1,17 @@
 'use strict';
 
-// LE CATALOGUE DU COMPTOIR — un produit, une quantité, au panier.
+// LE CATALOGUE DU COMPTOIR — un produit, une quantité, à la demande.
 // ===========================================================================
 // L'étape « Recueil des besoins » n'offrait qu'un formulaire : catégorie,
 // désignation, quantité, référence, couleur, production, commentaire. Pour
 // vendre un porte-clés en bois, la vendeuse remplissait six champs — debout,
 // au comptoir, le client en face. Les objets que l'atelier a EN RAYON sont
 // désormais des LIGNES dans une liste déroulante rangée par famille : elle
-// prend le produit, pose la quantité, ajoute au panier, recommence.
+// prend le produit, pose la quantité, ajoute à la demande, recommence.
 //
 // CE FICHIER GARDE CE QUI TOMBERAIT EN SILENCE :
 //
-//   1. LE PRODUIT FANTÔME. `Number('')` vaut ZÉRO : « Ajouter au panier »
+//   1. LE PRODUIT FANTÔME. `Number('')` vaut ZÉRO : « Ajouter à la demande »
 //      sans rien choisir posait la PREMIÈRE ligne du catalogue dans le devis
 //      — vu en cliquant, jamais en lisant.
 //   2. LE MÊME PRODUIT REPRIS. Il ajoute ses unités à la ligne qui existe,
@@ -23,7 +23,7 @@
 //      demande de devis sans prix ne doit pas s'afficher « 0 € ».
 //   4. LA VARIANTE DANS LA LIGNE. Bois/liège, clair/foncé, taille, coloris de
 //      tasse : chaque variante est SA propre ligne du menu. Aucun deuxième
-//      choix à faire, et deux variantes ne se confondent jamais au panier.
+//      choix à faire, et deux variantes ne se confondent jamais à la demande.
 //   5. LA SAISIE MANUELLE. Elle reste EN HAUT : le catalogue ne couvre pas
 //      tout (un textile, une commande spéciale) et rien de ce qui se faisait
 //      avant ne doit devenir plus long à faire. « Modifier » doit rouvrir ce
@@ -45,14 +45,14 @@ const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0
 assert.ok(!/Renseigne ce que le client demande/.test(DEVIS),
   'le bandeau explicatif de l’étape des besoins doit avoir disparu');
 
-// --- 2. Une ligne : produit, quantité, panier -------------------------------
+// --- 2. Une ligne : produit, quantité, demande ------------------------------
 
 assert.ok(/<select id="catProduit"><\/select>/.test(step2),
   'le catalogue est une LISTE DÉROULANTE, remplie par le script');
 assert.ok(/id="catQte"[^>]*type="number"[^>]*min="1"/.test(step2),
   'la quantité se pose à côté du produit');
-assert.ok(/onclick="ajouterAuPanier\(\)"/.test(step2),
-  '« Ajouter au panier » met la ligne dans le devis');
+assert.ok(/onclick="ajouterALaDemande\(\)"/.test(step2),
+  '« Ajouter à la demande » met la ligne dans le devis');
 assert.ok(/id="catStatus"[^>]*aria-live="polite"/.test(step2),
   'ce qui vient d’être ajouté s’annonce, pas seulement dans la liste du bas');
 
@@ -73,13 +73,64 @@ assert.ok(/function editNeed[\s\S]*?scrollIntoView/.test(DEVIS),
 assert.ok(/n===2&&!needs\.length\)return fail\('catProduit'/.test(DEVIS),
   'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié');
 assert.ok(/if\(editingNeed<0\)\$\('needFormTitle'\)\.textContent/.test(DEVIS),
-  'un ajout au panier ne doit pas effacer « Modifier le besoin n°X »');
+  'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 
 // Le doigt : ces trois-là se prennent debout, au comptoir.
 assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button\{min-height:52px\}/.test(DEVIS),
   'produit, quantité et bouton gardent une cible tactile pleine');
 assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
   'sur un téléphone la ligne se déplie en trois rangées');
+
+// La demande se lit en LIGNES, pas en cartes : dix articles tenaient sur trois
+// écrans et la vendeuse ne voyait plus ce qu'elle venait d'ajouter.
+const renderNeedsSrc = (DEVIS.match(/function renderNeeds\(\)\{[\s\S]*?\n/) || [''])[0];
+assert.ok(/need-ligne/.test(renderNeedsSrc) && !/need-card/.test(renderNeedsSrc),
+  'chaque article de la demande tient sur une ligne');
+assert.ok(/need-qte[\s\S]*?need-nom/.test(renderNeedsSrc),
+  'la quantité vient AVANT le nom : c’est elle qu’on relit');
+assert.ok(/editNeed\(\$\{i\}\)/.test(renderNeedsSrc) && /deleteNeed\(\$\{i\}\)/.test(renderNeedsSrc),
+  'modifier et supprimer restent sur la ligne');
+assert.ok(/\.need-actions button\{min-height:44px/.test(DEVIS),
+  'les deux boutons gardent leur cible tactile malgré la ligne serrée');
+
+// --- La barre du bas remplace la colonne de droite ------------------------
+// La carte « PROJET » répétait la référence (elle est sur l'étape), le statut
+// (le fil des étapes le dit) et la liste de ce qui manque (chaque étape la
+// donne au-dessus de son bouton). Elle poussait la saisie dans un couloir de
+// 320 px et disparaissait dès qu'on descendait.
+
+assert.ok(!/<aside class="sidebar">/.test(DEVIS),
+  'la colonne de droite a disparu : la saisie prend toute la largeur');
+['sideTitle', 'sideStatus', 'sidePrise', 'progressText', 'progressBar', 'missingList',
+  'getMissing', 'completion('].forEach((mort) => {
+  assert.ok(!DEVIS.includes(mort),
+    `« ${mort} » ne doit laisser ni élément ni code mort derrière lui`);
+});
+
+assert.ok(/<div class="barre-bas no-print" id="barreBas">/.test(DEVIS),
+  'le résumé rapide vit dans une barre en bas');
+// LE PIÈGE : la barre doit exister AVANT le script qui la remplit — sinon
+// `updateSidebar()` casse au chargement et le reste de l'amorçage ne tourne
+// jamais (select vide, aucun écouteur posé).
+assert.ok(DEVIS.indexOf('id="barreBas"') < DEVIS.indexOf('function updateSidebar'),
+  'la barre doit être posée avant le script qui l’écrit');
+
+const majBarre = (DEVIS.match(/function updateSidebar\(\)\{[\s\S]*?\n/) || [''])[0];
+const idsPage = new Set((DEVIS.match(/id="([^"]+)"/g) || []).map((m) => m.slice(4, -1)));
+(majBarre.match(/\$\('([A-Za-z0-9_-]+)'\)/g) || []).forEach((ref) => {
+  const id = ref.slice(3, -2);
+  assert.ok(idsPage.has(id), `le résumé écrit dans « ${id} », qui doit exister dans la page`);
+});
+
+assert.ok(/\.barre-bas\{[^}]*position:fixed/.test(DEVIS), 'la barre reste sous les yeux');
+assert.ok(/\.barre-bas\{[^}]*env\(safe-area-inset-bottom\)/.test(DEVIS),
+  'elle respecte la barre système de la tablette');
+assert.ok(/body\{padding-bottom:\d+px\}/.test(DEVIS),
+  'le corps garde la place de la barre : une barre fixe qui recouvre « suivant » est un bouton perdu');
+assert.ok(/@media print\{\.barre-bas\{display:none!important\}/.test(DEVIS),
+  'la barre ne s’imprime pas');
+assert.ok(/\.layout\{grid-template-columns:minmax\(0,1fr\)\}/.test(DEVIS),
+  'le parcours occupe toute la largeur, il n’y a plus de colonne à réserver');
 
 // --- 3. Le catalogue du patron, produit par produit -------------------------
 
@@ -122,7 +173,7 @@ const ATTENDU = {
 };
 
 // Le bloc du catalogue s'exécute pour de vrai : ce que fait « Ajouter au
-// panier » ne se lit pas dans une expression régulière.
+// demande » ne se lit pas dans une expression régulière.
 function bacASable() {
   const bloc = (DEVIS.match(/\/\* CATALOGUE-COMPTOIR[\s\S]*?\/\* \/CATALOGUE-COMPTOIR \*\//) || [''])[0];
   assert.ok(bloc, 'le bloc du catalogue doit être délimité dans la page');
@@ -143,7 +194,7 @@ function bacASable() {
     renderNeeds() {}, updateSidebar() {},
   };
   const fabrique = new Function('ctx', `with(ctx){${bloc}
-    return {CATALOGUE,ajouterAuPanier,catCle,lignesCatalogue,remplirSelectCatalogue};}`);
+    return {CATALOGUE,ajouterALaDemande,catCle,lignesCatalogue,remplirSelectCatalogue};}`);
   return Object.assign(fabrique(ctx), { needs: ctx.needs, els, echecs });
 }
 
@@ -200,7 +251,7 @@ assert.strictEqual((html.match(/<option value="\d+"/g) || []).length, plat.lengt
 assert.ok(html.includes('<optgroup label="Tasse céramique 350 ml (extérieur / intérieur)">'),
   'le groupe des tasses dit lequel des deux tons est le dehors');
 
-// --- 5. Ajouter au panier ---------------------------------------------------
+// --- 5. Ajouter à la demande ---------------------------------------------------
 
 const index = (texte) => {
   const i = plat.findIndex((l) => l.texte === texte);
@@ -212,7 +263,7 @@ const { catProduit, catQte, catStatus } = cat.els;
 // a) Rien de choisi : rien ne part. `Number('')` vaut zéro — sans garde,
 //    c'est « Bouchon Bois » qui se serait invité dans le devis.
 catProduit.value = '';
-cat.ajouterAuPanier();
+cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 0,
   'sans produit choisi, la première ligne du catalogue ne doit PAS s’ajouter');
 assert.deepStrictEqual(cat.echecs.map((e) => e.id), ['catProduit'],
@@ -221,24 +272,24 @@ assert.deepStrictEqual(cat.echecs.map((e) => e.id), ['catProduit'],
 // b) Un produit, une quantité.
 catProduit.value = index('Flasque Bois — Clair');
 catQte.value = '3';
-cat.ajouterAuPanier();
+cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 1, 'un produit ajouté = une ligne');
 assert.strictEqual(cat.needs[0].qty, 3, '… avec la quantité demandée');
 assert.strictEqual(catProduit.value, '', 'le menu repart à vide : reprendre la ligne d’avant est le geste qui double un article');
 assert.strictEqual(catQte.value, '1', '… et la quantité repart à 1');
-assert.ok(/Flasque Bois/.test(catStatus.textContent), 'ce qui part au panier s’annonce');
+assert.ok(/Flasque Bois/.test(catStatus.textContent), 'ce qui part à la demande s’annonce');
 
 // c) Le même produit repris : des unités, pas une deuxième ligne.
 catProduit.value = index('Flasque Bois — Clair');
 catQte.value = '2';
-cat.ajouterAuPanier();
+cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 1, 'le même produit repris ne rouvre pas de ligne');
 assert.strictEqual(cat.needs[0].qty, 5, '… il ajoute ses unités à la sienne');
 
 // d) Une autre variante est un autre article.
 catProduit.value = index('Flasque Bois — Foncé');
 catQte.value = '1';
-cat.ajouterAuPanier();
+cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 2, 'clair et foncé sont deux lignes');
 assert.deepStrictEqual(cat.needs.map((n) => n.color), ['Clair', 'Foncé'],
   'la variante choisie est celle qui part sur la ligne');
@@ -246,7 +297,7 @@ assert.deepStrictEqual(cat.needs.map((n) => n.color), ['Clair', 'Foncé'],
 // e) Quantité effacée d'un doigt : une unité, pas un blocage.
 catProduit.value = index('Shaker inox');
 catQte.value = '';
-cat.ajouterAuPanier();
+cat.ajouterALaDemande();
 assert.strictEqual(cat.needs[2].qty, 1, 'une quantité vide vaut une unité');
 
 // --- 6. Le besoin du catalogue est celui du formulaire ----------------------
@@ -279,4 +330,4 @@ const barre = (step2.match(/<div class="cat-top"[\s\S]*?<\/div>/) || [''])[0];
 assert.ok(/<svg /.test(barre) && !/<img|fonts\.googleapis|material-symbols/.test(barre),
   'l’icône de la saisie manuelle est dessinée dans la page');
 
-console.log('✓ catalogue comptoir : un produit, une quantité, au panier — et rien qui parte tout seul');
+console.log('✓ catalogue comptoir : un produit, une quantité, à la demande — et rien qui parte tout seul');
