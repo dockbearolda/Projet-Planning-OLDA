@@ -1422,6 +1422,48 @@ async function setWhatsappMessage(text) {
   return clean;
 }
 
+// --- Réglages de chiffrage textile -------------------------------------------
+// Coûts et cadences de l'ATELIER (DTF, pressage, coût horaire, arrondi) : ils
+// pilotent le prix calculé au comptoir. Ils appartiennent donc à l'atelier, pas
+// au navigateur d'un poste — un coût horaire corrigé sur un PC doit valoir pour
+// les autres, sinon deux postes annoncent deux prix pour le même article.
+// Stockés en clé/valeur applicative (app_meta.textile_settings, JSON).
+const TEXTILE_DEFAULTS = Object.freeze({
+  dtfCost: 7.56, dtfSpeed: 12, pressMin: 1.2, hourlyCost: 25, roundStep: 0.1, maxCoefQty: 150,
+});
+// Bornes hautes larges : elles n'existent que pour écarter une saisie absurde
+// (ou un corps de requête forgé), pas pour arbitrer un tarif.
+const TEXTILE_BORNES = Object.freeze({
+  dtfCost: [0, 1000], dtfSpeed: [0.1, 1000], pressMin: [0, 600],
+  hourlyCost: [0, 10000], roundStep: [0.01, 100], maxCoefQty: [1, 150],
+});
+
+function nettoyerReglagesTextile(brut) {
+  const out = { ...TEXTILE_DEFAULTS };
+  if (!brut || typeof brut !== 'object') return out;
+  for (const [cle, [min, max]] of Object.entries(TEXTILE_BORNES)) {
+    const v = Number(brut[cle]);
+    if (Number.isFinite(v) && v >= min && v <= max) out[cle] = v;
+  }
+  return out;
+}
+
+async function getReglagesTextile() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'textile_settings'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...TEXTILE_DEFAULTS };
+  try {
+    return nettoyerReglagesTextile(JSON.parse(rows[0].value));
+  } catch {
+    return { ...TEXTILE_DEFAULTS };
+  }
+}
+
+async function setReglagesTextile(patch) {
+  const propre = nettoyerReglagesTextile({ ...(await getReglagesTextile()), ...(patch || {}) });
+  await poserMeta('textile_settings', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Étapes rangées à la main (ordre manuel) ---------------------------------
 // Glisser une carte réécrit les `position` en base : le geste vaut donc pour
 // TOUS les postes. Or la décision « cette étape est rangée à la main » vivait,
@@ -1635,6 +1677,7 @@ module.exports = {
   getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
+  TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, getRequestJournal,
   clientKey, nextClientCode,

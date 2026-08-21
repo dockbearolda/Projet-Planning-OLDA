@@ -78,16 +78,21 @@ assert.ok(/function basculerSaisieManuelle\(force\)\{\n\s*const box=\$\('besoinM
   'le repli ne doit plus exiger un bouton qui n’existe plus');
 assert.ok(/function cancelNeedEdit\(\)\{[\s\S]*?basculerSaisieManuelle\(false\)\}/.test(DEVIS),
   '« Fermer » et « Annuler » referment le formulaire');
-assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
+assert.ok(/<div id="besoinAutreForm" class="hidden">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
   'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
 assert.ok(/<div id="besoinManuel" class="hidden">[\s\S]*id="needFormTitle"/.test(step2),
   'le formulaire détaillé est REPLIÉ, pas supprimé');
-assert.ok(/function editNeed\(i\)\{choisirTypeBesoin\('autre'\);basculerSaisieManuelle\(true\);/.test(DEVIS),
-  '« Modifier » doit rouvrir le formulaire replié');
+// Une ligne TEXTILE se remodifie dans son propre formulaire : la router vers
+// « Autre » perdrait tailles, marquage et négociation.
+assert.ok(/function editNeed\(i\)\{if\(needs\[i\]&&needs\[i\]\.textile\)return editTextileNeed\(i\);choisirTypeBesoin\('autre'\);basculerSaisieManuelle\(true\);/.test(DEVIS),
+  '« Modifier » doit rouvrir le formulaire replié — celui qui correspond à la ligne');
 assert.ok(/function editNeed[\s\S]*?scrollIntoView/.test(DEVIS),
   '… et l’amener sous les yeux : il s’ouvre en haut, le bouton est en bas de la liste');
-assert.ok(/n===2&&!needs\.length\)return fail\('catProduit'/.test(DEVIS),
-  'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié');
+// Depuis le 21/08 la tuile TEXTILE s'ouvre en premier : `catProduit` vit dans
+// « Autre » et se retrouve alors masqué. Le champ visé suit donc l'onglet
+// affiché — l'exigence n'a pas changé, son application couvre un cas de plus.
+assert.ok(/n===2&&!needs\.length\)return fail\(\$\('besoinAutreForm'\)\.classList\.contains\('hidden'\)\?'txRef':'catProduit'/.test(DEVIS),
+  'l’erreur « ajoute au moins un besoin » doit pointer sur un élément VISIBLE, pas sur un champ replié ou masqué');
 assert.ok(/if\(editingNeed<0\)\$\('needFormTitle'\)\.textContent/.test(DEVIS),
   'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 

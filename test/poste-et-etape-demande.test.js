@@ -197,24 +197,27 @@ assert.ok(/\.poste-choix-btn \{[\s\S]*?min-height: 64px;/.test(STYLES),
 
 // --- 8. Les deux familles de besoin -----------------------------------------
 // Le formulaire de recueil est celui d'« AUTRE » — le seul qui ait jamais
-// existé. Le TEXTILE aura le sien (tailles, coloris, emplacements) ; sa tuile
-// est posée maintenant, VIDE, pour que la place qui l'attend se voie.
+// existé, et il porte désormais le catalogue du rayon. Le TEXTILE a le sien
+// depuis le 21/08 : il chiffre tout seul, c'est lui qui s'ouvre en premier.
 
 const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
 assert.ok(/id="besoinTuileTextile"[^>]*data-type="textile"/.test(step2),
   'l’étape des besoins doit offrir une entrée Textile');
 assert.ok(/id="besoinTuileAutre"[^>]*data-type="autre"/.test(step2),
-  'et une entrée Autre — celle du formulaire actuel');
-assert.ok(/id="besoinTuileAutre"[^>]*class="besoin-tuile is-on"|class="besoin-tuile is-on"[^>]*id="besoinTuileAutre"/.test(step2),
-  '« Autre » reste allumé par défaut : on vient de retirer une étape à ce parcours, pas d’en rajouter un tap');
-assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
-  'le formulaire entier doit tenir dans l’enveloppe qu’on masque — titre et bouton compris');
-assert.ok(/id="besoinTextileVide"/.test(step2) && /parcours Textile arrive/.test(step2),
-  'la tuile Textile ne mène pas à un panneau muet : elle DIT que le parcours arrive');
+  'et une entrée Autre — celle du catalogue et de la saisie libre');
+assert.ok(/id="besoinTuileTextile"[^>]*class="besoin-tuile is-on"|class="besoin-tuile is-on"[^>]*id="besoinTuileTextile"/.test(step2),
+  '« Textile » est allumé par défaut : c’est le parcours qui chiffre');
+assert.ok(/<div id="besoinAutreForm" class="hidden">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
+  'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
+assert.ok(/<div id="besoinTextileForm">[\s\S]*id="txSaveBtn"/.test(step2),
+  'la tuile Textile ne mène plus à un panneau muet : elle ouvre le formulaire qui chiffre');
+// Le catalogue du rayon (PR #151) vit dans « Autre » et n'a pas bougé.
+assert.ok(/id="catProduit"/.test(step2) && /id="catQte"/.test(step2),
+  'le catalogue du rayon reste dans l’onglet « Autre »');
 
 // Les icônes sont dessinées dans la page. Rien ne vient d'un autre domaine :
 // un poste doit s'ouvrir sans dépendre d'un tiers joignable.
-const tuiles = (step2.match(/<div class="besoin-type"[\s\S]*?<\/div>\s*<div class="notice hidden"/) || [''])[0];
+const tuiles = (step2.match(/<div class="besoin-type"[\s\S]*?<\/div>\s*<div id="besoinTextileForm">/) || [''])[0];
 assert.strictEqual((tuiles.match(/<svg /g) || []).length, 2,
   'chaque tuile porte son icône en SVG dans la page');
 assert.ok(!/<img|fonts\.googleapis|material-symbols/.test(tuiles),
@@ -225,8 +228,12 @@ assert.ok(!/<img|fonts\.googleapis|material-symbols/.test(tuiles),
 // bien plus tard, sans que personne l'ait demandé.
 assert.ok(/if\(textile&&editingNeed>=0\)cancelNeedEdit\(\);/.test(DEVIS),
   'basculer sur Textile doit rendre une modification en cours à son besoin');
-assert.ok(/function editNeed\(i\)\{choisirTypeBesoin\('autre'\);/.test(DEVIS),
-  '« Modifier » depuis la liste doit rouvrir le formulaire, même en regardant la tuile Textile');
+// Chaque ligne se remodifie dans SON formulaire : une ligne « Autre » ramène
+// à l'onglet Autre, une ligne textile à celui qui porte tailles et marquage.
+assert.ok(/function editNeed\(i\)\{if\(needs\[i\]&&needs\[i\]\.textile\)return editTextileNeed\(i\);choisirTypeBesoin\('autre'\);/.test(DEVIS),
+  '« Modifier » depuis la liste doit rouvrir le formulaire correspondant à la ligne');
+assert.ok(/function editTextileNeed\(i\)\{\n\s*choisirTypeBesoin\('textile'\);/.test(DEVIS),
+  '… et la ligne textile rouvre bien l’onglet Textile');
 assert.ok(/b\.setAttribute\('aria-pressed',String\(on\)\)/.test(DEVIS),
   'la tuile choisie doit s’annoncer, pas seulement se colorer');
 
