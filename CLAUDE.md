@@ -1,4 +1,4 @@
-TABLETTE: oui
+TABLETTE: non
 
 # Planning OLDA — règles du dépôt
 
@@ -6,10 +6,18 @@ Complète le `CLAUDE.md` global. Ce qui suit est propre à ce projet.
 
 ## Cibles réelles
 
-L'outil tourne toute la journée sur une **Galaxy Tab A9+ 11" (SM-X210)** posée au
-comptoir et dans l'atelier — d'où `TABLETTE: oui`. Les deux orientations comptent,
-le paysage (≈ 1280 × 800 CSS) étant le mode d'usage principal. Le desktop sert au
-patron ; l'iPhone, ponctuellement.
+Les Galaxy Tab A9+ 11" (SM-X210) qui tournaient au comptoir et à l'atelier ont
+été **définitivement mises au rebut le 21/08/2026** et ne seront **jamais
+remplacées** — d'où `TABLETTE: non`. On ne cible plus ce format, ni en
+portrait ni en paysage, et les breakpoints ~800/1280px propres à cette dalle
+n'ont plus lieu d'être.
+
+**PC uniquement.** Sur ce projet, la cible n'est plus « iPhone toujours + PC
+toujours » du CLAUDE.md global : c'est **PC/Desktop exclusivement**, décidé le
+21/08/2026. Aucun poste (comptoir, atelier, patron) ne travaille plus sur
+téléphone. Pas de contrainte tactile-doigt (44px, safe-areas, hover
+indisponible) à respecter par défaut — clavier, souris, hover et focus visible
+redeviennent les seules interactions à soigner.
 
 L'atelier est à **Saint-Martin (UTC−4, pas d'heure d'été)** et le conteneur de
 production tourne en **UTC** : toute date civile calculée côté serveur passe par

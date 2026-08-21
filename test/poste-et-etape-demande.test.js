@@ -115,8 +115,11 @@ assert.ok(/if\(!\$\('source'\)\.value\)return fail\('source'/.test(DEVIS),
   'le canal se contrôle désormais avec le projet');
 assert.ok(!/if\(n===1\)\{/.test(DEVIS),
   'validateStep n’a plus d’étape 1 à valider');
-assert.ok(/m\.push\('Canal d’entrée'\);\n\s+if\(!v\('projectDescription'\)\)/.test(DEVIS),
-  'le contrôle en direct de l’étape « Projet » doit réclamer le canal d’entrée');
+// Le pavé « ⚠ À compléter » a été retiré : ce qui manque se dit désormais SUR
+// le champ, en rouge. Le contrôle, lui, réclame toujours la même chose — et
+// chaque manque doit maintenant désigner le champ à rougir.
+assert.ok(/m\.push\(\{id:'source',label:'Canal d’entrée'\}\);\n\s+if\(!v\('projectDescription'\)\)/.test(DEVIS),
+  'le contrôle en direct de l’étape « Projet » doit réclamer le canal d’entrée, et désigner son champ');
 
 // --- 5. Le fil des étapes : renuméroté, et piloté par data-step -------------
 
@@ -193,25 +196,26 @@ assert.ok(/\.poste-choix-btn \{[\s\S]*?min-height: 64px;/.test(STYLES),
   'les quatre noms se tapent au doigt');
 
 // --- 8. Les deux familles de besoin -----------------------------------------
-// Le formulaire de recueil est celui d'« AUTRE » — le seul qui ait jamais
-// existé. Le TEXTILE aura le sien (tailles, coloris, emplacements) ; sa tuile
-// est posée maintenant, VIDE, pour que la place qui l'attend se voie.
+// Le TEXTILE a désormais son propre formulaire : il chiffre tout seul (base
+// produits + coefficients dégressifs du patron). C'est lui qui s'ouvre en
+// premier — le parcours s'appelle « demande de devis textile ». « AUTRE »
+// reste le formulaire libre d'origine, pour tout ce qui ne se chiffre pas.
 
 const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
 assert.ok(/id="besoinTuileTextile"[^>]*data-type="textile"/.test(step2),
   'l’étape des besoins doit offrir une entrée Textile');
 assert.ok(/id="besoinTuileAutre"[^>]*data-type="autre"/.test(step2),
-  'et une entrée Autre — celle du formulaire actuel');
-assert.ok(/id="besoinTuileAutre"[^>]*class="besoin-tuile is-on"|class="besoin-tuile is-on"[^>]*id="besoinTuileAutre"/.test(step2),
-  '« Autre » reste allumé par défaut : on vient de retirer une étape à ce parcours, pas d’en rajouter un tap');
-assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
-  'le formulaire entier doit tenir dans l’enveloppe qu’on masque — titre et bouton compris');
-assert.ok(/id="besoinTextileVide"/.test(step2) && /parcours Textile arrive/.test(step2),
-  'la tuile Textile ne mène pas à un panneau muet : elle DIT que le parcours arrive');
+  'et une entrée Autre — celle du formulaire libre');
+assert.ok(/id="besoinTuileTextile"[^>]*class="besoin-tuile is-on"|class="besoin-tuile is-on"[^>]*id="besoinTuileTextile"/.test(step2),
+  '« Textile » est allumé par défaut : c’est le parcours qui chiffre, l’autre est le repli');
+assert.ok(/<div id="besoinAutreForm" class="hidden">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
+  'le formulaire « Autre » entier doit tenir dans l’enveloppe qu’on masque — titre et bouton compris');
+assert.ok(/<div id="besoinTextileForm">[\s\S]*id="txSaveBtn"/.test(step2),
+  'la tuile Textile ne mène plus à un panneau muet : elle ouvre le formulaire qui chiffre');
 
 // Les icônes sont dessinées dans la page. Rien ne vient d'un autre domaine :
 // un poste doit s'ouvrir sans dépendre d'un tiers joignable.
-const tuiles = (step2.match(/<div class="besoin-type"[\s\S]*?<\/div>\s*<div class="notice hidden"/) || [''])[0];
+const tuiles = (step2.match(/<div class="besoin-type"[\s\S]*?<\/div>\s*<div id="besoinTextileForm">/) || [''])[0];
 assert.strictEqual((tuiles.match(/<svg /g) || []).length, 2,
   'chaque tuile porte son icône en SVG dans la page');
 assert.ok(!/<img|fonts\.googleapis|material-symbols/.test(tuiles),

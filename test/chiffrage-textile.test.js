@@ -1,0 +1,198 @@
+'use strict';
+
+// LE CHIFFRAGE TEXTILE DU COMPTOIR
+//
+// Le moteur vient du fichier de calcul du patron
+// (OLDA_Chiffrage_Rapide_Tshirts_Windows_V5.html) : mêmes produits, mêmes
+// coefficients dégressifs, mêmes seuils de marge. Il est porté tel quel dans
+// public/comptoir/textile-catalog.js.
+//
+// Ce fichier vérifie :
+//   1. LE CALCUL — les chiffres du patron, aux bornes comprises.
+//   2. CE QUI RESTE À L'ÉCRAN — la marge et le temps de production ne doivent
+//      PAS partir dans le texte envoyé au client.
+//   3. LES RÉGLAGES D'ATELIER — bornés en base, partagés par tous les postes.
+
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const RACINE = path.join(__dirname, '..');
+const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+
+// Le moteur s'écrit pour le navigateur : on lui pose un `window` et on le lit.
+global.window = global.window || {};
+require(path.join(RACINE, 'public/comptoir/textile-catalog.js'));
+const TE = global.window.TextileEngine;
+
+// --- 1. Le calcul du patron --------------------------------------------------
+
+assert.ok(TE && TE.DB, 'le moteur doit s’exposer sur window.TextileEngine');
+assert.ok(TE.DB.refs.length > 40, 'la base produits du patron doit être complète');
+
+const cinquante = TE.calculate({
+  ref: 'K3025', isCustom: false, genre: 'Unisexe', transport: 'Maritime',
+  printType: 'Coeur + Dos', sizes: { M: 20, L: 20, XL: 10 },
+  discount: '', manualPrice: '', markupPercent: 0,
+});
+// Valeurs relevées dans le fichier du patron pour cette saisie exacte.
+assert.strictEqual(cinquante.qty, 50, 'la quantité est la somme des tailles');
+assert.strictEqual(Number(cinquante.sold.toFixed(2)), 15.30, 'prix HT unitaire du patron');
+assert.strictEqual(Number(cinquante.total.toFixed(2)), 765.00, 'total HT du patron');
+assert.strictEqual(cinquante.avis, 'BON — VALIDÉ', 'le verdict suit les seuils par quantité');
+
+// Un devis sans ligne chiffrable ne doit pas inventer un prix : c'est ce qui
+// avait produit des « HT : 0 € » sur des demandes non chiffrées.
+assert.strictEqual(TE.calculate({ ref: 'K3025', genre: 'Unisexe', transport: 'Maritime', printType: 'Aucun', sizes: {} }), null,
+  'sans quantité, aucun calcul');
+assert.strictEqual(TE.calculate({ isCustom: true, customRef: 'X', genre: 'Unisexe', transport: 'Maritime', printType: 'Aucun', sizes: { S: 5 } }), null,
+  'un produit libre sans prix d’achat ne se chiffre pas');
+
+// La grille du patron s'arrête à 150 : au-delà, elle ne se prolonge pas toute
+// seule — la remise supplémentaire est une décision, pas une extrapolation.
+assert.strictEqual(TE.coefFor(300).textile, TE.coefFor(150).textile,
+  'au-delà de la grille, le coefficient reste celui du dernier palier');
+assert.strictEqual(TE.coefFor(0).textile, TE.coefFor(1).textile,
+  'une quantité nulle retombe sur le premier palier, jamais sur undefined');
+
+// Les seuils se durcissent quand la quantité monte : la même marge de 50 %
+// n'a pas le même verdict sur 5 pièces et sur 200.
+assert.strictEqual(TE.classify(0.5, 1)[0], 'CORRECT — MAINTENIR');
+assert.strictEqual(TE.classify(0.5, 200)[0], 'TRÈS BON — VALIDÉ');
+
+// --- 1 bis. Le vocabulaire du comptoir ne doit pas casser le calcul ----------
+// Au comptoir on dit Homme / Femme / Enfant / Bébé. Le fichier du patron range
+// ses temps de marquage sous « Unisexe » et ignore « Bébé ». Un genre que la
+// table des temps ne connaît pas ne lève AUCUNE erreur : il rend simplement
+// zéro mètre de DTF, donc un marquage à 2,30 € au lieu de 9,90 €. Le prix est
+// faux et rien ne le dit — d'où ce garde-fou.
+TE.GENRES_SAISIE.forEach((g) => {
+  assert.ok(TE.DB.times[TE.genreMoteur(g)],
+    `le genre « ${g} » doit retomber sur une table de temps existante`);
+});
+TE.FAMILLES_ACCESSOIRE.forEach((f) => {
+  assert.strictEqual(TE.genreMoteur(f), f,
+    `la famille « ${f} » garde sa propre table de temps, on ne la traduit pas`);
+});
+
+// Renommer « Unisexe » en « Homme » ne doit RIEN changer au prix.
+const saisieHomme = { ref: 'K3025', transport: 'Maritime', printType: 'Coeur + Dos', sizes: { M: 20, L: 20, XL: 10 }, markupPercent: 0 };
+assert.strictEqual(
+  TE.calculate({ ...saisieHomme, genre: 'Homme' }).sold,
+  TE.calculate({ ...saisieHomme, genre: 'Unisexe' }).sold,
+  '« Homme » et « Unisexe » chiffrent le même prix : le libellé change, le calcul non');
+assert.strictEqual(TE.calculate({ ...saisieHomme, genre: 'Homme' }).basePrint, 9.9,
+  'le marquage reste celui du fichier du patron');
+
+// Une ligne enregistrée avant ce changement porte encore « Unisexe » : elle
+// doit se rouvrir sur « Homme », pas sur un champ vide.
+assert.strictEqual(TE.genreSaisie('Unisexe'), 'Homme');
+assert.strictEqual(TE.genreSaisie('Femme'), 'Femme');
+
+// La liste des couleurs est celle de l'atelier, pas celle du fichier.
+assert.ok(TE.DB.markingColors.includes('Rose bébé') && TE.DB.markingColors.includes('Bleu royal'),
+  'les couleurs relevées au comptoir remplacent celles du fichier');
+assert.ok(/id="txMarkColor"[^>]*list="txMarkColorList"/.test(DEVIS),
+  'la couleur de marquage se choisit OU se saisit : le champ reste libre');
+
+// --- 1 ter. Ce qui manque se dit sur le champ --------------------------------
+// Le pavé « ⚠ À compléter avant de continuer » a été retiré : un manque se
+// signale EN ROUGE sur le champ concerné.
+assert.ok(!/'⚠ À compléter avant de continuer/.test(DEVIS),
+  'le pavé récapitulatif des manques ne doit plus se construire');
+assert.ok(!/box\.id\s*=\s*'liveCheck'/.test(DEVIS),
+  'plus aucun pavé « liveCheck » ne se pose sous les étapes');
+assert.ok(/btn\.disabled\s*=\s*false/.test(DEVIS) && !/btn\.disabled\s*=\s*true/.test(DEVIS),
+  'le bouton reste cliquable : c’est lui qui déclenche le rouge, un bouton grisé n’explique rien');
+assert.ok(/window\.marquerManquants\s*=/.test(DEVIS),
+  'une fonction doit poser le rouge sur tous les champs manquants');
+assert.ok(/function goStep\(next\)\{if\(typeof marquerManquants==='function'&&!marquerManquants\(next-1\)\)return;/.test(DEVIS),
+  'avancer d’une étape passe d’abord par le marquage des manques');
+
+// Le champ désigné à l'étape « Besoins » dépend de l'onglet ouvert : pointer
+// `needCategory` pendant que le formulaire « Autre » est masqué rougirait un
+// champ que personne ne voit, et le bouton semblerait ne rien faire.
+const etape2 = (DEVIS.match(/2:function\(\)\{return needs\.length[\s\S]*?\},/) || [''])[0];
+assert.ok(/besoinAutreForm/.test(etape2) && /'txRef'/.test(etape2),
+  'le champ à rougir suit l’onglet affiché — jamais un champ masqué');
+
+// --- 2. La marge reste à l'écran ---------------------------------------------
+// `recapLines()` alimente le récapitulatif PDF **et** le message WhatsApp
+// envoyé au client. Tout ce qu'on range dans `n.comment` part donc au client :
+// la marge, le coût de revient et le temps de production n'y ont pas leur
+// place. Ils restent affichés au comptoir, où seule la vendeuse les lit.
+const txComment = (DEVIS.match(/function txComment\(d\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(txComment, 'txComment doit exister et ne prendre que la saisie');
+assert.ok(!/c\.mark|txPct|prodHours|c\.margin|c\.sold|costSeries/.test(txComment),
+  'le texte envoyé au client ne doit porter ni marge, ni coût, ni temps de production');
+assert.ok(/Tailles|Marquage/.test(txComment),
+  'il porte en revanche ce que le client a commandé : tailles et marquage');
+
+// --- 3. La négociation -------------------------------------------------------
+// Le client annonce son prix ; on lui pose des sorties, classées par ce
+// qu'elles laissent VRAIMENT à l'atelier.
+
+const negociable = TE.calculate({
+  ref: 'K3025', genre: 'Unisexe', transport: 'Maritime', printType: 'Coeur + Dos',
+  sizes: { M: 20, L: 20, XL: 10 }, markupPercent: 0,
+});
+const CIBLE = 12;
+const solutions = TE.defaultNegotiationSolutions(negociable, CIBLE);
+assert.ok(solutions.length >= 4, 'plusieurs sorties, jamais un seul « oui / non »');
+
+const classees = TE.rankedScenarios(negociable, solutions, CIBLE);
+for (let i = 1; i < classees.length; i++) {
+  assert.ok(classees[i - 1].m.margin >= classees[i].m.margin - 0.01,
+    'les solutions sont classées par ce qui reste à l’atelier, la meilleure en tête');
+}
+
+// Une pièce offerte n'est pas une pièce vendue : elle coûte sa production et
+// ne rapporte rien. C'est toute la différence entre offrir et remiser.
+const cadeau = classees.find((r) => r.m.freeQty > 0);
+assert.ok(cadeau, 'offrir des pièces doit faire partie des sorties proposées');
+assert.strictEqual(Number(cadeau.m.revenue.toFixed(2)), Number((cadeau.m.paidQty * cadeau.m.unitPrice).toFixed(2)),
+  'le chiffre d’affaires ne compte QUE les pièces payées');
+assert.strictEqual(Number(cadeau.m.cost.toFixed(2)), Number((cadeau.m.delivered * negociable.unitProductionCost).toFixed(2)),
+  'le coût compte TOUTES les pièces produites, offertes comprises');
+
+// Le point de comparaison est toujours le même : ce que l'atelier garderait en
+// disant simplement oui, sur la quantité d'aujourd'hui.
+const direct = negociable.qty * CIBLE - negociable.qty * negociable.unitProductionCost;
+classees.forEach((r) => {
+  assert.strictEqual(Number(r.m.vsDemand.toFixed(2)), Number((r.m.margin - direct).toFixed(2)),
+    'l’écart annoncé se mesure contre l’acceptation directe du prix demandé');
+});
+
+// Sans prix demandé, aucune proposition : on n'invente pas une négociation.
+assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, 0), []);
+assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, NaN), []);
+
+// Retenir une solution la réécrit dans la SAISIE (pièces en plus dans
+// « Autres », prix moyen réel en prix manuel) : le calcul reste le seul et
+// même, et la ligne se remodifie ensuite comme une autre.
+const retenir = (DEVIS.match(/function negRetenir\(i,\s*m\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(retenir, 'negRetenir doit exister');
+assert.ok(/sizes\.other/.test(retenir) && /manualPrice/.test(retenir),
+  'la solution retenue se réécrit dans la saisie, elle ne vit pas à côté');
+assert.ok(/m\.effective/.test(retenir),
+  'le prix retenu est le prix moyen par pièce LIVRÉE, sinon les pièces offertes se factureraient');
+
+// Le geste commercial se dit au client ; la marge, non.
+assert.ok(/Geste commercial/.test(DEVIS),
+  'les pièces offertes doivent apparaître sur le récapitulatif du client');
+
+// --- 4. Les réglages d'atelier -----------------------------------------------
+// Un coût horaire corrigé sur un poste doit valoir pour les autres : sinon deux
+// PC annoncent deux prix pour le même article. Ils vivent donc en base.
+assert.ok(/fetch\('\/api\/settings\/textile'/.test(DEVIS),
+  'les réglages de production se lisent au serveur, pas dans le navigateur');
+assert.ok(!/localStorage[^\n]*textile/i.test(DEVIS),
+  'aucun réglage de chiffrage ne doit rester dans le localStorage d’un poste');
+
+const DB_JS = fs.readFileSync(path.join(RACINE, 'db.js'), 'utf8');
+const nettoyage = (DB_JS.match(/function nettoyerReglagesTextile[\s\S]*?\n\}/) || [''])[0];
+assert.ok(nettoyage, 'les réglages reçus doivent passer par un nettoyage');
+assert.ok(/TEXTILE_BORNES/.test(nettoyage),
+  'une valeur hors bornes est écartée : un débit DTF à 0 diviserait par zéro');
+
+console.log('✓ chiffrage textile : les chiffres du patron, la marge qui reste au comptoir, les réglages en base');
