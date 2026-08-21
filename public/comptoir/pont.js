@@ -1206,7 +1206,7 @@ function menuOptions(hote){
     });
     return sorties;
   }
-  const source=document.getElementById(hote.getAttribute('list'));
+  const source=document.getElementById(hote.dataset.menuListe||hote.getAttribute('list'));
   return source?[...source.options].map(o=>menuOption(o,'')):[];
 }
 function menuOption(o,groupe){
@@ -1230,7 +1230,18 @@ function menuPoser(hote){
 
   let declencheur;
   if(libre){
-    /* Le champ de saisie EST le déclencheur : cliquer ouvre, taper filtre. */
+    /* Le champ de saisie EST le déclencheur : cliquer ouvre, taper filtre.
+       On DÉBRANCHE la liste native : tant que `list` reste posé, Chrome ouvre
+       la sienne — fond sombre, deuxième chevron — par-dessus la nôtre. Le
+       <datalist> reste dans la page (le formulaire le remplit par son id), on
+       ne fait que retenir son nom ici. `autocomplete=off` coupe en plus la
+       liste de saisies mémorisées par le navigateur, qui se superposerait
+       pareil. */
+    if(hote.getAttribute('list')){
+      hote.dataset.menuListe=hote.getAttribute('list');
+      hote.removeAttribute('list');
+    }
+    hote.setAttribute('autocomplete','off');
     declencheur=hote;
     peau.append(menuChevron());
   }else{
@@ -1269,13 +1280,13 @@ function menuPoser(hote){
   panneau.append(tete,liste);
   peau.append(panneau);
 
-  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,vus:[],vise:-1,ouvert:false};
+  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,vus:[],vise:-1,ouvert:false,filtrer:false};
   menus.set(hote,etat);
 
   declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
   declencheur.addEventListener('keydown',ev=>menuTouche(etat,ev));
   if(libre){
-    hote.addEventListener('input',()=>{etat.vise=0;if(etat.ouvert)menuPeindre(etat);menuPeindreChamp(etat)});
+    hote.addEventListener('input',()=>{etat.filtrer=true;etat.vise=0;if(etat.ouvert)menuPeindre(etat);menuPeindreChamp(etat)});
   }else{
     filtre.addEventListener('input',()=>{etat.vise=0;menuPeindre(etat)});
     filtre.addEventListener('keydown',ev=>menuTouche(etat,ev));
@@ -1338,7 +1349,10 @@ function menuPeindreChamp(etat){
 
 function menuFiltrees(etat){
   const toutes=menuOptions(etat.hote);
-  const brut=etat.libre?etat.hote.value:etat.filtre.value;
+  /* Un champ libre ne filtre QU'À PARTIR de la première frappe : à l'ouverture
+     il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
+     valeur-là — cliquer doit montrer toute la liste. */
+  const brut=etat.libre?(etat.filtrer?etat.hote.value:''):etat.filtre.value;
   const q=menuNorm(brut).trim();
   if(!q)return toutes;
   const mots=q.split(/\s+/);
@@ -1432,13 +1446,27 @@ function menuOuvrir(etat){
   if(!options.length)return;          /* catalogue pas encore chargé */
   menus.forEach(a=>{if(a!==etat)menuFermer(a,false)});   /* un seul à la fois */
   etat.ouvert=true;
+  etat.filtrer=false;   /* on ouvre sur la liste ENTIÈRE */
   etat.peau.classList.add('est-ouvert');
   etat.declencheur.setAttribute('aria-expanded','true');
   if(!etat.libre)etat.filtre.value='';
   /* On ouvre sur le choix en cours, pas en tête de liste. */
   etat.vise=Math.max(0,options.findIndex(o=>o.valeur===etat.hote.value));
   menuPeindre(etat);
+  menuPlacer(etat);
   if(!etat.libre&&etat.tete.style.display!=='none')etat.filtre.focus();
+}
+
+/* Le panneau est plus large que son champ : posé à gauche, celui de la
+   dernière colonne débordait de la page et la faisait défiler de côté. On le
+   retourne quand il ne tient pas — à droite, ou au-dessus. */
+function menuPlacer(etat){
+  const {panneau,peau}=etat;
+  panneau.style.left='';panneau.style.right='';panneau.style.top='';panneau.style.bottom='';
+  const marge=12,champ=peau.getBoundingClientRect(),boite=panneau.getBoundingClientRect();
+  if(champ.left+boite.width>window.innerWidth-marge){panneau.style.left='auto';panneau.style.right='0'}
+  const place=window.innerHeight-champ.bottom-marge;
+  if(boite.height>place&&champ.top>place){panneau.style.top='auto';panneau.style.bottom='calc(100% + 6px)'}
 }
 
 function menuFermer(etat,rendreFocus){

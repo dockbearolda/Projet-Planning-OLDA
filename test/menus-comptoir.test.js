@@ -123,6 +123,52 @@ assert.ok(/dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/.test(PONT),
 assert.ok(/if\(!options\.length\)return;/.test(PONT),
   'un menu sans options ne s’ouvre pas — le catalogue peut n’être pas encore là');
 
+// La liste NATIVE doit être débranchée du champ : tant que `list` reste posé,
+// Chrome ouvre la sienne — fond sombre, deuxième chevron — PAR-DESSUS la nôtre.
+// Le <datalist> reste dans la page, c'est le formulaire qui le remplit par son id.
+const poser = bloc(PONT, 'menuPoser');
+assert.ok(/hote\.dataset\.menuListe=hote\.getAttribute\('list'\);\s*hote\.removeAttribute\('list'\)/.test(poser),
+  'le champ libre perd son attribut `list` : sinon la liste native s’ouvre par-dessus');
+assert.ok(/hote\.setAttribute\('autocomplete','off'\)/.test(poser),
+  'les saisies mémorisées du navigateur se superposeraient pareil');
+assert.ok(/document\.getElementById\(hote\.dataset\.menuListe\|\|hote\.getAttribute\('list'\)\)/.test(PONT),
+  'les options se relisent par le nom retenu');
+assert.ok(/<datalist id="txColorList">/.test(DEVIS) && /<datalist id="txMarkColorList">/.test(DEVIS),
+  'les <datalist> restent dans la page : le formulaire les remplit par leur id');
+
+// CLIQUER MONTRE TOUT. Un champ libre contient déjà une valeur : filtrer dessus
+// à l'ouverture ne laissait voir QUE cette valeur — « Multi couleur » cachait
+// les dix-sept autres couleurs de marquage. C'est exactement le bug remonté.
+assert.ok(/etat\.filtrer=false;\s*\/\* on ouvre sur la liste ENTIÈRE \*\//.test(PONT),
+  'ouvrir un champ libre montre la liste entière, pas seulement sa valeur');
+assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\.filtre\.value/.test(PONT),
+  'le filtre d’un champ libre ne part qu’à la première frappe');
+
+// Le panneau est plus large que son champ : celui de la dernière colonne
+// débordait de la page et la faisait défiler de côté.
+assert.ok(/function menuPlacer\(etat\)/.test(PONT) && /panneau\.style\.right='0'/.test(PONT),
+  'un panneau qui ne tient pas à droite se retourne');
+assert.ok(/menuPlacer\(etat\);/.test(bloc(PONT, 'menuOuvrir')),
+  'le placement se recalcule à chaque ouverture');
+
+// Une couleur de marquage doit se VOIR : « Vert » et « Vert pastel » ne se
+// distinguent pas par leur nom.
+const CAT = fs.readFileSync(path.join(RACINE, 'public/comptoir/textile-catalog.js'), 'utf8');
+global.window = global.window || {};
+require(path.join(RACINE, 'public/comptoir/textile-catalog.js'));
+const TE = global.window.TextileEngine;
+TE.DB.markingColors.forEach((nom) => assert.ok(TE.markColorHexFor(nom),
+  `« ${nom} » doit avoir sa teinte d’affichage`));
+assert.strictEqual(TE.markColorHexFor('  VERT PASTEL '), TE.DB.markingColorsHex['Vert pastel'],
+  'la casse et les espaces ne doivent pas éteindre la pastille');
+assert.strictEqual(TE.markColorHexFor('Teinte maison'), null,
+  'une couleur hors liste n’invente pas de pastille');
+// « Multi couleur » n'est pas une teinte : elle se montre en dégradé.
+assert.ok(/gradient/.test(TE.markColorHexFor('Multi couleur')),
+  '« Multi couleur » se montre en dégradé — c’est ce qu’elle veut dire');
+assert.ok(/const hex=TE\(\)\.markColorHexFor\(x\)/.test(DEVIS),
+  'chaque couleur de marquage emporte sa teinte dans la liste');
+
 // Sous le seuil, un champ de filtre est du bruit : « Maritime / Chronopost »
 // se lit d'un coup d'œil.
 assert.ok(/MENU_SEUIL_FILTRE = 8/.test(PONT), 'le filtre n’apparaît qu’au-delà d’un seuil');
