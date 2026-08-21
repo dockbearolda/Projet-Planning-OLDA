@@ -47,7 +47,7 @@ assert.ok(!/Renseigne ce que le client demande/.test(DEVIS),
 
 // --- 2. Une ligne : produit, quantité, demande ------------------------------
 
-assert.ok(/<select id="catProduit"><\/select>/.test(step2),
+assert.ok(/<select id="catProduit"[^>]*><\/select>/.test(step2),
   'le catalogue est une LISTE DÉROULANTE, remplie par le script');
 assert.ok(/id="catQte"[^>]*type="number"[^>]*min="1"/.test(step2),
   'la quantité se pose à côté du produit');
@@ -56,12 +56,28 @@ assert.ok(/onclick="ajouterALaDemande\(\)"/.test(step2),
 assert.ok(!/catStatus/.test(DEVIS),
   'aucun message ne répète l’ajout : la ligne qui apparaît dans la demande EST la confirmation');
 
-// La saisie manuelle reste EN HAUT, avant la ligne du catalogue.
-const iManuel = step2.indexOf('id="catManuelBtn"');
-const iForm = step2.indexOf('id="besoinManuel"');
+// LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DU MENU — elle se prend au même
+// endroit que les produits, et son formulaire s'ouvre dessous.
+assert.ok(/<option value="__manuel">\+ Saisie manuelle/.test(DEVIS),
+  'la saisie manuelle se choisit dans la liste, en tête');
+assert.ok(/let html='<option value=""[^']*'\+\n\s*'<option value="__manuel"/.test(DEVIS),
+  '… juste après le choix vide, avant la première famille');
+assert.ok(/<select id="catProduit" onchange="choisirProduitCatalogue\(\)">/.test(step2),
+  'la choisir doit faire quelque chose tout de suite');
+assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';[\s\S]*?basculerSaisieManuelle\(true\)/.test(DEVIS),
+  'elle ouvre le formulaire ET rend la liste à vide : ce n’est pas un produit');
 const iSelect = step2.indexOf('id="catProduit"');
-assert.ok(iManuel > -1 && iForm > iManuel && iSelect > iForm,
-  'la saisie manuelle et son formulaire viennent AVANT la ligne du catalogue');
+const iForm = step2.indexOf('id="besoinManuel"');
+assert.ok(iSelect > -1 && iForm > iSelect,
+  'le formulaire détaillé s’ouvre SOUS la ligne où on vient de le choisir');
+assert.ok(!/catManuelBtn|cat-manuel|cat-top/.test(DEVIS),
+  'le bouton « Saisie manuelle » et son explication ont disparu de l’écran');
+// Le repli ne dépend plus d'un bouton : « Modifier » doit encore rouvrir le
+// formulaire, sinon le bouton de la liste ne fait plus rien de visible.
+assert.ok(/function basculerSaisieManuelle\(force\)\{\n\s*const box=\$\('besoinManuel'\);if\(!box\)return;/.test(DEVIS),
+  'le repli ne doit plus exiger un bouton qui n’existe plus');
+assert.ok(/function cancelNeedEdit\(\)\{[\s\S]*?basculerSaisieManuelle\(false\)\}/.test(DEVIS),
+  '« Fermer » et « Annuler » referment le formulaire');
 assert.ok(/<div id="besoinAutreForm">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
   'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
 assert.ok(/<div id="besoinManuel" class="hidden">[\s\S]*id="needFormTitle"/.test(step2),
@@ -92,6 +108,27 @@ assert.ok(/editNeed\(\$\{i\}\)/.test(renderNeedsSrc) && /deleteNeed\(\$\{i\}\)/.
   'modifier et supprimer restent sur la ligne');
 assert.ok(/\.need-actions button\{min-height:44px/.test(DEVIS),
   'les deux boutons gardent leur cible tactile malgré la ligne serrée');
+
+// CHAQUE ARTICLE PORTE SA PERSONNALISATION, sur sa ligne : c'est ce que
+// l'atelier grave, brode ou imprime, et ça change d'un article à l'autre dans
+// la même demande. Le texte va dans `comment` — le champ que la fiche, le
+// devis, le ticket de l'atelier et le message au client lisent DÉJÀ ligne par
+// ligne. Un champ neuf serait mort en silence.
+assert.ok(/class="need-perso"[^>]*oninput="setNeedPerso\(\$\{i\}/.test(renderNeedsSrc),
+  'chaque article de la demande porte son champ de personnalisation');
+assert.ok(/value="\$\{esc\(n\.comment\|\|''\)\}"/.test(renderNeedsSrc),
+  'ce champ montre ce qui est déjà écrit pour cet article');
+assert.ok(!/n\.comment\]/.test(renderNeedsSrc),
+  'le détail en petit ne répète plus la personnalisation : elle a son champ');
+assert.ok(/function setNeedPerso\(i,valeur\)\{[^}]*needs\[i\]\.comment=valeur/.test(DEVIS),
+  'la frappe va dans le besoin, à l’indice de sa ligne');
+assert.ok(!/function setNeedPerso[^}]*renderNeeds\(\)/.test(DEVIS),
+  'écrire ne REDESSINE PAS la liste : la ligne reprise sous les doigts perdrait le curseur');
+assert.ok(/\.need-perso\{[^}]*min-height:44px/.test(DEVIS),
+  'le champ de personnalisation se prend au doigt');
+// Celui qui chiffre doit voir ce qu'il chiffre : une gravure ne se devine pas.
+assert.ok(/Personnalisation :<\/b> \$\{esc\(n\.comment\)\}/.test(DEVIS),
+  'la personnalisation se relit à l’étape des prix');
 
 // --- La colonne de droite est partie ---------------------------------------
 // La carte « PROJET » répétait la référence (elle est sur l'étape), le statut
@@ -346,8 +383,8 @@ groupes.forEach((g) => {
 
 // Rien ne doit venir d'un autre domaine : un poste s'ouvre sans dépendre d'un
 // tiers joignable.
-const barre = (step2.match(/<div class="cat-top"[\s\S]*?<\/div>/) || [''])[0];
-assert.ok(/<svg /.test(barre) && !/<img|fonts\.googleapis|material-symbols/.test(barre),
-  'l’icône de la saisie manuelle est dessinée dans la page');
+const ligne = (step2.match(/<div class="cat-ligne">[\s\S]*?ajouterALaDemande[\s\S]*?<\/div><\/div>/) || [''])[0];
+assert.ok(ligne && !/<img|fonts\.googleapis|material-symbols/.test(ligne),
+  'la ligne du catalogue ne charge rien d’un autre domaine');
 
 console.log('✓ catalogue comptoir : un produit, une quantité, à la demande — et rien qui parte tout seul');
