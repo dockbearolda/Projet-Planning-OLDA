@@ -309,6 +309,27 @@ h2{letter-spacing:-.01em}
 .tx-avis.good{background:#e2f0e8;color:#1d6f43}
 .tx-avis.warn{background:#fff2dc;color:#8a4b00}
 .tx-avis.bad{background:#fdeaea;color:#a02020}
+/* CE QUE LA VENDEUSE VIENT D'ÉCRIRE, RELU AVEC LES MÊMES INTITULÉS que les
+   champs juste au-dessus. Le récapitulatif ne disait que « K3008 · Coconut
+   Milk · Poitrine + Dos · 2 pièces » : le genre, l'encre, le transport, les
+   tailles et la note — la moitié de la saisie — n'y étaient nulle part, et le
+   reste arrivait en file de points sans dire de quoi il parlait. */
+.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px 18px;margin-top:12px;padding-top:12px;border-top:1px solid #eef0f3}
+.tx-saisie>div{min-width:0}
+.tx-saisie span{display:block;font-size:11px;font-weight:800;color:var(--muted)}
+.tx-saisie b{display:block;font-size:14px;font-weight:700;line-height:1.3;margin-top:2px;overflow-wrap:anywhere}
+/* Les chiffres, en grille et non en file : à cinq valeurs, la rangée souple
+   laissait « Marge / heure » passer seule à la ligne, décrochée du reste. Les
+   deux que la vendeuse annonce au client sont les plus grosses. */
+.tx-argent{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px 18px;margin-top:12px}
+.tx-argent>div{min-width:0}
+.tx-argent span{display:block;font-size:11px;font-weight:800;color:var(--muted)}
+.tx-argent b{display:block;font-size:15px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.tx-argent .tx-fort b{font-size:20px;font-weight:900}
+/* Le classement de l'atelier était collé au chiffre, dans la même valeur :
+   « 436,74 € ⭐ PRIORITÉ OLDA » se lisait comme un seul nombre. */
+.tx-argent .tx-atelier{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;color:#3f4650;background:#eef0f3;border-radius:999px;padding:3px 9px}
+.tx-base{color:var(--muted);font-size:12.5px;line-height:1.4;margin-top:10px}
 .tx-card-metrics{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;font-size:13px}
 .tx-card-metrics span{color:#6d747b}
 .tx-card-metrics b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
@@ -353,6 +374,14 @@ h2{letter-spacing:-.01em}
 .demande-corps .need-qte{min-width:38px;padding:6px 8px;font-size:13px}
 .demande-corps .need-nom{font-size:14px}
 .demande-corps .need-meta{font-size:11.5px}
+/* CE QUI A ÉTÉ SAISI, sous le nom de l'article. La ligne portait « Textile ·
+   Coconut Milk · Réf. K3008 · Production DTF » : deux mots sur quatre venaient
+   du code, et le marquage, l'encre, les tailles et le transport — tout ce que
+   la vendeuse venait de choisir — n'y apparaissaient pas. L'intitulé à gauche
+   évite de confondre la couleur du vêtement et celle de l'encre. */
+.need-detail{grid-column:2/-1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;margin-top:3px}
+.need-detail-k{font-size:11px;font-weight:800;color:var(--muted);white-space:nowrap}
+.need-detail-v{font-size:11.5px;font-weight:700;color:#3f4650;line-height:1.35;overflow-wrap:anywhere}
 .demande-corps .need-perso{grid-column:1/-1;min-height:36px;margin-top:6px;font-size:13.5px;padding:7px 11px!important}
 /* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait
    les tablettes, parties au rebut. Des boutons discrets, alignés à droite. */
@@ -1338,10 +1367,50 @@ function txReadForm(){
 function txCalc(d){return txReady()?TE().calculate(d):null}
 function txDisplayRef(d){return d.isCustom?(d.customRef||'NOUVEAU'):d.ref}
 
-function txMetric(label,value){
-  const wrap=txEl('div');
+function txMetric(label,value,cls){
+  const wrap=txEl('div',cls);
   wrap.append(txEl('span',null,label),txEl('b',null,value));
   return wrap;
+}
+
+/* LE CLASSEMENT DE L'ATELIER SE DÉTACHE DU CHIFFRE. « 436,74 € ⭐ PRIORITÉ
+   OLDA » tenait dans une seule valeur : les deux se lisaient d'un bloc, et la
+   mention finissait par passer à la ligne toute seule. */
+function txAtelier(c){
+  const cell=txEl('div');
+  cell.append(txEl('span',null,'Marge / heure'),txEl('b',null,Number.isFinite(c.eurH)?money(c.eurH):'—'));
+  if(c.atelier&&c.atelier!=='—')cell.append(txEl('span','tx-atelier',c.atelier));
+  return cell;
+}
+
+/* CE QUE LA VENDEUSE VIENT D'ÉCRIRE, avec les MÊMES INTITULÉS que les champs
+   du formulaire. Le récapitulatif portait « K3008 · Coconut Milk · Poitrine +
+   Dos · 2 pièces » : le genre, la couleur du marquage, le transport, les
+   tailles et la note n'y étaient pas, et rien ne disait laquelle des deux
+   couleurs était celle de l'encre. Un champ vide ne prend pas de place. */
+function txSaisieLignes(d){
+  const L=TE().SIZE_LABELS;
+  const tailles=TE().SIZE_KEYS.filter(k=>txNum((d.sizes||{})[k])>0)
+    .map(k=>`${L[k]} ${txNum(d.sizes[k])}`).join(' · ');
+  return [
+    ['Référence',txDisplayRef(d)],
+    ['Couleur textile',d.color],
+    ['Genre',d.genre],
+    ['Emplacement du marquage',d.printType],
+    ['Couleur du marquage',d.markColor],
+    ['Transport',d.transport],
+    ['Tailles',tailles],
+    ['Note',d.note],
+  ].filter(([,v])=>String(v==null?'':v).trim());
+}
+function txSaisieBloc(d){
+  const box=txEl('div','tx-saisie');
+  txSaisieLignes(d).forEach(([k,v])=>{
+    const cell=txEl('div');
+    cell.append(txEl('span',null,k),txEl('b',null,v));
+    box.append(cell);
+  });
+  return box;
 }
 
 /* CE QU'ON EST EN TRAIN D'ÉCRIRE, à côté du numéro de la ligne. La liste
@@ -1366,25 +1435,24 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  const sousTitre=[txDisplayRef(d),d.color,d.printType,`${c.qty} pièce${c.qty>1?'s':''}`].filter(Boolean).join(' · ');
   const gauche=txEl('div');
-  gauche.append(txEl('div','tx-preview-title',c.item.designation),txEl('div','help',sousTitre));
+  gauche.append(txEl('div','tx-preview-title',c.item.designation),
+    txEl('div','help',`${c.qty} pièce${c.qty>1?'s':''} · récapitulatif avant ajout`));
   const head=txEl('div','tx-preview-head');
   head.append(gauche,txEl('span',`tx-avis ${c.cls}`,c.avis));
 
-  const metrics=txEl('div','tx-metrics');
-  metrics.append(
-    txMetric('Prix HT / pièce',money(c.sold)),
-    txMetric('Total HT',money(c.total)),
+  const argent=txEl('div','tx-argent');
+  argent.append(
+    txMetric('Prix HT / pièce',money(c.sold),'tx-fort'),
+    txMetric('Total HT',money(c.total),'tx-fort'),
     txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
     txMetric('Temps de production',TE().fmtTime(c.prodHours)),
-    txMetric('Marge / heure',`${Number.isFinite(c.eurH)?money(c.eurH):'—'} ${c.atelier}`)
+    txAtelier(c)
   );
 
-  const base=txEl('div','help',`Base : textile ${money(c.baseTextile)} + marquage ${money(c.basePrint)}`
+  const base=txEl('div','tx-base',`Base : textile ${money(c.baseTextile)} + marquage ${money(c.basePrint)}`
     +(txNum(d.manualPrice)>0?' — prix manuel appliqué':''));
-  base.style.marginTop='8px';
-  txFill(box,[head,metrics,base]);
+  txFill(box,[head,argent,base,txSaisieBloc(d)]);
 }
 
 function saveTextileNeed(){
@@ -1702,8 +1770,10 @@ function renderDetailArticle(){
   const tete=txEl('div','detail-tete');
   const gauche=txEl('div');
   gauche.append(txEl('div','detail-nom',n.label));
-  gauche.append(txEl('div','detail-meta',
-    [n.requestedRef?`Réf. ${n.requestedRef}`:'',n.color,`${c.qty} pièce${c.qty>1?'s':''}`].filter(Boolean).join(' · ')));
+  /* La référence et la couleur redescendent dans le récapitulatif de saisie,
+     avec leur intitulé : ici elles se répétaient sans dire ce qu'elles
+     étaient. La tête ne garde que le nombre de pièces. */
+  gauche.append(txEl('div','detail-meta',`${c.qty} pièce${c.qty>1?'s':''}`));
   const fermer=txEl('button','secondary','Fermer');
   fermer.onclick=()=>{articleOuvert=-1;negOuvert=-1;renderNeeds()};
   tete.append(gauche,fermer);
@@ -1724,17 +1794,17 @@ function renderDetailArticle(){
   boutons.append(modifier,dupliquer,negocier);
   rang.append(boutons);
 
-  const metrics=txEl('div','tx-card-metrics');
+  const metrics=txEl('div','tx-card-metrics tx-argent');
   metrics.append(
-    txMetric('Prix HT / pièce',money(c.sold)),
-    txMetric('Total HT',money(c.total)),
+    txMetric('Prix HT / pièce',money(c.sold),'tx-fort'),
+    txMetric('Total HT',money(c.total),'tx-fort'),
     txMetric('Marge',`${money(c.margin)} · ${txPct(c.mark)}`),
     txMetric('Temps prod.',TE().fmtTime(c.prodHours)),
-    txMetric('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—')
+    txAtelier(c)
   );
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics);
+  bloc.append(tete,rang,metrics,txSaisieBloc(n.textile));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
@@ -1775,14 +1845,37 @@ function ouvrirNegociation(i){
 function renderNeeds(){
   $('needCount').textContent=`${needs.length} article${needs.length>1?'s':''}`;
   $('needsDisplay').innerHTML=needs.length?needs.map((n,i)=>{
-    const detail=[n.category,n.color,n.requestedRef?`Réf. ${n.requestedRef}`:'',n.productionType?`Production ${n.productionType}`:''].filter(Boolean).map(esc).join(' · ');
+    /* LA LIGNE DIT CE QUI A ÉTÉ SAISI. Elle affichait « Textile · Coconut Milk
+       · Réf. K3008 · Production DTF » : deux mots sur quatre venaient du code,
+       et le genre, le marquage, l'encre, les tailles et le transport — tout ce
+       que la vendeuse venait de choisir juste au-dessus — n'y étaient nulle
+       part. Chaque ligne porte son intitulé : sans lui, « Coconut Milk » et
+       « Kaki » se ressemblent, alors que l'une est le vêtement et l'autre
+       l'encre.
+       Tout se calcule ICI, sans passer par le moteur textile : cette liste se
+       relit dans un bac à sable où seul ce corps de fonction existe. */
+    const t=n.textile;
+    const tailles=t&&t.sizes?[['S','S'],['M','M'],['L','L'],['XL','XL'],['XXL','2XL'],['other','Autres']]
+      .filter(([k])=>Number(t.sizes[k])>0).map(([k,l])=>`${l} ${Number(t.sizes[k])}`).join(' · '):'';
+    const lignes=(t?[
+      ['Réf.',[n.requestedRef,t.color,t.genre].filter(Boolean).join(' · ')],
+      ['Marquage',[t.printType,t.markColor].filter(Boolean).join(' · ')],
+      ['Tailles',[tailles,t.transport].filter(Boolean).join(' · ')],
+    ]:[
+      ['Famille',[n.category,n.color].filter(Boolean).join(' · ')],
+      ['Réf.',n.requestedRef],
+      ['Production',n.productionType],
+    ]).filter(([,v])=>v);
+    const detail=lignes.length
+      ? `<div class="need-detail">${lignes.map(([k,v])=>`<div class="need-detail-k">${esc(k)}</div><div class="need-detail-v">${esc(v)}</div>`).join('')}</div>`
+      : '';
     /* « Pas encore chiffré » et « gratuit » sont deux choses différentes : une
        ligne sans prix le DIT, elle n'affiche jamais 0 € — piège `Number(null)`. */
     const chiffre=Number.isFinite(n.unitHT);
     const prix=chiffre
       ? `<b>${money(n.unitHT*n.qty)}</b><span>${money(n.unitHT)} / pièce</span>`
       : '<b>À chiffrer</b>';
-    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div>${detail?`<div class="need-meta">${detail}</div>`:''}</div><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div><div class="need-actions">${n.textile?`<button class="secondary" onclick="ouvrirNegociation(${i})">Négociation</button>`:''}<button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`
+    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div></div><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div>${detail}<div class="need-actions">${n.textile?`<button class="secondary" onclick="ouvrirNegociation(${i})">Négociation</button>`:''}<button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div><input class="need-perso" id="needPerso-${i}" value="${esc(n.comment||'')}" placeholder="Personnalisation — texte à graver, prénom, logo, emplacement…" aria-label="Personnalisation de ${esc(n.label)}" oninput="setNeedPerso(${i},this.value)"></div>`
   }).join(''):`<div class="demande-vide"><svg class="demande-vide-ic" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5.4 8h13.2l-1.1 11.2a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg><b>Aucun article</b></div>`;
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();
