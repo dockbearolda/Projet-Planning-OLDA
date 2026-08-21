@@ -80,7 +80,7 @@ assert.ok(/function cancelNeedEdit\(\)\{[\s\S]*?basculerSaisieManuelle\(false\)\
   '« Fermer » et « Annuler » referment le formulaire');
 assert.ok(/<div id="besoinAutreForm" class="hidden">[\s\S]*id="needFormTitle"[\s\S]*id="saveNeedBtn"/.test(step2),
   'le formulaire entier reste dans l’enveloppe « Autre » — titre et bouton compris');
-assert.ok(/<div id="besoinManuel" class="hidden">[\s\S]*id="needFormTitle"/.test(step2),
+assert.ok(/<div id="besoinManuel" class="hidden[^"]*">[\s\S]*id="needFormTitle"/.test(step2),
   'le formulaire détaillé est REPLIÉ, pas supprimé');
 // Une ligne TEXTILE se remodifie dans son propre formulaire : la router vers
 // « Autre » perdrait tailles, marquage et négociation.

@@ -299,8 +299,20 @@ assert.ok(!/\$\('(tx|need)FormTitle'\)\.textContent=/.test(DEVIS),
   'plus aucune branche n’écrit le titre en direct — elles passeraient à côté de l’état');
 assert.ok(/<h3 class="form-num" id="txFormTitle">/.test(DEVIS) && /<h3 class="form-num" id="needFormTitle">/.test(DEVIS),
   'les deux formulaires portent la même bulle');
-assert.ok(/\.form-num\.is-edit\{background:var\(--orange\)\}/.test(DEVIS),
-  'la couleur dit l’état : sombre on ajoute, orange on reprend une ligne déjà posée');
+assert.ok(/\.form-num\.is-edit\{color:var\(--orange\)\}/.test(DEVIS),
+  'la couleur dit l’état : orange quand on reprend une ligne déjà posée');
+// TOUT L’ARTICLE est détouré, pas seulement son titre : ses dix champs se
+// mélangeaient aux réglages de la page (majoration, TGCA, réglages de
+// production) et on ne voyait plus où commençait la ligne en cours d’écriture.
+assert.ok(/\.article-bloc\{border:1\.5px solid #d7dce3;border-radius:14px;/.test(DEVIS),
+  'l’article en cours de saisie porte un cadre');
+assert.ok(/<div class="article-bloc"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
+  && /<div id="besoinManuel" class="hidden article-bloc">/.test(DEVIS),
+  'les deux familles de besoin ont le même cadre — « Autre » avait déjà son enveloppe');
+// Le cadre ne pose AUCUN `display` : `#besoinManuel` porte aussi `hidden`,
+// et une classe qui déclarerait son propre display le rendrait de nouveau visible.
+assert.ok(!/\.article-bloc\{[^}]*display:/.test(DEVIS),
+  '… et le cadre ne redonne pas de display à un bloc replié');
 
 // --- 7. LE CADRE DE CHIFFRAGE NE RESTE PAS VIDE ------------------------------
 assert.ok(/<div class="tx-preview hidden" id="txPreview"><\/div>/.test(DEVIS),
