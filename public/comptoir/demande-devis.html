@@ -211,8 +211,56 @@ h2{letter-spacing:-.01em}
 .tx-ligne-tete .actions{margin-left:auto}
 .tx-ligne-tete button{padding:8px 14px!important}
 #sideTextileCard .summary-row b{font-variant-numeric:tabular-nums}
-#txRef optgroup{font-size:12px;font-weight:800;color:#6d747b;background:#f3f4f5}
-#txRef option{font-weight:600;color:#202428;padding:4px 6px}
+/* ---- Choix de la référence : la RÉFÉRENCE d'abord, la désignation derrière ----
+   Une liste native tronquait la référence en bout de ligne, dans une colonne
+   large d'un tiers de formulaire : la vendeuse lisait « T-shirt bio léger
+   Premium 155 g » sans jamais voir « NS300 ». Ici la référence tient sa propre
+   colonne, en chiffres alignés, et le panneau déborde sur la largeur utile pour
+   que la désignation se lise entière. Poste PC : clavier, survol, focus visible. */
+.tx-combo-champ{position:relative}
+.tx-combo{display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:8px 12px;
+  border:1px solid #bcc2c8;border-radius:9px;background:#fff;cursor:pointer;text-align:left;
+  font:inherit;font-size:16px;color:var(--text);transition:border-color .12s ease,box-shadow .12s ease}
+.tx-combo:hover{border-color:#8d959d}
+.tx-combo:focus-visible{outline:3px solid rgba(20,46,84,.13);outline-offset:0;border-color:var(--green)}
+.tx-combo[aria-expanded="true"]{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.10)}
+.tx-jeton{flex:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;
+  font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#111827;
+  background:#eef0f3;border-radius:6px;padding:4px 7px;white-space:nowrap}
+.tx-combo-nom{flex:1 1 auto;min-width:0;font-size:15px;color:#3b424a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-combo-nom.est-vide{color:#767d85}
+.tx-combo-fleche{flex:none;width:13px;height:13px;color:#767d85;transition:transform .14s ease}
+.tx-combo[aria-expanded="true"] .tx-combo-fleche{transform:rotate(180deg)}
+
+.tx-panneau{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:max(100%,min(600px,84vw));
+  background:#fff;border:1px solid #d5d9de;border-radius:12px;overflow:hidden;display:none;
+  box-shadow:0 14px 34px rgba(17,24,39,.15),0 2px 6px rgba(17,24,39,.06)}
+.tx-panneau.est-ouvert{display:block;animation:txPanneauEntre .13s ease-out}
+@keyframes txPanneauEntre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.tx-panneau-tete{display:flex;align-items:center;gap:10px;padding:10px;background:#fafbfc;border-bottom:1px solid #eceff2}
+.tx-panneau-tete input{font-size:15px;padding:9px 11px}
+.tx-compte{flex:none;font-size:12px;font-weight:700;color:#767d85;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx-panneau-liste{max-height:328px;overflow-y:auto;margin:0;padding:6px;list-style:none}
+/* Le titre de famille reste collé en haut pendant le défilement : 48 lignes
+   sur 13 familles, sans ça on ne sait plus dans quoi on est. */
+.tx-groupe{position:sticky;top:0;z-index:1;background:#fff;padding:13px 10px 5px;
+  font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#8b9199}
+.tx-groupe:first-child{padding-top:5px}
+/* La référence a la colonne la plus large de sa rangée : c'est la seule dont le
+   texte est long. Transport n'a que deux valeurs courtes. */
+@media(min-width:701px){.tx-ligne-ref{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr)}}
+.tx-option{display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;align-items:baseline;
+  padding:9px 10px 9px 8px;border-left:3px solid transparent;border-radius:8px;cursor:pointer}
+.tx-option .tx-jeton{background:transparent;padding:0}
+.tx-option-nom{font-size:15px;color:#2b3138;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-option-libre{grid-template-columns:minmax(0,1fr);font-weight:700}
+/* Deux états distincts : le curseur du clavier (gris plein) et le choix en
+   cours (barre d'encre + nom en gras). Aucune couleur ici n'est décorative. */
+.tx-option.est-vise{background:#eaeef3}
+.tx-option[aria-selected="true"]{border-left-color:#111827;background:#f5f6f8}
+.tx-option[aria-selected="true"] .tx-option-nom{color:#111827;font-weight:700}
+.tx-panneau-rien{padding:22px 14px;text-align:center;color:#767d85;font-size:14px}
+@media(prefers-reduced-motion:reduce){.tx-panneau.est-ouvert{animation:none}.tx-combo-fleche,.tx-combo{transition:none}}
 /* ---- Négociation : un prix demandé, des sorties classées ---- */
 .neg-panneau{margin-top:14px;padding-top:14px;border-top:1px solid #e4e8ee}
 .neg-saisie{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:16px;align-items:end;margin-bottom:14px}
@@ -315,7 +363,7 @@ h2{letter-spacing:-.01em}
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-note">Chiffrage automatique</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-note">Tout le reste</span></span></button></div><div id="besoinTextileForm"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA</label><select id="txTgca" onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div><h3 id="txFormTitle">Article n°1</h3><div class="grid-3"><div class="field"><label>Référence *</label><select id="txRef" onchange="onTextileRefChange()"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><div class="tx-couleur"><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><span class="tx-pastille" id="txColorChip" aria-hidden="true"></span></div><datalist id="txColorList"></datalist></div><div class="field"><label>Transport</label><select id="txTransport" onchange="previewTextile()"><option value="Maritime" selected>Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre</label><select id="txGenre" onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage</label><select id="txPrintType" onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="previewTextile()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><details class="tx-adjust"><summary>Ajustements (remise, prix manuel)</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview" id="txPreview"><span class="help">Choisis une référence et renseigne au moins une taille pour voir le prix.</span></div><div class="actions"><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()">Ajouter cet article</button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div><details class="tx-adjust" style="margin-top:18px"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-note">Chiffrage automatique</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-note">Tout le reste</span></span></button></div><div id="besoinTextileForm"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA</label><select id="txTgca" onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div><h3 id="txFormTitle">Article n°1</h3><div class="grid-3 tx-ligne-ref"><div class="field tx-combo-champ"><label id="txRefEtiquette">Référence *</label><div class="tx-combo" id="txRef" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-controls="txRefListe" aria-labelledby="txRefEtiquette txRefNom"><span class="tx-jeton" id="txRefJeton" hidden></span><span class="tx-combo-nom est-vide" id="txRefNom">Chargement du catalogue…</span><svg class="tx-combo-fleche" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 4.5 3.5 3.5 3.5-3.5"/></svg></div><div class="tx-panneau" id="txRefPanneau"><div class="tx-panneau-tete"><input id="txRefFiltre" type="text" autocomplete="off" spellcheck="false" placeholder="Filtrer : NS300, sweat, capuche…" aria-label="Filtrer les références" aria-controls="txRefListe" aria-autocomplete="list"><span class="tx-compte" id="txRefCompte"></span></div><ul class="tx-panneau-liste" id="txRefListe" role="listbox" aria-labelledby="txRefEtiquette"></ul></div></div><div class="field"><label>Couleur textile</label><div class="tx-couleur"><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><span class="tx-pastille" id="txColorChip" aria-hidden="true"></span></div><datalist id="txColorList"></datalist></div><div class="field"><label>Transport</label><select id="txTransport" onchange="previewTextile()"><option value="Maritime" selected>Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre</label><select id="txGenre" onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage</label><select id="txPrintType" onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="previewTextile()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><details class="tx-adjust"><summary>Ajustements (remise, prix manuel)</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview" id="txPreview"><span class="help">Choisis une référence et renseigne au moins une taille pour voir le prix.</span></div><div class="actions"><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()">Ajouter cet article</button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div><details class="tx-adjust" style="margin-top:18px"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
@@ -979,6 +1027,184 @@ function txFill(host,nodes){
   host.replaceChildren(...nodes);
 }
 
+/* ---- LE CHOIX DE LA RÉFÉRENCE --------------------------------------------
+   Liste maison plutôt qu'un <select> natif : la référence doit ouvrir la ligne
+   dans sa propre colonne alignée, et la désignation se lire en entier. Le natif
+   ne sait faire ni l'un ni l'autre dans une colonne d'un tiers de formulaire.
+
+   `#txRef` garde son `.value` : TOUT le reste du formulaire continue de lire et
+   d'écrire là — txReadForm, txApplyToForm, cancelTextileEdit, et fail('txRef')
+   qui le met en rouge, lui donne le focus et pose son message juste dessous.
+   Poser la valeur ne déclenche rien ; les appelants enchaînent déjà
+   onTextileRefChange() eux-mêmes. */
+const txRefEtat={entrees:[],vus:[],vise:-1,valeur:'',ouvert:false};
+
+function txRefNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+
+function txRefCharger(entrees){
+  txRefEtat.entrees=entrees;
+  txRefInstaller();
+  txRefPeindreChamp();
+}
+
+function txRefInstaller(){
+  const racine=$('txRef');
+  if(racine.dataset.pose)return;
+  racine.dataset.pose='1';
+  Object.defineProperty(racine,'value',{
+    get:()=>txRefEtat.valeur,
+    set:(v)=>{txRefEtat.valeur=String(v??'');txRefPeindreChamp()},
+  });
+  racine.addEventListener('click',()=>txRefEtat.ouvert?txRefFermer(true):txRefOuvrir());
+  racine.addEventListener('keydown',ev=>{
+    if(ev.key==='ArrowDown'||ev.key==='Enter'||ev.key===' '){ev.preventDefault();txRefOuvrir()}
+  });
+  const filtre=$('txRefFiltre');
+  filtre.addEventListener('input',()=>{txRefEtat.vise=0;txRefPeindreListe()});
+  filtre.addEventListener('keydown',txRefTouche);
+  const liste=$('txRefListe');
+  liste.addEventListener('click',ev=>{
+    const li=ev.target.closest('[data-valeur]');
+    if(li)txRefChoisir(li.dataset.valeur);
+  });
+  /* Le survol déplace le curseur du clavier : sinon la souris éclaire une ligne
+     et Entrée en valide une autre. */
+  liste.addEventListener('mousemove',ev=>{
+    const li=ev.target.closest('.tx-option');
+    if(!li)return;
+    const i=Number(li.id.replace('txRefOpt-',''));
+    if(i!==txRefEtat.vise){txRefEtat.vise=i;txRefPeindreVise(false)}
+  });
+  /* `pointerdown` et non `click` : le panneau doit partir AVANT que le clic
+     n'atteigne ce qu'il visait derrière. */
+  document.addEventListener('pointerdown',ev=>{
+    if(txRefEtat.ouvert&&!ev.target.closest('#txRef,#txRefPanneau'))txRefFermer(false);
+  });
+}
+
+function txRefPeindreChamp(){
+  const jeton=$('txRefJeton'),nom=$('txRefNom'),racine=$('txRef');
+  if(!jeton||!nom)return;
+  const e=txRefEtat.entrees.find(x=>x.valeur===txRefEtat.valeur);
+  jeton.hidden=!e||!e.ref;
+  if(e&&e.ref)jeton.textContent=e.ref;
+  nom.textContent=e?e.nom:(txRefEtat.entrees.length?'Choisir une référence':'Chargement du catalogue…');
+  nom.classList.toggle('est-vide',!e);
+  /* La désignation est coupée à l'ellipse dans un champ étroit : l'infobulle
+     rend la ligne entière sans avoir à rouvrir la liste. */
+  racine.title=e&&e.ref?`${e.ref} — ${e.nom}`:'';
+}
+
+function txRefFiltrees(){
+  const q=txRefNorm($('txRefFiltre').value).trim();
+  if(!q)return txRefEtat.entrees;
+  const mots=q.split(/\s+/);
+  return txRefEtat.entrees.filter(e=>{
+    const foin=txRefNorm(`${e.ref} ${e.nom} ${e.groupe||''}`);
+    return mots.every(m=>foin.includes(m));
+  });
+}
+
+function txRefPeindreListe(){
+  let vus=txRefFiltrees();
+  const libre=txRefEtat.entrees.find(e=>e.libre);
+  /* Rien ne correspond : la saisie libre reste la sortie de secours, sinon la
+     vendeuse se retrouve devant une liste vide sans rien à faire. */
+  const rien=!vus.length;
+  if(rien&&libre)vus=[libre];
+  txRefEtat.vus=vus;
+  txRefEtat.vise=Math.min(Math.max(txRefEtat.vise,0),vus.length-1);
+
+  const total=txRefEtat.entrees.filter(e=>!e.libre).length;
+  const montrees=vus.filter(e=>!e.libre).length;
+  $('txRefCompte').textContent=montrees===total?`${total} références`:`${montrees} / ${total}`;
+
+  const noeuds=[];
+  if(rien){
+    const vide=document.createElement('li');
+    vide.className='tx-panneau-rien';vide.setAttribute('role','presentation');
+    vide.textContent='Aucune référence ne correspond.';
+    noeuds.push(vide);
+  }
+  let groupeCourant=null;
+  vus.forEach((e,i)=>{
+    if(e.groupe&&e.groupe!==groupeCourant){
+      groupeCourant=e.groupe;
+      const tete=document.createElement('li');
+      tete.className='tx-groupe';tete.setAttribute('role','presentation');tete.textContent=e.groupe;
+      noeuds.push(tete);
+    }
+    const li=document.createElement('li');
+    li.className=`tx-option${e.libre?' tx-option-libre':''}${i===txRefEtat.vise?' est-vise':''}`;
+    li.id=`txRefOpt-${i}`;
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected',String(e.valeur===txRefEtat.valeur));
+    li.dataset.valeur=e.valeur;
+    if(e.ref){const j=document.createElement('span');j.className='tx-jeton';j.textContent=e.ref;li.append(j)}
+    const n=document.createElement('span');n.className='tx-option-nom';n.textContent=e.nom;li.append(n);
+    noeuds.push(li);
+  });
+  txFill($('txRefListe'),noeuds);
+  txRefPeindreVise(true);
+}
+
+function txRefPeindreVise(deroule){
+  const liste=$('txRefListe');
+  liste.querySelectorAll('.est-vise').forEach(li=>li.classList.remove('est-vise'));
+  const actif=liste.querySelector(`#txRefOpt-${txRefEtat.vise}`);
+  if(!actif){$('txRefFiltre').removeAttribute('aria-activedescendant');return}
+  actif.classList.add('est-vise');
+  $('txRefFiltre').setAttribute('aria-activedescendant',actif.id);
+  if(deroule!==false)actif.scrollIntoView({block:'nearest'});
+}
+
+function txRefViser(pas){
+  const n=txRefEtat.vus.length;
+  if(!n)return;
+  txRefEtat.vise=(txRefEtat.vise+pas+n)%n;
+  txRefPeindreVise(true);
+}
+
+function txRefTouche(ev){
+  if(ev.key==='ArrowDown'){ev.preventDefault();txRefViser(1)}
+  else if(ev.key==='ArrowUp'){ev.preventDefault();txRefViser(-1)}
+  else if(ev.key==='Home'){ev.preventDefault();txRefEtat.vise=0;txRefPeindreVise(true)}
+  else if(ev.key==='End'){ev.preventDefault();txRefEtat.vise=txRefEtat.vus.length-1;txRefPeindreVise(true)}
+  else if(ev.key==='Enter'){ev.preventDefault();const e=txRefEtat.vus[txRefEtat.vise];if(e)txRefChoisir(e.valeur)}
+  else if(ev.key==='Escape'){ev.preventDefault();txRefFermer(true)}
+  else if(ev.key==='Tab')txRefFermer(false);
+}
+
+function txRefOuvrir(){
+  if(txRefEtat.ouvert||!txRefEtat.entrees.length)return;
+  txRefEtat.ouvert=true;
+  $('txRef').setAttribute('aria-expanded','true');
+  $('txRefPanneau').classList.add('est-ouvert');
+  $('txRefFiltre').value='';
+  /* On ouvre sur la référence en cours, pas en tête de liste. */
+  txRefEtat.vise=Math.max(0,txRefEtat.entrees.findIndex(e=>e.valeur===txRefEtat.valeur));
+  txRefPeindreListe();
+  $('txRefFiltre').focus();
+}
+
+function txRefFermer(rendreFocus){
+  if(!txRefEtat.ouvert)return;
+  txRefEtat.ouvert=false;
+  $('txRef').setAttribute('aria-expanded','false');
+  $('txRefPanneau').classList.remove('est-ouvert');
+  if(rendreFocus)$('txRef').focus();
+}
+
+function txRefChoisir(valeur){
+  txRefEtat.valeur=String(valeur??'');
+  txRefPeindreChamp();
+  txRefFermer(true);
+  /* Le rouge d'un champ manquant s'efface sur `change` : le <select> le
+     déclenchait tout seul, ici c'est à nous de le dire. */
+  $('txRef').dispatchEvent(new Event('change',{bubbles:true}));
+  onTextileRefChange();
+}
+
 function txPopulateSelects(){
   if(!txReady())return;
   const db=TE().DB;
@@ -1018,16 +1244,16 @@ function txPopulateSelects(){
   const groupes=[];
   [...proposables].sort((a,b)=>rang(a)-rang(b))
     .forEach(r=>{const g=groupeDe(r);if(!groupes.includes(g))groupes.push(g);});
-  const noeuds=[new Option('— Choisir une référence —',''),new Option('➕ Nouvelle référence / produit libre','__CUSTOM__')];
+  /* La référence OUVRE la ligne, la désignation suit. À l'intérieur d'un
+     groupe on range par référence : la colonne de gauche se lit alors d'un
+     trait (NS300, NS305, NS308…) au lieu de sauter d'une marque à l'autre. */
+  const entrees=[{valeur:'__CUSTOM__',ref:'',nom:'➕  Nouvelle référence / produit libre',libre:true}];
   groupes.forEach(g=>{
-    const groupe=document.createElement('optgroup');
-    groupe.label=g;
     proposables.filter(r=>groupeDe(r)===g)
-      .sort((a,b)=>libelle(a).localeCompare(libelle(b),'fr'))
-      .forEach(r=>groupe.append(new Option(`${libelle(r)} — ${r.ref}`,r.ref)));
-    noeuds.push(groupe);
+      .sort((a,b)=>a.ref.localeCompare(b.ref,'fr',{numeric:true}))
+      .forEach(r=>entrees.push({valeur:r.ref,ref:r.ref,nom:libelle(r),groupe:g}));
   });
-  txFill($('txRef'),noeuds);
+  txRefCharger(entrees);
   txFill($('txPrintType'),Object.keys(db.printTypes).map(x=>new Option(x,x,false,x==='Coeur + Dos')));
   txFill($('txMarkColorList'),db.markingColors.map(x=>new Option('',x)));
   if(!$('txMarkColor').value)$('txMarkColor').value=db.markingColors[0];
