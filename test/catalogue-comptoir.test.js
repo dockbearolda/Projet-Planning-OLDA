@@ -381,7 +381,17 @@ cat.ajouterALaDemande();
 assert.strictEqual(cat.needs.length, 1, 'un produit ajouté = une ligne');
 assert.strictEqual(cat.needs[0].qty, 3, '… avec la quantité demandée');
 assert.strictEqual(catProduit.value, '', 'le menu repart à vide : reprendre la ligne d’avant est le geste qui double un article');
-assert.strictEqual(catQte.value, '1', '… et la quantité repart à 1');
+// Le champ repart VIDE depuis le 21/08 (aucun champ ne s'ouvre pré-rempli) —
+// ce qui protège du doublon, c'est qu'il ne garde pas la quantité précédente.
+assert.strictEqual(catQte.value, '', '… et la quantité repart à vide');
+// … et une quantité vide vaut toujours UNE unité : la vendeuse a désigné le
+// produit, elle ne doit pas se battre avec le champ.
+catProduit.value = index('Décapsuleur Bois');
+catQte.value = '';
+cat.ajouterALaDemande();
+assert.strictEqual(cat.needs[cat.needs.length - 1].qty, 1,
+  'une quantité laissée vide vaut une unité, jamais zéro');
+cat.needs.pop();
 
 // c) Le même produit repris : des unités, pas une deuxième ligne.
 catProduit.value = index('Flasque Bois — Clair');
