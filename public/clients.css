@@ -50,7 +50,7 @@
   flex-shrink: 0;
 }
 .cl-brand__title { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.2px; color: var(--text-1); }
-.cl-brand__sub { margin: 0; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cl-brand__sub { margin: 0; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 .cl-search {
   display: flex;
@@ -195,7 +195,7 @@
 .cl-card__name {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-1);
   white-space: nowrap;
@@ -205,7 +205,7 @@
 /* Puce NATURE (pro/perso) — mêmes teintes que le tag pro/perso du planning. */
 .cl-nature {
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -312,7 +312,7 @@
 }
 .cl-dh__titles { flex: 1; min-width: 0; }
 .cl-dh__title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cl-dh__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-dh__sub { margin: 2px 0 0; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cl-dh__tools { display: flex; gap: 4px; flex-shrink: 0; }
 .cl-dh__btn {
   display: grid;
@@ -435,7 +435,7 @@
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 5px 10px;
   border-radius: 999px;
@@ -475,7 +475,7 @@
 .cl-note__head { display: flex; align-items: center; gap: 8px; }
 .cl-note__kind { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
 .cl-note__kind .material-symbols-outlined { font-size: 15px; }
-.cl-note__time { font-size: 11.5px; color: var(--text-3); }
+.cl-note__time { font-size: 11px; color: var(--text-3); }
 .cl-note__del { margin-left: auto; border: 0; background: transparent; color: var(--text-3); cursor: pointer; border-radius: 8px; display: grid; place-items: center; width: 26px; height: 26px; }
 .cl-note__del:hover { background: var(--state-hover); color: var(--danger); }
 .cl-note__del .material-symbols-outlined { font-size: 17px; }
@@ -490,7 +490,7 @@
   border-radius: 12px;
   background: var(--surface);
   color: var(--text-1);
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -513,7 +513,7 @@
   z-index: 80;
   background: var(--text-1);
   color: var(--surface);
-  font-size: 13.5px;
+  font-size: 13px;
   padding: 10px 18px;
   border-radius: 999px;
   box-shadow: var(--shadow-2);
@@ -561,7 +561,7 @@
 .cl-secteurs__list { display: flex; flex-wrap: wrap; gap: 8px; }
 .cl-secteurs__chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px;
-  border: 1px solid var(--border); border-radius: 999px; font-size: 13.5px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px; font-size: 13px; background: var(--surface);
 }
 .cl-secteurs__del {
   display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;
