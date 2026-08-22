@@ -80,14 +80,47 @@ assert.deepStrictEqual(local(TE.DB.thresholds[TE.DB.thresholds.length - 1]),
   { minQty: 150, excellent: 0.55, veryGood: 0.5, good: 0.45, correct: 0.4, limited: 0.35 },
   '… et ceux de la dernière');
 
-// --- 4. La négociation : les mêmes quatre sorties ----------------------------
-// Portées du même fichier (V9 « Classement & gain OLDA »). Le patron y ajoute
-// une cinquième ligne vierge, « Ma solution », qu'il remplit à la main : elle
-// ne CALCULE rien, elle se saisit — nous ne l'avons pas.
+// --- 4. La négociation : les mêmes quatre sorties, plus « Ma solution » ------
+// Portées du même fichier (V9 « Classement & gain OLDA »). Le moteur ne rend
+// que les quatre sorties CALCULÉES ; la cinquième ligne du patron, « Ma
+// solution », ne calcule rien — elle se saisit, et c'est l'écran qui la pose.
 const c = TE.calculate({ ref: 'NS300', genre: 'Unisexe', transport: 'Maritime', printType: 'Poitrine + Dos', sizes: { S: 50 } });
-const sols = TE.defaultNegotiationSolutions(c, Math.round(c.sold * 0.75 * 100) / 100);
+const cible = Math.round(c.sold * 0.75 * 100) / 100;
+const sols = TE.defaultNegotiationSolutions(c, cible);
 assert.deepStrictEqual(local(sols.map(s => s.kind)), ['small_gift', 'full_gift', 'volume_target', 'volume_mid'],
   'les quatre sorties du patron, dans son ordre');
 assert.ok(sols.every(s => s.paidQty > 0 && s.unitPrice > 0), 'aucune sortie ne propose de vendre à zéro');
+
+// « MA SOLUTION » — la contre-offre écrite à la main, mesurée par la MÊME règle.
+const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const fonction = (nom, signature) => {
+  const m = DEVIS.match(new RegExp(`function ${nom}\\(${signature}\\)\\{[\\s\\S]*?\\n\\}`));
+  assert.ok(m, `${nom} doit exister`);
+  return m[0];
+};
+assert.ok(/hote\.append\(negCarteMienne\(i, c\)\);\s*negMajCustom\(i\);/.test(DEVIS),
+  'la cinquième ligne est posée APRÈS les quatre sorties classées');
+const defaut = fonction('negCustomDe', 'n, c');
+assert.ok(/paidQty: t \? t\.paidQty : c\.qty/.test(defaut)
+  && /unitPrice: t \? t\.unitPrice : c\.sold/.test(defaut)
+  && /freeQty: t \? t\.freeQty : 0/.test(defaut),
+  'elle part du devis actuel, comme chez le patron — et tant qu’on n’y touche pas, elle SUIT la ligne');
+const poser = fonction('negPoserCustom', 'i, champ, valeur');
+assert.ok(/negMajCustom\(i\)/.test(poser) && !/renderNeeds\(\)/.test(poser),
+  'on écrit dans la carte, on ne la redessine pas : la tabulation d’un champ à l’autre perdrait sa cible');
+assert.ok(/input\.onchange = \(\) => negPoserCustom/.test(DEVIS) && !/input\.oninput = \(\) => negPoserCustom/.test(DEVIS),
+  '… et la mesure se refait quand le champ rend la main, pas à chaque chiffre tapé');
+const maj = fonction('negMajCustom', 'i');
+assert.ok(/TE\(\)\.scenarioMetrics\(c, s, target\)/.test(maj)
+  && /rankedScenarios\(c, \[\.\.\.TE\(\)\.defaultNegotiationSolutions\(c, target\), s\], target\)/.test(maj),
+  'elle est mesurée et classée avec les quatre autres, par la règle du patron');
+
+// Les chiffres, vérifiés à la main : 70 payées à 17 € + 5 offertes = 75 livrées.
+const mienne = TE.scenarioMetrics(c, { paidQty: 70, unitPrice: 17, freeQty: 5 }, cible);
+assert.strictEqual(mienne.delivered, 75);
+assert.strictEqual(Math.round(mienne.revenue * 100) / 100, 1190);
+assert.strictEqual(Math.round(mienne.effective * 100) / 100, 15.87, 'le client paie 15,87 € en moyenne par pièce livrée');
+assert.strictEqual(Math.round(mienne.margin * 100) / 100,
+  Math.round((1190 - 75 * c.unitProductionCost) * 100) / 100, 'les pièces offertes coûtent leur production');
 
 console.log(`✓ chiffrage conforme au fichier du patron : ${REF.cas.length} configurations, 24 valeurs chacune`);

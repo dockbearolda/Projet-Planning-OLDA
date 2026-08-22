@@ -243,6 +243,14 @@ h2{letter-spacing:-.01em}
 .neg-sol{border:1px solid #e4e8ee;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#fff}
 .neg-sol.is-best{border:2px solid #1c3d6e;background:#f7f9fc;padding:13px 15px}
 .neg-sol.is-bad{opacity:.6}
+/* « MA SOLUTION » : la ligne que la vendeuse remplit elle-même. Trait
+   pointillé — c'est une saisie, pas une proposition calculée. */
+.neg-mienne{border-style:dashed}
+.neg-mienne-saisie{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.neg-mienne-saisie .field{margin-bottom:0}
+.neg-mienne-saisie label{font-size:12px;font-weight:800;color:#6d747b}
+.neg-rang{background:#eef2f7;color:#142e54}
+@media(max-width:700px){.neg-mienne-saisie{grid-template-columns:1fr}}
 .neg-sol-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .neg-sol-nom{font-weight:800;font-size:15px}
 .neg-best-badge{background:#1c3d6e;color:#fff;border-radius:999px;padding:4px 12px;font-size:11px;font-weight:800;white-space:nowrap}
@@ -1850,6 +1858,125 @@ function negCarteSolution(i, c, target, r, rang){
   return carte;
 }
 
+/* « MA SOLUTION » — LA CINQUIÈME LIGNE DU FICHIER DU PATRON, celle qu'il
+   remplit lui-même. Les quatre autres sont des sorties CALCULÉES ; ici la
+   vendeuse pose SA contre-offre — pièces payées, prix, pièces offertes — et
+   lit, avec exactement la même règle, ce qu'elle laisse à l'atelier.
+
+   Elle reste EN DERNIER et ne prend jamais le badge « le mieux pour OLDA » :
+   tant qu'on n'y touche pas, elle vaut le devis actuel — donc la meilleure
+   marge possible — et se mettrait en tête d'une liste qui, elle, répond au
+   client. Son classement est dit en toutes lettres à la place.
+
+   Tant que personne ne l'a modifiée, RIEN n'est stocké : elle suit alors la
+   ligne (une taille de plus, un prix qui bouge) au lieu de figer un chiffre
+   périmé. */
+function negCustomDe(n, c){
+  const t = (n.textile || {}).negCustom;
+  return { kind:'custom', name:'Ma solution',
+    paidQty: t ? t.paidQty : c.qty,
+    unitPrice: t ? t.unitPrice : c.sold,
+    freeQty: t ? t.freeQty : 0 };
+}
+/* Sur `change`, pas sur `input` : le champ a déjà rendu la main, et on ÉCRIT
+   dans la carte au lieu de la redessiner — la reconstruire reprendrait le
+   champ suivant sous les doigts au moment même où la tabulation y arrive. */
+function negPoserCustom(i, champ, valeur){
+  const n = needs[i];
+  if(!n || !n.textile) return;
+  const c = txCalc(n.textile);
+  if(!c) return;
+  const base = negCustomDe(n, c);
+  n.textile.negCustom = { paidQty:base.paidQty, unitPrice:base.unitPrice, freeQty:base.freeQty };
+  n.textile.negCustom[champ] = txNum(valeur);
+  negMajCustom(i);
+}
+function negPhraseMienne(c, m, target){
+  if(m.unitPrice >= c.sold - 0.005 && m.freeQty === 0 && m.paidQty <= c.qty)
+    return 'C’est le devis actuel : rien n’est concédé au client.';
+  return negPhrase(c, m, target);
+}
+function negMajCustom(i){
+  const n = needs[i];
+  const carte = document.getElementById(`negMienne-${i}`);
+  if(!carte || !n || !n.textile) return;
+  const c = txCalc(n.textile);
+  if(!c) return;
+  const target = negTargetDe(n);
+  const s = negCustomDe(n, c);
+  const m = TE().scenarioMetrics(c, s, target);
+  const classe = TE().rankedScenarios(c, [...TE().defaultNegotiationSolutions(c, target), s], target);
+  const rang = classe.findIndex(r => r.s === s) + 1;
+
+  carte.classList.toggle('is-bad', m.sousLeCout);
+  const poser = (id, texte) => { const el = document.getElementById(`${id}-${i}`); if(el) el.textContent = texte; };
+  poser('negMienneRang', rang === 1 ? `1re sur ${classe.length}` : `${rang}e sur ${classe.length}`);
+  poser('negMiennePhrase', negPhraseMienne(c, m, target));
+  poser('negMienneEcart', m.vsDemand >= 0
+    ? `${money(m.vsDemand)} de mieux que d'accepter ${money(target)} tout de suite`
+    : `${money(Math.abs(m.vsDemand))} de moins que d'accepter ${money(target)} tout de suite`);
+  const chiffres = document.getElementById(`negMienneChiffres-${i}`);
+  if(chiffres) txFill(chiffres, [
+    negLigne('Livrées en tout', String(m.delivered)),
+    negLigne('Le client paie en moyenne', money(m.effective)),
+    negLigne('Il reste à OLDA', money(m.margin), m.margin>0 ? '#1d6f43' : '#a02020'),
+    negLigne('Marge', txPct(m.mark)),
+  ]);
+  const bouton = document.getElementById(`negMienneRetenir-${i}`);
+  if(bouton) bouton.onclick = () => negRetenir(i, m);
+}
+function negCarteMienne(i, c){
+  const n = needs[i];
+  const s = negCustomDe(n, c);
+  const carte = txEl('div', 'neg-sol neg-mienne');
+  carte.id = `negMienne-${i}`;
+
+  const tete = txEl('div', 'neg-sol-head');
+  const gauche = txEl('div');
+  gauche.append(txEl('div', 'neg-sol-nom', 'Ma solution'));
+  const phrase = txEl('div', 'help');
+  phrase.id = `negMiennePhrase-${i}`;
+  gauche.append(phrase);
+  const rang = txEl('span', 'badge neg-rang');
+  rang.id = `negMienneRang-${i}`;
+  tete.append(gauche, rang);
+  carte.append(tete);
+
+  const saisie = txEl('div', 'neg-mienne-saisie');
+  const champ = (cle, libelle, valeur, pas) => {
+    const f = txEl('div', 'field');
+    const l = txEl('label', null, libelle);
+    l.htmlFor = `negMienne${cle}-${i}`;
+    const input = document.createElement('input');
+    input.id = `negMienne${cle}-${i}`;
+    input.type = 'number'; input.min = cle === 'Paid' ? '1' : '0'; input.step = pas;
+    input.value = valeur;
+    input.onchange = () => negPoserCustom(i, cle === 'Paid' ? 'paidQty' : cle === 'Prix' ? 'unitPrice' : 'freeQty', input.value);
+    /* La molette sur un champ nombre change le chiffre sans qu'on l'ait tapé. */
+    input.addEventListener('wheel', () => input.blur(), { passive: true });
+    f.append(l, input);
+    return f;
+  };
+  saisie.append(
+    champ('Paid', 'Pièces payées', String(s.paidQty), '1'),
+    champ('Prix', 'Prix HT / pièce', String(Math.round(txNum(s.unitPrice)*100)/100), '0.01'),
+    champ('Free', 'Pièces offertes', String(s.freeQty), '1'));
+  carte.append(saisie);
+
+  const chiffres = txEl('div', 'neg-sol-metrics');
+  chiffres.id = `negMienneChiffres-${i}`;
+  carte.append(chiffres);
+
+  const pied = txEl('div', 'neg-sol-foot');
+  const ecart = txEl('span', 'help');
+  ecart.id = `negMienneEcart-${i}`;
+  const retenir = txEl('button', 'secondary', 'Retenir');
+  retenir.id = `negMienneRetenir-${i}`;
+  pied.append(ecart, retenir);
+  carte.append(pied);
+  return carte;
+}
+
 function negPanneau(i, n){
   const c = txCalc(n.textile);
   const bloc = txEl('div', 'neg-panneau');
@@ -1906,6 +2033,8 @@ function negRemplirResultats(hote, i, n){
   TE().rankedScenarios(c, sols, target).forEach((r, rang) => {
     hote.append(negCarteSolution(i, c, target, r, rang));
   });
+  hote.append(negCarteMienne(i, c));
+  negMajCustom(i);
 }
 
 /* La solution retenue se réécrit dans la SAISIE : les pièces livrées en plus
