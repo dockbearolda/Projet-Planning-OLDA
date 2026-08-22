@@ -50,25 +50,35 @@
 </head>
 <body>
   <div class="shell">
-    <!-- Barre du haut PLEINE LARGEUR : la marque, la navigation de l'outil
-         (Nouveau Projet · Planning · Dashboard · Base clients), la recherche
-         globale et les actions. Le rail latéral, dessous, ne porte plus que les
-         étapes du planning — il n'a donc plus à défiler. -->
+    <!-- LA MARQUE COIFFE LE RAIL, PAS LA BARRE. Case à elle dans la grille du
+         .shell (aire `brand`) : posée au-dessus du rail des étapes, elle lui
+         donne sa tête et fait monter la colonne de gauche jusqu'en haut. Hors
+         planning le rail disparaît mais elle reste — c'est la seule sortie du
+         poste comptoir, où la navigation est masquée. -->
+    <a class="brand" id="brandHome" href="#planning" aria-label="Planning OLDA — aller au planning">
+      <span class="brand-logo" id="brandLogo" aria-hidden="true">
+        <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
+          <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
+          <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
+          <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
+          <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
+          <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
+        </svg>
+      </span>
+    </a>
+    <!-- Barre du haut : elle commence APRÈS le rail (le rail, lui, monte
+         jusqu'en haut). Elle porte la recherche globale à gauche, puis, poussés
+         à DROITE, les onglets de l'outil et les actions. -->
     <header class="topbar">
-      <!-- La marque coiffe la barre : cliquable (retour planning), sans soulignement. -->
-      <a class="brand" id="brandHome" href="#planning" aria-label="Planning OLDA — aller au planning">
-        <span class="brand-logo" id="brandLogo" aria-hidden="true">
-          <svg class="brand-logo-svg" viewBox="55 68 174 176" fill="currentColor">
-            <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z"/>
-            <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z"/>
-            <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z"/>
-            <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z"/>
-            <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z"/>
-          </svg>
-        </span>
-      </a>
+      <div class="grid-search" id="gridSearch">
+        <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
+        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
+        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
+        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
+      </div>
 
-      <!-- Navigation de l'outil, désormais dans la barre du haut. Le hash de
+      <!-- Navigation de l'outil, calée à DROITE de la barre (la gauche
+           appartient au rail, qui monte jusqu'en haut). Le hash de
            l'URL fait foi (voir applyHash dans app.js) : un seul pilote, donc pas
            de vue qui se contredit. Nouveau Projet = LA porte d'entrée (toute
            commande y naît) ; Base clients (CRM) = le socle. -->
@@ -110,14 +120,6 @@
           <span class="nav-switch-label">Réglages</span>
         </a>
       </nav>
-
-      <div class="grid-search" id="gridSearch">
-        <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
-        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
-        <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
-        <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
-      </div>
-
 
       <div class="topbar-right">
         <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Passer en plein écran" hidden>

@@ -250,23 +250,26 @@ body {
   user-select: none;
 }
 
-/* Ossature : barre du haut PLEINE LARGEUR + filet, puis en dessous le rail des
-   étapes (à gauche) et la zone de travail (à droite). La barre du haut coiffe
-   tout : elle porte la marque et la navigation. Grille : l'ordre des enfants
-   dans le HTML n'a plus d'importance, chacun est posé par sa zone. */
+/* Ossature : LA COLONNE DE GAUCHE MONTE JUSQU'EN HAUT. Elle porte la marque
+   (case `brand`, à hauteur de la barre) puis le rail des étapes ; la barre du
+   haut commence à sa droite. Les deux partagent la même surface et le même
+   filet : de face, on lit un seul et même bandeau en L, pas une barre posée
+   sur une colonne. Grille : l'ordre des enfants dans le HTML n'a plus
+   d'importance, chacun est posé par sa zone. */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) 16px 1fr;
+  grid-template-columns: var(--sidebar-w, 240px) 16px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
-    "topbar  topbar  topbar"
-    "filet   filet   filet"
+    "brand   topbar  topbar"
+    "brand   filet   filet"
     "sidebar resizer main";
   height: 100vh;
   /* Android/Chrome : suit la hauteur réellement visible (barre d'adresse comprise) */
   height: 100dvh;
   overflow: hidden;
 }
+.brand { grid-area: brand; }
 .topbar { grid-area: topbar; }
 .topbar-filet { grid-area: filet; }
 .sidebar { grid-area: sidebar; }
@@ -289,26 +292,36 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 16px;
+  /* 32 px à gauche = la largeur de la gouttière (16) + le retrait de la zone de
+     travail (16) : la recherche démarre pile à l'aplomb de la carte du dessous. */
+  padding: 8px 16px 8px 32px;
   min-height: 64px;
   background: var(--surface);
 }
 
-/* La marque coiffe la barre : cliquable (retour planning), sans soulignement.
-   Ne se comprime pas — c'est la recherche, au centre, qui absorbe la place. */
+/* La marque COIFFE LE RAIL : même surface, même bordure droite, même filet en
+   bas — c'est ce qui soude la colonne de gauche à la barre du haut. Cliquable
+   (retour planning), sans soulignement. Hors planning le rail s'efface, elle
+   reste : au poste comptoir, où la navigation est masquée, c'est la seule
+   sortie. Le survol n'éclaire QUE la pastille : allumer un bloc de 240 px
+   romprait l'aplat qu'on vient de construire. */
 .brand {
   display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 4px 6px;
-  flex-shrink: 0;
+  padding: 0 16px;
   color: inherit; text-decoration: none;
-  border-radius: var(--radius);
-  transition: background var(--dur-1) var(--ease);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
 }
-.brand:hover { background: var(--surface-hover); }
-.brand:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.brand:focus-visible { outline: none; box-shadow: inset 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.brand:hover .brand-logo { box-shadow: var(--shadow-2); }
+/* Hors planning il n'y a plus de rail sous elle : le trait vertical n'aurait
+   plus rien à prolonger. */
+body.view-plein .brand,
+body.view-focus .brand { border-right: 0; }
 .brand-logo {
   width: 40px;
   height: 40px;
+  transition: box-shadow var(--dur-1) var(--ease);
   flex-shrink: 0;
   border-radius: 12px;
   display: grid;
@@ -319,7 +332,11 @@ body {
 }
 .brand-logo-svg { width: 26px; height: 26px; display: block; }
 
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* LES ONGLETS SONT À DROITE : c'est `.nav-switch` qui absorbe la place libre
+   (la recherche est bornée à 520 px), les actions le suivent. Deux marges
+   automatiques se partageraient l'espace et creuseraient un trou entre les
+   deux — d'où le 0 explicite ici. */
+.topbar-right { margin-left: 0; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 /* bouton icône rond (bascule de thème…) */
 .icon-btn {
@@ -463,7 +480,9 @@ body {
 }
 
 /* Filet sous la barre : simple séparation, plus de couleur (façon SumUp,
-   minimal). */
+   minimal). Il NE TRAVERSE PAS la colonne de gauche (voir les aires du .shell) :
+   sans ça une ligne couperait le rail sous la marque, et la colonne cesserait de
+   se lire d'un seul tenant. */
 .topbar-filet {
   height: 1px;
   flex-shrink: 0;
@@ -2491,8 +2510,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .search-palette[hidden] { display: none; }
 
 /* Pendant la recherche, la barre du haut reste au-dessus de l'assombrissement
-   pour que le champ et sa croix restent nets et cliquables. */
+   pour que le champ et sa croix restent nets et cliquables. La marque suit :
+   elle n'est plus DANS la barre (case à part dans la grille du .shell), et sans
+   ça l'assombrissement creusait un cran sombre au coin gauche du bandeau. Le
+   trait qui reste — la limite du voile sous la marque — tombe pile sur le filet
+   qui la prolonge à droite. */
 .topbar.searching { z-index: 1600; }
+.shell:has(.topbar.searching) .brand { position: relative; z-index: 1600; }
 
 .search-palette-scrim {
   position: absolute;
@@ -3466,17 +3490,18 @@ button, a, .stage, .deadline-badge,
    Responsive
    ========================================================================= */
 
-/* La barre du haut porte huit onglets LIBELLÉS (Demande · Commande · Planning ·
-   Dashboard · Fiverr · À commander · Base clients · Réglages), la recherche, le
-   bouton d'ajout et les actions : il faut ~1750 px pour aligner tout ça sur une
-   rangée avec un champ de recherche encore lisible. En dessous, plutôt que
+/* La barre du haut porte sept onglets LIBELLÉS (Nouveau Projet · Planning ·
+   Dashboard · Fiverr · À commander · Base clients · Réglages), la recherche et
+   les actions : il faut ~1750 px pour aligner tout ça sur une rangée avec un
+   champ de recherche encore lisible. La marque en est sortie (elle coiffe le
+   rail), mais le rail lui-même prend maintenant la gauche de l'écran : la barre
+   ne dispose pas d'un pixel de plus qu'avant, le seuil ne bouge pas. Plutôt que
    d'effacer les libellés (« Fiverr » et « À commander » ne se devinent pas à
    l'icône) ou d'éjecter les actions hors de l'écran, la barre se plie en DEUX
    rangées — les onglets prennent la seconde, pleine largeur. Rien ne
    disparaît, rien ne déborde. */
 @media (max-width: 1750px) {
   .topbar { flex-wrap: wrap; row-gap: 8px; }
-  .brand { order: 0; }
   .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
   .topbar-right { order: 3; }
   .nav-switch {
@@ -3484,6 +3509,10 @@ button, a, .stage, .deadline-badge,
     flex: 1 0 100%;
     width: 100%;
     min-width: 0;
+    /* Pliés sur leur propre rangée, les onglets restent À DROITE : c'est de ce
+       côté-là qu'on va les chercher, le rail tient la gauche. */
+    justify-content: flex-end;
+    margin-left: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -3506,6 +3535,7 @@ button, a, .stage, .deadline-badge,
 @media (max-width: 900px) {
   .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
+  .brand { padding: 0 12px; }
   .grid-search { max-width: none; }
   /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
      perd pas son nom. Sept pictogrammes muets (Fiverr, À commander, Base
@@ -3530,14 +3560,18 @@ button, a, .stage, .deadline-badge,
    puis la zone de travail. Le .shell devient une seule colonne qui défile. */
 @media (max-width: 640px) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto auto 1fr;
-    grid-template-areas: "topbar" "sidebar" "main";
+    grid-template-areas:
+      "brand   topbar"
+      "sidebar sidebar"
+      "main    main";
     height: auto;
     min-height: 100dvh;
     overflow: auto;
   }
   .topbar-filet { display: none; }
+  .brand { padding: 0 10px; border-right: 0; }
   /* La barre du haut, le rail et la zone de travail ne suivent QUE la largeur de
      l'écran : sans ce `min-width: 0`, la grille du planning (min-width 1180) les
      étirerait tous et pousserait les boutons hors de l'écran. Seule la grille
@@ -3703,7 +3737,9 @@ button, a, .stage, .deadline-badge,
    ONGLET DASHBOARD
    =========================================================================== */
 
-/* Navigation de l'outil, dans la barre du haut : onglets sur une rangée.
+/* Navigation de l'outil, calée À DROITE de la barre du haut : onglets sur une
+   rangée. `margin-left: auto` mange toute la place libre — la gauche de la
+   barre revient à la recherche, la droite aux onglets et aux actions.
    Ne se comprime pas — les libellés se replient en icônes seules quand la barre
    se resserre (voir les media queries plus bas). */
 .nav-switch {
@@ -3712,6 +3748,7 @@ button, a, .stage, .deadline-badge,
   align-items: center;
   gap: 4px;
   padding: 0;
+  margin-left: auto;
   flex-shrink: 0;
 }
 .nav-switch-btn {
@@ -3817,11 +3854,11 @@ body.view-focus .shell {
   /* `minmax(0, …)` et pas `1fr` : sur un onglet Fiverr / À commander la grille
      du planning est bien là, et sa largeur mini pousserait la colonne au-delà
      de l'écran. C'est à la grille de défiler, pas à la page. */
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "topbar"
-    "filet"
-    "main";
+    "brand topbar"
+    "brand filet"
+    "main  main";
 }
 body.view-plein .sidebar,
 body.view-plein .sidebar-resizer,
@@ -3837,6 +3874,9 @@ body.view-focus .sidebar-resizer { display: none; }
    elle ramène au planning) ainsi que plein écran / thème / avatar. */
 body.view-comptoir .nav-switch,
 body.view-comptoir .grid-search { display: none !important; }
+/* Ni onglets ni recherche pour pousser les actions : sans cette marge, plein
+   écran / thème / poste se collent au logo au lieu de tenir le coin droit. */
+body.view-comptoir .topbar-right { margin-left: auto; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {
