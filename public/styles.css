@@ -301,25 +301,23 @@ body {
   background: var(--surface);
 }
 
-/* La marque COIFFE LE RAIL : même surface, même bordure droite, même filet en
-   bas — c'est ce qui soude la colonne de gauche à la barre du haut. Cliquable
-   (retour planning), sans soulignement. Hors planning le rail s'efface, elle
-   reste : au poste comptoir, où la navigation est masquée, c'est la seule
-   sortie. Le survol n'éclaire QUE la pastille : allumer un bloc de 240 px
-   romprait l'aplat qu'on vient de construire. */
+/* La marque COIFFE LE RAIL, ET AUCUN TRAIT NE LA SÉPARE DE LA BARRE : sa case,
+   la barre du haut et le rail dessous sont le MÊME aplat de surface. Les deux
+   seuls traits de l'ossature partent du coin de sa case et s'en éloignent — le
+   filet vers la droite, le liseré du rail vers le bas : ils se rejoignent
+   exactement, rien ne coupe le bandeau.
+   Cliquable (retour planning), sans soulignement. Hors planning le rail
+   s'efface, elle reste : au poste comptoir, où la navigation est masquée,
+   c'est la seule sortie. Le survol n'éclaire QUE la pastille : allumer un bloc
+   de 240 px romprait l'aplat qu'on vient de construire. */
 .brand {
   display: flex; align-items: center; gap: 10px; min-width: 0;
   padding: 0 16px;
   color: inherit; text-decoration: none;
   background: var(--surface);
-  border-right: 1px solid var(--border);
 }
 .brand:focus-visible { outline: none; box-shadow: inset 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .brand:hover .brand-logo { box-shadow: var(--shadow-2); }
-/* Hors planning il n'y a plus de rail sous elle : le trait vertical n'aurait
-   plus rien à prolonger. */
-body.view-plein .brand,
-body.view-focus .brand { border-right: 0; }
 .brand-logo {
   width: 40px;
   height: 40px;
@@ -3583,7 +3581,7 @@ button, a, .stage, .deadline-badge,
     overflow: auto;
   }
   .topbar-filet { display: none; }
-  .brand { padding: 0 10px; border-right: 0; }
+  .brand { padding: 0 10px; }
   /* La barre du haut, le rail et la zone de travail ne suivent QUE la largeur de
      l'écran : sans ce `min-width: 0`, la grille du planning (min-width 1180) les
      étirerait tous et pousserait les boutons hors de l'écran. Seule la grille
