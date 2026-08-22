@@ -353,23 +353,15 @@ h2{letter-spacing:-.01em}
 .tx-recap-kpis b{display:block;margin-top:2px;font-size:var(--recap-grand);font-weight:800;line-height:1.1;
   color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .tx-recap-kpis .is-fort b{font-weight:900;color:#142e54}
-/* LA JAUGE REMPLACE LE BADGE « EXCELLENT — VALIDÉ ». Un mot ne disait ni de
-   combien on était au-dessus, ni ce qu'il restait avant de descendre. Les deux
-   repères sont ceux du patron et BAISSENT avec la quantité : 45 / 60 % à neuf
-   pièces, 35 / 50 % à deux cents. */
+/* LA MARGE, SITUÉE ENTRE SON SEUIL ET SA CIBLE — en CHIFFRES, sans barre : le
+   patron a fait retirer le remplissage le 21/08, il ne disait rien que les
+   trois nombres ne disent déjà. Ce sont ses seuils, et ils BAISSENT avec la
+   quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
 .tx-jauge{border:1px solid #e4e8ee;border-radius:12px;padding:15px 17px;margin-top:18px;background:#fbfcfd}
 .tx-jauge-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .tx-jauge-tete span{font-weight:800}
 .tx-jauge-tete b{font-weight:800;font-variant-numeric:tabular-nums}
-.tx-rail{position:relative;height:12px;border-radius:999px;background:#e3e7ec;margin:13px 0 10px}
-.tx-fil{height:100%;border-radius:999px;background:var(--valide);transition:width .18s ease,background .18s ease}
-.tx-jauge.est-warn .tx-fil{background:var(--orange)}
-.tx-jauge.est-bad .tx-fil{background:var(--red)}
-/* Les deux repères se lisent PAR-DESSUS le remplissage : le seuil en clair, la
-   cible à l'encre. Sans eux, 70 % et 45 % ont la même tête. */
-.tx-tick{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:2px;background:#aeb6bf}
-.tx-tick.is-cible{background:#142e54}
-.tx-jauge-pied{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tx-jauge-pied{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:9px}
 .tx-reperes{display:flex;gap:18px;font-weight:600;color:var(--muted)}
 .tx-verdict{font-weight:800;color:var(--valide)}
 .tx-jauge.est-warn .tx-verdict{color:var(--orange)}
@@ -1545,16 +1537,11 @@ function txJauge(c){
   const box=txEl('div',`tx-jauge est-${etat}`);
   const tete=txEl('div','tx-jauge-tete');
   tete.append(txEl('span',null,'Marge'),txEl('b',null,`${money(c.margin)} · ${txPct(c.mark)}`));
-  const rail=txEl('div','tx-rail'),fil=txEl('div','tx-fil');
-  fil.style.width=`${Math.max(0,Math.min(100,c.mark*100))}%`;
-  const rSeuil=txEl('span','tx-tick'),rCible=txEl('span','tx-tick is-cible');
-  rSeuil.style.left=`${seuil*100}%`;rCible.style.left=`${cible*100}%`;
-  rail.append(fil,rSeuil,rCible);
   const reperes=txEl('div','tx-reperes');
   reperes.append(txEl('span',null,`Seuil ${txPctCourt(seuil)}`),txEl('span',null,`Cible ${txPctCourt(cible)}`));
   const pied=txEl('div','tx-jauge-pied');
   pied.append(reperes,txEl('b','tx-verdict',verdict));
-  box.append(tete,rail,pied);
+  box.append(tete,pied);
   return box;
 }
 

@@ -170,8 +170,10 @@ assert.ok(/TE\(\)\.thresholdFor\(c\.qty\)/.test(jauge) && /seuil=t\.limited/.tes
   'seuil et cible viennent des seuils par quantité du moteur, jamais d’un nombre écrit en dur');
 assert.ok(/Sous le seuil/.test(jauge) && /Au-dessus du seuil/.test(jauge) && /Au-dessus de la cible/.test(jauge),
   'la jauge dit lequel des trois états on occupe');
-assert.ok(/Math\.max\(0,Math\.min\(100,c\.mark\*100\)\)/.test(jauge),
-  'une marge négative ne fait pas déborder la jauge');
+// La barre de remplissage a été retirée le 21/08 : elle ne disait rien que les
+// trois nombres ne disent déjà, et elle amenait sa propre géométrie.
+assert.ok(!/tx-rail|tx-fil|tx-tick/.test(DEVIS),
+  'la marge se lit en chiffres — plus de barre, ni de style qui traîne derrière');
 
 // Le moteur, lui, place bien 45 % et 60 % à neuf pièces — c'est ce que montre
 // la maquette du patron.
