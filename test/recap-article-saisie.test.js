@@ -226,4 +226,48 @@ assert.ok(/const pose=editingTextile>=0\?editingTextile:needs\.length-1;/.test(e
 assert.ok(enregistrer.indexOf('const pose=') < enregistrer.indexOf('cancelTextileEdit()'),
   'l’indice se lit AVANT que le formulaire ne soit remis à zéro');
 
-console.log('✓ récapitulatif : intitulés des champs, jauge seuil/cible, calcul dépliable, barre collante');
+// --- 6. DEUX TAILLES DE TEXTE, PAS UNE DE PLUS (21/08/2026) -----------------
+// La carte en comptait onze : 11, 11.5, 12, 12.5, 13, 13.5, 14, 15, 17, 20 et
+// 27 px. Des écarts d'un demi-pixel que l'œil ne lit pas comme une hiérarchie,
+// seulement comme du désordre — « c'est illisible », dit le patron. Une taille
+// pour tout ce qui se lit, une pour les quatre chiffres clés, et la hiérarchie
+// se fait à la GRAISSE et à la COULEUR.
+const DEBUT = DEVIS.indexOf('/* ---- LE RÉCAPITULATIF DE L\'ARTICLE ---');
+const FIN = DEVIS.indexOf('@media(max-width:700px){.tx-barre{position:static}}');
+assert.ok(DEBUT > 0 && FIN > DEBUT, 'le bloc de style du récapitulatif doit rester repérable');
+const STYLE = DEVIS.slice(DEBUT, FIN);
+
+const AUTORISEES = ['var(--recap-texte)', 'var(--recap-grand)', 'inherit'];
+const tailles = [...STYLE.matchAll(/font-size:\s*([^;}!]+)/g)].map((m) => m[1].trim());
+assert.ok(tailles.length >= 4, 'les tailles du bloc doivent bien être déclarées');
+// Le reste de la carte n'en déclare AUCUNE : tout hérite. C'est ce qui rend la
+// règle tenable — une bande de plus ne rouvre pas la question.
+assert.ok(!/font-size:\s*[\d.]+px/.test(STYLE),
+  'aucune taille en pixels dans le bloc : les deux seules vivent dans les variables');
+tailles.forEach((t) => assert.ok(AUTORISEES.includes(t),
+  `« font-size:${t} » — la carte n’a droit qu’à deux tailles : var(--recap-texte) et var(--recap-grand)`));
+
+// Les deux tailles elles-mêmes, déclarées une seule fois, pour les trois
+// surfaces qui portent ces blocs — le récapitulatif, sa barre, et la fiche.
+const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:(\d+)px;--recap-grand:(\d+)px;/);
+assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise');
+assert.ok(Number(declaration[1]) >= 15, 'le texte courant ne descend pas sous 15 px : ces écrans se lisent debout');
+assert.ok(Number(declaration[2]) > Number(declaration[1]) * 1.5,
+  'les quatre chiffres clés se voient de loin — sinon les deux tailles n’en font qu’une');
+
+// Et rien, dans la fiche, ne réintroduit une troisième taille par la porte de
+// derrière : un bouton, une pastille, un intitulé et un champ décident chacun
+// de la leur par défaut.
+['#detailArticle button', '#detailArticle input', '#detailArticle label', '#detailArticle .help',
+ '#detailArticle .badge'].forEach((sel) => assert.ok(STYLE.includes(sel),
+  `${sel} doit être ramené à la taille de la carte`));
+assert.ok(!/\.detail-nom\{[^}]*font-size/.test(DEVIS) && !/\.detail-meta\{[^}]*font-size/.test(DEVIS),
+  'la tête de la fiche ne garde pas ses anciennes tailles');
+
+// UNE SEULE POLICE. Les champs et les boutons n'héritent PAS de celle du corps
+// sans qu'on le leur dise — c'est ce qui donnait des écrans bariolés, champ
+// par champ, sur les postes Windows de l'atelier.
+assert.ok(/input,select,textarea,button\{font-family:inherit!important\}/.test(DEVIS),
+  'tout ce qui s’écrit hérite de la police du corps');
+
+console.log('✓ récapitulatif : intitulés des champs, jauge seuil/cible, calcul dépliable, deux tailles de texte');
