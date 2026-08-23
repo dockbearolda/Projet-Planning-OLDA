@@ -41,17 +41,39 @@ const SAISIE = {
   note: 'Prénom Léa sur la manche', discount: '', manualPrice: '', markupPercent: '',
 };
 
+// Les tailles se composent en NŒUDS (le « × » est en gris, le nombre à
+// l'encre) : le bac à sable n'a pas de DOM, on lui en donne juste assez pour
+// que `txTaillesNode` s'exécute — et pour relire le texte qu'il produit.
+class Noeud {
+  constructor(cls, texte) {
+    this.className = cls || '';
+    this.enfants = texte == null ? [] : [String(texte)];
+  }
+
+  append(...n) { this.enfants.push(...n); }
+
+  get childNodes() { return this.enfants; }
+
+  get childElementCount() { return this.enfants.filter((e) => e instanceof Noeud).length; }
+
+  get textContent() { return this.enfants.map((e) => (e instanceof Noeud ? e.textContent : e)).join(''); }
+}
+
 function lignesDeSaisie(d) {
   const contexte = vm.createContext({
     TE: () => ({ SIZE_KEYS: ['S', 'M', 'L', 'XL', 'XXL', 'other'],
       SIZE_LABELS: { S: 'S', M: 'M', L: 'L', XL: 'XL', XXL: '2XL', other: 'Autres' } }),
     txNum: (v) => Number(v) || 0,
     txDisplayRef: (x) => (x.isCustom ? (x.customRef || 'NOUVEAU') : x.ref),
+    txEl: (tag, cls, texte) => new Noeud(cls, texte),
     d,
   });
-  vm.runInContext(`${source('txSaisieLignes', 'd')}\nglobalThis.__r=txSaisieLignes(d);`, contexte);
+  vm.runInContext(`${source('txSaisieLignes', 'd')}\n${source('txTaillesNode', 'd')}\nglobalThis.__r=txSaisieLignes(d);`, contexte);
   return contexte.__r;
 }
+
+// La valeur d'une rangée est un texte, sauf les tailles qui sont un nœud.
+const lire = (v) => (v instanceof Noeud ? v.textContent : v);
 
 const lignes = lignesDeSaisie(SAISIE);
 const par = Object.fromEntries(lignes);
@@ -72,7 +94,22 @@ assert.strictEqual(par['Genre'], 'Bébé', 'le genre décide des temps de marqua
 assert.strictEqual(par['Emplacement du marquage'], 'Poitrine + Dos');
 assert.strictEqual(par['Couleur du marquage'], 'Kaki');
 assert.strictEqual(par['Transport'], 'Chronopost');
-assert.strictEqual(par['Tailles'], 'M 2', 'les tailles se relisent taille par taille');
+// LE NOMBRE D'ABORD, LA TAILLE ENSUITE (23/08/2026). La rangée disait « M 2 »
+// — qui se lit aussi bien « taille M2 » — et obligeait à traduire à chaque
+// lecture. On écrit « 2 × M », dans l'ordre où la vendeuse le dit à voix haute.
+assert.strictEqual(lire(par['Tailles']), '2×M', 'la quantité précède la taille');
+// Deux tailles se recopient avec une VRAIE espace entre elles : un simple
+// écart de mise en page donnerait « 2 × S4 × M » au copier-coller.
+const deux = Object.fromEntries(lignesDeSaisie({
+  ...SAISIE, sizes: { S: '2', M: '4', L: '', XL: '', XXL: '', other: '' },
+}));
+assert.strictEqual(lire(deux['Tailles']), '2×S 4×M', 'les paquets restent séparés dans le texte');
+// Le « × » est le seul élément gris de la rangée : il ne porte aucune donnée.
+const paquets = par['Tailles'].enfants.filter((e) => e instanceof Noeud);
+assert.strictEqual(paquets.length, 1, 'une taille saisie, un paquet');
+assert.ok(paquets[0].className === 'tx-taille'
+  && paquets[0].enfants.some((e) => e instanceof Noeud && e.className === 'tx-taille-x'),
+  'le paquet est insécable et son « × » porte sa propre classe');
 assert.strictEqual(par['Note'], 'Prénom Léa sur la manche');
 
 // Les DEUX couleurs sont là, chacune sous son intitulé : « Coconut Milk » et
@@ -118,7 +155,7 @@ const html = rendre([{
 }]);
 assert.ok(/Poitrine \+ Dos/.test(html) && /Kaki/.test(html),
   'la ligne dit où va le marquage et de quelle couleur');
-assert.ok(/M 2/.test(html), 'la ligne dit les tailles commandées');
+assert.ok(/2 × M/.test(html), 'la ligne dit les tailles commandées, dans le même sens qu’ailleurs');
 assert.ok(/Chronopost/.test(html), 'la ligne dit le transport choisi');
 assert.ok(/Bébé/.test(html), 'la ligne dit le genre');
 assert.ok(/Marquage<\/div>/.test(html) && /Tailles<\/div>/.test(html),
@@ -158,8 +195,14 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(c\),txTableau\(d,c\),txMargeBloc\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\)/.test(apercu),
+assert.ok(/txTete\(\),txTableau\(d,c\),txMargeBloc\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\)/.test(apercu),
   'le récapitulatif s’écrit dans l’ordre où il se lit : ce qu’on annonce et ce qu’est l’article, puis la marge, le calcul, les alertes');
+// L'EN-TÊTE N'EST QUE SON TITRE (23/08/2026). Il portait « 2 pièces · avant
+// ajout au projet » : le nombre de pièces se relit deux rangées plus bas dans
+// les tailles, et la seconde moitié décrivait l'écran à qui l'a sous les yeux.
+const tete = source('txTete', '');
+assert.ok(!/tx-tete-info/.test(DEVIS) && !/pièce/.test(tete),
+  'l’en-tête du récapitulatif ne redit ni le nombre de pièces ni où l’on se trouve');
 // La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre.
 assert.ok(/metrics,txMargeBloc\(n\.textile,c\),txCalcul\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
   '… et la fiche à gauche les écrit dans le même ordre');
@@ -258,9 +301,37 @@ const RE = eval(motif); // eslint-disable-line no-eval
 
 // LA BARRE D'ACTION. Elle reste visible quand le prix ne l'est pas : c'est par
 // son bouton qu'on apprend quel champ manque.
-assert.ok(/<div class="tx-barre"><span class="tx-barre-objet" id="txBarreObjet">/.test(DEVIS),
-  'la barre d’action porte ce qu’on s’apprête à ajouter');
 assert.ok(/\.tx-barre\{[^}]*position:sticky/.test(DEVIS), 'elle est collée en bas');
+// ELLE NE PORTE QUE SES BOUTONS (23/08/2026). Elle répétait « T-shirt … ·
+// 4 pièces · 123,60 € HT » juste sous le récapitulatif qui le dit déjà en plus
+// grand, et sans prix calculable « Complète les champs obligatoires » — alors
+// que le bouton pose l'erreur SUR le champ qui manque.
+// Les commentaires du fichier CITENT la phrase retirée pour dire pourquoi :
+// c'est le code qu'on interroge, pas ce qui l'explique.
+const CODE = DEVIS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+assert.ok(!/txBarreObjet|tx-barre-objet|Complète les champs obligatoires/.test(CODE),
+  'la barre ne redit pas ce que le récapitulatif dit déjà juste au-dessus');
+
+// « AJOUTER CET ARTICLE » EST TOUJOURS TOUT À DROITE — c'est la règle de
+// l'écran. Les deux boutons secondaires vont et viennent (« dupliquer » n'existe
+// qu'une fois le prix calculé, « annuler » qu'en édition) : l'action qui engage
+// doit donc être la DERNIÈRE du bloc, sinon sa place bouge d'un état à l'autre.
+const barre = DEVIS.match(/<div class="tx-barre">([\s\S]*?)<\/div><\/div>/);
+assert.ok(barre, 'la barre d’action doit rester repérable');
+const ordre = [...barre[1].matchAll(/<button id="(\w+)"/g)].map((m) => m[1]);
+assert.deepStrictEqual(ordre, ['txDupBtn', 'txCancelBtn', 'txSaveBtn'],
+  'le bouton qui ajoute ferme la rangée, quels que soient les boutons d’à côté');
+// Collé à droite par une MARGE AUTOMATIQUE : trop large, un contenu aligné en
+// fin de ligne sort par la GAUCHE de sa boîte, hors d’atteinte du défilement.
+assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
+  '… et le groupe est poussé à droite par une marge, pas par un alignement de fin de ligne');
+// La même règle sur la saisie « Autre » : « Fermer » précède l'ajout.
+const rangeeAutre = DEVIS.match(/<div class="actions a-droite">([\s\S]*?)<\/div>/);
+assert.ok(rangeeAutre, 'la rangée de la saisie « Autre » suit la même règle');
+assert.ok(rangeeAutre[1].indexOf('cancelNeedBtn') < rangeeAutre[1].indexOf('saveNeedBtn'),
+  '« Ajouter ce besoin » ferme la rangée, « Fermer » le précède');
+assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DEVIS),
+  '… et elle est collée à droite de la même façon');
 assert.ok(/txBarre\(c\);\s*if\(!c\)\{/.test(apercu),
   'elle se met à jour AVANT de renoncer : sans prix, elle doit encore parler');
 // Le libellé du bouton vit dans son propre nœud : `textContent` sur le bouton
