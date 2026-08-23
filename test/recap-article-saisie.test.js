@@ -292,6 +292,11 @@ assert.ok(/let txDetailOuvert=false;/.test(DEVIS),
   'le volet unique garde sa mémoire d’ouverture');
 assert.ok(/det\.open=txDetailOuvert/.test(volet) && /txDetailOuvert=det\.open/.test(volet),
   '… elle est relue à l’ouverture et réécrite au basculement');
+// UN VOLET RETIRÉ DU DOCUMENT DÉLIVRE ENCORE SON `toggle` : l'évènement est
+// différé. Sans ce garde-fou, le volet du besoin qu'on vient de poser réécrit
+// la mémoire APRÈS la remise à zéro, et le besoin suivant s'ouvre déjà déplié.
+assert.ok(/if\(!det\.isConnected\)return;/.test(volet),
+  'un volet déjà remplacé ne réécrit plus la mémoire');
 // UN ÉLÉMENT, PAS UN FRAGMENT : le détail d'un article posé ajoute une classe
 // au retour de txTableau, et un DocumentFragment n'a pas de `classList`.
 assert.ok(/const bloc=txEl\('div'\)/.test(table),
@@ -390,7 +395,22 @@ assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
 const rangeeAutre = DEVIS.match(/<div class="actions a-droite">([\s\S]*?)<\/div>/);
 assert.ok(rangeeAutre, 'la rangée de la saisie « Autre » suit la même règle');
 assert.ok(rangeeAutre[1].indexOf('cancelNeedBtn') < rangeeAutre[1].indexOf('saveNeedBtn'),
-  '« Ajouter ce besoin » ferme la rangée, « Fermer » le précède');
+  '« Ajouter un besoin » ferme la rangée, « Fermer » le précède');
+// LE MÊME MOT SUR LES DEUX FORMULAIRES (23/08/2026) : le textile disait
+// « Ajouter cet article », l'autre « Ajouter ce besoin » — deux libellés pour
+// le même geste, sur le même écran.
+assert.ok(!/Ajouter cet article|Ajouter ce besoin/.test(DEVIS),
+  'plus qu’un seul libellé pour le geste qui pose une ligne');
+assert.strictEqual((DEVIS.match(/Ajouter un besoin/g) || []).length, 4,
+  '« Ajouter un besoin » : les deux boutons, et les deux remises à zéro');
+// LE VOLET SE REFERME AVEC LA LIGNE QU'ON VIENT DE POSER. Sa mémoire existe
+// pour qu'il ne se referme pas sous les doigts pendant la frappe, pas pour
+// qu'un besoin s'ouvre déjà déplié parce que le précédent l'était.
+const annuler = source('cancelTextileEdit', '');
+assert.ok(/txDetailOuvert=false;/.test(annuler),
+  'un besoin repart volet fermé');
+assert.ok(/txDetailOuvert=false;/.test(source('editTextileNeed', 'i')),
+  '… et une modification aussi');
 assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DEVIS),
   '… et elle est collée à droite de la même façon');
 assert.ok(/txBarre\(c\);\s*if\(!c\)\{/.test(apercu),
