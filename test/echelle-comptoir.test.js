@@ -530,5 +530,24 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
   const m = DEVIS.match(new RegExp(`<section id="${etape}"[\\s\\S]*?</section>`));
   assert.ok(m && /class="bloc"/.test(m[0]), `l'étape ${etape} a au moins un groupe emballé`);
 });
+// Sur l'écran de vente, les groupes qui vivent dans un panneau à eux portent la
+// bulle EUX-MÊMES — deux d'entre eux étaient des `.card` blanches posées dans
+// une `.card` blanche, qui ne se voyaient qu'à leur trait.
+['individualForm', 'professionalForm', 'cashZone', 'mixZone'].forEach((id) => {
+  const m = VENTE.match(new RegExp(`<div id="${id}"[^>]*>`));
+  assert.ok(m && /class="[^"]*\bbloc\b/.test(m[0]), `${id} porte la bulle`);
+  assert.ok(m && !/class="[^"]*\bcard\b/.test(m[0]), `${id} n'est plus une carte blanche dans une carte blanche`);
+});
+// Une bulle posée dans un encadré repasse en blanc, et l'inverse : deux fonds
+// gris l'un sur l'autre ne se distinguent pas.
+[['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
+  assert.ok(/\.notice \.bloc\{background:var\(--surface\)\}/.test(sansCommentaires(src).replace(/,\s*/g, ',').replace(/\.bloc \.notice,[^{]*/, '')) ||
+            /\.notice \.bloc/.test(sansCommentaires(src)),
+    `${nom} : une bulle dans un encadré ne se confond pas avec lui`);
+});
+// Le numéro qui titre une bulle prend l'air d'une rangée : posé seul, il
+// collait son premier intitulé — « Besoin n°1 » et « Catégorie » se touchaient.
+assert.ok(/\.bloc>\.form-num,\.article-bloc>\.form-num\{margin-bottom:var\(--pas-3\)\}/.test(DEVIS),
+  'un numéro de bloc posé seul ne colle pas son premier intitulé');
 
 console.log('✓ comptoir : une rangée reste une rangée, et chaque groupe de champs a sa bulle');

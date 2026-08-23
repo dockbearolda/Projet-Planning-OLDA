@@ -156,9 +156,9 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 .bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
 .bloc>:first-child{margin-top:0}
 .bloc>:last-child{margin-bottom:0}
-/* Un encadré posé DANS une bulle repasse en blanc : sur le fond gris de la
-   bulle, son propre fond gris se confondrait avec elle. */
-.bloc .notice,.bloc .product-card{background:var(--surface)}
+/* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
+   encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
+.bloc .notice,.bloc .product-card,.notice .bloc{background:var(--surface)}
 .product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
 .product-top{display:flex;justify-content:space-between;gap:12px}
 .product-title{font-weight:var(--graisse-forte)}
@@ -783,7 +783,7 @@ h2{letter-spacing:-.01em}
         </button>
       </div>
 
-      <div id="individualForm" style="margin-top:16px">
+      <div id="individualForm" class="bloc" style="margin-top:16px">
         <div class="grid">
           <div class="field">
             <label for="newIndividualName">Prénom et nom *</label>
@@ -800,7 +800,7 @@ h2{letter-spacing:-.01em}
         </div>
       </div>
 
-      <div id="professionalForm" class="hidden" style="margin-top:16px">
+      <div id="professionalForm" class="bloc hidden" style="margin-top:16px">
         <div class="grid">
           <div class="field">
             <label id="companyNameLabel" for="newCompanyName">Raison sociale EBP *</label>
@@ -901,7 +901,7 @@ h2{letter-spacing:-.01em}
     <label class="payment-option"><input type="radio" name="payment" value="Mixte"> Mixte</label>
     <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
 
-    </div><div id="cashZone" class="card hidden">
+    </div><div id="cashZone" class="bloc hidden">
       <div class="field">
         <label for="cashGiven">Montant donné par le client</label>
         <input id="cashGiven" type="number" min="0" step="0.01">
@@ -909,7 +909,7 @@ h2{letter-spacing:-.01em}
       <div class="summary-row"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div>
     </div>
 
-    <div id="mixZone" class="grid card hidden">
+    <div id="mixZone" class="grid bloc hidden">
       <div class="field">
         <label for="mixCard">Carte bancaire</label>
         <input id="mixCard" type="number" min="0" step="0.01">
