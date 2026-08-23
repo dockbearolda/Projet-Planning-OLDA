@@ -82,10 +82,18 @@ const par = Object.fromEntries(lignes);
 // Un récapitulatif qui rebaptise les champs oblige à traduire de tête entre le
 // haut et le bas de la même page.
 const LABELS = DEVIS.match(/<label[^>]*>([^<]+)/g).map((m) => m.replace(/<label[^>]*>/, '').trim());
-lignes.forEach(([intitule]) => {
+// « Note » fait exception depuis le 23/08 : le champ a quitté le formulaire —
+// la note se tape APRÈS, sur la ligne de la demande, dans « Personnalisation »
+// (voir setNeedPerso, qui écrit dans `textile.note`). La rangée du
+// récapitulatif, elle, continue de la relire.
+lignes.filter(([intitule]) => intitule !== 'Note').forEach(([intitule]) => {
   assert.ok(LABELS.includes(intitule),
     `« ${intitule} » doit être l’intitulé d’un champ du formulaire, pas un autre mot`);
 });
+assert.ok(!/id="txNote"/.test(DEVIS),
+  'le champ « Note » a quitté le formulaire : il doublait la personnalisation de la ligne');
+assert.ok(/needs\[i\]\.textile\.note=valeur/.test(DEVIS),
+  '… et c’est bien la personnalisation de la ligne qui l’écrit désormais');
 
 // --- 2. Tout ce qui est saisi se relit ---------------------------------------
 assert.strictEqual(par['Référence'], 'K3008');
@@ -203,19 +211,19 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(\),txTableau\(d,c,\[txDetail\(d,c\)\]\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : le titre, le récapitulatif repliable, la négociation, puis les alertes');
+assert.ok(/txFill\(box,\[txTableau\(d,c,\[txDetail\(d,c\)\]\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)\]\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : le bloc repliable, la négociation, puis les alertes');
 // LES ALERTES RESTENT DEHORS. Une alarme qu'on peut plier n'en est plus une :
 // une dimension écrite dans la note engage la production, un prix manuel dit
 // que le calcul ne décide plus du prix.
 assert.ok(!/txAlertes/.test(source('txTableau', 'd,c,dedans,ou')),
   'les alertes ne se replient pas avec le récapitulatif');
-// L'EN-TÊTE N'EST QUE SON TITRE (23/08/2026). Il portait « 2 pièces · avant
-// ajout au projet » : le nombre de pièces se relit deux rangées plus bas dans
-// les tailles, et la seconde moitié décrivait l'écran à qui l'a sous les yeux.
-const tete = source('txTete', '');
-assert.ok(!/tx-tete-info/.test(DEVIS) && !/pièce/.test(tete),
-  'l’en-tête du récapitulatif ne redit ni le nombre de pièces ni où l’on se trouve');
+// LE TITRE DE LA CARTE ET SON TOTAL SONT LA MÊME LIGNE (23/08/2026). Ils en
+// faisaient deux — « Récapitulatif article » au-dessus, « Total HT … » en
+// dessous, deux lignes pour dire une seule chose — et le chevron du volet se
+// posait sur la seconde.
+assert.ok(!/tx-tete-info|txTete|tx-tete-titre/.test(DEVIS),
+  'plus de titre séparé : le titre EST le résumé du volet');
 // La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre.
 assert.ok(/metrics,\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
   '… et la fiche à gauche les écrit dans le même ordre');
@@ -276,14 +284,19 @@ const saisie = source('txSaisieLignes', 'd');
 // choisir lequel lire, et c'est le total que la vendeuse annonce. C'est aussi
 // le RÉSUMÉ du volet : replié, c'est le seul chiffre qui reste.
 const kpis = source('txKpiTotal', 'c');
-assert.ok(/txEl\('summary'\)/.test(kpis) && /Total HT/.test(kpis),
-  'le total est le résumé du récapitulatif');
+assert.ok(/txEl\('summary'\)/.test(kpis) && /Récapitulatif article/.test(kpis),
+  'le titre de la carte et son total sont le résumé du volet');
 assert.ok(!/Prix HT \/ pièce|Temps de production|Marge/.test(kpis),
-  '… et il est seul à ce niveau');
+  '… et ils sont seuls à ce niveau');
 assert.strictEqual((kpis.match(/est-annonce/g) || []).length, 1,
   'un seul chiffre porte la grande taille : le total');
-assert.ok(/txRang\(g,'Total HT',money\(c\.total\),'tx-recap-cle','est-annonce'\)/.test(kpis),
-  '… et c’est bien le total qui la porte');
+assert.ok(/txRang\(g,'Récapitulatif article',money\(c\.total\),'tx-recap-cle','est-annonce'\)/.test(kpis),
+  '… et c’est bien le total qui la porte, en face du titre');
+// Le titre se lit à l'encre et en gras — pas en gris comme les intitulés qu'il
+// coiffe —, et c'est lui qui porte le chevron.
+assert.ok(/\.tx-recap>summary \.tx-recap-cle\{color:var\(--text-1\);font-weight:var\(--graisse-forte\)\}/.test(DEVIS)
+  && /\.tx-recap>summary \.tx-recap-cle::before\{content:'▸'/.test(DEVIS),
+  'le titre porte le chevron, et se lit comme un titre');
 // L'ordre se juge sur l'APPEL À `append`, pas sur l'ordre des lignes du
 // fichier : la table du corps se construit avant d'être posée après le résumé.
 assert.ok(/det\.append\(txKpiTotal\(c\),g,/.test(table),
