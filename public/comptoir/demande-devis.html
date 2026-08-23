@@ -486,11 +486,22 @@ h2{letter-spacing:-.01em}
 .tx-tableau>b.est-bon{color:var(--success)}
 .tx-tableau>b.est-warn{color:var(--warning)}
 .tx-tableau>b.est-mauvais{color:var(--danger)}
-/* Une somme intermédiaire du calcul : c'est la GRAISSE de l'intitulé qui la
-   détache, pas une taille de plus. */
-.tx-tableau>span.est-somme{color:var(--text-1);font-weight:var(--graisse-forte)}
-/* Le trait fort sous lequel tombe le prix retenu. */
+/* TOUS LES INTITULÉS SE LISENT PAREIL. Quatre d'entre eux étaient en gras à
+   l'encre — « Base textile », « Marquage », « Prix HT / pièce », « Total HT » —
+   pour marquer les sommes intermédiaires du calcul. À la lecture, ça ne se
+   comprenait pas : l'œil sautait sur quatre lignes en gras au milieu de dix
+   autres sans savoir ce qui les rassemblait, et « Marquage » paraissait plus
+   important qu'« Arrondi » sans raison. Une rangée = un intitulé gris, une
+   valeur à l'encre, du premier au dernier.
+   IL RESTE UNE SEULE MARQUE, et elle dit une seule chose : le trait fort sous
+   lequel tombe le prix retenu. */
 .tx-tableau>.est-total{border-top:1px solid var(--text-1)}
+/* CE QUE LE PRIX LAISSE COMMENCE PLUS BAS. Les deux tables du volet se
+   suivaient à la rangée près : treize lignes d'affilée, sans que rien ne dise
+   où le calcul s'arrête et où commence la lecture d'atelier. C'est un ÉCART
+   qui le dit — pas un titre de plus, pas un deuxième trait fort qui se serait
+   lu comme un second total. */
+.tx-volet .tx-tableau+.tx-tableau{margin-top:var(--pas-4)}
 /* Les deux volets dépliables : leur résumé est une rangée du tableau, il
    commence donc à la même verticale que les intitulés. */
 .tx-volet{margin-top:var(--pas-3);padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
@@ -1707,8 +1718,9 @@ function txJauge(g,c){
     :['est-bon','Au-dessus de la cible'];
   txRang(g,'Marge',`${money(c.margin)} · ${txPct(c.mark)}`);
   /* Le verdict est la VALEUR de sa rangée : les repères le posent, la couleur
-     dit lequel des trois états on occupe. */
-  txRang(g,`Seuil ${txPctCourt(seuil)} · cible ${txPctCourt(cible)}`,verdict,etat);
+     dit lequel des trois états on occupe. L'état ne va que sur la VALEUR —
+     l'intitulé se lit comme tous les autres. */
+  txRang(g,`Seuil ${txPctCourt(seuil)} · cible ${txPctCourt(cible)}`,verdict,null,etat);
 }
 
 /* CE QUI COMPOSE LE PRIX. Les pastilles se lisent d'un coup d'œil ; le calcul
@@ -1725,14 +1737,14 @@ function txCalculBloc(d,c){
      il est déjà dans le prix d'achat. */
   txLigneCalcul(g,`Transport ${d.transport}`,tr>0?`+ ${money(tr)}`:'inclus');
   txLigneCalcul(g,`Coefficient ${c.qty} pièce${c.qty>1?'s':''}`,`× ${txNombre(cf.textile)}`);
-  txLigneCalcul(g,'Base textile',money(c.baseTextile),'est-somme');
-  txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint),'est-somme');
+  txLigneCalcul(g,'Base textile',money(c.baseTextile));
+  txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint));
   if(txNum(d.markupPercent)>0)txLigneCalcul(g,'Majoration libre',`+ ${txNombre(d.markupPercent)} %`);
   if(txNum(d.discount)>0)txLigneCalcul(g,'Remise',`− ${txNombre(d.discount)} %`);
   if(txNum(d.manualPrice)>0)txLigneCalcul(g,'Prix manuel',money(txNum(d.manualPrice)));
   txLigneCalcul(g,'Arrondi',`au ${money(TE().getSettings().roundStep)} supérieur`);
-  txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'est-total est-somme');
-  txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total),'est-somme');
+  txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'est-total');
+  txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total));
   /* La TGCA ferme la chaîne : tout ce qui précède est HT, cette rangée dit si
      la taxe s'ajoute par-dessus. C'est la seule des quatre rangées de l'ancien
      bloc « composition » que le calcul ne portait pas déjà. */

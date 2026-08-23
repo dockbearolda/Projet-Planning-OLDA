@@ -266,6 +266,25 @@ assert.ok(/txEl\('div','tx-tableau'\)/.test(volet), 'le volet écrit dans une ta
 const calcul = source('txCalculBloc', 'd,c');
 assert.ok(/txLigneCalcul\(g,'TGCA'/.test(calcul) && calcul.indexOf("'TGCA'") > calcul.indexOf('Total HT'),
   'la TGCA ferme le calcul, après le total HT');
+// TOUS LES INTITULÉS SE LISENT PAREIL (23/08/2026). Quatre étaient en gras à
+// l'encre pour marquer les « sommes intermédiaires » : l'œil sautait sur quatre
+// lignes au milieu de dix sans savoir ce qui les rassemblait, et « Marquage »
+// paraissait plus important qu'« Arrondi » sans raison. Il reste UNE marque,
+// qui dit une seule chose : le trait fort sous lequel tombe le prix retenu.
+assert.ok(!/est-somme/.test(DEVIS),
+  'plus de gras qui distingue quatre intitulés des autres');
+assert.strictEqual((calcul.match(/est-total/g) || []).length, 1,
+  'une seule rangée marquée dans tout le calcul');
+assert.ok(/txLigneCalcul\(g,'Prix HT \/ pièce',money\(c\.sold\),'est-total'\)/.test(calcul),
+  '… et c’est celle où le prix est arrêté');
+// La couleur de l'état ne va que sur la VALEUR : l'intitulé se lit comme les
+// autres, sinon deux repères se disputent la même rangée.
+assert.ok(/txRang\(g,`Seuil [^`]+`,verdict,null,etat\)/.test(source('txJauge', 'g,c')),
+  'le verdict porte l’état, son intitulé reste un intitulé');
+// CE QUE LE PRIX LAISSE COMMENCE PLUS BAS : un écart, pas un titre ni un
+// deuxième trait fort qui se lirait comme un second total.
+assert.ok(/\.tx-volet \.tx-tableau\+\.tx-tableau\{margin-top:var\(--pas-4\)\}/.test(DEVIS),
+  'les deux tables du volet sont séparées par un écart franc');
 // L'ÉTAT DU VOLET SURVIT À LA FRAPPE. Le récapitulatif se réécrit à chaque
 // touche : sans mémoire, il se refermait sous les doigts dès qu'on corrigeait
 // une taille.
