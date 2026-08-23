@@ -252,26 +252,25 @@ body {
   user-select: none;
 }
 
-/* Ossature : LA COLONNE DE GAUCHE MONTE JUSQU'EN HAUT. Elle porte la marque
-   (case `brand`, à hauteur de la barre) puis le rail des étapes ; la barre du
-   haut commence à sa droite. Les deux partagent la même surface et le même
-   filet : de face, on lit un seul et même bandeau en L, pas une barre posée
-   sur une colonne. Grille : l'ordre des enfants dans le HTML n'a plus
-   d'importance, chacun est posé par sa zone. */
+/* Ossature : LE RAIL TIENT TOUTE LA COLONNE DE GAUCHE, du haut de l'écran
+   jusqu'en bas — sa première famille commence donc à la première ligne de
+   pixels. La barre du haut démarre à sa droite ; son filet aussi. Les deux
+   traits de l'ossature (liseré du rail, filet de la barre) se rejoignent au
+   coin. Grille : l'ordre des enfants dans le HTML n'a plus d'importance,
+   chacun est posé par sa zone. */
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-w, 240px) 16px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
-    "brand   topbar  topbar"
-    "brand   filet   filet"
+    "sidebar topbar  topbar"
+    "sidebar filet   filet"
     "sidebar resizer main";
   height: 100vh;
   /* Android/Chrome : suit la hauteur réellement visible (barre d'adresse comprise) */
   height: 100dvh;
   overflow: hidden;
 }
-.brand { grid-area: brand; }
 .topbar { grid-area: topbar; }
 .topbar-filet { grid-area: filet; }
 .sidebar { grid-area: sidebar; }
@@ -308,36 +307,6 @@ body {
   background: var(--surface);
 }
 
-/* La marque COIFFE LE RAIL, ET AUCUN TRAIT NE LA SÉPARE DE LA BARRE : sa case,
-   la barre du haut et le rail dessous sont le MÊME aplat de surface. Les deux
-   seuls traits de l'ossature partent du coin de sa case et s'en éloignent — le
-   filet vers la droite, le liseré du rail vers le bas : ils se rejoignent
-   exactement, rien ne coupe le bandeau.
-   Cliquable (retour planning), sans soulignement. Hors planning le rail
-   s'efface, elle reste : au poste comptoir, où la navigation est masquée,
-   c'est la seule sortie. Le survol n'éclaire QUE la pastille : allumer un bloc
-   de 240 px romprait l'aplat qu'on vient de construire. */
-.brand {
-  display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 0 16px;
-  color: inherit; text-decoration: none;
-  background: var(--surface);
-}
-.brand:focus-visible { outline: none; box-shadow: inset 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.brand:hover .brand-logo { box-shadow: var(--shadow-2); }
-.brand-logo {
-  width: 40px;
-  height: 40px;
-  transition: box-shadow var(--dur-1) var(--ease);
-  flex-shrink: 0;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: var(--primary);
-  color: var(--on-primary);
-  box-shadow: var(--shadow-1);
-}
-.brand-logo-svg { width: 26px; height: 26px; display: block; }
 
 /* LES ONGLETS SONT À DROITE : c'est `.nav-switch` qui absorbe la place libre
    (la recherche est bornée à 520 px), les actions le suivent. Deux marges
@@ -600,27 +569,20 @@ body.sidebar-resizing .sidebar,
 body.sidebar-resizing .grid-wrap { pointer-events: none; }
 
 /* ---------------------------------------------------------------- Sidebar (rail)
-   Sous la barre du haut, à gauche (posée par la grille du .shell). Ne porte plus
-   que les ÉTAPES du planning : courte, elle ne défile qu'en dernier recours.
-   Un filet la sépare de la zone de travail. */
+   Toute la colonne de gauche, du haut de l'écran jusqu'en bas (posée par la
+   grille du .shell). Ne porte que les ÉTAPES du planning : courte, elle ne
+   défile qu'en dernier recours. Un liseré la sépare de la zone de travail.
+   AUCUN retrait en haut : la première famille commence à la première ligne de
+   pixels — c'est elle la tête du rail, il n'y a plus d'intitulé au-dessus. */
 .sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 0 4px;
+  padding: 0 0 4px;
   background: var(--surface);
   border-right: 1px solid var(--border);
 }
-.sidebar-head { padding: 12px 16px 6px; }
-.sidebar-head-label {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--text-2);
-}
-
 /* Le rail empile des ZONES (une par famille), nettement espacées entre elles
    (16px — plus généreux qu'avant : les groupes doivent se voir sans avoir à
    les compter). À l'intérieur d'une zone, l'en-tête et ses sous-catégories
@@ -628,7 +590,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    puis le détail. */
 /* Aucun padding latéral : c'est lui qui laissait 8px de blanc de chaque côté du
    bandeau de famille. Les zones traversent donc le rail d'un bord à l'autre. */
-.stages { padding: 6px 0 10px; display: flex; flex-direction: column; gap: 16px; }
+/* Aucun retrait en haut : la PREMIÈRE FAMILLE est la tête du rail, elle
+   commence à la première ligne de pixels de l'écran. */
+.stages { padding: 0 0 10px; display: flex; flex-direction: column; gap: 16px; }
 .stage-zone { display: flex; flex-direction: column; gap: 1px; }
 /* Une zone à sous-catégories devient une vraie petite carte (fond + liseré +
    ombre légère, même grammaire que .work) plutôt qu'un simple fond tonal :
@@ -2521,13 +2485,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .search-palette[hidden] { display: none; }
 
 /* Pendant la recherche, la barre du haut reste au-dessus de l'assombrissement
-   pour que le champ et sa croix restent nets et cliquables. La marque suit :
-   elle n'est plus DANS la barre (case à part dans la grille du .shell), et sans
-   ça l'assombrissement creusait un cran sombre au coin gauche du bandeau. Le
-   trait qui reste — la limite du voile sous la marque — tombe pile sur le filet
-   qui la prolonge à droite. */
+   pour que le champ et sa croix restent nets et cliquables. */
 .topbar.searching { z-index: 1600; }
-.shell:has(.topbar.searching) .brand { position: relative; z-index: 1600; }
 
 .search-palette-scrim {
   position: absolute;
@@ -3569,7 +3528,6 @@ button, a, .stage, .deadline-badge,
 @media (max-width: 900px) {
   .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
-  .brand { padding: 0 12px; }
   .grid-search { max-width: none; }
   /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
      perd pas son nom. Sept pictogrammes muets (Fiverr, À commander, Base
@@ -3594,18 +3552,17 @@ button, a, .stage, .deadline-badge,
    puis la zone de travail. Le .shell devient une seule colonne qui défile. */
 @media (max-width: 640px) {
   .shell {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
     grid-template-areas:
-      "brand   topbar"
-      "sidebar sidebar"
-      "main    main";
+      "topbar"
+      "sidebar"
+      "main";
     height: auto;
     min-height: 100dvh;
     overflow: auto;
   }
   .topbar-filet { display: none; }
-  .brand { padding: 0 10px; }
   /* La barre du haut, le rail et la zone de travail ne suivent QUE la largeur de
      l'écran : sans ce `min-width: 0`, la grille du planning (min-width 1180) les
      étirerait tous et pousserait les boutons hors de l'écran. Seule la grille
@@ -3888,11 +3845,11 @@ body.view-focus .shell {
   /* `minmax(0, …)` et pas `1fr` : sur un onglet Fiverr / À commander la grille
      du planning est bien là, et sa largeur mini pousserait la colonne au-delà
      de l'écran. C'est à la grille de défiler, pas à la page. */
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "brand topbar"
-    "brand filet"
-    "main  main";
+    "topbar"
+    "filet"
+    "main";
 }
 body.view-plein .sidebar,
 body.view-plein .sidebar-resizer,

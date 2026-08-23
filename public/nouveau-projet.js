@@ -85,13 +85,23 @@ function icone(nom) {
 }
 
 // --- Affichage ---------------------------------------------------------------
-// `id` vaut null sur l'accueil : aucun parcours ouvert, aucune barre de flux.
+// `id` vaut null sur l'accueil : aucun parcours ouvert, seulement les tuiles.
 function afficher(id) {
   const flux = FLUX.find((f) => f.id === id) || null;
   fluxAffiche = flux ? flux.id : null;
   ROOT.querySelector('#np-home').hidden = !!flux;
-  ROOT.querySelector('#np-bar').hidden = !flux;
   ROOT.querySelector('#np-frames').hidden = !flux;
+  /* LA FLÈCHE RESTE, MÊME SUR LES TUILES — ET C'EST LA SEULE SORTIE DU POSTE.
+     Ici la navigation de l'outil est masquée (on est devant le client) et la
+     marque a quitté la coquille : sans cette flèche, l'accueil du comptoir
+     serait un cul-de-sac. Elle remonte d'un cran à chaque fois : parcours →
+     tuiles → planning. */
+  const bar = ROOT.querySelector('#np-bar');
+  const btn = ROOT.querySelector('#np-home-btn');
+  bar.hidden = false;
+  const quoi = flux ? 'Changer de parcours' : 'Retour au planning';
+  btn.setAttribute('aria-label', quoi);
+  btn.title = quoi;
   masquerErreur();
 
   for (const f of FLUX) {
@@ -232,6 +242,8 @@ function construireBarre() {
   const barre = document.createElement('div');
   barre.className = 'np-bar';
   barre.id = 'np-bar';
+  /* `afficher()` la montre dès le premier passage, tuiles comprises : c'est lui
+     qui décide où mène la flèche. */
   barre.hidden = true;
 
   const retour = document.createElement('button');
@@ -242,10 +254,17 @@ function construireBarre() {
      bascule, et l'en-tête noir du parcours a disparu. Le libellé reste porté
      par le nom accessible et l'infobulle — clavier et survol, les deux seules
      interactions de ce poste. */
+  // Le libellé est posé par `afficher()` : il change avec ce que la flèche fait.
   retour.setAttribute('aria-label', 'Changer de parcours');
   retour.title = 'Changer de parcours';
   retour.append(flecheRetour());
-  retour.addEventListener('click', () => afficher(null));
+  retour.addEventListener('click', () => {
+    // Un parcours ouvert → on revient aux tuiles. Déjà sur les tuiles → on sort
+    // du poste comptoir. Le hash fait foi (voir applyHash) : on ne touche pas à
+    // la vue directement, sinon l'URL et l'écran se contrediraient.
+    if (fluxAffiche) afficher(null);
+    else location.hash = '#planning';
+  });
 
   /* La bascule « Vente directe / Demande de devis » a été RETIRÉE : on change
      de parcours par la flèche, qui ramène aux deux tuiles. */
@@ -276,7 +295,10 @@ function construire() {
     cadres.append(cadre);
   }
 
-  shell.append(construireAccueil(), construireBarre(), erreur, cadres);
+  /* LA BARRE EN PREMIER, pas entre l'accueil et les cadres : elle est visible
+     aussi sur les tuiles (c'est la sortie du poste) et un `flex: 1` sur
+     l'accueil l'aurait poussée tout en bas de l'écran. */
+  shell.append(construireBarre(), construireAccueil(), erreur, cadres);
   ROOT.replaceChildren(shell);
 }
 
