@@ -392,12 +392,20 @@ h2{letter-spacing:-.01em}
 
    Les deux chiffres qu'on annonce au client restent en grand : même rangée,
    même colonne, seulement plus gros. C'est la seule autre taille de la carte. */
+/* LE FILET D'UNE RANGÉE EST UN SEUL TRAIT, PAS DEUX MARCHES. Les cellules
+   s'alignaient sur la ligne de base (`align-items:baseline`) : sur les deux
+   rangées qu'on annonce, le nombre en 28 px et son intitulé en 15 px ne
+   commençaient donc pas à la même hauteur, et comme c'est CHAQUE cellule qui
+   porte le trait, le filet se cassait en plein milieu de la ligne — 11 px de
+   décalage entre la gauche et la droite. Les cellules s'étirent maintenant sur
+   toute la rangée (le trait est continu) et c'est leur CONTENU qui se pose en
+   bas — le grand nombre et son intitulé restent posés sur la même ligne. */
 .tx-tableau{display:grid;grid-template-columns:minmax(0,1fr) var(--tab-valeur);
-  align-items:baseline;margin-top:var(--pas-3)}
-.tx-tableau>*{padding:var(--pas-2) 0;border-top:1px solid var(--border-soft);min-width:0}
+  margin-top:var(--pas-3)}
+.tx-tableau>*{display:flex;align-items:flex-end;padding:var(--pas-2) 0;border-top:1px solid var(--border-soft);min-width:0}
 .tx-tableau>:nth-child(-n+2){border-top:0;padding-top:0}
 .tx-tableau>span{color:var(--text-2);font-weight:var(--graisse-note);overflow-wrap:anywhere}
-.tx-tableau>b{text-align:right;font-weight:var(--graisse-forte);color:var(--text-1);
+.tx-tableau>b{justify-content:flex-end;text-align:right;font-weight:var(--graisse-forte);color:var(--text-1);
   font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 /* Ce qu'on dit au client. */
 .tx-tableau>.est-annonce{font-size:var(--recap-grand);line-height:var(--ligne-titre)}
@@ -1525,7 +1533,7 @@ function txNombre(n){return (Number(n)||0).toLocaleString('fr-FR',{minimumFracti
 /* L'ÉTAT DES DEUX PANNEAUX DÉPLIABLES SURVIT À LA FRAPPE. Le récapitulatif se
    réécrit à CHAQUE touche : sans mémoire, le détail des champs se refermait
    sous les doigts dès qu'on corrigeait une taille. */
-let txCalculOuvert=false,txDetailsOuvert=false,txMargeOuverte=false;
+let txCalculOuvert=false,txMargeOuverte=false;
 
 function txTete(c){
   const t=txEl('div','tx-tete');
@@ -1630,7 +1638,16 @@ function txMargeBloc(d,c){
   return det;
 }
 
-/* LE HAUT DE LA CARTE : les deux chiffres annoncés, puis le volet.
+/* CE QUE LA CARTE MONTRE SANS QU'ON OUVRE RIEN : les deux chiffres qu'on
+   annonce au client, puis CE QU'EST L'ARTICLE — référence, couleur, genre,
+   emplacement et couleur du marquage, transport, tailles, note.
+   Ces sept-huit rangées étaient repliées derrière « Détail des champs — pour
+   relecture ». Or c'est précisément le récapitulatif : la vendeuse relit ce
+   qu'elle vient de saisir AVANT de poser l'article, et un contrôle qu'il faut
+   déplier n'est pas un contrôle. Ce qui reste replié, ce sont les deux
+   lectures d'atelier — la marge et le calcul du prix.
+   DEUX TABLES, PAS UNE : la colonne des valeurs vient d'un jeton fixe
+   (`--tab-valeur`), donc les virgules tombent ensemble d'une table à l'autre.
    Un vrai élément et non un fragment : l'appelant du détail d'un article posé
    lui ajoute une classe (`tx-card-metrics`), et un fragment n'a pas de
    `classList` — il se serait vidé à l'insertion, en emportant l'erreur. */
@@ -1638,7 +1655,7 @@ function txTableau(d,c){
   const bloc=txEl('div');
   const g=txEl('div','tx-tableau');
   txKpis(g,c);
-  bloc.append(g,txMargeBloc(d,c));
+  bloc.append(g,txSaisieBloc(d));
   return bloc;
 }
 
@@ -1669,17 +1686,6 @@ function txAlertes(d,c){
   return out;
 }
 
-/* LA SAISIE, REPLIÉE : elle ne sert qu'à relire avant d'ajouter. */
-function txDetailsBloc(d){
-  const lignes=txSaisieLignes(d),det=txEl('details','tx-volet'),sum=txEl('summary');
-  det.open=txDetailsOuvert;
-  const titre=()=>det.open?'Masquer le détail des champs':`Détail des champs (${lignes.length}) — pour relecture`;
-  sum.textContent=titre();
-  det.addEventListener('toggle',()=>{txDetailsOuvert=det.open;sum.textContent=titre()});
-  det.append(sum,txSaisieBloc(d));
-  return det;
-}
-
 /* CE QU'ON S'APPRÊTE À AJOUTER, écrit dans la barre collante. Sans prix
    calculable elle dit ce qu'elle attend — mais elle RESTE : c'est par son
    bouton qu'on apprend quel champ manque. */
@@ -1704,7 +1710,7 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTete(c),txTableau(d,c),txCalcul(d,c),...txAlertes(d,c),txDetailsBloc(d)]);
+  txFill(box,[txTete(c),txTableau(d,c),txMargeBloc(d,c),txCalcul(d,c),...txAlertes(d,c)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -2193,7 +2199,7 @@ function renderDetailArticle(){
   metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,txCalcul(n.textile,c),...txAlertes(n.textile,c),txSaisieBloc(n.textile));
+  bloc.append(tete,rang,metrics,txMargeBloc(n.textile,c),txCalcul(n.textile,c),...txAlertes(n.textile,c));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
