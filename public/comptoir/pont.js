@@ -1118,7 +1118,7 @@
 /* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la
    référence ni la pastille ne doivent la dépasser, sinon le champ regrandit
    et l'alignement repart. */
-.menu-declencheur .menu-jeton{font-size:var(--taille-note,13px);line-height:1.2;padding:1px 6px}
+.menu-declencheur .menu-jeton{font-size:var(--taille-texte,13px);line-height:1.2;padding:1px 6px}
 .menu-declencheur .menu-pastille{width:16px;height:16px}
 .menu-declencheur:hover{border-color:var(--border-strong,#8d959d)}
 .menu-declencheur:focus-visible{outline:3px solid rgba(var(--primary-rgb,20,46,84),.15);border-color:var(--primary,#142e54)}
@@ -1148,7 +1148,7 @@
    suffit à la faire ressortir de la désignation qui la suit. Les chiffres
    gardent leur largeur fixe (tabular-nums), c'est du réglage de chiffres, pas
    un changement de police. */
-.menu-jeton{flex:none;font-size:var(--taille-note,13px);font-weight:var(--graisse-forte,800);font-variant-numeric:tabular-nums;
+.menu-jeton{flex:none;font-size:var(--taille-texte,13px);font-weight:var(--graisse-forte,800);font-variant-numeric:tabular-nums;
   color:var(--text-1,#111827);background:var(--border-soft,#eef0f3);border-radius:6px;padding:4px 7px;white-space:nowrap}
 .menu-texte{flex:1 1 auto;min-width:0;font-size:var(--taille-texte,15px);color:var(--text-2,#3b424a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-texte.est-vide{color:var(--text-2,#767d85)}
@@ -1163,12 +1163,12 @@
 @keyframes menuEntre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 .menu-tete{display:flex;align-items:center;gap:10px;padding:10px;background:var(--zone-bg,#fafbfc);border-bottom:1px solid var(--border-soft,#eceff2)}
 .menu-tete input{font-size:var(--taille-texte,15px);padding:9px 11px}
-.menu-compte{flex:none;font-size:var(--taille-note,13px);font-weight:var(--graisse-note,600);color:var(--text-2,#767d85);font-variant-numeric:tabular-nums;white-space:nowrap}
+.menu-compte{flex:none;font-size:var(--taille-texte,13px);font-weight:var(--graisse-note,600);color:var(--text-2,#767d85);font-variant-numeric:tabular-nums;white-space:nowrap}
 .menu-liste{max-height:326px;overflow-y:auto;margin:0;padding:6px;list-style:none}
 /* Le titre de famille reste collé en haut pendant le défilement : 48
    références sur 13 familles, sans ça on ne sait plus dans quoi on est. */
 .menu-groupe{position:sticky;top:0;z-index:1;background:#fff;padding:13px 10px 5px;
-  font-size:var(--taille-note,13px);font-weight:var(--graisse-forte,800);letter-spacing:.09em;text-transform:uppercase;color:var(--text-2,#8b9199)}
+  font-size:var(--taille-texte,13px);font-weight:var(--graisse-forte,800);letter-spacing:.09em;text-transform:uppercase;color:var(--text-2,#8b9199)}
 .menu-groupe:first-child{padding-top:5px}
 .menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
   border-left:3px solid transparent;border-radius:8px;cursor:pointer}
@@ -1194,7 +1194,7 @@
 /* Une ligne, pas une bannière : un « + » et un mot. Elle doit se voir sans
    se mettre devant la liste — c'est un raccourci, pas la réponse attendue. */
 .menu-manuel{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border:0;
-  border-bottom:1px solid var(--border-soft,#eceff2);background:#fff;font:inherit;font-size:var(--taille-note,13px);font-weight:var(--graisse-note,600);
+  border-bottom:1px solid var(--border-soft,#eceff2);background:#fff;font:inherit;font-size:var(--taille-texte,13px);font-weight:var(--graisse-note,600);
   color:var(--text-2,#525960);text-align:left;cursor:pointer}
 .menu-manuel:hover,.menu-manuel:focus-visible{background:var(--zone-bg,#f5f6f8);color:var(--text-1,#111827);outline:none}
 .menu-plus{flex:none;font-size:var(--taille-texte,15px);font-weight:var(--graisse-forte,800);line-height:1;color:inherit}

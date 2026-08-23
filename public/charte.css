@@ -153,6 +153,11 @@
 
   --champ-y: 13px;
   --champ-x: 14px;
+  /* LA BOÎTE SERRÉE, pour une action posée DANS une ligne de liste : le
+     panier n'a que 380 px de large et un bouton de pleine taille coûtait
+     45 px de hauteur par article. Une seule boîte serrée, jamais deux —
+     le panier en avait deux (31 et 36 px) écrites en dur. */
+  --champ-y-serre: 7px;
 
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait
      sept (2, 7, 10, 11, 12, 14, 18 px) et sept rembourrages différents : le

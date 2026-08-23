@@ -412,8 +412,10 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
 {
   const manuel = reglesDe(PONT, '.menu-manuel');
   const ech = echelleDe(DEVIS);
-  assert.strictEqual(resoudre(manuel['font-size'], ech), '13px',
-    'il se lit sans se mettre devant la liste');
+  // La page ne connaît plus qu'UNE taille de texte (22/08) : l'ajout manuel
+  // l'a comme le reste, et se détache par sa graisse et son gris.
+  assert.strictEqual(resoudre(manuel['font-size'], ech), resoudre('var(--taille-texte)', ech),
+    'il se lit à la taille du texte de la page');
   assert.strictEqual(resoudre(manuel['font-weight'], ech), '600',
     '… en demi-gras, pas en gras : ce n’est pas la réponse attendue');
   assert.ok(/\.menu-manuel\{[^}]*color:var\(--text-2/.test(PONT), '… et en gris, pas à l’encre');
@@ -492,7 +494,8 @@ assert.ok(!/font-family:ui-monospace/.test(PONT), 'plus de chasse fixe dans les 
 {
   const jeton = reglesDe(PONT, '.menu-jeton');
   const ech = echelleDe(DEVIS);
-  assert.strictEqual(resoudre(jeton['font-size'], ech), '13px', 'la référence garde la taille des mentions');
+  assert.strictEqual(resoudre(jeton['font-size'], ech), resoudre('var(--taille-texte)', ech),
+    'la référence se lit à la taille du texte de la page');
   assert.strictEqual(resoudre(jeton['font-weight'], ech), '800', 'la référence prend la police de la page, en gras');
 }
 // « PARAGON 218T » fait 98 px en Manrope gras : à largeur FIXE, il s'écrivait

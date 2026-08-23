@@ -131,6 +131,21 @@ assert.deepStrictEqual(graissesEnDur, [],
 assert.ok(/b,strong\{font-weight:var\(--graisse-forte\)\}/.test(FEUILLES),
   'le gras par défaut du navigateur est ramené sur l’échelle');
 
+// --- 3 bis. DEUX TAILLES SUR CET ÉCRAN, PAS QUATRE ---------------------------
+//
+// La charte en propose quatre ; cet écran-ci n'en prend que DEUX. Le bloc d'un
+// article donnait deux écritures au MÊME rôle, à vingt pixels d'écart l'une de
+// l'autre : « Remise % » en 13 gras encre, et juste dessous « Prix HT / pièce »
+// en 15 demi-gras gris. Ce sont tous les deux le nom d'une valeur. Deux pixels
+// d'écart ne se lisent pas comme une hiérarchie, seulement comme du désordre.
+const employees = new Set();
+for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+  if (/ticket/.test(m[1].trim())) continue;
+  for (const d of m[2].matchAll(/font-size:\s*var\((--taille-[\w-]+)\)/g)) employees.add(d[1]);
+}
+assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-texte'],
+  'cet écran n’a droit qu’à la taille du texte et à celle des chiffres qu’on annonce');
+
 // --- 4. AUCUNE COULEUR EN DUR ------------------------------------------------
 //
 // L'écran en comptait 107 : un bleu marine pour l'action, un bleu vif au
@@ -187,6 +202,23 @@ assert.strictEqual(pilule.padding.split(' ')[0], 'var(--champ-y)', '… la pilul
 // est déjà plein, encré et large.
 assert.ok(!/button\.full\{[^}]*font-size/.test(FEUILLES),
   'le bouton pleine largeur n’a pas sa propre taille de texte');
+
+// AUCUNE HAUTEUR DE COMMANDE ÉCRITE EN DUR. Elle se calcule : taille du texte
+// + interligne + rembourrage. Deux boîtes seulement — la normale, et la serrée
+// d'une action posée dans une ligne de liste (le panier n'a que 380 px).
+assert.ok(echelle['--champ-y'] && echelle['--champ-y-serre'],
+  'les deux rembourrages verticaux sont déclarés dans la charte');
+const hauteurs = [];
+for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+  const selecteur = m[1].trim();
+  // Une zone de texte fait exception : sa hauteur minimale dit COMBIEN DE
+  // LIGNES elle montre, ce n'est pas la boîte d'une commande. Les tuiles et
+  // les cartes cliquables non plus — ce sont des cibles, pas des champs.
+  if (/ticket|textarea|besoin-tuile|priority-card|client-action-card|dp-|menu-liste|client-quick/.test(selecteur)) continue;
+  for (const d of m[2].matchAll(/min-height:\s*(\d+(?:\.\d+)?px)/g)) hauteurs.push(`${selecteur.slice(0, 40)} → min-height:${d[1]}`);
+}
+assert.deepStrictEqual(hauteurs, [],
+  'une hauteur de commande écrite en dur : elle doit sortir du rembourrage de la charte');
 
 // --- 6. TROIS ARRONDIS, TROIS ÉLÉVATIONS -------------------------------------
 ['--arrondi-champ', '--arrondi-bloc', '--arrondi-carte'].forEach((nom) =>

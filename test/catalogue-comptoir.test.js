@@ -121,8 +121,14 @@ assert.ok(/need-qte[\s\S]*?need-nom/.test(renderNeedsSrc),
   'la quantité vient AVANT le nom : c’est elle qu’on relit');
 assert.ok(/editNeed\(\$\{i\}\)/.test(renderNeedsSrc) && /deleteNeed\(\$\{i\}\)/.test(renderNeedsSrc),
   'modifier et supprimer restent sur la ligne');
-assert.ok(/\.need-actions button\{min-height:44px/.test(DEVIS),
-  'les deux boutons gardent leur cible tactile malgré la ligne serrée');
+// Plus de « min-height:44px » : cette cible visait le DOIGT, du temps des
+// tablettes du comptoir, parties au rebut le 21/08. Les deux boutons prennent
+// la boîte serrée de la charte — celle d'une action posée DANS une ligne de
+// liste — et elle se calcule, elle ne s'écrit pas.
+assert.ok(/\.need-actions button\{padding:var\(--champ-y-serre\)/.test(DEVIS),
+  'les deux boutons de la ligne prennent la boîte serrée de la charte');
+assert.ok(!/\.need-actions button\{[^}]*min-height/.test(DEVIS),
+  '… et aucune hauteur écrite en dur');
 
 // CHAQUE ARTICLE PORTE SA PERSONNALISATION, sur sa ligne : c'est ce que
 // l'atelier grave, brode ou imprime, et ça change d'un article à l'autre dans
@@ -139,8 +145,8 @@ assert.ok(/function setNeedPerso\(i,valeur\)\{[^}]*needs\[i\]\.comment=valeur/.t
   'la frappe va dans le besoin, à l’indice de sa ligne');
 assert.ok(!/function setNeedPerso[^}]*renderNeeds\(\)/.test(DEVIS),
   'écrire ne REDESSINE PAS la liste : la ligne reprise sous les doigts perdrait le curseur');
-assert.ok(/\.need-perso\{[^}]*min-height:44px/.test(DEVIS),
-  'le champ de personnalisation se prend au doigt');
+assert.ok(/\.need-perso\{[^}]*padding:var\(--champ-y-serre\)/.test(DEVIS),
+  'le champ de personnalisation prend la boîte serrée, comme les boutons de sa ligne');
 // Celui qui chiffre doit voir ce qu'il chiffre : une gravure ne se devine pas.
 assert.ok(/Personnalisation :<\/b> \$\{esc\(n\.comment\)\}/.test(DEVIS),
   'la personnalisation se relit à l’étape des prix');
