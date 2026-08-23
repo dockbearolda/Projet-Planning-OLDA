@@ -24,6 +24,62 @@ const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.h
 const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
 const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
 
+// L'ÉCHELLE DE L'ÉCRAN (22/08/2026). Les tailles, graisses, interlignes et
+// arrondis ne s'écrivent plus en dur : ils vivent dans des variables déclarées
+// au `:root` de la page. Chercher « 13px » dans une règle ne prouverait donc
+// plus rien — il faut RÉSOUDRE la variable avec la table de la page qui
+// l'accueille. C'est aussi ce qui permet de comparer les deux écrans entre eux
+// alors qu'un seul a encore ses valeurs en dur.
+const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+function jetonsDe(src, table = {}) {
+  for (const m of src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
+    m[1].split(';').forEach((d) => {
+      const i = d.indexOf(':');
+      if (i > 0 && d.trim().startsWith('--')) table[d.slice(0, i).trim()] = d.slice(i + 1).trim();
+    });
+  }
+  return table;
+}
+// Ce que la PAGE voit : ses propres jetons, plus ceux de la charte si elle la
+// charge. C'est aussi ce qui distingue les deux écrans — l'un l'a adoptée,
+// l'autre pas encore.
+function echelleDe(src) {
+  const table = /<link[^>]+charte\.css/.test(src) ? jetonsDe(CHARTE) : {};
+  return jetonsDe(src, table);
+}
+// Les déclarations posées sur UN sélecteur exact, cascade comprise : la même
+// règle est écrite deux fois sur ces écrans (la feuille de base, puis celle qui
+// impose). La dernière gagne, comme dans le navigateur.
+function reglesDe(src, selecteur) {
+  const out = {};
+  // Les commentaires de ce dépôt CITENT des règles, accolades comprises : sans
+  // les retirer d'abord, le découpage en règles part de travers.
+  const net = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of net.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    if (m[1].replace(/\s+/g, '') !== selecteur.replace(/\s+/g, '')) continue;
+    m[2].split(';').forEach((d) => {
+      const i = d.indexOf(':');
+      if (i > 0) out[d.slice(0, i).trim()] = d.slice(i + 1).replace('!important', '').trim();
+    });
+  }
+  return out;
+}
+function resoudre(valeur, table) {
+  let v = String(valeur || '');
+  for (let i = 0; i < 8 && v.includes('var('); i++) {
+    v = v.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*?)\s*)?\)/g,
+      (_, nom, repli) => (nom in table ? table[nom] : (repli || '')));
+  }
+  return v.trim();
+}
+// « calc(1.375 * 1em + 13px * 2 + 3px) » → un nombre de pixels.
+function pixels(expression, em) {
+  const brut = String(expression).replace(/^calc\(/, '').replace(/\)$/, '')
+    .replace(/1em/g, String(em)).replace(/px/g, '');
+  assert.ok(/^[\d.+\-*/() ]+$/.test(brut), `« ${expression} » doit rester du calcul`);
+  return Math.round(Function('return ' + brut)() * 100) / 100;
+}
+
 // Le corps d'une fonction, accolades comptées. Une expression régulière s'y
 // casse les dents : elle s'arrête au premier `}` en début de ligne, c'est-à-dire
 // à la fin du premier `if` — et le test passe alors sur un bout de fonction.
@@ -299,12 +355,12 @@ assert.ok(!/\$\('(tx|need)FormTitle'\)\.textContent=/.test(DEVIS),
   'plus aucune branche n’écrit le titre en direct — elles passeraient à côté de l’état');
 assert.ok(/<h3 class="form-num" id="txFormTitle">/.test(DEVIS) && /<h3 class="form-num" id="needFormTitle">/.test(DEVIS),
   'les deux formulaires portent la même bulle');
-assert.ok(/\.form-num\.is-edit\{color:var\(--orange\)\}/.test(DEVIS),
-  'la couleur dit l’état : orange quand on reprend une ligne déjà posée');
+assert.ok(/\.form-num\.is-edit\{color:var\(--warning\)\}/.test(DEVIS),
+  'la couleur dit l’état : ambre quand on reprend une ligne déjà posée');
 // TOUT L’ARTICLE est détouré, pas seulement son titre : ses dix champs se
 // mélangeaient aux réglages de la page (majoration, TGCA, réglages de
 // production) et on ne voyait plus où commençait la ligne en cours d’écriture.
-assert.ok(/\.article-bloc\{border:1\.5px solid #d7dce3;border-radius:14px;/.test(DEVIS),
+assert.ok(/\.article-bloc\{border:1\.5px solid var\(--border\);border-radius:var\(--arrondi-bloc\);/.test(DEVIS),
   'l’article en cours de saisie porte un cadre');
 assert.ok(/<div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
   && /<div id="besoinManuel" class="hidden article-bloc">/.test(DEVIS),
@@ -353,8 +409,17 @@ assert.ok(/\.menu-declencheur\{[^}]*cursor:pointer/.test(PONT),
 // raccourci se montre, il ne passe pas devant la réponse attendue.
 assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
   'l’ajout manuel tient en un « + » et un mot');
-assert.ok(/\.menu-manuel\{[^}]*font-size:13px;font-weight:700;\s*color:#525960/.test(PONT),
-  'il se lit sans se mettre devant la liste');
+{
+  const manuel = reglesDe(PONT, '.menu-manuel');
+  const ech = echelleDe(DEVIS);
+  // La page ne connaît plus qu'UNE taille de texte (22/08) : l'ajout manuel
+  // l'a comme le reste, et se détache par sa graisse et son gris.
+  assert.strictEqual(resoudre(manuel['font-size'], ech), resoudre('var(--taille-texte)', ech),
+    'il se lit à la taille du texte de la page');
+  assert.strictEqual(resoudre(manuel['font-weight'], ech), '600',
+    '… en demi-gras, pas en gras : ce n’est pas la réponse attendue');
+  assert.ok(/\.menu-manuel\{[^}]*color:var\(--text-2/.test(PONT), '… et en gris, pas à l’encre');
+}
 
 
 // --- 9. DEUX CHAMPS SUR UNE LIGNE ONT LA MÊME BOÎTE --------------------------
@@ -363,27 +428,61 @@ assert.ok(/\.menu-manuel\{[^}]*font-size:13px;font-weight:700;\s*color:#525960/.
 // « input,select,textarea{…!important} » que les deux écrans imposent. Il était
 // 5 px plus court que l'<input> d'à côté, avec un trait plus fin (1 px contre
 // 1,5), plus sombre (#bcc2c8 contre #d7dce3) et moins arrondi (9 px contre 10).
-assert.ok(/\.menu-declencheur\{[^}]*padding:13px 14px;\s*min-height:calc\(1\.375em \+ 29px\);/.test(PONT),
-  'le déclencheur reprend le rembourrage des champs, et une hauteur CALCULÉE — jamais en dur');
-assert.ok(/\.menu-declencheur\{[^}]*border:1\.5px solid #d7dce3;border-radius:10px;/.test(PONT),
-  '… le même trait et le même arrondi qu’un champ voisin');
-assert.ok(/\.menu-declencheur\{[^}]*font-size:16px;line-height:1\.375;/.test(PONT),
-  '… et la même hauteur de ligne');
+const declencheur = reglesDe(PONT, '.menu-declencheur');
+assert.ok(/^calc\(/.test(declencheur['min-height']),
+  'la hauteur du déclencheur reste CALCULÉE — jamais un nombre en dur');
 // EN RAPPORT ET NON EN « normal » : Chrome ne calcule pas la boîte d'un <input>
 // comme celle d'un <div>, « normal » les laissait à 22 px contre 20,5. Un
 // rapport suit la taille du texte et ne dépend pas de la police chargée — sur
 // un poste où Manrope n'est pas encore arrivée, les deux rétrécissent ENSEMBLE.
 [['demande-devis', DEVIS], ['vente-directe', VENTE]].forEach(([nom, src]) => {
-  assert.ok(/input,select,textarea\{border:1\.5px solid #d7dce3!important;padding:13px 14px!important;line-height:1\.375!important\}/.test(src),
+  const ech = echelleDe(src);
+  const champ = reglesDe(src, 'input,select,textarea');
+  const lire = (regles, cle) => resoudre(regles[cle], ech);
+
+  assert.strictEqual(lire(champ, 'line-height'), '1.375',
     `${nom} : les champs ont une hauteur de ligne fixée, pas « normal »`);
+  // La même valeur des deux côtés, quelle que soit la façon de l'écrire : le
+  // déclencheur d'une liste est un <div>, il ÉCHAPPE au
+  // « input,select,textarea{…!important} » que les deux écrans imposent.
+  ['padding', 'font-size', 'line-height', 'border-radius'].forEach((cle) => {
+    assert.strictEqual(lire(declencheur, cle), lire(champ, cle),
+      `${nom} : « ${cle} » — le déclencheur d'une liste et le champ d'à côté`);
+  });
+  assert.strictEqual(lire(declencheur, 'border'), lire(champ, 'border'),
+    `${nom} : … et le même trait`);
+  assert.ok(/^1\.5px solid /.test(lire(champ, 'border')),
+    `${nom} : … un trait de 1,5 px, celui de la charte`);
+  // Et la hauteur qui en sort est la MÊME au pixel : c'est tout l'objet du
+  // calcul. Un champ : deux rembourrages, la ligne de texte, deux traits.
+  const taille = parseFloat(lire(champ, 'font-size'));
+  const remplissage = parseFloat(lire(champ, 'padding'));
+  const attendue = 2 * remplissage + parseFloat(lire(champ, 'line-height')) * taille + 3;
+  assert.strictEqual(pixels(lire(declencheur, 'min-height'), taille), Math.round(attendue * 100) / 100,
+    `${nom} : le déclencheur et le champ font exactement la même hauteur`);
   // Un bouton plein et un bouton bordé sur la même rangée : le trait du second
   // ajoutait 3 px. Le plein porte le même trait, en transparent.
-  assert.ok(/\.primary,\.danger,\.whatsapp\{border:1\.5px solid transparent!important\}/.test(src),
+  assert.ok(/\.primary,[^{]*\.whatsapp\{[^}]*border:1\.5px solid transparent!important/.test(src),
     `${nom} : bouton plein et bouton bordé ont la même boîte`);
   // « 💾 Enregistrer » tirait sa hauteur de la police d'émojis : un demi-pixel
   // de plus que ses voisins.
-  assert.ok(/button\{line-height:1\.375!important\}/.test(src),
+  const bouton = reglesDe(src, 'button');
+  assert.strictEqual(resoudre(bouton['line-height'], ech), '1.375',
     `${nom} : un émoji dans un libellé ne décide plus de la hauteur du bouton`);
+  // ET LA MÊME BOÎTE QU'UN CHAMP. Sur la même rangée on trouvait 51 px pour un
+  // champ, 49,6 pour le bouton plein et 48,3 pour le bouton bordé : trois
+  // hauteurs, parce que chacun décidait de sa taille de texte. Même texte,
+  // même interligne, même rembourrage vertical — donc la même hauteur.
+  // Cette égalité ne se vérifie que sur l'écran qui a adopté l'échelle. Le
+  // 22/08, c'est demande-devis.html : vente-directe.html garde ses champs à
+  // 16 px et ses boutons à 15, et attend sa reprise. Le jour où il déclare
+  // l'échelle, ce contrôle s'allume tout seul et ne le laissera plus passer.
+  if (!ech['--taille-texte']) return;
+  const pilule = reglesDe(src, '.primary,.secondary,.danger,.whatsapp');
+  assert.strictEqual(resoudre(bouton['font-size'], ech), lire(champ, 'font-size'),
+    `${nom} : le bouton écrit dans la même taille que le champ d'à côté`);
+  assert.strictEqual(resoudre(pilule.padding, ech).split(' ')[0], lire(champ, 'padding').split(' ')[0],
+    `${nom} : … et se remplit de la même hauteur`);
 });
 
 
@@ -392,8 +491,13 @@ assert.ok(/\.menu-declencheur\{[^}]*font-size:16px;line-height:1\.375;/.test(PON
 // Elle était composée en monospace pour aligner les colonnes. Le patron n'en
 // veut pas : la graisse suffit à la détacher de la désignation qui la suit.
 assert.ok(!/font-family:ui-monospace/.test(PONT), 'plus de chasse fixe dans les menus');
-assert.ok(/\.menu-jeton\{flex:none;font-size:13px;font-weight:800;/.test(PONT),
-  'la référence prend la police de la page, en gras');
+{
+  const jeton = reglesDe(PONT, '.menu-jeton');
+  const ech = echelleDe(DEVIS);
+  assert.strictEqual(resoudre(jeton['font-size'], ech), resoudre('var(--taille-texte)', ech),
+    'la référence se lit à la taille du texte de la page');
+  assert.strictEqual(resoudre(jeton['font-weight'], ech), '800', 'la référence prend la police de la page, en gras');
+}
 // « PARAGON 218T » fait 98 px en Manrope gras : à largeur FIXE, il s'écrivait
 // par-dessus la désignation. Un plancher garde les courtes alignées et laisse
 // les longues pousser leur seule ligne — une référence ne se coupe jamais,

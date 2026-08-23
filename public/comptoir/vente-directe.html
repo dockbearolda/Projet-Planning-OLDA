@@ -4,6 +4,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- LE THÈME AVANT LE PREMIER PIXEL. Cet écran s'affiche dans un cadre du CRM :
+     l'hôte lui passe son thème dans l'adresse, et on l'applique ICI, avant que
+     la moindre couleur ne soit peinte — posé plus tard, le cadre s'ouvrirait en
+     clair puis basculerait sous les yeux de la vendeuse.
+     Ouvert seul (impression, mise au point), il retombe sur le choix mémorisé
+     du poste puis sur celui du système : la MÊME règle que le planning, et la
+     MÊME clé — les deux documents sont sur la même origine. -->
+<script>
+try {
+  var p = new URLSearchParams(location.search).get('theme');
+  var t = (p === 'dark' || p === 'light') ? p : localStorage.getItem('olda_theme');
+  if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+} catch (e) {}
+</script>
+<!-- LA CHARTE DE L'APPLICATION, le même fichier que le planning et que l'écran
+     de demande de devis : couleurs, échelle de texte, formes, thème sombre.
+     Cet écran-ci vivait sur SA palette — un bleu marine #142e54 pour l'action,
+     un bleu vif #3064e8 au focus, quatre-vingt-neuf teintes en tout — pendant
+     que l'écran d'à côté, celui du même poste, parlait déjà le vocabulaire de
+     la maison. Deux parcours du même comptoir ne peuvent pas avoir deux
+     chartes. Servi par nous : rien ne vient d'un autre domaine. -->
+<link rel="stylesheet" href="../charte.css">
 <style>
 /* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
    de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
@@ -17,98 +40,176 @@
 </style>
 <title>Atelier OLDA — Vente directe complète</title>
 <style>
-:root{
-  --green:#142e54; --green-dark:#142e54; --bg:#f3f4f5; --card:#fff;
-  --border:#d9d9d9; --text:#1f1f1f; --muted:#6b6b6b; --danger:#c62828;
+/* ============================================================================
+   L'ÉCHELLE DE L'ÉCRAN — LE SECOND PARCOURS DU COMPTOIR (23/08/2026)
+   ----------------------------------------------------------------------------
+   Le 22/08, l'écran de demande de devis est entré dans la charte : quatre
+   tailles au lieu de vingt-cinq, trois graisses, aucune couleur en dur. Celui-ci
+   est resté en arrière — et les deux tournent SUR LE MÊME POSTE, à un clic
+   l'un de l'autre. Il comptait DIX-NEUF tailles (10, 11, 12, 12.5, 13, 13.5,
+   14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 28 px), SIX graisses (400,
+   600, 700, 800, 900, 950 — dont deux que Manrope rabote sur 800, donc deux
+   marches invisibles) et QUATRE-VINGT-NEUF teintes.
+
+   Il prend la même échelle, et n'en emploie que DEUX marches :
+
+     --taille-texte  15px  ce qui se lit et ce qui se saisit : texte courant,
+                           champ, liste, bouton, intitulé, aide, pastille
+     --taille-grand  28px  les chiffres qu'on annonce au client
+
+   Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR.
+
+   LE TICKET GARDE LA SIENNE. C'est le seul morceau de cet écran qui n'est pas
+   de l'écran : il s'imprime, il part avec le client, et il se lit à un mètre
+   sur un comptoir. Son échelle à lui est déclarée plus bas, en un seul
+   endroit, et elle ne déborde jamais sur la page.
+   ========================================================================== */
+body{font-size:var(--taille-texte);line-height:var(--ligne-texte)}
+/* Le gras du navigateur vaut 700 : une quatrième graisse qui entrait par la
+   porte de derrière, sur chaque <b> et chaque <strong> de la page. */
+b,strong{font-weight:var(--graisse-forte)}
+</style>
+<style>
+/* L'ÉCHELLE DU TICKET — celle d'un DOCUMENT, pas d'un écran.
+   Le ticket se compose sur une feuille, se lit à bout de bras sur le comptoir
+   et part avec le client : il lui faut ses propres marches, plus hautes que
+   celles de l'écran. Elles sont déclarées ICI, une fois, au lieu des quinze
+   tailles semées dans quatre blocs « V10 », « V10.1 », « V10.2 », « V10.3 »
+   empilés les uns sur les autres à coups de !important. */
+.ticket{
+  --tk-note: 13px;    /* mention de pied, intitulé de rubrique */
+  --tk-texte: 15px;   /* la ligne courante du ticket */
+  --tk-titre: 19px;   /* le nom d'un article */
+  --tk-total: 24px;   /* le montant, et le nom de l'atelier en tête */
 }
+</style>
+<style>
 *{box-sizing:border-box}
-body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0}
-.container{max-width:1180px;margin:24px auto;padding:0 18px 40px}
-.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
-.step{padding:11px;text-align:center;background:#e5e5e5;border-radius:8px;font-weight:700}
-.step.active{background:var(--green);color:#fff}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-h2{margin-top:0;font-size:20px}
-h3{margin-top:0}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.field{margin-bottom:14px}
-label{display:block;font-weight:700;margin-bottom:6px}
-input,select,textarea{width:100%;padding:11px;border:1px solid #bdbdbd;border-radius:8px;font-size:16px;background:#fff}
+body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
+.container{max-width:1180px;margin:var(--pas-4) auto;padding:0 var(--pas-3) 40px}
+.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pas-2);margin-bottom:var(--pas-3)}
+.step{padding:11px;text-align:center;background:var(--border-soft);color:var(--text-2);border-radius:var(--arrondi-champ);font-weight:var(--graisse-forte)}
+.step.active{background:var(--primary);color:var(--on-primary)}
+.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
+h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pas-3)}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--pas-3)}
+/* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
+   Les grilles de formulaire collaient leurs cellules EN BAS
+   (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son
+   champ 18 px plus bas que ses voisins. Mais c'était régler le problème par le
+   bas : dès qu'un message d'erreur s'ajoute SOUS un champ, c'est le champ qui
+   REMONTE — 27 px au-dessus de ses voisins de rangée, au moment précis où
+   l'œil le cherche. Le rouge signalait le champ qui manque, et le décalait.
+   Chaque cellule reprend donc les LIGNES de sa rangée (`subgrid`) : les
+   intitulés sur la première, les commandes sur la deuxième, les messages sur la
+   troisième. Plus rien de ce qui est au-dessus ou au-dessous ne peut déplacer
+   une commande. Sans subgrid, on garde le collage en bas — le moins mauvais
+   des deux. */
+@supports (grid-template-rows:subgrid){
+  .grid,.grid-3{grid-template-rows:auto auto auto;align-items:stretch}
+  .grid>.field,.grid-3>.field{display:grid;grid-template-rows:subgrid;grid-row:span 3;margin-bottom:0}
+  .grid>.field>label,.grid-3>.field>label{grid-row:1;align-self:end}
+  .grid>.field>.error,.grid>.field>.help,
+  .grid-3>.field>.error,.grid-3>.field>.help{grid-row:3}
+  /* UN CHAMP QUI PORTE TOUT UN EMPILEMENT NE RENTRE PAS DANS TROIS LIGNES.
+     « Date souhaitée » tient sa date, ses trois raccourcis de délai, son avis
+     de supplément, son barème dépliable ET l'heure souhaitée avec son propre
+     intitulé : sept éléments pour trois lignes de rangée. Le débordement
+     partait dans les lignes implicites et démontait la rangée entière.
+     Une rangée qui contient un champ à deux intitulés renonce donc au partage
+     de lignes et se range normalement — c'est le seul cas des deux écrans. */
+  .grid:has(>.field label~label),.grid-3:has(>.field label~label){grid-template-rows:none}
+  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--pas-3)}
+}
+.field{margin-bottom:var(--pas-3)}
+label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
+input,select,textarea{width:100%;padding:var(--champ-y) var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface);color:var(--text-1)}
 textarea{min-height:110px;resize:vertical}
-input.invalid,select.invalid,textarea.invalid{border:2px solid var(--danger);background:#fff7f7}
-.help{font-size:12px;color:var(--muted);margin-top:5px}
-button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}
-.primary{background:var(--green);color:#fff}
-.primary:hover{background:var(--green-dark)}
-.secondary{background:#ececec;color:#111}
-.danger{background:#fff0f0;color:#9d0000;border:1px solid #e6bcbc}
-.whatsapp{background:#25D366;color:#fff}
+/* UN CHAMP EN ERREUR NE BOUGE PAS D'UN PIXEL. Le trait passait de 1,5 à 2 px :
+   le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
+   ne s'alignait plus avec ses voisins — au moment précis où l'œil le cherche.
+   Le trait garde sa LARGEUR, il change de couleur ; l'épaisseur qu'on voit
+   vient d'un anneau posé par-dessus (`box-shadow`), qui ne prend aucune place.
+   « !important » à contrecœur, mais indispensable : la recette des commandes
+   pose plus bas « input,select,textarea{border:…!important} », et sans lui le
+   trait rouge de cet écran ne s'est JAMAIS affiché — le champ fautif n'avait
+   qu'un fond rosé, que personne ne remarque à bout de bras. */
+.invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}
+.help{font-size:var(--taille-texte);color:var(--text-2);margin-top:5px}
+button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
+.primary{background:var(--primary);color:var(--on-primary)}
+.primary:hover{background:var(--primary-hover)}
+.secondary{background:var(--border-soft);color:var(--text-1)}
+.danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line)}
+/* WhatsApp n'a plus SA couleur : le vert de la marque était la seule teinte de
+   l'écran qui ne disait pas un état. Un bouton d'envoi est un bouton d'envoi. */
+.whatsapp{background:var(--primary);color:var(--on-primary)}
 .full{width:100%}
-.actions{display:flex;gap:10px;flex-wrap:wrap}
-.product-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;background:#fafafa}
+.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap}
+/* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
+   La MÊME bulle que sur l'écran de demande de devis — les deux parcours
+   tournent sur le même poste. Une étape était un long ruban de champs mis bout
+   à bout dans une carte blanche : rien ne disait où un sujet finissait et où le
+   suivant commençait. La bulle n'ajoute AUCUN intitulé, c'est un cadre. */
+.bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
+.bloc>:first-child{margin-top:0}
+.bloc>:last-child{margin-bottom:0}
+/* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
+   encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
+.bloc .notice,.bloc .product-card,.notice .bloc{background:var(--surface)}
+.product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
 .product-top{display:flex;justify-content:space-between;gap:12px}
-.product-title{font-weight:700}
-.product-description{white-space:pre-wrap;color:#444;margin-top:8px}
+.product-title{font-weight:var(--graisse-forte)}
+.product-description{white-space:pre-wrap;color:var(--text-2);margin-top:8px}
 .summary-row{display:flex;justify-content:space-between;gap:12px;margin:9px 0}
-.summary-total{font-size:22px;font-weight:700;border-top:1px solid #ccc;padding-top:12px}
-.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#eee}
-.badge.green{background:#e2e8f0;color:#142e54}
-.badge.orange{background:#fff1d6;color:#875500}
-.internal{border:2px solid #222;background:#fff}
+.summary-total{font-size:var(--taille-grand);font-weight:var(--graisse-forte);border-top:1px solid var(--border);padding-top:12px}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-weight:var(--graisse-forte);background:var(--border-soft)}
+.badge.green{background:var(--primary-soft);color:var(--primary)}
+.badge.orange{background:var(--warning-bg);color:var(--warning)}
+.internal{border:2px solid var(--primary);background:var(--surface)}
 .internal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.lock{background:#222;color:#fff;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700}
+.lock{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:5px 9px;font-weight:var(--graisse-forte)}
 .hidden{display:none!important}
-.payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:400}
+.payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:var(--graisse-texte)}
 .payment-option input,.inline-check input{width:auto}
-.inline-check{display:flex;align-items:center;gap:8px;font-weight:400;margin:14px 0}
-.success{background:#eef2f7;border:1px solid #9fb0c9;border-radius:10px;padding:15px}
-.ticket{max-width:390px;margin:20px auto;background:#fff;border:1px dashed #888;padding:20px;font-family:"Courier New",monospace}
-.ticket h2{text-align:center;margin-bottom:4px}
+.inline-check{display:flex;align-items:center;gap:8px;font-weight:var(--graisse-texte);margin:14px 0}
+.success{background:var(--success-bg);border:1px solid var(--success-line);border-radius:var(--arrondi-bloc);padding:15px}
 .center{text-align:center}
-.ticket-row{display:flex;justify-content:space-between;gap:10px;margin:6px 0}
-.ticket hr{border:0;border-top:1px dashed #777;margin:12px 0}
-.ticket-note{white-space:pre-wrap}
 .footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media(max-width:800px){
   .grid,.grid-3,.footer-actions,.stepper{grid-template-columns:1fr}
 }
-@media print{
-  body *{visibility:hidden}
-  #ticketArea,#ticketArea *{visibility:visible}
-  #ticketArea{position:absolute;left:0;top:0;width:100%;display:block!important}
-  .ticket{border:none;max-width:80mm}
-}
 
 .client-search-wrap{position:relative}
-.client-results{margin-top:10px;display:grid;gap:10px}
-.client-result{border:1px solid var(--border);border-radius:10px;padding:14px;background:#fafafa;display:flex;justify-content:space-between;gap:14px;align-items:center}
+.client-results{margin-top:var(--pas-2);display:grid;gap:var(--pas-2)}
+.client-result{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--zone-bg);display:flex;justify-content:space-between;gap:14px;align-items:center}
 .client-result-main{min-width:0}
-.client-result-name{font-weight:700;margin-bottom:4px}
-.client-result-meta{font-size:13px;color:var(--muted);line-height:1.4}
-.client-selected{border:2px solid var(--green);background:#f4f6fa}
+.client-result-name{font-weight:var(--graisse-forte);margin-bottom:4px}
+.client-result-meta{color:var(--text-2);line-height:var(--ligne-texte)}
+.client-selected{border:2px solid var(--primary);background:var(--primary-soft)}
 .client-selected .badge{margin-bottom:8px}
 .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.choice-card{border:2px solid var(--border);border-radius:10px;padding:16px;background:#fff;cursor:pointer;text-align:left}
-.choice-card.active{border-color:var(--green);background:#f4f6fa}
-.notice{padding:12px 14px;border-radius:10px;background:#fff7e8;border:1px solid #efd29b;margin:12px 0}
+.choice-card{border:2px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--surface);cursor:pointer;text-align:left}
+.choice-card.active{border-color:var(--primary);background:var(--primary-soft)}
+.notice{padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);border:1px solid var(--warning-line);margin:12px 0}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
-.modal{width:min(520px,100%);background:#fff;border-radius:12px;padding:22px;box-shadow:0 12px 35px rgba(0,0,0,.25)}
+.modal{width:min(520px,100%);background:var(--surface);border-radius:var(--arrondi-carte);padding:22px;box-shadow:var(--shadow-pop)}
 @media(max-width:800px){
   .client-result,.choice-grid{grid-template-columns:1fr;display:grid}
 }
 
 
-/* Parcours tablette bloc par bloc */
+/* Parcours bloc par bloc */
 .sale-panel-hidden{display:none!important}
 .tablet-wizard-nav{
-  position:sticky;bottom:0;z-index:100;margin:18px auto 0;
-  max-width:1100px;background:rgba(255,255,255,.97);
-  border:1px solid #d9dee7;border-radius:14px;
-  box-shadow:0 -4px 18px rgba(16,24,40,.10);
-  padding:12px;display:flex;justify-content:space-between;gap:10px
+  position:sticky;bottom:0;z-index:100;margin:var(--pas-3) auto 0;
+  max-width:1100px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--arrondi-carte);
+  box-shadow:var(--shadow-2);
+  padding:12px;display:flex;justify-content:space-between;gap:var(--pas-2)
 }
-.tablet-wizard-nav button{min-height:48px;padding:12px 18px;font-size:15px}
 .tablet-wizard-nav .wizard-spacer{flex:1}
 @media(max-width:760px){
   .container{padding-bottom:12px}
@@ -116,7 +217,7 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
   body{padding-bottom:88px}
   .tablet-wizard-nav button{flex:1}
 }
-/* Sur un téléphone, deux boutons côte à côte n'ont plus la place : « Valider les
+/* Deux boutons côte à côte n'ont plus la place sous 560 px : « Valider les
    articles et continuer → » se replie sur cinq lignes et la barre devient une
    pastille illisible. On les empile, pleine largeur, une ligne chacun. */
 @media(max-width:560px){
@@ -139,9 +240,8 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
 #payButton{display:none!important}
 
 #selectedClientCard{
-  border:2px solid #142e54!important;
-  background:#f4f6fa!important;
-  box-shadow:0 0 0 4px rgba(20,46,84,.10)!important;
+  border:2px solid var(--primary)!important;
+  background:var(--primary-soft)!important;
   padding:18px!important;
 }
 #selectedClientCard .badge{
@@ -149,65 +249,82 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
   align-items:center;
   margin-bottom:10px;
   padding:7px 11px;
-  font-size:12px;
   letter-spacing:.04em;
 }
 #selectedClientName{
-  font-size:21px;
-  font-weight:900;
-  color:#142e54;
+  font-weight:var(--graisse-forte);
   margin-bottom:5px;
 }
 #selectedClientMeta{
-  font-size:14px;
-  color:#475467;
-  line-height:1.5;
+  color:var(--text-2);
+  line-height:var(--ligne-texte);
 }
 .client-result.selected-result{
-  border:2px solid #142e54;
-  background:#f4f6fa;
+  border:2px solid var(--primary);
+  background:var(--primary-soft);
 }
 
-/* Aperçu du ticket */
+/* ------------------------------------------------------------------ LE TICKET
+   C'EST UNE FEUILLE DE PAPIER, PAS UN ÉCRAN. Il s'imprime et part avec le
+   client : ce qu'on montre à l'écran est un APERÇU du papier, donc il reste
+   blanc à l'encre noire même quand le poste est en thème sombre — comme le
+   ticket de l'écran d'à côté, qui n'a jamais fait autrement. Un aperçu
+   anthracite ne dit rien de ce qui va sortir de l'imprimante.
+   C'est aussi le seul endroit de cette page qui garde une échelle à lui
+   (--tk-*, déclarée en tête), et il ne la prête à rien d'autre.
+   Il était réglé quatre fois de suite — « V10 », « V10.1 », « V10.2 »,
+   « V10.3 » — chaque bloc rejouant les mêmes sélecteurs à coups de !important
+   pour corriger le précédent : quinze tailles, un fond noir posé puis repeint
+   en blanc à l'impression, des graisses 900 et 950 que Manrope rabote toutes
+   les deux sur 800. Il est écrit ici UNE fois, dans l'ordre où on le lit. */
 #ticketArea{
   max-width:620px;
-  margin:0 auto 24px;
+  margin:0 auto var(--pas-4);
 }
 .ticket{
+  max-width:700px;
+  margin:0 auto;
   border:1px solid #d5dae2;
-  border-radius:18px;
+  border-radius:var(--arrondi-carte);
   overflow:hidden;
   padding:0!important;
   background:#fff;
-  box-shadow:0 12px 35px rgba(16,24,40,.09);
+  color:#111827;
+  box-shadow:var(--shadow-2);
 }
 .ticket-head{
-  padding:22px;
+  padding:26px 24px;
   background:#111827;
   color:#fff;
   text-align:center;
 }
-.ticket-head h2{margin:0 0 5px;font-size:23px}
-.ticket-head div{font-size:12px;opacity:.82}
-.ticket-body{padding:20px}
+.ticket-head h2{margin:0 0 5px;font-size:var(--tk-total);letter-spacing:.04em;color:#fff}
+.ticket-head div{font-size:var(--tk-texte);color:#fff}
+.ticket-body{padding:var(--pas-4)}
 .ticket-client-box{
-  padding:12px 14px;
-  background:#f5f7fa;
-  border-radius:10px;
-  font-weight:800;
+  padding:16px 18px;
+  background:#f5f6f8;
+  border:1px solid #d5dae2;
+  border-radius:var(--arrondi-champ);
+  font-size:var(--tk-texte);
+  font-weight:var(--graisse-forte);
+  line-height:1.55;
   margin-bottom:16px;
 }
+/* L'intitulé d'une rubrique du ticket : le SEUL endroit où l'on descend sous
+   la taille du texte, et il est en capitales espacées — c'est une étiquette,
+   pas une phrase. */
 .ticket-section-label{
-  margin:15px 0 8px;
-  font-size:10px;
+  margin:20px 0 10px;
+  font-size:var(--tk-note);
   text-transform:uppercase;
-  letter-spacing:.09em;
-  color:#667085;
-  font-weight:900;
+  letter-spacing:.12em;
+  color:#6b7280;
+  font-weight:var(--graisse-forte);
 }
 .ticket-product{
-  padding:13px 0;
-  border-bottom:1px solid #eaecf0;
+  padding:18px 0;
+  border-bottom:1px solid #e5e7eb;
 }
 .ticket-product-main,
 .ticket-extra-line,
@@ -218,43 +335,68 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
   gap:14px;
   align-items:start;
 }
-.ticket-product-name{font-size:15px;font-weight:900}
-.ticket-product-description{margin-top:4px;font-size:12px;color:#667085}
-.ticket-product-price{font-weight:900;white-space:nowrap}
+.ticket-product-name{font-size:var(--tk-titre);font-weight:var(--graisse-forte);line-height:1.35}
+.ticket-product-description{margin-top:6px;font-size:var(--tk-texte);line-height:var(--ligne-texte);color:#6b7280;white-space:pre-line}
+.ticket-product-price{font-size:var(--tk-titre);font-weight:var(--graisse-forte);white-space:nowrap}
+/* Un supplément : une ligne en retrait, marquée d'un filet à l'attention —
+   c'est de l'argent en plus, il doit se voir sans se lire deux fois. */
 .ticket-extra-line{
-  margin:8px 0 0 14px;
-  padding:8px 10px;
-  border-left:3px solid #f59e0b;
-  background:#fffbeb;
+  margin:10px 0 0 16px;
+  padding:10px 12px;
+  border-left:3px solid #854d0e;
+  background:#fefce8;
   border-radius:0 8px 8px 0;
-  font-size:13px;
+  font-size:var(--tk-texte);
+  line-height:1.4;
 }
-.ticket-extra-price{font-weight:900}
+.ticket-extra-price{font-size:var(--tk-texte);font-weight:var(--graisse-forte)}
 .ticket-total-line{
-  margin-top:18px;
-  padding-top:15px;
+  margin-top:22px;
+  padding-top:18px;
   border-top:2px solid #111827;
-  font-size:21px;
-  font-weight:950;
+  font-size:var(--tk-total);
+  font-weight:var(--graisse-forte);
 }
 .ticket-payment-line{
-  margin-top:13px;
-  font-size:13px;
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:var(--arrondi-champ);
+  background:#f5f6f8;
+  font-size:var(--tk-texte);
 }
+.ticket-date{margin-top:4px;font-size:var(--tk-note)}
 .ticket-footer{
-  padding:14px 18px;
-  background:#f5f7fa;
-  color:#667085;
+  padding:17px 20px;
+  background:#f5f6f8;
+  color:#6b7280;
   text-align:center;
-  font-size:11px;
+  font-size:var(--tk-note);
+}
+.ticket-pickup{
+  margin-top:10px;
+  padding-top:9px;
+  border-top:1px solid #d5dae2;
+  font-size:var(--tk-texte);
+  font-weight:var(--graisse-forte);
 }
 .ticket-preview-actions{
   display:flex;
   gap:9px;
   flex-wrap:wrap;
-  margin-top:17px;
+  margin-top:20px;
 }
-.ticket-preview-actions button{min-height:44px}
+/* CES DEUX COMMANDES SONT POSÉES SUR LA FEUILLE : elles prennent les couleurs
+   du papier, pas celles du thème. En sombre, le bouton plein sortait en gris
+   très clair sur blanc — un bouton qu'on ne voit pas — et le bouton bordé en
+   gris moyen, à 2,5:1 de contraste. Le papier ne change pas de thème, ses
+   commandes non plus. (Elles ne s'impriment pas : la règle d'impression les
+   masque plus bas.) */
+.ticket-preview-actions button.primary,
+.ticket-preview-actions button.whatsapp{background:#111827!important;color:#fff!important;border-color:transparent!important;box-shadow:none}
+.ticket-preview-actions button.primary:hover,
+.ticket-preview-actions button.whatsapp:hover{background:#000!important}
+.ticket-preview-actions button.secondary{background:transparent!important;color:#374151!important;border-color:#d5dae2!important}
+.ticket-preview-actions button.secondary:hover{background:#f5f6f8!important;color:#111827!important;border-color:#9aa2aa!important}
 
 /* Fenêtre du choix d'export */
 .ticket-export-overlay{
@@ -262,7 +404,7 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
   position:fixed;
   inset:0;
   z-index:9999;
-  background:rgba(16,24,40,.52);
+  background:rgba(0,0,0,.52);
   align-items:center;
   justify-content:center;
   padding:20px;
@@ -270,33 +412,58 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
 .ticket-export-overlay.show{display:flex}
 .ticket-export-dialog{
   width:min(430px,94vw);
-  border-radius:17px;
-  background:#fff;
+  border-radius:var(--arrondi-carte);
+  background:var(--surface);
   padding:22px;
-  box-shadow:0 25px 70px rgba(16,24,40,.30);
+  box-shadow:var(--shadow-pop);
 }
-.ticket-export-dialog h3{margin:0 0 6px;font-size:21px}
-.ticket-export-dialog p{margin:0 0 17px;color:#667085}
+.ticket-export-dialog h3{margin:0 0 6px}
+.ticket-export-dialog p{margin:0 0 17px;color:var(--text-2)}
 .ticket-export-buttons{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-.ticket-export-buttons button{
-  min-height:52px;
-  border-radius:11px;
-  font-size:14px;
-  font-weight:900;
+  gap:var(--pas-2);
 }
 .ticket-export-cancel{
   width:100%;
-  margin-top:10px;
+  margin-top:var(--pas-2);
 }
 
 @media(max-width:600px){
   .ticket-export-buttons{grid-template-columns:1fr}
 }
+
+/* ---------------------------------------------------------- Date de retrait */
+.pickup-card{
+  margin:18px 0;
+  padding:var(--pas-3);
+  border:1px solid var(--border);
+  border-radius:var(--arrondi-bloc);
+  background:var(--surface);
+}
+.pickup-card h3{
+  margin:0 0 4px;
+}
+.pickup-help{
+  margin:0 0 13px;
+  color:var(--text-2);
+}
+.pickup-summary{
+  margin-top:var(--pas-2);
+  padding:10px 12px;
+  border-left:4px solid var(--primary);
+  background:var(--zone-bg);
+  font-weight:var(--graisse-forte);
+}
+
+/* ------------------------------------------------------------ L'IMPRESSION
+   Le ticket est le seul contenu qui parte sur la feuille, et il part en encre
+   NOIRE sur papier BLANC : les jetons de la charte suivent le thème du poste,
+   et un poste en thème sombre imprimait un pavé anthracite pleine page.
+   Le noir et le blanc sont donc écrits ici, en toutes lettres — c'est le
+   papier qui les impose, pas une décoration. */
 @media print{
+  @page{margin:8mm}
   body *{visibility:hidden!important}
   #ticketArea,#ticketArea *{visibility:visible!important}
   #ticketArea{
@@ -305,325 +472,33 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
     width:100%;
     max-width:none;
     margin:0;
-  }
-  .ticket-preview-actions{display:none!important}
-  .ticket{box-shadow:none;border:0}
-}
-
-
-/* V10.1 — Ticket identique, mais plus lisible pour le service */
-.ticket{
-  max-width:700px;
-  margin:0 auto;
-}
-.ticket-head{
-  padding:26px 24px;
-}
-.ticket-head h2{
-  font-size:28px;
-  letter-spacing:.04em;
-}
-.ticket-head div{
-  font-size:14px;
-}
-.ticket-body{
-  padding:24px;
-}
-.ticket-client-box{
-  padding:16px 18px;
-  font-size:16px;
-  line-height:1.55;
-  border:1px solid #d9dee7;
-}
-.ticket-section-label{
-  margin:20px 0 10px;
-  font-size:12px;
-  letter-spacing:.12em;
-}
-.ticket-product{
-  padding:18px 0;
-}
-.ticket-product-name{
-  font-size:19px;
-  line-height:1.35;
-}
-.ticket-product-description{
-  margin-top:6px;
-  font-size:14px;
-  line-height:1.5;
-  color:#475467;
-}
-.ticket-product-price{
-  font-size:18px;
-}
-.ticket-extra-line{
-  margin:10px 0 0 16px;
-  padding:10px 12px;
-  font-size:15px;
-  line-height:1.4;
-}
-.ticket-extra-price{
-  font-size:15px;
-}
-.ticket-total-line{
-  margin-top:22px;
-  padding-top:18px;
-  font-size:24px;
-}
-.ticket-payment-line{
-  margin-top:16px;
-  padding:12px 14px;
-  border-radius:10px;
-  background:#f5f7fa;
-  font-size:15px;
-}
-.ticket-footer{
-  padding:17px 20px;
-  font-size:13px;
-}
-.ticket-preview-actions{
-  margin-top:20px;
-}
-.ticket-preview-actions button{
-  min-height:48px;
-  padding:12px 18px;
-  font-size:14px;
-}
-@media print{
-  #ticketArea{
     padding:0;
   }
+  .ticket-preview-actions{display:none!important}
+  body{background:#fff!important}
   .ticket{
     max-width:none;
-    font-size:14px;
-  }
-  .ticket-head{
-    padding:20px;
-  }
-  .ticket-head h2{
-    font-size:25px;
-  }
-  .ticket-body{
-    padding:20px;
-  }
-  .ticket-product-name{
-    font-size:18px;
-  }
-  .ticket-product-description{
-    font-size:13px;
-  }
-  .ticket-total-line{
-    font-size:22px;
-  }
-}
-
-
-/* V10.2 — Contraste renforcé du ticket */
-.ticket,
-.ticket-body,
-.ticket-client-box,
-.ticket-product,
-.ticket-product-main,
-.ticket-extra-line,
-.ticket-total-line,
-.ticket-payment-line{
-  color:#111827!important;
-}
-
-.ticket-head{
-  background:#000!important;
-  color:#fff!important;
-}
-
-.ticket-head h2,
-.ticket-head div{
-  color:#fff!important;
-  opacity:1!important;
-}
-
-.ticket-client-box{
-  background:#f2f2f2!important;
-  border-color:#b8b8b8!important;
-}
-
-.ticket-client-box,
-.ticket-client-box *{
-  color:#111!important;
-}
-
-.ticket-section-label{
-  color:#111!important;
-  font-weight:950!important;
-}
-
-.ticket-product-name{
-  color:#000!important;
-  font-weight:950!important;
-}
-
-.ticket-product-description{
-  color:#222!important;
-  font-weight:600!important;
-}
-
-.ticket-product-price{
-  color:#000!important;
-  font-weight:950!important;
-}
-
-.ticket-extra-line{
-  background:#fff4d6!important;
-  border-left-color:#111!important;
-  color:#111!important;
-}
-
-.ticket-extra-line *,
-.ticket-extra-price{
-  color:#111!important;
-  font-weight:900!important;
-}
-
-.ticket-total-line{
-  color:#000!important;
-  border-top-color:#000!important;
-  font-weight:950!important;
-}
-
-.ticket-payment-line{
-  background:#ececec!important;
-  color:#111!important;
-}
-
-.ticket-payment-line strong{
-  color:#000!important;
-}
-
-.ticket-footer{
-  background:#ececec!important;
-  color:#111!important;
-  font-weight:700!important;
-}
-
-@media print{
-  .ticket,
-  .ticket *{
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
-  .ticket-product-description,
-  .ticket-footer,
-  .ticket-section-label{
-    color:#111!important;
-  }
-}
-
-
-/* V10.3 — Date/heure de retrait et impression économique */
-.pickup-card{
-  margin:18px 0;
-  padding:16px;
-  border:1px solid #b9c0ca;
-  border-radius:12px;
-  background:#fff;
-}
-.pickup-card h3{
-  margin:0 0 4px;
-  color:#111;
-  font-size:17px;
-}
-.pickup-help{
-  margin:0 0 13px;
-  color:#333;
-  font-size:13px;
-}
-.pickup-summary{
-  margin-top:10px;
-  padding:10px 12px;
-  border-left:4px solid #111;
-  background:#f5f5f5;
-  color:#111;
-  font-weight:800;
-}
-.ticket-pickup{
-  margin-top:10px;
-  padding-top:9px;
-  border-top:1px solid #777;
-  color:#000;
-  font-size:15px;
-  font-weight:900;
-}
-
-/* L'écran reste confortable, mais l'impression consomme très peu d'encre. */
-@media print{
-  @page{
-    margin:8mm;
-  }
-
-  body{
-    background:#fff!important;
-  }
-
-  .ticket{
     border:1px solid #555!important;
     border-radius:0!important;
     box-shadow:none!important;
     background:#fff!important;
   }
-
   .ticket-head{
     padding:12px 14px!important;
     background:#fff!important;
-    color:#000!important;
     border-bottom:2px solid #000!important;
   }
-
-  .ticket-head h2,
-  .ticket-head div{
-    color:#000!important;
-  }
-
-  .ticket-head h2{
-    font-size:22px!important;
-  }
-
-  .ticket-body{
-    padding:14px!important;
-    background:#fff!important;
-  }
-
+  .ticket-body{padding:14px!important;background:#fff!important}
   .ticket-client-box,
   .ticket-payment-line,
   .ticket-extra-line,
-  .ticket-footer{
-    background:#fff!important;
-  }
-
-  .ticket-client-box{
-    border:1px solid #777!important;
-  }
-
-  .ticket-extra-line{
-    border:1px solid #777!important;
-    border-left:3px solid #000!important;
-  }
-
-  .ticket-product{
-    border-bottom:1px solid #777!important;
-  }
-
-  .ticket-total-line{
-    border-top:2px solid #000!important;
-  }
-
-  .ticket-payment-line{
-    border:1px solid #777!important;
-  }
-
-  .ticket-footer{
-    border-top:1px solid #777!important;
-    color:#000!important;
-  }
-
+  .ticket-footer{background:#fff!important}
+  .ticket-client-box{border:1px solid #777!important}
+  .ticket-extra-line{border:1px solid #777!important;border-left:3px solid #000!important}
+  .ticket-product{border-bottom:1px solid #777!important}
+  .ticket-total-line{border-top:2px solid #000!important}
+  .ticket-payment-line{border:1px solid #777!important}
+  .ticket-footer{border-top:1px solid #777!important}
   .ticket,
   .ticket *{
     color:#000!important;
@@ -632,7 +507,6 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
     print-color-adjust:economy!important;
   }
 }
-
 </style>
 <style>
 body{font-family:'Manrope',Arial,sans-serif!important}
@@ -640,73 +514,74 @@ body{font-family:'Manrope',Arial,sans-serif!important}
    Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
    zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
    rien de ce qui les entoure — d'où l'écran bariolé, champ par champ.
-   `inherit` et non un nom en dur : dans le ticket de l'atelier, qui compose en
-   Courier, les champs doivent rester en Courier. */
+   `inherit` et non un nom en dur : dans le ticket, qui a sa propre échelle,
+   les champs doivent rester avec lui. */
 input,select,textarea,button{font-family:inherit!important}
-.card{border-radius:16px!important;border-color:#e4e8ee!important;box-shadow:0 4px 18px rgba(16,24,40,.06)!important}
-button{border-radius:10px!important}
-input,select,textarea{border-radius:10px!important;border-color:#cfd6de!important}
-input:focus,select:focus,textarea:focus{outline:3px solid rgba(20,46,84,.14);border-color:#142e54!important}
-.stepper{gap:10px!important}
-.step{border-radius:999px!important;background:#e9eeeb!important;color:#5c6b63}
-.step.active{background:#1c3d6e!important;color:#fff!important;box-shadow:0 6px 16px rgba(20,46,84,.28)}
-.product-card,.client-result{border-radius:12px!important}
-.tablet-wizard-nav{border-radius:16px!important;backdrop-filter:blur(6px)}
-</style>
-
-<style>
-.primary{background:#1c3d6e}
-.primary:hover{background:#142e54}
+.card{border-radius:var(--arrondi-carte)!important}
+button{border-radius:var(--arrondi-champ)!important}
+input,select,textarea{border-radius:var(--arrondi-champ)!important}
+.step{border-radius:999px!important}
+.step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+.product-card,.client-result{border-radius:var(--arrondi-bloc)!important}
+.tablet-wizard-nav{border-radius:var(--arrondi-carte)!important}
 </style>
 <style>
-/* ---- Esprit SumUp : épuré, pilules, contrastes nets ---- */
-body{background:#f7f8fa!important}
-button{font-weight:800}
-.primary,.secondary,.danger,.whatsapp{border-radius:999px!important;padding:13px 22px!important}
-.primary{background:#1c3d6e!important;box-shadow:0 2px 10px rgba(20,46,84,.18)}
-.primary:hover{background:#142e54!important;box-shadow:0 4px 16px rgba(20,46,84,.25)}
-.secondary{background:#fff!important;border:1.5px solid #d7dce3!important;color:#142e54!important}
-/* Un bouton plein et un bouton bordé sur la même rangée : le trait du second
-   ajoutait 3 px de haut, et « Ajouter ce besoin » finissait 3 px plus court
-   que « Fermer » juste à côté. Le plein porte le même trait, en transparent —
-   même boîte, dessin inchangé (le fond passe sous le trait). */
-.primary,.danger,.whatsapp{border:1.5px solid transparent!important}
+/* ---- LES COMMANDES, RECETTE DE LA CHARTE ----------------------------------
+   MOT POUR MOT celle de l'écran de demande de devis : les deux parcours
+   tournent sur le même poste, à un clic l'un de l'autre, et un bouton
+   « Enregistrer » ne peut pas être bleu marine ici et encre à côté.
+   UN SEUL accent dans toute l'application. Le bouton plein prend l'accent, le
+   bouton bordé n'est qu'un trait, et la couleur ne revient que pour dire un
+   état (rouge = ce qui détruit). */
+body{background:var(--bg)!important}
+button{font-weight:var(--graisse-forte)}
+/* Le bouton plein et le bouton bordé portent le MÊME trait de 1,5 px, celui
+   du plein transparent : sans ça le second était 3 px plus haut, et surtout
+   ni l'un ni l'autre ne faisait la hauteur du champ d'à côté. */
+.primary,.secondary,.danger,.whatsapp{padding:var(--champ-y) 22px!important;
+  border:1.5px solid transparent!important;
+  transition:background var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease),
+             border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform .08s var(--ease)}
+.primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+.primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
+.secondary{background:transparent!important;border-color:var(--border)!important;color:var(--text-2)!important}
+.secondary:hover{background:var(--surface-hover)!important;border-color:var(--border-strong)!important;color:var(--text-1)!important}
+.danger{background:var(--danger-bg)!important;border-color:var(--danger-line)!important;color:var(--danger)!important}
+.danger:hover{background:var(--danger-line)!important}
+button:active{transform:scale(.98)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
 /* Un émoji dans un libellé (« 💾 Enregistrer », « 📅 Déjà au planning ») tire sa
    hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
-button{line-height:1.375!important}
-.secondary:hover{border-color:#142e54!important}
-.card{border:1px solid #eef0f3!important;box-shadow:0 1px 3px rgba(20,46,84,.05)!important;padding:24px!important}
-input,select,textarea{border:1.5px solid #d7dce3!important;padding:13px 14px!important;line-height:1.375!important}
-input:focus,select:focus,textarea:focus{outline:3px solid rgba(48,100,232,.15)!important;border-color:#3064e8!important}
-label{font-weight:800;font-size:13.5px}
+button{line-height:var(--ligne-champ)!important}
+.card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;padding:var(--champ-y) var(--champ-x)!important;line-height:var(--ligne-champ)!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 </style>
 <style>
 /* ---- Barème express : discret sous la ligne de supplément ----
    Un lien, pas un bouton d'action : on ne règle pas le barème à chaque vente,
-   mais quand on en a besoin il est là, sous les yeux, pas dans un autre écran.
-   Cible tactile gardée à 44 px de haut malgré l'apparence de lien. */
+   mais quand on en a besoin il est là, sous les yeux, pas dans un autre écran. */
 .bareme-open{
-  display:inline-flex;align-items:center;min-height:44px;
-  margin-top:2px;padding:0;border:0;background:none;
-  color:#5b6472;font-size:12.5px;font-weight:700;text-decoration:underline;
+  display:inline-flex;align-items:center;
+  margin-top:2px;padding:var(--champ-y-serre) 0;border:0;background:none;
+  color:var(--text-2);font-weight:var(--graisse-forte);text-decoration:underline;
   text-underline-offset:3px;cursor:pointer;
 }
-.bareme-open:hover{color:#142e54}
-.bareme{margin-top:6px;padding:14px;border:1.5px solid #d7dce3;border-radius:14px;background:#fff}
+.bareme-open:hover{color:var(--text-1)}
+.bareme{margin-top:var(--pas-1);padding:var(--pas-3);border:1.5px solid var(--border);border-radius:var(--arrondi-carte);background:var(--surface)}
 .bareme.hidden{display:none}
-.bareme-grid{display:grid;gap:10px}
-.bareme-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
-.bareme-grid label span{display:flex;align-items:center;gap:6px;font-weight:800;color:#5b6472}
-/* 16 px minimum : en dessous, iOS zoome sur le champ à la mise au point. */
-.bareme-grid input{width:88px;text-align:right;font-size:16px!important;padding:9px 10px!important}
+.bareme-grid{display:grid;gap:var(--pas-2)}
+.bareme-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bareme-grid label span{display:flex;align-items:center;gap:var(--pas-1);font-weight:var(--graisse-forte);color:var(--text-2)}
+.bareme-grid input{width:88px;text-align:right;padding:var(--champ-y-serre) var(--pas-2)!important}
 .bareme-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.bareme-actions button{padding:11px 18px!important;font-size:13.5px}
-.bareme-msg{margin:10px 0 0;font-size:12.5px;font-weight:700;min-height:1em}
-.bareme-msg.ok{color:#12603a}
-.bareme-msg.ko{color:#9d0000}
+.bareme-actions button{padding:var(--champ-y-serre) 18px!important}
+.bareme-msg{margin:var(--pas-2) 0 0;font-weight:var(--graisse-forte);min-height:1em}
+.bareme-msg.ok{color:var(--success)}
+.bareme-msg.ko{color:var(--danger)}
 </style>
 </head>
 <body>
@@ -743,7 +618,7 @@ h2{letter-spacing:-.01em}
 
   <div class="card">
     <h2>1. Ajouter un article</h2>
-    <div class="grid">
+    <div class="bloc"><div class="grid">
       <div class="field">
         <label for="productName">Article *</label>
         <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
@@ -786,7 +661,7 @@ h2{letter-spacing:-.01em}
       <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
     </div>
 
-    <div class="grid">
+    </div><div class="bloc"><div class="grid">
       <div class="field">
         <label for="orderDate">Date de commande *</label>
         <input id="orderDate" type="date">
@@ -833,7 +708,7 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div class="actions">
+    </div><div class="actions">
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
     </div>
@@ -879,14 +754,14 @@ h2{letter-spacing:-.01em}
   <div class="card hidden" id="clientSection">
     <h2>2. Associer le client</h2>
 
-    <div class="field client-search-wrap">
+    <div class="bloc"><div class="field client-search-wrap">
       <label for="clientSearch">Rechercher un client existant</label>
       <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
       
       <div id="clientResults" class="client-results"></div>
     </div>
 
-    <div id="selectedClientCard" class="product-card client-selected hidden">
+    </div><div id="selectedClientCard" class="product-card client-selected hidden">
       <span class="badge green">✓ Client sélectionné</span>
       <div class="client-result-name" id="selectedClientName"></div>
       <div class="client-result-meta" id="selectedClientMeta"></div>
@@ -924,7 +799,7 @@ h2{letter-spacing:-.01em}
         </button>
       </div>
 
-      <div id="individualForm" style="margin-top:16px">
+      <div id="individualForm" class="bloc" style="margin-top:16px">
         <div class="grid">
           <div class="field">
             <label for="newIndividualName">Prénom et nom *</label>
@@ -941,7 +816,7 @@ h2{letter-spacing:-.01em}
         </div>
       </div>
 
-      <div id="professionalForm" class="hidden" style="margin-top:16px">
+      <div id="professionalForm" class="bloc hidden" style="margin-top:16px">
         <div class="grid">
           <div class="field">
             <label id="companyNameLabel" for="newCompanyName">Raison sociale EBP *</label>
@@ -1036,13 +911,13 @@ h2{letter-spacing:-.01em}
     <h2>3. Paiement</h2>
     <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
 
-    <label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
+    <div class="bloc"><label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
     <label class="payment-option"><input type="radio" name="payment" value="Espèces"> Espèces</label>
     <label class="payment-option"><input type="radio" name="payment" value="Virement"> Virement</label>
     <label class="payment-option"><input type="radio" name="payment" value="Mixte"> Mixte</label>
     <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
 
-    <div id="cashZone" class="card hidden">
+    </div><div id="cashZone" class="bloc hidden">
       <div class="field">
         <label for="cashGiven">Montant donné par le client</label>
         <input id="cashGiven" type="number" min="0" step="0.01">
@@ -1050,7 +925,7 @@ h2{letter-spacing:-.01em}
       <div class="summary-row"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div>
     </div>
 
-    <div id="mixZone" class="grid card hidden">
+    <div id="mixZone" class="grid bloc hidden">
       <div class="field">
         <label for="mixCard">Carte bancaire</label>
         <input id="mixCard" type="number" min="0" step="0.01">
@@ -1086,7 +961,7 @@ h2{letter-spacing:-.01em}
       <div class="ticket-section-label">Informations de commande</div>
       <div class="ticket-client-box">
         <div id="ticketOrder"></div>
-        <div id="ticketDate" style="margin-top:4px;font-size:12px;color:#667085"></div>
+        <div id="ticketDate" class="ticket-date"></div>
         <div id="ticketClient" style="margin-top:7px"></div>
         <div id="ticketClientDetails" class="ticket-details"></div>
         <div id="ticketPickup" class="ticket-pickup"></div>
@@ -2197,24 +2072,41 @@ renderProducts();
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+/* UN CHAMP DE DATE FAIT LA MÊME HAUTEUR QUE LES AUTRES. Chrome compose sa
+   valeur dans une boîte interne qui porte SON rembourrage : le champ sortait à
+   51,6 px là où tout le reste de la page — champs, boutons, menus — tient à
+   49,6. Deux pixels, sur une rangée où « Date de commande » côtoie un bouton,
+   se voient comme un décalage sans cause. On ramène cette boîte-là sur
+   l'interligne de l'échelle et on lui retire son rembourrage propre. */
+input[type=date]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit{line-height:var(--ligne-champ);padding:0;margin:0;height:auto}
+input[type=date]::-webkit-datetime-edit-fields-wrapper,input[type=time]::-webkit-datetime-edit-fields-wrapper{padding:0;margin:0}
+input[type=date]::-webkit-inner-spin-button,input[type=time]::-webkit-inner-spin-button{display:none}
+/* LA FLÈCHE DU MENU SUIT LE THÈME. Elle est gravée DANS l'image — un data-URI
+   ne connaît ni `currentColor` ni les variables de la page — donc elle est
+   dessinée deux fois : ardoise sur fond clair, gris clair sur fond sombre.
+   Sans le second tirage, un trait #475467 sur un champ #2b3546 : la flèche
+   disparaissait, et le champ n'avait plus l'air d'un menu.
+   (La plupart des menus de cet écran sont HABILLÉS par pont.js et n'utilisent
+   pas cette flèche-là ; celle-ci sert à ceux qui restent natifs.) */
 select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
-.req{color:#dc2626;font-weight:900;margin-left:2px}
-.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
+:root[data-theme="dark"] select{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23cbd5e1' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")}
+.req{color:var(--danger);font-weight:var(--graisse-forte);margin-left:2px}
+.dp-pop{position:absolute;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-pop);padding:var(--pas-3);width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
 .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.dp-title{font-weight:800;font-size:15px;color:#142e54}
+.dp-title{font-weight:var(--graisse-forte)}
 .dp-nav{display:flex;gap:4px}
-.dp-nav button{width:44px;height:44px;border:0;border-radius:50%;background:transparent;font-size:17px;cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
-.dp-nav button:hover{background:#f1f5f9}
+.dp-nav button{width:38px;height:38px;border:0;border-radius:50%;background:transparent;cursor:pointer;color:var(--text-2);display:grid;place-items:center;padding:0}
+.dp-nav button:hover{background:var(--surface-hover)}
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
-.dp-dow{font-size:11px;font-weight:800;color:#94a3b8;padding:6px 0}
-.dp-day{width:44px;height:44px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#1f2937;display:grid;place-items:center;padding:0}
-.dp-day:hover{background:#eef1f5}
-.dp-day.other{color:#c2cad6}
-.dp-day.today{outline:1.5px solid #142e54;outline-offset:-1.5px}
-.dp-day.sel{background:#1c3d6e;color:#fff}
+.dp-dow{font-weight:var(--graisse-forte);color:var(--text-3);padding:var(--pas-1) 0}
+.dp-day{width:38px;height:38px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-weight:var(--graisse-note);color:var(--text-1);display:grid;place-items:center;padding:0}
+.dp-day:hover{background:var(--surface-hover)}
+.dp-day.other{color:var(--text-3)}
+.dp-day.today{outline:1.5px solid var(--primary);outline-offset:-1.5px}
+.dp-day.sel{background:var(--primary);color:var(--on-primary)}
 .dp-foot{display:flex;justify-content:flex-end;margin-top:10px}
-.dp-foot button{border:0;background:transparent;color:#142e54;font-weight:800;cursor:pointer;padding:8px 10px;border-radius:8px}
-.dp-foot button:hover{background:#f1f5f9}
+.dp-foot button{border:0;background:transparent;color:var(--text-1);font-weight:var(--graisse-forte);cursor:pointer;padding:8px 10px;border-radius:var(--arrondi-champ)}
+.dp-foot button:hover{background:var(--surface-hover)}
 </style>
 <script>
 (function(){
@@ -2290,14 +2182,14 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 </script>
 <script>__attachCap(["newIndividualName","newCompanyContact","newCompanyCity","newCompanyName"]);</script>
 <style>
-#ticketArea .ticket-details{font-size:12.5px;font-weight:600;line-height:1.5;color:#344054;margin-top:8px}
-#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
-#ticketArea .ticket-details .tl span{color:#667085;font-weight:700;font-size:12px}
-#ticketArea .ticket-details .tl strong{color:#101828;font-weight:700;font-size:12.5px;white-space:pre-line}
-#ticketArea .ticket-client-box{font-size:14px!important}
-#ticketArea #ticketClient{font-size:15px}
-#ticketArea #ticketOrder{font-size:14px}
-#ticketArea #ticketPickup{font-size:13px}
+#ticketArea .ticket-details{font-size:var(--tk-note);font-weight:var(--graisse-note);line-height:1.5;color:#111827;margin-top:8px}
+#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #e5e7eb}
+#ticketArea .ticket-details .tl span{color:#6b7280;font-weight:var(--graisse-forte)}
+#ticketArea .ticket-details .tl strong{color:#111827;font-weight:var(--graisse-forte);white-space:pre-line}
+#ticketArea .ticket-client-box,
+#ticketArea #ticketClient,
+#ticketArea #ticketOrder,
+#ticketArea #ticketPickup{font-size:var(--tk-texte)}
 #ticketArea .ticket-product-description{white-space:pre-line}
 </style>
 <script>
@@ -2640,28 +2532,29 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 })();
 </script>
 <style>
-.live-check{margin:14px 0 0;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.55}
-.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.55}
+.live-check.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+.live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 .live-check ul{margin:7px 0 0;padding-left:18px}
-.live-check li{margin:3px 0;font-weight:600}
+.live-check li{margin:3px 0;font-weight:var(--graisse-note)}
 button.blocked{opacity:.45;cursor:not-allowed}
-.dup-warn{margin-top:12px;padding:12px 14px;border-radius:12px;background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:13px;font-weight:700}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-weight:var(--graisse-forte)}
 /* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
-   remplacent pas. Cibles au doigt de 44 px — l'écran vit sur une tablette. */
+   remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
+   prennent la boîte serrée de la charte. */
 .delay-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .delay-chip{
-  flex:1 1 auto;min-height:44px;padding:11px 14px;
-  border:1.5px solid #d7dce3!important;border-radius:999px!important;
-  background:#fff;color:#142e54;font-size:13.5px;font-weight:700
+  flex:1 1 auto;padding:var(--champ-y-serre) var(--champ-x);
+  border:1.5px solid var(--border)!important;border-radius:999px!important;
+  background:var(--surface);color:var(--text-1);font-weight:var(--graisse-forte)
 }
-.delay-chip:hover{border-color:#142e54!important}
-.delay-chip:active{background:#f2f5fa}
-.delay-warn{margin-top:9px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:700;line-height:1.5}
-.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
-.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
-.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.wa-link{color:#12603a;font-weight:900;text-decoration:none;border-bottom:1px solid #9fc9ae}
+.delay-chip:hover{border-color:var(--border-strong)!important;background:var(--surface-hover)}
+.delay-chip:active{background:var(--primary-soft)}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.5}
+.delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
+.delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
+.delay-warn.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+.wa-link{color:var(--text-1);font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid var(--border-strong)}
 </style>
 <script>
 (function(){

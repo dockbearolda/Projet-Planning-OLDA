@@ -39,6 +39,9 @@ const CACHE = 'olda-coquille-v3';
 const COQUILLE = [
   '/',
   '/index.html',
+  // Les jetons de la charte : sans eux, hors ligne, l'application s'ouvre sans
+  // une seule couleur — tout est en var() non résolue.
+  '/charte.css',
   '/styles.css',
   '/clients.css',
   '/projet.css',
@@ -71,6 +74,15 @@ const COQUILLE = [
   '/comptoir/vente-directe.html',
   '/comptoir/demande-devis.html',
   '/comptoir/pont.js',
+  // Le catalogue textile, chargé par une balise <script> de l'écran de devis :
+  // absent de la coquille, hors ligne `window.TextileEngine` n'existe pas et
+  // tout le chiffrage textile tombe — sans la moindre erreur à l'écran.
+  '/comptoir/textile-catalog.js',
+  // Le module PDF. Il venait de cdnjs (avec jsdelivr et unpkg en secours) :
+  // hors ligne, « Télécharger le PDF » ne pouvait par construction pas
+  // fonctionner. Il n'est chargé qu'au clic sur le bouton — la coquille est
+  // justement ce qui rend ce chargement-là possible sans réseau.
+  '/jspdf.umd.min.js',
   '/olda-logo.svg',
   // La police d'icônes : sans elle, toute la barre de navigation se réduit à la
   // première lettre de chaque icône.
@@ -136,9 +148,15 @@ self.addEventListener('fetch', (e) => {
       if (reseau && reseau.status === 200 && reseau.type === 'basic'
           && COQUILLE.includes(url.pathname)) {
         const copie = reseau.clone();
+        // ON RANGE SOUS LE CHEMIN, SANS SA QUERY. Les deux écrans du comptoir
+        // sont ouverts avec le thème de l'hôte dans leur adresse
+        // (`?theme=dark`) : rangés sous l'adresse complète, on aurait DEUX
+        // copies du même fichier — et aucune des deux ne répondrait à l'autre
+        // thème le jour où le poste est hors ligne. Le ménage de `activate`
+        // compare lui aussi des chemins nus.
         // `waitUntil` : sans lui, Chrome peut endormir le worker dès la réponse
         // rendue et abandonner l'écriture — la copie de secours restait vieille.
-        e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copie)).catch(() => {}));
+        e.waitUntil(caches.open(CACHE).then((c) => c.put(url.pathname, copie)).catch(() => {}));
       }
       // Le proxy devant la prod peut répondre 502/503 SANS que `fetch` ne lève :
       // sur une navigation, on préfère la dernière coquille connue à sa page
@@ -150,7 +168,9 @@ self.addEventListener('fetch', (e) => {
       return reseau;
     } catch (_) {
       // Réseau tombé : on sert la dernière coquille connue.
-      const enCache = await caches.match(req);
+      // `ignoreSearch` : un parcours du comptoir est demandé avec le thème dans
+      // son adresse, la coquille le connaît sous son chemin nu.
+      const enCache = await caches.match(req, { ignoreSearch: true });
       if (enCache) return enCache;
       // Une navigation sans correspondance exacte (un #hash, une sous-route)
       // retombe sur la page d'accueil, qui EST l'application.

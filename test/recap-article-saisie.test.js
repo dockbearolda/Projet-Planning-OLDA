@@ -138,34 +138,88 @@ assert.ok(!/need-detail-k"><\/div>/.test(catalogue),
 
 // --- 4. Le bloc sous le formulaire et la fiche disent la MÊME chose ----------
 const apercu = source('previewTextile', '');
-assert.ok(/txDetailsBloc\(d\)/.test(apercu),
-  'le bloc sous le formulaire relit la saisie en cours');
 const detail = source('renderDetailArticle', '');
-assert.ok(/txSaisieBloc\(n\.textile\)/.test(detail),
-  'la fiche ouverte à gauche relit la saisie de l’article');
-assert.ok(/function txDetailsBloc\(d\)\{[\s\S]*?txSaisieBloc\(d\)/.test(DEVIS),
-  '… et le détail replié porte bien cette même relecture');
+// La relecture de la saisie passe par `txTableau`, des DEUX côtés : une ligne
+// relue sous le formulaire ou dans la fiche à gauche doit se lire pareil.
+assert.ok(/txTableau\(d,c\)/.test(apercu) && /txTableau\(n\.textile, ?c\)/.test(detail),
+  'les deux vues montent le récapitulatif avec le même bloc');
+assert.ok(!/txDetailsBloc/.test(DEVIS),
+  'le volet « Détail des champs » n’existe plus : la relecture ne se déplie pas');
 // Le classement de l'atelier (« ⭐ PRIORITÉ OLDA ») ne s'affiche plus du tout :
 // il tenait d'abord dans la valeur — « 436,74 € ⭐ PRIORITÉ OLDA » se lisait
 // d'un bloc — puis en pastille, que le patron a retirée le 21/08. La marge à
 // l'heure reste, c'est le chiffre.
 assert.ok(!/c\.atelier/.test(DEVIS),
   'le classement de l’atelier ne s’affiche nulle part sur l’écran du comptoir');
-assert.ok(/txKpi\('Marge \/ heure'/.test(DEVIS),
-  '… la marge à l’heure, elle, reste un des quatre chiffres clés');
+assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
+  '… la marge à l’heure, elle, reste une des rangées du tableau');
 
 // --- 5. LE RÉCAPITULATIF REFAIT (21/08/2026) --------------------------------
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(c\),txKpis\(c\),txJauge\(c\),txDecompo\(d,c\),\.\.\.txAlertes\(d,c\),txDetailsBloc\(d\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : chiffres, marge, prix, alertes, saisie');
+assert.ok(/txTete\(c\),txTableau\(d,c\),txMargeBloc\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : ce qu’on annonce et ce qu’est l’article, puis la marge, le calcul, les alertes');
+// La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre.
+assert.ok(/metrics,txMargeBloc\(n\.textile,c\),txCalcul\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
+  '… et la fiche à gauche les écrit dans le même ordre');
+// CE QUE LA CARTE MONTRE SANS QU'ON OUVRE RIEN (23/08/2026).
+// Elle portait dix rangées d'affilée : le prix, le total, puis le temps de
+// production, la marge à l'heure, la marge, son seuil, sa cible, et le détail
+// textile / marquage / transport / TGCA — pendant que ce qu'EST l'article
+// (référence, couleur, genre, marquage, transport, tailles) dormait derrière
+// « Détail des champs — pour relecture ». C'était l'inverse de ce qu'il faut :
+// la lecture d'atelier noyait le prix qu'on annonce de vive voix, et le
+// contrôle de saisie — la raison d'être d'un récapitulatif — demandait un clic.
+// À découvert : les deux chiffres, puis l'article. Repliés : la marge et le
+// calcul du prix.
+const table = source('txTableau', 'd,c');
+assert.ok(/txKpis\(g,c\);\s*bloc\.append\(g,txSaisieBloc\(d\)\)/.test(table),
+  'la carte montre les chiffres annoncés, puis ce qu’est l’article');
+assert.ok(!/txJauge|txDecompo|txAtelier/.test(table),
+  'ni la marge, ni le coût atelier, ni la composition ne restent à découvert');
+assert.ok(/txEl\('div','tx-tableau'\)/.test(table), 'et les chiffres annoncés sont bien une table');
+// Les sept-huit rangées de l'article, à découvert : ce sont les intitulés du
+// formulaire, mot pour mot (vérifié plus haut).
+const saisie = source('txSaisieLignes', 'd');
+['Couleur textile', 'Genre', 'Emplacement du marquage', 'Couleur du marquage', 'Transport', 'Tailles', 'Note']
+  .forEach((champ) => assert.ok(saisie.includes(`'${champ}'`),
+    `« ${champ} » se lit dans le récapitulatif, sans rien déplier`));
+const kpis = source('txKpis', 'g,c');
+assert.ok(/Prix HT \/ pièce/.test(kpis) && /Total HT/.test(kpis),
+  'les deux chiffres à découvert sont le prix à la pièce et le total');
+assert.ok(!/Temps de production|Marge/.test(kpis),
+  '… et rien d’autre');
+// Le volet porte les huit rangées, dans une table de la MÊME forme : sans ça,
+// ses valeurs ne tombent pas sous celles du dessus quand on l'ouvre.
+const volet = source('txMargeBloc', 'd,c');
+assert.ok(/txEl\('div','tx-tableau'\)/.test(volet), 'le volet écrit dans une table de la même forme');
+assert.ok(/txAtelier\(g,c\);\s*txJauge\(g,c\);\s*txDecompo\(g,d,c\)/.test(volet),
+  'il porte le coût atelier, la marge et la composition, dans cet ordre');
+// L'ÉTAT DU VOLET SURVIT À LA FRAPPE. Le récapitulatif se réécrit à chaque
+// touche : sans mémoire, il se refermait sous les doigts dès qu'on corrigeait
+// une taille — le même piège que les deux volets d'à côté.
+assert.ok(/let txCalculOuvert=false,txMargeOuverte=false;/.test(DEVIS),
+  'les deux volets qui restent — la marge et le calcul — ont chacun leur mémoire');
+assert.ok(/det\.open=txMargeOuverte/.test(volet) && /txMargeOuverte=det\.open/.test(volet),
+  '… elle est relue à l’ouverture et réécrite au basculement');
+// UN ÉLÉMENT, PAS UN FRAGMENT : le détail d'un article posé ajoute une classe
+// au retour de txTableau, et un DocumentFragment n'a pas de `classList`.
+assert.ok(/const bloc=txEl\('div'\)/.test(table),
+  'txTableau rend un élément — l’appelant lui pose une classe');
+// Le calcul déplié écrit dans une table de la MÊME forme : sans ça, ses
+// valeurs ne tombent pas sous celles du récapitulatif.
+assert.ok(/function txCalculBloc\(d,c\)\{\s*const g=txEl\('div','tx-tableau'\)/.test(DEVIS),
+  'le calcul déplié se lit dans la même table');
+assert.ok(/function txSaisieBloc\(d\)\{\s*const box=txEl\('div','tx-tableau'\)/.test(DEVIS),
+  'la relecture des champs aussi');
+
 assert.ok(!/tx-avis/.test(DEVIS),
   'le badge « EXCELLENT — VALIDÉ » a laissé la place à la jauge, ici comme dans la fiche');
 
 // LES DEUX REPÈRES SONT CEUX DU PATRON. Écrits en dur (45 / 60), ils
 // mentiraient dès la dixième pièce : les seuils baissent avec la quantité.
-const jauge = source('txJauge', 'c');
+const jauge = source('txJauge', 'g,c');
 assert.ok(/TE\(\)\.thresholdFor\(c\.qty\)/.test(jauge) && /seuil=t\.limited/.test(jauge) && /cible=t\.veryGood/.test(jauge),
   'seuil et cible viennent des seuils par quantité du moteur, jamais d’un nombre écrit en dur');
 assert.ok(/Sous le seuil/.test(jauge) && /Au-dessus du seuil/.test(jauge) && /Au-dessus de la cible/.test(jauge),
@@ -188,14 +242,11 @@ assert.strictEqual(Math.round(TE.thresholdFor(9).veryGood * 100), 60, 'cible à 
 assert.ok(TE.thresholdFor(200).limited < TE.thresholdFor(9).limited,
   'les deux repères baissent quand la quantité monte');
 
-// L'ÉTAT DES DEUX PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
-// chaque touche : sans mémoire, le détail se refermait sous les doigts.
-assert.ok(/let txCalculOuvert=false,txDetailsOuvert=false;/.test(DEVIS),
-  'les deux panneaux dépliables gardent leur état hors du rendu');
-assert.ok(/det\.open=txDetailsOuvert/.test(DEVIS) && /txDetailsOuvert=det\.open/.test(DEVIS),
-  'le détail des champs se rouvre comme on l’avait laissé');
+// L'ÉTAT DES PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
+// chaque touche : sans mémoire, le volet se refermait sous les doigts.
+// (Celui de la marge est vérifié plus haut, avec le bloc qui le porte.)
 assert.ok(/det\.open=txCalculOuvert/.test(DEVIS) && /txCalculOuvert=det\.open/.test(DEVIS),
-  'le calcul aussi');
+  'le calcul se rouvre comme on l’avait laissé');
 
 // UNE DIMENSION ÉCRITE DANS LA NOTE ENGAGE LA PRODUCTION.
 const [, motif] = DEVIS.match(/const TX_DIMENSION=(\/.*\/i);/);
@@ -239,6 +290,36 @@ const FIN = DEVIS.indexOf('@media(max-width:700px){.tx-barre{position:static}}')
 assert.ok(DEBUT > 0 && FIN > DEBUT, 'le bloc de style du récapitulatif doit rester repérable');
 const STYLE = DEVIS.slice(DEBUT, FIN);
 
+// LA COLONNE DES VALEURS EST LA MÊME PARTOUT. Elle vient d'un jeton de la
+// charte, pas d'un « auto » : deux tables imbriquées — le récapitulatif et son
+// calcul déplié — doivent aligner leurs virgules sur la même verticale, et
+// « auto » les laisse chacune se dimensionner sur son plus long nombre.
+const regleTable = STYLE.match(/\.tx-tableau\{([^}]*)\}/);
+assert.ok(regleTable, 'la table du récapitulatif doit rester repérable');
+assert.ok(/grid-template-columns:minmax\(0,1fr\) var\(--tab-valeur\)/.test(regleTable[1]),
+  'une seule colonne de valeurs, large de --tab-valeur, pour toutes les tables de la carte');
+// LE FILET D'UNE RANGÉE EST UN SEUL TRAIT. `align-items:baseline` posait
+// l'intitulé et sa valeur sur la même ligne de base — mais PAS à la même
+// hauteur de boîte : sur les deux rangées qu'on annonce, le nombre en 28 px
+// commençait 11 px plus haut que son intitulé en 15 px, et comme c'est chaque
+// CELLULE qui porte le trait, le filet se cassait en deux marches au milieu de
+// la ligne. Les cellules s'étirent, leur contenu se pose en bas.
+assert.ok(!/align-items:baseline/.test(regleTable[1]),
+  'les cellules ne s’alignent plus sur la ligne de base : le filet se cassait en deux');
+const regleCellule = STYLE.match(/\.tx-tableau>\*\{([^}]*)\}/);
+assert.ok(regleCellule && /display:flex/.test(regleCellule[1]) && /align-items:flex-end/.test(regleCellule[1]),
+  '… c’est le CONTENU de la cellule qui se pose en bas, la cellule prend toute la rangée');
+assert.ok(/border-top:1px solid var\(--border-soft\)/.test(regleCellule[1]),
+  '… et c’est bien la cellule qui porte le filet');
+assert.ok(/\.tx-tableau>b\{[^}]*text-align:right/.test(STYLE)
+  && /\.tx-tableau>b\{[^}]*font-variant-numeric:tabular-nums/.test(STYLE),
+  'les valeurs sont alignées à droite, en chiffres de largeur fixe : c’est ce qui fait le tableau');
+// Le filet fait la rangée — pas un cadre de plus autour de chaque bande.
+assert.ok(/\.tx-tableau>\*\{[^}]*border-top:1px solid var\(--border-soft\)/.test(STYLE),
+  'un filet sépare les rangées');
+assert.ok(!/tx-jauge|tx-chip|tx-recap-kpis|tx-saisie\{/.test(DEVIS),
+  'les cinq anciennes façons de présenter la même chose ont disparu');
+
 const AUTORISEES = ['var(--recap-texte)', 'var(--recap-grand)', 'inherit'];
 const tailles = [...STYLE.matchAll(/font-size:\s*([^;}!]+)/g)].map((m) => m[1].trim());
 assert.ok(tailles.length >= 4, 'les tailles du bloc doivent bien être déclarées');
@@ -251,10 +332,28 @@ tailles.forEach((t) => assert.ok(AUTORISEES.includes(t),
 
 // Les deux tailles elles-mêmes, déclarées une seule fois, pour les trois
 // surfaces qui portent ces blocs — le récapitulatif, sa barre, et la fiche.
-const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:(\d+)px;--recap-grand:(\d+)px;/);
-assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise');
-assert.ok(Number(declaration[1]) >= 15, 'le texte courant ne descend pas sous 15 px : ces écrans se lisent debout');
-assert.ok(Number(declaration[2]) > Number(declaration[1]) * 1.5,
+// Depuis le 22/08 elles ne portent plus leurs propres nombres : elles pointent
+// L'ÉCHELLE DE L'ÉCRAN, qui vit au `:root` de la page. La carte reste à deux
+// tailles, mais ce sont désormais deux des quatre de la page — elle ne peut
+// plus dériver de son côté.
+const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:var\(--([\w-]+)\);--recap-grand:var\(--([\w-]+)\);/);
+assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise, et viennent de l’échelle');
+// L'échelle vit dans charte.css depuis le 22/08 : c'est le même fichier pour
+// le planning et pour les deux écrans du comptoir.
+const CHARTE = fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8');
+assert.ok(/<link[^>]+charte\.css/.test(DEVIS), 'l’écran charge bien la charte de l’application');
+const echelle = {};
+for (const m of CHARTE.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
+  m[1].split(';').forEach((d) => {
+    const i = d.indexOf(':');
+    if (i > 0 && d.trim().startsWith('--')) echelle[d.slice(0, i).trim()] = d.slice(i + 1).trim();
+  });
+}
+const texte = Number.parseFloat(echelle['--' + declaration[1]]);
+const grand = Number.parseFloat(echelle['--' + declaration[2]]);
+assert.ok(texte > 0 && grand > 0, 'les deux tailles pointées existent bien dans l’échelle de la page');
+assert.ok(texte >= 15, 'le texte courant ne descend pas sous 15 px : ces écrans se lisent debout');
+assert.ok(grand > texte * 1.5,
   'les quatre chiffres clés se voient de loin — sinon les deux tailles n’en font qu’une');
 
 // Et rien, dans la fiche, ne réintroduit une troisième taille par la porte de

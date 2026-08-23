@@ -132,7 +132,7 @@ assert.ok(/articleOuvert=i;negOuvert=i/.test(negRaccourci),
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le
 // bouton « Construire le projet » passait sous la ligne de flottaison.
-assert.ok(/\.demande-corps \.need-actions button\{[^}]*padding:5px 8px!important/.test(DEVIS),
+assert.ok(/\.demande-corps \.need-actions button\{[^}]*padding:var\(--champ-y-serre\) var\(--pas-2\)!important/.test(DEVIS),
   'les boutons de la ligne doivent battre le padding !important de la feuille du comptoir');
 
 console.log('✓ demande à droite : catalogue et textile dans une seule liste, prix absent qui se dit, indices qui se referment');
