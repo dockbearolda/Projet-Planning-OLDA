@@ -265,9 +265,13 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 }
 
 /* ------------------------------------------------------------------ LE TICKET
-   Il n'est PAS de l'écran : il s'imprime et part avec le client. C'est le seul
-   endroit de cette page qui garde une échelle à lui (--tk-*, déclarée en tête),
-   et il ne la prête à rien d'autre.
+   C'EST UNE FEUILLE DE PAPIER, PAS UN ÉCRAN. Il s'imprime et part avec le
+   client : ce qu'on montre à l'écran est un APERÇU du papier, donc il reste
+   blanc à l'encre noire même quand le poste est en thème sombre — comme le
+   ticket de l'écran d'à côté, qui n'a jamais fait autrement. Un aperçu
+   anthracite ne dit rien de ce qui va sortir de l'imprimante.
+   C'est aussi le seul endroit de cette page qui garde une échelle à lui
+   (--tk-*, déclarée en tête), et il ne la prête à rien d'autre.
    Il était réglé quatre fois de suite — « V10 », « V10.1 », « V10.2 »,
    « V10.3 » — chaque bloc rejouant les mêmes sélecteurs à coups de !important
    pour corriger le précédent : quinze tailles, un fond noir posé puis repeint
@@ -280,27 +284,27 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 .ticket{
   max-width:700px;
   margin:0 auto;
-  border:1px solid var(--border);
+  border:1px solid #d5dae2;
   border-radius:var(--arrondi-carte);
   overflow:hidden;
   padding:0!important;
-  background:var(--surface);
-  color:var(--text-1);
+  background:#fff;
+  color:#111827;
   box-shadow:var(--shadow-2);
 }
 .ticket-head{
   padding:26px 24px;
-  background:var(--primary);
-  color:var(--on-primary);
+  background:#111827;
+  color:#fff;
   text-align:center;
 }
-.ticket-head h2{margin:0 0 5px;font-size:var(--tk-total);letter-spacing:.04em;color:var(--on-primary)}
-.ticket-head div{font-size:var(--tk-texte);color:var(--on-primary)}
+.ticket-head h2{margin:0 0 5px;font-size:var(--tk-total);letter-spacing:.04em;color:#fff}
+.ticket-head div{font-size:var(--tk-texte);color:#fff}
 .ticket-body{padding:var(--pas-4)}
 .ticket-client-box{
   padding:16px 18px;
-  background:var(--zone-bg);
-  border:1px solid var(--border);
+  background:#f5f6f8;
+  border:1px solid #d5dae2;
   border-radius:var(--arrondi-champ);
   font-size:var(--tk-texte);
   font-weight:var(--graisse-forte);
@@ -315,12 +319,12 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
   font-size:var(--tk-note);
   text-transform:uppercase;
   letter-spacing:.12em;
-  color:var(--text-2);
+  color:#6b7280;
   font-weight:var(--graisse-forte);
 }
 .ticket-product{
   padding:18px 0;
-  border-bottom:1px solid var(--border-soft);
+  border-bottom:1px solid #e5e7eb;
 }
 .ticket-product-main,
 .ticket-extra-line,
@@ -332,15 +336,15 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
   align-items:start;
 }
 .ticket-product-name{font-size:var(--tk-titre);font-weight:var(--graisse-forte);line-height:1.35}
-.ticket-product-description{margin-top:6px;font-size:var(--tk-texte);line-height:var(--ligne-texte);color:var(--text-2);white-space:pre-line}
+.ticket-product-description{margin-top:6px;font-size:var(--tk-texte);line-height:var(--ligne-texte);color:#6b7280;white-space:pre-line}
 .ticket-product-price{font-size:var(--tk-titre);font-weight:var(--graisse-forte);white-space:nowrap}
 /* Un supplément : une ligne en retrait, marquée d'un filet à l'attention —
    c'est de l'argent en plus, il doit se voir sans se lire deux fois. */
 .ticket-extra-line{
   margin:10px 0 0 16px;
   padding:10px 12px;
-  border-left:3px solid var(--warning);
-  background:var(--warning-bg);
+  border-left:3px solid #854d0e;
+  background:#fefce8;
   border-radius:0 8px 8px 0;
   font-size:var(--tk-texte);
   line-height:1.4;
@@ -349,7 +353,7 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 .ticket-total-line{
   margin-top:22px;
   padding-top:18px;
-  border-top:2px solid var(--primary);
+  border-top:2px solid #111827;
   font-size:var(--tk-total);
   font-weight:var(--graisse-forte);
 }
@@ -357,21 +361,21 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
   margin-top:16px;
   padding:12px 14px;
   border-radius:var(--arrondi-champ);
-  background:var(--zone-bg);
+  background:#f5f6f8;
   font-size:var(--tk-texte);
 }
 .ticket-date{margin-top:4px;font-size:var(--tk-note)}
 .ticket-footer{
   padding:17px 20px;
-  background:var(--zone-bg);
-  color:var(--text-2);
+  background:#f5f6f8;
+  color:#6b7280;
   text-align:center;
   font-size:var(--tk-note);
 }
 .ticket-pickup{
   margin-top:10px;
   padding-top:9px;
-  border-top:1px solid var(--border);
+  border-top:1px solid #d5dae2;
   font-size:var(--tk-texte);
   font-weight:var(--graisse-forte);
 }
@@ -381,6 +385,18 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
   flex-wrap:wrap;
   margin-top:20px;
 }
+/* CES DEUX COMMANDES SONT POSÉES SUR LA FEUILLE : elles prennent les couleurs
+   du papier, pas celles du thème. En sombre, le bouton plein sortait en gris
+   très clair sur blanc — un bouton qu'on ne voit pas — et le bouton bordé en
+   gris moyen, à 2,5:1 de contraste. Le papier ne change pas de thème, ses
+   commandes non plus. (Elles ne s'impriment pas : la règle d'impression les
+   masque plus bas.) */
+.ticket-preview-actions button.primary,
+.ticket-preview-actions button.whatsapp{background:#111827!important;color:#fff!important;border-color:transparent!important;box-shadow:none}
+.ticket-preview-actions button.primary:hover,
+.ticket-preview-actions button.whatsapp:hover{background:#000!important}
+.ticket-preview-actions button.secondary{background:transparent!important;color:#374151!important;border-color:#d5dae2!important}
+.ticket-preview-actions button.secondary:hover{background:#f5f6f8!important;color:#111827!important;border-color:#9aa2aa!important}
 
 /* Fenêtre du choix d'export */
 .ticket-export-overlay{
@@ -2166,10 +2182,10 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 </script>
 <script>__attachCap(["newIndividualName","newCompanyContact","newCompanyCity","newCompanyName"]);</script>
 <style>
-#ticketArea .ticket-details{font-size:var(--tk-note);font-weight:var(--graisse-note);line-height:1.5;color:var(--text-1);margin-top:8px}
-#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid var(--border-soft)}
-#ticketArea .ticket-details .tl span{color:var(--text-2);font-weight:var(--graisse-forte)}
-#ticketArea .ticket-details .tl strong{color:var(--text-1);font-weight:var(--graisse-forte);white-space:pre-line}
+#ticketArea .ticket-details{font-size:var(--tk-note);font-weight:var(--graisse-note);line-height:1.5;color:#111827;margin-top:8px}
+#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #e5e7eb}
+#ticketArea .ticket-details .tl span{color:#6b7280;font-weight:var(--graisse-forte)}
+#ticketArea .ticket-details .tl strong{color:#111827;font-weight:var(--graisse-forte);white-space:pre-line}
 #ticketArea .ticket-client-box,
 #ticketArea #ticketClient,
 #ticketArea #ticketOrder,

@@ -34,8 +34,31 @@ const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
 // Les commentaires de ce dépôt CITENT des règles, accolades et tailles
 // comprises : sans les retirer d'abord, tout ce qui suit compte de travers.
 const sansCommentaires = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
+// Retire un bloc `@media print{…}` en comptant les accolades : sans ça, le
+// `#fff` du papier compte comme une couleur en dur de l'écran.
+function sansImpression(css) {
+  let out = '', i = 0;
+  while (i < css.length) {
+    const d = css.indexOf('@media print', i);
+    if (d < 0) { out += css.slice(i); break; }
+    out += css.slice(i, d);
+    let j = css.indexOf('{', d), n = 0;
+    for (; j < css.length; j += 1) {
+      if (css[j] === '{') n += 1;
+      else if (css[j] === '}' && (n -= 1) === 0) { j += 1; break; }
+    }
+    i = j;
+  }
+  return out;
+}
+
 const FEUILLES = [...DEVIS.matchAll(/<style>([\s\S]*?)<\/style>/g)]
   .map((m) => sansCommentaires(m[1])).join('\n');
+// LE PAPIER N'A PAS DE THÈME. Ce qui s'imprime part en noir sur blanc, écrit en
+// toutes lettres : les jetons de la charte suivent le poste, et un poste en
+// thème sombre imprimerait un pavé anthracite pleine page. Les blocs
+// `@media print` sortent donc du contrôle des couleurs.
+const FEUILLES_ECRAN = sansImpression(FEUILLES);
 
 // --- 1. LA CHARTE EST CHARGÉE, ET L'ÉCRAN N'A PLUS DE JETONS À LUI ----------
 
@@ -154,7 +177,7 @@ assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-texte
 // Le TICKET IMPRIMÉ garde les siennes — noir sur papier blanc, c'est un
 // document, pas de l'écran.
 const teintes = [];
-for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+for (const m of FEUILLES_ECRAN.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
   const selecteur = m[1].trim();
   if (/ticket/.test(selecteur) || /@font-face|@keyframes/.test(selecteur)) continue;
   for (const d of m[2].matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)) {
@@ -278,24 +301,6 @@ console.log('✓ charte du comptoir : quatre tailles, trois graisses, aucune cou
 // ===========================================================================
 const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
 
-// Retire un bloc `@media print{…}` en comptant les accolades : sans ça, le
-// `#fff` du papier compte comme une couleur en dur de l'écran.
-function sansImpression(css) {
-  let out = '', i = 0;
-  while (i < css.length) {
-    const d = css.indexOf('@media print', i);
-    if (d < 0) { out += css.slice(i); break; }
-    out += css.slice(i, d);
-    let j = css.indexOf('{', d), n = 0;
-    for (; j < css.length; j += 1) {
-      if (css[j] === '{') n += 1;
-      else if (css[j] === '}' && (n -= 1) === 0) { j += 1; break; }
-    }
-    i = j;
-  }
-  return out;
-}
-
 const FEUILLES_V = sansImpression([...VENTE.matchAll(/<style>([\s\S]*?)<\/style>/g)]
   .map((m) => sansCommentaires(m[1])).join('\n'));
 
@@ -342,6 +347,13 @@ assert.ok(echelleTicket, 'l’échelle du ticket est déclarée sur .ticket, en 
 assert.strictEqual((VENTE.match(/--tk-texte\s*:/g) || []).length, 1,
   '… une seule fois : elle était réglée dans quatre blocs « V10.x » successifs');
 
+// Le ticket ne suit PAS le thème : il montre le papier. On le vérifie plutôt
+// que de le laisser au hasard d'un jeton oublié.
+assert.ok(/\.ticket\{[^}]*background:#fff/.test(FEUILLES_V),
+  'le ticket de la vente est une feuille blanche, en clair comme en sombre');
+assert.ok(!/\.ticket\{[^}]*background:var\(--surface\)/.test(FEUILLES_V),
+  '… il ne prend pas la surface du thème, sinon l’aperçu ne dit rien du papier');
+
 // TROIS GRAISSES. Manrope s'arrête à 800 : la page en déclarait 900 et 950,
 // rendus l'un comme l'autre EXACTEMENT comme un 800.
 const graissesVente = [];
@@ -361,6 +373,11 @@ assert.ok(/b,strong\{font-weight:var\(--graisse-forte\)\}/.test(FEUILLES_V),
 const teintesVente = [];
 for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
   const sel = m[1].trim();
+  // LE TICKET GARDE LES SIENNES, comme sur l'écran de référence : c'est une
+  // FEUILLE DE PAPIER. Ce qu'on montre est un aperçu de ce qui va sortir de
+  // l'imprimante — il reste blanc à l'encre noire même en thème sombre, sinon
+  // l'aperçu ne dit rien du papier.
+  if (/ticket/.test(sel)) continue;
   if (/@font-face|@keyframes/.test(sel)) continue;
   for (const d of m[2].matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)) {
     if (d[0].includes('var(')) continue;
