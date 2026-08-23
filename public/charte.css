@@ -159,6 +159,12 @@
      le panier en avait deux (31 et 36 px) écrites en dur. */
   --champ-y-serre: 7px;
 
+  /* La colonne des valeurs d'un tableau. Fixe, pour que deux tables
+     imbriquées — un récapitulatif et son calcul déplié — alignent leurs
+     virgules sur la même verticale. « Au-dessus de la cible » est la plus
+     longue valeur qu'on y écrive. */
+  --tab-valeur: 168px;
+
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait
      sept (2, 7, 10, 11, 12, 14, 18 px) et sept rembourrages différents : le
      panneau de droite avait 17 px de marge en tête, 13 dans le corps et 15 au

@@ -356,44 +356,49 @@ h2{letter-spacing:-.01em}
 .tx-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
 .tx-tete-titre{margin:0;font-weight:var(--graisse-forte)}
 .tx-tete-info{font-weight:var(--graisse-note);color:var(--text-2)}
-/* LES QUATRE CHIFFRES CLÉS — les deux premiers sont ceux qu'on dit au client.
-   Chaque intitulé garde la hauteur de DEUX lignes : sans ça, « Temps de
-   production » passe à la ligne et son chiffre descend seul, décroché des
-   trois autres. */
-.tx-recap-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--pas-3) var(--pas-4);margin-top:var(--pas-3)}
-.tx-recap-kpis>div{min-width:0}
-.tx-recap-kpis span{display:flex;align-items:flex-end;min-height:2.9em;font-weight:var(--graisse-note);color:var(--text-2)}
-.tx-recap-kpis b{display:block;margin-top:2px;font-size:var(--recap-grand);font-weight:var(--graisse-forte);line-height:var(--ligne-titre);color:var(--text-1);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.tx-recap-kpis .is-fort b{font-weight:var(--graisse-forte);color:var(--primary)}
-/* LA MARGE, SITUÉE ENTRE SON SEUIL ET SA CIBLE — en CHIFFRES, sans barre : le
-   patron a fait retirer le remplissage le 21/08, il ne disait rien que les
-   trois nombres ne disent déjà. Ce sont ses seuils, et ils BAISSENT avec la
-   quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
-.tx-jauge{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-3);background:var(--zone-bg)}
-.tx-jauge-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.tx-jauge-tete span{font-weight:var(--graisse-forte)}
-.tx-jauge-tete b{font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums}
-.tx-jauge-pied{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:9px}
-.tx-reperes{display:flex;gap:18px;font-weight:var(--graisse-note);color:var(--text-2)}
-.tx-verdict{font-weight:var(--graisse-forte);color:var(--success)}
-.tx-jauge.est-warn .tx-verdict{color:var(--warning)}
-.tx-jauge.est-bad .tx-verdict{color:var(--danger)}
-/* CE QUI COMPOSE LE PRIX, en pastilles. Le détail du calcul se déplie d'un
-   clic sur la rangée : il répond à « pourquoi ce prix ? », il n'a pas à être
-   lu à chaque article. */
-.tx-decompo{margin-top:18px}
-.tx-decompo>summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;cursor:pointer;list-style:none}
-.tx-decompo>summary::-webkit-details-marker{display:none}
-.tx-decompo>summary::marker{content:''}
-.tx-chip{display:inline-flex;gap:8px;align-items:baseline;border:1px solid var(--border);border-radius:999px;padding:7px 15px;font-weight:var(--graisse-note);color:var(--text-2);white-space:nowrap}
-.tx-chip b{font-weight:var(--graisse-forte);color:var(--text-1);font-variant-numeric:tabular-nums}
-.tx-lien{font-weight:var(--graisse-forte);color:var(--primary);text-decoration:underline}
-.tx-decompo>summary:hover .tx-lien{color:var(--primary)}
-.tx-calcul{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--pas-1) var(--pas-4);margin-top:var(--pas-3);padding:var(--pas-3);border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);background:var(--zone-bg)}
-.tx-calcul span{color:var(--text-2);font-weight:var(--graisse-note)}
-.tx-calcul b{font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums;text-align:right}
-.tx-calcul .is-somme{font-weight:var(--graisse-forte);color:var(--text-1)}
-.tx-calcul .is-trait{border-top:1px solid var(--border-soft);padding-top:9px;margin-top:2px}
+/* ---- LE RÉCAPITULATIF SE LIT COMME UN TABLEAU ------------------------------
+   Il empilait cinq façons de présenter la même chose : quatre chiffres en
+   grille, une jauge dans son cadre, des pastilles en pilules, un calcul en
+   deux colonnes et une relecture en cases. L'œil recommençait à chaque bande,
+   et rien ne s'alignait avec rien.
+
+   UNE SEULE TABLE, du premier chiffre au dernier — calcul déplié et relecture
+   des champs compris. L'intitulé à gauche, la valeur à droite, TOUJOURS dans
+   la même colonne, en chiffres à chasse fixe pour que les virgules tombent
+   les unes sous les autres. Une rangée = deux cellules, séparées par un
+   filet ; c'est le filet qui fait le tableau, pas un cadre de plus.
+
+   Les deux chiffres qu'on annonce au client restent en grand : même rangée,
+   même colonne, seulement plus gros. C'est la seule autre taille de la carte. */
+.tx-tableau{display:grid;grid-template-columns:minmax(0,1fr) var(--tab-valeur);
+  align-items:baseline;margin-top:var(--pas-3)}
+.tx-tableau>*{padding:var(--pas-2) 0;border-top:1px solid var(--border-soft);min-width:0}
+.tx-tableau>:nth-child(-n+2){border-top:0;padding-top:0}
+.tx-tableau>span{color:var(--text-2);font-weight:var(--graisse-note);overflow-wrap:anywhere}
+.tx-tableau>b{text-align:right;font-weight:var(--graisse-forte);color:var(--text-1);
+  font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* Ce qu'on dit au client. */
+.tx-tableau>.est-annonce{font-size:var(--recap-grand);line-height:var(--ligne-titre)}
+.tx-tableau>b.est-annonce{color:var(--primary)}
+/* La couleur dit l'état, jamais autre chose. */
+.tx-tableau>b.est-bon{color:var(--success)}
+.tx-tableau>b.est-warn{color:var(--warning)}
+.tx-tableau>b.est-mauvais{color:var(--danger)}
+/* Une somme intermédiaire du calcul : c'est la GRAISSE de l'intitulé qui la
+   détache, pas une taille de plus. */
+.tx-tableau>span.est-somme{color:var(--text-1);font-weight:var(--graisse-forte)}
+/* Le trait fort sous lequel tombe le prix retenu. */
+.tx-tableau>.est-total{border-top:1px solid var(--text-1)}
+/* Les deux volets dépliables : leur résumé est une rangée du tableau, il
+   commence donc à la même verticale que les intitulés. */
+.tx-volet{margin-top:var(--pas-3);padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
+.tx-volet>summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none;
+  list-style:none;display:flex;gap:var(--pas-1);align-items:center}
+.tx-volet>summary::-webkit-details-marker{display:none}
+.tx-volet>summary::marker{content:''}
+.tx-volet>summary::before{content:'▸';color:var(--text-2)}
+.tx-volet[open]>summary::before{content:'▾'}
+.tx-volet .tx-tableau{margin-top:var(--pas-2)}
 /* CE QUI ENGAGE LA PRODUCTION ET QUE PERSONNE NE RELIT ENTRE LE COMPTOIR ET
    L'ATELIER. La couleur dit un état : ambre = à faire valider avant le devis. */
 .tx-alerte{display:flex;gap:11px;align-items:flex-start;margin-top:15px;padding:13px 16px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);color:var(--warning);font-weight:var(--graisse-note)}
@@ -401,17 +406,7 @@ h2{letter-spacing:-.01em}
 /* LA SAISIE, REPLIÉE. Elle ne sert qu'à relire avant d'ajouter : dépliée en
    permanence, elle poussait le bouton hors de l'écran. Son état SURVIT à la
    frappe — le bloc se réécrit à chaque touche, il ne doit pas se refermer
-   sous les doigts. */
-.tx-details{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)}
-.tx-details>summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none;list-style:none;display:flex;gap:9px;align-items:center}
-.tx-details>summary::-webkit-details-marker{display:none}
-.tx-details>summary::marker{content:''}
-.tx-details>summary::before{content:'▸';color:var(--text-2)}
-.tx-details[open]>summary::before{content:'▾'}
-.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:var(--pas-3) var(--pas-4);margin-top:var(--pas-3)}
-.tx-saisie>div{min-width:0}
-.tx-saisie span{display:block;font-weight:var(--graisse-note);color:var(--text-2)}
-.tx-saisie b{display:block;font-weight:var(--graisse-forte);margin-top:1px;overflow-wrap:anywhere}
+   sous les doigts. Elle se lit dans la même table que le reste. */
 /* LA BARRE D'ACTION RESTE SOUS LA MAIN. Dix champs et un récapitulatif plus
    haut, le bouton finissait sous la ligne de flottaison : on ajoutait un
    article en remontant l'écran. Collée en bas, elle porte aussi CE QU'ON
@@ -1485,12 +1480,8 @@ function txSaisieLignes(d){
   ].filter(([,v])=>String(v==null?'':v).trim());
 }
 function txSaisieBloc(d){
-  const box=txEl('div','tx-saisie');
-  txSaisieLignes(d).forEach(([k,v])=>{
-    const cell=txEl('div');
-    cell.append(txEl('span',null,k),txEl('b',null,v));
-    box.append(cell);
-  });
+  const box=txEl('div','tx-tableau');
+  txSaisieLignes(d).forEach(([k,v])=>txRang(box,k,v));
   return box;
 }
 
@@ -1521,78 +1512,92 @@ function txTete(c){
   return t;
 }
 
-/* LES QUATRE CHIFFRES QU'ON LIT EN PREMIER. Les deux de gauche sont ceux qu'on
-   annonce au client, les deux autres ce que la ligne coûte à l'atelier. */
-function txKpi(label,valeur,cls){
-  const cell=txEl('div',cls);
-  cell.append(txEl('span',null,label),txEl('b',null,valeur));
-  return cell;
+/* UNE RANGÉE DU TABLEAU : l'intitulé à gauche, la valeur à droite. Les deux
+   cellules sont posées à plat dans la grille — c'est ce qui garde la colonne
+   des valeurs sur la même verticale d'un bout à l'autre de la carte. */
+function txRang(g,libelle,valeur,cls,clsValeur){
+  const k=txEl('span',cls,libelle);
+  const v=txEl('b',clsValeur===undefined?cls:clsValeur,valeur);
+  g.append(k,v);
+  return v;
 }
-function txKpis(c){
-  const g=txEl('div','tx-recap-kpis');
-  g.append(
-    txKpi('Prix HT / pièce',money(c.sold),'is-fort'),
-    txKpi('Total HT',money(c.total),'is-fort'),
-    txKpi('Temps de production',TE().fmtTime(c.prodHours)),
-    txKpi('Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—'));
-  return g;
+
+/* LES QUATRE CHIFFRES QU'ON LIT EN PREMIER. Les deux premiers sont ceux qu'on
+   annonce au client — ils restent en grand ; les deux autres disent ce que la
+   ligne coûte à l'atelier. */
+function txKpis(g,c){
+  /* Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend
+     juste la place. Les deux cellules restent sur la même ligne de base. */
+  txRang(g,'Prix HT / pièce',money(c.sold),null,'est-annonce');
+  txRang(g,'Total HT',money(c.total),null,'est-annonce');
+  txRang(g,'Temps de production',TE().fmtTime(c.prodHours));
+  txRang(g,'Marge / heure',Number.isFinite(c.eurH)?money(c.eurH):'—');
 }
 
 /* LA MARGE, SITUÉE ENTRE SON SEUIL ET SA CIBLE. Le badge « EXCELLENT —
    VALIDÉ » ne disait ni de combien on était au-dessus, ni ce qu'il restait
    avant de descendre. Les deux repères sont ceux du patron et BAISSENT avec la
    quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
-function txJauge(c){
+function txJauge(g,c){
   const t=TE().thresholdFor(c.qty),seuil=t.limited,cible=t.veryGood;
-  const [etat,verdict]=c.mark<seuil?['bad','Sous le seuil']
-    :c.mark<cible?['warn','Au-dessus du seuil']
-    :['good','Au-dessus de la cible'];
-  const box=txEl('div',`tx-jauge est-${etat}`);
-  const tete=txEl('div','tx-jauge-tete');
-  tete.append(txEl('span',null,'Marge'),txEl('b',null,`${money(c.margin)} · ${txPct(c.mark)}`));
-  const reperes=txEl('div','tx-reperes');
-  reperes.append(txEl('span',null,`Seuil ${txPctCourt(seuil)}`),txEl('span',null,`Cible ${txPctCourt(cible)}`));
-  const pied=txEl('div','tx-jauge-pied');
-  pied.append(reperes,txEl('b','tx-verdict',verdict));
-  box.append(tete,pied);
-  return box;
+  const [etat,verdict]=c.mark<seuil?['est-mauvais','Sous le seuil']
+    :c.mark<cible?['est-warn','Au-dessus du seuil']
+    :['est-bon','Au-dessus de la cible'];
+  txRang(g,'Marge',`${money(c.margin)} · ${txPct(c.mark)}`);
+  /* Le verdict est la VALEUR de sa rangée : les repères le posent, la couleur
+     dit lequel des trois états on occupe. */
+  txRang(g,`Seuil ${txPctCourt(seuil)} · cible ${txPctCourt(cible)}`,verdict,etat);
 }
 
 /* CE QUI COMPOSE LE PRIX. Les pastilles se lisent d'un coup d'œil ; le calcul
    complet se déplie d'un clic sur la rangée — il répond à « pourquoi ce
    prix ? », il n'a pas à être lu à chaque article. */
 function txLigneCalcul(g,libelle,valeur,cls){
-  g.append(txEl('span',cls,libelle),txEl('b',cls,valeur));
+  txRang(g,libelle,valeur,cls);
 }
 function txCalculBloc(d,c){
-  const g=txEl('div','tx-calcul'),cf=TE().coefFor(c.qty),tr=txNum(TE().DB.transports[d.transport]);
+  const g=txEl('div','tx-tableau'),cf=TE().coefFor(c.qty),tr=txNum(TE().DB.transports[d.transport]);
   txLigneCalcul(g,`Prix d’achat ${txDisplayRef(d)}`,money(c.item.purchase));
   txLigneCalcul(g,`Transport ${d.transport}`,tr>0?`+ ${money(tr)}`:money(0));
   txLigneCalcul(g,`Coefficient ${c.qty} pièce${c.qty>1?'s':''}`,`× ${txNombre(cf.textile)}`);
-  txLigneCalcul(g,'Base textile',money(c.baseTextile),'is-somme');
-  txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint),'is-somme');
+  txLigneCalcul(g,'Base textile',money(c.baseTextile),'est-somme');
+  txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint),'est-somme');
   if(txNum(d.markupPercent)>0)txLigneCalcul(g,'Majoration libre',`+ ${txNombre(d.markupPercent)} %`);
   if(txNum(d.discount)>0)txLigneCalcul(g,'Remise',`− ${txNombre(d.discount)} %`);
   if(txNum(d.manualPrice)>0)txLigneCalcul(g,'Prix manuel',money(txNum(d.manualPrice)));
   txLigneCalcul(g,'Arrondi',`au ${money(TE().getSettings().roundStep)} supérieur`);
-  txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'is-trait is-somme');
-  txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total),'is-somme');
+  txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'est-total est-somme');
+  txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total),'est-somme');
   return g;
 }
-function txDecompo(d,c){
-  const det=txEl('details','tx-decompo');
+function txDecompo(g,d,c){
+  const tr=txNum(TE().DB.transports[d.transport]),tgca=txNum($('txTgca').value);
+  txRang(g,'Textile',money(c.baseTextile));
+  txRang(g,'Marquage',money(c.basePrint));
+  txRang(g,'Transport',tr>0?`+ ${money(tr)}`:'compris');
+  txRang(g,'TGCA',tgca>0?txPctCourt(tgca):'non');
+}
+
+/* LA TABLE ENTIÈRE. Une seule, du premier chiffre au dernier : c'est elle qui
+   tient la colonne des valeurs. */
+function txTableau(d,c){
+  const g=txEl('div','tx-tableau');
+  txKpis(g,c);
+  txJauge(g,c);
+  txDecompo(g,d,c);
+  return g;
+}
+
+/* LE CALCUL COMPLET, REPLIÉ. Il répond à « pourquoi ce prix ? », il n'a pas à
+   être lu à chaque article — et il se lit dans la même table, donc dans la
+   même colonne. */
+function txCalcul(d,c){
+  const det=txEl('details','tx-volet');
   det.open=txCalculOuvert;
   const sum=txEl('summary');
-  const pastille=(k,v)=>{const e=txEl('span','tx-chip');e.append(txEl('span',null,k),txEl('b',null,v));return e};
-  const tr=txNum(TE().DB.transports[d.transport]),tgca=txNum($('txTgca').value);
-  sum.append(pastille('Textile',money(c.baseTextile)),pastille('Marquage',money(c.basePrint)),
-    pastille('Transport',tr>0?`+${money(tr)}`:'compris'),
-    pastille('TGCA',tgca>0?txPctCourt(tgca):'non'));
-  const lien=txEl('span','tx-lien');
-  const poser=()=>{lien.textContent=det.open?'Masquer le calcul':'Voir le calcul'};
+  const poser=()=>{sum.textContent=det.open?'Masquer le calcul':'Voir le calcul'};
   poser();
   det.addEventListener('toggle',()=>{txCalculOuvert=det.open;poser()});
-  sum.append(lien);
   det.append(sum,txCalculBloc(d,c));
   return det;
 }
@@ -1612,7 +1617,7 @@ function txAlertes(d,c){
 
 /* LA SAISIE, REPLIÉE : elle ne sert qu'à relire avant d'ajouter. */
 function txDetailsBloc(d){
-  const lignes=txSaisieLignes(d),det=txEl('details','tx-details'),sum=txEl('summary');
+  const lignes=txSaisieLignes(d),det=txEl('details','tx-volet'),sum=txEl('summary');
   det.open=txDetailsOuvert;
   const titre=()=>det.open?'Masquer le détail des champs':`Détail des champs (${lignes.length}) — pour relecture`;
   sum.textContent=titre();
@@ -1645,7 +1650,7 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTete(c),txKpis(c),txJauge(c),txDecompo(d,c),...txAlertes(d,c),txDetailsBloc(d)]);
+  txFill(box,[txTete(c),txTableau(d,c),txCalcul(d,c),...txAlertes(d,c),txDetailsBloc(d)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -2130,11 +2135,11 @@ function renderDetailArticle(){
 
   /* Les mêmes blocs que le récapitulatif du formulaire : une ligne relue ici
      ou là-haut doit se lire pareil. */
-  const metrics=txKpis(c);
+  const metrics=txTableau(n.textile,c);
   metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,txJauge(c),txDecompo(n.textile,c),...txAlertes(n.textile,c),txSaisieBloc(n.textile));
+  bloc.append(tete,rang,metrics,txCalcul(n.textile,c),...txAlertes(n.textile,c),txSaisieBloc(n.textile));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');

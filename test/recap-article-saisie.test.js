@@ -151,21 +151,35 @@ assert.ok(/function txDetailsBloc\(d\)\{[\s\S]*?txSaisieBloc\(d\)/.test(DEVIS),
 // l'heure reste, c'est le chiffre.
 assert.ok(!/c\.atelier/.test(DEVIS),
   'le classement de l’atelier ne s’affiche nulle part sur l’écran du comptoir');
-assert.ok(/txKpi\('Marge \/ heure'/.test(DEVIS),
-  '… la marge à l’heure, elle, reste un des quatre chiffres clés');
+assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
+  '… la marge à l’heure, elle, reste une des rangées du tableau');
 
 // --- 5. LE RÉCAPITULATIF REFAIT (21/08/2026) --------------------------------
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(c\),txKpis\(c\),txJauge\(c\),txDecompo\(d,c\),\.\.\.txAlertes\(d,c\),txDetailsBloc\(d\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : chiffres, marge, prix, alertes, saisie');
+assert.ok(/txTete\(c\),txTableau\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\),txDetailsBloc\(d\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : le tableau, le calcul, les alertes, la saisie');
+// … et le tableau porte les trois blocs dans l'ordre : les chiffres, la marge,
+// ce qui compose le prix. UNE SEULE table — c'est elle qui tient la colonne
+// des valeurs, du premier chiffre au dernier.
+const table = source('txTableau', 'd,c');
+assert.ok(/txKpis\(g,c\);\s*txJauge\(g,c\);\s*txDecompo\(g,d,c\)/.test(table),
+  'les trois blocs s’écrivent dans la même table');
+assert.ok(/txEl\('div','tx-tableau'\)/.test(table), 'et cette table est bien une table');
+// Le calcul déplié écrit dans une table de la MÊME forme : sans ça, ses
+// valeurs ne tombent pas sous celles du récapitulatif.
+assert.ok(/function txCalculBloc\(d,c\)\{\s*const g=txEl\('div','tx-tableau'\)/.test(DEVIS),
+  'le calcul déplié se lit dans la même table');
+assert.ok(/function txSaisieBloc\(d\)\{\s*const box=txEl\('div','tx-tableau'\)/.test(DEVIS),
+  'la relecture des champs aussi');
+
 assert.ok(!/tx-avis/.test(DEVIS),
   'le badge « EXCELLENT — VALIDÉ » a laissé la place à la jauge, ici comme dans la fiche');
 
 // LES DEUX REPÈRES SONT CEUX DU PATRON. Écrits en dur (45 / 60), ils
 // mentiraient dès la dixième pièce : les seuils baissent avec la quantité.
-const jauge = source('txJauge', 'c');
+const jauge = source('txJauge', 'g,c');
 assert.ok(/TE\(\)\.thresholdFor\(c\.qty\)/.test(jauge) && /seuil=t\.limited/.test(jauge) && /cible=t\.veryGood/.test(jauge),
   'seuil et cible viennent des seuils par quantité du moteur, jamais d’un nombre écrit en dur');
 assert.ok(/Sous le seuil/.test(jauge) && /Au-dessus du seuil/.test(jauge) && /Au-dessus de la cible/.test(jauge),
@@ -238,6 +252,25 @@ const DEBUT = DEVIS.indexOf('/* ---- LE RÉCAPITULATIF DE L\'ARTICLE ---');
 const FIN = DEVIS.indexOf('@media(max-width:700px){.tx-barre{position:static}}');
 assert.ok(DEBUT > 0 && FIN > DEBUT, 'le bloc de style du récapitulatif doit rester repérable');
 const STYLE = DEVIS.slice(DEBUT, FIN);
+
+// LA COLONNE DES VALEURS EST LA MÊME PARTOUT. Elle vient d'un jeton de la
+// charte, pas d'un « auto » : deux tables imbriquées — le récapitulatif et son
+// calcul déplié — doivent aligner leurs virgules sur la même verticale, et
+// « auto » les laisse chacune se dimensionner sur son plus long nombre.
+const regleTable = STYLE.match(/\.tx-tableau\{([^}]*)\}/);
+assert.ok(regleTable, 'la table du récapitulatif doit rester repérable');
+assert.ok(/grid-template-columns:minmax\(0,1fr\) var\(--tab-valeur\)/.test(regleTable[1]),
+  'une seule colonne de valeurs, large de --tab-valeur, pour toutes les tables de la carte');
+assert.ok(/align-items:baseline/.test(regleTable[1]),
+  'l’intitulé et sa valeur tombent sur la même ligne de base, même quand la valeur est en grand');
+assert.ok(/\.tx-tableau>b\{[^}]*text-align:right/.test(STYLE)
+  && /\.tx-tableau>b\{[^}]*font-variant-numeric:tabular-nums/.test(STYLE),
+  'les valeurs sont alignées à droite, en chiffres de largeur fixe : c’est ce qui fait le tableau');
+// Le filet fait la rangée — pas un cadre de plus autour de chaque bande.
+assert.ok(/\.tx-tableau>\*\{[^}]*border-top:1px solid var\(--border-soft\)/.test(STYLE),
+  'un filet sépare les rangées');
+assert.ok(!/tx-jauge|tx-chip|tx-recap-kpis|tx-saisie\{/.test(DEVIS),
+  'les cinq anciennes façons de présenter la même chose ont disparu');
 
 const AUTORISEES = ['var(--recap-texte)', 'var(--recap-grand)', 'inherit'];
 const tailles = [...STYLE.matchAll(/font-size:\s*([^;}!]+)/g)].map((m) => m[1].trim());
