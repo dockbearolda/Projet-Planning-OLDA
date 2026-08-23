@@ -113,6 +113,15 @@ h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);l
   .grid>.field>label,.grid-3>.field>label{grid-row:1;align-self:end}
   .grid>.field>.error,.grid>.field>.help,
   .grid-3>.field>.error,.grid-3>.field>.help{grid-row:3}
+  /* UN CHAMP QUI PORTE TOUT UN EMPILEMENT NE RENTRE PAS DANS TROIS LIGNES.
+     « Date souhaitée » tient sa date, ses trois raccourcis de délai, son avis
+     de supplément, son barème dépliable ET l'heure souhaitée avec son propre
+     intitulé : sept éléments pour trois lignes de rangée. Le débordement
+     partait dans les lignes implicites et démontait la rangée entière.
+     Une rangée qui contient un champ à deux intitulés renonce donc au partage
+     de lignes et se range normalement — c'est le seul cas des deux écrans. */
+  .grid:has(>.field label~label),.grid-3:has(>.field label~label){grid-template-rows:none}
+  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--pas-3)}
 }
 .field{margin-bottom:var(--pas-3)}
 label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
@@ -122,8 +131,12 @@ textarea{min-height:110px;resize:vertical}
    le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
    ne s'alignait plus avec ses voisins — au moment précis où l'œil le cherche.
    Le trait garde sa LARGEUR, il change de couleur ; l'épaisseur qu'on voit
-   vient d'un anneau posé par-dessus (`box-shadow`), qui ne prend aucune place. */
-input.invalid,select.invalid,textarea.invalid{border:1.5px solid var(--danger);background:var(--danger-bg);box-shadow:0 0 0 1px var(--danger)}
+   vient d'un anneau posé par-dessus (`box-shadow`), qui ne prend aucune place.
+   « !important » à contrecœur, mais indispensable : la recette des commandes
+   pose plus bas « input,select,textarea{border:…!important} », et sans lui le
+   trait rouge de cet écran ne s'est JAMAIS affiché — le champ fautif n'avait
+   qu'un fond rosé, que personne ne remarque à bout de bras. */
+.invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}
 .help{font-size:var(--taille-texte);color:var(--text-2);margin-top:5px}
 button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
 .primary{background:var(--primary);color:var(--on-primary)}
@@ -135,6 +148,17 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 .whatsapp{background:var(--primary);color:var(--on-primary)}
 .full{width:100%}
 .actions{display:flex;gap:var(--pas-2);flex-wrap:wrap}
+/* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
+   La MÊME bulle que sur l'écran de demande de devis — les deux parcours
+   tournent sur le même poste. Une étape était un long ruban de champs mis bout
+   à bout dans une carte blanche : rien ne disait où un sujet finissait et où le
+   suivant commençait. La bulle n'ajoute AUCUN intitulé, c'est un cadre. */
+.bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
+.bloc>:first-child{margin-top:0}
+.bloc>:last-child{margin-bottom:0}
+/* Un encadré posé DANS une bulle repasse en blanc : sur le fond gris de la
+   bulle, son propre fond gris se confondrait avec elle. */
+.bloc .notice,.bloc .product-card{background:var(--surface)}
 .product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
 .product-top{display:flex;justify-content:space-between;gap:12px}
 .product-title{font-weight:var(--graisse-forte)}
@@ -578,7 +602,7 @@ h2{letter-spacing:-.01em}
 
   <div class="card">
     <h2>1. Ajouter un article</h2>
-    <div class="grid">
+    <div class="bloc"><div class="grid">
       <div class="field">
         <label for="productName">Article *</label>
         <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
@@ -621,7 +645,7 @@ h2{letter-spacing:-.01em}
       <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
     </div>
 
-    <div class="grid">
+    </div><div class="bloc"><div class="grid">
       <div class="field">
         <label for="orderDate">Date de commande *</label>
         <input id="orderDate" type="date">
@@ -668,7 +692,7 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div class="actions">
+    </div><div class="actions">
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
     </div>
@@ -714,14 +738,14 @@ h2{letter-spacing:-.01em}
   <div class="card hidden" id="clientSection">
     <h2>2. Associer le client</h2>
 
-    <div class="field client-search-wrap">
+    <div class="bloc"><div class="field client-search-wrap">
       <label for="clientSearch">Rechercher un client existant</label>
       <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
       
       <div id="clientResults" class="client-results"></div>
     </div>
 
-    <div id="selectedClientCard" class="product-card client-selected hidden">
+    </div><div id="selectedClientCard" class="product-card client-selected hidden">
       <span class="badge green">✓ Client sélectionné</span>
       <div class="client-result-name" id="selectedClientName"></div>
       <div class="client-result-meta" id="selectedClientMeta"></div>
@@ -871,13 +895,13 @@ h2{letter-spacing:-.01em}
     <h2>3. Paiement</h2>
     <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
 
-    <label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
+    <div class="bloc"><label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
     <label class="payment-option"><input type="radio" name="payment" value="Espèces"> Espèces</label>
     <label class="payment-option"><input type="radio" name="payment" value="Virement"> Virement</label>
     <label class="payment-option"><input type="radio" name="payment" value="Mixte"> Mixte</label>
     <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
 
-    <div id="cashZone" class="card hidden">
+    </div><div id="cashZone" class="card hidden">
       <div class="field">
         <label for="cashGiven">Montant donné par le client</label>
         <input id="cashGiven" type="number" min="0" step="0.01">

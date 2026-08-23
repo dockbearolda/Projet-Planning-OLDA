@@ -324,6 +324,15 @@ h2{letter-spacing:-.01em}
   .grid>.field>.error,.grid>.field>.help,
   .grid-3>.field>.error,.grid-3>.field>.help,
   .tx-controls>.field>.error,.tx-controls>.field>.help{grid-row:3}
+  /* UN CHAMP QUI PORTE TOUT UN EMPILEMENT NE RENTRE PAS DANS TROIS LIGNES.
+     « Date souhaitée » tient sa date, ses trois raccourcis de délai, son avis
+     de supplément, son barème dépliable ET l'heure souhaitée avec son propre
+     intitulé : sept éléments pour trois lignes de rangée. Le débordement
+     partait dans les lignes implicites et démontait la rangée entière.
+     Une rangée qui contient un champ à deux intitulés renonce donc au partage
+     de lignes et se range normalement — c'est le seul cas des deux écrans. */
+  .grid:has(>.field label~label),.grid-3:has(>.field label~label),.tx-controls:has(>.field label~label){grid-template-rows:none}
+  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field,.tx-controls:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--pas-3)}
 }
 .tx-sizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--pas-3);align-items:end}
 .tx-sizes .field{margin-bottom:0}
@@ -352,7 +361,23 @@ h2{letter-spacing:-.01em}
    production — et on ne voyait plus où commençait la ligne qu'on est en train
    d'écrire. Un cadre et un fond très légèrement retiré suffisent : la couleur
    reste celle de la charte, elle ne sert qu'à délimiter. */
-.article-bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-4) 0 0;background:var(--zone-bg)}
+/* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
+   Une étape était un long ruban : intitulés, champs, zones de texte et tuiles
+   mis bout à bout dans une seule carte blanche. Rien ne disait où un sujet
+   finissait et où le suivant commençait — l'œil recommençait à chaque ligne.
+   Le bloc de l'article le faisait déjà, et lui seul. C'est la MÊME bulle,
+   étendue à tous les groupes des deux écrans du comptoir : fond gris, liseré,
+   arrondi de bloc. Elle n'ajoute AUCUN intitulé — c'est un cadre, pas un
+   titre : les groupes qui n'en avaient pas n'en reçoivent pas. */
+.bloc,.article-bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
+.article-bloc{margin-top:var(--pas-4)}
+/* La bulle porte déjà son rembourrage : le premier et le dernier enfant ne
+   rajoutent pas leur marge par-dessus, sinon on lit deux airs au lieu d'un. */
+.bloc>:first-child{margin-top:0}
+.bloc>:last-child{margin-bottom:0}
+/* Un encadré posé DANS une bulle repasse en blanc : sur le fond gris de la
+   bulle, son propre fond gris se confondrait avec elle. */
+.bloc .notice,.bloc .tx-adjust{background:var(--surface)}
 /* Les blocs blancs du dedans le restent : sur un fond retiré, un cadre
    transparent se confondrait avec lui. */
 .article-bloc .tx-adjust,.article-bloc .tx-preview{background:var(--surface)}
@@ -608,7 +633,7 @@ h2{letter-spacing:-.01em}
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><span class="tx-barre-objet" id="txBarreObjet"></span><button id="txDupBtn" class="secondary" onclick="saveTextileNeed(true)">Ajouter et dupliquer</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter cet article</span><span class="tx-kbd" id="txRaccourci"></span></button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="bloc"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><span class="tx-barre-objet" id="txBarreObjet"></span><button id="txDupBtn" class="secondary" onclick="saveTextileNeed(true)">Ajouter et dupliquer</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter cet article</span><span class="tx-kbd" id="txRaccourci"></span></button><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
@@ -617,8 +642,8 @@ h2{letter-spacing:-.01em}
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
 
-<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
-<div class="field priority-field" id="projectPriorityField">
+<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><div class="bloc"><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
+</div><div class="bloc"><div class="field priority-field" id="projectPriorityField">
   <label id="projectPriorityLabel">Priorité du projet *</label>
   <div class="priority-grid" id="projectPriorityGroup">
     <button type="button" class="priority-card" data-priority="1" onclick="selectProjectPriority(1)">
@@ -640,10 +665,10 @@ h2{letter-spacing:-.01em}
   <input type="hidden" id="projectPriority" value="">
   <div class="field-error hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
 </div>
-<div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
+</div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
-<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div><div class="actions"><button class="secondary" onclick="showStep(2)">← Retour</button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions"><button class="secondary" onclick="showStep(2)">← Retour</button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
 
 
 <section id="step4" class="hidden">
@@ -652,7 +677,7 @@ h2{letter-spacing:-.01em}
       <div class="ref ref-display">—</div>
     </div>
 
-    <div class="field">
+    <div class="bloc"><div class="field">
       <label>État des informations du client *</label>
       <select id="controlStatus" data-menu-manuel-non onchange="toggleControlStatus(); updateControl()">
         <option value="" selected disabled hidden>Sélectionner une option</option>
@@ -717,7 +742,7 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div id="waitingInformationBox" class="notice orange hidden">
+    </div><div id="waitingInformationBox" class="notice orange hidden">
       <h3 style="margin-top:0">Informations encore attendues</h3>
       <div class="grid">
         <div class="field">
@@ -737,7 +762,7 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div class="field">
+    <div class="bloc"><div class="field">
       <label>Éléments reçus du client</label>
       <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
     </div>
@@ -747,7 +772,7 @@ h2{letter-spacing:-.01em}
       <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
     </div>
 
-    <div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
+    </div><div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
 
     <div class="actions" style="margin-top:16px">
       <button class="secondary" onclick="showStep(3)">← Retour</button>
@@ -763,7 +788,7 @@ h2{letter-spacing:-.01em}
       <div class="ref ref-display">—</div>
     </div>
 
-    <div class="field">
+    <div class="bloc"><div class="field">
       <label>Rechercher un client existant *</label>
       <input id="clientSearch" type="search" placeholder="Nom, entreprise, téléphone ou e-mail..." oninput="filterClientList()">
       <div class="help" style="margin-top:6px">Clique directement sur un client pour l’associer à la demande.</div>
@@ -771,7 +796,7 @@ h2{letter-spacing:-.01em}
 
     <div id="clientQuickList" class="client-quick-list"></div>
 
-    <div class="actions" style="margin-top:12px;justify-content:flex-start">
+    </div><div class="actions" style="margin-top:12px;justify-content:flex-start">
       <button type="button" class="secondary" onclick="showNewClientForm()">+ Créer un nouveau client</button>
     </div>
 
@@ -871,7 +896,7 @@ h2{letter-spacing:-.01em}
 
     <div id="selectedClientCard" class="notice green hidden" style="margin-top:16px"></div>
 
-    <div id="clientNextActionBlock" class="field hidden" style="margin-top:16px">
+    <div class="bloc"><div id="clientNextActionBlock" class="field hidden" style="margin-top:16px">
       <label>Suite souhaitée pour ce client *</label>
       <div class="client-action-grid">
         <button type="button" class="client-action-card" data-action="quote" onclick="selectClientNextAction('quote')">
@@ -887,7 +912,7 @@ h2{letter-spacing:-.01em}
       <div class="field-error hidden" id="clientNextActionError">⚠ Sélectionne la suite à donner à cette demande.</div>
     </div>
 
-    <div id="step5ValidationSummary" class="validation-summary hidden"></div>
+    </div><div id="step5ValidationSummary" class="validation-summary hidden"></div>
 
     <div class="actions" style="margin-top:16px">
       <button class="secondary" onclick="showStep(4)">← Retour</button>

@@ -466,3 +466,69 @@ assert.ok(/'\/comptoir\/textile-catalog\.js'/.test(SW),
   'le catalogue textile aussi : sans lui, hors ligne, tout le chiffrage tombe sans un mot');
 
 console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, et plus rien qui vienne d’ailleurs');
+
+// ===========================================================================
+// 12. UNE RANGÉE RESTE UNE RANGÉE (23/08/2026)
+// ---------------------------------------------------------------------------
+// « Quand un input est vide et s'entoure en rouge pour validation il se décale
+// et n'est plus centré avec les autres input. » Deux causes, et la plus grosse
+// n'était pas celle qu'on voit.
+// ===========================================================================
+[['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
+  const css = sansCommentaires(src);
+  // 1. LE TRAIT NE CHANGE PLUS DE LARGEUR. De 1,5 à 2 px, le champ gagnait 1 px
+  //    de haut : sur une rangée de trois, celui qui manque sortait du rang.
+  const inval = css.match(/(?:input\.invalid,select\.invalid,textarea\.invalid|\.invalid)\{([^}]*)\}/);
+  assert.ok(inval, `${nom} : la règle du champ en erreur doit rester repérable`);
+  assert.ok(!/border(?:-width)?:\s*2px/.test(inval[1]),
+    `${nom} : un champ en erreur ne change pas la largeur de son trait — il se décalerait de 1 px`);
+  assert.ok(/box-shadow:0 0 0 1px var\(--danger\)/.test(inval[1]),
+    `${nom} : … l'épaisseur qu'on voit vient d'un anneau, qui ne prend pas de place`);
+  assert.ok(/border-color:var\(--danger\)/.test(inval[1]),
+    `${nom} : … et le trait dit l'erreur par sa couleur`);
+
+  // 2. LE MESSAGE NE REMONTE PLUS LE CHAMP. Les grilles collaient leurs
+  //    cellules en bas : une ligne de texte ajoutée SOUS un champ le faisait
+  //    remonter de 27 px au-dessus de ses voisins de rangée.
+  assert.ok(/@supports \(grid-template-rows:subgrid\)\{/.test(css),
+    `${nom} : les rangées partagent leurs lignes, pour que rien ne déplace une commande`);
+  assert.ok(/>\.field\{display:grid;grid-template-rows:subgrid;grid-row:span 3/.test(css),
+    `${nom} : … chaque cellule reprend les trois lignes de sa rangée`);
+  assert.ok(/>\.field>\.error,[^{]*>\.field>\.help\{grid-row:3\}/.test(css.replace(/\n\s*/g, '')),
+    `${nom} : … et les messages vivent sur la troisième, jamais dans la boîte du champ`);
+  // Un champ qui porte tout un empilement (une date, ses raccourcis, son barème
+  // ET une heure avec son propre intitulé) déborde des trois lignes : sa rangée
+  // renonce au partage plutôt que de se démonter.
+  assert.ok(/:has\(>\.field label~label\)\{grid-template-rows:none\}/.test(css),
+    `${nom} : une rangée qui porte un champ à deux intitulés se range normalement`);
+});
+
+// ===========================================================================
+// 13. CHAQUE GROUPE DE CHAMPS DANS SA BULLE
+// ---------------------------------------------------------------------------
+// Demande du patron : « je veux aussi que ce genre de bulle grise entoure bien
+// chaque étape que tout soit bien lisible. » Une étape était un long ruban de
+// champs mis bout à bout dans une carte blanche — rien ne disait où un sujet
+// finissait et où le suivant commençait.
+// ===========================================================================
+[['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
+  const css = sansCommentaires(src);
+  const regle = css.match(/\.bloc(?:,\.article-bloc)?\{([^}]*)\}/);
+  assert.ok(regle, `${nom} : la bulle d'un groupe doit exister`);
+  ['background:var(--zone-bg)', 'border-radius:var(--arrondi-bloc)'].forEach((d) =>
+    assert.ok(regle[1].includes(d), `${nom} : la bulle porte « ${d} » — la même que sur l'autre écran`));
+  assert.ok(/\.bloc>:first-child\{margin-top:0\}/.test(css) && /\.bloc>:last-child\{margin-bottom:0\}/.test(css),
+    `${nom} : la bulle porte son rembourrage, ses bords n'ajoutent pas une deuxième marge`);
+  // Elle n'ajoute AUCUN intitulé : c'est un cadre, pas un titre.
+  assert.ok(!/<div class="bloc"><h[23]/.test(src.replace(/\n\s*/g, '')) || /<div class="bloc"><h3>Familles/.test(src),
+    `${nom} : la bulle n'invente pas d'intitulé — seuls les titres qui existaient déjà y entrent`);
+  assert.ok((src.match(/class="bloc"/g) || []).length >= 4,
+    `${nom} : les groupes de champs sont bien tous emballés`);
+});
+// Sur l'écran de devis, chaque étape du parcours porte ses bulles.
+['step2', 'step3', 'step4', 'step5'].forEach((etape) => {
+  const m = DEVIS.match(new RegExp(`<section id="${etape}"[\\s\\S]*?</section>`));
+  assert.ok(m && /class="bloc"/.test(m[0]), `l'étape ${etape} a au moins un groupe emballé`);
+});
+
+console.log('✓ comptoir : une rangée reste une rangée, et chaque groupe de champs a sa bulle');
