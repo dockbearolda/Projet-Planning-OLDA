@@ -18,16 +18,16 @@
 <title>Atelier OLDA — Vente directe complète</title>
 <style>
 :root{
-  --green:#142e54; --green-dark:#142e54; --bg:#f3f4f5; --card:#fff;
-  --border:#d9d9d9; --text:#1f1f1f; --muted:#6b6b6b; --danger:#c62828;
+  --vd-encre:#142e54; --vd-encre-fonce:#142e54; --vd-fond:#f3f4f5; --vd-carte:#fff;
+  --vd-trait:#d9d9d9; --vd-texte:#1f1f1f; --vd-gris:#6b6b6b; --vd-rouge:#c62828;
 }
 *{box-sizing:border-box}
-body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0}
+body{font-family:Arial,sans-serif;background:var(--vd-fond);color:var(--vd-texte);margin:0}
 .container{max-width:1180px;margin:24px auto;padding:0 18px 40px}
 .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 .step{padding:11px;text-align:center;background:#e5e5e5;border-radius:8px;font-weight:700}
-.step.active{background:var(--green);color:#fff}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.step.active{background:var(--vd-encre);color:#fff}
+.card{background:var(--vd-carte);border:1px solid var(--vd-trait);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
 h2{margin-top:0;font-size:20px}
 h3{margin-top:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -36,17 +36,17 @@ h3{margin-top:0}
 label{display:block;font-weight:700;margin-bottom:6px}
 input,select,textarea{width:100%;padding:11px;border:1px solid #bdbdbd;border-radius:8px;font-size:16px;background:#fff}
 textarea{min-height:110px;resize:vertical}
-input.invalid,select.invalid,textarea.invalid{border:2px solid var(--danger);background:#fff7f7}
-.help{font-size:12px;color:var(--muted);margin-top:5px}
+input.invalid,select.invalid,textarea.invalid{border:2px solid var(--vd-rouge);background:#fff7f7}
+.help{font-size:12px;color:var(--vd-gris);margin-top:5px}
 button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}
-.primary{background:var(--green);color:#fff}
-.primary:hover{background:var(--green-dark)}
+.primary{background:var(--vd-encre);color:#fff}
+.primary:hover{background:var(--vd-encre-fonce)}
 .secondary{background:#ececec;color:#111}
 .danger{background:#fff0f0;color:#9d0000;border:1px solid #e6bcbc}
 .whatsapp{background:#25D366;color:#fff}
 .full{width:100%}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
-.product-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;background:#fafafa}
+.product-card{border:1px solid var(--vd-trait);border-radius:10px;padding:14px;margin-top:10px;background:#fafafa}
 .product-top{display:flex;justify-content:space-between;gap:12px}
 .product-title{font-weight:700}
 .product-description{white-space:pre-wrap;color:#444;margin-top:8px}
@@ -82,15 +82,15 @@ button{border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:7
 
 .client-search-wrap{position:relative}
 .client-results{margin-top:10px;display:grid;gap:10px}
-.client-result{border:1px solid var(--border);border-radius:10px;padding:14px;background:#fafafa;display:flex;justify-content:space-between;gap:14px;align-items:center}
+.client-result{border:1px solid var(--vd-trait);border-radius:10px;padding:14px;background:#fafafa;display:flex;justify-content:space-between;gap:14px;align-items:center}
 .client-result-main{min-width:0}
 .client-result-name{font-weight:700;margin-bottom:4px}
-.client-result-meta{font-size:13px;color:var(--muted);line-height:1.4}
-.client-selected{border:2px solid var(--green);background:#f4f6fa}
+.client-result-meta{font-size:13px;color:var(--vd-gris);line-height:1.4}
+.client-selected{border:2px solid var(--vd-encre);background:#f4f6fa}
 .client-selected .badge{margin-bottom:8px}
 .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.choice-card{border:2px solid var(--border);border-radius:10px;padding:16px;background:#fff;cursor:pointer;text-align:left}
-.choice-card.active{border-color:var(--green);background:#f4f6fa}
+.choice-card{border:2px solid var(--vd-trait);border-radius:10px;padding:16px;background:#fff;cursor:pointer;text-align:left}
+.choice-card.active{border-color:var(--vd-encre);background:#f4f6fa}
 .notice{padding:12px 14px;border-radius:10px;background:#fff7e8;border:1px solid #efd29b;margin:12px 0}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
 .modal{width:min(520px,100%);background:#fff;border-radius:12px;padding:22px;box-shadow:0 12px 35px rgba(0,0,0,.25)}

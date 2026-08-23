@@ -257,8 +257,12 @@ tailles.forEach((t) => assert.ok(AUTORISEES.includes(t),
 // plus dériver de son côté.
 const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:var\(--([\w-]+)\);--recap-grand:var\(--([\w-]+)\);/);
 assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise, et viennent de l’échelle');
+// L'échelle vit dans charte.css depuis le 22/08 : c'est le même fichier pour
+// le planning et pour les deux écrans du comptoir.
+const CHARTE = fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8');
+assert.ok(/<link[^>]+charte\.css/.test(DEVIS), 'l’écran charge bien la charte de l’application');
 const echelle = {};
-for (const m of DEVIS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
+for (const m of CHARTE.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
   m[1].split(';').forEach((d) => {
     const i = d.indexOf(':');
     if (i > 0 && d.trim().startsWith('--')) echelle[d.slice(0, i).trim()] = d.slice(i + 1).trim();

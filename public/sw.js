@@ -39,6 +39,9 @@ const CACHE = 'olda-coquille-v3';
 const COQUILLE = [
   '/',
   '/index.html',
+  // Les jetons de la charte : sans eux, hors ligne, l'application s'ouvre sans
+  // une seule couleur — tout est en var() non résolue.
+  '/charte.css',
   '/styles.css',
   '/clients.css',
   '/projet.css',

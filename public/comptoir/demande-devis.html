@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- LA CHARTE DE L'APPLICATION, le même fichier que le planning : couleurs,
+     échelle de texte, formes, thème sombre. Cet écran vivait sur sa propre
+     palette — bleu marine #142e54 pour l'action, bleu vif #3064e8 au focus —
+     à côté de la charte arrêtée par la direction le 29/07. Il n'a plus de
+     couleurs à lui : il parle le vocabulaire de la maison.
+     Servi par nous, comme tout le reste : rien ne vient d'un autre domaine. -->
+<link rel="stylesheet" href="../charte.css">
 <style>
 /* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
    de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
@@ -53,52 +60,28 @@
    lisent les mêmes variables. Le TICKET IMPRIMÉ, lui, garde les siennes : il
    compose en Courier sur du 80 mm, c'est un document, pas de l'écran.
    ========================================================================== */
-:root{
-  --taille-note:13px;
-  --taille-texte:15px;
-  --taille-titre:19px;
-  --taille-grand:28px;
-
-  --graisse-texte:400;
-  --graisse-note:600;
-  --graisse-forte:800;
-
-  --ligne-titre:1.2;
-  --ligne-texte:1.45;
-  /* Les champs et les boutons : en RAPPORT et non en « normal », sinon Chrome
-     ne calcule pas la boite d'un div comme celle d'un champ. */
-  --ligne-champ:1.375;
-
-  --arrondi-champ:10px;
-  --arrondi-bloc:14px;
-  --arrondi-carte:16px;
-
-  --champ-y:13px;
-  --champ-x:14px;
-}
 body{font-size:var(--taille-texte);line-height:var(--ligne-texte)}
 /* Le gras du navigateur vaut 700 : une quatrième graisse qui entrait par la
    porte de derrière, sur chaque <b> et chaque <strong> de la page. */
 b,strong{font-weight:var(--graisse-forte)}
 </style>
 <style>
-:root{--green:#142e54;--green-dark:#142e54;--valide:#1d6f43;--green-soft:#eef2f7;--orange:#c46a00;--orange-soft:#fff6e8;--red:#bd2424;--red-soft:#fff0f0;--bg:#f3f4f5;--card:#fff;--border:#d8dde2;--text:#202428;--muted:#6d747b}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text)}.container{max-width:1260px;margin:22px auto;padding:0 18px 55px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}.sidebar{position:sticky;top:16px}.stepper{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}.step{flex:1 1 0;min-width:0;background:#e3e6e8;border-radius:9px;padding:10px 7px;text-align:center;font-size:var(--taille-note);font-weight:var(--graisse-forte);color:#626970}.step.active{background:var(--green);color:#fff}.step.done{background:var(--valide);color:#fff}.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:17px;box-shadow:0 2px 8px rgba(0,0,0,.05)}.hidden{display:none!important}h2{margin:0 0 16px;font-size:var(--taille-titre);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}h3{margin:18px 0 12px;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}.stage-head{display:flex;justify-content:flex-end;gap:12px;align-items:center}.ref{background:#111;color:#fff;padding:8px 11px;border-radius:8px;font-weight:var(--graisse-forte);white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.field{margin-bottom:14px}label{display:block;font-weight:var(--graisse-forte);font-size:var(--taille-note);margin-bottom:7px}input,select,textarea{width:100%;border:1px solid #bcc2c8;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);background:#fff}textarea{min-height:95px;resize:vertical}input:focus,select:focus,textarea:focus{outline:3px solid rgba(20,46,84,.13);border-color:var(--green)}.invalid{border:2px solid var(--red)!important;background:var(--red-soft)!important}.error{color:var(--red);font-size:var(--taille-note);font-weight:var(--graisse-forte);margin-top:5px}.help{color:var(--muted);font-size:var(--taille-note);line-height:var(--ligne-texte);margin-top:5px}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) 15px;font-weight:var(--graisse-forte);font-size:var(--taille-texte);cursor:pointer}button.primary{background:var(--green);color:#fff}button.primary:hover{background:var(--green-dark)}button.secondary{background:#edf0f2;color:#222}button.danger{background:#ffe6e6;color:var(--red)}button.whatsapp{background:#25D366;color:#083118}button.full{width:100%}.notice{background:#f7f8f9;border:1px dashed #bfc5ca;border-radius:var(--arrondi-bloc);padding:14px}.notice.orange{background:var(--orange-soft);border-color:#e7bb7e}.notice.green{background:var(--green-soft);border-color:#87c6a3}.need-card,.result,.quote-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:var(--taille-note);font-weight:var(--graisse-forte);background:#eceff1}.badge.green{background:#e2e8f0;color:var(--green-dark)}.badge.orange{background:#ffe8c6;color:#8a4b00}.summary-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #eee}.summary-row.total{font-size:var(--taille-texte);font-weight:var(--graisse-forte);border-bottom:0}.sidebar .status{font-weight:var(--graisse-forte);color:var(--orange)}.choice{background:#f3f4f5;border:2px solid transparent;text-align:left}.choice.active{border-color:var(--green);background:var(--green-soft)}.selected-client{border:2px solid #2e8b57;background:var(--green-soft)}.pill-wrap{display:flex;gap:8px;flex-wrap:wrap}.pill{background:#edf0f2;border-radius:999px;padding:7px 10px;font-size:var(--taille-note);font-weight:var(--graisse-forte)}@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;order:-1}.stepper .step{flex-basis:calc(20% - 5.6px)}}@media(max-width:700px){.grid,.grid-3{grid-template-columns:1fr}.stepper .step{flex-basis:calc(50% - 3.5px)}}@media print{body{background:#fff}.stepper,.sidebar,.no-print,.card:not(#finalCard){display:none!important}#step7,#finalCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:var(--font);color:var(--text-1)}.container{max-width:1260px;margin:var(--pas-4) auto;padding:0 var(--pas-4) 55px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--pas-4);align-items:start}.sidebar{position:sticky;top:16px}.stepper{display:flex;flex-wrap:wrap;gap:var(--pas-2);margin-bottom:var(--pas-4)}.step{flex:1 1 0;min-width:0;background:var(--border-soft);border-radius:9px;padding:10px 7px;text-align:center;font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--text-2)}.step.active{background:var(--primary);color:var(--on-primary)}.step.done{background:var(--success);color:var(--on-primary)}.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}.hidden{display:none!important}h2{margin:0 0 var(--pas-3);font-size:var(--taille-titre);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}h3{margin:var(--pas-4) 0 var(--pas-2);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}.stage-head{display:flex;justify-content:flex-end;gap:12px;align-items:center}.ref{background:var(--primary);color:var(--on-primary);padding:8px 11px;border-radius:8px;font-weight:var(--graisse-forte);white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);align-items:end}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end}.field{margin-bottom:var(--pas-3)}label{display:block;font-weight:var(--graisse-forte);font-size:var(--taille-note);margin-bottom:7px}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);background:var(--surface)}textarea{min-height:95px;resize:vertical}input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.13);border-color:var(--primary)}.invalid{border:2px solid var(--danger)!important;background:var(--danger-bg)!important}.error{color:var(--danger);font-size:var(--taille-note);font-weight:var(--graisse-forte);margin-top:5px}.help{color:var(--text-2);font-size:var(--taille-note);line-height:var(--ligne-texte);margin-top:5px}.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap;align-items:center}button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) 15px;font-weight:var(--graisse-forte);font-size:var(--taille-texte);cursor:pointer}button.primary{background:var(--primary);color:var(--on-primary)}button.primary:hover{background:var(--primary-hover)}button.secondary{background:var(--border-soft);color:var(--text-1)}button.danger{background:var(--danger-bg);color:var(--danger)}button.whatsapp{background:var(--primary);color:var(--on-primary)}button.full{width:100%}.notice{background:var(--zone-bg);border:1px dashed var(--border);border-radius:var(--arrondi-bloc);padding:14px}.notice.orange{background:var(--warning-bg);border-color:var(--warning-line)}.notice.green{background:var(--primary-soft);border-color:var(--success-line)}.need-card,.result,.quote-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:var(--taille-note);font-weight:var(--graisse-forte);background:var(--border-soft)}.badge.green{background:var(--primary-soft-hover);color:var(--primary-hover)}.badge.orange{background:var(--warning-bg);color:var(--warning)}.summary-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border-soft)}.summary-row.total{font-size:var(--taille-texte);font-weight:var(--graisse-forte);border-bottom:0}.sidebar .status{font-weight:var(--graisse-forte);color:var(--warning)}.choice{background:var(--bg);border:2px solid transparent;text-align:left}.choice.active{border-color:var(--primary);background:var(--primary-soft)}.pill-wrap{display:flex;gap:8px;flex-wrap:wrap}.pill{background:var(--border-soft);border-radius:999px;padding:7px 10px;font-size:var(--taille-note);font-weight:var(--graisse-forte)}@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;order:-1}.stepper .step{flex-basis:calc(20% - 5.6px)}}@media(max-width:700px){.grid,.grid-3{grid-template-columns:1fr}.stepper .step{flex-basis:calc(50% - 3.5px)}}@media print{body{background:var(--surface)}.stepper,.sidebar,.no-print,.card:not(#finalCard){display:none!important}#step7,#finalCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}}
 
-.priority-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:8px}
-.priority-card{border:1px solid #d9dee7;background:#fff;border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;transition:.18s ease;display:flex;flex-direction:column;gap:6px;min-height:125px}
-.priority-card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.08)}
-.priority-card.active{border:2px solid #111827;background:#f7f8fa}
+.priority-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);margin-top:var(--pas-2)}
+.priority-card{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;transition:.18s ease;display:flex;flex-direction:column;gap:6px;min-height:125px}
+.priority-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-2)}
+.priority-card.active{border:2px solid var(--primary);background:var(--bg)}
 /* Les deux familles de besoin. Cible tactile pleine (76 px) : c'est le
    premier geste de l'étape, il se fait au doigt sur la tablette du
    comptoir. Le liseré passe de 1 à 2 px quand la tuile est choisie — le
    rembourrage rend le pixel pour que la rangée ne bouge pas sous le doigt. */
-.besoin-type{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:4px 0 20px}
-.besoin-tuile{display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1px solid #d9dee7;background:#fff;border-radius:var(--arrondi-bloc);text-align:left;cursor:pointer;transition:.18s ease;font:inherit;color:var(--text)}
-.besoin-tuile:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.08)}
-.besoin-tuile.is-on{border:2px solid #111827;background:#f7f8fa;padding:13px 15px}
-.besoin-ic{flex-shrink:0;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:#eef2f7;color:var(--green)}
-.besoin-tuile.is-on .besoin-ic{background:var(--green);color:#fff}
+.besoin-type{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);margin:0 0 var(--pas-4)}
+.besoin-tuile{display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);text-align:left;cursor:pointer;transition:.18s ease;font:inherit;color:var(--text-1)}
+.besoin-tuile:hover{transform:translateY(-1px);box-shadow:var(--shadow-2)}
+.besoin-tuile.is-on{border:2px solid var(--primary);background:var(--bg);padding:13px 15px}
+.besoin-ic{flex-shrink:0;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary)}
+.besoin-tuile.is-on .besoin-ic{background:var(--primary);color:var(--on-primary)}
 .besoin-ic svg{width:24px;height:24px;display:block}
 .besoin-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
 .besoin-nom{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
@@ -113,84 +96,70 @@ b,strong{font-weight:var(--graisse-forte)}
    rien d'autre à toucher.
    La saisie manuelle reste EN HAUT : le catalogue ne couvre pas tout, et rien
    de ce qui se faisait avant ne doit devenir plus long à faire. */
-.cat-ligne{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:12px;align-items:end}
+.cat-ligne{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:var(--pas-3);align-items:end}
 .cat-ligne .field{margin-bottom:0;min-width:0}
 .cat-ligne button{white-space:nowrap}
 /* Le menu des produits : la FAMILLE d'abord, en gras et à l'encre ; le
    produit dessous, en écriture normale. Chrome rend l'intitulé d'un
    `<optgroup>` en gris italique — au comptoir, à bout de bras, ça ne se lit
    pas. Le fond gris clair de la famille sépare les blocs sans trait. */
-#catProduit optgroup{font-weight:var(--graisse-forte);font-style:normal;font-size:var(--taille-texte);color:var(--text);background:#e9edf1}
-#catProduit option{font-weight:var(--graisse-texte);font-style:normal;font-size:var(--taille-texte);color:var(--text);background:#fff}
+#catProduit optgroup{font-weight:var(--graisse-forte);font-style:normal;font-size:var(--taille-texte);color:var(--text-1);background:var(--border-soft)}
+#catProduit option{font-weight:var(--graisse-texte);font-style:normal;font-size:var(--taille-texte);color:var(--text-1);background:var(--surface)}
 @media(max-width:700px){.cat-ligne{grid-template-columns:1fr}.cat-ligne button{width:100%}}
 /* LA DEMANDE — une LIGNE par article, pas une carte. Un devis de dix articles
    tenait sur trois écrans : la vendeuse ne voyait plus ce qu'elle venait
    d'ajouter. La quantité d'abord (c'est elle qu'on relit), le nom, puis le
    détail en petit. Les deux boutons gardent leur cible de 44 px. */
-.need-ligne{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:#fff}
-.need-qte{flex:0 0 auto;min-width:42px;padding:6px 9px;border-radius:var(--arrondi-champ);background:#eceff1;font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:center}
+.need-ligne{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--pas-2);align-items:center;padding:var(--pas-2) var(--pas-3);border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:var(--surface)}
+.need-qte{flex:0 0 auto;min-width:42px;padding:6px 9px;border-radius:var(--arrondi-champ);background:var(--border-soft);font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:center}
 .need-txt{min-width:0}
 .need-nom{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
-.need-meta{font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--muted);line-height:var(--ligne-texte);margin-top:2px}
+.need-meta{font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--text-2);line-height:var(--ligne-texte);margin-top:2px}
 .need-actions{display:flex;gap:6px}
 .need-actions button{min-height:44px;padding:0 12px;font-size:var(--taille-note)}
-.need-perso{grid-column:1/-1;min-height:44px;margin-top:2px;border:1px solid #dde2e7;border-radius:var(--arrondi-champ);padding:9px 11px;font-size:var(--taille-texte);background:#fbfcfd}
-.need-perso:focus{background:#fff}
+.need-perso{grid-column:1/-1;min-height:44px;margin-top:2px;border:1px solid var(--border-soft);border-radius:var(--arrondi-champ);padding:9px 11px;font-size:var(--taille-texte);background:var(--zone-bg)}
+.need-perso:focus{background:var(--surface)}
 @media(max-width:560px){.need-ligne{grid-template-columns:auto minmax(0,1fr)}.need-actions{grid-column:1/-1}.need-actions button{flex:1 1 0}}
 .priority-stars{font-size:var(--taille-titre);line-height:1}
 .priority-card strong{font-size:var(--taille-texte)}
-.priority-card small{font-size:var(--taille-note);line-height:var(--ligne-texte);color:#667085}
+.priority-card small{font-size:var(--taille-note);line-height:var(--ligne-texte);color:var(--text-2)}
 @media(max-width:760px){.priority-grid{grid-template-columns:1fr}}
 
 
-.priority-field.priority-error{border:2px solid #dc2626;border-radius:var(--arrondi-bloc);padding:14px;background:#fff7f7}
-.priority-field.priority-error>label{color:#dc2626}
-.priority-field.priority-error .priority-card{border-color:#f0a3a3}
-.field-error{margin-top:10px;color:#dc2626;font-size:var(--taille-note);font-weight:var(--graisse-forte)}
+.priority-field.priority-error{border:2px solid var(--danger);border-radius:var(--arrondi-bloc);padding:14px;background:var(--danger-bg)}
+.priority-field.priority-error>label{color:var(--danger)}
+.priority-field.priority-error .priority-card{border-color:var(--danger-line)}
+.field-error{margin-top:10px;color:var(--danger);font-size:var(--taille-note);font-weight:var(--graisse-forte)}
 .field-error.hidden{display:none}
 
 
-.client-quick-list{display:grid;gap:10px;max-height:360px;overflow:auto;margin-top:10px}
-.client-item{border:1px solid #d9dee7;background:#fff;border-radius:var(--arrondi-bloc);padding:13px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:.15s ease}
-.client-item:hover{border-color:#111827;transform:translateY(-1px)}
-.client-item.active{border:2px solid #111827;background:#f7f8fa}
+.client-quick-list{display:grid;gap:var(--pas-2);max-height:360px;overflow:auto;margin-top:var(--pas-2)}
+.client-item{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:13px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:.15s ease}
+.client-item:hover{border-color:var(--primary);transform:translateY(-1px)}
+.client-item.active{border:2px solid var(--primary);background:var(--bg)}
 .client-main{display:flex;flex-direction:column;gap:3px}
 .client-main strong{font-size:var(--taille-texte)}
-.client-meta{font-size:var(--taille-note);color:#667085}
-.client-type{font-size:var(--taille-note);font-weight:var(--graisse-note);padding:5px 8px;border-radius:999px;background:#eef2f6;white-space:nowrap}
+.client-meta{font-size:var(--taille-note);color:var(--text-2)}
+.client-type{font-size:var(--taille-note);font-weight:var(--graisse-note);padding:5px 8px;border-radius:999px;background:var(--primary-soft);white-space:nowrap}
 
 
-.client-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px}
-.client-action-card{border:1px solid #d9dee7;background:#fff;border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:105px;transition:.15s ease}
-.client-action-card:hover{border-color:#111827;transform:translateY(-1px)}
-.client-action-card.active{border:2px solid #111827;background:#f7f8fa}
+.client-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);margin-top:var(--pas-2)}
+.client-action-card{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:105px;transition:.15s ease}
+.client-action-card:hover{border-color:var(--primary);transform:translateY(-1px)}
+.client-action-card.active{border:2px solid var(--primary);background:var(--bg)}
 .client-action-card strong{font-size:var(--taille-texte)}
-.client-action-card small{font-size:var(--taille-note);line-height:var(--ligne-texte);color:#667085}
-#clientNextActionBlock.action-error{border:2px solid #dc2626;border-radius:var(--arrondi-bloc);padding:14px;background:#fff7f7}
-#clientNextActionBlock.action-error>label{color:#dc2626}
+.client-action-card small{font-size:var(--taille-note);line-height:var(--ligne-texte);color:var(--text-2)}
+#clientNextActionBlock.action-error{border:2px solid var(--danger);border-radius:var(--arrondi-bloc);padding:14px;background:var(--danger-bg)}
+#clientNextActionBlock.action-error>label{color:var(--danger)}
 @media(max-width:760px){.client-action-grid{grid-template-columns:1fr}}
 
 
-.step-validation-error{
-  border:2px solid #dc2626 !important;
-  background:#fff7f7 !important;
-  border-radius:var(--arrondi-bloc);
-  padding:12px;
+.step-validation-error{border:2px solid var(--danger) !important;background:var(--danger-bg) !important;border-radius:var(--arrondi-bloc);padding:12px;
 }
 .step-validation-error label,
-.step-validation-error .field-title{
-  color:#dc2626 !important;
+.step-validation-error .field-title{color:var(--danger) !important;
 }
-.validation-summary{
-  border:2px solid #dc2626;
-  background:#fff7f7;
-  color:#991b1b;
-  border-radius:12px;
-  padding:12px 14px;
-  margin:12px 0;
-  font-size:var(--taille-texte);
-  font-weight:var(--graisse-note);
-  line-height:var(--ligne-texte);
+.validation-summary{border:2px solid var(--danger);background:var(--danger-bg);color:var(--danger);border-radius:12px;padding:12px 14px;margin:12px 0;font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte);
 }
 
 
@@ -203,9 +172,9 @@ b,strong{font-weight:var(--graisse-forte)}
 
 
 .download-status{margin-top:14px;border-radius:var(--arrondi-bloc);padding:13px 15px;font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
-.download-status.error{display:block!important;border:2px solid #dc2626;background:#fff1f2;color:#991b1b}
-.download-status.success{display:block!important;border:1px solid #16a34a;background:#f0fdf4;color:#142e54}
-.download-blocked{border:2px solid #dc2626!important;background:#fff1f2!important;color:#991b1b!important}
+.download-status.error{display:block!important;border:2px solid var(--danger);background:var(--danger-bg);color:var(--danger)}
+.download-status.success{display:block!important;border:1px solid var(--success-line);background:var(--success-bg);color:var(--success)}
+.download-blocked{border:2px solid var(--danger)!important;background:var(--danger-bg)!important;color:var(--danger)!important}
 .ticket-field-error{border:2px solid #dc2626!important;background:#fff1f2!important;border-radius:10px;padding:8px!important}
 
 
@@ -223,86 +192,97 @@ body{font-family:'Manrope',Arial,sans-serif!important}
    `inherit` et non un nom en dur : dans le ticket de l'atelier, qui compose en
    Courier, les champs doivent rester en Courier. */
 input,select,textarea,button{font-family:inherit!important}
-header p{color:#c3cede!important}
-.card{border-radius:var(--arrondi-carte)!important;border-color:#e4e8ee!important;box-shadow:0 4px 18px rgba(16,24,40,.06)!important}
+header p{color:var(--text-3)!important}
+.card{border-radius:var(--arrondi-carte)!important}
 button{border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
 .step{border-radius:999px!important}
-.step.active{background:#1c3d6e!important;box-shadow:0 6px 16px rgba(20,46,84,.28)}
+.step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
 .client-item,.priority-card,.client-action-card{border-radius:var(--arrondi-bloc)!important}
 </style>
 
 <style>
-.primary{background:#1c3d6e}
-.primary:hover{background:#142e54}
+.primary{background:var(--primary)}
+.primary:hover{background:var(--primary)}
 </style>
 <style>
-/* ---- Esprit SumUp : épuré, pilules, contrastes nets ---- */
-body{background:#f7f8fa!important}
+/* ---- LES COMMANDES, RECETTE DE LA CHARTE ----------------------------------
+   La même que le planning (.btn-primary / .help-btn / .ld-ctl) : UN SEUL
+   accent dans toute l'application, l'encre. Le bouton plein prend l'accent,
+   le bouton bordé n'est qu'un trait, et la couleur ne revient que pour dire
+   un état (rouge = ce qui détruit).
+   Les pilules de l'ancien habillage sont parties avec la palette : la charte
+   arrondit à « --arrondi-champ », du champ au bouton. */
+body{background:var(--bg)!important}
 button{font-weight:var(--graisse-forte)}
-.primary,.secondary,.danger,.whatsapp{border-radius:999px!important;padding:var(--champ-y) 22px!important}
-.primary{background:#1c3d6e!important;box-shadow:0 2px 10px rgba(20,46,84,.18)}
-.primary:hover{background:#142e54!important;box-shadow:0 4px 16px rgba(20,46,84,.25)}
-.secondary{background:#fff!important;border:1.5px solid #d7dce3!important;color:#142e54!important}
-/* Un bouton plein et un bouton bordé sur la même rangée : le trait du second
-   ajoutait 3 px de haut, et « Ajouter ce besoin » finissait 3 px plus court
-   que « Fermer » juste à côté. Le plein porte le même trait, en transparent —
-   même boîte, dessin inchangé (le fond passe sous le trait). */
-.primary,.danger,.whatsapp{border:1.5px solid transparent!important}
+/* Le bouton plein et le bouton bordé portent le MÊME trait de 1,5 px, celui
+   du plein transparent : sans ça le second était 3 px plus haut, et surtout
+   ni l'un ni l'autre ne faisait la hauteur du champ d'à côté. */
+.primary,.secondary,.danger,.whatsapp{padding:var(--champ-y) 22px!important;
+  border:1.5px solid transparent!important;
+  transition:background var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease),
+             border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform .08s var(--ease)}
+.primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+.primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
+.secondary{background:transparent!important;border-color:var(--border)!important;color:var(--text-2)!important}
+.secondary:hover{background:var(--surface-hover)!important;border-color:var(--border-strong)!important;color:var(--text-1)!important}
+.danger{background:var(--danger-bg)!important;border-color:var(--danger-line)!important;color:var(--danger)!important}
+.danger:hover{background:var(--danger-line)!important}
+button:active{transform:scale(.98)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
 /* Un émoji dans un libellé (« 💾 Enregistrer », « 📅 Déjà au planning ») tire sa
    hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-champ)!important}
-.secondary:hover{border-color:#142e54!important}
-.card{border:1px solid #eef0f3!important;box-shadow:0 1px 3px rgba(20,46,84,.05)!important;padding:24px!important}
-input,select,textarea{border:1.5px solid #d7dce3!important;padding:var(--champ-y) var(--champ-x)!important;line-height:var(--ligne-champ)!important}
-input:focus,select:focus,textarea:focus{outline:3px solid rgba(48,100,232,.15)!important;border-color:#3064e8!important}
+.card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;padding:var(--champ-y) var(--champ-x)!important;line-height:var(--ligne-champ)!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 </style>
 <style>
 /* ---- Chiffrage textile ---- */
-.tx-side-marge b{color:#1d6f43}
-.tx-ligne-chiffrage{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px solid #eef0f3}
+.tx-side-marge b{color:var(--success)}
+.tx-ligne-chiffrage{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-soft)}
 .tx-ligne-tete{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .tx-ligne-tete .actions{margin-left:auto}
 .tx-ligne-tete button{padding:8px 14px!important}
 #sideTextileCard .summary-row b{font-variant-numeric:tabular-nums}
 /* ---- Négociation : un prix demandé, des sorties classées ---- */
-.neg-panneau{margin-top:14px;padding-top:14px;border-top:1px solid #e4e8ee}
-.neg-saisie{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:16px;align-items:end;margin-bottom:14px}
+.neg-panneau{margin-top:14px;padding-top:14px;border-top:1px solid var(--border-soft)}
+.neg-saisie{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:var(--pas-3);align-items:end;margin-bottom:var(--pas-3)}
 .neg-saisie .field{margin-bottom:0}
 .neg-saisie>div:not(.field){font-size:var(--taille-note)}
-.neg-saisie>div:not(.field) span{color:#6d747b;display:block}
+.neg-saisie>div:not(.field) span{color:var(--text-2);display:block}
 .neg-saisie>div:not(.field) b{font-size:var(--taille-texte);font-variant-numeric:tabular-nums}
 
-.neg-sol{border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc);padding:14px 16px;margin-bottom:10px;background:#fff}
-.neg-sol.is-best{border:2px solid #1c3d6e;background:#f7f9fc;padding:13px 15px}
+.neg-sol{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-bottom:var(--pas-2);background:var(--surface)}
+.neg-sol.is-best{border:2px solid var(--primary);background:var(--zone-bg);padding:calc(var(--pas-3) - 1px)}
 .neg-sol.is-bad{opacity:.6}
 /* « MA SOLUTION » : la ligne que la vendeuse remplit elle-même. Trait
    pointillé — c'est une saisie, pas une proposition calculée. */
 .neg-mienne{border-style:dashed}
-.neg-mienne-saisie{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.neg-mienne-saisie{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end;margin-top:var(--pas-3)}
 .neg-mienne-saisie .field{margin-bottom:0}
-.neg-mienne-saisie label{color:#6d747b}
-.neg-rang{background:#eef2f7;color:#142e54}
+.neg-mienne-saisie label{color:var(--text-2)}
+.neg-rang{background:var(--primary-soft);color:var(--primary)}
 @media(max-width:700px){.neg-mienne-saisie{grid-template-columns:1fr}}
 .neg-sol-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .neg-sol-nom{font-weight:var(--graisse-forte);font-size:var(--taille-texte)}
-.neg-best-badge{background:#1c3d6e;color:#fff;border-radius:999px;padding:4px 12px;font-size:var(--taille-note);font-weight:var(--graisse-forte);white-space:nowrap}
+.neg-best-badge{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:4px 12px;font-size:var(--taille-note);font-weight:var(--graisse-forte);white-space:nowrap}
 .neg-sol-metrics{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;font-size:var(--taille-note)}
-.neg-sol-metrics span{color:#6d747b}
+.neg-sol-metrics span{color:var(--text-2)}
 .neg-sol-metrics b{display:block;font-size:var(--taille-texte);font-variant-numeric:tabular-nums}
 .neg-sol-foot{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .neg-sol-foot .help{margin-top:0}
 .neg-sol-foot button{padding:9px 20px!important}
 @media(max-width:820px){.neg-saisie{grid-template-columns:1fr}}
-.tx-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.tx-sizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.tx-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);align-items:end}
+.tx-sizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--pas-3);align-items:end}
 .tx-sizes .field{margin-bottom:0}
-.tx-sizes label{color:#6d747b}
-.tx-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.tx-adjust{border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc);padding:12px 14px;margin:14px 0}
+.tx-sizes label{color:var(--text-2)}
+.tx-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end}
+.tx-adjust{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0}
 .tx-adjust summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none}
 .tx-adjust[open]{padding-bottom:4px}
 /* LES RÉGLAGES DE L'ATELIER — coût DTF, coût horaire, arrondi, coefficient.
@@ -311,13 +291,12 @@ h2{letter-spacing:-.01em}
    article ». Repliés, ils ne sont plus qu'une ligne grise alignée à droite ;
    ouverts, ils redeviennent un panneau normal. Le contenu ne change pas. */
 .tx-reglages{border:0;padding:0;margin:16px 0 0;background:none;text-align:right}
-.tx-reglages>summary{display:inline-block;cursor:pointer;user-select:none;padding:4px 0;
-  font-size:var(--taille-note);font-weight:var(--graisse-note);color:#8b9199;list-style:none}
+.tx-reglages>summary{display:inline-block;cursor:pointer;user-select:none;padding:4px 0;font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--text-2);list-style:none}
 .tx-reglages>summary::-webkit-details-marker{display:none}
 .tx-reglages>summary::marker{content:''}
-.tx-reglages>summary:hover,.tx-reglages>summary:focus-visible{color:#111827;text-decoration:underline}
-.tx-reglages[open]{text-align:left;border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc);padding:12px 14px;background:#fff}
-.tx-reglages[open]>summary{font-weight:var(--graisse-forte);color:#111827;text-decoration:none}
+.tx-reglages>summary:hover,.tx-reglages>summary:focus-visible{color:var(--text-1);text-decoration:underline}
+.tx-reglages[open]{text-align:left;border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:12px 14px;background:var(--surface)}
+.tx-reglages[open]>summary{font-weight:var(--graisse-forte);color:var(--text-1);text-decoration:none}
 /* Le numéro de la ligne en cours de saisie : une bulle, pour qu'on voie d'un
    coup d'œil sur quel article on travaille. Sombre quand on en ajoute un,
    orange quand on en reprend un déjà posé — la couleur dit l'état. */
@@ -326,23 +305,22 @@ h2{letter-spacing:-.01em}
    production — et on ne voyait plus où commençait la ligne qu'on est en train
    d'écrire. Un cadre et un fond très légèrement retiré suffisent : la couleur
    reste celle de la charte, elle ne sert qu'à délimiter. */
-.article-bloc{border:1.5px solid #d7dce3;border-radius:var(--arrondi-bloc);padding:18px;margin:18px 0 0;background:#f8f9fb}
+.article-bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-4) 0 0;background:var(--zone-bg)}
 /* Les blocs blancs du dedans le restent : sur un fond retiré, un cadre
    transparent se confondrait avec lui. */
-.article-bloc .tx-adjust,.article-bloc .tx-preview{background:#fff}
+.article-bloc .tx-adjust,.article-bloc .tx-preview{background:var(--surface)}
 /* Le numéro de la ligne titre son bloc — il n'a plus besoin d'une pastille
    pour se faire voir. Il ne garde de la couleur que ce qui dit un ÉTAT :
    orange quand on reprend une ligne déjà posée. */
-.form-num{display:block;margin:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:#111827}
+.form-num{display:block;margin:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:var(--text-1)}
 /* Le numéro et CE QU'ON EST EN TRAIN D'ÉCRIRE sur la même ligne : la
    désignation ne tient pas dans le champ de la référence sans le remplir de
    points de suspension, et c'est ici qu'on la lit d'un coup d'œil. Elle
    s'efface dès qu'aucune référence n'est choisie — une désignation qui reste
    après coup ferait croire à un article encore en cours. */
 .form-tete{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 16px}
-.form-objet{min-width:0;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:#6d747b;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.form-num.is-edit{color:var(--orange)}
+.form-objet{min-width:0;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.form-num.is-edit{color:var(--warning)}
 /* ---- LE RÉCAPITULATIF DE L'ARTICLE ----------------------------------------
    Cinq bandes, dans l'ordre où on les lit avant d'ajouter : les quatre
    chiffres qu'on annonce, la marge située entre son seuil et sa cible, ce qui
@@ -360,8 +338,7 @@ h2{letter-spacing:-.01em}
 /* La FICHE ouverte à gauche reprend les mêmes blocs : les deux tailles y sont
    déclarées aussi, sinon `var(--recap-grand)` n'y vaut rien et les quatre
    chiffres y retombent à la taille du texte. */
-.tx-preview,.tx-barre,#detailArticle{--recap-texte:var(--taille-texte);--recap-grand:var(--taille-grand);
-  font-size:var(--recap-texte);line-height:var(--ligne-texte)}
+.tx-preview,.tx-barre,#detailArticle{--recap-texte:var(--taille-texte);--recap-grand:var(--taille-grand);font-size:var(--recap-texte);line-height:var(--ligne-texte)}
 /* Les seuls éléments qui décideraient d'une taille tout seuls : un titre, un
    résumé de bloc dépliable, un bouton. */
 .tx-tete-titre,.tx-decompo>summary,.tx-details>summary,.tx-barre button{font-size:inherit}
@@ -372,36 +349,35 @@ h2{letter-spacing:-.01em}
 #detailArticle .badge,#detailArticle .neg-sol-nom,#detailArticle .neg-sol-metrics,
 #detailArticle .neg-sol-metrics b,#detailArticle .neg-best-badge,
 #detailArticle .neg-saisie>div:not(.field),#detailArticle .neg-saisie b{font-size:inherit}
-.tx-preview{border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc);padding:20px 22px;margin:16px 0 0;background:#fff}
+.tx-preview{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--surface)}
 /* Quand le prix s'affiche, le cadre et la barre d'action ne font qu'une carte :
    le bas du récapitulatif se ferme sur la barre, pas sur du vide. */
-.tx-preview:not(.hidden){border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;padding-bottom:16px}
+.tx-preview:not(.hidden){border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
 .tx-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
 .tx-tete-titre{margin:0;font-weight:var(--graisse-forte)}
-.tx-tete-info{font-weight:var(--graisse-note);color:var(--muted)}
+.tx-tete-info{font-weight:var(--graisse-note);color:var(--text-2)}
 /* LES QUATRE CHIFFRES CLÉS — les deux premiers sont ceux qu'on dit au client.
    Chaque intitulé garde la hauteur de DEUX lignes : sans ça, « Temps de
    production » passe à la ligne et son chiffre descend seul, décroché des
    trois autres. */
-.tx-recap-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px 20px;margin-top:18px}
+.tx-recap-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--pas-3) var(--pas-4);margin-top:var(--pas-3)}
 .tx-recap-kpis>div{min-width:0}
-.tx-recap-kpis span{display:flex;align-items:flex-end;min-height:2.9em;font-weight:var(--graisse-note);color:var(--muted)}
-.tx-recap-kpis b{display:block;margin-top:2px;font-size:var(--recap-grand);font-weight:var(--graisse-forte);line-height:var(--ligne-titre);
-  color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.tx-recap-kpis .is-fort b{font-weight:var(--graisse-forte);color:#142e54}
+.tx-recap-kpis span{display:flex;align-items:flex-end;min-height:2.9em;font-weight:var(--graisse-note);color:var(--text-2)}
+.tx-recap-kpis b{display:block;margin-top:2px;font-size:var(--recap-grand);font-weight:var(--graisse-forte);line-height:var(--ligne-titre);color:var(--text-1);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tx-recap-kpis .is-fort b{font-weight:var(--graisse-forte);color:var(--primary)}
 /* LA MARGE, SITUÉE ENTRE SON SEUIL ET SA CIBLE — en CHIFFRES, sans barre : le
    patron a fait retirer le remplissage le 21/08, il ne disait rien que les
    trois nombres ne disent déjà. Ce sont ses seuils, et ils BAISSENT avec la
    quantité : 45 / 60 % à neuf pièces, 35 / 50 % à deux cents. */
-.tx-jauge{border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc);padding:15px 17px;margin-top:18px;background:#fbfcfd}
+.tx-jauge{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-3);background:var(--zone-bg)}
 .tx-jauge-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .tx-jauge-tete span{font-weight:var(--graisse-forte)}
 .tx-jauge-tete b{font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums}
 .tx-jauge-pied{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:9px}
-.tx-reperes{display:flex;gap:18px;font-weight:var(--graisse-note);color:var(--muted)}
-.tx-verdict{font-weight:var(--graisse-forte);color:var(--valide)}
-.tx-jauge.est-warn .tx-verdict{color:var(--orange)}
-.tx-jauge.est-bad .tx-verdict{color:var(--red)}
+.tx-reperes{display:flex;gap:18px;font-weight:var(--graisse-note);color:var(--text-2)}
+.tx-verdict{font-weight:var(--graisse-forte);color:var(--success)}
+.tx-jauge.est-warn .tx-verdict{color:var(--warning)}
+.tx-jauge.est-bad .tx-verdict{color:var(--danger)}
 /* CE QUI COMPOSE LE PRIX, en pastilles. Le détail du calcul se déplie d'un
    clic sur la rangée : il répond à « pourquoi ce prix ? », il n'a pas à être
    lu à chaque article. */
@@ -409,46 +385,42 @@ h2{letter-spacing:-.01em}
 .tx-decompo>summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;cursor:pointer;list-style:none}
 .tx-decompo>summary::-webkit-details-marker{display:none}
 .tx-decompo>summary::marker{content:''}
-.tx-chip{display:inline-flex;gap:8px;align-items:baseline;border:1px solid #dfe4ea;border-radius:999px;
-  padding:7px 15px;font-weight:var(--graisse-note);color:var(--muted);white-space:nowrap}
-.tx-chip b{font-weight:var(--graisse-forte);color:var(--text);font-variant-numeric:tabular-nums}
-.tx-lien{font-weight:var(--graisse-forte);color:#142e54;text-decoration:underline}
-.tx-decompo>summary:hover .tx-lien{color:#3064e8}
-.tx-calcul{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 20px;margin-top:15px;padding:15px 17px;
-  border:1px solid #eef0f3;border-radius:var(--arrondi-bloc);background:#fbfcfd}
-.tx-calcul span{color:var(--muted);font-weight:var(--graisse-note)}
+.tx-chip{display:inline-flex;gap:8px;align-items:baseline;border:1px solid var(--border);border-radius:999px;padding:7px 15px;font-weight:var(--graisse-note);color:var(--text-2);white-space:nowrap}
+.tx-chip b{font-weight:var(--graisse-forte);color:var(--text-1);font-variant-numeric:tabular-nums}
+.tx-lien{font-weight:var(--graisse-forte);color:var(--primary);text-decoration:underline}
+.tx-decompo>summary:hover .tx-lien{color:var(--primary)}
+.tx-calcul{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--pas-1) var(--pas-4);margin-top:var(--pas-3);padding:var(--pas-3);border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);background:var(--zone-bg)}
+.tx-calcul span{color:var(--text-2);font-weight:var(--graisse-note)}
 .tx-calcul b{font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums;text-align:right}
-.tx-calcul .is-somme{font-weight:var(--graisse-forte);color:var(--text)}
-.tx-calcul .is-trait{border-top:1px solid #e4e8ee;padding-top:9px;margin-top:2px}
+.tx-calcul .is-somme{font-weight:var(--graisse-forte);color:var(--text-1)}
+.tx-calcul .is-trait{border-top:1px solid var(--border-soft);padding-top:9px;margin-top:2px}
 /* CE QUI ENGAGE LA PRODUCTION ET QUE PERSONNE NE RELIT ENTRE LE COMPTOIR ET
    L'ATELIER. La couleur dit un état : ambre = à faire valider avant le devis. */
-.tx-alerte{display:flex;gap:11px;align-items:flex-start;margin-top:15px;padding:13px 16px;border-radius:var(--arrondi-bloc);
-  background:var(--orange-soft);color:#8a4b00;font-weight:var(--graisse-note)}
+.tx-alerte{display:flex;gap:11px;align-items:flex-start;margin-top:15px;padding:13px 16px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);color:var(--warning);font-weight:var(--graisse-note)}
 .tx-alerte::before{content:'';flex:none;width:8px;height:8px;margin-top:8px;border-radius:50%;background:currentColor}
 /* LA SAISIE, REPLIÉE. Elle ne sert qu'à relire avant d'ajouter : dépliée en
    permanence, elle poussait le bouton hors de l'écran. Son état SURVIT à la
    frappe — le bloc se réécrit à chaque touche, il ne doit pas se refermer
    sous les doigts. */
-.tx-details{margin-top:18px;padding-top:16px;border-top:1px solid #eef0f3}
+.tx-details{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)}
 .tx-details>summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none;list-style:none;display:flex;gap:9px;align-items:center}
 .tx-details>summary::-webkit-details-marker{display:none}
 .tx-details>summary::marker{content:''}
-.tx-details>summary::before{content:'▸';color:var(--muted)}
+.tx-details>summary::before{content:'▸';color:var(--text-2)}
 .tx-details[open]>summary::before{content:'▾'}
-.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:15px 20px;margin-top:16px}
+.tx-saisie{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:var(--pas-3) var(--pas-4);margin-top:var(--pas-3)}
 .tx-saisie>div{min-width:0}
-.tx-saisie span{display:block;font-weight:var(--graisse-note);color:var(--muted)}
+.tx-saisie span{display:block;font-weight:var(--graisse-note);color:var(--text-2)}
 .tx-saisie b{display:block;font-weight:var(--graisse-forte);margin-top:1px;overflow-wrap:anywhere}
 /* LA BARRE D'ACTION RESTE SOUS LA MAIN. Dix champs et un récapitulatif plus
    haut, le bouton finissait sous la ligne de flottaison : on ajoutait un
    article en remontant l'écran. Collée en bas, elle porte aussi CE QU'ON
    S'APPRÊTE À AJOUTER — le nom, le nombre de pièces, le total. */
-.tx-barre{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-  margin:0;padding:15px 22px;background:#fff;border:1px solid #e4e8ee;border-radius:var(--arrondi-bloc)}
-.tx-preview:not(.hidden)+.tx-barre{border-top:1px solid #eef0f3;border-top-left-radius:0;border-top-right-radius:0}
-.tx-barre-objet{flex:1 1 220px;min-width:0;font-weight:var(--graisse-note);color:var(--muted)}
-.tx-kbd{margin-left:10px;font-weight:var(--graisse-note);color:#8b9199;white-space:nowrap}
-.tx-barre .primary .tx-kbd{color:#c8d3e4}
+.tx-barre{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0;padding:var(--pas-3);background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc)}
+.tx-preview:not(.hidden)+.tx-barre{border-top:1px solid var(--border-soft);border-top-left-radius:0;border-top-right-radius:0}
+.tx-barre-objet{flex:1 1 220px;min-width:0;font-weight:var(--graisse-note);color:var(--text-2)}
+.tx-kbd{margin-left:10px;font-weight:var(--graisse-note);color:var(--text-2);white-space:nowrap}
+.tx-barre .primary .tx-kbd{color:var(--text-3)}
 @media(max-width:700px){.tx-barre{position:static}}
 @media(max-width:820px){.tx-sizes{grid-template-columns:repeat(3,minmax(0,1fr))}.tx-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.tx-controls{grid-template-columns:1fr}}
@@ -474,19 +446,19 @@ h2{letter-spacing:-.01em}
 /* L'aside porte déjà `position:sticky` : un deuxième collage ici ne servirait
    à rien. Tête et pied sont `flex:0 0 auto` — sans ça le pied RÉTRÉCIT quand la
    liste s'allonge et « Construire le projet » se fait rogner en silence. */
-.demande-panneau{display:flex;flex-direction:column;max-height:calc(100vh - 32px);background:#fff;border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:0 6px 20px rgba(17,24,39,.07);overflow:hidden}
-.demande-tete{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px;border-bottom:1px solid var(--border)}
+.demande-panneau{display:flex;flex-direction:column;max-height:calc(100vh - 32px);background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-2);overflow:hidden}
+.demande-tete{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:var(--pas-2);padding:var(--pas-3);border-bottom:1px solid var(--border)}
 .demande-tete h2{margin:0}
-.demande-corps{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 13px}
-.demande-vide{text-align:center;color:var(--muted);padding:26px 14px}
+.demande-corps{flex:1 1 auto;min-height:0;overflow-y:auto;padding:var(--pas-3)}
+.demande-vide{text-align:center;color:var(--text-2);padding:26px 14px}
 .demande-vide-ic{display:block;font-size:var(--taille-grand);margin-bottom:9px;opacity:.5}
-.demande-vide b{display:block;color:var(--text);font-size:var(--taille-texte);margin-bottom:5px}
+.demande-vide b{display:block;color:var(--text-1);font-size:var(--taille-texte);margin-bottom:5px}
 
 /* Une ligne = un article. Serrée, mais chaque zone garde sa place : la
    quantité à gauche, le prix aligné à droite, la personnalisation dessous. */
 .demande-corps .need-ligne{grid-template-columns:auto minmax(0,1fr) auto;gap:8px 10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .16s,box-shadow .16s,background .16s}
-.demande-corps .need-ligne:hover{border-color:#c3ccd6;box-shadow:0 2px 8px rgba(17,24,39,.06)}
-.demande-corps .need-ligne.is-ouvert{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,46,84,.09)}
+.demande-corps .need-ligne:hover{border-color:var(--border-strong);box-shadow:var(--shadow-1)}
+.demande-corps .need-ligne.is-ouvert{border-color:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.09)}
 .demande-corps .need-qte{min-width:38px;padding:6px 8px}
 /* CE QUI A ÉTÉ SAISI, sous le nom de l'article. La ligne portait « Textile ·
    Coconut Milk · Réf. K3008 · Production DTF » : deux mots sur quatre venaient
@@ -494,8 +466,8 @@ h2{letter-spacing:-.01em}
    la vendeuse venait de choisir — n'y apparaissaient pas. L'intitulé à gauche
    évite de confondre la couleur du vêtement et celle de l'encre. */
 .need-detail{grid-column:2/-1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;margin-top:3px}
-.need-detail-k{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--muted);white-space:nowrap}
-.need-detail-v{font-size:var(--taille-note);font-weight:var(--graisse-note);color:#3f4650;line-height:var(--ligne-texte);overflow-wrap:anywhere}
+.need-detail-k{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--text-2);white-space:nowrap}
+.need-detail-v{font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--text-2);line-height:var(--ligne-texte);overflow-wrap:anywhere}
 .demande-corps .need-perso{grid-column:1/-1;min-height:36px;margin-top:6px;padding:7px 11px!important}
 /* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait
    les tablettes, parties au rebut. Des boutons discrets, alignés à droite. */
@@ -504,7 +476,7 @@ h2{letter-spacing:-.01em}
    à toutes les pilules : sans `!important` ici, la ligne du panneau garde des
    boutons de pleine taille et chaque article coûte 45 px de hauteur. */
 .demande-corps .need-actions button{min-height:31px;padding:5px 8px!important;font-size:var(--taille-note);letter-spacing:-.01em}
-.demande-corps .need-perso:not(:focus):placeholder-shown{background:#fff;border-style:dashed;border-color:#e2e7ec}
+.demande-corps .need-perso:not(:focus):placeholder-shown{background:var(--surface);border-style:dashed;border-color:var(--border-soft)}
 
 /* Le prix tient sur la même rangée que le nom, aligné à droite : c'est la
    colonne que le client relit, elle ne doit pas se promener d'une ligne à
@@ -512,19 +484,19 @@ h2{letter-spacing:-.01em}
    « pas encore chiffré » et « gratuit » sont deux choses différentes. */
 .demande-prix{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .demande-prix b{display:block;font-size:var(--taille-texte);font-weight:var(--graisse-forte)}
-.demande-prix span{display:block;font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--muted);margin-top:1px}
-.demande-prix.a-chiffrer b{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.demande-prix span{display:block;font-size:var(--taille-note);font-weight:var(--graisse-note);color:var(--text-2);margin-top:1px}
+.demande-prix.a-chiffrer b{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--text-2);text-transform:uppercase;letter-spacing:.03em}
 
 
-.demande-pied{flex:0 0 auto;border-top:1px solid var(--border);background:#fafbfc;padding:11px 15px 13px}
+.demande-pied{flex:0 0 auto;border-top:1px solid var(--border);background:var(--zone-bg);padding:var(--pas-3)}
 .demande-total{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:var(--taille-note);padding:4px 0}
-.demande-total span{color:var(--muted);font-weight:var(--graisse-note)}
+.demande-total span{color:var(--text-2);font-weight:var(--graisse-note)}
 .demande-total b{font-variant-numeric:tabular-nums;font-weight:var(--graisse-forte)}
-.demande-total.is-fort{font-size:var(--taille-texte);padding:8px 0 4px;border-top:1px solid #e6e9ed;margin-top:5px}
-.demande-total.is-fort span{color:var(--text);font-weight:var(--graisse-forte)}
+.demande-total.is-fort{font-size:var(--taille-texte);padding:8px 0 4px;border-top:1px solid var(--border-soft);margin-top:5px}
+.demande-total.is-fort span{color:var(--text-1);font-weight:var(--graisse-forte)}
 .demande-total.is-fort b{font-weight:var(--graisse-forte)}
-.demande-chiffrage{border-top:1px solid #e6e9ed;margin-top:7px;padding-top:5px}
-.demande-atelier{margin-top:7px;border-top:1px dashed #d9dee4;padding-top:5px}
+.demande-chiffrage{border-top:1px solid var(--border-soft);margin-top:7px;padding-top:5px}
+.demande-atelier{margin-top:7px;border-top:1px dashed var(--border);padding-top:5px}
 .demande-atelier .demande-total{padding:3px 0}
 .demande-pied .full{margin-top:12px}
 .demande-reste{margin:9px 0 0;font-size:var(--taille-note)}
@@ -536,7 +508,7 @@ h2{letter-spacing:-.01em}
 /* Deux tailles ici aussi : la fiche porte les mêmes blocs que le
    récapitulatif, elle doit se lire pareil. */
 .detail-nom{font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
-.detail-meta{color:var(--muted);font-weight:var(--graisse-note);margin-top:3px}
+.detail-meta{color:var(--text-2);font-weight:var(--graisse-note);margin-top:3px}
 </style>
 <script src="textile-catalog.js"></script>
 </head>
@@ -618,7 +590,7 @@ h2{letter-spacing:-.01em}
   <input type="hidden" id="projectPriority" value="">
   <div class="field-error hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
 </div>
-<div class="grid"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:8px"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
+<div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
 <div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div><div class="actions"><button class="secondary" onclick="showStep(2)">← Retour</button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
@@ -888,9 +860,17 @@ h2{letter-spacing:-.01em}
       <button id="downloadPdfBtn" class="secondary" onclick="openRecapExport()">⬇️ Télécharger le ticket</button>
       <button class="whatsapp" onclick="sendWhatsApp()">💬 Envoyer sur WhatsApp</button>
     </div>
-    <div class="actions" style="margin-top:14px">
-      <button class="primary" onclick="newRequest()">Nouvelle demande</button>
-      <button class="secondary" onclick="saveDraft()">💾 Enregistrer</button>
+    <!-- L'ACCENT VA À CE QUI ENREGISTRE, ET IL PASSE DEVANT. La rangée portait
+         l'encre sur « Nouvelle demande » — un bouton qui EFFACE le dossier
+         (pont.js le compte parmi ses DESTRUCTEURS) — et laissait en simple
+         trait celui qui l'envoie au planning, en dernier. C'est la rangée qui
+         a coûté le dossier de Jacqueline le 13/08. La charte ne connaît qu'un
+         accent par rangée : il revient à l'acte principal.
+         Les deux boutons se retrouvent par leur `onclick`, pas par leur
+         classe : l'ordre et l'habillage ne changent rien à pont.js. -->
+    <div class="actions" style="margin-top:var(--pas-3)">
+      <button class="primary" onclick="saveDraft()">💾 Enregistrer</button>
+      <button class="secondary" onclick="newRequest()">Nouvelle demande</button>
     </div>
     <div id="downloadStatus" class="download-status hidden"></div>
   </div>
@@ -2343,7 +2323,7 @@ function renderSelectedClient(){
   const box=$('selectedClientCard');
   if(!selectedClient){box.classList.add('hidden');box.innerHTML='';$('clientNextActionBlock').classList.add('hidden');return;}showClientNextAction();
   box.classList.remove('hidden');
-  box.innerHTML=`<b style="font-size:var(--taille-note);color:var(--muted)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">${esc(selectedClient.name)}</span><br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
+  box.innerHTML=`<b style="font-size:var(--taille-note);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">${esc(selectedClient.name)}</span><br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
 }
 
 function showNewClientForm(){$('newClientForm').classList.remove('hidden');$('newClientName').focus()}
@@ -2775,7 +2755,11 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
     if(!actions) return;
     const btn=document.createElement("button");
     btn.id="oldaCreatePlanningBtn";
-    btn.className="primary";
+    // UN SEUL ACCENT PAR RANGÉE (charte). Ce bouton-ci est la mécanique : c'est
+    // « 💾 Enregistrer au planning » qui le presse (pont.js), avec le bandeau
+    // d'état et le chien de garde. Il garde sa place et son identifiant, il ne
+    // prend plus l'encre à celui qu'on demande à la vendeuse de viser.
+    btn.className="secondary";
     btn.textContent="📅 Créer dans le planning";
     btn.onclick=function(){
       const pr=val("projectPriority")||"2";
@@ -2831,23 +2815,23 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
    boîte de l'échelle — la ligne de texte, deux rembourrages, deux traits. */
 input[type=date],input[type=time]{height:calc(var(--ligne-champ) * 1em + var(--champ-y) * 2 + 3px)}
 select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
-.req{color:#dc2626;font-weight:var(--graisse-forte);margin-left:2px}
-.dp-pop{position:absolute;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:var(--arrondi-carte);box-shadow:0 18px 50px rgba(20,46,84,.25);padding:16px;width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
+.req{color:var(--danger);font-weight:var(--graisse-forte);margin-left:2px}
+.dp-pop{position:absolute;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-pop);padding:16px;width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
 .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.dp-title{font-weight:var(--graisse-forte);font-size:var(--taille-texte);color:#142e54}
+.dp-title{font-weight:var(--graisse-forte);font-size:var(--taille-texte);color:var(--primary)}
 .dp-nav{display:flex;gap:4px}
-.dp-nav button{width:44px;height:44px;border:0;border-radius:50%;background:transparent;font-size:var(--taille-titre);cursor:pointer;color:#475467;display:grid;place-items:center;padding:0}
-.dp-nav button:hover{background:#f1f5f9}
+.dp-nav button{width:44px;height:44px;border:0;border-radius:50%;background:transparent;font-size:var(--taille-titre);cursor:pointer;color:var(--text-2);display:grid;place-items:center;padding:0}
+.dp-nav button:hover{background:var(--surface-hover)}
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
-.dp-dow{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:#94a3b8;padding:6px 0}
-.dp-day{width:44px;height:44px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:#1f2937;display:grid;place-items:center;padding:0}
-.dp-day:hover{background:#eef1f5}
-.dp-day.other{color:#c2cad6}
-.dp-day.today{outline:1.5px solid #142e54;outline-offset:-1.5px}
-.dp-day.sel{background:#1c3d6e;color:#fff}
+.dp-dow{font-size:var(--taille-note);font-weight:var(--graisse-forte);color:var(--text-3);padding:6px 0}
+.dp-day{width:44px;height:44px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-1);display:grid;place-items:center;padding:0}
+.dp-day:hover{background:var(--surface-hover)}
+.dp-day.other{color:var(--text-3)}
+.dp-day.today{outline:1.5px solid var(--primary);outline-offset:-1.5px}
+.dp-day.sel{background:var(--primary);color:var(--on-primary)}
 .dp-foot{display:flex;justify-content:flex-end;margin-top:10px}
-.dp-foot button{border:0;background:transparent;color:#142e54;font-weight:var(--graisse-forte);cursor:pointer;padding:8px 10px;border-radius:8px}
-.dp-foot button:hover{background:#f1f5f9}
+.dp-foot button{border:0;background:transparent;color:var(--primary);font-weight:var(--graisse-forte);cursor:pointer;padding:8px 10px;border-radius:8px}
+.dp-foot button:hover{background:var(--surface-hover)}
 </style>
 <script>
 (function(){
@@ -2923,7 +2907,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 </script>
 <script>__attachCap(["newClientName","personName","companyContact","companyName"]);</script>
 <style>
-.footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--pas-3)}
 @media(max-width:800px){.footer-actions{grid-template-columns:1fr}}
 /* Règles reprises à l'identique du ticket de la vente directe (référence) */
 .ticket{max-width:390px;margin:20px auto;background:#fff;border:1px dashed #888;padding:20px;font-family:"Courier New",monospace}
@@ -2946,7 +2930,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   overflow:hidden;
   padding:0!important;
   background:#fff;
-  box-shadow:0 12px 35px rgba(16,24,40,.09);
+  box-shadow:var(--shadow-2);
 }
 .ticket-head{
   padding:22px;
@@ -3027,7 +3011,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   position:fixed;
   inset:0;
   z-index:9999;
-  background:rgba(16,24,40,.52);
+  background:rgba(0,0,0,.45);
   align-items:center;
   justify-content:center;
   padding:20px;
@@ -3036,9 +3020,9 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-export-dialog{
   width:min(430px,94vw);
   border-radius:var(--arrondi-carte);
-  background:#fff;
+  background:var(--surface);
   padding:22px;
-  box-shadow:0 25px 70px rgba(16,24,40,.30);
+  box-shadow:var(--shadow-pop);
 }
 .ticket-export-dialog h3{margin:0 0 6px;font-size:var(--taille-titre)}
 .ticket-export-dialog p{margin:0 0 17px;color:#667085}
@@ -3500,7 +3484,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(!selectedClient){box.classList.add('hidden');box.innerHTML='';document.getElementById('clientNextActionBlock').classList.add('hidden');return;}
     showClientNextAction();
     box.classList.remove('hidden');
-    box.innerHTML='<b style="font-size:var(--taille-note);color:var(--muted)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">'+esc2(selectedClient.name)+'</span>'+
+    box.innerHTML='<b style="font-size:var(--taille-note);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">'+esc2(selectedClient.name)+'</span>'+
       '<div class="help" style="margin-top:6px">'+window.clientInfoLines(selectedClient).map(function(l){return '<b>'+esc2(l[0])+'</b> : '+esc2(l[1]);}).join('<br>')+'</div>'+
       '<div class="actions" style="margin-top:10px;justify-content:flex-start"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
   };
@@ -3752,17 +3736,17 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 </div>
 <style>
 .live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
-.live-check.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.live-check.todo{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
+.live-check.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+.live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 .live-check ul{margin:7px 0 0;padding-left:18px}
 .live-check li{margin:3px 0;font-weight:var(--graisse-note)}
-.dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000;font-size:var(--taille-texte);font-weight:var(--graisse-note)}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-size:var(--taille-texte);font-weight:var(--graisse-note)}
 .dup-warn button{margin-top:9px}
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
-.delay-warn.bad{background:#fff0f0;border:1px solid #e8b4b4;color:#9d0000}
-.delay-warn.warn{background:#fff6e8;border:1px solid #efd29b;color:#8a5300}
-.delay-warn.ok{background:#eef7f1;border:1px solid #9fc9ae;color:#12603a}
-.wa-link{color:#12603a;font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid #9fc9ae}
+.delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
+.delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
+.delay-warn.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+.wa-link{color:var(--success);font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid var(--success-line)}
 </style>
 <script>
 (function(){

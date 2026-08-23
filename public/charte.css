@@ -1,0 +1,238 @@
+/* ===========================================================================
+   LA CHARTE — LES JETONS, ET RIEN D'AUTRE
+   ---------------------------------------------------------------------------
+   Une seule charte pour toute l'application : le planning, la base clients, et
+   les DEUX écrans du comptoir, qui sont des documents à part affichés dans un
+   cadre. Ils vivaient jusqu'ici sur leur propre palette — un bleu marine
+   #142e54 pour l'action, un bleu vif #3064e8 au focus — c'est-à-dire à côté de
+   la charte que la direction a arrêtée le 29/07.
+
+   Ce fichier ne contient QUE des jetons. Aucune règle, aucun sélecteur de
+   composant : c'est ce qui permet de le charger devant n'importe quelle page
+   sans rien lui imposer d'autre que son vocabulaire.
+
+   Trois familles :
+     · les couleurs — surfaces, texte, traits, accent, et les trois seules
+       couleurs sémantiques (danger / succès / attention) ;
+     · l'échelle de texte — quatre tailles, trois graisses, trois interlignes ;
+     · les formes — arrondis, boîte des champs, élévations.
+
+   Fond gris neutre #f5f6f8, cartes blanches liserées, accent = encre quasi
+   noire #111827. La couleur ne sert QU'À dire un état.
+   =========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces — gris neutre unique : le fond détache les cartes blanches,
+     aucune teinte colorée n'entre dans les surfaces. */
+  --bg: #f5f6f8;                     /* fond général */
+  --surface: #fff;
+  --surface-hover: #eef2f7;          /* survol générique (boutons, etc.) */
+  --row-alt: #f5f6f8;                /* bande paire des lignes (zébrage) */
+  --row-hover: #eef2f7;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #edeff2;              /* filet de séparation entre lignes */
+  --field-focus: #f5f6f8;            /* fond d'un champ au focus */
+  --search-bg: #eef2f7;              /* pilule de recherche au repos */
+  --search-bg-hover: #e2e8f0;
+  --chip-on-tonal: #fff;             /* pastille compteur sur pilule active */
+  --zone-bg: #f5f6f8;                /* fond doux d'une zone (famille + sous-cat) */
+
+  /* texte */
+  --text-1: #1f2937;                 /* principal */
+  --text-2: #6b7280;                 /* secondaire / en-têtes */
+  --text-3: #9ca3af;                 /* atténué */
+
+  /* bordures fines — le contour porte la forme, l'ombre ne fait qu'y aider */
+  --border: #e1e5ea;
+  --border-soft: #e5e7eb;            /* sert AUSSI de fond (pastilles, jetons) */
+  --card-border: #e5e7eb;            /* liseré des cartes */
+  --border-strong: #cbd2da;          /* le même trait, au survol / au focus */
+
+  /* couches d'état (hover / press) façon Material */
+  --state-hover: rgba(17, 24, 39, .05);
+  --state-press: rgba(17, 24, 39, .09);
+
+  /* accent — encre quasi noire, seule couleur d'action de l'app */
+  --primary: #111827;
+  --primary-hover: #000;
+  --primary-rgb: 17, 24, 39;
+  --on-primary: #fff;                /* texte / icône posé SUR l'accent plein */
+  --primary-soft: #eef2f7;           /* pilule active / fond accent clair */
+  --primary-soft-hover: #e2e8f0;
+
+  /* sémantique — les SEULES couleurs de la charte */
+  --danger:  #b91c1c;   --danger-bg:  #fef2f2;   --danger-line:  #fecaca;
+  --success: #166534;   --success-bg: #ecfdf3;   --success-line: #bbf7d0;
+  --warning: #854d0e;   --warning-bg: #fefce8;   --warning-line: #fde68a;
+  /* Le vert en composantes : l'anneau « enregistré » s'éteint en fondu, il lui
+     faut donc une opacité variable — impossible à partir du seul #166534. */
+  --success-rgb: 22, 101, 52;
+  /* deux crans d'ambre en plus : l'échelle d'urgence du point du jour a
+     besoin de trois niveaux lisibles (retard / bientôt / à planifier) sans
+     sortir de la famille ambre de la charte. */
+  --warning-deep: #713f12;           /* le plus appuyé */
+  --warning-2:    #a16207;           /* le plus clair — « à planifier » */
+
+  /* palette d'étapes (texte / fond) : gris par défaut, couleur seulement
+     quand l'étape porte un sens d'état (en cours / livrée / bloquée). */
+  --st-demande: #4b5563;   --st-demande-bg: #eef2f7;
+  --st-cours:   #854d0e;   --st-cours-bg:   #fefce8;
+  --st-livree:  #166534;   --st-livree-bg:  #ecfdf3;
+  --st-facture: #111827;   --st-facture-bg: #e5e7eb;
+  --st-archive: #6b7280;   --st-archive-bg: #f3f4f6;
+  --st-bloque:  #b91c1c;   --st-bloque-bg:  #fef2f2;
+
+  /* élévations — les trois niveaux de la charte (carte / flottant / modale) */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .05);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, .05);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .25);
+
+  /* bandeau de famille du rail — gris ardoise, pas l'encre pure : le plein
+     noir écrasait le reste de l'écran. Assez sombre pour rester un vrai
+     bandeau (blanc dessus à 10,4:1), assez doux pour ne pas cogner. Cran
+     « strong » = survol / famille active. */
+  --rail-head-bg: #374151;
+  --rail-head-bg-strong: #1f2937;
+  --rail-head-fg: #fff;
+
+  --scrollbar: #d1d5db;
+  --scrollbar-hover: #9ca3af;
+
+  /* mouvement Material */
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --dur-1: .12s;
+  --dur-2: .2s;
+  --dur-3: .32s;
+
+  /* infobulle : surface inversée façon Material (plain tooltip) */
+  --tip-bg: #1f2937;
+  --tip-fg: #f5f6f8;
+
+  --radius-card: 14px;
+  --radius: 9px;
+  --row-h: 76px;
+  --font: 'Manrope', Arial, Helvetica, sans-serif;
+}
+
+/* ---------------------------------------------------------------- Le texte
+   QUATRE TAILLES, ET CHACUNE A UN SEUL MÉTIER. L'écran de demande de devis en
+   comptait vingt-cinq (10, 11, 11.5, 12, 12.5, 13, 13.5, 14, 15, 16, 17, 18,
+   19, 20, 21, 22, 23, 24, 25, 27, 28 px) : des écarts d'un demi-pixel que
+   l'œil ne lit pas comme une hiérarchie, seulement comme du désordre.
+   Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR.
+
+   TROIS GRAISSES. Manrope s'arrête à 800 : un « font-weight:900 » est raboté
+   et rendu EXACTEMENT comme un 800 — une marche qui ne se voit pas.
+
+   UNE SEULE BOÎTE pour tout ce qui se clique et se remplit : même taille de
+   texte + même interligne + même rembourrage = la même hauteur, sans qu'aucune
+   ne soit jamais écrite en dur. */
+:root {
+  --taille-note: 13px;    /* intitulé de champ, aide, méta, pastille, étape */
+  --taille-texte: 15px;   /* ce qui se lit ET ce qui se saisit */
+  --taille-titre: 19px;   /* titre d'une carte, d'une section */
+  --taille-grand: 28px;   /* les chiffres qu'on annonce au client */
+
+  --graisse-texte: 400;
+  --graisse-note: 600;
+  --graisse-forte: 800;
+
+  --ligne-titre: 1.2;
+  --ligne-texte: 1.45;
+  /* Les champs et les boutons : en RAPPORT et non en « normal », sinon Chrome
+     ne calcule pas la boite d'un div comme celle d'un champ. */
+  --ligne-champ: 1.375;
+
+  /* Les formes. « --radius » et « --radius-card » plus haut disent la même
+     chose pour le planning ; ces trois-là nomment les trois seules formes de
+     l'application, du champ à la carte. */
+  --arrondi-champ: var(--radius);        /* 9px — champ, bouton, pastille */
+  --arrondi-bloc: 12px;                  /* bloc dans une carte */
+  --arrondi-carte: var(--radius-card);   /* 14px — la carte elle-même */
+
+  --champ-y: 13px;
+  --champ-x: 14px;
+
+  /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait
+     sept (2, 7, 10, 11, 12, 14, 18 px) et sept rembourrages différents : le
+     panneau de droite avait 17 px de marge en tête, 13 dans le corps et 15 au
+     pied, si bien que le titre, les articles et les totaux commençaient
+     chacun à un endroit. Rien ne s'alignait, sans qu'on sache dire pourquoi. */
+  --pas-1: 6px;    /* dans une ligne : un pictogramme et son mot */
+  --pas-2: 10px;   /* entre deux éléments d'un même groupe */
+  --pas-3: 16px;   /* gouttière d'un formulaire, rembourrage d'un bloc */
+  --pas-4: 24px;   /* rembourrage d'une carte, entre deux blocs */
+}
+
+/* ---------------------------------------------------------------- Thème sombre
+   Même charte, retournée : l'accent encre devient encre claire, d'où
+   --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent
+   clair serait illisible — toujours passer par le token).
+
+   Une seule palette sombre, dérivée des gris de la charte. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #111827;
+  --surface: #1f2937;
+  --surface-hover: #2b3546;
+  --row-alt: #1a2331;                /* bande paire des lignes (zébrage) */
+  --row-hover: #2b3546;              /* survol de ligne, plus marqué que le zébrage */
+  --row-line: #374151;               /* filet de séparation entre lignes */
+  --field-focus: #2b3546;
+  --search-bg: #29323f;
+  --search-bg-hover: #374151;
+  --chip-on-tonal: #111827;
+  --zone-bg: #1a2331;                /* fond doux d'une zone (famille + sous-cat) */
+
+  --text-1: #f3f4f6;
+  --text-2: #9ca3af;
+  --text-3: #6b7280;
+
+  --border: #374151;
+  --border-soft: #2b3441;
+  --card-border: #374151;
+  --border-strong: #4b5563;
+
+  --state-hover: rgba(243, 244, 246, .06);
+  --state-press: rgba(243, 244, 246, .1);
+
+  /* infobulle : la surface inversée s'inverse aussi en sombre */
+  --tip-bg: #f3f4f6;
+  --tip-fg: #111827;
+
+  --primary: #f3f4f6;
+  --primary-hover: #fff;
+  --primary-rgb: 243, 244, 246;
+  --on-primary: #111827;
+  --primary-soft: #374151;
+  --primary-soft-hover: #4b5563;
+
+  --danger:  #fca5a5;   --danger-bg:  rgba(185, 28, 28, .2);   --danger-line:  rgba(185, 28, 28, .5);
+  --success: #86efac;   --success-bg: rgba(22, 101, 52, .25);  --success-line: rgba(22, 101, 52, .55);
+  --warning: #fcd34d;   --warning-bg: rgba(133, 77, 14, .25);  --warning-line: rgba(133, 77, 14, .55);
+  --success-rgb: 134, 239, 172;
+  --warning-deep: #fef3c7;
+  --warning-2:    #fde68a;
+
+  --st-demande: #d1d5db;   --st-demande-bg: #2b3546;
+  --st-cours:   #fcd34d;   --st-cours-bg:   #3a2f14;
+  --st-livree:  #86efac;   --st-livree-bg:  #14301f;
+  --st-facture: #f3f4f6;   --st-facture-bg: #374151;
+  --st-archive: #9ca3af;   --st-archive-bg: #262f3c;
+  --st-bloque:  #fca5a5;   --st-bloque-bg:  #3a1c1c;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, .4);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .55);
+
+  /* En sombre le bandeau reste inversé (clair sur fond sombre) mais sort du
+     blanc quasi pur, qui éblouissait autant que le noir en thème clair. */
+  --rail-head-bg: #d1d5db;
+  --rail-head-bg-strong: #f3f4f6;
+  --rail-head-fg: #111827;
+
+  --scrollbar: #4b5563;
+  --scrollbar-hover: #6b7280;
+}

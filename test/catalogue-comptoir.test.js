@@ -357,7 +357,7 @@ assert.ok(/#catProduit optgroup\{[^}]*font-weight:(?:800|var\(--graisse-forte\))
   'la famille se lit en gras dans le menu');
 assert.ok(/#catProduit optgroup\{[^}]*font-style:normal/.test(DEVIS),
   '… et droite, pas en italique');
-assert.ok(/#catProduit optgroup\{[^}]*color:var\(--text\)/.test(DEVIS),
+assert.ok(/#catProduit optgroup\{[^}]*color:var\(--text-1\)/.test(DEVIS),
   '… à l’encre, pas en gris');
 assert.ok(/#catProduit option\{[^}]*font-weight:(?:400|var\(--graisse-texte\))/.test(DEVIS),
   'le produit, lui, reste en écriture normale');

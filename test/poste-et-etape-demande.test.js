@@ -153,10 +153,13 @@ assert.ok(/\.stepper\{display:flex;flex-wrap:wrap/.test(DEVIS),
 
 const done = (DEVIS.match(/\.step\.done\{([^}]*)\}/) || [])[1];
 assert.ok(done, 'la règle .step.done doit exister');
-assert.ok(/background:var\(--valide\)/.test(done),
+assert.ok(/background:var\(--success\)/.test(done),
   'une étape validée passe au VERT : c’est un état, pas un gris de plus');
-assert.ok(/--valide:#1d6f43/.test(DEVIS),
-  'le vert de validation a son propre jeton (--green de ce fichier est le bleu marine du patron)');
+// Depuis le 22/08 le vert ne vient plus d'un jeton propre à cet écran : c'est
+// celui de la charte (« --success », #166534), déclaré dans charte.css.
+const CHARTE = lire('public/charte.css');
+assert.ok(/--success:\s*#166534/.test(CHARTE),
+  'le vert de validation est celui de la charte, pas une teinte de cet écran');
 assert.ok(!/\.step\.done\{background:#e2e8f0/.test(DEVIS),
   'l’ancien gris bleuté ne doit plus traîner');
 

@@ -30,8 +30,8 @@ const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8
 // plus rien — il faut RÉSOUDRE la variable avec la table de la page qui
 // l'accueille. C'est aussi ce qui permet de comparer les deux écrans entre eux
 // alors qu'un seul a encore ses valeurs en dur.
-function echelleDe(src) {
-  const table = {};
+const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+function jetonsDe(src, table = {}) {
   for (const m of src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
     m[1].split(';').forEach((d) => {
       const i = d.indexOf(':');
@@ -39,6 +39,13 @@ function echelleDe(src) {
     });
   }
   return table;
+}
+// Ce que la PAGE voit : ses propres jetons, plus ceux de la charte si elle la
+// charge. C'est aussi ce qui distingue les deux écrans — l'un l'a adoptée,
+// l'autre pas encore.
+function echelleDe(src) {
+  const table = /<link[^>]+charte\.css/.test(src) ? jetonsDe(CHARTE) : {};
+  return jetonsDe(src, table);
 }
 // Les déclarations posées sur UN sélecteur exact, cascade comprise : la même
 // règle est écrite deux fois sur ces écrans (la feuille de base, puis celle qui
@@ -348,12 +355,12 @@ assert.ok(!/\$\('(tx|need)FormTitle'\)\.textContent=/.test(DEVIS),
   'plus aucune branche n’écrit le titre en direct — elles passeraient à côté de l’état');
 assert.ok(/<h3 class="form-num" id="txFormTitle">/.test(DEVIS) && /<h3 class="form-num" id="needFormTitle">/.test(DEVIS),
   'les deux formulaires portent la même bulle');
-assert.ok(/\.form-num\.is-edit\{color:var\(--orange\)\}/.test(DEVIS),
-  'la couleur dit l’état : orange quand on reprend une ligne déjà posée');
+assert.ok(/\.form-num\.is-edit\{color:var\(--warning\)\}/.test(DEVIS),
+  'la couleur dit l’état : ambre quand on reprend une ligne déjà posée');
 // TOUT L’ARTICLE est détouré, pas seulement son titre : ses dix champs se
 // mélangeaient aux réglages de la page (majoration, TGCA, réglages de
 // production) et on ne voyait plus où commençait la ligne en cours d’écriture.
-assert.ok(/\.article-bloc\{border:1\.5px solid #d7dce3;border-radius:(?:14px|var\(--arrondi-bloc\));/.test(DEVIS),
+assert.ok(/\.article-bloc\{border:1\.5px solid var\(--border\);border-radius:var\(--arrondi-bloc\);/.test(DEVIS),
   'l’article en cours de saisie porte un cadre');
 assert.ok(/<div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
   && /<div id="besoinManuel" class="hidden article-bloc">/.test(DEVIS),
@@ -409,7 +416,7 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
     'il se lit sans se mettre devant la liste');
   assert.strictEqual(resoudre(manuel['font-weight'], ech), '600',
     '… en demi-gras, pas en gras : ce n’est pas la réponse attendue');
-  assert.ok(/\.menu-manuel\{[^}]*color:#525960/.test(PONT), '… et en gris, pas à l’encre');
+  assert.ok(/\.menu-manuel\{[^}]*color:var\(--text-2/.test(PONT), '… et en gris, pas à l’encre');
 }
 
 
@@ -440,8 +447,10 @@ assert.ok(/^calc\(/.test(declencheur['min-height']),
     assert.strictEqual(lire(declencheur, cle), lire(champ, cle),
       `${nom} : « ${cle} » — le déclencheur d'une liste et le champ d'à côté`);
   });
-  assert.ok(/1\.5px solid #d7dce3/.test(lire(declencheur, 'border')) && /1\.5px solid #d7dce3/.test(lire(champ, 'border')),
+  assert.strictEqual(lire(declencheur, 'border'), lire(champ, 'border'),
     `${nom} : … et le même trait`);
+  assert.ok(/^1\.5px solid /.test(lire(champ, 'border')),
+    `${nom} : … un trait de 1,5 px, celui de la charte`);
   // Et la hauteur qui en sort est la MÊME au pixel : c'est tout l'objet du
   // calcul. Un champ : deux rembourrages, la ligne de texte, deux traits.
   const taille = parseFloat(lire(champ, 'font-size'));
@@ -451,7 +460,7 @@ assert.ok(/^calc\(/.test(declencheur['min-height']),
     `${nom} : le déclencheur et le champ font exactement la même hauteur`);
   // Un bouton plein et un bouton bordé sur la même rangée : le trait du second
   // ajoutait 3 px. Le plein porte le même trait, en transparent.
-  assert.ok(/\.primary,\.danger,\.whatsapp\{border:1\.5px solid transparent!important\}/.test(src),
+  assert.ok(/\.primary,[^{]*\.whatsapp\{[^}]*border:1\.5px solid transparent!important/.test(src),
     `${nom} : bouton plein et bouton bordé ont la même boîte`);
   // « 💾 Enregistrer » tirait sa hauteur de la police d'émojis : un demi-pixel
   // de plus que ses voisins.
