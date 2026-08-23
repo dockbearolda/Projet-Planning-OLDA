@@ -258,3 +258,211 @@ assert.ok(DEVIS.indexOf('onclick="saveDraft()"') < DEVIS.indexOf('onclick="newRe
   '… et il passe devant lui dans la rangée');
 
 console.log('✓ charte du comptoir : quatre tailles, trois graisses, aucune couleur en dur, une seule boîte pour les champs et les boutons');
+
+// ===========================================================================
+// 9. LE SECOND PARCOURS DU COMPTOIR — vente-directe.html (23/08/2026)
+// ---------------------------------------------------------------------------
+// Le 22/08, l'écran de demande de devis est entré dans la charte. Celui-ci est
+// resté en arrière — et les deux tournent SUR LE MÊME POSTE, à un clic l'un de
+// l'autre : bleu marine #142e54 pour l'action ici, encre #111827 à côté.
+// Il comptait DIX-NEUF tailles de texte, SIX graisses et QUATRE-VINGT-NEUF
+// teintes, empilées dans neuf feuilles successives (« V10 », « V10.1 »,
+// « V10.2 », « V10.3 ») qui se corrigeaient l'une l'autre à coups de
+// !important.
+//
+// LE TICKET FAIT EXCEPTION, et lui seul : il s'imprime et part avec le client.
+// Son échelle est déclarée en UN endroit (--tk-*) et ne déborde pas sur la
+// page ; ses noirs et ses blancs d'impression sont écrits en toutes lettres,
+// parce que c'est le papier qui les impose — un poste en thème sombre
+// imprimait sinon un pavé anthracite pleine page.
+// ===========================================================================
+const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+
+// Retire un bloc `@media print{…}` en comptant les accolades : sans ça, le
+// `#fff` du papier compte comme une couleur en dur de l'écran.
+function sansImpression(css) {
+  let out = '', i = 0;
+  while (i < css.length) {
+    const d = css.indexOf('@media print', i);
+    if (d < 0) { out += css.slice(i); break; }
+    out += css.slice(i, d);
+    let j = css.indexOf('{', d), n = 0;
+    for (; j < css.length; j += 1) {
+      if (css[j] === '{') n += 1;
+      else if (css[j] === '}' && (n -= 1) === 0) { j += 1; break; }
+    }
+    i = j;
+  }
+  return out;
+}
+
+const FEUILLES_V = sansImpression([...VENTE.matchAll(/<style>([\s\S]*?)<\/style>/g)]
+  .map((m) => sansCommentaires(m[1])).join('\n'));
+
+assert.ok(/<link rel="stylesheet" href="\.\.\/charte\.css">/.test(VENTE),
+  'l’écran de vente charge la charte, le même fichier que le planning et que l’écran d’à côté');
+assert.ok(!/<link[^>]+href="https?:/.test(VENTE) && !/<script[^>]+src="https?:/.test(VENTE),
+  '… et rien ne vient d’un autre domaine');
+
+// Plus un seul jeton à lui : les « --vd-* » (encre marine, fond, trait, rouge)
+// étaient sa charte privée.
+const jetonsVente = [];
+for (const m of FEUILLES_V.matchAll(/:root\s*\{([^}]*)\}/g)) {
+  m[1].split(';').forEach((d) => {
+    if (d.trim().startsWith('--')) jetonsVente.push(d.slice(0, d.indexOf(':')).trim());
+  });
+}
+assert.deepStrictEqual(jetonsVente, [], 'l’écran de vente n’a plus de charte à lui');
+assert.ok(!/--vd-/.test(VENTE), 'et plus une seule trace de l’ancienne palette');
+
+// DEUX TAILLES SUR CET ÉCRAN, comme sur celui d'à côté : ce qui se lit, et les
+// chiffres qu'on annonce. Le ticket a les siennes, et ne s'en sert que là.
+const taillesVente = new Set();
+const taillesTicket = new Set();
+for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+  const sel = m[1].trim();
+  for (const d of m[2].matchAll(/font-size:\s*([^;}!]+)/g)) {
+    const v = d[1].trim();
+    if (/ticket/.test(sel)) { taillesTicket.add(v); continue; }
+    assert.ok(/^var\(--taille-[\w-]+\)$/.test(v),
+      `${sel.slice(0, 44)} → font-size:${v} : une taille doit venir de l’échelle`);
+    taillesVente.add(v);
+  }
+}
+assert.deepStrictEqual([...taillesVente].sort(), ['var(--taille-grand)', 'var(--taille-texte)'],
+  'l’écran de vente n’a droit qu’à la taille du texte et à celle des chiffres qu’on annonce');
+// Le ticket ne pioche PAS dans l'échelle de l'écran, et l'écran ne pioche pas
+// dans la sienne : deux échelles qui se mélangent, c'est vingt-cinq tailles qui
+// reviennent par la bande.
+[...taillesTicket].forEach((v) => assert.ok(/^var\(--tk-[\w-]+\)$/.test(v),
+  `le ticket compose dans SON échelle, pas dans « ${v} »`));
+// … et elle est déclarée en UN endroit.
+const echelleTicket = VENTE.match(/\.ticket\{\s*((?:\s*--tk-[\w-]+:[^;]+;\s*(?:\/\*[\s\S]*?\*\/)?)+)/);
+assert.ok(echelleTicket, 'l’échelle du ticket est déclarée sur .ticket, en un seul bloc');
+assert.strictEqual((VENTE.match(/--tk-texte\s*:/g) || []).length, 1,
+  '… une seule fois : elle était réglée dans quatre blocs « V10.x » successifs');
+
+// TROIS GRAISSES. Manrope s'arrête à 800 : la page en déclarait 900 et 950,
+// rendus l'un comme l'autre EXACTEMENT comme un 800.
+const graissesVente = [];
+for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+  if (/@font-face/.test(m[1])) continue;
+  for (const d of m[2].matchAll(/font-weight:\s*([^;}!]+)/g)) {
+    const v = d[1].trim();
+    if (!/^var\(--graisse-(texte|note|forte)\)$/.test(v)) graissesVente.push(`${m[1].trim().slice(0, 40)} → ${v}`);
+  }
+}
+assert.deepStrictEqual(graissesVente, [], 'une graisse écrite en dur sur l’écran de vente');
+assert.ok(/b,strong\{font-weight:var\(--graisse-forte\)\}/.test(FEUILLES_V),
+  'le gras par défaut du navigateur y est aussi ramené sur l’échelle');
+
+// AUCUNE COULEUR EN DUR. Le voile d'une modale fait exception (du noir
+// transparent), et l'impression aussi — elle est déjà retirée plus haut.
+const teintesVente = [];
+for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+  const sel = m[1].trim();
+  if (/@font-face|@keyframes/.test(sel)) continue;
+  for (const d of m[2].matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)) {
+    if (d[0].includes('var(')) continue;
+    if (/^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,/.test(d[0])) continue;
+    teintesVente.push(`${sel.slice(0, 44)} → ${d[0]}`);
+  }
+}
+assert.deepStrictEqual([...new Set(teintesVente)], [],
+  'une couleur écrite en dur sur l’écran de vente : elle doit venir d’un jeton');
+
+// UNE SEULE BOÎTE, la même que sur l'écran d'à côté.
+const regleV = (selecteur) => {
+  const out = {};
+  for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    if (m[1].replace(/\s+/g, '') !== selecteur.replace(/\s+/g, '')) continue;
+    m[2].split(';').forEach((d) => {
+      const i = d.indexOf(':');
+      if (i > 0) out[d.slice(0, i).trim()] = d.slice(i + 1).replace('!important', '').trim();
+    });
+  }
+  return out;
+};
+const champV = regleV('input,select,textarea');
+const boutonV = regleV('button');
+assert.strictEqual(champV.padding.split(' ')[0], 'var(--champ-y)', 'un champ de la vente se remplit de la hauteur de l’échelle');
+assert.strictEqual(boutonV.padding.split(' ')[0], 'var(--champ-y)', '… un bouton de la même');
+assert.strictEqual(champV['border-radius'], 'var(--arrondi-champ)', 'et ils prennent l’arrondi des champs');
+assert.strictEqual(boutonV['border-radius'], 'var(--arrondi-champ)', '… tous les deux');
+// Chrome compose la valeur d'un champ de date dans une boîte interne qui porte
+// SON rembourrage : le champ sortait 2 px plus haut que ses voisins.
+[DEVIS, VENTE].forEach((src, i) => assert.ok(
+  /input\[type=date\]::-webkit-datetime-edit,input\[type=time\]::-webkit-datetime-edit\{line-height:var\(--ligne-champ\)/.test(src),
+  `${i ? 'la vente' : 'le devis'} : un champ de date fait la hauteur des autres`));
+
+// ===========================================================================
+// 10. LE THÈME DE L'HÔTE DESCEND DANS LE CADRE
+// ---------------------------------------------------------------------------
+// Les deux écrans du comptoir sont des documents à part, affichés dans un
+// cadre du CRM. Ils lisent la charte, thème sombre compris — mais un cadre ne
+// connaît pas le `data-theme` de son hôte : le poste basculait en sombre et
+// gardait un rectangle blanc en plein milieu.
+// ===========================================================================
+[['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
+  assert.ok(/URLSearchParams\(location\.search\)\.get\('theme'\)/.test(src),
+    `${nom} : le thème d’ouverture arrive par l’adresse du cadre`);
+  assert.ok(src.indexOf("get('theme')") < src.indexOf('charte.css'),
+    `${nom} : … et il est posé AVANT la charte, donc avant le premier pixel`);
+  assert.ok(/localStorage\.getItem\('olda_theme'\)/.test(src),
+    `${nom} : ouvert seul, il retombe sur le choix mémorisé du poste`);
+});
+
+const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+assert.ok(/e\.data\.type === 'OLDA_THEME'/.test(PONT),
+  'le pont écoute la bascule de l’hôte : l’interrupteur se clique aussi parcours ouvert');
+// Le composant de menu posait un fond BLANC en dur : en thème sombre, le champ
+// restait blanc au milieu d'un écran anthracite, et sa valeur — écrite à
+// l'encre claire — devenait invisible.
+assert.ok(!/background:#fff|color:#fff/.test(PONT),
+  'le composant de menu ne peint plus en blanc en dur');
+// Et une valeur choisie ne se lit pas comme un placeholder : les deux états
+// pointaient sur le même jeton.
+assert.ok(/\.menu-texte\{[^}]*color:var\(--text-1/.test(PONT),
+  'une valeur choisie prend l’encre du texte');
+assert.ok(/\.menu-texte\.est-vide\{color:var\(--text-2/.test(PONT),
+  '… et un menu vide garde le gris des placeholders');
+
+const NP = fs.readFileSync(path.join(RACINE, 'public/nouveau-projet.js'), 'utf8');
+assert.ok(/\$\{f\.src\}\?theme=\$\{themeActuel\(\)\}/.test(NP),
+  'l’hôte passe son thème dans l’adresse du parcours');
+assert.ok(/postMessage\(\{ type: 'OLDA_THEME', theme \}/.test(NP),
+  '… et prévient les cadres déjà ouverts');
+assert.ok(/attributeFilter: \['data-theme'\]/.test(NP),
+  '… en observant l’attribut, sans se mettre dans le chemin de l’interrupteur');
+// La coquille range sous le CHEMIN : avec le thème dans l'adresse, deux copies
+// du même fichier seraient entrées en cache, et aucune ne répondrait à l'autre
+// thème le jour où le poste est hors ligne.
+assert.ok(/c\.put\(url\.pathname, copie\)/.test(SW),
+  'la coquille range un parcours sous son chemin, sans sa query');
+assert.ok(/caches\.match\(req, \{ ignoreSearch: true \}\)/.test(SW),
+  '… et le ressort quelle que soit la query');
+
+// ===========================================================================
+// 11. LE MODULE PDF EST CHEZ NOUS
+// ---------------------------------------------------------------------------
+// Il venait de cdnjs.cloudflare.com, avec jsdelivr et unpkg en secours : trois
+// domaines tiers pour un écran qui doit s'ouvrir sans dépendre de personne — et
+// aucune chance que « Télécharger le PDF » fonctionne hors ligne.
+// ===========================================================================
+assert.ok(!/(?:src|href)\s*=\s*["']https?:\/\//.test(DEVIS.replace(/<!--[\s\S]*?-->/g, '')),
+  'plus une seule adresse d’un autre domaine dans l’écran de devis');
+[/cdnjs\.cloudflare\.com/, /cdn\.jsdelivr\.net/, /unpkg\.com/].forEach((rx) =>
+  assert.ok(!rx.test(DEVIS.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')),
+    `${rx.source} ne sert plus rien à cet écran`));
+assert.ok(fs.existsSync(path.join(RACINE, 'public/jspdf.umd.min.js')),
+  'le module PDF est servi par nous');
+assert.ok(/loadScriptOnce\(new URL\('\.\.\/jspdf\.umd\.min\.js',location\.href\)\.href\)/.test(DEVIS),
+  '… et chargé depuis notre origine, au premier clic seulement');
+assert.ok(!/<script[^>]+jspdf/.test(DEVIS),
+  '… pas posé en balise : 364 Ko qu’on ne paie plus à chaque ouverture du comptoir');
+assert.ok(/'\/jspdf\.umd\.min\.js'/.test(SW),
+  '… et dans la coquille, sinon hors ligne le bouton ne peut par construction rien faire');
+assert.ok(/'\/comptoir\/textile-catalog\.js'/.test(SW),
+  'le catalogue textile aussi : sans lui, hors ligne, tout le chiffrage tombe sans un mot');
+
+console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, et plus rien qui vienne d’ailleurs');

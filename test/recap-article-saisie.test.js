@@ -160,13 +160,42 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // collante.
 assert.ok(/txTete\(c\),txTableau\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\),txDetailsBloc\(d\)/.test(apercu),
   'le récapitulatif s’écrit dans l’ordre où il se lit : le tableau, le calcul, les alertes, la saisie');
-// … et le tableau porte les trois blocs dans l'ordre : les chiffres, la marge,
-// ce qui compose le prix. UNE SEULE table — c'est elle qui tient la colonne
-// des valeurs, du premier chiffre au dernier.
+// LE HAUT DE LA CARTE NE MONTRE QUE CE QU'ON ANNONCE (23/08/2026).
+// Il portait dix rangées d'affilée : le prix, le total, puis le temps de
+// production, la marge à l'heure, la marge, son seuil, sa cible, et le détail
+// textile / marquage / transport / TGCA. Ce sont deux lectures différentes —
+// ce qu'on dit au client, et ce que l'atelier y gagne — et la seconde noyait
+// la première au moment précis où la vendeuse annonce un prix de vive voix.
+// Il reste DEUX chiffres à découvert ; les huit autres rangées sont dans un
+// volet replié.
 const table = source('txTableau', 'd,c');
-assert.ok(/txKpis\(g,c\);\s*txJauge\(g,c\);\s*txDecompo\(g,d,c\)/.test(table),
-  'les trois blocs s’écrivent dans la même table');
-assert.ok(/txEl\('div','tx-tableau'\)/.test(table), 'et cette table est bien une table');
+assert.ok(/txKpis\(g,c\);\s*bloc\.append\(g,txMargeBloc\(d,c\)\)/.test(table),
+  'la carte montre les chiffres annoncés, puis le volet de la marge');
+assert.ok(!/txJauge|txDecompo/.test(table),
+  'ni la marge ni la composition ne restent à découvert');
+assert.ok(/txEl\('div','tx-tableau'\)/.test(table), 'et les chiffres annoncés sont bien une table');
+const kpis = source('txKpis', 'g,c');
+assert.ok(/Prix HT \/ pièce/.test(kpis) && /Total HT/.test(kpis),
+  'les deux chiffres à découvert sont le prix à la pièce et le total');
+assert.ok(!/Temps de production|Marge/.test(kpis),
+  '… et rien d’autre');
+// Le volet porte les huit rangées, dans une table de la MÊME forme : sans ça,
+// ses valeurs ne tombent pas sous celles du dessus quand on l'ouvre.
+const volet = source('txMargeBloc', 'd,c');
+assert.ok(/txEl\('div','tx-tableau'\)/.test(volet), 'le volet écrit dans une table de la même forme');
+assert.ok(/txAtelier\(g,c\);\s*txJauge\(g,c\);\s*txDecompo\(g,d,c\)/.test(volet),
+  'il porte le coût atelier, la marge et la composition, dans cet ordre');
+// L'ÉTAT DU VOLET SURVIT À LA FRAPPE. Le récapitulatif se réécrit à chaque
+// touche : sans mémoire, il se refermait sous les doigts dès qu'on corrigeait
+// une taille — le même piège que les deux volets d'à côté.
+assert.ok(/let txCalculOuvert=false,txDetailsOuvert=false,txMargeOuverte=false;/.test(DEVIS),
+  'le volet de la marge a sa mémoire, comme le calcul et le détail des champs');
+assert.ok(/det\.open=txMargeOuverte/.test(volet) && /txMargeOuverte=det\.open/.test(volet),
+  '… elle est relue à l’ouverture et réécrite au basculement');
+// UN ÉLÉMENT, PAS UN FRAGMENT : le détail d'un article posé ajoute une classe
+// au retour de txTableau, et un DocumentFragment n'a pas de `classList`.
+assert.ok(/const bloc=txEl\('div'\)/.test(table),
+  'txTableau rend un élément — l’appelant lui pose une classe');
 // Le calcul déplié écrit dans une table de la MÊME forme : sans ça, ses
 // valeurs ne tombent pas sous celles du récapitulatif.
 assert.ok(/function txCalculBloc\(d,c\)\{\s*const g=txEl\('div','tx-tableau'\)/.test(DEVIS),
@@ -202,10 +231,10 @@ assert.strictEqual(Math.round(TE.thresholdFor(9).veryGood * 100), 60, 'cible à 
 assert.ok(TE.thresholdFor(200).limited < TE.thresholdFor(9).limited,
   'les deux repères baissent quand la quantité monte');
 
-// L'ÉTAT DES DEUX PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
+// L'ÉTAT DES PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
 // chaque touche : sans mémoire, le détail se refermait sous les doigts.
-assert.ok(/let txCalculOuvert=false,txDetailsOuvert=false;/.test(DEVIS),
-  'les deux panneaux dépliables gardent leur état hors du rendu');
+// (Le troisième — la marge et la composition — est vérifié plus haut, avec le
+// volet qui le porte.)
 assert.ok(/det\.open=txDetailsOuvert/.test(DEVIS) && /txDetailsOuvert=det\.open/.test(DEVIS),
   'le détail des champs se rouvre comme on l’avait laissé');
 assert.ok(/det\.open=txCalculOuvert/.test(DEVIS) && /txCalculOuvert=det\.open/.test(DEVIS),

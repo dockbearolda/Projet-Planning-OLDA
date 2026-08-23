@@ -373,11 +373,11 @@
       margin:0 0 14px;padding:14px 16px;border-radius:14px;
       font:700 15px/1.35 inherit;border:2px solid transparent}
     .olda-etat__texte{flex:1 1 220px;white-space:pre-line}
-    .olda-etat--envoi{background:var(--zone-bg,#f5f6f8);color:var(--text-1,#111827);border-color:#d7dae0}
-    .olda-etat--ok{background:#e9f7ef;color:#0b5c34;border-color:#0b5c34}
-    .olda-etat--echec{background:#fdecea;color:#8f1d14;border-color:#8f1d14}
-    .olda-etat__reessai{min-height:44px;padding:0 18px;border-radius:12px;
-      border:0;background:#8f1d14;color:#fff;font:700 15px/44px inherit;
+    .olda-etat--envoi{background:var(--zone-bg,#f5f6f8);color:var(--text-1,#111827);border-color:var(--border,#d7dae0)}
+    .olda-etat--ok{background:var(--success-bg,#e9f7ef);color:var(--success,#0b5c34);border-color:var(--success-line,#0b5c34)}
+    .olda-etat--echec{background:var(--danger-bg,#fdecea);color:var(--danger,#8f1d14);border-color:var(--danger-line,#8f1d14)}
+    .olda-etat__reessai{min-height:44px;padding:0 18px;border-radius:var(--arrondi-champ,12px);
+      border:0;background:var(--danger,#8f1d14);color:var(--surface,#fff);font:inherit;font-weight:var(--graisse-forte,800);
       cursor:pointer}
   `;
   function poserStyle() {
@@ -972,6 +972,15 @@
   window.addEventListener('message', (e) => {
     if (e.origin !== location.origin) return;
     if (e.data && e.data.type === 'OLDA_POSTE') reporterQuiEstAuPoste();
+    // LE THÈME SUIT CELUI DU CRM, EN DIRECT. Le thème d'ouverture arrive par
+    // l'adresse du cadre (voir le script en tête de chaque écran) ; celui-ci
+    // couvre la BASCULE — le patron clique sur l'interrupteur du planning
+    // pendant qu'un parcours est ouvert derrière, et le cadre restait clair
+    // au milieu d'une application devenue sombre.
+    if (e.data && e.data.type === 'OLDA_THEME') {
+      const t = e.data.theme === 'dark' ? 'dark' : 'light';
+      if (document.documentElement.dataset.theme !== t) document.documentElement.dataset.theme = t;
+    }
   });
   window.addEventListener('storage', (e) => { if (e.key === QUI_KEY) reporterQuiEstAuPoste(); });
 
@@ -1107,18 +1116,19 @@
    texte si elle change. Le trait, sa couleur et son arrondi viennent
    de la même règle que les champs voisins — ils étaient plus fins, plus
    sombres et moins arrondis. */
-/* Le repli est le 16 px de l'écran qui n'a pas encore adopté l'échelle : le
-   déclencheur doit faire la boîte des champs DE SA PAGE, pas celle d'une
-   autre. Le jour où vente-directe.html déclare l'échelle, il la suit tout
-   seul. Les 3 px du calcul sont les deux traits de 1,5. */
+/* LES VALEURS DE REPLI NE SERVENT PLUS QU'À LA CHARTE ABSENTE. Les DEUX
+   écrans du comptoir chargent charte.css depuis le 23/08 : le déclencheur
+   prend l'échelle et les couleurs de sa page, thème sombre compris. Elles
+   restent parce qu'un fichier de style qui ne se charge pas ne doit pas rendre
+   un écran illisible. Les 3 px du calcul sont les deux traits de 1,5. */
 .menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:var(--champ-y,13px) var(--champ-x,14px);
   min-height:calc(var(--ligne-champ,1.375) * 1em + var(--champ-y,13px) * 2 + 3px);
-  border:1.5px solid var(--border,#d7dce3);border-radius:var(--arrondi-champ,10px);background:#fff;cursor:pointer;text-align:left;
-  font:inherit;font-size:var(--taille-texte,16px);line-height:var(--ligne-champ,1.375);color:var(--text-1,#1f1f1f);transition:border-color var(--dur-1,.12s) var(--ease,ease),box-shadow var(--dur-1,.12s) var(--ease,ease)}
+  border:1.5px solid var(--border,#d7dce3);border-radius:var(--arrondi-champ,10px);background:var(--surface,#fff);cursor:pointer;text-align:left;
+  font:inherit;font-size:var(--taille-texte,15px);line-height:var(--ligne-champ,1.375);color:var(--text-1,#1f1f1f);transition:border-color var(--dur-1,.12s) var(--ease,ease),box-shadow var(--dur-1,.12s) var(--ease,ease)}
 /* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la
    référence ni la pastille ne doivent la dépasser, sinon le champ regrandit
    et l'alignement repart. */
-.menu-declencheur .menu-jeton{font-size:var(--taille-texte,13px);line-height:1.2;padding:1px 6px}
+.menu-declencheur .menu-jeton{font-size:var(--taille-texte,15px);line-height:1.2;padding:1px 6px}
 .menu-declencheur .menu-pastille{width:16px;height:16px}
 .menu-declencheur:hover{border-color:var(--border-strong,#8d959d)}
 .menu-declencheur:focus-visible{outline:3px solid rgba(var(--primary-rgb,20,46,84),.15);border-color:var(--primary,#142e54)}
@@ -1148,17 +1158,23 @@
    suffit à la faire ressortir de la désignation qui la suit. Les chiffres
    gardent leur largeur fixe (tabular-nums), c'est du réglage de chiffres, pas
    un changement de police. */
-.menu-jeton{flex:none;font-size:var(--taille-texte,13px);font-weight:var(--graisse-forte,800);font-variant-numeric:tabular-nums;
+.menu-jeton{flex:none;font-size:var(--taille-texte,15px);font-weight:var(--graisse-forte,800);font-variant-numeric:tabular-nums;
   color:var(--text-1,#111827);background:var(--border-soft,#eef0f3);border-radius:6px;padding:4px 7px;white-space:nowrap}
-.menu-texte{flex:1 1 auto;min-width:0;font-size:var(--taille-texte,15px);color:var(--text-2,#3b424a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* UNE VALEUR CHOISIE NE SE LIT PAS COMME UN PLACEHOLDER. Les deux états
+   pointaient sur le MÊME jeton (--text-2) : « OUI — 4 % » sortait dans le gris
+   exact de « Choisir », et un menu rempli avait l'air vide — d'autant plus
+   depuis que la TGCA arrive renseignée. La valeur prend l'encre du texte, le
+   vide garde le gris des placeholders. (Les deux valeurs de repli, elles,
+   disaient déjà la bonne chose : encre foncée d'un côté, gris de l'autre.) */
+.menu-texte{flex:1 1 auto;min-width:0;font-size:var(--taille-texte,15px);color:var(--text-1,#3b424a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-texte.est-vide{color:var(--text-2,#767d85)}
 /* Une pastille de couleur EST une information : elle dit la teinte que la
    vendeuse ne devinerait pas d'après « Wet Sand ». */
-.menu-pastille{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--text-3,#9aa2aa);box-shadow:inset 0 0 0 1px #fff}
+.menu-pastille{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--text-3,#9aa2aa);box-shadow:inset 0 0 0 1px var(--surface,#fff)}
 
 .menu-panneau{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:max(100%,min(560px,80vw));
-  background:#fff;border:1px solid var(--border,#d5d9de);border-radius:var(--arrondi-bloc,12px);overflow:hidden;display:none;
-  box-shadow:0 14px 34px rgba(17,24,39,.15),0 2px 6px rgba(17,24,39,.06)}
+  background:var(--surface,#fff);border:1px solid var(--border,#d5d9de);border-radius:var(--arrondi-bloc,12px);overflow:hidden;display:none;
+  box-shadow:var(--shadow-2,0 14px 34px rgba(17,24,39,.15))}
 .menu.est-ouvert .menu-panneau{display:block;animation:menuEntre .13s ease-out}
 @keyframes menuEntre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 .menu-tete{display:flex;align-items:center;gap:10px;padding:10px;background:var(--zone-bg,#fafbfc);border-bottom:1px solid var(--border-soft,#eceff2)}
@@ -1167,7 +1183,7 @@
 .menu-liste{max-height:326px;overflow-y:auto;margin:0;padding:6px;list-style:none}
 /* Le titre de famille reste collé en haut pendant le défilement : 48
    références sur 13 familles, sans ça on ne sait plus dans quoi on est. */
-.menu-groupe{position:sticky;top:0;z-index:1;background:#fff;padding:13px 10px 5px;
+.menu-groupe{position:sticky;top:0;z-index:1;background:var(--surface,#fff);padding:13px 10px 5px;
   font-size:var(--taille-texte,13px);font-weight:var(--graisse-forte,800);letter-spacing:.09em;text-transform:uppercase;color:var(--text-2,#8b9199)}
 .menu-groupe:first-child{padding-top:5px}
 .menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
@@ -1194,14 +1210,14 @@
 /* Une ligne, pas une bannière : un « + » et un mot. Elle doit se voir sans
    se mettre devant la liste — c'est un raccourci, pas la réponse attendue. */
 .menu-manuel{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border:0;
-  border-bottom:1px solid var(--border-soft,#eceff2);background:#fff;font:inherit;font-size:var(--taille-texte,13px);font-weight:var(--graisse-note,600);
+  border-bottom:1px solid var(--border-soft,#eceff2);background:var(--surface,#fff);font:inherit;font-size:var(--taille-texte,15px);font-weight:var(--graisse-note,600);
   color:var(--text-2,#525960);text-align:left;cursor:pointer}
 .menu-manuel:hover,.menu-manuel:focus-visible{background:var(--zone-bg,#f5f6f8);color:var(--text-1,#111827);outline:none}
 .menu-plus{flex:none;font-size:var(--taille-texte,15px);font-weight:var(--graisse-forte,800);line-height:1;color:inherit}
 .menu-saisie{display:none;gap:8px;padding:10px;border-bottom:1px solid var(--border-soft,#eceff2);background:var(--zone-bg,#fafbfc)}
 .menu-saisie input{flex:1 1 auto;min-width:0;font-size:var(--taille-texte,15px);padding:9px 11px}
 .menu-saisie button{flex:none;border:0;border-radius:var(--arrondi-champ,10px);padding:9px 14px;background:var(--text-1,#111827);
-  color:#fff;font:inherit;font-weight:var(--graisse-forte,800);cursor:pointer}
+  color:var(--on-primary,#fff);font:inherit;font-weight:var(--graisse-forte,800);cursor:pointer}
 /* Pendant la saisie libre, la liste s'efface : deux façons de répondre à la
    même question en même temps, c'est une hésitation de plus au comptoir. */
 .menu.est-saisie .menu-saisie{display:flex}

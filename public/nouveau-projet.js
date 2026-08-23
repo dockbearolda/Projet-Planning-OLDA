@@ -46,11 +46,49 @@ const FLUX = [
   },
 ];
 
+// --- LE THÈME DE L'HÔTE, PASSÉ AUX PARCOURS ---------------------------------
+// Les deux écrans du comptoir sont des documents à part, affichés dans un
+// cadre. Ils lisent la même charte que le planning, thème sombre compris — mais
+// un cadre ne connaît pas le `data-theme` de son hôte.
+// DEUX CHEMINS, ET LES DEUX SONT NÉCESSAIRES :
+//   · l'ADRESSE porte le thème d'ouverture — le cadre l'applique avant son
+//     premier pixel, sinon il s'ouvre en clair puis bascule sous les yeux ;
+//   · un MESSAGE porte les basculements suivants — l'interrupteur du planning
+//     se clique très bien pendant qu'un parcours est ouvert derrière.
+function themeActuel() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function urlDuFlux(f) {
+  return `${f.src}?theme=${themeActuel()}`;
+}
+
 let ROOT = null;
 let enCours = false;       // un enregistrement est en vol : on n'en lance pas deux
 let fluxAffiche = null;    // le parcours SOUS LES YEUX, s'il y en a un
 
 const cadreDe = (id) => ROOT.querySelector(`#np-frame-${id}`);
+
+// Le cadre a pu être ouvert avant la bascule : on prévient ceux qui existent.
+// Un cadre jamais ouvert n'a pas de document — il prendra le thème par son
+// adresse le jour où on l'ouvre. Tant que l'onglet n'a pas été construit,
+// `ROOT` est nul : il n'y a personne à prévenir.
+function diffuserTheme() {
+  if (!ROOT) return;
+  const theme = themeActuel();
+  for (const f of FLUX) {
+    const cadre = cadreDe(f.id);
+    const w = cadre && cadre.getAttribute('src') && cadre.contentWindow;
+    if (w) w.postMessage({ type: 'OLDA_THEME', theme }, window.location.origin);
+  }
+}
+
+// On observe l'attribut plutôt que d'appeler depuis `applyTheme` : ce module est
+// chargé à la demande, il n'a rien à faire dans le chemin de l'interrupteur — et
+// n'importe qui d'autre peut changer le thème sans avoir à le savoir.
+new MutationObserver(diffuserTheme).observe(document.documentElement, {
+  attributes: true, attributeFilter: ['data-theme'],
+});
 
 /* Une flèche vers la gauche N'EXISTE PAS dans `olda-icones.woff2` : le
    sous-ensemble figé n'a qu'`arrow_forward` et `chevron_right`, et un nom
@@ -109,7 +147,7 @@ function afficher(id) {
     cadre.hidden = !flux || f.id !== flux.id;
     // Chargement à la demande : tant qu'un parcours n'a pas été ouvert, son
     // document n'est même pas téléchargé.
-    if (!cadre.hidden && !cadre.src) cadre.src = f.src;
+    if (!cadre.hidden && !cadre.src) cadre.src = urlDuFlux(f);
   }
   // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
   // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
@@ -141,10 +179,15 @@ function rafraichirClients(id) {
 function reinitialiser(id) {
   const cadre = cadreDe(id);
   if (!cadre || !cadre.getAttribute('src')) return;
+  // On recalcule l'adresse : le thème a pu changer depuis l'ouverture, et
+  // recharger l'ancienne rallumerait l'écran en clair le temps d'un message.
+  const flux = FLUX.find((f) => f.id === id);
+  const url = flux ? urlDuFlux(flux) : cadre.getAttribute('src');
+  cadre.setAttribute('src', url);
   try {
-    cadre.contentWindow.location.replace(cadre.src);
+    cadre.contentWindow.location.replace(url);
   } catch (err) {
-    cadre.src = cadre.getAttribute('src');
+    cadre.src = url;
   }
 }
 
