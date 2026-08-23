@@ -313,6 +313,16 @@ assert.ok(/const rienChoisi=etat\.hote\.value==='';\s*return menuOptions\(etat\.
 // pas un libellé d'attente, c'est une réponse — et le seul chemin de retour.
 assert.ok(/rienChoisi&&o\.valeur===''/.test(PONT),
   '… et redevient proposable une fois une vraie valeur prise');
+// LA RÉFÉRENCE, ELLE, N'EN A PLUS DU TOUT (23/08/2026). Elle est obligatoire :
+// on ne revient jamais à « rien », et la ligne d'attente occupait la première
+// place de la liste en répétant le champ fermé et le filtre. Elle est retirée
+// du <select> lui-même, pas du composant — les autres champs la gardent.
+assert.ok(!/Choisir une référence/.test(DEVIS.replace(/\/\*[\s\S]*?\*\//g, '')),
+  'la liste des références n’a plus de ligne d’attente');
+// SANS OPTION VIDE, LE NAVIGATEUR SÉLECTIONNE LA PREMIÈRE — « Nouvelle
+// référence / produit libre » : le formulaire se serait ouvert en saisie libre.
+assert.ok(/txFill\(\$\('txRef'\),noeuds\);[\s\S]{0,400}?\$\('txRef'\)\.value='';/.test(DEVIS),
+  '… et la référence repart explicitement sur aucune option sélectionnée');
 // Le compteur portait sur le contenu brut du <select> : « 49 / 50 » alors que
 // rien n'était filtré.
 assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(PONT),

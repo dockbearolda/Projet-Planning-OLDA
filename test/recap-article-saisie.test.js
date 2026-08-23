@@ -233,6 +233,15 @@ assert.ok(/Prix HT \/ pièce/.test(kpis) && /Total HT/.test(kpis),
   'les deux chiffres à découvert sont le prix à la pièce et le total');
 assert.ok(!/Temps de production|Marge/.test(kpis),
   '… et rien d’autre');
+// UN SEUL PRIX EN GRAND, ET C'EST LE TOTAL, EN TÊTE (23/08/2026). Les deux
+// étaient en 28 px l'un sous l'autre : deux nombres de même poids obligent à
+// choisir lequel lire, et c'est le total que la vendeuse annonce.
+assert.ok(kpis.indexOf('Total HT') < kpis.indexOf('Prix HT / pièce'),
+  'le total ouvre la carte, le prix à la pièce vient après');
+assert.strictEqual((kpis.match(/est-annonce/g) || []).length, 1,
+  'un seul chiffre porte la grande taille : le total');
+assert.ok(/txRang\(g,'Total HT',money\(c\.total\),null,'est-annonce'\)/.test(kpis),
+  '… et c’est bien le total qui la porte');
 // Le volet porte les huit rangées, dans une table de la MÊME forme : sans ça,
 // ses valeurs ne tombent pas sous celles du dessus quand on l'ouvre.
 const volet = source('txMargeBloc', 'd,c');

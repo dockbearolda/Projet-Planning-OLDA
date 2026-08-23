@@ -1047,11 +1047,10 @@ h2{letter-spacing:-.01em}
 <div class="demande-chiffrage hidden" id="sideTextileCard">
 <div class="demande-total"><span>Total HT</span><b id="txKpiHT">0,00 €</b></div>
 <div class="demande-total is-fort"><span>Total TTC</span><b id="txKpiTTC">0,00 €</b></div>
-<!-- Ce que la vendeuse seule lit : ces trois-là ne partent JAMAIS au client
-     (voir txComment). Deux valeurs par rangée pour tenir dans la hauteur. -->
+<!-- Ce que la vendeuse seule lit : la marge ne part JAMAIS au client (voir
+     txComment). Deux valeurs sur la rangée pour tenir dans la hauteur. -->
 <div class="demande-atelier">
 <div class="demande-total tx-side-marge"><span>Marge</span><b><span id="txKpiMargin">0,00 €</span> · <span id="txKpiMarginPct">0,0 %</span></b></div>
-<div class="demande-total"><span>Atelier</span><b><span id="txKpiTime">0 h 00</span> · <span id="txKpiHour">—</span> / h</b></div>
 </div>
 </div>
 <p class="help demande-reste hidden" id="dmdAChiffrer"></p>
@@ -1440,7 +1439,13 @@ function txPopulateSelects(){
   /* La référence OUVRE la ligne, la désignation suit. À l'intérieur d'un
      groupe on range par référence : la colonne de gauche se lit alors d'un
      trait (NS300, NS305, NS308…) au lieu de sauter d'une marque à l'autre. */
-  const noeuds=[new Option('— Choisir une référence —',''),new Option('➕  Nouvelle référence / produit libre','__CUSTOM__')];
+  /* PAS DE LIGNE « — Choisir une référence — » DANS LA LISTE. Le composant de
+     menus la cache tant que rien n'est choisi, puis la remet en tête — c'est
+     le seul chemin de retour vers « rien » sur les champs où « non précisé »
+     est une réponse. La référence n'est pas de ceux-là : elle est obligatoire,
+     on n'y revient jamais, et la ligne occupait la première place de la liste
+     en répétant ce que le champ fermé et le filtre disent déjà. */
+  const noeuds=[new Option('➕  Nouvelle référence / produit libre','__CUSTOM__')];
   groupes.forEach(g=>{
     const groupe=document.createElement('optgroup');
     groupe.label=g;
@@ -1454,6 +1459,10 @@ function txPopulateSelects(){
     noeuds.push(groupe);
   });
   txFill($('txRef'),noeuds);
+  /* SANS OPTION VIDE, LE NAVIGATEUR CHOISIT LA PREMIÈRE — ici « Nouvelle
+     référence / produit libre » : le formulaire se serait ouvert en saisie
+     libre. On repart donc explicitement sur aucune option sélectionnée. */
+  $('txRef').value='';
   txFill($('txPrintType'),[new Option('Choisir',''),...Object.keys(db.printTypes).map(x=>new Option(x,x))]);
   /* Chaque couleur de marquage emporte sa teinte : « Vert » et « Vert pastel »
      ne se distinguent pas par leur nom. */
@@ -1669,10 +1678,15 @@ function txRang(g,libelle,valeur,cls,clsValeur){
    la première au moment précis où la vendeuse annonce un prix de vive voix.
    Les huit autres rangées se déplient d'un clic (voir txMargeBloc). */
 function txKpis(g,c){
-  /* Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend
+  /* UN SEUL PRIX EN GRAND, ET C'EST LE TOTAL — en tête de la carte. Les deux
+     étaient écrits en 28 px, l'un sous l'autre : deux nombres de même poids
+     obligent à choisir lequel lire, et c'est le total que la vendeuse annonce.
+     Le prix à la pièce reste juste en dessous, à la taille du texte : il
+     explique le total, il ne rivalise plus avec lui.
+     Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend
      juste la place. Les deux cellules restent sur la même ligne de base. */
-  txRang(g,'Prix HT / pièce',money(c.sold),null,'est-annonce');
   txRang(g,'Total HT',money(c.total),null,'est-annonce');
+  txRang(g,'Prix HT / pièce',money(c.sold));
 }
 
 /* CE QUE LA LIGNE COÛTE À L'ATELIER. */
@@ -1942,15 +1956,15 @@ function onTextileGlobalChange(){
 }
 
 function txTotals(){
-  let qty=0,ht=0,margin=0,hours=0;
+  let qty=0,ht=0,margin=0;
   needs.forEach(n=>{
     if(!n.textile)return;
     const c=txCalc(n.textile);
     if(!c)return;
-    qty+=c.qty;ht+=c.total;margin+=c.margin;hours+=c.prodHours;
+    qty+=c.qty;ht+=c.total;margin+=c.margin;
   });
   const rate=txReady()?txNum($('txTgca').value):0;
-  return {qty,ht,tax:ht*rate,ttc:ht*(1+rate),margin,hours,eurH:hours>0?margin/hours:NaN};
+  return {qty,ht,tax:ht*rate,ttc:ht*(1+rate),margin};
 }
 /* Écriture GARDÉE : ces cases vivent dans le panneau de droite, qui a déjà
    changé de forme deux fois. Un identifiant qui disparaît ne doit pas arrêter
@@ -1958,13 +1972,10 @@ function txTotals(){
 function txRefreshTotals(){
   if(!txReady())return;
   const t=txTotals();
-  setTextSafe('txKpiQty',t.qty);
   setTextSafe('txKpiHT',money(t.ht));
   setTextSafe('txKpiTTC',money(t.ttc));
   setTextSafe('txKpiMargin',money(t.margin));
   setTextSafe('txKpiMarginPct',txPct(t.ht>0?t.margin/t.ht:0));
-  setTextSafe('txKpiTime',TE().fmtTime(t.hours));
-  setTextSafe('txKpiHour',Number.isFinite(t.eurH)?money(t.eurH):'—');
   $('sideTextileCard').classList.toggle('hidden',!needs.some(n=>n.textile));
 }
 
