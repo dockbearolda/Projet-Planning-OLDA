@@ -502,6 +502,16 @@ h2{letter-spacing:-.01em}
    qui le dit — pas un titre de plus, pas un deuxième trait fort qui se serait
    lu comme un second total. */
 .tx-volet .tx-tableau+.tx-tableau{margin-top:var(--pas-4)}
+/* LE RÉCAPITULATIF SE REPLIE SUR SON TOTAL. Son résumé EST une rangée du
+   tableau — le total et rien d'autre — donc il tombe dans la même colonne que
+   tout le reste, replié comme déplié. Le chevron se pose sur l'intitulé et non
+   sur le résumé : posé sur le résumé, il aurait décalé la rangée entière d'une
+   demi-largeur de triangle et cassé l'alignement du tableau. */
+.tx-recap>summary{cursor:pointer;user-select:none;list-style:none}
+.tx-recap>summary::-webkit-details-marker{display:none}
+.tx-recap>summary::marker{content:''}
+.tx-recap>summary .tx-recap-cle::before{content:'▸';color:var(--text-2);margin-inline-end:var(--pas-1)}
+.tx-recap[open]>summary .tx-recap-cle::before{content:'▾'}
 /* Les deux volets dépliables : leur résumé est une rangée du tableau, il
    commence donc à la même verticale que les intitulés. */
 .tx-volet{margin-top:var(--pas-3);padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
@@ -1660,6 +1670,7 @@ function txNombre(n){return (Number(n)||0).toLocaleString('fr-FR',{minimumFracti
    réécrit à CHAQUE touche : sans mémoire, le détail des champs se refermait
    sous les doigts dès qu'on corrigeait une taille. */
 let txDetailOuvert=false;
+const TX_RECAP={form:true,fiche:true};
 
 /* LE RÉCAPITULATIF S'ANNONCE PAR SON TITRE, RIEN DE PLUS. Il portait aussi
    « 2 pièces · avant ajout au projet » : le nombre de pièces se relit deux
@@ -1680,23 +1691,19 @@ function txRang(g,libelle,valeur,cls,clsValeur){
   return v;
 }
 
-/* LES DEUX CHIFFRES QU'ON ANNONCE AU CLIENT, ET RIEN D'AUTRE À DÉCOUVERT.
-   La carte en montrait dix d'affilée : le prix, le total, puis le temps de
-   production, la marge à l'heure, la marge, son seuil, sa cible, et le détail
-   textile / marquage / transport / TGCA. Ce sont deux lectures différentes —
-   ce qu'on dit au client, et ce que l'atelier y gagne — et la seconde noyait
-   la première au moment précis où la vendeuse annonce un prix de vive voix.
-   Tout le reste se déplie d'un clic, d'un seul (voir txDetail). */
-function txKpis(g,c){
-  /* UN SEUL PRIX EN GRAND, ET C'EST LE TOTAL — en tête de la carte. Les deux
-     étaient écrits en 28 px, l'un sous l'autre : deux nombres de même poids
-     obligent à choisir lequel lire, et c'est le total que la vendeuse annonce.
-     Le prix à la pièce reste juste en dessous, à la taille du texte : il
-     explique le total, il ne rivalise plus avec lui.
-     Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend
-     juste la place. Les deux cellules restent sur la même ligne de base. */
-  txRang(g,'Total HT',money(c.total),null,'est-annonce');
-  txRang(g,'Prix HT / pièce',money(c.sold));
+/* LE TOTAL EST LE RÉSUMÉ DU RÉCAPITULATIF. C'est le chiffre qu'on annonce de
+   vive voix, donc le seul qui reste quand tout le reste se replie.
+   UN SEUL PRIX EN GRAND, ET C'EST LUI. Le prix à la pièce était écrit en 28 px
+   juste en dessous : deux nombres de même poids obligent à choisir lequel lire.
+   Il est passé dans le corps, à la taille du texte — il explique le total, il
+   ne rivalise plus avec lui.
+   Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend juste
+   la place. Les deux cellules restent sur la même ligne de base. */
+function txKpiTotal(c){
+  const sum=txEl('summary'),g=txEl('div','tx-tableau');
+  txRang(g,'Total HT',money(c.total),'tx-recap-cle','est-annonce');
+  sum.append(g);
+  return sum;
 }
 
 /* CE QUE LA LIGNE COÛTE À L'ATELIER. */
@@ -1762,13 +1769,32 @@ function txCalculBloc(d,c){
    (`--tab-valeur`), donc les virgules tombent ensemble d'une table à l'autre.
    Un vrai élément et non un fragment : l'appelant du détail d'un article posé
    lui ajoute une classe (`tx-card-metrics`), et un fragment n'a pas de
-   `classList` — il se serait vidé à l'insertion, en emportant l'erreur. */
-function txTableau(d,c){
-  const bloc=txEl('div');
+   `classList` — il se serait vidé à l'insertion, en emportant l'erreur.
+
+   ET IL SE REPLIE SUR SON TOTAL. Ouvert par défaut — c'est un contrôle de
+   saisie, il se relit avant de poser la ligne. Replié, il ne garde que le
+   chiffre qu'on annonce : c'est exactement ce qu'il faut sous les yeux pendant
+   qu'on négocie, avec les solutions à la place du reste (voir
+   ouvrirNegociation, qui le replie tout seul). `dedans` porte ce qui doit se
+   replier AVEC lui — le calcul et la marge ; les alertes, elles, restent
+   dehors : une alarme qu'on peut plier n'est plus une alarme.
+
+   CHAQUE SURFACE A SA PROPRE MÉMOIRE D'OUVERTURE. Le récapitulatif du
+   formulaire est un contrôle de saisie : il s'ouvre. Celui de la fiche se
+   replie dès qu'on négocie. Avec une mémoire commune, l'état de l'un fuyait
+   sur l'autre — on négociait une ligne, et le besoin suivant s'écrivait déjà
+   replié. */
+function txTableau(d,c,dedans,ou){
+  const cle=ou||'form';
+  const det=txEl('details','tx-recap');
+  det.open=TX_RECAP[cle];
+  /* Le volet retiré du document délivre encore son `toggle` — même garde-fou
+     que txDetail, sans quoi une remise à zéro se ferait écraser après coup. */
+  det.addEventListener('toggle',()=>{if(det.isConnected)TX_RECAP[cle]=det.open});
   const g=txEl('div','tx-tableau');
-  txKpis(g,c);
-  bloc.append(g,txSaisieBloc(d));
-  return bloc;
+  txRang(g,'Prix HT / pièce',money(c.sold));
+  det.append(txKpiTotal(c),g,txSaisieBloc(d),...(dedans||[]));
+  return det;
 }
 
 /* TOUT CE QUI NE S'ANNONCE PAS AU CLIENT, DERRIÈRE UN SEUL CLIC. Il y avait
@@ -1847,7 +1873,7 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTete(),txTableau(d,c),txDetail(d,c),...txAlertes(d,c)]);
+  txFill(box,[txTete(),txTableau(d,c,[txDetail(d,c)]),...txAlertes(d,c)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -1940,7 +1966,7 @@ function txApplyToForm(t){
 function editTextileNeed(i){
   choisirTypeBesoin('textile');
   editingTextile=i;
-  txDetailOuvert=false;
+  txDetailOuvert=false;TX_RECAP.form=true;
   txApplyToForm(needs[i].textile||{});
   poserTitreForm('txFormTitle',`Modifier l’article n°${i+1}`,true);
   $('txSaveLabel').textContent='Enregistrer la modification';
@@ -1952,8 +1978,10 @@ function cancelTextileEdit(){
   /* LE VOLET SE REFERME AVEC LA LIGNE QU'ON VIENT DE POSER. Sa mémoire existe
      pour qu'il ne se referme pas SOUS LES DOIGTS pendant la frappe — pas pour
      qu'un besoin ouvre déjà déplié parce que le précédent l'était. Ouvert par
-     défaut, il repousse le bouton d'ajout d'une quinzaine de rangées. */
-  txDetailOuvert=false;
+     défaut, il repousse le bouton d'ajout d'une quinzaine de rangées.
+     Le récapitulatif, lui, revient OUVERT : c'est le contrôle de saisie du
+     besoin suivant, et une négociation l'avait peut-être replié. */
+  txDetailOuvert=false;TX_RECAP.form=true;
   ['txCustomRef','txCustomPurchase','txCustomDesignation','txColor','txGenre','txTransport','txPrintType','txMarkColor','txNote','txS','txM','txL','txXL','txXXL','txOther','txDiscount','txManualPrice'].forEach(id=>$(id).value='');
   $('txRef').value='';onTextileRefChange();menusRafraichirTous();
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
@@ -2249,10 +2277,9 @@ function negRemplirResultats(hote, i, n){
   if(!c) return;
   const target = negTargetDe(n);
 
-  if(!(target>0)){
-    hote.append(txEl('p', 'help', 'Saisis le prix que le client demande : les solutions apparaissent aussitôt.'));
-    return;
-  }
+  /* Sans prix demandé, RIEN : le champ juste au-dessus porte déjà son
+     intitulé, une phrase de plus ne faisait que décrire l'écran. */
+  if(!(target>0))return;
   if(target >= c.sold){
     hote.append(txEl('p', 'help', n.textile.negotiation
       ? `L'accord en place est déjà à ${money(c.sold)} la pièce : le client demande plus cher que ce qu'il paie.`
@@ -2334,11 +2361,11 @@ function renderDetailArticle(){
 
   /* Les mêmes blocs que le récapitulatif du formulaire : une ligne relue ici
      ou là-haut doit se lire pareil. */
-  const metrics=txTableau(n.textile,c);
+  const metrics=txTableau(n.textile,c,[txDetail(n.textile,c)],'fiche');
   metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,txDetail(n.textile,c),...txAlertes(n.textile,c));
+  bloc.append(tete,rang,metrics,...txAlertes(n.textile,c));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
@@ -2353,6 +2380,9 @@ function ouvrirArticle(i,ev){
   const n=needs[i];
   if(!n)return;
   if(!n.textile)return editNeed(i);
+  /* Ouvrir une fiche, c'est vouloir la LIRE : son récapitulatif s'ouvre, même
+     si la négociation précédente l'avait replié. */
+  TX_RECAP.fiche=true;
   articleOuvert=(articleOuvert===i)?-1:i;
   if(articleOuvert<0)negOuvert=-1;
   renderNeeds();
@@ -2365,6 +2395,11 @@ function ouvrirArticle(i,ev){
 function ouvrirNegociation(i){
   const n=needs[i];
   if(!n||!n.textile)return;
+  /* NÉGOCIER, C'EST REGARDER UN SEUL CHIFFRE. Le récapitulatif de la fiche se
+     replie sur son total : les dix rangées de relecture poussaient les
+     solutions hors de l'écran au moment précis où la vendeuse doit les
+     comparer. Celui du formulaire, lui, ne bouge pas. */
+  TX_RECAP.fiche=false;
   articleOuvert=i;negOuvert=i;
   renderNeeds();
   $('detailArticle').scrollIntoView({behavior:'smooth',block:'nearest'});
