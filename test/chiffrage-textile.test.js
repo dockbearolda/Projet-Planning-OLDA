@@ -202,8 +202,8 @@ assert.ok(!/^\s*renderNeeds\(\);?$/m.test(poser),
 
 // Le champ se construit UNE fois, les solutions se réécrivent à part : les
 // deux ne peuvent pas vivre dans la même fonction sans reprendre le curseur.
-const panneau = (DEVIS.match(/function negPanneau\(i,\s*n\)\{[\s\S]*?\n\}/) || [''])[0];
-const resultats = (DEVIS.match(/function negRemplirResultats\(hote,\s*i,\s*n\)\{[\s\S]*?\n\}/) || [''])[0];
+const panneau = (DEVIS.match(/function negPanneau\(i\)\{[\s\S]*?\n\}/) || [''])[0];
+const resultats = (DEVIS.match(/function negRemplirResultats\(hote,\s*i\)\{[\s\S]*?\n\}/) || [''])[0];
 assert.ok(resultats, 'les solutions doivent se rendre dans leur propre bloc');
 assert.ok(/negResultats-\$\{i\}/.test(panneau) && /negRemplirResultats\(/.test(panneau),
   'le panneau accroche un conteneur de solutions identifié par la ligne');

@@ -300,6 +300,12 @@ h2{letter-spacing:-.01em}
 .neg-sol-metrics{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;font-size:var(--taille-texte)}
 .neg-sol-metrics span{color:var(--text-2)}
 .neg-sol-metrics b{display:block;font-size:var(--taille-texte);font-variant-numeric:tabular-nums}
+/* La couleur dit un état, et elle vient de la charte : elle était écrite en
+   dur (#1d6f43 / #a02020) et ne suivait donc pas le thème sombre. */
+.neg-sol-metrics b.est-bon{color:var(--success)}
+.neg-sol-metrics b.est-mauvais{color:var(--danger)}
+/* Deux mots au lieu d'une phrase : « à éviter » se dit par la couleur. */
+.neg-best-badge.est-danger{background:var(--danger-bg);color:var(--danger)}
 .neg-sol-foot{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .neg-sol-foot .help{margin-top:0}
 .neg-sol-foot button{padding:var(--champ-y-serre) 20px!important}
@@ -691,7 +697,7 @@ h2{letter-spacing:-.01em}
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="bloc"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><button id="txNegBtn" type="button" class="secondary hidden" onclick="negocierDepuisTicket()">Le client négocie</button><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="bloc"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
@@ -1600,6 +1606,10 @@ function txReadForm(){
     note:$('txNote').value.trim(),
     discount:$('txDiscount').value,manualPrice:$('txManualPrice').value,
     markupPercent:$('txMarkup').value,
+    /* Ce que la NÉGOCIATION ajoute à l'article en cours — prix demandé,
+       contre-offre, accord retenu — n'a pas de champ dans le formulaire : ça
+       vit à côté, et ça part avec la ligne quand elle est posée. */
+    ...TX_NEG,
   };
 }
 function txCalc(d){return txReady()?TE().calculate(d):null}
@@ -1835,6 +1845,28 @@ function txDetail(d,c){
   return det;
 }
 
+/* LA NÉGOCIATION EST UN VOLET DU TICKET. « Le client trouve ça cher » se traite
+   là où le prix s'affiche : on déplie, on tape le prix demandé, on lit les
+   sorties possibles. C'était un bouton qui posait la ligne et emmenait la
+   vendeuse sur une autre carte — trois gestes pour une question qui se pose en
+   plein milieu de la saisie.
+   L'ouvrir replie le récapitulatif : les cartes de solutions ont besoin de la
+   hauteur, et pendant qu'on négocie c'est le total qu'on regarde. On ne le
+   replie qu'UNE fois — sinon chaque redessin rouvrirait la boucle. */
+let txNegOuvert=false;
+function txNegVolet(){
+  const det=txEl('details','tx-volet');
+  det.open=txNegOuvert;
+  const sum=txEl('summary',null,'Négociation');
+  det.addEventListener('toggle',()=>{
+    if(!det.isConnected)return;
+    txNegOuvert=det.open;
+    if(det.open&&TX_RECAP.form){TX_RECAP.form=false;previewTextile()}
+  });
+  det.append(sum,negPanneau('ticket'));
+  return det;
+}
+
 /* CE QUI ENGAGE LA PRODUCTION ET QUI DORT DANS LA NOTE. Une dimension écrite
    au comptoir (« logo 120 mm », « 30x40 ») décide du fichier d'impression, et
    personne ne la relit entre la vendeuse et l'atelier. */
@@ -1848,32 +1880,18 @@ function txAlertes(d,c){
   return out;
 }
 
-/* LA BARRE NE PORTE QUE SES ACTIONS. Elle répétait ce qu'on s'apprête à
-   ajouter — « T-shirt … · 4 pièces · 123,60 € HT » — juste sous le
-   récapitulatif qui le dit déjà, en plus grand ; et sans prix calculable elle
-   affichait « Complète les champs obligatoires », alors que le bouton pose
-   l'erreur SUR le champ qui manque. Elle ne disparaît pas pour autant — c'est
-   par son bouton qu'on apprend quel champ manque.
-   Reste le seul état qu'elle décide : on ne négocie pas un prix qui n'est pas
-   encore calculé. */
-function txBarre(c){
-  const neg=$('txNegBtn');
-  if(neg)neg.classList.toggle('hidden',!c);
-}
-
 function previewTextile(){
   if(!txReady())return;
   txPoserObjet();
   const d=txReadForm(),box=$('txPreview');
   const c=txManquants().length?null:txCalc(d);
-  txBarre(c);
   if(!c){
     txFill(box,[]);
     box.classList.add('hidden');
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTete(),txTableau(d,c,[txDetail(d,c)]),...txAlertes(d,c)]);
+  txFill(box,[txTete(),txTableau(d,c,[txDetail(d,c)]),txNegVolet(),...txAlertes(d,c)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -1925,15 +1943,6 @@ function saveTextileNeed(){
   return pose;
 }
 
-/* NÉGOCIER SANS SORTIR DU TICKET. « Le client trouve ça cher » arrive pendant
-   qu'on compose l'article, pas trois écrans plus loin. L'action pose la ligne
-   PUIS ouvre sa négociation : une remise se calcule sur un article qui existe,
-   et poser la ligne est de toute façon le geste suivant. Un champ manquant
-   arrête tout — `saveTextileNeed` a déjà marqué le champ en rouge. */
-function negocierDepuisTicket(){
-  const i=saveTextileNeed();
-  if(typeof i==='number')ouvrirNegociation(i);
-}
 /* Ce texte part dans le récapitulatif ET dans le message WhatsApp envoyé AU
    CLIENT (recapText). Il ne porte donc que ce que le client a commandé :
    marge, temps de production et coût de revient restent à l'écran, où seule
@@ -1958,6 +1967,10 @@ function txApplyToForm(t){
   $('txPrintType').value=t.printType||'';$('txMarkColor').value=t.markColor||'';
   const s=t.sizes||{};
   $('txS').value=s.S||'';$('txM').value=s.M||'';$('txL').value=s.L||'';$('txXL').value=s.XL||'';$('txXXL').value=s.XXL||'';$('txOther').value=s.other||'';
+  /* La négociation de la ligne revient avec elle : sans ça, rouvrir un article
+     déjà négocié repartait d'un prix demandé vide et d'un accord perdu. */
+  txNegRepartir();
+  ['negTarget','negCustom','negotiation'].forEach(k=>{if(t[k]!==undefined)TX_NEG[k]=t[k]});
   $('txNote').value=t.note||'';
   $('txDiscount').value=t.discount||'';$('txManualPrice').value=t.manualPrice||'';
   menusRafraichirTous();    /* sept valeurs posées d'un coup, aucun évènement derrière */
@@ -1981,7 +1994,7 @@ function cancelTextileEdit(){
      défaut, il repousse le bouton d'ajout d'une quinzaine de rangées.
      Le récapitulatif, lui, revient OUVERT : c'est le contrôle de saisie du
      besoin suivant, et une négociation l'avait peut-être replié. */
-  txDetailOuvert=false;TX_RECAP.form=true;
+  txDetailOuvert=false;TX_RECAP.form=true;txNegRepartir();
   ['txCustomRef','txCustomPurchase','txCustomDesignation','txColor','txGenre','txTransport','txPrintType','txMarkColor','txNote','txS','txM','txL','txXL','txXXL','txOther','txDiscount','txManualPrice'].forEach(id=>$(id).value='');
   $('txRef').value='';onTextileRefChange();menusRafraichirTous();
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
@@ -2047,39 +2060,62 @@ function txInit(){
    ensuite comme n'importe quelle autre. */
 let negOuvert = -1;
 
-function negTargetDe(n){ return txNum((n.textile||{}).negTarget); }
+/* SUR QUOI PORTE UNE NÉGOCIATION. Deux surfaces la lancent : le TICKET, sur
+   l'article en cours de saisie, et la FICHE, sur une ligne déjà posée. `i` est
+   l'indice de la ligne, ou la chaîne 'ticket'. Ces trois fonctions savent où
+   lire la saisie et où ranger ce que la négociation y ajoute ; tout le reste
+   de la négociation ne connaît que `i`.
+   Sur le ticket, la saisie EST le formulaire : elle se relit à chaque fois —
+   une taille corrigée doit changer les solutions — et ce que la négociation y
+   ajoute vit dans TX_NEG jusqu'à ce que la ligne soit posée (txReadForm l'y
+   recolle). */
+const TX_NEG={};
+/* Une négociation ne se traîne pas d'un article au suivant : le prix demandé
+   par le client d'avant n'a rien à faire sur la ligne d'après. */
+function txNegRepartir(){
+  Object.keys(TX_NEG).forEach(k=>{delete TX_NEG[k]});
+  txNegOuvert=false;
+}
+function negSaisie(i){
+  if(i!=='ticket')return (needs[i]||{}).textile||null;
+  const d=txReadForm();
+  return d.ref?d:null;
+}
+function negPoser(i,cle,valeur){
+  if(i==='ticket')TX_NEG[cle]=valeur;
+  else if(needs[i]&&needs[i].textile)needs[i].textile[cle]=valeur;
+}
+function negTargetDe(i){ return txNum((negSaisie(i)||{}).negTarget); }
 /* On écrit le prix demandé, on NE REDESSINE PAS la liste : `renderNeeds`
    remplace tout `needsDisplay`, donc le champ lui-même repartait à chaque
    frappe. Le curseur tombait après le premier chiffre — « 23 » se figeait
    à « 2 » et les solutions s'ouvraient comme si la vendeuse avait validé.
    Seules les solutions, qui vivent SOUS le champ, se réécrivent. */
 function negPoserTarget(i, valeur){
-  needs[i].textile.negTarget = valeur;
+  negPoser(i,'negTarget',valeur);
   const hote = document.getElementById(`negResultats-${i}`);
-  if(hote) negRemplirResultats(hote, i, needs[i]);
+  if(hote) negRemplirResultats(hote, i);
   else renderNeeds();
 }
 
-/* Ce que la vendeuse dit au client, en une phrase. Le vocabulaire de l'écran du
-   patron (« GAIN vs accepter client ») ne se lit pas au comptoir : on dit ce
-   qu'elle vend, ce que le client paie, et ce que ça laisse. */
-function negPhrase(c, m, target){
-  if(m.sousLeCout) return 'À éviter : ce prix est sous le coût de revient.';
-  if(m.freeQty>0 && m.hitsTarget)
-    return `Le client atteint son prix en recevant ${m.freeQty} pièce${m.freeQty>1?'s':''} offerte${m.freeQty>1?'s':''}, sans baisser le tarif.`;
-  if(m.freeQty>0)
-    return `${m.freeQty} pièce${m.freeQty>1?'s':''} offerte${m.freeQty>1?'s':''} : le prix moyen tombe à ${money(m.effective)} sans toucher au tarif.`;
-  if(m.extraPaid>0 && m.hitsTarget)
-    return `Le client obtient ${money(target)}, à condition d'en commander ${m.extraPaid} de plus.`;
-  if(m.extraPaid>0)
-    return `${m.extraPaid} pièce${m.extraPaid>1?'s':''} de plus à ${money(m.unitPrice)} : un geste, sans aller jusqu'à ${money(target)}.`;
-  return `Prix ramené à ${money(m.unitPrice)} sur la quantité actuelle.`;
+/* CE QU'ELLE PROPOSE, EN TROIS MOTS — et c'est le titre de la carte. Chaque
+   sortie tenait en six lignes : un nom de stratégie (« Compromis volume /
+   prix »), une phrase entière, cinq chiffres intitulés en toutes lettres, puis
+   une comparaison (« 79,01 € de mieux que d'accepter 23,00 € tout de suite »).
+   Devant le client, la vendeuse n'a pas le temps de lire un paragraphe par
+   carte : elle a besoin de ce qu'elle DIT — l'offre — et de ce que ça laisse.
+   Le reste était du commentaire, et il noyait les deux. */
+function negOffre(m){
+  const base=`${m.paidQty} à ${money(m.unitPrice)}`;
+  return m.freeQty>0 ? `${base} + ${m.freeQty} offerte${m.freeQty>1?'s':''}` : base;
 }
 
-function negLigne(label, valeur, fort){
+/* La couleur dit un état, et elle vient de la charte : un « #1d6f43 » écrit en
+   dur ne suit pas le thème sombre. */
+function negLigne(label, valeur, etat){
   const d = txEl('div');
-  d.append(txEl('span', null, label), txEl('b', null, valeur));
-  if(fort) d.querySelector('b').style.color = fort;
+  const v = txEl('b', etat||null, valeur);
+  d.append(txEl('span', null, label), v);
   return d;
 }
 
@@ -2088,31 +2124,21 @@ function negCarteSolution(i, c, target, r, rang){
   const carte = txEl('div', 'neg-sol' + (rang===0 ? ' is-best' : '') + (m.sousLeCout ? ' is-bad' : ''));
 
   const tete = txEl('div', 'neg-sol-head');
-  const gauche = txEl('div');
-  gauche.append(txEl('div', 'neg-sol-nom', r.s.name));
-  gauche.append(txEl('div', 'help', negPhrase(c, m, target)));
-  tete.append(gauche);
-  if(rang===0 && !m.sousLeCout) tete.append(txEl('span', 'neg-best-badge', 'Le mieux pour OLDA'));
+  tete.append(txEl('div', 'neg-sol-nom', negOffre(m)));
+  /* Deux mots, jamais une phrase : « à éviter » se dit par la couleur. */
+  if(m.sousLeCout) tete.append(txEl('span', 'neg-best-badge est-danger', 'Sous le coût'));
+  else if(rang===0) tete.append(txEl('span', 'neg-best-badge', 'Le mieux'));
   carte.append(tete);
 
+  const pied = txEl('div', 'neg-sol-foot');
   const chiffres = txEl('div', 'neg-sol-metrics');
   chiffres.append(
-    negLigne('Pièces payées', String(m.paidQty)),
-    negLigne('Offertes', String(m.freeQty)),
-    negLigne('Prix / pièce', money(m.unitPrice)),
-    negLigne('Le client paie en moyenne', money(m.effective)),
-    negLigne('Il reste à OLDA', money(m.margin), m.margin>0 ? '#1d6f43' : '#a02020')
+    negLigne('Le client paie', `${money(m.effective)} / pièce`),
+    negLigne('Marge', money(m.margin), m.margin>0 ? 'est-bon' : 'est-mauvais')
   );
-  carte.append(chiffres);
-
-  const pied = txEl('div', 'neg-sol-foot');
-  const ecart = txEl('span', 'help',
-    m.vsDemand>=0
-      ? `${money(m.vsDemand)} de mieux que d'accepter ${money(target)} tout de suite`
-      : `${money(Math.abs(m.vsDemand))} de moins que d'accepter ${money(target)} tout de suite`);
   const retenir = txEl('button', rang===0 ? 'primary' : 'secondary', 'Retenir');
   retenir.onclick = () => negRetenir(i, m);
-  pied.append(ecart, retenir);
+  pied.append(chiffres, retenir);
   carte.append(pied);
   return carte;
 }
@@ -2130,8 +2156,8 @@ function negCarteSolution(i, c, target, r, rang){
    Tant que personne ne l'a modifiée, RIEN n'est stocké : elle suit alors la
    ligne (une taille de plus, un prix qui bouge) au lieu de figer un chiffre
    périmé. */
-function negCustomDe(n, c){
-  const t = (n.textile || {}).negCustom;
+function negCustomDe(i, c){
+  const t = (negSaisie(i) || {}).negCustom;
   return { kind:'custom', name:'Ma solution',
     paidQty: t ? t.paidQty : c.qty,
     unitPrice: t ? t.unitPrice : c.sold,
@@ -2141,64 +2167,52 @@ function negCustomDe(n, c){
    dans la carte au lieu de la redessiner — la reconstruire reprendrait le
    champ suivant sous les doigts au moment même où la tabulation y arrive. */
 function negPoserCustom(i, champ, valeur){
-  const n = needs[i];
-  if(!n || !n.textile) return;
-  const c = txCalc(n.textile);
+  const t = negSaisie(i);
+  if(!t) return;
+  const c = txCalc(t);
   if(!c) return;
-  const base = negCustomDe(n, c);
-  n.textile.negCustom = { paidQty:base.paidQty, unitPrice:base.unitPrice, freeQty:base.freeQty };
-  n.textile.negCustom[champ] = txNum(valeur);
+  const base = negCustomDe(i, c);
+  const custom = { paidQty:base.paidQty, unitPrice:base.unitPrice, freeQty:base.freeQty };
+  custom[champ] = txNum(valeur);
+  negPoser(i, 'negCustom', custom);
   negMajCustom(i);
 }
-function negPhraseMienne(c, m, target){
-  if(m.unitPrice >= c.sold - 0.005 && m.freeQty === 0 && m.paidQty <= c.qty)
-    return 'C’est le devis actuel : rien n’est concédé au client.';
-  return negPhrase(c, m, target);
-}
 function negMajCustom(i){
-  const n = needs[i];
+  const t = negSaisie(i);
   const carte = document.getElementById(`negMienne-${i}`);
-  if(!carte || !n || !n.textile) return;
-  const c = txCalc(n.textile);
+  if(!carte || !t) return;
+  const c = txCalc(t);
   if(!c) return;
-  const target = negTargetDe(n);
-  const s = negCustomDe(n, c);
+  const target = negTargetDe(i);
+  const s = negCustomDe(i, c);
   const m = TE().scenarioMetrics(c, s, target);
   const classe = TE().rankedScenarios(c, [...TE().defaultNegotiationSolutions(c, target), s], target);
   const rang = classe.findIndex(r => r.s === s) + 1;
 
   carte.classList.toggle('is-bad', m.sousLeCout);
-  const poser = (id, texte) => { const el = document.getElementById(`${id}-${i}`); if(el) el.textContent = texte; };
-  poser('negMienneRang', rang === 1 ? `1re sur ${classe.length}` : `${rang}e sur ${classe.length}`);
-  poser('negMiennePhrase', negPhraseMienne(c, m, target));
-  poser('negMienneEcart', m.vsDemand >= 0
-    ? `${money(m.vsDemand)} de mieux que d'accepter ${money(target)} tout de suite`
-    : `${money(Math.abs(m.vsDemand))} de moins que d'accepter ${money(target)} tout de suite`);
+  const el = document.getElementById(`negMienneRang-${i}`);
+  if(el) el.textContent = rang === 1 ? `1re sur ${classe.length}` : `${rang}e sur ${classe.length}`;
+  /* Les deux mêmes chiffres que sur les autres cartes : ce que le client paie
+     et ce que ça laisse. Une carte qui se lit autrement que ses voisines
+     oblige à réapprendre à chaque ligne. */
   const chiffres = document.getElementById(`negMienneChiffres-${i}`);
   if(chiffres) txFill(chiffres, [
-    negLigne('Livrées en tout', String(m.delivered)),
-    negLigne('Le client paie en moyenne', money(m.effective)),
-    negLigne('Il reste à OLDA', money(m.margin), m.margin>0 ? '#1d6f43' : '#a02020'),
-    negLigne('Marge', txPct(m.mark)),
+    negLigne('Le client paie', `${money(m.effective)} / pièce`),
+    negLigne('Marge', money(m.margin), m.margin>0 ? 'est-bon' : 'est-mauvais'),
   ]);
   const bouton = document.getElementById(`negMienneRetenir-${i}`);
   if(bouton) bouton.onclick = () => negRetenir(i, m);
 }
 function negCarteMienne(i, c){
-  const n = needs[i];
-  const s = negCustomDe(n, c);
+  const s = negCustomDe(i, c);
   const carte = txEl('div', 'neg-sol neg-mienne');
   carte.id = `negMienne-${i}`;
 
   const tete = txEl('div', 'neg-sol-head');
-  const gauche = txEl('div');
-  gauche.append(txEl('div', 'neg-sol-nom', 'Ma solution'));
-  const phrase = txEl('div', 'help');
-  phrase.id = `negMiennePhrase-${i}`;
-  gauche.append(phrase);
+  tete.append(txEl('div', 'neg-sol-nom', 'Ma solution'));
   const rang = txEl('span', 'badge neg-rang');
   rang.id = `negMienneRang-${i}`;
-  tete.append(gauche, rang);
+  tete.append(rang);
   carte.append(tete);
 
   const saisie = txEl('div', 'neg-mienne-saisie');
@@ -2222,22 +2236,19 @@ function negCarteMienne(i, c){
     champ('Free', 'Pièces offertes', String(s.freeQty), '1'));
   carte.append(saisie);
 
+  const pied = txEl('div', 'neg-sol-foot');
   const chiffres = txEl('div', 'neg-sol-metrics');
   chiffres.id = `negMienneChiffres-${i}`;
-  carte.append(chiffres);
-
-  const pied = txEl('div', 'neg-sol-foot');
-  const ecart = txEl('span', 'help');
-  ecart.id = `negMienneEcart-${i}`;
   const retenir = txEl('button', 'secondary', 'Retenir');
   retenir.id = `negMienneRetenir-${i}`;
-  pied.append(ecart, retenir);
+  pied.append(chiffres, retenir);
   carte.append(pied);
   return carte;
 }
 
-function negPanneau(i, n){
-  const c = txCalc(n.textile);
+function negPanneau(i){
+  const t = negSaisie(i);
+  const c = t ? txCalc(t) : null;
   const bloc = txEl('div', 'neg-panneau');
   if(!c){
     bloc.append(txEl('p', 'help', 'Cette ligne doit être chiffrée avant de négocier.'));
@@ -2250,7 +2261,7 @@ function negPanneau(i, n){
   const input = document.createElement('input');
   input.id = `negTarget-${i}`;
   input.type = 'number'; input.min = '0'; input.step = '0.1';
-  input.value = (n.textile.negTarget ?? '');
+  input.value = (t.negTarget ?? '');
   input.placeholder = `Actuellement ${money(c.sold)}`;
   input.oninput = () => negPoserTarget(i, input.value);
   /* La molette sur un champ nombre change le prix sans qu'on l'ait tapé :
@@ -2264,26 +2275,25 @@ function negPanneau(i, n){
 
   const resultats = txEl('div', 'neg-resultats');
   resultats.id = `negResultats-${i}`;
-  negRemplirResultats(resultats, i, n);
+  negRemplirResultats(resultats, i);
   bloc.append(resultats);
   return bloc;
 }
 
 /* Tout ce qui dépend du prix demandé, et rien d'autre : ce bloc-là seul se
    réécrit pendant la frappe, le champ au-dessus ne bouge pas. */
-function negRemplirResultats(hote, i, n){
+function negRemplirResultats(hote, i){
   hote.textContent = '';
-  const c = txCalc(n.textile);
+  const t = negSaisie(i);
+  const c = t ? txCalc(t) : null;
   if(!c) return;
-  const target = negTargetDe(n);
+  const target = negTargetDe(i);
 
   /* Sans prix demandé, RIEN : le champ juste au-dessus porte déjà son
      intitulé, une phrase de plus ne faisait que décrire l'écran. */
   if(!(target>0))return;
   if(target >= c.sold){
-    hote.append(txEl('p', 'help', n.textile.negotiation
-      ? `L'accord en place est déjà à ${money(c.sold)} la pièce : le client demande plus cher que ce qu'il paie.`
-      : `Ce prix est au-dessus du tarif actuel (${money(c.sold)}) : il n'y a rien à négocier.`));
+    hote.append(txEl('p', 'help', `Rien à négocier : le tarif est déjà à ${money(c.sold)}.`));
     return;
   }
 
@@ -2300,14 +2310,28 @@ function negRemplirResultats(hote, i, n){
    tailles), et le prix manuel devient le prix moyen RÉELLEMENT encaissé par
    pièce livrée — sinon les pièces offertes se factureraient. */
 function negRetenir(i, m){
-  const t = needs[i].textile;
+  const t = negSaisie(i);
+  if(!t) return;
   const avant = TE().calculate(t);
   if(!avant) return;
   const enPlus = m.delivered - avant.qty;
-  if(enPlus > 0) t.sizes.other = String(txNum(t.sizes.other) + enPlus);
-  else if(enPlus < 0) return;  /* aucune solution ne livre moins : on ne rogne pas une saisie */
-  t.manualPrice = String(Math.round(m.effective*100)/100);
-  t.negotiation = { paidQty:m.paidQty, freeQty:m.freeQty, unitPrice:m.unitPrice, target:negTargetDe(needs[i]) };
+  if(enPlus < 0) return;  /* aucune solution ne livre moins : on ne rogne pas une saisie */
+  const autres = String(txNum(t.sizes.other) + enPlus);
+  const prix = String(Math.round(m.effective*100)/100);
+  const accord = { paidQty:m.paidQty, freeQty:m.freeQty, unitPrice:m.unitPrice, target:negTargetDe(i) };
+  if(i === 'ticket'){
+    /* SUR LE TICKET, LA SAISIE EST LE FORMULAIRE : la solution s'écrit dans
+       ses champs, et le récapitulatif la relit comme n'importe quelle
+       correction — il n'y a pas d'état de négociation à part. */
+    $('txOther').value = autres;
+    $('txManualPrice').value = prix;
+    TX_NEG.negotiation = accord;
+    previewTextile();
+    return;
+  }
+  t.sizes.other = autres;
+  t.manualPrice = prix;
+  t.negotiation = accord;
   const apres = TE().calculate(t);
   if(apres){ needs[i].qty = apres.qty; needs[i].unitHT = apres.sold; needs[i].comment = txComment(t); }
   negOuvert = -1;
@@ -2350,7 +2374,7 @@ function renderDetailArticle(){
   /* UNE SEULE ACTION SUR LA FICHE. Elle en portait trois : « Dupliquer », qui
      retapait un article de toutes façons modifiable ensuite, et « Le client
      négocie », qui n'avait rien à faire ici — la négociation se lance depuis
-     le ticket, au moment où le prix se discute (voir negocierDepuisTicket) ou
+     le ticket, dans son propre volet (voir txNegVolet), ou
      depuis la ligne de la demande. Reste ce qui n'existe nulle part ailleurs :
      rouvrir la saisie. */
   const boutons=txEl('div','actions');
@@ -2366,7 +2390,7 @@ function renderDetailArticle(){
 
   const bloc=txEl('div');
   bloc.append(tete,rang,metrics,...txAlertes(n.textile,c));
-  if(negOuvert===i)bloc.append(negPanneau(i,n));
+  if(negOuvert===i)bloc.append(negPanneau(i));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
 }

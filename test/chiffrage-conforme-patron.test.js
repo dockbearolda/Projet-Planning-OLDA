@@ -100,7 +100,7 @@ const fonction = (nom, signature) => {
 };
 assert.ok(/hote\.append\(negCarteMienne\(i, c\)\);\s*negMajCustom\(i\);/.test(DEVIS),
   'la cinquième ligne est posée APRÈS les quatre sorties classées');
-const defaut = fonction('negCustomDe', 'n, c');
+const defaut = fonction('negCustomDe', 'i, c');
 assert.ok(/paidQty: t \? t\.paidQty : c\.qty/.test(defaut)
   && /unitPrice: t \? t\.unitPrice : c\.sold/.test(defaut)
   && /freeQty: t \? t\.freeQty : 0/.test(defaut),

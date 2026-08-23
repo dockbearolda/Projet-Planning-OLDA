@@ -106,7 +106,7 @@ assert.ok(/if\(!n\.textile\)return editNeed\(i\)/.test(ouvrir),
 assert.ok(!/tx-card-metrics|negPanneau|tx-avis/.test(renderNeedsSrc),
   'le panneau de droite porte la demande, jamais le chiffrage ni la négociation');
 const detail = source('renderDetailArticle', '');
-assert.ok(/tx-card-metrics/.test(detail) && /negPanneau\(i,n\)/.test(detail),
+assert.ok(/tx-card-metrics/.test(detail) && /negPanneau\(i\)/.test(detail),
   'le détail à gauche porte les chiffres de l’article et sa négociation');
 assert.ok(/hote\.classList\.add\('hidden'\)/.test(detail) && /replaceChildren\(\)/.test(detail),
   'sans article ouvert le détail se VIDE : les chiffres d’une ligne supprimée ne doivent pas rester à l’écran');

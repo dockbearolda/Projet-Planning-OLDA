@@ -203,8 +203,8 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(\),txTableau\(d,c,\[txDetail\(d,c\)\]\),\.\.\.txAlertes\(d,c\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : le titre, le récapitulatif repliable, puis les alertes');
+assert.ok(/txTete\(\),txTableau\(d,c,\[txDetail\(d,c\)\]\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : le titre, le récapitulatif repliable, la négociation, puis les alertes');
 // LES ALERTES RESTENT DEHORS. Une alarme qu'on peut plier n'en est plus une :
 // une dimension écrite dans la note engage la production, un prix manuel dit
 // que le calcul ne décide plus du prix.
@@ -398,34 +398,33 @@ const CODE = DEVIS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, 
 assert.ok(!/txBarreObjet|tx-barre-objet|Complète les champs obligatoires/.test(CODE),
   'la barre ne redit pas ce que le récapitulatif dit déjà juste au-dessus');
 
-// « AJOUTER CET ARTICLE » EST TOUJOURS TOUT À DROITE — c'est la règle de
-// l'écran. Les boutons d'à côté vont et viennent (« annuler » n'existe qu'en
-// édition, « le client négocie » qu'une fois le prix calculé) : l'action qui
-// engage doit donc être la DERNIÈRE du bloc, sinon sa place bouge d'un état à
-// l'autre.
+// « AJOUTER UN BESOIN » EST TOUJOURS TOUT À DROITE — c'est la règle de
+// l'écran. Le bouton d'à côté va et vient (« annuler » n'existe qu'en
+// édition) : l'action qui engage doit donc être la DERNIÈRE du bloc, sinon sa
+// place bouge d'un état à l'autre.
 const barre = DEVIS.match(/<div class="tx-barre">([\s\S]*?)<\/div><\/div>/);
 assert.ok(barre, 'la barre d’action doit rester repérable');
 const ordre = [...barre[1].matchAll(/<button id="(\w+)"/g)].map((m) => m[1]);
-assert.deepStrictEqual(ordre, ['txNegBtn', 'txCancelBtn', 'txSaveBtn'],
-  'le bouton qui ajoute ferme la rangée, quels que soient les boutons d’à côté');
+assert.deepStrictEqual(ordre, ['txCancelBtn', 'txSaveBtn'],
+  'le bouton qui ajoute ferme la rangée, quel que soit le bouton d’à côté');
 // LE RACCOURCI NE S'ÉCRIT PLUS SUR LE BOUTON (23/08/2026) : la pastille disait
 // la même chose à chaque article, à côté du seul bouton de la barre. La touche,
 // elle, reste — vérifiée juste en dessous.
 assert.ok(!/tx-kbd|txRaccourci/.test(DEVIS),
   'plus de pastille de raccourci sur le bouton');
-// NÉGOCIER SANS SORTIR DU TICKET : l'action pose la ligne AVANT d'ouvrir sa
-// négociation, parce qu'une remise se calcule sur un article qui existe.
-assert.ok(/<button id="txNegBtn"[^>]*class="secondary hidden"[^>]*onclick="negocierDepuisTicket\(\)"/.test(DEVIS),
-  'le ticket porte l’entrée en négociation');
-const negTicket = source('negocierDepuisTicket', '');
-assert.ok(/const i=saveTextileNeed\(\);\s*if\(typeof i==='number'\)ouvrirNegociation\(i\)/.test(negTicket),
-  '… elle pose la ligne puis ouvre sa négociation, et s’arrête si un champ manque');
-// CE QUI SE CLIQUE A LA MÊME BOÎTE, PARTOUT (23/08/2026). Elle avait été posée
-// en lien — sans fond, sans rembourrage — pour être discrète : ce n'était pas
-// discret, c'était étranger, et une hauteur de moins sur sa propre rangée. La
-// discrétion se dit avec la boîte commune, le gris des actions secondes.
-assert.ok(!/tx-lien/.test(DEVIS),
-  'plus de commande sans boîte : l’écran n’en a qu’une');
+// LA NÉGOCIATION EST UN VOLET DU TICKET (23/08/2026). C'était un bouton qui
+// posait la ligne et emmenait la vendeuse sur une autre carte — trois gestes
+// pour une question qui se pose en plein milieu de la saisie.
+assert.ok(!/txNegBtn|negocierDepuisTicket|tx-lien/.test(DEVIS),
+  'plus de bouton « le client négocie » : c’est un volet');
+const negVolet = source('txNegVolet', '');
+assert.ok(/txEl\('summary',null,'Négociation'\)/.test(negVolet)
+  && /det\.append\(sum,negPanneau\('ticket'\)\)/.test(negVolet),
+  'le volet s’appelle « Négociation » et déroule les possibilités, sur l’article en cours');
+// L'ouvrir replie le récapitulatif — et une SEULE fois : sans la garde, chaque
+// redessin rouvrirait la boucle (le volet se recrée ouvert, donc il rebascule).
+assert.ok(/if\(det\.open&&TX_RECAP\.form\)\{TX_RECAP\.form=false;previewTextile\(\)\}/.test(negVolet),
+  '… et l’ouvrir replie le récapitulatif, sans boucler sur son propre redessin');
 // Collé à droite par une MARGE AUTOMATIQUE : trop large, un contenu aligné en
 // fin de ligne sort par la GAUCHE de sa boîte, hors d’atteinte du défilement.
 assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
@@ -452,8 +451,10 @@ assert.ok(/txDetailOuvert=false;/.test(source('editTextileNeed', 'i')),
   '… et une modification aussi');
 assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DEVIS),
   '… et elle est collée à droite de la même façon');
-assert.ok(/txBarre\(c\);\s*if\(!c\)\{/.test(apercu),
-  'elle se met à jour AVANT de renoncer : sans prix, elle doit encore parler');
+// La barre ne décide plus d'aucun état : elle ne porte que ses deux boutons,
+// et c'est par eux qu'on apprend quel champ manque.
+assert.ok(!/txBarre/.test(DEVIS),
+  'plus rien à mettre à jour dans la barre');
 assert.ok(/id="txSaveLabel"/.test(DEVIS) && !/\$\('txSaveBtn'\)\.textContent/.test(DEVIS),
   'le libellé du bouton vit dans son propre nœud');
 assert.ok(/ev\.key!=='Enter'\|\|!\(ev\.ctrlKey\|\|ev\.metaKey\)/.test(DEVIS),
