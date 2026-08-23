@@ -369,16 +369,19 @@ assert.deepStrictEqual(ordre, ['txNegBtn', 'txCancelBtn', 'txSaveBtn'],
 // elle, reste — vérifiée juste en dessous.
 assert.ok(!/tx-kbd|txRaccourci/.test(DEVIS),
   'plus de pastille de raccourci sur le bouton');
-// NÉGOCIER SANS SORTIR DU TICKET : l'action est discrète — un lien, pas un
-// bouton — et elle pose la ligne AVANT d'ouvrir sa négociation, parce qu'une
-// remise se calcule sur un article qui existe.
-assert.ok(/<button id="txNegBtn"[^>]*class="tx-lien hidden"[^>]*onclick="negocierDepuisTicket\(\)"/.test(DEVIS),
-  'le ticket porte l’entrée en négociation, en discret');
+// NÉGOCIER SANS SORTIR DU TICKET : l'action pose la ligne AVANT d'ouvrir sa
+// négociation, parce qu'une remise se calcule sur un article qui existe.
+assert.ok(/<button id="txNegBtn"[^>]*class="secondary hidden"[^>]*onclick="negocierDepuisTicket\(\)"/.test(DEVIS),
+  'le ticket porte l’entrée en négociation');
 const negTicket = source('negocierDepuisTicket', '');
 assert.ok(/const i=saveTextileNeed\(\);\s*if\(typeof i==='number'\)ouvrirNegociation\(i\)/.test(negTicket),
   '… elle pose la ligne puis ouvre sa négociation, et s’arrête si un champ manque');
-assert.ok(/\.tx-lien\{[^}]*background:none/.test(DEVIS) && /\.tx-lien\{[^}]*padding:0/.test(DEVIS),
-  'un lien n’a pas la boîte d’un bouton : c’est ce qui le rend discret');
+// CE QUI SE CLIQUE A LA MÊME BOÎTE, PARTOUT (23/08/2026). Elle avait été posée
+// en lien — sans fond, sans rembourrage — pour être discrète : ce n'était pas
+// discret, c'était étranger, et une hauteur de moins sur sa propre rangée. La
+// discrétion se dit avec la boîte commune, le gris des actions secondes.
+assert.ok(!/tx-lien/.test(DEVIS),
+  'plus de commande sans boîte : l’écran n’en a qu’une');
 // Collé à droite par une MARGE AUTOMATIQUE : trop large, un contenu aligné en
 // fin de ligne sort par la GAUCHE de sa boîte, hors d’atteinte du défilement.
 assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
