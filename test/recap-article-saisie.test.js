@@ -251,10 +251,24 @@ tailles.forEach((t) => assert.ok(AUTORISEES.includes(t),
 
 // Les deux tailles elles-mêmes, déclarées une seule fois, pour les trois
 // surfaces qui portent ces blocs — le récapitulatif, sa barre, et la fiche.
-const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:(\d+)px;--recap-grand:(\d+)px;/);
-assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise');
-assert.ok(Number(declaration[1]) >= 15, 'le texte courant ne descend pas sous 15 px : ces écrans se lisent debout');
-assert.ok(Number(declaration[2]) > Number(declaration[1]) * 1.5,
+// Depuis le 22/08 elles ne portent plus leurs propres nombres : elles pointent
+// L'ÉCHELLE DE L'ÉCRAN, qui vit au `:root` de la page. La carte reste à deux
+// tailles, mais ce sont désormais deux des quatre de la page — elle ne peut
+// plus dériver de son côté.
+const declaration = STYLE.match(/\.tx-preview,\.tx-barre,#detailArticle\{--recap-texte:var\(--([\w-]+)\);--recap-grand:var\(--([\w-]+)\);/);
+assert.ok(declaration, 'les deux tailles se déclarent au même endroit, fiche comprise, et viennent de l’échelle');
+const echelle = {};
+for (const m of DEVIS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:root\s*\{([^}]*)\}/g)) {
+  m[1].split(';').forEach((d) => {
+    const i = d.indexOf(':');
+    if (i > 0 && d.trim().startsWith('--')) echelle[d.slice(0, i).trim()] = d.slice(i + 1).trim();
+  });
+}
+const texte = Number.parseFloat(echelle['--' + declaration[1]]);
+const grand = Number.parseFloat(echelle['--' + declaration[2]]);
+assert.ok(texte > 0 && grand > 0, 'les deux tailles pointées existent bien dans l’échelle de la page');
+assert.ok(texte >= 15, 'le texte courant ne descend pas sous 15 px : ces écrans se lisent debout');
+assert.ok(grand > texte * 1.5,
   'les quatre chiffres clés se voient de loin — sinon les deux tailles n’en font qu’une');
 
 // Et rien, dans la fiche, ne réintroduit une troisième taille par la porte de

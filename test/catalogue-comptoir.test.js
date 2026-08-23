@@ -96,9 +96,13 @@ assert.ok(/n===2&&!needs\.length\)return fail\(\$\('besoinAutreForm'\)\.classLis
 assert.ok(/if\(editingNeed<0\)poserTitreForm\('needFormTitle'/.test(DEVIS),
   'un ajout à la demande ne doit pas effacer « Modifier le besoin n°X »');
 
-// Le doigt : ces trois-là se prennent debout, au comptoir.
-assert.ok(/\.cat-ligne select,\.cat-ligne input,\.cat-ligne button,\.cat-ligne \.menu-declencheur\{min-height:52px\}/.test(DEVIS),
-  'produit, quantité et bouton gardent une cible tactile pleine');
+// LA MÊME BOÎTE QUE LE RESTE DE L'ÉCRAN. Ces trois-là portaient un
+// « min-height:52px » : une cible pour le DOIGT, du temps des tablettes du
+// comptoir — parties au rebut le 21/08. Ils faisaient donc 52 px au milieu
+// d'une page où tout le reste en fait 49,6. Plus de hauteur à eux : ils
+// prennent celle de l'échelle, comme les autres champs et les autres boutons.
+assert.ok(!/\.cat-ligne[^{]*\{[^}]*min-height/.test(DEVIS),
+  'produit, quantité et bouton n’ont plus de hauteur à eux : ils prennent celle de la page');
 assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
   'sur un téléphone la ligne se déplie en trois rangées');
 
@@ -347,13 +351,15 @@ assert.strictEqual(cat.CATALOGUE[0].famille, 'Art de la table',
 // Chrome écrit l'intitulé d'un `<optgroup>` en gris italique : au comptoir, à
 // bout de bras, la famille ne se lisait pas. Elle passe en gras à l'encre, le
 // produit reste en écriture normale.
-assert.ok(/#catProduit optgroup\{[^}]*font-weight:800/.test(DEVIS),
+// La graisse vient de l'échelle de l'écran (« --graisse-forte », 800) depuis
+// le 22/08 : c'est elle qui porte les nombres, plus la règle.
+assert.ok(/#catProduit optgroup\{[^}]*font-weight:(?:800|var\(--graisse-forte\))/.test(DEVIS),
   'la famille se lit en gras dans le menu');
 assert.ok(/#catProduit optgroup\{[^}]*font-style:normal/.test(DEVIS),
   '… et droite, pas en italique');
 assert.ok(/#catProduit optgroup\{[^}]*color:var\(--text\)/.test(DEVIS),
   '… à l’encre, pas en gris');
-assert.ok(/#catProduit option\{[^}]*font-weight:400/.test(DEVIS),
+assert.ok(/#catProduit option\{[^}]*font-weight:(?:400|var\(--graisse-texte\))/.test(DEVIS),
   'le produit, lui, reste en écriture normale');
 
 // --- 5. Ajouter à la demande ---------------------------------------------------
