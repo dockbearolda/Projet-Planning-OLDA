@@ -418,7 +418,7 @@ h2{letter-spacing:-.01em}
 .tx-preview,.tx-barre,#detailArticle{--recap-texte:var(--taille-texte);--recap-grand:var(--taille-grand);font-size:var(--recap-texte);line-height:var(--ligne-texte)}
 /* Les seuls éléments qui décideraient d'une taille tout seuls : un titre, un
    résumé de bloc dépliable, un bouton. */
-.tx-tete-titre,.tx-decompo>summary,.tx-details>summary,.tx-barre button{font-size:inherit}
+.tx-tete-titre,.tx-volet>summary,.tx-barre button{font-size:inherit}
 /* LA FICHE ENTIÈRE TIENT DANS CES DEUX TAILLES, négociation comprise : un
    bouton, une pastille, un intitulé et un champ décident chacun de leur taille
    par défaut, et la fiche en comptait sept. */
@@ -1649,7 +1649,7 @@ function txNombre(n){return (Number(n)||0).toLocaleString('fr-FR',{minimumFracti
 /* L'ÉTAT DES DEUX PANNEAUX DÉPLIABLES SURVIT À LA FRAPPE. Le récapitulatif se
    réécrit à CHAQUE touche : sans mémoire, le détail des champs se refermait
    sous les doigts dès qu'on corrigeait une taille. */
-let txCalculOuvert=false,txMargeOuverte=false;
+let txDetailOuvert=false;
 
 /* LE RÉCAPITULATIF S'ANNONCE PAR SON TITRE, RIEN DE PLUS. Il portait aussi
    « 2 pièces · avant ajout au projet » : le nombre de pièces se relit deux
@@ -1676,7 +1676,7 @@ function txRang(g,libelle,valeur,cls,clsValeur){
    textile / marquage / transport / TGCA. Ce sont deux lectures différentes —
    ce qu'on dit au client, et ce que l'atelier y gagne — et la seconde noyait
    la première au moment précis où la vendeuse annonce un prix de vive voix.
-   Les huit autres rangées se déplient d'un clic (voir txMargeBloc). */
+   Tout le reste se déplie d'un clic, d'un seul (voir txDetail). */
 function txKpis(g,c){
   /* UN SEUL PRIX EN GRAND, ET C'EST LE TOTAL — en tête de la carte. Les deux
      étaient écrits en 28 px, l'un sous l'autre : deux nombres de même poids
@@ -1718,8 +1718,11 @@ function txLigneCalcul(g,libelle,valeur,cls){
 }
 function txCalculBloc(d,c){
   const g=txEl('div','tx-tableau'),cf=TE().coefFor(c.qty),tr=txNum(TE().DB.transports[d.transport]);
+  const tgca=txNum($('txTgca').value);
   txLigneCalcul(g,`Prix d’achat ${txDisplayRef(d)}`,money(c.item.purchase));
-  txLigneCalcul(g,`Transport ${d.transport}`,tr>0?`+ ${money(tr)}`:money(0));
+  /* « compris » et non « 0,00 € » : un transport maritime n'est pas gratuit,
+     il est déjà dans le prix d'achat. */
+  txLigneCalcul(g,`Transport ${d.transport}`,tr>0?`+ ${money(tr)}`:'compris');
   txLigneCalcul(g,`Coefficient ${c.qty} pièce${c.qty>1?'s':''}`,`× ${txNombre(cf.textile)}`);
   txLigneCalcul(g,'Base textile',money(c.baseTextile),'est-somme');
   txLigneCalcul(g,`Marquage ${d.printType} · ${c.nPrints} impression${c.nPrints>1?'s':''}`,money(c.basePrint),'est-somme');
@@ -1729,36 +1732,11 @@ function txCalculBloc(d,c){
   txLigneCalcul(g,'Arrondi',`au ${money(TE().getSettings().roundStep)} supérieur`);
   txLigneCalcul(g,'Prix HT / pièce',money(c.sold),'est-total est-somme');
   txLigneCalcul(g,`Total HT · ${c.qty} pièce${c.qty>1?'s':''}`,money(c.total),'est-somme');
+  /* La TGCA ferme la chaîne : tout ce qui précède est HT, cette rangée dit si
+     la taxe s'ajoute par-dessus. C'est la seule des quatre rangées de l'ancien
+     bloc « composition » que le calcul ne portait pas déjà. */
+  txLigneCalcul(g,'TGCA',tgca>0?txPctCourt(tgca):'non');
   return g;
-}
-function txDecompo(g,d,c){
-  const tr=txNum(TE().DB.transports[d.transport]),tgca=txNum($('txTgca').value);
-  txRang(g,'Textile',money(c.baseTextile));
-  txRang(g,'Marquage',money(c.basePrint));
-  txRang(g,'Transport',tr>0?`+ ${money(tr)}`:'compris');
-  txRang(g,'TGCA',tgca>0?txPctCourt(tgca):'non');
-}
-
-/* LA MARGE ET LA COMPOSITION, REPLIÉES. Tout ce qui regarde l'atelier et non
-   le client : le temps passé, la marge et ses repères, et de quoi le prix est
-   fait. La vendeuse l'ouvre quand elle négocie, pas quand elle annonce.
-   Le volet garde son état d'une frappe à l'autre (txMargeOuverte) : le
-   récapitulatif se réécrit à CHAQUE touche, et sans mémoire il se refermait
-   sous les doigts dès qu'on corrigeait une taille. */
-function txMargeBloc(d,c){
-  const det=txEl('details','tx-volet'),sum=txEl('summary');
-  det.open=txMargeOuverte;
-  const titre=()=>det.open?'Masquer la marge et la composition':'Marge et composition';
-  sum.textContent=titre();
-  det.addEventListener('toggle',()=>{txMargeOuverte=det.open;sum.textContent=titre()});
-  /* La même table que les deux chiffres du dessus : « --tab-valeur » est fixe,
-     donc les virgules restent sur la même verticale, volet ouvert ou fermé. */
-  const g=txEl('div','tx-tableau');
-  txAtelier(g,c);
-  txJauge(g,c);
-  txDecompo(g,d,c);
-  det.append(sum,g);
-  return det;
 }
 
 /* CE QUE LA CARTE MONTRE SANS QU'ON OUVRE RIEN : les deux chiffres qu'on
@@ -1782,17 +1760,33 @@ function txTableau(d,c){
   return bloc;
 }
 
-/* LE CALCUL COMPLET, REPLIÉ. Il répond à « pourquoi ce prix ? », il n'a pas à
-   être lu à chaque article — et il se lit dans la même table, donc dans la
-   même colonne. */
-function txCalcul(d,c){
-  const det=txEl('details','tx-volet');
-  det.open=txCalculOuvert;
-  const sum=txEl('summary');
-  const poser=()=>{sum.textContent=det.open?'Masquer le calcul':'Voir le calcul'};
-  poser();
-  det.addEventListener('toggle',()=>{txCalculOuvert=det.open;poser()});
-  det.append(sum,txCalculBloc(d,c));
+/* TOUT CE QUI NE S'ANNONCE PAS AU CLIENT, DERRIÈRE UN SEUL CLIC. Il y avait
+   deux volets — « Marge et composition » puis « Voir le calcul » — et il
+   fallait donc les ouvrir tous les deux pour lire une seule histoire. Pire :
+   ils la racontaient deux fois. « Textile », « Marquage » et « Transport »
+   annonçaient des montants que le calcul, juste en dessous, redonnait à la
+   ligne près sous « Base textile », « Marquage … · 2 impressions » et
+   « Transport Maritime ». Une seule de leurs quatre rangées manquait au
+   calcul, la TGCA : elle y est passée.
+   Un clic ouvre maintenant la suite entière — comment le prix se construit,
+   puis ce qu'il laisse à l'atelier.
+   Le volet garde son état d'une frappe à l'autre : le récapitulatif se réécrit
+   à CHAQUE touche, et sans mémoire il se refermait sous les doigts dès qu'on
+   corrigeait une taille. */
+function txDetail(d,c){
+  const det=txEl('details','tx-volet'),sum=txEl('summary');
+  det.open=txDetailOuvert;
+  const titre=()=>det.open?'Masquer le calcul et la marge':'Voir le calcul et la marge';
+  sum.textContent=titre();
+  det.addEventListener('toggle',()=>{txDetailOuvert=det.open;sum.textContent=titre()});
+  /* DEUX TABLES, PAS UNE : « --tab-valeur » est fixe, donc les virgules
+     tombent sur la même verticale de l'une à l'autre — et le changement de
+     table dit qu'on passe du prix à ce qu'il laisse, sans qu'un titre de plus
+     ait à le dire. */
+  const reste=txEl('div','tx-tableau');
+  txAtelier(reste,c);
+  txJauge(reste,c);
+  det.append(sum,txCalculBloc(d,c),reste);
   return det;
 }
 
@@ -1834,7 +1828,7 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTete(),txTableau(d,c),txMargeBloc(d,c),txCalcul(d,c),...txAlertes(d,c)]);
+  txFill(box,[txTete(),txTableau(d,c),txDetail(d,c),...txAlertes(d,c)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -2320,7 +2314,7 @@ function renderDetailArticle(){
   metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,txMargeBloc(n.textile,c),txCalcul(n.textile,c),...txAlertes(n.textile,c));
+  bloc.append(tete,rang,metrics,txDetail(n.textile,c),...txAlertes(n.textile,c));
   if(negOuvert===i)bloc.append(negPanneau(i,n));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');

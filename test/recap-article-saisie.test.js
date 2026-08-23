@@ -195,8 +195,8 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txTete\(\),txTableau\(d,c\),txMargeBloc\(d,c\),txCalcul\(d,c\),\.\.\.txAlertes\(d,c\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : ce qu’on annonce et ce qu’est l’article, puis la marge, le calcul, les alertes');
+assert.ok(/txTete\(\),txTableau\(d,c\),txDetail\(d,c\),\.\.\.txAlertes\(d,c\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : ce qu’on annonce et ce qu’est l’article, puis le détail replié, les alertes');
 // L'EN-TÊTE N'EST QUE SON TITRE (23/08/2026). Il portait « 2 pièces · avant
 // ajout au projet » : le nombre de pièces se relit deux rangées plus bas dans
 // les tailles, et la seconde moitié décrivait l'écran à qui l'a sous les yeux.
@@ -204,7 +204,7 @@ const tete = source('txTete', '');
 assert.ok(!/tx-tete-info/.test(DEVIS) && !/pièce/.test(tete),
   'l’en-tête du récapitulatif ne redit ni le nombre de pièces ni où l’on se trouve');
 // La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre.
-assert.ok(/metrics,txMargeBloc\(n\.textile,c\),txCalcul\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
+assert.ok(/metrics,txDetail\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
   '… et la fiche à gauche les écrit dans le même ordre');
 // CE QUE LA CARTE MONTRE SANS QU'ON OUVRE RIEN (23/08/2026).
 // Elle portait dix rangées d'affilée : le prix, le total, puis le temps de
@@ -242,18 +242,29 @@ assert.strictEqual((kpis.match(/est-annonce/g) || []).length, 1,
   'un seul chiffre porte la grande taille : le total');
 assert.ok(/txRang\(g,'Total HT',money\(c\.total\),null,'est-annonce'\)/.test(kpis),
   '… et c’est bien le total qui la porte');
-// Le volet porte les huit rangées, dans une table de la MÊME forme : sans ça,
-// ses valeurs ne tombent pas sous celles du dessus quand on l'ouvre.
-const volet = source('txMargeBloc', 'd,c');
+// UN SEUL VOLET, PAS DEUX (23/08/2026). « Marge et composition » et « Voir le
+// calcul » racontaient la même histoire en deux clics — et trois de leurs
+// rangées deux fois : « Textile », « Marquage » et « Transport » redonnaient
+// les montants que le calcul détaillait juste en dessous.
+const volet = source('txDetail', 'd,c');
+assert.ok(!/txMargeBloc|txDecompo|function txCalcul\(/.test(DEVIS),
+  'les deux anciens volets et la composition en double ont disparu');
+assert.ok(/det\.append\(sum,txCalculBloc\(d,c\),reste\)/.test(volet),
+  'un clic ouvre la suite entière : comment le prix se construit, puis ce qu’il laisse');
+assert.ok(/txAtelier\(reste,c\);\s*txJauge\(reste,c\)/.test(volet),
+  '… et ce qu’il laisse, c’est le coût atelier puis la marge et ses repères');
 assert.ok(/txEl\('div','tx-tableau'\)/.test(volet), 'le volet écrit dans une table de la même forme');
-assert.ok(/txAtelier\(g,c\);\s*txJauge\(g,c\);\s*txDecompo\(g,d,c\)/.test(volet),
-  'il porte le coût atelier, la marge et la composition, dans cet ordre');
+// La TGCA était la SEULE des quatre rangées de la composition que le calcul ne
+// portait pas : elle y est passée, en fin de chaîne — tout ce qui précède est HT.
+const calcul = source('txCalculBloc', 'd,c');
+assert.ok(/txLigneCalcul\(g,'TGCA'/.test(calcul) && calcul.indexOf("'TGCA'") > calcul.indexOf('Total HT'),
+  'la TGCA ferme le calcul, après le total HT');
 // L'ÉTAT DU VOLET SURVIT À LA FRAPPE. Le récapitulatif se réécrit à chaque
 // touche : sans mémoire, il se refermait sous les doigts dès qu'on corrigeait
-// une taille — le même piège que les deux volets d'à côté.
-assert.ok(/let txCalculOuvert=false,txMargeOuverte=false;/.test(DEVIS),
-  'les deux volets qui restent — la marge et le calcul — ont chacun leur mémoire');
-assert.ok(/det\.open=txMargeOuverte/.test(volet) && /txMargeOuverte=det\.open/.test(volet),
+// une taille.
+assert.ok(/let txDetailOuvert=false;/.test(DEVIS),
+  'le volet unique garde sa mémoire d’ouverture');
+assert.ok(/det\.open=txDetailOuvert/.test(volet) && /txDetailOuvert=det\.open/.test(volet),
   '… elle est relue à l’ouverture et réécrite au basculement');
 // UN ÉLÉMENT, PAS UN FRAGMENT : le détail d'un article posé ajoute une classe
 // au retour de txTableau, et un DocumentFragment n'a pas de `classList`.
@@ -294,11 +305,7 @@ assert.strictEqual(Math.round(TE.thresholdFor(9).veryGood * 100), 60, 'cible à 
 assert.ok(TE.thresholdFor(200).limited < TE.thresholdFor(9).limited,
   'les deux repères baissent quand la quantité monte');
 
-// L'ÉTAT DES PANNEAUX SURVIT À LA FRAPPE. Le récapitulatif se réécrit à
-// chaque touche : sans mémoire, le volet se refermait sous les doigts.
-// (Celui de la marge est vérifié plus haut, avec le bloc qui le porte.)
-assert.ok(/det\.open=txCalculOuvert/.test(DEVIS) && /txCalculOuvert=det\.open/.test(DEVIS),
-  'le calcul se rouvre comme on l’avait laissé');
+// (L'état du volet unique est vérifié plus haut, avec le bloc qui le porte.)
 
 // UNE DIMENSION ÉCRITE DANS LA NOTE ENGAGE LA PRODUCTION.
 const [, motif] = DEVIS.match(/const TX_DIMENSION=(\/.*\/i);/);
