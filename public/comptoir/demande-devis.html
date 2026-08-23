@@ -500,7 +500,12 @@ h2{letter-spacing:-.01em}
 .tx-preview:not(.hidden)+.tx-barre{border-top:1px solid var(--border-soft);border-top-left-radius:0;border-top-right-radius:0}
 .tx-barre-objet{flex:1 1 220px;min-width:0;font-weight:var(--graisse-note);color:var(--text-2)}
 .tx-kbd{margin-left:10px;font-weight:var(--graisse-note);color:var(--text-2);white-space:nowrap}
-.tx-barre .primary .tx-kbd{color:var(--text-3)}
+.tx-barre .primary /* LE RACCOURCI EST POSÉ SUR L'ACCENT, pas sur la page : sa couleur se dérive
+   donc de l'encre du bouton, pas de l'échelle de gris du texte. En thème
+   sombre le bouton plein devient clair, et un « --text-3 » pensé pour un fond
+   sombre y tombait à 4,4:1 — sous le seuil, sur la seule indication qui
+   apprend le raccourci à qui ne le connaît pas. */
+.tx-kbd{color:var(--on-primary);opacity:.72}
 @media(max-width:700px){.tx-barre{position:static}}
 @media(max-width:820px){.tx-sizes{grid-template-columns:repeat(3,minmax(0,1fr))}.tx-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.tx-controls{grid-template-columns:1fr}}
@@ -3136,6 +3141,18 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   margin-top:17px;
 }
 .ticket-preview-actions button{min-height:44px}
+/* CES DEUX COMMANDES SONT POSÉES SUR LA FEUILLE : elles prennent les couleurs
+   du papier, pas celles du thème. En sombre, « Imprimer » sortait en gris
+   clair sur blanc — 2,5:1, illisible — et « Télécharger », plein, en gris
+   très clair : un bouton qu'on ne voit pas. Le papier ne change pas de thème,
+   ses commandes non plus. (Elles ne s'impriment pas : la règle d'impression
+   les masque.) */
+.ticket-preview-actions button.primary,
+.ticket-preview-actions button.whatsapp{background:#111827!important;color:#fff!important;border-color:transparent!important;box-shadow:none}
+.ticket-preview-actions button.primary:hover,
+.ticket-preview-actions button.whatsapp:hover{background:#000!important}
+.ticket-preview-actions button.secondary{background:transparent!important;color:#374151!important;border-color:#d5dae2!important}
+.ticket-preview-actions button.secondary:hover{background:#f5f6f8!important;color:#111827!important;border-color:#9aa2aa!important}
 .ticket-export-overlay{
   display:none;
   position:fixed;
