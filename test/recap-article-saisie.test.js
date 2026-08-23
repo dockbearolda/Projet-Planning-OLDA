@@ -156,8 +156,15 @@ const html = rendre([{
 assert.ok(/Poitrine \+ Dos/.test(html) && /Kaki/.test(html),
   'la ligne dit où va le marquage et de quelle couleur');
 assert.ok(/2 × M/.test(html), 'la ligne dit les tailles commandées, dans le même sens qu’ailleurs');
-assert.ok(/Chronopost/.test(html), 'la ligne dit le transport choisi');
-assert.ok(/Bébé/.test(html), 'la ligne dit le genre');
+// NI LE GENRE NI LE TRANSPORT SUR LA LIGNE (23/08/2026). Le genre est une clé
+// de barème — il décide des temps de marquage — pas ce qui distingue un
+// article d'un autre pour la vendeuse ; le transport ne se lit qu'au moment de
+// chiffrer. Les deux restent dans le récapitulatif et dans la fiche, sous leur
+// intitulé (vérifié plus haut : txSaisieLignes les porte toujours).
+assert.ok(!/Chronopost/.test(html) && !/Bébé/.test(html),
+  'la ligne ne porte ni le transport ni le genre : elle dit ce qui distingue l’article');
+assert.ok(par['Genre'] === 'Bébé' && par['Transport'] === 'Chronopost',
+  '… mais le récapitulatif de l’article les garde, chacun sous son intitulé');
 assert.ok(/Marquage<\/div>/.test(html) && /Tailles<\/div>/.test(html),
   'chaque valeur porte son intitulé : « Coconut Milk » et « Kaki » ne se devinent pas');
 // « Production DTF » n'a jamais été saisi au comptoir : c'est le code qui
@@ -329,14 +336,30 @@ assert.ok(!/txBarreObjet|tx-barre-objet|Complète les champs obligatoires/.test(
   'la barre ne redit pas ce que le récapitulatif dit déjà juste au-dessus');
 
 // « AJOUTER CET ARTICLE » EST TOUJOURS TOUT À DROITE — c'est la règle de
-// l'écran. Les deux boutons secondaires vont et viennent (« dupliquer » n'existe
-// qu'une fois le prix calculé, « annuler » qu'en édition) : l'action qui engage
-// doit donc être la DERNIÈRE du bloc, sinon sa place bouge d'un état à l'autre.
+// l'écran. Les boutons d'à côté vont et viennent (« annuler » n'existe qu'en
+// édition, « le client négocie » qu'une fois le prix calculé) : l'action qui
+// engage doit donc être la DERNIÈRE du bloc, sinon sa place bouge d'un état à
+// l'autre.
 const barre = DEVIS.match(/<div class="tx-barre">([\s\S]*?)<\/div><\/div>/);
 assert.ok(barre, 'la barre d’action doit rester repérable');
 const ordre = [...barre[1].matchAll(/<button id="(\w+)"/g)].map((m) => m[1]);
-assert.deepStrictEqual(ordre, ['txDupBtn', 'txCancelBtn', 'txSaveBtn'],
+assert.deepStrictEqual(ordre, ['txNegBtn', 'txCancelBtn', 'txSaveBtn'],
   'le bouton qui ajoute ferme la rangée, quels que soient les boutons d’à côté');
+// LE RACCOURCI NE S'ÉCRIT PLUS SUR LE BOUTON (23/08/2026) : la pastille disait
+// la même chose à chaque article, à côté du seul bouton de la barre. La touche,
+// elle, reste — vérifiée juste en dessous.
+assert.ok(!/tx-kbd|txRaccourci/.test(DEVIS),
+  'plus de pastille de raccourci sur le bouton');
+// NÉGOCIER SANS SORTIR DU TICKET : l'action est discrète — un lien, pas un
+// bouton — et elle pose la ligne AVANT d'ouvrir sa négociation, parce qu'une
+// remise se calcule sur un article qui existe.
+assert.ok(/<button id="txNegBtn"[^>]*class="tx-lien hidden"[^>]*onclick="negocierDepuisTicket\(\)"/.test(DEVIS),
+  'le ticket porte l’entrée en négociation, en discret');
+const negTicket = source('negocierDepuisTicket', '');
+assert.ok(/const i=saveTextileNeed\(\);\s*if\(typeof i==='number'\)ouvrirNegociation\(i\)/.test(negTicket),
+  '… elle pose la ligne puis ouvre sa négociation, et s’arrête si un champ manque');
+assert.ok(/\.tx-lien\{[^}]*background:none/.test(DEVIS) && /\.tx-lien\{[^}]*padding:0/.test(DEVIS),
+  'un lien n’a pas la boîte d’un bouton : c’est ce qui le rend discret');
 // Collé à droite par une MARGE AUTOMATIQUE : trop large, un contenu aligné en
 // fin de ligne sort par la GAUCHE de sa boîte, hors d’atteinte du défilement.
 assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
@@ -350,21 +373,30 @@ assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DE
   '… et elle est collée à droite de la même façon');
 assert.ok(/txBarre\(c\);\s*if\(!c\)\{/.test(apercu),
   'elle se met à jour AVANT de renoncer : sans prix, elle doit encore parler');
-// Le libellé du bouton vit dans son propre nœud : `textContent` sur le bouton
-// entier effacerait la pastille du raccourci.
 assert.ok(/id="txSaveLabel"/.test(DEVIS) && !/\$\('txSaveBtn'\)\.textContent/.test(DEVIS),
-  'changer le libellé du bouton n’efface pas le raccourci écrit dessus');
+  'le libellé du bouton vit dans son propre nœud');
 assert.ok(/ev\.key!=='Enter'\|\|!\(ev\.ctrlKey\|\|ev\.metaKey\)/.test(DEVIS),
   'Ctrl/Cmd + Entrée ajoute l’article sans lâcher le clavier');
 
-// « Ajouter et dupliquer » pose la ligne ET garde la saisie pour la variante.
-const enregistrer = source('saveTextileNeed', 'dupliquer');
+// POSER LA LIGNE REND SON INDICE — c'est par lui que « Le client négocie »
+// enchaîne sur l'article qu'on vient d'ajouter.
+const enregistrer = source('saveTextileNeed', '');
 assert.ok(/const pose=editingTextile>=0\?editingTextile:needs\.length-1;/.test(enregistrer)
-  && /if\(dupliquer===true\)duplicateTextileNeed\(pose\)/.test(enregistrer),
-  'le duplicata repart de la ligne qu’on vient de poser, pas d’un indice périmé');
-// … et l'ordre compte : `cancelTextileEdit()` remet `editingTextile` à -1.
+  && /return pose;/.test(enregistrer),
+  'l’enregistrement rend l’indice de la ligne posée');
+// … et l'ordre compte : `cancelTextileEdit()` remet `editingTextile` à -1, donc
+// la ligne modifiée serait confondue avec la dernière.
 assert.ok(enregistrer.indexOf('const pose=') < enregistrer.indexOf('cancelTextileEdit()'),
   'l’indice se lit AVANT que le formulaire ne soit remis à zéro');
+// « Dupliquer » a disparu des deux écrans où il vivait : la barre du ticket et
+// la fiche. Rien ne doit en rester derrière.
+assert.ok(!/duplicateTextileNeed|negBasculer/.test(DEVIS),
+  'ni la duplication ni la bascule de négociation ne traînent en code mort');
+// (Le commentaire de la fonction CITE les deux boutons retirés pour dire
+// pourquoi : c'est le code qu'on interroge, pas ce qui l'explique.)
+const fiche = source('renderDetailArticle', '').replace(/\/\*[\s\S]*?\*\//g, '');
+assert.ok(/boutons\.append\(modifier\);/.test(fiche) && !/Dupliquer|Le client négocie/.test(fiche),
+  'la fiche ne garde que « Modifier l’article »');
 
 // --- 6. DEUX TAILLES DE TEXTE, PAS UNE DE PLUS (21/08/2026) -----------------
 // La carte en comptait onze : 11, 11.5, 12, 12.5, 13, 13.5, 14, 15, 17, 20 et
