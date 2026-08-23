@@ -293,7 +293,14 @@ body {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 14px;
+  /* LA BARRE SE MESURE ELLE-MÊME. Elle n'occupe plus la largeur de l'écran :
+     le rail lui en prend 180 à 460 px, réglables à la main. Une media query sur
+     la fenêtre ne peut donc plus dire si les onglets tiennent — c'est une
+     requête de CONTENEUR qui le sait (voir « le pli de la barre » plus bas). */
+  container-type: inline-size;
+  container-name: barre;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   /* 32 px à gauche = la largeur de la gouttière (16) + le retrait de la zone de
      travail (16) : la recherche démarre pile à l'aplomb de la carte du dessous. */
   padding: 8px 16px 8px 32px;
@@ -3500,33 +3507,50 @@ button, a, .stage, .deadline-badge,
    Responsive
    ========================================================================= */
 
-/* La barre du haut porte sept onglets LIBELLÉS (Nouveau Projet · Planning ·
-   Dashboard · Fiverr · À commander · Base clients · Réglages), la recherche et
-   les actions : il faut ~1750 px pour aligner tout ça sur une rangée avec un
-   champ de recherche encore lisible. La marque en est sortie (elle coiffe le
-   rail), mais le rail lui-même prend maintenant la gauche de l'écran : la barre
-   ne dispose pas d'un pixel de plus qu'avant, le seuil ne bouge pas. Plutôt que
-   d'effacer les libellés (« Fiverr » et « À commander » ne se devinent pas à
-   l'icône) ou d'éjecter les actions hors de l'écran, la barre se plie en DEUX
-   rangées — les onglets prennent la seconde, pleine largeur. Rien ne
-   disparaît, rien ne déborde. */
-@media (max-width: 1750px) {
-  .topbar { flex-wrap: wrap; row-gap: 8px; }
-  .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
-  .topbar-right { order: 3; }
-  .nav-switch {
+/* LE PLI DE LA BARRE. Sept onglets LIBELLÉS (Nouveau Projet · Planning ·
+   Dashboard · Fiverr · À commander · Base clients · Réglages) + la recherche +
+   les actions : il faut ~1360 px de BARRE pour les aligner sur une rangée avec
+   un champ de recherche encore lisible. En dessous, plutôt que d'effacer les
+   libellés (« Fiverr » et « À commander » ne se devinent pas à l'icône) ou
+   d'éjecter les actions hors de l'écran, la barre se plie en DEUX rangées — les
+   onglets prennent la seconde, pleine largeur.
+   La mesure porte sur la BARRE, pas sur la fenêtre : le rail lui mange 180 à
+   460 px selon le réglage du poste, une media query se tromperait d'autant. */
+/* Sélecteurs préfixés par `.topbar` À DESSEIN : une requête de conteneur
+   n'ajoute AUCUNE spécificité, et les règles de base des onglets vivent plus bas
+   dans le fichier — à égalité, c'est la dernière lue qui gagne, et le pli
+   n'aurait servi à rien. */
+@container barre (max-width: 1360px) {
+  .topbar .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
+  .topbar .topbar-right { order: 3; }
+  .topbar .nav-switch {
     order: 4;
     flex: 1 0 100%;
     width: 100%;
     min-width: 0;
-    /* Pliés sur leur propre rangée, les onglets restent À DROITE : c'est de ce
-       côté-là qu'on va les chercher, le rail tient la gauche. */
-    justify-content: flex-end;
     margin-left: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Un cran plus serré avant de renoncer : sur une rangée de moins de 900 px les
+   sept onglets se touchent presque, mais ils TIENNENT — et tenir vaut mieux que
+   défiler. On rogne l'écart et les flancs, jamais les libellés : « Fiverr » et
+   « À commander » ne se devinent pas à l'icône. */
+@container barre (max-width: 900px) {
+  .topbar .nav-switch { gap: 2px; }
+  .topbar .nav-switch-btn { padding: 8px 9px; }
+}
+
+/* LES ONGLETS TIENNENT LA DROITE — PAR UNE MARGE, JAMAIS PAR `justify-content`.
+   `flex-end` sur une rangée trop étroite fait déborder le contenu par la
+   GAUCHE, hors de la boîte : « Nouveau Projet » sortait rogné de 52 px, et cet
+   excédent-là n'est même pas atteignable au défilement (scrollWidth reste égal
+   à la largeur visible). Une marge automatique, elle, retombe à 0 dès qu'il n'y
+   a plus de place : les onglets se recalent à gauche et débordent du bon côté,
+   celui qui défile. */
+.nav-switch > :first-child { margin-left: auto; }
 
 /* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
