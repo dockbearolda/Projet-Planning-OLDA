@@ -1229,7 +1229,11 @@
    autour de la bulle déjà rougie. L'enveloppe porte la classe, la bulle
    porte le rouge. (Elle gagne : deux classes valent mieux qu'une.) */
 .menu.invalid{border:0!important;background:transparent!important;box-shadow:none!important}
-.menu.invalid .menu-declencheur{border:2px solid var(--danger,#c62828);background:var(--danger-bg,#fff0f0)}
+/* UN MENU EN ERREUR NE BOUGE PAS NON PLUS. Le déclencheur calcule sa hauteur
+   minimale à partir de ses DEUX traits de 1,5 px (« + 3px ») : un trait de
+   2 px le poussait à 50,6 px pendant que ses voisins restaient à 49,6. Le
+   trait garde sa largeur, l'anneau fait l'épaisseur — il ne prend pas de place. */
+.menu.invalid .menu-declencheur{border:1.5px solid var(--danger,#c62828);background:var(--danger-bg,#fff0f0);box-shadow:0 0 0 1px var(--danger,#c62828)}
 @media(prefers-reduced-motion:reduce){.menu.est-ouvert .menu-panneau{animation:none}.menu-declencheur{transition:none}}
 `;
 
