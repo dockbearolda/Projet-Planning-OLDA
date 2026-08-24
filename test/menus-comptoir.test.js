@@ -385,7 +385,10 @@ assert.ok(/\.form-num\.is-edit\{color:var\(--warning\)\}/.test(DEVIS),
 // TOUT L’ARTICLE est détouré, pas seulement son titre : ses dix champs se
 // mélangeaient aux réglages de la page (majoration, TGCA, réglages de
 // production) et on ne voyait plus où commençait la ligne en cours d’écriture.
-assert.ok(/\.article-bloc\{border:1\.5px solid var\(--border\);border-radius:var\(--arrondi-bloc\);/.test(DEVIS),
+// Depuis le 24/08 (« trois niveaux, jamais plus »), le cadre est celui d'une
+// carte de PREMIER niveau : liseré de carte, arrondi de carte, fond blanc —
+// partagé avec `.bloc`. L'article reste détouré, c'est ça qui compte.
+assert.ok(/\.bloc,\.article-bloc\{border:1px solid var\(--card-border\);border-radius:var\(--arrondi-carte\);/.test(DEVIS),
   'l’article en cours de saisie porte un cadre');
 assert.ok(/<div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">/.test(DEVIS)
   && /<div id="besoinManuel" class="hidden article-bloc">/.test(DEVIS),
@@ -460,6 +463,8 @@ assert.ok(/^calc\(/.test(declencheur['min-height']),
 // comme celle d'un <div>, « normal » les laissait à 22 px contre 20,5. Un
 // rapport suit la taille du texte et ne dépend pas de la police chargée — sur
 // un poste où Manrope n'est pas encore arrivée, les deux rétrécissent ENSEMBLE.
+// La hauteur d'un champ de l'écran à boîte nommée : `input,select{height:…}`.
+const regleChampHauteur = (src) => reglesDe(src, 'input,select').height || '';
 [['demande-devis', DEVIS], ['vente-directe', VENTE]].forEach(([nom, src]) => {
   const ech = echelleDe(src);
   const champ = reglesDe(src, 'input,select,textarea');
@@ -470,21 +475,36 @@ assert.ok(/^calc\(/.test(declencheur['min-height']),
   // La même valeur des deux côtés, quelle que soit la façon de l'écrire : le
   // déclencheur d'une liste est un <div>, il ÉCHAPPE au
   // « input,select,textarea{…!important} » que les deux écrans imposent.
+  // DEPUIS LE 24/08, demande-devis.html a sa densité (boîte NOMMÉE de 44 px,
+  // `--dd-champ-h`) : c'est la PAGE qui raccorde le déclencheur à sa boîte,
+  // par une règle à elle — pont.js garde son calcul pour l'autre écran.
+  const surcharge = nom === 'demande-devis' ? reglesDe(src, '.menu>.menu-declencheur') : {};
+  const decl = Object.assign({}, declencheur, surcharge);
+  if (nom === 'demande-devis') {
+    assert.strictEqual(surcharge['min-height'], 'var(--dd-champ-h)',
+      `${nom} : le déclencheur d'une liste prend la boîte nommée de la page`);
+  }
   ['padding', 'font-size', 'line-height', 'border-radius'].forEach((cle) => {
-    assert.strictEqual(lire(declencheur, cle), lire(champ, cle),
+    assert.strictEqual(lire(decl, cle), lire(champ, cle),
       `${nom} : « ${cle} » — le déclencheur d'une liste et le champ d'à côté`);
   });
-  assert.strictEqual(lire(declencheur, 'border'), lire(champ, 'border'),
+  assert.strictEqual(lire(decl, 'border'), lire(champ, 'border'),
     `${nom} : … et le même trait`);
   assert.ok(/^1\.5px solid /.test(lire(champ, 'border')),
     `${nom} : … un trait de 1,5 px, celui de la charte`);
-  // Et la hauteur qui en sort est la MÊME au pixel : c'est tout l'objet du
-  // calcul. Un champ : deux rembourrages, la ligne de texte, deux traits.
-  const taille = parseFloat(lire(champ, 'font-size'));
-  const remplissage = parseFloat(lire(champ, 'padding'));
-  const attendue = 2 * remplissage + parseFloat(lire(champ, 'line-height')) * taille + 3;
-  assert.strictEqual(pixels(lire(declencheur, 'min-height'), taille), Math.round(attendue * 100) / 100,
-    `${nom} : le déclencheur et le champ font exactement la même hauteur`);
+  // Et la hauteur qui en sort est la MÊME : c'est tout l'objet. Sur l'écran à
+  // boîte nommée, champ et déclencheur LISENT LE MÊME JETON — l'égalité est
+  // structurelle. Sur l'autre, elle se calcule comme avant.
+  if (nom === 'demande-devis') {
+    assert.strictEqual(regleChampHauteur(src), 'var(--dd-champ-h)',
+      `${nom} : le champ lit sa hauteur au même endroit que le déclencheur`);
+  } else {
+    const taille = parseFloat(lire(champ, 'font-size'));
+    const remplissage = parseFloat(lire(champ, 'padding'));
+    const attendue = 2 * remplissage + parseFloat(lire(champ, 'line-height')) * taille + 3;
+    assert.strictEqual(pixels(lire(decl, 'min-height'), taille), Math.round(attendue * 100) / 100,
+      `${nom} : le déclencheur et le champ font exactement la même hauteur`);
+  }
   // Un bouton plein et un bouton bordé sur la même rangée : le trait du second
   // ajoutait 3 px. Le plein porte le même trait, en transparent.
   assert.ok(/\.primary,[^{]*\.whatsapp\{[^}]*border:1\.5px solid transparent!important/.test(src),

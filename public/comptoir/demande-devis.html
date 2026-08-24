@@ -81,7 +81,7 @@ body{font-size:var(--taille-texte);line-height:var(--ligne-texte)}
 b,strong{font-weight:var(--graisse-forte)}
 </style>
 <style>
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:var(--font);color:var(--text-1)}.container{max-width:1260px;margin:var(--pas-4) auto;padding:0 var(--pas-4) 55px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--pas-4);align-items:start}.sidebar{position:sticky;top:16px}.stepper{display:flex;flex-wrap:wrap;gap:var(--pas-2);margin-bottom:var(--pas-4)}.step{flex:1 1 0;min-width:0;background:var(--border-soft);border-radius:9px;padding:10px 7px;text-align:center;font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:var(--text-2)}.step.active{background:var(--primary);color:var(--on-primary)}.step.done{background:var(--success);color:var(--on-primary)}.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}.hidden{display:none!important}h2{margin:0 0 var(--pas-3);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}h3{margin:var(--pas-4) 0 var(--pas-2);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}.stage-head{display:flex;justify-content:flex-end;gap:12px;align-items:center}.ref{background:var(--primary);color:var(--on-primary);padding:8px 11px;border-radius:8px;font-weight:var(--graisse-forte);white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);align-items:end}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end}.field{margin-bottom:var(--pas-3)}label{display:block;font-weight:var(--graisse-forte);font-size:var(--taille-texte);margin-bottom:7px}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);background:var(--surface)}textarea{min-height:95px;resize:vertical}input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.13);border-color:var(--primary)}.invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}.error{color:var(--danger);font-size:var(--taille-texte);font-weight:var(--graisse-forte)}.help{color:var(--text-2);font-size:var(--taille-texte);line-height:var(--ligne-texte);margin-top:5px}.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap;align-items:center}button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) 15px;font-weight:var(--graisse-forte);font-size:var(--taille-texte);cursor:pointer}button.primary{background:var(--primary);color:var(--on-primary)}button.primary:hover{background:var(--primary-hover)}button.secondary{background:var(--border-soft);color:var(--text-1)}button.danger{background:var(--danger-bg);color:var(--danger)}button.whatsapp{background:var(--primary);color:var(--on-primary)}button.full{width:100%}.notice{background:var(--zone-bg);border:1px dashed var(--border);border-radius:var(--arrondi-bloc);padding:14px}.notice.orange{background:var(--warning-bg);border-color:var(--warning-line)}.notice.green{background:var(--primary-soft);border-color:var(--success-line)}.need-card,.result,.quote-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:var(--taille-texte);font-weight:var(--graisse-forte);background:var(--border-soft)}.badge.green{background:var(--primary-soft-hover);color:var(--primary-hover)}.badge.orange{background:var(--warning-bg);color:var(--warning)}.summary-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border-soft)}.summary-row.total{font-size:var(--taille-texte);font-weight:var(--graisse-forte);border-bottom:0}.sidebar .status{font-weight:var(--graisse-forte);color:var(--warning)}.choice{background:var(--bg);border:2px solid transparent;text-align:left}.choice.active{border-color:var(--primary);background:var(--primary-soft)}.pill-wrap{display:flex;gap:8px;flex-wrap:wrap}.pill{background:var(--border-soft);border-radius:999px;padding:7px 10px;font-size:var(--taille-texte);font-weight:var(--graisse-forte)}@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;order:-1}.stepper .step{flex-basis:calc(20% - 5.6px)}}@media(max-width:700px){.grid,.grid-3{grid-template-columns:1fr}.stepper .step{flex-basis:calc(50% - 3.5px)}}@media print{body{background:#fff}.stepper,.sidebar,.no-print,.card:not(#finalCard){display:none!important}#step7,#finalCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:var(--font);color:var(--text-1)}.container{max-width:1260px;margin:var(--pas-4) auto;padding:0 var(--pas-4) 55px}.layout{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--pas-4)}.layout>main{flex:1 1 560px;min-width:0;max-height:100%}.layout>.sidebar{flex:0 1 320px;min-width:0}.sidebar{position:sticky;top:0}.stepper{display:flex;flex-wrap:wrap;gap:var(--pas-2);margin-bottom:var(--pas-4)}.step{position:relative;flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:var(--pas-1);border-radius:999px;padding:8px 12px;text-align:center;font-size:var(--dd-taille-valeur);font-weight:var(--graisse-note);color:var(--dd-placeholder);background:transparent}.step::before{content:"";flex:0 0 auto;width:20px;height:20px;border-radius:999px;border:1.5px solid var(--dd-contour);display:grid;place-items:center;font-size:var(--dd-taille-mention);font-weight:var(--dd-graisse-appuyee);line-height:1}.step:not(:first-child)::after{content:"";position:absolute;right:100%;top:50%;width:var(--pas-2);height:2px;margin-top:-1px;background:var(--card-border)}.step.done{color:var(--text-1);font-weight:var(--graisse-note)}.step.done::before{content:"\2713";background:var(--primary);border-color:var(--primary);color:var(--on-primary)}.step.done::after,.step.active::after{background:var(--primary)}.step.active{background:var(--primary);color:var(--on-primary);font-weight:var(--dd-graisse-appuyee)}.step.active::before{background:var(--dd-pastille-sur-encre);border-color:var(--dd-pastille-sur-encre-trait)}.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}.hidden{display:none!important}h2{margin:0 0 var(--pas-3);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}h3{margin:var(--pas-4) 0 var(--pas-2);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}.stage-head{display:flex;justify-content:flex-end;gap:12px;align-items:center}.ref{background:var(--primary);color:var(--on-primary);padding:8px 11px;border-radius:8px;font-weight:var(--graisse-forte);white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dd-rangee);align-items:end}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--dd-rangee);align-items:end}.grid>*,.grid-3>*{min-width:0}.field{margin-bottom:var(--dd-rangee)}label{display:block;font-weight:var(--graisse-note);font-size:var(--dd-taille-label);margin-bottom:var(--dd-label-gap)}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:var(--arrondi-champ);padding:0 var(--dd-champ-x);font-size:var(--dd-taille-valeur);background:var(--surface)}input,select{height:var(--dd-champ-h)}textarea{padding:var(--dd-champ-x);min-height:95px;resize:vertical}input::placeholder,textarea::placeholder{color:var(--dd-placeholder)}input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.13);border-color:var(--primary)}.invalid{border-color:var(--border)!important;box-shadow:inset 0 -2px 0 0 var(--danger)!important}.error{color:var(--danger);font-size:var(--taille-texte);font-weight:var(--graisse-forte)}.help{color:var(--text-2);font-size:var(--taille-texte);line-height:var(--ligne-texte);margin-top:5px}.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap;align-items:center}button{border:0;border-radius:var(--arrondi-champ);min-height:var(--dd-champ-h);padding:0 15px;font-weight:var(--graisse-forte);font-size:var(--dd-taille-valeur);cursor:pointer}button:disabled,button.primary:disabled,button.secondary:disabled{background:var(--dd-inactif);color:var(--surface);cursor:not-allowed}button.primary:disabled:hover{background:var(--dd-inactif)}button.primary{background:var(--primary);color:var(--on-primary)}button.primary:hover{background:var(--primary-hover)}button.secondary{background:var(--border-soft);color:var(--text-1)}button.danger{background:var(--danger-bg);color:var(--danger)}button.whatsapp{background:var(--primary);color:var(--on-primary)}button.full{width:100%}.notice{background:var(--zone-bg);border:1px dashed var(--border);border-radius:var(--arrondi-bloc);padding:14px}.notice.orange{background:var(--warning-bg);border-color:var(--warning-line)}.notice.green{background:var(--primary-soft);border-color:var(--success-line)}.need-card,.result,.quote-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:var(--taille-texte);font-weight:var(--graisse-forte);background:var(--border-soft)}.badge.green{background:var(--primary-soft-hover);color:var(--primary-hover)}.badge.orange{background:var(--warning-bg);color:var(--warning)}.summary-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border-soft)}.summary-row.total{font-size:var(--taille-texte);font-weight:var(--graisse-forte);border-bottom:0}.sidebar .status{font-weight:var(--graisse-forte);color:var(--warning)}.choice{background:var(--bg);border:2px solid transparent;text-align:left}.choice.active{border-color:var(--primary);background:var(--primary-soft)}.pill-wrap{display:flex;gap:8px;flex-wrap:wrap}.pill{background:var(--border-soft);border-radius:999px;padding:7px 10px;font-size:var(--taille-texte);font-weight:var(--graisse-forte)}@media(max-width:900px){.layout>.sidebar{flex-basis:100%;position:static}.stepper .step{flex-basis:calc(20% - 5.6px)}}@media(max-width:700px){.grid,.grid-3{grid-template-columns:1fr}.stepper .step{flex-basis:calc(50% - 3.5px)}}@media print{body{background:#fff}.stepper,.sidebar,.no-print,.card:not(#finalCard){display:none!important}#step7,#finalCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}}
 
 .priority-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);margin-top:var(--pas-2)}
 .priority-card{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;transition:.18s ease;display:flex;flex-direction:column;gap:6px;min-height:125px}
@@ -91,13 +91,23 @@ b,strong{font-weight:var(--graisse-forte)}
    premier geste de l'étape, il se fait au doigt sur la tablette du
    comptoir. Le liseré passe de 1 à 2 px quand la tuile est choisie — le
    rembourrage rend le pixel pour que la rangée ne bouge pas sous le doigt. */
-.besoin-type{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);margin:0 0 var(--pas-4)}
-.besoin-tuile{display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);text-align:left;cursor:pointer;transition:.18s ease;font:inherit;color:var(--text-1)}
-.besoin-tuile:hover{transform:translateY(-1px);box-shadow:var(--shadow-2)}
-.besoin-tuile.is-on{border:2px solid var(--primary);background:var(--bg);padding:13px 15px}
-.besoin-ic{flex-shrink:0;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--primary-soft);color:var(--primary)}
-.besoin-tuile.is-on .besoin-ic{background:var(--primary);color:var(--on-primary)}
-.besoin-ic svg{width:24px;height:24px;display:block}
+.besoin-type{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 var(--pas-4)}.besoin-type>*{min-width:0}
+/* LES DEUX TUILES FONT EXACTEMENT LA MÊME LARGEUR (24/08) : le liséré fait
+   1,5 px dans les DEUX états, allumé comme éteint. Un liséré qui passait de 1 à
+   2 px au clic redessinait la tuile d'un demi-pixel de chaque côté, et le
+   rembourrage devait le rattraper à la main. */
+.besoin-tuile{display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1.5px solid var(--card-border);background:var(--surface);border-radius:var(--arrondi-bloc);text-align:left;cursor:pointer;transition:.18s ease;font:inherit;color:var(--text-1)}
+.besoin-tuile:hover{border-color:var(--dd-contour)}
+.besoin-tuile.is-on{border-color:var(--text-1);background:var(--dd-actif-fond);box-shadow:var(--dd-ombre-tuile)}
+/* Un CARRÉ à bordure fine, et le glyphe en trait dedans : la pastille noire
+   pleine faisait de l'icône le point le plus lourd de l'écran, devant le nom
+   de la famille qu'elle accompagne. */
+.besoin-ic{flex-shrink:0;width:38px;height:38px;display:grid;place-items:center;border-radius:var(--arrondi-champ);border:1.5px solid var(--dd-contour);background:transparent;color:var(--text-1)}
+.besoin-tuile.is-on .besoin-ic{border-color:var(--text-1)}
+.besoin-ic svg{width:20px;height:20px;display:block}
+/* Ce que la famille recouvre, en une ligne : « Textile » et « Autre » ne le
+   disent pas tout seuls. */
+.besoin-aide{font-size:var(--dd-taille-aide);font-weight:var(--dd-graisse-douce);color:var(--text-3);line-height:var(--ligne-texte)}
 .besoin-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
 .besoin-nom{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 @media(max-width:700px){.besoin-type{grid-template-columns:1fr}}
@@ -226,7 +236,7 @@ header p{color:var(--text-3)!important}
 button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
 .step{border-radius:999px!important}
-.step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+.step.active{background:var(--primary)!important;color:var(--on-primary)!important}
 .priority-card{border-radius:var(--arrondi-bloc)!important}
 </style>
 
@@ -247,12 +257,15 @@ button{font-weight:var(--graisse-forte)}
 /* Le bouton plein et le bouton bordé portent le MÊME trait de 1,5 px, celui
    du plein transparent : sans ça le second était 3 px plus haut, et surtout
    ni l'un ni l'autre ne faisait la hauteur du champ d'à côté. */
-.primary,.secondary,.danger,.whatsapp{padding:var(--champ-y) 22px!important;
+.primary,.secondary,.danger,.whatsapp{padding:0 22px!important;
   border:1.5px solid transparent!important;
   transition:background var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease),
              border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform .08s var(--ease)}
 .primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
 .primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
+/* Rien à construire tant que la demande est vide : le bouton perd son encre,
+   garde sa place, et refuse le curseur. */
+.primary:disabled,.primary:disabled:hover,.whatsapp:disabled{background:var(--dd-inactif)!important;color:var(--surface)!important;box-shadow:none!important;cursor:not-allowed}
 .secondary{background:transparent!important;border-color:var(--border)!important;color:var(--text-2)!important}
 .secondary:hover{background:var(--surface-hover)!important;border-color:var(--border-strong)!important;color:var(--text-1)!important}
 .danger{background:var(--danger-bg)!important;border-color:var(--danger-line)!important;color:var(--danger)!important}
@@ -266,7 +279,9 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    la boîte. */
 button{line-height:var(--ligne-champ)!important}
 .card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important}
-input,select,textarea{border:1.5px solid var(--border)!important;padding:var(--champ-y) var(--champ-x)!important;line-height:var(--ligne-champ)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-champ)!important}
+input,select{padding:0 var(--dd-champ-x)!important}
+textarea{padding:var(--dd-champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 </style>
@@ -406,18 +421,37 @@ h2{letter-spacing:-.01em}
    étendue à tous les groupes des deux écrans du comptoir : fond gris, liseré,
    arrondi de bloc. Elle n'ajoute AUCUN intitulé — c'est un cadre, pas un
    titre : les groupes qui n'en avaient pas n'en reçoivent pas. */
-.bloc,.article-bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
-.article-bloc{margin-top:var(--pas-4)}
+/* TROIS NIVEAUX, JAMAIS PLUS (24/08/2026, demande du patron) : fond de page
+   gris → carte blanche → champ blanc. La bulle GRISE du 23/08 faisait un
+   quatrième niveau — une bulle grise arrondie posée dans une carte blanche
+   arrondie, elle-même sur le fond gris. Chaque groupe de champs devient donc
+   une CARTE DE PREMIER NIVEAU : blanche, liseré de carte, arrondi de carte.
+   La carte qui les contenait (`#step2>.card`) redevient un simple empilement,
+   sans fond ni liseré — voir plus bas. */
+.bloc,.article-bloc{border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin:var(--pas-3) 0 0;background:var(--surface)}
+.article-bloc{margin-top:var(--pas-3)}
+/* Le conteneur de l'étape « Besoins » n'est plus une carte : ses enfants en
+   sont. Sans ça on retrouverait un arrondi dans un arrondi. */
+#step2>.card{background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;margin:0}
+/* Et rien d'arrondi À L'INTÉRIEUR d'une carte : ce qui s'y range se sépare
+   d'un trait, il ne se remet pas dans une boîte. */
+#step2 .bloc .tx-adjust,#step2 .article-bloc .tx-adjust,#step2 .article-bloc .tx-preview,
+#step2 .tx-barre,#step2 .tx-reglages[open]{border-left:0;border-right:0;border-bottom:0;border-radius:0;background:transparent}
+/* SAUF LA BARRE D'ACTION : elle est COLLANTE (`position:sticky`). Transparente,
+   le formulaire défilerait au travers et le bouton d'ajout se lirait par-
+   dessus les champs. Elle garde donc le blanc de la carte qui la porte — c'est
+   son trait du haut, et lui seul, qui la sépare de ce qui précède. */
+#step2 .tx-barre{background:var(--surface)}
 /* La bulle porte déjà son rembourrage : le premier et le dernier enfant ne
    rajoutent pas leur marge par-dessus, sinon on lit deux airs au lieu d'un. */
 .bloc>:first-child{margin-top:0}
 .bloc>:last-child{margin-bottom:0}
 /* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
    encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
-.bloc .notice,.bloc .tx-adjust,.notice .bloc{background:var(--surface)}
+.bloc .notice,.notice .bloc{background:var(--zone-bg)}
 /* Les blocs blancs du dedans le restent : sur un fond retiré, un cadre
    transparent se confondrait avec lui. */
-.article-bloc .tx-adjust,.article-bloc .tx-preview{background:var(--surface)}
+/* (les blocs internes n'ont plus de fond à eux : voir le pavé « trois niveaux ») */
 /* Le numéro de la ligne titre son bloc — il n'a plus besoin d'une pastille
    pour se faire voir. Il ne garde de la couleur que ce qui dit un ÉTAT :
    orange quand on reprend une ligne déjà posée. */
@@ -669,13 +703,18 @@ h2{letter-spacing:-.01em}
 /* L'aside porte déjà `position:sticky` : un deuxième collage ici ne servirait
    à rien. Tête et pied sont `flex:0 0 auto` — sans ça le pied RÉTRÉCIT quand la
    liste s'allonge et « Construire le projet » se fait rogner en silence. */
-.demande-panneau{display:flex;flex-direction:column;max-height:calc(100vh - 32px);background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-2);overflow:hidden}
+/* TROIS ZONES, ET LE PAS SUIVANT TOUJOURS À L'ÉCRAN : en-tête fixe, liste qui
+   défile, pied fixe. La hauteur retranche la barre du parcours et l'air du
+   cadre — la liste s'allonge, « Construire le projet » ne bouge pas. */
+.demande-panneau{display:flex;flex-direction:column;max-height:calc(100vh - 190px);background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-2);overflow:hidden}
 .demande-tete{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:var(--pas-2);padding:var(--pas-3);border-bottom:1px solid var(--border)}
 .demande-tete h2{margin:0}
 .demande-corps{flex:1 1 auto;min-height:0;overflow-y:auto;padding:var(--pas-3)}
-.demande-vide{text-align:center;color:var(--text-2);padding:26px 14px}
-.demande-vide-ic{display:block;font-size:var(--taille-grand);margin-bottom:9px;opacity:.5}
-.demande-vide b{display:block;color:var(--text-1);font-size:var(--taille-texte);margin-bottom:5px}
+/* DEUX LIGNES, CENTRÉES, ET RIEN D'AUTRE. L'état vide tenait 400 px de haut
+   avec son illustration : de la place prise pour dire qu'il n'y a rien. */
+.demande-vide{text-align:center;color:var(--text-3);padding:var(--pas-4) 14px}
+.demande-vide b{display:block;color:var(--text-1);font-size:var(--dd-taille-valeur);margin-bottom:4px}
+.demande-vide span{display:block;font-size:var(--dd-taille-aide);font-weight:var(--dd-graisse-douce);line-height:var(--ligne-texte)}
 
 /* Une ligne = un article. Serrée, mais chaque zone garde sa place : la
    quantité à gauche, le nom sur toute la largeur, le détail dessous, et le
@@ -716,7 +755,22 @@ h2{letter-spacing:-.01em}
 /* La feuille « Esprit SumUp » plus haut impose `padding:13px 22px!important`
    à toutes les pilules : sans `!important` ici, la ligne du panneau garde des
    boutons de pleine taille et chaque article coûte 45 px de hauteur. */
-.demande-corps .need-actions button{padding:var(--champ-y-serre) var(--pas-2)!important;font-size:var(--taille-texte)}
+/* DEUX POIDS, PAS UN. « Modifier » est l'action par défaut : un bouton bordé.
+   « Supprimer » est un lien — il ne prend le rouge qu'au survol, au moment où
+   la main est déjà dessus. Les deux se ressemblaient (deux boutons pleins),
+   et le plus dangereux était le plus visible. */
+/* Une action posée DANS une ligne de liste reprend la boîte serrée : la
+   hauteur ne s'écrit pas, on rend au bouton son rembourrage et il se calcule. */
+.demande-corps .need-actions{--dd-champ-h:auto}
+.demande-corps .need-actions button{padding:var(--champ-y-serre) var(--pas-2)!important;font-size:var(--dd-taille-label)}
+/* `!important` à contrecœur : la rangée de boutons de la page les pose déjà
+   comme ça (`.secondary`/`.danger`, plus haut, tous en `!important`). On ne
+   peut pas la battre autrement, et la desserrer déplacerait TOUS les boutons
+   des sept étapes — hors sujet ici. */
+.demande-corps .need-actions .secondary{background:transparent!important;border-color:var(--dd-contour)!important;color:var(--text-1)!important}
+.demande-corps .need-actions .secondary:hover{background:var(--dd-survol-doux)!important;border-color:var(--dd-contour)!important}
+.demande-corps .need-actions .danger{background:transparent!important;border-color:transparent!important;padding:var(--champ-y-serre) 2px!important;color:var(--text-3)!important;font-weight:var(--dd-graisse-douce);box-shadow:none!important}
+.demande-corps .need-actions .danger:hover{background:transparent!important;color:var(--danger)!important}
 
 /* Le prix n'a plus de bloc à lui : il est devenu les deux dernières RANGÉES de
    la table de la carte (« Total », « À la pièce »). Une seule table du premier
@@ -749,7 +803,9 @@ h2{letter-spacing:-.01em}
 </style>
 <script src="textile-catalog.js"></script>
 </head>
-<body>
+<!-- La palette et la densité de CET écran vivent dans `charte.css`, sous
+     `.ecran-comptoir` : une couleur ne s'écrit qu'à un seul endroit. -->
+<body class="ecran-comptoir">
 <script>
 (function(){
   var eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
@@ -795,11 +851,11 @@ h2{letter-spacing:-.01em}
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span></span></button></div><div id="besoinTextileForm"><div class="bloc"><div class="tx-controls"><div class="field"><label>Majoration libre %</label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA <span class="req">*</span></label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence *</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile</label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport <span class="req">*</span></label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre</label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT *</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation</label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre <span class="req">*</span></label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage <span class="req">*</span></label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage <span class="req">*</span></label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note</label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise %</label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-aide">T-shirts, sweats, casquettes</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-aide">Objet, signalétique, sur-mesure</span></span></button></div><div id="besoinTextileForm"><div class="bloc"><div class="tx-controls"><div class="field"><label>Majoration libre % <span class="opt">optionnel</span></label><input id="txMarkup" type="number" step="0.1" value="" placeholder="0" oninput="onTextileGlobalChange()"></div><div class="field"><label>TGCA</label><select id="txTgca" data-menu-manuel-non onchange="onTextileGlobalChange()"><option value="0.04" selected>OUI — 4 %</option><option value="0">NON</option></select></div></div></div><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile <span class="opt">optionnel</span></label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport</label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre <span class="opt">optionnel</span></label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation <span class="opt">optionnel</span></label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre</label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage</label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note <span class="opt">optionnel</span></label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><details class="tx-adjust"><summary>Ajustements</summary><div class="grid"><div class="field"><label>Remise % <span class="opt">optionnel</span></label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div></details><div class="tx-preview hidden" id="txPreview"></div><div class="tx-barre"><div class="error msg-flottant msg-barre hidden" id="txManqueMsg"></div><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité</label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie *</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin *</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée *</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence</label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur</label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production</label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes</label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
+<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
      coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
@@ -1168,8 +1224,7 @@ h2{letter-spacing:-.01em}
 <div class="demande-tete"><h2>La demande</h2><span class="badge" id="needCount">0 besoin</span></div>
 <div class="demande-corps" id="needsDisplay"></div>
 <div class="demande-pied">
-<div class="demande-total"><span>Articles</span><b id="dmdArticles">0</b></div>
-<div class="demande-total"><span>Pièces</span><b id="dmdPieces">0</b></div>
+<div class="demande-total"><span>Articles · Pièces</span><b><span id="dmdArticles">0</span> · <span id="dmdPieces">0</span></b></div>
 <div class="demande-chiffrage hidden" id="sideTextileCard">
 <div class="demande-total"><span>Total HT</span><b id="txKpiHT">0,00 €</b></div>
 <div class="demande-total is-fort"><span>Total TTC</span><b id="txKpiTTC">0,00 €</b></div>
@@ -1180,7 +1235,9 @@ h2{letter-spacing:-.01em}
 </div>
 </div>
 <p class="help demande-reste hidden" id="dmdAChiffrer"></p>
-<button class="primary full" onclick="goStep(3)">Construire le projet →</button>
+<!-- Tant que la demande est vide, il n'y a rien à construire : le bouton le
+     DIT au lieu de mener à une étape sans objet. -->
+<button class="primary full" id="dmdCta" onclick="goStep(3)">Construire le projet →</button>
 </div>
 </div>
 </aside>
@@ -1193,7 +1250,7 @@ let currentStep=2,needs=[]  /* le parcours s'ouvre sur les besoins : l'étape 1 
 // `clientDirectory`. Laissé vide plutôt que rempli d'exemples.
 let clients=[];
 function makeRef(){const d=new Date(),yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),key=`olda-devis-v2-${yy}${mm}${dd}`,n=(Number(localStorage.getItem(key))||0)+1;localStorage.setItem(key,n);return`DEV-${yy}.${mm}.${dd}-${String(n).padStart(3,'0')}`}let reference=makeRef();
-function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error').forEach(e=>e.remove())}/* Un champ qui manque devient ROUGE, son message juste dessous. Seul le
+function clearErrors(){document.querySelectorAll('.invalid').forEach(e=>e.classList.remove('invalid'));document.querySelectorAll('.error:not(.msg-barre)').forEach(e=>e.remove());if(window.effacerMessagesDeBarre)effacerMessagesDeBarre()}/* Un champ qui manque devient ROUGE, son message juste dessous. Seul le
    PREMIER prend le focus et le défilement : on montre où commencer, on ne
    fait pas sauter la page une fois par champ. */
 /* Le rouge s'efface dès que le champ est rempli : le garder après coup ferait
@@ -1213,10 +1270,46 @@ function marquer(id,msg,premier){const el=$(id);if(!el)return false;
      ne montrerait rien à la vendeuse. */
   const peau=el.closest('.menu'),cible=peau&&el.tagName==='SELECT'?peau:el;
   const focusable=cible===peau?peau.querySelector('.menu-declencheur'):el;
-  cible.classList.add('invalid');const d=document.createElement('div');d.className='error msg-flottant';d.textContent=msg;
-  (peau||el).insertAdjacentElement('afterend',d);
+  cible.classList.add('invalid');
+  /* `marquerSansMessage` : le message est déjà posé ailleurs — à gauche du
+     bouton qui vient d'être cliqué (voir failPres). Le doubler sous le champ
+     ferait dire deux fois la même chose au même moment. */
+  if(!marquerSansMessage){const d=document.createElement('div');d.className='error msg-flottant';d.textContent=msg;
+  (peau||el).insertAdjacentElement('afterend',d);}
   if(premier){(peau||el).scrollIntoView({behavior:'smooth',block:'center'});focusable.focus()}return false}
 function fail(id,msg){return marquer(id,msg,true)}
+/* L'OBLIGATOIRE S'INVERSE (24/08/2026) — côté message. Un champ requis ne porte
+   plus d'étoile : le manque ne se voit donc qu'AU CLIC. Il se dit à deux
+   endroits, et deux seulement : le champ fautif se souligne de rouge, et une
+   phrase courte se pose À GAUCHE DU BOUTON qu'on vient d'appuyer — là où l'œil
+   est déjà. Hors du flux (`.msg-flottant`) : elle ne pousse aucun champ, quelle
+   que soit sa longueur (règle nucléaire du 24/08). */
+let marquerSansMessage=false;
+function failPres(zoneId,id,msg){
+  const z=$(zoneId);
+  if(z){z.textContent=msg;z.classList.remove('hidden')}
+  marquerSansMessage=true;
+  const r=marquer(id,msg,true);
+  marquerSansMessage=false;
+  /* IL S'EFFACE À LA PREMIÈRE MODIFICATION — mais on n'écoute qu'AU TOUR
+     SUIVANT, et une seule fois. Poser le message met le champ fautif au point
+     (`focus`), ce qui fait repasser les menus habillés de pont.js et leur fait
+     émettre des « change » : écouté tout de suite, le message s'effaçait dans
+     le même souffle qu'il s'affichait — vu au navigateur, catalogue encore en
+     cours de chargement. Ces événements-là ne viennent pas de la vendeuse. */
+  setTimeout(armerEffacementDeBarre,0);
+  return r
+}
+let effaceurDeBarre=null;
+function armerEffacementDeBarre(){
+  if(effaceurDeBarre)return;
+  effaceurDeBarre=()=>effacerMessagesDeBarre();
+  ['input','change'].forEach(ev=>document.addEventListener(ev,effaceurDeBarre,true));
+}
+function effacerMessagesDeBarre(){
+  if(effaceurDeBarre){['input','change'].forEach(ev=>document.removeEventListener(ev,effaceurDeBarre,true));effaceurDeBarre=null}
+  ['txManqueMsg','needManqueMsg'].forEach(k=>{const z=$(k);if(z){z.textContent='';z.classList.add('hidden')}})
+}
 /* TOUS les manques d'un coup : le panneau qui les listait a disparu, c'est
    le champ lui-même qui le dit maintenant. Une seule liste à remplir, pas
    un clic par champ. `__priorite` n'est pas un champ mais une rangée de
@@ -1508,7 +1601,7 @@ function basculerSaisieManuelle(force){
 }
 
 /* /CATALOGUE-COMPTOIR */
-function saveNeed(){clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
+function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
 function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
 function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
@@ -2121,6 +2214,7 @@ function previewTextile(){
    champ manquant, `fail` rend `false` : rien n'a été posé, il n'y a pas
    d'indice. */
 function saveTextileNeed(){
+  const fail=(id,msg)=>failPres('txManqueMsg',id,msg);
   clearErrors();
   if(!txReady())return fail('txRef','Le catalogue textile n’a pas pu être chargé. Recharge la page.');
   const d=txReadForm();
@@ -2757,7 +2851,7 @@ function renderNeeds(){
        entre les rangées, `tabular-nums` : exactement la langue du
        récapitulatif de l'article (voir `.tx-tableau`). */
     return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div></div>${detail}<div class="need-pied"><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div></div>`
-  }).join(''):`<div class="demande-vide"><svg class="demande-vide-ic" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5.4 8h13.2l-1.1 11.2a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg><b>Aucun article</b></div>`;
+  }).join(''):`<div class="demande-vide"><b>Aucun article</b><span>Ajoute un besoin à gauche, il s'inscrit ici.</span></div>`;
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();
 }
@@ -2932,6 +3026,7 @@ function setPricing(i,k,v){needs[i][k]=k==='unitHT'?(v===''?NaN:Number(v)):v;ren
    client, familles…) ont disparu avec elle — leurs écritures aussi. */
 function updateSidebar(){
   const a=$('dmdArticles');if(a)a.textContent=needs.length;
+  const cta=$('dmdCta');if(cta)cta.disabled=!needs.length;
   const p=$('dmdPieces');if(p)p.textContent=needs.reduce((s,n)=>s+(Number(n.qty)||0),0);
   const reste=needs.filter(n=>!Number.isFinite(n.unitHT)).length;
   const r=$('dmdAChiffrer');
@@ -3360,9 +3455,23 @@ input[type=date]::-webkit-inner-spin-button,input[type=time]::-webkit-inner-spin
    « input[type=date] » sa propre hauteur, prise dans ses parties internes :
    2 px de plus que le champ d'à côté, sur la même rangée. On lui impose la
    boîte de l'échelle — la ligne de texte, deux rembourrages, deux traits. */
-input[type=date],input[type=time]{height:calc(var(--ligne-champ) * 1em + var(--champ-y) * 2 + 3px)}
+input[type=date],input[type=time]{height:var(--dd-champ-h)}
 select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
 .req{color:var(--danger);font-weight:var(--graisse-forte);margin-left:2px}
+/* L'OBLIGATOIRE S'INVERSE (24/08/2026, demande du patron) : un champ requis ne
+   porte plus rien — c'est le cas normal, et l'étoile rouge le disait douze fois
+   par écran. C'est l'OPTIONNEL qui se signale, une fois, en gris.
+   Le rouge ne sert plus qu'à la validation réelle : au clic, sur le champ
+   fautif. Voir `.invalid` et le message posé près du bouton. */
+.opt{margin-left:6px;font-size:var(--dd-taille-mention);font-weight:var(--dd-graisse-douce);color:var(--dd-placeholder)}
+.menu>.menu-declencheur{min-height:var(--dd-champ-h);padding:0 var(--dd-champ-x);font-size:var(--dd-taille-valeur)}
+/* Un menu fautif se souligne, comme un champ fautif : il ne se remplit pas de
+   rouge (point 7 — le rouge dit la validation, il ne décore pas). */
+.menu.invalid>.menu-declencheur{border-color:var(--border);background:var(--surface);box-shadow:inset 0 -2px 0 0 var(--danger)}
+/* LE MESSAGE SE POSE À GAUCHE DU BOUTON, ET NE POUSSE PERSONNE — il reste hors
+   du flux (`.msg-flottant`, charte.css), on ne lui change QUE son ancrage :
+   au milieu de la rangée d'action, à gauche, jamais sous elle. */
+.tx-barre>.msg-flottant,.actions>.msg-flottant{top:50%;left:0;margin-top:0;transform:translateY(-50%);min-width:0;max-width:min(340px,58%);text-align:left}
 .dp-pop{position:absolute;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-pop);padding:16px;width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
 .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .dp-title{font-weight:var(--graisse-forte);font-size:var(--taille-texte);color:var(--primary)}

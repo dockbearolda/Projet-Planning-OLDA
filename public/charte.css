@@ -290,6 +290,106 @@
   color: var(--danger);
 }
 
+/* ======================================================= L'ÉCRAN DE LA DEMANDE
+   PALETTE ET DENSITÉ DU 24/08/2026 — demande du patron, en sept points.
+
+   Cet écran (`public/comptoir/demande-devis.html`, étape « 1. Besoins ») reçoit
+   une palette et une densité À LUI. C'est un ARBITRAGE, pas un oubli : la
+   charte du 29/07 est la charte de la maison, et le comptoir s'en écarte
+   volontairement ici — encre plus profonde, gris plus froids, champs plus bas,
+   deux tailles de plus pour les mentions.
+
+   POURQUOI CE FICHIER, ET PAS UNE FEUILLE DANS LA PAGE : parce qu'une couleur
+   ne doit s'écrire QU'ICI. L'écran en comptait 107 avant le 22/08 ; le
+   garde-fou `test/echelle-comptoir.test.js` interdit toujours la moindre teinte
+   en dur dans ses règles, et cette couche-là est ce qui lui permet de tenir.
+
+   POURQUOI `html[data-theme="light"]` POUR LES COULEURS : le thème sombre garde
+   la palette de la maison. Une palette claire posée sans condition rendrait
+   l'écran illisible de nuit — l'encre #0f1729 sur le fond sombre du thème.
+   Les FORMES et les TAILLES, elles, ne dépendent pas du thème : elles sont
+   posées à part, et valent dans les deux.
+
+   L'écran d'à côté (`vente-directe.html`) ne porte PAS la classe : il est resté
+   sur la charte de la maison. Les deux écrans du comptoir ont donc divergé le
+   24/08 — c'est à reprendre dès que le patron tranche pour le second. */
+.ecran-comptoir {
+  /* Formes : la carte s'arrondit un peu plus, le champ aussi. */
+  --arrondi-carte: 16px;
+  --arrondi-bloc: 16px;    /* un bloc interne EST une carte, voir point 4 */
+  --arrondi-champ: 10px;
+
+  /* LA BOÎTE DE CE QUI SE CLIQUE ET SE REMPLIT : 44 px, posée une seule fois.
+     Champ et bouton la prennent tous les deux — l'un par `height`, l'autre par
+     `min-height` (un bouton centre son contenu tout seul). C'est toujours UNE
+     boîte : ce qui change le 24/08, c'est qu'elle se nomme au lieu de se
+     déduire d'un rembourrage. */
+  --dd-champ-h: 44px;
+  --dd-champ-x: 12px;      /* rembourrage horizontal d'un champ */
+  --dd-label-gap: 7px;     /* de l'intitulé à son champ */
+  --dd-rangee: 18px;       /* d'une rangée de champs à la suivante */
+
+  /* Deux tailles de plus que l'échelle de la maison, pour ce que l'écran
+     MENTIONNE sans le faire lire : « optionnel », une ligne d'aide sous un
+     titre, une action discrète. Elles ne servent JAMAIS à du texte courant. */
+  --dd-taille-valeur: 14px;   /* ce qui se saisit et ce qui se clique */
+  --dd-taille-label: 12.5px;  /* l'intitulé d'un champ */
+  --dd-taille-aide: 12px;     /* la ligne d'aide sous un titre de tuile */
+  --dd-taille-mention: 11px;  /* « optionnel », et rien d'autre */
+
+  /* Deux graisses de plus : 500 pour ce qui s'efface (mention, action
+     discrète), 700 pour l'étape où l'on se tient. */
+  --dd-graisse-douce: 500;
+  --dd-graisse-appuyee: 700;
+
+  /* Les chiffres s'alignent en colonne, partout où il y en a. */
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-theme="light"] .ecran-comptoir {
+  --text-1: #0f1729;                 /* encre */
+  --text-2: #6b7280;                 /* secondaire */
+  --text-3: #8d94a1;                 /* tertiaire — repères, pas du texte lu */
+  --border: #e0e4ea;                 /* liseré d'un champ */
+  --card-border: #e8eaef;            /* liseré d'une carte */
+  --border-soft: #eef0f4;            /* séparateur */
+  --border-strong: #dfe3ea;          /* le même trait, appuyé */
+  --bg: #f6f7f9;                     /* fond de page */
+  --zone-bg: #f6f7f9;                /* une zone douce = le fond de page */
+  --surface: #ffffff;
+  --primary: #0f1729;                /* l'action porte l'encre */
+  --primary-hover: #000;
+  --primary-rgb: 15, 23, 41;
+  --danger: #b3341f;                 /* le rouge de la validation RÉELLE */
+
+  --dd-placeholder: #a8afba;         /* ce qui n'est pas encore saisi */
+  --dd-inactif: #c8cdd6;             /* une action qu'on ne peut pas encore faire */
+  --dd-actif-fond: #fbfaf7;          /* le fond chaud d'une tuile choisie */
+  --dd-survol-doux: #f4f6f9;         /* le survol d'un bouton bordé */
+  --dd-contour: #dfe3ea;             /* le contour d'un bouton bordé, d'une pastille */
+  /* La pastille de l'étape où l'on se tient : elle est POSÉE SUR l'encre, donc
+     elle se creuse dans le blanc plutôt que de porter une couleur à elle. */
+  --dd-pastille-sur-encre: rgba(255, 255, 255, .16);
+  --dd-pastille-sur-encre-trait: rgba(255, 255, 255, .3);
+  /* L'ombre d'une tuile choisie — un souffle, pas un relief. */
+  --dd-ombre-tuile: 0 1px 2px rgba(15, 23, 41, .06);
+}
+
+/* De nuit, ces quatre-là n'ont pas d'équivalent dans la charte : on les
+   redit sur les gris du thème sombre plutôt que de les laisser vides. */
+html[data-theme="dark"] .ecran-comptoir {
+  --dd-placeholder: var(--text-3);
+  --dd-inactif: var(--border-strong);
+  --dd-actif-fond: var(--surface-hover);
+  --dd-survol-doux: var(--surface-hover);
+  --dd-contour: var(--border-strong);
+  /* De nuit l'accent est CLAIR : la pastille de l'étape courante se creuse
+     dans le noir, sans quoi elle disparaîtrait dans son propre fond. */
+  --dd-pastille-sur-encre: rgba(0, 0, 0, .16);
+  --dd-pastille-sur-encre-trait: rgba(0, 0, 0, .3);
+  --dd-ombre-tuile: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
 /* ---------------------------------------------------------------- Thème sombre
    Même charte, retournée : l'accent encre devient encre claire, d'où
    --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent

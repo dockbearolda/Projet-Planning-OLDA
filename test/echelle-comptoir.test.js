@@ -117,7 +117,12 @@ assert.ok(/@font-face\{font-family:'Manrope';[^}]*font-weight:200 800/.test(sans
 //
 // Le ticket imprimé garde les siennes : Courier, 80 mm de large, c'est un
 // document, pas de l'écran. Tout le reste passe par l'échelle.
-const AUTORISEES = new Set([...TAILLES.map((t) => `var(${t})`), 'var(--recap-texte)', 'var(--recap-grand)', 'inherit']);
+// L'ÉCRAN DE LA DEMANDE A REÇU SA PROPRE DENSITÉ LE 24/08/2026 (7 points du
+// patron) : valeur 14, intitulé 12,5, aide 12, mention 11. Quatre tailles DE
+// PLUS, mais toujours NOMMÉES et déclarées une seule fois — dans charte.css,
+// sous `.ecran-comptoir`. La règle ne change pas : rien en dur, tout se nomme.
+const DD_TAILLES = ['--dd-taille-valeur', '--dd-taille-label', '--dd-taille-aide', '--dd-taille-mention'];
+const AUTORISEES = new Set([...TAILLES, ...DD_TAILLES].map((t) => `var(${t})`).concat(['var(--recap-texte)', 'var(--recap-grand)', 'inherit']));
 const fautes = [];
 for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
   const selecteur = m[1].trim();
@@ -144,7 +149,7 @@ for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
   if (/ticket/.test(selecteur) || /@font-face/.test(selecteur)) continue;
   for (const d of m[2].matchAll(/font-weight:\s*([^;}!]+)/g)) {
     const v = d[1].trim();
-    if (!/^var\(--graisse-(texte|note|forte)\)$/.test(v)) graissesEnDur.push(`${selecteur} → font-weight:${v}`);
+    if (!/^var\(--(?:graisse-(?:texte|note|forte)|dd-graisse-(?:douce|appuyee))\)$/.test(v)) graissesEnDur.push(`${selecteur} → font-weight:${v}`);
   }
 }
 assert.deepStrictEqual(graissesEnDur, [],
@@ -164,10 +169,17 @@ assert.ok(/b,strong\{font-weight:var\(--graisse-forte\)\}/.test(FEUILLES),
 const employees = new Set();
 for (const m of FEUILLES.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
   if (/ticket/.test(m[1].trim())) continue;
-  for (const d of m[2].matchAll(/font-size:\s*var\((--taille-[\w-]+)\)/g)) employees.add(d[1]);
+  for (const d of m[2].matchAll(/font-size:\s*var\((--(?:dd-)?taille-[\w-]+)\)/g)) employees.add(d[1]);
 }
-assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-texte'],
-  'cet écran n’a droit qu’à la taille du texte et à celle des chiffres qu’on annonce');
+// Depuis le 24/08 : les quatre tailles de la densité du comptoir, plus la
+// taille du texte pour ce que les autres étapes lisent. Les chiffres annoncés
+// au client passent par l'affectation `--recap-grand:var(--taille-grand)` —
+// une affectation n'est pas une taille en dur, et on la tient juste dessous.
+assert.deepStrictEqual([...employees].sort(),
+  ['--dd-taille-aide', '--dd-taille-label', '--dd-taille-mention', '--dd-taille-valeur', '--taille-texte'],
+  'cet écran écrit dans les tailles de sa densité, et dans rien d’autre');
+assert.ok(/--recap-grand:var\(--taille-grand\)/.test(FEUILLES),
+  'les chiffres annoncés au client gardent la grande taille de l’échelle');
 
 // --- 4. AUCUNE COULEUR EN DUR ------------------------------------------------
 //
@@ -215,12 +227,23 @@ const champ = regle('input,select,textarea');
 const bouton = regle('button');
 const pilule = regle('.primary,.secondary,.danger,.whatsapp');
 
-assert.strictEqual(champ['font-size'], 'var(--taille-texte)', 'un champ écrit dans la taille du texte');
-assert.strictEqual(bouton['font-size'], 'var(--taille-texte)', 'un bouton aussi');
+// DEPUIS LE 24/08, LA BOÎTE SE NOMME AU LIEU DE SE DÉDUIRE : 44 px
+// (`--dd-champ-h`, charte.css), portés par le champ en `height` et par le
+// bouton en `min-height` — un bouton centre son contenu tout seul. Le principe
+// qui compte n'a pas bougé : UNE seule boîte pour tout ce qui se clique ou se
+// remplit, et aucune hauteur locale — les deux la lisent au même endroit.
+assert.strictEqual(champ['font-size'], 'var(--dd-taille-valeur)', 'un champ écrit dans la taille des valeurs');
+assert.strictEqual(bouton['font-size'], 'var(--dd-taille-valeur)', 'un bouton aussi');
 assert.strictEqual(champ['line-height'], 'var(--ligne-champ)', 'le champ a une hauteur de ligne en rapport');
 assert.strictEqual(bouton['line-height'], 'var(--ligne-champ)', '… le bouton la même');
-assert.strictEqual(champ.padding.split(' ')[0], 'var(--champ-y)', 'le champ se remplit de la hauteur de l’échelle');
-assert.strictEqual(pilule.padding.split(' ')[0], 'var(--champ-y)', '… la pilule de la même');
+assert.ok(/input,select\{height:var\(--dd-champ-h\)\}/.test(FEUILLES),
+  'le champ fait la boîte nommée de la charte');
+assert.strictEqual(bouton['min-height'], 'var(--dd-champ-h)',
+  '… le bouton la même : une seule boîte, lue au même endroit');
+assert.strictEqual(champ.padding.split(' ')[0], '0',
+  'la hauteur du champ ne doit plus rien à son rembourrage vertical');
+assert.strictEqual(pilule.padding.split(' ')[0], '0',
+  '… celle de la pilule non plus');
 // Le bouton pleine largeur ne se distingue plus par sa taille de texte : il
 // est déjà plein, encré et large.
 assert.ok(!/button\.full\{[^}]*font-size/.test(FEUILLES),
@@ -521,10 +544,18 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
   assert.ok(inval, `${nom} : la règle du champ en erreur doit rester repérable`);
   assert.ok(!/border(?:-width)?:\s*2px/.test(inval[1]),
     `${nom} : un champ en erreur ne change pas la largeur de son trait — il se décalerait de 1 px`);
-  assert.ok(/box-shadow:0 0 0 1px var\(--danger\)/.test(inval[1]),
-    `${nom} : … l'épaisseur qu'on voit vient d'un anneau, qui ne prend pas de place`);
-  assert.ok(/border-color:var\(--danger\)/.test(inval[1]),
-    `${nom} : … et le trait dit l'erreur par sa couleur`);
+  if (nom === 'devis') {
+    // DEPUIS LE 24/08 (7 points du patron) : le champ fautif se SOULIGNE —
+    // un trait intérieur de 2 px, là où l'œil descend chercher le message.
+    // Toujours en ombre : elle ne prend pas de place, rien ne bouge.
+    assert.ok(/box-shadow:inset 0 -2px 0 0 var\(--danger\)/.test(inval[1]),
+      `${nom} : le champ fautif se souligne, d'un trait qui ne prend pas de place`);
+  } else {
+    assert.ok(/box-shadow:0 0 0 1px var\(--danger\)/.test(inval[1]),
+      `${nom} : … l'épaisseur qu'on voit vient d'un anneau, qui ne prend pas de place`);
+    assert.ok(/border-color:var\(--danger\)/.test(inval[1]),
+      `${nom} : … et le trait dit l'erreur par sa couleur`);
+  }
 
   // 2. LE MESSAGE NE REMONTE PLUS LE CHAMP. Les grilles collaient leurs
   //    cellules en bas : une ligne de texte ajoutée SOUS un champ le faisait
@@ -550,12 +581,26 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
 // champs mis bout à bout dans une carte blanche — rien ne disait où un sujet
 // finissait et où le suivant commençait.
 // ===========================================================================
+// DEPUIS LE 24/08, LES DEUX ÉCRANS DIVERGENT ICI, et c'est un choix du patron
+// (7 points) : sur l'écran de la demande, TROIS NIVEAUX et jamais plus — fond
+// de page gris, carte blanche, champ blanc. La bulle grise du 23/08 faisait un
+// quatrième niveau : chaque groupe devient une carte blanche de PREMIER niveau
+// (liseré de carte, arrondi de carte), et le conteneur de l'étape s'efface.
+// L'écran de vente, lui, garde la bulle du 23/08 — à réaligner quand le patron
+// tranchera pour lui.
 [['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
   const css = sansCommentaires(src);
   const regle = css.match(/\.bloc(?:,\.article-bloc)?\{([^}]*)\}/);
   assert.ok(regle, `${nom} : la bulle d'un groupe doit exister`);
-  ['background:var(--zone-bg)', 'border-radius:var(--arrondi-bloc)'].forEach((d) =>
-    assert.ok(regle[1].includes(d), `${nom} : la bulle porte « ${d} » — la même que sur l'autre écran`));
+  const attendu = nom === 'devis'
+    ? ['background:var(--surface)', 'border-radius:var(--arrondi-carte)', 'border:1px solid var(--card-border)']
+    : ['background:var(--zone-bg)', 'border-radius:var(--arrondi-bloc)'];
+  attendu.forEach((d) =>
+    assert.ok(regle[1].includes(d), `${nom} : le groupe porte « ${d} »`));
+  if (nom === 'devis') {
+    assert.ok(/#step2>\.card\{background:transparent;border:0;/.test(css),
+      `${nom} : le conteneur de l'étape n'est plus une carte — pas d'arrondi dans un arrondi`);
+  }
   assert.ok(/\.bloc>:first-child\{margin-top:0\}/.test(css) && /\.bloc>:last-child\{margin-bottom:0\}/.test(css),
     `${nom} : la bulle porte son rembourrage, ses bords n'ajoutent pas une deuxième marge`);
   // Elle n'ajoute AUCUN intitulé : c'est un cadre, pas un titre.

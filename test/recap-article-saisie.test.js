@@ -91,7 +91,10 @@ lignes.forEach(([intitule]) => {
   assert.ok(LABELS.includes(intitule),
     `« ${intitule} » doit être l’intitulé d’un champ du formulaire, pas un autre mot`);
 });
-assert.ok(/<label for="txNote">Note<\/label>/.test(DEVIS),
+// Depuis le 24/08 l'intitulé porte la mention « optionnel » (l'obligatoire ne
+// se marque plus, c'est l'optionnel qui se dit) : on ancre le nom du champ,
+// pas la mention qui le suit.
+assert.ok(/<label for="txNote">Note[\s<]/.test(DEVIS),
   'le champ « Note » est de retour dans le formulaire, sous son intitulé');
 assert.ok(!/setNeedPerso/.test(DEVIS),
   '… et le champ posé sur la carte de la demande s’en va avec');
@@ -493,7 +496,10 @@ assert.ok(/if\(det\.open&&TX_RECAP\.form\)\{TX_RECAP\.form=false;previewTextile\
 assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
   '… et le groupe est poussé à droite par une marge, pas par un alignement de fin de ligne');
 // La même règle sur la saisie « Autre » : « Fermer » précède l'ajout.
-const rangeeAutre = DEVIS.match(/<div class="actions a-droite">([\s\S]*?)<\/div>/);
+// La rangée s'ouvre depuis le 24/08 sur la zone de message de validation (un
+// <div> refermé aussitôt) : on lit jusqu'au bouton d'ajout, pas jusqu'au
+// premier </div>.
+const rangeeAutre = DEVIS.match(/<div class="actions a-droite">([\s\S]*?id="saveNeedBtn"[\s\S]*?<\/button>)/);
 assert.ok(rangeeAutre, 'la rangée de la saisie « Autre » suit la même règle');
 assert.ok(rangeeAutre[1].indexOf('cancelNeedBtn') < rangeeAutre[1].indexOf('saveNeedBtn'),
   '« Ajouter un besoin » ferme la rangée, « Fermer » le précède');

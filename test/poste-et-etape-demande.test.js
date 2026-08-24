@@ -156,17 +156,23 @@ assert.ok(!/\.stepper\{display:grid/.test(DEVIS),
 assert.ok(/\.stepper\{display:flex;flex-wrap:wrap/.test(DEVIS),
   'seules les bulles VISIBLES se partagent la ligne');
 
-// --- 6. Une bulle franchie passe au vert ------------------------------------
+// --- 6. Une bulle franchie porte une coche, pas un vert ----------------------
+//
+// Le vert du 22/08 est parti le 24/08 (7 points du patron), dans la ligne de
+// « le vert se tait » : une étape franchie est le cas NORMAL du parcours, elle
+// n'a pas à crier. Elle se dit à l'encre : pastille pleine avec une coche
+// blanche, libellé encré, filet amont encré. L'étape à venir reste grise, la
+// courante est une pilule pleine — trois états, zéro couleur de plus.
 
 const done = (DEVIS.match(/\.step\.done\{([^}]*)\}/) || [])[1];
 assert.ok(done, 'la règle .step.done doit exister');
-assert.ok(/background:var\(--success\)/.test(done),
-  'une étape validée passe au VERT : c’est un état, pas un gris de plus');
-// Depuis le 22/08 le vert ne vient plus d'un jeton propre à cet écran : c'est
-// celui de la charte (« --success », #166534), déclaré dans charte.css.
-const CHARTE = lire('public/charte.css');
-assert.ok(/--success:\s*#166534/.test(CHARTE),
-  'le vert de validation est celui de la charte, pas une teinte de cet écran');
+assert.ok(!/background:var\(--success\)/.test(done),
+  'une étape franchie ne repasse pas au vert : le cas normal ne crie pas');
+const doneCoche = (DEVIS.match(/\.step\.done::before\{([^}]*)\}/) || [])[1];
+assert.ok(doneCoche && /content:"\\2713"/.test(doneCoche) && /background:var\(--primary\)/.test(doneCoche),
+  'une étape franchie porte une coche sur pastille encrée');
+assert.ok(/\.step\.done::after,\.step\.active::after\{background:var\(--primary\)\}/.test(DEVIS),
+  '… et son filet amont s’encre avec elle');
 assert.ok(!/\.step\.done\{background:#e2e8f0/.test(DEVIS),
   'l’ancien gris bleuté ne doit plus traîner');
 
