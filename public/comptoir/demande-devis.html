@@ -669,7 +669,10 @@ h2{letter-spacing:-.01em}
    CETTE carte — 74 px pour « Marquage », 83 px pour « Production » — et les
    valeurs de deux articles empilés ne tombaient pas sur la même verticale. */
 .need-tab{grid-column:1/-1;display:grid;grid-template-columns:var(--need-cle) minmax(0,1fr);margin-top:var(--pas-1)}
-.need-tab>*{display:flex;align-items:flex-end;padding:var(--pas-1) 0;border-top:1px solid var(--border-soft);min-width:0;font-size:var(--taille-texte);line-height:var(--ligne-texte)}
+/* `flex-start` et non `flex-end` : une valeur qui passe à la ligne garde son
+   intitulé en face de sa PREMIÈRE ligne. Calé en bas, l'intitulé descendait au
+   niveau de la dernière et la valeur semblait commencer au-dessus de lui. */
+.need-tab>*{display:flex;align-items:flex-start;padding:var(--pas-1) 0;border-top:1px solid var(--border-soft);min-width:0;font-size:var(--taille-texte);line-height:var(--ligne-texte)}
 /* La première rangée ne porte pas de filet : un tableau commence par une
    valeur, pas par un trait. */
 .need-tab>:nth-child(-n+2){border-top:0}
@@ -2633,10 +2636,21 @@ function renderNeeds(){
        la vendeuse ; le transport ne se lit qu'au moment de chiffrer. Les deux
        restent dans le récapitulatif de l'article et dans sa fiche, sous leur
        intitulé. Ici, la ligne dit ce qui distingue UN article d'un autre : sa
-       référence, sa couleur, son marquage, ses tailles. */
+       référence, sa couleur, son marquage, son encre, ses tailles. */
     const lignes=(t?[
       ['Réf.',[n.requestedRef,t.color].filter(Boolean).join(' · ')],
-      ['Marquage',[t.printType,t.markColor].filter(Boolean).join(' · ')],
+      /* DEUX RANGÉES, PAS UNE. L'emplacement et l'encre étaient collés par un
+         point — « Poitrine + Dos + Manche Dr · Multi couleur » — et cette
+         valeur-là fait 195 px : dans une carte de 322 px elle repassait à la
+         ligne, et son intitulé se retrouvait à hauteur de la SECONDE ligne,
+         sous le début de sa propre valeur. Séparées, chacune tient sur une
+         rangée. « Couleur » suit « Marquage » : c'est l'adjacence qui dit
+         laquelle des deux couleurs de l'article on lit — l'autre, celle du
+         vêtement, reste collée à sa référence. (« Couleur du marquage » ferait
+         154 px d'intitulé : la valeur d'à côté repasserait à la ligne, on
+         aurait déplacé le défaut.) */
+      ['Marquage',t.printType],
+      ['Couleur',t.markColor],
       ['Tailles',tailles],
     ]:[
       ['Famille',[n.category,n.color].filter(Boolean).join(' · ')],

@@ -197,6 +197,20 @@ assert.ok(!/\.need-(ligne|tab)\{[^}]*grid-template-columns:auto/.test(DEVIS),
 // L'en-tête (pastille + nom) coiffe la table, il ne la contient pas.
 assert.ok(/\.need-tab\{[^}]*grid-column:1\/-1/.test(DEVIS),
   'la table prend toute la largeur de la carte');
+// L'EMPLACEMENT ET L'ENCRE SONT DEUX RANGÉES. Collés par un point, ils
+// faisaient une valeur de 195 px : dans 322 px elle repassait à la ligne, et
+// son intitulé se retrouvait à hauteur de la SECONDE ligne — sous le début de
+// sa propre valeur.
+assert.ok(/\['Marquage',t\.printType\]/.test(renderNeedsSrc)
+  && /\['Couleur',t\.markColor\]/.test(renderNeedsSrc),
+  'le marquage et sa couleur tiennent chacun leur rangée');
+assert.ok(!/\[t\.printType,t\.markColor\]/.test(renderNeedsSrc),
+  '… ils ne sont plus collés dans une seule valeur');
+// Et une valeur qui passerait quand même à la ligne garde son intitulé en face
+// de sa PREMIÈRE ligne : calé en bas, l'intitulé descendait au niveau de la
+// dernière et la valeur semblait commencer au-dessus de lui.
+assert.ok(/\.need-tab>\*\{[^}]*align-items:flex-start/.test(DEVIS),
+  'l’intitulé reste en face de la première ligne de sa valeur');
 assert.ok(/\.demande-corps \.need-ligne\{[^}]*gap:8px var\(--pas-2\)/.test(DEVIS),
   'la gouttière du panneau reste celle de la charte');
 
