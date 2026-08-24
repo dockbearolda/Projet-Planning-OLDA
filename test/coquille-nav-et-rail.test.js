@@ -229,7 +229,7 @@ console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue q
   assert.ok(modele, 'le bouton « revenir d’un cran » est le modèle : il doit exister');
   assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0]),
     '… 44 px et rond');
-  for (const sel of ['.colbar-close', '.cat-close', '.ld-close', '.guide-close']) {
+  for (const sel of ['.colbar-close', '.cat-close', '.ld-close']) {
     const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
     assert.ok(r, `${sel} doit exister`);
     assert.ok(/width: 44px/.test(r[0]) && /height: 44px/.test(r[0]),

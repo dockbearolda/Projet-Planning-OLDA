@@ -3,7 +3,6 @@
 // ===========================================================================
 
 // Guide des étapes (texte du patron, feuille « Descriptif Étapes »).
-import { STEP_GUIDE } from './guide.js';
 // Dashboard « Point du jour » (projection temps réel du planning).
 import { createDashboard } from './dashboard.js';
 // WhatsApp « commande prête » : numéro au format international + message rempli.
@@ -274,8 +273,6 @@ const $stageTitle = document.getElementById('stageTitle');
 const $stageCount = document.getElementById('stageCount');
 const $stageLink = document.getElementById('stageLink');
 const $stageLinkLabel = document.getElementById('stageLinkLabel');
-const $stageDesc = document.getElementById('stageDesc');
-const $stageHelp = document.getElementById('stageHelp');
 
 // --- Outil de devis logo Fiverr -------------------------------------------
 // Reprend la feuille de calcul : on saisit le prix du graphiste Fiverr EN DOLLARS
@@ -342,70 +339,6 @@ function updateStageLink(slug) {
     $stageLink.hidden = true;
   }
 }
-
-// --- Guide de l'étape (explication du patron) ------------------------------
-// Le guide de la vue courante : la sous-catégorie si l'une est active, sinon la
-// famille. Certaines entrées (ex. Fiverr) n'ont pas de guide → renvoie null.
-function currentGuide() {
-  return STEP_GUIDE[currentSub] || STEP_GUIDE[currentStage] || null;
-}
-
-// Met à jour le sous-titre explicatif (toujours visible) et l'accès au guide
-// complet, selon la famille / sous-catégorie affichée.
-function updateStageHelp() {
-  const g = currentGuide();
-  if ($stageDesc) {
-    $stageDesc.textContent = g ? g.desc : '';
-    $stageDesc.hidden = !g;
-  }
-  if ($stageHelp) $stageHelp.hidden = !g;
-  // Si le panneau est ouvert, on le recale sur la nouvelle étape.
-  if (guideOpen) fillGuide();
-}
-
-// Remplit le panneau détaillé avec le texte de la vue courante.
-function fillGuide() {
-  const g = currentGuide();
-  if (!g) { closeGuide(); return; }
-  setText('guideTitle', currentViewLabel());
-  setText('guideDesc', g.desc);
-  setText('guideWho', g.who);
-  setText('guideWhenIn', g.whenIn);
-  setText('guideWhenOut', g.whenOut);
-}
-
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text || '—';
-}
-
-const $guideOverlay = document.getElementById('guideOverlay');
-let guideOpen = false;
-
-function openGuide() {
-  if (!currentGuide() || !$guideOverlay) return;
-  fillGuide();
-  $guideOverlay.hidden = false;
-  guideOpen = true;
-  requestAnimationFrame(() => $guideOverlay.classList.add('open'));
-}
-
-function closeGuide() {
-  if (!$guideOverlay) return;
-  $guideOverlay.classList.remove('open');
-  guideOpen = false;
-  // Laisse jouer la transition d'opacité avant de masquer.
-  setTimeout(() => { if (!guideOpen) $guideOverlay.hidden = true; }, 180);
-}
-
-if ($stageHelp) $stageHelp.addEventListener('click', openGuide);
-if ($guideOverlay) {
-  const $guideClose = document.getElementById('guideClose');
-  if ($guideClose) $guideClose.addEventListener('click', closeGuide);
-  // Fermeture en tapant le fond (hors carte) : pratique au doigt sur tablette.
-  $guideOverlay.addEventListener('click', (e) => { if (e.target === $guideOverlay) closeGuide(); });
-}
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && guideOpen) closeGuide(); });
 
 // --- API helpers -----------------------------------------------------------
 async function api(method, url, body) {
@@ -652,7 +585,6 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   // donc jamais périmé). Le reste (colonnes, lignes, animation) suit la donnée.
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(slug);
-  updateStageHelp();
   updateFiverrTool(slug);
   paintSidebarActive();
   // Changer de sous-catégorie DANS la même famille ne recharge rien : les lignes
@@ -7286,7 +7218,6 @@ async function start() {
   // titre de repli du HTML — « Commande » — au lieu de l'étape en cours.
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(currentStage);
-  updateStageHelp();
   updateFiverrTool(currentStage);
   // Les noms « de base » (pilote + référents par catégorie) doivent être connus
   // AVANT le premier rendu, sinon les lignes s'affichent en « Non défini » puis
