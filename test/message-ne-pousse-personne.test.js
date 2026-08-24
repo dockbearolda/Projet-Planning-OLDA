@@ -82,12 +82,19 @@ assert.ok(/linear-gradient\(var\(--danger-bg\),\s*var\(--danger-bg\)\),\s*var\(-
 assert.ok(/d\.className\s*=\s*'error msg-flottant'/.test(DEVIS),
   'marquer() pose un message qui flotte');
 
-// Les deux messages écrits en dur dans la page.
-for (const id of ['projectPriorityError', 'clientNextActionError']) {
+// Les messages écrits en dur dans la page. `clientNextActionError` a disparu
+// avec le bloc « Suite souhaitée pour ce client » : la question est déduite de
+// l'étape 4, elle ne peut plus être laissée sans réponse.
+for (const id of ['projectPriorityError']) {
   const div = DEVIS.match(new RegExp(`<div class="[^"]*" id="${id}">`));
   assert.ok(div, `le message ${id} existe`);
   assert.ok(/\bmsg-flottant\b/.test(div[0]), `… et ${id} flotte`);
 }
+
+// L'avis « ce client était déjà dans la base » se pose sous le champ Client,
+// à la volée : lui aussi doit flotter, sinon il pousse tout le formulaire.
+assert.ok(/avis\.className\s*=\s*'help msg-flottant'/.test(DEVIS),
+  'l’avis client se pose avec msg-flottant');
 
 // Les contrôles d'adresse et de numéro : la ligne naît VIDE et se remplit à la
 // frappe — de 0 à 22 px au premier caractère si elle reste dans le flux.

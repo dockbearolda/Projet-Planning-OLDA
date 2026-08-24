@@ -235,15 +235,20 @@ assert.ok(/gradient/.test(TE.markColorHexFor('Multi couleur')),
 assert.ok(/const hex=TE\(\)\.markColorHexFor\(x\)/.test(DEVIS),
   'chaque couleur de marquage emporte sa teinte dans la liste');
 
-// UNE SEULE RECHERCHE SUR L'ÉCRAN : la référence. C'est la seule liste qu'on
-// ne parcourt pas des yeux. Ailleurs, le champ de filtre est un deuxième champ
-// dans le champ — il se pose à la main, jamais par un seuil qui décide seul.
+// DEUX RECHERCHES SUR L'ÉCRAN, ET DEUX SEULEMENT : la référence et le client.
+// Ce sont les deux seules listes qu'on ne parcourt pas des yeux — le catalogue
+// d'un côté, les 78 fiches de la base clients de l'autre. Ailleurs, le champ de
+// filtre est un deuxième champ dans le champ — il se pose à la main, jamais par
+// un seuil qui décide seul.
 assert.ok(!/MENU_SEUIL_FILTRE/.test(PONT), 'plus de seuil qui pose un filtre tout seul');
 assert.ok(/const filtrable=!etat\.libre&&etat\.hote\.hasAttribute\('data-menu-recherche'\)/.test(PONT),
   'la recherche se déclare, elle ne se devine pas');
-assert.ok((DEVIS.match(/data-menu-recherche/g) || []).length === 1
-  && /<select id="txRef"[^>]*data-menu-recherche/.test(DEVIS),
-  'et une seule liste la porte sur l’écran de devis : la référence');
+assert.strictEqual((DEVIS.match(/data-menu-recherche/g) || []).length, 2,
+  'deux listes seulement portent une recherche sur l’écran de devis');
+assert.ok(/<select id="txRef"[^>]*data-menu-recherche/.test(DEVIS),
+  '… la référence du catalogue');
+assert.ok(/<select id="clientSelect"[\s\S]{0,200}?data-menu-recherche/.test(DEVIS),
+  '… et le client, qui remplace l’ancienne pile de cartes cliquables');
 assert.ok(!/data-menu-recherche/.test(VENTE), 'aucune sur l’écran de vente directe');
 
 // Le clavier fait tout : le comptoir est un poste PC.

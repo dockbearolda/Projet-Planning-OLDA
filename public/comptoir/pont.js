@@ -44,21 +44,28 @@
   // alors sur son numéro de secours) qu'un écran qui ne rend jamais la main.
   // Ce fichier est chargé en script simple par les deux écrans du patron : il ne
   // peut pas importer `reseau.js`, d'où le minuteur écrit ici.
-  const api = async (method, url, body) => {
+  // Le minuteur, à part : `api` jette tout ce qui n'est pas un 200, alors que
+  // la création d'un client a BESOIN du corps de la réponse (le 409 « déjà dans
+  // la base » n'est pas une panne, c'est une information). Les deux passent
+  // donc par le même minuteur, sans partager la façon de lire la réponse.
+  const fetchMinute = async (url, options) => {
     const minuteur = new AbortController();
     const stop = setTimeout(() => minuteur.abort(), 15000);
     try {
-      const res = await fetch(url, {
-        method,
-        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: minuteur.signal,
-      });
-      if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
-      return await res.json();
+      return await fetch(url, { ...options, signal: minuteur.signal });
     } finally {
       clearTimeout(stop);
     }
+  };
+
+  const api = async (method, url, body) => {
+    const res = await fetchMinute(url, {
+      method,
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
+    return await res.json();
   };
 
   // Le jour du POSTE, pas celui du serveur : le conteneur tourne en UTC, il
@@ -131,6 +138,92 @@
     return fiche;
   }
 
+  // Le chemin INVERSE de `versEcran` : l'écran nomme les natures en toutes
+  // lettres, la base les range en code.
+  const NATURE_BASE = {
+    Particulier: 'perso', Association: 'asso', Revendeur: 'revendeur', Professionnel: 'pro',
+  };
+
+  // Même découpe que le serveur : le texte ENTIER reste le nom du dossier
+  // (c'est lui la clé de rapprochement), on n'en tire que prénom et nom.
+  function couperNomPerso(nomComplet) {
+    const mots = String(nomComplet || '').trim().split(/\s+/).filter(Boolean);
+    if (mots.length < 2) return { prenom: '', nom: mots[0] || '' };
+    return { prenom: mots[0], nom: mots.slice(1).join(' ') };
+  }
+
+  // Même normalisation que `clientKey` (db.js) : c'est elle qui décide si deux
+  // graphies désignent le même client. Sert uniquement à retrouver la fiche que
+  // le serveur vient de nous refuser en doublon.
+  const cleClient = (v) => String(v == null ? '' : v)
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  function versBase(fiche) {
+    const nature = NATURE_BASE[fiche.type] || 'pro';
+    const corps = {
+      entreprise: fiche.name || '',
+      client_type: nature,
+      telephone: fiche.phone || '',
+      email: fiche.email || '',
+    };
+    if (nature === 'perso') {
+      const p = couperNomPerso(fiche.name);
+      corps.prenom = p.prenom;
+      corps.nom = p.nom;
+    } else {
+      corps.nom = fiche.contact || '';
+      corps.fonction = fiche.contactRole || '';
+      corps.type = fiche.sector || '';
+      corps.adresse = fiche.address || '';
+      corps.zone = fiche.city || '';
+      corps.code_postal = fiche.postal || '';
+    }
+    return corps;
+  }
+
+  // LA FICHE ENTRE EN BASE AU MOMENT OÙ ON LA CRÉE, plus au moment où la
+  // demande part au planning. Une demande abandonnée emportait le client avec
+  // elle ; et le client n'avait, jusque-là, qu'un identifiant inventé dans
+  // l'onglet (`c1724…`) — donc pas de code CLI-PRO-xxxx, pas de fiche, et rien
+  // que le poste d'à côté puisse voir.
+  //
+  // Le doublon n'est PAS une erreur : deux comptoirs qui inscrivent le même
+  // nouveau client en même temps, c'est le cas normal ici. Le serveur refuse la
+  // seconde écriture (409) ; on récupère alors la fiche qui a gagné et on
+  // travaille avec elle, plutôt que d'en fabriquer une deuxième.
+  async function enregistrerClient(fiche, idExistant) {
+    const corps = versBase(fiche);
+    if (!corps.entreprise) throw new Error('le nom du client est vide');
+    const url = idExistant ? `/api/clients/${encodeURIComponent(idExistant)}` : '/api/clients';
+    const res = await fetchMinute(url, {
+      method: idExistant ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+    });
+    if (res.status === 409) {
+      await chargerClients();
+      const cle = cleClient(corps.entreprise);
+      const deja = (typeof clientDirectory !== 'undefined' ? clientDirectory : [])
+        .find((c) => cleClient(c.name) === cle);
+      if (deja) {
+        return { fiche: deja, avis: `« ${corps.entreprise} » était déjà dans la base clients : c'est cette fiche-là qui est associée à la demande.` };
+      }
+      throw new Error(`« ${corps.entreprise} » est déjà dans la base clients`);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `enregistrement refusé (${res.status})`);
+    const enregistree = versEcran(data);
+    // La base fait foi : on remplace la fiche locale par celle qu'elle rend
+    // (vrai identifiant, code CLI-…), on n'en garde pas deux versions.
+    if (typeof clientDirectory !== 'undefined' && Array.isArray(clientDirectory)) {
+      const i = clientDirectory.findIndex((c) => c.id === enregistree.id || c.id === idExistant);
+      if (i >= 0) clientDirectory.splice(i, 1, enregistree);
+      else clientDirectory.unshift(enregistree);
+    }
+    return { fiche: enregistree, avis: '' };
+  }
+
   // `clients` (vente directe) et `clientDirectory` (demande de devis) sont des
   // `const` de la page : on les REMPLIT sur place, on ne les remplace pas.
   // `typeof` évite le ReferenceError sur l'écran qui n'a pas l'autre.
@@ -143,7 +236,8 @@
     if (typeof clientDirectory !== 'undefined' && Array.isArray(clientDirectory)) {
       clientDirectory.splice(0, clientDirectory.length, ...fiches);
       // La liste de l'étape 5 est déjà à l'écran, vide : on la redessine.
-      if (typeof renderClientQuickList === 'function') renderClientQuickList();
+      if (typeof window.renderClientOptions === 'function') window.renderClientOptions();
+      else if (typeof renderClientQuickList === 'function') renderClientQuickList();
     }
   }
 
@@ -436,6 +530,14 @@
     const signature = `${etatEnvoi}${detail}`;
     if (signature === dernierPeint) return;
     dernierPeint = signature;
+    // LE VERT NE DIT PLUS RIEN. « ✔ Ce dossier est au planning » répétait ce
+    // que le bouton d'à côté dit déjà en devenant « 📅 Déjà au planning » et
+    // inactif. Ce qu'on ne peut PAS deviner en regardant l'écran — l'envoi en
+    // cours, l'échec et son bouton Réessayer — reste, entier : c'est par ce
+    // trou-là que des dossiers sont partis sans que personne ne s'en aperçoive.
+    // `display` et non `hidden` : `.olda-etat` porte sa propre règle `display`,
+    // elle défait l'attribut.
+    el.style.display = etatEnvoi === 'ok' ? 'none' : '';
     el.className = `olda-etat olda-etat--${etatEnvoi === 'ok' ? 'ok' : etatEnvoi === 'echec' ? 'echec' : 'envoi'}`;
     el.firstChild.textContent = detail ? `${PHRASES[etatEnvoi]}\n${detail}` : PHRASES[etatEnvoi];
     el.lastChild.hidden = etatEnvoi !== 'echec' && etatEnvoi !== 'attente';
@@ -1929,4 +2031,18 @@ document.addEventListener('pointerdown',ev=>{
   // L'hôte réaffiche l'écran pour un nouveau client : la base a pu bouger
   // entre-temps (un client créé depuis l'onglet Base clients).
   window.oldaRafraichirClients = () => chargerClients().catch(raterEnSilence('base clients indisponible'));
+
+  // L'écran ne parle jamais au serveur lui-même : il appelle ceci s'il existe,
+  // et continue de tourner seul s'il n'existe pas (fichier ouvert sans pont).
+  window.oldaEnregistrerClient = enregistrerClient;
+
+  /* Ouvre un menu déroulant sans clic : l'étape 5 arrive avec sa liste de
+     clients déjà dépliée, il n'y a plus qu'à choisir. */
+  window.oldaOuvrirMenu = (hote) => {
+    const el = typeof hote === 'string' ? document.getElementById(hote) : hote;
+    if (!el) return;
+    window.menusPoserTous();
+    const etat = menus.get(el);
+    if (etat) menuOuvrir(etat);
+  };
 })();

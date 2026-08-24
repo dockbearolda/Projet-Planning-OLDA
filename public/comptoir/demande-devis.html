@@ -169,25 +169,8 @@ b,strong{font-weight:var(--graisse-forte)}
 .field-error.hidden{display:none}
 
 
-.client-quick-list{display:grid;gap:var(--pas-2);max-height:360px;overflow:auto;margin-top:var(--pas-2)}
-.client-item{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:13px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:.15s ease}
-.client-item:hover{border-color:var(--primary);transform:translateY(-1px)}
-.client-item.active{border:2px solid var(--primary);background:var(--bg)}
-.client-main{display:flex;flex-direction:column;gap:3px}
-.client-main strong{font-size:var(--taille-texte)}
-.client-meta{font-size:var(--taille-texte);color:var(--text-2)}
-.client-type{font-size:var(--taille-texte);font-weight:var(--graisse-note);padding:5px 8px;border-radius:999px;background:var(--primary-soft);white-space:nowrap}
 
 
-.client-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pas-3);margin-top:var(--pas-2)}
-.client-action-card{border:1px solid var(--border);background:var(--surface);border-radius:var(--arrondi-bloc);padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:105px;transition:.15s ease}
-.client-action-card:hover{border-color:var(--primary);transform:translateY(-1px)}
-.client-action-card.active{border:2px solid var(--primary);background:var(--bg)}
-.client-action-card strong{font-size:var(--taille-texte)}
-.client-action-card small{font-size:var(--taille-texte);line-height:var(--ligne-texte);color:var(--text-2)}
-#clientNextActionBlock.action-error{border:2px solid var(--danger);border-radius:var(--arrondi-bloc);padding:14px;background:var(--danger-bg)}
-#clientNextActionBlock.action-error>label{color:var(--danger)}
-@media(max-width:760px){.client-action-grid{grid-template-columns:1fr}}
 
 
 .step-validation-error{border:2px solid var(--danger) !important;background:var(--danger-bg) !important;border-radius:var(--arrondi-bloc);padding:12px;
@@ -244,7 +227,7 @@ button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
 .step{border-radius:999px!important}
 .step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
-.client-item,.priority-card,.client-action-card{border-radius:var(--arrondi-bloc)!important}
+.priority-card{border-radius:var(--arrondi-bloc)!important}
 </style>
 
 <style>
@@ -959,7 +942,7 @@ h2{letter-spacing:-.01em}
       <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
     </div>
 
-    </div><div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
+    </div>
 
     <div class="actions a-droite" style="margin-top:16px">
       <button class="primary" onclick="goStep(5)">Choisir le client →</button>
@@ -975,12 +958,18 @@ h2{letter-spacing:-.01em}
     </div>
 
     <div class="bloc"><div class="field">
-      <label>Rechercher un client existant *</label>
-      <input id="clientSearch" type="search" placeholder="Nom, entreprise, téléphone ou e-mail..." oninput="filterClientList()">
-      <div class="help" style="margin-top:6px">Clique directement sur un client pour l’associer à la demande.</div>
+      <label for="clientSelect">Client *</label>
+      <!-- MÊME COMPOSANT QUE LA RÉFÉRENCE DES BESOINS (`#txRef`) : une liste
+           déroulante à chevron, avec sa recherche DANS le panneau. Le comptoir
+           ne connaît plus qu'une seule façon de choisir dans une liste.
+           `data-menu-manuel-non` : on ne tape pas un client à la main ici — il
+           vient de la base, ou il s'y ajoute par le bouton d'à côté. -->
+      <select id="clientSelect" data-menu-manuel-non data-menu-recherche
+              data-menu-filtre="Filtrer : nom, téléphone, e-mail…"
+              onchange="selectExistingClient(this.value)">
+        <option value="">Chargement de la base clients…</option>
+      </select>
     </div>
-
-    <div id="clientQuickList" class="client-quick-list"></div>
 
     </div><div class="actions" style="margin-top:12px">
       <button type="button" class="secondary" onclick="showNewClientForm()">+ Créer un nouveau client</button>
@@ -1082,23 +1071,7 @@ h2{letter-spacing:-.01em}
 
     <div id="selectedClientCard" class="notice green hidden" style="margin-top:16px"></div>
 
-    <div class="bloc"><div id="clientNextActionBlock" class="field hidden" style="margin-top:16px">
-      <label>Suite souhaitée pour ce client *</label>
-      <div class="client-action-grid">
-        <button type="button" class="client-action-card" data-action="quote" onclick="selectClientNextAction('quote')">
-          <strong>Devis à faire</strong>
-          <small>Le dossier est suffisamment complet pour préparer le devis.</small>
-        </button>
-        <button type="button" class="client-action-card" data-action="waiting" onclick="selectClientNextAction('waiting')">
-          <strong>Attendre les informations du client</strong>
-          <small>Il manque encore des éléments avant de pouvoir préparer le devis.</small>
-        </button>
-      </div>
-      <input type="hidden" id="clientNextAction" value="">
-      <div class="field-error msg-flottant hidden" id="clientNextActionError">⚠ Sélectionne la suite à donner à cette demande.</div>
-    </div>
-
-    </div><div id="step5ValidationSummary" class="validation-summary hidden"></div>
+    <div id="step5ValidationSummary" class="validation-summary hidden"></div>
 
     <div class="actions a-droite" style="margin-top:16px">
       <button class="primary" onclick="openRecapFromStep5()">Voir le récapitulatif →</button>
@@ -1252,7 +1225,12 @@ function fail(id,msg){return marquer(id,msg,true)}
    cartes : elle a son propre marquage. */
 function failAll(manques){manques.forEach((m,k)=>m[0]==='__priorite'?showProjectPriorityError(k===0):marquer(m[0],m[1],k===0));return !manques.length}
 document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
-function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();document.querySelector('.layout').classList.toggle('sans-demande',n!==2);for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'})}
+function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();document.querySelector('.layout').classList.toggle('sans-demande',n!==2);for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'});
+  /* LA LISTE DES CLIENTS S'OUVRE TOUTE SEULE, comme les cartes qu'elle
+     remplace étaient déjà à l'écran. Après le défilement, pas avant : le
+     moindre défilement referme les menus (pont.js), y compris celui-ci. */
+  if(n===5&&!selectedClient)setTimeout(()=>{if(currentStep===5&&!selectedClient&&window.oldaOuvrirMenu)window.oldaOuvrirMenu('clientSelect')},260);
+}
 function validateStep(n){clearErrors();
 if(n===2&&!needs.length)return fail($('besoinAutreForm').classList.contains('hidden')?'txRef':'catProduit','Ajoute au moins un besoin — choisis un produit et ajoute-le à la demande, ou passe par la saisie manuelle.');
 if(n===3){const m=[];
@@ -1281,14 +1259,22 @@ return true}
 function clearStep5Validation(){
   $('step5ValidationSummary').classList.add('hidden');
   $('step5ValidationSummary').innerHTML='';
-  ['clientSearch','selectedClientCard','clientNextActionBlock'].forEach(id=>{
-    const el=$(id);
+  ['clientSelect','selectedClientCard'].forEach(id=>{
+    const el=peauDe(id);
     if(el)el.classList.remove('step-validation-error');
   });
 }
 
-function markStep5Error(id,message){
+/* Un <select> habillé par `pont.js` est caché DERRIÈRE sa peau : le rougir lui
+   ne montrerait rien à la vendeuse. Même règle que `marquer()`. */
+function peauDe(id){
   const el=$(id);
+  if(!el)return null;
+  return (el.tagName==='SELECT'&&el.closest('.menu'))||el;
+}
+
+function markStep5Error(id,message){
+  const el=peauDe(id);
   if(el)el.classList.add('step-validation-error');
   return message;
 }
@@ -1298,7 +1284,7 @@ function validateStep5ForRecap(){
   const errors=[];
 
   if(!selectedClient){
-    errors.push(markStep5Error('clientSearch','Sélectionne ou crée un client.'));
+    errors.push(markStep5Error('clientSelect','Sélectionne ou crée un client.'));
   }else{
     const phone=selectedClient.phone||'';
     if(!isValidLocalPhone(phone)){
@@ -1306,9 +1292,6 @@ function validateStep5ForRecap(){
     }
   }
 
-  if(!$('clientNextAction').value){
-    errors.push(markStep5Error('clientNextActionBlock','Choisis « Devis à faire » ou « Attendre les informations du client ».'));
-  }
 
   if(errors.length){
     const summary=$('step5ValidationSummary');
@@ -2790,23 +2773,25 @@ function toggleControlStatus(){
   $('waitingInformationBox').classList.toggle('hidden',status!=='waiting');
   $('receivedViaField').classList.toggle('hidden',status==='waiting');
 }
+/* LE PAVÉ « Informations reçues » A ÉTÉ RETIRÉ. Il relisait en vert, juste
+   sous les champs, ce que la vendeuse venait d'y taper — et il poussait le
+   bouton de l'étape vers le bas à chaque frappe. Ce qu'il récapitulait se lit
+   à l'étape 5, dans le récapitulatif, une fois pour toutes.
+   La fonction reste : une vingtaine de champs l'appellent à chaque frappe. */
 function updateControl(){
-  const status=$('controlStatus').value;
-  const labels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:'En attente d’informations'};
-  const details=[];
-  if($('clientLogoStatus').value)details.push(`Type de logo : ${$('clientLogoStatus').value}`);if($('logoReceptionStatus').value)details.push(`Statut du logo : ${$('logoReceptionStatus').value}`);
-  if($('vectorizationStatus').value)details.push(`Vectorisation : ${$('vectorizationStatus').value}`);
-  if($('oldaMockupStatus').value)details.push(`Maquette / fichier numérique : ${$('oldaMockupStatus').value}`);
-  if(status!=='waiting'&&transmissionValue('informationReceivedVia','newInformationReceivedVia'))details.push(`Transmission : ${transmissionValue('informationReceivedVia','newInformationReceivedVia')}`);
-  if(status==='waiting'&&transmissionValue('expectedInformationVia','newExpectedInformationVia'))details.push(`Transmission prévue : ${transmissionValue('expectedInformationVia','newExpectedInformationVia')}`);
-  if(status==='waiting'&&$('expectedInformation').value.trim())details.push(`À recevoir : ${$('expectedInformation').value.trim()}`);
-  const complete=status&&!(status==='waiting'&&(!transmissionValue('expectedInformationVia','newExpectedInformationVia')||!$('expectedInformation').value.trim()));
-  $('controlBox').className=`notice ${complete?(status==='received'?'green':'orange'):'orange'}`;
-  $('controlBox').innerHTML=status
-    ? `<b>${labels[status]}</b>${details.length?`<ul>${details.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`
-    : 'Renseigne l’état des informations reçues.';
   updateSidebar();
 }
+
+/* LA « SUITE À DONNER » NE SE DEMANDE PLUS. L'étape 4 pose déjà la question —
+   « État des informations du client » : en attente d'informations, on attend le
+   client ; dans tous les autres cas le devis peut se faire. L'étape 5 la
+   REDEMANDAIT sous un autre nom, et rien n'empêchait les deux réponses de se
+   contredire. On la déduit désormais, à un seul endroit. */
+function clientNextActionValue(){
+  const champ=$('controlStatus');
+  return champ&&champ.value==='waiting'?'waiting':'quote';
+}
+window.clientNextActionValue=clientNextActionValue;
 
 
 function phoneDigits(value){
@@ -2851,40 +2836,41 @@ function isValidLocalPhone(value){
 // base au moment où la demande part au planning (upsert serveur).
 const clientDirectory=[];
 
-function filterClientList(){
-  const q=($('clientSearch').value||'').trim().toLowerCase();
-  const results=clientDirectory.filter(c=>[c.name,c.phone,c.email,c.type].join(' ').toLowerCase().includes(q));
-  renderClientQuickList(results);
+/* UNE SEULE FAÇON DE CHOISIR DANS UNE LISTE, sur tout le comptoir. Le choix du
+   client se faisait par une pile de cartes cliquables doublée d'un champ de
+   recherche — une mécanique qui n'existait qu'ici. C'est désormais le menu
+   déroulant des besoins (`pont.js`), avec son chevron et sa recherche dans le
+   panneau : la vendeuse fait le même geste partout. */
+function clientOptionLabel(c){
+  return [c.name,c.phone,c.email].filter(Boolean).join(' • ');
 }
 
-function renderClientQuickList(list=clientDirectory){
-  const box=$('clientQuickList');
-  if(!list.length){
-    box.innerHTML='<div class="notice orange">Aucun client trouvé. Tu peux créer un nouveau client.</div>';
-    return;
-  }
-  box.innerHTML=list.map(c=>`
-    <div class="client-item ${selectedClient&&selectedClient.id===c.id?'active':''}" onclick="selectExistingClient('${c.id}')">
-      <div class="client-main">
-        <strong>${esc(c.name)}</strong>
-        <span class="client-meta">${esc(c.phone||'Téléphone non renseigné')}${c.email?` • ${esc(c.email)}`:''}</span>
-      </div>
-      <span class="client-type">${esc(c.type)}</span>
-    </div>`).join('');
+function renderClientOptions(){
+  const sel=$('clientSelect');
+  if(!sel)return;
+  const tete=clientDirectory.length
+    ? 'Sélectionner un client'
+    : 'Aucun client dans la base — crée-le à côté';
+  sel.innerHTML=`<option value="">${esc(tete)}</option>`
+    +clientDirectory.map(c=>`<option value="${esc(c.id)}">${esc(clientOptionLabel(c))}</option>`).join('');
+  /* Un `.value` posé par programme ne déclenche AUCUN évènement : le champ
+     fermé doit être repeint à la main, sinon il affiche encore l'ancien choix. */
+  sel.value=selectedClient?selectedClient.id:'';
+  if(window.menuRafraichir)window.menuRafraichir(sel);
 }
+window.renderClientOptions=renderClientOptions;
 
 function selectExistingClient(id){clearStep5Validation();
   selectedClient=clientDirectory.find(c=>c.id===id)||null;
-  resetClientNextAction();
-  showClientNextAction();
-  renderClientQuickList(clientDirectory.filter(c=>[c.name,c.phone,c.email,c.type].join(' ').toLowerCase().includes(($('clientSearch').value||'').trim().toLowerCase())));
+  window.selectedClient=selectedClient;
+  renderClientOptions();
   renderSelectedClient();
   updateSidebar();
 }
 
 function renderSelectedClient(){
   const box=$('selectedClientCard');
-  if(!selectedClient){box.classList.add('hidden');box.innerHTML='';$('clientNextActionBlock').classList.add('hidden');return;}showClientNextAction();
+  if(!selectedClient){box.classList.add('hidden');box.innerHTML='';return;}
   box.classList.remove('hidden');
   box.innerHTML=`<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">${esc(selectedClient.name)}</span><br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
 }
@@ -2908,50 +2894,22 @@ function createAndSelectClient(){clearStep5Validation();
   };
   clientDirectory.unshift(client);
   selectedClient=client;
-  resetClientNextAction();
-  showClientNextAction();
-  $('clientSearch').value=client.name;
   hideNewClientForm();
-  renderClientQuickList();
+  renderClientOptions();
   renderSelectedClient();
   updateSidebar();
 }
 
 
-function selectClientNextAction(action){clearStep5Validation();
-  $('clientNextAction').value=action;
-  document.querySelectorAll('.client-action-card').forEach(btn=>{
-    btn.classList.toggle('active',btn.dataset.action===action);
-  });
-  clearClientNextActionError();
-  updateSidebar();
-}
-
-function showClientNextAction(){
-  $('clientNextActionBlock').classList.remove('hidden');
-}
-
-function resetClientNextAction(){
-  $('clientNextAction').value='';
-  document.querySelectorAll('.client-action-card').forEach(btn=>btn.classList.remove('active'));
-  clearClientNextActionError();
-}
-
-function showClientNextActionError(){
-  $('clientNextActionBlock').classList.add('action-error');
-  $('clientNextActionError').classList.remove('hidden');
-  $('clientNextActionBlock').scrollIntoView({behavior:'smooth',block:'center'});
-}
-
-function clearClientNextActionError(){
-  $('clientNextActionBlock').classList.remove('action-error');
-  $('clientNextActionError').classList.add('hidden');
-}
-
-function clientName(c){return c?(c.company||c.name||'Client'):'Client'}function clientMeta(c){return[c.type==='Professionnel'&&c.contact?`Contact : ${c.contact}`:'',c.phone?`WhatsApp : ${c.phone}`:'',c.email||''].filter(Boolean).join(' • ')}
-$('clientSearch').addEventListener('input',()=>{if(!$('clientResults'))return;const q=normalize($('clientSearch').value);if(!q){$('clientResults').innerHTML='';return}const r=clients.filter(c=>normalize([c.name,c.company,c.contact,c.phone,c.email].filter(Boolean).join(' ')).includes(q)).slice(0,8);$('clientResults').innerHTML=r.length?r.map(c=>`<div class="result"><div class="row-between"><div><b>${esc(clientName(c))}</b><div class="help">${esc(clientMeta(c))}</div></div><button class="primary" onclick="selectClient('${c.id}')">Associer</button></div></div>`).join(''):'<div class="notice">Aucun client trouvé.</div>'});
-function selectClient(id){selectedClient=clients.find(c=>c.id===id)||null;if(!selectedClient)return;$('selectedClientName').textContent=clientName(selectedClient);$('selectedClientMeta').textContent=clientMeta(selectedClient);$('selectedClientCard').classList.remove('hidden');$('searchArea').classList.add('hidden');$('clientCreation').classList.add('hidden');$('toPricingBtn').classList.remove('hidden');updateSidebar()}function clearClient(){selectedClient=null;$('selectedClientCard').classList.add('hidden');$('searchArea').classList.remove('hidden');$('toPricingBtn').classList.add('hidden');$('clientSearch').value='';$('clientResults').innerHTML='';updateSidebar()}function openClientCreation(){$('clientCreation').classList.remove('hidden');$('searchArea').classList.add('hidden')}function closeClientCreation(){$('clientCreation').classList.add('hidden');$('searchArea').classList.remove('hidden')}function chooseClientType(t){clientType=t;$('personChoice').classList.toggle('active',t==='person');$('proChoice').classList.toggle('active',t==='pro');$('personForm').classList.toggle('hidden',t!=='person');$('proForm').classList.toggle('hidden',t!=='pro')}function validPhone(v){const d=String(v||'').replace(/\D/g,'');return d.length>=9&&d.length<=12}
-function createClient(){clearErrors();let c;if(clientType==='person'){if(!$('personName').value.trim())return fail('personName','Renseigne le nom.');if(!validPhone($('personPhone').value))return fail('personPhone','Renseigne un WhatsApp valide.');c={id:`C${Date.now()}`,type:'Particulier',name:$('personName').value.trim(),phone:$('personPhone').value.trim(),email:$('personEmail').value.trim()}}else{if(!$('companyName').value.trim())return fail('companyName','Renseigne la société.');if(!$('companySector').value)return fail('companySector','Choisis le secteur.');if(!$('companyContact').value.trim())return fail('companyContact','Renseigne le contact.');if(!validPhone($('companyPhone').value))return fail('companyPhone','Renseigne un WhatsApp valide.');c={id:`C${Date.now()}`,type:'Professionnel',company:$('companyName').value.trim(),sector:$('companySector').value,contact:$('companyContact').value.trim(),phone:$('companyPhone').value.trim(),email:$('companyEmail').value.trim(),address:$('companyAddress').value.trim(),city:$('companyCity').value.trim(),postal:$('companyPostal').value.trim()}}clients.push(c);localStorage.setItem('oldaDevisClients',JSON.stringify(clients));selectClient(c.id)}
+function clientName(c){return c?(c.company||c.name||'Client'):'Client'}
+/* L'ANCIEN CHOIX DU CLIENT A ÉTÉ RETIRÉ ICI (24/08/2026). Sept fonctions —
+   selectClient, clearClient, openClientCreation, closeClientCreation,
+   chooseClientType, validPhone, createClient — visaient `#searchArea`,
+   `#clientResults`, `#clientCreation`, `#toPricingBtn`, `#personForm`… qui
+   n'existent plus dans cette page depuis longtemps : elles ne pouvaient
+   qu'échouer si quelque chose les appelait. Le client se choisit désormais
+   dans la liste déroulante `#clientSelect`, et se crée par le formulaire
+   `#newClientForm`, qui écrit en base. */
 function renderPricing(){$('pricingNeeds').innerHTML=needs.map((n,i)=>`<div class="quote-card"><div class="row-between"><div><span class="badge orange">Besoin client</span><h3>${esc(n.label)}</h3><div class="help">${n.qty} unité(s) • ${esc(n.category)}${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help"><b>Note :</b> ${esc(n.comment)}</div>`:''}</div></div><div class="grid-3" style="margin-top:12px"><div class="field"><label>Article proposé par Atelier OLDA *</label><input id="solution-${i}" value="${esc(n.solution)}" placeholder="Ex. NS300 tee-shirt premium" oninput="setPricing(${i},'solution',this.value)"></div><div class="field"><label>Référence / variante</label><input value="${esc(n.reference)}" placeholder="Ex. NS300 Black" oninput="setPricing(${i},'reference',this.value)"></div><div class="field"><label>Prix unitaire HT *</label><input id="price-${i}" type="number" min="0" step="0.01" value="${Number.isFinite(n.unitHT)?n.unitHT:''}" oninput="setPricing(${i},'unitHT',this.value)"></div></div><div class="summary-row total"><span>Total HT de cette ligne</span><b>${money(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0)}</b></div></div>`).join('')}
 function setPricing(i,k,v){needs[i][k]=k==='unitHT'?(v===''?NaN:Number(v)):v;renderPricing();calculateQuote()}function quoteTotals(){const subtotal=needs.reduce((s,n)=>s+(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0),0),transport=Number($('transport')?.value)||0,discount=Number($('discount')?.value)||0,ht=Math.max(0,subtotal+transport-discount),rate=(Number($('taxRate')?.value)||0)/100,tax=ht*rate,ttc=ht+tax,dep=ttc*((Number($('depositPercent')?.value)||0)/100);return{subtotal,transport,discount,ht,tax,ttc,dep}}function calculateQuote(){const t=quoteTotals();setTextSafe('subtotalHT',money(t.subtotal));setTextSafe('transportHT',money(t.transport));setTextSafe('discountHT',money(t.discount));setTextSafe('taxAmount',money(t.tax));setTextSafe('totalTTC',money(t.ttc));setTextSafe('depositAmount',money(t.dep));updateSidebar()}['transport','discount','taxRate','depositPercent'].forEach(id=>$(id)?.addEventListener('input',calculateQuote));
 /* `pont.js` appelle cette fonction par son nom (`window.updateSidebar`) et
@@ -2973,7 +2931,7 @@ function updateSidebar(){
     r.classList.toggle('hidden',!reste);
   }
 }
-document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));$('newProjectGoal').addEventListener('input',updateSidebar);toggleControlStatus();updateControl();renderClientQuickList();
+document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));$('newProjectGoal').addEventListener('input',updateSidebar);toggleControlStatus();updateControl();renderClientOptions();
 function setTextSafe(id,value){const el=$(id);if(el)el.textContent=value;}
 function setHtmlSafe(id,value){const el=$(id);if(el)el.innerHTML=value;}
 function fillFinal(){
@@ -2985,7 +2943,7 @@ function fillFinal(){
   const priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
   setTextSafe('finalPriority',priorityLabels[$('projectPriority').value]||'—');
   const clientActionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
-  setTextSafe('finalClientNextAction',clientActionLabels[$('clientNextAction').value]||'—');
+  setTextSafe('finalClientNextAction',clientActionLabels[clientNextActionValue()]||'—');
   setHtmlSafe('finalNeeds',needs.map(n=>`
     <div class="quote-card">
       <div class="row-between">
@@ -3017,7 +2975,7 @@ function recapText(){
     `WhatsApp : ${selectedClient?.phone||'—'}`,
     `Date souhaitée : ${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'} ${$('desiredTime').value||''}`,
     `Priorité : ${priorityLabels[$('projectPriority').value]||'—'}`,
-    `Suite à donner : ${actionLabels[$('clientNextAction').value]||'—'}`,
+    `Suite à donner : ${actionLabels[clientNextActionValue()]||'—'}`,
     '',
     'BESOINS EXPRIMÉS',
     ...needs.map(n=>`- ${n.qty} × ${n.label} (${n.category})${n.requestedRef?` — Réf. ${n.requestedRef}`:''}${n.color?` — ${n.color}`:''}${n.productionType?` — Production ${n.productionType}`:''}${n.comment?`
@@ -3084,10 +3042,6 @@ function validateRecapDownload(buttonId){
   if(!needs.length){
     errors.push('Aucun besoin n’est enregistré.');
     fields.push('finalNeeds');
-  }
-  if(!$('clientNextAction').value){
-    errors.push('La suite à donner au client n’est pas renseignée.');
-    fields.push('finalClientNextAction');
   }
 
   if(errors.length){
@@ -3248,7 +3202,7 @@ async function downloadRecapPDF(){
     const priorities={'1':'Projet simple','2':'Projet intéressant','3':'Projet prioritaire'};
     const actions={quote:'Devis à faire',waiting:'Attendre les informations du client'};
     addText(`Priorité : ${priorities[$('projectPriority').value]||'—'}`);
-    addText(`Suite à donner : ${actions[$('clientNextAction').value]||'—'}`);
+    addText(`Suite à donner : ${actions[clientNextActionValue()]||'—'}`);
 
     addSection('BESOINS EXPRIMÉS');
     needs.forEach((n,i)=>{
@@ -3327,7 +3281,7 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
     btn.textContent="📅 Créer dans le planning";
     btn.onclick=function(){
       const pr=val("projectPriority")||"2";
-      const next=val("clientNextAction");
+      const next=window.clientNextActionValue();
       const selected = window.selectedClient || null;
       const clientName = selected ? (selected.company||selected.name||selected.contact||"Client") : (val("finalClient")||"Client");
       const needs=(window.needs||[]).map(n=>`${n.qty} x ${n.label}`).join(" • ");
@@ -4028,27 +3982,82 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       client.city=v('newClientCity');
       client.postal=v('newClientPostal');
     }
-    if(window.__editingClientId){
-      var existing=clientDirectory.filter(function(c){return c.id===window.__editingClientId;})[0];
-      if(existing){
-        ['contact','contactRole','sector','phone2','address','city','postal'].forEach(function(k){delete existing[k];});
-        Object.keys(client).forEach(function(k){if(k!=='id')existing[k]=client[k];});
-        client=existing;
+    var enEdition=window.__editingClientId||null;
+    window.__editingClientId=null;
+
+    /* On POSE la fiche à l'écran. Appelé soit avec la fiche rendue par la base
+       (cas normal), soit avec la fiche locale quand l'écran tourne sans pont. */
+    var poser=function(fiche,avis){
+      if(enEdition){
+        var existing=clientDirectory.filter(function(c){return c.id===enEdition;})[0];
+        if(existing){
+          ['contact','contactRole','sector','phone2','address','city','postal'].forEach(function(k){delete existing[k];});
+          Object.keys(fiche).forEach(function(k){if(k!=='id')existing[k]=fiche[k];});
+          fiche=existing;
+        }
+      }else if(!clientDirectory.some(function(c){return c.id===fiche.id;})){
+        clientDirectory.unshift(fiche);
       }
-      window.__editingClientId=null;
-    }else{
-      clientDirectory.unshift(client);
-    }
-    selectedClient=client;
-    window.selectedClient=client;
-    resetClientNextAction();
-    showClientNextAction();
-    document.getElementById('clientSearch').value=client.name;
-    hideNewClientForm();
-    renderClientQuickList();
-    renderSelectedClient();
-    updateSidebar();
+      selectedClient=fiche;
+      window.selectedClient=fiche;
+      hideNewClientForm();
+      renderClientOptions();
+      renderSelectedClient();
+      updateSidebar();
+      showClientAvis(avis);
+    };
+
+    /* LA FICHE PART EN BASE MAINTENANT, pas au moment où la demande rejoint le
+       planning. Un client créé ici n'existait que dans cet onglet : une demande
+       abandonnée l'emportait avec elle, le poste d'à côté ne le voyait pas, et
+       il n'avait pas de code CLI-…
+       L'écriture vit dans `pont.js` — l'écran, lui, doit continuer de tourner
+       seul si on l'ouvre sans son pont. */
+    if(typeof window.oldaEnregistrerClient!=='function'){poser(client,'');return;}
+    setClientFormBusy(true);
+    window.oldaEnregistrerClient(client,enEdition).then(function(r){
+      setClientFormBusy(false);
+      poser(r.fiche,r.avis);
+    }).catch(function(err){
+      setClientFormBusy(false);
+      /* ON NE POSE RIEN. Afficher le client comme sélectionné alors que sa
+         fiche n'est pas en base, c'est exactement le mensonge qui a fait
+         perdre des dossiers : la vendeuse continue, et il n'y a rien derrière. */
+      window.__editingClientId=enEdition;
+      fail('newClientName','Client NON enregistré : '+(err&&err.message?err.message:'la base ne répond pas')+'. Réessaie.');
+    });
   };
+
+  /* Le bouton de création pendant l'écriture : on ne peut pas le presser deux
+     fois, et il dit ce qu'il fait. */
+  function setClientFormBusy(busy){
+    var bouton=document.querySelector('#newClientForm .primary');
+    if(!bouton)return;
+    if(busy){
+      if(!bouton.__libelle)bouton.__libelle=bouton.textContent;
+      bouton.disabled=true;bouton.textContent='Enregistrement…';
+    }else{
+      bouton.disabled=false;
+      if(bouton.__libelle)bouton.textContent=bouton.__libelle;
+    }
+  }
+
+  /* Un mot sous le champ Client — « ce client était déjà dans la base ». Il est
+     FLOTTANT : il ne pousse aucun champ (charte). */
+  function showClientAvis(texte){
+    var champ=document.getElementById('clientSelect');
+    if(!champ)return;
+    var peau=champ.closest('.menu')||champ;
+    var avis=document.getElementById('clientAvis');
+    if(!texte){if(avis)avis.remove();return;}
+    if(!avis){
+      avis=document.createElement('div');
+      avis.id='clientAvis';
+      avis.className='help msg-flottant';
+    }
+    avis.textContent=texte;
+    peau.insertAdjacentElement('afterend',avis);
+  }
 
   window.clientInfoLines=function(c){
     if(!c)return [];
@@ -4065,8 +4074,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 
   window.renderSelectedClient=function(){
     var box=document.getElementById('selectedClientCard');
-    if(!selectedClient){box.classList.add('hidden');box.innerHTML='';document.getElementById('clientNextActionBlock').classList.add('hidden');return;}
-    showClientNextAction();
+    if(!selectedClient){box.classList.add('hidden');box.innerHTML='';return;}
     box.classList.remove('hidden');
     box.innerHTML='<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">'+esc2(selectedClient.name)+'</span>'+
       '<div class="help" style="margin-top:6px">'+window.clientInfoLines(selectedClient).map(function(l){return '<b>'+esc2(l[0])+'</b> : '+esc2(l[1]);}).join('<br>')+'</div>'+
@@ -4134,7 +4142,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     document.getElementById('ticketTTC').textContent=val('projectBudget')?money(val('projectBudget')):'À chiffrer';
     var overlay=document.getElementById('ticketExportOverlay');
     if(overlay&&!overlay.__bound){overlay.__bound=true;overlay.addEventListener('click',function(e){if(e.target===this)closeRecapExport();});}
-    document.getElementById('ticketPayment').textContent=(actionLabels[val('clientNextAction')]||'—')+' (devis)';
+    document.getElementById('ticketPayment').textContent=(actionLabels[window.clientNextActionValue()]||'—')+' (devis)';
   };
 
   window.recapLines=function(){
@@ -4192,7 +4200,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     out.push(['Informations attendues',d(val('expectedInformation'))]);
     out.push(['Éléments reçus du client',d(val('receivedElements'))]);
     out.push(['Points à contrôler',d(val('missingNotes'))]);
-    out.push(['Suite à donner',d(actionLabels[val('clientNextAction')])]);
+    out.push(['Suite à donner',d(actionLabels[window.clientNextActionValue()])]);
     return out;
   };
 
@@ -4236,7 +4244,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       var payload={
         source:'Demande de devis',
         ref:reference,
-        client:selectedClient?clientName(selectedClient):(val('clientSearch')||'Client'),
+        client:selectedClient?clientName(selectedClient):'Client',
         name:val('projectTitle')||needsLabel||'Demande de devis',
         responsible:val('salesperson')||'Non défini',
         /* Pas de date souhaitee = PAS d'echeance : la dater du jour faisait
@@ -4245,7 +4253,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         due:val('desiredDate')||null,
         priority:val('projectPriority')||'2',
         stage:'demande',
-        status:val('clientNextAction')==='waiting'?'Demande à qualifier':'À chiffrer',
+        status:window.clientNextActionValue()==='waiting'?'Demande à qualifier':'À chiffrer',
         production:production||'À définir',
         comment:[val('projectConstraints'),val('missingNotes'),comment].filter(Boolean).join(' | '),
         // UNE DEMANDE N'A PAS DE PRIX : c'est précisément ce qu'on doit
@@ -4264,7 +4272,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         clientObj:selectedClient||null,
         quantity:(needs||[]).reduce(function(t,n){return t+(Number(n.qty)||0);},0),
         canal:val('source')||'',
-        suite:actionLabels[val('clientNextAction')]||''
+        suite:actionLabels[window.clientNextActionValue()]||''
       };
       parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},location.origin);
     };
@@ -4482,7 +4490,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         if(!window.transmissionLabel('expectedInformationVia','newExpectedInformationVia'))m.push('Transmission prévue par');
         if(!v('expectedInformation'))m.push('Informations que le client doit transmettre');
       }return m;},
-    5:function(){var m=[];if(!selectedClient)m.push('Client sélectionné');if(!v('clientNextAction'))m.push('Suite souhaitée pour ce client');return m;}
+    5:function(){return selectedClient?[]:['Client sélectionné'];}
   };
 
   /* Le panneau « à compléter avant de continuer » a disparu. Il répétait en
@@ -4514,11 +4522,18 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(!v('desiredDate'))missing.push('Date souhaitée de récupération');
     if(!v('projectBudget'))missing.push('Budget indicatif (facultatif mais conseillé)');
     if(missing.length){
+      box.style.display='';
       box.className='live-check todo';
       box.innerHTML='⚠ Dossier incomplet — à compléter avant envoi :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
     }else{
-      box.className='live-check ok';
-      box.textContent='✓ Dossier complet — le ticket peut être imprimé, envoyé au client et créé dans le planning.';
+      /* RIEN À DIRE QUAND TOUT VA BIEN. En vert, ce bandeau ne faisait que
+         répéter ce que les boutons juste au-dessus proposent déjà de faire.
+         Il ne parle plus que lorsqu'il MANQUE quelque chose — c'est la seule
+         chose qu'on ne pouvait pas deviner en regardant l'écran.
+         `display` et non `hidden` : `.live-check` porte sa propre règle
+         `display`, elle défait l'attribut. */
+      box.style.display='none';
+      box.textContent='';
     }
   }
 

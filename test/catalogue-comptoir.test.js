@@ -213,6 +213,12 @@ assert.ok(!/Toutes les informations obligatoires de cette étape/.test(DEVIS),
 assert.ok(!/liveCheck/.test(DEVIS), 'le panneau par étape ne se construit plus');
 assert.ok(!/btn\.disabled\s*=\s*true/.test(DEVIS),
   'le bouton « suivant » ne se désactive plus : c’est le clic qui révèle ce qui manque');
+
+// UNE SEULE EXCEPTION, et elle ne parle pas de validation : « Créer et
+// sélectionner » écrit une fiche en base. Tant que l'écriture est en vol, le
+// bouton se verrouille — deux pressions, c'est deux fiches pour le même client.
+assert.ok(/bouton\.disabled=true;bouton\.textContent='Enregistrement…'/.test(DEVIS),
+  'le bouton qui écrit en base se verrouille pendant son écriture');
 assert.ok(!/button\.blocked\{/.test(DEVIS), 'le style du bouton bloqué part avec lui');
 
 assert.ok(/function failAll\(manques\)/.test(DEVIS),

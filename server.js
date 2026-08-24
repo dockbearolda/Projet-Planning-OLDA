@@ -1603,6 +1603,11 @@ const trimOrNull = (v) => {
 const CLIENT_MAX = {
   entreprise: 120, nom: 80, type: 60, zone: 60,
   email: 160, telephone: 40,
+  // `fonction` est une colonne de la table depuis l'origine et la Base clients
+  // la cherche — mais elle ne figurait pas ici : aucune écriture ne pouvait
+  // donc la remplir. Le comptoir, qui demande « Personne à contacter » et son
+  // rôle, la perdait en silence à chaque fiche créée.
+  fonction: 80,
   raison_sociale: 120, code_postal: 12, ville: 80, pays: 60, secteur: 60, referent_prenom: 80,
   prenom: 80, adresse: 200,
 };
