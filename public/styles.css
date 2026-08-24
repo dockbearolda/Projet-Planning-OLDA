@@ -1409,6 +1409,12 @@ body.cards-off-ticket .pcard__ticket { display: none; }
 }
 .cell.num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
 
+/* CET ÉDITEUR N'EST PAS UN CHAMP, c'est du texte qu'on peut taper : il se pose
+   SUR une cellule de la grille, sa hauteur vient de `--row-h` et son
+   rembourrage aligne ses lettres sur celles de la cellule qu'il recouvre. Lui
+   donner la boîte de la charte décalerait le texte au moment du clic — il
+   garde donc la sienne, à dessein. Même raison pour `.ld-input--title` et
+   `.ld-input--sub`, qui se font passer pour le titre de la fiche. */
 .cell-input {
   width: 100%;
   border: 0;
@@ -2193,7 +2199,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .reason-input {
   display: block;
   width: 100%;
-  padding: 9px 11px;
+  padding: var(--champ-y) var(--champ-x);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
   background: var(--surface);
@@ -2424,7 +2430,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   gap: 12px;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
+  padding: var(--champ-y) var(--champ-x);
   border: 0;
   border-radius: var(--arrondi-champ);
   background: transparent;
@@ -3811,7 +3817,7 @@ body.view-comptoir .topbar-right { margin-inline-start: auto; }
   flex-shrink: 0;
   min-width: 150px;
   min-height: 40px;
-  padding: 8px 12px;
+  padding: var(--champ-y) var(--champ-x);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -5355,7 +5361,7 @@ body.view-comptoir .topbar-right { margin-inline-start: auto; }
 .reg-field { display: flex; flex-direction: column; gap: 8px; }
 .reg-textarea {
   width: 100%;
-  padding: 12px 14px;
+  padding: var(--champ-y) var(--champ-x);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -5727,7 +5733,7 @@ textarea.ld-ctl { font-weight: 600; }
   min-height: 36px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 10px;
+  padding: var(--champ-y-serre) var(--pas-2);
   font: inherit;
   font-size: var(--taille-texte);
   background: var(--surface);
@@ -5762,7 +5768,7 @@ textarea.ld-ctl { font-weight: 600; }
 .ld-hist__value { font-size: var(--taille-texte); font-weight: 700; white-space: nowrap; }
 .ld-empty { margin: 0; font-size: var(--taille-texte); color: var(--text-2); }
 
-.ld-fiche-item { padding: 8px 10px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
+.ld-fiche-item { padding: var(--champ-y-serre) var(--pas-2); border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
 .ld-fiche-item__title { margin: 0; font-size: var(--taille-texte); font-weight: 600; color: var(--text-1); }
 .ld-fiche-item__sub { margin: 3px 0 0; font-size: var(--taille-texte); color: var(--text-2); padding-left: 10px; }
 
@@ -5772,7 +5778,7 @@ textarea.ld-ctl { font-weight: 600; }
   min-height: 140px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 12px;
+  padding: var(--champ-y) var(--champ-x);
   font: inherit;
   font-size: var(--taille-texte);
   color: var(--text-1);
@@ -5816,7 +5822,7 @@ textarea.ld-ctl { font-weight: 600; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  padding: 10px 12px;
+  padding: var(--champ-y) var(--champ-x);
   font: inherit;
   font-size: var(--taille-texte);
   color: var(--text-1);
@@ -5970,7 +5976,7 @@ textarea.ld-ctl { font-weight: 600; }
      rangée (elle porte en plus son étiquette, et un min-height là ne ferait
      qu'ajouter du vide sous le contrôle). */
   .ld-field .ld-input { min-height: 48px; }
-  .ld-input { padding: 11px 12px; }
+  .ld-input { padding: var(--champ-y) var(--champ-x); }
   .ld-input--title { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
   .ld-input--sub { font-size: var(--taille-texte); }
   /* Les puces du tiroir tapent aussi dans les 44 px. */

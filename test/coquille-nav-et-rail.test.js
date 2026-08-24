@@ -118,3 +118,53 @@ assert.ok(/aria-expanded/.test(APP) && /Déplier le rail/.test(APP) && /Replier 
   'le bouton dit son état au clavier et au lecteur d’écran');
 
 console.log('✓ coquille : Nouveau Projet garde la navigation, le rail se replie et s’en souvient');
+
+// --- 5. L'ÉCHELLE DE L'ÉCRAN DE RÉFÉRENCE VAUT POUR TOUT L'OUTIL ------------
+// « De Nouveau Projet à Réglages, tout doit être parfaitement normé à l'image
+// de cette page. » Les trois feuilles du CRM ne connaissaient AUCUN jeton de la
+// charte : 293 déclarations de texte sur 15 tailles, 133 arrondis sur 17.
+const CLIENTS = fs.readFileSync(path.join(RACINE, 'public/clients.css'), 'utf8');
+const PROJ = fs.readFileSync(path.join(RACINE, 'public/projet.css'), 'utf8');
+const sansCommentaire = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
+
+for (const [nom, feuille] of [['styles.css', CSS], ['clients.css', CLIENTS], ['projet.css', PROJ]]) {
+  const f = sansCommentaire(feuille);
+  const parJeton = (f.match(/font-size:\s*var\(--taille-/g) || []).length;
+  const enDur = (f.match(/font-size:\s*[0-9.]+px/g) || []);
+  assert.ok(parJeton > 0, `${nom} doit employer l’échelle de la charte`);
+  // Ce qui reste en dur ne peut être QUE des icônes : elles sont dimensionnées
+  // par leur boîte, pas par la ligne de texte. Et leur échelle tient en 4
+  // valeurs, contre 15 avant.
+  const tailles = [...new Set(enDur.map((d) => parseFloat(d.match(/[0-9.]+/)[0])))];
+  const hors = tailles.filter((t) => ![16, 20, 24, 40].includes(t));
+  assert.deepStrictEqual(hors, [],
+    `${nom} : toute taille en dur doit être une taille d’icône (16/20/24/40), trouvé ${hors}`);
+}
+// Le TEXTE ne connaît que deux tailles — et `--taille-grand` est réservée aux
+// chiffres qu'on annonce, jamais à un intitulé.
+const employees = new Set();
+for (const d of sansCommentaire(CSS).matchAll(/font-size:\s*var\((--taille-[\w-]+)\)/g)) employees.add(d[1]);
+assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-texte'],
+  'deux tailles de texte sur tout l’outil, pas une de plus');
+
+// LA HIÉRARCHIE SE DIT À LA GRAISSE : sans ça, un titre et son paragraphe se
+// lisent pareil — c'est ce qui est arrivé en ramenant tout sur une taille.
+assert.ok(/#stageTitle|\.work-title h1/.test(CSS), 'le titre d’étape doit avoir sa règle');
+const titreEtape = sansCommentaire(CSS).match(/\.work-title h1 \{[^}]*\}/);
+assert.ok(titreEtape && /font-weight: var\(--graisse-forte\)/.test(titreEtape[0]),
+  'le titre d’étape se distingue par sa GRAISSE, plus par sa taille');
+
+// UNE SEULE BOÎTE DE SAISIE, celle de la charte. Deux exceptions ASSUMÉES, et
+// elles sont écrites dans le fichier : l'éditeur posé sur une cellule de la
+// grille et les titres de la fiche ne sont pas des champs — ce sont des textes
+// qu'on peut taper, leur rembourrage aligne leurs lettres sur celles qu'ils
+// recouvrent.
+for (const sel of ['.reason-input', '.cat-row-select', '.reg-textarea']) {
+  const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
+  assert.ok(r && /padding: var\(--champ-y\) var\(--champ-x\)/.test(r[0]),
+    `${sel} prend la boîte de saisie de la charte`);
+}
+assert.ok(/CET ÉDITEUR N'EST PAS UN CHAMP/.test(CSS),
+  'l’exception de `.cell-input` est écrite dans le fichier, pas devinée');
+
+console.log('✓ échelle : le CRM parle la langue de l’écran de référence du comptoir');
