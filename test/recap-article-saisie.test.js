@@ -238,26 +238,27 @@ assert.ok(/metrics,\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
 // À découvert : les deux chiffres, puis l'article. Repliés : la marge et le
 // calcul du prix.
 const table = source('txTableau', 'd,c,dedans,ou');
-assert.ok(/det\.append\(txKpiTotal\(c\),g,txSaisieBloc\(d\),\.\.\.\(dedans\|\|\[\]\)\)/.test(table),
-  'la carte montre le total, le prix à la pièce, puis ce qu’est l’article');
+assert.ok(/det\.append\(txKpiTotal\(c\),txSaisieBloc\(d\),\.\.\.\(dedans\|\|\[\]\)\)/.test(table),
+  'la carte montre son résumé, puis ce qu’est l’article');
 assert.ok(!/txJauge|txDecompo|txAtelier/.test(table),
   'ni la marge, ni le coût atelier, ni la composition ne restent à découvert');
-assert.ok(/txEl\('div','tx-tableau'\)/.test(table), 'et les chiffres annoncés sont bien une table');
-// IL SE REPLIE SUR SON TOTAL (23/08/2026). Ouvert par défaut — c'est un
-// contrôle de saisie, il se relit avant de poser la ligne. Replié, il ne garde
-// que le chiffre qu'on annonce : ce qu'il faut sous les yeux pendant qu'on
-// négocie, avec les solutions à la place du reste.
+assert.ok(/txEl\('div','tx-tableau'\)/.test(source('txKpiTotal', 'c')),
+  'et les chiffres annoncés sont bien une table');
+// IL SE REPLIE SUR SON RÉSUMÉ, ET IL EST FERMÉ PAR DÉFAUT (23/08/2026). Ce
+// résumé porte déjà les deux chiffres qu'on annonce — le total et le prix à la
+// pièce — et le reste est une relecture qu'on ouvre au besoin. Ouvert d'office,
+// il poussait la négociation et le bouton d'ajout d'une dizaine de rangées.
 assert.ok(/txEl\('details','tx-recap'\)/.test(table) && /det\.open=TX_RECAP\[cle\]/.test(table),
   'le récapitulatif est un volet, ouvert selon sa mémoire');
-assert.ok(/const TX_RECAP=\{form:true,fiche:true\};/.test(DEVIS),
-  '… et cette mémoire vaut « ouvert » par défaut, des deux côtés');
+assert.ok(/const TX_RECAP=\{form:false,fiche:false\};/.test(DEVIS),
+  '… et cette mémoire vaut « fermé » par défaut, des deux côtés');
 assert.ok(/if\(det\.isConnected\)TX_RECAP\[cle\]=det\.open/.test(table),
   '… avec le même garde-fou que l’autre volet : un `toggle` différé n’écrase plus la remise à zéro');
 // CHAQUE SURFACE A SA PROPRE MÉMOIRE. Avec une mémoire commune, replier la
 // fiche pour négocier faisait écrire le besoin SUIVANT déjà replié.
 assert.ok(/txTableau\(n\.textile, ?c,\[txDetail\(n\.textile, ?c\)\],'fiche'\)/.test(detail),
   'la fiche a sa propre mémoire d’ouverture');
-assert.ok(/txDetailOuvert=false;TX_RECAP\.form=true;/.test(source('cancelTextileEdit', '')),
+assert.ok(/txDetailOuvert=false;TX_RECAP\.form=false;/.test(source('cancelTextileEdit', '')),
   '… et un nouveau besoin repart sur celle du formulaire, ouverte');
 // NÉGOCIER, C'EST REGARDER UN SEUL CHIFFRE : les dix rangées de relecture
 // poussaient les solutions hors de l'écran au moment de les comparer.
@@ -266,9 +267,9 @@ assert.ok(/TX_RECAP\.fiche=false;/.test(ouvrirNeg),
   'entrer en négociation replie le récapitulatif sur son total');
 assert.ok(ouvrirNeg.indexOf('TX_RECAP.fiche=false') < ouvrirNeg.indexOf('renderNeeds()'),
   '… avant le rendu, sinon la fiche s’écrit encore dépliée');
-// Ouvrir une fiche, c'est vouloir la LIRE : son récapitulatif se rouvre.
-assert.ok(/TX_RECAP\.fiche=true;/.test(source('ouvrirArticle', 'i,ev')),
-  'ouvrir une fiche rouvre son récapitulatif');
+// Une fiche s'ouvre sur son récapitulatif replié, comme le ticket.
+assert.ok(/TX_RECAP\.fiche=false;/.test(source('ouvrirArticle', 'i,ev')),
+  'une fiche s’ouvre sur un récapitulatif replié');
 // Sans prix demandé, la négociation n'écrit RIEN : le champ juste au-dessus
 // porte déjà son intitulé, une phrase de plus décrivait l'écran.
 assert.ok(!/Saisis le prix que le client demande/.test(DEVIS),
@@ -285,22 +286,46 @@ const saisie = source('txSaisieLignes', 'd');
 // le RÉSUMÉ du volet : replié, c'est le seul chiffre qui reste.
 const kpis = source('txKpiTotal', 'c');
 assert.ok(/txEl\('summary'\)/.test(kpis) && /Récapitulatif article/.test(kpis),
-  'le titre de la carte et son total sont le résumé du volet');
-assert.ok(!/Prix HT \/ pièce|Temps de production|Marge/.test(kpis),
-  '… et ils sont seuls à ce niveau');
-assert.strictEqual((kpis.match(/est-annonce/g) || []).length, 1,
-  'un seul chiffre porte la grande taille : le total');
-assert.ok(/txRang\(g,'Récapitulatif article',money\(c\.total\),'tx-recap-cle','est-annonce'\)/.test(kpis),
-  '… et c’est bien le total qui la porte, en face du titre');
+  'le titre de la carte et ses prix sont le résumé du volet');
+assert.ok(!/Temps de production|Marge/.test(kpis),
+  '… et rien de la lecture d’atelier n’y monte');
+// LES DEUX PRIX, L'UN SOUS L'AUTRE. Le volet étant fermé par défaut, un prix à
+// la pièce resté dans le corps ne se voyait plus du tout.
+assert.ok(/money\(c\.total\)/.test(kpis) && /\$\{money\(c\.sold\)\} \/ pièce/.test(kpis),
+  'le résumé porte le total ET le prix à la pièce');
+assert.ok(kpis.indexOf('c.total') < kpis.indexOf('c.sold'),
+  '… le total d’abord, le prix à la pièce en dessous');
+// Un seul chiffre en grand, et c'est le total.
+assert.strictEqual((DEVIS.match(/font-size:var\(--recap-grand\)/g) || []).length, 1,
+  'une seule déclaration de la grande taille dans toute la carte');
+assert.ok(/\.tx-recap-total\{font-size:var\(--recap-grand\)/.test(DEVIS),
+  '… et c’est le total qui la porte');
+// LE CHEVRON NE SE DESSINE QU'UNE FOIS. `txRang` recopie la classe de
+// l'intitulé sur la cellule de la valeur quand on ne lui en donne pas une :
+// le chevron apparaissait alors une seconde fois, à gauche du prix à la pièce.
+assert.ok(/txRang\(g,'Récapitulatif article',prix,'tx-recap-cle',null\)/.test(kpis),
+  'la cellule du prix ne reprend pas la classe de l’intitulé');
 // Le titre se lit à l'encre et en gras — pas en gris comme les intitulés qu'il
 // coiffe —, et c'est lui qui porte le chevron.
 assert.ok(/\.tx-recap>summary \.tx-recap-cle\{color:var\(--text-1\);font-weight:var\(--graisse-forte\)\}/.test(DEVIS)
   && /\.tx-recap>summary \.tx-recap-cle::before\{content:'▸'/.test(DEVIS),
   'le titre porte le chevron, et se lit comme un titre');
-// L'ordre se juge sur l'APPEL À `append`, pas sur l'ordre des lignes du
-// fichier : la table du corps se construit avant d'être posée après le résumé.
-assert.ok(/det\.append\(txKpiTotal\(c\),g,/.test(table),
-  'le total ouvre la carte, le prix à la pièce vient après');
+// TOUS LES VOLETS DE LA CARTE ONT LA MÊME RANGÉE (23/08/2026) : « Ajustements »
+// gardait le triangle plein du navigateur et aucun rembourrage, les deux volets
+// du récapitulatif un chevron fin posé à la main. Trois hauteurs et deux
+// glyphes dans une pile de titres qu'on lit pourtant comme une liste.
+assert.ok(/\.tx-adjust>summary,\.tx-volet>summary,\.tx-recap>summary\{[^}]*padding:var\(--pas-2\) 0\}/.test(DEVIS),
+  'les trois volets de la carte partagent le rembourrage de leur rangée');
+assert.ok(/\.tx-adjust>summary::before,\.tx-volet>summary::before\{content:'▸'/.test(DEVIS),
+  '… et le même chevron, à la place du triangle du navigateur');
+// UN VOLET SE DÉROULE, IL NE SAUTE PAS : ouvrir « Ajustements » faisait bondir
+// toute la bulle d'une image à l'autre.
+assert.ok(/#besoinTextileForm\{interpolate-size:allow-keywords\}/.test(DEVIS),
+  'la hauteur « auto » est interpolable, sur le formulaire et pas au :root');
+assert.ok(/::details-content[^}]*transition:height var\(--dur-2\)[^}]*content-visibility var\(--dur-2\) allow-discrete/.test(DEVIS),
+  '… et le contenu glisse au lieu d’apparaître d’un coup');
+assert.ok(/@media\(prefers-reduced-motion:reduce\)\{\s*\.tx-adjust::details-content/.test(DEVIS),
+  '… sauf pour qui a demandé moins de mouvement');
 // UN SEUL VOLET, PAS DEUX (23/08/2026). « Marge et composition » et « Voir le
 // calcul » racontaient la même histoire en deux clics — et trois de leurs
 // rangées deux fois : « Textile », « Marquage » et « Transport » redonnaient

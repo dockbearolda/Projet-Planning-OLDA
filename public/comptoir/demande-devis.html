@@ -344,9 +344,10 @@ h2{letter-spacing:-.01em}
 .tx-sizes .field{margin-bottom:0}
 .tx-sizes label{color:var(--text-2)}
 .tx-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end}
-.tx-adjust{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0}
-.tx-adjust summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none}
-.tx-adjust[open]{padding-bottom:4px}
+/* Le rembourrage vertical vient du résumé, comme sur les autres volets : la
+   bulle n'en ajoute pas un second. */
+.tx-adjust{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:0 var(--pas-3);margin:var(--pas-3) 0}
+.tx-adjust[open]{padding-bottom:var(--pas-3)}
 /* LES RÉGLAGES DE L'ATELIER — coût DTF, coût horaire, arrondi, coefficient.
    C'est le patron qui y touche, et deux fois par an. Ils tenaient une bande
    pleine largeur en bas du formulaire, aussi présente que « Ajouter cet
@@ -485,8 +486,6 @@ h2{letter-spacing:-.01em}
 .tx-taille+.tx-taille{margin-inline-start:var(--pas-2)}
 .tx-taille-x{margin:0 .3em;color:var(--text-2);font-weight:var(--graisse-note)}
 /* Ce qu'on dit au client. */
-.tx-tableau>.est-annonce{font-size:var(--recap-grand);line-height:var(--ligne-titre)}
-.tx-tableau>b.est-annonce{color:var(--primary)}
 /* La couleur dit l'état, jamais autre chose. */
 .tx-tableau>b.est-bon{color:var(--success)}
 .tx-tableau>b.est-warn{color:var(--warning)}
@@ -507,29 +506,63 @@ h2{letter-spacing:-.01em}
    qui le dit — pas un titre de plus, pas un deuxième trait fort qui se serait
    lu comme un second total. */
 .tx-volet .tx-tableau+.tx-tableau{margin-top:var(--pas-4)}
-/* LE RÉCAPITULATIF SE REPLIE SUR SON TOTAL. Son résumé EST une rangée du
-   tableau — le total et rien d'autre — donc il tombe dans la même colonne que
-   tout le reste, replié comme déplié. Le chevron se pose sur l'intitulé et non
-   sur le résumé : posé sur le résumé, il aurait décalé la rangée entière d'une
-   demi-largeur de triangle et cassé l'alignement du tableau. */
-.tx-recap>summary{cursor:pointer;user-select:none;list-style:none}
+/* ---- LES VOLETS DE LA CARTE, TOUS SUR LA MÊME RANGÉE ----------------------
+   Ils en avaient trois traitements : « Ajustements » gardait le triangle plein
+   du navigateur et aucun rembourrage (22 px de haut), « Réglages » un chevron
+   de moins et une graisse plus légère (30 px), les deux volets du
+   récapitulatif un chevron fin posé à la main. Trois hauteurs et deux glyphes
+   dans une pile de titres qu'on lit pourtant comme une liste.
+   Une seule rangée pour tous : même graisse, même rembourrage, même chevron.
+   (« Réglages production et marge » reste à part : ce n'est pas une section de
+   la carte, c'est le lien discret en pied de formulaire.) */
+.tx-adjust>summary,.tx-volet>summary,.tx-recap>summary{
+  cursor:pointer;user-select:none;list-style:none;padding:var(--pas-2) 0}
+.tx-adjust>summary::-webkit-details-marker,.tx-volet>summary::-webkit-details-marker,
 .tx-recap>summary::-webkit-details-marker{display:none}
-.tx-recap>summary::marker{content:''}
-/* L'intitulé de cette rangée-là est le TITRE de la carte : il se lit à l'encre
-   et en gras, pas en gris comme les intitulés qu'il coiffe. */
+.tx-adjust>summary::marker,.tx-volet>summary::marker,.tx-recap>summary::marker{content:''}
+.tx-adjust>summary,.tx-volet>summary{display:flex;gap:var(--pas-1);align-items:center;
+  font-weight:var(--graisse-forte);line-height:var(--ligne-texte)}
+.tx-adjust>summary::before,.tx-volet>summary::before{content:'▸';color:var(--text-2)}
+.tx-adjust[open]>summary::before,.tx-volet[open]>summary::before{content:'▾'}
+/* LE RÉSUMÉ DU RÉCAPITULATIF EST UNE RANGÉE DU TABLEAU — le titre et ses deux
+   prix — donc ils tombent dans la même colonne que tout le reste, replié comme
+   déplié. Le chevron se pose sur l'INTITULÉ et non sur le résumé : posé sur le
+   résumé, il aurait décalé la rangée entière d'une demi-largeur de triangle et
+   cassé l'alignement du tableau. La table du résumé ne porte donc ni marge ni
+   filet : c'est le rembourrage du résumé, commun à tous les volets, qui fait
+   sa hauteur. */
+.tx-recap>summary .tx-tableau{margin-top:0}
+.tx-recap>summary .tx-tableau>*{padding:0;border-top:0}
 .tx-recap>summary .tx-recap-cle{color:var(--text-1);font-weight:var(--graisse-forte)}
 .tx-recap>summary .tx-recap-cle::before{content:'▸';color:var(--text-2);margin-inline-end:var(--pas-1)}
 .tx-recap[open]>summary .tx-recap-cle::before{content:'▾'}
-/* Les deux volets dépliables : leur résumé est une rangée du tableau, il
-   commence donc à la même verticale que les intitulés. */
+/* Les deux prix, l'un sous l'autre, alignés à droite comme sur la ligne de la
+   demande : le total qu'on annonce, et ce qu'il fait à la pièce. */
+.tx-recap-prix{display:flex;flex-direction:column;align-items:flex-end;min-width:0}
+.tx-recap-total{font-size:var(--recap-grand);line-height:var(--ligne-titre);
+  font-weight:var(--graisse-forte);color:var(--primary)}
+.tx-recap-piece{font-weight:var(--graisse-note);color:var(--text-2)}
 .tx-volet{margin-top:var(--pas-3);padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
-.tx-volet>summary{cursor:pointer;font-weight:var(--graisse-forte);user-select:none;
-  list-style:none;display:flex;gap:var(--pas-1);align-items:center}
-.tx-volet>summary::-webkit-details-marker{display:none}
-.tx-volet>summary::marker{content:''}
-.tx-volet>summary::before{content:'▸';color:var(--text-2)}
-.tx-volet[open]>summary::before{content:'▾'}
 .tx-volet .tx-tableau{margin-top:var(--pas-2)}
+/* ---- UN VOLET SE DÉROULE, IL NE SAUTE PAS -----------------------------------
+   Ouvrir « Ajustements » faisait bondir toute la bulle d'un coup : la carte
+   changeait de hauteur en une image, et l'œil perdait la ligne qu'il suivait.
+   Le contenu d'un `<details>` s'anime depuis Chrome 131 par `::details-content`,
+   à condition que la hauteur « auto » soit interpolable — d'où `interpolate-size`
+   posé sur le formulaire et non au `:root` : ce mot-clé rend TOUTE hauteur
+   automatique animable, on ne l'ouvre que là où on s'en sert.
+   `content-visibility` doit passer en discret (`allow-discrete`), sinon le
+   contenu disparaît à la première image et il n'y a plus rien à faire glisser.
+   Un navigateur qui ne connaît pas `::details-content` ignore la règle entière
+   et retrouve l'ouverture instantanée d'avant. */
+#besoinTextileForm{interpolate-size:allow-keywords}
+.tx-adjust::details-content,.tx-volet::details-content,.tx-recap::details-content{
+  height:0;overflow:hidden;
+  transition:height var(--dur-2) var(--ease),content-visibility var(--dur-2) allow-discrete}
+.tx-adjust[open]::details-content,.tx-volet[open]::details-content,.tx-recap[open]::details-content{height:auto}
+@media(prefers-reduced-motion:reduce){
+  .tx-adjust::details-content,.tx-volet::details-content,.tx-recap::details-content{transition:none}
+}
 /* CE QUI ENGAGE LA PRODUCTION ET QUE PERSONNE NE RELIT ENTRE LE COMPTOIR ET
    L'ATELIER. La couleur dit un état : ambre = à faire valider avant le devis. */
 .tx-alerte{display:flex;gap:11px;align-items:flex-start;margin-top:15px;padding:13px 16px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);color:var(--warning);font-weight:var(--graisse-note)}
@@ -1686,7 +1719,11 @@ function txNombre(n){return (Number(n)||0).toLocaleString('fr-FR',{minimumFracti
    réécrit à CHAQUE touche : sans mémoire, le détail des champs se refermait
    sous les doigts dès qu'on corrigeait une taille. */
 let txDetailOuvert=false;
-const TX_RECAP={form:true,fiche:true};
+/* FERMÉ PAR DÉFAUT, DES DEUX CÔTÉS. Son résumé porte déjà les deux chiffres
+   qu'on annonce — le total et le prix à la pièce — et le reste est une
+   relecture qu'on ouvre quand on en a besoin. Ouvert d'office, il poussait la
+   négociation et le bouton d'ajout d'une dizaine de rangées. */
+const TX_RECAP={form:false,fiche:false};
 
 /* UNE RANGÉE DU TABLEAU : l'intitulé à gauche, la valeur à droite. Les deux
    cellules sont posées à plat dans la grille — c'est ce qui garde la colonne
@@ -1711,12 +1748,19 @@ function txRang(g,libelle,valeur,cls,clsValeur){
    la place. Les deux cellules restent sur la même ligne de base. */
 function txKpiTotal(c){
   const sum=txEl('summary'),g=txEl('div','tx-tableau');
-  /* LE TITRE DE LA CARTE ET SON TOTAL SONT LA MÊME LIGNE. Ils en faisaient
-     deux : « Récapitulatif article » au-dessus, « Total HT … » en dessous —
-     deux lignes pour dire une seule chose, et le chevron du volet se posait
-     sur la seconde. Le titre porte maintenant le chevron à gauche et le
-     chiffre à droite, dans la colonne de toutes les autres valeurs. */
-  txRang(g,'Récapitulatif article',money(c.total),'tx-recap-cle','est-annonce');
+  /* LE TITRE DE LA CARTE ET SES DEUX PRIX SONT LA MÊME LIGNE. Ils en faisaient
+     trois : « Récapitulatif article », puis « Total HT … », puis « Prix HT /
+     pièce … » — et le volet étant fermé par défaut, le prix à la pièce ne se
+     voyait plus du tout. Le titre porte maintenant le chevron à gauche et, à
+     droite, le total puis le prix à la pièce en dessous, comme sur la ligne de
+     la demande. */
+  const prix=txEl('span','tx-recap-prix');
+  prix.append(txEl('span','tx-recap-total',money(c.total)),
+    txEl('span','tx-recap-piece',`${money(c.sold)} / pièce`));
+  /* `null` pour la valeur, explicitement : sans lui, txRang recopie la classe
+     de l'intitulé sur les DEUX cellules — et le chevron se dessinait une
+     seconde fois, à gauche du prix à la pièce. */
+  txRang(g,'Récapitulatif article',prix,'tx-recap-cle',null);
   sum.append(g);
   return sum;
 }
@@ -1806,9 +1850,9 @@ function txTableau(d,c,dedans,ou){
   /* Le volet retiré du document délivre encore son `toggle` — même garde-fou
      que txDetail, sans quoi une remise à zéro se ferait écraser après coup. */
   det.addEventListener('toggle',()=>{if(det.isConnected)TX_RECAP[cle]=det.open});
-  const g=txEl('div','tx-tableau');
-  txRang(g,'Prix HT / pièce',money(c.sold));
-  det.append(txKpiTotal(c),g,txSaisieBloc(d),...(dedans||[]));
+  /* Le prix à la pièce a rejoint le résumé, sous le total : il ne se répète
+     pas ici. Le corps ne porte plus que ce qu'EST l'article. */
+  det.append(txKpiTotal(c),txSaisieBloc(d),...(dedans||[]));
   return det;
 }
 
@@ -1987,7 +2031,7 @@ function txApplyToForm(t){
 function editTextileNeed(i){
   choisirTypeBesoin('textile');
   editingTextile=i;
-  txDetailOuvert=false;TX_RECAP.form=true;
+  txDetailOuvert=false;TX_RECAP.form=false;
   txApplyToForm(needs[i].textile||{});
   poserTitreForm('txFormTitle',`Modifier l’article n°${i+1}`,true);
   $('txSaveLabel').textContent='Enregistrer la modification';
@@ -2002,7 +2046,7 @@ function cancelTextileEdit(){
      défaut, il repousse le bouton d'ajout d'une quinzaine de rangées.
      Le récapitulatif, lui, revient OUVERT : c'est le contrôle de saisie du
      besoin suivant, et une négociation l'avait peut-être replié. */
-  txDetailOuvert=false;TX_RECAP.form=true;txNegRepartir();
+  txDetailOuvert=false;TX_RECAP.form=false;txNegRepartir();
   ['txCustomRef','txCustomPurchase','txCustomDesignation','txColor','txGenre','txTransport','txPrintType','txMarkColor','txS','txM','txL','txXL','txXXL','txOther','txDiscount','txManualPrice'].forEach(id=>$(id).value='');
   $('txRef').value='';onTextileRefChange();menusRafraichirTous();
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
@@ -2412,9 +2456,9 @@ function ouvrirArticle(i,ev){
   const n=needs[i];
   if(!n)return;
   if(!n.textile)return editNeed(i);
-  /* Ouvrir une fiche, c'est vouloir la LIRE : son récapitulatif s'ouvre, même
-     si la négociation précédente l'avait replié. */
-  TX_RECAP.fiche=true;
+  /* Une fiche s'ouvre sur son récapitulatif replié, comme le ticket : le
+     résumé porte déjà les deux chiffres. */
+  TX_RECAP.fiche=false;
   articleOuvert=(articleOuvert===i)?-1:i;
   if(articleOuvert<0)negOuvert=-1;
   renderNeeds();
