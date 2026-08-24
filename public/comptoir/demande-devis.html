@@ -2839,8 +2839,15 @@ const clientDirectory=[];
    recherche — une mécanique qui n'existait qu'ici. C'est désormais le menu
    déroulant des besoins (`pont.js`), avec son chevron et sa recherche dans le
    panneau : la vendeuse fait le même geste partout. */
-function clientOptionLabel(c){
-  return [c.name,c.phone,c.email].filter(Boolean).join(' • ');
+/* LA LISTE SE LIT EN UNE COLONNE DE NOMS. Le téléphone et l'e-mail écrits à
+   côté de chaque client n'aidaient personne à reconnaître le sien — les noms
+   sont uniques en base (la clé de rapprochement l'impose) — et ils
+   allongeaient chaque ligne, dans le panneau comme dans le champ une fois le
+   choix fait. Ils restent CHERCHABLES (`data-cherche`) : le champ de filtre
+   promet « nom, téléphone, e-mail », il doit tenir parole. Et ils restent
+   entiers sur la fiche du client, juste en dessous. */
+function clientOptionSearch(c){
+  return [c.phone,c.email,c.type,c.contact].filter(Boolean).join(' ');
 }
 
 function renderClientOptions(){
@@ -2850,7 +2857,7 @@ function renderClientOptions(){
     ? 'Sélectionner un client'
     : 'Aucun client dans la base — crée-le à côté';
   sel.innerHTML=`<option value="">${esc(tete)}</option>`
-    +clientDirectory.map(c=>`<option value="${esc(c.id)}">${esc(clientOptionLabel(c))}</option>`).join('');
+    +clientDirectory.map(c=>`<option value="${esc(c.id)}" data-cherche="${esc(clientOptionSearch(c))}">${esc(c.name)}</option>`).join('');
   /* Un `.value` posé par programme ne déclenche AUCUN évènement : le champ
      fermé doit être repeint à la main, sinon il affiche encore l'ancien choix. */
   sel.value=selectedClient?selectedClient.id:'';

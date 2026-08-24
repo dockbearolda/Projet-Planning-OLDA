@@ -1407,6 +1407,12 @@ function menuOption(o,groupe){
     texte:(o.textContent||'').trim()||o.value,
     jeton:o.dataset.ref||'',
     hex:o.dataset.hex||'',
+    /* CE QU'ON CHERCHE SANS L'AFFICHER. La liste des clients se lit en une
+       colonne de NOMS — le téléphone et l'e-mail à côté de chacun n'aidaient
+       personne à reconnaître son client, ils allongeaient chaque ligne. Mais
+       le champ de filtre promet « nom, téléphone, e-mail » : ils restent donc
+       cherchables, posés en `data-cherche` sur l'option. */
+    cherche:o.dataset.cherche||'',
     groupe,
   };
 }
@@ -1616,7 +1622,7 @@ function menuFiltrees(etat){
   if(!q)return toutes;
   const mots=q.split(/\s+/);
   return toutes.filter(o=>{
-    const foin=menuNorm(`${o.jeton} ${o.texte} ${o.groupe}`);
+    const foin=menuNorm(`${o.jeton} ${o.texte} ${o.groupe} ${o.cherche}`);
     return mots.every(m=>foin.includes(m));
   });
 }

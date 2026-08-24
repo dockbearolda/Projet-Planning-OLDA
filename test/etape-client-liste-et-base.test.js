@@ -136,6 +136,29 @@ assert.ok(/function peauDe\(id\)\{[\s\S]*?closest\('\.menu'\)/.test(DEVIS),
 assert.ok(/window\.menuRafraichir\(sel\)/.test(bloc(DEVIS, 'function renderClientOptions()')),
   'la liste repeinte à la main après réécriture des options');
 
+// UNE COLONNE DE NOMS, ET RIEN D'AUTRE. Le téléphone et l'e-mail écrits à côté
+// de chaque client allongeaient chaque ligne — dans le panneau comme dans le
+// champ une fois le choix fait — sans aider à reconnaître le sien : les noms
+// sont uniques en base, la clé de rapprochement l'impose.
+assert.ok(/<option value="\$\{esc\(c\.id\)\}" data-cherche="\$\{esc\(clientOptionSearch\(c\)\)\}">\$\{esc\(c\.name\)\}<\/option>/
+  .test(DEVIS), 'une option de client n’affiche que le nom');
+
+// … MAIS ILS RESTENT CHERCHABLES. Le champ de filtre promet « nom, téléphone,
+// e-mail » : le retirer de l'affichage ne doit pas le retirer de la recherche.
+assert.ok(/data-menu-filtre="Filtrer : nom, téléphone, e-mail…"/.test(DEVIS),
+  'le filtre promet toujours les trois');
+assert.ok(/return \[c\.phone,c\.email,c\.type,c\.contact\]\.filter\(Boolean\)\.join\(' '\)/.test(DEVIS),
+  '… et l’option les emporte, invisibles, dans `data-cherche`');
+assert.ok(/cherche:o\.dataset\.cherche\|\|''/.test(PONT),
+  'le composant lit ce texte caché');
+assert.ok(/menuNorm\(`\$\{o\.jeton\} \$\{o\.texte\} \$\{o\.groupe\} \$\{o\.cherche\}`\)/.test(PONT),
+  '… et le cherche avec le reste');
+
+// Le détail n'est pas perdu : il se lit sur la fiche, juste sous le champ.
+assert.ok(/window\.clientInfoLines=function\(c\)/.test(DEVIS)
+  && /lines\.push\(\['WhatsApp',c\.phone\|\|'Non renseigné'\]\)/.test(DEVIS),
+  'le téléphone et l’e-mail restent entiers sur la carte du client sélectionné');
+
 // ===========================================================================
 // 4. « Suite souhaitée pour ce client » : déduite, plus demandée
 // ===========================================================================
