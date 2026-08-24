@@ -182,10 +182,12 @@ body {
   align-items: center;
   gap: 8px;
   height: 44px;
-  padding: 0 12px 0 6px;
-  border: 1px solid var(--border-soft);
+  width: 44px;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--surface);
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   font-size: var(--taille-texte);
@@ -198,8 +200,8 @@ body {
 .poste:active { background: var(--state-press); }
 .poste:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .poste-pastille {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -210,7 +212,12 @@ body {
   user-select: none;
   flex-shrink: 0;
 }
-.poste-nom { white-space: nowrap; }
+/* LE POSTE NE MONTRE QUE SA LETTRE. Le prénom écrit à côté de la pastille
+   doublait ce que la pastille dit déjà, et il tenait 60 à 90 px dans le coin le
+   plus disputé de la barre. La pastille EST le bouton : un disque de 44 px,
+   sans bordure ni fond autour — le nom complet reste au nom accessible et à
+   l'infobulle, clavier et survol, les deux interactions de ce poste. */
+.poste-nom { display: none; }
 /* Personne ne s'est encore nommé : c'est un manque à combler, pas un état
    normal — l'ambre de la charte, celui de « attention », pas une décoration. */
 .poste.is-vide { border-color: var(--warning-line); background: var(--warning-bg); color: var(--warning); }
@@ -3601,6 +3608,27 @@ body.view-plein .fiverr-tool { display: none !important; }
    l'autre. Les boutons d'ICÔNE NUE de la barre du haut (plein écran, thème)
    n'en sont pas : ce sont des interrupteurs, ils gardent leur forme sans
    bordure. */
+
+/* ------------------------------------------------------------- Actualiser
+   La flèche TOURNE pendant la relecture, et elle finit son tour : coupée en
+   plein milieu, elle laisse le trait de travers et donne l'impression d'un
+   incident. La durée plancher vaut donc une révolution — en dessous, le geste
+   n'a pas le temps de se voir et l'écran clignote sans rien dire.
+   `transform` seulement : le compositeur l'anime sans repasser par la mise en
+   page, et le rail de 32 entrées ne coûte pas une image de plus. */
+@keyframes recharge-tourne { to { transform: rotate(360deg); } }
+.recharge-ic { transform-origin: 50% 50%; }
+.recharge[aria-busy="true"] { color: var(--primary); cursor: progress; }
+.recharge[aria-busy="true"] .recharge-ic { animation: recharge-tourne .7s linear infinite; }
+/* La relecture a abouti : un souffle de l'accent, puis on n'en parle plus. Rien
+   à lire, rien à fermer — c'est l'écran lui-même qui porte la réponse. */
+@keyframes recharge-fait { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.recharge.est-fait { color: var(--primary); }
+.recharge.est-fait .recharge-ic { animation: recharge-fait .32s var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+  .recharge[aria-busy="true"] .recharge-ic,
+  .recharge.est-fait .recharge-ic { animation: none; }
+}
 
 /* ------------------------------------------------- Passage d'une vue à l'autre
    Le cadre est le même pour toutes les vues (`main.work`) : c'est son CONTENU

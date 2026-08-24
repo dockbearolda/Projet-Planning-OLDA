@@ -348,3 +348,73 @@ console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu
 }
 
 console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée sur l’axe');
+
+// --- 10. ACTUALISER, ET LE POSTE RÉDUIT À SA LETTRE ------------------------
+{
+  const NP2 = fs.readFileSync(path.join(RACINE, 'public/nouveau-projet.js'), 'utf8');
+  void NP2;
+  // LE BOUTON NE RECHARGE PAS LA PAGE. `location.reload()` aurait coûté le
+  // défilement, l'étape ouverte, le tiroir d'un dossier et une saisie en cours,
+  // pour relire trois listes. On relit les DONNÉES à leur place.
+  assert.ok(/id="rechargerBtn"/.test(HTML), 'le bouton d’actualisation doit exister');
+  const geste = APP.match(/async function rafraichirLaVue\(\) \{[\s\S]*?\n\}/);
+  assert.ok(geste, 'rafraichirLaVue doit exister');
+  assert.ok(!/location\.reload/.test(geste[0]) && /loadCounts\(\)/.test(geste[0]),
+    'il relit les données, il ne recharge pas la page');
+  assert.ok(/selectStage\(currentStage, currentSub, true\)/.test(geste[0]),
+    '… et la liste de l’étape courante, en forçant la relecture');
+  // LA FLÈCHE FINIT SON TOUR : coupée en plein milieu, elle laisse le trait de
+  // travers et l'œil y lit un incident, pas une réussite.
+  assert.ok(/RECHARGE_TOUR_MS = 700/.test(APP)
+    && /Promise\.all\(\[rafraichirLaVue\(\), tour\]\)/.test(APP),
+    'on attend la révolution ET la donnée, jamais l’une sans l’autre');
+  assert.ok(/if \(rechargeEnCours\) return;/.test(APP),
+    'deux clics ne relisent pas deux fois');
+  assert.ok(/@keyframes recharge-tourne \{ to \{ transform: rotate\(360deg\); \} \}/.test(sansCommentaire(CSS))
+    && /prefers-reduced-motion: reduce\)\s*\{\s*\.recharge/.test(sansCommentaire(CSS)),
+    'la flèche tourne par `transform` seul, et se tait si on a demandé le calme');
+  // La police est un sous-ensemble figé de 91 glyphes : aucune icône de
+  // rafraîchissement dedans. Elle est donc DESSINÉE.
+  assert.ok(/class="recharge-ic"[\s\S]{0,80}viewBox/.test(HTML),
+    'la flèche est un SVG dessiné : la police n’en porte pas');
+
+  // LE POSTE NE MONTRE QUE SA LETTRE : le prénom doublait la pastille et tenait
+  // 60 à 90 px dans le coin le plus disputé de la barre.
+  assert.ok(/\.poste-nom \{ display: none; \}/.test(sansCommentaire(CSS)),
+    'le prénom quitte la barre : la pastille dit déjà qui est au poste');
+  const poste = sansCommentaire(CSS).match(/\.poste \{[^}]*\}/);
+  assert.ok(poste && /width: 44px/.test(poste[0]) && /padding: 0;/.test(poste[0]),
+    '… et le bouton devient son disque');
+  assert.ok(/aria-label="Poste : /.test(HTML) || /aria-label/.test(HTML),
+    'le nom complet reste au nom accessible');
+}
+
+// --- 11. TOUT CE QUI PEUT ÊTRE FIGÉ L'EST ----------------------------------
+{
+  const PONT2 = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+  // UNE BARRE QUI ENVELOPPE, pas un bouton glissé DANS la rangée : les deux
+  // parcours ne composent pas leurs étapes pareil (flex ici, `repeat(4, 1fr)`
+  // là), et un bouton posé dedans devenait une cinquième colonne.
+  assert.ok(/barre\.className = 'etapes-barre no-print'/.test(PONT2)
+    && /barre\.appendChild\(etapes\)/.test(PONT2),
+    'la barre enveloppe la rangée d’étapes, elle ne s’y insère pas');
+  assert.ok(/\.etapes-barre\{position:sticky;top:0/.test(PONT2),
+    'c’est la barre qui colle en haut : un seul élément à figer');
+  // UNE SEULE RANGÉE, TOUJOURS. Sous 980 px de cadre, `flex-basis: 20%` mettait
+  // les cinq pastilles sur CINQ lignes (mesuré à 569 px de cadre).
+  assert.ok(/\.etapes-barre \.stepper\{flex-wrap:nowrap\}/.test(PONT2)
+    && /\.etapes-barre \.step\{flex:1 1 0!important/.test(PONT2),
+    'les étapes tiennent sur une seule rangée, quelle que soit la largeur');
+  assert.ok(/text-overflow:ellipsis/.test(PONT2),
+    '… et un libellé qui ne rentre plus se coupe, il ne pousse pas la rangée');
+  // LE PANIER SE GARE SOUS LA BARRE. Il se calait à 16 px du haut — donc SOUS
+  // une barre qui en fait 64. La hauteur est MESURÉE : elle change avec la
+  // largeur du cadre.
+  assert.ok(/top:calc\(var\(--h-etapes,64px\) \+ var\(--pas-2\)\)/.test(PONT2),
+    'le panier se gare sous la barre, pas dessous');
+  assert.ok(/function mesurerLaBarre\(\)/.test(PONT2)
+    && /addEventListener\('resize', mesurerLaBarre/.test(PONT2),
+    '… et cette hauteur est mesurée, puis remesurée quand la largeur change');
+}
+
+console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut être figé l’est');

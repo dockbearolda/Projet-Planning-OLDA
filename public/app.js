@@ -6883,6 +6883,58 @@ if ($shell && $sidebarResizer) {
   });
 }
 
+// --- Actualiser les données -------------------------------------------------
+// LE BOUTON NE RECHARGE PAS LA PAGE. `location.reload()` aurait coûté le
+// défilement, l'étape ouverte, le tiroir d'un dossier et une saisie en cours —
+// et 600 Ko de statique pour relire trois listes. On relit les DONNÉES à leur
+// place, chacune là où elle vit.
+// Le flux d'événements tient déjà l'écran à jour ; ce bouton sert quand on
+// DOUTE — un collègue vient de poser une commande, le Wi-Fi a toussé.
+const RECHARGE_TOUR_MS = 700;   // une révolution de la flèche, cf. styles.css
+const $recharger = document.getElementById('rechargerBtn');
+let rechargeEnCours = false;
+
+async function rafraichirLaVue() {
+  // Les compteurs du rail valent pour TOUTES les vues : ils sont le seul chiffre
+  // qu'on relit sans quitter l'écran où l'on est.
+  await loadCounts();
+  if (isPlanningMode(viewMode)) return selectStage(currentStage, currentSub, true);
+  if (viewMode === 'dashboard') return dashboard.show();
+  if (viewMode === 'clients') return mountClients();
+  if (viewMode === 'reglages') return mountReglages();
+  // Nouveau Projet : le parcours est un document à part, il a sa propre base
+  // clients — c'est LUI qui sait la relire (voir pont.js).
+  const cadre = document.querySelector('.np-frame:not([hidden])');
+  const relire = cadre && cadre.contentWindow && cadre.contentWindow.oldaRafraichirClients;
+  if (typeof relire === 'function') relire();
+}
+
+if ($recharger) {
+  attachTip($recharger, 'Actualiser les données');
+  $recharger.addEventListener('click', async () => {
+    if (rechargeEnCours) return;          // deux clics ne relisent pas deux fois
+    rechargeEnCours = true;
+    $recharger.setAttribute('aria-busy', 'true');
+    $recharger.classList.remove('est-fait');
+    // LA FLÈCHE FINIT SON TOUR. Une relecture qui revient en 40 ms couperait
+    // l'animation de travers : l'œil y lit un incident, pas une réussite. On
+    // attend donc la révolution ET la donnée, jamais l'une sans l'autre.
+    const tour = new Promise((r) => setTimeout(r, RECHARGE_TOUR_MS));
+    try {
+      await Promise.all([rafraichirLaVue(), tour]);
+      $recharger.classList.add('est-fait');
+      setTimeout(() => $recharger.classList.remove('est-fait'), 400);
+    } catch (_) {
+      // Le réseau parle déjà pour lui-même (voir reseau.js et la bannière hors
+      // ligne) : un second message ici ne dirait rien de plus.
+      await tour;
+    } finally {
+      rechargeEnCours = false;
+      $recharger.removeAttribute('aria-busy');
+    }
+  });
+}
+
 // --- Replier le rail --------------------------------------------------------
 // La poignée ci-dessus règle la largeur, mais elle ne descend pas sous 180 px :
 // pour lire une commande large il fallait la traîner jusqu'au minimum, et ça ne

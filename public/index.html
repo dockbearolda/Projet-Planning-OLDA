@@ -136,6 +136,21 @@
         <button class="icon-btn" id="themeToggle" type="button" aria-label="Basculer clair / sombre">
           <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
         </button>
+        <!-- ACTUALISER. Le poste reste ouvert toute la journée sur le même
+             écran ; le flux d'événements le tient à jour, mais quand on doute —
+             un collègue vient de poser une commande, le Wi-Fi a toussé — on
+             veut pouvoir le DEMANDER. Ce bouton ne recharge PAS la page : il
+             relit les données à leur place. Recharger perdrait le défilement,
+             l'étape ouverte, le tiroir d'un dossier et une saisie en cours.
+             La flèche est DESSINÉE : la police d'icônes est un sous-ensemble
+             figé de 91 glyphes et n'en porte aucune de rafraîchissement (un nom
+             absent s'affiche en texte tronqué, sans la moindre erreur). -->
+        <button class="icon-btn recharge" id="rechargerBtn" type="button" aria-label="Actualiser les données">
+          <svg class="recharge-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"></path>
+            <path d="M20.5 4v5h-5"></path>
+          </svg>
+        </button>
         <!-- QUI EST AU POSTE. Remplace la pastille « O » décorative : le nom
              affiché ici est celui qui signe les demandes prises sur cet
              appareil (voir poste.js). Un tap le change — c'est le geste du

@@ -1751,8 +1751,19 @@ document.addEventListener('pointerdown',ev=>{
      parcours. Les flèches de bas d'étape gardent le leur — revenir d'une
      ÉTAPE. Deux gestes, deux boutons, jamais le même deux fois. */
   function grefferSortieDuParcours() {
-    const rangee = document.querySelector('.stepper');
-    if (!rangee || document.getElementById('sortieParcours')) return;
+    const etapes = document.querySelector('.stepper');
+    if (!etapes || document.getElementById('sortieParcours')) return;
+    /* UNE BARRE QUI ENVELOPPE, plutôt qu'un bouton GLISSÉ DANS la rangée. Les
+       deux parcours ne composent pas leurs étapes pareil — la demande de devis
+       en flex, la vente directe en `grid-template-columns: repeat(4, 1fr)` —
+       et un bouton posé dedans devenait une cinquième colonne : la grille se
+       décalait d'un cran. La barre porte la flèche À CÔTÉ de la rangée, qui
+       garde sa composition, quelle qu'elle soit. C'est aussi elle qui colle
+       en haut : un seul élément à figer plutôt qu'un par écran. */
+    const barre = document.createElement('div');
+    barre.className = 'etapes-barre no-print';
+    etapes.parentNode.insertBefore(barre, etapes);
+    barre.appendChild(etapes);
     const b = document.createElement('button');
     b.type = 'button';
     b.id = 'sortieParcours';
@@ -1764,8 +1775,23 @@ document.addEventListener('pointerdown',ev=>{
     /* L'hôte décide de ce que « quitter » veut dire : il est le seul à savoir
        s'il y a des tuiles derrière. Le parcours ne connaît aucune adresse. */
     b.onclick = () => { try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {} };
-    rangee.insertBefore(b, rangee.firstChild);
+    barre.insertBefore(b, barre.firstChild);
+    mesurerLaBarre();
   }
+
+  /* LE PANIER SE GARE SOUS LA BARRE, PAS DESSOUS. Il se cale déjà tout seul
+     (`position: sticky`), mais à 16 px du haut — donc SOUS la barre des étapes,
+     qui en fait 64. On mesure la barre et on lui rend sa hauteur : les deux
+     sont alors figés, l'un au-dessus de l'autre, et rien ne se recouvre.
+     Mesurée, pas devinée : elle change avec la largeur du cadre et avec la
+     langue des libellés. */
+  function mesurerLaBarre() {
+    const barre = document.querySelector('.etapes-barre');
+    if (!barre) return;
+    const h = Math.round(barre.getBoundingClientRect().height);
+    if (h > 0) document.documentElement.style.setProperty('--h-etapes', h + 'px');
+  }
+  window.addEventListener('resize', mesurerLaBarre, { passive: true });
   function poserStyleRangeeEtapes() {
     if (document.getElementById('styleRangeeEtapes')) return;
     const st = document.createElement('style');
@@ -1775,9 +1801,27 @@ document.addEventListener('pointerdown',ev=>{
        derrière les pastilles. La marge haute du conteneur repasse en
        rembourrage de la rangée, sinon un blanc de 24 px reste collé au-dessus
        d'elle une fois qu'elle s'est figée. */
-    st.textContent = '.stepper{position:sticky;top:0;z-index:20;background:var(--bg);'
-      + 'align-items:center;padding:var(--pas-2) 0;margin-bottom:var(--pas-3)}'
-      + '.stepper #sortieParcours{margin-right:var(--pas-2)}';
+    st.textContent = [
+      /* `top: 0` : le cadre est ce qui défile, l'hôte ne bouge pas. Le fond est
+         OBLIGATOIRE — sans lui le contenu défile en transparence derrière les
+         pastilles. La marge basse de la rangée passe sur la barre, sinon un
+         blanc reste collé sous elle une fois figée. */
+      '.etapes-barre{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;',
+      'align-items:center;gap:var(--pas-2);padding:var(--pas-2) 0;margin-bottom:var(--pas-3)}',
+      '.etapes-barre .stepper{flex:1 1 auto;min-width:0;margin-bottom:0}',
+      /* UNE SEULE RANGÉE, TOUJOURS. Sous 980 px de cadre, les pastilles se
+         voyaient imposer `flex-basis: 20%` : cinq de 138 px ne tiennent pas
+         dans 569, et elles tombaient sur CINQ lignes. Elles se compriment
+         maintenant (`flex: 1 1 0`), et le libellé qui ne rentre plus se coupe
+         proprement plutôt que de pousser la rangée. */
+      '.etapes-barre .stepper{flex-wrap:nowrap}',
+      '.etapes-barre .step{flex:1 1 0!important;min-width:0;white-space:nowrap;',
+      'overflow:hidden;text-overflow:ellipsis;padding-left:var(--pas-1);padding-right:var(--pas-1)}',
+      /* Le panier se gare SOUS la barre. Deux colonnes seulement : empilé, il
+         passe au-dessus du formulaire et n'a plus rien à se caler. */
+      '@media(min-width:981px){.layout .sidebar{position:sticky;',
+      'top:calc(var(--h-etapes,64px) + var(--pas-2))}}',
+    ].join('');
     document.head.appendChild(st);
   }
   poserStyleRangeeEtapes();
