@@ -90,13 +90,13 @@ assert.strictEqual((ouvert.html.match(/is-ouvert/g) || []).length, 1,
 // afficherait le chiffrage d'un AUTRE article, et la négociation en cours
 // porterait sur celui d'à côté.
 const supprimer = source('deleteNeed', 'i');
-assert.ok(/articleOuvert=-1/.test(supprimer) && /negOuvert=-1/.test(supprimer),
+assert.ok(/articleOuvert=-1/.test(supprimer) && /negFicheOuvert=false/.test(supprimer),
   'supprimer une ligne referme le détail : les indices derrière viennent de bouger');
 
 // --- 4. Le clic sur la ligne -------------------------------------------------
 const ouvrir = source('ouvrirArticle', 'i,ev');
 assert.ok(/closest\('button,input,textarea,select'\)/.test(ouvrir),
-  'un clic sur un bouton ou sur la personnalisation n’ouvre pas le détail');
+  'un clic sur une commande de la ligne n’ouvre pas le détail');
 assert.ok(/if\(!n\.textile\)return editNeed\(i\)/.test(ouvrir),
   'un article hors textile n’a pas de chiffrage : sa modification EST son détail');
 
@@ -106,7 +106,7 @@ assert.ok(/if\(!n\.textile\)return editNeed\(i\)/.test(ouvrir),
 assert.ok(!/tx-card-metrics|negPanneau|tx-avis/.test(renderNeedsSrc),
   'le panneau de droite porte la demande, jamais le chiffrage ni la négociation');
 const detail = source('renderDetailArticle', '');
-assert.ok(/tx-card-metrics/.test(detail) && /negPanneau\(i\)/.test(detail),
+assert.ok(/tx-card-metrics/.test(detail) && /negFicheVolet\(i\)/.test(detail),
   'le détail à gauche porte les chiffres de l’article et sa négociation');
 assert.ok(/hote\.classList\.add\('hidden'\)/.test(detail) && /replaceChildren\(\)/.test(detail),
   'sans article ouvert le détail se VIDE : les chiffres d’une ligne supprimée ne doivent pas rester à l’écran');
@@ -117,17 +117,49 @@ const totaux = source('txRefreshTotals', '');
 assert.ok(/setTextSafe\('txKpi/.test(totaux) && !/\$\('txKpi[^']*'\)\.textContent/.test(totaux),
   'les totaux s’écrivent par `setTextSafe` : un identifiant disparu n’arrête pas les autres');
 
-// La ligne textile porte quatre actions dans 326 px : si un libellé s'allonge
-// ou si le poste zoome, elles passent à la ligne au lieu de se comprimer.
+// La ligne porte DEUX actions dans 326 px : si un libellé s'allonge ou si le
+// poste zoome, elles passent à la ligne au lieu de se comprimer.
 assert.ok(/\.demande-corps \.need-actions\{[^}]*flex-wrap:wrap/.test(DEVIS),
   'la rangée d’actions peut passer à la ligne');
-// La négociation s’ouvre depuis la LIGNE : c’est le geste du comptoir, il ne
-// doit pas coûter un détour par le chiffrage.
-assert.ok(/onclick="ouvrirNegociation\(\$\{i\}\)">Négociation/.test(renderNeedsSrc),
-  'la ligne textile porte une bulle « Négociation »');
-const negRaccourci = source('ouvrirNegociation', 'i');
-assert.ok(/articleOuvert=i;negOuvert=i/.test(negRaccourci),
-  'le raccourci ouvre le détail ET déplie la négociation d’un seul geste');
+
+// --- 6. LA CARTE SE LIT, ELLE NE SE REMPLIT PAS -----------------------------
+// Elle portait un champ de saisie sous les boutons (« Personnalisation ») et
+// une TROISIÈME action, « Négociation » — la seule des trois qui n'agissait
+// ni sur la ligne ni sur ce qu'elle porte. Le patron les a retirées le 24/08.
+assert.ok(!/<input/.test(renderNeedsSrc),
+  'aucun champ de saisie sur la carte : la note se tape dans le formulaire de l’article');
+assert.ok(!/>Négociation</.test(renderNeedsSrc),
+  'la carte ne porte plus de bulle « Négociation »');
+assert.strictEqual((renderNeedsSrc.match(/<button/g) || []).length, 2,
+  'DEUX actions sur la carte, pas une de plus : Modifier et Supprimer');
+assert.ok(!/function ouvrirNegociation/.test(DEVIS),
+  'le raccourci de la ligne n’a plus de bouton : il s’en va avec lui');
+// La négociation reste à UN clic : la carte ouvre la fiche, la fiche porte son
+// volet — la même boîte que celui du ticket.
+const negVolet = source('negFicheVolet', 'i');
+assert.ok(/tx-volet/.test(negVolet) && /negPanneau\(i\)/.test(negVolet),
+  'la négociation d’une ligne posée est un volet de la fiche');
+assert.ok(/if\(!det\.isConnected\)return/.test(negVolet),
+  '… avec la garde du volet retiré : un `toggle` différé n’ouvre pas la fiche suivante');
+assert.ok(/TX_RECAP\.fiche=false/.test(negVolet),
+  '… et l’ouvrir replie le récapitulatif sur son total');
+
+// --- 7. LE PIED DE LA CARTE -------------------------------------------------
+// Le prix tenait une troisième colonne sur la rangée du nom : dans 380 px il
+// lui volait la moitié de la place. Il descend sur la rangée des actions.
+assert.ok(/need-pied/.test(renderNeedsSrc),
+  'le prix et les actions partagent le pied de la carte');
+assert.ok(renderNeedsSrc.indexOf('demande-prix') > renderNeedsSrc.indexOf('need-detail'),
+  'le prix vient APRÈS le détail : la carte se lit de haut en bas');
+assert.ok(/\.need-pied\{[^}]*grid-column:1\/-1/.test(DEVIS),
+  'le pied prend toute la largeur de la carte');
+// Coller à droite par une MARGE AUTOMATIQUE : sur une rangée trop étroite,
+// `justify-content:flex-end` fait sortir le contenu par la GAUCHE, et ce
+// débordement n'est pas rattrapable au défilement.
+assert.ok(/\.need-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
+  'les actions ferment la rangée, poussées par une marge automatique');
+assert.ok(!/\.(demande-corps \.)?need-actions\{[^}]*justify-content:flex-end/.test(DEVIS),
+  '… jamais par flex-end');
 
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le

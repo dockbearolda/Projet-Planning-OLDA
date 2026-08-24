@@ -82,18 +82,19 @@ const par = Object.fromEntries(lignes);
 // Un récapitulatif qui rebaptise les champs oblige à traduire de tête entre le
 // haut et le bas de la même page.
 const LABELS = DEVIS.match(/<label[^>]*>([^<]+)/g).map((m) => m.replace(/<label[^>]*>/, '').trim());
-// « Note » fait exception depuis le 23/08 : le champ a quitté le formulaire —
-// la note se tape APRÈS, sur la ligne de la demande, dans « Personnalisation »
-// (voir setNeedPerso, qui écrit dans `textile.note`). La rangée du
-// récapitulatif, elle, continue de la relire.
-lignes.filter(([intitule]) => intitule !== 'Note').forEach(([intitule]) => {
+// PLUS D'EXCEPTION : « Note » est redevenu un champ du formulaire le 24/08.
+// Il en était sorti la veille pour vivre sur la ligne de la demande — mais un
+// champ de saisie sur une carte qu'on relit n'a jamais eu sa place, et la note
+// décide du fichier d'impression (voir txAlertes) : elle appartient à la
+// saisie de l'article, avec les tailles et le marquage.
+lignes.forEach(([intitule]) => {
   assert.ok(LABELS.includes(intitule),
     `« ${intitule} » doit être l’intitulé d’un champ du formulaire, pas un autre mot`);
 });
-assert.ok(!/id="txNote"/.test(DEVIS),
-  'le champ « Note » a quitté le formulaire : il doublait la personnalisation de la ligne');
-assert.ok(/needs\[i\]\.textile\.note=valeur/.test(DEVIS),
-  '… et c’est bien la personnalisation de la ligne qui l’écrit désormais');
+assert.ok(/<label for="txNote">Note<\/label>/.test(DEVIS),
+  'le champ « Note » est de retour dans le formulaire, sous son intitulé');
+assert.ok(!/setNeedPerso/.test(DEVIS),
+  '… et le champ posé sur la carte de la demande s’en va avec');
 
 // --- 2. Tout ce qui est saisi se relit ---------------------------------------
 assert.strictEqual(par['Référence'], 'K3008');
@@ -261,12 +262,14 @@ assert.ok(/txTableau\(n\.textile, ?c,\[txDetail\(n\.textile, ?c\)\],'fiche'\)/.t
 assert.ok(/txDetailOuvert=false;TX_RECAP\.form=false;/.test(source('cancelTextileEdit', '')),
   '… et un nouveau besoin repart sur celle du formulaire, ouverte');
 // NÉGOCIER, C'EST REGARDER UN SEUL CHIFFRE : les dix rangées de relecture
-// poussaient les solutions hors de l'écran au moment de les comparer.
-const ouvrirNeg = source('ouvrirNegociation', 'i');
-assert.ok(/TX_RECAP\.fiche=false;/.test(ouvrirNeg),
-  'entrer en négociation replie le récapitulatif sur son total');
-assert.ok(ouvrirNeg.indexOf('TX_RECAP.fiche=false') < ouvrirNeg.indexOf('renderNeeds()'),
-  '… avant le rendu, sinon la fiche s’écrit encore dépliée');
+// poussaient les solutions hors de l'écran au moment de les comparer. Depuis
+// le 24/08 la négociation d'une ligne posée est un VOLET de la fiche : c'est
+// son ouverture qui replie le récapitulatif, comme sur le ticket.
+const voletFiche = source('negFicheVolet', 'i');
+assert.ok(/if\(det\.open&&TX_RECAP\.fiche\)\{TX_RECAP\.fiche=false;/.test(voletFiche),
+  'ouvrir la négociation replie le récapitulatif sur son total');
+assert.ok(/if\(!det\.isConnected\)return/.test(voletFiche),
+  '… et un `toggle` différé sur un volet retiré n’écrit plus rien');
 // Une fiche s'ouvre sur son récapitulatif replié, comme le ticket.
 assert.ok(/TX_RECAP\.fiche=false;/.test(source('ouvrirArticle', 'i,ev')),
   'une fiche s’ouvre sur un récapitulatif replié');

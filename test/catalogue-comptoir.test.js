@@ -130,26 +130,25 @@ assert.ok(/\.need-actions button\{padding:var\(--champ-y-serre\)/.test(DEVIS),
 assert.ok(!/\.need-actions button\{[^}]*min-height/.test(DEVIS),
   '… et aucune hauteur écrite en dur');
 
-// CHAQUE ARTICLE PORTE SA PERSONNALISATION, sur sa ligne : c'est ce que
-// l'atelier grave, brode ou imprime, et ça change d'un article à l'autre dans
-// la même demande. Le texte va dans `comment` — le champ que la fiche, le
-// devis, le ticket de l'atelier et le message au client lisent DÉJÀ ligne par
-// ligne. Un champ neuf serait mort en silence.
-assert.ok(/class="need-perso"[^>]*oninput="setNeedPerso\(\$\{i\}/.test(renderNeedsSrc),
-  'chaque article de la demande porte son champ de personnalisation');
-assert.ok(/value="\$\{esc\(n\.comment\|\|''\)\}"/.test(renderNeedsSrc),
-  'ce champ montre ce qui est déjà écrit pour cet article');
-assert.ok(!/n\.comment\]/.test(renderNeedsSrc),
-  'le détail en petit ne répète plus la personnalisation : elle a son champ');
-assert.ok(/function setNeedPerso\(i,valeur\)\{[^}]*needs\[i\]\.comment=valeur/.test(DEVIS),
-  'la frappe va dans le besoin, à l’indice de sa ligne');
-assert.ok(!/function setNeedPerso[^}]*renderNeeds\(\)/.test(DEVIS),
-  'écrire ne REDESSINE PAS la liste : la ligne reprise sous les doigts perdrait le curseur');
-assert.ok(/\.need-perso\{[^}]*padding:var\(--champ-y-serre\)/.test(DEVIS),
-  'le champ de personnalisation prend la boîte serrée, comme les boutons de sa ligne');
+// CHAQUE ARTICLE PORTE SA NOTE, SAISIE AVEC LUI : c'est ce que l'atelier
+// grave, brode ou imprime, et ça change d'un article à l'autre dans la même
+// demande. Elle avait été déplacée sur la carte de droite, dans un champ posé
+// sous les boutons ; le patron l'a ramenée dans le formulaire le 24/08 — une
+// carte se relit, elle ne se remplit pas. Le texte va dans `comment` — le
+// champ que la fiche, le devis, le ticket de l'atelier et le message au
+// client lisent DÉJÀ ligne par ligne. Un champ neuf serait mort en silence.
+assert.ok(/id="txNote"/.test(DEVIS),
+  'la note se saisit dans le formulaire de l’article');
+assert.ok(!/need-perso|setNeedPerso/.test(DEVIS),
+  'plus aucun champ de saisie sur la carte de la demande');
+assert.ok(/note:\$\('txNote'\)\.value\.trim\(\)/.test(DEVIS),
+  'le formulaire relit sa note à l’enregistrement');
+assert.ok(/comment:d\.note/.test(DEVIS),
+  '… et elle arrive dans `comment`, le champ que tout le reste lit déjà');
 // Celui qui chiffre doit voir ce qu'il chiffre : une gravure ne se devine pas.
-assert.ok(/Personnalisation :<\/b> \$\{esc\(n\.comment\)\}/.test(DEVIS),
-  'la personnalisation se relit à l’étape des prix');
+// Le récapitulatif reprend le MOT du champ — « Note », pas un synonyme.
+assert.ok(/Note :<\/b> \$\{esc\(n\.comment\)\}/.test(DEVIS),
+  'la note se relit à l’étape des prix, sous son intitulé');
 
 // --- La colonne de droite est partie ---------------------------------------
 // La carte « PROJET » répétait la référence (elle est sur l'étape), le statut
