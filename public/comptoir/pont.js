@@ -1776,22 +1776,7 @@ document.addEventListener('pointerdown',ev=>{
        s'il y a des tuiles derrière. Le parcours ne connaît aucune adresse. */
     b.onclick = () => { try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {} };
     barre.insertBefore(b, barre.firstChild);
-    mesurerLaBarre();
   }
-
-  /* LE PANIER SE GARE SOUS LA BARRE, PAS DESSOUS. Il se cale déjà tout seul
-     (`position: sticky`), mais à 16 px du haut — donc SOUS la barre des étapes,
-     qui en fait 64. On mesure la barre et on lui rend sa hauteur : les deux
-     sont alors figés, l'un au-dessus de l'autre, et rien ne se recouvre.
-     Mesurée, pas devinée : elle change avec la largeur du cadre et avec la
-     langue des libellés. */
-  function mesurerLaBarre() {
-    const barre = document.querySelector('.etapes-barre');
-    if (!barre) return;
-    const h = Math.round(barre.getBoundingClientRect().height);
-    if (h > 0) document.documentElement.style.setProperty('--h-etapes', h + 'px');
-  }
-  window.addEventListener('resize', mesurerLaBarre, { passive: true });
   function poserStyleRangeeEtapes() {
     if (document.getElementById('styleRangeeEtapes')) return;
     const st = document.createElement('style');
@@ -1802,11 +1787,10 @@ document.addEventListener('pointerdown',ev=>{
        rembourrage de la rangée, sinon un blanc de 24 px reste collé au-dessus
        d'elle une fois qu'elle s'est figée. */
     st.textContent = [
-      /* `top: 0` : le cadre est ce qui défile, l'hôte ne bouge pas. Le fond est
-         OBLIGATOIRE — sans lui le contenu défile en transparence derrière les
-         pastilles. La marge basse de la rangée passe sur la barre, sinon un
-         blanc reste collé sous elle une fois figée. */
-      '.etapes-barre{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;',
+      /* Elle n'a plus besoin d'être COLLANTE : elle n'est plus dans ce qui
+         défile (voir plus bas). Le fond reste, il la sépare de la colonne qui
+         passe dessous, et la marge basse de la rangée passe sur la barre. */
+      '.etapes-barre{flex:0 0 auto;z-index:30;background:var(--bg);display:flex;',
       'align-items:center;gap:var(--pas-2);padding:var(--pas-2) 0;margin-bottom:var(--pas-3)}',
       '.etapes-barre .stepper{flex:1 1 auto;min-width:0;margin-bottom:0}',
       /* UNE SEULE RANGÉE, TOUJOURS. Sous 980 px de cadre, les pastilles se
@@ -1817,10 +1801,30 @@ document.addEventListener('pointerdown',ev=>{
       '.etapes-barre .stepper{flex-wrap:nowrap}',
       '.etapes-barre .step{flex:1 1 0!important;min-width:0;white-space:nowrap;',
       'overflow:hidden;text-overflow:ellipsis;padding-left:var(--pas-1);padding-right:var(--pas-1)}',
-      /* Le panier se gare SOUS la barre. Deux colonnes seulement : empilé, il
-         passe au-dessus du formulaire et n'a plus rien à se caler. */
-      '@media(min-width:981px){.layout .sidebar{position:sticky;',
-      'top:calc(var(--h-etapes,64px) + var(--pas-2))}}',
+      /* ─────────── SEULE LA COLONNE DE SAISIE DÉFILE ───────────────────────
+         Coller la barre et le panier ne suffisait pas : « collant » veut dire
+         que l'élément suit le défilement JUSQU'À sa marque, puis s'arrête. Il
+         bouge donc quand même, sur les premiers pixels — c'est ce léger
+         glissement que le patron voyait.
+         On retire le défilement au DOCUMENT et on le donne à la seule colonne
+         qui doit bouger. La barre et le panier ne défilent plus du tout : ils
+         ne sont plus DANS ce qui défile. Plus rien à caler, plus rien à
+         mesurer, et zéro pixel de glissement.
+         Deux colonnes seulement : sous 981 px la mise en page s'empile, le
+         panier passe au-dessus du formulaire et cette hauteur fixe n'aurait
+         plus de sens — on rend alors le défilement à la page.
+         Et JAMAIS À L'IMPRESSION : une hauteur d'écran y couperait le
+         récapitulatif à la première page. */
+      '@media screen and (min-width:981px){',
+      'html,body{height:100%;overflow:hidden}',
+      '.container{height:100%;display:flex;flex-direction:column;margin-top:0;margin-bottom:0;padding-bottom:0}',
+      '.layout{flex:1 1 auto;min-height:0;align-items:stretch}',
+      /* `min-height:0` : sans lui, un enfant de flex refuse de descendre sous
+         la hauteur de son contenu et c'est la PAGE qui reprend le défilement. */
+      '.layout>main{min-height:0;overflow-y:auto;padding-bottom:var(--pas-4)}',
+      '.layout .sidebar{position:static;top:auto;height:100%;min-height:0;display:flex;flex-direction:column}',
+      '.layout .sidebar>*{min-height:0}',
+      '}',
     ].join('');
     document.head.appendChild(st);
   }

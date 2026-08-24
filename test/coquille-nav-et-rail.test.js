@@ -398,8 +398,8 @@ console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée su
   assert.ok(/barre\.className = 'etapes-barre no-print'/.test(PONT2)
     && /barre\.appendChild\(etapes\)/.test(PONT2),
     'la barre enveloppe la rangée d’étapes, elle ne s’y insère pas');
-  assert.ok(/\.etapes-barre\{position:sticky;top:0/.test(PONT2),
-    'c’est la barre qui colle en haut : un seul élément à figer');
+  assert.ok(/\.etapes-barre\{flex:0 0 auto/.test(PONT2),
+    'la barre garde sa hauteur en tête de la colonne : elle ne se comprime pas');
   // UNE SEULE RANGÉE, TOUJOURS. Sous 980 px de cadre, `flex-basis: 20%` mettait
   // les cinq pastilles sur CINQ lignes (mesuré à 569 px de cadre).
   assert.ok(/\.etapes-barre \.stepper\{flex-wrap:nowrap\}/.test(PONT2)
@@ -407,14 +407,32 @@ console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée su
     'les étapes tiennent sur une seule rangée, quelle que soit la largeur');
   assert.ok(/text-overflow:ellipsis/.test(PONT2),
     '… et un libellé qui ne rentre plus se coupe, il ne pousse pas la rangée');
-  // LE PANIER SE GARE SOUS LA BARRE. Il se calait à 16 px du haut — donc SOUS
-  // une barre qui en fait 64. La hauteur est MESURÉE : elle change avec la
-  // largeur du cadre.
-  assert.ok(/top:calc\(var\(--h-etapes,64px\) \+ var\(--pas-2\)\)/.test(PONT2),
-    'le panier se gare sous la barre, pas dessous');
-  assert.ok(/function mesurerLaBarre\(\)/.test(PONT2)
-    && /addEventListener\('resize', mesurerLaBarre/.test(PONT2),
-    '… et cette hauteur est mesurée, puis remesurée quand la largeur change');
+  // LE PANIER N'A PLUS RIEN À SE CALER : il n'est plus dans ce qui défile.
+  // La mesure de la barre qui lui servait d'appui est partie avec — du code
+  // mort dès l'instant où le document a cessé de défiler.
+  assert.ok(!/mesurerLaBarre/.test(PONT2) && !/--h-etapes/.test(PONT2),
+    'plus de hauteur à mesurer : rien ne se cale sur rien');
+  assert.ok(!/\.etapes-barre\{position:sticky/.test(PONT2),
+    'la barre n’a plus besoin d’être collante : elle ne défile plus du tout');
+
+  // SEULE LA COLONNE DE SAISIE DÉFILE. Coller ne suffisait pas : « collant »
+  // veut dire que l'élément SUIT le défilement jusqu'à sa marque, puis
+  // s'arrête — il bouge donc quand même, sur les premiers pixels. On retire le
+  // défilement au document et on le donne à la seule colonne qui doit bouger.
+  assert.ok(/html,body\{height:100%;overflow:hidden\}/.test(PONT2),
+    'le document du parcours ne défile plus');
+  assert.ok(/\.layout>main\{min-height:0;overflow-y:auto/.test(PONT2),
+    '… c’est la colonne de saisie qui défile, elle seule');
+  // `min-height: 0` n'est pas décoratif : sans lui, un enfant de flex refuse de
+  // descendre sous la hauteur de son contenu et c'est la PAGE qui reprend le
+  // défilement.
+  assert.ok(/\.layout\{flex:1 1 auto;min-height:0/.test(PONT2),
+    '… et la mise en page lui laisse la place de le faire');
+  // Deux garde-fous que rien ne rappelle quand on relit le fichier :
+  assert.ok(/@media screen and \(min-width:981px\)/.test(PONT2),
+    'JAMAIS à l’impression : une hauteur d’écran couperait le récapitulatif');
+  assert.ok(/min-width:981px/.test(PONT2),
+    '… ni sous 981 px, où la mise en page s’empile et rend le défilement à la page');
 }
 
 console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut être figé l’est');
