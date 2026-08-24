@@ -287,6 +287,33 @@ input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb
 h2{letter-spacing:-.01em}
 </style>
 <style>
+/* ------------------------------------------- Une rangée remplit sa ligne
+   `.grid` et `.grid-3` posaient un nombre FIXE de colonnes, sans regarder ce
+   qu'on y mettait. Une rangée de deux dans une grille de trois laissait donc
+   un tiers de vide — « Date souhaitée » et « Heure souhaitée » ne faisaient
+   ensemble que les deux tiers de la ligne, et c'est exactement ce qui se
+   voyait. Trois rangées de l'écran étaient dans ce cas.
+   Le nombre de colonnes suit désormais le nombre de cellules, et les colonnes
+   restent ÉGALES : deux cellules font deux moitiés, trois font trois tiers.
+   `minmax(0, 1fr)` et pas `1fr` : sans le minimum à zéro, un menu au libellé
+   long refuse de se réduire et déborde sa colonne.
+   Le nombre se lit sur les enfants RÉELS : aucune de ces rangées ne porte de
+   cellule masquée (vérifié sur les 17 rangées des cinq étapes), sinon un
+   `display:none` compterait quand même et rendrait une colonne fantôme.
+   Sous 701 px la rangée retombe sur une seule colonne (règle plus bas) : ces
+   règles-ci sont plus spécifiques, elles la battraient sans ce garde. */
+@media(min-width:701px){
+  .grid:not(:has(> :nth-child(2))),
+  .grid-3:not(:has(> :nth-child(2))){grid-template-columns:minmax(0,1fr)}
+  .grid-3:has(> :nth-child(2)):not(:has(> :nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* Les familles et le titre du projet partagent la ligne en deux moitiés. Le
+   collage en bas de `.grid` mettrait la pastille des familles au niveau du
+   CHAMP du titre, et les deux intitulés ne seraient plus sur la même ligne :
+   ici on aligne par le HAUT. */
+.tete-projet{align-items:start}
+
 /* ---- Chiffrage textile ---- */
 .tx-side-marge b{color:var(--success)}
 .tx-ligne-chiffrage{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-soft)}
@@ -779,7 +806,7 @@ h2{letter-spacing:-.01em}
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
 
-<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><div class="bloc"><h3>Familles concernées</h3><div class="pill-wrap" id="categoryPills"></div><div class="field" style="margin-top:18px"><label>Titre du projet *</label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
+<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><div class="bloc"><div class="grid tete-projet"><div class="field"><label>Familles concernées</label><div class="pill-wrap" id="categoryPills"></div></div><div class="field"><label>Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div></div>
 </div><div class="bloc"><div class="field priority-field" id="projectPriorityField">
   <label id="projectPriorityLabel">Priorité du projet *</label>
   <div class="priority-grid" id="projectPriorityGroup">
@@ -805,7 +832,7 @@ h2{letter-spacing:-.01em}
 </div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
-<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions"><button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(2)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions a-droite"><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
 
 
 <section id="step4" class="hidden">
@@ -911,8 +938,7 @@ h2{letter-spacing:-.01em}
 
     </div><div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
 
-    <div class="actions" style="margin-top:16px">
-      <button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(3)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
+    <div class="actions a-droite" style="margin-top:16px">
       <button class="primary" onclick="goStep(5)">Choisir le client →</button>
     </div>
   </div>
@@ -1051,8 +1077,7 @@ h2{letter-spacing:-.01em}
 
     </div><div id="step5ValidationSummary" class="validation-summary hidden"></div>
 
-    <div class="actions" style="margin-top:16px">
-      <button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(4)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
+    <div class="actions a-droite" style="margin-top:16px">
       <button class="primary" onclick="openRecapFromStep5()">Voir le récapitulatif →</button>
     </div>
   </div>
@@ -1080,7 +1105,7 @@ h2{letter-spacing:-.01em}
          accent par rangée : il revient à l'acte principal.
          Les deux boutons se retrouvent par leur `onclick`, pas par leur
          classe : l'ordre et l'habillage ne changent rien à pont.js. -->
-    <div class="actions" style="margin-top:var(--pas-3)">
+    <div class="actions a-droite" style="margin-top:var(--pas-3)">
       <button class="primary" onclick="saveDraft()">💾 Enregistrer</button>
       <button class="secondary" onclick="newRequest()">Nouvelle demande</button>
     </div>
@@ -4140,18 +4165,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(typeof downloadRecapTXT==='function')downloadRecapTXT();
   };
 
-  /* Bouton retour sur le récapitulatif (la barre du bas a été supprimée) */
-  function addBackButton(){
-    var actions=document.querySelector('#step7 .actions');
-    if(!actions||document.getElementById('recapBackBtn'))return;
-    var b=document.createElement('button');
-    b.id='recapBackBtn';b.className='btn-retour';
-    b.title=b.ariaLabel='Revenir à l’étape précédente';
-    b.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg>';
-    b.onclick=function(){showStep(5);};
-    actions.insertBefore(b,actions.firstChild);
-  }
-
   /* Le planning reçoit l’intégralité des informations saisies */
   function patchPlanningButton(){
     var btn=document.getElementById('oldaCreatePlanningBtn');
@@ -4222,8 +4235,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     },true);
   })();
   window.attachEmailCheck('newClientEmail');
-  setInterval(function(){addBackButton();patchPlanningButton();},400);
-  addBackButton();patchPlanningButton();
+  setInterval(function(){patchPlanningButton();},400);
+  patchPlanningButton();
 })();
 </script>
 <div id="ticketExportOverlay" class="ticket-export-overlay">

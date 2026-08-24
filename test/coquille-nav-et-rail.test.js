@@ -293,14 +293,19 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   assert.ok(/OLDA_PARCOURS_RETOUR/.test(PONT) && /OLDA_PARCOURS_RETOUR'\) \{ afficher\(null\)/.test(NP.replace(/msg\.type === '/, "'")),
     'le parcours demande la sortie, l’hôte décide de ce que ça veut dire');
 
-  // Les étapes des DEUX parcours portent la même. `← Retour` en bulle grise
-  // n'existe plus nulle part.
+  // `← Retour` en bulle grise n'existe plus nulle part.
+  //
+  // REVIREMENT DU 24/08, APRÈS COUP : la demande de devis portait DEUX flèches
+  // à l'écran — celle de la rangée d'étapes (« quitter le parcours ») et une
+  // en bas de chaque étape (« revenir d'un cran »). Deux gestes différents,
+  // mais deux flèches identiques à 40 cm des yeux. Le patron a tranché : « les
+  // flèches retour ici sont supprimées définitivement, car elle existe en haut
+  // à gauche. » Il n'en reste qu'UNE par écran, celle que pont.js greffe.
+  // Ce que ça coûte est écrit noir sur blanc plus bas.
   for (const f of ['public/comptoir/demande-devis.html', 'public/comptoir/vente-directe.html']) {
     const doc = fs.readFileSync(path.join(RACINE, f), 'utf8');
     assert.ok(!/>← Retour/.test(doc) && !/textContent='← Retour'/.test(doc),
       `${f} : plus aucun « ← Retour » en bulle grise`);
-    assert.ok((doc.match(/class="btn-retour"/g) || []).length >= 2 || /className='btn-retour'/.test(doc),
-      `${f} : ses étapes portent la flèche de la charte`);
     // UN `!important` SUR UN SÉLECTEUR NU BAT N'IMPORTE QUELLE CLASSE : sans
     // cette exception, la flèche reprenait l'arrondi d'un CHAMP (9 px).
     assert.ok(/button:not\(\.btn-retour\)\{border-radius/.test(doc),
@@ -308,6 +313,25 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   }
 }
 
+// LA DEMANDE DE DEVIS N'A PLUS QU'UNE SEULE FLÈCHE, ET ELLE N'EST PAS À ELLE :
+// c'est pont.js qui la greffe dans la rangée d'étapes. Aucune flèche « revenir
+// d'un cran » ne subsiste en bas d'étape, ni écrite dans la page, ni reposée
+// par un `setInterval` (le récapitulatif s'en remettait une toutes les 400 ms).
+{
+  const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+  assert.ok(!/class="btn-retour"[^>]*onclick="showStep\(/.test(DEVIS),
+    'plus aucune flèche « revenir d’un cran » en bas d’étape');
+  assert.ok(!/addBackButton/.test(DEVIS),
+    '… et plus rien ne la repose au récapitulatif, toutes les 400 ms');
+  // CE QU'ON PERD, ÉCRIT ICI POUR QU'ON LE SACHE : la flèche du haut QUITTE le
+  // parcours, elle ne revient pas d'une étape — et les pastilles de la rangée
+  // d'étapes ne sont pas cliquables. Revenir en arrière n'a donc plus aucune
+  // commande sur cet écran. C'est un arbitrage du patron, pas un oubli ; si on
+  // veut le rendre, le moins cher est de rendre les pastilles DÉJÀ FAITES
+  // cliquables (`.step.done`).
+  assert.ok(!/\.step[^{]*\{[^}]*cursor:\s*pointer/.test(DEVIS),
+    'les pastilles d’étape ne sont toujours pas cliquables : si ça change, ce commentaire doit changer aussi');
+}
 console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu’aux étapes des parcours');
 
 // --- 9. LA RANGÉE D'ONGLETS EST CENTRÉE, ET LES SEPT SUR LA MÊME LIGNE ------
