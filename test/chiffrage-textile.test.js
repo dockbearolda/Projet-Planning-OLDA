@@ -179,13 +179,18 @@ classees.forEach((r) => {
 assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, 0), []);
 assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, NaN), []);
 
-// Retenir une solution la réécrit dans la SAISIE (pièces en plus dans
-// « Autres », prix moyen réel en prix manuel) : le calcul reste le seul et
-// même, et la ligne se remodifie ensuite comme une autre.
+// RETENIR POSE UN PRIX, ET RIEN D'AUTRE (23/08/2026). La solution retenue
+// écrivait aussi les pièces manquantes dans « Autres » : choisir « 70 à
+// 15,55 € » sur une saisie de 55 faisait entrer quinze vêtements que personne
+// n'avait commandés — sans taille, sans qu'on l'ait tapé — et une deuxième
+// négociation en rajoutait encore. On retient le PRIX ; les pièces se
+// saisissent dans les cases des tailles, où elles ont un nom.
 const retenir = (DEVIS.match(/function negRetenir\(i,\s*m\)\{[\s\S]*?\n\}/) || [''])[0];
 assert.ok(retenir, 'negRetenir doit exister');
-assert.ok(/sizes\.other/.test(retenir) && /manualPrice/.test(retenir),
+assert.ok(/manualPrice/.test(retenir),
   'la solution retenue se réécrit dans la saisie, elle ne vit pas à côté');
+assert.ok(!/sizes/.test(retenir),
+  'retenir une offre n’ajoute AUCUNE pièce que la vendeuse n’a pas saisie');
 assert.ok(/m\.effective/.test(retenir),
   'le prix retenu est le prix moyen par pièce LIVRÉE, sinon les pièces offertes se factureraient');
 

@@ -2357,31 +2357,33 @@ function negRemplirResultats(hote, i){
   negMajCustom(i);
 }
 
-/* La solution retenue se réécrit dans la SAISIE : les pièces livrées en plus
-   rejoignent « Autres » (la vendeuse les ventile ensuite dans les vraies
-   tailles), et le prix manuel devient le prix moyen RÉELLEMENT encaissé par
-   pièce livrée — sinon les pièces offertes se factureraient. */
+/* RETENIR POSE UN PRIX, ET RIEN D'AUTRE. La solution retenue écrivait aussi
+   les pièces manquantes dans « Autres » : la vendeuse choisissait « 70 à
+   15,55 € » sur une saisie de 55, et quinze vêtements que personne n'avait
+   commandés entraient dans la demande — sans taille, sans qu'elle l'ait tapé,
+   et une deuxième négociation en rajoutait encore. Ce n'est pas ce qu'on
+   retient d'une offre : on retient le PRIX. Les pièces se saisissent dans les
+   cases des tailles, où elles ont un nom.
+   Le prix posé est celui que la carte annonce, « Le client paie » — le prix
+   moyen par pièce livrée, celui qui tient compte des pièces offertes.
+   ATTENTION, LE GARDE-FOU EST LA MARGE : appliquer un prix de volume sans le
+   volume laisse moins que ce que la carte annonçait, et la rangée « Marge »
+   du calcul le dit aussitôt (elle passe sous le seuil, en rouge). C'est
+   l'inverse d'avant, où les pièces inventées MASQUAIENT l'écart. */
 function negRetenir(i, m){
   const t = negSaisie(i);
   if(!t) return;
-  const avant = TE().calculate(t);
-  if(!avant) return;
-  const enPlus = m.delivered - avant.qty;
-  if(enPlus < 0) return;  /* aucune solution ne livre moins : on ne rogne pas une saisie */
-  const autres = String(txNum(t.sizes.other) + enPlus);
   const prix = String(Math.round(m.effective*100)/100);
   const accord = { paidQty:m.paidQty, freeQty:m.freeQty, unitPrice:m.unitPrice, target:negTargetDe(i) };
   if(i === 'ticket'){
-    /* SUR LE TICKET, LA SAISIE EST LE FORMULAIRE : la solution s'écrit dans
-       ses champs, et le récapitulatif la relit comme n'importe quelle
-       correction — il n'y a pas d'état de négociation à part. */
-    $('txOther').value = autres;
+    /* SUR LE TICKET, LA SAISIE EST LE FORMULAIRE : le prix s'écrit dans son
+       champ, et le récapitulatif le relit comme n'importe quelle correction —
+       il n'y a pas d'état de négociation à part. */
     $('txManualPrice').value = prix;
     TX_NEG.negotiation = accord;
     previewTextile();
     return;
   }
-  t.sizes.other = autres;
   t.manualPrice = prix;
   t.negotiation = accord;
   const apres = TE().calculate(t);
