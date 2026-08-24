@@ -1299,6 +1299,33 @@ function openRecapFromStep5(){
 }
 
 function goStep(next){if(validateStep(next-1))showStep(next)}
+/* LA FLÈCHE DU HAUT PORTE LE RETOUR (24/08, second tour). Elle ne faisait que
+   QUITTER le parcours ; les flèches de bas d'étape, qui revenaient d'un cran,
+   ont été retirées le matin même — plus rien ne ramenait en arrière. « Cette
+   flèche doit permettre le retour en arrière. » Elle porte donc les deux
+   gestes, dans cet ordre : revenir d'une ÉTAPE tant qu'il y en a une derrière,
+   et ne quitter le parcours qu'à la PREMIÈRE — sinon il n'y aurait plus de
+   sortie du tout.
+   ÇA SE DÉCIDE ICI, PAS DANS pont.js : les deux parcours du comptoir ne
+   composent pas leurs étapes pareil — celui-ci en `data-step` avec showStep(),
+   la vente directe sans `data-step` avec displayStep(). Le pont ne connaît
+   aucun modèle d'étapes ; il pose la question, le parcours répond.
+   L'ordre se lit sur les PASTILLES VISIBLES, jamais sur `n - 1` : « Chiffrage »
+   (étape 6) est masquée, et un décrément aveugle tomberait dessus. */
+function etapesVisibles(){
+  return [...document.querySelectorAll('.stepper .step[data-step]')]
+    .filter(p=>!p.classList.contains('hidden'))
+    .map(p=>Number(p.dataset.step)).sort((a,b)=>a-b);
+}
+function etapePrecedente(){
+  const avant=etapesVisibles().filter(n=>n<currentStep);
+  return avant.length?avant[avant.length-1]:null;
+}
+window.oldaParcours={
+  peutRevenir(){return etapePrecedente()!==null},
+  /* Rend `true` SI ON A BOUGÉ : c'est ce qui dit au pont de ne pas quitter. */
+  revenir(){const n=etapePrecedente();if(n===null)return false;showStep(n);return true}
+};
 function selectProjectPriority(level){
   $('projectPriority').value=String(level);
   document.querySelectorAll('.priority-card').forEach(btn=>{

@@ -323,14 +323,45 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
     'plus aucune flèche « revenir d’un cran » en bas d’étape');
   assert.ok(!/addBackButton/.test(DEVIS),
     '… et plus rien ne la repose au récapitulatif, toutes les 400 ms');
-  // CE QU'ON PERD, ÉCRIT ICI POUR QU'ON LE SACHE : la flèche du haut QUITTE le
-  // parcours, elle ne revient pas d'une étape — et les pastilles de la rangée
-  // d'étapes ne sont pas cliquables. Revenir en arrière n'a donc plus aucune
-  // commande sur cet écran. C'est un arbitrage du patron, pas un oubli ; si on
-  // veut le rendre, le moins cher est de rendre les pastilles DÉJÀ FAITES
-  // cliquables (`.step.done`).
-  assert.ok(!/\.step[^{]*\{[^}]*cursor:\s*pointer/.test(DEVIS),
-    'les pastilles d’étape ne sont toujours pas cliquables : si ça change, ce commentaire doit changer aussi');
+  // CE QUI A ÉTÉ RENDU DANS LA FOULÉE (24/08, second tour). Retirer les flèches
+  // du bas avait laissé l'écran SANS AUCUN retour en arrière : celle du haut ne
+  // faisait que quitter le parcours, et les pastilles ne sont pas cliquables.
+  // « Cette flèche doit permettre le retour en arrière. » Elle porte désormais
+  // les deux gestes : revenir d'une étape tant qu'il y en a une derrière, et ne
+  // quitter qu'à la PREMIÈRE — sinon il n'y aurait plus de sortie du tout.
+  assert.ok(/window\.oldaParcours\s*=\s*\{/.test(DEVIS),
+    'le parcours expose comment revenir : lui seul connaît son modèle d’étapes');
+  assert.ok(/peutRevenir\(\)\{return etapePrecedente\(\)!==null\}/.test(DEVIS),
+    '… il sait dire s’il RESTE une étape derrière, sans bouger');
+  assert.ok(/revenir\(\)\{const n=etapePrecedente\(\);if\(n===null\)return false;showStep\(n\);return true\}/.test(DEVIS),
+    '… et il rend `true` seulement s’il a bougé');
+
+  // L'ORDRE SE LIT SUR LES PASTILLES VISIBLES, PAS SUR `n - 1`. « Chiffrage »
+  // (étape 6) est masquée : un décrément aveugle tomberait dessus.
+  assert.ok(/\.filter\(p=>!p\.classList\.contains\('hidden'\)\)/.test(DEVIS),
+    'les étapes masquées sont sautées');
+
+  // LE PONT NE CONNAÎT AUCUN MODÈLE D'ÉTAPES. Les deux parcours ne composent
+  // pas les leurs pareil — `data-step` + showStep() ici, displayStep() sans
+  // `data-step` en vente directe. Il pose la question ; un parcours muet garde
+  // l'ancien geste, quitter.
+  const PONTJS = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+  const greffe = PONTJS.match(/function grefferSortieDuParcours\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(greffe, 'la greffe de la flèche existe');
+  assert.ok(!/showStep|displayStep|data-step/.test(greffe[0]),
+    'le pont ne code en dur aucun modèle d’étapes : il demande, il ne suppose pas');
+  assert.ok(/p\.revenir\(\)\) \{ majEtiquette\(\); return; \}/.test(greffe[0]),
+    'on ne quitte QUE si le parcours n’a pas bougé — sinon un clic ferait les deux');
+  assert.ok(/OLDA_PARCOURS_RETOUR/.test(greffe[0]),
+    '… et à la première étape, la flèche quitte toujours le parcours');
+
+  // L'ÉTIQUETTE SE LIT AVANT LE CLIC — au survol, et par un lecteur d'écran.
+  // Elle doit donc dire ce que la flèche fera à CETTE étape-là, et suivre les
+  // pas que la flèche ne fait pas elle-même (les boutons « suivant »).
+  assert.ok(/Revenir à l’étape précédente'\s*:\s*'Quitter ce parcours'/.test(greffe[0]),
+    'la flèche annonce le geste qu’elle va faire');
+  assert.ok(/new MutationObserver\(majEtiquette\)/.test(greffe[0]),
+    '… et l’étiquette suit l’étape, quel que soit ce qui l’a fait changer');
 }
 console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu’aux étapes des parcours');
 

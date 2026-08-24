@@ -1773,13 +1773,48 @@ document.addEventListener('pointerdown',ev=>{
     b.type = 'button';
     b.id = 'sortieParcours';
     b.className = 'btn-retour';
-    b.title = b.ariaLabel = 'Quitter ce parcours';
+
     b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'
       + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
       + '<path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg>';
+    /* LA FLÈCHE PORTE LES DEUX GESTES (24/08, second tour). Elle ne faisait
+       que quitter le parcours ; les flèches de bas d'étape qui revenaient d'un
+       cran ont été retirées le matin même, et plus rien ne ramenait en
+       arrière. Elle revient donc d'une ÉTAPE tant qu'il y en a une derrière,
+       et ne quitte le parcours qu'à la PREMIÈRE.
+       LE PONT NE CONNAÎT AUCUN MODÈLE D'ÉTAPES — les deux parcours ne
+       composent pas les leurs pareil. Il pose la question à `oldaParcours`,
+       que le parcours expose. Un parcours qui ne répond pas garde l'ancien
+       geste, quitter : c'est le cas de la vente directe, qui a gardé sa propre
+       flèche de retour en bas. */
+    const parcours = () => window.oldaParcours;
+    const peutRevenir = () => {
+      const p = parcours();
+      return !!(p && typeof p.peutRevenir === 'function' && p.peutRevenir());
+    };
+    /* L'étiquette se lit AVANT le clic — au survol, et par un lecteur d'écran.
+       Elle doit donc dire ce que la flèche va faire à CETTE étape-là. */
+    const majEtiquette = () => {
+      b.title = b.ariaLabel = peutRevenir()
+        ? 'Revenir à l’étape précédente'
+        : 'Quitter ce parcours';
+    };
+    majEtiquette();
     /* L'hôte décide de ce que « quitter » veut dire : il est le seul à savoir
        s'il y a des tuiles derrière. Le parcours ne connaît aucune adresse. */
-    b.onclick = () => { try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {} };
+    b.onclick = () => {
+      const p = parcours();
+      /* `revenir()` rend `true` s'il a bougé. On ne quitte QUE s'il n'a pas
+         bougé — sans ce retour, un clic à l'étape 3 reviendrait d'un cran ET
+         quitterait le parcours dans la foulée. */
+      if (p && typeof p.revenir === 'function' && p.revenir()) { majEtiquette(); return; }
+      try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {}
+    };
+    /* Le parcours change la classe `active` des pastilles à chaque pas : c'est
+       le seul signal commun aux deux écrans, et il couvre les pas que la
+       flèche ne fait pas elle-même (les boutons « suivant » du bas). */
+    new MutationObserver(majEtiquette)
+      .observe(etapes, { subtree: true, attributes: true, attributeFilter: ['class'] });
     barre.insertBefore(b, barre.firstChild);
   }
   function poserStyleRangeeEtapes() {
