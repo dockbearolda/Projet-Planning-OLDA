@@ -3679,21 +3679,15 @@ body.view-plein .grid-wrap,
 body.view-plein .colbar,
 body.view-plein .fiverr-tool { display: none !important; }
 
-body.view-plein .shell,
-body.view-focus .shell {
-  /* `minmax(0, …)` et pas `1fr` : sur un onglet Fiverr / À commander la grille
-     du planning est bien là, et sa largeur mini pousserait la colonne au-delà
-     de l'écran. C'est à la grille de défiler, pas à la page. */
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "topbar"
-    "filet"
-    "main";
-}
-body.view-plein .sidebar,
-body.view-plein .sidebar-resizer,
-body.view-focus .sidebar,
-body.view-focus .sidebar-resizer { display: none; }
+/* LE RAIL NE SE REPLIE PLUS TOUT SEUL (24/08/2026). Il disparaissait dès qu'on
+   quittait le planning — Point du jour, Base clients, Réglages, et surtout
+   Nouveau Projet : l'écran perdait sa colonne de gauche EN MÊME TEMPS que sa
+   navigation, et changer d'onglet donnait l'impression de changer de PAGE.
+   Le patron : « quand je clique, la sidebar doit rester si je ne la referme
+   pas ». Une seule chose la range désormais, et c'est le bouton (`.rail-plie`).
+   Ce qui disparaît hors planning, c'est l'échafaudage de la GRILLE (juste
+   au-dessus) : en-tête d'étape, lignes, rail des colonnes, outil Fiverr. Pas
+   la navigation. */
 
 /* ------------------------------------------------------------ Rail replié
    La poignée règle la largeur du rail, mais jamais en dessous de 180 px : pour
@@ -3715,10 +3709,8 @@ body.view-focus .sidebar-resizer { display: none; }
   transition: transform var(--dur-2) var(--ease);
 }
 .rail-plie .rail-toggle .material-symbols-outlined { transform: none; }
-/* Hors du planning le rail n'existe pas (voir le repli du .shell juste
-   au-dessus) : son bouton n'aurait rien à replier. */
-body.view-plein .rail-toggle,
-body.view-focus .rail-toggle { display: none; }
+/* Le bouton suit le rail : il est disponible sur TOUTES les vues, puisque le
+   rail y est. C'est le seul geste qui le range. */
 
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */

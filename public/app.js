@@ -596,6 +596,18 @@ function syncStageLabel(el, n) {
 // où le rail est visible. Défini ici, utilisé par selectStage ; la bascule de
 // vue elle-même vit plus bas (setViewMode / applyHash).
 function syncTabForStage(slug, sub) {
+  // LE RAIL EST À L'ÉCRAN PARTOUT depuis le 24/08 : on peut donc cliquer une
+  // étape depuis le Point du jour, la Base clients, les Réglages ou un parcours
+  // du comptoir. La grille du planning n'y est pas affichée — sans ce saut, le
+  // clic chargeait une étape que personne ne voyait, et le rail avait l'air
+  // mort. Le hash reste le seul pilote de la vue (voir applyHash).
+  // Une étape du rail n'est JAMAIS une catégorie promue (elles en sont retirées,
+  // voir RAIL_HIDDEN_STAGES / RAIL_HIDDEN_SUBS) : le `applyHash` qui suit ne
+  // peut donc pas « corriger » vers FAMILIES[0] par-dessus ce qu'on vient de
+  // choisir — c'est le piège du 06/08, et il ne se rouvre pas ici.
+  if (!isPlanningMode(viewMode)) { location.hash = '#planning'; return; }
+  // Onglet promu (Fiverr, À commander) : la grille montre SA catégorie, pas
+  // celle qu'on vient de cliquer dans le rail.
   const promoted = PROMOTED_BY_VIEW[viewMode];
   if (!promoted || (promoted.stage === slug && promoted.sub === sub)) return;
   location.hash = '#planning';

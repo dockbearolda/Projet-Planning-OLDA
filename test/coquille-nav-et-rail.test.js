@@ -83,12 +83,31 @@ assert.ok(/\.rail-toggle \.material-symbols-outlined \{[^}]*transform: scaleX\(-
 assert.ok(/\.rail-plie \.rail-toggle \.material-symbols-outlined \{ transform: none/.test(CSS),
   'rail replié, il pointe à droite : « reviens »');
 
-// Hors du planning le rail n'existe pas (view-plein / view-focus le replient
-// déjà) : son bouton n'aurait rien à replier.
-assert.ok(/body\.view-plein \.rail-toggle,\s*body\.view-focus \.rail-toggle \{ display: none/.test(CSS),
-  'hors planning, le bouton de repli s’efface avec le rail');
+// --- 3. LE RAIL RESTE TANT QU'ON NE LE REFERME PAS --------------------------
+// Il se repliait TOUT SEUL hors du planning : l'écran perdait sa colonne de
+// gauche en même temps que sa navigation, et changer d'onglet donnait
+// l'impression de changer de page. Un seul geste le range désormais : le
+// bouton. C'est la demande du 24/08, mot pour mot : « quand je clique, la
+// sidebar doit rester si je ne la referme pas ».
+assert.ok(!/body\.view-(plein|focus)[^{]*\.sidebar/.test(CSS),
+  'le rail ne se replie plus tout seul hors du planning');
+assert.ok(!/body\.view-(plein|focus)[^{]*\.rail-toggle/.test(CSS),
+  '… et son bouton reste disponible sur toutes les vues');
+assert.ok(!/body\.view-(plein|focus) \.shell/.test(CSS),
+  'la coquille garde ses trois colonnes partout : le rail a toujours la sienne');
+// Ce qui disparaît hors planning, c'est l'échafaudage de la GRILLE — pas la
+// navigation. Sans cette règle, l'en-tête d'étape se poserait sur le Dashboard.
+assert.ok(/body\.view-plein \.work-head[\s\S]{0,400}?display: none/.test(CSS),
+  'hors planning, c’est la grille qui s’efface, pas le rail');
 
-// --- 3. Le câblage ----------------------------------------------------------
+// Le rail est cliquable depuis TOUTES les vues : sans saut vers le planning, il
+// chargerait une étape que personne ne regarde et paraîtrait mort.
+const sync = APP.match(/function syncTabForStage\(slug, sub\) \{[\s\S]*?\n\}/);
+assert.ok(sync, 'syncTabForStage doit exister');
+assert.ok(/if \(!isPlanningMode\(viewMode\)\) \{ location\.hash = '#planning'; return; \}/.test(sync[0]),
+  'cliquer une étape depuis le Point du jour, la Base clients ou un parcours ramène AU PLANNING');
+
+// --- 4. Le câblage ----------------------------------------------------------
 // Mémorisé PAR APPAREIL, comme la largeur du rail juste au-dessus : c'est un
 // réglage de poste, pas une donnée de dossier.
 assert.ok(/RAIL_PLIE_KEY = 'olda_rail_plie'/.test(APP),
