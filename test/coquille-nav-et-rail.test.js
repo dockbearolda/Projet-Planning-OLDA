@@ -577,8 +577,24 @@ console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut êt
     `le rail ne peut pas descendre sous 200 px sans casser ses libellés (lu : ${min})`);
   // La valeur mémorisée par appareil repasse par le même serrage : un poste qui
   // avait enregistré 180 avant ce jour-là ne rouvre pas sur des mots coupés.
-  assert.ok(/if \(Number\.isFinite\(saved\)\) \$shell\.style\.setProperty\('--sidebar-w', clampW\(saved\)/.test(APP),
+  assert.ok(/if \(Number\.isFinite\(saved\)\) poser\(clampW\(saved\), SIDEBAR_MIN\);/.test(APP),
     'la largeur relue au démarrage repasse par le serrage');
+
+  // (4) LE RAIL SE BLOQUE AVANT DE CASSER LA BARRE DU HAUT. Poussé à fond (460)
+  // sur une fenêtre de 1440, la rangée des sept onglets ne tenait plus (945 px
+  // dans 932), Chrome lui posait une barre de défilement de 12 px et la barre
+  // passait de 108 à 120 px : la zone de travail perdait de la hauteur sans que
+  // rien ne l'explique. Mesuré après : la poignée s'arrête à 440.
+  // ON NE MODÉLISE PAS la largeur qu'il faut aux onglets — elle dépend de la
+  // police, de la langue, du pli de la barre, du nombre d'onglets. ON LA MESURE.
+  assert.ok(/const barreDeborde = \(\) => !!\$navSwitch && \$navSwitch\.scrollWidth > \$navSwitch\.clientWidth \+ 1;/.test(APP),
+    'la butée du rail se mesure sur la rangée d’onglets, elle ne se calcule pas');
+  assert.ok(/lastW = poser\(clampW\(startW \+ ev\.clientX - startX\), lastW\);/.test(APP),
+    '… le glisser rend la largeur qui casserait la barre et garde la dernière qui tenait');
+  // Une fenêtre qui rétrécit reprend de la largeur à la barre : un rail qui
+  // tenait tout à l'heure peut ne plus tenir.
+  assert.ok(/window\.addEventListener\('resize', \(\) => \{[\s\S]*?while \(w > SIDEBAR_MIN && barreDeborde\(\)\)/.test(APP),
+    'et le rail se resserre tout seul quand la fenêtre rétrécit');
   assert.ok(/overflow-wrap: break-word/.test(CSSNET2),
     'un mot plus long que sa colonne se coupe plutôt que de déborder — d’où le minimum mesuré');
 }

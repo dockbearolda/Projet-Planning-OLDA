@@ -224,10 +224,9 @@ function construireAccueil() {
   home.className = 'np-home';
   home.id = 'np-home';
 
-  const titre = document.createElement('h1');
-  titre.textContent = 'Nouveau projet';
-  home.append(titre);
-
+  /* PAS DE TITRE. « Nouveau projet » répétait mot pour mot l'onglet qui vient
+     d'être cliqué, juste au-dessus, et le seul contenu de l'écran est les deux
+     tuiles : elles se lisent sans qu'on les annonce. */
   const grille = document.createElement('div');
   grille.className = 'np-home__grid';
   for (const f of FLUX) {

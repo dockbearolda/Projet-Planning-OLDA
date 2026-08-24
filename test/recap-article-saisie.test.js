@@ -202,9 +202,22 @@ const apercu = source('previewTextile', '');
 const detail = source('renderDetailArticle', '');
 // La relecture de la saisie passe par `txTableau`, des DEUX côtés : une ligne
 // relue sous le formulaire ou dans la fiche à gauche doit se lire pareil.
-assert.ok(/txTableau\(d,c,\[txDetail\(d,c\)\]\)/.test(apercu)
-  && /txTableau\(n\.textile, ?c,\[txDetail\(n\.textile, ?c\)\],'fiche'\)/.test(detail),
+assert.ok(/txTableau\(d,c\)/.test(apercu)
+  && /txTableau\(n\.textile, ?c,'fiche'\)/.test(detail),
   'les deux vues montent le récapitulatif avec le même bloc');
+// « VOIR LE CALCUL ET LA MARGE » EST À CÔTÉ DU RÉCAPITULATIF, PAS DEDANS
+// (24/08/2026). Il y était logé (par un paramètre `dedans`) et disparaissait
+// donc avec lui : un volet à ouvrir qu'il fallait d'abord déplier un autre
+// volet pour trouver. Trois volets frères désormais — Récapitulatif article,
+// Voir le calcul et la marge, Négociation — qu'on ouvre dans l'ordre qu'on veut.
+assert.ok(!/txTableau\([^)]*\[txDetail/.test(DEVIS),
+  'le calcul n’est plus glissé À L’INTÉRIEUR du récapitulatif');
+assert.ok(!/function txTableau\(d,c,dedans/.test(DEVIS),
+  '… et le paramètre qui servait à l’y glisser n’existe plus');
+assert.ok(/txDetail\(d,c\),txNegVolet\(\)/.test(apercu),
+  '… il se pose entre le récapitulatif et la négociation, au même niveau qu’eux');
+assert.ok(/bloc\.append\(tete,rang,metrics,txDetail\(n\.textile,c\)/.test(detail),
+  '… des deux côtés : sous le formulaire comme dans la fiche');
 assert.ok(!/txDetailsBloc/.test(DEVIS),
   'le volet « Détail des champs » n’existe plus : la relecture ne se déplie pas');
 // Le classement de l'atelier (« ⭐ PRIORITÉ OLDA ») ne s'affiche plus du tout :
@@ -220,12 +233,12 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txFill\(box,\[txTableau\(d,c,\[txDetail\(d,c\)\]\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)\]\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : le bloc repliable, la négociation, puis les alertes');
+assert.ok(/txFill\(box,\[txTableau\(d,c\),txDetail\(d,c\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)\]\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : l’article, son calcul, la négociation, puis les alertes');
 // LES ALERTES RESTENT DEHORS. Une alarme qu'on peut plier n'en est plus une :
 // une dimension écrite dans la note engage la production, un prix manuel dit
 // que le calcul ne décide plus du prix.
-assert.ok(!/txAlertes/.test(source('txTableau', 'd,c,dedans,ou')),
+assert.ok(!/txAlertes/.test(source('txTableau', 'd,c,ou')),
   'les alertes ne se replient pas avec le récapitulatif');
 // LE TITRE DE LA CARTE ET SON TOTAL SONT LA MÊME LIGNE (23/08/2026). Ils en
 // faisaient deux — « Récapitulatif article » au-dessus, « Total HT … » en
@@ -233,8 +246,9 @@ assert.ok(!/txAlertes/.test(source('txTableau', 'd,c,dedans,ou')),
 // posait sur la seconde.
 assert.ok(!/tx-tete-info|txTete|tx-tete-titre/.test(DEVIS),
   'plus de titre séparé : le titre EST le résumé du volet');
-// La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre.
-assert.ok(/metrics,\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
+// La fiche ouverte à gauche écrit les mêmes blocs, dans le même ordre :
+// le récapitulatif, son calcul à CÔTÉ de lui, puis les alertes.
+assert.ok(/metrics,txDetail\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
   '… et la fiche à gauche les écrit dans le même ordre');
 // CE QUE LA CARTE MONTRE SANS QU'ON OUVRE RIEN (23/08/2026).
 // Elle portait dix rangées d'affilée : le prix, le total, puis le temps de
@@ -246,9 +260,9 @@ assert.ok(/metrics,\.\.\.txAlertes\(n\.textile,c\)/.test(detail),
 // contrôle de saisie — la raison d'être d'un récapitulatif — demandait un clic.
 // À découvert : les deux chiffres, puis l'article. Repliés : la marge et le
 // calcul du prix.
-const table = source('txTableau', 'd,c,dedans,ou');
-assert.ok(/det\.append\(txKpiTotal\(c\),txSaisieBloc\(d\),\.\.\.\(dedans\|\|\[\]\)\)/.test(table),
-  'la carte montre son résumé, puis ce qu’est l’article');
+const table = source('txTableau', 'd,c,ou');
+assert.ok(/det\.append\(txKpiTotal\(c\),txSaisieBloc\(d\)\);/.test(table),
+  'la carte montre son résumé, puis ce qu’est l’article — et RIEN d’autre');
 assert.ok(!/txJauge|txDecompo|txAtelier/.test(table),
   'ni la marge, ni le coût atelier, ni la composition ne restent à découvert');
 assert.ok(/txEl\('div','tx-tableau'\)/.test(source('txKpiTotal', 'c')),
@@ -265,7 +279,7 @@ assert.ok(/if\(det\.isConnected\)TX_RECAP\[cle\]=det\.open/.test(table),
   '… avec le même garde-fou que l’autre volet : un `toggle` différé n’écrase plus la remise à zéro');
 // CHAQUE SURFACE A SA PROPRE MÉMOIRE. Avec une mémoire commune, replier la
 // fiche pour négocier faisait écrire le besoin SUIVANT déjà replié.
-assert.ok(/txTableau\(n\.textile, ?c,\[txDetail\(n\.textile, ?c\)\],'fiche'\)/.test(detail),
+assert.ok(/txTableau\(n\.textile, ?c,'fiche'\)/.test(detail),
   'la fiche a sa propre mémoire d’ouverture');
 assert.ok(/txDetailOuvert=false;TX_RECAP\.form=false;/.test(source('cancelTextileEdit', '')),
   '… et un nouveau besoin repart sur celle du formulaire, ouverte');

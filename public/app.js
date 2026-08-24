@@ -6863,8 +6863,50 @@ const $sidebarResizer = document.getElementById('sidebarResizer');
 const $shell = document.querySelector('.shell');
 if ($shell && $sidebarResizer) {
   const clampW = (w) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(w)));
+
+  // LE RAIL SE BLOQUE AVANT DE CASSER LA BARRE DU HAUT. Ce qu'il prend, la
+  // barre le rend : poussé à fond (460) sur une fenêtre de 1440, la rangée des
+  // sept onglets ne tenait plus (945 px de contenu dans 932), Chrome lui posait
+  // une barre de défilement de 12 px, et la barre du haut passait de 108 à
+  // 120 px — la zone de travail perdait donc de la hauteur, sans que rien
+  // n'explique pourquoi.
+  //
+  // On ne MODÉLISE pas la largeur qu'il faut aux onglets (elle dépend de la
+  // police, de la langue, du pli de la barre, du nombre d'onglets) : ON LA
+  // MESURE. Le rail avance tant que la rangée ne déborde pas, et s'arrête au
+  // pixel où elle déborderait. La butée est donc juste sur n'importe quelle
+  // fenêtre, dans les deux dispositions de la barre.
+  const $navSwitch = document.querySelector('.nav-switch');
+  const barreDeborde = () => !!$navSwitch && $navSwitch.scrollWidth > $navSwitch.clientWidth + 1;
+
+  // Applique une largeur et la REND si elle casse la barre.
+  const poser = (w, repli) => {
+    $shell.style.setProperty('--sidebar-w', w + 'px');
+    if (w > repli && barreDeborde()) {
+      $shell.style.setProperty('--sidebar-w', repli + 'px');
+      return repli;
+    }
+    return w;
+  };
+
   const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || '', 10);
-  if (Number.isFinite(saved)) $shell.style.setProperty('--sidebar-w', clampW(saved) + 'px');
+  if (Number.isFinite(saved)) poser(clampW(saved), SIDEBAR_MIN);
+
+  // La fenêtre qui rétrécit reprend de la largeur à la barre : un rail qui
+  // tenait tout à l'heure peut ne plus tenir. On le resserre plutôt que de
+  // laisser réapparaître la barre de défilement.
+  window.addEventListener('resize', () => {
+    const actuel = Math.round(document.getElementById('sidebar').getBoundingClientRect().width);
+    if (!actuel) return;                 // rail replié : rien à resserrer
+    if (!barreDeborde()) return;
+    let w = actuel;
+    while (w > SIDEBAR_MIN && barreDeborde()) {
+      w -= 8;
+      $shell.style.setProperty('--sidebar-w', Math.max(SIDEBAR_MIN, w) + 'px');
+    }
+    try { localStorage.setItem(SIDEBAR_W_KEY, String(Math.max(SIDEBAR_MIN, w))); } catch (_) {}
+  });
+
   attachTip($sidebarResizer, 'Glisser pour régler la largeur');
   $sidebarResizer.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -6876,8 +6918,8 @@ if ($shell && $sidebarResizer) {
     document.body.classList.add('sidebar-resizing');
     try { $sidebarResizer.setPointerCapture(e.pointerId); } catch (_) {}
     const onMove = (ev) => {
-      lastW = clampW(startW + ev.clientX - startX);
-      $shell.style.setProperty('--sidebar-w', lastW + 'px');
+      // `lastW` sert de repli : c'est la dernière largeur qui TENAIT.
+      lastW = poser(clampW(startW + ev.clientX - startX), lastW);
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);

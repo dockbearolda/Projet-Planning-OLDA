@@ -1982,16 +1982,20 @@ function txCalculBloc(d,c){
    saisie, il se relit avant de poser la ligne. Replié, il ne garde que le
    chiffre qu'on annonce : c'est exactement ce qu'il faut sous les yeux pendant
    qu'on négocie, avec les solutions à la place du reste (les deux volets de
-   négociation le replient tout seuls). `dedans` porte ce qui doit se
-   replier AVEC lui — le calcul et la marge ; les alertes, elles, restent
-   dehors : une alarme qu'on peut plier n'est plus une alarme.
+   négociation le replient tout seuls).
+   IL NE CONTIENT QUE CE QU'EST L'ARTICLE. « Voir le calcul et la marge » y
+   était logé (par un paramètre `dedans`) et disparaissait donc avec lui : un
+   volet à ouvrir qu'il fallait d'abord déplier un autre volet pour trouver.
+   Il est désormais posé À CÔTÉ, comme « Négociation » — trois volets frères,
+   au même niveau, qu'on ouvre dans l'ordre qu'on veut. Les alertes aussi
+   restent dehors : une alarme qu'on peut plier n'est plus une alarme.
 
    CHAQUE SURFACE A SA PROPRE MÉMOIRE D'OUVERTURE. Le récapitulatif du
    formulaire est un contrôle de saisie : il s'ouvre. Celui de la fiche se
    replie dès qu'on négocie. Avec une mémoire commune, l'état de l'un fuyait
    sur l'autre — on négociait une ligne, et le besoin suivant s'écrivait déjà
    replié. */
-function txTableau(d,c,dedans,ou){
+function txTableau(d,c,ou){
   const cle=ou||'form';
   const det=txEl('details','tx-recap');
   det.open=TX_RECAP[cle];
@@ -2000,7 +2004,7 @@ function txTableau(d,c,dedans,ou){
   det.addEventListener('toggle',()=>{if(det.isConnected)TX_RECAP[cle]=det.open});
   /* Le prix à la pièce a rejoint le résumé, sous le total : il ne se répète
      pas ici. Le corps ne porte plus que ce qu'EST l'article. */
-  det.append(txKpiTotal(c),txSaisieBloc(d),...(dedans||[]));
+  det.append(txKpiTotal(c),txSaisieBloc(d));
   return det;
 }
 
@@ -2096,7 +2100,7 @@ function previewTextile(){
     return;
   }
   box.classList.remove('hidden');
-  txFill(box,[txTableau(d,c,[txDetail(d,c)]),txNegVolet(),...txAlertes(d,c)]);
+  txFill(box,[txTableau(d,c),txDetail(d,c),txNegVolet(),...txAlertes(d,c)]);
 }
 
 /* Ctrl + Entrée (Cmd sur Mac) ajoute l'article sans lâcher le clavier. Le
@@ -2623,11 +2627,11 @@ function renderDetailArticle(){
 
   /* Les mêmes blocs que le récapitulatif du formulaire : une ligne relue ici
      ou là-haut doit se lire pareil. */
-  const metrics=txTableau(n.textile,c,[txDetail(n.textile,c)],'fiche');
+  const metrics=txTableau(n.textile,c,'fiche');
   metrics.classList.add('tx-card-metrics');
 
   const bloc=txEl('div');
-  bloc.append(tete,rang,metrics,...txAlertes(n.textile,c),negFicheVolet(i));
+  bloc.append(tete,rang,metrics,txDetail(n.textile,c),...txAlertes(n.textile,c),negFicheVolet(i));
   hote.replaceChildren(bloc);
   hote.classList.remove('hidden');
 }
