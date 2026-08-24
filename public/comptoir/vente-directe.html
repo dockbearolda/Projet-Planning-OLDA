@@ -94,7 +94,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
 h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pas-3)}
-.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--pas-3)}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3)}
 /* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
    Les grilles de formulaire collaient leurs cellules EN BAS
    (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son
@@ -664,14 +664,53 @@ h2{letter-spacing:-.01em}
       <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
     </div>
 
-    </div><div class="bloc"><div class="grid">
-      <div class="field">
-        <label for="orderDate">Date de commande *</label>
-        <input id="orderDate" type="date">
+    </div><div class="bloc">
+      <!-- TROIS DATES, TROIS CELLULES ÉGALES. « Date souhaitée » portait à elle
+           seule HUIT éléments et DEUX intitulés : sa date, les trois raccourcis
+           de délai, l'avis de supplément, le barème dépliable, puis l'heure
+           souhaitée avec son propre intitulé. Mesuré : 8 enfants et 276 px de
+           haut à droite, 2 enfants à gauche étirés à la même hauteur — 215 px
+           de vide en face d'un empilement. Tout ce qui n'est pas une date
+           descend SOUS la rangée, sur toute la largeur.
+           En perdant son second intitulé, cette rangée cesse d'être
+           l'exception `label~label` — « le seul cas des deux écrans » — et
+           repartage ses lignes avec les autres : intitulés sur la première,
+           commandes sur la deuxième. -->
+      <!-- LA DATE DE COMMANDE NE S'AFFICHE PLUS : c'est TOUJOURS celle du
+           jour, personne ne la saisit, et elle occupait une cellule entière en
+           tête du bloc. Elle reste dans la page, et gardée — huit endroits s'en
+           servent : le palier de délai, l'enregistrement de l'article, la
+           réouverture d'une commande, le contrôle des champs obligatoires et
+           le ticket, qui l'imprime.
+           `isoDate()` rend la date CIVILE LOCALE (il retire le décalage avant
+           de formater) : à Saint-Martin, un `toISOString()` nu daterait du
+           lendemain dès 20 h. Vérifié avant de la retirer de l'écran — une date
+           fausse ne se verrait plus. -->
+      <input id="orderDate" type="date" class="hidden">
+      <div class="grid">
+        <div class="field">
+          <label for="deliveryDate">Date souhaitée *</label>
+          <input id="deliveryDate" type="date" onchange="updateDeadlineInfo()">
+        </div>
+        <div class="field">
+          <label for="deliveryTime">Heure souhaitée *</label>
+          <select id="deliveryTime" data-menu-manuel-non>
+          <option value="09:00">09:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00" selected>14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+          <option value="17:00">17:00</option>
+        </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="deliveryDate">Date souhaitée *</label>
-        <input id="deliveryDate" type="date" onchange="updateDeadlineInfo()">
+
+      <!-- Le délai sous la rangée : les raccourcis à gauche, le réglage du
+           barème qui ferme la rangée à droite. -->
+      <div class="delai-rangee">
         <!-- Les trois paliers ne sont plus un choix : ce sont des RACCOURCIS qui
              posent une date dans le calendrier au-dessus. -->
         <div class="delay-quick">
@@ -679,10 +718,20 @@ h2{letter-spacing:-.01em}
           <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
           <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
         </div>
-        <div id="deadlineInfo" class="help"></div>
         <!-- Barème express : réglable ici, là où le supplément s'affiche. -->
         <button type="button" id="baremeOpen" class="bareme-open">Modifier le barème</button>
-        <div id="baremeBox" class="bareme hidden">
+      </div>
+
+      <!-- SUR TOUTE LA LARGEUR. Cet avis CHANGE de texte à chaque date choisie,
+           et un texte qui change de hauteur pousse tout ce qui le suit — ce que
+           la règle du 24/08 interdit. Il tenait déjà sur une ligne dans la
+           cellule de 430 px (mesuré : 22 px là aussi, il ne débordait pas),
+           mais à 30 px près : un barème à trois chiffres ou un libellé de
+           palier plus long l'y faisait passer à deux. Sur 875 px il a la marge
+           qui manquait. Vérifié : les quatre textes possibles font 22 px, le
+           bloc 224 px et « Ajouter l'article » ne bouge pas d'un pixel. -->
+      <div id="deadlineInfo" class="help delai-etat"></div>
+      <div id="baremeBox" class="bareme hidden">
           <div class="bareme-grid">
             <label>Dans 5 jours<span><input id="bareme-j5" type="number" min="0" max="100" step="1"> %</span></label>
             <label>Dans 10 jours<span><input id="bareme-j10" type="number" min="0" max="100" step="1"> %</span></label>
@@ -695,22 +744,6 @@ h2{letter-spacing:-.01em}
           </div>
           <p id="baremeMsg" class="bareme-msg" role="status"></p>
         </div>
-
-        <label for="deliveryTime" style="margin-top:12px">Heure souhaitée *</label>
-        <select id="deliveryTime" data-menu-manuel-non>
-          <option value="09:00">09:00</option>
-          <option value="10:00">10:00</option>
-          <option value="11:00">11:00</option>
-          <option value="12:00">12:00</option>
-          <option value="13:00">13:00</option>
-          <option value="14:00" selected>14:00</option>
-          <option value="15:00">15:00</option>
-          <option value="16:00">16:00</option>
-          <option value="17:00">17:00</option>
-        </select>
-      </div>
-    </div>
-
     </div><div class="actions">
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
@@ -2545,6 +2578,16 @@ button.blocked{opacity:.45;cursor:not-allowed}
    remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
    prennent la boîte serrée de la charte. */
 .delay-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+/* Le délai tient sur DEUX lignes stables : les raccourcis et le réglage du
+   barème sur la première, l'avis de supplément sur la seconde. Tout mettre sur
+   une seule ligne la ferait déborder (385 + 420 + 150 px pour 910 disponibles),
+   et une rangée qui se replie change de hauteur selon la longueur du texte. */
+.delai-rangee{display:flex;align-items:center;gap:var(--pas-3);flex-wrap:wrap;margin-top:var(--pas-2)}
+.delai-rangee .delay-quick{margin-top:0}
+/* « Modifier le barème » ferme la rangée, à droite. Par une marge AUTOMATIQUE :
+   un `justify-content:flex-end` qui déborde se fait rogner par la gauche. */
+.delai-rangee .bareme-open{margin-inline-start:auto}
+.delai-etat{margin-top:var(--pas-2)}
 .delay-chip{
   flex:1 1 auto;padding:var(--champ-y-serre) var(--champ-x);
   border:1.5px solid var(--border)!important;border-radius:999px!important;
