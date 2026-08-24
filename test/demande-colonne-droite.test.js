@@ -20,6 +20,7 @@ const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
 const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
 
 function source(nom, signature) {
   const re = new RegExp(`function ${nom}\\(${signature}\\)\\{[\\s\\S]*?\\n\\}`);
@@ -160,6 +161,29 @@ assert.ok(/\.need-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
   'les actions ferment la rangée, poussées par une marge automatique');
 assert.ok(!/\.(demande-corps \.)?need-actions\{[^}]*justify-content:flex-end/.test(DEVIS),
   '… jamais par flex-end');
+
+// --- 8. TOUT LE TEXTE DE LA CARTE PART DU MÊME RAIL -------------------------
+// En `auto`, chaque carte calculait ses colonnes sur SON contenu. Mesuré sur
+// deux articles empilés : la pastille passait de 38 à 50 px (« 5× » contre
+// « 120× ») et la colonne des intitulés de 74 à 83 px (« Marquage » contre
+// « Production ») — le nom décalé de 11 px d'une carte à l'autre, les valeurs
+// de 21 px. Deux jetons FIXES, comme `--tab-valeur` pour les tableaux.
+['--need-qte', '--need-cle'].forEach((jeton) => {
+  assert.ok(new RegExp(`${jeton}\\s*:\\s*\\d+px`).test(CHARTE),
+    `${jeton} doit être déclaré au :root de la charte, en pixels`);
+});
+assert.ok(/\.need-ligne\{[^}]*grid-template-columns:var\(--need-qte\) minmax\(0,1fr\)/.test(DEVIS),
+  'la gouttière de la quantité est fixe : le nom part du même rail sur toutes les cartes');
+assert.ok(/\.need-detail\{[^}]*grid-template-columns:var\(--need-cle\) minmax\(0,1fr\)/.test(DEVIS),
+  'la colonne des intitulés est fixe : les valeurs tombent sur la même verticale');
+assert.ok(!/\.need-(ligne|detail)\{[^}]*grid-template-columns:auto/.test(DEVIS),
+  'aucune piste `auto` sur la carte : c’est elle qui faisait glisser les rails');
+// Le prix rejoint ce rail-là, pas celui de la pastille — le filet, lui,
+// traverse toute la carte : c'est le décalage qui vaut une gouttière.
+assert.ok(/\.need-pied\{[^}]*padding-left:calc\(var\(--need-qte\) \+ var\(--pas-2\)\)/.test(DEVIS),
+  'le prix reprend le rail du nom et des intitulés, d’exactement une gouttière');
+assert.ok(/\.demande-corps \.need-ligne\{[^}]*gap:8px var\(--pas-2\)/.test(DEVIS),
+  '… et la gouttière du panneau est bien celle que ce décalage additionne');
 
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le

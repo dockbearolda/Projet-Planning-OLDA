@@ -124,9 +124,15 @@ b,strong{font-weight:var(--graisse-forte)}
 /* LA DEMANDE — une LIGNE par article, pas une carte. Un devis de dix articles
    tenait sur trois écrans : la vendeuse ne voyait plus ce qu'elle venait
    d'ajouter. La quantité d'abord (c'est elle qu'on relit), le nom, puis le
-   détail en petit, et le pied qui porte le prix et les deux actions. */
-.need-ligne{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--pas-2);align-items:center;padding:var(--pas-2) var(--pas-3);border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:var(--surface)}
-.need-qte{flex:0 0 auto;min-width:42px;padding:6px 9px;border-radius:var(--arrondi-champ);background:var(--border-soft);font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:center}
+   détail en petit, et le pied qui porte le prix et les deux actions.
+   TOUT LE TEXTE DE LA CARTE PART DU MÊME RAIL. La quantité tient une
+   gouttière de largeur FIXE (`--need-qte`) : en `auto`, elle se calait sur
+   son propre nombre — « 5× » 38 px, « 120× » 50 px — et le nom, les
+   intitulés et les valeurs de deux articles empilés commençaient chacun à
+   un endroit. Le nom, le détail et le prix tombent maintenant sur la même
+   verticale, quelle que soit la quantité. */
+.need-ligne{display:grid;grid-template-columns:var(--need-qte) minmax(0,1fr);gap:var(--pas-2);align-items:center;padding:var(--pas-2) var(--pas-3);border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:var(--surface)}
+.need-qte{padding:6px;border-radius:var(--arrondi-champ);background:var(--border-soft);font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:center}
 .need-txt{min-width:0}
 .need-nom{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 .need-meta{font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);line-height:var(--ligne-texte);margin-top:2px}
@@ -141,8 +147,11 @@ b,strong{font-weight:var(--graisse-forte)}
    nom — dans 380 px il lui volait la moitié de la place, et « T-shirt
    manches longues pro » passait à deux lignes. Le nom prend maintenant
    toute la largeur ; le chiffre s'annonce en bas, sur la rangée des
-   actions, séparé du détail par un filet. */
-.need-pied{grid-column:1/-1;display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;margin-top:var(--pas-1);padding-top:var(--pas-2);border-top:1px solid var(--border-soft)}
+   actions, séparé du détail par un filet.
+   Le filet traverse TOUTE la carte — c'est lui qui sépare deux blocs — mais
+   le prix, lui, reprend le rail du nom et des intitulés : d'où le décalage
+   d'exactement une gouttière de quantité plus une gouttière de colonne. */
+.need-pied{grid-column:1/-1;display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;margin-top:var(--pas-1);padding-top:var(--pas-2);padding-left:calc(var(--need-qte) + var(--pas-2));border-top:1px solid var(--border-soft)}
 .priority-stars{font-size:var(--taille-texte);line-height:1}
 .priority-card strong{font-size:var(--taille-texte)}
 .priority-card small{font-size:var(--taille-texte);line-height:var(--ligne-texte);color:var(--text-2)}
@@ -644,16 +653,19 @@ h2{letter-spacing:-.01em}
 /* Une ligne = un article. Serrée, mais chaque zone garde sa place : la
    quantité à gauche, le nom sur toute la largeur, le détail dessous, et le
    pied qui porte le prix et les deux actions. */
-.demande-corps .need-ligne{grid-template-columns:auto minmax(0,1fr);gap:8px 10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .16s,box-shadow .16s,background .16s}
+.demande-corps .need-ligne{gap:8px var(--pas-2);padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .16s,box-shadow .16s,background .16s}
 .demande-corps .need-ligne:hover{border-color:var(--border-strong);box-shadow:var(--shadow-1)}
 .demande-corps .need-ligne.is-ouvert{border-color:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.09)}
-.demande-corps .need-qte{min-width:38px;padding:6px 8px}
 /* CE QUI A ÉTÉ SAISI, sous le nom de l'article. La ligne portait « Textile ·
    Coconut Milk · Réf. K3008 · Production DTF » : deux mots sur quatre venaient
    du code, et le marquage, l'encre, les tailles et le transport — tout ce que
    la vendeuse venait de choisir — n'y apparaissaient pas. L'intitulé à gauche
-   évite de confondre la couleur du vêtement et celle de l'encre. */
-.need-detail{grid-column:2/-1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;margin-top:3px}
+   évite de confondre la couleur du vêtement et celle de l'encre.
+   La colonne des intitulés est FIXE (`--need-cle`), comme celle des valeurs
+   d'un tableau : en `auto`, elle se calait sur l'intitulé le plus long de
+   CETTE carte — 74 px pour « Marquage », 83 px pour « Production » — et les
+   valeurs de deux articles empilés ne tombaient pas sur la même verticale. */
+.need-detail{grid-column:2/-1;display:grid;grid-template-columns:var(--need-cle) minmax(0,1fr);gap:1px 8px;margin-top:3px}
 .need-detail-k{font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:var(--text-2);white-space:nowrap}
 .need-detail-v{font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);line-height:var(--ligne-texte);overflow-wrap:anywhere}
 /* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait

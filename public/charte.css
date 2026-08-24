@@ -174,6 +174,18 @@
      longue valeur qu'on y écrive. */
   --tab-valeur: 168px;
 
+  /* LES DEUX RAILS D'UNE CARTE DE LISTE. Fixes, pour la même raison que la
+     colonne des valeurs juste au-dessus : en `auto`, chaque carte calcule sa
+     largeur sur SON contenu, et rien ne tombe sur la même verticale d'une
+     carte à l'autre. Mesuré sur le panneau de la demande : la quantité
+     glissait de 38 à 50 px (« 5× » contre « 120× »), les intitulés de 74 à
+     83 px (« Marquage » contre « Production ») — 11 px d'écart sur le nom,
+     21 px sur les valeurs, entre deux articles empilés.
+     Chaque jeton est calé sur la plus longue valeur qu'on y écrive :
+     « 9999× » pour la quantité, « Production » pour l'intitulé. */
+  --need-qte: 58px;
+  --need-cle: 86px;
+
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait
      sept (2, 7, 10, 11, 12, 14, 18 px) et sept rembourrages différents : le
      panneau de droite avait 17 px de marge en tête, 13 dans le corps et 15 au
