@@ -1177,7 +1177,16 @@
    vendeuse ne devinerait pas d'après « Wet Sand ». */
 .menu-pastille{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--text-3,#9aa2aa);box-shadow:inset 0 0 0 1px var(--surface,#fff)}
 
-.menu-panneau{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:max(100%,min(560px,80vw));
+/* POSITION FIXE, ET C'EST LE FOND DU PROBLÈME. En position absolue, le
+   panneau restait DANS le conteneur qui défile : large de 560 px dans une
+   cellule de 178, il comptait dans la largeur défilable de <main> quoi qu'on
+   calcule, et le navigateur décalait <main> pour le montrer. Hors du flux du
+   conteneur, il ne compte plus nulle part — et il ne peut plus être coupé.
+   La largeur et la position sont posées par menuPlacer() : en position fixe,
+   un pourcentage parlerait de la FENÊTRE, plus du champ.
+   (Pas d'accent grave dans ce commentaire : ce bloc vit dans un littéral de
+   gabarit, un accent grave le refermerait.) */
+.menu-panneau{position:fixed;z-index:40;
   background:var(--surface,#fff);border:1px solid var(--border,#d5d9de);border-radius:var(--arrondi-bloc,12px);overflow:hidden;display:none;
   box-shadow:var(--shadow-2,0 14px 34px rgba(17,24,39,.15))}
 .menu.est-ouvert .menu-panneau{display:block;animation:menuEntre .13s ease-out}
@@ -1656,17 +1665,63 @@ function menuOuvrir(etat){
   if(!etat.libre&&etat.tete.style.display!=='none')etat.filtre.focus();
 }
 
-/* Le panneau est plus large que son champ : posé à gauche, celui de la
-   dernière colonne débordait de la page et la faisait défiler de côté. On le
-   retourne quand il ne tient pas — à droite, ou au-dessus. */
+/* CE QUI BORNE LE PANNEAU N'EST PAS LA FENÊTRE. C'est le premier ancêtre qui
+   COUPE ou qui DÉFILE — et il peut être bien plus étroit qu'elle.
+   Le 24/08, `.layout>main` a reçu `overflow-y:auto` pour que seule la colonne
+   de saisie défile. En CSS, dès qu'un axe n'est plus `visible`, l'autre passe
+   de `visible` à `auto` : <main> est donc devenu, sans qu'on le demande, un
+   conteneur qui défile AUSSI de côté. Mesuré : 651 px de large dans une
+   fenêtre de 1103. Un panneau de 560 px ouvert sur la 3e colonne « tenait »
+   dans la fenêtre et débordait <main> de 340 px — le navigateur décalait
+   alors <main> de 333 px pour le montrer, et tout le formulaire glissait sous
+   les yeux au simple clic sur un menu.
+   On prend donc l'INTERSECTION de la fenêtre et de tous ces ancêtres. */
+function menuBornes(peau){
+  const b={gauche:0,droite:window.innerWidth,haut:0,bas:window.innerHeight};
+  for(let e=peau.parentElement;e&&e!==document.documentElement;e=e.parentElement){
+    const cs=getComputedStyle(e);
+    if(cs.overflowX==='visible'&&cs.overflowY==='visible')continue;
+    const r=e.getBoundingClientRect();
+    if(cs.overflowX!=='visible'){b.gauche=Math.max(b.gauche,r.left);b.droite=Math.min(b.droite,r.right)}
+    if(cs.overflowY!=='visible'){b.haut=Math.max(b.haut,r.top);b.bas=Math.min(b.bas,r.bottom)}
+  }
+  return b;
+}
+
+/* Le panneau est posé À LA MAIN, en coordonnées de fenêtre : sous le champ,
+   aligné sur son bord gauche, retourné au-dessus s'il n'y a pas la place, et
+   ramené à l'intérieur des bornes plutôt que débordant. Il ne rétrécit qu'en
+   dernier recours — une liste de références illisible ne vaut pas mieux. */
 function menuPlacer(etat){
   const {panneau,peau}=etat;
-  panneau.style.left='';panneau.style.right='';panneau.style.top='';panneau.style.bottom='';
-  const marge=12,champ=peau.getBoundingClientRect(),boite=panneau.getBoundingClientRect();
-  if(champ.left+boite.width>window.innerWidth-marge){panneau.style.left='auto';panneau.style.right='0'}
-  const place=window.innerHeight-champ.bottom-marge;
-  if(boite.height>place&&champ.top>place){panneau.style.top='auto';panneau.style.bottom='calc(100% + 6px)'}
+  const marge=12,b=menuBornes(peau),champ=peau.getBoundingClientRect();
+  const dispo=b.droite-b.gauche-2*marge;
+  const largeur=Math.max(champ.width,Math.min(560,dispo));
+  panneau.style.width=Math.round(largeur)+'px';
+  /* Aligné sur le champ, puis ramené dans les bornes — dans cet ordre : un
+     champ collé au bord droit doit rendre un panneau collé au bord droit, pas
+     un panneau qui sort. */
+  let gauche=champ.left;
+  if(gauche+largeur>b.droite-marge)gauche=b.droite-marge-largeur;
+  if(gauche<b.gauche+marge)gauche=b.gauche+marge;
+  panneau.style.left=Math.round(gauche)+'px';
+  panneau.style.right='auto';
+  /* Vertical : sous le champ, au-dessus si ça ne tient pas en dessous ET que
+     ça tient au-dessus. La hauteur se lit APRÈS la largeur — une liste plus
+     étroite est plus haute. */
+  const haut=panneau.getBoundingClientRect().height;
+  const dessous=b.bas-champ.bottom-marge, dessus=champ.top-b.haut-marge;
+  panneau.style.bottom='auto';
+  panneau.style.top=Math.round(haut>dessous&&dessus>dessous ? Math.max(b.haut+marge,champ.top-6-haut) : champ.bottom+6)+'px';
 }
+
+/* UN PANNEAU POSÉ EN COORDONNÉES DE FENÊTRE NE SUIT PAS CE QUI DÉFILE. Il
+   resterait planté en place pendant que son champ s'en va. On le referme :
+   c'est ce qu'attend n'importe quelle liste déroulante, et c'est sans état à
+   tenir à jour. En capture, parce qu'un défilement de conteneur ne remonte
+   pas jusqu'au document. */
+window.addEventListener('scroll',()=>{menus.forEach(a=>menuFermer(a,false))},true);
+window.addEventListener('resize',()=>{menus.forEach(a=>menuFermer(a,false))});
 
 function menuFermer(etat,rendreFocus){
   if(!etat.ouvert)return;

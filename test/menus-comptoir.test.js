@@ -201,9 +201,19 @@ assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\
   'le filtre d’un champ libre ne part qu’à la première frappe');
 
 // Le panneau est plus large que son champ : celui de la dernière colonne
-// débordait de la page et la faisait défiler de côté.
-assert.ok(/function menuPlacer\(etat\)/.test(PONT) && /panneau\.style\.right='0'/.test(PONT),
-  'un panneau qui ne tient pas à droite se retourne');
+// débordait et faisait défiler de côté.
+//
+// LA PARADE A CHANGÉ LE 24/08. On le RETOURNAIT (`right:0`) quand il dépassait
+// la fenêtre. Insuffisant : le panneau restait en position absolue DANS <main>,
+// devenu conteneur défilant le même jour, et comptait dans sa largeur quoi
+// qu'on calcule. Il est désormais posé en position FIXE, hors du conteneur, et
+// ramené dans les bornes réelles — voir menu-ne-fait-pas-defiler.test.js.
+assert.ok(/function menuPlacer\(etat\)/.test(PONT),
+  'le panneau est placé à la main');
+assert.ok(/if\(gauche\+largeur>b\.droite-marge\)gauche=b\.droite-marge-largeur/.test(PONT),
+  'un panneau qui ne tient pas à droite est ramené à l’intérieur');
+assert.ok(/if\(gauche<b\.gauche\+marge\)gauche=b\.gauche\+marge/.test(PONT),
+  '… et il ne sort pas par la gauche pour autant');
 assert.ok(/menuPlacer\(etat\);/.test(bloc(PONT, 'menuOuvrir')),
   'le placement se recalcule à chaque ouverture');
 
