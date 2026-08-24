@@ -132,14 +132,49 @@ assert.ok(/\.olda-etat__reessai\{[^}]*min-height:44px/.test(PONT),
 // ===========================================================================
 // « 💾 Enregistrer » écrivait `oldaDraft-<ref>` dans le navigateur et annonçait
 // « Brouillon enregistré » : rien, nulle part, ne relit jamais cette clé. La
-// vendeuse repartait convaincue d'avoir sauvegardé.
-assert.ok(/localStorage\.setItem\(`oldaDraft-/.test(DEVIS),
-  'l’écran écrit toujours son brouillon (on ne touche pas à ses fichiers)');
-assert.ok(/\[onclick\^="saveDraft"\]/.test(PONT),
-  'le filet doit rebrancher « 💾 Enregistrer » sur le vrai enregistrement');
-const REBRANCHE = PONT.match(/function rebrancherBoutonBrouillon\(\)[\s\S]*?\n  \}/)[0];
-assert.ok(/removeAttribute\('onclick'\)/.test(REBRANCHE) && /envoyerAuPlanning\(false\)/.test(REBRANCHE),
-  '« Enregistrer » doit enregistrer au planning, pas dans un brouillon mort');
+// vendeuse repartait convaincue d'avoir sauvegardé. `pont.js` l'avait rebranché
+// sur le vrai envoi ; le 24/08/2026 le bouton a été RETIRÉ, et le rebranchement
+// avec lui. Un geste qu'on ne demande plus ne peut plus être oublié.
+assert.ok(!/localStorage\.setItem\(`oldaDraft-/.test(DEVIS),
+  'plus rien n’écrit un brouillon que personne ne relit');
+assert.ok(!/saveDraft/.test(DEVIS), 'le bouton qui l’écrivait est parti avec');
+assert.ok(!/rebrancherBoutonBrouillon/.test(PONT),
+  '… et le rebranchement n’a plus d’objet');
+
+// CE QUI LE REMPLACE : le dossier part TOUT SEUL dès que l'écran de fin
+// s'affiche. C'est la seule raison pour laquelle on peut se passer du bouton.
+const GUET = PONT.match(/function guetterEcranFinal\(\)[\s\S]*?\n  \}/)[0];
+assert.ok(/envoyerAuPlanning\(true\)/.test(GUET),
+  'l’écran de fin envoie le dossier de lui-même');
+
+// LA MÉCANIQUE RESTE DANS LE DOCUMENT, invisible. C'est elle qui porte la fiche
+// complète, et pont.js l'envoie en la CLIQUANT : la retirer tue l'envoi.
+assert.ok(/btn\.style\.display="none";/.test(DEVIS),
+  'le bouton d’envoi ne se montre plus');
+assert.ok(!/btn\.hidden\s*=\s*true/.test(DEVIS),
+  '`hidden` serait défait par la règle d’affichage que la rangée impose aux boutons');
+assert.ok(/btn\.click\(\)/.test(PONT), 'l’envoi passe toujours par un clic sur elle');
+
+// UN `.click()` SUR UN BOUTON DÉSACTIVÉ NE FAIT RIEN, ET NE LÈVE RIEN. Le
+// bandeau restait sur « Enregistrement… » puis annonçait « Aucune réponse — le
+// réseau a peut-être décroché » alors que RIEN n'était parti : de quoi chercher
+// une panne de réseau qui n'a jamais existé. L'envoi ne doit dépendre de l'état
+// d'aucun bouton.
+assert.ok(/btn\.disabled = false;\s*\n\s*btn\.click\(\);/.test(PONT),
+  'la mécanique est réarmée avant d’être cliquée');
+assert.ok(!/btn\.disabled = true/.test(PONT),
+  'plus rien ne désactive la mécanique d’envoi');
+// Ce qui empêche le double envoi, c'est la garde d'état — pas un bouton grisé.
+const ENVOI_FN = PONT.match(/function envoyerAuPlanning\(auto\)[\s\S]*?\n  \}/)[0];
+assert.ok(/if \(etatEnvoi === 'envoi' \|\| etatEnvoi === 'ok'\) return;/.test(ENVOI_FN),
+  'un dossier déjà parti ne repart pas');
+
+// Et la rangée de fin ne porte plus qu'un bouton : celui qui passe au client
+// suivant. Il EFFACE le dossier — mais à ce moment-là le dossier est déjà
+// parti, et s'il ne l'est pas, le garde-fou ci-dessous demande confirmation.
+assert.ok(!/<button[^>]*>💾/.test(DEVIS), 'plus de bouton « Enregistrer » sur l’écran de fin');
+assert.ok(/<button class="secondary" onclick="newRequest\(\)">Nouvelle demande<\/button>\s*<\/div>/.test(DEVIS),
+  '… la rangée de fin ne porte plus que « Nouvelle demande »');
 
 // Les brouillons déjà écrits dorment dans les tablettes : ce sont peut-être des
 // dossiers perdus. On les montre au lieu de les laisser mourir avec le cache.

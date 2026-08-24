@@ -118,8 +118,15 @@ assert.ok(/if\(!\$\('source'\)\.value\)m\.push\(\['source'/.test(DEVIS),
   'le canal se contrôle désormais avec le projet');
 assert.ok(!/if\(n===1\)\{/.test(DEVIS),
   'validateStep n’a plus d’étape 1 à valider');
-assert.ok(/m\.push\('Canal d’entrée'\);\n\s+if\(!v\('projectDescription'\)\)/.test(DEVIS),
-  'le contrôle en direct de l’étape « Projet » doit réclamer le canal d’entrée');
+// Le SECOND contrôle — la liste `STEPS` du bandeau « Dossier incomplet » — a
+// disparu avec le bandeau le 24/08. Il doublait celui-ci et pouvait s'en
+// écarter sans que rien ne le dise. Le canal d'entrée n'est plus réclamé qu'à
+// un seul endroit : l'étape elle-même, au moment où on peut y répondre.
+assert.ok(!/var STEPS=/.test(DEVIS), 'plus de seconde liste des champs obligatoires');
+assert.strictEqual((DEVIS.match(/!\$\('source'\)\.value/g) || []).length, 1,
+  'le canal d’entrée n’est CONTRÔLÉ qu’à un seul endroit');
+assert.ok(!/m\.push\('Canal d’entrée'\)/.test(DEVIS),
+  '… les mentions qui restent sont des libellés du récapitulatif, pas des contrôles');
 
 // --- 5. Le fil des étapes : renuméroté, et piloté par data-step -------------
 

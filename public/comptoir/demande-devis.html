@@ -259,7 +259,8 @@ button{font-weight:var(--graisse-forte)}
 .danger:hover{background:var(--danger-line)!important}
 button:active{transform:scale(.98)}
 button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
-/* Un émoji dans un libellé (« 💾 Enregistrer », « 📅 Déjà au planning ») tire sa
+/* Un émoji dans un libellé (« 🖨️ Imprimer le ticket », « 💬 Envoyer sur
+   WhatsApp ») tire sa
    hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
@@ -1085,8 +1086,6 @@ h2{letter-spacing:-.01em}
 <section id="step7" class="hidden">
   <div class="card success no-print">
     <h2>✅ Demande enregistrée</h2>
-    <p id="recapStatus"></p>
-    <p><b>Les informations de la demande restent modifiables à tout moment.</b></p>
 
     <div class="footer-actions">
       <button class="secondary" onclick="printRecapTicket()">🖨️ Imprimer le ticket</button>
@@ -1111,7 +1110,6 @@ h2{letter-spacing:-.01em}
            qui efface est le plus loin possible du bord droit. L'accent, lui,
            ne bouge pas : il reste sur « Enregistrer ». -->
       <button class="secondary" onclick="newRequest()">Nouvelle demande</button>
-      <button class="primary" onclick="saveDraft()">💾 Enregistrer</button>
     </div>
     <div id="downloadStatus" class="download-status hidden"></div>
   </div>
@@ -3260,7 +3258,7 @@ ${recapText()}
 L’équipe Atelier OLDA`;
   window.open(`https://wa.me/${normalizePhone(selectedClient.phone)}?text=${encodeURIComponent(msg)}`,'_blank');
 }
-function saveDraft(){const d={reference,needs,selectedClient,fields:{}};document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.id)d.fields[el.id]=el.type==='checkbox'?el.checked:el.value});localStorage.setItem(`oldaDraft-${reference}`,JSON.stringify(d));alert(`Brouillon ${reference} enregistré sur cet appareil.`)}function newRequest(){if(confirm('Créer une nouvelle demande ?'))location.reload()}
+function newRequest(){if(confirm('Créer une nouvelle demande ?'))location.reload()}
 $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLocaleDateString('fr-FR');document.querySelectorAll('.ref-display').forEach(el=>el.textContent=reference);txInit();renderNeeds();remplirSelectCatalogue();updateSidebar();
 </script>
 <script>
@@ -3273,11 +3271,22 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
     if(!actions) return;
     const btn=document.createElement("button");
     btn.id="oldaCreatePlanningBtn";
-    // UN SEUL ACCENT PAR RANGÉE (charte). Ce bouton-ci est la mécanique : c'est
-    // « 💾 Enregistrer au planning » qui le presse (pont.js), avec le bandeau
-    // d'état et le chien de garde. Il garde sa place et son identifiant, il ne
-    // prend plus l'encre à celui qu'on demande à la vendeuse de viser.
+    // CE BOUTON N'EST PLUS UN BOUTON : c'est la MÉCANIQUE de l'envoi, et elle
+    // ne se montre plus (24/08/2026). Il n'y a plus rien à presser — le dossier
+    // part dans « À trier » DE LUI-MÊME dès que cet écran s'affiche
+    // (`guetterEcranFinal` → `envoyerAuPlanning(true)`, pont.js). Demander le
+    // geste en plus, c'était laisser le dossier dépendre de lui : c'est
+    // exactement ce qui a coûté celui de Jacqueline le 13/08.
+    //
+    // IL RESTE DANS LE DOCUMENT, et il doit y rester : c'est LUI qui porte la
+    // fiche complète (`patchPlanningButton` pose son `onclick`), et pont.js
+    // l'envoie en le CLIQUANT. `display:none` ne gêne pas un `.click()`
+    // programmé ; le retirer, ou renommer son identifiant, tue l'envoi — un
+    // test le garde (`test/dossier-comptoir-non-envoye.test.js`).
+    // `display` et non `hidden` : la rangée impose sa propre règle d'affichage
+    // aux boutons, elle défait l'attribut.
     btn.className="secondary";
+    btn.style.display="none";
     btn.textContent="📅 Créer dans le planning";
     btn.onclick=function(){
       const pr=val("projectPriority")||"2";
@@ -4091,8 +4100,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   };
 
   window.fillFinal=function(){
-    var st=document.getElementById('recapStatus');
-    if(st)st.textContent='Demande '+reference+' — '+((needs||[]).length)+' besoin(s) enregistré(s) pour '+(selectedClient?clientName(selectedClient):'le client')+'.';
     var priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
     var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
     var controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
@@ -4317,11 +4324,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   </div>
 </div>
 <style>
-.live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
-.live-check.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
-.live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
-.live-check ul{margin:7px 0 0;padding-left:18px}
-.live-check li{margin:3px 0;font-weight:var(--graisse-note)}
 .dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-size:var(--taille-texte);font-weight:var(--graisse-note)}
 .dup-warn button{margin-top:9px}
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
@@ -4473,73 +4475,20 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   };
 
   /* 3 — Contrôle en direct des informations obligatoires */
-  var STEPS={
-    /* L'étape 1 n'a plus d'écran ni de bouton — `refreshLive` la saute donc.
-       Elle reste dans la liste pour le récapitulatif : un dossier que personne
-       n'a signé (aucun nom au poste) doit se voir avant l'envoi. */
-    1:function(){return v('salesperson')?[]:['Personne au poste (à choisir en haut à droite)'];},
-    2:function(){return needs.length?[]:['Au moins un besoin enregistré'];},
-    3:function(){var m=[];if(!v('projectTitle'))m.push('Titre du projet');
-      var goal=(typeof projectGoalValue==='function')?projectGoalValue():v('projectGoal');
-      if(!goal)m.push('Objet du projet');
-      if(!v('projectPriority'))m.push('Priorité du projet');
-      if(!v('source'))m.push('Canal d’entrée');
-      if(!v('projectDescription'))m.push('Description générale');return m;},
-    4:function(){var m=[];if(!v('controlStatus'))m.push('État des informations du client');
-      if(v('controlStatus')==='waiting'){
-        if(!window.transmissionLabel('expectedInformationVia','newExpectedInformationVia'))m.push('Transmission prévue par');
-        if(!v('expectedInformation'))m.push('Informations que le client doit transmettre');
-      }return m;},
-    5:function(){return selectedClient?[]:['Client sélectionné'];}
-  };
-
-  /* Le panneau « à compléter avant de continuer » a disparu. Il répétait en
-     vert ce que la personne venait de faire, et surtout il DÉSACTIVAIT le
-     bouton : personne ne voyait donc jamais quel champ manquait, il fallait
-     lire une liste et deviner où elle pointait. Le bouton reste actif — au
-     clic, les champs qui manquent virent au ROUGE et le premier prend le
-     focus. Ne reste ici que le contrôle du délai. */
+  /* LE BANDEAU « Dossier incomplet » A ÉTÉ RETIRÉ (24/08/2026), et la liste
+     `STEPS` des champs manquants avec lui. Il listait, sur l'écran de FIN, ce
+     qu'il aurait fallu remplir avant — trop tard, et à un endroit où plus rien
+     ne se remplit. Ce qui manque se dit à l'étape, dans le champ, en rouge
+     (`failAll`), au moment où on peut encore y répondre.
+     Un dossier incomplet n'est pas perdu pour autant : il part dans « À trier »
+     comme les autres, et c'est là qu'on le complète. */
   function refreshLive(){
     if(currentStep===3)window.checkDesiredDate();
   }
 
-  /* 5 — Récapitulatif : dossier prêt ou éléments manquants */
-  function refreshRecapBanner(){
-    var host=el('step7');
-    if(!host||host.classList.contains('hidden'))return;
-    var box=el('recapReadyBanner');
-    if(!box){
-      box=document.createElement('div');
-      box.id='recapReadyBanner';
-      box.className='live-check ok';
-      var card=host.querySelector('.card');
-      var actions=card&&card.querySelector('.actions');
-      if(!card)return;
-      card.insertBefore(box,actions||card.firstChild);
-    }
-    var missing=[];
-    for(var n=1;n<=5;n++)missing=missing.concat(STEPS[n]());
-    if(!v('desiredDate'))missing.push('Date souhaitée de récupération');
-    if(!v('projectBudget'))missing.push('Budget indicatif (facultatif mais conseillé)');
-    if(missing.length){
-      box.style.display='';
-      box.className='live-check todo';
-      box.innerHTML='⚠ Dossier incomplet — à compléter avant envoi :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
-    }else{
-      /* RIEN À DIRE QUAND TOUT VA BIEN. En vert, ce bandeau ne faisait que
-         répéter ce que les boutons juste au-dessus proposent déjà de faire.
-         Il ne parle plus que lorsqu'il MANQUE quelque chose — c'est la seule
-         chose qu'on ne pouvait pas deviner en regardant l'écran.
-         `display` et non `hidden` : `.live-check` porte sa propre règle
-         `display`, elle défait l'attribut. */
-      box.style.display='none';
-      box.textContent='';
-    }
-  }
-
   document.addEventListener('input',function(){refreshLive();},true);
   document.addEventListener('change',function(){refreshLive();window.checkDesiredDate();},true);
-  setInterval(function(){refreshLive();refreshRecapBanner();},600);
+  setInterval(function(){refreshLive();},600);
 
 })();
 </script>

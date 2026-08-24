@@ -268,28 +268,39 @@ const SW = fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8');
 assert.ok(/'\/charte\.css'/.test(SW),
   'la charte est dans la coquille : hors ligne, sans elle, tout s’ouvre sans une couleur');
 
-// --- 8. L'ACCENT VA À CE QUI ENREGISTRE --------------------------------------
+// --- 8. LA RANGÉE DE FIN NE PORTE PLUS D'ENJEU -------------------------------
 //
-// La rangée de fin portait l'encre sur « Nouvelle demande » — un bouton qui
-// EFFACE le dossier — et laissait en simple trait celui qui l'envoie au
-// planning. C'est la rangée qui a coûté le dossier de Jacqueline le 13/08.
-assert.ok(/<button class="primary" onclick="saveDraft\(\)">/.test(DEVIS),
-  'le bouton qui enregistre porte l’accent');
+// HISTOIRE DE CETTE RANGÉE, parce qu'elle a coûté un dossier (13/08) :
+//   — elle portait l'encre sur « Nouvelle demande », qui EFFACE, et laissait en
+//     simple trait « Enregistrer », qui envoie. On a inversé l'accent.
+//   — collée à droite le 24/08, le point chaud est passé du premier au DERNIER
+//     bouton : l'ordre s'est inversé pour garder celui qui efface le plus loin
+//     possible de la main.
+//   — le 24/08 au soir, le patron a fait retirer « Enregistrer » : le dossier
+//     part dans « À trier » TOUT SEUL en arrivant sur l'écran. Un geste qu'on
+//     ne demande plus ne peut plus être oublié — c'est la vraie correction, et
+//     elle rend la question de l'accent sans objet.
+//
+// Ce qui se vérifie désormais : il ne reste QU'UN bouton, et rien de ce qu'il
+// peut faire ne perd un dossier en silence.
+assert.ok(!/onclick="saveDraft\(\)"/.test(DEVIS),
+  'plus rien n’attend un geste pour enregistrer');
+const rangeeFin = DEVIS.match(/<div class="actions a-droite"[^>]*>\s*(?:<!--[\s\S]*?-->\s*)*<button[\s\S]*?<\/div>/g)
+  .filter((r) => /newRequest/.test(r));
+assert.strictEqual(rangeeFin.length, 1, 'une seule rangée de fin');
+assert.strictEqual((rangeeFin[0].match(/<button/g) || []).length, 1,
+  'et elle ne porte qu’un bouton : celui qui passe au client suivant');
 assert.ok(/<button class="secondary" onclick="newRequest\(\)">/.test(DEVIS),
-  '… et celui qui efface le dossier n’est qu’un trait');
-// L'ORDRE S'EST INVERSÉ LE 24/08, ET L'INTENTION EST LA MÊME. Cette assertion
-// disait « celui qui enregistre passe DEVANT celui qui efface » — écrite quand
-// la rangée partait de la GAUCHE : le premier bouton était alors l'endroit où
-// la main va. Le patron a demandé que toute rangée de commandes finisse À
-// DROITE ; le point chaud est devenu le DERNIER bouton. Garder l'ancien ordre
-// aurait posé « Nouvelle demande » — qui EFFACE le dossier — précisément là.
-// Ce qu'on protège n'a pas changé : celui qui efface est le plus loin possible
-// de la main. Ce qui a changé, c'est de quel côté se trouve la main.
-assert.ok(DEVIS.indexOf('onclick="newRequest()"') < DEVIS.indexOf('onclick="saveDraft()"'),
-  'dans une rangée collée à droite, celui qui EFFACE est le plus à gauche');
-const rangeeFin = DEVIS.match(/<div class="actions[^"]*"[^>]*>[\s\S]*?onclick="saveDraft\(\)"[\s\S]*?<\/div>/);
-assert.ok(rangeeFin && !/onclick="newRequest\(\)"[^<]*<\/button>\s*<\/div>/.test(rangeeFin[0]),
-  '… et il ne ferme jamais la rangée, quoi qu’on y ajoute ensuite');
+  'il n’a pas l’encre : il n’enregistre rien, il efface l’écran');
+
+// LE FILET QUI REMPLACE L'ACCENT. « Nouvelle demande » recharge la page : tant
+// que le dossier n'est pas au planning, il le perd. pont.js l'intercepte et
+// demande confirmation — c'est ce qui autorise à le laisser seul dans la rangée.
+const PONT_FIN = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+assert.ok(/\[onclick\^="newRequest"\]/.test(PONT_FIN),
+  '« Nouvelle demande » reste surveillé par le garde-fou');
+assert.ok(/etatEnvoi === 'ok'/.test(PONT_FIN),
+  '… qui ne se tait que lorsque le dossier est vraiment au planning');
 
 console.log('✓ charte du comptoir : quatre tailles, trois graisses, aucune couleur en dur, une seule boîte pour les champs et les boutons');
 

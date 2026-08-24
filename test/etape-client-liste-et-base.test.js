@@ -170,13 +170,22 @@ assert.ok(/status:window\.clientNextActionValue\(\)==='waiting'\?'Demande à qua
 // ===========================================================================
 // 5. Le vert se tait. Ce qui ne va pas, jamais.
 // ===========================================================================
-const RECAP = bloc(DEVIS, '  function refreshRecapBanner()');
-assert.ok(/box\.style\.display='none';/.test(RECAP),
-  '« Dossier complet » ne s’affiche plus : les boutons au-dessus le disent déjà');
-assert.ok(/Dossier incomplet — à compléter avant envoi/.test(RECAP),
-  '… mais ce qui MANQUE se dit toujours, et se liste');
-assert.ok(/box\.style\.display='';/.test(RECAP),
-  '… et le bandeau revient quand il a de nouveau quelque chose à dire');
+// Le bandeau de l'écran de fin est parti ENTIER (24/08, second passage) : vert
+// il répétait les boutons d'à côté, orange il listait — sur l'écran de FIN, où
+// plus rien ne se remplit — ce qu'il aurait fallu remplir avant. Ce qui manque
+// se dit à l'étape, dans le champ, en rouge, quand on peut encore y répondre.
+['recapReadyBanner', 'refreshRecapBanner', 'live-check', 'var STEPS='].forEach((mort) => {
+  assert.ok(!DEVIS.includes(mort), `« ${mort} » devait partir avec le bandeau`);
+});
+// Les deux phrases qu'il affichait ne doivent plus être écrites nulle part.
+assert.ok(!/Dossier complet — le ticket/.test(DEVIS), 'le vert ne s’écrit plus');
+assert.ok(!/'⚠ Dossier incomplet/.test(DEVIS), 'l’orange non plus');
+assert.ok(/function failAll\(manques\)/.test(DEVIS),
+  'ce qui manque se dit toujours — mais dans le champ, à l’étape');
+
+// Un dossier incomplet n'est pas perdu : il part dans « À trier » comme les
+// autres. C'est précisément à ça que sert ce sur-dossier.
+assert.ok(/dans « À trier »/.test(PONT), 'le comptoir dépose dans « À trier »');
 
 const ETAT = bloc(PONT, '  function peindreEtat(nouveau)');
 assert.ok(/el\.style\.display = etatEnvoi === 'ok' \? 'none' : '';/.test(ETAT),

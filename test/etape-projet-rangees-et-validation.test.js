@@ -93,13 +93,12 @@ for (const r of rangees) {
 // pas : si « Annuler » suit le bouton primaire, c'est ANNULER qui se retrouve
 // au bord. Trois rangées étaient dans ce cas sur les deux écrans.
 //
-// UNE EXCEPTION, ET ELLE A COÛTÉ UN DOSSIER. La rangée du récapitulatif porte
-// « Nouvelle demande », qui EFFACE le dossier. L'accent (`primary`) reste sur
-// « Enregistrer » et le bouton qui efface ne doit PAS fermer la rangée : c'est
-// la règle écrite dans echelle-comptoir.test.js après le dossier perdu le
-// 13/08. Ce qui ferme réellement cette rangée-là, c'est « Créer dans le
-// planning », ajouté à l'exécution — donc l'action qui engage est bien la
-// dernière à l'écran. On saute cette rangée ici plutôt que de la « corriger ».
+// UNE EXCEPTION : la rangée du récapitulatif. Elle portait « Nouvelle demande »
+// (qui EFFACE) à côté de « Enregistrer » (qui envoie), et l'ordre des deux a
+// coûté un dossier le 13/08. Le 24/08 au soir le patron a fait retirer
+// « Enregistrer » : il ne reste qu'un bouton, et il n'y a plus d'ordre à
+// arbitrer. Elle sort donc de la règle « l'action qui engage ferme la rangée »,
+// puisqu'aucune action de cette rangée n'engage plus rien.
 for (const r of rangees) {
   if (/onclick="newRequest\(\)"/.test(r)) continue;
   const boutons = r.match(/<button[^>]*>/g) || [];
@@ -110,13 +109,20 @@ for (const r of rangees) {
     `l’action qui engage doit fermer la rangée : ${r.slice(0, 80)}`);
 }
 
-// … et on vérifie que l'exception reste ce qu'elle est : un bouton qui efface
-// n'est jamais le dernier d'une rangée collée à droite.
+// CE QUI PROTÈGE CETTE RANGÉE-LÀ, MAINTENANT. Elle ne porte qu'un bouton, il
+// n'a pas l'encre, et il n'enregistre rien — parce qu'il n'y a plus rien à
+// enregistrer : le dossier part dans « À trier » de lui-même en arrivant sur
+// l'écran. S'il n'est PAS parti, pont.js intercepte « Nouvelle demande » et
+// demande confirmation avant de perdre quoi que ce soit.
 const rangeeRecap = rangees.find(r => /onclick="newRequest\(\)"/.test(r));
 assert.ok(rangeeRecap, 'la rangée du récapitulatif existe');
 const derniersBoutons = rangeeRecap.match(/<button[^>]*>/g) || [];
-assert.ok(!/onclick="newRequest\(\)"/.test(derniersBoutons[derniersBoutons.length - 1]),
-  'le bouton qui EFFACE le dossier ne ferme pas la rangée — voir le 13/08');
+assert.strictEqual(derniersBoutons.length, 1,
+  'elle ne porte qu’un bouton : il n’y a plus d’ordre à arbitrer');
+assert.ok(!/\bprimary\b/.test(derniersBoutons[0]),
+  'et il n’a pas l’encre — il efface l’écran, il n’engage rien');
+assert.ok(!/onclick="saveDraft\(\)"/.test(DEVIS),
+  'plus aucun geste n’est demandé pour enregistrer — voir le 13/08');
 
 // Le récapitulatif ne dit pas « → » — il enregistre — mais c'est le même pied
 // d'étape, et il se range pareil.

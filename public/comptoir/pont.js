@@ -541,14 +541,6 @@
     el.className = `olda-etat olda-etat--${etatEnvoi === 'ok' ? 'ok' : etatEnvoi === 'echec' ? 'echec' : 'envoi'}`;
     el.firstChild.textContent = detail ? `${PHRASES[etatEnvoi]}\n${detail}` : PHRASES[etatEnvoi];
     el.lastChild.hidden = etatEnvoi !== 'echec' && etatEnvoi !== 'attente';
-    // Le bouton greffé par l'écran ne peut plus dire « Créer » une fois la
-    // ligne créée : elle l'est, et le retaper ne crée rien (l'empreinte du
-    // dossier le fait reconnaître). On le dit plutôt que de le laisser mentir.
-    const btn = document.getElementById('oldaCreatePlanningBtn');
-    if (btn && etatEnvoi === 'ok') {
-      btn.disabled = true;
-      btn.textContent = '📅 Déjà au planning';
-    }
   }
 
   function resultatEnvoi(ok, message) {
@@ -605,6 +597,14 @@
     if (window.parent !== window && auto) {
       parent.postMessage({ type: 'OLDA_ENVOI_AUTOMATIQUE' }, location.origin);
     }
+    // UN `.click()` SUR UN BOUTON DÉSACTIVÉ NE FAIT RIEN, ET NE LÈVE RIEN.
+    // L'envoi ne partait pas, le bandeau restait sur « Enregistrement… », puis
+    // annonçait « Aucune réponse — le réseau a peut-être décroché » : de quoi
+    // chercher une panne de réseau qui n'a jamais existé. On ne dépend donc pas
+    // de l'état d'un bouton pour envoyer. Ce qui empêche vraiment le double
+    // envoi, c'est la garde en tête de cette fonction (`etatEnvoi === 'ok'`) —
+    // et, côté serveur, l'empreinte du dossier.
+    btn.disabled = false;
     btn.click();
   }
 
@@ -623,27 +623,15 @@
     envoyerAuPlanning(true);
   }
 
-  // « 💾 Enregistrer » (écran devis) écrivait un brouillon dans le navigateur
-  // que RIEN ne relit — jamais — et annonçait « Brouillon enregistré » : la
-  // vendeuse repartait convaincue d'avoir sauvegardé son dossier. On le
-  // rebranche sur le seul enregistrement qui existe.
-  // Le nœud rebranché est mémorisé : tant qu'il est vivant, on ne repaie pas le
-  // sélecteur d'attribut par préfixe (le plus lent qui soit, non indexable) —
-  // qui tournait ici plusieurs fois par seconde, sur un document de 126 Ko.
-  let boutonBrouillon = null;
-  function rebrancherBoutonBrouillon() {
-    if (boutonBrouillon && boutonBrouillon.isConnected) return;
-    boutonBrouillon = null;
-    const b = document.querySelector('[onclick^="saveDraft"]');
-    if (!b) return;
-    boutonBrouillon = b;
-    if (b.__oldaRebranche) return;
-    b.__oldaRebranche = true;
-    b.removeAttribute('onclick');
-    b.onclick = null;
-    b.textContent = '💾 Enregistrer au planning';
-    b.addEventListener('click', () => envoyerAuPlanning(false));
-  }
+  // LE BOUTON « 💾 Enregistrer » A ÉTÉ RETIRÉ DE L'ÉCRAN (24/08/2026), et le
+  // rebranchement qui vivait ici avec lui. Il écrivait un brouillon dans le
+  // navigateur que RIEN ne relit jamais, en annonçant « Brouillon enregistré » :
+  // on l'avait rebranché sur le vrai envoi. Il n'y a plus de geste à
+  // rebrancher — le dossier part TOUT SEUL dès que l'écran de fin s'affiche
+  // (`guetterEcranFinal`), et le seul geste qui reste est le « Réessayer » du
+  // bandeau rouge, quand l'envoi a échoué.
+  // Les brouillons DÉJÀ écrits sur les postes, eux, continuent d'être proposés
+  // à la récupération (`montrerBrouillonsOublies`).
 
   // Les boutons qui EFFACENT le dossier : « Nouvelle demande » et « Nouvelle
   // vente » rechargent la page, « Retour accueil » quitte l'écran de fin. Tant
@@ -1882,7 +1870,7 @@ document.addEventListener('pointerdown',ev=>{
   window.menusRafraichirTous = function menusRafraichirTous(){menus.forEach(etat=>menuRafraichir(etat.hote))};
 
   // regreffent leurs propres boutons toutes les 400 ms).
-  const veilleur = new MutationObserver(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); window.menusPoserTous(); });
+  const veilleur = new MutationObserver(() => { guetterEcranFinal(); grefferLesIndicatifs(); window.menusPoserTous(); });
   // `attributeFilter` : le guet ne réagit qu'à la classe — c'est elle (`hidden`)
   // qui démasque l'écran de fin. Sans le filtre, CHAQUE changement d'attribut
   // du document (les minuteurs des écrans en produisent plusieurs par seconde)
@@ -1891,12 +1879,11 @@ document.addEventListener('pointerdown',ev=>{
   veilleur.observe(document.body, {
     subtree: true, childList: true, attributes: true, attributeFilter: ['class'],
   });
-  setInterval(() => { guetterEcranFinal(); rebrancherBoutonBrouillon(); grefferLesIndicatifs(); window.menusPoserTous(); }, VEILLE_MS);
+  setInterval(() => { guetterEcranFinal(); grefferLesIndicatifs(); window.menusPoserTous(); }, VEILLE_MS);
   guetterEcranFinal();
   grefferLesIndicatifs();
   poserStyleMenu();
   window.menusPoserTous();
-  rebrancherBoutonBrouillon();
   montrerBrouillonsOublies();
 
   /* ─────────────────────── LA RANGÉE D'ÉTAPES PORTE LA SORTIE ──────────────
