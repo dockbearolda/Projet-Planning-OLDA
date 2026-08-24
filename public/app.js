@@ -6846,7 +6846,17 @@ document.addEventListener('pointerdown', (e) => {
 // Une poignée verticale entre le rail et la zone de travail règle la largeur du
 // rail (glisser souris / doigt). Mémorisé par appareil (localStorage).
 const SIDEBAR_W_KEY = 'olda_sidebar_w';
-const SIDEBAR_MIN = 180, SIDEBAR_MAX = 460;
+// LE MINIMUM EST MESURÉ, PAS CHOISI. En dessous, la colonne qui reste au
+// libellé devient plus étroite que ses mots les plus longs — « Préparation »,
+// « Facturation », « marchandise », « Production » — et `overflow-wrap:
+// break-word` les COUPE EN PLEIN MILIEU : « PRÉPARATIO / N DU PROJET ».
+// Mesuré le 24/08/2026 sur les 33 libellés du pipeline : à 180 px, 7 se
+// cassaient et il manquait 10 px au pire d'entre eux ; le premier palier sans
+// aucune casse est 192 px. On prend 200 : le rendu du texte varie d'une machine
+// à l'autre, et une étape peut gagner une lettre.
+// Si le pipeline gagne un mot plus long, c'est ICI qu'il faut revenir — le
+// garde-fou de `test/coquille-nav-et-rail.test.js` le rappelle.
+const SIDEBAR_MIN = 200, SIDEBAR_MAX = 460;
 const $sidebarResizer = document.getElementById('sidebarResizer');
 // La largeur du rail est une colonne de la grille du .shell : c'est donc lui qui
 // porte `--sidebar-w` (le rail n'est plus enfant de `.app`).

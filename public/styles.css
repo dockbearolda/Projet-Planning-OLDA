@@ -425,6 +425,16 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* LES DEUX AXES SE DÉCLARENT, TOUJOURS. `overflow-y: auto` seul ne laisse pas
+     l'autre axe tranquille : dès qu'un axe cesse d'être `visible`, l'autre
+     passe de `visible` à `auto` — le rail devenait donc un conteneur qui DÉFILE
+     DE CÔTÉ sans qu'on l'ait demandé. Il suffit qu'un libellé dépasse d'un
+     pixel (ou qu'un bouton prenne le focus) pour que toute la colonne des
+     étapes glisse latéralement et que les catégories partent de l'écran.
+     `clip` plutôt que `hidden` : `hidden` reste un conteneur de défilement, un
+     `scrollIntoView` peut encore le décaler tout seul. `clip` ne défile jamais,
+     ni à la main ni par programme. */
+  overflow-x: clip;
   overflow-y: auto;
   padding: 0 0 4px;
   background: var(--surface);
@@ -3710,21 +3720,21 @@ body.view-plein .fiverr-tool { display: none !important; }
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
 
-/* `view-comptoir` (Nouveau Projet) : c'est un ONGLET COMME LES AUTRES.
+/* `view-comptoir` (Nouveau Projet) : c'est un ONGLET COMME LES AUTRES, et il
+   NE TOUCHE PLUS RIEN DANS LA BARRE.
    Il masquait toute la navigation — « poste de vente, devant le client » — et
    l'écran devenait un cul-de-sac : plus d'onglets, plus de rail, rien qui dise
-   qu'on est encore dans l'outil. Le patron l'a refusé le 24/08 : il veut
-   passer du parcours au planning, au Point du jour, et revenir, sans repasser
-   par la flèche du parcours ni par le bouton Précédent.
-   Seule la RECHERCHE reste masquée : elle filtre la grille du planning, qui
-   n'est pas à l'écran — un champ qui ne cherche rien. */
-body.view-comptoir .grid-search { display: none !important; }
-/* Et comme elle est le seul élément de gauche de la barre, sans elle les
-   actions du coin (plein écran, thème, poste) retombent contre le bord
-   GAUCHE dès que les onglets passent à la ligne. La marge automatique les
-   remet à leur place — vérifié à l'œil, la règle avait été retirée avec le
-   masquage des onglets et le défaut est revenu aussitôt. */
-body.view-comptoir .topbar-right { margin-inline-start: auto; }
+   qu'on est encore dans l'outil. Le patron l'a refusé le 24/08.
+   La RECHERCHE restait masquée, elle : elle filtre la grille du planning, qui
+   n'est pas à l'écran. Refusé aussi, le 24/08 au soir — une barre qui perd un
+   élément en changeant d'onglet n'est plus une ossature, et le vide qu'elle
+   laissait déplaçait le reste. Elle reste donc à sa place partout : elle
+   n'a jamais eu besoin de la grille pour travailler (elle interroge le
+   SERVEUR et rend ses résultats dans sa propre palette, par-dessus l'écran),
+   et chercher une commande depuis un parcours est exactement ce qu'on fait
+   quand un client en rappelle une au comptoir.
+   La marge automatique qui rattrapait ce vide sur `.topbar-right` part avec :
+   sans trou à rattraper, elle n'a plus d'objet. */
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {

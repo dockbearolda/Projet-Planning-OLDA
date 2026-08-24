@@ -41,14 +41,18 @@ assert.ok(!/target=/.test(lienProjet[0]),
 // planning, qui n'est pas à l'écran.
 assert.ok(!/body\.view-comptoir[^{]*\.nav-switch/.test(CSS),
   'la navigation reste visible sur Nouveau Projet : on doit pouvoir en repartir');
-assert.ok(/body\.view-comptoir \.grid-search \{[^}]*display: none/.test(CSS),
-  'seule la recherche se masque : elle filtre une grille qui n’est pas là');
-// LE DÉFAUT QUI EST REVENU EN COURS DE ROUTE : la recherche est le seul
-// élément de gauche de la barre. Sans elle, et dès que les onglets passent à la
-// ligne (requête de conteneur, seuil 1360 px), les actions du coin retombent
-// contre le bord GAUCHE.
-assert.ok(/body\.view-comptoir \.topbar-right \{[^}]*margin-inline-start: auto/.test(CSS),
-  'sans la recherche, les actions du coin tiennent la droite par une marge automatique');
+// LA RECHERCHE NE SE MASQUE PLUS NON PLUS (24/08 au soir). Elle restait
+// cachée sur cette vue — « elle filtre une grille absente de l'écran ». Mais
+// une barre qui perd un élément en changeant d'onglet n'est plus une ossature,
+// et le vide qu'elle laissait déplaçait le reste : il avait fallu une marge
+// automatique de rattrapage sur `.topbar-right`, partie avec le masquage.
+// Elle n'a jamais eu besoin de la grille : elle interroge le SERVEUR et rend
+// ses résultats dans sa propre palette, par-dessus l'écran — vérifié depuis un
+// parcours ouvert, « esmeralda » y trouve bien son dossier.
+assert.ok(!/body\.view-comptoir[^{]*\.grid-search/.test(CSS),
+  'la recherche reste à sa place sur Nouveau Projet');
+assert.ok(!/body\.view-comptoir[^{]*\.topbar-right/.test(CSS),
+  '… et la marge qui rattrapait son absence n’a plus d’objet');
 
 // --- 2. Le rail se replie d'un clic -----------------------------------------
 assert.ok(/id="railToggle"/.test(HTML), 'le bouton de repli du rail doit exister');
@@ -523,3 +527,60 @@ console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée su
 }
 
 console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut être figé l’est');
+
+// --- 12. L'OSSATURE NE DÉPEND D'AUCUNE PAGE, ET LE RAIL NE GLISSE JAMAIS ----
+{
+  const CSSNET2 = sansCommentaire(CSS);
+
+  // (1) AUCUNE VUE NE TOUCHE À LA BARRE. « Nouveau Projet » masquait la
+  // recherche — « elle filtre une grille absente de l'écran ». Refusé le 24/08
+  // au soir : une barre qui perd un élément en changeant d'onglet n'est plus
+  // une ossature, et le vide qu'elle laisse déplace le reste (il avait fallu
+  // une marge automatique de rattrapage sur `.topbar-right`, qui part avec).
+  // La recherche n'a jamais eu besoin de la grille : elle interroge le SERVEUR
+  // et rend ses résultats dans sa propre palette, par-dessus l'écran.
+  assert.ok(!/body\.view-[a-z-]+\s+\.grid-search/.test(CSSNET2),
+    'aucune vue ne masque ni ne déplace la recherche');
+  assert.ok(!/body\.view-[a-z-]+\s+\.topbar-right/.test(CSSNET2),
+    '… ni les actions du coin');
+  assert.ok(!/body\.view-[a-z-]+\s+\.nav-switch/.test(CSSNET2),
+    '… ni les onglets');
+  assert.ok(!/body\.view-[a-z-]+\s+\.topbar\b/.test(CSSNET2),
+    '… ni la barre elle-même');
+
+  // (2) LE RAIL NE DÉFILE JAMAIS DE CÔTÉ. `overflow-y: auto` seul ne laisse pas
+  // l'autre axe tranquille : dès qu'un axe cesse d'être `visible`, l'autre
+  // passe de `visible` à `auto`. Le rail devenait un conteneur qui glisse
+  // latéralement — il suffit d'un libellé qui dépasse d'un pixel, ou d'un
+  // bouton qui prend le focus, pour que toute la colonne des étapes parte de
+  // l'écran. Les deux axes se déclarent, toujours.
+  const rail = CSSNET2.match(/\.sidebar \{\n(?:.*\n)*?\}/);
+  assert.ok(rail, 'le bloc .sidebar doit exister');
+  assert.ok(/overflow-x: clip;/.test(rail[0]),
+    'le rail déclare son axe horizontal — sinon il glisse tout seul');
+  assert.ok(/overflow-y: auto;/.test(rail[0]), '… et son axe vertical');
+  // `clip` plutôt que `hidden` : `hidden` reste un conteneur de défilement,
+  // qu'un `scrollIntoView` peut décaler sans que personne n'ait rien demandé.
+  assert.ok(!/overflow-x: hidden;/.test(rail[0]),
+    '`hidden` défilerait encore par programme : c’est `clip` qu’il faut');
+
+  // (3) LA LARGEUR MINIMALE DU RAIL EST MESURÉE, PAS CHOISIE. En dessous, la
+  // colonne du libellé devient plus étroite que ses mots les plus longs
+  // (« Préparation », « Facturation », « marchandise », « Production ») et
+  // `overflow-wrap: break-word` les coupe EN PLEIN MILIEU :
+  // « PRÉPARATIO / N DU PROJET ». Mesuré le 24/08 sur les 33 libellés du
+  // pipeline : à 180 px, 7 se cassaient, 10 px manquaient au pire ; le premier
+  // palier sans aucune casse est 192. On prend 200 — le rendu du texte varie
+  // d'une machine à l'autre, et une étape peut gagner une lettre.
+  const min = Number((APP.match(/const SIDEBAR_MIN = (\d+)/) || [])[1]);
+  assert.ok(min >= 200,
+    `le rail ne peut pas descendre sous 200 px sans casser ses libellés (lu : ${min})`);
+  // La valeur mémorisée par appareil repasse par le même serrage : un poste qui
+  // avait enregistré 180 avant ce jour-là ne rouvre pas sur des mots coupés.
+  assert.ok(/if \(Number\.isFinite\(saved\)\) \$shell\.style\.setProperty\('--sidebar-w', clampW\(saved\)/.test(APP),
+    'la largeur relue au démarrage repasse par le serrage');
+  assert.ok(/overflow-wrap: break-word/.test(CSSNET2),
+    'un mot plus long que sa colonne se coupe plutôt que de déborder — d’où le minimum mesuré');
+}
+
+console.log('✓ ossature : aucune page ne touche à la barre, le rail ne glisse pas et ne casse plus ses mots');
