@@ -139,7 +139,14 @@ function afficher(id) {
      ailleurs : remonter d'un cran, du parcours vers les tuiles. */
   const bar = ROOT.querySelector('#np-bar');
   const btn = ROOT.querySelector('#np-home-btn');
-  bar.hidden = !flux;
+  /* LA BARRE NE COÛTE PLUS UNE RANGÉE. Elle prenait 61 px pour porter une seule
+     flèche, au-dessus d'une rangée d'étapes qui en prenait 94 : 155 px avant le
+     premier champ. Dans un parcours, la flèche vit maintenant DANS la rangée
+     d'étapes du cadre, qui est collante (voir `grefferSortieDuParcours` dans
+     pont.js) — elle ne s'en va donc plus au défilement, et l'en-tête a fondu de
+     moitié. Sur l'accueil à deux tuiles, la barre n'a jamais rien à porter :
+     les onglets et le rail sont là. */
+  bar.hidden = true;
   const quoi = flux ? 'Changer de parcours' : 'Retour au planning';
   btn.setAttribute('aria-label', quoi);
   btn.title = quoi;
@@ -440,6 +447,10 @@ function auMessage(e) {
   if (!estUnDesNotres(e.source)) return;
   const msg = e.data;
   if (!msg) return;
+  /* La flèche de la rangée d'étapes, dans le cadre : le parcours ne connaît
+     aucune adresse, il dit seulement qu'on veut en sortir. L'hôte, lui, sait
+     qu'il y a deux tuiles derrière. */
+  if (msg.type === 'OLDA_PARCOURS_RETOUR') { afficher(null); return; }
   if (msg.type === 'OLDA_ENVOI_AUTOMATIQUE') {
     prochainEnvoiAutomatique = true;
     // Le dossier suit dans la foulée (même tâche). S'il ne venait pas, le

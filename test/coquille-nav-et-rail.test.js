@@ -267,10 +267,29 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   // doubler l'onglet « Planning » — et proposer de « revenir » d'un écran où
   // l'on vient d'arriver.
   const NP = fs.readFileSync(path.join(RACINE, 'public/nouveau-projet.js'), 'utf8');
-  assert.ok(/bar\.hidden = !flux;/.test(NP),
-    'la flèche ne s’affiche que DANS un parcours, jamais sur l’accueil à deux tuiles');
+  const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+  // LA BARRE DE L'HÔTE NE COÛTE PLUS UNE RANGÉE (24/08). Elle prenait 61 px pour
+  // porter UNE flèche, au-dessus d'une rangée d'étapes qui en prenait 94 :
+  // 155 px avant le premier champ. Et c'est la rangée d'étapes qui s'en allait
+  // au défilement — la barre, hors du cadre, ne bougeait pas.
+  assert.ok(/bar\.hidden = true;/.test(NP),
+    'la barre de l’hôte ne se montre plus : sa flèche vit dans la rangée d’étapes');
   assert.ok(/retour\.className = 'btn-retour np-bar-home'/.test(NP),
     '… et c’est bien le bouton de la charte qu’elle porte');
+  // La flèche descend DANS le cadre, dans la rangée d'étapes, qui devient
+  // collante : on voit en permanence où l'on en est ET par où sortir.
+  assert.ok(/id = 'sortieParcours'/.test(PONT) && /b\.className = 'btn-retour'/.test(PONT),
+    'la rangée d’étapes porte la sortie, avec le bouton de la charte');
+  assert.ok(/position:sticky;top:0/.test(PONT),
+    '… et elle est collante : elle ne s’en va plus au défilement');
+  // Le fond n'est pas décoratif : sans lui, le contenu défile en transparence
+  // derrière les pastilles.
+  assert.ok(/background:var\(--bg\)/.test(PONT),
+    '… avec un fond opaque, sinon le contenu défile au travers');
+  // Le parcours ne connaît AUCUNE adresse : il dit qu'on veut sortir, l'hôte
+  // sait ce qu'il y a derrière.
+  assert.ok(/OLDA_PARCOURS_RETOUR/.test(PONT) && /OLDA_PARCOURS_RETOUR'\) \{ afficher\(null\)/.test(NP.replace(/msg\.type === '/, "'")),
+    'le parcours demande la sortie, l’hôte décide de ce que ça veut dire');
 
   // Les étapes des DEUX parcours portent la même. `← Retour` en bulle grise
   // n'existe plus nulle part.

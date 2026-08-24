@@ -1737,6 +1737,52 @@ document.addEventListener('pointerdown',ev=>{
   rebrancherBoutonBrouillon();
   montrerBrouillonsOublies();
 
+  /* ─────────────────────── LA RANGÉE D'ÉTAPES PORTE LA SORTIE ──────────────
+     L'en-tête coûtait 155 px avant le premier champ : 61 px pour une barre de
+     l'hôte qui ne contenait QU'UNE flèche, et 94 px pour la rangée d'étapes,
+     passée à deux lignes. Et c'est la rangée d'étapes qui s'en allait au
+     défilement — la barre de l'hôte, elle, ne bougeait pas : elle vit hors du
+     cadre, au-dessus.
+     Les deux n'en font plus qu'une : la flèche descend DANS la rangée
+     d'étapes, qui devient COLLANTE. On voit donc en permanence où l'on en est
+     et par où sortir, pour la moitié de la hauteur.
+     La flèche est le même bouton que partout ailleurs (`.btn-retour` de la
+     charte) et porte le même geste que la barre qu'elle remplace : quitter le
+     parcours. Les flèches de bas d'étape gardent le leur — revenir d'une
+     ÉTAPE. Deux gestes, deux boutons, jamais le même deux fois. */
+  function grefferSortieDuParcours() {
+    const rangee = document.querySelector('.stepper');
+    if (!rangee || document.getElementById('sortieParcours')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'sortieParcours';
+    b.className = 'btn-retour';
+    b.title = b.ariaLabel = 'Quitter ce parcours';
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'
+      + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg>';
+    /* L'hôte décide de ce que « quitter » veut dire : il est le seul à savoir
+       s'il y a des tuiles derrière. Le parcours ne connaît aucune adresse. */
+    b.onclick = () => { try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {} };
+    rangee.insertBefore(b, rangee.firstChild);
+  }
+  function poserStyleRangeeEtapes() {
+    if (document.getElementById('styleRangeeEtapes')) return;
+    const st = document.createElement('style');
+    st.id = 'styleRangeeEtapes';
+    /* `top: 0` : le cadre est ce qui défile (l'hôte, lui, ne bouge pas).
+       Le fond est OBLIGATOIRE — sans lui le contenu défile en transparence
+       derrière les pastilles. La marge haute du conteneur repasse en
+       rembourrage de la rangée, sinon un blanc de 24 px reste collé au-dessus
+       d'elle une fois qu'elle s'est figée. */
+    st.textContent = '.stepper{position:sticky;top:0;z-index:20;background:var(--bg);'
+      + 'align-items:center;padding:var(--pas-2) 0;margin-bottom:var(--pas-3)}'
+      + '.stepper #sortieParcours{margin-right:var(--pas-2)}';
+    document.head.appendChild(st);
+  }
+  poserStyleRangeeEtapes();
+  grefferSortieDuParcours();
+
   // L'hôte réaffiche l'écran pour un nouveau client : la base a pu bouger
   // entre-temps (un client créé depuis l'onglet Base clients).
   window.oldaRafraichirClients = () => chargerClients().catch(raterEnSilence('base clients indisponible'));
