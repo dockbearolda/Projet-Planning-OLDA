@@ -90,29 +90,6 @@ new MutationObserver(diffuserTheme).observe(document.documentElement, {
   attributes: true, attributeFilter: ['data-theme'],
 });
 
-/* Une flèche vers la gauche N'EXISTE PAS dans `olda-icones.woff2` : le
-   sous-ensemble figé n'a qu'`arrow_forward` et `chevron_right`, et un nom
-   absent s'affiche en texte tronqué sans la moindre erreur. On la dessine
-   donc au trait, l'idiome déjà en place ailleurs dans l'application. */
-function flecheRetour() {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '20');
-  svg.setAttribute('height', '20');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  svg.setAttribute('aria-hidden', 'true');
-  const trait = document.createElementNS(NS, 'path');
-  trait.setAttribute('d', 'M19 12H5');
-  const pointe = document.createElementNS(NS, 'path');
-  pointe.setAttribute('d', 'm11 6-6 6 6 6');
-  svg.append(trait, pointe);
-  return svg;
-}
 
 function icone(nom) {
   const i = document.createElement('span');
@@ -129,27 +106,14 @@ function afficher(id) {
   fluxAffiche = flux ? flux.id : null;
   ROOT.querySelector('#np-home').hidden = !!flux;
   ROOT.querySelector('#np-frames').hidden = !flux;
-  /* LA FLÈCHE N'APPARAÎT QUE DANS UN PARCOURS. Elle restait affichée sur les
-     tuiles parce qu'elle était, à l'époque, la SEULE sortie du poste : la
-     navigation de l'outil y était masquée. Elle ne l'est plus (24/08) — les
-     onglets et le rail sont à l'écran — donc sur l'accueil la flèche ne fait
-     que doubler l'onglet « Planning », et elle propose de « revenir » depuis
-     un écran où l'on vient d'arriver.
-     Dans un parcours, en revanche, elle porte un geste qui n'existe nulle part
-     ailleurs : remonter d'un cran, du parcours vers les tuiles. */
-  const bar = ROOT.querySelector('#np-bar');
-  const btn = ROOT.querySelector('#np-home-btn');
-  /* LA BARRE NE COÛTE PLUS UNE RANGÉE. Elle prenait 61 px pour porter une seule
-     flèche, au-dessus d'une rangée d'étapes qui en prenait 94 : 155 px avant le
-     premier champ. Dans un parcours, la flèche vit maintenant DANS la rangée
-     d'étapes du cadre, qui est collante (voir `grefferSortieDuParcours` dans
-     pont.js) — elle ne s'en va donc plus au défilement, et l'en-tête a fondu de
-     moitié. Sur l'accueil à deux tuiles, la barre n'a jamais rien à porter :
-     les onglets et le rail sont là. */
-  bar.hidden = true;
-  const quoi = flux ? 'Changer de parcours' : 'Retour au planning';
-  btn.setAttribute('aria-label', quoi);
-  btn.title = quoi;
+  /* PLUS DE BARRE DE SORTIE ICI. L'hôte en posait une au-dessus du cadre :
+     61 px pour une seule flèche, au-dessus d'une rangée d'étapes qui en prenait
+     94. La flèche vit désormais DANS la rangée d'étapes du parcours (voir
+     `grefferSortieDuParcours` dans comptoir/pont.js), et c'est le message
+     `OLDA_PARCOURS_RETOUR` qui remonte jusqu'ici.
+     Sur l'accueil à deux tuiles, il n'y a rien à porter : les onglets et le
+     rail sont à l'écran, et « revenir » depuis un écran où l'on vient
+     d'arriver n'aurait rien voulu dire. */
   masquerErreur();
 
   for (const f of FLUX) {
@@ -287,44 +251,6 @@ function construireAccueil() {
   return home;
 }
 
-// --- Barre de flux : la seule commande de l'hôte au-dessus du parcours -------
-// Volontairement mince : le parcours porte déjà son propre en-tête noir avec son
-// titre. Cette barre ne sert qu'à changer d'avis — on ne la fait pas concurrencer
-// l'écran de saisie.
-function construireBarre() {
-  const barre = document.createElement('div');
-  barre.className = 'np-bar';
-  barre.id = 'np-bar';
-  /* `afficher()` la montre dès le premier passage, tuiles comprises : c'est lui
-     qui décide où mène la flèche. */
-  barre.hidden = true;
-
-  const retour = document.createElement('button');
-  retour.type = 'button';
-  retour.className = 'btn-retour np-bar-home';
-  retour.id = 'np-home-btn';
-  /* Une flèche seule : le nom du parcours est déjà écrit à droite, dans la
-     bascule, et l'en-tête noir du parcours a disparu. Le libellé reste porté
-     par le nom accessible et l'infobulle — clavier et survol, les deux seules
-     interactions de ce poste. */
-  // Le libellé est posé par `afficher()` : il change avec ce que la flèche fait.
-  retour.setAttribute('aria-label', 'Changer de parcours');
-  retour.title = 'Changer de parcours';
-  retour.append(flecheRetour());
-  retour.addEventListener('click', () => {
-    // Un parcours ouvert → on revient aux tuiles. Déjà sur les tuiles → on sort
-    // du poste comptoir. Le hash fait foi (voir applyHash) : on ne touche pas à
-    // la vue directement, sinon l'URL et l'écran se contrediraient.
-    if (fluxAffiche) afficher(null);
-    else location.hash = '#planning';
-  });
-
-  /* La bascule « Vente directe / Demande de devis » a été RETIRÉE : on change
-     de parcours par la flèche, qui ramène aux deux tuiles. */
-  barre.append(retour);
-  return barre;
-}
-
 function construire() {
   const shell = document.createElement('div');
   shell.className = 'np-shell';
@@ -351,7 +277,7 @@ function construire() {
   /* LA BARRE EN PREMIER, pas entre l'accueil et les cadres : elle est visible
      aussi sur les tuiles (c'est la sortie du poste) et un `flex: 1` sur
      l'accueil l'aurait poussée tout en bas de l'écran. */
-  shell.append(construireBarre(), construireAccueil(), erreur, cadres);
+  shell.append(construireAccueil(), erreur, cadres);
   ROOT.replaceChildren(shell);
 }
 

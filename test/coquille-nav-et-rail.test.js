@@ -259,8 +259,12 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0])
     && /border: 1px solid var\(--border\)/.test(modele[0]),
     'la flèche est ronde, 44 px, bordée');
-  assert.ok(!/\.np-bar-home \{/.test(sansCommentaire(PROJ)),
-    'la flèche du parcours n’a plus de forme à elle : une seule source');
+  // LA BARRE DE SORTIE DE L'HÔTE N'EXISTE PLUS (24/08). Elle coûtait 61 px pour
+  // une seule flèche ; celle-ci vit dans la rangée d'étapes du parcours. Tout
+  // ce qui la construisait est parti avec elle — sinon c'est du code qu'on
+  // relit pendant des mois sans savoir qu'il ne sert plus.
+  assert.ok(!/np-bar/.test(sansCommentaire(PROJ)),
+    'plus une règle pour la barre de sortie : elle n’existe plus');
 
   // ELLE N'APPARAÎT PAS SUR LES TUILES. Elle y restait du temps où elle était la
   // SEULE sortie du poste ; la navigation est revenue, elle n'y ferait plus que
@@ -272,10 +276,8 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   // porter UNE flèche, au-dessus d'une rangée d'étapes qui en prenait 94 :
   // 155 px avant le premier champ. Et c'est la rangée d'étapes qui s'en allait
   // au défilement — la barre, hors du cadre, ne bougeait pas.
-  assert.ok(/bar\.hidden = true;/.test(NP),
-    'la barre de l’hôte ne se montre plus : sa flèche vit dans la rangée d’étapes');
-  assert.ok(/retour\.className = 'btn-retour np-bar-home'/.test(NP),
-    '… et c’est bien le bouton de la charte qu’elle porte');
+  assert.ok(!/np-bar|construireBarre|flecheRetour/.test(NP),
+    '… et rien ne la construit plus : la barre, son bouton, sa flèche dessinée');
   // La flèche descend DANS le cadre, dans la rangée d'étapes, qui devient
   // collante : on voit en permanence où l'on en est ET par où sortir.
   assert.ok(/id = 'sortieParcours'/.test(PONT) && /b\.className = 'btn-retour'/.test(PONT),

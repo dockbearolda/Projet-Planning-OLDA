@@ -60,21 +60,10 @@
 }
 .np-tile__icon .material-symbols-outlined { font-size: 40px; }
 .np-tile strong { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
-/* --- Barre de bascule : la SEULE commande de l'hôte au-dessus du parcours ----
-   Volontairement mince et claire : le parcours porte déjà son propre en-tête
-   noir avec son titre, deux bandeaux sombres empilés mangeraient la hauteur
-   utile de la tablette (800 px en paysage). Elle ne sert qu'à changer d'avis. */
-.np-bar {
-  flex: 0 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; padding: 8px 16px;
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  font-family: var(--font);
-}
-.np-bar[hidden] { display: none; }
-/* La flèche du parcours n'a plus de forme à elle : elle porte `.btn-retour`,
-   le bouton « revenir d'un cran » de la charte — le MÊME objet que celui des
-   étapes du parcours, qui vit dans un autre document. Une seule source. */
+/* LA BARRE DE SORTIE A ÉTÉ RETIRÉE (24/08). Elle coûtait 61 px de hauteur pour
+   une seule flèche, au-dessus d'une rangée d'étapes qui en prenait 94. La
+   flèche vit maintenant DANS cette rangée, côté parcours (comptoir/pont.js),
+   et elle porte `.btn-retour`, le bouton « revenir d'un cran » de la charte. */
 
 /* Un dossier qui ne part pas au planning se DIT : la vendeuse a le client
    devant elle, elle ne doit pas découvrir la perte le lendemain. */
@@ -101,7 +90,6 @@
 .np-frame[hidden] { display: none; }
 
 @media (max-width: 760px) {
-  .np-bar { gap: 8px; padding: 8px 12px; }
   /* Une tuile par ligne : sur 375 px, deux colonnes les rendraient illisibles. */
   .np-home { justify-content: flex-start; padding: 24px 14px 40px; }
   .np-home h1 { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
