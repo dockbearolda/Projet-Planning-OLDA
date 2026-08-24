@@ -801,6 +801,11 @@
       aide.className = 'help';
       boite.insertAdjacentElement('afterend', aide);
     }
+    // Qu'on vienne de la poser ou qu'on reprenne celle de l'écran, cette ligne
+    // CHANGE de contenu à chaque frappe : elle doit flotter. Sans la classe,
+    // elle passait de 0 à 22 px au premier chiffre saisi et poussait le champ
+    // suivant — la règle nucléaire du 24/08 (voir charte.css).
+    aide.classList.add('msg-flottant');
 
     function peindre() {
       const p = telPays(select.value);

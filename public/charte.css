@@ -220,6 +220,76 @@
 .btn-retour:hover { border-color: var(--primary); background: var(--surface-hover); }
 .btn-retour:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* --------------------------------------------- Un message ne pousse personne
+   RÈGLE NUCLÉAIRE : aucune commande ne bouge parce qu'un message apparaît ou
+   disparaît. Demandée le 24/08 sur un cas mesuré — « Ajouter à la demande »
+   sans produit choisi posait « Choisis un produit dans la liste. » sous le
+   champ, DANS le flux : la cellule gagnait 48,5 px, et comme la rangée du
+   catalogue colle ses cellules en bas, l'input Quantité descendait d'autant.
+   Le bloc entier suivait, et tout ce qui venait après.
+
+   Réserver une ligne vide sous chaque champ ne tient PAS la promesse : le
+   message s'enroule. Celui du catalogue prend déjà deux lignes dans la colonne
+   de gauche, et « Adresse incomplète : il faut une arobase et un nom de
+   domaine (ex. nom@entreprise.com). » en prend trois dans une colonne de
+   tiers. Une hauteur figée ne couvre pas un texte dont on ne connaît pas
+   d'avance la longueur — et c'est exactement ce qu'une règle nucléaire
+   interdit de parier.
+
+   Le message SORT donc du flux. Il ne mesure rien, il ne pousse rien, quelle
+   que soit sa longueur, quelle que soit la largeur de la colonne.
+
+   Il recouvre ce qui le suit : c'est le prix, et il est payé. `pointer-events:
+   none` laisse cliquable le champ qui passe dessous, et le message s'efface
+   dès que le champ fautif est rempli.
+
+   Seuls les messages de RETOUR flottent — erreur de validation, contrôle d'un
+   numéro ou d'une adresse. Les 24 lignes d'aide écrites en dur dans les deux
+   parcours gardent un contenu FIXE : elles n'ont jamais déplacé personne,
+   elles restent dans le flux.
+
+   La règle vit ici, et pas dans la feuille du CRM : les parcours du comptoir
+   sont des documents à part, et la charte est le seul fichier qu'eux et le
+   CRM lisent tous les deux. */
+:has(> .msg-flottant) { position: relative; }
+
+.msg-flottant {
+  position: absolute; top: 100%; left: 0; z-index: 30;
+  /* Au moins la largeur du champ, sinon la largeur du texte — plafonnée.
+     « Renseigne au moins une taille. » s'accroche à la cellule « S », large
+     de 60 px : sans cela le message y tomberait en colonne d'un mot. */
+  min-width: 100%; width: max-content; max-width: min(340px, 80vw);
+  margin-top: 4px;
+  pointer-events: none;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--taille-texte);
+  line-height: var(--ligne-texte);
+  font-weight: var(--graisse-forte);
+}
+
+/* Vide, il ne reste PAS une pastille posée sur le champ du dessous : les
+   contrôles de numéro et d'adresse remettent le texte à '' pour effacer. */
+.msg-flottant:empty { display: none; }
+
+/* `hidden` doit rester plus fort que l'affichage : un message masqué qui
+   resterait posé recouvrirait un champ sans rien dire. */
+.msg-flottant.hidden { display: none; }
+
+/* Le rouge dit l'état, il ne décore pas. Deux classes (0,2,0) : la règle bat
+   `.error` et `.field-error` des deux parcours quel que soit l'ordre des
+   fichiers. Le fond est COMPOSÉ sur --surface — en thème sombre --danger-bg
+   est translucide, et le texte de la page se lirait au travers. */
+.error.msg-flottant,
+.field-error.msg-flottant {
+  border-color: var(--danger-line);
+  background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface);
+  color: var(--danger);
+}
+
 /* ---------------------------------------------------------------- Thème sombre
    Même charte, retournée : l'accent encre devient encre claire, d'où
    --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent

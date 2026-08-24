@@ -2216,8 +2216,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     var help=helpId?document.getElementById(helpId):null;
     if(!help){
       help=document.createElement('div');
-      help.className='help';
-      help.style.marginTop='5px';
+      help.className='help msg-flottant';
       input.insertAdjacentElement('afterend',help);
     }
     var paint=function(){
@@ -2577,8 +2576,7 @@ button.blocked{opacity:.45;cursor:not-allowed}
     if(!input||input.__phoneBound)return;
     input.__phoneBound=true;
     var help=document.createElement('div');
-    help.className='help';
-    help.style.marginTop='5px';
+    help.className='help msg-flottant';
     input.insertAdjacentElement('afterend',help);
     var paint=function(){
       var d=digits(input.value);
