@@ -179,20 +179,45 @@ classees.forEach((r) => {
 assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, 0), []);
 assert.deepStrictEqual(TE.defaultNegotiationSolutions(negociable, NaN), []);
 
-// RETENIR POSE UN PRIX, ET RIEN D'AUTRE (23/08/2026). La solution retenue
-// écrivait aussi les pièces manquantes dans « Autres » : choisir « 70 à
-// 15,55 € » sur une saisie de 55 faisait entrer quinze vêtements que personne
-// n'avait commandés — sans taille, sans qu'on l'ait tapé — et une deuxième
-// négociation en rajoutait encore. On retient le PRIX ; les pièces se
-// saisissent dans les cases des tailles, où elles ont un nom.
+// RETENIR POSE UN ACCORD — LES TROIS NOMBRES DU V9 (23/08/2026) : quantité
+// FACTURÉE, prix à la pièce, pièces OFFERTES. La solution retenue écrivait
+// avant les pièces manquantes dans « Autres » : choisir « 70 à 15,55 € » sur
+// une saisie de 55 faisait entrer quinze vêtements que personne n'avait
+// commandés — sans taille, sans qu'on l'ait tapé — et une deuxième négociation
+// en rajoutait encore.
 const retenir = (DEVIS.match(/function negRetenir\(i,\s*m\)\{[\s\S]*?\n\}/) || [''])[0];
 assert.ok(retenir, 'negRetenir doit exister');
-assert.ok(/manualPrice/.test(retenir),
-  'la solution retenue se réécrit dans la saisie, elle ne vit pas à côté');
-assert.ok(!/sizes/.test(retenir),
-  'retenir une offre n’ajoute AUCUNE pièce que la vendeuse n’a pas saisie');
-assert.ok(/m\.effective/.test(retenir),
-  'le prix retenu est le prix moyen par pièce LIVRÉE, sinon les pièces offertes se factureraient');
+assert.ok(/paidQty:m\.paidQty, freeQty:m\.freeQty, unitPrice:m\.unitPrice/.test(retenir),
+  'l’accord porte les trois nombres du fichier du patron');
+assert.ok(!/sizes|manualPrice/.test(retenir),
+  'retenir une offre n’écrit NI dans les tailles NI dans le prix manuel : l’accord fait le devis');
+// C'est `txAvecAccord` qui applique l'accord — et il ne facture QUE ce qui est
+// saisi : la quantité facturée de l'offre sert de rappel, pas de quantité.
+const accord = (DEVIS.match(/function txAvecAccord\(c,d\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(accord, 'txAvecAccord doit exister');
+assert.ok(/scenarioMetrics\(c,\{paidQty:c\.qty,unitPrice:txNum\(a\.unitPrice\),freeQty:offertes\}/.test(accord),
+  'on ne facture que les pièces saisies ; les offertes s’ajoutent aux livrées');
+assert.ok(/qty:m\.delivered/.test(accord) && /sold:m\.effective/.test(accord) && /total:m\.revenue/.test(accord),
+  'l’accord décide des pièces livrées, du prix moyen et du total');
+// UN GESTE NE BAISSE PAS LE PRIX, UN VOLUME NE DONNE RIEN : c'est le modèle du
+// V9, et les quatre sorties le respectent déjà.
+const sorties = TE.defaultNegotiationSolutions(negociable, CIBLE);
+const parGenre = Object.fromEntries(sorties.map((s) => [s.kind, s]));
+['small_gift', 'full_gift'].forEach((k) => {
+  assert.strictEqual(parGenre[k].unitPrice, negociable.sold, `${k} : le tarif ne bouge pas`);
+  assert.strictEqual(parGenre[k].paidQty, negociable.qty, `${k} : la quantité facturée non plus`);
+  assert.ok(parGenre[k].freeQty > 0, `${k} : c’est le nombre de pièces offertes qui change`);
+});
+['volume_target', 'volume_mid'].forEach((k) => {
+  assert.strictEqual(parGenre[k].freeQty, 0, `${k} : rien n’est offert`);
+  assert.ok(parGenre[k].unitPrice < negociable.sold, `${k} : c’est le prix qui baisse`);
+  assert.ok(parGenre[k].paidQty >= negociable.qty, `${k} : … contre du volume`);
+});
+// ON REVIENT AU TARIF D'UN CLIC : rien n'ayant été écrit ailleurs que dans
+// l'accord, y renoncer suffit.
+const retirer = (DEVIS.match(/function negRetirerAccord\(i\)\{[\s\S]*?\n\}/) || [''])[0];
+assert.ok(retirer && /delete TX_NEG\.negotiation/.test(retirer) && /delete t\.negotiation/.test(retirer),
+  'retirer l’accord le supprime, des deux côtés');
 
 // LE PRIX DEMANDÉ SE TAPE EN ENTIER. `renderNeeds` remplace tout
 // `needsDisplay` : tant que la frappe le rappelait, le champ repartait à zéro

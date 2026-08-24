@@ -288,6 +288,11 @@ h2{letter-spacing:-.01em}
 .neg-sol.is-bad{opacity:.6}
 /* « MA SOLUTION » : la ligne que la vendeuse remplit elle-même. Trait
    pointillé — c'est une saisie, pas une proposition calculée. */
+/* L'accord en place : ce qu'on a retenu, et de quoi y renoncer. */
+.neg-accord{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:var(--pas-3);
+  padding:var(--pas-2) var(--pas-3);border-radius:var(--arrondi-bloc);background:var(--primary-soft);
+  font-weight:var(--graisse-forte);color:var(--text-1)}
+.neg-accord button{margin-inline-start:auto;padding:var(--champ-y-serre) 14px!important}
 .neg-mienne{border-style:dashed}
 .neg-mienne-saisie{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3);align-items:end;margin-top:var(--pas-3)}
 .neg-mienne-saisie .field{margin-bottom:0}
@@ -1651,7 +1656,41 @@ function txReadForm(){
     ...TX_NEG,
   };
 }
-function txCalc(d){return txReady()?TE().calculate(d):null}
+/* LE TARIF, SANS L'ACCORD. La négociation part TOUJOURS du tarif : sinon une
+   deuxième discussion négocierait sur le prix déjà négocié, et les remises se
+   cumuleraient sans que personne ne s'en aperçoive. */
+function txCalcTarif(d){return txReady()?TE().calculate(d):null}
+
+/* CE QUE VAUT LA LIGNE : le tarif tant qu'aucune offre n'a été retenue,
+   l'ACCORD dès qu'il y en a un. */
+function txCalc(d){return txAvecAccord(txCalcTarif(d),d)}
+
+/* UNE OFFRE RETENUE TIENT EN TROIS NOMBRES, ceux du fichier V9 du patron : la
+   quantité FACTURÉE, le prix à la pièce, les pièces OFFERTES. Chez lui, les
+   deux familles ne se comportent pas pareil, et c'est tout le sujet :
+     — un GESTE ne baisse pas le prix : le client paie autant et reçoit plus ;
+     — un VOLUME ne donne rien : le client commande plus et paie moins cher.
+   ON NE FACTURE QUE CE QUI EST SAISI. La quantité facturée de l'accord n'entre
+   donc pas dans le calcul : elle sert à rappeler ce que l'offre supposait
+   (voir txAlertes). Les pièces OFFERTES, elles, se produisent — elles entrent
+   dans les pièces livrées et dans le coût, jamais dans les cases des tailles.
+   Le tarif continue de tourner en dessous : il donne le coût de revient et les
+   temps, sur lesquels le moteur mesure l'accord exactement comme il mesure une
+   solution de négociation. */
+function txAvecAccord(c,d){
+  const a=c&&d&&d.negotiation;
+  if(!a)return c;
+  const offertes=Math.max(0,Math.round(txNum(a.freeQty)));
+  const m=TE().scenarioMetrics(c,{paidQty:c.qty,unitPrice:txNum(a.unitPrice),freeQty:offertes},txNum(a.target));
+  /* Le temps de production suit les pièces LIVRÉES : une pièce offerte se
+     marque et se presse comme les autres. */
+  const facteur=c.qty>0?m.delivered/c.qty:1;
+  const heures=c.prodHours*facteur;
+  return {...c,accord:m,facturees:c.qty,offertes,
+    qty:m.delivered,sold:m.effective,total:m.revenue,
+    costSeries:m.cost,margin:m.margin,mark:m.mark,
+    prodHours:heures,eurH:heures>0?m.margin/heures:NaN};
+}
 function txDisplayRef(d){return d.isCustom?(d.customRef||'NOUVEAU'):d.ref}
 
 
@@ -1660,6 +1699,17 @@ function txDisplayRef(d){return d.isCustom?(d.customRef||'NOUVEAU'):d.ref}
    Dos · 2 pièces » : le genre, la couleur du marquage, le transport, les
    tailles et la note n'y étaient pas, et rien ne disait laquelle des deux
    couleurs était celle de l'encre. Un champ vide ne prend pas de place. */
+/* L'ACCORD SE LIT SUR LE TICKET, EN TOUTES LETTRES. Sans ça, une ligne
+   négociée ressemble à une ligne au tarif dont le prix serait bizarre : c'est
+   l'accord qui explique le chiffre, et c'est lui que la vendeuse redit au
+   client. Les mots sont ceux de la carte qu'elle a retenue. */
+function txAccordTexte(a){
+  const facturees=Math.max(1,Math.round(txNum(a.paidQty)));
+  const offertes=Math.max(0,Math.round(txNum(a.freeQty)));
+  const base=`${facturees} à ${money(txNum(a.unitPrice))}`;
+  return offertes>0?`${base} + ${offertes} offerte${offertes>1?'s':''}`:base;
+}
+
 function txSaisieLignes(d){
   const lignes=[
     ['Référence',txDisplayRef(d)],
@@ -1673,6 +1723,7 @@ function txSaisieLignes(d){
      « × » en gris (voir txTaillesNode). Aucune taille saisie, aucune rangée. */
   const tailles=txTaillesNode(d);
   if(tailles.childElementCount)lignes.push(['Tailles',tailles]);
+  if(d.negotiation)lignes.push(['Négocié',txAccordTexte(d.negotiation)]);
   if(String(d.note==null?'':d.note).trim())lignes.push(['Note',d.note]);
   return lignes;
 }
@@ -1926,6 +1977,14 @@ function txAlertes(d,c){
     out.push(txEl('div','tx-alerte','Contrainte technique détectée dans la note (dimension de marquage) — à valider en production avant devis.'));
   if(txNum(d.manualPrice)>0)
     out.push(txEl('div','tx-alerte',`Prix manuel appliqué : ${money(c.sold)} la pièce — le calcul ne décide plus du prix.`));
+  /* UNE OFFRE DE VOLUME NE SE FACTURE PAS TOUTE SEULE. « 70 à 15,55 € » n'est
+     tenable qu'à 70 : on ne remplit rien à la place de la vendeuse — les
+     pièces se saisissent dans les tailles, où elles ont un nom — mais on lui
+     dit combien il en manque, sinon le prix baisse sans la commande. */
+  const a=d.negotiation,facturees=c.accord?c.accord.paidQty:0;
+  const attendues=a?Math.max(1,Math.round(txNum(a.paidQty))):0;
+  if(a&&attendues>facturees)
+    out.push(txEl('div','tx-alerte',`L’offre retenue suppose ${attendues} pièces facturées, la saisie en compte ${facturees} : il en manque ${attendues-facturees} à répartir dans les tailles.`));
   return out;
 }
 
@@ -2221,7 +2280,7 @@ function negCustomDe(i, c){
 function negPoserCustom(i, champ, valeur){
   const t = negSaisie(i);
   if(!t) return;
-  const c = txCalc(t);
+  const c = txCalcTarif(t);
   if(!c) return;
   const base = negCustomDe(i, c);
   const custom = { paidQty:base.paidQty, unitPrice:base.unitPrice, freeQty:base.freeQty };
@@ -2233,7 +2292,7 @@ function negMajCustom(i){
   const t = negSaisie(i);
   const carte = document.getElementById(`negMienne-${i}`);
   if(!carte || !t) return;
-  const c = txCalc(t);
+  const c = txCalcTarif(t);
   if(!c) return;
   const target = negTargetDe(i);
   const s = negCustomDe(i, c);
@@ -2300,7 +2359,7 @@ function negCarteMienne(i, c){
 
 function negPanneau(i){
   const t = negSaisie(i);
-  const c = t ? txCalc(t) : null;
+  const c = t ? txCalcTarif(t) : null;
   const bloc = txEl('div', 'neg-panneau');
   if(!c){
     bloc.append(txEl('p', 'help', 'Cette ligne doit être chiffrée avant de négocier.'));
@@ -2325,6 +2384,17 @@ function negPanneau(i){
   haut.append(negLigne('Devis actuel', `${c.qty} × ${money(c.sold)}`));
   bloc.append(haut);
 
+  /* L'ACCORD EN PLACE SE LIT ET SE RETIRE ICI. Rien n'ayant été écrit ailleurs
+     que dans l'accord, y renoncer suffit à revenir au tarif. */
+  if(t.negotiation){
+    const rappel = txEl('div', 'neg-accord');
+    rappel.append(txEl('span', null, `Accord retenu : ${txAccordTexte(t.negotiation)}`));
+    const retirer = txEl('button', 'secondary', 'Retirer l’accord');
+    retirer.onclick = () => negRetirerAccord(i);
+    rappel.append(retirer);
+    bloc.append(rappel);
+  }
+
   const resultats = txEl('div', 'neg-resultats');
   resultats.id = `negResultats-${i}`;
   negRemplirResultats(resultats, i);
@@ -2337,7 +2407,7 @@ function negPanneau(i){
 function negRemplirResultats(hote, i){
   hote.textContent = '';
   const t = negSaisie(i);
-  const c = t ? txCalc(t) : null;
+  const c = t ? txCalcTarif(t) : null;
   if(!c) return;
   const target = negTargetDe(i);
 
@@ -2373,22 +2443,37 @@ function negRemplirResultats(hote, i){
 function negRetenir(i, m){
   const t = negSaisie(i);
   if(!t) return;
-  const prix = String(Math.round(m.effective*100)/100);
+  /* LES TROIS NOMBRES DU V9, ET RIEN D'AUTRE : quantité facturée, prix à la
+     pièce, pièces offertes. Aucune taille touchée, aucun prix manuel bricolé —
+     c'est l'accord lui-même qui fait le devis (voir txAvecAccord). */
   const accord = { paidQty:m.paidQty, freeQty:m.freeQty, unitPrice:m.unitPrice, target:negTargetDe(i) };
   if(i === 'ticket'){
-    /* SUR LE TICKET, LA SAISIE EST LE FORMULAIRE : le prix s'écrit dans son
-       champ, et le récapitulatif le relit comme n'importe quelle correction —
-       il n'y a pas d'état de négociation à part. */
-    $('txManualPrice').value = prix;
     TX_NEG.negotiation = accord;
+    txNegOuvert = false;   /* l'offre est retenue : on referme et on lit le ticket */
     previewTextile();
     return;
   }
-  t.manualPrice = prix;
   t.negotiation = accord;
-  const apres = TE().calculate(t);
+  const apres = txCalc(t);
   if(apres){ needs[i].qty = apres.qty; needs[i].unitHT = apres.sold; needs[i].comment = txComment(t); }
   negOuvert = -1;
+  renderNeeds(); updateSidebar();
+}
+
+/* ON REVIENT AU TARIF D'UN CLIC. Un accord se retire — le client change
+   d'avis, la vendeuse s'est trompée de carte — et rien n'a été écrit ailleurs
+   qu'ici : il suffit de l'oublier. */
+function negRetirerAccord(i){
+  if(i === 'ticket'){
+    delete TX_NEG.negotiation;
+    previewTextile();
+    return;
+  }
+  const t = negSaisie(i);
+  if(!t) return;
+  delete t.negotiation;
+  const apres = txCalc(t);
+  if(apres){ needs[i].qty = apres.qty; needs[i].unitHT = apres.sold; needs[i].comment = txComment(t); }
   renderNeeds(); updateSidebar();
 }
 
@@ -2422,9 +2507,9 @@ function renderDetailArticle(){
 
   const rang=txEl('div','tx-ligne-tete');
   const neg=n.textile.negotiation;
-  if(neg)rang.append(txEl('span','badge', txNum(neg.freeQty)>0
-    ? `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)} + ${txNum(neg.freeQty)} offerte(s)`
-    : `Négocié : ${txNum(neg.paidQty)} à ${money(neg.unitPrice)}`));
+  /* Les mêmes mots que sur le ticket et que sur la carte retenue : un accord
+     ne se raconte pas de trois façons. */
+  if(neg)rang.append(txEl('span','badge',`Négocié : ${txAccordTexte(neg)}`));
   /* UNE SEULE ACTION SUR LA FICHE. Elle en portait trois : « Dupliquer », qui
      retapait un article de toutes façons modifiable ensuite, et « Le client
      négocie », qui n'avait rien à faire ici — la négociation se lance depuis
