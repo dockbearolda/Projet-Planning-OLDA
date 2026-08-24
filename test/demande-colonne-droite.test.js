@@ -34,7 +34,7 @@ function source(nom, signature) {
 // source : c'est le HTML réellement produit qu'on veut juger, pas sa forme.
 const renderNeedsSrc = source('renderNeeds', '');
 
-function rendre(needs, articleOuvert = -1) {
+function rendre(needs, articleOuvert = -1, ouverts) {
   const ecran = {};
   const boite = (id) => (ecran[id] = ecran[id] || {});
   const contexte = vm.createContext({
@@ -48,6 +48,7 @@ function rendre(needs, articleOuvert = -1) {
     money: (n) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
       .format(Number(n) || 0),
     renderDetailArticle() {}, txRefreshTotals() {}, updateSidebar() {},
+    dmdDetailsOuverts: ouverts || new Set(),
   });
   vm.runInContext(`${renderNeedsSrc}\nrenderNeeds();`, contexte);
   return { html: boite('needsDisplay').innerHTML || '', compteur: boite('needCount').textContent };
@@ -85,6 +86,53 @@ assert.ok(/need-ligne is-ouvert/.test(ouvert.html),
   'la ligne dont le détail est ouvert à gauche se repère dans le panneau');
 assert.strictEqual((ouvert.html.match(/is-ouvert/g) || []).length, 1,
   'une seule ligne ouverte à la fois');
+
+// --- 2 bis. LE DÉTAIL SE DÉROULE, ET LE CHOIX TIENT (24/08/2026) -------------
+// Fermée, la carte dit l'essentiel : la désignation (en titre), la référence,
+// le prix. Le reste — marquage, encre, tailles, prix à la pièce, famille —
+// attend derrière « Détail ». Le choix est un ÉTAT (dmdDetailsOuverts) : la
+// liste se redessine à chaque ajout, une ouverture portée par le seul DOM se
+// refermerait sous les yeux au premier article suivant. Un nouvel article
+// arrive toujours refermé.
+{
+  const ferme = rendre([TASSES, TSHIRTS]);
+  // Les rangées pliées restent dans le DOM (le CSS les cache) : ce qui doit
+  // se vérifier ici, c'est le MARQUAGE des rangées et l'état de la ligne.
+  assert.ok(/class="need-derouler"/.test(ferme.html),
+    'chaque carte qui a du détail porte sa rangée « Détail »');
+  assert.ok(!/detail-ouvert/.test(ferme.html),
+    'aucune ouverture par défaut : un nouvel article arrive refermé');
+  assert.ok(/aria-expanded="false"/.test(ferme.html) && !/aria-expanded="true"/.test(ferme.html),
+    '… et la rangée-bouton le dit aussi au lecteur d’écran');
+  // La référence et l'argent ne sont jamais pliés ; le descriptif l'est.
+  assert.ok(/<span>Réf\.<\/span>/.test(ferme.html),
+    'la référence reste visible carte fermée : elle n’est pas marquée pliée');
+  assert.ok(/<span class="est-argent">Total<\/span>/.test(ferme.html),
+    '… le total non plus');
+  assert.ok(/<span class="need-plie">Famille<\/span>/.test(ferme.html),
+    'la famille attend derrière « Détail »');
+  assert.ok(/class="est-argent need-plie">À la pièce<\/span>/.test(ferme.html),
+    '… le prix à la pièce aussi');
+  // Le bouton vient APRÈS les paires visibles : glissé entre deux moitiés de
+  // rangée, il décale la parité de la grille et le filet de première rangée
+  // tombe sur une seule des deux cellules.
+  assert.ok(ferme.html.indexOf('need-derouler') > ferme.html.indexOf('>Total<'),
+    'la rangée « Détail » suit les rangées visibles, elle ne coupe pas une paire');
+
+  const deroule = rendre([TASSES, TSHIRTS], -1, new Set([1]));
+  assert.ok(/detail-ouvert/.test(deroule.html) && /aria-expanded="true"/.test(deroule.html),
+    'l’état mémorisé rouvre la ligne au redessin suivant : le choix tient');
+  assert.strictEqual((deroule.html.match(/detail-ouvert/g) || []).length, 1,
+    '… et il ne rouvre QUE la ligne choisie');
+}
+// La suppression décale les indices : la mémoire d'ouverture se réindexe,
+// sinon le déroulé saute sur la ligne d'en dessous.
+assert.ok(/dmdDetailsOuverts=new Set\(\[\.\.\.dmdDetailsOuverts\]\.filter\(k=>k!==i\)\.map\(k=>k>i\?k-1:k\)\)/.test(source('deleteNeed', 'i')),
+  'supprimer une ligne réindexe la mémoire du déroulé');
+// Le clic sur « Détail » ne remonte pas jusqu'à la ligne : il ouvrirait la
+// fiche à gauche en même temps qu'il déroule.
+assert.ok(/ev\.stopPropagation\(\)/.test(source('basculerDetailArticle', 'i,ev')),
+  'dérouler n’ouvre pas la fiche : le clic s’arrête à la rangée « Détail »');
 
 // --- 3. Les indices se décalent ---------------------------------------------
 // `needs.splice(i,1)` remonte tout ce qui suit : garder l'article ouvert
@@ -131,8 +179,14 @@ assert.ok(!/<input/.test(renderNeedsSrc),
   'aucun champ de saisie sur la carte : la note se tape dans le formulaire de l’article');
 assert.ok(!/>Négociation</.test(renderNeedsSrc),
   'la carte ne porte plus de bulle « Négociation »');
-assert.strictEqual((renderNeedsSrc.match(/<button/g) || []).length, 2,
-  'DEUX actions sur la carte, pas une de plus : Modifier et Supprimer');
+// Depuis le 24/08 la carte porte AUSSI la rangée « Détail » — une commande de
+// LECTURE (elle déroule ce que la carte dit, elle ne touche pas au dossier).
+// La règle des deux actions reste entière : Modifier et Supprimer, dans
+// .need-actions, et rien d'autre qui AGISSE.
+assert.strictEqual((renderNeedsSrc.match(/<button/g) || []).length, 3,
+  'trois boutons : deux actions (Modifier, Supprimer) et la rangée de lecture « Détail »');
+assert.strictEqual((renderNeedsSrc.match(/class="need-actions"[\s\S]*?<\/div>/g) || [''])[0].split('<button').length - 1, 2,
+  'DEUX actions qui agissent sur la carte, pas une de plus : Modifier et Supprimer');
 assert.ok(!/function ouvrirNegociation/.test(DEVIS),
   'le raccourci de la ligne n’a plus de bouton : il s’en va avec lui');
 // La négociation reste à UN clic : la carte ouvre la fiche, la fiche porte son
@@ -201,8 +255,9 @@ assert.ok(/\.need-tab\{[^}]*grid-column:1\/-1/.test(DEVIS),
 // faisaient une valeur de 195 px : dans 322 px elle repassait à la ligne, et
 // son intitulé se retrouvait à hauteur de la SECONDE ligne — sous le début de
 // sa propre valeur.
-assert.ok(/\['Marquage',t\.printType\]/.test(renderNeedsSrc)
-  && /\['Couleur',t\.markColor\]/.test(renderNeedsSrc),
+// (le « ,1 » marque la rangée comme pliée derrière « Détail », voir 2 bis)
+assert.ok(/\['Marquage',t\.printType,1\]/.test(renderNeedsSrc)
+  && /\['Couleur',t\.markColor,1\]/.test(renderNeedsSrc),
   'le marquage et sa couleur tiennent chacun leur rangée');
 assert.ok(!/\[t\.printType,t\.markColor\]/.test(renderNeedsSrc),
   '… ils ne sont plus collés dans une seule valeur');

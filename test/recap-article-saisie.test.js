@@ -146,7 +146,7 @@ assert.strictEqual(libre['Référence'], 'SWEAT-XL');
 // --- 3. La ligne de la demande -----------------------------------------------
 // On EXÉCUTE `renderNeeds` : c'est le HTML produit qu'on juge.
 const renderNeedsSrc = source('renderNeeds', '');
-function rendre(needs) {
+function rendre(needs, ouverts) {
   const ecran = {};
   const boite = (id) => (ecran[id] = ecran[id] || {});
   const contexte = vm.createContext({
@@ -155,6 +155,7 @@ function rendre(needs) {
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])),
     money: (n) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0),
     renderDetailArticle() {}, txRefreshTotals() {}, updateSidebar() {},
+    dmdDetailsOuverts: ouverts || new Set(),
   });
   vm.runInContext(`${renderNeedsSrc}\nrenderNeeds();`, contexte);
   return boite('needsDisplay').innerHTML || '';
@@ -179,7 +180,9 @@ assert.ok(par['Genre'] === 'Bébé' && par['Transport'] === 'Chronopost',
   '… mais le récapitulatif de l’article les garde, chacun sous son intitulé');
 // Depuis le 24/08 la carte est une TABLE : l'intitulé est un `<span>`, sa
 // valeur un `<b>` calé à droite (voir `.need-tab`).
-assert.ok(/<span>Marquage<\/span>/.test(html) && /<span>Tailles<\/span>/.test(html),
+// Depuis le 24/08 ces rangées sont pliées derrière « Détail » (class
+// need-plie) : présentes dans la table, cachées carte fermée.
+assert.ok(/<span class="need-plie">Marquage<\/span>/.test(html) && /<span class="need-plie">Tailles<\/span>/.test(html),
   'chaque valeur porte son intitulé : « Coconut Milk » et « Kaki » ne se devinent pas');
 assert.ok(/<span class="est-argent">Total<\/span>/.test(html),
   '… et l’argent ferme la table, sous son intitulé lui aussi');
@@ -191,7 +194,7 @@ assert.ok(!/Production DTF/.test(html),
 // Un article du catalogue n'a pas de chiffrage textile : il garde sa famille,
 // et son intitulé aussi — une case vide décalerait toute la grille.
 const catalogue = rendre([{ category: 'Art de la table', label: 'Bouchon Bois', qty: 3, comment: '', unitHT: NaN }]);
-assert.ok(/<span>Famille<\/span><b>Art de la table/.test(catalogue),
+assert.ok(/<span class="need-plie">Famille<\/span><b class="need-plie">Art de la table/.test(catalogue),
   'un article hors textile garde sa famille, sous un intitulé');
 assert.ok(!/<span><\/span>/.test(catalogue),
   'aucun intitulé vide : la colonne de gauche de la table resterait béante');
@@ -199,6 +202,21 @@ assert.ok(!/<span><\/span>/.test(catalogue),
 // jamais 0 € — « pas encore chiffré » et « gratuit » sont deux choses.
 assert.ok(/a-chiffrer">À chiffrer<\/b>/.test(catalogue) && !/0,00/.test(catalogue),
   '… et sa rangée Total dit « À chiffrer », jamais 0 €');
+
+// --- 3 bis. LE RÉCAPITULATIF AU-DESSUS DES AJUSTEMENTS (24/08/2026) ----------
+// Demande du patron : le prix qu'on s'apprête à annoncer se lit AVANT les
+// réglages fins (remise, prix manuel), pas après. L'aperçu (#txPreview, qui
+// porte « Récapitulatif article » et « Voir le calcul et la marge ») précède
+// donc le volet « Ajustements » dans le formulaire textile.
+assert.ok(DEVIS.indexOf('id="txPreview"') >= 0 && DEVIS.indexOf('<details class="tx-adjust">') >= 0,
+  'l’aperçu et le volet des ajustements doivent exister tous les deux');
+assert.ok(DEVIS.indexOf('id="txPreview"') < DEVIS.indexOf('<details class="tx-adjust">'),
+  'le récapitulatif se lit au-dessus des ajustements');
+// L'ancien ordre soudait l'aperçu à la barre d'action (bord bas ouvert, coins
+// droits) : ces deux règles n'ont plus d'objet et ne doivent pas revenir.
+assert.ok(!/\.tx-preview:not\(\.hidden\)\{border-bottom:0/.test(DEVIS)
+  && !/\.tx-preview:not\(\.hidden\)\+\.tx-barre/.test(DEVIS),
+  'plus de soudure aperçu/barre : les ajustements vivent entre les deux');
 
 // --- 4. Le bloc sous le formulaire et la fiche disent la MÊME chose ----------
 const apercu = source('previewTextile', '');
