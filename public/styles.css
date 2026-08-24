@@ -3695,18 +3695,49 @@ body.view-plein .sidebar-resizer,
 body.view-focus .sidebar,
 body.view-focus .sidebar-resizer { display: none; }
 
+/* ------------------------------------------------------------ Rail replié
+   La poignée règle la largeur du rail, mais jamais en dessous de 180 px : pour
+   lire une commande large, il fallait la traîner jusqu'au minimum et ça ne
+   suffisait pas. Ce repli-là la met à ZÉRO d'un clic, et la ramène d'un clic.
+   La classe est posée sur <html> et non sur <body> : c'est ce qui permet au
+   script en tête de page de la relire AVANT le premier pixel (même chemin que
+   le thème), sinon le rail s'affiche puis se range sous les yeux.
+   `display:none` plutôt qu'une colonne de 0 px seule : le rail défile, et un
+   contenu de 32 entrées dans une piste de largeur nulle déborde. */
+.rail-plie .shell { grid-template-columns: 0 0 minmax(0, 1fr); }
+.rail-plie .sidebar,
+.rail-plie .sidebar-resizer { display: none; }
+/* Le chevron dit où va le rail. La police est un sous-ensemble FIGÉ de 91
+   glyphes et n'a aucune flèche gauche : on retourne le seul chevron qu'elle
+   porte plutôt que d'alourdir la police pour une icône. */
+.rail-toggle .material-symbols-outlined {
+  transform: scaleX(-1);
+  transition: transform var(--dur-2) var(--ease);
+}
+.rail-plie .rail-toggle .material-symbols-outlined { transform: none; }
+/* Hors du planning le rail n'existe pas (voir le repli du .shell juste
+   au-dessus) : son bouton n'aurait rien à replier. */
+body.view-plein .rail-toggle,
+body.view-focus .rail-toggle { display: none; }
+
 /* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
    du Planning il n'a rien à piloter, et son résultat serait invisible. */
 
-/* `view-comptoir` (Nouveau Projet) : poste de vente, devant le client — il ne
-   doit voir QUE l'étape en cours, jamais la nav du back-office (Dashboard,
-   Fiverr, Réglages…) ni la recherche globale. La marque reste (seule sortie,
-   elle ramène au planning) ainsi que plein écran / thème / avatar. */
-body.view-comptoir .nav-switch,
+/* `view-comptoir` (Nouveau Projet) : c'est un ONGLET COMME LES AUTRES.
+   Il masquait toute la navigation — « poste de vente, devant le client » — et
+   l'écran devenait un cul-de-sac : plus d'onglets, plus de rail, rien qui dise
+   qu'on est encore dans l'outil. Le patron l'a refusé le 24/08 : il veut
+   passer du parcours au planning, au Point du jour, et revenir, sans repasser
+   par la flèche du parcours ni par le bouton Précédent.
+   Seule la RECHERCHE reste masquée : elle filtre la grille du planning, qui
+   n'est pas à l'écran — un champ qui ne cherche rien. */
 body.view-comptoir .grid-search { display: none !important; }
-/* Ni onglets ni recherche pour pousser les actions : sans cette marge, plein
-   écran / thème / poste se collent au logo au lieu de tenir le coin droit. */
-body.view-comptoir .topbar-right { margin-left: auto; }
+/* Et comme elle est le seul élément de gauche de la barre, sans elle les
+   actions du coin (plein écran, thème, poste) retombent contre le bord
+   GAUCHE dès que les onglets passent à la ligne. La marge automatique les
+   remet à leur place — vérifié à l'œil, la règle avait été retirée avec le
+   masquage des onglets et le défaut est revenu aussitôt. */
+body.view-comptoir .topbar-right { margin-inline-start: auto; }
 
 /* Panneau « Attribution des catégories ». */
 .cat-overlay {

@@ -6939,6 +6939,31 @@ if ($shell && $sidebarResizer) {
   });
 }
 
+// --- Replier le rail --------------------------------------------------------
+// La poignée ci-dessus règle la largeur, mais elle ne descend pas sous 180 px :
+// pour lire une commande large il fallait la traîner jusqu'au minimum, et ça ne
+// suffisait pas. Ce bouton met le rail à ZÉRO d'un clic et le ramène du même
+// geste. Mémorisé par appareil, comme la largeur.
+// La classe vit sur <html>, pas sur <body> : le script en tête de page la relit
+// AVANT le premier pixel, sinon le rail s'affiche puis se range sous les yeux à
+// chaque ouverture de l'outil.
+const RAIL_PLIE_KEY = 'olda_rail_plie';
+const $railToggle = document.getElementById('railToggle');
+if ($railToggle) {
+  const direLEtatDuRail = () => {
+    const plie = document.documentElement.classList.contains('rail-plie');
+    $railToggle.setAttribute('aria-expanded', String(!plie));
+    $railToggle.setAttribute('aria-label', plie ? 'Déplier le rail des étapes' : 'Replier le rail des étapes');
+  };
+  direLEtatDuRail();
+  attachTip($railToggle, 'Replier / déplier le rail');
+  $railToggle.addEventListener('click', () => {
+    const plie = document.documentElement.classList.toggle('rail-plie');
+    try { localStorage.setItem(RAIL_PLIE_KEY, plie ? '1' : '0'); } catch (_) {}
+    direLEtatDuRail();
+  });
+}
+
 // ===========================================================================
 // ONGLET DASHBOARD — « Point du jour » (module dédié : dashboard.js)
 // ===========================================================================
