@@ -375,10 +375,23 @@ console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu
   assert.ok(!/\.nav-switch-btn--base\s*\{[^}]*margin/.test(sansCommentaire(CLIENTS)),
     '« Base clients » n’a plus de marge à elle : les sept onglets sont sur la ligne');
 
-  // (2) Pliés sur leur propre rangée, les onglets partaient du bord gauche —
-  // 917 px de contenu dans 1012 px, tout le vide à droite.
-  const pli = sansCommentaire(CSS).match(/@container barre \(max-width: 1360px\) \{[\s\S]*?\n\}\n/);
-  assert.ok(pli, 'le pli de la barre doit exister');
+  // (2) LE PLI EST L'ÉTAT DE BASE, ET IL NE REGARDE PLUS LE RAIL.
+  // Il se décidait sur la largeur de la BARRE (`@container barre`), donc sur
+  // celle du rail. Mesuré en 1440 : rail sorti, barre 1260 → deux rangées ;
+  // rail rentré, barre 1440 → une rangée. Ranger le rail réorganisait donc
+  // l'ossature : onglets de la 2e rangée à la 1re, recherche de 940 à 391 px,
+  // et les quatre actions sous la recherche CONTRE LE BORD GAUCHE.
+  const CSSNET = sansCommentaire(CSS);
+  assert.ok(!/@container barre/.test(CSSNET),
+    'le pli ne se décide plus sur la largeur de la barre : elle dépend du rail');
+  assert.ok(!/\.topbar \{[^}]*container-type/.test(CSSNET),
+    '… la barre ne se mesure donc plus elle-même');
+
+  // La disposition PLIÉE est posée sans condition : une largeur inconnue, un
+  // écran de plus, un rail élargi à la main retombent sur celle qui tient
+  // toujours — jamais sur celle qui déborde.
+  const pli = CSSNET.match(/\.topbar \.nav-switch \{\n(?:.*\n)*?\}/);
+  assert.ok(pli && /order: 4/.test(pli[0]), 'la rangée d’onglets pliée est l’état de base');
   assert.ok(/justify-content: safe center/.test(pli[0]),
     'la rangée pliée centre ses onglets');
   // `safe` n'est pas décoratif : la rangée peut DÉFILER, et un `center` sec rend
@@ -386,22 +399,39 @@ console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu
   // que `justify-content: flex-end`.
   assert.ok(/overflow-x: auto/.test(pli[0]),
     '… et elle défile, ce qui est exactement pourquoi le centrage doit être `safe`');
-  // UNE MARGE AUTO MANGE TOUTE LA PLACE LIBRE AVANT `justify-content` : sans la
-  // rendre, le centrage ne prend pas. Mesuré : 67,4 px résolus sur le premier
-  // onglet, la rangée 33,7 px à droite de l’axe malgré le centrage demandé.
-  assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(pli[0]),
-    '… et le premier onglet rend sa marge automatique, sinon le centrage ne prend pas');
-  // Sur la rangée PLEINE, en revanche, les onglets tiennent la droite par cette
-  // marge — jamais par flex-end (le contenu sortirait par la gauche).
-  assert.ok(/\.nav-switch > :first-child \{ margin-left: auto; \}/.test(sansCommentaire(CSS)),
-    'sur la rangée pleine, les onglets tiennent la droite par une marge automatique');
-  assert.ok(!/\.nav-switch \{[^}]*justify-content:\s*flex-end/.test(sansCommentaire(CSS)),
-    '… jamais par flex-end');
   // Le rembourrage rend l'écart des flancs de la barre (32 à gauche, 16 à
   // droite) : sans lui, centrer dans cette boîte poserait les onglets 8 px à
   // droite de l'axe réel de la barre.
   assert.ok(/padding-inline-end: 16px/.test(pli[0]),
     '… et le rembourrage rend l’écart des flancs, pour que l’axe tombe juste');
+  // UNE MARGE AUTO MANGE TOUTE LA PLACE LIBRE AVANT `justify-content` : sans la
+  // rendre, le centrage ne prend pas. Mesuré : 67,4 px résolus sur le premier
+  // onglet, la rangée 33,7 px à droite de l’axe malgré le centrage demandé.
+  assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(CSSNET),
+    '… et le premier onglet rend sa marge automatique, sinon le centrage ne prend pas');
+
+  // LA RANGÉE UNIQUE est l'exception, décidée sur la FENÊTRE — qui, elle, ne
+  // bouge pas quand on range le rail. 1720 = les ~1490 px qu'il faut à la
+  // rangée + le rail à sa largeur par défaut (180) + une marge. L'ancien seuil
+  // (1360 px de barre) était en prime sous-évalué : à 1440 la rangée se
+  // dépliait pour se casser aussitôt.
+  const rangeeUnique = CSSNET.match(/@media \(min-width: 1720px\) \{[\s\S]*?\n\}\n/);
+  assert.ok(rangeeUnique, 'la rangée unique se décide sur la fenêtre');
+  // `nowrap` la VERROUILLE : sans lui, une barre trop courte de quelques pixels
+  // remet les actions à la ligne, sous la recherche et contre le bord gauche.
+  assert.ok(/\.topbar \{ flex-wrap: nowrap; \}/.test(rangeeUnique[0]),
+    '… et rien ne peut y passer à la ligne');
+  // Sur la rangée pleine, les onglets tiennent la droite par une marge
+  // automatique — jamais par flex-end (le contenu sortirait par la gauche).
+  assert.ok(/margin-left: auto/.test(rangeeUnique[0]),
+    'sur la rangée pleine, les onglets tiennent la droite par une marge automatique');
+  assert.ok(!/\.nav-switch \{[^}]*justify-content:\s*flex-end/.test(CSSNET),
+    '… jamais par flex-end');
+
+  // Le resserrement des onglets se décide lui aussi sur la FENÊTRE : un écart
+  // qui changerait au rangement du rail serait le même défaut en plus petit.
+  assert.ok(/@media \(max-width: 1100px\) \{\n  \.topbar \.nav-switch \{ gap: 2px; \}/.test(CSSNET),
+    'le resserrement des onglets ne dépend pas non plus du rail');
 }
 
 console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée sur l’axe');
