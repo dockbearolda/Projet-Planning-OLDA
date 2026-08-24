@@ -129,14 +129,17 @@ function afficher(id) {
   fluxAffiche = flux ? flux.id : null;
   ROOT.querySelector('#np-home').hidden = !!flux;
   ROOT.querySelector('#np-frames').hidden = !flux;
-  /* LA FLÈCHE RESTE, MÊME SUR LES TUILES — ET C'EST LA SEULE SORTIE DU POSTE.
-     Ici la navigation de l'outil est masquée (on est devant le client) et la
-     marque a quitté la coquille : sans cette flèche, l'accueil du comptoir
-     serait un cul-de-sac. Elle remonte d'un cran à chaque fois : parcours →
-     tuiles → planning. */
+  /* LA FLÈCHE N'APPARAÎT QUE DANS UN PARCOURS. Elle restait affichée sur les
+     tuiles parce qu'elle était, à l'époque, la SEULE sortie du poste : la
+     navigation de l'outil y était masquée. Elle ne l'est plus (24/08) — les
+     onglets et le rail sont à l'écran — donc sur l'accueil la flèche ne fait
+     que doubler l'onglet « Planning », et elle propose de « revenir » depuis
+     un écran où l'on vient d'arriver.
+     Dans un parcours, en revanche, elle porte un geste qui n'existe nulle part
+     ailleurs : remonter d'un cran, du parcours vers les tuiles. */
   const bar = ROOT.querySelector('#np-bar');
   const btn = ROOT.querySelector('#np-home-btn');
-  bar.hidden = false;
+  bar.hidden = !flux;
   const quoi = flux ? 'Changer de parcours' : 'Retour au planning';
   btn.setAttribute('aria-label', quoi);
   btn.title = quoi;
@@ -291,7 +294,7 @@ function construireBarre() {
 
   const retour = document.createElement('button');
   retour.type = 'button';
-  retour.className = 'np-bar-home';
+  retour.className = 'btn-retour np-bar-home';
   retour.id = 'np-home-btn';
   /* Une flèche seule : le nom du parcours est déjà écrit à droite, dans la
      bascule, et l'en-tête noir du parcours a disparu. Le libellé reste porté

@@ -238,7 +238,10 @@ body{font-family:'Manrope',Arial,sans-serif!important}
 input,select,textarea,button{font-family:inherit!important}
 header p{color:var(--text-3)!important}
 .card{border-radius:var(--arrondi-carte)!important}
-button{border-radius:var(--arrondi-champ)!important}
+/* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
+   et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
+   ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
+button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
 .step{border-radius:999px!important}
 .step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
@@ -793,7 +796,7 @@ h2{letter-spacing:-.01em}
 </div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
-<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions"><button class="secondary" onclick="showStep(2)">← Retour</button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions"><button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(2)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
 
 
 <section id="step4" class="hidden">
@@ -900,7 +903,7 @@ h2{letter-spacing:-.01em}
     </div><div id="controlBox" class="notice orange">Renseigne l’état des informations reçues.</div>
 
     <div class="actions" style="margin-top:16px">
-      <button class="secondary" onclick="showStep(3)">← Retour</button>
+      <button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(3)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
       <button class="primary" onclick="goStep(5)">Choisir le client →</button>
     </div>
   </div>
@@ -1040,7 +1043,7 @@ h2{letter-spacing:-.01em}
     </div><div id="step5ValidationSummary" class="validation-summary hidden"></div>
 
     <div class="actions" style="margin-top:16px">
-      <button class="secondary" onclick="showStep(4)">← Retour</button>
+      <button class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente" onclick="showStep(4)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
       <button class="primary" onclick="openRecapFromStep5()">Voir le récapitulatif →</button>
     </div>
   </div>
@@ -4108,7 +4111,9 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     var actions=document.querySelector('#step7 .actions');
     if(!actions||document.getElementById('recapBackBtn'))return;
     var b=document.createElement('button');
-    b.id='recapBackBtn';b.className='secondary';b.textContent='← Retour';
+    b.id='recapBackBtn';b.className='btn-retour';
+    b.title=b.ariaLabel='Revenir à l’étape précédente';
+    b.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg>';
     b.onclick=function(){showStep(5);};
     actions.insertBefore(b,actions.firstChild);
   }

@@ -518,7 +518,10 @@ body{font-family:'Manrope',Arial,sans-serif!important}
    les champs doivent rester avec lui. */
 input,select,textarea,button{font-family:inherit!important}
 .card{border-radius:var(--arrondi-carte)!important}
-button{border-radius:var(--arrondi-champ)!important}
+/* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
+   et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
+   ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
+button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
 .step{border-radius:999px!important}
 .step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
@@ -903,7 +906,7 @@ h2{letter-spacing:-.01em}
 
     <div class="actions" style="margin-top:18px">
       <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
-      <button id="backToArticlesBtn" class="secondary">← Retour aux articles</button>
+      <button id="backToArticlesBtn" class="btn-retour" title="Revenir aux articles" aria-label="Revenir aux articles"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
     </div>
   </div>
 
@@ -1952,7 +1955,7 @@ renderProducts();
   const nav=document.createElement("div");
   nav.className="tablet-wizard-nav";
   nav.innerHTML=`
-    <button id="saleBack" class="secondary">← Retour</button>
+    <button id="saleBack" class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
     <div class="wizard-spacer"></div>
     <button id="saleNext" class="primary">
       Valider et passer à l'étape suivante →

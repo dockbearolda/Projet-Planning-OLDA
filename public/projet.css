@@ -72,14 +72,9 @@
   font-family: var(--font);
 }
 .np-bar[hidden] { display: none; }
-.np-bar-home {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; padding: 0;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-1);
-  font-family: inherit; cursor: pointer;
-}
-.np-bar-home:hover { border-color: var(--primary); background: var(--surface-hover); }
-.np-bar-home:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* La flèche du parcours n'a plus de forme à elle : elle porte `.btn-retour`,
+   le bouton « revenir d'un cran » de la charte — le MÊME objet que celui des
+   étapes du parcours, qui vit dans un autre document. Une seule source. */
 
 /* Un dossier qui ne part pas au planning se DIT : la vendeuse a le client
    devant elle, elle ne doit pas découvrir la perte le lendemain. */

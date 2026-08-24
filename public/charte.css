@@ -197,6 +197,29 @@
   --pas-4: 24px;   /* rembourrage d'une carte, entre deux blocs */
 }
 
+/* ------------------------------------------------------- Revenir d'un cran
+   UN SEUL OBJET POUR UN SEUL GESTE : rond, 44 px, bordé, la flèche à l'encre.
+   Il en existait sept formes — cinq ronds de tailles et d'arrondis différents
+   dans le CRM, et « ← Retour » en bulle grise dans les deux parcours du
+   comptoir. Aucune ne se reconnaissait d'un écran à l'autre.
+   Il vit ICI, dans la charte, et pas dans la feuille du CRM : les parcours du
+   comptoir sont des DOCUMENTS À PART (voir public/comptoir/*.html) et la charte
+   est le seul fichier qu'eux et le CRM lisent tous les deux. C'est ce qui fait
+   que la flèche du parcours et celle d'une étape sont littéralement le même
+   bouton, pas deux qui se ressemblent.
+   La classe bat le sélecteur `button` nu des parcours (0,1,0 contre 0,0,1) :
+   leur `padding` et leur `border-radius` par défaut ne s'appliquent pas ici. */
+.btn-retour {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-1);
+  font-family: inherit; cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.btn-retour:hover { border-color: var(--primary); background: var(--surface-hover); }
+.btn-retour:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
 /* ---------------------------------------------------------------- Thème sombre
    Même charte, retournée : l'accent encre devient encre claire, d'où
    --on-primary qui repasse en sombre (un `color:#fff` en dur sur un accent

@@ -222,8 +222,11 @@ console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue q
 // Il en existait cinq formes — 32, 36, 40, 44, 46 px, trois arrondis, la moitié
 // sans bordure. À l'œil, aucun ne se reconnaissait d'un écran à l'autre.
 {
-  const modele = sansCommentaire(PROJ).match(/\.np-bar-home \{[^}]*\}/);
-  assert.ok(modele, 'le bouton de retour du parcours est le modèle : il doit exister');
+  // Le modèle a déménagé dans la CHARTE le 24/08 (`.btn-retour`) : c'est le seul
+  // fichier que le CRM et les deux parcours du comptoir lisent tous les deux.
+  const CHARTE0 = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+  const modele = sansCommentaire(CHARTE0).match(/\.btn-retour \{[^}]*\}/);
+  assert.ok(modele, 'le bouton « revenir d’un cran » est le modèle : il doit exister');
   assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0]),
     '… 44 px et rond');
   for (const sel of ['.colbar-close', '.cat-close', '.ld-close', '.guide-close']) {
@@ -243,3 +246,45 @@ console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue q
 }
 
 console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’application');
+
+// --- 8. LA FLÈCHE « REVENIR D'UN CRAN » ------------------------------------
+// Elle vit dans la CHARTE, pas dans la feuille du CRM : les deux parcours du
+// comptoir sont des documents à part, et la charte est le seul fichier qu'eux
+// et le CRM lisent tous les deux. C'est ce qui fait que la flèche du parcours
+// et celle d'une étape sont littéralement le même bouton.
+{
+  const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+  const modele = sansCommentaire(CHARTE).match(/\.btn-retour \{[^}]*\}/);
+  assert.ok(modele, '.btn-retour doit être déclaré dans la charte, pas ailleurs');
+  assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0])
+    && /border: 1px solid var\(--border\)/.test(modele[0]),
+    'la flèche est ronde, 44 px, bordée');
+  assert.ok(!/\.np-bar-home \{/.test(sansCommentaire(PROJ)),
+    'la flèche du parcours n’a plus de forme à elle : une seule source');
+
+  // ELLE N'APPARAÎT PAS SUR LES TUILES. Elle y restait du temps où elle était la
+  // SEULE sortie du poste ; la navigation est revenue, elle n'y ferait plus que
+  // doubler l'onglet « Planning » — et proposer de « revenir » d'un écran où
+  // l'on vient d'arriver.
+  const NP = fs.readFileSync(path.join(RACINE, 'public/nouveau-projet.js'), 'utf8');
+  assert.ok(/bar\.hidden = !flux;/.test(NP),
+    'la flèche ne s’affiche que DANS un parcours, jamais sur l’accueil à deux tuiles');
+  assert.ok(/retour\.className = 'btn-retour np-bar-home'/.test(NP),
+    '… et c’est bien le bouton de la charte qu’elle porte');
+
+  // Les étapes des DEUX parcours portent la même. `← Retour` en bulle grise
+  // n'existe plus nulle part.
+  for (const f of ['public/comptoir/demande-devis.html', 'public/comptoir/vente-directe.html']) {
+    const doc = fs.readFileSync(path.join(RACINE, f), 'utf8');
+    assert.ok(!/>← Retour/.test(doc) && !/textContent='← Retour'/.test(doc),
+      `${f} : plus aucun « ← Retour » en bulle grise`);
+    assert.ok((doc.match(/class="btn-retour"/g) || []).length >= 2 || /className='btn-retour'/.test(doc),
+      `${f} : ses étapes portent la flèche de la charte`);
+    // UN `!important` SUR UN SÉLECTEUR NU BAT N'IMPORTE QUELLE CLASSE : sans
+    // cette exception, la flèche reprenait l'arrondi d'un CHAMP (9 px).
+    assert.ok(/button:not\(\.btn-retour\)\{border-radius/.test(doc),
+      `${f} : la flèche échappe à l’arrondi de champ imposé aux boutons`);
+  }
+}
+
+console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu’aux étapes des parcours');
