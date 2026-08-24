@@ -864,7 +864,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
   color: var(--text-2);
@@ -2014,9 +2014,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-title { margin: 0; font-size: var(--taille-texte); font-weight: 700; color: var(--text-1); }
 .colbar-close {
   margin-left: auto;
-  width: 32px; height: 32px;
+  width: 44px; height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 50%;
+  border: 1px solid var(--border); border-radius: 999px;
   background: transparent; color: var(--text-2);
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -3702,6 +3702,13 @@ body.view-plein .fiverr-tool { display: none !important; }
    au-dessus) : en-tête d'étape, lignes, rail des colonnes, outil Fiverr. Pas
    la navigation. */
 
+/* UN SEUL BOUTON « RETOUR / FERMER », celui de la barre du parcours : 44 px,
+   rond, bordé. Il en existait cinq formes — 32, 36, 40, 44 et 46 px, trois
+   arrondis, la moitié sans bordure — et aucun ne se reconnaissait d'un écran à
+   l'autre. Les boutons d'ICÔNE NUE de la barre du haut (plein écran, thème)
+   n'en sont pas : ce sont des interrupteurs, ils gardent leur forme sans
+   bordure. */
+
 /* ------------------------------------------------- Passage d'une vue à l'autre
    Le cadre est le même pour toutes les vues (`main.work`) : c'est son CONTENU
    qui change. Sans rien, il changeait d'une image sur l'autre — l'œil repartait
@@ -3794,13 +3801,13 @@ body.view-comptoir .topbar-right { margin-inline-start: auto; }
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 50%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   background: transparent;
   color: var(--text-2);
   cursor: pointer;
@@ -5509,7 +5516,7 @@ body.view-comptoir .topbar-right { margin-inline-start: auto; }
 .ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .ld-head__titles { flex: 1; min-width: 0; }
 .ld-head__badges { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-.ld-close { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--text-2); border-radius: var(--arrondi-champ); cursor: pointer; }
+.ld-close { flex-shrink: 0; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); background: transparent; color: var(--text-2); border-radius: 999px; cursor: pointer; }
 .ld-close:hover { background: var(--state-hover); color: var(--text-1); }
 
 /* Le corps prend le gris de page (--bg) et chaque section devient une carte

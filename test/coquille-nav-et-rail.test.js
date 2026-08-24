@@ -216,3 +216,30 @@ assert.ok(/void cadre\.offsetWidth/.test(bascule[0]),
   '… avec le recalcul forcé, sans lequel l’animation ne rejoue pas au 2e passage');
 
 console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue qui se voit');
+
+// --- 7. UN SEUL BOUTON « RETOUR / FERMER » ---------------------------------
+// Celui que le patron a montré du doigt (`.np-bar-home`) : 44 px, rond, bordé.
+// Il en existait cinq formes — 32, 36, 40, 44, 46 px, trois arrondis, la moitié
+// sans bordure. À l'œil, aucun ne se reconnaissait d'un écran à l'autre.
+{
+  const modele = sansCommentaire(PROJ).match(/\.np-bar-home \{[^}]*\}/);
+  assert.ok(modele, 'le bouton de retour du parcours est le modèle : il doit exister');
+  assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0]),
+    '… 44 px et rond');
+  for (const sel of ['.colbar-close', '.cat-close', '.ld-close', '.guide-close']) {
+    const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
+    assert.ok(r, `${sel} doit exister`);
+    assert.ok(/width: 44px/.test(r[0]) && /height: 44px/.test(r[0]),
+      `${sel} prend la taille du bouton de retour`);
+    assert.ok(/border-radius: 999px/.test(r[0]), `${sel} est rond comme lui`);
+    assert.ok(/border: 1px solid var\(--border\)/.test(r[0]), `${sel} est bordé comme lui`);
+  }
+  // Les icônes NUES de la barre du haut ne sont pas des retours : ce sont des
+  // interrupteurs (plein écran, thème). Elles gardent leur forme sans bordure —
+  // la distinction est voulue, le test la tient pour qu'elle ne se perde pas.
+  const nu = sansCommentaire(CSS).match(/\.icon-btn \{[^}]*\}/);
+  assert.ok(nu && /border: 0/.test(nu[0]),
+    'un interrupteur d’icône n’est pas un bouton de retour : il reste sans bordure');
+}
+
+console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’application');
