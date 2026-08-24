@@ -147,7 +147,29 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
    l'écran qui ne disait pas un état. Un bouton d'envoi est un bouton d'envoi. */
 .whatsapp{background:var(--primary);color:var(--on-primary)}
 .full{width:100%}
-.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap}
+/* TOUTE RANGÉE DE COMMANDES FINIT À DROITE (24/08). « Ajouter l'article, etc.
+   doit toujours être en bas à droite. » Ce n'était vrai que des rangées
+   marquées `a-droite` : les autres partaient du bord gauche — « Ajouter
+   l'article » à 1252 px du bord droit, « + Créer un nouveau client » à 771,
+   « Réinitialiser valeurs Excel » à 365.
+   PAR UNE MARGE AUTOMATIQUE SUR LE PREMIER, jamais par `justify-content:
+   flex-end` : une rangée en flex-end qui déborde se fait rogner PAR LA GAUCHE,
+   et c'est le début du contenu qui devient inatteignable.
+   Sur le PREMIER enfant, pas sur le dernier : les boutons ajoutés en cours de
+   route le sont par `appendChild` (le bouton du planning au récapitulatif, les
+   deux boutons du doublon de client). Poussé par le premier, le groupe reste
+   collé à droite quel que soit ce qu'on lui ajoute. */
+.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap;align-items:center}
+/* PAR UN ÉCARTEUR, PAS PAR UNE MARGE SUR LE PREMIER ENFANT. Le premier enfant
+   est souvent MASQUÉ — « Annuler la modification » ne s'affiche qu'en cours de
+   modification. Un élément en `display:none` n'est pas mis en page : la marge
+   automatique posée dessus ne pousse rien, et « Ajouter l'article » restait
+   collé à gauche. Piège vicieux, parce qu'en démasquant les boutons POUR
+   MESURER on obtient le bon résultat.
+   L'écarteur est un pseudo-élément flexible : il prend tout l'espace libre
+   quels que soient les enfants masqués, et il se réduit à zéro quand la rangée
+   déborde — là où `justify-content:flex-end` rognerait PAR LA GAUCHE. */
+.actions::before{content:"";flex:1 1 0;min-width:0}
 /* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
    La MÊME bulle que sur l'écran de demande de devis — les deux parcours
    tournent sur le même poste. Une étape était un long ruban de champs mis bout
@@ -203,9 +225,19 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 
 /* Parcours bloc par bloc */
 .sale-panel-hidden{display:none!important}
+/* LA VALIDATION DE LA VENTE FERME LA LIGNE, À DROITE (24/08). Cette barre
+   flottait au CENTRE, large de 385 px : `.container` est en
+   `flex-direction:column`, la barre en est un ITEM, et sur un item flex une
+   marge `auto` ne centre pas — elle AVALE l'espace libre. Mesuré : 342,9 px
+   absorbés de chaque côté. Le `max-width:1100px` et les marges automatiques
+   avaient été écrits pour un contexte de bloc, où ils auraient marché.
+   `align-self:stretch` lui rend la largeur de la carte ; l'écarteur pousse
+   alors « Valider … et continuer → » au bord droit, où l'action qui engage se
+   trouve partout ailleurs. Le `max-width` s'en va : à 1180 px de conteneur il
+   laissait la barre 48 px plus étroite que la carte, décalée de tout le reste. */
 .tablet-wizard-nav{
-  position:sticky;bottom:0;z-index:100;margin:var(--pas-3) auto 0;
-  max-width:1100px;background:var(--surface);
+  position:sticky;bottom:0;z-index:100;margin:var(--pas-3) 0 0;
+  align-self:stretch;background:var(--surface);
   border:1px solid var(--border);border-radius:var(--arrondi-carte);
   box-shadow:var(--shadow-2);
   padding:12px;display:flex;justify-content:space-between;gap:var(--pas-2)
@@ -581,6 +613,7 @@ h2{letter-spacing:-.01em}
 .bareme-grid label span{display:flex;align-items:center;gap:var(--pas-1);font-weight:var(--graisse-forte);color:var(--text-2)}
 .bareme-grid input{width:88px;text-align:right;padding:var(--champ-y-serre) var(--pas-2)!important}
 .bareme-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.bareme-actions::before{content:"";flex:1 1 0;min-width:0}
 .bareme-actions button{padding:var(--champ-y-serre) 18px!important}
 .bareme-msg{margin:var(--pas-2) 0 0;font-weight:var(--graisse-forte);min-height:1em}
 .bareme-msg.ok{color:var(--success)}
@@ -739,14 +772,14 @@ h2{letter-spacing:-.01em}
           </div>
           <p class="help">Vaut aussi pour une date choisie au calendrier : ≤ 5 jours ouvrés, ≤ 10, au-delà.</p>
           <div class="bareme-actions">
-            <button type="button" id="baremeSave" class="primary">Enregistrer</button>
             <button type="button" id="baremeCancel" class="secondary">Annuler</button>
+            <button type="button" id="baremeSave" class="primary">Enregistrer</button>
           </div>
           <p id="baremeMsg" class="bareme-msg" role="status"></p>
         </div>
     </div><div class="actions">
-      <button id="saveProductBtn" class="primary">Ajouter l'article</button>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
+      <button id="saveProductBtn" class="primary">Ajouter l'article</button>
     </div>
   </div>
 
@@ -924,8 +957,8 @@ h2{letter-spacing:-.01em}
       </div>
 
       <div class="actions">
-        <button id="createAndSelectClientBtn" class="primary">Créer et sélectionner ce client</button>
         <button id="cancelCreateClientBtn" class="secondary">Annuler</button>
+        <button id="createAndSelectClientBtn" class="primary">Créer et sélectionner ce client</button>
       </div>
     </div>
 
@@ -938,8 +971,8 @@ h2{letter-spacing:-.01em}
         <input id="orderNumber" type="hidden">
 
     <div class="actions" style="margin-top:18px">
-      <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
       <button id="backToArticlesBtn" class="btn-retour" title="Revenir aux articles" aria-label="Revenir aux articles"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
+      <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
     </div>
   </div>
 

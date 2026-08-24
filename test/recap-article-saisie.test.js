@@ -498,7 +498,11 @@ assert.ok(/txDetailOuvert=false;/.test(annuler),
   'un besoin repart volet fermé');
 assert.ok(/txDetailOuvert=false;/.test(source('editTextileNeed', 'i')),
   '… et une modification aussi');
-assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DEVIS),
+// Le collage à droite ne dépend plus de la classe `a-droite` : TOUTE rangée de
+// commandes finit à droite depuis le 24/08, par un écarteur flexible — un
+// premier enfant MASQUÉ ne portait pas la marge (voir
+// etape-projet-rangees-et-validation.test.js).
+assert.ok(/\.actions::before\{content:"";flex:1 1 0;min-width:0\}/.test(DEVIS),
   '… et elle est collée à droite de la même façon');
 // La barre ne décide plus d'aucun état : elle ne porte que ses deux boutons,
 // et c'est par eux qu'on apprend quel champ manque.

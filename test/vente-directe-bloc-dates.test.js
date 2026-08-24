@@ -92,4 +92,23 @@ assert.ok(/<div id="deadlineInfo" class="help delai-etat"><\/div>/.test(bloc),
 assert.ok(/\.grid-3\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/.test(VENTE),
   'les colonnes peuvent se réduire : sinon un libellé long les déséquilibre');
 
+// --- 5. La validation de la vente ferme la ligne, à droite -----------------
+// Cette barre flottait au CENTRE, large de 385 px pour 1071 de carte.
+// `.container` est en `flex-direction:column` : la barre en est un ITEM, et sur
+// un item flex une marge `auto` n'aligne pas — elle AVALE l'espace libre.
+// Mesuré : 342,9 px absorbés de chaque côté. Le `max-width` et les marges
+// automatiques avaient été écrits pour un contexte de BLOC, où ils marchaient.
+const barre = VENTE.match(/\.tablet-wizard-nav\{[^}]*\}/);
+assert.ok(barre, 'la barre de validation existe');
+assert.ok(/align-self:stretch/.test(barre[0]),
+  'la barre prend la largeur de la carte, elle ne flotte plus au centre');
+assert.ok(!/margin:var\(--pas-3\) auto 0/.test(barre[0]),
+  '… ses marges automatiques ne l’avalent plus');
+assert.ok(!/max-width:1100px/.test(barre[0]),
+  '… et aucun plafond ne la laisse plus étroite que la carte (48 px à 1180)');
+// L'écarteur pousse « Valider … et continuer → » au bord droit ; le retour
+// reste à gauche. Mesuré : 1 px de chaque côté, à l'intérieur de la barre.
+assert.ok(/\.tablet-wizard-nav \.wizard-spacer\{flex:1\}/.test(VENTE),
+  'l’écarteur sépare le retour de la validation');
+
 console.log('✓ vente directe : la date du jour quitte l’écran sans quitter le dossier, et le bloc des dates ne porte plus d’empilement');

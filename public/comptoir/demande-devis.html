@@ -636,9 +636,28 @@ h2{letter-spacing:-.01em}
    contenu simplement aligné en fin de ligne sort par la GAUCHE de sa boîte, là
    où aucun défilement ne va le chercher. */
 .tx-barre-actions{margin-inline-start:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
-/* La même règle sur la saisie « Autre » : « Fermer » précède, « Ajouter ce
-   besoin » ferme la rangée. */
-.actions.a-droite>:first-child{margin-inline-start:auto}
+/* TOUTE RANGÉE DE COMMANDES FINIT À DROITE (24/08). « Ajouter l'article, etc.
+   doit toujours être en bas à droite. » Ce n'était vrai que des rangées
+   marquées `a-droite` : les autres partaient du bord gauche — « Ajouter
+   l'article » à 1252 px du bord droit, « + Créer un nouveau client » à 771,
+   « Réinitialiser valeurs Excel » à 365.
+   PAR UNE MARGE AUTOMATIQUE SUR LE PREMIER, jamais par `justify-content:
+   flex-end` : une rangée en flex-end qui déborde se fait rogner PAR LA GAUCHE,
+   et c'est le début du contenu qui devient inatteignable.
+   Sur le PREMIER enfant, pas sur le dernier : les boutons ajoutés en cours de
+   route le sont par `appendChild` (le bouton du planning au récapitulatif, les
+   deux boutons du doublon de client). Poussé par le premier, le groupe reste
+   collé à droite quel que soit ce qu'on lui ajoute. */
+/* PAR UN ÉCARTEUR, PAS PAR UNE MARGE SUR LE PREMIER ENFANT. Le premier enfant
+   est souvent MASQUÉ — « Annuler la modification » ne s'affiche qu'en cours de
+   modification. Un élément en `display:none` n'est pas mis en page : la marge
+   automatique posée dessus ne pousse rien, et « Ajouter l'article » restait
+   collé à gauche. Piège vicieux, parce qu'en démasquant les boutons POUR
+   MESURER on obtient le bon résultat.
+   L'écarteur est un pseudo-élément flexible : il prend tout l'espace libre
+   quels que soient les enfants masqués, et il se réduit à zéro quand la rangée
+   déborde — là où `justify-content:flex-end` rognerait PAR LA GAUCHE. */
+.actions::before{content:"";flex:1 1 0;min-width:0}
 /* CE QUI SE CLIQUE A LA MÊME BOÎTE, PARTOUT. « Le client négocie » avait été
    posé en lien — sans fond, sans rembourrage, souligné — pour être discret. Ce
    n'était pas discret, c'était étranger : une commande sans boîte au milieu
@@ -959,7 +978,7 @@ h2{letter-spacing:-.01em}
 
     <div id="clientQuickList" class="client-quick-list"></div>
 
-    </div><div class="actions" style="margin-top:12px;justify-content:flex-start">
+    </div><div class="actions" style="margin-top:12px">
       <button type="button" class="secondary" onclick="showNewClientForm()">+ Créer un nouveau client</button>
     </div>
 
@@ -1051,9 +1070,9 @@ h2{letter-spacing:-.01em}
         </div>
       </div>
 
-      <div class="actions" style="justify-content:flex-start">
-        <button type="button" class="primary" onclick="createAndSelectClient()">Créer et sélectionner</button>
+      <div class="actions">
         <button type="button" class="secondary" onclick="hideNewClientForm()">Annuler</button>
+        <button type="button" class="primary" onclick="createAndSelectClient()">Créer et sélectionner</button>
       </div>
     </div>
 
@@ -1106,8 +1125,16 @@ h2{letter-spacing:-.01em}
          Les deux boutons se retrouvent par leur `onclick`, pas par leur
          classe : l'ordre et l'habillage ne changent rien à pont.js. -->
     <div class="actions a-droite" style="margin-top:var(--pas-3)">
-      <button class="primary" onclick="saveDraft()">💾 Enregistrer</button>
+      <!-- L'ORDRE DE CETTE RANGÉE A COÛTÉ UN DOSSIER (13/08). « Nouvelle
+           demande » EFFACE le dossier : il doit rester loin de l'endroit où la
+           main va. Tant que la rangée partait de la GAUCHE, cet endroit était
+           le premier bouton, et « Enregistrer » passait devant lui. Depuis le
+           24/08 la rangée est collée à DROITE : le point chaud est devenu le
+           DERNIER. L'ordre s'inverse donc, et l'intention est la même — celui
+           qui efface est le plus loin possible du bord droit. L'accent, lui,
+           ne bouge pas : il reste sur « Enregistrer ». -->
       <button class="secondary" onclick="newRequest()">Nouvelle demande</button>
+      <button class="primary" onclick="saveDraft()">💾 Enregistrer</button>
     </div>
     <div id="downloadStatus" class="download-status hidden"></div>
   </div>
@@ -4039,7 +4066,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     box.classList.remove('hidden');
     box.innerHTML='<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">'+esc2(selectedClient.name)+'</span>'+
       '<div class="help" style="margin-top:6px">'+window.clientInfoLines(selectedClient).map(function(l){return '<b>'+esc2(l[0])+'</b> : '+esc2(l[1]);}).join('<br>')+'</div>'+
-      '<div class="actions" style="margin-top:10px;justify-content:flex-start"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
+      '<div class="actions" style="margin-top:10px"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
   };
 
   function tl(k,v){return '<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(v||'—')+'</strong></div>';}

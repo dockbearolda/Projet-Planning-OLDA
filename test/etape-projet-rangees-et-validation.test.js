@@ -74,14 +74,50 @@ assert.ok(/@media\(min-width:701px\)\{/.test(DEVIS),
 // Toute rangée d'actions qui porte une commande d'avancement (« … → ») se
 // range à droite. Le garde-fou vise le SENS, pas les quatre rangées connues :
 // une cinquième étape ajoutée demain sera prise elle aussi.
+// TOUTE rangée de commandes finit à droite — plus seulement celles marquées
+// `a-droite`. « Ajouter l'article, etc. doit TOUJOURS être en bas à droite. »
+// Mesuré avant : « Ajouter l'article » à 1252 px du bord droit, « + Créer un
+// nouveau client » à 771, « Réinitialiser valeurs Excel » à 365.
 const rangees = DEVIS.match(/<div class="actions[^"]*"[^>]*>[\s\S]*?<\/div>/g) || [];
 const avecAvancement = rangees.filter(r => /<button[^>]*class="primary"[^>]*>[^<]*→/.test(r));
 assert.ok(avecAvancement.length >= 3,
   `les pieds d’étape portent une commande d’avancement (trouvé ${avecAvancement.length})`);
-for (const r of avecAvancement) {
-  assert.ok(/class="actions[^"]*\ba-droite\b/.test(r),
-    `une rangée d’avancement n’est pas rangée à droite : ${r.slice(0, 90)}`);
+
+// Aucune rangée ne remet un alignement à gauche par un style EN LIGNE : il
+// battrait la règle. « Créer et sélectionner » en portait un.
+for (const r of rangees) {
+  assert.ok(!/justify-content:\s*flex-start/.test(r),
+    `une rangée se recolle à gauche par un style en ligne : ${r.slice(0, 80)}`);
 }
+
+// L'ACTION QUI ENGAGE EST LA DERNIÈRE. Coller la rangée à droite ne suffit
+// pas : si « Annuler » suit le bouton primaire, c'est ANNULER qui se retrouve
+// au bord. Trois rangées étaient dans ce cas sur les deux écrans.
+//
+// UNE EXCEPTION, ET ELLE A COÛTÉ UN DOSSIER. La rangée du récapitulatif porte
+// « Nouvelle demande », qui EFFACE le dossier. L'accent (`primary`) reste sur
+// « Enregistrer » et le bouton qui efface ne doit PAS fermer la rangée : c'est
+// la règle écrite dans echelle-comptoir.test.js après le dossier perdu le
+// 13/08. Ce qui ferme réellement cette rangée-là, c'est « Créer dans le
+// planning », ajouté à l'exécution — donc l'action qui engage est bien la
+// dernière à l'écran. On saute cette rangée ici plutôt que de la « corriger ».
+for (const r of rangees) {
+  if (/onclick="newRequest\(\)"/.test(r)) continue;
+  const boutons = r.match(/<button[^>]*>/g) || [];
+  if (boutons.length < 2) continue;
+  const iPrimaire = boutons.findIndex(b => /class="[^"]*\bprimary\b/.test(b));
+  if (iPrimaire === -1) continue;
+  assert.ok(iPrimaire === boutons.length - 1,
+    `l’action qui engage doit fermer la rangée : ${r.slice(0, 80)}`);
+}
+
+// … et on vérifie que l'exception reste ce qu'elle est : un bouton qui efface
+// n'est jamais le dernier d'une rangée collée à droite.
+const rangeeRecap = rangees.find(r => /onclick="newRequest\(\)"/.test(r));
+assert.ok(rangeeRecap, 'la rangée du récapitulatif existe');
+const derniersBoutons = rangeeRecap.match(/<button[^>]*>/g) || [];
+assert.ok(!/onclick="newRequest\(\)"/.test(derniersBoutons[derniersBoutons.length - 1]),
+  'le bouton qui EFFACE le dossier ne ferme pas la rangée — voir le 13/08');
 
 // Le récapitulatif ne dit pas « → » — il enregistre — mais c'est le même pied
 // d'étape, et il se range pareil.
@@ -94,8 +130,13 @@ assert.ok(/\ba-droite\b/.test(recap[0]),
 // en `justify-content:flex-end` qui déborde se fait rogner PAR LA GAUCHE, et
 // c'est le début du contenu qui devient inatteignable. Piège déjà payé ailleurs
 // dans ce dépôt.
-assert.ok(/\.actions\.a-droite>:first-child\{margin-inline-start:auto\}/.test(DEVIS),
-  'le collage à droite passe par une marge automatique');
+// PAR UN ÉCARTEUR, PAS PAR UNE MARGE SUR LE PREMIER ENFANT. Le premier enfant
+// est souvent MASQUÉ (« Annuler la modification » ne paraît qu'en modification) :
+// un élément en `display:none` n'est pas mis en page, la marge posée dessus ne
+// pousse rien. Piège vicieux — en démasquant les boutons POUR MESURER, on
+// obtient le bon résultat et on croit la règle bonne.
+assert.ok(/\.actions::before\{content:"";flex:1 1 0;min-width:0\}/.test(DEVIS),
+  'le collage à droite passe par un écarteur flexible, insensible aux boutons masqués');
 const blocActions = DEVIS.match(/\.actions\{[^}]*\}/);
 assert.ok(blocActions && !/justify-content:\s*flex-end/.test(blocActions[0]),
   '… et surtout pas par un flex-end, qui rogne par la gauche');

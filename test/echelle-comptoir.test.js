@@ -277,8 +277,19 @@ assert.ok(/<button class="primary" onclick="saveDraft\(\)">/.test(DEVIS),
   'le bouton qui enregistre porte l’accent');
 assert.ok(/<button class="secondary" onclick="newRequest\(\)">/.test(DEVIS),
   '… et celui qui efface le dossier n’est qu’un trait');
-assert.ok(DEVIS.indexOf('onclick="saveDraft()"') < DEVIS.indexOf('onclick="newRequest()"'),
-  '… et il passe devant lui dans la rangée');
+// L'ORDRE S'EST INVERSÉ LE 24/08, ET L'INTENTION EST LA MÊME. Cette assertion
+// disait « celui qui enregistre passe DEVANT celui qui efface » — écrite quand
+// la rangée partait de la GAUCHE : le premier bouton était alors l'endroit où
+// la main va. Le patron a demandé que toute rangée de commandes finisse À
+// DROITE ; le point chaud est devenu le DERNIER bouton. Garder l'ancien ordre
+// aurait posé « Nouvelle demande » — qui EFFACE le dossier — précisément là.
+// Ce qu'on protège n'a pas changé : celui qui efface est le plus loin possible
+// de la main. Ce qui a changé, c'est de quel côté se trouve la main.
+assert.ok(DEVIS.indexOf('onclick="newRequest()"') < DEVIS.indexOf('onclick="saveDraft()"'),
+  'dans une rangée collée à droite, celui qui EFFACE est le plus à gauche');
+const rangeeFin = DEVIS.match(/<div class="actions[^"]*"[^>]*>[\s\S]*?onclick="saveDraft\(\)"[\s\S]*?<\/div>/);
+assert.ok(rangeeFin && !/onclick="newRequest\(\)"[^<]*<\/button>\s*<\/div>/.test(rangeeFin[0]),
+  '… et il ne ferme jamais la rangée, quoi qu’on y ajoute ensuite');
 
 console.log('✓ charte du comptoir : quatre tailles, trois graisses, aucune couleur en dur, une seule boîte pour les champs et les boutons');
 
