@@ -288,3 +288,44 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
 }
 
 console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu’aux étapes des parcours');
+
+// --- 9. LA RANGÉE D'ONGLETS EST CENTRÉE, ET LES SEPT SUR LA MÊME LIGNE ------
+// Deux défauts mesurés le 24/08 dans la barre du haut.
+{
+  // (1) « Base clients » était le SEUL des sept à ne pas être sur la ligne :
+  // un `margin-top: 6px` traînait dans clients.css, sans un mot pour dire
+  // pourquoi. La rangée est centrée (`align-items: center`) : 6 px de marge
+  // haute y descendent le bouton de 3 px. Mesuré : haut à 66 px contre 63.
+  assert.ok(!/\.nav-switch-btn--base\s*\{[^}]*margin/.test(sansCommentaire(CLIENTS)),
+    '« Base clients » n’a plus de marge à elle : les sept onglets sont sur la ligne');
+
+  // (2) Pliés sur leur propre rangée, les onglets partaient du bord gauche —
+  // 917 px de contenu dans 1012 px, tout le vide à droite.
+  const pli = sansCommentaire(CSS).match(/@container barre \(max-width: 1360px\) \{[\s\S]*?\n\}\n/);
+  assert.ok(pli, 'le pli de la barre doit exister');
+  assert.ok(/justify-content: safe center/.test(pli[0]),
+    'la rangée pliée centre ses onglets');
+  // `safe` n'est pas décoratif : la rangée peut DÉFILER, et un `center` sec rend
+  // le début du contenu inatteignable dès qu'il déborde — même famille de piège
+  // que `justify-content: flex-end`.
+  assert.ok(/overflow-x: auto/.test(pli[0]),
+    '… et elle défile, ce qui est exactement pourquoi le centrage doit être `safe`');
+  // UNE MARGE AUTO MANGE TOUTE LA PLACE LIBRE AVANT `justify-content` : sans la
+  // rendre, le centrage ne prend pas. Mesuré : 67,4 px résolus sur le premier
+  // onglet, la rangée 33,7 px à droite de l’axe malgré le centrage demandé.
+  assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(pli[0]),
+    '… et le premier onglet rend sa marge automatique, sinon le centrage ne prend pas');
+  // Sur la rangée PLEINE, en revanche, les onglets tiennent la droite par cette
+  // marge — jamais par flex-end (le contenu sortirait par la gauche).
+  assert.ok(/\.nav-switch > :first-child \{ margin-left: auto; \}/.test(sansCommentaire(CSS)),
+    'sur la rangée pleine, les onglets tiennent la droite par une marge automatique');
+  assert.ok(!/\.nav-switch \{[^}]*justify-content:\s*flex-end/.test(sansCommentaire(CSS)),
+    '… jamais par flex-end');
+  // Le rembourrage rend l'écart des flancs de la barre (32 à gauche, 16 à
+  // droite) : sans lui, centrer dans cette boîte poserait les onglets 8 px à
+  // droite de l'axe réel de la barre.
+  assert.ok(/padding-inline-end: 16px/.test(pli[0]),
+    '… et le rembourrage rend l’écart des flancs, pour que l’axe tombe juste');
+}
+
+console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée sur l’axe');

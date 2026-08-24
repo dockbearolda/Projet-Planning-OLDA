@@ -3340,9 +3340,31 @@ button, a, .stage, .deadline-badge,
     width: 100%;
     min-width: 0;
     margin-left: 0;
+    /* LES ONGLETS SE CENTRENT SUR L'AXE DE LA BARRE. Pliés sur leur propre
+       rangée, ils partaient du bord gauche : 917 px de contenu dans 1012 px de
+       rangée, donc 95 px de vide, tout à droite.
+       `safe` n'est pas décoratif : la rangée peut défiler (`overflow-x`), et un
+       `center` sec rend le DÉBUT du contenu inatteignable dès qu'il déborde —
+       le mot-clé retombe alors sur `start`. Même famille de piège que
+       `justify-content: flex-end`.
+       Les 16 px de rembourrage à droite RENDENT l'écart des flancs de la barre
+       (32 à gauche, 16 à droite : la recherche s'aligne sur la carte du
+       dessous, voir `.topbar`). Sans eux, centrer dans cette boîte-là poserait
+       les onglets 8 px à droite de l'axe réel. */
+    justify-content: safe center;
+    padding-inline-end: 16px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+  /* ET IL FAUT RENDRE LA MARGE AUTOMATIQUE, sans quoi tout ce qui précède ne
+     sert à rien. Sur la rangée pleine, les onglets tiennent la droite par
+     `.nav-switch > :first-child { margin-left: auto }` — et une marge AUTO
+     mange toute la place libre AVANT que `justify-content` n'ait son mot à
+     dire. Mesuré : 67,4 px de marge résolue sur « Nouveau Projet », et les
+     sept onglets 33,7 px à droite de l'axe malgré le centrage demandé.
+     Pliés sur leur propre rangée, ils n'ont plus de droite à tenir : ils la
+     rendent, et le centrage prend. */
+  .topbar .nav-switch > :first-child { margin-left: 0; }
 }
 
 /* Un cran plus serré avant de renoncer : sur une rangée de moins de 900 px les

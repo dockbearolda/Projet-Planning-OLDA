@@ -523,8 +523,12 @@
 }
 .cl-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
-/* --- Entrée de nav « Base clients » --- */
-.nav-switch-btn--base { margin-top: 6px; }
+/* --- Entrée de nav « Base clients » ---
+   ELLE N'A PLUS DE RÉGLAGE À ELLE. Un `margin-top: 6px` traînait ici, sans un
+   mot pour dire pourquoi. La rangée d'onglets est centrée (`align-items:
+   center`) : une marge haute de 6 px y descend le bouton de 3 px, et « Base
+   clients » était le seul des sept à ne pas être sur la ligne. Mesuré : haut à
+   66 px quand les six autres étaient à 63. */
 
 /* --- Mobile / tablette --- */
 @media (max-width: 720px) {
