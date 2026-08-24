@@ -308,11 +308,6 @@ h2{letter-spacing:-.01em}
   .grid-3:has(> :nth-child(2)):not(:has(> :nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
-/* Les familles et le titre du projet partagent la ligne en deux moitiés. Le
-   collage en bas de `.grid` mettrait la pastille des familles au niveau du
-   CHAMP du titre, et les deux intitulés ne seraient plus sur la même ligne :
-   ici on aligne par le HAUT. */
-.tete-projet{align-items:start}
 
 /* ---- Chiffrage textile ---- */
 .tx-side-marge b{color:var(--success)}
@@ -825,7 +820,10 @@ h2{letter-spacing:-.01em}
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
 
-<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><div class="bloc"><div class="grid tete-projet"><div class="field"><label>Familles concernées</label><div class="pill-wrap" id="categoryPills"></div></div><div class="field"><label>Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div></div>
+<section id="step3" class="hidden"><div class="card"><div class="stage-head"><div class="ref ref-display">—</div></div><div class="bloc"><!-- « Familles concernées » retiré le 24/08 : la famille se déduit des besoins
+     déjà saisis, la pastille ne faisait que la répéter en lecture seule et
+     mangeait une moitié de rangée. Le titre prend la ligne entière. -->
+      <div class="field"><label>Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
 </div><div class="bloc"><div class="field priority-field" id="projectPriorityField">
   <label id="projectPriorityLabel">Priorité du projet *</label>
   <div class="priority-grid" id="projectPriorityGroup">
@@ -848,7 +846,13 @@ h2{letter-spacing:-.01em}
   <input type="hidden" id="projectPriority" value="">
   <div class="field-error msg-flottant hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
 </div>
-</div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
+</div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option><option value="custom">Choisir une date</option></select><input id="desiredDate" class="hidden" type="date" style="margin-top:var(--pas-2)"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><!-- L'AVIS SUR LA DATE VIT SOUS LA RANGÉE, PAS DEDANS. Posé dans la cellule
+     de « Date souhaitée », il la faisait grandir — et comme la rangée colle
+     ses cellules en bas, « Heure souhaitée » descendait avec : le défaut
+     exact du 24/08 au matin. Il porte un BOUTON (« Utiliser cette date »),
+     donc il ne peut pas flotter comme un message : un message flottant ne
+     prend pas le clic. -->
+<div id="desiredDateWarning" class="delay-warn hidden"></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
 <div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions a-droite"><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
@@ -2772,7 +2776,7 @@ function renderNeeds(){
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();
 }
-function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){$('categoryPills').innerHTML=categories().map(c=>`<span class="pill">${esc(c)}</span>`).join('');if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();if(!$('projectDescription').value.trim())$('projectDescription').value=`Le client souhaite ${needs.map(n=>`${n.qty} ${n.label}`).join(', ')}.`}
+function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();if(!$('projectDescription').value.trim())$('projectDescription').value=`Le client souhaite ${needs.map(n=>`${n.qty} ${n.label}`).join(', ')}.`}
 function toggleNewTransmissionMethod(selectId,inputId){
   const show=$(selectId).value==='__new__';
   $(inputId).classList.toggle('hidden',!show);
@@ -4315,7 +4319,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-size:var(--taille-texte);font-weight:var(--graisse-note);line-height:var(--ligne-texte)}
 .delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
 .delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
-.delay-warn.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
 .wa-link{color:var(--success);font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid var(--success-line)}
 </style>
 <script>
@@ -4422,7 +4425,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(!box){
       box=document.createElement('div');
       box.id='desiredDateWarning';
-      box.className='delay-warn ok';
+      box.className='delay-warn';
       var host=el('desiredDate')&&el('desiredDate').parentNode;
       if(!host)return;
       host.appendChild(box);
@@ -4445,8 +4448,13 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         '<button type="button" class="secondary" style="margin-left:8px" onclick="applyDesiredDate(\''+isoOf(mini)+'\')">Utiliser cette date</button>';
       return;
     }
-    box.className='delay-warn ok';
-    box.textContent='✓ Date compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
+    /* RIEN À DIRE = RIEN À L'ÉCRAN. Le bandeau vert « ✓ Date compatible avec
+       les horaires de l'atelier » ne disait rien qu'on ne sache : il occupait
+       deux lignes pour confirmer l'absence de problème, et il DÉCALAIT la
+       rangée en apparaissant. La charte est explicite — la couleur dit un
+       état, jamais une décoration. Les deux vrais états restent : l'atelier
+       fermé le week-end, et le délai trop court. */
+    box.style.display='none';
   };
   window.applyDesiredDate=function(iso){
     el('desiredDelay').value='custom';

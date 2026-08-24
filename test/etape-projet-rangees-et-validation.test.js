@@ -22,29 +22,28 @@ const path = require('node:path');
 const RACINE = path.join(__dirname, '..');
 const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
 
-// --- 1. Le titre du projet est à DROITE des familles -----------------------
-// Les deux partagent la ligne en deux moitiés. L'ORDRE compte : « à droite »
-// veut dire deuxième cellule, pas « quelque part sur la même ligne ».
-const debut = DEVIS.indexOf('<div class="grid tete-projet">');
-assert.ok(debut > 0, 'les familles et le titre partagent une rangée');
-const zone = DEVIS.slice(debut, debut + 700);
-const iFamilles = zone.indexOf('id="categoryPills"');
-const iTitre = zone.indexOf('id="projectTitle"');
-// LES DEUX D'ABORD, L'ORDRE ENSUITE. Comparer deux `indexOf` sans vérifier
-// qu'ils ont trouvé laisse passer exactement le défaut qu'on veut attraper :
-// absent, `indexOf` rend -1, et -1 est plus petit que tout.
-assert.ok(iFamilles > -1 && iTitre > -1,
-  'les deux cellules sont bien DANS la rangée');
-assert.ok(iFamilles < iTitre,
-  'les familles à gauche, le titre du projet à DROITE');
-assert.ok(!/<h3>Familles concernées<\/h3>/.test(DEVIS),
-  'les familles portent un intitulé de champ, pas un titre : sinon les deux ' +
-  'intitulés de la rangée ne sont ni de la même boîte ni sur la même ligne');
+// --- 1. Le titre du projet tient la ligne, seul ------------------------------
+// Le 24/08 au matin le titre est passé à DROITE des familles, en deux moitiés.
+// L'après-midi : « supprime ça » — la pastille des familles. Elle ne faisait
+// que répéter, en lecture seule, ce qui se déduit des besoins déjà saisis, et
+// mangeait une moitié de rangée pour ça.
+assert.ok(!/id="categoryPills"/.test(DEVIS),
+  'la pastille des familles a quitté l’écran');
+assert.ok(!/<label>Familles concernées<\/label>/.test(DEVIS) && !/<h3>Familles concernées<\/h3>/.test(DEVIS),
+  '… avec son intitulé');
+// … ET AVEC CE QUI L'ÉCRIVAIT. `prepareProject()` posait son contenu par
+// `innerHTML` : laissé en place, il lèverait sur un élément absent à chaque
+// passage à l'étape Projet — donc à chaque dossier.
+assert.ok(!/categoryPills/.test(DEVIS),
+  'plus rien n’écrit dans un élément qui n’existe plus');
+// `categories()` reste : le titre proposé s'en sert.
+assert.ok(/function categories\(\)/.test(DEVIS) && /suggestedTitle/.test(DEVIS),
+  'le titre proposé automatiquement continue de se déduire des familles');
 
-// Le collage en bas de `.grid` mettrait la pastille des familles au niveau du
-// CHAMP du titre — les deux intitulés se retrouveraient décalés d'une ligne.
-assert.ok(/\.tete-projet\{align-items:start\}/.test(DEVIS),
-  'la rangée s’aligne par le HAUT : les deux intitulés sur la même ligne');
+// La rangée n'ayant plus qu'une cellule, le titre prend toute la ligne — et la
+// règle d'alignement écrite pour deux cellules s'en va avec elle.
+assert.ok(!/tete-projet/.test(DEVIS),
+  'la rangée à deux moitiés n’existe plus : ni sa classe, ni sa règle');
 
 // --- 2. Une rangée remplit sa ligne ----------------------------------------
 // `.grid` et `.grid-3` posaient un nombre FIXE de colonnes sans regarder ce
@@ -141,4 +140,38 @@ const blocActions = DEVIS.match(/\.actions\{[^}]*\}/);
 assert.ok(blocActions && !/justify-content:\s*flex-end/.test(blocActions[0]),
   '… et surtout pas par un flex-end, qui rogne par la gauche');
 
-console.log('✓ étape Projet : le titre à droite des familles, chaque rangée remplit sa ligne, ce qui valide ferme à droite');
+// --- 5. L'avis sur la date : deux états, et hors de la cellule -------------
+// « Supprime ça » visait le bandeau VERT — « ✓ Date compatible avec les
+// horaires de l'atelier ». Il ne disait rien qu'on ne sache, prenait deux
+// lignes pour confirmer l'absence de problème, et DÉCALAIT la rangée en
+// paraissant. La charte est explicite : la couleur dit un état, pas une
+// décoration.
+assert.ok(!/Date compatible avec les horaires/.test(DEVIS),
+  'le bandeau « tout va bien » ne s’affiche plus');
+assert.ok(!/\.delay-warn\.ok\{/.test(DEVIS),
+  '… et sa couleur n’a plus d’emploi');
+
+// LES DEUX VRAIS ÉTATS RESTENT. Ce sont des garde-fous, pas des confirmations :
+// l'atelier est fermé le week-end, et un délai de moins de 3 jours ouvrés n'est
+// pas tenable. Chacun propose une date de remplacement en un clic.
+assert.ok(/L’atelier est fermé le week-end/.test(DEVIS),
+  'l’alerte week-end reste — l’atelier ne travaille pas le samedi');
+assert.ok(/Délai très court/.test(DEVIS),
+  'l’alerte de délai court reste');
+assert.strictEqual((DEVIS.match(/>Utiliser cette date</g) || []).length, 2,
+  '… et chacune des DEUX garde son bouton « Utiliser cette date »');
+
+// IL VIT SOUS LA RANGÉE, PAS DEDANS. Posé dans la cellule de « Date souhaitée »
+// il la faisait grandir, et « Heure souhaitée » descendait avec — le défaut du
+// matin, à l'identique. Mesuré après : 0 px sur les deux commandes de la
+// rangée quand l'alerte week-end paraît.
+// Il porte un BOUTON : il ne peut donc pas flotter comme un message, un
+// message flottant ne prend pas le clic.
+const rangeeDates = DEVIS.match(/<div class="grid-3">(?:(?!<\/div><\/div>)[\s\S])*?id="desiredTime"[\s\S]*?<\/select><\/div><\/div>/);
+assert.ok(rangeeDates, 'la rangée des dates existe');
+assert.ok(!/desiredDateWarning/.test(rangeeDates[0]),
+  'l’avis n’est plus dans une cellule de la rangée');
+assert.ok(/<div id="desiredDateWarning" class="delay-warn hidden"><\/div>/.test(DEVIS),
+  '… il a sa place à lui, sous la rangée, et il naît muet');
+
+console.log('✓ étape Projet : le titre tient la ligne, chaque rangée la remplit, l’avis de date ne dit plus « tout va bien », ce qui valide ferme à droite');
