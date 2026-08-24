@@ -165,11 +165,21 @@
 
     <!-- Rail latéral : toute la hauteur de l'écran, à gauche, la barre du haut
          commence à sa droite. Il ne porte que les ÉTAPES du planning (la
-         navigation de l'outil est dans la barre du haut) et démarre directement sur sa
-         première famille — ni marque ni intitulé au-dessus. Masqué hors du
-         planning (voir le repli du .shell) pour laisser la zone de travail
-         prendre toute la largeur. -->
+         navigation de l'outil est dans la barre du haut).
+         L'EN-TÊTE COLLANT est revenu le 24/08 (spécification du patron) : la
+         marque, le nombre d'étapes et le total général coiffent le rail — la
+         décision « ni marque ni intitulé au-dessus » du 23/08 est retirée.
+         Le nombre d'étapes et le total se CALCULENT (renderSidebar/loadCounts),
+         ils ne s'écrivent jamais ici. -->
     <aside class="sidebar" id="sidebar">
+      <header class="rail-tete">
+        <span class="rail-logo" aria-hidden="true">O</span>
+        <span class="rail-titre-bloc">
+          <span class="rail-titre">Planning OLDA</span>
+          <span class="rail-sous-titre" id="railEtapes"></span>
+        </span>
+        <span class="rail-total" id="railTotal" title="Commandes dans le pipeline">0</span>
+      </header>
       <nav class="stages" id="stages" aria-label="Étapes du pipeline"></nav>
     </aside>
 

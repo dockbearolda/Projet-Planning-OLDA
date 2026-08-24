@@ -383,8 +383,8 @@ function buildStageEl(family, sub) {
   label.className = 'stage-label';
   label.textContent = isSub ? sub.label : family.label;
   const count = document.createElement('span');
-  count.className = 'stage-count' + (n > 0 ? ' has-items' : '');
-  count.textContent = n;
+  count.className = 'stage-count';
+  poserCompte(count, n);
   el.append(label, count);
   // Le compteur fait partie du nom accessible : « À chiffrer, 9 commandes ».
   el.setAttribute('aria-label', `${label.textContent} — ${n} commande${n > 1 ? 's' : ''}`);
@@ -403,18 +403,40 @@ function renderSidebar() {
   FAMILIES.filter((f) => !RAIL_HIDDEN_STAGES.has(f.slug)).forEach((f) => {
     const zone = document.createElement('div');
     zone.className = 'stage-zone';
+    // La phase se NOMME : c'est par ce data-fam que la palette (charte.css)
+    // pose les cinq rôles de couleur — rail, titre, pastille, chiffre, actif.
+    zone.dataset.fam = f.slug;
     const hasSub = familyHasSub(f.slug);
     if (hasSub) zone.classList.add('has-sub');
+    // Refonte du 24/08 : la zone est une rangée « filet | colonne ». Le filet
+    // vertical dit d'un trait si la phase a du monde (couleur) ou non (gris) —
+    // son état suit `is-empty` de l'en-tête, par :has() en CSS.
+    const filet = document.createElement('span');
+    filet.className = 'zone-filet';
+    filet.setAttribute('aria-hidden', 'true');
+    const corps = document.createElement('div');
+    corps.className = 'zone-corps';
     const head = buildStageEl(f);
     head.classList.add('zone-head'); // le grand titre se lit comme un en-tête de zone
-    zone.appendChild(head);
+    corps.appendChild(head);
     if (hasSub) {
       SUB_STAGES[f.slug]
         .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug))  // promue en onglet
-        .forEach((sub) => zone.appendChild(buildStageEl(f, sub)));
+        .forEach((sub) => corps.appendChild(buildStageEl(f, sub)));
     }
+    zone.append(filet, corps);
     $stages.appendChild(zone);
   });
+  // LE SOUS-TITRE SE CALCULE, il ne s'écrit jamais en dur : les étapes du
+  // pipeline visibles au rail — les sous-étapes, plus les familles qui n'en
+  // ont pas (« À trier » est une étape à part entière).
+  const railEtapes = document.getElementById('railEtapes');
+  if (railEtapes) {
+    const n = $stages.querySelectorAll('.stage').length
+      - $stages.querySelectorAll('.stage-zone.has-sub .zone-head').length;
+    railEtapes.textContent = `${n} étape${n > 1 ? 's' : ''}`;
+  }
+  poserTotalRail();
 }
 
 // Rejoue l'animation d'entrée (léger fondu décalé) au changement d'étape — sur
@@ -518,6 +540,20 @@ function montrerEtapeActive(el) {
 
 // Nom accessible d'une entrée du rail : le libellé ET son compteur, pour qu'un
 // lecteur d'écran annonce « À chiffrer — 9 commandes » d'un seul tenant.
+/* Le chiffre d'un compteur : rien du tout à zéro (refonte du 24/08 — « aucune
+   pastille et aucun zéro »), le nombre sinon. L'aria-label, lui, dit toujours
+   le vrai compte, zéro compris (syncStageLabel). */
+function poserCompte(c, n) {
+  c.textContent = n > 0 ? n : '';
+  c.classList.toggle('has-items', n > 0);
+}
+/* Le TOTAL GÉNÉRAL de l'en-tête du rail : la somme des familles du pipeline
+   (Fiverr, promu en onglet, vit hors du rail et n'y entre pas). Recalculé à
+   chaque écriture de compteurs — jamais entretenu à part. */
+function poserTotalRail() {
+  const el = document.getElementById('railTotal');
+  if (el) el.textContent = FAMILIES.reduce((t, f) => t + (counts[f.slug] ?? 0), 0);
+}
 function syncStageLabel(el, n) {
   const label = el.querySelector('.stage-label');
   if (label) el.setAttribute('aria-label', `${label.textContent} — ${n} commande${n > 1 ? 's' : ''}`);
@@ -627,13 +663,11 @@ async function loadCounts() {
     const key = el.dataset.sub != null ? el.dataset.sub : el.dataset.slug;
     const n = counts[key] ?? 0;
     const c = el.querySelector('.stage-count');
-    if (c) {
-      c.textContent = n;
-      c.classList.toggle('has-items', n > 0);
-    }
+    if (c) poserCompte(c, n);
     el.classList.toggle('is-empty', n === 0);
     syncStageLabel(el, n);
   });
+  poserTotalRail();
 }
 
 // Jeton de chargement : deux clics rapides lancent deux fetch ; on ne monte QUE la
@@ -754,9 +788,10 @@ function bumpCount(slug, delta) {
   if (!el) return;
   const n = counts[slug];
   const c = el.querySelector('.stage-count');
-  if (c) { c.textContent = n; c.classList.toggle('has-items', n > 0); }
+  if (c) poserCompte(c, n);
   el.classList.toggle('is-empty', n === 0);
   syncStageLabel(el, n);
+  poserTotalRail();
 }
 
 // Vrai si la commande appartient à la vue actuellement affichée (même critère que
@@ -6852,11 +6887,14 @@ const SIDEBAR_W_KEY = 'olda_sidebar_w';
 // break-word` les COUPE EN PLEIN MILIEU : « PRÉPARATIO / N DU PROJET ».
 // Mesuré le 24/08/2026 sur les 33 libellés du pipeline : à 180 px, 7 se
 // cassaient et il manquait 10 px au pire d'entre eux ; le premier palier sans
-// aucune casse est 192 px. On prend 200 : le rendu du texte varie d'une machine
-// à l'autre, et une étape peut gagner une lettre.
-// Si le pipeline gagne un mot plus long, c'est ICI qu'il faut revenir — le
-// garde-fou de `test/coquille-nav-et-rail.test.js` le rappelle.
-const SIDEBAR_MIN = 200, SIDEBAR_MAX = 460;
+// REFONTE DU 24/08 : la spécification du patron fixe le rail à 284 px. C'est
+// donc la nouvelle largeur MINIMALE — et la base que la zone de travail
+// concède (`--rail-base`, styles.css) : au repos, le rail ne recouvre rien.
+// La poignée ne sert plus qu'à l'élargir au-delà, PAR-DESSUS les cartes.
+// L'ancien minimum mesuré (200, pour la typographie des bandeaux) n'a plus
+// cours : les bandeaux sont partis avec la refonte.
+// Le garde-fou de `test/coquille-nav-et-rail.test.js` tient 284 des deux côtés.
+const SIDEBAR_MIN = 284, SIDEBAR_MAX = 460;
 const $sidebarResizer = document.getElementById('sidebarResizer');
 // La largeur du rail est une colonne de la grille du .shell : c'est donc lui qui
 // porte `--sidebar-w` (le rail n'est plus enfant de `.app`).

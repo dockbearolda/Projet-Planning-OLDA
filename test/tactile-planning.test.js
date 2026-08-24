@@ -100,7 +100,9 @@ function bloc(css, condition, aiguille) {
   }
   // Neutraliser ne veut pas dire aplatir : l'étape ACTIVE garde son fond, sinon
   // le rail ne dirait plus où l'on est dès qu'on a touché une entrée.
-  assert.match(sansSurvol, /\.stage\.active:hover\s*\{\s*background:\s*var\(--primary-soft\)/,
+  // Depuis la refonte du rail (24/08), le fond d'état est celui de la PHASE
+  // (--za, la couleur « actif » de sa palette), plus le gris unique d'avant.
+  assert.match(sansSurvol, /\.stage\.active:hover\s*\{\s*background:\s*var\(--za\)/,
     'l’étape active doit garder son fond d’état au doigt');
   assert.match(sansSurvol, /\.grid tbody tr\.row-alt:hover\s*\{\s*background:\s*var\(--row-alt\)/,
     'le zébrage doit survivre à la neutralisation du survol');

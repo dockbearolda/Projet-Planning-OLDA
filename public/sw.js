@@ -89,6 +89,7 @@ const COQUILLE = [
   // La police de texte. Absente, tout retombe sur Arial : lisible, mais le
   // poste n'a plus la même tête d'une ouverture à l'autre.
   '/manrope-latin-variable.woff2',
+  '/plus-jakarta-sans-latin-variable.woff2',
   '/manifest.webmanifest',
 ];
 

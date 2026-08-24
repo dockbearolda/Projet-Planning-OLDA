@@ -21,6 +21,17 @@
    le relais le temps du chargement. Contrairement aux icônes, un mot en Arial
    se lit très bien ; une icône pas encore prête, elle, s'écrit en toutes
    lettres — d'où les deux réglages opposés. */
+/* La police du RAIL (refonte du 24/08) : Plus Jakarta Sans, graisse variable
+   200-800, latin seul — même régime que Manrope : servie par nous, jamais un
+   autre domaine. Seul le rail l'emploie : les autres écrans restent sur la
+   police de la maison. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('plus-jakarta-sans-latin-variable.woff2') format('woff2');
+}
 @font-face {
   font-family: 'Manrope';
   font-style: normal;
@@ -115,8 +126,8 @@ body {
      `test/coquille-nav-et-rail.test.js` tient les deux nombres ensemble.
      La barre du haut, elle, garde sa colonne à droite du rail : c'est ce qui
      empêche le rail de recouvrir les onglets et le bouton qui le range. */
-  --rail-base: 200px;
-  --rail-w: var(--sidebar-w, 240px);
+  --rail-base: 284px;
+  --rail-w: var(--sidebar-w, 284px);
   --rail-sur: max(0px, calc(var(--rail-w) - var(--rail-base)));
   grid-template-columns: var(--rail-w) 16px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
@@ -472,9 +483,8 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      ni à la main ni par programme. */
   overflow-x: clip;
   overflow-y: auto;
-  padding: 0 0 4px;
   background: var(--surface);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--rail-vide);
 }
 /* Le rail empile des ZONES (une par famille), nettement espacées entre elles
    (16px — plus généreux qu'avant : les groupes doivent se voir sans avoir à
@@ -485,236 +495,201 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    bandeau de famille. Les zones traversent donc le rail d'un bord à l'autre. */
 /* Aucun retrait en haut : la PREMIÈRE FAMILLE est la tête du rail, elle
    commence à la première ligne de pixels de l'écran. */
-.stages { padding: 0 0 10px; display: flex; flex-direction: column; gap: 16px; }
-.stage-zone { display: flex; flex-direction: column; gap: 1px; }
-/* Une zone à sous-catégories devient une vraie petite carte (fond + liseré +
-   ombre légère, même grammaire que .work) plutôt qu'un simple fond tonal :
-   le groupe se voit comme une SECTION, pas comme une teinte qui s'estompe.
-   `overflow: hidden` + pas de padding en haut : l'en-tête de famille vient
-   coiffer la carte bord à bord (voir .stage.zone-head). */
-/* Pas d'`overflow: hidden` ici : il clipperait le bandeau au bord INTÉRIEUR du
-   liseré, laissant un filet clair de 1px tout autour et des coins rognés — le
-   bandeau avait l'air de ne pas remplir la carte. Le bandeau déborde donc sur
-   le liseré (marges négatives, voir .stage.zone-head) et porte lui-même les
-   coins arrondis du haut. */
-.stage-zone.has-sub {
-  background: var(--surface);
-  /* Liseré haut/bas seulement : un liseré latéral rendrait à nouveau le bandeau
-     plus étroit que le rail. La zone se lit toujours comme une SECTION grâce au
-     fond + l'ombre + les 16px qui la séparent de la suivante. */
-  border-top: 1px solid var(--border-soft);
-  border-bottom: 1px solid var(--border-soft);
-  border-radius: 0;
-  padding: 0 3px 3px;
-  box-shadow: var(--shadow-1);
-}
+/* --------------------------------------------------- Le rail, refonte du 24/08
+   SPÉCIFICATION DU PATRON, appliquée telle quelle. Les bandeaux ardoise pleins
+   sont partis : chaque phase est un SEGMENT DE FILET vertical (3 px, détaché
+   de ses voisins) + un TITRE TYPOGRAPHIQUE — aucun fond, aucune bordure, rien
+   qui puisse se lire comme une ligne sélectionnée. La couleur de phase (cinq
+   rôles, voir charte.css) dit d'un coup d'œil où il y a du travail.
+   RIEN NE SE PLIE : l'atelier compte quatre personnes et chacune voit toutes
+   les étapes en permanence. L'ordre, le regroupement, les libellés et la
+   logique (clic, clavier, glisser-déposer) ne bougent pas d'un pixel.
+   La police du rail est Plus Jakarta Sans, SERVIE PAR NOUS (voir @font-face
+   plus haut) : graisses 400-800, chiffres tabulaires partout. */
+.sidebar { font-family: 'Plus Jakarta Sans', var(--font); }
 
-/* Entrée du rail : un <button> (le rail est la navigation principale, il doit
-   s'atteindre au clavier), remis à plat pour se dessiner comme avant. */
-.stage {
-  position: relative;
-  overflow: hidden;
+/* L'ascenseur se fait discret : 6 px, pouce gris, piste transparente. */
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--rail-pouce); border-radius: 999px; }
+
+/* EN-TÊTE COLLANT : marque + nombre d'étapes (calculé) + total général. Il
+   coiffe le défilement — z-index au-dessus des puces et filets du corps. */
+.rail-tete {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 16px 16px 13px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rail-filet-tete);
+}
+.rail-logo {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--rail-encre);
+  color: var(--surface);
+  font-size: var(--rail-taille-forte);
+  font-weight: 700;
+}
+.rail-titre-bloc { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rail-titre { font-size: var(--rail-taille-titre); font-weight: 700; letter-spacing: -0.01em; color: var(--rail-encre); white-space: nowrap; }
+.rail-sous-titre { font-size: var(--rail-taille-note); color: var(--rail-muet); }
+.rail-total {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--rail-pastille-tete);
+  color: var(--rail-encre);
+  font-size: var(--rail-taille-forte);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le corps : une colonne de phases, 12 px d'air entre deux — les segments de
+   filet sont donc DÉTACHÉS les uns des autres, sur le même axe vertical. */
+.stages { padding: 10px 12px 22px; display: flex; flex-direction: column; gap: 12px; }
+
+/* UNE PHASE = filet | colonne. Le filet est coloré dès que la phase contient
+   au moins une commande — l'état vient de l'en-tête (`is-empty`, déjà tenu
+   par loadCounts/bumpCount) : `:has()` évite un troisième endroit qui compte. */
+.stage-zone { display: flex; gap: 12px; }
+.zone-filet { flex: 0 0 3px; border-radius: 3px; background: var(--zr); }
+.stage-zone:has(.zone-head.is-empty) .zone-filet { background: var(--rail-vide); }
+.zone-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+/* Entrée du rail : un <button> (le rail est la navigation principale, il doit
+   s'atteindre au clavier), remis à plat pour se dessiner comme une ligne. */
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   width: 100%;
   margin: 0;
-  padding: 9px 14px;
+  min-height: 30px;
+  padding: 5px 8px 5px 9px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
   color: var(--text-1);
   user-select: none;
-  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+  transition: background 120ms var(--ease);
 }
-.stage:hover { background: var(--state-hover); }
-.stage.active { background: var(--primary-soft); color: var(--primary); }
-.stage.active:hover { background: var(--primary-soft-hover); }
+.stage:hover { background: var(--rail-hover); }
+.stage.active { background: var(--za); }
 .stage:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
+/* LA PUCE, 7 px : pleine couleur de phase si l'étape a du monde, anneau gris
+   sur blanc sinon. Sélectionnée ET non vide : un halo couleur actif — le
+   disque semble flotter sur la ligne. */
+.stage::before {
+  content: "";
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--zr);
+}
+.stage.is-empty::before { background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--rail-anneau); }
+.stage.active:not(.is-empty)::before { box-shadow: 0 0 0 3px var(--za); }
+
+/* Le libellé : la GRAISSE et la COULEUR disent l'état — 700 encre si
+   sélectionné, 600 sombre s'il y a du monde, 500 gris lisible si vide.
+   Jamais plus clair que --rail-videtxt : une étape vide se lit quand même. */
 .stage-label {
-  font-size: var(--taille-texte);
-  font-weight: 500;
   flex: 1;
   min-width: 0;
+  font-size: var(--rail-taille-etape);
+  font-weight: 500;
+  color: var(--rail-videtxt);
   overflow-wrap: break-word;
 }
-.stage.active .stage-label { color: var(--primary); font-weight: 600; }
-/* Compteur : même boîte centrée pour tous (pastille tonale OU « 0 » discret) afin
-   qu'ils s'alignent sur un même axe vertical, chiffre centré. */
+.stage:not(.is-empty) .stage-label { font-weight: 600; color: var(--rail-nonvide); }
+.stage.active .stage-label { font-weight: 700; color: var(--rail-encre); }
+
+/* LE COMPTEUR : pastille tonale de la phase quand l'étape a du monde ; VIDE
+   sinon — ni pastille ni zéro, mais la cellule garde sa largeur pour que la
+   colonne des chiffres reste un seul axe (le texte est retiré par le JS). */
 .stage-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 20px;
-  padding: 0 6px;
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1.5px 7px;
   border-radius: 999px;
-  font-size: var(--taille-texte);
-  font-weight: 500;
-  color: var(--text-3);
+  font-size: var(--rail-taille-compte);
+  font-weight: 700;
+  text-align: center;
+  color: var(--zc);
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+  transition: background 120ms var(--ease);
 }
-/* Compteur discret : plus de pastille colorée pour chaque ligne non vide (elle
-   se répétait sur presque tout le rail) — un chiffre simplement plus affirmé
-   que le « 0 » atténué. L'accent ne revient que sur la ligne ACTIVE. */
-.stage-count.has-items { color: var(--text-2); font-weight: 600; }
-.stage.active .stage-count { color: var(--primary); }
-.stage.active .stage-count.has-items { color: var(--primary); }
-.stage.drop-target {
-  background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1.5px var(--primary);
-  color: var(--primary);
-}
+.stage-count.has-items { background: var(--zp); }
 
-/* Grand titre de ZONE — BARRE PLEINE. Demande de la direction : les familles
-   doivent sauter aux yeux depuis l'atelier, pas se deviner. D'où le bandeau
-   plein + majuscules + gras : c'est LA catégorie, on ne la rate pas. Le fond
-   est un gris ARDOISE (--rail-head-bg), pas l'encre pure : à cinq bandeaux
-   par écran, le noir plein écrasait tout le reste. Aucune teinte n'entre par
-   cette porte — que du gris de la charte.
-   Reste cliquable (afficher toute la famille) et se lit comme un EN-TÊTE —
-   d'où le verrouillage du dépôt dessus quand la zone a des sous-catégories
-   (voir stageAcceptsDrop). */
+/* Cible de glisser-déposer : un anneau couleur de phase + le fond actif.
+   C'est un retour de GESTE, pas un état de sélection. */
+.stage.drop-target { background: var(--za); box-shadow: inset 0 0 0 1.5px var(--zr); }
+
+/* ------------------------------------------------ Le titre d'une catégorie
+   TYPOGRAPHIE PURE : capitales serrées dans la couleur soutenue de la phase,
+   un filet horizontal qui court jusqu'au total, et le total aligné sur la
+   colonne des compteurs. Aucun fond, aucune bordure, aucune ombre.
+   Il RESTE un bouton : afficher toute la famille se fait toujours d'un clic
+   (et « À trier », famille sans sous-étapes, n'a que cette ligne-là). */
 .stage.zone-head {
-  /* Traverse le rail D'UN BORD À L'AUTRE : -3px de côté annule le padding de la
-     zone, -1px en haut recouvre le liseré. Plus aucun blanc autour du bandeau —
-     c'est ce qui faisait dire « ça ne va pas au bout ». */
-  margin: -1px -3px 3px;
-  border-radius: 0;
-  padding: 11px 14px;
-  background: var(--rail-head-bg);
-  color: var(--rail-head-fg);
+  min-height: auto;
+  margin: 4px 0 8px;
+  padding: 0 8px 0 9px;
+  gap: 10px;
+  border-radius: 9px;
 }
-/* Famille sans sous-catégorie : même bandeau pleine largeur, pas de pastille
-   arrondie qui flotterait au milieu du rail. */
-.stage-zone:not(.has-sub) .stage.zone-head {
-  margin: 0;
-  border-radius: 0;
-}
+.stage.zone-head::before { content: none; }        /* pas de puce sur un titre */
+.stage.zone-head:hover { background: transparent; }
+.stage.zone-head.active { background: transparent; }
 .stage.zone-head .stage-label {
-  font-weight: 700;
-  color: var(--rail-head-fg);
-  font-size: var(--taille-texte);
-  letter-spacing: .04em;
+  /* `0 1 auto` + min-width — jamais `0 0 auto` : « FACTURATION & REMISE AU
+     CLIENT » est plus large que le rail, et un libellé qui refuse de céder
+     poussait son total à 290 px, HORS du rail (mesuré). Il s'enroule sur deux
+     lignes plutôt que de s'ellipser : l'atelier lit les libellés entiers. */
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--rail-taille-note);
+  font-weight: 800;
+  letter-spacing: .1em;
   text-transform: uppercase;
+  color: var(--zt);
 }
-/* Survol / actif : on ne peut pas éclaircir un fond déjà plein — on l'assombrit
-   d'un cran (--rail-head-bg-strong). Le fond ne suffit pas à porter l'état
-   ACTIF sur un rail de cinq bandeaux quasi identiques : c'est le TAQUET clair
-   collé au bord gauche qui le dit. */
-.stage.zone-head:hover { background: var(--rail-head-bg-strong); }
-.stage.zone-head.active { background: var(--rail-head-bg-strong); }
-.stage.zone-head.active .stage-label { color: var(--rail-head-fg); }
-.stage.zone-head::before {
+/* Le filet horizontal, entre le libellé et le total (ordre flex). */
+.stage.zone-head::after {
   content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  background: var(--rail-head-fg);
-  opacity: 0;
-  transition: opacity var(--dur-2) var(--ease);
+  order: 2;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 1px;
+  background: var(--rail-vide);
 }
-.stage.zone-head.active::before { opacity: 1; }
-/* barre inversée (cible de dépôt) : le taquet doit repasser au gris foncé */
-.stage.zone-head.drop-target::before { background: var(--rail-head-bg-strong); }
-/* Compteur posé SUR le bandeau : pastille inversée, lisible de loin. */
-.stage.zone-head .stage-count {
-  color: var(--rail-head-fg);
-  font-weight: 700;
-  font-size: var(--taille-texte);
-}
-.stage.zone-head .stage-count.has-items {
-  background: var(--rail-head-fg);
-  color: var(--rail-head-bg-strong);
-}
-/* Cible de glisser-déposer sur un bandeau plein : le fond tonal de
-   `.stage.drop-target` disparaîtrait sous le gris foncé. On INVERSE donc la
-   barre pour dire « déposer ici ». */
-.stage.zone-head.drop-target {
-  background: var(--rail-head-fg);
-  color: var(--rail-head-bg-strong);
-  box-shadow: inset 0 0 0 2px var(--rail-head-bg-strong);
-}
-.stage.zone-head.drop-target .stage-label { color: var(--rail-head-bg-strong); }
-.stage.zone-head.drop-target .stage-count { color: var(--rail-head-bg-strong); }
-.stage.zone-head.drop-target .stage-count.has-items {
-  background: var(--rail-head-bg-strong);
-  color: var(--rail-head-fg);
-}
+.stage.zone-head .stage-count { order: 3; font-size: var(--rail-taille-compte); font-weight: 800; padding: 0 7px; color: var(--zt); }
+.stage.zone-head .stage-count.has-items { background: transparent; }
+.stage.zone-head.is-empty .stage-count { color: var(--rail-zero); }
+/* L'état ACTIF d'un titre (À trier, ou la vue « toute la famille ») reste
+   typographique : le libellé passe à l'encre et le filet prend la couleur du
+   rail — rien qui ressemble à une ligne sélectionnée. */
+.stage.zone-head.active .stage-label { color: var(--rail-encre); }
+.stage.zone-head.active::after { background: var(--zr); }
+/* Déposer sur un titre : le même anneau de geste que sur une ligne. */
+.stage.zone-head.drop-target { background: var(--za); box-shadow: inset 0 0 0 1.5px var(--zr); }
 
-/* Sous-catégories : déroulées sous leur famille (miroir de la « Vue Étapes »).
-   Plus compactes, en retrait à gauche (le bord droit — donc les compteurs —
-   reste aligné sur les familles), texte plus léger : hiérarchie claire, rail
-   lisible. Une sous-catégorie active reprend la surbrillance pastel. */
-/* Hauteur portée à 44px : c'est la cible tactile de la charte, et le rail se
-   lit de plus loin quand les lignes respirent. */
-.stage.substage {
-  min-height: 44px;
-  padding: 11px 14px 11px 34px;
-}
-/* Sous-catégorie renseignée : texte principal, pas gris — sous un bandeau
-   aussi appuyé, un libellé à 12px/400 en --text-2 décrochait complètement.
-   Les sous-catégories à 0 restent en gris (voir plus bas) mais gardent la
-   même taille : ce sont des libellés à lire, pas des décorations. */
-.stage.substage .stage-label {
-  font-size: var(--taille-texte);
-  font-weight: 600;
-  color: var(--text-1);
-}
-.stage.substage.active .stage-label { color: var(--primary); font-weight: 700; }
-.stage.substage .stage-count { min-width: 22px; height: 20px; font-size: var(--taille-texte); }
-/* Repère vertical matérialisant le rattachement à la famille — il s'épaissit
-   et passe à l'encre sur la sous-catégorie active. */
-.stage.substage::before {
-  content: "";
-  position: absolute;
-  left: 20px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--border);
-  border-radius: var(--arrondi-champ);
-}
-.stage.substage.active::before { width: 3px; background: var(--primary); }
-
-/* étape vide : atténuée */
-.stage.is-empty { opacity: .55; }
-.stage.is-empty .stage-label { font-weight: 400; color: var(--text-2); }
-.stage.is-empty .stage-count { color: var(--text-3); }
-.stage.is-empty:hover { opacity: 1; }
-.stage.active.is-empty { opacity: 1; }
-.stage.active.is-empty .stage-label { color: var(--primary); }
-
-/* Une FAMILLE vide reste une barre pleine : on l'atténue à peine (elle doit
-   rester repérable d'un coup d'œil, c'est tout l'objet du bandeau) et surtout
-   on ne lui applique pas le texte gris des étapes vides — il passerait en
-   gris sur encre, illisible. Ces règles doivent rester APRÈS le bloc
-   `.stage.is-empty` : même spécificité, c'est l'ordre qui tranche. */
-.stage.zone-head.is-empty { opacity: .82; }
-.stage.zone-head.is-empty .stage-label,
-.stage.zone-head.active.is-empty .stage-label {
-  font-weight: 700;
-  color: var(--rail-head-fg);
-}
-.stage.zone-head.is-empty .stage-count { color: var(--rail-head-fg); }
-
-/* Une SOUS-CATÉGORIE vide ne se met plus en sourdine deux fois. Elle cumulait
-   `opacity: .55` ET la couleur --text-2 : le libellé tombait autour de 2,3:1
-   sur le blanc, en dessous du minimum lisible — c'est ce qui rendait le rail
-   pénible à parcourir. Un seul cran d'atténuation suffit à dire « rien ici » :
-   la couleur. On garde donc la taille, on retire le voile d'opacité et on
-   remonte le compteur de --text-3 à --text-2. */
-.stage.substage.is-empty { opacity: 1; }
-.stage.substage.is-empty .stage-label { font-weight: 500; color: var(--text-2); }
-.stage.substage.is-empty .stage-count { color: var(--text-2); }
+/* Une étape vide reste PLEINEMENT lisible : l'état est déjà dit trois fois
+   (puce en anneau, graisse 500, pas de pastille) — aucun voile d'opacité. */
+.stage.is-empty { opacity: 1; }
 
 /* ---------------------------------------------------------------- Zone de travail */
 .work {
@@ -3348,7 +3323,7 @@ button, a, .stage, .deadline-badge,
 
 /* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
-  .shell { --rail-w: var(--sidebar-w, 224px); grid-template-columns: var(--rail-w) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 284px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .app { padding: 12px; }
   /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
      la place aux onglets et à la recherche. */
@@ -3361,7 +3336,7 @@ button, a, .stage, .deadline-badge,
 
 /* Portrait étroit : rail réduit, grille scrollable */
 @media (max-width: 900px) {
-  .shell { --rail-w: var(--sidebar-w, 200px); grid-template-columns: var(--rail-w) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 284px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
   .grid-search { max-width: none; }
   /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
@@ -6078,7 +6053,7 @@ textarea.ld-ctl { font-weight: 600; }
    trois endroits (montage, /api/counts, mise à jour optimiste), et une teinte
    posée à la main aurait fini par en manquer un. */
 .stage[data-slug="a_trier"] .stage-count.has-items {
-  background: var(--primary);
+  background: var(--zr);
   color: var(--surface);
 }
 
@@ -6138,11 +6113,9 @@ summary:focus-visible {
   .pcard__ticket:hover { background: var(--surface); border-color: var(--border); color: var(--text-2); }
   .pcard__del:hover { background: var(--surface); border-color: var(--border); color: var(--text-3); }
   .stage:hover { background: transparent; }
-  .stage.active:hover { background: var(--primary-soft); }
-  .stage.zone-head:hover { background: var(--rail-head-bg); }
-  .stage.zone-head.active:hover { background: var(--rail-head-bg-strong); }
-  .stage.is-empty:hover { opacity: .55; }
-  .stage.active.is-empty:hover { opacity: 1; }
+  .stage.active:hover { background: var(--za); }
+  .stage.zone-head:hover,
+  .stage.zone-head.active:hover { background: transparent; }
   .grid tbody tr:hover { background: transparent; }
   .grid tbody tr.row-alt:hover { background: var(--row-alt); }
   .grid tbody tr:hover .handle { color: var(--text-3); }
@@ -6184,8 +6157,8 @@ summary:focus-visible {
 .pcard__ticket:active,
 .pcard__del:active,
 .pcard__ref-btn:active { transform: scale(.94); }
-.stage:active { background: var(--state-press); }
-.stage.zone-head:active { background: var(--rail-head-bg-strong); }
+.stage:active { background: var(--rail-hover); }
+.stage.zone-head:active { background: transparent; }
 .nav-switch-btn:active,
 .help-btn:active,
 .stage-link:active,

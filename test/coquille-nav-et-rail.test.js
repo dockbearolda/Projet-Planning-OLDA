@@ -131,7 +131,7 @@ console.log('✓ coquille : Nouveau Projet garde la navigation, le rail se repli
 // cartes changeaient de largeur sous les yeux, le texte se repliát, et la
 // requête de conteneur de `.grid-wrap` rebasculait d’une disposition à l’autre.
 //
-// La zone de travail ne concède plus QUE la largeur MINIMALE du rail (200 px,
+// La zone de travail ne concède plus QUE la largeur MINIMALE du rail (284 px,
 // la même que SIDEBAR_MIN). Tout ce que le rail prend au-delà, il le prend
 // PAR-DESSUS : la boîte de travail ne bouge plus d’un pixel, ni en largeur ni
 // en position, et c’est le rail qui recouvre le bord gauche des cartes.
@@ -141,14 +141,15 @@ console.log('✓ coquille : Nouveau Projet garde la navigation, le rail se repli
 // Ce qui est gagné ici, c’est que RIEN NE SE RECALCULE — pas de reflux, pas de
 // saut de mise en page (CLS), un glisser de poignée à 60 fps.
 const shellCSS = (CSS.match(/\n\.shell \{\n[\s\S]*?\n\}/) || [''])[0];
-assert.ok(/--rail-base:\s*200px/.test(shellCSS),
+// 284 depuis la refonte du rail (24/08) : la spécification fixe sa largeur.
+assert.ok(/--rail-base:\s*284px/.test(shellCSS),
   'la coquille nomme la part de rail que la zone de travail concède');
 // Le socle CSS et la borne du script disent le MÊME nombre. S’ils divergent, le
 // rail découvre une bande de carte (base > min) ou la recouvre en permanence
 // (base < min) : deux défauts muets, invisibles au minimum de largeur.
 const min = APP.match(/SIDEBAR_MIN\s*=\s*(\d+)/);
 assert.ok(min, 'SIDEBAR_MIN doit exister');
-assert.strictEqual(min[1], '200',
+assert.strictEqual(min[1], '284',
   'la largeur minimale du rail et `--rail-base` sont le MÊME nombre');
 // Le surplus : ce que le rail prend au-delà de sa base. Jamais négatif — un
 // rail plus étroit que sa base pousserait la zone de travail vers la droite.
@@ -629,17 +630,14 @@ console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut êt
   assert.ok(!/overflow-x: hidden;/.test(rail[0]),
     '`hidden` défilerait encore par programme : c’est `clip` qu’il faut');
 
-  // (3) LA LARGEUR MINIMALE DU RAIL EST MESURÉE, PAS CHOISIE. En dessous, la
-  // colonne du libellé devient plus étroite que ses mots les plus longs
-  // (« Préparation », « Facturation », « marchandise », « Production ») et
-  // `overflow-wrap: break-word` les coupe EN PLEIN MILIEU :
-  // « PRÉPARATIO / N DU PROJET ». Mesuré le 24/08 sur les 33 libellés du
-  // pipeline : à 180 px, 7 se cassaient, 10 px manquaient au pire ; le premier
-  // palier sans aucune casse est 192. On prend 200 — le rendu du texte varie
-  // d'une machine à l'autre, et une étape peut gagner une lettre.
+  // (3) LA LARGEUR MINIMALE DU RAIL. L'ancien plancher (200) était MESURÉ sur
+  // la typographie des bandeaux, partis avec la refonte du 24/08 : c'est la
+  // spécification du patron qui fixe désormais le rail à 284 px — sa nouvelle
+  // largeur minimale, et la base que la zone de travail concède. La poignée ne
+  // sert plus qu'à l'élargir au-delà, par-dessus les cartes.
   const min = Number((APP.match(/const SIDEBAR_MIN = (\d+)/) || [])[1]);
-  assert.ok(min >= 200,
-    `le rail ne peut pas descendre sous 200 px sans casser ses libellés (lu : ${min})`);
+  assert.ok(min >= 284,
+    `le rail ne descend pas sous les 284 px de la spécification (lu : ${min})`);
   // La valeur mémorisée par appareil repasse par le même serrage : un poste qui
   // avait enregistré 180 avant ce jour-là ne rouvre pas sur des mots coupés.
   assert.ok(/if \(Number\.isFinite\(saved\)\) poser\(clampW\(saved\), SIDEBAR_MIN\);/.test(APP),

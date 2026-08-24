@@ -101,9 +101,6 @@
      noir écrasait le reste de l'écran. Assez sombre pour rester un vrai
      bandeau (blanc dessus à 10,4:1), assez doux pour ne pas cogner. Cran
      « strong » = survol / famille active. */
-  --rail-head-bg: #374151;
-  --rail-head-bg-strong: #1f2937;
-  --rail-head-fg: #fff;
 
   --scrollbar: #d1d5db;
   --scrollbar-hover: #9ca3af;
@@ -290,6 +287,76 @@
   color: var(--danger);
 }
 
+/* ============================================================ LE RAIL DES ÉTAPES
+   REFONTE DU 24/08/2026 (spécification du patron, appliquée telle quelle).
+
+   Les bandeaux ardoise pleins des familles sont RETIRÉS : chaque phase est
+   désormais un segment de filet vertical + un titre typographique, et la
+   couleur de phase dit D'UN COUP D'ŒIL où il y a du travail. Quatre teintes
+   viennent de la spécification ; « Facturation » et « Paiement » n'y
+   figuraient pas — leurs teintes sont choisies dans la même famille
+   (désaturées, même clarté), à faire valider.
+
+   CINQ RÔLES PAR PHASE, posés sur la zone par `data-fam` :
+     --zr  rail      le filet vertical, et la puce d'une étape non vide
+     --zt  titre     le libellé de la catégorie, et son total
+     --zp  pastille  le fond pâle du compteur d'une étape non vide
+     --zc  chiffre   le texte de ce compteur
+     --za  actif     le fond de la ligne sélectionnée
+
+   DE NUIT, les quatre rôles clairs se DÉRIVENT du rail (color-mix sur les
+   gris du thème) : une seule vérité par phase, pas douze hexadécimaux de
+   plus à maintenir. Le poste est PC + Chrome (décision du 21/08) : color-mix
+   et :has() y sont acquis. */
+[data-fam="a_trier"]           { --zr: #8a82a0; --zt: #574a75; --zp: #eceaf1; --zc: #5f5775; --za: #f5f4f8; }
+[data-fam="demande_chiffrage"] { --zr: #7a90ad; --zt: #3f5a80; --zp: #e8edf3; --zc: #4f6482; --za: #f2f5f8; }
+[data-fam="preparation"]       { --zr: #a2947a; --zt: #6b5a33; --zp: #f1ece2; --zc: #71634a; --za: #f8f5f0; }
+[data-fam="production"]        { --zr: #7f9a88; --zt: #40634d; --zp: #e8efea; --zc: #4f6d5b; --za: #f2f6f3; }
+/* Hors spécification — même famille de teintes, à faire valider : */
+[data-fam="facturation"]       { --zr: #a2808f; --zt: #6d4459; --zp: #f1eaee; --zc: #745464; --za: #f8f3f6; }
+[data-fam="paiement"]          { --zr: #8892a0; --zt: #465468; --zp: #eaedf1; --zc: #566274; --za: #f4f5f8; }
+:root[data-theme="dark"] [data-fam] {
+  --zt: color-mix(in srgb, var(--zr) 55%, #fff);
+  --zp: color-mix(in srgb, var(--zr) 22%, var(--surface));
+  --zc: color-mix(in srgb, var(--zr) 62%, #fff);
+  --za: color-mix(in srgb, var(--zr) 17%, var(--surface));
+}
+
+/* Les gris ET les tailles du rail — nommés ici, jamais écrits dans styles.css
+   (le garde-fou d'échelle n'admet en dur que les tailles d'icônes). */
+.sidebar {
+  --rail-taille-titre: 13px;    /* « Planning OLDA » */
+  --rail-taille-forte: 11.5px;  /* l'initiale du logo, le total général */
+  --rail-taille-note: 10.5px;   /* le sous-titre, le titre d'une catégorie */
+  --rail-taille-etape: 12.5px;  /* le libellé d'une étape */
+  --rail-taille-compte: 11px;   /* les compteurs */
+
+  --rail-encre: #0f1729;         /* sélection, titre de l'outil, logo */
+  --rail-nonvide: #39424f;       /* libellé d'une étape qui a du monde */
+  --rail-videtxt: #6b7280;       /* libellé d'une étape vide — reste lisible (4,5:1) */
+  --rail-muet: #a8afba;          /* le sous-titre de l'en-tête */
+  --rail-zero: #c8cdd6;          /* un total de catégorie à zéro */
+  --rail-hover: #f4f6f9;         /* survol d'une ligne */
+  --rail-vide: #e8eaef;          /* filet d'une phase vide, séparateurs */
+  --rail-filet-tete: #f2f4f7;    /* le trait sous l'en-tête collant */
+  --rail-pastille-tete: #f1f3f7; /* la pastille du total général */
+  --rail-anneau: #dfe3ea;        /* l'anneau d'une puce vide */
+  --rail-pouce: #d7dbe2;         /* le pouce de l'ascenseur */
+}
+:root[data-theme="dark"] .sidebar {
+  --rail-encre: var(--text-1);
+  --rail-nonvide: var(--text-1);
+  --rail-videtxt: var(--text-2);
+  --rail-muet: var(--text-3);
+  --rail-zero: var(--text-3);
+  --rail-hover: var(--surface-hover);
+  --rail-vide: var(--border-soft);
+  --rail-filet-tete: var(--border-soft);
+  --rail-pastille-tete: var(--primary-soft);
+  --rail-anneau: var(--border-strong);
+  --rail-pouce: var(--border-strong);
+}
+
 /* ======================================================= L'ÉCRAN DE LA DEMANDE
    PALETTE ET DENSITÉ DU 24/08/2026 — demande du patron, en sept points.
 
@@ -459,9 +526,6 @@ html[data-theme="dark"] .ecran-comptoir {
 
   /* En sombre le bandeau reste inversé (clair sur fond sombre) mais sort du
      blanc quasi pur, qui éblouissait autant que le noir en thème clair. */
-  --rail-head-bg: #d1d5db;
-  --rail-head-bg-strong: #f3f4f6;
-  --rail-head-fg: #111827;
 
   --scrollbar: #4b5563;
   --scrollbar-hover: #6b7280;
