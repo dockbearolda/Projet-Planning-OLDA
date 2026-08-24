@@ -7163,6 +7163,24 @@ window.addEventListener('olda:projet-cree', async (e) => {
 // en-tête. Seul le rail s'efface (l'onglet le remplace).
 const isPlanningMode = (mode) => mode === 'planning' || mode in PROMOTED_BY_VIEW;
 
+// CHANGER DE VUE SE VOIT. D'un onglet à l'autre, le contenu du cadre était
+// REMPLACÉ d'une image sur l'autre : rien ne disait que c'était la même
+// application qui changeait de page, et l'œil repartait de zéro à chaque fois.
+// Une entrée courte — 200 ms, opacité + 6 px — suffit à relier les deux états.
+// Sur le CADRE, pas sur la page : on n'anime que ce qui change.
+// `opacity` et `transform` seulement : ce sont les deux propriétés que le
+// compositeur sait animer sans repasser par la mise en page — une grille de
+// 400 lignes ne coûte pas une image de plus.
+function jouerBasculeDeVue() {
+  const cadre = document.querySelector('.work');
+  if (!cadre) return;
+  // Le réglage système fait foi : on ne bouge rien chez qui a demandé le calme.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  cadre.classList.remove('vue-entre');
+  void cadre.offsetWidth;   // force le recalcul : sans lui, l'animation ne rejoue pas
+  cadre.classList.add('vue-entre');
+}
+
 function setViewMode(mode) {
   // La visibilité du planning (en-tête, grille, outil Fiverr, rail d'étapes) est
   // pilotée par une classe sur <body> : l'attribut `hidden` seul ne suffit pas,
@@ -7197,6 +7215,8 @@ function setViewMode(mode) {
   // Nouveau Projet = poste comptoir, devant le client : la nav du back-office
   // (Dashboard, Fiverr, Réglages…) disparaît, il ne reste que l'étape en cours.
   document.body.classList.toggle('view-comptoir', mode === 'projet');
+
+  jouerBasculeDeVue();
 
   if (dash) dashboard.show(); else dashboard.hide();
   if (clients) mountClients();

@@ -103,7 +103,7 @@
   color: var(--text-2);
   font-size: var(--taille-texte);
   font-weight: 500;
-  padding: 6px 14px;
+  padding: var(--champ-y-serre) var(--pas-2);
   border-radius: 999px;
   cursor: pointer;
 }
@@ -124,7 +124,7 @@
   color: var(--text-2);
   font-size: var(--taille-texte);
   font-weight: 500;
-  padding: 6px 14px;
+  padding: var(--champ-y-serre) var(--pas-2);
   border-radius: 999px;
   cursor: pointer;
 }

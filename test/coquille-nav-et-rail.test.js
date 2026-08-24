@@ -168,3 +168,51 @@ assert.ok(/CET ÉDITEUR N'EST PAS UN CHAMP/.test(CSS),
   'l’exception de `.cell-input` est écrite dans le fichier, pas devinée');
 
 console.log('✓ échelle : le CRM parle la langue de l’écran de référence du comptoir');
+
+// --- 6. UN SEUL VOCABULAIRE DE COMMANDE, ET UNE BASCULE QUI SE VOIT ---------
+// « Les mêmes boutons retour, les mêmes boutons valider… pour qu'à l'œil il y
+// ait une normalisation complète. » Les boutons du CRM comptaient DIX-NEUF
+// rembourrages différents ; l'écran de référence en a deux, plus la forme
+// ronde d'un retour / fermer.
+{
+  const boites = new Set();
+  for (const [nom, feuille] of [['styles.css', CSS], ['clients.css', CLIENTS], ['projet.css', PROJ]]) {
+    for (const [, sel, corps] of sansCommentaire(feuille).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const s1 = sel.replace(/\s+/g, ' ').trim();
+      if (!/button|\.btn|-btn\b|__btn/.test(s1)) continue;
+      // Les cases du calendrier sont une GRILLE, pas des commandes ; les boutons
+      // en `padding: 0 Npx` tiennent leur hauteur du parent ; `padding: 0` est
+      // la forme ronde (44 px), troisième mot du vocabulaire.
+      if (/\.cal-|\.maj__btn|\.reg-btn|\.cl-seg__btn/.test(s1)) continue;
+      const p = corps.match(/padding:\s*([^;]+)/);
+      if (!p) continue;
+      const v = p[1].trim();
+      if (v === '0' || /^0 \d+px$/.test(v) || v === '10px') continue;
+      boites.add(v);
+    }
+  }
+  assert.deepStrictEqual([...boites].sort(),
+    ['var(--champ-y) var(--champ-x)', 'var(--champ-y-serre) var(--pas-2)'],
+    `deux boîtes de commande sur tout l’outil, trouvé : ${[...boites].join(' / ')}`);
+}
+
+// CHANGER DE VUE SE VOIT. Le cadre est le même pour toutes les vues : son
+// contenu était remplacé d'une image sur l'autre, sans rien pour relier les
+// deux états. Deux propriétés seulement — le compositeur les anime sans
+// repasser par la mise en page, une grille de 400 lignes ne coûte rien.
+const anim = sansCommentaire(CSS).match(/@keyframes vue-entre \{([\s\S]*?)\n\}/);
+assert.ok(anim, 'la bascule d’une vue à l’autre doit être animée');
+assert.ok(/opacity/.test(anim[1]) && /transform/.test(anim[1]),
+  '… par opacité et déplacement');
+assert.ok(!/\b(width|height|margin|padding|top|left)\s*:/.test(anim[1]),
+  '… et JAMAIS par une propriété qui repasse par la mise en page');
+assert.ok(/@media \(prefers-reduced-motion: reduce\) \{\s*\.work\.vue-entre \{ animation: none/.test(sansCommentaire(CSS)),
+  'qui a demandé le calme ne voit rien bouger');
+const bascule = APP.match(/function jouerBasculeDeVue\(\) \{[\s\S]*?\n\}/);
+assert.ok(bascule, 'jouerBasculeDeVue doit exister');
+assert.ok(/prefers-reduced-motion: reduce/.test(bascule[0]),
+  '… et le script le vérifie AUSSI, avant de poser la classe');
+assert.ok(/void cadre\.offsetWidth/.test(bascule[0]),
+  '… avec le recalcul forcé, sans lequel l’animation ne rejoue pas au 2e passage');
+
+console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue qui se voit');

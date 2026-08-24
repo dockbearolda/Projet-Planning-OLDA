@@ -246,7 +246,7 @@ body {
   align-items: center;
   gap: 12px;
   min-height: 64px;
-  padding: 12px 16px;
+  padding: var(--champ-y) var(--champ-x);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-bloc);
   background: var(--surface);
@@ -748,7 +748,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   color: var(--on-primary);
   border: 1px solid transparent;
   border-radius: var(--arrondi-champ);
-  padding: 10px 20px 10px 15px;
+  padding: var(--champ-y) var(--champ-x);
   font-size: var(--taille-texte);
   font-weight: 600;
   font-family: inherit;
@@ -791,7 +791,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   align-items: center;
   gap: 6px;
   min-height: 40px;              /* cible tactile confortable (tablette) */
-  padding: 8px 16px;
+  padding: var(--champ-y-serre) var(--pas-2);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
   background: transparent;
@@ -2213,7 +2213,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .reason-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .reason-btn {
   min-height: 40px;
-  padding: 8px 16px;
+  padding: var(--champ-y-serre) var(--pas-2);
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
@@ -3083,7 +3083,7 @@ input[type="date"].cell-input { color: var(--text-1); }
 .ask__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .ask__btn {
   min-height: 44px;
-  padding: 11px 18px;
+  padding: var(--champ-y) var(--champ-x);
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
@@ -3351,7 +3351,7 @@ button, a, .stage, .deadline-badge,
    « À commander » ne se devinent pas à l'icône. */
 @container barre (max-width: 900px) {
   .topbar .nav-switch { gap: 2px; }
-  .topbar .nav-switch-btn { padding: 8px 9px; }
+  .topbar .nav-switch-btn { padding: var(--champ-y-serre) var(--pas-2); }
 }
 
 /* LES ONGLETS TIENNENT LA DROITE — PAR UNE MARGE, JAMAIS PAR `justify-content`.
@@ -3390,7 +3390,7 @@ button, a, .stage, .deadline-badge,
     flex-direction: column;
     gap: 2px;
     min-height: 44px;
-    padding: 6px 8px;
+    padding: var(--champ-y-serre) var(--pas-2);
   }
   .nav-switch-label { font-size: var(--taille-texte); line-height: 1.15; max-width: 76px; }
   /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
@@ -3436,7 +3436,7 @@ button, a, .stage, .deadline-badge,
     gap: 4px;
     padding-bottom: 2px;
   }
-  .nav-switch-btn { flex: 0 0 auto; padding: 8px 12px; }
+  .nav-switch-btn { flex: 0 0 auto; padding: var(--champ-y-serre) var(--pas-2); }
   .nav-switch-label { display: inline; }
   #viewProjet { padding-right: 12px; margin-right: 6px; }
   /* rail empilé au-dessus de la zone de travail : pas de poignée horizontale */
@@ -3530,7 +3530,7 @@ button, a, .stage, .deadline-badge,
   .ticket-cell { width: 44px; height: 44px; }
   .col-ticket { width: 76px; }
   .menu-item { padding: 12px 14px; font-size: var(--taille-texte); }
-  .reason-btn { min-height: 44px; padding: 10px 18px; font-size: var(--taille-texte); }
+  .reason-btn { min-height: 44px; padding: var(--champ-y) var(--champ-x); font-size: var(--taille-texte); }
   .type-tag,
   .prio-tag {
     min-height: 44px;
@@ -3572,7 +3572,7 @@ button, a, .stage, .deadline-badge,
   .stage-label { font-size: var(--taille-texte); }
 
   /* (.nav-switch-btn : plancher 44 px déjà posé plus haut dans ce bloc.) */
-  .btn-primary { padding: 12px 20px 12px 16px; font-size: var(--taille-texte); }
+  .btn-primary { padding: var(--champ-y) var(--champ-x); font-size: var(--taille-texte); }
   .icon-btn { width: 46px; height: 46px; }
 }
 
@@ -3599,7 +3599,7 @@ button, a, .stage, .deadline-badge,
   align-items: center;
   gap: 7px;
   min-height: 40px;
-  padding: 8px 12px;
+  padding: var(--champ-y-serre) var(--pas-2);
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
@@ -3701,6 +3701,23 @@ body.view-plein .fiverr-tool { display: none !important; }
    Ce qui disparaît hors planning, c'est l'échafaudage de la GRILLE (juste
    au-dessus) : en-tête d'étape, lignes, rail des colonnes, outil Fiverr. Pas
    la navigation. */
+
+/* ------------------------------------------------- Passage d'une vue à l'autre
+   Le cadre est le même pour toutes les vues (`main.work`) : c'est son CONTENU
+   qui change. Sans rien, il changeait d'une image sur l'autre — l'œil repartait
+   de zéro à chaque onglet. Une entrée courte les relie.
+   Deux propriétés seulement, opacité et déplacement : le compositeur les anime
+   sans repasser par la mise en page. */
+@keyframes vue-entre {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.work.vue-entre { animation: vue-entre var(--dur-2) var(--ease) both; }
+/* Le garde-fou est déjà dans le script (prefers-reduced-motion), on le double
+   ici : une animation posée par une autre voie ne doit pas passer au travers. */
+@media (prefers-reduced-motion: reduce) {
+  .work.vue-entre { animation: none; }
+}
 
 /* ------------------------------------------------------------ Rail replié
    La poignée règle la largeur du rail, mais jamais en dessous de 180 px : pour
