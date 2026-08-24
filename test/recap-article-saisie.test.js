@@ -174,8 +174,12 @@ assert.ok(!/Chronopost/.test(html) && !/Bébé/.test(html),
   'la ligne ne porte ni le transport ni le genre : elle dit ce qui distingue l’article');
 assert.ok(par['Genre'] === 'Bébé' && par['Transport'] === 'Chronopost',
   '… mais le récapitulatif de l’article les garde, chacun sous son intitulé');
-assert.ok(/Marquage<\/div>/.test(html) && /Tailles<\/div>/.test(html),
+// Depuis le 24/08 la carte est une TABLE : l'intitulé est un `<span>`, sa
+// valeur un `<b>` calé à droite (voir `.need-tab`).
+assert.ok(/<span>Marquage<\/span>/.test(html) && /<span>Tailles<\/span>/.test(html),
   'chaque valeur porte son intitulé : « Coconut Milk » et « Kaki » ne se devinent pas');
+assert.ok(/<span class="est-argent">Total<\/span>/.test(html),
+  '… et l’argent ferme la table, sous son intitulé lui aussi');
 // « Production DTF » n'a jamais été saisi au comptoir : c'est le code qui
 // l'écrivait, et il occupait la place du marquage.
 assert.ok(!/Production DTF/.test(html),
@@ -184,10 +188,14 @@ assert.ok(!/Production DTF/.test(html),
 // Un article du catalogue n'a pas de chiffrage textile : il garde sa famille,
 // et son intitulé aussi — une case vide décalerait toute la grille.
 const catalogue = rendre([{ category: 'Art de la table', label: 'Bouchon Bois', qty: 3, comment: '', unitHT: NaN }]);
-assert.ok(/need-detail-k">Famille<\/div><div class="need-detail-v">Art de la table/.test(catalogue),
+assert.ok(/<span>Famille<\/span><b>Art de la table/.test(catalogue),
   'un article hors textile garde sa famille, sous un intitulé');
-assert.ok(!/need-detail-k"><\/div>/.test(catalogue),
-  'aucun intitulé vide : la colonne de gauche de la grille resterait béante');
+assert.ok(!/<span><\/span>/.test(catalogue),
+  'aucun intitulé vide : la colonne de gauche de la table resterait béante');
+// Et il DIT qu'il reste à chiffrer, dans la rangée d'argent : il n'affiche
+// jamais 0 € — « pas encore chiffré » et « gratuit » sont deux choses.
+assert.ok(/a-chiffrer">À chiffrer<\/b>/.test(catalogue) && !/0,00/.test(catalogue),
+  '… et sa rangée Total dit « À chiffrer », jamais 0 €');
 
 // --- 4. Le bloc sous le formulaire et la fiche disent la MÊME chose ----------
 const apercu = source('previewTextile', '');

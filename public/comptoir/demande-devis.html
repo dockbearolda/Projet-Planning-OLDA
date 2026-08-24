@@ -151,7 +151,7 @@ b,strong{font-weight:var(--graisse-forte)}
    Le filet traverse TOUTE la carte — c'est lui qui sépare deux blocs — mais
    le prix, lui, reprend le rail du nom et des intitulés : d'où le décalage
    d'exactement une gouttière de quantité plus une gouttière de colonne. */
-.need-pied{grid-column:1/-1;display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;margin-top:var(--pas-1);padding-top:var(--pas-2);padding-left:calc(var(--need-qte) + var(--pas-2));border-top:1px solid var(--border-soft)}
+.need-pied{grid-column:1/-1;display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;margin-top:var(--pas-2);padding-top:var(--pas-2);border-top:1px solid var(--border-soft)}
 .priority-stars{font-size:var(--taille-texte);line-height:1}
 .priority-card strong{font-size:var(--taille-texte)}
 .priority-card small{font-size:var(--taille-texte);line-height:var(--ligne-texte);color:var(--text-2)}
@@ -668,9 +668,20 @@ h2{letter-spacing:-.01em}
    d'un tableau : en `auto`, elle se calait sur l'intitulé le plus long de
    CETTE carte — 74 px pour « Marquage », 83 px pour « Production » — et les
    valeurs de deux articles empilés ne tombaient pas sur la même verticale. */
-.need-detail{grid-column:2/-1;display:grid;grid-template-columns:var(--need-cle) minmax(0,1fr);gap:1px 8px;margin-top:3px}
-.need-detail-k{font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:var(--text-2);white-space:nowrap}
-.need-detail-v{font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);line-height:var(--ligne-texte);overflow-wrap:anywhere}
+.need-tab{grid-column:1/-1;display:grid;grid-template-columns:var(--need-cle) minmax(0,1fr);margin-top:var(--pas-1)}
+.need-tab>*{display:flex;align-items:flex-end;padding:var(--pas-1) 0;border-top:1px solid var(--border-soft);min-width:0;font-size:var(--taille-texte);line-height:var(--ligne-texte)}
+/* La première rangée ne porte pas de filet : un tableau commence par une
+   valeur, pas par un trait. */
+.need-tab>:nth-child(-n+2){border-top:0}
+.need-tab>span{color:var(--text-2);font-weight:var(--graisse-note)}
+.need-tab>b{justify-content:flex-end;text-align:right;font-weight:var(--graisse-forte);color:var(--text-1);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* LES DEUX RANGÉES D'ARGENT SE DÉTACHENT — c'est ce que la vendeuse annonce.
+   Un filet plus marqué les sépare du descriptif, et l'intitulé passe à l'encre :
+   la hiérarchie se dit à la graisse et à la couleur, jamais par une taille de
+   plus (l'écran n'en a que deux). */
+.need-tab>.est-argent{border-top-color:var(--border)}
+.need-tab>span.est-argent{color:var(--text-1);font-weight:var(--graisse-forte)}
+.need-tab>b.a-chiffrer{color:var(--text-2);text-transform:uppercase;letter-spacing:.03em}
 /* Souris et clavier seulement (CLAUDE.md du dépôt) : la cible de 44 px visait
    les tablettes, parties au rebut. Des boutons discrets, collés à droite du
    pied par la marge automatique de la règle de base. */
@@ -680,15 +691,11 @@ h2{letter-spacing:-.01em}
    boutons de pleine taille et chaque article coûte 45 px de hauteur. */
 .demande-corps .need-actions button{padding:var(--champ-y-serre) var(--pas-2)!important;font-size:var(--taille-texte)}
 
-/* Le prix OUVRE le pied de la carte : c'est le premier chiffre qu'on relit,
-   il occupe la même place sur toutes les lignes. Le total puis, à côté, le
-   prix à la pièce en gris — deux valeurs d'un même nombre, sur une seule
-   rangée. Un article pas encore chiffré le DIT : il n'affiche pas 0 €,
-   « pas encore chiffré » et « gratuit » sont deux choses différentes. */
-.demande-prix{display:flex;align-items:baseline;gap:var(--pas-1);flex-wrap:wrap;white-space:nowrap;font-variant-numeric:tabular-nums}
-.demande-prix b{font-size:var(--taille-texte);font-weight:var(--graisse-forte)}
-.demande-prix span{font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2)}
-.demande-prix.a-chiffrer b{font-size:var(--taille-texte);font-weight:var(--graisse-forte);color:var(--text-2);text-transform:uppercase;letter-spacing:.03em}
+/* Le prix n'a plus de bloc à lui : il est devenu les deux dernières RANGÉES de
+   la table de la carte (« Total », « À la pièce »). Une seule table du premier
+   mot au dernier chiffre — voir `.need-tab`. Un article pas encore chiffré le
+   DIT toujours : il n'affiche pas 0 €, « pas encore chiffré » et « gratuit »
+   sont deux choses différentes. */
 
 
 .demande-pied{flex:0 0 auto;border-top:1px solid var(--border);background:var(--zone-bg);padding:var(--pas-3)}
@@ -2636,15 +2643,23 @@ function renderNeeds(){
       ['Réf.',n.requestedRef],
       ['Production',n.productionType],
     ]).filter(([,v])=>v);
-    const detail=lignes.length
-      ? `<div class="need-detail">${lignes.map(([k,v])=>`<div class="need-detail-k">${esc(k)}</div><div class="need-detail-v">${esc(v)}</div>`).join('')}</div>`
-      : '';
     /* « Pas encore chiffré » et « gratuit » sont deux choses différentes : une
        ligne sans prix le DIT, elle n'affiche jamais 0 € — piège `Number(null)`. */
     const chiffre=Number.isFinite(n.unitHT);
-    const prix=chiffre
-      ? `<b>${money(n.unitHT*n.qty)}</b><span>${money(n.unitHT)} / pièce</span>`
-      : '<b>À chiffrer</b>';
+    /* L'ARGENT FERME LA TABLE, il n'a plus de rangée à part. Le prix vivait
+       dans un pied, à côté des boutons : deux façons de présenter la même
+       chose sur la même carte. Une seule table du premier mot au dernier
+       chiffre — c'est la règle du récapitulatif de l'article, elle vaut ici
+       aussi. */
+    const argent=chiffre
+      ? [['Total',money(n.unitHT*n.qty)],['À la pièce',money(n.unitHT)]]
+      : [['Total','À chiffrer']];
+    const rangs=[...lignes,...argent.map(([k,v])=>[k,v,true])];
+    const detail=`<div class="need-tab">${rangs.map(([k,v,arg])=>{
+      const cl=arg?' class="est-argent"':'';
+      const clv=arg?` class="est-argent${chiffre?'':' a-chiffrer'}"`:'';
+      return `<span${cl}>${esc(k)}</span><b${clv}>${esc(v)}</b>`;
+    }).join('')}</div>`;
     /* LA CARTE SE LIT DE HAUT EN BAS, ET ELLE NE SE REMPLIT PAS. Trois choses
        l'encombraient : un champ de saisie posé sous les boutons — la note se
        tape avec l'article, dans son formulaire — et une TROISIÈME action,
@@ -2652,8 +2667,15 @@ function renderNeeds(){
        qu'elle porte. Elle se déplie maintenant sur la fiche, où le chiffrage
        a la largeur qu'il lui faut (voir negFicheVolet).
        Reste ce qu'une carte doit dire : combien, quoi, avec quel détail, pour
-       combien — et les deux seules actions qui portent sur elle. */
-    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div></div>${detail}<div class="need-pied"><div class="demande-prix${chiffre?'':' a-chiffrer'}">${prix}</div><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div></div>`
+       combien — et les deux seules actions qui portent sur elle.
+       ET ELLE SE LIT COMME UN TABLEAU. Le détail était une grille sans filet et
+       l'argent vivait à part, dans un pied, à côté des boutons : deux façons de
+       présenter la même chose sur une carte de 322 px, et un bloc où l'œil ne
+       trouvait pas de ligne à suivre. Une seule table maintenant, du premier
+       mot au dernier chiffre — intitulé à gauche, valeur à droite, un filet
+       entre les rangées, `tabular-nums` : exactement la langue du
+       récapitulatif de l'article (voir `.tx-tableau`). */
+    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}" onclick="ouvrirArticle(${i},event)"><span class="need-qte">${n.qty}×</span><div class="need-txt"><div class="need-nom">${esc(n.label)}</div></div>${detail}<div class="need-pied"><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div></div>`
   }).join(''):`<div class="demande-vide"><svg class="demande-vide-ic" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5.4 8h13.2l-1.1 11.2a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg><b>Aucun article</b></div>`;
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();

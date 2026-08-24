@@ -145,15 +145,30 @@ assert.ok(/if\(!det\.isConnected\)return/.test(negVolet),
 assert.ok(/TX_RECAP\.fiche=false/.test(negVolet),
   '… et l’ouvrir replie le récapitulatif sur son total');
 
-// --- 7. LE PIED DE LA CARTE -------------------------------------------------
-// Le prix tenait une troisième colonne sur la rangée du nom : dans 380 px il
-// lui volait la moitié de la place. Il descend sur la rangée des actions.
-assert.ok(/need-pied/.test(renderNeedsSrc),
-  'le prix et les actions partagent le pied de la carte');
-assert.ok(renderNeedsSrc.indexOf('demande-prix') > renderNeedsSrc.indexOf('need-detail'),
-  'le prix vient APRÈS le détail : la carte se lit de haut en bas');
+// --- 7. LA CARTE SE LIT COMME UN TABLEAU ------------------------------------
+// Elle en était deux : une grille de détail SANS FILET pour ce qui se lit, et
+// un pied à part pour l'argent, collé aux boutons. Deux façons de présenter la
+// même chose sur une carte de 322 px, et un bloc où l'œil ne trouvait pas de
+// ligne à suivre. Une seule table maintenant, du premier mot au dernier
+// chiffre — la langue du récapitulatif de l'article (voir `.tx-tableau`).
+assert.ok(/need-tab/.test(renderNeedsSrc) && !/need-detail/.test(renderNeedsSrc),
+  'le détail et l’argent sont UNE table, plus deux blocs');
+assert.ok(!/demande-prix/.test(DEVIS),
+  'le prix n’a plus de bloc à lui : il est devenu des rangées de la table');
+assert.ok(renderNeedsSrc.indexOf("'Total'") > renderNeedsSrc.indexOf('lignes'),
+  'l’argent FERME la table : la carte se lit de haut en bas');
+// Intitulé à gauche, valeur à droite, un filet entre les rangées, tabular-nums.
+assert.ok(/\.need-tab>b\{[^}]*text-align:right/.test(DEVIS)
+  && /\.need-tab>b\{[^}]*font-variant-numeric:tabular-nums/.test(DEVIS),
+  'les valeurs tiennent la droite, les chiffres sur la même verticale');
+assert.ok(/\.need-tab>\*\{[^}]*border-top:1px solid var\(--border-soft\)/.test(DEVIS),
+  'un filet sépare les rangées : c’est ce qui en fait un tableau');
+assert.ok(/\.need-tab>:nth-child\(-n\+2\)\{border-top:0\}/.test(DEVIS),
+  '… sauf la première : un tableau commence par une valeur, pas par un trait');
+assert.ok(/\.need-tab\{[^}]*grid-template-columns:var\(--need-cle\) minmax\(0,1fr\)/.test(DEVIS),
+  'sa colonne d’intitulés est le jeton fixe : deux cartes empilées s’alignent');
 assert.ok(/\.need-pied\{[^}]*grid-column:1\/-1/.test(DEVIS),
-  'le pied prend toute la largeur de la carte');
+  'le pied ne porte plus que les actions, sur toute la largeur');
 // Coller à droite par une MARGE AUTOMATIQUE : sur une rangée trop étroite,
 // `justify-content:flex-end` fait sortir le contenu par la GAUCHE, et ce
 // débordement n'est pas rattrapable au défilement.
@@ -174,16 +189,16 @@ assert.ok(!/\.(demande-corps \.)?need-actions\{[^}]*justify-content:flex-end/.te
 });
 assert.ok(/\.need-ligne\{[^}]*grid-template-columns:var\(--need-qte\) minmax\(0,1fr\)/.test(DEVIS),
   'la gouttière de la quantité est fixe : le nom part du même rail sur toutes les cartes');
-assert.ok(/\.need-detail\{[^}]*grid-template-columns:var\(--need-cle\) minmax\(0,1fr\)/.test(DEVIS),
-  'la colonne des intitulés est fixe : les valeurs tombent sur la même verticale');
-assert.ok(!/\.need-(ligne|detail)\{[^}]*grid-template-columns:auto/.test(DEVIS),
+assert.ok(!/\.need-(ligne|tab)\{[^}]*grid-template-columns:auto/.test(DEVIS),
   'aucune piste `auto` sur la carte : c’est elle qui faisait glisser les rails');
-// Le prix rejoint ce rail-là, pas celui de la pastille — le filet, lui,
-// traverse toute la carte : c'est le décalage qui vaut une gouttière.
-assert.ok(/\.need-pied\{[^}]*padding-left:calc\(var\(--need-qte\) \+ var\(--pas-2\)\)/.test(DEVIS),
-  'le prix reprend le rail du nom et des intitulés, d’exactement une gouttière');
+// LA TABLE PREND TOUTE LA LARGEUR DE LA CARTE, pastille comprise : dans 322 px,
+// l'indenter d'une gouttière coûtait 68 px à la colonne des valeurs, et
+// « Poitrine + Dos + Manche Dr · Multi couleur » y passait sur trois lignes.
+// L'en-tête (pastille + nom) coiffe la table, il ne la contient pas.
+assert.ok(/\.need-tab\{[^}]*grid-column:1\/-1/.test(DEVIS),
+  'la table prend toute la largeur de la carte');
 assert.ok(/\.demande-corps \.need-ligne\{[^}]*gap:8px var\(--pas-2\)/.test(DEVIS),
-  '… et la gouttière du panneau est bien celle que ce décalage additionne');
+  'la gouttière du panneau reste celle de la charte');
 
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le
