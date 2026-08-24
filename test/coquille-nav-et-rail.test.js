@@ -123,6 +123,71 @@ assert.ok(/aria-expanded/.test(APP) && /Déplier le rail/.test(APP) && /Replier 
 
 console.log('✓ coquille : Nouveau Projet garde la navigation, le rail se replie et s’en souvient');
 
+// --- 3. LE RAIL S’ÉLARGIT PAR-DESSUS LA ZONE DE TRAVAIL -----------------------
+// « Quand j’élargis le rail, ma zone de travail se rétrécit » (24/08). Elle se
+// rétrécissait pour de bon : le rail est une COLONNE de la grille du .shell,
+// donc chaque pixel qu’il prenait était retiré à la carte de travail, qui
+// recalculait toute sa grille à CHAQUE pixel du glisser — les colonnes des
+// cartes changeaient de largeur sous les yeux, le texte se repliát, et la
+// requête de conteneur de `.grid-wrap` rebasculait d’une disposition à l’autre.
+//
+// La zone de travail ne concède plus QUE la largeur MINIMALE du rail (200 px,
+// la même que SIDEBAR_MIN). Tout ce que le rail prend au-delà, il le prend
+// PAR-DESSUS : la boîte de travail ne bouge plus d’un pixel, ni en largeur ni
+// en position, et c’est le rail qui recouvre le bord gauche des cartes.
+//
+// À NE PAS CONFONDRE avec « la zone de travail ne perd plus rien » : le rail
+// reste opaque et à gauche, donc ce qu’il gagne, l’œil le perd de toute façon.
+// Ce qui est gagné ici, c’est que RIEN NE SE RECALCULE — pas de reflux, pas de
+// saut de mise en page (CLS), un glisser de poignée à 60 fps.
+const shellCSS = (CSS.match(/\n\.shell \{\n[\s\S]*?\n\}/) || [''])[0];
+assert.ok(/--rail-base:\s*200px/.test(shellCSS),
+  'la coquille nomme la part de rail que la zone de travail concède');
+// Le socle CSS et la borne du script disent le MÊME nombre. S’ils divergent, le
+// rail découvre une bande de carte (base > min) ou la recouvre en permanence
+// (base < min) : deux défauts muets, invisibles au minimum de largeur.
+const min = APP.match(/SIDEBAR_MIN\s*=\s*(\d+)/);
+assert.ok(min, 'SIDEBAR_MIN doit exister');
+assert.strictEqual(min[1], '200',
+  'la largeur minimale du rail et `--rail-base` sont le MÊME nombre');
+// Le surplus : ce que le rail prend au-delà de sa base. Jamais négatif — un
+// rail plus étroit que sa base pousserait la zone de travail vers la droite.
+assert.ok(/--rail-sur:\s*max\(0px,/.test(shellCSS),
+  'le surplus du rail ne descend jamais sous zéro');
+// La zone de travail se reprend ce surplus par la GAUCHE : sa boîte part
+// toujours de `--rail-base` + la poignée, quelle que soit la largeur du rail.
+assert.ok(/\n\.app \{\n[\s\S]*?margin-left: calc\(-1 \* var\(--rail-sur/.test(CSS),
+  'la zone de travail glisse SOUS le rail au lieu de se laisser rétrécir');
+// Sans peinture au-dessus, la carte passerait PAR-DESSUS le rail : les étapes
+// disparaîtraient derrière elle dès le premier pixel de surplus.
+const railCSS = (CSS.match(/\n\.sidebar \{\n[\s\S]*?\n\}/) || [''])[0];
+assert.ok(/position: relative/.test(railCSS) && /z-index: 10/.test(railCSS),
+  'le rail se peint AU-DESSUS de la zone de travail');
+// … et sous la barre du haut (20) : le rail ne recouvre jamais les onglets, ni
+// le bouton qui le range. C’est pour ça que la barre garde sa colonne à lui.
+assert.ok(/\.topbar \{[\s\S]*?z-index: 20/.test(CSS),
+  'la barre du haut reste au-dessus du rail');
+// LA POIGNÉE EST OPAQUE. Les 16 px de respiration entre le rail et la carte
+// sont sa colonne à elle : transparente, on y verrait la carte glisser dessous
+// et le rail paraîtrait collé au papier.
+const poigneeCSS = (CSS.match(/\n\.sidebar-resizer \{\n[\s\S]*?\n\}/) || [''])[0];
+assert.ok(/background: var\(--bg\)/.test(poigneeCSS),
+  'la poignée masque ce qui glisse dessous : elle porte le fond de la page');
+assert.ok(/z-index: 10/.test(poigneeCSS),
+  '… et elle se peint elle aussi au-dessus de la zone de travail');
+// Rail rangé : plus de colonne, donc plus de surplus. Sans cette remise à zéro,
+// la zone de travail garderait sa marge négative et sortirait de l’écran par la
+// gauche — sans aucun rail pour la recouvrir.
+assert.ok(/\.rail-plie \.shell \{[^}]*--rail-sur: 0px/.test(CSS),
+  'rail rangé, la zone de travail reprend toute sa place');
+// Même raison en une seule colonne (≤ 640) : le rail n’est plus à gauche mais
+// AU-DESSUS, il ne recouvre donc plus rien.
+const uneColonne = (CSS.match(/@media \(max-width: 640px\) \{[\s\S]*?\n\}\n/) || [''])[0];
+assert.ok(/--rail-sur: 0px/.test(uneColonne),
+  'empilé sur une colonne, le rail ne recouvre plus la zone de travail');
+
+console.log('✓ coquille : le rail s’élargit par-dessus la zone de travail, qui ne bouge plus');
+
 // --- 5. L'ÉCHELLE DE L'ÉCRAN DE RÉFÉRENCE VAUT POUR TOUT L'OUTIL ------------
 // « De Nouveau Projet à Réglages, tout doit être parfaitement normé à l'image
 // de cette page. » Les trois feuilles du CRM ne connaissaient AUCUN jeton de la

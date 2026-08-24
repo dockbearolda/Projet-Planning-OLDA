@@ -99,7 +99,26 @@ body {
    chacun est posé par sa zone. */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) 16px minmax(0, 1fr);
+  /* LE RAIL S'ÉLARGIT PAR-DESSUS LA ZONE DE TRAVAIL, PLUS À SES DÉPENS (24/08).
+     Le rail est une colonne : chaque pixel qu'il prenait était retiré à la carte
+     de travail, qui recalculait TOUTE sa grille à chaque pixel du glisser (les
+     colonnes des cartes changeaient de largeur sous les yeux, la requête de
+     conteneur de `.grid-wrap` rebasculait d'une disposition à l'autre).
+     Désormais la zone de travail ne concède que `--rail-base` — la largeur
+     MINIMALE du rail, celle qu'il a de toute façon. Le surplus (`--rail-sur`)
+     lui est repris par la gauche : sa boîte ne bouge plus, ni en largeur ni en
+     position, et c'est le rail qui recouvre le bord gauche des cartes.
+     Ce qui est gagné n'est pas de la place — le rail reste opaque et à gauche —
+     c'est que PLUS RIEN NE SE RECALCULE : pas de reflux, pas de saut de mise en
+     page, un glisser de poignée à 60 fps.
+     `--rail-base` doit rester égal à SIDEBAR_MIN (app.js) : le garde-fou de
+     `test/coquille-nav-et-rail.test.js` tient les deux nombres ensemble.
+     La barre du haut, elle, garde sa colonne à droite du rail : c'est ce qui
+     empêche le rail de recouvrir les onglets et le bouton qui le range. */
+  --rail-base: 200px;
+  --rail-w: var(--sidebar-w, 240px);
+  --rail-sur: max(0px, calc(var(--rail-w) - var(--rail-base)));
+  grid-template-columns: var(--rail-w) 16px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
     "sidebar topbar  topbar"
@@ -373,6 +392,11 @@ body {
   display: flex;
   padding: 16px;
   overflow: hidden;
+  /* Elle repart de `--rail-base` + la poignée, quelle que soit la largeur du
+     rail : ce que le rail prend au-delà, il le prend PAR-DESSUS elle. Sa boîte
+     mesure donc toujours « fenêtre − 216 px », et rien n'y bouge quand on règle
+     le rail. Voir le pavé de `.shell`. */
+  margin-left: calc(-1 * var(--rail-sur));
 }
 
 /* Densité : hauteur de ligne */
@@ -383,6 +407,12 @@ body {
 /* Poignée de redimensionnement du rail (occupe la colonne centrale = ancien gap) */
 .sidebar-resizer {
   position: relative;
+  /* ELLE EST OPAQUE, ET C'EST STRUCTUREL. Ces 16 px sont la respiration entre le
+     rail et la carte ; depuis que la zone de travail glisse SOUS le rail, la
+     carte passe aussi sous cette colonne-là. Transparente, on l'y verrait
+     défiler et le rail paraîtrait collé au papier. */
+  background: var(--bg);
+  z-index: 10;
   align-self: stretch;
   cursor: col-resize;
   touch-action: none;
@@ -425,6 +455,12 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* AU-DESSUS DE LA ZONE DE TRAVAIL (qui glisse sous lui), SOUS LA BARRE DU HAUT
+     (20) : le rail ne recouvre jamais les onglets ni le bouton qui le range.
+     10 laisse aussi passer par-dessus tout ce qui doit flotter — le panneau des
+     colonnes (30), le voile de catégorie (60), le tiroir d'une ligne (70). */
+  position: relative;
+  z-index: 10;
   /* LES DEUX AXES SE DÉCLARENT, TOUJOURS. `overflow-y: auto` seul ne laisse pas
      l'autre axe tranquille : dès qu'un axe cesse d'être `visible`, l'autre
      passe de `visible` à `auto` — le rail devenait donc un conteneur qui DÉFILE
@@ -3312,7 +3348,7 @@ button, a, .stage, .deadline-badge,
 
 /* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
-  .shell { grid-template-columns: var(--sidebar-w, 224px) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 224px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .app { padding: 12px; }
   /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
      la place aux onglets et à la recherche. */
@@ -3325,7 +3361,7 @@ button, a, .stage, .deadline-badge,
 
 /* Portrait étroit : rail réduit, grille scrollable */
 @media (max-width: 900px) {
-  .shell { grid-template-columns: var(--sidebar-w, 200px) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 200px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
   .grid-search { max-width: none; }
   /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
@@ -3351,6 +3387,8 @@ button, a, .stage, .deadline-badge,
    puis la zone de travail. Le .shell devient une seule colonne qui défile. */
 @media (max-width: 640px) {
   .shell {
+    /* Le rail n'est plus à gauche mais AU-DESSUS : il ne recouvre plus rien. */
+    --rail-sur: 0px;
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
     grid-template-areas:
@@ -3703,7 +3741,10 @@ body.view-plein .fiverr-tool { display: none !important; }
    le thème), sinon le rail s'affiche puis se range sous les yeux.
    `display:none` plutôt qu'une colonne de 0 px seule : le rail défile, et un
    contenu de 32 entrées dans une piste de largeur nulle déborde. */
-.rail-plie .shell { grid-template-columns: 0 0 minmax(0, 1fr); }
+/* Plus de colonne, donc plus de surplus : sans cette remise à zéro la zone de
+   travail garderait sa marge négative et sortirait de l'écran par la gauche,
+   sans aucun rail pour la recouvrir. */
+.rail-plie .shell { --rail-sur: 0px; grid-template-columns: 0 0 minmax(0, 1fr); }
 .rail-plie .sidebar,
 .rail-plie .sidebar-resizer { display: none; }
 /* Le chevron dit où va le rail. La police est un sous-ensemble FIGÉ de 91
