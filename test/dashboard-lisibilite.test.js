@@ -108,17 +108,37 @@ assert.ok(/\.pj-todo-list\.is-atelier \.pj-row \{/.test(CSS),
   'la variante « atelier » de la grille doit exister en CSS');
 
 // ===========================================================================
-// 3. UN COMPTEUR À ZÉRO QUITTE LA BARRE
+// 3. L'ÉCRAN NE PORTE QUE DU TRAVAIL
 // ===========================================================================
-// L'éteindre en gris ne suffisait pas : il occupait la même surface et l'œil
-// devait le LIRE pour découvrir qu'il ne disait rien.
-assert.ok(/\$kpiEls\[key\]\.btn\.hidden = !n;/.test(DASH),
-  'un compteur d’alarme à zéro doit être retiré de la barre, pas seulement éteint');
-assert.ok(/Rien ne brûle/.test(DASH),
-  'quand les quatre compteurs se taisent, la barre doit le DIRE — une barre vide '
-  + 'se lit « l’écran n’a pas fini de charger »');
-assert.ok(!/is-zero/.test(DASH) && !/is-zero/.test(CSS),
-  'l’ancien état « compteur éteint » ne doit pas cohabiter avec le nouveau');
+// Le 25/08, le patron a retiré d'un coup tout ce qui n'était pas le travail
+// lui-même : les quatre compteurs d'alarme, la jauge « Charge par étape », le
+// briefing « Ce matin », le champ de recherche, la pastille de filtre et
+// l'onglet « Tout l'atelier ». Il reste les onglets, les files, les cartes.
+//
+// La garde tient le PRINCIPE, pas la nostalgie : rien qui compte, mesure,
+// jauge ou filtre ne doit revenir s'intercaler entre l'ouverture de l'écran et
+// la première ligne de travail. Une reprise se discute avec lui, elle ne se
+// glisse pas dans un correctif.
+const cssNu = CSS.replace(/\/\*[\s\S]*?\*\//g, ' ');
+for (const parti of ['pj-alarme', 'pj-al', 'pj-charge', 'pj-matin', 'pj-mot',
+  'pj-search', 'pj-filterchip', 'pj-stat']) {
+  const enSelecteur = new RegExp('\\.' + parti + '(?![\\w-])');
+  assert.ok(!enSelecteur.test(cssNu), `${parti} : cet appareil de mesure a été retiré de l’écran`);
+}
+for (const mort of ['kpiFilter', 'KPI_PRED', 'KPI_LABEL', 'filtreMatin',
+  'searchQuery', 'isDimmed', 'buildCharge', 'buildMatin', 'MATIN_MAX']) {
+  assert.ok(!DASH.includes(mort), `${mort} : le code qui le servait part avec lui`);
+}
+assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/matin.js')),
+  'le moteur du briefing est retiré, pas laissé en code mort — il reste dans '
+  + 'l’historique si le patron le redemande');
+assert.ok(!/'\/matin\.js'/.test(lire('public/sw.js')),
+  '… et il quitte la coquille hors ligne en même temps');
+
+// L'écran n'a plus que DEUX formes : l'équipe, ou la file d'une personne.
+assert.ok(!/mkTab\('todo'/.test(DASH), 'l’onglet « Tout l’atelier » est retiré');
+assert.ok(/buildTodoView\(activeTab\)/.test(DASH),
+  'un onglet de prénom mène directement à la file de cette personne');
 
 // ===========================================================================
 // 4. L'ÉCHELLE EST CELLE DE LA CHARTE
@@ -223,11 +243,8 @@ assert.ok(/import \{ lirePoste \} from '\.\/poste\.js';/.test(DASH),
 assert.ok(/document\.addEventListener\('olda:poste'/.test(DASH),
   'un changement de personne en cours de journée doit déplacer la marque '
   + '— `storage` ne se déclenche pas dans l’onglet qui écrit');
-const SW = lire('public/sw.js');
-for (const f of ['/poste.js', '/matin.js']) {
-  assert.ok(SW.includes(`'${f}'`),
-    `${f} est importé par le dashboard : sans lui dans la coquille, l’écran ne `
-    + 's’ouvre plus hors ligne');
-}
+assert.ok(lire('public/sw.js').includes("'/poste.js'"),
+  'poste.js est importé par le dashboard : sans lui dans la coquille, l’écran '
+  + 'ne s’ouvre plus hors ligne');
 
 console.log('dashboard-lisibilite.test.js OK');

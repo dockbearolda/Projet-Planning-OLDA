@@ -3769,7 +3769,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    Cibles : Galaxy Tab paysage 1280×800 (mode d'usage principal), portrait
    800×1280, desktop, iPhone.
    =========================================================================== */
-.dashboard, .dd-panel, .pj-feed {
+.dashboard, .dd-panel {
   /* surfaces & texte */
   --pj-bg: var(--bg);
   --pj-surface: var(--surface);
@@ -3812,31 +3812,14 @@ body.view-plein .fiverr-tool { display: none !important; }
   --pj-shadow: var(--shadow-2);
   --pj-font: var(--font);
 
-  /* Dégradé de la jauge de charge : UNE seule teinte (l'encre), du clair au
-     foncé, dans l'ordre du pipeline — entrée à gauche, sortie à droite. C'est
-     une échelle ordonnée, donc la clarté suffit à l'encoder ; aucune couleur
-     n'est dépensée, et chaque segment porte son chiffre + sa légende (jamais
-     la teinte seule pour identifier une étape). */
-  /* La rampe COMMENCE assez foncé pour se voir. À #d1d5db, le premier segment
-     se rendait à 1,51:1 sur le blanc de sa carte — un barreau qu'on ne
-     distingue pas de son fond n'encode plus rien. #8b929f passe à 3,05:1, le
-     seuil des éléments graphiques porteurs de sens, et les cinq crans restent
-     distincts les uns des autres. */
-  --pj-pal-1: #8b929f;
-  --pj-pal-2: #6f7686;
-  --pj-pal-3: #565d6c;
-  --pj-pal-4: #3b4250;
-  --pj-pal-5: #1f2937;
-
   /* Les pistes de la grille des lignes, nommées une fois : l'entête de
      colonnes et les lignes DOIVENT partager exactement la même définition.
-     Il n'y a plus de piste « pourquoi » dans la FILE : le motif n'y est qu'une
-     exception (machine goulot, stagnation) et descend sur un deuxième rang
-     quand il existe, au lieu de réserver 262 px de vide sur chaque ligne. Le
-     BAC, lui, la garde — l'attente y est le sujet de la ligne. */
+     Aucune piste « pourquoi » : le motif d'un classement descend sur un
+     deuxième rang, et seulement quand il existe. Dans le BAC, ce qu'on attend
+     EST le sujet de la ligne : il y prend une piste souple, aussi large que le
+     client. */
   --pj-c-rank: 32px;
   --pj-c-pos: 176px;
-  --pj-c-why: 176px;
   --pj-c-due: 104px;
   --pj-c-prio: 62px;
   --pj-c-pilot: 128px;
@@ -3845,27 +3828,13 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-family: var(--pj-font);
 }
 
-/* En thème sombre la jauge doit se détacher de la surface sombre : la même
-   échelle, retournée (l'étape la plus avancée reste la plus contrastée). */
-:root[data-theme="dark"] .dashboard,
-:root[data-theme="dark"] .dd-panel,
-:root[data-theme="dark"] .pj-feed {
-  --pj-pal-1: #4b5563;
-  --pj-pal-2: #6b7280;
-  --pj-pal-3: #9ca3af;
-  --pj-pal-4: #cbd5e1;
-  --pj-pal-5: #f1f5f9;
-}
-
 .dashboard { background: var(--pj-bg); color: var(--pj-ink); }
 
 /* L'attribut hidden doit gagner même sur les éléments qui portent un display. */
-.dashboard [hidden], .dd-panel [hidden], .pj-feed [hidden] { display: none !important; }
+.dashboard [hidden], .dd-panel [hidden] { display: none !important; }
 
 /* Focus clavier visibles partout dans le point du jour. */
-.dashboard button:focus-visible, .dd-panel button:focus-visible,
-.pj-feed button:focus-visible,
-.pj-search-input:focus-visible {
+.dashboard button:focus-visible, .dd-panel button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .35);
 }
@@ -3940,47 +3909,6 @@ body.view-plein .fiverr-tool { display: none !important; }
   line-height: 1.3;
 }
 
-/* Recherche : la pilule de la charte, à la taille de saisie de la charte. */
-.pj-search {
-  display: flex;
-  align-items: center;
-  gap: var(--pas-1);
-  min-width: 200px;
-  max-width: 320px;
-  flex: 1 1 240px;
-  padding: 0 var(--pas-2);
-  height: 40px;
-  border-radius: var(--arrondi-champ);
-  background: var(--search-bg);
-  color: var(--pj-ink-2);
-  transition: background var(--dur-1) var(--ease);
-}
-.pj-search:focus-within { background: var(--search-bg-hover); }
-.pj-search > .material-symbols-outlined { font-size: 20px; color: var(--pj-ink-2); }
-.pj-search-input {
-  flex: 1;
-  min-width: 0;                       /* sans quoi le champ pousse la pilule */
-  border: 0;
-  background: none;
-  color: var(--pj-ink);
-  font: inherit;
-  font-size: var(--taille-texte);
-  outline: none;
-}
-.pj-search-input::placeholder { color: var(--pj-muet); font-weight: var(--graisse-texte); }
-.pj-search-clear {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 99px;
-  background: none;
-  color: var(--pj-ink-2);
-  font-size: var(--taille-texte);
-  line-height: 1;
-  cursor: pointer;
-}
-
 /* Les trois outils du patron : Activité, Machines, Attribution. */
 .pj-tool {
   position: relative;
@@ -4002,94 +3930,6 @@ body.view-plein .fiverr-tool { display: none !important; }
 .pj-tool:hover { background: var(--state-hover); color: var(--pj-ink); }
 .pj-tool--icon { width: 40px; padding: 0; justify-content: center; }
 .pj-tool .material-symbols-outlined { font-size: 20px; }
-.pj-tool-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 99px;
-  background: var(--pj-late);
-  color: #fff;
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-forte);
-  line-height: 18px;
-  text-align: center;
-}
-
-/* ===========================================================================
-   LA BARRE D'ALARME — une ligne, et rien qui soit à zéro
-   ---------------------------------------------------------------------------
-   Quatre boîtes de 26 px alignées côte à côte occupaient la même surface
-   qu'elles portent un chiffre ou un zéro : l'œil devait les LIRE pour
-   découvrir qu'elles ne disaient rien. Ici un compteur vide quitte la barre,
-   et quand les quatre se taisent une phrase prend leur place. C'est la seule
-   façon pour que « rien ne brûle » se voie sans être lu.
-   =========================================================================== */
-.pj-alarme {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--pas-2);
-  padding: var(--pas-3) 0 var(--pas-2);
-  min-height: 34px;                   /* la barre ne saute pas quand elle se vide */
-}
-.pj-al {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--pas-1);
-  padding: 4px var(--pas-2);
-  border: 1px solid transparent;
-  border-radius: var(--arrondi-champ);
-  background: none;
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-.pj-al:hover { background: var(--state-hover); }
-.pj-al.active { background: var(--primary-soft); border-color: var(--pj-border-strong); }
-.pj-al-n {
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--pj-ink);
-}
-.pj-al-l {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-note);
-  color: var(--pj-ink-2);
-}
-/* La couleur ne se dépense que sur ce qui brûle : le retard et le blocage
-   sont à nous, l'échéance proche prévient, l'attente client n'est pas notre
-   sujet — elle reste à l'encre. */
-.pj-al.k-late .pj-al-n,
-.pj-al.k-blocked .pj-al-n { color: var(--pj-late); }
-.pj-al.k-soon .pj-al-n { color: var(--pj-soon-deep); }
-
-.pj-alarme-calme {
-  margin: 0;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-note);
-  color: var(--pj-ink-2);
-}
-
-/* Chip « Filtre : … ✕ » — il annule le filtre actif. */
-.pj-filterchip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--pas-1);
-  margin-left: auto;
-  padding: 5px var(--pas-2);
-  border: 1px solid var(--pj-border-strong);
-  border-radius: 99px;
-  background: var(--pj-surface);
-  color: var(--pj-ink);
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-note);
-  cursor: pointer;
-}
-.pj-filterchip-x { font-weight: var(--graisse-forte); color: var(--pj-ink-2); }
 
 /* ------------------------------------------------ Onglets */
 .pj-tabs {
@@ -4208,90 +4048,6 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-weight: var(--graisse-texte);
   color: var(--pj-ink-2);
   white-space: nowrap;
-}
-
-/* ===========================================================================
-   LA FILE — un tableau, pas une pile de cartes
-   ---------------------------------------------------------------------------
-   Pistes FIXES, partagées par l'entête de colonnes et les lignes. Aucune piste
-   `auto` : une ligne sans « pourquoi » ou sans priorité garde ses colonnes en
-   place au lieu de décaler toute la file.
-   La grille se replie sur la largeur de SA LISTE (requête de conteneur), pas
-   sur celle de la fenêtre.
-   =========================================================================== */
-/* ===========================================================================
-   « CE MATIN » — le briefing, en tête de toutes les vues
-   ---------------------------------------------------------------------------
-   Il doit se lire AVANT la file, sans devenir un bandeau qu'on saute. Trois
-   partis pris pour ça :
-     · pas de fond coloré sur le bloc — la couleur reste réservée aux états, et
-       un pavé teinté en haut d'écran finit par ne plus se voir ;
-     · chaque observation est un BOUTON : elle se prouve d'un clic, la file
-       n'affiche plus qu'elle. Ce qui est cliquable doit en avoir l'air ;
-     · le TON se dit par un liseré à gauche, pas par la couleur du texte : les
-       phrases restent à l'encre, donc lisibles, et l'urgence se lit au balayage.
-   =========================================================================== */
-.pj-matin { margin-bottom: var(--pas-4); }
-.pj-matin-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--pas-2);
-  margin-bottom: var(--pas-2);
-}
-.pj-matin-t {
-  margin: 0;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  color: var(--pj-ink);
-}
-.pj-matin-reste {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-texte);
-  color: var(--pj-ink-2);
-}
-.pj-matin-vide {
-  margin: 0;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-texte);
-  color: var(--pj-ink-2);
-}
-/* Deux colonnes tant que la place le permet : cinq observations empilées
-   poussent la file hors de l'écran, et c'est la file qu'on vient faire. */
-.pj-matin-liste {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--pas-2);
-}
-.pj-mot {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--pas-2) var(--pas-3);
-  border: 1px solid var(--pj-border);
-  border-left: 3px solid var(--pj-border-strong);
-  border-radius: var(--arrondi-bloc);
-  background: var(--pj-surface);
-  color: var(--pj-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-.pj-mot:hover { background: var(--row-hover); }
-.pj-mot.active { border-color: var(--pj-accent); background: var(--primary-soft); }
-.pj-mot:disabled { cursor: default; }
-.pj-mot.t-urgent { border-left-color: var(--pj-late); }
-.pj-mot.t-attention { border-left-color: var(--pj-soon); }
-.pj-mot-t {
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  line-height: 1.25;
-}
-.pj-mot-d {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-texte);
-  color: var(--pj-ink-2);
-  line-height: 1.4;
 }
 
 .pj-todo { display: flex; flex-direction: column; gap: var(--pas-4); }
@@ -4682,74 +4438,6 @@ body.view-plein .fiverr-tool { display: none !important; }
    =========================================================================== */
 .pj-team { display: flex; flex-direction: column; gap: var(--pas-4); }
 
-/* --- Jauge de charge par étape ------------------------------------------- */
-.pj-charge {
-  padding: var(--pas-3) var(--pas-4);
-  border: 1px solid var(--pj-border);
-  border-radius: var(--arrondi-carte);
-  background: var(--pj-surface);
-}
-.pj-charge-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--pas-2);
-  margin-bottom: var(--pas-2);
-}
-.pj-charge-t {
-  margin: 0;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  color: var(--pj-ink);
-}
-.pj-charge-n {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-note);
-  color: var(--pj-ink-2);
-}
-.pj-charge-bar {
-  display: flex;
-  gap: 2px;
-  height: 12px;
-  border-radius: 99px;
-  overflow: hidden;
-}
-.pj-charge-seg { background: var(--pj-pal, var(--pj-ink-2)); }
-.pj-charge-seg:nth-child(1) { --pj-pal: var(--pj-pal-1); }
-.pj-charge-seg:nth-child(2) { --pj-pal: var(--pj-pal-2); }
-.pj-charge-seg:nth-child(3) { --pj-pal: var(--pj-pal-3); }
-.pj-charge-seg:nth-child(4) { --pj-pal: var(--pj-pal-4); }
-.pj-charge-seg:nth-child(5) { --pj-pal: var(--pj-pal-5); }
-.pj-charge-vide { flex: 1; background: var(--pj-border-soft); }
-.pj-charge-leg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--pas-1) var(--pas-3);
-  margin-top: var(--pas-2);
-}
-.pj-charge-lg { display: inline-flex; align-items: center; gap: var(--pas-1); }
-.pj-charge-lg-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  background: var(--pj-pal, var(--pj-ink-2));
-}
-.pj-charge-lg:nth-child(1) { --pj-pal: var(--pj-pal-1); }
-.pj-charge-lg:nth-child(2) { --pj-pal: var(--pj-pal-2); }
-.pj-charge-lg:nth-child(3) { --pj-pal: var(--pj-pal-3); }
-.pj-charge-lg:nth-child(4) { --pj-pal: var(--pj-pal-4); }
-.pj-charge-lg:nth-child(5) { --pj-pal: var(--pj-pal-5); }
-.pj-charge-lg-t {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-texte);
-  color: var(--pj-ink-2);
-}
-.pj-charge-lg-n {
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-forte);
-  color: var(--pj-ink);
-  font-variant-numeric: tabular-nums;
-}
-
 /* --- Les quatre colonnes -------------------------------------------------- */
 .pj-board {
   display: grid;
@@ -4902,7 +4590,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   transition: opacity var(--dur-2) var(--ease);
 }
 .dd-scrim.open { opacity: 1; pointer-events: auto; }
-.dd-panel, .pj-feed {
+.dd-panel {
   position: fixed;
   top: 0;
   right: 0;
@@ -4921,7 +4609,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   transition: transform .28s var(--ease), visibility 0s .28s;
   padding-bottom: env(safe-area-inset-bottom);
 }
-.dd-panel.open, .pj-feed.open { transform: translateX(0); visibility: visible; transition: transform .28s var(--ease); }
+.dd-panel.open { transform: translateX(0); visibility: visible; transition: transform .28s var(--ease); }
 .dd-close {
   position: absolute;
   top: 12px;
@@ -5113,29 +4801,6 @@ body.view-plein .fiverr-tool { display: none !important; }
 .dd-open:hover { background: var(--pj-bg); color: var(--pj-ink); }
 .dd-open .material-symbols-outlined { font-size: 16px; }
 
-/* ------------------------------------------------ Fil d'activité */
-.pj-feed { width: min(400px, 100vw); }
-.pj-feed-title { margin: 0; padding: 22px 22px 12px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.02em; }
-.pj-feed-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 22px; }
-.pj-feed .pj-empty { margin-top: 6px; }
-.pj-feed-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--pj-border-soft);
-}
-.pj-feed-dot {
-  width: 8px;
-  height: 8px;
-  margin-top: 5px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--dot, var(--pj-accent));
-}
-.pj-feed-text { flex: 1; min-width: 0; font-size: var(--taille-texte); font-weight: var(--graisse-texte); line-height: 1.45; color: var(--pj-ink); overflow-wrap: anywhere; }
-.pj-feed-time { flex-shrink: 0; font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--pj-ink-4); font-variant-numeric: tabular-nums; }
-
 /* ------------------------------------------------ Réglages Machines */
 .mac-card { width: min(640px, 100%); }
 .mac-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
@@ -5213,7 +4878,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 
 /* Portable 13" : les colonnes fixes se resserrent avant de tomber. */
 @media (max-width: 1279px) {
-  .dashboard, .dd-panel, .pj-feed { --pj-c-why: 148px; --pj-c-pos: 150px; --pj-c-pilot: 116px; }
+  .dashboard, .dd-panel { --pj-c-why: 148px; --pj-c-pos: 150px; --pj-c-pilot: 116px; }
 }
 
 /* Fenêtre à demi-écran : la barre d'outils se réduit aux icônes et la
@@ -5222,8 +4887,6 @@ body.view-plein .fiverr-tool { display: none !important; }
    reléguait les trois outils sur une ligne à eux, orphelins en haut à gauche. */
 @media (max-width: 900px) {
   .pj-head-row { flex-wrap: wrap; }
-  .pj-search { order: 10; flex: 1 1 100%; max-width: none; }
-  .pj-tool-label { display: none; }
   .pj-tool { width: 40px; padding: 0; justify-content: center; }
   .pj-head { padding-inline: var(--pas-3); }
   .pj-body { padding-inline: var(--pas-3); }
@@ -5602,7 +5265,6 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    détachait plus du fond sombre. */
 :root[data-theme="dark"] .ligne-drawer__card { box-shadow: 0 24px 70px rgba(0, 0, 0, .6); }
 :root[data-theme="dark"] .dd-panel,
-:root[data-theme="dark"] .pj-feed { box-shadow: -18px 0 48px rgba(0, 0, 0, .5); }
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
@@ -5893,8 +5555,6 @@ summary:focus-visible {
 /* Réponses au survol qui manquaient : ces commandes étaient cliquables sans
    jamais le dire à la souris. */
 .search-palette-item:hover { background: var(--state-hover); }
-.pj-search-clear:hover,
-.pj-filterchip:hover,
 .cat-row-select:hover,
 .mac-imp:hover,
 .reg-tarif-add:hover,

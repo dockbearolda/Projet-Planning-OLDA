@@ -136,7 +136,7 @@ assert.strictEqual(bac.rankFor('Mélina').queue.length, 0,
 // file commune sont désormais LE MÊME rendu à un filtre près.
 assert.ok(!/function buildPersonView/.test(SRC),
   'la vue personne dédoublée ne doit pas revenir : une seule liste par onglet');
-assert.ok(/buildTodoView\(activeTab === 'todo' \? null : activeTab\)/.test(SRC),
-  'l’onglet d’une personne passe par le MÊME constructeur que la file commune');
+assert.ok(/buildTodoView\(activeTab\)/.test(SRC),
+  'l’onglet d’une personne mène directement à SA file, en un seul rendu');
 
 console.log('dashboard-person-view.test.js OK');

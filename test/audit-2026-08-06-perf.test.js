@@ -383,9 +383,15 @@ function bloc(src, signature) {
     'SYNTHESE_FAMILLES (serveur) et ACTIVE_FAMILIES (Point du jour) doivent dire la même chose',
   );
 
-  // MAIS une commande qui QUITTE le bord doit continuer d'arriver : c'est elle
-  // que le fil d'activité annonce « marquée traitée ✓ ». Elle n'est plus dans
-  // `ids`, elle est quand même dans `lignes`.
+  // MAIS une commande qui QUITTE le bord doit continuer d'arriver dans
+  // `lignes`, tout en sortant de `ids`. C'est `ids` qui fait la composition du
+  // tableau : sans lui, un dossier passé en « Paiement & clôture » resterait
+  // affiché jusqu'au prochain chargement complet.
+  //
+  // (Le fil d'activité, qui annonçait « marquée traitée ✓ » à partir de ces
+  // `lignes`, a été retiré de l'écran le 25/08 sur ordre du patron. Le contrat
+  // du serveur, lui, ne bouge pas : c'est `ids` qui compte, et il est plus sûr
+  // d'envoyer la ligne partante que de la taire.)
   const vivante = (await call('GET', '/api/requests?stage=production')).body[0];
   const avantSortie = await call('GET', '/api/requests/synthese');
   assert.strictEqual(
@@ -405,10 +411,15 @@ function bloc(src, signature) {
     !apresSortie.body.ids || !apresSortie.body.ids.includes(vivante.id),
     'mais elle ne fait plus partie du tableau',
   );
-  const fusion = bloc(DASH, '  async function refresh() {');
+  const fusion = bloc(DASH, '  function fusionner(synthese) {');
   assert.match(
-    fusion, /const parties = \(synthese\.lignes \|\| \[\]\)\.filter/,
-    'et l’écran donne bien ces sorties au fil d’activité',
+    fusion, /if \(Array\.isArray\(synthese\.ids\)\) ordreIds = synthese\.ids\.map\(String\);/,
+    'l’écran prend `ids` pour la composition du tableau — c’est ce qui fait '
+    + 'DISPARAÎTRE un dossier qui vient de quitter le bord',
+  );
+  assert.match(
+    fusion, /return ordreIds\.map\(\(id\) => connues\.get\(id\)\)\.filter\(Boolean\);/,
+    '… et rien d’autre que `ids` ne décide de ce qui reste à l’écran',
   );
 
   // =========================================================================

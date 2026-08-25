@@ -140,18 +140,36 @@ function bloc(src, signature) {
 }
 
 // ===========================================================================
-// 8. Le fil d'activité ne garde pas ce qui n'a pas eu lieu
+// 8. L'ÉCRAN NE GARDE RIEN QUI N'A PAS EU LIEU
+// ---------------------------------------------------------------------------
+// Les trois gestes du panneau détail sont OPTIMISTES : ils modifient la ligne à
+// l'écran, puis écrivent au serveur. Si l'écriture échoue, tout doit revenir en
+// arrière — sinon le poste affiche un état que la base ne connaît pas, et c'est
+// exactement le genre de mensonge qui fait perdre un dossier.
+//
+// La garde portait aussi, jusqu'au 25/08, sur le retrait de la ligne du fil
+// d'activité. Le fil a été retiré de l'écran ce jour-là ; ce qui compte — le
+// retour en arrière des DONNÉES — n'a pas bougé d'un pouce.
 // ===========================================================================
 {
-  assert.ok(/function retirerActivite\(ligne\)/.test(DASH));
-  assert.ok(/return ligne;/.test(bloc(DASH, '  function logActivity(text, color)')),
-    'logActivity rend son entrée pour qu’on puisse la retirer');
-  for (const geste of ['function sendTo(r, stage, sub)', 'function clearFlag(r)', 'function markDone(r)']) {
+  for (const [geste, champs] of [
+    ['function sendTo(r, stage, sub)', ['stage', 'sub_stage']],
+    ['function clearFlag(r)', ['flag', 'flag_reason']],
+    ['function markDone(r)', ['stage', 'sub_stage']],
+  ]) {
     const b = bloc(DASH, `  ${geste}`);
-    assert.ok(/const trace = logActivity\(/.test(b), `${geste} : l’entrée doit être retenue`);
-    assert.ok(/retirerActivite\(trace\);/.test(b),
-      `${geste} : le retour en arrière doit retirer l’entrée — « Ce qui a bougé » `
-      + 'est ce que le patron lit pour savoir ce qui s’est passé');
+    for (const champ of champs) {
+      assert.ok(new RegExp(`${champ}: r\\.${champ}`).test(b),
+        `${geste} : l’état d’avant doit être retenu (${champ}) — sans lui, pas de retour possible`);
+    }
+    assert.ok(/\.catch\(\(\) => \{[\s\S]*?Object\.assign\(r, prev\);/.test(b),
+      `${geste} : un échec d’écriture doit REMETTRE la ligne comme elle était`);
+    assert.ok(/\.catch\(\(\) => \{[\s\S]*?renderAll\(\);/.test(b),
+      `${geste} : … et repeindre, sinon l’écran garde l’état optimiste`);
+    assert.ok(/\.catch\(\(\) => \{[\s\S]*?showToast\(/.test(b),
+      `${geste} : … et le DIRE. Un échec silencieux est pire qu’un échec`);
+    assert.ok(/\.catch\(\(\) => \{[\s\S]*?refresh\(\);/.test(b),
+      `${geste} : … et redemander la vérité au serveur`);
   }
 }
 
@@ -192,4 +210,4 @@ function bloc(src, signature) {
   assert.ok(/PORT=3001 npm start/.test(SERVER), 'on dit quoi faire, pas seulement ce qui ne va pas');
 }
 
-console.log('✓ audit 17/08 : ticket entier ou rien, écritures ordonnées, grille nommée, fil d’activité honnête');
+console.log('✓ audit 17/08 : ticket entier ou rien, écritures ordonnées, grille nommée, gestes optimistes qui savent revenir en arrière');

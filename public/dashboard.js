@@ -2,21 +2,28 @@
 // Dashboard « Point du jour » — projection temps réel du planning.
 // ===========================================================================
 // L'écran répond à UNE question, pour quatre personnes : « qu'est-ce que je
-// fais maintenant ? ». Tout ce qui ne sert pas cette question descend ou
-// disparaît. Trois partis pris, posés le 25/08 après une refonte complète :
+// fais maintenant ? ». Trois partis pris, posés le 25/08 :
 //
-//   1. L'ÉCRAN S'OUVRE SUR MOI. Le poste sait qui est là (`olda.qui`) : la vue
-//      par défaut est la file de cette personne, pas les quarante dossiers de
-//      tout l'atelier.
-//   2. UNE COLONNE = UNE INFORMATION. La version précédente écrivait l'échéance
+//   1. IL NE PORTE QUE DU TRAVAIL. Le patron a retiré d'un coup, ce jour-là,
+//      tout ce qui n'en était pas : les quatre compteurs d'alarme, la jauge
+//      « Charge par étape », le briefing « Ce matin », le champ de recherche
+//      (l'application en a un, en haut), la pastille de filtre, l'onglet
+//      « Tout l'atelier » et le fil « Ce qui a bougé ». Restent le titre, les
+//      cinq onglets, et les dossiers. L'en-tête est passé de 195 à 57 px —
+//      c'est-à-dire que la première ligne de travail a remonté d'autant.
+//      RIEN QUI COMPTE, MESURE OU FILTRE ne doit revenir s'intercaler là :
+//      une reprise se discute, elle ne se glisse pas dans un correctif.
+//   2. CINQ ONGLETS, ET LES QUATRE PRÉNOMS NE BOUGENT PAS. Équipe d'abord,
+//      puis Loïc, Charlie, Mélina, Julien, dans cet ordre, sur tous les
+//      postes. Celui de la personne au poste porte une marque, il ne change
+//      pas de place : on ne réordonne pas une liste de quatre noms qu'on
+//      connaît par cœur.
+//   3. UNE COLONNE = UNE INFORMATION. La version précédente écrivait l'échéance
 //      deux fois par ligne (colonne « Pourquoi maintenant » : « En retard de
 //      3 j », colonne « Échéance » : « Retard 3 j ») et la priorité trois fois
 //      (colonne « Prio », « Priorité haute (3★) » dans le pourquoi, et le rang
 //      de la file qui en découle). Le « pourquoi » ne garde donc QUE les motifs
 //      qu'aucune autre colonne ne porte : machine goulot, stagnation.
-//   3. UN ZÉRO NE S'AFFICHE PAS. Un compteur éteint mais présent occupe quand
-//      même l'œil ; celui qui n'a rien à dire quitte la barre. Quand rien ne
-//      brûle, la barre entière est remplacée par une phrase calme.
 //
 // AUCUNE donnée propre : tout vient de /api/requests + /api/category-owners ;
 // toute action (envoi de catégorie, marquer traité, étoiles) écrit via la même
@@ -42,13 +49,11 @@ import { armerModale } from './modale.js';
 // Qui est au poste : c'est cette personne que l'onglet marque, et pour qui le
 // briefing du matin est calculé.
 import { lirePoste } from './poste.js';
-// Ce que l'écran a compris avant qu'on le lise (voir matin.js).
-import { briefing } from './matin.js';
 
 export function createDashboard(deps) {
   const {
     root, api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
-    daysLeft, prioBand, showToast, attachTip, fold,
+    daysLeft, prioBand, showToast, attachTip,
     jumpToPlanning,
   } = deps;
 
@@ -129,7 +134,7 @@ export function createDashboard(deps) {
   let veilleTimer = null;
   const REFRESH_FOND_MS = 30000;
 
-  // 'todo' (toute la file) | 'team' | prénom.
+  // 'team' | prénom.
   // La personne au poste, relue à chaque rendu : elle change en cours de
   // journée (bouton « Se nommer »), et c'est elle qui décide de la vue par
   // défaut. `null` tant que personne ne s'est nommé.
@@ -143,17 +148,7 @@ export function createDashboard(deps) {
   // les quatre.
   let activeTab = 'team';
 
-  let kpiFilter = null;         // null | 'late' | 'soon' | 'waiting' | 'active'
-  // Filtre posé en cliquant une observation du briefing : { titre, ids:Set }.
-  // Il n'est PAS de la même famille que le filtre d'alarme — celui-ci désigne
-  // une liste nommée de dossiers, pas une catégorie —, et les deux ne
-  // cohabitent pas : poser l'un lève l'autre.
-  let filtreMatin = null;
-  let searchQuery = '';
 
-  // Fil d'activité (local à la session : diff des snapshots + actions locales).
-  const activity = [];          // { ts, text, color }
-  let unseen = 0;
 
   // --- Dérivations métier --------------------------------------------------
   const isActive = (r) => ACTIVE_SET.has(r.stage);
@@ -279,60 +274,12 @@ export function createDashboard(deps) {
   // priorité : le KPI et le bac « à relancer » doivent parler des mêmes lignes.
   const isWaitingClient = (r) => WAITING_SUBS.has(r.sub_stage);
 
-  const isBlocked = (r) => r.flag === 'bloque';
 
   // « En retard » = L'ATELIER est en retard. Une commande dont la balle est chez
   // le client (devis/BAT partis, ou finie et pas encore récupérée) a beau avoir
   // dépassé sa date, ce n'est plus notre retard : elle est comptée en « Attente
   // client », pas ici — sinon le compteur du matin gonfle avec du travail fait.
   const isLate = (r) => urgency(r).band === 0 && !isWaitingClient(r);
-
-  function kpis() {
-    const act = rows.filter(isActive);
-    return {
-      late: act.filter(isLate).length,
-      blocked: act.filter(isBlocked).length,
-      soon: act.filter((r) => urgency(r).band === 1).length,
-      waiting: act.filter(isWaitingClient).length,
-      active: act.length,
-    };
-  }
-
-  // --- Filtres (KPI + recherche) : estompe les cartes non concernées -------
-  const KPI_PRED = {
-    late: isLate,
-    blocked: isBlocked,
-    soon: (r) => urgency(r).band === 1,
-    waiting: isWaitingClient,
-    active: () => true,
-  };
-  const KPI_LABEL = { late: 'En retard', blocked: 'Bloquées', soon: 'Échéance proche', waiting: 'Attente client', active: 'Commandes actives' };
-
-  // Mêmes champs que la recherche du planning (SEARCH_FIELDS dans app.js) :
-  // chercher un numéro de téléphone trouvait la commande sur le planning et
-  // rien sur le point du jour — même requête, deux verdicts opposés.
-  const DASH_SEARCH_FIELDS = [
-    'billing_company', 'contact_referent', 'product', 'color', 'description',
-    'contact_phone', 'contact_email', 'responsable', 'referent', 'flag_reason',
-  ];
-  // Les jetons de la requête se découpent UNE fois par requête, pas une fois
-  // par ligne : `fold` (minuscules + accents) est la brique la plus appelée du
-  // rendu, et la vue Équipe la payait 12 fois par ligne et par frappe.
-  let jetonsPour = null;
-  let jetonsRecherche = [];
-  function matchesSearch(r) {
-    if (!searchQuery) return true;
-    if (searchQuery !== jetonsPour) {
-      jetonsPour = searchQuery;
-      jetonsRecherche = fold(searchQuery).split(/\s+/).filter(Boolean);
-    }
-    const hay = DASH_SEARCH_FIELDS.map((f) => fold(r[f])).join(' ')
-      + ' ' + fold(effectivePilot(r)) + ' ' + fold(effectiveReferents(r).join(' '));
-    return jetonsRecherche.every((t) => hay.includes(t));
-  }
-  const isDimmed = (r) => (kpiFilter && !KPI_PRED[kpiFilter](r))
-    || (filtreMatin && !filtreMatin.ids.has(r.id))
-    || !matchesSearch(r);
 
   // --- Petites briques DOM -------------------------------------------------
   function el(tag, cls, text) {
@@ -443,7 +390,6 @@ export function createDashboard(deps) {
   function nextActionOf(r) {
     return NEXT_ACTION[r.sub_stage] || NEXT_ACTION[r.stage] || 'Faire avancer le dossier';
   }
-  const fmtTime = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
   // --- Carte de la vue Équipe ----------------------------------------------
   // DEUX lignes, pas six. La version précédente empilait client, badge,
@@ -459,7 +405,6 @@ export function createDashboard(deps) {
     const u = urgency(r);
     const b = el('button', `pj-card pj-card--board u-${u.cls}`);
     b.type = 'button';
-    if (isDimmed(r)) b.classList.add('is-dim');
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
     const top = el('div', 'pj-card-top');
@@ -481,27 +426,7 @@ export function createDashboard(deps) {
   }
 
   // --- Header (construit une fois, mis à jour par refs) --------------------
-  let $head, $searchInput, $searchClear, $actBadge, $kpiEls = {}, $chip, $chipLabel, $tabs;
-  let $date, $alarme, $alarmeCalme;
-
-  // Les QUATRE compteurs d'alarme. « Commandes actives » n'en est pas un : son
-  // filtre ne retire rien (tout le point du jour EST actif) et son chiffre est
-  // déjà porté par la vue Équipe.
-  //
-  // ILS NE S'AFFICHENT QUE S'ILS ONT QUELQUE CHOSE À DIRE. Les éteindre en gris
-  // (première refonte) ne suffisait pas : quatre boîtes de 26 px occupent la
-  // même surface, qu'elles portent un chiffre ou un zéro, et l'œil doit les
-  // lire pour découvrir qu'elles ne disent rien. Un compteur à zéro quitte donc
-  // la barre. Quand les quatre sont à zéro, la barre entière devient une phrase
-  // — c'est-à-dire l'information « rien ne brûle », enfin lisible d'un coup.
-  const STAT_KEYS = ['late', 'blocked', 'soon', 'waiting'];
-  const STAT_LABEL = { late: 'en retard', blocked: 'bloquées', soon: 'sous 48 h', waiting: 'en attente client' };
-  const STAT_HINT = {
-    late: 'Échéance dépassée et la balle est dans notre camp',
-    blocked: 'Signalées bloquées depuis le planning',
-    soon: 'À rendre aujourd’hui, demain ou après-demain',
-    waiting: 'Devis / BAT partis, ou commande prête à retirer',
-  };
+  let $head, $tabs, $date;
 
   // Date du jour en clair. L'horloge du POSTE fait foi : les postes sont
   // physiquement à Saint-Martin, c'est bien leur jour civil qu'on affiche
@@ -523,49 +448,6 @@ export function createDashboard(deps) {
     title.appendChild($date);
     row.appendChild(title);
 
-    // Recherche : filtre en direct toutes les vues (estompe les non-concernées).
-    const search = el('div', 'pj-search');
-    search.appendChild(icon('search'));
-    $searchInput = el('input', 'pj-search-input');
-    $searchInput.type = 'text';
-    $searchInput.placeholder = 'Filtrer le point du jour';
-    $searchInput.setAttribute('aria-label', 'Filtrer les commandes affichées');
-    $searchInput.autocomplete = 'off';
-    // Rendu différé de quelques dizaines de millisecondes : `renderBody()`
-    // reconstruit tout le point du jour, et le faire à chaque caractère
-    // hachait la frappe sur la tablette.
-    let rechercheTimer = null;
-    $searchInput.addEventListener('input', () => {
-      searchQuery = $searchInput.value.trim();
-      $searchClear.hidden = !searchQuery;
-      clearTimeout(rechercheTimer);
-      rechercheTimer = setTimeout(renderBody, 120);
-    });
-    $searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && searchQuery) { e.stopPropagation(); $searchInput.value = ''; searchQuery = ''; $searchClear.hidden = true; renderBody(); }
-    });
-    $searchClear = el('button', 'pj-search-clear', '×');
-    $searchClear.type = 'button';
-    $searchClear.hidden = true;
-    $searchClear.setAttribute('aria-label', 'Effacer le filtre');
-    $searchClear.addEventListener('click', () => {
-      $searchInput.value = ''; searchQuery = ''; $searchClear.hidden = true; renderBody(); $searchInput.focus();
-    });
-    search.appendChild($searchInput);
-    search.appendChild($searchClear);
-    row.appendChild(search);
-
-    // Activité (badge rouge = nouveautés non lues).
-    const act = el('button', 'pj-tool');
-    act.type = 'button';
-    act.append(icon('overview'), el('span', 'pj-tool-label', 'Activité'));
-    $actBadge = el('span', 'pj-tool-badge');
-    $actBadge.hidden = true;
-    act.appendChild($actBadge);
-    attachTip(act, 'Ce qui a bougé');
-    act.addEventListener('click', openActivity);
-    row.appendChild(act);
-
     // Machines (réglages du patron : importance + durée de fabrication).
     const mach = el('button', 'pj-tool pj-tool--icon');
     mach.type = 'button';
@@ -584,60 +466,12 @@ export function createDashboard(deps) {
 
     $head.appendChild(row);
 
-    // La barre d'alarme : UNE ligne, et seulement ce qui n'est pas à zéro.
-    // Chaque compteur reste un filtre (clic = n'afficher que celles-là).
-    $alarme = el('div', 'pj-alarme');
-    for (const k of STAT_KEYS) {
-      const b = el('button', `pj-al k-${k}`);
-      b.type = 'button';
-      const n = el('span', 'pj-al-n', '0');
-      b.append(n, el('span', 'pj-al-l', STAT_LABEL[k]));
-      b.setAttribute('aria-pressed', 'false');
-      attachTip(b, STAT_HINT[k]);
-      b.addEventListener('click', () => setKpiFilter(kpiFilter === k ? null : k));
-      $kpiEls[k] = { btn: b, n };
-      $alarme.appendChild(b);
-    }
-    // Ce qui s'affiche quand les quatre compteurs sont à zéro. C'est un état à
-    // part entière, pas une absence : sans lui, la barre disparaîtrait et
-    // l'écran laisserait croire qu'il n'a pas fini de charger.
-    $alarmeCalme = el('p', 'pj-alarme-calme');
-    $alarme.appendChild($alarmeCalme);
-
-    // Chip « Filtre : … ✕ » (annule le filtre KPI actif).
-    $chip = el('button', 'pj-filterchip');
-    $chip.type = 'button';
-    $chip.hidden = true;
-    $chipLabel = el('span', null, '');
-    $chip.append($chipLabel, el('span', 'pj-filterchip-x', '✕'));
-    // La pastille annule CE QUI EST POSÉ, quel que soit des deux filtres.
-    $chip.addEventListener('click', () => {
-      if (filtreMatin) setFiltreMatin(null); else setKpiFilter(null);
-    });
-    $alarme.appendChild($chip);
-
-    $head.appendChild($alarme);
-
     // Onglets : moi · tout l'atelier · les autres · Équipe.
     $tabs = el('nav', 'pj-tabs');
     $tabs.setAttribute('aria-label', 'Vue du point du jour');
     $head.appendChild($tabs);
 
     return $head;
-  }
-
-  function setFiltreMatin(f) {
-    filtreMatin = f;
-    kpiFilter = null;
-    renderHead();
-    renderBody();
-  }
-
-  function setKpiFilter(k) {
-    kpiFilter = k;
-    filtreMatin = null;
-    renderHead();
-    renderBody();
   }
 
   function allerA(key) {
@@ -647,34 +481,7 @@ export function createDashboard(deps) {
   }
 
   function renderHead() {
-    const k = kpis();
-    const total = STAT_KEYS.reduce((s, key) => s + k[key], 0);
-    for (const key of STAT_KEYS) {
-      const n = k[key];
-      $kpiEls[key].n.textContent = n;
-      // Un compteur à zéro QUITTE la barre. L'éteindre en gris ne suffisait
-      // pas : il occupait la même surface et l'œil devait le lire pour
-      // découvrir qu'il n'avait rien à dire.
-      $kpiEls[key].btn.hidden = !n;
-      $kpiEls[key].btn.classList.toggle('active', kpiFilter === key);
-      $kpiEls[key].btn.setAttribute('aria-pressed', String(kpiFilter === key));
-    }
-    // Rien ne brûle : une phrase à la place de quatre zéros.
-    const actives = rows.filter(isActive).length;
-    $alarmeCalme.hidden = total > 0;
-    $alarmeCalme.textContent = actives
-      ? `Rien ne brûle — ${actives} commande${actives > 1 ? 's' : ''} en cours.`
-      : 'Rien en cours.';
-    $alarme.classList.toggle('is-calme', total === 0);
-
-    $chip.hidden = !kpiFilter && !filtreMatin;
-    if (kpiFilter) $chipLabel.textContent = `Filtre : ${KPI_LABEL[kpiFilter]}`;
-    else if (filtreMatin) $chipLabel.textContent = `Ce matin : ${filtreMatin.titre}`;
-
     $date.textContent = libelleDuJour();
-
-    $actBadge.hidden = unseen === 0;
-    $actBadge.textContent = unseen > 9 ? '9+' : String(unseen);
 
     // La personne au poste ne décide plus de l'onglet OUVERT — l'écran s'ouvre
     // sur l'équipe — mais elle décide de celui qui porte la marque.
@@ -714,68 +521,6 @@ export function createDashboard(deps) {
       const day = dayList(who);
       mkTab(who, who, day.length, day.some(isLate), who === qui ? 'pj-tab--moi' : null);
     }
-    // La file commune, en bout de rangée : ce que l'atelier doit sortir, tous
-    // pilotes confondus. Elle ne s'intercale pas entre les prénoms.
-    const { queue } = rankFor(null);
-    const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque' && isLate(r));
-    mkTab('todo', 'Tout l’atelier', queue.length, todoLate);
-  }
-
-  // Jauge de charge : une barre empilée, un segment par famille active, dans
-  // l'ordre du pipeline, chaque segment nommé et chiffré sous la barre.
-  //
-  // ELLE A QUITTÉ L'EN-TÊTE. « Où le travail s'est empilé dans la chaîne » est
-  // une question de dispatch, pas une question de poste : elle n'apporte rien à
-  // qui vient lire sa propre file, et elle coûtait un bloc de six chiffres au-
-  // dessus de chaque vue. Elle vit donc là où on se la pose — en tête de la vue
-  // Équipe, avec les quatre charges individuelles.
-  function buildCharge() {
-    const act = rows.filter(isActive);
-    const parFamille = ACTIVE_FAMILIES.map((slug) => ({
-      slug,
-      label: (FAMILIES.find((f) => f.slug === slug) || {}).label || slug,
-      n: act.filter((r) => r.stage === slug).length,
-    }));
-    const total = act.length;
-
-    const charge = el('section', 'pj-charge');
-    const ch = el('header', 'pj-charge-head');
-    ch.appendChild(el('h2', 'pj-charge-t', 'Charge par étape'));
-    ch.appendChild(el('span', 'pj-charge-n', total
-      ? `${total} commande${total > 1 ? 's' : ''} en cours`
-      : 'Aucune commande en cours'));
-    charge.appendChild(ch);
-
-    const bar = el('div', 'pj-charge-bar');
-    bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label',
-      `Charge par étape : ${parFamille.map((f) => `${f.label} ${f.n}`).join(', ')}`);
-    const leg = el('div', 'pj-charge-leg');
-
-    if (!total) {
-      bar.appendChild(el('span', 'pj-charge-vide'));
-    } else {
-      parFamille.forEach((f, i) => {
-        if (!f.n) return;                        // un segment vide ne se dessine pas
-        // Le barreau ne porte AUCUN chiffre : il montre une proportion. Les
-        // valeurs exactes sont sur la légende juste dessous, à l'encre pleine —
-        // un chiffre posé dans un gris moyen passe sous le seuil de contraste,
-        // et un nombre sur chaque segment répète la légende pour rien.
-        const seg = el('span', 'pj-charge-seg');
-        seg.style.setProperty('--pal', String(i + 1));
-        seg.style.flexGrow = String(f.n);
-        attachTip(seg, `${f.label} — ${f.n} commande${f.n > 1 ? 's' : ''}`);
-        bar.appendChild(seg);
-
-        const lg = el('span', 'pj-charge-lg');
-        lg.style.setProperty('--pal', String(i + 1));
-        lg.append(el('span', 'pj-charge-lg-dot'), el('span', 'pj-charge-lg-t', f.label),
-          el('span', 'pj-charge-lg-n', String(f.n)));
-        leg.appendChild(lg);
-      });
-    }
-    charge.append(bar, leg);
-    return charge;
   }
 
   // En-tête de section : un titre, son compte, et un filet qui court jusqu'au
@@ -791,88 +536,8 @@ export function createDashboard(deps) {
   }
 
   // --- Vue Équipe : 4 colonnes égales --------------------------------------
-  // ===========================================================================
-  // « CE MATIN » — le briefing, et ce qu'il coûte de ne pas le lire
-  // ===========================================================================
-  // Trois règles, sinon ce bloc devient un bandeau qu'on saute :
-  //
-  //   1. IL NE PARLE QUE S'IL A QUELQUE CHOSE À DIRE. Rien à signaler → une
-  //      seule phrase, et l'écran passe à la file.
-  //   2. CHAQUE PHRASE SE PROUVE. Elle nomme les dossiers qui la fondent, et
-  //      un clic n'affiche qu'eux — on peut toujours vérifier ce qu'elle
-  //      avance, au lieu de croire un chiffre.
-  //   3. CINQ AU MAXIMUM. Au-delà, ce n'est plus un briefing, c'est une
-  //      deuxième liste à lire avant la première.
-  const MATIN_MAX = 5;
-
-  function buildMatin(who) {
-    // Le briefing d'une personne est calculé SUR SES DOSSIERS : « 3 commandes
-    // à sortir aujourd'hui » ne veut pas dire la même chose pour l'atelier et
-    // pour Mélina.
-    const base = who
-      ? rows.filter((r) => isActive(r)
-        && (effectivePilot(r) === who || effectiveReferents(r).includes(who)))
-      : rows;
-    const items = briefing(base, {
-      now: Date.now(),
-      machines,
-      // La charge ne se compare qu'à l'échelle de l'atelier : dans la vue
-      // d'une personne, « X porte plus que Y » n'a pas de sens.
-      employees: who ? [] : EMPLOYEES,
-      estActif: isActive,
-      pilotDe: effectivePilot,
-      referentsDe: effectiveReferents,
-      nomClient: clientName,
-      articleDe: articleOf,
-      labelEtape: (r) => (r.sub_stage && SUB_LABEL[r.sub_stage])
-        || STAGE_LABEL[r.stage] || r.stage,
-    });
-
-    const sec = el('section', 'pj-matin');
-    const head = el('header', 'pj-matin-head');
-    head.appendChild(el('h2', 'pj-matin-t', who ? `Ce matin, ${who}` : 'Ce matin'));
-    if (items.length > MATIN_MAX) {
-      head.appendChild(el('span', 'pj-matin-reste',
-        `+ ${items.length - MATIN_MAX} autre${items.length - MATIN_MAX > 1 ? 's' : ''}`));
-    }
-    sec.appendChild(head);
-
-    if (!items.length) {
-      sec.classList.add('is-calme');
-      sec.appendChild(el('p', 'pj-matin-vide', who
-        ? 'Rien qui réclame une décision : ta file suffit.'
-        : 'Rien qui réclame une décision ce matin — la file suffit.'));
-      return sec;
-    }
-
-    const liste = el('div', 'pj-matin-liste');
-    for (const it of items.slice(0, MATIN_MAX)) {
-      const b = el('button', `pj-mot t-${it.ton}`);
-      b.type = 'button';
-      const pose = filtreMatin && filtreMatin.cle === it.cle;
-      b.classList.toggle('active', !!pose);
-      b.setAttribute('aria-pressed', String(!!pose));
-      b.append(el('span', 'pj-mot-t', it.titre), el('span', 'pj-mot-d', it.detail));
-      if (it.ids && it.ids.length) {
-        // Le clic BASCULE : recliquer la même phrase rend la vue entière.
-        b.addEventListener('click', () => setFiltreMatin(pose
-          ? null
-          : { cle: it.cle, titre: it.titre, ids: new Set(it.ids) }));
-      } else {
-        b.disabled = true;
-      }
-      liste.appendChild(b);
-    }
-    sec.appendChild(liste);
-    return sec;
-  }
-
   function buildTeamView() {
     const wrap = el('div', 'pj-team');
-    // La charge par étape ouvre la vue : c'est l'autre moitié du dispatch —
-    // qui est chargé, et où le travail s'est empilé dans la chaîne.
-    wrap.appendChild(buildCharge());
-
     const board = el('div', 'pj-board');
     // Charge de référence : la file la plus chargée donne l'échelle des jauges.
     // Sans repère commun, quatre colonnes de hauteurs différentes ne disent pas
@@ -940,20 +605,15 @@ export function createDashboard(deps) {
         : 'Chargement du planning…'));
       return;
     }
-    // Le briefing ouvre l'écran, dans toutes les vues : c'est la première
-    // chose qu'on lit le matin, avant même de savoir quelle file on regarde.
-    $body.appendChild(buildMatin(activeTab === 'team' || activeTab === 'todo' ? null : activeTab));
-
     if (activeTab === 'team') {
       $body.appendChild(buildTeamView());
     } else {
-      // La file commune et la file d'une personne sont LE MÊME écran, à un
-      // filtre près. Elles avaient deux mises en page différentes — la vue
-      // personne posait en plus, à droite, « Je pilote » et « J'épaule », qui
-      // relistaient dossier pour dossier ce que la file de gauche montrait
-      // déjà. On lisait donc « Restaurant La Samanna » deux fois, à 40 cm
-      // d'écart, sur le même écran.
-      $body.appendChild(buildTodoView(activeTab === 'todo' ? null : activeTab));
+      // L'écran n'a plus que deux formes : l'équipe, ou la file d'UNE personne.
+      // La vue personne posait autrefois, à droite de sa file, « Je pilote » et
+      // « J'épaule » qui relistaient dossier pour dossier ce que la file de
+      // gauche montrait déjà — on lisait « Restaurant La Samanna » deux fois, à
+      // 40 cm d'écart, sur le même écran.
+      $body.appendChild(buildTodoView(activeTab));
     }
   }
 
@@ -1008,7 +668,6 @@ export function createDashboard(deps) {
     const u = urgency(r);
     const b = el('button', `pj-card pj-row u-${u.cls}`);
     b.type = 'button';
-    if (isDimmed(r)) b.classList.add('is-dim');
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
     b.appendChild(el('span', 'pj-row-rank', String(index + 1)));
@@ -1054,7 +713,6 @@ export function createDashboard(deps) {
   function buildHoldCard(r, kind, who) {
     const b = el('button', 'pj-card pj-row pj-row--hold ' + (kind === 'bloque' ? 'is-bloque' : 'is-attente'));
     b.type = 'button';
-    if (isDimmed(r)) b.classList.add('is-dim');
 
     b.appendChild(el('span', 'pj-hold-tag ' + (kind === 'bloque' ? 't-bloque' : 't-attente'),
       kind === 'bloque' ? 'Bloquée' : 'À relancer'));
@@ -1409,12 +1067,10 @@ export function createDashboard(deps) {
     const target = sub ? SUB_LABEL[sub] : STAGE_LABEL[stage];
     let msg = `${clientName(r)} → ${target}`;
     if (before !== after) msg += ` · pilote ${before || 'À attribuer'} → ${after || 'À attribuer'}`;
-    const trace = logActivity(msg, AVATAR[after] || 'var(--pj-accent)');
     renderAll();
     showToast(msg);
     api('PATCH', `/api/requests/${r.id}`, { stage, sub_stage: sub }).catch(() => {
       Object.assign(r, prev);
-      retirerActivite(trace);
       renderAll();
       showToast(`Échec de l’envoi — ${clientName(r)} reste en ${STAGE_LABEL[prev.stage]}`);
       refresh();
@@ -1427,12 +1083,10 @@ export function createDashboard(deps) {
     const prev = { flag: r.flag, flag_reason: r.flag_reason };
     r.flag = null;
     r.flag_reason = null;
-    const trace = logActivity(`${clientName(r)} — alerte levée ✓`, 'var(--success)');
     renderAll();
     showToast(`${clientName(r)} — alerte levée ✓`);
     api('PATCH', `/api/requests/${r.id}`, { flag: null }).catch(() => {
       Object.assign(r, prev);
-      retirerActivite(trace);
       renderAll();
       showToast('Échec — l’alerte est toujours là');
       refresh();
@@ -1446,150 +1100,16 @@ export function createDashboard(deps) {
     const prev = { stage: r.stage, sub_stage: r.sub_stage };
     r.stage = 'paiement';
     r.sub_stage = 'paiement_a_controler';
-    const trace = logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
     closeDetail();
     renderAll();
     showToast(`${clientName(r)} — marquée traitée ✓`);
     api('PATCH', `/api/requests/${r.id}`, { stage: 'paiement', sub_stage: 'paiement_a_controler' }).catch(() => {
       Object.assign(r, prev);
-      retirerActivite(trace);
       renderAll();
       showToast('Échec — la commande n’a pas été clôturée');
       refresh();
     });
   }
-
-  // --- Fil d'activité « Ce qui a bougé » -----------------------------------
-  let activityEl = null, activityScrim = null, activityOpen = false, $activityList = null;
-
-  // L'entête (badge « non lus », onglets) se repeint UNE fois par rafale : un
-  // rafraîchissement qui diffe vingt lignes appelait vingt fois renderHead —
-  // vingt reconstructions de la barre d'onglets pour un badge qui ne fait
-  // qu'incrémenter. La micro-tâche part après la rafale entière.
-  let entetePrevue = false;
-  function planifierEntete() {
-    if (entetePrevue) return;
-    entetePrevue = true;
-    queueMicrotask(() => { entetePrevue = false; if ($head) renderHead(); });
-  }
-  function logActivity(text, color) {
-    const ligne = { ts: Date.now(), text, color: color || 'var(--pj-accent)' };
-    activity.unshift(ligne);
-    if (activity.length > 80) activity.length = 80;
-    if (activityOpen) renderActivityList();
-    else { unseen++; planifierEntete(); }
-    return ligne;
-  }
-
-  // L'ENTRÉE SE RETIRE QUAND L'ÉCRITURE EST RETOMBÉE. Les trois gestes du
-  // Point du jour (envoyer, lever l'alerte, marquer traitée) écrivent au fil
-  // AVANT la réponse du serveur — c'est ce qui les rend vifs. Mais quand le
-  // PATCH échouait, on remettait la commande en place, on le disait dans un
-  // message… et la ligne « Untel → Production » restait au fil. Or « Ce qui a
-  // bougé » est ce que le patron lit pour savoir ce qui s'est passé : il y
-  // trouvait un évènement qui n'a jamais eu lieu, longtemps après la
-  // disparition du message d'échec.
-  function retirerActivite(ligne) {
-    if (!ligne) return;
-    const i = activity.indexOf(ligne);
-    if (i < 0) return;                       // déjà sortie par le plafond de 80
-    activity.splice(i, 1);
-    if (activityOpen) renderActivityList();
-    else { unseen = Math.max(0, unseen - 1); planifierEntete(); }
-  }
-
-  // Diff entre l'ancien cache et le nouveau : alimente le fil avec ce qui a
-  // bougé AILLEURS (Planning, autres postes). Nos propres actions optimistes
-  // sont déjà loguées et déjà dans le cache → le diff ne les recompte pas.
-  function diffIntoActivity(oldById, fresh) {
-    for (const r of fresh) {
-      const o = oldById.get(String(r.id));
-      if (!o) {
-        if (isActive(r)) {
-          logActivity(`Nouvelle commande — ${clientName(r)} (${STAGE_LABEL[r.stage] || r.stage})`, 'var(--pj-accent)');
-        }
-        continue;
-      }
-      const wasActive = ACTIVE_SET.has(o.stage);
-      if (r.stage === 'paiement' && o.stage !== 'paiement' && wasActive) {
-        logActivity(`${clientName(r)} — marquée traitée ✓`, 'var(--success)');
-        continue;
-      }
-      if (!isActive(r) && !wasActive) continue;
-      if (o.stage !== r.stage || (o.sub_stage ?? null) !== (r.sub_stage ?? null)) {
-        const target = (r.sub_stage && SUB_LABEL[r.sub_stage]) || STAGE_LABEL[r.stage] || r.stage;
-        logActivity(`${clientName(r)} → ${target}`, AVATAR[effectivePilot(r)] || 'var(--pj-accent)');
-      }
-      if ((o.responsable ?? null) !== (r.responsable ?? null)) {
-        const who = r.responsable || 'À attribuer';
-        logActivity(`${clientName(r)} · pilote → ${who}`, AVATAR[r.responsable] || 'var(--pj-accent)');
-      }
-    }
-  }
-
-  function ensureActivity() {
-    if (activityEl) return;
-    activityScrim = el('div', 'dd-scrim');
-    activityScrim.addEventListener('click', closeActivity);
-    activityEl = el('aside', 'pj-feed');
-    activityEl.setAttribute('role', 'dialog');
-    activityEl.setAttribute('aria-modal', 'true');
-    activityEl.setAttribute('aria-label', 'Fil d’activité');
-    const close = el('button', 'dd-close');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Fermer le fil d’activité');
-    close.appendChild(icon('close'));
-    close.addEventListener('click', closeActivity);
-    activityEl.appendChild(close);
-    activityEl.appendChild(el('h2', 'pj-feed-title', 'Ce qui a bougé'));
-    $activityList = el('div', 'pj-feed-list');
-    activityEl.appendChild($activityList);
-    document.body.append(activityScrim, activityEl);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && activityOpen) closeActivity();
-    });
-  }
-
-  function renderActivityList() {
-    $activityList.replaceChildren();
-    if (!activity.length) {
-      $activityList.appendChild(el('p', 'pj-empty', 'Rien n’a bougé pour le moment.'));
-      return;
-    }
-    for (const a of activity) {
-      const line = el('div', 'pj-feed-item');
-      const dot = el('span', 'pj-feed-dot');
-      dot.style.setProperty('--dot', a.color);
-      line.append(dot, el('span', 'pj-feed-text', a.text), el('time', 'pj-feed-time', fmtTime(a.ts)));
-      $activityList.appendChild(line);
-    }
-  }
-
-  let desarmerActivity = null;
-
-  function openActivity() {
-    ensureActivity();
-    unseen = 0;
-    renderHead();
-    renderActivityList();
-    activityOpen = true;
-    activityScrim.classList.add('open');
-    activityEl.classList.add('open');
-    if (!desarmerActivity) {
-      desarmerActivity = armerModale(activityEl, { premier: () => activityEl.querySelector('.dd-close') });
-    }
-  }
-
-  function closeActivity() {
-    if (!activityEl) return;
-    activityOpen = false;
-    if (desarmerActivity) { desarmerActivity(); desarmerActivity = null; }
-    activityScrim.classList.remove('open');
-    activityEl.classList.remove('open');
-  }
-
-  // --- Attribution des catégories (config du patron, conservée) ------------
-  let configOpen = false;
 
   function openConfig() {
     // Garde de réentrance : deux taps rapides sur l'engrenage empilaient deux
@@ -1913,19 +1433,6 @@ export function createDashboard(deps) {
       if (enVol) await enVol;
 
       const fresh = fusionner(synthese);
-      // Diff pour le fil d'activité (seulement après le premier chargement).
-      if (loaded) {
-        const oldById = new Map(rows.map((r) => [String(r.id), r]));
-        // LES COMMANDES QUI VIENNENT DE QUITTER LE BORD. La synthèse ne porte
-        // que les familles vivantes : une commande passée en « Paiement &
-        // clôture » n'est plus dans `fresh` et s'évaporerait du fil, alors que
-        // c'est justement l'évènement à annoncer (« marquée traitée ✓ »). Le
-        // serveur nous l'envoie quand même dans `lignes` ; on la donne au diff,
-        // sans la remettre dans le tableau.
-        const auBord = new Set(fresh.map((r) => String(r.id)));
-        const parties = (synthese.lignes || []).filter((l) => !auBord.has(String(l.id)));
-        diffIntoActivity(oldById, [...fresh, ...parties]);
-      }
       rows = fresh;
       // Posés APRÈS coup : si quoi que ce soit au-dessus avait échoué, on
       // redemanderait à partir du même point plutôt que de sauter un intervalle.
@@ -2003,7 +1510,6 @@ export function createDashboard(deps) {
   function hide() {
     visible = false;
     closeDetail();
-    closeActivity();
     // La reprise du premier chargement s'arrête avec l'onglet : on ne
     // redemande pas le planning entier en boucle pour un écran quitté.
     // Le prochain passage sur l'onglet relance (show → refresh).

@@ -193,21 +193,14 @@ assert.match(CRM, /--pj-muet:\s*var\(--text-3\)/,
 // L'état zéro était la SEULE exception assumée : un compteur à zéro s'éteignait
 // en gris atténué, c'était le message.
 //
-// LA REFONTE DU 25/08 EST ALLÉE PLUS LOIN et cette exception a disparu : un
-// compteur à zéro ne s'éteint plus, il QUITTE la barre. L'éteindre ne suffisait
-// pas — quatre boîtes occupent la même surface qu'elles portent un chiffre ou
-// un zéro, et l'œil doit les lire pour découvrir qu'elles se taisent. Quand les
-// quatre sont muets, une phrase prend leur place.
-assert.ok(!/\.pj-stat\b/.test(CRM),
-  'la tuile de compteur du Point du jour a été remplacée : un zéro quitte la barre');
-assert.match(CRM, /\.pj-al\.k-late \.pj-al-n/, 'la barre d’alarme a pris sa place');
-assert.match(lire('public/dashboard.js'), /\$kpiEls\[key\]\.btn\.hidden = !n;/,
-  'et c’est bien un RETRAIT, pas un gris de plus');
-
-// Le gris atténué garde donc ses emplois — ceux où l'effacement EST le
-// message, et rien d'autre : une invite de saisie, un remplissage de jauge,
-// un séparateur.
-for (const sel of ['.pj-search-input::placeholder', '.pj-col-load-fill', '.dd-pos-sep']) {
+// Ces compteurs n'existent PLUS : le patron a retiré de l'écran, le 25/08, tout
+// ce qui n'était pas le travail lui-même — les quatre alarmes, la jauge de
+// charge, le briefing, la recherche. L'exception disparaît donc avec eux, mais
+// la DOCTRINE ne bouge pas : le gris atténué garde ses emplois, ceux où
+// l'effacement EST le message, et rien d'autre.
+assert.ok(!/\.pj-stat\b|\.pj-al\b/.test(CRM.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+  'les compteurs du Point du jour ont été retirés de l’écran');
+for (const sel of ['.pj-col-load-fill', '.dd-pos-sep']) {
   // TOUTES les règles qui portent ce sélecteur, pas la première : un sélecteur
   // apparaît souvent d'abord dans un groupe (`.a, .b { … }`) qui pose la forme,
   // puis seul pour sa couleur. Ne regarder que la première déclare un manque

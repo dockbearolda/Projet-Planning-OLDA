@@ -7136,7 +7136,7 @@ const jumpToPlanning = (r) => ouvrirCommandeAuPlanning({ id: r.id, stage: r.stag
 const dashboard = createDashboard({
   root: $dashboard,
   api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
-  daysLeft, prioBand, showToast, attachTip, fold,
+  daysLeft, prioBand, showToast, attachTip,
   jumpToPlanning,
 });
 

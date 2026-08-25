@@ -48,7 +48,6 @@ const COQUILLE = [
   '/app.js',
   '/dashboard.js',
   '/priority.js',
-  '/matin.js',
   '/whatsapp.js',
   '/nom-client.js',
   '/confirmer.js',
