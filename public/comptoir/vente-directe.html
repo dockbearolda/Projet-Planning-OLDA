@@ -87,9 +87,9 @@ b,strong{font-weight:var(--graisse-forte)}
 *{box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
 .container{max-width:1180px;margin:var(--pas-4) auto;padding:0 var(--pas-3) 40px}
-.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--pas-2);margin-bottom:var(--pas-3)}
-.step{padding:11px;text-align:center;background:var(--border-soft);color:var(--text-2);border-radius:var(--arrondi-champ);font-weight:var(--graisse-forte)}
-.step.active{background:var(--primary);color:var(--on-primary)}
+
+
+
 .card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
 h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
@@ -201,7 +201,7 @@ button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--
 .center{text-align:center}
 .footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media(max-width:800px){
-  .grid,.grid-3,.footer-actions,.stepper{grid-template-columns:1fr}
+  .grid,.grid-3,.footer-actions,
 }
 
 .client-search-wrap{position:relative}
@@ -555,8 +555,8 @@ input,select,textarea,button{font-family:inherit!important}
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
 button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
 input,select,textarea{border-radius:var(--arrondi-champ)!important}
-.step{border-radius:999px!important}
-.step.active{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+
+
 .product-card,.client-result{border-radius:var(--arrondi-bloc)!important}
 .tablet-wizard-nav{border-radius:var(--arrondi-carte)!important}
 </style>
@@ -1148,9 +1148,14 @@ function clientMeta(client){
   ].filter(Boolean).join(" • ");
 }
 
+/* TROIS ÉTATS, comme sur l'écran d'à côté : franchie (coche), courante
+   (pilule pleine), à venir (gris). Cet écran peignait en « courante » TOUTES
+   les étapes jusqu'à la position atteinte — quatre pilules encrées d'affilée,
+   sans qu'on puisse dire où l'on se trouve. */
 function updateStepper(activeIndex){
   document.querySelectorAll(".stepper .step").forEach((step,index)=>{
-    step.classList.toggle("active",index<=activeIndex);
+    step.classList.toggle("active",index===activeIndex);
+    step.classList.toggle("done",index<activeIndex);
   });
 }
 

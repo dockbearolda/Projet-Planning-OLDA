@@ -221,6 +221,71 @@
 .btn-retour:hover { border-color: var(--primary); background: var(--surface-hover); }
 .btn-retour:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* ------------------------------------------------------- Le fil des étapes
+   UN SEUL FIL D'ÉTAPES, pour la même raison que le bouton juste au-dessus :
+   les deux parcours du comptoir en avaient chacun un, et ils ne se
+   ressemblaient que de loin. Mesuré le 25/08 : la bulle de « 1. Besoins »
+   tombait à 41 px, celle de « 1. Articles » à 47 px — rembourrage 8/12 contre
+   11, graisse 600 contre 800, pastille d'un côté et rien de l'autre. Deux
+   écrans ouverts à un clic l'un de l'autre, deux fils différents.
+
+   Il vit donc ICI, le seul fichier que les deux parcours lisent tous les deux :
+   la bulle ne peut plus diverger, elle est littéralement la même.
+
+   TROIS ÉTATS, ET LE VERT NE SERT À RIEN (voir la note du bandeau d'erreur) :
+   franchie = coche blanche sur pastille encrée ; courante = pilule pleine ;
+   à venir = gris. La hauteur ne s'écrit nulle part — elle sort de la taille du
+   texte, de l'interligne et du rembourrage, comme toutes les autres boîtes. */
+.stepper {
+  display: flex; flex-wrap: wrap; gap: var(--pas-2);
+  margin-bottom: var(--pas-4);
+}
+.step {
+  position: relative; flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: var(--pas-1);
+  border-radius: 999px; padding: 8px 12px; text-align: center;
+  font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ);
+  color: var(--text-3); background: transparent;
+}
+/* La pastille : vide tant que l'étape n'est pas franchie, cochée ensuite. */
+.step::before {
+  content: ""; flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  display: grid; place-items: center;
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: 1;
+}
+/* Le trait qui relie deux étapes. Posé à GAUCHE de chaque bulle sauf la
+   première : dans une rangée qui peut se replier, un trait accroché à droite
+   dépasserait de la dernière bulle de la ligne. */
+.step:not(:first-child)::after {
+  content: ""; position: absolute; right: 100%; top: 50%;
+  width: var(--pas-2); height: 2px; margin-top: -1px;
+  background: var(--card-border);
+}
+.step.done { color: var(--text-1); }
+.step.done::before {
+  content: "\2713";
+  background: var(--primary); border-color: var(--primary); color: var(--on-primary);
+}
+.step.done::after, .step.active::after { background: var(--primary); }
+.step.active {
+  background: var(--primary); color: var(--on-primary);
+  font-weight: var(--graisse-forte);
+}
+/* Posée SUR l'encre, la pastille de l'étape courante se creuse dans le fond
+   plutôt que de porter une couleur à elle. En thème sombre l'accent est clair :
+   elle se creuse alors dans le noir, sans quoi elle disparaîtrait. */
+.step.active::before {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .3);
+}
+:root[data-theme="dark"] .step.active::before {
+  background: rgba(0, 0, 0, .16);
+  border-color: rgba(0, 0, 0, .3);
+}
+
 /* --------------------------------------------- Un message ne pousse personne
    RÈGLE NUCLÉAIRE : aucune commande ne bouge parce qu'un message apparaît ou
    disparaît. Demandée le 24/08 sur un cas mesuré — « Ajouter à la demande »
@@ -333,11 +398,11 @@
      étapes en 12,5 px et ses catégories en 10,5 px — sur le 15,4 pouces de la
      vendeuse, c'est le coin de l'écran qu'elle lisait le moins bien, alors
      qu'il porte les compteurs qu'elle balaie toute la journée. */
-  --rail-taille-titre: 15px;    /* « Planning OLDA » */
-  --rail-taille-forte: 13px;    /* l'initiale du logo, le total général */
-  --rail-taille-note: 12px;     /* le sous-titre, le titre d'une catégorie */
-  --rail-taille-etape: 14px;    /* le libellé d'une étape */
-  --rail-taille-compte: 12.5px; /* les compteurs */
+  --rail-taille-titre: 17px;    /* « Planning OLDA » */
+  --rail-taille-forte: 15px;    /* l'initiale du logo, le total général */
+  --rail-taille-note: 13px;     /* le sous-titre, le titre d'une catégorie */
+  --rail-taille-etape: 16px;    /* le libellé d'une étape */
+  --rail-taille-compte: 14px;   /* les compteurs */
 
   --rail-encre: #0f1729;         /* sélection, titre de l'outil, logo */
   --rail-nonvide: #39424f;       /* libellé d'une étape qui a du monde */

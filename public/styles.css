@@ -126,8 +126,8 @@ body {
      `test/coquille-nav-et-rail.test.js` tient les deux nombres ensemble.
      La barre du haut, elle, garde sa colonne à droite du rail : c'est ce qui
      empêche le rail de recouvrir les onglets et le bouton qui le range. */
-  --rail-base: 284px;
-  --rail-w: var(--sidebar-w, 284px);
+  --rail-base: 320px;
+  --rail-w: var(--sidebar-w, 320px);
   --rail-sur: max(0px, calc(var(--rail-w) - var(--rail-base)));
   grid-template-columns: var(--rail-w) 16px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
@@ -3326,7 +3326,7 @@ button, a, .stage, .deadline-badge,
 
 /* Tablette paysage / largeur intermédiaire : rail un peu plus étroit par défaut. */
 @media (max-width: 1280px) {
-  .shell { --rail-w: var(--sidebar-w, 284px); grid-template-columns: var(--rail-w) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 320px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .app { padding: 12px; }
   /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
      la place aux onglets et à la recherche. */
@@ -3339,7 +3339,7 @@ button, a, .stage, .deadline-badge,
 
 /* Portrait étroit : rail réduit, grille scrollable */
 @media (max-width: 900px) {
-  .shell { --rail-w: var(--sidebar-w, 284px); grid-template-columns: var(--rail-w) 16px 1fr; }
+  .shell { --rail-w: var(--sidebar-w, 320px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
   .grid-search { max-width: none; }
   /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne

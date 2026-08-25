@@ -6887,14 +6887,21 @@ const SIDEBAR_W_KEY = 'olda_sidebar_w';
 // break-word` les COUPE EN PLEIN MILIEU : « PRÉPARATIO / N DU PROJET ».
 // Mesuré le 24/08/2026 sur les 33 libellés du pipeline : à 180 px, 7 se
 // cassaient et il manquait 10 px au pire d'entre eux ; le premier palier sans
-// REFONTE DU 24/08 : la spécification du patron fixe le rail à 284 px. C'est
-// donc la nouvelle largeur MINIMALE — et la base que la zone de travail
-// concède (`--rail-base`, styles.css) : au repos, le rail ne recouvre rien.
-// La poignée ne sert plus qu'à l'élargir au-delà, PAR-DESSUS les cartes.
+// REFONTE DU 24/08 : la spécification du patron fixait le rail à 284 px. C'est
+// la largeur MINIMALE — et la base que la zone de travail concède
+// (`--rail-base`, styles.css) : au repos, le rail ne recouvre rien. La poignée
+// ne sert plus qu'à l'élargir au-delà, PAR-DESSUS les cartes.
 // L'ancien minimum mesuré (200, pour la typographie des bandeaux) n'a plus
 // cours : les bandeaux sont partis avec la refonte.
-// Le garde-fou de `test/coquille-nav-et-rail.test.js` tient 284 des deux côtés.
-const SIDEBAR_MIN = 284, SIDEBAR_MAX = 460;
+//
+// 320 DEPUIS LE 25/08, et pour la même raison qu'en 24/08 : cette largeur se
+// DÉDUIT de la taille des libellés, elle ne se choisit pas. Les 284 px avaient
+// été mesurés sur des étapes en 12,5 px ; passées en 16 px, sept des 33 se
+// repliaient sur deux ou trois lignes au lieu de quatre. 320 rétablit le pliage
+// d'origine et 340 n'apporte rien de plus — donc 320.
+// Le garde-fou de `test/coquille-nav-et-rail.test.js` vérifie l'ÉGALITÉ avec
+// `--rail-base`, pas un chiffre : la largeur peut suivre la typographie.
+const SIDEBAR_MIN = 320, SIDEBAR_MAX = 460;
 const $sidebarResizer = document.getElementById('sidebarResizer');
 // La largeur du rail est une colonne de la grille du .shell : c'est donc lui qui
 // porte `--sidebar-w` (le rail n'est plus enfant de `.app`).

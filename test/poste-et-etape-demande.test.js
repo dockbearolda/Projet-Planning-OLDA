@@ -151,10 +151,29 @@ assert.ok(/<section id="step2">/.test(DEVIS),
 
 // Le fil ne tient plus par un nombre de colonnes : deux bulles masquées sur
 // une grille de 7 laissaient deux colonnes vides.
-assert.ok(!/\.stepper\{display:grid/.test(DEVIS),
-  'le fil des étapes ne doit plus dépendre d’un nombre de colonnes figé');
-assert.ok(/\.stepper\{display:flex;flex-wrap:wrap/.test(DEVIS),
+//
+// DEPUIS LE 25/08 LE FIL EST UN COMPOSANT PARTAGÉ, dans `charte.css` — le seul
+// fichier que les DEUX parcours du comptoir lisent tous les deux. Les deux en
+// avaient chacun un : bulle de 41 px ici, de 47 px à côté, pastille d'un seul
+// côté. Ce qui se vérifie maintenant, c'est qu'aucune page ne s'en redonne un.
+const CHARTE_ETAPES = lire('public/charte.css');
+const VENTE_ETAPES = lire('public/comptoir/vente-directe.html');
+assert.ok(!/\.stepper\s*\{[^}]*display:\s*grid/.test(CHARTE_ETAPES),
+  'le fil des étapes ne doit pas dépendre d’un nombre de colonnes figé');
+assert.ok(/\.stepper\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap/.test(CHARTE_ETAPES),
   'seules les bulles VISIBLES se partagent la ligne');
+// La hauteur d'une bulle ne s'écrit nulle part : elle sort de la taille du
+// texte, de l'interligne et du rembourrage — comme toutes les autres boîtes.
+// C'est ce qui garantit que les deux écrans donnent la MÊME bulle.
+assert.ok(!/\.step\s*\{[^}]*(?:height|min-height):\s*\d/.test(CHARTE_ETAPES),
+  'la bulle d’étape ne porte pas de hauteur en dur');
+[['devis', DEVIS], ['vente', VENTE_ETAPES]].forEach(([nom, src]) => {
+  const regles = [...src.matchAll(/<style>([\s\S]*?)<\/style>/g)]
+    .map((m) => m[1].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n')
+    .replace(/@media print\{[\s\S]*?\}\s*\}/g, '');
+  assert.ok(!/\.step\s*(?:\.\w+|::?\w+)?\s*\{/.test(regles),
+    `${nom} : la page ne redonne pas sa propre bulle d’étape — le fil vit dans charte.css`);
+});
 
 // --- 6. Une bulle franchie porte une coche, pas un vert ----------------------
 //
@@ -164,17 +183,25 @@ assert.ok(/\.stepper\{display:flex;flex-wrap:wrap/.test(DEVIS),
 // blanche, libellé encré, filet amont encré. L'étape à venir reste grise, la
 // courante est une pilule pleine — trois états, zéro couleur de plus.
 
-const done = (DEVIS.match(/\.step\.done\{([^}]*)\}/) || [])[1];
+// Ces règles vivent dans `charte.css` depuis le 25/08 : les deux parcours du
+// comptoir partagent la MÊME bulle, donc les trois états valent pour les deux.
+const done = (CHARTE_ETAPES.match(/\.step\.done\s*\{([^}]*)\}/) || [])[1];
 assert.ok(done, 'la règle .step.done doit exister');
-assert.ok(!/background:var\(--success\)/.test(done),
+assert.ok(!/background:\s*var\(--success\)/.test(done),
   'une étape franchie ne repasse pas au vert : le cas normal ne crie pas');
-const doneCoche = (DEVIS.match(/\.step\.done::before\{([^}]*)\}/) || [])[1];
-assert.ok(doneCoche && /content:"\\2713"/.test(doneCoche) && /background:var\(--primary\)/.test(doneCoche),
+const doneCoche = (CHARTE_ETAPES.match(/\.step\.done::before\s*\{([^}]*)\}/) || [])[1];
+assert.ok(doneCoche && /content:\s*"\\2713"/.test(doneCoche) && /background:\s*var\(--primary\)/.test(doneCoche),
   'une étape franchie porte une coche sur pastille encrée');
-assert.ok(/\.step\.done::after,\.step\.active::after\{background:var\(--primary\)\}/.test(DEVIS),
+assert.ok(/\.step\.done::after,\s*\.step\.active::after\s*\{\s*background:\s*var\(--primary\)/.test(CHARTE_ETAPES),
   '… et son filet amont s’encre avec elle');
-assert.ok(!/\.step\.done\{background:#e2e8f0/.test(DEVIS),
+assert.ok(!/\.step\.done\s*\{[^}]*background:\s*#e2e8f0/.test(CHARTE_ETAPES),
   'l’ancien gris bleuté ne doit plus traîner');
+// Les deux écrans peignent leurs états de la MÊME façon : « franchie » et
+// « courante » sont deux états distincts. La vente marquait TOUT le passé en
+// « courante » — quatre pilules encrées d'affilée, sans dire où l'on est.
+assert.ok(/classList\.toggle\("active",\s*index===activeIndex\)/.test(VENTE_ETAPES)
+       && /classList\.toggle\("done",\s*index<activeIndex\)/.test(VENTE_ETAPES),
+  'la vente distingue l’étape courante des étapes franchies');
 
 // --- 7. Le nom s'affiche en haut à droite, et survit hors ligne -------------
 

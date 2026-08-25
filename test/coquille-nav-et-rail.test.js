@@ -141,15 +141,25 @@ console.log('✓ coquille : Nouveau Projet garde la navigation, le rail se repli
 // Ce qui est gagné ici, c’est que RIEN NE SE RECALCULE — pas de reflux, pas de
 // saut de mise en page (CLS), un glisser de poignée à 60 fps.
 const shellCSS = (CSS.match(/\n\.shell \{\n[\s\S]*?\n\}/) || [''])[0];
-// 284 depuis la refonte du rail (24/08) : la spécification fixe sa largeur.
-assert.ok(/--rail-base:\s*284px/.test(shellCSS),
-  'la coquille nomme la part de rail que la zone de travail concède');
-// Le socle CSS et la borne du script disent le MÊME nombre. S’ils divergent, le
-// rail découvre une bande de carte (base > min) ou la recouvre en permanence
-// (base < min) : deux défauts muets, invisibles au minimum de largeur.
+// 284 px à la refonte du 24/08, 320 depuis le 25/08 : cette largeur n'est pas
+// un chiffre rond, elle se DÉDUIT de la typographie du rail. Elle avait été
+// mesurée sur les 33 libellés du pipeline en 12,5 px ; passés en 16 px, sept
+// d'entre eux se cassaient sur deux ou trois lignes au lieu de quatre. 320 px
+// rétablit exactement le pliage d'origine, et au-delà on ne gagne plus rien
+// (mesuré : 340 px donne le même résultat que 320). Toute nouvelle taille de
+// libellé oblige à refaire cette mesure.
+const base = shellCSS.match(/--rail-base:\s*(\d+)px/);
+assert.ok(base, 'la coquille nomme la part de rail que la zone de travail concède');
+assert.ok(Number(base[1]) >= 320,
+  `--rail-base = ${base[1]}px : sous 320, les libellés d’étape se replient en 16 px`);
+// Le socle CSS et la borne du script disent le MÊME nombre — c'est l'invariant,
+// pas la valeur. S’ils divergent, le rail découvre une bande de carte
+// (base > min) ou la recouvre en permanence (base < min) : deux défauts muets,
+// invisibles au minimum de largeur. On le vérifie donc PAR ÉGALITÉ, pour que la
+// largeur puisse suivre la typographie sans qu'on ait à corriger un littéral.
 const min = APP.match(/SIDEBAR_MIN\s*=\s*(\d+)/);
 assert.ok(min, 'SIDEBAR_MIN doit exister');
-assert.strictEqual(min[1], '284',
+assert.strictEqual(min[1], base[1],
   'la largeur minimale du rail et `--rail-base` sont le MÊME nombre');
 // Le surplus : ce que le rail prend au-delà de sa base. Jamais négatif — un
 // rail plus étroit que sa base pousserait la zone de travail vers la droite.
