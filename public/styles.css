@@ -528,12 +528,13 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    haut du rail se lisait autrement plus haut que tout le reste de l'écran. */
 .stages { padding: 17px 12px 22px; display: flex; flex-direction: column; gap: 16px; }
 
-/* UNE PHASE = filet | colonne. Le filet est coloré dès que la phase contient
-   au moins une commande — l'état vient de l'en-tête (`is-empty`, déjà tenu
-   par loadCounts/bumpCount) : `:has()` évite un troisième endroit qui compte. */
-.stage-zone { display: flex; gap: 12px; }
-.zone-filet { flex: 0 0 3px; border-radius: 3px; background: var(--zr); }
-.stage-zone:has(.zone-head.is-empty) .zone-filet { background: var(--rail-vide); }
+/* UNE PHASE = une simple colonne. Elle portait un filet vertical coloré sur sa
+   gauche (3 px, couleur de phase si elle avait du monde, gris sinon) : RETIRÉ
+   le 25/08. La couleur de phase se dit déjà trois fois — sur le titre de la
+   catégorie, sur la puce de chaque étape et sur la pastille des compteurs ;
+   une quatrième, en barre pleine hauteur, n'ajoutait rien et fermait le rail
+   sur la gauche. */
+.stage-zone { display: flex; }
 /* 5 px entre deux sous-étapes, plus 1 : elles se touchaient presque, et en
    16 px la colonne se lisait comme un bloc de texte plutôt que comme une liste
    de lignes cliquables. */

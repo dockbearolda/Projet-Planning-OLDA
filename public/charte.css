@@ -410,7 +410,7 @@
   --rail-muet: #a8afba;          /* le sous-titre de l'en-tête */
   --rail-zero: #c8cdd6;          /* un total de catégorie à zéro */
   --rail-hover: #f4f6f9;         /* survol d'une ligne */
-  --rail-vide: #e8eaef;          /* filet d'une phase vide, séparateurs */
+  --rail-vide: #e8eaef;          /* séparateurs, bord droit du rail */
   --rail-anneau: #dfe3ea;        /* l'anneau d'une puce vide */
   --rail-pouce: #d7dbe2;         /* le pouce de l'ascenseur */
 }

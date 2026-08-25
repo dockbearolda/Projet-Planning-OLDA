@@ -408,12 +408,10 @@ function renderSidebar() {
     zone.dataset.fam = f.slug;
     const hasSub = familyHasSub(f.slug);
     if (hasSub) zone.classList.add('has-sub');
-    // Refonte du 24/08 : la zone est une rangée « filet | colonne ». Le filet
-    // vertical dit d'un trait si la phase a du monde (couleur) ou non (gris) —
-    // son état suit `is-empty` de l'en-tête, par :has() en CSS.
-    const filet = document.createElement('span');
-    filet.className = 'zone-filet';
-    filet.setAttribute('aria-hidden', 'true');
+    // Le filet vertical coloré à gauche de chaque phase a été RETIRÉ le 25/08 :
+    // la couleur de phase se lit déjà sur le titre, sur les puces et sur les
+    // pastilles de compteur. Une quatrième fois, en barre pleine hauteur, ne
+    // disait rien de plus et refermait le rail sur la gauche.
     const corps = document.createElement('div');
     corps.className = 'zone-corps';
     const head = buildStageEl(f);
@@ -424,7 +422,7 @@ function renderSidebar() {
         .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug))  // promue en onglet
         .forEach((sub) => corps.appendChild(buildStageEl(f, sub)));
     }
-    zone.append(filet, corps);
+    zone.append(corps);
     $stages.appendChild(zone);
   });
 }
