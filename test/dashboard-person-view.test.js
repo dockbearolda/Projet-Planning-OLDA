@@ -1,14 +1,19 @@
 'use strict';
 
-// Vue personne du Dashboard : elle doit montrer LES DEUX facettes du travail
-// d'un employé — ce qu'il PILOTE et ce qu'il ÉPAULE en tant que référent.
+// L'onglet d'une personne doit porter LES DEUX facettes de son travail — ce
+// qu'elle PILOTE et ce qu'elle ÉPAULE en tant que référente.
 //
 // Régression corrigée ici : la liste « Mes projets où je suis référent » avait
-// été retirée (commit 569dc06). Or « Ma journée » ne retient que l'urgent
+// été retirée (commit 569dc06). Or « Ma journée » ne retenait que l'urgent
 // (retard / échéance proche / à planifier / à commander). Résultat : une
 // commande où l'on n'est QUE référent et qui est « Sans date » (bande 4)
 // n'apparaissait NULLE PART dans l'onglet — cas typique de Julien, qui ne pilote
 // que « Contrôle & emballage » (souvent vide) et suit la production en référent.
+//
+// La refonte du 25/08 a supprimé le panneau latéral qui la portait : la file
+// d'une personne et celle de l'atelier sont désormais le même rendu, à un
+// filtre près. La garde ne peut donc plus nommer une fonction de mise en page,
+// elle vérifie LE RÉSULTAT — la commande est-elle dans la file de Julien.
 //
 // Comme dans next-flow-step.test.js, on n'exécute pas une copie de la logique :
 // on extrait les vrais blocs source de public/dashboard.js et on les évalue.
@@ -75,15 +80,63 @@ assert.deepStrictEqual(effectiveReferents(anneModeConcept), ['Julien'], 'référ
 assert.deepStrictEqual(piloting('Julien').map((r) => r.id), [], 'Julien ne pilote pas cette commande');
 assert.deepStrictEqual(refereeing('Julien').map((r) => r.id), [1], 'la commande doit être dans les projets référent de Julien');
 
-// --- 2. La vue personne DOIT rendre la liste des projets en référent --------
-// Garde-fou contre la re-suppression : buildPersonView doit alimenter le
-// panneau latéral avec refereeing(who), en plus de piloting(who).
-const VIEW_FROM = SRC.indexOf('function buildPersonView');
-const VIEW_TO = SRC.indexOf('\n  // --- Corps', VIEW_FROM);
-assert.ok(VIEW_FROM >= 0 && VIEW_TO > VIEW_FROM, 'buildPersonView introuvable');
-const viewSrc = SRC.slice(VIEW_FROM, VIEW_TO);
+// --- 2. L'onglet d'une personne DOIT porter ses dossiers de RÉFÉRENT --------
+// C'est LA régression à empêcher, et elle ne dépend d'aucune mise en page :
+// une commande où l'on n'est que référent, et qui n'est pas urgente, doit
+// apparaître dans l'onglet de cette personne.
+//
+// Elle était protégée jusqu'au 25/08 par une assertion sur `buildPersonView`
+// — une fonction qui posait, à droite de la file, deux listes « Je pilote » et
+// « J'épaule » relistant dossier pour dossier ce que la file montrait déjà.
+// La refonte a fusionné les trois en une seule liste : la garde ne peut plus
+// nommer la fonction, elle doit vérifier LE RÉSULTAT. On exécute donc le vrai
+// `rankFor` du dashboard, alimenté par le vrai moteur `rankRequests`.
+const PRIO = fs.readFileSync(path.join(__dirname, '..', 'public', 'priority.js'), 'utf8');
 
-assert.ok(/refereeing\(who\)/.test(viewSrc), 'la vue personne doit rendre refereeing(who) (liste des projets en référent)');
-assert.ok(/piloting\(who\)/.test(viewSrc), 'la vue personne doit rendre piloting(who) (liste des projets en pilotage)');
+const RANK_FROM = SRC.indexOf('  function rankFor(who) {');
+const RANK_TO = SRC.indexOf('\n  }', RANK_FROM);
+assert.ok(RANK_FROM >= 0 && RANK_TO > RANK_FROM, 'rankFor introuvable');
+
+const bac = {
+  ACTIVE_SET: sandbox.ACTIVE_SET,
+  EMPLOYEES: sandbox.EMPLOYEES,
+  owners: sandbox.owners,
+  catRefs: sandbox.catRefs,
+  rows: sandbox.rows,
+  machines: [],
+  classementsParPersonne: new Map(),
+  Date,
+};
+vm.createContext(bac);
+vm.runInContext(
+  `${PRIO.replace(/^export\s+/gm, '')}\n`
+  + `${SRC.slice(DERIV_FROM, DERIV_TO)}\n`
+  + `${SRC.slice(RANK_FROM, RANK_TO)}\n  }\n`
+  + 'globalThis.rankFor = rankFor;',
+  bac,
+);
+
+const ids = (who) => Array.from(bac.rankFor(who).queue, (x) => x.r.id);
+const fileDeJulien = ids('Julien');
+assert.deepStrictEqual(fileDeJulien, [1],
+  'une commande où l’on est SEULEMENT référent, et sans date, doit rester dans '
+  + 'la file de cette personne — c’est le cas de Julien, qui ne pilote que '
+  + '« Contrôle & emballage » (souvent vide) et suit la production en référent');
+
+// Et elle y est bien AU MÊME TITRE que pour son pilote : le même dossier
+// apparaît dans les deux files, une fois chacune.
+assert.deepStrictEqual(ids('Charlie'), [1],
+  'le pilote la voit aussi');
+assert.strictEqual(bac.rankFor('Mélina').queue.length, 0,
+  'et personne d’autre ne la voit');
+
+// --- 3. La file d'une personne ne se dédouble plus --------------------------
+// « Ma file » à gauche et « Je pilote / J'épaule » à droite montraient les
+// mêmes dossiers côte à côte, sur le même écran. La vue d'une personne et la
+// file commune sont désormais LE MÊME rendu à un filtre près.
+assert.ok(!/function buildPersonView/.test(SRC),
+  'la vue personne dédoublée ne doit pas revenir : une seule liste par onglet');
+assert.ok(/buildTodoView\(activeTab === 'todo' \? null : activeTab\)/.test(SRC),
+  'l’onglet d’une personne passe par le MÊME constructeur que la file commune');
 
 console.log('dashboard-person-view.test.js OK');
