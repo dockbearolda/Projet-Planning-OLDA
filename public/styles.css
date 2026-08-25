@@ -1297,10 +1297,42 @@ body.cards-off-ticket .pcard__ticket { display: none; }
    (règles positionnelles) forçait le navigateur à réévaluer les frères suivants
    à chaque insertBefore d'un tri ou d'un glisser. Une seule règle, sans
    position : le tableau et les cartes partagent le même geste visuel. */
-.row-enter { animation: rowIn .26s var(--ease) both; }
-@keyframes rowIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
+.liste-entre { animation: listeIn var(--dur-2) var(--ease) both; }
+@keyframes listeIn {
+  /* L'OPACITÉ SEULE. Chaque ligne glissait de 5 px, décalée de 22 ms : sur une
+     étape pleine, douze départs échelonnés sur 154 ms, puis 260 ms d'animation.
+     Un clic donnait une ondulation d'un tiers de seconde APRÈS que la liste
+     avait déjà changé de hauteur. Un fondu unique porté par le conteneur dit la
+     même chose — « ce n'est plus la même liste » — sans déplacer un pixel. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liste-entre { animation: none; }
+}
+
+/* L'ATTENTE DE LA FAMILLE SUIVANTE.
+   La liste sortante RESTE à l'écran pendant la requête : on ne démonte plus
+   avant d'avoir la suite, sinon la hauteur défilable tombe à zéro et
+   l'ascenseur saute en pleine course (mesuré 3 718 → 781 → 2 992 px).
+   `transition-delay` : le fondu ne COMMENCE qu'après 160 ms. Une réponse
+   rapide ne fait donc rien clignoter du tout — c'est le délai qui remplace le
+   minuteur qu'on aurait dû armer, puis annuler, en JavaScript. */
+.grid-wrap #rows,
+.grid-wrap #cards { transition: opacity var(--dur-2) var(--ease); }
+.grid-wrap.en-attente #rows,
+.grid-wrap.en-attente #cards {
+  opacity: .35;
+  /* On ne doit pas pouvoir ouvrir, d'un clic distrait, une commande de la
+     famille qu'on vient de quitter. */
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease) 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid-wrap #rows,
+  .grid-wrap #cards,
+  .grid-wrap.en-attente #rows,
+  .grid-wrap.en-attente #cards { transition: none; }
 }
 
 /* (La « ligne brouillon » et son bouton « + » ont été retirés : depuis que

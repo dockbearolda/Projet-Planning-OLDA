@@ -286,8 +286,14 @@ assert.strictEqual(bouton['border-radius'], 'var(--arrondi-champ)', '… un bout
 const INDEX = fs.readFileSync(path.join(RACINE, 'public/index.html'), 'utf8');
 assert.ok(/<link rel="stylesheet" href="charte\.css"/.test(INDEX),
   'le planning charge la charte, et AVANT sa propre feuille');
-assert.ok(INDEX.indexOf('charte.css') < INDEX.indexOf('styles.css'),
-  '… devant styles.css : les jetons d’abord, les règles ensuite');
+// On compare la position des BALISES, pas celle des chaînes : un commentaire
+// qui cite « styles.css » plus haut dans l'en-tête faisait échouer cette garde
+// alors que l'ordre de chargement n'avait pas bougé d'un pouce.
+const posFeuille = (f) => INDEX.indexOf(`<link rel="stylesheet" href="${f}"`);
+assert.ok(posFeuille('charte.css') >= 0 && posFeuille('styles.css') >= 0,
+  'les deux feuilles doivent être chargées par une balise <link>');
+assert.ok(posFeuille('charte.css') < posFeuille('styles.css'),
+  '… la charte devant styles.css : les jetons d’abord, les règles ensuite');
 const STYLES = fs.readFileSync(path.join(RACINE, 'public/styles.css'), 'utf8');
 assert.ok(!/:root\s*\{[^}]*--bg\s*:/.test(STYLES),
   'styles.css ne redéclare pas les jetons : ils n’existent qu’à un seul endroit');

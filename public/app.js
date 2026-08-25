@@ -427,35 +427,25 @@ function renderSidebar() {
   });
 }
 
-// Rejoue l'animation d'entrée (léger fondu décalé) au changement d'étape — sur
-// la vue réellement affichée : le tableau OU les cartes, même geste visuel.
-// SEULES LES PREMIÈRES LIGNES s'animent, par une classe posée ici : la règle
-// CSS `.stage-enter tr:nth-child(…)` faisait démarrer 392 animations de
-// repaint au même instant sur une étape de 400 lignes, et sa simple présence
-// (règle positionnelle) forçait le navigateur à réévaluer le style de tous les
-// frères suivants à CHAQUE insertBefore d'un tri ou d'un glisser.
+// L'ENTRÉE D'UNE ÉTAPE — UN SEUL MOUVEMENT, ET IL NE DÉPLACE RIEN.
+// Douze lignes glissaient chacune de 5 px, décalées de 22 ms : une ondulation
+// de 414 ms qui démarrait APRÈS que la liste avait déjà changé de hauteur.
+// Trois mouvements pour un seul clic (effondrement, remplissage, ondulation) —
+// c'est ce que Charlie appelait « ça rebondit ». Le fondu porte désormais sur
+// LA LISTE, une fois, et sur la seule opacité : le compositeur l'anime sans
+// repasser par la mise en page, une étape de 400 lignes ne coûte donc rien.
 let stageEnterTimer = null;
-const STAGE_ENTER_MAX = 12; // au-delà, la ligne naît sous le pli : personne ne la voit entrer
-function retirerRowEnter() {
-  for (const el of document.querySelectorAll('.row-enter')) {
-    el.classList.remove('row-enter');
-    el.style.animationDelay = '';
-  }
-}
 function playStageEnter() {
   const host = modeCartes() ? $cards : $rows;
   if (!host) return;
-  retirerRowEnter();
+  // Qui a demandé le calme ne voit rien bouger — et surtout ne se retrouve pas
+  // avec une liste bloquée à l'opacité de départ si le minuteur saute.
+  if (mouvementReduit()) return;
+  host.classList.remove('liste-entre');
   void host.offsetWidth; // relance l'animation CSS
-  let i = 0;
-  for (const el of host.children) {
-    if (el.classList.contains('is-hidden')) continue;
-    el.classList.add('row-enter');
-    el.style.animationDelay = `${Math.min(i, 7) * 22}ms`;
-    if (++i >= STAGE_ENTER_MAX) break;
-  }
+  host.classList.add('liste-entre');
   clearTimeout(stageEnterTimer);
-  stageEnterTimer = setTimeout(retirerRowEnter, 600);
+  stageEnterTimer = setTimeout(() => host.classList.remove('liste-entre'), 500);
 }
 
 // Masque la colonne « Sous-étape » quand la famille courante n'a pas de
@@ -484,6 +474,10 @@ function clearGrid() {
   // serait exactement le « glitch » que cette fonction existe pour empêcher.
   for (const [, carte] of cardEls) carte.el.remove();
   cardEls.clear();
+  // Les bannières de lot ne sont ni dans `rowEls` ni dans `cardEls` : sans
+  // cette ligne, l'en-tête d'un ticket survivait au vidage et coiffait les
+  // commandes d'une AUTRE famille — en désignant le mauvais client.
+  nettoyerBandes(new Set());
   rows = [];
   lastRendered = [];
   lastRowsSig = '';
@@ -615,9 +609,23 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   // « Tout afficher » vaut pour L'ÉTAPE où on l'a demandé : on ne traîne pas
   // l'historique complet de la clôture derrière soi en changeant de famille.
   if (!sameFamily) { plafondListe = PALIER_LISTE; listeTronqueeA = 0; listeTotal = 0; renderListeSuite(); }
-  // Relecture forcée : on garde la grille à l'écran (pas de `clearGrid`), sinon
-  // elle clignoterait alors qu'on est déjà au bon endroit.
-  if (!sameFamily) clearGrid();
+  // ON NE VIDE PLUS AVANT D'AVOIR LA SUITE. `clearGrid()` posé ICI démontait
+  // toutes les lignes puis attendait le réseau : le contenu défilable tombait
+  // de 3 718 px à 781 px, l'ascenseur sautait en pleine hauteur, et il
+  // remontait à 2 992 px quand la réponse arrivait. Mesuré à 24 ms en local —
+  // mais c'est la DURÉE DE LA REQUÊTE en atelier, un demi-seconde d'écran
+  // effondré. C'est ce que Charlie appelait « la page rebondit ».
+  // La liste sortante reste donc à l'écran, éteinte et injouable, et le rendu
+  // suivant la remplace en place : la hauteur ne passe jamais par zéro.
+  if (!sameFamily) {
+    // LA DONNÉE EST PÉRIMÉE DÈS LE CLIC, même si les lignes restent à l'écran.
+    // C'est `clearGrid()` qui remettait cette signature à zéro : sans elle, un
+    // clic sur une sous-étape PENDANT le chargement reprenait le raccourci
+    // « même famille » et redessinait les lignes de la famille PRÉCÉDENTE,
+    // filtrées par une sous-étape qui ne leur appartient pas.
+    lastRowsSig = '';
+    marquerEnAttente(true);
+  }
   try {
     await loadRows();
   } catch (_) {
@@ -625,15 +633,32 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
     // moindre message — le même symptôme visuel qu'une panne grave. On le dit,
     // et le temps réel remettra les lignes dès que la liaison revient.
     if (currentStage === slug) {
+      // ICI, oui, on vide : garder les lignes de la famille PRÉCÉDENTE sous le
+      // titre de la nouvelle serait un mensonge, et le message ne se lirait pas.
+      clearGrid();
       $empty.hidden = false;
       $empty.textContent = 'Connexion perdue — les commandes réapparaîtront dès le retour du réseau.';
       showToast('Chargement impossible : vérifie la connexion.');
     }
     return;
+  } finally {
+    if (currentStage === slug) marquerEnAttente(false);
   }
   // Anime l'entrée des VRAIES lignes, seulement si cette sélection est toujours
   // celle affichée (un clic plus récent a pu prendre le relais entre-temps).
   if (currentStage === slug) { remonterLaListe(); playStageEnter(); }
+}
+
+// L'ATTENTE NE SE VOIT QUE SI ELLE DURE. La classe est posée tout de suite, mais
+// le fondu qui l'accompagne porte un `transition-delay` (voir styles.css) : une
+// réponse en 30 ms ne fait donc RIEN clignoter, et seule une vraie attente
+// éteint la liste sortante. Pas de minuteur à armer ni à annuler.
+// `pointer-events: none` va avec : on ne doit pas pouvoir ouvrir, du bout du
+// doigt, une commande de la famille qu'on vient de quitter.
+function marquerEnAttente(on) {
+  const wrap = document.querySelector('.grid-wrap');
+  if (wrap) wrap.classList.toggle('en-attente', !!on);
+  if ($rows) $rows.setAttribute('aria-busy', on ? 'true' : 'false');
 }
 
 // --- Chargement données ----------------------------------------------------
@@ -7496,12 +7521,17 @@ function setViewMode(mode) {
   // (Dashboard, Fiverr, Réglages…) disparaît, il ne reste que l'étape en cours.
   document.body.classList.toggle('view-comptoir', mode === 'projet');
 
-  jouerBasculeDeVue();
-
+  // ON MONTE LE CONTENU AVANT D'ANIMER, pas pendant. Dans l'autre ordre, le
+  // cadre finissait de monter de 6 px pendant que le Point du jour posait ses
+  // quatre colonnes : le mouvement du cadre et l'arrivée du contenu se
+  // superposaient, et l'œil lisait deux secousses là où il n'y a qu'un clic.
+  // Mesuré : colonnes posées à 42 ms, animation du cadre de 0 à 200 ms.
   if (dash) dashboard.show(); else dashboard.hide();
   if (clients) mountClients();
   if (reglages) mountReglages();
   if (projet) mountProjet();
+
+  jouerBasculeDeVue();
   if (isPlanningMode(mode)) {
     // De retour au planning : la sous-étape courante peut avoir changé ailleurs.
     updateFiverrTool(currentStage);
