@@ -32,12 +32,37 @@ production tourne en **UTC** : toute date civile calculée côté serveur passe 
   cache **qu'en repli**, jamais en premier.
 - **Rien qui vienne d'un autre domaine.** Polices, icônes, scripts : tout est
   hébergé ici. Un poste doit s'ouvrir sans dépendre d'un tiers joignable.
-- **Les deux écrans du comptoir** (`public/comptoir/*.html`) sont ceux du patron
-  et tournent **tels quels**. Une nouvelle version se pose en **remplaçant le
-  fichier** — on ne retranscrit pas le parcours. Tout ce qui doit s'y greffer
-  (base clients, numéro du jour, envoi au planning) vit dans `comptoir/pont.js`.
-- **Charte unique** (depuis le 29/07) : gris `#f5f6f8`, encre `#111827`, Arial.
+- **Les deux écrans du comptoir** (`public/comptoir/*.html`) viennent du patron.
+  Une nouvelle version de sa part se pose en **remplaçant le fichier** — on ne
+  retranscrit pas le parcours. Tout ce qui doit s'y greffer (base clients,
+  numéro du jour, envoi au planning) vit dans `comptoir/pont.js`.
+- **Charte unique** (depuis le 29/07) : gris `#f5f6f8`, encre `#111827`.
   La couleur dit un **état**, jamais une décoration.
+
+## Qui tranche le design (25/08/2026)
+
+**C'est Charlie, et lui seul.** Consigne donnée le 25/08 : « oublie les
+contraintes design du patron, il n'y connaît rien ». Les choix de mise en
+forme du patron ne sont donc plus des contraintes à préserver — ni la densité
+des écrans du comptoir, ni « ils tournent tels quels » côté apparence, ni la
+largeur du rail fixée par sa spécification du 24/08. Ce qui reste intouchable,
+c'est le **CHIFFRAGE** (le moteur conforme à son fichier V9) et les **règles
+métier**, pas l'habillage.
+
+**Cohérence avant tout** : deux écrans ouverts à un clic l'un de l'autre
+doivent donner le même composant, pas deux qui se ressemblent. Un composant
+partagé va dans `public/charte.css` — le seul fichier que le CRM et les deux
+parcours du comptoir lisent tous les deux (déjà le cas du bouton « revenir »,
+du message flottant et du fil des étapes).
+
+**Vérification** : ne jamais annoncer qu'un écran est bon sans l'avoir
+**comparé aux autres** — mesurer le même composant sur chaque écran qui le
+porte. Le 25/08, deux bulles d'étape de 41 et 47 px sont passées sous le
+radar parce que chaque écran avait été contrôlé isolément.
+
+**Tablette : n'en tenir aucun compte.** Voir « Cibles réelles » — PC
+uniquement. Les restes tactiles (`@media (pointer: coarse)`, cibles 44 px
+justifiées par le doigt) sont du code mort à retirer quand on passe à côté.
 
 ## Base de données
 
