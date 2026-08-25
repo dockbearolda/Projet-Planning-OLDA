@@ -410,10 +410,12 @@ body {
   margin-left: calc(-1 * var(--rail-sur));
 }
 
-/* Densité : hauteur de ligne */
-.app.density-compact { --row-h: 50px; }
-.app.density-normal  { --row-h: 60px; }
-.app.density-confort { --row-h: 78px; }
+/* Densité : hauteur de ligne. Montées d'un septième le 25/08 avec la taille du
+   texte — une ligne qui garde sa hauteur pendant que son contenu grossit, c'est
+   du texte qui touche ses bords. */
+.app.density-compact { --row-h: 56px; }
+.app.density-normal  { --row-h: 68px; }
+.app.density-confort { --row-h: 88px; }
 
 /* Poignée de redimensionnement du rail (occupe la colonne centrale = ancien gap) */
 .sidebar-resizer {
@@ -1157,13 +1159,13 @@ body.cards-off-ticket .pcard__ticket { display: none; }
 .pcard__grip { cursor: grab; }
 .pcard.dragging { opacity: .35; }
 
-/* Sous ~1040 px de conteneur, les planchers fixes (150+240+190+180 px…) ne
+/* Sous ce seuil de conteneur, les planchers fixes (150+240+190+180 px…) ne
    tiennent plus : colonnes proportionnelles, qui se compriment sans pousser
    les actions hors de vue. Les actions et le plancher des pastilles, eux,
    gardent leur largeur : c'est ce qui tient l'alignement d'une carte à
    l'autre. `minmax(0, …)` sur les colonnes de texte, sinon leur contenu
    (une description sans espace) les empêche de se comprimer. */
-@container (max-width: 1200px) {
+@container (max-width: 1360px) {
   .pcard {
     grid-template-columns:
       minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr)
@@ -1187,16 +1189,17 @@ body.cards-off-ticket .pcard__ticket { display: none; }
   .pcard { --ref-taille: 44px; --ref-ecart: 8px; --ref-cols: 2; }
   .pcard__ref-btn { font-size: var(--taille-texte); }
 }
-/* Sous ~840 px de conteneur, quatre colonnes deviennent illisibles : chaque
+/* Sous ce seuil de conteneur, quatre colonnes deviennent illisibles : chaque
    bloc prend la ligne, les actions restent à droite du nom du client.
-   LES DEUX SEUILS SONT FONCTION DE LA TAILLE DU TEXTE, et ils ont bougé avec
-   elle le 24/08 : la carte était réglée sur du 11-13 px, elle se lit
-   maintenant en `--taille-texte` (15 px) comme tout le reste de l'outil. Le
-   même contenu réclame ~15 % de largeur en plus — 720 → 840, 1040 → 1200.
-   Mesuré : rail ouvert, la carte dispose de 776 px ; à l'ancien seuil elle
-   tenait cinq colonnes de 90 à 168 px où « DÉLAI RESTANT » et
-   « Référent : Loïc » passaient à la ligne. */
-@container (max-width: 840px) {
+   LES DEUX SEUILS SONT FONCTION DE LA TAILLE DU TEXTE, et ils bougent CHAQUE
+   FOIS qu'elle bouge — c'est la deuxième fois. La carte était réglée sur du
+   11-13 px ; passée en 15 px le 24/08, le même contenu réclamait ~15 % de
+   largeur en plus (720 → 840, 1040 → 1200). Passée en 17 px le 25/08, il en
+   réclame encore ~13 % : 840 → 950 et 1200 → 1360. Sans ça, cinq colonnes de
+   90 à 168 px où « DÉLAI RESTANT » et « Référent : Loïc » passent à la ligne.
+   Les colonnes du Point du jour (`--pj-c-*`) et ses trois seuils à lui
+   suivent la même règle, pour la même raison. */
+@container (max-width: 950px) {
   .pcard {
     grid-template-columns: minmax(0, 1fr) var(--pcard-actions);
     /* Une seule colonne pour le texte : les pastilles de référent reprennent
@@ -3937,13 +3940,13 @@ body.view-plein .fiverr-tool { display: none !important; }
 
   /* Les pistes de la grille des lignes, nommées une fois : l'entête de
      colonnes et les lignes DOIVENT partager exactement la même définition. */
-  --pj-c-rank: 30px;
-  --pj-c-prio: 34px;
-  --pj-c-pos: 168px;
-  --pj-c-why: 224px;
-  --pj-c-due: 96px;
-  --pj-c-pilot: 132px;
-  --pj-c-tag: 78px;
+  --pj-c-rank: 34px;
+  --pj-c-prio: 50px;
+  --pj-c-pos: 190px;
+  --pj-c-why: 262px;
+  --pj-c-due: 118px;
+  --pj-c-pilot: 150px;
+  --pj-c-tag: 88px;
 
   font-family: var(--pj-font);
 }
@@ -4431,7 +4434,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 /* Repli, dans l'ordre inverse de l'utilité : « pourquoi », puis l'étape, puis
    le pilote descendent sous le client. Le rang, le client et l'échéance ne
    quittent JAMAIS la première ligne — c'est le trio qu'on lit en balayant. */
-@container (max-width: 800px) {
+@container (max-width: 900px) {
   .pj-row-head, .pj-row {
     grid-template-columns:
       var(--pj-c-rank) var(--pj-c-prio) minmax(0, 1fr) var(--pj-c-pos) var(--pj-c-due) var(--pj-c-pilot);
@@ -4452,7 +4455,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   .pj-row--hold > .pj-flag    { grid-area: 3 / 2 / auto / -1; }
 }
 
-@container (max-width: 580px) {
+@container (max-width: 660px) {
   .pj-row-head, .pj-row {
     grid-template-columns: var(--pj-c-rank) var(--pj-c-prio) minmax(0, 1fr) var(--pj-c-due) var(--pj-c-pilot);
   }
@@ -4486,7 +4489,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    client se REPLIE sur deux lignes au lieu d'être coupé — c'est la seule
    donnée qu'on ne peut pas se permettre de tronquer, et à 375 px il ne reste
    pas de quoi l'écrire sur une seule. */
-@container (max-width: 440px) {
+@container (max-width: 500px) {
   .pj-row-head { display: none; }
   .pj-row, .pj-row--hold { --pj-c-due: 84px; align-items: start; }
   .pj-row { grid-template-columns: var(--pj-c-rank) minmax(0, 1fr) var(--pj-c-due); }
@@ -5273,7 +5276,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 
 /* Sous 1280 : la colonne « pourquoi » se resserre avant de tomber. */
 @media (max-width: 1279px) {
-  .dashboard, .dd-panel, .pj-feed { --pj-c-why: 176px; --pj-c-pos: 150px; --pj-c-pilot: 120px; }
+  .dashboard, .dd-panel, .pj-feed { --pj-c-why: 200px; --pj-c-pos: 170px; --pj-c-pilot: 136px; }
 }
 
 /* Tablette portrait (800×1280) & petits desktops : le « pourquoi » descend
@@ -5441,9 +5444,17 @@ body.view-plein .fiverr-tool { display: none !important; }
 .reg-tarif-cat { margin: 18px 0 8px; font-size: var(--taille-texte); font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
 .reg-tarif-cat:first-child { margin-top: 4px; }
 .reg-tarif-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.reg-tarif-input { min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: var(--taille-texte); background: var(--surface); color: var(--text-1); }
-.reg-tarif-input--nom { flex: 1 1 220px; }
-.reg-tarif-input--num { flex: 0 0 90px; text-align: right; }
+/* `min-width: 0` N'EST PAS DÉCORATIF ICI. La taille minimale automatique d'un
+   élément de formulaire vaut sa largeur INTRINSÈQUE — une vingtaine de
+   caractères — et elle l'emporte sur `flex-basis`. Les deux champs de prix ne
+   faisaient donc pas 102 px mais 190, comme le champ de désignation : les trois
+   se partageaient la rangée à parts égales. Ça passait tant que 3 × 190 tombait
+   juste ; en 17 px la même règle donne 3 × 211 et la rangée déborde de 63 px.
+   Avec `min-width: 0`, le prix reprend ses 102 px et la désignation récupère
+   les 150 px qu'on lui prenait. */
+.reg-tarif-input { min-width: 0; min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: var(--taille-texte); background: var(--surface); color: var(--text-1); }
+.reg-tarif-input--nom { flex: 1 1 250px; }
+.reg-tarif-input--num { flex: 0 0 102px; text-align: right; }
 .reg-tarif-toggle, .reg-tarif-del { flex: 0 0 36px; min-height: 36px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .reg-tarif-toggle.is-on { color: var(--primary); }
 .reg-tarif-del:hover { color: var(--danger); }

@@ -135,10 +135,15 @@
    texte + même interligne + même rembourrage = la même hauteur, sans qu'aucune
    ne soit jamais écrite en dur. */
 :root {
-  --taille-note: 13px;    /* intitulé de champ, aide, méta, pastille, étape */
-  --taille-texte: 15px;   /* ce qui se lit ET ce qui se saisit */
-  --taille-titre: 19px;   /* titre d'une carte, d'une section */
-  --taille-grand: 28px;   /* les chiffres qu'on annonce au client */
+  /* ÉCHELLE DU 25/08/2026 — celle que le patron a validée sur l'écran de
+     référence (« 1. Besoins »), montée ici pour TOUTE l'application : le poste
+     de la vendeuse est un 15,4 pouces Windows, et le 15 px d'avant s'y lisait
+     trop petit. Le rapport entre les marches ne change pas, tout monte
+     d'environ un septième. */
+  --taille-note: 14px;    /* intitulé de champ, aide, méta, pastille, étape */
+  --taille-texte: 17px;   /* ce qui se lit ET ce qui se saisit */
+  --taille-titre: 21px;   /* titre d'une carte, d'une section */
+  --taille-grand: 32px;   /* les chiffres qu'on annonce au client */
 
   --graisse-texte: 400;
   --graisse-note: 600;
@@ -169,7 +174,7 @@
      imbriquées — un récapitulatif et son calcul déplié — alignent leurs
      virgules sur la même verticale. « Au-dessus de la cible » est la plus
      longue valeur qu'on y écrive. */
-  --tab-valeur: 168px;
+  --tab-valeur: 190px;
 
   /* LE RAIL DES INTITULÉS D'UNE CARTE DE LISTE. Fixe, pour la même raison
      que la colonne des valeurs juste au-dessus : en `auto`, chaque carte
@@ -180,7 +185,7 @@
      (La quantité a eu son rail à elle — 58 px de bulle, puis 46 px de colonne
      nue — avant de rejoindre le TITRE de la ligne le 24/08 au soir :
      « 3× T-shirt … » s'écrit d'un seul tenant, plus rien à mesurer.) */
-  --need-cle: 86px;
+  --need-cle: 98px;
 
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait
      sept (2, 7, 10, 11, 12, 14, 18 px) et sept rembourrages différents : le
@@ -324,11 +329,15 @@
 /* Les gris ET les tailles du rail — nommés ici, jamais écrits dans styles.css
    (le garde-fou d'échelle n'admet en dur que les tailles d'icônes). */
 .sidebar {
-  --rail-taille-titre: 13px;    /* « Planning OLDA » */
-  --rail-taille-forte: 11.5px;  /* l'initiale du logo, le total général */
-  --rail-taille-note: 10.5px;   /* le sous-titre, le titre d'une catégorie */
-  --rail-taille-etape: 12.5px;  /* le libellé d'une étape */
-  --rail-taille-compte: 11px;   /* les compteurs */
+  /* Montées du même rapport que le reste le 25/08 : le rail écrivait ses
+     étapes en 12,5 px et ses catégories en 10,5 px — sur le 15,4 pouces de la
+     vendeuse, c'est le coin de l'écran qu'elle lisait le moins bien, alors
+     qu'il porte les compteurs qu'elle balaie toute la journée. */
+  --rail-taille-titre: 15px;    /* « Planning OLDA » */
+  --rail-taille-forte: 13px;    /* l'initiale du logo, le total général */
+  --rail-taille-note: 12px;     /* le sous-titre, le titre d'une catégorie */
+  --rail-taille-etape: 14px;    /* le libellé d'une étape */
+  --rail-taille-compte: 12.5px; /* les compteurs */
 
   --rail-encre: #0f1729;         /* sélection, titre de l'outil, logo */
   --rail-nonvide: #39424f;       /* libellé d'une étape qui a du monde */
@@ -417,15 +426,10 @@
   --dd-taille-aide: 14px;     /* l'aide sous un titre de tuile — même marche */
   --dd-taille-mention: 14px;  /* « optionnel » — discret par la couleur */
 
-  /* Ce que la maison lit en 15/28 se lit ICI en 17/32 — surcharges DE PORTÉE :
-     le `:root` ne bouge pas, donc ni le planning ni l'écran de vente. Les deux
-     largeurs calées sur la taille du texte suivent, sinon « Au-dessus de la
-     cible » (colonne des valeurs) et « Production » (rail des intitulés d'une
-     carte) reviendraient à la ligne. */
-  --taille-texte: 17px;
-  --taille-grand: 32px;
-  --tab-valeur: 190px;
-  --need-cle: 98px;
+  /* Les quatre surcharges de portée qui vivaient ici (17/32, colonne des
+     valeurs, rail des intitulés) sont REMONTÉES AU `:root` le 25/08 : le patron
+     a validé cette échelle sur cet écran, toute l'application la reprend. Il
+     n'y a plus d'écart à maintenir entre la maison et le comptoir. */
 
   /* Deux graisses d'appoint, repliées elles aussi le 25/08 au soir : la douce
      rejoint le texte (400 — le discret est gris, pas maigre) et l'appuyée la
