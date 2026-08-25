@@ -1,0 +1,220 @@
+'use strict';
+
+// ===========================================================================
+// LE POINT DU JOUR SE LIT — les invariants de la refonte du 25/08
+// ===========================================================================
+// Le patron avait tranché « absolument illisible ». Ce qui se mesurait :
+//
+//   · NEUF tailles de texte (11, 12, 13, 14, 16, 17, 19, 26 px) et cinq
+//     graisses, quand la charte en pose quatre et trois. Le corps de la file
+//     était à 11 px, sous le plancher de la charte.
+//   · SEPT textes sous le seuil de contraste, dont l'étoile pleine de la
+//     priorité à 1,18:1 — invisible.
+//   · La même information écrite deux ou trois fois par ligne.
+//
+// Les trois familles sont gardées ici. La troisième est la plus fragile :
+// elle tient à un ACCORD entre deux fichiers (priority.js écrit les motifs,
+// dashboard.js retire ceux que les colonnes portent déjà). Changer un libellé
+// d'un côté sans l'autre, et la répétition revient sans que rien ne casse.
+
+process.env.TZ = 'UTC';
+
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+const DASH = lire('public/dashboard.js');
+const PRIO = lire('public/priority.js');
+const CSS = lire('public/styles.css');
+
+// ===========================================================================
+// 1. AUCUNE INFORMATION ÉCRITE DEUX FOIS SUR UNE LIGNE
+// ===========================================================================
+// `reasonsFor` produit cinq familles de motifs. Deux d'entre elles — l'échéance
+// et la priorité haute — sont exactement les deux cellules voisines de la
+// colonne « pourquoi ». En pratique, toute ligne en retard portait
+// « En retard de 3 j · Priorité haute (3★) » à côté d'un badge « Retard 3 j »
+// et d'une colonne de priorité.
+const bacPrio = {};
+vm.createContext(bacPrio);
+vm.runInContext(`${PRIO.replace(/^export\s+/gm, '')}
+  globalThis.reasonsFor = reasonsFor;
+  globalThis.scoreRequest = scoreRequest;`, bacPrio);
+
+// Le filtre du dashboard, extrait de sa source (pas une copie).
+const MOTIF_LIGNE = DASH.match(/const MOTIF_DEJA_DIT = (\/.+\/);/);
+assert.ok(MOTIF_LIGNE, 'MOTIF_DEJA_DIT introuvable — le dédoublonnage des motifs a disparu');
+const MOTIF_DEJA_DIT = new RegExp(MOTIF_LIGNE[1].slice(1, -1));
+const utiles = (r) => r.filter((t) => !MOTIF_DEJA_DIT.test(t));
+
+const NOW = Date.parse('2026-08-25T12:00:00Z');
+const mk = (o) => ({
+  id: 'x', stage: 'production', sub_stage: null, priority: 1,
+  deadline: null, updated_at: '2026-08-25T09:00:00Z', ...o,
+});
+const motifs = (o, machines) => bacPrio.reasonsFor(
+  bacPrio.scoreRequest(mk(o), { now: NOW, machines: new Map(machines || []), weights: undefined }),
+);
+
+// a) Tout ce que l'ÉCHÉANCE peut produire doit être retiré : le badge le dit.
+for (const [jours, attendu] of [[-3, 'En retard de 3 j'], [0, 'Échéance aujourd’hui'],
+  [1, 'Échéance demain'], [3, 'Échéance dans 3 j']]) {
+  const d = new Date(NOW + jours * 86400000).toISOString().slice(0, 10);
+  const bruts = motifs({ deadline: d });
+  assert.ok(bruts.includes(attendu),
+    `le moteur doit toujours produire « ${attendu} » (sinon ce test ne garde plus rien)`);
+  assert.ok(!utiles(bruts).includes(attendu),
+    `« ${attendu} » double le badge d’échéance : il ne doit pas s’afficher dans la colonne`);
+}
+
+// b) La PRIORITÉ haute est retirée : la cellule « Prio » la dit.
+const hautes = motifs({ priority: 3 });
+assert.ok(hautes.some((t) => /^Priorité haute/.test(t)), 'le moteur produit toujours la priorité haute');
+assert.ok(!utiles(hautes).some((t) => /^Priorité haute/.test(t)),
+  '« Priorité haute » double la cellule Prio de la ligne');
+
+// c) Ce qu'AUCUNE autre cellule ne porte doit SURVIVRE — sinon on aurait retiré
+//    une colonne au lieu de la dédoublonner.
+const goulot = motifs({ sub_stage: 'prod_trotec' }, [['trotec', { slug: 'trotec', name: 'Trotec', importance: 5 }]]);
+assert.deepStrictEqual(utiles(goulot), goulot,
+  'la machine goulot n’est écrite nulle part ailleurs : elle doit rester');
+assert.ok(goulot.length, 'le cas machine goulot doit bien produire un motif');
+
+const fige = motifs({ updated_at: '2026-08-05T09:00:00Z' });
+assert.ok(fige.some((t) => /^Sans mouvement/.test(t)), 'le moteur signale la stagnation');
+assert.ok(utiles(fige).some((t) => /^Sans mouvement/.test(t)),
+  'la stagnation n’est écrite nulle part ailleurs : elle doit rester');
+
+// d) Et le MOTEUR n'est pas amputé : le panneau détail et priority.test.js
+//    s'appuient sur ses motifs complets.
+assert.ok(/out\.push\(`En retard de \$\{-s\.d\} j`\)/.test(PRIO),
+  'le moteur garde ses motifs complets — c’est l’AFFICHAGE qui ne répète pas');
+
+// ===========================================================================
+// 2. UNE COLONNE CONSTANTE N'EST PAS UNE COLONNE
+// ===========================================================================
+// Dans la file d'une personne, la colonne « Pilote » affichait son propre nom
+// à chaque rang. Elle n'existe donc que dans une vue d'atelier.
+assert.ok(/if \(!who\) b\.appendChild\(porteurEl\(r, null\)\);/.test(DASH),
+  'la cellule « pilote » ne doit être posée que quand la vue n’est pas celle d’une personne');
+assert.ok(/\.\.\.\(who \? \[\] : \[\{ k: 'pilot'/.test(DASH),
+  'l’en-tête de colonnes doit suivre la ligne : pas de colonne « Pilote » dans une vue personne');
+assert.ok(/'pj-todo-list' \+ \(who \? '' : ' is-atelier'\)/.test(DASH),
+  'c’est la LISTE qui porte la variante de grille — l’entête et toutes ses lignes '
+  + 'doivent partager exactement les mêmes pistes');
+assert.ok(/\.pj-todo-list\.is-atelier \.pj-row \{/.test(CSS),
+  'la variante « atelier » de la grille doit exister en CSS');
+
+// ===========================================================================
+// 3. UN COMPTEUR À ZÉRO QUITTE LA BARRE
+// ===========================================================================
+// L'éteindre en gris ne suffisait pas : il occupait la même surface et l'œil
+// devait le LIRE pour découvrir qu'il ne disait rien.
+assert.ok(/\$kpiEls\[key\]\.btn\.hidden = !n;/.test(DASH),
+  'un compteur d’alarme à zéro doit être retiré de la barre, pas seulement éteint');
+assert.ok(/Rien ne brûle/.test(DASH),
+  'quand les quatre compteurs se taisent, la barre doit le DIRE — une barre vide '
+  + 'se lit « l’écran n’a pas fini de charger »');
+assert.ok(!/is-zero/.test(DASH) && !/is-zero/.test(CSS),
+  'l’ancien état « compteur éteint » ne doit pas cohabiter avec le nouveau');
+
+// ===========================================================================
+// 4. L'ÉCHELLE EST CELLE DE LA CHARTE
+// ===========================================================================
+// Le bloc du Point du jour (écran + panneaux) ne pose plus AUCUNE taille de
+// texte en dur : tout passe par --taille-*. Seules les fontes d'icônes et les
+// glyphes cliquables (l'étoile du panneau détail) gardent une taille propre —
+// ce ne sont pas des textes.
+const DEBUT = CSS.indexOf('/* ------------------------------------------------ En-tête « Point du jour » */');
+const FIN = CSS.indexOf('/* --- Fiche projet (planning) ---');
+assert.ok(DEBUT > 0 && FIN > DEBUT, 'bloc CSS du Point du jour introuvable');
+const blocPJ = CSS.slice(DEBUT, FIN);
+
+// On lit le CODE, pas les commentaires : ceux-ci CITENT les valeurs retirées
+// pour expliquer pourquoi elles l'ont été.
+const sansCommentaires = blocPJ.replace(/\/\*[\s\S]*?\*\//g, '');
+// Ce qui reste en dur ne peut être QU'une taille d'ICÔNE — même règle que
+// coquille-nav-et-rail.test.js pour le reste de l'outil : une icône est
+// dimensionnée par sa boîte, pas par une ligne de texte.
+const TAILLES_ICONE = [16, 20, 24, 40];
+const enDur = [];
+for (const r of sansCommentaires.split('}')) {
+  const m = r.match(/font-size:\s*(\d+)px/g);
+  if (!m) continue;
+  for (const t of m) {
+    if (TAILLES_ICONE.includes(Number(t.match(/\d+/)[0]))) continue;
+    enDur.push(`${r.split('{')[0].trim().slice(0, 40)} → ${t}`);
+  }
+}
+assert.deepStrictEqual(enDur, [],
+  'toute taille de texte du Point du jour doit passer par la charte '
+  + '(--taille-note / --taille-texte / --taille-grand) :\n  ' + enDur.join('\n  '));
+
+// Et l'échelle du Point du jour est celle, FERMÉE, de tout l'outil : trois
+// tailles. Une quatrième ferait tomber coquille-nav-et-rail.test.js — on le
+// dit ici aussi, à l'endroit où la tentation se présente (un titre d'écran,
+// un chiffre d'alarme). La hiérarchie se dit à la GRAISSE.
+const jetonsTaille = new Set(
+  [...sansCommentaires.matchAll(/font-size:\s*var\((--taille-[\w-]+)\)/g)].map((m) => m[1]),
+);
+assert.deepStrictEqual([...jetonsTaille].sort(), ['--taille-note', '--taille-texte'],
+  'le Point du jour ne connaît que la taille de lecture et l’annotation — '
+  + `trouvé : ${[...jetonsTaille].sort().join(', ')}`);
+
+const graissesEnDur = [...sansCommentaires.matchAll(/font-weight:\s*(\d+)/g)].map((m) => m[1]);
+assert.deepStrictEqual(graissesEnDur, [],
+  `graisses en dur dans le Point du jour : ${graissesEnDur.join(', ')} — la charte en `
+  + 'pose trois (--graisse-texte / --graisse-note / --graisse-forte)');
+
+// ===========================================================================
+// 5. LE GRIS ATTÉNUÉ NE PORTE PAS DE TEXTE
+// ===========================================================================
+// --pj-ink-4 était --text-3 (#9ca3af, 2,54:1 sur blanc) et portait la famille
+// sous l'étape, les badges « Dans 3 j » et « Sans date », les en-têtes de
+// colonnes, les messages vides. --text-3 reste un REPÈRE, jamais du texte.
+assert.ok(/--pj-ink-4: var\(--text-2\);/.test(CSS),
+  '--pj-ink-4 porte du texte qu’on lit : il ne peut pas être l’encre atténuée');
+assert.ok(/--pj-star-off: var\(--text-2\);/.test(CSS),
+  'l’étoile éteinte du panneau détail doit se voir — c’est la FORME du glyphe qui '
+  + 'dit l’état, pas un gris à 1,52:1');
+assert.ok(!/var\(--text-3\)/.test(sansCommentaires),
+  'aucune règle du Point du jour ne doit tirer directement sur l’encre atténuée');
+
+// Et l'étoile de la FILE a disparu : la priorité y est un mot, comme sur le
+// planning. C'est elle qui se rendait à 1,18:1 — l'étoile PLEINE, celle qui
+// était censée signaler une priorité haute.
+//
+// On regarde ce que le dashboard ÉMET, pas la position d'un sélecteur dans le
+// CSS : `--pj-star-off` (le jeton du panneau détail) contient « pj-star » et
+// ferait passer n'importe quelle recherche naïve pour un échec.
+assert.ok(!/'pj-stars?\b/.test(DASH),
+  'la file ne monte plus d’étoiles : la priorité y est un mot');
+assert.ok(!/\.pj-stars?\b\s*[,{]/.test(CSS),
+  'et leurs règles ne traînent pas derrière elles');
+// Le panneau détail, lui, GARDE ses étoiles : c'est un champ de saisie, pas un
+// affichage — on y clique pour régler la priorité.
+assert.ok(/\.dd-star\b/.test(CSS), 'le réglage par étoiles du panneau détail reste');
+assert.ok(/w\.textContent = 'Haute';/.test(DASH),
+  'seule la priorité HAUTE porte une marque — basse et moyenne n’en méritent aucune');
+
+// ===========================================================================
+// 6. L'ÉCRAN S'OUVRE SUR LA PERSONNE AU POSTE
+// ===========================================================================
+// Le poste sait qui est là (`olda.qui`, cf. poste.js). L'onglet par défaut
+// n'est plus la file de tout l'atelier.
+assert.ok(/import \{ lirePoste \} from '\.\/poste\.js';/.test(DASH),
+  'le Point du jour doit savoir qui est au poste');
+assert.ok(/let activeTab = moi\(\) \|\| 'todo';/.test(DASH),
+  'la vue par défaut est celle de la personne au poste');
+assert.ok(/document\.addEventListener\('olda:poste'/.test(DASH),
+  'un changement de personne en cours de journée doit rendre la vue par défaut '
+  + '— `storage` ne se déclenche pas dans l’onglet qui écrit');
+assert.ok(/ongletAuto = false/.test(DASH),
+  'dès que quelqu’un choisit un onglet lui-même, on ne lui reprend plus la main');
+assert.ok(/'\/poste\.js'/.test(lire('public/sw.js')),
+  'poste.js est importé par le dashboard : sans lui dans la coquille, l’écran ne '
+  + 's’ouvre plus hors ligne');
+
+console.log('dashboard-lisibilite.test.js OK');

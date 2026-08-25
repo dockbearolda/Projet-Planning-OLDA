@@ -1,11 +1,27 @@
 // ===========================================================================
 // Dashboard « Point du jour » — projection temps réel du planning.
 // ===========================================================================
-// Lu chaque matin au point d'équipe (PC) et affiché sur la Galaxy Tab en
-// paysage dans l'atelier. AUCUNE donnée propre : tout vient de /api/requests +
-// /api/category-owners ; toute action (envoi de catégorie, marquer traité,
-// étoiles) écrit via la même API que le Planning — une commande = une seule
-// source de vérité, le SSE resynchronise les deux vues.
+// L'écran répond à UNE question, pour quatre personnes : « qu'est-ce que je
+// fais maintenant ? ». Tout ce qui ne sert pas cette question descend ou
+// disparaît. Trois partis pris, posés le 25/08 après une refonte complète :
+//
+//   1. L'ÉCRAN S'OUVRE SUR MOI. Le poste sait qui est là (`olda.qui`) : la vue
+//      par défaut est la file de cette personne, pas les quarante dossiers de
+//      tout l'atelier.
+//   2. UNE COLONNE = UNE INFORMATION. La version précédente écrivait l'échéance
+//      deux fois par ligne (colonne « Pourquoi maintenant » : « En retard de
+//      3 j », colonne « Échéance » : « Retard 3 j ») et la priorité trois fois
+//      (colonne « Prio », « Priorité haute (3★) » dans le pourquoi, et le rang
+//      de la file qui en découle). Le « pourquoi » ne garde donc QUE les motifs
+//      qu'aucune autre colonne ne porte : machine goulot, stagnation.
+//   3. UN ZÉRO NE S'AFFICHE PAS. Un compteur éteint mais présent occupe quand
+//      même l'œil ; celui qui n'a rien à dire quitte la barre. Quand rien ne
+//      brûle, la barre entière est remplacée par une phrase calme.
+//
+// AUCUNE donnée propre : tout vient de /api/requests + /api/category-owners ;
+// toute action (envoi de catégorie, marquer traité, étoiles) écrit via la même
+// API que le Planning — une commande = une seule source de vérité, le SSE
+// resynchronise les deux vues.
 //
 // Routage catégorie → pilote (cœur de la refonte) : le PILOTE EFFECTIF d'une
 // commande est son `responsable` s'il a été posé à la main ; sinon le
@@ -23,6 +39,8 @@ import { rankRequests, WAITING_SUBS, WAITING_REASON } from './priority.js';
 // fermeture. Les quatre fenêtres du Point du jour se déclaraient modales en
 // laissant le clavier derrière elles, sous un voile opaque.
 import { armerModale } from './modale.js';
+// Qui est au poste : c'est cette personne qui décide de la vue par défaut.
+import { lirePoste } from './poste.js';
 
 export function createDashboard(deps) {
   const {
@@ -39,7 +57,10 @@ export function createDashboard(deps) {
   // Couleur d'avatar : l'accent de la charte pour tout le monde. On passe par
   // le jeton CSS, pas par une valeur figée — sinon l'avatar reste sombre en
   // thème sombre, où l'accent s'éclaircit.
-  const AVATAR_DEFAULT = 'var(--text-3)';
+  // Le fond de la pastille « ? » (dossier sans pilote). --text-3 rendait un
+  // blanc sur #9ca3af, soit 2,54:1 : la seule initiale illisible de l'écran
+  // était justement celle qui signale un dossier que personne ne porte.
+  const AVATAR_DEFAULT = 'var(--text-2)';
   const AVATAR = { 'Loïc': 'var(--primary)', 'Charlie': 'var(--primary)', 'Mélina': 'var(--primary)', 'Julien': 'var(--primary)' };
 
   // Une commande « Sans date » vieillit : au bout de 7 jours elle devient
@@ -105,8 +126,20 @@ export function createDashboard(deps) {
   let veilleTimer = null;
   const REFRESH_FOND_MS = 30000;
 
-  // 'todo' (à faire maintenant) | 'team' | prénom.
-  let activeTab = 'todo';
+  // 'todo' (toute la file) | 'team' | prénom.
+  // La personne au poste, relue à chaque rendu : elle change en cours de
+  // journée (bouton « Se nommer »), et c'est elle qui décide de la vue par
+  // défaut. `null` tant que personne ne s'est nommé.
+  const moi = () => {
+    const nom = lirePoste();
+    return EMPLOYEES.includes(nom) ? nom : null;
+  };
+  let activeTab = moi() || 'todo';
+  // Vrai tant que l'utilisateur n'a pas choisi d'onglet lui-même : si le poste
+  // se nomme APRÈS l'ouverture de l'écran (le cas normal au premier
+  // démarrage), la vue bascule sur cette personne. Dès qu'il a cliqué un
+  // onglet, on ne lui reprend plus la main.
+  let ongletAuto = true;
 
   let kpiFilter = null;         // null | 'late' | 'soon' | 'waiting' | 'active'
   let searchQuery = '';
@@ -310,13 +343,26 @@ export function createDashboard(deps) {
     if (name) attachTip(a, name);
     return a;
   }
-  // Étoiles en AFFICHAGE (les cartes sont des <button> : pas d'interactif
-  // imbriqué). Le réglage se fait dans le panneau détail ou le Planning.
-  function starsEl(r, cls) {
-    const w = el('span', 'pj-stars' + (cls ? ' ' + cls : ''));
+  // Priorité en AFFICHAGE — un MOT, et seulement quand elle est haute.
+  //
+  // Les trois étoiles ★★☆ disaient la même chose trois fois : la file est déjà
+  // classée (le rang le dit), le « pourquoi » écrivait « Priorité haute (3★) »
+  // deux colonnes plus loin, et l'étoile pleine se rendait à 1,18:1 sur le
+  // blanc — c'est-à-dire invisible. Le planning a fait ce chemin avant nous
+  // (badge texte Basse / Moyenne / Haute) : le point du jour parle enfin la
+  // même langue. Une priorité basse ou moyenne ne mérite aucune marque ; seule
+  // « Haute » en porte une, à l'accent, comme sur le planning.
+  //
+  // La cellule existe toujours quand la priorité n'est pas haute : c'est une
+  // piste de grille de largeur fixe, elle ne doit jamais disparaître (sinon la
+  // ligne suivante décale — cf. la carte du planning).
+  function prioEl(r) {
     const n = prioBand(r);
-    w.setAttribute('aria-label', `Priorité ${n} sur 3`);
-    for (let i = 1; i <= 3; i++) w.appendChild(el('span', 'pj-star' + (i <= n ? ' on' : ''), i <= n ? '★' : '☆'));
+    const w = el('span', 'pj-prio');
+    if (n < 3) return w;
+    w.classList.add('is-haute');
+    w.textContent = 'Haute';
+    w.setAttribute('aria-label', 'Priorité haute');
     return w;
   }
   function badgeEl(r) {
@@ -349,70 +395,98 @@ export function createDashboard(deps) {
     return w;
   }
 
-  // Pilote (ou « À attribuer ») : pastille + nom, colonne de largeur fixe pour
-  // que les noms s'alignent d'une ligne à l'autre.
-  function pilotEl(r) {
-    const who = effectivePilot(r);
-    const w = el('span', 'pj-pilot' + (who ? '' : ' is-none'));
-    w.append(avatarEl(who), el('span', 'pj-pilot-n', who || 'À attribuer'));
+  // La DERNIÈRE colonne d'une ligne dit toujours quelque chose d'utile :
+  //   · file commune / vue Équipe → QUI porte le dossier (pastille + nom) ;
+  //   · vue d'une personne        → à quel TITRE il est chez elle.
+  // Dans la vue de Charlie, la colonne « Pilote » affichait « C Charlie » sur
+  // les dix lignes : une colonne entière de constante. Le rôle, lui, distingue
+  // ce qu'on pilote de ce qu'on épaule — c'est ce qu'on cherche à savoir quand
+  // on regarde SA propre file.
+  function porteurEl(r, who) {
+    if (!who) {
+      const pil = effectivePilot(r);
+      const w = el('span', 'pj-porteur' + (pil ? '' : ' is-none'));
+      w.append(avatarEl(pil), el('span', 'pj-porteur-n', pil || 'À attribuer'));
+      return w;
+    }
+    const role = roleOf(r, who);
+    const w = el('span', 'pj-porteur');
+    // « Pilote » d'abord : quand on est les deux, c'est le titre qui engage.
+    w.appendChild(el('span', 'pj-role role-' + (role === 'referent' ? 'referent' : 'pilote'),
+      role === 'referent' ? 'J’épaule' : 'Je pilote'));
     return w;
   }
-  function roleTag(role) {
-    const label = role === 'both' ? 'PILOTE · RÉF.' : role === 'pilote' ? 'PILOTE' : 'RÉFÉRENT';
-    return el('span', `pj-role role-${role}`, label);
-  }
+
+  // Les motifs de classement, DÉDOUBLONNÉS de ce que la ligne écrit déjà.
+  //
+  // `reasonsFor` (priority.js) sort au plus deux motifs, et les deux premiers
+  // de sa liste — l'échéance et la priorité haute — sont précisément les deux
+  // colonnes voisines. En pratique, toute ligne en retard portait « En retard
+  // de 3 j · Priorité haute (3★) » à côté d'un badge « Retard 3 j » et d'une
+  // colonne de priorité. La colonne ne servait donc à rien sur la majorité des
+  // lignes, tout en occupant 224 px au milieu de la file.
+  //
+  // On ne touche PAS au moteur : il garde ses motifs complets (le panneau
+  // détail et test/priority.test.js s'appuient dessus). C'est l'affichage qui
+  // ne répète pas.
+  const MOTIF_DEJA_DIT = /^(En retard de|Échéance |Priorité haute)/;
+  const motifsUtiles = (reasons) => (reasons || []).filter((t) => !MOTIF_DEJA_DIT.test(t));
   function nextActionOf(r) {
     return NEXT_ACTION[r.sub_stage] || NEXT_ACTION[r.stage] || 'Faire avancer le dossier';
   }
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-  // --- Cartes --------------------------------------------------------------
-  // variant : 'board' (colonne équipe) | 'mini' (une ligne).
-  function buildCard(r, role, variant) {
+  // --- Carte de la vue Équipe ----------------------------------------------
+  // DEUX lignes, pas six. La version précédente empilait client, badge,
+  // article, bandeau d'alerte, étape sur deux étages et une étiquette de rôle :
+  // six rangs par dossier, donc quatre dossiers visibles dans une colonne de
+  // 950 px de haut, pour des files de onze à seize. On ne voyait pas le tiers
+  // de la charge de qui que ce soit — c'est pourtant LA question du dispatch.
+  //
+  // Ici : « client — échéance » puis « article · étape ». Le motif du blocage
+  // reste en clair (c'est l'information qui débloque la journée) mais sur la
+  // ligne de l'article, pas sur un bandeau à lui.
+  function buildCard(r, role) {
     const u = urgency(r);
-    const b = el('button', `pj-card pj-card--${variant} u-${u.cls}`);
+    const b = el('button', `pj-card pj-card--board u-${u.cls}`);
     b.type = 'button';
     if (isDimmed(r)) b.classList.add('is-dim');
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
-    if (variant === 'mini') {
-      // Une ligne : client · article · échéance. L'alerte descend sur sa propre
-      // ligne (elle porte un motif en clair : la serrer sur la même la rendait
-      // illisible), le rôle et les étoiles sont portés par la section.
-      const row = el('div', 'pj-card-row');
-      row.append(el('span', 'pj-card-client', clientName(r)),
-        el('span', 'pj-card-article', articleOf(r)), badgeEl(r));
-      b.appendChild(row);
-      const f = flagEl(r, true);
-      if (f) b.appendChild(f);
-    } else {
-      const top = el('div', 'pj-card-top');
-      top.append(el('span', 'pj-card-client', clientName(r)), badgeEl(r));
-      b.appendChild(top);
-      b.appendChild(el('p', 'pj-card-article', articleOf(r)));
-      // L'alerte passe AVANT la position : « pourquoi ça n'avance pas » prime
-      // sur « où c'en est » quand on balaie le tableau le matin.
-      const f = flagEl(r, true);
-      if (f) b.appendChild(f);
-      const meta = el('div', 'pj-card-meta');
-      meta.append(posEl(r), starsEl(r, 'mini'));
-      if (role) meta.appendChild(roleTag(role));
-      b.appendChild(meta);
-    }
+    const top = el('div', 'pj-card-top');
+    top.append(el('span', 'pj-card-client', clientName(r)), badgeEl(r));
+    b.appendChild(top);
+
+    const bas = el('div', 'pj-card-bas');
+    bas.appendChild(el('span', 'pj-card-article', articleOf(r)));
+    const sub = r.sub_stage && SUB_LABEL[r.sub_stage];
+    bas.appendChild(el('span', 'pj-card-etape', sub || STAGE_LABEL[r.stage] || r.stage));
+    b.appendChild(bas);
+
+    const f = flagEl(r, true);
+    if (f) b.appendChild(f);
+    if (role === 'referent') b.appendChild(el('span', 'pj-role role-referent', 'J’épaule'));
+
     b.addEventListener('click', () => openDetail(r.id));
     return b;
   }
 
   // --- Header (construit une fois, mis à jour par refs) --------------------
   let $head, $searchInput, $searchClear, $actBadge, $kpiEls = {}, $chip, $chipLabel, $tabs;
-  let $date, $chargeBar, $chargeTotal, $chargeLeg;
+  let $date, $alarme, $alarmeCalme;
 
   // Les QUATRE compteurs d'alarme. « Commandes actives » n'en est pas un : son
   // filtre ne retire rien (tout le point du jour EST actif) et son chiffre est
-  // déjà porté par la jauge de charge. Cinq boîtes identiques dont une inerte,
-  // c'était la raison pour laquelle l'œil n'accrochait nulle part.
+  // déjà porté par la vue Équipe.
+  //
+  // ILS NE S'AFFICHENT QUE S'ILS ONT QUELQUE CHOSE À DIRE. Les éteindre en gris
+  // (première refonte) ne suffisait pas : quatre boîtes de 26 px occupent la
+  // même surface, qu'elles portent un chiffre ou un zéro, et l'œil doit les
+  // lire pour découvrir qu'elles ne disent rien. Un compteur à zéro quitte donc
+  // la barre. Quand les quatre sont à zéro, la barre entière devient une phrase
+  // — c'est-à-dire l'information « rien ne brûle », enfin lisible d'un coup.
   const STAT_KEYS = ['late', 'blocked', 'soon', 'waiting'];
-  const STAT_LABEL = { late: 'En retard', blocked: 'Bloquées', soon: 'Sous 48 h', waiting: 'Attente client' };
+  const STAT_LABEL = { late: 'en retard', blocked: 'bloquées', soon: 'sous 48 h', waiting: 'en attente client' };
   const STAT_HINT = {
     late: 'Échéance dépassée et la balle est dans notre camp',
     blocked: 'Signalées bloquées depuis le planning',
@@ -420,7 +494,7 @@ export function createDashboard(deps) {
     waiting: 'Devis / BAT partis, ou commande prête à retirer',
   };
 
-  // Date du jour en clair. L'horloge du POSTE fait foi : les tablettes sont
+  // Date du jour en clair. L'horloge du POSTE fait foi : les postes sont
   // physiquement à Saint-Martin, c'est bien leur jour civil qu'on affiche
   // (la règle `America/Marigot` vise les dates calculées côté serveur, en UTC).
   function libelleDuJour() {
@@ -501,43 +575,25 @@ export function createDashboard(deps) {
 
     $head.appendChild(row);
 
-    // Bandeau d'état : les 4 alarmes à gauche, la charge de l'atelier à droite.
-    const strip = el('div', 'pj-strip');
-
-    // Un SEUL bloc segmenté, pas quatre cartes flottantes : on lit une rangée
-    // d'instruments. Un compteur à zéro s'éteint (gris, léger) — l'œil ne
-    // tombe alors que sur ce qui n'est pas à zéro.
-    const stats = el('div', 'pj-stats');
+    // La barre d'alarme : UNE ligne, et seulement ce qui n'est pas à zéro.
+    // Chaque compteur reste un filtre (clic = n'afficher que celles-là).
+    $alarme = el('div', 'pj-alarme');
     for (const k of STAT_KEYS) {
-      const b = el('button', `pj-stat k-${k}`);
+      const b = el('button', `pj-al k-${k}`);
       b.type = 'button';
-      const n = el('span', 'pj-stat-n', '0');
-      b.append(n, el('span', 'pj-stat-l', STAT_LABEL[k]));
+      const n = el('span', 'pj-al-n', '0');
+      b.append(n, el('span', 'pj-al-l', STAT_LABEL[k]));
       b.setAttribute('aria-pressed', 'false');
       attachTip(b, STAT_HINT[k]);
       b.addEventListener('click', () => setKpiFilter(kpiFilter === k ? null : k));
       $kpiEls[k] = { btn: b, n };
-      stats.appendChild(b);
+      $alarme.appendChild(b);
     }
-    strip.appendChild(stats);
-
-    // Jauge de charge : où le travail s'est empilé, dans l'ORDRE du pipeline.
-    // Un seul dégradé d'encre du clair (entrée) au foncé (sortie) : la couleur
-    // reste réservée à l'état, et la position dans la chaîne se lit d'un coup.
-    const charge = el('section', 'pj-charge');
-    const ch = el('header', 'pj-charge-head');
-    ch.appendChild(el('h2', 'pj-charge-t', 'Charge par étape'));
-    $chargeTotal = el('span', 'pj-charge-n', '—');
-    ch.appendChild($chargeTotal);
-    charge.appendChild(ch);
-    $chargeBar = el('div', 'pj-charge-bar');
-    $chargeBar.setAttribute('role', 'img');
-    charge.appendChild($chargeBar);
-    $chargeLeg = el('div', 'pj-charge-leg');
-    charge.appendChild($chargeLeg);
-    strip.appendChild(charge);
-
-    $head.appendChild(strip);
+    // Ce qui s'affiche quand les quatre compteurs sont à zéro. C'est un état à
+    // part entière, pas une absence : sans lui, la barre disparaîtrait et
+    // l'écran laisserait croire qu'il n'a pas fini de charger.
+    $alarmeCalme = el('p', 'pj-alarme-calme');
+    $alarme.appendChild($alarmeCalme);
 
     // Chip « Filtre : … ✕ » (annule le filtre KPI actif).
     $chip = el('button', 'pj-filterchip');
@@ -545,10 +601,11 @@ export function createDashboard(deps) {
     $chip.hidden = true;
     $chipLabel = el('span', null, '');
     $chip.append($chipLabel, el('span', 'pj-filterchip-x', '✕'));
-    $chip.addEventListener('click', () => setKpiFilter(null));
-    $head.appendChild($chip);
+    $alarme.appendChild($chip);
 
-    // Onglets : JE SUIS · employés · Équipe.
+    $head.appendChild($alarme);
+
+    // Onglets : moi · tout l'atelier · les autres · Équipe.
     $tabs = el('nav', 'pj-tabs');
     $tabs.setAttribute('aria-label', 'Vue du point du jour');
     $head.appendChild($tabs);
@@ -562,31 +619,53 @@ export function createDashboard(deps) {
     renderBody();
   }
 
+  // Bascule d'onglet. `auto` distingue un choix de l'utilisateur (on ne lui
+  // reprend plus la main) d'un recalage automatique après nomination du poste.
+  function allerA(key, auto) {
+    activeTab = key;
+    if (!auto) ongletAuto = false;
+    renderHead();
+    renderBody();
+  }
+
   function renderHead() {
     const k = kpis();
-    for (const key of Object.keys($kpiEls)) {
+    const total = STAT_KEYS.reduce((s, key) => s + k[key], 0);
+    for (const key of STAT_KEYS) {
       const n = k[key];
       $kpiEls[key].n.textContent = n;
-      // Zéro = rien à signaler : le compteur s'éteint. C'est ce qui permet de
-      // balayer la rangée sans la lire — seul ce qui n'est pas nul accroche.
-      $kpiEls[key].btn.classList.toggle('is-zero', !n);
+      // Un compteur à zéro QUITTE la barre. L'éteindre en gris ne suffisait
+      // pas : il occupait la même surface et l'œil devait le lire pour
+      // découvrir qu'il n'avait rien à dire.
+      $kpiEls[key].btn.hidden = !n;
       $kpiEls[key].btn.classList.toggle('active', kpiFilter === key);
       $kpiEls[key].btn.setAttribute('aria-pressed', String(kpiFilter === key));
-      $kpiEls[key].btn.disabled = !n && kpiFilter !== key;
     }
+    // Rien ne brûle : une phrase à la place de quatre zéros.
+    const actives = rows.filter(isActive).length;
+    $alarmeCalme.hidden = total > 0;
+    $alarmeCalme.textContent = actives
+      ? `Rien ne brûle — ${actives} commande${actives > 1 ? 's' : ''} en cours.`
+      : 'Rien en cours.';
+    $alarme.classList.toggle('is-calme', total === 0);
+
     $chip.hidden = !kpiFilter;
     if (kpiFilter) $chipLabel.textContent = `Filtre : ${KPI_LABEL[kpiFilter]}`;
 
     $date.textContent = libelleDuJour();
-    renderCharge();
 
     $actBadge.hidden = unseen === 0;
     $actBadge.textContent = unseen > 9 ? '9+' : String(unseen);
 
+    // La personne au poste a pu se nommer après l'ouverture de l'écran : tant
+    // qu'on n'a pas choisi d'onglet soi-même, la vue le suit.
+    const qui = moi();
+    if (ongletAuto && qui && activeTab !== qui) activeTab = qui;
+
     // Onglets (reconstruits : compte + point rouge + actif dépendent des données).
     $tabs.replaceChildren();
-    const mkTab = (key, label, count, withDot) => {
-      const b = el('button', 'pj-tab');
+    const mkTab = (key, label, count, withDot, cls) => {
+      const b = el('button', 'pj-tab' + (cls ? ' ' + cls : ''));
       b.type = 'button';
       const on = activeTab === key;
       b.classList.toggle('active', on);
@@ -600,28 +679,40 @@ export function createDashboard(deps) {
         d.setAttribute('aria-label', 'en retard');
         b.appendChild(d);
       }
+      b.addEventListener('click', () => allerA(key, false));
       $tabs.appendChild(b);
       return b;
     };
-    // « À faire » : la file commune, en tête. Point rouge s'il y a du retard.
+
+    // MOI D'ABORD, nommé. C'est la réponse à « qu'est-ce que j'ai à faire ? »,
+    // et elle ne doit pas se chercher au milieu de cinq onglets identiques.
+    if (qui) {
+      const day = dayList(qui);
+      mkTab(qui, `À toi, ${qui}`, day.length, day.some(isLate), 'pj-tab--moi');
+    }
+    // La file commune : ce que l'atelier doit sortir, tous pilotes confondus.
     const { queue } = rankFor(null);
     const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque' && isLate(r));
-    const todo = mkTab('todo', 'À faire', queue.length, todoLate);
-    todo.addEventListener('click', () => { activeTab = 'todo'; renderHead(); renderBody(); });
+    mkTab('todo', 'Tout l’atelier', queue.length, todoLate);
 
+    // Les collègues — sans se répéter soi-même, qui a déjà son onglet en tête.
     for (const who of EMPLOYEES) {
+      if (who === qui) continue;
       const day = dayList(who);
-      const t = mkTab(who, who, day.length, day.some(isLate));
-      t.addEventListener('click', () => { activeTab = who; renderHead(); renderBody(); });
+      mkTab(who, who, day.length, day.some(isLate));
     }
-    const team = mkTab('team', 'Équipe', null, false);
-    team.addEventListener('click', () => { activeTab = 'team'; renderHead(); renderBody(); });
+    mkTab('team', 'Équipe', null, false);
   }
 
   // Jauge de charge : une barre empilée, un segment par famille active, dans
-  // l'ordre du pipeline. Chaque segment porte SON CHIFFRE (jamais la couleur
-  // seule) et un clic envoie la vue Planning sur la famille concernée.
-  function renderCharge() {
+  // l'ordre du pipeline, chaque segment nommé et chiffré sous la barre.
+  //
+  // ELLE A QUITTÉ L'EN-TÊTE. « Où le travail s'est empilé dans la chaîne » est
+  // une question de dispatch, pas une question de poste : elle n'apporte rien à
+  // qui vient lire sa propre file, et elle coûtait un bloc de six chiffres au-
+  // dessus de chaque vue. Elle vit donc là où on se la pose — en tête de la vue
+  // Équipe, avec les quatre charges individuelles.
+  function buildCharge() {
     const act = rows.filter(isActive);
     const parFamille = ACTIVE_FAMILIES.map((slug) => ({
       slug,
@@ -630,43 +721,49 @@ export function createDashboard(deps) {
     }));
     const total = act.length;
 
-    $chargeTotal.textContent = total
+    const charge = el('section', 'pj-charge');
+    const ch = el('header', 'pj-charge-head');
+    ch.appendChild(el('h2', 'pj-charge-t', 'Charge par étape'));
+    ch.appendChild(el('span', 'pj-charge-n', total
       ? `${total} commande${total > 1 ? 's' : ''} en cours`
-      : 'Aucune commande en cours';
+      : 'Aucune commande en cours'));
+    charge.appendChild(ch);
 
-    $chargeBar.replaceChildren();
-    $chargeLeg.replaceChildren();
-    $chargeBar.setAttribute('aria-label',
+    const bar = el('div', 'pj-charge-bar');
+    bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label',
       `Charge par étape : ${parFamille.map((f) => `${f.label} ${f.n}`).join(', ')}`);
+    const leg = el('div', 'pj-charge-leg');
 
     if (!total) {
-      $chargeBar.appendChild(el('span', 'pj-charge-vide'));
-      return;
+      bar.appendChild(el('span', 'pj-charge-vide'));
+    } else {
+      parFamille.forEach((f, i) => {
+        if (!f.n) return;                        // un segment vide ne se dessine pas
+        // Le barreau ne porte AUCUN chiffre : il montre une proportion. Les
+        // valeurs exactes sont sur la légende juste dessous, à l'encre pleine —
+        // un chiffre posé dans un gris moyen passe sous le seuil de contraste,
+        // et un nombre sur chaque segment répète la légende pour rien.
+        const seg = el('span', 'pj-charge-seg');
+        seg.style.setProperty('--pal', String(i + 1));
+        seg.style.flexGrow = String(f.n);
+        attachTip(seg, `${f.label} — ${f.n} commande${f.n > 1 ? 's' : ''}`);
+        bar.appendChild(seg);
+
+        const lg = el('span', 'pj-charge-lg');
+        lg.style.setProperty('--pal', String(i + 1));
+        lg.append(el('span', 'pj-charge-lg-dot'), el('span', 'pj-charge-lg-t', f.label),
+          el('span', 'pj-charge-lg-n', String(f.n)));
+        leg.appendChild(lg);
+      });
     }
-
-    parFamille.forEach((f, i) => {
-      if (!f.n) return;                          // un segment vide ne se dessine pas
-      // Le barreau ne porte AUCUN chiffre : il montre une proportion. Les
-      // valeurs exactes sont sur la légende juste dessous, à l'encre pleine —
-      // un chiffre posé dans un gris moyen passe sous le seuil de contraste,
-      // et un nombre sur chaque segment répète la légende pour rien.
-      const seg = el('span', 'pj-charge-seg');
-      seg.style.setProperty('--pal', String(i + 1));
-      seg.style.flexGrow = String(f.n);
-      attachTip(seg, `${f.label} — ${f.n} commande${f.n > 1 ? 's' : ''}`);
-      $chargeBar.appendChild(seg);
-
-      const lg = el('span', 'pj-charge-lg');
-      lg.style.setProperty('--pal', String(i + 1));
-      lg.append(el('span', 'pj-charge-lg-dot'), el('span', 'pj-charge-lg-t', f.label),
-        el('span', 'pj-charge-lg-n', String(f.n)));
-      $chargeLeg.appendChild(lg);
-    });
+    charge.append(bar, leg);
+    return charge;
   }
 
-  // En-tête de section : un titre discret, son compte, et un filet qui court
-  // jusqu'au bord. Assez présent pour découper l'écran, assez sobre pour ne
-  // pas rivaliser avec les lignes qu'il annonce.
+  // En-tête de section : un titre, son compte, et un filet qui court jusqu'au
+  // bord. Assez présent pour découper l'écran, assez sobre pour ne pas
+  // rivaliser avec les lignes qu'il annonce.
   function sectionHead(title, count, hint) {
     const h = el('header', 'pj-section-head');
     h.appendChild(el('h2', 'pj-section-title', title));
@@ -678,6 +775,11 @@ export function createDashboard(deps) {
 
   // --- Vue Équipe : 4 colonnes égales --------------------------------------
   function buildTeamView() {
+    const wrap = el('div', 'pj-team');
+    // La charge par étape ouvre la vue : c'est l'autre moitié du dispatch —
+    // qui est chargé, et où le travail s'est empilé dans la chaîne.
+    wrap.appendChild(buildCharge());
+
     const board = el('div', 'pj-board');
     // Charge de référence : la file la plus chargée donne l'échelle des jauges.
     // Sans repère commun, quatre colonnes de hauteurs différentes ne disent pas
@@ -692,7 +794,7 @@ export function createDashboard(deps) {
 
       const head = el('button', 'pj-col-head');
       head.type = 'button';
-      attachTip(head, `Ouvrir la vue de ${who}`);
+      attachTip(head, `Ouvrir la file de ${who}`);
 
       const line = el('span', 'pj-col-line');
       line.append(avatarEl(who), el('span', 'pj-col-name', who),
@@ -715,77 +817,19 @@ export function createDashboard(deps) {
       head.appendChild(el('span', 'pj-col-sub' + (late ? ' is-late' : ''),
         late ? `${late} en retard` : day.length ? 'À l’heure' : 'Disponible'));
 
-      head.addEventListener('click', () => { activeTab = who; renderHead(); renderBody(); });
+      head.addEventListener('click', () => allerA(who, false));
       col.appendChild(head);
 
       const list = el('div', 'pj-col-cards');
       if (!day.length) {
         list.appendChild(el('div', 'pj-free', 'Peut prendre une urgence au dispatch'));
       } else {
-        for (const r of day) list.appendChild(buildCard(r, roleOf(r, who), 'board'));
+        for (const r of day) list.appendChild(buildCard(r, roleOf(r, who)));
       }
       col.appendChild(list);
       board.appendChild(col);
     }
-    return board;
-  }
-
-  // --- Vue personne : Ma journée + pilotage / référent ---------------------
-  function buildPersonView(who) {
-    const wrap = el('div', 'pj-person');
-
-    // Ma file : le MÊME moteur de priorité, filtré à mes commandes (pilote ou
-    // référent). Classée par urgence/priorité/machine/stagnation, avec le pourquoi.
-    const { queue } = rankFor(who);
-    const mine = queue.slice(0, 10);
-
-    const main = el('section', 'pj-person-main');
-    main.appendChild(sectionHead('Ma file — à faire maintenant', queue.length, 'classée par urgence'));
-    if (!mine.length) {
-      main.appendChild(el('p', 'pj-empty', 'Rien à lancer — tout est à jour.'));
-    } else {
-      const list = el('div', 'pj-todo-list');
-      list.appendChild(buildRowHead(COLS_FILE));
-      mine.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
-      // L'en-tête annonce le total, la liste s'arrête à 10 : sans cette
-      // mention, on lisait « 14 » au-dessus de 10 cartes sans comprendre où
-      // étaient passées les quatre autres.
-      if (queue.length > mine.length) {
-        list.appendChild(el('p', 'pj-empty', `+ ${queue.length - mine.length} autre${queue.length - mine.length > 1 ? 's' : ''} — voir le planning`));
-      }
-      main.appendChild(list);
-    }
-    wrap.appendChild(main);
-
-    const side = el('div', 'pj-person-side');
-    const mkList = (title, ic, list, role) => {
-      const sec = el('section', 'pj-section');
-      sec.appendChild(sectionHead(title, list.length));
-      if (!list.length) {
-        sec.appendChild(el('p', 'pj-empty', 'Rien pour le moment.'));
-      } else {
-        const l = el('div', 'pj-mini-list');
-        for (const r of list) l.appendChild(buildCard(r, role, 'mini'));
-        sec.appendChild(l);
-      }
-      return sec;
-    };
-    // Les deux facettes du travail : ce qu'on PILOTE et ce qu'on ÉPAULE en
-    // référent. Sans la liste « référent », une personne qui pilote peu mais
-    // suit beaucoup de commandes en référent (Julien : « Contrôle & emballage »
-    // pilote, toute la production en référent) ne verrait pas ses dossiers non
-    // urgents — « Ma journée » ne retient que le pressant. On masque une liste
-    // vide pour ne pas encombrer, et on affiche un repère si les deux le sont.
-    const pilote = sortCards(piloting(who));
-    const referent = sortCards(refereeing(who));
-    if (pilote.length) side.appendChild(mkList('Je pilote', 'flight_takeoff', pilote, 'pilote'));
-    if (referent.length) side.appendChild(mkList('J’épaule', 'diversity_3', referent, 'referent'));
-    if (!pilote.length && !referent.length) {
-      const sec = el('section', 'pj-section');
-      sec.appendChild(el('p', 'pj-empty', 'Aucun projet attribué pour le moment.'));
-      side.appendChild(sec);
-    }
-    wrap.appendChild(side);
+    wrap.appendChild(board);
     return wrap;
   }
 
@@ -803,12 +847,16 @@ export function createDashboard(deps) {
         : 'Chargement du planning…'));
       return;
     }
-    if (activeTab === 'todo') {
-      $body.appendChild(buildTodoView());
-    } else if (activeTab === 'team') {
+    if (activeTab === 'team') {
       $body.appendChild(buildTeamView());
     } else {
-      $body.appendChild(buildPersonView(activeTab));
+      // La file commune et la file d'une personne sont LE MÊME écran, à un
+      // filtre près. Elles avaient deux mises en page différentes — la vue
+      // personne posait en plus, à droite, « Je pilote » et « J'épaule », qui
+      // relistaient dossier pour dossier ce que la file de gauche montrait
+      // déjà. On lisait donc « Restaurant La Samanna » deux fois, à 40 cm
+      // d'écart, sur le même écran.
+      $body.appendChild(buildTodoView(activeTab === 'todo' ? null : activeTab));
     }
   }
 
@@ -841,12 +889,24 @@ export function createDashboard(deps) {
   // le calcul — le compteur de l'entête continue d'annoncer le total.
   const TODO_MAX = 50;
 
-  // Une ligne de file = une GRILLE à colonnes fixes : rang · priorité · client
-  // et article · position · pourquoi · échéance · pilote. Les colonnes tombent
-  // au même endroit d'une ligne à l'autre, donc l'œil descend une colonne au
-  // lieu de relire chaque carte. Aucune piste `auto` : un élément qui manque
-  // sur une ligne ne doit pas décaler toute la file (cf. la carte du planning).
-  function buildTodoCard(item, index) {
+  // ---------------------------------------------------------------------------
+  // LA LIGNE — six cellules, et pas deux qui disent la même chose
+  // ---------------------------------------------------------------------------
+  // Avant : rang · priorité · client+article · étape · POURQUOI · échéance ·
+  // pilote. Sur une ligne en retard, cela donnait, de gauche à droite :
+  //
+  //     2   ▮▮▮   Restaurant La Samanna   À chiffrer   « En retard de 2 j ·
+  //         (haute)  Uniformes 45 pièces    Demande…      Priorité haute (3★) »
+  //         → Retard 2 j → C Charlie
+  //
+  // c'est-à-dire l'échéance écrite DEUX fois, la priorité TROIS fois, et — dans
+  // sa propre vue — une colonne « pilote » constante sur les dix lignes.
+  //
+  // Maintenant : rang · client+article · étape · motif RESTANT · échéance ·
+  // priorité (si haute) · porteur (pilote ailleurs, rôle chez soi). Les
+  // colonnes tombent au même endroit d'une ligne à l'autre : aucune piste
+  // `auto`, un élément absent ne décale pas la file (cf. la carte du planning).
+  function buildTodoCard(item, index, who) {
     const { r, reasons } = item;
     const u = urgency(r);
     const b = el('button', `pj-card pj-row u-${u.cls}`);
@@ -855,42 +915,46 @@ export function createDashboard(deps) {
     if (FLAG_LABEL[r.flag]) b.classList.add(r.flag === 'bloque' ? 'is-bloque' : 'is-a-voir');
 
     b.appendChild(el('span', 'pj-row-rank', String(index + 1)));
-    b.appendChild(starsEl(r, 'col'));
 
-    const who = el('span', 'pj-row-who');
-    who.append(el('span', 'pj-card-client', clientName(r)),
+    const qui = el('span', 'pj-row-who');
+    qui.append(el('span', 'pj-card-client', clientName(r)),
       el('span', 'pj-card-article', articleOf(r)));
-    b.appendChild(who);
+    b.appendChild(qui);
 
     b.appendChild(posEl(r));
-
-    // Le « pourquoi » redevient du TEXTE : c'est une explication, pas un état.
-    // En pastilles ambre, il parlait la même langue que l'alerte « À voir » et
-    // répétait l'échéance déjà lisible deux colonnes plus loin.
-    const why = el('span', 'pj-row-why');
-    if (reasons && reasons.length) {
-      why.textContent = reasons.join(' · ');
-      attachTip(why, reasons.join(' · '));
-    }
-    b.appendChild(why);
-
     b.appendChild(badgeEl(r));
-    b.appendChild(pilotEl(r));
+    b.appendChild(prioEl(r));
+    // La colonne « pilote » n'existe QUE là où le pilote change d'une ligne à
+    // l'autre. Dans sa propre file, elle affichait son propre nom dix fois.
+    if (!who) b.appendChild(porteurEl(r, null));
 
-    // Alerte : sa propre ligne, pleine largeur sous le reste. Un dossier bloqué
-    // doit se voir d'une rangée entière, pas d'un liseré de 3 px.
+    // Deuxième rang : ce qui n'arrive qu'exceptionnellement. Une colonne dédiée
+    // à l'exception reste vide la plupart du temps — 176 px de rien au milieu
+    // de la file — alors qu'une ligne qui n'apparaît que si elle a quelque
+    // chose à dire ne coûte rien aux autres.
+    const plus = el('div', 'pj-row-plus');
+    if (who && roleOf(r, who) === 'referent') {
+      plus.appendChild(el('span', 'pj-role role-referent', 'J’épaule'));
+    }
+    // Le « pourquoi » est du TEXTE — une explication, pas un état — et il ne
+    // garde que ce que les autres cellules ne portent pas déjà.
+    const motifs = motifsUtiles(reasons);
+    if (motifs.length) plus.appendChild(el('span', 'pj-row-why', motifs.join(' · ')));
+    // Alerte : elle prend toute la largeur sous le reste. Un dossier bloqué se
+    // voit d'une rangée entière, pas d'un liseré de 3 px.
     const f = flagEl(r, true);
-    if (f) b.appendChild(f);
+    if (f) plus.appendChild(f);
+    if (plus.children.length) b.appendChild(plus);
 
     b.addEventListener('click', () => openDetail(r.id));
     return b;
   }
 
   // Ligne du bac « à débloquer / relancer » (hors file : on attend quelqu'un).
-  // Même grille que la file, une colonne de moins : ni rang ni classement ici,
-  // ces dossiers n'attendent pas de nous qu'on les fasse avancer mais qu'on
-  // aille chercher la réponse.
-  function buildHoldCard(r, kind) {
+  // Même grille que la file, le rang et la priorité en moins : ces dossiers
+  // n'attendent pas de nous qu'on les fasse avancer mais qu'on aille chercher
+  // la réponse — les classer entre eux n'aurait aucun sens.
+  function buildHoldCard(r, kind, who) {
     const b = el('button', 'pj-card pj-row pj-row--hold ' + (kind === 'bloque' ? 'is-bloque' : 'is-attente'));
     b.type = 'button';
     if (isDimmed(r)) b.classList.add('is-dim');
@@ -898,10 +962,10 @@ export function createDashboard(deps) {
     b.appendChild(el('span', 'pj-hold-tag ' + (kind === 'bloque' ? 't-bloque' : 't-attente'),
       kind === 'bloque' ? 'Bloquée' : 'À relancer'));
 
-    const who = el('span', 'pj-row-who');
-    who.append(el('span', 'pj-card-client', clientName(r)),
+    const qui = el('span', 'pj-row-who');
+    qui.append(el('span', 'pj-card-client', clientName(r)),
       el('span', 'pj-card-article', articleOf(r)));
-    b.appendChild(who);
+    b.appendChild(qui);
 
     b.appendChild(posEl(r));
 
@@ -913,7 +977,7 @@ export function createDashboard(deps) {
     b.appendChild(w);
 
     b.appendChild(badgeEl(r));
-    b.appendChild(pilotEl(r));
+    if (!who) b.appendChild(porteurEl(r, null));
 
     b.addEventListener('click', () => openDetail(r.id));
     return b;
@@ -927,14 +991,20 @@ export function createDashboard(deps) {
     for (const c of cols) h.appendChild(el('span', 'pj-row-head-c c-' + c.k, c.t));
     return h;
   }
-  const COLS_FILE = [
-    { k: 'rank', t: '#' }, { k: 'prio', t: 'Prio' }, { k: 'who', t: 'Client & projet' },
-    { k: 'pos', t: 'Étape' }, { k: 'why', t: 'Pourquoi maintenant' },
-    { k: 'due', t: 'Échéance' }, { k: 'pilot', t: 'Pilote' },
+  // Les colonnes : la dernière n'existe que dans une vue d'ATELIER, où le
+  // pilote change d'une ligne à l'autre. Dans la file d'une personne, elle
+  // répéterait son nom à chaque rang.
+  const colsFile = (who) => [
+    { k: 'rank', t: '#' }, { k: 'who', t: 'Client & projet' },
+    { k: 'pos', t: 'Étape' }, { k: 'due', t: 'Échéance' }, { k: 'prio', t: 'Prio' },
+    ...(who ? [] : [{ k: 'pilot', t: 'Pilote' }]),
   ];
-  const COLS_HOLD = [
+  // Le bac garde SA colonne « pourquoi » : ici, ce qu'on attend est le sujet
+  // même de la ligne, pas une exception.
+  const colsHold = (who) => [
     { k: 'tag', t: 'État' }, { k: 'who', t: 'Client & projet' }, { k: 'pos', t: 'Étape' },
-    { k: 'why', t: 'On attend quoi' }, { k: 'due', t: 'Échéance' }, { k: 'pilot', t: 'Pilote' },
+    { k: 'why', t: 'On attend quoi' }, { k: 'due', t: 'Échéance' },
+    ...(who ? [] : [{ k: 'pilot', t: 'Pilote' }]),
   ];
 
   function buildTodoView(who) {
@@ -942,20 +1012,23 @@ export function createDashboard(deps) {
     const { queue, blocked, waiting } = rankFor(who);
 
     const main = el('section', 'pj-todo-sec');
-    main.appendChild(sectionHead(who ? 'Ma file — à faire maintenant' : 'À faire maintenant',
+    main.appendChild(sectionHead(who ? `À faire — ${who}` : 'À faire maintenant',
       queue.length, 'la plus urgente en tête'));
     if (!queue.length) {
       main.appendChild(el('p', 'pj-empty', 'Rien à lancer — tout est à jour.'));
     } else {
-      const list = el('div', 'pj-todo-list');
-      list.appendChild(buildRowHead(COLS_FILE));
+      // `is-atelier` = la colonne « pilote » existe. C'est la LISTE qui la
+      // porte, pas la ligne : les pistes de la grille doivent être identiques
+      // pour l'entête de colonnes et pour toutes ses lignes.
+      const list = el('div', 'pj-todo-list' + (who ? '' : ' is-atelier'));
+      list.appendChild(buildRowHead(colsFile(who)));
       // La file est CLASSÉE : au-delà des premières, on ne lit plus, on fait
       // défiler. Elle montait pourtant une carte par commande active du
-      // planning — des centaines, reconstruites à chaque évènement temps réel,
-      // sur une tablette. La vue perso plafonne à 10 et la grille du planning à
-      // 400 depuis longtemps ; celle-ci n'avait aucun plafond.
+      // planning — des centaines, reconstruites à chaque évènement temps réel.
+      // La grille du planning plafonne à 400 depuis longtemps ; celle-ci
+      // n'avait aucun plafond.
       const montrees = queue.slice(0, TODO_MAX);
-      montrees.forEach((item, i) => list.appendChild(buildTodoCard(item, i)));
+      montrees.forEach((item, i) => list.appendChild(buildTodoCard(item, i, who)));
       main.appendChild(list);
       // Un plafond muet se lit « il n'y a que ça » : on dit ce qu'on ne montre pas.
       if (queue.length > TODO_MAX) {
@@ -968,13 +1041,13 @@ export function createDashboard(deps) {
 
     // Bac « à débloquer / relancer » : ce qui attend quelqu'un d'autre, à part.
     if (blocked.length || waiting.length) {
-      const sec = el('section', 'pj-todo-sec pj-todo-hold');
+      const sec = el('section', 'pj-todo-sec');
       sec.appendChild(sectionHead('À débloquer / relancer', blocked.length + waiting.length,
         'la balle n’est pas dans notre camp'));
-      const list = el('div', 'pj-hold-list');
-      list.appendChild(buildRowHead(COLS_HOLD));
-      for (const r of blocked) list.appendChild(buildHoldCard(r, 'bloque'));
-      for (const r of waiting) list.appendChild(buildHoldCard(r, 'attente'));
+      const list = el('div', 'pj-hold-list' + (who ? '' : ' is-atelier'));
+      list.appendChild(buildRowHead(colsHold(who)));
+      for (const r of blocked) list.appendChild(buildHoldCard(r, 'bloque', who));
+      for (const r of waiting) list.appendChild(buildHoldCard(r, 'attente', who));
       sec.appendChild(list);
       wrap.appendChild(sec);
     }
@@ -1810,6 +1883,17 @@ export function createDashboard(deps) {
     root.appendChild(buildHead());
     $body = el('div', 'pj-body');
     root.appendChild($body);
+    // Qui est au poste décide de l'onglet par défaut ET du libellé du premier
+    // onglet : quand quelqu'un se nomme (ou change de personne en cours de
+    // journée), l'écran suit. `poste.js` prévient par un évènement de document
+    // — `storage` ne se déclenche pas dans l'onglet qui écrit.
+    // Quelqu'un d'autre vient de s'asseoir : on lui rend la vue par défaut,
+    // même si la personne d'avant avait choisi un autre onglet.
+    document.addEventListener('olda:poste', () => {
+      ongletAuto = true;
+      renderHead();
+      renderBody();
+    });
     renderHead();
     renderBody();
   }

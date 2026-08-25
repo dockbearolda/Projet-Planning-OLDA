@@ -190,13 +190,33 @@ assert.match(CRM, /--pj-ink-4:\s*var\(--text-2\)/,
 assert.match(CRM, /--pj-muet:\s*var\(--text-3\)/,
   '… et le gris atténué garde son propre nom, pour les endroits où il est assumé');
 
-// L'état zéro est la SEULE exception assumée : un compteur à zéro s'éteint,
-// c'est le message. Son libellé, lui, reste lisible — sinon la tuile ne dit
-// plus de quoi elle parle.
-assert.match(CRM, /\.pj-stat\.is-zero \.pj-stat-n \{ color: var\(--pj-muet\)/,
-  'le NOMBRE d’un état zéro reste éteint');
-assert.match(CRM, /\.pj-stat\.is-zero \.pj-stat-l \{ color: var\(--pj-ink-4\)/,
-  '… mais son libellé se lit');
+// L'état zéro était la SEULE exception assumée : un compteur à zéro s'éteignait
+// en gris atténué, c'était le message.
+//
+// LA REFONTE DU 25/08 EST ALLÉE PLUS LOIN et cette exception a disparu : un
+// compteur à zéro ne s'éteint plus, il QUITTE la barre. L'éteindre ne suffisait
+// pas — quatre boîtes occupent la même surface qu'elles portent un chiffre ou
+// un zéro, et l'œil doit les lire pour découvrir qu'elles se taisent. Quand les
+// quatre sont muets, une phrase prend leur place.
+assert.ok(!/\.pj-stat\b/.test(CRM),
+  'la tuile de compteur du Point du jour a été remplacée : un zéro quitte la barre');
+assert.match(CRM, /\.pj-al\.k-late \.pj-al-n/, 'la barre d’alarme a pris sa place');
+assert.match(lire('public/dashboard.js'), /\$kpiEls\[key\]\.btn\.hidden = !n;/,
+  'et c’est bien un RETRAIT, pas un gris de plus');
+
+// Le gris atténué garde donc ses emplois — ceux où l'effacement EST le
+// message, et rien d'autre : une invite de saisie, un remplissage de jauge,
+// un séparateur.
+for (const sel of ['.pj-search-input::placeholder', '.pj-col-load-fill', '.dd-pos-sep']) {
+  // TOUTES les règles qui portent ce sélecteur, pas la première : un sélecteur
+  // apparaît souvent d'abord dans un groupe (`.a, .b { … }`) qui pose la forme,
+  // puis seul pour sa couleur. Ne regarder que la première déclare un manque
+  // qui n'existe pas.
+  const motif = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^{]*\\{[^}]*\\}', 'g');
+  const regles = CRM.match(motif) || [];
+  assert.ok(regles.some((r) => /var\(--pj-muet\)/.test(r)),
+    `${sel} : le gris atténué reste là où l’effacement est le message`);
+}
 
 // Les règles que l'audit avait nommées une à une.
 for (const [fichier, src, sel] of [
