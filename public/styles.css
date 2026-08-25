@@ -5835,8 +5835,10 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    trois endroits (montage, /api/counts, mise à jour optimiste), et une teinte
    posée à la main aurait fini par en manquer un. */
 .stage[data-slug="a_trier"] .stage-count.has-items {
-  background: var(--zr);
-  color: var(--surface);
+  /* Le ton FONCÉ de la phase, pas celui du filet : du blanc sur `--zr` ne
+     donnait que 3,63:1 (voir --zsur-fond dans la charte). */
+  background: var(--zsur-fond);
+  color: var(--zsur-encre);
 }
 
 /* ------------------------------------------------------- Finitions desktop

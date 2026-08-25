@@ -432,11 +432,21 @@
 /* Hors spécification — même famille de teintes, à faire valider : */
 [data-fam="facturation"]       { --zr: #a2808f; --zt: #6d4459; --zp: #f1eaee; --zc: #745464; --za: #f8f3f6; }
 [data-fam="paiement"]          { --zr: #8892a0; --zt: #465468; --zp: #eaedf1; --zc: #566274; --za: #f4f5f8; }
+/* UN SIXIÈME RÔLE, POUR LE SEUL COMPTEUR QUI S'INVERSE (25/08/2026).
+   Le compteur du sur-dossier « À trier » se lit à l'envers des autres — fond
+   plein, texte clair — parce que ce ne sont pas des commandes en cours mais des
+   dossiers que personne n'a rangés. Il prenait `--zr`, la teinte du filet :
+   du blanc dessus ne donnait que 3,63:1, sous les 4,5 d'un texte de 14 px.
+   Il prend maintenant le ton FONCÉ de sa phase (celui du chiffre), et le blanc
+   y passe à 6,76. De nuit les rôles clairs se dérivent en CLAIR : l'encre du
+   compteur bascule alors sur le fond de page. */
+[data-fam] { --zsur-fond: var(--zc); --zsur-encre: #fff; }
 :root[data-theme="dark"] [data-fam] {
   --zt: color-mix(in srgb, var(--zr) 55%, #fff);
   --zp: color-mix(in srgb, var(--zr) 22%, var(--surface));
   --zc: color-mix(in srgb, var(--zr) 62%, #fff);
   --za: color-mix(in srgb, var(--zr) 17%, var(--surface));
+  --zsur-encre: var(--bg);
 }
 
 /* Les gris ET les tailles du rail — nommés ici, jamais écrits dans styles.css
