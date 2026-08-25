@@ -601,26 +601,32 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
 // champs mis bout à bout dans une carte blanche — rien ne disait où un sujet
 // finissait et où le suivant commençait.
 // ===========================================================================
-// DEPUIS LE 24/08, LES DEUX ÉCRANS DIVERGENT ICI, et c'est un choix du patron
-// (7 points) : sur l'écran de la demande, TROIS NIVEAUX et jamais plus — fond
-// de page gris, carte blanche, champ blanc. La bulle grise du 23/08 faisait un
-// quatrième niveau : chaque groupe devient une carte blanche de PREMIER niveau
-// (liseré de carte, arrondi de carte), et le conteneur de l'étape s'efface.
-// L'écran de vente, lui, garde la bulle du 23/08 — à réaligner quand le patron
-// tranchera pour lui.
+// TROIS NIVEAUX, JAMAIS PLUS — SUR LES DEUX ÉCRANS DEPUIS LE 25/08.
+// L'écran de la demande avait abandonné la bulle GRISE dès le 24/08 : posée
+// dans une carte blanche arrondie, elle-même sur le fond gris de la page, elle
+// faisait un QUATRIÈME niveau. Chaque groupe y est devenu une carte blanche de
+// premier niveau, et le conteneur de l'étape s'est effacé.
+// L'écran de vente était resté sur la bulle du 23/08 — le même objet avait donc
+// deux formes selon l'écran où on le regardait, à un clic l'un de l'autre. Il
+// suit maintenant la référence.
+// La cause de fond était ailleurs, et c'est elle qui compte : la vente ne
+// portait PAS `.ecran-comptoir`, la couche de jetons de l'écran de référence.
+// Douze couleurs y différaient d'un demi-ton.
 [['devis', DEVIS], ['vente', VENTE]].forEach(([nom, src]) => {
   const css = sansCommentaires(src);
+  assert.ok(/<body class="ecran-comptoir">/.test(src),
+    `${nom} : l'écran porte la couche de jetons de la référence`);
   const regle = css.match(/\.bloc(?:,\.article-bloc)?\{([^}]*)\}/);
   assert.ok(regle, `${nom} : la bulle d'un groupe doit exister`);
-  const attendu = nom === 'devis'
-    ? ['background:var(--surface)', 'border-radius:var(--arrondi-carte)', 'border:1px solid var(--card-border)']
-    : ['background:var(--zone-bg)', 'border-radius:var(--arrondi-bloc)'];
-  attendu.forEach((d) =>
+  ['background:var(--surface)', 'border-radius:var(--arrondi-carte)',
+    'border:1px solid var(--card-border)', 'padding:var(--pas-4)'].forEach((d) =>
     assert.ok(regle[1].includes(d), `${nom} : le groupe porte « ${d} »`));
-  if (nom === 'devis') {
-    assert.ok(/#step2>\.card\{background:transparent;border:0;/.test(css),
-      `${nom} : le conteneur de l'étape n'est plus une carte — pas d'arrondi dans un arrondi`);
-  }
+  // Le conteneur qui ne porte QUE des groupes redevient un empilement.
+  const aplati = nom === 'devis'
+    ? /#step2>\.card\{background:transparent;border:0;/
+    : /\.card:has\(> \.bloc\)\{background:transparent;border:0;/;
+  assert.ok(aplati.test(css),
+    `${nom} : le conteneur de l'étape n'est plus une carte — pas d'arrondi dans un arrondi`);
   assert.ok(/\.bloc>:first-child\{margin-top:0\}/.test(css) && /\.bloc>:last-child\{margin-bottom:0\}/.test(css),
     `${nom} : la bulle porte son rembourrage, ses bords n'ajoutent pas une deuxième marge`);
   // Elle n'ajoute AUCUN intitulé : c'est un cadre, pas un titre.

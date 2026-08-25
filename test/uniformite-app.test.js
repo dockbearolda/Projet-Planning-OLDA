@@ -390,4 +390,42 @@ for (const morte of ['ld-input', 'ld-section', 'ld-value', 'ld-notes', 'ld-reaso
     `.${morte} n’a aucun porteur : sa règle ne revient pas dans la feuille`);
 }
 
+// ===========================================================================
+// 15. LES DEUX ÉCRANS DU COMPTOIR SONT LE MÊME ÉCRAN
+// ---------------------------------------------------------------------------
+// La divergence du 24/08 tenait à UNE CLASSE MANQUANTE, pas à une règle
+// oubliée : `.ecran-comptoir` est la couche de jetons de l'écran de référence
+// (palette, échelle, boîte unique) et la vente ne l'avait jamais portée. Douze
+// couleurs y différaient d'un demi-ton — l'encre, les quatre traits, le fond de
+// page, le rouge de validation.
+// Et « TROIS NIVEAUX, JAMAIS PLUS » : la vente était restée sur la bulle GRISE
+// du 23/08, abandonnée dès le lendemain sur l'écran de la demande parce qu'elle
+// faisait un quatrième niveau — bulle grise arrondie dans une carte blanche
+// arrondie, elle-même sur le fond gris de la page.
+// Mesuré au rendu, les deux écrans côte à côte : la signature du groupe de
+// champs est identique au caractère près.
+// ===========================================================================
+assert.match(VENTE, /<body class="ecran-comptoir">/,
+  'la vente porte la couche de jetons de l’écran de référence');
+assert.match(DEVIS, /<body class="ecran-comptoir">/,
+  '… la demande aussi, évidemment');
+for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+  const m = sansCom(src).match(/(^|[\n;}])\.(bloc|article-bloc)[^{}\n]*\{([^}]*)\}/);
+  assert.ok(m, `${nom} : le groupe de champs a bien une règle`);
+  assert.match(m[3], /background:var\(--surface\)/,
+    `${nom} : un groupe de champs est une carte BLANCHE, pas une bulle grise`);
+  assert.match(m[3], /border:1px solid var\(--card-border\)/,
+    `${nom} : … avec le trait d’une carte`);
+  assert.match(m[3], /padding:var\(--pas-4\)/,
+    `${nom} : … et le rembourrage d’une carte`);
+}
+// La carte qui ne porte QUE des groupes redevient un empilement, sinon on
+// retrouve un arrondi dans un arrondi.
+assert.match(DEVIS, /#step2>\.card\{background:transparent;border:0/,
+  'la demande aplatit la carte qui contient ses groupes');
+assert.match(VENTE, /\.card:has\(> \.bloc\)\{background:transparent;border:0/,
+  'la vente aussi');
+assert.ok(!/(^|[\n;}])\.card\{[^}]*!important/.test(sansCom(VENTE)),
+  '… et aucun `.card` en !important ne vient la lui rendre de force');
+
 console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');

@@ -171,11 +171,26 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
    déborde — là où `justify-content:flex-end` rognerait PAR LA GAUCHE. */
 .actions::before{content:"";flex:1 1 0;min-width:0}
 /* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
-   La MÊME bulle que sur l'écran de demande de devis — les deux parcours
-   tournent sur le même poste. Une étape était un long ruban de champs mis bout
-   à bout dans une carte blanche : rien ne disait où un sujet finissait et où le
-   suivant commençait. La bulle n'ajoute AUCUN intitulé, c'est un cadre. */
-.bloc{border:1.5px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin:var(--pas-3) 0 0;background:var(--zone-bg)}
+   Une étape était un long ruban de champs mis bout à bout dans une carte
+   blanche : rien ne disait où un sujet finissait et où le suivant commençait.
+   La bulle n'ajoute AUCUN intitulé, c'est un cadre.
+
+   TROIS NIVEAUX, JAMAIS PLUS (rattrapage du 25/08/2026). Cet écran était resté
+   sur la bulle GRISE du 23/08 ; l'écran de la demande l'a abandonnée dès le
+   lendemain parce qu'elle faisait un QUATRIÈME niveau — une bulle grise
+   arrondie dans une carte blanche arrondie, elle-même sur le fond gris de la
+   page. Le même objet avait donc deux formes selon l'écran où on le regardait,
+   à un clic l'un de l'autre : gris / trait 1,5 / rembourrage 16 ici, blanc /
+   trait 1 / rembourrage 24 là-bas. C'est l'écran de référence qui tranche.
+   Fond de page gris → carte blanche → champ blanc, et le groupe de champs EST
+   la carte : la carte qui les contenait redevient un empilement (voir juste
+   dessous). Aucun champ visible ne vit hors d'une bulle sur cet écran — les
+   sept qui traînent sont des champs CACHÉS, porteurs de valeurs pour le ticket
+   et le planning. */
+.bloc{border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin:var(--pas-3) 0 0;background:var(--surface)}
+/* Les trois cartes qui portent des groupes ne sont plus des cartes : leurs
+   enfants en sont. Sans ça on retrouverait un arrondi dans un arrondi. */
+.card:has(> .bloc){background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;margin:0 0 var(--pas-3)}
 .bloc>:first-child{margin-top:0}
 .bloc>:last-child{margin-bottom:0}
 /* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
@@ -549,7 +564,12 @@ body{font-family:'Manrope',Arial,sans-serif!important}
    `inherit` et non un nom en dur : dans le ticket, qui a sa propre échelle,
    les champs doivent rester avec lui. */
 input,select,textarea,button{font-family:inherit!important}
-.card{border-radius:var(--arrondi-carte)!important}
+/* `:not(:has(> .bloc))` : une carte qui ne contient QUE des groupes de champs
+   n'est plus une carte depuis le 25/08 — ce sont ses enfants qui le sont (voir
+   « TROIS NIVEAUX, JAMAIS PLUS » plus bas). Sans cette exception, ces deux
+   `!important` la lui rendaient de force, et on retrouvait l'arrondi dans
+   l'arrondi. */
+.card:not(:has(> .bloc)){border-radius:var(--arrondi-carte)!important}
 /* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
    et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
@@ -590,7 +610,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-champ)!important}
-.card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
+.card:not(:has(> .bloc)){border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
 input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-champ)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
@@ -620,7 +640,16 @@ h2{letter-spacing:-.01em}
 .bareme-msg.ko{color:var(--danger)}
 </style>
 </head>
-<body>
+<!-- LA CLASSE QUI MANQUAIT (25/08/2026). `.ecran-comptoir` est la couche de
+     jetons de l'écran de RÉFÉRENCE (charte.css) : palette, échelle, boîte
+     unique. L'écran de la demande la portait ; celui-ci ne l'a jamais eue.
+     Les deux parcours tournent sur le même poste, à un clic l'un de l'autre,
+     et douze couleurs y différaient d'un demi-ton — l'encre, les quatre
+     traits, le fond de page, le rouge de validation. C'est la cause de fond
+     de la divergence des deux écrans, pas une règle oubliée quelque part.
+     Rien d'autre ne bouge : les tailles, la boîte de 50 px et les arrondis
+     étaient déjà identiques (mesuré jeton par jeton). -->
+<body class="ecran-comptoir">
 <script>
 (function(){
   var eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
