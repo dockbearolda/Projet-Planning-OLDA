@@ -271,21 +271,21 @@
   }
 
   // DEMANDE DE DEVIS : « DEV-26.07.31-001 ». `reference` est la variable que
-  // toute la page relit (bandeaux d'étape, récapitulatif, message au planning),
-  // donc on la réécrit ET on rafraîchit les bandeaux déjà dessinés.
-  // Contrairement au ticket de vente, cette référence est AFFICHÉE dès la
-  // première étape : tant qu'elle n'est pas réservée on montre « — » plutôt
-  // qu'un numéro provisoire que la vendeuse pourrait annoncer au client avant
-  // qu'il ne change.
+  // toute la page relit (récapitulatif, ticket, message au planning).
+  // Elle est VIDÉE à l'ouverture et ne vaut quelque chose qu'une fois le numéro
+  // réservé au SERVEUR, à la première ligne saisie : deux postes qui comptent
+  // chacun dans leur coin finissaient par se donner le même numéro. Le numéro
+  // que la page s'était donné toute seule reste en secours, signé du poste, pour
+  // le cas où le serveur ne répond pas.
+  //
+  // Les bandeaux « .ref-display » qui l'affichaient sur les étapes 3, 4 et 5 ont
+  // été RETIRÉS de l'écran le 25/08 : il n'y a plus rien à repeindre, et la
+  // référence ne se lit plus que sur le ticket et dans le PDF.
   let refSecours = '';
-  function peindreRef() {
-    document.querySelectorAll('.ref-display').forEach((el) => { el.textContent = reference || '—'; });
-  }
   function masquerRef() {
     if (typeof reference === 'undefined') return;
     refSecours = marquerPoste(reference);
     reference = '';
-    peindreRef();
   }
   async function numeroDevis() {
     if (typeof reference === 'undefined') return;
@@ -297,8 +297,6 @@
       // que de laisser la demande sans référence.
       reference = refSecours;
       throw err;
-    } finally {
-      peindreRef();
     }
   }
 
