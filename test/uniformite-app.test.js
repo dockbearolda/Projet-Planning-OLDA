@@ -295,4 +295,32 @@ assert.match(DEVIS, /window\.oldaArmerModale\(carte,/,
 assert.match(lire('public/sw.js'), /'\/modale\.js'/,
   'modale.js est dans la coquille hors ligne');
 
+// ===========================================================================
+// 11. UNE ÉTIQUETTE EST RELIÉE À SON CHAMP
+// ---------------------------------------------------------------------------
+// 63 des 68 étiquettes de l'écran de la demande ne visaient AUCUN champ.
+// Conséquence à la souris autant qu'au clavier : cliquer sur « Taille M » ne
+// plaçait pas le curseur dans la case. Celles qui ne coiffent pas une case mais
+// un ENSEMBLE (les six tailles, les trois priorités) nomment leur groupe par
+// `aria-labelledby` — le `for=` n'y aurait rien à viser.
+// ===========================================================================
+for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+  const etiquettes = [...src.matchAll(/<label(\s[^>]*)?>([\s\S]*?)<\/label>/g)];
+  const orphelines = etiquettes.filter((m) => {
+    if (/\sfor=/.test(m[1] || '')) return false;               // reliée
+    if (/<(input|select|textarea)\b/.test(m[2])) return false;  // elle enveloppe son champ
+    if (/\sid="/.test(m[1] || '')) return false;                // elle nomme un groupe
+    return true;
+  }).map((m) => m[2].replace(/<[^>]*>/g, '').trim().slice(0, 30));
+  assert.deepStrictEqual(orphelines, [],
+    `${nom} : une étiquette ne vise ni un champ, ni un groupe`);
+}
+// Les deux groupes nommés, et le champ dont le nom vivait dans un titre.
+assert.match(DEVIS, /<div class="tx-sizes" role="group" aria-labelledby="txSizesLabel">/,
+  'les six tailles forment un groupe nommé');
+assert.match(DEVIS, /id="projectPriorityGroup" role="group" aria-labelledby="projectPriorityLabel"/,
+  'les trois priorités aussi');
+assert.match(VENTE, /<textarea id="internalNote" aria-labelledby="internalNoteTitle"/,
+  'la note interne porte le nom de son bloc');
+
 console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');

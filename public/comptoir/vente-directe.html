@@ -810,10 +810,13 @@ h2{letter-spacing:-.01em}
 
   <div class="card internal">
     <div class="internal-head">
-      <h2>Note interne OLDA</h2>
+      <h2 id="internalNoteTitle">Note interne OLDA</h2>
       <span class="lock">🔒 Interne uniquement</span>
     </div>
-    <textarea id="internalNote" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
+    <!-- Le seul champ des deux parcours dont le nom vivait dans le titre du
+         bloc, et nulle part ailleurs : au clavier il s'annonçait « zone de
+         texte », sans plus. -->
+    <textarea id="internalNote" aria-labelledby="internalNoteTitle" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
     
   </div>
 

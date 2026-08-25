@@ -871,11 +871,11 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-aide">T-shirts, sweats, casquettes</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-aide">Objet, signalétique, sur-mesure</span></span></button></div><div id="besoinTextileForm"><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label>Couleur textile <span class="opt">optionnel</span></label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label>Transport</label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label>Référence libre <span class="opt">optionnel</span></label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label>Prix d'achat HT</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label>Désignation <span class="opt">optionnel</span></label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label>Genre</label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label>Emplacement du marquage</label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label>Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label>Tailles</label><div class="tx-sizes"><div class="field"><label>S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label>Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note <span class="opt">optionnel</span></label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><div class="tx-preview hidden" id="txPreview"></div><details class="tx-adjust"><summary>Ajustement tarifaire</summary><div class="grid"><div class="field"><label>Remise % <span class="opt">optionnel</span></label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label>Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div><div id="txNegHote"></div></details><div class="tx-barre"><div class="error msg-flottant msg-barre hidden" id="txManqueMsg"></div><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label>Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label>Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label>Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-aide">T-shirts, sweats, casquettes</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-aide">Objet, signalétique, sur-mesure</span></span></button></div><div id="besoinTextileForm"><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label for="txColor">Couleur textile <span class="opt">optionnel</span></label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label for="txTransport">Transport</label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost (+1,50 €)</option></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label for="txCustomRef">Référence libre <span class="opt">optionnel</span></label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label for="txCustomPurchase">Prix d'achat HT</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label for="txCustomDesignation">Désignation <span class="opt">optionnel</span></label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label for="txGenre">Genre</label><select id="txGenre" data-menu-manuel-non onchange="previewTextile()"></select></div><div class="field"><label for="txPrintType">Emplacement du marquage</label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label for="txMarkColor">Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div></div><div class="field"><label id="txSizesLabel">Tailles</label><div class="tx-sizes" role="group" aria-labelledby="txSizesLabel"><div class="field"><label for="txS">S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txM">M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txL">L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXL">XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXXL">2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txOther">Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field"><label for="txNote">Note <span class="opt">optionnel</span></label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><div class="tx-preview hidden" id="txPreview"></div><details class="tx-adjust"><summary>Ajustement tarifaire</summary><div class="grid"><div class="field"><label for="txDiscount">Remise % <span class="opt">optionnel</span></label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label for="txManualPrice">Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div><div id="txNegHote"></div></details><div class="tx-barre"><div class="error msg-flottant msg-barre hidden" id="txManqueMsg"></div><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label for="txSetDtfCost">Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetDtfSpeed">Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetPressMin">Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetHourlyCost">Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetRoundStep">Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetMaxCoefQty">Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label>Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label>Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label>Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label>Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label>Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label>Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label>Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
+<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
      coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
@@ -883,10 +883,14 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
 <section id="step3" class="hidden"><div class="card"><div class="bloc"><!-- « Familles concernées » retiré le 24/08 : la famille se déduit des besoins
      déjà saisis, la pastille ne faisait que la répéter en lecture seule et
      mangeait une moitié de rangée. Le titre prend la ligne entière. -->
-      <div class="field"><label>Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
+      <div class="field"><label for="projectTitle">Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
 </div><div class="bloc"><div class="field priority-field" id="projectPriorityField">
   <label id="projectPriorityLabel">Priorité du projet *</label>
-  <div class="priority-grid" id="projectPriorityGroup">
+  <!-- UNE ÉTIQUETTE QUI NE VISE PAS UN CHAMP NOMME UN GROUPE (25/08/2026).
+       Trois des 68 étiquettes de cet écran ne coiffent pas une case mais un
+       ENSEMBLE de cases : le `for=` n'aurait rien à viser, c'est
+       `aria-labelledby` qui les relie. -->
+  <div class="priority-grid" id="projectPriorityGroup" role="group" aria-labelledby="projectPriorityLabel">
     <button type="button" class="priority-card" data-priority="1" onclick="selectProjectPriority(1)">
       <span class="priority-stars">⭐</span>
       <strong>Projet simple</strong>
@@ -906,23 +910,23 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
   <input type="hidden" id="projectPriority" value="">
   <div class="field-error msg-flottant hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
 </div>
-</div><div class="bloc"><div class="grid-3"><div class="field"><label>Date souhaitée</label><!-- LA DATE S'ÉCRIT DANS LE CHAMP, PAS DANS UN DEUXIÈME (24/08). « Choisir
+</div><div class="bloc"><div class="grid-3"><div class="field"><label for="desiredDelay">Date souhaitée</label><!-- LA DATE S'ÉCRIT DANS LE CHAMP, PAS DANS UN DEUXIÈME (24/08). « Choisir
      une date » ouvrait un input de plus sous la liste : deux champs pour une
      seule question. Le calendrier natif s'ouvre sur un input FANTÔME — rendu
      mais invisible, car `display:none` casse showPicker() — et la date choisie
      (ou calculée par « Dans N jours ») s'écrit dans l'option « Choisir une
      date », donc dans le champ fermé ET en première ligne du panneau, qui
      porte toujours soit l'invitation, soit la date en place. -->
-<select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option id="desiredDateOption" value="custom">Choisir une date</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option></select><input id="desiredDate" class="date-fantome" type="date" tabindex="-1" aria-hidden="true"></div><div class="field"><label>Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><!-- L'AVIS SUR LA DATE VIT SOUS LA RANGÉE, PAS DEDANS. Posé dans la cellule
+<select id="desiredDelay" data-menu-manuel-non onchange="updateDesiredDate()"><option value="">Non précisée</option><option id="desiredDateOption" value="custom">Choisir une date</option><option value="5">Dans 5 jours</option><option value="10">Dans 10 jours</option><option value="15">Dans 15 jours</option></select><input id="desiredDate" class="date-fantome" type="date" tabindex="-1" aria-hidden="true"></div><div class="field"><label for="desiredTime">Heure souhaitée</label><select id="desiredTime" data-menu-manuel-non><option>09:00</option><option>10:00</option><option>11:00</option><option>12:00</option><option selected>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option></select></div></div><!-- L'AVIS SUR LA DATE VIT SOUS LA RANGÉE, PAS DEDANS. Posé dans la cellule
      de « Date souhaitée », il la faisait grandir — et comme la rangée colle
      ses cellules en bas, « Heure souhaitée » descendait avec : le défaut
      exact du 24/08 au matin. Il porte un BOUTON (« Utiliser cette date »),
      donc il ne peut pas flotter comme un message : un message flottant ne
      prend pas le clic. -->
-<div id="desiredDateWarning" class="delay-warn hidden"></div><div class="grid-3"><div class="field"><label>Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
+<div id="desiredDateWarning" class="delay-warn hidden"></div><div class="grid-3"><div class="field"><label for="projectGoal">Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
-<div class="field"><label>Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label>Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label>Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label>Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions a-droite"><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+<div class="field"><label for="source">Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label for="projectBudget">Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label for="projectDescription">Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label for="projectConstraints">Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions a-droite"><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
 
 
 <section id="step4" class="hidden">
@@ -940,7 +944,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
          rangée reste vide, et l'état ne se déplace pas sous les yeux. -->
     <div class="bloc"><div class="grid">
       <div class="field">
-        <label>État des informations du client *</label>
+        <label for="controlStatus">État des informations du client *</label>
         <select id="controlStatus" data-menu-manuel-non onchange="toggleControlStatus(); updateControl()">
           <option value="" selected disabled hidden>Sélectionner une option</option>
           <option value="received">Informations reçues</option>
@@ -950,7 +954,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
       </div>
 
       <div class="field" id="receivedViaField">
-        <label>Informations transmises par</label>
+        <label for="informationReceivedVia">Informations transmises par</label>
         <select id="informationReceivedVia" onchange="toggleNewTransmissionMethod('informationReceivedVia','newInformationReceivedVia'); updateControl()">
           <option value="" selected disabled hidden>Sélectionner une option</option>
           <option>WhatsApp</option>
@@ -963,7 +967,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
 
     <div class="grid">
       <div class="field">
-        <label>Type de logo</label>
+        <label for="clientLogoStatus">Type de logo</label>
         <select id="clientLogoStatus" onchange="updateControl()">
           <option selected>Pas de besoin</option>
           <option>Logo OLDA</option>
@@ -973,7 +977,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
       </div>
 
       <div class="field">
-        <label>Statut du logo</label>
+        <label for="logoReceptionStatus">Statut du logo</label>
         <select id="logoReceptionStatus" onchange="updateControl()">
           <option value="" selected disabled hidden>Sélectionner une option</option>
           <option>Reçu</option>
@@ -985,7 +989,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
 
     <div class="grid">
       <div class="field">
-        <label>Reprise de vectorisation</label>
+        <label for="vectorizationStatus">Reprise de vectorisation</label>
         <select id="vectorizationStatus" onchange="updateControl()">
           <option selected>Pas de besoin</option>
           <option>À chiffrer</option>
@@ -994,7 +998,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
       </div>
 
       <div class="field">
-        <label>Maquette / fichier numérique</label>
+        <label for="oldaMockupStatus">Maquette / fichier numérique</label>
         <select id="oldaMockupStatus" onchange="updateControl()">
           <option selected>Non nécessaire</option>
           <option>À prévoir</option>
@@ -1009,7 +1013,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
       <h3 style="margin-top:0">Informations encore attendues</h3>
       <div class="grid">
         <div class="field">
-          <label>Transmission prévue par *</label>
+          <label for="expectedInformationVia">Transmission prévue par *</label>
           <select id="expectedInformationVia" onchange="toggleNewTransmissionMethod('expectedInformationVia','newExpectedInformationVia'); updateControl()">
             <option value="" selected disabled hidden>Sélectionner une option</option>
             <option>WhatsApp</option>
@@ -1019,7 +1023,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
           <input id="newExpectedInformationVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
         </div>
         <div class="field">
-          <label>Informations que le client doit transmettre *</label>
+          <label for="expectedInformation">Informations que le client doit transmettre *</label>
           <textarea id="expectedInformation" rows="4" placeholder="Ex. logo, texte exact, photos, tailles, dimensions, quantité définitive..." oninput="updateControl()"></textarea>
         </div>
       </div>
@@ -1030,12 +1034,12 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
          seconde tombait sous la ligne de flottaison. -->
     <div class="bloc"><div class="grid">
       <div class="field">
-        <label>Éléments reçus du client</label>
+        <label for="receivedElements">Éléments reçus du client</label>
         <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
       </div>
 
       <div class="field">
-        <label>Points à contrôler ou à compléter</label>
+        <label for="missingNotes">Points à contrôler ou à compléter</label>
         <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
       </div>
     </div>
@@ -1077,7 +1081,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
       <h3 style="margin-top:0">Nouveau client</h3>
       <div class="grid">
         <div class="field">
-          <label>Type de client *</label>
+          <label for="newClientType">Type de client *</label>
           <select id="newClientType" onchange="updateClientTypeFields()">
             <option value="" selected disabled hidden>Sélectionner une option</option>
             <option>Particulier</option>
@@ -1087,17 +1091,17 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
           </select>
         </div>
         <div class="field">
-          <label id="newClientNameLabel">Nom du client *</label>
+          <label for="newClientName" id="newClientNameLabel">Nom du client *</label>
           <input id="newClientName" placeholder="Ex. Hôtel Grand Case Beach Club">
         </div>
       </div>
       <div class="grid">
         <div class="field">
-          <label>WhatsApp *</label>
+          <label for="newClientPhone">WhatsApp *</label>
           <input id="newClientPhone" inputmode="numeric" autocomplete="tel" maxlength="14" placeholder="Ex. 06 90 12 34 56" oninput="formatPhoneInput(this)" onblur="validatePhoneField(this)"><div id="newClientPhoneHelp" class="help"></div>
         </div>
         <div class="field">
-          <label id="newClientEmailLabel">E-mail</label>
+          <label for="newClientEmail" id="newClientEmailLabel">E-mail</label>
           <input id="newClientEmail" type="email" placeholder="Ex. contact@entreprise.com">
         </div>
       </div>
@@ -1106,17 +1110,17 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
         <div class="notice green" style="margin:4px 0 14px">Client professionnel, association ou revendeur : toutes les informations de suivi et de facturation sont à enregistrer.</div>
         <div class="grid">
           <div class="field">
-            <label>Personne à contacter *</label>
+            <label for="newClientContact">Personne à contacter *</label>
             <input id="newClientContact" placeholder="Ex. Marie Durand">
           </div>
           <div class="field">
-            <label>Fonction du contact</label>
+            <label for="newClientContactRole">Fonction du contact</label>
             <input id="newClientContactRole" placeholder="Ex. Responsable communication">
           </div>
         </div>
         <div class="grid">
           <div class="field">
-            <label>Secteur d'activité *</label>
+            <label for="newClientSector">Secteur d'activité *</label>
             <select id="newClientSector">
               <option value="" selected disabled hidden>Sélectionner une option</option>
               <option>Hôtel</option>
@@ -1141,21 +1145,21 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
             </select>
           </div>
           <div class="field">
-            <label>Second contact / fixe</label>
+            <label for="newClientPhone2">Second contact / fixe</label>
             <input id="newClientPhone2" placeholder="Ex. 05 90 12 34 56">
           </div>
         </div>
         <div class="grid-3">
           <div class="field">
-            <label>Adresse</label>
+            <label for="newClientAddress">Adresse</label>
             <input id="newClientAddress" placeholder="Adresse de facturation">
           </div>
           <div class="field">
-            <label>Ville</label>
+            <label for="newClientCity">Ville</label>
             <input id="newClientCity" placeholder="Ex. Saint-Martin">
           </div>
           <div class="field">
-            <label>Code postal</label>
+            <label for="newClientPostal">Code postal</label>
             <input id="newClientPostal" placeholder="97150">
           </div>
         </div>
@@ -3201,7 +3205,7 @@ function clientName(c){return c?(c.company||c.name||'Client'):'Client'}
    qu'échouer si quelque chose les appelait. Le client se choisit désormais
    dans la liste déroulante `#clientSelect`, et se crée par le formulaire
    `#newClientForm`, qui écrit en base. */
-function renderPricing(){$('pricingNeeds').innerHTML=needs.map((n,i)=>`<div class="quote-card"><div class="row-between"><div><span class="badge orange">Besoin client</span><h3>${esc(n.label)}</h3><div class="help">${n.qty} unité(s) • ${esc(n.category)}${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help"><b>Note :</b> ${esc(n.comment)}</div>`:''}</div></div><div class="grid-3" style="margin-top:12px"><div class="field"><label>Article proposé par Atelier OLDA *</label><input id="solution-${i}" value="${esc(n.solution)}" placeholder="Ex. NS300 tee-shirt premium" oninput="setPricing(${i},'solution',this.value)"></div><div class="field"><label>Référence / variante</label><input value="${esc(n.reference)}" placeholder="Ex. NS300 Black" oninput="setPricing(${i},'reference',this.value)"></div><div class="field"><label>Prix unitaire HT *</label><input id="price-${i}" type="number" min="0" step="0.01" value="${Number.isFinite(n.unitHT)?n.unitHT:''}" oninput="setPricing(${i},'unitHT',this.value)"></div></div><div class="summary-row total"><span>Total HT de cette ligne</span><b>${money(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0)}</b></div></div>`).join('')}
+function renderPricing(){$('pricingNeeds').innerHTML=needs.map((n,i)=>`<div class="quote-card"><div class="row-between"><div><span class="badge orange">Besoin client</span><h3>${esc(n.label)}</h3><div class="help">${n.qty} unité(s) • ${esc(n.category)}${n.requestedRef?` • Réf. ${esc(n.requestedRef)}`:''}${n.color?` • ${esc(n.color)}`:''}${n.productionType?` • Production ${esc(n.productionType)}`:''}</div>${n.comment?`<div class="help"><b>Note :</b> ${esc(n.comment)}</div>`:''}</div></div><div class="grid-3" style="margin-top:12px"><div class="field"><label for="solution-${i}">Article proposé par Atelier OLDA *</label><input id="solution-${i}" value="${esc(n.solution)}" placeholder="Ex. NS300 tee-shirt premium" oninput="setPricing(${i},'solution',this.value)"></div><div class="field"><label for="reference-${i}">Référence / variante</label><input id="reference-${i}" value="${esc(n.reference)}" placeholder="Ex. NS300 Black" oninput="setPricing(${i},'reference',this.value)"></div><div class="field"><label for="price-${i}">Prix unitaire HT *</label><input id="price-${i}" type="number" min="0" step="0.01" value="${Number.isFinite(n.unitHT)?n.unitHT:''}" oninput="setPricing(${i},'unitHT',this.value)"></div></div><div class="summary-row total"><span>Total HT de cette ligne</span><b>${money(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0)}</b></div></div>`).join('')}
 function setPricing(i,k,v){needs[i][k]=k==='unitHT'?(v===''?NaN:Number(v)):v;renderPricing();calculateQuote()}function quoteTotals(){const subtotal=needs.reduce((s,n)=>s+(Number.isFinite(n.unitHT)?n.unitHT*n.qty:0),0),transport=Number($('transport')?.value)||0,discount=Number($('discount')?.value)||0,ht=Math.max(0,subtotal+transport-discount),rate=(Number($('taxRate')?.value)||0)/100,tax=ht*rate,ttc=ht+tax,dep=ttc*((Number($('depositPercent')?.value)||0)/100);return{subtotal,transport,discount,ht,tax,ttc,dep}}function calculateQuote(){const t=quoteTotals();setTextSafe('subtotalHT',money(t.subtotal));setTextSafe('transportHT',money(t.transport));setTextSafe('discountHT',money(t.discount));setTextSafe('taxAmount',money(t.tax));setTextSafe('totalTTC',money(t.ttc));setTextSafe('depositAmount',money(t.dep));updateSidebar()}['transport','discount','taxRate','depositPercent'].forEach(id=>$(id)?.addEventListener('input',calculateQuote));
 /* `pont.js` appelle cette fonction par son nom (`window.updateSidebar`) et
    une quinzaine d'endroits la déclenchent à chaque frappe. Le résumé n'a
