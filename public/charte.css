@@ -362,8 +362,8 @@
    Cet écran (`public/comptoir/demande-devis.html`, étape « 1. Besoins ») reçoit
    une palette et une densité À LUI. C'est un ARBITRAGE, pas un oubli : la
    charte du 29/07 est la charte de la maison, et le comptoir s'en écarte
-   volontairement ici — encre plus profonde, gris plus froids, deux tailles de
-   plus pour les mentions.
+   volontairement ici — encre plus profonde, gris plus froids, et sa propre
+   densité de formulaire.
 
    L'ÉCHELLE A GROSSI LE 25/08/2026 : le patron lit cet écran sur le 15,4
    pouces Windows du poste et la densité du 24/08 (boîte 44, valeur 14,
@@ -402,13 +402,20 @@
   --dd-label-gap: 8px;     /* de l'intitulé à son champ */
   --dd-rangee: 20px;       /* d'une rangée de champs à la suivante */
 
-  /* Deux tailles de plus que l'échelle de la maison, pour ce que l'écran
-     MENTIONNE sans le faire lire : « optionnel », une ligne d'aide sous un
-     titre, une action discrète. Elles ne servent JAMAIS à du texte courant. */
-  --dd-taille-valeur: 16px;   /* ce qui se saisit et ce qui se clique */
+  /* LES QUATRE RÔLES DE LA DENSITÉ RESTENT NOMMÉS, mais depuis le 25/08 au
+     soir ils se replient sur DEUX valeurs (demande du patron : uniformiser,
+     tout doit être bien visible). L'écran affichait cinq tailles et dix
+     combinaisons — dont 16 et 17 côte à côte sur la MÊME rangée : un champ nu
+     écrivait sa valeur en 16, un menu habillé de pont.js en 17. Désormais ce
+     qui se lit et ce qui se saisit ne font qu'UNE taille (celle du corps), et
+     tout le petit texte (intitulé, aide, mention) une seule aussi : la
+     discrétion d'une mention se dit par sa COULEUR et sa graisse, plus jamais
+     par sa taille. Les jetons demeurent : ce sont des rôles — re-séparer un
+     rôle un jour, c'est ne changer qu'une valeur ici. */
+  --dd-taille-valeur: 17px;   /* ce qui se saisit et se clique = ce qui se lit */
   --dd-taille-label: 14px;    /* l'intitulé d'un champ */
-  --dd-taille-aide: 13px;     /* la ligne d'aide sous un titre de tuile */
-  --dd-taille-mention: 12px;  /* « optionnel », et rien d'autre */
+  --dd-taille-aide: 14px;     /* l'aide sous un titre de tuile — même marche */
+  --dd-taille-mention: 14px;  /* « optionnel » — discret par la couleur */
 
   /* Ce que la maison lit en 15/28 se lit ICI en 17/32 — surcharges DE PORTÉE :
      le `:root` ne bouge pas, donc ni le planning ni l'écran de vente. Les deux
@@ -420,10 +427,12 @@
   --tab-valeur: 190px;
   --need-cle: 98px;
 
-  /* Deux graisses de plus : 500 pour ce qui s'efface (mention, action
-     discrète), 700 pour l'étape où l'on se tient. */
-  --dd-graisse-douce: 500;
-  --dd-graisse-appuyee: 700;
+  /* Deux graisses d'appoint, repliées elles aussi le 25/08 au soir : la douce
+     rejoint le texte (400 — le discret est gris, pas maigre) et l'appuyée la
+     forte (800 — le 700 ne servait qu'à la pilule de l'étape courante, une
+     graisse pour un seul élément n'est pas une hiérarchie). */
+  --dd-graisse-douce: 400;
+  --dd-graisse-appuyee: 800;
 
   /* Les chiffres s'alignent en colonne, partout où il y en a. */
   font-variant-numeric: tabular-nums;
