@@ -362,8 +362,15 @@
    Cet écran (`public/comptoir/demande-devis.html`, étape « 1. Besoins ») reçoit
    une palette et une densité À LUI. C'est un ARBITRAGE, pas un oubli : la
    charte du 29/07 est la charte de la maison, et le comptoir s'en écarte
-   volontairement ici — encre plus profonde, gris plus froids, champs plus bas,
-   deux tailles de plus pour les mentions.
+   volontairement ici — encre plus profonde, gris plus froids, deux tailles de
+   plus pour les mentions.
+
+   L'ÉCHELLE A GROSSI LE 25/08/2026 : le patron lit cet écran sur le 15,4
+   pouces Windows du poste et la densité du 24/08 (boîte 44, valeur 14,
+   intitulé 12,5) y restait trop petite. Tout monte d'environ un septième et
+   la hiérarchie ne bouge pas d'un rôle. Cet écran est la RÉFÉRENCE : le jour
+   où le patron valide, c'est CES valeurs que le reste de l'application
+   reprendra — d'ici là, elles ne valent que sous `.ecran-comptoir`.
 
    POURQUOI CE FICHIER, ET PAS UNE FEUILLE DANS LA PAGE : parce qu'une couleur
    ne doit s'écrire QU'ICI. L'écran en comptait 107 avant le 22/08 ; le
@@ -385,23 +392,33 @@
   --arrondi-bloc: 16px;    /* un bloc interne EST une carte, voir point 4 */
   --arrondi-champ: 10px;
 
-  /* LA BOÎTE DE CE QUI SE CLIQUE ET SE REMPLIT : 44 px, posée une seule fois.
+  /* LA BOÎTE DE CE QUI SE CLIQUE ET SE REMPLIT : 50 px, posée une seule fois.
      Champ et bouton la prennent tous les deux — l'un par `height`, l'autre par
      `min-height` (un bouton centre son contenu tout seul). C'est toujours UNE
      boîte : ce qui change le 24/08, c'est qu'elle se nomme au lieu de se
      déduire d'un rembourrage. */
-  --dd-champ-h: 44px;
-  --dd-champ-x: 12px;      /* rembourrage horizontal d'un champ */
-  --dd-label-gap: 7px;     /* de l'intitulé à son champ */
-  --dd-rangee: 18px;       /* d'une rangée de champs à la suivante */
+  --dd-champ-h: 50px;
+  --dd-champ-x: 14px;      /* rembourrage horizontal d'un champ */
+  --dd-label-gap: 8px;     /* de l'intitulé à son champ */
+  --dd-rangee: 20px;       /* d'une rangée de champs à la suivante */
 
   /* Deux tailles de plus que l'échelle de la maison, pour ce que l'écran
      MENTIONNE sans le faire lire : « optionnel », une ligne d'aide sous un
      titre, une action discrète. Elles ne servent JAMAIS à du texte courant. */
-  --dd-taille-valeur: 14px;   /* ce qui se saisit et ce qui se clique */
-  --dd-taille-label: 12.5px;  /* l'intitulé d'un champ */
-  --dd-taille-aide: 12px;     /* la ligne d'aide sous un titre de tuile */
-  --dd-taille-mention: 11px;  /* « optionnel », et rien d'autre */
+  --dd-taille-valeur: 16px;   /* ce qui se saisit et ce qui se clique */
+  --dd-taille-label: 14px;    /* l'intitulé d'un champ */
+  --dd-taille-aide: 13px;     /* la ligne d'aide sous un titre de tuile */
+  --dd-taille-mention: 12px;  /* « optionnel », et rien d'autre */
+
+  /* Ce que la maison lit en 15/28 se lit ICI en 17/32 — surcharges DE PORTÉE :
+     le `:root` ne bouge pas, donc ni le planning ni l'écran de vente. Les deux
+     largeurs calées sur la taille du texte suivent, sinon « Au-dessus de la
+     cible » (colonne des valeurs) et « Production » (rail des intitulés d'une
+     carte) reviendraient à la ligne. */
+  --taille-texte: 17px;
+  --taille-grand: 32px;
+  --tab-valeur: 190px;
+  --need-cle: 98px;
 
   /* Deux graisses de plus : 500 pour ce qui s'efface (mention, action
      discrète), 700 pour l'étape où l'on se tient. */

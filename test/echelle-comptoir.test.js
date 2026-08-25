@@ -118,9 +118,11 @@ assert.ok(/@font-face\{font-family:'Manrope';[^}]*font-weight:200 800/.test(sans
 // Le ticket imprimé garde les siennes : Courier, 80 mm de large, c'est un
 // document, pas de l'écran. Tout le reste passe par l'échelle.
 // L'ÉCRAN DE LA DEMANDE A REÇU SA PROPRE DENSITÉ LE 24/08/2026 (7 points du
-// patron) : valeur 14, intitulé 12,5, aide 12, mention 11. Quatre tailles DE
-// PLUS, mais toujours NOMMÉES et déclarées une seule fois — dans charte.css,
-// sous `.ecran-comptoir`. La règle ne change pas : rien en dur, tout se nomme.
+// patron), grossie le 25/08 pour le 15,4 pouces Windows du poste : valeur 16,
+// intitulé 14, aide 13, mention 12 — et ce qui se lit passe en 17/32 par une
+// surcharge DE PORTÉE sous `.ecran-comptoir`, le `:root` ne bouge pas. Quatre
+// tailles DE PLUS, mais toujours NOMMÉES et déclarées une seule fois — dans
+// charte.css. La règle ne change pas : rien en dur, tout se nomme.
 const DD_TAILLES = ['--dd-taille-valeur', '--dd-taille-label', '--dd-taille-aide', '--dd-taille-mention'];
 const AUTORISEES = new Set([...TAILLES, ...DD_TAILLES].map((t) => `var(${t})`).concat(['var(--recap-texte)', 'var(--recap-grand)', 'inherit']));
 const fautes = [];
