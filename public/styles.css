@@ -657,13 +657,21 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      `.stage-zone + .stage-zone`). Ici on ne règle que la distance du titre à
      ses propres étapes — courte, pour qu'il leur reste attaché. */
   margin: 0 0 10px;
-  padding: 0 8px 0 9px;
+  /* LE BANDEAU DE PHASE. Le titre d'une famille est SURLIGNÉ dans la couleur de
+     sa phase — demandé le 25/08 : « ces familles-là doivent être mises en avant,
+     surlignées en couleur ».
+     Il prend le ton FONCÉ de la phase (--zsur-fond, l'encre de son compteur) et
+     non son ton pâle : à --zp, le bandeau se rend à 1,18:1 sur le fond du rail,
+     c'est-à-dire un blanc légèrement sali — un surlignage qu'on ne distingue pas
+     de son support ne surligne rien. Sur le ton foncé, le blanc passe à 5,7:1 au
+     pire des six phases. */
+  padding: 7px 8px 7px 9px;
   gap: 10px;
   border-radius: 9px;
+  background: var(--zsur-fond);
 }
 .stage.zone-head::before { content: none; }        /* pas de puce sur un titre */
-.stage.zone-head:hover { background: transparent; }
-.stage.zone-head.active { background: transparent; }
+.stage.zone-head:hover { background: var(--zsur-fond); }
 .stage.zone-head .stage-label {
   /* `0 1 auto` + min-width — jamais `0 0 auto` : « FACTURATION & REMISE AU
      CLIENT » est plus large que le rail, et un libellé qui refuse de céder
@@ -675,7 +683,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   font-weight: var(--graisse-forte);
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--zt);
+  color: var(--zsur-encre);
 }
 /* LE FILET ENTRE LE LIBELLÉ ET LE TOTAL A ÉTÉ RETIRÉ (25/08). Il faisait
    doublon avec la coupure pleine largeur qui sépare désormais deux familles :
@@ -686,18 +694,25 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
        le libellé par la gauche dès qu'il déborde ;
      · il portait l'état ACTIF de la famille en prenant la couleur du rail —
        repris par le total, qui passe à l'encre avec le libellé. */
-.stage.zone-head .stage-count { margin-left: auto; font-size: var(--rail-taille-compte); font-weight: var(--graisse-forte); padding: 0 7px; color: var(--zt); }
+.stage.zone-head .stage-count { margin-left: auto; font-size: var(--rail-taille-compte); font-weight: var(--graisse-forte); padding: 0 7px; color: var(--zsur-encre); }
 .stage.zone-head .stage-count.has-items { background: transparent; }
-.stage.zone-head.is-empty .stage-count { color: var(--rail-zero); }
-/* L'état ACTIF d'un titre (À trier, ou la vue « toute la famille ») reste
-   typographique : le libellé ET le total passent à l'encre — rien qui
-   ressemble à une ligne sélectionnée. Les deux ensemble, sinon la famille
-   ouverte se signalait par un seul mot assombri au milieu de six titres
-   colorés : trop peu pour se repérer d'un coup d'œil. */
+/* Un total à ZÉRO s'efface — mais par la GRAISSE, pas par un blanc translucide :
+   à 80 % d'opacité il retombe à 4,35:1 sur deux des six phases, sous le seuil.
+   C'est la doctrine du projet, la hiérarchie se dit à la graisse. */
+.stage.zone-head.is-empty .stage-count { font-weight: var(--graisse-texte); }
+/* L'état ACTIF (À trier, ou la vue « toute la famille ») : le bandeau quitte sa
+   phase pour l'ACCENT de l'application. Six bandeaux colorés dont un plus foncé
+   ne se distinguerait pas ; l'accent, lui, ne ressemble à aucune phase, et la
+   paire accent / sur-accent bascule toute seule en thème sombre. */
+.stage.zone-head.active { background: var(--primary); }
 .stage.zone-head.active .stage-label,
-.stage.zone-head.active .stage-count { color: var(--rail-encre); }
-/* Déposer sur un titre : le même anneau de geste que sur une ligne. */
+.stage.zone-head.active .stage-count { color: var(--on-primary); }
+/* Déposer sur un titre : le bandeau s'éclaircit et prend l'anneau du geste. Le
+   texte repasse alors au ton foncé de la phase — du blanc sur un fond pâle ne
+   se lirait plus. */
 .stage.zone-head.drop-target { background: var(--za); box-shadow: inset 0 0 0 1.5px var(--zr); }
+.stage.zone-head.drop-target .stage-label,
+.stage.zone-head.drop-target .stage-count { color: var(--zt); }
 
 /* Une étape vide reste PLEINEMENT lisible : l'état est déjà dit trois fois
    (puce en anneau, graisse 500, pas de pastille) — aucun voile d'opacité. */
@@ -5518,12 +5533,17 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    commandes en cours, ce sont des dossiers que PERSONNE n'a encore rangés.
    Réglé en CSS sur le slug plutôt qu'en JS : les compteurs se repeignent à
    trois endroits (montage, /api/counts, mise à jour optimiste), et une teinte
-   posée à la main aurait fini par en manquer un. */
+   posée à la main aurait fini par en manquer un.
+
+   Depuis le 25/08, le titre de CHAQUE famille est un bandeau plein de sa phase
+   (voir `.stage.zone-head`) : l'inversion fond/texte que ce compteur était seul
+   à porter est devenue la règle commune. Il garde donc un TRAIT, pas un fond —
+   sans lui il se confondrait avec le total des cinq autres familles, alors
+   qu'il ne compte pas la même chose. */
 .stage[data-slug="a_trier"] .stage-count.has-items {
-  /* Le ton FONCÉ de la phase, pas celui du filet : du blanc sur `--zr` ne
-     donnait que 3,63:1 (voir --zsur-fond dans la charte). */
-  background: var(--zsur-fond);
+  background: transparent;
   color: var(--zsur-encre);
+  box-shadow: inset 0 0 0 1.5px var(--zsur-encre);
 }
 
 /* ------------------------------------------------------- Finitions desktop
@@ -5599,7 +5619,7 @@ summary:focus-visible {
 .pcard__del:active,
 .pcard__ref-btn:active { transform: scale(.94); }
 .stage:active { background: var(--rail-hover); }
-.stage.zone-head:active { background: transparent; }
+.stage.zone-head:active { background: var(--zsur-fond); }
 .nav-switch-btn:active,
 .help-btn:active,
 .stage-link:active,

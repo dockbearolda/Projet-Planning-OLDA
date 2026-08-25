@@ -678,4 +678,42 @@ console.log('✓ stabilité : actualiser sans recharger, et tout ce qui peut êt
     'un mot plus long que sa colonne se coupe plutôt que de déborder — d’où le minimum mesuré');
 }
 
+// ===========================================================================
+// LE TITRE D'UNE FAMILLE EST UN BANDEAU DE SA PHASE (25/08)
+// ---------------------------------------------------------------------------
+// « Ces familles-là doivent être mises en avant, surlignées en couleur. »
+//
+// Le piège de ce genre de demande, c'est de surligner avec le ton PÂLE de la
+// phase : `--zp` se rend à 1,18:1 sur le fond du rail, c'est-à-dire un blanc
+// légèrement sali. Un surlignage qu'on ne distingue pas de son support ne
+// surligne rien — même défaut que le premier segment de l'ancienne jauge de
+// charge. Le bandeau prend donc le ton FONCÉ (`--zsur-fond`), sur lequel le
+// blanc passe à 5,7:1 au pire des six phases (mesuré au rendu).
+{
+  // Son propre exemplaire sans commentaires : `CSSNET2` vit dans un bloc plus
+  // haut. On lit le CODE, pas les commentaires — ceux-ci CITENT les valeurs
+  // écartées pour expliquer pourquoi elles l'ont été.
+  const CSSNU = sansCommentaire(CSS);
+  const bloc = (sel) => {
+    const m = CSSNU.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{[^}]*\\}'));
+    assert.ok(m, `règle introuvable : ${sel}`);
+    return m[0];
+  };
+  assert.match(bloc('.stage.zone-head'), /background: var\(--zsur-fond\)/,
+    'le titre d’une famille porte le bandeau de sa phase');
+  assert.match(bloc('.stage.zone-head .stage-label'), /color: var\(--zsur-encre\)/,
+    '… et son libellé l’encre qui va avec — jamais une couleur en dur');
+  // L'ACTIF ne peut pas être « la même couleur en plus foncé » : six bandeaux
+  // colorés dont un plus sombre ne se distinguent pas. Il prend l'accent de
+  // l'application, qui ne ressemble à aucune phase et bascule seul de nuit.
+  assert.match(bloc('.stage.zone-head.active'), /background: var\(--primary\)/,
+    'la famille ouverte quitte sa phase pour l’accent');
+  // Le sur-dossier gardait un compteur INVERSÉ quand il était seul à l'être.
+  // Maintenant que chaque titre est un bandeau, un fond de plus se confondrait
+  // avec le bandeau : il lui reste un anneau, qui le distingue encore.
+  assert.match(bloc('.stage[data-slug="a_trier"] .stage-count.has-items'),
+    /box-shadow: inset 0 0 0 [\d.]+px var\(--zsur-encre\)/,
+    'le compteur du sur-dossier garde un trait, pas un fond redondant');
+}
+
 console.log('✓ ossature : aucune page ne touche à la barre, le rail ne glisse pas et ne casse plus ses mots');
