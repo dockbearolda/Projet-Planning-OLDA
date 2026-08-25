@@ -92,7 +92,13 @@
            commande y naît) ; Base clients (CRM) = le socle. -->
       <nav class="nav-switch" aria-label="Navigation">
         <a class="nav-switch-btn nav-switch-btn--projet" id="viewProjet" href="#nouveau-projet">
-          <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+          <!-- `add` et pas `bolt` : l'éclair décrivait une VITESSE, pas une
+               action. Cette entrée est la seule de la barre qui CRÉE quelque
+               chose — le plus dit exactement ça, et ne se confond avec aucune
+               autre icône de l'application. Toute icône Material posée ici doit
+               figurer dans olda-icones.woff2 (91 glyphes) : un nom absent
+               s'affiche en TEXTE réduit à sa première lettre, sans erreur. -->
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>
           <span class="nav-switch-label">Nouveau Projet</span>
         </a>
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
