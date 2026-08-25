@@ -161,4 +161,138 @@ assert.match(CRM,
   /\.send-btn:focus-visible,\s*\.del-btn:focus-visible,\s*\.dup-btn:focus-visible \{[^}]*opacity:\s*1[^}]*pointer-events:\s*auto/,
   'le clavier révèle ces trois boutons ET les rend cliquables');
 
-console.log('✓ uniformité : une boîte, trois graisses, aucune échelle parallèle, et le retour répond en 120 ms');
+// ===========================================================================
+// 7. LE GRIS ATTÉNUÉ NE PORTE PLUS DE TEXTE QU'ON LIT
+// ---------------------------------------------------------------------------
+// La charte définit son troisième gris comme « atténué — repères, pas du texte
+// à lire ». 54 règles s'en servaient pourtant comme couleur de texte : 2,54:1
+// sur le blanc d'une carte, là où un texte courant en demande 4,5.
+// ON NE L'ASSOMBRIT PAS : la valeur qui passerait le seuil sur les trois fonds
+// où la charte le pose vaut #656c7a, et le deuxième gris vaut #5f6774 — les
+// deux se confondent. Un troisième cran ne peut pas être à la fois lisible et
+// discret ; c'est arithmétique. Il reste donc là où l'effacement EST le
+// message, et nulle part ailleurs.
+// ===========================================================================
+const CLIENTS_CSS = lire('public/clients.css');
+
+assert.match(CRM, /--pj-ink-4:\s*var\(--text-2\)/,
+  'la quatrième encre du Point du jour porte du texte : elle se lit');
+assert.match(CRM, /--pj-muet:\s*var\(--text-3\)/,
+  '… et le gris atténué garde son propre nom, pour les endroits où il est assumé');
+
+// L'état zéro est la SEULE exception assumée : un compteur à zéro s'éteint,
+// c'est le message. Son libellé, lui, reste lisible — sinon la tuile ne dit
+// plus de quoi elle parle.
+assert.match(CRM, /\.pj-stat\.is-zero \.pj-stat-n \{ color: var\(--pj-muet\)/,
+  'le NOMBRE d’un état zéro reste éteint');
+assert.match(CRM, /\.pj-stat\.is-zero \.pj-stat-l \{ color: var\(--pj-ink-4\)/,
+  '… mais son libellé se lit');
+
+// Les règles que l'audit avait nommées une à une.
+for (const [fichier, src, sel] of [
+  ['styles.css', CRM, '.cell-price-ht'], ['styles.css', CRM, '.reg-count'],
+  ['styles.css', CRM, '.menu-item.muted'], ['styles.css', CRM, '.colbar-empty'],
+  ['clients.css', CLIENTS_CSS, '.cl-f__label'], ['clients.css', CLIENTS_CSS, '.cl-note__time'],
+  ['clients.css', CLIENTS_CSS, '.cl-card__time'],
+]) {
+  const bloc = new RegExp(`${sel.replace(/[.]/g, '\\.')}[^{}]*\\{[^}]*\\}`);
+  const m = src.match(bloc);
+  assert.ok(m && !/var\(--text-3\)/.test(m[0]),
+    `${fichier} ${sel} ne porte plus le gris atténué`);
+}
+
+// Une étape à venir dit où l'on va : c'est de la navigation, pas du décor.
+assert.ok(/\.step \{[^}]*color: var\(--text-2\)/.test(CHARTE),
+  'une étape non franchie du parcours se lit');
+// Le seul état de la charte qui échouait (4,39:1 sur son propre fond).
+assert.match(CHARTE, /--st-archive: #676e7b/,
+  'la teinte « archive » passe le seuil sur son fond');
+// Une action qu'on ne peut pas encore faire dit quand même ce qu'elle fera.
+assert.ok(!/button:disabled[^}]*color:var\(--surface\)/.test(DEVIS),
+  'un bouton désactivé ne porte plus du blanc sur un gris pâle');
+
+// ===========================================================================
+// 8. AUCUN ÉCOUTEUR NE FIGE UNE FONCTION QUE LA PAGE REDÉFINIT ENSUITE
+// ---------------------------------------------------------------------------
+// LA GARDE LA PLUS CHÈRE DE CE FICHIER. `addEventListener(evt, uneFonction)`
+// capture l'OBJET fonction tel qu'il est à l'inscription. Les deux écrans du
+// comptoir sont corrigés par des greffes qui redéfinissent `window.X` plus bas
+// dans la page : un `onclick` du balisage les voit (il résout au moment du
+// clic), un écouteur inscrit avec une référence nue ne les voit JAMAIS.
+// Quatre boutons de la fiche client étaient dans ce cas. Conséquence
+// reproduite en base le 25/08 : « Modifier les informations » d'un client,
+// « Annuler », puis « + Créer un nouveau client » — le drapeau d'édition
+// restait armé, et l'enregistrement ÉCRASAIT la fiche du premier. Une fiche
+// détruite, un client jamais créé, le code CLI-… passé au mauvais nom.
+// ===========================================================================
+for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+  const redefinies = new Set(
+    [...src.matchAll(/window\.([A-Za-z_$][\w$]*)\s*=\s*function/g)].map((m) => m[1]),
+  );
+  const figees = [...src.matchAll(
+    /addEventListener\(\s*["']([^"']+)["']\s*,\s*([A-Za-z_$][\w$]*)\s*[,)]/g,
+  )].filter((m) => redefinies.has(m[2])).map((m) => `${m[1]} → ${m[2]}`);
+  assert.deepStrictEqual(figees, [],
+    `${nom} : un écouteur fige une fonction que la page redéfinit plus bas`);
+}
+
+// ===========================================================================
+// 9. UN INDEX D'ÉDITION EST UN INDEX DANS LA LISTE : IL SUIT LA SUPPRESSION
+// ---------------------------------------------------------------------------
+// `deleteNeed` réindexait soigneusement la mémoire d'AFFICHAGE — son
+// commentaire le dit — mais pas `editingNeed`, le seul index qui ÉCRIT.
+// Modifier CCC, supprimer AAA, enregistrer : DDD écrasé, CCC inchangé, aucun
+// message. Même oubli sur la vente (`editIndex`).
+// ===========================================================================
+assert.match(DEVIS, /function deleteNeed\([^)]*\)\{[\s\S]{0,400}?suivreSuppressionEdition\(i\)/,
+  'supprimer un besoin fait suivre l’index d’édition');
+assert.match(DEVIS, /function suivreSuppressionEdition[\s\S]{0,600}?editingTextile/,
+  '… les DEUX index, le manuel et le textile');
+assert.match(VENTE, /function deleteProduct\([\s\S]{0,700}?editIndex!==null && editIndex>index\) editIndex--/,
+  'supprimer un article fait suivre l’index d’édition de la vente');
+
+// ===========================================================================
+// 10. CE QUI N'AVAIT AUCUN CHEMIN CLAVIER EN A UN
+// ---------------------------------------------------------------------------
+// Le poste est un PC : clavier et souris. Quatre actions n'étaient pas
+// « pénibles » au clavier — elles étaient IMPOSSIBLES.
+// ===========================================================================
+const APP = lire('public/app.js');
+
+// Attacher un PDF : un <label> n'est jamais dans l'ordre de tabulation, et le
+// <input type="file"> qu'il contient en est sorti par `hidden`.
+assert.match(APP, /lbl\.tabIndex = 0;[\s\S]{0,200}?lbl\.setAttribute\('role', 'button'\)/,
+  'le trombone est atteignable au clavier');
+assert.match(APP, /lbl\.addEventListener\('keydown'[\s\S]{0,220}?input\.click\(\)/,
+  '… et Entrée/Espace y ouvrent le sélecteur de fichier');
+
+// Retirer un PDF : `display: none` le sortait de la tabulation ET de l'arbre
+// d'accessibilité. C'était la seule porte de l'écran pour détacher un fichier.
+assert.ok(!/\.pdf-slot:hover \.pdf-btn__remove \{ display: inline-flex; \}/.test(CRM),
+  'la croix de retrait n’est plus révélée par le seul display');
+assert.match(CRM,
+  /\.pdf-slot:hover \.pdf-btn__remove,\s*\.pdf-slot:focus-within \.pdf-btn__remove,\s*\.pdf-btn__remove:focus-visible \{[^}]*opacity: 1[^}]*pointer-events: auto/,
+  '… le focus la montre et la rend cliquable');
+
+// Ouvrir un article : c'était le dernier <div onclick> du dépôt.
+assert.match(DEVIS, /<button type="button" class="need-titre" aria-expanded="\$\{i===articleOuvert\}"/,
+  'le titre d’une ligne de la demande est un vrai bouton');
+
+// Les fenêtres modales emmènent le focus avec elles, et le rendent en partant.
+const MODALE = lire('public/modale.js');
+assert.match(MODALE, /export function armerModale/, 'le piège à focus est un composant partagé');
+assert.match(MODALE, /focusAvant\.focus\(\{ preventScroll: true \}\)/,
+  '… il REND le focus à la fermeture');
+for (const [nom, chemin] of [['clients.js', 'public/clients.js'], ['dashboard.js', 'public/dashboard.js']]) {
+  assert.match(lire(chemin), /import \{ armerModale \} from '\.\/modale\.js'/,
+    `${nom} se sert du composant partagé plutôt que d’en recopier un`);
+}
+assert.match(DEVIS, /<div class="ticket-export-dialog" role="dialog" aria-modal="true"/,
+  'la fenêtre d’export du comptoir se déclare enfin modale');
+assert.match(DEVIS, /window\.oldaArmerModale\(carte,/,
+  '… et elle emmène le focus, par la passerelle vers le module du CRM');
+// Un fichier importé qui manque à la coquille, c'est un écran mort hors ligne.
+assert.match(lire('public/sw.js'), /'\/modale\.js'/,
+  'modale.js est dans la coquille hors ligne');
+
+console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');

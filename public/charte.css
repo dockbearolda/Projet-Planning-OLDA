@@ -89,7 +89,10 @@
   --st-cours:   #854d0e;   --st-cours-bg:   #fefce8;
   --st-livree:  #166534;   --st-livree-bg:  #ecfdf3;
   --st-facture: #111827;   --st-facture-bg: #e5e7eb;
-  --st-archive: #6b7280;   --st-archive-bg: #f3f4f6;
+  /* Un cran plus sombre le 25/08 : #6b7280 sur son propre fond ne donnait que
+     4,39:1, sous les 4,5 d'un texte courant. C'est la seule teinte d'état de
+     toute la charte qui échouait — les autres passent largement. */
+  --st-archive: #676e7b;   --st-archive-bg: #f3f4f6;
   --st-bloque:  #b91c1c;   --st-bloque-bg:  #fef2f2;
 
   /* élévations — les trois niveaux de la charte (carte / flottant / modale) */
@@ -281,7 +284,11 @@
   border-radius: 999px; padding: 8px 12px; text-align: center;
   font-size: var(--taille-texte); font-weight: var(--graisse-note);
   line-height: var(--ligne-champ);
-  color: var(--text-3); background: transparent;
+  /* UNE ÉTAPE À VENIR SE LIT (25/08/2026). Elle était posée sur le gris
+     atténué — 2,85:1 —, or « 2. Projet » dit où l'on va : c'est de la
+     navigation, pas du décor. Ce qui distingue les trois états, c'est la
+     pastille et le fond de l'étape courante, pas l'illisibilité des autres. */
+  color: var(--text-2); background: transparent;
 }
 /* La pastille : vide tant que l'étape n'est pas franchie, cochée ensuite. */
 .step::before {
@@ -564,7 +571,17 @@ html[data-theme="light"] .ecran-comptoir {
   --danger: #b3341f;                 /* le rouge de la validation RÉELLE */
 
   --dd-placeholder: #a8afba;         /* ce qui n'est pas encore saisi */
-  --dd-inactif: #c8cdd6;             /* une action qu'on ne peut pas encore faire */
+  /* UNE ACTION QU'ON NE PEUT PAS ENCORE FAIRE DIT QUAND MÊME CE QU'ELLE FERA
+     (25/08/2026). Elle portait du BLANC sur ce gris — 1,60:1 : « Construire le
+     projet → » était illisible tant qu'il n'y avait pas de besoin, c'est-à-dire
+     exactement au moment où l'on cherche ce qu'il faut faire. Le fond s'éclaire
+     jusqu'au gris des pastilles, et le libellé passe à l'encre secondaire :
+     4,61:1, et la différence avec un bouton armé reste évidente — celui-ci
+     porte l'encre pleine. */
+  --dd-inactif: #e5e7eb;             /* une action qu'on ne peut pas encore faire */
+  /* Un cran sous l'encre secondaire du comptoir (#6b7280) : sur ce fond pâle
+     elle ne donnerait que 3,90:1. Celle-ci donne 4,61. */
+  --dd-inactif-encre: #5f6774;
   --dd-actif-fond: #fbfaf7;          /* le fond chaud d'une tuile choisie */
   --dd-survol-doux: #f4f6f9;         /* le survol d'un bouton bordé */
   --dd-contour: #dfe3ea;             /* le contour d'un bouton bordé, d'une pastille */
@@ -581,6 +598,7 @@ html[data-theme="light"] .ecran-comptoir {
 html[data-theme="dark"] .ecran-comptoir {
   --dd-placeholder: var(--text-3);
   --dd-inactif: var(--border-strong);
+  --dd-inactif-encre: var(--text-1);
   --dd-actif-fond: var(--surface-hover);
   --dd-survol-doux: var(--surface-hover);
   --dd-contour: var(--border-strong);

@@ -379,14 +379,14 @@ body {
 }
 .grid-search-input::placeholder { color: var(--text-3); }
 .grid-search-clear {
-  border: 0; background: transparent; color: var(--text-3);
+  border: 0; background: transparent; color: var(--text-2);
   font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1; cursor: pointer; padding: 2px 4px;
   border-radius: 50%; flex-shrink: 0;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .grid-search-clear:hover { color: var(--text-1); background: var(--state-hover); }
 .grid-search-kbd {
-  font-family: inherit; font-size: var(--taille-texte); line-height: 1.6; color: var(--text-3);
+  font-family: inherit; font-size: var(--taille-texte); line-height: 1.6; color: var(--text-2);
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--arrondi-champ);
   padding: 0 6px; flex-shrink: 0;
 }
@@ -1145,7 +1145,7 @@ body.cards-off-ticket .pcard__ticket { display: none; }
 .pcard__del {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 999px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-3);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
   cursor: pointer;
 }
 .pcard__del:hover { background: var(--st-bloque-bg); border-color: transparent; color: var(--st-bloque); }
@@ -1532,7 +1532,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
 /* Vide : trombone neutre, discret tant qu'aucun PDF n'est attaché. */
 .pdf-btn--empty {
-  color: var(--text-3);
+  color: var(--text-2);
   background: color-mix(in srgb, var(--text-3) 12%, transparent);
 }
 .pdf-btn--empty:hover { background: color-mix(in srgb, var(--text-3) 22%, transparent); }
@@ -1923,10 +1923,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   margin: 10px 0 6px 4px;
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
   letter-spacing: .06em; text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .colbar-legend[hidden], .colbar-empty[hidden] { display: none; }
-.colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-3); }
+.colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-2); }
 .colbar-list { display: flex; flex-direction: column; gap: 4px; }
 
 /* Une entrée = une colonne. 44 px de haut : c'est tapé au doigt sur la
@@ -1970,7 +1970,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   flex: 0 0 auto;
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
   letter-spacing: .03em; text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .colbar-reset {
@@ -2024,7 +2024,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .cell-price-ht {
   display: block;
   padding-inline-end: 8px;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: var(--taille-texte);
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
@@ -2064,7 +2064,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .menu-item:hover { background: var(--state-hover); }
 .menu-item.selected { background: var(--primary-soft); color: var(--primary); font-weight: var(--graisse-note); }
-.menu-item.muted { color: var(--text-3); }
+.menu-item.muted { color: var(--text-2); }
 .menu-item.muted:hover { color: var(--text-2); }
 
 /* Saisie du motif d'alerte (« BLOQUÉE — pourquoi ? ») : même popover que le menu.
@@ -2266,7 +2266,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .search-palette-hint {
   font-size: var(--taille-texte);
-  color: var(--text-3);
+  color: var(--text-2);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2300,7 +2300,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-weight: var(--graisse-note);
   letter-spacing: .5px;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
   /* Fond PLAT : un dégradé sur un élément collant est re-rasterisé à chaque
      image de défilement de la liste de résultats. */
   background: var(--surface);
@@ -2391,7 +2391,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .search-palette-empty {
   padding: 28px 16px;
   text-align: center;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: var(--taille-texte);
 }
 
@@ -2443,7 +2443,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .cal-dow,
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .cal-dow { margin-bottom: 2px; }
-.cal-dow span { text-align: center; font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--text-3); padding: 2px 0; }
+.cal-dow span { text-align: center; font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--text-2); padding: 2px 0; }
 .cal-day {
   display: flex;
   align-items: center;
@@ -2497,7 +2497,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-weight: var(--graisse-note);
   letter-spacing: .02em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-right: 1px;
 }
 .cal-quick-btn {
@@ -2625,7 +2625,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   border-radius: 50%;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -2750,7 +2750,7 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   flex: 0 0 auto;
   border: 0;
   background: transparent;
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   opacity: 0;
   width: 34px;
@@ -2773,7 +2773,7 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   flex: 0 0 auto;
   border: 0;
   background: transparent;
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   opacity: 0;
   width: 34px;
@@ -3684,7 +3684,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-weight: var(--graisse-forte);
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .cat-row-select {
   flex-shrink: 0;
@@ -3775,7 +3775,22 @@ body.view-plein .fiverr-tool { display: none !important; }
   --pj-ink: var(--text-1);
   --pj-ink-2: var(--text-2);
   --pj-ink-3: var(--text-2);
-  --pj-ink-4: var(--text-3);
+  /* LA QUATRIÈME ENCRE PORTE DU TEXTE, ELLE DOIT DONC SE LIRE (25/08/2026).
+     Elle pointait sur le troisième gris de la charte — « atténué : repères,
+     pas du texte à lire » — et 24 règles du Point du jour s'en servaient pour
+     du texte : l'heure de chaque événement du fil, les compteurs de tête, les
+     intitulés du panneau de détail. Mesuré : 2,54:1 sur le blanc d'une carte,
+     2,35 sur le gris de fond, 3,04 en thème sombre — là où un texte courant en
+     demande 4,5.
+     ON NE L'ASSOMBRIT PAS : la valeur qui passerait le seuil sur les trois
+     fonds vaut #656c7a, et le deuxième gris vaut #5f6774 — les deux se
+     confondent. Un troisième cran ne peut pas être à la fois lisible et
+     discret ; c'est arithmétique, pas une question de goût.
+     Le gris atténué reste donc, sous son propre nom, pour les endroits où
+     l'effacement EST le message : l'état zéro, un séparateur, une invite de
+     saisie. Partout ailleurs on lit. */
+  --pj-ink-4: var(--text-2);
+  --pj-muet: var(--text-3);
   --pj-accent: var(--primary);
   /* urgences : trois crans de la famille ambre + le rouge pour le retard */
   --pj-late: var(--danger);       --pj-late-bg: var(--danger-bg);
@@ -3895,7 +3910,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-weight: var(--graisse-texte);
   color: var(--pj-ink);
 }
-.pj-search-input::placeholder { color: var(--pj-ink-4); font-weight: var(--graisse-texte); }
+.pj-search-input::placeholder { color: var(--pj-muet); font-weight: var(--graisse-texte); }
 .pj-search-input:focus { outline: none; }
 .pj-search-input:focus-visible { box-shadow: none; }
 .pj-search-clear {
@@ -4015,7 +4030,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 /* Zéro = rien à signaler : le compteur s'éteint (gris, léger, non cliquable).
    C'est ce qui permet de balayer la rangée sans la lire — seuls les chiffres
    qui ne sont pas nuls accrochent l'œil. */
-.pj-stat.is-zero .pj-stat-n { color: var(--pj-ink-4); font-weight: var(--graisse-texte); }
+.pj-stat.is-zero .pj-stat-n { color: var(--pj-muet); font-weight: var(--graisse-texte); }
 .pj-stat.is-zero .pj-stat-l { color: var(--pj-ink-4); }
 .pj-stat:disabled { cursor: default; }
 .pj-stat.active {
@@ -4718,7 +4733,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--arrondi-champ);
-  background: var(--pj-ink-4);
+  background: var(--pj-muet);
 }
 /* La fraction en retard passe PAR-DESSUS le remplissage neutre. */
 .pj-col-load-late {
@@ -4925,7 +4940,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-size: var(--taille-texte);
 }
 .dd-pos-fam { font-weight: var(--graisse-texte); color: var(--pj-ink-3); }
-.dd-pos-sep { color: var(--pj-ink-4); }
+.dd-pos-sep { color: var(--pj-muet); }
 .dd-pos-sub { font-weight: var(--graisse-forte); color: var(--pj-ink); }
 
 .dd-group { margin-bottom: 14px; }
@@ -5092,7 +5107,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
@@ -5264,7 +5279,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .reg-jeton:hover { background: var(--primary-soft); border-color: var(--primary); }
-.reg-count { margin-left: auto; font-size: var(--taille-texte); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.reg-count { margin-left: auto; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 /* Aperçu : une bulle de conversation, pour juger le message tel qu'il arrive. */
 .reg-apercu { display: flex; flex-direction: column; gap: 6px; }
@@ -5606,7 +5621,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .ld-detail-line:last-child { border-bottom: 0; }
 .ld-detail-line > span {
   font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
-  text-transform: uppercase; color: var(--text-3);
+  text-transform: uppercase; color: var(--text-2);
   padding-top: 12px;
 }
 .ld-detail-input {
