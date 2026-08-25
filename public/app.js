@@ -427,16 +427,6 @@ function renderSidebar() {
     zone.append(filet, corps);
     $stages.appendChild(zone);
   });
-  // LE SOUS-TITRE SE CALCULE, il ne s'écrit jamais en dur : les étapes du
-  // pipeline visibles au rail — les sous-étapes, plus les familles qui n'en
-  // ont pas (« À trier » est une étape à part entière).
-  const railEtapes = document.getElementById('railEtapes');
-  if (railEtapes) {
-    const n = $stages.querySelectorAll('.stage').length
-      - $stages.querySelectorAll('.stage-zone.has-sub .zone-head').length;
-    railEtapes.textContent = `${n} étape${n > 1 ? 's' : ''}`;
-  }
-  poserTotalRail();
 }
 
 // Rejoue l'animation d'entrée (léger fondu décalé) au changement d'étape — sur
@@ -546,13 +536,6 @@ function montrerEtapeActive(el) {
 function poserCompte(c, n) {
   c.textContent = n > 0 ? n : '';
   c.classList.toggle('has-items', n > 0);
-}
-/* Le TOTAL GÉNÉRAL de l'en-tête du rail : la somme des familles du pipeline
-   (Fiverr, promu en onglet, vit hors du rail et n'y entre pas). Recalculé à
-   chaque écriture de compteurs — jamais entretenu à part. */
-function poserTotalRail() {
-  const el = document.getElementById('railTotal');
-  if (el) el.textContent = FAMILIES.reduce((t, f) => t + (counts[f.slug] ?? 0), 0);
 }
 function syncStageLabel(el, n) {
   const label = el.querySelector('.stage-label');
@@ -667,7 +650,6 @@ async function loadCounts() {
     el.classList.toggle('is-empty', n === 0);
     syncStageLabel(el, n);
   });
-  poserTotalRail();
 }
 
 // Jeton de chargement : deux clics rapides lancent deux fetch ; on ne monte QUE la
@@ -791,7 +773,6 @@ function bumpCount(slug, delta) {
   if (c) poserCompte(c, n);
   el.classList.toggle('is-empty', n === 0);
   syncStageLabel(el, n);
-  poserTotalRail();
 }
 
 // Vrai si la commande appartient à la vue actuellement affichée (même critère que

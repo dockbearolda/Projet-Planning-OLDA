@@ -515,48 +515,18 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .sidebar::-webkit-scrollbar-track { background: transparent; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--rail-pouce); border-radius: 999px; }
 
-/* EN-TÊTE COLLANT : marque + nombre d'étapes (calculé) + total général. Il
-   coiffe le défilement — z-index au-dessus des puces et filets du corps. */
-.rail-tete {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 16px 13px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--rail-filet-tete);
-}
-.rail-logo {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--rail-encre);
-  color: var(--surface);
-  font-size: var(--rail-taille-forte);
-  font-weight: 700;
-}
-.rail-titre-bloc { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.rail-titre { font-size: var(--rail-taille-titre); font-weight: 700; letter-spacing: -0.01em; color: var(--rail-encre); white-space: nowrap; }
-.rail-sous-titre { font-size: var(--rail-taille-note); color: var(--rail-muet); }
-.rail-total {
-  flex: 0 0 auto;
-  padding: 3px 9px;
-  border-radius: 20px;
-  background: var(--rail-pastille-tete);
-  color: var(--rail-encre);
-  font-size: var(--rail-taille-forte);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Le corps : une colonne de phases, 12 px d'air entre deux — les segments de
-   filet sont donc DÉTACHÉS les uns des autres, sur le même axe vertical. */
-.stages { padding: 10px 12px 22px; display: flex; flex-direction: column; gap: 12px; }
+/* L'EN-TÊTE DU RAIL A ÉTÉ RETIRÉ (25/08) : logo, « Planning OLDA », le nombre
+   d'étapes et le total général. Il coiffait le défilement et coûtait ~60 px de
+   hauteur pour trois informations qu'on ne lit pas — le nom de l'outil est déjà
+   dans l'onglet du navigateur, et les compteurs qui comptent sont ceux des
+   étapes. Le rail commence donc directement par les phases.
+   Le corps : une colonne de phases, 16 px d'air entre deux — les segments de
+   filet sont DÉTACHÉS les uns des autres, sur le même axe vertical.
+   17 px en tête et non un chiffre rond : c'est ce qui pose le premier titre de
+   catégorie sur la MÊME ligne d'yeux que la barre de recherche, à droite
+   (mesuré : centres à 30 px tous les deux). Sans l'en-tête pour l'occuper, le
+   haut du rail se lisait autrement plus haut que tout le reste de l'écran. */
+.stages { padding: 17px 12px 22px; display: flex; flex-direction: column; gap: 16px; }
 
 /* UNE PHASE = filet | colonne. Le filet est coloré dès que la phase contient
    au moins une commande — l'état vient de l'en-tête (`is-empty`, déjà tenu
@@ -564,7 +534,10 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .stage-zone { display: flex; gap: 12px; }
 .zone-filet { flex: 0 0 3px; border-radius: 3px; background: var(--zr); }
 .stage-zone:has(.zone-head.is-empty) .zone-filet { background: var(--rail-vide); }
-.zone-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* 5 px entre deux sous-étapes, plus 1 : elles se touchaient presque, et en
+   16 px la colonne se lisait comme un bloc de texte plutôt que comme une liste
+   de lignes cliquables. */
+.zone-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
 /* Entrée du rail : un <button> (le rail est la navigation principale, il doit
    s'atteindre au clavier), remis à plat pour se dessiner comme une ligne. */
@@ -575,8 +548,10 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   gap: 9px;
   width: 100%;
   margin: 0;
-  min-height: 30px;
-  padding: 5px 8px 5px 9px;
+  /* La ligne respire : en 16 px, 30 px de haut et 5 px de rembourrage ne
+     laissaient rien autour du texte — le libellé touchait ses propres bords. */
+  min-height: 38px;
+  padding: 8px 8px 8px 9px;
   border: 0;
   border-radius: 9px;
   background: transparent;

@@ -411,8 +411,6 @@
   --rail-zero: #c8cdd6;          /* un total de catégorie à zéro */
   --rail-hover: #f4f6f9;         /* survol d'une ligne */
   --rail-vide: #e8eaef;          /* filet d'une phase vide, séparateurs */
-  --rail-filet-tete: #f2f4f7;    /* le trait sous l'en-tête collant */
-  --rail-pastille-tete: #f1f3f7; /* la pastille du total général */
   --rail-anneau: #dfe3ea;        /* l'anneau d'une puce vide */
   --rail-pouce: #d7dbe2;         /* le pouce de l'ascenseur */
 }
@@ -424,8 +422,6 @@
   --rail-zero: var(--text-3);
   --rail-hover: var(--surface-hover);
   --rail-vide: var(--border-soft);
-  --rail-filet-tete: var(--border-soft);
-  --rail-pastille-tete: var(--primary-soft);
   --rail-anneau: var(--border-strong);
   --rail-pouce: var(--border-strong);
 }
