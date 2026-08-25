@@ -44,7 +44,10 @@ assert.ok(/\$\('receivedViaField'\)\.classList\.toggle\('hidden',status==='waiti
 // déroulante —, puis le rail entier : dans un panneau de 320 px, une colonne
 // réservée au « 3× » repoussait le nom, qui se repliait sur deux lignes.
 // « 3× T-shirt … » s'écrit d'un seul tenant, comme on l'annonce.
-assert.ok(/<div class="need-titre"><span class="need-qte">/.test(DEVIS),
+// Le titre est devenu un <button> le 25/08 (c'est lui qui ouvre la ligne au
+// clavier — voir uniformite-app.test.js). Ce que cette garde protège n'a pas
+// bougé : le nombre et le nom sont le MÊME élément de titre, dans cet ordre.
+assert.ok(/class="need-titre"[^>]*><span class="need-qte">/.test(DEVIS),
   'le nombre et le nom sont la même ligne de titre');
 assert.ok(/\.need-qte\{font-variant-numeric:tabular-nums/.test(DEVIS),
   '… le nombre en chiffres à chasse fixe, et plus aucune bulle autour');

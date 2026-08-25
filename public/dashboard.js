@@ -19,6 +19,10 @@
 // `referent` s'il a été saisi à la main, sinon ceux de sa catégorie.
 
 import { rankRequests, WAITING_SUBS, WAITING_REASON } from './priority.js';
+// Le focus suit la fenêtre qui s'ouvre, et revient d'où il venait à la
+// fermeture. Les quatre fenêtres du Point du jour se déclaraient modales en
+// laissant le clavier derrière elles, sous un voile opaque.
+import { armerModale } from './modale.js';
 
 export function createDashboard(deps) {
   const {
@@ -1006,17 +1010,23 @@ export function createDashboard(deps) {
     });
   }
 
+  let desarmerDetail = null;
+
   function openDetail(id) {
     ensureDetail();
     detailId = String(id);
     renderDetail();
     detailScrim.classList.add('open');
     detailEl.classList.add('open');
+    if (!desarmerDetail) {
+      desarmerDetail = armerModale(detailEl, { premier: () => detailEl.querySelector('.dd-close') });
+    }
   }
 
   function closeDetail() {
     if (!detailEl) return;
     detailId = null;
+    if (desarmerDetail) { desarmerDetail(); desarmerDetail = null; }
     detailScrim.classList.remove('open');
     detailEl.classList.remove('open');
   }
@@ -1385,6 +1395,8 @@ export function createDashboard(deps) {
     }
   }
 
+  let desarmerActivity = null;
+
   function openActivity() {
     ensureActivity();
     unseen = 0;
@@ -1393,11 +1405,15 @@ export function createDashboard(deps) {
     activityOpen = true;
     activityScrim.classList.add('open');
     activityEl.classList.add('open');
+    if (!desarmerActivity) {
+      desarmerActivity = armerModale(activityEl, { premier: () => activityEl.querySelector('.dd-close') });
+    }
   }
 
   function closeActivity() {
     if (!activityEl) return;
     activityOpen = false;
+    if (desarmerActivity) { desarmerActivity(); desarmerActivity = null; }
     activityScrim.classList.remove('open');
     activityEl.classList.remove('open');
   }
@@ -1420,9 +1436,11 @@ export function createDashboard(deps) {
     // chaque fermeture par la croix ou par le fond — une journée de réglages
     // en accumulait des dizaines. Chaque fenêtre ne ferme QU'ELLE-MÊME.
     const surEchap = (e) => { if (e.key === 'Escape') close(); };
+    let desarmer = null;
     const close = () => {
       configOpen = false;
       document.removeEventListener('keydown', surEchap);
+      if (desarmer) { desarmer(); desarmer = null; }
       overlay.classList.remove('open');
       setTimeout(() => overlay.remove(), 180);
     };
@@ -1516,6 +1534,7 @@ export function createDashboard(deps) {
     configOpen = true;
     requestAnimationFrame(() => overlay.classList.add('open'));
     document.addEventListener('keydown', surEchap);
+    desarmer = armerModale(card, { premier: () => closeBtn });
   }
 
   // --- Réglages « Machines » (config du patron) ----------------------------
@@ -1537,9 +1556,11 @@ export function createDashboard(deps) {
     // Même précaution que pour l'attribution : l'écouteur Échap part avec la
     // fenêtre, quelle que soit la façon dont on l'a fermée.
     const surEchap = (e) => { if (e.key === 'Escape') close(); };
+    let desarmer = null;
     const close = () => {
       machinesOpen = false;
       document.removeEventListener('keydown', surEchap);
+      if (desarmer) { desarmer(); desarmer = null; }
       overlay.classList.remove('open');
       setTimeout(() => overlay.remove(), 180);
     };
@@ -1656,6 +1677,7 @@ export function createDashboard(deps) {
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('open'));
     document.addEventListener('keydown', surEchap);
+    desarmer = armerModale(card, { premier: () => closeBtn });
   }
 
   // --- Données -------------------------------------------------------------

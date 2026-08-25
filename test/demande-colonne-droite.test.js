@@ -183,8 +183,18 @@ assert.ok(!/>Négociation</.test(renderNeedsSrc),
 // LECTURE (elle déroule ce que la carte dit, elle ne touche pas au dossier).
 // La règle des deux actions reste entière : Modifier et Supprimer, dans
 // .need-actions, et rien d'autre qui AGISSE.
-assert.strictEqual((renderNeedsSrc.match(/<button/g) || []).length, 3,
-  'trois boutons : deux actions (Modifier, Supprimer) et la rangée de lecture « Détail »');
+// La garde compte ce qui AGIT, pas les balises. Depuis le 25/08 le titre de la
+// carte est lui aussi un <button> : c'est le seul chemin CLAVIER pour ouvrir
+// l'article (c'était le dernier <div onclick> du dépôt). Comme « Détail », il
+// LIT — il ne touche pas au dossier. Ce qui agit reste dans `.need-actions`,
+// et ils restent deux.
+const actions = (renderNeedsSrc.match(/need-actions">(.*?)<\/div>/) || ['', ''])[1];
+assert.strictEqual((actions.match(/<button/g) || []).length, 2,
+  'deux actions et deux seules sur la carte : Modifier et Supprimer');
+assert.ok(/>Modifier</.test(actions) && />Supprimer</.test(actions),
+  '… et ce sont bien celles-là');
+assert.strictEqual((renderNeedsSrc.match(/<button/g) || []).length, 4,
+  'quatre boutons en tout : les deux actions, la rangée « Détail », et le titre qui ouvre la ligne');
 assert.strictEqual((renderNeedsSrc.match(/class="need-actions"[\s\S]*?<\/div>/g) || [''])[0].split('<button').length - 1, 2,
   'DEUX actions qui agissent sur la carte, pas une de plus : Modifier et Supprimer');
 assert.ok(!/function ouvrirNegociation/.test(DEVIS),
@@ -246,7 +256,10 @@ assert.ok(/--need-cle\s*:\s*\d+px/.test(CHARTE),
 // était réservée repoussait le nom dans un panneau de 320 px.
 assert.ok(!/--need-qte/.test(CHARTE) && !/var\(--need-qte\)/.test(DEVIS),
   'le rail de la quantité n’existe plus, ni le jeton qui le portait');
-assert.ok(/<div class="need-titre"><span class="need-qte">/.test(DEVIS),
+// Le titre est un <button> depuis le 25/08 (le seul chemin clavier pour ouvrir
+// la ligne) ; ce que la garde protège n'a pas bougé : nombre et nom dans LE
+// MÊME élément de titre, dans cet ordre.
+assert.ok(/class="need-titre"[^>]*><span class="need-qte">/.test(DEVIS),
   'le nombre et le nom sont la même ligne de titre');
 assert.ok(!/\.need-(ligne|tab)\{[^}]*grid-template-columns:auto/.test(DEVIS),
   'aucune piste `auto` sur la carte : c’est elle qui faisait glisser les rails');

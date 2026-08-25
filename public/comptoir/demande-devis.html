@@ -142,7 +142,18 @@ b,strong{font-weight:var(--graisse-forte)}
    on l'annonce — le nombre en chiffres à chasse fixe, le nom enchaîné. Seuls
    les intitulés du détail gardent leur rail (`--need-cle`). */
 .need-ligne{padding:var(--pas-2) var(--pas-3);border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:var(--surface)}
-.need-titre{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+/* LE TITRE D'UNE LIGNE EST LE BOUTON QUI L'OUVRE (25/08/2026). La carte
+   entière reste cliquable à la souris — c'est le geste naturel. Au clavier, il
+   n'y avait AUCUN chemin : c'était le seul <div onclick> du dépôt, avec le
+   curseur de pointeur et l'effet de survol d'un bouton, et rien à atteindre en
+   tabulant. Il ne peut pas porter `role="button"` — il contient deux vrais
+   boutons ; c'est donc son titre qui devient le bouton, et lui seul.
+   Le dépouillement suit à la lettre la géométrie mesurée avant : 17 px, 800,
+   interligne du titre, aucun rembourrage, aucun trait. */
+.need-titre{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)!important;
+  display:block;inline-size:100%;text-align:start;background:none;border:0!important;padding:0!important;margin:0;
+  color:inherit;cursor:pointer;min-height:0!important}
+.need-titre:active{transform:none}
 .need-qte{font-variant-numeric:tabular-nums;margin-inline-end:6px}
 .need-nom{overflow-wrap:anywhere}
 /* LES ACTIONS FERMENT LEUR RANGÉE, tout à droite, poussées par une MARGE
@@ -1658,10 +1669,25 @@ function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);cho
 function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
    détail d'un AUTRE article, et le volet négocierait sur celui d'à côté. */
+/* UN INDEX D'ÉDITION EST UN INDEX DANS `needs` (25/08/2026). Il se décale
+   exactement comme la mémoire d'ouverture juste en dessous — et il a été
+   oublié pendant des mois. Sans ce suivi : modifier CCC, supprimer AAA,
+   « Enregistrer » — la modification destinée à CCC écrasait DDD, CCC ne
+   bougeait pas, et rien ne le disait. Si le décalage sortait de la liste,
+   l'enregistrement levait une erreur et le bouton faisait comme s'il avait
+   marché. C'est l'index qui ÉCRIT : il ne se rattrape nulle part ailleurs. */
+function suivreSuppressionEdition(i){
+  const dire=(zoneId,msg)=>{const z=$(zoneId);if(z){z.textContent=msg;z.classList.remove('hidden')}};
+  if(editingNeed===i){cancelNeedEdit();dire('needManqueMsg','Le besoin que tu modifiais a été supprimé.')}
+  else if(editingNeed>i){editingNeed--;poserTitreForm('needFormTitle',`Modifier le besoin n°${editingNeed+1}`,true)}
+  if(editingTextile===i){cancelTextileEdit();dire('txManqueMsg','L’article que tu modifiais a été supprimé.')}
+  else if(editingTextile>i){editingTextile--;poserTitreForm('txFormTitle',`Modifier l’article n°${editingTextile+1}`,true)}
+}
 function deleteNeed(i){needs.splice(i,1);articleOuvert=-1;negFicheOuvert=false;
   /* Les indices derrière viennent de bouger : la mémoire d'ouverture suit,
      sinon le déroulé sauterait sur la ligne d'en dessous. */
   dmdDetailsOuverts=new Set([...dmdDetailsOuverts].filter(k=>k!==i).map(k=>k>i?k-1:k));
+  suivreSuppressionEdition(i);
   renderNeeds();updateSidebar()}
 /* Le clic sur « Détail » : pas de redessin — la liste garde son défilement et
    rien d'autre ne bouge. La classe et le Set changent ensemble : le prochain
@@ -2994,7 +3020,7 @@ function renderNeeds(){
        mot au dernier chiffre — intitulé à gauche, valeur à droite, un filet
        entre les rangées, `tabular-nums` : exactement la langue du
        récapitulatif de l'article (voir `.tx-tableau`). */
-    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}${ouvert?' detail-ouvert':''}" onclick="ouvrirArticle(${i},event)"><div class="need-titre"><span class="need-qte">${n.qty}×</span><span class="need-nom">${esc(n.label)}</span></div>${detail}<div class="need-pied"><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div></div>`
+    return `<div class="need-ligne${i===articleOuvert?' is-ouvert':''}${ouvert?' detail-ouvert':''}" onclick="ouvrirArticle(${i},event)"><button type="button" class="need-titre" aria-expanded="${i===articleOuvert}" onclick="ouvrirArticle(${i})"><span class="need-qte">${n.qty}×</span><span class="need-nom">${esc(n.label)}</span></button>${detail}<div class="need-pied"><div class="need-actions"><button class="secondary" onclick="editNeed(${i})">Modifier</button><button class="danger" onclick="deleteNeed(${i})">Supprimer</button></div></div></div>`
   }).join(''):`<div class="demande-vide"><b>Aucun article</b><span>Ajoute un besoin à gauche, il s'inscrit ici.</span></div>`;
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();
@@ -3123,14 +3149,25 @@ function renderSelectedClient(){
 }
 
 function showNewClientForm(){$('newClientForm').classList.remove('hidden');$('newClientName').focus()}
-function hideNewClientForm(){$('newClientForm').classList.add('hidden')}
+/* REFERMER, C'EST RENONCER (25/08/2026). Le drapeau d'édition ne survit pas à
+   « Annuler » : le laisser armé faisait partir la création SUIVANTE en mise à
+   jour de la fiche qu'on venait de regarder. */
+function hideNewClientForm(){$('newClientForm').classList.add('hidden');window.__editingClientId=null}
 /* CRÉER UN CLIENT SE FAIT DEPUIS LA LISTE, PAS À CÔTÉ D'ELLE. Le raccourci
    était un bouton SOUS le champ : on ouvrait la liste, on cherchait son
    client, on ne le trouvait pas, on refermait la liste — et c'est seulement
    là qu'on voyait le bouton. La liste s'ouvrant toute seule en arrivant sur
    l'étape (voir showStep), « + Créer un nouveau client » est maintenant le
    premier mot du panneau, au-dessus du filtre. */
-$('clientSelect').addEventListener('menu-action',showNewClientForm);
+/* ON APPELLE LA VERSION DU MOMENT, PAS CELLE DE L'INSCRIPTION (25/08/2026).
+   `addEventListener(evt, showNewClientForm)` FIGE la fonction telle qu'elle est
+   ici. Les greffes du bas de page redéfinissent `window.showNewClientForm` —
+   elles n'atteignaient jamais ce bouton. Conséquence reproduite en base :
+   « Modifier les informations » d'un client, « Annuler », puis « + Créer un
+   nouveau client » — le drapeau d'édition restait posé, et l'enregistrement
+   ÉCRASAIT la fiche du premier client au lieu d'en créer une. Une fiche
+   détruite, un client jamais créé, et le code CLI-… passé au mauvais nom. */
+$('clientSelect').addEventListener('menu-action',()=>window.showNewClientForm());
 
 function createAndSelectClient(){clearStep5Validation();
   if(!$('newClientType').value)return fail('newClientType','Choisis le type de client.');
@@ -4501,12 +4538,26 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     fillFinal();
     window.print();
   };
+  /* LA FENÊTRE D'EXPORT EMMÈNE LE FOCUS AVEC ELLE (25/08/2026). C'était la
+     seule fenêtre du dépôt sans `role="dialog"`, sans Échap, et sans piège à
+     focus : elle s'ouvrait, le clavier restait derrière, sous un voile opaque.
+     `armerModale` est le composant partagé du CRM (../modale.js), posé sur
+     `window` par la passerelle en fin de page. */
+  var desarmerExport=null;
+  var exportEchap=function(e){if(e.key==='Escape'){e.preventDefault();window.closeRecapExport();}};
   window.openRecapExport=function(){
     if(typeof validateRecapDownload==='function'&&!validateRecapDownload('downloadPdfBtn'))return;
     fillFinal();
     document.getElementById('ticketExportOverlay').classList.add('show');
+    document.addEventListener('keydown',exportEchap);
+    var carte=document.querySelector('#ticketExportOverlay .ticket-export-dialog');
+    if(!desarmerExport&&typeof window.oldaArmerModale==='function'){
+      desarmerExport=window.oldaArmerModale(carte,{premier:function(){return carte.querySelector('.ticket-export-cancel');}});
+    }
   };
   window.closeRecapExport=function(){
+    document.removeEventListener('keydown',exportEchap);
+    if(desarmerExport){desarmerExport();desarmerExport=null;}
     document.getElementById('ticketExportOverlay').classList.remove('show');
   };
   window.exportRecapPDF=function(){
@@ -4593,7 +4644,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 })();
 </script>
 <div id="ticketExportOverlay" class="ticket-export-overlay">
-  <div class="ticket-export-dialog">
+  <div class="ticket-export-dialog" role="dialog" aria-modal="true" aria-label="Télécharger le ticket">
     <h3>Télécharger le ticket</h3>
     <p>Choisis le format souhaité.</p>
     <div class="ticket-export-buttons">
@@ -4775,5 +4826,14 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 </script>
 <!-- Le pont avec le CRM : base clients réelle et référence du jour réservée
      côté serveur. Chargé en DERNIER, une fois tout le reste en place. -->
+<!-- PASSERELLE VERS LE COMPOSANT PARTAGÉ. Cet écran est en scripts classiques ;
+     `modale.js` est un module ES du CRM. Plutôt que d'en recopier le piège à
+     focus ici — une deuxième implémentation à maintenir — on le pose sur
+     `window`. Un module s'exécute APRÈS les scripts classiques de la page :
+     l'appel n'a lieu qu'au clic, il est donc toujours servi. -->
+<script type="module">
+  import { armerModale } from '../modale.js';
+  window.oldaArmerModale = armerModale;
+</script>
 <script src="pont.js"></script>
 </body></html>

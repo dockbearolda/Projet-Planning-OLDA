@@ -2463,10 +2463,24 @@ function cellPdfSlot(r, kind) {
     const lbl = document.createElement('label');
     lbl.className = 'pdf-btn pdf-btn--empty';
     attachTip(lbl, `Attacher ${label.withArticle}`);
+    // ATTACHER UN PDF SE FAIT AUSSI AU CLAVIER (25/08/2026). Un <label> n'est
+    // jamais dans l'ordre de tabulation, et le <input type="file"> qu'il
+    // contient en est sorti par `hidden` : il n'y avait rien à atteindre, donc
+    // rien à actionner. Le poste est un PC — une vendeuse qui saisit toute la
+    // journée tabule. Le label prend donc le rôle et la place d'un bouton, et
+    // Entrée/Espace ouvrent le sélecteur de fichier.
+    lbl.tabIndex = 0;
+    lbl.setAttribute('role', 'button');
+    lbl.setAttribute('aria-label', `Attacher ${label.withArticle}`);
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/pdf';
     input.hidden = true;
+    lbl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault(); // Espace ferait défiler la page
+      input.click();
+    });
     input.addEventListener('change', () => {
       const file = input.files && input.files[0];
       if (!file) return;

@@ -119,7 +119,12 @@ assert.ok(/<select id="clientSelect"[\s\S]{0,240}?data-menu-manuel-non/.test(DEV
 // un évènement `menu-action` que la page écoute.
 assert.ok(/<select id="clientSelect"[\s\S]{0,400}?data-menu-action="Créer un nouveau client"/.test(DEVIS),
   'la liste des clients porte son raccourci de création');
-assert.ok(/\$\('clientSelect'\)\.addEventListener\('menu-action',showNewClientForm\)/.test(DEVIS),
+// TARDIF, PAS CAPTURÉ (25/08/2026). La référence nue figeait la fonction telle
+// qu'elle était à l'inscription : les greffes du bas de page, qui remettent le
+// drapeau d'édition à zéro, n'atteignaient jamais ce bouton — et créer un
+// client APRÈS avoir renoncé à en modifier un ÉCRASAIT la fiche du premier,
+// en base. Reproduit, puis fermé. Cette forme-ci appelle la version du moment.
+assert.ok(/\$\('clientSelect'\)\.addEventListener\('menu-action',\(\)=>window\.showNewClientForm\(\)\)/.test(DEVIS),
   '… et c’est la page qui décide de ce qui s’ouvre : le menu n’en sait rien');
 assert.ok(!/onclick="showNewClientForm\(\)"/.test(DEVIS),
   'le bouton d’à côté n’existe plus : un seul chemin vers la création');

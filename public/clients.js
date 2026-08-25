@@ -15,6 +15,9 @@ import { confirmerAction } from './confirmer.js';
 // Un enregistrement de fiche client ne doit pas rester en suspens : sans
 // minuteur, le bouton « Enregistrer » se désarme et ne se réarme jamais.
 import { fetchBorne } from './reseau.js';
+// Le focus suit la fenêtre qui s'ouvre, et revient d'où il venait à la
+// fermeture. Le tiroir se déclarait modal en laissant le clavier DERRIÈRE lui.
+import { armerModale } from './modale.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -600,11 +603,25 @@ function noteEl(n) {
   return item;
 }
 
+// Le piège à focus du tiroir. Armé à l'OUVERTURE seulement : `renderDrawer` se
+// rappelle à chaque frappe enregistrée, et le réarmer reprendrait le focus sous
+// les doigts de qui est en train de taper.
+let desarmerDrawer = null;
+
 function renderDrawer() {
   const card = $('#cl-drawer-card');
   const box = $('#cl-drawer');
-  if (!drawer) { box.hidden = true; return; }
+  if (!drawer) {
+    box.hidden = true;
+    if (desarmerDrawer) { desarmerDrawer(); desarmerDrawer = null; }
+    return;
+  }
   box.hidden = false;
+  // La croix d'abord, jamais « Supprimer » : c'est la première chose
+  // atteignable de l'en-tête, et on n'ouvre pas une fiche sur son bouton rouge.
+  if (!desarmerDrawer) {
+    desarmerDrawer = armerModale(card, { premier: () => card.querySelector('#cl-close') });
+  }
   card.replaceChildren();
 
   const creating = drawer.mode === 'create';
@@ -1091,16 +1108,23 @@ function renderSecteursPanel() {
   panel.append(scrim, card);
 }
 
+let desarmerSecteurs = null;
+
 function openSecteurs() {
   const panel = $('#cl-secteurs');
   if (!panel) return;
   panel.hidden = false;
   renderSecteursPanel();
+  const card = panel.querySelector('.cl-secteurs__card');
+  if (card && !desarmerSecteurs) {
+    desarmerSecteurs = armerModale(card, { premier: () => card.querySelector('.cl-secteurs__close') });
+  }
 }
 
 function closeSecteurs() {
   const panel = $('#cl-secteurs');
   if (!panel) return;
+  if (desarmerSecteurs) { desarmerSecteurs(); desarmerSecteurs = null; }
   panel.hidden = true;
   panel.replaceChildren();
 }

@@ -1552,15 +1552,20 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .pdf-btn--filled:hover { background: color-mix(in srgb, var(--success) 18%, var(--success-bg)); }
 
-/* Croix de retrait : cachée par défaut, révélée au survol du slot. Geste
-   souris uniquement (comme les infobulles) — pas d'équivalent tactile dans
-   cette version, cohérent avec l'usage PC/Mac visé par cette fonctionnalité
-   (cf. spec). */
+/* Croix de retrait : effacée par défaut, révélée au survol du slot — ET au
+   focus (25/08/2026). Elle était en `display: none`, ce qui la sortait de la
+   tabulation ET de l'arbre d'accessibilité : détacher un fichier n'avait
+   AUCUN chemin clavier, et c'est la seule porte de l'écran pour le faire.
+   `opacity` la laisse dans le document ; `pointer-events` l'empêche
+   d'intercepter un clic tant qu'elle est invisible. */
 .pdf-btn__remove {
   position: absolute;
   top: -6px; right: -2px;
   width: 16px; height: 16px;
-  display: none;
+  display: inline-flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-1) var(--ease);
   align-items: center;
   justify-content: center;
   border: none;
@@ -1583,8 +1588,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    seule croix ne changerait rien, c'est le slot lui-même qu'il faut remonter.
    `z-index: 1` reste sous l'en-tête collant du tableau (z-index 2) et ne peut pas
    sortir de .grid-wrap, qui crée son propre contexte d'empilement. */
-.pdf-slot:hover { z-index: 1; }
-.pdf-slot:hover .pdf-btn__remove { display: inline-flex; }
+.pdf-slot:hover, .pdf-slot:focus-within { z-index: 1; }
+.pdf-slot:hover .pdf-btn__remove,
+.pdf-slot:focus-within .pdf-btn__remove,
+.pdf-btn__remove:focus-visible { opacity: 1; pointer-events: auto; }
 
 
 

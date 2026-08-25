@@ -26,7 +26,7 @@
 // vide (l'installation ne peut rien télécharger), et l'application ne s'ouvrirait
 // plus du tout. En gardant le nom, l'installation se contente d'AJOUTER le
 // fichier manquant quand le réseau est là, et ne casse rien quand il ne l'est pas.
-const CACHE = 'olda-coquille-v3';
+const CACHE = 'olda-coquille-v4';
 
 // La coquille : ce qu'il faut pour AFFICHER l'application. Les données, elles,
 // viennent du réseau — hors ligne, on montre l'écran et son message d'erreur,
@@ -61,6 +61,10 @@ const COQUILLE = [
   // Importé statiquement par app.js : absent du cache, l'import échoue hors
   // ligne et le planning ne s'ouvre plus.
   '/poste.js',
+  // Le piège à focus des fenêtres modales, importé par clients.js, dashboard.js
+  // ET l'écran de la demande — même règle : absent du cache, l'import échoue et
+  // l'écran concerné ne s'ouvre plus hors ligne.
+  '/modale.js',
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',

@@ -778,6 +778,7 @@ h2{letter-spacing:-.01em}
           <p id="baremeMsg" class="bareme-msg" role="status"></p>
         </div>
     </div><div class="actions">
+      <div class="error msg-flottant hidden" id="productEditMsg"></div>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
     </div>
@@ -1492,6 +1493,7 @@ function requirePrice(){
   return false;
 }
 function saveProduct(){
+  document.getElementById("productEditMsg").classList.add("hidden");
   if(!requireFields(["productName","quantity","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
   if(!requirePrice()) return;
   // UNE DATE CIVILE SE LIT À MIDI. `new Date("2026-08-24")` est minuit UTC,
@@ -1522,6 +1524,7 @@ function resetProductForm(){
 }
 function editProduct(index){
   const p=products[index];
+  document.getElementById("productEditMsg").classList.add("hidden");
   editIndex=index;
   document.getElementById("productName").value=p.name;
   document.getElementById("quantity").value=p.qty;
@@ -1543,6 +1546,17 @@ function editProduct(index){
 function deleteProduct(index){
   if(confirm("Supprimer cet article ?")){
     products.splice(index,1);
+    // UN INDEX D'ÉDITION EST UN INDEX DANS `products` (25/08/2026). Il se
+    // décale avec la liste. Sans ça, modifier un article puis en supprimer un
+    // autre faisait écrire « Enregistrer les modifications » dans l'article
+    // d'à côté : la modification frappait le mauvais et l'autre disparaissait,
+    // sans un mot. Même oubli, même correctif, sur l'écran de la demande.
+    const msg=document.getElementById("productEditMsg");
+    if(editIndex===index){
+      resetProductForm();
+      msg.textContent="L’article que tu modifiais a été supprimé.";
+      msg.classList.remove("hidden");
+    } else if(editIndex!==null && editIndex>index) editIndex--;
     renderProducts();
   }
 }
@@ -1798,16 +1812,24 @@ document.getElementById("continueToPaymentBtn").addEventListener("click",continu
 document.getElementById("backToArticlesBtn").addEventListener("click",backToArticles);
 
 document.getElementById("clientSearch").addEventListener("input",renderClientResults);
-document.getElementById("showCreateClientBtn").addEventListener("click",showCreateClient);
+// ON APPELLE LA VERSION DU MOMENT, PAS CELLE DE L'INSCRIPTION (25/08/2026).
+// `addEventListener(evt, uneFonction)` FIGE la fonction telle qu'elle est ici.
+// Les greffes du bas de page redéfinissent `window.showCreateClient`,
+// `window.createAndSelectClient` et `window.editSelectedClient` — elles
+// n'atteignaient aucun de ces trois boutons. « Modifier le client » exécutait
+// la version périmée, qui appelle `showCreateClient()` : celle-ci efface le
+// client sélectionné, la ligne suivante lit `selectedClient.type` sur null,
+// et le formulaire s'ouvrait VIDE, sans client, sans un mot.
+document.getElementById("showCreateClientBtn").addEventListener("click",()=>window.showCreateClient());
 document.getElementById("cancelCreateClientBtn").addEventListener("click",()=>{
   document.getElementById("createClientBox").classList.add("hidden");
   resetCreateClientForm();
 });
 document.getElementById("chooseIndividualBtn").addEventListener("click",()=>setCreateClientType("Particulier"));
 document.getElementById("chooseProfessionalBtn").addEventListener("click",()=>setCreateClientType("Professionnel"));
-document.getElementById("createAndSelectClientBtn").addEventListener("click",createAndSelectClient);
+document.getElementById("createAndSelectClientBtn").addEventListener("click",()=>window.createAndSelectClient());
 document.getElementById("changeClientBtn").addEventListener("click",clearSelectedClient);
-document.getElementById("editSelectedClientBtn").addEventListener("click",editSelectedClient);
+document.getElementById("editSelectedClientBtn").addEventListener("click",()=>window.editSelectedClient());
 
 ["newIndividualPhone","newCompanyPhone"].forEach(id=>{
   document.getElementById(id).addEventListener("input",function(){
@@ -2410,6 +2432,10 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 
   var originalReset=window.resetCreateClientForm;
   window.resetCreateClientForm=function(){
+    /* Refermer, c'est renoncer : le drapeau d'édition ne survit pas à
+       « Annuler ». Le laisser armé ferait partir la création suivante en
+       écrasement de la fiche qu'on venait de regarder. */
+    window.__editingClientId=null;
     ['newCompanyContactRole'].forEach(function(id){var e=el(id);if(e)e.value='';});
     originalReset();
   };
