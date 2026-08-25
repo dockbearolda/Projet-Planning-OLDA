@@ -171,22 +171,15 @@
      longue valeur qu'on y écrive. */
   --tab-valeur: 168px;
 
-  /* LES DEUX RAILS D'UNE CARTE DE LISTE. Fixes, pour la même raison que la
-     colonne des valeurs juste au-dessus : en `auto`, chaque carte calcule sa
-     largeur sur SON contenu, et rien ne tombe sur la même verticale d'une
-     carte à l'autre. Mesuré sur le panneau de la demande : la quantité
-     glissait de 38 à 50 px (« 5× » contre « 120× »), les intitulés de 74 à
-     83 px (« Marquage » contre « Production ») — 11 px d'écart sur le nom,
-     21 px sur les valeurs, entre deux articles empilés.
-     Chaque jeton est calé sur la plus longue valeur qu'on y écrive :
-     « 9999× » pour la quantité, « Production » pour l'intitulé.
-     LA QUANTITÉ N'EST PLUS UNE BULLE (24/08/2026) : elle avait un fond gris et
-     six pixels de rembourrage, soit 58 px de rail pour deux caractères, dans
-     un panneau où la ligne fait 286 px. Un cinquième de la ligne partait en
-     boîte, et le nom de l'article — ce qu'on lit vraiment — se repliait sur
-     deux lignes. Le rail ne mesure donc plus que le texte : « 9999× » fait
-     44,9 px, mesuré à la graisse forte. */
-  --need-qte: 46px;
+  /* LE RAIL DES INTITULÉS D'UNE CARTE DE LISTE. Fixe, pour la même raison
+     que la colonne des valeurs juste au-dessus : en `auto`, chaque carte
+     calcule sa largeur sur SON contenu — les intitulés glissaient de 74 à
+     83 px (« Marquage » contre « Production ») entre deux articles empilés,
+     et rien ne tombait sur la même verticale. Calé sur le plus long :
+     « Production ».
+     (La quantité a eu son rail à elle — 58 px de bulle, puis 46 px de colonne
+     nue — avant de rejoindre le TITRE de la ligne le 24/08 au soir :
+     « 3× T-shirt … » s'écrit d'un seul tenant, plus rien à mesurer.) */
   --need-cle: 86px;
 
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait

@@ -303,25 +303,24 @@ assert.ok(/'\/charte\.css'/.test(SW),
 //     part dans « À trier » TOUT SEUL en arrivant sur l'écran. Un geste qu'on
 //     ne demande plus ne peut plus être oublié — c'est la vraie correction, et
 //     elle rend la question de l'accent sans objet.
+//   — puis « Nouvelle demande » lui-même (2e passe du même soir) : le client
+//     suivant se prend par la barre du haut, qui repart de zéro.
 //
-// Ce qui se vérifie désormais : il ne reste QU'UN bouton, et rien de ce qu'il
-// peut faire ne perd un dossier en silence.
+// Ce qui se vérifie désormais : il ne reste AUCUN bouton dans cette rangée,
+// et plus rien sur l'écran de fin ne peut perdre un dossier en silence.
 assert.ok(!/onclick="saveDraft\(\)"/.test(DEVIS),
   'plus rien n’attend un geste pour enregistrer');
-const rangeeFin = DEVIS.match(/<div class="actions a-droite"[^>]*>\s*(?:<!--[\s\S]*?-->\s*)*<button[\s\S]*?<\/div>/g)
-  .filter((r) => /newRequest/.test(r));
-assert.strictEqual(rangeeFin.length, 1, 'une seule rangée de fin');
-assert.strictEqual((rangeeFin[0].match(/<button/g) || []).length, 1,
-  'et elle ne porte qu’un bouton : celui qui passe au client suivant');
-assert.ok(/<button class="secondary" onclick="newRequest\(\)">/.test(DEVIS),
-  'il n’a pas l’encre : il n’enregistre rien, il efface l’écran');
+assert.ok(!/newRequest/.test(DEVIS),
+  'plus de « Nouvelle demande » : plus un bouton de l’écran n’efface le dossier');
+assert.ok(/<div class="actions a-droite" style="margin-top:var\(--pas-3\)"><\/div>/.test(DEVIS),
+  'la rangée de fin reste, vide : l’hôte du bouton-mécanique (« #step7 .actions ») que la greffe pose et que pont.js clique');
 
 // LE FILET QUI REMPLACE L'ACCENT. « Nouvelle demande » recharge la page : tant
 // que le dossier n'est pas au planning, il le perd. pont.js l'intercepte et
 // demande confirmation — c'est ce qui autorise à le laisser seul dans la rangée.
 const PONT_FIN = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
 assert.ok(/\[onclick\^="newRequest"\]/.test(PONT_FIN),
-  '« Nouvelle demande » reste surveillé par le garde-fou');
+  'le garde-fou garde son sélecteur : il couvrirait un « Nouvelle demande » ressuscité, et ne coûte rien tant qu’il n’y en a pas');
 assert.ok(/etatEnvoi === 'ok'/.test(PONT_FIN),
   '… qui ne se tait que lorsque le dossier est vraiment au planning');
 

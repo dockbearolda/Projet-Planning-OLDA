@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const DEVIS = fs.readFileSync(path.join(__dirname, '..', 'public/comptoir/demande-devis.html'), 'utf8');
+const CHARTE = fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8');
 
 const step4 = DEVIS.match(/<section id="step4"[\s\S]*?<\/section>/)[0];
 
@@ -27,10 +28,6 @@ const step4 = DEVIS.match(/<section id="step4"[\s\S]*?<\/section>/)[0];
   assert.ok(re.test(step4), `« ${g} » et « ${d} » partagent une rangée de deux`);
 });
 
-// Aucun champ de l'étape ne reste seul sur sa ligne : chaque .field du bloc
-// des listes vit dans une .grid. (Les champs de repli « nouveau mode de
-// transmission » vivent DANS le field de leur liste, pas à côté.)
-const champsNus = (step4.match(/<\/div>\s*<div class="field">/g) || []).length;
 assert.ok(/<div class="bloc"><div class="grid">/.test(step4),
   'le bloc des listes ouvre directement sur une rangée de deux');
 
@@ -42,17 +39,18 @@ assert.ok(/<div class="field" id="receivedViaField">/.test(step4),
 assert.ok(/\$\('receivedViaField'\)\.classList\.toggle\('hidden',status==='waiting'\)/.test(DEVIS),
   '… et il se cache toujours quand les informations sont en attente');
 
-// LA QUANTITÉ DE LA DEMANDE N'EST PLUS UNE BULLE. Fond gris et arrondi de
-// champ : le sosie d'une liste déroulante, sur un écran où tout ce qui a cette
-// forme se clique. Reste le nombre, à droite de son rail, chiffres à chasse
-// fixe pour que « 11× » et « 33× » finissent au même endroit.
-assert.ok(/\.need-qte\{font-size:var\(--taille-texte\);font-weight:var\(--graisse-forte\);text-align:right;font-variant-numeric:tabular-nums\}/.test(DEVIS),
-  'la quantité se lit, elle ne se clique pas : ni fond, ni rembourrage, ni arrondi');
+// LA QUANTITÉ DE LA DEMANDE A REJOINT LE TITRE DE SA LIGNE (2e passe du
+// 24/08). D'abord la bulle grise est partie — le sosie d'une liste
+// déroulante —, puis le rail entier : dans un panneau de 320 px, une colonne
+// réservée au « 3× » repoussait le nom, qui se repliait sur deux lignes.
+// « 3× T-shirt … » s'écrit d'un seul tenant, comme on l'annonce.
+assert.ok(/<div class="need-titre"><span class="need-qte">/.test(DEVIS),
+  'le nombre et le nom sont la même ligne de titre');
+assert.ok(/\.need-qte\{font-variant-numeric:tabular-nums/.test(DEVIS),
+  '… le nombre en chiffres à chasse fixe, et plus aucune bulle autour');
 assert.ok(!/\.need-qte\{[^}]*background/.test(DEVIS),
   '… le fond gris de pastille ne revient pas');
+assert.ok(!/--need-qte/.test(CHARTE) && !/var\(--need-qte\)/.test(DEVIS),
+  'le rail de la quantité n’existe plus — ni le jeton, ni personne pour le lire');
 
-const CHARTE = fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8');
-assert.ok(/--need-qte: 46px;/.test(CHARTE),
-  'le rail de la quantité est calé sur « 9999\u00d7 » mesuré nu (44,9 px), plus sur la bulle');
-
-console.log('\u2713 contr\u00f4le en deux colonnes, et la quantit\u00e9 sans bulle');
+console.log('✓ contrôle en deux colonnes, et la quantité dans le titre de sa ligne');

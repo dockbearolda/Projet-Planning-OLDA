@@ -93,14 +93,12 @@ for (const r of rangees) {
 // pas : si « Annuler » suit le bouton primaire, c'est ANNULER qui se retrouve
 // au bord. Trois rangées étaient dans ce cas sur les deux écrans.
 //
-// UNE EXCEPTION : la rangée du récapitulatif. Elle portait « Nouvelle demande »
-// (qui EFFACE) à côté de « Enregistrer » (qui envoie), et l'ordre des deux a
-// coûté un dossier le 13/08. Le 24/08 au soir le patron a fait retirer
-// « Enregistrer » : il ne reste qu'un bouton, et il n'y a plus d'ordre à
-// arbitrer. Elle sort donc de la règle « l'action qui engage ferme la rangée »,
-// puisqu'aucune action de cette rangée n'engage plus rien.
+// L'ANCIENNE EXCEPTION — la rangée du récapitulatif — a disparu avec son
+// dernier bouton : « Enregistrer » est parti quand l'envoi est devenu
+// automatique (24/08 au soir), « Nouvelle demande » à la 2e passe du même
+// soir. La rangée vide reste dans le document : c'est l'hôte de la mécanique
+// d'envoi (#oldaCreatePlanningBtn), que la greffe pose via « #step7 .actions ».
 for (const r of rangees) {
-  if (/onclick="newRequest\(\)"/.test(r)) continue;
   const boutons = r.match(/<button[^>]*>/g) || [];
   if (boutons.length < 2) continue;
   const iPrimaire = boutons.findIndex(b => /class="[^"]*\bprimary\b/.test(b));
@@ -109,18 +107,13 @@ for (const r of rangees) {
     `l’action qui engage doit fermer la rangée : ${r.slice(0, 80)}`);
 }
 
-// CE QUI PROTÈGE CETTE RANGÉE-LÀ, MAINTENANT. Elle ne porte qu'un bouton, il
-// n'a pas l'encre, et il n'enregistre rien — parce qu'il n'y a plus rien à
-// enregistrer : le dossier part dans « À trier » de lui-même en arrivant sur
-// l'écran. S'il n'est PAS parti, pont.js intercepte « Nouvelle demande » et
-// demande confirmation avant de perdre quoi que ce soit.
-const rangeeRecap = rangees.find(r => /onclick="newRequest\(\)"/.test(r));
-assert.ok(rangeeRecap, 'la rangée du récapitulatif existe');
-const derniersBoutons = rangeeRecap.match(/<button[^>]*>/g) || [];
-assert.strictEqual(derniersBoutons.length, 1,
-  'elle ne porte qu’un bouton : il n’y a plus d’ordre à arbitrer');
-assert.ok(!/\bprimary\b/.test(derniersBoutons[0]),
-  'et il n’a pas l’encre — il efface l’écran, il n’engage rien');
+// CE QUI PROTÈGE L'ÉCRAN DE FIN, MAINTENANT : plus un seul bouton n'y efface
+// quoi que ce soit — le dossier part dans « À trier » de lui-même en arrivant
+// sur l'écran, et le client suivant se prend par la barre du haut.
+assert.ok(!/onclick="newRequest\(\)"/.test(DEVIS),
+  'plus de bouton qui efface le dossier sur l’écran de fin');
+assert.ok(/<div class="actions a-droite" style="margin-top:var\(--pas-3\)"><\/div>/.test(DEVIS),
+  '… la rangée vide reste : l’hôte de la mécanique d’envoi, posée par la greffe');
 assert.ok(!/onclick="saveDraft\(\)"/.test(DEVIS),
   'plus aucun geste n’est demandé pour enregistrer — voir le 13/08');
 
@@ -177,6 +170,21 @@ const rangeeDates = DEVIS.match(/<div class="grid-3">(?:(?!<\/div><\/div>)[\s\S]
 assert.ok(rangeeDates, 'la rangée des dates existe');
 assert.ok(!/desiredDateWarning/.test(rangeeDates[0]),
   'l’avis n’est plus dans une cellule de la rangée');
+// LA DATE S'ÉCRIT DANS LE CHAMP, PAS DANS UN DEUXIÈME (24/08). « Choisir une
+// date » ouvrait un input de plus sous la liste. Le calendrier natif s'ouvre
+// sur un input FANTÔME — rendu mais invisible : `display:none` casse
+// showPicker(), et `input[type="date"]` (0,1,1) battait la classe seule, le
+// fantôme reprenait ses 44 px et creusait un trou sous la liste.
+assert.ok(/<option id="desiredDateOption" value="custom">Choisir une date<\/option>/.test(DEVIS),
+  '« Choisir une date » est le premier choix de la liste, et c’est lui qui affichera la date');
+assert.ok(/<input id="desiredDate" class="date-fantome" type="date" tabindex="-1" aria-hidden="true">/.test(DEVIS),
+  'l’input de date est un fantôme : plus jamais un deuxième champ à l’écran');
+assert.ok(/input\[type="date"\]\.date-fantome\{[^}]*height:0;min-height:0;opacity:0/.test(DEVIS),
+  '… rendu mais sans place ni encre, à une spécificité qui bat la règle des champs');
+assert.ok(/try\{\$\('desiredDate'\)\.showPicker\(\)\}catch\(e\)\{\$\('desiredDate'\)\.focus\(\)\}/.test(DEVIS),
+  'choisir « Choisir une date » ouvre le calendrier natif, avec un repli');
+assert.ok(/opt\.textContent=iso\?formatDate\(iso\):'Choisir une date'/.test(DEVIS),
+  'la date choisie ou calculée s’écrit dans l’option, donc dans le champ fermé');
 assert.ok(/<div id="desiredDateWarning" class="delay-warn hidden"><\/div>/.test(DEVIS),
   '… il a sa place à lui, sous la rangée, et il naît muet');
 

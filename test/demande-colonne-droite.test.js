@@ -221,7 +221,9 @@ assert.ok(/\.need-tab>:nth-child\(-n\+2\)\{border-top:0\}/.test(DEVIS),
   '… sauf la première : un tableau commence par une valeur, pas par un trait');
 assert.ok(/\.need-tab\{[^}]*grid-template-columns:var\(--need-cle\) minmax\(0,1fr\)/.test(DEVIS),
   'sa colonne d’intitulés est le jeton fixe : deux cartes empilées s’alignent');
-assert.ok(/\.need-pied\{[^}]*grid-column:1\/-1/.test(DEVIS),
+// (La carte n'est plus une grille depuis la 2e passe du 24/08 : le pied est
+// un bloc, il prend toute la largeur sans qu'une piste ait à le dire.)
+assert.ok(/\.need-pied\{display:flex/.test(DEVIS),
   'le pied ne porte plus que les actions, sur toute la largeur');
 // Coller à droite par une MARGE AUTOMATIQUE : sur une rangée trop étroite,
 // `justify-content:flex-end` fait sortir le contenu par la GAUCHE, et ce
@@ -237,19 +239,23 @@ assert.ok(!/\.(demande-corps \.)?need-actions\{[^}]*justify-content:flex-end/.te
 // « 120× ») et la colonne des intitulés de 74 à 83 px (« Marquage » contre
 // « Production ») — le nom décalé de 11 px d'une carte à l'autre, les valeurs
 // de 21 px. Deux jetons FIXES, comme `--tab-valeur` pour les tableaux.
-['--need-qte', '--need-cle'].forEach((jeton) => {
-  assert.ok(new RegExp(`${jeton}\\s*:\\s*\\d+px`).test(CHARTE),
-    `${jeton} doit être déclaré au :root de la charte, en pixels`);
-});
-assert.ok(/\.need-ligne\{[^}]*grid-template-columns:var\(--need-qte\) minmax\(0,1fr\)/.test(DEVIS),
-  'la gouttière de la quantité est fixe : le nom part du même rail sur toutes les cartes');
+assert.ok(/--need-cle\s*:\s*\d+px/.test(CHARTE),
+  '--need-cle doit être déclaré au :root de la charte, en pixels');
+// LA QUANTITÉ N'A PLUS DE RAIL (2e passe du 24/08) : « 3× » fait partie du
+// titre — « 3× T-shirt … » d'un seul tenant — parce que la colonne qui lui
+// était réservée repoussait le nom dans un panneau de 320 px.
+assert.ok(!/--need-qte/.test(CHARTE) && !/var\(--need-qte\)/.test(DEVIS),
+  'le rail de la quantité n’existe plus, ni le jeton qui le portait');
+assert.ok(/<div class="need-titre"><span class="need-qte">/.test(DEVIS),
+  'le nombre et le nom sont la même ligne de titre');
 assert.ok(!/\.need-(ligne|tab)\{[^}]*grid-template-columns:auto/.test(DEVIS),
   'aucune piste `auto` sur la carte : c’est elle qui faisait glisser les rails');
-// LA TABLE PREND TOUTE LA LARGEUR DE LA CARTE, pastille comprise : dans 322 px,
-// l'indenter d'une gouttière coûtait 68 px à la colonne des valeurs, et
-// « Poitrine + Dos + Manche Dr · Multi couleur » y passait sur trois lignes.
-// L'en-tête (pastille + nom) coiffe la table, il ne la contient pas.
-assert.ok(/\.need-tab\{[^}]*grid-column:1\/-1/.test(DEVIS),
+// LA TABLE PREND TOUTE LA LARGEUR DE LA CARTE : dans 322 px, l'indenter d'une
+// gouttière coûtait 68 px à la colonne des valeurs, et « Poitrine + Dos +
+// Manche Dr · Multi couleur » y passait sur trois lignes. La carte étant un
+// BLOC (2e passe du 24/08), la table est pleine largeur d'elle-même — ce qui
+// se vérifie, c'est qu'aucune indentation ne revient.
+assert.ok(/\.need-tab\{display:grid/.test(DEVIS) && !/\.need-tab\{[^}]*margin-inline-start/.test(DEVIS),
   'la table prend toute la largeur de la carte');
 // L'EMPLACEMENT ET L'ENCRE SONT DEUX RANGÉES. Collés par un point, ils
 // faisaient une valeur de 195 px : dans 322 px elle repassait à la ligne, et
@@ -266,8 +272,10 @@ assert.ok(!/\[t\.printType,t\.markColor\]/.test(renderNeedsSrc),
 // dernière et la valeur semblait commencer au-dessus de lui.
 assert.ok(/\.need-tab>\*\{[^}]*align-items:flex-start/.test(DEVIS),
   'l’intitulé reste en face de la première ligne de sa valeur');
-assert.ok(/\.demande-corps \.need-ligne\{[^}]*gap:8px var\(--pas-2\)/.test(DEVIS),
-  'la gouttière du panneau reste celle de la charte');
+// (Le `gap` de grille est parti avec la grille : l'espacement vertical vient
+// des marges de la table et du pied, la carte est un simple empilement.)
+assert.ok(!/\.demande-corps \.need-ligne\{[^}]*gap:/.test(DEVIS),
+  'plus de gap de grille sur une carte qui n’en est plus une');
 
 // La feuille « Esprit SumUp » impose `padding:13px 22px!important` à toutes les
 // pilules. Sans `!important` ici, chaque article coûtait 45 px de hauteur et le

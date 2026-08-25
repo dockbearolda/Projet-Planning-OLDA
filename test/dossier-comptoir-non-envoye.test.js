@@ -169,12 +169,13 @@ const ENVOI_FN = PONT.match(/function envoyerAuPlanning\(auto\)[\s\S]*?\n  \}/)[
 assert.ok(/if \(etatEnvoi === 'envoi' \|\| etatEnvoi === 'ok'\) return;/.test(ENVOI_FN),
   'un dossier déjà parti ne repart pas');
 
-// Et la rangée de fin ne porte plus qu'un bouton : celui qui passe au client
-// suivant. Il EFFACE le dossier — mais à ce moment-là le dossier est déjà
-// parti, et s'il ne l'est pas, le garde-fou ci-dessous demande confirmation.
+// Et la rangée de fin ne porte plus AUCUN bouton (2e passe du 24/08) :
+// « Enregistrer » est parti quand l'envoi est devenu automatique, « Nouvelle
+// demande » quand le patron l'a fait retirer — le client suivant se prend par
+// la barre du haut. La rangée vide reste : la greffe y pose la mécanique.
 assert.ok(!/<button[^>]*>💾/.test(DEVIS), 'plus de bouton « Enregistrer » sur l’écran de fin');
-assert.ok(/<button class="secondary" onclick="newRequest\(\)">Nouvelle demande<\/button>\s*<\/div>/.test(DEVIS),
-  '… la rangée de fin ne porte plus que « Nouvelle demande »');
+assert.ok(!/newRequest/.test(DEVIS),
+  '… ni « Nouvelle demande » : plus un bouton de l’écran n’efface le dossier');
 
 // Les brouillons déjà écrits dorment dans les tablettes : ce sont peut-être des
 // dossiers perdus. On les montre au lieu de les laisser mourir avec le cache.
