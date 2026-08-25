@@ -21,17 +21,18 @@
    le relais le temps du chargement. Contrairement aux icônes, un mot en Arial
    se lit très bien ; une icône pas encore prête, elle, s'écrit en toutes
    lettres — d'où les deux réglages opposés. */
-/* La police du RAIL (refonte du 24/08) : Plus Jakarta Sans, graisse variable
-   200-800, latin seul — même régime que Manrope : servie par nous, jamais un
-   autre domaine. Seul le rail l'emploie : les autres écrans restent sur la
-   police de la maison. */
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url('plus-jakarta-sans-latin-variable.woff2') format('woff2');
-}
+/* UNE SEULE POLICE POUR TOUTE L'APPLICATION (25/08/2026).
+   Le rail avait la sienne depuis la refonte du 24/08 — Plus Jakarta Sans — et
+   trois caractères se rendaient donc sur le planning : Manrope pour le corps,
+   Plus Jakarta pour toute la colonne de gauche, Arial pour les boutons
+   d'icône. Le premier audit avait annoncé « une seule police sur les neuf
+   écrans » : c'était faux, il n'avait mesuré que l'écran du comptoir, qui n'a
+   pas de rail.
+   Mesuré avant de trancher : à 320 px de rail, Manrope replie exactement les
+   MÊMES quatre libellés, et le plus large mesure 239 px contre 240. Le
+   changement ne coûte rien à la mise en page — il retire une police.
+   (`git show 134338c -- public/plus-jakarta-sans-latin-variable.woff2` la
+   ramène si le choix se rediscute.) */
 @font-face {
   font-family: 'Manrope';
   font-style: normal;
@@ -63,6 +64,17 @@ html, body {
 body {
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+
+/* LES CHAMPS ET LES BOUTONS N'HÉRITENT PAS DE LA POLICE DU CORPS (25/08/2026).
+   Chrome leur en impose une : Arial pour un `input`, un `select`, un `button`,
+   et du monospace pour un `textarea`. Le CRM le corrigeait au coup par coup —
+   huit règles éparses, dont une `.dashboard button` qui ne faisait que ça — et
+   il en manquait : « Colonnes », le seul bouton d'icône de l'écran à porter un
+   MOT, se rendait en Arial 17 px au milieu d'une page en Manrope. C'est le
+   piège que le second audit annonçait comme latent ; il ne l'était pas.
+   L'écran de la demande pose la même règle depuis longtemps ; elle manquait
+   ici. */
+button, input, select, textarea { font-family: inherit; }
 
 /* Icônes Material Symbols.
    Chaque icône est un MOT écrit en toutes lettres (« view_kanban », « search »)
@@ -413,8 +425,8 @@ body {
 /* Densité : hauteur de ligne. Montées d'un septième le 25/08 avec la taille du
    texte — une ligne qui garde sa hauteur pendant que son contenu grossit, c'est
    du texte qui touche ses bords. */
-.app.density-compact { --row-h: 56px; }
-.app.density-normal  { --row-h: 68px; }
+
+
 .app.density-confort { --row-h: 88px; }
 
 /* Poignée de redimensionnement du rail (occupe la colonne centrale = ancien gap) */
@@ -506,9 +518,8 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    RIEN NE SE PLIE : l'atelier compte quatre personnes et chacune voit toutes
    les étapes en permanence. L'ordre, le regroupement, les libellés et la
    logique (clic, clavier, glisser-déposer) ne bougent pas d'un pixel.
-   La police du rail est Plus Jakarta Sans, SERVIE PAR NOUS (voir @font-face
-   plus haut) : graisses 400-800, chiffres tabulaires partout. */
-.sidebar { font-family: 'Plus Jakarta Sans', var(--font); }
+   Le rail écrit dans la police de la maison comme le reste depuis le 25/08
+   (voir le @font-face plus haut) : graisses 400-800, chiffres tabulaires. */
 
 /* L'ascenseur se fait discret : 6 px, pouce gris, piste transparente. */
 .sidebar::-webkit-scrollbar { width: 6px; }
@@ -831,11 +842,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .help-btn:hover { background: var(--surface-hover); color: var(--text-1); }
 .help-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .help-btn-ic { font-size: 20px; flex-shrink: 0; }
-
-
-
-
-
 
 
 /* Tablette / téléphone étroit : le panneau devient une feuille en bas d'écran,
@@ -1301,8 +1307,7 @@ body.cards-off-ticket .pcard__ticket { display: none; }
    SUR une cellule de la grille, sa hauteur vient de `--row-h` et son
    rembourrage aligne ses lettres sur celles de la cellule qu'il recouvre. Lui
    donner la boîte de la charte décalerait le texte au moment du clic — il
-   garde donc la sienne, à dessein. Même raison pour `.ld-input--title` et
-   `.ld-input--sub`, qui se font passer pour le titre de la fiche. */
+   garde donc la sienne, à dessein. */
 .cell-input {
   width: 100%;
   border: 0;
@@ -1330,8 +1335,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   position: relative;
   z-index: 1;
 }
-.cell-display { cursor: text; }
-.cell-display.placeholder { color: var(--text-3); }
+
 
 /* poignée de glisser (largeur : voir .col-handle plus bas, avec ses voisines) */
 .handle-cell {
@@ -1592,7 +1596,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .pdf-slot:hover .pdf-btn__remove,
 .pdf-slot:focus-within .pdf-btn__remove,
 .pdf-btn__remove:focus-visible { opacity: 1; pointer-events: auto; }
-
 
 
 /* Type Pro / Perso : pastille */
@@ -2154,8 +2157,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .deadline-badge.orange { color: var(--primary); background: var(--primary-soft); }
 .deadline-badge.red { color: var(--primary); background: var(--primary-soft); font-weight: var(--graisse-note); }
 /* champ vide actionnable */
-.deadline-badge.empty,
-.empty-field {
+.deadline-badge.empty {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -2172,9 +2174,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   white-space: nowrap;
   transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.deadline-badge.empty:hover,
-.empty-field:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
-.empty-field svg,
+.deadline-badge.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
 .deadline-badge.empty svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 /* Infobulle maison — remplace la bulle système de Chrome (attribut `title`),
@@ -3123,8 +3123,13 @@ body.dragging-active .grid-wrap { pointer-events: none; }
   scrollbar-gutter: stable;
 }
 
-button, a, .stage, .deadline-badge,
-.type-tag, .empty-field, .cal-day, .desc-toggle {
+button,
+a,
+.stage,
+.deadline-badge,
+.type-tag,
+.cal-day,
+.desc-toggle {
   touch-action: manipulation;
 }
 
@@ -3337,7 +3342,6 @@ button, a, .stage, .deadline-badge,
   /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
      fichier et gagnerait à spécificité égale. */
   #viewProjet { padding-right: 8px; margin-right: 4px; }
-  .btn-primary-label { display: none; }
   .topbar .btn-primary { padding: 10px; }
 }
 
@@ -3398,7 +3402,6 @@ button, a, .stage, .deadline-badge,
   .poste { padding: 0 4px; }
   .poste-nom { display: none; }
 }
-
 
 
 /* ===========================================================================
@@ -3841,7 +3844,6 @@ body.view-plein .fiverr-tool { display: none !important; }
 }
 
 .dashboard { background: var(--pj-bg); color: var(--pj-ink); }
-.dashboard button { font-family: inherit; }
 
 /* L'attribut hidden doit gagner même sur les éléments qui portent un display. */
 .dashboard [hidden], .dd-panel [hidden], .pj-feed [hidden] { display: none !important; }
@@ -5336,7 +5338,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 .reg-tarif-toggle.is-on { color: var(--primary); }
 .reg-tarif-del:hover { color: var(--danger); }
 .reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: var(--ctrl-h); padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: var(--taille-texte); cursor: pointer; }
-.reg-tarif-params { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+
 .reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: var(--taille-texte); color: var(--text-2); }
 
 @media (max-width: 700px) {
@@ -5387,7 +5389,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    l'écran Nouveau Projet au-dessus de sa page grise. */
 .ld-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .ld-head__titles { flex: 1; min-width: 0; }
-.ld-head__badges { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
 .ld-close { flex-shrink: 0; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); background: transparent; color: var(--text-2); border-radius: 999px; cursor: pointer; }
 .ld-close:hover { background: var(--state-hover); color: var(--text-1); }
 
@@ -5413,15 +5415,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 @media (max-width: 760px) {
   .ld-body { grid-template-columns: 1fr; }
 }
-.ld-section {
-  margin: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-2);
-}
-.ld-section--full { grid-column: 1 / -1; }
+
 
 /* --- Encadrés de la fiche — valeurs reprises telles quelles de l'écran du
    patron (.sheet-box / .sheet-k / .sheet-v / .sheet-input) ------------------
@@ -5581,14 +5575,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 /* Titre de section : recette de .pjc-section-title (encre grasse + filet), pas
    la micro-capitale grise d'avant qui n'existait qu'ici. 15 px et non 18 :
    au-dessus, le titre du panneau fait 20 px, la hiérarchie doit tenir. */
-.ld-section-title {
-  margin: 0 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  color: var(--text-1);
-}
+
 .ld-docs { display: flex; gap: 6px; }
 
 /* Imprimer / Télécharger le récapitulatif : les deux gestes de l'écran du
@@ -5640,8 +5627,8 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    thèmes — invisible en sombre. Même jeton inversible que les autres anneaux. */
 .ld-detail-input:focus { outline: 2px solid rgba(var(--primary-rgb), .25); outline-offset: 1px; }
 :root[data-theme="dark"] .ld-detail-input:focus { outline-color: rgba(var(--primary-rgb), .4); }
-.ld-detail-save { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
-.ld-detail-state { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-2); align-self: center; }
+
+
 @media (max-width: 620px) {
   .ld-detail-line { grid-template-columns: 1fr; }
   .ld-detail-line > span { padding-top: 0; }
@@ -5669,20 +5656,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .ld-fiche-item__sub { margin: 3px 0 0; font-size: var(--taille-texte); color: var(--text-2); padding-left: 10px; }
 
 /* Même recette de champ que .pjc-card textarea/input : cadre visible au repos. */
-.ld-notes {
-  width: 100%;
-  min-height: 140px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--champ-y) var(--champ-x);
-  font: inherit;
-  font-size: var(--taille-texte);
-  color: var(--text-1);
-  background: var(--surface);
-  resize: vertical;
-  box-sizing: border-box;
-}
-.ld-notes:focus { outline: 2px solid rgba(var(--primary-rgb), .13); border-color: var(--primary); }
+
 
 /* --- Tiroir éditable ------------------------------------------------------
    Le tiroir n'est pas une fiche de lecture : chaque rangée porte un contrôle
@@ -5707,70 +5681,21 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 /* Empilés, seuls les champs de saisie prennent toute la largeur : une puce ou
    un interrupteur étiré sur 400 px n'aurait plus l'air cliquable. */
 .ld-field > button,
-.ld-field > .ld-value,
 .ld-field > .flag-reason { align-self: flex-start; max-width: 100%; }
 
-/* Champ texte : recette de .pjc-card input, à l'identique — cadre visible au
-   repos, encre au focus. Le tiroir se remplit autant qu'il se lit ; un champ
-   invisible tant qu'on ne le survole pas ne se voyait pas au doigt. */
-.ld-input {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: var(--champ-y) var(--champ-x);
-  font: inherit;
-  font-size: var(--taille-texte);
-  color: var(--text-1);
-  text-overflow: ellipsis;
-  box-sizing: border-box;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-.ld-input::placeholder { color: var(--text-3); }
-.ld-input:hover { border-color: var(--text-3); }
-.ld-input:focus { outline: 2px solid rgba(var(--primary-rgb), .13); border-color: var(--primary); }
-.ld-input.num { font-variant-numeric: tabular-nums; }
+/* ICI VIVAIT L'ANCIEN TIROIR DE FICHE — retiré le 25/08/2026.
+   Quinze classes (`ld-input` et ses deux variantes, `ld-section`, `ld-value`,
+   `ld-notes`, `ld-reason`, `ld-stage-chip`, `ld-resp-chip`, `ld-detail-save`,
+   `ld-detail-state`, `ld-head__badges`…) décrivaient une fiche remplacée
+   depuis, mais jamais retirée de la feuille : leurs règles ne peignaient plus
+   rien. Vérifié la fiche OUVERTE, pas déduit : elle porte 35 classes `ld-*`,
+   aucune de cette liste. */
 
-/* Titre et sous-titre de l'en-tête : c'est le titre du panneau, pas une rangée
-   de formulaire — il garde donc le rendu texte de .pjc-header (30/700 ramené à
-   l'échelle d'un panneau de 468 px) et PERD le cadre que .ld-input pose
-   maintenant au repos ; le cadre revient au survol et au focus, pour qu'on voie
-   quand même que ça se modifie.
-   Le décalage à gauche compense le rembourrage du champ, pour que le texte reste
-   aligné sur le bord du panneau tant qu'on ne le survole pas ; à droite le
-   champ s'arrête net sur le conteneur, sinon il passerait SOUS le bouton de
-   fermeture et lui volerait ses clics. */
-.ld-input--title,
-.ld-input--sub {
-  width: calc(100% + 9px);
-  margin-inline-start: -9px;
-  border-color: transparent;
-  background: transparent;
-}
-.ld-input--title:hover,
-.ld-input--sub:hover { border-color: var(--border); background: var(--surface); }
-.ld-input--title {
-  margin-block: -5px;
-  padding: 4px 8px;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-}
-.ld-input--sub {
-  margin-block: 2px 0;
-  padding: 3px 8px;
-  font-size: var(--taille-texte);
-  color: var(--text-2);
-}
 
 /* Valeur en lecture seule (le HT déduit du TTC) : calée sur le rembourrage d'un
    champ pour rester dans l'alignement de la colonne, mais sans cadre ni
    interaction — rien à y modifier, c'est un calcul. */
-.ld-value {
-  padding: 10px 0;
-  font-size: var(--taille-texte);
-  font-variant-numeric: tabular-nums;
-}
-.ld-value--muted { color: var(--text-2); }
+
 
 /* Interrupteur du bloc Paiement : trois états lisibles — Oui (allumé), Non,
    et « — » quand personne ne s'est encore prononcé. */
@@ -5805,13 +5730,12 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .ld-field .flag-chip,
 .ld-field .flag-reason,
 .ld-field .deadline-badge { margin: 0; }
-.ld-resp-chip { padding: 4px 12px; max-width: 100%; }
+
 /* Étape et motif peuvent être longs : ils se replient au lieu de déborder du
    panneau. Empilés sous leur étiquette, ils disposent de toute la largeur — le
    bornage à 66 % et l'alignement à droite de l'ancienne rangée n'ont plus lieu
    d'être. */
-.ld-stage-chip { max-width: 100%; white-space: normal; text-align: left; }
-.ld-reason { max-width: 100%; text-align: left; }
+
 
 /* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
 
@@ -5855,7 +5779,6 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }
 }
-
 
 
 /* ===========================================================================
@@ -5951,43 +5874,17 @@ summary:focus-visible {
 .pcard.dragging { cursor: grabbing; }
 .pcard button, .pcard a { cursor: pointer; }
 
-/* =========================================================================
-   AU DOIGT, LE SURVOL N'EXISTE PAS — ET ANDROID LE LAISSE COLLÉ
-   =========================================================================
-   Chrome Android applique `:hover` au tap et l'y LAISSE jusqu'au tap suivant
-   ailleurs. Sur la tablette de l'atelier, la dernière carte touchée restait
-   donc éclairée en permanence : elle se lisait comme « celle-ci est
-   sélectionnée » alors que rien ne l'était. Même chose pour l'étape du rail
-   qu'on vient d'ouvrir, qui gardait le fond du survol par-dessus le fond de
-   l'état actif.
-   On borne donc le survol aux appareils qui en ont un — la souris du patron ne
-   perd rien, le doigt ne garde plus de trace. Ce qui remplace le survol au
-   doigt, c'est l'APPUI (bloc suivant) : immédiat, et qui s'efface tout seul. */
-@media (hover: none) {
-  .pcard:hover { border-color: var(--border); box-shadow: var(--shadow-1); }
-  .pcard:hover .pcard__handle { color: var(--text-3); }
-  .pcard__ref-btn:hover { border-color: var(--border); background: var(--surface); }
-  .pcard__ref-btn.is-on:hover { background: var(--text-1); border-color: var(--text-1); }
-  .pcard__open:hover,
-  .pcard__ticket:hover { background: var(--surface); border-color: var(--border); color: var(--text-2); }
-  .pcard__del:hover { background: var(--surface); border-color: var(--border); color: var(--text-3); }
-  .stage:hover { background: transparent; }
-  .stage.active:hover { background: var(--za); }
-  .stage.zone-head:hover,
-  .stage.zone-head.active:hover { background: transparent; }
-  .grid tbody tr:hover { background: transparent; }
-  .grid tbody tr.row-alt:hover { background: var(--row-alt); }
-  .grid tbody tr:hover .handle { color: var(--text-3); }
-  /* Ligne alertée : sa teinte de repos, pas celle du survol — sinon la dernière
-     ligne bloquée touchée restait plus foncée que ses voisines, et se lisait
-     comme « plus urgente » qu'elles. */
-  .grid tbody tr.is-bloque:hover > td { background: color-mix(in srgb, var(--st-bloque-bg) 62%, var(--surface)); }
-  .grid tbody tr.is-a-voir:hover > td { background: color-mix(in srgb, var(--primary-soft) 62%, var(--surface)); }
-  .nav-switch-btn:hover { background: transparent; color: var(--text-2); }
-  .nav-switch-btn.active:hover { background: transparent; color: var(--text-1); }
-  .icon-btn:hover { background: transparent; color: var(--text-2); }
-  .help-btn:hover { background: transparent; color: var(--text-2); }
-}
+/* AU DOIGT, LE SURVOL N’EXISTAIT PAS — bloc RETIRÉ le 25/08/2026.
+   Chrome Android laissait `:hover` collé après un tap : la dernière carte
+   touchée restait éclairée comme si elle était sélectionnée. Vingt-et-une
+   règles neutralisaient donc le survol sous `@media (hover: none)`.
+   Les Galaxy Tab de l’atelier sont au rebut depuis le 21/08 et ne seront pas
+   remplacées : aucun poste n’est sans souris, cette requête ne peut plus
+   correspondre. C’est le dernier bloc de la seconde échelle tactile — sept
+   `@media (pointer: coarse)` étaient partis le 25/08 au matin, celui-ci avait
+   survécu parce qu’il interroge le SURVOL et pas le pointeur.
+   (`git show 134338c -- public/styles.css` le ramène si un jour un écran
+   tactile revient au comptoir.) */
 
 /* =========================================================================
    L'APPUI RÉPOND DANS LA FRAME — pas au retour du serveur

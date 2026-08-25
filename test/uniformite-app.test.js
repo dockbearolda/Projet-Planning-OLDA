@@ -79,9 +79,19 @@ assert.ok(parJeton >= 15,
 // surtout, leurs cibles de 44 px tenaient une DEUXIÈME échelle de tailles à
 // côté de celle de la charte, et c'est ça qui coûtait cher.
 // ===========================================================================
-for (const [nom, src] of [['styles.css', CRM], ['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
-  assert.ok(!/@media\s*\(\s*pointer:\s*coarse/.test(src),
+// Onze au total : sept dans styles.css le matin, trois dans clients.css
+// l'après-midi, et un dernier `@media (hover: none)` — le seul qui interrogeait
+// le SURVOL et pas le pointeur, ce qui lui avait valu de passer entre les
+// mailles. On lit le CODE, pas les commentaires : ceux-ci racontent ce qui a
+// été retiré, et la garde se déclenchait sur leur propre récit.
+const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
+for (const [nom, src] of [['styles.css', CRM], ['clients.css', lire('public/clients.css')],
+  ['projet.css', lire('public/projet.css')], ['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+  const code = sansCom(src);
+  assert.ok(!/@media\s*\(\s*pointer:\s*coarse/.test(code),
     `${nom} : plus de règles tactiles, le poste est un PC`);
+  assert.ok(!/@media\s*\(\s*hover:\s*none/.test(code),
+    `${nom} : plus de règles « sans survol », tout poste a une souris`);
 }
 
 // ===========================================================================
@@ -322,5 +332,62 @@ assert.match(DEVIS, /id="projectPriorityGroup" role="group" aria-labelledby="pro
   'les trois priorités aussi');
 assert.match(VENTE, /<textarea id="internalNote" aria-labelledby="internalNoteTitle"/,
   'la note interne porte le nom de son bloc');
+
+// ===========================================================================
+// 12. LE RAIL PARLE LA LANGUE DE L'APPLICATION
+// ---------------------------------------------------------------------------
+// Il avait CINQ tailles à lui (13, 14, 15, 16, 17) dont trois hors de
+// l'échelle, et sa propre police — trois caractères se rendaient donc sur le
+// planning, dans la colonne la plus lue de l'écran. Mesuré avant de trancher :
+// à 320 px de rail, la police de la maison replie exactement les MÊMES quatre
+// libellés et le plus large mesure 239 px contre 240.
+// ===========================================================================
+// (Le CODE, pas les commentaires : celui de la charte NOMME les jetons retirés
+//  pour dire pourquoi ils sont partis — la garde se déclenchait dessus.)
+const CHARTE_CODE = sansCom(CHARTE);
+assert.ok(!/--rail-taille-titre|--rail-taille-forte|--rail-muet/.test(CHARTE_CODE),
+  'les jetons du rail devenus inutiles avec l’en-tête ne traînent plus');
+for (const jeton of ['--rail-taille-note', '--rail-taille-etape', '--rail-taille-compte']) {
+  const m = CHARTE.match(new RegExp(`${jeton}:\\s*([^;]+);`));
+  assert.ok(m && /var\(--taille-(note|texte)\)/.test(m[1]),
+    `${jeton} vient de l’échelle de la charte, il n’a plus de valeur à lui`);
+}
+assert.ok(!/font-family:\s*'Plus Jakarta Sans'/.test(sansCom(CRM)),
+  'une seule police : le rail écrit comme le reste');
+assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/plus-jakarta-sans-latin-variable.woff2')),
+  '… et le fichier de la seconde police ne dort plus dans public/');
+// Chrome impose Arial aux champs et aux boutons : sans cette règle, « Colonnes »
+// — le seul bouton d'icône à porter un mot — sortait en Arial 17 px.
+assert.match(CRM, /button, input, select, textarea \{ font-family: inherit; \}/,
+  'les contrôles héritent de la police du corps');
+
+// ===========================================================================
+// 13. UN JETON, UNE VALEUR
+// ---------------------------------------------------------------------------
+// « Bloc dans une carte » valait 12 px au socle et 16 sur l'écran de référence
+// du comptoir : le même objet, deux formes selon l'écran où on le regardait.
+// ===========================================================================
+assert.match(CHARTE, /--arrondi-bloc: var\(--arrondi-carte\)/,
+  'un bloc dans une carte EST une carte, partout');
+assert.strictEqual((CHARTE.match(/^\s*--arrondi-bloc:/gm) || []).length, 1,
+  'et il n’est déclaré qu’UNE fois dans toute la charte');
+
+// ===========================================================================
+// 14. LE CODE MORT NE REVIENT PAS
+// ---------------------------------------------------------------------------
+// Vingt-et-une classes sans aucun porteur, dont quinze formaient l'ANCIEN
+// tiroir de fiche, remplacé mais jamais retiré de la feuille.
+// La sonde qui les a trouvées s'est trompée deux fois avant d'être juste : elle
+// avait d'abord donné `c-due`, `c-pos`, `c-why` pour mortes, alors qu'elles
+// sont fabriquées par `'pj-row-head-c c-' + c.k` — un préfixe en FIN de chaîne
+// concaténée. Chacune des vingt-et-une a ensuite été vérifiée au rendu, la
+// fiche de ligne OUVERTE : elle en porte 35, aucune de cette liste.
+// ===========================================================================
+for (const morte of ['ld-input', 'ld-section', 'ld-value', 'ld-notes', 'ld-reason',
+  'ld-stage-chip', 'ld-resp-chip', 'ld-detail-save', 'ld-head__badges',
+  'cell-display', 'empty-field', 'density-compact', 'btn-primary-label', 'reg-tarif-params']) {
+  assert.ok(!new RegExp(`\\.${morte.replace(/[-]/g, '[-]')}\\b`).test(sansCom(CRM)),
+    `.${morte} n’a aucun porteur : sa règle ne revient pas dans la feuille`);
+}
 
 console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');

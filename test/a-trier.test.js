@@ -90,12 +90,23 @@ assert.ok(/openLigneDetail\(r\.id\)/.test(BOUTON),
   'sans destination connue, on renvoie sur la fiche plutôt que de deviner');
 
 // LE TACTILE A ÉTÉ RETIRÉ LE 25/08. Les Galaxy Tab sont au rebut depuis le
-// 21/08 et le projet est PC uniquement : les sept blocs `@media (pointer:
-// coarse)` ne servaient plus personne, et leurs cibles de 44 px entretenaient
-// une deuxième échelle de tailles à côté de celle de la charte.
-// Ce qui se vérifie maintenant : qu'ils ne reviennent pas.
-assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
-  'plus de règles tactiles : le projet est PC uniquement (voir CLAUDE.md)');
+// 21/08 et le projet est PC uniquement : les blocs `@media (pointer: coarse)`
+// ne servaient plus personne, et leurs cibles de 44 px entretenaient une
+// deuxième échelle de tailles à côté de celle de la charte. Sept sont partis
+// le matin (styles.css), trois de plus dans la Base clients l'après-midi, et
+// un dernier `@media (hover: none)` — le seul qui interrogeait le SURVOL et
+// pas le pointeur, ce qui lui avait valu de survivre à la première coupe.
+// Ce qui se vérifie maintenant : qu'aucun ne revienne, dans AUCUNE feuille.
+// On lit le CODE, pas les commentaires — ceux-ci racontent justement ce qui a
+// été retiré, et la garde se déclenchait dessus.
+const sansCommentairesCSS = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
+for (const feuille of ['public/styles.css', 'public/clients.css', 'public/projet.css']) {
+  const code = sansCommentairesCSS(lire(feuille));
+  assert.ok(!/@media\s*\(pointer:\s*coarse\)/.test(code),
+    `${feuille} : plus de règles tactiles, le projet est PC uniquement (voir CLAUDE.md)`);
+  assert.ok(!/@media\s*\(hover:\s*none\)/.test(code),
+    `${feuille} : plus de règles « sans survol » — tout poste a une souris`);
+}
 // La couleur dit un ÉTAT (« pas encore à sa place »), jamais une décoration :
 // elle vient des variables de la charte, pas d'un code écrit en dur.
 const REGLE = CSS.match(/\n\.ranger-chip \{[\s\S]*?\n\}/)[0];

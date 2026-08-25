@@ -87,25 +87,29 @@ function bloc(css, condition, aiguille) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. LE SURVOL NE RESTE PLUS COLLÉ SUR LA TABLETTE
+// 1. LE SURVOL N'A PLUS À ÊTRE NEUTRALISÉ : IL N'Y A PLUS DE DOIGT
 // ---------------------------------------------------------------------------
+// Chrome Android laissait `:hover` collé après un tap — la dernière carte
+// touchée restait éclairée comme si elle était sélectionnée. Vingt-et-une
+// règles le neutralisaient sous `@media (hover: none)`.
+// Les Galaxy Tab de l'atelier sont au rebut depuis le 21/08 et ne seront pas
+// remplacées ; aucun poste n'est sans souris. Ce bloc a donc été retiré le
+// 25/08 — le dernier de la seconde échelle tactile, celui qui avait survécu à
+// la coupe du matin parce qu'il interroge le SURVOL et pas le pointeur.
+//
+// Ce qui se vérifie ici maintenant : que la neutralisation ne revienne pas, et
+// surtout que ce qu'elle protégeait tienne toujours SANS elle — l'étape active
+// garde son fond d'état, et le zébrage survit au survol d'une ligne.
 {
-  const sansSurvol = bloc(CSS, '(hover: none)');
-  // Les surfaces qu'on TOUCHE toute la journée, et dont un survol resté collé
-  // se lit comme un état : la carte du planning et l'étape du rail.
-  for (const sel of ['.pcard:hover', '.stage:hover', '.stage.active:hover',
-    '.grid tbody tr:hover', '.nav-switch-btn:hover']) {
-    assert.ok(sansSurvol.includes(sel + ' '),
-      `« ${sel} » doit être neutralisé au doigt — sinon la dernière ligne touchée reste éclairée`);
-  }
-  // Neutraliser ne veut pas dire aplatir : l'étape ACTIVE garde son fond, sinon
-  // le rail ne dirait plus où l'on est dès qu'on a touché une entrée.
-  // Depuis la refonte du rail (24/08), le fond d'état est celui de la PHASE
-  // (--za, la couleur « actif » de sa palette), plus le gris unique d'avant.
-  assert.match(sansSurvol, /\.stage\.active:hover\s*\{\s*background:\s*var\(--za\)/,
-    'l’étape active doit garder son fond d’état au doigt');
-  assert.match(sansSurvol, /\.grid tbody tr\.row-alt:hover\s*\{\s*background:\s*var\(--row-alt\)/,
-    'le zébrage doit survivre à la neutralisation du survol');
+  const code = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/@media\s*\(hover:\s*none\)/.test(code),
+    'la neutralisation tactile du survol ne revient pas : tout poste a une souris');
+  // Le fond d'état de l'étape courante vient de la palette de sa phase (--za,
+  // refonte du rail du 24/08) : c'est lui qui dit où l'on se tient.
+  assert.match(code, /\.stage\.active\s*\{[^}]*background:\s*var\(--za\)/,
+    'l’étape active garde son fond d’état');
+  assert.match(code, /\.grid tbody tr\.row-alt[^{]*\{[^}]*background:\s*var\(--row-alt\)/,
+    'le zébrage des lignes tient toujours');
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +237,7 @@ function bloc(css, condition, aiguille) {
   // au doigt ; il a été retiré le 25/08 (projet PC uniquement depuis le 21/08).
   // RESTE DONC UNE SEULE AUTRE PORTE : le clavier. Sans elle, trois actions
   // deviennent inatteignables pour qui tabule — et « supprimer » en fait partie.
-  assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
+  assert.ok(!/@media\s*\(pointer:\s*coarse\)/.test(CSS.replace(/\/\*[\s\S]*?\*\//g, '')),
     'les règles tactiles ne doivent pas revenir : le poste est un PC');
   assert.match(CSS,
     /\.send-btn:focus-visible,\s*\.del-btn:focus-visible,\s*\.dup-btn:focus-visible \{[^}]*opacity:\s*1/,

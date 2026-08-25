@@ -179,9 +179,15 @@
   /* Les formes. « --radius » et « --radius-card » plus haut disent la même
      chose pour le planning ; ces trois-là nomment les trois seules formes de
      l'application, du champ à la carte. */
-  --arrondi-champ: var(--radius);        /* 9px — champ, bouton, pastille */
-  --arrondi-bloc: 12px;                  /* bloc dans une carte */
-  --arrondi-carte: var(--radius-card);   /* 14px — la carte elle-même */
+  --arrondi-champ: var(--radius);        /* champ, bouton, pastille */
+  /* UN JETON, UNE VALEUR (25/08/2026). « Bloc dans une carte » valait 12 px
+     au socle et 16 sur l'écran de référence du comptoir : le même objet, deux
+     formes selon l'écran où on le regardait. C'est l'écran de référence qui
+     tranche, comme pour l'échelle et pour la boîte — un bloc dans une carte
+     EST une carte. Il ne reste donc que deux formes rectangulaires, et
+     l'écran du comptoir n'a plus de forme à lui. */
+  --arrondi-bloc: var(--arrondi-carte);  /* bloc dans une carte */
+  --arrondi-carte: var(--radius-card);   /* la carte elle-même */
 
   /* LA BOÎTE UNIQUE DE L'APPLICATION (25/08/2026).
      Tout ce qui se clique et se remplit fait cette hauteur : champ, zone de
@@ -440,16 +446,19 @@
      étapes en 12,5 px et ses catégories en 10,5 px — sur le 15,4 pouces de la
      vendeuse, c'est le coin de l'écran qu'elle lisait le moins bien, alors
      qu'il porte les compteurs qu'elle balaie toute la journée. */
-  --rail-taille-titre: 17px;    /* « Planning OLDA » */
-  --rail-taille-forte: 15px;    /* l'initiale du logo, le total général */
-  --rail-taille-note: 13px;     /* le sous-titre, le titre d'une catégorie */
-  --rail-taille-etape: 16px;    /* le libellé d'une étape */
-  --rail-taille-compte: 14px;   /* les compteurs */
+  /* LE RAIL PARLE L'ÉCHELLE DE LA CHARTE (25/08/2026). Il avait CINQ tailles à
+     lui — 13, 14, 15, 16, 17 — dont trois qui n'existent nulle part ailleurs,
+     dans la colonne la plus lue de l'écran. Il n'en garde que les deux de
+     l'application : 17 pour ce qu'on lit, 14 pour ce qu'on compte.
+     Les deux tailles qui ne servaient plus rien depuis le retrait de
+     l'en-tête (--rail-taille-titre, --rail-taille-forte) sont parties avec. */
+  --rail-taille-note: var(--taille-note);     /* le titre d'une catégorie */
+  --rail-taille-etape: var(--taille-texte);   /* le libellé d'une étape */
+  --rail-taille-compte: var(--taille-note);   /* les compteurs */
 
   --rail-encre: #0f1729;         /* sélection, titre de l'outil, logo */
   --rail-nonvide: #39424f;       /* libellé d'une étape qui a du monde */
   --rail-videtxt: #6b7280;       /* libellé d'une étape vide — reste lisible (4,5:1) */
-  --rail-muet: #a8afba;          /* le sous-titre de l'en-tête */
   --rail-zero: #c8cdd6;          /* un total de catégorie à zéro */
   --rail-hover: #f4f6f9;         /* survol d'une ligne */
   --rail-vide: #e8eaef;          /* bord droit du rail, filet d'un titre */
@@ -464,7 +473,6 @@
   --rail-encre: var(--text-1);
   --rail-nonvide: var(--text-1);
   --rail-videtxt: var(--text-2);
-  --rail-muet: var(--text-3);
   --rail-zero: var(--text-3);
   --rail-hover: var(--surface-hover);
   --rail-vide: var(--border-soft);
@@ -504,11 +512,9 @@
    sur la charte de la maison. Les deux écrans du comptoir ont donc divergé le
    24/08 — c'est à reprendre dès que le patron tranche pour le second. */
 .ecran-comptoir {
-  /* L'arrondi de carte n'est plus redit ici : il vaut 16 px au `:root` depuis
-     le 25/08, pour toute l'application. Ne restent que les deux formes encore
-     propres à cet écran — un bloc interne y EST une carte, et son champ
-     s'arrondit d'un pixel de plus. */
-  --arrondi-bloc: var(--arrondi-carte);
+  /* Cet écran n'a plus AUCUNE forme à lui depuis le 25/08 : ni l'arrondi de
+     carte, ni celui du bloc (« un bloc dans une carte EST une carte » est
+     remonté au socle, pour toute l'application). */
 
   /* LA BOÎTE DE CE QUI SE CLIQUE ET SE REMPLIT : 50 px, posée une seule fois.
      Champ et bouton la prennent tous les deux — l'un par `height`, l'autre par

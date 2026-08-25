@@ -174,7 +174,9 @@ assert.ok(largeurCol >= rangee(34),
 // uniquement depuis le 21/08, ces règles ne servaient plus personne et
 // entretenaient une deuxième échelle de tailles. Ce qui reste vérifié, c'est
 // que la colonne tient la rangée à la SEULE taille qui existe désormais.
-assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
+// (On lit le CODE, pas les commentaires : ceux-ci racontent ce qui a été
+//  retiré, et la garde se déclenchait sur leur propre récit.)
+assert.ok(!/@media\s*\(pointer:\s*coarse\)/.test(CSS.replace(/\/\*[\s\S]*?\*\//g, '')),
   'plus de second jeu de tailles tactiles : une seule échelle');
 
 // La marge de droite se pose sur la rangée et PAS sur le <td> : `.grid tbody td`

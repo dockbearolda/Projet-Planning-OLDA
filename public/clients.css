@@ -575,11 +575,12 @@
 .cl-secteurs__del .material-symbols-outlined { font-size: 16px; }
 .cl-secteurs__add { display: flex; gap: 8px; margin-top: 16px; }
 .cl-secteurs__add .cl-f__input { flex: 1; }
-/* Doigt : les croix restent atteignables sans viser au pixel près. */
-@media (pointer: coarse) {
-  .cl-secteurs__del { width: 36px; height: 36px; }
-  .cl-secteurs__chip { padding: 8px 8px 8px 14px; }
-}
+/* LE DOIGT N’EST PLUS UNE CIBLE — trois blocs `@media (pointer: coarse)`
+   RETIRÉS le 25/08/2026 (cibles de 44 px, champs à 16 px pour ne pas faire
+   zoomer iOS). Les Galaxy Tab de l’atelier sont au rebut depuis le 21/08 et
+   ne seront pas remplacées ; aucun poste ne travaille sur téléphone. La même
+   coupe avait été faite dans styles.css au matin, celle-ci avait été oubliée.
+   (`git show 134338c -- public/clients.css` les ramène.) */
 
 /* Bouton d'outil de l'en-tête (gestion des secteurs) : même gabarit que les
    boutons de tri, mais sa propre classe — le tri intercepte tous les clics de
@@ -595,29 +596,11 @@
 .cl-tool:hover { border-color: var(--primary); color: var(--primary); }
 .cl-tool:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .cl-tool .material-symbols-outlined { font-size: 20px; }
-@media (pointer: coarse) { .cl-tool { min-height: 44px; } }
 
 /* --- Tablette et téléphone : le doigt, pas la souris -----------------------
    Deux règles du projet, appliquées ici d'un bloc plutôt que dispersées :
    - toute cible se tape sans viser (44 px de zone, même quand le dessin reste
      compact : c'est le rembourrage qui grandit, pas le visuel) ;
-   - tout champ de saisie fait au moins 16 px, sinon iOS zoome à la mise au
-     point et la page reste décalée après coup. */
-@media (pointer: coarse) {
-  .cl-search__input,
-  .cl-f__input,
-  .cl-composer__input { font-size: var(--taille-texte); }
-
-  .cl-search__clear { min-width: 44px; min-height: 44px; padding: 0 12px; }
-  .cl-note__del { width: 44px; height: 44px; }
-  .cl-dh__btn { width: 44px; height: 44px; }
-  .cl-seg__btn { min-height: 44px; }
-  .cl-sort__btn,
-  .cl-filter__btn { min-height: 44px; }
-  .cl-kind { min-height: 44px; }
-  .cl-composer__add { min-height: 44px; }
-  .cl-secteurs__del { width: 44px; height: 44px; }
-}
 
 /* Réponses au survol qui manquaient (poste souris) : tri, filtres de nature,
    fermeture du panneau secteurs. */
