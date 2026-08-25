@@ -526,7 +526,25 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    catégorie sur la MÊME ligne d'yeux que la barre de recherche, à droite
    (mesuré : centres à 30 px tous les deux). Sans l'en-tête pour l'occuper, le
    haut du rail se lisait autrement plus haut que tout le reste de l'écran. */
-.stages { padding: 17px 12px 22px; display: flex; flex-direction: column; gap: 16px; }
+.stages { padding: 17px 12px 22px; display: flex; flex-direction: column; }
+
+/* SÉPARER DEUX FAMILLES (25/08). Le filet vertical coloré faisait ce travail
+   sans qu'on s'en rende compte ; retiré, les six familles se sont mises à
+   couler les unes dans les autres.
+   Deux moyens, et le second compte plus que le premier :
+     · un filet net sur toute la largeur utile du rail — pas un trait mou, une
+       coupure franche ;
+     · l'air RÉPARTI EN DÉSÉQUILIBRE : 22 px au-dessus du titre, 10 en dessous.
+       C'est ce déséquilibre qui fait le groupe. À écart égal, l'œil ne sait pas
+       si un titre appartient aux lignes du dessus ou à celles du dessous ;
+       collé à ses propres étapes, il ne se pose plus la question.
+   L'espace ne se met PAS en `gap` sur le conteneur : il doit appartenir à la
+   famille qui commence, sinon le filet se retrouve au milieu de nulle part. */
+.stage-zone + .stage-zone {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rail-separation);
+}
 
 /* UNE PHASE = une simple colonne. Elle portait un filet vertical coloré sur sa
    gauche (3 px, couleur de phase si elle avait du monde, gris sinon) : RETIRÉ
@@ -624,7 +642,10 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    (et « À trier », famille sans sous-étapes, n'a que cette ligne-là). */
 .stage.zone-head {
   min-height: auto;
-  margin: 4px 0 8px;
+  /* Rien au-dessus : l'air du dessus appartient à la SÉPARATION (voir
+     `.stage-zone + .stage-zone`). Ici on ne règle que la distance du titre à
+     ses propres étapes — courte, pour qu'il leur reste attaché. */
+  margin: 0 0 10px;
   padding: 0 8px 0 9px;
   gap: 10px;
   border-radius: 9px;

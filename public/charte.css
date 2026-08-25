@@ -410,7 +410,11 @@
   --rail-muet: #a8afba;          /* le sous-titre de l'en-tête */
   --rail-zero: #c8cdd6;          /* un total de catégorie à zéro */
   --rail-hover: #f4f6f9;         /* survol d'une ligne */
-  --rail-vide: #e8eaef;          /* séparateurs, bord droit du rail */
+  --rail-vide: #e8eaef;          /* bord droit du rail, filet d'un titre */
+  /* LA COUPURE ENTRE DEUX FAMILLES a son ton à elle, plus soutenu que le
+     filet d'un titre : c'est le seul trait du rail qui doit se voir d'un coup
+     d'œil, sans qu'on le cherche. À #e8eaef il se confondait avec le blanc. */
+  --rail-separation: #d5dae2;
   --rail-anneau: #dfe3ea;        /* l'anneau d'une puce vide */
   --rail-pouce: #d7dbe2;         /* le pouce de l'ascenseur */
 }
@@ -422,6 +426,7 @@
   --rail-zero: var(--text-3);
   --rail-hover: var(--surface-hover);
   --rail-vide: var(--border-soft);
+  --rail-separation: var(--border-strong);
   --rail-anneau: var(--border-strong);
   --rail-pouce: var(--border-strong);
 }
