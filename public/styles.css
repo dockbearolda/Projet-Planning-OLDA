@@ -666,23 +666,25 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   text-transform: uppercase;
   color: var(--zt);
 }
-/* Le filet horizontal, entre le libellé et le total (ordre flex). */
-.stage.zone-head::after {
-  content: "";
-  order: 2;
-  flex: 1 1 0;
-  min-width: 0;
-  height: 1px;
-  background: var(--rail-vide);
-}
-.stage.zone-head .stage-count { order: 3; font-size: var(--rail-taille-compte); font-weight: 800; padding: 0 7px; color: var(--zt); }
+/* LE FILET ENTRE LE LIBELLÉ ET LE TOTAL A ÉTÉ RETIRÉ (25/08). Il faisait
+   doublon avec la coupure pleine largeur qui sépare désormais deux familles :
+   deux traits à 20 px l'un de l'autre, et l'œil ne savait plus lequel comptait.
+   Il ne servait pas QU'À décorer, d'où les deux reprises ci-dessous :
+     · c'est lui qui poussait le total à droite (`flex:1 1 0`) — repris par une
+       marge automatique, jamais par `justify-content:flex-end`, qui rognerait
+       le libellé par la gauche dès qu'il déborde ;
+     · il portait l'état ACTIF de la famille en prenant la couleur du rail —
+       repris par le total, qui passe à l'encre avec le libellé. */
+.stage.zone-head .stage-count { margin-left: auto; font-size: var(--rail-taille-compte); font-weight: 800; padding: 0 7px; color: var(--zt); }
 .stage.zone-head .stage-count.has-items { background: transparent; }
 .stage.zone-head.is-empty .stage-count { color: var(--rail-zero); }
 /* L'état ACTIF d'un titre (À trier, ou la vue « toute la famille ») reste
-   typographique : le libellé passe à l'encre et le filet prend la couleur du
-   rail — rien qui ressemble à une ligne sélectionnée. */
-.stage.zone-head.active .stage-label { color: var(--rail-encre); }
-.stage.zone-head.active::after { background: var(--zr); }
+   typographique : le libellé ET le total passent à l'encre — rien qui
+   ressemble à une ligne sélectionnée. Les deux ensemble, sinon la famille
+   ouverte se signalait par un seul mot assombri au milieu de six titres
+   colorés : trop peu pour se repérer d'un coup d'œil. */
+.stage.zone-head.active .stage-label,
+.stage.zone-head.active .stage-count { color: var(--rail-encre); }
 /* Déposer sur un titre : le même anneau de geste que sur une ligne. */
 .stage.zone-head.drop-target { background: var(--za); box-shadow: inset 0 0 0 1.5px var(--zr); }
 
