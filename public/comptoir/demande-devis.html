@@ -3547,17 +3547,27 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
     btn.style.display="none";
     btn.textContent="📅 Créer dans le planning";
     btn.onclick=function(){
+      // CE FILET LISAIT « window.reference », « window.needs » et
+      // « window.selectedClient » — trois variables déclarées en `let` au fil de
+      // la page. Un `let` de premier niveau N'EST PAS posé sur `window` : les
+      // trois valaient `undefined`, et le repli partait donc avec une référence
+      // HORODATÉE (« DEV-1787663662895 »), sans client et sans un seul besoin.
+      // Un autre script de la même page les lit très bien en direct — c'est
+      // d'ailleurs ce que fait patchPlanningButton. (Les deux identifiants de
+      // secours, « finalRef » et « finalClient », n'existent nulle part dans le
+      // document : ils ne rattrapaient rien.)
       const pr=val("projectPriority")||"2";
       const next=window.clientNextActionValue();
-      const selected = window.selectedClient || null;
-      const clientName = selected ? (selected.company||selected.name||selected.contact||"Client") : (val("finalClient")||"Client");
-      const needs=(window.needs||[]).map(n=>`${n.qty} x ${n.label}`).join(" • ");
-      const production=(window.needs||[]).map(n=>n.productionType).filter(Boolean).join(" + ");
+      const selected = (typeof selectedClient!=="undefined" && selectedClient) || null;
+      const clientNom = selected ? (selected.company||selected.name||selected.contact||"Client") : "Client";
+      const lignes = (typeof needs!=="undefined" && needs) || [];
+      const needsLabel = lignes.map(n=>`${n.qty} x ${n.label}`).join(" • ");
+      const production = lignes.map(n=>n.productionType).filter(Boolean).join(" + ");
       const payload={
         source:"Demande de devis",
-        ref:(window.reference||val("finalRef")||("DEV-"+Date.now())),
-        client:clientName,
-        name:val("projectTitle")||needs||"Demande de devis",
+        ref:((typeof reference!=="undefined" && reference)||("DEV-"+Date.now())),
+        client:clientNom,
+        name:val("projectTitle")||needsLabel||"Demande de devis",
         responsible:val("salesperson")||"Non défini",
         due:val("desiredDate")||todayISO(),
         priority:String(pr),
