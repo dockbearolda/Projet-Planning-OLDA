@@ -50,6 +50,32 @@ CREATE TABLE IF NOT EXISTS requests (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
+-- LES QUATRE PERSONNES DE L'ATELIER, avec leur rôle.
+--
+-- L'application n'avait qu'un mot de passe commun et JETAIT l'identifiant : les
+-- quatre prénoms n'étaient que des étiquettes posées sur `requests.responsable`.
+-- Ils deviennent des comptes — mais la population ne change pas, ce sont les
+-- mêmes quatre personnes (voir EQUIPE dans db.js).
+--
+-- `code_hash` : scrypt, jamais le code en clair. null = code pas encore choisi,
+-- la personne le pose à sa première connexion. Le mot de passe partagé reste la
+-- porte d'entrée du site : ce code-ci ne protège pas de l'extérieur, il dit
+-- QUI est au poste parmi quatre personnes déjà entrées.
+-- Down : DROP TABLE users;
+CREATE TABLE IF NOT EXISTS users (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  prenom      text NOT NULL,
+  role        text NOT NULL,               -- direction / chef_atelier / boutique / operateur
+  code_hash   text,
+  actif       boolean NOT NULL DEFAULT true,
+  derniere_connexion timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- Le prénom est la clé de connexion : deux « Mélina » rendraient la connexion
+-- ambiguë, et c'est la base qui doit l'empêcher, pas le code.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_prenom ON users (prenom);
+
 -- Clé/valeur applicative : sert de garde d'idempotence aux migrations de données
 -- ponctuelles (ex. bascule du pipeline linéaire vers le modèle « familles »).
 CREATE TABLE IF NOT EXISTS app_meta (

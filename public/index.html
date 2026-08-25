@@ -110,6 +110,12 @@
           <span class="material-symbols-outlined" aria-hidden="true">add</span>
           <span class="nav-switch-label">Nouveau Projet</span>
         </a>
+        <!-- `work` EST dans la police (91 glyphes) : déjà utilisé par la fiche
+             client. Un nom absent ne lève rien, il s'affiche en texte tronqué. -->
+        <a class="nav-switch-btn nav-switch-btn--montravail" id="viewMonTravail" href="#mon-travail" hidden>
+          <span class="material-symbols-outlined" aria-hidden="true">work</span>
+          <span class="nav-switch-label">Mon travail</span>
+        </a>
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
           <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
           <span class="nav-switch-label">Planning</span>
@@ -355,6 +361,12 @@
              l'atelier (message WhatsApp « commande prête »…). Rendu par
              reglages.js, chargé au premier affichage. -->
         <section class="reglages" id="reglages" hidden aria-label="Réglages"></section>
+
+        <!-- Onglet Mon travail : l'écran de l'opérateur. « Ouvrir le logiciel le
+             matin et savoir immédiatement quoi faire » — trois listes, rien
+             d'autre. Il n'apparaît dans la barre que si les comptes sont
+             allumés : sans identité, « mon » ne veut rien dire. -->
+        <section class="montravail" id="montravail" hidden aria-label="Mon travail"></section>
 
         <!-- Onglet Nouveau Projet : LES DEUX flux du comptoir — vente directe
              et demande de devis. L'aiguillage (nouveau-projet.js, chargé au

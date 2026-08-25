@@ -698,3 +698,72 @@ html[data-theme="dark"] .ecran-comptoir {
   --scrollbar: #4b5563;
   --scrollbar-hover: #6b7280;
 }
+
+/* ===========================================================================
+   CONNEXION — « Qui est au poste ? »
+   Le voile qui s'affiche quand les comptes sont allumés et que personne ne
+   s'est nommé. Aucune couleur neuve, aucune taille neuve : le fond général, la
+   carte, les deux tailles de texte et l'accent plein de la charte — donc il
+   suit les deux thèmes tout seul, par les jetons.
+   Il vit ICI et pas dans styles.css parce que les écrans du comptoir doivent
+   pouvoir le porter aussi : c'est le seul fichier que les trois écrans lisent.
+   =========================================================================== */
+.connexion {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center;
+  padding: 32px;
+  background: var(--bg);
+}
+.connexion__carte {
+  width: min(520px, 100%);
+  display: flex; flex-direction: column; gap: 20px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-2);
+  padding: 32px;
+}
+.connexion__titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+.connexion__sous { margin: -12px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
+.connexion__equipe { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.connexion__qui {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  min-height: var(--ctrl-h); padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text-1);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.connexion__qui:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+/* L'accent plein dit « c'est toi » — un ÉTAT, pas une décoration. */
+.connexion__qui.is-moi { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.connexion__prenom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
+.connexion__role { font-size: var(--taille-note); color: var(--text-2); }
+.connexion__qui.is-moi .connexion__role { color: var(--on-primary); opacity: .78; }
+.connexion__code {
+  min-height: var(--ctrl-h); padding: 0 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text-1);
+  font: inherit; font-size: var(--taille-texte);
+  letter-spacing: .3em;
+}
+.connexion__code:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
+.connexion__aide, .connexion__erreur { margin: -12px 0 0; font-size: var(--taille-note); }
+.connexion__aide { color: var(--text-2); }
+.connexion__erreur { color: var(--danger); font-weight: var(--graisse-note); }
+/* Un message vide ne réserve PAS sa place : sinon la carte garderait un trou de
+   19 px sous le champ, et surtout elle CHANGERAIT DE HAUTEUR à l'apparition du
+   message — le bouton descendrait sous le doigt. Voir « un message ne pousse
+   personne » : ici la carte est centrée, donc elle grandit des deux côtés. */
+.connexion__aide:empty, .connexion__erreur:empty { display: none; }
+.connexion__ok {
+  min-height: var(--ctrl-h); border: 0; border-radius: var(--radius);
+  background: var(--primary); color: var(--on-primary);
+  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  cursor: pointer;
+}
+.connexion__ok:hover:not(:disabled) { background: var(--primary-hover); }
+.connexion__ok:disabled { opacity: .45; cursor: default; }
+/* Le fond ne défile plus derrière le voile : sans ça, la molette promène un
+   planning qu'on ne peut pas utiliser. */
+body.a-connecter { overflow: hidden; }

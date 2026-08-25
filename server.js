@@ -28,8 +28,11 @@ const {
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
-  logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
+  JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, getFlags, setFlags,
+  ROLES, ROLE_LABELS, CODE_MIN, CODE_MAX,
+  getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
+  poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
@@ -60,6 +63,17 @@ const VIVANTES_NU = 'deleted_at IS NULL';
 // une preuve — n'importe qui peut écrire n'importe quel prénom. Le jour où les
 // comptes existent, seule CETTE fonction change ; tous ses appelants restent.
 const quiDemande = (req) => {
+  // LA SESSION D'ABORD, et de loin. Une fois les comptes allumés, `req.moi`
+  // vient d'un jeton signé et d'une relecture en base : c'est le seul « qui »
+  // qui vaut quelque chose. L'en-tête, lui, est déclaratif — n'importe quel
+  // poste peut y écrire n'importe quel prénom.
+  //
+  // Sans cette ligne, allumer les comptes ne changeait RIEN au journal : il
+  // continuait de croire l'en-tête, et se retrouvait vide dès qu'un appel
+  // arrivait sans lui. C'est le test de « Mon travail » qui l'a trouvé — la
+  // liste « terminé aujourd'hui » se lit dans le journal, pas dans l'état des
+  // lignes, et elle restait donc obstinément vide.
+  if (req.moi && req.moi.prenom) return req.moi.prenom;
   const brut = req.get('X-Qui');
   if (typeof brut !== 'string' || !brut.trim()) return null;
   // Le poste l'envoie encodé en pourcent — un en-tête HTTP ne transporte pas
@@ -192,6 +206,33 @@ const PATCHABLE = [
   'flag', 'flag_reason',
   'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
 ];
+
+// QUELLE CAPACITÉ IL FAUT POUR ÉCRIRE CHAQUE CHAMP.
+//
+// Une permission par route ne suffit pas ici : le même PATCH sert à faire
+// avancer une tâche (tout le monde), à changer un pilote (chef d'atelier) et à
+// marquer un acompte reçu (boutique). Refuser la route entière à l'opérateur,
+// ce serait l'empêcher de terminer son travail ; la lui ouvrir en entier, ce
+// serait lui donner les prix. On tranche donc CHAMP PAR CHAMP.
+//
+// Cette table décrit exactement ce que le patron écrit de chaque rôle :
+//   - l'opérateur « commence une tâche, la termine, indique un problème,
+//     passe une tâche en Bloqué » → sous-étape, alerte et motif ;
+//   - le chef d'atelier « organise la production, modifie les priorités,
+//     attribue les tâches » → étape, priorité, pilote, référent, ordre ;
+//   - la boutique « crée les clients et les demandes, enregistre les
+//     acomptes » → tout le descriptif, plus l'argent ;
+//   - la direction, tout.
+// Un champ absent de cette table exige `clients` : c'est le défaut PRUDENT —
+// un champ ajouté demain sans y penser est refusé à l'opérateur, jamais offert.
+const CAPACITE_PAR_CHAMP = {
+  sub_stage: 'travailler', flag: 'travailler', flag_reason: 'travailler',
+  stage: 'production', priority: 'production', position: 'production',
+  responsable: 'production', referent: 'production',
+  project_value: 'argent', acompte_demande: 'argent', acompte_verse: 'argent',
+  acompte_montant: 'argent', paye: 'argent', paiement_mode: 'argent',
+};
+const capaciteDuChamp = (champ) => CAPACITE_PAR_CHAMP[champ] || 'clients';
 
 // Champs booléens du suivi de paiement. null = on ne se prononce pas (une ligne
 // jamais renseignée n'affirme pas « non payé »).
@@ -458,6 +499,283 @@ app.get('/api/version', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// COMPTES NOMINATIFS ET RÔLES (§3, §25, §39 du patron).
+//
+// « Construire les permissions proprement dès le départ. Ne pas simplement
+//   cacher les boutons côté interface. Les permissions doivent également être
+//   contrôlées côté serveur. »
+//
+// Le mot de passe partagé RESTE : c'est lui qui protège le site de l'extérieur,
+// et il le fait bien. Ce qui s'ajoute par-dessus dit QUI est au poste parmi les
+// quatre personnes déjà entrées — et c'est cette identité-là qui décide de ce
+// qu'on voit et de ce qu'on peut écrire.
+//
+// TOUT CE BLOC DORT tant que l'interrupteur `comptes` est éteint : sans lui,
+// l'application se comporte exactement comme avant. C'est ce qui permet de le
+// livrer sans toucher au comptoir qui tourne.
+// ---------------------------------------------------------------------------
+
+// Les interrupteurs sont lus à CHAQUE requête protégée : les relire en base à
+// chaque fois, c'est un aller-retour Postgres par appel, sur toutes les routes.
+// On les garde en mémoire et on invalide à l'écriture (voir PUT /api/flags).
+let flagsCache = null;
+async function flags() {
+  if (!flagsCache) flagsCache = await getFlags();
+  return flagsCache;
+}
+const oublierFlags = () => { flagsCache = null; };
+
+// CE QUE CHAQUE RÔLE PEUT FAIRE. Écrit une fois, en toutes lettres — c'est la
+// seule table à relire quand on se demande « qui a le droit de quoi ».
+//   travailler : avancer une tâche, signaler un blocage (tout le monde)
+//   production : priorités, attribution, ordre du planning, changement de famille
+//   clients    : créer/modifier clients, demandes, commandes
+//   argent     : voir ET écrire prix, acompte, paiement
+//   marge      : voir les coûts et la marge
+//   forcer     : débloquer, passer outre une étape
+//   reglages   : tout ce qui vaut pour tous les postes
+const CAPACITES = {
+  direction: ['travailler', 'production', 'clients', 'argent', 'marge', 'forcer', 'reglages'],
+  chef_atelier: ['travailler', 'production'],
+  boutique: ['travailler', 'clients', 'argent'],
+  operateur: ['travailler'],
+};
+
+// Sans session (interrupteur éteint, ou poste pas encore connecté alors que le
+// mot de passe partagé l'a laissé entrer), on rend TOUT : c'est le comportement
+// d'avant, et il ne doit pas changer tant que les comptes ne sont pas allumés.
+function peut(moi, capacite) {
+  if (!moi) return true;
+  return (CAPACITES[moi.role] || []).includes(capacite);
+}
+
+// --- Jeton de session ---------------------------------------------------------
+// Signé, pas chiffré : le poste peut lire son contenu, il ne peut pas le
+// fabriquer. Aucune table de sessions à tenir — donc rien à nettoyer, et rien
+// qui grossisse. La contrepartie assumée : révoquer une session avant son terme
+// demanderait de changer le secret (donc de déconnecter les quatre).
+const COOKIE_SESSION = 'olda_session';
+const SESSION_JOURS = 30;
+// `Secure` interdit au navigateur de poser le cookie sur du http : en local, la
+// connexion échouerait sans un mot d'explication — on se reconnecterait en
+// boucle. En production, Railway sert en https et le drapeau est indispensable.
+const SUR_HTTPS = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+
+const b64u = (buf) => Buffer.from(buf).toString('base64url');
+
+async function signerJeton(charge) {
+  const secret = await getSecretSession();
+  const corps = b64u(JSON.stringify(charge));
+  const sceau = crypto.createHmac('sha256', secret).update(corps).digest('base64url');
+  return `${corps}.${sceau}`;
+}
+
+async function lireJeton(jeton) {
+  if (typeof jeton !== 'string' || !jeton.includes('.')) return null;
+  const [corps, sceau] = jeton.split('.');
+  if (!corps || !sceau) return null;
+  const secret = await getSecretSession();
+  const attendu = crypto.createHmac('sha256', secret).update(corps).digest('base64url');
+  // Longueurs différentes → `timingSafeEqual` LÈVE au lieu de rendre faux : un
+  // jeton tronqué ferait alors une erreur 500 au lieu d'une déconnexion propre.
+  if (sceau.length !== attendu.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sceau), Buffer.from(attendu))) return null;
+  try {
+    const charge = JSON.parse(Buffer.from(corps, 'base64url').toString('utf8'));
+    if (!charge || typeof charge !== 'object') return null;
+    if (!Number.isFinite(charge.e) || charge.e < Date.now()) return null;
+    return charge;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Analyse du `Cookie` à la main : une dépendance de plus pour découper une
+// chaîne sur des points-virgules ne se justifie pas.
+function cookie(req, nom) {
+  const brut = req.headers.cookie;
+  if (!brut) return null;
+  for (const part of brut.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === nom) return decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return null;
+}
+
+// Pose `req.moi` = { id, prenom, role } quand les comptes sont allumés ET que le
+// poste s'est connecté. `null` sinon — et `null` veut dire « comme avant ».
+//
+// ⚠ PAS `asyncH` ICI : il rend `(req, res) => …` et laisse tomber le `next`.
+// Passé en middleware, la chaîne ne repartirait jamais — toutes les requêtes
+// resteraient en attente, sans erreur ni message.
+//
+// Une panne de lecture ne bloque pas le poste : on continue SANS session,
+// c'est-à-dire comme avant les comptes. Refuser l'entrée parce qu'on n'a pas su
+// lire un cookie, ce serait fermer l'atelier sur un incident de base.
+app.use((req, res, next) => {
+  req.moi = null;
+  (async () => {
+    const f = await flags();
+    if (!f.comptes) return;
+    const charge = await lireJeton(cookie(req, COOKIE_SESSION));
+    if (!charge) return;
+    // On relit l'utilisateur en base plutôt que de croire le jeton sur parole :
+    // un compte désactivé, ou dont le rôle a changé, doit valoir immédiatement —
+    // sinon un jeton de trente jours porterait un rôle périmé pendant un mois.
+    const u = await getUtilisateur(charge.u);
+    if (u) req.moi = { id: u.id, prenom: u.prenom, role: u.role };
+  })().catch((err) => { console.error('session :', err.message); }).then(() => next());
+});
+
+// LA PORTE. Comptes allumés et personne de connecté = on ne répond RIEN d'utile.
+//
+// Sans elle, le trou est béant : `peut(null, …)` rend `true` — c'est le
+// comportement d'avant, celui qu'il faut garder quand les comptes dorment — et
+// un poste qui se contenterait de ne pas se connecter aurait donc TOUS les
+// droits. L'interrupteur ne servirait qu'à afficher un écran de connexion qu'on
+// peut ignorer.
+//
+// Trois routes restent ouvertes, et seulement trois : celle qui dit s'il faut se
+// connecter, celle par où l'on se connecte, et le numéro de version (la bulle
+// « mise à jour disponible » interroge celle-là en boucle, y compris sur un
+// poste au repos).
+const PORTE_OUVERTE = new Set(['/api/session', '/api/version']);
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();   // le site, ses pages, ses polices
+  if (PORTE_OUVERTE.has(req.path)) return next();
+  flags().then((f) => {
+    if (!f.comptes || req.moi) return next();
+    // 401 et pas 403 : ce n'est pas « interdit à vous », c'est « dis-moi qui tu
+    // es ». L'écran sait faire la différence et n'affiche pas le même message.
+    res.status(401).json({ error: 'Connecte-toi pour continuer.', connexion: true });
+  }).catch(() => next());
+});
+
+// Refuse la route à qui n'a pas la capacité. C'est la garde de DERNIER recours :
+// l'écran cache déjà ce qu'on ne peut pas faire, mais un écran n'est pas une
+// permission — le patron le dit lui-même.
+const exige = (capacite) => (req, res, next) => {
+  if (peut(req.moi, capacite)) return next();
+  res.status(403).json({
+    error: `Réservé : ${ROLE_LABELS[req.moi.role]} n’a pas accès à cette action.`,
+    capacite,
+  });
+};
+
+// LES COLONNES D'ARGENT, retirées de la réponse pour qui n'a pas la capacité.
+// C'est LA différence entre « cacher un bouton » et une permission : un
+// opérateur qui ouvre les outils de son navigateur ne doit pas trouver le prix
+// dans la réponse réseau. Le patron l'écrit noir sur blanc pour ce rôle-là.
+const CHAMPS_ARGENT = ['project_value', 'acompte_demande', 'acompte_verse',
+  'acompte_montant', 'paye', 'paiement_mode'];
+
+function sansArgent(ligne) {
+  const propre = { ...ligne };
+  for (const c of CHAMPS_ARGENT) delete propre[c];
+  // La fiche du comptoir porte le détail chiffré ligne à ligne : la vider à
+  // moitié serait pire que la retirer, le récapitulatif deviendrait faux.
+  if (propre.fiche && typeof propre.fiche === 'object') {
+    const { paiement, prix, total, lot, ...reste } = propre.fiche;
+    propre.fiche = { ...reste, ...(lot ? { lot } : {}) };
+  }
+  return propre;
+}
+
+// Un seul point de passage pour toutes les lectures de commande : ajouter une
+// route plus tard sans y penser, c'est rouvrir le trou qu'on vient de fermer.
+const selonMoi = (req, lignes) => (peut(req.moi, 'argent')
+  ? lignes
+  : (Array.isArray(lignes) ? lignes.map(sansArgent) : sansArgent(lignes)));
+
+// --- Routes de session ---------------------------------------------------------
+
+// Qui suis-je, et que puis-je ? L'écran s'en sert pour se composer.
+app.get('/api/session', asyncH(async (req, res) => {
+  const f = await flags();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    comptes: !!f.comptes,
+    moi: req.moi ? { ...req.moi, label: ROLE_LABELS[req.moi.role] } : null,
+    capacites: req.moi ? CAPACITES[req.moi.role] : null,
+    // La liste des prénoms sert l'écran de connexion : on ne demande à personne
+    // de taper son nom, on le lui fait choisir. Quatre personnes, quatre tuiles.
+    equipe: f.comptes ? (await getUtilisateurs()).map((u) => ({
+      prenom: u.prenom, role: u.role, label: ROLE_LABELS[u.role], aUnCode: u.a_un_code,
+    })) : [],
+  });
+}));
+
+// Ralentisseur de connexion, même principe que le mot de passe partagé : dix
+// essais par prénom, puis l'attente. Sans lui, un code à quatre chiffres se
+// devine en quelques minutes.
+const echecsCode = new Map();
+function tropDEssaisCode(prenom) {
+  const e = echecsCode.get(prenom);
+  return !!e && Date.now() < e.jusqua && e.n >= 10;
+}
+function compterEchecCode(prenom) {
+  const e = echecsCode.get(prenom);
+  const maintenant = Date.now();
+  if (!e || maintenant > e.jusqua) echecsCode.set(prenom, { n: 1, jusqua: maintenant + 10 * 60000 });
+  else echecsCode.set(prenom, { n: e.n + 1, jusqua: maintenant + 10 * 60000 });
+}
+
+app.post('/api/session', asyncH(async (req, res) => {
+  const f = await flags();
+  if (!f.comptes) return res.status(409).json({ error: 'Les comptes ne sont pas activés.' });
+  const b = req.body || {};
+  const prenom = typeof b.prenom === 'string' ? b.prenom.trim() : '';
+  const code = typeof b.code === 'string' ? b.code : '';
+  if (!prenom) return res.status(400).json({ error: 'Choisis ton prénom.' });
+  if (tropDEssaisCode(prenom)) {
+    res.set('Retry-After', '600');
+    return res.status(429).json({ error: 'Trop d’essais. Réessaie dans quelques minutes.' });
+  }
+  const u = await getUtilisateurParPrenom(prenom);
+  if (!u) return res.status(404).json({ error: 'Ce prénom n’est pas dans l’équipe.' });
+
+  if (!u.code_hash) {
+    // PREMIÈRE CONNEXION : la personne pose son code. Il n'y a pas d'écran
+    // d'administration à traverser pour ça — à quatre personnes derrière un mot
+    // de passe commun, en inventer un serait du travail pour rien.
+    if (code.length < CODE_MIN || code.length > CODE_MAX) {
+      return res.status(400).json({ error: `Choisis un code de ${CODE_MIN} chiffres au moins.` });
+    }
+    await poserCode(u.id, code);
+  } else if (!codeCorrect(code, u.code_hash)) {
+    compterEchecCode(prenom);
+    return res.status(401).json({ error: 'Code incorrect.' });
+  }
+
+  echecsCode.delete(prenom);
+  await toucherConnexion(u.id);
+  const jeton = await signerJeton({
+    u: u.id, p: u.prenom, r: u.role, e: Date.now() + SESSION_JOURS * 86400000,
+  });
+  // `HttpOnly` : le jeton n'est pas lisible en JavaScript, donc un script tiers
+  // ne peut pas l'emporter. `SameSite=Lax` : il ne part pas sur une requête
+  // venue d'un autre site. `Secure` seulement en production — en local, le site
+  // est en http et un cookie `Secure` n'y serait jamais posé.
+  res.setHeader('Set-Cookie', [
+    `${COOKIE_SESSION}=${encodeURIComponent(jeton)}`,
+    'Path=/', 'HttpOnly', 'SameSite=Lax',
+    `Max-Age=${SESSION_JOURS * 86400}`,
+    ...(SUR_HTTPS ? ['Secure'] : []),
+  ].join('; '));
+  res.json({
+    moi: { id: u.id, prenom: u.prenom, role: u.role, label: ROLE_LABELS[u.role] },
+    capacites: CAPACITES[u.role],
+    premiere: !u.code_hash,
+  });
+}));
+
+app.delete('/api/session', (req, res) => {
+  res.setHeader('Set-Cookie', `${COOKIE_SESSION}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  res.status(204).end();
+});
+
+// ---------------------------------------------------------------------------
 // Interrupteurs de fonctionnalité (voir FLAGS_CONNUS dans db.js).
 // Ils décident ce qu'un poste AFFICHE, jamais ce que le serveur AUTORISE : un
 // écran éteint côté interface reste atteignable par l'API. C'est volontaire à
@@ -468,15 +786,16 @@ app.get('/api/flags', asyncH(async (req, res) => {
   res.json({ flags: await getFlags(), connus: FLAGS_CONNUS });
 }));
 
-app.put('/api/flags', asyncH(async (req, res) => {
+app.put('/api/flags', exige('reglages'), asyncH(async (req, res) => {
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
     return res.status(400).json({ error: 'Objet attendu' });
   }
-  const flags = await setFlags(req.body);
+  const etat = await setFlags(req.body);
+  oublierFlags();
   // Chaque poste doit basculer sans qu'on aille le rouvrir un par un : c'est
   // tout l'intérêt d'un interrupteur central plutôt que d'un réglage local.
   broadcast({ kind: 'flags' });
-  res.json({ flags, connus: FLAGS_CONNUS });
+  res.json({ flags: etat, connus: FLAGS_CONNUS });
 }));
 
 // ---------------------------------------------------------------------------
@@ -565,7 +884,7 @@ app.get('/api/category-owners', asyncH(async (req, res) => {
   res.json(await getCategoryOwners());
 }));
 
-app.put('/api/category-owners', asyncH(async (req, res) => {
+app.put('/api/category-owners', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Objet { catégorie: employé } attendu' });
@@ -582,7 +901,7 @@ app.get('/api/category-referents', asyncH(async (req, res) => {
   res.json(await getCategoryReferents());
 }));
 
-app.put('/api/category-referents', asyncH(async (req, res) => {
+app.put('/api/category-referents', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Objet { catégorie: [employés] } attendu' });
@@ -600,7 +919,7 @@ app.get('/api/machines', asyncH(async (req, res) => {
   res.json(await getMachines());
 }));
 
-app.put('/api/machines', asyncH(async (req, res) => {
+app.put('/api/machines', exige('reglages'), asyncH(async (req, res) => {
   if (!Array.isArray(req.body)) {
     return res.status(400).json({ error: 'Tableau de machines attendu' });
   }
@@ -626,18 +945,18 @@ const enregistrerTarifsTasse = asyncH(async (req, res) => {
   broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
 });
-app.put('/api/tarifs-tasse', enregistrerTarifsTasse);
+app.put('/api/tarifs-tasse', exige('reglages'), enregistrerTarifsTasse);
 // POST accepté aussi : c'est la seule méthode que `navigator.sendBeacon` sait
 // émettre, et c'est lui qui sauve la dernière correction quand on ferme
 // l'onglet Réglages avant la fin du délai d'enregistrement (voir reglages.js).
-app.post('/api/tarifs-tasse', enregistrerTarifsTasse);
+app.post('/api/tarifs-tasse', exige('reglages'), enregistrerTarifsTasse);
 
 // Paramètres globaux du calcul (taux horaires MO/machine, TGCA).
 app.get('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
   res.json(await getTarifsTasseParametres());
 }));
 
-app.put('/api/tarifs-tasse/parametres', asyncH(async (req, res) => {
+app.put('/api/tarifs-tasse/parametres', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body || {};
   for (const key of ['tauxHoraireMo', 'tauxHoraireMachine', 'tgca']) {
     if (key in body && !Number.isFinite(Number(body[key]))) {
@@ -657,7 +976,7 @@ app.get('/api/supplements-express', asyncH(async (req, res) => {
   res.json(await getSupplementsExpress());
 }));
 
-app.put('/api/supplements-express', asyncH(async (req, res) => {
+app.put('/api/supplements-express', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body || {};
   for (const key of ['j5', 'j10', 'j15']) {
     if (!(key in body)) continue;   // palier non envoyé = palier inchangé
@@ -687,7 +1006,7 @@ app.get('/api/settings/whatsapp', asyncH(async (req, res) => {
   res.json({ message: await getWhatsappMessage() });
 }));
 
-app.put('/api/settings/whatsapp', asyncH(async (req, res) => {
+app.put('/api/settings/whatsapp', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body || {};
   if (typeof body.message !== 'string') {
     return res.status(400).json({ error: 'Champ « message » (texte) attendu' });
@@ -709,7 +1028,7 @@ app.get('/api/settings/textile', asyncH(async (req, res) => {
   res.json(await getReglagesTextile());
 }));
 
-app.put('/api/settings/textile', asyncH(async (req, res) => {
+app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Objet de réglages attendu' });
@@ -734,7 +1053,7 @@ app.get('/api/ordre-manuel', asyncH(async (req, res) => {
 //                        que pour l'onglet resté ouvert sur le JS d'avant le
 //                        déploiement : le fichier garde son nom, donc une
 //                        tablette peut encore l'envoyer pendant quelques minutes.
-app.put('/api/ordre-manuel', asyncH(async (req, res) => {
+app.put('/api/ordre-manuel', exige('production'), asyncH(async (req, res) => {
   const b = req.body;
   if (b && !Array.isArray(b) && typeof b === 'object' && 'etape' in b) {
     if (!STAGE_SLUGS.includes(b.etape)) {
@@ -966,7 +1285,7 @@ app.get('/api/requests', asyncH(async (req, res) => {
     }
   }
 
-  res.json(rows.map(allegerFiche));
+  res.json(selonMoi(req, rows.map(allegerFiche)));
 }));
 
 // GET /api/requests/synthese[?depuis=<ISO>] → CE QUI A CHANGÉ, et rien d'autre.
@@ -1090,7 +1409,7 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
     jusqua,
     empreinte,
     ...(memeComposition ? {} : { ids }),
-    lignes: lignes.map(allegerSynthese),
+    lignes: selonMoi(req, lignes.map(allegerSynthese)),
   });
 }));
 
@@ -1139,7 +1458,7 @@ app.get('/api/requests/recherche', asyncH(async (req, res) => {
   const { rows } = await pool.query(
     `${SELECT} WHERE ${conditions} AND ${VIVANTES} ORDER BY r.updated_at DESC LIMIT $${params.length}`, params,
   );
-  res.json(rows.map(allegerFiche));
+  res.json(selonMoi(req, rows.map(allegerFiche)));
 }));
 
 // GET /api/requests/corbeille → ce qui a été retiré du planning, du plus récent
@@ -1157,7 +1476,7 @@ app.get('/api/requests/corbeille', asyncH(async (req, res) => {
   const { rows } = await pool.query(
     `${SELECT} WHERE r.deleted_at IS NOT NULL ORDER BY r.deleted_at DESC LIMIT $1`, [CORBEILLE_MAX],
   );
-  res.json(rows.map(allegerFiche));
+  res.json(selonMoi(req, rows.map(allegerFiche)));
 }));
 
 // GET /api/requests/:id → UNE commande, fiche COMPLÈTE. C'est ce que le tiroir
@@ -1169,7 +1488,76 @@ app.get('/api/requests/:id', asyncH(async (req, res) => {
   // personne ne peut plus atteindre autrement — et qu'on pouvait modifier.
   const { rows } = await pool.query(`${SELECT_COMPLET} WHERE r.id = $1 AND ${VIVANTES}`, [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  res.json(rows[0]);
+  res.json(selonMoi(req, rows[0]));
+}));
+
+// GET /api/mon-travail → les trois listes de l'écran « Mon travail » (§25).
+//
+// « L'objectif : ouvrir le logiciel le matin et savoir immédiatement quoi
+//   faire. » Donc trois listes et rien d'autre — pas de compteurs, pas de
+//   graphique, pas de rappel de ce qui va bien.
+//
+// Le tri se fait ICI et pas au poste : c'est la même règle pour les quatre, et
+// un opérateur ne doit pas recevoir tout le planning pour en garder six lignes.
+//
+// EN ATTENTE ≠ À FAIRE : une commande dont on attend le client, le fournisseur
+// ou un BAT n'est pas du travail — la mettre dans « à faire » ferait une liste
+// qu'on ne peut pas finir, donc une liste qu'on cesse de regarder.
+const SOUS_ETAPES_ATTENTE = new Set([
+  'devis_envoye', 'bat_envoye', 'attente_marchandise', 'client_prevenu', 'validation_acompte',
+]);
+
+app.get('/api/mon-travail', asyncH(async (req, res) => {
+  // Sans comptes, « mon » n'a pas de sens : on prend le prénom du poste, qui est
+  // ce que l'application sait de mieux. Avec, c'est l'identité qui tranche.
+  const qui = req.moi ? req.moi.prenom : quiDemande(req);
+  if (!qui) return res.json({ qui: null, aFaire: [], enAttente: [], finiAujourdhui: [] });
+
+  const { rows } = await pool.query(
+    `${SELECT} WHERE ${VIVANTES} AND (r.responsable = $1 OR r.referent = $1)
+       AND r.stage IN ('a_trier','demande_chiffrage','preparation','production','facturation')
+     ${ORDER}`, [qui],
+  );
+  const lignes = rows.map(allegerFiche);
+
+  const enAttente = [];
+  const aFaire = [];
+  for (const l of lignes) {
+    if (l.flag === 'bloque' || SOUS_ETAPES_ATTENTE.has(l.sub_stage)) enAttente.push(l);
+    else aFaire.push(l);
+  }
+
+  // TERMINÉ AUJOURD'HUI se lit dans le journal, pas dans l'état des lignes :
+  // l'état dit où elles SONT, pas ce que cette personne a fait. Le jour est
+  // celui de l'ATELIER — en UTC, la journée basculerait à 20 h locales et la
+  // liste se viderait en plein service.
+  const debutJour = `${jourAtelier()}T00:00:00-04:00`;
+  const { rows: faits } = await pool.query(
+    `SELECT e.request_id, e.value_after, e.created_at, r.billing_company, r.product
+       FROM request_events e JOIN requests r ON r.id = e.request_id
+      WHERE e.who = $1 AND e.field = 'sub_stage' AND e.created_at >= $2
+        AND r.deleted_at IS NULL
+      ORDER BY e.created_at DESC LIMIT 40`, [qui, debutJour],
+  );
+  // Une commande poussée trois fois dans la journée ne fait qu'UNE ligne : la
+  // liste raconte ce qui a avancé, pas combien de fois on a cliqué.
+  const vues = new Set();
+  const finiAujourdhui = [];
+  for (const f of faits) {
+    if (vues.has(f.request_id)) continue;
+    vues.add(f.request_id);
+    finiAujourdhui.push({
+      id: f.request_id, billing_company: f.billing_company, product: f.product,
+      sub_stage: f.value_after, quand: f.created_at,
+    });
+  }
+
+  res.json({
+    qui,
+    aFaire: selonMoi(req, aFaire),
+    enAttente: selonMoi(req, enAttente),
+    finiAujourdhui,
+  });
 }));
 
 // GET /api/counts → { slug: n, ... } : objet plat mêlant FAMILLES et SOUS-FAMILLES
@@ -1197,7 +1585,7 @@ app.get('/api/counts', asyncH(async (req, res) => {
 }));
 
 // POST /api/requests → crée (corps partiel autorisé)
-app.post('/api/requests', asyncH(async (req, res) => {
+app.post('/api/requests', exige('clients'), asyncH(async (req, res) => {
   const body = normalizeFlagBody(req.body || {});
   const incoherence = verifierCoherenceEtape(body, body.stage || 'demande_chiffrage');
   if (incoherence) return res.status(400).json({ error: incoherence });
@@ -1256,7 +1644,7 @@ app.post('/api/requests', asyncH(async (req, res) => {
 // commande au comptoir : deux lignes ne peuvent pas revendiquer le même.
 const COPIABLE = PATCHABLE.filter((k) => !['position', 'flag', 'flag_reason'].includes(k));
 
-app.post('/api/requests/:id/copie', asyncH(async (req, res) => {
+app.post('/api/requests/:id/copie', exige('clients'), asyncH(async (req, res) => {
   const { rows: src } = await pool.query(
     `SELECT * FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
   );
@@ -1316,7 +1704,7 @@ app.post('/api/requests/:id/copie', asyncH(async (req, res) => {
 // rame » de la tablette : un geste, une tempête.
 // Ici : une requête, une transaction, UN seul évènement.
 const REORDER_MAX = 500; // une étape n'en tient pas tant ; au-delà c'est une erreur
-app.patch('/api/requests/positions', asyncH(async (req, res) => {
+app.patch('/api/requests/positions', exige('production'), asyncH(async (req, res) => {
   const list = Array.isArray(req.body) ? req.body : null;
   if (!list) return res.status(400).json({ error: 'Tableau [{ id, position }] attendu' });
   if (list.length === 0) return res.json({ misAJour: 0 });
@@ -1378,6 +1766,19 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const incoherence = verifierCoherenceEtape(body, avant[0].stage);
   if (incoherence) return res.status(400).json({ error: incoherence });
 
+  // PERMISSION CHAMP PAR CHAMP. On refuse TOUT le PATCH dès qu'un seul champ
+  // dépasse : appliquer les champs permis et taire les autres serait pire — le
+  // poste croirait avoir enregistré, et la moitié seulement serait passée.
+  for (const champ of PATCHABLE) {
+    if (!(champ in body)) continue;
+    const capacite = capaciteDuChamp(champ);
+    if (peut(req.moi, capacite)) continue;
+    return res.status(403).json({
+      error: `Réservé : ${ROLE_LABELS[req.moi.role]} ne peut pas modifier « ${JOURNAL_FIELDS[champ] || champ} ».`,
+      capacite,
+    });
+  }
+
   const sets = [];
   const params = [];
   let i = 1;
@@ -1407,7 +1808,7 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   // décide — il doit donc être exact.
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
-  res.json(rows[0]);
+  res.json(selonMoi(req, rows[0]));
 }));
 
 // GET /api/requests/:id/journal → ce qui a changé sur cette commande, du plus
@@ -1435,7 +1836,7 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
 // On prend donc la ligne (`FOR UPDATE`) le temps de la relire et de la
 // réécrire : le second poste attend, repart de la fiche corrigée, et les deux
 // corrections tiennent.
-app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
+app.patch('/api/requests/:id/fiche', exige('clients'), asyncH(async (req, res) => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
   // Ce qui se juge SANS la fiche stockée se juge avant de prendre le verrou :
   // une saisie invalide ne doit pas faire patienter le poste d'à côté.
@@ -1529,7 +1930,7 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
 // Le verbe HTTP ne change pas : c'est bien « retirer du planning » que le poste
 // demande, et tous les appelants le disent déjà comme ça. C'est ce qu'on FAIT
 // derrière qui change.
-app.delete('/api/requests/:id', asyncH(async (req, res) => {
+app.delete('/api/requests/:id', exige('production'), asyncH(async (req, res) => {
   // `RETURNING stage` : l'évènement doit dire OÙ la ligne vivait, sinon les
   // postes ne savent pas si la grille qu'ils affichent vient de perdre une
   // ligne — et, faute de mieux, ils relisent tous la leur.
@@ -1551,7 +1952,7 @@ app.delete('/api/requests/:id', asyncH(async (req, res) => {
 // suppression pour l'historique, mais tout aussi définitif pour l'employé qui
 // s'est trompé de ligne. Elle revient dans SA famille et à SA sous-étape —
 // aucune des deux n'a été touchée par l'archivage.
-app.post('/api/requests/:id/restaurer', asyncH(async (req, res) => {
+app.post('/api/requests/:id/restaurer', exige('production'), asyncH(async (req, res) => {
   const { rows } = await pool.query(
     `UPDATE requests SET deleted_at = NULL, updated_at = now()
      WHERE id = $1 AND deleted_at IS NOT NULL RETURNING stage`, [req.params.id],
@@ -1579,7 +1980,7 @@ async function touchRequest(id) {
 }
 
 // PUT /api/requests/:id/pdf/:kind  (corps = PDF brut, ?name=<nom de fichier>)
-app.put('/api/requests/:id/pdf/:kind',
+app.put('/api/requests/:id/pdf/:kind', exige('clients'),
   express.raw({ type: () => true, limit: '12mb' }),
   asyncH(async (req, res) => {
     const { id, kind } = req.params;
@@ -1634,7 +2035,7 @@ app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // DELETE /api/requests/:id/pdf/:kind
-app.delete('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
+app.delete('/api/requests/:id/pdf/:kind', exige('clients'), asyncH(async (req, res) => {
   const { id, kind } = req.params;
   if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
   const { rowCount } = await pool.query(
@@ -1783,14 +2184,14 @@ app.get('/api/clients/secteurs', asyncH(async (req, res) => {
   res.json(await getClientSecteurs());
 }));
 
-app.post('/api/clients/secteurs', asyncH(async (req, res) => {
+app.post('/api/clients/secteurs', exige('clients'), asyncH(async (req, res) => {
   const label = req.body && req.body.label;
   const list = await addClientSecteur(label);
   if (!list) return res.status(400).json({ error: 'libellé de secteur vide' });
   res.status(201).json(list);
 }));
 
-app.delete('/api/clients/secteurs/:label', asyncH(async (req, res) => {
+app.delete('/api/clients/secteurs/:label', exige('clients'), asyncH(async (req, res) => {
   res.json(await removeClientSecteur(req.params.label));
 }));
 
@@ -1812,7 +2213,7 @@ app.get('/api/clients/:id', asyncH(async (req, res) => {
 // compteur — deux fiches ne peuvent pas porter le même numéro.
 
 // POST /api/clients → crée un client. Seule l'entreprise est obligatoire.
-app.post('/api/clients', asyncH(async (req, res) => {
+app.post('/api/clients', exige('clients'), asyncH(async (req, res) => {
   const body = req.body || {};
   const cols = [];
   const vals = [];
@@ -1851,7 +2252,7 @@ app.post('/api/clients', asyncH(async (req, res) => {
 }));
 
 // PATCH /api/clients/:id → met à jour un ou plusieurs champs (édition en place).
-app.patch('/api/clients/:id', asyncH(async (req, res) => {
+app.patch('/api/clients/:id', exige('clients'), asyncH(async (req, res) => {
   const body = req.body || {};
   const sets = [];
   const params = [];
@@ -1896,7 +2297,7 @@ app.patch('/api/clients/:id', asyncH(async (req, res) => {
 // rendez-vous. Or les commandes passées citent ce client par son nom : une
 // fiche effacée laissait des dossiers rattachés à quelqu'un qui n'existe plus,
 // et la timeline qui expliquait pourquoi partait avec.
-app.delete('/api/clients/:id', asyncH(async (req, res) => {
+app.delete('/api/clients/:id', exige('clients'), asyncH(async (req, res) => {
   const { rowCount } = await pool.query(
     `UPDATE clients SET deleted_at = now(), updated_at = now()
      WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
@@ -1907,7 +2308,7 @@ app.delete('/api/clients/:id', asyncH(async (req, res) => {
 }));
 
 // POST /api/clients/:id/notes → ajoute une note (note / appel / email / rdv).
-app.post('/api/clients/:id/notes', asyncH(async (req, res) => {
+app.post('/api/clients/:id/notes', exige('clients'), asyncH(async (req, res) => {
   const body = req.body || {};
   const kind = NOTE_KINDS.has(body.kind) ? body.kind : 'note';
   const text = String(body.body == null ? '' : body.body).trim().slice(0, NOTE_MAX);
@@ -1925,7 +2326,7 @@ app.post('/api/clients/:id/notes', asyncH(async (req, res) => {
 }));
 
 // DELETE /api/clients/:id/notes/:noteId → retire une note de la timeline.
-app.delete('/api/clients/:id/notes/:noteId', asyncH(async (req, res) => {
+app.delete('/api/clients/:id/notes/:noteId', exige('clients'), asyncH(async (req, res) => {
   const { rowCount } = await pool.query(
     'DELETE FROM client_notes WHERE id = $1 AND client_id = $2',
     [req.params.noteId, req.params.id],
@@ -2765,7 +3166,7 @@ function buildProjet(body, tarifsById) {
 // POST /api/projets → crée un Nouveau Projet (comptoir ultra-minimal). Recharge
 // systématiquement le catalogue tarifs + paramètres AVANT de construire, pour
 // ne jamais calculer avec des prix périmés.
-app.post('/api/projets', asyncH(async (req, res) => {
+app.post('/api/projets', exige('clients'), asyncH(async (req, res) => {
   const [articles, parametres] = await Promise.all([getTarifsTasseArticles(), getTarifsTasseParametres()]);
   PROJET_TAUX_MO = parametres.tauxHoraireMo;
   PROJET_TAUX_MACHINE = parametres.tauxHoraireMachine;
@@ -2945,7 +3346,7 @@ function unDossierALaFois(travail) {
 }
 
 // POST /api/comptoir/projet → enregistre le dossier d'un des deux parcours.
-app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(async () => {
+app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => unDossierALaFois(async () => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
 
   // NATURE : une vente directe est une commande validée et payée ; une demande
@@ -3287,7 +3688,7 @@ function lignesLibelleValeur(brut) {
 // le même numéro au client, et un numéro attribué n'est jamais réutilisé.
 // Le jour est celui du POSTE (`jour`, aaaa-mm-jj) : le conteneur tourne en UTC,
 // il basculerait au lendemain dès 20 h à Saint-Martin.
-app.post('/api/vente/numero', asyncH(async (req, res) => {
+app.post('/api/vente/numero', exige('clients'), asyncH(async (req, res) => {
   const r = await reserverNumeroDuJour('vente', req.body || {});
   res.status(201).json(r);
 }));
@@ -3296,7 +3697,7 @@ app.post('/api/vente/numero', asyncH(async (req, res) => {
 // DEVIS : « DEV-26.07.30-001 ». Deux séries distinctes et deux clés app_meta
 // distinctes — une demande et une vente du même jour ne se disputent pas un
 // rang, et le préfixe dit du premier coup d'œil ce qu'on a en main.
-app.post('/api/devis/numero', asyncH(async (req, res) => {
+app.post('/api/devis/numero', exige('clients'), asyncH(async (req, res) => {
   const r = await reserverNumeroDuJour('devis', req.body || {});
   res.status(201).json({ ...r, numero: `DEV-${r.numero}` });
 }));

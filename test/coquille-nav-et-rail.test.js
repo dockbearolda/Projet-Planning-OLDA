@@ -101,7 +101,11 @@ assert.ok(!/body\.view-(plein|focus) \.shell/.test(CSS),
   'la coquille garde ses trois colonnes partout : le rail a toujours la sienne');
 // Ce qui disparaît hors planning, c'est l'échafaudage de la GRILLE — pas la
 // navigation. Sans cette règle, l'en-tête d'étape se poserait sur le Dashboard.
-assert.ok(/body\.view-plein \.work-head[\s\S]{0,400}?display: none/.test(CSS),
+// La fenêtre est large À DESSEIN : ce qui compte, c'est que `.work-head` et
+// `display: none` soient dans LE MÊME bloc de sélecteurs, pas qu'ils soient
+// proches. Chaque commentaire ajouté entre deux sélecteurs de la liste rognait
+// la marge, et la garde tombait sur une règle parfaitement correcte.
+assert.ok(/body\.view-plein \.work-head[\s\S]{0,1200}?display: none/.test(CSS),
   'hors planning, c’est la grille qui s’efface, pas le rail');
 
 // Le rail est cliquable depuis TOUTES les vues : sans saut vers le planning, il

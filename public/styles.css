@@ -3469,6 +3469,12 @@ a,
   margin-left: auto;
   flex-shrink: 0;
 }
+/* `hidden` NE SUFFIT PAS ICI, et c'est un piège qu'on a déjà payé ailleurs :
+   l'attribut vaut `display: none` par la feuille du navigateur, mais la règle
+   de classe juste dessous pose `display: flex` — plus spécifique, donc elle
+   gagne. Un onglet réservé restait donc à l'écran, cliquable, et menait à un
+   « Réservé ». La règle doit être portée par la CLASSE, pas par l'attribut. */
+.nav-switch-btn[hidden] { display: none; }
 .nav-switch-btn {
   display: flex;
   align-items: center;
@@ -3562,6 +3568,13 @@ a,
    Les deux replient le rail : la zone de travail prend toute la largeur. */
 body.view-plein .work-head,
 body.view-plein .grid-wrap,
+/* LE CONTENEUR AUSSI, et pas seulement son contenu. `.grid-area` porte
+   `flex: 1` : vidé de ses deux enfants, il restait une boîte INVISIBLE qui
+   s'octroyait tout l'espace libre — mesuré à 231 px poussés au-dessus de
+   « Mon travail », sur un écran dont le premier mot doit se lire tout de suite.
+   Ça ne se voyait pas sur les vues dont le contenu remplit déjà la hauteur ;
+   ça saute aux yeux sur une vue courte. */
+body.view-plein .grid-area,
 /* Le rail des colonnes ne pilote que la grille du planning : hors planning il
    n'a rien à régler et se superposait à l'en-tête de la Base clients. */
 body.view-plein .colbar,
@@ -5795,3 +5808,46 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .send-btn:active, .del-btn:active, .dup-btn:active { transform: scale(.92); }
 .send-btn, .del-btn, .dup-btn { transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
             background var(--dur-1) var(--ease), transform .09s var(--ease); }
+
+/* ===========================================================================
+   MON TRAVAIL — l'écran de celui qui produit (§25).
+   Trois listes, rien d'autre. Mêmes jetons, mêmes deux tailles de texte que
+   partout ailleurs : 17 pour ce qui se lit, 14 pour ce qui se consulte.
+   =========================================================================== */
+.mt-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
+.mt-head__titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+
+.mt-bloc { display: flex; flex-direction: column; gap: 10px; }
+.mt-bloc__head { display: flex; align-items: baseline; gap: 10px; }
+/* PAS de quatrième taille : la charte en compte trois, et la hiérarchie se
+   fait à la GRAISSE. Un titre de bloc est du texte de 17 en 800, pas une
+   taille intermédiaire de plus. */
+.mt-bloc__titre { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.01em; }
+/* Un REPÈRE, pas une performance : il dit s'il reste du travail. */
+.mt-bloc__n { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mt-bloc__vide { margin: 0; font-size: var(--taille-texte); color: var(--text-2); }
+
+.mt-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.mt-carte {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.mt-carte:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.mt-carte:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.mt-carte__haut { display: flex; align-items: baseline; gap: 8px; }
+/* `min-width: 0` : sans lui un nom long garde sa largeur intrinsèque et pousse
+   la pastille « Urgent » hors de la carte. Même piège que partout ailleurs. */
+.mt-carte__client { min-width: 0; flex: 1 1 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-carte__urgent { flex: 0 0 auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+.mt-carte__quoi { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
+.mt-carte__quand { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mt-carte__quand.is-proche { color: var(--warning); }
+.mt-carte__quand.is-retard { color: var(--st-bloque); }
+/* Le motif du blocage : sur une ligne bloquée, c'est LA seule chose à lire. */
+.mt-carte.is-bloque { border-color: var(--st-bloque-bg); background: var(--st-bloque-bg); }
+.mt-carte__motif { margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }

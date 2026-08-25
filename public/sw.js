@@ -55,6 +55,11 @@ const COQUILLE = [
   // absente du cache, son import échoue hors ligne et le planning ne s'ouvre
   // plus du tout — la même règle que reseau.js et ticket.js juste dessous.
   '/maj.js',
+  // IMPORTÉ STATIQUEMENT par app.js, comme maj.js juste au-dessus : absent du
+  // cache, son import échoue hors ligne et le planning ne s'ouvre plus du tout.
+  // (`montravail.js`, lui, est importé À LA DEMANDE : son absence hors ligne ne
+  // coûte que cet onglet-là, pas l'application.)
+  '/session.js',
   // Importé par app.js, clients.js ET reglages.js : absent du cache, l'import
   // échoue hors ligne et c'est l'application ENTIÈRE qui ne s'ouvre plus.
   '/reseau.js',

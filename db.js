@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { Pool, types } = require('pg');
 
 // `deadline` est une colonne `date` : un jour civil, sans heure ni fuseau. Par
@@ -114,6 +115,25 @@ for (const [family, subs] of Object.entries(SUB_STAGES)) {
 //   - RESPONSABLES : valeurs acceptées pour responsable/referent (+ « À attribuer »).
 const EMPLOYEES = ['Loïc', 'Charlie', 'Mélina', 'Julien'];
 const RESPONSABLES = [...EMPLOYEES, 'À attribuer'];
+
+// --- Les quatre personnes, et leur rôle --------------------------------------
+// Attribution donnée par Charlie le 25/08/2026, en réponse au §3 du patron.
+// Ce sont EXACTEMENT les quatre prénoms d'EMPLOYEES ci-dessus : le rôle se pose
+// sur une liste qui existe déjà, il ne crée pas de population nouvelle. C'est
+// pour ça qu'aucun écran de gestion d'utilisateurs n'est nécessaire d'abord.
+const ROLES = ['direction', 'chef_atelier', 'boutique', 'operateur'];
+const ROLE_LABELS = {
+  direction: 'Direction',
+  chef_atelier: 'Chef d’atelier',
+  boutique: 'Boutique',
+  operateur: 'Atelier',
+};
+const EQUIPE = [
+  { prenom: 'Loïc', role: 'direction' },
+  { prenom: 'Charlie', role: 'chef_atelier' },
+  { prenom: 'Mélina', role: 'boutique' },
+  { prenom: 'Julien', role: 'operateur' },
+];
 
 // Types de client.
 const CLIENT_TYPES = ['pro', 'perso', 'asso', 'revendeur'];
@@ -383,6 +403,39 @@ async function init() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_requests_vivantes
       ON requests (stage, position ASC NULLS LAST) WHERE deleted_at IS NULL`);
   } catch (_) { /* pg-mem local : index partiel non géré, sans conséquence */ }
+
+  // LES QUATRE COMPTES. Créés s'ils manquent, jamais réécrits : un code déjà
+  // choisi ne doit pas repartir à zéro au redémarrage suivant. C'est un `INSERT
+  // … ON CONFLICT DO NOTHING` sur le prénom, donc idempotent par nature — pas
+  // besoin d'une garde `app_meta`, et surtout pas d'une garde qui empêcherait
+  // un cinquième compte d'arriver un jour.
+  // Down : DELETE FROM users WHERE prenom IN ('Loïc','Charlie','Mélina','Julien');
+  for (const membre of EQUIPE) {
+    try {
+      await pool.query(
+        'INSERT INTO users (prenom, role) VALUES ($1, $2) ON CONFLICT (prenom) DO NOTHING',
+        [membre.prenom, membre.role],
+      );
+    } catch (_) {
+      // pg-mem : l'index unique sur `prenom` peut manquer, donc `ON CONFLICT`
+      // n'a rien à quoi se raccrocher. On retombe sur la lecture-puis-écriture,
+      // qui suffit ici : le démarrage n'est pas concurrent avec lui-même.
+      const { rows } = await pool.query('SELECT 1 FROM users WHERE prenom = $1', [membre.prenom]);
+      if (!rows.length) {
+        await pool.query('INSERT INTO users (prenom, role) VALUES ($1, $2)', [membre.prenom, membre.role]);
+      }
+    }
+  }
+  // LE RÔLE, LUI, SE RÉALIGNE. C'est une décision d'organisation, pas une
+  // donnée que la personne possède : si Charlie décide que Julien passe chef
+  // d'atelier, la ligne d'EQUIPE fait foi au prochain démarrage. Le code
+  // personnel, lui, n'est jamais touché.
+  for (const membre of EQUIPE) {
+    await pool.query(
+      'UPDATE users SET role = $2, updated_at = now() WHERE prenom = $1 AND role <> $2',
+      [membre.prenom, membre.role],
+    );
+  }
 
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
@@ -1563,6 +1616,96 @@ async function basculerOrdreManuel(etape, range) {
   }
 }
 
+// --- Comptes nominatifs ------------------------------------------------------
+// Le code personnel est haché en scrypt — fourni par Node, aucune dépendance à
+// ajouter (le dépôt en compte trois en tout, et c'est une règle). Le sel est
+// tiré par code : deux personnes qui choisiraient « 1234 » n'ont pas la même
+// empreinte, donc la voir ne renseigne sur rien.
+//
+// Format rangé : « scrypt$<sel hex>$<empreinte hex> ». Écrit en toutes lettres
+// pour qu'une empreinte lue en base dise elle-même comment elle a été faite —
+// le jour où le paramètre change, l'ancienne reste vérifiable.
+const SCRYPT_N = 16384; // ~50 ms par vérification : négligeable à quatre personnes
+const CODE_MIN = 4;
+const CODE_MAX = 64;
+
+function hacherCode(code) {
+  const sel = crypto.randomBytes(16);
+  const cle = crypto.scryptSync(String(code), sel, 32, { N: SCRYPT_N, r: 8, p: 1 });
+  return `scrypt$${sel.toString('hex')}$${cle.toString('hex')}`;
+}
+
+// Comparaison à TEMPS CONSTANT. Un `===` s'arrête au premier octet faux et
+// laisse deviner l'empreinte en chronométrant les réponses — même travers que
+// le mot de passe partagé, déjà corrigé côté Basic Auth.
+function codeCorrect(code, range) {
+  if (typeof range !== 'string') return false;
+  const [algo, selHex, attenduHex] = range.split('$');
+  if (algo !== 'scrypt' || !selHex || !attenduHex) return false;
+  try {
+    const attendu = Buffer.from(attenduHex, 'hex');
+    const cle = crypto.scryptSync(String(code), Buffer.from(selHex, 'hex'), attendu.length,
+      { N: SCRYPT_N, r: 8, p: 1 });
+    return crypto.timingSafeEqual(cle, attendu);
+  } catch (_) {
+    return false;
+  }
+}
+
+// Le secret qui SIGNE les jetons de session. Tiré une fois et rangé en base :
+// tiré à chaque démarrage, il déconnecterait tout l'atelier à chaque
+// déploiement — et sur Railway, un déploiement c'est un redémarrage.
+// Down : DELETE FROM app_meta WHERE key = 'session_secret'.
+let secretSession = null;
+async function getSecretSession() {
+  if (secretSession) return secretSession;
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'session_secret'");
+  if (rows[0] && typeof rows[0].value === 'string' && rows[0].value.length >= 32) {
+    secretSession = rows[0].value;
+    return secretSession;
+  }
+  const neuf = crypto.randomBytes(32).toString('hex');
+  // ON CONFLICT DO NOTHING puis relecture : deux instances qui démarrent
+  // ensemble (Railway pendant un déploiement) ne doivent pas se voler le
+  // secret l'une à l'autre — la première qui écrit gagne, l'autre relit.
+  await pool.query(
+    "INSERT INTO app_meta (key, value) VALUES ('session_secret', $1) ON CONFLICT (key) DO NOTHING", [neuf],
+  );
+  const { rows: relu } = await pool.query("SELECT value FROM app_meta WHERE key = 'session_secret'");
+  secretSession = (relu[0] && relu[0].value) || neuf;
+  return secretSession;
+}
+
+async function getUtilisateurs() {
+  const { rows } = await pool.query(
+    'SELECT id, prenom, role, actif, derniere_connexion, (code_hash IS NOT NULL) AS a_un_code'
+    + ' FROM users WHERE actif = true ORDER BY created_at ASC',
+  );
+  return rows;
+}
+
+async function getUtilisateurParPrenom(prenom) {
+  const { rows } = await pool.query(
+    'SELECT * FROM users WHERE prenom = $1 AND actif = true LIMIT 1', [prenom],
+  );
+  return rows[0] || null;
+}
+
+async function getUtilisateur(id) {
+  const { rows } = await pool.query('SELECT * FROM users WHERE id = $1 AND actif = true LIMIT 1', [id]);
+  return rows[0] || null;
+}
+
+async function poserCode(id, code) {
+  await pool.query(
+    'UPDATE users SET code_hash = $1, updated_at = now() WHERE id = $2', [hacherCode(code), id],
+  );
+}
+
+async function toucherConnexion(id) {
+  await pool.query('UPDATE users SET derniere_connexion = now() WHERE id = $1', [id]);
+}
+
 // --- Interrupteurs de fonctionnalité -----------------------------------------
 // Les gros chantiers à venir (comptes nominatifs, modèle Projet/Tâche, coûts et
 // marge, stock) touchent tous des écrans qui tournent aujourd'hui au comptoir et
@@ -1801,5 +1944,8 @@ module.exports = {
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,
+  ROLES, ROLE_LABELS, EQUIPE, CODE_MIN, CODE_MAX,
+  getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
+  poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
 };

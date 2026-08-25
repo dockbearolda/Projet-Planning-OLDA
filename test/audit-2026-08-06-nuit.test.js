@@ -83,7 +83,10 @@ function bloc(src, signature) {
   // que le verrou est bien posé (lecture du source), et que la correction se
   // comporte toujours correctement de bout en bout (appels réels).
   const SRV = lire('server.js');
-  const handlerFiche = bloc(SRV, "app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {");
+  // La signature s'est enrichie d'une garde de permission : on repère la route
+  // par son CHEMIN, pas par la ligne entière — sinon toute permission ajoutée
+  // demain fait échouer une garde qui ne parle pas de permissions.
+  const handlerFiche = bloc(SRV, "app.patch('/api/requests/:id/fiche',");
   assert.match(
     handlerFiche, /BEGIN/,
     'la correction de fiche s’ouvre dans une transaction',

@@ -24,6 +24,8 @@ import { noterVersion, surveillerMaj } from './maj.js';
 // Qui est au poste : le nom affiché en haut à droite, et celui qui signe les
 // demandes prises sur cet appareil (le parcours comptoir le relit).
 import { monterPoste, lirePoste } from './poste.js';
+import { relireSession, puisJe, moi, comptesActifs, seDeconnecter, signalerNonConnecte, surChangement }
+  from './session.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -363,8 +365,21 @@ async function api(method, url, body) {
   const res = await fetchBorne(url, opts);
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).error || detail; } catch (_) {}
-    throw new Error(detail);
+    let corps = null;
+    try { corps = await res.json(); detail = corps.error || detail; } catch (_) {}
+    // 401 EN PLEIN TRAVAIL : la session a expiré (trente jours), ou les comptes
+    // viennent d'être allumés depuis un autre poste. On redemande qui est là
+    // plutôt que d'afficher « Erreur 401 » sur un écran qui se vide.
+    const err = new Error(detail);
+    if (res.status === 401 && corps && corps.connexion) {
+      signalerNonConnecte();
+      // MARQUÉ, pour que le reste de l'application se taise : le voile de
+      // connexion dit déjà quoi faire, et un bandeau « Connecte-toi pour
+      // continuer » posé par-dessus ne fait que répéter la même phrase — sur un
+      // écran où il n'y a plus rien d'autre à lire.
+      err.aConnecter = true;
+    }
+    throw err;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -6325,6 +6340,8 @@ function estPanneReseau(err) {
 
 function reportError(err) {
   console.error(err);
+  // Le voile de connexion parle déjà : on ne double pas.
+  if (err && err.aConnecter) return;
   // signal discret et non bloquant
   if (estPanneReseau(err)) { showToast('Connexion perdue — on réessaie tout seul.'); return; }
   const msg = (err && err.message) ? err.message : 'Erreur réseau';
@@ -7252,6 +7269,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'dashboard') return dashboard.show();
   if (viewMode === 'clients') return mountClients();
   if (viewMode === 'reglages') return mountReglages();
+  if (viewMode === 'montravail') return mountMonTravail();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7324,7 +7342,9 @@ const $viewDashboard = document.getElementById('viewDashboard');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
+const $viewMonTravail = document.getElementById('viewMonTravail');
 const $reglages = document.getElementById('reglages');
+const $montravail = document.getElementById('montravail');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7429,6 +7449,32 @@ function mountClients() {
 // Les Réglages du patron (message WhatsApp « commande prête »…). Petit module,
 // chargé au premier passage puis monté ; les visites suivantes relisent la
 // valeur enregistrée — un autre poste a pu la changer entre-temps.
+// MON TRAVAIL — même montage paresseux que les autres vues : le module ne part
+// du serveur qu'au premier passage sur l'onglet, et l'écran de l'opérateur ne
+// pèse rien sur le démarrage de ceux qui ne l'ouvrent jamais.
+let mtLoading = null;
+let mtModule = null;
+function mountMonTravail() {
+  if (!$montravail) return;
+  if (!mtLoading) {
+    mtLoading = import('./montravail.js')
+      .then((m) => {
+        mtModule = m;
+        // Les libellés de sous-étape vivent déjà ici : les redemander au serveur
+        // ferait un appel de plus pour une table que l'écran connaît par cœur.
+        m.poserLibelles(SUB_LABEL);
+        return m.initMonTravail($montravail);
+      })
+      .catch((err) => {
+        mtLoading = null;
+        mtModule = null;
+        reportError(err);
+      });
+  } else if (mtModule && mtModule.refreshMonTravail) {
+    mtModule.refreshMonTravail();
+  }
+}
+
 let reglagesLoading = null;
 let reglagesModule = null;
 function mountReglages() {
@@ -7523,6 +7569,7 @@ function setViewMode(mode) {
   if ($viewDashboard) $viewDashboard.classList.toggle('active', mode === 'dashboard');
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
+  if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
@@ -7539,10 +7586,12 @@ function setViewMode(mode) {
   const dash = mode === 'dashboard';
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
+  const montravail = mode === 'montravail';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
+  if ($montravail) $montravail.hidden = !montravail;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7558,6 +7607,7 @@ function setViewMode(mode) {
   if (dash) dashboard.show(); else dashboard.hide();
   if (clients) mountClients();
   if (reglages) mountReglages();
+  if (montravail) mountMonTravail();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7574,7 +7624,7 @@ function setViewMode(mode) {
 const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
-  '#clients': 'clients', '#reglages': 'reglages',
+  '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {
@@ -7666,6 +7716,11 @@ if ('serviceWorker' in navigator) {
 function demarrerAvecReprise(essai = 0) {
   start().catch((err) => {
     reportError(err);
+    // TANT QU'ON NE SAIT PAS QUI EST LÀ, on ne réessaie pas : la reprise
+    // relancerait le même appel toutes les 1,5 s derrière le voile, pour
+    // recevoir le même 401. C'est la connexion qui relance (elle recharge la
+    // page), pas le minuteur.
+    if (err && err.aConnecter) return;
     // Le service worker a servi la coquille : l'écran est là, mais vide. On DIT
     // pourquoi — un planning vide sans explication se lit comme « tout a
     // disparu », et c'est le moment où quelqu'un ressaisit une commande.
@@ -7684,4 +7739,49 @@ function demarrerAvecReprise(essai = 0) {
 // ne fait qu'écrire le nom dans la barre.
 monterPoste(EMPLOYEES);
 
-demarrerAvecReprise();
+// CE QUE CHAQUE RÔLE VOIT. C'est un CONFORT, pas une sécurité : le serveur
+// refuse déjà ce qu'il faut refuser, et retire les colonnes d'argent de la
+// réponse elle-même. Ici on évite seulement de proposer des portes fermées —
+// un opérateur qui clique « Réglages » pour tomber sur « Réservé » apprend
+// juste qu'on ne lui fait pas confiance.
+//
+// Comptes éteints, `puisJe()` rend `true` partout : rien ne se cache, l'écran
+// est exactement celui d'avant.
+function appliquerDroits() {
+  const onglet = (el, visible) => { if (el) el.hidden = !visible; };
+  onglet($viewMonTravail, comptesActifs());
+  onglet($viewReglages, puisJe('reglages'));
+  onglet($viewClients, puisJe('clients'));
+  onglet($viewProjet, puisJe('clients'));
+  // « À commander » et « Fiverr » sont des entrées PROMUES (voir PROMOTED) :
+  // elles n'ont pas de constante dédiée, on les prend par leur identifiant.
+  onglet(document.getElementById('viewACommander'), puisJe('production'));
+  onglet(document.getElementById('viewFiverr'), puisJe('clients'));
+  // Le Point du jour parle de TOUTE l'équipe : ce n'est pas l'écran d'un
+  // opérateur, qui a le sien.
+  onglet($viewDashboard, puisJe('production') || puisJe('clients'));
+
+  // Le rôle descend sur <body> : le prix, la marge et les boutons d'argent se
+  // cachent en CSS plutôt que par une condition répétée à trente endroits.
+  const m = moi();
+  for (const r of ['direction', 'chef_atelier', 'boutique', 'operateur']) {
+    document.body.classList.toggle(`role-${r}`, !!m && m.role === r);
+  }
+  document.body.classList.toggle('sans-argent', !puisJe('argent'));
+
+  // L'onglet ouvert est peut-être celui qu'on vient de fermer : on ne laisse
+  // personne devant un écran qu'il n'a plus le droit de lire.
+  const interdit = (location.hash === '#reglages' && !puisJe('reglages'))
+    || (location.hash === '#clients' && !puisJe('clients'))
+    || (location.hash === '#nouveau-projet' && !puisJe('clients'));
+  if (interdit) location.hash = comptesActifs() ? '#mon-travail' : '#planning';
+}
+
+// QUI, ET AVEC QUELS DROITS — avant le premier appel de données. Dans l'autre
+// ordre, le planning part chercher des lignes qu'on n'a pas encore le droit de
+// lire : l'écran affiche une erreur, PUIS le voile de connexion par-dessus.
+// Comptes éteints, cet appel rend `{ comptes: false }` et ne fait rien d'autre.
+relireSession()
+  .catch(() => { /* comptes injoignables : on démarre comme avant */ })
+  .then(() => { appliquerDroits(); demarrerAvecReprise(); });
+surChangement(appliquerDroits);
