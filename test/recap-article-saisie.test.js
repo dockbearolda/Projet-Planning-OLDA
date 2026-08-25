@@ -206,8 +206,8 @@ assert.ok(/a-chiffrer">À chiffrer<\/b>/.test(catalogue) && !/0,00/.test(catalog
 // --- 3 bis. LE RÉCAPITULATIF AU-DESSUS DES AJUSTEMENTS (24/08/2026) ----------
 // Demande du patron : le prix qu'on s'apprête à annoncer se lit AVANT les
 // réglages fins (remise, prix manuel), pas après. L'aperçu (#txPreview, qui
-// porte « Récapitulatif article » et « Voir le calcul et la marge ») précède
-// donc le volet « Ajustements » dans le formulaire textile.
+// porte « Détails » et « Tarification ») précède donc le volet « Ajustement
+// tarifaire » dans le formulaire textile.
 assert.ok(DEVIS.indexOf('id="txPreview"') >= 0 && DEVIS.indexOf('<details class="tx-adjust">') >= 0,
   'l’aperçu et le volet des ajustements doivent exister tous les deux');
 assert.ok(DEVIS.indexOf('id="txPreview"') < DEVIS.indexOf('<details class="tx-adjust">'),
@@ -226,17 +226,21 @@ const detail = source('renderDetailArticle', '');
 assert.ok(/txTableau\(d,c\)/.test(apercu)
   && /txTableau\(n\.textile, ?c,'fiche'\)/.test(detail),
   'les deux vues montent le récapitulatif avec le même bloc');
-// « VOIR LE CALCUL ET LA MARGE » EST À CÔTÉ DU RÉCAPITULATIF, PAS DEDANS
-// (24/08/2026). Il y était logé (par un paramètre `dedans`) et disparaissait
-// donc avec lui : un volet à ouvrir qu'il fallait d'abord déplier un autre
-// volet pour trouver. Trois volets frères désormais — Récapitulatif article,
-// Voir le calcul et la marge, Négociation — qu'on ouvre dans l'ordre qu'on veut.
+// « TARIFICATION » EST À CÔTÉ DU RÉCAPITULATIF, PAS DEDANS (24/08/2026). Il y
+// était logé (par un paramètre `dedans`) et disparaissait donc avec lui : un
+// volet à ouvrir qu'il fallait d'abord déplier un autre volet pour trouver.
+// Trois volets frères désormais — Détails, Tarification, Ajustement tarifaire —
+// qu'on ouvre dans l'ordre qu'on veut. Et TROIS NOMS, plus une phrase : ce
+// qu'est l'article, ce qui fait son prix, ce qui le change.
 assert.ok(!/txTableau\([^)]*\[txDetail/.test(DEVIS),
   'le calcul n’est plus glissé À L’INTÉRIEUR du récapitulatif');
 assert.ok(!/function txTableau\(d,c,dedans/.test(DEVIS),
   '… et le paramètre qui servait à l’y glisser n’existe plus');
-assert.ok(/txDetail\(d,c\),txNegVolet\(\)/.test(apercu),
-  '… il se pose entre le récapitulatif et la négociation, au même niveau qu’eux');
+assert.ok(/txTableau\(d,c\),txDetail\(d,c\),\.\.\.txAlertes/.test(apercu),
+  '… il se pose juste après le récapitulatif, au même niveau que lui');
+assert.ok(/txEl\('summary',null,'Tarification'\)/.test(DEVIS)
+  && !/'Voir le calcul et la marge'|'Masquer le calcul et la marge'/.test(DEVIS),
+  '… il porte un NOM, et cet intitulé ne change plus à l’ouverture : le chevron le disait déjà');
 assert.ok(/bloc\.append\(tete,rang,metrics,txDetail\(n\.textile,c\)/.test(detail),
   '… des deux côtés : sous le formulaire comme dans la fiche');
 assert.ok(!/txDetailsBloc/.test(DEVIS),
@@ -254,8 +258,8 @@ assert.ok(/txRang\(g,'Marge \/ heure'/.test(DEVIS),
 // Chiffres clés en haut, jauge de marge à la place du badge « EXCELLENT »,
 // décomposition du prix dépliable, détail des champs replié, barre d'action
 // collante.
-assert.ok(/txFill\(box,\[txTableau\(d,c\),txDetail\(d,c\),txNegVolet\(\),\.\.\.txAlertes\(d,c\)\]\)/.test(apercu),
-  'le récapitulatif s’écrit dans l’ordre où il se lit : l’article, son calcul, la négociation, puis les alertes');
+assert.ok(/txFill\(box,\[txTableau\(d,c\),txDetail\(d,c\),\.\.\.txAlertes\(d,c\)\]\)/.test(apercu),
+  'le récapitulatif s’écrit dans l’ordre où il se lit : l’article, son calcul, puis les alertes');
 // LES ALERTES RESTENT DEHORS. Une alarme qu'on peut plier n'en est plus une :
 // une dimension écrite dans la note engage la production, un prix manuel dit
 // que le calcul ne décide plus du prix.
@@ -331,8 +335,10 @@ const saisie = source('txSaisieLignes', 'd');
 // choisir lequel lire, et c'est le total que la vendeuse annonce. C'est aussi
 // le RÉSUMÉ du volet : replié, c'est le seul chiffre qui reste.
 const kpis = source('txKpiTotal', 'c');
-assert.ok(/txEl\('summary'\)/.test(kpis) && /Récapitulatif article/.test(kpis),
+assert.ok(/txEl\('summary'\)/.test(kpis) && /'Détails'/.test(kpis),
   'le titre de la carte et ses prix sont le résumé du volet');
+assert.ok(!/'Récapitulatif article'/.test(DEVIS),
+  '… et il s’appelle « Détails » : il n’ouvre qu’une part de la carte, pas la carte');
 assert.ok(!/Temps de production|Marge/.test(kpis),
   '… et rien de la lecture d’atelier n’y monte');
 // LES DEUX PRIX, L'UN SOUS L'AUTRE. Le volet étant fermé par défaut, un prix à
@@ -349,7 +355,7 @@ assert.ok(/\.tx-recap-total\{font-size:var\(--recap-grand\)/.test(DEVIS),
 // LE CHEVRON NE SE DESSINE QU'UNE FOIS. `txRang` recopie la classe de
 // l'intitulé sur la cellule de la valeur quand on ne lui en donne pas une :
 // le chevron apparaissait alors une seconde fois, à gauche du prix à la pièce.
-assert.ok(/txRang\(g,'Récapitulatif article',prix,'tx-recap-cle',null\)/.test(kpis),
+assert.ok(/txRang\(g,'Détails',prix,'tx-recap-cle',null\)/.test(kpis),
   'la cellule du prix ne reprend pas la classe de l’intitulé');
 // Le titre se lit à l'encre et en gras — pas en gris comme les intitulés qu'il
 // coiffe —, et c'est lui qui porte le chevron.
@@ -501,14 +507,50 @@ assert.ok(!/tx-kbd|txRaccourci/.test(DEVIS),
 // pour une question qui se pose en plein milieu de la saisie.
 assert.ok(!/txNegBtn|negocierDepuisTicket|tx-lien/.test(DEVIS),
   'plus de bouton « le client négocie » : c’est un volet');
-const negVolet = source('txNegVolet', '');
-assert.ok(/txEl\('summary',null,'Négociation'\)/.test(negVolet)
-  && /det\.append\(sum,negPanneau\('ticket'\)\)/.test(negVolet),
-  'le volet s’appelle « Négociation » et déroule les possibilités, sur l’article en cours');
+// … ET ELLE A REJOINT LES AJUSTEMENTS : « AJUSTEMENT TARIFAIRE » (24/08/2026).
+// Remise, prix manuel et prix demandé par le client font tous les trois la même
+// chose — ils changent le prix — et ils vivaient dans deux volets frères, l'un
+// dans l'aperçu, l'autre en dessous : on baissait un prix à deux endroits sans
+// jamais voir les deux leviers ensemble.
+assert.ok(/<summary>Ajustement tarifaire<\/summary>/.test(DEVIS),
+  'un seul volet porte les trois leviers de prix');
+assert.ok(!/'Négociation'|>Négociation</.test(DEVIS),
+  '… et plus rien ne s’appelle « Négociation » tout seul, ni sur le ticket ni sur la fiche');
+// LA FUSION SE FAIT DANS LE VOLET STATIQUE, JAMAIS L'INVERSE. « Remise % » et
+// « Prix manuel HT » rappellent previewTextile() à CHAQUE touche : logés dans
+// l'aperçu, qui se reconstruit entièrement à ce moment-là, ils perdraient le
+// curseur sous les doigts au premier chiffre tapé. C'est la négociation qui
+// vient à eux, dans un hôte fixe que l'aperçu remplit sans toucher au reste.
+const ajust = (DEVIS.match(/<details class="tx-adjust">[\s\S]*?<\/details>/) || [''])[0];
+assert.ok(/id="txDiscount"/.test(ajust) && /id="txManualPrice"/.test(ajust),
+  'les deux champs d’ajustement restent dans le HTML statique du volet');
+assert.ok(/id="txNegHote"/.test(ajust)
+  && ajust.indexOf('id="txManualPrice"') < ajust.indexOf('id="txNegHote"'),
+  '… et la négociation vient en dessous d’eux, dans un hôte fixe');
+const apercuSrc = source('previewTextile', '');
+assert.ok(!/txDiscount|txManualPrice/.test(apercuSrc),
+  'l’aperçu ne reconstruit JAMAIS les champs d’ajustement : le curseur s’y perdrait à la frappe');
+// Sans chiffrage l'hôte se VIDE : negPanneau rend « Cette ligne doit être
+// chiffrée avant de négocier », vrai sur la fiche d'une ligne posée, muet au
+// comptoir — la phrase se serait affichée sous deux champs vides dès le premier
+// écran, avant même qu'une référence soit choisie.
+assert.ok(/replaceChildren\(\.\.\.\(chiffre\?\[negPanneau\('ticket'\)\]:\[\]\)\)/.test(source('txNegRendre', 'chiffre')),
+  'la négociation se remplit quand la ligne est chiffrée, et se vide sinon');
+assert.ok(/txNegRendre\(!!c\)/.test(apercuSrc),
+  '… à chaque aperçu, chiffré ou non : le volet reste à l’écran, c’est son contenu qui part');
 // L'ouvrir replie le récapitulatif — et une SEULE fois : sans la garde, chaque
-// redessin rouvrirait la boucle (le volet se recrée ouvert, donc il rebascule).
-assert.ok(/if\(det\.open&&TX_RECAP\.form\)\{TX_RECAP\.form=false;previewTextile\(\)\}/.test(negVolet),
+// redessin rouvrirait la boucle.
+assert.ok(/if\(det\.open&&TX_RECAP\.form\)\{TX_RECAP\.form=false;previewTextile\(\)\}/.test(DEVIS),
   '… et l’ouvrir replie le récapitulatif, sans boucler sur son propre redessin');
+// LE VOLET NE SE RECONSTRUISANT PLUS, SA MÉMOIRE NE SUFFIT PLUS : refermer,
+// c'est refermer l'ÉLÉMENT. Un article remis à zéro et une offre retenue
+// passent donc par la même fonction, qui pose les deux.
+const ouvrir = source('txAjustOuvrir', 'v');
+assert.ok(/txNegOuvert=v/.test(ouvrir) && /det\.open=v/.test(ouvrir),
+  'refermer le volet pose l’élément ET la mémoire');
+assert.ok(/txAjustOuvrir\(false\)/.test(source('txNegRepartir', ''))
+  && /txAjustOuvrir\(false\)/.test(source('negRetenir', 'i, m')),
+  '… un article remis à zéro comme une offre retenue le referment pour de bon');
 // Collé à droite par une MARGE AUTOMATIQUE : trop large, un contenu aligné en
 // fin de ligne sort par la GAUCHE de sa boîte, hors d’atteinte du défilement.
 assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
