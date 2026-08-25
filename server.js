@@ -771,7 +771,11 @@ const ORDER_INVERSE = 'ORDER BY r.position DESC NULLS FIRST, r.priority ASC, r.d
 // courte (500 caractères au plus) et la grille en a besoin pour marquer d'un
 // point les lignes qui en portent une — sinon il faudrait ouvrir chaque fiche
 // pour savoir laquelle parle à l'atelier.
-const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination', 'atelier'];
+// `lot` EST DANS LA LISTE, et doit y rester : c'est lui qui regroupe les lignes
+// d'un même ticket sous une bannière et qui pose le « 2/4 » sur chaque carte.
+// Retiré d'ici, il ne casse rien — les lignes se dispersent simplement dans le
+// pipeline sans que plus personne ne voie qu'elles vont ensemble.
+const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination', 'atelier', 'lot'];
 
 // LES TECHNIQUES DE MARQUAGE, en clair : « dtf », « uv », « laser »…
 // Le moteur de priorité s'en sert pour rattacher une commande à sa machine AVANT
@@ -2856,6 +2860,15 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   if (prix.error) return res.status(400).json({ error: prix.error });
   const valeur = prix.valeur;
 
+  // COMBIEN DE LIGNES ce dossier va-t-il produire ? Un seul article (ou un
+  // écran qui n'en envoie pas) : une ligne, à l'identique de toujours.
+  // Plusieurs : une ligne par article, sauf si l'argent ne se découpe pas
+  // proprement — auquel cas on préfère une ligne juste à quatre fausses.
+  const articles = articlesDuComptoir(b.articles);
+  const parts = articles.length > 1 ? partsDuTicket(articles, valeur) : null;
+  const lot = articles.length > 1 && parts ? articles : [];
+  const nbLignes = lot.length || 1;
+
   // IDEMPOTENCE. Le réseau de la tablette peut avaler la RÉPONSE d'un envoi qui
   // a pourtant abouti : l'écran annonce un échec, la vendeuse réessaie, et la
   // vente entrait une seconde fois au planning sous le même numéro de ticket.
@@ -2873,11 +2886,18 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   // a fini sous une autre référence (cas de la collision ci-dessous).
   const ref = borner(b.ref, 40);
   const empreinte = empreinteDossier(b, ref, nomDossier, valeur, quantite);
+  // L'empreinte porte un index UNIQUE (voir db.js) : quatre lignes du même
+  // dossier ne peuvent pas porter la même. Chacune prend donc son rang en
+  // suffixe. Un dossier d'UNE ligne garde l'empreinte nue — le dédoublonnage
+  // des dossiers déjà en base reste bit pour bit celui d'avant.
+  const empreinteDe = (i) => (nbLignes > 1 ? `${empreinte}#${i + 1}` : empreinte);
   let refFinale = ref;
   let refModifiee = null;
   if (ref) {
+    // On interroge l'empreinte de la PREMIÈRE ligne : les quatre naissent dans
+    // une seule transaction, la première existe si et seulement si le lot existe.
     const { rows: memeDossier } = await pool.query(
-      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinte],
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinteDe(0)],
     );
     if (memeDossier.length) {
       return res.json({
@@ -2951,38 +2971,98 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
     'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
   );
 
+  // CE QUE CHAQUE LIGNE PORTE EN PROPRE. Un dossier d'un seul article n'a
+  // qu'une entrée, et elle vaut exactement ce que la ligne unique valait avant :
+  // aucun chemin nouveau pour le cas courant.
+  const lignes = nbLignes > 1
+    ? lot.map((a, i) => ({
+      // La désignation de l'article devient l'objet de la ligne — c'est ce que
+      // l'atelier lit dans la grille. « 10 x Mug • 3 x T-shirt • … » ne disait
+      // à personne ce qu'IL avait à faire.
+      produit: a.label,
+      quantite: a.qte,
+      // La part de cet article dans le ticket. La somme des lignes vaut le
+      // ticket, à l'euro près (voir partsDuTicket).
+      valeur: parts[i],
+      // Sa PROPRE date : les mugs vendredi, les casquettes mardi. Sans date à
+      // lui, l'article suit celle du dossier.
+      deadline: a.due || deadline,
+      description: a.detail || borner(b.comment, DESCRIPTION_MAX) || description,
+      // Le rang sert au suffixe d'empreinte ET à retrouver l'article dans
+      // `fiche.details` (« Article 2 — Désignation »), que le ticket relit déjà.
+      lot: { ref: refFinale, rang: i + 1, total: nbLignes },
+      heure: a.heure,
+    }))
+    : [{
+      produit: borner(b.name, OBJET_MAX),
+      quantite,
+      valeur,
+      deadline,
+      description,
+      lot: null,
+      heure: null,
+    }];
+
+  // UNE SEULE TRANSACTION. Quatre `INSERT` autonomes, c'est un dossier qui peut
+  // rester à moitié en base si le réseau tombe entre le deuxième et le
+  // troisième : la vendeuse verrait un échec, réessaierait, et l'empreinte des
+  // deux premières lignes ferait passer le renvoi pour un doublon — les deux
+  // articles manquants n'entreraient JAMAIS. Tout ou rien.
   let rows;
+  const cx = await pool.connect();
   try {
-    ({ rows } = await pool.query(
-      `INSERT INTO requests
-         (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
-          contact_referent, contact_phone, contact_email, quantity, product, description,
-          deadline, position, fiche, project_value, paye, paiement_mode)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-       RETURNING id`,
-      [
-        famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
-        clientType, nomDossier,
-        borner(cl.contact, 120), borner(cl.phone, 40), borner(cl.email, 160),
-        quantite, borner(b.name, OBJET_MAX), description,
-        deadline, posRows[0].pos, JSON.stringify(fiche), valeur,
-        // Un paiement n'existe que sur une vente : une demande ne se prononce pas.
-        estDemande ? null : !!pay.paye, estDemande ? null : mode,
-      ],
-    ));
+    await cx.query('BEGIN');
+    rows = [];
+    for (let i = 0; i < lignes.length; i += 1) {
+      const l = lignes[i];
+      const ficheLigne = {
+        ...fiche,
+        empreinte: empreinteDe(i),
+        ...(l.lot ? { lot: l.lot } : {}),
+        ...(l.heure ? { heureSouhaitee: l.heure } : {}),
+      };
+      const { rows: r } = await cx.query(
+        `INSERT INTO requests
+           (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+            contact_referent, contact_phone, contact_email, quantity, product, description,
+            deadline, position, fiche, project_value, paye, paiement_mode)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         RETURNING id`,
+        [
+          famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
+          clientType, nomDossier,
+          borner(cl.contact, 120), borner(cl.phone, 40), borner(cl.email, 160),
+          l.quantite, l.produit, l.description,
+          // Les rangs se suivent (pos, pos+1, pos+2…) : les lignes d'un même
+          // ticket restent CONTIGUËS dans « À trier », ce dont la bannière a
+          // besoin. L'écart de 1000 entre deux dossiers laisse la place aux
+          // déplacements à la main.
+          l.deadline, Number(posRows[0].pos) + i, JSON.stringify(ficheLigne), l.valeur,
+          // Un paiement n'existe que sur une vente : une demande ne se prononce
+          // pas. Sur un lot, le client a payé le TICKET — les quatre lignes
+          // portent donc le même état de paiement, et leurs prix se somment.
+          estDemande ? null : !!pay.paye, estDemande ? null : mode,
+        ],
+      );
+      rows.push(r[0]);
+    }
+    await cx.query('COMMIT');
   } catch (err) {
+    await cx.query('ROLLBACK').catch(() => {});
     // La base vient de refuser un dossier dont l'empreinte existe déjà : c'est
     // le MÊME dossier, arrivé deux fois. La file ci-dessus l'empêche déjà au
     // sein d'un serveur ; ce rattrapage vaut pour le jour où il y en aurait
     // deux. On rend la ligne d'origine — exactement ce que la vendeuse attend.
     if (!err || err.code !== '23505') throw err;
     const { rows: dejaLa } = await pool.query(
-      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinte],
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'empreinte' = $1 LIMIT 1", [empreinteDe(0)],
     );
     if (!dejaLa.length) throw err;
     return res.json({
       id: dejaLa[0].id, stage: dejaLa[0].stage, subStage: dejaLa[0].sub_stage, dejaEnregistre: true,
     });
+  } finally {
+    cx.release();
   }
 
   const perso = clientType === 'perso' ? couperNomPerso(nomDossier) : null;
@@ -2999,6 +3079,10 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
   broadcast({ kind: 'create', stages: [famille] });
   res.status(201).json({
     id: rows[0].id, stage: famille, subStage: sousEtape,
+    // Combien de lignes ce dossier a produites, et lesquelles. L'écran de la
+    // vendeuse le DIT : « 4 articles → 4 lignes ». Sans ce compte, elle croit
+    // avoir enregistré une commande et en trouve quatre au planning.
+    ...(nbLignes > 1 ? { lot: { total: nbLignes, ids: rows.map((r) => r.id) } } : {}),
     // Où le dossier ATTEND (`stage`) et où il DOIT aller (`destination`) : deux
     // choses différentes depuis que tout le comptoir passe par le sur-dossier.
     destination: { stage: destination, subStage: destinationSous },
@@ -3008,6 +3092,65 @@ app.post('/api/comptoir/projet', asyncH(async (req, res) => unDossierALaFois(asy
     ...(refModifiee ? { refModifiee } : {}),
   });
 })));
+
+// --- UN DOSSIER, PLUSIEURS TRAVAUX -----------------------------------------
+// Un client prend 10 mugs, 3 tee-shirts, 4 décapsuleurs et 10 casquettes. Ce
+// n'est pas UN travail, c'en est quatre : les casquettes peuvent partir en
+// production pendant que les mugs attendent le fournisseur. Or une étape
+// appartient à la LIGNE (« À commander » est une sous-étape de Préparation),
+// pas au ticket — tant que le dossier est une seule ligne, il est tout entier
+// en attente ou tout entier en production, jamais les deux.
+//
+// Un dossier à plusieurs articles entre donc au planning en autant de lignes,
+// reliées par le numéro de ticket (`fiche.lot`). Le comptoir envoie ses
+// articles en clair dans `articles` ; un écran qui n'en envoie pas retombe sur
+// UNE ligne, exactement comme avant.
+function articlesDuComptoir(brut) {
+  if (!Array.isArray(brut)) return [];
+  const out = [];
+  for (const a of brut) {
+    if (!a || typeof a !== 'object') continue;
+    const label = borner(a.label, OBJET_MAX);
+    if (!label) continue;                       // sans désignation, pas de ligne
+    const qte = Number(a.qty);
+    out.push({
+      label,
+      qte: Number.isInteger(qte) && qte > 0 ? qte : null,
+      detail: borner(a.detail, DESCRIPTION_MAX) || null,
+      due: isDay(a.due) ? a.due : null,
+      heure: isHeure(a.heure) ? a.heure : null,
+      // `montant` reste BRUT ici : c'est `partsDuTicket` qui décide s'il est
+      // exploitable, parce que la décision porte sur le lot entier.
+      montant: a.amount,
+    });
+  }
+  return out;
+}
+
+// LA PART DE CHAQUE LIGNE DANS LE TICKET. Règle : la somme des lignes vaut
+// EXACTEMENT ce que le client a payé — sinon la colonne Prix du planning ment,
+// et toute somme faite dessus ment avec elle. L'écart d'arrondi se pose sur la
+// première ligne plutôt que de se diluer.
+//
+// `null` = on ne sait pas découper proprement (un article sans montant lisible).
+// On refuse alors de découper le dossier : une ligne unique au bon prix vaut
+// mieux que quatre au mauvais.
+function partsDuTicket(articles, total) {
+  if (total == null) return articles.map(() => null);   // une demande n'a pas de prix
+  const parts = [];
+  for (const a of articles) {
+    const p = prixComptoir(a.montant);
+    if (p.error || p.valeur == null) return null;
+    parts.push(p.valeur);
+  }
+  const somme = parts.reduce((t, v) => t + v, 0);
+  const ecart = Math.round((total - somme) * 100) / 100;
+  if (ecart) parts[0] = Math.round((parts[0] + ecart) * 100) / 100;
+  // Un écart qui rendrait la première ligne négative n'est pas un arrondi :
+  // c'est que les montants envoyés ne décrivent pas ce ticket. On ne découpe pas.
+  if (parts[0] < 0) return null;
+  return parts;
+}
 
 // Les récapitulatifs du comptoir arrivent en paires [libellé, valeur]. On les
 // range en objets et on jette tout ce qui n'a pas cette forme : la fiche est

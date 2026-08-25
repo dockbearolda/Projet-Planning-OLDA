@@ -1938,6 +1938,10 @@ renderProducts();
         production:production || "À définir",
         comment:[`Délai souhaité : ${deliveryDelayLabel()}`,text("internalNote")].filter(Boolean).join(" | "),
         amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
+        // Même sur le payload de secours : un panier à quatre articles doit
+        // donner quatre lignes, y compris le jour où patchPlanningButton
+        // n'a pas eu le temps de passer.
+        articles:typeof window.articlesPourPlanning==="function"?window.articlesPourPlanning():[],
         checks:{products:true,bat:false,files:true,qty:true,payment:!document.querySelector('input[name="payment"][value="Paiement au retrait"]')?.checked}
       };
       parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},location.origin);
@@ -2579,6 +2583,27 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     return r?r.value:'';
   }
 
+  /* LES ARTICLES, EN CLAIR. Le planning en fait UNE LIGNE PAR ARTICLE : les
+     casquettes peuvent partir en production pendant que les mugs attendent le
+     fournisseur, ce qu'une ligne unique interdit (l'étape appartient à la
+     ligne). Chaque article garde sa date et son heure de retrait : le ticket en
+     annonce déjà une par article, le planning ne doit pas les écraser.
+     Le total du ticket reste `amount` et fait foi — le serveur pose l'écart
+     d'arrondi sur la première ligne pour que la somme tombe juste. */
+  window.articlesPourPlanning=function(){
+    var lignes=(typeof products!=="undefined"&&products)||[];
+    return lignes.map(function(p){
+      return {
+        label:p.name,
+        qty:Number(p.qty)||0,
+        detail:p.description||'',
+        due:p.deliveryDate||'',
+        heure:p.deliveryTime||'',
+        amount:p.totalTTC
+      };
+    });
+  };
+
   function patchPlanningButton(){
     var btn=el('oldaCreatePlanningBtn');
     if(!btn||btn.__oldaPatched)return;
@@ -2627,6 +2652,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
           email:v('clientEmail')
         },
         quantity:(typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+(Number(p.qty)||0);},0),
+        // Le panier article par article : le planning en fait une ligne chacun.
+        articles:window.articlesPourPlanning(),
         paiement:{
           modeLabel:mode,
           mode:MODES_PLANNING[mode]||null,

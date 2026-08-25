@@ -135,10 +135,24 @@ export function modeleTicket(r) {
   const demande = f.source === 'Demande de devis' || l.order_kind === 'demande';
   const postes = postesDuPanier(f.details);
 
+  // UN PANIER DE QUATRE ARTICLES, C'EST QUATRE LIGNES AU PLANNING — donc quatre
+  // papiers, chacun pour son établi. Celui-ci ne parle QUE de son article :
+  // imprimer les quatre sur chaque papier ferait annoncer « à retirer le 28/08 »
+  // au-dessus de trois articles qui ne sont pas dus ce jour-là, et l'atelier
+  // emballerait une commande incomplète en la croyant finie.
+  // On ne filtre que si le compte tombe juste : sur un dossier d'avant le
+  // découpage, ou dont le récapitulatif ne s'aligne plus, le papier entier vaut
+  // mieux qu'un papier arbitrairement amputé.
+  const lotT = f.lot && typeof f.lot === 'object' ? f.lot : null;
+  const rang = lotT ? Number(lotT.rang) : 0;
+  const total = lotT ? Number(lotT.total) : 0;
+  const seulPoste = rang >= 1 && total > 1 && postes.length === total;
+  const duPoste = seulPoste ? [postes[rang - 1]] : postes;
+
   // Le détail figé n'existe que sur un dossier du comptoir. Une ligne créée à la
   // main dans la grille n'a pas de panier : son ticket porte alors ce que la
   // ligne sait — la description et la quantité. Mieux qu'un ticket vide.
-  const lignes = demande ? besoinsDemande(postes) : articlesVente(postes);
+  const lignes = demande ? besoinsDemande(duPoste) : articlesVente(duPoste);
   if (!lignes.length && texte(l.product)) {
     lignes.push({
       designation: texte(l.product),
@@ -163,6 +177,11 @@ export function modeleTicket(r) {
     titre: 'Ticket atelier',
     // La référence est LA clé : c'est elle qui relie ce papier au dossier.
     ref: texte(f.ref),
+    // « Article 2 sur 4 » — un COMPTE, pas un identifiant : la référence, elle,
+    // ne s'imprime toujours pas (voir dessinerTicket). Ce compte-là fait
+    // produire : il dit que la commande du client n'est pas complète avec ce
+    // seul papier.
+    lot: seulPoste ? { rang, total } : null,
     date: dateCreation(f.creeLe),
     // POUR QUI. Le nom sur l'établi, et de quoi joindre quelqu'un : « appeler
     // avant de couper » ne sert à rien sans le numéro.
@@ -190,6 +209,7 @@ export function modeleTicket(r) {
 export function ticketTexte(t) {
   const sep = '--------------------------------';
   const out = ['ATELIER OLDA', 'Saint-Martin', t.titre.toUpperCase(), sep];
+  if (t.lot) out.push(`ARTICLE ${t.lot.rang} SUR ${t.lot.total} DE LA COMMANDE`);
   if (t.date) out.push(`Le ${t.date}`);
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
@@ -226,6 +246,12 @@ export const CSS_TICKET = `
                text-transform: uppercase; letter-spacing: .08em; }
   .tk__sep { border: 0; border-top: 1px dashed #000; margin: 8px 0; }
   .tk__note { margin: 3px 0 0; font-size: 11px; text-align: center; font-weight: 700; }
+  /* « Article 2 sur 4 » — encadré, parce que c'est l'avertissement qui empêche
+     d'emballer une commande incomplète. Noir sur blanc comme tout le reste : une
+     imprimante à tickets ne connaît que le noir. */
+  .tk__lot { margin: 4px auto 0; padding: 2px 6px; border: 1px solid #000;
+             display: table; font-size: 11px; font-weight: 800;
+             text-transform: uppercase; letter-spacing: .04em; }
   .tk__ligne { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
   .tk__ligne span:first-child { color: #000; }
   .tk__remise { margin: 0; font-size: 13px; font-weight: 800; text-align: center;
@@ -326,6 +352,9 @@ export function dessinerTicket(t, doc, editeur) {
   // fenêtre d'impression et le libellé de la carte s'en servent pour dire DE
   // QUEL dossier ce papier parle — mais le papier lui-même va à l'établi, et un
   // identifiant de dossier n'y fait rien produire.
+  // CE PAPIER NE FAIT PAS TOUTE LA COMMANDE. Un compte, pas un identifiant :
+  // sans lui, l'atelier finit son article et emballe en croyant avoir fini.
+  if (t.lot) tk.append(el('p', 'tk__lot', `Article ${t.lot.rang} sur ${t.lot.total} de la commande`));
   if (t.date) tk.append(el('p', 'tk__note', `Le ${t.date}`));
   tk.append(sep());
 

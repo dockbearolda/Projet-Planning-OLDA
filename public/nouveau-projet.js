@@ -206,6 +206,14 @@ function avisEnregistrement(data) {
     return `Enregistré — mais la référence du ticket était déjà prise par une AUTRE commande. `
       + `Ce dossier porte désormais « ${data.refModifiee} » : corrige le numéro sur le ticket remis au client.`;
   }
+  // UN DOSSIER À PLUSIEURS ARTICLES DEVIENT PLUSIEURS LIGNES. Le dire, sinon la
+  // vendeuse croit avoir enregistré une commande, en trouve quatre au planning,
+  // conclut au doublon et en supprime trois.
+  const n = data.lot && Number(data.lot.total) > 1 ? Number(data.lot.total) : 0;
+  if (n) {
+    return `Enregistré — ${n} articles, donc ${n} lignes au planning, regroupées sous le même ticket. `
+      + `Chacune avance à son rythme : on peut produire les unes pendant que les autres attendent le fournisseur.`;
+  }
   return null;
 }
 // Pendant l'envoi, la vendeuse doit voir qu'il se passe quelque chose : sans

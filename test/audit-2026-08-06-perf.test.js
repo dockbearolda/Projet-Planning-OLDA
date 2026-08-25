@@ -516,6 +516,10 @@ function bloc(src, signature) {
     // c'est le repère que le client rapporte au comptoir.
     refsTicket: (r) => (r.fiche ? replier([r.fiche.ref, r.fiche.refTicket].filter(Boolean).join(' ')) : ''),
     paintZebra: () => {},
+    // Les bannières de lot suivent leurs lignes dans le même passage. Aucune
+    // ici : ce fichier juge le COMPTEUR, leur règle propre est gardée par
+    // test/lot-articles.test.js.
+    bandEls: new Map(),
     $empty: { hidden: false, textContent: '' },
     $stageCount: { textContent: '' },
   };

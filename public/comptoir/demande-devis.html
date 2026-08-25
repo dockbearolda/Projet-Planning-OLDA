@@ -3502,6 +3502,9 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
         production:production||"À définir",
         comment:val("projectConstraints")||val("missingNotes")||"",
         amount:null,
+        // Même sur le payload de secours : quatre besoins doivent donner quatre
+        // lignes, y compris si patchPlanningButton n'a pas eu le temps de passer.
+        articles:typeof window.besoinsPourPlanning==="function"?window.besoinsPourPlanning():[],
         checks:{
           products:false,
           bat:val("oldaMockupStatus")==="Terminée",
@@ -4351,6 +4354,25 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(typeof downloadRecapTXT==='function')downloadRecapTXT();
   };
 
+  /* LES BESOINS, EN CLAIR. Le planning en fait UNE LIGNE PAR BESOIN : quatre
+     besoins, ce n'est pas un travail mais quatre, et chacun avance à son
+     rythme dès que le devis est accepté (l'étape appartient à la ligne, pas au
+     ticket). Une demande n'a PAS de prix — `amount` reste absent, le serveur
+     laisse les quatre lignes à « À chiffrer ». */
+  window.besoinsPourPlanning=function(){
+    var lignes=(typeof needs!=="undefined"&&needs)||[];
+    return lignes.map(function(n){
+      return {
+        label:n.label,
+        qty:Number(n.qty)||0,
+        /* Ce que l'atelier a besoin de lire sur SA ligne : la matière, la
+           couleur, la technique, puis ce que le client a précisé. */
+        detail:[n.category,n.color,n.productionType,n.textileResume,n.comment]
+          .filter(Boolean).join(' · ')
+      };
+    });
+  };
+
   /* Le planning reçoit l’intégralité des informations saisies */
   function patchPlanningButton(){
     var btn=document.getElementById('oldaCreatePlanningBtn');
@@ -4391,6 +4413,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         // --- Ce que le PLANNING lit en clair plutôt que dans du texte ---
         clientObj:selectedClient||null,
         quantity:(needs||[]).reduce(function(t,n){return t+(Number(n.qty)||0);},0),
+        // Les besoins un par un : le planning en fait une ligne chacun.
+        articles:window.besoinsPourPlanning(),
         canal:val('source')||'',
         suite:actionLabels[window.clientNextActionValue()]||''
       };

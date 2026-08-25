@@ -884,7 +884,38 @@ function ordreFamille() {
   // bandes soient contiguës (en-têtes de groupe). À l'intérieur d'une bande, les
   // commandes urgentes (échéance ≤ 1 jour, aujourd'hui ou dépassée) remontent en
   // tête, la plus urgente d'abord, puis échéance la plus proche.
-  return liste.sort(cmpAuto);
+  return regrouperLots(liste.sort(cmpAuto));
+}
+
+// LES ARTICLES D'UN MÊME TICKET RESTENT ENSEMBLE. Le tri automatique classe par
+// urgence : les quatre articles d'un panier ayant chacun SA date de retrait, ils
+// se retrouvaient dispersés dans la liste, un dossier étranger au milieu — et la
+// bannière, qui coiffe des lignes VOISINES, se cassait en morceaux.
+// Le lot prend donc la place de son article le plus urgent (le premier que le
+// tri a rencontré), et à l'intérieur ses lignes suivent l'ordre du TICKET : ce
+// que la vendeuse a saisi, ce que le client a sous les yeux sur son papier.
+// Ne s'applique QU'AU TRI AUTOMATIQUE : une étape rangée à la main garde son
+// ordre, y compris si quelqu'un a délibérément sorti un article de son groupe.
+function regrouperLots(liste) {
+  const groupes = new Map();
+  for (const r of liste) {
+    const l = lotDe(r);
+    if (!l) continue;
+    if (!groupes.has(l.ref)) groupes.set(l.ref, []);
+    groupes.get(l.ref).push(r);
+  }
+  if (!groupes.size) return liste;
+  for (const g of groupes.values()) g.sort((a, b) => lotDe(a).rang - lotDe(b).rang);
+  const posee = new Set();
+  const out = [];
+  for (const r of liste) {
+    const l = lotDe(r);
+    if (!l) { out.push(r); continue; }
+    if (posee.has(l.ref)) continue;      // déjà sortie avec son groupe
+    posee.add(l.ref);
+    out.push(...groupes.get(l.ref));
+  }
+  return out;
 }
 
 function applySortAndRender({ syncDrawer = true } = {}) {
@@ -1179,6 +1210,11 @@ function buildCard(r) {
   const ref = document.createElement('div');
   ref.className = 'pcard__ref';
   ref.textContent = (r.fiche && r.fiche.ref) || '';
+  // « 2/4 » COLLÉ À LA RÉFÉRENCE : la carte dit qu'elle est un article parmi
+  // quatre, et lesquels. Aucune piste de grille en plus — une ligne qui
+  // n'apparaîtrait que sur certaines cartes décalerait toute la file.
+  const marque = lotChip(r);
+  if (marque) ref.append(' ', marque);
   const blocClient = ref.textContent
     ? pcardBloc('Client', client, ref)
     : pcardBloc('Client', client);
@@ -1547,10 +1583,15 @@ function renderCards(data) {
   for (const [id, entry] of cardEls) {
     if (!voulus.has(id)) { entry.el.remove(); cardEls.delete(id); }
   }
+  const bandes = bandesDeLot(data);
+  const debutBande = new Map(bandes.map((b) => [b.debut, b]));
+  nettoyerBandes(new Set(bandes.map((b) => b.ref)));
   const ordre = [];
   let budget = TRANCHE_RENDU;
   let reste = false;
-  for (const r of data) {
+  for (let idx = 0; idx < data.length; idx += 1) {
+    const r = data[idx];
+    if (debutBande.has(idx)) ordre.push(noeudBandeLot(debutBande.get(idx), true));
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = cardEls.get(id);
@@ -1610,10 +1651,16 @@ function renderRows(data) {
 
   // 2. Construire la séquence ordonnée des lignes, en créant / reconstruisant /
   //    réutilisant chacune au passage. Par TRANCHES : voir TRANCHE_RENDU.
+  const bandes = bandesDeLot(data);
+  const debutBande = new Map(bandes.map((b) => [b.debut, b]));
+  nettoyerBandes(new Set(bandes.map((b) => b.ref)));
+
   const order = [];
   let budget = TRANCHE_RENDU;
   let reste = false;
-  for (const r of data) {
+  for (let idx = 0; idx < data.length; idx += 1) {
+    const r = data[idx];
+    if (debutBande.has(idx)) order.push(noeudBandeLot(debutBande.get(idx), false));
     const id = String(r.id);
     const sig = `${r.id}:${r.updated_at}`;
     let entry = rowEls.get(id);
@@ -1680,6 +1727,18 @@ function applySearchAndCounts() {
     if (!entry) continue;
     (cartes ? entry.el : entry.tr).classList.toggle('is-hidden', !match);
   }
+  // LA BANNIÈRE SUIT SES LIGNES. La recherche masque en CSS sans démonter :
+  // sans cette passe, un ticket dont aucune ligne ne correspond laissait son
+  // en-tête seul à l'écran, coiffant les lignes du ticket suivant.
+  for (const entree of bandEls.values()) {
+    const source = cartes ? cardEls : rowEls;
+    const vues = entree.ids.filter((id) => {
+      const e = source.get(id);
+      return e && !(cartes ? e.el : e.tr).classList.contains('is-hidden');
+    });
+    entree.el.classList.toggle('is-hidden', vues.length < 2);
+  }
+
   $empty.hidden = visible > 0;
   if (visible === 0) {
     $empty.textContent = q
@@ -2169,6 +2228,143 @@ function boutonRanger(r) {
   return btn;
 }
 
+// --- LES LIGNES D'UN MÊME TICKET --------------------------------------------
+// Un client prend 10 mugs, 3 tee-shirts, 4 décapsuleurs et 10 casquettes : le
+// comptoir en fait QUATRE lignes, parce qu'on produit les casquettes pendant
+// que les mugs attendent le fournisseur — et une étape appartient à la LIGNE,
+// pas au ticket. Reste à VOIR qu'elles vont ensemble : sans quoi le découpage
+// ne ferait que disperser un dossier dans le pipeline, et l'article oublié
+// remplacerait le dossier bloqué. Deux marques, complémentaires :
+//   - la BANNIÈRE, quand les lignes sont VOISINES (dans « À trier » elles le
+//     sont toujours : elles y naissent à la suite) ;
+//   - le « 2/4 » sur CHAQUE ligne, qui la suit partout où elle va ensuite.
+function lotDe(r) {
+  const l = r && r.fiche && typeof r.fiche === 'object' ? r.fiche.lot : null;
+  if (!l || typeof l !== 'object') return null;
+  const total = Number(l.total);
+  const rang = Number(l.rang);
+  if (!(total > 1) || !(rang >= 1)) return null;
+  return { ref: String(l.ref || r.fiche.ref || ''), rang, total };
+}
+
+function lotChip(r) {
+  const l = lotDe(r);
+  if (!l) return null;
+  const s = document.createElement('span');
+  s.className = 'lot-chip';
+  s.textContent = `${l.rang}/${l.total}`;
+  attachTip(s, `Article ${l.rang} sur ${l.total} du ticket ${l.ref}`
+    + ` — ${l.total - 1} autre${l.total > 2 ? 's' : ''} avance${l.total > 2 ? 'nt' : ''} de son côté`);
+  return s;
+}
+
+// Les suites de lignes VOISINES d'un même ticket dans la liste affichée. Une
+// ligne isolée n'en fait pas partie : une bannière au-dessus d'une seule ligne
+// n'apprend rien — c'est le « 2/4 » qui porte l'information là.
+function bandesDeLot(data) {
+  const bandes = [];
+  let cur = null;
+  for (let i = 0; i < data.length; i += 1) {
+    const l = lotDe(data[i]);
+    if (cur && l && l.ref === cur.ref) { cur.lignes.push(data[i]); continue; }
+    if (cur && cur.lignes.length > 1) bandes.push(cur);
+    cur = l ? { ref: l.ref, total: l.total, debut: i, lignes: [data[i]] } : null;
+  }
+  if (cur && cur.lignes.length > 1) bandes.push(cur);
+  return bandes;
+}
+
+// La bannière : qui, quel ticket, combien d'articles — et le bouton qui les
+// range TOUS d'un coup. Découper un dossier en quatre ne doit pas quadrupler le
+// travail de la vendeuse : tant que les articles n'ont pas divergé, ils se
+// rangent ensemble. Chacun reste déplaçable seul, c'est tout l'intérêt.
+function banniereLot(bande) {
+  const r0 = bande.lignes[0];
+  const el = document.createElement('div');
+  el.className = 'lot-band';
+
+  const nom = document.createElement('span');
+  nom.className = 'lot-band__nom';
+  nom.textContent = r0.billing_company || 'Sans nom';
+  const ref = document.createElement('span');
+  ref.className = 'lot-band__ref';
+  ref.textContent = bande.ref;
+  const compte = document.createElement('span');
+  compte.className = 'lot-band__compte';
+  // « 3 des 4 articles » : une ligne du ticket est déjà partie ailleurs. C'est
+  // une information, pas une anomalie — mais elle doit se lire.
+  compte.textContent = bande.lignes.length === bande.total
+    ? `${bande.total} articles`
+    : `${bande.lignes.length} des ${bande.total} articles`;
+  el.append(nom, ref, compte);
+
+  const dest = destinationDe(r0);
+  const memeDest = bande.lignes.every((x) => {
+    const d = destinationDe(x);
+    return d && dest && d.stage === dest.stage && d.sub === dest.sub;
+  });
+  if (r0.stage === A_TRIER && dest && memeDest) {
+    const ou = STAGE_LABEL[dest.stage] + (dest.sub ? ` › ${SUB_LABEL[dest.sub]}` : '');
+    const n = bande.lignes.length;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ranger-chip lot-band__ranger';
+    btn.textContent = `Ranger les ${n}`;
+    attachTip(btn, `Ranger les ${n} articles du ticket ${bande.ref} dans « ${ou} »`);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!armerUneFois(btn)) return;
+      // Copie de la liste : chaque `moveToStage` repeint, donc réécrit `rows`.
+      for (const x of [...bande.lignes]) moveToStage(x, dest.stage, dest.sub);
+      showToast(`${n} articles rangés dans ${ou}.`);
+    });
+    el.appendChild(btn);
+  }
+  return el;
+}
+
+// Les bannières montées, par ticket : on les RÉUTILISE d'un rendu à l'autre.
+// Reconstruites à chaque fois, elles casseraient le glissement des lignes qui
+// changent de rang (cf. avantReordonnancement) et clignoteraient à chaque
+// rafraîchissement temps réel.
+const bandEls = new Map(); // ref -> { el, sig, ids }
+
+function noeudBandeLot(bande, cartes) {
+  const sig = [bande.ref, bande.lignes.length, bande.total,
+    bande.lignes[0].stage, bande.lignes[0].sub_stage,
+    bande.lignes[0].billing_company, cartes ? 'c' : 't'].join('|');
+  const vu = bandEls.get(bande.ref);
+  if (vu && vu.sig === sig) {
+    vu.ids = bande.lignes.map((x) => String(x.id));
+    return vu.el;
+  }
+  const contenu = banniereLot(bande);
+  let el = contenu;
+  if (!cartes) {
+    // Dans le tableau, la bannière est une ligne à part entière. `colSpan` large
+    // plutôt que compté : les colonnes vont et viennent avec les réglages, une
+    // valeur exacte se périmerait en silence au prochain ajout.
+    const tr = document.createElement('tr');
+    tr.className = 'lot-band-row';
+    const td = document.createElement('td');
+    td.colSpan = 99;
+    td.className = 'lot-band-cell';
+    td.appendChild(contenu);
+    tr.appendChild(td);
+    el = tr;
+  }
+  if (vu) vu.el.remove();
+  bandEls.set(bande.ref, { el, sig, ids: bande.lignes.map((x) => String(x.id)) });
+  return el;
+}
+
+// Retire les bannières dont le ticket n'a plus deux lignes voisines à l'écran.
+function nettoyerBandes(gardees) {
+  for (const [ref, entree] of bandEls) {
+    if (!gardees.has(ref)) { entree.el.remove(); bandEls.delete(ref); }
+  }
+}
+
 function cellSubStage(r) {
   const td = document.createElement('td');
   td.className = 'col-sub-cell';
@@ -2617,6 +2813,16 @@ function cellDescription(r) {
   syncTitleOnOverflow(name);
 
   stack.appendChild(name);
+  // « 2/4 » SOUS LA DESCRIPTION. Dispersée dans le pipeline, la ligne doit dire
+  // seule qu'elle appartient à un ticket de quatre articles — sinon les mugs
+  // restés en commande n'ont plus personne pour les réclamer.
+  const marque = lotChip(r);
+  if (marque) {
+    const sous = document.createElement('div');
+    sous.className = 'product-lot';
+    sous.append(marque, ` ${(r.fiche && r.fiche.ref) || ''}`);
+    stack.appendChild(sous);
+  }
   td.appendChild(stack);
   return td;
 }

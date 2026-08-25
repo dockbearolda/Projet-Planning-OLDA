@@ -351,6 +351,11 @@
     if (d.refModifiee) {
       return `Commande enregistrée au planning ✔\n\nATTENTION : la référence du ticket était déjà prise par une AUTRE commande.\nCelle-ci est enregistrée sous « ${d.refModifiee} ».\nCorrige le numéro sur le ticket remis au client.`;
     }
+    // UN DOSSIER À PLUSIEURS ARTICLES DEVIENT PLUSIEURS LIGNES. Sans le dire, la
+    // vendeuse croit avoir enregistré une commande et en trouve quatre au
+    // planning — elle penserait à un doublon et en supprimerait trois.
+    const n = d.lot && Number(d.lot.total) > 1 ? Number(d.lot.total) : 0;
+    if (n) return `Commande enregistrée au planning ✔\n\n${n} articles → ${n} lignes, regroupées sous le même ticket.\nChacune avance à son rythme (production, commande fournisseur…).`;
     return 'Commande enregistrée au planning ✔';
   }
 

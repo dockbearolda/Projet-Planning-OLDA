@@ -5528,6 +5528,102 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .pcard__meta .ranger-chip { margin: 0; padding: 4px 9px; font-size: var(--taille-texte); }
 
 
+/* LES LIGNES D'UN MÊME TICKET.
+   ===========================================================================
+   Un panier de quatre articles entre au planning en QUATRE lignes : c'est la
+   seule façon de produire les casquettes pendant que les mugs attendent le
+   fournisseur (l'étape appartient à la ligne). Il faut donc voir, d'un coup
+   d'œil, que ces quatre-là n'en font qu'un — sans quoi on aurait remplacé
+   « le dossier bloqué » par « l'article oublié ».
+
+   La bannière ne porte AUCUNE couleur d'état : elle ne dit pas qu'il se passe
+   quelque chose, elle dit d'où viennent les lignes qui la suivent. Un simple
+   changement de fond et un trait de liaison à gauche, qui court le long du
+   groupe. La couleur reste réservée aux états (retard, alerte, à ranger). */
+.lot-band {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  padding: 6px 13px;
+  background: var(--surface-hover);
+  /* Un fond de cette clarté se rend à 1,12:1 sur le blanc : à lui seul il ne
+     délimite rien. Le liseré, lui, est un BORD — il se lit par sa netteté et
+     non par sa surface, comme le liseré d'un champ de la charte. Le trait
+     APPUYÉ (1,52:1 contre 1,27) : c'est un en-tête de groupe, pas le contour
+     d'un champ au repos. */
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: var(--taille-note);
+  color: var(--text-2);
+}
+.lot-band__nom {
+  font-weight: var(--graisse-forte);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Sans ceci, un nom long pousse le compteur et le bouton hors du bandeau au
+     lieu de se laisser couper : un enfant de flex ne rétrécit pas sous la
+     largeur de son contenu tant qu'on ne le lui dit pas. */
+  min-width: 0;
+}
+.lot-band__ref { font-variant-numeric: tabular-nums; }
+/* Le compte pousse le bouton à droite : l'action qui engage est le DERNIER
+   élément de la rangée, comme partout ailleurs dans l'application. */
+.lot-band__compte { margin-right: auto; white-space: nowrap; }
+.lot-band__ranger { margin: 0; padding: 4px 11px; font-size: var(--taille-note); }
+
+/* Dans le TABLEAU, la bannière est une ligne à part entière. Elle ne prend ni
+   zébrage ni survol : ce n'est pas une commande, on ne peut rien y faire
+   d'autre que ranger le lot.
+   SPÉCIFICITÉ : `.grid tbody td` impose `height: var(--row-h)` et `padding: 0`
+   à toutes les cellules. Une règle `.lot-band-cell` seule perd le duel et la
+   bannière se retrouvait centrée dans une case de 88 px — à ÉGALE distance de
+   la ligne du dessus et de celle du dessous, donc lue comme un séparateur
+   entre deux groupes plutôt que comme la tête du sien. */
+.grid tbody tr.lot-band-row,
+.grid tbody tr.lot-band-row:hover { background: none; }
+.grid tbody td.lot-band-cell {
+  height: auto;
+  /* Loin de ce qui précède, COLLÉE à ce qui suit : un en-tête appartient à ce
+     qu'il coiffe. C'est l'écart, plus que le fond, qui le dit. */
+  padding: 18px 12px 3px;
+  border-bottom: 0;
+}
+/* Dans la vue CARTES, elle s'intercale entre deux cartes. La file est une
+   grille à gouttière : la bannière y prend sa place comme une carte, on la
+   colle simplement un peu plus près du groupe qu'elle coiffe. */
+.cards > .lot-band { margin: 6px 0 -4px; }
+
+/* LE « 2/4 » — la marque que la ligne emporte partout où elle va ensuite.
+   Elle survit à la dispersion des lignes dans le pipeline, quand la bannière,
+   elle, ne peut plus exister : ses lignes ne sont plus voisines. */
+.lot-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+/* Sous la description, dans le tableau : le rang puis le numéro du ticket. */
+.product-lot {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-1);
+  padding: 0 14px 2px;
+  font-size: var(--taille-note);
+  color: var(--text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
 /* LE SUR-DOSSIER SE VOIT DEPUIS N'IMPORTE QUELLE FAMILLE. Il est en tête du
    rail, et son compteur ne se lit pas comme les autres : ce ne sont pas des
    commandes en cours, ce sont des dossiers que PERSONNE n'a encore rangés.
