@@ -5851,3 +5851,36 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 /* Le motif du blocage : sur une ligne bloquée, c'est LA seule chose à lire. */
 .mt-carte.is-bloque { border-color: var(--st-bloque-bg); background: var(--st-bloque-bg); }
 .mt-carte__motif { margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+
+/* Les ÉTAPES d'un article, sur sa carte de « Mon travail ». Une case, un nom,
+   et ce qui a été déclaré — rien d'autre. */
+.mt-etapes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+.mt-etape { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: var(--taille-note); color: var(--text-2); }
+.mt-etape__label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.mt-etape__case { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex: 0 0 auto; }
+.mt-etape__nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* L'étape EN COURS est la seule mise en avant : le reste est un chemin
+   parcouru et un chemin restant, et n'appelle aucune décision. */
+.mt-etape.is-en-cours .mt-etape__nom { color: var(--text-1); font-weight: var(--graisse-forte); }
+.mt-etape.is-faite .mt-etape__nom { text-decoration: line-through; color: var(--text-3); }
+.mt-etape__qui { margin-left: auto; flex: 0 0 auto; color: var(--text-3); }
+/* Le compte : un champ DÉJÀ JUSTE, à corriger seulement si ça ne l'est pas. */
+.mt-compte { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; flex: 0 0 auto; }
+.mt-compte__n { width: 58px; min-height: 28px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); text-align: right; font-variant-numeric: tabular-nums; }
+.mt-compte__n:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
+.mt-compte__total { color: var(--text-3); white-space: nowrap; }
+.mt-compte__perte { color: var(--st-bloque); font-weight: var(--graisse-note); white-space: nowrap; }
+
+/* LE DOSSIER dans la fiche : articles voisins, étapes de l'article, prochaine
+   action. Mêmes volets que le reste de la fiche, aucun composant neuf. */
+.ld-dossier { display: contents; }
+.ld-pa__champ { width: 100%; min-height: var(--ctrl-h); padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-texte); }
+.ld-pa__champ:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
+.ld-articles, .ld-taches { display: flex; flex-direction: column; gap: 4px; }
+.ld-article { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-soft); }
+.ld-article:last-child { border-bottom: 0; }
+/* L'article qu'on a ouvert, dans la liste de ses voisins : sans repère, on ne
+   sait plus lequel des quatre on est en train de regarder. */
+.ld-article.is-moi { font-weight: var(--graisse-forte); }
+.ld-tache.is-faite { color: var(--text-3); }
+.ld-modeles { margin-top: 8px; min-height: var(--ctrl-h); padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-texte); }

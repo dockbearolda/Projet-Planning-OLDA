@@ -4534,6 +4534,16 @@ function renderLigneDetail() {
   paiement.append(ldRow('Mode', modeChip));
   body.append(ldBox('Paiement', paiement, true));
 
+  // --- LE DOSSIER : ses articles, ses étapes, sa prochaine action --------------
+  // C'est la « page projet » du §10, posée LÀ où la commande s'ouvre déjà —
+  // plutôt qu'un écran de plus à atteindre. Elle ne s'affiche que si la ligne
+  // appartient à un dossier ou porte des étapes : sur une commande d'un seul
+  // article sans liste d'étapes, il n'y aurait rien à montrer.
+  const dossierEl = document.createElement('div');
+  dossierEl.className = 'ld-dossier';
+  body.append(dossierEl);
+  chargerDossier(r, dossierEl);
+
   // --- Historique (replié) ------------------------------------------------------
   // L'application ne tient pas de journal des modifications : on affiche ce
   // qu'on sait vraiment, la naissance de la ligne et sa dernière retouche,
@@ -4670,6 +4680,120 @@ function journalValeur(field, brut) {
   if (field === 'deadline') return dateFr(brut);
   if (field === 'paye') return brut === 'true' ? 'oui' : 'non';
   return String(brut);
+}
+
+// LE DOSSIER — les articles voisins, les étapes de celui-ci, la prochaine action.
+//
+// Trois questions auxquelles la fiche ne savait pas répondre : « qu'est-ce qu'il
+// y a d'autre dans cette commande ? », « où en est CET article ? », « qu'est-ce
+// qu'il faut faire ensuite ? ». La troisième est celle que le patron appelle
+// « très importante » : l'objectif est qu'un projet ne puisse pas être oublié.
+async function chargerDossier(r, hote) {
+  let taches = [];
+  let projet = null;
+  try {
+    [taches, projet] = await Promise.all([
+      api('GET', `/api/requests/${r.id}/taches`),
+      r.project_id ? api('GET', `/api/projets/${r.project_id}`) : Promise.resolve(null),
+    ]);
+  } catch (_) {
+    // Le dossier est un CONFORT : son absence ne doit pas amputer la fiche, qui
+    // porte déjà tout ce qui permet de travailler.
+    return;
+  }
+  if (!hote.isConnected) return;
+  const morceaux = [];
+
+  // 1. LA PROCHAINE ACTION, en tête et en clair. Elle vaut pour tout le dossier.
+  if (projet) {
+    const pa = document.createElement('div');
+    pa.className = 'ld-pa';
+    const champ = document.createElement('input');
+    champ.type = 'text';
+    champ.className = 'ld-pa__champ';
+    champ.placeholder = 'Prochaine action — relancer le client, commander le textile…';
+    champ.value = projet.action || '';
+    champ.maxLength = 160;
+    // À LA PERTE DU FOCUS, jamais à la frappe : reconstruire la fiche à chaque
+    // touche reprendrait le champ sous les doigts et perdrait le curseur.
+    champ.addEventListener('change', async () => {
+      try { await api('PATCH', `/api/projets/${projet.id}`, { action: champ.value.trim() || null }); }
+      catch (err) { reportError(err); }
+    });
+    pa.append(champ);
+    morceaux.push(ldVolet('Prochaine action', projet.action || 'Aucune — le dossier peut s’oublier', [pa], true));
+  }
+
+  // 2. LES AUTRES ARTICLES du même dossier. « Je peux produire les casquettes
+  //    mais pas les mugs » : encore faut-il voir les deux.
+  if (projet && Array.isArray(projet.articles) && projet.articles.length > 1) {
+    const liste = document.createElement('div');
+    liste.className = 'ld-articles';
+    for (const a of projet.articles) {
+      const l = document.createElement('div');
+      l.className = 'ld-article' + (a.id === r.id ? ' is-moi' : '');
+      l.append(
+        ldValeur(`${a.quantity ? `${a.quantity} × ` : ''}${a.product || 'Sans désignation'}`),
+        ldValeur(SUB_LABEL[a.sub_stage] || STAGE_LABEL[a.stage] || ''),
+      );
+      liste.append(l);
+    }
+    morceaux.push(ldVolet(
+      'Articles du dossier', `${projet.articles.length} articles`, [liste], true,
+    ));
+  }
+
+  // 3. LES ÉTAPES de CET article — et de quoi en poser si la liste est vide.
+  const etapes = document.createElement('div');
+  etapes.className = 'ld-taches';
+  if (taches.length) {
+    for (const t of taches) {
+      const l = document.createElement('div');
+      l.className = 'ld-tache' + (t.fait ? ' is-faite' : '');
+      const marque = t.fait ? '✓' : '·';
+      const compte = t.qte_faite != null
+        ? ` — ${t.qte_faite}${t.qte_prevue != null ? `/${t.qte_prevue}` : ''}${t.perte ? `, ${t.perte} perdue${t.perte > 1 ? 's' : ''}` : ''}`
+        : '';
+      l.append(ldValeur(`${marque} ${t.libelle}${t.qui ? ` · ${t.qui}` : ''}${compte}`));
+      etapes.append(l);
+    }
+  } else {
+    etapes.append(ldValeur('Aucune étape posée. Choisis un modèle pour en poser une liste.'));
+  }
+  // Poser une liste d'étapes est un geste de CHEF D'ATELIER : c'est lui qui
+  // organise la production. On ne propose pas le choix à qui se le verrait
+  // refuser par le serveur.
+  if (puisJe('production')) {
+    const choix = document.createElement('select');
+    choix.className = 'ld-modeles';
+    choix.append(new Option('Poser une liste d’étapes…', ''));
+    for (const m of MODELES) choix.append(new Option(m.nom, m.id));
+    choix.addEventListener('change', async () => {
+      if (!choix.value) return;
+      try {
+        await api('POST', `/api/requests/${r.id}/taches`, { modele: choix.value });
+        showToast('Étapes posées.');
+        chargerDossier(r, hote);
+      } catch (err) { reportError(err); }
+      choix.value = '';
+    });
+    etapes.append(choix);
+  }
+  const faites = taches.filter((t) => t.fait).length;
+  morceaux.push(ldVolet(
+    'Étapes de cet article',
+    taches.length ? `${faites}/${taches.length} faites` : 'aucune',
+    [etapes], true,
+  ));
+
+  hote.replaceChildren(...morceaux);
+}
+
+// Les modèles d'étapes, lus UNE fois : ce sont quatre listes de mots qui ne
+// changent qu'aux Réglages, pas à chaque ouverture de fiche.
+let MODELES = [];
+async function chargerModeles() {
+  try { MODELES = await api('GET', '/api/modeles'); } catch (_) { MODELES = []; }
 }
 
 // Va chercher ce qui a changé sur cette commande et l'écrit dans l'Historique.
@@ -7683,7 +7807,7 @@ async function start() {
   // déclenche la reprise, voir demarrerAvecReprise).
   await Promise.all([
     loadCategoryConfig(), loadCounts().catch(() => {}), loadWhatsappMessage(),
-    loadTgca(), loadOrdreManuel(),
+    loadTgca(), loadOrdreManuel(), chargerModeles(),
   ]);
   await loadRows();
   lastRowsSig = signature(rows);

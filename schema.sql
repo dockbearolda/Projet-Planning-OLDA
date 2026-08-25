@@ -76,6 +76,69 @@ CREATE TABLE IF NOT EXISTS users (
 -- ambiguë, et c'est la base qui doit l'empêcher, pas le code.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_prenom ON users (prenom);
 
+-- LE PROJET — le niveau que le modèle n'avait pas.
+--
+-- « CLIENT → PROJET → ARTICLE / LOT → TÂCHES » (§1). Le client existait, les
+-- articles existaient (une ligne de `requests` = un article, depuis le travail
+-- sur les lots), mais entre les deux il n'y avait RIEN : un « projet » était une
+-- ligne de commande, et le regroupement d'un panier vivait à l'écran, par la
+-- référence du ticket. Pas d'identifiant, pas de statut, pas de total, pas de
+-- page.
+--
+-- Une ligne SANS projet reste parfaitement valide : c'est le cas de toutes
+-- celles d'avant, et de toute commande à un seul article qu'on ne veut pas
+-- habiller d'un dossier. Le projet est un REGROUPEMENT, pas un passage obligé.
+-- Down : ALTER TABLE requests DROP COLUMN IF EXISTS project_id; DROP TABLE projects;
+CREATE TABLE IF NOT EXISTS projects (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero        text,                    -- référence du ticket quand elle existe
+  nom           text NOT NULL,           -- « Hôtel ABC – Uniformes été 2026 »
+  client_id     uuid,                    -- fiche de la base clients (null = client libre)
+  billing_company text,                  -- le nom tel qu'il s'affiche, copié pour la lecture
+  -- LA PROCHAINE ACTION (§5). « L'objectif est qu'un projet ne puisse pas être
+  -- oublié. » Elle ne se DÉDUIT pas de l'étape : l'étape dit où on en est, la
+  -- prochaine action dit ce qu'il faut faire ensuite, et les deux ne coïncident
+  -- pas — « relancer le client » n'est l'étape de personne.
+  action        text,
+  action_qui    text,
+  action_date   date,
+  action_faite  boolean NOT NULL DEFAULT false,
+  deleted_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_projects_client ON projects (client_id);
+
+-- LES TÂCHES — la liste d'étapes d'UN article.
+--
+-- Les sept sous-étapes de production sont une liste PLATE et partagée : une
+-- ligne se trouve à l'une d'elles. Le patron demande l'inverse — que le T-shirt
+-- porte ses sept étapes et la gourde ses cinq, chacune avec un fait/pas fait, un
+-- qui et un quand (§1, §28, §30). Une checklist (§30) est la même chose : une
+-- liste ordonnée de cases. On n'en fait donc qu'un seul objet.
+--
+-- `qte_prevue` / `qte_faite` / `perte` portent le §26 (« Prévu : 50, produit :
+-- 49, perte : 1 ») ET le §27 (contrôle qualité) : l'étape « Contrôle » est une
+-- tâche comme une autre, ce sont ses quantités qui disent ce qu'elle a trouvé.
+-- Une ligne de production n'a pas besoin de deux mécaniques pour ça.
+-- Down : DROP TABLE tasks;
+CREATE TABLE IF NOT EXISTS tasks (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id  uuid NOT NULL,
+  ordre       int NOT NULL DEFAULT 0,
+  libelle     text NOT NULL,
+  fait        boolean NOT NULL DEFAULT false,
+  qui         text,                      -- qui l'a terminée
+  fait_at     timestamptz,
+  qte_prevue  int,
+  qte_faite   int,
+  perte       int,
+  commentaire text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_request ON tasks (request_id, ordre);
+
 -- Clé/valeur applicative : sert de garde d'idempotence aux migrations de données
 -- ponctuelles (ex. bascule du pipeline linéaire vers le modèle « familles »).
 CREATE TABLE IF NOT EXISTS app_meta (

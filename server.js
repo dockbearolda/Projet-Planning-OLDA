@@ -31,6 +31,7 @@ const {
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, getFlags, setFlags,
   ROLES, ROLE_LABELS, CODE_MIN, CODE_MAX,
+  getModeles, setModeles,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
@@ -1087,6 +1088,11 @@ const COLONNES_REQUEST = [
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline',
   'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
   'flag', 'flag_reason', 'position', 'fiche', 'created_at', 'updated_at',
+  // Un identifiant, donc 36 octets par ligne — et il gagne sa place : c'est lui
+  // qui dit à la grille qu'une ligne appartient à un DOSSIER, donc qu'il y a une
+  // page de projet à ouvrir et des articles voisins à montrer. Sans lui, il
+  // faudrait un appel par ligne pour le découvrir.
+  'project_id',
 ];
 
 // LA LISTE NE LIT PLUS LA FICHE ENTIÈRE. `allegerFiche` n'en garde que quatre
@@ -1552,12 +1558,312 @@ app.get('/api/mon-travail', asyncH(async (req, res) => {
     });
   }
 
+  // LES ÉTAPES VIENNENT AVEC. Sans elles, l'écran dirait « Polos brodés » et
+  // l'opérateur devrait ouvrir la fiche pour savoir laquelle des sept étapes lui
+  // revient — c'est exactement le clic que cet écran est censé supprimer.
+  // Un seul appel pour toutes les lignes : une requête par carte, sur une liste
+  // qui se rafraîchit au temps réel, ce serait un aller-retour par battement.
+  const idsVus = [...aFaire, ...enAttente].map((l) => l.id);
+  let parLigne = new Map();
+  if (idsVus.length) {
+    const { rows: t } = await pool.query(
+      'SELECT * FROM tasks WHERE request_id = ANY($1::uuid[]) ORDER BY ordre ASC', [idsVus],
+    );
+    for (const tache of t) {
+      if (!parLigne.has(tache.request_id)) parLigne.set(tache.request_id, []);
+      parLigne.get(tache.request_id).push(tache);
+    }
+  }
+  const avecTaches = (liste) => selonMoi(req, liste).map((l) => ({
+    ...l, taches: parLigne.get(l.id) || [],
+  }));
+
   res.json({
     qui,
-    aFaire: selonMoi(req, aFaire),
-    enAttente: selonMoi(req, enAttente),
+    aFaire: avecTaches(aFaire),
+    enAttente: avecTaches(enAttente),
     finiAujourdhui,
   });
+}));
+
+// ---------------------------------------------------------------------------
+// PROJETS ET TÂCHES (§1, §5, §10, §26, §27, §28, §29, §30)
+//
+// « CLIENT → PROJET → ARTICLE / LOT → TÂCHES. » Le client existait, les articles
+// existaient. Entre les deux, rien ; en dessous, rien non plus.
+//
+// Un projet est un REGROUPEMENT, pas un passage obligé : une commande à un seul
+// article n'a pas besoin d'un dossier, et toutes les lignes d'avant n'en ont
+// pas. Une tâche appartient à UNE LIGNE — c'est-à-dire à un article — parce
+// que c'est là que le patron pose la différence : le T-shirt a ses sept étapes,
+// la gourde ses cinq.
+// ---------------------------------------------------------------------------
+const PROJET_NOM_MAX = 160;
+const TACHE_MAX = 80;
+const COMMENTAIRE_MAX = 500;
+
+// Le total et l'avancement d'un projet ne se RANGENT pas : ils se recalculent.
+// Rangés, ils se désynchronisent au premier article modifié ailleurs — et un
+// total faux sur une page de projet est pire que pas de total du tout.
+async function projetComplet(id, req) {
+  const { rows: p } = await pool.query(
+    `SELECT * FROM projects WHERE id = $1 AND ${VIVANTES_NU}`, [id],
+  );
+  if (!p.length) return null;
+  const { rows: lignes } = await pool.query(
+    `${SELECT} WHERE r.project_id = $1 AND ${VIVANTES} ${ORDER}`, [id],
+  );
+  const articles = lignes.map(allegerFiche);
+  const ids = articles.map((a) => a.id);
+  let taches = [];
+  if (ids.length) {
+    const { rows: t } = await pool.query(
+      `SELECT * FROM tasks WHERE request_id = ANY($1::uuid[]) ORDER BY request_id, ordre ASC`, [ids],
+    );
+    taches = t;
+  }
+  // Le total n'est rendu qu'à qui a le droit de le voir. Le calculer puis le
+  // retirer serait inutile ; ne pas le calculer du tout, c'est la même règle
+  // que pour les colonnes d'argent — la donnée n'arrive pas.
+  const total = peut(req.moi, 'argent')
+    ? articles.reduce((s, a) => s + (Number(a.project_value) || 0), 0)
+    : undefined;
+  return {
+    ...p[0],
+    articles: selonMoi(req, articles),
+    taches,
+    ...(total === undefined ? {} : { total: Math.round(total * 100) / 100 }),
+  };
+}
+
+app.get('/api/projets/:id', asyncH(async (req, res) => {
+  const projet = await projetComplet(req.params.id, req);
+  if (!projet) return res.status(404).json({ error: 'Projet introuvable' });
+  res.json(projet);
+}));
+
+// PATCH /api/projets/:id → le nom, et surtout LA PROCHAINE ACTION (§5).
+//
+// « C'est une notion très importante. L'objectif est qu'un projet ne puisse pas
+//   être oublié. » Elle ne se déduit pas de l'étape : l'étape dit où on en est,
+//   la prochaine action dit ce qu'il faut faire — et « relancer le client »
+//   n'est l'étape de personne.
+const PROJET_PATCHABLE = ['nom', 'action', 'action_qui', 'action_date', 'action_faite'];
+app.patch('/api/projets/:id', exige('clients'), asyncH(async (req, res) => {
+  const b = req.body || {};
+  const sets = [];
+  const params = [];
+  let i = 1;
+  for (const champ of PROJET_PATCHABLE) {
+    if (!(champ in b)) continue;
+    let v = b[champ];
+    if (champ === 'action_faite') v = v === true;
+    else if (champ === 'action_date') v = isDay(v) ? v : null;
+    else if (champ === 'action_qui') v = RESPONSABLE_SET.has(v) ? v : null;
+    else v = borner(v, PROJET_NOM_MAX) || null;
+    sets.push(`${champ} = $${i}`); params.push(v); i += 1;
+  }
+  if (!sets.length) return res.status(400).json({ error: 'rien à modifier' });
+  sets.push('updated_at = now()');
+  params.push(req.params.id);
+  const { rows } = await pool.query(
+    `UPDATE projects SET ${sets.join(', ')} WHERE id = $${i} AND ${VIVANTES_NU} RETURNING *`, params,
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Projet introuvable' });
+  broadcast({ kind: 'update', stages: [] });
+  res.json(rows[0]);
+}));
+
+// POST /api/projets/:id/copie → refait le dossier à neuf (§29).
+//
+// « C'est essentiel pour les clients récurrents. » L'hôtel qui recommande les
+// mêmes uniformes chaque saison ne doit pas les ressaisir article par article.
+//
+// CE QUI NE SE COPIE PAS, et c'est le fond du sujet : l'avancement. Un dossier
+// dupliqué repart de zéro — étapes décochées, pas de paiement, pas de référence
+// de ticket, pas de pièce jointe. Copier l'avancement donnerait une commande
+// qui se croit à moitié faite alors que rien n'est produit, et c'est ainsi
+// qu'on livre une caisse vide.
+app.post('/api/projets/:id/copie', exige('clients'), asyncH(async (req, res) => {
+  const { rows: p } = await pool.query(
+    `SELECT * FROM projects WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
+  if (!p.length) return res.status(404).json({ error: 'Projet introuvable' });
+  const { rows: articles } = await pool.query(
+    `SELECT * FROM requests WHERE project_id = $1 AND ${VIVANTES_NU} ORDER BY position ASC`, [req.params.id],
+  );
+  if (!articles.length) return res.status(400).json({ error: 'Ce dossier n’a aucun article à copier' });
+
+  const cx = await pool.connect();
+  let neuf;
+  try {
+    await cx.query('BEGIN');
+    const { rows: pr } = await cx.query(
+      'INSERT INTO projects (nom, client_id, billing_company) VALUES ($1, $2, $3) RETURNING *',
+      [`${p[0].nom} (copie)`, p[0].client_id, p[0].billing_company],
+    );
+    neuf = pr[0];
+    const { rows: pos } = await cx.query(
+      'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1',
+      [articles[0].stage],
+    );
+    for (let i = 0; i < articles.length; i += 1) {
+      const a = articles[i];
+      // La fiche du comptoir part SANS son empreinte ni sa référence : ce sont
+      // les deux clés d'idempotence du dossier d'origine. Les recopier ferait
+      // passer la copie pour un renvoi de l'original — donc la ferait ignorer.
+      const fiche = a.fiche && typeof a.fiche === 'object' ? { ...a.fiche } : null;
+      if (fiche) { delete fiche.empreinte; delete fiche.ref; delete fiche.lot; }
+      await cx.query(
+        `INSERT INTO requests
+           (stage, sub_stage, order_kind, responsable, referent, priority, client_type,
+            billing_company, contact_referent, contact_phone, contact_email,
+            quantity, product, color, project_value, description, deadline, position, fiche, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+        [a.stage, a.sub_stage, a.order_kind, a.responsable, a.referent, a.priority, a.client_type,
+          a.billing_company, a.contact_referent, a.contact_phone, a.contact_email,
+          a.quantity, a.product, a.color, a.project_value, a.description, null,
+          Number(pos[0].pos) + i, fiche ? JSON.stringify(fiche) : null, neuf.id],
+      );
+    }
+    await cx.query('COMMIT');
+  } catch (err) {
+    await cx.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    cx.release();
+  }
+  broadcast({ kind: 'update', stages: [articles[0].stage] });
+  res.status(201).json(await projetComplet(neuf.id, req));
+}));
+
+// GET /api/modeles → les listes d'étapes toutes faites (§28).
+app.get('/api/modeles', asyncH(async (req, res) => res.json(await getModeles())));
+app.put('/api/modeles', exige('reglages'), asyncH(async (req, res) => {
+  const saved = await setModeles(req.body);
+  broadcast({ kind: 'modeles' });
+  res.json(saved);
+}));
+
+// GET /api/requests/:id/taches → la liste d'étapes d'UN article.
+app.get('/api/requests/:id/taches', asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM tasks WHERE request_id = $1 ORDER BY ordre ASC', [req.params.id],
+  );
+  res.json(rows);
+}));
+
+// POST /api/requests/:id/taches → pose une liste d'étapes, depuis un modèle ou
+// à la main. REMPLACE la liste existante : deux poses successives ne doivent pas
+// donner deux fois les mêmes étapes — c'est le premier réflexe de quelqu'un qui
+// s'est trompé de modèle, et le résultat serait une liste inutilisable.
+//
+// Ce qui est DÉJÀ FAIT est conservé quand l'étape porte le même libellé : sinon
+// changer de modèle en cours de route effacerait le travail de la matinée.
+app.post('/api/requests/:id/taches', exige('production'), asyncH(async (req, res) => {
+  const b = req.body || {};
+  let etapes = [];
+  if (typeof b.modele === 'string') {
+    const modele = (await getModeles()).find((m) => m.id === b.modele);
+    if (!modele) return res.status(400).json({ error: `modèle inconnu : ${b.modele}` });
+    etapes = modele.etapes;
+  } else if (Array.isArray(b.etapes)) {
+    etapes = b.etapes.map((e) => borner(e, TACHE_MAX)).filter(Boolean).slice(0, 20);
+  }
+  if (!etapes.length) return res.status(400).json({ error: 'aucune étape à poser' });
+
+  const { rows: ligne } = await pool.query(
+    `SELECT quantity FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
+  if (!ligne.length) return res.status(404).json({ error: 'Commande introuvable' });
+
+  const { rows: avant } = await pool.query(
+    'SELECT libelle, fait, qui, fait_at, qte_faite, perte, commentaire FROM tasks WHERE request_id = $1',
+    [req.params.id],
+  );
+  const dejaFait = new Map(avant.filter((t) => t.fait).map((t) => [t.libelle, t]));
+
+  const cx = await pool.connect();
+  let posees = [];
+  try {
+    await cx.query('BEGIN');
+    await cx.query('DELETE FROM tasks WHERE request_id = $1', [req.params.id]);
+    for (let k = 0; k < etapes.length; k += 1) {
+      const garde = dejaFait.get(etapes[k]);
+      const { rows } = await cx.query(
+        `INSERT INTO tasks (request_id, ordre, libelle, fait, qui, fait_at, qte_prevue, qte_faite, perte, commentaire)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [req.params.id, k, etapes[k], !!garde, garde ? garde.qui : null,
+          garde ? garde.fait_at : null, ligne[0].quantity,
+          garde ? garde.qte_faite : null, garde ? garde.perte : null,
+          garde ? garde.commentaire : null],
+      );
+      posees.push(rows[0]);
+    }
+    await cx.query('COMMIT');
+  } catch (err) {
+    await cx.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    cx.release();
+  }
+  broadcast({ kind: 'update', stages: [] });
+  res.status(201).json(posees);
+}));
+
+// PATCH /api/taches/:id → cocher une étape, et déclarer ce qui s'est passé.
+//
+// « Prévu : 50, produit : 49, perte : 1 » (§26) et le contrôle qualité (§27)
+// passent tous les deux par ici : l'étape « Contrôle » est une tâche comme une
+// autre, ce sont ses quantités qui disent ce qu'elle a trouvé.
+//
+// C'est la SEULE écriture ouverte à l'opérateur au-delà de la sous-étape : c'est
+// exactement son travail, et le patron le liste mot pour mot.
+app.patch('/api/taches/:id', exige('travailler'), asyncH(async (req, res) => {
+  const b = req.body || {};
+  const sets = [];
+  const params = [];
+  let i = 1;
+  const entier = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number.parseInt(v, 10);
+    return Number.isInteger(n) && n >= 0 && n <= 999999 ? n : undefined;
+  };
+
+  if ('fait' in b) {
+    const fait = b.fait === true;
+    sets.push(`fait = $${i}`); params.push(fait); i += 1;
+    // L'heure et le nom se posent AVEC la case, pas à côté : une étape cochée
+    // sans savoir par qui ni quand ne répond à aucune des questions qu'on se
+    // pose en rouvrant le dossier.
+    sets.push(`qui = $${i}`); params.push(fait ? quiDemande(req) : null); i += 1;
+    sets.push(`fait_at = ${fait ? 'now()' : 'NULL'}`);
+  }
+  for (const champ of ['qte_faite', 'perte']) {
+    if (!(champ in b)) continue;
+    const v = entier(b[champ]);
+    if (v === undefined) return res.status(400).json({ error: `${champ} doit être un nombre entier` });
+    sets.push(`${champ} = $${i}`); params.push(v); i += 1;
+  }
+  if ('commentaire' in b) {
+    sets.push(`commentaire = $${i}`); params.push(borner(b.commentaire, COMMENTAIRE_MAX) || null); i += 1;
+  }
+  if (!sets.length) return res.status(400).json({ error: 'rien à modifier' });
+  sets.push('updated_at = now()');
+  params.push(req.params.id);
+  const { rows } = await pool.query(
+    `UPDATE tasks SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`, params,
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Étape introuvable' });
+
+  // LA LIGNE EST TOUCHÉE, elle aussi : sans ça, cocher une étape ne change pas
+  // `updated_at` et le temps réel ne dit rien — l'écran d'à côté garde une case
+  // décochée jusqu'au prochain rafraîchissement complet.
+  const { rows: ligne } = await pool.query(
+    'UPDATE requests SET updated_at = now() WHERE id = $1 RETURNING stage', [rows[0].request_id],
+  );
+  broadcast({ kind: 'update', stages: ligne.length ? [ligne[0].stage] : [] });
+  res.json(rows[0]);
 }));
 
 // GET /api/counts → { slug: n, ... } : objet plat mêlant FAMILLES et SOUS-FAMILLES
@@ -2100,6 +2406,12 @@ function todayPlus(days) {
 // en colonne, les deux doivent donc la calculer exactement pareil.
 
 const trimOrNull = (v) => {
+  // UN OBJET N'EST PAS UN TEXTE. `String({})` rend « [object Object] » et
+  // `String([1,2])` rend « 1,2 » : un poste qui envoie `client` là où le
+  // serveur attend `clientObj` écrivait donc « [object Object] » comme NOM DE
+  // CLIENT au planning — une chaîne parfaitement valide, qu'aucune validation
+  // ne rattrape ensuite. Une valeur du mauvais type vaut « rien », pas « ça ».
+  if (v !== null && typeof v === 'object') return null;
   const s = String(v == null ? '' : v).trim();
   return s === '' ? null : s;
 };
@@ -3531,6 +3843,28 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
   try {
     await cx.query('BEGIN');
     rows = [];
+    // LE DOSSIER NAÎT ICI, dans la MÊME transaction que ses articles. Créé
+    // avant, il resterait en base tout seul si l'insertion échouait — un projet
+    // vide, sans article, que personne ne saurait interpréter.
+    //
+    // Un seul article ne fait PAS de projet : le niveau ne dirait plus rien s'il
+    // y avait autant de dossiers que de commandes. C'est le regroupement qui
+    // justifie le projet, et lui seul.
+    let projetId = null;
+    if (nbLignes > 1) {
+      // LE NOM SE CONSTRUIT DE CE QU'ON A, pas d'un gabarit. Un dossier sans
+      // référence (le comptoir n'en a pas toujours réservé une) donnait
+      // « Client — null » ; et le nom de client peut manquer aussi. On assemble
+      // donc ce qui existe, dans l'ordre, et on ne colle jamais un tiret sur
+      // rien — un titre est la première chose qu'on lit du dossier.
+      const bouts = [borner(nomDossier, 120), refFinale].filter(Boolean);
+      const nomProjet = bouts.join(' — ') || 'Dossier sans nom';
+      const { rows: pr } = await cx.query(
+        'INSERT INTO projects (numero, nom, billing_company) VALUES ($1, $2, $3) RETURNING id',
+        [refFinale || null, nomProjet, borner(nomDossier, 120) || null],
+      );
+      projetId = pr[0].id;
+    }
     for (let i = 0; i < lignes.length; i += 1) {
       const l = lignes[i];
       const ficheLigne = {
@@ -3543,8 +3877,8 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
         `INSERT INTO requests
            (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
             contact_referent, contact_phone, contact_email, quantity, product, description,
-            deadline, position, fiche, project_value, paye, paiement_mode)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+            deadline, position, fiche, project_value, paye, paiement_mode, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          RETURNING id`,
         [
           famille, sousEtape, estDemande ? 'demande' : 'commande', responsable, priorite,
@@ -3560,6 +3894,7 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
           // pas. Sur un lot, le client a payé le TICKET — les quatre lignes
           // portent donc le même état de paiement, et leurs prix se somment.
           estDemande ? null : !!pay.paye, estDemande ? null : mode,
+          projetId,
         ],
       );
       rows.push(r[0]);

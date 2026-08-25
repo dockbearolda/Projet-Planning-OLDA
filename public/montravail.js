@@ -59,7 +59,118 @@ function carte(l, avecEtape = true) {
     else if (j !== null && j <= 1) t.classList.add('is-proche');
     c.append(t);
   }
+
+  // LES ÉTAPES DE CET ARTICLE. C'est ici que se coche le travail : sans elles,
+  // l'écran dirait « Polos brodés » et il faudrait ouvrir la fiche pour savoir
+  // laquelle des sept étapes revient à qui — exactement le clic que cet écran
+  // supprime. C'est la SEULE saisie qu'on tolère sur une carte : une case, pas
+  // un formulaire (voir « une carte se relit, elle ne se remplit pas »).
+  if (Array.isArray(l.taches) && l.taches.length) c.append(listeEtapes(l));
   return c;
+}
+
+// L'étape EN COURS est la première non faite : c'est elle qu'on met en avant,
+// les autres se lisent comme un chemin parcouru et un chemin restant.
+function listeEtapes(l) {
+  const box = el('div', 'mt-etapes');
+  const enCours = l.taches.find((t) => !t.fait);
+  l.taches.forEach((t, i) => {
+    const derniere = i === l.taches.length - 1;
+    const ligne = el('div', 'mt-etape');
+    if (t.fait) ligne.classList.add('is-faite');
+    if (enCours && t.id === enCours.id) ligne.classList.add('is-en-cours');
+
+    const etiquette = el('label', 'mt-etape__label');
+    const case_ = el('input', 'mt-etape__case');
+    case_.type = 'checkbox';
+    case_.checked = !!t.fait;
+    case_.dataset.tache = t.id;
+    case_.addEventListener('change', () => cocher(l, t, case_, derniere, ligne));
+    etiquette.append(case_, el('span', 'mt-etape__nom', t.libelle));
+    ligne.append(etiquette);
+    if (t.fait && t.qui) ligne.append(el('span', 'mt-etape__qui', t.qui));
+
+    // LE COMPTE NE SE DEMANDE QU'À LA DERNIÈRE ÉTAPE, et seulement une fois
+    // faite. Le poser sur chacune, ce serait sept questions pour une commande
+    // qui n'en pose aucune ; le poser avant, ce serait demander un chiffre
+    // qu'on n'a pas encore.
+    if (derniere && t.fait) ligne.append(champCompte(l, t));
+
+    // On n'ouvre pas le dossier quand on coche : le clic reste dans la rangée.
+    ligne.addEventListener('click', (e) => e.stopPropagation());
+    box.append(ligne);
+  });
+  return box;
+}
+
+// LE CAS NORMAL NE DEMANDE RIEN. Cocher la dernière étape déclare d'office que
+// tout est bon — c'est ce qui arrive presque toujours, et poser la question à
+// chaque fois ferait taper le même nombre cent fois par semaine.
+//
+// Le champ reste là, rempli, pour le jour où ce n'est PAS le cas : on corrige
+// 50 en 49, la perte se calcule seule. C'est une correction, pas une saisie —
+// d'où un seul champ, déjà juste, et aucune validation à cliquer.
+function champCompte(l, t) {
+  const box = el('span', 'mt-compte');
+  const bon = el('input', 'mt-compte__n');
+  bon.type = 'number';
+  bon.min = '0';
+  bon.value = t.qte_faite == null ? '' : String(t.qte_faite);
+  bon.setAttribute('aria-label', 'Pièces bonnes');
+  const total = t.qte_prevue == null ? '' : ` / ${t.qte_prevue}`;
+  const suite = el('span', 'mt-compte__total', `${total} bonnes`);
+
+  // À LA PERTE DU FOCUS, jamais à la frappe : un `renderMonTravail()` déclenché
+  // à chaque touche reprendrait le champ sous les doigts et perdrait le curseur
+  // — le piège est déjà documenté ailleurs dans ce dépôt.
+  bon.addEventListener('change', async () => {
+    const n = Number.parseInt(bon.value, 10);
+    if (!Number.isInteger(n) || n < 0) { bon.value = t.qte_faite == null ? '' : String(t.qte_faite); return; }
+    const prevu = t.qte_prevue;
+    await ecrireTache(t.id, {
+      qte_faite: n,
+      ...(prevu != null ? { perte: Math.max(0, prevu - n) } : {}),
+    });
+    refreshMonTravail();
+  });
+
+  if (t.perte) box.append(el('span', 'mt-compte__perte', `${t.perte} perdue${t.perte > 1 ? 's' : ''}`));
+  box.prepend(suite);
+  box.prepend(bon);
+  return box;
+}
+
+async function ecrireTache(id, corps) {
+  const res = await fetchBorne(`/api/taches/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  return res.json();
+}
+
+async function cocher(l, t, case_, derniere) {
+  const fait = case_.checked;
+  const corps = { fait };
+  // Tout est bon par défaut : c'est le cas courant, et le champ qui apparaît
+  // juste après permet de dire le contraire en un chiffre.
+  if (fait && derniere && t.qte_prevue != null && t.qte_faite == null) {
+    corps.qte_faite = t.qte_prevue;
+    corps.perte = 0;
+  }
+  case_.disabled = true;
+  try {
+    await ecrireTache(t.id, corps);
+  } catch (_) {
+    // On REMET la case comme elle était : laisser une case cochée qui n'a rien
+    // enregistré, c'est faire croire que le travail est déclaré.
+    case_.checked = !fait;
+    case_.disabled = false;
+    return;
+  }
+  case_.disabled = false;
+  refreshMonTravail();
 }
 
 // Le jour civil de l'ATELIER. En UTC, « aujourd'hui » bascule à 20 h locales et

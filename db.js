@@ -404,6 +404,30 @@ async function init() {
       ON requests (stage, position ASC NULLS LAST) WHERE deleted_at IS NULL`);
   } catch (_) { /* pg-mem local : index partiel non géré, sans conséquence */ }
 
+  // LE RATTACHEMENT D'UNE LIGNE À SON PROJET. Nullable, sans contrainte : les
+  // lignes d'avant restent valides, elles n'appartiennent simplement à aucun
+  // dossier — et une commande à un seul article n'a pas besoin d'en avoir un.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS project_id;
+  try {
+    await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS project_id uuid');
+  } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  try {
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_requests_project ON requests (project_id)');
+  } catch (_) { /* pg-mem : sans conséquence, le filtre reste correct */ }
+
+  // LES PROJETS DÉJÀ REGROUPÉS À L'ÉCRAN DEVIENNENT DE VRAIS DOSSIERS.
+  //
+  // Depuis le travail sur les lots, un panier de N articles fait N lignes qui
+  // portent la MÊME référence de ticket dans `fiche.lot.ref`. Ce regroupement
+  // existait donc déjà — mais seulement à l'affichage. On le range en base, une
+  // fois, pour les dossiers qui étaient là avant les projets.
+  //
+  // Garde app_meta PROPRE (deux incidents réels sont venus d'une garde
+  // partagée) : la migration ne doit pas rejouer et recréer des doublons.
+  // Down : UPDATE requests SET project_id = NULL; DELETE FROM projects;
+  //        DELETE FROM app_meta WHERE key = 'lots_en_projets_v1';
+  await migrerLotsEnProjets();
+
   // LES QUATRE COMPTES. Créés s'ils manquent, jamais réécrits : un code déjà
   // choisi ne doit pas repartir à zéro au redémarrage suivant. C'est un `INSERT
   // … ON CONFLICT DO NOTHING` sur le prénom, donc idempotent par nature — pas
@@ -1616,6 +1640,92 @@ async function basculerOrdreManuel(etape, range) {
   }
 }
 
+// --- Projets et tâches -------------------------------------------------------
+
+// Range en projets les lots déjà regroupés à l'écran. Une seule fois.
+async function migrerLotsEnProjets() {
+  const { rows: deja } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'lots_en_projets_v1'");
+  if (deja.length) return;
+
+  // On ne prend QUE les lignes qui portent une référence de lot ET pas encore de
+  // projet. Une ligne isolée n'a pas de dossier à recevoir : lui en fabriquer un
+  // ferait autant de projets que de commandes, et le niveau ne dirait plus rien.
+  let lignes = [];
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, fiche->'lot'->>'ref' AS ref, billing_company
+         FROM requests
+        WHERE project_id IS NULL AND fiche->'lot'->>'ref' IS NOT NULL
+        ORDER BY created_at ASC`,
+    );
+    lignes = rows;
+  } catch (_) {
+    // pg-mem ne sait pas toujours descendre dans un jsonb imbriqué. Ce n'est
+    // pas une panne : la base locale n'a pas d'historique à reprendre.
+    lignes = [];
+  }
+
+  const parRef = new Map();
+  for (const l of lignes) {
+    if (!l.ref) continue;
+    if (!parRef.has(l.ref)) parRef.set(l.ref, []);
+    parRef.get(l.ref).push(l);
+  }
+
+  for (const [ref, groupe] of parRef) {
+    const nom = `${groupe[0].billing_company || 'Client'} — ${ref}`;
+    const { rows: p } = await pool.query(
+      'INSERT INTO projects (numero, nom, billing_company) VALUES ($1, $2, $3) RETURNING id',
+      [ref, nom, groupe[0].billing_company || null],
+    );
+    for (const l of groupe) {
+      await pool.query('UPDATE requests SET project_id = $1 WHERE id = $2', [p[0].id, l.id]);
+    }
+  }
+  await poserMeta('lots_en_projets_v1', String(parRef.size));
+}
+
+// MODÈLES DE PROJET (§28) — « T-shirt DTF » pose ses cinq étapes.
+//
+// Sans modèle, la tâche est ingérable : il faudrait ressaisir la liste des
+// étapes à chaque commande, et personne ne le ferait deux fois. C'est la
+// condition de son utilité, pas un confort.
+//
+// Rangés en `app_meta` et non dans une table : ce sont quatre listes de mots que
+// le patron veut pouvoir changer, pas des données qui se croisent avec autre
+// chose. Une table coûterait un écran d'administration pour rien.
+// Down : DELETE FROM app_meta WHERE key = 'modeles_taches'.
+const DEFAULT_MODELES = [
+  { id: 'tshirt_dtf', nom: 'T-shirt DTF', etapes: ['Préparation du fichier', 'Impression DTF', 'Découpe', 'Pressage', 'Contrôle'] },
+  { id: 'tasse_uv', nom: 'Tasse UV', etapes: ['Préparation du fichier', 'Impression UV', 'Contrôle'] },
+  { id: 'trotec', nom: 'Gravure & Découpe', etapes: ['Préparation du fichier', 'Gravure Trotec', 'Nettoyage', 'Contrôle'] },
+  { id: 'textile_commande', nom: 'Textile à commander', etapes: ['Commande textile', 'Réception', 'Préparation du fichier', 'Impression DTF', 'Pressage', 'Contrôle'] },
+];
+
+async function getModeles() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'modeles_taches'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return DEFAULT_MODELES.map((m) => ({ ...m }));
+  try {
+    const lu = JSON.parse(rows[0].value);
+    return Array.isArray(lu) && lu.length ? lu : DEFAULT_MODELES.map((m) => ({ ...m }));
+  } catch (_) {
+    return DEFAULT_MODELES.map((m) => ({ ...m }));
+  }
+}
+
+async function setModeles(liste) {
+  const propre = (Array.isArray(liste) ? liste : [])
+    .map((m) => ({
+      id: String((m && m.id) || '').trim().slice(0, 40),
+      nom: String((m && m.nom) || '').trim().slice(0, 80),
+      etapes: (Array.isArray(m && m.etapes) ? m.etapes : [])
+        .map((e) => String(e || '').trim().slice(0, 80)).filter(Boolean).slice(0, 20),
+    }))
+    .filter((m) => m.id && m.nom && m.etapes.length);
+  await poserMeta('modeles_taches', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Comptes nominatifs ------------------------------------------------------
 // Le code personnel est haché en scrypt — fourni par Node, aucune dépendance à
 // ajouter (le dépôt en compte trois en tout, et c'est une règle). Le sel est
@@ -1945,6 +2055,7 @@ module.exports = {
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,
   ROLES, ROLE_LABELS, EQUIPE, CODE_MIN, CODE_MAX,
+  DEFAULT_MODELES, getModeles, setModeles,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
