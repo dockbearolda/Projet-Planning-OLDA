@@ -200,21 +200,34 @@ assert.ok(/w\.textContent = 'Haute';/.test(DASH),
   'seule la priorité HAUTE porte une marque — basse et moyenne n’en méritent aucune');
 
 // ===========================================================================
-// 6. L'ÉCRAN S'OUVRE SUR LA PERSONNE AU POSTE
+// 6. L'ÉCRAN S'OUVRE SUR L'ÉQUIPE, ET LES QUATRE PRÉNOMS NE BOUGENT PAS
 // ===========================================================================
-// Le poste sait qui est là (`olda.qui`, cf. poste.js). L'onglet par défaut
-// n'est plus la file de tout l'atelier.
+// Une version du 25/08 sortait la personne au poste de la liste pour la poser
+// en tête (« À toi, Charlie ») : l'ordre des collègues devenait variable d'un
+// poste à l'autre, et un prénom manquait là où l'œil allait le chercher. On ne
+// réordonne pas une liste de quatre noms qu'on connaît par cœur.
+assert.ok(/let activeTab = 'team';/.test(DASH),
+  'l’écran s’ouvre sur l’équipe — c’est la lecture du matin');
+const ordreOnglets = DASH.slice(DASH.indexOf("mkTab('team'"), DASH.indexOf("mkTab('todo'"));
+assert.ok(/for \(const who of EMPLOYEES\)/.test(ordreOnglets),
+  'l’Équipe vient d’abord, puis les employés DANS L’ORDRE de EMPLOYEES');
+assert.ok(!/if \(who === qui\) continue/.test(DASH),
+  'aucun prénom ne quitte la liste : la personne au poste est MARQUÉE, pas déplacée');
+assert.ok(/who === qui \? 'pj-tab--moi' : null/.test(DASH),
+  '… et c’est bien une marque sur son onglet');
+assert.ok(/\.pj-tab--moi \.pj-tab-l/.test(CSS), 'la marque existe en CSS');
+
+// Le poste reste ce qui personnalise l'écran — le briefing, et la marque.
 assert.ok(/import \{ lirePoste \} from '\.\/poste\.js';/.test(DASH),
   'le Point du jour doit savoir qui est au poste');
-assert.ok(/let activeTab = moi\(\) \|\| 'todo';/.test(DASH),
-  'la vue par défaut est celle de la personne au poste');
 assert.ok(/document\.addEventListener\('olda:poste'/.test(DASH),
-  'un changement de personne en cours de journée doit rendre la vue par défaut '
+  'un changement de personne en cours de journée doit déplacer la marque '
   + '— `storage` ne se déclenche pas dans l’onglet qui écrit');
-assert.ok(/ongletAuto = false/.test(DASH),
-  'dès que quelqu’un choisit un onglet lui-même, on ne lui reprend plus la main');
-assert.ok(/'\/poste\.js'/.test(lire('public/sw.js')),
-  'poste.js est importé par le dashboard : sans lui dans la coquille, l’écran ne '
-  + 's’ouvre plus hors ligne');
+const SW = lire('public/sw.js');
+for (const f of ['/poste.js', '/matin.js']) {
+  assert.ok(SW.includes(`'${f}'`),
+    `${f} est importé par le dashboard : sans lui dans la coquille, l’écran ne `
+    + 's’ouvre plus hors ligne');
+}
 
 console.log('dashboard-lisibilite.test.js OK');

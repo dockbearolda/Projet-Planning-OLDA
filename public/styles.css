@@ -4125,16 +4125,15 @@ body.view-plein .fiverr-tool { display: none !important; }
 }
 /* « À toi, Prénom » : l'onglet par défaut se distingue des autres AVANT d'être
    actif — c'est la réponse à la question qu'on vient poser à cet écran. */
-.pj-tab--moi { padding-left: var(--pas-2); }
-.pj-tab--moi::after {
-  content: '';
-  position: absolute;
-  right: -1px;
-  top: 25%;
-  bottom: 25%;
-  width: 1px;
-  background: var(--pj-border);
+/* « C'est toi. » L'onglet de la personne au poste ne CHANGE PAS DE PLACE — les
+   quatre prénoms restent dans le même ordre d'un poste à l'autre, on ne
+   réapprend pas une liste qu'on connaît par cœur — il porte simplement une
+   marque. Un liseré, pas une couleur : la couleur dit un état, et « c'est toi »
+   n'en est pas un. */
+.pj-tab--moi .pj-tab-l {
+  box-shadow: inset 0 -2px 0 var(--pj-border-strong);
 }
+.pj-tab--moi.active .pj-tab-l { box-shadow: none; }
 /* Le libellé cède avant le compte : un onglet ne s'élargit pas indéfiniment,
    et c'est le nombre — pas la fin du prénom — qu'on vient chercher. */
 .pj-tab-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -4220,6 +4219,81 @@ body.view-plein .fiverr-tool { display: none !important; }
    La grille se replie sur la largeur de SA LISTE (requête de conteneur), pas
    sur celle de la fenêtre.
    =========================================================================== */
+/* ===========================================================================
+   « CE MATIN » — le briefing, en tête de toutes les vues
+   ---------------------------------------------------------------------------
+   Il doit se lire AVANT la file, sans devenir un bandeau qu'on saute. Trois
+   partis pris pour ça :
+     · pas de fond coloré sur le bloc — la couleur reste réservée aux états, et
+       un pavé teinté en haut d'écran finit par ne plus se voir ;
+     · chaque observation est un BOUTON : elle se prouve d'un clic, la file
+       n'affiche plus qu'elle. Ce qui est cliquable doit en avoir l'air ;
+     · le TON se dit par un liseré à gauche, pas par la couleur du texte : les
+       phrases restent à l'encre, donc lisibles, et l'urgence se lit au balayage.
+   =========================================================================== */
+.pj-matin { margin-bottom: var(--pas-4); }
+.pj-matin-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pas-2);
+  margin-bottom: var(--pas-2);
+}
+.pj-matin-t {
+  margin: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink);
+}
+.pj-matin-reste {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+}
+.pj-matin-vide {
+  margin: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+}
+/* Deux colonnes tant que la place le permet : cinq observations empilées
+   poussent la file hors de l'écran, et c'est la file qu'on vient faire. */
+.pj-matin-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--pas-2);
+}
+.pj-mot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--pas-2) var(--pas-3);
+  border: 1px solid var(--pj-border);
+  border-left: 3px solid var(--pj-border-strong);
+  border-radius: var(--arrondi-bloc);
+  background: var(--pj-surface);
+  color: var(--pj-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.pj-mot:hover { background: var(--row-hover); }
+.pj-mot.active { border-color: var(--pj-accent); background: var(--primary-soft); }
+.pj-mot:disabled { cursor: default; }
+.pj-mot.t-urgent { border-left-color: var(--pj-late); }
+.pj-mot.t-attention { border-left-color: var(--pj-soon); }
+.pj-mot-t {
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  line-height: 1.25;
+}
+.pj-mot-d {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+  line-height: 1.4;
+}
+
 .pj-todo { display: flex; flex-direction: column; gap: var(--pas-4); }
 .pj-todo-sec { min-width: 0; }
 

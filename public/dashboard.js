@@ -39,8 +39,11 @@ import { rankRequests, WAITING_SUBS, WAITING_REASON } from './priority.js';
 // fermeture. Les quatre fenêtres du Point du jour se déclaraient modales en
 // laissant le clavier derrière elles, sous un voile opaque.
 import { armerModale } from './modale.js';
-// Qui est au poste : c'est cette personne qui décide de la vue par défaut.
+// Qui est au poste : c'est cette personne que l'onglet marque, et pour qui le
+// briefing du matin est calculé.
 import { lirePoste } from './poste.js';
+// Ce que l'écran a compris avant qu'on le lise (voir matin.js).
+import { briefing } from './matin.js';
 
 export function createDashboard(deps) {
   const {
@@ -134,14 +137,18 @@ export function createDashboard(deps) {
     const nom = lirePoste();
     return EMPLOYEES.includes(nom) ? nom : null;
   };
-  let activeTab = moi() || 'todo';
-  // Vrai tant que l'utilisateur n'a pas choisi d'onglet lui-même : si le poste
-  // se nomme APRÈS l'ouverture de l'écran (le cas normal au premier
-  // démarrage), la vue bascule sur cette personne. Dès qu'il a cliqué un
-  // onglet, on ne lui reprend plus la main.
-  let ongletAuto = true;
+  // L'écran s'ouvre sur l'ÉQUIPE : c'est la lecture du matin, celle qui répond
+  // à « par quoi on commence, et qui prend quoi ». La file d'une personne est
+  // à un clic, et son onglet porte une marque pour qu'elle le trouve sans lire
+  // les quatre.
+  let activeTab = 'team';
 
   let kpiFilter = null;         // null | 'late' | 'soon' | 'waiting' | 'active'
+  // Filtre posé en cliquant une observation du briefing : { titre, ids:Set }.
+  // Il n'est PAS de la même famille que le filtre d'alarme — celui-ci désigne
+  // une liste nommée de dossiers, pas une catégorie —, et les deux ne
+  // cohabitent pas : poser l'un lève l'autre.
+  let filtreMatin = null;
   let searchQuery = '';
 
   // Fil d'activité (local à la session : diff des snapshots + actions locales).
@@ -323,7 +330,9 @@ export function createDashboard(deps) {
       + ' ' + fold(effectivePilot(r)) + ' ' + fold(effectiveReferents(r).join(' '));
     return jetonsRecherche.every((t) => hay.includes(t));
   }
-  const isDimmed = (r) => (kpiFilter && !KPI_PRED[kpiFilter](r)) || !matchesSearch(r);
+  const isDimmed = (r) => (kpiFilter && !KPI_PRED[kpiFilter](r))
+    || (filtreMatin && !filtreMatin.ids.has(r.id))
+    || !matchesSearch(r);
 
   // --- Petites briques DOM -------------------------------------------------
   function el(tag, cls, text) {
@@ -601,6 +610,10 @@ export function createDashboard(deps) {
     $chip.hidden = true;
     $chipLabel = el('span', null, '');
     $chip.append($chipLabel, el('span', 'pj-filterchip-x', '✕'));
+    // La pastille annule CE QUI EST POSÉ, quel que soit des deux filtres.
+    $chip.addEventListener('click', () => {
+      if (filtreMatin) setFiltreMatin(null); else setKpiFilter(null);
+    });
     $alarme.appendChild($chip);
 
     $head.appendChild($alarme);
@@ -613,17 +626,22 @@ export function createDashboard(deps) {
     return $head;
   }
 
-  function setKpiFilter(k) {
-    kpiFilter = k;
+  function setFiltreMatin(f) {
+    filtreMatin = f;
+    kpiFilter = null;
     renderHead();
     renderBody();
   }
 
-  // Bascule d'onglet. `auto` distingue un choix de l'utilisateur (on ne lui
-  // reprend plus la main) d'un recalage automatique après nomination du poste.
-  function allerA(key, auto) {
+  function setKpiFilter(k) {
+    kpiFilter = k;
+    filtreMatin = null;
+    renderHead();
+    renderBody();
+  }
+
+  function allerA(key) {
     activeTab = key;
-    if (!auto) ongletAuto = false;
     renderHead();
     renderBody();
   }
@@ -649,18 +667,18 @@ export function createDashboard(deps) {
       : 'Rien en cours.';
     $alarme.classList.toggle('is-calme', total === 0);
 
-    $chip.hidden = !kpiFilter;
+    $chip.hidden = !kpiFilter && !filtreMatin;
     if (kpiFilter) $chipLabel.textContent = `Filtre : ${KPI_LABEL[kpiFilter]}`;
+    else if (filtreMatin) $chipLabel.textContent = `Ce matin : ${filtreMatin.titre}`;
 
     $date.textContent = libelleDuJour();
 
     $actBadge.hidden = unseen === 0;
     $actBadge.textContent = unseen > 9 ? '9+' : String(unseen);
 
-    // La personne au poste a pu se nommer après l'ouverture de l'écran : tant
-    // qu'on n'a pas choisi d'onglet soi-même, la vue le suit.
+    // La personne au poste ne décide plus de l'onglet OUVERT — l'écran s'ouvre
+    // sur l'équipe — mais elle décide de celui qui porte la marque.
     const qui = moi();
-    if (ongletAuto && qui && activeTab !== qui) activeTab = qui;
 
     // Onglets (reconstruits : compte + point rouge + actif dépendent des données).
     $tabs.replaceChildren();
@@ -679,29 +697,28 @@ export function createDashboard(deps) {
         d.setAttribute('aria-label', 'en retard');
         b.appendChild(d);
       }
-      b.addEventListener('click', () => allerA(key, false));
+      b.addEventListener('click', () => allerA(key));
       $tabs.appendChild(b);
       return b;
     };
 
-    // MOI D'ABORD, nommé. C'est la réponse à « qu'est-ce que j'ai à faire ? »,
-    // et elle ne doit pas se chercher au milieu de cinq onglets identiques.
-    if (qui) {
-      const day = dayList(qui);
-      mkTab(qui, `À toi, ${qui}`, day.length, day.some(isLate), 'pj-tab--moi');
+    // L'ÉQUIPE D'ABORD, puis les quatre prénoms DANS L'ORDRE.
+    //
+    // Une version précédente sortait la personne au poste de la liste pour la
+    // poser en tête (« À toi, Charlie ») : l'ordre des collègues devenait
+    // variable d'un poste à l'autre, et Charlie manquait là où l'œil allait le
+    // chercher. On ne réordonne pas une liste de quatre noms qu'on connaît par
+    // cœur ; on marque simplement celui qui est au poste.
+    mkTab('team', 'Équipe', null, false);
+    for (const who of EMPLOYEES) {
+      const day = dayList(who);
+      mkTab(who, who, day.length, day.some(isLate), who === qui ? 'pj-tab--moi' : null);
     }
-    // La file commune : ce que l'atelier doit sortir, tous pilotes confondus.
+    // La file commune, en bout de rangée : ce que l'atelier doit sortir, tous
+    // pilotes confondus. Elle ne s'intercale pas entre les prénoms.
     const { queue } = rankFor(null);
     const todoLate = rows.some((r) => isActive(r) && r.flag !== 'bloque' && isLate(r));
     mkTab('todo', 'Tout l’atelier', queue.length, todoLate);
-
-    // Les collègues — sans se répéter soi-même, qui a déjà son onglet en tête.
-    for (const who of EMPLOYEES) {
-      if (who === qui) continue;
-      const day = dayList(who);
-      mkTab(who, who, day.length, day.some(isLate));
-    }
-    mkTab('team', 'Équipe', null, false);
   }
 
   // Jauge de charge : une barre empilée, un segment par famille active, dans
@@ -774,6 +791,82 @@ export function createDashboard(deps) {
   }
 
   // --- Vue Équipe : 4 colonnes égales --------------------------------------
+  // ===========================================================================
+  // « CE MATIN » — le briefing, et ce qu'il coûte de ne pas le lire
+  // ===========================================================================
+  // Trois règles, sinon ce bloc devient un bandeau qu'on saute :
+  //
+  //   1. IL NE PARLE QUE S'IL A QUELQUE CHOSE À DIRE. Rien à signaler → une
+  //      seule phrase, et l'écran passe à la file.
+  //   2. CHAQUE PHRASE SE PROUVE. Elle nomme les dossiers qui la fondent, et
+  //      un clic n'affiche qu'eux — on peut toujours vérifier ce qu'elle
+  //      avance, au lieu de croire un chiffre.
+  //   3. CINQ AU MAXIMUM. Au-delà, ce n'est plus un briefing, c'est une
+  //      deuxième liste à lire avant la première.
+  const MATIN_MAX = 5;
+
+  function buildMatin(who) {
+    // Le briefing d'une personne est calculé SUR SES DOSSIERS : « 3 commandes
+    // à sortir aujourd'hui » ne veut pas dire la même chose pour l'atelier et
+    // pour Mélina.
+    const base = who
+      ? rows.filter((r) => isActive(r)
+        && (effectivePilot(r) === who || effectiveReferents(r).includes(who)))
+      : rows;
+    const items = briefing(base, {
+      now: Date.now(),
+      machines,
+      // La charge ne se compare qu'à l'échelle de l'atelier : dans la vue
+      // d'une personne, « X porte plus que Y » n'a pas de sens.
+      employees: who ? [] : EMPLOYEES,
+      estActif: isActive,
+      pilotDe: effectivePilot,
+      referentsDe: effectiveReferents,
+      nomClient: clientName,
+      articleDe: articleOf,
+      labelEtape: (r) => (r.sub_stage && SUB_LABEL[r.sub_stage])
+        || STAGE_LABEL[r.stage] || r.stage,
+    });
+
+    const sec = el('section', 'pj-matin');
+    const head = el('header', 'pj-matin-head');
+    head.appendChild(el('h2', 'pj-matin-t', who ? `Ce matin, ${who}` : 'Ce matin'));
+    if (items.length > MATIN_MAX) {
+      head.appendChild(el('span', 'pj-matin-reste',
+        `+ ${items.length - MATIN_MAX} autre${items.length - MATIN_MAX > 1 ? 's' : ''}`));
+    }
+    sec.appendChild(head);
+
+    if (!items.length) {
+      sec.classList.add('is-calme');
+      sec.appendChild(el('p', 'pj-matin-vide', who
+        ? 'Rien qui réclame une décision : ta file suffit.'
+        : 'Rien qui réclame une décision ce matin — la file suffit.'));
+      return sec;
+    }
+
+    const liste = el('div', 'pj-matin-liste');
+    for (const it of items.slice(0, MATIN_MAX)) {
+      const b = el('button', `pj-mot t-${it.ton}`);
+      b.type = 'button';
+      const pose = filtreMatin && filtreMatin.cle === it.cle;
+      b.classList.toggle('active', !!pose);
+      b.setAttribute('aria-pressed', String(!!pose));
+      b.append(el('span', 'pj-mot-t', it.titre), el('span', 'pj-mot-d', it.detail));
+      if (it.ids && it.ids.length) {
+        // Le clic BASCULE : recliquer la même phrase rend la vue entière.
+        b.addEventListener('click', () => setFiltreMatin(pose
+          ? null
+          : { cle: it.cle, titre: it.titre, ids: new Set(it.ids) }));
+      } else {
+        b.disabled = true;
+      }
+      liste.appendChild(b);
+    }
+    sec.appendChild(liste);
+    return sec;
+  }
+
   function buildTeamView() {
     const wrap = el('div', 'pj-team');
     // La charge par étape ouvre la vue : c'est l'autre moitié du dispatch —
@@ -817,7 +910,7 @@ export function createDashboard(deps) {
       head.appendChild(el('span', 'pj-col-sub' + (late ? ' is-late' : ''),
         late ? `${late} en retard` : day.length ? 'À l’heure' : 'Disponible'));
 
-      head.addEventListener('click', () => allerA(who, false));
+      head.addEventListener('click', () => allerA(who));
       col.appendChild(head);
 
       const list = el('div', 'pj-col-cards');
@@ -847,6 +940,10 @@ export function createDashboard(deps) {
         : 'Chargement du planning…'));
       return;
     }
+    // Le briefing ouvre l'écran, dans toutes les vues : c'est la première
+    // chose qu'on lit le matin, avant même de savoir quelle file on regarde.
+    $body.appendChild(buildMatin(activeTab === 'team' || activeTab === 'todo' ? null : activeTab));
+
     if (activeTab === 'team') {
       $body.appendChild(buildTeamView());
     } else {
@@ -1883,17 +1980,11 @@ export function createDashboard(deps) {
     root.appendChild(buildHead());
     $body = el('div', 'pj-body');
     root.appendChild($body);
-    // Qui est au poste décide de l'onglet par défaut ET du libellé du premier
-    // onglet : quand quelqu'un se nomme (ou change de personne en cours de
-    // journée), l'écran suit. `poste.js` prévient par un évènement de document
-    // — `storage` ne se déclenche pas dans l'onglet qui écrit.
-    // Quelqu'un d'autre vient de s'asseoir : on lui rend la vue par défaut,
-    // même si la personne d'avant avait choisi un autre onglet.
-    document.addEventListener('olda:poste', () => {
-      ongletAuto = true;
-      renderHead();
-      renderBody();
-    });
+    // Un changement de personne en cours de journée déplace la marque « c'est
+    // toi » d'un onglet à l'autre, et repersonnalise le briefing du matin.
+    // `poste.js` prévient par un évènement de document — `storage` ne se
+    // déclenche pas dans l'onglet qui écrit.
+    document.addEventListener('olda:poste', () => { renderHead(); renderBody(); });
     renderHead();
     renderBody();
   }
