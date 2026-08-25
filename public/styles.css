@@ -5072,6 +5072,23 @@ body.view-plein .fiverr-tool { display: none !important; }
 .reg-tarif-del:hover { color: var(--danger); }
 .reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: var(--ctrl-h); padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: var(--taille-texte); cursor: pointer; }
 
+/* CORBEILLE — même rangée que les tarifs, mêmes jetons, aucun composant neuf.
+   `min-width: 0` sur le bloc qui porte le texte : sans lui, un nom de client
+   long garde sa largeur intrinsèque et pousse le bouton hors de la carte
+   (même piège que `.reg-tarif-input`, juste au-dessus). */
+.reg-corb { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.reg-corb:last-child { border-bottom: 0; }
+.reg-corb__quoi { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+.reg-corb__nom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-corb__detail { font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-corb__quand { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* LE MÊME PIÈGE QUE `.reg-tarif-input`, dans l'autre sens : sans `flex: 0 0
+   auto`, le bouton se laisse écraser à 120 px, son libellé passe sur deux
+   lignes et il monte à 71 px — quand les deux autres `reg-btn` de l'écran font
+   50. Un composant partagé doit mesurer pareil partout où il est posé. */
+.reg-corb .reg-btn { flex: 0 0 auto; white-space: nowrap; }
+.reg-corb__vide { margin: 12px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
+
 .reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: var(--taille-texte); color: var(--text-2); }
 
 @media (max-width: 700px) {

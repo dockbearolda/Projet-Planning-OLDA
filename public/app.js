@@ -23,7 +23,7 @@ import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.
 import { noterVersion, surveillerMaj } from './maj.js';
 // Qui est au poste : le nom affiché en haut à droite, et celui qui signe les
 // demandes prises sur cet appareil (le parcours comptoir le relit).
-import { monterPoste } from './poste.js';
+import { monterPoste, lirePoste } from './poste.js';
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -343,6 +343,19 @@ function updateStageLink(slug) {
 // --- API helpers -----------------------------------------------------------
 async function api(method, url, body) {
   const opts = { method, headers: {} };
+  // LE POSTE SIGNE CE QU'IL FAIT. Le prénom choisi une fois par appareil part
+  // avec chaque écriture : c'est ce que le journal enregistre dans « qui ».
+  // Déclaratif, jamais une preuve — mais « Mélina, hier à 16 h » répond à une
+  // question à laquelle « hier à 16 h » ne répondait pas.
+  // Sur les lectures aussi : ça ne coûte rien et ça évite d'avoir à se demander,
+  // à chaque nouvel appel, s'il fallait le mettre.
+  // ⚠ ENCODÉ, et ce n'est pas de la coquetterie : `fetch` REFUSE un en-tête qui
+  // sort du latin-1 et lève une TypeError. Un prénom saisi avec un caractère
+  // exotique ferait alors échouer NON PAS la signature, mais l'appel entier —
+  // toutes les écritures de l'application, pour un champ décoratif. En pourcent,
+  // c'est de l'ASCII quoi qu'on tape ; le serveur le décode.
+  const qui = lirePoste();
+  if (qui) opts.headers['X-Qui'] = encodeURIComponent(qui);
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -4618,7 +4631,13 @@ function renderLigneDetail() {
 const JOURNAL_LABELS = {
   stage: 'Étape', sub_stage: 'Sous-étape', flag: 'État', flag_reason: 'Motif',
   priority: 'Priorité', project_value: 'Prix TTC', deadline: 'Date souhaitée',
-  responsable: 'Pilote', referent: 'Référent', paye: 'Payé',
+  responsable: 'Pilote', referent: 'Référent',
+  quantity: 'Quantité', product: 'Désignation',
+  acompte_demande: 'Acompte demandé', acompte_verse: 'Acompte reçu',
+  acompte_montant: 'Montant de l’acompte', paye: 'Payé', paiement_mode: 'Mode de règlement',
+  fiche_heure: 'Heure de retrait', fiche_detail: 'Détail de la fiche',
+  fiche_atelier: 'Consigne atelier',
+  archive: 'Archivage',
 };
 
 function journalValeur(field, brut) {
@@ -4639,9 +4658,13 @@ function journalValeur(field, brut) {
 }
 
 // Va chercher ce qui a changé sur cette commande et l'écrit dans l'Historique.
-// Ce que l'application NE SAIT PAS, c'est QUI : elle n'a qu'un mot de passe
-// commun à tout l'atelier. On l'écrit noir sur blanc plutôt que de laisser
-// croire à un oubli.
+//
+// Le journal dit maintenant QUI — le prénom que le poste s'est donné, envoyé à
+// chaque écriture. C'est DÉCLARATIF, pas une preuve : l'application n'a toujours
+// qu'un mot de passe commun, et n'importe quel poste peut se dire n'importe qui.
+// La note du bas le rappelle, parce qu'un nom affiché sans réserve se lit comme
+// une certitude — et il ne faut pas qu'une ligne d'historique serve à accuser
+// quelqu'un. Un poste qui ne s'est pas nommé n'ajoute simplement rien.
 async function chargerJournal(id, hote) {
   let lignes = [];
   try {
@@ -4655,11 +4678,17 @@ async function chargerJournal(id, hote) {
     hote.replaceChildren(ldValeur('Aucune modification enregistrée depuis la mise en service du journal.'));
     return;
   }
-  const items = lignes.map((l) => ldValeur(
-    `${horodatageFr(l.created_at)} — ${JOURNAL_LABELS[l.field] || l.field} : `
-    + `${journalValeur(l.field, l.value_before)} → ${journalValeur(l.field, l.value_after)}`,
-  ));
-  const note = ldValeur('L’application n’a qu’un mot de passe commun : elle enregistre ce qui a changé, pas qui l’a fait.');
+  const items = lignes.map((l) => {
+    const par = l.who ? ` · ${l.who}` : '';
+    // L'ARCHIVAGE se raconte, il ne se compare pas : « Archivage : — → Retirée
+    // du planning » serait du charabia pour un geste qui n'a pas d'avant.
+    const corps = l.field === 'archive'
+      ? journalValeur(l.field, l.value_after)
+      : `${JOURNAL_LABELS[l.field] || l.field} : `
+        + `${journalValeur(l.field, l.value_before)} → ${journalValeur(l.field, l.value_after)}`;
+    return ldValeur(`${horodatageFr(l.created_at)}${par} — ${corps}`);
+  });
+  const note = ldValeur('Le prénom est celui que le poste s’est donné : il dit qui a saisi, il ne le prouve pas.');
   note.className += ' ld-journal__note';
   hote.replaceChildren(...items, note);
 }

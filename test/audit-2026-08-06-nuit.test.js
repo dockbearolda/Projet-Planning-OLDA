@@ -88,8 +88,11 @@ function bloc(src, signature) {
     handlerFiche, /BEGIN/,
     'la correction de fiche s’ouvre dans une transaction',
   );
+  // Ce qui compte, c'est que la ligne soit PRISE — pas la lettre exacte de la
+  // requête. La clause s'est enrichie depuis (le filtre d'archivage s'y est
+  // ajouté) : on garde donc le verrou sous surveillance, sans figer le reste.
   assert.match(
-    handlerFiche, /SELECT fiche FROM requests WHERE id = \$1 FOR UPDATE/,
+    handlerFiche, /SELECT fiche FROM requests WHERE id = \$1[^`']*FOR UPDATE/,
     'la ligne est PRISE pendant qu’on la relit : sans ça, deux corrections '
     + 'simultanées partent de la même fiche d’avant et la seconde efface la première',
   );

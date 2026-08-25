@@ -355,6 +355,35 @@ async function init() {
   // que les clients rapatriés en reçoivent un eux aussi.
   await rattraperCodesClients();
 
+  // ARCHIVAGE au lieu de suppression, sur les deux tables qui portent du métier.
+  // Colonnes nullables sans défaut : une ligne d'avant la migration vaut « null »
+  // donc « vivante », ce qui est exact. Rien à recalculer, rien à rattraper.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS deleted_at;
+  //        ALTER TABLE clients  DROP COLUMN IF EXISTS deleted_at;
+  for (const table of ['requests', 'clients']) {
+    try {
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at timestamptz`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
+  // LE « QUI » DU JOURNAL. Déclaratif (le prénom du poste), pas une preuve —
+  // voir le commentaire de la colonne dans schema.sql.
+  // Down : ALTER TABLE request_events DROP COLUMN IF EXISTS who;
+  try {
+    await pool.query('ALTER TABLE request_events ADD COLUMN IF NOT EXISTS who text');
+  } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+
+  // Toutes les lectures d'écran filtrent désormais `deleted_at IS NULL` (voir
+  // VIVANTES dans server.js). Sans index, ce filtre s'ajoute à un parcours que
+  // l'index de liste couvrait entièrement — et il porte sur TOUTES les lectures,
+  // y compris le temps réel. L'index PARTIEL ne range que les lignes vivantes :
+  // il reste petit quoi qu'il arrive, l'archive n'y entrant jamais.
+  // Down : DROP INDEX IF EXISTS idx_requests_vivantes;
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_requests_vivantes
+      ON requests (stage, position ASC NULLS LAST) WHERE deleted_at IS NULL`);
+  } catch (_) { /* pg-mem local : index partiel non géré, sans conséquence */ }
+
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
   // Même règle pour les deux autres reliquats : on ne retire QUE ce qui est vide.
@@ -1534,6 +1563,55 @@ async function basculerOrdreManuel(etape, range) {
   }
 }
 
+// --- Interrupteurs de fonctionnalité -----------------------------------------
+// Les gros chantiers à venir (comptes nominatifs, modèle Projet/Tâche, coûts et
+// marge, stock) touchent tous des écrans qui tournent aujourd'hui au comptoir et
+// à l'atelier. Un interrupteur permet de les livrer À MOITIÉ sans que personne
+// ne s'en aperçoive : le code part, l'écran reste celui d'avant, et il ne bascule
+// que le jour où le patron a validé en local.
+//
+// La liste est ÉCRITE ICI, pas devinée : un interrupteur inconnu envoyé par un
+// poste est ignoré. Sans ça, une faute de frappe créerait un drapeau fantôme
+// que personne ne lit et qui ne s'éteint jamais.
+//
+// Tous à `false` par défaut. Un interrupteur absent d'`app_meta` vaut « éteint »,
+// jamais « allumé » : au pire on n'a pas la nouveauté, jamais un écran cassé.
+// Down : DELETE FROM app_meta WHERE key = 'flags'.
+const FLAGS_CONNUS = {
+  comptes: 'Connexion nominative et rôles',
+  projets: 'Regroupement Projet et liste de tâches',
+  marges: 'Décomposition des coûts et marge',
+  stock: 'Fournisseurs, catalogue, achats et stock',
+};
+const FLAGS_SLUGS = Object.keys(FLAGS_CONNUS);
+const FLAGS_ETEINTS = Object.fromEntries(FLAGS_SLUGS.map((s) => [s, false]));
+
+async function getFlags() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'flags'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...FLAGS_ETEINTS };
+  try {
+    const lu = JSON.parse(rows[0].value);
+    if (!lu || typeof lu !== 'object') return { ...FLAGS_ETEINTS };
+    // On repart TOUJOURS de la liste connue : un drapeau retiré du code
+    // disparaît de la réponse même s'il traîne encore en base.
+    return { ...FLAGS_ETEINTS, ...Object.fromEntries(
+      FLAGS_SLUGS.filter((s) => s in lu).map((s) => [s, lu[s] === true]),
+    ) };
+  } catch (_) {
+    return { ...FLAGS_ETEINTS };
+  }
+}
+
+// Fusion, jamais remplacement : deux postes ouverts sur les réglages ne doivent
+// pas s'effacer l'un l'autre parce que l'un a envoyé sa vision complète.
+async function setFlags(patch) {
+  const src = patch && typeof patch === 'object' ? patch : {};
+  const propre = { ...(await getFlags()) };
+  for (const s of FLAGS_SLUGS) if (s in src) propre[s] = src[s] === true;
+  await poserMeta('flags', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Journal des modifications ----------------------------------------------
 // « Qui a déplacé ça ? » n'avait aucune réponse : la fiche ne connaissait que la
 // naissance de la ligne et sa dernière retouche. On enregistre désormais CE QUI
@@ -1553,12 +1631,26 @@ const JOURNAL_FIELDS = {
   deadline: 'Date souhaitée',
   responsable: 'Pilote',
   referent: 'Référent',
+  // CE QUI TOUCHE À L'ARGENT ET À LA QUANTITÉ. Ces six-là ne laissaient aucune
+  // trace : un acompte marqué reçu par erreur, une quantité corrigée de 50 à 5,
+  // un mode de règlement changé — le dossier ne disait plus ni quoi, ni quand.
+  // Ce sont précisément les mouvements qu'on cherche à reconstituer quand un
+  // chiffre ne tombe pas juste.
+  quantity: 'Quantité',
+  product: 'Désignation',
+  acompte_demande: 'Acompte demandé',
+  acompte_verse: 'Acompte reçu',
+  acompte_montant: 'Montant de l’acompte',
   paye: 'Payé',
+  paiement_mode: 'Mode de règlement',
   // Le DÉTAIL de la fiche comptoir ne vit pas dans une colonne : ces deux-là
   // sont écrits par `logFicheChange`, pas par la comparaison de colonnes.
   fiche_heure: 'Heure de retrait',
   fiche_detail: 'Détail de la fiche',
   fiche_atelier: 'Consigne atelier',
+  // L'ARCHIVAGE et son retour, écrits en toutes lettres par `logCycleDeVie` :
+  // ce ne sont pas des comparaisons de colonnes, ce sont deux gestes.
+  archive: 'Archivage',
 };
 const JOURNAL_MAX = 40; // ce qu'on renvoie à la fiche : la vie récente suffit
 
@@ -1574,7 +1666,10 @@ const enTexte = (v) => {
   return String(v);
 };
 
-async function logRequestChanges(requestId, avant, apres) {
+// `qui` : le prénom du poste, tel qu'il arrive dans l'en-tête `X-Qui`. Toujours
+// le DERNIER argument et toujours facultatif — un appelant qui l'ignore écrit
+// une ligne sans « qui », exactement comme avant, plutôt que de ne rien écrire.
+async function logRequestChanges(requestId, avant, apres, qui) {
   if (!avant || !apres) return;
   const memeValeur = (a, b) => (enTexte(a) ?? '') === (enTexte(b) ?? '');
   const lignes = Object.keys(JOURNAL_FIELDS)
@@ -1584,12 +1679,37 @@ async function logRequestChanges(requestId, avant, apres) {
   try {
     for (const l of lignes) {
       await pool.query(
-        'INSERT INTO request_events (request_id, field, value_before, value_after) VALUES ($1, $2, $3, $4)',
-        [requestId, l.field, l.before, l.after],
+        'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1, $2, $3, $4, $5)',
+        [requestId, l.field, l.before, l.after, nomDuPoste(qui)],
       );
     }
   } catch (err) {
     console.error('journal des modifications :', err.message);
+  }
+}
+
+// Le prénom du poste, borné. Il vient d'un en-tête HTTP : il peut être absent,
+// vide, ou long comme le bras. On le range comme une donnée, pas comme une
+// affirmation — c'est déclaratif jusqu'à ce que les comptes existent.
+const QUI_MAX = 40;
+function nomDuPoste(qui) {
+  if (typeof qui !== 'string') return null;
+  const propre = qui.trim().slice(0, QUI_MAX);
+  return propre || null;
+}
+
+// ARCHIVAGE ET RETOUR D'ARCHIVE. Deux gestes, pas deux valeurs de colonne : le
+// journal doit dire « archivée » et « remise au planning », pas afficher un
+// horodatage brut que personne ne lit. C'est aussi la seule trace qui survit à
+// un archivage — la ligne, elle, quitte tous les écrans.
+async function logCycleDeVie(requestId, geste, qui) {
+  try {
+    await pool.query(
+      'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1, $2, $3, $4, $5)',
+      [requestId, 'archive', null, geste, nomDuPoste(qui)],
+    );
+  } catch (err) {
+    console.error('journal du cycle de vie :', err.message);
   }
 }
 
@@ -1604,7 +1724,7 @@ async function logRequestChanges(requestId, avant, apres) {
 // table pour rien) : on écrit CE QUI A CHANGÉ. L'heure de retrait a son propre
 // libellé — c'est elle qui commande le délai de production, elle mérite d'être
 // lue d'un coup d'œil ; le reste se résume au nombre de lignes rectifiées.
-async function logFicheChange(requestId, avant, apres) {
+async function logFicheChange(requestId, avant, apres, qui) {
   const lignes = [];
   const heureAvant = avant && avant.heureSouhaitee ? String(avant.heureSouhaitee) : null;
   const heureApres = apres && apres.heureSouhaitee ? String(apres.heureSouhaitee) : null;
@@ -1640,8 +1760,8 @@ async function logFicheChange(requestId, avant, apres) {
   try {
     for (const l of lignes) {
       await pool.query(
-        'INSERT INTO request_events (request_id, field, value_before, value_after) VALUES ($1, $2, $3, $4)',
-        [requestId, l.field, l.before, l.after],
+        'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1, $2, $3, $4, $5)',
+        [requestId, l.field, l.before, l.after, nomDuPoste(qui)],
       );
     }
   } catch (err) {
@@ -1656,7 +1776,7 @@ async function logFicheChange(requestId, avant, apres) {
 // réel (voir rafraichirFichesApresChangement).
 async function getRequestJournal(requestId) {
   const { rows } = await pool.query(
-    `SELECT field, value_before, value_after, created_at FROM request_events
+    `SELECT field, value_before, value_after, who, created_at FROM request_events
      WHERE request_id = $1 ORDER BY created_at DESC, field ASC LIMIT $2`,
     [requestId, JOURNAL_MAX],
   );
@@ -1679,6 +1799,7 @@ module.exports = {
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
-  JOURNAL_FIELDS, logRequestChanges, logFicheChange, getRequestJournal,
+  JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
+  FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,
   clientKey, nextClientCode,
 };

@@ -169,7 +169,15 @@ function bloc(src, signature) {
     SRV.slice(SRV.indexOf('const COLONNES_REQUEST = ['), SRV.indexOf('];', SRV.indexOf('const COLONNES_REQUEST = [')))
       .match(/'([a-z_]+)'/g).map((s) => s.slice(1, -1)),
   );
+  // `deleted_at` est la SEULE exception, et elle se justifie par arithmétique :
+  // toute ligne servie est vivante (les lectures d'écran filtrent
+  // `deleted_at IS NULL`), donc la colonne vaudrait null sur 100 % des lignes
+  // rendues. La servir, c'est envoyer un champ toujours vide à chaque poste, sur
+  // chaque ligne, à chaque rafraîchissement. La corbeille, elle, trie par
+  // `deleted_at` côté serveur : elle n'a pas besoin de le rendre non plus.
+  const HORS_PROJECTION = new Set(['deleted_at']);
   for (const { column_name: c } of colonnes) {
+    if (HORS_PROJECTION.has(c)) continue;
     assert.ok(declarees.has(c), `colonne « ${c} » absente de COLONNES_REQUEST : elle ne serait plus servie`);
   }
 
@@ -202,21 +210,34 @@ function bloc(src, signature) {
     !/CREATE TABLE IF NOT EXISTS production_sectors/.test(SQL_ACTIF),
     'la table `production_sectors` ne se crée plus',
   );
-  // Les deux derniers points qui la touchaient encore doivent survivre à son
-  // absence : une table manquante ne doit transformer ni un démarrage ni une
-  // suppression de commande en panne.
+  // Le retrait d'une commande NE CASCADE PLUS DU TOUT : il archive la ligne et
+  // ne touche ni ses pièces jointes, ni son journal, ni quoi que ce soit
+  // d'autre. La question « et si `production_sectors` a disparu ? » ne se pose
+  // donc plus de ce côté — il n'y a plus une seule suppression en cascade à
+  // tolérer. C'est la garde qui suit qui le vérifie.
+  // On juge LE HANDLER, pas tout le fichier : retirer une pièce jointe précise
+  // ou une note de client reste une suppression légitime, demandée geste par
+  // geste. Ce qui ne doit plus exister, c'est la cascade déclenchée par le
+  // retrait d'UNE commande.
+  const debutSuppr = SRV.indexOf("app.delete('/api/requests/:id'");
+  const handlerSuppr = SRV.slice(debutSuppr, SRV.indexOf('}));', debutSuppr));
+  assert.ok(debutSuppr > 0, 'le retrait d’une commande reste repérable');
+  assert.ok(
+    !/DELETE FROM/.test(handlerSuppr),
+    'retirer une commande n’efface plus RIEN : ni ses PDF, ni son journal',
+  );
   assert.match(
-    SRV, /DELETE FROM production_sectors WHERE request_id = \$1', \[req\.params\.id\]\)\s*\n\s*\.catch/,
-    'la cascade de suppression tolère la table retirée',
+    handlerSuppr, /UPDATE requests SET deleted_at = now\(\)/,
+    '… elle est ARCHIVÉE, ce qui est la seule façon de garder son historique',
   );
   assert.match(
     DB, /SELECT sector FROM production_sectors[\s\S]{0,120}\.then\(\(x\) => x\.rows, \(\) => \[\]\)/,
-    'et la vieille migration aussi',
+    'la vieille migration, elle, tolère toujours la table retirée',
   );
   const suppr = await call('POST', '/api/requests', { stage: 'production', billing_company: 'À supprimer' });
   assert.strictEqual(
     (await call('DELETE', `/api/requests/${suppr.body.id}`)).status, 204,
-    'supprimer une commande marche toujours sans la table',
+    'retirer une commande marche toujours sans la table',
   );
 
   // La synthèse du Point du jour porte la même règle.

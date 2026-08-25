@@ -28,7 +28,8 @@ const {
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
-  logRequestChanges, logFicheChange, getRequestJournal,
+  logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
+  FLAGS_CONNUS, getFlags, setFlags,
   clientKey, nextClientCode,
 } = require('./db');
 const RESPONSABLE_SET = new Set(RESPONSABLES);
@@ -38,6 +39,37 @@ const ORDER_KIND_SET = new Set(ORDER_KINDS);
 // Longueur maximale du motif d'alerte : une phrase, pas un roman (la ligne de
 // grille l'affiche tronqué, l'infobulle en donne le texte complet).
 const FLAG_REASON_MAX = 240;
+
+// UNE COMMANDE ARCHIVÉE RESTE EN BASE ET SORT DE TOUS LES ÉCRANS.
+// `deleted_at IS NULL` est donc à poser sur CHAQUE lecture qui alimente un
+// écran ou un compteur. Écrit en constante, en deux formes, pour qu'on puisse
+// le retrouver d'un `grep` — et un test vérifie qu'aucune lecture d'écran ne
+// l'oublie, parce qu'une lecture qui l'oublie ne casse rien : elle ressuscite
+// simplement une ligne archivée au milieu du planning, sans erreur ni message.
+//
+// Deux endroits ne le portent PAS, et c'est voulu :
+//   - les recherches par empreinte / par référence de ticket, qui doivent voir
+//     l'archive pour ne JAMAIS réutiliser un numéro ni recréer un dossier déjà
+//     saisi (voir refs-comptoir-collision) ;
+//   - la corbeille, dont c'est tout l'objet.
+const VIVANTES = 'r.deleted_at IS NULL';
+const VIVANTES_NU = 'deleted_at IS NULL';
+
+// QUI a fait le geste. Aujourd'hui c'est le prénom choisi une fois par
+// appareil (`olda.qui`), envoyé en en-tête par le poste : déclaratif, jamais
+// une preuve — n'importe qui peut écrire n'importe quel prénom. Le jour où les
+// comptes existent, seule CETTE fonction change ; tous ses appelants restent.
+const quiDemande = (req) => {
+  const brut = req.get('X-Qui');
+  if (typeof brut !== 'string' || !brut.trim()) return null;
+  // Le poste l'envoie encodé en pourcent — un en-tête HTTP ne transporte pas
+  // sûrement un « é ». Un encodage abîmé (proxy, poste ancien) ne doit pas
+  // faire échouer l'écriture qu'on est en train de journaliser : on garde
+  // alors le texte brut, quitte à ce qu'il soit moins joli.
+  let nom = brut;
+  try { nom = decodeURIComponent(brut); } catch (_) { /* on garde le brut */ }
+  return nom.trim().slice(0, 40) || null;
+};
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -424,6 +456,28 @@ app.get('/api/version', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ version: VERSION_SITE });
 });
+
+// ---------------------------------------------------------------------------
+// Interrupteurs de fonctionnalité (voir FLAGS_CONNUS dans db.js).
+// Ils décident ce qu'un poste AFFICHE, jamais ce que le serveur AUTORISE : un
+// écran éteint côté interface reste atteignable par l'API. C'est volontaire à
+// ce stade — ce sont des chantiers en cours, pas des droits. Le jour où les
+// comptes existent, ce sont les RÔLES qui autorisent, et eux se vérifient ici.
+// ---------------------------------------------------------------------------
+app.get('/api/flags', asyncH(async (req, res) => {
+  res.json({ flags: await getFlags(), connus: FLAGS_CONNUS });
+}));
+
+app.put('/api/flags', asyncH(async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Objet attendu' });
+  }
+  const flags = await setFlags(req.body);
+  // Chaque poste doit basculer sans qu'on aille le rouvrir un par un : c'est
+  // tout l'intérêt d'un interrupteur central plutôt que d'un réglage local.
+  broadcast({ kind: 'flags' });
+  res.json({ flags, connus: FLAGS_CONNUS });
+}));
 
 // ---------------------------------------------------------------------------
 // Flux temps réel (SSE) — push instantané façon Google Sheets.
@@ -869,20 +923,20 @@ app.get('/api/requests', asyncH(async (req, res) => {
   if (stage) {
     if (!STAGE_SLUGS.includes(stage)) return res.status(400).json({ error: `stage invalide: ${stage}` });
     if (plafond === null) {
-      ({ rows } = await pool.query(`${SELECT} WHERE r.stage = $1 ${ORDER}`, [stage]));
+      ({ rows } = await pool.query(`${SELECT} WHERE r.stage = $1 AND ${VIVANTES} ${ORDER}`, [stage]));
     } else {
       // On prend la fin de la liste — donc on trie À L'ENVERS pour la couper,
       // puis on remet l'ordre d'affichage. Prendre les premières aurait donné
       // les plus anciennes : exactement celles que personne ne vient voir.
       const r = await pool.query(
-        `${SELECT} WHERE r.stage = $1 ${ORDER_INVERSE} LIMIT $2`, [stage, plafond + 1],
+        `${SELECT} WHERE r.stage = $1 AND ${VIVANTES} ${ORDER_INVERSE} LIMIT $2`, [stage, plafond + 1],
       );
       const { lignes, complet } = bornerListe(r.rows, plafond);
       rows = lignes.reverse();
       if (!complet) {
         res.set('X-Liste-Tronquee', String(plafond));
         const { rows: n } = await pool.query(
-          'SELECT COUNT(*)::int AS n FROM requests WHERE stage = $1', [stage],
+          `SELECT COUNT(*)::int AS n FROM requests WHERE stage = $1 AND ${VIVANTES_NU}`, [stage],
         );
         res.set('X-Liste-Total', String(n[0].n));
       }
@@ -890,7 +944,7 @@ app.get('/api/requests', asyncH(async (req, res) => {
   } else {
     const parEtape = 'r.stage, r.position ASC NULLS LAST, r.priority DESC, r.deadline ASC NULLS LAST, r.created_at ASC';
     if (plafond === null) {
-      ({ rows } = await pool.query(`${SELECT} ORDER BY ${parEtape}`));
+      ({ rows } = await pool.query(`${SELECT} WHERE ${VIVANTES} ORDER BY ${parEtape}`));
     } else {
       // MÊME RÈGLE QUE PAR ÉTAPE : on rend la FIN de la liste. Le plafond
       // s'appliquait ici sur l'ordre normal, donc sur les PREMIÈRES lignes —
@@ -899,12 +953,14 @@ app.get('/api/requests', asyncH(async (req, res) => {
       // « préparation » n'apparaissaient tout simplement jamais. Un appelant
       // sans `?stage=` recevait une réponse amputée sans rien qui le dise.
       const parEtapeInverse = 'r.stage DESC, r.position DESC NULLS FIRST, r.priority ASC, r.deadline DESC NULLS FIRST, r.created_at DESC';
-      const r = await pool.query(`${SELECT} ORDER BY ${parEtapeInverse} LIMIT $1`, [plafond + 1]);
+      const r = await pool.query(
+        `${SELECT} WHERE ${VIVANTES} ORDER BY ${parEtapeInverse} LIMIT $1`, [plafond + 1],
+      );
       const { lignes, complet } = bornerListe(r.rows, plafond);
       rows = lignes.reverse();
       if (!complet) {
         res.set('X-Liste-Tronquee', String(plafond));
-        const { rows: n } = await pool.query('SELECT COUNT(*)::int AS n FROM requests');
+        const { rows: n } = await pool.query(`SELECT COUNT(*)::int AS n FROM requests WHERE ${VIVANTES_NU}`);
         res.set('X-Liste-Total', String(n[0].n));
       }
     }
@@ -983,7 +1039,7 @@ const empreinteIds = (ids) => require('crypto')
 // famille ajoutée là-bas et oubliée ici serait vide sur le Point du jour, sans
 // message ni erreur — un test compare les deux.
 const SYNTHESE_FAMILLES = ['a_trier', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
-const SYNTHESE_FILTRE = `r.stage IN (${SYNTHESE_FAMILLES.map((s) => `'${s}'`).join(', ')})`;
+const SYNTHESE_FILTRE = `r.stage IN (${SYNTHESE_FAMILLES.map((s) => `'${s}'`).join(', ')}) AND ${VIVANTES}`;
 
 app.get('/api/requests/synthese', asyncH(async (req, res) => {
   const depuis = typeof req.query.depuis === 'string' && req.query.depuis ? req.query.depuis : null;
@@ -1018,7 +1074,7 @@ app.get('/api/requests/synthese', asyncH(async (req, res) => {
     // s'évaporer. On ne filtre donc PAS sur la famille dans la mise à jour
     // incrémentale : ce qui a bougé depuis `depuis` est toujours peu de chose.
     const { rows } = await pool.query(
-      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 ${ORDER}`, [borne],
+      `SELECT ${SYNTHESE_CHAMPS} FROM requests r WHERE r.updated_at >= $1 AND ${VIVANTES} ${ORDER}`, [borne],
     );
     lignes = rows;
   } else {
@@ -1081,7 +1137,25 @@ app.get('/api/requests/recherche', asyncH(async (req, res) => {
   const conditions = jetons.map((_, i) => `strpos(${FOIN_RECHERCHE}, $${i + 1}) > 0`).join(' AND ');
   params.push(RECHERCHE_MAX + 1); // un de plus : l'écran sait dire « affine »
   const { rows } = await pool.query(
-    `${SELECT} WHERE ${conditions} ORDER BY r.updated_at DESC LIMIT $${params.length}`, params,
+    `${SELECT} WHERE ${conditions} AND ${VIVANTES} ORDER BY r.updated_at DESC LIMIT $${params.length}`, params,
+  );
+  res.json(rows.map(allegerFiche));
+}));
+
+// GET /api/requests/corbeille → ce qui a été retiré du planning, du plus récent
+// au plus ancien. La SEULE lecture qui regarde volontairement l'archive.
+//
+// DÉCLARÉE AVANT `/:id`, et c'est obligatoire : Express prend la première route
+// qui correspond, et « corbeille » se lirait sinon comme un identifiant — la
+// réponse serait un 404, ou une erreur de type Postgres selon l'humeur.
+// C'est la même règle que pour `recherche` et `synthese`, juste au-dessus.
+//
+// Bornée : la corbeille ne se vide jamais, et personne ne remonte au-delà des
+// dernières erreurs de manipulation.
+const CORBEILLE_MAX = 100;
+app.get('/api/requests/corbeille', asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    `${SELECT} WHERE r.deleted_at IS NOT NULL ORDER BY r.deleted_at DESC LIMIT $1`, [CORBEILLE_MAX],
   );
   res.json(rows.map(allegerFiche));
 }));
@@ -1090,7 +1164,10 @@ app.get('/api/requests/recherche', asyncH(async (req, res) => {
 // de détail et le récapitulatif imprimable vont chercher : le détail n'est
 // chargé que pour la ligne qu'on ouvre, jamais pour les centaines d'autres.
 app.get('/api/requests/:id', asyncH(async (req, res) => {
-  const { rows } = await pool.query(`${SELECT_COMPLET} WHERE r.id = $1`, [req.params.id]);
+  // Une commande archivée n'a plus de tiroir : elle a quitté les écrans. Sans
+  // ce filtre, un lien gardé ouvert dans un onglet rouvrait une fiche que
+  // personne ne peut plus atteindre autrement — et qu'on pouvait modifier.
+  const { rows } = await pool.query(`${SELECT_COMPLET} WHERE r.id = $1 AND ${VIVANTES}`, [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   res.json(rows[0]);
 }));
@@ -1109,8 +1186,9 @@ app.get('/api/counts', asyncH(async (req, res) => {
   // allers-retours Postgres à CHAQUE évènement temps réel (loadCounts est
   // systématique dans le poll). En parallèle, un seul temps d'attente.
   const [{ rows: byStage }, { rows: bySub }] = await Promise.all([
-    pool.query('SELECT stage, COUNT(*)::int AS n FROM requests GROUP BY stage'),
-    pool.query('SELECT sub_stage, COUNT(*)::int AS n FROM requests WHERE sub_stage IS NOT NULL GROUP BY sub_stage'),
+    pool.query(`SELECT stage, COUNT(*)::int AS n FROM requests WHERE ${VIVANTES_NU} GROUP BY stage`),
+    pool.query(`SELECT sub_stage, COUNT(*)::int AS n FROM requests
+      WHERE sub_stage IS NOT NULL AND ${VIVANTES_NU} GROUP BY sub_stage`),
   ]);
   for (const r of byStage) if (r.stage in counts) counts[r.stage] = r.n;
   for (const r of bySub) if (SUB_SLUGS.has(r.sub_stage)) counts[r.sub_stage] = r.n;
@@ -1179,7 +1257,9 @@ app.post('/api/requests', asyncH(async (req, res) => {
 const COPIABLE = PATCHABLE.filter((k) => !['position', 'flag', 'flag_reason'].includes(k));
 
 app.post('/api/requests/:id/copie', asyncH(async (req, res) => {
-  const { rows: src } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
+  const { rows: src } = await pool.query(
+    `SELECT * FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
   if (src.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
   const source = src[0];
 
@@ -1287,7 +1367,9 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   // la famille change (pour remettre la sous-étape à zéro), vérifier que la
   // sous-étape demandée relève bien de cette famille, et fournir l'« avant » du
   // journal des modifications.
-  const { rows: avant } = await pool.query('SELECT * FROM requests WHERE id = $1', [req.params.id]);
+  const { rows: avant } = await pool.query(
+    `SELECT * FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
   if (avant.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
 
   const body = effacerSousEtapeSiChangementDeFamille(
@@ -1316,7 +1398,7 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const query = `UPDATE requests SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`;
   const { rows } = await pool.query(query, params);
   if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  await logRequestChanges(req.params.id, avant[0], rows[0]);
+  await logRequestChanges(req.params.id, avant[0], rows[0], quiDemande(req));
   // LES DEUX ÉTAPES quand la ligne change de famille. L'évènement ne nommait
   // que la nouvelle : le poste qui regardait l'ANCIENNE n'avait aucune raison
   // de relire sa grille et gardait la ligne à l'écran, dans une famille qu'elle
@@ -1379,7 +1461,7 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'SELECT fiche FROM requests WHERE id = $1 FOR UPDATE', [req.params.id],
+      `SELECT fiche FROM requests WHERE id = $1 AND ${VIVANTES_NU} FOR UPDATE`, [req.params.id],
     );
     if (rows.length === 0) {
       await client.query('ROLLBACK');
@@ -1431,35 +1513,55 @@ app.patch('/api/requests/:id/fiche', asyncH(async (req, res) => {
   // elle a sa ligne dans l'« Historique ». Sans ça, une quantité rectifiée ou
   // une heure de retrait déplacée ne laissait aucune trace, et personne ne
   // pouvait dire ce qui avait bougé sur le dossier.
-  await logFicheChange(req.params.id, issue.avant, issue.apres);
+  await logFicheChange(req.params.id, issue.avant, issue.apres, quiDemande(req));
   broadcast({ kind: 'update', stages: [issue.ligne.stage] });
   return res.json(issue.ligne);
 }));
 
-// DELETE /api/requests/:id
+// DELETE /api/requests/:id → ARCHIVE la commande. Rien ne s'efface.
+//
+// Cette route DÉTRUISAIT tout : la ligne, ses PDF (devis, BAT, facture) et son
+// journal entier. Une main qui glisse sur une corbeille, et le dossier n'avait
+// jamais existé — impossible de dire ce qui avait été commandé, ni pour combien,
+// ni par qui. Le patron le demande noir sur blanc : on archive, on ne supprime
+// pas. La ligne quitte donc tous les écrans (voir VIVANTES) et garde tout.
+//
+// Le verbe HTTP ne change pas : c'est bien « retirer du planning » que le poste
+// demande, et tous les appelants le disent déjà comme ça. C'est ce qu'on FAIT
+// derrière qui change.
 app.delete('/api/requests/:id', asyncH(async (req, res) => {
-  // La COMMANDE part en premier. Dans l'ordre inverse, une panne au milieu de
-  // la cascade détruisait définitivement les PDF (devis, BAT, facture) d'une
-  // commande qui, elle, restait au planning. Ici le pire cas laisse des pièces
-  // orphelines, invisibles et sans conséquence.
   // `RETURNING stage` : l'évènement doit dire OÙ la ligne vivait, sinon les
   // postes ne savent pas si la grille qu'ils affichent vient de perdre une
   // ligne — et, faute de mieux, ils relisent tous la leur.
+  // `AND deleted_at IS NULL` : archiver deux fois ne doit pas réécrire la date
+  // du premier archivage, sinon la corbeille se réordonne toute seule.
   const { rows: partie } = await pool.query(
-    'DELETE FROM requests WHERE id = $1 RETURNING stage', [req.params.id],
+    `UPDATE requests SET deleted_at = now(), updated_at = now()
+     WHERE id = $1 AND ${VIVANTES_NU} RETURNING stage`, [req.params.id],
   );
   if (partie.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
-  // Cascade côté applicatif (pg-mem ne gère pas les clés étrangères en local).
-  await pool.query('DELETE FROM attachments WHERE request_id = $1', [req.params.id]);
-  // `production_sectors` est retirée des bases où elle est vide (voir
-  // retirerTableProductionSectors) : absente, il n'y a rien à nettoyer — et une
-  // table manquante ne doit pas transformer une suppression en « Erreur serveur ».
-  await pool.query('DELETE FROM production_sectors WHERE request_id = $1', [req.params.id])
-    .catch(() => {});
-  await pool.query('DELETE FROM request_events WHERE request_id = $1', [req.params.id]);
+  await logCycleDeVie(req.params.id, 'Retirée du planning', quiDemande(req));
   broadcast({ kind: 'delete', stages: [partie[0].stage] });
   res.status(204).end();
 }));
+
+// POST /api/requests/:id/restaurer → la remet au planning, là où elle était.
+//
+// Sans ce chemin, l'archivage serait un trou noir : plus doux qu'une
+// suppression pour l'historique, mais tout aussi définitif pour l'employé qui
+// s'est trompé de ligne. Elle revient dans SA famille et à SA sous-étape —
+// aucune des deux n'a été touchée par l'archivage.
+app.post('/api/requests/:id/restaurer', asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    `UPDATE requests SET deleted_at = NULL, updated_at = now()
+     WHERE id = $1 AND deleted_at IS NOT NULL RETURNING stage`, [req.params.id],
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable dans la corbeille' });
+  await logCycleDeVie(req.params.id, 'Remise au planning', quiDemande(req));
+  broadcast({ kind: 'update', stages: [rows[0].stage] });
+  res.status(204).end();
+}));
+
 
 // ---------------------------------------------------------------------------
 // Pièces jointes PDF (Devis / BAT / Facture) — 3 emplacements fixes par commande.
@@ -1491,7 +1593,7 @@ app.put('/api/requests/:id/pdf/:kind',
       return res.status(400).json({ error: 'ce fichier n’est pas un PDF' });
     }
 
-    const exists = await pool.query('SELECT 1 FROM requests WHERE id = $1', [id]);
+    const exists = await pool.query(`SELECT 1 FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [id]);
     if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
 
     let filename = String(req.query.name || '').slice(0, 255).trim();
@@ -1644,7 +1746,8 @@ async function commandeCountByClientKey() {
   // jamais). Le rapprochement normalisé (clientKey) reste en JS : deux
   // graphies du même client s'additionnent ici.
   const { rows } = await pool.query(
-    'SELECT billing_company, COUNT(*)::int AS n FROM requests WHERE billing_company IS NOT NULL GROUP BY billing_company',
+    `SELECT billing_company, COUNT(*)::int AS n FROM requests
+     WHERE billing_company IS NOT NULL AND ${VIVANTES_NU} GROUP BY billing_company`,
   );
   const counts = new Map();
   for (const r of rows) {
@@ -1657,7 +1760,7 @@ async function commandeCountByClientKey() {
 // GET /api/clients → base clients complète, enrichie du nombre de commandes au
 // planning et de notes. Sert AUSSI l'auto-complétion de la prise de commande.
 app.get('/api/clients', asyncH(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM clients');
+  const { rows } = await pool.query(`SELECT * FROM clients WHERE ${VIVANTES_NU}`);
   const { rows: noteRows } = await pool.query(
     'SELECT client_id, COUNT(*)::int AS n FROM client_notes GROUP BY client_id',
   );
@@ -1693,7 +1796,9 @@ app.delete('/api/clients/secteurs/:label', asyncH(async (req, res) => {
 
 // GET /api/clients/:id → une fiche + sa timeline de notes (récent en premier).
 app.get('/api/clients/:id', asyncH(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM clients WHERE id = $1', [req.params.id]);
+  const { rows } = await pool.query(
+    `SELECT * FROM clients WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
   if (rows.length === 0) return res.status(404).json({ error: 'Client introuvable' });
   const { rows: notes } = await pool.query(
     'SELECT * FROM client_notes WHERE client_id = $1 ORDER BY created_at DESC', [req.params.id],
@@ -1785,12 +1890,18 @@ app.patch('/api/clients/:id', asyncH(async (req, res) => {
 }));
 
 // DELETE /api/clients/:id → supprime le client et ses notes (cascade applicative).
+// DELETE /api/clients/:id → DÉSACTIVE la fiche. Ses notes restent.
+//
+// Elle détruisait la fiche ET tout son historique d'appels, d'emails et de
+// rendez-vous. Or les commandes passées citent ce client par son nom : une
+// fiche effacée laissait des dossiers rattachés à quelqu'un qui n'existe plus,
+// et la timeline qui expliquait pourquoi partait avec.
 app.delete('/api/clients/:id', asyncH(async (req, res) => {
-  // La fiche d'abord, ses notes ensuite : si la suppression échoue en chemin,
-  // on ne veut pas d'un client vivant dont l'historique a disparu.
-  const { rowCount } = await pool.query('DELETE FROM clients WHERE id = $1', [req.params.id]);
+  const { rowCount } = await pool.query(
+    `UPDATE clients SET deleted_at = now(), updated_at = now()
+     WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
   if (rowCount === 0) return res.status(404).json({ error: 'Client introuvable' });
-  await pool.query('DELETE FROM client_notes WHERE client_id = $1', [req.params.id]);
   broadcast({ kind: 'client' });
   res.status(204).end();
 }));
@@ -1801,7 +1912,9 @@ app.post('/api/clients/:id/notes', asyncH(async (req, res) => {
   const kind = NOTE_KINDS.has(body.kind) ? body.kind : 'note';
   const text = String(body.body == null ? '' : body.body).trim().slice(0, NOTE_MAX);
   if (!text) return res.status(400).json({ error: 'la note est vide' });
-  const exists = await pool.query('SELECT 1 FROM clients WHERE id = $1', [req.params.id]);
+  const exists = await pool.query(
+    `SELECT 1 FROM clients WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
   if (exists.rowCount === 0) return res.status(404).json({ error: 'Client introuvable' });
   const { rows } = await pool.query(
     'INSERT INTO client_notes (client_id, kind, body) VALUES ($1,$2,$3) RETURNING *',
@@ -1846,6 +1959,10 @@ async function upsertClientFromCommande(cl) {
   // prenaient une commande du même nouveau client en même temps lisaient tous
   // les deux « pas encore là » et créaient chacun leur fiche.
   const key = clientKey(entreprise);
+  // SANS filtre sur `deleted_at`, et c'est voulu : `idx_clients_cle` est UNIQUE,
+  // donc une fiche désactivée occupe toujours sa clé. Ignorer l'archive ferait
+  // partir un INSERT qui violerait la contrainte — et la prise de commande
+  // échouerait sur un doublon que personne ne voit à l'écran.
   const { rowCount } = await pool.query('SELECT 1 FROM clients WHERE cle = $1 LIMIT 1', [key]);
   if (rowCount) return;
   // La nature pro/perso choisie au comptoir suit le client dans sa fiche ;

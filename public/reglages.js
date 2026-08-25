@@ -163,7 +163,106 @@ function buildStatic() {
   tcard.appendChild(tarifsParamsEl);
   page.appendChild(tcard);
 
+  // --- Carte « Corbeille » ----------------------------------------------------
+  // Une commande retirée du planning n'est plus détruite : elle attend ici.
+  // Sans cette carte, l'archivage serait invisible — donc, pour l'employé qui
+  // s'est trompé de ligne, exactement aussi définitif qu'une suppression.
+  const ccard = el('section', 'reg-card');
+  const cch = el('header', 'reg-card__head');
+  cch.append(ic('delete', 'reg-card__ic'),
+    (() => {
+      const t = el('div');
+      t.append(el('h3', 'reg-card__title', 'Corbeille'),
+        el('p', 'reg-card__desc',
+          'Les commandes retirées du planning. Rien n’est effacé : elles gardent leur '
+          + 'prix, leurs documents et tout leur historique, et reviennent d’un clic à '
+          + 'l’étape où elles étaient.'));
+      return t;
+    })());
+  ccard.appendChild(cch);
+  const corbList = el('div', 'reg-corbeille');
+  corbList.id = 'reg-corbeille';
+  ccard.appendChild(corbList);
+  page.appendChild(ccard);
+
   ROOT.replaceChildren(page);
+}
+
+// --- Corbeille ----------------------------------------------------------------
+// Chargée à chaque passage sur les Réglages : elle n'a pas besoin d'être en
+// temps réel, et personne ne la regarde en continu.
+let corbeille = [];
+
+function corbeilleRow(r) {
+  const row = el('div', 'reg-corb');
+  const quoi = el('div', 'reg-corb__quoi');
+  quoi.append(
+    el('span', 'reg-corb__nom', r.billing_company || 'Sans client'),
+    el('span', 'reg-corb__detail', [
+      r.product,
+      r.quantity ? `${r.quantity} pièce${r.quantity > 1 ? 's' : ''}` : null,
+      // La référence du ticket est ce que le client a en main : c'est par elle
+      // qu'il rappelle, et c'est donc elle qui permet de retrouver la ligne.
+      r.fiche && r.fiche.ref ? `nº ${r.fiche.ref}` : null,
+    ].filter(Boolean).join(' · ')),
+  );
+  const quand = el('span', 'reg-corb__quand', dateCourte(r.updated_at));
+  const btn = el('button', 'reg-btn', 'Remettre au planning');
+  btn.type = 'button';
+  btn.dataset.restaurer = r.id;
+  row.append(quoi, quand, btn);
+  return row;
+}
+
+// `deleted_at` n'est pas dans la projection de liste (voir COLONNES_REQUEST) :
+// la corbeille est déjà triée du plus récent au plus ancien par le serveur, et
+// c'est le seul ordre qu'on affiche. On date donc sur `updated_at`, que
+// l'archivage vient justement de poser.
+const dateCourte = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR');
+};
+
+function renderCorbeille() {
+  const hote = $('#reg-corbeille');
+  if (!hote) return;
+  if (!corbeille.length) {
+    hote.replaceChildren(el('p', 'reg-corb__vide', 'Rien n’a été retiré du planning.'));
+    return;
+  }
+  hote.replaceChildren(...corbeille.map(corbeilleRow));
+}
+
+async function chargerCorbeille() {
+  try {
+    const lignes = await api('GET', '/api/requests/corbeille');
+    corbeille = Array.isArray(lignes) ? lignes : [];
+  } catch (_) {
+    // Une corbeille injoignable ne doit pas empêcher de régler le reste : la
+    // carte le dit et les autres cartes continuent de fonctionner.
+    corbeille = [];
+    const hote = $('#reg-corbeille');
+    if (hote) hote.replaceChildren(el('p', 'reg-corb__vide', 'Corbeille indisponible — vérifie la connexion.'));
+    return;
+  }
+  renderCorbeille();
+}
+
+async function restaurer(id, bouton) {
+  bouton.disabled = true;
+  bouton.textContent = 'Remise en cours…';
+  try {
+    await api('POST', `/api/requests/${encodeURIComponent(id)}/restaurer`);
+  } catch (err) {
+    bouton.disabled = false;
+    bouton.textContent = 'Remettre au planning';
+    flash(err.message || 'Remise impossible', 'is-ko');
+    return;
+  }
+  // On retire la ligne de la liste locale plutôt que de tout recharger : la
+  // carte ne bouge pas sous les doigts de celui qui vient de cliquer.
+  corbeille = corbeille.filter((r) => r.id !== id);
+  renderCorbeille();
 }
 
 // Le texte du moment, jetons remplacés par l'exemple.
@@ -404,6 +503,8 @@ function wire() {
     if (jeton) return insertToken(jeton.dataset.token);
     if (e.target.closest('#reg-wa-save')) return save();
     if (e.target.closest('#reg-wa-reset')) { ta.value = saved; sync(); flash(''); }
+    const remise = e.target.closest('[data-restaurer]');
+    if (remise) return restaurer(remise.dataset.restaurer, remise);
   });
 }
 
@@ -417,10 +518,13 @@ export async function refreshReglages() {
   let messageRelu = false;
   // Les trois lectures sont indépendantes : en série, chaque retour sur
   // l'onglet payait trois temps d'attente réseau bout à bout.
+  // La corbeille part dans le MÊME lot : une lecture de plus en série, c'est un
+  // temps d'attente de plus à chaque retour sur l'onglet.
   const [resMessage, articles, params] = await Promise.all([
     fetchBorne('/api/settings/whatsapp').catch(() => null),
     api('GET', '/api/tarifs-tasse').catch(() => null),
     api('GET', '/api/tarifs-tasse/parametres').catch(() => null),
+    chargerCorbeille(),
   ]);
   try {
     // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le

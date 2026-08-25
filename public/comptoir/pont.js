@@ -58,10 +58,27 @@
     }
   };
 
+  // LE COMPTOIR SIGNE AUSSI. Le prénom de la vendeuse part avec chaque appel,
+  // dans le même en-tête que le CRM : sans lui, tout ce qui se saisit ici
+  // arriverait au journal sans nom, alors que c'est précisément là que les
+  // dossiers naissent.
+  //
+  // ⚠ Encodé en pourcent : `fetch` REFUSE un en-tête hors latin-1 et lève —
+  // un prénom exotique ferait échouer l'envoi du dossier, pas seulement sa
+  // signature. La clé est réécrite ici parce que ce fichier est servi tel quel
+  // aux écrans du patron : il ne peut pas importer `poste.js`.
+  const enTeteQui = () => {
+    let nom = '';
+    try { nom = localStorage.getItem('olda.qui') || ''; } catch (_) { /* stockage refusé */ }
+    return nom ? { 'X-Qui': encodeURIComponent(nom) } : {};
+  };
+
   const api = async (method, url, body) => {
     const res = await fetchMinute(url, {
       method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: body === undefined
+        ? enTeteQui()
+        : { 'Content-Type': 'application/json', ...enTeteQui() },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
@@ -198,7 +215,7 @@
     const url = idExistant ? `/api/clients/${encodeURIComponent(idExistant)}` : '/api/clients';
     const res = await fetchMinute(url, {
       method: idExistant ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...enTeteQui() },
       body: JSON.stringify(corps),
     });
     if (res.status === 409) {

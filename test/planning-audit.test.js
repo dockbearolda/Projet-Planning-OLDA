@@ -131,11 +131,42 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(ech.value_after, '2026-09-14', 'l’échéance est journalisée en ISO');
   assert.strictEqual(ech.value_before, null);
 
-  // Une commande supprimée n'abandonne pas son journal derrière elle.
+  // UNE COMMANDE RETIRÉE GARDE TOUT. C'était l'inverse : la ligne, ses PDF et
+  // son journal entier étaient détruits — une main qui glisse, et le dossier
+  // n'avait jamais existé. On archive désormais, et l'historique est justement
+  // ce qui doit survivre : c'est lui qui répond « qu'est-ce qui est arrivé à ce
+  // dossier ? » six mois plus tard.
   r = await call('DELETE', `/api/requests/${jid}`);
   assert.strictEqual(r.status, 204);
   r = await call('GET', `/api/requests/${jid}/journal`);
-  assert.deepStrictEqual(r.body, [], 'le journal part avec la commande');
+  assert.ok(
+    r.body.some((l) => l.field === 'project_value'),
+    'le journal SURVIT au retrait : le prix passé se relit encore',
+  );
+  const retrait = r.body.find((l) => l.field === 'archive');
+  assert.ok(retrait, '… et le retrait lui-même y laisse sa ligne');
+  assert.strictEqual(retrait.value_after, 'Retirée du planning');
+
+  // La ligne, elle, a bien quitté tous les écrans.
+  assert.strictEqual(
+    (await call('GET', `/api/requests/${jid}`)).status, 404,
+    'la commande retirée n’a plus de fiche à ouvrir',
+  );
+  const restantes = await call('GET', '/api/requests');
+  assert.ok(
+    !restantes.body.some((l) => l.id === jid),
+    '… ni de place dans la liste',
+  );
+
+  // Et elle revient d'un geste, dans SA famille : sans ce chemin de retour,
+  // l'archivage serait aussi définitif qu'une suppression pour qui s'est trompé
+  // de ligne.
+  assert.strictEqual((await call('POST', `/api/requests/${jid}/restaurer`)).status, 204);
+  const revenue = await call('GET', `/api/requests/${jid}`);
+  assert.strictEqual(revenue.status, 200, 'remise au planning, la commande se rouvre');
+  assert.strictEqual(revenue.body.stage, 'demande_chiffrage', '… là où elle était');
+  assert.strictEqual(revenue.body.sub_stage, 'a_chiffrer', '… et à sa sous-étape');
+  await call('DELETE', `/api/requests/${jid}`);
 
   // -------------------------------------------------------------------------
   // RANGER UNE ÉTAPE EN UN SEUL ENVOI. Glisser une carte renumérote toute la

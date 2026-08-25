@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS requests (
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
   fiche           jsonb,                             -- détail de la fiche vendeuse (null si créée à la main)
+  -- ARCHIVAGE, pas suppression. Une commande retirée du planning garde sa ligne,
+  -- son journal et ses PDF : c'est la seule façon de répondre « qu'est-ce qui
+  -- est arrivé au dossier de l'Hôtel X ? » six mois plus tard. `DELETE FROM
+  -- requests` détruisait la ligne ET, en cascade, tout son historique.
+  -- null = vivante (le cas courant, donc pas de valeur par défaut à écrire).
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS deleted_at;
+  deleted_at      timestamptz,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -60,6 +67,13 @@ CREATE TABLE IF NOT EXISTS request_events (
   field        text NOT NULL,             -- nom de colonne suivi (voir JOURNAL_FIELDS)
   value_before text,
   value_after  text,
+  -- QUI a fait le changement. Le poste l'envoie en en-tête `X-Qui` : c'est le
+  -- prénom choisi une fois par appareil (`olda.qui`), pas un compte — donc
+  -- déclaratif, jamais une preuve. null = poste qui ne s'est pas nommé, ou
+  -- ligne d'avant cette colonne. Le jour où les comptes existent, c'est la
+  -- SOURCE qui change (l'utilisateur connecté), pas la colonne.
+  -- Down : ALTER TABLE request_events DROP COLUMN IF EXISTS who;
+  who          text,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_request_events_request ON request_events (request_id, created_at DESC);
@@ -117,6 +131,11 @@ CREATE TABLE IF NOT EXISTS clients (
   email       text,
   telephone   text,
   adresse     text,
+  -- Même règle que pour les commandes : une fiche client se DÉSACTIVE, elle ne
+  -- s'efface pas. Ses commandes passées la citent, et un client « supprimé »
+  -- laisserait des dossiers rattachés à un nom introuvable.
+  -- Down : ALTER TABLE clients DROP COLUMN IF EXISTS deleted_at;
+  deleted_at  timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
