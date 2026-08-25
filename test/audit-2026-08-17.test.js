@@ -169,18 +169,16 @@ function bloc(src, signature) {
   assert.ok(/actif\.setAttribute\('aria-label',\s*\n\s*`\$\{quoi\(\)\} : /.test(b),
     'la bascule dit DE QUOI elle parle avant de dire son état');
 
-  // Plancher tactile de la charte, dans le bloc (pointer: coarse).
-  const coarse = CSS.split('@media (pointer: coarse)');
-  const tactile = coarse.join('\n');
-  for (const regle of [
-    '.reg-tarif-input { min-height: 44px; }',
-    '.reg-tarif-add { min-height: 44px; }',
-    '.reg-jeton { min-height: 44px; }',
-  ]) {
-    assert.ok(tactile.includes(regle), `règle tactile manquante : ${regle}`);
+  // LE PLANCHER TACTILE A ÉTÉ RETIRÉ LE 25/08 : projet PC uniquement depuis le
+  // 21/08 (Galaxy Tab au rebut), et ces cibles de 44 px tenaient une deuxième
+  // échelle de tailles à côté de celle de la charte. Ce qui compte désormais,
+  // c'est que ces trois commandes prennent la boîte unique de l'application.
+  for (const regle of ['.reg-tarif-input', '.reg-tarif-add', '.reg-jeton']) {
+    const m = CSS.match(new RegExp(`\\${regle}\\s*\\{([^}]*)\\}`));
+    assert.ok(m, `la règle ${regle} doit exister`);
+    assert.ok(/min-height:\s*var\(--ctrl-h\)/.test(m[1]),
+      `${regle} doit prendre la boîte unique (--ctrl-h), pas une hauteur à elle`);
   }
-  assert.ok(/\.reg-tarif-toggle,\s*\n\s*\.reg-tarif-del \{ flex-basis: 44px; min-width: 44px; min-height: 44px; \}/.test(CSS),
-    'la bascule et la corbeille des tarifs sous le plancher de 44 px');
 }
 
 // ===========================================================================

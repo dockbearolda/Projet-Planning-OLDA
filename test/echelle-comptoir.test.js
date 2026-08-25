@@ -450,8 +450,19 @@ const regleV = (selecteur) => {
 };
 const champV = regleV('input,select,textarea');
 const boutonV = regleV('button');
-assert.strictEqual(champV.padding.split(' ')[0], 'var(--champ-y)', 'un champ de la vente se remplit de la hauteur de l’échelle');
-assert.strictEqual(boutonV.padding.split(' ')[0], 'var(--champ-y)', '… un bouton de la même');
+// DEPUIS LE 25/08, LA BOÎTE SE NOMME SUR CET ÉCRAN AUSSI. Il la CALCULAIT
+// encore à partir de son rembourrage — 17 px de texte × 1,375 + 26 de
+// rembourrage + 3 de trait = 52,4 px — quand les deux autres surfaces
+// tombaient à 50. Deux pixels et demi, sur des écrans ouverts à un clic l'un
+// de l'autre. La hauteur ne se déduit plus : elle se lit, au même endroit que
+// partout ailleurs.
+assert.strictEqual(champV.padding.split(' ')[0], '0',
+  'la hauteur d’un champ de la vente ne doit plus rien à son rembourrage vertical');
+assert.strictEqual(boutonV.padding.split(' ')[0], '0', '… celle d’un bouton non plus');
+assert.ok(/input,select\{height:var\(--ctrl-h\)\}/.test(FEUILLES_V),
+  'le champ de la vente prend la boîte nommée de l’application');
+assert.strictEqual(boutonV['min-height'], 'var(--ctrl-h)',
+  '… et le bouton la même : une seule boîte, lue au même endroit');
 assert.strictEqual(champV['border-radius'], 'var(--arrondi-champ)', 'et ils prennent l’arrondi des champs');
 assert.strictEqual(boutonV['border-radius'], 'var(--arrondi-champ)', '… tous les deux');
 // Chrome compose la valeur d'un champ de date dans une boîte interne qui porte

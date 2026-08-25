@@ -169,14 +169,13 @@ const rangee = (cible) => 4 * cible + 3 * ecart + margeDroite;
 assert.ok(largeurCol >= rangee(34),
   `.col-del (${largeurCol}px) doit tenir ${rangee(34)}px de rangée`);
 
-// Au doigt les boutons passent à 44 px (charte tactile) : la colonne suit. Le
-// bloc tactile déclare les deux, l'un après l'autre — c'est celui-là qu'on lit,
-// pas le premier `.col-del` venu.
-assert.ok(/\.open-btn \{ width: 44px; height: 44px; \}/.test(CSS),
-  '« ouvrir » doit lui aussi respecter le plancher tactile de 44 px');
-const tactile = CSS.match(/\.open-btn \{ width: 44px; height: 44px; \}[\s\S]{0,400}?\.col-del \{ width: (\d+)px; \}/);
-assert.ok(tactile && Number(tactile[1]) >= rangee(44),
-  `la largeur tactile de .col-del doit tenir ${rangee(44)}px de rangée`);
+// LE DOUBLE JEU TACTILE A DISPARU LE 25/08. Les boutons passaient à 44 px sous
+// `(pointer: coarse)` et la colonne s'élargissait avec eux ; le projet est PC
+// uniquement depuis le 21/08, ces règles ne servaient plus personne et
+// entretenaient une deuxième échelle de tailles. Ce qui reste vérifié, c'est
+// que la colonne tient la rangée à la SEULE taille qui existe désormais.
+assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
+  'plus de second jeu de tailles tactiles : une seule échelle');
 
 // La marge de droite se pose sur la rangée et PAS sur le <td> : `.grid tbody td`
 // écrit un `padding` raccourci plus spécifique qui écrasait celui de .col-del —

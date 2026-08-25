@@ -89,9 +89,13 @@ assert.ok(/armerUneFois\(btn\)/.test(BOUTON),
 assert.ok(/openLigneDetail\(r\.id\)/.test(BOUTON),
   'sans destination connue, on renvoie sur la fiche plutôt que de deviner');
 
-// Tablette : cinq dossiers se rangent au doigt, l'un après l'autre.
-assert.ok(/@media \(pointer: coarse\) \{\s*\n\s*\.ranger-chip \{ min-height: 44px;/.test(CSS),
-  'le bouton « Ranger » doit faire 44 px au doigt');
+// LE TACTILE A ÉTÉ RETIRÉ LE 25/08. Les Galaxy Tab sont au rebut depuis le
+// 21/08 et le projet est PC uniquement : les sept blocs `@media (pointer:
+// coarse)` ne servaient plus personne, et leurs cibles de 44 px entretenaient
+// une deuxième échelle de tailles à côté de celle de la charte.
+// Ce qui se vérifie maintenant : qu'ils ne reviennent pas.
+assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
+  'plus de règles tactiles : le projet est PC uniquement (voir CLAUDE.md)');
 // La couleur dit un ÉTAT (« pas encore à sa place »), jamais une décoration :
 // elle vient des variables de la charte, pas d'un code écrit en dur.
 const REGLE = CSS.match(/\n\.ranger-chip \{[\s\S]*?\n\}/)[0];

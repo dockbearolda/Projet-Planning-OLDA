@@ -105,7 +105,18 @@
   --scrollbar: #d1d5db;
   --scrollbar-hover: #9ca3af;
 
-  /* mouvement Material */
+  /* LE MOUVEMENT — et la durée dit QUEL GENRE de changement, pas un chiffre
+     choisi au hasard. C'est ce qui manquait : quatorze règles faisaient répondre
+     un survol en 200 ms, la durée d'un panneau qui s'ouvre. Le poste paraissait
+     mou alors que rien n'était lent (une vue se peint en 3 à 9 ms, mesuré).
+
+       --dur-1  RETOUR IMMÉDIAT — fond, trait, couleur, ombre : tout ce qui
+                répond au doigt posé, au survol, au focus. C'est un accusé de
+                réception : au-delà de ~120 ms l'œil le lit comme un délai.
+       --dur-2  UN OBJET QUI ENTRE OU SORT — `transform` et `opacity` : un
+                panneau, une infobulle, un message. Là, 200 ms se voient comme
+                un mouvement, pas comme une attente.
+       --dur-3  les grands déplacements, rares. */
   --ease: cubic-bezier(.2, 0, 0, 1);
   --dur-1: .12s;
   --dur-2: .2s;
@@ -115,8 +126,15 @@
   --tip-bg: #1f2937;
   --tip-fg: #f5f6f8;
 
-  --radius-card: 14px;
-  --radius: 9px;
+  /* 14 px jusqu'au 25/08. L'audit a mesuré TROIS arrondis de carte en service
+     (12 au planning, 14 aux réglages, 16 au comptoir) : c'est celui de l'écran
+     de référence qui l'emporte, et il vaut maintenant pour toute l'application. */
+  --radius-card: 16px;
+  /* 9 px jusqu'au 25/08, mais l'écran de référence du comptoir arrondissait ses
+     champs à 10 : deux formes à un pixel d'écart, sur deux écrans ouverts à un
+     clic l'un de l'autre. C'est celle de la référence qui vaut désormais
+     partout, et le comptoir n'a plus la sienne. */
+  --radius: 10px;
   --row-h: 76px;
   --font: 'Manrope', Arial, Helvetica, sans-serif;
 }
@@ -161,6 +179,23 @@
   --arrondi-champ: var(--radius);        /* 9px — champ, bouton, pastille */
   --arrondi-bloc: 12px;                  /* bloc dans une carte */
   --arrondi-carte: var(--radius-card);   /* 14px — la carte elle-même */
+
+  /* LA BOÎTE UNIQUE DE L'APPLICATION (25/08/2026).
+     Tout ce qui se clique et se remplit fait cette hauteur : champ, zone de
+     texte, liste déroulante, bouton d'action. UNE valeur, à un seul endroit.
+     L'audit du 25/08 en a mesuré TROIS en service — 40 px au CRM, 50 sur
+     l'écran de la demande, 52,4 sur la vente — et le CRM n'était même pas
+     d'accord avec lui-même : son champ faisait 40 et son bouton 44, si bien
+     que sur une rangée où les deux se côtoient l'un dépassait l'autre.
+     50 px est la valeur de l'écran de RÉFÉRENCE, celui que le patron a validé.
+
+     TROIS FORMES, ET LA FORME DIT LE RÔLE :
+       · rectangle arrondi (--arrondi-champ) = ça se remplit ou ça agit ;
+       · rond parfait                        = une icône seule, une initiale ;
+       · pilule (999px)                      = une étiquette, un état, un compteur.
+     Un bouton d'action ne prend donc JAMAIS la pilule : c'était le cas au CRM
+     et pas au comptoir, et rien ne distinguait plus une action d'une étiquette. */
+  --ctrl-h: 50px;
 
   --champ-y: 13px;
   --champ-x: 14px;
@@ -462,17 +497,21 @@
    sur la charte de la maison. Les deux écrans du comptoir ont donc divergé le
    24/08 — c'est à reprendre dès que le patron tranche pour le second. */
 .ecran-comptoir {
-  /* Formes : la carte s'arrondit un peu plus, le champ aussi. */
-  --arrondi-carte: 16px;
-  --arrondi-bloc: 16px;    /* un bloc interne EST une carte, voir point 4 */
-  --arrondi-champ: 10px;
+  /* L'arrondi de carte n'est plus redit ici : il vaut 16 px au `:root` depuis
+     le 25/08, pour toute l'application. Ne restent que les deux formes encore
+     propres à cet écran — un bloc interne y EST une carte, et son champ
+     s'arrondit d'un pixel de plus. */
+  --arrondi-bloc: var(--arrondi-carte);
 
   /* LA BOÎTE DE CE QUI SE CLIQUE ET SE REMPLIT : 50 px, posée une seule fois.
      Champ et bouton la prennent tous les deux — l'un par `height`, l'autre par
      `min-height` (un bouton centre son contenu tout seul). C'est toujours UNE
      boîte : ce qui change le 24/08, c'est qu'elle se nomme au lieu de se
      déduire d'un rembourrage. */
-  --dd-champ-h: 50px;
+  /* La boîte du comptoir N'EN EST PLUS UNE À LUI : elle pointe sur celle de
+     l'application. Le jeton reste pour que les règles de l'écran (et le
+     `--dd-champ-h:auto` local d'une ligne de liste) continuent de le nommer. */
+  --dd-champ-h: var(--ctrl-h);
   --dd-champ-x: 14px;      /* rembourrage horizontal d'un champ */
   --dd-label-gap: 8px;     /* de l'intitulé à son champ */
   --dd-rangee: 20px;       /* d'une rangée de champs à la suivante */

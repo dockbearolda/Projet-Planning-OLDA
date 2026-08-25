@@ -125,7 +125,7 @@ h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);l
 }
 .field{margin-bottom:var(--pas-3)}
 label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
-input,select,textarea{width:100%;padding:var(--champ-y) var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface);color:var(--text-1)}
+input,select,textarea{width:100%;padding:0 var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface);color:var(--text-1)}input,select{height:var(--ctrl-h)}textarea{padding:var(--champ-x);min-height:110px;resize:vertical}
 textarea{min-height:110px;resize:vertical}
 /* UN CHAMP EN ERREUR NE BOUGE PAS D'UN PIXEL. Le trait passait de 1,5 à 2 px :
    le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
@@ -138,7 +138,7 @@ textarea{min-height:110px;resize:vertical}
    qu'un fond rosé, que personne ne remarque à bout de bras. */
 .invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}
 .help{font-size:var(--taille-texte);color:var(--text-2);margin-top:5px}
-button{border:0;border-radius:var(--arrondi-champ);padding:var(--champ-y) var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
+button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padding:0 var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
 .primary{background:var(--primary);color:var(--on-primary)}
 .primary:hover{background:var(--primary-hover)}
 .secondary{background:var(--border-soft);color:var(--text-1)}
@@ -573,9 +573,9 @@ button{font-weight:var(--graisse-forte)}
 /* Le bouton plein et le bouton bordé portent le MÊME trait de 1,5 px, celui
    du plein transparent : sans ça le second était 3 px plus haut, et surtout
    ni l'un ni l'autre ne faisait la hauteur du champ d'à côté. */
-.primary,.secondary,.danger,.whatsapp{padding:var(--champ-y) 22px!important;
+.primary,.secondary,.danger,.whatsapp{padding:0 22px!important;min-height:var(--ctrl-h)!important;
   border:1.5px solid transparent!important;
-  transition:background var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease),
+  transition:background var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease),
              border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform .08s var(--ease)}
 .primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
 .primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
@@ -591,7 +591,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    la boîte. */
 button{line-height:var(--ligne-champ)!important}
 .card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
-input,select,textarea{border:1.5px solid var(--border)!important;padding:var(--champ-y) var(--champ-x)!important;line-height:var(--ligne-champ)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-champ)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 </style>

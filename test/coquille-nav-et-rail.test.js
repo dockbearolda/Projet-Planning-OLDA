@@ -220,12 +220,18 @@ for (const [nom, feuille] of [['styles.css', CSS], ['clients.css', CLIENTS], ['p
   assert.deepStrictEqual(hors, [],
     `${nom} : toute taille en dur doit être une taille d’icône (16/20/24/40), trouvé ${hors}`);
 }
-// Le TEXTE ne connaît que deux tailles — et `--taille-grand` est réservée aux
-// chiffres qu'on annonce, jamais à un intitulé.
+// LE TEXTE NE CONNAÎT QUE TROIS TAILLES, chacune avec un seul métier :
+//   --taille-texte  ce qui se lit et ce qui se saisit ;
+//   --taille-note   une ANNOTATION secondaire, et rien d'autre ;
+//   --taille-grand  les chiffres qu'on annonce, jamais un intitulé.
+// « --taille-note » est entrée le 25/08 avec les pastilles « À voir » et leur
+// motif : ils écrivaient en 16 px, la dernière taille de vrai texte à traîner
+// hors de l'échelle. Le point qui compte n'a pas changé — la liste est CLOSE,
+// et une quatrième taille fait tomber le test.
 const employees = new Set();
 for (const d of sansCommentaire(CSS).matchAll(/font-size:\s*var\((--taille-[\w-]+)\)/g)) employees.add(d[1]);
-assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-texte'],
-  'deux tailles de texte sur tout l’outil, pas une de plus');
+assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-note', '--taille-texte'],
+  'trois tailles de texte sur tout l’outil, pas une de plus');
 
 // LA HIÉRARCHIE SE DIT À LA GRAISSE : sans ça, un titre et son paragraphe se
 // lisent pareil — c'est ce qui est arrivé en ramenant tout sur une taille.

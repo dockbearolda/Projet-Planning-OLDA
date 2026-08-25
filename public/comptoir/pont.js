@@ -1214,8 +1214,13 @@
    prend l'échelle et les couleurs de sa page, thème sombre compris. Elles
    restent parce qu'un fichier de style qui ne se charge pas ne doit pas rendre
    un écran illisible. Les 3 px du calcul sont les deux traits de 1,5. */
-.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:var(--champ-y,13px) var(--champ-x,14px);
-  min-height:calc(var(--ligne-champ,1.375) * 1em + var(--champ-y,13px) * 2 + 3px);
+/* LA BOÎTE SE LIT, ELLE NE SE CALCULE PLUS (25/08). Ce déclencheur déduisait
+   sa hauteur d'un rembourrage et d'un interligne — trois termes à garder
+   d'accord avec ceux du champ d'à côté, et ils avaient fini par diverger de
+   2,4 px. Il prend maintenant la boîte nommée de l'application, comme le
+   champ, le bouton et la zone de texte. */
+.menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:0 var(--champ-x,14px);
+  min-height:var(--ctrl-h,50px);
   border:1.5px solid var(--border,#d7dce3);border-radius:var(--arrondi-champ,10px);background:var(--surface,#fff);cursor:pointer;text-align:left;
   font:inherit;font-size:var(--taille-texte,15px);line-height:var(--ligne-champ,1.375);color:var(--text-1,#1f1f1f);transition:border-color var(--dur-1,.12s) var(--ease,ease),box-shadow var(--dur-1,.12s) var(--ease,ease)}
 /* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la

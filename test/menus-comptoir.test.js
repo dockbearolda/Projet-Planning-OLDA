@@ -459,8 +459,16 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
 // 5 px plus court que l'<input> d'à côté, avec un trait plus fin (1 px contre
 // 1,5), plus sombre (#bcc2c8 contre #d7dce3) et moins arrondi (9 px contre 10).
 const declencheur = reglesDe(PONT, '.menu-declencheur');
-assert.ok(/^calc\(/.test(declencheur['min-height']),
-  'la hauteur du déclencheur reste CALCULÉE — jamais un nombre en dur');
+// ELLE ÉTAIT CALCULÉE, ELLE EST MAINTENANT LUE (25/08). Le calcul
+// « interligne + 2 × rembourrage + 3 » tenait tant que ses trois termes
+// restaient d'accord avec ceux du champ voisin — et ils avaient fini par
+// diverger de 2,4 px. Le déclencheur prend désormais la boîte NOMMÉE de
+// l'application, exactement comme le champ, le bouton et la zone de texte :
+// il n'y a plus qu'un seul endroit où cette hauteur existe.
+assert.strictEqual(declencheur['min-height'], 'var(--ctrl-h,50px)',
+  'le déclencheur prend la boîte nommée, pas une hauteur à lui');
+assert.ok(/--ctrl-h:\s*\d+px/.test(fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8')),
+  '… et cette boîte est déclarée une seule fois, dans la charte');
 // EN RAPPORT ET NON EN « normal » : Chrome ne calcule pas la boîte d'un <input>
 // comme celle d'un <div>, « normal » les laissait à 22 px contre 20,5. Un
 // rapport suit la taille du texte et ne dépend pas de la police chargée — sur
@@ -477,15 +485,15 @@ const regleChampHauteur = (src) => reglesDe(src, 'input,select').height || '';
   // La même valeur des deux côtés, quelle que soit la façon de l'écrire : le
   // déclencheur d'une liste est un <div>, il ÉCHAPPE au
   // « input,select,textarea{…!important} » que les deux écrans imposent.
-  // DEPUIS LE 24/08, demande-devis.html a sa densité (boîte NOMMÉE de 44 px,
-  // `--dd-champ-h`) : c'est la PAGE qui raccorde le déclencheur à sa boîte,
-  // par une règle à elle — pont.js garde son calcul pour l'autre écran.
+  //
+  // LES DEUX ÉCRANS LISENT LA MÊME BOÎTE DEPUIS LE 25/08. Il y avait deux
+  // modèles jusque-là : une hauteur NOMMÉE sur l'écran de la demande, et un
+  // CALCUL (interligne + 2 × rembourrage + 3) sur la vente et dans pont.js.
+  // Deux façons d'obtenir la même chose, donc deux façons de diverger — et
+  // elles avaient divergé de 2,4 px. L'égalité est maintenant structurelle :
+  // champ, bouton et déclencheur pointent tous sur `--ctrl-h`.
   const surcharge = nom === 'demande-devis' ? reglesDe(src, '.menu>.menu-declencheur') : {};
   const decl = Object.assign({}, declencheur, surcharge);
-  if (nom === 'demande-devis') {
-    assert.strictEqual(surcharge['min-height'], 'var(--dd-champ-h)',
-      `${nom} : le déclencheur d'une liste prend la boîte nommée de la page`);
-  }
   ['padding', 'font-size', 'line-height', 'border-radius'].forEach((cle) => {
     assert.strictEqual(lire(decl, cle), lire(champ, cle),
       `${nom} : « ${cle} » — le déclencheur d'une liste et le champ d'à côté`);
@@ -494,19 +502,13 @@ const regleChampHauteur = (src) => reglesDe(src, 'input,select').height || '';
     `${nom} : … et le même trait`);
   assert.ok(/^1\.5px solid /.test(lire(champ, 'border')),
     `${nom} : … un trait de 1,5 px, celui de la charte`);
-  // Et la hauteur qui en sort est la MÊME : c'est tout l'objet. Sur l'écran à
-  // boîte nommée, champ et déclencheur LISENT LE MÊME JETON — l'égalité est
-  // structurelle. Sur l'autre, elle se calcule comme avant.
-  if (nom === 'demande-devis') {
-    assert.strictEqual(regleChampHauteur(src), 'var(--dd-champ-h)',
-      `${nom} : le champ lit sa hauteur au même endroit que le déclencheur`);
-  } else {
-    const taille = parseFloat(lire(champ, 'font-size'));
-    const remplissage = parseFloat(lire(champ, 'padding'));
-    const attendue = 2 * remplissage + parseFloat(lire(champ, 'line-height')) * taille + 3;
-    assert.strictEqual(pixels(lire(decl, 'min-height'), taille), Math.round(attendue * 100) / 100,
-      `${nom} : le déclencheur et le champ font exactement la même hauteur`);
-  }
+  // La hauteur : le champ la LIT, et elle remonte jusqu'à `--ctrl-h`.
+  const hauteurChamp = regleChampHauteur(src);
+  assert.ok(/^var\(--(ctrl-h|dd-champ-h)\)$/.test(hauteurChamp),
+    `${nom} : le champ lit la boîte nommée (trouvé « ${hauteurChamp} »)`);
+  const hauteurDecl = (decl['min-height'] || '').replace(/,\s*\d+px\)/, ')');
+  assert.ok(/^var\(--(ctrl-h|dd-champ-h)\)$/.test(hauteurDecl),
+    `${nom} : le déclencheur lit la même (trouvé « ${decl['min-height']} »)`);
   // Un bouton plein et un bouton bordé sur la même rangée : le trait du second
   // ajoutait 3 px. Le plein porte le même trait, en transparent.
   assert.ok(/\.primary,[^{]*\.whatsapp\{[^}]*border:1\.5px solid transparent!important/.test(src),

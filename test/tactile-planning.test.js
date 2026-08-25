@@ -229,16 +229,18 @@ function bloc(css, condition, aiguille) {
 // ---------------------------------------------------------------------------
 {
   // `dupliquer` / `supprimer` / `envoyer vers Fiverr` naissent invisibles et ne
-  // se révèlent qu'au survol de la ligne ; le bloc tactile les force déjà en
-  // `opacity: 1 !important`. Une seconde règle plus bas dans la feuille (sans
-  // `!important`) serait MORTE, et donnerait à croire le problème traité.
-  const tactile = bloc(CSS, '(pointer: coarse)', '.dup-btn');
-  assert.match(tactile, /\.dup-btn\s*\{\s*opacity:\s*1\s*!important/,
-    'la révélation au doigt de ces boutons vit dans le bloc tactile, avec !important');
-  const regle = '.dup-btn { opacity: 1 !important';
-  const apres = CSS.slice(CSS.indexOf('}', CSS.indexOf(regle)) + 1);
-  assert.ok(!/\.(send|del|dup)-btn[^{]*\{[^}]*opacity:\s*\.?\d/.test(apres),
-    'aucune règle d’opacité plus bas : elle serait perdue face au !important au-dessus');
+  // se révèlent qu'au survol de leur ligne. Le bloc tactile les forçait visibles
+  // au doigt ; il a été retiré le 25/08 (projet PC uniquement depuis le 21/08).
+  // RESTE DONC UNE SEULE AUTRE PORTE : le clavier. Sans elle, trois actions
+  // deviennent inatteignables pour qui tabule — et « supprimer » en fait partie.
+  assert.ok(!/@media \(pointer: coarse\)/.test(CSS),
+    'les règles tactiles ne doivent pas revenir : le poste est un PC');
+  assert.match(CSS,
+    /\.send-btn:focus-visible,\s*\.del-btn:focus-visible,\s*\.dup-btn:focus-visible \{[^}]*opacity:\s*1/,
+    'le clavier révèle ces boutons : c’est la seule autre porte que le survol');
+  assert.match(CSS,
+    /\.send-btn:focus-visible,\s*\.del-btn:focus-visible,\s*\.dup-btn:focus-visible \{[^}]*pointer-events:\s*auto/,
+    '… et ils redeviennent cliquables avec, pas seulement visibles');
 }
 
 // ---------------------------------------------------------------------------
