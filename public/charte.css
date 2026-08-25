@@ -179,8 +179,14 @@
      83 px (« Marquage » contre « Production ») — 11 px d'écart sur le nom,
      21 px sur les valeurs, entre deux articles empilés.
      Chaque jeton est calé sur la plus longue valeur qu'on y écrive :
-     « 9999× » pour la quantité, « Production » pour l'intitulé. */
-  --need-qte: 58px;
+     « 9999× » pour la quantité, « Production » pour l'intitulé.
+     LA QUANTITÉ N'EST PLUS UNE BULLE (24/08/2026) : elle avait un fond gris et
+     six pixels de rembourrage, soit 58 px de rail pour deux caractères, dans
+     un panneau où la ligne fait 286 px. Un cinquième de la ligne partait en
+     boîte, et le nom de l'article — ce qu'on lit vraiment — se repliait sur
+     deux lignes. Le rail ne mesure donc plus que le texte : « 9999× » fait
+     44,9 px, mesuré à la graisse forte. */
+  --need-qte: 46px;
   --need-cle: 86px;
 
   /* LES ÉCARTS. Quatre pas, pas davantage. L'écran du comptoir en comptait

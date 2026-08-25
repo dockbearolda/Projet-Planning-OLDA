@@ -109,7 +109,30 @@ assert.ok(/<select id="clientSelect"/.test(DEVIS), 'le client est un <select>');
 assert.ok(/<select id="clientSelect"[\s\S]{0,240}?data-menu-recherche/.test(DEVIS),
   '… avec la recherche DANS le panneau : 79 fiches ne se parcourent pas des yeux');
 assert.ok(/<select id="clientSelect"[\s\S]{0,240}?data-menu-manuel-non/.test(DEVIS),
-  '… et sans saisie libre : un client vient de la base, ou du bouton d’à côté');
+  '… et sans saisie libre : un client a un téléphone et un secteur, pas juste un nom');
+
+// LE RACCOURCI DE CRÉATION VIT DANS LE PANNEAU, PAS À CÔTÉ (24/08/2026).
+// C'était un bouton SOUS le champ : on ouvrait la liste, on cherchait, on ne
+// trouvait pas, on refermait — et c'est seulement là qu'on voyait le bouton.
+// `data-menu-action` le pose en PREMIÈRE ligne du panneau, où toutes les
+// autres listes posent leur « + Ajouter » ; le clic ferme le menu et laisse
+// un évènement `menu-action` que la page écoute.
+assert.ok(/<select id="clientSelect"[\s\S]{0,400}?data-menu-action="Créer un nouveau client"/.test(DEVIS),
+  'la liste des clients porte son raccourci de création');
+assert.ok(/\$\('clientSelect'\)\.addEventListener\('menu-action',showNewClientForm\)/.test(DEVIS),
+  '… et c’est la page qui décide de ce qui s’ouvre : le menu n’en sait rien');
+assert.ok(!/onclick="showNewClientForm\(\)"/.test(DEVIS),
+  'le bouton d’à côté n’existe plus : un seul chemin vers la création');
+assert.ok(/const motAction=hote\.dataset\.menuAction;/.test(PONT),
+  'pont.js sait poser une action qui n’est pas une valeur');
+assert.ok(/if\(action\)panneau\.append\(action\);\n  if\(avecManuel\)panneau\.append\(manuel,saisie\);/.test(PONT),
+  '… en tête du panneau, au-dessus du filtre — jamais dans la liste');
+assert.ok(/dispatchEvent\(new CustomEvent\('menu-action',\{bubbles:true\}\)\)/.test(PONT),
+  '… et le clic dit « menu-action », il ne choisit AUCUNE valeur');
+// AU CLAVIER AUSSI : Tab s'arrête sur l'action avant de refermer le panneau.
+// Un raccourci qu'on ne peut pas atteindre au clavier n'existe pas.
+assert.ok(/if\(etat\.action&&document\.activeElement!==etat\.action\)\{\n      ev\.preventDefault\(\);etat\.action\.focus\(\);return;/.test(PONT),
+  'la tabulation entre dans le panneau : premier arrêt, l’action');
 
 // L'ancienne mécanique — un champ de recherche maison doublé d'une pile de
 // cartes cliquables — n'existait QUE sur cette étape.

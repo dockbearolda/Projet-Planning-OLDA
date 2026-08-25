@@ -142,7 +142,13 @@ b,strong{font-weight:var(--graisse-forte)}
    un endroit. Le nom, le détail et le prix tombent maintenant sur la même
    verticale, quelle que soit la quantité. */
 .need-ligne{display:grid;grid-template-columns:var(--need-qte) minmax(0,1fr);gap:var(--pas-2);align-items:center;padding:var(--pas-2) var(--pas-3);border:1px solid var(--border);border-radius:var(--arrondi-bloc);margin-bottom:8px;background:var(--surface)}
-.need-qte{padding:6px;border-radius:var(--arrondi-champ);background:var(--border-soft);font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:center}
+/* ELLE SE LIT, ELLE NE SE CLIQUE PAS. Le fond gris et l'arrondi de champ en
+   faisaient le sosie exact d'une liste déroulante — sur un écran où tout le
+   reste de cette forme se clique, une pastille inerte fait hésiter. Reste le
+   nombre, à l'encre et en gras, collé à droite contre son rail : « 3× » et le
+   nom se lisent d'un trait, comme on les dit à voix haute. Chiffres à chasse
+   fixe, sinon « 11× » et « 33× » ne finissent pas au même endroit. */
+.need-qte{font-size:var(--taille-texte);font-weight:var(--graisse-forte);text-align:right;font-variant-numeric:tabular-nums}
 .need-txt{min-width:0}
 .need-nom{font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
 /* LES ACTIONS FERMENT LEUR RANGÉE, tout à droite, poussées par une MARGE
@@ -916,14 +922,37 @@ h2{letter-spacing:-.01em}
       <div class="ref ref-display">—</div>
     </div>
 
-    <div class="bloc"><div class="field">
-      <label>État des informations du client *</label>
-      <select id="controlStatus" data-menu-manuel-non onchange="toggleControlStatus(); updateControl()">
-        <option value="" selected disabled hidden>Sélectionner une option</option>
-        <option value="received">Informations reçues</option>
-        <option value="partial">Informations reçues partiellement</option>
-        <option value="waiting">En attente d’informations</option>
-      </select>
+    <!-- DEUX CHAMPS PAR LIGNE, ET AUCUN QUI RESTE SEUL SUR LA SIENNE.
+         « État des informations » et « Reprise de vectorisation » prenaient
+         chacun une ligne entière pour une liste de trois mots, entre deux
+         rangées qui en portaient deux : l'œil redescendait en zigzag au lieu
+         de suivre deux colonnes.
+         ET LES PAIRES DISENT QUELQUE CHOSE : l'état des informations avec le
+         chemin par lequel elles sont arrivées, le logo avec son statut, la
+         vectorisation avec la maquette. « Informations transmises par »
+         disparaît quand on est EN ATTENTE (`#receivedViaField`) : sa moitié de
+         rangée reste vide, et l'état ne se déplace pas sous les yeux. -->
+    <div class="bloc"><div class="grid">
+      <div class="field">
+        <label>État des informations du client *</label>
+        <select id="controlStatus" data-menu-manuel-non onchange="toggleControlStatus(); updateControl()">
+          <option value="" selected disabled hidden>Sélectionner une option</option>
+          <option value="received">Informations reçues</option>
+          <option value="partial">Informations reçues partiellement</option>
+          <option value="waiting">En attente d’informations</option>
+        </select>
+      </div>
+
+      <div class="field" id="receivedViaField">
+        <label>Informations transmises par</label>
+        <select id="informationReceivedVia" onchange="toggleNewTransmissionMethod('informationReceivedVia','newInformationReceivedVia'); updateControl()">
+          <option value="" selected disabled hidden>Sélectionner une option</option>
+          <option>WhatsApp</option>
+          <option>Email</option>
+          <option value="__new__">+ Créer un nouveau</option>
+        </select>
+        <input id="newInformationReceivedVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
+      </div>
     </div>
 
     <div class="grid">
@@ -948,16 +977,16 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div class="field">
-      <label>Reprise de vectorisation</label>
-      <select id="vectorizationStatus" onchange="updateControl()">
-        <option selected>Pas de besoin</option>
-        <option>À chiffrer</option>
-        <option>À faire</option>
-      </select>
-    </div>
-
     <div class="grid">
+      <div class="field">
+        <label>Reprise de vectorisation</label>
+        <select id="vectorizationStatus" onchange="updateControl()">
+          <option selected>Pas de besoin</option>
+          <option>À chiffrer</option>
+          <option>À faire</option>
+        </select>
+      </div>
+
       <div class="field">
         <label>Maquette / fichier numérique</label>
         <select id="oldaMockupStatus" onchange="updateControl()">
@@ -967,17 +996,6 @@ h2{letter-spacing:-.01em}
           <option>En cours</option>
           <option>Terminée</option>
         </select>
-      </div>
-
-      <div class="field" id="receivedViaField">
-        <label>Informations transmises par</label>
-        <select id="informationReceivedVia" onchange="toggleNewTransmissionMethod('informationReceivedVia','newInformationReceivedVia'); updateControl()">
-          <option value="" selected disabled hidden>Sélectionner une option</option>
-          <option>WhatsApp</option>
-          <option>Email</option>
-          <option value="__new__">+ Créer un nouveau</option>
-        </select>
-        <input id="newInformationReceivedVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
       </div>
     </div>
 
@@ -1001,14 +1019,19 @@ h2{letter-spacing:-.01em}
       </div>
     </div>
 
-    <div class="bloc"><div class="field">
-      <label>Éléments reçus du client</label>
-      <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
-    </div>
+    <!-- Les deux zones de texte aussi : côte à côte, ce qu'on a reçu et ce
+         qu'il reste à contrôler se comparent d'un regard. Empilées, la
+         seconde tombait sous la ligne de flottaison. -->
+    <div class="bloc"><div class="grid">
+      <div class="field">
+        <label>Éléments reçus du client</label>
+        <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
+      </div>
 
-    <div class="field">
-      <label>Points à contrôler ou à compléter</label>
-      <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
+      <div class="field">
+        <label>Points à contrôler ou à compléter</label>
+        <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
+      </div>
     </div>
 
     </div>
@@ -1031,17 +1054,20 @@ h2{letter-spacing:-.01em}
       <!-- MÊME COMPOSANT QUE LA RÉFÉRENCE DES BESOINS (`#txRef`) : une liste
            déroulante à chevron, avec sa recherche DANS le panneau. Le comptoir
            ne connaît plus qu'une seule façon de choisir dans une liste.
-           `data-menu-manuel-non` : on ne tape pas un client à la main ici — il
-           vient de la base, ou il s'y ajoute par le bouton d'à côté. -->
+           `data-menu-manuel-non` : on ne tape pas un client à la main ici — un
+           client a un téléphone, un e-mail, un secteur ; il vient de la base,
+           ou il s'y crée par le formulaire.
+           `data-menu-action` POSE CE RACCOURCI DANS LE PANNEAU, en tête, là où
+           toutes les autres listes du comptoir posent leur « + Ajouter ». La
+           page écoute l'évènement `menu-action` sur ce <select>. -->
       <select id="clientSelect" data-menu-manuel-non data-menu-recherche
+              data-menu-action="Créer un nouveau client"
               data-menu-filtre="Filtrer : nom, téléphone, e-mail…"
               onchange="selectExistingClient(this.value)">
         <option value="">Chargement de la base clients…</option>
       </select>
     </div>
 
-    </div><div class="actions" style="margin-top:12px">
-      <button type="button" class="secondary" onclick="showNewClientForm()">+ Créer un nouveau client</button>
     </div>
 
     <div id="newClientForm" class="notice hidden" style="margin-top:16px">
@@ -3089,6 +3115,13 @@ function renderSelectedClient(){
 
 function showNewClientForm(){$('newClientForm').classList.remove('hidden');$('newClientName').focus()}
 function hideNewClientForm(){$('newClientForm').classList.add('hidden')}
+/* CRÉER UN CLIENT SE FAIT DEPUIS LA LISTE, PAS À CÔTÉ D'ELLE. Le raccourci
+   était un bouton SOUS le champ : on ouvrait la liste, on cherchait son
+   client, on ne le trouvait pas, on refermait la liste — et c'est seulement
+   là qu'on voyait le bouton. La liste s'ouvrant toute seule en arrivant sur
+   l'étape (voir showStep), « + Créer un nouveau client » est maintenant le
+   premier mot du panneau, au-dessus du filtre. */
+$('clientSelect').addEventListener('menu-action',showNewClientForm);
 
 function createAndSelectClient(){clearStep5Validation();
   if(!$('newClientType').value)return fail('newClientType','Choisis le type de client.');

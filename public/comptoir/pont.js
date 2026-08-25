@@ -1490,6 +1490,28 @@ function menuPoser(hote){
   mot.textContent=motManuel;
   manuel.append(plus,mot);
 
+  /* UNE LISTE PEUT PORTER UNE ACTION QUI N'EST PAS UNE VALEUR. « + Ajouter »
+     range ce qu'on tape DANS la liste ; « + Créer un nouveau client » ne le
+     peut pas — un client, c'est un nom, un téléphone, un e-mail, un secteur,
+     donc un formulaire. Le raccourci se lit pourtant au même endroit et de la
+     même façon : `data-menu-action="<le mot>"` pose la ligne, le clic ferme le
+     menu et laisse un évènement `menu-action` sur le <select>. La page décide
+     de ce qui s'ouvre ; le menu, lui, n'en sait rien. */
+  const motAction=hote.dataset.menuAction;
+  let action=null;
+  if(motAction){
+    action=document.createElement('button');
+    action.type='button';
+    action.className='menu-manuel';
+    const plusAction=document.createElement('span');
+    plusAction.className='menu-plus';
+    plusAction.setAttribute('aria-hidden','true');
+    plusAction.textContent='+';
+    const motAct=document.createElement('span');
+    motAct.textContent=motAction;
+    action.append(plusAction,motAct);
+  }
+
   const saisie=document.createElement('div');
   saisie.className='menu-saisie';
   const champLibre=document.createElement('input');
@@ -1504,12 +1526,13 @@ function menuPoser(hote){
      « + Ajouter » puis la liste, et rien d'autre. La mention qui expliquait
      qu'on pouvait écrire dans le champ est partie avec — un deuxième message
      au même endroit, formulé autrement, c'est déjà une hésitation. */
+  if(action)panneau.append(action);
   if(avecManuel)panneau.append(manuel,saisie);
   panneau.append(tete,liste);
   peau.append(panneau);
 
   const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,
-    avecManuel,manuel,saisie,champLibre,vus:[],vise:-1,ouvert:false,filtrer:false};
+    avecManuel,manuel,saisie,champLibre,action,vus:[],vise:-1,ouvert:false,filtrer:false};
   menus.set(hote,etat);
 
   declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
@@ -1531,6 +1554,17 @@ function menuPoser(hote){
     const li=ev.target.closest('[data-valeur]');
     if(li)menuChoisir(etat,li.dataset.valeur);
   });
+  if(action){
+    action.addEventListener('click',()=>{
+      menuFermer(etat,false);
+      hote.dispatchEvent(new CustomEvent('menu-action',{bubbles:true}));
+    });
+    /* Échap depuis le bouton referme le menu et rend le focus au champ, comme
+       depuis la liste : une fois entré au clavier, on doit pouvoir ressortir. */
+    action.addEventListener('keydown',ev=>{
+      if(ev.key==='Escape'){ev.preventDefault();menuFermer(etat,true)}
+    });
+  }
   manuel.addEventListener('click',()=>menuManuelOuvrir(etat));
   valider.addEventListener('click',()=>menuManuelValider(etat));
   champLibre.addEventListener('keydown',ev=>{
@@ -1707,7 +1741,18 @@ function menuTouche(etat,ev){
     else if(etat.libre)menuFermer(etat,false);
   }
   else if(ev.key==='Escape'){ev.preventDefault();menuFermer(etat,true)}
-  else if(ev.key==='Tab')menuFermer(etat,false);
+  /* LA TABULATION ENTRE DANS LE PANNEAU AVANT D'EN SORTIR. Un menu qui porte
+     une action (« + Créer un nouveau client ») la rendait inatteignable au
+     clavier : Tab refermait le panneau, et le bouton partait avec. Elle est le
+     premier arrêt ; le Tab suivant, lui, referme comme avant. Sur un poste où
+     la souris n'est pas la seule main, un raccourci qu'on ne peut pas
+     atteindre n'existe pas. */
+  else if(ev.key==='Tab'){
+    if(etat.action&&document.activeElement!==etat.action){
+      ev.preventDefault();etat.action.focus();return;
+    }
+    menuFermer(etat,false);
+  }
 }
 
 /* Un seul geste pour la vendeuse, deux chemins derrière :
