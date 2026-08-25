@@ -426,27 +426,24 @@ export function createDashboard(deps) {
   }
 
   // --- Header (construit une fois, mis à jour par refs) --------------------
-  let $head, $tabs, $date;
+  let $head, $tabs;
 
-  // Date du jour en clair. L'horloge du POSTE fait foi : les postes sont
-  // physiquement à Saint-Martin, c'est bien leur jour civil qu'on affiche
-  // (la règle `America/Marigot` vise les dates calculées côté serveur, en UTC).
-  function libelleDuJour() {
-    const s = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-
+  // L'EN-TÊTE TIENT SUR UNE SEULE RANGÉE : les onglets à gauche, les deux
+  // réglages du patron à droite.
+  //
+  // Le titre « Point du jour » et sa date ont été retirés le 25/08. L'onglet
+  // actif dans la barre du haut dit déjà sur quel écran on est, et la date du
+  // jour, celui qui la lit la connaît. Une ligne qui répète ce qu'on sait
+  // déjà, c'est une ligne de travail en moins à l'écran.
   function buildHead() {
     $head = el('header', 'pj-head');
 
     const row = el('div', 'pj-head-row');
 
-    // Titre + date : un écran lu chaque matin doit dire de quel matin il parle.
-    const title = el('div', 'pj-title');
-    title.appendChild(el('h1', 'pj-title-h', 'Point du jour'));
-    $date = el('p', 'pj-title-d', libelleDuJour());
-    title.appendChild($date);
-    row.appendChild(title);
+    // Onglets : Équipe, puis les quatre prénoms dans l'ordre.
+    $tabs = el('nav', 'pj-tabs');
+    $tabs.setAttribute('aria-label', 'Vue du point du jour');
+    row.appendChild($tabs);
 
     // Machines (réglages du patron : importance + durée de fabrication).
     const mach = el('button', 'pj-tool pj-tool--icon');
@@ -466,11 +463,6 @@ export function createDashboard(deps) {
 
     $head.appendChild(row);
 
-    // Onglets : moi · tout l'atelier · les autres · Équipe.
-    $tabs = el('nav', 'pj-tabs');
-    $tabs.setAttribute('aria-label', 'Vue du point du jour');
-    $head.appendChild($tabs);
-
     return $head;
   }
 
@@ -481,8 +473,6 @@ export function createDashboard(deps) {
   }
 
   function renderHead() {
-    $date.textContent = libelleDuJour();
-
     // La personne au poste ne décide plus de l'onglet OUVERT — l'écran s'ouvre
     // sur l'équipe — mais elle décide de celui qui porte la marque.
     const qui = moi();
