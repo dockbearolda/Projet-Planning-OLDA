@@ -231,6 +231,20 @@ b,strong{font-weight:var(--graisse-forte)}
      n'appelait le générateur, donc plus personne ne chargeait jsPDF. Les deux
      sont partis ensemble — voir le commentaire là où vivait le générateur. -->
 <style>
+/* LES `!important` DE CET ÉCRAN NE SONT PAS DÉCORATIFS — MESURÉ LE 25/08/2026.
+   Un audit les donnait pour « une centaine qui ne battent plus rien, la
+   spécificité suffit déjà ». L'expérience dit autre chose. Sur cet écran :
+     · 530 déclarations `!important` (en propriétés dépliées) ;
+     · les retirer TOUTES d'un coup déplace 114 des 154 éléments visibles ;
+     · en retirer UNE SEULE à la fois n'en déplace que 17 — parce que
+       plusieurs se battent sur la même propriété : ôter la première laisse
+       gagner la suivante, qui est `!important` elle aussi ;
+     · 416 ne visent aucun élément rendu à cette étape-ci du parcours : on ne
+       peut RIEN en dire depuis cet état de l'écran.
+   Autrement dit, le compte « une centaine d'inutiles » est à peu près juste
+   (97 mesurés retirables un par un ici) mais le raisonnement ne l'est pas :
+   ils s'appuient les uns sur les autres. On n'y touche pas sans rejouer la
+   mesure sur les SEPT étapes, et l'écran tourne chez le patron. */
 body{font-family:'Manrope',Arial,sans-serif!important}
 /* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
    Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
