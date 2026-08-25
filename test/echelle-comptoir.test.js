@@ -519,25 +519,31 @@ assert.ok(/caches\.match\(req, \{ ignoreSearch: true \}\)/.test(SW),
   '… et le ressort quelle que soit la query');
 
 // ===========================================================================
-// 11. LE MODULE PDF EST CHEZ NOUS
+// 11. RIEN NE VIENT D'AILLEURS, ET LE TICKET S'IMPRIME
 // ---------------------------------------------------------------------------
-// Il venait de cdnjs.cloudflare.com, avec jsdelivr et unpkg en secours : trois
-// domaines tiers pour un écran qui doit s'ouvrir sans dépendre de personne — et
-// aucune chance que « Télécharger le PDF » fonctionne hors ligne.
+// Le module PDF venait de cdnjs.cloudflare.com, avec jsdelivr et unpkg en
+// secours : trois domaines tiers pour un écran qui doit s'ouvrir sans dépendre
+// de personne. Il avait été rapatrié chez nous — puis le ticket est devenu une
+// feuille de papier (PR #142/#143) et le bouton « PDF » est passé par
+// l'impression du navigateur. Plus personne n'appelait le générateur ; les 106
+// lignes et les 364 Ko sont partis ensemble le 25/08.
+// Ce que cette garde tient : la règle du zéro-tiers, qui elle ne bouge pas.
 // ===========================================================================
 assert.ok(!/(?:src|href)\s*=\s*["']https?:\/\//.test(DEVIS.replace(/<!--[\s\S]*?-->/g, '')),
   'plus une seule adresse d’un autre domaine dans l’écran de devis');
 [/cdnjs\.cloudflare\.com/, /cdn\.jsdelivr\.net/, /unpkg\.com/].forEach((rx) =>
   assert.ok(!rx.test(DEVIS.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')),
     `${rx.source} ne sert plus rien à cet écran`));
-assert.ok(fs.existsSync(path.join(RACINE, 'public/jspdf.umd.min.js')),
-  'le module PDF est servi par nous');
-assert.ok(/loadScriptOnce\(new URL\('\.\.\/jspdf\.umd\.min\.js',location\.href\)\.href\)/.test(DEVIS),
-  '… et chargé depuis notre origine, au premier clic seulement');
-assert.ok(!/<script[^>]+jspdf/.test(DEVIS),
-  '… pas posé en balise : 364 Ko qu’on ne paie plus à chaque ouverture du comptoir');
-assert.ok(/'\/jspdf\.umd\.min\.js'/.test(SW),
-  '… et dans la coquille, sinon hors ligne le bouton ne peut par construction rien faire');
+const CODE_DEVIS = DEVIS.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+assert.ok(!/jspdf/i.test(CODE_DEVIS),
+  'plus une ligne de code qui parle de jsPDF : le ticket s’imprime');
+assert.ok(!fs.existsSync(path.join(RACINE, 'public/jspdf.umd.min.js')),
+  '… et la bibliothèque de 364 Ko ne dort plus dans public/');
+assert.ok(!/jspdf/i.test(SW),
+  '… ni dans la coquille hors ligne, où elle coûtait 364 Ko par installation');
+// Le chemin qui RESTE : « PDF » passe par l'impression du navigateur.
+assert.ok(/window\.exportRecapPDF=function\(\)\{[\s\S]{0,160}?printRecapTicket\(\)/.test(DEVIS),
+  'le bouton « PDF » imprime — c’est le navigateur qui fabrique le fichier');
 assert.ok(/'\/comptoir\/textile-catalog\.js'/.test(SW),
   'le catalogue textile aussi : sans lui, hors ligne, tout le chiffrage tombe sans un mot');
 

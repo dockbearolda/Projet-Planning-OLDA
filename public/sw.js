@@ -81,11 +81,9 @@ const COQUILLE = [
   // absent de la coquille, hors ligne `window.TextileEngine` n'existe pas et
   // tout le chiffrage textile tombe — sans la moindre erreur à l'écran.
   '/comptoir/textile-catalog.js',
-  // Le module PDF. Il venait de cdnjs (avec jsdelivr et unpkg en secours) :
-  // hors ligne, « Télécharger le PDF » ne pouvait par construction pas
-  // fonctionner. Il n'est chargé qu'au clic sur le bouton — la coquille est
-  // justement ce qui rend ce chargement-là possible sans réseau.
-  '/jspdf.umd.min.js',
+  // (Le module PDF a quitté la coquille le 25/08 : plus personne ne l'appelait
+  //  depuis que le ticket s'imprime, et il coûtait 364 Ko à chaque
+  //  installation pour du code que rien n'exécutait.)
   '/olda-logo.svg',
   // La police d'icônes : sans elle, toute la barre de navigation se réduit à la
   // première lettre de chaque icône.

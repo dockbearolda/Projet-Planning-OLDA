@@ -219,17 +219,17 @@ b,strong{font-weight:var(--graisse-forte)}
 
 
 </style>
-<!-- LE MODULE PDF EST CHEZ NOUS, ET IL NE SE CHARGE QU'AU MOMENT DU CLIC.
+<!-- PLUS AUCUN MODULE PDF (25/08/2026).
      Il venait de cdnjs.cloudflare.com, avec jsdelivr et unpkg en secours :
      trois domaines tiers pour un écran qui doit s'ouvrir sans dépendre de
      personne. Chez le fournisseur d'accès de Saint-Martin, un jour où cdnjs
      ne répondait pas, « Télécharger le PDF » se contentait de tourner puis
      d'échouer — la vendeuse n'avait plus que « Imprimer ».
-     Il n'est PLUS posé ici en `defer` : 364 Ko téléchargés à chaque ouverture
-     du comptoir pour un bouton qu'on ne touche qu'en fin de dossier, et pas
-     toujours. `ensureJsPDF()` va le chercher au premier clic, sur notre
-     origine ; le service worker l'a déjà mis de côté (coquille), donc hors
-     ligne aussi. -->
+     Il avait donc été rapatrié chez nous, chargé au premier clic seulement.
+     Puis le ticket est devenu une feuille de papier (PR #142/#143) et le
+     bouton « PDF » est passé par l'impression du navigateur : plus personne
+     n'appelait le générateur, donc plus personne ne chargeait jsPDF. Les deux
+     sont partis ensemble — voir le commentaire là où vivait le générateur. -->
 <style>
 body{font-family:'Manrope',Arial,sans-serif!important}
 /* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
@@ -3393,147 +3393,20 @@ function downloadRecapTXT(){
   }
 }
 
-function loadScriptOnce(src){
-  return new Promise((resolve,reject)=>{
-    const existing=[...document.scripts].find(s=>s.src===src);
-    if(existing){
-      if(window.jspdf&&window.jspdf.jsPDF)return resolve();
-      existing.addEventListener('load',resolve,{once:true});
-      existing.addEventListener('error',reject,{once:true});
-      return;
-    }
-    const script=document.createElement('script');
-    script.src=src;
-    script.onload=resolve;
-    script.onerror=reject;
-    document.head.appendChild(script);
-  });
-}
+/* LE TICKET S’IMPRIME, IL NE SE GÉNÈRE PLUS (25/08/2026).
+   Il y avait ici 106 lignes de composition PDF (`downloadRecapPDF`) et les
+   deux fonctions qui allaient chercher jsPDF au premier clic. PLUS PERSONNE
+   NE LES APPELAIT : le bouton « PDF » de la fenêtre d’export passe par
+   `printRecapTicket()` depuis que le ticket est une feuille de papier, et
+   c’est l’impression du navigateur qui produit le PDF.
+   Conséquence en cascade : jsPDF (364 Ko) n’avait plus qu’elles pour
+   appelant. Le fichier sort donc aussi de la coquille hors ligne, où il
+   coûtait 364 Ko à chaque installation pour du code que rien n’exécutait.
+   Tout est dans l’historique : `git show d19185a -- public/jspdf.umd.min.js`
+   le ramène, et rebrancher le générateur tient en une ligne. */
 
-/* LE MODULE PDF, SERVI PAR NOUS, AU PREMIER CLIC.
-   Il y avait ici trois adresses : cdnjs en principal, jsdelivr et unpkg en
-   secours. Trois domaines tiers — c'est-à-dire trois façons pour « Télécharger
-   le PDF » de ne rien faire le jour où l'un d'eux ne répond pas, et aucune
-   chance qu'il fonctionne hors ligne. Le fichier est maintenant dans
-   `public/`, dans la coquille du service worker, et il ne part au
-   téléchargement qu'ici : 364 Ko qu'on ne paie pas à chaque ouverture du
-   comptoir. */
-async function ensureJsPDF(){
-  if(window.jspdf&&window.jspdf.jsPDF)return true;
-  try{
-    await loadScriptOnce(new URL('../jspdf.umd.min.js',location.href).href);
-  }catch(error){
-    console.warn('Échec chargement PDF',error);
-  }
-  return !!(window.jspdf&&window.jspdf.jsPDF);
-}
 
-async function downloadRecapPDF(){
-  if(!validateRecapDownload('downloadPdfBtn'))return;
 
-  const button=$('downloadPdfBtn');
-  const original=button.textContent;
-  button.disabled=true;
-  button.textContent='Création du PDF…';
-
-  try{
-    const ready=await ensureJsPDF();
-    if(!ready){
-      showDownloadError(
-        'downloadPdfBtn',
-        'Le module PDF est bloqué par la connexion ou le navigateur. Utilise « Imprimer », puis choisis « Enregistrer au format PDF ».',
-        ['finalCard']
-      );
-      return;
-    }
-
-    fillFinal();
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const margin=16;
-    const pageWidth=210;
-    const usable=pageWidth-(margin*2);
-    let y=18;
-
-    function ensureSpace(height=10){
-      if(y+height>280){
-        doc.addPage();
-        y=18;
-      }
-    }
-    function addText(text,size=10,bold=false,spacing=5){
-      ensureSpace(spacing+5);
-      doc.setFont('helvetica',bold?'bold':'normal');
-      doc.setFontSize(size);
-      const lines=doc.splitTextToSize(String(text||'—'),usable);
-      doc.text(lines,margin,y);
-      y+=lines.length*spacing;
-    }
-    function addSection(title){
-      y+=3;
-      ensureSpace(12);
-      doc.setDrawColor(180);
-      doc.line(margin,y,pageWidth-margin,y);
-      y+=7;
-      addText(title,11,true,7);
-    }
-
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(18);
-    doc.text('ATELIER OLDA',margin,y);
-    y+=8;
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(10);
-    doc.text('Fiche récapitulative de demande client',margin,y);
-    y+=7;
-
-    addSection('INFORMATIONS GÉNÉRALES');
-    addText(`Référence : ${reference}`,10,true);
-    addText(`Date : ${formatDate($('requestDate').value)}`);
-    addText(`Projet : ${$('projectTitle').value||'—'}`);
-    addText(`Client : ${selectedClient?clientName(selectedClient):'—'}`);
-    addText(`Téléphone : ${selectedClient?.phone||'—'}`);
-    addText(`Date souhaitée : ${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'} ${$('desiredTime').value||''}`);
-
-    const priorities={'1':'Projet simple','2':'Projet intéressant','3':'Projet prioritaire'};
-    const actions={quote:'Devis à faire',waiting:'Attendre les informations du client'};
-    addText(`Priorité : ${priorities[$('projectPriority').value]||'—'}`);
-    addText(`Suite à donner : ${actions[clientNextActionValue()]||'—'}`);
-
-    addSection('BESOINS EXPRIMÉS');
-    needs.forEach((n,i)=>{
-      addText(`${i+1}. ${n.qty} x ${n.label}`,10,true,6);
-      addText(`Catégorie : ${n.category}${n.requestedRef?` | Réf. ${n.requestedRef}`:''}${n.color?` | Couleur ${n.color}`:''}${n.productionType?` | Production ${n.productionType}`:''}`,9,false,5);
-      if(n.comment)addText(`Informations : ${n.comment}`,9,false,5);
-      y+=2;
-    });
-
-    addSection('CONTRÔLE DU DOSSIER');
-    addText(`État : ${({received:'Informations reçues',partial:'Reçues partiellement',waiting:"En attente d'informations"})[$('controlStatus').value]||'—'}`);
-    addText(`Logo : ${$('clientLogoStatus').value||'—'}`);
-    addText(`Statut du logo : ${$('logoReceptionStatus').value||'—'}`);
-    addText(`Vectorisation : ${$('vectorizationStatus').value||'—'}`);
-    if($('oldaMockupStatus')){
-      addText(`Maquette / fichier numérique : ${$('oldaMockupStatus').value||'—'}`);
-    }
-    if($('expectedInformation').value.trim()){
-      addText(`Informations attendues : ${$('expectedInformation').value.trim()}`);
-    }
-
-    doc.save(safeFileName('pdf'));
-    showDownloadSuccess('Le ticket PDF a été téléchargé.');
-  }catch(error){
-    console.error(error);
-    showDownloadError(
-      'downloadPdfBtn',
-      `La création du PDF a échoué : ${error.message||'erreur inconnue'}. Utilise « Imprimer » puis « Enregistrer au format PDF ».`,
-      ['finalCard']
-    );
-  }finally{
-    button.disabled=false;
-    button.textContent=original;
-  }
-}
 
 function normalizePhone(p){
   let d=phoneDigits(p);
@@ -3777,49 +3650,35 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-note{white-space:pre-wrap}
 @media print{
 #ticketArea,#ticketArea *{visibility:visible}
-#ticketArea{position:absolute;left:0;top:0;width:100%;display:block!important}
-.ticket{border:none;max-width:80mm}
+#ticketArea{display:block!important}
 }
 #ticketArea{
   max-width:620px;
-  margin:0 auto 24px;
-}
+  margin:0 auto 24px}
 .ticket{
   border:1px solid #d5dae2;
   border-radius:18px;
   overflow:hidden;
   padding:0!important;
   background:#fff;
-  box-shadow:var(--shadow-2);
-}
+  box-shadow:var(--shadow-2)}
 .ticket-head{
-  padding:22px;
   background:#111827;
   color:#fff;
-  text-align:center;
-}
-.ticket-head h2{margin:0 0 5px;font-size:23px}
-.ticket-head div{font-size:12px;opacity:.82}
-.ticket-body{padding:20px}
+  text-align:center}
+.ticket-head h2{margin:0 0 5px}
+.ticket-head div{opacity:.82}
 .ticket-client-box{
-  padding:12px 14px;
   background:#f5f7fa;
   border-radius:10px;
   font-weight:800;
-  margin-bottom:16px;
-}
+  margin-bottom:16px}
 .ticket-section-label{
-  margin:15px 0 8px;
-  font-size:10px;
   text-transform:uppercase;
-  letter-spacing:.09em;
   color:#667085;
-  font-weight:900;
-}
+  font-weight:900}
 .ticket-product{
-  padding:13px 0;
-  border-bottom:1px solid #eaecf0;
-}
+  border-bottom:1px solid #eaecf0}
 .ticket-product-main,
 .ticket-extra-line,
 .ticket-total-line,
@@ -3827,45 +3686,25 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   display:grid;
   grid-template-columns:1fr auto;
   gap:14px;
-  align-items:start;
-}
-.ticket-product-name{font-size:15px;font-weight:900}
-.ticket-product-description{margin-top:4px;font-size:12px;color:#667085}
+  align-items:start}
+.ticket-product-name{font-weight:900}
 .ticket-product-price{font-weight:900;white-space:nowrap}
 .ticket-extra-line{
-  margin:8px 0 0 14px;
-  padding:8px 10px;
   border-left:3px solid #f59e0b;
   background:#fffbeb;
-  border-radius:0 8px 8px 0;
-  font-size:13px;
-}
+  border-radius:0 8px 8px 0}
 .ticket-extra-price{font-weight:900}
 .ticket-total-line{
-  margin-top:18px;
-  padding-top:15px;
   border-top:2px solid #111827;
-  font-size:21px;
-  font-weight:950;
-}
-.ticket-payment-line{
-  margin-top:13px;
-  font-size:13px;
-}
+  font-weight:950}
 .ticket-footer{
-  padding:14px 18px;
   background:#f5f7fa;
   color:#667085;
-  text-align:center;
-  font-size:11px;
-}
+  text-align:center}
 .ticket-preview-actions{
   display:flex;
   gap:9px;
-  flex-wrap:wrap;
-  margin-top:17px;
-}
-.ticket-preview-actions button{min-height:var(--dd-champ-h)}
+  flex-wrap:wrap}
 /* CES DEUX COMMANDES SONT POSÉES SUR LA FEUILLE : elles prennent les couleurs
    du papier, pas celles du thème. En sombre, « Imprimer » sortait en gris
    clair sur blanc — 2,5:1, illisible — et « Télécharger », plein, en gris
@@ -3886,149 +3725,106 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   background:rgba(0,0,0,.45);
   align-items:center;
   justify-content:center;
-  padding:20px;
-}
+  padding:20px}
 .ticket-export-overlay.show{display:flex}
 .ticket-export-dialog{
   width:min(430px,94vw);
   border-radius:var(--arrondi-carte);
   background:var(--surface);
   padding:22px;
-  box-shadow:var(--shadow-pop);
-}
+  box-shadow:var(--shadow-pop)}
 .ticket-export-dialog h3{margin:0 0 6px;font-size:var(--taille-texte)}
 .ticket-export-dialog p{margin:0 0 17px;color:#667085}
 .ticket-export-buttons{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:10px;
-}
+  gap:10px}
 .ticket-export-buttons button{
   min-height:52px;
   border-radius:var(--arrondi-champ);
-  font-weight:var(--graisse-forte);
-}
+  font-weight:var(--graisse-forte)}
 .ticket-export-cancel{
   width:100%;
-  margin-top:10px;
-}
+  margin-top:10px}
 @media(max-width:600px){
 .ticket-export-buttons{grid-template-columns:1fr}
 }
-@media print{
-#ticketArea,#ticketArea *{visibility:visible!important}
-#ticketArea{
-    position:absolute;
-    left:0;top:0;
-    width:100%;
-    max-width:none;
-    margin:0;
-  }
-.ticket-preview-actions{display:none!important}
-.ticket{box-shadow:none;border:0}
-}
 .ticket{
   max-width:700px;
-  margin:0 auto;
-}
+  margin:0 auto}
 .ticket-head{
-  padding:26px 24px;
-}
+  padding:26px 24px}
 .ticket-head h2{
   font-size:28px;
-  letter-spacing:.04em;
-}
+  letter-spacing:.04em}
 .ticket-head div{
-  font-size:14px;
-}
+  font-size:14px}
 .ticket-body{
-  padding:24px;
-}
+  padding:24px}
 .ticket-client-box{
   padding:16px 18px;
   font-size:16px;
   line-height:1.55;
-  border:1px solid #d9dee7;
-}
+  border:1px solid #d9dee7}
 .ticket-section-label{
   margin:20px 0 10px;
   font-size:12px;
-  letter-spacing:.12em;
-}
+  letter-spacing:.12em}
 .ticket-product{
-  padding:18px 0;
-}
+  padding:18px 0}
 .ticket-product-name{
   font-size:19px;
-  line-height:1.35;
-}
+  line-height:1.35}
 .ticket-product-description{
   margin-top:6px;
   font-size:14px;
   line-height:1.5;
-  color:#475467;
-}
+  color:#475467}
 .ticket-product-price{
-  font-size:18px;
-}
+  font-size:18px}
 .ticket-extra-line{
   margin:10px 0 0 16px;
   padding:10px 12px;
   font-size:15px;
-  line-height:1.4;
-}
+  line-height:1.4}
 .ticket-extra-price{
-  font-size:15px;
-}
+  font-size:15px}
 .ticket-total-line{
   margin-top:22px;
   padding-top:18px;
-  font-size:24px;
-}
+  font-size:24px}
 .ticket-payment-line{
   margin-top:16px;
   padding:12px 14px;
   border-radius:10px;
   background:#f5f7fa;
-  font-size:15px;
-}
+  font-size:15px}
 .ticket-footer{
   padding:17px 20px;
-  font-size:13px;
-}
+  font-size:13px}
 .ticket-preview-actions{
-  margin-top:20px;
-}
+  margin-top:20px}
 .ticket-preview-actions button{
   min-height:48px;
-  padding:12px 18px;
-}
+  padding:12px 18px}
 @media print{
 #ticketArea{
-    padding:0;
-  }
+    padding:0}
 .ticket{
     max-width:none;
-    font-size:14px;
-  }
+    font-size:14px}
 .ticket-head{
-    padding:20px;
-  }
+    padding:20px}
 .ticket-head h2{
-    font-size:25px;
-  }
+    font-size:25px}
 .ticket-body{
-    padding:20px;
-  }
+    padding:20px}
 .ticket-product-name{
-    font-size:18px;
-  }
+    font-size:18px}
 .ticket-product-description{
-    font-size:13px;
-  }
+    font-size:13px}
 .ticket-total-line{
-    font-size:22px;
-  }
+    font-size:22px}
 }
 .ticket,
 .ticket-body,
@@ -4038,79 +3834,58 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-extra-line,
 .ticket-total-line,
 .ticket-payment-line{
-  color:#111827!important;
-}
+  color:#111827!important}
 .ticket-head{
   background:#000!important;
-  color:#fff!important;
-}
+  color:#fff!important}
 .ticket-head h2,
 .ticket-head div{
   color:#fff!important;
-  opacity:1!important;
-}
+  opacity:1!important}
 .ticket-client-box{
   background:#f2f2f2!important;
-  border-color:#b8b8b8!important;
-}
+  border-color:#b8b8b8!important}
 .ticket-client-box,
 .ticket-client-box *{
-  color:#111!important;
-}
+  color:#111!important}
 .ticket-section-label{
   color:#111!important;
-  font-weight:950!important;
-}
+  font-weight:950!important}
 .ticket-product-name{
   color:#000!important;
-  font-weight:950!important;
-}
+  font-weight:950!important}
 .ticket-product-description{
   color:#222!important;
-  font-weight:600!important;
-}
+  font-weight:600!important}
 .ticket-product-price{
   color:#000!important;
-  font-weight:950!important;
-}
+  font-weight:950!important}
 .ticket-extra-line{
   background:#fff4d6!important;
   border-left-color:#111!important;
-  color:#111!important;
-}
+  color:#111!important}
 .ticket-extra-line *,
 .ticket-extra-price{
   color:#111!important;
-  font-weight:900!important;
-}
+  font-weight:900!important}
 .ticket-total-line{
   color:#000!important;
   border-top-color:#000!important;
-  font-weight:950!important;
-}
+  font-weight:950!important}
 .ticket-payment-line{
   background:#ececec!important;
-  color:#111!important;
-}
+  color:#111!important}
 .ticket-payment-line strong{
-  color:#000!important;
-}
+  color:#000!important}
 .ticket-footer{
   background:#ececec!important;
   color:#111!important;
-  font-weight:700!important;
-}
+  font-weight:700!important}
 @media print{
-.ticket,
-  .ticket *{
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
 .ticket-product-description,
   .ticket-footer,
   .ticket-section-label{
-    color:#111!important;
-  }
+    color:#111!important}
 }
 .ticket-pickup{
   margin-top:10px;
@@ -4118,65 +3893,51 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   border-top:1px solid #777;
   color:#000;
   font-size:15px;
-  font-weight:900;
-}
+  font-weight:900}
 @media print{
 .ticket{
     border:1px solid #555!important;
     border-radius:0!important;
     box-shadow:none!important;
-    background:#fff!important;
-  }
+    background:#fff!important}
 .ticket-head{
     padding:12px 14px!important;
     background:#fff!important;
     color:#000!important;
-    border-bottom:2px solid #000!important;
-  }
+    border-bottom:2px solid #000!important}
 .ticket-head h2,
   .ticket-head div{
-    color:#000!important;
-  }
+    color:#000!important}
 .ticket-head h2{
-    font-size:22px!important;
-  }
+    font-size:22px!important}
 .ticket-body{
     padding:14px!important;
-    background:#fff!important;
-  }
+    background:#fff!important}
 .ticket-client-box,
   .ticket-payment-line,
   .ticket-extra-line,
   .ticket-footer{
-    background:#fff!important;
-  }
+    background:#fff!important}
 .ticket-client-box{
-    border:1px solid #777!important;
-  }
+    border:1px solid #777!important}
 .ticket-extra-line{
     border:1px solid #777!important;
-    border-left:3px solid #000!important;
-  }
+    border-left:3px solid #000!important}
 .ticket-product{
-    border-bottom:1px solid #777!important;
-  }
+    border-bottom:1px solid #777!important}
 .ticket-total-line{
-    border-top:2px solid #000!important;
-  }
+    border-top:2px solid #000!important}
 .ticket-payment-line{
-    border:1px solid #777!important;
-  }
+    border:1px solid #777!important}
 .ticket-footer{
     border-top:1px solid #777!important;
-    color:#000!important;
-  }
+    color:#000!important}
 .ticket,
   .ticket *{
     color:#000!important;
     text-shadow:none!important;
     -webkit-print-color-adjust:economy!important;
-    print-color-adjust:economy!important;
-  }
+    print-color-adjust:economy!important}
 }
 #ticketArea .ticket-details{font-size:12.5px;font-weight:600;line-height:1.5;color:#344054;margin-top:8px}
 #ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
