@@ -218,6 +218,15 @@ const DEMANDE = {
     'Fonction du contact',
     'Gérante',
     'repart immédiatement',
+    // RETIRÉ LE 26/08 — Charlie, écran par écran. Un papier qui ne sort jamais
+    // de l'atelier n'a pas à rappeler où il est lu, ni à se signer.
+    'ATELIER OLDA',            // l'en-tête de marque
+    'Saint-Martin',            // la ville
+    'À RETIRER LE',            // la bande d'échéance, ses deux libellés
+    'RÉPONSE SOUHAITÉE',
+    '16h30',                   // et sa valeur
+    "POUR L'ATELIER",          // la consigne : elle reste au dossier
+    "L'équipe",                // la signature du pied
   ]) {
     assert.ok(!papier.includes(interdit), `le ticket ne doit plus porter « ${interdit} » :\n${papier}`);
   }
@@ -225,35 +234,32 @@ const DEMANDE = {
   // l'argent essaierait de revenir, il porte ce signe.
   assert.ok(!papier.includes('€'), `aucun montant ne doit figurer sur le ticket :\n${papier}`);
 
-  // …et ce qui DOIT y être : quoi, combien, pour quand, pour qui, comment.
-  for (const attendu of ['ATELIER OLDA', 'TICKET ATELIER', 'Coco Beach',
-    'Mélina', '0690 66 24 00', 'À RETIRER LE 07/08/2026 à 16h30',
+  // …et ce qui DOIT y être : quoi, combien, pour qui, comment.
+  for (const attendu of ['TICKET ATELIER', 'Coco Beach',
+    'Mélina', '0690 66 24 00',
     '2 x Polo brodé', 'Broderie poitrine, fil or', '1 x Tasse personnalisée']) {
     assert.ok(papier.includes(attendu), `le ticket doit porter « ${attendu} » :\n${papier}`);
   }
 
-  // LA CONSIGNE DE L'ATELIER, dans son cadre — la raison d'être du papier.
+  // LA CONSIGNE D'ATELIER N'EST PLUS UN CHAMP DU MODÈLE. Elle vit toujours dans
+  // la fiche — le tiroir l'écrit, la grille marque d'un point les dossiers qui
+  // en portent une — mais elle ne s'imprime plus.
   const avecConsigne = modeleTicket({
     ...VENTE, fiche: { ...VENTE.fiche, atelier: 'Logo poitrine gauche 8 cm — appeler avant de couper' },
   });
-  assert.strictEqual(avecConsigne.atelier, 'Logo poitrine gauche 8 cm — appeler avant de couper');
-  const avecCadre = ticketTexte(avecConsigne);
-  assert.ok(avecCadre.includes("POUR L'ATELIER"));
-  assert.ok(avecCadre.includes('appeler avant de couper'));
+  assert.strictEqual(avecConsigne.atelier, undefined);
+  assert.ok(!ticketTexte(avecConsigne).includes('appeler avant de couper'));
 
   // =========================================================================
   // 2. LA LIGNE FAIT FOI pour ce qui se corrige après la vente
   // =========================================================================
-  // Le récapitulatif figé annonce une récupération le 07/08 à 14:00 ; la ligne,
-  // elle, a été corrigée depuis (16:30). Un ticket réimprimé doit porter la
-  // correction, sinon l'atelier produit pour une heure que personne ne tiendra.
-  assert.strictEqual(tv.remiseLabel, 'À retirer le');
-  assert.strictEqual(tv.remise, '07/08/2026 à 16h30');
+  // L'ÉCHÉANCE NE S'IMPRIME PLUS (26/08) : ni le champ, ni son libellé.
+  assert.strictEqual(tv.remise, undefined);
+  assert.strictEqual(tv.remiseLabel, undefined);
 
   const corrigee = modeleTicket({
     ...VENTE, deadline: '2026-08-11', billing_company: 'Coco Beach Bar', contact_phone: '0690 00 11 22',
   });
-  assert.strictEqual(corrigee.remise, '11/08/2026 à 16h30');
   // Le récapitulatif figé dit encore « Coco Beach » et l'ancien numéro : c'est
   // la LIGNE qui fait foi pour tout ce qui se corrige après la vente.
   assert.strictEqual(corrigee.client, 'Coco Beach Bar');
@@ -279,8 +285,6 @@ const DEMANDE = {
   // pas une demande, on y répond.
   assert.strictEqual(td.titre, 'Ticket atelier');
   assert.strictEqual(td.ref, 'DEV-26.08.06-002');
-  assert.strictEqual(td.remiseLabel, 'Réponse souhaitée');
-  assert.strictEqual(td.remise, '20/08/2026');
   assert.ok(!ticketTexte(td).includes('€'), 'un devis non chiffré n’annonce surtout aucun montant');
 
   assert.strictEqual(td.lignes.length, 1);
@@ -314,7 +318,6 @@ const DEMANDE = {
   });
   assert.strictEqual(sansContact.contact, '');
   assert.strictEqual(sansContact.tel, '');
-  assert.strictEqual(sansContact.remise, '');
   assert.ok(!ticketTexte(sansContact).includes('Contact'));
 
   // ON NE REMET AUCUN TICKET AU CLIENT. Les vieux dossiers portent encore un
@@ -449,9 +452,10 @@ const DEMANDE = {
   assert.strictEqual(aLaMain.lignes.length, 1);
   assert.strictEqual(aLaMain.lignes[0].designation, 'Bâche 2 m');
   assert.strictEqual(aLaMain.lignes[0].detail, 'Impression UV');
-  assert.strictEqual(aLaMain.atelier, 'Œillets tous les 50 cm');
+  assert.strictEqual(aLaMain.atelier, undefined, 'la consigne ne s’imprime plus');
   const papierMain = ticketTexte(aLaMain);
-  assert.ok(papierMain.includes('1 x Bâche 2 m') && papierMain.includes("POUR L'ATELIER"));
+  assert.ok(papierMain.includes('1 x Bâche 2 m'));
+  assert.ok(!papierMain.includes('Œillets'), 'elle reste au dossier');
 
   // -------------------------------------------------------------------------
   // 6 bis. LE TICKET EN COLONNE — affichable ou non, et sans décaler le reste

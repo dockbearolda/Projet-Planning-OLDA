@@ -145,13 +145,15 @@ assert.deepStrictEqual(t4.lignes[0].prod.tailles.length, 0);
 // ---------------------------------------------------------------------------
 // 3. LA MISE EN PAGE DU PAPIER
 // ---------------------------------------------------------------------------
-// UNE ÉCHELLE, quatre tailles — celle de l'écran du comptoir. Elle ne se
+// UNE ÉCHELLE — celle de l'écran du comptoir, moins sa taille de titre : le
+// papier n'a plus d'en-tête de marque à habiller (retiré le 26/08). Elle ne se
 // choisit pas au cas par cas : les valeurs sont des jetons, lus partout.
-for (const jeton of ['--tk-titre: 17px', '--tk-fort: 15px', '--tk-texte: 13px', '--tk-note: 11px']) {
+for (const jeton of ['--tk-fort: 15px', '--tk-texte: 13px', '--tk-note: 11px']) {
   assert.ok(CSS_TICKET.includes(jeton), `l’échelle du ticket doit poser ${jeton}`);
 }
-assert.ok(!/font-size: 1[024]px/.test(CSS_TICKET),
-  'aucune taille en dur : tout passe par les quatre jetons');
+assert.ok(!CSS_TICKET.includes('--tk-titre'), 'le jeton de titre n’a plus rien à habiller');
+assert.ok(!/font-size: 1[0247]px/.test(CSS_TICKET),
+  'aucune taille en dur : tout passe par les trois jetons');
 // LES TAILLES EN TABLEAU, à colonnes ÉGALES : une piste qui dépend de son
 // contenu ferait une grille bancale d'un ticket à l'autre.
 assert.match(CSS_TICKET, /\.tk__tailles \{[^}]*grid-auto-columns: 1fr/);
@@ -162,10 +164,15 @@ assert.match(CSS_TICKET, /\.tk__logo-mm \{[^}]*font-size: var\(--tk-fort\)/);
 // DANS LA CASE ET AU BOUT DU FILET, le champ ne pose pas de trait de plus :
 // sans ça deux traits se superposaient sous chaque nombre.
 assert.match(CSS_TICKET, /\.tk__taille-v \.tk__champ, \.tk__logo-mm \.tk__champ \{[^}]*border-bottom: 0/);
-// POUR QUAND, dans son cadre, en tête : c'est la question que l'établi pose
-// avant toutes les autres.
-assert.match(CSS_TICKET, /\.tk__remise \{[^}]*border: 2px solid/);
-assert.match(CSS_TICKET, /\.tk__remise-v \{[^}]*font-size: var\(--tk-fort\)/);
+// CE QUE CHARLIE A FAIT RETIRER DU PAPIER LE 26/08, écran par écran. Rien de
+// tout cela ne doit revenir par une règle laissée derrière : une feuille de
+// style qui décrit un bloc absent finit par le faire réapparaître.
+for (const parti of ['.tk__nom', '.tk__lieu', '.tk__remise', '.tk__atelier',
+  '.tk__jour', '.tk__heure']) {
+  assert.ok(!CSS_TICKET.includes(parti), `« ${parti} » n’habille plus rien`);
+}
+// Le projet est PC uniquement : plus une règle justifiée par le doigt.
+assert.ok(!CSS_TICKET.includes('pointer: coarse'), 'plus d’échelle tactile sur le ticket');
 // Le papier reste en NOIR SUR BLANC : la charte réserve la couleur aux états,
 // et une imprimante à tickets ne connaît que le noir.
 const couleurs = CSS_TICKET.replace(/\/\*[\s\S]*?\*\//g, ' ')

@@ -152,12 +152,13 @@ const VENTE = {
   console.log('✓ ticket modifiable : chaque valeur sait où elle se réécrit');
 
   // =========================================================================
-  // 2. LE CADRE « POUR L'ATELIER »
+  // 2. LA CONSIGNE D'ATELIER RESTE AU DOSSIER (26/08)
   // =========================================================================
-  // Il ne vient PAS du comptoir : ni la note interne (« client difficile »), ni
-  // les points à contrôler ne le remplissent — ceux-là restent au dossier de
-  // travail. C'est ce qu'un collègue écrit pour celui qui va produire.
-  assert.strictEqual(t.atelier, '', 'aucune consigne tant que personne n’en a écrit');
+  // Elle s'imprimait, dans son cadre, en bas du papier. Charlie l'a retirée du
+  // ticket : elle continue de vivre dans la fiche — le tiroir l'écrit sous
+  // « Consigne atelier », et la grille marque d'un point les dossiers qui en
+  // portent une — mais le papier ne la sort plus.
+  assert.strictEqual(t.atelier, undefined, 'le modèle ne porte plus ce champ du tout');
   assert.ok(!ticketTexte(t).includes("POUR L'ATELIER"));
   assert.ok(!ticketTexte(t).includes('Client difficile'), 'la note interne ne passe jamais sur le papier');
 
@@ -166,16 +167,12 @@ const VENTE = {
     fiche: { ...VENTE.fiche, atelier: 'Logo poitrine gauche 8 cm — appeler avant de couper' },
   });
   const papier = ticketTexte(avecConsigne);
-  assert.ok(papier.includes("POUR L'ATELIER"));
-  assert.ok(papier.includes('Logo poitrine gauche 8 cm — appeler avant de couper'));
-  // Elle se lit APRÈS le travail : d'abord ce qu'on produit, puis ce qu'il faut
-  // savoir pour le produire — et sans jamais retourner le papier.
-  assert.ok(papier.indexOf('Polo brodé') < papier.indexOf("POUR L'ATELIER"));
-  assert.ok(papier.indexOf("POUR L'ATELIER") < papier.indexOf("L'équipe Atelier OLDA"));
-  // Et elle n'a pas fait disparaître le reste au passage.
+  assert.ok(!papier.includes("POUR L'ATELIER"));
+  assert.ok(!papier.includes('Logo poitrine gauche 8 cm — appeler avant de couper'));
+  // Et le retrait n'a pas emporté le travail au passage.
   assert.ok(papier.includes('Polo brodé') && papier.includes('Broderie poitrine'));
 
-  console.log('✓ ticket modifiable : la consigne atelier s’imprime, la note interne jamais');
+  console.log('✓ ticket modifiable : la consigne atelier reste au dossier, la note interne aussi');
 
   // =========================================================================
   // 3. LE PAPIER NE SORT AUCUN CHAMP
@@ -203,14 +200,13 @@ const VENTE = {
   for (const interdite of ['input', 'textarea', 'select']) {
     assert.ok(!balisesPapier.includes(interdite), `le papier ne doit porter aucun ${interdite}`);
   }
-  assert.ok(texteDe(surPapier).includes("Pour l'atelier"));
   // On ne remet aucun ticket au client : la ligne « Ticket remis au client »
   // n'existe plus, ni sur le papier ni en correction.
   assert.ok(!texteDe(surPapier).includes('remis au client'));
 
   // Avec l'éditeur, TOUTES les valeurs corrigeables deviennent des champs — y
-  // compris celles qui sont vides (le numéro du papier, la consigne atelier) :
-  // c'est en les voyant offertes qu'on pense à les remplir.
+  // compris celles qui sont vides : c'est en les voyant offertes qu'on pense à
+  // les remplir.
   const vus = [];
   const doc = faireDoc();
   const aLEcran = dessinerTicket(t, doc, (cle) => {
@@ -219,14 +215,17 @@ const VENTE = {
     c.className = 'tk__champ';
     return c;
   });
-  for (const attendu of ['client', 'contact', 'tel', 'remise', 'atelier',
+  for (const attendu of ['client', 'contact', 'tel',
     'qte', 'designation', 'detail']) {
     assert.ok(vus.includes(attendu), `« ${attendu} » doit être corrigeable dans l’aperçu`);
   }
   // L'ARGENT N'EST PLUS OFFERT DU TOUT. Pas un champ vide qu'on remplirait par
   // mégarde : aucune case. Le prix et le règlement se corrigent sur la ligne du
   // planning et dans la fiche, là où ils vivent.
-  for (const parti of ['total', 'paiement', 'prix', 'supplement', 'refTicket']) {
+  for (const parti of ['total', 'paiement', 'prix', 'supplement', 'refTicket',
+    // Retirés du papier le 26/08 : ce qui ne s'imprime pas ne se corrige pas
+    // ici. L'échéance se règle sur la ligne du planning, la consigne au tiroir.
+    'remise', 'atelier']) {
     assert.ok(!vus.includes(parti), `« ${parti} » n’a plus à figurer sur un ticket d’atelier`);
   }
   assert.ok(balises(aLEcran).includes('input'));
@@ -237,13 +236,13 @@ const VENTE = {
   assert.ok(!texteDe(aLEcran).includes('26.08.06-003'),
     'la référence ne s’affiche plus sur l’aperçu du ticket d’atelier');
 
-  // Une demande de devis suit la même règle, et garde sa consigne : l'atelier
-  // peut avoir une maquette à préparer avant que rien ne soit chiffré.
+  // Une demande de devis suit exactement la même règle.
   const vusDevis = [];
   const docD = faireDoc();
   dessinerTicket(devis, docD, (cle) => { vusDevis.push(cle); return docD.createElement('input'); });
-  for (const parti of ['total', 'paiement', 'prix']) assert.ok(!vusDevis.includes(parti));
-  assert.ok(vusDevis.includes('atelier'), 'une demande aussi peut porter une consigne');
+  for (const parti of ['total', 'paiement', 'prix', 'remise', 'atelier']) {
+    assert.ok(!vusDevis.includes(parti));
+  }
 
   console.log('✓ ticket modifiable : champs à l’écran, aucun sur le papier');
 
@@ -332,10 +331,11 @@ const VENTE = {
   const trop = await call('PATCH', `/api/requests/${id}/fiche`, { atelier: 'x'.repeat(900) });
   assert.ok(trop.body.fiche.atelier.length <= 500);
 
-  // Vidée, elle disparaît — et le ticket reprend sa forme d'avant.
+  // Vidée, elle disparaît du dossier. Le papier, lui, ne la portait déjà plus
+  // (retirée le 26/08) : le modèle du ticket ne connaît pas ce champ.
   const videe = await call('PATCH', `/api/requests/${id}/fiche`, { atelier: '' });
   assert.strictEqual(videe.body.fiche.atelier, null);
-  assert.strictEqual(modeleTicket(videe.body).atelier, '');
+  assert.strictEqual(modeleTicket(videe.body).atelier, undefined);
   await call('PATCH', `/api/requests/${id}/fiche`, { atelier: 'Broderie fil or' });
 
   console.log('✓ ticket modifiable : le serveur écrit la consigne, jamais la référence');

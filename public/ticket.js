@@ -52,15 +52,6 @@ function dateCreation(iso) {
   return Number.isNaN(d.getTime()) ? '' : JOUR_ATELIER.format(d);
 }
 
-// « aaaa-mm-jj » → « jj/mm/aaaa ». Une échéance est une date CIVILE, sans
-// heure ni fuseau : on la découpe, on ne la fait pas passer par un Date.
-function dateFr(iso) {
-  const m = String(iso || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
-}
-
-const heureFr = (h) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(h || '')) ? String(h).replace(':', 'h') : '');
-
 // LE TRAVAIL, extrait du récapitulatif du comptoir. Tout ce qui n'est pas un
 // poste — le secteur, l'adresse, les totaux, la note interne — reste où il est.
 // Les postes se regroupent par NUMÉRO plutôt que par position, pour qu'une
@@ -218,9 +209,6 @@ export function modeleTicket(r) {
     if (demande) lignes[0].detail = '';
   }
 
-  const heure = heureFr(f.heureSouhaitee);
-  const jour = dateFr(l.deadline);
-
   return {
     demande,
     titre: 'Ticket atelier',
@@ -237,19 +225,8 @@ export function modeleTicket(r) {
     client: texte(l.billing_company),
     contact: texte(l.contact_referent),
     tel: texte(l.contact_phone),
-    // POUR QUAND. Sur une vente c'est le RETRAIT ; sur une demande, la date de
-    // réponse souhaitée. Deux promesses différentes, deux libellés.
-    remiseLabel: demande ? 'Réponse souhaitée' : 'À retirer le',
-    remise: jour ? `${jour}${heure ? ` à ${heure}` : ''}` : '',
     // QUOI ET COMBIEN, avec ce qu'on en fait.
     lignes,
-    // POUR L'ATELIER — la consigne de production, écrite après coup depuis le
-    // planning. Elle ne vient PAS du comptoir : ni la note interne OLDA
-    // (« client difficile »), ni les points à contrôler ne la remplissent — ces
-    // deux-là restent au dossier de travail. C'est ce qu'un collègue ajoute
-    // pour celui qui va produire : « logo poitrine gauche 8 cm », « appeler
-    // avant de couper ». Elle s'imprime avec le ticket, dans son propre cadre.
-    atelier: texte(f.atelier),
   };
 }
 
@@ -257,12 +234,11 @@ export function modeleTicket(r) {
 // imprimante recopie. Même contenu que le papier, à la ligne près.
 export function ticketTexte(t) {
   const sep = '--------------------------------';
-  const out = ['ATELIER OLDA', 'Saint-Martin', t.titre.toUpperCase(), sep];
+  const out = [t.titre.toUpperCase(), sep];
   if (t.lot) out.push(`ARTICLE ${t.lot.rang} SUR ${t.lot.total} DE LA COMMANDE`);
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
   if (t.tel) out.push(`Tél : ${t.tel}`);
-  if (t.remise) out.push(sep, `${t.remiseLabel.toUpperCase()} ${t.remise}`);
   if (t.lignes.length) {
     out.push(sep);
     for (const a of t.lignes) {
@@ -279,12 +255,9 @@ export function ticketTexte(t) {
       if (a.detail) out.push(`  ${a.detail}`);
     }
   }
-  if (t.atelier) out.push(sep, "POUR L'ATELIER", t.atelier);
-  // La date de PRISE ne fait pas produire : elle descend au pied, avec la
-  // signature, comme sur le papier.
-  out.push(sep);
-  if (t.date) out.push(`Commande prise le ${t.date}`);
-  out.push("L'équipe Atelier OLDA");
+  // La date de PRISE ne fait pas produire : elle reste au pied, comme sur le
+  // papier.
+  if (t.date) out.push(sep, `Commande prise le ${t.date}`);
   return out.join('\n');
 }
 
@@ -299,19 +272,17 @@ export function ticketTexte(t) {
 // Tout est en noir sur blanc : la charte réserve la couleur aux ÉTATS, et une
 // imprimante à tickets ne connaît de toute façon que le noir.
 export const CSS_TICKET = `
-  /* L'ÉCHELLE DU TICKET — la même que l'écran du comptoir : quatre tailles,
-     trois graisses, et rien d'autre. Elle ne se choisit pas au cas par cas.
-       fort   = ce qui DÉCIDE et qu'on ne doit pas lire de travers : la date de
-                retrait, le nombre par taille, la largeur d'un logo. Une taille
-                mal lue coûte une réimpression.
+  /* L'ÉCHELLE DU TICKET — celle de l'écran du comptoir, moins sa taille de
+     titre : le papier n'a plus d'en-tête de marque à habiller.
+       fort   = ce qui DÉCIDE et qu'on ne doit pas lire de travers : le nombre
+                par taille, la largeur d'un logo. Une taille mal lue coûte une
+                réimpression.
        texte  = ce qui se lit : désignations, valeurs.
        note   = les intitulés, le pied. */
-  .tk { --tk-titre: 17px; --tk-fort: 15px; --tk-texte: 13px; --tk-note: 11px;
+  .tk { --tk-fort: 15px; --tk-texte: 13px; --tk-note: 11px;
         width: 76mm; margin: 0 auto; padding: 4mm 0; color: #000;
         font: var(--tk-texte)/1.45 Arial, Helvetica, sans-serif; }
-  .tk__nom { margin: 0; font-size: var(--tk-titre); font-weight: 800; letter-spacing: .06em; text-align: center; }
-  .tk__lieu { margin: 2px 0 0; font-size: var(--tk-note); text-align: center; }
-  .tk__titre { margin: 2px 0 0; font-size: var(--tk-note); font-weight: 800; text-align: center;
+  .tk__titre { margin: 0; font-size: var(--tk-note); font-weight: 800; text-align: center;
                text-transform: uppercase; letter-spacing: .08em; }
   .tk__sep { border: 0; border-top: 1px dashed #000; margin: 7px 0; }
   /* « Article 2 sur 4 » — encadré, parce que c'est l'avertissement qui empêche
@@ -320,14 +291,6 @@ export const CSS_TICKET = `
   .tk__lot { margin: 5px auto 0; padding: 2px 6px; border: 1px solid #000;
              display: table; font-size: var(--tk-note); font-weight: 800;
              text-transform: uppercase; letter-spacing: .04em; }
-
-  /* POUR QUAND — la première question de l'établi, dans son propre cadre.
-     L'intitulé au-dessus, la date en gros : à deux mètres du plan de travail,
-     c'est la seule ligne qu'on doit pouvoir lire sans se pencher. */
-  .tk__remise { margin: 0; padding: 4px 6px; border: 2px solid #000; text-align: center; }
-  .tk__remise-k { display: block; font-size: var(--tk-note); font-weight: 600;
-                  text-transform: uppercase; letter-spacing: .06em; }
-  .tk__remise-v { display: block; margin-top: 1px; font-size: var(--tk-fort); font-weight: 800; }
 
   /* POUR QUI — intitulé à gauche, valeur à droite. L'intitulé est une étiquette,
      pas une phrase : petites capitales, graisse moyenne. */
@@ -371,17 +334,9 @@ export const CSS_TICKET = `
   .tk__logo-fil { flex: 1 1 auto; align-self: center; border-bottom: 1px dotted #000; }
   .tk__logo-mm { flex: 0 0 auto; font-size: var(--tk-fort); font-weight: 800; white-space: nowrap; }
 
-  /* POUR L'ATELIER — un cadre plein, qu'on ne confond avec aucun article.
-     Noir sur blanc comme le reste : une imprimante à tickets ne connaît que ça,
-     et la charte réserve la couleur aux états. */
-  .tk__atelier { padding: 5px 7px; border: 1px solid #000; }
-  .tk__atelier-titre { margin: 0 0 3px; font-size: var(--tk-note); font-weight: 800;
-                       letter-spacing: .08em; text-transform: uppercase; }
-  .tk__atelier-txt { margin: 0; font-size: var(--tk-texte); white-space: pre-line; }
-
-  /* LE PIED porte ce qui NE FAIT PAS PRODUIRE : la date de prise, la signature.
-     Elle était en tête, entre l'avertissement de lot et le client — trois
-     lignes de contexte avant la première qui dit quoi faire. */
+  /* LE PIED porte ce qui NE FAIT PAS PRODUIRE : la date de prise. Elle était
+     en tête, entre l'avertissement de lot et le client — trois lignes de
+     contexte avant la première qui dit quoi faire. */
   .tk__pied { margin: 7px 0 0; font-size: var(--tk-note); text-align: center; }
 
   /* LES CHAMPS DE CORRECTION. Le ticket s'ouvre DÉJÀ modifiable depuis la
@@ -390,7 +345,7 @@ export const CSS_TICKET = `
      n'en pose aucun (elle n'appelle pas l'éditeur) — le ticket qu'on corrige
      est donc, à la case près, celui qui sort de l'imprimante.
      Les hauteurs confortables ne valent que dans l'aperçu (classe tk--edit) :
-     au doigt, sur la tablette du comptoir, une ligne de 12 px ne se vise pas. */
+     une ligne de 12 px se vise mal à la souris, et le papier n'en porte pas. */
   .tk__champ {
     font: inherit; color: #000; background: transparent;
     border: 0; border-bottom: 1px dashed #8a8f98; border-radius: 0;
@@ -402,8 +357,7 @@ export const CSS_TICKET = `
   .tk--edit .tk__champ { min-height: 34px; }
   .tk--edit .tk__ligne { align-items: center; }
   .tk--edit .tk__ligne > span:first-child { flex: 0 0 62px; }
-  /* La quantité : un champ court sur la même rangée que le nom de l'article.
-     Il garde une cible d'au moins 44 px de large au doigt. */
+  /* La quantité : un champ court sur la même rangée que le nom de l'article. */
   .tk--edit .tk__art-tete { align-items: center; gap: 6px; }
   .tk--edit .tk__art-nom { display: flex; align-items: center; gap: 4px; flex: 1 1 auto; }
   .tk__qte { flex: 0 0 46px; text-align: center; }
@@ -417,26 +371,6 @@ export const CSS_TICKET = `
   .tk__logo-mm .tk__champ { text-align: right; }
   .tk--edit .tk__taille-v .tk__champ { min-height: 30px; }
   .tk--edit .tk__logo-mm { flex: 0 0 96px; }
-  /* La remise, c'est UNE promesse : le jour et l'heure se lisent côte à côte,
-     comme ils s'impriment (« À retirer le 20/08/2026 à 16h30 »). */
-  .tk__remise-champs { display: flex; align-items: center; gap: 6px; }
-  .tk__jour { flex: 1 1 auto; }
-  .tk__heure { flex: 0 0 84px; }
-  .tk--edit .tk__atelier { padding: 6px 7px; }
-  .tk__atelier-txt .tk__champ { resize: vertical; }
-  .tk--edit .tk__atelier-txt .tk__champ { min-height: 66px; }
-
-  /* AU DOIGT (la tablette du comptoir, le téléphone). Deux règles de la maison :
-     tout champ fait au moins 16 px — en dessous, iOS zoome à la mise au point et
-     la page reste décalée ensuite — et toute cible fait au moins 44 px. Le
-     ticket s'allonge donc quand on le corrige, et il défile ; le papier, lui, ne
-     bouge pas d'un millimètre : il ne porte aucun champ. */
-  @media (pointer: coarse) {
-    .tk__champ { font-size: 16px; }
-    .tk--edit .tk__champ { min-height: 44px; }
-    .tk--edit .tk__taille-v .tk__champ { min-height: 40px; }
-    .tk--edit .tk__heure { flex: 0 0 108px; }
-  }
 `;
 
 // Le ticket en DOM, dans le document qu'on lui donne — la page pour l'aperçu,
@@ -463,11 +397,9 @@ export function dessinerTicket(t, doc, editeur) {
   const sep = () => el('hr', 'tk__sep');
 
   const tk = el('div', editeur ? 'tk tk--edit' : 'tk');
-  tk.append(
-    el('p', 'tk__nom', 'ATELIER OLDA'),
-    el('p', 'tk__lieu', 'Saint-Martin'),
-    el('p', 'tk__titre', t.titre),
-  );
+  // PAS D'EN-TÊTE DE MARQUE. Ce papier ne sort jamais de l'atelier : personne
+  // n'a besoin qu'il rappelle le nom ni la ville de la maison où il est lu.
+  tk.append(el('p', 'tk__titre', t.titre));
 
   // LA RÉFÉRENCE NE S'IMPRIME PAS. Elle reste dans le modèle — le titre de la
   // fenêtre d'impression et le libellé de la carte s'en servent pour dire DE
@@ -476,23 +408,15 @@ export function dessinerTicket(t, doc, editeur) {
   // CE PAPIER NE FAIT PAS TOUTE LA COMMANDE. Un compte, pas un identifiant :
   // sans lui, l'atelier finit son article et emballe en croyant avoir fini.
   if (t.lot) tk.append(el('p', 'tk__lot', `Article ${t.lot.rang} sur ${t.lot.total} de la commande`));
-  tk.append(sep());
 
-  // POUR QUAND, EN PREMIER. C'est la question que l'établi pose avant toutes
-  // les autres, et elle décide de l'ordre de la journée. Elle était perdue au
-  // milieu, après trois lignes de coordonnées.
-  if (t.remise || editeur) {
-    const p = el('p', 'tk__remise');
-    p.append(el('span', 'tk__remise-k', t.remiseLabel));
-    const v = el('span', 'tk__remise-v');
-    v.append(val('remise', t.remise));
-    p.append(v);
-    tk.append(p, sep());
-  }
-
-  if (t.client || editeur) tk.append(duo('tk__ligne', 'Client', val('client', t.client)));
-  if (t.contact || editeur) tk.append(duo('tk__ligne', 'Contact', val('contact', t.contact)));
-  if (t.tel || editeur) tk.append(duo('tk__ligne', 'Tél', val('tel', t.tel)));
+  // POUR QUI. Le trait de séparation appartient au bloc : sans personne à
+  // joindre — une ligne créée à la main, sans société — deux filets se
+  // suivaient, et le papier annonçait une section vide.
+  const pourQui = [];
+  if (t.client || editeur) pourQui.push(duo('tk__ligne', 'Client', val('client', t.client)));
+  if (t.contact || editeur) pourQui.push(duo('tk__ligne', 'Contact', val('contact', t.contact)));
+  if (t.tel || editeur) pourQui.push(duo('tk__ligne', 'Tél', val('tel', t.tel)));
+  if (pourQui.length) tk.append(sep(), ...pourQui);
 
   if (t.lignes.length) {
     tk.append(sep());
@@ -530,22 +454,9 @@ export function dessinerTicket(t, doc, editeur) {
     }
   }
 
-  // POUR L'ATELIER — sous ce qu'on produit, en dernier et dans son cadre. Celui
-  // qui fabrique lit le travail puis la consigne, sans retourner le papier.
-  if (t.atelier || editeur) {
-    const box = el('div', 'tk__atelier');
-    const txt = el('p', 'tk__atelier-txt');
-    txt.append(val('atelier', t.atelier));
-    box.append(el('p', 'tk__atelier-titre', "Pour l'atelier"), txt);
-    tk.append(sep(), box);
-  }
-
-  // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise,
-  // et qui la rend. En tête, ces deux lignes repoussaient d'autant la première
-  // qui dit quoi faire.
-  tk.append(sep());
-  if (t.date) tk.append(el('p', 'tk__pied', `Commande prise le ${t.date}`));
-  tk.append(el('p', 'tk__pied', "L'équipe Atelier OLDA"));
+  // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise.
+  // En tête, cette ligne repoussait d'autant la première qui dit quoi faire.
+  if (t.date) tk.append(sep(), el('p', 'tk__pied', `Commande prise le ${t.date}`));
   return tk;
 
   // --- Le bloc de production, en trois temps -------------------------------

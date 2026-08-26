@@ -4094,13 +4094,6 @@ function editeurTicket(r, champs) {
     return c;
   };
 
-  const boite = (cls, ...noeuds) => {
-    const d = document.createElement('div');
-    d.className = cls;
-    d.append(...noeuds);
-    return d;
-  };
-
   // Un champ de texte branché sur une COLONNE de la ligne : le cas le plus
   // courant (client, contact, téléphone).
   const surLaLigne = (col, valeur, o) => {
@@ -4122,29 +4115,9 @@ function editeurTicket(r, champs) {
         return surLaLigne('contact_phone', txt, {
           type: 'tel', mode: 'tel', label: 'Téléphone', placeholder: 'téléphone',
         });
-      // LA REMISE : une date (colonne de la ligne) et une heure (clé de la
-      // fiche — c'est elle qui commande le calcul du délai de production).
-      case 'remise': {
-        const jour = champ('input', String(r.deadline || '').slice(0, 10), {
-          type: 'date', cls: 'tk__jour', label: 'Date de remise',
-        });
-        brancher(jour, { ou: 'ligne', col: 'deadline' }, () => texteOuNull(jour.value));
-        const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
-        const heure = champ('input', f.heureSouhaitee || '', {
-          type: 'time', cls: 'tk__heure', label: 'Heure de remise',
-        });
-        brancher(heure, { ou: 'fiche', cle: 'heureSouhaitee' }, () => texteOuNull(heure.value));
-        return boite('tk__remise-champs', jour, heure);
-      }
-      // POUR L'ATELIER — la raison d'être de tout ceci. Toujours offerte, même
-      // vide : c'est en la voyant vide qu'on pense à la remplir.
-      case 'atelier': {
-        const c = champ('textarea', txt, {
-          rows: 3, label: 'Consigne pour l’atelier',
-          placeholder: 'ce qu’il faut savoir pour produire (emplacement, taille, matière, à vérifier…)',
-        });
-        return brancher(c, { ou: 'fiche', cle: 'atelier' }, () => texteOuNull(c.value));
-      }
+      // L'ÉCHÉANCE ET LA CONSIGNE D'ATELIER NE SONT PLUS SUR LE PAPIER (26/08),
+      // donc plus corrigeables ici. Elles restent l'une et l'autre dans le
+      // dossier : « Heure de remise » et « Consigne atelier », au tiroir.
       default: {
         // Les valeurs d'un ARTICLE. Sans adresse d'écriture — le détail d'un
         // besoin de devis résume trois champs — la valeur reste du texte : mieux
