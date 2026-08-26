@@ -273,7 +273,7 @@ console.log('✓ échelle : le CRM parle la langue de l’écran de référence 
       // Les cases du calendrier sont une GRILLE, pas des commandes ; les boutons
       // en `padding: 0 Npx` tiennent leur hauteur du parent ; `padding: 0` est
       // la forme ronde (44 px), troisième mot du vocabulaire.
-      if (/\.cal-|\.maj__btn|\.reg-btn|\.cl-seg__btn/.test(s1)) continue;
+      if (/\.cal-|\.maj__btn|\.reg-btn/.test(s1)) continue;
       const p = corps.match(/padding:\s*([^;]+)/);
       if (!p) continue;
       const v = p[1].trim();

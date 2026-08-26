@@ -263,7 +263,11 @@ for (const jeton of ['--ligne-serre', '--trait-reserve', '--champ-y-serre']) {
 }
 for (const [nom, src, sels] of [
   ['styles.css', CRM, ['.nav-switch-btn', '.ld-act']],
-  ['clients.css', CLIENTS, ['.cl-filter__btn', '.cl-sort__btn', '.cl-seg__btn']],
+  ['clients.css', CLIENTS, ['.cl-filter__btn', '.cl-sort__btn']],
+  // Le sélecteur segmenté est monté dans la charte le 26/08 : les Réglages et
+  // l'écran des tailles de logo le portent aussi. La recette le suit — c'est
+  // même tout l'intérêt d'un composant partagé.
+  ['charte.css', CHARTE, ['.segmente__btn']],
 ]) {
   for (const sel of sels) {
     // EN DÉBUT DE LIGNE : la règle de base s'écrit sans indentation, les

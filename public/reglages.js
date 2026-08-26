@@ -193,16 +193,6 @@ function buildStatic() {
     + 'comporte exactement comme avant. Allumer « Connexion nominative » demandera '
     + 'à chacun de choisir son prénom et son code au prochain chargement.', 'reg-flags'));
 
-  // --- Carte « Tailles de logo » ----------------------------------------------
-  // L'atelier tient le tableau sur un autre site ; le comptoir en garde une
-  // copie pour ne dépendre de personne au moment de servir un client. C'est ce
-  // bouton qui rapproche les deux — pas un déploiement.
-  page.appendChild(carteSimple('draw', 'Tailles de logo',
-    'La largeur du logo à imprimer, référence par référence et taille par taille, '
-    + 'reprise du site « Tailles Logo DTF » de l’atelier. Au comptoir, elle se pose '
-    + 'toute seule dans l’article textile — et reste modifiable, client par client. '
-    + 'À mettre à jour quand vous avez complété le tableau là-bas.', 'reg-tailles-logo'));
-
   // --- Carte « Corbeille » ----------------------------------------------------
   // Une commande retirée du planning n'est plus détruite : elle attend ici.
   // Sans cette carte, l'archivage serait invisible — donc, pour l'employé qui
@@ -350,66 +340,6 @@ function renderFlags() {
     l.append(inter);
     return l;
   }));
-}
-
-// --- Tailles de logo -----------------------------------------------------------
-let taillesLogo = { maj: null, source: null, familles: {} };
-let taillesLogoEtat = '';      // ce que le dernier clic a donné, dit DANS la carte
-
-function compterTaillesLogo(table) {
-  let refs = 0;
-  let mesures = 0;
-  for (const parRef of Object.values((table && table.familles) || {})) {
-    for (const tailles of Object.values(parRef)) {
-      refs += 1;
-      mesures += Object.keys(tailles).length;
-    }
-  }
-  return { refs, mesures };
-}
-
-function renderTaillesLogo() {
-  const hote = $('#reg-tailles-logo');
-  if (!hote) return;
-  const { refs, mesures } = compterTaillesLogo(taillesLogo);
-  const l = el('div', 'reg-ligne');
-  l.append(el('span', 'reg-ligne__nom', refs
-    ? `${refs} référence${refs > 1 ? 's' : ''}, ${mesures} largeur${mesures > 1 ? 's' : ''}`
-    : 'Aucune taille enregistrée'));
-  // LE RÉSULTAT SE LIT DANS LA CARTE, pas en haut de l'écran : le bandeau
-  // d'état vit à côté du message WhatsApp, à plusieurs écrans de ce bouton —
-  // on aurait cliqué ici et la réponse serait apparue hors de vue.
-  // TROIS ÉTATS, pas deux : sans date MAIS avec des largeurs, ce sont celles
-  // livrées avec l'application — dire « saisie à la main » serait faux, et
-  // c'est le genre de phrase qui envoie chercher un problème qui n'existe pas.
-  let dit;
-  if (taillesLogoEtat) dit = taillesLogoEtat;
-  else if (taillesLogo.maj) {
-    dit = `mise à jour le ${new Date(taillesLogo.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
-  } else if (refs) dit = 'livrées avec l’application — jamais relues sur le site';
-  else dit = 'le comptoir saisit chaque largeur à la main';
-  l.append(el('span', 'reg-ligne__aide', dit));
-  const b = el('button', 'reg-btn', 'Mettre à jour');
-  b.type = 'button';
-  b.id = 'reg-tailles-logo-maj';
-  l.append(b);
-  hote.replaceChildren(l);
-}
-
-async function majTaillesLogo(bouton) {
-  if (bouton) bouton.disabled = true;
-  taillesLogoEtat = 'Lecture du site…';
-  renderTaillesLogo();
-  try {
-    const recu = await api('POST', '/api/tailles-logo/rafraichir');
-    if (recu && recu.familles) taillesLogo = recu;
-    taillesLogoEtat = 'à jour';
-  } catch (err) {
-    // Le tableau déjà enregistré n'a pas bougé — le serveur le garantit. Le
-    // message le dit, sinon on croit avoir tout perdu.
-    taillesLogoEtat = err.message;
-  }
-  renderTaillesLogo();
 }
 
 // --- Corbeille ----------------------------------------------------------------
@@ -727,8 +657,6 @@ function wire() {
     if (jeton) return insertToken(jeton.dataset.token);
     if (e.target.closest('#reg-wa-save')) return save();
     if (e.target.closest('#reg-wa-reset')) { ta.value = saved; sync(); flash(''); }
-    const majLogo = e.target.closest('#reg-tailles-logo-maj');
-    if (majLogo) return majTaillesLogo(majLogo);
     const remise = e.target.closest('[data-restaurer]');
     if (remise) return restaurer(remise.dataset.restaurer, remise);
   });
@@ -755,7 +683,6 @@ export async function refreshReglages() {
     api('GET', '/api/modeles').then((d) => { if (Array.isArray(d)) modeles = d; }).catch(() => {}),
     api('GET', '/api/machines').then((d) => { if (Array.isArray(d)) machines = d; }).catch(() => {}),
     api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
-    api('GET', '/api/tailles-logo').then((d) => { if (d && d.familles) taillesLogo = d; }).catch(() => {}),
   ]);
   renderMarges();
   renderModeles();
@@ -763,8 +690,6 @@ export async function refreshReglages() {
   renderFlags();
   // L'état d'un clic précédent ne survit pas à un retour sur l'onglet : ce
   // qu'on relit fait foi.
-  taillesLogoEtat = '';
-  renderTaillesLogo();
   try {
     // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le
     // mot de passe) donnait `data.message === undefined` → le textarea se

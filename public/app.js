@@ -7612,6 +7612,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'reglages') return mountReglages();
   if (viewMode === 'montravail') return mountMonTravail();
   if (viewMode === 'pilotage') return mountPilotage();
+  if (viewMode === 'tailleslogos') return mountTaillesLogos();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7686,9 +7687,11 @@ const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $viewMonTravail = document.getElementById('viewMonTravail');
 const $viewPilotage = document.getElementById('viewPilotage');
+const $viewTaillesLogos = document.getElementById('viewTaillesLogos');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
+const $tailleslogos = document.getElementById('tailleslogos');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7806,6 +7809,22 @@ function mountPilotage() {
       .catch((err) => { pilLoading = null; pilModule = null; reportError(err); });
   } else if (pilModule && pilModule.refreshPilotage) {
     pilModule.refreshPilotage();
+  }
+}
+
+// TAILLES DES LOGOS — même montage paresseux : le module et le catalogue
+// textile qu'il charge ne partent du serveur qu'au premier passage sur
+// l'onglet.
+let tlLoading = null;
+let tlModule = null;
+function mountTaillesLogos() {
+  if (!$tailleslogos) return;
+  if (!tlLoading) {
+    tlLoading = import('./tailles-logos.js')
+      .then((m) => { tlModule = m; return m.initTaillesLogos($tailleslogos); })
+      .catch((err) => { tlLoading = null; tlModule = null; reportError(err); });
+  } else if (tlModule && tlModule.refreshTaillesLogos) {
+    tlModule.refreshTaillesLogos();
   }
 }
 
@@ -7928,6 +7947,7 @@ function setViewMode(mode) {
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
+  if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
   if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
@@ -7946,12 +7966,14 @@ function setViewMode(mode) {
   const reglages = mode === 'reglages';
   const montravail = mode === 'montravail';
   const pilotage = mode === 'pilotage';
+  const tailleslogos = mode === 'tailleslogos';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($montravail) $montravail.hidden = !montravail;
   if ($pilotage) $pilotage.hidden = !pilotage;
+  if ($tailleslogos) $tailleslogos.hidden = !tailleslogos;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7969,6 +7991,7 @@ function setViewMode(mode) {
   if (reglages) mountReglages();
   if (montravail) mountMonTravail();
   if (pilotage) mountPilotage();
+  if (tailleslogos) mountTaillesLogos();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7987,6 +8010,7 @@ const VIEWS = {
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   '#pilotage': 'pilotage',
+  '#tailles-logos': 'tailleslogos',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {

@@ -671,12 +671,12 @@ function renderDrawer() {
   const natRow = el('div', 'cl-f cl-f--nature');
   const natLab = el('span', 'cl-f__label');
   natLab.append(ic('badge', 'cl-f__ic'), el('span', null, 'Nature'));
-  const seg = el('div', 'cl-seg');
+  const seg = el('div', 'segmente');
   seg.setAttribute('role', 'radiogroup');
   seg.setAttribute('aria-label', 'Nature du client');
   const cur = nature(c.client_type);
   for (const n of NATURES) {
-    const nb = el('button', `cl-seg__btn${n.id === cur ? ' is-on' : ''}`, n.label);
+    const nb = el('button', `segmente__btn${n.id === cur ? ' is-on' : ''}`, n.label);
     nb.type = 'button';
     nb.dataset.nature = n.id;
     nb.setAttribute('role', 'radio');
@@ -1023,7 +1023,7 @@ function wire() {
       return renderList();
     }
 
-    const segBtn = t.closest('.cl-seg__btn');
+    const segBtn = t.closest('.segmente__btn');
     if (segBtn) return setNature(segBtn.dataset.nature);
 
     if (t.closest('#cl-new')) return openNew();

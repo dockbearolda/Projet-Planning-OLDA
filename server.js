@@ -27,7 +27,8 @@ const {
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
-  getTaillesLogo, setTaillesLogo, compterTaillesLogo,
+  getTaillesLogo, majTailleLogo, compterTaillesLogo,
+  TAILLES_LOGO_EMPLACEMENTS, taillesLogoPour,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, getFlags, setFlags,
@@ -38,7 +39,11 @@ const {
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
 } = require('./db');
-const { lireTaillesLogo, BASE_PAR_DEFAUT: TAILLES_LOGO_BASE } = require('./tailles-logo');
+// Les familles du tableau des tailles de logo : ce sont les genres que le
+// comptoir sait choisir (textile-catalog.js — GENRES_SAISIE et
+// FAMILLES_ACCESSOIRE). Une famille que la vendeuse ne peut pas choisir serait
+// une colonne que personne ne lira jamais.
+const FAMILLES_TAILLES_LOGO = ['Homme', 'Femme', 'Enfant', 'Bébé', 'Tote Bag', 'Casquettes', 'Pochettes'];
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 const FLAG_SET = new Set(FLAGS);
@@ -1107,51 +1112,32 @@ app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
   res.json(reglages);
 }));
 
-// LE TABLEAU DES TAILLES DE LOGO, recopié du site « Tailles Logo DTF ».
-// Le comptoir ne lit QUE cette copie : le second site peut être en train de
-// redémarrer, la vendeuse garde ses largeurs. Voir tailles-logo.js.
-// GET → { maj, source, familles } · POST /rafraichir → relit le site.
+// LE TABLEAU DES TAILLES DE LOGO. La largeur du logo à imprimer, par famille,
+// par référence, par emplacement et par taille de vêtement.
+//
+// GET rend AUSSI les emplacements et les tailles par famille : le comptoir et
+// l'écran de saisie doivent parler des mêmes colonnes, et une liste recopiée
+// des deux côtés finit toujours par diverger.
 app.get('/api/tailles-logo', asyncH(async (req, res) => {
-  res.json(await getTaillesLogo());
+  const table = await getTaillesLogo();
+  const tailles = {};
+  for (const famille of FAMILLES_TAILLES_LOGO) tailles[famille] = taillesLogoPour(famille);
+  res.json({ ...table, emplacements: TAILLES_LOGO_EMPLACEMENTS, tailles });
 }));
 
-// LA MISE À JOUR EST UN GESTE, PAS UN RÉFLEXE. Elle ne part pas au démarrage :
-// le tableau se remplit à la main, à l'atelier, et c'est le patron qui sait
-// quand il vient de le compléter. Un appel sortant au boot ferait dépendre le
-// démarrage d'un tiers pour une donnée qui change deux fois par mois.
-app.post('/api/tailles-logo/rafraichir', exige('reglages'), asyncH(async (req, res) => {
-  let lu;
+// UNE CASE À LA FOIS. Le tableau se remplit au fur et à mesure, case par case,
+// depuis les Réglages : envoyer le document entier à chaque frappe ferait
+// perdre la colonne d'à côté si deux postes le remplissent en même temps.
+// Une largeur vide (ou nulle) EFFACE la case — c'est une action, pas un oubli.
+app.patch('/api/tailles-logo', exige('reglages'), asyncH(async (req, res) => {
+  const { famille, reference, emplacement, taille, largeur } = req.body || {};
   try {
-    lu = await lireTaillesLogo();
+    const table = await majTailleLogo(famille, reference, emplacement, taille, largeur);
+    broadcast({ kind: 'settings' });
+    res.json({ ...table, ...compterTaillesLogo(table) });
   } catch (err) {
-    // LE TABLEAU EN PLACE NE BOUGE PAS. Un site injoignable ne doit pas vider
-    // ce que le comptoir utilise aujourd'hui — c'est exactement le moment où
-    // la vendeuse en a besoin.
-    const garde = await getTaillesLogo();
-    return res.status(502).json({
-      error: `Le site des tailles de logo n'a pas répondu (${err.message}). Les tailles déjà enregistrées restent en place.`,
-      ...garde,
-      ...compterTaillesLogo(garde),
-    });
+    res.status(400).json({ error: err.message });
   }
-  // UN RELEVÉ VIDE N'ÉCRASE PAS UN TABLEAU REMPLI. Le site peut répondre 200
-  // avec un contenu incomplet le temps qu'il se réveille : écrire dans ce cas
-  // effacerait ce que le comptoir utilise, sans que rien ne le signale.
-  const enPlace = await getTaillesLogo();
-  if (!lu.mesures && compterTaillesLogo(enPlace).mesures) {
-    return res.status(502).json({
-      error: 'Le site des tailles de logo a répondu sans aucune largeur. Les tailles déjà enregistrées restent en place.',
-      ...enPlace,
-      ...compterTaillesLogo(enPlace),
-    });
-  }
-  const table = await setTaillesLogo({
-    maj: new Date().toISOString(),
-    source: lu.source || TAILLES_LOGO_BASE,
-    familles: lu.familles,
-  });
-  broadcast({ kind: 'settings' });
-  res.json({ ...table, ...compterTaillesLogo(table) });
 }));
 
 // ÉTAPES RANGÉES À LA MAIN. Glisser une carte réécrit les `position` en base :

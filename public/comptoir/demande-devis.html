@@ -1971,34 +1971,38 @@ const TX_OBLIGATOIRES=[
 function txManquants(){return TX_OBLIGATOIRES.filter(([id])=>!String($(id).value).trim())}
 
 /* ===========================================================================
-   LA TAILLE DU LOGO — reprise du tableau de l'atelier.
+   LA TAILLE DU LOGO — ce que l'atelier a mesuré.
    ===========================================================================
-   L'atelier tient un second site (« Tailles Logo DTF ») où chaque référence
-   porte, POUR CHAQUE TAILLE DE VÊTEMENT, la largeur du logo à imprimer. Ce
-   n'est pas une constante par référence : sur NS300 le dos passe de 240 mm en
-   XS à 320 mm en XL. La vendeuse choisissait sa référence ici et allait lire
-   là-bas — quand elle y pensait ; sinon la dimension partait dans la note,
-   quand elle partait.
-   Le serveur en garde une copie (`/api/tailles-logo`) : le comptoir ne parle
-   jamais au second site, et une largeur déjà connue reste disponible même
-   quand celui-ci ne répond pas.
+   Chaque référence porte, POUR CHAQUE EMPLACEMENT et CHAQUE TAILLE DE
+   VÊTEMENT, la largeur du logo à imprimer. Ce n'est pas une constante par
+   référence : sur NS300 le dos passe de 240 mm en XS à 320 mm en XL. La
+   vendeuse choisissait sa référence ici et allait lire ailleurs — quand elle y
+   pensait ; sinon la dimension partait dans la note, quand elle partait.
+   Le tableau vit maintenant dans le CRM (Réglages → Tailles de logo) : le
+   comptoir lit `/api/tailles-logo`, une seule base, aucune copie à rafraîchir.
    TOUT RESTE MODIFIABLE. Le tableau propose, il ne décide pas : le client peut
    vouloir 320 mm là où la référence en dit 300. */
-let TX_LOGO={maj:null,source:null,familles:{}};
-let TX_LOGO_INDEX={};          /* familles rangées sous un nom comparable */
+let TX_LOGO={familles:{}};
+/* LA RECHERCHE SE FAIT SUR LA RÉFÉRENCE, PAS SUR LA FAMILLE. Une référence
+   identifie un produit : deux familles n'en partagent jamais une. Passer par la
+   famille rouvrait trois pièges pour rien — le catalogue range le body K831 en
+   « Enfant » quand l'atelier l'a mesuré en « Bébé », la vendeuse peut corriger
+   le genre à la main, et « Pochette » n'est pas « Pochettes ». La famille ne
+   sert plus qu'à ranger le tableau dans l'écran de saisie. */
+let TX_LOGO_INDEX={};          /* référence → emplacement → taille → mm */
+let TX_LOGO_EMPLACEMENTS=[];   /* les colonnes du tableau, données par le serveur */
 /* CE QU'ON SAIT DU TABLEAU, à ne jamais confondre avec ce qu'on sait de la
    RÉFÉRENCE. Le 26/08, un essai en local a montré des cases vides sous
    « Cette référence n'est pas encore dans le tableau » — alors qu'elle y
-   était : c'est la copie du serveur qui n'avait pas été remplie. Accuser la
-   référence quand on n'a pas lu le tableau envoie chercher au mauvais
-   endroit. */
+   était : c'est la base qui n'avait pas encore été semée. Accuser la référence
+   quand on n'a pas lu le tableau envoie chercher au mauvais endroit. */
 let TX_LOGO_ETAT='attente';    /* attente | ok | vide | muet */
 let txLogoManuel={};           /* ce que la vendeuse a écrit elle-même */
 let txLogoSignature='';        /* la grille ne se reconstruit que si elle change */
 
 /* Le tableau et le catalogue ne se sont pas mis d'accord sur les pluriels
    (« Pochette » / « Pochettes ») ni sur les accents. On compare donc sur une
-   forme réduite — et seulement pour retrouver la famille, jamais pour la
+   forme réduite — et seulement pour retrouver la ligne, jamais pour la
    réécrire. */
 function txLogoCle(s){
   return String(s==null?'':s).trim().toLowerCase()
@@ -2006,19 +2010,22 @@ function txLogoCle(s){
 }
 function txLogoIndexer(){
   TX_LOGO_INDEX={};
-  for(const [famille,refs] of Object.entries((TX_LOGO&&TX_LOGO.familles)||{})){
-    const parRef={};
-    for(const [ref,tailles] of Object.entries(refs||{})){
-      const parTaille={};
-      for(const [taille,v] of Object.entries(tailles||{}))parTaille[txLogoCle(taille)]=v;
-      parRef[txLogoCle(ref)]=parTaille;
+  for(const refs of Object.values((TX_LOGO&&TX_LOGO.familles)||{})){
+    for(const [ref,parEmplacement] of Object.entries(refs||{})){
+      const emplacements=TX_LOGO_INDEX[txLogoCle(ref)]||{};
+      for(const [emplacement,tailles] of Object.entries(parEmplacement||{})){
+        const parTaille=emplacements[emplacement]||{};
+        for(const [taille,mm] of Object.entries(tailles||{}))parTaille[txLogoCle(taille)]=mm;
+        emplacements[emplacement]=parTaille;
+      }
+      TX_LOGO_INDEX[txLogoCle(ref)]=emplacements;
     }
-    TX_LOGO_INDEX[txLogoCle(famille)]=parRef;
   }
 }
 function txLoadTaillesLogo(){
   return fetch('/api/tailles-logo').then(r=>r.ok?r.json():null).then(t=>{
     if(t&&t.familles&&typeof t.familles==='object')TX_LOGO=t;
+    if(t&&Array.isArray(t.emplacements))TX_LOGO_EMPLACEMENTS=t.emplacements;
     txLogoIndexer();
     TX_LOGO_ETAT=Object.keys(TX_LOGO_INDEX).length?'ok':'vide';
     txRenderLogo(true);
@@ -2029,51 +2036,55 @@ function txLoadTaillesLogo(){
   });
 }
 
-/* LE TABLEAU N'A QUE DEUX COLONNES — « Avant » et « Dos » — et ce sont des
-   TAILLES DE LOGO, pas des emplacements : 55 à 80 mm devant, 200 à 340 mm dans
-   le dos. On ne rapproche donc que ce dont on est sûr :
-     — Coeur et Poitrine sont le petit logo de devant → colonne « avant » ;
-     — Dos est la grande impression → colonne « dos ».
-   « Avant » côté chiffrage est une impression PLEINE FACE (0,335 ml, autant que
-   le dos) : le mot est le même, la taille non — on ne remplit rien, la rangée
-   reste là et se saisit. Idem pour les manches et les faces de tote bag, que le
-   tableau ne mesure pas. Un chiffre faux coûte une réimpression ; une case vide
-   coûte une question. */
-const TX_LOGO_COLONNE={'Coeur':'avant','Poitrine':'avant','Dos':'dos'};
-
 /* Les rangées se lisent DANS L'ORDRE DE L'INTITULÉ que la vendeuse vient de
    choisir — « Avant + Dos » montre Avant puis Dos. La liste du moteur, elle,
    est rangée pour le calcul (Coeur, Dos, Poitrine, …) et donnait « Dos » avant
    « Avant » : deux lectures pour la même ligne. */
-const TX_LOGO_ORDRE=['Coeur','Poitrine','Avant',
-  'Face Optimisée 205 x 205 mm','Face Classique 250 x 250 mm','Dos','Manche DR','Manche GA'];
+const TX_LOGO_ORDRE=['Coeur','Poitrine','Avant','Dos','Manche DR','Manche GA'];
+
+/* LES EMPLACEMENTS MARQUÉS QUE LE TABLEAU SAIT MESURER. Les deux faces de tote
+   bag n'en sont pas : leur taille est écrite DANS LEUR NOM (« Face Classique
+   250 x 250 mm »). Leur ouvrir une rangée serait demander de recopier ce qui
+   est déjà écrit juste au-dessus. */
 function txPlacementsMarques(printType){
   const flags=(TE().DB.printTypes||{})[printType]||{};
-  const marques=TE().PLACEMENTS.filter(p=>txNum(flags[p])>0);
-  return marques.slice().sort((a,b)=>{
-    const ia=TX_LOGO_ORDRE.indexOf(a),ib=TX_LOGO_ORDRE.indexOf(b);
-    return (ia<0?99:ia)-(ib<0?99:ib);
-  });
+  const colonnes=TX_LOGO_EMPLACEMENTS.length?TX_LOGO_EMPLACEMENTS:TX_LOGO_ORDRE;
+  return TE().PLACEMENTS
+    .filter(p=>txNum(flags[p])>0&&colonnes.includes(p))
+    .sort((a,b)=>{
+      const ia=TX_LOGO_ORDRE.indexOf(a),ib=TX_LOGO_ORDRE.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib);
+    });
 }
 
-/* La largeur que le tableau donne pour cette référence, ce genre, cette taille
-   et cet emplacement — ou null. Le catalogue connaît deux noms pour une même
-   référence (le sien et celui de TopTex : K3025 / K3025IC) ; le tableau peut
-   porter l'un ou l'autre, on essaie les deux. */
+/* La largeur que le tableau donne pour cette référence, ce genre, cet
+   emplacement et cette taille — ou null. Le catalogue connaît deux noms pour
+   une même référence (le sien et celui de TopTex : K3025 / K3025IC) ; le
+   tableau peut porter l'un ou l'autre, on essaie les deux. */
 function txLogoDuTableau(d,placement,cleTaille){
-  const colonne=TX_LOGO_COLONNE[placement];
-  if(!colonne||d.isCustom)return null;
-  const parRef=TX_LOGO_INDEX[txLogoCle(d.genre)];
-  if(!parRef)return null;
+  const emplacements=txLogoEmplacementsDe(d);
+  if(!emplacements)return null;
+  const mm=(emplacements[placement]||{})[txLogoCle(TE().SIZE_LABELS[cleTaille])];
+  return mm==null?null:mm;
+}
+
+/* Le catalogue connaît deux noms pour une même référence (le sien et celui de
+   TopTex : K3025 / K3025IC) ; le tableau peut porter l'un ou l'autre. */
+function txLogoEmplacementsDe(d){
+  if(d.isCustom)return null;
   const item=TE().getRef(d.ref);
-  const taille=txLogoCle(TE().SIZE_LABELS[cleTaille]);
   for(const nom of [d.ref,item&&item.toptex]){
     if(!nom)continue;
-    const v=(parRef[txLogoCle(nom)]||{})[taille];
-    if(v&&v[colonne]!=null)return v[colonne];
+    const trouve=TX_LOGO_INDEX[txLogoCle(nom)];
+    if(trouve)return trouve;
   }
   return null;
 }
+
+/* La référence est-elle connue du tableau, ne serait-ce que pour une seule
+   case ? C'est ce qui distingue « pas encore mesurée dans cette taille » de
+   « pas encore au tableau ». */
+function txLogoRefConnue(d){return !!txLogoEmplacementsDe(d);}
 
 /* Ce que la grille porte à l'instant : { 'Coeur': { S:60, M:65 }, … }.
    Une case vide n'est pas un zéro — elle ne descend pas. */
@@ -2101,12 +2112,12 @@ function txRenderLogo(force){
   const places=txPlacementsMarques(d.printType);
   const tailles=TE().SIZE_KEYS.filter(k=>txNum(d.sizes[k])>0);
   const signature=[d.ref,d.isCustom,d.genre,d.printType,
-    tailles.map(k=>k+':'+txNum(d.sizes[k])).join(','),TX_LOGO.maj].join('|');
+    tailles.map(k=>k+':'+txNum(d.sizes[k])).join(','),TX_LOGO_ETAT].join('|');
   if(!force&&signature===txLogoSignature)return;
   txLogoSignature=signature;
 
-  /* Sans emplacement ni taille, il n'y a rien à dire : le bloc disparaît au
-     lieu d'afficher une grille vide au-dessus de la note. */
+  /* Sans emplacement mesurable ni taille, il n'y a rien à dire : le bloc
+     disparaît au lieu d'afficher une grille vide au-dessus de la note. */
   if(!places.length||!tailles.length){
     wrap.classList.add('hidden');txFill(hote,[]);aide.textContent='';return;
   }
@@ -2120,9 +2131,9 @@ function txRenderLogo(force){
     noeuds.push(txEl('span','tx-logo-place',placement));
     for(const k of tailles){
       const cle=placement+'|'+k,tableau=txLogoDuTableau(d,placement,k);
-      const champ=document.createElement('input');
       /* MÊME CHAMP que les six cases des tailles juste au-dessus, attribut pour
          attribut : deux grilles voisines ne doivent pas être deux composants. */
+      const champ=document.createElement('input');
       champ.type='number';champ.min='0';champ.step='1';
       champ.dataset.cle=cle;
       champ.setAttribute('aria-label',`Taille du logo ${placement} en ${L[k]}, en millimètres`);
@@ -2148,12 +2159,9 @@ function txLogoAideMaj(){
   const aide=$('txLogoAide'),hote=$('txLogo');
   if(!aide||!hote||!txReady())return;
   const d=txReadForm();
-  const hors=txPlacementsMarques(d.printType).filter(p=>!TX_LOGO_COLONNE[p]);
-  const reste=hors.length?` Le tableau ne mesure que le devant et le dos : ${hors.join(', ')} se saisi${hors.length>1?'ssent':'t'} à la main.`:'';
-  let reprises=0,mains=0,mesurable=0;
+  let reprises=0,mains=0;
   for(const champ of hote.querySelectorAll('input[data-cle]')){
     const [placement,cle]=champ.dataset.cle.split('|');
-    if(TX_LOGO_COLONNE[placement])mesurable++;
     const saisi=Math.round(txNum(champ.value));
     if(!(saisi>0))continue;
     const tableau=txLogoDuTableau(d,placement,cle);
@@ -2161,31 +2169,26 @@ function txLogoAideMaj(){
   }
   const pluriel=(n)=>n>1?'s':'';
   if(reprises&&mains)
-    aide.textContent=`${reprises} largeur${pluriel(reprises)} reprise${pluriel(reprises)} du tableau de l’atelier, ${mains} saisie${pluriel(mains)} à la main.${reste}`;
+    aide.textContent=`${reprises} largeur${pluriel(reprises)} reprise${pluriel(reprises)} du tableau de l’atelier, ${mains} saisie${pluriel(mains)} à la main.`;
   else if(reprises)
-    aide.textContent=`${reprises} largeur${pluriel(reprises)} reprise${pluriel(reprises)} du tableau de l’atelier — modifiable${pluriel(reprises)}.${reste}`;
+    aide.textContent=`${reprises} largeur${pluriel(reprises)} reprise${pluriel(reprises)} du tableau de l’atelier — modifiable${pluriel(reprises)}.`;
   else if(mains)
-    aide.textContent=`Largeur${pluriel(mains)} saisie${pluriel(mains)} à la main.${reste}`;
-  else if(!mesurable)
-    aide.textContent=`À saisir à la main.${reste}`.trim();
-  else if(d.isCustom)
-    aide.textContent=`Produit libre : le tableau ne le connaît pas, la taille du logo se saisit à la main.${reste}`;
+    aide.textContent=`Largeur${pluriel(mains)} saisie${pluriel(mains)} à la main.`;
   /* LE TABLEAU AVANT LA RÉFÉRENCE. Tant qu'on ne l'a pas lu, on ne sait rien
-     de cette référence — et le dire évite d'aller la chercher là où elle
-     est déjà. */
+     de cette référence — et le dire évite d'aller la chercher là où elle est
+     déjà. */
   else if(TX_LOGO_ETAT==='attente')
     aide.textContent='Lecture du tableau des tailles de logo…';
   else if(TX_LOGO_ETAT==='muet')
-    aide.textContent=`Le tableau des tailles de logo n’a pas pu être lu — à saisir à la main.${reste}`;
+    aide.textContent='Le tableau des tailles de logo n’a pas pu être lu — à saisir à la main.';
   else if(TX_LOGO_ETAT==='vide')
-    aide.textContent=`Aucune taille de logo enregistrée (Réglages → Tailles de logo) — à saisir à la main.${reste}`;
-  else{
-    const parRef=TX_LOGO_INDEX[txLogoCle(d.genre)],item=TE().getRef(d.ref);
-    const connue=parRef&&[d.ref,item&&item.toptex].some(n=>n&&parRef[txLogoCle(n)]);
-    aide.textContent=connue
-      ? `Cette référence est dans le tableau, mais pas pour ces tailles — à saisir à la main.${reste}`
-      : `Cette référence n’est pas encore dans le tableau des tailles de logo — à saisir à la main.${reste}`;
-  }
+    aide.textContent='Aucune taille de logo enregistrée (Réglages → Tailles de logo) — à saisir à la main.';
+  else if(d.isCustom)
+    aide.textContent='Produit libre : le tableau ne le connaît pas, la taille du logo se saisit à la main.';
+  else if(txLogoRefConnue(d))
+    aide.textContent='Cette référence est au tableau, mais pas pour ces tailles ni ces emplacements — à saisir à la main.';
+  else
+    aide.textContent='Cette référence n’est pas encore au tableau des tailles de logo (Réglages → Tailles de logo) — à saisir à la main.';
 }
 
 /* UN SEUL ÉCOUTEUR, posé une fois sur l'hôte : les champs, eux, sont refaits à

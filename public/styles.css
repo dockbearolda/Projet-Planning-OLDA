@@ -5954,6 +5954,99 @@ body.dragging-active .pcard:active { border-color: var(--border); }
    fonctions en cours). Une rangée = un nom, une aide, et le contrôle à droite —
    la même forme que `.reg-tarif-row`, sans en refaire une nouvelle. */
 .reg-liste { display: flex; flex-direction: column; }
+
+/* UN TABLEAU, PAS UN TEXTE. Les Réglages sont bornés à 760 px — une largeur de
+   lecture, juste pour du texte et des listes courtes. Ici il y a six ou sept
+   colonnes de chiffres : à 69 px elles se serrent, à pleine largeur elles se
+   lisent. C'est la largeur de la Base clients, l'autre écran de données. */
+.tl-page { max-width: none; }
+
+/* --- Tailles des logos : le tableau lui-même ---------------------------------
+   Une famille à la fois, un emplacement à la fois : six emplacements × six
+   tailles feraient trente-six colonnes, et un tableau de trente-six colonnes ne
+   se lit pas. Les deux rangées de choix sont le sélecteur segmenté de la charte
+   — le même que la Base clients. */
+.tl-barres { display: flex; flex-direction: column; gap: var(--pas-2); align-items: flex-start; }
+/* La grille défile dans SA boîte, dans les deux sens : la page, elle, ne part
+   jamais de côté et ne s'allonge pas de deux mille pixels parce qu'une famille
+   compte vingt-six références. */
+.tl-cadre { max-height: 58vh; overflow: auto; overscroll-behavior: contain; }
+.tl-grille {
+  display: grid;
+  /* La colonne des références est BORNÉE : en `max-content`, la désignation la
+     poussait à 430 px et il ne restait qu'une taille à l'écran. C'est la
+     référence qu'on cherche, la désignation ne fait que la situer — elle se
+     coupe. */
+  grid-template-columns: 260px repeat(var(--tl-cols, 1), minmax(0, 1fr));
+  /* AUCUN INTERVALLE VERTICAL : l'en-tête est collant, et une ligne qui défile
+     apparaîtrait dans l'espace entre deux cellules d'en-tête. Le rythme vient
+     du rembourrage des cellules. */
+  column-gap: var(--pas-2);
+  row-gap: 0;
+  align-items: center;
+}
+/* Les intitulés de colonne nomment une colonne : ils prennent la taille d'un
+   INTITULÉ, comme partout ailleurs, pas celle du texte courant. */
+.tl-coin,
+.tl-tete {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* Le fond de la CARTE, sans quoi les lignes défileraient au travers des
+     intitulés. */
+  background: var(--surface);
+  padding: 0 0 var(--pas-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-2);
+  line-height: var(--ligne-serre);
+}
+.tl-tete { text-align: center; }
+/* LA RÉFÉRENCE AU-DESSUS, LA DÉSIGNATION EN DESSOUS. Côte à côte, la
+   désignation réclamait 430 px et il ne restait qu'une taille à l'écran ; la
+   page des Réglages est bornée à 760 px de large, on ne les élargit pas pour
+   une carte. Sur deux lignes, la rangée ne grandit pas — le champ fait déjà
+   44 px de haut. */
+.tl-ref {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--pas-1) var(--pas-2) var(--pas-1) 0;
+}
+.tl-ref b { line-height: var(--ligne-serre); }
+.tl-ref b { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+.tl-nom {
+  width: 100%;
+  min-width: 0;
+  line-height: var(--ligne-serre);
+  font-size: var(--taille-note);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-champ {
+  width: 100%;
+  min-width: 0;
+  height: var(--ctrl-h);
+  margin: var(--pas-1) 0;
+  padding: 0 var(--pas-2);
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+  text-align: center;
+}
+.tl-champ:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+/* La couleur dit un ÉTAT : ici, « cette largeur n'est pas enregistrée ». */
+.tl-champ.est-ko { border-color: var(--danger); }
+.tl-pied,
+.tl-vide { font-size: var(--taille-note); color: var(--text-2); line-height: var(--ligne-texte); margin: 0; }
 .reg-ligne { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
 .reg-ligne:last-child { border-bottom: 0; }
 .reg-ligne__nom { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
