@@ -2140,6 +2140,12 @@ function logosDuDetail(texte) {
   return out;
 }
 
+function encreDuDetail(texte) {
+  const seg = segmentDuDetail(texte, 'Marquage ');
+  const m = seg.match(/\(([^)]+)\)\s*$/);
+  return m ? m[1].trim() : '';
+}
+
 // Ce qu'une ligne a à produire, relu dans le récapitulatif de SON dossier. Le
 // rang vient du lot (« Besoin 2 — Couleur ») : quatre lignes d'un même ticket
 // n'ont ni la même référence ni les mêmes tailles.
@@ -2153,11 +2159,14 @@ function prodDuRecap(fiche) {
     ref: rangees.get(`${tete}Référence`) || '',
     couleur: rangees.get(`${tete}Couleur`) || '',
     marquage: rangees.get(`${tete}Production`) || '',
+    // « Marquage Coeur + Dos (Blanc) » : entre parenthèses, la couleur de
+    // l'ENCRE. Elle ne se devine pas — si la parenthèse manque, on n'écrit rien.
+    encre: encreDuDetail(detail),
     tailles: taillesDuDetail(detail),
     logos: logosDuDetail(detail),
   };
-  return prod.ref || prod.couleur || prod.marquage || prod.tailles.length || prod.logos.length
-    ? prod : null;
+  return prod.ref || prod.couleur || prod.marquage || prod.encre
+    || prod.tailles.length || prod.logos.length ? prod : null;
 }
 
 // Selon le pilote (Postgres / pg-mem), une colonne JSON revient en objet ou en

@@ -2726,10 +2726,15 @@ function prodDuBesoin(n){
     ref:String((n&&n.requestedRef)||'').trim(),
     couleur:String((n&&n.color)||'').trim(),
     marquage:String((n&&n.productionType)||'').trim(),
+    /* LA COULEUR DE L'ENCRE, à ne pas confondre avec celle du vêtement. Sur un
+       t-shirt rouge, blanc ou noir ce n'est pas le même fichier — et c'est
+       l'atelier qui charge le rouleau. */
+    encre:'',
     tailles:[],logos:[]
   };
   const t=n&&n.textile;
   if(!t)return prod;
+  prod.encre=String(t.markColor||'').trim();
   const L=TE().SIZE_LABELS;
   /* LE NOMBRE D'ABORD, PUIS LA TAILLE : « 2 × S ». C'est l'ordre des trois
      autres endroits qui les écrivent, et il n'y en a pas deux. */

@@ -3991,6 +3991,16 @@ function poserStyleTicket() {
 function corpsTicket(cible, valeur) {
   if (cible.ou === 'ligne') return { fiche: false, corps: { [cible.col]: valeur } };
   if (cible.ou === 'fiche') return { fiche: true, corps: { [cible.cle]: valeur } };
+  // CE QU'ON RECTIFIE À L'ÉTABLI : un nombre par taille, une largeur de logo.
+  // Par POSITION comme le récapitulatif — on n'envoie QUE la case corrigée, et
+  // la correction du poste d'à côté tient toujours quand la nôtre arrive.
+  if (cible.ou === 'prod') {
+    const cases = [];
+    cases[cible.i] = cible.liste === 'tailles'
+      ? { n: Number(valeur) }
+      : { mm: String(valeur == null ? '' : valeur) };
+    return { fiche: true, corps: { prod: { [cible.liste]: cases } } };
+  }
   const positions = [];
   positions[cible.i] = String(valeur == null ? '' : valeur);
   return { fiche: true, corps: { details: positions } };
@@ -4151,6 +4161,11 @@ function editeurTicket(r, champs) {
             tag: 'textarea', rows: 2, label: 'Ce qu’on produit',
             placeholder: '+ précision pour l’atelier',
           },
+          // LES DEUX VALEURS QU'ON RECTIFIE DEVANT LA PRESSE. Elles sont dans
+          // la case du tableau et au bout du filet du bordereau : le champ n'y
+          // pose pas de trait de plus (voir CSS_TICKET).
+          'prod-taille': { mode: 'numeric', label: 'Nombre de pièces pour cette taille' },
+          'prod-logo': { mode: 'numeric', label: 'Largeur du logo en mm' },
         }[cle] || { label: cle };
         const c = champ(o.tag || 'input', txt, o);
         // Une valeur du récapitulatif est une CHAÎNE, pas une valeur typée : on

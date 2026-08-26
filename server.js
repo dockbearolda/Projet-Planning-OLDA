@@ -2585,6 +2585,36 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
   res.json(await getRequestJournal(req.params.id));
 }));
 
+// LES DEUX VALEURS QUE L'ÉTABLI RECTIFIE, et rien d'autre : le nombre d'une
+// taille, la largeur d'une face. Par POSITION, comme le récapitulatif — une
+// entrée absente du patch laisse la valeur en place, donc deux postes qui
+// corrigent deux largeurs différentes ne s'effacent pas l'un l'autre.
+//
+// UN NOMBRE DE PIÈCES NE DESCEND PAS À ZÉRO par cette porte : retirer une
+// taille change la longueur du tableau, donc les positions de toutes les
+// suivantes — la correction d'à côté irait alors sur la mauvaise case. On
+// retire une taille au dossier, pas au ticket.
+function corrigerProd(actuel, patch) {
+  if (!actuel || typeof actuel !== 'object') return actuel;
+  if (!patch || typeof patch !== 'object') return actuel;
+  const out = { ...actuel };
+  if (Array.isArray(patch.tailles) && Array.isArray(actuel.tailles)) {
+    out.tailles = actuel.tailles.map((t, i) => {
+      const v = patch.tailles[i];
+      const n = v && typeof v === 'object' ? Number(v.n) : NaN;
+      return Number.isInteger(n) && n > 0 ? { ...t, n } : t;
+    });
+  }
+  if (Array.isArray(patch.logos) && Array.isArray(actuel.logos)) {
+    out.logos = actuel.logos.map((l, i) => {
+      const v = patch.logos[i];
+      const mm = v && typeof v === 'object' ? borner(v.mm, 120) : null;
+      return mm ? { ...l, mm } : l;
+    });
+  }
+  return out;
+}
+
 // PATCH /api/requests/:id/fiche → corrige le DÉTAIL COMPLET d'une commande du
 // comptoir (le récapitulatif enregistré à la prise). Une quantité change, une
 // taille se précise, un numéro de téléphone était faux : ça se corrige sur la
@@ -2664,6 +2694,14 @@ app.patch('/api/requests/:id/fiche', exige('clients'), asyncH(async (req, res) =
     // secours, l'un a dû changer). `ref`, elle, ne se retape JAMAIS : c'est la
     // clé du dossier — la recherche et l'idempotence de la prise s'y appuient.
     if ('refTicket' in b) majFiche.refTicket = borner(b.refTicket, 40);
+    // CE QU'ON RECTIFIE À L'ÉTABLI : un nombre par taille, une largeur de logo.
+    // « Finalement le dos en 300 » se décide devant la presse, et une
+    // rectification qui ne vit que sur le papier est perdue au ticket suivant.
+    // On corrige PAR POSITION, comme le récapitulatif — deux postes qui
+    // rectifient deux largeurs différentes ne s'effacent pas l'un l'autre.
+    // Le reste de `prod` (référence, couleur, technique) ne s'écrit PAS par
+    // cette porte : c'est l'identité de l'article, elle se corrige au dossier.
+    if ('prod' in b) majFiche.prod = corrigerProd(fiche.prod, b.prod);
 
     const { rows: maj } = await client.query(
       'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
@@ -4611,12 +4649,16 @@ function prodDuComptoir(brut) {
     ref: mot(brut.ref) || '',
     couleur: mot(brut.couleur) || '',
     marquage: mot(brut.marquage) || '',
+    // La couleur de l'ENCRE, pas celle du vêtement : elle ne se lit que sur le
+    // ticket de l'atelier, là où quelqu'un charge un rouleau.
+    encre: mot(brut.encre) || '',
     tailles,
     logos,
   };
   // Un objet vide ne vaut pas la place qu'il prend dans la liste : sans un seul
   // fait, il n'y a rien à afficher et la carte doit l'ignorer.
-  return prod.ref || prod.couleur || prod.marquage || tailles.length || logos.length ? prod : null;
+  return prod.ref || prod.couleur || prod.marquage || prod.encre
+    || tailles.length || logos.length ? prod : null;
 }
 
 // LA PART DE CHAQUE LIGNE DANS LE TICKET. Règle : la somme des lignes vaut

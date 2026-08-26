@@ -75,6 +75,7 @@ const BESOIN_TEXTILE = {
   productionType: 'DTF',
   comment: 'Le client fournit le logo en PDF vectoriel.',
   textile: {
+    markColor: 'Noir',
     sizes: { S: '8', M: '12', L: '10', XL: '', XXL: '', other: '' },
     // Le dos change de largeur d'une taille à l'autre, le coeur non : les deux
     // formes doivent sortir différemment.
@@ -99,11 +100,16 @@ assert.deepStrictEqual(prod.logos, [
 // deux FACES sur la ligne du planning. Le même signe des deux côtés faisait
 // lire « Dos S 260 · M 280 » comme deux faces.
 assert.doesNotMatch(prod.logos[1].mm, / · /);
+// LA COULEUR DE L'ENCRE, à ne pas confondre avec celle du vêtement : « Blanc »
+// sur un t-shirt Blanc n'existe pas, et c'est l'atelier qui charge le rouleau.
+// Elle ne s'affiche PAS sur la carte du planning — voir le ticket.
+assert.strictEqual(prod.encre, 'Noir');
 
 // Un besoin NON textile n'a ni tailles ni logos, et ce n'est pas une panne :
 // il garde sa référence, sa couleur et sa technique.
 const prodObjet = prodDe({ requestedRef: 'MUG-11', color: 'Blanc', productionType: 'Sublimation' });
-assert.deepStrictEqual(prodObjet, { ref: 'MUG-11', couleur: 'Blanc', marquage: 'Sublimation', tailles: [], logos: [] });
+assert.deepStrictEqual(prodObjet,
+  { ref: 'MUG-11', couleur: 'Blanc', marquage: 'Sublimation', encre: '', tailles: [], logos: [] });
 
 // Une case de logo vide n'est pas un zéro : elle n'ouvre pas de face.
 const prodSansLogo = prodDe({ requestedRef: 'K3025', textile: { sizes: { other: '20' }, logo: { Dos: {} } } });
