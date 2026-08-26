@@ -210,16 +210,17 @@ const TE = global.window.TextileEngine;
     assert.ok(iExacte > 0 && iUnique > iExacte, 'la taille EXACTE d’abord, « Taille unique » en repli');
   }
 
-  // --- 7. LE TABLEAU AVANT LA RÉFÉRENCE --------------------------------------
-  const aideSrc = DEVIS_JS.slice(DEVIS_JS.indexOf('function txLogoAideMaj('));
-  const corpsAide = aideSrc.slice(0, aideSrc.indexOf('\n}'));
-  const posEtat = corpsAide.indexOf("TX_LOGO_ETAT==='vide'");
-  const posAccuse = corpsAide.indexOf('n’est pas encore au tableau');
-  assert.ok(posEtat > 0 && posAccuse > 0 && posEtat < posAccuse,
-    'l’état du TABLEAU se dit AVANT d’accuser la référence — sinon le message ment');
-  for (const etat of ['attente', 'muet', 'vide']) {
-    assert.ok(corpsAide.includes(`TX_LOGO_ETAT==='${etat}'`), `l’état « ${etat} » a son message`);
-  }
+  // --- 7. PAS DE LIGNE D'AIDE SOUS LA GRILLE ---------------------------------
+  // Elle disait « 2 largeurs reprises du tableau — modifiables ». Charlie l'a
+  // retirée : sous des cases pleines elle ne dit rien qu'on ne voie déjà, et
+  // sous des cases vides le vide se lit tout seul.
+  assert.ok(!/txLogoAide/.test(DEVIS), 'plus de ligne d’aide sous la grille');
+  // L'ÉTAT DE LA LECTURE RESTE, LUI : il n'affiche plus rien, mais c'est lui
+  // qui fait reconstruire la grille quand le tableau arrive du serveur — sans
+  // ça, une référence connue s'ouvrirait vide et n'aurait jamais ses largeurs.
+  const rendu2 = DEVIS_JS.slice(DEVIS_JS.indexOf('function txRenderLogo('));
+  assert.match(rendu2.slice(0, 900), /TX_LOGO_ETAT\]\.join\('\|'\)/,
+    'l’arrivée du tableau change la signature, donc la grille se refait');
 
   // --- 7 bis. LE CHAMP, SES GARDES ET SON VOYAGE -----------------------------
   assert.match(DEVIS, /id="txLogoWrap"/, 'le bloc existe dans le formulaire textile');
