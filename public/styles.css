@@ -1111,6 +1111,10 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 /* Nom hérité de la catégorie (pas posé sur la ligne) : même liseré pointillé que
    la puce du tableau, pour qu'on voie d'un coup d'œil ce qui est automatique. */
 .pcard__ref-name.is-auto { border-bottom: 1px dashed var(--border); display: inline-block; }
+/* `hidden` ne masque rien tout seul quand une classe voisine porte son propre
+   `display` : la règle est écrite en clair pour que le nom du référent
+   disparaisse VRAIMENT quand la pastille le dit déjà. */
+.pcard__ref-name[hidden] { display: none; }
 .pcard__open {
   display: grid; place-items: center;
   width: var(--rond); height: var(--rond); border-radius: var(--pilule);

@@ -1268,7 +1268,14 @@ const PROD_FAITS = [
   {
     key: 'prod_ref',
     label: 'Réf.',
-    lire: (p) => [p.ref, p.couleur, p.marquage].filter(Boolean).join(' · '),
+    // LA RÉFÉRENCE NE S'ÉCRIT PAS DEUX FOIS. La désignation de l'article la
+    // porte presque toujours (« T-shirt col rond NS300 ») et la ligne juste
+    // en dessous la répétait : deux fois NS300 sur trois centimètres.
+    lire: (p, r) => {
+      const nom = String((r && r.product) || '');
+      const ref = p.ref && nom.includes(p.ref) ? '' : p.ref;
+      return [ref, p.couleur, p.marquage].filter(Boolean).join(' · ');
+    },
   },
   {
     key: 'prod_tailles',
@@ -1297,7 +1304,7 @@ function blocProduction(r) {
   bloc.className = 'prod-fiche';
   for (const fait of PROD_FAITS) {
     if (hiddenCols.has(fait.key)) continue;
-    const valeur = fait.lire(p);
+    const valeur = fait.lire(p, r);
     if (!valeur) continue;
     const cle = document.createElement('span');
     cle.className = 'prod-fiche__cle';
@@ -1310,7 +1317,16 @@ function blocProduction(r) {
   return bloc.childElementCount ? bloc : null;
 }
 
-function buildCard(r) {
+// `opts.coiffee` : la carte est sous une BANNIÈRE de lot, qui nomme déjà le
+// client et le ticket. `opts.rangeParLeGroupe` : cette bannière porte son
+// « Ranger les N ». Dans les deux cas la carte se tait — trois fois le même nom
+// et trois boutons « Ranger » sur quinze centimètres, ce n'est pas de
+// l'insistance, c'est du bruit.
+function buildCard(r, options) {
+  // Pas de valeur par défaut DANS la signature : `opts = {}` y met une paire
+  // d'accolades, et les sondes qui relèvent le corps d'une fonction en comptant
+  // les accolades depuis la première rencontrée s'arrêtaient net sur celle-là.
+  const opts = options || {};
   const carte = document.createElement('article');
   carte.dataset.id = r.id;
   const delai = tempsRestant(r.deadline, r.fiche && r.fiche.heureSouhaitee);
@@ -1329,9 +1345,20 @@ function buildCard(r) {
   // n'apparaîtrait que sur certaines cartes décalerait toute la file.
   const marque = lotChip(r);
   if (marque) ref.append(' ', marque);
-  const blocClient = ref.textContent
-    ? pcardBloc('Client', client, ref)
-    : pcardBloc('Client', client);
+  const lot = lotDe(r);
+  // SOUS UNE BANNIÈRE, la colonne ne répète pas le client : elle dit QUEL
+  // article on lit. C'est la seule chose que la bannière ne peut pas dire à sa
+  // place, et la colonne garde sa largeur — la file ne se décale pas.
+  const blocClient = opts.coiffee && lot
+    ? pcardBloc('Article', (() => {
+      const n = document.createElement('div');
+      n.className = 'pcard__client';
+      n.textContent = `${lot.rang} sur ${lot.total}`;
+      return n;
+    })())
+    : (ref.textContent
+      ? pcardBloc('Client', client, ref)
+      : pcardBloc('Client', client));
 
   // 2. QUOI — la description, puis les deux puces qui situent la commande.
   const nom = document.createElement('div');
@@ -1351,11 +1378,18 @@ function buildCard(r) {
   // de la seule information neuve, la sous-étape.
   // À TRIER : à la place de la puce qui SITUE, le bouton qui RANGE.
   // Même emplacement, même gabarit — la file ne se décale pas d'un pixel.
-  meta.appendChild(r.stage === A_TRIER && currentStage === A_TRIER
-    ? boutonRanger(r)
-    : puce(r.stage === currentStage
-      ? (SUB_LABEL[r.sub_stage] || (familyHasSub(r.stage) ? 'à préciser' : STAGE_LABEL[r.stage]))
-      : stageDestinationLabel(r.stage, r.sub_stage ?? null)));
+  // NI LE BOUTON NI LA PUCE quand la bannière du lot range déjà les articles
+  // ensemble : elle dit le geste ET la destination, à deux centimètres
+  // au-dessus. Trois boutons « Ranger » l'un sous l'autre pour un seul geste
+  // utile, puis « À trier » répété sur l'écran « À trier » — c'était deux fois
+  // du bruit pour rien.
+  if (!opts.rangeParLeGroupe) {
+    meta.appendChild(r.stage === A_TRIER && currentStage === A_TRIER
+      ? boutonRanger(r)
+      : puce(r.stage === currentStage
+        ? (SUB_LABEL[r.sub_stage] || (familyHasSub(r.stage) ? 'à préciser' : STAGE_LABEL[r.stage]))
+        : stageDestinationLabel(r.stage, r.sub_stage ?? null)));
+  }
   if (r.flag) {
     const pf = puce(FLAG_BY_VALUE[r.flag] ? FLAG_BY_VALUE[r.flag].label : 'À voir');
     pf.classList.add('pcard__pill--' + (r.flag === 'bloque' ? 'bloque' : 'a-voir'));
@@ -1376,19 +1410,18 @@ function buildCard(r) {
   remise.className = 'pcard__sub';
   const heure = r.fiche && r.fiche.heureSouhaitee ? ` à ${r.fiche.heureSouhaitee.replace(':', 'h')}` : '';
   remise.textContent = `Remise client : ${dateFr(r.deadline)}${heure}`;
-  const cible = document.createElement('div');
-  cible.className = 'pcard__sub';
-
-  // Le délai restant suit l'HORLOGE, pas la donnée : on le réécrit sur place à
-  // chaque minute (voir rafraichirTemps) plutôt que de reconstruire la carte —
-  // reconstruire, c'était refaire tout le DOM du planning une fois par minute.
+  // « À TERMINER AVANT ven. 28/08 18h00 » A QUITTÉ LA CARTE. C'est le MÊME
+  // instant que le décompte juste au-dessus, écrit en absolu — et il portait
+  // une seconde date (28/08) à côté de la promesse client (29/08) sans qu'un
+  // mot n'explique laquelle des deux compte. Trois lignes pour une échéance.
+  // Elle reste à portée : au survol du décompte, et en clair dans la fiche.
   const majDelai = () => {
     const d = tempsRestant(r.deadline, r.fiche && r.fiche.heureSouhaitee);
     const b = bandeUrgence(d);
     for (const x of ['retard', 'urgent', 'calme']) carte.classList.toggle(`pcard--${x}`, x === b);
     delaiEl.className = 'pcard__delai' + (b === 'calme' ? '' : ` pcard__delai--${b}`);
     delaiEl.textContent = d.texte;
-    cible.textContent = `À terminer avant ${d.echeanceTexte}`;
+    attachTip(delaiEl, `À terminer avant ${d.echeanceTexte}`);
   };
   majDelai();
   carte.__majTemps = majDelai;
@@ -1426,12 +1459,23 @@ function buildCard(r) {
   // refaisait tout un article de DOM pour un simple appui.
   const majRefs = () => {
     const eff = nomEffectif();
-    nomRef.textContent = `Référent : ${eff.qui}`;
+    let allumee = false;
+    for (const b of refs.children) {
+      const on = b.dataset.employe === r.referent;
+      b.classList.toggle('is-on', on);
+      if (on) allumee = true;
+    }
+    // LE NOM NE S'ÉCRIT QUE SI AUCUNE PASTILLE NE LE DIT. Une initiale noircie
+    // et « Référent : Loïc » juste dessous, c'est deux fois la même chose sur
+    // deux lignes. Le nom RESTE quand il vient du réglage de la catégorie :
+    // aucune pastille n'est allumée dans ce cas-là, et la carte serait muette
+    // sur la seule question qui compte — qui s'en occupe.
+    nomRef.hidden = allumee;
+    nomRef.textContent = allumee ? '' : `Référent : ${eff.qui}`;
     nomRef.classList.toggle('is-auto', eff.auto);
     attachTip(nomRef, eff.auto
       ? 'Nom par défaut de la catégorie — appuyer sur une initiale pour en nommer un autre'
       : `Référent : ${eff.qui}`);
-    for (const b of refs.children) b.classList.toggle('is-on', b.dataset.employe === r.referent);
   };
   for (const e of EMPLOYEES) {
     const b = document.createElement('button');
@@ -1533,7 +1577,7 @@ function buildCard(r) {
   carte.append(
     blocClient,
     pcardBloc('Projet', ...quoi),
-    pcardBloc('Délai restant', delaiEl, remise, cible),
+    pcardBloc('Délai restant', delaiEl, remise),
     prixVisible
       ? pcardBloc('TTC', montant, refs, nomRef)
       : pcardBloc('Référent', refs, nomRef),
@@ -1711,6 +1755,15 @@ function renderCards(data) {
   const bandes = bandesDeLot(data);
   const debutBande = new Map(bandes.map((b) => [b.debut, b]));
   nettoyerBandes(new Set(bandes.map((b) => b.ref)));
+  // CE QUE LA BANNIÈRE DIT DÉJÀ, LA CARTE NE LE RÉPÈTE PAS : le nom du client,
+  // le numéro de ticket, le bouton qui range. La SIGNATURE le porte — sans ça
+  // une carte sortie de son groupe garderait l'en-tête d'un groupe qu'elle
+  // vient de quitter jusqu'au prochain aller-retour serveur.
+  const coiffees = new Map();
+  for (const b of bandes) {
+    const groupe = bandeRangeable(b);
+    for (const l of b.lignes) coiffees.set(String(l.id), groupe);
+  }
   const ordre = [];
   let budget = TRANCHE_RENDU;
   let reste = false;
@@ -1718,17 +1771,19 @@ function renderCards(data) {
     const r = data[idx];
     if (debutBande.has(idx)) ordre.push(noeudBandeLot(debutBande.get(idx), true));
     const id = String(r.id);
-    const sig = `${r.id}:${r.updated_at}`;
+    const coiffee = coiffees.has(id);
+    const opts = { coiffee, rangeParLeGroupe: coiffees.get(id) === true };
+    const sig = `${r.id}:${r.updated_at}:${coiffee ? 'b' : ''}${opts.rangeParLeGroupe ? 'g' : ''}`;
     let entry = cardEls.get(id);
     if (!entry) {
       if (budget <= 0) { reste = true; break; }
       budget -= 1;
-      entry = { el: buildCard(r), sig };
+      entry = { el: buildCard(r, opts), sig };
       cardEls.set(id, entry);
     } else if (entry.sig !== sig && !estPrise(entry.el)) {
       if (budget <= 0) { reste = true; break; }
       budget -= 1;
-      const el = buildCard(r);
+      const el = buildCard(r, opts);
       entry.el.replaceWith(el);
       entry.el = el;
       entry.sig = sig;
@@ -2415,6 +2470,20 @@ function bandesDeLot(data) {
   return bandes;
 }
 
+// LA BANNIÈRE RANGE-T-ELLE LE GROUPE ? Vrai tant que les articles n'ont pas
+// divergé de destination. Lu à deux endroits — par la bannière, qui pose le
+// bouton, et par les cartes qu'elle coiffe, qui n'ont alors pas à poser le
+// leur. Une seule règle, pas deux qui se ressemblent.
+function bandeRangeable(bande) {
+  const r0 = bande.lignes[0];
+  const dest = destinationDe(r0);
+  if (r0.stage !== A_TRIER || !dest) return false;
+  return bande.lignes.every((x) => {
+    const d = destinationDe(x);
+    return d && d.stage === dest.stage && d.sub === dest.sub;
+  });
+}
+
 // La bannière : qui, quel ticket, combien d'articles — et le bouton qui les
 // range TOUS d'un coup. Découper un dossier en quatre ne doit pas quadrupler le
 // travail de la vendeuse : tant que les articles n'ont pas divergé, ils se
@@ -2440,17 +2509,16 @@ function banniereLot(bande) {
   el.append(nom, ref, compte);
 
   const dest = destinationDe(r0);
-  const memeDest = bande.lignes.every((x) => {
-    const d = destinationDe(x);
-    return d && dest && d.stage === dest.stage && d.sub === dest.sub;
-  });
-  if (r0.stage === A_TRIER && dest && memeDest) {
+  if (bandeRangeable(bande)) {
     const ou = STAGE_LABEL[dest.stage] + (dest.sub ? ` › ${SUB_LABEL[dest.sub]}` : '');
     const n = bande.lignes.length;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ranger-chip lot-band__ranger';
-    btn.textContent = `Ranger les ${n}`;
+    // LA DESTINATION EST SUR LE BOUTON, plus seulement dans l'infobulle : c'est
+    // la bannière, et elle seule, qui la dit maintenant — les cartes qu'elle
+    // coiffe ne portent plus de puce d'étape.
+    btn.textContent = `Ranger les ${n} dans ${STAGE_LABEL[dest.stage]}`;
     attachTip(btn, `Ranger les ${n} articles du ticket ${bande.ref} dans « ${ou} »`);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();

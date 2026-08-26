@@ -348,7 +348,7 @@ assert.match(
   // UN SEUL COMPOSANT. Deux vues à un clic l'une de l'autre doivent donner le
   // même bloc, pas deux qui se ressemblent.
   assert.ok(/function blocProduction\(r\)/.test(APP), 'le bloc de production est une fonction unique');
-  const carte = APP.match(/function buildCard\(r\)[\s\S]*?\n\}/);
+  const carte = APP.match(/function buildCard\(r, options\)[\s\S]*?\n\}/);
   assert.ok(carte && /blocProduction\(r\)/.test(carte[0]), 'la carte porte le bloc');
   const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
   assert.ok(cellule && /blocProduction\(r\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME bloc');

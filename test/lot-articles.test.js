@@ -438,9 +438,15 @@ delete process.env.APP_PASSWORD;
 
   // Le « 2/4 » vit dans les DEUX vues : le tableau et les cartes. Une seule des
   // deux, et la moitié des postes ne verrait jamais qu’une ligne a des sœurs.
-  for (const [fn, ou] of [['function buildCard(r) {', 'la carte'], ['function cellDescription(r) {', 'le tableau']]) {
+  for (const [fn, ou] of [['function buildCard(r, options) {', 'la carte'], ['function cellDescription(r) {', 'le tableau']]) {
     assert.ok(/lotChip\(r\)/.test(bloc(APP, fn)), `${ou} doit porter la marque « 2/4 »`);
   }
+  // SOUS UNE BANNIÈRE, la marque devient le bloc en toutes lettres : la
+  // bannière nomme déjà le client et le ticket, la colonne dit alors QUEL
+  // article on lit — « 1 sur 2 ». L'information ne disparaît jamais, elle
+  // change de forme selon qu'un en-tête la coiffe ou non.
+  assert.ok(/pcardBloc\('Article'/.test(bloc(APP, 'function buildCard(r, options) {')),
+    'une carte coiffée par la bannière doit dire quel article elle est');
 
   const CSS = lire('public/styles.css').replace(/\/\*[\s\S]*?\*\//g, ' ');
   for (const cls of ['lot-band', 'lot-band__nom', 'lot-chip', 'product-lot']) {
