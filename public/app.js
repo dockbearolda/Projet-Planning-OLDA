@@ -70,6 +70,13 @@ const SUB_STAGES = {
     { slug: 'prepa_produits', label: 'Préparation des produits' },
     { slug: 'prepa_bat', label: 'Préparation du BAT' },
     { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    // ELLE MANQUAIT ICI, ET ELLE AVALAIT DES DOSSIERS (retrouvée le 26/08).
+    // `db.js` la connaît, le serveur la valide, /api/counts la compte — mais
+    // l'écran ne l'avait pas : une commande posée là s'affichait « à préciser »
+    // et le rail n'avait AUCUNE ligne pour l'accueillir. Elle était donc en
+    // base, comptée, et introuvable. Et c'est justement le cas où quelqu'un
+    // attend : un BAT que le client renvoie à corriger.
+    { slug: 'bat_modif', label: 'BAT – Modification demandée' },
     { slug: 'bat_valide', label: 'BAT validé' },
     { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
@@ -425,6 +432,110 @@ function buildStageEl(family, sub) {
   return el;
 }
 
+// ===========================================================================
+// LES ÉTAPES VIDES SE REPLIENT — ET RIEN N'EST SUPPRIMÉ
+// ===========================================================================
+// Mesuré au rendu le 26/08 : 33 lignes dans le rail, 1 362 px de haut, dont
+// 899 px (66 %) de lignes VIDES — sur un écran de 1 043 px. Le rail débordait
+// donc de l'écran, et les deux tiers de ce qu'on faisait défiler ne portaient
+// aucun dossier.
+//
+// ON NE SUPPRIME AUCUNE ÉTAPE. La structure complète du pipeline est ce que le
+// patron veut voir, et il a raison : c'est elle qui dit ce qui reste à faire
+// après. Ce qui change, c'est qu'elle ne s'impose plus quand elle est vide.
+//
+// TROIS RÈGLES, et elles se tiennent :
+//   · L'ORDRE NE CHANGE JAMAIS. Les étapes repliées ne partent pas en bas de la
+//     phase : elles disparaissent de leur place et y reviennent. L'ordre EST le
+//     pipeline, ce n'est pas une mise en page.
+//   · L'ÉTAPE OUVERTE NE SE REPLIE JAMAIS, même vide. Sans ça, cliquer sur une
+//     étape vide la faisait disparaître sous le doigt.
+//   · ON NE REPLIE QU'À PARTIR DE DEUX. Cacher une ligne derrière une ligne ne
+//     gagne rien et coûte un clic.
+//
+// LA LIGNE DE REPLI RESTE AU MÊME ENDROIT dans les deux états — à la fin de sa
+// phase, même hauteur. Une bascule = UN mouvement (les étapes qui reviennent),
+// et il ne déplace rien d'autre.
+const REPLI_MINIMUM = 2;
+const RAIL_DEPLIE_KEY = 'olda.rail-deplie';
+
+// LE CHOIX SUIT LA PERSONNE, pas la machine : le chef d'atelier veut sa
+// production dépliée, la boutique son chiffrage. Même règle que les colonnes
+// du planning (cf. colsKey).
+const railKey = () => {
+  const qui = lirePoste();
+  return qui ? `${RAIL_DEPLIE_KEY}:${qui}` : RAIL_DEPLIE_KEY;
+};
+
+function lireRailDeplie() {
+  try {
+    const brut = JSON.parse(localStorage.getItem(railKey()) || 'null');
+    if (Array.isArray(brut)) return new Set(brut.filter((x) => typeof x === 'string'));
+  } catch (_) { /* stockage refusé ou illisible */ }
+  return new Set();
+}
+
+let railDeplie = lireRailDeplie();
+
+function saveRailDeplie() {
+  try { localStorage.setItem(railKey(), JSON.stringify([...railDeplie])); } catch (_) {}
+}
+
+// QUELLES ÉTAPES SONT VIDES, en une chaîne. Le rail se monte AVANT l'arrivée
+// des compteurs (loadCounts les pose ensuite sur place) : sans cette empreinte,
+// le repli était calculé sur des compteurs tous à zéro et repliait la totalité
+// du rail — 33 lignes devenaient 11, dont aucune ne portait le travail du jour.
+// On ne repeint donc pas à chaque rafraîchissement, mais quand la carte des
+// vides a VRAIMENT changé.
+function empreinteDesVides() {
+  const out = [];
+  for (const f of FAMILIES) {
+    for (const sub of (SUB_STAGES[f.slug] || [])) {
+      if ((counts[sub.slug] ?? 0) === 0) out.push(sub.slug);
+    }
+  }
+  return out.join(',');
+}
+let videsMontees = null;
+
+// Les sous-étapes d'une phase, avec celles qu'on replie marquées. Rend la liste
+// à AFFICHER et le nombre de repliées — le rendu n'a plus qu'à poser.
+function replierLesVides(famille, sousEtapes) {
+  if (railDeplie.has(famille)) return { visibles: sousEtapes, repliees: 0 };
+  const cachables = sousEtapes.filter((sub) => {
+    const n = counts[sub.slug] ?? 0;
+    if (n > 0) return false;
+    // L'étape OUVERTE ne se replie pas, même vide : on doit voir où on est.
+    return !(currentStage === famille && currentSub === sub.slug);
+  });
+  if (cachables.length < REPLI_MINIMUM) return { visibles: sousEtapes, repliees: 0 };
+  const aCacher = new Set(cachables.map((s) => s.slug));
+  return {
+    visibles: sousEtapes.filter((s) => !aCacher.has(s.slug)),
+    repliees: aCacher.size,
+  };
+}
+
+// La ligne qui replie ou déplie une phase. Elle porte le MÊME gabarit qu'une
+// étape (même hauteur, même colonne de compteur) : le rail garde son rythme.
+function ligneDeRepli(famille, repliees) {
+  const deplie = railDeplie.has(famille);
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'stage stage-repli';
+  el.textContent = deplie ? 'Masquer les étapes vides' : `+ ${repliees} étape${repliees > 1 ? 's' : ''} vide${repliees > 1 ? 's' : ''}`;
+  el.setAttribute('aria-expanded', String(deplie));
+  attachTip(el, deplie
+    ? 'Ne montrer que les étapes qui portent un dossier'
+    : 'Montrer toute la structure de cette phase');
+  el.addEventListener('click', () => {
+    if (deplie) railDeplie.delete(famille); else railDeplie.add(famille);
+    saveRailDeplie();
+    renderSidebar();
+  });
+  return el;
+}
+
 function renderSidebar() {
   $stages.replaceChildren();
   // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
@@ -450,9 +561,15 @@ function renderSidebar() {
     head.classList.add('zone-head'); // le grand titre se lit comme un en-tête de zone
     corps.appendChild(head);
     if (hasSub) {
-      SUB_STAGES[f.slug]
-        .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug))  // promue en onglet
-        .forEach((sub) => corps.appendChild(buildStageEl(f, sub)));
+      const toutes = SUB_STAGES[f.slug]
+        .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug));  // promue en onglet
+      const { visibles, repliees } = replierLesVides(f.slug, toutes);
+      visibles.forEach((sub) => corps.appendChild(buildStageEl(f, sub)));
+      // La ligne de repli ferme la phase, dépliée comme repliée : même place,
+      // même hauteur. Elle n'apparaît que s'il y a quelque chose à replier.
+      if (repliees > 0 || railDeplie.has(f.slug)) {
+        corps.appendChild(ligneDeRepli(f.slug, repliees));
+      }
     }
     zone.append(corps);
     $stages.appendChild(zone);
@@ -705,6 +822,15 @@ async function loadCounts() {
     el.classList.toggle('is-empty', n === 0);
     syncStageLabel(el, n);
   });
+  // LE REPLI DÉPEND DES COMPTEURS, et les compteurs arrivent APRÈS le rail.
+  // On le repeint quand la liste des étapes vides a changé — pas à chaque
+  // rafraîchissement : reconstruire le rail à chaque évènement du flux lui
+  // ferait perdre le survol et l'onde du clic en cours.
+  const empreinte = empreinteDesVides();
+  if (empreinte !== videsMontees) {
+    videsMontees = empreinte;
+    renderSidebar();
+  }
 }
 
 // Jeton de chargement : deux clics rapides lancent deux fetch ; on ne monte QUE la
@@ -6677,6 +6803,11 @@ function saveHiddenCols() {
 // le poste et gardait l'écran de Mélina jusqu'au prochain rechargement — donc
 // le prix qu'il ne veut pas voir, et pas la largeur du dos.
 document.addEventListener('olda:poste', () => {
+  // Le rail suit la personne lui aussi : le chef d'atelier veut sa production
+  // dépliée, la boutique son chiffrage. Il se repeint TOUJOURS, même quand les
+  // colonnes n'ont pas bougé — les deux réglages sont indépendants.
+  railDeplie = lireRailDeplie();
+  renderSidebar();
   const avant = [...hiddenCols].sort().join(',');
   hiddenCols = lireHiddenCols();
   if ([...hiddenCols].sort().join(',') === avant) return;

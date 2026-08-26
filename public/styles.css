@@ -604,6 +604,31 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .stage:not(.is-empty) .stage-label { font-weight: var(--graisse-note); color: var(--rail-nonvide); }
 .stage.active .stage-label { font-weight: var(--graisse-forte); color: var(--rail-encre); }
 
+/* LA LIGNE QUI REPLIE LES ÉTAPES VIDES DE SA PHASE.
+   Mesuré le 26/08 : le rail faisait 1 362 px pour un écran de 1 043, dont
+   899 px (66 %) de lignes qui ne portaient aucun dossier. On ne supprime
+   AUCUNE étape — la structure complète est ce que le patron veut voir — mais
+   elle ne s'impose plus quand elle est vide.
+   Elle emprunte le gabarit de `.stage` (même hauteur, même rembourrage, même
+   arrondi) : le rail garde son rythme, et la ligne ne bouge pas d'un pixel
+   entre l'état replié et l'état déplié — une bascule = un seul mouvement, et
+   c'est celui des étapes qui reviennent.
+   Elle ne porte NI puce NI compteur : ce n'est pas une étape, c'est une
+   commande. La puce de `.stage` est un ::before qui PREND SA PLACE dans la
+   rangée flex (7 px + 9 px d'écart) : la retirer sans corriger le retrait
+   décalait le texte de 16 px vers la gauche. Mesuré au rendu : les libellés
+   d'étape commencent à 37 px du bord du rail, celui-ci aussi. */
+.stage-repli {
+  min-height: 38px;
+  padding-left: 25px;
+  font-size: var(--rail-taille-etape);
+  font-weight: var(--graisse-texte);
+  color: var(--rail-videtxt);
+  font-variant-numeric: tabular-nums;
+}
+.stage-repli::before { content: none; }
+.stage-repli:hover { color: var(--rail-nonvide); }
+
 /* LE COMPTEUR : pastille tonale de la phase quand l'étape a du monde ; VIDE
    sinon — ni pastille ni zéro, mais la cellule garde sa largeur pour que la
    colonne des chiffres reste un seul axe (le texte est retiré par le JS). */
