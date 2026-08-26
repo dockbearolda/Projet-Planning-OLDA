@@ -5433,6 +5433,29 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    une archive en lecture seule : une quantité change, une taille se précise,
    et c'est ICI qu'on le corrige — sinon la correction ne vit que dans la tête
    de celui qui l'a apprise. */
+/* LE FIL DES ÉTAPES DE LA PRISE DE COMMANDE, dans la fiche. C'est LE composant
+   du comptoir (`.stepper` / `.step` de charte.css) — pas un cousin : le chef
+   d'atelier retrouve, en ouvrant le dossier, exactement les étapes que la
+   vendeuse a franchies, avec leurs mots et leurs coches. Ici elles se cliquent,
+   d'où le <button> : on lui retire seulement ce que le navigateur ajoute de
+   son côté. `font-family` et NON le raccourci `font` — celui-ci annulerait
+   l'interligne que .step vient de poser. */
+/* Chaque bulle prend la largeur de son mot, elle ne se partage pas la rangée :
+   à parts égales, « 5. Récapitulatif » passait à la ligne et sa bulle faisait
+   une tête de plus que les quatre autres — le défaut des bulles de 41 et 47 px
+   du 25/08, repayé. Le fil se replie d'une bulle entière si la place manque. */
+.ld-fil { margin-bottom: var(--pas-2); }
+.ld-fil .step { flex: 0 1 auto; white-space: nowrap; }
+.ld-etape {
+  appearance: none; border: 0; cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.ld-etape:hover:not(.active) { background: var(--state-hover); color: var(--text-1); }
+.ld-etape:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* `hidden` seul ne masque rien quand la classe porte son propre `display` :
+   c'est le piège qu'on a déjà payé ailleurs. */
+.ld-etape-panneau[hidden] { display: none; }
 .ld-detail-line {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);

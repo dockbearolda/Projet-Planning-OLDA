@@ -4231,35 +4231,130 @@ async function ouvrirTicket(r) {
 // libellé figé (il vient du parcours), valeur éditable. On n'enregistre qu'au
 // bouton — corriger dix lignes ne doit pas faire dix allers-retours réseau, et
 // tant qu'on n'a pas validé, rien n'a bougé en base.
+// LES ÉTAPES DE LA PRISE DE COMMANDE, telles que la vendeuse les a franchies.
+//
+// Le détail archivé s'affichait en UNE liste de cinquante champs à la file,
+// sous « tout est modifiable » : on y trouvait tout et on n'y repérait rien.
+// Or ces cinquante lignes ont été saisies EN ÉTAPES, et ce sont ces
+// étapes-là — les siennes, avec ses mots — qu'on doit retrouver en ouvrant le
+// dossier. On rend donc le MÊME fil que son écran (`.stepper` / `.step` de
+// charte.css, littéralement le composant du comptoir) : on clique une étape,
+// on voit ce qu'elle porte.
+//
+// Une étape RENSEIGNÉE porte la coche du parcours (`done`) — un dossier où le
+// contrôle du logo n'a jamais été rempli le dit sans qu'on ait à l'ouvrir.
+const LD_ETAPE_CLIENT = new Set(['Client', 'Type de client', 'Personne à contacter',
+  'Fonction du contact', 'WhatsApp', 'Second contact', 'E-mail', 'Secteur', 'Adresse']);
+// Les libellés sont ceux des écrans du comptoir, mot pour mot : `recapLines`
+// dans demande-devis.html, `saleRecapLines` dans vente-directe.html. Une étape
+// se reconnaît à ses lignes, et la DERNIÈRE ramasse tout le reste — aucune
+// ligne archivée ne peut disparaître parce qu'un libellé a changé chez le
+// patron.
+const LD_ETAPES = {
+  'Demande de devis': [
+    { titre: '1. Besoins',
+      porte: (k) => /^Besoin \d+ — /.test(k) || k === 'Nombre de besoins' || k === 'Quantité totale' },
+    { titre: '2. Projet',
+      porte: (k) => ['Titre du projet', 'Objet du projet', 'Priorité', 'Date souhaitée',
+        'Heure souhaitée', 'Budget indicatif', 'Description générale',
+        'Décisions / contraintes'].includes(k) },
+    { titre: '3. Contrôle',
+      porte: (k) => ['État du dossier', 'Type de logo', 'Statut du logo', 'Vectorisation',
+        'Maquette / fichier', 'Informations transmises par', 'Transmission prévue par',
+        'Informations attendues', 'Éléments reçus du client', 'Points à contrôler',
+        'Suite à donner'].includes(k) },
+    { titre: '4. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
+    { titre: '5. Récapitulatif', porte: () => true },
+  ],
+  'Vente directe': [
+    { titre: '1. Articles',
+      porte: (k) => /^Article \d+ — /.test(k) || ['Nombre d’articles', 'Quantité totale',
+        'Récupération prévue', 'Délai souhaité'].includes(k) },
+    { titre: '2. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
+    { titre: '3. Paiement',
+      porte: (k) => ['Total HT', 'Taxe', 'Suppléments', 'Total TTC', 'Paiement',
+        'Montant donné', 'Monnaie rendue', 'Part carte', 'Part espèces'].includes(k) },
+    { titre: '4. Ticket', porte: () => true },
+  ],
+};
+
+// Une valeur que le comptoir a écrite « — » est un champ VIDE, pas une valeur :
+// c'est sa marque à lui. Elle ne fait pas franchir une étape.
+const ldRenseigne = (v) => { const t = String(v == null ? '' : v).trim(); return !!t && t !== '—'; };
+
+// LE RANGEMENT, À PART DU RENDU : c'est lui qui décide où va chaque ligne, et
+// c'est lui qu'il faut pouvoir éprouver sans écran.
+//
+// L'INDEX D'ORIGINE SUIT LE CHAMP. Le récapitulatif se réécrit PAR POSITION
+// dans `fiche.client` / `fiche.details` (voir ldEnregistrer) : regrouper à
+// l'écran ne doit renuméroter personne, ou l'on écrirait la couleur du
+// besoin 2 dans la désignation du besoin 1.
+function ldEtapesDuRecap(source, lignesClient, lignesDetail) {
+  const etapes = (LD_ETAPES[source] || LD_ETAPES['Demande de devis'])
+    .map((e) => ({ ...e, lignes: [] }));
+  const derniere = etapes[etapes.length - 1];
+  const pourClient = etapes.find((e) => e.client) || derniere;
+  lignesClient.forEach((l, i) => pourClient.lignes.push({ ...l, groupe: 'client', i }));
+  lignesDetail.forEach((l, i) => {
+    (etapes.find((e) => e.porte(String(l.k || ''))) || derniere)
+      .lignes.push({ ...l, groupe: 'details', i });
+  });
+  return etapes.filter((e) => e.lignes.length);
+}
+
 function ldBlocDetail(r) {
   const f = r.fiche;
-  const groupes = [
-    { cle: 'client', titre: 'Client', lignes: Array.isArray(f.client) ? f.client : [] },
-    {
-      cle: 'details',
-      titre: f.source === 'Demande de devis' ? 'Demande' : 'Vente',
-      lignes: Array.isArray(f.details) ? f.details : [],
-    },
-  ].filter((g) => g.lignes.length);
-  if (!groupes.length) return null;
+  const lignesClient = Array.isArray(f.client) ? f.client : [];
+  const lignesDetail = Array.isArray(f.details) ? f.details : [];
+  if (!lignesClient.length && !lignesDetail.length) return null;
 
-  const total = groupes.reduce((n, g) => n + g.lignes.length, 0);
-  const section = ldVolet(
-    'Détail complet de la demande enregistrée',
-    `${total} ligne${total > 1 ? 's' : ''} — tout est modifiable`,
-    null, true,
-  );
+  const vues = ldEtapesDuRecap(f.source, lignesClient, lignesDetail);
+  if (!vues.length) return null;
+
   const champs = { client: [], details: [] };
+  const section = ldBox('Prise de commande — les étapes de la vendeuse', null, true);
+  const fil = document.createElement('div');
+  fil.className = 'stepper ld-fil';
+  section.append(fil);
 
-  for (const g of groupes) {
-    if (groupes.length > 1) {
-      const st = document.createElement('p');
-      st.className = 'ld-fiche-item__title';
-      st.style.margin = '10px 0 4px';
-      st.textContent = g.titre;
-      section.appendChild(st);
-    }
-    for (const l of g.lignes) {
+  const onglets = [];
+  const panneaux = [];
+  const montrer = (n) => {
+    onglets.forEach((o, i) => {
+      o.classList.toggle('active', i === n);
+      o.setAttribute('aria-selected', i === n ? 'true' : 'false');
+      o.tabIndex = i === n ? 0 : -1;
+    });
+    panneaux.forEach((p, i) => { p.hidden = i !== n; });
+  };
+
+  vues.forEach((e, n) => {
+    const onglet = document.createElement('button');
+    onglet.type = 'button';
+    onglet.role = 'tab';
+    // `done` = l'étape porte au moins une valeur. C'est le même signe que sur
+    // l'écran du comptoir : la coche dit « franchie », pas « jolie ».
+    onglet.className = 'step ld-etape' + (e.lignes.some((l) => ldRenseigne(l.v)) ? ' done' : '');
+    onglet.textContent = e.titre;
+    onglet.addEventListener('click', () => montrer(n));
+    // Les flèches parcourent le fil, comme dans n'importe quelle rangée
+    // d'onglets : c'est un PC, le clavier est la première main.
+    onglet.addEventListener('keydown', (ev) => {
+      const pas = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : 0;
+      if (!pas) return;
+      ev.preventDefault();
+      const cible = (n + pas + vues.length) % vues.length;
+      montrer(cible);
+      onglets[cible].focus();
+    });
+    fil.append(onglet);
+    onglets.push(onglet);
+
+    const panneau = document.createElement('div');
+    panneau.className = 'ld-etape-panneau';
+    panneau.setAttribute('role', 'tabpanel');
+    panneau.setAttribute('aria-label', e.titre);
+    for (const l of e.lignes) {
       const ligne = document.createElement('div');
       ligne.className = 'ld-detail-line';
       const k = document.createElement('span');
@@ -4272,12 +4367,16 @@ function ldBlocDetail(r) {
       if (longue) champ.rows = 3;
       champ.value = l.v == null ? '' : l.v;
       champ.setAttribute('aria-label', l.k);
-      ldSuivi(`detail:${g.cle}:${champs[g.cle].length}`, champ, l.v);
-      champs[g.cle].push(champ);
+      ldSuivi(`detail:${l.groupe}:${l.i}`, champ, l.v);
+      champs[l.groupe][l.i] = champ;
       ligne.append(k, champ);
-      section.appendChild(ligne);
+      panneau.append(ligne);
     }
-  }
+    section.append(panneau);
+    panneaux.push(panneau);
+  });
+  fil.setAttribute('role', 'tablist');
+  montrer(0);
 
   // Pas de bouton ici : le détail s'enregistre avec le reste de la fiche, par
   // le bouton du bas. Un seul geste pour l'employé.
@@ -4715,7 +4814,7 @@ function renderLigneDetail() {
   if (fiche.fichePartielle) {
     // Le détail arrive dans un instant (voir openLigneDetail) : on l'annonce
     // plutôt que d'afficher « non enregistré », qui serait faux.
-    body.append(ldVolet('Détail complet', 'Chargement…', ldValeur('Un instant…'), true));
+    body.append(ldVolet('Prise de commande', 'Chargement…', ldValeur('Un instant…'), true));
   } else if (fiche.kind === 'comptoir-v17') {
     const bloc = ldBlocDetail(r);
     if (bloc) { champsDetail = bloc.champs; body.append(bloc.box); }
