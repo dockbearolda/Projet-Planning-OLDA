@@ -90,9 +90,30 @@ assert.strictEqual(t.lignes[0].detail, '',
   'le résumé du besoin s’efface quand le bloc de production dit la même chose');
 
 const papier = ticketTexte(t);
-// LA COULEUR DE L'ENCRE N'EST PAS CELLE DU VÊTEMENT. « DTF » tout seul ne dit
+// LES QUATRE FAITS QU'ON CHERCHE DU REGARD (Charlie, 26/08), dans cet ordre :
+// la RÉFÉRENCE et la QUANTITÉ ensemble, puis la COULEUR DU MARQUAGE, puis les
+// tailles, puis la LARGEUR DE CHAQUE LOGO.
+assert.match(papier, /^K3008 — 32 pièces$/m);
+// La couleur du VÊTEMENT et la désignation confirment qu'on a la bonne boîte :
+// elles se lisent après, jamais à la place.
+assert.match(papier, /^ {2}Rouge · T-shirt unisexe Oversize épais 220 g$/m);
+// LA COULEUR DU MARQUAGE N'EST PAS CELLE DU VÊTEMENT. « DTF » tout seul ne dit
 // pas quel rouleau charger ; sur un t-shirt rouge, blanc ou noir change tout.
-assert.match(papier, /K3008 · Rouge · DTF encre Blanc/);
+// La technique NOMME, la couleur DÉCIDE — et le mot « encre » ne s'écrit nulle
+// part, la clé de la fiche s'appelle ainsi mais pas l'écran.
+assert.match(papier, /^ {2}Marquage : DTF · Blanc$/m);
+// L'INTITULÉ NE VARIE PAS avec la technique : « SÉRIGRAPHIE » puis « DTF » sur
+// la carte d'à côté, c'était une colonne d'intitulés à largeur variable.
+const serigraphie = ticketTexte(modeleTicket({
+  ...DEMANDE, fiche: { ...DEMANDE.fiche, prod: { ...PROD, marquage: 'Sérigraphie', encre: 'Or' } },
+}));
+assert.match(serigraphie, /^ {2}Marquage : Sérigraphie · Or$/m);
+// Sans couleur connue, la rangée dit au moins la technique — jamais un trou.
+const sansCouleur = ticketTexte(modeleTicket({
+  ...DEMANDE, fiche: { ...DEMANDE.fiche, prod: { ...PROD, encre: '' } },
+}));
+assert.match(sansCouleur, /^ {2}Marquage : DTF$/m);
+assert.ok(!/encre/i.test(papier), `le papier ne dit plus « encre » :\n${papier}`);
 assert.match(papier, /Tailles : 12 x S {2}20 x M/);
 assert.match(papier, /Logo Coeur : 80 mm/);
 assert.match(papier, /Logo Dos : S 300\/M 320 mm/);
@@ -103,7 +124,7 @@ assert.ok(!papier.includes('€'), `aucun montant sur un ticket d’atelier :\n$
 // signature. En tête, elle repoussait d'autant la première ligne utile.
 const lignesPapier = papier.split('\n');
 assert.ok(lignesPapier.indexOf('Commande prise le 26/08/2026')
-  > lignesPapier.findIndex((x) => x.startsWith('60 x') || x.includes('T-shirt')),
+  > lignesPapier.findIndex((x) => x.includes('T-shirt')),
   'la date de prise se lit APRÈS le travail, pas avant');
 
 // ---------------------------------------------------------------------------
@@ -145,15 +166,31 @@ assert.deepStrictEqual(t4.lignes[0].prod.tailles.length, 0);
 // ---------------------------------------------------------------------------
 // 3. LA MISE EN PAGE DU PAPIER
 // ---------------------------------------------------------------------------
-// UNE ÉCHELLE — celle de l'écran du comptoir, moins sa taille de titre : le
-// papier n'a plus d'en-tête de marque à habiller (retiré le 26/08). Elle ne se
-// choisit pas au cas par cas : les valeurs sont des jetons, lus partout.
-for (const jeton of ['--tk-fort: 15px', '--tk-texte: 13px', '--tk-note: 11px']) {
+// UNE ÉCHELLE, QUATRE TAILLES. Elle ne se choisit pas au cas par cas : les
+// valeurs sont des jetons, lus partout. Le plus grand n'habille QUE les deux
+// faits qu'on cherche du regard — la référence et la quantité ; il habillait
+// l'en-tête de marque, retiré le 26/08.
+for (const jeton of ['--tk-cle: 20px', '--tk-fort: 15px', '--tk-texte: 13px', '--tk-note: 11px']) {
   assert.ok(CSS_TICKET.includes(jeton), `l’échelle du ticket doit poser ${jeton}`);
 }
-assert.ok(!CSS_TICKET.includes('--tk-titre'), 'le jeton de titre n’a plus rien à habiller');
+assert.ok(!CSS_TICKET.includes('--tk-titre'), 'l’ancien jeton de titre n’habille plus rien');
+const surCle = (CSS_TICKET.match(/var\(--tk-cle\)/g) || []).length;
+assert.strictEqual(surCle, 2, 'la plus grande taille ne porte QUE la référence et la quantité');
 assert.ok(!/font-size: 1[0247]px/.test(CSS_TICKET),
-  'aucune taille en dur : tout passe par les trois jetons');
+  'aucune taille en dur : tout passe par les quatre jetons');
+// LA FEUILLE DE STYLE EST UN LITTÉRAL GABARIT : un accent grave dans un
+// commentaire CSS le TERMINE. Le module reste syntaxiquement valide (le
+// morceau suivant devient un gabarit étiqueté), `node --check` passe, et
+// l'application s'ouvre sur un écran NU — « .tk__champ is not a function ».
+// Arrivé le 26/08 en citant un nom de classe entre accents graves.
+assert.ok(!CSS_TICKET.includes('`'), 'aucun accent grave dans la feuille du ticket');
+
+// LE CADRE D'IDENTITÉ est le seul trait plein du papier : c'est là que l'œil
+// tombe. La référence à gauche, la quantité à droite, sur la même ligne de base.
+assert.match(CSS_TICKET, /\.tk__ident \{[^}]*border: 2px solid/);
+assert.match(CSS_TICKET, /\.tk__ident-tete \{[^}]*justify-content: space-between/);
+// La couleur du marquage porte la graisse forte, son intitulé reste une étiquette.
+assert.match(CSS_TICKET, /\.tk__ident-mq-v \{[^}]*font-size: var\(--tk-fort\)/);
 // LES TAILLES EN TABLEAU, à colonnes ÉGALES : une piste qui dépend de son
 // contenu ferait une grille bancale d'un ticket à l'autre.
 assert.match(CSS_TICKET, /\.tk__tailles \{[^}]*grid-auto-columns: 1fr/);

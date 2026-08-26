@@ -135,20 +135,42 @@ function prodDuTicket(brut) {
     .filter((l) => l.face && l.mm);
   const p = {
     ref: texte(brut.ref), couleur: texte(brut.couleur), marquage: texte(brut.marquage),
-    // LA COULEUR DE L'ENCRE ne vit que sur ce papier. Elle n'est pas sur la
-    // carte du planning — là on regarde une file, ici on charge un rouleau.
+    // LA COULEUR DU MARQUAGE. La clé s'appelle encore `encre` — c'est ce que
+    // le comptoir envoie et ce que la base porte, on ne renomme pas un champ
+    // stocké pour un mot d'écran. RIEN NE L'AFFICHE SOUS CE NOM (Charlie,
+    // 26/08) : à l'écran c'est la couleur DU DTF, et l'intitulé est la
+    // technique elle-même.
     encre: texte(brut.encre),
     tailles, logos,
   };
   return p.ref || p.couleur || p.marquage || p.encre || tailles.length || logos.length ? p : null;
 }
 
-// LA TÊTE DU BLOC DE PRODUCTION : ce qu'on prend dans le stock, de quelle
-// couleur, marqué comment et avec quelle encre. « DTF » tout seul ne dit pas
-// quel rouleau charger ; « DTF encre Blanc » si.
-function teteProd(p) {
-  const marquage = [p.marquage, p.encre ? `encre ${p.encre}` : ''].filter(Boolean).join(' ');
-  return [p.ref, p.couleur, marquage].filter(Boolean).join(' · ');
+// LE MARQUAGE — la technique, puis SA COULEUR, et c'est la couleur qui porte la
+// graisse : « DTF » tout seul ne dit pas quel rouleau charger. Le mot « encre »
+// ne s'écrit nulle part (Charlie, 26/08) ; la clé de la fiche s'appelle encore
+// ainsi, on ne renomme pas un champ stocké pour un mot d'écran.
+//
+// L'INTITULÉ NE VARIE PAS. Mettre la technique en intitulé donnait « DTF » sur
+// un dossier et « SÉRIGRAPHIE » sur le suivant : une colonne d'intitulés à
+// largeur variable, et la file ne se balaye plus du regard.
+function marquageProd(p) {
+  if (!p.marquage && !p.encre) return null;
+  return { cle: 'Marquage', tech: p.marquage, val: p.encre };
+}
+
+// L'IDENTITÉ DE L'ARTICLE : la référence, ce qu'on en fait sortir du stock, et
+// combien. La référence et la quantité sont les deux seules choses qu'on
+// cherche du regard sur une pile de tickets — elles ont leur propre taille.
+function identiteProd(p, a) {
+  const qte = texte(a && a.qte);
+  return {
+    ref: p.ref,
+    qte: qte ? `${qte} pièce${Number(qte) > 1 ? 's' : ''}` : '',
+    // La couleur du textile et la désignation CONFIRMENT qu'on a pris la bonne
+    // boîte : on les lit une fois, après avoir trouvé la référence.
+    nom: [p.couleur, texte(a && a.designation)].filter(Boolean).join(' · '),
+  };
 }
 
 // LE MODÈLE DU TICKET. Pur : mêmes entrées, mêmes sorties, aucun DOM.
@@ -242,15 +264,20 @@ export function ticketTexte(t) {
   if (t.lignes.length) {
     out.push(sep);
     for (const a of t.lignes) {
-      out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}`);
-      // La production d'abord, dans l'ordre du papier : ce qui décide de la
-      // coupe et du fichier passe devant la précision de vive voix.
+      // AVEC UNE FICHE DE PRODUCTION, l'identité prend la tête : la référence
+      // et la quantité d'abord, la couleur et la désignation en confirmation.
+      // Sans elle, la ligne garde sa forme d'avant — « 40 x Bâche 2 m ».
       if (a.prod) {
         const p = a.prod;
-        const tete = teteProd(p);
-        if (tete) out.push(`  ${tete}`);
+        const id = identiteProd(p, a);
+        out.push([id.ref, id.qte].filter(Boolean).join(' — '));
+        if (id.nom) out.push(`  ${id.nom}`);
+        const mq = marquageProd(p);
+        if (mq) out.push(`  ${mq.cle} : ${[mq.tech, mq.val].filter(Boolean).join(' · ')}`);
         if (p.tailles.length) out.push(`  Tailles : ${p.tailles.map((x) => `${x.n} x ${x.t}`).join('  ')}`);
         for (const g of p.logos) out.push(`  Logo ${g.face} : ${g.mm} mm`);
+      } else {
+        out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}`);
       }
       if (a.detail) out.push(`  ${a.detail}`);
     }
@@ -272,14 +299,15 @@ export function ticketTexte(t) {
 // Tout est en noir sur blanc : la charte réserve la couleur aux ÉTATS, et une
 // imprimante à tickets ne connaît de toute façon que le noir.
 export const CSS_TICKET = `
-  /* L'ÉCHELLE DU TICKET — celle de l'écran du comptoir, moins sa taille de
-     titre : le papier n'a plus d'en-tête de marque à habiller.
-       fort   = ce qui DÉCIDE et qu'on ne doit pas lire de travers : le nombre
-                par taille, la largeur d'un logo. Une taille mal lue coûte une
-                réimpression.
-       texte  = ce qui se lit : désignations, valeurs.
+  /* L'ÉCHELLE DU TICKET — quatre tailles, trois graisses, et rien d'autre.
+       cle    = les deux faits qu'on CHERCHE du regard sur une pile de tickets :
+                la référence et la quantité. Rien d'autre ne porte cette taille.
+       fort   = ce qui DÉCIDE et qu'on ne doit pas lire de travers : la couleur
+                du marquage, le nombre par taille, la largeur d'un logo. Une
+                taille mal lue coûte une réimpression.
+       texte  = ce qui CONFIRME : couleur du textile, désignation, précisions.
        note   = les intitulés, le pied. */
-  .tk { --tk-fort: 15px; --tk-texte: 13px; --tk-note: 11px;
+  .tk { --tk-cle: 20px; --tk-fort: 15px; --tk-texte: 13px; --tk-note: 11px;
         width: 76mm; margin: 0 auto; padding: 4mm 0; color: #000;
         font: var(--tk-texte)/1.45 Arial, Helvetica, sans-serif; }
   .tk__titre { margin: 0; font-size: var(--tk-note); font-weight: 800; text-align: center;
@@ -311,7 +339,31 @@ export const CSS_TICKET = `
   .tk__prod { margin: 4px 0 0; }
   .tk__prod-titre { margin: 6px 0 2px; font-size: var(--tk-note); font-weight: 800;
                     text-transform: uppercase; letter-spacing: .08em; }
-  .tk__prod-tete { font-size: var(--tk-texte); font-weight: 600; }
+
+  /* CE QU'ON VA CHERCHER, ET COMBIEN — le seul cadre plein du papier, parce que
+     c'est le premier endroit où l'œil doit tomber. La référence à gauche, la
+     quantité à droite, sur la même ligne de base : deux faits, deux bords, rien
+     entre les deux pour les confondre. La couleur du textile et la désignation
+     passent dessous, en confirmation. */
+  .tk__ident { margin: 2px 0 0; padding: 4px 6px; border: 2px solid #000; }
+  .tk__ident-tete { display: flex; justify-content: space-between;
+                    align-items: baseline; gap: 8px; }
+  .tk__ident-ref { font-size: var(--tk-cle); font-weight: 800; letter-spacing: .02em;
+                   min-width: 0; overflow-wrap: anywhere; }
+  .tk__ident-qte { flex: 0 0 auto; font-size: var(--tk-cle); font-weight: 800;
+                   white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tk__ident-nom { margin: 1px 0 0; font-size: var(--tk-texte); font-weight: 600; }
+  /* LE MARQUAGE, dans le même cadre et séparé d'un trait : c'est le deuxième
+     geste (charger le rouleau), pas un troisième bloc à chercher. */
+  .tk__ident-mq { display: flex; justify-content: space-between; align-items: baseline;
+                  gap: 8px; margin: 4px 0 0; padding-top: 3px; border-top: 1px solid #000; }
+  .tk__ident-mq-k { flex: 0 0 auto; font-size: var(--tk-note); font-weight: 800;
+                    text-transform: uppercase; letter-spacing: .08em; }
+  .tk__ident-mq-v { flex: 0 1 auto; text-align: right; font-size: var(--tk-fort);
+                    font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
+  /* La technique NOMME, la couleur DÉCIDE : « DTF · Noir » — c'est la couleur
+     qui dit quel rouleau charger, elle seule porte la graisse forte. */
+  .tk__ident-mq-tech { font-size: var(--tk-texte); font-weight: 600; }
 
   /* LES TAILLES EN TABLEAU, jamais en phrase. « 6 × S · 10 × M · 6 × L · 2 × XL »
      se lit de travers dès qu'on est pressé : une colonne par taille, le nombre
@@ -331,8 +383,13 @@ export const CSS_TICKET = `
      d'une ligne à l'autre. */
   .tk__logo { display: flex; align-items: baseline; gap: 5px; margin: 2px 0 0; }
   .tk__logo-face { flex: 0 0 auto; font-size: var(--tk-texte); font-weight: 600; }
-  .tk__logo-fil { flex: 1 1 auto; align-self: center; border-bottom: 1px dotted #000; }
-  .tk__logo-mm { flex: 0 0 auto; font-size: var(--tk-fort); font-weight: 800; white-space: nowrap; }
+  .tk__logo-fil { flex: 1 1 auto; min-width: 8px; align-self: center; border-bottom: 1px dotted #000; }
+  /* UNE LARGEUR PAR TAILLE tient rarement sur la ligne : « S 280/M 300/L 300/
+     XL 320/XXL 340 » fait deux fois la laize du papier. Elle se replie donc
+     dans sa propre colonne, calée à droite, plutôt que de déborder la feuille —
+     le filet garde 8 px pour continuer à relier la face à sa mesure. */
+  .tk__logo-mm { flex: 0 1 auto; min-width: 0; text-align: right;
+                 font-size: var(--tk-fort); font-weight: 800; overflow-wrap: anywhere; }
 
   /* LE PIED porte ce qui NE FAIT PAS PRODUIRE : la date de prise. Elle était
      en tête, entre l'avertissement de lot et le client — trois lignes de
@@ -371,6 +428,19 @@ export const CSS_TICKET = `
   .tk__logo-mm .tk__champ { text-align: right; }
   .tk--edit .tk__taille-v .tk__champ { min-height: 30px; }
   .tk--edit .tk__logo-mm { flex: 0 0 96px; }
+  /* LE CADRE D'IDENTITÉ EN CORRECTION. Un champ fait 100 % de LARGEUR : posé à
+     côté d'un mot (« 20 » + « pièces », « Jaune · » + la désignation), il
+     prenait toute la place PLUS celle du mot, et la feuille débordait de côté.
+     Les deux rangées deviennent donc des rangées flex, où le champ prend ce qui
+     reste au lieu de tout. */
+  .tk--edit .tk__ident-qte { flex: 0 0 132px; display: flex; align-items: baseline; gap: 2px; }
+  .tk--edit .tk__ident-qte .tk__champ { flex: 1 1 auto; min-width: 0; text-align: right; }
+  .tk--edit .tk__ident-nom { display: flex; align-items: baseline; gap: 3px; }
+  /* La couleur du textile ne se coupe pas de son point médian : par défaut un
+     élément flex peut rétrécir, et « Jaune · » se repliait en « Jaune » puis un
+     point tout seul sur la ligne suivante. */
+  .tk--edit .tk__ident-nom > span:first-child { flex: 0 0 auto; white-space: nowrap; }
+  .tk--edit .tk__ident-nom .tk__champ { flex: 1 1 auto; min-width: 0; }
 `;
 
 // Le ticket en DOM, dans le document qu'on lui donne — la page pour l'aperçu,
@@ -422,25 +492,18 @@ export function dessinerTicket(t, doc, editeur) {
     tk.append(sep());
     for (const a of t.lignes) {
       const art = el('div', 'tk__art');
-      const tete = el('div', 'tk__art-tete');
-      const nom = el('div', 'tk__art-nom');
-      if (editeur) {
-        nom.append(
-          val('qte', a.qte, a.ou && a.ou.qte),
-          el('span', 'tk__x', '×'),
-          val('designation', a.designation, a.ou && a.ou.designation),
-        );
-      } else {
-        nom.textContent = `${a.qte ? `${a.qte} × ` : ''}${a.designation}`;
-      }
-      tete.append(nom);
-      art.append(tete);
 
-      // CE QU'IL Y A À PRODUIRE — la référence, la couleur, la technique, le
-      // nombre par taille et la largeur de chaque logo. C'est ce qui décide du
-      // fichier d'impression et de la coupe : ça passe avant la précision
-      // dictée au comptoir, qui vient la compléter.
-      if (a.prod) art.append(blocProd(a.prod));
+      // CE QU'IL Y A À PRODUIRE — la référence, la quantité, la couleur du
+      // marquage, le nombre par taille, la largeur de chaque logo. C'est ce qui
+      // décide du fichier d'impression et de la coupe : ça passe avant la
+      // précision dictée au comptoir, qui vient la compléter.
+      //
+      // AVEC UNE FICHE, la quantité et la désignation entrent dans le cadre
+      // d'identité : les écrire aussi en tête, c'est deux fois la même chose à
+      // deux centimètres. Sans fiche — une ligne saisie à la main — la tête de
+      // l'article reste la seule chose qui dise quoi produire.
+      if (a.prod) art.append(blocProd(a.prod, a));
+      else art.append(teteArticle(a));
 
       // La précision de vive voix. En correction elle est offerte même vide :
       // c'est là qu'on note ce qui n'entre dans aucune case.
@@ -459,11 +522,65 @@ export function dessinerTicket(t, doc, editeur) {
   if (t.date) tk.append(sep(), el('p', 'tk__pied', `Commande prise le ${t.date}`));
   return tk;
 
-  // --- Le bloc de production, en trois temps -------------------------------
-  function blocProd(p) {
+  // La tête d'un article SANS fiche de production : « 40 × Bâche 2 m ».
+  function teteArticle(a) {
+    const tete = el('div', 'tk__art-tete');
+    const nom = el('div', 'tk__art-nom');
+    if (editeur) {
+      nom.append(
+        val('qte', a.qte, a.ou && a.ou.qte),
+        el('span', 'tk__x', '×'),
+        val('designation', a.designation, a.ou && a.ou.designation),
+      );
+    } else {
+      nom.textContent = `${a.qte ? `${a.qte} × ` : ''}${a.designation}`;
+    }
+    tete.append(nom);
+    return tete;
+  }
+
+  // --- Le bloc de production, en quatre temps ------------------------------
+  function blocProd(p, a) {
     const bloc = el('div', 'tk__prod');
-    const tete = teteProd(p);
-    if (tete) bloc.append(el('p', 'tk__prod-tete', tete));
+
+    // 1. CE QU'ON VA CHERCHER, ET COMBIEN. Les deux seuls faits qu'on cherche
+    //    du regard sur une pile de tickets ont leur propre taille et leur
+    //    propre cadre. La référence ne se retape pas ici — c'est l'identité de
+    //    l'article, elle se corrige au dossier ; la quantité, si.
+    const id = identiteProd(p, a);
+    const boite = el('div', 'tk__ident');
+    const tete = el('div', 'tk__ident-tete');
+    if (id.ref) tete.append(el('span', 'tk__ident-ref', id.ref));
+    const qte = el('span', 'tk__ident-qte');
+    if (editeur) qte.append(val('qte', a.qte, a.ou && a.ou.qte), el('span', null, ' pièces'));
+    else if (id.qte) qte.textContent = id.qte;
+    if (editeur || id.qte) tete.append(qte);
+    boite.append(tete);
+
+    // La couleur du textile et la désignation CONFIRMENT qu'on a pris la bonne
+    // boîte. En correction, la désignation reste un champ : elle vit sur la
+    // ligne du planning, et c'est le seul endroit du papier qui la porte.
+    if (editeur) {
+      const nom = el('p', 'tk__ident-nom');
+      if (p.couleur) nom.append(el('span', null, `${p.couleur} · `));
+      nom.append(val('designation', a.designation, a.ou && a.ou.designation));
+      boite.append(nom);
+    } else if (id.nom) {
+      boite.append(el('p', 'tk__ident-nom', id.nom));
+    }
+
+    // 2. CE QU'ON CHARGE DANS LA MACHINE — la technique en intitulé, sa
+    //    couleur en valeur. C'est la couleur qui décide du rouleau.
+    const mq = marquageProd(p);
+    if (mq) {
+      const rang = el('div', 'tk__ident-mq');
+      const v = el('span', 'tk__ident-mq-v');
+      if (mq.tech) v.append(el('span', 'tk__ident-mq-tech', mq.val ? `${mq.tech} · ` : mq.tech));
+      if (mq.val) v.append(el('span', null, mq.val));
+      rang.append(el('span', 'tk__ident-mq-k', mq.cle), v);
+      boite.append(rang);
+    }
+    bloc.append(boite);
 
     // LES TAILLES EN TABLEAU, jamais en phrase : une colonne par taille, le
     // nombre dessous. « 6 × S · 10 × M · 6 × L · 2 × XL » se lit de travers dès

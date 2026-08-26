@@ -359,11 +359,46 @@ assert.match(
   const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
   assert.ok(cellule && /blocProduction\(r\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME bloc');
 
-  // TROIS FAITS, TROIS CASES. Chacun décide de ce qu'il voit.
-  for (const cle of ['prod_ref', 'prod_tailles', 'prod_logos']) {
+  // QUATRE FAITS, QUATRE CASES. Chacun décide de ce qu'il voit.
+  for (const cle of ['prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']) {
     assert.ok(new RegExp(`key: '${cle}'[^}]*surCarte: true`).test(APP),
       `${cle} doit exister dans le rail ET vivre dans les deux vues`);
   }
+
+  // -------------------------------------------------------------------------
+  // 4 bis. LA HIÉRARCHIE SE FAIT À LA GRAISSE (Charlie, 26/08)
+  // -------------------------------------------------------------------------
+  // « doit être mis en avant la référence, la quantité, la couleur du DTF, la
+  // taille des logos ». Quatre faits portent la graisse forte, et EUX SEULS —
+  // une taille de plus aurait demandé une rangée de plus, et c'est la rangée
+  // qui permet de balayer une file.
+  const bloc = APP.slice(APP.indexOf('const PROD_FAITS = ['),
+    APP.indexOf('\n];', APP.indexOf('const PROD_FAITS = [')));
+  assert.match(bloc, /morceau\(ref, true\)/, 'la référence porte la graisse');
+  assert.match(bloc, /morceau\(p\.encre, true\)/, 'la couleur du marquage aussi');
+  assert.match(bloc, /morceau\(q, true\)/, 'la quantité aussi');
+  assert.match(bloc, /x\.mm\} mm` : String\(x\.mm\), fort: true/, 'la largeur des logos aussi');
+  // …et rien d'autre : la couleur du textile, la technique, la désignation et
+  // le détail par taille ENTOURENT ces quatre-là. Ils s'écrivent sans graisse,
+  // explicitement — c'est le contraste qui fait la hiérarchie.
+  for (const sans of ['morceau(p.couleur)', 'morceau(p.marquage)', 'morceau(cases)']) {
+    assert.ok(bloc.includes(sans), `${sans} doit rester en graisse de texte`);
+  }
+
+  // LE MOT « ENCRE » NE S'ÉCRIT PLUS. La clé de la fiche s'appelle encore ainsi
+  // — on ne renomme pas un champ stocké pour un mot d'écran — mais aucun
+  // intitulé ni aucune valeur ne le sort.
+  // (les commentaires d'abord : leurs apostrophes françaises font de faux
+  // littéraux, et « la clé s'appelle encore ainsi » se serait fait prendre)
+  const blocCode = bloc.replace(/^\s*\/\/.*$/gm, '');
+  // Les littéraux se cherchent LIGNE PAR LIGNE : `[^']*` traverse les sauts de
+  // ligne et faisait d'un `' · '` et du `' · '` suivant un seul faux littéral,
+  // qui « contenait » tout le code entre les deux.
+  const DIT_ENCRE = /'[^'\n]*[Ee]ncre[^'\n]*'|`[^`\n]*[Ee]ncre[^`\n]*`/;
+  assert.ok(!DIT_ENCRE.test(blocCode), 'aucune chaîne affichable ne dit « encre »');
+  assert.match(blocCode, /p\.encre/, 'la clé de la fiche, elle, ne change pas');
+  assert.match(bloc, /key: 'prod_dtf',\s*\n\s*label: 'Marquage',/,
+    'l’intitulé ne varie pas avec la technique : la colonne garde sa largeur');
   // LE PRIX AUSSI : à l'atelier il n'apprend rien et prend la place de ce qu'on
   // cherche. Il vit dans les deux vues, le décocher ne doit pas rappeler le
   // tableau complet.

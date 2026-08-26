@@ -104,7 +104,10 @@ assert.match(APP, /const sig = `\$\{r\.id\}:\$\{r\.updated_at\}:\$\{coiffee \? '
 // désignation dit déjà.
 const faits = APP.slice(APP.indexOf('const PROD_FAITS = ['), APP.indexOf('\n];', APP.indexOf('const PROD_FAITS = [')));
 assert.match(faits, /nom\.includes\(p\.ref\) \? '' : p\.ref/);
-// La couleur et le marquage, eux, ne sont nulle part ailleurs : ils restent.
-assert.match(faits, /\[ref, p\.couleur, p\.marquage\]\.filter\(Boolean\)/);
+// La couleur du textile n'est nulle part ailleurs : elle reste, à côté de la
+// référence. Le marquage, lui, a sa propre rangée depuis le 26/08 — l'intitulé
+// est la technique, la valeur sa couleur.
+assert.match(faits, /morceau\(ref, true\), morceau\(p\.couleur\)/);
+assert.match(faits, /key: 'prod_dtf'/);
 
 console.log('✓ carte : cinq doublons fermés — une échéance, un référent, un en-tête de lot, un bouton, une référence');

@@ -1264,6 +1264,20 @@ function pcardBloc(label, ...enfants) {
 // la ligne et la largeur du dos est indispensable, au comptoir c'est l'inverse.
 // Une rangée sans valeur ne s'affiche pas — un récapitulatif reprend ce qui a
 // été saisi, jamais ce qui manque.
+//
+// QUATRE FAITS PORTENT LA GRAISSE, et eux seuls (Charlie, 26/08) : la
+// RÉFÉRENCE, la QUANTITÉ, la COULEUR DU MARQUAGE et la LARGEUR DES LOGOS. Ce
+// sont les quatre choses qu'on cherche du regard ; tout le reste de la rangée
+// les entoure et se lit en 400. C'est la hiérarchie à la graisse de la maison,
+// appliquée à l'intérieur d'une valeur.
+//
+// `lire` rend des MORCEAUX — `{ t, fort }` — et non une chaîne : sans ça, mettre
+// la référence en avant demandait une rangée de plus, et la carte y perdait la
+// densité qui permet de balayer une file.
+const morceau = (t, fort) => (t ? [{ t: String(t), fort: !!fort }] : []);
+const joindre = (listes, sep) => listes.filter((x) => x.length)
+  .flatMap((x, i) => (i ? [{ t: sep }, ...x] : x));
+
 const PROD_FAITS = [
   {
     key: 'prod_ref',
@@ -1274,25 +1288,47 @@ const PROD_FAITS = [
     lire: (p, r) => {
       const nom = String((r && r.product) || '');
       const ref = p.ref && nom.includes(p.ref) ? '' : p.ref;
-      return [ref, p.couleur, p.marquage].filter(Boolean).join(' · ');
+      return joindre([morceau(ref, true), morceau(p.couleur)], ' · ');
     },
+  },
+  {
+    key: 'prod_dtf',
+    label: 'Marquage',
+    // LA TECHNIQUE NOMME, LA COULEUR DÉCIDE : « DTF · Noir ». C'est la couleur
+    // qui dit quel rouleau charger — « DTF » tout seul ne dit rien à charger —
+    // donc elle seule porte la graisse. Le mot « encre » ne s'écrit nulle part
+    // (Charlie, 26/08) ; la clé de la fiche s'appelle encore ainsi, on ne
+    // renomme pas un champ stocké pour un mot d'écran.
+    lire: (p) => joindre([morceau(p.marquage), morceau(p.encre, true)], ' · '),
   },
   {
     key: 'prod_tailles',
     label: 'Tailles',
-    // Le NOMBRE d'abord, puis la taille : « 3 × S ». C'est l'ordre des trois
-    // autres endroits qui les écrivent, et il n'y en a pas deux.
-    lire: (p) => (p.tailles || []).map((x) => `${x.n} × ${x.t}`).join(' · '),
+    // LE TOTAL EN TÊTE : c'est la quantité de la commande, et c'est aussi la
+    // somme qu'on vérifie d'un coup d'œil. Puis le NOMBRE avant la taille —
+    // « 3 × S » — comme aux trois autres endroits qui les écrivent.
+    lire: (p, r) => {
+      const cases = (p.tailles || []).map((x) => `${x.n} × ${x.t}`).join(' · ');
+      const q = r && r.quantity != null ? `${r.quantity} pièce${r.quantity > 1 ? 's' : ''}` : '';
+      return joindre([morceau(q, true), morceau(cases)], ' : ');
+    },
   },
   {
     key: 'prod_logos',
     label: 'Logos',
     // Les faces se séparent au point médian, les tailles d'une même face à la
     // barre : « Coeur 60 · Dos S 260/M 280 ». Sans cette différence, une face
-    // mesurée taille par taille se lisait comme deux faces.
+    // mesurée taille par taille se lisait comme deux faces. La LARGEUR porte la
+    // graisse, la face la nomme.
     lire: (p) => {
-      const faces = (p.logos || []).map((x) => `${x.face} ${x.mm}`).join(' · ');
-      return faces ? `${faces} mm` : '';
+      const g = p.logos || [];
+      // L'unité appartient à la LARGEUR : un « mm » séparé faisait deux
+      // fragments gras côte à côte pour un seul fait.
+      return g.flatMap((x, i) => [
+        ...(i ? [{ t: ' · ' }] : []),
+        { t: `${x.face} ` },
+        { t: i === g.length - 1 ? `${x.mm} mm` : String(x.mm), fort: true },
+      ]);
     },
   },
 ];
@@ -1304,14 +1340,19 @@ function blocProduction(r) {
   bloc.className = 'prod-fiche';
   for (const fait of PROD_FAITS) {
     if (hiddenCols.has(fait.key)) continue;
-    const valeur = fait.lire(p, r);
-    if (!valeur) continue;
+    const parts = fait.lire(p, r);
+    if (!parts.length) continue;
     const cle = document.createElement('span');
     cle.className = 'prod-fiche__cle';
-    cle.textContent = fait.label;
+    cle.textContent = typeof fait.label === 'function' ? fait.label(p) : fait.label;
     const val = document.createElement('span');
     val.className = 'prod-fiche__val';
-    val.textContent = valeur;
+    for (const m of parts) {
+      const s = document.createElement('span');
+      if (m.fort) s.className = 'prod-fiche__fort';
+      s.textContent = m.t;
+      val.appendChild(s);
+    }
     bloc.append(cle, val);
   }
   return bloc.childElementCount ? bloc : null;
@@ -6561,6 +6602,7 @@ const PLANNING_COLS = [
   // `horsTableau` : elles n'ont pas de colonne à elles — le bloc se pose dans
   // la cellule « Infos » et dans le bloc « Projet » de la carte.
   { key: 'prod_ref',     label: 'Référence & couleur', surCarte: true, horsTableau: true },
+  { key: 'prod_dtf',     label: 'Couleur du marquage', surCarte: true, horsTableau: true },
   { key: 'prod_tailles', label: 'Quantité par taille', surCarte: true, horsTableau: true },
   { key: 'prod_logos',   label: 'Largeur des logos', surCarte: true, horsTableau: true },
   { key: 'description', label: 'Infos' },
@@ -6573,7 +6615,7 @@ const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) 
 // Celles dont la case change ce qu'une ligne DESSINE, sans changer de vue : il
 // faut les redessiner à la main. Le ticket n'en est pas — sa place reste
 // réservée sur toutes les cartes, c'est le CSS qui l'affiche ou non.
-const COLS_REDESSINENT = new Set(['price', 'prod_ref', 'prod_tailles', 'prod_logos']);
+const COLS_REDESSINENT = new Set(['price', 'prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']);
 // Celles qui n'existent QUE dans le tableau : ce sont elles, et elles seules,
 // qui décident de la vue (cf. modeCartes). Le ticket en est exclu — le retirer
 // sur les cartes doit retirer le bouton, pas rappeler le tableau complet.
