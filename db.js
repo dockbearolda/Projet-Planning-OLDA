@@ -1651,6 +1651,82 @@ async function setReglagesTextile(patch) {
   return propre;
 }
 
+// --- Tailles de logo (site « Tailles Logo DTF ») ------------------------------
+// La copie locale du tableau de l'atelier : { famille: { référence: { taille:
+// { avant, dos } } } }, en millimètres. Elle est rangée en base et non figée
+// dans le catalogue parce que le tableau se remplit au fur et à mesure — voir
+// tailles-logo.js pour le pourquoi et la lecture du site.
+//
+// Le comptoir ne lit QUE cette copie : c'est elle qui garantit qu'un poste
+// s'ouvre même si le second site ne répond pas.
+// Down : DELETE FROM app_meta WHERE key = 'tailles_logo'.
+const TAILLES_LOGO_VIDE = Object.freeze({ maj: null, source: null, familles: {} });
+
+// Le tableau vient d'un AUTRE service : on ne le range pas tel quel. Une
+// largeur n'est retenue que si c'est un nombre tenable, et une case vide reste
+// vide — un logo de 0 mm partirait en production sans que rien ne proteste.
+function nettoyerTaillesLogo(brut) {
+  const out = { maj: null, source: null, familles: {} };
+  if (!brut || typeof brut !== 'object') return out;
+  if (typeof brut.maj === 'string' && brut.maj) out.maj = brut.maj;
+  if (typeof brut.source === 'string' && brut.source) out.source = brut.source;
+  const familles = brut.familles;
+  if (!familles || typeof familles !== 'object') return out;
+  for (const [famille, refs] of Object.entries(familles)) {
+    if (!refs || typeof refs !== 'object') continue;
+    for (const [ref, tailles] of Object.entries(refs)) {
+      if (!tailles || typeof tailles !== 'object') continue;
+      for (const [taille, v] of Object.entries(tailles)) {
+        if (!v || typeof v !== 'object') continue;
+        const avant = Number(v.avant);
+        const dos = Number(v.dos);
+        const propre = {
+          avant: Number.isFinite(avant) && avant > 0 ? Math.round(avant) : null,
+          dos: Number.isFinite(dos) && dos > 0 ? Math.round(dos) : null,
+        };
+        if (propre.avant === null && propre.dos === null) continue;
+        if (!out.familles[famille]) out.familles[famille] = {};
+        if (!out.familles[famille][ref]) out.familles[famille][ref] = {};
+        out.familles[famille][ref][taille] = propre;
+      }
+    }
+  }
+  return out;
+}
+
+// Combien de références et combien de cases : c'est ce que les Réglages
+// affichent pour dire si la mise à jour a servi à quelque chose.
+function compterTaillesLogo(table) {
+  let refs = 0;
+  let mesures = 0;
+  for (const parRef of Object.values((table && table.familles) || {})) {
+    for (const tailles of Object.values(parRef)) {
+      refs++;
+      mesures += Object.keys(tailles).length;
+    }
+  }
+  return { refs, mesures };
+}
+
+async function getTaillesLogo() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tailles_logo'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...TAILLES_LOGO_VIDE, familles: {} };
+  try {
+    return nettoyerTaillesLogo(JSON.parse(rows[0].value));
+  } catch {
+    return { ...TAILLES_LOGO_VIDE, familles: {} };
+  }
+}
+
+// REMPLACE le tableau, il ne le complète pas : une référence retirée du site
+// doit disparaître d'ici aussi, sinon le comptoir continuerait de proposer une
+// largeur que l'atelier a corrigée en la supprimant.
+async function setTaillesLogo(table) {
+  const propre = nettoyerTaillesLogo(table);
+  await poserMeta('tailles_logo', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Étapes rangées à la main (ordre manuel) ---------------------------------
 // Glisser une carte réécrit les `position` en base : le geste vaut donc pour
 // TOUS les postes. Or la décision « cette étape est rangée à la main » vivait,
@@ -2171,6 +2247,7 @@ module.exports = {
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
+  getTaillesLogo, setTaillesLogo, compterTaillesLogo, nettoyerTaillesLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,

@@ -66,9 +66,11 @@ function lignesDeSaisie(d) {
     txNum: (v) => Number(v) || 0,
     txDisplayRef: (x) => (x.isCustom ? (x.customRef || 'NOUVEAU') : x.ref),
     txEl: (tag, cls, texte) => new Noeud(cls, texte),
+    // `txLogoNode` compose lui aussi des nœuds : même bac à sable.
+    document: { createTextNode: (t) => String(t) },
     d,
   });
-  vm.runInContext(`${source('txSaisieLignes', 'd')}\n${source('txTaillesNode', 'd')}\nglobalThis.__r=txSaisieLignes(d);`, contexte);
+  vm.runInContext(`${source('txSaisieLignes', 'd')}\n${source('txTaillesNode', 'd')}\n${source('txLogoNode', 'd')}\nglobalThis.__r=txSaisieLignes(d);`, contexte);
   return contexte.__r;
 }
 
@@ -718,5 +720,25 @@ assert.ok(!/\.detail-nom\{[^}]*font-size/.test(DEVIS) && !/\.detail-meta\{[^}]*f
 // par champ, sur les postes Windows de l'atelier.
 assert.ok(/input,select,textarea,button\{font-family:inherit!important\}/.test(DEVIS),
   'tout ce qui s’écrit hérite de la police du corps');
+
+// --- La taille du logo se relit comme le reste (26/08/2026) ------------------
+// Elle décide du fichier d'impression : si elle n'apparaît pas dans le
+// récapitulatif, personne ne la vérifie entre la vendeuse et l'atelier.
+{
+  const avecLogo = lignesDeSaisie({
+    ...SAISIE,
+    logo: { Coeur: { S: 60, M: 65 }, Dos: { S: 260, M: 299 } },
+  });
+  const par2 = Object.fromEntries(avecLogo);
+  // L'INTITULÉ EST CELUI DU CHAMP, mot pour mot — l'unité comprise, et elle ne
+  // s'écrit qu'une fois : « S 60 · M 65 », pas « S 60 mm · M 65 mm ».
+  assert.ok('Taille du logo (mm)' in par2, 'la rangée existe dès qu\'une largeur est posée');
+  const dit = lire(par2['Taille du logo (mm)']);
+  assert.match(dit, /Coeur S 60 · M 65/);
+  assert.match(dit, /Dos S 260 · M 299/);
+  assert.ok(!/mm/.test(dit), 'l’unité est dans l’intitulé, pas répétée sur chaque largeur');
+  // Sans largeur saisie, aucune rangée : un champ vide ne prend pas de place.
+  assert.ok(!('Taille du logo (mm)' in par), 'rien de vide ne s’affiche');
+}
 
 console.log('✓ récapitulatif : intitulés des champs, jauge seuil/cible, calcul dépliable, deux tailles de texte');
