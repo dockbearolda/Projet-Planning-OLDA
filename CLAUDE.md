@@ -38,6 +38,13 @@ production tourne en **UTC** : toute date civile calculée côté serveur passe 
   numéro du jour, envoi au planning) vit dans `comptoir/pont.js`.
 - **Charte unique** (depuis le 29/07) : gris `#f5f6f8`, encre `#111827`.
   La couleur dit un **état**, jamais une décoration.
+  **Une seule exception, tranchée par Charlie le 26/08** : les **cinq teintes
+  de phase du rail** (`[data-fam]` dans `charte.css` — `--zr` / `--zt` / `--zp`
+  / `--zc` / `--za`). Une phase n'est pas un état, c'est une catégorie : la
+  règle ne la couvrait donc pas, et l'écran faisait autrement depuis le 24/08.
+  L'exception est **close** : elle vaut pour le rail et pour rien d'autre.
+  Partout ailleurs — cartes, tableau, ticket, comptoir — une couleur qui ne dit
+  pas un état est un défaut.
 
 ## Qui tranche le design (25/08/2026)
 

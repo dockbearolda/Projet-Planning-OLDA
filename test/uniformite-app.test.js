@@ -441,4 +441,42 @@ assert.match(VENTE, /\.card:has\(> \.bloc\)\{background:transparent;border:0/,
 assert.ok(!/(^|[\n;}])\.card\{[^}]*!important/.test(sansCom(VENTE)),
   '… et aucun `.card` en !important ne vient la lui rendre de force');
 
+// ---------------------------------------------------------------------------
+// L'EXCEPTION DE COULEUR EST CLOSE (Charlie, 26/08/2026)
+// ---------------------------------------------------------------------------
+// La charte dit : « la couleur dit un ÉTAT, jamais une décoration ». Le rail
+// porte pourtant cinq teintes PAR PHASE depuis le 24/08 — une phase est une
+// catégorie, pas un état. Charlie a tranché en faveur des teintes, et
+// l'exception est écrite (CLAUDE.md + charte.css) au lieu d'être subie.
+//
+// Une exception écrite mais non tenue s'élargit toute seule : celle-ci vaut
+// pour le rail et pour rien d'autre. Les cinq rôles de phase ne se déclarent
+// que dans les blocs `[data-fam]`, et nulle part ailleurs.
+const ROLES_DE_PHASE = ['--zr', '--zt', '--zp', '--zc', '--za'];
+const blocsFamille = sansCom(CHARTE).match(/\[data-fam="[a-z_]+"\][^{]*\{[^}]*\}/g) || [];
+assert.strictEqual(blocsFamille.length, 6,
+  `six familles, six blocs de teintes — vu ${blocsFamille.length}`);
+for (const bloc of blocsFamille) {
+  for (const role of ROLES_DE_PHASE) {
+    assert.ok(bloc.includes(`${role}:`), `un bloc de phase doit poser ${role}`);
+  }
+}
+// Hors de ces blocs, une teinte de phase ne s'invente pas : elle se DÉRIVE du
+// rail (`var(--zr)`). C'est ce que fait le thème sombre — les quatre rôles
+// clairs se recalculent à partir du seul `--zr`, une vérité par phase et pas
+// douze hexadécimaux de plus. Toute autre déclaration serait une SIXIÈME
+// couleur entrée par la porte de service.
+// On compte les DÉCLARATIONS (`--zr:`), jamais les usages (`var(--zr)`), qui
+// eux sont libres.
+const LIGNE_DE_ROLE = /(--z[rtpca])\s*:([^;]*);/g;
+for (const [nom, src] of [['charte.css', CHARTE], ['styles.css', CRM]]) {
+  const horsBlocs = blocsFamille.reduce((t, b) => t.split(b).join(''), sansCom(src));
+  for (const m of horsBlocs.matchAll(LIGNE_DE_ROLE)) {
+    assert.ok(m[2].includes('var(--z'),
+      `${nom} : « ${m[1]}:${m[2].trim()} » invente une teinte hors du rail — `
+      + 'une teinte de phase se dérive de --zr, elle ne se pose pas à la main');
+  }
+}
+
 console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');
+console.log('✓ couleur : l’exception du rail est écrite, et elle reste au rail');

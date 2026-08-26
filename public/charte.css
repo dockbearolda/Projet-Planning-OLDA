@@ -427,7 +427,24 @@
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .champ-recherche:hover { border-color: var(--border-strong); }
+/* C'est la PILULE qui montre le focus, pas le champ : lui n'a ni fond ni trait
+   (règle du dessous). `:focus-within` la fait donc réagir aussi bien au clic
+   qu'à la tabulation — on tape dedans toute la journée, il faut voir où va la
+   frappe. */
 .champ-recherche:focus-within { border-color: var(--primary); background: var(--surface); }
+
+/* UNE CASE À COCHER NATIVE NE DIT PAS QU'ELLE A LE FOCUS. Chrome dessine bien
+   son anneau, mais il disparaît dès qu'une feuille pose `outline: 0` plus haut
+   dans la cascade — et l'application en pose plusieurs. Relevé au rendu le
+   26/08 : la case des Réglages était la seule surface de saisie de toute
+   l'application à ne rien changer quand on arrive dessus au clavier.
+   Même halo que les boutons de la maison, pour que ce soit LE MÊME signal
+   partout. */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+}
 /* Le champ lui-même n'a ni fond ni trait : c'est la pilule qui les porte. Sans
    ça, Chrome pose sa propre boîte blanche à l'intérieur de la nôtre. */
 .champ-recherche input {
@@ -597,7 +614,18 @@
    DE NUIT, les quatre rôles clairs se DÉRIVENT du rail (color-mix sur les
    gris du thème) : une seule vérité par phase, pas douze hexadécimaux de
    plus à maintenir. Le poste est PC + Chrome (décision du 21/08) : color-mix
-   et :has() y sont acquis. */
+   et :has() y sont acquis.
+
+   ─── L'EXCEPTION À LA RÈGLE DE COULEUR (Charlie, 26/08/2026) ───────────────
+   La charte dit : « la couleur dit un ÉTAT, jamais une décoration ». Une phase
+   n'est pas un état, c'est une catégorie — ces cinq teintes sortaient donc de
+   la règle, et l'écran contredisait le texte depuis le 24/08. Charlie a tranché
+   en faveur des teintes : elles restent, et l'exception est écrite (ici et dans
+   CLAUDE.md) plutôt que subie.
+
+   ELLE EST CLOSE. Elle vaut pour le rail et pour rien d'autre : sur une carte,
+   dans le tableau, sur le ticket ou au comptoir, une couleur qui ne dit pas un
+   état reste un défaut. `test/uniformite-app.test.js` tient la frontière. */
 [data-fam="a_trier"]           { --zr: #8a82a0; --zt: #574a75; --zp: #eceaf1; --zc: #5f5775; --za: #f5f4f8; }
 [data-fam="demande_chiffrage"] { --zr: #7a90ad; --zt: #3f5a80; --zp: #e8edf3; --zc: #4f6482; --za: #f2f5f8; }
 [data-fam="preparation"]       { --zr: #a2947a; --zt: #6b5a33; --zp: #f1ece2; --zc: #71634a; --za: #f8f5f0; }

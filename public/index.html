@@ -51,13 +51,14 @@
        une seule charte, un seul endroit où la changer. -->
   <link rel="stylesheet" href="charte.css" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="clients.css" />
-  <link rel="stylesheet" href="projet.css" />
+  <!-- clients.css et projet.css NE SONT PAS ICI : chacune part avec l'écran
+       qu'elle habille, au premier passage (voir poserFeuille dans app.js).
+       Elles pesaient 30 Ko au démarrage de tous les postes, pour deux écrans
+       dont le JavaScript, lui, attendait déjà. -->
   <!-- Les modules importés par app.js ne sont découverts qu'une fois app.js
        téléchargé et analysé : deux allers-retours en série. On les annonce dès
        le départ pour qu'ils partent en même temps (~1 aller-retour de gagné en
        4G, soit 100 à 300 ms sur l'ouverture d'un poste). -->
-  <link rel="modulepreload" href="dashboard.js" />
   <link rel="modulepreload" href="priority.js" />
   <link rel="modulepreload" href="whatsapp.js" />
   <link rel="modulepreload" href="nom-client.js" />

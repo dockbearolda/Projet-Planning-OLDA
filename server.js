@@ -4752,6 +4752,58 @@ async function reserverNumeroDuJour(serie, body) {
 // porte un nom fixe, et le jour où l'on y ajoute un glyphe, aucun poste ne doit
 // rester des heures sur l'ancienne. Revalider 16 Ko coûte un 304, rien de plus.
 const NO_CACHE = /\.(html|js|css|webmanifest|svg|woff2)$/;
+
+// LES COMMENTAIRES NE PARTENT PAS SUR LE FIL. 46 % du poids servi était de la
+// prose française : la mémoire du projet, indispensable dans la source,
+// parfaitement inutile dans un navigateur. On la retire ICI, à la volée, et le
+// disque n'est jamais touché — 391 → 177 Ko compressés sur les 25 fichiers
+// servis, soit 214 Ko de moins à chaque chargement à froid.
+//
+// CE N'EST PAS UN BUILD : rien n'est écrit, aucun outil n'entre dans le dépôt,
+// les fichiers gardent leur nom (c'est ce nom fixe qui impose `no-cache` juste
+// en dessous). Les numéros de ligne ne bougent pas d'un cran — voir
+// depouiller.js — donc une pile d'appels remontée d'un poste reste lisible.
+//
+// LE CACHE EST INDEXÉ SUR (chemin, taille, date) : en développement, un fichier
+// modifié se resert dépouillé à neuf sans redémarrer. Il est BORNÉ par le
+// nombre de fichiers du dossier, pas par le trafic.
+const { depouiller } = require('./depouiller.js');
+const DEPOUILLABLE = /\.(js|css)$/;
+const depouilles = new Map();
+
+function servirDepouille(res, chemin, stat) {
+  const cle = `${chemin}:${stat.size}:${stat.mtimeMs}`;
+  let corps = depouilles.get(cle);
+  if (corps === undefined) {
+    const src = fs.readFileSync(chemin, 'utf8');
+    corps = depouiller(src, chemin.endsWith('.css') ? 'css' : 'js');
+    depouilles.clear();               // une seule version en vol : la dernière
+    depouilles.set(cle, corps);
+  }
+  // L'ETAG DOIT SUIVRE LE CORPS SERVI, pas le fichier sur le disque : sinon un
+  // poste qui a l'ancienne version en cache reçoit un 304 pour un contenu qui
+  // a changé, et garde du code périmé — exactement le mal que `no-cache`
+  // existe pour empêcher.
+  res.setHeader('ETag', `W/"d-${Buffer.byteLength(corps)}-${Math.round(stat.mtimeMs)}"`);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type(chemin.endsWith('.css') ? 'text/css' : 'text/javascript');
+  res.send(corps);
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (!DEPOUILLABLE.test(req.path)) return next();
+  // `path.join` normalise `..` : on vérifie ensuite qu'on n'est pas sorti de
+  // `public/`, sans quoi une adresse fabriquée lirait n'importe quel fichier.
+  const racine = path.join(__dirname, 'public');
+  const chemin = path.join(racine, decodeURIComponent(req.path));
+  if (!chemin.startsWith(racine + path.sep)) return next();
+  let stat;
+  try { stat = fs.statSync(chemin); } catch (_) { return next(); }
+  if (!stat.isFile()) return next();
+  try { servirDepouille(res, chemin, stat); } catch (_) { return next(); }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (NO_CACHE.test(filePath)) res.setHeader('Cache-Control', 'no-cache');

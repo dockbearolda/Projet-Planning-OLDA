@@ -4,7 +4,6 @@
 
 // Guide des étapes (texte du patron, feuille « Descriptif Étapes »).
 // Dashboard « Point du jour » (projection temps réel du planning).
-import { createDashboard } from './dashboard.js';
 // WhatsApp « commande prête » : numéro au format international + message rempli.
 import { whatsappLink } from './whatsapp.js';
 // Nom d'un particulier : où s'arrête le prénom, où commence le NOM de famille.
@@ -8106,12 +8105,50 @@ async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = fa
 // Saut depuis le Point du jour (« Ouvrir dans le planning »).
 const jumpToPlanning = (r) => ouvrirCommandeAuPlanning({ id: r.id, stage: r.stage, sub: r.sub_stage });
 
-const dashboard = createDashboard({
-  root: $dashboard,
-  api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
-  daysLeft, prioBand, showToast, attachTip,
-  jumpToPlanning,
-});
+// LE POINT DU JOUR ARRIVE À LA DEMANDE, comme les six autres écrans. Il était
+// le seul module secondaire en import STATIQUE : 70 Ko téléchargés, analysés et
+// exécutés à l'ouverture de chaque poste, pour un onglet que beaucoup n'ouvrent
+// jamais de la journée. Sa PREMIÈRE SYNTHÈSE attendait déjà le premier
+// affichage (voir `show` dans dashboard.js) ; c'est le module lui-même qui
+// partait trop tôt.
+//
+// Les quatre appels du planning passent par cette façade. Aucun ne peut arriver
+// avant que quelqu'un n'ouvre l'onglet :
+//   `show`         — la seule porte : elle charge, monte, puis affiche ;
+//   `hide`         — rien à cacher tant que rien n'est monté ;
+//   `notifyChange` — sans cache monté il n'y a rien à tenir à jour (le module
+//                    lui-même renonce déjà dans ce cas) ;
+//   `start`        — ne fait plus rien au démarrage : il monte la coquille, et
+//                    c'est `show` qui s'en charge au premier passage.
+let pjChargement = null;
+let pjModule = null;
+function chargerPointDuJour() {
+  if (!pjChargement) {
+    pjChargement = import('./dashboard.js')
+      .then((m) => {
+        pjModule = m.createDashboard({
+          root: $dashboard,
+          api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
+          daysLeft, prioBand, showToast, attachTip,
+          jumpToPlanning,
+        });
+        pjModule.start();
+        return pjModule;
+      })
+      .catch((err) => {
+        pjChargement = null;                 // rechargeable au prochain essai
+        pjModule = null;
+        reportError(err);
+      });
+  }
+  return pjChargement;
+}
+const dashboard = {
+  start() {},
+  show() { chargerPointDuJour().then(() => pjModule && pjModule.show()); },
+  hide() { if (pjModule) pjModule.hide(); },
+  notifyChange(kinds) { if (pjModule) pjModule.notifyChange(kinds); },
+};
 
 // --- Bascule Planning / Dashboard ------------------------------------------
 // Le HASH de l'URL est l'unique pilote de la vue. La navigation du rail n'est
@@ -8122,12 +8159,33 @@ const dashboard = createDashboard({
 // La Base clients (CRM) : liste + fiche éditable + notes. Module lourd (rendu
 // complet), chargé au premier passage puis monté ; les visites suivantes
 // rafraîchissent seulement les données (un client a pu être créé à la commande).
+// UNE FEUILLE POSÉE AVEC SON ÉCRAN. `clients.css` et `projet.css` partaient au
+// démarrage — 30 Ko — pour deux écrans dont le JAVASCRIPT, lui, attendait le
+// premier passage. On attend la fin du chargement avant de monter : une vue
+// peinte avant sa feuille clignote une fois, et ce clignotement se voit.
+const feuillesPosees = new Set();
+function poserFeuille(href) {
+  if (feuillesPosees.has(href)) return Promise.resolve();
+  feuillesPosees.add(href);
+  return new Promise((resoudre) => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = href;
+    // Une feuille manquante ne doit pas retenir l'écran : il s'affichera nu
+    // plutôt que pas du tout.
+    l.addEventListener('load', resoudre, { once: true });
+    l.addEventListener('error', resoudre, { once: true });
+    document.head.appendChild(l);
+  });
+}
+
 let clientsLoading = null;
 let clientsModule = null;
 function mountClients() {
   if (!$clients) return;
   if (!clientsLoading) {
-    clientsLoading = import('./clients.js')
+    clientsLoading = Promise.all([poserFeuille('clients.css'), import('./clients.js')])
+      .then(([, m]) => m)
       .then((m) => { clientsModule = m; return m.initClients($clients); })
       .catch((err) => {
         clientsLoading = null;                // rechargeable au prochain essai
@@ -8223,8 +8281,8 @@ let projetModule = null;
 function mountProjet() {
   if (!$projet) return;
   if (!projetLoading) {
-    projetLoading = import('./nouveau-projet.js')
-      .then((m) => { projetModule = m; return m.initProjet($projet); })
+    projetLoading = Promise.all([poserFeuille('projet.css'), import('./nouveau-projet.js')])
+      .then(([, m]) => { projetModule = m; return m.initProjet($projet); })
       .catch((err) => {
         projetLoading = null;
         projetModule = null;
