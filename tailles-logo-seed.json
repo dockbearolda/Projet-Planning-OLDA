@@ -292,6 +292,24 @@
           "XS": 260
         }
       }
+    },
+    "Tote Bag": {
+      "W101": {
+        "Face Optimisée 205 x 205 mm": {
+          "Taille unique": 205
+        },
+        "Face Classique 250 x 250 mm": {
+          "Taille unique": 250
+        }
+      },
+      "KI3223": {
+        "Face Optimisée 205 x 205 mm": {
+          "Taille unique": 205
+        },
+        "Face Classique 250 x 250 mm": {
+          "Taille unique": 250
+        }
+      }
     }
   }
 }

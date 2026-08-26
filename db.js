@@ -1677,8 +1677,15 @@ async function setReglagesTextile(patch) {
 // dos) : même mot, autre taille, et rien pour le dire. En reprenant les noms du
 // chiffrage il n'y a plus rien à traduire — donc plus rien à traduire de
 // travers.
+// C'est la RÉUNION de tous les emplacements du chiffrage, familles comprises :
+// un vêtement en a six, un tote bag en a deux qui n'ont rien à voir (le fichier
+// V9 du patron le dit lui-même — `DB.times`). Le serveur valide contre cette
+// liste ; c'est l'ÉCRAN qui choisit les colonnes de la famille affichée, parce
+// que lui a le catalogue sous la main. Recopier la table du patron ici serait
+// la recopier une deuxième fois, donc la laisser diverger.
 const TAILLES_LOGO_EMPLACEMENTS = Object.freeze([
   'Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA',
+  'Face Optimisée 205 x 205 mm', 'Face Classique 250 x 250 mm',
 ]);
 
 // Les tailles proposées par famille. Elles ne se stockent pas : une colonne
@@ -1690,6 +1697,10 @@ const TAILLES_LOGO_TAILLES = Object.freeze({
   Enfant: ['2/4 ans', '4/6 ans', '6/8 ans', '8/10 ans', '10/12 ans', '12/14 ans'],
   'Bébé': ['3 mois', '6 mois', '9 mois', '12 mois', '18 mois', '24 mois', '36 mois'],
 });
+// UN OBJET N'A QU'UNE TAILLE, et sa largeur de logo vaut donc quelle que soit
+// la case où la vendeuse a saisi la quantité (elle n'a que S/M/L/XL/2XL/Autres
+// devant elle). La clé « Taille unique » est reconnue comme telle au comptoir :
+// elle répond pour toutes les tailles. Voir `txLogoDuTableau`.
 const TAILLES_LOGO_TAILLES_DEFAUT = Object.freeze(['Taille unique']);
 
 function taillesLogoPour(famille) {

@@ -86,9 +86,10 @@ const TE = global.window.TextileEngine;
     'la largeur dépend de la TAILLE du vêtement : 240 en XS, 320 en XL');
   // Les colonnes descendent AVEC le tableau : une liste recopiée des deux côtés
   // finit toujours par diverger.
-  assert.deepStrictEqual(neuve.body.emplacements,
-    ['Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA'],
-    'les colonnes sont les emplacements du chiffrage, mot pour mot');
+  for (const e of ['Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA']) {
+    assert.ok(neuve.body.emplacements.includes(e),
+      `« ${e} » est une colonne : les emplacements du chiffrage, mot pour mot`);
+  }
   assert.deepStrictEqual(neuve.body.tailles.Homme, ['XS', 'S', 'M', 'L', 'XL', '2XL']);
   assert.ok(neuve.body.tailles['Bébé'].includes('3 mois'), 'chaque famille a ses tailles');
 
@@ -99,6 +100,22 @@ const TE = global.window.TextileEngine;
   assert.strictEqual(cellule(neuve.body, 'Homme', 'NS300', 'Poitrine', 'S'), 60);
   assert.strictEqual(cellule(neuve.body, 'Homme', 'NS300', 'Avant', 'S'), undefined,
     '« Avant » est une PLEINE FACE : rien ne l’a mesurée, la case reste vide');
+
+  // --- 1 bis. UN TOTE BAG N'A NI COEUR NI MANCHES ----------------------------
+  // Le fichier V9 du patron le dit lui-même (`DB.times`) : un vêtement a six
+  // emplacements, un tote bag en a deux qui n'ont rien à voir — et leur taille
+  // est écrite DANS LEUR NOM. C'est la seule largeur qu'on connaissait sans
+  // l'avoir mesurée : elle est posée, les autres cases restent vides.
+  assert.ok(neuve.body.emplacements.includes('Face Optimisée 205 x 205 mm')
+    && neuve.body.emplacements.includes('Face Classique 250 x 250 mm'),
+    'les colonnes reconnues sont la RÉUNION de toutes les familles');
+  assert.strictEqual(cellule(neuve.body, 'Tote Bag', 'W101', 'Face Classique 250 x 250 mm', 'Taille unique'), 250);
+  assert.strictEqual(cellule(neuve.body, 'Tote Bag', 'KI3223', 'Face Optimisée 205 x 205 mm', 'Taille unique'), 205);
+  // C'est l'ÉCRAN qui choisit les colonnes de la famille affichée : lui a le
+  // catalogue sous la main. Les recopier côté serveur serait recopier la table
+  // du patron une deuxième fois, donc la laisser diverger.
+  assert.match(ECRAN, /TE\.DB\.times\[TE\.genreMoteur\(nom\)\]/,
+    'les colonnes viennent de la table du patron, pas d’une liste réécrite');
 
   // --- 2. UNE CASE À LA FOIS -------------------------------------------------
   const ecrit = await call('PATCH', '/api/tailles-logo',
@@ -155,6 +172,19 @@ const TE = global.window.TextileEngine;
   const places = DEVIS_JS.slice(DEVIS_JS.indexOf('function txPlacementsMarques('));
   assert.match(places.slice(0, places.indexOf('\n}')), /colonnes\.includes\(p\)/,
     'seuls les emplacements que le tableau mesure ouvrent une rangée');
+
+  // UN OBJET N'A QU'UNE TAILLE. La vendeuse n'a que S/M/L/XL/2XL/Autres devant
+  // elle, et aucune ne décrit un tote bag : la clé « Taille unique » répond
+  // donc pour toutes. Un VÊTEMENT n'a jamais cette clé — le repli ne peut pas
+  // déraper et donner la largeur d'un S à un 2XL.
+  {
+    const f = DEVIS_JS.slice(DEVIS_JS.indexOf('function txLogoDuTableau('));
+    const corps = f.slice(0, f.indexOf('\n}'));
+    const iExacte = corps.indexOf('SIZE_LABELS[cleTaille]');
+    const iUnique = corps.indexOf("txLogoCle('Taille unique')");
+    assert.ok(iExacte > 0 && iUnique > iExacte,
+      'la taille EXACTE d’abord, « Taille unique » seulement en repli');
+  }
 
   // --- 5. LE TABLEAU AVANT LA RÉFÉRENCE --------------------------------------
   const aideSrc = DEVIS_JS.slice(DEVIS_JS.indexOf('function txLogoAideMaj('));

@@ -58,6 +58,26 @@ let etat = '';                 // ce que la dernière écriture a donné, dit DA
 const FAMILLES = ['Homme', 'Femme', 'Enfant', 'Bébé', 'Tote Bag', 'Casquettes', 'Pochettes'];
 const EMPLACEMENTS_DEFAUT = ['Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA'];
 
+// LES COLONNES SUIVENT LA FAMILLE, et c'est le fichier V9 du patron qui le dit
+// (`DB.times`) : un vêtement a six emplacements, un tote bag en a deux qui
+// n'ont rien à voir — et leur taille est écrite dans leur nom. Une casquette
+// avec une colonne « Manche GA » n'a aucun sens, et une colonne qui n'a aucun
+// sens finit par être remplie.
+function emplacementsDeLaFamille(nom) {
+  const TE = window.TextileEngine;
+  if (!TE) return EMPLACEMENTS_DEFAUT;
+  const table = TE.DB.times[TE.genreMoteur(nom)];
+  const propres = table ? Object.keys(table) : [];
+  if (!propres.length) return EMPLACEMENTS_DEFAUT;
+  // Rangés dans l'ordre où on les lit sur un vêtement, pas dans celui du calcul.
+  const ordre = ['Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA'];
+  return propres.slice().sort((a, b) => {
+    const ia = ordre.indexOf(a);
+    const ib = ordre.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
 // LE CATALOGUE TEXTILE, chargé à la demande. Les lignes du tableau sont les
 // références du catalogue : les taper à la main laisserait passer une faute de
 // frappe qui rendrait la mesure introuvable au comptoir, sans rien signaler.
@@ -141,8 +161,7 @@ function segmente(liste, actif, groupe, aria) {
 
 function render() {
   if (!ROOT) return;
-  const emplacements = table.emplacements && table.emplacements.length
-    ? table.emplacements : EMPLACEMENTS_DEFAUT;
+  const emplacements = emplacementsDeLaFamille(famille);
   if (!emplacements.includes(emplacement)) [emplacement] = emplacements;
   const tailles = (table.tailles || {})[famille] || ['Taille unique'];
 

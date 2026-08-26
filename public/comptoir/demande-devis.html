@@ -2064,8 +2064,16 @@ function txPlacementsMarques(printType){
 function txLogoDuTableau(d,placement,cleTaille){
   const emplacements=txLogoEmplacementsDe(d);
   if(!emplacements)return null;
-  const mm=(emplacements[placement]||{})[txLogoCle(TE().SIZE_LABELS[cleTaille])];
-  return mm==null?null:mm;
+  const parTaille=emplacements[placement]||{};
+  const mm=parTaille[txLogoCle(TE().SIZE_LABELS[cleTaille])];
+  if(mm!=null)return mm;
+  /* UN OBJET N'A QU'UNE TAILLE. Un tote bag, une casquette, une trousse : leur
+     largeur de logo vaut quelle que soit la case où la vendeuse a saisi la
+     quantité — elle n'a que S/M/L/XL/2XL/Autres devant elle, et aucune ne
+     décrit un tote bag. La clé « Taille unique » répond donc pour toutes.
+     Un vêtement, lui, n'a jamais cette clé : le repli ne peut pas déraper. */
+  const unique=parTaille[txLogoCle('Taille unique')];
+  return unique==null?null:unique;
 }
 
 /* Le catalogue connaît deux noms pour une même référence (le sien et celui de
