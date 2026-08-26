@@ -136,14 +136,43 @@ assert.deepStrictEqual(feu({ devis_requis: true, bat_requis: false, project_valu
 console.log('✓ feu : la tasse n’exige rien, les 200 t-shirts exigent les trois');
 
 // ---------------------------------------------------------------------------
-// 4. LE VERT SE TAIT, L'ÉCHEC PARLE
+// 4. LE VERT SE TAIT — JUSQU'AU BOUT
 // ---------------------------------------------------------------------------
-// Règle de la maison. Ce qui est obtenu s'efface en gris ; ce qui manque porte
-// la couleur d'état ET la graisse. Quand tout va bien, il n'y a rien à lire.
-assert.match(CSS, /\.feu__pt\.is-ok \{[^}]*color: var\(--text-3\)/,
-  'l’obtenu se tait');
-assert.match(CSS, /\.feu__pt\.is-manque \{[^}]*color: var\(--danger\)[^}]*font-weight: var\(--graisse-forte\)/,
-  'ce qui manque parle — couleur d’ÉTAT et graisse, pas une décoration');
+// Première version : « ● Devis ◌ BAT ◌ Argent » sur chaque carte. Charlie
+// (26/08) : « je n'aime pas du tout le design du feu, il faut qu'il soit bien
+// visible. Quelque chose de haut de gamme et de discret. » Les trois adjectifs
+// ne se contredisent pas — ils disent : ne montre QUE ce qui manque, et
+// montre-le dans le rythme du reste.
+//
+// L'OBTENU NE S'ÉCRIT PLUS DU TOUT : `feuDuDossier` ne rend que le manquant.
+assert.match(APP, /FEU_FAITS\.filter\(\(f\) => f\.requis\(r\) && !f\.obtenu\(r\)\)/,
+  'seul ce qui manque s’affiche — l’obtenu ne prend aucune place');
+
+// AUCUN GLYPHE. « ● » et « ◌ » sont des caractères de police : ils changent de
+// dessin d'un poste à l'autre et se lisent comme du texte, pas comme un repère.
+const blocFeu = APP.slice(APP.indexOf('function blocFeu'), APP.indexOf('function blocProduction'));
+assert.ok(!/[●◌○◉]/.test(blocFeu), 'plus un seul glyphe dans le feu');
+
+// LA MÊME GRILLE QUE LA FICHE DE PRODUCTION : c'est ce qui la fait lire comme
+// sa cinquième ligne au lieu d'une pastille rapportée.
+assert.match(blocFeu, /bloc\.className = 'prod-fiche feu'/,
+  'la rangée emprunte la grille de la fiche de production');
+assert.match(blocFeu, /cle\.className = 'prod-fiche__cle feu__cle'/,
+  'et son intitulé');
+assert.match(blocFeu, /s\.className = 'prod-fiche__fort'/,
+  'les valeurs prennent la graisse forte, comme les quatre faits au-dessus');
+
+// UN SEUL MOT PORTE LA COULEUR — l'intitulé. La couleur dit un ÉTAT, il n'y en
+// a qu'une par carte, et elle ne décore rien.
+assert.match(CSS, /\.prod-fiche__cle\.feu__cle \{ color: var\(--danger\); \}/,
+  'seul l’intitulé « Manque » porte la couleur d’état — et DEUX classes, sinon '
+  + '`.prod-fiche__cle` (déclarée après) lui repose son gris');
+assert.ok(!/\.feu__val|\.feu__pt/.test(CSS),
+  'aucune règle de couleur sur les valeurs : elles sont à l’encre comme le reste');
+
+// ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi faire.
+assert.match(APP, /manque: \(r\) => \(r\.acompte_demande === true \? 'Acompte' : 'Paiement'\)/,
+  'un acompte demandé se réclame par son nom ; sinon c’est un paiement');
 
 // LE MÊME COMPOSANT DANS LES DEUX VUES : deux écrans à un clic l'un de l'autre
 // doivent donner le même bloc, pas deux qui se ressemblent.
@@ -151,6 +180,13 @@ const carte = APP.match(/function buildCard\(r, options\)[\s\S]*?\n\}/);
 assert.ok(carte && /blocFeu\(r\)/.test(carte[0]), 'la carte porte le feu');
 const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
 assert.ok(cellule && /blocFeu\(r\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME');
+// …ET DANS LE MÊME ORDRE : « Manque » est la CINQUIÈME ligne de la fiche, pas
+// une rangée posée devant. On lit ce qu'il y a à produire, puis ce qui empêche
+// de le faire — et c'est ce qui aligne les cinq intitulés dans une colonne.
+assert.ok(carte[0].indexOf('blocProduction(r)') < carte[0].indexOf('blocFeu(r)'),
+  'sur la carte, « Manque » vient APRÈS la fiche de production');
+assert.ok(cellule[0].indexOf('blocProduction(r)') < cellule[0].indexOf('blocFeu(r)'),
+  'et dans la cellule Infos aussi');
 
 // CHACUN CHOISIT : à l'atelier on veut le feu, à la boutique peut-être pas.
 assert.match(APP, /key: 'feu',[^}]*surCarte: true/,
@@ -163,5 +199,10 @@ assert.match(APP, /COLS_REDESSINENT = new Set\(\['price', 'feu'/,
 // passage en production aujourd'hui, et c'était déjà le cas.
 assert.match(APP, /ce feu AFFICHE, il ne bloque pas/,
   'l’intention doit être écrite : un verrou qui se trompe arrête l’atelier');
+
+// ET SUR UN DOSSIER OÙ RIEN NE MANQUE, IL N'Y A PAS DE RANGÉE. C'est là qu'est
+// la discrétion — et c'est aussi ce qui rend les autres visibles.
+assert.match(blocFeu, /if \(!manque\.length\) return null;/,
+  'rien ne manque = rien ne s’affiche');
 
 console.log('✓ feu : le vert se tait, l’échec parle — et le même bloc dans les deux vues');

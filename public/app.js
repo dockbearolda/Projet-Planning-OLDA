@@ -1498,9 +1498,32 @@ const PROD_FAITS = [
 // Les 200 t-shirts exigent les trois, sans que personne ait coché quoi que ce
 // soit.
 //
-// LE VERT SE TAIT, L'ÉCHEC PARLE (règle de la maison). Ce qui est obtenu passe
-// en gris discret : quand tout va bien, il n'y a rien à lire. Ce qui manque
-// porte la couleur d'état et la graisse — c'est la seule chose qu'on cherche.
+// LE VERT SE TAIT — JUSQU'AU BOUT (règle de la maison, appliquée à la lettre).
+// La première version écrivait « ● Devis ◌ BAT ◌ Argent » : trois glyphes et
+// trois mots sur CHAQUE carte, dont deux tiers ne disaient rien d'utile. Charlie
+// (26/08) : « je n'aime pas du tout le design du feu, il faut qu'il soit bien
+// visible. Quelque chose de haut de gamme et de discret. »
+//
+// Les trois adjectifs ne se contredisent pas — ils disent : ne montre QUE ce qui
+// manque, et montre-le dans le rythme du reste. La rangée emprunte donc la
+// grille de la fiche de production (même colonne d'intitulé à 84 px, mêmes
+// tailles, mêmes graisses) : elle se lit comme sa cinquième ligne, pas comme une
+// pastille rapportée.
+//
+//   RÉF.       K3025 · Noir
+//   MARQUAGE   DTF · Blanc
+//   TAILLES    24 pièces : 6 × S · 10 × M · 6 × L · 2 × XL
+//   LOGOS      Coeur 90 · Dos 280 mm
+//   MANQUE     BAT · Acompte
+//
+// Un seul mot porte la couleur d'ÉTAT — l'intitulé. Les valeurs prennent la
+// graisse forte, comme les quatre faits de production au-dessus. Aucun glyphe :
+// « ● » et « ◌ » sont des caractères de police, ils changent de dessin d'un
+// poste à l'autre et se lisent comme du texte, pas comme un repère.
+//
+// ET QUAND RIEN NE MANQUE, LA RANGÉE N'EXISTE PAS. C'est là qu'est la
+// discrétion : sur une file de trente dossiers, seuls ceux qui coincent portent
+// une marque, et l'œil ne cherche que celle-là.
 //
 // EN LECTURE SEULE POUR L'INSTANT : ce feu AFFICHE, il ne bloque pas. Seul le
 // BAT refuse encore le passage en production (verrou de server.js). On regarde
@@ -1511,18 +1534,17 @@ const FEU_FAITS = [
     label: 'Devis',
     requis: (r) => r.devis_requis === true,
     obtenu: (r) => !!r.devis_valide_le,
-    dit: (r) => (r.devis_valide_le
-      ? `Devis validé le ${dateFr(r.devis_valide_le)}`
-      : 'Devis pas encore validé par le client'),
+    // Le mot qui s'écrit quand il MANQUE, et la phrase au survol.
+    manque: () => 'Devis',
+    dit: () => 'Devis envoyé — pas encore validé par le client',
   },
   {
     cle: 'bat',
     label: 'BAT',
     requis: (r) => r.bat_requis === true,
     obtenu: (r) => !!r.bat_valide_le,
-    dit: (r) => (r.bat_valide_le
-      ? `BAT validé le ${dateFr(r.bat_valide_le)}`
-      : 'BAT pas encore validé par le client'),
+    manque: () => 'BAT',
+    dit: () => 'BAT envoyé — pas encore validé par le client',
   },
   {
     cle: 'argent',
@@ -1535,41 +1557,55 @@ const FEU_FAITS = [
     // OU un acompte demandé ET reçu. Un acompte demandé qui n'est pas versé ne
     // couvre rien.
     obtenu: (r) => r.paye === true || (r.acompte_demande === true && r.acompte_verse === true),
-    dit: (r) => {
-      if (r.paye === true) return 'Soldée';
-      if (r.acompte_demande === true && r.acompte_verse === true) {
-        return r.acompte_montant != null
-          ? `Acompte reçu (${eur(Number(r.acompte_montant))})`
-          : 'Acompte reçu';
-      }
-      if (r.acompte_demande === true) return 'Acompte demandé — pas encore reçu';
-      return 'Rien d’encaissé';
-    },
+    // ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi
+    // faire ; « Acompte » dit qu'il a été demandé et qu'il n'est pas rentré,
+    // « Paiement » qu'on n'a encore rien réclamé.
+    manque: (r) => (r.acompte_demande === true ? 'Acompte' : 'Paiement'),
+    dit: (r) => (r.acompte_demande === true
+      ? (r.acompte_montant != null
+        ? `Acompte de ${eur(Number(r.acompte_montant))} demandé — pas encore reçu`
+        : 'Acompte demandé — pas encore reçu')
+      : 'Rien d’encaissé sur cette commande'),
   },
 ];
 
-// Ce que le dossier exige, et où il en est. Rien à afficher = rien n'est exigé.
+// CE QUI MANQUE À CE DOSSIER, dans l'ordre du parcours : le devis avant le BAT,
+// le BAT avant l'argent. Une liste vide = rien ne bloque, et il n'y a rien à
+// afficher.
 function feuDuDossier(r) {
-  return FEU_FAITS.filter((f) => f.requis(r))
-    .map((f) => ({ cle: f.cle, label: f.label, ok: f.obtenu(r), dit: f.dit(r) }));
+  return FEU_FAITS.filter((f) => f.requis(r) && !f.obtenu(r))
+    .map((f) => ({ cle: f.cle, mot: f.manque(r), dit: f.dit(r) }));
 }
 
 function blocFeu(r) {
-  const faits = feuDuDossier(r);
-  if (!faits.length) return null;
+  const manque = feuDuDossier(r);
+  if (!manque.length) return null;
+  // LA MÊME GRILLE QUE LA FICHE DE PRODUCTION — c'est ce qui la fait lire comme
+  // sa dernière ligne au lieu d'une pastille rapportée. Deux écrans à un clic
+  // l'un de l'autre doivent donner le même composant ; ici, deux rangées d'une
+  // même carte aussi.
   const bloc = document.createElement('div');
-  bloc.className = 'feu';
-  const manquants = faits.filter((f) => !f.ok).length;
-  bloc.setAttribute('aria-label', manquants === 0
-    ? 'Rien ne manque avant la production'
-    : `${manquants} condition${manquants > 1 ? 's' : ''} manquante${manquants > 1 ? 's' : ''} avant la production`);
-  for (const f of faits) {
+  bloc.className = 'prod-fiche feu';
+  const cle = document.createElement('span');
+  cle.className = 'prod-fiche__cle feu__cle';
+  cle.textContent = 'Manque';
+  const val = document.createElement('span');
+  val.className = 'prod-fiche__val';
+  manque.forEach((m, i) => {
+    if (i) {
+      const sep = document.createElement('span');
+      sep.textContent = ' · ';
+      val.appendChild(sep);
+    }
     const s = document.createElement('span');
-    s.className = `feu__pt${f.ok ? ' is-ok' : ' is-manque'}`;
-    s.textContent = `${f.ok ? '●' : '◌'} ${f.label}`;
-    attachTip(s, f.dit);
-    bloc.appendChild(s);
-  }
+    s.className = 'prod-fiche__fort';
+    s.textContent = m.mot;
+    attachTip(s, m.dit);
+    val.appendChild(s);
+  });
+  bloc.setAttribute('aria-label',
+    `Avant la production, il manque : ${manque.map((m) => m.dit).join(' ; ')}`);
+  bloc.append(cle, val);
   return bloc;
 }
 
@@ -1854,10 +1890,11 @@ function buildCard(r, options) {
   const prixVisible = !hiddenCols.has('price');
   // Ce qu'il y a à produire se lit sous le nom du dossier, avant les pastilles
   // d'état : c'est la réponse à « QUOI », pas une décoration de l'étape.
-  // LE FEU juste sous le nom du projet : « qu'est-ce que c'est » puis « est-ce
-  // que ça peut avancer ». C'est la première question du patron, elle passe
-  // donc avant le détail de production.
-  const quoi = [nom, hiddenCols.has('feu') ? null : blocFeu(r), blocProduction(r), meta, motif]
+  // « MANQUE » EST LA CINQUIÈME LIGNE DE LA FICHE, pas une rangée à part : on
+  // lit ce qu'il y a à produire (réf, marquage, tailles, logos), puis ce qui
+  // empêche de le faire. La conclusion vient après les faits — et c'est aussi
+  // ce qui aligne les cinq intitulés dans une seule colonne.
+  const quoi = [nom, blocProduction(r), hiddenCols.has('feu') ? null : blocFeu(r), meta, motif]
     .filter(Boolean);
   carte.append(
     blocClient,
@@ -3381,14 +3418,15 @@ function cellInfos(r) {
   // LE MÊME BLOC QUE SUR LA CARTE, au même endroit dans la lecture : ce qu'il y
   // a à produire d'abord, la note libre ensuite. Deux vues à un clic l'une de
   // l'autre doivent donner le même composant, pas deux qui se ressemblent.
-  // LE MÊME COMPOSANT DANS LES DEUX VUES — deux écrans à un clic l'un de l'autre
-  // doivent donner le même bloc, pas deux qui se ressemblent.
+  const prod = blocProduction(r);
+  if (prod) stack.appendChild(prod);
+  // LE MÊME COMPOSANT, DANS LE MÊME ORDRE, DANS LES DEUX VUES — deux écrans à
+  // un clic l'un de l'autre doivent donner le même bloc, pas deux qui se
+  // ressemblent.
   if (!hiddenCols.has('feu')) {
     const feu = blocFeu(r);
     if (feu) stack.appendChild(feu);
   }
-  const prod = blocProduction(r);
-  if (prod) stack.appendChild(prod);
 
   const descRow = document.createElement('div');
   descRow.className = 'product-desc-row';

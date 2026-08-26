@@ -1067,25 +1067,36 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    carte qui ne montre que « TAILLES » et sa voisine qui montre « RÉF. »
    n'alignaient pas leurs valeurs, et la file se lisait en escalier — c'est le
    défaut qu'on paie à chaque fois qu'une piste de grille dépend du contenu. */
-/* LE FEU — ce qui manque avant de produire (devis · BAT · argent).
-   LE VERT SE TAIT, L'ÉCHEC PARLE (règle de la maison) : ce qui est obtenu
-   passe en gris discret, ce qui manque porte la couleur d'état et la graisse.
-   Quand tout va bien, il n'y a rien à lire — et c'est le but.
-   La rangée ne s'affiche PAS quand le dossier n'exige rien : une tasse payée
-   au comptoir n'a ni devis, ni BAT, ni argent en attente, sa carte reste nue.
-   `flex-wrap` plutôt qu'une grille : de un à trois faits selon le dossier, la
-   rangée ne doit pas réserver de place pour ceux qui n'existent pas. */
-.feu {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--pas-3);
-  margin-top: 6px;
-  font-size: var(--taille-note);
-  line-height: 1.5;
-}
-.feu__pt { white-space: nowrap; }
-.feu__pt.is-ok { color: var(--text-3); font-weight: var(--graisse-texte); }
-.feu__pt.is-manque { color: var(--danger); font-weight: var(--graisse-forte); }
+/* CE QUI MANQUE AVANT DE PRODUIRE — la cinquième ligne de la fiche.
+   Elle porte la classe `.prod-fiche` : même colonne d'intitulé, mêmes tailles,
+   mêmes graisses que Réf. / Marquage / Tailles / Logos. Elle se lit donc dans
+   le rythme de la carte, pas comme une pastille rapportée — c'est ce qui la
+   rend discrète tout en restant repérable, l'œil descendant déjà cette colonne.
+
+   UN SEUL MOT PORTE LA COULEUR : l'intitulé. Les valeurs prennent la graisse
+   forte, comme les quatre faits au-dessus. La couleur dit un ÉTAT (« il manque
+   quelque chose »), elle ne décore rien — et il n'y en a qu'une par carte.
+
+   ET QUAND RIEN NE MANQUE, IL N'Y A PAS DE RANGÉE. Sur une file de trente
+   dossiers, seuls ceux qui coincent portent une marque. C'est là qu'est la
+   discrétion, et c'est aussi ce qui la rend visible.
+
+   Le collage à la fiche : les deux blocs se suivent sans respiration, pour que
+   l'ensemble se lise comme UNE grille de cinq lignes et non comme deux blocs.
+   Sur un dossier sans fiche de production (une demande pas encore chiffrée),
+   la rangée existe seule et retrouve alors sa marge. */
+.feu { margin-top: 6px; }
+/* LE PAS VERTICAL DOIT ÊTRE LE MÊME d'une rangée à l'autre, sinon les cinq
+   lignes ne se lisent plus comme une seule grille. `.prod-fiche` sépare ses
+   rangées de 3 px (son `row-gap`) : le raccord entre les deux blocs reprend
+   exactement cette valeur. Mesuré au rendu avec 0 : 25 / 25 / 25 puis 22 px —
+   le décrochage se voyait. */
+.prod-fiche + .feu { margin-top: 3px; }
+/* DEUX CLASSES (0,2,0) : la règle doit battre `.prod-fiche__cle`, qui pose le
+   gris des intitulés — et qui est déclarée APRÈS celle-ci dans la feuille.
+   Sans ça l'intitulé « Manque » sortait au même gris que « Réf. » : mesuré au
+   rendu, rgb(95,103,116) au lieu du rouge d'état. */
+.prod-fiche__cle.feu__cle { color: var(--danger); }
 
 .prod-fiche {
   /* La colonne des intitulés se cale sur le PLUS LARGE, mesuré au rendu :
