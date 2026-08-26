@@ -1549,10 +1549,24 @@ const FEU_FAITS = [
   {
     cle: 'argent',
     label: 'Argent',
-    // Il n'y a d'argent à attendre que s'il y a un montant. Un dossier encore
-    // « à chiffrer » n'exige rien : on ne peut pas réclamer ce qu'on n'a pas
-    // encore annoncé.
-    requis: (r) => r.project_value != null,
+    // ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET.
+    //
+    // Première version : « exigé dès qu'il y a un montant ». Mesuré sur 307
+    // dossiers de préparation, elle marquait 184 cartes — 60 % à elle seule, et
+    // 73 % avec le BAT. Un signal qui s'allume sur trois cartes sur quatre n'est
+    // plus un signal, c'est un fond d'écran : on l'éteint au bout d'une semaine.
+    //
+    // La cause est simple : à l'atelier, « pas encore payé » en préparation
+    // n'est pas une anomalie, c'est la NORMALE — on encaisse au retrait. Ce qui
+    // est anormal, c'est d'avoir RÉCLAMÉ un acompte et de ne pas l'avoir vu
+    // arriver : quelqu'un attend une réponse, et personne ne le sait.
+    //
+    // Avec cette règle : 32 dossiers sur 307 au lieu de 184.
+    //
+    // (Le patron dit « en production il doit avoir le paiement ». Cette exigence
+    // -là se tiendra au VERROU, quand Charlie aura confirmé la règle — pas dans
+    // un voyant allumé en permanence sur toute la préparation.)
+    requis: (r) => r.acompte_demande === true,
     // « CERTAINS ONT DES ACOMPTES » : couvert, ce n'est pas soldé — c'est soldé
     // OU un acompte demandé ET reçu. Un acompte demandé qui n'est pas versé ne
     // couvre rien.
@@ -1560,12 +1574,10 @@ const FEU_FAITS = [
     // ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi
     // faire ; « Acompte » dit qu'il a été demandé et qu'il n'est pas rentré,
     // « Paiement » qu'on n'a encore rien réclamé.
-    manque: (r) => (r.acompte_demande === true ? 'Acompte' : 'Paiement'),
-    dit: (r) => (r.acompte_demande === true
-      ? (r.acompte_montant != null
-        ? `Acompte de ${eur(Number(r.acompte_montant))} demandé — pas encore reçu`
-        : 'Acompte demandé — pas encore reçu')
-      : 'Rien d’encaissé sur cette commande'),
+    manque: () => 'Acompte',
+    dit: (r) => (r.acompte_montant != null
+      ? `Acompte de ${eur(Number(r.acompte_montant))} demandé — pas encore reçu`
+      : 'Acompte demandé — pas encore reçu'),
   },
 ];
 

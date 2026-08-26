@@ -73,65 +73,71 @@ assert.ok(bloc.length > 400, 'FEU_FAITS doit être lisible dans app.js');
 const exige = {
   devis: (r) => r.devis_requis === true,
   bat: (r) => r.bat_requis === true,
-  argent: (r) => r.project_value != null,
+  argent: (r) => r.acompte_demande === true,
 };
 const obtenu = {
   devis: (r) => !!r.devis_valide_le,
   bat: (r) => !!r.bat_valide_le,
   argent: (r) => r.paye === true || (r.acompte_demande === true && r.acompte_verse === true),
 };
-const feu = (r) => Object.keys(exige).filter((k) => exige[k](r))
-  .map((k) => `${obtenu[k](r) ? '●' : '◌'} ${k}`);
+// Ce que la carte AFFICHE : uniquement ce qui manque. L'obtenu ne prend aucune
+// place — c'est la règle « le vert se tait », appliquée jusqu'au bout.
+const manque = (r) => Object.keys(exige).filter((k) => exige[k](r) && !obtenu[k](r));
 
 // La règle du test doit être CELLE d'app.js, mot pour mot.
 assert.match(bloc, /requis: \(r\) => r\.devis_requis === true/);
 assert.match(bloc, /requis: \(r\) => r\.bat_requis === true/);
-assert.match(bloc, /requis: \(r\) => r\.project_value != null/);
+assert.match(bloc, /requis: \(r\) => r\.acompte_demande === true/);
 assert.match(bloc, /r\.paye === true \|\| \(r\.acompte_demande === true && r\.acompte_verse === true\)/);
 
-// LA TASSE À 12 € AU COMPTOIR : payée à la caisse, ni devis ni BAT.
-// Elle n'exige RIEN, donc sa carte ne porte pas la rangée. C'est le contrôle
-// qui compte : ajouter trois cases à cocher sur une vente de 12 € serait un
-// échec, quel que soit le reste.
-const TASSE = {
+// LA TASSE À 12 € AU COMPTOIR : payée à la caisse, ni devis ni BAT, aucun
+// acompte réclamé. Elle n'exige RIEN, donc sa carte ne porte pas la rangée.
+// C'est le contrôle qui décide de tout : ajouter la moindre cérémonie à une
+// vente de 12 € serait un échec quel que soit le reste.
+assert.deepStrictEqual(manque({
   devis_requis: false, bat_requis: false,
   project_value: 12, paye: true, acompte_demande: null, acompte_verse: null,
-};
-assert.deepStrictEqual(feu(TASSE), ['● argent'],
-  'la tasse ne montre que l’argent, déjà encaissé — rien à faire');
-assert.ok(feu(TASSE).every((f) => f.startsWith('●')),
-  'et RIEN ne lui manque : zéro geste ajouté au comptoir');
+}), [], 'la tasse ne porte AUCUNE marque');
 
-// LES 200 T-SHIRTS, du devis au solde. On déroule, étape par étape.
+// LES 200 T-SHIRTS, du devis au solde.
 const PRO = {
   devis_requis: true, devis_valide_le: null,
   bat_requis: true, bat_valide_le: null,
   project_value: 3400, paye: null, acompte_demande: null, acompte_verse: null,
 };
-assert.deepStrictEqual(feu(PRO), ['◌ devis', '◌ bat', '◌ argent'],
-  'au départ, les trois manquent');
+assert.deepStrictEqual(manque(PRO), ['devis', 'bat'],
+  'au départ : le devis et le BAT. PAS l’argent — personne n’a encore rien réclamé');
 
 PRO.devis_valide_le = '2026-08-20T10:00:00.000Z';
-assert.deepStrictEqual(feu(PRO), ['● devis', '◌ bat', '◌ argent']);
+assert.deepStrictEqual(manque(PRO), ['bat'], 'le devis validé disparaît de la rangée');
 
-// « CERTAINS ONT DES ACOMPTES » — et un acompte DEMANDÉ ne couvre rien.
+// ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET.
+// « Pas encore payé » en préparation n'est pas une anomalie : à l'atelier on
+// encaisse au retrait. Ce qui est anormal, c'est d'avoir RÉCLAMÉ un acompte et
+// de ne pas l'avoir vu arriver — quelqu'un attend, et personne ne le sait.
+// Mesuré sur 307 dossiers de préparation : la règle « dès qu'il y a un montant »
+// marquait 184 cartes (60 % à elle seule, 73 % avec le BAT), la règle
+// « acompte réclamé et pas reçu » en marque 32. Un signal qui s'allume sur
+// trois cartes sur quatre n'est plus un signal : on l'éteint au bout d'une
+// semaine, et on perd les deux autres avec.
 PRO.acompte_demande = true;
 PRO.acompte_montant = 1360;
-assert.deepStrictEqual(feu(PRO), ['● devis', '◌ bat', '◌ argent'],
-  'un acompte demandé mais pas versé ne couvre RIEN');
+assert.deepStrictEqual(manque(PRO), ['bat', 'argent'],
+  'l’acompte est réclamé et n’arrive pas : ÇA, c’est anormal');
 
 PRO.acompte_verse = true;
-assert.deepStrictEqual(feu(PRO), ['● devis', '◌ bat', '● argent'],
-  'acompte reçu = couvert, même sans être soldé — c’est toute la nuance du patron');
+assert.deepStrictEqual(manque(PRO), ['bat'],
+  'acompte reçu = couvert, même sans être soldé — toute la nuance du patron');
 
 PRO.bat_valide_le = '2026-08-22T14:10:00.000Z';
-assert.deepStrictEqual(feu(PRO), ['● devis', '● bat', '● argent'],
-  'les trois au vert : le dossier peut partir en production');
+assert.deepStrictEqual(manque(PRO), [],
+  'plus rien ne manque : la carte ne porte plus de rangée du tout');
 
-// UN DOSSIER PAS ENCORE CHIFFRÉ n'exige pas d'argent : on ne peut pas réclamer
-// ce qu'on n'a pas encore annoncé.
-assert.deepStrictEqual(feu({ devis_requis: true, bat_requis: false, project_value: null }),
-  ['◌ devis'], 'sans montant, aucune exigence d’argent');
+// UNE COMMANDE QU'ON ENCAISSERA AU RETRAIT ne porte aucune marque d'argent :
+// c'est le cas le plus courant de l'atelier, et il est parfaitement normal.
+assert.deepStrictEqual(
+  manque({ devis_requis: false, bat_requis: false, project_value: 850, paye: null }),
+  [], 'pas d’acompte réclamé = rien à signaler');
 
 console.log('✓ feu : la tasse n’exige rien, les 200 t-shirts exigent les trois');
 
@@ -170,9 +176,12 @@ assert.match(CSS, /\.prod-fiche__cle\.feu__cle \{ color: var\(--danger\); \}/,
 assert.ok(!/\.feu__val|\.feu__pt/.test(CSS),
   'aucune règle de couleur sur les valeurs : elles sont à l’encre comme le reste');
 
-// ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi faire.
-assert.match(APP, /manque: \(r\) => \(r\.acompte_demande === true \? 'Acompte' : 'Paiement'\)/,
-  'un acompte demandé se réclame par son nom ; sinon c’est un paiement');
+// ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi faire ;
+// « Acompte » dit qu'il a été réclamé et qu'il n'est pas rentré.
+assert.match(APP, /manque: \(\) => 'Acompte'/,
+  'la rangée nomme l’acompte, pas « l’argent »');
+assert.match(APP, /Acompte de \$\{eur\(Number\(r\.acompte_montant\)\)\} demandé — pas encore reçu/,
+  'et le survol donne le montant réclamé');
 
 // LE MÊME COMPOSANT DANS LES DEUX VUES : deux écrans à un clic l'un de l'autre
 // doivent donner le même bloc, pas deux qui se ressemblent.
