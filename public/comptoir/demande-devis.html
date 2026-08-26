@@ -2712,6 +2712,54 @@ function txComment(d){
   else if(n&&txNum(n.paidQty)>0)txt+=` • Tarif négocié : ${txNum(n.paidQty)} pièce(s) à ${money(n.unitPrice)}`;
   return txt;
 }
+/* CE QU'IL Y A À FAIRE, EN CHAMPS SÉPARÉS — pas en phrase. Le planning
+   recevait « Textile · Blanc · DTF · Tailles : 3 × S · 5 × M • Marquage
+   Coeur + Dos (Noir) • Transport … » : quarante signes à relire en entier pour
+   savoir ce qu'on produit, sur une ligne large de deux cents pixels. Le chef
+   d'atelier n'a pas à déchiffrer. Il lui faut QUATRE faits, chacun à sa
+   place — la référence, la couleur, le nombre par taille, et chaque face
+   marquée avec sa largeur de logo — et c'est le planning, pas le comptoir, qui
+   décide de leur mise en forme. On les envoie donc DÉCOUPÉS.
+   Ce qui n'est pas saisi n'est pas envoyé : une case vide ne s'affiche pas. */
+function prodDuBesoin(n){
+  const prod={
+    ref:String((n&&n.requestedRef)||'').trim(),
+    couleur:String((n&&n.color)||'').trim(),
+    marquage:String((n&&n.productionType)||'').trim(),
+    tailles:[],logos:[]
+  };
+  const t=n&&n.textile;
+  if(!t)return prod;
+  const L=TE().SIZE_LABELS;
+  /* LE NOMBRE D'ABORD, PUIS LA TAILLE : « 2 × S ». C'est l'ordre des trois
+     autres endroits qui les écrivent, et il n'y en a pas deux. */
+  for(const k of TE().SIZE_KEYS){
+    const q=Math.round(txNum(t.sizes&&t.sizes[k]));
+    if(q>0)prod.tailles.push({t:L[k],n:q});
+  }
+  /* UNE FACE, UNE LARGEUR — sauf quand elle change d'une taille à l'autre, et
+     là on les écrit toutes : sur NS300 le dos va de 240 mm en XS à 320 en XL,
+     un seul chiffre enverrait trois pièces sur quatre au mauvais fichier. */
+  const faces=Object.keys(t.logo||{}).sort((a,b)=>{
+    const ia=TX_LOGO_ORDRE.indexOf(a),ib=TX_LOGO_ORDRE.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  for(const face of faces){
+    const parTaille=t.logo[face]||{};
+    const cases=TE().SIZE_KEYS.filter(k=>txNum(parTaille[k])>0);
+    if(!cases.length)continue;
+    const distinctes=[...new Set(cases.map(k=>Math.round(txNum(parTaille[k]))))];
+    /* Les tailles d'une MÊME face se séparent à la barre — le point médian, lui,
+       sépare deux FACES sur la ligne du planning. Le même signe des deux côtés
+       faisait lire « Dos S 260 · M 280 » comme deux faces. */
+    prod.logos.push({face,mm:distinctes.length===1
+      ?String(distinctes[0])
+      :cases.map(k=>`${L[k]} ${Math.round(txNum(parTaille[k]))}`).join('/')});
+  }
+  return prod;
+}
+window.prodDuBesoin=prodDuBesoin;
+
 function txApplyToForm(t){
   $('txRef').value=t.ref||'';onTextileRefChange();
   txTgcaForm=t.tgca!==false;   /* la case de l'article revient telle qu'elle était posée */
@@ -4647,10 +4695,14 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       return {
         label:n.label,
         qty:Number(n.qty)||0,
-        /* Ce que l'atelier a besoin de lire sur SA ligne : la matière, la
-           couleur, la technique, puis ce que le client a précisé. */
-        detail:[n.category,n.color,n.productionType,n.textileResume,n.comment]
-          .filter(Boolean).join(' · ')
+        /* CE QU'IL Y A À FAIRE, découpé fait par fait : le planning en compose
+           une ligne qui se lit d'un coup d'œil (voir prodDuBesoin). */
+        prod:prodDuBesoin(n),
+        /* Et SEULEMENT ce que le client a précisé de vive voix. La matière, la
+           couleur, la technique et les tailles étaient collées ici faute d'un
+           endroit pour les mettre : elles en ont un maintenant, et la note
+           libre redevient une note libre. */
+        detail:n.comment||''
       };
     });
   };

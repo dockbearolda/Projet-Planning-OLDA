@@ -1033,6 +1033,34 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   border-left: 2px solid var(--st-bloque);
   font-size: var(--taille-texte); line-height: 1.35; color: var(--text-2);
 }
+/* CE QU'IL Y A À FAIRE — le MÊME bloc sur la carte et dans la cellule « Infos »
+   du tableau (voir blocProduction dans app.js). Le chef d'atelier lisait une
+   phrase de quarante signes recopiée du récapitulatif imprimé ; il lit
+   maintenant trois rangées, toujours dans le même ordre.
+
+   DEUX COLONNES ARRÊTÉES. L'intitulé a une largeur FIXE : en `max-content`, une
+   carte qui ne montre que « TAILLES » et sa voisine qui montre « RÉF. »
+   n'alignaient pas leurs valeurs, et la file se lisait en escalier — c'est le
+   défaut qu'on paie à chaque fois qu'une piste de grille dépend du contenu. */
+.prod-fiche {
+  --prod-cle: 68px;                 /* « TAILLES » en 14 px capitales, au plus large */
+  display: grid;
+  grid-template-columns: var(--prod-cle) minmax(0, 1fr);
+  gap: 3px var(--pas-2);
+  margin-top: 6px;
+}
+.prod-fiche__cle {
+  font-size: var(--taille-note); font-weight: var(--graisse-note);
+  letter-spacing: .05em; text-transform: uppercase;
+  line-height: 1.4; color: var(--text-2);
+}
+/* Les chiffres en chasse fixe : « 3 × S · 5 × M » et « 12 × S · 5 × M » doivent
+   tomber l'un sous l'autre d'une ligne à la suivante. */
+.prod-fiche__val {
+  font-size: var(--taille-texte); font-weight: var(--graisse-texte);
+  line-height: 1.3; color: var(--text-1);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
 .pcard__delai { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pcard__delai--retard { color: var(--danger); }
 .pcard__delai--urgent { color: var(--warning-2); }
@@ -2567,6 +2595,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* Ticket : une icône, pas un numéro (cf. cellTicket) — la largeur d'une
    pastille et ses marges, comme les autres colonnes à puce. */
 .col-ticket { width: 64px; }
+/* « DESCRIPTION » ET « INFOS » ONT UNE LARGEUR, ELLES AUSSI. Elles étaient les
+   seules à ne pas en avoir, et `table-layout: fixed` ne lit QUE la première
+   rangée pour répartir : sur les étapes qui en ouvrent une par une BANNIÈRE de
+   lot (« À trier »), cette rangée est un `colspan` — les deux colonnes sans
+   largeur y tombaient à 7 px, et leur contenu se déroulait sur 1 200 px de
+   haut. C'est le défaut visible sur la capture du 26/08 : le récapitulatif à
+   rallonge s'y empilait mot par mot. Les valeurs sont celles que COL_DEFAULTS
+   annonce déjà côté app.js — il se disait « miroir des .col-* du CSS », il
+   l'est maintenant vraiment. */
+.col-product { width: 220px; }
+.col-infos { width: 260px; }
 
 /* Plancher de largeur de la grille, par jeu de colonnes affichées.
    Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a

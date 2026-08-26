@@ -489,6 +489,18 @@ async function init() {
     );
   }
 
+  // LES DOSSIERS DÉJÀ EN BASE RATTRAPENT LEUR LIGNE DE PRODUCTION.
+  //
+  // Garde app_meta PROPRE, une par migration (deux incidents réels sont venus
+  // d'une garde partagée) — et elles sont indépendantes : la première lit
+  // `fiche.details`, la seconde compare `description`.
+  // Down : UPDATE requests SET fiche = fiche - 'prod' WHERE ... ;
+  //        DELETE FROM app_meta WHERE key = 'prod_des_lignes_v1';
+  await reprendreProdDesLignes();
+  // Down : reposer le récapitulatif recomposé (recapDeLaFiche) sur les mêmes
+  //        lignes ; DELETE FROM app_meta WHERE key = 'infos_sans_recap_v1';
+  await libererLaColonneInfos();
+
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
   // Le stock retiré le 26/08 : on récupère la place, mais seulement si personne
@@ -2048,6 +2060,209 @@ async function migrerLotsEnProjets() {
   await poserMeta('lots_en_projets_v1', String(parRef.size));
 }
 
+// ---------------------------------------------------------------------------
+// CE QU'IL Y A À FAIRE, POUR LES DOSSIERS D'AVANT (26/08/2026)
+//
+// Un dossier du comptoir arrive désormais avec le travail rangé fait par fait
+// dans `fiche.prod` — référence, couleur, nombre par taille, largeur de logo
+// par face — et la carte du planning le lit là. Les dossiers déjà en base ne
+// portent ces faits que dans le récapitulatif archivé (`fiche.details`), noyés
+// dans des phrases : nulle part où la carte puisse aller les chercher.
+//
+// ON RECOPIE, ON NE CALCULE RIEN. Chaque fait est repris tel quel dans les
+// rangées du récapitulatif, écrites par nous et donc de forme connue. Ce qui ne
+// se relit pas exactement est ABANDONNÉ, jamais deviné : un chiffre faux coûte
+// une réimpression, une case vide coûte une question.
+// ---------------------------------------------------------------------------
+
+// Les tailles que le comptoir sait écrire. Toute autre est le signe qu'on ne
+// lit pas ce qu'on croit : on préfère alors ne rien reprendre du tout.
+const TAILLES_DU_RECAP = ['S', 'M', 'L', 'XL', '2XL', 'Autres'];
+const CASE_LOGO = `(?:${TAILLES_DU_RECAP.join('|')}) \\d+`;
+const LOGO_D_UNE_FACE = new RegExp(`^(.+?) (${CASE_LOGO}(?: · ${CASE_LOGO})*)$`);
+const UNE_TAILLE = /^(\d+) × (.+)$/;
+
+// Un récapitulatif archivé, relu par libellé. « — » est la marque du champ vide
+// au comptoir : il vaut absence, pas valeur.
+function rangeesDuRecap(details) {
+  const par = new Map();
+  for (const l of Array.isArray(details) ? details : []) {
+    if (!l || typeof l !== 'object') continue;
+    const v = String(l.v == null ? '' : l.v).trim();
+    if (l.k && v && v !== '—') par.set(String(l.k), v);
+  }
+  return par;
+}
+
+// Le détail textile est une suite de segments séparés par « • ». On ne prend
+// que celui qu'on cherche, et seulement s'il se nomme exactement.
+function segmentDuDetail(texte, tete) {
+  for (const seg of String(texte || '').split(' • ')) {
+    if (seg.startsWith(tete)) return seg.slice(tete.length).trim();
+  }
+  return '';
+}
+
+function taillesDuDetail(texte) {
+  const seg = segmentDuDetail(texte, 'Tailles : ');
+  if (!seg || seg === 'à préciser') return [];
+  const out = [];
+  for (const bout of seg.split(' · ')) {
+    const m = bout.trim().match(UNE_TAILLE);
+    // UNE SEULE RANGÉE DOUTEUSE ET ON ABANDONNE TOUT : une série de tailles
+    // amputée d'une taille est pire qu'une série absente — elle se croit
+    // complète.
+    if (!m || !TAILLES_DU_RECAP.includes(m[2])) return [];
+    out.push({ t: m[2], n: Number(m[1]) });
+  }
+  return out;
+}
+
+function logosDuDetail(texte) {
+  const seg = segmentDuDetail(texte, 'Taille du logo (mm) : ');
+  if (!seg) return [];
+  const out = [];
+  for (const bloc of seg.split(' / ')) {
+    const m = bloc.trim().match(LOGO_D_UNE_FACE);
+    if (!m) return [];
+    const largeurs = m[2].split(' · ').map((c) => c.split(' ')[1]);
+    const distinctes = [...new Set(largeurs)];
+    // Une face, une largeur — sauf quand elle change d'une taille à l'autre,
+    // et là on garde les tailles avec : sur NS300 le dos va de 240 à 320 mm.
+    // Les tailles d'une même face se rejoignent à la BARRE : le point médian
+    // sépare deux faces sur la ligne du planning, et le même signe des deux
+    // côtés ferait lire « Dos S 260 · M 280 » comme deux faces.
+    out.push({
+      face: m[1],
+      mm: distinctes.length === 1 ? distinctes[0] : m[2].split(' · ').join('/'),
+    });
+  }
+  return out;
+}
+
+// Ce qu'une ligne a à produire, relu dans le récapitulatif de SON dossier. Le
+// rang vient du lot (« Besoin 2 — Couleur ») : quatre lignes d'un même ticket
+// n'ont ni la même référence ni les mêmes tailles.
+function prodDuRecap(fiche) {
+  const rangees = rangeesDuRecap(fiche.details);
+  if (!rangees.size) return null;
+  const rang = (fiche.lot && Number(fiche.lot.rang)) || 1;
+  const tete = `${fiche.source === 'Vente directe' ? 'Article' : 'Besoin'} ${rang} — `;
+  const detail = rangees.get(`${tete}Détail textile`) || '';
+  const prod = {
+    ref: rangees.get(`${tete}Référence`) || '',
+    couleur: rangees.get(`${tete}Couleur`) || '',
+    marquage: rangees.get(`${tete}Production`) || '',
+    tailles: taillesDuDetail(detail),
+    logos: logosDuDetail(detail),
+  };
+  return prod.ref || prod.couleur || prod.marquage || prod.tailles.length || prod.logos.length
+    ? prod : null;
+}
+
+// Selon le pilote (Postgres / pg-mem), une colonne JSON revient en objet ou en
+// texte : on accepte les deux plutôt que de sauter la moitié des lignes.
+function ficheObjet(brut) {
+  let f = brut;
+  if (typeof f === 'string') {
+    try { f = JSON.parse(f); } catch (_) { return null; }
+  }
+  return f && typeof f === 'object' ? f : null;
+}
+
+async function reprendreProdDesLignes() {
+  const { rows: deja } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'prod_des_lignes_v1'");
+  if (deja.length) return;
+
+  // LE TRI SE FAIT EN JAVASCRIPT, PAS EN SQL. Un `LIKE` est le premier réflexe
+  // — et pg-mem lui rend zéro ligne dès que le motif porte un accent ou un
+  // tiret cadratin (constaté le 26/08 sur « ATELIER OLDA — RÉCAPITULATIF% » :
+  // la migration ne trouvait rien en local et tout en prod, le pire des deux
+  // mondes). Une passe complète, UNE fois dans la vie de la base, ne coûte pas
+  // le risque de ne migrer que la moitié des postes.
+  let lignes = [];
+  try {
+    const { rows } = await pool.query('SELECT id, fiche FROM requests WHERE fiche IS NOT NULL');
+    lignes = rows;
+  } catch (_) {
+    lignes = [];   // base neuve : rien à reprendre
+  }
+
+  let reprises = 0;
+  for (const l of lignes) {
+    const fiche = ficheObjet(l.fiche);
+    if (!fiche || fiche.prod) continue;
+    if (!String(fiche.kind || '').startsWith('comptoir')) continue;
+    const prod = prodDuRecap(fiche);
+    if (!prod) continue;
+    // `updated_at` n'est PAS touché : le Point du jour lit « ce qui a bougé
+    // depuis », et un démarrage ne doit pas lui faire croire que tout le
+    // comptoir vient d'être repris à la main.
+    await pool.query('UPDATE requests SET fiche = $2 WHERE id = $1',
+      [l.id, JSON.stringify({ ...fiche, prod })]);
+    reprises += 1;
+  }
+  await poserMeta('prod_des_lignes_v1', String(reprises));
+}
+
+// ---------------------------------------------------------------------------
+// LA COLONNE « INFOS » SE LIBÈRE DU RÉCAPITULATIF IMPRIMÉ (26/08/2026)
+//
+// Un dossier du comptoir entrait au planning avec son récapitulatif ENTIER dans
+// `description` : quarante lignes de « Type de dossier : … / Article 1 — Prix
+// personnalisation : 0,00 € » dans une colonne large de deux cents pixels. Le
+// chef d'atelier n'y lisait rien, et la note qu'il voulait y écrire se perdait
+// au bout du pavé. Le comptoir n'y met plus que ce que la vendeuse a écrit ;
+// restent les dossiers déjà en base.
+//
+// ON NE RETIRE QUE CE QU'ON SAIT RÉÉCRIRE. Une ligne n'est touchée que si sa
+// description est EXACTEMENT le récapitulatif recomposé depuis `fiche.details`
+// — la preuve que personne n'y a jamais ajouté un mot. Dès qu'un signe diffère,
+// on laisse : ce n'est plus une copie, c'est du travail.
+// ---------------------------------------------------------------------------
+const RECAP_MAX = 1200;   // le même plafond que le serveur applique à `description`
+const RECAP_TETE = 'ATELIER OLDA — RÉCAPITULATIF';
+
+function recapDeLaFiche(fiche) {
+  const titre = fiche.source === 'Vente directe'
+    ? `${RECAP_TETE} DE VENTE DIRECTE`
+    : `${RECAP_TETE} DE DEMANDE`;
+  const lignes = (Array.isArray(fiche.details) ? fiche.details : [])
+    .map((l) => `${l.k} : ${l.v}`);
+  const texte = [titre, ''].concat(lignes).join('\n');
+  return texte.length <= RECAP_MAX ? texte : `${texte.slice(0, RECAP_MAX - 1)}…`;
+}
+
+async function libererLaColonneInfos() {
+  const { rows: deja } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'infos_sans_recap_v1'");
+  if (deja.length) return;
+
+  // Même règle qu'au-dessus : aucun `LIKE`, le motif est accentué et pg-mem
+  // lui rend zéro ligne.
+  let lignes = [];
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, description, fiche FROM requests WHERE description IS NOT NULL AND fiche IS NOT NULL',
+    );
+    lignes = rows;
+  } catch (_) { lignes = []; }
+
+  let liberees = 0;
+  for (const l of lignes) {
+    if (!String(l.description).startsWith(RECAP_TETE)) continue;
+    const fiche = ficheObjet(l.fiche);
+    if (!fiche) continue;
+    if (l.description !== recapDeLaFiche(fiche)) continue;
+    // Ce que la vendeuse avait écrit de sa main reprend la place — et si elle
+    // n'avait rien écrit, la colonne redevient vide, prête à recevoir une note.
+    const note = typeof fiche.commentaire === 'string' && fiche.commentaire.trim()
+      ? fiche.commentaire : null;
+    await pool.query('UPDATE requests SET description = $2 WHERE id = $1', [l.id, note]);
+    liberees += 1;
+  }
+  await poserMeta('infos_sans_recap_v1', String(liberees));
+}
+
 // MODÈLES DE PROJET (§28) — « T-shirt DTF » pose ses cinq étapes.
 //
 // Sans modèle, la tâche est ingérable : il faudrait ressaisir la liste des
@@ -2424,4 +2639,14 @@ module.exports = {
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
+  // Exposées pour être ÉPROUVÉES, pas pour être appelées : ce sont les deux
+  // fonctions qui décident, à la reprise des dossiers d'avant, ce qu'on relit
+  // du récapitulatif archivé et ce qu'on accepte d'y retirer. Une migration qui
+  // se trompe sur un chiffre coûte une réimpression ; celle-là doit pouvoir se
+  // vérifier sans base.
+  prodDuRecap, recapDeLaFiche,
+  // Et les deux migrations elles-mêmes : pg-mem refuse de rejouer `init()` en
+  // entier (son `CREATE TABLE IF NOT EXISTS` échoue au second passage), or une
+  // migration qui n'a jamais tourné sur de vraies lignes n'est pas éprouvée.
+  reprendreProdDesLignes, libererLaColonneInfos,
 };

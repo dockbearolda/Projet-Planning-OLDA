@@ -1288,7 +1288,12 @@ const ORDER_INVERSE = 'ORDER BY r.position DESC NULLS FIRST, r.priority ASC, r.d
 // d'un même ticket sous une bannière et qui pose le « 2/4 » sur chaque carte.
 // Retiré d'ici, il ne casse rien — les lignes se dispersent simplement dans le
 // pipeline sans que plus personne ne voie qu'elles vont ensemble.
-const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination', 'atelier', 'lot'];
+// `prod` EST DANS LA LISTE, et c'est tout son intérêt : référence, couleur,
+// nombre par taille et largeur de logo par face — les quatre faits qui disent
+// à l'atelier ce qu'il a à faire, lus sur la carte sans ouvrir le dossier. Il
+// est court et borné (voir prodDuComptoir) ; retiré d'ici, la ligne redevient
+// muette et il faut rouvrir chaque fiche pour savoir ce qu'on produit.
+const FICHE_LISTE = ['kind', 'source', 'ref', 'heureSouhaitee', 'destination', 'atelier', 'lot', 'prod'];
 
 // LES TECHNIQUES DE MARQUAGE, en clair : « dtf », « uv », « laser »…
 // Le moteur de priorité s'en sert pour rattacher une commande à sa machine AVANT
@@ -4377,9 +4382,17 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
     details: lignesLibelleValeur(b.details),
   };
 
-  // La colonne « Infos » du planning : le récapitulatif tel qu'il est imprimé.
-  const description = borner(b.recap, DESCRIPTION_MAX)
-    || borner(b.comment, DESCRIPTION_MAX);
+  // La colonne « Infos » du planning est une NOTE LIBRE, pas une archive. Elle
+  // recevait le récapitulatif IMPRIMÉ — quarante lignes de « Type de dossier :
+  // … / Article 1 — Prix personnalisation : 0,00 € » dans une colonne large de
+  // deux cents pixels. Le chef d'atelier ne pouvait plus rien y lire, et la
+  // note qu'il voulait y écrire se perdait au bout du pavé.
+  //
+  // RIEN N'EST PERDU : le récapitulatif est archivé en entier dans
+  // `fiche.details`, d'où le tiroir du planning et le ticket de l'atelier le
+  // relisent déjà, ligne à ligne. Seul ce que la vendeuse a écrit de sa main
+  // entre ici — et ce qu'il y a à PRODUIRE a désormais sa place à lui (`prod`).
+  const description = borner(b.comment, DESCRIPTION_MAX);
 
   const { rows: posRows } = await pool.query(
     'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
@@ -4401,7 +4414,11 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
       // Sa PROPRE date : les mugs vendredi, les casquettes mardi. Sans date à
       // lui, l'article suit celle du dossier.
       deadline: a.due || deadline,
-      description: a.detail || borner(b.comment, DESCRIPTION_MAX) || description,
+      description: a.detail || description,
+      // CE QUE CET ARTICLE-LÀ demande à l'atelier. Il appartient à la LIGNE et
+      // pas au dossier : quatre articles, quatre références, quatre séries de
+      // tailles — les partager reviendrait à annoncer le même travail partout.
+      prod: a.prod,
       // Le rang sert au suffixe d'empreinte ET à retrouver l'article dans
       // `fiche.details` (« Article 2 — Désignation »), que le ticket relit déjà.
       lot: { ref: refFinale, rang: i + 1, total: nbLignes },
@@ -4413,6 +4430,9 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
       valeur,
       deadline,
       description,
+      // Un dossier d'un seul article n'a pas de lot, mais il a bien un article :
+      // sa ligne mérite la même lecture que les quatre d'un ticket groupé.
+      prod: (articles[0] && articles[0].prod) || null,
       lot: null,
       heure: null,
     }];
@@ -4455,6 +4475,7 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
         ...fiche,
         empreinte: empreinteDe(i),
         ...(l.lot ? { lot: l.lot } : {}),
+        ...(l.prod ? { prod: l.prod } : {}),
         ...(l.heure ? { heureSouhaitee: l.heure } : {}),
       };
       const { rows: r } = await cx.query(
@@ -4553,6 +4574,7 @@ function articlesDuComptoir(brut) {
     out.push({
       label,
       qte: Number.isInteger(qte) && qte > 0 ? qte : null,
+      prod: prodDuComptoir(a.prod),
       detail: borner(a.detail, DESCRIPTION_MAX) || null,
       due: isDay(a.due) ? a.due : null,
       heure: isHeure(a.heure) ? a.heure : null,
@@ -4562,6 +4584,39 @@ function articlesDuComptoir(brut) {
     });
   }
   return out;
+}
+
+// CE QU'IL Y A À FAIRE, EN CHAMPS SÉPARÉS — jamais en phrase. Le comptoir
+// l'envoie déjà découpé (référence, couleur, marquage, nombre par taille,
+// largeur par face) et on le range tel quel : le chef d'atelier lit sa ligne,
+// il ne la déchiffre pas.
+//
+// TOUT EST BORNÉ, et court. Cette structure est dans FICHE_LISTE : elle repart
+// vers chaque poste à chaque rafraîchissement du planning, comme le numéro de
+// ticket. Une largeur de logo tient en trois chiffres, une taille en trois
+// signes — ce qui déborde n'est pas une mesure, c'est une faute de frappe.
+const PROD_ENTREES_MAX = 12;        // 6 tailles, 6 emplacements : le compte y est
+function prodDuComptoir(brut) {
+  if (!brut || typeof brut !== 'object') return null;
+  const mot = (v) => borner(v, 60);
+  const tailles = (Array.isArray(brut.tailles) ? brut.tailles : [])
+    .slice(0, PROD_ENTREES_MAX)
+    .map((x) => ({ t: mot(x && x.t), n: Number(x && x.n) }))
+    .filter((x) => x.t && Number.isInteger(x.n) && x.n > 0);
+  const logos = (Array.isArray(brut.logos) ? brut.logos : [])
+    .slice(0, PROD_ENTREES_MAX)
+    .map((x) => ({ face: mot(x && x.face), mm: borner(x && x.mm, 120) }))
+    .filter((x) => x.face && x.mm);
+  const prod = {
+    ref: mot(brut.ref) || '',
+    couleur: mot(brut.couleur) || '',
+    marquage: mot(brut.marquage) || '',
+    tailles,
+    logos,
+  };
+  // Un objet vide ne vaut pas la place qu'il prend dans la liste : sans un seul
+  // fait, il n'y a rien à afficher et la carte doit l'ignorer.
+  return prod.ref || prod.couleur || prod.marquage || tailles.length || logos.length ? prod : null;
 }
 
 // LA PART DE CHAQUE LIGNE DANS LE TICKET. Règle : la somme des lignes vaut

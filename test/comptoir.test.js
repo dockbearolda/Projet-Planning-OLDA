@@ -106,7 +106,15 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(lVente.priority, 3);
   assert.strictEqual(lVente.product, '40 x Polo brodé • 10 x Casquette');
   assert.strictEqual(lVente.responsable, 'À attribuer', '« Non défini » n’est pas un employé : la ligne attend son pilote');
-  assert.match(lVente.description, /RÉCAPITULATIF DE VENTE DIRECTE/, 'la colonne Infos porte le récapitulatif imprimé');
+  // LA COLONNE « INFOS » EST UNE NOTE LIBRE, PAS UNE ARCHIVE. Elle a porté le
+  // récapitulatif IMPRIMÉ pendant des mois : quarante lignes de « Type de
+  // dossier : … / Article 1 — Prix personnalisation : 0,00 € » dans une colonne
+  // large de deux cents pixels, où le chef d'atelier ne lisait plus rien.
+  // Seul ce que la vendeuse a écrit de sa main y entre.
+  assert.strictEqual(lVente.description, 'Délai souhaité : 5 jours ouvrés | Logo poitrine',
+    'la colonne Infos porte la note de la vendeuse, et elle seule');
+  assert.doesNotMatch(lVente.description, /RÉCAPITULATIF/,
+    'le récapitulatif imprimé n’a plus rien à faire dans une note libre');
 
   // Ce que la LISTE transporte : juste de quoi dessiner la ligne (numéro de
   // ticket, heure de retrait). Le récapitulatif ligne à ligne pèse plusieurs

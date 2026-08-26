@@ -1254,6 +1254,62 @@ function pcardBloc(label, ...enfants) {
   return d;
 }
 
+// CE QU'IL Y A À FAIRE, EN CLAIR — le MÊME bloc sur la carte et dans le
+// tableau. Le chef d'atelier ne lit pas un dossier, il lit une ligne : la
+// référence et sa couleur, le nombre par taille, la largeur du logo sur chaque
+// face marquée. Trois rangées, toujours dans le même ordre, toujours au même
+// endroit — c'est ce qui permet de balayer une file du regard.
+//
+// CHACUN CHOISIT LES SIENNES (rail « Colonnes ») : à l'atelier le prix pollue
+// la ligne et la largeur du dos est indispensable, au comptoir c'est l'inverse.
+// Une rangée sans valeur ne s'affiche pas — un récapitulatif reprend ce qui a
+// été saisi, jamais ce qui manque.
+const PROD_FAITS = [
+  {
+    key: 'prod_ref',
+    label: 'Réf.',
+    lire: (p) => [p.ref, p.couleur, p.marquage].filter(Boolean).join(' · '),
+  },
+  {
+    key: 'prod_tailles',
+    label: 'Tailles',
+    // Le NOMBRE d'abord, puis la taille : « 3 × S ». C'est l'ordre des trois
+    // autres endroits qui les écrivent, et il n'y en a pas deux.
+    lire: (p) => (p.tailles || []).map((x) => `${x.n} × ${x.t}`).join(' · '),
+  },
+  {
+    key: 'prod_logos',
+    label: 'Logos',
+    // Les faces se séparent au point médian, les tailles d'une même face à la
+    // barre : « Coeur 60 · Dos S 260/M 280 ». Sans cette différence, une face
+    // mesurée taille par taille se lisait comme deux faces.
+    lire: (p) => {
+      const faces = (p.logos || []).map((x) => `${x.face} ${x.mm}`).join(' · ');
+      return faces ? `${faces} mm` : '';
+    },
+  },
+];
+
+function blocProduction(r) {
+  const p = r.fiche && r.fiche.prod;
+  if (!p || typeof p !== 'object') return null;
+  const bloc = document.createElement('div');
+  bloc.className = 'prod-fiche';
+  for (const fait of PROD_FAITS) {
+    if (hiddenCols.has(fait.key)) continue;
+    const valeur = fait.lire(p);
+    if (!valeur) continue;
+    const cle = document.createElement('span');
+    cle.className = 'prod-fiche__cle';
+    cle.textContent = fait.label;
+    const val = document.createElement('span');
+    val.className = 'prod-fiche__val';
+    val.textContent = valeur;
+    bloc.append(cle, val);
+  }
+  return bloc.childElementCount ? bloc : null;
+}
+
 function buildCard(r) {
   const carte = document.createElement('article');
   carte.dataset.id = r.id;
@@ -1465,11 +1521,22 @@ function buildCard(r) {
   // qu'il y prenait coûtaient 44 px de haut à CHAQUE carte, soit deux commandes
   // de moins par écran. Le bloc dit déjà « Remise client » et « À terminer
   // avant » juste en dessous : il n'y a pas d'autre délai possible.
+  // LE PRIX N'EST PAS OBLIGATOIRE SUR LA LIGNE. À l'atelier il n'apprend rien
+  // et prend la place de ce qu'on cherche ; le bloc, lui, RESTE — il porte les
+  // référents, et la carte est une grille à cinq colonnes : en retirer un
+  // décalerait les actions de toutes les cartes. C'est l'intitulé qui dit ce
+  // que le bloc montre.
+  const prixVisible = !hiddenCols.has('price');
+  // Ce qu'il y a à produire se lit sous le nom du dossier, avant les pastilles
+  // d'état : c'est la réponse à « QUOI », pas une décoration de l'étape.
+  const quoi = [nom, blocProduction(r), meta, motif].filter(Boolean);
   carte.append(
     blocClient,
-    pcardBloc('Projet', nom, meta, motif),
+    pcardBloc('Projet', ...quoi),
     pcardBloc('Délai restant', delaiEl, remise, cible),
-    pcardBloc('TTC', montant, refs, nomRef),
+    prixVisible
+      ? pcardBloc('TTC', montant, refs, nomRef)
+      : pcardBloc('Référent', refs, nomRef),
     actions,
   );
 
@@ -2957,6 +3024,12 @@ function cellInfos(r) {
   td.className = 'col-infos-cell';
   const stack = document.createElement('div');
   stack.className = 'infos-stack';
+
+  // LE MÊME BLOC QUE SUR LA CARTE, au même endroit dans la lecture : ce qu'il y
+  // a à produire d'abord, la note libre ensuite. Deux vues à un clic l'une de
+  // l'autre doivent donner le même composant, pas deux qui se ressemblent.
+  const prod = blocProduction(r);
+  if (prod) stack.appendChild(prod);
 
   const descRow = document.createElement('div');
   descRow.className = 'product-desc-row';
@@ -6287,7 +6360,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
 const COL_DEFAULTS = {
   handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, ticket: 64,
-  product: 220, price: 92, sub_stage: 170, description: 210, deadline: 136, del: 200,
+  product: 220, price: 92, sub_stage: 170, description: 260, deadline: 136, del: 200,
 };
 
 let colWidths = {};
@@ -6320,8 +6393,21 @@ const PLANNING_COLS = [
   { key: 'client',      label: 'Nom du dossier client', locked: true },
   { key: 'ticket',      label: 'Ticket atelier', surCarte: true },
   { key: 'product',     label: 'Description' },
-  { key: 'price',       label: 'Prix TTC', auto: (slug) => !PRICE_VISIBLE_STAGES.has(slug) },
+  // LE PRIX EXISTE DANS LES DEUX VUES (colonne du tableau, bloc TTC de la
+  // carte) : le décocher doit le retirer des deux, pas rappeler le tableau
+  // complet — c'est exactement ce que dit `surCarte`. À l'atelier il n'apprend
+  // rien et prend la place de ce qu'on cherche.
+  { key: 'price',       label: 'Prix TTC', surCarte: true, auto: (slug) => !PRICE_VISIBLE_STAGES.has(slug) },
   { key: 'sub_stage',   label: 'Sous-étape', auto: (slug) => !familyHasSub(slug) },
+  // CE QU'IL Y A À FAIRE, fait par fait. Trois cases plutôt qu'une : le chef
+  // d'atelier veut la largeur du DTF au dos, la vendeuse veut la référence et
+  // la couleur, personne ne veut les trois tout le temps. Elles vivent dans les
+  // DEUX vues (voir blocProduction), d'où `surCarte`.
+  // `horsTableau` : elles n'ont pas de colonne à elles — le bloc se pose dans
+  // la cellule « Infos » et dans le bloc « Projet » de la carte.
+  { key: 'prod_ref',     label: 'Référence & couleur', surCarte: true, horsTableau: true },
+  { key: 'prod_tailles', label: 'Quantité par taille', surCarte: true, horsTableau: true },
+  { key: 'prod_logos',   label: 'Largeur des logos', surCarte: true, horsTableau: true },
   { key: 'description', label: 'Infos' },
   { key: 'deadline',    label: 'Date souhaitée' },
   { key: 'flag',        label: 'État' },
@@ -6329,6 +6415,10 @@ const PLANNING_COLS = [
 
 // Colonnes qu'on peut éteindre (toutes sauf l'identité de la ligne).
 const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) => c.key));
+// Celles dont la case change ce qu'une ligne DESSINE, sans changer de vue : il
+// faut les redessiner à la main. Le ticket n'en est pas — sa place reste
+// réservée sur toutes les cartes, c'est le CSS qui l'affiche ou non.
+const COLS_REDESSINENT = new Set(['price', 'prod_ref', 'prod_tailles', 'prod_logos']);
 // Celles qui n'existent QUE dans le tableau : ce sont elles, et elles seules,
 // qui décident de la vue (cf. modeCartes). Le ticket en est exclu — le retirer
 // sur les cartes doit retirer le bouton, pas rappeler le tableau complet.
@@ -6341,15 +6431,41 @@ const COLS_TABLEAU = new Set(
 // repère que le client rapporte au comptoir). Les autres colonnes ne sont pas
 // perdues, elles attendent dans le rail « Colonnes » — en rallumer une ramène le
 // tableau avec elle.
-let hiddenCols = new Set(COLS_TABLEAU);
-try {
-  const saved = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
+// LE CHOIX SUIT LA PERSONNE, PLUS L'APPAREIL. Le chef d'atelier ne veut pas du
+// prix qui pollue sa ligne mais lui faut la largeur du DTF au dos ; la boutique
+// veut l'inverse — et les deux se nomment tour à tour sur le même PC. La clé
+// porte donc le prénom du poste (`olda.qui`, cf. poste.js), et le réglage
+// commun à la machine sert de point de départ à qui n'a pas encore choisi :
+// personne ne retrouve son écran remis à zéro le jour de la mise à jour.
+const colsKey = () => {
+  const qui = lirePoste();
+  return qui ? `${COLS_KEY}:${qui}` : COLS_KEY;
+};
+
+function lireHiddenCols() {
   // On ne garde que des clés connues et jamais une colonne verrouillée : un
   // localStorage d'une version précédente ne doit pas pouvoir faire disparaître
   // l'identité de la ligne. Un réglage enregistré avant l'arrivée du ticket ne
   // le nomme pas : il reste donc allumé, comme il l'était.
-  if (Array.isArray(saved)) hiddenCols = new Set(saved.filter((k) => COLS_ETEIGNABLES.has(k)));
-} catch (_) { hiddenCols = new Set(COLS_TABLEAU); }
+  for (const cle of [colsKey(), COLS_KEY]) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(cle) || 'null');
+      if (!Array.isArray(saved)) continue;
+      const garde = saved.filter((k) => COLS_ETEIGNABLES.has(k));
+      // LE RÉGLAGE COMMUN DE LA MACHINE NE DISAIT PAS LA MÊME CHOSE. « Prix
+      // TTC » y était rangé par DÉFAUT — ça voulait dire « pas de colonne dans
+      // le tableau », alors que la carte, elle, affichait le TTC. Depuis que la
+      // case commande les deux vues, le relire tel quel ferait disparaître le
+      // montant de toutes les cartes de tous les postes, sans que personne
+      // l'ait demandé. On repart donc avec le prix ALLUMÉ ; qui n'en veut pas
+      // le décoche, et ce choix-là part sur sa clé à lui.
+      return new Set(cle === COLS_KEY ? garde.filter((k) => k !== 'price') : garde);
+    } catch (_) { /* stockage refusé ou illisible : on essaie la suivante */ }
+  }
+  return new Set(COLS_TABLEAU);
+}
+
+let hiddenCols = lireHiddenCols();
 
 // VUE ÉPURÉE tant qu'aucune colonne DU TABLEAU n'est allumée. C'est la même
 // commande pour les deux vues : le rail « Colonnes » dit ce qu'on veut voir, et
@@ -6358,8 +6474,23 @@ const modeCartes = () => COLS_TABLEAU.size > 0
   && [...COLS_TABLEAU].every((k) => hiddenCols.has(k));
 
 function saveHiddenCols() {
-  try { localStorage.setItem(COLS_KEY, JSON.stringify([...hiddenCols])); } catch (_) {}
+  try { localStorage.setItem(colsKey(), JSON.stringify([...hiddenCols])); } catch (_) {}
 }
+
+// QUAND LA PERSONNE CHANGE, L'ÉCRAN CHANGE AVEC ELLE. Sans ça, Julien reprenait
+// le poste et gardait l'écran de Mélina jusqu'au prochain rechargement — donc
+// le prix qu'il ne veut pas voir, et pas la largeur du dos.
+document.addEventListener('olda:poste', () => {
+  const avant = [...hiddenCols].sort().join(',');
+  hiddenCols = lireHiddenCols();
+  if ([...hiddenCols].sort().join(',') === avant) return;
+  applyColVisibility();
+  renderColbar();
+  // Les lignes déjà montées portent le choix de la personne PRÉCÉDENTE : leur
+  // signature ne dit rien du réglage, elle ne suit que la date de la commande.
+  invalidateRowCache(null);
+  applySortAndRender();
+});
 
 // Pose une classe `off-<clé>` par colonne retirée (règles dans styles.css) et
 // publie la largeur totale ainsi libérée dans `--cols-off`. Les planchers de
@@ -6376,6 +6507,11 @@ function applyColVisibility() {
   document.body.classList.toggle('view-cartes', cartes);
   let off = 0;
   for (const c of PLANNING_COLS) {
+    // Les trois faits de production n'ont PAS de colonne à eux : ils vivent
+    // dans la cellule « Infos » et dans le bloc « Projet » de la carte. Leur
+    // poser une classe `off-…` que rien ne lit laisserait croire, en lisant la
+    // grille, qu'une colonne y répond.
+    if (c.horsTableau) continue;
     const cache = hiddenCols.has(c.key);
     $grid.classList.toggle('off-' + c.key, cache);
     if (cache) off += COL_DEFAULTS[c.key] || 0;
@@ -6440,8 +6576,13 @@ function colbarItem(col) {
       renderColbar();
       // Rallumer la première colonne fait revenir le tableau, tout éteindre
       // ramène les cartes : dans les deux cas la vue affichée est vide tant
-      // qu'on ne l'a pas construite.
-      if (modeCartes() !== avant) applySortAndRender();
+      // qu'on ne l'a pas construite. Les cases qui décident du CONTENU d'une
+      // ligne (le prix, les trois faits de production) ne changent pas de vue :
+      // elles se voient quand même redessiner, sinon la case se coche et rien
+      // ne bouge à l'écran. Le ticket, lui, reste réglé par le CSS — sa place
+      // est réservée sur toutes les cartes, elle ne doit pas se refermer.
+      if (COLS_REDESSINENT.has(col.key)) invalidateRowCache(null);
+      if (modeCartes() !== avant || COLS_REDESSINENT.has(col.key)) applySortAndRender();
     });
   }
   return btn;
