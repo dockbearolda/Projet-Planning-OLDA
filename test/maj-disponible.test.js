@@ -408,10 +408,13 @@ function fonction(src, nom) {
   const zMaj = Number(CSS.match(/\.maj \{[\s\S]*?z-index: (\d+)/)[1]);
   const zAsk = Number(CSS.match(/\.ask \{[\s\S]*?z-index: (\d+)/)[1]);
   assert.ok(zMaj < zAsk, `la bulle (${zMaj}) doit passer sous la confirmation (${zAsk})`);
-  // Cible tactile : la tablette est posée à plat, souvent tapée d'un doigt
-  // occupé ailleurs.
-  assert.match(CSS, /\.maj__btn \{[\s\S]*?min-height: 44px/,
-    'le bouton de la bulle doit faire 44 px de haut');
+  // LA BOÎTE RONDE DE LA CHARTE (`--rond`). La justification a changé le
+  // 26/08 sans que la valeur bouge : ce n'est plus « une cible prenable au
+  // doigt sur une tablette posée à plat » — les tablettes sont au rebut depuis
+  // le 21/08 — c'est la boîte de tout ce qui se clique sans porter de mot,
+  // celle du bouton « revenir ». Le nombre ne s'écrit plus qu'à un endroit.
+  assert.match(CSS, /\.maj__btn \{[\s\S]*?min-height: var\(--rond\)/,
+    'le bouton de la bulle prend la boîte ronde de la charte');
   console.log('✓ branchement : écouté par le planning, dans la coquille, sous la confirmation');
 
   process.exit(0);

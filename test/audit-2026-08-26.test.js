@@ -211,4 +211,81 @@ for (const [nom, src] of [['app.js', APP], ['pont.js', PONT]]) {
   }
 }
 
+// ===========================================================================
+// 10. UN SÉLECTEUR RESTÉ OUVERT AVALE LA RÈGLE SUIVANTE
+// ---------------------------------------------------------------------------
+// DEUX fois dans ce fichier, et par le même geste : on retire un sélecteur
+// d'une liste écrite sur plusieurs lignes, et on emporte la ligne qui la
+// FERME — accolade et déclaration comprises. Il reste une liste close par une
+// virgule, qui se colle à la règle d'après. Le CSS est valide, rien ne
+// s'affiche en console, et le symptôme apparaît à côté :
+//
+//   · `.guide-card` retiré (edf1fc1) → six panneaux ont perdu
+//     `overscroll-behavior: contain` et hérité d'un `scrollbar-gutter`. Au
+//     bout d'un panneau, c'est la PAGE derrière qui se met à défiler.
+//   · `.pj-feed` retiré (089d581) → le panneau du Point du jour a gagné un
+//     `gap: 6px` en thème sombre SEULEMENT, et perdu l'ombre qui devait le
+//     détacher du fond sombre.
+//
+// On tient donc les deux déclarations par leur EFFET, pas par leur écriture.
+// ===========================================================================
+{
+  const css = sansCom(CRM);
+  const confinement = css.match(/([^{}]*)\{[^{}]*overscroll-behavior:\s*contain[^{}]*\}/g) || [];
+  const couvert = confinement.join(' ');
+  for (const panneau of ['.pj-body', '.dd-scroll', '.ld-body', '.menu-pop', '.search-palette-results', '.colbar-scroll']) {
+    assert.ok(couvert.includes(panneau),
+      `${panneau} confine son défilement — sinon la page derrière bouge quand on arrive au bout`);
+  }
+  // Et le panneau sombre garde SON ombre, sans écart parasite.
+  const sombre = css.match(/:root\[data-theme="dark"\] \.dd-panel\s*\{([^}]*)\}/);
+  assert.ok(sombre, 'le panneau du Point du jour garde une règle propre en thème sombre');
+  assert.match(sombre[1], /box-shadow:/, '… et c’est bien son ombre qu’elle porte');
+  assert.ok(!/gap:/.test(sombre[1]), '… et rien d’autre : un « gap » y serait le reste d’une règle avalée');
+}
+
+// ===========================================================================
+// 11. LA BOÎTE SERRÉE A UNE RECETTE, PAS UN NOMBRE
+// ---------------------------------------------------------------------------
+// Cinq boutons au rembourrage IDENTIQUE (7 px / 10 px) mesuraient 37, 39, 40,
+// 44 et 50 px. Trois causes, toutes invisibles à la lecture :
+//   · `min-height` écrit en dur, qui court-circuite le calcul ;
+//   · `line-height: normal`, qui laisse le contenu décider — la charte le dit
+//     déjà pour la grande boîte, il manquait pour la petite ;
+//   · `font: inherit` posé APRÈS l'interligne : le raccourci réécrit
+//     `line-height` avec la valeur héritée, et annule la règle sans rien dire.
+// La recette tient en quatre ingrédients — taille, interligne, rembourrage,
+// trait réservé — et la hauteur en sort seule : 39,4 px, mesuré identique sur
+// l'onglet de la barre, l'action de la fiche et les pilules de la base clients.
+// ===========================================================================
+for (const jeton of ['--ligne-serre', '--trait-reserve', '--champ-y-serre']) {
+  assert.ok(new RegExp(`${jeton}:`).test(CHARTE), `${jeton} est déclarée dans la charte`);
+}
+for (const [nom, src, sels] of [
+  ['styles.css', CRM, ['.nav-switch-btn', '.ld-act']],
+  ['clients.css', CLIENTS, ['.cl-filter__btn', '.cl-sort__btn', '.cl-seg__btn']],
+]) {
+  for (const sel of sels) {
+    // EN DÉBUT DE LIGNE : la règle de base s'écrit sans indentation, les
+    // variantes de requête média sont décalées. Sans l'ancre, on lisait
+    // « .topbar .nav-switch-btn { padding: … } » et pas la vraie règle.
+    const regle = sansCom(src).match(new RegExp(`^\\${sel}\\s*\\{([^}]*)\\}`, 'm'));
+    assert.ok(regle, `${nom} : ${sel} existe`);
+    assert.match(regle[1], /line-height:\s*var\(--ligne-serre\)/,
+      `${nom} : ${sel} prend l’interligne serré — sinon sa hauteur suit son contenu`);
+    // UN TRAIT DE 1 px, VISIBLE OU RÉSERVÉ. Il compte dans la boîte : la pilule
+    // de filtre n'en avait pas et tombait à 37,4 quand l'action de la fiche,
+    // qui en porte un, faisait 39,4. Même recette, deux pixels d'écart.
+    assert.match(regle[1], /border:\s*(var\(--trait-reserve\)|1px solid )/,
+      `${nom} : ${sel} porte un trait de 1 px, visible ou réservé — il compte dans la boîte`);
+    assert.ok(!/min-height:\s*\d/.test(regle[1]),
+      `${nom} : ${sel} n’écrit pas sa hauteur — elle sort de la recette`);
+    // L'ORDRE COMPTE : `font:` est un raccourci, il réécrit `line-height`.
+    const iLigne = regle[1].indexOf('line-height');
+    const mFont = /(^|[;\s])font:\s/.exec(regle[1]);
+    assert.ok(!mFont || mFont.index < iLigne,
+      `${nom} : ${sel} pose son interligne APRÈS « font: », sinon le raccourci l’écrase`);
+  }
+}
+
 console.log('✓ audit du 26/08 : une échelle, une boîte, un rond, une durée — et rien qui charge derrière le voile');

@@ -232,9 +232,11 @@ assert.ok(/\.poste-ecran:not\(\[hidden\]\) \{\s*\n\s*display: grid;/.test(STYLES
 assert.ok(!/^\.poste-ecran \{[^}]*display:/m.test(STYLES),
   '.poste-ecran ne doit pas porter un display nu, il défairait hidden');
 
-// Tablette et téléphone : la cible reste prenable au doigt.
-assert.ok(/\.poste \{[\s\S]*?height: 44px;/.test(STYLES),
-  'le bouton du poste garde une cible de 44 px');
+// LA BOÎTE RONDE DE LA CHARTE (`--rond`), et non plus « une cible prenable au
+// doigt » : le projet est PC uniquement depuis le 21/08. La valeur ne change
+// pas, la raison si — et elle ne s'écrit plus qu'à un endroit.
+assert.ok(/\.poste \{[\s\S]*?height: var\(--rond\);/.test(STYLES),
+  'le bouton du poste prend la boîte ronde de la charte');
 assert.ok(/\.poste-choix-btn \{[\s\S]*?min-height: 64px;/.test(STYLES),
   'les quatre noms se tapent au doigt');
 

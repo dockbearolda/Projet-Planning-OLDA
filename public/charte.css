@@ -194,6 +194,12 @@
      l'écran du comptoir n'a plus de forme à lui. */
   --arrondi-bloc: var(--arrondi-carte);  /* bloc dans une carte */
   --arrondi-carte: var(--radius-card);   /* la carte elle-même */
+  /* LA PILULE — la troisième forme, celle d'une étiquette, d'un état, d'un
+     compteur (voir « TROIS FORMES » plus bas). Elle s'écrivait « 999px » en
+     soixante endroits et « 99px » en huit autres : deux orthographes pour la
+     même intention, et rien pour dire laquelle. Un rectangle très arrondi n'est
+     pas une pilule — c'est le rayon SUPÉRIEUR à la demi-hauteur qui l'est. */
+  --pilule: 999px;
 
   /* LA BOÎTE UNIQUE DE L'APPLICATION (25/08/2026).
      Tout ce qui se clique et se remplit fait cette hauteur : champ, zone de
@@ -247,6 +253,24 @@
      45 px de hauteur par article. Une seule boîte serrée, jamais deux —
      le panier en avait deux (31 et 36 px) écrites en dur. */
   --champ-y-serre: 7px;
+  /* … ET SON INTERLIGNE. La boîte serrée ne s'écrit pas non plus : elle SORT du
+     texte, de l'interligne et du rembourrage — à condition que les trois soient
+     les mêmes. Mesuré le 26/08 sur cinq boutons au rembourrage IDENTIQUE
+     (7 px / 10 px) : 37 px pour une pilule de filtre, 39 pour une action de la
+     fiche (une icône dedans, et `line-height: normal` qui la laisse décider),
+     40 pour un onglet, 44 pour une ligne du rail des colonnes, 50 pour le
+     bouton « Colonnes ». Cinq hauteurs pour la même intention.
+     C'est `normal` le coupable, et la charte le dit déjà pour la grande boîte :
+     un RAPPORT suit la taille du texte et ne dépend ni de la police chargée ni
+     de ce qu'on pose dans le bouton. 17 × 1,375 + 2 × 7 = 37,4 px, toujours. */
+  --ligne-serre: var(--ligne-champ);
+  /* … ET LE TRAIT RÉSERVÉ. Quatrième ingrédient, et le dernier : un onglet
+     garde `1px solid transparent` pour pouvoir s'entourer sans se déplacer, une
+     pilule de filtre n'en avait pas. Même texte, même interligne, même
+     rembourrage — et pourtant 39,4 px d'un côté, 37,4 de l'autre : le trait
+     compte dans la boîte. On le réserve donc PARTOUT, et la boîte serrée fait
+     enfin la même chose sur les quatre écrans qui la portent. */
+  --trait-reserve: 1px solid transparent;
 
   /* La colonne des valeurs d'un tableau. Fixe, pour que deux tables
      imbriquées — un récapitulatif et son calcul déplié — alignent leurs
@@ -290,8 +314,8 @@
    leur `padding` et leur `border-radius` par défaut ne s'appliquent pas ici. */
 .btn-retour {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; padding: 0; flex: 0 0 auto;
-  border: 1px solid var(--border); border-radius: 999px;
+  width: var(--rond); height: var(--rond); padding: 0; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: var(--pilule);
   background: var(--surface); color: var(--text-1);
   font-family: inherit; cursor: pointer;
   transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
@@ -321,7 +345,7 @@
   display: flex; align-items: center; gap: var(--pas-2);
   margin: 0; padding: 0 var(--champ-x);
   height: var(--ctrl-h); min-width: 0;
-  border: 1px solid var(--border); border-radius: 999px;
+  border: 1px solid var(--border); border-radius: var(--pilule);
   background: var(--search-bg); color: var(--text-2);
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
@@ -359,7 +383,7 @@
 .step {
   position: relative; flex: 1 1 0; min-width: 0;
   display: flex; align-items: center; justify-content: center; gap: var(--pas-1);
-  border-radius: 999px; padding: 8px 12px; text-align: center;
+  border-radius: var(--pilule); padding: 8px 12px; text-align: center;
   font-size: var(--taille-texte); font-weight: var(--graisse-note);
   line-height: var(--ligne-champ);
   /* UNE ÉTAPE À VENIR SE LIT (25/08/2026). Elle était posée sur le gris
@@ -371,7 +395,7 @@
 /* La pastille : vide tant que l'étape n'est pas franchie, cochée ensuite. */
 .step::before {
   content: ""; flex: 0 0 auto;
-  width: 22px; height: 22px; border-radius: 999px;
+  width: 22px; height: 22px; border-radius: var(--pilule);
   border: 1.5px solid var(--border-strong);
   display: grid; place-items: center;
   font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: 1;

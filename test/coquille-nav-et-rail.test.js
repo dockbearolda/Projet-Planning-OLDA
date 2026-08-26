@@ -317,14 +317,18 @@ console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue q
   const CHARTE0 = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
   const modele = sansCommentaire(CHARTE0).match(/\.btn-retour \{[^}]*\}/);
   assert.ok(modele, 'le bouton « revenir d’un cran » est le modèle : il doit exister');
-  assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0]),
-    '… 44 px et rond');
+  // LE ROND EST UN JETON DEPUIS LE 26/08 (`--rond`), et la pilule aussi
+  // (`--pilule`). Le nombre s'écrivait treize fois dans le CRM : on vérifie
+  // donc que le modèle prend bien le jeton, ET que le jeton vaut bien 44 px.
+  assert.ok(/width: var\(--rond\)/.test(modele[0]) && /border-radius: var\(--pilule\)/.test(modele[0]),
+    '… la boîte ronde nommée de la charte');
+  assert.match(CHARTE0, /--rond:\s*44px/, '… et ce rond vaut 44 px');
   for (const sel of ['.colbar-close', '.cat-close', '.ld-close']) {
     const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
     assert.ok(r, `${sel} doit exister`);
-    assert.ok(/width: 44px/.test(r[0]) && /height: 44px/.test(r[0]),
+    assert.ok(/width: var\(--rond\)/.test(r[0]) && /height: var\(--rond\)/.test(r[0]),
       `${sel} prend la taille du bouton de retour`);
-    assert.ok(/border-radius: 999px/.test(r[0]), `${sel} est rond comme lui`);
+    assert.ok(/border-radius: var\(--pilule\)/.test(r[0]), `${sel} est rond comme lui`);
     assert.ok(/border: 1px solid var\(--border\)/.test(r[0]), `${sel} est bordé comme lui`);
   }
   // Les icônes NUES de la barre du haut ne sont pas des retours : ce sont des
@@ -346,9 +350,10 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
   const modele = sansCommentaire(CHARTE).match(/\.btn-retour \{[^}]*\}/);
   assert.ok(modele, '.btn-retour doit être déclaré dans la charte, pas ailleurs');
-  assert.ok(/width: 44px/.test(modele[0]) && /border-radius: 999px/.test(modele[0])
+  assert.ok(/width: var\(--rond\)/.test(modele[0]) && /border-radius: var\(--pilule\)/.test(modele[0])
     && /border: 1px solid var\(--border\)/.test(modele[0]),
-    'la flèche est ronde, 44 px, bordée');
+    'la flèche prend la boîte ronde nommée, et elle est bordée');
+  assert.match(CHARTE, /--rond:\s*44px/, '… et ce rond vaut 44 px');
   // LA BARRE DE SORTIE DE L'HÔTE N'EXISTE PLUS (24/08). Elle coûtait 61 px pour
   // une seule flèche ; celle-ci vit dans la rangée d'étapes du parcours. Tout
   // ce qui la construisait est parti avec elle — sinon c'est du code qu'on
@@ -560,7 +565,7 @@ console.log('✓ barre : sept onglets sur la même ligne, la rangée centrée su
   assert.ok(/\.poste-nom \{ display: none; \}/.test(sansCommentaire(CSS)),
     'le prénom quitte la barre : la pastille dit déjà qui est au poste');
   const poste = sansCommentaire(CSS).match(/\.poste \{[^}]*\}/);
-  assert.ok(poste && /width: 44px/.test(poste[0]) && /padding: 0;/.test(poste[0]),
+  assert.ok(poste && /width: var\(--rond\)/.test(poste[0]) && /padding: 0;/.test(poste[0]),
     '… et le bouton devient son disque');
   assert.ok(/aria-label="Poste : /.test(HTML) || /aria-label/.test(HTML),
     'le nom complet reste au nom accessible');
