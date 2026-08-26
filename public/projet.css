@@ -58,7 +58,7 @@
   display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
   background: var(--primary); color: var(--on-primary);
 }
-.np-tile__icon .material-symbols-outlined { font-size: 40px; }
+.np-tile__icon .material-symbols-outlined { font-size: var(--ic-tuile); }
 .np-tile strong { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
 /* LA BARRE DE SORTIE A ÉTÉ RETIRÉE (24/08). Elle coûtait 61 px de hauteur pour
    une seule flèche, au-dessus d'une rangée d'étapes qui en prenait 94. La
@@ -70,7 +70,7 @@
 .np-erreur {
   flex: 0 0 auto; margin: 0; padding: 13px 16px;
   background: var(--danger-bg); border-bottom: 1px solid var(--danger-line); color: var(--danger);
-  font-family: var(--font); font-size: var(--taille-texte); font-weight: 700;
+  font-family: var(--font); font-size: var(--taille-texte); font-weight: var(--graisse-note);
 }
 .np-erreur[hidden] { display: none; }
 /* Le dossier EST enregistré, mais pas comme la vendeuse le croit : un renvoi
@@ -96,5 +96,4 @@
   .np-home__grid { grid-template-columns: 1fr; gap: 14px; }
   .np-tile { padding: 24px 18px 22px; }
   .np-tile__icon { width: 64px; height: 64px; }
-  .np-tile__icon .material-symbols-outlined { font-size: 40px; }
 }

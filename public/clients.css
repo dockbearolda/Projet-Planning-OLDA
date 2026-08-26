@@ -40,43 +40,22 @@
 .cl-brand__av {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--rond);
+  height: var(--rond);
   border-radius: var(--arrondi-bloc);
   background: var(--primary);
   color: var(--on-primary);
-  font-weight: 700;
+  font-weight: var(--graisse-forte);
   font-size: var(--taille-texte);
   flex-shrink: 0;
 }
 .cl-brand__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.2px; color: var(--text-1); }
 .cl-brand__sub { margin: 0; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
 
-.cl-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 280px;
-  min-width: 200px;
-  padding: 0 12px;
-  height: 42px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  transition: border-color var(--dur-2, .18s) var(--ease, ease), background var(--dur-2, .18s) var(--ease, ease);
-}
-.cl-search:focus-within { border-color: var(--primary); background: var(--surface); }
-.cl-search__ic { font-size: 20px; color: var(--text-2); flex-shrink: 0; }
-.cl-search__input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-1);
-  font-size: var(--taille-texte);
-}
-.cl-search__input:focus { outline: none; }
-.cl-search__input::placeholder { color: var(--text-3); }
+/* Même objet qu'au planning : la pilule vit dans charte.css
+   (`.champ-recherche`). Ne reste ici que la largeur — celle-ci pousse. */
+.cl-search { flex: 1 1 280px; min-width: 200px; }
+.cl-search__ic { font-size: var(--ic); color: var(--text-2); flex-shrink: 0; }
 .cl-search__clear {
   border: 0;
   background: transparent;
@@ -102,7 +81,7 @@
   background: transparent;
   color: var(--text-2);
   font-size: var(--taille-texte);
-  font-weight: 500;
+  font-weight: var(--graisse-note);
   padding: var(--champ-y-serre) var(--pas-2);
   border-radius: 999px;
   cursor: pointer;
@@ -123,7 +102,7 @@
   background: transparent;
   color: var(--text-2);
   font-size: var(--taille-texte);
-  font-weight: 500;
+  font-weight: var(--graisse-note);
   padding: var(--champ-y-serre) var(--pas-2);
   border-radius: 999px;
   cursor: pointer;
@@ -138,15 +117,15 @@
   background: var(--primary);
   color: var(--on-primary);
   font-size: var(--taille-texte);
-  font-weight: 600;
+  font-weight: var(--graisse-note);
   padding: 0 16px;
-  height: 42px;
+  height: var(--ctrl-h);
   border-radius: 999px;
   cursor: pointer;
-  transition: background var(--dur-2, .18s) var(--ease, ease);
+  transition: background var(--dur-2) var(--ease);
 }
 .cl-new:hover { background: var(--primary-hover); }
-.cl-new .material-symbols-outlined { font-size: 20px; }
+.cl-new .material-symbols-outlined { font-size: var(--ic); }
 
 /* --- Liste --- */
 .cl-list {
@@ -170,23 +149,23 @@
   text-align: left;
   padding: 12px 14px;
   background: var(--surface);
-  border: 1px solid var(--card-border, var(--border));
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-1);
   cursor: pointer;
-  transition: box-shadow var(--dur-2, .18s) var(--ease, ease), transform var(--dur-2, .18s) var(--ease, ease), border-color var(--dur-2, .18s) var(--ease, ease);
+  transition: box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
 }
 .cl-card:hover { box-shadow: var(--shadow-2); transform: translateY(-1px); }
 .cl-card.is-active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), var(--shadow-2); }
 .cl-av {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--rond);
+  height: var(--rond);
   border-radius: var(--arrondi-bloc);
   background: var(--primary-soft);
   color: var(--primary);
-  font-weight: 700;
+  font-weight: var(--graisse-forte);
   font-size: var(--taille-texte);
   flex-shrink: 0;
 }
@@ -196,7 +175,12 @@
   flex: 0 1 auto;
   min-width: 0;
   font-size: var(--taille-texte);
-  font-weight: 600;
+  /* LE NOM MÈNE LA CARTE, comme au planning (`.pcard__client`, graisse forte).
+     En 600 il pesait exactement autant que l'étiquette « Professionnel » posée
+     à côté, et moins que ses propres initiales dans la pastille : rien ne
+     menait la carte. L'échelle n'a qu'une taille de texte ici — c'est la
+     graisse, et elle seule, qui fait la hiérarchie. */
+  font-weight: var(--graisse-forte);
   color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;
@@ -206,7 +190,7 @@
 .cl-nature {
   flex-shrink: 0;
   font-size: var(--taille-texte);
-  font-weight: 700;
+  font-weight: var(--graisse-note);
   letter-spacing: .04em;
   text-transform: uppercase;
   padding: 2px 8px;
@@ -246,12 +230,12 @@
   align-items: center;
   gap: 3px;
   font-size: var(--taille-texte);
-  font-weight: 600;
+  font-weight: var(--graisse-note);
   padding: 3px 8px;
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }
-.cl-badge .material-symbols-outlined { font-size: 16px; }
+.cl-badge .material-symbols-outlined { font-size: var(--ic-serre); }
 .cl-badge--cmd { background: var(--primary-soft); color: var(--primary); }
 .cl-badge--note { background: var(--state-hover); color: var(--text-2); }
 .cl-card__time { font-size: var(--taille-texte); color: var(--text-2); white-space: nowrap; }
@@ -270,7 +254,7 @@
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, .42);
-  animation: clScrim var(--dur-2, .18s) var(--ease, ease) both;
+  animation: clScrim var(--dur-2) var(--ease) both;
 }
 @keyframes clScrim { from { opacity: 0; } to { opacity: 1; } }
 .cl-drawer__card {
@@ -287,7 +271,7 @@
 }
 :root[data-theme="dark"] .cl-drawer__card {
   box-shadow: -18px 0 48px rgba(0, 0, 0, .55);
-  animation: clSlide var(--dur-3, .24s) var(--ease, ease) both;
+  animation: clSlide var(--dur-3) var(--ease) both;
 }
 @keyframes clSlide { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
 
@@ -301,12 +285,12 @@
 .cl-dh__av {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: var(--rond);
+  height: var(--rond);
   border-radius: var(--arrondi-bloc);
   background: var(--primary-soft);
   color: var(--primary);
-  font-weight: 700;
+  font-weight: var(--graisse-forte);
   font-size: var(--taille-texte);
   flex-shrink: 0;
 }
@@ -318,7 +302,7 @@
   display: grid;
   place-items: center;
   width: 36px;
-  height: 36px;
+  height: var(--rond);
   border: 0;
   background: transparent;
   color: var(--text-2);
@@ -327,7 +311,7 @@
 }
 .cl-dh__btn:hover { background: var(--state-hover); color: var(--text-1); }
 .cl-dh__btn--danger:hover { background: var(--danger-bg); color: var(--danger); }
-.cl-dh__btn .material-symbols-outlined { font-size: 20px; }
+.cl-dh__btn .material-symbols-outlined { font-size: var(--ic); }
 
 .cl-dbody { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 18px 24px; -webkit-overflow-scrolling: touch; }
 
@@ -337,10 +321,10 @@
   grid-template-columns: 1fr;
   gap: 4px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--border-soft, var(--border));
+  border-bottom: 1px solid var(--border-soft);
 }
-.cl-f__label { display: flex; align-items: center; gap: 8px; font-size: var(--taille-texte); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-2); }
-.cl-f__ic { font-size: 16px; color: var(--text-2); }
+.cl-f__label { display: flex; align-items: center; gap: 8px; font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .02em; text-transform: uppercase; color: var(--text-2); }
+.cl-f__ic { font-size: var(--ic-serre); color: var(--text-2); }
 .cl-f__input {
   border: 1px solid transparent;
   background: transparent;
@@ -353,10 +337,10 @@
      évidence d'un champ resté vide. Sans transition, le rouge du champ manquant
      apparaissait d'un bloc à la sortie du champ — le geste le plus fréquent de
      la saisie client. */
-  transition: background var(--dur-2, .18s) var(--ease, ease),
-              border-color var(--dur-2, .18s) var(--ease, ease),
-              box-shadow var(--dur-2, .18s) var(--ease, ease),
-              color var(--dur-2, .18s) var(--ease, ease);
+  transition: background var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
 }
 /* Nature pro/perso dans la fiche : segmented (bouton), pas champ texte. */
 .cl-seg {
@@ -368,15 +352,15 @@
   border-radius: 999px;
 }
 .cl-seg__btn {
-  min-height: 34px; padding: 0 18px;
+  padding: var(--champ-y-serre) var(--pas-3);
   border: 0; border-radius: 999px; background: transparent;
-  color: var(--text-2); font-size: var(--taille-texte); font-weight: 500; cursor: pointer;
-  transition: background var(--dur-2, .18s) var(--ease, ease), color var(--dur-2, .18s) var(--ease, ease);
+  color: var(--text-2); font-size: var(--taille-texte); font-weight: var(--graisse-note); cursor: pointer;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
 .cl-seg__btn:hover { color: var(--text-1); }
-.cl-seg__btn.is-on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-1); font-weight: 600; }
+.cl-seg__btn.is-on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-1); font-weight: var(--graisse-note); }
 
-.cl-f__input--strong { font-weight: 600; }
+.cl-f__input--strong { font-weight: var(--graisse-note); }
 .cl-f__input--readonly { color: var(--text-2); background: var(--surface-hover); cursor: default; }
 .cl-f__input--missing { border-color: var(--st-bloque); background: var(--st-bloque-bg); }
 .cl-f__input::placeholder { color: var(--text-3); }
@@ -390,19 +374,19 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 42px;
+  height: var(--ctrl-h);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-bloc);
   background: var(--surface);
   color: var(--text-1);
   font-size: var(--taille-texte);
-  font-weight: 500;
+  font-weight: var(--graisse-note);
   text-decoration: none;
   cursor: pointer;
-  transition: background var(--dur-2, .18s) var(--ease, ease), border-color var(--dur-2, .18s) var(--ease, ease);
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
 }
 .cl-act:hover { background: var(--surface-hover); border-color: var(--primary); }
-.cl-act .material-symbols-outlined { font-size: 20px; color: var(--primary); }
+.cl-act .material-symbols-outlined { font-size: var(--ic); color: var(--primary); }
 .cl-act.is-off { opacity: .4; pointer-events: none; }
 
 .cl-meta { margin: 16px 0 4px; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -410,8 +394,8 @@
 /* --- Notes & historique --- */
 .cl-notes { margin-top: 12px; }
 .cl-notes__head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.cl-notes__title { margin: 0; font-size: var(--taille-texte); font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--text-2); }
-.cl-notes__count { font-size: var(--taille-texte); font-weight: 700; color: var(--text-2); background: var(--state-hover); border-radius: 999px; padding: 1px 8px; min-width: 22px; text-align: center; }
+.cl-notes__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .03em; text-transform: uppercase; color: var(--text-2); }
+.cl-notes__count { font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-2); background: var(--state-hover); border-radius: 999px; padding: 1px 8px; min-width: 22px; text-align: center; }
 
 .cl-composer { border: 1px solid var(--border); border-radius: var(--arrondi-bloc); background: var(--bg); padding: 10px; }
 .cl-composer__input {
@@ -421,7 +405,7 @@
   color: var(--text-1);
   font-size: var(--taille-texte);
   resize: vertical;
-  min-height: 44px;
+  min-height: var(--ctrl-h);
   font-family: inherit;
 }
 .cl-composer__input:focus { outline: none; }
@@ -436,12 +420,12 @@
   background: var(--surface);
   color: var(--text-2);
   font-size: var(--taille-texte);
-  font-weight: 500;
+  font-weight: var(--graisse-note);
   padding: 5px 10px;
   border-radius: 999px;
   cursor: pointer;
 }
-.cl-kind .material-symbols-outlined { font-size: 16px; }
+.cl-kind .material-symbols-outlined { font-size: var(--ic-serre); }
 .cl-kind.is-on { background: var(--primary-soft); color: var(--primary); border-color: transparent; }
 .cl-composer__add {
   margin-left: auto;
@@ -452,13 +436,13 @@
   background: var(--primary);
   color: var(--on-primary);
   font-size: var(--taille-texte);
-  font-weight: 600;
+  font-weight: var(--graisse-note);
   padding: 7px 14px;
   border-radius: 999px;
   cursor: pointer;
 }
 .cl-composer__add:hover { background: var(--primary-hover); }
-.cl-composer__add .material-symbols-outlined { font-size: 16px; }
+.cl-composer__add .material-symbols-outlined { font-size: var(--ic-serre); }
 
 .cl-timeline { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .cl-timeline__empty { color: var(--text-2); font-size: var(--taille-texte); text-align: center; padding: 14px 0; }
@@ -473,25 +457,25 @@
 .cl-note--email { border-left-color: var(--primary); }
 .cl-note--rdv { border-left-color: var(--warning); }
 .cl-note__head { display: flex; align-items: center; gap: 8px; }
-.cl-note__kind { display: inline-flex; align-items: center; gap: 4px; font-size: var(--taille-texte); font-weight: 600; color: var(--text-2); }
-.cl-note__kind .material-symbols-outlined { font-size: 16px; }
+.cl-note__kind { display: inline-flex; align-items: center; gap: 4px; font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-2); }
+.cl-note__kind .material-symbols-outlined { font-size: var(--ic-serre); }
 .cl-note__time { font-size: var(--taille-texte); color: var(--text-2); }
-.cl-note__del { margin-left: auto; border: 0; background: transparent; color: var(--text-2); cursor: pointer; border-radius: var(--arrondi-champ); display: grid; place-items: center; width: 26px; height: 26px; }
+.cl-note__del { margin-left: auto; border: 0; background: transparent; color: var(--text-2); cursor: pointer; border-radius: var(--arrondi-champ); display: grid; place-items: center; width: var(--rond-serre); height: var(--rond-serre); }
 .cl-note__del:hover { background: var(--state-hover); color: var(--danger); }
-.cl-note__del .material-symbols-outlined { font-size: 16px; }
+.cl-note__del .material-symbols-outlined { font-size: var(--ic-serre); }
 .cl-note__body { margin: 6px 0 0; font-size: var(--taille-texte); color: var(--text-1); white-space: pre-wrap; word-break: break-word; }
 
 /* --- Pied (création) --- */
 .cl-dfoot { display: flex; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
 .cl-btn {
   flex: 1;
-  height: 44px;
+  height: var(--ctrl-h);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-bloc);
   background: var(--surface);
   color: var(--text-1);
   font-size: var(--taille-texte);
-  font-weight: 600;
+  font-weight: var(--graisse-note);
   cursor: pointer;
 }
 .cl-btn:hover { background: var(--surface-hover); }
@@ -519,7 +503,7 @@
   box-shadow: var(--shadow-2);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--dur-2, .18s) var(--ease, ease), transform var(--dur-2, .18s) var(--ease, ease);
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
 .cl-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
@@ -560,7 +544,7 @@
 }
 .cl-secteurs__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cl-secteurs__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
-.cl-secteurs__close { border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; padding: 6px; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
+.cl-secteurs__close { border: 0; background: none; color: var(--text-2); cursor: pointer; display: flex; padding: 6px; min-width: var(--rond); min-height: var(--rond); align-items: center; justify-content: center; }
 .cl-secteurs__hint { margin: 6px 0 14px; font-size: var(--taille-texte); color: var(--text-2); }
 .cl-secteurs__list { display: flex; flex-wrap: wrap; gap: 8px; }
 .cl-secteurs__chip {
@@ -568,11 +552,11 @@
   border: 1px solid var(--border); border-radius: 999px; font-size: var(--taille-texte); background: var(--surface);
 }
 .cl-secteurs__del {
-  display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center; width: var(--rond-serre); height: var(--rond-serre);
   border: 0; border-radius: 50%; background: none; color: var(--text-2); cursor: pointer;
 }
 .cl-secteurs__del:hover { background: var(--state-hover); color: var(--danger); }
-.cl-secteurs__del .material-symbols-outlined { font-size: 16px; }
+.cl-secteurs__del .material-symbols-outlined { font-size: var(--ic-serre); }
 .cl-secteurs__add { display: flex; gap: 8px; margin-top: 16px; }
 .cl-secteurs__add .cl-f__input { flex: 1; }
 /* LE DOIGT N’EST PLUS UNE CIBLE — trois blocs `@media (pointer: coarse)`
@@ -587,15 +571,15 @@
    la sienne. */
 .cl-tool {
   display: inline-flex; align-items: center; gap: 6px;
-  min-height: 40px; padding: 0 14px;
+  min-height: var(--ctrl-h); padding: 0 14px;
   border: 1px solid var(--border); border-radius: 999px;
   background: var(--surface); color: var(--text-2);
-  font: inherit; font-size: var(--taille-texte); font-weight: 600; cursor: pointer;
+  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note); cursor: pointer;
   transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .cl-tool:hover { border-color: var(--primary); color: var(--primary); }
 .cl-tool:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.cl-tool .material-symbols-outlined { font-size: 20px; }
+.cl-tool .material-symbols-outlined { font-size: var(--ic); }
 
 /* --- Tablette et téléphone : le doigt, pas la souris -----------------------
    Deux règles du projet, appliquées ici d'un bloc plutôt que dispersées :

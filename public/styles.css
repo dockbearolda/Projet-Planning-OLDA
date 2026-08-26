@@ -214,7 +214,7 @@ button, input, select, textarea { font-family: inherit; }
 .icon-btn:hover { background: var(--state-hover); color: var(--text-1); }
 .icon-btn:active { background: var(--state-press); }
 .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.icon-btn .material-symbols-outlined { font-size: 20px; }
+.icon-btn .material-symbols-outlined { font-size: var(--ic); }
 
 /* QUI EST AU POSTE — en haut à droite, à la place de l'ancienne pastille
    décorative. Ce n'est pas un ornement : le nom affiché ici est celui qui
@@ -355,41 +355,16 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* ---------------------------------------------------------------- Recherche (pilule) */
+/* La pilule elle-même vit dans charte.css (`.champ-recherche`) — le planning et
+   la base clients portent LE MÊME objet. Ne reste ici que sa place dans la
+   barre : elle pousse jusqu'à 520 px et pas au-delà, sinon elle chasse les
+   onglets. */
 .grid-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 0 14px;
-  height: 44px;
   width: 100%;
-  min-width: 0;
   max-width: 520px;
   flex: 1 1 220px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-2);
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
-              box-shadow var(--dur-1) var(--ease);
 }
-.grid-search:hover { border-color: var(--border-strong); }
-.grid-search:focus-within {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-1);
-}
-.grid-search-ic { font-size: 20px; color: var(--text-2); flex-shrink: 0; }
-.grid-search-input {
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--taille-texte);
-  color: var(--text-1);
-  min-width: 0;
-}
-.grid-search-input::placeholder { color: var(--text-3); }
+.grid-search-ic { font-size: var(--ic); color: var(--text-2); flex-shrink: 0; }
 .grid-search-clear {
   border: 0; background: transparent; color: var(--text-2);
   font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1; cursor: pointer; padding: 2px 4px;
@@ -583,14 +558,14 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   min-height: 38px;
   padding: 8px 8px 8px 9px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--arrondi-champ);
   background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
   color: var(--text-1);
   user-select: none;
-  transition: background 120ms var(--ease);
+  transition: background var(--dur-1) var(--ease);
 }
 .stage:hover { background: var(--rail-hover); }
 .stage.active { background: var(--za); }
@@ -637,7 +612,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   text-align: center;
   color: var(--zc);
   font-variant-numeric: tabular-nums;
-  transition: background 120ms var(--ease);
+  transition: background var(--dur-1) var(--ease);
 }
 .stage-count.has-items { background: var(--zp); }
 
@@ -667,7 +642,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      pire des six phases. */
   padding: 7px 8px 7px 9px;
   gap: 10px;
-  border-radius: 9px;
+  border-radius: var(--arrondi-champ);
   background: var(--zsur-fond);
 }
 .stage.zone-head::before { content: none; }        /* pas de puce sur un titre */
@@ -805,9 +780,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   font-family: inherit;
   cursor: pointer;
   box-shadow: var(--shadow-1);
-  transition: box-shadow var(--dur-1) var(--ease), background var(--dur-1) var(--ease), transform .08s var(--ease);
+  transition: box-shadow var(--dur-1) var(--ease), background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
 }
-.btn-primary .material-symbols-outlined { font-size: 20px; color: var(--on-primary); font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+.btn-primary .material-symbols-outlined { font-size: var(--ic); color: var(--on-primary); font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
 .btn-primary:hover { box-shadow: var(--shadow-2); background: var(--primary-hover); }
 .btn-primary:active { transform: scale(.98); }
 .btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .25); }
@@ -834,7 +809,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .stage-link[hidden] { display: none; }
 .stage-link:hover { background: var(--surface-hover); color: var(--text-1); }
 .stage-link:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.stage-link-ic { font-size: 16px; flex-shrink: 0; }
+.stage-link-ic { font-size: var(--ic-serre); flex-shrink: 0; }
 
 /* -------------------------------------- Bouton « Guide » + sous-titre étape */
 .help-btn {
@@ -856,7 +831,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .help-btn[hidden] { display: none; }
 .help-btn:hover { background: var(--surface-hover); color: var(--text-1); }
 .help-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.help-btn-ic { font-size: 20px; flex-shrink: 0; }
+.help-btn-ic { font-size: var(--ic); flex-shrink: 0; }
 
 
 /* Tablette / téléphone étroit : le panneau devient une feuille en bas d'écran,
@@ -918,7 +893,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .fiverr-tool-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .fiverr-tool-input::placeholder { color: var(--text-3); }
 .fiverr-tool-unit { font-size: var(--taille-texte); color: var(--text-2); font-weight: var(--graisse-texte); }
-.fiverr-tool-arrow { font-size: 24px; color: var(--text-3); flex-shrink: 0; margin-bottom: 6px; }
+.fiverr-tool-arrow { font-size: var(--ic-grand); color: var(--text-3); flex-shrink: 0; margin-bottom: 6px; }
 .fiverr-tool-detail { display: flex; flex-direction: column; gap: 6px; }
 .fiverr-tool-detail-label {
   font-size: var(--taille-texte);
@@ -992,9 +967,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-carte);
-  transition: background var(--dur-1, .12s) var(--ease, ease),
-              border-color var(--dur-1, .12s) var(--ease, ease),
-              box-shadow var(--dur-1, .12s) var(--ease, ease);
+  transition: background var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
   /* PAS de `content-visibility: auto` ici, et c'est mesuré. L'idée était bonne
      sur le papier — ne pas dessiner les cartes hors écran — mais sur une liste
      de cette forme elle coûte plus qu'elle ne rapporte : le travail différé
@@ -1262,7 +1237,7 @@ body.cards-off-ticket .pcard__ticket { display: none; }
 .grid thead th.num { text-align: right; }
 .grid thead th.sortable { cursor: pointer; transition: color var(--dur-1) var(--ease); }
 .grid thead th.sortable:hover { color: var(--text-1); }
-.grid thead th .arrow { color: var(--primary); font-size: 16px; margin-left: 3px; }
+.grid thead th .arrow { color: var(--primary); font-size: var(--ic-serre); margin-left: 3px; }
 
 .grid tbody td {
   border-bottom: 1px solid var(--row-line);
@@ -1326,7 +1301,7 @@ body.cards-off-ticket .pcard__ticket { display: none; }
   /* On ne doit pas pouvoir ouvrir, d'un clic distrait, une commande de la
      famille qu'on vient de quitter. */
   pointer-events: none;
-  transition: opacity var(--dur-3) var(--ease) 160ms;
+  transition: opacity var(--dur-3) var(--ease) var(--delai-aveu);
 }
 @media (prefers-reduced-motion: reduce) {
   .grid-wrap #rows,
@@ -1747,7 +1722,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .ref-chip:hover { color: var(--primary); background: var(--primary-soft); }
 .ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.ref-chip.empty { color: var(--text-3, var(--text-2)); font-weight: var(--graisse-texte); opacity: .75; }
+.ref-chip.empty { color: var(--text-3); font-weight: var(--graisse-texte); opacity: .75; }
 .ref-chip.empty:hover { opacity: 1; color: var(--primary); }
 
 /* Nom « de base » hérité de la catégorie (pilote / référent non posés à la main).
@@ -1799,7 +1774,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .flag-chip.empty {
   border: 1px dashed var(--border);
   background: transparent;
-  color: var(--text-3, var(--text-2));
+  color: var(--text-3);
   font-weight: var(--graisse-texte);
   letter-spacing: 0;
   opacity: .75;
@@ -1826,7 +1801,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .flag-reason:hover { color: var(--primary); }
 .flag-reason:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); border-radius: var(--arrondi-champ); }
-.flag-reason.empty { color: var(--text-3, var(--text-2)); opacity: .7; }
+.flag-reason.empty { color: var(--text-3); opacity: .7; }
 /* RIEN À SIGNALER : le motif n'existe pas, il ne doit pas occuper de place.
    `display: -webkit-box` ci-dessus ÉCRASE l'attribut `hidden` que pose
    flagControl : sur chaque ligne sans alerte restait un bouton vide, sans nom
@@ -1955,7 +1930,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .colbar-close:hover { background: var(--state-hover); color: var(--text-1); }
 .colbar-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.colbar-close .material-symbols-outlined { font-size: 20px; }
+.colbar-close .material-symbols-outlined { font-size: var(--ic); }
 
 .colbar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; }
 /* Le bloc « Retirées » ne défile pas avec le reste : il garde sa place en bas,
@@ -2001,7 +1976,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .colbar-item:hover { background: var(--state-hover); }
 .colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.colbar-item__ic { flex: 0 0 auto; font-size: 20px; color: var(--text-3); }
+.colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-3); }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Sur l'écran : liseré plein + coche. Retirée : pointillé et texte atténué —
@@ -2126,7 +2101,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-weight: var(--graisse-note);
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--text-3, var(--text-2));
+  color: var(--text-3);
 }
 .reason-input {
   display: block;
@@ -3301,8 +3276,19 @@ a,
      les onglets 8 px à droite de l'axe réel. */
   justify-content: safe center;
   padding-inline-end: 16px;
+  /* LA RANGÉE SE PLIE PLUTÔT QUE DE DÉFILER (26/08). Elle ne défilait pas par
+     choix : `overflow-x: auto` était le dernier recours, et il tenait tant que
+     la barre portait sept onglets. À neuf — « Mon travail » et « Pilotage » se
+     sont ajoutés — il faut 1 279 px pour 1 072 disponibles sur une fenêtre de
+     1 440 : « Réglages » se posait à 175 px HORS de l'écran, derrière une
+     barre de défilement horizontale que rien n'annonce. Un onglet qu'on ne
+     voit pas est un écran qui n'existe pas.
+     Le pli coûte une rangée de 40 px, et seulement quand la place manque
+     vraiment. Le défilement reste en dernier recours pour le cas où un seul
+     onglet serait plus large que la barre. */
+  flex-wrap: wrap;
+  row-gap: 4px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 /* ET IL FAUT RENDRE LA MARGE AUTOMATIQUE, sans quoi tout ce qui précède ne
    sert à rien. Sur la rangée pleine, les onglets tiennent la droite par
@@ -3493,7 +3479,7 @@ a,
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.nav-switch-btn .material-symbols-outlined { font-size: 20px; flex: 0 0 auto; }
+.nav-switch-btn .material-symbols-outlined { font-size: var(--ic); flex: 0 0 auto; }
 /* Marque dessinée (Fiverr) : même encombrement qu'un glyphe de la police, pour
    qu'elle s'aligne sur les six autres onglets sans décaler leur rangée. */
 .nav-switch-mark { width: 20px; height: 20px; flex: 0 0 auto; display: block; }
@@ -3612,7 +3598,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    à lire, rien à fermer — c'est l'écran lui-même qui porte la réponse. */
 @keyframes recharge-fait { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
 .recharge.est-fait { color: var(--primary); }
-.recharge.est-fait .recharge-ic { animation: recharge-fait .32s var(--ease); }
+.recharge.est-fait .recharge-ic { animation: recharge-fait var(--dur-3) var(--ease); }
 @media (prefers-reduced-motion: reduce) {
   .recharge[aria-busy="true"] .recharge-ic,
   .recharge.est-fait .recharge-ic { animation: none; }
@@ -3981,7 +3967,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 }
 .pj-tool:hover { background: var(--state-hover); color: var(--pj-ink); }
 .pj-tool--icon { width: 40px; padding: 0; justify-content: center; }
-.pj-tool .material-symbols-outlined { font-size: 20px; }
+.pj-tool .material-symbols-outlined { font-size: var(--ic); }
 
 /* ------------------------------------------------ Onglets */
 .pj-tabs {
@@ -4658,10 +4644,10 @@ body.view-plein .fiverr-tool { display: none !important; }
   /* Fermé : visibility retire le panneau du focus clavier (posée APRÈS la
      glissade de sortie pour ne pas couper l'animation). */
   visibility: hidden;
-  transition: transform .28s var(--ease), visibility 0s .28s;
+  transition: transform var(--dur-3) var(--ease), visibility 0s var(--dur-3);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.dd-panel.open { transform: translateX(0); visibility: visible; transition: transform .28s var(--ease); }
+.dd-panel.open { transform: translateX(0); visibility: visible; transition: transform var(--dur-3) var(--ease); }
 .dd-close {
   position: absolute;
   top: 12px;
@@ -4843,7 +4829,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   color: var(--surface);
 }
 .dd-done:hover { filter: brightness(1.06); }
-.dd-done .material-symbols-outlined { font-size: 20px; }
+.dd-done .material-symbols-outlined { font-size: var(--ic); }
 .dd-open {
   padding: 0 16px;
   border: 1px solid var(--pj-border);
@@ -4851,7 +4837,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   color: var(--pj-ink-2);
 }
 .dd-open:hover { background: var(--pj-bg); color: var(--pj-ink); }
-.dd-open .material-symbols-outlined { font-size: 16px; }
+.dd-open .material-symbols-outlined { font-size: var(--ic-serre); }
 
 /* ------------------------------------------------ Réglages Machines */
 .mac-card { width: min(640px, 100%); }
@@ -4973,7 +4959,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 }
 
 .reg-head { display: flex; align-items: flex-start; gap: 12px; }
-.reg-head__ic { font-size: 24px; color: var(--primary); }
+.reg-head__ic { font-size: var(--ic-grand); color: var(--primary); }
 .reg-head__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.02em; color: var(--text-1); }
 .reg-head__sub { margin: 2px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
 
@@ -4990,7 +4976,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 .reg-card__head { display: flex; align-items: flex-start; gap: 12px; }
 /* Icône de section : décorative, donc grise. Dans la charte la couleur ne
    signale qu'un état — un vert ici laisserait croire à un statut « OK ». */
-.reg-card__ic { font-size: 20px; color: var(--text-2); }
+.reg-card__ic { font-size: var(--ic); color: var(--text-2); }
 .reg-card__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
 .reg-card__desc { margin: 4px 0 0; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
 
@@ -5124,7 +5110,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   position: absolute;
   inset: 0;
   background: rgba(16, 24, 40, .45);
-  animation: ldScrim var(--dur-2, .18s) var(--ease, ease) both;
+  animation: ldScrim var(--dur-2) var(--ease) both;
 }
 @keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
 .ligne-drawer__card {
@@ -5138,7 +5124,7 @@ body.view-plein .fiverr-tool { display: none !important; }
   border-radius: var(--arrondi-carte);
   overflow: hidden;
   box-shadow: 0 24px 70px rgba(16, 24, 40, .30);
-  animation: ldSlide var(--dur-3, .24s) var(--ease, ease) both;
+  animation: ldSlide var(--dur-3) var(--ease) both;
 }
 @keyframes ldSlide { from { transform: translateY(14px) scale(.99); opacity: .4; } to { transform: none; opacity: 1; } }
 /* Téléphone : la fiche prend tout l'écran, une marge de bulle ne servirait
@@ -5259,7 +5245,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
   font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: #202939;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ld-volet__chevron { flex: none; color: #98a2b3; transition: transform var(--dur-2, .18s) var(--ease, ease); }
+.ld-volet__chevron { flex: none; color: #98a2b3; transition: transform var(--dur-2) var(--ease); }
 .ld-volet[open] > .ld-volet__tete { border-bottom: 1px solid #eef0f3; border-radius: 12px 12px 0 0; }
 .ld-volet[open] > .ld-volet__tete .ld-volet__chevron { transform: rotate(180deg); }
 /* Ouvert, la valeur laisse la place au champ : elle serait écrite deux fois. */
@@ -5351,7 +5337,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
   font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte); cursor: pointer;
 }
 .ld-act:hover { background: var(--state-hover); border-color: var(--text-2); }
-.ld-act .material-symbols-outlined { font-size: 16px; }
+.ld-act .material-symbols-outlined { font-size: var(--ic-serre); }
 @media (max-width: 700px) { .ld-act-label { display: none; } }
 
 /* DÉTAIL COMPLET DE LA DEMANDE — tout est modifiable.
@@ -5795,7 +5781,7 @@ summary:focus-visible {
 .ordre-reset,
 .colbar-item,
 .menu-item,
-.ld-act { transition: transform .09s var(--ease), background var(--dur-1) var(--ease),
+.ld-act { transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
             border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
 /* Le doigt qui GLISSE une carte n'appuie pas dessus : sans ça, l'enfoncement
    se posait au début de chaque prise et luttait avec le fantôme. */
@@ -5807,7 +5793,7 @@ body.dragging-active .pcard:active { border-color: var(--border); }
    seulement de répondre sous le doigt, comme le reste. */
 .send-btn:active, .del-btn:active, .dup-btn:active { transform: scale(.92); }
 .send-btn, .del-btn, .dup-btn { transition: opacity var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
-            background var(--dur-1) var(--ease), transform .09s var(--ease); }
+            background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
 
 /* ===========================================================================
    MON TRAVAIL — l'écran de celui qui produit (§25).

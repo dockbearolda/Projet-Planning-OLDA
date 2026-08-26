@@ -269,7 +269,7 @@ function buildStatic() {
   bt.append(el('p', 'cl-brand__sub', ''));
   brand.append(bt);
 
-  const search = el('div', 'cl-search');
+  const search = el('div', 'champ-recherche cl-search');
   search.append(ic('search', 'cl-search__ic'));
   const input = el('input', 'cl-search__input');
   input.type = 'text';

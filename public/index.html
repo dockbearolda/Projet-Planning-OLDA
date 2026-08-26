@@ -87,7 +87,7 @@
         <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
       </button>
 
-      <div class="grid-search" id="gridSearch">
+      <div class="champ-recherche grid-search" id="gridSearch">
         <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
         <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
         <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
@@ -120,11 +120,15 @@
           <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
           <span class="nav-switch-label">Planning</span>
         </a>
-        <!-- `bar_chart` n'est PAS dans la police (91 glyphes) : on reprend
-             `dashboard`, qui y est, plutôt qu'un nom qui s'afficherait en
-             texte tronqué à sa première lettre, sans erreur ni message. -->
+        <!-- `bar_chart` n'est PAS dans la police : le nom absent se rendrait en
+             TEXTE, sans erreur ni message. On avait donc repris `dashboard` —
+             mais l'onglet d'à côté le portait déjà, et deux onglets voisins
+             avec le même pictogramme ne se distinguent plus que par leur mot.
+             `request_quote` est dans la police (vérifié au rendu : un glyphe
+             présent mesure une case, un nom absent mesure sa longueur) et il
+             dit ce que cet écran montre — l'argent, la marge, ce qui bloque. -->
         <a class="nav-switch-btn nav-switch-btn--pilotage" id="viewPilotage" href="#pilotage" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+          <span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
           <span class="nav-switch-label">Pilotage</span>
         </a>
         <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">

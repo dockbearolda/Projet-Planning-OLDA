@@ -5114,7 +5114,11 @@ function attachTip(el, text) {
 
 // Filets de sécurité : une ancre peut disparaître sans pointerleave (ligne
 // re-rendue, grille défilée, onglet changé) — la bulle resterait orpheline.
-window.addEventListener('scroll', hideTip, true);
+// EN PASSIF : posé en capture sur `window`, cet écouteur voit TOUS les
+// défilements de l'application. Sans la mention, Chrome doit attendre qu'il
+// ait rendu la main avant de composer l'image suivante — alors qu'il ne fait
+// que refermer une infobulle et ne peut, par nature, pas annuler le geste.
+window.addEventListener('scroll', hideTip, { capture: true, passive: true });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); }, true);
 
 // --- Menu déroulant réutilisable (type / responsable / sous-étape) ---------
@@ -7084,7 +7088,7 @@ function openPalette() {
   requestAnimationFrame(() => $palette.classList.add('open'));
 }
 
-window.addEventListener('resize', () => { if (paletteOpen) positionPalette(); });
+window.addEventListener('resize', () => { if (paletteOpen) positionPalette(); }, { passive: true });
 
 function closePalette() {
   if (!paletteOpen) return;
@@ -7514,8 +7518,20 @@ if ($shell && $sidebarResizer) {
   // La fenêtre qui rétrécit reprend de la largeur à la barre : un rail qui
   // tenait tout à l'heure peut ne plus tenir. On le resserre plutôt que de
   // laisser réapparaître la barre de défilement.
-  window.addEventListener('resize', () => {
-    const actuel = Math.round(document.getElementById('sidebar').getBoundingClientRect().width);
+  // UNE FOIS PAR IMAGE, PAS UNE FOIS PAR ÉVÈNEMENT. Le resserrement lit une
+  // géométrie, écrit une largeur, relit, réécrit — jusqu'à dix-huit fois. Chaque
+  // lecture qui suit une écriture force Chrome à recalculer la mise en page
+  // AVANT de répondre. Or `resize` part en rafale tant qu'on tire le bord de la
+  // fenêtre : c'était donc jusqu'à un millier de calculs de mise en page par
+  // seconde, pour un réglage qui ne se voit qu'une fois le geste fini.
+  // `requestAnimationFrame` fond la rafale en une seule passe par image — et
+  // c'est le moment où le navigateur allait recalculer de toute façon.
+  let resserrementPrevu = false;
+  const resserrerLeRail = () => {
+    resserrementPrevu = false;
+    const rail = document.getElementById('sidebar');
+    if (!rail) return;
+    const actuel = Math.round(rail.getBoundingClientRect().width);
     if (!actuel) return;                 // rail replié : rien à resserrer
     if (!barreDeborde()) return;
     let w = actuel;
@@ -7524,7 +7540,12 @@ if ($shell && $sidebarResizer) {
       $shell.style.setProperty('--sidebar-w', Math.max(SIDEBAR_MIN, w) + 'px');
     }
     try { localStorage.setItem(SIDEBAR_W_KEY, String(Math.max(SIDEBAR_MIN, w))); } catch (_) {}
-  });
+  };
+  window.addEventListener('resize', () => {
+    if (resserrementPrevu) return;
+    resserrementPrevu = true;
+    requestAnimationFrame(resserrerLeRail);
+  }, { passive: true });
 
   attachTip($sidebarResizer, 'Glisser pour régler la largeur');
   $sidebarResizer.addEventListener('pointerdown', (e) => {
@@ -8113,5 +8134,19 @@ function appliquerDroits() {
 // Comptes éteints, cet appel rend `{ comptes: false }` et ne fait rien d'autre.
 relireSession()
   .catch(() => { /* comptes injoignables : on démarre comme avant */ })
-  .then(() => { appliquerDroits(); demarrerAvecReprise(); });
+  .then(() => {
+    appliquerDroits();
+    // ON NE CHARGE RIEN DERRIÈRE LE VOILE (26/08). Le commentaire ci-dessus
+    // disait déjà pourquoi l'ordre compte — mais l'appel partait quand même,
+    // que quelqu'un soit connecté ou non. Mesuré sur un poste verrouillé :
+    // huit requêtes, huit 401, neuf erreurs rouges dans la console, sur le
+    // PREMIER écran que voit celui qui arrive le matin. Et sur une liaison
+    // lente, huit allers-retours dépensés à ne rien ramener.
+    // La connexion recharge la page (voir session.js) : c'est elle qui lance
+    // le chargement, une fois qu'on sait qui est là et ce qu'il a le droit de
+    // lire. Comptes éteints, `moi()` vaut null mais `comptesActifs()` aussi —
+    // et on démarre exactement comme avant.
+    if (comptesActifs() && !moi()) return;
+    demarrerAvecReprise();
+  });
 surChangement(appliquerDroits);

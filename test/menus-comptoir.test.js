@@ -465,8 +465,15 @@ const declencheur = reglesDe(PONT, '.menu-declencheur');
 // diverger de 2,4 px. Le déclencheur prend désormais la boîte NOMMÉE de
 // l'application, exactement comme le champ, le bouton et la zone de texte :
 // il n'y a plus qu'un seul endroit où cette hauteur existe.
-assert.strictEqual(declencheur['min-height'], 'var(--ctrl-h,50px)',
+// SANS REPLI (26/08). La valeur s'écrivait « var(--ctrl-h,50px) » : le jeton,
+// puis le même nombre écrit à côté. Un repli n'est lu que si la charte n'est
+// pas chargée — auquel cas l'écran se rendrait dans l'ANCIENNE échelle sans que
+// rien ne le signale. On exige donc le jeton NU, et on vérifie qu'aucun chiffre
+// ne subsiste dans la valeur : une hauteur, un seul endroit, pour de bon.
+assert.strictEqual(declencheur['min-height'], 'var(--ctrl-h)',
   'le déclencheur prend la boîte nommée, pas une hauteur à lui');
+assert.ok(!/\d/.test(declencheur['min-height'] || ''),
+  '… et aucun nombre ne double le jeton, pas même en repli');
 assert.ok(/--ctrl-h:\s*\d+px/.test(fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8')),
   '… et cette boîte est déclarée une seule fois, dans la charte');
 // EN RAPPORT ET NON EN « normal » : Chrome ne calcule pas la boîte d'un <input>

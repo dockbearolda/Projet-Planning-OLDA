@@ -63,10 +63,22 @@ assert.ok(!/window\.innerWidth/.test(placer[0]),
 // Il resterait planté pendant que son champ s'en va. On le referme.
 // En CAPTURE (`true`) : le défilement d'un conteneur ne remonte PAS jusqu'au
 // document, et <main> est précisément un conteneur.
-assert.ok(/window\.addEventListener\('scroll',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\},true\)/.test(PONT),
-  'un défilement referme les menus, et l’écoute est en capture');
-assert.ok(/window\.addEventListener\('resize',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\}\)/.test(PONT),
-  '… et un redimensionnement aussi');
+// ET EN PASSIF (26/08). L'écoute est posée sur `window`, en capture : elle voit
+// donc CHAQUE défilement de l'écran. Sans la mention `passive`, Chrome doit
+// attendre que le rappel ait rendu la main avant de composer l'image suivante,
+// au cas où il appellerait `preventDefault()` — ce qu'il ne fait pas et ne peut
+// pas faire ici. C'est une image d'attente offerte à chaque défilement, pour
+// rien.
+const ecouteScroll = PONT.match(/window\.addEventListener\('scroll',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\},([^)]*)\)/);
+assert.ok(ecouteScroll, 'un défilement referme les menus');
+assert.ok(/capture:\s*true/.test(ecouteScroll[1]) || ecouteScroll[1].trim() === 'true',
+  '… et l’écoute est en capture — un conteneur qui défile ne remonte pas au document');
+assert.ok(/passive:\s*true/.test(ecouteScroll[1]),
+  '… et en passif : elle n’annule rien, elle ne doit donc rien faire attendre');
+const ecouteResize = PONT.match(/window\.addEventListener\('resize',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\}(?:,([^)]*))?\)/);
+assert.ok(ecouteResize, '… et un redimensionnement aussi');
+assert.ok(/passive:\s*true/.test(ecouteResize[1] || ''),
+  '… lui aussi en passif');
 
 // --- 4. Le bloc CSS vit dans un littéral de gabarit ------------------------
 // UN ACCENT GRAVE Y REFERME LA CHAÎNE. C'est arrivé en écrivant ce correctif :

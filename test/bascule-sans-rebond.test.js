@@ -100,8 +100,16 @@ assert.ok(/pointer-events:\s*none/.test(attente[1]),
   'on ne doit pas pouvoir ouvrir une commande de la famille qu’on vient de quitter');
 // Le délai REMPLACE le minuteur qu'il aurait fallu armer puis annuler en JS :
 // une réponse en 30 ms ne fait alors rien clignoter du tout.
-const delai = attente[1].match(/transition:[^;]*?(\d+)ms/);
-assert.ok(delai && Number(delai[1]) >= 120,
+// LE DÉLAI EST UN JETON DEPUIS LE 26/08 : il était écrit « 160ms » au milieu
+// d'une transition, seul nombre de tout le fichier qui ne sortait pas de la
+// charte. On vérifie donc les DEUX maillons — la règle prend bien le jeton, et
+// le jeton vaut bien assez pour couvrir une réponse rapide.
+assert.ok(/transition:[^;]*var\(--delai-aveu\)/.test(attente[1]),
+  'le fondu d’attente prend le délai NOMMÉ de la charte, pas un nombre posé là');
+const jeton = lire('public/charte.css').match(/--delai-aveu:\s*([\d.]+)(m?s)/);
+assert.ok(jeton, '`--delai-aveu` est déclaré dans la charte');
+const ms = jeton[2] === 's' ? Number(jeton[1]) * 1000 : Number(jeton[1]);
+assert.ok(ms >= 120,
   'le fondu d’attente doit être RETARDÉ (≥ 120 ms) : sinon une réponse rapide fait clignoter l’écran');
 // L'opacité, jamais la mise en page : sur une étape de 400 lignes, une
 // propriété qui repasse par le layout coûterait le prix de la liste entière.
