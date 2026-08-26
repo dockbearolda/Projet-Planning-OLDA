@@ -51,6 +51,7 @@ let table = { familles: {}, emplacements: [], tailles: {} };
 let famille = 'Homme';
 let emplacement = 'Coeur';
 let etat = '';                 // ce que la dernière écriture a donné, dit DANS l'écran
+let colonnes = 1;              // largeur de la grille affichée, pour se déplacer dedans
 
 // Les familles sont celles que la vendeuse peut choisir au comptoir
 // (textile-catalog.js — GENRES_SAISIE et FAMILLES_ACCESSOIRE). Une famille
@@ -200,7 +201,8 @@ function render() {
   // références.
   const cadre = el('div', 'tl-cadre');
   const grille = el('div', 'tl-grille');
-  grille.style.setProperty('--tl-cols', String(tailles.length));
+  colonnes = tailles.length;
+  grille.style.setProperty('--tl-cols', String(colonnes));
   grille.append(el('span', 'tl-coin', 'Référence'));
   for (const t of tailles) grille.appendChild(el('span', 'tl-tete', t));
   for (const ligne of lignes) {
@@ -238,7 +240,9 @@ function pied() {
   const { refs, mesures } = compter();
   p.textContent = `${refs} référence${refs > 1 ? 's' : ''} renseignée${refs > 1 ? 's' : ''}, `
     + `${mesures} largeur${mesures > 1 ? 's' : ''} au total. `
-    + 'Une case vide veut dire « pas encore mesuré ».';
+    + 'Une case vide veut dire « pas encore mesuré ». '
+    + 'Entrée et les flèches haut/bas descendent la colonne, la tabulation va de côté, '
+    + 'et un bloc copié depuis un tableur se colle d’un coup.';
 }
 
 // --- Écriture ----------------------------------------------------------------
@@ -272,12 +276,97 @@ async function enregistrer(input) {
   pied();
 }
 
+// LA SAISIE SE FAIT À LA MAIN, ET C'EST LE MÉTIER : personne d'autre que
+// l'atelier ne connaît ces largeurs. Le tableau en compte des centaines, alors
+// l'écran doit se comporter comme un tableur — c'est ce que faisait le site
+// d'avant, et le lui retirer en le reprenant aurait été un recul.
+//
+// LES FLÈCHES HAUT/BAS DÉPLACENT, ELLES N'INCRÉMENTENT PLUS. Sur un champ
+// numérique, une flèche change la valeur : de quoi corriger une mesure sans
+// s'en apercevoir, en croyant simplement descendre d'une ligne. Gauche et
+// droite, elles, restent au curseur — c'est ce qu'on veut en corrigeant un
+// chiffre — et la tabulation suffit pour aller de côté.
+function cases() {
+  return [...ROOT.querySelectorAll('.tl-champ')];
+}
+function deplacer(champ, dLigne, dCol) {
+  const tous = cases();
+  const n = tous.indexOf(champ);
+  if (n < 0 || !colonnes) return;
+  const col = (n % colonnes) + dCol;
+  if (col < 0 || col >= colonnes) return;      // on ne repasse pas sur la ligne d'à côté
+  const cible = tous[(Math.floor(n / colonnes) + dLigne) * colonnes + col];
+  if (!cible) return;
+  cible.focus();
+  cible.select();
+}
+
+// COLLER UN BLOC DEPUIS UN TABLEUR. C'est le geste qui transforme une soirée de
+// saisie en une sélection : les mesures existent souvent déjà quelque part.
+// Une case VIDE dans le bloc ne touche à rien : dans une feuille, un blanc veut
+// dire « pas mesuré », pas « efface ce que tu as ». Effacer reste un geste
+// délibéré, case par case.
+async function collerBloc(depuis, texte) {
+  const lignes = texte.replace(/\r/g, '').split('\n');
+  while (lignes.length > 1 && lignes[lignes.length - 1] === '') lignes.pop();
+  const bloc = lignes.map((l) => l.split('\t'));
+  const tous = cases();
+  const n = tous.indexOf(depuis);
+  if (n < 0 || !colonnes) return;
+  const ligne0 = Math.floor(n / colonnes);
+  const col0 = n % colonnes;
+
+  const aEcrire = [];
+  bloc.forEach((valeurs, dl) => valeurs.forEach((v, dc) => {
+    const val = String(v).trim().replace(',', '.');
+    if (!val) return;
+    const col = col0 + dc;
+    if (col >= colonnes) return;               // le bloc est plus large que la grille
+    const cible = tous[(ligne0 + dl) * colonnes + col];
+    if (cible && cible.value !== val) aEcrire.push([cible, val]);
+  }));
+  if (!aEcrire.length) return;
+
+  // EN SÉQUENCE, et on dit où on en est : cent cases, c'est cent allers-retours,
+  // et un écran muet pendant cinq secondes passe pour un écran cassé.
+  let faites = 0;
+  for (const [cible, val] of aEcrire) {
+    cible.value = val;
+    // eslint-disable-next-line no-await-in-loop
+    await enregistrer(cible);
+    // `enregistrer` vide `etat` quand ça passe et y met le refus sinon : un
+    // texte ici veut dire que la case n'est pas enregistrée. On s'arrête, elle
+    // se lit, et les suivantes ne partent pas dans le vide.
+    if (etat) return;
+    faites += 1;
+    etat = `${faites} / ${aEcrire.length} largeurs enregistrées…`;
+    pied();
+  }
+  etat = '';
+  pied();
+}
+
 function wire() {
   // UN SEUL ÉCOUTEUR pour toute la grille : ses champs sont refaits à chaque
   // changement de famille ou d'emplacement.
   ROOT.addEventListener('change', (e) => {
     const champ = e.target.closest('.tl-champ');
     if (champ) enregistrer(champ);
+  });
+  ROOT.addEventListener('keydown', (e) => {
+    const champ = e.target.closest('.tl-champ');
+    if (!champ) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); deplacer(champ, -1, 0); }
+    else if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); deplacer(champ, 1, 0); }
+  });
+  ROOT.addEventListener('paste', (e) => {
+    const champ = e.target.closest('.tl-champ');
+    if (!champ) return;
+    const texte = (e.clipboardData || window.clipboardData).getData('text');
+    // Une valeur seule : le collage normal du navigateur fait déjà l'affaire.
+    if (!/[\t\n]/.test(texte)) return;
+    e.preventDefault();
+    collerBloc(champ, texte);
   });
   ROOT.addEventListener('click', (e) => {
     const f = e.target.closest('[data-famille]');

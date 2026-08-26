@@ -270,6 +270,40 @@ const TE = global.window.TextileEngine;
   assert.match(ECRAN, /addEventListener\('change'/);
   assert.ok(!/addEventListener\('input'/.test(ECRAN));
 
+  // --- 7 bis. LA SAISIE SE COMPORTE COMME UN TABLEUR ------------------------
+  // Ces largeurs se MESURENT : personne ne peut les déduire, il faut les
+  // rentrer. Le tableau en compte des centaines — l'écran doit donc se saisir
+  // au clavier et accepter un bloc collé, comme le site d'avant. Le lui retirer
+  // en le reprenant aurait été un recul.
+  {
+    // LES FLÈCHES DÉPLACENT, ELLES N'INCRÉMENTENT PLUS. Sur un champ numérique,
+    // une flèche change la VALEUR : de quoi corriger une mesure sans s'en
+    // apercevoir, en croyant descendre d'une ligne.
+    const clavier = ECRAN.slice(ECRAN.indexOf("addEventListener('keydown'"));
+    const corps = clavier.slice(0, clavier.indexOf('});'));
+    assert.match(corps, /ArrowUp[\s\S]*preventDefault/, '« haut » ne touche pas à la valeur');
+    assert.match(corps, /'ArrowDown' \|\| e\.key === 'Enter'/,
+      '« bas » et « Entrée » descendent la colonne, comme dans un tableur');
+    // Gauche/droite restent au CURSEUR — c'est ce qu'on veut en corrigeant un
+    // chiffre — et la tabulation suffit pour aller de côté.
+    assert.ok(!/ArrowLeft|ArrowRight/.test(corps),
+      'gauche et droite restent au curseur : on corrige un chiffre avec');
+  }
+  {
+    const coller = ECRAN.slice(ECRAN.indexOf('async function collerBloc('));
+    const corps = coller.slice(0, coller.indexOf('\n}'));
+    assert.match(corps, /split\('\\t'\)/, 'un bloc de tableur se colle d’un coup');
+    // UNE CASE VIDE DU BLOC NE TOUCHE À RIEN : dans une feuille, un blanc veut
+    // dire « pas mesuré », pas « efface ce que tu as ». Effacer reste un geste
+    // délibéré, case par case.
+    assert.match(corps, /if \(!val\) return;/, 'un blanc du bloc n’efface pas la case');
+    assert.match(corps, /col >= colonnes/, 'un bloc plus large que la grille ne déborde pas sur la ligne d’à côté');
+    // Cent cases, c'est cent allers-retours : un écran muet passe pour cassé.
+    assert.match(corps, /largeurs enregistrées/, 'le compte avance pendant le collage');
+    assert.match(corps, /if \(etat\) return;/,
+      'un refus arrête le collage — les suivantes ne partent pas dans le vide');
+  }
+
   // --- 8. UN SEUL SÉLECTEUR SEGMENTÉ POUR TOUTE L'APPLICATION ---------------
   // Deux écrans à un clic l'un de l'autre doivent donner le MÊME composant.
   assert.match(CHARTE, /^\.segmente \{/m, 'le composant est monté dans la charte partagée');
