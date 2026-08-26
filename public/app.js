@@ -7395,6 +7395,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'reglages') return mountReglages();
   if (viewMode === 'montravail') return mountMonTravail();
   if (viewMode === 'pilotage') return mountPilotage();
+  if (viewMode === 'stock') return mountStock();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7469,9 +7470,11 @@ const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $viewMonTravail = document.getElementById('viewMonTravail');
 const $viewPilotage = document.getElementById('viewPilotage');
+const $viewStock = document.getElementById('viewStock');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
+const $stock = document.getElementById('stock');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7579,6 +7582,19 @@ function mountClients() {
 // MON TRAVAIL — même montage paresseux que les autres vues : le module ne part
 // du serveur qu'au premier passage sur l'onglet, et l'écran de l'opérateur ne
 // pèse rien sur le démarrage de ceux qui ne l'ouvrent jamais.
+let stkLoading = null;
+let stkModule = null;
+function mountStock() {
+  if (!$stock) return;
+  if (!stkLoading) {
+    stkLoading = import('./stock.js')
+      .then((m) => { stkModule = m; return m.initStock($stock); })
+      .catch((err) => { stkLoading = null; stkModule = null; reportError(err); });
+  } else if (stkModule && stkModule.refreshStock) {
+    stkModule.refreshStock();
+  }
+}
+
 let pilLoading = null;
 let pilModule = null;
 function mountPilotage() {
@@ -7711,6 +7727,7 @@ function setViewMode(mode) {
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
+  if ($viewStock) $viewStock.classList.toggle('active', mode === 'stock');
   if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
@@ -7729,12 +7746,14 @@ function setViewMode(mode) {
   const reglages = mode === 'reglages';
   const montravail = mode === 'montravail';
   const pilotage = mode === 'pilotage';
+  const stock = mode === 'stock';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($montravail) $montravail.hidden = !montravail;
   if ($pilotage) $pilotage.hidden = !pilotage;
+  if ($stock) $stock.hidden = !stock;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7752,6 +7771,7 @@ function setViewMode(mode) {
   if (reglages) mountReglages();
   if (montravail) mountMonTravail();
   if (pilotage) mountPilotage();
+  if (stock) mountStock();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7769,7 +7789,7 @@ const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
-  '#pilotage': 'pilotage',
+  '#pilotage': 'pilotage', '#stock': 'stock',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {
@@ -7899,6 +7919,9 @@ function appliquerDroits() {
   // Direction. Sans comptes, personne ne le voit : il n'aurait aucun sens
   // d'exposer le CA sur un poste qui ne sait pas qui l'utilise.
   onglet($viewPilotage, comptesActifs() && puisJe('marge'));
+  // Le stock intéresse l'atelier qui sort la marchandise ET la boutique qui la
+  // promet : on l'ouvre à qui a l'une OU l'autre capacité.
+  onglet($viewStock, puisJe('production') || puisJe('clients'));
   onglet($viewReglages, puisJe('reglages'));
   onglet($viewClients, puisJe('clients'));
   onglet($viewProjet, puisJe('clients'));
@@ -7920,7 +7943,8 @@ function appliquerDroits() {
 
   // L'onglet ouvert est peut-être celui qu'on vient de fermer : on ne laisse
   // personne devant un écran qu'il n'a plus le droit de lire.
-  const interdit = (location.hash === '#pilotage' && !puisJe('marge'))
+  const interdit = (location.hash === '#stock' && !puisJe('production') && !puisJe('clients'))
+    || (location.hash === '#pilotage' && !puisJe('marge'))
     || (location.hash === '#reglages' && !puisJe('reglages'))
     || (location.hash === '#clients' && !puisJe('clients'))
     || (location.hash === '#nouveau-projet' && !puisJe('clients'));

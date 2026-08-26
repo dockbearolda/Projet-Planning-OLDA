@@ -147,6 +147,132 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_request ON tasks (request_id, ordre);
 
+-- LES FOURNISSEURS (§17). Le seul fournisseur que le code connaissait était
+-- TopTex, et seulement comme source de couleurs textile.
+-- Down : DROP TABLE suppliers;
+CREATE TABLE IF NOT EXISTS suppliers (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  nom         text NOT NULL,
+  contact     text,
+  email       text,
+  telephone   text,
+  -- Le DÉLAI MOYEN est ce qui permet de répondre « quand ? » sans appeler.
+  -- `transport` : 'aerien' / 'maritime' (§18) — à Saint-Martin, c'est la
+  -- différence entre trois jours et six semaines, donc entre deux métiers.
+  delai_jours int,
+  transport   text,
+  notes       text,
+  deleted_at  timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- LE CATALOGUE PRODUITS (§14). `catalog.json` proposait des familles et des
+-- libellés ; il n'y avait aucune table produit — donc ni référence interne, ni
+-- référence fournisseur, ni prix d'achat, ni poids, ni stock.
+--
+-- Le produit porte ce qui ne dépend NI de la couleur NI de la taille. Tout ce
+-- qui en dépend descend dans `variants` : c'est la seule façon d'avoir un stock
+-- juste, parce qu'on ne commande pas « des T-shirts », on commande des T-shirts
+-- noirs en L.
+-- Down : DROP TABLE variants; DROP TABLE products;
+CREATE TABLE IF NOT EXISTS products (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ref_interne   text,                     -- la référence OLDA
+  ref_fournisseur text,
+  supplier_id   uuid,
+  designation   text NOT NULL,
+  famille       text,                     -- T-shirt, Tasse, Casquette, Goodies, Signalétique…
+  marque        text,
+  prix_achat    numeric(12,2),
+  prix_vente    numeric(12,2),
+  poids_g       int,
+  technique     text,                     -- dtf / uv / laser / broderie…
+  notes         text,
+  actif         boolean NOT NULL DEFAULT true,
+  deleted_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_products_famille ON products (famille);
+
+-- UNE VARIANTE = une référence × une couleur × une taille. C'est CE niveau qui
+-- porte le stock (§16).
+--
+-- `stock_reel` est ce qu'il y a sur l'étagère ; `stock_reserve` ce qui est déjà
+-- promis à une commande validée. Le DISPONIBLE est leur différence, et il ne se
+-- range pas : rangé, il se désynchronise au premier des deux qui bouge.
+-- Down : DROP TABLE variants;
+CREATE TABLE IF NOT EXISTS variants (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id    uuid NOT NULL,
+  couleur       text,
+  taille        text,
+  stock_reel    int NOT NULL DEFAULT 0,
+  stock_reserve int NOT NULL DEFAULT 0,
+  -- « Possibilité d'identifier les couleurs BEST SELLER » : ce qu'on remet en
+  -- rayon sans réfléchir, et qu'on ne doit jamais laisser tomber à zéro.
+  best_seller   boolean NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_variants_product ON variants (product_id);
+
+-- LE JOURNAL DU STOCK. Sans lui, « il en manque trois » n'a aucune réponse :
+-- on ne saurait pas si c'est une casse, une sortie oubliée ou une erreur de
+-- comptage. Une ligne par mouvement, jamais de modification en place.
+-- Down : DROP TABLE stock_moves;
+CREATE TABLE IF NOT EXISTS stock_moves (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  variant_id  uuid NOT NULL,
+  delta       int NOT NULL,               -- +12 réception, −3 sortie atelier
+  motif       text NOT NULL,              -- reception / sortie / inventaire / casse
+  request_id  uuid,                       -- la commande qui l'a consommé, s'il y en a une
+  qui         text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_stock_moves_variant ON stock_moves (variant_id, created_at DESC);
+
+-- LES COMMANDES FOURNISSEUR (§18). Les sous-étapes « À commander » et « Attente
+-- marchandise » disaient qu'une commande ATTEND de la marchandise ; elles ne
+-- disaient pas ce qui a été commandé, à qui, ni où c'est.
+-- Down : DROP TABLE purchase_lines; DROP TABLE purchase_orders;
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero      text,
+  supplier_id uuid,
+  -- a_commander / commande / expedie / transit / metropole / recu / controle
+  statut      text NOT NULL DEFAULT 'a_commander',
+  transport   text,                       -- aerien / maritime
+  facture_ref text,
+  montant     numeric(12,2),
+  frais_port  numeric(12,2),
+  notes       text,
+  commande_le date,
+  recu_le     date,
+  deleted_at  timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_po_statut ON purchase_orders (statut);
+
+-- Une ligne d'achat. `request_id` est ce qui permet de REGROUPER les besoins de
+-- plusieurs dossiers dans une seule commande fournisseur — c'est la demande
+-- explicite du §18, et c'est aussi ce qui fait qu'à la réception on sait quel
+-- dossier débloquer.
+CREATE TABLE IF NOT EXISTS purchase_lines (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id    uuid NOT NULL,
+  variant_id  uuid,
+  request_id  uuid,
+  designation text NOT NULL,
+  quantite    int NOT NULL DEFAULT 1,
+  prix_unitaire numeric(12,2),
+  recu        int NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pl_order ON purchase_lines (order_id);
+
 -- Clé/valeur applicative : sert de garde d'idempotence aux migrations de données
 -- ponctuelles (ex. bascule du pipeline linéaire vers le modèle « familles »).
 CREATE TABLE IF NOT EXISTS app_meta (
