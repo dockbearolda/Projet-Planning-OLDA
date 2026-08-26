@@ -6960,14 +6960,32 @@ const PALETTE_MAX = 60;       // plafond d'affichage (au-delà : « affinez »)
 
 // Ordre d'affichage des groupes = ordre du pipeline (familles puis spécial).
 const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.slug, i]));
+// Les deux natures de résultat qui ne sont pas des commandes. Elles portent un
+// « stage » à elles pour que le groupement existant les range sans savoir
+// qu'elles sont d'une autre nature.
+const GROUPE_RECHERCHE = { __clients: 'Clients', __produits: 'Catalogue' };
 
 // Interroge le serveur. Le jeton écarte les réponses dépassées : sur une frappe
 // rapide, celle de « po » peut revenir APRÈS celle de « polo » et réafficher les
 // résultats d'avant sous les doigts de celui qui cherche.
 function rechercheServeur(texte) {
   const token = ++rechercheToken;
-  return api('GET', `/api/requests/recherche?q=${encodeURIComponent(texte)}`)
-    .then((data) => (token === rechercheToken ? (Array.isArray(data) ? data : []) : null));
+  return api('GET', `/api/recherche?q=${encodeURIComponent(texte)}`)
+    .then((data) => {
+      if (token !== rechercheToken) return null;
+      if (!data || typeof data !== 'object') return [];
+      // UNE SEULE LISTE, MARQUÉE. Le rendu groupe déjà par `stage` : on donne
+      // donc aux clients et aux produits un « stage » à eux, et tout le reste du
+      // code de la palette continue de fonctionner sans savoir qu'il y a
+      // maintenant trois natures de résultat.
+      //
+      // Les COMMANDES d'abord : c'est ce qu'on cherche dans neuf cas sur dix.
+      return [
+        ...(data.commandes || []),
+        ...(data.clients || []).map((c) => ({ ...c, __quoi: 'client', stage: '__clients' })),
+        ...(data.produits || []).map((x) => ({ ...x, __quoi: 'produit', stage: '__produits' })),
+      ];
+    });
 }
 
 // Le filtrage jeton par jeton vit désormais côté serveur (même règle : chaque
@@ -7107,7 +7125,7 @@ function renderPaletteResults(hits, tokens) {
 
   if (!hits.length) {
     $paletteCount.textContent = '0 résultat';
-    paletteMessage('Aucune commande ne correspond dans tout le planning.');
+    paletteMessage('Rien ne correspond — ni commande, ni client, ni produit.');
     return;
   }
 
@@ -7125,7 +7143,7 @@ function renderPaletteResults(hits, tokens) {
       curStage = r.stage;
       const gh = document.createElement('div');
       gh.className = 'search-palette-group';
-      gh.textContent = STAGE_LABEL[r.stage] || r.stage;
+      gh.textContent = GROUPE_RECHERCHE[r.stage] || STAGE_LABEL[r.stage] || r.stage;
       $paletteResults.appendChild(gh);
     }
     const idx = paletteItems.length;
@@ -7143,8 +7161,14 @@ function buildPaletteItem(r, tokens, idx) {
   el.setAttribute('role', 'option');
   el.dataset.idx = idx;
 
-  const title = r.billing_company || r.contact_referent || '— sans dossier';
-  const desc = r.product || r.description || '';
+  const title = r.__quoi === 'client' ? r.entreprise
+    : r.__quoi === 'produit' ? r.designation
+      : (r.billing_company || r.contact_referent || '— sans dossier');
+  const desc = r.__quoi === 'client'
+    ? [r.nom, r.ville, r.telephone, r.email].filter(Boolean).join(' · ')
+    : r.__quoi === 'produit'
+      ? [r.ref_interne, r.marque, r.famille].filter(Boolean).join(' · ')
+      : (r.product || r.description || '');
 
   const main = document.createElement('div');
   main.className = 'spi-main';
@@ -7226,6 +7250,27 @@ function revealRow(id) {
 // la palette, met la ligne brièvement en évidence.
 async function jumpToResult(r) {
   closePalette();
+  // UN CLIENT ET UN PRODUIT NE S'OUVRENT PAS AU PLANNING. Les envoyer sur
+  // `ouvrirCommandeAuPlanning` chercherait une commande qui n'existe pas, et le
+  // clic semblerait « ne rien faire » — le pire résultat possible pour une
+  // recherche, parce qu'on ne sait pas si on a mal cherché ou mal cliqué.
+  if (r.__quoi === 'client') {
+    location.hash = '#clients';
+    // La Base clients filtre sa propre liste : on lui passe le nom, elle
+    // s'ouvre dessus. Un identifiant ne lui servirait à rien tant qu'elle n'a
+    // pas chargé sa liste.
+    setTimeout(() => window.dispatchEvent(
+      new CustomEvent('olda:chercher-client', { detail: r.entreprise }),
+    ), 120);
+    return;
+  }
+  if (r.__quoi === 'produit') {
+    location.hash = '#stock';
+    setTimeout(() => window.dispatchEvent(
+      new CustomEvent('olda:chercher-produit', { detail: r.ref_interne || r.designation }),
+    ), 120);
+    return;
+  }
   // La recherche a rempli son office : on la vide, sinon la grille d'arrivée
   // resterait filtrée sur la requête et semblerait amputée de ses lignes.
   if ($gridSearchInput) { $gridSearchInput.value = ''; $gridSearchInput.blur(); }

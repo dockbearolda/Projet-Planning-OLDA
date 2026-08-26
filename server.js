@@ -2889,6 +2889,63 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   res.json({ ...selonMoi(req, rows[0]), ...(alerte ? { alerte } : {}) });
 }));
 
+// GET /api/recherche?q=… → UNE recherche pour tout (§44).
+//
+// « Créer une recherche permettant de retrouver rapidement : client, société,
+//   numéro projet, devis, facture, référence produit, téléphone, email. »
+//
+// Il y en avait TROIS : la palette (commandes), la Base clients, et le Stock.
+// Chacune marchait ; aucune ne répondait à la question telle qu'elle se pose,
+// qui est « où est ce truc ? » et pas « dans quelle table est ce truc ? ».
+//
+// On ne fusionne PAS les trois écrans — chacun garde le sien, qui filtre sa
+// liste sur place. On ajoute le point d'entrée qui manquait : celui qui ne
+// demande pas de choisir d'abord.
+app.get('/api/recherche', asyncH(async (req, res) => {
+  const jetons = replier(req.query.q).split(/\s+/).filter(Boolean).slice(0, RECHERCHE_JETONS_MAX);
+  if (!jetons.length) return res.json({ commandes: [], clients: [], produits: [] });
+
+  // Les trois lectures partent ENSEMBLE : en série, une recherche paierait trois
+  // temps d'attente pour une frappe. Chacune est bornée court — la palette
+  // affiche une poignée de résultats par groupe, pas un inventaire.
+  const foinClient = `translate(lower(concat_ws(' ',
+    c.entreprise, c.nom, c.prenom, c.raison_sociale, c.email, c.telephone,
+    c.code, c.ville, c.zone, c.secteur)), '${ACCENTS}', '${SANS_ACCENTS}')`;
+  const foinProduit = `translate(lower(concat_ws(' ',
+    p.ref_interne, p.ref_fournisseur, p.designation, p.famille, p.marque)), '${ACCENTS}', '${SANS_ACCENTS}')`;
+
+  // Les conditions se construisent AVANT, dans une variable — pas dans un
+  // gabarit imbriqué au milieu de la requête. C'est la forme qu'emploie déjà la
+  // recherche de commandes, et elle a une deuxième vertu : le test qui vérifie
+  // qu'aucune lecture d'écran n'oublie le filtre d'archivage lit le source, et
+  // un backtick imbriqué lui masquait la suite de la requête.
+  const ou = (foin) => jetons.map((_, i) => `strpos(${foin}, $${i + 1}) > 0`).join(' AND ');
+  const condCommandes = ou(FOIN_RECHERCHE);
+  const condClients = ou(foinClient);
+  const condProduits = ou(foinProduit);
+
+  const [commandes, clients, produits] = await Promise.all([
+    pool.query(
+      `${SELECT} WHERE ${condCommandes} AND ${VIVANTES}
+        ORDER BY r.updated_at DESC LIMIT 20`, jetons,
+    ),
+    pool.query(
+      `SELECT id, entreprise, nom, prenom, ville, telephone, email, code FROM clients c
+        WHERE ${condClients} AND c.${VIVANTES_NU} ORDER BY entreprise ASC LIMIT 10`, jetons,
+    ),
+    pool.query(
+      `SELECT id, ref_interne, designation, famille, marque FROM products p
+        WHERE ${condProduits} AND p.${VIVANTES_NU} ORDER BY designation ASC LIMIT 10`, jetons,
+    ),
+  ]);
+
+  res.json({
+    commandes: selonMoi(req, commandes.rows.map(allegerFiche)),
+    clients: clients.rows,
+    produits: produits.rows,
+  });
+}));
+
 // GET /api/requests/:id/journal → ce qui a changé sur cette commande, du plus
 // récent au plus ancien. La fiche l'affiche dans « Historique ».
 app.get('/api/requests/:id/journal', asyncH(async (req, res) => {

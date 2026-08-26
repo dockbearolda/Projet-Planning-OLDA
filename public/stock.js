@@ -334,6 +334,18 @@ async function charger() {
   rendreListe();
 }
 
+// LA RECHERCHE GLOBALE MÈNE ICI AUSSI. Même raison : arriver sur le catalogue
+// entier en devant retaper la référence qu'on vient de taper serait une demi-
+// réponse.
+window.addEventListener('olda:chercher-produit', (e) => {
+  const champ = ROOT && ROOT.querySelector('.stk-cherche');
+  if (!champ) return;
+  recherche = e.detail || '';
+  champ.value = recherche;
+  chargerProduits().then(rendreListe);
+  champ.focus();
+});
+
 let monte = false;
 export async function initStock(root) {
   ROOT = root;

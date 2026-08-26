@@ -237,9 +237,25 @@ function bloc(src, signature) {
   ]) {
     assert.ok(APP.includes(appelant), `entrée non branchée sur le chemin unique : ${appelant}`);
   }
+  // LA GARDE PORTE SUR LE CHEMIN DES COMMANDES, et seulement sur lui. Depuis
+  // que la recherche est globale (§44), elle rend aussi des CLIENTS et des
+  // PRODUITS — qui ne s'ouvrent pas au planning : les envoyer sur
+  // `ouvrirCommandeAuPlanning` chercherait une commande qui n'existe pas, et le
+  // clic semblerait « ne rien faire ».
+  //
+  // Ce qui doit rester vrai : une COMMANDE ne saute jamais par le hash. On
+  // vérifie donc que chaque écriture de hash est gardée par un test de nature,
+  // et que la fonction se termine bien sur le chemin unique.
+  const saut = APP.slice(APP.indexOf('async function jumpToResult'));
+  const corpsSaut = saut.slice(0, saut.indexOf('\n}'));
+  const avantChaqueHash = corpsSaut.split('location.hash = ').slice(0, -1);
+  for (const avant of avantChaqueHash) {
+    assert.ok(/r\.__quoi === '(client|produit)'\)\s*\{[^}]*$/.test(avant.replace(/\n/g, ' ')),
+      'toute écriture de hash dans la recherche doit être réservée à un résultat qui n’est PAS une commande');
+  }
   assert.ok(
-    !/async function jumpToResult[\s\S]{0,900}location\.hash = /.test(APP),
-    'la recherche globale n’écrit plus le hash à la main',
+    /await ouvrirCommandeAuPlanning\(\{ id: r\.id, stage: r\.stage, sub: r\.sub_stage \}\);/.test(corpsSaut),
+    '… et une commande passe TOUJOURS par le chemin unique',
   );
 
   // =========================================================================

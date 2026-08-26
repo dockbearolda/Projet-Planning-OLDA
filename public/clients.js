@@ -1201,6 +1201,18 @@ async function load() {
 }
 
 let mounted = false;
+
+// LA RECHERCHE GLOBALE MÈNE ICI. Cliquer un client dans la palette ouvre cet
+// onglet ; sans ce relais, on arriverait sur une liste de 78 fiches en devant
+// retaper le nom qu'on venait de taper.
+window.addEventListener('olda:chercher-client', (e) => {
+  const champ = ROOT && ROOT.querySelector('.cl-search__input');
+  if (!champ) return;
+  champ.value = e.detail || '';
+  champ.dispatchEvent(new Event('input', { bubbles: true }));
+  champ.focus();
+});
+
 export async function initClients(root) {
   if (mounted) return;
   ROOT = root;

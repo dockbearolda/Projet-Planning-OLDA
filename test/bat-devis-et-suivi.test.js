@@ -270,6 +270,61 @@ delete process.env.APP_PASSWORD;
   assert.ok(/err\.detail = corps;/.test(APP),
     'le corps du refus voyage avec l’erreur — sinon un 409 n’est qu’un texte');
 
-  console.log('✓ BAT verrouillé, devis versionnés, motifs comptables, client pesé');
+  // =========================================================================
+  // 8. UNE SEULE RECHERCHE POUR TOUT (§44)
+  // =========================================================================
+  // « Créer UNE recherche permettant de retrouver rapidement : client, société,
+  //   numéro projet, référence produit, téléphone, email. » Il y en avait
+  //   TROIS : la palette (commandes), la Base clients, le Stock. Chacune
+  //   marchait ; aucune ne répondait à la question telle qu'elle se pose — « où
+  //   est ce truc ? », pas « dans quelle table est ce truc ? ».
+  await call('Mélina', 'POST', '/api/requests', {
+    stage: 'production', sub_stage: 'prod_dtf', billing_company: 'Native Beach Bar',
+    product: 'T-shirts staff', quantity: 30,
+  });
+  await call('Mélina', 'POST', '/api/clients', { entreprise: 'Native Spirit Boutique', ville: 'Marigot' });
+  // MÉLINA et pas Charlie : créer au catalogue relève de la capacité `clients`,
+  // que le chef d'atelier n'a pas. Le test s'était trompé de personne — et c'est
+  // la permission qui avait raison.
+  const auCatalogue = await call('Mélina', 'POST', '/api/produits', {
+    designation: 'T-shirt NS300', marque: 'Native Spirit', ref_interne: 'OLDA-TS-001',
+  });
+  assert.strictEqual(auCatalogue.status, 201, JSON.stringify(auCatalogue.body));
+
+  const globale = await call('Loïc', 'GET', '/api/recherche?q=native');
+  assert.strictEqual(globale.status, 200);
+  assert.ok(globale.body.commandes.some((c) => c.billing_company === 'Native Beach Bar'),
+    'un seul mot trouve la commande…');
+  assert.ok(globale.body.clients.some((c) => c.entreprise === 'Native Spirit Boutique'),
+    '… le client, même sans commande…');
+  assert.ok(globale.body.produits.some((x) => x.designation === 'T-shirt NS300'),
+    '… et le produit au catalogue');
+
+  // Une référence interne suffit — c'est ce qu'on a sous les yeux sur l'étagère.
+  const parRef = await call('Loïc', 'GET', '/api/recherche?q=OLDA-TS-001');
+  assert.ok(parRef.body.produits.length, 'la référence interne trouve le produit');
+
+  // L'ARCHIVE NE REMONTE PAS. Une recherche qui rend des dossiers retirés du
+  // planning ferait rouvrir ce qu'on vient de ranger.
+  const aRetirer = await call('Mélina', 'POST', '/api/requests', {
+    stage: 'production', billing_company: 'Native Fantome',
+  });
+  await call('Charlie', 'DELETE', `/api/requests/${aRetirer.body.id}`);
+  const apres = await call('Loïc', 'GET', '/api/recherche?q=fantome');
+  assert.strictEqual(apres.body.commandes.length, 0, 'une commande archivée ne remonte pas');
+
+  // Rien à chercher = rien à répondre, sans balayer trois tables pour le dire.
+  const vide = await call('Loïc', 'GET', '/api/recherche?q=');
+  assert.deepStrictEqual(vide.body, { commandes: [], clients: [], produits: [] });
+
+  // Côté écran : une commande passe TOUJOURS par le chemin unique, un client et
+  // un produit vont sur LEUR écran — les envoyer au planning chercherait une
+  // commande qui n'existe pas, et le clic semblerait ne rien faire.
+  assert.ok(/GROUPE_RECHERCHE = \{ __clients: 'Clients', __produits: 'Catalogue' \}/.test(APP),
+    'les deux natures qui ne sont pas des commandes ont leur groupe');
+  assert.ok(/olda:chercher-client/.test(APP) && /olda:chercher-produit/.test(APP),
+    'cliquer un client ou un produit emmène l’écran d’arrivée sur CE résultat');
+
+  console.log('✓ BAT verrouillé, devis versionnés, motifs comptables, client pesé, UNE recherche');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });
