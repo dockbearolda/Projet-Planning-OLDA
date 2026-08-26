@@ -477,6 +477,21 @@ function lireRailDeplie() {
 
 let railDeplie = lireRailDeplie();
 
+// LES ÉTAPES REPLIÉES RESTENT DES CIBLES. « Les étapes vides, on doit se
+// rappeler qu'elles existent : quand je glisse une ligne et que je passe sur
+// "+ 5 étapes vides", le simple fait de passer dessus doit les ouvrir pour que
+// je puisse y déposer. » (Charlie, 26/08)
+//
+// Sans ça le repli aurait fermé la porte principale : on déplace un dossier en
+// le GLISSANT sur le rail, et une étape vide est exactement celle où l'on veut
+// souvent le mettre — c'est même sa définition. Le repli aurait donc caché les
+// destinations les plus probables.
+//
+// L'OUVERTURE EST TEMPORAIRE, dans un ensemble à part : elle ne s'enregistre
+// pas et le rail se referme à la fin du geste. Si la ligne a été déposée dans
+// une de ces étapes, celle-ci n'est plus vide et reste visible d'elle-même.
+let railGlisse = new Set();
+
 function saveRailDeplie() {
   try { localStorage.setItem(railKey(), JSON.stringify([...railDeplie])); } catch (_) {}
 }
@@ -501,7 +516,9 @@ let videsMontees = null;
 // Les sous-étapes d'une phase, avec celles qu'on replie marquées. Rend la liste
 // à AFFICHER et le nombre de repliées — le rendu n'a plus qu'à poser.
 function replierLesVides(famille, sousEtapes) {
-  if (railDeplie.has(famille)) return { visibles: sousEtapes, repliees: 0 };
+  if (railDeplie.has(famille) || railGlisse.has(famille)) {
+    return { visibles: sousEtapes, repliees: 0 };
+  }
   const cachables = sousEtapes.filter((sub) => {
     const n = counts[sub.slug] ?? 0;
     if (n > 0) return false;
@@ -523,6 +540,10 @@ function ligneDeRepli(famille, repliees) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'stage stage-repli';
+  // La phase qu'elle replie — c'est par là qu'un glisser vient l'ouvrir.
+  // JAMAIS `data-slug` : ce n'est pas une étape, et une cible de dépôt sans
+  // étape enverrait un PATCH `stage: undefined`.
+  el.dataset.repli = famille;
   el.textContent = deplie ? 'Masquer les étapes vides' : `+ ${repliees} étape${repliees > 1 ? 's' : ''} vide${repliees > 1 ? 's' : ''}`;
   el.setAttribute('aria-expanded', String(deplie));
   attachTip(el, deplie
@@ -6410,6 +6431,13 @@ function onDragMove(e) {
 // Les familles sans sous-catégorie (Demande, Attente Client, Archivé) et Fiverr
 // restent des cibles directes — il n'y a rien de plus fin où viser.
 function stageAcceptsDrop(stageEl, r) {
+  // LA LIGNE DE REPLI N'EST PAS UNE ÉTAPE. Elle emprunte la classe `.stage`
+  // pour garder le rythme du rail, donc `closest('.stage')` la ramasse — et
+  // sans ce refus elle passait le test (son `data-slug` étant `undefined`, il
+  // « diffère » de l'étape de la ligne), devenait cible, et la dépose partait
+  // en PATCH `stage: undefined`. Elle OUVRE la phase au survol, elle ne
+  // reçoit rien (voir ouvrirAuGlisser).
+  if (stageEl.classList.contains('stage-repli')) return false;
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
@@ -6430,13 +6458,41 @@ function placerDansLaListe(el, y) {
   paintZebra(); // garder les bandes cohérentes pendant le réordonnancement
 }
 
+// PASSER SUR « + N ÉTAPES VIDES » PENDANT UN GLISSER LES OUVRE. Le geste ne
+// s'interrompt pas : le rail s'allonge sous le curseur et la ligne peut se
+// poser dans l'étape voulue. On ne repeint QU'UNE FOIS par phase — le suivi en
+// vol tourne à chaque frame, reconstruire le rail soixante fois par seconde
+// aurait fait clignoter tout le côté gauche.
+function ouvrirAuGlisser(el) {
+  const repli = el && el.closest ? el.closest('.stage-repli') : null;
+  if (!repli) return false;
+  const famille = repli.dataset.repli;
+  if (!famille || railGlisse.has(famille)) return false;
+  railGlisse.add(famille);
+  renderSidebar();
+  return true;
+}
+
+// Le rail se referme à la fin du geste : l'ouverture était temporaire, elle ne
+// s'enregistre pas. Une étape où l'on vient de déposer n'est plus vide et reste
+// visible d'elle-même.
+function refermerApresGlisser() {
+  if (!railGlisse.size) return;
+  railGlisse = new Set();
+  renderSidebar();
+}
+
 function updateDragTarget() {
   if (!dragState) return;
   dragState.raf = 0;
   const x = dragState.lastX, y = dragState.lastY;
   const el = document.elementFromPoint(x, y);
   document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
-  const stageEl = el && el.closest ? el.closest('.stage') : null;
+  // L'ouverture change la hauteur du rail sous le curseur : on relit ce qui s'y
+  // trouve MAINTENANT plutôt que de viser l'élément d'avant.
+  const ouvert = ouvrirAuGlisser(el);
+  const sous = ouvert ? document.elementFromPoint(x, y) : el;
+  const stageEl = sous && sous.closest ? sous.closest('.stage') : null;
   if (stageEl) {
     if (stageAcceptsDrop(stageEl, dragState.r)) stageEl.classList.add('drop-target');
   } else {
@@ -6482,7 +6538,7 @@ async function onDragEnd(e) {
   // Geste ANNULÉ par le système (défilement natif qui prend la main, alerte,
   // bascule d'application sur tablette…) : rien ne se dépose, rien ne s'écrit —
   // la grille reprend simplement son ordre trié.
-  if (e.type === 'pointercancel') { applySortAndRender(); return; }
+  if (e.type === 'pointercancel') { refermerApresGlisser(); applySortAndRender(); return; }
 
   // Ligne encore en cours de création (id temporaire, ex. duplication non
   // brouillon) : on ne peut pas la déplacer / réordonner tant que son id réel
@@ -6490,9 +6546,14 @@ async function onDragEnd(e) {
   // geste proprement et on remet la grille en ordre.
   if (isTempId(ds.r.id)) {
     showToast('Commande en cours de création — réessaie dans un instant.');
+    refermerApresGlisser();
     applySortAndRender();
     return;
   }
+
+  // On referme APRÈS avoir lu la cible : la refermer avant retirerait du
+  // document l'étape sur laquelle on vient de relâcher.
+  const aRefermer = railGlisse.size > 0;
 
   if (stageEl) {
     // Relâché sur le rail. Une cible valide (sous-catégorie, ou famille sans
@@ -6518,6 +6579,7 @@ async function onDragEnd(e) {
     placerDansLaListe(ds.tr, e.clientY);
     await commitReorder(ds.r);
   }
+  if (aRefermer) refermerApresGlisser();
 }
 
 // Déplace une commande vers une famille (targetSub null) ou directement vers une

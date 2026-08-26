@@ -118,3 +118,49 @@ assert.match(CSS, /\.stage-repli[\s\S]{0,400}?min-height|\.stage-repli[\s\S]{0,4
   'la ligne de repli garde sa hauteur dans les deux états');
 
 console.log('✓ rail : les étapes vides se replient, l’ordre tient, l’étape ouverte reste');
+
+// ---------------------------------------------------------------------------
+// 3. UNE ÉTAPE REPLIÉE RESTE UNE CIBLE — ON Y DÉPOSE
+// ---------------------------------------------------------------------------
+// Charlie, en essayant le repli : « les étapes vides, on doit se rappeler
+// qu'elles existent. Quand je glisse une ligne et que je passe sur "+ 5 étapes
+// vides", le simple fait de passer dessus doit les ouvrir pour que je puisse y
+// déposer. »
+//
+// Il a raison, et le repli fermait la porte PRINCIPALE : on déplace un dossier
+// en le GLISSANT sur le rail, et une étape vide est très exactement celle où on
+// veut souvent le mettre — c'est même sa définition. Sans ouverture au survol,
+// le repli cachait les destinations les plus probables.
+assert.match(APP, /function ouvrirAuGlisser/,
+  'passer sur la ligne de repli pendant un glisser doit ouvrir la phase');
+assert.match(APP, /railGlisse/,
+  'l’ouverture du glisser vit dans son PROPRE ensemble');
+// ELLE NE S'ENREGISTRE PAS : c'est une ouverture de passage, pas un réglage.
+const blocGlisse = APP.slice(APP.indexOf('let railGlisse'), APP.indexOf('function saveRailDeplie'));
+assert.ok(!/localStorage/.test(blocGlisse),
+  'l’ouverture au glisser ne doit rien écrire : elle est temporaire');
+assert.match(APP, /function refermerApresGlisser/,
+  'et le rail se referme à la fin du geste');
+// Refermée dans les TROIS sorties du geste : dépose, réordonnancement, annulation.
+assert.strictEqual((APP.match(/refermerApresGlisser\(\)/g) || []).length, 4,
+  'refermée à la définition + aux trois sorties du geste (dépose, réordre, annulation)');
+
+// ON NE REPEINT QU'UNE FOIS PAR PHASE. Le suivi en vol tourne à chaque frame :
+// reconstruire le rail soixante fois par seconde ferait clignoter tout le côté
+// gauche pendant le geste.
+assert.match(APP, /if \(!famille \|\| railGlisse\.has\(famille\)\) return false;/,
+  'une phase déjà ouverte ne déclenche pas un second rendu');
+
+// LA LIGNE DE REPLI N'EST PAS UNE ÉTAPE, ET NE REÇOIT RIEN. Elle emprunte la
+// classe `.stage` pour garder le rythme du rail — donc `closest('.stage')` la
+// ramasse. Sans refus explicite elle passait le test (son `data-slug` étant
+// `undefined`, il « diffère » de l'étape de la ligne), devenait cible, et la
+// dépose partait en PATCH `stage: undefined`.
+assert.match(APP, /if \(stageEl\.classList\.contains\('stage-repli'\)\) return false;/,
+  'la ligne de repli est refusée comme cible de dépôt');
+assert.match(APP, /el\.dataset\.repli = famille;/,
+  'elle porte sa phase pour qu’un glisser sache laquelle ouvrir');
+assert.ok(!/stage-repli[\s\S]{0,300}?dataset\.slug =/.test(APP),
+  'et JAMAIS de data-slug : ce n’est pas une étape');
+
+console.log('✓ rail : on glisse sur « + N étapes vides », la phase s’ouvre, on dépose dedans');
