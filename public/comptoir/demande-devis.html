@@ -1982,7 +1982,7 @@ function txManquants(){return TX_OBLIGATOIRES.filter(([id])=>!String($(id).value
    comptoir lit `/api/tailles-logo`, une seule base, aucune copie à rafraîchir.
    TOUT RESTE MODIFIABLE. Le tableau propose, il ne décide pas : le client peut
    vouloir 320 mm là où la référence en dit 300. */
-let TX_LOGO={familles:{}};
+let TX_LOGO={familles:[]};
 /* LA RECHERCHE SE FAIT SUR LA RÉFÉRENCE, PAS SUR LA FAMILLE. Une référence
    identifie un produit : deux familles n'en partagent jamais une. Passer par la
    famille rouvrait trois pièges pour rien — le catalogue range le body K831 en
@@ -1990,7 +1990,6 @@ let TX_LOGO={familles:{}};
    le genre à la main, et « Pochette » n'est pas « Pochettes ». La famille ne
    sert plus qu'à ranger le tableau dans l'écran de saisie. */
 let TX_LOGO_INDEX={};          /* référence → emplacement → taille → mm */
-let TX_LOGO_EMPLACEMENTS=[];   /* les colonnes du tableau, données par le serveur */
 /* CE QU'ON SAIT DU TABLEAU, à ne jamais confondre avec ce qu'on sait de la
    RÉFÉRENCE. Le 26/08, un essai en local a montré des cases vides sous
    « Cette référence n'est pas encore dans le tableau » — alors qu'elle y
@@ -2010,8 +2009,8 @@ function txLogoCle(s){
 }
 function txLogoIndexer(){
   TX_LOGO_INDEX={};
-  for(const refs of Object.values((TX_LOGO&&TX_LOGO.familles)||{})){
-    for(const [ref,parEmplacement] of Object.entries(refs||{})){
+  for(const famille of (TX_LOGO&&TX_LOGO.familles)||[]){
+    for(const [ref,parEmplacement] of Object.entries((famille&&famille.refs)||{})){
       const emplacements=TX_LOGO_INDEX[txLogoCle(ref)]||{};
       for(const [emplacement,tailles] of Object.entries(parEmplacement||{})){
         const parTaille=emplacements[emplacement]||{};
@@ -2024,8 +2023,7 @@ function txLogoIndexer(){
 }
 function txLoadTaillesLogo(){
   return fetch('/api/tailles-logo').then(r=>r.ok?r.json():null).then(t=>{
-    if(t&&t.familles&&typeof t.familles==='object')TX_LOGO=t;
-    if(t&&Array.isArray(t.emplacements))TX_LOGO_EMPLACEMENTS=t.emplacements;
+    if(t&&Array.isArray(t.familles))TX_LOGO=t;
     txLogoIndexer();
     TX_LOGO_ETAT=Object.keys(TX_LOGO_INDEX).length?'ok':'vide';
     txRenderLogo(true);
@@ -2042,15 +2040,16 @@ function txLoadTaillesLogo(){
    « Avant » : deux lectures pour la même ligne. */
 const TX_LOGO_ORDRE=['Coeur','Poitrine','Avant','Dos','Manche DR','Manche GA'];
 
-/* LES EMPLACEMENTS MARQUÉS QUE LE TABLEAU SAIT MESURER. Les deux faces de tote
-   bag n'en sont pas : leur taille est écrite DANS LEUR NOM (« Face Classique
-   250 x 250 mm »). Leur ouvrir une rangée serait demander de recopier ce qui
-   est déjà écrit juste au-dessus. */
+/* CHAQUE EMPLACEMENT MARQUÉ OUVRE SA RANGÉE. On ne filtre plus sur ce que le
+   tableau « sait mesurer » : depuis que chaque famille porte SES faces, une
+   liste de colonnes valable pour tout le monde n'existe plus. La rangée existe
+   parce que la vendeuse a coché cet emplacement — le tableau la remplit s'il a
+   une face de ce nom pour cette référence, sinon elle se saisit. Filtrer
+   reviendrait à cacher une rangée dont l'atelier a besoin. */
 function txPlacementsMarques(printType){
   const flags=(TE().DB.printTypes||{})[printType]||{};
-  const colonnes=TX_LOGO_EMPLACEMENTS.length?TX_LOGO_EMPLACEMENTS:TX_LOGO_ORDRE;
   return TE().PLACEMENTS
-    .filter(p=>txNum(flags[p])>0&&colonnes.includes(p))
+    .filter(p=>txNum(flags[p])>0)
     .sort((a,b)=>{
       const ia=TX_LOGO_ORDRE.indexOf(a),ib=TX_LOGO_ORDRE.indexOf(b);
       return (ia<0?99:ia)-(ib<0?99:ib);

@@ -1655,57 +1655,30 @@ async function setReglagesTextile(patch) {
 }
 
 // --- Tailles de logo ----------------------------------------------------------
-// LA LARGEUR DU LOGO À IMPRIMER, par famille, par référence, par EMPLACEMENT et
-// par taille de vêtement — en millimètres. Ce n'est pas une constante par
-// référence : sur NS300 le dos va de 240 mm en XS à 320 mm en XL, et c'est
-// précisément ce qu'on ne retient pas de tête.
+// LA LARGEUR DU LOGO À IMPRIMER, en millimètres : par famille, par référence,
+// par FACE et par taille. Ce n'est pas une constante par référence — sur NS300
+// le dos va de 240 mm en XS à 320 mm en XL, et c'est ce qu'on ne retient pas de
+// tête.
 //
-// Le tableau vivait sur un second site (« Tailles Logo DTF ») que le Planning
-// recopiait. Deux applications pour une même donnée, donc deux vérités
-// possibles et une copie qui pouvait dater : il est rentré ici le 26/08. Il
-// s'édite dans les Réglages et le comptoir le lit directement.
+// UNE FAMILLE PORTE SES PROPRES FACES ET SES PROPRES TAILLES, parce qu'un objet
+// n'a pas les faces d'un vêtement : un tote bag en a deux, une casquette une
+// seule (l'avant), un t-shirt six. Une liste unique valable pour tout le monde
+// donnait à la casquette une colonne « Manche GA » — et une colonne qui n'a
+// aucun sens finit par être remplie.
+//
+// LES FACES SONT DES NOMS LIBRES, et c'est le nom qui fait le lien avec le
+// comptoir : la vendeuse choisit un emplacement de marquage (« Coeur + Dos »),
+// et la largeur se prend sur la face qui porte ce nom. Les familles connues du
+// chiffrage arrivent donc avec les noms du chiffrage. Une face nommée autrement
+// vit très bien — elle ne se remplira simplement pas toute seule au comptoir.
 //
 // Stocké en clé/valeur applicative (app_meta.tailles_logo, JSON), comme les
 // machines et les tarifs tasse : quelques centaines de nombres, lus en entier,
 // écrits une case à la fois.
 // Down : DELETE FROM app_meta WHERE key = 'tailles_logo'.
-//   { familles: { "Homme": { "NS300": { "Coeur": { "S": 60 }, "Dos": {…} } } } }
+//   { familles: [ { nom, tailles: [], faces: [], refs: { REF: { face: { taille: mm } } } } ] }
 
-// LES COLONNES SONT LES EMPLACEMENTS DU CHIFFRAGE, mot pour mot. L'ancien site
-// n'en avait que deux, « Avant » et « Dos », et son « Avant » (55 à 80 mm)
-// n'était pas l'« Avant » du chiffrage (une pleine face, au même temps que le
-// dos) : même mot, autre taille, et rien pour le dire. En reprenant les noms du
-// chiffrage il n'y a plus rien à traduire — donc plus rien à traduire de
-// travers.
-// C'est la RÉUNION de tous les emplacements du chiffrage, familles comprises :
-// un vêtement en a six, un tote bag en a deux qui n'ont rien à voir (le fichier
-// V9 du patron le dit lui-même — `DB.times`). Le serveur valide contre cette
-// liste ; c'est l'ÉCRAN qui choisit les colonnes de la famille affichée, parce
-// que lui a le catalogue sous la main. Recopier la table du patron ici serait
-// la recopier une deuxième fois, donc la laisser diverger.
-const TAILLES_LOGO_EMPLACEMENTS = Object.freeze([
-  'Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA',
-  'Face Optimisée 205 x 205 mm', 'Face Classique 250 x 250 mm',
-]);
-
-// Les tailles proposées par famille. Elles ne se stockent pas : une colonne
-// vide n'est pas une donnée, et une liste rangée en base pourrait diverger de
-// ce que le comptoir sait saisir.
-const TAILLES_LOGO_TAILLES = Object.freeze({
-  Homme: ['XS', 'S', 'M', 'L', 'XL', '2XL'],
-  Femme: ['XS', 'S', 'M', 'L', 'XL', '2XL'],
-  Enfant: ['2/4 ans', '4/6 ans', '6/8 ans', '8/10 ans', '10/12 ans', '12/14 ans'],
-  'Bébé': ['3 mois', '6 mois', '9 mois', '12 mois', '18 mois', '24 mois', '36 mois'],
-});
-// UN OBJET N'A QU'UNE TAILLE, et sa largeur de logo vaut donc quelle que soit
-// la case où la vendeuse a saisi la quantité (elle n'a que S/M/L/XL/2XL/Autres
-// devant elle). La clé « Taille unique » est reconnue comme telle au comptoir :
-// elle répond pour toutes les tailles. Voir `txLogoDuTableau`.
-const TAILLES_LOGO_TAILLES_DEFAUT = Object.freeze(['Taille unique']);
-
-function taillesLogoPour(famille) {
-  return TAILLES_LOGO_TAILLES[famille] || TAILLES_LOGO_TAILLES_DEFAUT;
-}
+const TAILLES_LOGO_MAX_NOM = 60;
 
 // Une largeur n'est retenue que si c'est un nombre tenable. Une case vide reste
 // VIDE : un logo de 0 mm partirait en production sans que rien ne proteste.
@@ -1714,27 +1687,59 @@ function largeurLogo(v) {
   return Number.isFinite(n) && n > 0 && n <= 5000 ? Math.round(n) : null;
 }
 
+function nomPropre(v) {
+  return String(v == null ? '' : v).trim().slice(0, TAILLES_LOGO_MAX_NOM);
+}
+
+// Une liste de noms : rangée, sans doublon, sans vide. Elle sert de colonnes et
+// d'onglets — deux entrées du même nom donneraient deux colonnes qui écrivent
+// dans la même case.
+function listeDeNoms(brut) {
+  const out = [];
+  for (const v of Array.isArray(brut) ? brut : []) {
+    const nom = nomPropre(v);
+    if (nom && !out.includes(nom)) out.push(nom);
+  }
+  return out;
+}
+
 function nettoyerTaillesLogo(brut) {
-  const out = { familles: {} };
+  const out = { familles: [] };
   const familles = brut && typeof brut === 'object' ? brut.familles : null;
-  if (!familles || typeof familles !== 'object') return out;
-  for (const [famille, refs] of Object.entries(familles)) {
-    if (!refs || typeof refs !== 'object') continue;
-    for (const [ref, parEmplacement] of Object.entries(refs)) {
-      if (!parEmplacement || typeof parEmplacement !== 'object') continue;
-      for (const [emplacement, tailles] of Object.entries(parEmplacement)) {
-        if (!TAILLES_LOGO_EMPLACEMENTS.includes(emplacement)) continue;
-        if (!tailles || typeof tailles !== 'object') continue;
-        for (const [taille, v] of Object.entries(tailles)) {
+  if (!Array.isArray(familles)) return out;
+  for (const f of familles) {
+    if (!f || typeof f !== 'object') continue;
+    const nom = nomPropre(f.nom);
+    if (!nom || out.familles.some((x) => x.nom === nom)) continue;
+    const tailles = listeDeNoms(f.tailles);
+    const faces = listeDeNoms(f.faces);
+    // LES RÉFÉRENCES DÉCLARÉES À LA MAIN. Les lignes d'une famille viennent
+    // normalement du catalogue textile, par le genre. Une famille créée ici
+    // (« Sac à dos », « Mug ») n'y a aucun genre : sans cette liste, elle
+    // s'ouvrirait vide et il n'y aurait rien à remplir.
+    const references = listeDeNoms(f.references);
+    const refs = {};
+    for (const [ref, parFace] of Object.entries(f.refs && typeof f.refs === 'object' ? f.refs : {})) {
+      const cleRef = nomPropre(ref);
+      if (!cleRef || !parFace || typeof parFace !== 'object') continue;
+      for (const [face, parTaille] of Object.entries(parFace)) {
+        const cleFace = nomPropre(face);
+        // UNE MESURE SANS COLONNE EST INVISIBLE ET INDÉBOULONNABLE : on ne garde
+        // que ce qui a encore une face et une taille dans la famille. Retirer
+        // une face retire donc ses mesures, et c'est le sens de l'action.
+        if (!cleFace || !faces.includes(cleFace) || !parTaille || typeof parTaille !== 'object') continue;
+        for (const [taille, v] of Object.entries(parTaille)) {
+          const cleTaille = nomPropre(taille);
+          if (!cleTaille || !tailles.includes(cleTaille)) continue;
           const mm = largeurLogo(v);
           if (mm === null) continue;
-          if (!out.familles[famille]) out.familles[famille] = {};
-          if (!out.familles[famille][ref]) out.familles[famille][ref] = {};
-          if (!out.familles[famille][ref][emplacement]) out.familles[famille][ref][emplacement] = {};
-          out.familles[famille][ref][emplacement][taille] = mm;
+          if (!refs[cleRef]) refs[cleRef] = {};
+          if (!refs[cleRef][cleFace]) refs[cleRef][cleFace] = {};
+          refs[cleRef][cleFace][cleTaille] = mm;
         }
       }
     }
+    out.familles.push({ nom, tailles, faces, references, refs });
   }
   return out;
 }
@@ -1744,10 +1749,10 @@ function nettoyerTaillesLogo(brut) {
 function compterTaillesLogo(table) {
   let refs = 0;
   let mesures = 0;
-  for (const parRef of Object.values((table && table.familles) || {})) {
-    for (const parEmplacement of Object.values(parRef)) {
+  for (const f of (table && table.familles) || []) {
+    for (const parFace of Object.values(f.refs || {})) {
       refs += 1;
-      for (const tailles of Object.values(parEmplacement)) mesures += Object.keys(tailles).length;
+      for (const t of Object.values(parFace)) mesures += Object.keys(t).length;
     }
   }
   return { refs, mesures };
@@ -1755,78 +1760,125 @@ function compterTaillesLogo(table) {
 
 async function getTaillesLogo() {
   const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tailles_logo'");
-  if (!rows[0] || typeof rows[0].value !== 'string') return { familles: {} };
+  if (!rows[0] || typeof rows[0].value !== 'string') return { familles: [] };
   try {
     return nettoyerTaillesLogo(JSON.parse(rows[0].value));
   } catch {
-    return { familles: {} };
+    return { familles: [] };
   }
 }
 
-async function setTaillesLogo(table) {
-  const propre = nettoyerTaillesLogo(table);
-  await poserMeta('tailles_logo', JSON.stringify(propre));
-  return propre;
-}
-
-// UNE CASE À LA FOIS, ET UNE À LA FOIS POUR DE BON.
+// TOUTES LES ÉCRITURES PASSENT EN FILE.
 //
 // Le document est lu, modifié, réécrit : entre la lecture et l'écriture il y a
-// un `await`, donc deux requêtes qui se croisent perdraient l'une des deux —
-// et pas seulement quand elles visent la même case. Deux postes qui remplissent
+// un `await`, donc deux requêtes qui se croisent perdraient l'une des deux — et
+// pas seulement quand elles visent la même case. Deux postes qui remplissent
 // deux colonnes différentes, c'est exactement le genre de perte qu'on ne voit
-// qu'en relisant le tableau trois jours plus tard. Les écritures passent donc
-// en file : elles sont rares et courtes, la file ne coûte rien.
+// qu'en relisant le tableau trois jours plus tard. Les écritures sont rares et
+// courtes : la file ne coûte rien.
 let fileTaillesLogo = Promise.resolve();
 
-function majTailleLogo(famille, reference, emplacement, taille, largeur) {
+function ecrireTaillesLogo(travail) {
   const suite = fileTaillesLogo.then(async () => {
-    if (!TAILLES_LOGO_EMPLACEMENTS.includes(emplacement)) throw new Error('Emplacement inconnu');
-    const f = String(famille || '').trim();
-    const r = String(reference || '').trim();
-    const t = String(taille || '').trim();
-    if (!f || !r || !t) throw new Error('Famille, référence et taille sont nécessaires');
     const table = await getTaillesLogo();
-    const mm = largeurLogo(largeur);
-    if (mm === null) {
-      // VIDER UNE CASE EST UNE ACTION, pas un oubli : on retire la clé plutôt
-      // que d'y ranger un zéro, et on nettoie les niveaux devenus vides pour
-      // qu'une référence sans aucune mesure cesse de compter comme renseignée.
-      const parRef = table.familles[f];
-      const parEmp = parRef && parRef[r];
-      if (parEmp && parEmp[emplacement]) {
-        delete parEmp[emplacement][t];
-        if (!Object.keys(parEmp[emplacement]).length) delete parEmp[emplacement];
-        if (!Object.keys(parEmp).length) delete parRef[r];
-        if (!Object.keys(parRef).length) delete table.familles[f];
-      }
-    } else {
-      if (!table.familles[f]) table.familles[f] = {};
-      if (!table.familles[f][r]) table.familles[f][r] = {};
-      if (!table.familles[f][r][emplacement]) table.familles[f][r][emplacement] = {};
-      table.familles[f][r][emplacement][t] = mm;
-    }
-    await poserMeta('tailles_logo', JSON.stringify(table));
-    return table;
+    const sortie = await travail(table);
+    await poserMeta('tailles_logo', JSON.stringify(nettoyerTaillesLogo(table)));
+    return sortie === undefined ? getTaillesLogo() : sortie;
   });
   // La file ne doit pas mourir sur un refus : l'écriture suivante repart.
   fileTaillesLogo = suite.catch(() => {});
   return suite;
 }
 
+const trouverFamille = (table, nom) => (table.familles || []).find((f) => f.nom === nomPropre(nom));
+
+function majTailleLogo(famille, reference, face, taille, largeur) {
+  return ecrireTaillesLogo(async (table) => {
+    const f = trouverFamille(table, famille);
+    if (!f) throw new Error('Famille inconnue');
+    const ref = nomPropre(reference);
+    const cleFace = nomPropre(face);
+    const cleTaille = nomPropre(taille);
+    if (!ref) throw new Error('Référence manquante');
+    if (!f.faces.includes(cleFace)) throw new Error('Face inconnue dans cette famille');
+    if (!f.tailles.includes(cleTaille)) throw new Error('Taille inconnue dans cette famille');
+    const mm = largeurLogo(largeur);
+    if (mm === null) {
+      // VIDER UNE CASE EST UNE ACTION, pas un oubli : on retire la clé plutôt
+      // que d'y ranger un zéro. `nettoyerTaillesLogo` fait le ménage des
+      // niveaux devenus vides à l'écriture.
+      const parFace = f.refs[ref];
+      if (parFace && parFace[cleFace]) delete parFace[cleFace][cleTaille];
+    } else {
+      if (!f.refs[ref]) f.refs[ref] = {};
+      if (!f.refs[ref][cleFace]) f.refs[ref][cleFace] = {};
+      f.refs[ref][cleFace][cleTaille] = mm;
+    }
+  });
+}
+
+// CRÉER, RENOMMER, RETIRER UNE FAMILLE — et ses faces, et ses tailles. Le
+// tableau doit suivre l'atelier : un objet nouveau arrive, il lui faut sa
+// catégorie le jour même, pas au prochain déploiement.
+function creerFamilleLogo(nom, modele) {
+  return ecrireTaillesLogo(async (table) => {
+    const propre = nomPropre(nom);
+    if (!propre) throw new Error('Il faut un nom');
+    if (trouverFamille(table, propre)) throw new Error('Cette famille existe déjà');
+    table.familles.push({
+      nom: propre,
+      tailles: listeDeNoms((modele && modele.tailles) || ['Taille unique']),
+      faces: listeDeNoms((modele && modele.faces) || ['Avant']),
+      references: listeDeNoms((modele && modele.references) || []),
+      refs: {},
+    });
+  });
+}
+
+function majFamilleLogo(nom, patch) {
+  return ecrireTaillesLogo(async (table) => {
+    const f = trouverFamille(table, nom);
+    if (!f) throw new Error('Famille inconnue');
+    if (patch && patch.nom !== undefined) {
+      const propre = nomPropre(patch.nom);
+      if (!propre) throw new Error('Il faut un nom');
+      if (propre !== f.nom && trouverFamille(table, propre)) throw new Error('Cette famille existe déjà');
+      f.nom = propre;
+    }
+    // RETIRER UNE FACE OU UNE TAILLE RETIRE SES MESURES, et c'est le sens de
+    // l'action — `nettoyerTaillesLogo` ne garde que ce qui a encore une
+    // colonne. On refuse en revanche de tout vider d'un coup par une liste
+    // vide : ce serait un effacement déguisé en réglage.
+    for (const cle of ['tailles', 'faces']) {
+      if (!patch || patch[cle] === undefined) continue;
+      const liste = listeDeNoms(patch[cle]);
+      if (!liste.length) throw new Error(cle === 'faces' ? 'Il faut au moins une face' : 'Il faut au moins une taille');
+      f[cle] = liste;
+    }
+    // Les références déclarées, elles, peuvent être vides : une famille qui
+    // prend ses lignes au catalogue n'en déclare aucune.
+    if (patch && patch.references !== undefined) f.references = listeDeNoms(patch.references);
+  });
+}
+
+function retirerFamilleLogo(nom) {
+  return ecrireTaillesLogo(async (table) => {
+    const avant = table.familles.length;
+    table.familles = table.familles.filter((f) => f.nom !== nomPropre(nom));
+    if (table.familles.length === avant) throw new Error('Famille inconnue');
+  });
+}
+
 // L'INSTANTANÉ LIVRÉ AVEC LE CODE, pour une base NEUVE.
 //
-// Il porte ce que l'atelier avait relevé sur l'ancien site avant que le tableau
-// ne rentre ici. Sans lui, une base fraîche (pg-mem en local, premier
-// déploiement) démarre vide : le comptoir affiche des cases vides et annonce
-// que la référence n'est pas au tableau — alors qu'elle y est. Constaté le
-// 26/08 sur un essai en local.
+// Il porte ce que l'atelier avait relevé sur l'ancien site. Sans lui, une base
+// fraîche démarre vide : le comptoir affiche des cases vides et annonce que la
+// référence n'est pas au tableau — alors qu'elle y est. Constaté le 26/08 sur
+// un essai en local.
 //
 // LA GARDE, C'EST LA CLÉ ELLE-MÊME : si `tailles_logo` est là, on n'y touche
-// pas. Pas de seconde clé à tenir, donc pas de garde partagée avec quoi que ce
-// soit.
-// Down : DELETE FROM app_meta WHERE key = 'tailles_logo' — le semis rejoue au
-// démarrage suivant.
+// pas. Pas de seconde clé à tenir, donc pas de garde partagée.
+// Down : DELETE FROM app_meta WHERE key = 'tailles_logo'.
 async function semerTaillesLogo() {
   const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tailles_logo'");
   if (rows.length) return;
@@ -1837,7 +1889,7 @@ async function semerTaillesLogo() {
     return;   // pas d'instantané : on démarre sans, l'écran le remplira
   }
   const propre = nettoyerTaillesLogo(brut);
-  if (!Object.keys(propre.familles).length) return;
+  if (!propre.familles.length) return;
   await poserMeta('tailles_logo', JSON.stringify(propre));
 }
 
@@ -2361,8 +2413,8 @@ module.exports = {
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
-  getTaillesLogo, setTaillesLogo, majTailleLogo, compterTaillesLogo, nettoyerTaillesLogo,
-  TAILLES_LOGO_EMPLACEMENTS, taillesLogoPour,
+  getTaillesLogo, majTailleLogo, compterTaillesLogo, nettoyerTaillesLogo,
+  creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,

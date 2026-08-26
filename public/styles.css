@@ -5975,26 +5975,107 @@ body.dragging-active .pcard:active { border-color: var(--border); }
    lisent. C'est la largeur de la Base clients, l'autre écran de données. */
 .tl-page { max-width: none; }
 
-/* --- Tailles des logos : le tableau lui-même ---------------------------------
-   Une famille à la fois, un emplacement à la fois : six emplacements × six
-   tailles feraient trente-six colonnes, et un tableau de trente-six colonnes ne
-   se lit pas. Les deux rangées de choix sont le sélecteur segmenté de la charte
-   — le même que la Base clients. */
-.tl-barres { display: flex; flex-direction: column; gap: var(--pas-2); align-items: flex-start; }
-/* La grille défile dans SA boîte, dans les deux sens : la page, elle, ne part
-   jamais de côté et ne s'allonge pas de deux mille pixels parce qu'une famille
-   compte vingt-six références. */
+/* --- Tailles des logos ------------------------------------------------------
+   LES FAMILLES EN COLONNE, ce qu'elles contiennent à droite. En rangée de
+   pilules, familles et faces faisaient deux barres de boutons superposées et
+   rien ne disait laquelle commandait l'autre — sans compter que sept noms de
+   longueurs différentes poussaient la seconde à la ligne. */
+.tl-carte { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); gap: var(--pas-4); align-items: start; }
+.tl-familles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tl-familles__t {
+  padding: 0 var(--pas-2) var(--pas-1);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-2);
+}
+.tl-famille {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  padding: var(--champ-y-serre) var(--pas-2);
+  border: var(--trait-reserve);
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.tl-famille:hover { background: var(--state-hover); color: var(--text-1); }
+.tl-famille.est-on { background: var(--bg); color: var(--text-1); font-weight: var(--graisse-forte); }
+.tl-famille__nom { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Le compte dit où il reste à travailler : c'est la seule chose qui hiérarchise
+   une liste de familles toutes pareilles. */
+.tl-famille__n { flex: 0 0 auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.tl-ajout {
+  margin-top: var(--pas-2);
+  padding: var(--champ-y-serre) var(--pas-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
+  text-align: left;
+  cursor: pointer;
+}
+.tl-ajout:hover { background: var(--primary-soft); border-color: var(--primary); }
+
+.tl-panneau { display: flex; flex-direction: column; gap: var(--pas-3); min-width: 0; }
+.tl-tete-famille { display: flex; align-items: baseline; gap: var(--pas-3); flex-wrap: wrap; }
+.tl-nom-famille { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); line-height: var(--ligne-titre); }
+.tl-outils { display: flex; gap: var(--pas-3); flex-wrap: wrap; }
+.tl-outils--face { margin-top: calc(-1 * var(--pas-2)); }
+/* Renommer, retirer : des gestes rares. Ils ne prennent pas la forme d'un
+   bouton, qui appellerait le clic tous les jours pour un usage par trimestre. */
+.tl-lien {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  cursor: pointer;
+}
+.tl-lien:hover { color: var(--text-1); text-decoration: underline; }
+
+/* LES FACES DE LA FAMILLE — un tote bag en a deux, une casquette une seule. */
+.tl-faces { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--pilule); width: fit-content; max-width: 100%; }
+.tl-face {
+  padding: var(--champ-y-serre) var(--pas-3);
+  border: var(--trait-reserve);
+  border-radius: var(--pilule);
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.tl-face:hover { color: var(--text-1); }
+.tl-face.est-on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-1); }
+.tl-face--ajout { color: var(--primary); font-weight: var(--graisse-forte); }
+
+/* La grille défile dans SA boîte : la page ne part jamais de côté et ne
+   s'allonge pas de deux mille pixels parce qu'une famille compte vingt-six
+   références. */
 .tl-cadre { max-height: 58vh; overflow: auto; overscroll-behavior: contain; }
 .tl-grille {
   display: grid;
   /* La colonne des références est BORNÉE : en `max-content`, la désignation la
-     poussait à 430 px et il ne restait qu'une taille à l'écran. C'est la
-     référence qu'on cherche, la désignation ne fait que la situer — elle se
-     coupe. */
-  grid-template-columns: 260px repeat(var(--tl-cols, 1), minmax(0, 1fr));
+     poussait à 430 px et il ne restait qu'une taille à l'écran. */
+  grid-template-columns: 240px repeat(var(--tl-cols, 1), minmax(0, 1fr));
   /* AUCUN INTERVALLE VERTICAL : l'en-tête est collant, et une ligne qui défile
-     apparaîtrait dans l'espace entre deux cellules d'en-tête. Le rythme vient
-     du rembourrage des cellules. */
+     apparaîtrait dans l'espace entre deux cellules d'en-tête. */
   column-gap: var(--pas-2);
   row-gap: 0;
   align-items: center;
@@ -6017,10 +6098,8 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 }
 .tl-tete { text-align: center; }
 /* LA RÉFÉRENCE AU-DESSUS, LA DÉSIGNATION EN DESSOUS. Côte à côte, la
-   désignation réclamait 430 px et il ne restait qu'une taille à l'écran ; la
-   page des Réglages est bornée à 760 px de large, on ne les élargit pas pour
-   une carte. Sur deux lignes, la rangée ne grandit pas — le champ fait déjà
-   44 px de haut. */
+   désignation réclamait 430 px. Sur deux lignes, la rangée ne grandit pas — le
+   champ fait déjà 44 px de haut. */
 .tl-ref {
   display: flex;
   flex-direction: column;
@@ -6029,8 +6108,7 @@ body.dragging-active .pcard:active { border-color: var(--border); }
   overflow: hidden;
   padding: var(--pas-1) var(--pas-2) var(--pas-1) 0;
 }
-.tl-ref b { line-height: var(--ligne-serre); }
-.tl-ref b { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+.tl-ref b { line-height: var(--ligne-serre); font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
 .tl-nom {
   width: 100%;
   min-width: 0;

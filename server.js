@@ -28,7 +28,7 @@ const {
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
   getTaillesLogo, majTailleLogo, compterTaillesLogo,
-  TAILLES_LOGO_EMPLACEMENTS, taillesLogoPour,
+  creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, getFlags, setFlags,
@@ -39,11 +39,6 @@ const {
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
 } = require('./db');
-// Les familles du tableau des tailles de logo : ce sont les genres que le
-// comptoir sait choisir (textile-catalog.js — GENRES_SAISIE et
-// FAMILLES_ACCESSOIRE). Une famille que la vendeuse ne peut pas choisir serait
-// une colonne que personne ne lira jamais.
-const FAMILLES_TAILLES_LOGO = ['Homme', 'Femme', 'Enfant', 'Bébé', 'Tote Bag', 'Casquettes', 'Pochettes'];
 const RESPONSABLE_SET = new Set(RESPONSABLES);
 const CLIENT_TYPE_SET = new Set(CLIENT_TYPES);
 const FLAG_SET = new Set(FLAGS);
@@ -1113,28 +1108,56 @@ app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
 }));
 
 // LE TABLEAU DES TAILLES DE LOGO. La largeur du logo à imprimer, par famille,
-// par référence, par emplacement et par taille de vêtement.
-//
-// GET rend AUSSI les emplacements et les tailles par famille : le comptoir et
-// l'écran de saisie doivent parler des mêmes colonnes, et une liste recopiée
-// des deux côtés finit toujours par diverger.
+// par référence, par FACE et par taille — et chaque famille porte SES faces et
+// SES tailles : un tote bag n'a pas les faces d'un t-shirt.
 app.get('/api/tailles-logo', asyncH(async (req, res) => {
-  const table = await getTaillesLogo();
-  const tailles = {};
-  for (const famille of FAMILLES_TAILLES_LOGO) tailles[famille] = taillesLogoPour(famille);
-  res.json({ ...table, emplacements: TAILLES_LOGO_EMPLACEMENTS, tailles });
+  res.json(await getTaillesLogo());
 }));
 
-// UNE CASE À LA FOIS. Le tableau se remplit au fur et à mesure, case par case,
-// depuis les Réglages : envoyer le document entier à chaque frappe ferait
-// perdre la colonne d'à côté si deux postes le remplissent en même temps.
-// Une largeur vide (ou nulle) EFFACE la case — c'est une action, pas un oubli.
+// UNE CASE À LA FOIS. Le tableau se remplit case par case, à la main : envoyer
+// le document entier à chaque frappe ferait perdre la colonne d'à côté si deux
+// postes le remplissent en même temps. Une largeur vide EFFACE la case — c'est
+// une action, pas un oubli.
 app.patch('/api/tailles-logo', exige('reglages'), asyncH(async (req, res) => {
-  const { famille, reference, emplacement, taille, largeur } = req.body || {};
+  const { famille, reference, face, taille, largeur } = req.body || {};
   try {
-    const table = await majTailleLogo(famille, reference, emplacement, taille, largeur);
+    const table = await majTailleLogo(famille, reference, face, taille, largeur);
     broadcast({ kind: 'settings' });
     res.json({ ...table, ...compterTaillesLogo(table) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}));
+
+// LES FAMILLES SE CRÉENT DEPUIS L'ÉCRAN. Un objet nouveau arrive à l'atelier :
+// il lui faut sa catégorie le jour même, pas au prochain déploiement.
+app.post('/api/tailles-logo/familles', exige('reglages'), asyncH(async (req, res) => {
+  try {
+    const table = await creerFamilleLogo((req.body || {}).nom, req.body);
+    broadcast({ kind: 'settings' });
+    res.status(201).json(table);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}));
+
+// Renommer la famille, ou changer SA liste de faces / de tailles. Retirer une
+// face retire ses mesures : c'est le sens de l'action, et l'écran le demande.
+app.patch('/api/tailles-logo/familles/:nom', exige('reglages'), asyncH(async (req, res) => {
+  try {
+    const table = await majFamilleLogo(req.params.nom, req.body || {});
+    broadcast({ kind: 'settings' });
+    res.json(table);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}));
+
+app.delete('/api/tailles-logo/familles/:nom', exige('reglages'), asyncH(async (req, res) => {
+  try {
+    const table = await retirerFamilleLogo(req.params.nom);
+    broadcast({ kind: 'settings' });
+    res.json(table);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
