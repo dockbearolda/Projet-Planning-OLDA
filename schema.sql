@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS requests (
   -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS bat_requis, bat_valide_le;
   bat_requis      boolean NOT NULL DEFAULT false,
   bat_valide_le   timestamptz,
+  -- LE DEVIS, EN MIROIR DU BAT (26/08/2026). Il n'était qu'une SOUS-ÉTAPE
+  -- déplacée à la main : rien qu'on puisse vérifier, ni dater, ni attribuer.
+  -- Même règle que le BAT — `devis_requis` se pose tout seul dès qu'un devis
+  -- existe, ou dès qu'un dossier naît d'une demande de devis. La date dit QUAND
+  -- et, par le journal, PAR QUI : c'est toute la différence entre un FAIT et
+  -- une position dans un tableau.
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS devis_requis, devis_valide_le;
+  devis_requis    boolean NOT NULL DEFAULT false,
+  devis_valide_le timestamptz,
   -- D'OÙ VIENT LA DEMANDE (§8). Bouche-à-oreille, Instagram, passage, client
   -- existant… C'est la seule information qui dit où mettre l'effort, et elle ne
   -- se retrouve nulle part une fois la demande passée.

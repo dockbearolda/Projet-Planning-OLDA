@@ -1458,6 +1458,100 @@ const PROD_FAITS = [
   },
 ];
 
+// ===========================================================================
+// LE FEU : CE QUI MANQUE AVANT DE PRODUIRE
+// ===========================================================================
+// « Le souci de mon patron c'est de ne pas connaître en temps réel l'état de la
+// commande. Quand le projet arrive en production il doit obligatoirement avoir
+// un devis validé, un BAT validé ainsi que le paiement, mais certains ont des
+// acomptes. » (Charlie, 26/08)
+//
+// TROIS FAITS, ET CHACUN DIT S'IL EST EXIGÉ. C'est la réponse au « difficile
+// d'uniformiser » : on n'uniformise pas, chaque dossier déclare ce qu'il exige,
+// et il le déclare TOUT SEUL —
+//   · le devis  : un PDF déposé, ou un passage par le chiffrage ;
+//   · le BAT    : un PDF déposé, ou un passage par une étape de BAT ;
+//   · l'argent  : dès qu'il y a un montant à encaisser.
+// La tasse à 12 € payée au comptoir n'exige donc RIEN : pas de devis, pas de
+// BAT, et l'argent déjà encaissé. Sa carte ne porte pas cette rangée du tout.
+// Les 200 t-shirts exigent les trois, sans que personne ait coché quoi que ce
+// soit.
+//
+// LE VERT SE TAIT, L'ÉCHEC PARLE (règle de la maison). Ce qui est obtenu passe
+// en gris discret : quand tout va bien, il n'y a rien à lire. Ce qui manque
+// porte la couleur d'état et la graisse — c'est la seule chose qu'on cherche.
+//
+// EN LECTURE SEULE POUR L'INSTANT : ce feu AFFICHE, il ne bloque pas. Seul le
+// BAT refuse encore le passage en production (verrou de server.js). On regarde
+// d'abord si la règle dit vrai sur de vrais dossiers ; on verrouillera ensuite.
+const FEU_FAITS = [
+  {
+    cle: 'devis',
+    label: 'Devis',
+    requis: (r) => r.devis_requis === true,
+    obtenu: (r) => !!r.devis_valide_le,
+    dit: (r) => (r.devis_valide_le
+      ? `Devis validé le ${dateFr(r.devis_valide_le)}`
+      : 'Devis pas encore validé par le client'),
+  },
+  {
+    cle: 'bat',
+    label: 'BAT',
+    requis: (r) => r.bat_requis === true,
+    obtenu: (r) => !!r.bat_valide_le,
+    dit: (r) => (r.bat_valide_le
+      ? `BAT validé le ${dateFr(r.bat_valide_le)}`
+      : 'BAT pas encore validé par le client'),
+  },
+  {
+    cle: 'argent',
+    label: 'Argent',
+    // Il n'y a d'argent à attendre que s'il y a un montant. Un dossier encore
+    // « à chiffrer » n'exige rien : on ne peut pas réclamer ce qu'on n'a pas
+    // encore annoncé.
+    requis: (r) => r.project_value != null,
+    // « CERTAINS ONT DES ACOMPTES » : couvert, ce n'est pas soldé — c'est soldé
+    // OU un acompte demandé ET reçu. Un acompte demandé qui n'est pas versé ne
+    // couvre rien.
+    obtenu: (r) => r.paye === true || (r.acompte_demande === true && r.acompte_verse === true),
+    dit: (r) => {
+      if (r.paye === true) return 'Soldée';
+      if (r.acompte_demande === true && r.acompte_verse === true) {
+        return r.acompte_montant != null
+          ? `Acompte reçu (${eur(Number(r.acompte_montant))})`
+          : 'Acompte reçu';
+      }
+      if (r.acompte_demande === true) return 'Acompte demandé — pas encore reçu';
+      return 'Rien d’encaissé';
+    },
+  },
+];
+
+// Ce que le dossier exige, et où il en est. Rien à afficher = rien n'est exigé.
+function feuDuDossier(r) {
+  return FEU_FAITS.filter((f) => f.requis(r))
+    .map((f) => ({ cle: f.cle, label: f.label, ok: f.obtenu(r), dit: f.dit(r) }));
+}
+
+function blocFeu(r) {
+  const faits = feuDuDossier(r);
+  if (!faits.length) return null;
+  const bloc = document.createElement('div');
+  bloc.className = 'feu';
+  const manquants = faits.filter((f) => !f.ok).length;
+  bloc.setAttribute('aria-label', manquants === 0
+    ? 'Rien ne manque avant la production'
+    : `${manquants} condition${manquants > 1 ? 's' : ''} manquante${manquants > 1 ? 's' : ''} avant la production`);
+  for (const f of faits) {
+    const s = document.createElement('span');
+    s.className = `feu__pt${f.ok ? ' is-ok' : ' is-manque'}`;
+    s.textContent = `${f.ok ? '●' : '◌'} ${f.label}`;
+    attachTip(s, f.dit);
+    bloc.appendChild(s);
+  }
+  return bloc;
+}
+
 function blocProduction(r) {
   const p = r.fiche && r.fiche.prod;
   if (!p || typeof p !== 'object') return null;
@@ -1739,7 +1833,11 @@ function buildCard(r, options) {
   const prixVisible = !hiddenCols.has('price');
   // Ce qu'il y a à produire se lit sous le nom du dossier, avant les pastilles
   // d'état : c'est la réponse à « QUOI », pas une décoration de l'étape.
-  const quoi = [nom, blocProduction(r), meta, motif].filter(Boolean);
+  // LE FEU juste sous le nom du projet : « qu'est-ce que c'est » puis « est-ce
+  // que ça peut avancer ». C'est la première question du patron, elle passe
+  // donc avant le détail de production.
+  const quoi = [nom, hiddenCols.has('feu') ? null : blocFeu(r), blocProduction(r), meta, motif]
+    .filter(Boolean);
   carte.append(
     blocClient,
     pcardBloc('Projet', ...quoi),
@@ -3262,6 +3360,12 @@ function cellInfos(r) {
   // LE MÊME BLOC QUE SUR LA CARTE, au même endroit dans la lecture : ce qu'il y
   // a à produire d'abord, la note libre ensuite. Deux vues à un clic l'une de
   // l'autre doivent donner le même composant, pas deux qui se ressemblent.
+  // LE MÊME COMPOSANT DANS LES DEUX VUES — deux écrans à un clic l'un de l'autre
+  // doivent donner le même bloc, pas deux qui se ressemblent.
+  if (!hiddenCols.has('feu')) {
+    const feu = blocFeu(r);
+    if (feu) stack.appendChild(feu);
+  }
   const prod = blocProduction(r);
   if (prod) stack.appendChild(prod);
 
@@ -6726,6 +6830,7 @@ const PLANNING_COLS = [
   // DEUX vues (voir blocProduction), d'où `surCarte`.
   // `horsTableau` : elles n'ont pas de colonne à elles — le bloc se pose dans
   // la cellule « Infos » et dans le bloc « Projet » de la carte.
+  { key: 'feu',          label: 'Ce qui manque (devis/BAT/argent)', surCarte: true, horsTableau: true },
   { key: 'prod_ref',     label: 'Référence & couleur', surCarte: true, horsTableau: true },
   { key: 'prod_dtf',     label: 'Couleur du marquage', surCarte: true, horsTableau: true },
   { key: 'prod_tailles', label: 'Quantité par taille', surCarte: true, horsTableau: true },
@@ -6740,7 +6845,7 @@ const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) 
 // Celles dont la case change ce qu'une ligne DESSINE, sans changer de vue : il
 // faut les redessiner à la main. Le ticket n'en est pas — sa place reste
 // réservée sur toutes les cartes, c'est le CSS qui l'affiche ou non.
-const COLS_REDESSINENT = new Set(['price', 'prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']);
+const COLS_REDESSINENT = new Set(['price', 'feu', 'prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']);
 // Celles qui n'existent QUE dans le tableau : ce sont elles, et elles seules,
 // qui décident de la vue (cf. modeCartes). Le ticket en est exclu — le retirer
 // sur les cartes doit retirer le bouton, pas rappeler le tableau complet.

@@ -1067,6 +1067,26 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    carte qui ne montre que « TAILLES » et sa voisine qui montre « RÉF. »
    n'alignaient pas leurs valeurs, et la file se lisait en escalier — c'est le
    défaut qu'on paie à chaque fois qu'une piste de grille dépend du contenu. */
+/* LE FEU — ce qui manque avant de produire (devis · BAT · argent).
+   LE VERT SE TAIT, L'ÉCHEC PARLE (règle de la maison) : ce qui est obtenu
+   passe en gris discret, ce qui manque porte la couleur d'état et la graisse.
+   Quand tout va bien, il n'y a rien à lire — et c'est le but.
+   La rangée ne s'affiche PAS quand le dossier n'exige rien : une tasse payée
+   au comptoir n'a ni devis, ni BAT, ni argent en attente, sa carte reste nue.
+   `flex-wrap` plutôt qu'une grille : de un à trois faits selon le dossier, la
+   rangée ne doit pas réserver de place pour ceux qui n'existent pas. */
+.feu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--pas-3);
+  margin-top: 6px;
+  font-size: var(--taille-note);
+  line-height: 1.5;
+}
+.feu__pt { white-space: nowrap; }
+.feu__pt.is-ok { color: var(--text-3); font-weight: var(--graisse-texte); }
+.feu__pt.is-manque { color: var(--danger); font-weight: var(--graisse-forte); }
+
 .prod-fiche {
   /* La colonne des intitulés se cale sur le PLUS LARGE, mesuré au rendu :
      « MARQUAGE » fait 83 px en 14 px capitales (+.05em). À 68 px — la valeur

@@ -1224,6 +1224,9 @@ const COLONNES_REQUEST = [
   // LE BAT : la grille en a besoin pour marquer les lignes qu'on ne doit pas
   // encore produire, et la fiche pour dire pourquoi le passage est refusé.
   'bat_requis', 'bat_valide_le',
+  // LE DEVIS, en miroir : la carte en a besoin pour dire ce qui manque AVANT
+  // qu'on tente de produire.
+  'devis_requis', 'devis_valide_le',
   // La provenance de la demande, la date PRÉVUE par l'atelier (à ne pas
   // confondre avec la date souhaitée par le client) et le créneau de retrait.
   'provenance', 'date_prevue', 'retrait_creneau',
@@ -2243,6 +2246,11 @@ app.get('/api/counts', asyncH(async (req, res) => {
 // de BAT — c'est-à-dire sur tout dossier venu du comptoir avec une destination.
 // Le verrou paraissait alors fonctionner et laissait passer la moitié des cas.
 const ETAPES_BAT = new Set(['prepa_bat', 'bat_envoye', 'bat_modif', 'bat_valide']);
+// LE DEVIS SUIT LA MÊME RÈGLE (26/08). Un dossier qui traverse le chiffrage en
+// exige un ; « Devis validé » pose la date. Ce sont les mêmes trois lignes que
+// pour le BAT, et pour la même raison : personne n'a à cocher une case.
+const ETAPES_DEVIS = new Set(['chiffrage_en_cours', 'devis_envoye', 'devis_valide']);
+
 async function marquerBat(id, sousEtape) {
   if (!ETAPES_BAT.has(sousEtape)) return;
   const valide = sousEtape === 'bat_valide';
@@ -2251,6 +2259,16 @@ async function marquerBat(id, sousEtape) {
        ${valide ? ', bat_valide_le = COALESCE(bat_valide_le, now())' : ''}
      WHERE id = $1`, [id],
   ).catch(() => { /* le verrou est un garde-fou, pas une raison de faire échouer */ });
+}
+
+async function marquerDevis(id, sousEtape) {
+  if (!ETAPES_DEVIS.has(sousEtape)) return;
+  const valide = sousEtape === 'devis_valide';
+  await pool.query(
+    `UPDATE requests SET devis_requis = true
+       ${valide ? ', devis_valide_le = COALESCE(devis_valide_le, now())' : ''}
+     WHERE id = $1`, [id],
+  ).catch(() => { /* garde-fou, jamais une raison de faire échouer la requête */ });
 }
 
 // POST /api/requests → crée (corps partiel autorisé)
@@ -2294,8 +2312,13 @@ app.post('/api/requests', exige('clients'), asyncH(async (req, res) => {
   query = `INSERT INTO requests (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`;
   const { rows } = await pool.query(query, params);
   await marquerBat(rows[0].id, rows[0].sub_stage);
+  await marquerDevis(rows[0].id, rows[0].sub_stage);
   broadcast({ kind: 'create', stages: [rows[0].stage] });
-  res.status(201).json({ ...rows[0], ...(ETAPES_BAT.has(rows[0].sub_stage) ? { bat_requis: true } : {}) });
+  res.status(201).json({
+    ...rows[0],
+    ...(ETAPES_BAT.has(rows[0].sub_stage) ? { bat_requis: true } : {}),
+    ...(ETAPES_DEVIS.has(rows[0].sub_stage) ? { devis_requis: true } : {}),
+  });
 }));
 
 // POST /api/requests/:id/copie → recopie une commande (« Dupliquer », « Envoyer
@@ -2497,6 +2520,7 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   // ça ne se voyait pas ; maintenant que l'écran écoute ce champ, c'est lui qui
   // décide — il doit donc être exact.
   await marquerBat(req.params.id, rows[0].sub_stage);
+  await marquerDevis(req.params.id, rows[0].sub_stage);
 
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
@@ -2843,6 +2867,11 @@ app.put('/api/requests/:id/pdf/:kind', exige('clients'),
     // le ferait.
     if (kind === 'bat') {
       await pool.query('UPDATE requests SET bat_requis = true WHERE id = $1', [id]).catch(() => {});
+    }
+    // DÉPOSER UN DEVIS, C'EST EN AVOIR UN. Même règle, même raison : le dossier
+    // en exige un désormais, sans que personne ait eu à le déclarer.
+    if (kind === 'devis') {
+      await pool.query('UPDATE requests SET devis_requis = true WHERE id = $1', [id]).catch(() => {});
     }
     const stage = await touchRequest(id);
     broadcast({ kind: 'update', stages: stage ? [stage] : [] });

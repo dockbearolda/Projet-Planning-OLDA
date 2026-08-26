@@ -426,6 +426,30 @@ async function init() {
     } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
   }
 
+  // LE DEVIS, EN MIROIR DU BAT (26/08/2026). « Quand le projet arrive en
+  // production il doit obligatoirement avoir un devis validé, un BAT validé
+  // ainsi que le paiement » (le patron, rapporté par Charlie). Le BAT avait ses
+  // deux colonnes ; le devis n'était qu'une SOUS-ÉTAPE qu'on déplaçait à la
+  // main — donc rien qu'on puisse vérifier, ni dater, ni attribuer.
+  //
+  // `devis_requis` s'arme TOUT SEUL, comme `bat_requis` : déposer un devis,
+  // c'est en avoir un ; et un dossier né d'une demande de devis en exige un par
+  // construction. Personne n'a à cocher « ce dossier a un devis », et personne
+  // ne le ferait.
+  //
+  // La date, elle, dit QUAND et — au journal — PAR QUI. Une colonne dans un
+  // tableau ne dit ni l'un ni l'autre : c'est toute la différence entre un fait
+  // et une position.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS devis_requis, devis_valide_le;
+  for (const [col, type] of [
+    ['devis_requis', 'boolean NOT NULL DEFAULT false'],
+    ['devis_valide_le', 'timestamptz'],
+  ]) {
+    try {
+      await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
+
   // LE COÛT DE REVIENT, colonne à part. Down : ALTER TABLE requests DROP COLUMN
   // IF EXISTS cout_revient;
   try {
