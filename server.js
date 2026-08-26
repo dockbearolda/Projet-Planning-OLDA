@@ -1814,445 +1814,6 @@ app.post('/api/projets/:id/copie', exige('clients'), asyncH(async (req, res) => 
 }));
 
 // ---------------------------------------------------------------------------
-// FOURNISSEURS, CATALOGUE, STOCK, ACHATS (§14 à §18)
-//
-// Rien de tout ça n'existait : le mot « stock » n'apparaissait nulle part dans
-// le code applicatif, et le seul fournisseur connu était TopTex — comme source
-// de couleurs textile, pas comme fiche.
-//
-// LE STOCK VIT SUR LA VARIANTE, pas sur le produit : on ne commande pas « des
-// T-shirts », on commande des T-shirts noirs en L. C'est la seule façon d'avoir
-// un chiffre juste, et c'est ce que le patron décrit (§16 : recherche par
-// référence, marque, modèle, COULEUR, TAILLE).
-// ---------------------------------------------------------------------------
-const TRANSPORTS = new Set(['aerien', 'maritime']);
-const PO_STATUTS = ['a_commander', 'commande', 'expedie', 'transit', 'metropole', 'recu', 'controle'];
-const PO_STATUT_SET = new Set(PO_STATUTS);
-const PO_LABELS = {
-  a_commander: 'À commander', commande: 'Commandé', expedie: 'Expédié',
-  transit: 'En transit', metropole: 'En métropole', recu: 'Reçu', controle: 'Contrôlé',
-};
-
-// --- Fournisseurs (§17) -------------------------------------------------------
-app.get('/api/fournisseurs', asyncH(async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT * FROM suppliers WHERE ${VIVANTES_NU} ORDER BY nom ASC`,
-  );
-  res.json(rows);
-}));
-
-const FOURNISSEUR_CHAMPS = { nom: 120, contact: 120, email: 160, telephone: 40, notes: 500 };
-function corpsFournisseur(b) {
-  const v = {};
-  for (const [champ, max] of Object.entries(FOURNISSEUR_CHAMPS)) {
-    if (champ in b) v[champ] = borner(b[champ], max);
-  }
-  if ('delai_jours' in b) {
-    const n = Number.parseInt(b.delai_jours, 10);
-    v.delai_jours = Number.isInteger(n) && n >= 0 && n <= 365 ? n : null;
-  }
-  if ('transport' in b) v.transport = TRANSPORTS.has(b.transport) ? b.transport : null;
-  return v;
-}
-
-app.post('/api/fournisseurs', exige('clients'), asyncH(async (req, res) => {
-  const v = corpsFournisseur(req.body || {});
-  if (!v.nom) return res.status(400).json({ error: 'le nom du fournisseur est obligatoire' });
-  const cols = Object.keys(v);
-  const { rows } = await pool.query(
-    `INSERT INTO suppliers (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *`,
-    cols.map((c) => v[c]),
-  );
-  broadcast({ kind: 'fournisseurs' });
-  res.status(201).json(rows[0]);
-}));
-
-app.patch('/api/fournisseurs/:id', exige('clients'), asyncH(async (req, res) => {
-  const v = corpsFournisseur(req.body || {});
-  const cols = Object.keys(v);
-  if (!cols.length) return res.status(400).json({ error: 'rien à modifier' });
-  const { rows } = await pool.query(
-    `UPDATE suppliers SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(', ')}, updated_at = now()
-      WHERE id = $${cols.length + 1} AND ${VIVANTES_NU} RETURNING *`,
-    [...cols.map((c) => v[c]), req.params.id],
-  );
-  if (!rows.length) return res.status(404).json({ error: 'Fournisseur introuvable' });
-  broadcast({ kind: 'fournisseurs' });
-  res.json(rows[0]);
-}));
-
-// Un fournisseur se DÉSACTIVE : ses commandes passées le citent.
-app.delete('/api/fournisseurs/:id', exige('clients'), asyncH(async (req, res) => {
-  const { rowCount } = await pool.query(
-    `UPDATE suppliers SET deleted_at = now() WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
-  );
-  if (!rowCount) return res.status(404).json({ error: 'Fournisseur introuvable' });
-  broadcast({ kind: 'fournisseurs' });
-  res.status(204).end();
-}));
-
-// --- Catalogue et stock (§14, §15, §16) ---------------------------------------
-
-// GET /api/produits?q=… → LA recherche du §16 : « référence, marque, modèle,
-// couleur, taille, fournisseur ». Une seule requête, sur le foin de tous ces
-// champs — un poste ne doit pas avoir à choisir DANS QUOI il cherche.
-app.get('/api/produits', asyncH(async (req, res) => {
-  const jetons = replier(req.query.q).split(/\s+/).filter(Boolean).slice(0, 6);
-  const params = [];
-  const foin = `translate(lower(concat_ws(' ',
-    p.ref_interne, p.ref_fournisseur, p.designation, p.famille, p.marque, p.technique,
-    s.nom, v.couleur, v.taille)), '${ACCENTS}', '${SANS_ACCENTS}')`;
-  const conditions = jetons.map((j, i) => { params.push(j); return `strpos(${foin}, $${i + 1}) > 0`; });
-  const where = [`p.${VIVANTES_NU}`, ...conditions].join(' AND ');
-  const { rows } = await pool.query(
-    `SELECT p.*, s.nom AS fournisseur,
-            v.id AS variant_id, v.couleur, v.taille, v.stock_reel, v.stock_reserve, v.best_seller
-       FROM products p
-       LEFT JOIN suppliers s ON s.id = p.supplier_id
-       LEFT JOIN variants v ON v.product_id = p.id
-      WHERE ${where}
-      ORDER BY p.designation ASC, v.couleur ASC NULLS FIRST, v.taille ASC NULLS FIRST
-      LIMIT 400`, params,
-  );
-
-  // On rend un PRODUIT avec ses variantes, pas une ligne par variante : c'est
-  // ainsi que le patron le décrit, et un T-shirt en 7 tailles × 12 couleurs
-  // ferait sinon 84 lignes indiscernables à l'écran.
-  const parProduit = new Map();
-  for (const r of rows) {
-    if (!parProduit.has(r.id)) {
-      const { variant_id: _v, couleur: _c, taille: _t, stock_reel: _sr,
-        stock_reserve: _srv, best_seller: _bs, ...produit } = r;
-      parProduit.set(r.id, { ...produit, variantes: [], stock_reel: 0, stock_reserve: 0 });
-    }
-    const p = parProduit.get(r.id);
-    if (!r.variant_id) continue;
-    p.variantes.push({
-      id: r.variant_id, couleur: r.couleur, taille: r.taille,
-      stock_reel: r.stock_reel, stock_reserve: r.stock_reserve,
-      // LE DISPONIBLE NE SE RANGE PAS : il se déduit. Rangé, il se
-      // désynchronise au premier des deux autres qui bouge — et c'est LUI
-      // qu'on regarde pour dire oui ou non à un client.
-      disponible: r.stock_reel - r.stock_reserve,
-      best_seller: r.best_seller,
-    });
-    p.stock_reel += r.stock_reel;
-    p.stock_reserve += r.stock_reserve;
-  }
-  const liste = [...parProduit.values()].map((p) => ({
-    ...p, disponible: p.stock_reel - p.stock_reserve,
-    // La VALEUR du stock (§16), au prix d'ACHAT : au prix de vente, ce serait un
-    // chiffre d'affaires espéré, pas ce qu'on a immobilisé.
-    valeur: p.prix_achat == null ? null : Math.round(Number(p.prix_achat) * p.stock_reel * 100) / 100,
-  }));
-  res.json(peut(req.moi, 'marge') ? liste : liste.map((p) => {
-    const { prix_achat: _a, valeur: _v, ...reste } = p;
-    return reste;
-  }));
-}));
-
-const PRODUIT_TEXTES = { ref_interne: 60, ref_fournisseur: 60, designation: 160, famille: 60, marque: 60, technique: 40, notes: 500 };
-function corpsProduit(b) {
-  const v = {};
-  for (const [champ, max] of Object.entries(PRODUIT_TEXTES)) {
-    if (champ in b) v[champ] = borner(b[champ], max);
-  }
-  for (const champ of ['prix_achat', 'prix_vente']) {
-    if (!(champ in b)) continue;
-    const n = Number(b[champ]);
-    v[champ] = Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
-  }
-  if ('poids_g' in b) {
-    const n = Number.parseInt(b.poids_g, 10);
-    v.poids_g = Number.isInteger(n) && n >= 0 ? n : null;
-  }
-  if ('supplier_id' in b) v.supplier_id = b.supplier_id || null;
-  if ('actif' in b) v.actif = b.actif !== false;
-  return v;
-}
-
-// POST /api/produits → crée un produit, avec ses variantes s'il en a.
-//
-// §15 : « Le système ne doit jamais me bloquer parce qu'un produit n'existe pas
-// encore dans le catalogue. » Un produit se crée donc avec une désignation et
-// rien d'autre — référence, fournisseur, prix, tout est facultatif.
-app.post('/api/produits', exige('clients'), asyncH(async (req, res) => {
-  const b = req.body || {};
-  const v = corpsProduit(b);
-  if (!v.designation) return res.status(400).json({ error: 'la désignation est obligatoire' });
-  const cols = Object.keys(v);
-  const cx = await pool.connect();
-  let produit;
-  try {
-    await cx.query('BEGIN');
-    const { rows } = await cx.query(
-      `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *`,
-      cols.map((c) => v[c]),
-    );
-    produit = rows[0];
-    // Un produit SANS variante déclarée en reçoit une, neutre : sans elle il
-    // n'aurait aucun endroit où porter du stock, et il faudrait y penser plus
-    // tard — c'est-à-dire jamais.
-    const variantes = Array.isArray(b.variantes) && b.variantes.length
-      ? b.variantes
-      : [{ couleur: null, taille: null }];
-    for (const va of variantes.slice(0, 200)) {
-      await cx.query(
-        'INSERT INTO variants (product_id, couleur, taille, stock_reel, best_seller) VALUES ($1,$2,$3,$4,$5)',
-        [produit.id, borner(va && va.couleur, 40), borner(va && va.taille, 20),
-          Number.isInteger(Number(va && va.stock_reel)) ? Number(va.stock_reel) : 0,
-          !!(va && va.best_seller)],
-      );
-    }
-    await cx.query('COMMIT');
-  } catch (err) {
-    await cx.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    cx.release();
-  }
-  broadcast({ kind: 'produits' });
-  res.status(201).json(produit);
-}));
-
-app.patch('/api/produits/:id', exige('clients'), asyncH(async (req, res) => {
-  const v = corpsProduit(req.body || {});
-  const cols = Object.keys(v);
-  if (!cols.length) return res.status(400).json({ error: 'rien à modifier' });
-  const { rows } = await pool.query(
-    `UPDATE products SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(', ')}, updated_at = now()
-      WHERE id = $${cols.length + 1} AND ${VIVANTES_NU} RETURNING *`,
-    [...cols.map((c) => v[c]), req.params.id],
-  );
-  if (!rows.length) return res.status(404).json({ error: 'Produit introuvable' });
-  broadcast({ kind: 'produits' });
-  res.json(rows[0]);
-}));
-
-// POST /api/variantes/:id/mouvement → LE SEUL chemin qui change un stock.
-//
-// On n'écrit JAMAIS `stock_reel` directement : chaque changement passe par un
-// mouvement daté et signé. Sans ça, « il en manque trois » n'a aucune réponse —
-// on ne saurait pas si c'est une casse, une sortie oubliée ou une erreur de
-// comptage. L'inventaire lui-même est un mouvement (l'écart constaté).
-app.post('/api/variantes/:id/mouvement', exige('production'), asyncH(async (req, res) => {
-  const b = req.body || {};
-  const delta = Number.parseInt(b.delta, 10);
-  if (!Number.isInteger(delta) || delta === 0) {
-    return res.status(400).json({ error: 'delta doit être un entier non nul' });
-  }
-  const motif = borner(b.motif, 40) || 'ajustement';
-  const cx = await pool.connect();
-  let variante;
-  try {
-    await cx.query('BEGIN');
-    // `FOR UPDATE` : deux réceptions saisies en même temps liraient sinon le
-    // même stock d'avant, et la seconde écraserait la première.
-    const { rows: v } = await cx.query('SELECT * FROM variants WHERE id = $1 FOR UPDATE', [req.params.id]);
-    if (!v.length) { await cx.query('ROLLBACK'); return res.status(404).json({ error: 'Variante introuvable' }); }
-    // LE STOCK PEUT DESCENDRE SOUS ZÉRO, et on le laisse : refuser une sortie
-    // parce que le compteur dit 0 alors que la pièce est dans la main de
-    // l'opérateur, c'est apprendre à ne plus rien saisir. Un négatif se VOIT et
-    // se corrige à l'inventaire ; une saisie refusée ne se voit jamais.
-    const { rows: maj } = await cx.query(
-      'UPDATE variants SET stock_reel = stock_reel + $1, updated_at = now() WHERE id = $2 RETURNING *',
-      [delta, req.params.id],
-    );
-    variante = maj[0];
-    await cx.query(
-      'INSERT INTO stock_moves (variant_id, delta, motif, request_id, qui) VALUES ($1,$2,$3,$4,$5)',
-      [req.params.id, delta, motif, b.request_id || null, quiDemande(req)],
-    );
-    await cx.query('COMMIT');
-  } catch (err) {
-    await cx.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    cx.release();
-  }
-  broadcast({ kind: 'produits' });
-  res.json({ ...variante, disponible: variante.stock_reel - variante.stock_reserve });
-}));
-
-// POST /api/variantes/:id/reserver → « une commande client validée peut réserver
-// automatiquement le stock » (§16). On ne SORT rien : la marchandise est encore
-// là, elle est simplement promise. C'est la différence entre « il en reste
-// douze » et « il en reste douze mais dix sont pour l'Hôtel Esmeralda ».
-app.post('/api/variantes/:id/reserver', exige('production'), asyncH(async (req, res) => {
-  const n = Number.parseInt((req.body || {}).quantite, 10);
-  if (!Number.isInteger(n) || n === 0) return res.status(400).json({ error: 'quantite doit être un entier non nul' });
-  const { rows } = await pool.query(
-    // Une réservation ne descend jamais sous zéro : libérer plus que ce qui est
-    // réservé donnerait un « réservé négatif », donc un disponible SUPÉRIEUR au
-    // réel — on promettrait de la marchandise qui n'existe pas.
-    `UPDATE variants SET stock_reserve = GREATEST(0, stock_reserve + $1), updated_at = now()
-      WHERE id = $2 RETURNING *`, [n, req.params.id],
-  );
-  if (!rows.length) return res.status(404).json({ error: 'Variante introuvable' });
-  broadcast({ kind: 'produits' });
-  res.json({ ...rows[0], disponible: rows[0].stock_reel - rows[0].stock_reserve });
-}));
-
-// --- Achats (§18) --------------------------------------------------------------
-app.get('/api/achats', asyncH(async (req, res) => {
-  // DEUX LECTURES, PAS UNE SOUS-REQUÊTE CORRÉLÉE. La forme
-  // `(SELECT COUNT(*) … WHERE l.order_id = o.id)` est parfaitement valide en
-  // Postgres, mais pg-mem — la base locale, celle sur laquelle tout se teste et
-  // sur laquelle le patron valide — répond « Unknown alias "o" ». L'écran des
-  // achats aurait donc été cassé EN LOCAL et parfaitement fonctionnel en
-  // production : le pire des deux mondes, et invisible tant qu'on ne l'ouvre pas.
-  const [{ rows }, { rows: comptes }] = await Promise.all([
-    pool.query(
-      `SELECT o.*, s.nom AS fournisseur
-         FROM purchase_orders o LEFT JOIN suppliers s ON s.id = o.supplier_id
-        WHERE o.${VIVANTES_NU} ORDER BY o.created_at DESC LIMIT 200`,
-    ),
-    pool.query('SELECT order_id, COUNT(*)::int AS n FROM purchase_lines GROUP BY order_id'),
-  ]);
-  const parCommande = new Map(comptes.map((c) => [c.order_id, c.n]));
-  res.json(rows.map((o) => ({
-    ...o,
-    nb_lignes: parCommande.get(o.id) || 0,
-    statut_label: PO_LABELS[o.statut] || o.statut,
-  })));
-}));
-
-app.get('/api/achats/:id', asyncH(async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT o.*, s.nom AS fournisseur FROM purchase_orders o
-       LEFT JOIN suppliers s ON s.id = o.supplier_id
-      WHERE o.id = $1 AND o.${VIVANTES_NU}`, [req.params.id],
-  );
-  if (!rows.length) return res.status(404).json({ error: 'Commande fournisseur introuvable' });
-  const { rows: lignes } = await pool.query(
-    `SELECT l.*, r.billing_company, r.product
-       FROM purchase_lines l LEFT JOIN requests r ON r.id = l.request_id
-      WHERE l.order_id = $1 ORDER BY l.created_at ASC`, [req.params.id],
-  );
-  res.json({ ...rows[0], statut_label: PO_LABELS[rows[0].statut] || rows[0].statut, lignes });
-}));
-
-app.post('/api/achats', exige('production'), asyncH(async (req, res) => {
-  const b = req.body || {};
-  const { rows } = await pool.query(
-    `INSERT INTO purchase_orders (numero, supplier_id, transport, notes)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [borner(b.numero, 40), b.supplier_id || null,
-      TRANSPORTS.has(b.transport) ? b.transport : null, borner(b.notes, 500)],
-  );
-  broadcast({ kind: 'achats' });
-  res.status(201).json(rows[0]);
-}));
-
-// POST /api/achats/:id/lignes → « ajouter plusieurs projets, regrouper les
-// besoins » (§18). Une ligne peut citer le dossier qui l'a demandée : c'est ce
-// qui permet, à la réception, de savoir quel dossier débloquer.
-app.post('/api/achats/:id/lignes', exige('production'), asyncH(async (req, res) => {
-  const b = req.body || {};
-  const designation = borner(b.designation, 160);
-  if (!designation) return res.status(400).json({ error: 'la désignation est obligatoire' });
-  const q = Number.parseInt(b.quantite, 10);
-  const prix = Number(b.prix_unitaire);
-  const { rows } = await pool.query(
-    `INSERT INTO purchase_lines (order_id, variant_id, request_id, designation, quantite, prix_unitaire)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [req.params.id, b.variant_id || null, b.request_id || null, designation,
-      Number.isInteger(q) && q > 0 ? q : 1,
-      Number.isFinite(prix) && prix >= 0 ? Math.round(prix * 100) / 100 : null],
-  );
-  broadcast({ kind: 'achats' });
-  res.status(201).json(rows[0]);
-}));
-
-app.patch('/api/achats/:id', exige('production'), asyncH(async (req, res) => {
-  const b = req.body || {};
-  const v = {};
-  if ('statut' in b) {
-    if (!PO_STATUT_SET.has(b.statut)) {
-      return res.status(400).json({ error: `statut invalide (${PO_STATUTS.join('|')})` });
-    }
-    v.statut = b.statut;
-    // Les dates se posent AVEC le statut, pas à côté : une commande passée au
-    // statut « commandé » sans date de commande ne permet pas de calculer le
-    // moindre délai, et c'est le délai qu'on regarde.
-    if (b.statut === 'commande') v.commande_le = jourAtelier();
-    if (b.statut === 'recu') v.recu_le = jourAtelier();
-  }
-  if ('transport' in b) v.transport = TRANSPORTS.has(b.transport) ? b.transport : null;
-  if ('facture_ref' in b) v.facture_ref = borner(b.facture_ref, 60);
-  if ('numero' in b) v.numero = borner(b.numero, 40);
-  if ('notes' in b) v.notes = borner(b.notes, 500);
-  if ('supplier_id' in b) v.supplier_id = b.supplier_id || null;
-  for (const champ of ['montant', 'frais_port']) {
-    if (!(champ in b)) continue;
-    const n = Number(b[champ]);
-    v[champ] = Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
-  }
-  const cols = Object.keys(v);
-  if (!cols.length) return res.status(400).json({ error: 'rien à modifier' });
-  const { rows } = await pool.query(
-    `UPDATE purchase_orders SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(', ')}, updated_at = now()
-      WHERE id = $${cols.length + 1} AND ${VIVANTES_NU} RETURNING *`,
-    [...cols.map((c) => v[c]), req.params.id],
-  );
-  if (!rows.length) return res.status(404).json({ error: 'Commande fournisseur introuvable' });
-  broadcast({ kind: 'achats' });
-  res.json(rows[0]);
-}));
-
-// POST /api/achats/:id/reception → la marchandise ARRIVE.
-//
-// C'est le seul endroit où le stock monte tout seul : chaque ligne reçue génère
-// son mouvement, avec son motif. Une réception partielle est le cas NORMAL (le
-// fournisseur envoie ce qu'il a) — on enregistre donc ce qui arrive, ligne par
-// ligne, et la commande ne passe « reçue » que lorsqu'il ne manque plus rien.
-app.post('/api/achats/:id/reception', exige('production'), asyncH(async (req, res) => {
-  const recues = Array.isArray((req.body || {}).lignes) ? req.body.lignes : [];
-  if (!recues.length) return res.status(400).json({ error: 'aucune ligne reçue' });
-  const cx = await pool.connect();
-  try {
-    await cx.query('BEGIN');
-    for (const r of recues) {
-      const n = Number.parseInt(r && r.recu, 10);
-      if (!Number.isInteger(n) || n <= 0) continue;
-      const { rows: l } = await cx.query(
-        'UPDATE purchase_lines SET recu = recu + $1 WHERE id = $2 AND order_id = $3 RETURNING *',
-        [n, r.id, req.params.id],
-      );
-      if (!l.length || !l[0].variant_id) continue;
-      await cx.query(
-        'UPDATE variants SET stock_reel = stock_reel + $1, updated_at = now() WHERE id = $2',
-        [n, l[0].variant_id],
-      );
-      await cx.query(
-        'INSERT INTO stock_moves (variant_id, delta, motif, request_id, qui) VALUES ($1,$2,$3,$4,$5)',
-        [l[0].variant_id, n, 'reception', l[0].request_id || null, quiDemande(req)],
-      );
-    }
-    const { rows: reste } = await cx.query(
-      'SELECT COUNT(*)::int AS n FROM purchase_lines WHERE order_id = $1 AND recu < quantite',
-      [req.params.id],
-    );
-    if (reste[0].n === 0) {
-      await cx.query(
-        `UPDATE purchase_orders SET statut = 'recu', recu_le = $1, updated_at = now() WHERE id = $2`,
-        [jourAtelier(), req.params.id],
-      );
-    }
-    await cx.query('COMMIT');
-  } catch (err) {
-    await cx.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    cx.release();
-  }
-  broadcast({ kind: 'achats' });
-  broadcast({ kind: 'produits' });
-  const { rows } = await pool.query('SELECT * FROM purchase_orders WHERE id = $1', [req.params.id]);
-  res.json(rows[0] || null);
-}));
-
-// ---------------------------------------------------------------------------
 // ARGENT : marge (§13), règles d'acompte (§21), pilotage (§24)
 // ---------------------------------------------------------------------------
 
@@ -2909,18 +2470,18 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
 // GET /api/recherche?q=… → UNE recherche pour tout (§44).
 //
 // « Créer une recherche permettant de retrouver rapidement : client, société,
-//   numéro projet, devis, facture, référence produit, téléphone, email. »
+//   numéro projet, téléphone, email. »
 //
-// Il y en avait TROIS : la palette (commandes), la Base clients, et le Stock.
-// Chacune marchait ; aucune ne répondait à la question telle qu'elle se pose,
-// qui est « où est ce truc ? » et pas « dans quelle table est ce truc ? ».
+// Il y en avait DEUX : la palette (commandes) et la Base clients. Chacune
+// marchait ; aucune ne répondait à la question telle qu'elle se pose, qui est
+// « où est ce truc ? » et pas « dans quelle table est ce truc ? ».
 //
-// On ne fusionne PAS les trois écrans — chacun garde le sien, qui filtre sa
+// On ne fusionne PAS les deux écrans — chacun garde le sien, qui filtre sa
 // liste sur place. On ajoute le point d'entrée qui manquait : celui qui ne
 // demande pas de choisir d'abord.
 app.get('/api/recherche', asyncH(async (req, res) => {
   const jetons = replier(req.query.q).split(/\s+/).filter(Boolean).slice(0, RECHERCHE_JETONS_MAX);
-  if (!jetons.length) return res.json({ commandes: [], clients: [], produits: [] });
+  if (!jetons.length) return res.json({ commandes: [], clients: [] });
 
   // Les trois lectures partent ENSEMBLE : en série, une recherche paierait trois
   // temps d'attente pour une frappe. Chacune est bornée court — la palette
@@ -2928,8 +2489,6 @@ app.get('/api/recherche', asyncH(async (req, res) => {
   const foinClient = `translate(lower(concat_ws(' ',
     c.entreprise, c.nom, c.prenom, c.raison_sociale, c.email, c.telephone,
     c.code, c.ville, c.zone, c.secteur)), '${ACCENTS}', '${SANS_ACCENTS}')`;
-  const foinProduit = `translate(lower(concat_ws(' ',
-    p.ref_interne, p.ref_fournisseur, p.designation, p.famille, p.marque)), '${ACCENTS}', '${SANS_ACCENTS}')`;
 
   // Les conditions se construisent AVANT, dans une variable — pas dans un
   // gabarit imbriqué au milieu de la requête. C'est la forme qu'emploie déjà la
@@ -2939,9 +2498,8 @@ app.get('/api/recherche', asyncH(async (req, res) => {
   const ou = (foin) => jetons.map((_, i) => `strpos(${foin}, $${i + 1}) > 0`).join(' AND ');
   const condCommandes = ou(FOIN_RECHERCHE);
   const condClients = ou(foinClient);
-  const condProduits = ou(foinProduit);
 
-  const [commandes, clients, produits] = await Promise.all([
+  const [commandes, clients] = await Promise.all([
     pool.query(
       `${SELECT} WHERE ${condCommandes} AND ${VIVANTES}
         ORDER BY r.updated_at DESC LIMIT 20`, jetons,
@@ -2950,16 +2508,11 @@ app.get('/api/recherche', asyncH(async (req, res) => {
       `SELECT id, entreprise, nom, prenom, ville, telephone, email, code FROM clients c
         WHERE ${condClients} AND c.${VIVANTES_NU} ORDER BY entreprise ASC LIMIT 10`, jetons,
     ),
-    pool.query(
-      `SELECT id, ref_interne, designation, famille, marque FROM products p
-        WHERE ${condProduits} AND p.${VIVANTES_NU} ORDER BY designation ASC LIMIT 10`, jetons,
-    ),
   ]);
 
   res.json({
     commandes: selonMoi(req, commandes.rows.map(allegerFiche)),
     clients: clients.rows,
-    produits: produits.rows,
   });
 }));
 

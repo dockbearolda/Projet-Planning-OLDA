@@ -283,26 +283,18 @@ delete process.env.APP_PASSWORD;
     product: 'T-shirts staff', quantity: 30,
   });
   await call('Mélina', 'POST', '/api/clients', { entreprise: 'Native Spirit Boutique', ville: 'Marigot' });
-  // MÉLINA et pas Charlie : créer au catalogue relève de la capacité `clients`,
-  // que le chef d'atelier n'a pas. Le test s'était trompé de personne — et c'est
-  // la permission qui avait raison.
-  const auCatalogue = await call('Mélina', 'POST', '/api/produits', {
-    designation: 'T-shirt NS300', marque: 'Native Spirit', ref_interne: 'OLDA-TS-001',
-  });
-  assert.strictEqual(auCatalogue.status, 201, JSON.stringify(auCatalogue.body));
-
   const globale = await call('Loïc', 'GET', '/api/recherche?q=native');
   assert.strictEqual(globale.status, 200);
   assert.ok(globale.body.commandes.some((c) => c.billing_company === 'Native Beach Bar'),
     'un seul mot trouve la commande…');
   assert.ok(globale.body.clients.some((c) => c.entreprise === 'Native Spirit Boutique'),
     '… le client, même sans commande…');
-  assert.ok(globale.body.produits.some((x) => x.designation === 'T-shirt NS300'),
-    '… et le produit au catalogue');
-
-  // Une référence interne suffit — c'est ce qu'on a sous les yeux sur l'étagère.
-  const parRef = await call('Loïc', 'GET', '/api/recherche?q=OLDA-TS-001');
-  assert.ok(parRef.body.produits.length, 'la référence interne trouve le produit');
+  // Le CATALOGUE a été retiré le 26/08 (« supprime stock définitivement ») : la
+  // recherche ne rend plus que deux natures. Ce qui compte n'a pas changé — un
+  // seul champ, et il trouve un client MÊME SANS COMMANDE, ce qu'aucune des deux
+  // recherches d'avant ne savait faire.
+  assert.strictEqual(globale.body.produits, undefined,
+    'plus de catalogue : la recherche ne prétend pas en avoir un');
 
   // L'ARCHIVE NE REMONTE PAS. Une recherche qui rend des dossiers retirés du
   // planning ferait rouvrir ce qu'on vient de ranger.
@@ -315,15 +307,17 @@ delete process.env.APP_PASSWORD;
 
   // Rien à chercher = rien à répondre, sans balayer trois tables pour le dire.
   const vide = await call('Loïc', 'GET', '/api/recherche?q=');
-  assert.deepStrictEqual(vide.body, { commandes: [], clients: [], produits: [] });
+  assert.deepStrictEqual(vide.body, { commandes: [], clients: [] });
 
   // Côté écran : une commande passe TOUJOURS par le chemin unique, un client et
   // un produit vont sur LEUR écran — les envoyer au planning chercherait une
   // commande qui n'existe pas, et le clic semblerait ne rien faire.
-  assert.ok(/GROUPE_RECHERCHE = \{ __clients: 'Clients', __produits: 'Catalogue' \}/.test(APP),
-    'les deux natures qui ne sont pas des commandes ont leur groupe');
-  assert.ok(/olda:chercher-client/.test(APP) && /olda:chercher-produit/.test(APP),
-    'cliquer un client ou un produit emmène l’écran d’arrivée sur CE résultat');
+  assert.ok(/GROUPE_RECHERCHE = \{ __clients: 'Clients' \}/.test(APP),
+    'la nature qui n’est pas une commande a son groupe');
+  assert.ok(/olda:chercher-client/.test(APP),
+    'cliquer un client emmène la Base clients sur CE résultat');
+  assert.ok(!/olda:chercher-produit/.test(APP),
+    '… et il ne reste aucun chemin vers un écran Stock qui n’existe plus');
 
   console.log('✓ BAT verrouillé, devis versionnés, motifs comptables, client pesé, UNE recherche');
   process.exit(0);

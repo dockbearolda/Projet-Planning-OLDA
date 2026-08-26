@@ -143,13 +143,6 @@
           <svg class="nav-switch-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6 2h12a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4zM6.6 10.4h2.6V9.3c0-2.2 1.5-3.6 3.7-3.6h1.6v2.4h-1.2c-.9 0-1.4.5-1.4 1.3v1h2.4v2.3h-2.4V19H9.2v-6.3H6.6zM15.9 12.7h1.9V19h-1.9zM15.9 5.8h1.9v2.1h-1.9z"/></svg>
           <span class="nav-switch-label">Fiverr</span>
         </a>
-        <!-- `inventory` n'est pas dans la police (91 glyphes) : `shopping_cart`
-             y est, et c'est déjà l'icône d'« À commander » — deux entrées
-             voisines, même famille de geste. -->
-        <a class="nav-switch-btn nav-switch-btn--stock" id="viewStock" href="#stock" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">shopping_cart</span>
-          <span class="nav-switch-label">Stock</span>
-        </a>
         <a class="nav-switch-btn" id="viewACommander" href="#a-commander">
           <span class="material-symbols-outlined" aria-hidden="true">shopping_cart</span>
           <span class="nav-switch-label">À commander</span>
@@ -388,10 +381,6 @@
              ici seulement. Réservé (capacité `marge`), côté serveur compris. -->
         <section class="pilotage" id="pilotage" hidden aria-label="Pilotage"></section>
 
-        <!-- Onglet Stock : catalogue, déclinaisons, fournisseurs et commandes
-             fournisseur. Trois moments du même geste — on cherche ce qu'on a,
-             on voit qu'il en manque, on le commande — donc un seul écran. -->
-        <section class="stock" id="stock" hidden aria-label="Stock"></section>
 
         <!-- Onglet Nouveau Projet : LES DEUX flux du comptoir — vente directe
              et demande de devis. L'aiguillage (nouveau-projet.js, chargé au

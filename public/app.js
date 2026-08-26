@@ -6995,7 +6995,7 @@ const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.slug, i]));
 // Les deux natures de résultat qui ne sont pas des commandes. Elles portent un
 // « stage » à elles pour que le groupement existant les range sans savoir
 // qu'elles sont d'une autre nature.
-const GROUPE_RECHERCHE = { __clients: 'Clients', __produits: 'Catalogue' };
+const GROUPE_RECHERCHE = { __clients: 'Clients' };
 
 // Interroge le serveur. Le jeton écarte les réponses dépassées : sur une frappe
 // rapide, celle de « po » peut revenir APRÈS celle de « polo » et réafficher les
@@ -7015,7 +7015,6 @@ function rechercheServeur(texte) {
       return [
         ...(data.commandes || []),
         ...(data.clients || []).map((c) => ({ ...c, __quoi: 'client', stage: '__clients' })),
-        ...(data.produits || []).map((x) => ({ ...x, __quoi: 'produit', stage: '__produits' })),
       ];
     });
 }
@@ -7157,7 +7156,7 @@ function renderPaletteResults(hits, tokens) {
 
   if (!hits.length) {
     $paletteCount.textContent = '0 résultat';
-    paletteMessage('Rien ne correspond — ni commande, ni client, ni produit.');
+    paletteMessage('Rien ne correspond — ni commande, ni client.');
     return;
   }
 
@@ -7193,14 +7192,12 @@ function buildPaletteItem(r, tokens, idx) {
   el.setAttribute('role', 'option');
   el.dataset.idx = idx;
 
-  const title = r.__quoi === 'client' ? r.entreprise
-    : r.__quoi === 'produit' ? r.designation
-      : (r.billing_company || r.contact_referent || '— sans dossier');
+  const title = r.__quoi === 'client'
+    ? r.entreprise
+    : (r.billing_company || r.contact_referent || '— sans dossier');
   const desc = r.__quoi === 'client'
     ? [r.nom, r.ville, r.telephone, r.email].filter(Boolean).join(' · ')
-    : r.__quoi === 'produit'
-      ? [r.ref_interne, r.marque, r.famille].filter(Boolean).join(' · ')
-      : (r.product || r.description || '');
+    : (r.product || r.description || '');
 
   const main = document.createElement('div');
   main.className = 'spi-main';
@@ -7282,7 +7279,7 @@ function revealRow(id) {
 // la palette, met la ligne brièvement en évidence.
 async function jumpToResult(r) {
   closePalette();
-  // UN CLIENT ET UN PRODUIT NE S'OUVRENT PAS AU PLANNING. Les envoyer sur
+  // UN CLIENT NE S'OUVRE PAS AU PLANNING. L'envoyer sur
   // `ouvrirCommandeAuPlanning` chercherait une commande qui n'existe pas, et le
   // clic semblerait « ne rien faire » — le pire résultat possible pour une
   // recherche, parce qu'on ne sait pas si on a mal cherché ou mal cliqué.
@@ -7293,13 +7290,6 @@ async function jumpToResult(r) {
     // pas chargé sa liste.
     setTimeout(() => window.dispatchEvent(
       new CustomEvent('olda:chercher-client', { detail: r.entreprise }),
-    ), 120);
-    return;
-  }
-  if (r.__quoi === 'produit') {
-    location.hash = '#stock';
-    setTimeout(() => window.dispatchEvent(
-      new CustomEvent('olda:chercher-produit', { detail: r.ref_interne || r.designation }),
     ), 120);
     return;
   }
@@ -7585,7 +7575,6 @@ async function rafraichirLaVue() {
   if (viewMode === 'reglages') return mountReglages();
   if (viewMode === 'montravail') return mountMonTravail();
   if (viewMode === 'pilotage') return mountPilotage();
-  if (viewMode === 'stock') return mountStock();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7660,11 +7649,9 @@ const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $viewMonTravail = document.getElementById('viewMonTravail');
 const $viewPilotage = document.getElementById('viewPilotage');
-const $viewStock = document.getElementById('viewStock');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
-const $stock = document.getElementById('stock');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7772,19 +7759,6 @@ function mountClients() {
 // MON TRAVAIL — même montage paresseux que les autres vues : le module ne part
 // du serveur qu'au premier passage sur l'onglet, et l'écran de l'opérateur ne
 // pèse rien sur le démarrage de ceux qui ne l'ouvrent jamais.
-let stkLoading = null;
-let stkModule = null;
-function mountStock() {
-  if (!$stock) return;
-  if (!stkLoading) {
-    stkLoading = import('./stock.js')
-      .then((m) => { stkModule = m; return m.initStock($stock); })
-      .catch((err) => { stkLoading = null; stkModule = null; reportError(err); });
-  } else if (stkModule && stkModule.refreshStock) {
-    stkModule.refreshStock();
-  }
-}
-
 let pilLoading = null;
 let pilModule = null;
 function mountPilotage() {
@@ -7917,7 +7891,6 @@ function setViewMode(mode) {
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
-  if ($viewStock) $viewStock.classList.toggle('active', mode === 'stock');
   if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
@@ -7936,14 +7909,12 @@ function setViewMode(mode) {
   const reglages = mode === 'reglages';
   const montravail = mode === 'montravail';
   const pilotage = mode === 'pilotage';
-  const stock = mode === 'stock';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($montravail) $montravail.hidden = !montravail;
   if ($pilotage) $pilotage.hidden = !pilotage;
-  if ($stock) $stock.hidden = !stock;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7961,7 +7932,6 @@ function setViewMode(mode) {
   if (reglages) mountReglages();
   if (montravail) mountMonTravail();
   if (pilotage) mountPilotage();
-  if (stock) mountStock();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7979,7 +7949,7 @@ const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
-  '#pilotage': 'pilotage', '#stock': 'stock',
+  '#pilotage': 'pilotage',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {
@@ -8109,9 +8079,6 @@ function appliquerDroits() {
   // Direction. Sans comptes, personne ne le voit : il n'aurait aucun sens
   // d'exposer le CA sur un poste qui ne sait pas qui l'utilise.
   onglet($viewPilotage, comptesActifs() && puisJe('marge'));
-  // Le stock intéresse l'atelier qui sort la marchandise ET la boutique qui la
-  // promet : on l'ouvre à qui a l'une OU l'autre capacité.
-  onglet($viewStock, puisJe('production') || puisJe('clients'));
   onglet($viewReglages, puisJe('reglages'));
   onglet($viewClients, puisJe('clients'));
   onglet($viewProjet, puisJe('clients'));
@@ -8133,8 +8100,7 @@ function appliquerDroits() {
 
   // L'onglet ouvert est peut-être celui qu'on vient de fermer : on ne laisse
   // personne devant un écran qu'il n'a plus le droit de lire.
-  const interdit = (location.hash === '#stock' && !puisJe('production') && !puisJe('clients'))
-    || (location.hash === '#pilotage' && !puisJe('marge'))
+  const interdit = (location.hash === '#pilotage' && !puisJe('marge'))
     || (location.hash === '#reglages' && !puisJe('reglages'))
     || (location.hash === '#clients' && !puisJe('clients'))
     || (location.hash === '#nouveau-projet' && !puisJe('clients'));

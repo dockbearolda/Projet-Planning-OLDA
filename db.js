@@ -488,6 +488,9 @@ async function init() {
 
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
+  // Le stock retiré le 26/08 : on récupère la place, mais seulement si personne
+  // n'y a rien saisi.
+  await retirerTablesStock();
   // Même règle pour les deux autres reliquats : on ne retire QUE ce qui est vide.
   await retirerTableProductionSectors();
   await retirerColonneStatus();
@@ -499,6 +502,45 @@ async function init() {
 // plus ancienne), on n'y touche pas : ce n'est pas au démarrage du service de
 // décider de supprimer des données que personne n'a regardées.
 // Down : voir le DDL conservé dans schema.sql.
+// LE STOCK A ÉTÉ RETIRÉ (26/08/2026, décision de Charlie : « supprime stock
+// définitivement »). Les six tables du lot 5 — catalogue, déclinaisons,
+// mouvements, fournisseurs, commandes fournisseur et leurs lignes — ne sont plus
+// créées ni lues par personne.
+//
+// On les retire des bases qui les portent, mais SEULEMENT si elles sont toutes
+// VIDES : c'est la règle du dépôt pour tout ménage de schéma, et ici elle a une
+// raison de plus — rien n'a jamais été déployé, donc une base qui contiendrait
+// des lignes serait une base où quelqu'un a saisi pour de bon.
+//
+// Down (tout est dans le commit ca5d556) :
+//   git revert af709a2  →  rend l'écran, les routes et le schéma.
+async function retirerTablesStock() {
+  const tables = ['purchase_lines', 'purchase_orders', 'stock_moves', 'variants', 'products', 'suppliers'];
+  let occupees = 0;
+  for (const t of tables) {
+    try {
+      const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM ${t}`);
+      if (rows[0].n > 0) occupees += rows[0].n;
+    } catch (_) { /* absente : c'est ce qu'on veut */ }
+  }
+  if (occupees > 0) {
+    console.log(`ℹ  Tables du stock conservées : elles contiennent ${occupees} ligne(s).`);
+    return;
+  }
+  // L'ORDRE COMPTE : les lignes d'achat avant les commandes, les déclinaisons
+  // avant les produits. Sur une base qui porte de vraies clés étrangères,
+  // l'inverse échouerait — et sur pg-mem, qui n'en pose pas, ça ne coûte rien.
+  for (const t of tables) {
+    try {
+      await pool.query(`DROP TABLE ${t}`);
+    } catch (err) {
+      const absente = (err && err.code === '42P01')
+        || /does not exist|n'existe pas/i.test((err && err.message) || '');
+      if (!absente) console.error(`Table « ${t} » non retirée (sans conséquence) :`, err.message);
+    }
+  }
+}
+
 async function retirerTableStatuses() {
   try {
     const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM statuses');
@@ -1913,7 +1955,6 @@ const FLAGS_CONNUS = {
   comptes: 'Connexion nominative et rôles',
   projets: 'Regroupement Projet et liste de tâches',
   marges: 'Décomposition des coûts et marge',
-  stock: 'Fournisseurs, catalogue, achats et stock',
 };
 const FLAGS_SLUGS = Object.keys(FLAGS_CONNUS);
 const FLAGS_ETEINTS = Object.fromEntries(FLAGS_SLUGS.map((s) => [s, false]));

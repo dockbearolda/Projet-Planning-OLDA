@@ -209,20 +209,20 @@ delete process.env.APP_PASSWORD;
 
   const f1 = await call('PUT', '/api/flags', { projets: true });
   assert.strictEqual(f1.body.flags.projets, true);
-  assert.strictEqual(f1.body.flags.stock, false, 'allumer l’un n’allume pas les autres');
+  assert.strictEqual(f1.body.flags.marges, false, 'allumer l’un n’allume pas les autres');
 
   // Fusion, pas remplacement : deux postes ouverts sur les réglages ne doivent
   // pas s'effacer l'un l'autre.
-  const f2 = await call('PUT', '/api/flags', { stock: true });
+  const f2 = await call('PUT', '/api/flags', { marges: true });
   assert.strictEqual(f2.body.flags.projets, true, 'le drapeau posé par l’autre poste tient');
-  assert.strictEqual(f2.body.flags.stock, true);
+  assert.strictEqual(f2.body.flags.marges, true);
 
   // Un nom inconnu est ignoré, pas rangé : sinon une faute de frappe crée un
   // drapeau fantôme que personne ne lit et qui ne s'éteint jamais.
   const f3 = await call('PUT', '/api/flags', { projetss: true });
   assert.strictEqual(f3.body.flags.projetss, undefined, 'un interrupteur inconnu n’entre pas en base');
   assert.strictEqual((await call('PUT', '/api/flags', [1, 2])).status, 400, 'un tableau n’est pas un objet');
-  await call('PUT', '/api/flags', { projets: false, stock: false });
+  await call('PUT', '/api/flags', { projets: false, marges: false });
 
   // =========================================================================
   // 6. LE FILTRE EST POSÉ PARTOUT — LU DANS LE SOURCE

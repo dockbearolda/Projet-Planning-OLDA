@@ -5917,52 +5917,6 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .pil-poste__n { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); font-variant-numeric: tabular-nums; }
 .pil-poste__lignes { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
 
-/* ===========================================================================
-   STOCK, FOURNISSEURS ET ACHATS (§14 à §18).
-   Un seul écran : trois moments du même geste. Mêmes jetons, mêmes deux
-   tailles de texte, la couleur ne dit qu'un état (rupture, best-seller).
-   =========================================================================== */
-.stk-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
-.stk-titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
-.stk-barre { display: flex; align-items: center; gap: 12px; }
-/* `min-width: 0` : sans lui le champ garde sa largeur intrinsèque et pousse le
-   message hors du cadre — le piège documenté sur `.reg-tarif-input`. */
-.stk-cherche { flex: 1 1 auto; min-width: 0; min-height: var(--ctrl-h); padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-texte); }
-.stk-cherche:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
-.stk-message { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
-.stk-message.is-ko { color: var(--danger); font-weight: var(--graisse-note); }
-
-.stk-liste { display: flex; flex-direction: column; gap: 12px; }
-.stk-produit { background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; }
-.stk-produit__tete { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-.stk-produit__nom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.stk-produit__meta { font-size: var(--taille-note); color: var(--text-2); }
-.stk-produit__valeur { margin-left: auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
-
-/* Une grille, pas un flex : les colonnes de chiffres doivent s'aligner d'une
-   déclinaison à l'autre — c'est tout l'intérêt de les mettre l'une sous l'autre. */
-.stk-var { display: grid; grid-template-columns: 1fr auto 54px 62px 54px 34px 34px; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border-soft); font-size: var(--taille-note); color: var(--text-2); }
-.stk-var--entete { border-top: 0; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
-.stk-var--entete .stk-var__n { font-weight: var(--graisse-note); }
-.stk-var__nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-1); }
-.stk-var__best { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--success); white-space: nowrap; }
-.stk-var__n { text-align: right; font-variant-numeric: tabular-nums; }
-.stk-var__n--reserve { color: var(--text-3); }
-/* LE DISPONIBLE est celui qu'on regarde : il est le seul en pleine encre. */
-.stk-var__dispo { font-weight: var(--graisse-forte); color: var(--text-1); }
-.stk-var__dispo.is-vide { color: var(--st-bloque); }
-.stk-pas { min-height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: var(--taille-texte); line-height: 1; cursor: pointer; }
-.stk-pas:hover { background: var(--surface-hover); border-color: var(--border-strong); color: var(--text-1); }
-
-.stk-bloc { display: flex; flex-direction: column; gap: 8px; }
-.stk-bloc__titre { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.stk-vide { margin: 0; font-size: var(--taille-texte); color: var(--text-2); }
-.stk-fourn, .stk-achat { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: var(--taille-note); color: var(--text-2); }
-.stk-fourn:last-child, .stk-achat:last-child { border-bottom: 0; }
-.stk-fourn__nom, .stk-achat__num { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.stk-fourn__meta, .stk-achat__qui { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stk-fourn__delai, .stk-fourn__transport, .stk-achat__n, .stk-achat__transport { flex: 0 0 auto; white-space: nowrap; }
-.stk-statut { flex: 0 0 auto; min-height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); }
 
 /* LES SEPT MOTIFS DE BLOCAGE (§6), en jetons au-dessus du champ libre.
    Ils REMPLISSENT le champ, ils ne le remplacent pas : un blocage qui n'entre
@@ -5989,24 +5943,6 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .reg-champ__unite { font-size: var(--taille-note); color: var(--text-2); }
 .reg-inter { flex: 0 0 auto; width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
 
-/* Créer un fournisseur / une commande depuis l'écran Stock. Le formulaire est
-   REPLIÉ, pas absent : déplié en permanence il pousserait les listes hors de
-   l'écran pour un geste qu'on fait une fois par mois. */
-.stk-tete { display: flex; align-items: center; gap: 12px; }
-.stk-ajout { margin-left: auto; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); font-weight: var(--graisse-note); cursor: pointer; white-space: nowrap; }
-.stk-ajout:hover { background: var(--surface-hover); border-color: var(--border-strong); }
-.stk-ajout--plein { border-color: transparent; background: var(--primary); color: var(--on-primary); }
-.stk-ajout--plein:hover { background: var(--primary-hover); border-color: transparent; }
-.stk-ajout:disabled { opacity: .45; cursor: default; }
-/* `hidden` DOIT gagner : la règle de classe pose `display: flex`, plus
-   spécifique — le piège déjà payé sur `.nav-switch-btn`. */
-.stk-form[hidden] { display: none; }
-.stk-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; margin: 4px 0 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-/* `min-width: 0` : la taille minimale automatique d'un champ vaut sa largeur
-   intrinsèque (~20 caractères) et l'emporte sur `flex-basis` — six champs
-   feraient déborder la rangée. */
-.stk-champ { flex: 1 1 150px; min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); }
-.stk-champ:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
 
 /* À DÉBLOQUER (§6) — la LISTE, pas le compteur. Un « 4 » ne montre rien : il
    faudrait aller chercher lesquels, et c'est le geste que l'écran supprime. */
