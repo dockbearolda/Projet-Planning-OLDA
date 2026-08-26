@@ -39,6 +39,14 @@ CREATE TABLE IF NOT EXISTS requests (
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
   fiche           jsonb,                             -- détail de la fiche vendeuse (null si créée à la main)
+  -- LE COÛT DE REVIENT de la ligne (§11, §13). Sans lui, aucune marge n'est
+  -- calculable : le moteur sort un PRIX, et un prix seul ne dit pas ce qu'on
+  -- gagne. Rempli automatiquement par le flux « Nouveau Projet » (qui connaît
+  -- les prix d'achat et les temps de la grille tarifaire), saisissable à la main
+  -- partout ailleurs. null = coût inconnu, ce qui n'est PAS zéro : une marge
+  -- calculée sur un coût nul afficherait 100 % sur tout ce qu'on n'a pas chiffré.
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS cout_revient;
+  cout_revient    numeric(12,2),
   -- ARCHIVAGE, pas suppression. Une commande retirée du planning garde sa ligne,
   -- son journal et ses PDF : c'est la seule façon de répondre « qu'est-ce qui
   -- est arrivé au dossier de l'Hôtel X ? » six mois plus tard. `DELETE FROM

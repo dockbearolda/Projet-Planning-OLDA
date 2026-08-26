@@ -120,6 +120,13 @@
           <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
           <span class="nav-switch-label">Planning</span>
         </a>
+        <!-- `bar_chart` n'est PAS dans la police (91 glyphes) : on reprend
+             `dashboard`, qui y est, plutôt qu'un nom qui s'afficherait en
+             texte tronqué à sa première lettre, sans erreur ni message. -->
+        <a class="nav-switch-btn nav-switch-btn--pilotage" id="viewPilotage" href="#pilotage" hidden>
+          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+          <span class="nav-switch-label">Pilotage</span>
+        </a>
         <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
           <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
           <span class="nav-switch-label">Dashboard</span>
@@ -367,6 +374,12 @@
              d'autre. Il n'apparaît dans la barre que si les comptes sont
              allumés : sans identité, « mon » ne veut rien dire. -->
         <section class="montravail" id="montravail" hidden aria-label="Mon travail"></section>
+
+        <!-- Onglet Pilotage : l'écran de la Direction. Il NE REMPLACE PAS le
+             Point du jour — celui-là est un écran d'équipe, vidé exprès de tout
+             ce qui n'est pas du travail. Les chiffres d'argent vivent ici, et
+             ici seulement. Réservé (capacité `marge`), côté serveur compris. -->
+        <section class="pilotage" id="pilotage" hidden aria-label="Pilotage"></section>
 
         <!-- Onglet Nouveau Projet : LES DEUX flux du comptoir — vente directe
              et demande de devis. L'aiguillage (nouveau-projet.js, chargé au

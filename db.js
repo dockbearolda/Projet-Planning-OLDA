@@ -404,6 +404,12 @@ async function init() {
       ON requests (stage, position ASC NULLS LAST) WHERE deleted_at IS NULL`);
   } catch (_) { /* pg-mem local : index partiel non géré, sans conséquence */ }
 
+  // LE COÛT DE REVIENT, colonne à part. Down : ALTER TABLE requests DROP COLUMN
+  // IF EXISTS cout_revient;
+  try {
+    await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS cout_revient numeric(12,2)');
+  } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+
   // LE RATTACHEMENT D'UNE LIGNE À SON PROJET. Nullable, sans contrainte : les
   // lignes d'avant restent valides, elles n'appartiennent simplement à aucun
   // dossier — et une commande à un seul article n'a pas besoin d'en avoir un.
@@ -1202,10 +1208,10 @@ async function setCategoryReferents(map) {
 // Stocké en clé/valeur applicative (app_meta.machines, tableau JSON), comme les
 // autres réglages. Absent → on sert la liste par défaut (les 4 postes du flux).
 const DEFAULT_MACHINES = [
-  { slug: 'dtf', name: 'DTF', importance: 3, minutesPerUnit: null },
-  { slug: 'presse', name: 'Presse', importance: 3, minutesPerUnit: null },
-  { slug: 'trotec', name: 'Trotec', importance: 3, minutesPerUnit: null },
-  { slug: 'uv', name: 'UV', importance: 3, minutesPerUnit: null },
+  { slug: 'dtf', name: 'DTF', importance: 3, minutesPerUnit: null, coutHoraire: null, consommables: null },
+  { slug: 'presse', name: 'Presse', importance: 3, minutesPerUnit: null, coutHoraire: null, consommables: null },
+  { slug: 'trotec', name: 'Trotec', importance: 3, minutesPerUnit: null, coutHoraire: null, consommables: null },
+  { slug: 'uv', name: 'UV', importance: 3, minutesPerUnit: null, coutHoraire: null, consommables: null },
 ];
 
 // Clé stable à partir d'un libellé : minuscules, sans accents, alphanumérique.
@@ -1230,7 +1236,21 @@ function cleanMachine(m, index) {
     const n = Number(m.minutesPerUnit);
     if (Number.isFinite(n) && n > 0) minutesPerUnit = Math.round(n * 10) / 10;
   }
-  return { slug, name, importance, minutesPerUnit };
+  // COÛT HORAIRE ET CONSOMMABLES (§12). « Chaque machine peut avoir un coût
+  // horaire… Les coûts doivent être paramétrables. » `null` = non renseigné, et
+  // c'est différent de zéro : une machine dont on n'a pas encore chiffré
+  // l'heure ne coûte pas « rien », on ne sait simplement pas. Le calcul
+  // retombe alors sur le taux machine global des paramètres.
+  const positifOuNull = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+  };
+  return {
+    slug, name, importance, minutesPerUnit,
+    coutHoraire: positifOuNull(m.coutHoraire),
+    consommables: positifOuNull(m.consommables),
+  };
 }
 
 async function getMachines() {
@@ -1638,6 +1658,46 @@ async function basculerOrdreManuel(etape, range) {
   } finally {
     client.release();
   }
+}
+
+// --- Marge : cible, minimum, alerte (§13) ------------------------------------
+// « Je veux pouvoir définir : marge cible, marge minimum, alerte marge faible.
+//   Si un commercial descend sous la marge minimum : afficher une alerte. La
+//   Direction peut néanmoins forcer le prix. »
+//
+// ALERTER, PAS INTERDIRE — c'est écrit noir sur blanc, et c'est aussi la seule
+// règle tenable : un prix se négocie devant le client, et un logiciel qui refuse
+// une vente au comptoir est un logiciel qu'on contourne en notant sur un papier.
+// Down : DELETE FROM app_meta WHERE key = 'marges'.
+const DEFAULT_MARGES = { cible: 60, minimum: 35 };
+
+async function getMarges() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'marges'");
+  if (!rows[0]) return { ...DEFAULT_MARGES };
+  try {
+    const lu = JSON.parse(rows[0].value);
+    return lu && typeof lu === 'object' ? { ...DEFAULT_MARGES, ...lu } : { ...DEFAULT_MARGES };
+  } catch (_) {
+    return { ...DEFAULT_MARGES };
+  }
+}
+
+async function setMarges(p) {
+  const src = p && typeof p === 'object' ? p : {};
+  const pct = (v, def) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n * 10) / 10 : def;
+  };
+  const propre = {
+    cible: pct(src.cible, DEFAULT_MARGES.cible),
+    minimum: pct(src.minimum, DEFAULT_MARGES.minimum),
+  };
+  // Un minimum au-dessus de la cible n'a pas de sens et rendrait l'alerte
+  // permanente : on remet la cible au niveau du minimum plutôt que d'accepter
+  // un réglage qui crierait sur chaque vente.
+  if (propre.minimum > propre.cible) propre.cible = propre.minimum;
+  await poserMeta('marges', JSON.stringify(propre));
+  return propre;
 }
 
 // --- Projets et tâches -------------------------------------------------------
@@ -2056,6 +2116,7 @@ module.exports = {
   FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,
   ROLES, ROLE_LABELS, EQUIPE, CODE_MIN, CODE_MAX,
   DEFAULT_MODELES, getModeles, setModeles,
+  DEFAULT_MARGES, getMarges, setMarges,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,

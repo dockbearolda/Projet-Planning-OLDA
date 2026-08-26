@@ -7394,6 +7394,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'clients') return mountClients();
   if (viewMode === 'reglages') return mountReglages();
   if (viewMode === 'montravail') return mountMonTravail();
+  if (viewMode === 'pilotage') return mountPilotage();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7467,8 +7468,10 @@ const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
 const $viewReglages = document.getElementById('viewReglages');
 const $viewMonTravail = document.getElementById('viewMonTravail');
+const $viewPilotage = document.getElementById('viewPilotage');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
+const $pilotage = document.getElementById('pilotage');
 const $viewProjet = document.getElementById('viewProjet');
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7576,6 +7579,19 @@ function mountClients() {
 // MON TRAVAIL — même montage paresseux que les autres vues : le module ne part
 // du serveur qu'au premier passage sur l'onglet, et l'écran de l'opérateur ne
 // pèse rien sur le démarrage de ceux qui ne l'ouvrent jamais.
+let pilLoading = null;
+let pilModule = null;
+function mountPilotage() {
+  if (!$pilotage) return;
+  if (!pilLoading) {
+    pilLoading = import('./pilotage.js')
+      .then((m) => { pilModule = m; return m.initPilotage($pilotage); })
+      .catch((err) => { pilLoading = null; pilModule = null; reportError(err); });
+  } else if (pilModule && pilModule.refreshPilotage) {
+    pilModule.refreshPilotage();
+  }
+}
+
 let mtLoading = null;
 let mtModule = null;
 function mountMonTravail() {
@@ -7694,6 +7710,7 @@ function setViewMode(mode) {
   if ($viewClients) $viewClients.classList.toggle('active', mode === 'clients');
   if ($viewReglages) $viewReglages.classList.toggle('active', mode === 'reglages');
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
+  if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
   if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
@@ -7711,11 +7728,13 @@ function setViewMode(mode) {
   const clients = mode === 'clients';
   const reglages = mode === 'reglages';
   const montravail = mode === 'montravail';
+  const pilotage = mode === 'pilotage';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
   if ($reglages) $reglages.hidden = !reglages;
   if ($montravail) $montravail.hidden = !montravail;
+  if ($pilotage) $pilotage.hidden = !pilotage;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7732,6 +7751,7 @@ function setViewMode(mode) {
   if (clients) mountClients();
   if (reglages) mountReglages();
   if (montravail) mountMonTravail();
+  if (pilotage) mountPilotage();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7749,6 +7769,7 @@ const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
   '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
+  '#pilotage': 'pilotage',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {
@@ -7874,6 +7895,10 @@ monterPoste(EMPLOYEES);
 function appliquerDroits() {
   const onglet = (el, visible) => { if (el) el.hidden = !visible; };
   onglet($viewMonTravail, comptesActifs());
+  // Le pilotage n'existe QUE pour qui voit les marges — c'est-à-dire la
+  // Direction. Sans comptes, personne ne le voit : il n'aurait aucun sens
+  // d'exposer le CA sur un poste qui ne sait pas qui l'utilise.
+  onglet($viewPilotage, comptesActifs() && puisJe('marge'));
   onglet($viewReglages, puisJe('reglages'));
   onglet($viewClients, puisJe('clients'));
   onglet($viewProjet, puisJe('clients'));
@@ -7895,7 +7920,8 @@ function appliquerDroits() {
 
   // L'onglet ouvert est peut-être celui qu'on vient de fermer : on ne laisse
   // personne devant un écran qu'il n'a plus le droit de lire.
-  const interdit = (location.hash === '#reglages' && !puisJe('reglages'))
+  const interdit = (location.hash === '#pilotage' && !puisJe('marge'))
+    || (location.hash === '#reglages' && !puisJe('reglages'))
     || (location.hash === '#clients' && !puisJe('clients'))
     || (location.hash === '#nouveau-projet' && !puisJe('clients'));
   if (interdit) location.hash = comptesActifs() ? '#mon-travail' : '#planning';

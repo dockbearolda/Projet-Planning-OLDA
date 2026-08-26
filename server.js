@@ -32,6 +32,7 @@ const {
   FLAGS_CONNUS, getFlags, setFlags,
   ROLES, ROLE_LABELS, CODE_MIN, CODE_MAX,
   getModeles, setModeles,
+  getMarges, setMarges,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,
@@ -206,6 +207,7 @@ const PATCHABLE = [
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason',
   'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
+  'cout_revient',
 ];
 
 // QUELLE CAPACITÉ IL FAUT POUR ÉCRIRE CHAQUE CHAMP.
@@ -232,6 +234,9 @@ const CAPACITE_PAR_CHAMP = {
   responsable: 'production', referent: 'production',
   project_value: 'argent', acompte_demande: 'argent', acompte_verse: 'argent',
   acompte_montant: 'argent', paye: 'argent', paiement_mode: 'argent',
+  // Le coût de revient est d'un cran au-dessus du prix : le prix se négocie
+  // devant le client, le coût dit ce que l'atelier gagne. Direction seule.
+  cout_revient: 'marge',
 };
 const capaciteDuChamp = (champ) => CAPACITE_PAR_CHAMP[champ] || 'clients';
 
@@ -669,7 +674,19 @@ const exige = (capacite) => (req, res, next) => {
 // opérateur qui ouvre les outils de son navigateur ne doit pas trouver le prix
 // dans la réponse réseau. Le patron l'écrit noir sur blanc pour ce rôle-là.
 const CHAMPS_ARGENT = ['project_value', 'acompte_demande', 'acompte_verse',
-  'acompte_montant', 'paye', 'paiement_mode'];
+  'acompte_montant', 'paye', 'paiement_mode', 'cout_revient'];
+
+// LE COÛT EST D'UN CRAN AU-DESSUS DU PRIX. La boutique doit voir le prix — elle
+// le négocie et encaisse l'acompte — mais ce que l'atelier GAGNE sur chaque
+// article ne la regarde pas, et le patron ne liste la marge que pour la
+// Direction. Deux niveaux, donc deux filtres.
+const CHAMPS_MARGE = ['cout_revient', 'marge_euros', 'marge_pct'];
+
+function sansMarge(ligne) {
+  const propre = { ...ligne };
+  for (const c of CHAMPS_MARGE) delete propre[c];
+  return propre;
+}
 
 function sansArgent(ligne) {
   const propre = { ...ligne };
@@ -685,9 +702,34 @@ function sansArgent(ligne) {
 
 // Un seul point de passage pour toutes les lectures de commande : ajouter une
 // route plus tard sans y penser, c'est rouvrir le trou qu'on vient de fermer.
-const selonMoi = (req, lignes) => (peut(req.moi, 'argent')
-  ? lignes
-  : (Array.isArray(lignes) ? lignes.map(sansArgent) : sansArgent(lignes)));
+// LA MARGE SE CALCULE À LA LECTURE, elle ne se range pas : rangée, elle mentirait
+// dès qu'un prix ou un coût bouge — et une marge fausse est pire qu'une marge
+// absente, parce qu'on décide dessus.
+//
+// Le HT se déduit du TTC : c'est sur le HT que la marge se compte, la TGCA
+// n'appartenant pas à l'atelier. Sans coût connu, PAS de marge — surtout pas
+// zéro, qui se lirait « on ne gagne rien » là où on ne sait simplement pas.
+function avecMarge(ligne, tgca) {
+  const prix = Number(ligne.project_value);
+  const cout = Number(ligne.cout_revient);
+  if (!Number.isFinite(prix) || !Number.isFinite(cout) || ligne.cout_revient == null) return ligne;
+  const ht = prix / (1 + tgca);
+  const euros = Math.round((ht - cout) * 100) / 100;
+  return {
+    ...ligne,
+    marge_euros: euros,
+    marge_pct: ht > 0 ? Math.round((euros / ht) * 1000) / 10 : null,
+  };
+}
+
+const selonMoi = (req, lignes) => {
+  const un = (l) => {
+    if (!peut(req.moi, 'argent')) return sansArgent(l);
+    if (!peut(req.moi, 'marge')) return sansMarge(l);
+    return avecMarge(l, PROJET_TGCA);
+  };
+  return Array.isArray(lignes) ? lignes.map(un) : un(lignes);
+};
 
 // --- Routes de session ---------------------------------------------------------
 
@@ -965,6 +1007,10 @@ app.put('/api/tarifs-tasse/parametres', exige('reglages'), asyncH(async (req, re
     }
   }
   const saved = await setTarifsTasseParametres(body);
+  // Les taux servent AUSSI au calcul de marge, à chaque lecture de ligne : sans
+  // ce rappel, la TGCA changée aux Réglages ne vaudrait qu'au prochain
+  // redémarrage, et les marges affichées seraient celles d'avant.
+  await chargerTaux();
   broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
 }));
@@ -1093,6 +1139,10 @@ const COLONNES_REQUEST = [
   // page de projet à ouvrir et des articles voisins à montrer. Sans lui, il
   // faudrait un appel par ligne pour le découvrir.
   'project_id',
+  // LE COÛT DE REVIENT. Il ne part QUE vers qui a le droit de voir les marges
+  // (voir `sansArgent` / `sansMarge`) : c'est la donnée la plus sensible du
+  // dossier — elle dit ce que l'atelier gagne, article par article.
+  'cout_revient',
 ];
 
 // LA LISTE NE LIT PLUS LA FICHE ENTIÈRE. `allegerFiche` n'en garde que quatre
@@ -1737,6 +1787,165 @@ app.post('/api/projets/:id/copie', exige('clients'), asyncH(async (req, res) => 
   res.status(201).json(await projetComplet(neuf.id, req));
 }));
 
+// ---------------------------------------------------------------------------
+// ARGENT : marge (§13), règles d'acompte (§21), pilotage (§24)
+// ---------------------------------------------------------------------------
+
+// Le libellé lisible d'une sous-étape, construit UNE fois : « prod_dtf » ne dit
+// rien à personne sur un écran de pilotage.
+const LIBELLE_SOUS_ETAPE = new Map(
+  Object.values(SUB_STAGES).flat().map((s) => [s.slug, s.label]),
+);
+
+app.get('/api/marges', asyncH(async (req, res) => res.json(await getMarges())));
+app.put('/api/marges', exige('reglages'), asyncH(async (req, res) => {
+  const saved = await setMarges(req.body);
+  broadcast({ kind: 'marges' });
+  res.json(saved);
+}));
+
+// LES RÈGLES D'ACOMPTE D'OLDA (§21), écrites une fois.
+//
+//   ≤ 100 €        → paiement intégral
+//   > 100 €        → acompte de 50 %
+//   Express / J    → paiement intégral
+//
+// Elles se CALCULENT, elles ne se rangent pas : rangées sur la ligne, elles
+// mentiraient dès que le prix change — et c'est justement quand le prix change
+// que la question « combien doit-il verser ? » se pose.
+const ACOMPTE_SEUIL = 100;
+const ACOMPTE_PART = 0.5;
+function acompteAttendu(total, express) {
+  const n = Number(total);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (express || n <= ACOMPTE_SEUIL) {
+    return { montant: Math.round(n * 100) / 100, part: 1, motif: express ? 'Express ou Jour J : paiement intégral' : `Moins de ${ACOMPTE_SEUIL} € : paiement intégral` };
+  }
+  return {
+    montant: Math.round(n * ACOMPTE_PART * 100) / 100,
+    part: ACOMPTE_PART,
+    motif: `Plus de ${ACOMPTE_SEUIL} € : acompte de ${Math.round(ACOMPTE_PART * 100)} %`,
+  };
+}
+
+// GET /api/argent/:id → ce que CETTE commande doit rapporter, et où en est son
+// règlement. Un seul endroit qui répond à « combien reste-t-il à encaisser ? ».
+app.get('/api/argent/:id', exige('argent'), asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT project_value, acompte_montant, acompte_demande, acompte_verse, paye, cout_revient, deadline, created_at
+       FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [req.params.id],
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Commande introuvable' });
+  const l = rows[0];
+  const total = Number(l.project_value);
+  // « Express » se déduit du délai réellement accordé : moins de trois jours
+  // entre la prise et l'échéance, c'est la règle du catalogue (jour_j +20 %,
+  // express sous 3 jours +10 %) — on ne redemande pas au poste de le dire.
+  let express = false;
+  if (l.deadline && l.created_at) {
+    const jours = (Date.parse(String(l.deadline).slice(0, 10)) - Date.parse(String(l.created_at).slice(0, 10))) / 86400000;
+    express = Number.isFinite(jours) && jours <= 3;
+  }
+  const attendu = acompteAttendu(total, express);
+  const verse = l.acompte_verse ? (Number(l.acompte_montant) || 0) : 0;
+  const marges = await getMarges();
+  const ht = Number.isFinite(total) ? total / (1 + PROJET_TGCA) : null;
+  const cout = l.cout_revient == null ? null : Number(l.cout_revient);
+  const margeEuros = ht != null && cout != null ? Math.round((ht - cout) * 100) / 100 : null;
+  const margePct = margeEuros != null && ht > 0 ? Math.round((margeEuros / ht) * 1000) / 10 : null;
+
+  res.json({
+    total: Number.isFinite(total) ? total : null,
+    express,
+    acompte: attendu,
+    verse,
+    reste: l.paye ? 0 : Math.round(((Number.isFinite(total) ? total : 0) - verse) * 100) / 100,
+    paye: l.paye === true,
+    // La marge n'est rendue qu'à la Direction, comme partout ailleurs.
+    ...(peut(req.moi, 'marge') ? { marge: { euros: margeEuros, pct: margePct, ...marges } } : {}),
+  });
+}));
+
+// GET /api/pilotage → l'écran de la Direction (§24).
+//
+// Il ne remplace PAS le Point du jour : celui-là est un écran d'ÉQUIPE, vidé
+// exprès de tout ce qui n'est pas du travail. Le patron veut y voir le chiffre
+// d'affaires et la marge ; les deux ont raison, mais pas sur le même écran.
+// C'est donc un second écran, réservé, et le premier ne bouge pas.
+app.get('/api/pilotage', exige('marge'), asyncH(async (req, res) => {
+  const marges = await getMarges();
+  const [enCours, bloques, retards, aEncaisser, machines] = await Promise.all([
+    // CE QUI RENTRE : tout ce qui n'est pas soldé ni archivé porte encore de
+    // l'argent à faire ou à encaisser.
+    // LE CA PORTE SUR TOUT ; LA MARGE, SEULEMENT SUR CE QUI EST CHIFFRÉ.
+    // Sommer le prix de huit lignes et le coût d'une seule donne une
+    // « marge » de 92 % qui n'existe pas — c'est une soustraction entre deux
+    // périmètres différents. Le `ca_chiffre` ci-dessous est donc le prix des
+    // SEULES lignes qui portent un coût, et c'est de celui-là que la marge se
+    // déduit. L'écran dit sur combien de lignes elle porte.
+    pool.query(
+      `SELECT COUNT(*)::int AS n,
+              COALESCE(SUM(project_value), 0) AS ca,
+              COALESCE(SUM(CASE WHEN cout_revient IS NOT NULL THEN project_value ELSE 0 END), 0) AS ca_chiffre,
+              COALESCE(SUM(cout_revient), 0) AS cout,
+              COUNT(cout_revient)::int AS chiffres
+         FROM requests WHERE ${VIVANTES_NU} AND stage <> 'paiement'`,
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS n FROM requests WHERE ${VIVANTES_NU} AND flag = 'bloque'`,
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS n FROM requests
+        WHERE ${VIVANTES_NU} AND deadline < $1 AND stage NOT IN ('paiement', 'facturation')`,
+      [jourAtelier()],
+    ),
+    pool.query(
+      `SELECT COALESCE(SUM(project_value), 0) - COALESCE(SUM(CASE WHEN acompte_verse THEN acompte_montant ELSE 0 END), 0) AS reste,
+              COUNT(*)::int AS n
+         FROM requests WHERE ${VIVANTES_NU} AND (paye IS NULL OR paye = false) AND project_value IS NOT NULL`,
+    ),
+    // LA CHARGE DE L'ATELIER : les minutes de production encore devant, par
+    // machine. Sans `minutesPerUnit` réglé, une machine ne dit rien plutôt que
+    // d'annoncer zéro — zéro se lirait « rien à faire ».
+    pool.query(
+      `SELECT sub_stage, COALESCE(SUM(quantity), 0)::int AS pieces, COUNT(*)::int AS lignes
+         FROM requests WHERE ${VIVANTES_NU} AND stage = 'production' GROUP BY sub_stage`,
+    ),
+  ]);
+
+  const ca = Math.round(Number(enCours.rows[0].ca) * 100) / 100;
+  const cout = Math.round(Number(enCours.rows[0].cout) * 100) / 100;
+  const ht = Math.round((ca / (1 + PROJET_TGCA)) * 100) / 100;
+  const chiffrees = enCours.rows[0].chiffres;
+  // La marge se calcule sur le MÊME périmètre que le coût : le prix des seules
+  // lignes chiffrées. Sans aucune ligne chiffrée, elle vaut `null` — pas zéro,
+  // qui se lirait « on ne gagne rien ».
+  const htChiffre = Math.round((Number(enCours.rows[0].ca_chiffre) / (1 + PROJET_TGCA)) * 100) / 100;
+  const margeEuros = chiffrees ? Math.round((htChiffre - cout) * 100) / 100 : null;
+
+  res.json({
+    marges,
+    enCours: {
+      lignes: enCours.rows[0].n, ca, ht, cout, chiffrees,
+      marge: margeEuros,
+      // Le pourcentage porte lui aussi sur le périmètre chiffré, et l'écran le
+      // dit : « sur 3 des 8 lignes » n'est pas la même information que « 68 % ».
+      margePct: margeEuros != null && htChiffre > 0
+        ? Math.round((margeEuros / htChiffre) * 1000) / 10 : null,
+    },
+    bloques: bloques.rows[0].n,
+    retards: retards.rows[0].n,
+    aEncaisser: {
+      montant: Math.round(Number(aEncaisser.rows[0].reste) * 100) / 100,
+      lignes: aEncaisser.rows[0].n,
+    },
+    atelier: machines.rows.map((m) => ({
+      sousEtape: m.sub_stage, libelle: LIBELLE_SOUS_ETAPE.get(m.sub_stage) || m.sub_stage,
+      pieces: m.pieces, lignes: m.lignes,
+    })),
+  });
+}));
+
 // GET /api/modeles → les listes d'étapes toutes faites (§28).
 app.get('/api/modeles', asyncH(async (req, res) => res.json(await getModeles())));
 app.put('/api/modeles', exige('reglages'), asyncH(async (req, res) => {
@@ -2114,7 +2323,34 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   // décide — il doit donc être exact.
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
-  res.json(selonMoi(req, rows[0]));
+
+  // ALERTE MARGE FAIBLE (§13). « Si un commercial descend sous la marge
+  // minimum : afficher une alerte. La Direction peut néanmoins forcer le prix. »
+  //
+  // ON ALERTE, ON N'INTERDIT PAS — c'est écrit noir sur blanc, et c'est aussi
+  // la seule règle tenable : un prix se négocie devant le client, et un logiciel
+  // qui refuse une vente au comptoir est un logiciel qu'on contourne en notant
+  // sur un papier. L'enregistrement est donc DÉJÀ fait quand l'alerte part.
+  //
+  // Elle n'accompagne que les modifications de PRIX ou de COÛT : recevoir
+  // « marge faible » en changeant une date d'échéance apprendrait à l'ignorer.
+  let alerte = null;
+  const touchePrix = 'project_value' in body || 'cout_revient' in body;
+  if (touchePrix && rows[0].cout_revient != null && rows[0].project_value != null) {
+    const marges = await getMarges();
+    const ht = Number(rows[0].project_value) / (1 + PROJET_TGCA);
+    const euros = ht - Number(rows[0].cout_revient);
+    const pct = ht > 0 ? (euros / ht) * 100 : 0;
+    if (pct < marges.minimum) {
+      alerte = {
+        type: 'marge_faible',
+        pct: Math.round(pct * 10) / 10,
+        minimum: marges.minimum,
+        message: `Marge de ${Math.round(pct * 10) / 10} % — en dessous du minimum de ${marges.minimum} %.`,
+      };
+    }
+  }
+  res.json({ ...selonMoi(req, rows[0]), ...(alerte ? { alerte } : {}) });
 }));
 
 // GET /api/requests/:id/journal → ce qui a changé sur cette commande, du plus
@@ -4104,7 +4340,26 @@ app.use((err, req, res, next) => {
 // ---------------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------------
+// LES TAUX SE CHARGENT AU DÉMARRAGE, pas au premier chiffrage.
+//
+// Ils n'étaient posés qu'à l'intérieur de `POST /api/projets`. Tant que
+// personne n'avait chiffré depuis le redémarrage, ils valaient donc les
+// constantes du code — et c'est sur la TGCA que la marge se calcule, à chaque
+// lecture de ligne. Un serveur qui vient de repartir aurait affiché des marges
+// calculées sur 4 % même si le patron avait réglé autre chose.
+async function chargerTaux() {
+  try {
+    const p = await getTarifsTasseParametres();
+    PROJET_TAUX_MO = p.tauxHoraireMo;
+    PROJET_TAUX_MACHINE = p.tauxHoraireMachine;
+    PROJET_TGCA = p.tgca;
+  } catch (err) {
+    console.error('taux de calcul :', err.message);
+  }
+}
+
 init()
+  .then(chargerTaux)
   .then(loadCommandeZones)
   .then(() => {
     // `__server` est exposé pour les tests (PORT=0 → port libre, adresse lue au
