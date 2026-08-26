@@ -376,6 +376,9 @@ async function init() {
   // Base clients : import initial des clients pros rapatriés de l'ancienne app.
   await seedClients();
 
+  // Tailles de logo : l'instantané livré avec le code, si la base n'en a pas.
+  await semerTaillesLogo();
+
   // Identifiant lisible pour les fiches qui n'en ont pas — après l'import, pour
   // que les clients rapatriés en reçoivent un eux aussi.
   await rattraperCodesClients();
@@ -1716,6 +1719,35 @@ async function getTaillesLogo() {
   } catch {
     return { ...TAILLES_LOGO_VIDE, familles: {} };
   }
+}
+
+// L'INSTANTANÉ LIVRÉ AVEC LE CODE, pour une base NEUVE.
+//
+// Sans lui, une base fraîche (pg-mem en local, premier déploiement) démarre
+// avec un tableau VIDE : le comptoir affiche des cases vides et annonce que la
+// référence n'est pas dans le tableau — alors qu'elle y est. Une fonction qu'il
+// faut aller allumer dans les Réglages pour qu'elle existe est une fonction qui
+// n'existe pas. Constaté le 26/08 sur un essai en local.
+//
+// LA GARDE, C'EST LA CLÉ ELLE-MÊME : si `tailles_logo` est là, on n'y touche
+// pas — un relevé du site fait toujours foi sur l'instantané. Pas de seconde
+// clé à tenir, donc pas de garde partagée avec quoi que ce soit.
+// Down : DELETE FROM app_meta WHERE key = 'tailles_logo' — le semis rejoue au
+// démarrage suivant.
+async function semerTaillesLogo() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tailles_logo'");
+  if (rows.length) return;
+  let brut;
+  try {
+    brut = JSON.parse(fs.readFileSync(path.join(__dirname, 'tailles-logo-seed.json'), 'utf8'));
+  } catch (_) {
+    return;   // pas d'instantané : on démarre sans, les Réglages le rempliront
+  }
+  // `maj` reste NULL : ces largeurs n'ont pas été relues sur le site, elles
+  // viennent du fichier. L'écran des Réglages le dit en toutes lettres.
+  const propre = nettoyerTaillesLogo({ maj: null, source: brut.source, familles: brut.familles });
+  if (!Object.keys(propre.familles).length) return;
+  await poserMeta('tailles_logo', JSON.stringify(propre));
 }
 
 // REMPLACE le tableau, il ne le complète pas : une référence retirée du site

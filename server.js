@@ -1134,6 +1134,17 @@ app.post('/api/tailles-logo/rafraichir', exige('reglages'), asyncH(async (req, r
       ...compterTaillesLogo(garde),
     });
   }
+  // UN RELEVÉ VIDE N'ÉCRASE PAS UN TABLEAU REMPLI. Le site peut répondre 200
+  // avec un contenu incomplet le temps qu'il se réveille : écrire dans ce cas
+  // effacerait ce que le comptoir utilise, sans que rien ne le signale.
+  const enPlace = await getTaillesLogo();
+  if (!lu.mesures && compterTaillesLogo(enPlace).mesures) {
+    return res.status(502).json({
+      error: 'Le site des tailles de logo a répondu sans aucune largeur. Les tailles déjà enregistrées restent en place.',
+      ...enPlace,
+      ...compterTaillesLogo(enPlace),
+    });
+  }
   const table = await setTaillesLogo({
     maj: new Date().toISOString(),
     source: lu.source || TAILLES_LOGO_BASE,

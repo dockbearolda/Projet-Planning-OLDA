@@ -1986,6 +1986,13 @@ function txManquants(){return TX_OBLIGATOIRES.filter(([id])=>!String($(id).value
    vouloir 320 mm là où la référence en dit 300. */
 let TX_LOGO={maj:null,source:null,familles:{}};
 let TX_LOGO_INDEX={};          /* familles rangées sous un nom comparable */
+/* CE QU'ON SAIT DU TABLEAU, à ne jamais confondre avec ce qu'on sait de la
+   RÉFÉRENCE. Le 26/08, un essai en local a montré des cases vides sous
+   « Cette référence n'est pas encore dans le tableau » — alors qu'elle y
+   était : c'est la copie du serveur qui n'avait pas été remplie. Accuser la
+   référence quand on n'a pas lu le tableau envoie chercher au mauvais
+   endroit. */
+let TX_LOGO_ETAT='attente';    /* attente | ok | vide | muet */
 let txLogoManuel={};           /* ce que la vendeuse a écrit elle-même */
 let txLogoSignature='';        /* la grille ne se reconstruit que si elle change */
 
@@ -2012,8 +2019,14 @@ function txLogoIndexer(){
 function txLoadTaillesLogo(){
   return fetch('/api/tailles-logo').then(r=>r.ok?r.json():null).then(t=>{
     if(t&&t.familles&&typeof t.familles==='object')TX_LOGO=t;
-    txLogoIndexer();txRenderLogo(true);
-  }).catch(()=>{/* serveur injoignable : le champ reste, il se saisit à la main */});
+    txLogoIndexer();
+    TX_LOGO_ETAT=Object.keys(TX_LOGO_INDEX).length?'ok':'vide';
+    txRenderLogo(true);
+  }).catch(()=>{
+    /* Le champ reste et se saisit à la main — mais on ne fera porter le
+       chapeau à aucune référence. */
+    TX_LOGO_ETAT='muet';txRenderLogo(true);
+  });
 }
 
 /* LE TABLEAU N'A QUE DEUX COLONNES — « Avant » et « Dos » — et ce sont des
@@ -2157,6 +2170,15 @@ function txLogoAideMaj(){
     aide.textContent=`À saisir à la main.${reste}`.trim();
   else if(d.isCustom)
     aide.textContent=`Produit libre : le tableau ne le connaît pas, la taille du logo se saisit à la main.${reste}`;
+  /* LE TABLEAU AVANT LA RÉFÉRENCE. Tant qu'on ne l'a pas lu, on ne sait rien
+     de cette référence — et le dire évite d'aller la chercher là où elle
+     est déjà. */
+  else if(TX_LOGO_ETAT==='attente')
+    aide.textContent='Lecture du tableau des tailles de logo…';
+  else if(TX_LOGO_ETAT==='muet')
+    aide.textContent=`Le tableau des tailles de logo n’a pas pu être lu — à saisir à la main.${reste}`;
+  else if(TX_LOGO_ETAT==='vide')
+    aide.textContent=`Aucune taille de logo enregistrée (Réglages → Tailles de logo) — à saisir à la main.${reste}`;
   else{
     const parRef=TX_LOGO_INDEX[txLogoCle(d.genre)],item=TE().getRef(d.ref);
     const connue=parRef&&[d.ref,item&&item.toptex].some(n=>n&&parRef[txLogoCle(n)]);

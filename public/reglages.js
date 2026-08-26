@@ -379,9 +379,15 @@ function renderTaillesLogo() {
   // LE RÉSULTAT SE LIT DANS LA CARTE, pas en haut de l'écran : le bandeau
   // d'état vit à côté du message WhatsApp, à plusieurs écrans de ce bouton —
   // on aurait cliqué ici et la réponse serait apparue hors de vue.
-  const dit = taillesLogoEtat || (taillesLogo.maj
-    ? `mise à jour le ${new Date(taillesLogo.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`
-    : 'le comptoir saisit chaque largeur à la main');
+  // TROIS ÉTATS, pas deux : sans date MAIS avec des largeurs, ce sont celles
+  // livrées avec l'application — dire « saisie à la main » serait faux, et
+  // c'est le genre de phrase qui envoie chercher un problème qui n'existe pas.
+  let dit;
+  if (taillesLogoEtat) dit = taillesLogoEtat;
+  else if (taillesLogo.maj) {
+    dit = `mise à jour le ${new Date(taillesLogo.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
+  } else if (refs) dit = 'livrées avec l’application — jamais relues sur le site';
+  else dit = 'le comptoir saisit chaque largeur à la main';
   l.append(el('span', 'reg-ligne__aide', dit));
   const b = el('button', 'reg-btn', 'Mettre à jour');
   b.type = 'button';

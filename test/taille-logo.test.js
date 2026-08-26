@@ -78,13 +78,20 @@ const GRILLES = {
   },
 };
 
+// Le site peut aussi répondre 200 SANS AUCUNE LARGEUR — c'est ce qu'il fait le
+// temps de se réveiller, et c'est le cas qui écraserait tout en silence.
+let siteVide = false;
+
 function fauxSite() {
   return new Promise((resolve) => {
     const s = http.createServer((req, res) => {
       const m = req.url.match(/^\/api\/categories\/([A-Z]+)\/grid$/);
       res.setHeader('Content-Type', 'application/json');
-      if (req.url === '/api/categories') return res.end(JSON.stringify(CATEGORIES));
-      if (m && GRILLES[m[1]]) return res.end(JSON.stringify(GRILLES[m[1]]));
+      if (req.url === '/api/categories') return res.end(JSON.stringify(siteVide ? [] : CATEGORIES));
+      if (m && GRILLES[m[1]]) {
+        const g = GRILLES[m[1]];
+        return res.end(JSON.stringify(siteVide ? { ...g, products: [] } : g));
+      }
       res.statusCode = 404;
       res.end('{}');
     });
@@ -139,10 +146,20 @@ const TE = global.window.TextileEngine;
     return { status: res.status, body: await res.json() };
   };
 
-  const vide = await call('GET', '/api/tailles-logo');
-  assert.strictEqual(vide.status, 200);
-  assert.deepStrictEqual(vide.body.familles, {}, 'rien n’est importé tout seul au démarrage');
-  assert.strictEqual(vide.body.maj, null);
+  // UNE BASE NEUVE PORTE DÉJÀ LES LARGEURS. C'est le défaut du 26/08 : sur une
+  // base fraîche, le comptoir montrait des cases vides et accusait la référence
+  // de ne pas être au tableau — il fallait avoir trouvé un bouton dans les
+  // Réglages pour que la fonction existe.
+  const neuve = await call('GET', '/api/tailles-logo');
+  assert.strictEqual(neuve.status, 200);
+  const semees = Object.keys(neuve.body.familles || {});
+  assert.ok(semees.length, 'l’instantané livré avec le code est en base dès le premier démarrage');
+  assert.ok(neuve.body.familles.Homme && neuve.body.familles.Homme.NS300,
+    'et il porte les références du catalogue');
+  // `maj` reste NULL : ces largeurs viennent du FICHIER, pas d'une lecture du
+  // site. C'est ce que l'écran des Réglages annonce, et c'est vrai.
+  assert.strictEqual(neuve.body.maj, null,
+    'aucun appel sortant au démarrage : le semis n’est pas une mise à jour');
 
   const maj = await call('POST', '/api/tailles-logo/rafraichir');
   assert.strictEqual(maj.status, 200, JSON.stringify(maj.body));
@@ -152,6 +169,7 @@ const TE = global.window.TextileEngine;
   const relu = await call('GET', '/api/tailles-logo');
   assert.strictEqual(relu.body.familles.Homme.NS300.S.dos, 260,
     'le comptoir lit la COPIE : il ne parle jamais au second site');
+  assert.ok(relu.body.maj, 'un relevé du site fait foi sur l’instantané, et il est daté');
 
   // --- 3. LE SITE INJOIGNABLE NE VIDE RIEN -----------------------------------
   process.env.TAILLE_LOGO_URL = 'http://127.0.0.1:9';   // discard : refus immédiat
@@ -163,6 +181,17 @@ const TE = global.window.TextileEngine;
   assert.strictEqual(apresEchec.body.familles.Homme.NS300.S.dos, 260,
     'UN SITE MUET NE DOIT RIEN EFFACER : c’est le moment où le comptoir en a besoin');
   process.env.TAILLE_LOGO_URL = base;
+
+  // --- 3 bis. UN SITE QUI RÉPOND « RIEN » N'ÉCRASE RIEN ----------------------
+  // Plus vicieux que le site muet : il répond 200, tout va bien, et le tableau
+  // se viderait sans un mot.
+  siteVide = true;
+  const rienDuTout = await call('POST', '/api/tailles-logo/rafraichir');
+  assert.strictEqual(rienDuTout.status, 502, 'un relevé sans aucune largeur est un échec, pas une mise à jour');
+  const apresRien = await call('GET', '/api/tailles-logo');
+  assert.strictEqual(apresRien.body.familles.Homme.NS300.S.dos, 260,
+    'le tableau en place ne bouge pas');
+  siteVide = false;
 
   site.close();
   if (app.__server) app.__server.close();
@@ -216,6 +245,25 @@ const TE = global.window.TextileEngine;
   assert.ok(!/txRenderLogo/.test(corps),
     'la correction ne reconstruit RIEN : elle reprendrait le champ sous les doigts');
   assert.match(corps, /txLogoAideMaj\(\)/, 'seule la ligne d’aide est réécrite');
+
+  // LE TABLEAU AVANT LA RÉFÉRENCE. Le 26/08, un essai en local a montré « Cette
+  // référence n'est pas encore dans le tableau » sous une référence qui y
+  // était : c'est la copie du serveur qui n'avait pas été remplie. Accuser la
+  // référence quand on n'a pas lu le tableau envoie chercher au mauvais endroit.
+  const aideSrc = DEVIS_JS.slice(DEVIS_JS.indexOf('function txLogoAideMaj('));
+  const corpsAide = aideSrc.slice(0, aideSrc.indexOf('\n}'));
+  const posEtat = corpsAide.indexOf("TX_LOGO_ETAT==='vide'");
+  const posAccuse = corpsAide.indexOf('n’est pas encore dans le tableau');
+  assert.ok(posEtat > 0 && posAccuse > 0, 'les deux messages existent');
+  assert.ok(posEtat < posAccuse,
+    'l’état du TABLEAU se dit AVANT d’accuser la référence — sinon le message ment');
+  for (const etat of ['attente', 'muet', 'vide']) {
+    assert.ok(corpsAide.includes(`TX_LOGO_ETAT==='${etat}'`), `l’état « ${etat} » a son message`);
+  }
+  // Et l'état se pose bien aux trois moments : au départ, à la réponse, à l'échec.
+  assert.match(DEVIS_JS, /let TX_LOGO_ETAT='attente'/);
+  assert.match(DEVIS_JS, /TX_LOGO_ETAT=Object\.keys\(TX_LOGO_INDEX\)\.length\?'ok':'vide'/);
+  assert.match(DEVIS_JS, /TX_LOGO_ETAT='muet'/);
 
   // --- 6. LE PRIX NE BOUGE PAS ----------------------------------------------
   const saisie = {

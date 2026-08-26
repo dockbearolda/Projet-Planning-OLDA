@@ -1,0 +1,281 @@
+{
+  "source": "https://taille-logo-app-production.up.railway.app",
+  "familles": {
+    "Bébé": {
+      "K831": {
+        "12 mois": {
+          "avant": 130,
+          "dos": 130
+        },
+        "18 mois": {
+          "avant": 140,
+          "dos": 140
+        },
+        "24 mois": {
+          "avant": 140,
+          "dos": 140
+        },
+        "3 mois": {
+          "avant": 110,
+          "dos": 110
+        },
+        "36 mois": {
+          "avant": 140,
+          "dos": 140
+        },
+        "6 mois": {
+          "avant": 120,
+          "dos": 120
+        },
+        "9 mois": {
+          "avant": 130,
+          "dos": 130
+        }
+      }
+    },
+    "Femme": {
+      "BY042": {
+        "L": {
+          "avant": 60,
+          "dos": 240
+        },
+        "M": {
+          "avant": 60,
+          "dos": 240
+        },
+        "S": {
+          "avant": 60,
+          "dos": 220
+        },
+        "XS": {
+          "avant": 55,
+          "dos": 200
+        }
+      },
+      "K3026IC": {
+        "L": {
+          "avant": 65,
+          "dos": 260
+        },
+        "M": {
+          "avant": 60,
+          "dos": 240
+        },
+        "S": {
+          "avant": 60,
+          "dos": 240
+        },
+        "XL": {
+          "avant": 65,
+          "dos": 280
+        },
+        "XS": {
+          "avant": 60,
+          "dos": 220
+        }
+      },
+      "NS313": {
+        "L": {
+          "avant": 70,
+          "dos": 340
+        },
+        "M": {
+          "avant": 70,
+          "dos": 320
+        },
+        "S": {
+          "avant": 70,
+          "dos": 320
+        },
+        "XS": {
+          "avant": 70,
+          "dos": 300
+        }
+      },
+      "NS342": {
+        "L": {
+          "avant": 65,
+          "dos": 280
+        },
+        "M": {
+          "avant": 60,
+          "dos": 260
+        },
+        "S": {
+          "avant": 60,
+          "dos": 240
+        },
+        "XS": {
+          "avant": 60,
+          "dos": 220
+        }
+      }
+    },
+    "Homme": {
+      "K3022": {
+        "2XL": {
+          "avant": 70,
+          "dos": 300
+        },
+        "L": {
+          "avant": 70,
+          "dos": 280
+        },
+        "M": {
+          "avant": 60,
+          "dos": 260
+        },
+        "S": {
+          "avant": 60,
+          "dos": 240
+        },
+        "XL": {
+          "avant": 70,
+          "dos": 300
+        }
+      },
+      "K3025": {
+        "2XL": {
+          "avant": 70,
+          "dos": 320
+        },
+        "L": {
+          "avant": 65,
+          "dos": 300
+        },
+        "M": {
+          "avant": 65,
+          "dos": 280
+        },
+        "S": {
+          "avant": 60,
+          "dos": 260
+        },
+        "XL": {
+          "avant": 70,
+          "dos": 320
+        },
+        "XS": {
+          "avant": 60,
+          "dos": 240
+        }
+      },
+      "NS300": {
+        "2XL": {
+          "avant": 70,
+          "dos": 320
+        },
+        "L": {
+          "avant": 65,
+          "dos": 300
+        },
+        "M": {
+          "avant": 65,
+          "dos": 280
+        },
+        "S": {
+          "avant": 60,
+          "dos": 260
+        },
+        "XL": {
+          "avant": 70,
+          "dos": 320
+        },
+        "XS": {
+          "avant": 60,
+          "dos": 240
+        }
+      },
+      "NS308": {
+        "L": {
+          "avant": 70,
+          "dos": 340
+        },
+        "S": {
+          "avant": 65,
+          "dos": 320
+        },
+        "XL": {
+          "avant": 70,
+          "dos": 340
+        }
+      },
+      "NS332": {
+        "L": {
+          "avant": 70,
+          "dos": 340
+        },
+        "M": {
+          "avant": 70,
+          "dos": 320
+        },
+        "S": {
+          "avant": 65,
+          "dos": 320
+        },
+        "XL": {
+          "avant": 70,
+          "dos": 340
+        },
+        "XS": {
+          "avant": 65,
+          "dos": 300
+        }
+      },
+      "NS352": {
+        "L": {
+          "avant": 75,
+          "dos": 320
+        },
+        "M": {
+          "avant": 70,
+          "dos": 320
+        },
+        "S": {
+          "avant": 70,
+          "dos": 300
+        },
+        "XL": {
+          "avant": 75,
+          "dos": 320
+        }
+      },
+      "PA479": {
+        "L": {
+          "avant": 70,
+          "dos": 300
+        },
+        "M": {
+          "avant": 65,
+          "dos": 300
+        },
+        "S": {
+          "avant": 65,
+          "dos": 280
+        }
+      },
+      "PARAGON 210": {
+        "L": {
+          "avant": 80,
+          "dos": 320
+        },
+        "M": {
+          "avant": 70,
+          "dos": 300
+        },
+        "S": {
+          "avant": 65,
+          "dos": 280
+        },
+        "XL": {
+          "avant": 80,
+          "dos": 320
+        },
+        "XS": {
+          "avant": 65,
+          "dos": 260
+        }
+      }
+    }
+  }
+}
