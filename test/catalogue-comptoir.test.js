@@ -24,10 +24,14 @@
 //   4. LA VARIANTE DANS LA LIGNE. Bois/liège, clair/foncé, taille, coloris de
 //      tasse : chaque variante est SA propre ligne du menu. Aucun deuxième
 //      choix à faire, et deux variantes ne se confondent jamais à la demande.
-//   5. LA SAISIE MANUELLE. Elle reste EN HAUT : le catalogue ne couvre pas
-//      tout (un textile, une commande spéciale) et rien de ce qui se faisait
-//      avant ne doit devenir plus long à faire. « Modifier » doit rouvrir ce
-//      formulaire replié, sinon le bouton de la liste ne fait rien de visible.
+//   5. LA SAISIE MANUELLE, VISIBLE SANS DÉPLIER LA LISTE. Elle est la
+//      première ligne du menu (21/08) — mais un menu fermé ne montre rien, et
+//      au comptoir la vendeuse ne trouvait plus comment saisir un produit hors
+//      rayon (26/08). Elle est donc AUSSI un bouton écrit sous la ligne
+//      produit / quantité. Les deux entrées passent par la MÊME fonction : une
+//      porte qui s'ouvrirait autrement que l'autre finirait par diverger.
+//      « Modifier » doit rouvrir ce formulaire replié, sinon le bouton de la
+//      liste ne fait rien de visible.
 //
 // Tout se lit dans les sources : ces écrans n'ont ni build ni DOM de test, et
 // une nouvelle version d'un écran du patron se pose en REMPLAÇANT le fichier.
@@ -62,16 +66,30 @@ assert.ok(/<option value="__manuel">\+ Saisie manuelle/.test(DEVIS),
   'la saisie manuelle se choisit dans la liste, en tête');
 assert.ok(/let html='<option value=""[^']*'\+\n\s*'<option value="__manuel"/.test(DEVIS),
   '… juste après le choix vide, avant la première famille');
-assert.ok(/<select id="catProduit" onchange="choisirProduitCatalogue\(\)">/.test(step2),
+assert.ok(/<select id="catProduit"[^>]*onchange="choisirProduitCatalogue\(\)"/.test(step2),
   'la choisir doit faire quelque chose tout de suite');
-assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';[\s\S]*?basculerSaisieManuelle\(true\)/.test(DEVIS),
+assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';\s*ouvrirSaisieManuelle\(\)/.test(DEVIS),
   'elle ouvre le formulaire ET rend la liste à vide : ce n’est pas un produit');
 const iSelect = step2.indexOf('id="catProduit"');
 const iForm = step2.indexOf('id="besoinManuel"');
 assert.ok(iSelect > -1 && iForm > iSelect,
   'le formulaire détaillé s’ouvre SOUS la ligne où on vient de le choisir');
+// LA PORTE SE VOIT SANS OUVRIR LE MENU. Repliée dans la liste le 21/08, elle
+// ne se montrait plus qu'à qui la dépliait : au comptoir, devant le client, la
+// vendeuse ne trouvait pas comment saisir un produit hors rayon. Un bouton la
+// dit donc en toutes lettres sous la ligne produit / quantité — et l'entrée du
+// menu NOMME ce qu'elle ajoute au lieu de dire « Ajouter » tout court.
+assert.ok(/id="catHorsBtn"[^>]*onclick="ouvrirSaisieManuelle\(\)"/.test(step2),
+  'la saisie manuelle s’ouvre sans avoir à déplier la liste');
+assert.ok(/<select id="catProduit"[^>]*data-menu-manuel-texte="Produit hors catalogue"/.test(step2),
+  '… et l’entrée du menu dit CE qu’elle ajoute');
+assert.ok(/function ouvrirSaisieManuelle\(\)\{\n\s*basculerSaisieManuelle\(true\);/.test(DEVIS),
+  'les deux portes passent par la même fonction : une seule à tenir');
+// Ce qui ne revient PAS : la bannière du haut d'écran et son bouton à bascule
+// (« Saisie manuelle » / « Masquer la saisie manuelle »), partis le 21/08. Le
+// libellé se suffit, et une porte ne se referme pas par où on l'ouvre.
 assert.ok(!/catManuelBtn|cat-manuel|cat-top/.test(DEVIS),
-  'le bouton « Saisie manuelle » et son explication ont disparu de l’écran');
+  'l’ancienne bannière à bascule et son explication ne reviennent pas');
 // Le repli ne dépend plus d'un bouton : « Modifier » doit encore rouvrir le
 // formulaire, sinon le bouton de la liste ne fait plus rien de visible.
 assert.ok(/function basculerSaisieManuelle\(force\)\{\n\s*const box=\$\('besoinManuel'\);if\(!box\)return;/.test(DEVIS),
