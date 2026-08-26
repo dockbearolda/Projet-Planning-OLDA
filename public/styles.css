@@ -183,8 +183,13 @@ button, input, select, textarea { font-family: inherit; }
   flex-wrap: wrap;
   gap: 8px 14px;
   /* 32 px à gauche = la largeur de la gouttière (16) + le retrait de la zone de
-     travail (16) : la recherche démarre pile à l'aplomb de la carte du dessous. */
-  padding: 8px 16px 8px 32px;
+     travail (16) : la recherche démarre pile à l'aplomb de la carte du dessous.
+     Les deux flancs sont des JETONS parce que la rangée d'onglets les REPREND
+     au pixel près (marge négative, plus bas) : écrits deux fois, ils auraient
+     divergé, et la rangée serait retombée à côté de l'axe. */
+  --topbar-flanc-g: 32px;
+  --topbar-flanc-d: 16px;
+  padding: 8px var(--topbar-flanc-d) 8px var(--topbar-flanc-g);
   min-height: 64px;
   background: var(--surface);
 }
@@ -3281,26 +3286,48 @@ a,
      `center` sec rend le DÉBUT du contenu inatteignable dès qu'il déborde —
      le mot-clé retombe alors sur `start`. Même famille de piège que
      `justify-content: flex-end`.
-     Les 16 px de rembourrage à droite RENDENT l'écart des flancs de la barre
-     (32 à gauche, 16 à droite : la recherche s'aligne sur la carte du
-     dessous, voir `.topbar`). Sans eux, centrer dans cette boîte-là poserait
-     les onglets 8 px à droite de l'axe réel. */
+     Le rembourrage de droite qui rendait l'écart des flancs de la barre n'a
+     plus lieu d'être : la rangée reprend les 12 px des DEUX côtés (voir la
+     marge négative plus bas), sa boîte est donc symétrique et l'axe tombe
+     juste. Il coûtait 16 px sur une rangée qui n'en a pas à perdre. */
   justify-content: safe center;
-  padding-inline-end: 16px;
-  /* LA RANGÉE SE PLIE PLUTÔT QUE DE DÉFILER (26/08). Elle ne défilait pas par
-     choix : `overflow-x: auto` était le dernier recours, et il tenait tant que
-     la barre portait sept onglets. À neuf — « Mon travail » et « Pilotage » se
-     sont ajoutés — il faut 1 279 px pour 1 072 disponibles sur une fenêtre de
-     1 440 : « Réglages » se posait à 175 px HORS de l'écran, derrière une
-     barre de défilement horizontale que rien n'annonce. Un onglet qu'on ne
-     voit pas est un écran qui n'existe pas.
-     Le pli coûte une rangée de 40 px, et seulement quand la place manque
-     vraiment. Le défilement reste en dernier recours pour le cas où un seul
-     onglet serait plus large que la barre. */
-  flex-wrap: wrap;
-  row-gap: 4px;
+  /* UNE SEULE LIGNE, VERROUILLÉE (26/08, demande de Charlie). La rangée s'est
+     pliée un temps : c'était le seul moyen de ne pas poser « Réglages » 175 px
+     hors de l'écran quand les onglets se sont multipliés. Mais deux rangées
+     d'onglets, c'est deux endroits où chercher — et 40 px de barre en plus sur
+     tous les écrans.
+     La place se prend donc SUR LES FLANCS, jamais sur les libellés : écart
+     resserré, rembourrage resserré, et les 12 px de marge de la barre rendus à
+     la rangée (elle est seule sur sa ligne, personne d'autre n'en a besoin).
+     Mesuré : 1 145 px nécessaires pour 1 072 disponibles à 1 440 — les trois
+     leviers en rendent 86, il en reste 13 de marge.
+     Le défilement reste le dernier recours, pour la fenêtre si étroite qu'un
+     seul onglet serait plus large qu'elle. */
+  flex-wrap: nowrap;
+  gap: 2px;
+  /* LA RANGÉE REPREND LES DEUX FLANCS DE LA BARRE. Elle est seule sur sa
+     ligne : personne d'autre n'a besoin de cette marge. Ça rend 48 px — et
+     comme les flancs sont ASYMÉTRIQUES (32 à gauche, 16 à droite), les
+     reprendre tels quels remet aussi la boîte de la rangée à l'aplomb de la
+     barre : le centrage tombe alors sur l'axe RÉEL, sans compensation. */
+  margin-left: calc(-1 * var(--topbar-flanc-g));
+  margin-right: calc(-1 * var(--topbar-flanc-d));
   overflow-x: auto;
 }
+/* Les flancs des onglets, sur la rangée qui leur est propre. C'est le premier
+   levier quand la place manque, et le seul qui ne coûte rien à la lecture :
+   « Fiverr » et « À commander » ne se devinent pas à l'icône. */
+.topbar .nav-switch-btn { padding-inline: 7px; }
+/* LA RANGÉE SERRÉE — posée par la mesure, jamais par une largeur devinée (voir
+   `ajusterLesOnglets` dans app.js). Les mots s'en vont, les icônes restent, et
+   chacune reprend son mot en infobulle. Les flancs se rouvrent : une icône
+   seule dans 7 px de chaque côté ferait une cible de 34 px. */
+.nav-switch.est-serree .nav-switch-label { display: none; }
+.topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 11px; }
+.topbar .nav-switch.est-serree .nav-switch-btn--projet { padding-right: 14px; }
+.topbar .nav-switch.est-serree .nav-switch-btn--reglages { padding-left: 14px; }
+.topbar .nav-switch-btn--projet { padding-right: 11px; margin-right: 4px; }
+.topbar .nav-switch-btn--reglages { padding-left: 11px; margin-left: 4px; }
 /* ET IL FAUT RENDRE LA MARGE AUTOMATIQUE, sans quoi tout ce qui précède ne
    sert à rien. Sur la rangée pleine, les onglets tiennent la droite par
    `.nav-switch > :first-child { margin-left: auto }` — et une marge AUTO mange
@@ -3311,36 +3338,12 @@ a,
    centrage prend. */
 .topbar .nav-switch > :first-child { margin-left: 0; }
 
-/* LA RANGÉE UNIQUE — l'exception, et seulement quand il y a vraiment la place.
-   `flex-wrap: nowrap` la VERROUILLE : sans lui, une barre trop courte de
-   quelques pixels remet les actions à la ligne, sous la recherche et contre le
-   bord gauche — c'est exactement l'accident qu'on vient de corriger. Ici, rien
-   ne peut passer à la ligne : la recherche se resserre (jusqu'à 160), puis les
-   onglets défilent. Une disposition qui se resserre reste la même ; une
-   disposition qui se replie devient une autre. */
-@media (min-width: 1720px) {
-  .topbar { flex-wrap: nowrap; }
-  .topbar .grid-search { order: 0; flex: 1 1 160px; max-width: 520px; }
-  .topbar .topbar-right { order: 0; }
-  .topbar .nav-switch {
-    order: 0;
-    flex: 0 1 auto;
-    width: auto;
-    /* LES ONGLETS TIENNENT LA DROITE — PAR UNE MARGE, JAMAIS PAR
-       `justify-content`. `flex-end` sur une rangée trop étroite fait déborder
-       le contenu par la GAUCHE, hors de la boîte : « Nouveau Projet » sortait
-       rogné de 52 px, et cet excédent-là n'est même pas atteignable au
-       défilement (scrollWidth reste égal à la largeur visible). Une marge
-       automatique, elle, retombe à 0 dès qu'il n'y a plus de place : les
-       onglets se recalent à gauche et débordent du bon côté, celui qui
-       défile. */
-    margin-left: auto;
-    justify-content: flex-start;
-    padding-inline-end: 0;
-    overflow-x: auto;
-  }
-  .topbar .nav-switch > :first-child { margin-left: 0; }
-}
+/* PLUS D'EXCEPTION « RANGÉE UNIQUE » (26/08). Au-dessus de 1 720 px, les
+   onglets remontaient sur la ligne de la recherche — et s'y repliaient en deux
+   rangées, puisqu'ils la partageaient. La barre changeait donc de forme au
+   milieu de la plage de largeurs, et se pliait justement là où il y a le plus
+   de place. La recherche reste EN HAUT, les onglets ont leur ligne : une seule
+   disposition, à toutes les largeurs. */
 
 /* Un cran plus serré avant de renoncer : sur une fenêtre étroite les sept
    onglets se touchent presque, mais ils TIENNENT — et tenir vaut mieux que
@@ -3500,7 +3503,18 @@ a,
 /* Marque dessinée (Fiverr) : même encombrement qu'un glyphe de la police, pour
    qu'elle s'aligne sur les six autres onglets sans décaler leur rangée. */
 .nav-switch-mark { width: 20px; height: 20px; flex: 0 0 auto; display: block; }
-.nav-switch-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* UN ONGLET EST UN INTITULÉ, pas du texte courant : il prend donc la taille
+   des intitulés (14 px), déjà dans l'échelle de l'application — celle des
+   étiquettes de champ et des en-têtes de colonne. En 17 px, les huit onglets
+   demandaient 1 092 px : ils ne tenaient sur une ligne qu'à partir de 1 440,
+   et se repliaient sur tous les écrans plus étroits. */
+.nav-switch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+}
 .nav-switch-btn:hover { background: var(--surface-hover); color: var(--text-1); }
 /* Onglet actif : plus de fond bleu clair (c'était le seul endroit où l'accent
    se répétait dix fois d'affilée dans la barre). La position se lit au texte

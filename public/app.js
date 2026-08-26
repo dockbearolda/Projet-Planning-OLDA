@@ -7544,7 +7544,6 @@ if ($shell && $sidebarResizer) {
   // c'est le moment où le navigateur allait recalculer de toute façon.
   let resserrementPrevu = false;
   const resserrerLeRail = () => {
-    resserrementPrevu = false;
     const rail = document.getElementById('sidebar');
     if (!rail) return;
     const actuel = Math.round(rail.getBoundingClientRect().width);
@@ -7557,11 +7556,20 @@ if ($shell && $sidebarResizer) {
     }
     try { localStorage.setItem(SIDEBAR_W_KEY, String(Math.max(SIDEBAR_MIN, w))); } catch (_) {}
   };
+  // Le rail d'abord — il peut rendre la place qui suffit —, les onglets
+  // ensuite. Les deux dans la MÊME passe : `resserrerLeRail` sort par trois
+  // chemins différents, l'ajustement ne peut pas vivre à l'intérieur.
+  const ajusterLaBarre = () => {
+    resserrementPrevu = false;
+    resserrerLeRail();
+    ajusterLesOnglets();
+  };
   window.addEventListener('resize', () => {
     if (resserrementPrevu) return;
     resserrementPrevu = true;
-    requestAnimationFrame(resserrerLeRail);
+    requestAnimationFrame(ajusterLaBarre);
   }, { passive: true });
+  ajusterLesOnglets();
 
   attachTip($sidebarResizer, 'Glisser pour régler la largeur');
   $sidebarResizer.addEventListener('pointerdown', (e) => {
@@ -8133,6 +8141,43 @@ monterPoste(EMPLOYEES);
 //
 // Comptes éteints, `puisJe()` rend `true` partout : rien ne se cache, l'écran
 // est exactement celui d'avant.
+// DERNIER RECOURS : LES LIBELLÉS CÈDENT, JAMAIS LA RANGÉE (26/08).
+//
+// Le rail s'est déjà resserré autant qu'il pouvait. S'il manque encore de la
+// place, il y avait deux mauvaises sorties : replier la barre en DEUX rangées
+// d'onglets — deux endroits où chercher, et 40 px de barre sur tous les écrans
+// — ou faire défiler la rangée, ce qui pose le dernier onglet hors de l'écran
+// derrière une barre de défilement que rien n'annonce. Un onglet qu'on ne voit
+// pas est un écran qui n'existe pas.
+// On retire donc les libellés : les icônes sont distinctes, chacune reprend son
+// mot en infobulle, et la rangée reste une rangée.
+//
+// ON MESURE TOUJOURS AVEC LES LIBELLÉS. Mesurer la rangée déjà réduite dirait
+// « ça tient » et on ne les remettrait jamais — la barre resterait muette pour
+// toujours après un seul passage sur une fenêtre étroite.
+//
+// Le cas arrive dès que les comptes allument « Mon travail » et « Pilotage » :
+// dix onglets au lieu de huit, 1 170 px de contenu pour 960 disponibles à
+// 1 280. À huit onglets, la rangée tient dès 1 280 et les mots restent.
+//
+// DÉCLARATION DE FONCTION, pas une constante : le bloc du rail l'appelle six
+// cents lignes plus haut, et une `let` y serait dans sa zone morte.
+function ajusterLesOnglets() {
+  const nav = document.querySelector('.nav-switch');
+  if (!nav) return;
+  nav.classList.remove('est-serree');
+  const onglets = nav.querySelectorAll('.nav-switch-btn');
+  if (nav.scrollWidth <= nav.clientWidth + 1) {
+    for (const a of onglets) a.removeAttribute('title');
+    return;
+  }
+  nav.classList.add('est-serree');
+  for (const a of onglets) {
+    const mot = a.querySelector('.nav-switch-label');
+    if (mot) a.title = mot.textContent.trim();
+  }
+}
+
 function appliquerDroits() {
   const onglet = (el, visible) => { if (el) el.hidden = !visible; };
   onglet($viewMonTravail, comptesActifs());
@@ -8147,6 +8192,8 @@ function appliquerDroits() {
   // elles n'ont pas de constante dédiée, on les prend par leur identifiant.
   onglet(document.getElementById('viewACommander'), puisJe('production'));
   onglet(document.getElementById('viewFiverr'), puisJe('clients'));
+  // Le nombre d'onglets vient de changer : la rangée se remesure.
+  requestAnimationFrame(() => ajusterLesOnglets());
   // Le Point du jour parle de TOUTE l'équipe : ce n'est pas l'écran d'un
   // opérateur, qui a le sien.
   onglet($viewDashboard, puisJe('production') || puisJe('clients'));

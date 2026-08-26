@@ -152,18 +152,67 @@ for (const [nom, src, sel] of [['styles.css', CRM, '.grid-search'], ['clients.cs
 }
 
 // ===========================================================================
-// 6. NEUF ONGLETS TIENNENT DANS LA BARRE
+// 6. LES ONGLETS TIENNENT SUR UNE SEULE LIGNE
 // ---------------------------------------------------------------------------
-// Ils défilaient : `overflow-x: auto` était le dernier recours, calibré sur
-// sept onglets. À neuf, « Réglages » se posait 175 px hors de l'écran d'une
-// fenêtre de 1 440 — derrière une barre de défilement horizontale que rien
-// n'annonce. Un onglet qu'on ne voit pas est un écran qui n'existe pas.
+// Trois dispositions se sont succédé, et les deux premières se voyaient :
+//   — ils DÉFILAIENT (`overflow-x`), calibré sur sept onglets : à neuf,
+//     « Réglages » se posait 175 px hors de l'écran d'une fenêtre de 1 440,
+//     derrière une barre de défilement que rien n'annonce ;
+//   — ils se PLIAIENT sur deux rangées : plus rien hors de l'écran, mais deux
+//     endroits où chercher et 40 px de barre en plus, partout.
+// Depuis le 26/08 (demande de Charlie) : UNE SEULE LIGNE, et ce sont les
+// LIBELLÉS qui cèdent quand la place manque — jamais la rangée.
 // ===========================================================================
 {
   const regle = sansCom(CRM).match(/\.topbar\s+\.nav-switch\s*\{([^}]*)\}/);
   assert.ok(regle, 'la rangée d’onglets a bien sa règle de barre');
-  assert.match(regle[1], /flex-wrap:\s*wrap/,
-    'la rangée d’onglets se PLIE quand la place manque, elle ne sort pas de l’écran');
+  assert.match(regle[1], /flex-wrap:\s*nowrap/,
+    'la rangée est VERROUILLÉE sur une ligne : rien ne repasse en dessous');
+  // Elle reprend les deux flancs de la barre, par les JETONS et pas par des
+  // nombres recopiés : les flancs sont ASYMÉTRIQUES (32 à gauche, 16 à droite)
+  // et, écrits deux fois, ils divergeraient — la rangée retomberait à côté de
+  // l'axe qu'elle prétend viser.
+  assert.match(regle[1], /margin-left:\s*calc\(-1 \* var\(--topbar-flanc-g\)\)/);
+  assert.match(regle[1], /margin-right:\s*calc\(-1 \* var\(--topbar-flanc-d\)\)/);
+  const barre = sansCom(CRM).match(/(?:^|\n)\.topbar\s*\{([^}]*padding[^}]*)\}/);
+  assert.ok(barre, 'la barre déclare son rembourrage');
+  assert.match(barre[1], /--topbar-flanc-g:/, 'et ses flancs sont des jetons');
+  assert.match(barre[1], /padding:[^;]*var\(--topbar-flanc-d\)[^;]*var\(--topbar-flanc-g\)/,
+    'le rembourrage LIT les jetons — sinon les deux nombres se séparent');
+}
+// LE REPLI DES LIBELLÉS SE MESURE, IL NE SE DEVINE PAS. Une requête média ne
+// peut pas voir combien d'onglets sont affichés : allumer les comptes en ajoute
+// deux, et un seuil en pixels serait juste pour un cas et faux pour l'autre.
+{
+  const src = sansCom(APP);
+  const f = src.slice(src.indexOf('function ajusterLesOnglets('));
+  const corps = f.slice(0, f.indexOf('\n}'));
+  assert.ok(corps, 'la mesure existe');
+  // ON MESURE AVEC LES LIBELLÉS : mesurer la rangée déjà réduite dirait
+  // « ça tient » et on ne les remettrait jamais.
+  const iRetire = corps.indexOf("classList.remove('est-serree')");
+  const iMesure = corps.indexOf('scrollWidth');
+  assert.ok(iRetire >= 0 && iMesure > iRetire,
+    'les libellés reviennent AVANT la mesure, sinon la barre reste muette pour toujours');
+  assert.match(corps, /classList\.add\('est-serree'\)/);
+  assert.match(corps, /a\.title = mot\.textContent/,
+    'sans libellé, chaque icône reprend son mot en infobulle');
+  assert.match(corps, /removeAttribute\('title'\)/,
+    '… et le rend quand les libellés reviennent');
+  // Et la mesure repart quand le NOMBRE d'onglets change, pas seulement quand
+  // la fenêtre bouge.
+  const droits = src.slice(src.indexOf('function appliquerDroits('));
+  assert.match(droits.slice(0, droits.indexOf('\n}')), /ajusterLesOnglets\(\)/,
+    'allumer les comptes ajoute deux onglets : la rangée se remesure');
+  assert.match(sansCom(CRM), /\.nav-switch\.est-serree \.nav-switch-label \{ display: none/);
+}
+// UN ONGLET EST UN INTITULÉ, pas du texte courant : en 17 px les huit onglets
+// ne tenaient sur une ligne qu'à partir de 1 440.
+{
+  const regle = sansCom(CRM).match(/(?:^|\n)\.nav-switch-label\s*\{([^}]*)\}/);
+  assert.ok(regle, '.nav-switch-label a sa règle');
+  assert.match(regle[1], /font-size:\s*var\(--taille-note\)/,
+    'les onglets prennent la taille des intitulés — pas une taille de plus');
 }
 // … et deux onglets voisins ne portent pas le même pictogramme : « Pilotage »
 // et « Dashboard » se suivent, et tous deux disaient `dashboard`.
@@ -193,8 +242,25 @@ assert.match(APP, /if \(comptesActifs\(\) && !moi\(\)\) return;\s*\n\s*demarrerA
 // recalculer la mise en page avant de répondre, et `resize` part en rafale
 // tant qu'on tire le bord de la fenêtre.
 // ===========================================================================
-assert.match(APP, /resserrementPrevu = true;\s*\n\s*requestAnimationFrame\(resserrerLeRail\);/,
-  'la rafale de redimensionnement se fond en une passe par image');
+// PAR SON EFFET, PAS PAR LE NOM DE LA FONCTION : la passe fait deux choses
+// depuis le 26/08 (le rail, puis les onglets), elle a donc changé de nom — et
+// une garantie qui s'écrit sur un nom ne garantit rien.
+{
+  const src = sansCom(APP);
+  const i = src.indexOf('resserrementPrevu = true;');
+  assert.ok(i > 0, 'le garde-fou de la rafale existe');
+  const suite = src.slice(i, i + 220);
+  assert.match(suite, /requestAnimationFrame\(/,
+    'la rafale de redimensionnement se fond en une passe par image');
+  // Et la passe fait bien les deux : un rail resserré peut suffire, sinon les
+  // libellés cèdent.
+  const passe = src.match(/requestAnimationFrame\((\w+)\)/g);
+  assert.ok(passe && passe.length, 'la passe est nommée');
+  const nom = suite.match(/requestAnimationFrame\((\w+)\)/)[1];
+  const corps = src.slice(src.indexOf(`const ${nom} = `));
+  assert.match(corps.slice(0, corps.indexOf('};')), /resserrerLeRail\(\);[\s\S]*ajusterLesOnglets\(\)/,
+    'la même passe resserre le rail PUIS remesure les onglets — le rail peut rendre la place qui suffit');
+}
 
 // ===========================================================================
 // 9. CE QUI ÉCOUTE LE DÉFILEMENT NE LE FAIT PAS ATTENDRE
