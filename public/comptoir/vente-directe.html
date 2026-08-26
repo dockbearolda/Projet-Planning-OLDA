@@ -2721,7 +2721,8 @@ button.blocked{opacity:.45;cursor:not-allowed}
 .delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.5}
 .delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
 .delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
-.delay-warn.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+/* `.ok` n'existe plus : le créneau valide ne s'annonce pas (voir checkDeliveryDate). */
+.delay-warn:empty{display:none}
 .wa-link{color:var(--text-1);font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid var(--border-strong)}
 </style>
 <script>
@@ -2867,11 +2868,13 @@ button.blocked{opacity:.45;cursor:not-allowed}
     if(!box){
       box=document.createElement('div');
       box.id='deliveryDateWarning';
-      box.className='delay-warn ok';
+      box.className='delay-warn';
       input.parentNode.appendChild(box);
     }
     var iso=v('deliveryDate');
     if(!iso){box.style.display='none';return;}
+    // Reparaît seulement si l'une des branches ci-dessous a quelque chose à
+    // dire : un créneau valide se tait (voir plus bas).
     box.style.display='block';
     var d=new Date(iso+'T12:00:00');
     if(!isWorkingDay(d)){
@@ -2889,8 +2892,17 @@ button.blocked{opacity:.45;cursor:not-allowed}
       box.innerHTML='⏱ Récupération à 9h00 : la commande doit être <b>terminée le '+frOf(prev)+' avant 18h00</b>.';
       return;
     }
-    box.className='delay-warn ok';
-    box.textContent='✓ Créneau compatible avec les horaires de l’atelier (lundi au vendredi, 9h–18h).';
+    // LE VERT SE TAIT (26/08). « ✓ Créneau compatible » disait que RIEN ne
+    // cloche — c'est-à-dire le cas normal, celui qu'on n'a pas besoin
+    // d'annoncer. Il occupait une bulle verte pleine largeur sous chaque date
+    // valide, et surtout il posait dans l'écran la couleur « succès » de la
+    // charte pour du décor : à force, un vrai succès ne se distingue plus.
+    // Ce qui reste, c'est ce qu'on ne peut PAS deviner : l'atelier fermé, et
+    // la veille à tenir pour une récupération à 9 h. Vider le texte AUSSI —
+    // une bulle sans classe garderait sa hauteur et son rembourrage.
+    box.className='delay-warn';
+    box.textContent='';
+    box.style.display='none';
   };
   window.applyDeliveryDate=function(iso){
     el('deliveryDate').value=iso;

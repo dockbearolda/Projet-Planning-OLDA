@@ -543,6 +543,11 @@ function bloc(src, signature) {
     bandEls: new Map(),
     $empty: { hidden: false, textContent: '' },
     $stageCount: { textContent: '' },
+    // LA LISTE N'EST PAS COUPÉE ici : le serveur borne à 400 lignes et
+    // l'annonce par deux en-têtes ; à 0 / 0, il a tout rendu. Le cas coupé est
+    // joué juste après.
+    listeTronqueeA: 0,
+    listeTotal: 0,
   };
   vm.createContext(sable);
   vm.runInContext(`${compteur}\nglobalThis.compter = applySearchAndCounts;`, sable);
@@ -561,6 +566,29 @@ function bloc(src, signature) {
   sable.gridQuery = '06-042';
   sable.compter();
   assert.strictEqual(sable.$stageCount.textContent, '1 commande');
+
+  // LISTE COUPÉE (26/08) : l'en-tête annonçait ce qu'il AFFICHE, le rail ce que
+  // l'étape CONTIENT — mesuré 400 contre 456 sur le même écran, à six
+  // centimètres l'un de l'autre. Il dit maintenant les deux.
+  sable.gridQuery = '';
+  sable.listeTronqueeA = 400;
+  sable.listeTotal = 456;
+  sable.compter();
+  assert.strictEqual(
+    sable.$stageCount.textContent, '3 des 456 commandes',
+    'liste coupée : l’en-tête dit ce qu’il montre ET ce que l’étape contient',
+  );
+  // … mais pendant une recherche, non : « 2 des 456 » ferait croire à une coupe
+  // alors que c'est le filtre qui a trié.
+  sable.gridQuery = 'esmeralda';
+  sable.compter();
+  assert.strictEqual(
+    sable.$stageCount.textContent, '2 commandes',
+    'une recherche n’est pas une troncature : on n’annonce pas le total de l’étape',
+  );
+  sable.gridQuery = '';
+  sable.listeTronqueeA = 0;
+  sable.listeTotal = 0;
 
   // `content-visibility: auto` a été essayé sur les cartes, mesuré, et RETIRÉ :
   // sur une liste de cette forme, le travail différé retombe pendant le

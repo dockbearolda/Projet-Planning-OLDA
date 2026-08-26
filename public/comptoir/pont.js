@@ -37,7 +37,59 @@
 // part pas au planning se voit — dans l'écran même, pas seulement dans le
 // bandeau de l'hôte ; une vente qu'on ne peut pas SAISIR bloquerait le comptoir.
 
+//   6. LE MESSAGE DE REFUS. Les deux écrans refusaient par `alert()` —
+//      dix-neuf appels au total. Une boîte système est la seule surface que la
+//      charte ne peut pas habiller, elle bloque le navigateur entier, et elle
+//      retarde le `focus()` que le code pose juste après : le curseur n'arrive
+//      dans le champ fautif qu'une fois la boîte fermée. On les route vers un
+//      bandeau posé (`.msg-ecran`, charte.css). Ce qui doit être ACQUITTÉ —
+//      « la référence du ticket a changé, corrige le papier remis au client » —
+//      garde une vraie boîte, par `window.alertSysteme`.
+
 (function () {
+  // ------------------------------------------------------------- LE BANDEAU
+  // UN SEUL à l'écran : deux refus d'affilée remplacent le texte, ils
+  // n'empilent pas deux bandeaux. Posé en `fixed` — il ne pousse aucun champ.
+  const MSG_MS = 6000;
+  let bandeauMsg = null;
+  let minuteurMsg = null;
+
+  function montrerMessage(texte) {
+    const dit = String(texte == null ? '' : texte).trim();
+    if (!dit) return;
+    if (!bandeauMsg) {
+      bandeauMsg = document.createElement('p');
+      bandeauMsg.className = 'msg-ecran';
+      bandeauMsg.setAttribute('role', 'alert');
+      // Un clic dessus l'efface : on ne fait pas viser une croix de 12 px pour
+      // se débarrasser d'une phrase qu'on vient de lire.
+      bandeauMsg.addEventListener('click', () => cacherMessage());
+      document.body.appendChild(bandeauMsg);
+    }
+    bandeauMsg.textContent = dit;
+    // Deux images : la première pose le nœud, la seconde déclenche le fondu.
+    // Sans elle, le navigateur voit l'état final d'emblée et rien ne bouge.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (bandeauMsg) bandeauMsg.classList.add('est-la');
+    }));
+    clearTimeout(minuteurMsg);
+    minuteurMsg = setTimeout(cacherMessage, MSG_MS);
+  }
+
+  function cacherMessage() {
+    clearTimeout(minuteurMsg);
+    minuteurMsg = null;
+    if (bandeauMsg) bandeauMsg.classList.remove('est-la');
+  }
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cacherMessage(); });
+
+  // LA BOÎTE SYSTÈME RESTE JOIGNABLE, sous son vrai nom : ce qui doit être
+  // ACQUITTÉ ne peut pas passer par un bandeau qui s'efface tout seul.
+  window.alertSysteme = window.alert.bind(window);
+  window.alert = montrerMessage;
+  window.oldaMessage = montrerMessage;
+
   // Minuteur : sur un wifi qui décroche, `fetch` n'échoue jamais — il attend.
   // Ici c'est la réservation d'un numéro de ticket au moment où le client est
   // devant le comptoir : mieux vaut une erreur au bout de 15 s (l'écran bascule
@@ -410,13 +462,21 @@
         // trois cas de la même façon, c'était laisser croire à un enregistrement
         // là où rien n'avait été créé.
         resultatEnvoi(true, messageEnregistrement(data));
-        // Un envoi AUTOMATIQUE ne s'annonce pas par une boîte de dialogue : la
-        // vendeuse est en train d'imprimer le ticket du client, un `alert` lui
-        // barre l'écran pour dire ce que le bandeau dit déjà.
-        if (!envoiAutomatique) alert(messageEnregistrement(data));
+        // LA BOÎTE DE DIALOGUE NE SERT QU'À CE QUI DEMANDE UN GESTE (26/08).
+        // Le raisonnement était déjà écrit pour l'envoi automatique — « un
+        // `alert` lui barre l'écran pour dire ce que le bandeau dit déjà » —
+        // il vaut aussi pour l'envoi manuel : `resultatEnvoi` vient de peindre
+        // ce message DANS l'écran, en toutes lettres. Le répéter dans une boîte
+        // système, c'est un clic de plus à chaque commande, sur la seule
+        // surface de l'application que la charte ne peut pas habiller.
+        //
+        // SAUF quand la référence a changé : le ticket est déjà entre les mains
+        // du client et porte un numéro faux. Là, il ne suffit pas de le dire —
+        // il faut que quelqu'un le lise. Un bandeau se contourne, pas une boîte.
+        if (!envoiAutomatique && data && data.refModifiee) window.alertSysteme(messageEnregistrement(data));
       } catch (err) {
         resultatEnvoi(false, err.message);
-        if (!envoiAutomatique) alert(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
+        if (!envoiAutomatique) window.alertSysteme(`Enregistrement au planning IMPOSSIBLE : ${err.message}\nLe dossier est intact — réessaie.`);
       } finally {
         envoiEnCours = false;
       }
@@ -724,7 +784,7 @@
           .map(([c, v]) => `  ${c} : ${v}`).join('\n');
         return `${k.replace('oldaDraft-', '')}\nClient : ${client || '—'}\nBesoins : ${besoins || '—'}\n${champs}`;
       }).join('\n\n———\n\n');
-      window.alert(tout);
+      window.alertSysteme(tout);
     });
     const effacer = document.createElement('button');
     effacer.type = 'button';

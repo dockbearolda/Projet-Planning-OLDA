@@ -1803,7 +1803,23 @@ function applySearchAndCounts() {
       ? 'Aucune commande ne correspond à la recherche.'
       : 'Aucune commande à cette étape.';
   }
-  const base = visible ? `${visible} commande${visible > 1 ? 's' : ''}` : '';
+  // LE COMPTE NE MENT PAS (26/08). Quand le serveur a coupé la liste, l'en-tête
+  // annonçait ce qu'il AFFICHE et le rail ce que l'étape CONTIENT : mesuré sur
+  // une étape de 456 commandes, « Production · 400 commandes » à six centimètres
+  // d'un compteur de rail qui disait 456. Les deux avaient raison, et l'écran
+  // était faux. La mention « 400 des 456 » existait — mais posée sous les 400
+  // cartes, à 172 000 px du haut : pour apprendre qu'il en manque, il fallait
+  // les avoir toutes dépassées. On le dit donc là où l'œil va, et on garde le
+  // bandeau du bas, qui porte le bouton pour charger la suite.
+  // Pendant une recherche, `visible` compte ce que le filtre laisse : on ne
+  // parle de troncature que sur la liste entière, sinon « 3 des 456 » ferait
+  // croire à une coupe alors que c'est la recherche qui a trié.
+  const coupee = !q && listeTronqueeA && listeTotal > listeTronqueeA;
+  const base = visible
+    ? (coupee
+      ? `${visible} des ${listeTotal} commandes`
+      : `${visible} commande${visible > 1 ? 's' : ''}`)
+    : '';
   $stageCount.textContent = base;
   paintZebra();
 }

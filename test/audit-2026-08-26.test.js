@@ -288,4 +288,86 @@ for (const [nom, src, sels] of [
   }
 }
 
+// ===========================================================================
+// 12. DEUX COMPTEURS SUR LE MÊME ÉCRAN NE SE CONTREDISENT PAS
+// ---------------------------------------------------------------------------
+// Le serveur coupe une liste à 400 lignes et l'annonce par deux en-têtes
+// (`X-Liste-Tronquee`, `X-Liste-Total`). Mesuré sur une étape de 456 commandes :
+// le rail affichait 456 (il lit les compteurs), l'en-tête 400 (il compte ce
+// qu'il montre) — les deux avaient raison, et l'écran était faux. La phrase
+// qui réconciliait les deux existait bel et bien… posée SOUS les 400 cartes,
+// à 172 000 px du haut de la zone défilante : pour apprendre qu'il manque 56
+// commandes, il fallait les avoir toutes dépassées.
+//
+// C'est la famille du « dossier perdu en silence » : un compteur qui ment est
+// pire qu'un compteur absent, parce qu'il clôt la question.
+// ===========================================================================
+assert.match(APP, /const coupee = !q && listeTronqueeA && listeTotal > listeTronqueeA;/,
+  'l’en-tête sait quand la liste a été coupée');
+assert.match(APP, /\$\{visible\} des \$\{listeTotal\} commandes/,
+  '… et il le DIT, là où l’œil va — pas seulement sous la dernière carte');
+// Pendant une recherche, la coupe ne se mentionne pas : « 3 des 456 » ferait
+// croire à une troncature alors que c'est le filtre qui a trié.
+assert.ok(/const coupee = !q &&/.test(APP),
+  '… et jamais pendant une recherche : le filtre n’est pas une coupe');
+// Le bandeau du bas reste : c'est LUI qui porte le bouton « charger la suite ».
+assert.match(APP, /listeSuiteTout/, 'le bouton qui charge la suite reste en bas de liste');
+
+// ===========================================================================
+// 13. LE COMPTOIR NE REFUSE PLUS PAR BOÎTE SYSTÈME
+// ---------------------------------------------------------------------------
+// Dix-neuf `alert()` sur les deux écrans du comptoir, zéro dans le CRM — qui
+// passe déjà par `confirmer.js`, `modale.js` et `.msg-flottant`. Or c'est le
+// comptoir qu'on tient toute la journée. Une boîte système est la seule
+// surface que la charte ne peut pas habiller : police du système, couleurs du
+// système, un clic obligatoire à chaque refus. Et elle retardait le `focus()`
+// posé juste après — le curseur n'arrivait dans le champ fautif qu'une fois la
+// boîte fermée.
+//
+// Vérifié avant de basculer : les DIX-SEPT appels de la vente directe sont
+// tous suivis d'un `return`, d'un `return false` ou d'un `.focus()`. Aucun ne
+// s'appuie sur la pause pour être lu avant la suite.
+//
+// Ce qui doit être ACQUITTÉ garde une vraie boîte, sous son vrai nom : une
+// référence de ticket changée alors que le papier est déjà entre les mains du
+// client, et un enregistrement qui a échoué.
+// ===========================================================================
+assert.match(PONT, /window\.alertSysteme = window\.alert\.bind\(window\);\s*\n\s*window\.alert = montrerMessage;/,
+  'le comptoir route ses refus vers le bandeau, et garde la boîte sous alertSysteme');
+assert.ok(/\.msg-ecran\s*\{[^}]*position: fixed/.test(sansCom(CHARTE)),
+  'le bandeau est POSÉ : il ne pousse aucun champ (règle du 24/08)');
+assert.ok(/\.msg-ecran\s*\{[^}]*bottom:/.test(sansCom(CHARTE)),
+  '… et en bas : en haut il recouvrait la rangée d’étapes, donc la navigation');
+for (const acquitter of ['data.refModifiee', 'Enregistrement au planning IMPOSSIBLE']) {
+  const ligne = PONT.split('\n').find((l) => l.includes(acquitter) && /alert/.test(l));
+  assert.ok(ligne && /alertSysteme/.test(ligne),
+    `« ${acquitter.slice(0, 30)} » demande un geste : il garde une vraie boîte`);
+}
+// Et le CRM n'en a toujours aucune.
+for (const [nom, src] of [['app.js', APP], ['clients.js', lire('public/clients.js')],
+  ['reglages.js', lire('public/reglages.js')], ['dashboard.js', lire('public/dashboard.js')]]) {
+  assert.ok(!/(^|[^.\w])alert\(/.test(sansCom(src)), `${nom} : aucune boîte système`);
+}
+
+// ===========================================================================
+// 14. LE VERT SE TAIT
+// ---------------------------------------------------------------------------
+// « ✓ Créneau compatible avec les horaires de l'atelier » occupait une bulle
+// verte pleine largeur sous CHAQUE date valide — pour dire que rien ne cloche,
+// c'est-à-dire le cas normal. Et il posait la couleur « succès » de la charte
+// en décoration : à force, un vrai succès ne se distingue plus. Ce qui reste,
+// c'est ce qu'on ne peut pas deviner — l'atelier fermé, la veille à tenir.
+// ===========================================================================
+// Sur le CODE, pas sur les commentaires : celui qui explique la décision cite
+// forcément la phrase qu'on vient de retirer.
+const VENTE_NU = sansCom(VENTE);
+assert.ok(!/Créneau compatible/.test(VENTE_NU),
+  'le créneau valide ne s’annonce pas : c’est le cas normal');
+assert.ok(!/\.delay-warn\.ok\s*\{/.test(VENTE_NU),
+  '… et sa bulle verte n’existe plus');
+for (const garde of ['delay-warn bad', 'delay-warn warn']) {
+  assert.ok(VENTE.includes(garde),
+    `« ${garde} » reste : l’atelier fermé et la veille à tenir ne se devinent pas`);
+}
+
 console.log('✓ audit du 26/08 : une échelle, une boîte, un rond, une durée — et rien qui charge derrière le voile');
