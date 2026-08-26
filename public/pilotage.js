@@ -46,6 +46,17 @@ function tuile(titre, valeur, note, etat) {
   return t;
 }
 
+// Depuis combien de temps, en clair. « il y a 6 jours » se compare d'un coup
+// d'œil quand une date demande de compter.
+function depuis(iso) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const j = Math.floor((Date.now() - t) / 86400000);
+  if (j <= 0) return 'aujourd’hui';
+  if (j === 1) return 'depuis hier';
+  return `depuis ${j} jours`;
+}
+
 export function renderPilotage(d) {
   if (!ROOT) return;
   const page = el('div', 'pil-page');
@@ -79,6 +90,35 @@ export function renderPilotage(d) {
   grille.append(tuile('À débloquer', String(d.bloques || 0),
     'quelqu’un attend une décision', d.bloques ? 'alerte' : null));
   page.append(grille);
+
+  // À DÉBLOQUER, EN PREMIER ET EN ENTIER (§6). « La Direction doit avoir un
+  // écran qui montre IMMÉDIATEMENT les projets nécessitant une intervention. »
+  // Une tuile qui dit « 4 » ne montre rien : il faudrait aller les chercher, et
+  // c'est le geste que cet écran existe pour supprimer.
+  const bloques = Array.isArray(d.aDebloquer) ? d.aDebloquer : [];
+  if (bloques.length) {
+    const bloc = el('section', 'pil-bloc');
+    bloc.append(el('h2', 'pil-bloc__titre', 'À débloquer'));
+    const liste = el('div', 'pil-bloques');
+    for (const b of bloques) {
+      const l = el('article', 'pil-bloque');
+      const haut = el('div', 'pil-bloque__haut');
+      haut.append(el('span', 'pil-bloque__client', b.billing_company || 'Sans client'));
+      // DEPUIS QUAND. C'est la seule chose qui hiérarchise : un dossier bloqué
+      // depuis six jours n'est pas le même problème qu'un dossier bloqué ce matin.
+      haut.append(el('span', 'pil-bloque__depuis', depuis(b.updated_at)));
+      l.append(haut);
+      // LE MOTIF est ce qu'on vient lire : sans lui, la liste dit qu'il y a un
+      // problème sans dire lequel — donc elle n'aide à rien décider.
+      l.append(el('p', 'pil-bloque__motif', b.flag_reason || 'Motif non précisé'));
+      l.append(el('p', 'pil-bloque__quoi', [
+        b.product, b.etape, b.responsable,
+      ].filter(Boolean).join(' · ')));
+      liste.append(l);
+    }
+    bloc.append(liste);
+    page.append(bloc);
+  }
 
   // LA CHARGE DE L'ATELIER : ce qu'il reste à produire, par poste. C'est la
   // question « est-ce que ça va passer cette semaine ? », et elle ne se répond

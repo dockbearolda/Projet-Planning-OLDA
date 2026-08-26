@@ -6007,3 +6007,13 @@ body.dragging-active .pcard:active { border-color: var(--border); }
    feraient déborder la rangée. */
 .stk-champ { flex: 1 1 150px; min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); }
 .stk-champ:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
+
+/* À DÉBLOQUER (§6) — la LISTE, pas le compteur. Un « 4 » ne montre rien : il
+   faudrait aller chercher lesquels, et c'est le geste que l'écran supprime. */
+.pil-bloques { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.pil-bloque { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: var(--st-bloque-bg); border: 1px solid var(--st-bloque); border-radius: var(--radius); }
+.pil-bloque__haut { display: flex; align-items: baseline; gap: 10px; }
+.pil-bloque__client { flex: 1 1 auto; min-width: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pil-bloque__depuis { flex: 0 0 auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); white-space: nowrap; }
+.pil-bloque__motif { margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+.pil-bloque__quoi { margin: 0; font-size: var(--taille-note); color: var(--text-2); }

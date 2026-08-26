@@ -3587,6 +3587,12 @@ const LD_ICONES = {
   dupliquer: ['M9 9h11v11H9z', 'M5 15V5a2 2 0 0 1 2-2h10'],
   envoyer: ['M5 12h13', 'M13 6l6 6-6 6'],
   ticket: ['M4 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M4 19h16', 'M8 9h8', 'M8 12.5h5'],
+  // DESSINÉE, pas prise dans la police. Toutes les actions de la fiche sont des
+  // icônes au trait ; un nom de glyphe passé ici retombe sur le repli et
+  // s'affiche EN TEXTE à côté du libellé — mesuré : le bouton disait
+  // « mailEmail ». La police est un sous-ensemble figé, et son absence ne lève
+  // rien : elle se voit, ou elle ne se voit pas.
+  mail: ['M3 6h18v12H3z', 'M3 7l9 6 9-6'],
 };
 
 // `icone` : une fonction qui rend un SVG (une marque, cf. fiverrIcon), une clé
@@ -4409,6 +4415,11 @@ function renderLigneDetail() {
     ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r)),
     ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
     ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
+    // ENVOYER PAR EMAIL (§19). Le même principe que la pastille WhatsApp : on
+    // OUVRE le message tout écrit, on n'envoie rien. C'est l'employé qui relit
+    // et qui appuie — un logiciel qui écrit au client tout seul est un logiciel
+    // qu'on n'ose plus utiliser.
+    ldActionBtn('mail', 'Email', () => envoyerParEmail(r)),
     close,
   );
   head.append(titles, actions);
@@ -4846,6 +4857,27 @@ async function chargerDossier(r, hote) {
 let MODELES = [];
 async function chargerModeles() {
   try { MODELES = await api('GET', '/api/modeles'); } catch (_) { MODELES = []; }
+}
+
+// OUVRE le brouillon d'email, avec le récapitulatif déjà écrit. Rien ne part.
+//
+// `mailto:` a une limite pratique de longueur (les clients mail coupent au-delà
+// de ~2 000 caractères, sans le dire) : un récapitulatif de trente articles
+// arriverait tronqué au milieu d'une ligne. On coupe donc NOUS, proprement, et
+// on le dit dans le message plutôt que de laisser le client mail décider.
+const EMAIL_MAX = 1800;
+function envoyerParEmail(r) {
+  const texte = ticketTexte(modeleTicket(r));
+  const coupe = texte.length > EMAIL_MAX
+    ? `${texte.slice(0, EMAIL_MAX)}\n\n[…] Récapitulatif complet en pièce jointe.`
+    : texte;
+  const objet = `${r.billing_company || 'Votre commande'} — Atelier OLDA`;
+  const dest = r.contact_email || '';
+  // Sans adresse, on ouvre quand même : le brouillon est prêt, il ne manque que
+  // le destinataire — c'est plus utile qu'un refus « pas d'email sur la fiche ».
+  if (!dest) showToast('Pas d’email sur la fiche — le brouillon s’ouvre sans destinataire.');
+  window.location.href = `mailto:${encodeURIComponent(dest)}`
+    + `?subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(coupe)}`;
 }
 
 // Va chercher ce qui a changé sur cette commande et l'écrit dans l'Historique.

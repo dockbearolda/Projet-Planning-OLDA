@@ -2417,7 +2417,24 @@ app.get('/api/pilotage', exige('marge'), asyncH(async (req, res) => {
   const htChiffre = Math.round((Number(enCours.rows[0].ca_chiffre) / (1 + PROJET_TGCA)) * 100) / 100;
   const margeEuros = chiffrees ? Math.round((htChiffre - cout) * 100) / 100 : null;
 
+  // LA LISTE DES BLOQUÉS, pas seulement leur nombre. « La Direction doit avoir
+  // un écran À DÉBLOQUER qui montre immédiatement les projets nécessitant une
+  // intervention » (§6). Un compteur ne montre rien : il dit qu'il y a quatre
+  // dossiers, pas lesquels ni pourquoi — donc il faut aller les chercher, et
+  // c'est exactement le geste que cet écran doit supprimer.
+  //
+  // Triés du plus ANCIENNEMENT bloqué au plus récent : c'est celui qui attend
+  // depuis le plus longtemps qui coûte le plus cher, pas le dernier arrivé.
+  const { rows: aDebloquer } = await pool.query(
+    `SELECT id, billing_company, product, flag_reason, responsable, deadline, updated_at, stage, sub_stage
+       FROM requests WHERE ${VIVANTES_NU} AND flag = 'bloque'
+      ORDER BY updated_at ASC LIMIT 30`,
+  );
+
   res.json({
+    aDebloquer: aDebloquer.map((l) => ({
+      ...l, etape: LIBELLE_SOUS_ETAPE.get(l.sub_stage) || l.stage,
+    })),
     marges,
     enCours: {
       lignes: enCours.rows[0].n, ca, ht, cout, chiffrees,
