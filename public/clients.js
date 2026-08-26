@@ -218,6 +218,15 @@ function initials(name) {
 }
 
 // « il y a 3 j », « aujourd'hui », « il y a 2 h ». Repère de fraîcheur discret.
+// Les montants s'écrivent en entier : sur une fiche client on regarde un ordre
+// de grandeur, et « 12 450 € » se lit d'un coup quand « 12 449,80 € » se déchiffre.
+const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const euros = (n) => (Number.isFinite(Number(n)) ? EUROS.format(Number(n)) : '—');
+const dateCourte = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('fr-FR');
+};
+
 function ago(iso) {
   if (!iso) return '';
   const then = new Date(iso).getTime();
@@ -711,6 +720,42 @@ function renderDrawer() {
     if (c.updated_at && c.updated_at !== c.created_at) parts.push(`modifié ${ago(c.updated_at)}`);
     meta.textContent = parts.join(' · ');
     bodyScroll.append(meta);
+
+    // CE QUE LE CLIENT PÈSE (§9). La fiche disait QUI il est ; elle ne disait
+    // pas s'il représente 200 € ou 12 000 €. En le rappelant au téléphone, c'est
+    // la première chose qu'on voudrait savoir — et la seule qui n'y était pas.
+    //
+    // `ca` n'arrive QUE pour qui a le droit de voir l'argent : le serveur le
+    // retire pour l'atelier. Absent, on n'affiche pas une case vide, on n'en
+    // parle pas du tout.
+    const poids = [];
+    if (drawer.ca != null) poids.push({ n: euros(drawer.ca), t: 'chiffre d’affaires' });
+    if (drawer.projets) poids.push({ n: String(drawer.projets), t: `dossier${drawer.projets > 1 ? 's' : ''}` });
+    if (drawer.derniere_commande) poids.push({ n: dateCourte(drawer.derniere_commande), t: 'dernière commande' });
+    if (poids.length) {
+      const bloc = el('div', 'cl-poids');
+      for (const x of poids) {
+        const b = el('div', 'cl-poids__x');
+        b.append(el('span', 'cl-poids__n', x.n), el('span', 'cl-poids__t', x.t));
+        bloc.append(b);
+      }
+      bodyScroll.append(bloc);
+    }
+
+    // SES DERNIÈRES COMMANDES. Cinq suffisent : la fiche se lit au téléphone,
+    // pas en réunion — au-delà, personne ne descend.
+    if (Array.isArray(drawer.dernieres) && drawer.dernieres.length) {
+      const liste = el('section', 'cl-dernieres');
+      liste.append(el('h3', 'cl-notes__title', 'Dernières commandes'));
+      for (const l of drawer.dernieres) {
+        const ligne = el('div', 'cl-derniere');
+        ligne.append(el('span', 'cl-derniere__quoi', l.product || 'Sans désignation'));
+        if (l.project_value != null) ligne.append(el('span', 'cl-derniere__prix', euros(l.project_value)));
+        ligne.append(el('span', 'cl-derniere__quand', dateCourte(l.created_at)));
+        liste.append(ligne);
+      }
+      bodyScroll.append(liste);
+    }
 
     const notes = el('section', 'cl-notes');
     const nh = el('header', 'cl-notes__head');

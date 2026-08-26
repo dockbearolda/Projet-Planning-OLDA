@@ -608,3 +608,18 @@
 .cl-filter__btn:hover,
 .cl-kind:hover,
 .cl-secteurs__close:hover { background: var(--state-hover); }
+
+/* CE QUE LE CLIENT PÈSE (§9). Trois chiffres, sur la fiche, là où l'on regarde
+   déjà : la fiche disait QUI il est, pas s'il représente 200 € ou 12 000 €. */
+.cl-poids { display: flex; gap: 24px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); margin: 4px 0 12px; }
+.cl-poids__x { display: flex; flex-direction: column; gap: 1px; }
+.cl-poids__n { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.cl-poids__t { font-size: var(--taille-note); color: var(--text-2); }
+
+.cl-dernieres { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+.cl-derniere { display: flex; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); font-size: var(--taille-note); color: var(--text-2); }
+.cl-derniere:last-child { border-bottom: 0; }
+/* `min-width: 0` : une désignation longue pousserait le prix hors de la fiche. */
+.cl-derniere__quoi { flex: 1 1 auto; min-width: 0; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-derniere__prix, .cl-derniere__quand { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.cl-derniere__prix { font-weight: var(--graisse-note); color: var(--text-1); }

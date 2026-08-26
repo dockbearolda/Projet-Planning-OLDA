@@ -163,6 +163,36 @@ function buildStatic() {
   tcard.appendChild(tarifsParamsEl);
   page.appendChild(tcard);
 
+  // --- Carte « Marge » --------------------------------------------------------
+  // §13 : « marge cible, marge minimum, alerte marge faible ». Deux nombres, et
+  // c'est tout — la troisième ligne du patron (l'alerte) n'est pas un réglage,
+  // c'est ce que le serveur fait de ces deux-là.
+  // `receipt_long` et pas `percent` : la police est un sous-ensemble figé de
+  // 91 glyphes, et un nom absent ne lève RIEN — il s'affiche en texte tronqué à
+  // sa première lettre. On ne prend que des noms déjà en service ailleurs.
+  page.appendChild(carteSimple('receipt_long', 'Marge',
+    'En dessous du minimum, une vente reste ENREGISTRÉE mais l’écran prévient. '
+    + 'On alerte, on n’interdit pas : un logiciel qui refuse une vente au comptoir '
+    + 'est un logiciel qu’on contourne sur un papier.', 'reg-marges'));
+
+  // --- Carte « Modèles d'étapes » ---------------------------------------------
+  page.appendChild(carteSimple('work', 'Modèles d’étapes',
+    'Les listes toutes faites qu’on pose sur un article : « T-shirt DTF » et ses '
+    + 'cinq étapes, « Tasse UV » et ses trois. Sans modèle, il faudrait ressaisir '
+    + 'les étapes à chaque commande — et personne ne le ferait deux fois.', 'reg-modeles'));
+
+  // --- Carte « Machines » ------------------------------------------------------
+  page.appendChild(carteSimple('settings', 'Coût des machines',
+    'Le coût horaire et les consommables de chaque poste. Vide ne veut pas dire '
+    + 'zéro : une machine non chiffrée retombe sur le taux machine général '
+    + 'ci-dessus, elle ne coûte pas « rien ».', 'reg-machines'));
+
+  // --- Carte « Fonctions en cours » --------------------------------------------
+  page.appendChild(carteSimple('settings', 'Fonctions en cours',
+    'Les chantiers livrés mais pas encore allumés. Éteints, l’application se '
+    + 'comporte exactement comme avant. Allumer « Connexion nominative » demandera '
+    + 'à chacun de choisir son prénom et son code au prochain chargement.', 'reg-flags'));
+
   // --- Carte « Corbeille » ----------------------------------------------------
   // Une commande retirée du planning n'est plus détruite : elle attend ici.
   // Sans cette carte, l'archivage serait invisible — donc, pour l'employé qui
@@ -186,6 +216,130 @@ function buildStatic() {
   page.appendChild(ccard);
 
   ROOT.replaceChildren(page);
+}
+
+// Une carte de réglage = un en-tête + un conteneur que le rendu remplit. Les
+// deux premières cartes (WhatsApp, Tarifs) sont écrites à la main parce qu'elles
+// portent des contrôles particuliers ; celles-ci se ressemblent toutes.
+function carteSimple(icone, titre, desc, idContenu) {
+  const card = el('section', 'reg-card');
+  const head = el('header', 'reg-card__head');
+  head.append(ic(icone, 'reg-card__ic'), (() => {
+    const t = el('div');
+    t.append(el('h3', 'reg-card__title', titre), el('p', 'reg-card__desc', desc));
+    return t;
+  })());
+  card.appendChild(head);
+  const box = el('div', 'reg-liste');
+  box.id = idContenu;
+  card.appendChild(box);
+  return card;
+}
+
+// --- Marge, modèles, machines, interrupteurs ---------------------------------
+let marges = { cible: 60, minimum: 35 };
+let modeles = [];
+let machines = [];
+let flags = { flags: {}, connus: {} };
+
+// Un champ de nombre qui s'enregistre à la PERTE DU FOCUS, jamais à la frappe :
+// un enregistrement par touche ferait un appel par chiffre tapé.
+function champNombre(valeur, suffixe, onSave) {
+  const wrap = el('label', 'reg-champ');
+  const input = el('input', 'reg-tarif-input reg-tarif-input--num');
+  input.type = 'number';
+  input.value = valeur == null ? '' : String(valeur);
+  input.addEventListener('change', () => onSave(input.value, input));
+  wrap.append(input);
+  if (suffixe) wrap.append(el('span', 'reg-champ__unite', suffixe));
+  return wrap;
+}
+
+function renderMarges() {
+  const hote = $('#reg-marges');
+  if (!hote) return;
+  const ligne = (cle, label, aide) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', label));
+    l.append(el('span', 'reg-ligne__aide', aide));
+    l.append(champNombre(marges[cle], '%', async (v) => {
+      try {
+        marges = await api('PUT', '/api/marges', { ...marges, [cle]: Number(v) });
+        renderMarges();
+        flash('Enregistré', 'is-ok');
+      } catch (err) { flash(err.message, 'is-ko'); }
+    }));
+    return l;
+  };
+  hote.replaceChildren(
+    ligne('cible', 'Marge cible', 'ce qu’on vise'),
+    // Un minimum au-dessus de la cible rendrait l'alerte permanente : le
+    // serveur remonte alors la cible, et l'écran le montre tout de suite.
+    ligne('minimum', 'Marge minimum', 'en dessous, l’écran prévient'),
+  );
+}
+
+function renderModeles() {
+  const hote = $('#reg-modeles');
+  if (!hote) return;
+  hote.replaceChildren(...modeles.map((m) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', m.nom));
+    // Les étapes se lisent d'un coup, séparées par des flèches : c'est un
+    // CHEMIN, et une liste à puces ne le dirait pas.
+    l.append(el('span', 'reg-ligne__aide', (m.etapes || []).join(' → ')));
+    return l;
+  }));
+  if (!modeles.length) hote.append(el('p', 'reg-corb__vide', 'Aucun modèle.'));
+}
+
+function renderMachines() {
+  const hote = $('#reg-machines');
+  if (!hote) return;
+  hote.replaceChildren(...machines.map((m, i) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', m.name));
+    l.append(el('span', 'reg-ligne__aide', 'coût horaire · consommables'));
+    const sauver = async (champ, v) => {
+      machines[i] = { ...machines[i], [champ]: v === '' ? null : Number(v) };
+      try {
+        machines = await api('PUT', '/api/machines', machines);
+        flash('Enregistré', 'is-ok');
+      } catch (err) { flash(err.message, 'is-ko'); }
+    };
+    l.append(champNombre(m.coutHoraire, '€/h', (v) => sauver('coutHoraire', v)));
+    l.append(champNombre(m.consommables, '€', (v) => sauver('consommables', v)));
+    return l;
+  }));
+}
+
+function renderFlags() {
+  const hote = $('#reg-flags');
+  if (!hote) return;
+  const noms = Object.keys(flags.connus || {});
+  hote.replaceChildren(...noms.map((nom) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', flags.connus[nom]));
+    const inter = el('input', 'reg-inter');
+    inter.type = 'checkbox';
+    inter.checked = !!(flags.flags || {})[nom];
+    inter.setAttribute('aria-label', flags.connus[nom]);
+    inter.addEventListener('change', async () => {
+      try {
+        flags = await api('PUT', '/api/flags', { [nom]: inter.checked });
+        // ALLUMER LES COMPTES CHANGE L'ÉCRAN ENTIER : la barre, les droits, la
+        // connexion. On recharge plutôt que de laisser une moitié d'écran
+        // d'avant cohabiter avec une moitié d'après.
+        if (nom === 'comptes') window.location.reload();
+        renderFlags();
+      } catch (err) {
+        inter.checked = !inter.checked;
+        flash(err.message, 'is-ko');
+      }
+    });
+    l.append(inter);
+    return l;
+  }));
 }
 
 // --- Corbeille ----------------------------------------------------------------
@@ -525,7 +679,15 @@ export async function refreshReglages() {
     api('GET', '/api/tarifs-tasse').catch(() => null),
     api('GET', '/api/tarifs-tasse/parametres').catch(() => null),
     chargerCorbeille(),
+    api('GET', '/api/marges').then((d) => { if (d) marges = d; }).catch(() => {}),
+    api('GET', '/api/modeles').then((d) => { if (Array.isArray(d)) modeles = d; }).catch(() => {}),
+    api('GET', '/api/machines').then((d) => { if (Array.isArray(d)) machines = d; }).catch(() => {}),
+    api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
   ]);
+  renderMarges();
+  renderModeles();
+  renderMachines();
+  renderFlags();
   try {
     // Sans le contrôle de `res.ok`, une réponse d'erreur (500, 401 derrière le
     // mot de passe) donnait `data.message === undefined` → le textarea se

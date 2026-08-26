@@ -5974,3 +5974,36 @@ body.dragging-active .pcard:active { border-color: var(--border); }
   font: inherit; font-size: var(--taille-note); cursor: pointer; white-space: nowrap;
 }
 .reason-motif:hover { background: var(--surface-hover); border-color: var(--border-strong); color: var(--text-1); }
+
+/* Les cartes de réglage qui listent des lignes (marge, modèles, machines,
+   fonctions en cours). Une rangée = un nom, une aide, et le contrôle à droite —
+   la même forme que `.reg-tarif-row`, sans en refaire une nouvelle. */
+.reg-liste { display: flex; flex-direction: column; }
+.reg-ligne { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.reg-ligne:last-child { border-bottom: 0; }
+.reg-ligne__nom { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* `min-width: 0` : sans lui, une suite d'étapes longue garde sa largeur
+   intrinsèque et pousse le contrôle hors de la carte. */
+.reg-ligne__aide { flex: 1 1 auto; min-width: 0; font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-champ { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+.reg-champ__unite { font-size: var(--taille-note); color: var(--text-2); }
+.reg-inter { flex: 0 0 auto; width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+
+/* Créer un fournisseur / une commande depuis l'écran Stock. Le formulaire est
+   REPLIÉ, pas absent : déplié en permanence il pousserait les listes hors de
+   l'écran pour un geste qu'on fait une fois par mois. */
+.stk-tete { display: flex; align-items: center; gap: 12px; }
+.stk-ajout { margin-left: auto; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); font-weight: var(--graisse-note); cursor: pointer; white-space: nowrap; }
+.stk-ajout:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.stk-ajout--plein { border-color: transparent; background: var(--primary); color: var(--on-primary); }
+.stk-ajout--plein:hover { background: var(--primary-hover); border-color: transparent; }
+.stk-ajout:disabled { opacity: .45; cursor: default; }
+/* `hidden` DOIT gagner : la règle de classe pose `display: flex`, plus
+   spécifique — le piège déjà payé sur `.nav-switch-btn`. */
+.stk-form[hidden] { display: none; }
+.stk-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; margin: 4px 0 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+/* `min-width: 0` : la taille minimale automatique d'un champ vaut sa largeur
+   intrinsèque (~20 caractères) et l'emporte sur `flex-basis` — six champs
+   feraient déborder la rangée. */
+.stk-champ { flex: 1 1 150px; min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); }
+.stk-champ:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }

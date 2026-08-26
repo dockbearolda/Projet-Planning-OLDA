@@ -4258,6 +4258,12 @@ function buildProjet(body, tarifsById) {
 
   const venteHt = nonChiffre ? null : prixTotalTtc / (1 + PROJET_TGCA);
   const margeHt = nonChiffre ? null : Math.round((venteHt - prixRevientTotal) * 100) / 100;
+  // LE COÛT DE REVIENT SORT DU MOTEUR, lui aussi. Il était calculé puis
+  // TRANSFORMÉ en marge, et seule la marge partait dans le JSON de la fiche —
+  // donc illisible depuis la liste, non sommable, non comparable. Rendu ici, il
+  // va se ranger dans sa colonne : c'est LUI qui permet de recalculer la marge
+  // quand le prix change, ce que la marge figée ne savait pas faire.
+  const coutRevient = nonChiffre ? null : Math.round(prixRevientTotal * 100) / 100;
   // Le HT n'est jamais stocké : il se déduit du TTC et du taux TGCA du moment.
   // On le renvoie quand même à l'écran de confirmation, pour éviter que chaque
   // vue le recalcule avec un taux qu'elle aurait deviné.
@@ -4291,6 +4297,7 @@ function buildProjet(body, tarifsById) {
     prixTotalTtc,
     prixTotalHt,
     margeHt,
+    coutRevient,
     paiement,
     deadline,
     priority,
@@ -4384,8 +4391,8 @@ app.post('/api/projets', exige('clients'), asyncH(async (req, res) => {
     `INSERT INTO requests
        (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company, contact_referent,
         contact_phone, contact_email, quantity, product, description, deadline, position, fiche, project_value,
-        acompte_demande, acompte_verse, acompte_montant, paye, paiement_mode)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        acompte_demande, acompte_verse, acompte_montant, paye, paiement_mode, cout_revient)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING *`,
     [
       // La NATURE tranchée à la prise : une demande de devis entre en
@@ -4398,6 +4405,11 @@ app.post('/api/projets', exige('clients'), asyncH(async (req, res) => {
       JSON.stringify(projet), projet.prixTotalTtc,
       projet.paiement.acompteDemande, projet.paiement.acompteVerse, projet.paiement.acompteMontant,
       projet.paiement.paye, projet.paiement.mode ? projet.paiement.mode.id : null,
+      // LE COÛT DE REVIENT, dans SA colonne. Il vivait dans le JSON de la fiche
+      // — donc invisible de la liste, de la somme et de toute comparaison. La
+      // marge n'était calculable nulle part, et le tableau de bord de la
+      // Direction serait resté vide quoi qu'on fasse.
+      projet.coutRevient,
     ],
   );
 

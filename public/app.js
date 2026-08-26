@@ -4437,6 +4437,32 @@ function renderLigneDetail() {
     type: 'number', step: '0.01', inputMode: 'decimal',
     placeholder: 'à chiffrer', label: 'Valeur TTC',
   }), r.project_value == null ? '' : r.project_value);
+  // LE COÛT DE REVIENT. Il se remplit tout seul quand le dossier vient de
+  // « Nouveau Projet » (le moteur connaît les prix d'achat et les temps) ; au
+  // comptoir, le moteur V9 sort un PRIX sans dire ce qu'il coûte — il faut donc
+  // pouvoir le saisir, sinon la marge de ces dossiers reste à jamais vide.
+  // Réservé à la Direction : c'est la donnée qui dit ce que l'atelier gagne.
+  const cCout = ldSuivi('cout', ldChamp(r.cout_revient == null ? '' : r.cout_revient, {
+    type: 'number', step: '0.01', inputMode: 'decimal',
+    placeholder: 'coût inconnu', label: 'Coût de revient',
+  }), r.cout_revient == null ? '' : r.cout_revient);
+  // LA DATE PRÉVUE ≠ LA DATE SOUHAITÉE. Celle du client est une promesse ;
+  // celle-ci est le jour où l'atelier compte vraiment le faire. Les confondre,
+  // c'est déplacer une promesse en croyant déplacer un planning.
+  const cPrevue = ldSuivi('prevue',
+    ldChamp(jourSeul(r.date_prevue), { type: 'date', label: 'Prévu à l’atelier' }), jourSeul(r.date_prevue));
+  // LE CRÉNEAU DE RETRAIT (§22). L'heure vivait dans le JSON de la fiche :
+  // illisible depuis la liste, donc inutilisable pour préparer une journée de
+  // retraits.
+  const cCreneau = ldSuivi('creneau',
+    ldChamp(r.retrait_creneau || '', { type: 'time', label: 'Créneau de retrait' }), r.retrait_creneau || '');
+  // D'OÙ VIENT LA DEMANDE (§8). C'est la seule information qui dit où mettre
+  // l'effort, et elle ne se retrouve nulle part une fois la demande passée.
+  const cProvenance = ldSuivi('provenance', ldSelect(
+    [{ value: '', label: 'Provenance : non dite' },
+      ...PROVENANCES.map((v) => ({ value: v, label: v }))],
+    r.provenance || '', 'Provenance de la demande'), r.provenance || '');
+
   const cProduction = ldSuivi('production',
     ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' }), fiche.production);
   // LA MÊME CONSIGNE QUE SUR LE TICKET. Elle s'écrit surtout depuis le ticket
@@ -4488,6 +4514,15 @@ function renderLigneDetail() {
     ldBox('Remise au client', remise),
     ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
     ldBox('Valeur TTC', cPrix),
+    // LE COÛT JUSTE APRÈS LE PRIX, et seulement pour qui peut le voir : c'est
+    // côte à côte qu'ils se lisent (« 850 pour 300, ça va »). Affiché aux
+    // autres, il serait vide — le serveur le retire de la réponse — et son
+    // enregistrement refusé : une case qu'on remplit pour rien est pire que pas
+    // de case du tout.
+    ...(puisJe('marge') ? [ldBox('Coût de revient', cCout)] : []),
+    ldBox('Prévu à l’atelier', cPrevue),
+    ldBox('Créneau de retrait', cCreneau),
+    ldBox('Provenance', cProvenance),
     ldBox('Production', cProduction),
     ldBox('Pour l’atelier — s’imprime sur le ticket', cAtelier, true),
     ldBox('Informations / commentaire', cInfos, true),
@@ -4628,7 +4663,8 @@ function renderLigneDetail() {
     enregistrer.textContent = 'Enregistrement…';
     try {
       const modifie = await enregistrerFiche(r, {
-        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cProduction, cAtelier, cInfos,
+        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cCout, cPrevue, cCreneau, cProvenance,
+        cProduction, cAtelier, cInfos,
         cTel, cEmail, cPlace, cReferent, note, champsDetail,
       });
       showToast(modifie ? 'Fiche enregistrée' : 'Rien à enregistrer — aucune modification');
@@ -4658,6 +4694,17 @@ function renderLigneDetail() {
 // Libellés du journal (miroir de JOURNAL_FIELDS côté serveur) et mise en mots
 // des valeurs brutes : « production » ne veut rien dire dans une fiche, « Étape :
 // Préparation du projet » si.
+// D'OÙ VIENT LA DEMANDE (§8). Liste courte et FERMÉE : sept provenances qu'on
+// peut compter valent mieux qu'un champ libre où « bouche à oreille »,
+// « bouche-à-oreille » et « BAO » feraient trois lignes différentes.
+const PROVENANCES = ['Passage', 'Bouche-à-oreille', 'Client existant', 'Instagram',
+  'Facebook', 'Téléphone', 'Site web'];
+
+// Une colonne `date` revient en objet Date selon le pilote : le champ HTML
+// n'accepte que « aaaa-mm-jj ». Sans cette coupe, le champ restait vide alors
+// que la date était bien en base.
+const jourSeul = (v) => (v ? String(v).slice(0, 10) : '');
+
 const JOURNAL_LABELS = {
   stage: 'Étape', sub_stage: 'Sous-étape', flag: 'État', flag_reason: 'Motif',
   priority: 'Priorité', project_value: 'Prix TTC', deadline: 'Date souhaitée',
@@ -4869,6 +4916,10 @@ async function enregistrerFiche(r, c) {
   if (ldModifie(c.cPriorite)) corps.priority = Number(c.cPriorite.value);
   if (ldModifie(c.cDate)) corps.deadline = texte(c.cDate.value);
   if (ldModifie(c.cPrix)) corps.project_value = nombre(c.cPrix.value);
+  if (c.cCout && ldModifie(c.cCout)) corps.cout_revient = nombre(c.cCout.value);
+  if (ldModifie(c.cPrevue)) corps.date_prevue = texte(c.cPrevue.value);
+  if (ldModifie(c.cCreneau)) corps.retrait_creneau = texte(c.cCreneau.value);
+  if (ldModifie(c.cProvenance)) corps.provenance = texte(c.cProvenance.value);
   if (ldModifie(c.cTel)) corps.contact_phone = texte(c.cTel.value);
   if (ldModifie(c.cEmail)) corps.contact_email = texte(c.cEmail.value);
   if (ldModifie(c.cReferent)) corps.referent = c.cReferent.value || null;

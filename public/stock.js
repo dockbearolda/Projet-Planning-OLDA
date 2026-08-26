@@ -132,6 +132,95 @@ function ligneAchat(o) {
   return l;
 }
 
+// --- Créer ----------------------------------------------------------------------
+// LE FORMULAIRE EST REPLIÉ, PAS ABSENT. Déplié en permanence, il pousserait les
+// listes hors de l'écran pour un geste qu'on fait une fois par mois ; caché
+// derrière un autre écran, on ne le trouverait pas. Il s'ouvre sur place.
+function enTete(titre, libelleBouton, onClic) {
+  const h = el('header', 'stk-tete');
+  h.append(el('h2', 'stk-bloc__titre', titre));
+  const b = el('button', 'stk-ajout', libelleBouton);
+  b.type = 'button';
+  b.addEventListener('click', onClic);
+  h.append(b);
+  return h;
+}
+
+function ouvrirFormulaire(quoi) {
+  const f = ROOT.querySelector(`#stk-form-${quoi}`);
+  if (!f) return;
+  f.hidden = !f.hidden;
+  if (!f.hidden) { const p = f.querySelector('input, select'); if (p) p.focus(); }
+}
+
+function champ(nom, placeholder, type = 'text') {
+  const i = el('input', 'stk-champ');
+  i.type = type;
+  i.name = nom;
+  i.placeholder = placeholder;
+  i.setAttribute('aria-label', placeholder);
+  return i;
+}
+
+// Un formulaire = une rangée de champs et UN bouton qui engage, tout à droite.
+// C'est la règle déjà posée ailleurs : l'action qui valide est le dernier
+// élément de la rangée, jamais au milieu.
+function formulaire(id, champs, libelle, onEnvoi) {
+  const f = el('form', 'stk-form');
+  f.id = `stk-form-${id}`;
+  f.hidden = true;
+  for (const c of champs) f.append(c);
+  const ok = el('button', 'stk-ajout stk-ajout--plein', libelle);
+  ok.type = 'submit';
+  f.append(ok);
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    ok.disabled = true;
+    try {
+      await onEnvoi(Object.fromEntries(new FormData(f).entries()));
+      f.reset();
+      f.hidden = true;
+      await charger();
+      message('Enregistré');
+    } catch (err) {
+      message(err.message, true);
+    }
+    ok.disabled = false;
+  });
+  return f;
+}
+
+function formulaireFournisseur() {
+  const transport = el('select', 'stk-champ');
+  transport.name = 'transport';
+  transport.setAttribute('aria-label', 'Transport');
+  transport.append(new Option('Transport…', ''), new Option('Aérien', 'aerien'), new Option('Maritime', 'maritime'));
+  return formulaire('fournisseur', [
+    champ('nom', 'Nom du fournisseur'),
+    champ('contact', 'Contact'),
+    champ('email', 'Email', 'email'),
+    champ('telephone', 'Téléphone', 'tel'),
+    champ('delai_jours', 'Délai (j)', 'number'),
+    transport,
+  ], 'Créer', (v) => api('POST', '/api/fournisseurs', v));
+}
+
+function formulaireAchat() {
+  const qui = el('select', 'stk-champ');
+  qui.name = 'supplier_id';
+  qui.id = 'stk-achat-fournisseur';
+  qui.setAttribute('aria-label', 'Fournisseur');
+  const transport = el('select', 'stk-champ');
+  transport.name = 'transport';
+  transport.setAttribute('aria-label', 'Transport');
+  transport.append(new Option('Transport…', ''), new Option('Aérien', 'aerien'), new Option('Maritime', 'maritime'));
+  return formulaire('achat', [
+    champ('numero', 'Numéro'),
+    qui,
+    transport,
+  ], 'Créer', (v) => api('POST', '/api/achats', v));
+}
+
 // --- Rendu ------------------------------------------------------------------------
 let $message = null;
 function message(texte, erreur) {
@@ -170,17 +259,17 @@ function render() {
   // FOURNISSEURS et ACHATS suivent, sur le même écran : ce sont trois moments
   // du même geste — on cherche, on voit qu'il en manque, on commande.
   const blocF = el('section', 'stk-bloc');
-  blocF.append(el('h2', 'stk-bloc__titre', 'Fournisseurs'));
+  blocF.append(enTete('Fournisseurs', 'Nouveau fournisseur', () => ouvrirFormulaire('fournisseur')));
   const listeF = el('div', 'stk-fournisseurs');
   listeF.id = 'stk-fournisseurs';
-  blocF.append(listeF);
+  blocF.append(formulaireFournisseur(), listeF);
   page.append(blocF);
 
   const blocA = el('section', 'stk-bloc');
-  blocA.append(el('h2', 'stk-bloc__titre', 'Commandes fournisseur'));
+  blocA.append(enTete('Commandes fournisseur', 'Nouvelle commande', () => ouvrirFormulaire('achat')));
   const listeA = el('div', 'stk-achats');
   listeA.id = 'stk-achats';
-  blocA.append(listeA);
+  blocA.append(formulaireAchat(), listeA);
   page.append(blocA);
 
   ROOT.replaceChildren(page);
@@ -207,6 +296,15 @@ function rendreListe() {
       if (f.transport) l.append(el('span', 'stk-fourn__transport', f.transport === 'aerien' ? 'Aérien' : 'Maritime'));
       return l;
     }) : [el('p', 'stk-vide', 'Aucun fournisseur enregistré.')]));
+  }
+  // Le choix de fournisseur du formulaire d'achat se remplit de la liste qu'on
+  // vient de charger : proposer un menu vide serait proposer une impasse.
+  const qui = ROOT.querySelector('#stk-achat-fournisseur');
+  if (qui) {
+    const garde = qui.value;
+    qui.replaceChildren(new Option('Fournisseur…', ''));
+    for (const f of fournisseurs) qui.append(new Option(f.nom, f.id));
+    qui.value = garde;
   }
   const la = ROOT.querySelector('#stk-achats');
   if (la) {
