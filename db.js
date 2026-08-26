@@ -67,6 +67,11 @@ const SUB_STAGES = {
     { slug: 'prepa_produits', label: 'Préparation des produits' },
     { slug: 'prepa_bat', label: 'Préparation du BAT' },
     { slug: 'bat_envoye', label: 'BAT envoyé – Attente validation' },
+    // « Modification demandée » (§20). Sans elle, un BAT que le client renvoie
+    // à corriger retombait dans « Préparation du BAT » — indiscernable d'un BAT
+    // qu'on n'a jamais envoyé, alors que ce n'est pas du tout le même travail
+    // ni la même urgence : là, quelqu'un attend.
+    { slug: 'bat_modif', label: 'BAT – Modification demandée' },
     { slug: 'bat_valide', label: 'BAT validé' },
     { slug: 'validation_acompte', label: 'Validation acompte / Conditions de paiement' },
     { slug: 'a_commander', label: 'À commander' },
@@ -403,6 +408,20 @@ async function init() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_requests_vivantes
       ON requests (stage, position ASC NULLS LAST) WHERE deleted_at IS NULL`);
   } catch (_) { /* pg-mem local : index partiel non géré, sans conséquence */ }
+
+  // LE BAT et LA PROVENANCE. Down : ALTER TABLE requests DROP COLUMN IF EXISTS
+  // bat_requis, bat_valide_le, provenance;
+  for (const [col, type] of [
+    ['bat_requis', 'boolean NOT NULL DEFAULT false'],
+    ['bat_valide_le', 'timestamptz'],
+    ['provenance', 'text'],
+    ['date_prevue', 'date'],
+    ['retrait_creneau', 'text'],
+  ]) {
+    try {
+      await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
+  }
 
   // LE COÛT DE REVIENT, colonne à part. Down : ALTER TABLE requests DROP COLUMN
   // IF EXISTS cout_revient;

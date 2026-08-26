@@ -371,6 +371,11 @@ async function api(method, url, body) {
     // viennent d'être allumés depuis un autre poste. On redemande qui est là
     // plutôt que d'afficher « Erreur 401 » sur un écran qui se vide.
     const err = new Error(detail);
+    // Le CORPS du refus voyage avec l'erreur : sans lui, un 409 « BAT non
+    // validé » n'est qu'un texte, et l'écran ne peut rien proposer d'autre que
+    // de le lire. C'est ce qui permet à la Direction de forcer le passage.
+    err.detail = corps;
+    err.status = res.status;
     if (res.status === 401 && corps && corps.connexion) {
       signalerNonConnecte();
       // MARQUÉ, pour que le reste de l'application se taise : le voile de
@@ -5082,6 +5087,15 @@ function openMenu(anchor, items, current, onPick) {
 // que le menu. Le motif est FACULTATIF (Entrée / Enregistrer valide même vide),
 // pour ne jamais bloquer quelqu'un qui veut juste signaler vite fait.
 // Réutilise openMenuEl : ouvrir l'un ferme l'autre, un clic dehors ferme tout.
+// Miroir de MOTIFS_BLOCAGE (server.js). Écrits ici plutôt que chargés : sept
+// libellés fixes ne valent pas un aller-retour réseau à l'ouverture d'un menu,
+// et l'écran doit s'ouvrir même quand le réseau hésite. `/api/motifs-blocage`
+// reste la source pour qui veut les lire (et un test compare les deux listes).
+const MOTIFS_BLOCAGE = [
+  'Attente client', 'Attente fournisseur', 'Problème machine', 'Fichier manquant',
+  'BAT non validé', 'Paiement manquant', 'Rupture de stock',
+].map((label) => ({ label }));
+
 function openReasonPrompt(anchor, title, value, onSave) {
   closeMenu();
   closeCalendar();
@@ -5092,12 +5106,35 @@ function openReasonPrompt(anchor, title, value, onSave) {
   head.className = 'reason-title';
   head.textContent = `${title} — motif`;
 
+  // LES SEPT MOTIFS DU PATRON (§6), en un clic — et le texte libre EN DESSOUS.
+  //
+  // Le motif était uniquement tapé à la main : impossible de compter, de trier,
+  // ou de dire « quatre dossiers attendent le même fournisseur ». Les jetons
+  // remplissent le champ ; ils ne le remplacent pas. Un blocage qui n'entre dans
+  // aucune case existe, et le forcer dans une case le rendrait invisible.
+  const jetons = document.createElement('div');
+  jetons.className = 'reason-motifs';
+  for (const m of MOTIFS_BLOCAGE) {
+    const j = document.createElement('button');
+    j.type = 'button';
+    j.className = 'reason-motif';
+    j.textContent = m.label;
+    j.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // On REMPLACE plutôt qu'on n'ajoute : deux motifs cliqués l'un après
+      // l'autre donneraient « Attente clientAttente fournisseur ».
+      input.value = m.label;
+      input.focus();
+    });
+    jetons.append(j);
+  }
+
   const input = document.createElement('textarea');
   input.className = 'reason-input';
   input.rows = 2;
   input.maxLength = FLAG_REASON_MAX;
   input.value = value || '';
-  input.placeholder = 'ex. attente du BAT signé par le client';
+  input.placeholder = 'ou en toutes lettres…';
 
   const actions = document.createElement('div');
   actions.className = 'reason-actions';
@@ -5119,7 +5156,7 @@ function openReasonPrompt(anchor, title, value, onSave) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
   });
 
-  pop.append(head, input, actions);
+  pop.append(head, jetons, input, actions);
   document.body.appendChild(pop);
   const pr = anchor.getBoundingClientRect();
   const cr = pop.getBoundingClientRect();
@@ -5907,13 +5944,38 @@ function moveToStage(r, slug, targetSub = null) {
   // flèche « étape suivante » se recalculent tout de suite (sans attendre le SSE).
   invalidateRowCache(r.id);
   applySortAndRender();
-  api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: targetSub }).catch((err) => {
+  api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: targetSub }).catch(async (err) => {
     rows = prevRows;
     r.stage = prevStage;
     r.sub_stage = prevSub;
     lastRowsSig = signature(rows);
     if (familyChanged) { bumpCount(viewSlug, +1); bumpCount(slug, -1); }
     applySortAndRender();
+
+    // LE VERROU DU BAT (§20). Le serveur a refusé le passage en production
+    // parce que le BAT n'est pas validé. « La Direction peut forcer le passage
+    // si nécessaire » : on le lui PROPOSE ici, plutôt que de la laisser
+    // chercher un bouton qui n'existe pas — ou contourner par une autre étape,
+    // ce qui viderait le verrou de tout sens.
+    const d = err && err.detail;
+    if (d && d.batBloque && d.forcable) {
+      const ok = await confirmerAction(
+        'Produire sans BAT validé ?',
+        'Le client n’a pas validé le bon à tirer. Passer en production maintenant, '
+        + 'c’est accepter de refaire la pièce s’il demande une correction.',
+        'Passer quand même',
+      );
+      if (ok) {
+        try {
+          await api('PATCH', `/api/requests/${r.id}`, { stage: slug, sub_stage: targetSub, forcer: true });
+          await loadRows();
+          applySortAndRender();
+          return;
+        } catch (e2) { reportError(e2); }
+      }
+      resyncAfterRollback();
+      return;
+    }
     reportError(err);
     resyncAfterRollback();
   });

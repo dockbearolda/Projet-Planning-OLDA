@@ -39,6 +39,33 @@ CREATE TABLE IF NOT EXISTS requests (
   flag_reason     text,                              -- MOTIF libre de l'alerte (« BLOQUÉE — attente BAT client »)
   position        double precision,
   fiche           jsonb,                             -- détail de la fiche vendeuse (null si créée à la main)
+  -- LE BAT (§20). « La production ne doit normalement commencer qu'après
+  -- validation. La Direction peut forcer le passage si nécessaire. »
+  --
+  -- Rien n'empêchait de produire avant validation : les trois sous-étapes
+  -- (préparation / envoyé / validé) DÉCRIVAIENT le BAT, elles ne le
+  -- garantissaient pas. `bat_requis` se pose tout seul dès qu'un BAT existe ou
+  -- qu'on entre dans une étape qui en parle — on ne demande à personne de
+  -- cocher « ce dossier a un BAT », parce que personne ne le ferait.
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS bat_requis, bat_valide_le;
+  bat_requis      boolean NOT NULL DEFAULT false,
+  bat_valide_le   timestamptz,
+  -- D'OÙ VIENT LA DEMANDE (§8). Bouche-à-oreille, Instagram, passage, client
+  -- existant… C'est la seule information qui dit où mettre l'effort, et elle ne
+  -- se retrouve nulle part une fois la demande passée.
+  provenance      text,
+  -- LA DATE PRÉVUE (§23), à ne pas confondre avec `deadline` : celle-là est la
+  -- date SOUHAITÉE par le client, celle-ci est le jour où l'atelier compte
+  -- vraiment le faire. Les confondre, c'est soit promettre ce qu'on ne tiendra
+  -- pas, soit déplacer une promesse en croyant déplacer un planning.
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS date_prevue;
+  date_prevue     date,
+  -- LE CRÉNEAU DE RETRAIT (§22). L'heure vivait dans le JSON de la fiche
+  -- comptoir : illisible depuis la liste, donc inutilisable pour préparer une
+  -- journée de retraits. Bornée 9 h–17 h par l'écran, pas par la base — un
+  -- retrait exceptionnel à 18 h ne doit pas être impossible à enregistrer.
+  -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS retrait_creneau;
+  retrait_creneau text,
   -- LE COÛT DE REVIENT de la ligne (§11, §13). Sans lui, aucune marge n'est
   -- calculable : le moteur sort un PRIX, et un prix seul ne dit pas ce qu'on
   -- gagne. Rempli automatiquement par le flux « Nouveau Projet » (qui connaît
@@ -272,6 +299,30 @@ CREATE TABLE IF NOT EXISTS purchase_lines (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_pl_order ON purchase_lines (order_id);
+
+-- L'HISTORIQUE DES PIÈCES JOINTES (§19, §20) — « Le système doit conserver les
+-- versions : V1, V2, V3. Chaque changement important doit rester consultable. »
+--
+-- `attachments` garde UN emplacement par type et par commande : c'est la version
+-- COURANTE, celle qu'on ouvre d'un clic, et tout le code existant continue de la
+-- lire sans rien changer. Ce qu'elle écrasait part désormais ici, avant d'être
+-- remplacée. Table additive : aucune migration destructive sur une table qui
+-- porte déjà des PDF en production.
+-- Down : DROP TABLE attachment_versions;
+CREATE TABLE IF NOT EXISTS attachment_versions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id  uuid NOT NULL,
+  kind        text NOT NULL,             -- devis / bat / facture
+  version     int  NOT NULL,
+  filename    text NOT NULL,
+  data        text NOT NULL,
+  qui         text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+-- UNIQUE, et c'est lui qui tient la course : deux dépôts simultanés du même
+-- document ne peuvent pas prendre le même numéro de version. Le perdant relit
+-- le maximum et réessaie (voir archiverVersion dans server.js).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_att_versions ON attachment_versions (request_id, kind, version);
 
 -- Clé/valeur applicative : sert de garde d'idempotence aux migrations de données
 -- ponctuelles (ex. bascule du pipeline linéaire vers le modèle « familles »).

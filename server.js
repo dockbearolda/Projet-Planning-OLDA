@@ -205,7 +205,7 @@ const PATCHABLE = [
   'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority', 'client_type', 'billing_company',
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
-  'flag', 'flag_reason',
+  'flag', 'flag_reason', 'provenance', 'date_prevue', 'retrait_creneau',
   'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
   'cout_revient',
 ];
@@ -232,6 +232,9 @@ const CAPACITE_PAR_CHAMP = {
   sub_stage: 'travailler', flag: 'travailler', flag_reason: 'travailler',
   stage: 'production', priority: 'production', position: 'production',
   responsable: 'production', referent: 'production',
+  // La date PRÉVUE appartient à celui qui organise l'atelier ; la date
+  // SOUHAITÉE (`deadline`) est une promesse au client, donc à la boutique.
+  date_prevue: 'production',
   project_value: 'argent', acompte_demande: 'argent', acompte_verse: 'argent',
   acompte_montant: 'argent', paye: 'argent', paiement_mode: 'argent',
   // Le coût de revient est d'un cran au-dessus du prix : le prix se négocie
@@ -633,6 +636,23 @@ app.use((req, res, next) => {
     if (u) req.moi = { id: u.id, prenom: u.prenom, role: u.role };
   })().catch((err) => { console.error('session :', err.message); }).then(() => next());
 });
+
+// LES MOTIFS DE BLOCAGE (§6), au choix plutôt qu'en texte libre.
+//
+// Le motif était une phrase tapée à la main : impossible de compter, de trier,
+// ou de dire « il y a quatre dossiers qui attendent le même fournisseur ». Ce
+// sont EXACTEMENT les sept motifs que le patron liste. On garde le texte libre
+// à côté — un blocage qui n'entre dans aucune case existe, et le forcer dans
+// une case le rendrait invisible.
+const MOTIFS_BLOCAGE = [
+  { id: 'attente_client', label: 'Attente client' },
+  { id: 'attente_fournisseur', label: 'Attente fournisseur' },
+  { id: 'probleme_machine', label: 'Problème machine' },
+  { id: 'fichier_manquant', label: 'Fichier manquant' },
+  { id: 'bat_non_valide', label: 'BAT non validé' },
+  { id: 'paiement_manquant', label: 'Paiement manquant' },
+  { id: 'rupture_stock', label: 'Rupture de stock' },
+];
 
 // LA PORTE. Comptes allumés et personne de connecté = on ne répond RIEN d'utile.
 //
@@ -1143,6 +1163,12 @@ const COLONNES_REQUEST = [
   // (voir `sansArgent` / `sansMarge`) : c'est la donnée la plus sensible du
   // dossier — elle dit ce que l'atelier gagne, article par article.
   'cout_revient',
+  // LE BAT : la grille en a besoin pour marquer les lignes qu'on ne doit pas
+  // encore produire, et la fiche pour dire pourquoi le passage est refusé.
+  'bat_requis', 'bat_valide_le',
+  // La provenance de la demande, la date PRÉVUE par l'atelier (à ne pas
+  // confondre avec la date souhaitée par le client) et le créneau de retrait.
+  'provenance', 'date_prevue', 'retrait_creneau',
 ];
 
 // LA LISTE NE LIT PLUS LA FICHE ENTIÈRE. `allegerFiche` n'en garde que quatre
@@ -2236,6 +2262,35 @@ const LIBELLE_SOUS_ETAPE = new Map(
   Object.values(SUB_STAGES).flat().map((s) => [s.slug, s.label]),
 );
 
+// GET /api/motifs-blocage → les sept motifs du §6, en clair.
+//
+// Le texte libre RESTE possible à côté : un blocage qui n'entre dans aucune
+// case existe, et le forcer dans une case le rendrait invisible. Ce qu'on gagne,
+// c'est de pouvoir compter — « quatre dossiers attendent le même fournisseur »
+// est une information ; quatre phrases tapées à la main n'en sont pas une.
+app.get('/api/motifs-blocage', (req, res) => res.json(MOTIFS_BLOCAGE));
+
+// GET /api/delais → les majorations d'urgence, en UN seul endroit (§7).
+//
+// Il y en avait DEUX qui ne disaient pas la même chose : le catalogue
+// (jour_j +20 %, express sous 3 jours +10 %, exactement la règle du patron) et
+// un barème « suppléments express » éditable depuis la vente directe (j5 +20 %,
+// j10 +10 %). Deux vérités pour la même question, dont une seule réglable.
+// Cette route rend celle qui FAIT FOI — le catalogue — et signale l'autre.
+app.get('/api/delais', asyncH(async (req, res) => {
+  const supplements = await getSupplementsExpress();
+  res.json({
+    // La règle du patron, telle qu'elle s'applique aujourd'hui.
+    delais: (COM.delais || []).map((d) => ({
+      id: d.id, label: d.label, jours: d.jours, majoration: d.majoration,
+    })),
+    // Le second barème, celui de la vente directe. Rendu à côté et NON fusionné :
+    // les réconcilier en silence changerait des prix sans que personne l'ait
+    // décidé, et c'est le genre de décision qui appartient au patron.
+    supplementsVenteDirecte: supplements,
+  });
+}));
+
 app.get('/api/marges', asyncH(async (req, res) => res.json(await getMarges())));
 app.put('/api/marges', exige('reglages'), asyncH(async (req, res) => {
   const saved = await setMarges(req.body);
@@ -2538,6 +2593,25 @@ app.get('/api/counts', asyncH(async (req, res) => {
   res.json(counts);
 }));
 
+// LE BAT SE MARQUE TOUT SEUL. Demander à quelqu'un de cocher « ce dossier a un
+// BAT » revient à ne jamais l'avoir : entrer dans une étape qui parle de BAT,
+// c'est en avoir un. Et le valider, c'est le dater.
+//
+// APPELÉ DEPUIS LA CRÉATION *ET* DEPUIS LA MODIFICATION. Posé sur le seul
+// PATCH, le verrou ne s'armait pas sur une ligne CRÉÉE directement à une étape
+// de BAT — c'est-à-dire sur tout dossier venu du comptoir avec une destination.
+// Le verrou paraissait alors fonctionner et laissait passer la moitié des cas.
+const ETAPES_BAT = new Set(['prepa_bat', 'bat_envoye', 'bat_modif', 'bat_valide']);
+async function marquerBat(id, sousEtape) {
+  if (!ETAPES_BAT.has(sousEtape)) return;
+  const valide = sousEtape === 'bat_valide';
+  await pool.query(
+    `UPDATE requests SET bat_requis = true
+       ${valide ? ', bat_valide_le = COALESCE(bat_valide_le, now())' : ''}
+     WHERE id = $1`, [id],
+  ).catch(() => { /* le verrou est un garde-fou, pas une raison de faire échouer */ });
+}
+
 // POST /api/requests → crée (corps partiel autorisé)
 app.post('/api/requests', exige('clients'), asyncH(async (req, res) => {
   const body = normalizeFlagBody(req.body || {});
@@ -2578,8 +2652,9 @@ app.post('/api/requests', exige('clients'), asyncH(async (req, res) => {
   }
   query = `INSERT INTO requests (${cols.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`;
   const { rows } = await pool.query(query, params);
+  await marquerBat(rows[0].id, rows[0].sub_stage);
   broadcast({ kind: 'create', stages: [rows[0].stage] });
-  res.status(201).json(rows[0]);
+  res.status(201).json({ ...rows[0], ...(ETAPES_BAT.has(rows[0].sub_stage) ? { bat_requis: true } : {}) });
 }));
 
 // POST /api/requests/:id/copie → recopie une commande (« Dupliquer », « Envoyer
@@ -2720,6 +2795,26 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const incoherence = verifierCoherenceEtape(body, avant[0].stage);
   if (incoherence) return res.status(400).json({ error: incoherence });
 
+  // LE VERROU DU BAT (§20). « La production ne doit normalement commencer
+  // qu'après validation. La Direction peut forcer le passage si nécessaire. »
+  //
+  // Le mot important est « normalement » : on refuse, on n'interdit pas
+  // définitivement. Un refus sans porte de sortie serait contourné en passant
+  // la ligne par une autre étape — et alors le verrou n'aurait rien gardé, il
+  // aurait juste appris à le contourner.
+  if (body.stage === 'production' && avant[0].stage !== 'production'
+      && avant[0].bat_requis && !avant[0].bat_valide_le) {
+    if (!(peut(req.moi, 'forcer') && body.forcer === true)) {
+      return res.status(409).json({
+        error: 'Le BAT n’est pas validé : la production ne peut pas commencer.',
+        batBloque: true,
+        // On DIT qui peut passer outre, sinon l'employé cherche le bouton qui
+        // n'existe pas chez lui, ou pire, contourne par une autre étape.
+        forcable: peut(req.moi, 'forcer'),
+      });
+    }
+  }
+
   // PERMISSION CHAMP PAR CHAMP. On refuse TOUT le PATCH dès qu'un seul champ
   // dépasse : appliquer les champs permis et taire les autres serait pire — le
   // poste croirait avoir enregistré, et la moitié seulement serait passée.
@@ -2760,6 +2855,8 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   // a quittée. Tant que chaque poste retéléchargeait tout à chaque évènement,
   // ça ne se voyait pas ; maintenant que l'écran écoute ce champ, c'est lui qui
   // décide — il doit donc être exact.
+  await marquerBat(req.params.id, rows[0].sub_stage);
+
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
 
@@ -2982,6 +3079,27 @@ app.put('/api/requests/:id/pdf/:kind', exige('clients'),
     if (!filename) filename = `${kind}.pdf`;
     const data = buf.toString('base64');
 
+    // LA VERSION D'AVANT PART À L'HISTORIQUE (§19, §20). Elle était PERDUE :
+    // un devis V2 déposé écrasait le V1, et « quel prix lui avait-on annoncé la
+    // première fois ? » n'avait plus de réponse. Même chose pour un BAT qu'on
+    // corrige — c'est justement la version d'avant que le client conteste.
+    //
+    // TROIS LECTURES, PAS UNE SOUS-REQUÊTE CORRÉLÉE. La forme
+    // `INSERT … SELECT … (SELECT MAX(v.version) … WHERE v.request_id = a.request_id)`
+    // est valide en Postgres, mais pg-mem — la base locale, celle sur laquelle
+    // le patron valide — répond « column "a.request_id" does not exist ». Même
+    // piège que la liste des achats : cassé en local, parfait en production.
+    //
+    // La course entre deux dépôts simultanés est tenue par l'index UNIQUE sur
+    // (request_id, kind, version) : le perdant relit le maximum et réessaie une
+    // fois. Deux versions ne peuvent donc pas porter le même numéro.
+    await archiverVersion(id, kind, quiDemande(req)).catch((err) => {
+      // L'historique est un CONFORT : s'il échoue, le dépôt du document doit
+      // quand même aboutir. Perdre une version d'archive est ennuyeux ; perdre
+      // le devis que la vendeuse vient de déposer est bien pire.
+      console.error('historique des pièces jointes :', err.message);
+    });
+
     // Upsert atomique sur la clé (request_id, kind). En delete + insert, deux
     // envois simultanés du même emplacement se marchaient dessus : le second
     // violait la clé primaire et renvoyait 500 sur un dépôt pourtant valide.
@@ -2992,10 +3110,72 @@ app.put('/api/requests/:id/pdf/:kind', exige('clients'),
        DO UPDATE SET filename = EXCLUDED.filename, data = EXCLUDED.data, updated_at = now()`,
       [id, kind, filename, data],
     );
+    // DÉPOSER UN BAT, C'EST EN AVOIR UN. Le verrou de production s'arme donc
+    // tout seul : personne n'a à cocher « ce dossier a un BAT », et personne ne
+    // le ferait.
+    if (kind === 'bat') {
+      await pool.query('UPDATE requests SET bat_requis = true WHERE id = $1', [id]).catch(() => {});
+    }
     const stage = await touchRequest(id);
     broadcast({ kind: 'update', stages: stage ? [stage] : [] });
     res.json({ kind, filename });
   }));
+
+// Range la version COURANTE à l'historique, avant qu'on l'écrase.
+async function archiverVersion(id, kind, qui, essai = 0) {
+  const { rows: actuel } = await pool.query(
+    'SELECT filename, data FROM attachments WHERE request_id = $1 AND kind = $2', [id, kind],
+  );
+  // Rien à archiver : c'est le PREMIER dépôt. L'historique commence donc à V1
+  // le jour où on remplace ce document-là, pas le jour où on le pose.
+  if (!actuel.length) return;
+  const { rows: max } = await pool.query(
+    'SELECT COALESCE(MAX(version), 0) AS n FROM attachment_versions WHERE request_id = $1 AND kind = $2',
+    [id, kind],
+  );
+  try {
+    await pool.query(
+      `INSERT INTO attachment_versions (request_id, kind, version, filename, data, qui)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, kind, Number(max[0].n) + 1, actuel[0].filename, actuel[0].data, qui],
+    );
+  } catch (err) {
+    // 23505 = un autre dépôt a pris ce numéro entre-temps. On relit et on
+    // réessaie UNE fois : deux tentatives suffisent à deux postes, et une
+    // boucle sur un échec durable bloquerait le dépôt qu'on protège.
+    if (err && err.code === '23505' && essai === 0) return archiverVersion(id, kind, qui, 1);
+    throw err;
+  }
+}
+
+// GET /api/requests/:id/pdf/:kind/versions → la liste des versions passées.
+// Sans les blobs : une liste de dix devis ferait plusieurs mégaoctets pour
+// afficher trois lignes de dates.
+app.get('/api/requests/:id/pdf/:kind/versions', asyncH(async (req, res) => {
+  const { id, kind } = req.params;
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
+  const { rows } = await pool.query(
+    `SELECT version, filename, qui, created_at FROM attachment_versions
+      WHERE request_id = $1 AND kind = $2 ORDER BY version DESC`, [id, kind],
+  );
+  res.json(rows);
+}));
+
+// GET /api/requests/:id/pdf/:kind/versions/:v → CETTE version-là, en clair.
+app.get('/api/requests/:id/pdf/:kind/versions/:v', asyncH(async (req, res) => {
+  const { id, kind, v } = req.params;
+  if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
+  const { rows } = await pool.query(
+    'SELECT filename, data FROM attachment_versions WHERE request_id = $1 AND kind = $2 AND version = $3',
+    [id, kind, Number.parseInt(v, 10) || 0],
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Version introuvable' });
+  const buf = Buffer.from(rows[0].data, 'base64');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${rows[0].filename.replace(/"/g, '')}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(buf);
+}));
 
 // GET /api/requests/:id/pdf/:kind  → ouvre le PDF inline (consultable à tout moment)
 app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
@@ -3192,7 +3372,39 @@ app.get('/api/clients/:id', asyncH(async (req, res) => {
     'SELECT * FROM client_notes WHERE client_id = $1 ORDER BY created_at DESC', [req.params.id],
   );
   const counts = await commandeCountByClientKey();
-  res.json({ ...rows[0], notes, commandes: counts.get(clientKey(rows[0].entreprise)) || 0 });
+
+  // §9 : « chiffre d'affaires, dernière commande, projets, devis, commandes ».
+  // La fiche disait QUI est le client ; elle ne disait pas CE QU'IL PÈSE — donc
+  // impossible de savoir, en le rappelant, si on parle à un client de 200 € ou
+  // de 12 000 €.
+  //
+  // Le rapprochement se fait sur la CLÉ normalisée du nom, pas sur un
+  // identifiant : les commandes ne portent pas `client_id` (elles citent le nom,
+  // et deux graphies du même client existent). C'est le même rapprochement que
+  // partout ailleurs — voir `clientKey`.
+  const cle = clientKey(rows[0].entreprise);
+  const { rows: lignes } = await pool.query(
+    `SELECT id, billing_company, product, project_value, stage, sub_stage, created_at, project_id
+       FROM requests WHERE ${VIVANTES_NU} AND billing_company IS NOT NULL
+       ORDER BY created_at DESC LIMIT 500`,
+  );
+  const siennes = lignes.filter((l) => clientKey(l.billing_company) === cle);
+  // Le CA ne se rend qu'à qui voit l'argent : sur un poste d'atelier, une fiche
+  // client ne doit pas annoncer ce que le client a dépensé.
+  const ca = siennes.reduce((t, l) => t + (Number(l.project_value) || 0), 0);
+  const dossiers = [...new Set(siennes.map((l) => l.project_id).filter(Boolean))];
+
+  res.json({
+    ...rows[0],
+    notes,
+    commandes: counts.get(cle) || 0,
+    derniere_commande: siennes.length ? siennes[0].created_at : null,
+    projets: dossiers.length,
+    // Les cinq dernières suffisent : la fiche se lit au téléphone, pas en
+    // réunion — au-delà, personne ne descend.
+    dernieres: selonMoi(req, siennes.slice(0, 5)),
+    ...(peut(req.moi, 'argent') ? { ca: Math.round(ca * 100) / 100 } : {}),
+  });
 }));
 
 // `nextClientCode` (compteur « CLI-PRO-0007 ») vient de db.js : la migration qui

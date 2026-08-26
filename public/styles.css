@@ -5963,3 +5963,14 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .stk-fourn__meta, .stk-achat__qui { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stk-fourn__delai, .stk-fourn__transport, .stk-achat__n, .stk-achat__transport { flex: 0 0 auto; white-space: nowrap; }
 .stk-statut { flex: 0 0 auto; min-height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); }
+
+/* LES SEPT MOTIFS DE BLOCAGE (§6), en jetons au-dessus du champ libre.
+   Ils REMPLISSENT le champ, ils ne le remplacent pas : un blocage qui n'entre
+   dans aucune case existe, et le forcer dans une case le rendrait invisible. */
+.reason-motifs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.reason-motif {
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 10px; background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--taille-note); cursor: pointer; white-space: nowrap;
+}
+.reason-motif:hover { background: var(--surface-hover); border-color: var(--border-strong); color: var(--text-1); }
