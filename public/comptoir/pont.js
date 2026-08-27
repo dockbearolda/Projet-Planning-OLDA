@@ -1467,6 +1467,32 @@ function menuRenvoiManuel(hote){
 
 function menuNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
 
+/* CE QU'UNE RECHERCHE DOIT COMPRENDRE (27/08/2026).
+   « NS300 », « ns 300 », « n ns 300 », « NS-300 », « ns3 » désignent tous la
+   même référence, et personne ne les tape deux fois de la même façon. On
+   RÉDUIT donc les deux côtés à leurs lettres et à leurs chiffres avant de
+   comparer : la casse, les accents, les espaces, les tirets et les points ne
+   veulent rien dire dans un code. */
+function menuReduire(s){return menuNorm(s).replace(/[^a-z0-9]+/g,'')}
+
+/* Combien une option répond à ce qu'on a tapé. -1 = elle ne répond pas.
+   Le RANG compte autant que le filtre : taper « ns3 » doit faire remonter
+   NS300 avant un texte qui contient « ns3 » au milieu d'une phrase. */
+function menuScore(o,q){
+  const mots=String(q||'').split(/\s+/).map(menuReduire).filter(Boolean);
+  if(!mots.length)return 0;
+  const jeton=menuReduire(o.jeton);
+  const foin=menuReduire(`${o.jeton} ${o.texte} ${o.groupe} ${o.cherche}`);
+  /* Chaque morceau tapé doit se retrouver quelque part — c'est ce qui fait
+     marcher « n ns 300 » aussi bien que « ns300 ». */
+  if(!mots.every(m=>foin.includes(m)))return -1;
+  const tout=mots.join('');
+  if(jeton&&jeton.startsWith(tout))return 3;   /* la référence, par son début */
+  if(jeton&&jeton.includes(tout))return 2;     /* la référence, plus loin */
+  if(foin.startsWith(tout))return 1;           /* le libellé, par son début */
+  return 0;
+}
+
 /* Les options telles qu'elles existent à l'instant T. On les relit à CHAQUE
    ouverture : `txPopulateSelects` et `onTextileRefChange` réécrivent le contenu
    des <select> et des <datalist> en cours de route. */
@@ -1737,13 +1763,15 @@ function menuFiltrees(etat){
      il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
      valeur-là — cliquer doit montrer toute la liste. */
   const brut=etat.libre?(etat.filtrer?etat.hote.value:''):etat.filtre.value;
-  const q=menuNorm(brut).trim();
+  const q=String(brut||'').trim();
   if(!q)return toutes;
-  const mots=q.split(/\s+/);
-  return toutes.filter(o=>{
-    const foin=menuNorm(`${o.jeton} ${o.texte} ${o.groupe} ${o.cherche}`);
-    return mots.every(m=>foin.includes(m));
-  });
+  /* On garde ce qui répond, et on remonte ce qui répond LE MIEUX. Le tri est
+     stable : à score égal, la liste garde l'ordre du formulaire. */
+  return toutes
+    .map((o,i)=>({o,s:menuScore(o,q),i}))
+    .filter(x=>x.s>=0)
+    .sort((a,b)=>b.s-a.s||a.i-b.i)
+    .map(x=>x.o);
 }
 
 function menuPeindre(etat){

@@ -771,6 +771,23 @@ function basculerDetailArticle(i,ev){
    Le moteur de calcul est celui du patron, porté tel quel dans
    textile-catalog.js (window.TextileEngine). */
 function TE(){return window.TextileEngine}
+/* LE TARIF DE TRANSPORT VIENT DU SERVEUR, PAS DU CATALOGUE. Il ne fait
+   qu'augmenter, et le changer ne doit pas demander un déploiement : il vit en
+   base (app_meta) et se règle dans les Réglages. On l'injecte dans le moteur à
+   l'ouverture du parcours — un parcours DÉJÀ ouvert garde le tarif qu'il a lu
+   en entrant, ce qui est le bon comportement : un devis en cours de saisie ne
+   doit pas changer de prix sous les doigts de la vendeuse.
+   Si l'appel échoue — hors ligne, serveur qui redémarre — le moteur garde sa
+   valeur d'usine : mieux vaut chiffrer au tarif d'hier que ne pas chiffrer. */
+async function txChargerTarifsTransport(){
+  try{
+    const r=await fetch('/api/tarifs-transport');
+    if(!r.ok)return;
+    const t=await r.json();
+    if(t&&typeof t==='object'&&txReady())TE().setSettings({transports:t});
+  }catch(_){/* le moteur garde ses valeurs d'usine */}
+}
+txChargerTarifsTransport();
 function txReady(){return !!(window.TextileEngine&&window.TextileEngine.DB)}
 function txNum(v){return TE().num(v)}
 function txPct(part){return (Number(part)||0).toLocaleString('fr-FR',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1})}
@@ -1452,7 +1469,7 @@ function txLigneCalcul(g,libelle,valeur,cls){
   txRang(g,libelle,valeur,cls);
 }
 function txCalculBloc(d,c){
-  const g=txEl('div','tx-tableau'),cf=TE().coefFor(c.qty),tr=txNum(TE().DB.transports[d.transport]);
+  const g=txEl('div','tx-tableau'),cf=TE().coefFor(c.qty),tr=txNum(TE().tarifTransport(d.transport));
   const tgca=d.tgca!==false?TX_TGCA_TAUX:0;
   txLigneCalcul(g,`Prix d’achat ${txDisplayRef(d)}`,money(c.item.purchase));
   /* « inclus » et non « 0,00 € » : un transport maritime n'est pas gratuit,

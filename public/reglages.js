@@ -198,6 +198,17 @@ function buildStatic() {
     + 'calcule sur les jours OUVRÉS et vaut pour tous les postes : le comptoir '
     + 'l’applique à la commande suivante, sans rien recharger.', 'reg-express'));
 
+  // --- Carte « Transport » ------------------------------------------------------
+  // IL VIVAIT FIGÉ DANS LE CATALOGUE TEXTILE. Le changer demandait un
+  // déploiement, alors qu'un tarif de transporteur bouge — et ne fait
+  // qu'augmenter. Le catalogue garde la LISTE des transports (c'est elle qui
+  // remplit le menu du comptoir) ; c'est ici qu'on pose leur PRIX.
+  page.appendChild(carteSimple('local_shipping', 'Transport',
+    'Le coût du transport d’une pièce, en euros HT. Il entre dans le prix '
+    + 'd’achat avant le coefficient : le changer rechiffre tout ce qui part '
+    + 'ensuite. Le maritime est compris dans le prix d’achat, il reste à zéro.',
+    'reg-transport'));
+
   // --- Carte « Fonctions en cours » --------------------------------------------
   page.appendChild(carteSimple('settings', 'Fonctions en cours',
     'Les chantiers livrés mais pas encore allumés. Éteints, l’application se '
@@ -267,6 +278,48 @@ function champNombre(valeur, suffixe, onSave) {
   wrap.append(input);
   if (suffixe) wrap.append(el('span', 'reg-champ__unite', suffixe));
   return wrap;
+}
+
+// LE TARIF DE TRANSPORT. La liste des transports vient du serveur, pas d'une
+// liste écrite ici : en ajouter un demain ne doit pas demander de retoucher cet
+// écran.
+let transports = {};
+
+function renderTransport() {
+  const hote = $('#reg-transport');
+  if (!hote) return;
+  const noms = Object.keys(transports).sort();
+  if (!noms.length) {
+    hote.replaceChildren(el('p', 'reg-vide', 'Aucun transport au catalogue.'));
+    return;
+  }
+  hote.replaceChildren(...noms.map((nom) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', nom));
+    l.append(el('span', 'reg-ligne__aide',
+      nom === 'Maritime' ? 'compris dans le prix d’achat' : 'par pièce, avant coefficient'));
+    l.append(champNombre(transports[nom], '€ HT', async (v) => {
+      const n = Number(String(v).replace(',', '.'));
+      // LE SERVEUR REFUSE HORS DE [0, 100] : on le dit ici plutôt que de laisser
+      // partir un appel qui reviendra avec un message technique.
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        flash('Un prix de transport s’écrit en euros, entre 0 et 100.', 'is-ko');
+        renderTransport();
+        return;
+      }
+      try {
+        transports = await api('PUT', '/api/tarifs-transport', { ...transports, [nom]: n });
+        renderTransport();
+        flash('Enregistré — le prochain chiffrage en tient compte', 'is-ok');
+      } catch (err) {
+        // Jamais d'échec muet : sinon on chiffre au tarif d'avant en croyant
+        // l'avoir changé.
+        flash(err.message, 'is-ko');
+        renderTransport();
+      }
+    }));
+    return l;
+  }));
 }
 
 function renderMarges() {
@@ -738,9 +791,11 @@ export async function refreshReglages() {
     api('GET', '/api/machines').then((d) => { if (Array.isArray(d)) machines = d; }).catch(() => {}),
     api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
     api('GET', '/api/supplements-express').then((d) => { if (d) express = d; }).catch(() => {}),
+    api('GET', '/api/tarifs-transport').then((d) => { if (d) transports = d; }).catch(() => {}),
   ]);
   renderMarges();
   renderExpress();
+  renderTransport();
   renderModeles();
   renderMachines();
   renderFlags();

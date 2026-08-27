@@ -23,6 +23,7 @@ const {
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   getSupplementsExpress, setSupplementsExpress,
+  getTarifsTransport, setTarifsTransport,
   getCommandeZones, getHiddenCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
@@ -1063,6 +1064,33 @@ app.put('/api/supplements-express', exige('reglages'), asyncH(async (req, res) =
   }
   const saved = await setSupplementsExpress(body);
   broadcast({ kind: 'supplements-express' });
+  res.json(saved);
+}));
+
+// TARIF DE TRANSPORT — euros HT par pièce, réglable depuis les Réglages.
+// Il vivait figé dans le catalogue textile : le changer demandait un
+// déploiement, alors qu'un tarif de transporteur bouge (et ne fait
+// qu'augmenter). Le catalogue garde la LISTE des transports, cette table leur
+// PRIX. Diffusé en SSE : les postes du comptoir chiffrent au nouveau tarif
+// sans recharger.
+app.get('/api/tarifs-transport', asyncH(async (req, res) => {
+  res.json(await getTarifsTransport());
+}));
+
+app.put('/api/tarifs-transport', exige('reglages'), asyncH(async (req, res) => {
+  const body = req.body || {};
+  for (const [nom, brut] of Object.entries(body)) {
+    if (brut === null || brut === '') continue;      // non envoyé = inchangé
+    const n = Number(brut);
+    // Un prix hors [0, 100] € la pièce est une faute de frappe, pas une
+    // intention : on la renvoie à l'écran plutôt que de la laisser retomber en
+    // silence sur l'ancienne valeur — le patron croirait avoir enregistré.
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      return res.status(400).json({ error: `${nom} : prix en euros attendu entre 0 et 100` });
+    }
+  }
+  const saved = await setTarifsTransport(body);
+  broadcast({ kind: 'tarifs-transport' });
   res.json(saved);
 }));
 

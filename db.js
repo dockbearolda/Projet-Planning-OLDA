@@ -1599,6 +1599,58 @@ async function setSupplementsExpress(p) {
   return clean;
 }
 
+// --- Tarif de transport ------------------------------------------------------
+// Le prix du transport d'une pièce n'est pas une constante du chiffrage : il
+// bouge avec le transporteur, et il ne fait qu'augmenter. Il vivait dans le
+// catalogue textile, figé — le changer demandait un déploiement.
+//
+// Le catalogue garde la LISTE des transports (c'est elle qui remplit le menu de
+// l'écran) ; cette table-ci porte leur PRIX, en euros HT par pièce.
+// Le maritime est compris dans le prix d'achat : il reste à zéro.
+//
+// ⚠️ LE FICHIER V9 DU PATRON SUPPOSE 1,50. La conformité du MOTEUR se vérifie
+// donc en lui injectant ce tarif-là (voir test/chiffrage-conforme-patron) :
+// c'est la FORMULE qui est conforme, pas le prix du jour.
+const DEFAULT_TARIFS_TRANSPORT = { Maritime: 0, Chronopost: 1.8 };
+
+async function getTarifsTransport() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tarifs_transport'");
+  if (!rows[0]) return { ...DEFAULT_TARIFS_TRANSPORT };
+  try {
+    const parsed = JSON.parse(rows[0].value);
+    return parsed && typeof parsed === 'object'
+      ? { ...DEFAULT_TARIFS_TRANSPORT, ...parsed }
+      : { ...DEFAULT_TARIFS_TRANSPORT };
+  } catch (_) {
+    return { ...DEFAULT_TARIFS_TRANSPORT };
+  }
+}
+
+async function setTarifsTransport(p) {
+  const src = p && typeof p === 'object' ? p : {};
+  // On repart des tarifs EN PLACE : un transport absent de l'envoi garde le sien.
+  const actuel = await getTarifsTransport();
+  // `null` et '' ne valent PAS 0 (Number les y ramènerait) : ils veulent dire
+  // « rien envoyé ». Un prix négatif ou délirant est une faute de frappe, pas
+  // une intention — on garde l'ancien plutôt que de chiffrer faux au client
+  // suivant. Au centime, comme tout ce qui est un prix.
+  const prix = (v, def) => {
+    const n = v === null || v === '' ? NaN : Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return def;
+    return Math.round(n * 100) / 100;
+  };
+  const clean = { ...actuel };
+  for (const nom of Object.keys(actuel)) clean[nom] = prix(src[nom], actuel[nom]);
+  // Un transport qu'on n'avait pas encore : on l'accepte s'il porte un prix.
+  for (const nom of Object.keys(src)) {
+    if (nom in clean) continue;
+    const n = prix(src[nom], NaN);
+    if (Number.isFinite(n)) clean[nom] = n;
+  }
+  await poserMeta('tarifs_transport', JSON.stringify(clean));
+  return clean;
+}
+
 // --- Emplacements d'impression ajoutés au comptoir ---------------------------
 // Zones créées à la volée du temps de l'ancienne prise de commande détaillée
 // (app_meta.commande_zones) et zones du catalogue qu'un poste avait masquées
@@ -2861,6 +2913,7 @@ module.exports = {
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
   DEFAULT_SUPPLEMENTS_EXPRESS, getSupplementsExpress, setSupplementsExpress,
+  DEFAULT_TARIFS_TRANSPORT, getTarifsTransport, setTarifsTransport,
   getCommandeZones, getHiddenCommandeZones,
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,

@@ -36,10 +36,30 @@ const TE = bac.window.TextileEngine;
    les repasse par du texte avant de les juger. */
 const local = (v) => JSON.parse(JSON.stringify(v));
 
+// --- 0. LE TARIF DE TRANSPORT N'EST PLUS UNE CONSTANTE DU MOTEUR ------------
+// Il vaut 1,80 € HT depuis le 27/08/2026, et il se règle désormais depuis les
+// Réglages : un tarif de transporteur bouge, le changer ne doit pas demander un
+// déploiement. LE FICHIER V9 DU PATRON, LUI, SUPPOSE 1,50 — 59 de ses 205 cas
+// passent par Chronopost.
+//
+// On vérifie donc DEUX choses distinctes, et il faut les garder distinctes :
+//   - la FORMULE est conforme au fichier du patron → on lui injecte 1,50, le
+//     tarif que ce fichier suppose, et on compare les 205 cas ;
+//   - le TARIF DU JOUR est bien celui que Charlie a donné → assertion séparée,
+//     ci-dessous.
+// Confondre les deux, c'est soit figer le tarif pour toujours, soit perdre la
+// preuve que le moteur calcule juste.
+assert.deepStrictEqual(local(TE.getSettings().transports), { Maritime: 0, Chronopost: 1.8 },
+  'le tarif d’usine : le maritime est compris dans le prix d’achat, Chronopost vaut 1,80 € HT');
+const TARIF_DU_FICHIER_V9 = { Maritime: 0, Chronopost: 1.5 };
+TE.setSettings({ transports: TARIF_DU_FICHIER_V9 });
+
 // --- 1. Les réglages de l'atelier -------------------------------------------
 // Coût du DTF, débit, pressage, coût horaire, arrondi, quantité plafond du
 // coefficient : ce sont EUX qui multiplient tout le reste.
-assert.deepStrictEqual(local(TE.getSettings()), REF.reglages,
+const reglagesHorsTarif = local(TE.getSettings());
+delete reglagesHorsTarif.transports;   // comparé juste au-dessus, il ne bouge pas ici
+assert.deepStrictEqual(reglagesHorsTarif, REF.reglages,
   'les réglages par défaut sont ceux du fichier du patron');
 
 // --- 2. Les 205 cas ----------------------------------------------------------
@@ -73,8 +93,11 @@ assert.ok(REF.cas.length >= 200, 'la table de référence doit couvrir au moins 
 // Un produit retiré, un coefficient arrondi, un seuil déplacé : le devis part
 // faux sans erreur. On tient les bornes.
 assert.strictEqual(TE.DB.refs.length, 49, 'les 49 produits du patron');
-assert.strictEqual(TE.DB.transports.Maritime, 0, 'le maritime est compris dans le prix d’achat');
-assert.strictEqual(TE.DB.transports.Chronopost, 1.5, 'Chronopost coûte 1,50 € la pièce');
+// `DB.transports` garde la LISTE des transports — c'est elle qui remplit le
+// menu de l'écran. Leur PRIX, lui, est un réglage (voir §0). On tient donc les
+// deux noms, pas leurs valeurs.
+assert.deepStrictEqual(Object.keys(local(TE.DB.transports)).sort(), ['Chronopost', 'Maritime'],
+  'les deux transports du patron restent au catalogue');
 assert.strictEqual(Object.keys(TE.DB.printTypes).length, 13, 'les 13 emplacements de marquage');
 assert.deepStrictEqual(local(TE.DB.thresholds[0]), { minQty: 1, excellent: 0.7, veryGood: 0.6, good: 0.55, correct: 0.5, limited: 0.45 },
   'les seuils de marge de la première tranche');
@@ -124,5 +147,34 @@ assert.strictEqual(Math.round(mienne.revenue * 100) / 100, 1190);
 assert.strictEqual(Math.round(mienne.effective * 100) / 100, 15.87, 'le client paie 15,87 € en moyenne par pièce livrée');
 assert.strictEqual(Math.round(mienne.margin * 100) / 100,
   Math.round((1190 - 75 * c.unitProductionCost) * 100) / 100, 'les pièces offertes coûtent leur production');
+
+// --- LE TARIF RÈGLE DOIT ARRIVER JUSQU'AU CHIFFRAGE -------------------------
+// Un réglage qui n'atteint pas le moteur est pire que pas de réglage : le
+// patron change le prix, l'écran dit « enregistré », et le devis part au tarif
+// d'avant. On tient donc les trois maillons.
+assert.strictEqual(typeof TE.tarifTransport, 'function',
+  'le moteur doit exposer le tarif : l’écran en a besoin pour son récapitulatif');
+assert.match(DEVIS, /fetch\('\/api\/tarifs-transport'\)/,
+  'le parcours doit lire le tarif du serveur à son ouverture');
+assert.match(DEVIS, /TE\(\)\.setSettings\(\{transports:t\}\)/,
+  '… et l’injecter dans le moteur');
+// La forme d'APPEL, pas le mot : `DB.transports['']` est cité dans un
+// commentaire de l'écran, et un commentaire ne chiffre rien.
+assert.ok(!/TE\(\)\.DB\.transports\[/.test(DEVIS),
+  'plus rien ne doit lire le prix dans la table figée du catalogue — c’est un réglage');
+
+// Et le calcul en tient VRAIMENT compte : on le prouve, on ne le suppose pas.
+// Le transport entre dans le prix d'achat AVANT le coefficient : 30 centimes de
+// transport en plus font 80 centimes sur le prix de vente d'une pièce. C'est
+// pour ça que ce réglage ne peut pas être approximatif.
+const cas = { ref: 'NS300', genre: 'Unisexe', printType: 'Poitrine Seul', sizes: { S: 10 }, transport: 'Chronopost' };
+TE.setSettings({ transports: { Maritime: 0, Chronopost: 1.5 } });
+const a150 = TE.calculate(cas);
+TE.setSettings({ transports: { Maritime: 0, Chronopost: 1.8 } });
+const a180 = TE.calculate(cas);
+assert.ok(a180.sold > a150.sold,
+  `un transport plus cher doit faire monter le prix (${a150.sold} → ${a180.sold}) `
+  + '— sinon le réglage ne sert à rien');
+TE.setSettings({ transports: TARIF_DU_FICHIER_V9 });
 
 console.log(`✓ chiffrage conforme au fichier du patron : ${REF.cas.length} configurations, 24 valeurs chacune`);

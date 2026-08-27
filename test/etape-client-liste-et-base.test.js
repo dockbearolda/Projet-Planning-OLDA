@@ -181,7 +181,10 @@ assert.ok(/return \[c\.phone,c\.email,c\.type,c\.contact\]\.filter\(Boolean\)\.j
   '… et l’option les emporte, invisibles, dans `data-cherche`');
 assert.ok(/cherche:o\.dataset\.cherche\|\|''/.test(PONT),
   'le composant lit ce texte caché');
-assert.ok(/menuNorm\(`\$\{o\.jeton\} \$\{o\.texte\} \$\{o\.groupe\} \$\{o\.cherche\}`\)/.test(PONT),
+// `menuReduire` depuis le 27/08 : la recherche réduit les deux côtés à leurs
+// lettres et à leurs chiffres, pour que « ns 300 » trouve « NS300 ». Ce qui
+// compte ici reste le même — le texte caché est cherché AVEC le reste.
+assert.ok(/menuReduire\(`\$\{o\.jeton\} \$\{o\.texte\} \$\{o\.groupe\} \$\{o\.cherche\}`\)/.test(PONT),
   '… et le cherche avec le reste');
 
 // Le détail n'est pas perdu : il se lit sur la fiche, juste sous le champ.
