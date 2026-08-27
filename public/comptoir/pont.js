@@ -1368,6 +1368,29 @@
 @keyframes menuEntre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 .menu-tete{display:flex;align-items:center;gap:10px;padding:10px;background:var(--zone-bg);border-bottom:1px solid var(--border-soft)}
 .menu-tete input{font-size:var(--taille-texte);padding:9px 11px}
+/* ON CHERCHE DANS LA BULLE, PAS DANS UN CHAMP DE PLUS (27/08/2026).
+   Le filtre vivait en tête du panneau : cliquer ouvrait une liste, puis il
+   fallait descendre d'un cran pour taper — un deuxième champ pour la même
+   question, et il ne s'affichait que sur la liste des références. Il se pose
+   maintenant SUR le déclencheur, à sa place exacte : la bulle devient un champ
+   de saisie, le curseur y est déjà, on tape. C'est ce que fait n'importe quel
+   bon sélecteur, et ça vaut pour TOUS les menus.
+   Il épouse la boîte du déclencheur — même hauteur, même rembourrage, même
+   arrondi — pour que rien ne bouge à l'ouverture. */
+.menu-filtre{display:none}
+.menu.est-ouvert>.menu-filtre{
+  display:block;position:absolute;left:0;top:0;width:100%;
+  min-height:var(--ctrl-h);height:var(--ctrl-h);
+  padding:0 var(--champ-x);margin:0;
+  border:1.5px solid var(--primary);border-radius:var(--arrondi-champ);
+  background:var(--surface);color:var(--text-1);
+  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-champ);
+  box-shadow:0 0 0 3px rgba(var(--primary-rgb),.10);
+  outline:none;z-index:1}
+/* Ce qui était choisi reste lisible pendant qu'on cherche : il devient
+   l'invite du champ. Sans ça, ouvrir un menu efface sous les yeux la valeur
+   qu'on venait vérifier. */
+.menu.est-ouvert>.menu-filtre::placeholder{color:var(--text-2)}
 .menu-compte{flex:none;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .menu-liste{max-height:326px;overflow-y:auto;margin:0;padding:6px;list-style:none}
 /* Le titre de famille reste collé en haut pendant le défilement : 48
@@ -1578,7 +1601,10 @@ function menuPoser(hote){
   filtre.setAttribute('aria-label','Filtrer la liste');
   const compte=document.createElement('span');
   compte.className='menu-compte';
-  tete.append(filtre,compte);
+  /* Le filtre ne vit plus dans le panneau : il se pose SUR le déclencheur
+     (voir la règle .menu.est-ouvert>.menu-filtre). L'entête du panneau ne garde
+     que le compteur. */
+  tete.append(compte);
   const liste=document.createElement('ul');
   liste.className='menu-liste';
   liste.setAttribute('role','listbox');
@@ -1641,6 +1667,8 @@ function menuPoser(hote){
   if(avecManuel)panneau.append(manuel,saisie);
   panneau.append(tete,liste);
   peau.append(panneau);
+  /* Posé APRÈS le panneau : il se superpose au déclencheur, pas au panneau. */
+  if(!libre)peau.append(filtre);
 
   const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,
     avecManuel,manuel,saisie,champLibre,action,vus:[],vise:-1,ouvert:false,filtrer:false};
@@ -1787,9 +1815,12 @@ function menuPeindre(etat){
      et son compteur sont un deuxième champ dans le champ : on le pose donc à
      la main, avec `data-menu-recherche`, et jamais par un seuil qui décide
      tout seul. Un menu libre, lui, se filtre en tapant dans le champ. */
-  const filtrable=!etat.libre&&etat.hote.hasAttribute('data-menu-recherche');
-  etat.tete.style.display=filtrable?'':'none';
-  if(filtrable)etat.compte.textContent=vus.length===toutes?`${toutes} choix`:`${vus.length} / ${toutes}`;
+  /* Le compteur ne se montre QUE pendant une recherche : au repos, « 49 choix »
+     sur une liste qu'on a sous les yeux est un mot de plus à lire. Il dit alors
+     ce qui reste, ce qui est la seule chose utile à ce moment-là. */
+  const cherche=!etat.libre&&etat.filtre.value.trim()!=='';
+  etat.tete.style.display=cherche?'':'none';
+  if(cherche)etat.compte.textContent=`${vus.length} / ${toutes}`;
 
   const noeuds=[];
   if(!vus.length){
@@ -1911,12 +1942,25 @@ function menuOuvrir(etat){
   etat.peau.classList.remove('est-saisie');   /* jamais rouvert en cours de frappe */
   etat.peau.classList.add('est-ouvert');
   etat.declencheur.setAttribute('aria-expanded','true');
-  if(!etat.libre)etat.filtre.value='';
+  if(!etat.libre){
+    etat.filtre.value='';
+    /* Ce qui était choisi devient l'invite : on cherche sans perdre de vue ce
+       qu'on remplace. */
+    const choisie=options.find(o=>o.valeur===etat.hote.value);
+    etat.filtre.placeholder=choisie&&choisie.valeur
+      ? [choisie.jeton,choisie.texte].filter(Boolean).join(' — ')
+      : (etat.hote.dataset.menuFiltre||'Rechercher…');
+  }
   /* On ouvre sur le choix en cours, pas en tête de liste. */
   etat.vise=Math.max(0,options.findIndex(o=>o.valeur===etat.hote.value));
   menuPeindre(etat);
   menuPlacer(etat);
-  if(!etat.libre&&etat.tete.style.display!=='none')etat.filtre.focus();
+  /* LE CURSEUR EST DANS LA BULLE, TOUJOURS. Il n'y allait que sur la liste des
+     références — la seule qui portait `data-menu-recherche`. Sur les autres, il
+     fallait viser une ligne à la souris ou descendre à la flèche : ouvrir un
+     menu, c'est vouloir en choisir une, et le plus court chemin est d'en taper
+     le début. */
+  if(!etat.libre)etat.filtre.focus();
 }
 
 /* CE QUI BORNE LE PANNEAU N'EST PAS LA FENÊTRE. C'est le premier ancêtre qui

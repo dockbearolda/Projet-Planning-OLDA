@@ -237,14 +237,33 @@ assert.ok(/gradient/.test(TE.markColorHexFor('Multi couleur')),
 assert.ok(/const hex=TE\(\)\.markColorHexFor\(x\)/.test(DEVIS),
   'chaque couleur de marquage emporte sa teinte dans la liste');
 
-// DEUX RECHERCHES SUR L'ÉCRAN, ET DEUX SEULEMENT : la référence et le client.
-// Ce sont les deux seules listes qu'on ne parcourt pas des yeux — le catalogue
-// d'un côté, les 78 fiches de la base clients de l'autre. Ailleurs, le champ de
-// filtre est un deuxième champ dans le champ — il se pose à la main, jamais par
-// un seuil qui décide seul.
+// ON CHERCHE DANS LA BULLE, ET SUR TOUS LES MENUS (27/08/2026).
+//
+// La règle d'avant disait « deux recherches sur l'écran, et deux seulement » —
+// la référence et le client — parce qu'un champ de filtre EN TÊTE DU PANNEAU
+// est un deuxième champ pour la même question. Charlie l'a renversée : « la
+// recherche se fait directement dans la bulle comme les sites haut de gamme,
+// une recherche de pointe ultra intelligente PARTOUT sur l'app ».
+//
+// Les deux tiennent ensemble, parce que ce n'est plus le même objet : le champ
+// ne s'ajoute plus SOUS la bulle, il DEVIENT la bulle. Il n'y a toujours qu'un
+// seul champ pour une seule question — et le curseur y est déjà.
 assert.ok(!/MENU_SEUIL_FILTRE/.test(PONT), 'plus de seuil qui pose un filtre tout seul');
-assert.ok(/const filtrable=!etat\.libre&&etat\.hote\.hasAttribute\('data-menu-recherche'\)/.test(PONT),
-  'la recherche se déclare, elle ne se devine pas');
+assert.ok(/\.menu\.est-ouvert>\.menu-filtre\{/.test(PONT),
+  'le champ de recherche se pose SUR le déclencheur, à sa place exacte');
+assert.ok(/if\(!libre\)peau\.append\(filtre\)/.test(PONT),
+  '… donc sur la peau du menu, pas dans le panneau');
+assert.ok(/if\(!etat\.libre\)etat\.filtre\.focus\(\)/.test(PONT),
+  'ouvrir un menu, c’est vouloir choisir : le curseur est dans la bulle, sur TOUS les menus');
+assert.ok(/etat\.filtre\.placeholder=choisie&&choisie\.valeur/.test(PONT),
+  'ce qui était choisi devient l’invite : on cherche sans perdre de vue ce qu’on remplace');
+
+// LA RECHERCHE COMPREND CE QU'ON TAPE VRAIMENT. « NS300 », « ns 300 »,
+// « n ns 300 », « NS-300 », « ns3 » désignent la même référence.
+assert.ok(/function menuReduire\(s\)\{return menuNorm\(s\)\.replace\(\/\[\^a-z0-9\]\+\/g,''\)\}/.test(PONT),
+  'les deux côtés se réduisent à leurs lettres et à leurs chiffres avant comparaison');
+assert.ok(/if\(jeton&&jeton\.startsWith\(tout\)\)return 3/.test(PONT),
+  'une référence qui COMMENCE par ce qu’on tape remonte en tête — le rang compte autant que le filtre');
 assert.strictEqual((DEVIS.match(/data-menu-recherche/g) || []).length, 2,
   'deux listes seulement portent une recherche sur l’écran de devis');
 assert.ok(/<select id="txRef"[^>]*data-menu-recherche/.test(DEVIS),
