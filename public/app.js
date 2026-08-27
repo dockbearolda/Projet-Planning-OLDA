@@ -1974,6 +1974,8 @@ function renderRows(data) {
 
   // Les notes savent maintenant si elles sont coupées : la mise en page existe.
   relireLesNotes();
+  // Une ligne neuve naît dans l'ordre du gabarit : on la range comme les autres.
+  appliquerOrdreColonnes();
   applyEmptyCols();
   updateSortArrows();
 }
@@ -7060,6 +7062,95 @@ const colsKey = () => {
   return qui ? `${COLS_KEY}:${qui}` : COLS_KEY;
 };
 
+// ---------------------------------------------------------------------------
+// L'ORDRE DES COLONNES SE RÈGLE (Charlie, 27/08/2026)
+// ---------------------------------------------------------------------------
+// « les colonnes ici je dois pouvoir les déplacer comme je le souhaite, mettre
+// en premier Documents par exemple. »
+//
+// LE PIÈGE, D'ABORD. L'ordre était écrit en dur à TROIS endroits qui doivent
+// rester au même rang : le <colgroup>, le <thead> et buildRow(). Un <col> agit
+// sur la colonne de MÊME RANG — son `data-col` n'est qu'une étiquette. Déplacer
+// un <th> sans son <col> vise la mauvaise colonne, en silence.
+//
+// On ne réécrit donc pas les trois : on applique LA MÊME PERMUTATION aux trois.
+// Le <colgroup> reste la source de vérité rang → clé (il porte `data-col`), et
+// tout le reste s'y range. L'invariant est tenu par construction, pas par
+// vigilance.
+//
+// La poignée reste en tête et les actions en queue : ce ne sont pas des
+// colonnes, ce sont les bords de la ligne.
+const ORDRE_FIXE_DEBUT = ['handle'];
+const ORDRE_FIXE_FIN = ['del'];
+const ordreKey = () => `${colsKey()}:ordre`;
+
+function clesDuTableau() {
+  const cg = $grid && $grid.querySelector('colgroup');
+  return cg ? [...cg.children].map((c) => c.dataset.col) : [];
+}
+
+let ordreCols = null;   // null = l'ordre du gabarit
+
+function lireOrdreCols() {
+  const connues = clesDuTableau();
+  if (!connues.length) return null;
+  for (const cle of [ordreKey(), `${COLS_KEY}:ordre`]) {
+    try {
+      const brut = JSON.parse(localStorage.getItem(cle) || 'null');
+      if (!Array.isArray(brut)) continue;
+      // On repart des clés RÉELLES du tableau : un ordre enregistré sous une
+      // version précédente peut nommer une colonne qui n'existe plus, ou en
+      // oublier une nouvelle. Ce qu'il connaît donne le rang, le reste suit.
+      const garde = brut.filter((k) => connues.includes(k));
+      const manque = connues.filter((k) => !garde.includes(k));
+      return normaliserOrdre([...garde, ...manque]);
+    } catch (_) { /* stockage refusé ou illisible : on essaie la suivante */ }
+  }
+  return null;
+}
+
+// La poignée devant, les actions derrière, quoi qu'on ait enregistré.
+function normaliserOrdre(liste) {
+  const milieu = liste.filter((k) => !ORDRE_FIXE_DEBUT.includes(k) && !ORDRE_FIXE_FIN.includes(k));
+  return [...ORDRE_FIXE_DEBUT, ...milieu, ...ORDRE_FIXE_FIN];
+}
+
+const ordreVoulu = () => ordreCols || clesDuTableau();
+
+// LA MÊME PERMUTATION POUR LES TROIS RANGS. `append` déplace des nœuds
+// existants : on ne reconstruit rien, donc rien ne perd son focus ni son état.
+function permutationCols() {
+  const connues = clesDuTableau();
+  const voulu = ordreVoulu();
+  if (voulu.length !== connues.length) return null;
+  const perm = voulu.map((k) => connues.indexOf(k));
+  return perm.some((i) => i < 0) ? null : perm;
+}
+
+function rangerCellules(parent, perm) {
+  if (!parent) return;
+  const enfants = [...parent.children];
+  if (enfants.length !== perm.length) return;   // ligne d'un autre gabarit
+  parent.append(...perm.map((i) => enfants[i]));
+}
+
+function appliquerOrdreColonnes() {
+  if (!$grid) return;
+  const perm = permutationCols();
+  // L'identité (0,1,2…) ne demande aucun travail : c'est le cas le plus fréquent.
+  if (!perm || perm.every((v, i) => v === i)) return;
+  rangerCellules($grid.querySelector('colgroup'), perm);
+  rangerCellules($grid.querySelector('thead tr'), perm);
+  if ($rows) for (const tr of $rows.children) rangerCellules(tr, perm);
+}
+
+function poserOrdreCols(liste) {
+  ordreCols = normaliserOrdre(liste);
+  try { localStorage.setItem(ordreKey(), JSON.stringify(ordreCols)); } catch (_) { /* stockage refusé */ }
+  appliquerOrdreColonnes();
+  renderColbar();
+}
+
 function lireHiddenCols() {
   // On ne garde que des clés connues et jamais une colonne verrouillée : un
   // localStorage d'une version précédente ne doit pas pouvoir faire disparaître
@@ -7095,10 +7186,14 @@ document.addEventListener('olda:poste', () => {
   // colonnes n'ont pas bougé — les deux réglages sont indépendants.
   railDeplie = lireRailDeplie();
   renderSidebar();
-  const avant = [...hiddenCols].sort().join(',');
+  const avant = [...hiddenCols].sort().join(',') + '|' + (ordreCols || []).join(',');
   hiddenCols = lireHiddenCols();
-  if ([...hiddenCols].sort().join(',') === avant) return;
+  // L'ORDRE SUIT LA PERSONNE, comme le choix des colonnes : le chef d'atelier et
+  // la boutique se nomment tour à tour sur le même PC.
+  ordreCols = lireOrdreCols();
+  if ([...hiddenCols].sort().join(',') + '|' + (ordreCols || []).join(',') === avant) return;
   applyColVisibility();
+  appliquerOrdreColonnes();
   renderColbar();
   // Les lignes déjà montées portent le choix de la personne PRÉCÉDENTE : leur
   // signature ne dit rien du réglage, elle ne suit que la date de la commande.
@@ -7164,6 +7259,23 @@ function colbarItem(col) {
   label.textContent = col.label;
   btn.appendChild(label);
 
+  // ON DÉPLACE UNE COLONNE EN LA GLISSANT. Seules celles qui ONT une colonne :
+  // le feu et les faits de production vivent dans la cellule « Infos », il n'y
+  // a rien à ranger pour eux. Et seulement dans « Sur l'écran » — une colonne
+  // rangée n'a pas de rang.
+  const deplacable = !col.horsTableau && !hiddenCols.has(col.key)
+    && !ORDRE_FIXE_DEBUT.includes(col.key) && !ORDRE_FIXE_FIN.includes(col.key);
+  if (deplacable) {
+    btn.draggable = true;
+    btn.dataset.cle = col.key;
+    btn.classList.add('is-deplacable');
+    const grip = document.createElement('span');
+    grip.className = 'material-symbols-outlined colbar-item__grip';
+    grip.setAttribute('aria-hidden', 'true');
+    grip.textContent = 'drag_indicator';
+    btn.appendChild(grip);
+  }
+
   if (col.locked) {
     // `aria-disabled` plutôt que `disabled` : un bouton désactivé ne reçoit
     // plus d'événements de survol, donc l'infobulle qui EXPLIQUE pourquoi il
@@ -7206,8 +7318,19 @@ function renderColbar() {
   if (!$colbarOn || !$colbarOff) return;
   $colbarOn.replaceChildren();
   $colbarOff.replaceChildren();
+  // « SUR L'ÉCRAN » SE LIT DANS L'ORDRE DE L'ÉCRAN. Une liste qui ne montre pas
+  // l'ordre des colonnes ne peut pas servir à le changer — et c'est ici qu'on
+  // le change, pas sur l'en-tête : un en-tête porte déjà deux gestes (trier,
+  // régler la largeur), un troisième s'y marcherait dessus.
+  // Les colonnes SANS colonne (le feu, les faits de production) gardent l'ordre
+  // du rail : elles vivent dans la cellule « Infos », il n'y a rien à déplacer.
+  const rang = ordreVoulu();
+  const place = (c) => (c.horsTableau ? 900 : rang.indexOf(c.key));
+  const visibles = PLANNING_COLS.filter((c) => !hiddenCols.has(c.key))
+    .sort((a, b) => place(a) - place(b));
+  for (const col of visibles) $colbarOn.appendChild(colbarItem(col));
   for (const col of PLANNING_COLS) {
-    (hiddenCols.has(col.key) ? $colbarOff : $colbarOn).appendChild(colbarItem(col));
+    if (hiddenCols.has(col.key)) $colbarOff.appendChild(colbarItem(col));
   }
   const rien = hiddenCols.size === 0;
   $colbarOffLegend.hidden = rien;
@@ -7238,7 +7361,11 @@ function setColbarOpen(open, memoriser = true) {
 
 function initColbar() {
   if (!$colbar) return;
+  // L'ordre se lit ICI et pas plus tôt : il vient du <colgroup>, qui n'existe
+  // qu'une fois la page montée.
+  ordreCols = lireOrdreCols();
   applyColVisibility();
+  appliquerOrdreColonnes();
   renderColbar();
   // Le rail des colonnes coûte 208 px de largeur (ou, sur tablette, un panneau
   // posé sur la grille) : il ne s'ouvre de lui-même que sur un écran assez
@@ -7251,6 +7378,53 @@ function initColbar() {
   } catch (_) {}
   setColbarOpen(open, false);
   $colbarOpen.addEventListener('click', () => setColbarOpen($colbar.hidden));
+
+  // --- GLISSER POUR RANGER LES COLONNES ------------------------------------
+  // Le glisser-déposer NATIF : c'est lui qui donne l'image fantôme sous le
+  // curseur et la fluidité du système, sans une ligne de suivi de pointeur.
+  // Les écouteurs sont posés UNE FOIS sur la liste, pas sur chaque entrée —
+  // `renderColbar` la reconstruit à chaque changement, et des écouteurs par
+  // entrée disparaîtraient avec elle (ou s'empileraient).
+  let priseCle = null;
+  $colbarOn.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.colbar-item.is-deplacable');
+    if (!item) { e.preventDefault(); return; }
+    priseCle = item.dataset.cle;
+    item.classList.add('est-prise');
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox exige une donnée pour armer le glisser.
+    try { e.dataTransfer.setData('text/plain', priseCle); } catch (_) { /* refusé */ }
+  });
+  $colbarOn.addEventListener('dragend', () => {
+    priseCle = null;
+    $colbarOn.querySelectorAll('.est-prise, .est-cible').forEach((n) => {
+      n.classList.remove('est-prise', 'est-cible');
+    });
+  });
+  $colbarOn.addEventListener('dragover', (e) => {
+    if (!priseCle) return;
+    e.preventDefault();                       // sans ça, aucun dépôt n'est permis
+    e.dataTransfer.dropEffect = 'move';
+    const sur = e.target.closest('.colbar-item.is-deplacable');
+    $colbarOn.querySelectorAll('.est-cible').forEach((n) => n.classList.remove('est-cible'));
+    if (sur && sur.dataset.cle !== priseCle) sur.classList.add('est-cible');
+  });
+  $colbarOn.addEventListener('drop', (e) => {
+    if (!priseCle) return;
+    e.preventDefault();
+    const sur = e.target.closest('.colbar-item.is-deplacable');
+    if (!sur || sur.dataset.cle === priseCle) return;
+    const liste = ordreVoulu().filter((k) => k !== priseCle);
+    const i = liste.indexOf(sur.dataset.cle);
+    if (i < 0) return;
+    // On se pose AVANT ou APRÈS selon le côté par lequel on arrive : déposer
+    // sur la moitié basse d'une entrée veut dire « après elle ».
+    const r = sur.getBoundingClientRect();
+    const apres = e.clientY > r.top + r.height / 2;
+    liste.splice(apres ? i + 1 : i, 0, priseCle);
+    priseCle = null;
+    poserOrdreCols(liste);
+  });
   document.getElementById('colbarClose').addEventListener('click', () => setColbarOpen(false));
   // « Tout réafficher » ramène le tableau complet ; « Tout ranger » repose le
   // planning sur ses cartes épurées. Le même bouton, dans les deux sens : on ne

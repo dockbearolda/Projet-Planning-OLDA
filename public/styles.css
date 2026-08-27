@@ -2165,6 +2165,27 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* LA POIGNÉE DE RANGEMENT. Elle ne se montre qu'au survol de l'entrée : au
+   repos, la liste se lit ; sous la souris, elle se manipule. Elle garde sa
+   place — l'opacité, pas `display` — sinon l'intitulé se décale au survol. */
+.colbar-item__grip {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: var(--ic);
+  color: var(--text-2);
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.colbar-item.is-deplacable { cursor: grab; }
+.colbar-item.is-deplacable:hover .colbar-item__grip,
+.colbar-item.is-deplacable:focus-visible .colbar-item__grip { opacity: 1; }
+/* L'entrée qu'on tient s'efface : c'est l'image fantôme du système qui suit le
+   curseur, celle-ci ne fait que marquer d'où l'on part. */
+.colbar-item.est-prise { opacity: .4; cursor: grabbing; }
+/* OÙ ÇA VA SE POSER. Un trait plein sur le bord visé — pas un déplacement des
+   voisins : une liste qui s'ouvre et se referme sous le curseur donne une cible
+   qui bouge, et on lâche à côté. */
+.colbar-item.est-cible { box-shadow: inset 0 0 0 2px var(--primary); }
 
 /* Sur l'écran : liseré plein + coche. Retirée : pointillé et texte atténué —
    la différence se voit sans lire, même de loin. */
