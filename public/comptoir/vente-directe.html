@@ -574,7 +574,12 @@ input,select,textarea,button{font-family:inherit!important}
    et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
 button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
-input,select,textarea{border-radius:var(--arrondi-champ)!important}
+/* `:not(.faces__zone)` : le FOND d'une tasse est un DISQUE, et un
+   `!important` sur un sélecteur nu bat n'importe quelle classe — même
+   celle d'un composant partagé. Le fond se retrouvait carré, à l'endroit
+   précis où la forme dit de quel côté on marque. Même carve-out que le
+   bouton « revenir » juste au-dessus, pour la même raison. */
+input,select,textarea:not(.faces__zone){border-radius:var(--arrondi-champ)!important}
 
 
 .product-card,.client-result{border-radius:var(--arrondi-bloc)!important}

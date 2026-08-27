@@ -332,6 +332,39 @@ assert.strictEqual(tousLes(nTextile, 'tk__grille--zones').length, 1);
 assert.strictEqual(tousLes(nTextile, 'tk__aecrire').length, 0,
   'toutes ses largeurs sont connues : aucun trait à remplir');
 
+// TOUT ARTICLE N'A PAS DE RÉFÉRENCE, et le papier doit rester lisible sans.
+// Un textile en a une (elle sort du catalogue) ; une tasse, une gravure, un
+// besoin saisi à la main n'en ont pas — la vendeuse n'a rien à recopier. Le
+// papier affichait alors un tiret de 64 px : une BARRE NOIRE à l'endroit exact
+// où l'atelier cherche ce qu'il doit produire. C'est la DÉSIGNATION qui prend
+// la place — elle identifie la pièce, ce qu'un tiret ne fera jamais — et elle
+// cesse alors de se répéter deux centimètres plus bas.
+const PROD_TASSE = { ...TASSE.fiche.prod };
+const nSansRef = papierDe({ ...PROD_TASSE, ref: '' }, 24);
+const capsSansRef = tousLes(nSansRef, 'tk__cap').map((n) => n.textContent);
+assert.ok(capsSansRef.includes('ARTICLE'), 'l’intitulé dit ce que la case porte vraiment');
+assert.ok(!capsSansRef.includes('RÉFÉRENCE'),
+  'et il ne promet pas une référence qui n’existe pas');
+const geantSansRef = tousLes(nSansRef, 'tk__geant');
+assert.strictEqual(geantSansRef[0].textContent, 'Article',
+  'la désignation prend la place, jamais un tiret géant');
+assert.ok(geantSansRef[0].className.includes('tk__geant--texte'),
+  'une désignation est une phrase : elle prend le cran en dessous, sinon elle déborde');
+// La couleur, elle, reste : elle confirme qu'on a pris la bonne boîte. C'est la
+// DÉSIGNATION qui s'en va, puisqu'elle est déjà l'identité juste au-dessus.
+assert.strictEqual(tousLes(nSansRef, 'tk__ident-nom')[0].textContent,
+  'Noir (ext.) / Blanc (int.)',
+  'la ligne de confirmation garde la couleur et lâche la désignation devenue identité');
+
+// Avec une référence, rien ne bouge : c'est elle l'identité, et la désignation
+// reste la ligne qui confirme qu'on a pris la bonne boîte.
+const nAvecRef = papierDe(PROD_TASSE, 24);
+assert.ok(tousLes(nAvecRef, 'tk__cap').map((n) => n.textContent).includes('RÉFÉRENCE'));
+assert.strictEqual(tousLes(nAvecRef, 'tk__geant')[0].textContent, 'TC 06');
+assert.strictEqual(tousLes(nAvecRef, 'tk__geant')[0].className, 'tk__geant',
+  'une référence tient en six signes : elle garde le plus grand corps');
+assert.strictEqual(tousLes(nAvecRef, 'tk__ident-nom').length, 1);
+
 // UNE TASSE : une seule grille. « Taille unique » n'ouvre AUCUNE colonne — elle
 // occuperait toute une case pour ne rien apprendre, la quantité est déjà écrite
 // en 64 px juste au-dessus. Restent les trois faces, chacune avec son trait.

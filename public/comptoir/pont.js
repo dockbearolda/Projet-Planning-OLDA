@@ -2174,93 +2174,161 @@ document.addEventListener('pointerdown',ev=>{
 })();
 
 /* ===========================================================================
-   LA TASSE — TROIS FACES SUR LESQUELLES ON ÉCRIT (26/08/2026)
+   LES FACES D'UN ARTICLE — LA VENDEUSE ÉCRIT DESSUS (26/08/2026)
    ===========================================================================
    Charlie : « une tasse y'a 2 faces et le cul de la tasse, ce qui fait
-   3 faces ; l'idée est d'avoir une carte adaptée à chaque article ».
+   3 faces » — puis « du mug au couteau à graver, une carte adaptée à chaque
+   article ».
 
-   Une tasse n'a pas de TAILLES, elle a des EMPLACEMENTS. Jusqu'ici la vendeuse
-   décrivait les trois zones dans le pavé « Informations importantes », et
-   l'atelier lisait un paragraphe au lieu d'une carte — c'est le fond qu'on
-   oublie, et un fond oublié c'est une tasse à refaire.
+   Un objet n'a pas de TAILLES, il a des EMPLACEMENTS. Jusqu'ici la vendeuse
+   décrivait ses zones dans le pavé « Informations importantes », et l'atelier
+   lisait un paragraphe au lieu d'une carte — c'est le fond qu'on oublie, et un
+   fond oublié c'est une tasse à refaire.
 
-   ELLE ÉCRIT SUR LA FACE. Pas dans un champ qui porte le nom de la face : sur
-   la face elle-même. Le dessin fait le travail de l'intitulé.
+   LES FACES VIENNENT DU TABLEAU DES TAILLES DE LOGO, pas d'ici. Chaque famille
+   y déclare les siennes (Réglages → Tailles de logo) : c'est déjà là que vit
+   « un tote bag a deux faces, une casquette une seule ». Une famille créée
+   demain marchera donc au comptoir le jour où elle est créée, sans qu'on
+   revienne dans ce fichier — et une famille sans faces n'affiche rien, ce qui
+   est exactement le comportement d'avant.
 
-   PAS DE MILLIMÈTRES ICI. Au comptoir on sait QUOI mettre, pas COMBIEN de mm —
+   PAS DE MILLIMÈTRES ICI. Au comptoir on sait QUOI marquer, pas COMBIEN de mm —
    c'est l'atelier qui mesure, et le ticket sort déjà un trait pour l'écrire.
    Demander une largeur au comptoir, c'est obtenir un chiffre inventé.
    ======================================================================== */
-const TASSE_FACES = [
-  { cle: 'avant',   nom: 'Face avant',   aide: 'Logo, texte, photo…' },
-  { cle: 'arriere', nom: 'Face arrière', aide: 'Rien si vierge' },
-  { cle: 'fond',    nom: 'Fond',         aide: 'Souvent le logo OLDA' },
-];
 
-/* Pose les trois faces dans `hote` et renvoie de quoi les relire.
-   `valeurs` : { avant, arriere, fond } — ce qui était déjà saisi.
-   `auChangement` : appelé à chaque frappe avec l'objet complet. */
-function tasseFaces(hote, valeurs, auChangement) {
-  const etat = { avant: '', arriere: '', fond: '', ...(valeurs || {}) };
+/* La clé d'une face : son nom réduit, sans accent ni article. Elle ne sert qu'à
+   deux choses — retrouver une valeur déjà saisie quand le tableau a été
+   retouché entre-temps, et donner sa forme au dessin (le fond est un disque).
+   Ce n'est JAMAIS elle qui part en production : c'est le nom, tel qu'il est
+   écrit dans le tableau, que l'atelier lira sur le papier. */
+function cleDeFace(nom) {
+  return String(nom == null ? '' : nom).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/^(face|cote|coté)\s+/, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+/* LA SEULE FAMILLE DESSINÉE. Le dessin de la tasse (deux parois, une anse, un
+   disque) se reconnaît sans être lu, et c'est ce qui empêche d'écrire au
+   mauvais endroit. Les autres familles prennent la grille nue, qui suffit.
+   Comparaison sur le nom réduit : « Tasses céramique 350 ml » marche aussi. */
+const FACES_DESSIN = { 'tasse-ceramique-350-ml': 'tasse' };
+function dessinDeFamille(famille) {
+  // Le nom réduit MOT À MOT, pluriel compris : le tableau des tailles de logo
+  // et le catalogue ne se sont jamais mis d'accord sur les pluriels
+  // (« Pochette » / « Pochettes »), et l'atelier écrit les deux.
+  const cle = String(famille == null ? '' : famille).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/[^a-z0-9]+/).filter(Boolean)
+    .map((mot) => mot.replace(/s$/, ''))
+    .join('-');
+  return FACES_DESSIN[cle] || '';
+}
+
+/* Ce qui se lit en filigrane dans une face vide. Un texte d'aide par NOM de
+   face quand on en connaît un, sinon la même invitation pour toutes : ce qu'on
+   attend est le contenu à marquer, jamais une dimension. */
+const FACES_AIDE = {
+  avant: 'Logo, texte, photo…',
+  arriere: 'Rien si vierge',
+  fond: 'Souvent le logo OLDA',
+};
+const FACES_AIDE_DEFAUT = 'Ce qu’on marque ici';
+
+/* Pose les faces dans `hote` et renvoie de quoi les relire.
+   `faces`   : les noms déclarés par la famille — ['Face avant', 'Fond', …].
+   `valeurs` : ce qui était déjà saisi, par nom de face.
+   `auChangement` : appelé à chaque frappe avec l'objet complet.
+   `dessin`  : '' ou 'tasse'. */
+function facesArticle(hote, faces, valeurs, auChangement, dessin) {
+  const noms = (Array.isArray(faces) ? faces : [])
+    .map((f) => String(f == null ? '' : f).trim()).filter(Boolean);
+  const etat = {};
+  /* On reprend une valeur par son NOM, et à défaut par sa clé : renommer
+     « Fond » en « Dessous » dans le tableau ne doit pas effacer ce que la
+     vendeuse venait d'écrire dessus. */
+  const parCle = {};
+  for (const [k, v] of Object.entries(valeurs || {})) parCle[cleDeFace(k)] = v;
+  for (const nom of noms) {
+    const v = (valeurs || {})[nom];
+    etat[nom] = String((v === undefined ? parCle[cleDeFace(nom)] : v) || '');
+  }
+
   const boite = document.createElement('div');
-  boite.className = 'tasse';
+  boite.className = 'faces' + (dessin ? ' faces--' + dessin : '');
 
-  for (const f of TASSE_FACES) {
+  for (const nom of noms) {
+    const cle = cleDeFace(nom);
     const face = document.createElement('div');
-    face.className = 'tasse__face tasse__face--' + f.cle;
+    face.className = 'faces__face faces__face--' + (cle || 'x');
 
-    const nom = document.createElement('label');
-    nom.className = 'tasse__nom';
-    nom.textContent = f.nom;
+    const etiquette = document.createElement('label');
+    etiquette.className = 'faces__nom';
+    etiquette.textContent = nom;
 
     const zone = document.createElement('textarea');
-    zone.className = 'tasse__zone';
-    zone.value = etat[f.cle];
-    zone.placeholder = f.aide;
+    zone.className = 'faces__zone';
+    zone.value = etat[nom];
+    zone.placeholder = FACES_AIDE[cle] || FACES_AIDE_DEFAUT;
     /* La vendeuse est à la SOURIS pour naviguer et au CLAVIER pour écrire
        (Charlie, 26/08). Donc : rien à intercepter. Un textarea nu garde le
        copier/coller, le Ctrl+A, la sélection et l'annulation du navigateur —
        tout ce qu'elle utilise réellement. Poser un raccourci ici, c'est en
        casser un qu'elle connaît déjà. */
     zone.addEventListener('input', () => {
-      etat[f.cle] = zone.value;
+      etat[nom] = zone.value;
       if (auChangement) auChangement({ ...etat });
     });
 
-    const id = 'tasse-' + f.cle + '-' + Math.random().toString(36).slice(2, 8);
+    const id = 'face-' + (cle || 'x') + '-' + Math.random().toString(36).slice(2, 8);
     zone.id = id;
-    nom.setAttribute('for', id);
+    etiquette.setAttribute('for', id);
 
-    face.append(nom, zone);
-    /* L'anse ne se pose que sur la face avant : c'est elle qui dit de quel
-       côté on regarde la tasse. */
-    if (f.cle === 'avant') {
+    face.append(etiquette, zone);
+    /* L'anse ne se pose que sur la face avant d'une tasse : c'est elle qui dit
+       de quel côté on regarde. */
+    if (dessin === 'tasse' && cle === 'avant') {
       const anse = document.createElement('span');
-      anse.className = 'tasse__anse';
+      anse.className = 'faces__anse';
       anse.setAttribute('aria-hidden', 'true');
       face.appendChild(anse);
     }
     boite.appendChild(face);
   }
 
-  /* UNE BASCULE = UN MOUVEMENT : on ne vide jamais avant d'avoir de quoi
-     remplacer. Le contenu sortant reste jusqu'à ce que le nouveau soit prêt. */
+  /* UNE BASCULE = UN MOUVEMENT : on ne vide jamais un conteneur avant d'avoir
+     de quoi le remplacer. Le contenu sortant reste jusqu'à ce que le nouveau
+     soit prêt — d'où la construction complète AVANT la pose. */
   hote.replaceChildren(boite);
   return { lire: () => ({ ...etat }) };
 }
 
-/* CE QUE LA TASSE DONNE À LA FICHE DE PRODUCTION. Chaque face écrite devient
+/* CE QUE LES FACES DONNENT À LA FICHE DE PRODUCTION. Chaque face écrite devient
    une ZONE du ticket — même sans mesure : le papier sort alors un trait pour
    l'écrire à l'établi. Une face laissée vide n'est pas une zone : on ne marque
    rien dessus, et une carte vide sur le papier finit par être remplie de
    n'importe quoi. */
-function tasseVersZones(valeurs) {
+function zonesDepuisFaces(faces, valeurs) {
   const v = valeurs || {};
-  return TASSE_FACES
-    .filter((f) => String(v[f.cle] || '').trim())
-    .map((f) => ({ face: f.nom, mm: '', quoi: String(v[f.cle]).trim() }));
+  return (Array.isArray(faces) ? faces : [])
+    .map((f) => String(f == null ? '' : f).trim())
+    .filter((nom) => nom && String(v[nom] || '').trim())
+    .map((nom) => ({ face: nom, mm: '', quoi: String(v[nom]).trim() }));
 }
 
-window.tasseFaces = tasseFaces;
-window.tasseVersZones = tasseVersZones;
-window.TASSE_FACES = TASSE_FACES;
+/* Et le chemin inverse, pour rouvrir un article déjà saisi : une ligne relue
+   doit se relire à l'identique, y compris ses faces. */
+function valeursDepuisZones(zones) {
+  const out = {};
+  for (const z of Array.isArray(zones) ? zones : []) {
+    if (z && z.face) out[String(z.face)] = String(z.quoi || '');
+  }
+  return out;
+}
+
+window.facesArticle = facesArticle;
+window.zonesDepuisFaces = zonesDepuisFaces;
+window.valeursDepuisZones = valeursDepuisZones;
+window.dessinDeFamille = dessinDeFamille;
+window.cleDeFace = cleDeFace;

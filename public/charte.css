@@ -970,47 +970,50 @@ html[data-theme="dark"] .ecran-comptoir {
 body.a-connecter { overflow: hidden; }
 
 /* ===========================================================================
-   LA TASSE — TROIS FACES SUR LESQUELLES ON ÉCRIT (26/08/2026)
+   LES FACES D'UN ARTICLE — ON ÉCRIT DESSUS (26/08/2026)
    ===========================================================================
    Charlie : « une tasse y'a 2 faces et le cul de la tasse, ce qui fait
-   3 faces ». Une tasse n'a pas de tailles : elle a des EMPLACEMENTS. Lui
-   présenter la grille du textile obligeait la vendeuse à décrire trois zones
+   3 faces » — puis « du mug au couteau à graver, une carte adaptée à chaque
+   article ». Un objet n'a pas de tailles : il a des EMPLACEMENTS. Lui
+   présenter la grille du textile obligeait la vendeuse à décrire ses zones
    dans un pavé de commentaire, et l'atelier lisait un paragraphe au lieu
    d'une carte.
 
-   ELLE ÉCRIT SUR LA FACE, PAS DANS UN CHAMP QUI PORTE SON NOM. Le dessin fait
-   le travail de l'intitulé : deux parois et un disque se reconnaissent sans
-   être lus, et on ne se trompe pas de zone.
+   LES FACES VIENNENT DU TABLEAU, PAS DU CODE. Chaque famille déclare les
+   siennes dans Réglages → Tailles de logo : une tasse en a trois, un couteau
+   deux, une plaque une seule. Le composant les rend telles qu'elles sont
+   déclarées — c'est ce qui fait qu'une famille nouvelle marche le jour où on
+   la crée, sans toucher à cet écran.
 
-   LE FOND EST UN DISQUE. C'est la seule forme du système qui vaut ici : le cul
-   d'une tasse est rond, et le dessiner carré est exactement ce qui fait écrire
-   au mauvais endroit. La règle « rond = une icône seule » parle des rôles
-   d'interface ; ici le rond n'est pas un rôle, c'est la pièce.
+   ELLE ÉCRIT SUR LA FACE, PAS DANS UN CHAMP QUI PORTE SON NOM. Le dessin fait
+   le travail de l'intitulé, et on ne se trompe pas de zone.
 
    AUCUNE COULEUR : ni le corps, ni l'anse, ni les faces. La couleur dit un
-   état — et une tasse n'est pas un état. Le seul moment où une teinte entre,
+   état — et une face n'est pas un état. Le seul moment où une teinte entre,
    c'est le focus, qui est bien un état.
    ======================================================================== */
-.tasse {
+.faces {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  /* Une, deux ou six faces : les colonnes se posent d'elles-mêmes. Un nombre
+     de colonnes écrit en dur donnerait une face étirée sur toute la largeur
+     quand la famille n'en déclare qu'une. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--pas-4);
   align-items: start;
 }
-/* La paroi déroulée : deux rectangles, comme si on avait ouvert la tasse. */
-.tasse__face {
+.faces__face {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--pas-1);
   min-width: 0;
 }
-.tasse__nom {
+.faces__nom {
   font-size: var(--taille-note);
   font-weight: 600;
   color: var(--text-2);
 }
-.tasse__zone {
+.faces__zone {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -1025,16 +1028,33 @@ body.a-connecter { overflow: hidden; }
   resize: none;
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.tasse__zone::placeholder { color: var(--text-3); }
-.tasse__zone:focus {
+.faces__zone::placeholder { color: var(--text-3); }
+.faces__zone:focus {
   outline: none;
   background: var(--field-focus);
   border-color: var(--text-1);
 }
+
+/* LA TASSE, telle qu'on la reconnaît : deux parois déroulées et un disque.
+   C'est la SEULE famille dessinée, et c'est justifié — le fond d'une tasse
+   est ce qu'on oublie, et un fond oublié c'est une tasse à refaire. Toute
+   autre famille prend la grille nue au-dessus, qui suffit. */
+/* La tasse ne force PAS ses trois faces sur une ligne. Mesuré dans la colonne
+   de saisie du comptoir : à trois colonnes imposées, une paroi tombait à
+   106 px et « Logo Coco Beach + Depuis 1998 » y était coupée. Une paroi trop
+   étroite pour la phrase qu'on y écrit est pire qu'une tasse qui se déroule
+   sur deux lignes — on écrit dans le pavé de commentaire, et on est revenu au
+   point de départ. Les colonnes se posent donc comme partout ailleurs. */
 /* L'ANSE, à droite de la face avant : c'est elle qui fait lire « tasse » d'un
    coup d'œil, et elle dit de quel côté on regarde. Un trait, pas un dessin. */
-.tasse__face--avant .tasse__zone { border-right-width: 3px; }
-.tasse__anse {
+/* L'anse déborde la face de sa propre largeur : la tasse lui réserve donc
+   cette largeur à droite. Sans ça, sur une colonne étroite — la tasse déroulée
+   en une seule colonne — elle sortait de la carte et se faisait couper au bord.
+   Mesuré : elle tombe pile dans l'écart entre deux faces quand elles sont
+   côte à côte, donc rien ne bouge dans le cas courant. */
+.faces--tasse { padding-right: var(--pas-3); }
+.faces--tasse .faces__face--avant .faces__zone { border-right-width: 3px; }
+.faces__anse {
   position: absolute;
   right: calc(var(--pas-3) * -1);
   top: calc(var(--taille-note) + var(--pas-1) + var(--ctrl-h) * .85);
@@ -1045,10 +1065,14 @@ body.a-connecter { overflow: hidden; }
   border-radius: 0 999px 999px 0;
   pointer-events: none;
 }
-/* LE FOND : un disque. Il porte moins de texte que les parois — on y met une
-   mention, pas une composition — donc il est plus petit, et c'est juste. */
-.tasse__face--fond { align-items: center; }
-.tasse__face--fond .tasse__zone {
+/* LE FOND EST UN DISQUE. C'est la seule forme du système qui vaut ici : le cul
+   d'une tasse est rond, et le dessiner carré est exactement ce qui fait écrire
+   au mauvais endroit. La règle « rond = une icône seule » parle des rôles
+   d'interface ; ici le rond n'est pas un rôle, c'est la pièce.
+   Il porte moins de texte que les parois — on y met une mention, pas une
+   composition — donc il est plus petit, et c'est juste. */
+.faces--tasse .faces__face--fond { align-items: center; }
+.faces--tasse .faces__face--fond .faces__zone {
   width: calc(var(--ctrl-h) * 2.4);
   height: calc(var(--ctrl-h) * 2.4);
   min-height: 0;

@@ -185,12 +185,24 @@ function marquageProd(p) {
 // cherche du regard sur une pile de tickets — elles ont leur propre taille.
 function identiteProd(p, a) {
   const qte = texte(a && a.qte);
+  const designation = texte(a && a.designation);
+  // TOUT ARTICLE N'A PAS DE RÉFÉRENCE. Un textile en a une (elle sort du
+  // catalogue) ; une tasse, une gravure, un besoin saisi à la main n'en ont
+  // pas — la vendeuse n'a rien à recopier. Le papier affichait alors un tiret
+  // de 64 px, c'est-à-dire une barre noire là où l'atelier cherche ce qu'il
+  // doit produire. C'est donc la DÉSIGNATION qui prend la place : elle
+  // identifie la pièce, ce qu'un tiret ne fera jamais.
+  const parRef = Boolean(p.ref);
   return {
-    ref: p.ref,
+    cle: parRef ? 'RÉFÉRENCE' : 'ARTICLE',
+    parRef,
+    ref: parRef ? p.ref : designation,
     qte: qte ? `${qte} pièce${Number(qte) > 1 ? 's' : ''}` : '',
-    // La couleur du textile et la désignation CONFIRMENT qu'on a pris la bonne
-    // boîte : on les lit une fois, après avoir trouvé la référence.
-    nom: [p.couleur, texte(a && a.designation)].filter(Boolean).join(' · '),
+    // La couleur et la désignation CONFIRMENT qu'on a pris la bonne boîte : on
+    // les lit une fois, après avoir trouvé la référence. Quand la désignation
+    // EST déjà l'identité, elle ne se répète pas deux centimètres plus bas —
+    // la carte ne dit pas deux fois la même chose.
+    nom: [p.couleur, parRef ? designation : ''].filter(Boolean).join(' · '),
   };
 }
 
@@ -397,6 +409,12 @@ export const CSS_TICKET = `
   .tk__ident-col--d { align-items: flex-end; }
   .tk__geant { font-size: var(--tk-geant); font-weight: 800; letter-spacing: -.045em;
                line-height: .95; overflow-wrap: anywhere; }
+  /* ATTENTION : aucun accent grave ici, il fermerait le gabarit.
+     Une DESIGNATION prend la place de la reference quand l'article n'en a pas
+     (tasse, gravure, besoin saisi a la main). C'est une phrase, pas un code de
+     six signes : a 64 px elle deborde la colonne. Elle prend le cran en
+     dessous, qui reste le plus gros caractere de la feuille apres le nombre. */
+  .tk__geant--texte { font-size: var(--tk-titre); line-height: 1.02; }
   .tk__ident-qte { display: flex; align-items: baseline; gap: 8px; line-height: .95; }
   .tk__ident-unite { font-size: var(--tk-fort); font-weight: 500; color: var(--tk-ardoise); }
   .tk__ident-nom { margin: 0; padding: 0 28px 18px; font-size: var(--tk-fort); font-weight: 700;
@@ -658,7 +676,13 @@ export function dessinerTicket(t, doc, editeur) {
     const boite = el('div', 'tk__ident');
     const tete2 = el('div', 'tk__ident-tete');
     const cg = el('div', 'tk__ident-col');
-    cg.append(cap('RÉFÉRENCE'), el('div', 'tk__geant', id.ref || '—'));
+    // Une désignation est une PHRASE, pas un code de six signes : à 64 px elle
+    // déborde. Elle prend donc le cran en dessous, qui reste le plus gros
+    // caractère de la feuille après la quantité.
+    const identite = el('div', 'tk__geant' + (id.parRef ? '' : ' tk__geant--texte'));
+    if (!id.parRef && editeur) identite.append(val('designation', a.designation, a.ou && a.ou.designation));
+    else identite.textContent = id.ref || '—';
+    cg.append(cap(id.cle), identite);
     const cd = el('div', 'tk__ident-col tk__ident-col--d');
     const q = el('div', 'tk__ident-qte');
     if (editeur) {
@@ -675,7 +699,7 @@ export function dessinerTicket(t, doc, editeur) {
 
     // La couleur de l'article et sa désignation CONFIRMENT qu'on a pris la
     // bonne boîte : on les lit une fois, après avoir trouvé la référence.
-    if (editeur) {
+    if (editeur && id.parRef) {
       const nom = el('p', 'tk__ident-nom');
       if (p.couleur) nom.append(el('span', null, p.couleur + ' · '));
       nom.append(val('designation', a.designation, a.ou && a.ou.designation));

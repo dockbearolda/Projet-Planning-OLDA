@@ -259,7 +259,12 @@ header p{color:var(--text-2)!important}
    et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
 button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
-input,select,textarea{border-radius:var(--arrondi-champ)!important}
+/* `:not(.faces__zone)` : le FOND d'une tasse est un DISQUE, et un
+   `!important` sur un sélecteur nu bat n'importe quelle classe — même
+   celle d'un composant partagé. Le fond se retrouvait carré, à l'endroit
+   précis où la forme dit de quel côté on marque. Même carve-out que le
+   bouton « revenir » juste au-dessus, pour la même raison. */
+input,select,textarea:not(.faces__zone){border-radius:var(--arrondi-champ)!important}
 .priority-card{border-radius:var(--arrondi-bloc)!important}
 </style>
 
@@ -916,7 +921,9 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
+<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><!-- CE QU'ON MARQUE, FACE PAR FACE. Vide et masqué tant que la catégorie
+     choisie ne déclare pas de faces : une famille sans faces garde
+     exactement l'écran d'avant. --><div class="field hidden" id="needFacesWrap"><label id="needFacesLabel">Ce qu’on marque, face par face</label><div id="needFacesHote" role="group" aria-labelledby="needFacesLabel"></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
      coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
@@ -1559,7 +1566,7 @@ function poserDateChoisie(){
   if(iso)$('desiredDelay').value='custom';
   menuRafraichir($('desiredDelay'));
 }
-$('desiredDate').addEventListener('change',poserDateChoisie);function toggleNewProjectGoal(){$('newProjectGoal').classList.toggle('hidden',$('projectGoal').value!=='__new__');if($('projectGoal').value==='__new__')$('newProjectGoal').focus();updateSidebar()}function projectGoalValue(){return $('projectGoal').value==='__new__'?$('newProjectGoal').value.trim():$('projectGoal').value}function selectedNeedCategory(){return $('needCategory').value==='__new__'?$('newCategory').value.trim():$('needCategory').value}function toggleNewCategory(){$('newCategory').classList.toggle('hidden',$('needCategory').value!=='__new__');if($('needCategory').value==='__new__')$('newCategory').focus()}function choisirTypeBesoin(type){const textile=type==='textile';
+$('desiredDate').addEventListener('change',poserDateChoisie);function toggleNewProjectGoal(){$('newProjectGoal').classList.toggle('hidden',$('projectGoal').value!=='__new__');if($('projectGoal').value==='__new__')$('newProjectGoal').focus();updateSidebar()}function projectGoalValue(){return $('projectGoal').value==='__new__'?$('newProjectGoal').value.trim():$('projectGoal').value}function selectedNeedCategory(){return $('needCategory').value==='__new__'?$('newCategory').value.trim():$('needCategory').value}function toggleNewCategory(){$('newCategory').classList.toggle('hidden',$('needCategory').value!=='__new__');if($('needCategory').value==='__new__')$('newCategory').focus();renderNeedFaces()}function choisirTypeBesoin(type){const textile=type==='textile';
 /* Une modification en cours ne doit pas rester dans un formulaire qu'on masque :
    on la rend à son besoin d'origine avant de basculer, sinon « Enregistrer la
    modification » reviendrait plus tard sur un besoin qu'on croyait reposé. */
@@ -1709,9 +1716,9 @@ function basculerSaisieManuelle(force){
 }
 
 /* /CATALOGUE-COMPTOIR */
-function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
-function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
-function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
+function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),zones:zonesDuBesoin(category),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
+function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';needFaces=typeof window.valeursDepuisZones==='function'?window.valeursDepuisZones(n.zones):{};renderNeedFaces(true);poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
+function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
    détail d'un AUTRE article, et le volet négocierait sur celui d'à côté. */
 /* UN INDEX D'ÉDITION EST UN INDEX DANS `needs` (25/08/2026). Il se décale
@@ -2027,6 +2034,7 @@ function txLoadTaillesLogo(){
     txLogoIndexer();
     TX_LOGO_ETAT=Object.keys(TX_LOGO_INDEX).length?'ok':'vide';
     txRenderLogo(true);
+    renderNeedFaces(true);
   }).catch(()=>{
     /* Le champ reste et se saisit à la main — mais on ne fera porter le
        chapeau à aucune référence. */
@@ -2721,6 +2729,50 @@ function txComment(d){
    marquée avec sa largeur de logo — et c'est le planning, pas le comptoir, qui
    décide de leur mise en forme. On les envoie donc DÉCOUPÉS.
    Ce qui n'est pas saisi n'est pas envoyé : une case vide ne s'affiche pas. */
+/* ===========================================================================
+   LES FACES DE L'ARTICLE — CE QU'ON MARQUE, PAS COMBIEN DE MILLIMÈTRES
+   ===========================================================================
+   Charlie, 26/08 : « du mug au couteau à graver, une carte adaptée à chaque
+   article » — et « dessus c'est pas des mm mais des noms de logo, des phrases,
+   elle me dit quoi graver ».
+
+   LES FACES VIENNENT DE LA FAMILLE, jamais d'une liste écrite ici. Le tableau
+   des tailles de logo dit déjà qu'un tote bag a deux faces et une casquette
+   une seule : c'est la même déclaration qui sert. Une famille qui n'en déclare
+   aucune n'affiche rien — l'écran reste celui d'avant, au pixel près. */
+let needFaces={};              /* ce qui est écrit, par NOM de face */
+let needFacesSignature='';     /* la grille ne se reconstruit que si elle change */
+function facesDeLaCategorie(cat){
+  const cle=txLogoCle(cat);
+  if(!cle)return[];
+  const f=((TX_LOGO&&TX_LOGO.familles)||[]).find(x=>txLogoCle(x.nom)===cle);
+  return f&&Array.isArray(f.faces)?f.faces:[];
+}
+/* On ne reconstruit QUE si la liste des faces change. Reposer le composant à
+   chaque passage reprendrait le champ sous les doigts de la vendeuse : le
+   curseur saute, et la fin de la phrase se perd. */
+function renderNeedFaces(force){
+  const wrap=$('needFacesWrap'),hote=$('needFacesHote');
+  if(!wrap||!hote)return;
+  /* pont.js est chargé APRÈS ce script : tant qu'il n'est pas là, on ne montre
+     pas une boîte qu'on ne saurait pas remplir. */
+  if(typeof window.facesArticle!=='function'){wrap.classList.add('hidden');return}
+  const cat=selectedNeedCategory();
+  const faces=facesDeLaCategorie(cat);
+  wrap.classList.toggle('hidden',!faces.length);
+  if(!faces.length){needFacesSignature='';return}
+  const dessin=typeof window.dessinDeFamille==='function'?window.dessinDeFamille(cat):'';
+  const sig=faces.join('|')+'§'+dessin;
+  if(!force&&sig===needFacesSignature)return;
+  needFacesSignature=sig;
+  window.facesArticle(hote,faces,needFaces,v=>{needFaces=v},dessin);
+}
+function zonesDuBesoin(category){
+  return typeof window.zonesDepuisFaces==='function'
+    ?window.zonesDepuisFaces(facesDeLaCategorie(category),needFaces):[];
+}
+window.renderNeedFaces=renderNeedFaces;
+
 function prodDuBesoin(n){
   const prod={
     ref:String((n&&n.requestedRef)||'').trim(),
@@ -2732,6 +2784,11 @@ function prodDuBesoin(n){
     encre:'',
     tailles:[],logos:[]
   };
+  /* UNE ZONE PORTE UNE CONSIGNE. Sur un textile la largeur vient du tableau et
+     suffit ; sur une tasse ou une gravure, ce qui compte est CE QU'ON MARQUE —
+     la mesure, elle, se prend à l'établi. Le ticket sort alors un trait. */
+  for(const z of (Array.isArray(n&&n.zones)?n.zones:[]))
+    if(z&&z.face)prod.logos.push({face:String(z.face),mm:'',quoi:String(z.quoi||'')});
   const t=n&&n.textile;
   if(!t)return prod;
   prod.encre=String(t.markColor||'').trim();

@@ -379,6 +379,9 @@ async function init() {
   // Tailles de logo : l'instantané livré avec le code, si la base n'en a pas.
   await semerTaillesLogo();
 
+  // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
+  await semerFacesTasse();
+
   // Identifiant lisible pour les fiches qui n'en ont pas — après l'import, pour
   // que les clients rapatriés en reçoivent un eux aussi.
   await rattraperCodesClients();
@@ -1927,6 +1930,45 @@ async function semerTaillesLogo() {
   const propre = nettoyerTaillesLogo(brut);
   if (!propre.familles.length) return;
   await poserMeta('tailles_logo', JSON.stringify(propre));
+}
+
+// LES FACES DE LA TASSE ENTRENT AU TABLEAU (27/08/2026).
+//
+// Charlie : « une tasse y'a 2 faces et le cul de la tasse, ce qui fait
+// 3 faces ». Le comptoir affiche les faces qu'une famille DÉCLARE — c'est ce
+// qui fait qu'un couteau à graver marchera le jour où on lui en déclare. La
+// tasse, elle, est déjà vendue tous les jours : elle arrive avec le code.
+//
+// L'INSTANTANÉ NE SUFFIT PAS. `semerTaillesLogo` ne parle qu'à une base NEUVE
+// (sa garde est la présence de la clé) : en production la clé est là depuis le
+// 26/08, l'instantané n'y passera donc plus jamais. D'où cette migration, et sa
+// PROPRE garde — deux incidents réels sont venus d'une garde partagée.
+//
+// Elle AJOUTE, elle n'écrase pas : si la famille existe déjà avec ses faces,
+// rien ne bouge. Une famille que l'atelier aurait renommée n'est pas retrouvée
+// et on en crée une seconde — c'est visible dans l'écran des tailles de logo,
+// et réparable d'un clic, là où écraser une déclaration ne se voit pas.
+// Down : DELETE FROM app_meta WHERE key = 'faces_tasse';
+//        puis retirer la famille depuis Réglages → Tailles de logo.
+const TASSE_FAMILLE = 'Tasse céramique 350 ml';
+const TASSE_FACES = ['Face avant', 'Face arrière', 'Fond'];
+async function semerFacesTasse() {
+  const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_tasse'");
+  if (rows.length) return;
+  await ecrireTaillesLogo(async (table) => {
+    const f = table.familles.find((x) => x.nom === TASSE_FAMILLE);
+    if (f) {
+      for (const face of TASSE_FACES) if (!f.faces.includes(face)) f.faces.push(face);
+    } else {
+      // UNE TAILLE, parce que le tableau en exige une pour retenir une mesure —
+      // et une tasse n'en a qu'une. Ce sont les FACES qui portent le travail.
+      table.familles.push({
+        nom: TASSE_FAMILLE, tailles: ['Taille unique'],
+        faces: [...TASSE_FACES], references: [], refs: {},
+      });
+    }
+  });
+  await poserMeta('faces_tasse', '1');
 }
 
 // --- Étapes rangées à la main (ordre manuel) ---------------------------------
