@@ -1087,7 +1087,34 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    l'ensemble se lise comme UNE grille de cinq lignes et non comme deux blocs.
    Sur un dossier sans fiche de production (une demande pas encore chiffrée),
    la rangée existe seule et retrouve alors sa marge. */
-.feu { margin-top: 6px; }
+/* LA BANDE. « Il faut qu'il soit bien visible. Quelque chose de haut de gamme
+   et de discret » (Charlie, 26/08) — puis, le 27/08 : « ça doit être
+   parfaitement lisible ». Les deux tiennent ensemble si la couleur porte
+   l'ÉTAT et rien d'autre : un fond d'alerte et un trait à gauche, aucun glyphe,
+   aucun mot en plus. La rangée n'existe que quand quelque chose manque, donc
+   sur une file de trente dossiers l'œil ne trouve que ceux qui coincent.
+
+   LE TEXTE NE BOUGE PAS D'UN PIXEL : la bande déborde de 10 px de chaque côté
+   (marge négative) et les reprend en rembourrage. Les intitulés des cinq
+   rangées — RÉF., MARQUAGE, TAILLES, LOGOS, MANQUE — restent donc alignés sur
+   une seule colonne, ce qui était tout l'intérêt d'emprunter cette grille. */
+.feu {
+  margin-top: var(--pas-1);
+  margin-inline: calc(var(--pas-2) * -1);
+  padding: var(--pas-1) var(--pas-2);
+  border-radius: var(--arrondi-champ);
+  background: var(--danger-bg);
+  /* `box-shadow` et non `border-left` : un trait de bordure décalerait la
+     grille de trois pixels, et les cinq intitulés ne s'aligneraient plus. */
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+/* Le nombre de jours, pas le mot : c'est lui qui décide si on relance
+   aujourd'hui. Une taille en dessous — il précise, il ne s'annonce pas. */
+.feu__depuis {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--text-2);
+}
 /* LE PAS VERTICAL DOIT ÊTRE LE MÊME d'une rangée à l'autre, sinon les cinq
    lignes ne se lisent plus comme une seule grille. `.prod-fiche` sépare ses
    rangées de 3 px (son `row-gap`) : le raccord entre les deux blocs reprend

@@ -70,14 +70,16 @@ console.log('✓ feu : les exigences s’arment seules — devis, BAT, argent');
 const bloc = APP.slice(APP.indexOf('const FEU_FAITS = ['), APP.indexOf('\n// Ce que le dossier exige'));
 assert.ok(bloc.length > 400, 'FEU_FAITS doit être lisible dans app.js');
 
+const APRES_CHIFFRAGE = new Set(['preparation', 'production', 'facturation', 'paiement']);
+const APRES_BAT = new Set(['production', 'facturation', 'paiement']);
 const exige = {
   devis: (r) => r.devis_requis === true,
   bat: (r) => r.bat_requis === true,
-  argent: (r) => r.acompte_demande === true,
+  argent: (r) => r.stage === 'production',
 };
 const obtenu = {
-  devis: (r) => !!r.devis_valide_le,
-  bat: (r) => !!r.bat_valide_le,
+  devis: (r) => !!r.devis_valide_le || r.sub_stage === 'devis_valide' || APRES_CHIFFRAGE.has(r.stage),
+  bat: (r) => !!r.bat_valide_le || r.sub_stage === 'bat_valide' || APRES_BAT.has(r.stage),
   argent: (r) => r.paye === true || (r.acompte_demande === true && r.acompte_verse === true),
 };
 // Ce que la carte AFFICHE : uniquement ce qui manque. L'obtenu ne prend aucune
@@ -87,62 +89,77 @@ const manque = (r) => Object.keys(exige).filter((k) => exige[k](r) && !obtenu[k]
 // La règle du test doit être CELLE d'app.js, mot pour mot.
 assert.match(bloc, /requis: \(r\) => r\.devis_requis === true/);
 assert.match(bloc, /requis: \(r\) => r\.bat_requis === true/);
-assert.match(bloc, /requis: \(r\) => r\.acompte_demande === true/);
+assert.match(bloc, /requis: \(r\) => r\.stage === 'production'/);
+assert.match(bloc, /FEU_APRES_CHIFFRAGE\.has\(r\.stage\)/);
+assert.match(bloc, /FEU_APRES_BAT\.has\(r\.stage\)/);
 assert.match(bloc, /r\.paye === true \|\| \(r\.acompte_demande === true && r\.acompte_verse === true\)/);
+assert.match(APP, /const FEU_APRES_CHIFFRAGE = new Set\(\['preparation', 'production', 'facturation', 'paiement'\]\)/);
+assert.match(APP, /const FEU_APRES_BAT = new Set\(\['production', 'facturation', 'paiement'\]\)/);
 
-// LA TASSE À 12 € AU COMPTOIR : payée à la caisse, ni devis ni BAT, aucun
-// acompte réclamé. Elle n'exige RIEN, donc sa carte ne porte pas la rangée.
-// C'est le contrôle qui décide de tout : ajouter la moindre cérémonie à une
-// vente de 12 € serait un échec quel que soit le reste.
+// LA TASSE À 12 € AU COMPTOIR : payée à la caisse, ni devis ni BAT. Elle
+// n'exige RIEN, donc sa carte ne porte pas la rangée. C'est le contrôle qui
+// décide de tout : ajouter la moindre cérémonie à une vente de 12 € serait un
+// échec quel que soit le reste.
 assert.deepStrictEqual(manque({
-  devis_requis: false, bat_requis: false,
+  stage: 'paiement', sub_stage: 'archive', devis_requis: false, bat_requis: false,
   project_value: 12, paye: true, acompte_demande: null, acompte_verse: null,
 }), [], 'la tasse ne porte AUCUNE marque');
 
 // LES 200 T-SHIRTS, du devis au solde.
 const PRO = {
+  stage: 'demande_chiffrage', sub_stage: 'devis_envoye',
   devis_requis: true, devis_valide_le: null,
   bat_requis: true, bat_valide_le: null,
   project_value: 3400, paye: null, acompte_demande: null, acompte_verse: null,
 };
 assert.deepStrictEqual(manque(PRO), ['devis', 'bat'],
-  'au départ : le devis et le BAT. PAS l’argent — personne n’a encore rien réclamé');
+  'devis parti sans retour, et un BAT déjà armé. PAS l’argent — on n’est pas en production');
 
-PRO.devis_valide_le = '2026-08-20T10:00:00.000Z';
-assert.deepStrictEqual(manque(PRO), ['bat'], 'le devis validé disparaît de la rangée');
+// LE DEVIS EST ACQUIS DE FAIT DÈS QUE LE DOSSIER A QUITTÉ LE CHIFFRAGE : on ne
+// prépare pas une commande dont le devis a été refusé. C'est ÇA qui rend la
+// règle vraie sur de vrais dossiers — la sous-étape « Devis validé » n'a jamais
+// été employée une seule fois sur les 185 de l'atelier.
+PRO.stage = 'preparation';
+PRO.sub_stage = 'bat_envoye';
+assert.deepStrictEqual(manque(PRO), ['bat'],
+  'passé en préparation, le devis ne manque plus — le dossier a avancé, donc il est passé');
 
-// ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET.
-// « Pas encore payé » en préparation n'est pas une anomalie : à l'atelier on
-// encaisse au retrait. Ce qui est anormal, c'est d'avoir RÉCLAMÉ un acompte et
-// de ne pas l'avoir vu arriver — quelqu'un attend, et personne ne le sait.
-// Sur un JEU DE CHARGE de 307 dossiers de préparation : la règle « dès qu'il y a
-// un montant » marquait 184 cartes (60 % à elle seule, 73 % avec le BAT), la
-// règle « acompte réclamé et pas reçu » en marque 32. Un signal qui s'allume sur
-// trois cartes sur quatre n'est plus un signal : on l'éteint au bout d'une
-// semaine, et on perd les deux autres avec.
-//
-// ⚠️ CE JEU NE RESSEMBLE PAS À L'ATELIER. Sur les 184 vrais dossiers de prod
-// (26/08 au soir), `acompte_demande` est NULL sur les 184 lignes : la règle
-// resserrée s'allume sur ZÉRO carte. Ce test vérifie la MÉCANIQUE de la règle,
-// pas sa portée — pour la portée, voir la mesure sur copie de prod.
+// LE BAT, EN MIROIR : y être en production le PROUVE, puisque le verrou de
+// server.js interdit d'y entrer sans lui.
+PRO.stage = 'production';
+PRO.sub_stage = 'prod_dtf';
+assert.deepStrictEqual(manque(PRO), ['argent'],
+  'en production : le BAT est acquis, et c’est l’argent qui devient exigible');
+
+// « CERTAINS ONT DES ACOMPTES » : couvert, ce n'est pas soldé.
 PRO.acompte_demande = true;
 PRO.acompte_montant = 1360;
-assert.deepStrictEqual(manque(PRO), ['bat', 'argent'],
-  'l’acompte est réclamé et n’arrive pas : ÇA, c’est anormal');
-
+assert.deepStrictEqual(manque(PRO), ['argent'],
+  'un acompte réclamé qui n’arrive pas ne couvre rien');
 PRO.acompte_verse = true;
-assert.deepStrictEqual(manque(PRO), ['bat'],
+assert.deepStrictEqual(manque(PRO), [],
   'acompte reçu = couvert, même sans être soldé — toute la nuance du patron');
 
-PRO.bat_valide_le = '2026-08-22T14:10:00.000Z';
-assert.deepStrictEqual(manque(PRO), [],
-  'plus rien ne manque : la carte ne porte plus de rangée du tout');
-
-// UNE COMMANDE QU'ON ENCAISSERA AU RETRAIT ne porte aucune marque d'argent :
-// c'est le cas le plus courant de l'atelier, et il est parfaitement normal.
+// ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET — et l'étape le dit
+// souvent déjà. Un dossier à « Paiement › à contrôler » n'a pas besoin d'un
+// voyant « il manque l'argent » : c'est le nom de l'endroit où il est.
 assert.deepStrictEqual(
-  manque({ devis_requis: false, bat_requis: false, project_value: 850, paye: null }),
-  [], 'pas d’acompte réclamé = rien à signaler');
+  manque({ stage: 'paiement', sub_stage: 'paiement_a_controler', devis_requis: true, bat_requis: true, paye: null }),
+  [], 'le feu ne répète pas ce que l’étape dit déjà');
+assert.deepStrictEqual(
+  manque({ stage: 'paiement', sub_stage: 'archive', devis_requis: true, bat_requis: true, paye: null }),
+  [], 'et il se tait sur les dossiers archivés — le travail est fait');
+
+// UNE COMMANDE QU'ON ENCAISSERA AU RETRAIT ne porte aucune marque d'argent
+// avant la production : c'est le cas le plus courant de l'atelier.
+assert.deepStrictEqual(
+  manque({ stage: 'preparation', sub_stage: 'prepa_produits', devis_requis: false, bat_requis: false, project_value: 850, paye: null }),
+  [], 'en préparation, « pas encore payé » n’est pas une anomalie');
+
+// LA PORTÉE, MESURÉE SUR LES 185 DOSSIERS RÉELS (27/08). Ni muet ni mur : la
+// version d'avant en allumait 0, la toute première 184 sur 307.
+assert.match(APP, /28 s'allument, soit 15 %/,
+  'la portée de la règle est écrite dans le code, avec sa date et son échantillon');
 
 console.log('✓ feu : la tasse n’exige rien, les 200 t-shirts exigent les trois');
 
@@ -183,10 +200,33 @@ assert.ok(!/\.feu__val|\.feu__pt/.test(CSS),
 
 // ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi faire ;
 // « Acompte » dit qu'il a été réclamé et qu'il n'est pas rentré.
-assert.match(APP, /manque: \(\) => 'Acompte'/,
-  'la rangée nomme l’acompte, pas « l’argent »');
-assert.match(APP, /Acompte de \$\{eur\(Number\(r\.acompte_montant\)\)\} demandé — pas encore reçu/,
+assert.match(APP, /manque: \(r\) => \(r\.acompte_demande === true \? 'Acompte' : 'Paiement'\)/,
+  'la rangée nomme ce qu’on attend — « Acompte » s’il a été réclamé, sinon « Paiement »');
+assert.match(APP, /Acompte de \$\{eur\(Number\(r\.acompte_montant\)\)\} demande - pas encore recu/,
   'et le survol donne le montant réclamé');
+
+// DEPUIS QUAND. « Il manque le devis » ne dit pas s'il faut relancer ;
+// « Devis 12 j » le dit, et c'est la seule chose que la ligne ajoute.
+assert.match(APP, /function joursDepuis\(iso\)/,
+  'le délai se calcule — il ne se devine pas au survol');
+assert.match(APP, /joursDepuis\(r\.updated_at\)/,
+  'on lit `updated_at` : le journal ne couvre pas le passé, il dirait MOINS');
+assert.match(blocFeu, /d\.className = 'feu__depuis'/,
+  'le nombre de jours s’écrit sur la ligne, collé au mot');
+assert.match(CSS, /\.feu__depuis \{[\s\S]*?font-size: var\(--taille-note\)/,
+  'une taille en dessous : il précise, il ne s’annonce pas');
+
+// PARFAITEMENT LISIBLE (Charlie, 27/08) — sans cesser d'être discret : une
+// bande d'état, aucun glyphe, aucun mot en plus. Et la bande ne DÉPLACE rien :
+// elle déborde de 10 px de chaque côté et les reprend en rembourrage, sinon les
+// cinq intitulés de la fiche ne s'alignent plus sur une colonne.
+const bande = CSS.match(/\n\.feu \{[\s\S]*?\n\}/)[0];
+assert.match(bande, /background: var\(--danger-bg\)/, 'la couleur dit l’état, et rien d’autre');
+assert.match(bande, /box-shadow: inset 3px 0 0 var\(--danger\)/,
+  '`box-shadow` et non `border-left` : une bordure décalerait la grille de 3 px');
+assert.match(bande, /margin-inline: calc\(var\(--pas-2\) \* -1\)/);
+assert.match(bande, /padding: var\(--pas-1\) var\(--pas-2\)/,
+  'la bande déborde exactement de ce qu’elle reprend : le texte ne bouge pas');
 
 // LE MÊME COMPOSANT DANS LES DEUX VUES : deux écrans à un clic l'un de l'autre
 // doivent donner le même bloc, pas deux qui se ressemblent.
@@ -220,3 +260,29 @@ assert.match(blocFeu, /if \(!manque\.length\) return null;/,
   'rien ne manque = rien ne s’affiche');
 
 console.log('✓ feu : le vert se tait, l’échec parle — et le même bloc dans les deux vues');
+
+// ---------------------------------------------------------------------------
+// 5. LE RATTRAPAGE — SANS LUI, LA RÈGLE EST MUETTE
+// ---------------------------------------------------------------------------
+// `bat_requis` et `devis_requis` s'arment vers l'AVANT. Les 185 dossiers déjà
+// en base au moment où les colonnes sont apparues valent `false`, quoi qu'ils
+// aient traversé — et le feu s'allumait donc sur ZÉRO carte. Le rattrapage lit
+// les trois traces que le dossier porte déjà : sa sous-étape actuelle, une
+// pièce jointe déposée, le journal des sous-étapes.
+assert.match(DB, /async function rattraperFeu\(\)/, 'le rattrapage doit exister');
+assert.match(DB, /SELECT 1 FROM app_meta WHERE key = 'feu_rattrapage'/,
+  'sa PROPRE garde : deux incidents réels sont venus d’une garde partagée');
+assert.match(DB, /await rattraperFeu\(\);/, 'et il doit être joué au démarrage');
+assert.match(DB, /Down : UPDATE requests SET bat_requis = false, devis_requis = false/,
+  'toute migration porte son down');
+// LES TROIS SOURCES, aucune n'est une supposition.
+assert.match(DB, /SELECT id FROM requests WHERE sub_stage IN/, '1. la sous-étape actuelle');
+assert.match(DB, /SELECT request_id AS id FROM attachments WHERE kind = \$1/, '2. la pièce jointe');
+assert.match(DB, /FROM request_events\s*\n?\s*WHERE field = 'sub_stage'/, '3. le journal');
+// pg-mem ne rend pas `= ANY($1)` à plat : la migration passerait en prod et ne
+// ferait RIEN en local — l'écart qu'on ne voit qu'une fois déployé.
+assert.ok(!/sub_stage = ANY\(/.test(DB) && !/id = ANY\(/.test(DB),
+  'aucun `= ANY($1)` dans le rattrapage : pg-mem ne le rend pas');
+assert.match(DB, /const placeholders = /, 'les listes se posent en $1, $2, …');
+
+console.log('✓ feu : le rattrapage rend aux 185 dossiers ce qu’ils portaient déjà');

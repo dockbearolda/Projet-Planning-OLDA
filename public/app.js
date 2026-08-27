@@ -1534,72 +1534,107 @@ const PROD_FAITS = [
 // EN LECTURE SEULE POUR L'INSTANT : ce feu AFFICHE, il ne bloque pas. Seul le
 // BAT refuse encore le passage en production (verrou de server.js). On regarde
 // d'abord si la règle dit vrai sur de vrais dossiers ; on verrouillera ensuite.
+// LE FEU LIT CE QUE LE DOSSIER SAIT DÉJÀ, jamais une case que quelqu'un doit
+// penser à cocher. Version du 26/08 : `acompte_demande` décidait de l'argent —
+// mesuré le 27/08 sur les 185 dossiers réels, ce champ est NULL sur les 185. La
+// règle n'était pas fausse, elle était MUETTE, et un feu muet est un feu qu'on
+// finit par retirer.
+//
+// TROIS FAITS, ET CHACUN SE DÉDUIT DE L'ÉTAPE :
+//   · le devis est ACQUIS dès que le dossier a quitté « Demande & chiffrage » —
+//     on ne prépare pas une commande dont le devis a été refusé ;
+//   · le BAT est ACQUIS dès l'entrée en production — le verrou de server.js
+//     l'impose déjà, donc y être PROUVE qu'il est passé ;
+//   · l'argent est EXIGÉ en production, et là seulement (« quand le projet
+//     arrive en production il doit obligatoirement avoir […] le paiement »,
+//     le patron, 26/08). Avant, « pas encore payé » n'est pas une anomalie :
+//     on encaisse au retrait.
+//
+// Le feu ne dit donc QUE ce que l'étape ne dit pas déjà. Un dossier à
+// « Paiement › à contrôler » n'a pas besoin d'un voyant « il manque l'argent » :
+// c'est le nom de l'endroit où il est.
+//
+// MESURÉ SUR LES 185 DOSSIERS DE L'ATELIER (27/08) : 28 s'allument, soit 15 %.
+//   · 15 en Demande & chiffrage — devis parti, aucun retour ;
+//   · 6 en Préparation — BAT en attente ;
+//   · 7 en Production — pas payé.
+//   · 0 sur les 60 dossiers archivés et les 66 « paiement à contrôler ».
+// La version d'avant en allumait 0 ; la toute première (« exigé dès qu'il y a un
+// montant ») en allumait 184 sur 307. Un signal, ce n'est ni l'un ni l'autre.
+const FEU_APRES_CHIFFRAGE = new Set(['preparation', 'production', 'facturation', 'paiement']);
+const FEU_APRES_BAT = new Set(['production', 'facturation', 'paiement']);
+
 const FEU_FAITS = [
   {
     cle: 'devis',
     label: 'Devis',
     requis: (r) => r.devis_requis === true,
-    obtenu: (r) => !!r.devis_valide_le,
-    // Le mot qui s'écrit quand il MANQUE, et la phrase au survol.
+    obtenu: (r) => !!r.devis_valide_le || r.sub_stage === 'devis_valide'
+      || FEU_APRES_CHIFFRAGE.has(r.stage),
+    // CE QUI SE LIT SUR LA LIGNE. Pas la catégorie qui manque — ce qu'on attend,
+    // et depuis quand : c'est le nombre de jours qui décide si on relance
+    // aujourd'hui ou pas.
     manque: () => 'Devis',
-    dit: () => 'Devis envoyé — pas encore validé par le client',
+    attente: () => 'sans retour',
+    dit: () => 'Devis envoye - pas encore valide par le client',
   },
   {
     cle: 'bat',
     label: 'BAT',
     requis: (r) => r.bat_requis === true,
-    obtenu: (r) => !!r.bat_valide_le,
+    obtenu: (r) => !!r.bat_valide_le || r.sub_stage === 'bat_valide'
+      || FEU_APRES_BAT.has(r.stage),
     manque: () => 'BAT',
-    dit: () => 'BAT envoyé — pas encore validé par le client',
+    attente: () => 'sans retour',
+    dit: () => 'BAT envoye - pas encore valide par le client',
   },
   {
     cle: 'argent',
     label: 'Argent',
-    // ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET.
-    //
-    // Première version : « exigé dès qu'il y a un montant ». Sur un jeu de
-    // charge de 307 dossiers de préparation, elle marquait 184 cartes — 60 % à
-    // elle seule, et 73 % avec le BAT. Un signal qui s'allume sur trois cartes
-    // sur quatre n'est plus un signal, c'est un fond d'écran : on l'éteint au
-    // bout d'une semaine.
-    //
-    // La cause est simple : à l'atelier, « pas encore payé » en préparation
-    // n'est pas une anomalie, c'est la NORMALE — on encaisse au retrait. Ce qui
-    // est anormal, c'est d'avoir RÉCLAMÉ un acompte et de ne pas l'avoir vu
-    // arriver : quelqu'un attend une réponse, et personne ne le sait.
-    //
-    // Avec cette règle : 32 dossiers sur 307 au lieu de 184.
-    //
-    // ⚠️ CES DEUX CHIFFRES VIENNENT DU JEU DE CHARGE, PAS DE L'ATELIER. Mesurée
-    // le 26/08 au soir sur les 184 vrais dossiers de production, la règle
-    // resserrée s'allume sur ZÉRO carte : `acompte_demande` y est NULL sur les
-    // 184 lignes — le champ n'a jamais servi. La règle n'est donc pas fausse,
-    // elle est MUETTE, et un verrou posé par-dessus ne contrôlerait rien.
-    //
-    // (Le patron dit « en production il doit avoir le paiement ». Cette exigence
-    // -là se tiendra au VERROU, quand Charlie aura confirmé la règle — pas dans
-    // un voyant allumé en permanence sur toute la préparation.)
-    requis: (r) => r.acompte_demande === true,
+    requis: (r) => r.stage === 'production',
     // « CERTAINS ONT DES ACOMPTES » : couvert, ce n'est pas soldé — c'est soldé
     // OU un acompte demandé ET reçu. Un acompte demandé qui n'est pas versé ne
     // couvre rien.
     obtenu: (r) => r.paye === true || (r.acompte_demande === true && r.acompte_verse === true),
-    // ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi
-    // faire ; « Acompte » dit qu'il a été demandé et qu'il n'est pas rentré,
-    // « Paiement » qu'on n'a encore rien réclamé.
-    manque: () => 'Acompte',
-    dit: (r) => (r.acompte_montant != null
-      ? `Acompte de ${eur(Number(r.acompte_montant))} demandé — pas encore reçu`
-      : 'Acompte demandé — pas encore reçu'),
+    manque: (r) => (r.acompte_demande === true ? 'Acompte' : 'Paiement'),
+    attente: () => 'en production',
+    dit: (r) => (r.acompte_demande === true
+      ? (r.acompte_montant != null
+        ? `Acompte de ${eur(Number(r.acompte_montant))} demande - pas encore recu`
+        : 'Acompte demande - pas encore recu')
+      : 'En production sans paiement ni acompte'),
   },
 ];
 
 // CE QUI MANQUE À CE DOSSIER, dans l'ordre du parcours : le devis avant le BAT,
 // le BAT avant l'argent. Une liste vide = rien ne bloque, et il n'y a rien à
 // afficher.
+// DEPUIS QUAND. « Il manque le devis » ne dit pas s'il faut relancer ; « parti,
+// sans retour depuis 12 jours » le dit. On lit `updated_at` — la dernière fois
+// que le dossier a bougé — et non le journal : le journal ne couvre pas le
+// passé, il dirait MOINS que la colonne sur les dossiers d'avant sa mise en
+// service.
+function joursDepuis(iso) {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
 function feuDuDossier(r) {
+  const jours = joursDepuis(r.updated_at);
   return FEU_FAITS.filter((f) => f.requis(r) && !f.obtenu(r))
-    .map((f) => ({ cle: f.cle, mot: f.manque(r), dit: f.dit(r) }));
+    .map((f) => ({
+      cle: f.cle,
+      mot: f.manque(r),
+      jours,
+      // « 12 j » et non « depuis 12 jours » : la ligne en porte deja deux, et
+      // c'est le NOMBRE qu'on cherche. RIEN le jour même — « Devis aujourd'hui »
+      // se lit comme un devis A FAIRE aujourd'hui, et il n'y a de toute façon
+      // personne a relancer sur un dossier qui vient de bouger.
+      depuis: jours ? `${jours} j` : '',
+      dit: jours == null ? f.dit(r) : `${f.dit(r)} (${f.attente(r)} depuis ${jours} j)`,
+    }));
 }
 
 function blocFeu(r) {
@@ -1608,7 +1643,9 @@ function blocFeu(r) {
   // LA MÊME GRILLE QUE LA FICHE DE PRODUCTION — c'est ce qui la fait lire comme
   // sa dernière ligne au lieu d'une pastille rapportée. Deux écrans à un clic
   // l'un de l'autre doivent donner le même composant ; ici, deux rangées d'une
-  // même carte aussi.
+  // même carte aussi. La bande de couleur, elle, déborde de dix pixels de
+  // chaque côté SANS déplacer le texte (marge négative + rembourrage égal) :
+  // les intitulés des cinq rangées restent alignés sur une seule colonne.
   const bloc = document.createElement('div');
   bloc.className = 'prod-fiche feu';
   const cle = document.createElement('span');
@@ -1625,9 +1662,17 @@ function blocFeu(r) {
     const s = document.createElement('span');
     s.className = 'prod-fiche__fort';
     s.textContent = m.mot;
-    attachTip(s, m.dit);
     val.appendChild(s);
+    // DEPUIS QUAND, collé au mot. « Devis » ne dit pas s'il faut relancer ;
+    // « Devis 12 j » le dit — et c'est la seule chose que la ligne ajoute.
+    if (m.depuis) {
+      const d = document.createElement('span');
+      d.className = 'feu__depuis';
+      d.textContent = ` ${m.depuis}`;
+      val.appendChild(d);
+    }
   });
+  attachTip(bloc, manque.map((m) => m.dit).join(' · '));
   bloc.setAttribute('aria-label',
     `Avant la production, il manque : ${manque.map((m) => m.dit).join(' ; ')}`);
   bloc.append(cle, val);

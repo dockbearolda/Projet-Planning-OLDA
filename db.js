@@ -381,6 +381,9 @@ async function init() {
 
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
+  // Le feu ne peut rien dire des dossiers d'avant lui tant qu'on ne lui a pas
+  // rendu ce qu'ils portaient déjà.
+  await rattraperFeu();
 
   // Identifiant lisible pour les fiches qui n'en ont pas — après l'import, pour
   // que les clients rapatriés en reçoivent un eux aussi.
@@ -1969,6 +1972,75 @@ async function semerFacesTasse() {
     }
   });
   await poserMeta('faces_tasse', '1');
+}
+
+// --- Rattrapage du feu : ce que les dossiers d'avant savaient déjà -----------
+// `bat_requis` et `devis_requis` s'arment TOUT SEULS depuis leur création — au
+// dépôt d'un PDF, ou au passage par une sous-étape de BAT / de chiffrage. Mais
+// ils s'arment vers l'AVANT : les dossiers déjà en base au moment où les
+// colonnes sont apparues valent `false`, quoi qu'ils aient traversé.
+//
+// Mesuré sur la base de l'atelier le 27/08 : le feu s'allumait sur ZÉRO carte
+// des 185. Pas parce que tout va bien — parce que personne n'avait rien à lui
+// dire. Le rattrapage lit les trois traces que le dossier porte déjà, dans cet
+// ordre de fiabilité décroissante :
+//   1. sa sous-étape ACTUELLE      (15 dossiers pour le devis, 5 pour le BAT) ;
+//   2. une pièce jointe déposée    (3 · 4) ;
+//   3. le journal des sous-étapes  (4 · 21 — de loin la meilleure source pour
+//      le BAT : vingt dossiers sont passés par « Préparation du BAT »).
+// Total : 20 dossiers armés pour le devis, 22 pour le BAT.
+//
+// ON NE DEVINE RIEN. Un dossier qui n'a laissé aucune de ces trois traces reste
+// à `false` : mieux vaut un feu muet sur un dossier qu'un feu qui ment sur
+// trente.
+//
+// Down : UPDATE requests SET bat_requis = false, devis_requis = false;
+//        DELETE FROM app_meta WHERE key = 'feu_rattrapage';
+//        (les colonnes elles-mêmes se défont avec leur propre migration)
+const FEU_ETAPES_DEVIS = ['chiffrage_en_cours', 'devis_envoye', 'devis_valide'];
+const FEU_ETAPES_BAT = ['prepa_bat', 'bat_envoye', 'bat_modif', 'bat_valide'];
+
+// `IN ($1, $2, …)` et non `= ANY($1)` : pg-mem, la base locale de test, ne rend
+// pas le tableau à plat — la migration passerait en prod et ne ferait RIEN en
+// local, ce qui est exactement le genre d'écart qu'on ne voit qu'une fois
+// déployé.
+const placeholders = (liste, depuis = 1) => liste.map((_, i) => `$${i + depuis}`).join(', ');
+
+async function rattraperFeu() {
+  const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'feu_rattrapage'");
+  if (rows.length) return;
+  for (const [colonne, dateColonne, etapes, kind, etapeValide] of [
+    ['devis_requis', 'devis_valide_le', FEU_ETAPES_DEVIS, 'devis', 'devis_valide'],
+    ['bat_requis', 'bat_valide_le', FEU_ETAPES_BAT, 'bat', 'bat_valide'],
+  ]) {
+    const ids = new Set();
+    const ramasser = async (sql, params) => {
+      const r = await pool.query(sql, params).catch(() => ({ rows: [] }));
+      for (const x of r.rows) if (x.id) ids.add(x.id);
+    };
+    await ramasser(
+      `SELECT id FROM requests WHERE sub_stage IN (${placeholders(etapes)})`, etapes,
+    );
+    await ramasser('SELECT request_id AS id FROM attachments WHERE kind = $1', [kind]);
+    await ramasser(
+      `SELECT request_id AS id FROM request_events
+        WHERE field = 'sub_stage' AND value_after IN (${placeholders(etapes)})`, etapes,
+    );
+    if (!ids.size) continue;
+    const liste = [...ids];
+    await pool.query(
+      `UPDATE requests SET ${colonne} = true WHERE id IN (${placeholders(liste)})`, liste,
+    ).catch(() => { /* colonne absente : sa migration ne s'est pas jouée */ });
+    // LA VALIDATION, quand elle a laissé une trace. Elle n'en laisse presque
+    // jamais aujourd'hui (zéro dossier sur 185 est passé par « Devis validé »),
+    // mais la ligne coûte une requête et évite d'allumer un dossier qui, lui,
+    // a bel et bien été validé.
+    await pool.query(
+      `UPDATE requests SET ${dateColonne} = COALESCE(${dateColonne}, updated_at)
+        WHERE sub_stage = $1 AND ${dateColonne} IS NULL`, [etapeValide],
+    ).catch(() => {});
+  }
+  await poserMeta('feu_rattrapage', '1');
 }
 
 // --- Étapes rangées à la main (ordre manuel) ---------------------------------
