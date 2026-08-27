@@ -2172,3 +2172,95 @@ document.addEventListener('pointerdown',ev=>{
     if (etat) menuOuvrir(etat);
   };
 })();
+
+/* ===========================================================================
+   LA TASSE — TROIS FACES SUR LESQUELLES ON ÉCRIT (26/08/2026)
+   ===========================================================================
+   Charlie : « une tasse y'a 2 faces et le cul de la tasse, ce qui fait
+   3 faces ; l'idée est d'avoir une carte adaptée à chaque article ».
+
+   Une tasse n'a pas de TAILLES, elle a des EMPLACEMENTS. Jusqu'ici la vendeuse
+   décrivait les trois zones dans le pavé « Informations importantes », et
+   l'atelier lisait un paragraphe au lieu d'une carte — c'est le fond qu'on
+   oublie, et un fond oublié c'est une tasse à refaire.
+
+   ELLE ÉCRIT SUR LA FACE. Pas dans un champ qui porte le nom de la face : sur
+   la face elle-même. Le dessin fait le travail de l'intitulé.
+
+   PAS DE MILLIMÈTRES ICI. Au comptoir on sait QUOI mettre, pas COMBIEN de mm —
+   c'est l'atelier qui mesure, et le ticket sort déjà un trait pour l'écrire.
+   Demander une largeur au comptoir, c'est obtenir un chiffre inventé.
+   ======================================================================== */
+const TASSE_FACES = [
+  { cle: 'avant',   nom: 'Face avant',   aide: 'Logo, texte, photo…' },
+  { cle: 'arriere', nom: 'Face arrière', aide: 'Rien si vierge' },
+  { cle: 'fond',    nom: 'Fond',         aide: 'Souvent le logo OLDA' },
+];
+
+/* Pose les trois faces dans `hote` et renvoie de quoi les relire.
+   `valeurs` : { avant, arriere, fond } — ce qui était déjà saisi.
+   `auChangement` : appelé à chaque frappe avec l'objet complet. */
+function tasseFaces(hote, valeurs, auChangement) {
+  const etat = { avant: '', arriere: '', fond: '', ...(valeurs || {}) };
+  const boite = document.createElement('div');
+  boite.className = 'tasse';
+
+  for (const f of TASSE_FACES) {
+    const face = document.createElement('div');
+    face.className = 'tasse__face tasse__face--' + f.cle;
+
+    const nom = document.createElement('label');
+    nom.className = 'tasse__nom';
+    nom.textContent = f.nom;
+
+    const zone = document.createElement('textarea');
+    zone.className = 'tasse__zone';
+    zone.value = etat[f.cle];
+    zone.placeholder = f.aide;
+    /* La vendeuse est à la SOURIS pour naviguer et au CLAVIER pour écrire
+       (Charlie, 26/08). Donc : rien à intercepter. Un textarea nu garde le
+       copier/coller, le Ctrl+A, la sélection et l'annulation du navigateur —
+       tout ce qu'elle utilise réellement. Poser un raccourci ici, c'est en
+       casser un qu'elle connaît déjà. */
+    zone.addEventListener('input', () => {
+      etat[f.cle] = zone.value;
+      if (auChangement) auChangement({ ...etat });
+    });
+
+    const id = 'tasse-' + f.cle + '-' + Math.random().toString(36).slice(2, 8);
+    zone.id = id;
+    nom.setAttribute('for', id);
+
+    face.append(nom, zone);
+    /* L'anse ne se pose que sur la face avant : c'est elle qui dit de quel
+       côté on regarde la tasse. */
+    if (f.cle === 'avant') {
+      const anse = document.createElement('span');
+      anse.className = 'tasse__anse';
+      anse.setAttribute('aria-hidden', 'true');
+      face.appendChild(anse);
+    }
+    boite.appendChild(face);
+  }
+
+  /* UNE BASCULE = UN MOUVEMENT : on ne vide jamais avant d'avoir de quoi
+     remplacer. Le contenu sortant reste jusqu'à ce que le nouveau soit prêt. */
+  hote.replaceChildren(boite);
+  return { lire: () => ({ ...etat }) };
+}
+
+/* CE QUE LA TASSE DONNE À LA FICHE DE PRODUCTION. Chaque face écrite devient
+   une ZONE du ticket — même sans mesure : le papier sort alors un trait pour
+   l'écrire à l'établi. Une face laissée vide n'est pas une zone : on ne marque
+   rien dessus, et une carte vide sur le papier finit par être remplie de
+   n'importe quoi. */
+function tasseVersZones(valeurs) {
+  const v = valeurs || {};
+  return TASSE_FACES
+    .filter((f) => String(v[f.cle] || '').trim())
+    .map((f) => ({ face: f.nom, mm: '', quoi: String(v[f.cle]).trim() }));
+}
+
+window.tasseFaces = tasseFaces;
+window.tasseVersZones = tasseVersZones;
+window.TASSE_FACES = TASSE_FACES;

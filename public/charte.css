@@ -968,3 +968,96 @@ html[data-theme="dark"] .ecran-comptoir {
 /* Le fond ne défile plus derrière le voile : sans ça, la molette promène un
    planning qu'on ne peut pas utiliser. */
 body.a-connecter { overflow: hidden; }
+
+/* ===========================================================================
+   LA TASSE — TROIS FACES SUR LESQUELLES ON ÉCRIT (26/08/2026)
+   ===========================================================================
+   Charlie : « une tasse y'a 2 faces et le cul de la tasse, ce qui fait
+   3 faces ». Une tasse n'a pas de tailles : elle a des EMPLACEMENTS. Lui
+   présenter la grille du textile obligeait la vendeuse à décrire trois zones
+   dans un pavé de commentaire, et l'atelier lisait un paragraphe au lieu
+   d'une carte.
+
+   ELLE ÉCRIT SUR LA FACE, PAS DANS UN CHAMP QUI PORTE SON NOM. Le dessin fait
+   le travail de l'intitulé : deux parois et un disque se reconnaissent sans
+   être lus, et on ne se trompe pas de zone.
+
+   LE FOND EST UN DISQUE. C'est la seule forme du système qui vaut ici : le cul
+   d'une tasse est rond, et le dessiner carré est exactement ce qui fait écrire
+   au mauvais endroit. La règle « rond = une icône seule » parle des rôles
+   d'interface ; ici le rond n'est pas un rôle, c'est la pièce.
+
+   AUCUNE COULEUR : ni le corps, ni l'anse, ni les faces. La couleur dit un
+   état — et une tasse n'est pas un état. Le seul moment où une teinte entre,
+   c'est le focus, qui est bien un état.
+   ======================================================================== */
+.tasse {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--pas-4);
+  align-items: start;
+}
+/* La paroi déroulée : deux rectangles, comme si on avait ouvert la tasse. */
+.tasse__face {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-1);
+  min-width: 0;
+}
+.tasse__nom {
+  font-size: var(--taille-note);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.tasse__zone {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: calc(var(--ctrl-h) * 2.4);
+  padding: var(--champ-y) var(--champ-x);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--arrondi-carte);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+  resize: none;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.tasse__zone::placeholder { color: var(--text-3); }
+.tasse__zone:focus {
+  outline: none;
+  background: var(--field-focus);
+  border-color: var(--text-1);
+}
+/* L'ANSE, à droite de la face avant : c'est elle qui fait lire « tasse » d'un
+   coup d'œil, et elle dit de quel côté on regarde. Un trait, pas un dessin. */
+.tasse__face--avant .tasse__zone { border-right-width: 3px; }
+.tasse__anse {
+  position: absolute;
+  right: calc(var(--pas-3) * -1);
+  top: calc(var(--taille-note) + var(--pas-1) + var(--ctrl-h) * .85);
+  width: var(--pas-3);
+  height: calc(var(--ctrl-h) * .8);
+  border: 3px solid var(--border-strong);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  pointer-events: none;
+}
+/* LE FOND : un disque. Il porte moins de texte que les parois — on y met une
+   mention, pas une composition — donc il est plus petit, et c'est juste. */
+.tasse__face--fond { align-items: center; }
+.tasse__face--fond .tasse__zone {
+  width: calc(var(--ctrl-h) * 2.4);
+  height: calc(var(--ctrl-h) * 2.4);
+  min-height: 0;
+  border-radius: 50%;
+  text-align: center;
+  /* UN TEXTAREA NE CENTRE PAS SON TEXTE VERTICALEMENT — `align-items` n'a
+     aucune prise sur le contenu d'un champ de saisie. On le pose donc par le
+     rembourrage haut, calculé pour qu'une mention d'une ou deux lignes tombe
+     au milieu du disque. C'est le seul endroit du système où un rembourrage
+     n'est pas un pas de l'échelle : il est GÉOMÉTRIQUE, il suit le rayon. */
+  padding: calc(var(--ctrl-h) * .78) var(--pas-4) var(--pas-3);
+}
