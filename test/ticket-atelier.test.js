@@ -424,11 +424,24 @@ const DEMANDE = {
   assert.ok(/ldActionBtn\('telecharger', 'Récap complet', \(\) => telechargerRecap\(r\)\)/.test(APP));
   assert.ok(!/imprimerRecap/.test(APP), 'imprimerRecap ne doit plus exister');
 
-  // Le ticket s'atteint depuis LA LIGNE, dans les deux vues.
-  assert.ok(/carte\.append|pcard__ticket/.test(APP));
-  assert.ok(/tk\.className = 'pcard__ticket'/.test(APP), 'la carte doit porter le bouton ticket');
+  // LES DEUX PAPIERS S'ATTEIGNENT DEPUIS LA LIGNE, dans les deux vues, et par
+  // le MÊME composant (27/08) : une commande sort un ticket d'atelier ET un bon
+  // de commande, et c'est la même question qu'on se pose devant une ligne.
+  assert.ok(/function boutonsPapiers\(r, classe\)/.test(APP),
+    'un seul composant construit les deux boutons : le tableau et la carte ne '
+    + 'doivent pas donner deux boutons qui se ressemblent');
+  assert.ok(/boutonsPapiers\(r, 'pcard__ticket'\)/.test(APP), 'la carte porte les deux papiers');
+  assert.ok(/boutonsPapiers\(r, 'ticket-cell'\)/.test(APP), 'la colonne aussi');
   assert.ok(/tr\.appendChild\(cellTicket\(r\)\)/.test(APP),
-    'la ligne du tableau doit porter sa colonne ticket');
+    'la ligne du tableau doit porter sa colonne documents');
+  assert.ok(/ouvrirTicket\(r\);/.test(APP) && /ouvrirBureau\(r\);/.test(APP),
+    'et chacun ouvre son papier');
+  // La rangée d'actions de la carte compte un bouton de plus : sa largeur doit
+  // suivre, sinon le dernier bouton sort de la carte.
+  assert.ok(/grid-template-columns: repeat\(5, var\(--rond\)\)/.test(CSS_APP),
+    'la rangée d’actions de la carte porte cinq boutons');
+  assert.ok(/--pcard-actions: 252px/.test(CSS_APP),
+    '5 x 44 + 4 x 8 = 252 px : la largeur réservée suit le nombre de boutons');
 
   // SUR TOUTES LES LIGNES. Le bouton ne paraissait que sur les dossiers nés au
   // comptoir : logique tant qu'il sortait le papier du CLIENT — une ligne tapée
@@ -496,7 +509,7 @@ const DEMANDE = {
   // son CONTENU décale toutes les autres d'une ligne à l'autre. La colonne
   // d'actions garde donc une largeur arrêtée — et le bouton étant désormais sur
   // toutes les lignes, plus rien ne peut la faire varier de l'une à l'autre.
-  assert.ok(/--pcard-actions: 200px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
+  assert.ok(/--pcard-actions: 252px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
   assert.ok(!/grid-template-columns:[^;]*\bauto;/.test(CSS.match(/\.pcard \{[\s\S]*?\n\}/)[0]),
     'aucune piste `auto` dans la grille de la carte : elle dépendrait du contenu');
   assert.ok(/body\.cards-off-ticket \.pcard \{ --pcard-actions: 148px; \}/.test(CSS),

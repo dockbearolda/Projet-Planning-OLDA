@@ -1890,16 +1890,11 @@ function buildCard(r, options) {
   // l'ATELIER, la question n'est plus « d'où vient ce dossier » mais « qui va le
   // produire » : une ligne saisie à la main se fabrique comme les autres, et son
   // ticket se bâtit sur ce que la ligne sait (cf. modeleTicket).
-  const tk = document.createElement('button');
-  tk.type = 'button';
-  tk.className = 'pcard__ticket';
-  if (consigneAtelier(r)) tk.classList.add('pcard__ticket--consigne');
-  tk.setAttribute('aria-label', `Ticket atelier — corriger et imprimer${
-    consigneAtelier(r) ? ' · consigne pour l’atelier' : ''}`);
-  attachTip(tk, infobulleTicket(r));
-  tk.appendChild(strokeIcon(LD_ICONES.ticket));
-  tk.addEventListener('click', (ev) => { ev.stopPropagation(); ouvrirTicket(r); });
-  actions.append(prise, tk, ouvrir, suppr);
+  // LES DEUX PAPIERS, le même composant que dans le tableau (voir
+  // `boutonsPapiers`) : deux vues à un clic l'une de l'autre doivent donner le
+  // MÊME bouton, pas deux qui se ressemblent.
+  const [tk, bu] = boutonsPapiers(r, 'pcard__ticket');
+  actions.append(prise, tk, bu, ouvrir, suppr);
 
   // « Délai restant » et non « Délai de production restant » : les intitulés
   // forment UNE rangée partagée (cf. .pcard__bloc), donc le plus long les
@@ -4384,6 +4379,10 @@ async function ouvrirBureau(r) {
 
   actions.append(
     bouton('Fermer', fermer),
+    // PASSER À L'AUTRE PAPIER SANS RESSORTIR. On a la ligne sous les yeux :
+    // fermer, la retrouver dans la grille et viser l'autre pastille, c'est
+    // trois gestes pour une question qu'on se pose ici.
+    bouton('Ticket atelier', () => { fermer(); ouvrirTicket(r); }),
     // Le document en texte : c'est ce qu'on colle dans un e-mail au bureau.
     bouton('Copier', () => {
       const dit = () => showToast('Bon de commande copié');
@@ -4702,7 +4701,15 @@ async function ouvrirTicket(r) {
   imprimer.type = 'button';
   imprimer.className = 'ask__btn tk-modal__print';
   imprimer.textContent = 'Imprimer le ticket';
-  actions.append(fermer, copier, imprimer);
+  // PASSER À L'AUTRE PAPIER SANS RESSORTIR. Le bon de commande décrit la même
+  // ligne pour d'autres mains : fermer, la retrouver dans la grille et viser
+  // l'autre pastille, c'est trois gestes pour une question qu'on se pose ici.
+  const versBureau = document.createElement('button');
+  versBureau.type = 'button';
+  versBureau.className = 'ask__btn';
+  versBureau.textContent = 'Bon de commande';
+  versBureau.addEventListener('click', () => { partir(); ouvrirBureau(r); });
+  actions.append(fermer, versBureau, copier, imprimer);
   carte.append(feuille, aide, actions);
   fond.append(carte);
   document.body.append(fond);
@@ -5772,30 +5779,59 @@ async function enregistrerFiche(r, c) {
 // lettres sur le ticket qu'un appui fait apparaître — ainsi que sur la carte.
 // TOUTES les lignes en ont un : ce papier dit ce qu'il y a à produire, et une
 // ligne tapée à la main se produit comme celles du comptoir.
+// LES DEUX PAPIERS DE LA LIGNE, CÔTE À CÔTE (27/08/2026).
+// Une commande sort DEUX documents, et ils ne servent pas aux mêmes mains :
+//   · le TICKET part à l'établi et ne porte aucun argent ;
+//   · le BON DE COMMANDE est celui du bureau — prix, taxe, règlement, marge.
+// Ils étaient à deux endroits différents : le ticket sur la ligne, le bon de
+// commande derrière l'ouverture de la fiche. Or c'est la MÊME question qu'on
+// se pose devant une ligne (« sors-moi le papier »), et la réponse dépend
+// seulement de qui le demande. Les deux sont donc là, au même endroit.
 function cellTicket(r) {
   const td = document.createElement('td');
   td.className = 'col-ticket-cell';
+  for (const b of boutonsPapiers(r, 'ticket-cell')) td.appendChild(b);
+  return td;
+}
+
+// Les deux boutons, construits une fois : la carte et le tableau doivent donner
+// le MÊME composant, pas deux qui se ressemblent.
+function boutonsPapiers(r, classe) {
   const ref = (r.fiche && r.fiche.ref) || '';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'ticket-cell';
-  const libelle = ref ? `Ticket atelier ${ref}` : 'Ticket atelier';
   const consigne = consigneAtelier(r);
+
+  const atelier = document.createElement('button');
+  atelier.type = 'button';
+  atelier.className = classe;
   // Un point sur la pastille : ce dossier porte une consigne pour l'atelier.
   // Le point ne prend AUCUNE place (il se peint hors de la boîte) — la colonne
   // garde donc la même largeur sur toutes les lignes.
-  if (consigne) btn.classList.add('ticket-cell--consigne');
-  attachTip(btn, infobulleTicket(r));
-  btn.setAttribute('aria-label',
-    `${libelle} — corriger et imprimer${consigne ? ' · consigne pour l’atelier' : ''}`);
-  btn.appendChild(strokeIcon(LD_ICONES.ticket));
-  btn.addEventListener('click', (e) => {
+  if (consigne) atelier.classList.add(`${classe}--consigne`);
+  attachTip(atelier, infobulleTicket(r));
+  atelier.setAttribute('aria-label',
+    `${ref ? `Ticket atelier ${ref}` : 'Ticket atelier'} — corriger et imprimer${
+      consigne ? ' · consigne pour l’atelier' : ''}`);
+  atelier.appendChild(strokeIcon(LD_ICONES.ticket));
+  atelier.addEventListener('click', (e) => {
     e.stopPropagation();
     ouvrirTicket(r);
-    btn.blur();
+    atelier.blur();
   });
-  td.appendChild(btn);
-  return td;
+
+  const bureau = document.createElement('button');
+  bureau.type = 'button';
+  bureau.className = `${classe} ${classe}--bureau`;
+  attachTip(bureau, 'Bon de commande — prix, taxe, règlement et marge');
+  bureau.setAttribute('aria-label',
+    `${ref ? `Bon de commande ${ref}` : 'Bon de commande'} — le document du bureau`);
+  bureau.appendChild(strokeIcon(LD_ICONES.bureau));
+  bureau.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ouvrirBureau(r);
+    bureau.blur();
+  });
+
+  return [atelier, bureau];
 }
 
 // --- Infobulles maison -----------------------------------------------------
@@ -7085,7 +7121,9 @@ const PLANNING_COLS = [
   { key: 'client_type', label: 'Type' },
   { key: 'responsable', label: 'Responsable' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
-  { key: 'ticket',      label: 'Ticket atelier', surCarte: true },
+  // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
+  // n'en nommait plus que la moitié.
+  { key: 'ticket',      label: 'Documents', surCarte: true },
   { key: 'product',     label: 'Description' },
   // LE PRIX EXISTE DANS LES DEUX VUES (colonne du tableau, bloc TTC de la
   // carte) : le décocher doit le retirer des deux, pas rappeler le tableau

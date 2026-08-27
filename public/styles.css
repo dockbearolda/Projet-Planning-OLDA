@@ -979,7 +979,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      file. Les actions ont donc une largeur ARRÊTÉE, la même pour toutes.
      `--pcard-refs` : largeur exacte des pastilles de référent (voir plus bas).
      La colonne TTC ne peut pas descendre en dessous, sinon elles s'empilent. */
-  --pcard-actions: 200px;                     /* poignée + ticket + ouvrir + supprimer */
+  /* poignée + ticket atelier + bon de commande + ouvrir + supprimer.
+     5 x 44 + 4 x 8 = 252 px. */
+  --pcard-actions: 252px;
   grid-template-columns:
     minmax(150px, 1.05fr) minmax(240px, 1.9fr) 190px minmax(var(--pcard-refs), 180px) var(--pcard-actions);
   /* DEUX RANGÉES, partagées par les quatre blocs : les intitulés dans la
@@ -1199,7 +1201,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    non. 4 × 44 + 3 × 8 = 200 px, la valeur de --pcard-actions. */
 .pcard__actions {
   display: grid;
-  grid-template-columns: repeat(4, var(--rond));
+  grid-template-columns: repeat(5, var(--rond));
   gap: 8px;
   align-items: center;
   /* Seul bloc à rester centré quand les autres se calent en haut : la rangée de
@@ -1237,6 +1239,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .pcard__ticket svg { width: 18px; height: 18px; }
 /* Ticket retiré depuis le rail « Colonnes » : la case disparaît des DEUX vues,
    et la colonne d'actions se resserre d'autant — toutes les cartes ensemble. */
+/* Les DEUX papiers partent ensemble : ils répondent à la même question
+   (« sors-moi le document »), en masquer la moitié n'aurait aucun sens.
+   3 x 44 + 2 x 8 = 148 px. */
 body.cards-off-ticket .pcard { --pcard-actions: 148px; }
 body.cards-off-ticket .pcard__actions { grid-template-columns: repeat(3, var(--rond)); }
 body.cards-off-ticket .pcard__ticket { display: none; }
@@ -1280,6 +1285,15 @@ body.cards-off-ticket .pcard__ticket { display: none; }
    Les colonnes du Point du jour (`--pj-c-*`) et ses trois seuils à lui
    suivent la même règle, pour la même raison. */
 @container (max-width: 950px) {
+  /* LES CINQ BOUTONS PASSENT SUR DEUX RANGÉES (27/08/2026). Le cinquième — le
+     bon de commande — portait la rangée à 252 px : sur une carte étroite, les
+     boutons prenaient plus de place que le nom du client, qui se repliait
+     alors une LETTRE par ligne (mesuré : « Hôte / l / Esm / eral / da »).
+     Trois par rangée, la largeur retombe à 148 px et le texte reprend ses
+     100 px. La carte grandit de 52 px, et c'est le bon échange : une carte un
+     peu plus haute se lit, un nom coupé en cinq ne se lit pas. */
+  .pcard { --pcard-actions: 148px; }
+  .pcard__actions { grid-template-columns: repeat(3, var(--rond)); }
   .pcard {
     grid-template-columns: minmax(0, 1fr) var(--pcard-actions);
     /* Une seule colonne pour le texte : les pastilles de référent reprennent
@@ -2663,7 +2677,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .col-client { width: 210px; }
 /* Ticket : une icône, pas un numéro (cf. cellTicket) — la largeur d'une
    pastille et ses marges, comme les autres colonnes à puce. */
-.col-ticket { width: 64px; }
+/* DEUX pastilles depuis le 27/08 (ticket d'atelier + bon de commande) :
+   2 x 30 px + 6 px d'écart + 2 x 8 px de rembourrage = 82 px. */
+.col-ticket { width: 82px; }
 /* « DESCRIPTION » ET « INFOS » ONT UNE LARGEUR, ELLES AUSSI. Elles étaient les
    seules à ne pas en avoir, et `table-layout: fixed` ne lit QUE la première
    rangée pour répartir : sur les étapes qui en ouvrent une par une BANNIÈRE de
@@ -5689,7 +5705,12 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    le numéro se lit, et chaque ligne le porte au même endroit.
    Encadré plutôt que teinté : le vert des pastilles PDF dit « le document
    existe » — le reprendre ici brouillerait cette lecture. */
-.col-ticket-cell { padding: 0 8px; vertical-align: middle; text-align: center; }
+.col-ticket-cell { padding: 0 8px; vertical-align: middle; text-align: center;
+  white-space: nowrap; }
+/* L'écart entre les deux papiers : un pas de l'échelle, pas une valeur
+   choisie ici. Sans lui, les deux pastilles se touchent et se lisent comme
+   un seul bouton large. */
+.ticket-cell + .ticket-cell { margin-left: var(--pas-1); }
 .ticket-cell {
   display: inline-grid; place-items: center;
   width: 30px; height: 30px;

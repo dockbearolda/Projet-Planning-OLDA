@@ -424,9 +424,15 @@ const VENTE = {
   assert.ok(/positions\[cible\.i\] = String\(valeur == null \? '' : valeur\);/.test(APP));
 
   // Le point sur la pastille dit qu'une consigne existe, dans les DEUX vues.
+  // Depuis le 27/08 un SEUL composant construit les deux boutons de la ligne
+  // (ticket d'atelier + bon de commande) : la classe se compose donc du nom
+  // passé par l'appelant, et le point suit le papier de l'ATELIER — c'est lui
+  // que la consigne concerne.
   assert.ok(/function consigneAtelier\(r\)/.test(APP));
-  assert.ok(/btn\.classList\.add\('ticket-cell--consigne'\)/.test(APP));
-  assert.ok(/tk\.classList\.add\('pcard__ticket--consigne'\)/.test(APP));
+  assert.ok(/atelier\.classList\.add\(`\$\{classe\}--consigne`\)/.test(APP),
+    'le point se pose sur le ticket d’atelier, quelle que soit la vue');
+  assert.ok(/boutonsPapiers\(r, 'ticket-cell'\)/.test(APP) && /boutonsPapiers\(r, 'pcard__ticket'\)/.test(APP),
+    'et les deux vues passent bien par ce composant');
   assert.ok(/\.ticket-cell--consigne::after,\s*\.pcard__ticket--consigne::after/.test(CSS));
   // Il se peint HORS de la boîte : une pastille qui grossit décalerait toute la
   // rangée d'actions des cartes, ligne après ligne.
