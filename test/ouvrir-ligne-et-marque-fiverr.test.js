@@ -186,10 +186,15 @@ assert.ok(/\.col-del \{ white-space: nowrap; text-align: right; padding-right: 8
   && margeDroite > 0,
 'la marge de droite doit vivre sur .row-actions, que rien n’écrase');
 
-// Les planchers de la grille ont bougé d'autant que la colonne (116 → 158).
-for (const [avant, apres] of [[1334, 1376], [1284, 1326], [1424, 1466]]) {
+// Les planchers de la grille suivent la LARGEUR RÉELLE des colonnes. Ils ont
+// d'abord grandi de 42 px avec la colonne d'actions (116 → 158), puis perdu
+// 198 px le 27/08 quand Type (66) et Responsable (132) ont quitté le tableau —
+// une colonne retirée de PLANNING_COLS ne peut plus être retranchée par
+// `--cols-off`, c'est donc au plancher de l'oublier — et regagné 66 px le même
+// jour, quand quatre colonnes ont été élargies à la taille de leur intitulé.
+for (const [avant, apres] of [[1376, 1284], [1326, 1234], [1466, 1374]]) {
   assert.ok(CSS.includes(`min-width: calc(${apres}px - var(--cols-off, 0px))`),
-    `le plancher ${avant} doit avoir suivi l’élargissement de la colonne d’actions`);
+    `le plancher ${avant} doit avoir suivi le retrait des deux colonnes`);
 }
 
 console.log('✓ planning : la marque Fiverr remplace la flèche, la ligne s’ouvre dans les deux vues OK');

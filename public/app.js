@@ -2341,11 +2341,13 @@ function buildRow(r) {
 
   // étoiles : 1 à 3, attribuables au clic (réglent la priorité de la ligne)
   tr.appendChild(cellStars(r));
-  // type : Pro / Perso / Asso / Revendeur (menu au clic)
-  tr.appendChild(cellType(r));
-  // responsable : QUI agit (puce cliquable) — la réponse du patron au « personne
-  // ne remplit » : chaque projet porte un nom.
-  tr.appendChild(cellResponsable(r));
+  // TYPE ET RESPONSABLE N'ONT PLUS DE COLONNE (27/08). Mesuré sur les 184
+  // dossiers réels : le pilote n'est vraiment attribué que sur 24 d'entre eux
+  // (48 disent « À attribuer », ce qui ne dit rien) et le référent sur 5 ; le
+  // type, lui, est toujours rempli mais ne change RIEN à ce qu'on fait de la
+  // ligne — le nom du dossier le dit déjà, et le bon de commande le porte.
+  // Les deux contrôles restent entiers dans la fiche (typeControl /
+  // respControl) : on retire une colonne, pas une capacité.
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
   // ticket : le numéro du dossier, en clair, et son papier d'atelier réimprimable
@@ -2441,7 +2443,7 @@ function prioBand(r) {
 }
 
 // Cellule priorité : badge texte (Basse/Moyenne/Haute), menu au clic — même
-// patron que cellType. Les étoiles ★☆☆ étaient moins lisibles d'un coup d'œil
+// patron que typeControl. Les étoiles ★☆☆ étaient moins lisibles d'un coup d'œil
 // et moins « pro » qu'un mot ; « Haute » seule reste en accent (c'est la
 // priorité qui doit sauter aux yeux dans la file), Basse/Moyenne restent
 // neutres pour ne pas rivaliser avec elle.
@@ -2469,16 +2471,9 @@ function cellStars(r) {
   return td;
 }
 
-// Type de client : Pro / Perso / Asso / Revendeur. Menu au clic (4 valeurs).
-function cellType(r) {
-  const td = document.createElement('td');
-  td.className = 'col-type';
-  td.appendChild(typeControl(r));
-  return td;
-}
-
-// La puce de type, détachée de sa cellule — la fiche projet la réutilise (elle
-// n'existait que dans le tableau complet, donc nulle part sur la vue par défaut).
+// La puce de type : Pro / Perso / Asso / Revendeur, menu au clic (4 valeurs).
+// Elle n'a plus de colonne dans le tableau depuis le 27/08 — elle vit dans la
+// fiche projet, qui l'a toujours réutilisée telle quelle.
 function typeControl(r) {
   const type = document.createElement('button');
   type.type = 'button';
@@ -2513,16 +2508,9 @@ function typeControl(r) {
 // (puce en pointillés), pour qu'aucune commande ne reste anonyme. N'importe quel
 // collaborateur peut changer le référent (et le pilote) à tout moment, ou
 // revenir au nom de base via « Par défaut ».
-function cellResponsable(r) {
-  const td = document.createElement('td');
-  td.className = 'col-resp-cell';
-  td.appendChild(respControl(r));
-  return td;
-}
-
-// Pilote + référent, détachés de leur cellule : la fiche projet les réutilise.
-// Le PILOTE, en particulier, n'était modifiable que depuis le tableau complet —
-// donc inaccessible sur la vue par défaut, où seul le référent se change.
+// IL VIT DANS LA FICHE, plus dans une colonne : le pilote n'est réellement
+// attribué que sur 24 des 184 dossiers (et le référent sur 5) — une colonne
+// vide neuf fois sur dix mange la largeur de ce qu'on cherche vraiment.
 function respControl(r) {
   const stack = document.createElement('div');
   stack.className = 'resp-stack';
@@ -7088,9 +7076,13 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // Largeurs naturelles (miroir des .col-* du CSS) : sert de repli quand une
 // colonne est masquée (offsetWidth 0) au moment de figer les largeurs manuelles,
 // pour qu'elle reprenne une largeur utile — pas le plancher — en réapparaissant.
+// C'est AUSSI ce que `--cols-off` retranche au plancher de la grille quand on
+// range une colonne : cinq de ces valeurs avaient dérivé du CSS (handle, stars,
+// flag, sub_stage, del), donc la grille se voyait retrancher une largeur que la
+// colonne rangée n'occupait pas. Elles sont remises au miroir le 27/08.
 const COL_DEFAULTS = {
-  handle: 52, stars: 78, client_type: 96, responsable: 148, flag: 138, client: 210, ticket: 64,
-  product: 220, price: 92, sub_stage: 170, description: 260, deadline: 136, del: 200,
+  handle: 44, stars: 96, flag: 120, client: 214, ticket: 116,
+  product: 220, price: 132, sub_stage: 140, description: 260, deadline: 148, del: 158,
 };
 
 let colWidths = {};
@@ -7107,10 +7099,11 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 // le fait donc pas apparaître en Production, où il est toujours vide. Le rail
 // l'écrit noir sur blanc (voir la mention « vide ici ») pour qu'on ne croie
 // pas à un bug.
-// `v2` : nouvelle clé volontairement, pour que TOUS les postes repartent sur la
-// vue épurée. Un poste qui avait réglé ses colonnes en v1 aurait sinon gardé son
-// tableau, et l'écran validé par le patron ne serait apparu nulle part.
-const COLS_KEY = 'olda_cols_v2';
+// `v3` : nouvelle clé volontairement, pour que TOUS les postes repartent sur la
+// ligne arrêtée le 27/08 (cf. COLS_DEFAUT). Un poste qui avait réglé ses
+// colonnes en v2 aurait sinon gardé son écran, et la nouvelle ligne par défaut
+// ne serait apparue nulle part.
+const COLS_KEY = 'olda_cols_v3';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
 // posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
 // la masquer en plus du choix manuel. `surCarte` = colonne qui existe DANS LES
@@ -7118,8 +7111,6 @@ const COLS_KEY = 'olda_cols_v2';
 // retirer ne fait donc pas basculer d'une vue à l'autre.
 const PLANNING_COLS = [
   { key: 'stars',       label: 'Priorité' },
-  { key: 'client_type', label: 'Type' },
-  { key: 'responsable', label: 'Responsable' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
   // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
   // n'en nommait plus que la moitié.
@@ -7160,11 +7151,22 @@ const COLS_TABLEAU = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !c.surCarte).map((c) => c.key),
 );
 
-// PAR DÉFAUT, TOUT EST RANGÉ SAUF LE TICKET : le planning s'ouvre sur les
-// cartes épurées, et le ticket de l'atelier reste à portée de doigt (c'est le seul
-// repère que le client rapporte au comptoir). Les autres colonnes ne sont pas
-// perdues, elles attendent dans le rail « Colonnes » — en rallumer une ramène le
-// tableau avec elle.
+// CE QU'UNE LIGNE DIT PAR DÉFAUT (Charlie, 27/08) : à qui c'est, ses deux
+// papiers, ce que ça coûte, ce qui manque avant de produire, les infos, et pour
+// quand. Six faits, et c'est tout — le reste attend dans le rail, à un clic.
+//
+// Deux d'entre eux (Infos, Date souhaitée) n'existent que dans le tableau : le
+// planning s'ouvre donc sur le TABLEAU et non plus sur les cartes. « Revenir
+// aux cartes » est toujours là, en bas du rail.
+//
+// La colonne « Infos » porte aussi les blocs SANS colonne à eux — ce qui manque
+// et les quatre faits de production (cf. `horsTableau`) : les allumer se voit
+// dans cette cellule-là.
+const COLS_DEFAUT = new Set(['client', 'ticket', 'price', 'feu', 'description', 'deadline']);
+const COLS_MASQUEES_DEFAUT = new Set(
+  PLANNING_COLS.filter((c) => !c.locked && !COLS_DEFAUT.has(c.key)).map((c) => c.key),
+);
+
 // LE CHOIX SUIT LA PERSONNE, PLUS L'APPAREIL. Le chef d'atelier ne veut pas du
 // prix qui pollue sa ligne mais lui faut la largeur du DTF au dos ; la boutique
 // veut l'inverse — et les deux se nomment tour à tour sur le même PC. La clé
@@ -7179,24 +7181,15 @@ const colsKey = () => {
 function lireHiddenCols() {
   // On ne garde que des clés connues et jamais une colonne verrouillée : un
   // localStorage d'une version précédente ne doit pas pouvoir faire disparaître
-  // l'identité de la ligne. Un réglage enregistré avant l'arrivée du ticket ne
-  // le nomme pas : il reste donc allumé, comme il l'était.
+  // l'identité de la ligne, ni ressusciter une colonne retirée du rail.
   for (const cle of [colsKey(), COLS_KEY]) {
     try {
       const saved = JSON.parse(localStorage.getItem(cle) || 'null');
       if (!Array.isArray(saved)) continue;
-      const garde = saved.filter((k) => COLS_ETEIGNABLES.has(k));
-      // LE RÉGLAGE COMMUN DE LA MACHINE NE DISAIT PAS LA MÊME CHOSE. « Prix
-      // TTC » y était rangé par DÉFAUT — ça voulait dire « pas de colonne dans
-      // le tableau », alors que la carte, elle, affichait le TTC. Depuis que la
-      // case commande les deux vues, le relire tel quel ferait disparaître le
-      // montant de toutes les cartes de tous les postes, sans que personne
-      // l'ait demandé. On repart donc avec le prix ALLUMÉ ; qui n'en veut pas
-      // le décoche, et ce choix-là part sur sa clé à lui.
-      return new Set(cle === COLS_KEY ? garde.filter((k) => k !== 'price') : garde);
+      return new Set(saved.filter((k) => COLS_ETEIGNABLES.has(k)));
     } catch (_) { /* stockage refusé ou illisible : on essaie la suivante */ }
   }
-  return new Set(COLS_TABLEAU);
+  return new Set(COLS_MASQUEES_DEFAUT);
 }
 
 let hiddenCols = lireHiddenCols();

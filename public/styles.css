@@ -1332,7 +1332,11 @@ body.cards-off-ticket .pcard__ticket { display: none; }
   border-bottom: 1px solid var(--border);
   color: var(--text-2);
   font-weight: var(--graisse-texte);
-  font-size: var(--taille-texte);
+  /* UN EN-TÊTE EST UN INTITULÉ, pas du contenu : 14, comme partout ailleurs
+     dans l'application. À 17 il pesait autant que la ligne qu'il nomme — et
+     trois de ses mots ne tenaient plus dans leur colonne, coupés en plein
+     milieu d'une lettre (« DOCUME », « DATE SOUHAIT »). */
+  font-size: var(--taille-note);
   text-transform: uppercase;
   letter-spacing: .06em;
   text-align: left;
@@ -1504,7 +1508,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    remplace les étoiles ★☆☆ — plus lisible d'un coup d'œil, même patron que
    .type-tag. Seule « Haute » (p3) porte l'accent : c'est la seule qui doit
    sauter aux yeux dans une file de travail, Basse/Moyenne restent neutres. */
-.col-stars { width: 92px; }
+/* « MOYENNE » demande 94 px : à 92 la pastille de priorité se coupait de deux
+   pixels — invisible tant que la colonne restait rangée, permanent depuis
+   qu'on peut la rallumer sur la ligne par défaut. */
+.col-stars { width: 96px; }
 .col-stars-cell { text-align: center; }
 .prio-tag {
   position: relative;
@@ -1764,8 +1771,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   background: var(--border-soft);
 }
 
-/* Responsable : puce « initiale + nom » (QUI agit sur le projet) */
-.col-resp-cell { padding: 0; vertical-align: middle; }
+/* Responsable : puce « initiale + nom » (QUI agit sur le projet). Plus de
+   colonne dans le tableau depuis le 27/08 — la puce vit dans la fiche. */
 .resp-chip {
   position: relative;
   overflow: hidden;
@@ -1997,8 +2004,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    que l'étape courante ne remplit pas. */
 .grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
 .grid.off-ticket      col[data-col="ticket"],      .grid.off-ticket      th.col-ticket,   .grid.off-ticket      td.col-ticket-cell,
-.grid.off-client_type col[data-col="client_type"], .grid.off-client_type .col-type,
-.grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
 .grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
 .grid.off-price       col[data-col="price"],       .grid.off-price       th.col-price,    .grid.off-price       td.col-price-cell,
 .grid.off-sub_stage   col[data-col="sub_stage"],   .grid.off-sub_stage   th.col-sub,      .grid.off-sub_stage   td.col-sub-cell,
@@ -2660,12 +2665,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    les 2 colonnes texte (description / infos) n'ont PAS de largeur et se
    partagent équitablement l'espace restant → la grille s'adapte à la fenêtre. */
 .col-handle { width: var(--rond); }
-.col-type { width: 66px; }
-.col-resp { width: 132px; }
 .col-flag { width: 120px; }
-.col-price { width: 92px; }
+/* CE N'EST NI LE TTC NI L'INTITULÉ QUI DÉCIDENT, C'EST LA LIGNE « HT : … ».
+   À 92 px, « HT : 1 394,23 € » (119 px) sortait de la colonne dès le premier
+   millier — mesuré sur une commande réelle de 1 450 €. 132 px tiennent cinq
+   chiffres (« HT : 12 394,23 € », 129 px), ce qu'aucune commande de l'atelier
+   ne dépasse. */
+.col-price { width: 132px; }
 .col-sub { width: 140px; }
-.col-deadline { width: 124px; }
+/* « DATE SOUHAITÉE » demande 143 px — l'intitulé, là encore, est plus large
+   que le badge qu'il nomme. */
+.col-deadline { width: 148px; }
 /* Quatre boutons depuis que « Ouvrir la fiche » a rejoint la file, contre trois
    avant : 4 × 34 + 3 × 4 (le `gap` de .row-actions) + 8 de marge = 156, plus la
    même petite réserve qu'avant. */
@@ -2674,12 +2684,18 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    incompressible (204 px à six pastilles). Élastique, elle tombait à 85 px sur les étapes qui
    affichent Prix ET Sous-étape, et le cluster sortait de la cellule. 210 px =
    les pastilles + une marge, et le nom dispose de la même largeur au-dessus. */
-.col-client { width: 210px; }
+/* 210 px = les pastilles + une marge — et « NOM DU DOSSIER CLIENT » y tient
+   à 4 px près. */
+.col-client { width: 214px; }
 /* Ticket : une icône, pas un numéro (cf. cellTicket) — la largeur d'une
    pastille et ses marges, comme les autres colonnes à puce. */
 /* DEUX pastilles depuis le 27/08 (ticket d'atelier + bon de commande) :
-   2 x 30 px + 6 px d'écart + 2 x 8 px de rembourrage = 82 px. */
-.col-ticket { width: 82px; }
+   2 x 30 px + 6 px d'écart + 2 x 8 px de rembourrage = 82 px pour le CONTENU.
+   C'EST L'INTITULÉ QUI DÉCIDE, et il est plus large que ce qu'il nomme :
+   « DOCUMENTS » demande 113 px, et le tableau étant `table-layout: fixed`, il
+   se coupait en plein milieu d'une lettre (« DOCUME »). Une colonne ne peut
+   pas être plus étroite que son propre nom. */
+.col-ticket { width: 116px; }
 /* « DESCRIPTION » ET « INFOS » ONT UNE LARGEUR, ELLES AUSSI. Elles étaient les
    seules à ne pas en avoir, et `table-layout: fixed` ne lit QUE la première
    rangée pour répartir : sur les étapes qui en ouvrent une par une BANNIÈRE de
@@ -2707,16 +2723,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    valable — retirer une colonne de 210 px baisse le plancher de 210 px, point.
    Sans ça, retirer trois colonnes laissait la grille défiler horizontalement
    alors qu'on venait justement de lui faire de la place.
-   Les trois valeurs comptent la colonne Ticket (64 px) : elle est allumée par
-   défaut, et `--cols-off` la retranche dès qu'on la retire du rail.
+   Les trois valeurs comptent la colonne Documents (82 px) : elle est allumée
+   par défaut, et `--cols-off` la retranche dès qu'on la retire du rail.
+   −198 px le 27/08 : Type (66) et Responsable (132) ont quitté le tableau, et
+   elles ne peuvent plus être retranchées par `--cols-off` puisqu'elles ne sont
+   plus dans PLANNING_COLS — c'est donc au plancher de les oublier.
+   +106 px le même jour : cinq colonnes ont été élargies à ce qu'elles portent
+   vraiment — Documents +34, Date souhaitée +24 et Nom du dossier client +4
+   (leur propre intitulé), Prix TTC +40 (sa ligne « HT » au-delà du millier),
+   Priorité +4 (la pastille « Moyenne »).
    +42 px depuis que la colonne d'actions porte « Ouvrir la fiche » (116 → 158) :
    sans ce report, ce sont Description et Infos qui payaient le bouton. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1376px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1326px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1466px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1284px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1234px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1374px - var(--cols-off, 0px)); }
 
-.grid thead th.col-type { text-align: center; }
-.grid tbody td.col-type { text-align: center; vertical-align: middle; }
 
 /* Description (produit) + Infos (notes) */
 .col-product-cell,

@@ -417,11 +417,17 @@ assert.match(
   assert.match(APP, /const colsKey = \(\) => \{[\s\S]*?lirePoste\(\)/);
   assert.match(APP, /for \(const cle of \[colsKey\(\), COLS_KEY\]\)/,
     'qui n’a pas encore choisi repart du réglage de la machine, pas de zéro');
-  // Le réglage commun rangeait « Prix TTC » PAR DÉFAUT — ça voulait dire « pas
-  // de colonne dans le tableau », pas « pas de montant sur la carte ». Le
-  // relire tel quel effacerait le TTC de toutes les cartes de tous les postes.
-  assert.match(APP, /cle === COLS_KEY \? garde\.filter\(\(k\) => k !== 'price'\) : garde/,
-    'le prix repart allumé quand on hérite du réglage de la machine');
+  // LA CLÉ CHANGE QUAND LA LIGNE PAR DÉFAUT CHANGE. Un poste qui avait réglé
+  // ses colonnes en v2 garderait son écran, et la nouvelle ligne n'apparaîtrait
+  // nulle part — c'est exactement le rattrapage qu'on avait dû faire en v2.
+  assert.match(APP, /const COLS_KEY = 'olda_cols_v3';/,
+    'nouvelle ligne par défaut = nouvelle clé, sinon personne ne la voit');
+  // Le rattrapage v2 (« le prix repart allumé ») n'a plus lieu d'être : rien
+  // n'a encore écrit sous la clé v3, et tout ce qui l'écrira sortira du code
+  // actuel. Le filtre par exception est donc PARTI — le relire ferait revenir
+  // une colonne que la personne vient de ranger.
+  assert.ok(!/k !== 'price'/.test(APP),
+    'plus de colonne rallumée par exception à la lecture du réglage');
   assert.match(APP, /addEventListener\('olda:poste'/,
     'changer de personne change l’écran tout de suite, pas au prochain rechargement');
 
