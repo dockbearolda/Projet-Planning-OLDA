@@ -1575,6 +1575,17 @@ renderProducts();
   });
 
   window.showSaleWizardStep=displayStep;
+  /* L'ÉTAPE COURANTE DOIT SORTIR DE CETTE FERMETURE. Le contrôle en direct
+     (`refreshLive`, plus bas) vit dans un AUTRE bloc de script et lisait
+     `currentSaleStep` en direct. Ce bloc-ci est une fonction anonyme appelée
+     aussitôt : la variable n'en sort pas, `typeof` la trouvait donc toujours
+     indéfinie, et le contrôle retombait sur son repli — l'étape 1, pour
+     toujours. Le bandeau vert « ✓ toutes les informations sont renseignées »
+     s'affichait donc aux étapes 2, 3 et 4 sans rien avoir vérifié : à l'étape
+     « Client », il disait que tout était bon pendant que le bouton refusait
+     d'avancer faute de client choisi. On EXPOSE, et on ne lit plus une
+     variable au hasard de la portée. */
+  window.etapeVenteCourante=function(){return currentSaleStep;};
   displayStep(1);
 })();
 </script>
@@ -2284,7 +2295,10 @@ renderProducts();
     // encaissée et déjà partie au planning. Il garde son rôle aux étapes 1 à 3,
     // où il dit ce qui manque et bloque le bouton « suivant ».
     var fini=el('paymentSuccess')&&!el('paymentSuccess').classList.contains('hidden');
-    var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
+    /* L'étape vient de l'accesseur exporté par le bloc du parcours. Elle se
+       lisait avant sur l'identifiant nu `currentSaleStep`, enfermé dans une
+       fonction anonyme d'un autre bloc : le repli à 1 s'appliquait toujours. */
+    var step=(typeof window.etapeVenteCourante==='function')?window.etapeVenteCourante():1;
     if(fini||step>=4){
       var old=el('liveCheckSale');
       if(old)old.remove();
