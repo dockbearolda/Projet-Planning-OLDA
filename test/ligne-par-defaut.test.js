@@ -5,24 +5,24 @@
 // Le rail des colonnes comptait seize entrées. Charlie en a arrêté six — et
 // seulement six :
 //
-//   Nom du dossier client · Documents · Prix TTC · Ce qui manque · Infos ·
-//   Date souhaitée
+//   Qui suit · Nom du dossier client · Documents · Prix TTC · Ce qui manque ·
+//   Infos · Date souhaitée
 //
-// À qui c'est, ses deux papiers, ce que ça coûte, ce qui l'empêche d'avancer,
-// les notes, et pour quand. Deux d'entre elles n'existent que dans le tableau :
-// le planning s'ouvre donc sur le TABLEAU, plus sur les cartes.
+// Qui s'en occupe, à qui c'est, ses deux papiers, ce que ça coûte, ce qui
+// l'empêche d'avancer, les notes, et pour quand. Deux d'entre elles n'existent
+// que dans le tableau : le planning s'ouvre donc sur le TABLEAU, plus sur les
+// cartes.
 //
-// DEUX COLONNES ONT ÉTÉ RETIRÉES, mesure à l'appui sur les 184 dossiers réels
-// de la production :
+// UNE COLONNE A ÉTÉ RETIRÉE — TYPE : toujours rempli sur les 184 dossiers
+// réels, mais il ne change RIEN à ce qu'on fait de la ligne (le nom du dossier
+// le dit, et le bon de commande le porte). ON RETIRE UNE COLONNE, PAS UNE
+// CAPACITÉ : `typeControl` vivait déjà dans la fiche projet, il y reste entier.
 //
-//   · RESPONSABLE — le pilote n'est vraiment attribué que sur 24 d'entre eux
-//     (48 disent « À attribuer », ce qui ne dit rien) et le référent sur 5.
-//     Une colonne de 132 px vide neuf fois sur dix.
-//   · TYPE — toujours rempli, mais il ne change RIEN à ce qu'on fait de la
-//     ligne : le nom du dossier le dit, et le bon de commande le porte.
-//
-// ON RETIRE UNE COLONNE, PAS UNE CAPACITÉ : les deux contrôles vivaient déjà
-// dans la fiche projet (`typeControl`, `respControl`), ils y restent entiers.
+// « QUI SUIT » A ÉTÉ RETIRÉE PUIS REMISE LE MÊME JOUR. Le chiffre qui l'avait
+// condamnée — 24 pilotes attribués sur 184, 5 référents — disait l'inverse de
+// ce que j'en avais lu : on n'attribue pas un dossier en ouvrant sa fiche, on
+// l'attribue en le voyant passer. La colonne est donc sur la ligne PAR DÉFAUT,
+// et elle porte les DEUX puces, le pilote et le référent en dessous.
 //
 // Et le piège qui a déjà coûté une colonne masquée de travers : un <col> agit
 // sur la colonne de MÊME RANG, son `data-col` n'est qu'une étiquette. Retirer
@@ -43,8 +43,8 @@ const CSS = lire('styles.css');
 const defaut = APP.match(/const COLS_DEFAUT = new Set\(\[([^\]]*)\]\)/);
 assert.ok(defaut, 'la ligne par défaut doit être écrite en clair, pas déduite');
 const cles = defaut[1].match(/'([^']+)'/g).map((x) => x.slice(1, -1));
-assert.deepStrictEqual(cles, ['client', 'ticket', 'price', 'feu', 'description', 'deadline'],
-  'six faits, dans l’ordre où la ligne les lit');
+assert.deepStrictEqual(cles, ['responsable', 'client', 'ticket', 'price', 'feu', 'description', 'deadline'],
+  'les faits de la ligne, dans l’ordre où elle les lit');
 
 // Le reste se déduit de la liste : ajouter une colonne au rail ne doit pas
 // l'allumer chez tout le monde sans que personne l'ait demandé.
@@ -74,7 +74,7 @@ assert.match(APP, /\{ key: 'feu',\s+label: '[^']+', surCarte: true, horsTableau:
 // ---------------------------------------------------------------------------
 // 2. TYPE ET RESPONSABLE ONT QUITTÉ LE TABLEAU — AUX TROIS ENDROITS
 // ---------------------------------------------------------------------------
-for (const mort of ['client_type', 'responsable']) {
+for (const mort of ['client_type']) {
   assert.ok(!new RegExp(`\\{ key: '${mort}',`).test(APP), `${mort} ne doit plus être une colonne`);
   assert.ok(!HTML.includes(`<col data-col="${mort}"`), `le <col> ${mort} doit avoir disparu`);
   assert.ok(!new RegExp(`data-sort="${mort}"`).test(HTML), `le <th> ${mort} doit avoir disparu`);
@@ -82,11 +82,19 @@ for (const mort of ['client_type', 'responsable']) {
   assert.ok(!new RegExp(`\\b${mort}: \\d+`).test(APP.match(/const COL_DEFAULTS = \{[\s\S]*?\};/)[0]),
     `${mort} ne doit plus peser dans COL_DEFAULTS`);
 }
-for (const mort of ['cellType', 'cellResponsable']) {
-  assert.ok(!new RegExp(`function ${mort}\\b`).test(APP), `${mort} est du code mort`);
-}
-assert.ok(!/\.col-type \{|\.col-resp \{|\.col-resp-cell \{/.test(CSS),
-  'les largeurs et l’habillage des deux colonnes retirées partent avec elles');
+assert.ok(!/function cellType\b/.test(APP), 'cellType est du code mort');
+assert.ok(!/\.col-type \{/.test(CSS),
+  'la largeur de la colonne retirée part avec elle');
+
+// ON ATTRIBUE UNE LIGNE DEPUIS LA LIGNE. La cellule est revenue, et elle porte
+// le contrôle COMPLET — pilote ET référent — pas seulement le premier.
+assert.match(APP, /function cellResponsable\(r\) \{[\s\S]*?td\.appendChild\(respControl\(r\)\)/,
+  'la cellule pose le contrôle entier, pas une puce isolée');
+assert.match(APP, /tr\.appendChild\(cellResponsable\(r\)\);/,
+  'buildRow doit reposer la cellule sur la ligne');
+assert.match(CSS, /\.col-resp \{ width: 132px; \}/);
+assert.match(CSS, /\.grid\.off-responsable col\[data-col="responsable"\]/,
+  'elle se range depuis le rail, comme les autres');
 
 // ON RETIRE UNE COLONNE, PAS UNE CAPACITÉ.
 assert.match(APP, /ldBox\('Type de client', typeControl\(r\)\)/,
@@ -112,6 +120,7 @@ const ordreTd = [...corps.matchAll(/(?:tr\.appendChild\((cell[A-Za-z]+)\(r\)\)|c
 const LIGNE = [
   ['handle', 'col-handle', 'col-handle'],
   ['stars', 'col-stars', 'cellStars'],
+  ['responsable', 'col-resp', 'cellResponsable'],
   ['client', 'col-client', 'cellDossier'],
   ['ticket', 'col-ticket', 'cellTicket'],
   ['product', 'col-product', 'cellDescription'],
@@ -133,7 +142,7 @@ assert.deepStrictEqual(ordreTd, LIGNE.map((x) => x[2]), 'buildRow pose les cellu
 // encore. Une colonne supprimée doit donc sortir du plancher lui-même, sinon
 // la grille garde 198 px de largeur qu'aucune colonne n'occupe et continue de
 // défiler de côté alors qu'on vient de lui faire de la place.
-for (const px of [1284, 1234, 1374]) {
+for (const px of [1416, 1366, 1506]) {
   assert.ok(CSS.includes(`min-width: calc(${px}px - var(--cols-off, 0px))`),
     `le plancher ${px} doit refléter les colonnes réellement présentes`);
 }
@@ -155,7 +164,7 @@ for (const [sel, px] of [['col-ticket', 116], ['col-price', 132], ['col-deadline
 assert.match(CSS, /\.grid thead th \{[\s\S]*?font-size: var\(--taille-note\)/);
 // Les mots du tableau et ceux du rail sont les MÊMES : deux noms pour une
 // colonne, c'est deux composants qui se ressemblent au lieu d'un seul.
-for (const mot of ['Nom du dossier client', 'Documents', 'Prix TTC', 'Date souhaitée']) {
+for (const mot of ['Nom du dossier client', 'Documents', 'Prix TTC', 'Date souhaitée', 'Qui suit']) {
   assert.ok(HTML.includes(`>${mot}</th>`), `le <th> doit dire « ${mot} », comme le rail`);
   assert.ok(APP.includes(`label: '${mot}'`), `le rail doit dire « ${mot} », comme le <th>`);
 }
@@ -165,11 +174,11 @@ for (const mot of ['Nom du dossier client', 'Documents', 'Prix TTC', 'Date souha
 const defauts = APP.match(/const COL_DEFAULTS = \{[\s\S]*?\};/)[0];
 for (const [cle, sel] of [['ticket', 'col-ticket'], ['price', 'col-price'],
   ['deadline', 'col-deadline'], ['client', 'col-client'], ['stars', 'col-stars'],
-  ['flag', 'col-flag'], ['sub_stage', 'col-sub'], ['del', 'col-del'],
+  ['flag', 'col-flag'], ['sub_stage', 'col-sub'], ['del', 'col-del'], ['responsable', 'col-resp'],
   ['product', 'col-product'], ['description', 'col-infos']]) {
   const px = CSS.match(new RegExp(`\\.${sel} \\{ width: (\\d+)px; \\}`))[1];
   assert.ok(new RegExp(`\\b${cle}: ${px}\\b`).test(defauts),
     `COL_DEFAULTS.${cle} doit valoir ${px}, comme .${sel}`);
 }
 
-console.log('✓ ligne par défaut : six faits, deux colonnes retirées, et les trois rangs alignés');
+console.log('✓ ligne par défaut : qui suit la ligne, ce qu’elle porte, et les trois rangs alignés');

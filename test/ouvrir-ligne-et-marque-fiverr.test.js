@@ -188,11 +188,11 @@ assert.ok(/\.col-del \{ white-space: nowrap; text-align: right; padding-right: 8
 
 // Les planchers de la grille suivent la LARGEUR RÉELLE des colonnes. Ils ont
 // d'abord grandi de 42 px avec la colonne d'actions (116 → 158), puis perdu
-// 198 px le 27/08 quand Type (66) et Responsable (132) ont quitté le tableau —
-// une colonne retirée de PLANNING_COLS ne peut plus être retranchée par
-// `--cols-off`, c'est donc au plancher de l'oublier — et regagné 66 px le même
-// jour, quand quatre colonnes ont été élargies à la taille de leur intitulé.
-for (const [avant, apres] of [[1376, 1284], [1326, 1234], [1466, 1374]]) {
+// 66 px le 27/08 quand Type a quitté le tableau — une colonne retirée de
+// PLANNING_COLS ne peut plus être retranchée par `--cols-off`, c'est donc au
+// plancher de l'oublier — et regagné 106 px le même jour, quand cinq colonnes
+// ont été élargies à ce qu'elles portent vraiment.
+for (const [avant, apres] of [[1376, 1416], [1326, 1366], [1466, 1506]]) {
   assert.ok(CSS.includes(`min-width: calc(${apres}px - var(--cols-off, 0px))`),
     `le plancher ${avant} doit avoir suivi le retrait des deux colonnes`);
 }

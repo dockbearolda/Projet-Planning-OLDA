@@ -1771,8 +1771,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   background: var(--border-soft);
 }
 
-/* Responsable : puce « initiale + nom » (QUI agit sur le projet). Plus de
-   colonne dans le tableau depuis le 27/08 — la puce vit dans la fiche. */
+/* Qui suit : puce « initiale + nom » (QUI agit sur le projet), et le référent
+   juste en dessous quand il diffère du pilote. */
+.col-resp-cell { padding: 0; vertical-align: middle; }
 .resp-chip {
   position: relative;
   overflow: hidden;
@@ -2003,6 +2004,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    par étape. Les deux se cumulent — le choix du rail ne rouvre pas une colonne
    que l'étape courante ne remplit pas. */
 .grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
+.grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
 .grid.off-ticket      col[data-col="ticket"],      .grid.off-ticket      th.col-ticket,   .grid.off-ticket      td.col-ticket-cell,
 .grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
 .grid.off-price       col[data-col="price"],       .grid.off-price       th.col-price,    .grid.off-price       td.col-price-cell,
@@ -2665,6 +2667,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    les 2 colonnes texte (description / infos) n'ont PAS de largeur et se
    partagent équitablement l'espace restant → la grille s'adapte à la fenêtre. */
 .col-handle { width: var(--rond); }
+/* « Qui suit » : la puce du pilote (« M Mélina ») et celle du référent en
+   dessous. L'intitulé, lui, tient largement — c'est le contenu qui décide. */
+.col-resp { width: 132px; }
 .col-flag { width: 120px; }
 /* CE N'EST NI LE TTC NI L'INTITULÉ QUI DÉCIDENT, C'EST LA LIGNE « HT : … ».
    À 92 px, « HT : 1 394,23 € » (119 px) sortait de la colonne dès le premier
@@ -2725,18 +2730,19 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    alors qu'on venait justement de lui faire de la place.
    Les trois valeurs comptent la colonne Documents (82 px) : elle est allumée
    par défaut, et `--cols-off` la retranche dès qu'on la retire du rail.
-   −198 px le 27/08 : Type (66) et Responsable (132) ont quitté le tableau, et
-   elles ne peuvent plus être retranchées par `--cols-off` puisqu'elles ne sont
-   plus dans PLANNING_COLS — c'est donc au plancher de les oublier.
+   −66 px le 27/08 : Type (66) a quitté le tableau, et une colonne supprimée ne
+   peut plus être retranchée par `--cols-off` puisqu'elle n'est plus dans
+   PLANNING_COLS — c'est donc au plancher de l'oublier. « Qui suit » (132), elle,
+   est revenue le même jour : on attribue une ligne en la voyant passer.
    +106 px le même jour : cinq colonnes ont été élargies à ce qu'elles portent
    vraiment — Documents +34, Date souhaitée +24 et Nom du dossier client +4
    (leur propre intitulé), Prix TTC +40 (sa ligne « HT » au-delà du millier),
    Priorité +4 (la pastille « Moyenne »).
    +42 px depuis que la colonne d'actions porte « Ouvrir la fiche » (116 → 158) :
    sans ce report, ce sont Description et Infos qui payaient le bouton. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1284px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1234px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1374px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1416px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1366px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1506px - var(--cols-off, 0px)); }
 
 
 /* Description (produit) + Infos (notes) */

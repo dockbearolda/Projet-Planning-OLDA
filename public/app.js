@@ -2341,13 +2341,15 @@ function buildRow(r) {
 
   // étoiles : 1 à 3, attribuables au clic (réglent la priorité de la ligne)
   tr.appendChild(cellStars(r));
-  // TYPE ET RESPONSABLE N'ONT PLUS DE COLONNE (27/08). Mesuré sur les 184
-  // dossiers réels : le pilote n'est vraiment attribué que sur 24 d'entre eux
-  // (48 disent « À attribuer », ce qui ne dit rien) et le référent sur 5 ; le
-  // type, lui, est toujours rempli mais ne change RIEN à ce qu'on fait de la
-  // ligne — le nom du dossier le dit déjà, et le bon de commande le porte.
-  // Les deux contrôles restent entiers dans la fiche (typeControl /
-  // respControl) : on retire une colonne, pas une capacité.
+  // QUI SUIT : le pilote (puce principale) et le référent juste en dessous.
+  // C'est ICI qu'on attribue une ligne — pas dans la fiche, qu'il faut ouvrir.
+  // Le peu de dossiers attribués (24 pilotes sur 184) n'était pas une raison de
+  // retirer la colonne le 27/08 : c'était une raison de la garder SOUS LES YEUX.
+  tr.appendChild(cellResponsable(r));
+  // TYPE N'A PLUS DE COLONNE (27/08) : toujours rempli, mais il ne change rien
+  // à ce qu'on fait de la ligne — le nom du dossier le dit, et le bon de
+  // commande le porte. Son contrôle reste entier dans la fiche (typeControl) :
+  // on retire une colonne, pas une capacité.
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
   // ticket : le numéro du dossier, en clair, et son papier d'atelier réimprimable
@@ -2508,9 +2510,16 @@ function typeControl(r) {
 // (puce en pointillés), pour qu'aucune commande ne reste anonyme. N'importe quel
 // collaborateur peut changer le référent (et le pilote) à tout moment, ou
 // revenir au nom de base via « Par défaut ».
-// IL VIT DANS LA FICHE, plus dans une colonne : le pilote n'est réellement
-// attribué que sur 24 des 184 dossiers (et le référent sur 5) — une colonne
-// vide neuf fois sur dix mange la largeur de ce qu'on cherche vraiment.
+function cellResponsable(r) {
+  const td = document.createElement('td');
+  td.className = 'col-resp-cell';
+  td.appendChild(respControl(r));
+  return td;
+}
+
+// Pilote + référent, détachés de leur cellule : la fiche projet les réutilise.
+// Le PILOTE, en particulier, n'était modifiable que depuis le tableau complet —
+// donc inaccessible sur la vue par défaut, où seul le référent se change.
 function respControl(r) {
   const stack = document.createElement('div');
   stack.className = 'resp-stack';
@@ -7081,7 +7090,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // flag, sub_stage, del), donc la grille se voyait retrancher une largeur que la
 // colonne rangée n'occupait pas. Elles sont remises au miroir le 27/08.
 const COL_DEFAULTS = {
-  handle: 44, stars: 96, flag: 120, client: 214, ticket: 116,
+  handle: 44, stars: 96, responsable: 132, flag: 120, client: 214, ticket: 116,
   product: 220, price: 132, sub_stage: 140, description: 260, deadline: 148, del: 158,
 };
 
@@ -7111,6 +7120,10 @@ const COLS_KEY = 'olda_cols_v3';
 // retirer ne fait donc pas basculer d'une vue à l'autre.
 const PLANNING_COLS = [
   { key: 'stars',       label: 'Priorité' },
+  // « Qui suit », le même mot qu'en fiche et que dans le <th> : trois écrans,
+  // un seul nom. « Responsable » nommait la colonne et « Qui suit » la fiche,
+  // pour le même contrôle.
+  { key: 'responsable', label: 'Qui suit' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
   // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
   // n'en nommait plus que la moitié.
@@ -7151,9 +7164,14 @@ const COLS_TABLEAU = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !c.surCarte).map((c) => c.key),
 );
 
-// CE QU'UNE LIGNE DIT PAR DÉFAUT (Charlie, 27/08) : à qui c'est, ses deux
-// papiers, ce que ça coûte, ce qui manque avant de produire, les infos, et pour
-// quand. Six faits, et c'est tout — le reste attend dans le rail, à un clic.
+// CE QU'UNE LIGNE DIT PAR DÉFAUT (Charlie, 27/08) : qui la suit, à qui c'est,
+// ses deux papiers, ce que ça coûte, ce qui manque avant de produire, les
+// infos, et pour quand. Le reste attend dans le rail, à un clic.
+//
+// « QUI SUIT » EST DANS LA LIGNE, pas seulement dans le rail : on attribue un
+// dossier en le voyant passer, pas en ouvrant sa fiche. C'est précisément
+// parce que 24 dossiers sur 184 ont un pilote qu'il faut le demander là où
+// l'œil se pose.
 //
 // Deux d'entre eux (Infos, Date souhaitée) n'existent que dans le tableau : le
 // planning s'ouvre donc sur le TABLEAU et non plus sur les cartes. « Revenir
@@ -7162,7 +7180,7 @@ const COLS_TABLEAU = new Set(
 // La colonne « Infos » porte aussi les blocs SANS colonne à eux — ce qui manque
 // et les quatre faits de production (cf. `horsTableau`) : les allumer se voit
 // dans cette cellule-là.
-const COLS_DEFAUT = new Set(['client', 'ticket', 'price', 'feu', 'description', 'deadline']);
+const COLS_DEFAUT = new Set(['responsable', 'client', 'ticket', 'price', 'feu', 'description', 'deadline']);
 const COLS_MASQUEES_DEFAUT = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !COLS_DEFAUT.has(c.key)).map((c) => c.key),
 );
