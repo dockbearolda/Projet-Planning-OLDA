@@ -106,8 +106,20 @@ b,strong{font-weight:var(--graisse-forte)}
    rien d'autre à toucher.
    La saisie manuelle reste EN HAUT : le catalogue ne couvre pas tout, et rien
    de ce qui se faisait avant ne doit devenir plus long à faire. */
-.cat-ligne{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:var(--pas-3);align-items:end}
+/* LE CHAMP QUI COMPTE N'EST PAS LE PLUS ETROIT (Charlie, 27/08/2026).
+   La troisieme colonne etait en «auto» : le bouton prenait sa largeur
+   intrinseque — 222 px sur une rangee de 526 — et le menu du catalogue
+   tombait a 142 px, moins que son propre intitule. «Choisir un produit...»
+   y sortait coupe, et «Tasse ceramique 350 ml — TC 01» aussi.
+   La rangee passe donc en flexible qui RENVOIE A LA LIGNE : le produit garde
+   un plancher de 240 px, et c'est le bouton qui descend quand la place manque.
+   Il reste colle a droite par une marge automatique (jamais par flex-end, qui
+   rogne par la gauche des qu'il deborde). */
+.cat-ligne{display:flex;flex-wrap:wrap;gap:var(--pas-3);align-items:flex-end}
 .cat-ligne .field{margin-bottom:0;min-width:0}
+.cat-ligne>.field:first-child{flex:1 1 240px}
+.cat-ligne>.field:nth-child(2){flex:0 0 130px}
+.cat-ligne>.field:last-child{flex:0 0 auto;margin-left:auto}
 .cat-ligne button{white-space:nowrap}
 /* Le menu des produits : la FAMILLE d'abord, en gras et à l'encre ; le
    produit dessous, en écriture normale. Chrome rend l'intitulé d'un
@@ -123,7 +135,7 @@ b,strong{font-weight:var(--graisse-forte)}
    il n'y en a pas un deuxième à tenir. */
 .cat-hors{display:inline-flex;align-items:center;gap:7px;margin-top:var(--pas-3)}
 .cat-hors-plus{line-height:1}
-@media(max-width:700px){.cat-ligne{grid-template-columns:1fr}.cat-ligne button{width:100%}.cat-hors{display:flex;width:100%;justify-content:center}}
+@media(max-width:700px){.cat-ligne>.field{flex:1 1 100%}.cat-ligne button{width:100%}.cat-hors{display:flex;width:100%;justify-content:center}}
 /* LA DEMANDE — une LIGNE par article, pas une carte. Un devis de dix articles
    tenait sur trois écrans : la vendeuse ne voyait plus ce qu'elle venait
    d'ajouter. La quantité d'abord (c'est elle qu'on relit), le nom À SA SUITE,

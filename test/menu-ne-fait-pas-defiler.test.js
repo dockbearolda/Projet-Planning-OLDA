@@ -69,12 +69,88 @@ assert.ok(!/window\.innerWidth/.test(placer[0]),
 // au cas où il appellerait `preventDefault()` — ce qu'il ne fait pas et ne peut
 // pas faire ici. C'est une image d'attente offerte à chaque défilement, pour
 // rien.
-const ecouteScroll = PONT.match(/window\.addEventListener\('scroll',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\},([^)]*)\)/);
+const ecouteScroll = PONT.match(/window\.addEventListener\('scroll',menuDefilementExterieur,([^)]*)\)/);
 assert.ok(ecouteScroll, 'un défilement referme les menus');
 assert.ok(/capture:\s*true/.test(ecouteScroll[1]) || ecouteScroll[1].trim() === 'true',
   '… et l’écoute est en capture — un conteneur qui défile ne remonte pas au document');
 assert.ok(/passive:\s*true/.test(ecouteScroll[1]),
   '… et en passif : elle n’annule rien, elle ne doit donc rien faire attendre');
+
+// --- 3 bis. MAIS SA PROPRE LISTE N'EST PAS « L'ÉCRAN QUI DÉFILE » ---------
+// (Charlie, 27/08/2026 : « ce menu bug, ça ne doit pas arriver ».)
+//
+// La même écoute, en capture sur `window`, voyait AUSSI le défilement de la
+// liste du panneau — et refermait le menu sous le doigt. Deux symptômes, une
+// seule cause :
+//   · à la molette, 82 produits sur 13 familles : la liste part, le menu ferme ;
+//   · à l'OUVERTURE, `menuPeindreVise()` amène le choix en cours à l'écran par
+//     `scrollIntoView`. Dès qu'on avait choisi un article situé plus bas que la
+//     fenêtre de liste, le menu se refermait AU MOMENT MÊME où il s'ouvrait —
+//     et ne se rouvrait plus jamais. Mesuré : « TC 01 », 68e de 82, liste
+//     déroulée à 2921 px.
+//
+// Le garde-fou EXÉCUTE la règle plutôt que de la relire : on sort la fonction
+// du fichier et on la fait tourner sur des objets factices. Une reformulation
+// du test d'appartenance ne peut donc pas passer à côté.
+const source = PONT.match(/function menuDefilementExterieur\(ev\)\{[\s\S]*?\n\}/);
+assert.ok(source, 'le tri des défilements est une fonction nommée, donc lisible et testable');
+
+function faireNoeud(enfants = []) {
+  const n = { enfants };
+  n.contains = (autre) => autre === n || enfants.some((e) => e.contains && e.contains(autre));
+  return n;
+}
+const vm = require('node:vm');
+function joue(ev, etats, cal) {
+  const fermes = [];
+  const contexte = vm.createContext({
+    ev,
+    menus: new Map(etats.map((e, i) => [i, e])),
+    menuFermer: (e) => { e.ouvert = false; fermes.push(e.nom); },
+    calOuvert: cal || null,
+    calFermer: () => fermes.push('calendrier'),
+    // Les noeuds factices sont de simples objets : `instanceof Node` doit donc
+    // les reconnaitre, sinon la garde tomberait pour la mauvaise raison.
+    Node: Object,
+  });
+  vm.runInContext(`${source[0]}\nmenuDefilementExterieur(ev);`, contexte);
+  return fermes;
+}
+
+const listeA = faireNoeud();
+const panneauA = faireNoeud([listeA]);
+const menuA = { nom: 'A', ouvert: true, panneau: panneauA };
+const panneauB = faireNoeud([]);
+const menuB = { nom: 'B', ouvert: true, panneau: panneauB };
+
+// La liste du menu A défile : A reste ouvert. B, lui, n'a rien à voir avec ce
+// geste — mais il est ailleurs à l'écran, et il se referme comme avant.
+assert.deepStrictEqual(joue({ target: listeA }, [menuA, { ...menuB }]), ['B'],
+  'le défilement de sa PROPRE liste ne referme pas le menu');
+
+// Le document défile : tout se referme.
+menuA.ouvert = true;
+assert.deepStrictEqual(joue({ target: faireNoeud() }, [menuA, { ...menuB, ouvert: true }]).sort(), ['A', 'B'],
+  '… mais un défilement venu d’ailleurs les referme tous, comme avant');
+
+// Un menu déjà fermé ne se referme pas deux fois.
+assert.deepStrictEqual(joue({ target: faireNoeud() }, [{ nom: 'C', ouvert: false, panneau: faireNoeud() }]), [],
+  'un menu fermé est laissé tranquille');
+
+// LE CALENDRIER SUIT LA MÊME RÈGLE. Il est posé en coordonnées de fenêtre lui
+// aussi : sans ça il restait en plan pendant que son champ s'en allait.
+const panneauCal = faireNoeud();
+assert.deepStrictEqual(joue({ target: faireNoeud() }, [], { panneau: panneauCal }), ['calendrier'],
+  'un défilement de l’écran referme aussi le calendrier');
+assert.deepStrictEqual(joue({ target: panneauCal }, [], { panneau: panneauCal }), [],
+  '… et jamais un défilement venu de lui-même');
+
+// --- 3 ter. LE DÉFILEMENT S'ARRÊTE AU BAS DE LA LISTE ---------------------
+// Sans `overscroll-behavior`, la molette poursuivie en bout de liste part dans
+// la page derrière — donc dans un défilement d'écran, donc dans la fermeture du
+// menu, exactement quand on cherche le dernier article.
+assert.match(PONT, /\.menu-liste\{[^}]*overscroll-behavior:contain/,
+  'la liste retient le défilement au lieu de le passer à la page');
 const ecouteResize = PONT.match(/window\.addEventListener\('resize',\(\)=>\{menus\.forEach\(a=>menuFermer\(a,false\)\)\}(?:,([^)]*))?\)/);
 assert.ok(ecouteResize, '… et un redimensionnement aussi');
 assert.ok(/passive:\s*true/.test(ecouteResize[1] || ''),

@@ -1446,7 +1446,11 @@
    qu'on venait vérifier. */
 .menu.est-ouvert>.menu-filtre::placeholder{color:var(--text-2)}
 .menu-compte{flex:none;font-size:var(--taille-texte);font-weight:var(--graisse-note);color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.menu-liste{max-height:326px;overflow-y:auto;margin:0;padding:6px;list-style:none}
+/* LE DEFILEMENT S'ARRETE AU BAS DE LA LISTE. Sans overscroll-behavior, la
+   molette poursuivie en bout de liste part dans la page derriere — et comme
+   un defilement d'ecran referme le menu, la liste se fermait au moment ou
+   l'on cherchait le dernier article. */
+.menu-liste{max-height:326px;overflow-y:auto;overscroll-behavior:contain;margin:0;padding:6px;list-style:none}
 /* Le titre de famille reste collé en haut pendant le défilement : 48
    références sur 13 familles, sans ça on ne sait plus dans quoi on est. */
 .menu-groupe{position:sticky;top:0;z-index:1;background:var(--surface);padding:13px 10px 5px;
@@ -2275,7 +2279,29 @@ function menuPlacer(etat){
 // EN PASSIF, comme au CRM : en capture sur `window`, il voit chaque
 // défilement de l'écran. Il ne peut pas annuler le geste — il n'a donc
 // aucune raison de faire attendre la composition de l'image.
-window.addEventListener('scroll',()=>{menus.forEach(a=>menuFermer(a,false))},{capture:true,passive:true});
+//
+// MAIS SA PROPRE LISTE N'EST PAS « L'ÉCRAN QUI DÉFILE » (Charlie, 27/08/2026).
+// En capture sur window, ce écouteur voit AUSSI le défilement de la liste du
+// panneau — et il la refermait sous le doigt. Deux conséquences, toutes deux
+// signalées comme « le menu bugue » :
+//   · à la molette, 82 produits sur 13 familles : la liste part, le menu ferme ;
+//   · à l'ouverture, menuPeindreVise() amène le choix en cours à l'écran par
+//     scrollIntoView — donc dès qu'on avait choisi un article situé plus bas
+//     que la fenêtre de liste, le menu se refermait AU MOMENT MÊME où il
+//     s'ouvrait, et ne se rouvrait plus jamais.
+// On ne referme donc que sur un défilement qui vient d'AILLEURS que le panneau.
+function menuDefilementExterieur(ev){
+  const cible=ev.target;
+  menus.forEach(a=>{
+    if(!a.ouvert)return;
+    if(cible instanceof Node&&a.panneau.contains(cible))return;
+    menuFermer(a,false);
+  });
+  /* Le calendrier, lui, n'a rien qui défile : tout défilement le laisse en
+     plan, posé en coordonnées de fenêtre pendant que son champ s'en va. */
+  if(calOuvert&&!(cible instanceof Node&&calOuvert.panneau.contains(cible)))calFermer();
+}
+window.addEventListener('scroll',menuDefilementExterieur,{capture:true,passive:true});
 window.addEventListener('resize',()=>{menus.forEach(a=>menuFermer(a,false))},{passive:true});
 
 function menuFermer(etat,rendreFocus){

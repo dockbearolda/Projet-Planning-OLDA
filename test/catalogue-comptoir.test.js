@@ -152,8 +152,22 @@ assert.ok(/if\(editingNeed<0\)poserTitreForm\('needFormTitle'/.test(DEVIS),
 // prennent celle de l'échelle, comme les autres champs et les autres boutons.
 assert.ok(!/\.cat-ligne[^{]*\{[^}]*min-height/.test(DEVIS),
   'produit, quantité et bouton n’ont plus de hauteur à eux : ils prennent celle de la page');
-assert.ok(/@media\(max-width:700px\)\{\.cat-ligne\{grid-template-columns:1fr\}/.test(DEVIS),
-  'sur un téléphone la ligne se déplie en trois rangées');
+assert.ok(/@media\(max-width:700px\)\{\.cat-ligne>\.field\{flex:1 1 100%\}/.test(DEVIS),
+  'sur une fenêtre étroite la ligne se déplie en trois rangées');
+
+// LE CHAMP QUI COMPTE N'EST PAS LE PLUS ÉTROIT (Charlie, 27/08/2026).
+// La troisième colonne était en `auto` : le bouton prenait sa largeur
+// intrinsèque — 222 px sur une rangée de 526 — et le menu du catalogue tombait
+// à 142 px, moins large que son propre intitulé. « Choisir un produit… » y
+// sortait coupé, « Tasse céramique 350 ml — TC 01 » aussi.
+assert.ok(/\.cat-ligne\{display:flex;flex-wrap:wrap/.test(DEVIS),
+  'la rangée renvoie à la ligne au lieu d’écraser le champ le plus important');
+assert.ok(/\.cat-ligne>\.field:first-child\{flex:1 1 240px\}/.test(DEVIS),
+  '… le produit garde un plancher : c’est le bouton qui descend quand la place manque');
+// Collé à droite par une MARGE automatique : `justify-content:flex-end` rogne
+// par la gauche dès que le contenu déborde.
+assert.ok(/\.cat-ligne>\.field:last-child\{flex:0 0 auto;margin-left:auto\}/.test(DEVIS),
+  '… et l’action qui engage reste le dernier élément à droite');
 
 // La demande se lit en LIGNES, pas en cartes : dix articles tenaient sur trois
 // écrans et la vendeuse ne voyait plus ce qu'elle venait d'ajouter.
