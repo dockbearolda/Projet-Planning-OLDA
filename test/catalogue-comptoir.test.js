@@ -71,8 +71,36 @@ assert.ok(/let html='<option value=""[^']*'\+\n\s*'<option value="__manuel"/.tes
   '… juste après le choix vide, avant la première famille');
 assert.ok(/<select id="catProduit"[^>]*onchange="choisirProduitCatalogue\(\)"/.test(step2),
   'la choisir doit faire quelque chose tout de suite');
-assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';\s*ouvrirSaisieManuelle\(\)/.test(DEVIS),
+assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';\s*viderCatPerso\(\);\s*ouvrirSaisieManuelle\(\)/.test(DEVIS),
   'elle ouvre le formulaire ET rend la liste à vide : ce n’est pas un produit');
+
+// CE QUE LE CLIENT VEUT SUR CE PRODUIT (27/08/2026). Un produit du catalogue
+// partait dans la demande sans un mot sur ce qu'on devait y marquer :
+// l'atelier recevait « Tasse céramique × 12 » et rien d'autre. Il porte
+// maintenant les mêmes deux choses que la saisie manuelle — ses FACES et une
+// note libre.
+assert.ok(/<div id="catPerso" class="hidden cat-perso">/.test(DEVIS),
+  'le bloc de personnalisation existe, masqué tant qu’aucun produit n’est choisi');
+assert.ok(/function renderCatFaces\(force\)/.test(DEVIS),
+  'les faces du produit choisi se dessinent comme celles de la saisie manuelle');
+assert.ok(/const faces=l\?facesDeLaCategorie\(l\.famille,l\.label\):\[\];/.test(DEVIS),
+  '… par l’ARTICLE d’abord, la famille à défaut — la règle des faces ne se dédouble pas');
+// Deux variables et non une : les deux formulaires sont à l'écran en même
+// temps, une seule les ferait se marcher dessus.
+assert.ok(/let catFaces=\{\};/.test(DEVIS) && /let needFaces=\{\};/.test(DEVIS),
+  'le catalogue et la saisie manuelle gardent chacun ce qui est écrit sur leurs faces');
+// DEUX PRODUITS MARQUÉS DIFFÉREMMENT SONT DEUX LIGNES. Le regroupement par
+// produit date d'avant la personnalisation : additionner douze tasses « logo
+// doré » et six tasses « prénom gravé » ferait partir dix-huit tasses avec une
+// seule des deux consignes.
+assert.ok(/const i=marque\?-1:needs\.findIndex/.test(DEVIS),
+  'un produit qui porte une marque ne se regroupe pas');
+assert.ok(/&& !\(n\.comment\|\|''\)\.trim\(\) && !\(Array\.isArray\(n\.zones\)&&n\.zones\.length\)/.test(DEVIS),
+  '… et il ne se regroupe pas non plus avec une ligne qui en porte une');
+// Changer de produit vide ce qu'on avait écrit pour le précédent : le garder
+// poserait la gravure d'une tasse sur un couteau.
+assert.ok(/catFaces=\{\};catFacesSignature='';\s*const c=\$\('catComment'\);if\(c\)c\.value='';/.test(DEVIS),
+  'changer de produit efface la personnalisation du précédent');
 const iSelect = step2.indexOf('id="catProduit"');
 const iForm = step2.indexOf('id="besoinManuel"');
 assert.ok(iSelect > -1 && iForm > iSelect,
@@ -471,8 +499,14 @@ assert.strictEqual(cat.needs[2].qty, 1, 'une quantité vide vaut une unité');
 
 // --- 6. Le besoin du catalogue est celui du formulaire ----------------------
 
+// `zones` EN FAIT PARTIE DEPUIS LE 27/08. La saisie manuelle en posait déjà
+// (`zonesDuBesoin`), pas le catalogue : les deux formes divergeaient, et cette
+// liste-ci ne le voyait pas puisqu'elle ne nommait pas la clé. Un produit du
+// catalogue porte maintenant ce qu'on marque dessus, comme celui écrit à la
+// main — l'invariant « les deux chemins donnent la même forme » tient enfin
+// pour de bon.
 const CLES = ['category', 'label', 'qty', 'requestedRef', 'color', 'productionType',
-  'comment', 'solution', 'reference', 'unitHT'];
+  'comment', 'zones', 'solution', 'reference', 'unitHT'];
 assert.deepStrictEqual(Object.keys(cat.needs[0]).sort(), [...CLES].sort(),
   'le besoin posé par le catalogue a exactement les clés de celui du formulaire');
 const saveNeed = (DEVIS.match(/function saveNeed\(\)\{[\s\S]*?\n/) || [''])[0];

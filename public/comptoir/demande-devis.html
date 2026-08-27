@@ -102,7 +102,20 @@ try {
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" data-menu-manuel-texte="Produit hors catalogue" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><button type="button" class="secondary cat-hors" id="catHorsBtn" onclick="ouvrirSaisieManuelle()"><span class="cat-hors-plus" aria-hidden="true">+</span>Ajouter un produit hors catalogue</button></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><!-- CE QU'ON MARQUE, FACE PAR FACE. Vide et masqué tant que la catégorie
+<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" data-menu-manuel-texte="Produit hors catalogue" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><!-- CE QUE LE CLIENT VEUT SUR CE PRODUIT (Charlie, 27/08/2026) : « dans autre
+     je dois pouvoir sous chaque produit ajouter la personnalisation que
+     souhaite le client sur le produit ».
+     Un produit du catalogue partait dans la demande sans un mot sur ce qu'on
+     devait y marquer — l'atelier recevait « Tasse céramique × 12 » et rien
+     d'autre. Il porte maintenant les mêmes deux choses que la saisie manuelle :
+     ses FACES (déclarées par l'article, ou par sa famille à défaut) et une note
+     libre. Masqué tant qu'aucun produit n'est choisi : il n'y aurait rien à
+     marquer. -->
+<div id="catPerso" class="hidden cat-perso">
+  <div class="field hidden" id="catFacesWrap"><label id="catFacesLabel">Ce qu’on marque, face par face</label><div id="catFacesHote" role="group" aria-labelledby="catFacesLabel"></div></div>
+  <div class="field"><label for="catComment">Personnalisation souhaitée <span class="opt">optionnel</span></label><textarea id="catComment" rows="3" placeholder="Ex. logo doré au centre, prénom gravé sous l’anse, texte « Bon anniversaire »…"></textarea></div>
+</div>
+<button type="button" class="secondary cat-hors" id="catHorsBtn" onclick="ouvrirSaisieManuelle()"><span class="cat-hors-plus" aria-hidden="true">+</span>Ajouter un produit hors catalogue</button></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><!-- CE QU'ON MARQUE, FACE PAR FACE. Vide et masqué tant que la catégorie
      choisie ne déclare pas de faces : une famille sans faces garde
      exactement l'écran d'avant. --><div class="field hidden" id="needFacesWrap"><label id="needFacesLabel">Ce qu’on marque, face par face</label><div id="needFacesHote" role="group" aria-labelledby="needFacesLabel"></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
      coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
@@ -699,11 +712,57 @@ function ouvrirSaisieManuelle(){
   $('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'});
   $('needCategory').focus();
 }
+/* Ce qui est écrit sur les faces du produit du catalogue, par NOM de face.
+   Séparé de `needFaces` (la saisie manuelle) : les deux formulaires sont à
+   l'écran en même temps, une seule variable les ferait se marcher dessus. */
+let catFaces={};
+let catFacesSignature='';
+
+/* LES FACES DU PRODUIT CHOISI. Même règle que la saisie manuelle : l'ARTICLE
+   porte ses faces quand il en a, la famille seulement à défaut — un couteau se
+   grave sur son manche, une planche sur sa surface, et les deux vivent dans
+   « Art de la table ». */
+function renderCatFaces(force){
+  const wrap=$('catFacesWrap'),hote=$('catFacesHote');
+  if(!wrap||!hote)return;
+  if(typeof window.facesArticle!=='function'){wrap.classList.add('hidden');return}
+  const sel=$('catProduit');
+  const l=sel&&sel.value!==''&&sel.value!=='__manuel'?CAT_LIGNES[Number(sel.value)]:null;
+  const faces=l?facesDeLaCategorie(l.famille,l.label):[];
+  wrap.classList.toggle('hidden',!faces.length);
+  if(!faces.length){catFacesSignature='';return}
+  const dessin=typeof window.dessinDeFamille==='function'
+    ?(window.dessinDeFamille(l.label)||window.dessinDeFamille(l.famille)):'';
+  const sig=faces.join('|')+'§'+dessin;
+  /* On ne reconstruit QUE si la liste change : reposer le composant à chaque
+     passage reprendrait le champ sous les doigts de la vendeuse. */
+  if(!force&&sig===catFacesSignature)return;
+  catFacesSignature=sig;
+  window.facesArticle(hote,faces,catFaces,v=>{catFaces=v},dessin);
+}
+
+function viderCatPerso(){
+  catFaces={};catFacesSignature='';
+  const c=$('catComment');if(c)c.value='';
+  const w=$('catFacesWrap');if(w)w.classList.add('hidden');
+  const b=$('catPerso');if(b)b.classList.add('hidden');
+}
+
 function choisirProduitCatalogue(){
   const sel=$('catProduit');
-  if(sel.value!=='__manuel')return;
-  sel.value='';
-  ouvrirSaisieManuelle();
+  if(sel.value==='__manuel'){
+    sel.value='';
+    viderCatPerso();
+    ouvrirSaisieManuelle();
+    return;
+  }
+  /* CHANGER DE PRODUIT VIDE CE QU'ON AVAIT ÉCRIT POUR LE PRÉCÉDENT. Le garder
+     poserait la gravure d'une tasse sur un couteau, sans que rien ne le dise. */
+  catFaces={};catFacesSignature='';
+  const c=$('catComment');if(c)c.value='';
+  const bloc=$('catPerso');
+  if(bloc)bloc.classList.toggle('hidden',sel.value==='');
+  renderCatFaces(true);
 }
 function ajouterALaDemande(){
   clearErrors();
@@ -715,14 +774,27 @@ function ajouterALaDemande(){
   /* Une quantité vide ou effacée d'un doigt vaut UNE unité : la vendeuse a
      désigné le produit, elle ne doit pas se battre avec le champ. */
   const qte=Math.max(1,Math.round(Number(champQte.value)||1));
+  const perso=($('catComment')&&$('catComment').value||'').trim();
+  /* `typeof window` et non `window.` : le contrôle de cette fonction la joue
+     hors navigateur, où l'objet global n'existe pas — et une référence à un nom
+     absent ne rend pas `undefined`, elle LÈVE. */
+  const zones=(typeof window!=='undefined'&&typeof window.zonesDepuisFaces==='function')
+    ?window.zonesDepuisFaces(facesDeLaCategorie(l.famille,l.label),catFaces):[];
+  const marque=perso!==''||zones.length>0;
   const cle=catCle(l.famille,l.label,l.color);
-  const i=needs.findIndex(n=>catCle(n.category,n.label,n.color||'')===cle);
+  /* DEUX PRODUITS MARQUÉS DIFFÉREMMENT SONT DEUX LIGNES. Le regroupement par
+     produit date d'avant la personnalisation : additionner les quantités de
+     douze tasses « logo doré » et de six tasses « prénom gravé » ferait partir
+     dix-huit tasses à l'atelier, avec une seule des deux consignes. On ne
+     regroupe donc que ce qui ne porte AUCUNE marque — des deux côtés. */
+  const i=marque?-1:needs.findIndex(n=>catCle(n.category,n.label,n.color||'')===cle
+    && !(n.comment||'').trim() && !(Array.isArray(n.zones)&&n.zones.length));
   if(i>=0)needs[i].qty=(Number(needs[i].qty)||0)+qte;
-  else needs.push({category:l.famille,label:l.label,qty:qte,requestedRef:'',color:l.color,productionType:'',comment:'',solution:'',reference:'',unitHT:NaN});
+  else needs.push({category:l.famille,label:l.label,qty:qte,requestedRef:'',color:l.color,productionType:'',comment:perso,zones,solution:'',reference:'',unitHT:NaN});
   renderNeeds();updateSidebar();
   /* On repart à vide : reprendre la ligne précédente en double est le geste
      qui fait partir un devis avec deux fois le même article. */
-  sel.value='';champQte.value='';sel.focus();
+  sel.value='';champQte.value='';viderCatPerso();sel.focus();
 }
 function basculerSaisieManuelle(force){
   const box=$('besoinManuel');if(!box)return;
