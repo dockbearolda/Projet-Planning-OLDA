@@ -5476,10 +5476,15 @@ body.view-plein .fiverr-tool { display: none !important; }
   background: var(--surface);
 }
 .ld-box--full { grid-column: 1 / -1; }
+/* L'INTITULÉ D'UN CHAMP SE LIT — c'est lui qui dit ce qu'on regarde. À
+   `--text-3` (« repères, pas du texte à lire », dixit la charte) il ne donnait
+   que 2,54:1 en thème clair, en petites capitales espacées, dans le panneau le
+   plus consulté de l'application. Le thème sombre le corrigeait déjà plus bas :
+   le défaut n'existait donc QUE de jour, c'est-à-dire partout. */
 .ld-k {
   margin: 0 0 6px;
   font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
-  text-transform: uppercase; color: var(--text-3);
+  text-transform: uppercase; color: var(--text-2);
 }
 .ld-v { margin: 0 0 4px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); white-space: pre-wrap; }
 .ld-v:last-child { margin-bottom: 0; }
@@ -5542,7 +5547,8 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
   font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ld-volet__chevron { flex: none; color: var(--text-3); transition: transform var(--dur-2) var(--ease); }
+/* Le chevron dit si le volet est ouvert : un état, pas un décor (2,54:1 avant). */
+.ld-volet__chevron { flex: none; color: var(--text-2); transition: transform var(--dur-2) var(--ease); }
 .ld-volet[open] > .ld-volet__tete { border-bottom: 1px solid var(--border-soft); border-radius: 12px 12px 0 0; }
 .ld-volet[open] > .ld-volet__tete .ld-volet__chevron { transform: rotate(180deg); }
 /* Ouvert, la valeur laisse la place au champ : elle serait écrite deux fois. */
@@ -5587,6 +5593,10 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    composition et on ne remplace que les fonds et les encres, sinon elle
    deviendrait illisible sur un poste réglé en sombre. */
 :root[data-theme="dark"] .ld-box { background: var(--surface); border-color: var(--border); }
+/* `--text-2` est désormais posé sur la règle de base, et le jeton suit le
+   thème : cette reprise n'a plus rien à corriger. On la garde nommée pour dire
+   que le cas a été traité aux deux endroits — la retirer sans un mot ferait
+   croire, à la prochaine lecture, que le sombre a été oublié. */
 :root[data-theme="dark"] .ld-k, :root[data-theme="dark"] .ld-volet__chevron { color: var(--text-2); }
 :root[data-theme="dark"] .ld-v,
 :root[data-theme="dark"] .ld-volet__apercu,
