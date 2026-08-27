@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // AUDIT DU 26/08/2026 — ce qui restait après celui du 25.
 //
 // Même méthode que la veille : neuf écrans mesurés DANS le navigateur, un
@@ -47,8 +49,8 @@ const PROJET = lire('public/projet.css');
 const APP = lire('public/app.js');
 const PONT = lire('public/comptoir/pont.js');
 const INDEX = lire('public/index.html');
-const DEVIS = lire('public/comptoir/demande-devis.html');
-const VENTE = lire('public/comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 
 const FEUILLES = [['styles.css', CRM], ['clients.css', CLIENTS], ['projet.css', PROJET]];
 

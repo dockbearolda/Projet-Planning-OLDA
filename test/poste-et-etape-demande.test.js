@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran, feuille } = require('./ecran-comptoir');
+
 // QUI EST AU POSTE — et l'étape « Demande » qui disparaît.
 // ===========================================================================
 // Le parcours « Demande de devis » s'ouvrait sur une étape entière qui ne
@@ -44,7 +46,7 @@ const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 
 const POSTE = lire('public/poste.js');
 const PONT = lire('public/comptoir/pont.js');
-const DEVIS = lire('public/comptoir/demande-devis.html');
+const DEVIS = ecran('demande-devis');
 const INDEX = lire('public/index.html');
 const APP = lire('public/app.js');
 const SW = lire('public/sw.js');
@@ -162,7 +164,7 @@ assert.ok(/<section id="step2">/.test(DEVIS),
 // avaient chacun un : bulle de 41 px ici, de 47 px à côté, pastille d'un seul
 // côté. Ce qui se vérifie maintenant, c'est qu'aucune page ne s'en redonne un.
 const CHARTE_ETAPES = lire('public/charte.css');
-const VENTE_ETAPES = lire('public/comptoir/vente-directe.html');
+const VENTE_ETAPES = ecran('vente-directe');
 assert.ok(!/\.stepper\s*\{[^}]*display:\s*grid/.test(CHARTE_ETAPES),
   'le fil des étapes ne doit pas dépendre d’un nombre de colonnes figé');
 assert.ok(/\.stepper\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap/.test(CHARTE_ETAPES),
@@ -172,9 +174,8 @@ assert.ok(/\.stepper\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap/.test(CHART
 // C'est ce qui garantit que les deux écrans donnent la MÊME bulle.
 assert.ok(!/\.step\s*\{[^}]*(?:height|min-height):\s*\d/.test(CHARTE_ETAPES),
   'la bulle d’étape ne porte pas de hauteur en dur');
-[['devis', DEVIS], ['vente', VENTE_ETAPES]].forEach(([nom, src]) => {
-  const regles = [...src.matchAll(/<style>([\s\S]*?)<\/style>/g)]
-    .map((m) => m[1].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n')
+['demande-devis', 'vente-directe'].forEach((nom) => {
+  const regles = feuille(nom).replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/@media print\{[\s\S]*?\}\s*\}/g, '');
   assert.ok(!/\.step\s*(?:\.\w+|::?\w+)?\s*\{/.test(regles),
     `${nom} : la page ne redonne pas sa propre bulle d’étape — le fil vit dans charte.css`);

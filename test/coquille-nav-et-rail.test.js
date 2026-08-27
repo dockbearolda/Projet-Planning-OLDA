@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LA COQUILLE : NAVIGATION ET RAIL (24/08/2026)
 //
 // Deux demandes du patron, le même jour, sur la même ossature :
@@ -397,8 +399,8 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   // flèches retour ici sont supprimées définitivement, car elle existe en haut
   // à gauche. » Il n'en reste qu'UNE par écran, celle que pont.js greffe.
   // Ce que ça coûte est écrit noir sur blanc plus bas.
-  for (const f of ['public/comptoir/demande-devis.html', 'public/comptoir/vente-directe.html']) {
-    const doc = fs.readFileSync(path.join(RACINE, f), 'utf8');
+  for (const f of ['demande-devis', 'vente-directe']) {
+    const doc = ecran(f);
     assert.ok(!/>← Retour/.test(doc) && !/textContent='← Retour'/.test(doc),
       `${f} : plus aucun « ← Retour » en bulle grise`);
     // UN `!important` SUR UN SÉLECTEUR NU BAT N'IMPORTE QUELLE CLASSE : sans
@@ -413,7 +415,7 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
 // d'un cran » ne subsiste en bas d'étape, ni écrite dans la page, ni reposée
 // par un `setInterval` (le récapitulatif s'en remettait une toutes les 400 ms).
 {
-  const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+  const DEVIS = ecran('demande-devis');
   assert.ok(!/class="btn-retour"[^>]*onclick="showStep\(/.test(DEVIS),
     'plus aucune flèche « revenir d’un cran » en bas d’étape');
   assert.ok(!/addBackButton/.test(DEVIS),

@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // L'INDICATIF DU PAYS, AU COMPTOIR.
 // ===========================================================================
 // Saint-Martin est une île frontière : le côté français (+590) et le côté
@@ -177,7 +179,7 @@ assert.ok(!telComplet('zzz', '690662400'), 'un pays inconnu ne valide rien');
   // sur un numéro international. Elles doivent TOUTES être relayées : en oublier
   // une suffit à écrire un numéro faux en base ou à ouvrir la conversation
   // WhatsApp d'un inconnu.
-  const DEVIS = lire('comptoir/demande-devis.html');
+  const DEVIS = ecran('demande-devis');
   assert.ok(/slice\(0, ?10\)/.test(DEVIS),
     'la troncature à dix chiffres est bien la prémisse : si elle disparaît de '
     + 'l’écran, ces relais n’ont plus lieu d’être');

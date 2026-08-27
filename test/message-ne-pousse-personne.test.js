@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // UN MESSAGE NE POUSSE PERSONNE (24/08/2026) — RÈGLE NUCLÉAIRE
 //
 // « Quand j'oublie de rentrer un produit ça décale l'input en haut. Ça ne doit
@@ -31,8 +33,8 @@ const RACINE = path.join(__dirname, '..');
 const lire = (p) => fs.readFileSync(path.join(RACINE, p), 'utf8');
 
 const CHARTE = lire('public/charte.css');
-const DEVIS = lire('public/comptoir/demande-devis.html');
-const VENTE = lire('public/comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 const PONT = lire('public/comptoir/pont.js');
 
 // --- 1. La règle vit dans la charte, une seule fois -------------------------

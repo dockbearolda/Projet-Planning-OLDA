@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // ===========================================================================
 // LES FACES D'UN ARTICLE — CE QU'ON MARQUE, PAS COMBIEN DE MILLIMÈTRES
 // ===========================================================================
@@ -35,8 +37,8 @@ const RACINE = path.join(__dirname, '..');
 const lire = (p) => fs.readFileSync(path.join(RACINE, p), 'utf8');
 const PONT = lire('public/comptoir/pont.js');
 const CHARTE = lire('public/charte.css');
-const DEVIS = lire('public/comptoir/demande-devis.html');
-const VENTE = lire('public/comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 const DB = lire('db.js');
 
 // --- 1. Les fonctions pures de pont.js, dans un bac à sable -----------------
@@ -234,7 +236,7 @@ delete process.env.APP_PASSWORD;
   // LA RECHERCHE SUIT L'ARTICLE PUIS LA FAMILLE. Un couteau ajouté depuis le
   // catalogue arrive avec `category: 'Art de la table'` : sans cette cascade,
   // il n'aurait jamais ses faces.
-  const PAGE = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+  const PAGE = ecran('demande-devis');
   assert.match(PAGE, /function facesDeLaCategorie\(cat,label\)\{\s*\n\s*const parArticle=facesDeclarees\(label\);\s*\n\s*return parArticle\.length\?parArticle:facesDeclarees\(cat\);/,
     'la désignation d’abord, la catégorie ensuite');
   assert.match(PAGE, /zones:zonesDuBesoin\(category,\$\('needLabel'\)\.value\.trim\(\)\)/,

@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran, page, feuille } = require('./ecran-comptoir');
+
 // LA CHARTE SUR L'ÉCRAN DU COMPTOIR (22/08/2026)
 //
 // `public/comptoir/demande-devis.html` est l'écran de RÉFÉRENCE du comptoir.
@@ -28,7 +30,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
 
 // Les commentaires de ce dépôt CITENT des règles, accolades et tailles
@@ -52,8 +54,7 @@ function sansImpression(css) {
   return out;
 }
 
-const FEUILLES = [...DEVIS.matchAll(/<style>([\s\S]*?)<\/style>/g)]
-  .map((m) => sansCommentaires(m[1])).join('\n');
+const FEUILLES = sansCommentaires(feuille('demande-devis'));
 // LE PAPIER N'A PAS DE THÈME. Ce qui s'imprime part en noir sur blanc, écrit en
 // toutes lettres : les jetons de la charte suivent le poste, et un poste en
 // thème sombre imprimerait un pavé anthracite pleine page. Les blocs
@@ -139,7 +140,7 @@ assert.deepStrictEqual(fautes, [],
   'une taille écrite en dur revient dans l’écran : elle doit venir de l’échelle');
 
 // Et pas non plus posée à la main dans le HTML ou dans un morceau de JS.
-const HORS_FEUILLE = sansCommentaires(DEVIS.replace(/<style>[\s\S]*?<\/style>/g, ''));
+const HORS_FEUILLE = sansCommentaires(page('demande-devis'));
 [...HORS_FEUILLE.matchAll(/font-size:\s*([^;"'}]+)/g)].forEach((m) => {
   if (/ticket/i.test(HORS_FEUILLE.slice(Math.max(0, m.index - 220), m.index))) return;
   assert.ok(m[1].trim().startsWith('var(--taille-'),
@@ -353,10 +354,9 @@ console.log('✓ charte du comptoir : quatre tailles, trois graisses, aucune cou
 // parce que c'est le papier qui les impose — un poste en thème sombre
 // imprimait sinon un pavé anthracite pleine page.
 // ===========================================================================
-const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+const VENTE = ecran('vente-directe');
 
-const FEUILLES_V = sansImpression([...VENTE.matchAll(/<style>([\s\S]*?)<\/style>/g)]
-  .map((m) => sansCommentaires(m[1])).join('\n'));
+const FEUILLES_V = sansImpression(sansCommentaires(feuille('vente-directe')));
 
 assert.ok(/<link rel="stylesheet" href="\.\.\/charte\.css">/.test(VENTE),
   'l’écran de vente charge la charte, le même fichier que le planning et que l’écran d’à côté');

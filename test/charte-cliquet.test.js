@@ -23,11 +23,17 @@
 // `@media (pointer: coarse)` entretenant une seconde échelle, `!important` sur
 // un sélecteur nu.
 //
-// LES DEUX GROS FICHIERS SONT LES ÉCRANS DU PATRON (161 des 252). Ils sont
-// remplacés EN BLOC quand il en envoie une nouvelle version : les nettoyer là
-// est du travail qui s'efface. Le durable, pour eux, est de vider leur <style>
-// et de les faire lire `charte.css` — c'est un chantier à part, et le plafond
-// est là pour qu'ils n'empirent pas d'ici là.
+// LES DEUX GROS FICHIERS SONT LES ÉCRANS DU COMPTOIR (161 des 252). Le 27/08,
+// leur CSS est sorti des pages : `vente-directe.css` et `demande-devis.css`,
+// même ordre, même cascade. Les écarts ont suivi le fichier — 45 et 116, aux
+// mêmes lignes — ce qui est la preuve que le déplacement n'a rien changé.
+// C'était le préalable : tant que les règles vivaient dans dix blocs semés dans
+// la page, les nettoyer demandait de retrouver lequel portait quoi. Maintenant
+// elles sont à un endroit, et le plafond peut descendre.
+//
+// UNE PART NE DESCENDRA PAS, ET C'EST VOULU : les couleurs du TICKET. Il
+// s'imprime sur du papier blanc — un jeton de charte.css y vaut vide, et le
+// ticket sort nu. Ces teintes-là sont écrites en clair exprès.
 
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -39,9 +45,9 @@ const RACINE = path.join(__dirname, '..');
 // Plafonds relevés le 27/08/2026. Un fichier absent de cette table doit être
 // à ZÉRO : c'est ce qui rend le cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
-  'public/comptoir/demande-devis.html': 116,
+  'public/comptoir/demande-devis.css': 116,
   'public/styles.css': 84,
-  'public/comptoir/vente-directe.html': 45,
+  'public/comptoir/vente-directe.css': 45,
   'public/clients.css': 4,
   'public/projet.css': 3,
 };
@@ -90,6 +96,24 @@ assert.deepStrictEqual(trop, [],
 // installée — c'est-à-dire nulle part le jour où quelqu'un d'autre reprend.
 assert.ok(fs.existsSync(path.join(RACINE, 'outils/verifier-charte.mjs')),
   'le vérificateur vit DANS le dépôt, pas sur un poste');
+
+// ET LE CSS NE REVIENT PAS DANS LA PAGE. Un bloc `<style>` remis dans un écran
+// du comptoir échappe à tout : le vérificateur ne le compte plus (il ne lit que
+// les .css), le serveur ne le dépouille plus (il ne dépouille pas le HTML), et
+// on serait revenu à dix endroits où chercher une règle — sans que rien ne le
+// dise. C'est le genre de retour qui se fait en une ligne et se paie six mois.
+for (const nom of ['vente-directe', 'demande-devis']) {
+  const page = fs.readFileSync(path.join(RACINE, `public/comptoir/${nom}.html`), 'utf8');
+  assert.ok(!/<style[\s>]/.test(page),
+    `${nom} : les règles vivent dans ${nom}.css, pas dans la page`);
+  assert.ok(page.includes(`<link rel="stylesheet" href="${nom}.css">`),
+    `${nom} : la page charge sa feuille`);
+  // Le @font-face a suivi la feuille : sans préchargement, Manrope n'est
+  // découverte qu'une fois le CSS reçu ET analysé — la page s'affiche en entier
+  // dans la police de repli, puis TOUT se recompose.
+  assert.ok(/<link rel="preload" as="font"[^>]+manrope/.test(page),
+    `${nom} : la police part en même temps que la feuille qui la nomme`);
+}
 
 const total = Object.values(compte).reduce((s, n) => s + n, 0);
 console.log(`✓ charte : cliquet tenu — ${total} écart(s), aucun fichier n'a reculé`);

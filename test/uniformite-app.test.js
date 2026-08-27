@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran, feuille } = require('./ecran-comptoir');
+
 // UNIFORMITÉ DE TOUTE L'APPLICATION (25/08/2026)
 //
 // Ce fichier est né d'un audit : neuf écrans mesurés dans le navigateur, un
@@ -32,13 +34,13 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 
 const CHARTE = lire('public/charte.css');
 const CRM = lire('public/styles.css');
-const DEVIS = lire('public/comptoir/demande-devis.html');
-const VENTE = lire('public/comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 
-// Les règles d'une page : ses blocs <style>, sans les commentaires, sans le
-// papier (un ticket a sa propre échelle, il s'imprime).
+// Les règles d'un écran : sa feuille, sans les commentaires, sans le papier
+// (un ticket a sa propre échelle, il s'imprime).
 function reglesDePage(src) {
-  let css = sansCommentaires([...src.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n'));
+  let css = sansCommentaires(src);
   let out = '', i = 0;
   while (true) {
     const d = css.indexOf('@media print', i);
@@ -119,7 +121,7 @@ for (const [nom, src] of [['styles.css', CRM], ['clients.css', lire('public/clie
 // que les trois soient d'accord. Aucune page ne redéclare un jeton de forme,
 // de taille ou de boîte — sinon elle repart, seule, dans sa direction.
 // ===========================================================================
-for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+for (const [nom, src] of [['demande-devis', feuille('demande-devis')], ['vente-directe', feuille('vente-directe')]]) {
   const regles = reglesDePage(src);
   const redits = [];
   for (const m of regles.matchAll(/:root\s*\{([^}]*)\}/g)) {

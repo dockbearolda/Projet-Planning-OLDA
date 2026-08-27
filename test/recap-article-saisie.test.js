@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE RÉCAPITULATIF DIT CE QUI A ÉTÉ SAISI (21/08/2026)
 //
 // Le bloc sous le formulaire annonçait « K3008 · Coconut Milk · Poitrine +
@@ -21,7 +23,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 
 function source(nom, signature) {
   const re = new RegExp(`function ${nom}\\(${signature}\\)\\{[\\s\\S]*?\\n\\}`);

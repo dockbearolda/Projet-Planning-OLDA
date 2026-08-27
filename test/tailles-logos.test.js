@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LES TAILLES DES LOGOS (26/08/2026)
 //
 // La largeur du logo à imprimer, par famille, par référence, par FACE et par
@@ -33,7 +35,7 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
-const DEVIS = lire('public/comptoir/demande-devis.html');
+const DEVIS = ecran('demande-devis');
 const ECRAN = lire('public/tailles-logos.js');
 const APP = lire('public/app.js');
 const INDEX = lire('public/index.html');

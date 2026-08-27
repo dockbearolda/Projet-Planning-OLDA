@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LES COLORIS TEXTILE VIENNENT DE TOPTEX
 //
 // Le client vit dans toptex.js (racine, jamais public/) et le catalogue du
@@ -214,7 +216,7 @@ assert.ok(!/toptex\.io/.test(catalogueSource),
 
   // La pastille de la page suit le champ, y compris quand la couleur est posée
   // APRÈS la référence (reprise d'un article déjà saisi).
-  const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+  const DEVIS = ecran('demande-devis');
   assert.ok(/id="txColor"[^>]*oninput="onTextileColorChange\(\)"/.test(DEVIS),
     'la saisie libre d’une couleur rafraîchit la pastille et l’aperçu');
   const reprise = (DEVIS.match(/function txApplyToForm\(t\)\{[\s\S]*?\n\}/) || [''])[0];

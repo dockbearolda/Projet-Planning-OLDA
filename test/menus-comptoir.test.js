@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LES MENUS DÉROULANTS DU COMPTOIR
 //
 // Un seul modèle pour les deux écrans : le <select> natif affichait la
@@ -20,8 +22,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
-const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
 
 // L'ÉCHELLE DE L'ÉCRAN (22/08/2026). Les tailles, graisses, interlignes et

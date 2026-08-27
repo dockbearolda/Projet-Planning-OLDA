@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE TICKET QUE LA VENDEUSE IMPRIME POUR L'ATELIER.
 // ===========================================================================
 // Le papier qui sort au comptoir part à l'atelier avec le dossier. La vendeuse
@@ -36,8 +38,8 @@ const vm = require('node:vm');
 
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 const PONT = lire('comptoir/pont.js');
-const VENTE = lire('comptoir/vente-directe.html');
-const DEVIS = lire('comptoir/demande-devis.html');
+const VENTE = ecran('vente-directe');
+const DEVIS = ecran('demande-devis');
 
 // ===========================================================================
 // 1. LA RÈGLE, ÉPROUVÉE POUR DE VRAI

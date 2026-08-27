@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // L'ÉTAPE « CONTRÔLE » A DISPARU (27/08/2026)
 //
 // Charlie : « il y a toutes les infos, mais on ne va pas se servir de toutes
@@ -28,7 +30,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DEVIS = fs.readFileSync(path.join(__dirname, '..', 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 const CHARTE = fs.readFileSync(path.join(__dirname, '..', 'public/charte.css'), 'utf8');
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // AUDIT DU 18/08 — ce que le comptoir facturait, écrivait et dédoublonnait de
 // travers depuis les évolutions des 17 et 18/08.
 // ===========================================================================
@@ -36,7 +38,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
-const VENTE = lire('comptoir/vente-directe.html');
+const VENTE = ecran('vente-directe');
 const PONT = lire('comptoir/pont.js');
 
 // Le source d'une fonction nommée, accolades appariées : c'est ce qui permet

@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE CHIFFRAGE TEXTILE DU COMPTOIR
 //
 // Le moteur vient du fichier de calcul du patron
@@ -18,7 +20,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 
 // Le moteur s'écrit pour le navigateur : on lui pose un `window` et on le lit.
 global.window = global.window || {};

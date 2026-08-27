@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LA DEMANDE DANS LA COLONNE DE DROITE (21/08/2026)
 //
 // Le client commande trois tasses ET deux tee-shirts : les deux s'empilent
@@ -19,7 +21,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
 
 function source(nom, signature) {

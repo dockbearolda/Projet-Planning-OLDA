@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LA FICHE REND LES ÉTAPES DE LA PRISE DE COMMANDE (26/08/2026)
 //
 // « Lorsque je clique sur le dossier, je dois retrouver toutes les étapes de ma
@@ -28,8 +30,8 @@ const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'public/app.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(RACINE, 'public/styles.css'), 'utf8');
 const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
-const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 
 function morceau(nom, ouverture, fermeture) {
   const i = APP.indexOf(ouverture);

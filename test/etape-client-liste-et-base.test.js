@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // L'ÉTAPE CLIENT, ET CE QUI N'A PLUS À ÊTRE DIT (24/08/2026)
 //
 // Quatre demandes du patron, sur l'écran « Demande de devis » :
@@ -20,7 +22,7 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
-const DEVIS = lire('public/comptoir/demande-devis.html');
+const DEVIS = ecran('demande-devis');
 const PONT = lire('public/comptoir/pont.js');
 const SERVEUR = lire('server.js');
 

@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE DOSSIER QUI N'ARRIVE JAMAIS AU PLANNING.
 // ===========================================================================
 // Plainte de la vendeuse, le 14/08 : « des clients qui rentrent dans le
@@ -36,8 +38,8 @@ const path = require('node:path');
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 const PONT = lire('comptoir/pont.js');
 const HOTE = lire('nouveau-projet.js');
-const DEVIS = lire('comptoir/demande-devis.html');
-const VENTE = lire('comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 
 // ===========================================================================
 // 1. LA PRÉMISSE : l'écran promet un enregistrement qu'il ne fait pas

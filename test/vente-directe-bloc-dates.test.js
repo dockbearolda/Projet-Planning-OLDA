@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE BLOC DES DATES DE LA VENTE DIRECTE (24/08/2026)
 //
 // « Cette bulle ne va pas, y'a trop de truc. » Mesuré avant de toucher :
@@ -17,7 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+const VENTE = ecran('vente-directe');
 
 // Le bloc va de son ouverture au champ de l'heure : c'est là que tout se joue.
 const deb = VENTE.indexOf('<input id="orderDate"');

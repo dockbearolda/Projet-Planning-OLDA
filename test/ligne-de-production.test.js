@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // CE QU'IL Y A À FAIRE, EN UNE LIGNE (26/08/2026)
 //
 // Le chef d'atelier ouvrait le planning et lisait ça, dans une colonne large
@@ -31,7 +33,7 @@ const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (p) => fs.readFileSync(path.join(RACINE, p), 'utf8');
-const DEVIS = lire('public/comptoir/demande-devis.html');
+const DEVIS = ecran('demande-devis');
 const APP = lire('public/app.js');
 const CSS = lire('public/styles.css');
 const SERVEUR = lire('server.js');

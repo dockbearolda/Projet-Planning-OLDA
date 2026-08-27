@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LES DEUX PARCOURS DU COMPTOIR, SIMPLIFIÉS (27/08/2026)
 //
 // Charlie : « il y a toutes les infos, mais on ne va pas se servir de toutes
@@ -22,8 +24,8 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
-const DEVIS = lire('public/comptoir/demande-devis.html');
-const VENTE = lire('public/comptoir/vente-directe.html');
+const DEVIS = ecran('demande-devis');
+const VENTE = ecran('vente-directe');
 const CHARTE = lire('public/charte.css');
 const REGLAGES = lire('public/reglages.js');
 

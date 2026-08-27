@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE CHIFFRAGE DOIT DONNER LES CHIFFRES DU FICHIER DU PATRON (21/08/2026)
 //
 // Le moteur de `textile-catalog.js` est porté du fichier de calcul du patron
@@ -92,7 +94,7 @@ assert.deepStrictEqual(local(sols.map(s => s.kind)), ['small_gift', 'full_gift',
 assert.ok(sols.every(s => s.paidQty > 0 && s.unitPrice > 0), 'aucune sortie ne propose de vendre à zéro');
 
 // « MA SOLUTION » — la contre-offre écrite à la main, mesurée par la MÊME règle.
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 const fonction = (nom, signature) => {
   const m = DEVIS.match(new RegExp(`function ${nom}\\(${signature}\\)\\{[\\s\\S]*?\\n\\}`));
   assert.ok(m, `${nom} doit exister`);

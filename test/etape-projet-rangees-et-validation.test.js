@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // L'ÉTAPE « PROJET » : LA LIGNE SE REMPLIT, ET CE QUI VALIDE FERME LA RANGÉE
 // (24/08/2026)
 //
@@ -20,7 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const DEVIS = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+const DEVIS = ecran('demande-devis');
 
 // --- 1. Le titre du projet tient la ligne, seul ------------------------------
 // Le 24/08 au matin le titre est passé à DROITE des familles, en deux moitiés.

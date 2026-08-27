@@ -1,5 +1,7 @@
 'use strict';
 
+const { ecran } = require('./ecran-comptoir');
+
 // LE CATALOGUE DU COMPTOIR — un produit, une quantité, à la demande.
 // ===========================================================================
 // L'étape « Recueil des besoins » n'offrait qu'un formulaire : catégorie,
@@ -41,7 +43,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
-const DEVIS = lire('public/comptoir/demande-devis.html');
+const DEVIS = ecran('demande-devis');
 const CATALOGUE_JS = lire('public/comptoir/catalogue.js');
 const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
 
