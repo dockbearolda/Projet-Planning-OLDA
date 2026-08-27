@@ -187,6 +187,17 @@ function buildStatic() {
     + 'zéro : une machine non chiffrée retombe sur le taux machine général '
     + 'ci-dessus, elle ne coûte pas « rien ».', 'reg-machines'));
 
+  // --- Carte « Suppléments express » ------------------------------------------
+  // ILS ONT QUITTÉ L'ÉCRAN DE VENTE LE 27/08. Trois pourcentages d'atelier :
+  // ils valent pour tous les postes, ils changent une fois par an, et ils
+  // n'avaient rien à faire sous les yeux d'une vendeuse qui a un client devant
+  // elle. Même API (`/api/supplements-express`), même effet immédiat sur les
+  // deux parcours du comptoir.
+  page.appendChild(carteSimple('bolt', 'Suppléments express',
+    'La majoration appliquée quand le client veut sa commande vite. Elle se '
+    + 'calcule sur les jours OUVRÉS et vaut pour tous les postes : le comptoir '
+    + 'l’applique à la commande suivante, sans rien recharger.', 'reg-express'));
+
   // --- Carte « Fonctions en cours » --------------------------------------------
   page.appendChild(carteSimple('settings', 'Fonctions en cours',
     'Les chantiers livrés mais pas encore allumés. Éteints, l’application se '
@@ -238,6 +249,9 @@ function carteSimple(icone, titre, desc, idContenu) {
 
 // --- Marge, modèles, machines, interrupteurs ---------------------------------
 let marges = { cible: 60, minimum: 35 };
+// Les mêmes valeurs par défaut que le comptoir : si la lecture échoue, les deux
+// écrans racontent la même chose plutôt que deux barèmes différents.
+let express = { j5: 0, j10: 0, j15: 0 };
 let modeles = [];
 let machines = [];
 let flags = { flags: {}, connus: {} };
@@ -277,6 +291,46 @@ function renderMarges() {
     // serveur remonte alors la cible, et l'écran le montre tout de suite.
     ligne('minimum', 'Marge minimum', 'en dessous, l’écran prévient'),
   );
+}
+
+// Les trois paliers, dans l'ordre où le délai les traverse. Les intitulés sont
+// ceux du comptoir, mot pour mot : deux écrans qui nomment différemment le même
+// réglage, c'est deux réglages pour qui les lit.
+const EXPRESS_PALIERS = [
+  ['j5', 'Sous 5 jours ouvrés', 'la commande la plus urgente'],
+  ['j10', 'Sous 10 jours ouvrés', 'le palier intermédiaire'],
+  ['j15', 'Au-delà', 'le délai standard — le plus souvent 0 %'],
+];
+
+function renderExpress() {
+  const hote = $('#reg-express');
+  if (!hote) return;
+  hote.replaceChildren(...EXPRESS_PALIERS.map(([cle, nom, aide]) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', nom));
+    l.append(el('span', 'reg-ligne__aide', aide));
+    l.append(champNombre(express[cle], '%', async (v) => {
+      const n = Number(String(v).replace(',', '.'));
+      // LE SERVEUR REFUSE HORS DE [0, 100] : on le dit ici plutôt que de laisser
+      // partir un appel qui reviendra en erreur avec un message technique.
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        flash('Chaque palier attend un pourcentage entre 0 et 100.', 'is-ko');
+        renderExpress();
+        return;
+      }
+      try {
+        express = await api('PUT', '/api/supplements-express', { ...express, [cle]: n });
+        renderExpress();
+        flash('Enregistré — vaut pour tous les postes', 'is-ok');
+      } catch (err) {
+        // Jamais d'échec muet : sinon la vendeuse applique un barème qui n'a
+        // pas changé, en croyant le contraire.
+        flash(err.message, 'is-ko');
+        renderExpress();
+      }
+    }));
+    return l;
+  }));
 }
 
 function renderModeles() {
@@ -683,8 +737,10 @@ export async function refreshReglages() {
     api('GET', '/api/modeles').then((d) => { if (Array.isArray(d)) modeles = d; }).catch(() => {}),
     api('GET', '/api/machines').then((d) => { if (Array.isArray(d)) machines = d; }).catch(() => {}),
     api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
+    api('GET', '/api/supplements-express').then((d) => { if (d) express = d; }).catch(() => {}),
   ]);
   renderMarges();
+  renderExpress();
   renderModeles();
   renderMachines();
   renderFlags();

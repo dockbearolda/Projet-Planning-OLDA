@@ -58,11 +58,26 @@ assert.ok(/<label for="deliveryTime">/.test(bloc),
 // plus rien n'est empilé dans la cellule de « Date souhaitée ».
 const finRangee = bloc.indexOf('<label for="deliveryTime">');
 assert.ok(finRangee > -1, 'la cellule de l’heure est dans le bloc');
-for (const orphelin of ['delay-quick', 'deadlineInfo', 'baremeOpen', 'baremeBox']) {
+for (const orphelin of ['delay-quick', 'deadlineInfo']) {
   const ou = bloc.indexOf(orphelin);
   assert.ok(ou > -1, `${orphelin} est toujours là`);
   assert.ok(ou > finRangee, `${orphelin} n’est plus empilé dans la cellule de la date`);
 }
+// LE BARÈME A QUITTÉ L'ÉCRAN DE VENTE (27/08). Trois pourcentages d'atelier
+// qui valent pour tous les postes et changent une fois par an : ils n'ont rien
+// à faire sous les yeux d'une vendeuse qui a un client devant elle. Ils se
+// règlent dans Réglages, sur la même API.
+for (const parti of ['baremeOpen', 'baremeBox', 'bareme-open']) {
+  assert.ok(!VENTE.includes(`id="${parti}"`) && !VENTE.includes(`class="${parti}"`),
+    `${parti} ne doit plus être sur l’écran de vente`);
+}
+// …MAIS LE BARÈME SE CHARGE TOUJOURS. `charger()` partait APRÈS la garde qui
+// cherchait le bouton : retirer le bouton aurait fait tourner l'écran sur les
+// pourcentages par DÉFAUT, et le supplément affiché au client aurait été faux.
+const gardeBareme = VENTE.indexOf('const ouvrir = el("baremeOpen");');
+const chargeBareme = VENTE.indexOf('    charger();');
+assert.ok(chargeBareme > -1 && chargeBareme < gardeBareme,
+  'le barème se charge AVANT la garde qui cherche son éditeur');
 
 // LE SECOND INTITULÉ ÉTAIT LA CAUSE DE L'EXCEPTION. Une rangée qui contient un
 // champ à deux intitulés renonce au partage de lignes (`label~label`) — c'était
@@ -74,10 +89,9 @@ assert.ok(/\.grid:has\(>\.field label~label\)/.test(VENTE),
 // Une seule ligne déborderait (385 + 420 + 150 px pour 910 disponibles), et une
 // rangée qui se replie change de hauteur selon la longueur du texte.
 assert.ok(/<div class="delai-rangee">/.test(bloc), 'le délai a sa propre rangée');
-assert.ok(/\.delai-rangee \.bareme-open\{margin-inline-start:auto\}/.test(VENTE),
-  '« Modifier le barème » ferme la rangée à droite, par une marge automatique');
 assert.ok(!/\.delai-rangee\{[^}]*justify-content:\s*flex-end/.test(VENTE),
-  '… et surtout pas par un flex-end, qui rogne par la gauche');
+  'ce qui ferme la rangée à droite se pose par une marge automatique, '
+  + 'jamais par un flex-end, qui rogne par la gauche');
 
 // L'AVIS DE SUPPLÉMENT CHANGE DE TEXTE À CHAQUE DATE. Sur toute la largeur il a
 // la marge qui lui manquait dans une cellule de 430 px. Vérifié dans le

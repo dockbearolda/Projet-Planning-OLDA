@@ -1085,3 +1085,59 @@ body.a-connecter { overflow: hidden; }
      n'est pas un pas de l'échelle : il est GÉOMÉTRIQUE, il suit le rayon. */
   padding: calc(var(--ctrl-h) * .78) var(--pas-4) var(--pas-3);
 }
+
+/* ===========================================================================
+   LE VOLET — CE QUI SERT UNE FOIS SUR TROIS (27/08/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « il y a toutes les infos, mais on ne va pas se servir de toutes
+   les infos. » Mesuré sur les 55 dossiers réels du comptoir, une douzaine de
+   champs sont remplis moins d'une fois sur deux — et ils sont SUR LE CHEMIN,
+   entre le client et le prix.
+
+   TROIS NIVEAUX, PAS UN DE PLUS : ce qui est rempli neuf fois sur dix reste à
+   l'écran ; ce qui sert une fois sur trois passe derrière ce volet ; ce qui
+   n'est pas une saisie de comptoir (une fiche client, un barème d'atelier)
+   déménage — dans la Base clients, dans les Réglages.
+
+   UN VOLET N'EST PAS UNE SUPPRESSION : il DIT que le champ existe. C'est toute
+   la différence avec un champ retiré, qu'on ne retrouve plus.
+
+   Un seul composant pour les deux parcours du comptoir : deux écrans à un clic
+   l'un de l'autre doivent donner le même volet, pas deux qui se ressemblent.
+   =========================================================================== */
+.volet-plus > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-1);
+  padding: var(--pas-2) 0;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-weight: var(--graisse-forte);
+  line-height: var(--ligne-texte);
+  color: var(--text-2);
+}
+.volet-plus > summary::-webkit-details-marker { display: none; }
+.volet-plus > summary::marker { content: ''; }
+.volet-plus > summary::before { content: '\25B8'; color: var(--text-2); }
+.volet-plus[open] > summary::before { content: '\25BE'; }
+.volet-plus > summary:hover,
+.volet-plus > summary:focus-visible { color: var(--text-1); }
+.volet-plus[open] > summary { color: var(--text-1); }
+
+/* UN VOLET SE DÉROULE, IL NE SAUTE PAS. `interpolate-size` est posé sur le
+   volet et non au `:root` : le mot-clé rend TOUTE hauteur automatique animable,
+   on ne l'ouvre que là où on s'en sert. `content-visibility` passe en discret,
+   sinon le contenu disparaît à la première image et il n'y a plus rien à faire
+   glisser. Un navigateur qui ne connaît pas `::details-content` ignore la règle
+   et retrouve l'ouverture instantanée. */
+.volet-plus { interpolate-size: allow-keywords; }
+.volet-plus::details-content {
+  height: 0;
+  overflow: hidden;
+  transition: height var(--dur-2) var(--ease), content-visibility var(--dur-2) allow-discrete;
+}
+.volet-plus[open]::details-content { height: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .volet-plus::details-content { transition: none; }
+}

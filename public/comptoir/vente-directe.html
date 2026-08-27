@@ -785,8 +785,12 @@ h2{letter-spacing:-.01em}
           <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
           <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
         </div>
-        <!-- Barème express : réglable ici, là où le supplément s'affiche. -->
-        <button type="button" id="baremeOpen" class="bareme-open">Modifier le barème</button>
+        <!-- LE BARÈME A QUITTÉ L'ÉCRAN DE VENTE (27/08). Ce sont trois
+             pourcentages d'atelier — ils valent pour tous les postes, ils
+             changent une fois par an, et ils n'ont rien à faire sous les yeux
+             d'une vendeuse qui a un client devant elle. Ils se règlent dans
+             Réglages, sur la même API `/api/supplements-express`. Le supplément
+             lui-même continue de s'afficher ici, sous la date. -->
       </div>
 
       <!-- SUR TOUTE LA LARGEUR. Cet avis CHANGE de texte à chaque date choisie,
@@ -798,19 +802,7 @@ h2{letter-spacing:-.01em}
            qui manquait. Vérifié : les quatre textes possibles font 22 px, le
            bloc 224 px et « Ajouter l'article » ne bouge pas d'un pixel. -->
       <div id="deadlineInfo" class="help delai-etat"></div>
-      <div id="baremeBox" class="bareme hidden">
-          <div class="bareme-grid">
-            <label>Dans 5 jours<span><input id="bareme-j5" type="number" min="0" max="100" step="1"> %</span></label>
-            <label>Dans 10 jours<span><input id="bareme-j10" type="number" min="0" max="100" step="1"> %</span></label>
-            <label>Dans 15 jours<span><input id="bareme-j15" type="number" min="0" max="100" step="1"> %</span></label>
-          </div>
-          <p class="help">Vaut aussi pour une date choisie au calendrier : ≤ 5 jours ouvrés, ≤ 10, au-delà.</p>
-          <div class="bareme-actions">
-            <button type="button" id="baremeCancel" class="secondary">Annuler</button>
-            <button type="button" id="baremeSave" class="primary">Enregistrer</button>
-          </div>
-          <p id="baremeMsg" class="bareme-msg" role="status"></p>
-        </div>
+      
     </div><div class="actions">
       <div class="error msg-flottant hidden" id="productEditMsg"></div>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
@@ -842,17 +834,19 @@ h2{letter-spacing:-.01em}
     </div>
   </div>
 
-  <div class="card internal">
-    <div class="internal-head">
-      <h2 id="internalNoteTitle">Note interne OLDA</h2>
+  <!-- REPLIÉE (27/08) : remplie 5 fois sur 33 ventes réelles. Elle reste à un
+       clic, et le volet DIT qu'elle existe — ce qu'un champ supprimé ne dit
+       plus. -->
+  <details class="card internal volet-plus">
+    <summary class="internal-head">
+      <span id="internalNoteTitle" class="volet-titre">Note interne OLDA</span>
       <span class="lock">🔒 Interne uniquement</span>
-    </div>
+    </summary>
     <!-- Le seul champ des deux parcours dont le nom vivait dans le titre du
          bloc, et nulle part ailleurs : au clavier il s'annonçait « zone de
          texte », sans plus. -->
     <textarea id="internalNote" aria-labelledby="internalNoteTitle" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
-    
-  </div>
+  </details>
 
   <div class="card">
     <button id="goToClientBtn" class="primary full">Passer au paiement →</button>
@@ -930,9 +924,40 @@ h2{letter-spacing:-.01em}
             <input id="newCompanyName" placeholder="Ex. Hôtel Exemple">
           </div>
           <div class="field">
-            <label for="newCompanySector">Secteur d'activité *</label>
-            <select id="newCompanySector">
-              <option value="">Choisir un secteur</option>
+            <label for="newCompanyContact">Prénom contact *</label>
+            <input id="newCompanyContact" placeholder="Ex. Marie">
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="newCompanyPhone">WhatsApp *</label>
+            <input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88">
+          </div>
+          <div class="field">
+            <label for="newCompanyEmail">E-mail *</label>
+            <input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com">
+          </div>
+        </div>
+
+        <!-- REPLIÉES LE 27/08, mesuré sur les dossiers réels du comptoir :
+             secteur 38 %, adresse / ville / code postal 40 %, fonction du
+             contact 25 %. L'atelier ne livre pas — le client vient chercher, et
+             la facture part par e-mail. Elles restent saisissables ici d'un
+             clic, et se complètent surtout à froid dans la fiche client, où
+             l'on a le temps.
+             L'ASTÉRISQUE DU SECTEUR EST TOMBÉ : un champ obligatoire rempli
+             38 % du temps n'est pas obligatoire, il est contourné.
+             Le <select> garde son `id` et ses options — c'est LE MÊME élément
+             qu'avant, descendu d'un cran, pas une copie. Deux champs pour une
+             valeur, c'est la valeur qui finit par se perdre. -->
+        <details class="volet-plus">
+          <summary class="volet-titre">Coordonnées et secteur d’activité</summary>
+          <div class="grid">
+            <div class="field">
+              <label for="newCompanySector">Secteur d’activité</label>
+              <select id="newCompanySector">
+                <option value="">Choisir un secteur</option>
               <option>Hôtel</option>
               <option>Restaurant</option>
               <option>Bar</option>
@@ -952,46 +977,28 @@ h2{letter-spacing:-.01em}
               <option>Transport</option>
               <option>Administration</option>
               <option>Autre</option>
-            </select>
+              </select>
+            </div>
+            <div class="field">
+              <label for="newCompanyContactRole">Fonction du contact</label>
+              <input id="newCompanyContactRole" placeholder="Ex. Responsable communication">
+            </div>
           </div>
-        </div>
-
-        <div class="grid-3">
-          <div class="field">
-            <label for="newCompanyAddress">Adresse</label>
-            <input id="newCompanyAddress" placeholder="Adresse">
+          <div class="grid-3">
+            <div class="field">
+              <label for="newCompanyAddress">Adresse</label>
+              <input id="newCompanyAddress" placeholder="Adresse">
+            </div>
+            <div class="field">
+              <label for="newCompanyCity">Ville</label>
+              <input id="newCompanyCity" placeholder="Ex. Saint-Martin">
+            </div>
+            <div class="field">
+              <label for="newCompanyPostal">Code postal</label>
+              <input id="newCompanyPostal" placeholder="97150">
+            </div>
           </div>
-          <div class="field">
-            <label for="newCompanyCity">Ville</label>
-            <input id="newCompanyCity" placeholder="Ex. Saint-Martin">
-          </div>
-          <div class="field">
-            <label for="newCompanyPostal">Code postal</label>
-            <input id="newCompanyPostal" placeholder="97150">
-          </div>
-        </div>
-
-        <div class="grid-3">
-          <div class="field">
-            <label for="newCompanyContact">Prénom contact *</label>
-            <input id="newCompanyContact" placeholder="Ex. Marie">
-          </div>
-          <div class="field">
-            <label for="newCompanyPhone">WhatsApp *</label>
-            <input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88">
-          </div>
-          <div class="field">
-            <label for="newCompanyEmail">E-mail *</label>
-            <input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com">
-          </div>
-        </div>
-
-        <div class="grid-3">
-          <div class="field">
-            <label for="newCompanyContactRole">Fonction du contact</label>
-            <input id="newCompanyContactRole" placeholder="Ex. Responsable communication">
-          </div>
-        </div>
+        </details>
       </div>
 
       <div class="actions">
@@ -1302,8 +1309,12 @@ function createAndSelectClient(){
       email:document.getElementById("newIndividualEmail").value.trim()
     };
   }else{
-    if(!requireFields(["newCompanyName","newCompanySector","newCompanyContact","newCompanyPhone"])){
-      alert("Ajoute la raison sociale, le secteur, le contact et le WhatsApp.");
+    /* LE SECTEUR N'EST PLUS EXIGE (27/08) : il etait rempli 38 % du temps sur
+       les dossiers reels — un champ obligatoire qu'on contourne huit fois sur
+       treize n'exige rien, il retarde. Il est descendu dans le volet, avec
+       l'adresse, et se complete a froid dans la fiche client. */
+    if(!requireFields(["newCompanyName","newCompanyContact","newCompanyPhone"])){
+      alert("Ajoute la raison sociale, le contact et le WhatsApp.");
       return;
     }
     client={
@@ -2528,8 +2539,17 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     }
   };
 
+  /* UN RECAPITULATIF REPREND LES CHAMPS SAISIS — un champ vide ne s'affiche
+     pas. La regle existait pour l'ecran de la demande ; celui-ci ecrivait un
+     tiret. Mesure sur les 33 ventes reelles : « Personne a contacter », « Fonction
+     du contact », « Secteur » et « Adresse » valaient « — » dans plus de la
+     moitie des dossiers, et « Supplement express » « 0,00 € » dans 38 sur 41.
+     Cinq lignes de bruit par dossier, recopiees sur le bon de commande et
+     relues par quelqu'un a chaque fois. */
   window.saleRecapLines=function(){
     var d=function(x){var t=String(x==null?'':x).trim();return t?t:'—';};
+    var vide=function(x){var t=String(x==null?'':x).trim();return !t||t==='—';};
+    var zero=function(x){var n=Number(String(x==null?'':x).replace(/[^0-9,.-]/g,'').replace(',','.'));return !Number.isFinite(n)||n===0;};
     var c=selectedClient||{};
     var p0=(typeof products!=="undefined"?products:[])[0]||{};
     var mode=(document.querySelector('input[name="payment"]:checked')||{}).value||'';
@@ -2540,31 +2560,41 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       ['Date de commande',d(v('orderDate')?new Date(v('orderDate')+'T12:00:00').toLocaleDateString('fr-FR'):'')],
       ['Client',d(c.company||c.name||v('clientName'))],
       ['Type de client',d(c.type||v('clientType'))],
-      ['Personne à contacter',d(c.contact)],
-      ['Fonction du contact',d(c.contactRole)],
       ['WhatsApp',d(c.phone||v('clientPhone'))],
-      ['E-mail',d(c.email||v('clientEmail'))],
-      ['Secteur',d(c.sector)],
-      ['Adresse',d([c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — '))],
       ['Récupération prévue',d((p0.deliveryDate?new Date(p0.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p0.deliveryTime?' à '+p0.deliveryTime:''))],
       ['Délai souhaité',d(typeof deliveryDelayLabel==='function'?deliveryDelayLabel():'')],
       ['Nombre d’articles',String((typeof products!=="undefined"?products:[]).length)],
       ['Quantité totale',String((typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+Number(p.qty||0);},0))]
     ];
+    /* Les quatre lignes du client ne s'ecrivent que si elles disent quelque
+       chose. Elles restent a LEUR place — juste apres le type de client. */
+    var apresType=2;
+    [['E-mail',c.email||v('clientEmail')],
+     ['Personne à contacter',c.contact],
+     ['Fonction du contact',c.contactRole],
+     ['Secteur',c.sector],
+     ['Adresse',[c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — ')]]
+      .forEach(function(paire){
+        if(vide(paire[1]))return;
+        out.splice(out.length-apresType,0,[paire[0],String(paire[1]).trim()]);
+      });
     (typeof products!=="undefined"?products:[]).forEach(function(p,i){
       var no='Article '+(i+1)+' — ';
       out.push([no+'Désignation',d(p.name)]);
       out.push([no+'Quantité',d(p.qty)]);
       out.push([no+'Prix article',d(euro.format(Number(p.priceArticle||0)))]);
-      out.push([no+'Prix personnalisation',d(euro.format(Number(p.priceCustom||0)))]);
-      out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
+      /* Ces deux-la ne s'ecrivent qu'au-dessus de zero : la personnalisation
+         sert 11 fois sur 19, le supplement express 3 fois sur 41. */
+      if(!zero(p.priceCustom))out.push([no+'Prix personnalisation',euro.format(Number(p.priceCustom||0))]);
+      if(!zero(p.surcharge))out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
       out.push([no+'Total TTC',euro.format(Number(p.totalTTC||0))]);
       out.push([no+'Description de production',d(p.description)]);
       out.push([no+'Récupération',d((p.deliveryDate?new Date(p.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p.deliveryTime?' à '+p.deliveryTime:''))]);
     });
     out.push(['Total HT',euro.format((typeof lastTotals!=="undefined"?lastTotals.ht:0)||0)]);
     out.push(['Taxe',euro.format((typeof lastTotals!=="undefined"?lastTotals.tax:0)||0)]);
-    out.push(['Suppléments',euro.format((typeof lastTotals!=="undefined"?lastTotals.surcharge:0)||0)]);
+    if(!zero((typeof lastTotals!=="undefined"?lastTotals.surcharge:0)||0))
+      out.push(['Suppléments',euro.format((typeof lastTotals!=="undefined"?lastTotals.surcharge:0)||0)]);
     out.push(['Total TTC',euro.format((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0)]);
     out.push(['Paiement',d(mode||(typeof selectedPayment==='function'?selectedPayment():''))]);
     if(mode==='Espèces'){
@@ -2575,7 +2605,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       out.push(['Part carte',d(v('mixCard')?euro.format(Number(v('mixCard'))):'')]);
       out.push(['Part espèces',d(v('mixCash')?euro.format(Number(v('mixCash'))):'')]);
     }
-    out.push(['Note interne OLDA',d(v('internalNote'))]);
+    if(!vide(v('internalNote')))out.push(['Note interne OLDA',v('internalNote').trim()]);
     return out;
   };
 
@@ -3064,6 +3094,11 @@ button.blocked{opacity:.45;cursor:not-allowed}
   }
 
   document.addEventListener("DOMContentLoaded", function(){
+    // LE BARÈME SE CHARGE TOUJOURS, l'éditeur n'est plus là. Il partait après
+    // la garde ci-dessous : retirer le bouton aurait fait tourner l'écran sur
+    // les pourcentages PAR DÉFAUT, sans que rien ne le dise — le supplément
+    // affiché au client aurait été faux.
+    charger();
     const ouvrir = el("baremeOpen");
     if(!ouvrir || !box()) return;
     ouvrir.addEventListener("click", function(){
@@ -3077,7 +3112,6 @@ button.blocked{opacity:.45;cursor:not-allowed}
       ouvrir.textContent = "Modifier le barème";
     });
     el("baremeSave")?.addEventListener("click", enregistrer);
-    charger();
   });
 })();
 </script>
