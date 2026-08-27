@@ -381,6 +381,7 @@ async function init() {
 
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
+  await semerFacesCouteau();
   // Le feu ne peut rien dire des dossiers d'avant lui tant qu'on ne lui a pas
   // rendu ce qu'ils portaient déjà.
   await rattraperFeu();
@@ -1954,6 +1955,13 @@ async function semerTaillesLogo() {
 // Down : DELETE FROM app_meta WHERE key = 'faces_tasse';
 //        puis retirer la famille depuis Réglages → Tailles de logo.
 const TASSE_FAMILLE = 'Tasse céramique 350 ml';
+// LE COUTEAU SE GRAVE SUR SON MANCHE, DEUX FACES (Charlie, 27/08). Il vit dans
+// « Art de la table », avec treize autres objets qui ne se gravent pas au même
+// endroit : ses faces sont donc déclarées sur L'ARTICLE et non sur la famille —
+// le comptoir cherche la désignation d'abord, la catégorie ensuite.
+// Le nom se change dans Réglages → Tailles de logo, c'est une donnée.
+const COUTEAU_FAMILLE = 'Couteau Multi';
+const COUTEAU_FACES = ['Manche — face 1', 'Manche — face 2'];
 const TASSE_FACES = ['Face avant', 'Face arrière', 'Fond'];
 async function semerFacesTasse() {
   const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_tasse'");
@@ -1972,6 +1980,27 @@ async function semerFacesTasse() {
     }
   });
   await poserMeta('faces_tasse', '1');
+}
+
+// Down : retirer la famille « Couteau Multi » de app_meta.tailles_logo,
+//        DELETE FROM app_meta WHERE key = 'faces_couteau';
+async function semerFacesCouteau() {
+  const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_couteau'");
+  if (rows.length) return;
+  await ecrireTaillesLogo(async (table) => {
+    const f = table.familles.find((x) => x.nom === COUTEAU_FAMILLE);
+    if (f) {
+      for (const face of COUTEAU_FACES) if (!f.faces.includes(face)) f.faces.push(face);
+    } else {
+      // UNE TAILLE, parce que le tableau en exige une pour retenir une mesure —
+      // et un manche n'en a qu'une. Ce sont les FACES qui portent le travail.
+      table.familles.push({
+        nom: COUTEAU_FAMILLE, tailles: ['Taille unique'],
+        faces: [...COUTEAU_FACES], references: [], refs: {},
+      });
+    }
+  });
+  await poserMeta('faces_couteau', '1');
 }
 
 // --- Rattrapage du feu : ce que les dossiers d'avant savaient déjà -----------

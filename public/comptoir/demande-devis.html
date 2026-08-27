@@ -1662,7 +1662,7 @@ function basculerSaisieManuelle(force){
 }
 
 /* /CATALOGUE-COMPTOIR */
-function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),zones:zonesDuBesoin(category),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
+function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),zones:zonesDuBesoin(category,$('needLabel').value.trim()),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
 function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';needFaces=typeof window.valeursDepuisZones==='function'?window.valeursDepuisZones(n.zones):{};renderNeedFaces(true);poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
 function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
@@ -2688,11 +2688,23 @@ function txComment(d){
    aucune n'affiche rien — l'écran reste celui d'avant, au pixel près. */
 let needFaces={};              /* ce qui est écrit, par NOM de face */
 let needFacesSignature='';     /* la grille ne se reconstruit que si elle change */
-function facesDeLaCategorie(cat){
-  const cle=txLogoCle(cat);
+function facesDeclarees(nom){
+  const cle=txLogoCle(nom);
   if(!cle)return[];
   const f=((TX_LOGO&&TX_LOGO.familles)||[]).find(x=>txLogoCle(x.nom)===cle);
   return f&&Array.isArray(f.faces)?f.faces:[];
+}
+/* LA DÉSIGNATION D'ABORD, LA CATÉGORIE ENSUITE. Un couteau multifonction et une
+   planche à découper vivent tous deux dans « Art de la table » et ne se gravent
+   pas au même endroit : le couteau sur son manche, deux faces ; la planche sur
+   sa surface. C'est donc l'ARTICLE qui porte ses faces quand il en a, et la
+   famille seulement quand il n'en a pas — comme la tasse, dont la famille EST
+   l'article.
+   Conséquence : déclarer un objet dans Réglages → Tailles de logo suffit à le
+   faire marcher. Pas de catégorie à créer, pas de menu à toucher. */
+function facesDeLaCategorie(cat,label){
+  const parArticle=facesDeclarees(label);
+  return parArticle.length?parArticle:facesDeclarees(cat);
 }
 /* On ne reconstruit QUE si la liste des faces change. Reposer le composant à
    chaque passage reprendrait le champ sous les doigts de la vendeuse : le
@@ -2704,20 +2716,29 @@ function renderNeedFaces(force){
      pas une boîte qu'on ne saurait pas remplir. */
   if(typeof window.facesArticle!=='function'){wrap.classList.add('hidden');return}
   const cat=selectedNeedCategory();
-  const faces=facesDeLaCategorie(cat);
+  const label=($('needLabel').value||'').trim();
+  const faces=facesDeLaCategorie(cat,label);
   wrap.classList.toggle('hidden',!faces.length);
   if(!faces.length){needFacesSignature='';return}
-  const dessin=typeof window.dessinDeFamille==='function'?window.dessinDeFamille(cat):'';
+  /* Le dessin suit la même règle que les faces : l'article d'abord. */
+  const dessin=typeof window.dessinDeFamille==='function'
+    ?(window.dessinDeFamille(label)||window.dessinDeFamille(cat)):'';
   const sig=faces.join('|')+'§'+dessin;
   if(!force&&sig===needFacesSignature)return;
   needFacesSignature=sig;
   window.facesArticle(hote,faces,needFaces,v=>{needFaces=v},dessin);
 }
-function zonesDuBesoin(category){
+function zonesDuBesoin(category,label){
   return typeof window.zonesDepuisFaces==='function'
-    ?window.zonesDepuisFaces(facesDeLaCategorie(category),needFaces):[];
+    ?window.zonesDepuisFaces(facesDeLaCategorie(category,label),needFaces):[];
 }
 window.renderNeedFaces=renderNeedFaces;
+/* LA DÉSIGNATION DÉCIDE, DONC ELLE DÉCLENCHE. Sans cet écouteur, écrire
+   « Couteau Multi » n'ouvrait la boîte des faces qu'au prochain changement de
+   catégorie. `renderNeedFaces` ne reconstruit QUE si la liste des faces change
+   (cf. la signature) : la frappe ne reprend donc jamais le champ sous les
+   doigts — et c'est un AUTRE élément qui se repose, pas celui qu'on remplit. */
+(function(){const l=$('needLabel');if(l)l.addEventListener('input',()=>renderNeedFaces())})();
 
 function prodDuBesoin(n){
   const prod={

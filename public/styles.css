@@ -2086,20 +2086,26 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .colbar-close .material-symbols-outlined { font-size: var(--ic); }
 
+/* UN SEUL ASCENSEUR. « Sur l'écran » et « Retirées » avaient chacun le sien —
+   le second épinglé en bas, avec un `max-height: 45%`. Sur quatorze colonnes,
+   cinq étaient visibles et quatre hors d'atteinte : personne ne devine qu'un
+   deuxième ascenseur existe à l'intérieur d'un bloc qui a l'air complet. */
 .colbar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; }
-/* Le bloc « Retirées » ne défile pas avec le reste : il garde sa place en bas,
-   et c'est LUI qui se comprime (jusqu'à son propre scroll) quand la liste du
-   haut est longue. */
 .colbar-off {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  max-height: 45%;
-  padding: 0 12px 8px;
+  margin-top: var(--pas-2);
+  padding-top: var(--pas-1);
   border-top: 1px solid var(--border-soft);
 }
+/* CE SONT LES INTITULÉS QUI RESTENT SOUS LES YEUX, pas le bloc entier : en
+   défilant dans « Retirées », on sait toujours qu'on est dans « Retirées ».
+   Le fond est OPAQUE — sans lui, les entrées défilent au travers du mot. */
 .colbar-legend {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   margin: 10px 0 6px 4px;
+  padding: var(--pas-1) 0;
+  background: var(--bg);
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
   letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-2);
@@ -2108,8 +2114,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-2); }
 .colbar-list { display: flex; flex-direction: column; gap: 4px; }
 
-/* Une entrée = une colonne. 44 px de haut : c'est tapé au doigt sur la
-   tablette de l'atelier, pas seulement cliqué à la souris. */
+/* Une entrée = une colonne, à la hauteur du rond du système. */
 .colbar-item {
   display: flex;
   align-items: center;

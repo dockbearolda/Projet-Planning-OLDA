@@ -210,6 +210,38 @@ delete process.env.APP_PASSWORD;
     [['Face avant', 'Logo Coco Beach'], ['Fond', 'Logo OLDA']],
     'les faces sans millimètre atteignent la base AVEC leur consigne');
 
+  // -------------------------------------------------------------------------
+  // LE COUTEAU : DEUX FACES SUR LE MANCHE, DÉCLARÉES SUR L'ARTICLE
+  // -------------------------------------------------------------------------
+  // « Art de la table » porte quatorze objets qui ne se gravent pas au même
+  // endroit : un couteau sur son manche, une planche sur sa surface. Les faces
+  // se déclarent donc sur la DÉSIGNATION, et la famille ne sert que de repli —
+  // comme pour la tasse, dont la famille EST l'article.
+  assert.match(DB, /const COUTEAU_FAMILLE = 'Couteau Multi';/);
+  assert.match(DB, /const COUTEAU_FACES = \['Manche — face 1', 'Manche — face 2'\];/);
+  assert.match(DB, /SELECT 1 FROM app_meta WHERE key = 'faces_couteau'/,
+    'sa PROPRE garde : deux incidents réels sont venus d’une garde partagée');
+  assert.match(DB, /await semerFacesCouteau\(\);/, 'et elle est jouée au démarrage');
+  assert.match(DB, /Down : retirer la famille « Couteau Multi »/,
+    'toute migration porte son down');
+
+  // La table le rend vraiment, avec ses deux faces et rien d'autre.
+  const tableLogos = await fetch(`${base}/api/tailles-logo`).then((r) => r.json());
+  const couteau = (tableLogos.familles || []).find((f) => f.nom === 'Couteau Multi');
+  assert.ok(couteau, 'la famille « Couteau Multi » doit exister dans app_meta.tailles_logo');
+  assert.deepStrictEqual(couteau.faces, ['Manche — face 1', 'Manche — face 2']);
+
+  // LA RECHERCHE SUIT L'ARTICLE PUIS LA FAMILLE. Un couteau ajouté depuis le
+  // catalogue arrive avec `category: 'Art de la table'` : sans cette cascade,
+  // il n'aurait jamais ses faces.
+  const PAGE = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.html'), 'utf8');
+  assert.match(PAGE, /function facesDeLaCategorie\(cat,label\)\{\s*\n\s*const parArticle=facesDeclarees\(label\);\s*\n\s*return parArticle\.length\?parArticle:facesDeclarees\(cat\);/,
+    'la désignation d’abord, la catégorie ensuite');
+  assert.match(PAGE, /zones:zonesDuBesoin\(category,\$\('needLabel'\)\.value\.trim\(\)\)/,
+    'et le besoin enregistré passe bien la désignation');
+  assert.match(PAGE, /l\.addEventListener\('input',\(\)=>renderNeedFaces\(\)\)/,
+    'écrire la désignation ouvre la boîte des faces sans attendre');
+
   console.log('✓ faces d’article : la famille déclare, la vendeuse écrit, l’atelier lit');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

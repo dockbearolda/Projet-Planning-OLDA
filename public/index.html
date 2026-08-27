@@ -354,14 +354,18 @@
                 Le planning est en fiches épurées. Rallume une colonne dans « Retirées » pour revenir au tableau.
               </p>
               <div class="colbar-list" id="colbarOn"></div>
-            </div>
-            <!-- Bloc « Retirées » ÉPINGLÉ, hors de la zone qui défile : c'est
-                 tout l'intérêt du rail, ces colonnes doivent rester sous les
-                 yeux sans avoir à faire défiler quoi que ce soit. -->
-            <div class="colbar-off">
-              <p class="colbar-legend" id="colbarOffLegend">Retirées</p>
-              <div class="colbar-list" id="colbarOff"></div>
-              <p class="colbar-empty" id="colbarOffEmpty">Toutes les colonnes sont affichées.</p>
+              <!-- « Retirées » DANS la même zone qui défile. Il était épinglé
+                   en bas, avec son propre défilement : deux ascenseurs dans un
+                   rail de 672 px, et sur quatorze colonnes on n'en voyait que
+                   cinq — quatre étaient carrément hors d'atteinte sans deviner
+                   qu'un second ascenseur existait. Un seul défilement, et ce
+                   sont les DEUX INTITULÉS qui restent sous les yeux (collants) :
+                   c'est ce qu'ils devaient faire depuis le début. -->
+              <div class="colbar-off">
+                <p class="colbar-legend" id="colbarOffLegend">Retirées</p>
+                <div class="colbar-list" id="colbarOff"></div>
+                <p class="colbar-empty" id="colbarOffEmpty">Toutes les colonnes sont affichées.</p>
+              </div>
             </div>
             <button class="colbar-reset" id="colbarReset" type="button">Tout réafficher</button>
           </aside>
