@@ -1632,7 +1632,7 @@ function feuDuDossier(r) {
       // c'est le NOMBRE qu'on cherche. RIEN le jour même — « Devis aujourd'hui »
       // se lit comme un devis A FAIRE aujourd'hui, et il n'y a de toute façon
       // personne a relancer sur un dossier qui vient de bouger.
-      depuis: jours ? `${jours} j` : '',
+      depuis: jours ? `${jours}\u00a0j` : '',
       dit: jours == null ? f.dit(r) : `${f.dit(r)} (${f.attente(r)} depuis ${jours} j)`,
     }));
 }
@@ -1663,15 +1663,22 @@ function blocFeu(r) {
     s.className = 'prod-fiche__fort';
     s.textContent = m.mot;
     val.appendChild(s);
-    // DEPUIS QUAND, collé au mot. « Devis » ne dit pas s'il faut relancer ;
-    // « Devis 12 j » le dit — et c'est la seule chose que la ligne ajoute.
-    if (m.depuis) {
-      const d = document.createElement('span');
-      d.className = 'feu__depuis';
-      d.textContent = ` ${m.depuis}`;
-      val.appendChild(d);
-    }
   });
+  // DEPUIS QUAND, UNE SEULE FOIS, À LA FIN. « Devis » ne dit pas s'il faut
+  // relancer ; « Devis 12 j » le dit — et c'est la seule chose que la ligne
+  // ajoute. Mais l'horloge est la MÊME pour les trois faits : elle sort d'un
+  // seul `updated_at`. L'écrire après chaque mot donnait « Devis 21 j · BAT
+  // 21 j » — le même nombre deux fois sur la même ligne, et deux lignes de
+  // haut au lieu d'une dès que deux choses manquent.
+  // L'ESPACE EST INSÉCABLE : « 21 j » ne se coupe pas entre le nombre et son
+  // unité, et le nombre ne se retrouve pas seul sur la ligne suivante.
+  const depuis = manque.find((m) => m.depuis);
+  if (depuis) {
+    const d = document.createElement('span');
+    d.className = 'feu__depuis';
+    d.textContent = `\u00a0${depuis.depuis}`;
+    val.appendChild(d);
+  }
   attachTip(bloc, manque.map((m) => m.dit).join(' · '));
   bloc.setAttribute('aria-label',
     `Avant la production, il manque : ${manque.map((m) => m.dit).join(' ; ')}`);

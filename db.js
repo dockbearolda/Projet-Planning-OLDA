@@ -1222,20 +1222,81 @@ async function seed() {
       product: 'Casquettes brodées', project_value: 120, description: 'Client pas pressé — à planifier',
       deadline: null, position: 3000, created_days_ago: 9,
     },
+    // --- CINQ DOSSIERS POUR VOIR LE FEU (27/08/2026) -----------------------
+    //
+    // Le feu ne s'allume que sur ce qui MANQUE, et il ne dit rien tant qu'on
+    // n'a pas de dossier qui coince. Les huit exemples ci-dessus sont tous en
+    // règle : la base locale était donc muette sur la seule chose qu'on ait
+    // besoin de regarder pour juger la rangée « Manque ».
+    //
+    // Ces cinq-là couvrent les quatre mots que le feu sait écrire — Devis, BAT,
+    // Paiement, Acompte — plus le cas où deux manquent en même temps. Ils
+    // portent un `updated_at` RECULÉ : sans lui, « depuis 0 j » ne s'écrit pas,
+    // et c'est précisément le nombre qui dit s'il faut relancer.
+    //
+    // Ils ne partent jamais en production : `seed()` n'est appelé QUE sur une
+    // table vide, et la base de l'atelier en porte 187.
+    {
+      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'Mélina', priority: 2, client_type: 'pro',
+      billing_company: 'Beach Bar Orient', contact_referent: 'Nathalie R.', quantity: 60,
+      product: 'Polos service', color: 'Bleu marine', project_value: 1180,
+      description: 'Devis parti le 15, aucun retour', deadline: inDays(6), position: 3000,
+      devis_requis: true, updated_days_ago: 12,
+    },
+    {
+      stage: 'preparation', sub_stage: 'prepa_bat', responsable: 'Charlie', priority: 3, client_type: 'pro',
+      billing_company: 'Garage Marigot', contact_referent: 'Pascal D.', quantity: 25,
+      product: 'Sweats atelier', color: 'Gris', project_value: 900,
+      description: 'BAT envoyé, en attente de validation', deadline: inDays(2), position: 4000,
+      bat_requis: true, updated_days_ago: 4,
+    },
+    {
+      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', priority: 3, client_type: 'pro',
+      billing_company: 'Villa Rousseau', contact_referent: 'Mme Rousseau', quantity: 30,
+      product: 'Serviettes brodées', color: 'Blanc', project_value: 660,
+      description: 'Parti en production sans encaissement', deadline: inDays(1), position: 2000,
+      paye: false, updated_days_ago: 6,
+    },
+    {
+      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie', priority: 2, client_type: 'asso',
+      billing_company: 'Club Nautique', contact_referent: 'Yann L.', quantity: 80,
+      product: 'Plaques gravées', project_value: 1600,
+      description: 'Acompte demandé, pas encore versé', deadline: inDays(4), position: 3000,
+      paye: false, acompte_demande: true, acompte_verse: false, updated_days_ago: 2,
+    },
+    {
+      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'À attribuer', priority: 1, client_type: 'perso',
+      billing_company: 'Sophie Delcourt', contact_referent: 'Sophie Delcourt', quantity: 4,
+      product: 'Tableaux photo', project_value: 260,
+      description: 'Maquette commencée avant le retour du devis', deadline: inDays(10), position: 4000,
+      devis_requis: true, bat_requis: true, updated_days_ago: 21,
+    },
   ];
 
   for (const s of samples) {
-    const createdAt = new Date(today.getTime() - (s.created_days_ago ?? 0) * 86400000).toISOString();
+    const recule = (j) => new Date(today.getTime() - (j ?? 0) * 86400000).toISOString();
+    const createdAt = recule(s.created_days_ago);
+    // `updated_at` PORTE L'HORLOGE DU FEU : « Devis 12 j » se lit dessus. Sans
+    // le reculer, tout dossier d'exemple est frais du jour et la rangée
+    // « Manque » sort sans son nombre — c'est-à-dire sans ce qui dit s'il faut
+    // relancer. Il ne peut pas être plus ancien que la création.
+    const updatedAt = recule(Math.max(s.updated_days_ago ?? 0, 0) || s.created_days_ago || 0);
     await pool.query(
       `INSERT INTO requests
         (stage, sub_stage, responsable, referent, priority, client_type, billing_company, contact_referent,
-         quantity, product, color, project_value, description, deadline, position, created_at,
-         flag, flag_reason)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+         quantity, product, color, project_value, description, deadline, position, created_at, updated_at,
+         flag, flag_reason, devis_requis, bat_requis, paye, acompte_demande, acompte_verse)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
       [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.referent ?? null, s.priority, s.client_type,
        s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
-       s.project_value, s.description, s.deadline, s.position, createdAt,
-       s.flag ?? null, s.flag_reason ?? null],
+       s.project_value, s.description, s.deadline, s.position, createdAt, updatedAt,
+       s.flag ?? null, s.flag_reason ?? null,
+       // `bat_requis` et `devis_requis` sont NOT NULL DEFAULT false : leur
+       // passer `null` explicitement viole la contrainte au lieu de prendre le
+       // défaut. Les trois autres acceptent le nul, mais un booléen d'exemple
+       // qui vaut « on ne sait pas » ne dit rien de plus que « non ».
+       s.devis_requis ?? false, s.bat_requis ?? false,
+       s.paye ?? false, s.acompte_demande ?? false, s.acompte_verse ?? false],
     );
   }
 }

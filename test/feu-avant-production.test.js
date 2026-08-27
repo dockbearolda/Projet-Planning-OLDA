@@ -216,6 +216,35 @@ assert.match(blocFeu, /d\.className = 'feu__depuis'/,
 assert.match(CSS, /\.feu__depuis \{[\s\S]*?font-size: var\(--taille-note\)/,
   'une taille en dessous : il précise, il ne s’annonce pas');
 
+// L'HORLOGE EST LA MÊME POUR LES TROIS FAITS (27/08/2026). Elle sort d'un seul
+// `updated_at` : l'écrire après chaque mot donnait « Devis 21 j · BAT 21 j »,
+// le même nombre deux fois sur la même ligne — et deux lignes de haut au lieu
+// d'une dès que deux choses manquent, ce qui casse le balayage de la file.
+assert.strictEqual((blocFeu.match(/feu__depuis/g) || []).length, 1,
+  'le nombre de jours s’écrit UNE fois, à la fin — pas après chaque mot');
+assert.ok(blocFeu.indexOf('feu__depuis') > blocFeu.indexOf('manque.forEach'),
+  '… donc après la boucle qui écrit les mots, pas dedans');
+assert.match(APP, /depuis: jours \? `\$\{jours\}\\u00a0j` : ''/,
+  'l’espace entre le nombre et son unité est INSÉCABLE : « 21 j » ne se coupe pas');
+
+// LA BANDE NE SORT PAS DE SA COLONNE DANS LE TABLEAU (27/08/2026).
+// Le débordement de 10 px a été dessiné pour la CARTE, où il vit dans un
+// rembourrage de 16 px. Le tableau est devenu la vue par défaut le 27/08 et n'a
+// aucun rembourrage à emprunter : mesuré au rendu, une bande de 280 px dans une
+// cellule de 260, donc 10 px peints PAR-DESSUS le prix à gauche et la date à
+// droite. Une couleur d'alerte qui recouvre la colonne d'à côté n'est plus un
+// état, c'est un défaut d'affichage.
+assert.match(CSS, /\.grid \.infos-stack > \.feu \{ margin-inline: 0;/,
+  'dans le tableau, la bande prend exactement la largeur de sa colonne');
+// Et les trois choses que cette colonne empile partent du MÊME bord : la fiche
+// de production, la rangée « Manque », et la note libre — qui est un CHAMP, et
+// dont le texte commence au rembourrage de la boîte unique.
+assert.match(CSS, /\.grid \.infos-stack > \.feu \{[^}]*padding-inline: var\(--champ-x\)/,
+  'la rangée « Manque » se cale sur le rembourrage du champ, pas sur un pas d’écart');
+assert.match(CSS, /\.grid \.infos-stack > \.prod-fiche \{ padding-inline: var\(--champ-x\); \}/,
+  '… et la fiche de production avec elle, sinon les intitulés se décalent de 4 px');
+
+
 // PARFAITEMENT LISIBLE (Charlie, 27/08) — sans cesser d'être discret : une
 // bande d'état, aucun glyphe, aucun mot en plus. Et la bande ne DÉPLACE rien :
 // elle déborde de 10 px de chaque côté et les reprend en rembourrage, sinon les
@@ -224,7 +253,8 @@ const bande = CSS.match(/\n\.feu \{[\s\S]*?\n\}/)[0];
 assert.match(bande, /background: var\(--danger-bg\)/, 'la couleur dit l’état, et rien d’autre');
 assert.match(bande, /box-shadow: inset 3px 0 0 var\(--danger\)/,
   '`box-shadow` et non `border-left` : une bordure décalerait la grille de 3 px');
-assert.match(bande, /margin-inline: calc\(var\(--pas-2\) \* -1\)/);
+assert.match(bande, /margin-inline: calc\(var\(--pas-2\) \* -1\)/,
+  'sur la CARTE, la bande déborde de son rembourrage — c’est là qu’elle a été dessinée');
 assert.match(bande, /padding: var\(--pas-1\) var\(--pas-2\)/,
   'la bande déborde exactement de ce qu’elle reprend : le texte ne bouge pas');
 

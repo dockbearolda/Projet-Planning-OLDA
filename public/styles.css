@@ -1127,6 +1127,31 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    rendu, rgb(95,103,116) au lieu du rouge d'état. */
 .prod-fiche__cle.feu__cle { color: var(--danger); }
 
+/* DANS LE TABLEAU, LA BANDE NE SORT PAS DE SA COLONNE (27/08/2026).
+   Le débordement de 10 px a été dessiné pour la CARTE, où il vit à l'intérieur
+   d'un rembourrage de 16 px : la couleur entoure le texte, le texte ne bouge
+   pas, rien ne déborde. Le tableau est devenu la vue par défaut le 27/08, et
+   là il n'y a aucun rembourrage à emprunter — la cellule « Infos » fait
+   exactement sa colonne. Mesuré au rendu : bande de 280 px dans une cellule de
+   260, donc 10 px peints PAR-DESSUS le prix à gauche et la date à droite.
+   Une couleur d'alerte qui recouvre la colonne d'à côté n'est plus un état,
+   c'est un défaut d'affichage.
+
+   La bande reprend donc la largeur de sa colonne, et c'est la GRILLE DE
+   PRODUCTION qui rentre pour rester alignée avec elle : « RÉF. », « MARQUAGE »,
+   « TAILLES », « LOGOS » et « MANQUE » gardent une seule colonne d'intitulés,
+   ce qui était tout l'intérêt d'emprunter cette grille.
+
+   ELLES RENTRENT DE `--champ-x`, PAS D'UN PAS D'ÉCART. La troisième chose que
+   cette colonne empile est la note libre, et c'est un CHAMP : son texte
+   commence au rembourrage de la boîte unique. Cadrer la grille sur un pas de
+   10 px laissait un décalage de 4 px entre « MANQUE » et la note, juste en
+   dessous — assez pour se voir, trop peu pour ressembler à autre chose qu'un
+   défaut. Les trois lignes partent du même bord.
+   La note, elle, garde ses 260 px : la colonne est déjà juste. */
+.grid .infos-stack > .feu { margin-inline: 0; padding-inline: var(--champ-x); }
+.grid .infos-stack > .prod-fiche { padding-inline: var(--champ-x); }
+
 .prod-fiche {
   /* La colonne des intitulés se cale sur le PLUS LARGE, mesuré au rendu :
      « MARQUAGE » fait 83 px en 14 px capitales (+.05em). À 68 px — la valeur
