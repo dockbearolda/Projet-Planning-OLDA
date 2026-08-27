@@ -42,6 +42,7 @@ const path = require('node:path');
 
 const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const DEVIS = lire('public/comptoir/demande-devis.html');
+const CATALOGUE_JS = lire('public/comptoir/catalogue.js');
 const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
 
 // --- 1. Le bandeau qui expliquait l'étape a disparu -------------------------
@@ -295,8 +296,17 @@ const ATTENDU = {
 // Le bloc du catalogue s'exécute pour de vrai : ce que fait « Ajouter au
 // demande » ne se lit pas dans une expression régulière.
 function bacASable() {
-  const bloc = (DEVIS.match(/\/\* CATALOGUE-COMPTOIR[\s\S]*?\/\* \/CATALOGUE-COMPTOIR \*\//) || [''])[0];
-  assert.ok(bloc, 'le bloc du catalogue doit être délimité dans la page');
+  // LE CATALOGUE A SA PROPRE SOURCE (27/08). Il vivait en constante dans cette
+  // page ; un deuxième écran en ayant besoin, deux catalogues auraient été deux
+  // catalogues à tenir — donc un produit ajouté d'un côté et introuvable de
+  // l'autre. Le bac à sable charge les deux morceaux DANS L'ORDRE DE LA PAGE :
+  // le fichier partagé d'abord, ce qui s'en sert ensuite.
+  const bloc = CATALOGUE_JS.replace(/^window\..*$/gm, '')
+    + (DEVIS.match(/\/\* CATALOGUE-COMPTOIR[\s\S]*?\/\* \/CATALOGUE-COMPTOIR \*\//) || [''])[0];
+  assert.ok(/const CATALOGUE\s*=/.test(CATALOGUE_JS), 'le catalogue vit dans son propre fichier');
+  assert.ok(/CATALOGUE-COMPTOIR/.test(DEVIS), 'et l’écran garde le bloc qui s’en sert');
+  assert.ok(/<script src="catalogue\.js"><\/script>/.test(DEVIS),
+    'l’écran charge le catalogue partagé — sinon la page s’ouvre sans produits');
   const faux = (extra) => Object.assign({
     value: '', innerHTML: '', textContent: '',
     classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } },

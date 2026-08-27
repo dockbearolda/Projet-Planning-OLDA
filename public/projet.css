@@ -97,3 +97,215 @@
   .np-tile { padding: 24px 18px 22px; }
   .np-tile__icon { width: 64px; height: 64px; }
 }
+
+/* ===========================================================================
+   LA VOIE RAPIDE (27/08/2026)
+   ===========================================================================
+   Un écran, trois blocs, aucun pas. Tout est sur l'échelle de la charte : deux
+   tailles de texte par surface, UNE hauteur de boîte, quatre écarts. Aucune
+   teinte, aucune durée, aucune taille écrite en clair — la couleur ne dit
+   qu'un état, et une rangée d'articles n'est pas un état.
+   ======================================================================== */
+.np-eclair { flex: 1; min-height: 0; overflow: auto; padding: var(--pas-4) 0; }
+.np-eclair[hidden] { display: none; }
+
+.ec {
+  display: flex; flex-direction: column; gap: var(--pas-4);
+  max-width: 980px; margin: 0 auto; padding: 0 var(--pas-4);
+}
+
+/* --- La nature du dossier : la première question qu'on pose au client ----- */
+.ec-nature { display: flex; gap: var(--pas-2); }
+.ec-nature__b {
+  min-height: var(--ctrl-h); padding: 0 var(--pas-4);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.ec-nature__b:hover { background: var(--surface-hover); }
+.ec-nature__b.is-on {
+  background: var(--primary); border-color: var(--primary);
+  color: var(--on-primary); font-weight: var(--graisse-forte);
+}
+
+/* --- Un bloc ------------------------------------------------------------- */
+.ec-bloc {
+  display: flex; flex-direction: column; gap: var(--pas-3);
+  padding: var(--pas-4);
+  background: var(--surface); border: 1px solid var(--card-border);
+  border-radius: var(--arrondi-carte);
+}
+.ec-bloc__titre {
+  margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note);
+  color: var(--text-2); letter-spacing: .04em; text-transform: uppercase;
+}
+
+/* --- LE MESSAGE NE POUSSE PERSONNE : il sort du flux (voir charte.css) ---- */
+.ec-msg { margin: 0; }
+.ec-msg--echec { color: var(--danger); font-weight: var(--graisse-note); }
+
+/* --- La liste qui se filtre ---------------------------------------------- */
+/* Le panneau est ABSOLU : il recouvre ce qui suit au lieu de le pousser. Un
+   panneau qui pousse déplace le champ suivant au moment précis où on va le
+   viser. */
+.ec-combo { position: relative; flex: 1; min-width: 0; }
+.ec-combo__champ {
+  width: 100%; min-width: 0; box-sizing: border-box;
+  height: var(--ctrl-h); padding: 0 var(--champ-x);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-1);
+  font: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.ec-combo__champ:focus {
+  outline: none; background: var(--field-focus); border-color: var(--primary);
+}
+.ec-combo__panneau {
+  position: absolute; z-index: 30; top: calc(100% + var(--pas-1)); left: 0; right: 0;
+  max-height: calc(var(--ctrl-h) * 5.4); overflow-y: auto;
+  padding: var(--pas-1);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--arrondi-carte); box-shadow: var(--shadow-pop);
+}
+.ec-combo__panneau[hidden] { display: none; }
+.ec-combo__ligne {
+  display: flex; align-items: baseline; gap: var(--pas-2);
+  width: 100%; padding: var(--champ-y-serre) var(--pas-2);
+  border: 0; border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-1);
+  font: inherit; font-size: var(--taille-texte); text-align: left; cursor: pointer;
+}
+.ec-combo__ligne.is-vise, .ec-combo__ligne:hover { background: var(--state-hover); }
+.ec-combo__nom { flex: 1; min-width: 0; }
+.ec-combo__note {
+  flex: none; font-size: var(--taille-note); color: var(--text-2);
+}
+
+/* --- Le client choisi : sa fiche se LIT, elle ne se retape pas ------------ */
+.ec-client__carte {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--pas-3);
+  padding: var(--pas-3); background: var(--zone-bg);
+  border: 1px solid var(--border-soft); border-radius: var(--arrondi-bloc);
+}
+.ec-client__carte[hidden] { display: none; }
+.ec-client__id { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+.ec-client__nom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
+.ec-client__sous { font-size: var(--taille-note); color: var(--text-2); }
+.ec-lien {
+  border: 0; background: transparent; padding: 0;
+  color: var(--text-1); font: inherit; font-size: var(--taille-note);
+  font-weight: var(--graisse-note); text-decoration: underline; cursor: pointer;
+}
+
+/* --- La rangée qui ajoute : produit · quantité · prix · l'action à DROITE - */
+.ec-rangee { display: flex; flex-wrap: wrap; gap: var(--pas-2); align-items: center; }
+/* L'hôte de la liste doit GRANDIR, et il passe À LA LIGNE plutôt que d'être
+   écrasé. Mesuré : dans la colonne du CRM (387 px de rangée), la quantité, le
+   prix et le bouton — tous les trois de largeur fixe — laissaient 15 px au
+   champ produit. Le champ LE PLUS IMPORTANT de la rangée était le plus petit.
+   `flex-basis: 260px` le fait donc passer sur sa propre ligne dès qu'il n'y a
+   plus la place, et `min-width: 0` l'autorise à rétrécir jusque-là : sans lui,
+   un champ en flex garde sa largeur intrinsèque (≈ 20 caractères). */
+.ec-rangee__produit { display: flex; flex: 1 1 260px; min-width: 0; }
+.ec-rangee__qte, .ec-rangee__prix, .ec-art__qte, .ec-art__prix, .ec-face__quoi,
+.ec-cel input, .ec-cel select, .ec-cel textarea {
+  min-width: 0; box-sizing: border-box;
+  height: var(--ctrl-h); padding: 0 var(--champ-x);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-1);
+  font: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ);
+}
+.ec-cel textarea { height: auto; padding: var(--champ-y) var(--champ-x); resize: vertical; }
+.ec-rangee__qte { flex: 0 0 5.5rem; }
+.ec-rangee__prix { flex: 0 0 8rem; }
+.ec-rangee__prix[hidden], .ec-art__prix[hidden] { display: none; }
+/* L'action qui engage est le DERNIER élément à droite de la rangée. */
+.ec-rangee__ok {
+  flex: none; min-height: var(--ctrl-h); padding: 0 var(--pas-4);
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
+  background: var(--primary); color: var(--on-primary);
+  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.ec-rangee__ok:hover { background: var(--primary-hover); }
+
+/* --- Les lignes posées : elles se relisent ET se corrigent sur place ------ */
+.ec-articles { display: flex; flex-direction: column; gap: var(--pas-2); }
+.ec-vide { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
+.ec-art {
+  display: flex; flex-direction: column; gap: var(--pas-2);
+  padding: var(--pas-3); border: 1px solid var(--border-soft);
+  border-radius: var(--arrondi-bloc); background: var(--surface);
+}
+/* La tête d'une ligne PASSE À LA LIGNE. Mesuré : « Tasse céramique 350 ml
+   TC 06 — Noir (ext.) / Blanc (int.) » coincé entre trois cases de largeur
+   fixe se repliait UN MOT PAR LIGNE, et la carte prenait la moitié de l'écran.
+   Le nom prend donc sa propre ligne dès qu'il n'a plus 220 px. */
+.ec-art__tete { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pas-2); }
+.ec-art__nom { flex: 1 1 220px; min-width: 0; font-size: var(--taille-texte); font-weight: var(--graisse-note); }
+.ec-art__fam { flex: none; font-size: var(--taille-note); color: var(--text-2); }
+.ec-art__qte { flex: 0 0 5rem; }
+.ec-art__prix { flex: 0 0 7.5rem; }
+/* Une croix qui efface est une ICÔNE SEULE : elle prend le rond, pas la boîte
+   d'une action. La forme dit le rôle. */
+.ec-art__oter {
+  flex: none; width: var(--rond-serre); height: var(--rond-serre);
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-2);
+  font: inherit; font-size: var(--taille-note); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.ec-art__oter:hover { background: var(--state-hover); color: var(--danger); }
+
+/* --- Les faces déclarées par la famille ---------------------------------- */
+.ec-art__faces {
+  display: grid; gap: var(--pas-2);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.ec-face { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+.ec-face__nom { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+
+/* --- Conclure ------------------------------------------------------------ */
+.ec-fin { display: grid; gap: var(--pas-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.ec-cel { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+.ec-cel[hidden] { display: none; }
+.ec-cel__lab { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+.ec-plus { border: 1px solid var(--border-soft); border-radius: var(--arrondi-carte); background: var(--surface); }
+.ec-plus > summary {
+  padding: var(--champ-y) var(--pas-4);
+  font-size: var(--taille-texte); font-weight: var(--graisse-note); cursor: pointer;
+}
+.ec-plus__corps {
+  display: grid; gap: var(--pas-3); padding: 0 var(--pas-4) var(--pas-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* --- Le pied : le total, et l'action tout à droite ------------------------ */
+.ec-pied {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--pas-4);
+  padding: var(--pas-3) var(--pas-4);
+  background: var(--surface); border: 1px solid var(--card-border);
+  border-radius: var(--arrondi-carte);
+}
+.ec-total { display: flex; flex-direction: column; gap: var(--pas-1); }
+.ec-total__k { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+.ec-total__v { font-size: var(--taille-grand); font-weight: var(--graisse-forte); letter-spacing: -.02em; }
+.ec-envoyer {
+  flex: none; min-height: var(--ctrl-h); padding: 0 var(--pas-4);
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
+  background: var(--primary); color: var(--on-primary);
+  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.ec-envoyer:hover:not(:disabled) { background: var(--primary-hover); }
+/* Un bouton éteint s'ÉCLAIRCIT, il ne devient pas transparent : l'opacité rend
+   son libellé illisible au moment exact où l'on cherche ce qui se passe. */
+.ec-envoyer:disabled { background: var(--border-soft); color: var(--text-2); cursor: default; }
+
+.ec-sortie { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
