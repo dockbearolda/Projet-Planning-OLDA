@@ -1,0 +1,3088 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- LE THÈME AVANT LE PREMIER PIXEL. Cet écran s'affiche dans un cadre du CRM :
+     l'hôte lui passe son thème dans l'adresse, et on l'applique ICI, avant que
+     la moindre couleur ne soit peinte — posé plus tard, le cadre s'ouvrirait en
+     clair puis basculerait sous les yeux de la vendeuse.
+     Ouvert seul (impression, mise au point), il retombe sur le choix mémorisé
+     du poste puis sur celui du système : la MÊME règle que le planning, et la
+     MÊME clé — les deux documents sont sur la même origine. -->
+<script>
+try {
+  var p = new URLSearchParams(location.search).get('theme');
+  var t = (p === 'dark' || p === 'light') ? p : localStorage.getItem('olda_theme');
+  if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+} catch (e) {}
+</script>
+<!-- LA CHARTE DE L'APPLICATION, le même fichier que le planning et que l'écran
+     de demande de devis : couleurs, échelle de texte, formes, thème sombre.
+     Cet écran-ci vivait sur SA palette — un bleu marine #142e54 pour l'action,
+     un bleu vif #3064e8 au focus, quatre-vingt-neuf teintes en tout — pendant
+     que l'écran d'à côté, celui du même poste, parlait déjà le vocabulaire de
+     la maison. Deux parcours du même comptoir ne peuvent pas avoir deux
+     chartes. Servi par nous : rien ne vient d'un autre domaine. -->
+<link rel="stylesheet" href="../charte.css">
+<style>
+/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
+   de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
+   d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
+   même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
+   un poste s'ouvre sans dépendre d'un tiers joignable.
+   Manrope : celle du patron. Inter, essayée le 21/08, rendait mal sur les
+   Windows de l'atelier — variable non hintée, DirectWrite la sort maigre et
+   sale aux petites tailles. Un fichier de 25 Ko, graisse variable 200-800. */
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../manrope-latin-variable.woff2') format('woff2')}
+</style>
+<title>Atelier OLDA — Vente directe complète</title>
+<style>
+/* ============================================================================
+   L'ÉCHELLE DE L'ÉCRAN — LE SECOND PARCOURS DU COMPTOIR (23/08/2026)
+   ----------------------------------------------------------------------------
+   Le 22/08, l'écran de demande de devis est entré dans la charte : quatre
+   tailles au lieu de vingt-cinq, trois graisses, aucune couleur en dur. Celui-ci
+   est resté en arrière — et les deux tournent SUR LE MÊME POSTE, à un clic
+   l'un de l'autre. Il comptait DIX-NEUF tailles (10, 11, 12, 12.5, 13, 13.5,
+   14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 28 px), SIX graisses (400,
+   600, 700, 800, 900, 950 — dont deux que Manrope rabote sur 800, donc deux
+   marches invisibles) et QUATRE-VINGT-NEUF teintes.
+
+   Il prend la même échelle, et n'en emploie que DEUX marches :
+
+     --taille-texte  15px  ce qui se lit et ce qui se saisit : texte courant,
+                           champ, liste, bouton, intitulé, aide, pastille
+     --taille-grand  28px  les chiffres qu'on annonce au client
+
+   Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR.
+
+   LE TICKET GARDE LA SIENNE. C'est le seul morceau de cet écran qui n'est pas
+   de l'écran : il s'imprime, il part avec le client, et il se lit à un mètre
+   sur un comptoir. Son échelle à lui est déclarée plus bas, en un seul
+   endroit, et elle ne déborde jamais sur la page.
+   ========================================================================== */
+body{font-size:var(--taille-texte);line-height:var(--ligne-texte)}
+/* Le gras du navigateur vaut 700 : une quatrième graisse qui entrait par la
+   porte de derrière, sur chaque <b> et chaque <strong> de la page. */
+b,strong{font-weight:var(--graisse-forte)}
+</style>
+<style>
+/* L'ÉCHELLE DU TICKET — celle d'un DOCUMENT, pas d'un écran.
+   Le ticket se compose sur une feuille, se lit à bout de bras sur le comptoir
+   et part avec le client : il lui faut ses propres marches, plus hautes que
+   celles de l'écran. Elles sont déclarées ICI, une fois, au lieu des quinze
+   tailles semées dans quatre blocs « V10 », « V10.1 », « V10.2 », « V10.3 »
+   empilés les uns sur les autres à coups de !important. */
+.ticket{
+  --tk-note: 13px;    /* mention de pied, intitulé de rubrique */
+  --tk-texte: 15px;   /* la ligne courante du ticket */
+  --tk-titre: 19px;   /* le nom d'un article */
+  --tk-total: 24px;   /* le montant, et le nom de l'atelier en tête */
+}
+</style>
+<style>
+*{box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
+.container{max-width:1180px;margin:var(--pas-4) auto;padding:0 var(--pas-3) 40px}
+
+
+
+.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
+h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pas-3)}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3)}
+/* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
+   Les grilles de formulaire collaient leurs cellules EN BAS
+   (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son
+   champ 18 px plus bas que ses voisins. Mais c'était régler le problème par le
+   bas : dès qu'un message d'erreur s'ajoute SOUS un champ, c'est le champ qui
+   REMONTE — 27 px au-dessus de ses voisins de rangée, au moment précis où
+   l'œil le cherche. Le rouge signalait le champ qui manque, et le décalait.
+   Chaque cellule reprend donc les LIGNES de sa rangée (`subgrid`) : les
+   intitulés sur la première, les commandes sur la deuxième, les messages sur la
+   troisième. Plus rien de ce qui est au-dessus ou au-dessous ne peut déplacer
+   une commande. Sans subgrid, on garde le collage en bas — le moins mauvais
+   des deux. */
+@supports (grid-template-rows:subgrid){
+  .grid,.grid-3{grid-template-rows:auto auto auto;align-items:stretch}
+  .grid>.field,.grid-3>.field{display:grid;grid-template-rows:subgrid;grid-row:span 3;margin-bottom:0}
+  .grid>.field>label,.grid-3>.field>label{grid-row:1;align-self:end}
+  .grid>.field>.error,.grid>.field>.help,
+  .grid-3>.field>.error,.grid-3>.field>.help{grid-row:3}
+  /* UN CHAMP QUI PORTE TOUT UN EMPILEMENT NE RENTRE PAS DANS TROIS LIGNES.
+     « Date souhaitée » tient sa date, ses trois raccourcis de délai, son avis
+     de supplément, son barème dépliable ET l'heure souhaitée avec son propre
+     intitulé : sept éléments pour trois lignes de rangée. Le débordement
+     partait dans les lignes implicites et démontait la rangée entière.
+     Une rangée qui contient un champ à deux intitulés renonce donc au partage
+     de lignes et se range normalement — c'est le seul cas des deux écrans. */
+  .grid:has(>.field label~label),.grid-3:has(>.field label~label){grid-template-rows:none}
+  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--pas-3)}
+}
+.field{margin-bottom:var(--pas-3)}
+label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
+input,select,textarea{width:100%;padding:0 var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface);color:var(--text-1)}input,select{height:var(--ctrl-h)}textarea{padding:var(--champ-x);min-height:110px;resize:vertical}
+textarea{min-height:110px;resize:vertical}
+/* UN CHAMP EN ERREUR NE BOUGE PAS D'UN PIXEL. Le trait passait de 1,5 à 2 px :
+   le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
+   ne s'alignait plus avec ses voisins — au moment précis où l'œil le cherche.
+   Le trait garde sa LARGEUR, il change de couleur ; l'épaisseur qu'on voit
+   vient d'un anneau posé par-dessus (`box-shadow`), qui ne prend aucune place.
+   « !important » à contrecœur, mais indispensable : la recette des commandes
+   pose plus bas « input,select,textarea{border:…!important} », et sans lui le
+   trait rouge de cet écran ne s'est JAMAIS affiché — le champ fautif n'avait
+   qu'un fond rosé, que personne ne remarque à bout de bras. */
+.invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}
+.help{font-size:var(--taille-texte);color:var(--text-2);margin-top:5px}
+button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padding:0 var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
+.primary{background:var(--primary);color:var(--on-primary)}
+.primary:hover{background:var(--primary-hover)}
+.secondary{background:var(--border-soft);color:var(--text-1)}
+.danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line)}
+/* WhatsApp n'a plus SA couleur : le vert de la marque était la seule teinte de
+   l'écran qui ne disait pas un état. Un bouton d'envoi est un bouton d'envoi. */
+.whatsapp{background:var(--primary);color:var(--on-primary)}
+.full{width:100%}
+/* TOUTE RANGÉE DE COMMANDES FINIT À DROITE (24/08). « Ajouter l'article, etc.
+   doit toujours être en bas à droite. » Ce n'était vrai que des rangées
+   marquées `a-droite` : les autres partaient du bord gauche — « Ajouter
+   l'article » à 1252 px du bord droit, « + Créer un nouveau client » à 771,
+   « Réinitialiser valeurs Excel » à 365.
+   PAR UNE MARGE AUTOMATIQUE SUR LE PREMIER, jamais par `justify-content:
+   flex-end` : une rangée en flex-end qui déborde se fait rogner PAR LA GAUCHE,
+   et c'est le début du contenu qui devient inatteignable.
+   Sur le PREMIER enfant, pas sur le dernier : les boutons ajoutés en cours de
+   route le sont par `appendChild` (le bouton du planning au récapitulatif, les
+   deux boutons du doublon de client). Poussé par le premier, le groupe reste
+   collé à droite quel que soit ce qu'on lui ajoute. */
+.actions{display:flex;gap:var(--pas-2);flex-wrap:wrap;align-items:center}
+/* PAR UN ÉCARTEUR, PAS PAR UNE MARGE SUR LE PREMIER ENFANT. Le premier enfant
+   est souvent MASQUÉ — « Annuler la modification » ne s'affiche qu'en cours de
+   modification. Un élément en `display:none` n'est pas mis en page : la marge
+   automatique posée dessus ne pousse rien, et « Ajouter l'article » restait
+   collé à gauche. Piège vicieux, parce qu'en démasquant les boutons POUR
+   MESURER on obtient le bon résultat.
+   L'écarteur est un pseudo-élément flexible : il prend tout l'espace libre
+   quels que soient les enfants masqués, et il se réduit à zéro quand la rangée
+   déborde — là où `justify-content:flex-end` rognerait PAR LA GAUCHE. */
+.actions::before{content:"";flex:1 1 0;min-width:0}
+/* CHAQUE GROUPE DE CHAMPS DANS SA BULLE (23/08/2026, demande du patron).
+   Une étape était un long ruban de champs mis bout à bout dans une carte
+   blanche : rien ne disait où un sujet finissait et où le suivant commençait.
+   La bulle n'ajoute AUCUN intitulé, c'est un cadre.
+
+   TROIS NIVEAUX, JAMAIS PLUS (rattrapage du 25/08/2026). Cet écran était resté
+   sur la bulle GRISE du 23/08 ; l'écran de la demande l'a abandonnée dès le
+   lendemain parce qu'elle faisait un QUATRIÈME niveau — une bulle grise
+   arrondie dans une carte blanche arrondie, elle-même sur le fond gris de la
+   page. Le même objet avait donc deux formes selon l'écran où on le regardait,
+   à un clic l'un de l'autre : gris / trait 1,5 / rembourrage 16 ici, blanc /
+   trait 1 / rembourrage 24 là-bas. C'est l'écran de référence qui tranche.
+   Fond de page gris → carte blanche → champ blanc, et le groupe de champs EST
+   la carte : la carte qui les contenait redevient un empilement (voir juste
+   dessous). Aucun champ visible ne vit hors d'une bulle sur cet écran — les
+   sept qui traînent sont des champs CACHÉS, porteurs de valeurs pour le ticket
+   et le planning. */
+.bloc{border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin:var(--pas-3) 0 0;background:var(--surface)}
+/* Les trois cartes qui portent des groupes ne sont plus des cartes : leurs
+   enfants en sont. Sans ça on retrouverait un arrondi dans un arrondi. */
+.card:has(> .bloc){background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;margin:0 0 var(--pas-3)}
+.bloc>:first-child{margin-top:0}
+.bloc>:last-child{margin-bottom:0}
+/* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
+   encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
+.bloc .notice,.bloc .product-card,.notice .bloc{background:var(--surface)}
+.product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
+.product-top{display:flex;justify-content:space-between;gap:12px}
+.product-title{font-weight:var(--graisse-forte)}
+.product-description{white-space:pre-wrap;color:var(--text-2);margin-top:8px}
+.summary-row{display:flex;justify-content:space-between;gap:12px;margin:9px 0}
+.summary-total{font-size:var(--taille-grand);font-weight:var(--graisse-forte);border-top:1px solid var(--border);padding-top:12px}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-weight:var(--graisse-forte);background:var(--border-soft)}
+.badge.green{background:var(--primary-soft);color:var(--primary)}
+.badge.orange{background:var(--warning-bg);color:var(--warning)}
+.internal{border:2px solid var(--primary);background:var(--surface)}
+.internal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.lock{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:5px 9px;font-weight:var(--graisse-forte)}
+.hidden{display:none!important}
+.payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:var(--graisse-texte)}
+.payment-option input,.inline-check input{width:auto}
+.inline-check{display:flex;align-items:center;gap:8px;font-weight:var(--graisse-texte);margin:14px 0}
+.success{background:var(--success-bg);border:1px solid var(--success-line);border-radius:var(--arrondi-bloc);padding:15px}
+.center{text-align:center}
+.footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:800px){
+  .grid,.grid-3,.footer-actions,
+}
+
+.client-search-wrap{position:relative}
+.client-results{margin-top:var(--pas-2);display:grid;gap:var(--pas-2)}
+.client-result{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--zone-bg);display:flex;justify-content:space-between;gap:14px;align-items:center}
+.client-result-main{min-width:0}
+.client-result-name{font-weight:var(--graisse-forte);margin-bottom:4px}
+.client-result-meta{color:var(--text-2);line-height:var(--ligne-texte)}
+.client-selected{border:2px solid var(--primary);background:var(--primary-soft)}
+.client-selected .badge{margin-bottom:8px}
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice-card{border:2px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--surface);cursor:pointer;text-align:left}
+.choice-card.active{border-color:var(--primary);background:var(--primary-soft)}
+.notice{padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);border:1px solid var(--warning-line);margin:12px 0}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal{width:min(520px,100%);background:var(--surface);border-radius:var(--arrondi-carte);padding:22px;box-shadow:var(--shadow-pop)}
+@media(max-width:800px){
+  .client-result,.choice-grid{grid-template-columns:1fr;display:grid}
+}
+
+
+/* Parcours bloc par bloc */
+.sale-panel-hidden{display:none!important}
+/* LA VALIDATION DE LA VENTE FERME LA LIGNE, À DROITE (24/08). Cette barre
+   flottait au CENTRE, large de 385 px : `.container` est en
+   `flex-direction:column`, la barre en est un ITEM, et sur un item flex une
+   marge `auto` ne centre pas — elle AVALE l'espace libre. Mesuré : 342,9 px
+   absorbés de chaque côté. Le `max-width:1100px` et les marges automatiques
+   avaient été écrits pour un contexte de bloc, où ils auraient marché.
+   `align-self:stretch` lui rend la largeur de la carte ; l'écarteur pousse
+   alors « Valider … et continuer → » au bord droit, où l'action qui engage se
+   trouve partout ailleurs. Le `max-width` s'en va : à 1180 px de conteneur il
+   laissait la barre 48 px plus étroite que la carte, décalée de tout le reste. */
+.tablet-wizard-nav{
+  position:sticky;bottom:0;z-index:100;margin:var(--pas-3) 0 0;
+  align-self:stretch;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--arrondi-carte);
+  box-shadow:var(--shadow-2);
+  padding:12px;display:flex;justify-content:space-between;gap:var(--pas-2)
+}
+.tablet-wizard-nav .wizard-spacer{flex:1}
+@media(max-width:760px){
+  .container{padding-bottom:12px}
+  .tablet-wizard-nav{position:fixed;left:10px;right:10px;bottom:10px;margin:0}
+  body{padding-bottom:88px}
+  .tablet-wizard-nav button{flex:1}
+}
+/* Deux boutons côte à côte n'ont plus la place sous 560 px : « Valider les
+   articles et continuer → » se replie sur cinq lignes et la barre devient une
+   pastille illisible. On les empile, pleine largeur, une ligne chacun. */
+@media(max-width:560px){
+  .tablet-wizard-nav{flex-wrap:wrap}
+  .tablet-wizard-nav button{flex:1 1 100%}
+  .tablet-wizard-nav .wizard-spacer{display:none}
+  body{padding-bottom:150px}
+}
+
+
+/* Masque les anciens boutons de navigation pour ne garder qu'une action claire */
+#goToClientBtn,
+#continueToPaymentBtn,
+#backToArticlesBtn{
+  display:none!important;
+}
+
+
+/* V10 — Vente directe reprise propre */
+#payButton{display:none!important}
+
+#selectedClientCard{
+  border:2px solid var(--primary)!important;
+  background:var(--primary-soft)!important;
+  padding:18px!important;
+}
+#selectedClientCard .badge{
+  display:inline-flex;
+  align-items:center;
+  margin-bottom:10px;
+  padding:7px 11px;
+  letter-spacing:.04em;
+}
+#selectedClientName{
+  font-weight:var(--graisse-forte);
+  margin-bottom:5px;
+}
+#selectedClientMeta{
+  color:var(--text-2);
+  line-height:var(--ligne-texte);
+}
+.client-result.selected-result{
+  border:2px solid var(--primary);
+  background:var(--primary-soft);
+}
+
+/* ------------------------------------------------------------------ LE TICKET
+   C'EST UNE FEUILLE DE PAPIER, PAS UN ÉCRAN. Il s'imprime et part avec le
+   client : ce qu'on montre à l'écran est un APERÇU du papier, donc il reste
+   blanc à l'encre noire même quand le poste est en thème sombre — comme le
+   ticket de l'écran d'à côté, qui n'a jamais fait autrement. Un aperçu
+   anthracite ne dit rien de ce qui va sortir de l'imprimante.
+   C'est aussi le seul endroit de cette page qui garde une échelle à lui
+   (--tk-*, déclarée en tête), et il ne la prête à rien d'autre.
+   Il était réglé quatre fois de suite — « V10 », « V10.1 », « V10.2 »,
+   « V10.3 » — chaque bloc rejouant les mêmes sélecteurs à coups de !important
+   pour corriger le précédent : quinze tailles, un fond noir posé puis repeint
+   en blanc à l'impression, des graisses 900 et 950 que Manrope rabote toutes
+   les deux sur 800. Il est écrit ici UNE fois, dans l'ordre où on le lit. */
+#ticketArea{
+  max-width:620px;
+  margin:0 auto var(--pas-4);
+}
+.ticket{
+  max-width:700px;
+  margin:0 auto;
+  border:1px solid #d5dae2;
+  border-radius:var(--arrondi-carte);
+  overflow:hidden;
+  padding:0!important;
+  background:#fff;
+  color:#111827;
+  box-shadow:var(--shadow-2);
+}
+.ticket-head{
+  padding:26px 24px;
+  background:#111827;
+  color:#fff;
+  text-align:center;
+}
+.ticket-head h2{margin:0 0 5px;font-size:var(--tk-total);letter-spacing:.04em;color:#fff}
+.ticket-head div{font-size:var(--tk-texte);color:#fff}
+.ticket-body{padding:var(--pas-4)}
+.ticket-client-box{
+  padding:16px 18px;
+  background:#f5f6f8;
+  border:1px solid #d5dae2;
+  border-radius:var(--arrondi-champ);
+  font-size:var(--tk-texte);
+  font-weight:var(--graisse-forte);
+  line-height:1.55;
+  margin-bottom:16px;
+}
+/* L'intitulé d'une rubrique du ticket : le SEUL endroit où l'on descend sous
+   la taille du texte, et il est en capitales espacées — c'est une étiquette,
+   pas une phrase. */
+.ticket-section-label{
+  margin:20px 0 10px;
+  font-size:var(--tk-note);
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  color:#6b7280;
+  font-weight:var(--graisse-forte);
+}
+.ticket-product{
+  padding:18px 0;
+  border-bottom:1px solid #e5e7eb;
+}
+.ticket-product-main,
+.ticket-extra-line,
+.ticket-total-line,
+.ticket-payment-line{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:14px;
+  align-items:start;
+}
+.ticket-product-name{font-size:var(--tk-titre);font-weight:var(--graisse-forte);line-height:1.35}
+.ticket-product-description{margin-top:6px;font-size:var(--tk-texte);line-height:var(--ligne-texte);color:#6b7280;white-space:pre-line}
+.ticket-product-price{font-size:var(--tk-titre);font-weight:var(--graisse-forte);white-space:nowrap}
+/* Un supplément : une ligne en retrait, marquée d'un filet à l'attention —
+   c'est de l'argent en plus, il doit se voir sans se lire deux fois. */
+.ticket-extra-line{
+  margin:10px 0 0 16px;
+  padding:10px 12px;
+  border-left:3px solid #854d0e;
+  background:#fefce8;
+  border-radius:0 8px 8px 0;
+  font-size:var(--tk-texte);
+  line-height:1.4;
+}
+.ticket-extra-price{font-size:var(--tk-texte);font-weight:var(--graisse-forte)}
+.ticket-total-line{
+  margin-top:22px;
+  padding-top:18px;
+  border-top:2px solid #111827;
+  font-size:var(--tk-total);
+  font-weight:var(--graisse-forte);
+}
+.ticket-payment-line{
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:var(--arrondi-champ);
+  background:#f5f6f8;
+  font-size:var(--tk-texte);
+}
+.ticket-date{margin-top:4px;font-size:var(--tk-note)}
+.ticket-footer{
+  padding:17px 20px;
+  background:#f5f6f8;
+  color:#6b7280;
+  text-align:center;
+  font-size:var(--tk-note);
+}
+.ticket-pickup{
+  margin-top:10px;
+  padding-top:9px;
+  border-top:1px solid #d5dae2;
+  font-size:var(--tk-texte);
+  font-weight:var(--graisse-forte);
+}
+.ticket-preview-actions{
+  display:flex;
+  gap:9px;
+  flex-wrap:wrap;
+  margin-top:20px;
+}
+/* CES DEUX COMMANDES SONT POSÉES SUR LA FEUILLE : elles prennent les couleurs
+   du papier, pas celles du thème. En sombre, le bouton plein sortait en gris
+   très clair sur blanc — un bouton qu'on ne voit pas — et le bouton bordé en
+   gris moyen, à 2,5:1 de contraste. Le papier ne change pas de thème, ses
+   commandes non plus. (Elles ne s'impriment pas : la règle d'impression les
+   masque plus bas.) */
+.ticket-preview-actions button.primary,
+.ticket-preview-actions button.whatsapp{background:#111827!important;color:#fff!important;border-color:transparent!important;box-shadow:none}
+.ticket-preview-actions button.primary:hover,
+.ticket-preview-actions button.whatsapp:hover{background:#000!important}
+.ticket-preview-actions button.secondary{background:transparent!important;color:#374151!important;border-color:#d5dae2!important}
+.ticket-preview-actions button.secondary:hover{background:#f5f6f8!important;color:#111827!important;border-color:#9aa2aa!important}
+
+/* Fenêtre du choix d'export */
+.ticket-export-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(0,0,0,.52);
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.ticket-export-overlay.show{display:flex}
+.ticket-export-dialog{
+  width:min(430px,94vw);
+  border-radius:var(--arrondi-carte);
+  background:var(--surface);
+  padding:22px;
+  box-shadow:var(--shadow-pop);
+}
+.ticket-export-dialog h3{margin:0 0 6px}
+.ticket-export-dialog p{margin:0 0 17px;color:var(--text-2)}
+.ticket-export-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:var(--pas-2);
+}
+.ticket-export-cancel{
+  width:100%;
+  margin-top:var(--pas-2);
+}
+
+@media(max-width:600px){
+  .ticket-export-buttons{grid-template-columns:1fr}
+}
+
+/* ---------------------------------------------------------- Date de retrait */
+.pickup-card{
+  margin:18px 0;
+  padding:var(--pas-3);
+  border:1px solid var(--border);
+  border-radius:var(--arrondi-bloc);
+  background:var(--surface);
+}
+.pickup-card h3{
+  margin:0 0 4px;
+}
+.pickup-help{
+  margin:0 0 13px;
+  color:var(--text-2);
+}
+.pickup-summary{
+  margin-top:var(--pas-2);
+  padding:10px 12px;
+  border-left:4px solid var(--primary);
+  background:var(--zone-bg);
+  font-weight:var(--graisse-forte);
+}
+
+/* ------------------------------------------------------------ L'IMPRESSION
+   Le ticket est le seul contenu qui parte sur la feuille, et il part en encre
+   NOIRE sur papier BLANC : les jetons de la charte suivent le thème du poste,
+   et un poste en thème sombre imprimait un pavé anthracite pleine page.
+   Le noir et le blanc sont donc écrits ici, en toutes lettres — c'est le
+   papier qui les impose, pas une décoration. */
+@media print{
+  @page{margin:8mm}
+  body *{visibility:hidden!important}
+  #ticketArea,#ticketArea *{visibility:visible!important}
+  #ticketArea{
+    position:absolute;
+    left:0;top:0;
+    width:100%;
+    max-width:none;
+    margin:0;
+    padding:0;
+  }
+  .ticket-preview-actions{display:none!important}
+  body{background:#fff!important}
+  .ticket{
+    max-width:none;
+    border:1px solid #555!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    background:#fff!important;
+  }
+  .ticket-head{
+    padding:12px 14px!important;
+    background:#fff!important;
+    border-bottom:2px solid #000!important;
+  }
+  .ticket-body{padding:14px!important;background:#fff!important}
+  .ticket-client-box,
+  .ticket-payment-line,
+  .ticket-extra-line,
+  .ticket-footer{background:#fff!important}
+  .ticket-client-box{border:1px solid #777!important}
+  .ticket-extra-line{border:1px solid #777!important;border-left:3px solid #000!important}
+  .ticket-product{border-bottom:1px solid #777!important}
+  .ticket-total-line{border-top:2px solid #000!important}
+  .ticket-payment-line{border:1px solid #777!important}
+  .ticket-footer{border-top:1px solid #777!important}
+  .ticket,
+  .ticket *{
+    color:#000!important;
+    text-shadow:none!important;
+    -webkit-print-color-adjust:economy!important;
+    print-color-adjust:economy!important;
+  }
+}
+</style>
+<style>
+body{font-family:'Manrope',Arial,sans-serif!important}
+/* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
+   Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
+   zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
+   rien de ce qui les entoure — d'où l'écran bariolé, champ par champ.
+   `inherit` et non un nom en dur : dans le ticket, qui a sa propre échelle,
+   les champs doivent rester avec lui. */
+input,select,textarea,button{font-family:inherit!important}
+/* `:not(:has(> .bloc))` : une carte qui ne contient QUE des groupes de champs
+   n'est plus une carte depuis le 25/08 — ce sont ses enfants qui le sont (voir
+   « TROIS NIVEAUX, JAMAIS PLUS » plus bas). Sans cette exception, ces deux
+   `!important` la lui rendaient de force, et on retrouvait l'arrondi dans
+   l'arrondi. */
+.card:not(:has(> .bloc)){border-radius:var(--arrondi-carte)!important}
+/* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
+   et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
+   ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
+button:not(.btn-retour){border-radius:var(--arrondi-champ)!important}
+/* `:not(.faces__zone)` : le FOND d'une tasse est un DISQUE, et un
+   `!important` sur un sélecteur nu bat n'importe quelle classe — même
+   celle d'un composant partagé. Le fond se retrouvait carré, à l'endroit
+   précis où la forme dit de quel côté on marque. Même carve-out que le
+   bouton « revenir » juste au-dessus, pour la même raison. */
+input,select,textarea:not(.faces__zone){border-radius:var(--arrondi-champ)!important}
+
+
+.product-card,.client-result{border-radius:var(--arrondi-bloc)!important}
+.tablet-wizard-nav{border-radius:var(--arrondi-carte)!important}
+</style>
+<style>
+/* ---- LES COMMANDES, RECETTE DE LA CHARTE ----------------------------------
+   MOT POUR MOT celle de l'écran de demande de devis : les deux parcours
+   tournent sur le même poste, à un clic l'un de l'autre, et un bouton
+   « Enregistrer » ne peut pas être bleu marine ici et encre à côté.
+   UN SEUL accent dans toute l'application. Le bouton plein prend l'accent, le
+   bouton bordé n'est qu'un trait, et la couleur ne revient que pour dire un
+   état (rouge = ce qui détruit). */
+body{background:var(--bg)!important}
+button{font-weight:var(--graisse-forte)}
+/* Le bouton plein et le bouton bordé portent le MÊME trait de 1,5 px, celui
+   du plein transparent : sans ça le second était 3 px plus haut, et surtout
+   ni l'un ni l'autre ne faisait la hauteur du champ d'à côté. */
+.primary,.secondary,.danger,.whatsapp{padding:0 22px!important;min-height:var(--ctrl-h)!important;
+  border:1.5px solid transparent!important;
+  transition:background var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease),
+             border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform var(--dur-1) var(--ease)}
+.primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
+.primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
+.secondary{background:transparent!important;border-color:var(--border)!important;color:var(--text-2)!important}
+.secondary:hover{background:var(--surface-hover)!important;border-color:var(--border-strong)!important;color:var(--text-1)!important}
+.danger{background:var(--danger-bg)!important;border-color:var(--danger-line)!important;color:var(--danger)!important}
+.danger:hover{background:var(--danger-line)!important}
+button:active{transform:scale(.98)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
+/* Un émoji dans un libellé (« 💾 Enregistrer », « 📅 Déjà au planning ») tire sa
+   hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
+   pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
+   la boîte. */
+button{line-height:var(--ligne-champ)!important}
+.card:not(:has(> .bloc)){border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-champ)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
+h2{letter-spacing:-.01em}
+</style>
+<style>
+/* ---- Barème express : discret sous la ligne de supplément ----
+   Un lien, pas un bouton d'action : on ne règle pas le barème à chaque vente,
+   mais quand on en a besoin il est là, sous les yeux, pas dans un autre écran. */
+.bareme-open{
+  display:inline-flex;align-items:center;
+  margin-top:2px;padding:var(--champ-y-serre) 0;border:0;background:none;
+  color:var(--text-2);font-weight:var(--graisse-forte);text-decoration:underline;
+  text-underline-offset:3px;cursor:pointer;
+}
+.bareme-open:hover{color:var(--text-1)}
+.bareme{margin-top:var(--pas-1);padding:var(--pas-3);border:1.5px solid var(--border);border-radius:var(--arrondi-carte);background:var(--surface)}
+.bareme.hidden{display:none}
+.bareme-grid{display:grid;gap:var(--pas-2)}
+.bareme-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bareme-grid label span{display:flex;align-items:center;gap:var(--pas-1);font-weight:var(--graisse-forte);color:var(--text-2)}
+.bareme-grid input{width:88px;text-align:right;padding:var(--champ-y-serre) var(--pas-2)!important}
+.bareme-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.bareme-actions::before{content:"";flex:1 1 0;min-width:0}
+.bareme-actions button{padding:var(--champ-y-serre) 18px!important}
+.bareme-msg{margin:var(--pas-2) 0 0;font-weight:var(--graisse-forte);min-height:1em}
+.bareme-msg.ok{color:var(--success)}
+.bareme-msg.ko{color:var(--danger)}
+</style>
+</head>
+<!-- LA CLASSE QUI MANQUAIT (25/08/2026). `.ecran-comptoir` est la couche de
+     jetons de l'écran de RÉFÉRENCE (charte.css) : palette, échelle, boîte
+     unique. L'écran de la demande la portait ; celui-ci ne l'a jamais eue.
+     Les deux parcours tournent sur le même poste, à un clic l'un de l'autre,
+     et douze couleurs y différaient d'un demi-ton — l'encre, les quatre
+     traits, le fond de page, le rouge de validation. C'est la cause de fond
+     de la divergence des deux écrans, pas une règle oubliée quelque part.
+     Rien d'autre ne bouge : les tailles, la boîte de 50 px et les arrondis
+     étaient déjà identiques (mesuré jeton par jeton). -->
+<body class="ecran-comptoir">
+<script>
+(function(){
+  var eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
+  function animate(el,to,fmt){
+    var from=el.__rollVal!=null?el.__rollVal:0;
+    el.__rollVal=to;
+    if(from===to){el.textContent=fmt(to);return;}
+    if(el.__rollRaf)cancelAnimationFrame(el.__rollRaf);
+    var start=null,dur=700;
+    function step(ts){
+      if(!start)start=ts;
+      var t=Math.min(1,(ts-start)/dur);
+      var e=1-Math.pow(1-t,3);
+      el.textContent=fmt(from+(to-from)*e);
+      if(t<1)el.__rollRaf=requestAnimationFrame(step);
+    }
+    el.__rollRaf=requestAnimationFrame(step);
+  }
+  window.rollMoney=function(el,v){if(el)animate(el,Number(v)||0,function(x){return eur.format(x)});};
+  window.rollInt=function(el,v,suffix){if(el)animate(el,Number(v)||0,function(x){return Math.round(x).toLocaleString("fr-FR")+(suffix||"")});};
+})();
+</script>
+
+<div class="container">
+  <div class="stepper">
+    <div class="step active">1. Articles</div>
+    <div class="step">2. Client</div>
+    <div class="step">3. Paiement</div>
+    <div class="step">4. Ticket</div>
+  </div>
+
+  <div class="card">
+    <h2>1. Ajouter un article</h2>
+    <div class="bloc"><div class="grid">
+      <div class="field">
+        <label for="productName">Article *</label>
+        <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
+        <datalist id="productsList">
+          <option value="Tee-shirt personnalisé">
+          <option value="Sweat personnalisé">
+          <option value="Casquette personnalisée">
+          <option value="Tasse personnalisée">
+          <option value="Gourde personnalisée">
+          <option value="Porte-clés personnalisé">
+          <option value="Plaque gravée">
+        </datalist>
+      </div>
+      <div class="field">
+        <label for="quantity">Quantité *</label>
+        <input id="quantity" type="number" min="1" step="1" placeholder="Ex. 10">
+      </div>
+    </div>
+
+    <!-- L'ASTÉRISQUE PORTAIT SUR CHAQUE CHAMP, alors que l'une des deux parts
+         peut rester vide : le client qui apporte son propre t-shirt ne paie
+         que la personnalisation, l'article revendu tel quel n'en porte aucune.
+         C'est le TOTAL qui est exigé — l'écran le dit maintenant tel quel. -->
+    <div class="grid">
+      <div class="field">
+        <label for="articlePrice">Prix article</label>
+        <input id="articlePrice" type="number" min="0" step="0.01" placeholder="0,00">
+      </div>
+      <div class="field">
+        <label for="customPrice">Prix personnalisation</label>
+        <input id="customPrice" type="number" min="0" step="0.01" placeholder="0,00">
+      </div>
+    </div>
+    <!-- `margin` explicite : la ligne d'aide s'intercale entre deux blocs, et
+         sans marge basse elle venait coller l'intitulé du champ suivant. -->
+    <div class="help" style="margin:0 0 14px">Prix obligatoire * — l’un des deux, ou les deux. Le client paie la somme.</div>
+
+    <div class="field">
+      <label for="productDescription">Description de production *</label>
+      <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
+    </div>
+
+    </div><div class="bloc">
+      <!-- TROIS DATES, TROIS CELLULES ÉGALES. « Date souhaitée » portait à elle
+           seule HUIT éléments et DEUX intitulés : sa date, les trois raccourcis
+           de délai, l'avis de supplément, le barème dépliable, puis l'heure
+           souhaitée avec son propre intitulé. Mesuré : 8 enfants et 276 px de
+           haut à droite, 2 enfants à gauche étirés à la même hauteur — 215 px
+           de vide en face d'un empilement. Tout ce qui n'est pas une date
+           descend SOUS la rangée, sur toute la largeur.
+           En perdant son second intitulé, cette rangée cesse d'être
+           l'exception `label~label` — « le seul cas des deux écrans » — et
+           repartage ses lignes avec les autres : intitulés sur la première,
+           commandes sur la deuxième. -->
+      <!-- LA DATE DE COMMANDE NE S'AFFICHE PLUS : c'est TOUJOURS celle du
+           jour, personne ne la saisit, et elle occupait une cellule entière en
+           tête du bloc. Elle reste dans la page, et gardée — huit endroits s'en
+           servent : le palier de délai, l'enregistrement de l'article, la
+           réouverture d'une commande, le contrôle des champs obligatoires et
+           le ticket, qui l'imprime.
+           `isoDate()` rend la date CIVILE LOCALE (il retire le décalage avant
+           de formater) : à Saint-Martin, un `toISOString()` nu daterait du
+           lendemain dès 20 h. Vérifié avant de la retirer de l'écran — une date
+           fausse ne se verrait plus. -->
+      <input id="orderDate" type="date" class="hidden">
+      <div class="grid">
+        <div class="field">
+          <label for="deliveryDate">Date souhaitée *</label>
+          <input id="deliveryDate" type="date" onchange="updateDeadlineInfo()">
+        </div>
+        <div class="field">
+          <label for="deliveryTime">Heure souhaitée *</label>
+          <select id="deliveryTime" data-menu-manuel-non>
+          <option value="09:00">09:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00" selected>14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+          <option value="17:00">17:00</option>
+        </select>
+        </div>
+      </div>
+
+      <!-- Le délai sous la rangée : les raccourcis à gauche, le réglage du
+           barème qui ferme la rangée à droite. -->
+      <div class="delai-rangee">
+        <!-- Les trois paliers ne sont plus un choix : ce sont des RACCOURCIS qui
+             posent une date dans le calendrier au-dessus. -->
+        <div class="delay-quick">
+          <button type="button" class="delay-chip" data-jours="5">Dans 5 jours</button>
+          <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
+          <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
+        </div>
+        <!-- Barème express : réglable ici, là où le supplément s'affiche. -->
+        <button type="button" id="baremeOpen" class="bareme-open">Modifier le barème</button>
+      </div>
+
+      <!-- SUR TOUTE LA LARGEUR. Cet avis CHANGE de texte à chaque date choisie,
+           et un texte qui change de hauteur pousse tout ce qui le suit — ce que
+           la règle du 24/08 interdit. Il tenait déjà sur une ligne dans la
+           cellule de 430 px (mesuré : 22 px là aussi, il ne débordait pas),
+           mais à 30 px près : un barème à trois chiffres ou un libellé de
+           palier plus long l'y faisait passer à deux. Sur 875 px il a la marge
+           qui manquait. Vérifié : les quatre textes possibles font 22 px, le
+           bloc 224 px et « Ajouter l'article » ne bouge pas d'un pixel. -->
+      <div id="deadlineInfo" class="help delai-etat"></div>
+      <div id="baremeBox" class="bareme hidden">
+          <div class="bareme-grid">
+            <label>Dans 5 jours<span><input id="bareme-j5" type="number" min="0" max="100" step="1"> %</span></label>
+            <label>Dans 10 jours<span><input id="bareme-j10" type="number" min="0" max="100" step="1"> %</span></label>
+            <label>Dans 15 jours<span><input id="bareme-j15" type="number" min="0" max="100" step="1"> %</span></label>
+          </div>
+          <p class="help">Vaut aussi pour une date choisie au calendrier : ≤ 5 jours ouvrés, ≤ 10, au-delà.</p>
+          <div class="bareme-actions">
+            <button type="button" id="baremeCancel" class="secondary">Annuler</button>
+            <button type="button" id="baremeSave" class="primary">Enregistrer</button>
+          </div>
+          <p id="baremeMsg" class="bareme-msg" role="status"></p>
+        </div>
+    </div><div class="actions">
+      <div class="error msg-flottant hidden" id="productEditMsg"></div>
+      <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
+      <button id="saveProductBtn" class="primary">Ajouter l'article</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Articles de la commande</h2>
+      <div id="productList"><p class="help">Aucun article ajouté.</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Résumé TTC</h2>
+      <div id="summaryLines">
+        <p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>
+      </div>
+      <div class="summary-row summary-total" style="margin-top:16px">
+        <span>TOTAL À ENCAISSER</span>
+        <span id="summaryTTC">0,00 €</span>
+      </div>
+      <div class="help">Tous les montants affichés dans ce résumé sont TTC.</div>
+
+      <!-- Calculs conservés en interne, mais masqués à l'écran -->
+      <span id="summaryHT" class="hidden">0,00 €</span>
+      <span id="summaryTax" class="hidden">0,00 €</span>
+      <span id="summarySurcharge" class="hidden">0,00 €</span>
+    </div>
+  </div>
+
+  <div class="card internal">
+    <div class="internal-head">
+      <h2 id="internalNoteTitle">Note interne OLDA</h2>
+      <span class="lock">🔒 Interne uniquement</span>
+    </div>
+    <!-- Le seul champ des deux parcours dont le nom vivait dans le titre du
+         bloc, et nulle part ailleurs : au clavier il s'annonçait « zone de
+         texte », sans plus. -->
+    <textarea id="internalNote" aria-labelledby="internalNoteTitle" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
+    
+  </div>
+
+  <div class="card">
+    <button id="goToClientBtn" class="primary full">Passer au paiement →</button>
+  </div>
+
+  <div class="card hidden" id="clientSection">
+    <h2>2. Associer le client</h2>
+
+    <div class="bloc"><div class="field client-search-wrap">
+      <label for="clientSearch">Rechercher un client existant</label>
+      <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
+      
+      <div id="clientResults" class="client-results"></div>
+    </div>
+
+    </div><div id="selectedClientCard" class="product-card client-selected hidden">
+      <span class="badge green">✓ Client sélectionné</span>
+      <div class="client-result-name" id="selectedClientName"></div>
+      <div class="client-result-meta" id="selectedClientMeta"></div>
+      <div class="actions" style="margin-top:10px">
+        <button id="changeClientBtn" class="secondary">Changer de client</button>
+        <button id="editSelectedClientBtn" class="secondary">Modifier le client</button>
+      </div>
+    </div>
+
+    <div id="clientNotFoundBox" class="notice">
+      <b>Le client n'existe pas encore ?</b>
+      <div class="help" style="margin:6px 0 10px">Crée la fiche puis elle sera automatiquement sélectionnée pour cette commande.</div>
+      <button id="showCreateClientBtn" class="primary">+ Créer un nouveau client</button>
+    </div>
+
+    <div id="createClientBox" class="hidden">
+      <h3>Créer un nouveau client</h3>
+
+      <div class="choice-grid" style="grid-template-columns:repeat(2,1fr)">
+        <button id="chooseIndividualBtn" class="choice-card active" type="button">
+          <b>Particulier</b>
+          <div class="help" style="margin-top:4px">Nom, WhatsApp, e-mail facultatif.</div>
+        </button>
+        <button id="chooseProfessionalBtn" class="choice-card" type="button">
+          <b>Professionnel</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+        <button id="chooseAssociationBtn" class="choice-card" type="button">
+          <b>Association</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+        <button id="chooseResellerBtn" class="choice-card" type="button">
+          <b>Revendeur</b>
+          <div class="help" style="margin-top:4px">Toutes les informations de suivi et facturation.</div>
+        </button>
+      </div>
+
+      <div id="individualForm" class="bloc" style="margin-top:16px">
+        <div class="grid">
+          <div class="field">
+            <label for="newIndividualName">Prénom et nom *</label>
+            <input id="newIndividualName" placeholder="Ex. Jean Dupont">
+          </div>
+          <div class="field">
+            <label for="newIndividualPhone">WhatsApp *</label>
+            <input id="newIndividualPhone" placeholder="Ex. 06 90 47 97 88">
+          </div>
+        </div>
+        <div class="field">
+          <label for="newIndividualEmail">E-mail (facultatif)</label>
+          <input id="newIndividualEmail" type="email" placeholder="client@email.com">
+        </div>
+      </div>
+
+      <div id="professionalForm" class="bloc hidden" style="margin-top:16px">
+        <div class="grid">
+          <div class="field">
+            <label id="companyNameLabel" for="newCompanyName">Raison sociale EBP *</label>
+            <input id="newCompanyName" placeholder="Ex. Hôtel Exemple">
+          </div>
+          <div class="field">
+            <label for="newCompanySector">Secteur d'activité *</label>
+            <select id="newCompanySector">
+              <option value="">Choisir un secteur</option>
+              <option>Hôtel</option>
+              <option>Restaurant</option>
+              <option>Bar</option>
+              <option>Boutique</option>
+              <option>Agence immobilière</option>
+              <option>Conciergerie</option>
+              <option>Villa de location</option>
+              <option>Nautisme</option>
+              <option>BTP</option>
+              <option>Artisan</option>
+              <option>Événementiel</option>
+              <option>Association</option>
+              <option>École</option>
+              <option>Salle de sport</option>
+              <option>Santé</option>
+              <option>Tourisme</option>
+              <option>Transport</option>
+              <option>Administration</option>
+              <option>Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyAddress">Adresse</label>
+            <input id="newCompanyAddress" placeholder="Adresse">
+          </div>
+          <div class="field">
+            <label for="newCompanyCity">Ville</label>
+            <input id="newCompanyCity" placeholder="Ex. Saint-Martin">
+          </div>
+          <div class="field">
+            <label for="newCompanyPostal">Code postal</label>
+            <input id="newCompanyPostal" placeholder="97150">
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyContact">Prénom contact *</label>
+            <input id="newCompanyContact" placeholder="Ex. Marie">
+          </div>
+          <div class="field">
+            <label for="newCompanyPhone">WhatsApp *</label>
+            <input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88">
+          </div>
+          <div class="field">
+            <label for="newCompanyEmail">E-mail *</label>
+            <input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com">
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="field">
+            <label for="newCompanyContactRole">Fonction du contact</label>
+            <input id="newCompanyContactRole" placeholder="Ex. Responsable communication">
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="cancelCreateClientBtn" class="secondary">Annuler</button>
+        <button id="createAndSelectClientBtn" class="primary">Créer et sélectionner ce client</button>
+      </div>
+    </div>
+
+    <input id="clientName" type="hidden">
+    <input id="clientPhone" type="hidden">
+    <input id="clientEmail" type="hidden">
+    <input id="clientType" type="hidden">
+    <input id="clientId" type="hidden">
+    <input id="counterSale" type="hidden" value="false">
+        <input id="orderNumber" type="hidden">
+
+    <div class="actions" style="margin-top:18px">
+      <button id="backToArticlesBtn" class="btn-retour" title="Revenir aux articles" aria-label="Revenir aux articles"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
+      <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="paymentSection">
+    <h2>3. Paiement</h2>
+    <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
+
+    <div class="bloc"><label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Espèces"> Espèces</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Virement"> Virement</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Mixte"> Mixte</label>
+    <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
+
+    </div><div id="cashZone" class="bloc hidden">
+      <div class="field">
+        <label for="cashGiven">Montant donné par le client</label>
+        <input id="cashGiven" type="number" min="0" step="0.01">
+      </div>
+      <div class="summary-row"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div>
+    </div>
+
+    <div id="mixZone" class="grid bloc hidden">
+      <div class="field">
+        <label for="mixCard">Carte bancaire</label>
+        <input id="mixCard" type="number" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label for="mixCash">Espèces</label>
+        <input id="mixCash" type="number" min="0" step="0.01">
+      </div>
+    </div>
+
+    <button id="payButton" class="primary full">Encaisser le paiement</button>
+  </div>
+
+  <div id="paymentSuccess" class="card success hidden">
+    <p><b>La note interne OLDA reste modifiable à tout moment.</b></p>
+
+    <div class="footer-actions">
+      <button id="sendWhatsAppBtn" class="whatsapp">💬 Envoyer sur WhatsApp</button>
+    </div>
+    <!-- Vide à l'écran : c'est ici que `addPlanningButton()` greffe le bouton
+         d'envoi au planning, que le pont presse. Il est masqué, pas retiré. -->
+    <div class="actions" style="margin-top:14px"></div>
+  </div>
+
+  
+<div id="ticketArea" class="hidden">
+  <div class="ticket">
+    <div class="ticket-head">
+      <h2>ATELIER OLDA</h2>
+      <div>Ticket de commande — Saint-Martin</div>
+    </div>
+    <div class="ticket-body">
+      <div class="ticket-section-label">Informations de commande</div>
+      <div class="ticket-client-box">
+        <div id="ticketOrder"></div>
+        <div id="ticketDate" class="ticket-date"></div>
+        <div id="ticketClient" style="margin-top:7px"></div>
+        <div id="ticketClientDetails" class="ticket-details"></div>
+        <div id="ticketPickup" class="ticket-pickup"></div>
+      </div>
+
+      <div class="ticket-section-label">Articles et suppléments</div>
+      <div id="ticketProducts"></div>
+
+      <div class="ticket-section-label">Informations complémentaires</div>
+      <div id="ticketExtraDetails" class="ticket-details"></div>
+
+      <div class="ticket-total-line">
+        <span>Total commande TTC</span>
+        <span id="ticketTTC"></span>
+      </div>
+
+      <div class="ticket-payment-line">
+        <span>Paiement</span>
+        <strong id="ticketPayment"></strong>
+      </div>
+
+      <div class="ticket-preview-actions">
+        <button id="ticketPrintPreviewBtn" class="secondary">🖨️ Imprimer</button>
+        <button id="ticketDownloadPreviewBtn" class="primary">⬇️ Télécharger</button>
+      </div>
+    </div>
+    <div class="ticket-footer">Merci pour votre confiance — L'équipe Atelier OLDA</div>
+  </div>
+</div>
+
+<div id="ticketExportOverlay" class="ticket-export-overlay">
+  <div class="ticket-export-dialog">
+    <h3>Télécharger le ticket</h3>
+    <p>Choisis le format souhaité.</p>
+    <div class="ticket-export-buttons">
+      <button id="ticketPdfBtn" class="primary">PDF</button>
+      <button id="ticketTxtBtn" class="secondary">TXT</button>
+    </div>
+    <button id="ticketExportCancelBtn" class="secondary ticket-export-cancel">Annuler</button>
+  </div>
+</div>
+
+<script>
+const products = [];
+
+// LA VRAIE BASE CLIENTS. Le tableau part vide et `pont.js` le remplit depuis
+// GET /api/clients au chargement de l'écran : la vendeuse cherche dans les
+// clients de l'atelier, pas dans un jeu d'exemple. Un client créé ici entre
+// dans la base au moment où le projet part au planning (upsert serveur).
+const clients = [];
+
+let selectedClient = null;
+let createClientType = "Particulier";
+let editIndex = null;
+let lastTotals = {ht:0,tax:0,surcharge:0,ttc:0};
+const euro = new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"});
+
+/* Date civile LOCALE (celle de la tablette, donc celle de l'atelier).
+   `toISOString()` seul bascule en UTC : aux Antilles il rend déjà la date du
+   LENDEMAIN dès 20 h, et la vente du soir partait datée du jour suivant. */
+function isoDate(date){ const d=new Date(date); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+/* UNE DATE CIVILE SE LIT À MIDI. « 2026-08-24 » passé nu à `new Date` est
+   minuit UTC, c'est-à-dire dimanche 20 h à Saint-Martin (UTC−4) : le jour de
+   la semaine qu'on en tire est celui de la VEILLE. `saveProduct` avait déjà
+   été corrigé ; le comptage des jours ouvrés, lui, lisait encore à sec — et
+   c'est lui qui décide du palier, donc du SUPPLÉMENT EXPRESS facturé et de la
+   priorité envoyée au planning. Mesuré sur 5 000 couples de dates : le palier
+   basculait d'un cran dans 228 cas (4,6 %), tantôt en faveur du client,
+   tantôt à ses dépens. */
+function jourCivil(v){
+  if(v instanceof Date) return new Date(v.getFullYear(),v.getMonth(),v.getDate(),12,0,0);
+  const m=String(v||"").slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12,0,0) : null;
+}
+function businessDaysBetween(start,end){
+  const a=jourCivil(start), b=jourCivil(end);
+  if(!a || !b) return 0;
+  let count=0, d=new Date(a);
+  while(d < b){
+    d.setDate(d.getDate()+1);
+    if(d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  return count;
+}
+function formatPhoneInput(value){
+  const digits=String(value||"").replace(/\D/g,"").slice(0,10);
+  return digits.replace(/(\d{2})(?=\d)/g,"$1 ").trim();
+}
+
+function normalizeSearch(value){
+  return String(value||"")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]/g,"");
+}
+
+function clientDisplayName(client){
+  return client.type==="Professionnel" ? client.company : client.name;
+}
+
+function clientMeta(client){
+  if(client.type==="Professionnel"){
+    return [
+      client.contact ? "Contact : "+client.contact : "",
+      client.phone ? "WhatsApp : "+client.phone : "",
+      client.email || "",
+      client.sector || ""
+    ].filter(Boolean).join(" • ");
+  }
+  return [
+    client.phone ? "WhatsApp : "+client.phone : "",
+    client.email || "",
+    client.type
+  ].filter(Boolean).join(" • ");
+}
+
+/* TROIS ÉTATS, comme sur l'écran d'à côté : franchie (coche), courante
+   (pilule pleine), à venir (gris). Cet écran peignait en « courante » TOUTES
+   les étapes jusqu'à la position atteinte — quatre pilules encrées d'affilée,
+   sans qu'on puisse dire où l'on se trouve. */
+function updateStepper(activeIndex){
+  document.querySelectorAll(".stepper .step").forEach((step,index)=>{
+    step.classList.toggle("active",index===activeIndex);
+    step.classList.toggle("done",index<activeIndex);
+  });
+}
+
+function renderClientResults(){
+  const query=document.getElementById("clientSearch").value.trim();
+  const box=document.getElementById("clientResults");
+
+  if(!query){
+    box.innerHTML="";
+    return;
+  }
+
+  const normalized=normalizeSearch(query);
+  const results=clients.filter(client=>{
+    const haystack=normalizeSearch([
+      client.name,
+      client.company,
+      client.contact,
+      client.phone,
+      client.email
+    ].filter(Boolean).join(" "));
+    return haystack.includes(normalized);
+  });
+
+  if(results.length===0){
+    box.innerHTML='<div class="help">Aucun client trouvé. Tu peux créer une nouvelle fiche ci-dessous.</div>';
+    return;
+  }
+
+  box.innerHTML=results.map(client=>`
+    <div class="client-result">
+      <div class="client-result-main">
+        <div class="client-result-name">${escapeHtml(clientDisplayName(client))}</div>
+        <div class="client-result-meta">${escapeHtml(clientMeta(client))}</div>
+      </div>
+      <button class="primary select-client-btn" data-client-id="${client.id}">Sélectionner</button>
+    </div>
+  `).join("");
+
+  box.querySelectorAll(".select-client-btn").forEach(button=>{
+    button.addEventListener("click",()=>selectClientById(button.dataset.clientId));
+  });
+}
+
+function selectClientById(id){
+  const client=clients.find(item=>item.id===id);
+  if(!client) return;
+
+  selectedClient=client;
+  document.getElementById("clientId").value=client.id;
+  document.getElementById("clientType").value=client.type;
+  document.getElementById("clientName").value=clientDisplayName(client);
+  document.getElementById("clientPhone").value=client.phone||"";
+  document.getElementById("clientEmail").value=client.email||"";
+  document.getElementById("counterSale").value="false";
+
+  document.getElementById("selectedClientName").textContent=
+    "✓ "+clientDisplayName(client);
+  document.getElementById("selectedClientMeta").textContent=
+    clientMeta(client)+" • Bien associé à cette vente";
+  document.getElementById("selectedClientCard").classList.remove("hidden");
+
+  document.getElementById("clientResults").innerHTML="";
+  document.getElementById("clientSearch").value="";
+  document.getElementById("createClientBox").classList.add("hidden");
+}
+function clearSelectedClient(){
+  selectedClient=null;
+  ["clientId","clientType","clientName","clientPhone","clientEmail"].forEach(id=>{
+    document.getElementById(id).value="";
+  });
+  document.getElementById("counterSale").value="false";
+  document.getElementById("selectedClientCard").classList.add("hidden");
+  document.getElementById("clientSearch").focus();
+}
+
+function showCreateClient(){
+  document.getElementById("createClientBox").classList.remove("hidden");
+  document.getElementById("selectedClientCard").classList.add("hidden");
+  clearSelectedClient();
+  document.getElementById("newIndividualName").focus();
+}
+
+function setCreateClientType(type){
+  createClientType=type;
+  const individual=type==="Particulier";
+  document.getElementById("individualForm").classList.toggle("hidden",!individual);
+  document.getElementById("professionalForm").classList.toggle("hidden",individual);
+  document.getElementById("chooseIndividualBtn").classList.toggle("active",individual);
+  document.getElementById("chooseProfessionalBtn").classList.toggle("active",!individual);
+}
+
+function createAndSelectClient(){
+  let client;
+
+  if(createClientType==="Particulier"){
+    if(!requireFields(["newIndividualName","newIndividualPhone"])){
+      alert("Ajoute le prénom, le nom et le WhatsApp.");
+      return;
+    }
+    client={
+      id:"CLI-"+String(clients.length+1).padStart(3,"0"),
+      type:"Particulier",
+      name:document.getElementById("newIndividualName").value.trim(),
+      phone:document.getElementById("newIndividualPhone").value.trim(),
+      email:document.getElementById("newIndividualEmail").value.trim()
+    };
+  }else{
+    if(!requireFields(["newCompanyName","newCompanySector","newCompanyContact","newCompanyPhone"])){
+      alert("Ajoute la raison sociale, le secteur, le contact et le WhatsApp.");
+      return;
+    }
+    client={
+      id:"CLI-"+String(clients.length+1).padStart(3,"0"),
+      type:"Professionnel",
+      company:document.getElementById("newCompanyName").value.trim(),
+      sector:document.getElementById("newCompanySector").value,
+      address:document.getElementById("newCompanyAddress").value.trim(),
+      city:document.getElementById("newCompanyCity").value.trim(),
+      postal:document.getElementById("newCompanyPostal").value.trim(),
+      contact:document.getElementById("newCompanyContact").value.trim(),
+      phone:document.getElementById("newCompanyPhone").value.trim(),
+      email:document.getElementById("newCompanyEmail").value.trim()
+    };
+  }
+
+  clients.push(client);
+  selectClientById(client.id);
+  resetCreateClientForm();
+}
+
+function resetCreateClientForm(){
+  [
+    "newIndividualName","newIndividualPhone","newIndividualEmail",
+    "newCompanyName","newCompanyAddress","newCompanyCity","newCompanyPostal",
+    "newCompanyContact","newCompanyPhone","newCompanyEmail"
+  ].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("newCompanySector").value="";
+  setCreateClientType("Particulier");
+}
+
+function editSelectedClient(){
+  if(!selectedClient) return;
+
+  showCreateClient();
+  setCreateClientType(selectedClient.type);
+
+  if(selectedClient.type==="Particulier"){
+    document.getElementById("newIndividualName").value=selectedClient.name||"";
+    document.getElementById("newIndividualPhone").value=selectedClient.phone||"";
+    document.getElementById("newIndividualEmail").value=selectedClient.email||"";
+  }else{
+    document.getElementById("newCompanyName").value=selectedClient.company||"";
+    document.getElementById("newCompanySector").value=selectedClient.sector||"";
+    document.getElementById("newCompanyAddress").value=selectedClient.address||"";
+    document.getElementById("newCompanyCity").value=selectedClient.city||"";
+    document.getElementById("newCompanyPostal").value=selectedClient.postal||"";
+    document.getElementById("newCompanyContact").value=selectedClient.contact||"";
+    document.getElementById("newCompanyPhone").value=selectedClient.phone||"";
+    document.getElementById("newCompanyEmail").value=selectedClient.email||"";
+  }
+}
+
+function generateOrderNumber(){
+  const now=new Date();
+  const stamp=now.getFullYear().toString().slice(-2)+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0");
+  const random=Math.floor(Math.random()*900+100);
+  return `VD-${stamp}-${random}`;
+}
+function init(){
+  const today=new Date();
+  document.getElementById("orderDate").value=isoDate(today);
+  setDeliveryInDays(15);
+  document.getElementById("orderNumber").value=generateOrderNumber();
+
+
+  updateDeadlineInfo();
+  updatePaymentZones();
+  updateStepper(0);
+}
+function cleanInvalid(el){ el.classList.remove("invalid"); }
+function requireFields(ids){
+  let ok=true, first=null;
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    const val=String(el.value||"").trim();
+    if(!val || (el.type==="number" && Number(val)<=0)){
+      el.classList.add("invalid"); ok=false; if(!first) first=el;
+    } else cleanInvalid(el);
+  });
+  if(first) first.focus();
+  return ok;
+}
+
+// LA DATE FAIT FOI, ET ELLE SEULE. Le palier — donc le supplément express et
+// la priorité envoyée au planning — se DÉDUIT de l'écart en jours ouvrés entre
+// la commande et la récupération. Un palier retenu à côté de la date, c'était
+// deux vérités pour un seul fait : la date déplacée à la main au calendrier
+// gardait le supplément du palier d'avant.
+function setDeliveryInDays(jours){
+  const orderValue=document.getElementById("orderDate").value;
+  const target=jourCivil(orderValue) || jourCivil(new Date());
+  target.setDate(target.getDate()+Number(jours));
+  // L'ATELIER EST FERMÉ LE WEEK-END, et l'écran le dit en rouge dès qu'on pose
+  // une date de samedi ou de dimanche. Un raccourci qui produit une date que
+  // l'écran refuse aussitôt n'en est pas un : « Dans 5 jours » tombait un
+  // dimanche deux jours sur sept. On avance donc jusqu'au lundi — le palier ne
+  // bouge pas pour autant, il se compte en jours OUVRÉS et le week-end n'en
+  // fait pas partie.
+  while(target.getDay()===0 || target.getDay()===6) target.setDate(target.getDate()+1);
+  document.getElementById("deliveryDate").value=isoDate(target);
+  updateDeadlineInfo();
+  if(typeof window.checkDeliveryDate==="function") window.checkDeliveryDate();
+}
+
+// Le palier de DEUX dates quelconques : c'est ce qui permet de qualifier
+// l'article déjà au panier, pas seulement ce qui est à l'écran.
+function palierDeDates(order,delivery){
+  if(!order || !delivery) return null;
+  const days=businessDaysBetween(order,delivery);
+  return days<=5 ? "j5" : days<=10 ? "j10" : "j15";
+}
+function palierDelai(){
+  return palierDeDates(document.getElementById("orderDate").value,
+                       document.getElementById("deliveryDate").value);
+}
+const LIBELLE_PALIER={
+  j5:"Sous 5 jours ouvrés (urgent)",
+  j10:"Sous 10 jours ouvrés (prioritaire)",
+  j15:"Au-delà de 10 jours ouvrés (standard)"
+};
+// LES DATES DU DOSSIER, pas celles du formulaire. `due` part déjà du PREMIER
+// ARTICLE — c'est la date annoncée au client sur son ticket. La phrase « Délai
+// souhaité » et la priorité, elles, lisaient encore ce qui était tapé à
+// l'instant : un deuxième article commencé puis abandonné, une date corrigée
+// dans le formulaire après l'enregistrement, et le dossier partait au planning
+// en annonçant « urgent » sous une échéance standard — ou l'inverse.
+function datesDuDossier(){
+  const p=(typeof products!=="undefined"?products:[])[0];
+  if(p && p.deliveryDate) return {order:p.orderDate, delivery:p.deliveryDate};
+  return {order:document.getElementById("orderDate").value,
+          delivery:document.getElementById("deliveryDate").value};
+}
+function deliveryDelayLabel(){
+  const d=datesDuDossier();
+  return LIBELLE_PALIER[palierDeDates(d.order,d.delivery)] || "";
+}
+// La priorité du planning décrit le MÊME écart que le supplément : un dossier
+// facturé en urgence qui arriverait en priorité basse, personne ne le
+// comprendrait. La date de commande vient donc du même article que l'échéance
+// qu'on lui passe.
+window.prioritePourDate=function(iso){
+  const p=palierDeDates(datesDuDossier().order, iso);
+  return p==="j5" ? "3" : p==="j10" ? "2" : "1";
+};
+
+// BARÈME DES SUPPLÉMENTS EXPRESS — voir la section « Barème express » en bas de
+// page. Les taux ne sont plus écrits ici : ils viennent du serveur et se règlent
+// depuis l'écran. Les valeurs ci-dessous ne servent que tant que le barème n'est
+// pas arrivé (première frappe avant la fin du chargement).
+window.OLDA_SUPPLEMENTS = window.OLDA_SUPPLEMENTS || { j5:20, j10:10, j15:0 };
+function tauxPalier(palier){
+  const v = Number(window.OLDA_SUPPLEMENTS[palier]);
+  return Number.isFinite(v) ? v/100 : 0;
+}
+function getDeadlineRate(){
+  const p=palierDelai();
+  return p ? tauxPalier(p) : 0;
+}
+// Le pourcentage AFFICHÉ suit le barème : l'écrire en dur mentirait dès la
+// première modification.
+function pourcent(rate){
+  return String(Math.round(rate*1000)/10).replace(".",",");
+}
+function updateDeadlineInfo(){
+  const rate=getDeadlineRate();
+  const p=palierDelai();
+  if(!p){
+    document.getElementById("deadlineInfo").textContent="Choisis une date de récupération.";
+    return;
+  }
+  const quoi = LIBELLE_PALIER[p];
+  // La pastille dit le NIVEAU de supplément, plus le palier : à barème modifié,
+  // « 15 jours » peut très bien être devenu payant.
+  const puce = rate>=0.20 ? "🔴" : rate>0 ? "🟠" : "🟢";
+  const suffixe = rate>0 ? " — supplément de "+pourcent(rate)+" %" : " — aucun supplément";
+  document.getElementById("deadlineInfo").textContent = puce+" "+quoi+suffixe;
+}
+function productFromForm(){
+  const qty=Number(document.getElementById("quantity").value);
+  // DEUX PRIX SAISIS, UN SEUL PRIX DE VENTE : l'objet d'un côté, le travail
+  // dessus de l'autre. Le client paie la somme des deux — le détail ne sert
+  // qu'à l'atelier, il ne figure pas sur le papier qu'on lui remet.
+  const priceArticle=Number(document.getElementById("articlePrice").value)||0;
+  const priceCustom=Number(document.getElementById("customPrice").value)||0;
+  const price=priceArticle+priceCustom;
+  // Le sélecteur TTC/HT et la case « taxe » ont disparu de l'écran : on fige
+  // ce qu'ils affichaient par défaut, et qui est la seule pratique du comptoir
+  // — un prix TTC, taxe de 4 % comprise. Le montant encaissé est donc, au
+  // centime près, celui que la vendeuse a tapé. Les deux valeurs restent
+  // écrites dans l'article : le récapitulatif, le ticket et les exports les
+  // lisent, et un dossier doit dire sous quel régime il a été chiffré.
+  const priceType="TTC";
+  const taxApplied=true;
+  const unitHT=price/1.04;
+  const baseHT=unitHT*qty;
+  const rate=getDeadlineRate();
+  const surcharge=baseHT*rate;
+  const taxableHT=baseHT+surcharge;
+  const tax=taxApplied ? taxableHT*0.04 : 0;
+  const totalTTC=taxableHT+tax;
+  return {
+    name:document.getElementById("productName").value.trim(),
+    qty, price, priceArticle, priceCustom, priceType, taxApplied,
+    description:document.getElementById("productDescription").value.trim(),
+    orderDate:document.getElementById("orderDate").value,
+    deliveryDate:document.getElementById("deliveryDate").value,
+    deliveryTime:document.getElementById("deliveryTime").value,
+    baseHT,surcharge,tax,totalTTC,rate
+  };
+}
+// Un prix se répartit entre l'objet et le travail, et l'une des deux parts peut
+// être nulle : le client qui apporte son propre t-shirt ne paie que la
+// personnalisation, et l'article revendu tel quel n'en porte aucune. Exiger les
+// deux bloquerait des ventes réelles. Ce qui ne peut pas être nul, c'est le
+// TOTAL — sinon on encaisserait zéro.
+function requirePrice(){
+  const a=document.getElementById("articlePrice");
+  const c=document.getElementById("customPrice");
+  if((Number(a.value)||0)+(Number(c.value)||0)>0){ cleanInvalid(a); cleanInvalid(c); return true; }
+  a.classList.add("invalid"); c.classList.add("invalid");
+  alert("Indique un prix : celui de l'article, celui de la personnalisation, ou les deux.");
+  a.focus();
+  return false;
+}
+function saveProduct(){
+  document.getElementById("productEditMsg").classList.add("hidden");
+  if(!requireFields(["productName","quantity","productDescription","orderDate","deliveryDate","deliveryTime"])) return;
+  if(!requirePrice()) return;
+  // UNE DATE CIVILE SE LIT À MIDI. `new Date("2026-08-24")` est minuit UTC,
+  // c'est-à-dire dimanche 20 h à Saint-Martin (UTC−4) : le contrôle lisait la
+  // veille et refusait TOUS les lundis, en laissant passer tous les samedis.
+  // Le reste du fichier épingle déjà l'heure ; cette ligne était la seule à ne
+  // pas le faire, et le calendrier désormais en premier la rend permanente.
+  const delivery=new Date(document.getElementById("deliveryDate").value+"T12:00:00");
+  if(delivery.getDay()===0 || delivery.getDay()===6){
+    alert("La date de livraison doit être un jour ouvré.");
+    document.getElementById("deliveryDate").classList.add("invalid");
+    return;
+  }
+  const item=productFromForm();
+  if(editIndex===null) products.push(item); else products[editIndex]=item;
+  resetProductForm();
+  renderProducts();
+}
+function resetProductForm(){
+  document.getElementById("productName").value="";
+  document.getElementById("quantity").value="";
+  document.getElementById("articlePrice").value="";
+  document.getElementById("customPrice").value="";
+  document.getElementById("productDescription").value="";
+  editIndex=null;
+  document.getElementById("saveProductBtn").textContent="Ajouter l'article";
+  document.getElementById("cancelEditBtn").classList.add("hidden");
+}
+function editProduct(index){
+  const p=products[index];
+  document.getElementById("productEditMsg").classList.add("hidden");
+  editIndex=index;
+  document.getElementById("productName").value=p.name;
+  document.getElementById("quantity").value=p.qty;
+  document.getElementById("articlePrice").value=p.priceArticle;
+  document.getElementById("customPrice").value=p.priceCustom;
+  document.getElementById("productDescription").value=p.description;
+  document.getElementById("orderDate").value=p.orderDate;
+  document.getElementById("deliveryDate").value=p.deliveryDate;
+  document.getElementById("deliveryTime").value=p.deliveryTime||"14:00";
+  // Le palier se lit sur la date : sans ce rappel, la ligne d'information
+  // resterait sur celle de l'article précédent.
+  updateDeadlineInfo();
+  document.getElementById("saveProductBtn").textContent="Enregistrer les modifications";
+  document.getElementById("cancelEditBtn").classList.remove("hidden");
+  const desc=document.getElementById("productDescription");
+  window.scrollTo({top:desc.getBoundingClientRect().top+window.scrollY-150,behavior:"smooth"});
+  desc.focus();
+}
+function deleteProduct(index){
+  if(confirm("Supprimer cet article ?")){
+    products.splice(index,1);
+    // UN INDEX D'ÉDITION EST UN INDEX DANS `products` (25/08/2026). Il se
+    // décale avec la liste. Sans ça, modifier un article puis en supprimer un
+    // autre faisait écrire « Enregistrer les modifications » dans l'article
+    // d'à côté : la modification frappait le mauvais et l'autre disparaissait,
+    // sans un mot. Même oubli, même correctif, sur l'écran de la demande.
+    const msg=document.getElementById("productEditMsg");
+    if(editIndex===index){
+      resetProductForm();
+      msg.textContent="L’article que tu modifiais a été supprimé.";
+      msg.classList.remove("hidden");
+    } else if(editIndex!==null && editIndex>index) editIndex--;
+    renderProducts();
+  }
+}
+function renderProducts(){
+  const box=document.getElementById("productList");
+  if(products.length===0){
+    box.innerHTML='<p class="help">Aucun article ajouté.</p>';
+  } else {
+    box.innerHTML=products.map((p,i)=>`
+      <div class="product-card">
+        <div class="product-top">
+          <div>
+            <div class="product-title">${escapeHtml(p.name)} × ${p.qty}</div>
+            <span class="badge ${p.rate ? "orange":"green"}">${p.rate ? "Supplément "+(p.rate*100)+" %":"Délai standard"}</span>
+          </div>
+          <b>${euro.format(p.totalTTC)} TTC</b>
+        </div>
+        <div class="product-description">${escapeHtml(p.description)}</div>
+        <div class="help">Récupération : ${new Date(p.deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")} à ${p.deliveryTime||"14:00"}</div>
+        <div class="actions" style="margin-top:10px">
+          <button class="secondary" onclick="editProduct(${i})">✏️ Modifier</button>
+          <button class="danger" onclick="deleteProduct(${i})">🗑️ Supprimer</button>
+        </div>
+      </div>`).join("");
+  }
+  calculateTotals();
+}
+function calculateTotals(){
+  const totals=products.reduce((a,p)=>({
+    ht:a.ht+p.baseHT,
+    tax:a.tax+p.tax,
+    surcharge:a.surcharge+p.surcharge,
+    ttc:a.ttc+p.totalTTC
+  }),{ht:0,tax:0,surcharge:0,ttc:0});
+  lastTotals=totals;
+  document.getElementById("summaryHT").textContent=euro.format(totals.ht);
+  document.getElementById("summaryTax").textContent=euro.format(totals.tax);
+  document.getElementById("summarySurcharge").textContent=euro.format(totals.surcharge);
+  rollMoney(document.getElementById("summaryTTC"),totals.ttc);
+
+  const summaryLines=document.getElementById("summaryLines");
+  if(products.length===0){
+    summaryLines.innerHTML='<p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>';
+  }else{
+    const articleLines = products.map(p=>{
+      const articleTTC = p.totalTTC - (p.surcharge * (p.taxApplied ? 1.04 : 1));
+      return `
+        <div class="summary-row">
+          <span>${escapeHtml(p.name)} × ${p.qty}</span>
+          <b>${euro.format(articleTTC)}</b>
+        </div>
+      `;
+    }).join("");
+
+    const expressTTC = products.reduce((sum,p)=>sum + (p.surcharge * (p.taxApplied ? 1.04 : 1)),0);
+    const expressRates = [...new Set(products.filter(p=>p.rate>0).map(p=>p.rate))];
+    let expressLabel = "Supplément express";
+    if(expressRates.length===1){
+      const r = expressRates[0];
+      expressLabel = (r>=0.20 ? "Supplément urgence (+" : "Supplément express (+")+pourcent(r)+" %)";
+    }else if(expressRates.length>1){
+      expressLabel = "Suppléments express / urgence";
+    }
+
+    const expressLine = expressTTC>0 ? `
+      <div class="summary-row">
+        <span>${expressLabel}</span>
+        <b>${euro.format(expressTTC)}</b>
+      </div>
+    ` : "";
+
+    summaryLines.innerHTML = articleLines + expressLine;
+  }
+
+  if(!document.getElementById("amountDueVal"))document.getElementById("amountDue").innerHTML='<span>TOTAL À ENCAISSER</span><span id="amountDueVal">0,00 €</span>';
+  rollMoney(document.getElementById("amountDueVal"),totals.ttc);
+  updateCashChange();
+}
+function selectedPayment(){ return document.querySelector('input[name="payment"]:checked').value; }
+function updatePaymentZones(){
+  const mode=selectedPayment();
+  document.getElementById("cashZone").classList.toggle("hidden",mode!=="Espèces");
+  document.getElementById("mixZone").classList.toggle("hidden",mode!=="Mixte");
+}
+function updateCashChange(){
+  const change=Math.max(0,Number(document.getElementById("cashGiven").value||0)-lastTotals.ttc);
+  rollMoney(document.getElementById("cashChange"),change);
+}
+function validatePayment(){
+  if(!selectedClient){
+    alert("Aucun client n'est associé à la commande.");
+    return false;
+  }
+  if(products.length===0){
+    alert("Ajoute au moins un article avant de passer au paiement.");
+    return false;
+  }
+  const mode=selectedPayment();
+  if(mode==="Espèces" && Number(document.getElementById("cashGiven").value||0)<lastTotals.ttc){
+    alert("Le montant donné par le client est insuffisant.");
+    return false;
+  }
+  if(mode==="Mixte"){
+    const total=Number(document.getElementById("mixCard").value||0)+Number(document.getElementById("mixCash").value||0);
+    if(Math.abs(total-lastTotals.ttc)>0.01){
+      alert("Le total du paiement mixte doit être égal au total TTC.");
+      return false;
+    }
+  }
+  return true;
+}
+
+function goToClient(){
+  if(products.length===0){
+    alert("Ajoute au moins un article avant de passer au paiement.");
+    return;
+  }
+  document.getElementById("clientSection").classList.remove("hidden");
+  document.getElementById("paymentSection").classList.add("hidden");
+  updateStepper(1);
+  document.getElementById("clientSection").scrollIntoView({behavior:"smooth"});
+}
+
+function continueToPayment(){
+  if(!selectedClient){
+    alert("Sélectionne un client ou crée une nouvelle fiche avant de continuer.");
+    document.getElementById("clientSearch").focus();
+    return;
+  }
+  document.getElementById("paymentSection").classList.remove("hidden");
+  updateStepper(2);
+  document.getElementById("paymentSection").scrollIntoView({behavior:"smooth"});
+}
+
+function backToArticles(){
+  document.getElementById("clientSection").classList.add("hidden");
+  document.getElementById("paymentSection").classList.add("hidden");
+  updateStepper(0);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function processPayment(){
+  if(!validatePayment()) return false;
+
+  fillTicket();
+  document.getElementById("paymentSuccess").classList.remove("hidden");
+  document.getElementById("ticketArea").classList.remove("hidden");
+  updateStepper(3);
+  return true;
+}
+function fillTicket(){
+  document.getElementById("ticketOrder").textContent=
+    "Commande : "+document.getElementById("orderNumber").value;
+  document.getElementById("ticketDate").textContent=
+    new Date().toLocaleString("fr-FR");
+  document.getElementById("ticketClient").textContent=
+    "Client : "+document.getElementById("clientName").value.trim();
+
+  const referenceProduct=products[0];
+  const pickupDate=referenceProduct ? referenceProduct.deliveryDate : "";
+  const pickupTime=referenceProduct ? (referenceProduct.deliveryTime||"14:00") : "";
+  const pickupDateLabel=pickupDate
+    ? new Date(pickupDate+"T12:00:00").toLocaleDateString("fr-FR")
+    : "Non renseignée";
+  document.getElementById("ticketPickup").textContent=
+    "Récupération prévue : "+pickupDateLabel+
+    (pickupTime ? " à "+pickupTime : "");
+
+  document.getElementById("ticketProducts").innerHTML=products.map(p=>{
+    const qty=Number(p.qty||1);
+
+    // Prix de l'article seul, sans le supplément express.
+    let baseTTC;
+    if(p.priceType==="TTC"){
+      baseTTC=Number(p.price||0)*qty;
+    }else{
+      const baseHT=Number(p.price||0)*qty;
+      baseTTC=p.taxApplied ? baseHT*1.04 : baseHT;
+    }
+
+    // Le supplément est calculé et affiché sur sa propre ligne.
+    const supplementTTC=
+      Number(p.surcharge||0)*(p.taxApplied ? 1.04 : 1);
+
+    return `
+      <div class="ticket-product">
+        <div class="ticket-product-main">
+          <div>
+            <div class="ticket-product-name">${escapeHtml(p.name)} — Quantité : ${qty}</div>
+            <div class="ticket-product-description">${escapeHtml(p.description||"")}</div>
+          </div>
+          <div class="ticket-product-price">${euro.format(baseTTC)}</div>
+        </div>
+
+        ${supplementTTC>0 ? `
+          <div class="ticket-extra-line">
+            <span>Supplément express</span>
+            <span class="ticket-extra-price">${euro.format(supplementTTC)}</span>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("ticketTTC").textContent=euro.format(lastTotals.ttc);
+  document.getElementById("ticketPayment").textContent=selectedPayment();
+}
+function printTicket(){
+  fillTicket();
+  const ticket=document.getElementById("ticketArea");
+  ticket.classList.remove("hidden");
+  window.print();
+}
+function downloadTicket(){
+  fillTicket();
+  document.getElementById("ticketExportOverlay").classList.add("show");
+}
+function normalizePhone(phone){ return phone.replace(/[^\d]/g,""); }
+function sendWhatsApp(){
+  const phone=normalizePhone(document.getElementById("clientPhone").value);
+  if(!phone){
+    alert("Ajoute le numéro WhatsApp du client.");
+    document.getElementById("clientPhone").focus();
+    return;
+  }
+  const client=document.getElementById("clientName").value.trim();
+  const detail=products.map(p=>`• ${p.name} x ${p.qty}\n${p.description}\nTotal : ${euro.format(p.totalTTC)}`).join("\n\n");
+  const message=`Bonjour ${client},
+
+Voici le détail de votre commande Atelier OLDA :
+
+Commande : ${document.getElementById("orderNumber").value}
+
+${detail}
+
+Total TTC : ${euro.format(lastTotals.ttc)}
+Paiement : ${selectedPayment()}
+
+Merci pour votre confiance,
+L'équipe Atelier OLDA`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,"_blank");
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+document.getElementById("saveProductBtn").addEventListener("click",saveProduct);
+document.getElementById("cancelEditBtn").addEventListener("click",resetProductForm);
+document.getElementById("orderDate").addEventListener("change",updateDeadlineInfo);
+document.querySelectorAll('input[name="payment"]').forEach(r=>r.addEventListener("change",updatePaymentZones));
+document.getElementById("cashGiven").addEventListener("input",updateCashChange);
+document.getElementById("goToClientBtn").addEventListener("click",goToClient);
+document.getElementById("continueToPaymentBtn").addEventListener("click",continueToPayment);
+document.getElementById("backToArticlesBtn").addEventListener("click",backToArticles);
+
+document.getElementById("clientSearch").addEventListener("input",renderClientResults);
+// ON APPELLE LA VERSION DU MOMENT, PAS CELLE DE L'INSCRIPTION (25/08/2026).
+// `addEventListener(evt, uneFonction)` FIGE la fonction telle qu'elle est ici.
+// Les greffes du bas de page redéfinissent `window.showCreateClient`,
+// `window.createAndSelectClient` et `window.editSelectedClient` — elles
+// n'atteignaient aucun de ces trois boutons. « Modifier le client » exécutait
+// la version périmée, qui appelle `showCreateClient()` : celle-ci efface le
+// client sélectionné, la ligne suivante lit `selectedClient.type` sur null,
+// et le formulaire s'ouvrait VIDE, sans client, sans un mot.
+document.getElementById("showCreateClientBtn").addEventListener("click",()=>window.showCreateClient());
+document.getElementById("cancelCreateClientBtn").addEventListener("click",()=>{
+  document.getElementById("createClientBox").classList.add("hidden");
+  resetCreateClientForm();
+});
+document.getElementById("chooseIndividualBtn").addEventListener("click",()=>setCreateClientType("Particulier"));
+document.getElementById("chooseProfessionalBtn").addEventListener("click",()=>setCreateClientType("Professionnel"));
+document.getElementById("createAndSelectClientBtn").addEventListener("click",()=>window.createAndSelectClient());
+document.getElementById("changeClientBtn").addEventListener("click",clearSelectedClient);
+document.getElementById("editSelectedClientBtn").addEventListener("click",()=>window.editSelectedClient());
+
+["newIndividualPhone","newCompanyPhone"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",function(){
+    this.value=formatPhoneInput(this.value);
+  });
+});
+
+document.getElementById("newCompanyCity").addEventListener("input",function(){
+  if(normalizeSearch(this.value)==="saintmartin"){
+    document.getElementById("newCompanyPostal").value="97150";
+  }
+});
+document.getElementById("newCompanyPostal").addEventListener("input",function(){
+  if(this.value.trim()==="97150"){
+    document.getElementById("newCompanyCity").value="Saint-Martin";
+  }
+});
+
+document.getElementById("payButton").addEventListener("click",processPayment);
+document.getElementById("sendWhatsAppBtn").addEventListener("click",sendWhatsApp);
+
+// Raccourcis clavier : Entrée ajoute l'article / sélectionne le client unique
+["productName","quantity","articlePrice","customPrice"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();saveProduct();}
+  });
+});
+// Les raccourcis de délai : ils POSENT une date, ils n'en retiennent aucune.
+document.querySelectorAll(".delay-chip").forEach(b=>{
+  b.addEventListener("click",()=>setDeliveryInDays(b.dataset.jours));
+});
+document.getElementById("clientSearch").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const btns=document.querySelectorAll("#clientResults .select-client-btn");
+    if(btns.length===1)btns[0].click();
+  }
+});
+
+init();
+renderProducts();
+</script>
+
+<script>
+(function(){
+  function pick(id){ return document.getElementById(id); }
+  function text(id){ return pick(id)?.value || pick(id)?.textContent || ""; }
+  function addPlanningButton(){
+    if(document.getElementById("oldaCreatePlanningBtn")) return;
+    const host=document.querySelector("#paymentSuccess .actions") || document.querySelector("#paymentSuccess .footer-actions");
+    if(!host) return;
+    const btn=document.createElement("button");
+    btn.id="oldaCreatePlanningBtn";
+    // MASQUÉ, PAS SUPPRIMÉ. C'est ce bouton que `pont.js` presse pour envoyer
+    // le dossier au planning (`btn.click()`, après avoir vérifié `isConnected`).
+    // Le retirer du DOM ne cacherait pas une commande : elle n'arriverait plus
+    // nulle part. Il quitte l'écran, il reste la mécanique.
+    btn.className="primary hidden";
+    btn.textContent="📅 Créer dans le planning";
+    btn.style.marginTop="10px";
+    btn.onclick=function(){
+      const selected = window.selectedClient || null;
+      const productNames = (typeof products!=="undefined"?products:[]).map(p=>`${p.qty} x ${p.name}`).join(" • ");
+      const production = (typeof products!=="undefined"?products:[]).map(p=>p.description).filter(Boolean).join(" | ");
+      const payload={
+        source:"Vente directe",
+        ref:text("orderNumber") || text("ticketOrder") || ("VD-"+Date.now()),
+        client:selected ? (selected.company||selected.name||selected.contact||"Client") : (text("clientName")||"Client"),
+        name:productNames || "Vente directe",
+        responsible:"Non défini",
+        due:text("deliveryDate") || isoDate(new Date()),
+        priority:window.prioritePourDate(text("deliveryDate")),
+        stage:"preparation",
+        status:"Préparation des produits",
+        production:production || "À définir",
+        comment:[`Délai souhaité : ${deliveryDelayLabel()}`,text("internalNote")].filter(Boolean).join(" | "),
+        amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
+        // Même sur le payload de secours : un panier à quatre articles doit
+        // donner quatre lignes, y compris le jour où patchPlanningButton
+        // n'a pas eu le temps de passer.
+        articles:typeof window.articlesPourPlanning==="function"?window.articlesPourPlanning():[],
+        checks:{products:true,bat:false,files:true,qty:true,payment:!document.querySelector('input[name="payment"][value="Paiement au retrait"]')?.checked}
+      };
+      parent.postMessage({type:"OLDA_CREATE_PROJECT",payload},location.origin);
+    };
+    host.appendChild(btn);
+    // Le bouton naît ici avec un payload MINIMAL ; le vrai (client structuré,
+    // récapitulatif complet, paiement) est posé par patchPlanningButton, plus
+    // bas dans la page. On l'appelle tout de suite plutôt que d'attendre son
+    // scrutateur toutes les 400 ms : sans ça, une vendeuse rapide part au
+    // planning avec la fiche pauvre.
+    if(window.patchPlanningButton) window.patchPlanningButton();
+  }
+  const observer=new MutationObserver(addPlanningButton);
+  observer.observe(document.body,{subtree:true,attributes:true,childList:true});
+  addPlanningButton();
+})();
+</script>
+
+
+
+
+<script>
+(function(){
+  function getBaseTTC(p){
+    const qty=Number(p.qty||1);
+    if(p.priceType==="TTC") return Number(p.price||0)*qty;
+    const ht=Number(p.price||0)*qty;
+    return p.taxApplied ? ht*1.04 : ht;
+  }
+
+  function getSupplementTTC(p){
+    return Number(p.surcharge||0)*(p.taxApplied ? 1.04 : 1);
+  }
+
+  function closeExportChoice(){
+    document.getElementById("ticketExportOverlay").classList.remove("show");
+  }
+
+  function exportTXT(){
+    fillTicket();
+
+    const lines=[
+      "ATELIER OLDA",
+      "Saint-Martin",
+      "TICKET DE COMMANDE",
+      "--------------------------------",
+      "Commande : "+document.getElementById("orderNumber").value,
+      "Date : "+new Date().toLocaleString("fr-FR"),
+      "Client : "+document.getElementById("clientName").value.trim(),
+      "Récupération prévue : "+
+        (products[0] && products[0].deliveryDate
+          ? new Date(products[0].deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")
+          : "Non renseignée")+
+        " à "+(products[0] ? (products[0].deliveryTime||"14:00") : ""),
+      "--------------------------------"
+    ];
+
+    products.forEach(p=>{
+      lines.push(`${p.name} × ${p.qty}`);
+      if(p.description) lines.push(p.description);
+      lines.push(`Article : ${euro.format(getBaseTTC(p))}`);
+
+      const supplement=getSupplementTTC(p);
+      if(supplement>0){
+        lines.push(`+ Supplément express : ${euro.format(supplement)}`);
+      }
+      lines.push("");
+    });
+
+    lines.push("--------------------------------");
+    lines.push("TOTAL COMMANDE TTC : "+euro.format(lastTotals.ttc));
+    lines.push("Paiement : "+selectedPayment());
+    lines.push("--------------------------------");
+    lines.push("Merci pour votre confiance");
+    lines.push("L'équipe Atelier OLDA");
+
+    const blob=new Blob(
+      ["\ufeff"+lines.join("\r\n")],
+      {type:"text/plain;charset=utf-8"}
+    );
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=
+      `Ticket_Atelier_OLDA_${document.getElementById("orderNumber").value}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    closeExportChoice();
+  }
+
+  function exportPDF(){
+    // L'utilisateur choisit ensuite « Enregistrer au format PDF »
+    // dans la fenêtre native d'impression de sa tablette ou de son ordinateur.
+    closeExportChoice();
+    printTicket();
+  }
+
+  document.getElementById("ticketPrintPreviewBtn")
+    .addEventListener("click",printTicket);
+  document.getElementById("ticketDownloadPreviewBtn")
+    .addEventListener("click",downloadTicket);
+  document.getElementById("ticketPdfBtn")
+    .addEventListener("click",exportPDF);
+  document.getElementById("ticketTxtBtn")
+    .addEventListener("click",exportTXT);
+  document.getElementById("ticketExportCancelBtn")
+    .addEventListener("click",closeExportChoice);
+
+  document.getElementById("ticketExportOverlay")
+    .addEventListener("click",function(event){
+      if(event.target===this) closeExportChoice();
+    });
+})();
+</script>
+
+
+<script>
+(function(){
+  let currentSaleStep=1;
+  const container=document.querySelector(".container");
+  const children=[...container.children];
+  const stepper=children.find(el=>el.classList.contains("stepper"));
+  const client=document.getElementById("clientSection");
+  const payment=document.getElementById("paymentSection");
+  const success=document.getElementById("paymentSuccess");
+  const ticket=document.getElementById("ticketArea");
+  const clientIndex=children.indexOf(client);
+
+  children
+    .filter((el,index)=>el!==stepper && index>0 && index<clientIndex)
+    .forEach(el=>el.dataset.saleStep="1");
+
+  client.dataset.saleStep="2";
+  payment.dataset.saleStep="3";
+  success.dataset.saleStep="4";
+  ticket.dataset.saleStep="4";
+
+  const nav=document.createElement("div");
+  nav.className="tablet-wizard-nav";
+  nav.innerHTML=`
+    <button id="saleBack" class="btn-retour" title="Revenir à l’étape précédente" aria-label="Revenir à l’étape précédente"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
+    <div class="wizard-spacer"></div>
+    <button id="saleNext" class="primary">
+      Valider et passer à l'étape suivante →
+    </button>
+  `;
+  container.appendChild(nav);
+
+  // Le bouton de bas d'écran occupe la MÊME place à toutes les étapes, et à
+  // l'étape 4 il recharge la page. Un double-tap sur « Valider la commande et
+  // le paiement » (étape 3 → 4, instantané) faisait donc partir le second tap
+  // sur le rechargement : articles, client et paiement effacés avant même
+  // l'impression du ticket. On désarme le bouton un court instant après chaque
+  // changement d'étape.
+  var etapeChangeeLe=0;
+  function displayStep(step){
+    currentSaleStep=Math.max(1,Math.min(4,step));
+    etapeChangeeLe=Date.now();
+
+    document.querySelectorAll("[data-sale-step]").forEach(el=>{
+      const visible=Number(el.dataset.saleStep)===currentSaleStep;
+      el.classList.toggle("sale-panel-hidden",!visible);
+      if(visible) el.classList.remove("hidden");
+    });
+
+    updateStepper(currentSaleStep-1);
+
+    document.getElementById("saleBack").style.visibility=
+      currentSaleStep===1 ? "hidden" : "visible";
+
+    const labels={
+      1:"Valider les articles et continuer →",
+      2:"Valider le client et continuer →",
+      3:"Valider la commande et le paiement →",
+      4:"Nouvelle vente"
+    };
+    document.getElementById("saleNext").textContent=labels[currentSaleStep];
+
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  document.getElementById("saleBack").addEventListener("click",()=>{
+    if(currentSaleStep>1) displayStep(currentSaleStep-1);
+  });
+
+  document.getElementById("saleNext").addEventListener("click",()=>{
+    // Deuxième tap d'un double-tap : l'étape vient de changer sous le doigt.
+    if(Date.now()-etapeChangeeLe<800) return;
+
+    if(currentSaleStep===1){
+      if(products.length===0){
+        alert("Ajoute puis enregistre au moins un article avant de continuer.");
+        return;
+      }
+      displayStep(2);
+      return;
+    }
+
+    if(currentSaleStep===2){
+      if(!selectedClient){
+        alert("Sélectionne un client. Le cadre vert doit apparaître avant de continuer.");
+        document.getElementById("clientSearch").focus();
+        return;
+      }
+      displayStep(3);
+      return;
+    }
+
+    if(currentSaleStep===3){
+      if(processPayment()){
+        displayStep(4);
+      }
+      return;
+    }
+
+    // Étape 4 : la vente est finie. On confirme avant d'effacer l'écran — le
+    // ticket, le lien WhatsApp et le bouton « Créer dans le planning » y sont
+    // encore. Le parcours « demande de devis » confirme déjà de la même façon.
+    if(confirm("Commencer une nouvelle vente ? L'écran actuel sera effacé.")) location.reload();
+  });
+
+  window.showSaleWizardStep=displayStep;
+  displayStep(1);
+})();
+</script>
+
+
+
+
+
+<script>
+(function(){
+  const deliveryDate=document.getElementById("deliveryDate");
+  const deliveryTime=document.getElementById("deliveryTime");
+
+  function localDateValue(date){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,"0");
+    const d=String(date.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function closestFullHour(date){
+    let hour=date.getHours();
+    if(date.getMinutes()>0) hour+=1;
+    hour=Math.max(9,Math.min(17,hour));
+    return `${String(hour).padStart(2,"0")}:00`;
+  }
+
+  if(!deliveryTime.value){
+    deliveryTime.value="14:00";
+  }
+
+})();
+</script>
+
+<style>
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+/* UN CHAMP DE DATE FAIT LA MÊME HAUTEUR QUE LES AUTRES. Chrome compose sa
+   valeur dans une boîte interne qui porte SON rembourrage : le champ sortait à
+   51,6 px là où tout le reste de la page — champs, boutons, menus — tient à
+   49,6. Deux pixels, sur une rangée où « Date de commande » côtoie un bouton,
+   se voient comme un décalage sans cause. On ramène cette boîte-là sur
+   l'interligne de l'échelle et on lui retire son rembourrage propre. */
+input[type=date]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit{line-height:var(--ligne-champ);padding:0;margin:0;height:auto}
+input[type=date]::-webkit-datetime-edit-fields-wrapper,input[type=time]::-webkit-datetime-edit-fields-wrapper{padding:0;margin:0}
+input[type=date]::-webkit-inner-spin-button,input[type=time]::-webkit-inner-spin-button{display:none}
+/* LA FLÈCHE DU MENU SUIT LE THÈME. Elle est gravée DANS l'image — un data-URI
+   ne connaît ni `currentColor` ni les variables de la page — donc elle est
+   dessinée deux fois : ardoise sur fond clair, gris clair sur fond sombre.
+   Sans le second tirage, un trait #475467 sur un champ #2b3546 : la flèche
+   disparaissait, et le champ n'avait plus l'air d'un menu.
+   (La plupart des menus de cet écran sont HABILLÉS par pont.js et n'utilisent
+   pas cette flèche-là ; celle-ci sert à ceux qui restent natifs.) */
+select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23475467' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px!important}
+:root[data-theme="dark"] select{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23cbd5e1' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")}
+.req{color:var(--danger);font-weight:var(--graisse-forte);margin-left:2px}
+.dp-pop{position:absolute;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:var(--arrondi-carte);box-shadow:var(--shadow-pop);padding:var(--pas-3);width:352px;max-width:calc(100vw - 24px);font-family:inherit;user-select:none}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-title{font-weight:var(--graisse-forte)}
+.dp-nav{display:flex;gap:4px}
+.dp-nav button{width:38px;height:38px;border:0;border-radius:50%;background:transparent;cursor:pointer;color:var(--text-2);display:grid;place-items:center;padding:0}
+.dp-nav button:hover{background:var(--surface-hover)}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.dp-dow{font-weight:var(--graisse-forte);color:var(--text-2);padding:var(--pas-1) 0}
+.dp-day{width:38px;height:38px;margin:0 auto;border:0;border-radius:50%;background:transparent;cursor:pointer;font-weight:var(--graisse-note);color:var(--text-1);display:grid;place-items:center;padding:0}
+.dp-day:hover{background:var(--surface-hover)}
+.dp-day.other{color:var(--text-3)}
+.dp-day.today{outline:1.5px solid var(--primary);outline-offset:-1.5px}
+.dp-day.sel{background:var(--primary);color:var(--on-primary)}
+.dp-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.dp-foot button{border:0;background:transparent;color:var(--text-1);font-weight:var(--graisse-forte);cursor:pointer;padding:8px 10px;border-radius:var(--arrondi-champ)}
+.dp-foot button:hover{background:var(--surface-hover)}
+</style>
+<script>
+(function(){
+  var MONTHS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  var DOWS=["L","M","M","J","V","S","D"];
+  var pop=null,target=null,vy=0,vm=0;
+  function iso(y,m,d){return y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+  function close(){if(pop){pop.remove();pop=null;target=null;}}
+  function render(){
+    var sel=target.value||"";
+    var today=new Date();var tIso=iso(today.getFullYear(),today.getMonth(),today.getDate());
+    var first=new Date(vy,vm,1);var startDow=(first.getDay()+6)%7;
+    var dim=new Date(vy,vm+1,0).getDate();var dimPrev=new Date(vy,vm,0).getDate();
+    var h='<div class="dp-head"><div class="dp-title">'+MONTHS[vm]+' '+vy+'</div><div class="dp-nav"><button type="button" data-nav="-1">‹</button><button type="button" data-nav="1">›</button></div></div><div class="dp-grid">';
+    for(var i=0;i<7;i++)h+='<div class="dp-dow">'+DOWS[i]+'</div>';
+    var cells=Math.ceil((startDow+dim)/7)*7;
+    for(var c=0;c<cells;c++){
+      var d=c-startDow+1,cm=vm,other=false;
+      if(d<1){d=dimPrev+d;cm=vm-1;other=true;}
+      else if(d>dim){d=d-dim;cm=vm+1;other=true;}
+      var dt=new Date(vy,cm,d);var v=iso(dt.getFullYear(),dt.getMonth(),dt.getDate());
+      var cls="dp-day"+(other?" other":"")+(v===tIso?" today":"")+(v===sel?" sel":"");
+      h+='<button type="button" class="'+cls+'" data-v="'+v+'">'+d+'</button>';
+    }
+    h+='</div><div class="dp-foot"><button type="button" data-today="1">Aujourd&#39;hui</button></div>';
+    pop.innerHTML=h;
+  }
+  function setVal(v){
+    target.value=v;
+    target.dispatchEvent(new Event("input",{bubbles:true}));
+    target.dispatchEvent(new Event("change",{bubbles:true}));
+    close();
+  }
+  function open(inp){
+    close();target=inp;
+    var base=inp.value?new Date(inp.value+"T12:00:00"):new Date();
+    vy=base.getFullYear();vm=base.getMonth();
+    pop=document.createElement("div");pop.className="dp-pop";
+    document.body.appendChild(pop);render();
+    var r=inp.getBoundingClientRect();
+    var left=Math.min(r.left+window.scrollX,window.scrollX+document.documentElement.clientWidth-306);
+    pop.style.left=Math.max(8,left)+"px";
+    pop.style.top=(r.bottom+window.scrollY+6)+"px";
+    pop.addEventListener("click",function(e){
+      var b=e.target.closest("button");if(!b)return;
+      if(b.dataset.nav){vm+=Number(b.dataset.nav);if(vm<0){vm=11;vy--;}if(vm>11){vm=0;vy++;}render();return;}
+      if(b.dataset.today){var t=new Date();setVal(iso(t.getFullYear(),t.getMonth(),t.getDate()));return;}
+      if(b.dataset.v)setVal(b.dataset.v);
+    });
+  }
+  document.addEventListener("mousedown",function(e){
+    var inp=e.target.closest?e.target.closest('input[type=date]'):null;
+    if(inp&&!inp.disabled){e.preventDefault();inp.blur();open(inp);return;}
+    if(pop&&!pop.contains(e.target))close();
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")close();});
+  document.querySelectorAll("label").forEach(function(l){
+    if(/\*\s*$/.test(l.textContent)&&!l.querySelector(".req")){
+      l.innerHTML=l.innerHTML.replace(/\s*\*\s*$/,' <span class="req">*</span>');
+    }
+  });
+  window.__attachCap=function(ids){
+    ids.forEach(function(id){
+      var el=document.getElementById(id);if(!el)return;
+      el.addEventListener("input",function(){
+        var pos=this.selectionStart;
+        var v=this.value.replace(/(^|[\s\-'])([a-zà-öø-ÿ])/g,function(m,a,b){return a+b.toUpperCase();});
+        if(v!==this.value){this.value=v;try{this.setSelectionRange(pos,pos);}catch(e){}}
+      });
+    });
+  };
+})();
+</script>
+<script>__attachCap(["newIndividualName","newCompanyContact","newCompanyCity","newCompanyName"]);</script>
+<style>
+#ticketArea .ticket-details{font-size:var(--tk-note);font-weight:var(--graisse-note);line-height:1.5;color:#111827;margin-top:8px}
+#ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #e5e7eb}
+#ticketArea .ticket-details .tl span{color:#6b7280;font-weight:var(--graisse-forte)}
+#ticketArea .ticket-details .tl strong{color:#111827;font-weight:var(--graisse-forte);white-space:pre-line}
+#ticketArea .ticket-client-box,
+#ticketArea #ticketClient,
+#ticketArea #ticketOrder,
+#ticketArea #ticketPickup{font-size:var(--tk-texte)}
+#ticketArea .ticket-product-description{white-space:pre-line}
+</style>
+<script>
+(function(){
+  var PRO_TYPES=['Professionnel','Association','Revendeur'];
+  var esc2=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]});};
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  function tl(k,val){return '<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(val||'—')+'</strong></div>';}
+
+
+  /* Contrôle du format de l'e-mail : arobase + nom de domaine + extension */
+  window.isValidEmail=function(value){
+    var v=String(value||'').trim();
+    return /^[^\s@,;]+@[^\s@,;]+\.[a-zA-Z]{2,}$/.test(v);
+  };
+  window.attachEmailCheck=function(id,helpId){
+    var input=document.getElementById(id);
+    if(!input||input.__mailBound)return;
+    input.__mailBound=true;
+    var help=helpId?document.getElementById(helpId):null;
+    if(!help){
+      help=document.createElement('div');
+      help.className='help msg-flottant';
+      input.insertAdjacentElement('afterend',help);
+    }
+    var paint=function(){
+      var v=input.value.trim();
+      if(!v){input.classList.remove('invalid');input.style.borderColor='';help.textContent='';help.style.color='';return;}
+      if(window.isValidEmail(v)){
+        input.classList.remove('invalid');
+        [input.nextElementSibling,input.previousElementSibling,help.nextElementSibling].forEach(function(n){
+          if(n&&n.classList&&n.classList.contains('error'))n.remove();
+        });
+        input.style.borderColor='#1c7c4a';
+        help.textContent='✓ Adresse e-mail valide';
+        help.style.color='#1c7c4a';
+      }else{
+        input.classList.add('invalid');
+        input.style.borderColor='#c62828';
+        help.textContent="⚠ Adresse incomplète : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).";
+        help.style.color='#c62828';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__mailPaint=paint;
+  };
+
+  window.clientInfoLines=function(c){
+    if(!c)return [];
+    var lines=[['Type de client',c.type||'—'],['Nom / société',c.company||c.name||'—']];
+    if(c.contact)lines.push(['Personne à contacter',c.contact+(c.contactRole?' ('+c.contactRole+')':'')]);
+    lines.push(['WhatsApp',c.phone||'Non renseigné']);
+    lines.push(['E-mail',c.email||'Non renseigné']);
+    if(c.sector)lines.push(['Secteur',c.sector]);
+    var adr=[c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+    if(adr)lines.push(['Adresse',adr]);
+    return lines;
+  };
+
+  /* Type de client : Particulier léger, Pro / Association / Revendeur complet */
+  window.setCreateClientType=function(type){
+    createClientType=type;
+    var individual=type==='Particulier';
+    el('individualForm').classList.toggle('hidden',!individual);
+    el('professionalForm').classList.toggle('hidden',individual);
+    [['chooseIndividualBtn','Particulier'],['chooseProfessionalBtn','Professionnel'],['chooseAssociationBtn','Association'],['chooseResellerBtn','Revendeur']].forEach(function(pair){
+      var b=el(pair[0]);
+      if(b)b.classList.toggle('active',type===pair[1]);
+    });
+    var label=el('companyNameLabel');
+    if(label)label.textContent=type==='Association'?'Nom de l’association *':(type==='Revendeur'?'Raison sociale du revendeur *':'Raison sociale EBP *');
+  };
+
+  var originalShowCreate=window.showCreateClient;
+  window.showCreateClient=function(){
+    window.__editingClientId=null;
+    originalShowCreate();
+  };
+
+  window.createAndSelectClient=function(){
+    var client;
+    if(createClientType==='Particulier'){
+      if(!requireFields(['newIndividualName','newIndividualPhone'])){
+        alert('Ajoute le prénom, le nom et le WhatsApp.');
+        return;
+      }
+      var mailP=v('newIndividualEmail');
+      if(mailP&&!window.isValidEmail(mailP)){
+        el('newIndividualEmail').__mailPaint&&el('newIndividualEmail').__mailPaint();
+        el('newIndividualEmail').focus();
+        alert("Adresse e-mail invalide : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).");
+        return;
+      }
+      client={
+        id:'CLI-'+String(clients.length+1).padStart(3,'0'),
+        type:'Particulier',
+        name:v('newIndividualName'),
+        phone:v('newIndividualPhone'),
+        email:v('newIndividualEmail')
+      };
+    }else{
+      if(!requireFields(['newCompanyName','newCompanySector','newCompanyContact','newCompanyPhone','newCompanyEmail'])){
+        alert('Pour un client professionnel, association ou revendeur : raison sociale, secteur, personne à contacter, WhatsApp et e-mail sont obligatoires.');
+        return;
+      }
+      if(!window.isValidEmail(v('newCompanyEmail'))){
+        el('newCompanyEmail').__mailPaint&&el('newCompanyEmail').__mailPaint();
+        el('newCompanyEmail').focus();
+        alert("Adresse e-mail invalide : il faut une arobase et un nom de domaine (ex. nom@entreprise.com).");
+        return;
+      }
+      client={
+        id:'CLI-'+String(clients.length+1).padStart(3,'0'),
+        type:createClientType||'Professionnel',
+        company:v('newCompanyName'),
+        sector:v('newCompanySector'),
+        address:v('newCompanyAddress'),
+        city:v('newCompanyCity'),
+        postal:v('newCompanyPostal'),
+        contact:v('newCompanyContact'),
+        contactRole:v('newCompanyContactRole'),
+        phone:v('newCompanyPhone'),
+        email:v('newCompanyEmail'),
+        siret:'',
+        billing:''
+      };
+    }
+    if(window.__editingClientId){
+      var existing=clients.filter(function(c){return c.id===window.__editingClientId;})[0];
+      if(existing){
+        ['name','company','contact','contactRole','sector','address','city','postal'].forEach(function(k){delete existing[k];});
+        Object.keys(client).forEach(function(k){if(k!=='id')existing[k]=client[k];});
+        client=existing;
+      }
+      window.__editingClientId=null;
+    }else{
+      clients.push(client);
+    }
+    selectClientById(client.id);
+    resetCreateClientForm();
+  };
+
+  var originalReset=window.resetCreateClientForm;
+  window.resetCreateClientForm=function(){
+    /* Refermer, c'est renoncer : le drapeau d'édition ne survit pas à
+       « Annuler ». Le laisser armé ferait partir la création suivante en
+       écrasement de la fiche qu'on venait de regarder. */
+    window.__editingClientId=null;
+    ['newCompanyContactRole'].forEach(function(id){var e=el(id);if(e)e.value='';});
+    originalReset();
+  };
+
+  window.editSelectedClient=function(){
+    var c=selectedClient;
+    if(!c)return;
+    el('createClientBox').classList.remove('hidden');
+    el('selectedClientCard').classList.add('hidden');
+    window.__editingClientId=c.id;
+    setCreateClientType(c.type||'Particulier');
+    var set=function(id,val){var e=el(id);if(e)e.value=val||'';};
+    if((c.type||'Particulier')==='Particulier'){
+      set('newIndividualName',c.name);
+      set('newIndividualPhone',c.phone);
+      set('newIndividualEmail',c.email);
+      el('newIndividualName').focus();
+    }else{
+      set('newCompanyName',c.company||c.name);
+      set('newCompanySector',c.sector);
+      set('newCompanyAddress',c.address);
+      set('newCompanyCity',c.city);
+      set('newCompanyPostal',c.postal);
+      set('newCompanyContact',c.contact);
+      set('newCompanyContactRole',c.contactRole);
+      set('newCompanyPhone',c.phone);
+      set('newCompanyEmail',c.email);
+      el('newCompanyName').focus();
+    }
+  };
+
+  /* Ticket : toutes les informations saisies apparaissent */
+  var originalFill=window.fillTicket;
+  window.fillTicket=function(){
+    originalFill();
+    var box=el('ticketClientDetails');
+    if(box){
+      var lines=window.clientInfoLines(selectedClient);
+      if(!lines.length){
+        lines=[['Type de client',v('clientType')||'Client comptoir'],['WhatsApp',v('clientPhone')||'Non renseigné'],['E-mail',v('clientEmail')||'Non renseigné']];
+      }
+      box.innerHTML=lines.map(function(l){return tl(l[0],l[1]);}).join('');
+    }
+    var extra=el('ticketExtraDetails');
+    if(extra){
+      var rows=[tl('Délai souhaité',(typeof deliveryDelayLabel==='function'?deliveryDelayLabel():''))];
+      if(v('internalNote'))rows.push(tl('Note interne OLDA',v('internalNote')));
+      extra.innerHTML=rows.join('');
+    }
+  };
+
+  window.saleRecapLines=function(){
+    var d=function(x){var t=String(x==null?'':x).trim();return t?t:'—';};
+    var c=selectedClient||{};
+    var p0=(typeof products!=="undefined"?products:[])[0]||{};
+    var mode=(document.querySelector('input[name="payment"]:checked')||{}).value||'';
+    var out=[
+      ['Type de dossier','Vente directe'],
+      ['Commande',d(v('orderNumber'))],
+      ['Date de la vente',new Date().toLocaleString('fr-FR')],
+      ['Date de commande',d(v('orderDate')?new Date(v('orderDate')+'T12:00:00').toLocaleDateString('fr-FR'):'')],
+      ['Client',d(c.company||c.name||v('clientName'))],
+      ['Type de client',d(c.type||v('clientType'))],
+      ['Personne à contacter',d(c.contact)],
+      ['Fonction du contact',d(c.contactRole)],
+      ['WhatsApp',d(c.phone||v('clientPhone'))],
+      ['E-mail',d(c.email||v('clientEmail'))],
+      ['Secteur',d(c.sector)],
+      ['Adresse',d([c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — '))],
+      ['Récupération prévue',d((p0.deliveryDate?new Date(p0.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p0.deliveryTime?' à '+p0.deliveryTime:''))],
+      ['Délai souhaité',d(typeof deliveryDelayLabel==='function'?deliveryDelayLabel():'')],
+      ['Nombre d’articles',String((typeof products!=="undefined"?products:[]).length)],
+      ['Quantité totale',String((typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+Number(p.qty||0);},0))]
+    ];
+    (typeof products!=="undefined"?products:[]).forEach(function(p,i){
+      var no='Article '+(i+1)+' — ';
+      out.push([no+'Désignation',d(p.name)]);
+      out.push([no+'Quantité',d(p.qty)]);
+      out.push([no+'Prix article',d(euro.format(Number(p.priceArticle||0)))]);
+      out.push([no+'Prix personnalisation',d(euro.format(Number(p.priceCustom||0)))]);
+      out.push([no+'Supplément express',euro.format(Number(p.surcharge||0))]);
+      out.push([no+'Total TTC',euro.format(Number(p.totalTTC||0))]);
+      out.push([no+'Description de production',d(p.description)]);
+      out.push([no+'Récupération',d((p.deliveryDate?new Date(p.deliveryDate+'T12:00:00').toLocaleDateString('fr-FR'):'')+(p.deliveryTime?' à '+p.deliveryTime:''))]);
+    });
+    out.push(['Total HT',euro.format((typeof lastTotals!=="undefined"?lastTotals.ht:0)||0)]);
+    out.push(['Taxe',euro.format((typeof lastTotals!=="undefined"?lastTotals.tax:0)||0)]);
+    out.push(['Suppléments',euro.format((typeof lastTotals!=="undefined"?lastTotals.surcharge:0)||0)]);
+    out.push(['Total TTC',euro.format((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0)]);
+    out.push(['Paiement',d(mode||(typeof selectedPayment==='function'?selectedPayment():''))]);
+    if(mode==='Espèces'){
+      out.push(['Montant donné',d(v('cashGiven')?euro.format(Number(v('cashGiven'))):'')]);
+      out.push(['Monnaie rendue',d(el('cashChange')?el('cashChange').textContent:'')]);
+    }
+    if(mode==='Mixte'){
+      out.push(['Part carte',d(v('mixCard')?euro.format(Number(v('mixCard'))):'')]);
+      out.push(['Part espèces',d(v('mixCash')?euro.format(Number(v('mixCash'))):'')]);
+    }
+    out.push(['Note interne OLDA',d(v('internalNote'))]);
+    return out;
+  };
+
+  // Le mode de paiement coché, tel que le planning le connaît (catalog.json).
+  // « Paiement au retrait » n'est PAS un mode : c'est l'absence d'encaissement,
+  // donc pas de mode et `paye` à faux.
+  var MODES_PLANNING={'Carte bancaire':'cb','Espèces':'especes','Virement':'virement','Mixte':'mixte'};
+  function modeCoche(){
+    var r=document.querySelector('input[name="payment"]:checked');
+    return r?r.value:'';
+  }
+
+  /* LES ARTICLES, EN CLAIR. Le planning en fait UNE LIGNE PAR ARTICLE : les
+     casquettes peuvent partir en production pendant que les mugs attendent le
+     fournisseur, ce qu'une ligne unique interdit (l'étape appartient à la
+     ligne). Chaque article garde sa date et son heure de retrait : le ticket en
+     annonce déjà une par article, le planning ne doit pas les écraser.
+     Le total du ticket reste `amount` et fait foi — le serveur pose l'écart
+     d'arrondi sur la première ligne pour que la somme tombe juste. */
+  window.articlesPourPlanning=function(){
+    var lignes=(typeof products!=="undefined"&&products)||[];
+    return lignes.map(function(p){
+      return {
+        label:p.name,
+        qty:Number(p.qty)||0,
+        detail:p.description||'',
+        due:p.deliveryDate||'',
+        heure:p.deliveryTime||'',
+        amount:p.totalTTC
+      };
+    });
+  };
+
+  function patchPlanningButton(){
+    var btn=el('oldaCreatePlanningBtn');
+    if(!btn||btn.__oldaPatched)return;
+    btn.__oldaPatched=true;
+    btn.onclick=function(){
+      var productNames=(typeof products!=="undefined"?products:[]).map(function(p){return p.qty+' x '+p.name;}).join(' • ');
+      var production=(typeof products!=="undefined"?products:[]).map(function(p){return p.description;}).filter(Boolean).join(' | ');
+      /* `due` et `priority` doivent décrire la MÊME date, d'où cette variable :
+         l'échéance envoyée et l'urgence facturée ne peuvent pas diverger. */
+      var dueIso=((typeof products!=="undefined"?products:[])[0]||{}).deliveryDate
+        ||(el('deliveryDate')&&el('deliveryDate').value)||isoDate(new Date());
+      var mode=modeCoche();
+      var payload={
+        source:'Vente directe',
+        ref:v('orderNumber')||('VD-'+Date.now()),
+        client:selectedClient?(selectedClient.company||selectedClient.name):(v('clientName')||'Client'),
+        name:productNames||'Vente directe',
+        responsible:'Non défini',
+        /* L'échéance envoyée au planning est celle du PREMIER article — c'est
+           celle qu'annonce le ticket remis au client, et `dueTime` juste
+           dessous vient déjà du même article. Auparavant on prenait la valeur
+           courante du formulaire (le dernier article saisi) : sur un panier à
+           plusieurs dates, le planning recevait une date que le client n'avait
+           jamais vue. */
+        due:dueIso,
+        priority:window.prioritePourDate(dueIso),
+        stage:'preparation',
+        status:'Préparation des produits',
+        production:production||'À définir',
+        comment:[(typeof deliveryDelayLabel==='function'?'Délai souhaité : '+deliveryDelayLabel():''),v('internalNote')].filter(Boolean).join(' | '),
+        amount:(typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0,
+        dueTime:((typeof products!=="undefined"?products:[])[0]||{}).deliveryTime||v('deliveryTime')||'14:00',
+        clientId:selectedClient?selectedClient.id:'',
+        client_info:window.clientInfoLines(selectedClient),
+        details:window.saleRecapLines(),
+        recap:['ATELIER OLDA — RÉCAPITULATIF DE VENTE DIRECTE',''].concat(window.saleRecapLines().map(function(l){return l[0]+' : '+l[1];})).join('\n'),
+        checks:{products:true,bat:false,files:true,qty:true,payment:mode!=='Paiement au retrait'},
+        // --- Ce que le PLANNING a besoin de lire en clair, pas dans du texte ---
+        // La fiche client complète : le planning en tire le type (pro / perso),
+        // la personne à contacter, le WhatsApp et l'e-mail — sans les relire
+        // dans les lignes du récapitulatif.
+        clientObj:selectedClient||{
+          type:v('clientType')||'Particulier',
+          name:v('clientName'),
+          phone:v('clientPhone'),
+          email:v('clientEmail')
+        },
+        quantity:(typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+(Number(p.qty)||0);},0),
+        // Le panier article par article : le planning en fait une ligne chacun.
+        articles:window.articlesPourPlanning(),
+        paiement:{
+          modeLabel:mode,
+          mode:MODES_PLANNING[mode]||null,
+          paye:!!mode&&mode!=='Paiement au retrait',
+          retraitImmediat:false
+        }
+      };
+      parent.postMessage({type:'OLDA_CREATE_PROJECT',payload:payload},location.origin);
+    };
+  }
+  // Exposé pour que le bouton soit gréé DÈS sa création (cf. addPlanningButton).
+  window.patchPlanningButton=patchPlanningButton;
+
+  (function(){
+    function attachAll(){
+      var list=document.querySelectorAll('input[type=email], input[id*="mail" i]');
+      Array.prototype.forEach.call(list,function(input){
+        if(input.id&&!input.__mailBound)window.attachEmailCheck(input.id);
+      });
+    }
+    attachAll();
+    setInterval(attachAll,800);
+    document.addEventListener('submit',function(e){e.preventDefault();},true);
+  })();
+  window.attachEmailCheck('newIndividualEmail');
+  window.attachEmailCheck('newCompanyEmail');
+  setInterval(patchPlanningButton,400);
+  patchPlanningButton();
+
+  [['chooseIndividualBtn','Particulier'],['chooseProfessionalBtn','Professionnel'],['chooseAssociationBtn','Association'],['chooseResellerBtn','Revendeur']].forEach(function(pair){
+    var b=el(pair[0]);
+    if(b)b.addEventListener('click',function(){setCreateClientType(pair[1]);});
+  });
+})();
+</script>
+<style>
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.55}
+.live-check.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
+.live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
+.live-check ul{margin:7px 0 0;padding-left:18px}
+.live-check li{margin:3px 0;font-weight:var(--graisse-note)}
+button.blocked{opacity:.45;cursor:not-allowed}
+.dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-weight:var(--graisse-forte)}
+/* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
+   remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
+   prennent la boîte serrée de la charte. */
+.delay-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+/* Le délai tient sur DEUX lignes stables : les raccourcis et le réglage du
+   barème sur la première, l'avis de supplément sur la seconde. Tout mettre sur
+   une seule ligne la ferait déborder (385 + 420 + 150 px pour 910 disponibles),
+   et une rangée qui se replie change de hauteur selon la longueur du texte. */
+.delai-rangee{display:flex;align-items:center;gap:var(--pas-3);flex-wrap:wrap;margin-top:var(--pas-2)}
+.delai-rangee .delay-quick{margin-top:0}
+/* « Modifier le barème » ferme la rangée, à droite. Par une marge AUTOMATIQUE :
+   un `justify-content:flex-end` qui déborde se fait rogner par la gauche. */
+.delai-rangee .bareme-open{margin-inline-start:auto}
+.delai-etat{margin-top:var(--pas-2)}
+.delay-chip{
+  flex:1 1 auto;padding:var(--champ-y-serre) var(--champ-x);
+  border:1.5px solid var(--border)!important;border-radius:999px!important;
+  background:var(--surface);color:var(--text-1);font-weight:var(--graisse-forte)
+}
+.delay-chip:hover{border-color:var(--border-strong)!important;background:var(--surface-hover)}
+.delay-chip:active{background:var(--primary-soft)}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.5}
+.delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
+.delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
+/* `.ok` n'existe plus : le créneau valide ne s'annonce pas (voir checkDeliveryDate). */
+.delay-warn:empty{display:none}
+.wa-link{color:var(--text-1);font-weight:var(--graisse-forte);text-decoration:none;border-bottom:1px solid var(--border-strong)}
+</style>
+<script>
+(function(){
+  function el(id){return document.getElementById(id);}
+  function v(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9@.]/g,'');};
+  function digits(s){return String(s||'').replace(/\D/g,'');}
+
+  /* 1 — WhatsApp : format, contrôle des 10 chiffres, lien cliquable */
+  window.waHref=function(phone){
+    var d=digits(phone);
+    if(d.length===10&&d.charAt(0)==='0')d='590'+d.slice(1);
+    return 'https://wa.me/'+d;
+  };
+  function attachPhoneCheck(id){
+    var input=el(id);
+    if(!input||input.__phoneBound)return;
+    input.__phoneBound=true;
+    var help=document.createElement('div');
+    help.className='help msg-flottant';
+    input.insertAdjacentElement('afterend',help);
+    var paint=function(){
+      var d=digits(input.value);
+      if(!d){input.style.borderColor='';help.textContent='';return;}
+      if(d.length===10){
+        input.style.borderColor='#1c7c4a';
+        help.style.color='#1c7c4a';
+        help.textContent='✓ Numéro valide';
+      }else{
+        input.style.borderColor='#c62828';
+        help.style.color='#c62828';
+        help.textContent='⚠ Le numéro doit contenir 10 chiffres ('+d.length+' saisi'+(d.length>1?'s':'')+').';
+      }
+    };
+    input.addEventListener('input',paint);
+    input.addEventListener('blur',paint);
+    input.__phonePaint=paint;
+  }
+  attachPhoneCheck('newIndividualPhone');
+  attachPhoneCheck('newCompanyPhone');
+
+  var baseSelect=window.selectClientById;
+  window.selectClientById=function(id){
+    baseSelect(id);
+    var meta=el('selectedClientMeta');
+    if(meta&&selectedClient&&selectedClient.phone){
+      /* Le texte de la fiche est reconstruit par le DOM, jamais réinjecté en
+         HTML : il contient des champs libres de la base clients (contact,
+         e-mail), et repasser par innerHTML les faisait interpréter comme du
+         balisage — une fiche piégée s'exécutait à chaque sélection. */
+      var texte=meta.textContent;
+      var coupe=texte.indexOf(selectedClient.phone);
+      if(coupe>=0){
+        var lien=document.createElement('a');
+        lien.className='wa-link';
+        lien.target='_blank';
+        lien.href=window.waHref(selectedClient.phone);
+        lien.textContent=selectedClient.phone+' ↗';
+        meta.textContent='';
+        meta.appendChild(document.createTextNode(texte.slice(0,coupe)));
+        meta.appendChild(lien);
+        meta.appendChild(document.createTextNode(texte.slice(coupe+selectedClient.phone.length)));
+      }
+    }
+  };
+
+  /* 2 — Détection de doublon client */
+  function findDuplicate(){
+    var name=createClientType==='Particulier'?v('newIndividualName'):v('newCompanyName');
+    var phone=digits(createClientType==='Particulier'?v('newIndividualPhone'):v('newCompanyPhone'));
+    var mail=norm(createClientType==='Particulier'?v('newIndividualEmail'):v('newCompanyEmail'));
+    var n=norm(name);
+    return clients.filter(function(c){
+      if(window.__editingClientId&&c.id===window.__editingClientId)return false;
+      return (n&&(norm(c.name)===n||norm(c.company)===n))||
+             (phone&&digits(c.phone)===phone)||
+             (mail&&c.email&&norm(c.email)===mail);
+    })[0]||null;
+  }
+  var baseCreate=window.createAndSelectClient;
+  window.createAndSelectClient=function(){
+    if(!window.__editingClientId&&!window.__dupConfirmed){
+      var d=findDuplicate();
+      if(d){
+        var box=el('clientDuplicateWarn')||document.createElement('div');
+        box.id='clientDuplicateWarn';
+        box.className='dup-warn';
+        var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
+        /* Construit par le DOM : le libellé vient de champs libres de la base
+           clients, et concaténé dans du HTML une fiche piégée s'exécutait ici. */
+        box.textContent='⚠ Ce client semble déjà enregistré : ';
+        var fort=document.createElement('b');
+        fort.textContent=label;
+        box.appendChild(fort);
+        var actions=document.createElement('div');
+        actions.className='actions';
+        actions.style.justifyContent='flex-start';
+        actions.style.marginTop='9px';
+        var bUtiliser=document.createElement('button');
+        bUtiliser.type='button';
+        bUtiliser.className='primary';
+        bUtiliser.textContent='Utiliser cette fiche';
+        bUtiliser.addEventListener('click',function(){window.useExistingDuplicate(d.id);});
+        var bForcer=document.createElement('button');
+        bForcer.type='button';
+        bForcer.className='secondary';
+        bForcer.textContent='Créer quand même';
+        bForcer.addEventListener('click',function(){window.forceCreateClient();});
+        actions.appendChild(bUtiliser);
+        actions.appendChild(bForcer);
+        box.appendChild(actions);
+        el('createClientBox').appendChild(box);
+        return;
+      }
+    }
+    window.__dupConfirmed=false;
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    return baseCreate();
+  };
+  window.useExistingDuplicate=function(id){
+    var old=el('clientDuplicateWarn');
+    if(old)old.remove();
+    el('createClientBox').classList.add('hidden');
+    selectClientById(id);
+  };
+  window.forceCreateClient=function(){
+    window.__dupConfirmed=true;
+    window.createAndSelectClient();
+  };
+
+  /* 6 — Contrôle du délai (atelier ouvert du lundi au vendredi, 9h–18h) */
+  function isWorkingDay(d){var x=d.getDay();return x>=1&&x<=5;}
+  function nextWorkingDay(d){var x=new Date(d);do{x.setDate(x.getDate()+1);}while(!isWorkingDay(x));return x;}
+  function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function frOf(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'});}
+
+  window.checkDeliveryDate=function(){
+    var input=el('deliveryDate');
+    if(!input)return;
+    var box=el('deliveryDateWarning');
+    if(!box){
+      box=document.createElement('div');
+      box.id='deliveryDateWarning';
+      box.className='delay-warn';
+      input.parentNode.appendChild(box);
+    }
+    var iso=v('deliveryDate');
+    if(!iso){box.style.display='none';return;}
+    // Reparaît seulement si l'une des branches ci-dessous a quelque chose à
+    // dire : un créneau valide se tait (voir plus bas).
+    box.style.display='block';
+    var d=new Date(iso+'T12:00:00');
+    if(!isWorkingDay(d)){
+      var alt=nextWorkingDay(d);
+      box.className='delay-warn bad';
+      box.innerHTML='⚠ L’atelier est fermé le week-end. Première récupération possible : <b>'+frOf(alt)+'</b>'+
+        ' <button type="button" class="secondary" style="margin-left:8px" onclick="applyDeliveryDate(\''+isoOf(alt)+'\')">Utiliser cette date</button>';
+      return;
+    }
+    var time=v('deliveryTime')||'14:00';
+    if(time<='09:00'){
+      var prev=new Date(d);
+      do{prev.setDate(prev.getDate()-1);}while(!isWorkingDay(prev));
+      box.className='delay-warn warn';
+      box.innerHTML='⏱ Récupération à 9h00 : la commande doit être <b>terminée le '+frOf(prev)+' avant 18h00</b>.';
+      return;
+    }
+    // LE VERT SE TAIT (26/08). « ✓ Créneau compatible » disait que RIEN ne
+    // cloche — c'est-à-dire le cas normal, celui qu'on n'a pas besoin
+    // d'annoncer. Il occupait une bulle verte pleine largeur sous chaque date
+    // valide, et surtout il posait dans l'écran la couleur « succès » de la
+    // charte pour du décor : à force, un vrai succès ne se distingue plus.
+    // Ce qui reste, c'est ce qu'on ne peut PAS deviner : l'atelier fermé, et
+    // la veille à tenir pour une récupération à 9 h. Vider le texte AUSSI —
+    // une bulle sans classe garderait sa hauteur et son rembourrage.
+    box.className='delay-warn';
+    box.textContent='';
+    box.style.display='none';
+  };
+  window.applyDeliveryDate=function(iso){
+    el('deliveryDate').value=iso;
+    if(typeof updateDeadlineInfo==='function')updateDeadlineInfo();
+    window.checkDeliveryDate();
+  };
+
+  /* 3 — Contrôle en direct des informations obligatoires */
+  function missingForStep(step){
+    var m=[];
+    if(step===1){
+      if(!products.length){
+        m.push('Au moins un article enregistré');
+        if(!v('productName'))m.push('Article');
+        if(!v('quantity'))m.push('Quantité');
+        if((Number(v('articlePrice'))||0)+(Number(v('customPrice'))||0)<=0)m.push('Prix');
+        if(!v('productDescription'))m.push('Description de production');
+        if(!v('deliveryDate'))m.push('Date souhaitée');
+      }
+    }
+    if(step===2&&!selectedClient)m.push('Client associé à la vente');
+    if(step===3){
+      var mode=(document.querySelector('input[name="payment"]:checked')||{}).value;
+      if(!mode)m.push('Mode de paiement');
+      if(mode==='Espèces'&&Number(v('cashGiven'))<Number((typeof lastTotals!=="undefined"?lastTotals.ttc:0)||0))m.push('Montant donné par le client');
+      if(mode==='Mixte'&&(Number(v('mixCard'))+Number(v('mixCash')))<=0)m.push('Répartition carte / espèces');
+    }
+    return m;
+  }
+
+  function refreshLive(){
+    var btn=el('saleNext');
+    if(!btn)return;
+    // L'écran de fin n'a plus rien à contrôler : le bandeau de l'étape 3 y
+    // restait affiché, à répéter « tout est renseigné » sous une commande déjà
+    // encaissée et déjà partie au planning. Il garde son rôle aux étapes 1 à 3,
+    // où il dit ce qui manque et bloque le bouton « suivant ».
+    var fini=el('paymentSuccess')&&!el('paymentSuccess').classList.contains('hidden');
+    var step=(typeof currentSaleStep!=='undefined')?currentSaleStep:1;
+    if(fini||step>=4){
+      var old=el('liveCheckSale');
+      if(old)old.remove();
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+      return;
+    }
+    var missing=missingForStep(step);
+    var box=el('liveCheckSale');
+    if(!box){
+      box=document.createElement('div');
+      box.id='liveCheckSale';
+      box.className='live-check';
+      box.style.margin='0 0 10px';
+      btn.parentNode.parentNode.insertBefore(box,btn.parentNode);
+    }
+    if(missing.length){
+      box.className='live-check todo';
+      box.innerHTML='⚠ À compléter avant de continuer :<ul>'+missing.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+      btn.classList.add('blocked');
+      btn.disabled=true;
+    }else{
+      box.className='live-check ok';
+      box.textContent='✓ Toutes les informations obligatoires de cette étape sont renseignées.';
+      btn.classList.remove('blocked');
+      btn.disabled=false;
+    }
+  }
+
+  document.addEventListener('input',function(){refreshLive();},true);
+  document.addEventListener('change',function(){refreshLive();window.checkDeliveryDate();},true);
+  setInterval(function(){refreshLive();},600);
+})();
+</script>
+<!-- ====================================================================== -->
+<!-- BARÈME EXPRESS — le seul endroit de cet écran qui parle au serveur pour
+     autre chose qu'un client ou un ticket.
+
+     Le supplément d'urgence est une décision commerciale, pas une constante :
+     il bouge avec la charge de l'atelier. Il vit donc en base (app_meta), se
+     règle ici même sous la ligne qui l'annonce, et vaut aussitôt pour tous les
+     postes. `getDeadlineRate()` (plus haut) ne lit plus que ce barème.
+
+     Bloc isolé À DESSEIN : quand une nouvelle version de cet écran arrive du
+     patron, c'est cette section + les trois retouches balisées « barème » qu'il
+     faut reporter, rien d'autre. -->
+<script>
+(function(){
+  const CHAMPS = { j5:"bareme-j5", j10:"bareme-j10", j15:"bareme-j15" };
+  const el = (id) => document.getElementById(id);
+  const box = () => el("baremeBox");
+
+  function message(texte, ok){
+    const m = el("baremeMsg");
+    if(!m) return;
+    m.textContent = texte || "";
+    m.className = "bareme-msg" + (texte ? (ok ? " ok" : " ko") : "");
+  }
+
+  // Recopie le barème courant dans les champs. Appelé à chaque ouverture : on ne
+  // veut jamais éditer par-dessus une valeur qu'un autre poste a changée entre-temps.
+  function remplir(){
+    for(const [cle, id] of Object.entries(CHAMPS)){
+      const champ = el(id);
+      if(champ) champ.value = window.OLDA_SUPPLEMENTS[cle];
+    }
+    message("");
+  }
+
+  // Tout ce que le barème touche à l'écran : la ligne de délai, les badges des
+  // articles déjà saisis et le total. Un article ajouté AVANT la modification
+  // garde son taux (c'est le prix annoncé au client) — seul le prochain suit le
+  // nouveau barème.
+  function rafraichir(){
+    if(typeof updateDeadlineInfo === "function") updateDeadlineInfo();
+  }
+
+  async function charger(){
+    try{
+      const r = await fetch("/api/supplements-express");
+      if(!r.ok) return;                       // barème par défaut : l'écran reste utilisable
+      const data = await r.json();
+      if(data && typeof data === "object") window.OLDA_SUPPLEMENTS = data;
+      rafraichir();
+    }catch(_){ /* hors ligne : on garde les valeurs par défaut */ }
+  }
+
+  async function enregistrer(){
+    const envoi = {};
+    for(const [cle, id] of Object.entries(CHAMPS)){
+      const brut = String((el(id)||{}).value ?? "").trim().replace(",",".");
+      const n = Number(brut);
+      if(brut === "" || !Number.isFinite(n) || n < 0 || n > 100){
+        message("Chaque palier attend un pourcentage entre 0 et 100.", false);
+        return;
+      }
+      envoi[cle] = n;
+    }
+    message("Enregistrement…", true);
+    try{
+      const r = await fetch("/api/supplements-express", {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(envoi),
+      });
+      const data = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.error || ("erreur "+r.status));
+      window.OLDA_SUPPLEMENTS = data;
+      rafraichir();
+      message("Barème enregistré — il vaut pour tous les postes.", true);
+    }catch(err){
+      // Jamais d'échec muet : la vendeuse croirait le nouveau barème appliqué.
+      message("Enregistrement impossible : "+err.message+". Le barème n'a pas changé.", false);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    const ouvrir = el("baremeOpen");
+    if(!ouvrir || !box()) return;
+    ouvrir.addEventListener("click", function(){
+      const ferme = box().classList.contains("hidden");
+      if(ferme) remplir();
+      box().classList.toggle("hidden", !ferme);
+      ouvrir.textContent = ferme ? "Fermer le barème" : "Modifier le barème";
+    });
+    el("baremeCancel")?.addEventListener("click", function(){
+      box().classList.add("hidden");
+      ouvrir.textContent = "Modifier le barème";
+    });
+    el("baremeSave")?.addEventListener("click", enregistrer);
+    charger();
+  });
+})();
+</script>
+<!-- Le pont avec le CRM : base clients réelle et numéro de ticket du jour
+     réservé côté serveur. Chargé en DERNIER, une fois tout le reste en place. -->
+<script src="pont.js"></script>
+</body>
+</html>
