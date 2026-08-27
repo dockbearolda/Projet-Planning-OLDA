@@ -181,4 +181,38 @@ for (const [cle, sel] of [['ticket', 'col-ticket'], ['price', 'col-price'],
     `COL_DEFAULTS.${cle} doit valoir ${px}, comme .${sel}`);
 }
 
+// ---------------------------------------------------------------------------
+// 6. LE PRIX ET SON HT SONT DEUX LIGNES D'UN MÊME FAIT
+// ---------------------------------------------------------------------------
+// Le champ prenait la hauteur d'une rangée entière — 88 px pour un nombre de
+// 17 — et ouvrait trente-trois pixels de vide entre le montant et son HT.
+// C'était aussi, à elle seule, la cellule qui décidait de la hauteur de TOUTES
+// les lignes du planning : 110 px demandés quand la plus haute des autres en
+// demandait 88. Mesuré au rendu : la ligne est passée de 111 à 89 px, et elle
+// fait désormais la même hauteur avec ou sans prix.
+const prix = CSS.match(/\.col-price-cell \.cell-price \{[\s\S]*?\n\}/);
+assert.ok(prix, 'la cellule du prix doit reprendre la main sur la hauteur du champ');
+assert.match(prix[0], /height: auto;/,
+  'le champ ne prend plus la hauteur d’une rangée');
+// `line-height: normal` laisse le CONTENU décider de la hauteur — c'est ce qui
+// donne trois hauteurs de champ dans une même application.
+assert.match(prix[0], /line-height: 1\.3;/);
+
+// LE MÊME BORD DROIT. 24 px de rembourrage pour le champ, 8 pour le HT : deux
+// nombres alignés à droite et décalés de 16 px l'un sous l'autre.
+const ht = CSS.match(/\.cell-price-ht \{[\s\S]*?\n\}/)[0];
+const bord = (bloc) => (bloc.match(/padding(?:-inline-end)?: ([^;]+);/) || [])[1];
+assert.ok(/24px/.test(bord(prix[0])) && /24px/.test(bord(ht)),
+  'le montant et son HT se calent sur le même bord droit');
+// 14 : une mention de contrôle ne pèse pas autant que le montant qu'elle contrôle.
+assert.match(ht, /font-size: var\(--taille-note\)/);
+// L'écart entre les deux lignes est un PAS du système, pas un nombre choisi.
+assert.match(ht, /margin-top: var\(--pas-1\)/);
+
+// Et l'écart de la cellule « Qui suit » aussi : 12 px n'est pas un des quatre
+// pas, et il coûtait exactement les deux pixels qui coupaient « Réf. Charlie »
+// (110 px de puce demandés, 108 laissés).
+assert.match(CSS, /\.resp-stack \{[^}]*padding: var\(--pas-1\) var\(--pas-2\);/,
+  'la colonne dont le métier est de nommer quelqu’un ne coupe pas le nom');
+
 console.log('✓ ligne par défaut : qui suit la ligne, ce qu’elle porte, et les trois rangs alignés');

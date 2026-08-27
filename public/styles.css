@@ -1825,7 +1825,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .resp-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
 
 /* Pile Pilote (haut) + Référent (bas, plus discret) dans une seule cellule. */
-.resp-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 12px; }
+/* 12 px n'est pas un des quatre écarts du système, et il coûtait exactement ce
+   qui manquait : « Réf. Charlie » demande 110 px de puce, la colonne n'en
+   laissait que 108 et le nom se coupait — sur la colonne dont le seul métier
+   est de nommer quelqu'un. À 10, elle en laisse 112. */
+.resp-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--pas-1) var(--pas-2); }
 .resp-stack .resp-chip { margin: 0; max-width: 100%; }
 .ref-chip {
   max-width: 100%;
@@ -2167,13 +2171,34 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 
 /* Le HT sous le prix : une mention de contrôle, pas une deuxième valeur à lire.
-   Vide tant que la ligne n'a pas de prix, donc la cellule ne bouge pas. */
+   Vide tant que la ligne n'a pas de prix, donc la cellule ne bouge pas.
+
+   LE MONTANT ET SON HT SONT DEUX LIGNES D'UN MÊME FAIT, pas deux cellules
+   empilées. Le champ prenait la hauteur d'une rangée entière (88 px pour un
+   nombre de 17) : trente-trois pixels de vide s'ouvraient entre le montant et
+   son HT — et c'est cette cellule, la seule, qui décidait de la hauteur de
+   TOUTES les lignes du planning. Elle demandait 110 px quand la plus haute des
+   autres en demandait 88.
+
+   Et les deux ne se calaient pas sur le même bord : 24 px de rembourrage à
+   droite pour le champ, 8 pour le HT. Deux nombres alignés à droite, décalés
+   de 16 px l'un sous l'autre. */
 .col-price-cell { text-align: right; }
+.col-price-cell .cell-price {
+  height: auto;
+  padding: var(--pas-2) 24px 0;
+  /* `line-height: normal` laisse le contenu décider de la hauteur : c'est ce
+     qui donne trois hauteurs de champ dans une même application. */
+  line-height: 1.3;
+}
 .cell-price-ht {
   display: block;
-  padding-inline-end: 8px;
+  padding: 0 24px var(--pas-2);
+  margin-top: var(--pas-1);
   color: var(--text-2);
-  font-size: var(--taille-texte);
+  /* 14 : le commentaire ci-dessus dit « mention de contrôle » — à 17 elle
+     pesait exactement autant que le montant qu'elle contrôle. */
+  font-size: var(--taille-note);
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
   white-space: nowrap;
