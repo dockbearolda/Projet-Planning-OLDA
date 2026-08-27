@@ -923,7 +923,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .fiverr-tool-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .fiverr-tool-input::placeholder { color: var(--text-3); }
 .fiverr-tool-unit { font-size: var(--taille-texte); color: var(--text-2); font-weight: var(--graisse-texte); }
-.fiverr-tool-arrow { font-size: var(--ic-grand); color: var(--text-3); flex-shrink: 0; margin-bottom: 6px; }
+.fiverr-tool-arrow { font-size: var(--ic-grand); color: var(--text-2); flex-shrink: 0; margin-bottom: 6px; }
 .fiverr-tool-detail { display: flex; flex-direction: column; gap: 6px; }
 .fiverr-tool-detail-label {
   font-size: var(--taille-texte);
@@ -1902,8 +1902,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .ref-chip:hover { color: var(--primary); background: var(--primary-soft); }
 .ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.ref-chip.empty { color: var(--text-3); font-weight: var(--graisse-texte); opacity: .75; }
-.ref-chip.empty:hover { opacity: 1; color: var(--primary); }
+/* « + référent » DIT CE QU'IL FAUT FAIRE : c'est un libellé d'action, pas un
+   repère. À `--text-3` sous une opacité de .75 il tombait à 1,85:1 sur le
+   blanc — la colonne en portait soixante-deux. L'encre secondaire suffit à le
+   mettre en retrait du nom déjà posé, et elle se lit. */
+.ref-chip.empty { color: var(--text-2); font-weight: var(--graisse-texte); }
+.ref-chip.empty:hover { color: var(--primary); }
 
 /* Nom « de base » hérité de la catégorie (pilote / référent non posés à la main).
    Le NOM reste plein format — la colonne est étroite et c'est lui qui compte ;
@@ -1954,12 +1958,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .flag-chip.empty {
   border: 1px dashed var(--border);
   background: transparent;
-  color: var(--text-3);
+  color: var(--text-2);
   font-weight: var(--graisse-texte);
   letter-spacing: 0;
-  opacity: .75;
 }
-.flag-chip.empty:hover { opacity: 1; border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
+.flag-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
 /* Motif : 2 lignes max, le texte complet est dans l'infobulle. */
 .flag-reason {
   max-width: 100%;
@@ -1981,7 +1984,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .flag-reason:hover { color: var(--primary); }
 .flag-reason:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); border-radius: var(--arrondi-champ); }
-.flag-reason.empty { color: var(--text-3); opacity: .7; }
+.flag-reason.empty { color: var(--text-2); }
 /* RIEN À SIGNALER : le motif n'existe pas, il ne doit pas occuper de place.
    `display: -webkit-box` ci-dessus ÉCRASE l'attribut `hidden` que pose
    flagControl : sur chaque ligne sans alerte restait un bouton vide, sans nom
@@ -2160,7 +2163,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .colbar-item:hover { background: var(--state-hover); }
 .colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-3); }
+.colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Sur l'écran : liseré plein + coche. Retirée : pointillé et texte atténué —
@@ -3183,7 +3186,7 @@ input[type="date"].cell-input { color: var(--text-1); }
   transition: background var(--dur-1) var(--ease);
 }
 .maj__btn:hover { background: var(--primary-hover); }
-.maj__btn:disabled { opacity: .6; cursor: default; }
+.maj__btn:disabled { background: var(--inactif); color: var(--inactif-encre); cursor: default; }
 
 /* Téléphone : la bulle prend la largeur plutôt que de se tasser en trois
    colonnes illisibles, et le bouton passe dessous, pleine largeur. */
@@ -5324,10 +5327,18 @@ body.view-plein .fiverr-tool { display: none !important; }
   font-size: var(--taille-texte);
   font-weight: var(--graisse-forte);
   cursor: pointer;
-  transition: background var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .reg-btn:hover:not(:disabled) { background: var(--state-hover); }
-.reg-btn:disabled { opacity: .45; cursor: default; }
+/* Cette règle porte (0,2,0) : elle passe DEVANT `.reg-btn--primary` (0,1,0),
+   et c'est voulu — un « Enregistrer » qu'on ne peut pas encore actionner
+   s'éteint comme les autres au lieu de garder son fond d'accent. */
+.reg-btn:disabled {
+  border-color: transparent;
+  background: var(--inactif);
+  color: var(--inactif-encre);
+  cursor: default;
+}
 .reg-btn--primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
 .reg-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
 
@@ -5566,7 +5577,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
   font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte); cursor: pointer;
 }
 .ld-save:hover:not(:disabled) { background: #000; }
-.ld-save:disabled { opacity: .55; cursor: default; }
+.ld-save:disabled { border-color: transparent; background: var(--inactif); color: var(--inactif-encre); cursor: default; }
 .ld-note { margin-top: 10px; min-height: 80px; }
 @media (max-width: 620px) {
   .ld-foot__row .ld-ctl, .ld-save { flex: 1 1 100%; }

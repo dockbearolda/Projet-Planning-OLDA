@@ -62,6 +62,19 @@
   --state-hover: rgba(17, 24, 39, .05);
   --state-press: rgba(17, 24, 39, .09);
 
+  /* UNE COMMANDE QU'ON NE PEUT PAS ENCORE ACTIONNER DIT QUAND MÊME CE QU'ELLE
+     FERA. L'application l'éteignait à l'`opacity` — six règles, de .45 à .75 —
+     et c'est une impasse arithmétique : l'opacité rapproche l'encre DU FOND,
+     donc elle éteint le libellé exactement au moment où l'on cherche ce qu'il
+     faut faire (« Enregistrer » à 2,67:1, « + référent » à 1,85:1, mesuré au
+     rendu le 27/08). Le comptoir avait déjà tranché le 25/08 pour son propre
+     bouton : le fond s'éclaircit, l'encre passe au secondaire, le contraste
+     tient (4,61:1) et la différence avec une commande armée reste évidente —
+     celle-là porte l'encre pleine. On remonte donc sa solution dans la charte,
+     pour que les deux moitiés de l'application éteignent de la même façon. */
+  --inactif: #e5e7eb;                /* le fond d'une commande éteinte */
+  --inactif-encre: #5f6774;          /* son libellé — 4,61:1 sur ce fond */
+
   /* accent — encre quasi noire, seule couleur d'action de l'app */
   --primary: #111827;
   --primary-hover: #000;
@@ -795,10 +808,12 @@ html[data-theme="light"] .ecran-comptoir {
      jusqu'au gris des pastilles, et le libellé passe à l'encre secondaire :
      4,61:1, et la différence avec un bouton armé reste évidente — celui-ci
      porte l'encre pleine. */
-  --dd-inactif: #e5e7eb;             /* une action qu'on ne peut pas encore faire */
-  /* Un cran sous l'encre secondaire du comptoir (#6b7280) : sur ce fond pâle
-     elle ne donnerait que 3,90:1. Celle-ci donne 4,61. */
-  --dd-inactif-encre: #5f6774;
+  /* Ces deux-là sont désormais CEUX DE LA CHARTE (--inactif) : c'est de cet
+     écran qu'ils viennent, et c'est le CRM qui les a rejoints. On garde les
+     noms `--dd-*` — la feuille du comptoir les nomme partout — mais plus la
+     valeur, sinon les deux moitiés dérivent au premier réglage. */
+  --dd-inactif: var(--inactif);      /* une action qu'on ne peut pas encore faire */
+  --dd-inactif-encre: var(--inactif-encre);
   --dd-actif-fond: #fbfaf7;          /* le fond chaud d'une tuile choisie */
   --dd-survol-doux: #f4f6f9;         /* le survol d'un bouton bordé */
   --dd-contour: #dfe3ea;             /* le contour d'un bouton bordé, d'une pastille */
@@ -814,8 +829,8 @@ html[data-theme="light"] .ecran-comptoir {
    redit sur les gris du thème sombre plutôt que de les laisser vides. */
 html[data-theme="dark"] .ecran-comptoir {
   --dd-placeholder: var(--text-3);
-  --dd-inactif: var(--border-strong);
-  --dd-inactif-encre: var(--text-1);
+  --dd-inactif: var(--inactif);
+  --dd-inactif-encre: var(--inactif-encre);
   --dd-actif-fond: var(--surface-hover);
   --dd-survol-doux: var(--surface-hover);
   --dd-contour: var(--border-strong);
@@ -863,6 +878,12 @@ html[data-theme="dark"] .ecran-comptoir {
 
   --state-hover: rgba(243, 244, 246, .06);
   --state-press: rgba(243, 244, 246, .1);
+
+  /* De nuit, la commande éteinte s'ÉCLAIRCIT elle aussi — vers le gris des
+     traits appuyés, pas vers le fond : c'est ce qui la laisse visible.
+     #f3f4f6 sur #4b5563 donne 6,8:1. */
+  --inactif: #4b5563;
+  --inactif-encre: #f3f4f6;
 
   /* infobulle : la surface inversée s'inverse aussi en sombre */
   --tip-bg: #f3f4f6;
@@ -964,7 +985,7 @@ html[data-theme="dark"] .ecran-comptoir {
   cursor: pointer;
 }
 .connexion__ok:hover:not(:disabled) { background: var(--primary-hover); }
-.connexion__ok:disabled { opacity: .45; cursor: default; }
+.connexion__ok:disabled { background: var(--inactif); color: var(--inactif-encre); cursor: default; }
 /* Le fond ne défile plus derrière le voile : sans ça, la molette promène un
    planning qu'on ne peut pas utiliser. */
 body.a-connecter { overflow: hidden; }

@@ -126,6 +126,18 @@ const REGLES = [
     ok: (v) => ['0s', '0ms'].includes(v),
   },
   {
+    // UNE COMMANDE ÉTEINTE À L'OPACITÉ DEVIENT ILLISIBLE, et c'est arithmétique :
+    // l'opacité rapproche l'encre DU FOND. Le 27/08, six règles éteignaient de
+    // cette façon — « Enregistrer » à 2,67:1, « + référent » à 1,85:1, et les
+    // deux actions « Appeler / Écrire » d'une fiche client à 2,2:1. Chacune
+    // s'éteignait au moment précis où l'on cherche ce qu'il faut faire.
+    // La sortie est --inactif / --inactif-encre : le fond s'éclaircit, l'encre
+    // passe au secondaire, et l'écart avec une commande armée reste évident.
+    nom: 'commande éteinte à l’opacité',
+    re: /^[^{}]*(?::disabled|\[disabled\]|\[aria-disabled|\.is-off|\.blocked)[^{}]*\{[^}]*opacity\s*:/gm,
+    pourquoi: 'l’opacité rapproche l’encre du fond : le libellé s’éteint — passer par --inactif / --inactif-encre',
+  },
+  {
     nom: 'cible tactile / seconde échelle',
     re: /@media[^{]*pointer\s*:\s*coarse/g,
     pourquoi: 'une seule échelle — un bloc tactile en entretient une deuxième en silence',

@@ -375,7 +375,17 @@
 }
 .cl-act:hover { background: var(--surface-hover); border-color: var(--primary); }
 .cl-act .material-symbols-outlined { font-size: var(--ic); color: var(--primary); }
-.cl-act.is-off { opacity: .4; pointer-events: none; }
+/* « Appeler » / « Écrire » quand le client n'a ni numéro ni adresse. Éteintes
+   à l'opacité, elles tombaient à 2,2:1 — on ne lisait plus laquelle des deux
+   manquait. Même traitement que partout ailleurs : le fond s'éclaircit, le
+   libellé passe à l'encre secondaire. */
+.cl-act.is-off {
+  border-color: transparent;
+  background: var(--inactif);
+  color: var(--inactif-encre);
+  pointer-events: none;
+}
+.cl-act.is-off .material-symbols-outlined { color: var(--inactif-encre); }
 
 .cl-meta { margin: 16px 0 4px; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
 
@@ -469,7 +479,7 @@
 .cl-btn:hover { background: var(--surface-hover); }
 .cl-btn--primary { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
 .cl-btn--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
-.cl-btn--primary:disabled { opacity: .6; cursor: default; }
+.cl-btn--primary:disabled { border-color: transparent; background: var(--inactif); color: var(--inactif-encre); cursor: default; }
 /* Un champ obligatoire laissé vide n'empêche plus la création (voir
    wireCreateValidation, clients.js) : un 1er clic incomplet arme cet état
    « confirmer quand même » à la place de bloquer le bouton. */

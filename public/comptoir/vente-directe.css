@@ -677,7 +677,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 .live-check ul{margin:7px 0 0;padding-left:18px}
 .live-check li{margin:3px 0;font-weight:var(--graisse-note)}
-button.blocked{opacity:.45;cursor:not-allowed}
+button.blocked{background:var(--dd-inactif);color:var(--dd-inactif-encre);cursor:not-allowed}
 .dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-weight:var(--graisse-forte)}
 /* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
    remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
