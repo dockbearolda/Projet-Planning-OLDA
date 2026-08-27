@@ -425,7 +425,10 @@ assert.match(
   // LA CLÉ CHANGE QUAND LA LIGNE PAR DÉFAUT CHANGE. Un poste qui avait réglé
   // ses colonnes en v2 garderait son écran, et la nouvelle ligne n'apparaîtrait
   // nulle part — c'est exactement le rattrapage qu'on avait dû faire en v2.
-  assert.match(APP, /const COLS_KEY = 'olda_cols_v3';/,
+  // v4 (27/08 au soir) : l'ARTICLE entre dans la ligne par défaut — 99 % des
+  // 187 dossiers de la production le portent, et c'était la seule donnée bien
+  // remplie que la ligne ne disait pas.
+  assert.match(APP, /const COLS_KEY = 'olda_cols_v4';/,
     'nouvelle ligne par défaut = nouvelle clé, sinon personne ne la voit');
   // Le rattrapage v2 (« le prix repart allumé ») n'a plus lieu d'être : rien
   // n'a encore écrit sous la clé v3, et tout ce qui l'écrira sortira du code

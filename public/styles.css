@@ -2867,9 +2867,49 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   border: 0;
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-/* Repliée = 1 ligne tronquée (…) + infobulle sur le texte complet. Dépliée
-   (flèche) ou en cours d'édition = retour au texte multi-lignes normal. */
+/* Repliée = deux lignes coupées par la VUE ci-dessous. Dépliée (flèche) ou en
+   cours d'édition = retour au texte multi-lignes normal. */
 .product-desc.expanded { white-space: pre-wrap; text-overflow: clip; }
+
+/* LA VUE DE LECTURE DE LA NOTE, posée par-dessus le champ.
+   Un `textarea` IGNORE `text-overflow: ellipsis` : la propriété ne s'applique
+   qu'à un bloc, jamais au texte interne d'une commande de formulaire. La note
+   se coupait donc net, en plein mot, sans le moindre signe qu'il y avait une
+   suite — sur 66 % des notes de la production, dont la médiane fait 336
+   caractères. Ce bloc-ci, lui, sait poser de vrais points de suspension.
+   Même patron que le nom du dossier client (.client-company-view) : deux
+   écrans du même tableau ne peuvent pas résoudre le même problème de deux
+   façons. */
+.product-desc-view {
+  position: absolute;
+  inset: 0 0 auto 0;
+  padding: 2px 14px 4px;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+  line-height: 1.45;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* La rangée porte la vue : c'est elle le repère de position. */
+.product-desc-row { position: relative; }
+/* Le champ garde la place ET reste cliquable ; c'est son TEXTE qu'on efface,
+   pas lui — sinon on ne pourrait plus entrer dedans pour écrire. */
+.product-desc-row .product-desc { color: transparent; caret-color: var(--text-1); }
+.product-desc-row:focus-within .product-desc-view,
+.product-desc-view.expanded { display: none; }
+.product-desc-row:focus-within .product-desc,
+.product-desc.expanded { color: var(--text-2); }
+.product-desc-row:focus-within .product-desc { color: var(--text-1); }
+/* Vide : le champ montre son invite (« + Ajouter une note »), la vue n'a rien
+   à dire et s'efface. */
+.infos-stack.desc-empty .product-desc-view { display: none; }
+.infos-stack.desc-empty .product-desc { color: var(--text-2); }
 .product-desc::placeholder { color: var(--text-3); }
 .product-desc:focus {
   outline: none;
@@ -3056,6 +3096,52 @@ body.col-resizing .grid-wrap { pointer-events: none; }
 .grid tbody tr:hover .send-btn,
 .grid tbody tr:hover .del-btn,
 .grid tbody tr:hover .dup-btn { opacity: 1; pointer-events: auto; }
+
+/* ===========================================================================
+   LES ICÔNES D'UNE LIGNE — UNE SEULE TAILLE, ET LE VIDE ATTEND LE SURVOL
+   ===========================================================================
+   Charlie, 27/08 : « il y a beaucoup trop de petites icônes, il faudrait soit
+   les regrouper, soit faire en sorte qu'elles soient plus visibles ».
+
+   Comptées sur une ligne : ONZE, en QUATRE boîtes différentes — 22 px (la
+   flèche de la note), 24 (WhatsApp et les trois pièces jointes), 30 (les deux
+   papiers), 34 (les quatre actions de fin de ligne) — et des glyphes à 13,3 et
+   17 px, tous SOUS les 20 px que la charte appelle « l'icône courante ». Trop
+   nombreuses ET plus petites que partout ailleurs : les deux à la fois.
+
+   Une seule boîte, un seul glyphe. La charte n'en veut qu'une (loi 4), et la
+   forme ronde dit déjà le rôle : une icône seule (loi 5). */
+.grid tbody { --ligne-ic: 32px; }
+.grid tbody :is(.wa-btn, .pdf-btn, .ticket-cell, .desc-toggle,
+                .open-btn, .send-btn, .dup-btn, .del-btn) {
+  width: var(--ligne-ic);
+  height: var(--ligne-ic);
+}
+.grid tbody :is(.wa-btn, .pdf-btn, .ticket-cell, .desc-toggle,
+                .open-btn, .send-btn, .dup-btn, .del-btn) > svg {
+  width: var(--ic);
+  height: var(--ic);
+}
+
+/* CE QUI EST VIDE N'APPARAÎT QU'AU SURVOL. La règle existait déjà, trois lignes
+   plus haut, pour les actions de fin de ligne — elle n'avait simplement jamais
+   été étendue au reste.
+   Mesuré en PRODUCTION, 187 dossiers : 7 pièces jointes en tout (4 BAT,
+   3 devis), soit 3,7 %. Les trois emplacements étaient donc dessinés 561 fois
+   pour 7 fichiers. Le référent, lui, est posé sur 5 dossiers — 3 %.
+   Ce qui est REMPLI reste visible en permanence : c'est le signal.
+   L'opacité et non `display` : la place reste réservée, rien ne bouge quand la
+   souris passe (loi 8 — un message ne pousse personne). */
+.grid tbody tr :is(.pdf-btn--empty, .ref-chip.empty, .flag-chip.empty) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.grid tbody tr:hover :is(.pdf-btn--empty, .ref-chip.empty, .flag-chip.empty),
+.grid tbody tr:focus-within :is(.pdf-btn--empty, .ref-chip.empty, .flag-chip.empty) {
+  opacity: 1;
+  pointer-events: auto;
+}
 /* CES TROIS BOUTONS NE SE MONTRENT QU'AU SURVOL DE LEUR LIGNE. Le clavier doit
    donc les révéler AUSSI, sinon ils sont hors d'atteinte pour qui tabule — et
    depuis le retrait des règles tactiles (25/08), c'est la seule autre façon de

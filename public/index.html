@@ -303,13 +303,13 @@
               <col data-col="stars" />
               <col data-col="responsable" />
               <col data-col="client" />
-              <col data-col="ticket" />
               <col data-col="product" />
               <col data-col="price" />
               <col data-col="sub_stage" />
               <col data-col="description" />
               <col data-col="deadline" />
               <col data-col="flag" />
+              <col data-col="ticket" />
               <col data-col="del" />
             </colgroup>
             <thead>
@@ -318,13 +318,16 @@
                 <th class="col-stars sortable" data-sort="priority">Priorité</th>
                 <th class="col-resp sortable" data-sort="responsable">Qui suit</th>
                 <th class="col-client sortable" data-sort="billing_company">Nom du dossier client</th>
-                <th class="col-ticket sortable" data-sort="ticket">Documents</th>
-                <th class="col-product sortable" data-sort="product">Description</th>
+                <th class="col-product sortable" data-sort="product">Article</th>
                 <th class="col-price sortable num" data-sort="project_value">Prix TTC</th>
                 <th class="col-sub sortable" data-sort="sub_stage">Sous-étape</th>
                 <th class="col-infos sortable" data-sort="description">Infos</th>
                 <th class="col-deadline sortable" data-sort="deadline">Date souhaitée</th>
                 <th class="col-flag sortable" data-sort="flag">État</th>
+                <!-- LES PAPIERS SONT DES OUTILS, PAS DES FAITS. Ils étaient
+                     posés entre « à qui » et « quoi », au milieu de ce qui se
+                     lit ; ils rejoignent les autres actions, à droite. -->
+                <th class="col-ticket sortable" data-sort="ticket">Documents</th>
                 <th class="col-del" aria-label=""></th>
               </tr>
             </thead>

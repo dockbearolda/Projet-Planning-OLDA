@@ -13,6 +13,20 @@
 // que dans le tableau : le planning s'ouvre donc sur le TABLEAU, plus sur les
 // cartes.
 //
+// DEUX CHANGEMENTS LE 27/08 AU SOIR, sur les chiffres de la PRODUCTION (187
+// dossiers, pas les 184 d'alors) :
+//
+//   1. L'ARTICLE ENTRE. `product` est rempli sur 186 dossiers sur 187 — 99 %,
+//      la donnée la mieux remplie de toute la base — et c'était la seule qui
+//      manquait à la ligne. Un planning d'atelier ne disait pas ce qu'il y
+//      avait à produire. Elle se lit juste après le client : qui, pour quoi.
+//      Elle s'appelle « Article » et non « Description » : le ticket de
+//      l'atelier l'appelle déjà comme ça, et « Description » la nommait comme
+//      sa voisine « Infos », qui porte la note libre.
+//   2. LES PAPIERS DESCENDENT EN FIN DE LIGNE. Ce sont des OUTILS, pas des
+//      faits : posés entre « à qui » et « quoi », ils coupaient la lecture en
+//      deux. Toutes les autres actions de la ligne sont déjà à droite.
+//
 // UNE COLONNE A ÉTÉ RETIRÉE — TYPE : toujours rempli sur les 184 dossiers
 // réels, mais il ne change RIEN à ce qu'on fait de la ligne (le nom du dossier
 // le dit, et le bon de commande le porte). ON RETIRE UNE COLONNE, PAS UNE
@@ -43,7 +57,8 @@ const CSS = lire('styles.css');
 const defaut = APP.match(/const COLS_DEFAUT = new Set\(\[([^\]]*)\]\)/);
 assert.ok(defaut, 'la ligne par défaut doit être écrite en clair, pas déduite');
 const cles = defaut[1].match(/'([^']+)'/g).map((x) => x.slice(1, -1));
-assert.deepStrictEqual(cles, ['responsable', 'client', 'ticket', 'price', 'feu', 'description', 'deadline'],
+assert.deepStrictEqual(cles,
+  ['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline', 'ticket'],
   'les faits de la ligne, dans l’ordre où elle les lit');
 
 // Le reste se déduit de la liste : ajouter une colonne au rail ne doit pas
@@ -55,7 +70,7 @@ assert.match(APP, /return new Set\(COLS_MASQUEES_DEFAUT\);/,
 
 // NOUVELLE LIGNE = NOUVELLE CLÉ. Un poste réglé sous l'ancienne garderait son
 // écran, et la ligne arrêtée n'apparaîtrait nulle part.
-assert.match(APP, /const COLS_KEY = 'olda_cols_v3';/);
+assert.match(APP, /const COLS_KEY = 'olda_cols_v4';/);
 
 // LE TABLEAU, PAS LES CARTES. « Infos » et « Date souhaitée » n'existent que
 // là ; le planning ne peut donc plus s'ouvrir sur les cartes — et c'est voulu.
@@ -122,13 +137,14 @@ const LIGNE = [
   ['stars', 'col-stars', 'cellStars'],
   ['responsable', 'col-resp', 'cellResponsable'],
   ['client', 'col-client', 'cellDossier'],
-  ['ticket', 'col-ticket', 'cellTicket'],
   ['product', 'col-product', 'cellDescription'],
   ['price', 'col-price', 'cellPrice'],
   ['sub_stage', 'col-sub', 'cellSubStage'],
   ['description', 'col-infos', 'cellInfos'],
   ['deadline', 'col-deadline', 'cellDeadline'],
   ['flag', 'col-flag', 'cellFlag'],
+  // Les papiers sont des OUTILS : ils rejoignent les autres actions, à droite.
+  ['ticket', 'col-ticket', 'cellTicket'],
   ['del', 'col-del', 'col-del'],
 ];
 assert.deepStrictEqual(ordreCol, LIGNE.map((x) => x[0]), 'le <colgroup> dit la ligne');

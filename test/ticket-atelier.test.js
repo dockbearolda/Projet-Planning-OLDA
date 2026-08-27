@@ -478,16 +478,20 @@ const DEMANDE = {
 
   // Une VRAIE colonne du tableau : <col>, <th> et <td> au même rang. L'ordre
   // compte — un <col> agit sur la colonne de même rang, pas sur son data-col.
+  // Depuis le 27/08 au soir, la colonne est en FIN de ligne : les deux papiers
+  // sont des OUTILS, pas des faits, et toutes les autres actions de la ligne
+  // sont déjà à droite. Posés entre « à qui » et « quoi », ils coupaient la
+  // lecture en deux.
   const rangCol = (cle) => HTML.indexOf(`<col data-col="${cle}"`);
-  assert.ok(rangCol('ticket') > rangCol('client') && rangCol('ticket') < rangCol('product'),
-    'le <col> ticket doit se placer entre client et product');
+  assert.ok(rangCol('ticket') > rangCol('flag') && rangCol('ticket') < rangCol('del'),
+    'le <col> ticket doit se placer entre flag et del — avec les autres actions');
   const thead = HTML.match(/<thead>[\s\S]*?<\/thead>/)[0];
-  assert.ok(thead.indexOf('col-ticket') > thead.indexOf('col-client')
-    && thead.indexOf('col-ticket') < thead.indexOf('col-product'),
+  assert.ok(thead.indexOf('col-ticket') > thead.indexOf('col-flag')
+    && thead.indexOf('col-ticket') < thead.indexOf('col-del'),
   'le <th> ticket doit suivre le même ordre que le colgroup');
   const corps = APP.match(/function buildRow\(r\)[\s\S]*?\n\}/)[0];
-  assert.ok(corps.indexOf('cellTicket(r)') > corps.indexOf('cellDossier(r)')
-    && corps.indexOf('cellTicket(r)') < corps.indexOf('cellDescription(r)'),
+  assert.ok(corps.indexOf('cellTicket(r)') > corps.indexOf('cellFlag(r)')
+    && corps.indexOf('cellTicket(r)') < corps.indexOf("className = 'col-del'"),
   'buildRow doit poser la cellule ticket au même rang que son <col>');
 
   // Elle se retire depuis le rail « Colonnes », comme les autres.

@@ -1972,6 +1972,8 @@ function renderRows(data) {
   if (positions) animerReordonnancement(positions);
   if (reste) planifierSuiteRendu();
 
+  // Les notes savent maintenant si elles sont coupées : la mise en page existe.
+  relireLesNotes();
   applyEmptyCols();
   updateSortArrows();
 }
@@ -2107,9 +2109,8 @@ function buildRow(r) {
   // on retire une colonne, pas une capacité.
   // nom du dossier client (référent / contact déplacés dans le popover contact)
   tr.appendChild(cellDossier(r));
-  // ticket : le numéro du dossier, en clair, et son papier d'atelier réimprimable
-  tr.appendChild(cellTicket(r));
-  // description : ce qui est produit (ancien champ « produit »)
+  // article : ce qui est produit. La donnée la mieux remplie de la base
+  // (99 % des 187 dossiers de la production) — et elle n'était pas sur la ligne.
   tr.appendChild(cellDescription(r));
   // prix : montant HT — une ligne sans prix ne peut pas entrer en Facturation
   tr.appendChild(cellPrice(r));
@@ -2121,6 +2122,10 @@ function buildRow(r) {
   tr.appendChild(cellDeadline(r));
   // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
   tr.appendChild(cellFlag(r));
+  // les deux papiers du dossier. LES PAPIERS SONT DES OUTILS, PAS DES FAITS :
+  // posés entre « à qui » et « quoi », ils coupaient la lecture en deux. Ils
+  // rejoignent les autres actions, à droite.
+  tr.appendChild(cellTicket(r));
   // actions de fin de ligne : OUVRIR (toujours là) + envoyer vers (Fiverr) +
   // dupliquer + supprimer (révélées au survol)
   const tdDel = document.createElement('td');
@@ -3106,7 +3111,7 @@ function cellDescription(r) {
   name.className = 'cell-input product-name';
   name.type = 'text';
   name.value = r.product ?? '';
-  name.placeholder = 'description';
+  name.placeholder = 'article';
   // Le `<th>` de la colonne ne nomme PAS le champ qu'elle contient : au clavier
   // comme au lecteur d'écran, ces trois cellules du tableau (dossier, projet,
   // prix) s'annonçaient « zone de texte », sans dire laquelle — et le prix, dont
@@ -3179,8 +3184,40 @@ function cellPrice(r) {
   return td;
 }
 
+// SAVOIR SI UNE NOTE EST COUPÉE DEMANDE UNE MISE EN PAGE. Tant que la cellule
+// n'est pas posée dans le document, `scrollHeight` vaut zéro et le calcul
+// conclut toujours « rien à déplier » — la flèche n'apparaissait jamais.
+// Attendre une image ne suffit pas : les lignes se posent PAR TRANCHES, à
+// plusieurs tours d'horloge. On observe donc la boîte elle-même : la réponse
+// arrive quand elle arrive, et elle revient aussi quand on TIRE LA COLONNE,
+// ce qui est précisément le moment où une note cesse (ou se met) à déborder.
+// UN SEUL observateur pour tout le tableau : un par ligne, sur soixante lignes
+// reconstruites à chaque évènement du temps réel, ce serait soixante objets à
+// ramasser par rafraîchissement.
+const observateurNotes = typeof ResizeObserver === 'function'
+  ? new ResizeObserver((entrees) => {
+    for (const e of entrees) {
+      const relire = e.target.__relire;
+      if (relire) relire();
+    }
+  })
+  : null;
+
+// ET UNE RELECTURE À UN MOMENT GARANTI. L'observateur ci-dessus répond quand la
+// boîte change — parfait pour la poignée de colonne, insuffisant pour l'état de
+// DÉPART : sa première réponse arrive à un tour d'horloge que rien ne garantit,
+// et certains contextes ne la délivrent pas du tout. On relit donc une fois,
+// après que `renderRows` a posé toutes ses lignes : là, la mise en page existe.
+// Une seule mesure groupée pour tout le tableau — pas une par ligne.
+function relireLesNotes() {
+  if (!$rows) return;
+  for (const v of $rows.querySelectorAll('.product-desc-view')) {
+    if (v.__relire) v.__relire();
+  }
+}
+
 // Infos : notes libres multi-lignes (ancien champ « description »). Repliée à
-// 1 ligne par défaut ; dès qu'il y a ≥ 2 lignes, une flèche déroule les suivantes.
+// deux lignes par défaut ; dès qu'elle est coupée, une flèche déroule la suite.
 function cellInfos(r) {
   const td = document.createElement('td');
   td.className = 'col-infos-cell';
@@ -3204,10 +3241,23 @@ function cellInfos(r) {
   descRow.className = 'product-desc-row';
   const desc = document.createElement('textarea');
   desc.className = 'cell-input product-desc';
-  desc.rows = 1;
+  desc.rows = 2;
   desc.value = r.description ?? '';
   desc.placeholder = '+ Ajouter une note';
   desc.setAttribute('aria-label', 'Infos — note libre sur la commande');
+
+  // UNE NOTE SE LIT. Le champ seul ne pouvait pas la rendre lisible : un
+  // `textarea` IGNORE `text-overflow: ellipsis` — la propriété ne vaut que pour
+  // un bloc, pas pour le texte interne d'une commande de formulaire. La note
+  // était donc coupée net, en plein mot, sans le moindre signe qu'il y avait
+  // une suite. Mesuré en PRODUCTION : 122 notes, MÉDIANE 336 caractères, et
+  // 66 % d'entre elles plus longues que ce qu'une ligne de 244 px peut montrer.
+  // On lisait donc un huitième de note sur deux dossiers sur trois.
+  // La vue est un vrai bloc : deux lignes, et de vrais points de suspension.
+  // Elle s'efface dès qu'on entre dans le champ (comme le nom du dossier).
+  const view = document.createElement('div');
+  view.className = 'product-desc-view';
+  view.setAttribute('aria-hidden', 'true');
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -3218,17 +3268,25 @@ function cellInfos(r) {
 
   let open = false;
   let lastSent = r.description ?? '';
-  const isMulti = () => desc.value.indexOf('\n') !== -1;
+  // LA FLÈCHE APPARAÎT QUAND IL Y A QUELQUE CHOSE À DÉPLIER — c'est-à-dire
+  // quand la vue est COUPÉE. Elle ne se montrait qu'aux notes portant un retour
+  // à la ligne : une note d'un seul paragraphe de 300 signes n'en avait donc
+  // jamais, et rien ne permettait d'en lire la suite. Or c'est le cas normal —
+  // en production, la médiane est à 336 caractères d'un seul tenant.
+  const estCoupee = () => view.scrollHeight > view.clientHeight + 1;
 
   const sync = () => {
     stack.classList.toggle('desc-empty', desc.value.trim() === '');
-    const multi = isMulti();
-    toggle.hidden = !multi;
-    if (!multi) open = false;
-    toggle.classList.toggle('open', open);
-    // hauteur : repliée = 1 ligne tronquée (CSS) ; dépliée OU en édition = tout le contenu.
+    // La vue porte le texte tant qu'on n'écrit pas dedans.
+    view.textContent = desc.value;
     const expanded = open || document.activeElement === desc;
     desc.classList.toggle('expanded', expanded);
+    view.classList.toggle('expanded', expanded);
+    const coupee = estCoupee() || open;
+    toggle.hidden = !coupee;
+    if (!coupee) open = false;
+    toggle.classList.toggle('open', open);
+    // hauteur : repliée = deux lignes (CSS) ; dépliée OU en édition = tout.
     if (expanded) {
       desc.style.height = 'auto';
       desc.style.height = desc.scrollHeight + 'px';
@@ -3262,10 +3320,13 @@ function cellInfos(r) {
   });
 
   descRow.appendChild(desc);
+  descRow.appendChild(view);
   descRow.appendChild(toggle);
   stack.appendChild(descRow);
   td.appendChild(stack);
   sync();
+  // Voir `observateurNotes` : la coupure ne se sait qu'une fois la boîte posée.
+  if (observateurNotes) { view.__relire = sync; observateurNotes.observe(view); }
   return td;
 }
 
@@ -6894,7 +6955,7 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 // ligne arrêtée le 27/08 (cf. COLS_DEFAUT). Un poste qui avait réglé ses
 // colonnes en v2 aurait sinon gardé son écran, et la nouvelle ligne par défaut
 // ne serait apparue nulle part.
-const COLS_KEY = 'olda_cols_v3';
+const COLS_KEY = 'olda_cols_v4';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
 // posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
 // la masquer en plus du choix manuel. `surCarte` = colonne qui existe DANS LES
@@ -6907,10 +6968,10 @@ const PLANNING_COLS = [
   // pour le même contrôle.
   { key: 'responsable', label: 'Qui suit' },
   { key: 'client',      label: 'Nom du dossier client', locked: true },
-  // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
-  // n'en nommait plus que la moitié.
-  { key: 'ticket',      label: 'Documents', surCarte: true },
-  { key: 'product',     label: 'Description' },
+  // « ARTICLE » ET NON « DESCRIPTION » : la colonne porte `product`, c'est-à-dire
+  // ce qu'il y a à produire — et le ticket de l'atelier l'appelle déjà ARTICLE.
+  // « Description » la nommait comme sa voisine « Infos », qui porte la note.
+  { key: 'product',     label: 'Article' },
   // LE PRIX EXISTE DANS LES DEUX VUES (colonne du tableau, bloc TTC de la
   // carte) : le décocher doit le retirer des deux, pas rappeler le tableau
   // complet — c'est exactement ce que dit `surCarte`. À l'atelier il n'apprend
@@ -6931,6 +6992,10 @@ const PLANNING_COLS = [
   { key: 'description', label: 'Infos' },
   { key: 'deadline',    label: 'Date souhaitée' },
   { key: 'flag',        label: 'État' },
+  // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
+  // n'en nommait plus que la moitié. Elle est en FIN de ligne depuis le soir
+  // même : ce sont des outils, ils vont avec les autres.
+  { key: 'ticket',      label: 'Documents', surCarte: true },
 ];
 
 // Colonnes qu'on peut éteindre (toutes sauf l'identité de la ligne).
@@ -6962,7 +7027,24 @@ const COLS_TABLEAU = new Set(
 // La colonne « Infos » porte aussi les blocs SANS colonne à eux — ce qui manque
 // et les quatre faits de production (cf. `horsTableau`) : les allumer se voit
 // dans cette cellule-là.
-const COLS_DEFAUT = new Set(['responsable', 'client', 'ticket', 'price', 'feu', 'description', 'deadline']);
+// `product` — L'ARTICLE — EST ENTRÉ LE 27/08 AU SOIR. Compté sur les 187
+// dossiers de la PRODUCTION, colonne par colonne :
+//
+//   product (l'article)      186 / 187   99 %   ← et il n'était pas sur la ligne
+//   quantity                 146 / 187   78 %
+//   deadline                 124 / 187   66 %
+//   description (Infos)      122 / 187   65 %
+//   contact_phone             82 / 187   44 %
+//   responsable (Qui suit)    75 / 187   40 %
+//   project_value (Prix TTC)  72 / 187   39 %
+//   color                      9 / 187    5 %
+//   referent                   5 / 187    3 %
+//   flag (État)                3 / 187    2 %
+//
+// La donnée la MIEUX remplie de la base était la seule absente de la ligne :
+// le planning d'un atelier ne disait pas ce qu'il y avait à produire. Elle se
+// pose juste après le client — qui, pour quoi — avant l'argent et les papiers.
+const COLS_DEFAUT = new Set(['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline', 'ticket']);
 const COLS_MASQUEES_DEFAUT = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !COLS_DEFAUT.has(c.key)).map((c) => c.key),
 );
