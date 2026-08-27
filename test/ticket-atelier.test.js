@@ -552,9 +552,15 @@ const DEMANDE = {
     'receipt_long', 'request_quote', 'right_panel_close', 'room', 'search', 'settings',
     'shopping_cart', 'storefront', 'tag', 'tune', 'view_column', 'view_kanban', 'visibility',
     'work']);
-  const DESSINS = new Set(Object.keys({
-    imprimer: 1, telecharger: 1, dupliquer: 1, envoyer: 1, ticket: 1,
-  }));
+  // LES DESSINS SE LISENT DANS LE CODE, pas dans une copie ici. Recopiée, la
+  // liste dit « manquant » à chaque icône ajoutée alors qu'elle est bien là —
+  // et on finit par la corriger sans regarder, ce qui vide le contrôle.
+  const DESSINS = new Set(
+    [...(APP.match(/const LD_ICONES = \{[\s\S]*?\n\};/) || [''])[0]
+      .matchAll(/^\s{2}([a-z_]+):\s*\[/gm)].map((m) => m[1]),
+  );
+  assert.ok(DESSINS.has('ticket') && DESSINS.has('imprimer'),
+    'les dessins maison se relisent bien depuis LD_ICONES');
   for (const [, nom] of APP.matchAll(/ldActionBtn\('([a-z_]+)'/g)) {
     assert.ok(DESSINS.has(nom) || LIGATURES.has(nom),
       `ldActionBtn('${nom}') : ni dessin maison, ni glyphe de la police auto-hébergée`);

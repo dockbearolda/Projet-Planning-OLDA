@@ -3157,7 +3157,22 @@ input[type="date"].cell-input { color: var(--text-1); }
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(420px, 100%);
+  /* LA BOÎTE FAIT LA LARGEUR DU PAPIER (27/08/2026). Elle valait 420 px du
+     temps du rouleau de 76 mm ; depuis que le ticket est en A4, la feuille
+     fait 794 px et on n'en voyait que la MOITIÉ, à faire défiler de côté. Un
+     aperçu qu'il faut faire glisser pour lire n'est pas un aperçu — et c'est
+     le même défaut pour le bon de commande, qui est A4 lui aussi.
+     `min()` garde la boîte à l'intérieur de l'écran sur un poste étroit ;
+     `--tk-papier` mesure 210 mm plus les 2 x 18 px de rembourrage de la boîte
+     ET les 2 x 1 px de trait de la feuille — mesuré, il manquait ces 2 px et
+     la feuille se faisait rogner de deux pixels, ce qui suffit à laisser une
+     barre de défilement horizontale.
+     ET LES 16 px DE LA BARRE VERTICALE : un ticket long défile dans la
+     feuille, et cette barre-là prend sa largeur À L'INTÉRIEUR du papier — sans
+     la compter, `overflow-y` contamine l'autre axe et la feuille redevient
+     défilable de côté (mesuré : 780 px utiles pour 794 px de papier). */
+  --tk-papier: calc(210mm + 54px);
+  width: min(var(--tk-papier), calc(100vw - 2 * var(--pas-4)));
   max-height: min(88vh, 900px);
   padding: 18px;
   border-radius: var(--arrondi-carte);

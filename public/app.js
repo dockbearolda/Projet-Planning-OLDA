@@ -17,6 +17,12 @@ import { fetchBorne, DELAI_ENVOI } from './reseau.js';
 // LE TICKET du client — celui que la vendeuse imprime au comptoir, réimprimable
 // à l'identique depuis n'importe quelle ligne du planning.
 import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.js';
+// LE DOCUMENT DU BUREAU est chargé À LA DEMANDE : c'est un papier qu'on
+// ressort pour facturer ou pour contester, pas à chaque ouverture d'un poste.
+let bureauMod = null;
+const chargerBureau = () => (bureauMod
+  ? Promise.resolve(bureauMod)
+  : import('./bureau.js').then((m) => { bureauMod = m; return m; }));
 // « Le patron a mis à jour » : une tablette du comptoir ne se recharge jamais
 // d'elle-même, elle exécute donc encore la version d'avant-hier. On lui propose.
 import { noterVersion, surveillerMaj } from './maj.js';
@@ -4098,6 +4104,8 @@ const LD_ICONES = {
   // « mailEmail ». La police est un sous-ensemble figé, et son absence ne lève
   // rien : elle se voit, ou elle ne se voit pas.
   mail: ['M3 6h18v12H3z', 'M3 7l9 6 9-6'],
+  // Le document du BUREAU : une feuille à lignes, avec son coin replié.
+  bureau: ['M6 3h8l4 4v14H6z', 'M14 3v4h4', 'M9 12h6', 'M9 15.5h6', 'M9 19h3'],
 };
 
 // `icone` : une fonction qui rend un SVG (une marque, cf. fiverrIcon), une clé
@@ -4301,6 +4309,137 @@ function imprimerModele(t, titre) {
 async function imprimerTicket(r) {
   const t = await ticketDeLaLigne(r);
   imprimerModele(t, `Ticket atelier ${t.ref || r.billing_company || ''}`.trim());
+}
+
+// ===========================================================================
+// LE DOCUMENT DU BUREAU — l'autre papier de la même ligne
+// ===========================================================================
+// LE TICKET NE PORTE PAS D'ARGENT, et ce n'est pas un oubli : l'établi n'en
+// fait rien, et une feuille qui traîne sur un plan de travail n'a pas à
+// annoncer ce que le client a payé. Mais quelqu'un DOIT avoir tout : celui qui
+// facture, celui qui relance, celui qui veut savoir ce qu'une affaire a
+// rapporté. C'est ce papier-là.
+//
+// Même ligne, même fiche, deux lectures. Il n'y a pas deux saisies : c'est le
+// modèle qui choisit ce qu'il montre.
+let bureauOuvert = false;
+
+async function ouvrirBureau(r) {
+  if (bureauOuvert) return;
+  bureauOuvert = true;
+  let mod;
+  let t;
+  try {
+    mod = await chargerBureau();
+    // LA MÊME GARDE QUE LE TICKET, et elle compte encore plus ici : un document
+    // du bureau amputé de son détail aurait l'air vrai — on facturerait dessus.
+    try {
+      await chargerFicheComplete(r.id);
+    } catch (_) {
+      throw new Error(TICKET_SANS_DETAIL);
+    }
+    completerFiche(r);
+    if (r.fiche && r.fiche.fichePartielle) throw new Error(TICKET_SANS_DETAIL);
+    t = mod.modeleBureau(r);
+  } catch (err) {
+    bureauOuvert = false;
+    reportError(err);
+    return;
+  }
+  poserStyleBureau(mod.CSS_BUREAU);
+
+  const focusAvant = document.activeElement;
+  const fond = document.createElement('div');
+  fond.className = 'tk-modal';
+  const carte = document.createElement('div');
+  carte.className = 'tk-modal__card';
+  carte.setAttribute('role', 'dialog');
+  carte.setAttribute('aria-modal', 'true');
+  carte.setAttribute('aria-label', `${t.titre}${t.ref ? ` ${t.ref}` : ''}`);
+
+  const feuille = document.createElement('div');
+  feuille.className = 'tk-modal__paper';
+  feuille.appendChild(mod.dessinerBureau(t, document));
+
+  const actions = document.createElement('div');
+  actions.className = 'tk-modal__actions';
+  const bouton = (label, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ask__btn';
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const fermer = () => {
+    fond.remove();
+    document.removeEventListener('keydown', auClavier);
+    bureauOuvert = false;
+    if (focusAvant && focusAvant.focus) focusAvant.focus();
+  };
+  // Échap referme : c'est le geste que tout le monde a déjà, et une boîte dont
+  // on ne sort qu'en visant un bouton est une boîte qu'on garde ouverte.
+  const auClavier = (e) => { if (e.key === 'Escape') fermer(); };
+  document.addEventListener('keydown', auClavier);
+
+  actions.append(
+    bouton('Fermer', fermer),
+    // Le document en texte : c'est ce qu'on colle dans un e-mail au bureau.
+    bouton('Copier', () => {
+      const dit = () => showToast('Bon de commande copié');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(mod.bureauTexte(t))
+          .then(dit, () => showToast('Copie refusée par le navigateur'));
+      } else {
+        showToast('Copie indisponible sur ce poste');
+      }
+    }),
+    bouton('Imprimer', () => imprimerBureau(mod, t)),
+  );
+
+  carte.append(feuille, actions);
+  fond.append(carte);
+  // Le clic HORS de la carte referme, celui dedans non : sans ce test, choisir
+  // une ligne du document fermait le document.
+  fond.addEventListener('click', (e) => { if (e.target === fond) fermer(); });
+  document.body.append(fond);
+  // `.tk-modal` NAÎT À OPACITÉ ZÉRO : c'est la classe `open`, posée au cadre
+  // suivant, qui la fait apparaître. Sans elle, le document est bien monté,
+  // bien dimensionné, et parfaitement INVISIBLE — le bouton « ne fait rien ».
+  requestAnimationFrame(() => {
+    fond.classList.add('open');
+    const premier = actions.querySelector('button');
+    if (premier) premier.focus();
+  });
+}
+
+function imprimerBureau(mod, t) {
+  const cadre = document.createElement('iframe');
+  cadre.setAttribute('aria-hidden', 'true');
+  // Assez large pour une feuille de 210 mm (environ 794 px) : dans un cadre
+  // trop étroit, les colonnes du détail se calculent sur la mauvaise largeur.
+  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
+  document.body.appendChild(cadre);
+  const d = cadre.contentDocument;
+  d.title = `${t.titre} ${t.ref || ''}`.trim();
+  const style = d.createElement('style');
+  style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${mod.CSS_BUREAU}`;
+  d.head.appendChild(style);
+  d.body.appendChild(mod.dessinerBureau(t, d));
+  cadre.contentWindow.focus();
+  cadre.contentWindow.print();
+  setTimeout(() => cadre.remove(), 1000);
+}
+
+// La feuille est posée dans la page à la PREMIÈRE ouverture : c'est la même
+// chaîne que reçoit le cadre d'impression, donc l'aperçu ne peut pas dériver de
+// ce qui sort sur le papier.
+function poserStyleBureau(css) {
+  if (document.getElementById('bu-style')) return;
+  const s = document.createElement('style');
+  s.id = 'bu-style';
+  s.textContent = css;
+  document.head.appendChild(s);
 }
 
 // La feuille du ticket est posée dans la page à la PREMIÈRE ouverture, et pas
@@ -5014,6 +5153,9 @@ function renderLigneDetail() {
     // document de travail, il n'a jamais eu à sortir sur l'imprimante.
     ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r)),
     ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
+    // L'AUTRE PAPIER DE LA MÊME LIGNE : celui du bureau, avec les prix, la
+    // taxe, le règlement, la marge. Le ticket, lui, n'en porte rien.
+    ldActionBtn('bureau', 'Bon de commande', () => ouvrirBureau(r)),
     ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
     // ENVOYER PAR EMAIL (§19). Le même principe que la pastille WhatsApp : on
     // OUVRE le message tout écrit, on n'envoie rien. C'est l'employé qui relit
