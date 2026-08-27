@@ -626,7 +626,12 @@ window.oldaParcours={
 function updateDesiredDate(){const choice=$('desiredDelay').value;
   if(choice==='custom'){
     /* Le calendrier s'ouvre ; la valeur suivra sur `change` (poserDateChoisie). */
-    try{$('desiredDate').showPicker()}catch(e){$('desiredDate').focus()}
+    /* NOTRE CALENDRIER, PAS CELUI DE CHROME (27/08/2026). Il s'accroche sur le
+       MENU et non sur le champ : celui-ci est un fantôme d'un pixel (voir
+       `date-fantome`), un panneau posé dessus tomberait n'importe où. */
+    const ancre=document.querySelector('#desiredDelay')?.closest('.menu')||$('desiredDate');
+    if(window.oldaCalendrier)window.oldaCalendrier($('desiredDate'),ancre);
+    else{try{$('desiredDate').showPicker()}catch(e){$('desiredDate').focus()}}
   }else if(['5','10','15'].includes(choice)){
     const d=new Date();d.setDate(d.getDate()+Number(choice));
     $('desiredDate').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
