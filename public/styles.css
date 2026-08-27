@@ -2165,6 +2165,47 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* LE MENU DE « + NOUVEAU PROJET ». Deux lignes, posées sous le bouton : c'est
+   tout ce que l'écran à deux tuiles disait, et il prenait une page entière pour
+   le dire. Posé dans le <body> et non sous le bouton : la barre de navigation
+   vit dans un conteneur qui défile, un panneau en `absolute` s'y couperait. */
+.np-menu {
+  position: fixed;
+  z-index: 1200;
+  min-width: 232px;
+  padding: var(--pas-1);
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-bloc);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  animation: npMenuEntre var(--dur-2) var(--ease);
+}
+@keyframes npMenuEntre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .np-menu { animation: none; } }
+.np-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  width: 100%;
+  min-height: var(--ctrl-h);
+  padding: 0 var(--champ-x);
+  border: 1px solid transparent;
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  line-height: var(--ligne-champ);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.np-menu__item:hover { background: var(--primary-soft); color: var(--primary); }
+.np-menu__item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.np-menu__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
+.np-menu__item:hover .np-menu__ic { color: var(--primary); }
+
 /* LA POIGNÉE DE RANGEMENT. Elle ne se montre qu'au survol de l'entrée : au
    repos, la liste se lit ; sous la souris, elle se manipule. Elle garde sa
    place — l'opacité, pas `display` — sinon l'intitulé se décale au survol. */

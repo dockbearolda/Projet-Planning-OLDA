@@ -8630,6 +8630,41 @@ const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
 const $tailleslogos = document.getElementById('tailleslogos');
 const $viewProjet = document.getElementById('viewProjet');
+// « + Nouveau Projet » NE NAVIGUE PLUS, il PROPOSE. Le module qui connaît les
+// deux parcours n'est chargé qu'au premier passage : on l'importe au premier
+// clic, puis on garde la liste sous la main.
+let parcoursConnus = null;
+if ($viewProjet) {
+  $viewProjet.setAttribute('aria-haspopup', 'menu');
+  $viewProjet.setAttribute('aria-expanded', 'false');
+  $viewProjet.addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    if (menuProjet) { fermerMenuProjet(); return; }
+    if (!parcoursConnus) {
+      try {
+        const m = await import('./nouveau-projet.js');
+        parcoursConnus = m.PARCOURS;
+      } catch (err) {
+        // Le module ne répond pas : on retombe sur l'écran à deux tuiles plutôt
+        // que de ne rien faire du tout.
+        reportError(err);
+        location.hash = '#nouveau-projet';
+        return;
+      }
+    }
+    ouvrirMenuProjet(parcoursConnus);
+  });
+  // Un clic ailleurs, Échap : le menu se referme. Il n'y a pas d'état bloqué.
+  document.addEventListener('pointerdown', (ev) => {
+    if (!menuProjet) return;
+    if (menuProjet.contains(ev.target) || ev.target.closest('#viewProjet')) return;
+    fermerMenuProjet();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && menuProjet) { fermerMenuProjet(); $viewProjet.focus(); }
+  });
+  window.addEventListener('resize', fermerMenuProjet, { passive: true });
+}
 const $projet = document.getElementById('nouveau-projet');
 
 // 'planning' | 'dashboard' | 'clients' | 'reglages' | 'projet'
@@ -8870,6 +8905,78 @@ function mountReglages() {
 // et ne charge le JS d'un flux qu'au premier passage dessus.
 let projetLoading = null;
 let projetModule = null;
+// LE CHOIX SE FAIT DANS LA BARRE, PLUS SUR UN ÉCRAN À LUI (Charlie, 27/08/2026)
+// « les 2 icônes sont au milieu seul, c'est le seul endroit de l'app où il y a
+// ça. » C'était une page entière pour poser une question à deux réponses : un
+// clic, un chargement, et une grande carte vide autour de deux tuiles.
+//
+// Le parcours voulu s'ouvre donc DIRECTEMENT depuis « + Nouveau Projet ».
+// L'écran à deux tuiles n'est pas supprimé — on y arrive encore par l'adresse
+// `#nouveau-projet`, et c'est là que retombe un poste qui ne sait pas encore
+// lequel il veut — mais plus personne n'y passe par un clic.
+let menuProjet = null;
+
+function fermerMenuProjet() {
+  if (!menuProjet) return;
+  menuProjet.remove();
+  menuProjet = null;
+  if ($viewProjet) $viewProjet.setAttribute('aria-expanded', 'false');
+}
+
+function ouvrirMenuProjet(parcours) {
+  fermerMenuProjet();
+  const pan = document.createElement('div');
+  pan.className = 'np-menu';
+  pan.setAttribute('role', 'menu');
+  for (const p of parcours) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'np-menu__item';
+    b.setAttribute('role', 'menuitem');
+    const ic = document.createElement('span');
+    ic.className = 'material-symbols-outlined np-menu__ic';
+    ic.setAttribute('aria-hidden', 'true');
+    ic.textContent = p.icone;
+    b.append(ic, document.createTextNode(p.label));
+    b.addEventListener('click', () => {
+      fermerMenuProjet();
+      allerAuParcours(p.id);
+    });
+    pan.appendChild(b);
+  }
+  // Posé sous le bouton, dans le document : la barre de navigation est
+  // elle-même dans un conteneur qui défile, un panneau en `absolute` s'y
+  // couperait (même piège que le menu du comptoir).
+  const r = $viewProjet.getBoundingClientRect();
+  pan.style.top = `${Math.round(r.bottom + 6)}px`;
+  pan.style.left = `${Math.round(r.left)}px`;
+  document.body.appendChild(pan);
+  menuProjet = pan;
+  $viewProjet.setAttribute('aria-expanded', 'true');
+  const premier = pan.querySelector('button');
+  if (premier) premier.focus();
+}
+
+// Ouvrir un parcours demande le module : il n'est chargé qu'au premier passage.
+//
+// L'ORDRE COMPTE. Changer l'adresse déclenche `applyHash`, qui monte la vue et
+// appelle `mountProjet()` — lequel REMET le parcours à zéro (chaque passage sur
+// l'onglet repart de l'accueil). Ouvrir le parcours avant que ça se produise le
+// ferait donc refermer aussitôt. On laisse d'abord l'adresse faire son travail,
+// puis on ouvre.
+async function allerAuParcours(id) {
+  location.hash = '#nouveau-projet';
+  // Un tour d'horloge : le temps que `hashchange` soit traité et que la vue
+  // soit montée. Sans lui, on ouvrait un parcours qui se refermait derrière.
+  await new Promise((r) => setTimeout(r, 0));
+  setViewMode('projet');
+  mountProjet();
+  try {
+    await projetLoading;
+    if (projetModule && projetModule.ouvrirParcours) projetModule.ouvrirParcours(id);
+  } catch (err) { reportError(err); }
+}
+
 function mountProjet() {
   if (!$projet) return;
   if (!projetLoading) {

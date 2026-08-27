@@ -415,6 +415,20 @@ export function parcoursOuvert() {
   return fluxAffiche !== null;
 }
 
+// LES DEUX PARCOURS, NOMMÉS DEHORS. La barre de navigation propose le choix
+// directement (voir `menuNouveauProjet` dans app.js) : l'écran à deux tuiles
+// n'est plus qu'un repli — on y arrive encore par l'adresse, jamais par un clic.
+export const PARCOURS = FLUX.map((f) => ({ id: f.id, label: f.label, icone: f.icone }));
+
+// Ouvrir un parcours SANS passer par l'accueil. `afficher` connaît déjà tout le
+// travail (cadre à la demande, thème, sortie) : on ne fait que lui donner la
+// main depuis l'extérieur.
+export function ouvrirParcours(id) {
+  if (!FLUX.some((f) => f.id === id)) return false;
+  afficher(id);
+  return true;
+}
+
 // --- Montage -----------------------------------------------------------------
 let monte = false;
 export async function initProjet(root) {
