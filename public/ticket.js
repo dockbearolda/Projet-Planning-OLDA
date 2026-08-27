@@ -144,7 +144,15 @@ function prodDuTicket(brut) {
   // et sans largeur. La face disparue, l'atelier ne savait même plus qu'il y
   // avait un fond à marquer. On garde la zone, on laisse la mesure à écrire.
   const logos = (Array.isArray(brut.logos) ? brut.logos : [])
-    .map((l, i) => ({ face: texte(l && l.face), mm: texte(l && l.mm), ou: { ou: 'prod', liste: 'logos', i } }))
+    .map((l, i) => ({
+      face: texte(l && l.face),
+      // CE QU'ON MARQUE — « Logo client », « QR code vers le site », une phrase
+      // à graver. C'est la CONSIGNE, et sur une tasse ou une gravure c'est la
+      // seule chose qui fasse produire : la mesure, elle, se prend à l'établi.
+      quoi: texte(l && l.quoi),
+      mm: texte(l && l.mm),
+      ou: { ou: 'prod', liste: 'logos', i },
+    }))
     .filter((l) => l.face);
   const p = {
     ref: texte(brut.ref), couleur: texte(brut.couleur), marquage: texte(brut.marquage),
@@ -301,8 +309,12 @@ export function ticketTexte(t) {
         // UNE ZONE SANS MESURE RESTE ANNONCÉE. « à mesurer » dit qu'il y a
         // quelque chose à marquer là ; l'omettre laisserait croire qu'il n'y a
         // rien — c'est le fond de la tasse qu'on oublie.
+        // LA CONSIGNE D'ABORD, la cote ensuite. « Dos : 300 mm » dit où et
+        // combien ; « Face avant : Logo client » dit QUOI — et sans le quoi, il
+        // n'y a rien à graver.
         for (const g of p.logos) {
-          out.push(`  Zone ${g.face} : ${g.mm ? `${g.mm} mm` : 'à mesurer'}`);
+          const dit = [g.quoi, g.mm ? `${g.mm} mm` : ''].filter(Boolean).join(' — ');
+          out.push(`  Zone ${g.face} : ${dit || 'à préciser'}`);
         }
       } else {
         out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}`);
@@ -425,6 +437,12 @@ export const CSS_TICKET = `
   /* LA MESURE D'UNE ZONE, quand elle change d'une taille à l'autre : une ligne
      par taille, reliée à sa mesure. Sur NS300 le dos va de 240 mm en XS à 320 en
      XL — un seul chiffre enverrait trois pièces sur quatre au mauvais fichier. */
+  /* LA CONSIGNE : ce qu'il y a a marquer sur cette face. Elle se LIT, donc
+     elle prend le corps de lecture et non celui des nombres — un nom de logo
+     en 40 px deborderait de sa carte des le deuxieme mot. */
+  .tk__quoi { padding: 10px 10px 6px; text-align: center;
+              font-size: var(--tk-texte); font-weight: 700; line-height: 1.25;
+              overflow-wrap: anywhere; }
   .tk__mes { display: flex; align-items: center; justify-content: space-between; gap: 6px;
              padding: 6px 12px; border-top: 1px dotted var(--tk-filet); }
   .tk__mes-v { display: flex; align-items: baseline; gap: 3px; }
@@ -710,8 +728,16 @@ export function dessinerTicket(t, doc, editeur) {
       for (const zone of p.logos) {
         const c = el('div', 'tk__case');
         c.append(el('div', 'tk__case-k', zone.face));
+        // CE QU'ON MARQUE, en tête de la carte. Sur un textile la case reste
+        // vide (la largeur suffit, le fichier est au catalogue) ; sur une tasse
+        // ou une gravure c'est TOUT le travail, et ça passe donc avant la cote.
+        if (zone.quoi) c.append(el('div', 'tk__quoi', zone.quoi));
         const mesures = mesuresDeFace(zone.mm);
-        if (!mesures.length) {
+        if (zone.quoi && !mesures.length) {
+          // Une consigne sans cote se suffit : l'atelier sait quoi graver et
+          // décide de la taille sur la pièce. Pas de trait vide sous le texte —
+          // un trait qui ne demande rien finit par être rempli de n'importe quoi.
+        } else if (!mesures.length) {
           // ZONE À MESURER À L'ÉTABLI. Un trait, pas un blanc : un blanc ne se
           // remplit pas. En correction, c'est le champ lui-même qui prend la
           // place du trait — la mesure prise revient alors au dossier.

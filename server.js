@@ -2610,7 +2610,9 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
 }));
 
 // LES DEUX VALEURS QUE L'ÉTABLI RECTIFIE, et rien d'autre : le nombre d'une
-// taille, la largeur d'une face. Par POSITION, comme le récapitulatif — une
+// taille, la largeur d'une face. Ce QU'ON MARQUE (`quoi`) n'en fait pas partie :
+// c'est la commande du client, elle se corrige au dossier, pas au ticket — et
+// `{ ...l, mm }` la reporte telle quelle. Par POSITION, comme le récapitulatif — une
 // entrée absente du patch laisse la valeur en place, donc deux postes qui
 // corrigent deux largeurs différentes ne s'effacent pas l'un l'autre.
 //
@@ -4670,10 +4672,28 @@ function prodDuComptoir(brut) {
     .slice(0, PROD_ENTREES_MAX)
     .map((x) => ({ t: mot(x && x.t), n: Number(x && x.n) }))
     .filter((x) => x.t && Number.isInteger(x.n) && x.n > 0);
+  // UNE ZONE PORTE UNE CONSIGNE, PAS SEULEMENT UNE COTE (26/08). Charlie :
+  // « dessus c'est pas des mm mais des noms de logo, des phrases — elle me dit
+  // quoi graver ». Sur un textile la largeur vient du catalogue et suffit ; sur
+  // une tasse ou une gravure, ce qui compte est CE QU'ON MARQUE, et la mesure
+  // se prend à l'établi.
+  //
+  // Le filtre exigeait une mesure. Les trois faces d'une tasse n'en ont pas :
+  // elles n'atteignaient donc même pas la base, et tout le détail repartait
+  // dans le pavé de commentaire. Une zone existe dès qu'elle a un NOM.
   const logos = (Array.isArray(brut.logos) ? brut.logos : [])
     .slice(0, PROD_ENTREES_MAX)
-    .map((x) => ({ face: mot(x && x.face), mm: borner(x && x.mm, 120) }))
-    .filter((x) => x.face && x.mm);
+    // `quoi` N'EXISTE QUE S'IL EXISTE. Cette structure est dans FICHE_LISTE :
+    // elle repart vers CHAQUE poste à chaque rafraîchissement du planning. Un
+    // « quoi: null » sur chaque face de chaque textile, c'est du poids sur le
+    // fil pour ne rien dire — et ça change la forme des dossiers d'avant.
+    .map((x) => {
+      const zone = { face: mot(x && x.face), mm: borner(x && x.mm, 120) };
+      const quoi = borner(x && x.quoi, 160);
+      if (quoi) zone.quoi = quoi;
+      return zone;
+    })
+    .filter((x) => x.face);
   const prod = {
     ref: mot(brut.ref) || '',
     couleur: mot(brut.couleur) || '',

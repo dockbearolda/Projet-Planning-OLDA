@@ -194,8 +194,9 @@ const tTasse = modeleTicket(TASSE).lignes[0].prod;
 assert.strictEqual(tTasse.logos.length, 3, 'les deux flancs et le fond');
 assert.deepStrictEqual(tTasse.logos.map((z) => z.face), ['Face A', 'Face B', 'Fond']);
 const papierTasse = ticketTexte(modeleTicket(TASSE));
-assert.match(papierTasse, /Zone Fond : à mesurer/,
-  'une zone sans mesure s’annonce quand même — c’est le fond qu’on oublie');
+assert.match(papierTasse, /Zone Fond : à préciser/,
+  'une zone sans rien s’annonce quand même — c’est le fond qu’on oublie ; et le '
+  + 'mot dit bien ce qui manque : PAS seulement une mesure, la consigne aussi');
 
 // ---------------------------------------------------------------------------
 // 3. LA MISE EN PAGE DU PAPIER
@@ -228,6 +229,19 @@ assert.strictEqual((CSS_TICKET.match(/var\(--tk-geant\)/g) || []).length, 1,
 // même jour en citant « style » de la même façon. C'est le contrôle le moins
 // cher du dépôt.
 assert.ok(!CSS_TICKET.includes('`'), 'aucun accent grave dans la feuille du ticket');
+
+// AUCUN JETON ÉTRANGER. Le cadre d'impression ne charge QUE cette feuille :
+// `charte.css` n'y est pas. Un `var(--pas-2)` emprunté à la charte y vaut la
+// chaîne vide — le rembourrage tombe à zéro sur le PAPIER, et nulle part
+// ailleurs, donc l'aperçu à l'écran (qui, lui, a la charte) paraît correct.
+// C'est le même genre de panne que l'accent grave : invisible là où on regarde.
+const jetonsEtrangers = [...new Set(
+  (CSS_TICKET.match(/var\(\s*(--[a-z0-9-]+)/gi) || [])
+    .map((m) => m.replace(/var\(\s*/i, ''))
+    .filter((j) => !j.startsWith('--tk-')),
+)];
+assert.deepStrictEqual(jetonsEtrangers, [],
+  `la feuille du ticket ne doit dépendre que de ses propres jetons : ${jetonsEtrangers.join(', ')}`);
 
 // LE CADRE D'IDENTITÉ est le seul trait plein du papier : c'est là que l'œil
 // tombe. La référence à gauche, la quantité à droite, sur la même ligne de base.
@@ -330,6 +344,28 @@ assert.strictEqual(tousLes(nTasse, 'tk__case').length, 3,
   'les deux flancs et le fond, pas un de moins');
 assert.strictEqual(tousLes(nTasse, 'tk__aecrire').length, 3,
   'une zone sans mesure sort un TRAIT pour l’écrire — un blanc ne se remplit pas');
+
+// CE QU'ON MARQUE TRAVERSE JUSQU'AU PAPIER (26/08). Charlie : « dessus c'est
+// pas des mm mais des noms de logo, des phrases — elle me dit quoi graver ».
+// Sur un textile la largeur vient du catalogue et suffit ; sur une tasse, la
+// CONSIGNE est tout le travail, et la mesure se prend à l'établi.
+const GRAVE = { ...pTasse, logos: [
+  { face: 'Face avant', mm: '', quoi: 'Logo client + « Coco Beach »' },
+  { face: 'Fond', mm: '', quoi: 'Logo OLDA' },
+] };
+const nGrave = papierDe(GRAVE, 24);
+const quoiRendus = tousLes(nGrave, 'tk__quoi').map((n) => n.textContent);
+assert.deepStrictEqual(quoiRendus, ['Logo client + « Coco Beach »', 'Logo OLDA'],
+  'la carte de zone porte CE QU’ON MARQUE');
+// Une consigne se suffit : pas de trait vide sous elle. Un trait qui ne demande
+// rien finit par être rempli de n’importe quoi.
+assert.strictEqual(tousLes(nGrave, 'tk__aecrire').length, 0,
+  'une zone qui dit déjà quoi graver n’ouvre pas de trait à remplir');
+// Et elle s'écrit aussi sur le ticket en TEXTE, la consigne AVANT la cote.
+const texteGrave = ticketTexte({ ...modeleTicket(TASSE),
+  lignes: [{ ...modeleTicket(TASSE).lignes[0], prod: GRAVE }] });
+assert.match(texteGrave, /Zone Face avant : Logo client/);
+assert.match(texteGrave, /Zone Fond : Logo OLDA/);
 
 // UNE SEULE TAILLE QUI DIT QUELQUE CHOSE, elle, reste : « XL » dit quelle boîte
 // ouvrir. On ne retire que les libellés qui SONT le mot « unique ».
