@@ -112,4 +112,52 @@ const morts = [...COQUILLE].filter((u) => u !== '/' && !fs.existsSync(path.join(
 assert.deepStrictEqual(morts, [],
   'la coquille demande des fichiers qui n’existent pas : ' + morts.join(', '));
 
-console.log(`✓ coquille : ${COQUILLE.size} entrées, tout ce qui s’importe statiquement y est`);
+// --- Et l'annonce des modules, qui se tenait à la main elle aussi ----------
+//
+// Un module importé par `app.js` n'est DÉCOUVERT qu'une fois `app.js`
+// téléchargé et analysé : c'est un aller-retour de plus, en série. `index.html`
+// les annonce donc d'avance — mais la liste dérive. Le 27/08 elle en oubliait
+// quatre (dont deux nés le matin même, en sortant la fiche de production de
+// `app.js`) et en annonçait un qui n'était plus tiré qu'à la demande :
+// 10 Ko téléchargés à chaque ouverture pour un écran qui n'est peut-être
+// jamais ouvert.
+//
+// On ne compare pas à une liste écrite : on suit les imports depuis `app.js`.
+const html = lire('public/index.html');
+const ENTREE = 'app.js';   // le seul module que la page charge elle-même
+
+const importsDe = (rel) => {
+  const chemin = path.join(PUBLIC, rel);
+  if (!fs.existsSync(chemin)) return [];
+  const src = sansComs(fs.readFileSync(chemin, 'utf8'));
+  return [...src.matchAll(RE_IMPORT)]
+    .map((m) => resoudre(rel, m[1]))
+    .filter((u) => u && fs.existsSync(path.join(PUBLIC, u.slice(1))))
+    .map((u) => u.slice(1));
+};
+
+const tires = new Set();
+const aSuivre = [ENTREE];
+while (aSuivre.length) {
+  const rel = aSuivre.pop();
+  for (const dep of importsDe(rel)) {
+    if (tires.has(dep)) continue;
+    tires.add(dep);
+    aSuivre.push(dep);
+  }
+}
+
+const annonces = new Set(
+  [...html.matchAll(/<link rel="modulepreload" href="([^"]+)"/g)].map((m) => m[1].replace(/^\.\//, '')),
+);
+const oublies = [...tires].filter((m) => !annonces.has(m)).sort();
+const inutiles = [...annonces].filter((m) => !tires.has(m)).sort();
+
+assert.deepStrictEqual(oublies, [],
+  'des modules partent au démarrage sans être annoncés — un aller-retour en série pour chacun :\n  '
+  + oublies.join('\n  '));
+assert.deepStrictEqual(inutiles, [],
+  'des modules sont annoncés sans être tirés au démarrage — téléchargés pour rien à chaque ouverture :\n  '
+  + inutiles.join('\n  '));
+
+console.log(`✓ coquille : ${COQUILLE.size} entrées, et ${annonces.size} modules annoncés — les deux listes suivent les imports`);

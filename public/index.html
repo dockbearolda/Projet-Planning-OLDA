@@ -58,14 +58,25 @@
   <!-- Les modules importés par app.js ne sont découverts qu'une fois app.js
        téléchargé et analysé : deux allers-retours en série. On les annonce dès
        le départ pour qu'ils partent en même temps (~1 aller-retour de gagné en
-       4G, soit 100 à 300 ms sur l'ouverture d'un poste). -->
-  <link rel="modulepreload" href="priority.js" />
+       4G, soit 100 à 300 ms sur l'ouverture d'un poste).
+       CETTE LISTE EST EXACTEMENT CELLE DES IMPORTS STATIQUES DE app.js, et elle
+       se tenait à la main : quatre modules y manquaient (dont deux nés le 27/08
+       en sortant la fiche de production de app.js), et l'aller-retour qu'on
+       croyait supprimé était revenu pour eux. `priority.js`, lui, n'y avait
+       plus sa place : il n'est tiré que par `dashboard.js`, qui se charge À LA
+       DEMANDE — on téléchargeait 10 Ko à chaque ouverture pour un écran qui
+       n'est peut-être jamais ouvert. test/coquille-complete.test.js compare
+       désormais les deux listes ; on ne la tient plus de mémoire. -->
   <link rel="modulepreload" href="whatsapp.js" />
   <link rel="modulepreload" href="nom-client.js" />
   <link rel="modulepreload" href="confirmer.js" />
   <link rel="modulepreload" href="ticket.js" />
   <link rel="modulepreload" href="reseau.js" />
   <link rel="modulepreload" href="poste.js" />
+  <link rel="modulepreload" href="session.js" />
+  <link rel="modulepreload" href="maj.js" />
+  <link rel="modulepreload" href="ligne-faits.js" />
+  <link rel="modulepreload" href="format.js" />
   <link rel="icon" href="olda-logo.svg" />
 </head>
 <body>
