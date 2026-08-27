@@ -41,7 +41,7 @@ vm.runInContext(
    globalThis.CSS_TICKET = CSS_TICKET;`,
   bac,
 );
-const { modeleTicket, ticketTexte, CSS_TICKET } = bac;
+const { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } = bac;
 
 const PROD = {
   ref: 'K3008', couleur: 'Rouge', marquage: 'DTF', encre: 'Blanc',
@@ -115,8 +115,10 @@ const sansCouleur = ticketTexte(modeleTicket({
 assert.match(sansCouleur, /^ {2}Marquage : DTF$/m);
 assert.ok(!/encre/i.test(papier), `le papier ne dit plus « encre » :\n${papier}`);
 assert.match(papier, /Tailles : 12 x S {2}20 x M/);
-assert.match(papier, /Logo Coeur : 80 mm/);
-assert.match(papier, /Logo Dos : S 300\/M 320 mm/);
+// « ZONE », plus « Logo » : une face de tasse ou une zone de gravure n'accueille
+// pas forcément un logo, et le mot décidait de ce qu'on croyait pouvoir y mettre.
+assert.match(papier, /Zone Coeur : 80 mm/);
+assert.match(papier, /Zone Dos : S 300\/M 320 mm/);
 // 5. TOUJOURS PAS UN EURO — le contrôle qui tient tout seul.
 assert.ok(!papier.includes('€'), `aucun montant sur un ticket d’atelier :\n${papier}`);
 
@@ -155,13 +157,45 @@ assert.strictEqual(t3.lignes[0].prod, undefined);
 assert.strictEqual(t3.lignes[0].detail, 'Textile · Rouge · DTF',
   'sans bloc de production, le résumé du besoin reprend sa place — il est tout ce qu’on a');
 
-// Une largeur vide n'est pas une largeur : elle n'ouvre pas de ligne.
+// UNE ZONE SANS MESURE RESTE UNE ZONE À MARQUER (règle inversée le 26/08).
+//
+// L'ancienne règle — « une largeur vide n'ouvre pas de ligne » — se tenait tant
+// que le ticket ne parlait que de textile, où la largeur arrive du catalogue.
+// Hors textile elle faisait disparaître le travail : les trois faces d'une
+// tasse (les deux flancs et le fond) arrivent NOMMÉES et SANS largeur, parce
+// qu'on les mesure à l'établi. La face effacée, l'atelier ne savait même plus
+// qu'il y avait un fond à marquer — et un fond oublié, c'est une tasse à refaire.
+//
+// On garde donc la zone, et le papier sort un trait pour écrire la mesure.
 const t4 = modeleTicket({
   ...DEMANDE,
   fiche: { ...DEMANDE.fiche, prod: { ...PROD, logos: [{ face: 'Dos', mm: '' }], tailles: [] } },
 });
-assert.deepStrictEqual(t4.lignes[0].prod.logos.length, 0);
-assert.deepStrictEqual(t4.lignes[0].prod.tailles.length, 0);
+assert.strictEqual(t4.lignes[0].prod.logos.length, 1, 'la zone survit à l’absence de mesure');
+assert.strictEqual(t4.lignes[0].prod.logos[0].face, 'Dos');
+assert.strictEqual(t4.lignes[0].prod.logos[0].mm, '');
+assert.strictEqual(t4.lignes[0].prod.tailles.length, 0, 'une taille sans nombre, elle, ne dit rien');
+
+// UNE TASSE : une seule taille, trois faces. Le papier ne doit pas lui sortir de
+// grille de tailles — « Taille unique » occupe une colonne pour ne rien
+// apprendre, la quantité est déjà écrite en 64 px juste au-dessus.
+const TASSE = {
+  ...DEMANDE,
+  fiche: {
+    ...DEMANDE.fiche,
+    prod: {
+      ref: 'TC 06', couleur: 'Noir (ext.) / Blanc (int.)', marquage: 'UV', encre: 'Quadri',
+      tailles: [{ t: 'Taille unique', n: 24 }],
+      logos: [{ face: 'Face A', mm: '' }, { face: 'Face B', mm: '' }, { face: 'Fond', mm: '' }],
+    },
+  },
+};
+const tTasse = modeleTicket(TASSE).lignes[0].prod;
+assert.strictEqual(tTasse.logos.length, 3, 'les deux flancs et le fond');
+assert.deepStrictEqual(tTasse.logos.map((z) => z.face), ['Face A', 'Face B', 'Fond']);
+const papierTasse = ticketTexte(modeleTicket(TASSE));
+assert.match(papierTasse, /Zone Fond : à mesurer/,
+  'une zone sans mesure s’annonce quand même — c’est le fond qu’on oublie');
 
 // ---------------------------------------------------------------------------
 // 3. LA MISE EN PAGE DU PAPIER
@@ -170,19 +204,29 @@ assert.deepStrictEqual(t4.lignes[0].prod.tailles.length, 0);
 // valeurs sont des jetons, lus partout. Le plus grand n'habille QUE les deux
 // faits qu'on cherche du regard — la référence et la quantité ; il habillait
 // l'en-tête de marque, retiré le 26/08.
-for (const jeton of ['--tk-cle: 20px', '--tk-fort: 15px', '--tk-texte: 13px', '--tk-note: 11px']) {
+// UNE ÉCHELLE, DES JETONS, AUCUNE TAILLE EN DUR. Le papier est passé du rouleau
+// de 76 mm à l'A4 le 26/08 : il porte plus de niveaux qu'un ticket de caisse
+// (un titre, un cadre d'identité, deux grilles, un cadre à écrire). Ce qui ne
+// change pas, c'est que chaque taille est DÉCLARÉE — une taille posée au cas par
+// cas dans une règle est une échelle qui dérive au troisième ajout.
+for (const jeton of ['--tk-geant: 64px', '--tk-titre: 44px', '--tk-nombre: 40px',
+  '--tk-cle: 25px', '--tk-fort: 23px', '--tk-mes: 18px', '--tk-texte: 17px',
+  '--tk-note: 15px', '--tk-etiq: 12px', '--tk-cap: 10px']) {
   assert.ok(CSS_TICKET.includes(jeton), `l’échelle du ticket doit poser ${jeton}`);
 }
-assert.ok(!CSS_TICKET.includes('--tk-titre'), 'l’ancien jeton de titre n’habille plus rien');
-const surCle = (CSS_TICKET.match(/var\(--tk-cle\)/g) || []).length;
-assert.strictEqual(surCle, 2, 'la plus grande taille ne porte QUE la référence et la quantité');
-assert.ok(!/font-size: 1[0247]px/.test(CSS_TICKET),
-  'aucune taille en dur : tout passe par les quatre jetons');
+assert.ok(!/font(?:-size)?:[^;]*?\d+px/.test(CSS_TICKET.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+  'aucune taille en dur : tout passe par les jetons');
+// LA PLUS GRANDE TAILLE NE PORTE QUE LA RÉFÉRENCE ET LA QUANTITÉ — les deux
+// seuls faits qu'on cherche du regard sur une pile de papiers.
+assert.strictEqual((CSS_TICKET.match(/var\(--tk-geant\)/g) || []).length, 1,
+  'le plus grand corps n’habille qu’une seule règle');
 // LA FEUILLE DE STYLE EST UN LITTÉRAL GABARIT : un accent grave dans un
 // commentaire CSS le TERMINE. Le module reste syntaxiquement valide (le
 // morceau suivant devient un gabarit étiqueté), `node --check` passe, et
 // l'application s'ouvre sur un écran NU — « .tk__champ is not a function ».
-// Arrivé le 26/08 en citant un nom de classe entre accents graves.
+// Arrivé le 26/08 en citant un nom de classe entre accents graves, et REVENU le
+// même jour en citant « style » de la même façon. C'est le contrôle le moins
+// cher du dépôt.
 assert.ok(!CSS_TICKET.includes('`'), 'aucun accent grave dans la feuille du ticket');
 
 // LE CADRE D'IDENTITÉ est le seul trait plein du papier : c'est là que l'œil
@@ -191,33 +235,113 @@ assert.match(CSS_TICKET, /\.tk__ident \{[^}]*border: 2px solid/);
 assert.match(CSS_TICKET, /\.tk__ident-tete \{[^}]*justify-content: space-between/);
 // La couleur du marquage porte la graisse forte, son intitulé reste une étiquette.
 assert.match(CSS_TICKET, /\.tk__ident-mq-v \{[^}]*font-size: var\(--tk-fort\)/);
-// LES TAILLES EN TABLEAU, à colonnes ÉGALES : une piste qui dépend de son
-// contenu ferait une grille bancale d'un ticket à l'autre.
-assert.match(CSS_TICKET, /\.tk__tailles \{[^}]*grid-auto-columns: 1fr/);
-assert.match(CSS_TICKET, /\.tk__taille-v \{[^}]*font-size: var\(--tk-fort\)/);
-// La largeur d'un logo se lit au bout d'un filet, comme sur un bordereau.
-assert.match(CSS_TICKET, /\.tk__logo-fil \{[^}]*border-bottom: 1px dotted/);
-assert.match(CSS_TICKET, /\.tk__logo-mm \{[^}]*font-size: var\(--tk-fort\)/);
-// DANS LA CASE ET AU BOUT DU FILET, le champ ne pose pas de trait de plus :
-// sans ça deux traits se superposaient sous chaque nombre.
-assert.match(CSS_TICKET, /\.tk__taille-v \.tk__champ, \.tk__logo-mm \.tk__champ \{[^}]*border-bottom: 0/);
+
+// LES DEUX GRILLES SONT LA MÊME GRILLE, à une largeur de case près : tailles et
+// zones sont deux AXES INDÉPENDANTS. La maquette rangeait la largeur du dos
+// DANS la carte de la taille — ça se tient pour un t-shirt et ça ne veut rien
+// dire pour une tasse, qui a trois faces et une seule taille.
+assert.match(CSS_TICKET, /\.tk__grille \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(/);
+assert.match(CSS_TICKET, /\.tk__grille--zones \{[^}]*minmax\(/);
+// ELLE COMPTE SES COLONNES EN CSS. Poser le nombre de colonnes en style EN LIGNE
+// obligeait le rendu à connaître la largeur du papier, et rendait le ticket
+// indessinable dans un DOM minimal — les tests le dessinent sans « style ».
+const SRC_TICKET = lire('public/ticket.js');
+const rendu = SRC_TICKET.slice(SRC_TICKET.indexOf('export function dessinerTicket'));
+assert.ok(!/\.style\b/.test(rendu),
+  'le rendu du ticket ne pose aucun style en ligne : la grille se compte en CSS');
+assert.match(CSS_TICKET, /\.tk__case-v \{[^}]*font-size: var\(--tk-nombre\)/);
+// UNE ZONE SANS MESURE SORT AVEC UN TRAIT POUR L'ÉCRIRE, pas avec un blanc :
+// un blanc ne se remplit pas.
+assert.match(CSS_TICKET, /\.tk__aecrire \{[^}]*border-bottom: 1px solid/);
+// UN ARTICLE PAR FEUILLE : sans ça, deux tickets d'une même commande se suivent
+// sur la même page et l'établi en perd un.
+assert.match(CSS_TICKET, /\.tk \+ \.tk \{[^}]*break-before: page/);
+assert.match(CSS_TICKET, /\.tk \+ \.tk \{[^}]*page-break-before: always/);
+
 // CE QUE CHARLIE A FAIT RETIRER DU PAPIER LE 26/08, écran par écran. Rien de
 // tout cela ne doit revenir par une règle laissée derrière : une feuille de
 // style qui décrit un bloc absent finit par le faire réapparaître.
 for (const parti of ['.tk__nom', '.tk__lieu', '.tk__remise', '.tk__atelier',
-  '.tk__jour', '.tk__heure']) {
+  '.tk__jour', '.tk__heure', '.tk__logo-fil', '.tk__tailles']) {
   assert.ok(!CSS_TICKET.includes(parti), `« ${parti} » n’habille plus rien`);
 }
 // Le projet est PC uniquement : plus une règle justifiée par le doigt.
 assert.ok(!CSS_TICKET.includes('pointer: coarse'), 'plus d’échelle tactile sur le ticket');
-// Le papier reste en NOIR SUR BLANC : la charte réserve la couleur aux états,
-// et une imprimante à tickets ne connaît que le noir.
+
+// LE PAPIER N'A QUE DES DENSITÉS D'ENCRE. La charte réserve la couleur aux
+// ÉTATS — cette règle parle de l'ÉCRAN, où une couleur se lit comme un signal.
+// Sur du papier, le gris ardoise ne signale rien : il fait reculer un intitulé
+// derrière sa valeur. Trois encres, pas une de plus, et aucune qui code un état.
 const couleurs = CSS_TICKET.replace(/\/\*[\s\S]*?\*\//g, ' ')
   .match(/#[0-9a-f]{3,6}/gi) || [];
 for (const c of couleurs) {
-  assert.ok(['#000', '#fff', '#8a8f98', '#9aa0a6', '#f0f1f3'].includes(c.toLowerCase()),
+  assert.ok(['#fff', '#202930', '#4a6274', '#adb8b9'].includes(c.toLowerCase()),
     `le ticket ne porte pas de couleur : ${c}`);
 }
+
+// ---------------------------------------------------------------------------
+// 3 bis. LA CARTE S'ADAPTE À L'ARTICLE — au RENDU, pas seulement au modèle
+// ---------------------------------------------------------------------------
+// C'est la demande de Charlie du 26/08 : « du mug au couteau à graver, une carte
+// adaptée à chaque article ». La réponse tient en une phrase : LES TAILLES ET
+// LES ZONES SONT DEUX AXES INDÉPENDANTS. La maquette rangeait la largeur du dos
+// DANS la carte de la taille — ça se tient pour un t-shirt et ça ne veut rien
+// dire pour une tasse, qui a trois faces et une seule taille.
+//
+// Aucune famille n'est écrite en dur dans le rendu : ce sont les faces du
+// dossier qui décident, et le dossier les tient de la table des tailles de logo.
+const faireDoc = () => ({
+  createElement: (tag) => ({
+    tag, className: '', textContent: '', enfants: [],
+    append(...n) { this.enfants.push(...n); },
+    appendChild(n) { this.enfants.push(n); return n; },
+    setAttribute() {},
+  }),
+});
+const tousLes = (n, cls, acc = []) => {
+  if (String(n.className || '').split(' ').includes(cls)) acc.push(n);
+  for (const c of n.enfants || []) tousLes(c, cls, acc);
+  return acc;
+};
+const papierDe = (prod, qte) => dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '26/08/2026', retrait: '30/08/2026',
+  client: 'Coco Beach', contact: 'Mélina', tel: '0690', lot: null,
+  lignes: [{ designation: 'Article', qte: String(qte), detail: '', prod }],
+}, faireDoc());
+
+// UN T-SHIRT : deux grilles. Les tailles distinguent, les zones aussi.
+const pTextile = modeleTicket({ ...DEMANDE, fiche: { ...DEMANDE.fiche, prod: PROD } }).lignes[0].prod;
+const nTextile = papierDe(pTextile, 32);
+assert.strictEqual(tousLes(nTextile, 'tk__grille').length, 2,
+  'un textile sort ses tailles ET ses zones');
+assert.strictEqual(tousLes(nTextile, 'tk__grille--zones').length, 1);
+assert.strictEqual(tousLes(nTextile, 'tk__aecrire').length, 0,
+  'toutes ses largeurs sont connues : aucun trait à remplir');
+
+// UNE TASSE : une seule grille. « Taille unique » n'ouvre AUCUNE colonne — elle
+// occuperait toute une case pour ne rien apprendre, la quantité est déjà écrite
+// en 64 px juste au-dessus. Restent les trois faces, chacune avec son trait.
+const pTasse = modeleTicket(TASSE).lignes[0].prod;
+const nTasse = papierDe(pTasse, 24);
+assert.strictEqual(tousLes(nTasse, 'tk__grille').length, 1,
+  '« Taille unique » ne doit ouvrir aucune grille de tailles');
+assert.strictEqual(tousLes(nTasse, 'tk__grille--zones').length, 1);
+assert.strictEqual(tousLes(nTasse, 'tk__case').length, 3,
+  'les deux flancs et le fond, pas un de moins');
+assert.strictEqual(tousLes(nTasse, 'tk__aecrire').length, 3,
+  'une zone sans mesure sort un TRAIT pour l’écrire — un blanc ne se remplit pas');
+
+// UNE SEULE TAILLE QUI DIT QUELQUE CHOSE, elle, reste : « XL » dit quelle boîte
+// ouvrir. On ne retire que les libellés qui SONT le mot « unique ».
+const nXL = papierDe({ ...pTasse, tailles: [{ t: 'XL', n: 5 }] }, 5);
+assert.strictEqual(tousLes(nXL, 'tk__grille').length, 2,
+  '« XL » n’est pas une taille muette : elle garde sa colonne');
+
+// UN ARTICLE SANS AUCUNE ZONE ne sort aucun bloc de zones — une bâche ne se
+// marque pas, et un cadre vide finit par être rempli de n’importe quoi.
+const nNu = papierDe({ ...pTasse, tailles: [], logos: [] }, 40);
+assert.strictEqual(tousLes(nNu, 'tk__grille').length, 0,
+  'ni tailles ni zones : aucune grille');
 
 // ---------------------------------------------------------------------------
 // 4. CE QUI SE RECTIFIE À L'ÉTABLI

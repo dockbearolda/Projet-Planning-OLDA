@@ -4269,20 +4269,28 @@ async function ticketDeLaLigne(r) {
 // une page propre dans un cadre hors écran, on l'imprime, on le retire. Un
 // cadre plutôt qu'une fenêtre : aucun bloqueur de pop-up ne peut l'empêcher.
 //
-// Pas de `@page { size: … }` : on laisse le papier de l'imprimante décider.
-// Forcer un format de 80 mm ferait mettre le ticket à l'échelle du A4 par le
-// navigateur — un ticket géant sur toute la largeur de la feuille. Le ticket
-// garde donc sa taille réelle : étroit et découpable sur une feuille ordinaire,
-// pleine laize sur une imprimante à tickets.
+// `@page { size: A4 portrait }` DEPUIS LE 26/08. Le ticket était un rouleau de
+// caisse de 76 mm, et on laissait alors l'imprimante décider du papier — forcer
+// un format aurait fait mettre un ticket de 80 mm à l'échelle du A4, c'est-à-dire
+// un ticket géant sur toute la largeur de la feuille.
+//
+// Le papier de l'atelier fait maintenant 210 x 297 mm par construction : le
+// déclarer est ce qui garantit qu'un article tient sur UNE feuille, et que le
+// suivant commence sur la sienne (voir `.tk + .tk` dans CSS_TICKET). Marge à
+// zéro : le ticket porte ses propres marges intérieures, deux marges empilées
+// rétréciraient la zone utile sans que rien ne le dise.
 function imprimerModele(t, titre) {
   const cadre = document.createElement('iframe');
   cadre.setAttribute('aria-hidden', 'true');
-  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px;height:1000px;border:0';
+  // LE CADRE DOIT ÊTRE ASSEZ LARGE POUR LA FEUILLE. À 400 px, une page de
+  // 210 mm (environ 794 px) se disposait dans un cadre deux fois trop étroit :
+  // les grilles de tailles et de zones se calculaient sur la mauvaise largeur.
+  cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
   document.body.appendChild(cadre);
   const d = cadre.contentDocument;
   d.title = titre;
   const style = d.createElement('style');
-  style.textContent = `@page{margin:8mm}body{margin:0;background:#fff}${CSS_TICKET}`;
+  style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${CSS_TICKET}`;
   d.head.appendChild(style);
   d.body.appendChild(dessinerTicket(t, d));
   cadre.contentWindow.focus();

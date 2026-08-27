@@ -52,6 +52,14 @@ function dateCreation(iso) {
   return Number.isNaN(d.getTime()) ? '' : JOUR_ATELIER.format(d);
 }
 
+// UNE COLONNE `date` NE PASSE PAS PAR UN FUSEAU. Elle ne porte pas d'heure :
+// la reconstruire en `Date` lui en invente une (minuit UTC), et l'afficher dans
+// le fuseau de l'atelier la fait alors reculer d'un jour. On la découpe.
+function dateSeule(iso) {
+  const m = String(iso || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+}
+
 // LE TRAVAIL, extrait du récapitulatif du comptoir. Tout ce qui n'est pas un
 // poste — le secteur, l'adresse, les totaux, la note interne — reste où il est.
 // Les postes se regroupent par NUMÉRO plutôt que par position, pour qu'une
@@ -130,9 +138,14 @@ function prodDuTicket(brut) {
   const tailles = (Array.isArray(brut.tailles) ? brut.tailles : [])
     .map((t, i) => ({ t: texte(t && t.t), n: texte(t && t.n), ou: { ou: 'prod', liste: 'tailles', i } }))
     .filter((t) => t.t && t.n);
+  // UNE FACE SANS MESURE RESTE UNE ZONE À MARQUER. Filtrer sur la mesure
+  // faisait disparaître du papier toute zone qu'on mesure à l'établi — c'est
+  // le cas normal hors textile : les trois faces d'une tasse arrivent nommées
+  // et sans largeur. La face disparue, l'atelier ne savait même plus qu'il y
+  // avait un fond à marquer. On garde la zone, on laisse la mesure à écrire.
   const logos = (Array.isArray(brut.logos) ? brut.logos : [])
     .map((l, i) => ({ face: texte(l && l.face), mm: texte(l && l.mm), ou: { ou: 'prod', liste: 'logos', i } }))
-    .filter((l) => l.face && l.mm);
+    .filter((l) => l.face);
   const p = {
     ref: texte(brut.ref), couleur: texte(brut.couleur), marquage: texte(brut.marquage),
     // LA COULEUR DU MARQUAGE. La clé s'appelle encore `encre` — c'est ce que
@@ -242,6 +255,15 @@ export function modeleTicket(r) {
     // seul papier.
     lot: seulPoste ? { rang, total } : null,
     date: dateCreation(f.creeLe),
+    // QUAND LE CLIENT VIENT LE CHERCHER. C'est la seule date qui fasse
+    // ORDONNER le travail : « prise le 26 » ne dit pas quoi faire en premier.
+    //
+    // `deadline` est une colonne `date`, pas un horodatage : on la découpe en
+    // CHAÎNE, sans jamais construire de `Date`. Minuit UTC reformaté en
+    // America/Marigot (UTC-4) reculerait d'un jour, et le papier annoncerait un
+    // retrait la veille. `dateCreation` reste réservée à `creeLe`, qui est un
+    // vrai horodatage et doit, lui, passer par le fuseau de l'atelier.
+    retrait: dateSeule(l.deadline),
     // POUR QUI. Le nom sur l'établi, et de quoi joindre quelqu'un : « appeler
     // avant de couper » ne sert à rien sans le numéro.
     client: texte(l.billing_company),
@@ -261,6 +283,7 @@ export function ticketTexte(t) {
   if (t.client) out.push(`Client : ${t.client}`);
   if (t.contact) out.push(`Contact : ${t.contact}`);
   if (t.tel) out.push(`Tél : ${t.tel}`);
+  if (t.retrait) out.push(`Retrait : ${t.retrait}`);
   if (t.lignes.length) {
     out.push(sep);
     for (const a of t.lignes) {
@@ -275,7 +298,12 @@ export function ticketTexte(t) {
         const mq = marquageProd(p);
         if (mq) out.push(`  ${mq.cle} : ${[mq.tech, mq.val].filter(Boolean).join(' · ')}`);
         if (p.tailles.length) out.push(`  Tailles : ${p.tailles.map((x) => `${x.n} x ${x.t}`).join('  ')}`);
-        for (const g of p.logos) out.push(`  Logo ${g.face} : ${g.mm} mm`);
+        // UNE ZONE SANS MESURE RESTE ANNONCÉE. « à mesurer » dit qu'il y a
+        // quelque chose à marquer là ; l'omettre laisserait croire qu'il n'y a
+        // rien — c'est le fond de la tasse qu'on oublie.
+        for (const g of p.logos) {
+          out.push(`  Zone ${g.face} : ${g.mm ? `${g.mm} mm` : 'à mesurer'}`);
+        }
       } else {
         out.push(`${a.qte ? `${a.qte} x ` : ''}${a.designation}`);
       }
@@ -291,157 +319,179 @@ export function ticketTexte(t) {
 // La feuille de style du ticket. Partagée par l'aperçu à l'écran et par
 // l'impression : ce qu'on voit est ce qui sort de l'imprimante.
 //
-// LARGEUR 80 mm — le format d'un rouleau de caisse, et celui qu'imprime déjà
-// l'écran du comptoir. Sur une imprimante A4 ordinaire, le ticket sort en haut
-// de la feuille, étroit et découpable ; sur une imprimante à tickets, il occupe
-// toute la laize. Dans les deux cas c'est UN ticket, pas un dossier.
+// A4 PORTRAIT (210 x 297 mm), depuis le 26/08. Le ticket était un rouleau de
+// caisse de 76 mm — le format de l'écran du comptoir, hérité de la vente. Ce
+// papier-ci ne va pas au client : il va à l'établi, il y reste toute la durée
+// du travail, on écrit dessus et on le signe. Un rouleau ne porte ni un plan de
+// marquage, ni un cadre où noter ce qu'on a mesuré.
 //
-// Tout est en noir sur blanc : la charte réserve la couleur aux ÉTATS, et une
-// imprimante à tickets ne connaît de toute façon que le noir.
+// ⚠️ CHANGEMENT D'IMPRIMANTE. Une imprimante à tickets ne sort pas de l'A4 :
+// ce papier suppose la laser/jet d'encre de l'atelier.
+//
+// Les trois encres sont celles de la maquette de Charlie. Sur du papier ce sont
+// des DENSITÉS D'ENCRE, pas des états : la règle de la charte (« la couleur dit
+// un état ») parle de l'écran, où une couleur se lit comme un signal. Ici le
+// gris ardoise ne signale rien, il recule un intitulé derrière sa valeur.
 export const CSS_TICKET = `
-  /* L'ÉCHELLE DU TICKET — quatre tailles, trois graisses, et rien d'autre.
-       cle    = les deux faits qu'on CHERCHE du regard sur une pile de tickets :
-                la référence et la quantité. Rien d'autre ne porte cette taille.
-       fort   = ce qui DÉCIDE et qu'on ne doit pas lire de travers : la couleur
-                du marquage, le nombre par taille, la largeur d'un logo. Une
-                taille mal lue coûte une réimpression.
-       texte  = ce qui CONFIRME : couleur du textile, désignation, précisions.
-       note   = les intitulés, le pied. */
-  .tk { --tk-cle: 20px; --tk-fort: 15px; --tk-texte: 13px; --tk-note: 11px;
-        width: 76mm; margin: 0 auto; padding: 4mm 0; color: #000;
-        font: var(--tk-texte)/1.45 Arial, Helvetica, sans-serif; }
-  .tk__titre { margin: 0; font-size: var(--tk-note); font-weight: 800; text-align: center;
-               text-transform: uppercase; letter-spacing: .08em; }
-  .tk__sep { border: 0; border-top: 1px dashed #000; margin: 7px 0; }
-  /* « Article 2 sur 4 » — encadré, parce que c'est l'avertissement qui empêche
-     d'emballer une commande incomplète. Noir sur blanc comme tout le reste : une
-     imprimante à tickets ne connaît que le noir. */
-  .tk__lot { margin: 5px auto 0; padding: 2px 6px; border: 1px solid #000;
-             display: table; font-size: var(--tk-note); font-weight: 800;
-             text-transform: uppercase; letter-spacing: .04em; }
+  /* L'ÉCHELLE DU TICKET. Deux tailles PORTENT (la référence et la quantité,
+     les deux seuls faits qu'on cherche du regard sur une pile), une taille
+     DÉCIDE (mesures, nombres par taille), deux tailles ACCOMPAGNENT. */
+  .tk { --tk-encre: #202930; --tk-ardoise: #4A6274; --tk-filet: #ADB8B9;
+        --tk-geant: 64px; --tk-titre: 44px; --tk-nombre: 40px; --tk-cle: 25px;
+        --tk-fort: 23px; --tk-mes: 18px; --tk-texte: 17px; --tk-note: 15px;
+        --tk-etiq: 12px; --tk-cap: 10px;
+        width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
+        display: flex; flex-direction: column; background: #fff; color: var(--tk-encre);
+        font: var(--tk-texte)/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
-  /* POUR QUI — intitulé à gauche, valeur à droite. L'intitulé est une étiquette,
-     pas une phrase : petites capitales, graisse moyenne. */
-  .tk__ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 3px 0; }
-  .tk__ligne > span:first-child { flex: 0 0 auto; font-size: var(--tk-note); font-weight: 600;
-                                  text-transform: uppercase; letter-spacing: .04em; }
-  .tk__ligne > span:last-child { text-align: right; font-weight: 600; }
+  /* LES INTITULÉS. Une seule classe, partout : capitales espacées, gris
+     ardoise, petites. Un intitulé ne se lit pas, il se saute — c'est la valeur
+     qu'on vient chercher. */
+  .tk__cap { font: 500 var(--tk-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+             letter-spacing: .16em; color: var(--tk-ardoise); }
 
-  /* CE QU'ON PRODUIT ------------------------------------------------------ */
-  .tk__art { margin: 8px 0 0; }
-  .tk__art + .tk__art { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #000; }
-  .tk__art-tete { display: flex; gap: 8px; }
-  .tk__art-nom { font-size: var(--tk-texte); font-weight: 800; }
-  /* La précision de vive voix : elle vient APRÈS les faits de production, elle
-     ne les remplace pas. */
-  .tk__art-detail { margin: 4px 0 0; font-size: var(--tk-texte); white-space: pre-line; }
+  .tk__tete { display: flex; align-items: flex-end; justify-content: space-between;
+              gap: 24px; padding: 30px 46px 14px; border-bottom: 3px solid var(--tk-encre); }
+  .tk__titre { margin: 0; font-size: var(--tk-titre); font-weight: 800; letter-spacing: -.05em;
+               line-height: .95; text-transform: uppercase; }
+  /* LE COMPTE D'ARTICLES, encadré. Il ne s'affiche QUE si la commande en a
+     plusieurs : « 1/1 » n'apprend rien et occuperait le coin de l'oeil que le
+     compte réel doit occuper seul. */
+  .tk__no { display: flex; align-items: baseline; gap: 6px; padding: 7px 14px;
+            border: 1px solid var(--tk-encre); }
+  .tk__no-n { font: 700 var(--tk-fort)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .tk__no-t { font: 400 var(--tk-etiq)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              color: var(--tk-ardoise); }
 
-  .tk__prod { margin: 4px 0 0; }
-  .tk__prod-titre { margin: 6px 0 2px; font-size: var(--tk-note); font-weight: 800;
-                    text-transform: uppercase; letter-spacing: .08em; }
+  .tk__qui { display: flex; align-items: flex-end; justify-content: space-between;
+             gap: 28px; padding: 16px 46px; border-bottom: 1px solid var(--tk-filet); }
+  .tk__client-nom { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+  .tk__champs { display: flex; gap: 28px; }
+  .tk__champ-bloc { display: flex; flex-direction: column; gap: 4px; }
+  .tk__champ-val { font-size: var(--tk-texte); font-weight: 700; }
+  .tk__champ-val--fort { font-weight: 800; }
 
-  /* CE QU'ON VA CHERCHER, ET COMBIEN — le seul cadre plein du papier, parce que
-     c'est le premier endroit où l'œil doit tomber. La référence à gauche, la
-     quantité à droite, sur la même ligne de base : deux faits, deux bords, rien
-     entre les deux pour les confondre. La couleur du textile et la désignation
-     passent dessous, en confirmation. */
-  .tk__ident { margin: 2px 0 0; padding: 4px 6px; border: 2px solid #000; }
-  .tk__ident-tete { display: flex; justify-content: space-between;
-                    align-items: baseline; gap: 8px; }
-  .tk__ident-ref { font-size: var(--tk-cle); font-weight: 800; letter-spacing: .02em;
-                   min-width: 0; overflow-wrap: anywhere; }
-  .tk__ident-qte { flex: 0 0 auto; font-size: var(--tk-cle); font-weight: 800;
-                   white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .tk__ident-nom { margin: 1px 0 0; font-size: var(--tk-texte); font-weight: 600; }
-  /* LE MARQUAGE, dans le même cadre et séparé d'un trait : c'est le deuxième
-     geste (charger le rouleau), pas un troisième bloc à chercher. */
-  .tk__ident-mq { display: flex; justify-content: space-between; align-items: baseline;
-                  gap: 8px; margin: 4px 0 0; padding-top: 3px; border-top: 1px solid #000; }
-  .tk__ident-mq-k { flex: 0 0 auto; font-size: var(--tk-note); font-weight: 800;
-                    text-transform: uppercase; letter-spacing: .08em; }
-  .tk__ident-mq-v { flex: 0 1 auto; text-align: right; font-size: var(--tk-fort);
-                    font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
-  /* La technique NOMME, la couleur DÉCIDE : « DTF · Noir » — c'est la couleur
-     qui dit quel rouleau charger, elle seule porte la graisse forte. */
-  .tk__ident-mq-tech { font-size: var(--tk-texte); font-weight: 600; }
+  .tk__corps { flex: 1; min-height: 0; display: flex; flex-direction: column;
+               gap: 18px; padding: 20px 46px 0; }
 
-  /* LES TAILLES EN TABLEAU, jamais en phrase. « 6 × S · 10 × M · 6 × L · 2 × XL »
-     se lit de travers dès qu'on est pressé : une colonne par taille, le nombre
-     dessous, et l'erreur devient difficile. Les colonnes sont ÉGALES — une
-     piste qui dépend de son contenu ferait une grille bancale d'un ticket à
-     l'autre. */
-  .tk__tailles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-                 border: 1px solid #000; }
-  .tk__taille { border-left: 1px solid #000; text-align: center; min-width: 0; }
-  .tk__taille:first-child { border-left: 0; }
-  .tk__taille-k { font-size: var(--tk-note); font-weight: 600; letter-spacing: .04em;
-                  text-transform: uppercase; padding: 1px 2px; border-bottom: 1px solid #000; }
-  .tk__taille-v { font-size: var(--tk-fort); font-weight: 800; padding: 2px; }
+  /* L'IDENTITÉ DE L'ARTICLE. Référence et quantité en 64 px : ce sont les deux
+     choses qu'on cherche sur une pile de papiers, et elles sont seules à cette
+     taille. */
+  .tk__ident { border: 2px solid var(--tk-encre); }
+  .tk__ident-tete { display: flex; align-items: flex-start; justify-content: space-between;
+                    gap: 24px; padding: 22px 28px 16px; }
+  .tk__ident-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .tk__ident-col--d { align-items: flex-end; }
+  .tk__geant { font-size: var(--tk-geant); font-weight: 800; letter-spacing: -.045em;
+               line-height: .95; overflow-wrap: anywhere; }
+  .tk__ident-qte { display: flex; align-items: baseline; gap: 8px; line-height: .95; }
+  .tk__ident-unite { font-size: var(--tk-fort); font-weight: 500; color: var(--tk-ardoise); }
+  .tk__ident-nom { margin: 0; padding: 0 28px 18px; font-size: var(--tk-fort); font-weight: 700;
+                   letter-spacing: -.01em; line-height: 1.3; }
+  .tk__ident-mq { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+                  padding: 14px 28px; border-top: 1px solid var(--tk-filet); }
+  .tk__ident-mq-v { font-size: var(--tk-fort); font-weight: 800; letter-spacing: -.02em;
+                    text-align: right; min-width: 0; overflow-wrap: anywhere; }
 
-  /* LES LARGEURS DE LOGO — une face par ligne, reliée à sa mesure par un filet.
-     C'est la mise en page d'un bordereau : l'œil suit le trait et ne saute pas
-     d'une ligne à l'autre. */
-  .tk__logo { display: flex; align-items: baseline; gap: 5px; margin: 2px 0 0; }
-  .tk__logo-face { flex: 0 0 auto; font-size: var(--tk-texte); font-weight: 600; }
-  .tk__logo-fil { flex: 1 1 auto; min-width: 8px; align-self: center; border-bottom: 1px dotted #000; }
-  /* UNE LARGEUR PAR TAILLE tient rarement sur la ligne : « S 280/M 300/L 300/
-     XL 320/XXL 340 » fait deux fois la laize du papier. Elle se replie donc
-     dans sa propre colonne, calée à droite, plutôt que de déborder la feuille —
-     le filet garde 8 px pour continuer à relier la face à sa mesure. */
-  .tk__logo-mm { flex: 0 1 auto; min-width: 0; text-align: right;
-                 font-size: var(--tk-fort); font-weight: 800; overflow-wrap: anywhere; }
+  .tk__bloc { display: flex; flex-direction: column; gap: 10px; }
+  .tk__bloc-titre { letter-spacing: .18em; }
 
-  /* LE PIED porte ce qui NE FAIT PAS PRODUIRE : la date de prise. Elle était
-     en tête, entre l'avertissement de lot et le client — trois lignes de
-     contexte avant la première qui dit quoi faire. */
-  .tk__pied { margin: 7px 0 0; font-size: var(--tk-note); text-align: center; }
+  /* LES TAILLES ET LES ZONES SONT DEUX AXES INDÉPENDANTS, jamais imbriqués.
+     La maquette rangeait la largeur du dos DANS la carte de la taille : ça se
+     tient pour un t-shirt et ça ne veut rien dire pour une tasse, qui a trois
+     faces et une seule taille. Deux grilles séparées s'adaptent aux deux. */
+  /* LA GRILLE COMPTE SES COLONNES TOUTE SEULE. Le nombre de tailles et le
+     nombre de zones changent d'un article à l'autre : les poser en style EN
+     LIGNE obligeait le rendu à connaître la largeur du papier, et rendait le
+     ticket indessinable hors navigateur (les tests le dessinent dans un DOM
+     minimal, sans propriete style). auto-fit fait le calcul en CSS : une zone
+     occupe toute la laize, six se rangent en deux rangs.
+     ATTENTION : aucun accent grave ici, il terminerait le gabarit. */
+  .tk__grille { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
+  /* LES ZONES TIENNENT SUR UN SEUL RANG jusqu'à six. À 150 px de large minimum,
+     un vetement marque a six emplacements passait a DEUX rangs et la feuille
+     sortait a 311 mm — un second papier presque vide, que l'atelier perd.
+     A 104 px, les six tiennent sur un rang et la feuille retombe a 297 mm.
+     Deux zones occupent toujours toute la laize : c'est 1fr qui repartit. */
+  .tk__grille--zones { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+  .tk__bloc--infos { flex: 1; min-height: 0; }
+  .tk__case { border: 1.5px solid var(--tk-encre); overflow: hidden; }
+  .tk__case-k { padding: 6px 0; text-align: center; border-bottom: 1px solid var(--tk-filet);
+                font: 600 var(--tk-etiq)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                letter-spacing: .2em; color: var(--tk-ardoise); overflow-wrap: anywhere; }
+  .tk__case-v { padding: 12px 0; text-align: center; font-size: var(--tk-nombre); font-weight: 800;
+                letter-spacing: -.04em; line-height: 1; }
+  /* LA MESURE D'UNE ZONE, quand elle change d'une taille à l'autre : une ligne
+     par taille, reliée à sa mesure. Sur NS300 le dos va de 240 mm en XS à 320 en
+     XL — un seul chiffre enverrait trois pièces sur quatre au mauvais fichier. */
+  .tk__mes { display: flex; align-items: center; justify-content: space-between; gap: 6px;
+             padding: 6px 12px; border-top: 1px dotted var(--tk-filet); }
+  .tk__mes-v { display: flex; align-items: baseline; gap: 3px; }
+  .tk__mes-n { font-size: var(--tk-mes); font-weight: 800; letter-spacing: -.02em; }
+  /* UNE ZONE SANS MESURE N'EST PAS UNE ZONE VIDE : c'est une mesure à prendre.
+     Elle sort donc avec un trait pour l'écrire, pas avec un blanc. */
+  .tk__aecrire { display: block; margin: 14px 12px 12px; border-bottom: 1px solid var(--tk-encre); height: 22px; }
+  .tk__aecrire-k { display: block; padding: 0 12px 10px; text-align: center; }
 
-  /* LES CHAMPS DE CORRECTION. Le ticket s'ouvre DÉJÀ modifiable depuis la
-     ligne : chaque valeur est un champ, à sa place et dans la police du papier.
-     Un trait pointillé dit « ça se tape » sans rien déplacer, et l'impression
-     n'en pose aucun (elle n'appelle pas l'éditeur) — le ticket qu'on corrige
-     est donc, à la case près, celui qui sort de l'imprimante.
-     Les hauteurs confortables ne valent que dans l'aperçu (classe tk--edit) :
-     une ligne de 12 px se vise mal à la souris, et le papier n'en porte pas. */
-  .tk__champ {
-    font: inherit; color: #000; background: transparent;
-    border: 0; border-bottom: 1px dashed #8a8f98; border-radius: 0;
-    padding: 1px 2px; margin: 0; width: 100%; min-width: 0;
-    -webkit-appearance: none; appearance: none;
-  }
-  .tk__champ::placeholder { color: #9aa0a6; font-style: italic; }
-  .tk__champ:focus { outline: 0; border-bottom-color: #000; background: #f0f1f3; }
-  .tk--edit .tk__champ { min-height: 34px; }
-  .tk--edit .tk__ligne { align-items: center; }
-  .tk--edit .tk__ligne > span:first-child { flex: 0 0 62px; }
-  /* La quantité : un champ court sur la même rangée que le nom de l'article. */
-  .tk--edit .tk__art-tete { align-items: center; gap: 6px; }
-  .tk--edit .tk__art-nom { display: flex; align-items: center; gap: 4px; flex: 1 1 auto; }
-  .tk__qte { flex: 0 0 46px; text-align: center; }
-  .tk__x { flex: 0 0 auto; }
-  /* DANS LA GRILLE DES TAILLES ET SUR UNE LARGEUR, le champ ne porte pas de
-     trait : la case et le filet du bordereau disent déjà où l'on tape. Sans
-     ça, deux traits se superposaient sous chaque nombre. */
-  .tk__taille-v .tk__champ, .tk__logo-mm .tk__champ {
-    border-bottom: 0; text-align: center; font-weight: 800;
-  }
-  .tk__logo-mm .tk__champ { text-align: right; }
-  .tk--edit .tk__taille-v .tk__champ { min-height: 30px; }
-  .tk--edit .tk__logo-mm { flex: 0 0 96px; }
-  /* LE CADRE D'IDENTITÉ EN CORRECTION. Un champ fait 100 % de LARGEUR : posé à
-     côté d'un mot (« 20 » + « pièces », « Jaune · » + la désignation), il
-     prenait toute la place PLUS celle du mot, et la feuille débordait de côté.
-     Les deux rangées deviennent donc des rangées flex, où le champ prend ce qui
-     reste au lieu de tout. */
-  .tk--edit .tk__ident-qte { flex: 0 0 132px; display: flex; align-items: baseline; gap: 2px; }
-  .tk--edit .tk__ident-qte .tk__champ { flex: 1 1 auto; min-width: 0; text-align: right; }
-  .tk--edit .tk__ident-nom { display: flex; align-items: baseline; gap: 3px; }
-  /* La couleur du textile ne se coupe pas de son point médian : par défaut un
-     élément flex peut rétrécir, et « Jaune · » se repliait en « Jaune » puis un
-     point tout seul sur la ligne suivante. */
-  .tk--edit .tk__ident-nom > span:first-child { flex: 0 0 auto; white-space: nowrap; }
-  .tk--edit .tk__ident-nom .tk__champ { flex: 1 1 auto; min-width: 0; }
+  /* LE CADRE À ÉCRIRE ABSORBE, IL NE POUSSE PAS. Avec un plancher de 250 px il
+     s'ajoutait aux blocs du dessus au lieu de prendre ce qui reste : un ticket
+     textile (deux grilles) sortait à 324 mm et partait sur une SECONDE feuille
+     presque vide — mesuré le 26/08. Il n'a donc plus de hauteur minimale : il
+     est le seul bloc élastique de la page, et c'est lui qui fait tomber la
+     feuille sur 297 mm pile. */
+  .tk__infos { flex: 1; min-height: 0; padding: 14px 24px 16px; border: 1.5px solid var(--tk-encre);
+               background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, var(--tk-filet) 35px, var(--tk-filet) 36px);
+               background-position: 0 8px; background-clip: content-box; white-space: pre-line; }
+
+  .tk__conformite { display: flex; align-items: center; gap: 18px; margin: 18px 46px 20px;
+                    padding: 14px 18px; border: 1.5px solid var(--tk-encre); }
+  .tk__case-a-cocher { flex: none; width: 24px; height: 24px; border: 1.5px solid var(--tk-encre); }
+  .tk__conformite-txt { font-size: var(--tk-note); font-weight: 500; line-height: 1.35; }
+
+  .tk__pied { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+              padding: 14px 46px 24px; border-top: 1px dashed var(--tk-encre); }
+  .tk__pied-fort { font-weight: 700; color: var(--tk-encre); }
+
+  /* UN ARTICLE PAR FEUILLE. Sans ça, deux tickets d'une même commande se
+     suivent sur la même page et l'établi en perd un. */
+  .tk + .tk { break-before: page; page-break-before: always; }
+
+  /* EN CORRECTION, un champ garde exactement la place et le dessin du texte
+     qu'il remplace : le papier ne doit pas se réorganiser quand on l'ouvre. */
+  .tk__champ { font: inherit; color: inherit; letter-spacing: inherit; line-height: inherit;
+               background: none; border: 0; border-bottom: 1px dotted var(--tk-ardoise);
+               padding: 0; margin: 0; min-width: 0; width: 100%; }
+  .tk--edit .tk__case-v .tk__champ, .tk--edit .tk__mes-n .tk__champ { text-align: center; }
+  .tk__champ:focus { outline: 2px solid var(--tk-encre); outline-offset: 2px; }
 `;
+
+// LES MESURES D'UNE ZONE. Le comptoir envoie soit une largeur unique (« 260 »),
+// soit une largeur PAR TAILLE quand elle change (« S 260/M 280/L 300 ») — sur
+// 76 mm il n'y avait pas la place de faire autrement. On la redéploie ici :
+// une ligne par taille, chacune reliée à sa mesure.
+//
+// Une chaîne vide ne rend pas une liste vide « par erreur » : c'est le cas
+// NORMAL hors textile, et il a son propre dessin (un trait pour écrire).
+function mesuresDeFace(mm) {
+  const brut = String(mm == null ? '' : mm).trim();
+  if (!brut) return [];
+  if (brut.indexOf('/') < 0) return [{ t: '', mm: brut }];
+  return brut.split('/').map((part) => {
+    const m = part.trim().match(/^(.*\S)\s+(\S+)$/);
+    return m ? { t: m[1], mm: m[2] } : { t: '', mm: part.trim() };
+  });
+}
+
+// UNE TAILLE QUI NE DISTINGUE RIEN NE S'IMPRIME PAS. « Taille unique » occupe
+// une colonne entière pour ne rien apprendre — la quantité est déjà écrite en
+// 64 px juste au-dessus. « XL » tout seul, lui, dit quelle boîte ouvrir : on le
+// garde. On ne retire donc que les libellés qui SONT le mot « unique ».
+const TAILLE_MUETTE = /^(taille\s+)?unique$|^tu$|^[-—]$/i;
+function taillesParlantes(tailles) {
+  if (tailles.length === 1 && TAILLE_MUETTE.test(tailles[0].t)) return [];
+  return tailles;
+}
 
 // Le ticket en DOM, dans le document qu'on lui donne — la page pour l'aperçu,
 // le cadre d'impression pour le papier. `doc` est explicite : au moment
@@ -459,158 +509,244 @@ export function dessinerTicket(t, doc, editeur) {
   // police et sous la même classe. `cible` dit OÙ la valeur s'écrit quand elle
   // vient d'un article du récapitulatif (cf. `ou` dans le modèle).
   const val = (cle, txt, cible) => (editeur ? editeur(cle, txt, cible) : el('span', null, txt));
-  const duo = (cls, gauche, droite) => {
-    const d = el('div', cls);
-    d.append(el('span', null, gauche), typeof droite === 'string' ? el('span', null, droite) : droite);
-    return d;
+  const cap = (txt, cls) => el('div', cls ? 'tk__cap ' + cls : 'tk__cap', txt);
+  const champ = (label, valeur, cle, fort) => {
+    const b = el('div', 'tk__champ-bloc');
+    const v = el('div', 'tk__champ-val' + (fort ? ' tk__champ-val--fort' : ''));
+    if (editeur && cle) v.append(val(cle, valeur));
+    else v.textContent = valeur || '—';
+    b.append(cap(label), v);
+    return b;
   };
-  const sep = () => el('hr', 'tk__sep');
 
   const tk = el('div', editeur ? 'tk tk--edit' : 'tk');
-  // PAS D'EN-TÊTE DE MARQUE. Ce papier ne sort jamais de l'atelier : personne
-  // n'a besoin qu'il rappelle le nom ni la ville de la maison où il est lu.
-  tk.append(el('p', 'tk__titre', t.titre));
 
-  // LA RÉFÉRENCE NE S'IMPRIME PAS. Elle reste dans le modèle — le titre de la
-  // fenêtre d'impression et le libellé de la carte s'en servent pour dire DE
-  // QUEL dossier ce papier parle — mais le papier lui-même va à l'établi, et un
-  // identifiant de dossier n'y fait rien produire.
+  // L'EN-TÊTE. Pas de marque, pas d'adresse : ce papier ne sort jamais de
+  // l'atelier, personne n'a besoin qu'il rappelle le nom de la maison où il est
+  // lu. La référence du dossier ne s'imprime pas non plus en tête — elle ne fait
+  // rien produire ; elle revient au pied, là où on la cherche pour classer.
+  const tete = el('header', 'tk__tete');
+  tete.append(el('h1', 'tk__titre', t.titre));
   // CE PAPIER NE FAIT PAS TOUTE LA COMMANDE. Un compte, pas un identifiant :
   // sans lui, l'atelier finit son article et emballe en croyant avoir fini.
-  if (t.lot) tk.append(el('p', 'tk__lot', `Article ${t.lot.rang} sur ${t.lot.total} de la commande`));
+  if (t.lot) {
+    const no = el('div', 'tk__no');
+    no.append(cap('NO.'), el('span', 'tk__no-n', String(t.lot.rang)),
+      el('span', 'tk__no-t', '/' + t.lot.total));
+    tete.append(no);
+  }
+  tk.append(tete);
 
-  // POUR QUI. Le trait de séparation appartient au bloc : sans personne à
-  // joindre — une ligne créée à la main, sans société — deux filets se
-  // suivaient, et le papier annonçait une section vide.
-  const pourQui = [];
-  if (t.client || editeur) pourQui.push(duo('tk__ligne', 'Client', val('client', t.client)));
-  if (t.contact || editeur) pourQui.push(duo('tk__ligne', 'Contact', val('contact', t.contact)));
-  if (t.tel || editeur) pourQui.push(duo('tk__ligne', 'Tél', val('tel', t.tel)));
-  if (pourQui.length) tk.append(sep(), ...pourQui);
+  // POUR QUI, ET POUR QUAND. Le nom porte la taille ; le reste sert quand
+  // quelque chose cloche — « appeler avant de couper » ne sert à rien sans le
+  // numéro. La date de RETRAIT est la seule qui fasse ordonner le travail.
+  const qui = el('div', 'tk__qui');
+  const gauche = el('div', 'tk__ident-col');
+  const nomClient = el('div', 'tk__client-nom');
+  if (editeur) nomClient.append(val('client', t.client));
+  else nomClient.textContent = t.client || '—';
+  gauche.append(cap('CLIENT'), nomClient);
+  const champs = el('div', 'tk__champs');
+  champs.append(
+    champ('CONTACT', t.contact, 'contact'),
+    champ('TÉL', t.tel, 'tel'),
+    champ('DATE DE RETRAIT', t.retrait, null, true),
+  );
+  qui.append(gauche, champs);
+  tk.append(qui);
 
-  if (t.lignes.length) {
-    tk.append(sep());
-    for (const a of t.lignes) {
-      const art = el('div', 'tk__art');
-
-      // CE QU'IL Y A À PRODUIRE — la référence, la quantité, la couleur du
-      // marquage, le nombre par taille, la largeur de chaque logo. C'est ce qui
-      // décide du fichier d'impression et de la coupe : ça passe avant la
-      // précision dictée au comptoir, qui vient la compléter.
-      //
-      // AVEC UNE FICHE, la quantité et la désignation entrent dans le cadre
-      // d'identité : les écrire aussi en tête, c'est deux fois la même chose à
-      // deux centimètres. Sans fiche — une ligne saisie à la main — la tête de
-      // l'article reste la seule chose qui dise quoi produire.
-      if (a.prod) art.append(blocProd(a.prod, a));
-      else art.append(teteArticle(a));
-
-      // La précision de vive voix. En correction elle est offerte même vide :
-      // c'est là qu'on note ce qui n'entre dans aucune case.
-      if (a.detail || (editeur && a.ou && a.ou.detail)) {
-        const det = el('p', 'tk__art-detail');
-        if (editeur) det.append(val('detail', a.detail, a.ou.detail));
-        else det.textContent = a.detail;
-        art.append(det);
-      }
-      tk.append(art);
+  const corps = el('main', 'tk__corps');
+  for (const a of t.lignes) {
+    if (a.prod) blocsProduction(a.prod, a);
+    else corps.append(teteArticle(a));
+    // La précision de vive voix. En correction elle est offerte même vide :
+    // c'est là qu'on note ce qui n'entre dans aucune case.
+    if (a.detail || (editeur && a.ou && a.ou.detail)) {
+      const det = el('p', 'tk__ident-nom');
+      if (editeur) det.append(val('detail', a.detail, a.ou.detail));
+      else det.textContent = a.detail;
+      corps.append(det);
     }
   }
 
-  // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise.
-  // En tête, cette ligne repoussait d'autant la première qui dit quoi faire.
-  if (t.date) tk.append(sep(), el('p', 'tk__pied', `Commande prise le ${t.date}`));
+  // CE QU'ON ÉCRIT À L'ÉTABLI. Le cadre est réglé, pas vide : un rectangle nu
+  // ne se remplit pas, des lignes si. C'est là que finit ce qui n'entre dans
+  // aucune case — et c'est la moitié du travail d'un atelier.
+  const infos = el('div', 'tk__bloc tk__bloc--infos');
+  infos.append(cap('INFORMATIONS', 'tk__bloc-titre'), el('div', 'tk__infos'));
+  corps.append(infos);
+  tk.append(corps);
+
+  // LA SIGNATURE DE CONFORMITÉ. Elle n'existait pas sur le rouleau : on ne
+  // signe pas un ticket de caisse. Sur ce papier-ci, elle dit que quelqu'un a
+  // regardé la pièce avant qu'elle parte — et elle nomme ce quelqu'un par sa
+  // main, pas par un champ de plus.
+  const conf = el('div', 'tk__conformite');
+  const txt = el('div', 'tk__ident-col');
+  txt.append(cap('CONTRÔLE DE CONFORMITÉ', 'tk__bloc-titre'),
+    el('div', 'tk__conformite-txt',
+      'Je certifie que l’article a été réalisé et vérifié, et qu’il est conforme à la demande.'));
+  conf.append(el('span', 'tk__case-a-cocher'), txt);
+  tk.append(conf);
+
+  // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise,
+  // et de quel dossier ce papier parle — pour le reclasser, pas pour le faire.
+  const pied = el('footer', 'tk__pied');
+  const g = el('div', 'tk__cap');
+  // Aucun nœud de texte nu : le ticket se dessine aussi hors navigateur (les
+  // tests le rendent dans un DOM minimal, et c'est cette portabilité qui permet
+  // de vérifier le papier sans ouvrir Chrome). Tout passe par un élément.
+  if (t.date) g.append(el('span', null, 'COMMANDE PRISE LE '), el('span', 'tk__pied-fort', t.date));
+  // À DROITE, DE QUOI RECONNAÎTRE UNE FEUILLE ISOLÉE — la référence de
+  // l'ARTICLE, celle qu'on va chercher au stock, jamais celle du DOSSIER.
+  // La clé du dossier ne s'imprime pas : ce papier va à l'établi, pas au
+  // classement, et un identifiant de dossier n'y fait rien produire.
+  const article = t.lignes.find((x) => x.prod && x.prod.ref);
+  const d = el('div', 'tk__cap');
+  d.textContent = [article ? article.prod.ref : '',
+    t.lot ? t.lot.rang + '/' + t.lot.total : ''].filter(Boolean).join(' · ');
+  pied.append(g, d);
+  tk.append(pied);
   return tk;
 
-  // La tête d'un article SANS fiche de production : « 40 × Bâche 2 m ».
+  // La tête d'un article SANS fiche de production : « 40 × Bâche 2 m ». Une
+  // ligne créée à la main dans la grille n'a pas de panier : le papier porte
+  // alors ce que la ligne sait. Mieux qu'un papier vide.
   function teteArticle(a) {
-    const tete = el('div', 'tk__art-tete');
-    const nom = el('div', 'tk__art-nom');
-    if (editeur) {
-      nom.append(
-        val('qte', a.qte, a.ou && a.ou.qte),
-        el('span', 'tk__x', '×'),
-        val('designation', a.designation, a.ou && a.ou.designation),
-      );
-    } else {
-      nom.textContent = `${a.qte ? `${a.qte} × ` : ''}${a.designation}`;
-    }
-    tete.append(nom);
-    return tete;
+    const boite = el('div', 'tk__ident');
+    const tete2 = el('div', 'tk__ident-tete');
+    const cg = el('div', 'tk__ident-col');
+    const nom = el('div', 'tk__geant');
+    if (editeur) nom.append(val('designation', a.designation, a.ou && a.ou.designation));
+    else nom.textContent = a.designation;
+    cg.append(cap('ARTICLE'), nom);
+    const cd = el('div', 'tk__ident-col tk__ident-col--d');
+    const q = el('div', 'tk__ident-qte');
+    if (editeur) q.append(el('span', 'tk__geant', ''), val('qte', a.qte, a.ou && a.ou.qte));
+    else q.append(el('span', 'tk__geant', a.qte || ''));
+    q.append(el('span', 'tk__ident-unite', 'pièces'));
+    cd.append(cap('QUANTITÉ'), q);
+    tete2.append(cg, cd);
+    boite.append(tete2);
+    return boite;
   }
 
-  // --- Le bloc de production, en quatre temps ------------------------------
-  function blocProd(p, a) {
-    const bloc = el('div', 'tk__prod');
-
-    // 1. CE QU'ON VA CHERCHER, ET COMBIEN. Les deux seuls faits qu'on cherche
-    //    du regard sur une pile de tickets ont leur propre taille et leur
-    //    propre cadre. La référence ne se retape pas ici — c'est l'identité de
-    //    l'article, elle se corrige au dossier ; la quantité, si.
+  // --- L'ARTICLE, EN TROIS BLOCS QUI S'ADAPTENT À LUI ---------------------
+  // 1. son identité (toujours), 2. ses tailles (si elles distinguent quelque
+  // chose), 3. ses zones de marquage (autant que l'article en a).
+  function blocsProduction(p, a) {
     const id = identiteProd(p, a);
-    const boite = el('div', 'tk__ident');
-    const tete = el('div', 'tk__ident-tete');
-    if (id.ref) tete.append(el('span', 'tk__ident-ref', id.ref));
-    const qte = el('span', 'tk__ident-qte');
-    if (editeur) qte.append(val('qte', a.qte, a.ou && a.ou.qte), el('span', null, ' pièces'));
-    else if (id.qte) qte.textContent = id.qte;
-    if (editeur || id.qte) tete.append(qte);
-    boite.append(tete);
 
-    // La couleur du textile et la désignation CONFIRMENT qu'on a pris la bonne
-    // boîte. En correction, la désignation reste un champ : elle vit sur la
-    // ligne du planning, et c'est le seul endroit du papier qui la porte.
+    const boite = el('div', 'tk__ident');
+    const tete2 = el('div', 'tk__ident-tete');
+    const cg = el('div', 'tk__ident-col');
+    cg.append(cap('RÉFÉRENCE'), el('div', 'tk__geant', id.ref || '—'));
+    const cd = el('div', 'tk__ident-col tk__ident-col--d');
+    const q = el('div', 'tk__ident-qte');
+    if (editeur) {
+      const n = el('span', 'tk__geant');
+      n.append(val('qte', a.qte, a.ou && a.ou.qte));
+      q.append(n);
+    } else {
+      q.append(el('span', 'tk__geant', String(a.qte || '')));
+    }
+    q.append(el('span', 'tk__ident-unite', Number(a.qte) > 1 ? 'pièces' : 'pièce'));
+    cd.append(cap('QUANTITÉ'), q);
+    tete2.append(cg, cd);
+    boite.append(tete2);
+
+    // La couleur de l'article et sa désignation CONFIRMENT qu'on a pris la
+    // bonne boîte : on les lit une fois, après avoir trouvé la référence.
     if (editeur) {
       const nom = el('p', 'tk__ident-nom');
-      if (p.couleur) nom.append(el('span', null, `${p.couleur} · `));
+      if (p.couleur) nom.append(el('span', null, p.couleur + ' · '));
       nom.append(val('designation', a.designation, a.ou && a.ou.designation));
       boite.append(nom);
     } else if (id.nom) {
       boite.append(el('p', 'tk__ident-nom', id.nom));
     }
 
-    // 2. CE QU'ON CHARGE DANS LA MACHINE — la technique en intitulé, sa
-    //    couleur en valeur. C'est la couleur qui décide du rouleau.
+    // CE QU'ON CHARGE DANS LA MACHINE — la technique, puis SA COULEUR, et c'est
+    // la couleur qui porte la graisse : « DTF » tout seul ne dit pas quel
+    // rouleau charger. L'intitulé, lui, ne varie jamais.
     const mq = marquageProd(p);
     if (mq) {
       const rang = el('div', 'tk__ident-mq');
-      const v = el('span', 'tk__ident-mq-v');
-      if (mq.tech) v.append(el('span', 'tk__ident-mq-tech', mq.val ? `${mq.tech} · ` : mq.tech));
-      if (mq.val) v.append(el('span', null, mq.val));
-      rang.append(el('span', 'tk__ident-mq-k', mq.cle), v);
+      rang.append(cap(mq.cle.toUpperCase(), 'tk__bloc-titre'),
+        el('div', 'tk__ident-mq-v', [mq.tech, mq.val].filter(Boolean).join(' · ')));
       boite.append(rang);
     }
-    bloc.append(boite);
+    corps.append(boite);
 
-    // LES TAILLES EN TABLEAU, jamais en phrase : une colonne par taille, le
-    // nombre dessous. « 6 × S · 10 × M · 6 × L · 2 × XL » se lit de travers dès
-    // qu'on est pressé, et une taille mal lue coûte une réimpression.
-    if (p.tailles.length) {
-      bloc.append(el('p', 'tk__prod-titre', 'Tailles'));
-      const grille = el('div', 'tk__tailles');
-      for (const x of p.tailles) {
-        const col = el('div', 'tk__taille');
-        const v = el('div', 'tk__taille-v');
+    // 2. LES TAILLES — une colonne par taille, le nombre dessous. Jamais en
+    //    phrase : « 6 × S · 10 × M · 6 × L » se lit de travers dès qu'on est
+    //    pressé, et une taille mal lue coûte une réimpression.
+    const tailles = taillesParlantes(p.tailles);
+    if (tailles.length) {
+      const bloc = el('div', 'tk__bloc');
+      bloc.append(cap('TAILLES', 'tk__bloc-titre'));
+      const grille = el('div', 'tk__grille');
+      for (const x of tailles) {
+        const c = el('div', 'tk__case');
+        const v = el('div', 'tk__case-v');
         v.append(val('prod-taille', x.n, x.ou));
-        col.append(el('div', 'tk__taille-k', x.t), v);
-        grille.append(col);
+        c.append(el('div', 'tk__case-k', x.t), v);
+        grille.append(c);
       }
       bloc.append(grille);
+      corps.append(bloc);
     }
 
-    // LES LARGEURS DE LOGO — une face par ligne, reliée à sa mesure par un
-    // filet : l'œil suit le trait et ne saute pas d'une ligne à l'autre.
+    // 3. LES ZONES DE MARQUAGE — une carte par face, quel que soit son nom.
+    //    C'EST LE BLOC QUI ADAPTE LE PAPIER À L'ARTICLE : six faces pour un
+    //    t-shirt, trois pour une tasse (les deux flancs et le fond), une pour
+    //    une casquette, deux pour un couteau gravé. Aucune famille n'est écrite
+    //    en dur ici — les faces viennent du dossier, et le dossier les tient de
+    //    la table des tailles de logo, que Charlie remplit dans le CRM.
     if (p.logos.length) {
-      bloc.append(el('p', 'tk__prod-titre', 'Logos'));
-      for (const g of p.logos) {
-        const ligne = el('div', 'tk__logo');
-        const mm = el('span', 'tk__logo-mm');
-        if (editeur) mm.append(val('prod-logo', g.mm, g.ou), el('span', null, ' mm'));
-        else mm.textContent = `${g.mm} mm`;
-        ligne.append(el('span', 'tk__logo-face', g.face), el('span', 'tk__logo-fil'), mm);
-        bloc.append(ligne);
+      const bloc = el('div', 'tk__bloc');
+      bloc.append(cap('ZONES DE MARQUAGE', 'tk__bloc-titre'));
+      const grille = el('div', 'tk__grille tk__grille--zones');
+      for (const zone of p.logos) {
+        const c = el('div', 'tk__case');
+        c.append(el('div', 'tk__case-k', zone.face));
+        const mesures = mesuresDeFace(zone.mm);
+        if (!mesures.length) {
+          // ZONE À MESURER À L'ÉTABLI. Un trait, pas un blanc : un blanc ne se
+          // remplit pas. En correction, c'est le champ lui-même qui prend la
+          // place du trait — la mesure prise revient alors au dossier.
+          if (editeur) {
+            const v = el('div', 'tk__case-v');
+            v.append(val('prod-logo', '', zone.ou));
+            c.append(v);
+          } else {
+            c.append(el('span', 'tk__aecrire'), cap('mm', 'tk__aecrire-k'));
+          }
+        } else if (mesures.length === 1 && !mesures[0].t) {
+          const v = el('div', 'tk__case-v');
+          if (editeur) v.append(val('prod-logo', zone.mm, zone.ou));
+          else v.append(el('span', null, mesures[0].mm));
+          c.append(v, cap('mm', 'tk__aecrire-k'));
+        } else if (editeur) {
+          // En correction on réécrit la CHAÎNE telle que le comptoir l'a
+          // composée : la découper en champs par taille écrirait quatre valeurs
+          // dans une case qui n'en attend qu'une.
+          const v = el('div', 'tk__case-v');
+          v.append(val('prod-logo', zone.mm, zone.ou));
+          c.append(v);
+        } else {
+          for (const m of mesures) {
+            const r = el('div', 'tk__mes');
+            const vv = el('span', 'tk__mes-v');
+            vv.append(el('span', 'tk__mes-n', m.mm), cap('mm'));
+            r.append(cap(m.t), vv);
+            c.append(r);
+          }
+        }
+        grille.append(c);
       }
+      bloc.append(grille);
+      corps.append(bloc);
     }
-    return bloc;
   }
 }

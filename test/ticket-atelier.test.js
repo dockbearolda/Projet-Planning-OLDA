@@ -524,13 +524,17 @@ const DEMANDE = {
   // L'aperçu et l'impression partagent la MÊME feuille de style : ce qu'on voit
   // à l'écran est ce qui sort de l'imprimante.
   assert.ok(/s\.textContent = CSS_TICKET;/.test(APP));
-  assert.ok(/style\.textContent = `@page\{margin:8mm\}body\{margin:0;background:#fff\}\$\{CSS_TICKET\}`/.test(APP));
-  // Pas de `size` dans le @page du cadre d'impression : forcer un format de
-  // 80 mm ferait mettre le ticket à l'échelle du A4 par le navigateur — un
-  // ticket géant sur toute la largeur de la feuille.
+  // LE FORMAT EST DÉCLARÉ, depuis le 26/08. Tant que le ticket était un rouleau
+  // de 76 mm, forcer un format aurait fait mettre un ticket de 80 mm à l'échelle
+  // du A4 — un ticket géant sur toute la largeur de la feuille. Le papier de
+  // l'atelier fait maintenant 210 x 297 mm par construction : le déclarer est ce
+  // qui garantit qu'un article tient sur UNE feuille.
   const regleImpression = APP.match(/style\.textContent = `(@page[^`]*)`/);
   assert.ok(regleImpression, 'la feuille du cadre d’impression est introuvable');
-  assert.ok(!/size\s*:/.test(regleImpression[1]), `@page ne doit pas forcer de format : ${regleImpression[1]}`);
+  assert.match(regleImpression[1], /size\s*:\s*A4 portrait/,
+    'le cadre d’impression doit déclarer l’A4 : sans lui, un article déborde sur la feuille du suivant');
+  assert.match(regleImpression[1], /margin\s*:\s*0/,
+    'marge à zéro : le ticket porte ses propres marges, deux marges empilées rognent la zone utile');
 
   // La recherche de la grille regarde aussi le numéro du ticket.
   assert.ok(/refsTicket\(r\)\.includes\(q\)/.test(APP));
