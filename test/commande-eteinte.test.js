@@ -104,4 +104,39 @@ for (const [sel, pourquoi] of A_LIRE) {
   assert.ok(!/opacity\s*:/.test(m[1]), `${sel} — ${pourquoi} : une opacité l’éteint`);
 }
 
+// --- 5. Au comptoir, l'extinction doit être DANS LA COUCHE QUI GAGNE ------
+// Les deux écrans du patron portent une couche de reprise en `!important` —
+// c'est elle qui leur donne la boîte de la charte. Une règle d'extinction posée
+// AILLEURS dans la feuille perd contre `.primary{background:…!important}` : le
+// bouton reste plein encre alors qu'il refuse le clic. C'est arrivé le 27/08,
+// et ça ne se voit sur aucun autre écran — seul le comptoir a cette couche.
+//
+// La règle : toute classe que la couche peint avec un fond `!important` doit
+// avoir son extinction dans la même couche, elle aussi en `!important`.
+for (const ecran of ['vente-directe', 'demande-devis']) {
+  const css = lire(`public/comptoir/${ecran}.css`);
+  assert.ok(/--dd-inactif\b/.test(css) && /--dd-inactif-encre\b/.test(css),
+    `${ecran} : l'extinction passe par les jetons, pas par une teinte à elle`);
+
+  // Les classes peintes en !important par la couche de reprise.
+  const peintes = new Set();
+  for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    if (!/background\s*:[^;]*!important/.test(m[2])) continue;
+    for (const c of m[1].matchAll(/\.([a-z][\w-]*)/g)) peintes.add(c[1]);
+  }
+  // Celles qui portent une ACTION : les seules qu'on peut éteindre.
+  const actions = [...peintes].filter((c) => ['primary', 'secondary', 'danger', 'whatsapp'].includes(c));
+  assert.ok(actions.length, `${ecran} : la couche de reprise ne peint aucun bouton ?`);
+
+  for (const classe of actions) {
+    const eteinte = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].some(([, sel, corps]) =>
+      new RegExp(`\\.${classe}(?:\\.blocked|:disabled)`).test(sel)
+      && /background\s*:[^;]*!important/.test(corps)
+      && /--dd-inactif\b/.test(corps));
+    assert.ok(eteinte,
+      `${ecran} — « .${classe} » se peint en !important mais ne s'éteint pas dans la même couche : `
+      + 'désactivé, il gardera l’aspect d’un bouton armé qui refuse le clic');
+  }
+}
+
 console.log('✓ commande éteinte : elle s’éclaircit, elle ne s’efface pas — et les deux thèmes tiennent');

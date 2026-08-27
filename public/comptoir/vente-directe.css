@@ -584,6 +584,19 @@ button{font-weight:var(--graisse-forte)}
              border-color var(--dur-2) var(--ease),color var(--dur-2) var(--ease),transform var(--dur-1) var(--ease)}
 .primary,.whatsapp{background:var(--primary)!important;color:var(--on-primary)!important;box-shadow:var(--shadow-1)}
 .primary:hover,.whatsapp:hover{background:var(--primary-hover)!important;box-shadow:var(--shadow-2)}
+/* UNE ACTION QU'ON NE PEUT PAS ENCORE FAIRE. Elle vit ICI, dans la couche qui
+   porte les `!important` : posée plus haut dans la feuille, elle perdait contre
+   `.primary{background:var(--primary)!important}` et « Valider les articles »
+   restait plein encre alors qu'il refusait le clic — un bouton armé qui ne
+   répond pas. Le libellé continue de dire ce qu'il ferait (--dd-inactif, la
+   paire de la charte). `.blocked` ET `:disabled` : le script pose les deux, et
+   le second seul suffirait à laisser un bouton non stylé.
+   Règle SŒUR de celle de demande-devis.css — même sortie, deux écrans à un clic
+   l'un de l'autre. */
+button.blocked,button.blocked:hover,button:disabled,
+.primary:disabled,.primary:disabled:hover,.whatsapp:disabled,
+.secondary:disabled,.secondary:disabled:hover,
+.danger:disabled,.danger:disabled:hover{background:var(--dd-inactif)!important;color:var(--dd-inactif-encre)!important;border-color:transparent!important;box-shadow:none!important;cursor:not-allowed}
 .secondary{background:transparent!important;border-color:var(--border)!important;color:var(--text-2)!important}
 .secondary:hover{background:var(--surface-hover)!important;border-color:var(--border-strong)!important;color:var(--text-1)!important}
 .danger{background:var(--danger-bg)!important;border-color:var(--danger-line)!important;color:var(--danger)!important}
@@ -677,7 +690,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 .live-check ul{margin:7px 0 0;padding-left:18px}
 .live-check li{margin:3px 0;font-weight:var(--graisse-note)}
-button.blocked{background:var(--dd-inactif);color:var(--dd-inactif-encre);cursor:not-allowed}
 .dup-warn{margin-top:12px;padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger);font-weight:var(--graisse-forte)}
 /* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
    remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
