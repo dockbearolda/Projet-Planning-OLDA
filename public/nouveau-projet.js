@@ -31,19 +31,12 @@
 // Le parcours, lui, ne connaît aucune adresse d'API : il produit un dossier
 // complet, l'hôte l'enregistre.
 
-// LA VOIE RAPIDE, à côté des deux parcours complets (27/08/2026).
-// Mesuré sur les 184 dossiers réels : douze champs sont remplis moins d'une
-// fois sur deux, six moins d'une fois sur cinq — et ils sont SUR LE CHEMIN,
-// entre le client et le prix. `eclair.js` les range derrière un volet et laisse
-// sur la route ce qui est toujours rempli. Ce n'est pas un second modèle de
-// données : même route, même fiche, même ticket d'atelier.
-//
-// Elle n'est PAS un cadre : elle vit dans ce document, avec la charte du CRM et
-// son thème. Un cadre lui aurait coûté un pont de messages pour rien — les deux
-// parcours du patron, eux, sont des documents à part parce qu'ils se REMPLACENT
-// d'une version à l'autre.
-const ECLAIR = { id: 'eclair', label: 'Saisie éclair', icone: 'bolt' };
-
+// UNE VOIE RAPIDE A ÉTÉ CONSTRUITE ICI LE 27/08, PUIS RETIRÉE LE MÊME JOUR.
+// Elle posait un TROISIÈME parcours à côté des deux du patron : trois écrans à
+// tenir, trois endroits où une règle métier peut diverger. La bonne réponse
+// était de simplifier les deux qui existent — c'est ce qui a été fait (voir
+// `archives/comptoir-2026-08-27/`). On ne double pas un parcours pour le rendre
+// court : on le raccourcit.
 const FLUX = [
   {
     id: 'vente',
@@ -115,18 +108,10 @@ function icone(nom) {
 // --- Affichage ---------------------------------------------------------------
 // `id` vaut null sur l'accueil : aucun parcours ouvert, seulement les tuiles.
 function afficher(id) {
-  const eclair = id === ECLAIR.id;
   const flux = FLUX.find((f) => f.id === id) || null;
-  fluxAffiche = eclair ? ECLAIR.id : (flux ? flux.id : null);
-  ROOT.querySelector('#np-home').hidden = Boolean(flux) || eclair;
+  fluxAffiche = flux ? flux.id : null;
+  ROOT.querySelector('#np-home').hidden = Boolean(flux);
   ROOT.querySelector('#np-frames').hidden = !flux;
-  const paneEclair = ROOT.querySelector('#np-eclair');
-  if (paneEclair) {
-    paneEclair.hidden = !eclair;
-    // MONTÉE À LA DEMANDE, comme les cadres : tant que personne n'a ouvert la
-    // voie rapide, ni son module ni le catalogue ne sont téléchargés.
-    if (eclair) monterVoieRapide(paneEclair);
-  }
   /* PLUS DE BARRE DE SORTIE ICI. L'hôte en posait une au-dessus du cadre :
      61 px pour une seule flèche, au-dessus d'une rangée d'étapes qui en prenait
      94. La flèche vit désormais DANS la rangée d'étapes du parcours (voir
@@ -184,55 +169,6 @@ function reinitialiser(id) {
   } catch (err) {
     cadre.src = url;
   }
-}
-
-// --- LA VOIE RAPIDE ----------------------------------------------------------
-// Elle n'a besoin que de deux choses de l'hôte : de quoi ENREGISTRER (la même
-// route, la même file, le même traitement des trois issues), et de quoi PASSER
-// LA MAIN au parcours complet quand elle ne sait pas faire.
-let eclairPromesse = null;
-let eclairEcran = null;
-
-// Le catalogue est un script CLASSIQUE : les deux écrans du comptoir le
-// chargent par balise, sans build. On le pose de la même façon, une seule fois.
-function poserCatalogue() {
-  if (typeof window.catalogueAPlat === 'function') return Promise.resolve();
-  return new Promise((ok, ko) => {
-    const s = document.createElement('script');
-    s.src = 'comptoir/catalogue.js';
-    s.onload = ok;
-    s.onerror = () => ko(new Error('catalogue injoignable'));
-    document.head.append(s);
-  });
-}
-
-function monterVoieRapide(hote) {
-  if (eclairPromesse) return eclairPromesse;
-  eclairPromesse = Promise.all([poserCatalogue(), import('./eclair.js')])
-    .then(([, mod]) => {
-      eclairEcran = mod.monterEclair(hote, {
-        // L'ERREUR REMONTE À LA VOIE RAPIDE, elle ne s'affiche pas au-dessus :
-        // l'écran de saisie a son propre message, à côté du bouton qu'on vient
-        // de taper. Un message hors de vue est un dossier perdu en silence.
-        enregistrer: async (payload) => {
-          const data = await enregistrer(payload, { rendreErreur: true });
-          const avis = avisEnregistrement(data);
-          if (avis) montrerAvis(avis);
-          return data;
-        },
-        ouvrirParcours: (nature) => afficher(nature === 'devis' ? 'devis' : 'vente'),
-      });
-      return eclairEcran;
-    })
-    .catch((err) => {
-      eclairPromesse = null;
-      hote.replaceChildren(Object.assign(document.createElement('p'), {
-        className: 'np-erreur',
-        textContent: `Saisie éclair indisponible : ${err.message}. Les deux parcours complets restent ouverts.`,
-      }));
-      return null;
-    });
-  return eclairPromesse;
 }
 
 // --- Erreur d'enregistrement -------------------------------------------------
@@ -307,9 +243,7 @@ function construireAccueil() {
      tuiles : elles se lisent sans qu'on les annonce. */
   const grille = document.createElement('div');
   grille.className = 'np-home__grid';
-  // LA VOIE RAPIDE EN PREMIER : c'est celle qui sert au client courant. Les
-  // deux parcours complets restent à côté, pour ce qu'elle ne sait pas faire.
-  for (const f of [ECLAIR, ...FLUX]) {
+  for (const f of FLUX) {
     const tuile = document.createElement('button');
     tuile.type = 'button';
     tuile.className = 'np-tile';
@@ -353,17 +287,10 @@ function construire() {
     cadres.append(cadre);
   }
 
-  // La voie rapide vit ICI, dans le document du CRM : pas de cadre, donc pas de
-  // pont de messages ni de thème à repasser.
-  const pane = document.createElement('div');
-  pane.className = 'np-eclair';
-  pane.id = 'np-eclair';
-  pane.hidden = true;
-
   /* LA BARRE EN PREMIER, pas entre l'accueil et les cadres : elle est visible
      aussi sur les tuiles (c'est la sortie du poste) et un `flex: 1` sur
      l'accueil l'aurait poussée tout en bas de l'écran. */
-  shell.append(construireAccueil(), erreur, pane, cadres);
+  shell.append(construireAccueil(), erreur, cadres);
   ROOT.replaceChildren(shell);
 }
 
@@ -391,7 +318,7 @@ function repondreAuParcours(source, ok, message) {
 // enregistre son dossier dès qu'il est complet (voir le filet de pont.js). On
 // ne l'emporte donc PAS sur la ligne du planning : elle a le ticket à l'écran,
 // et il lui reste à l'imprimer.
-async function enregistrer(payload, { auto = false, source = null, rendreErreur = false } = {}) {
+async function enregistrer(payload, { auto = false, source = null } = {}) {
   // Double tap sur « Créer dans le planning » = une seule ligne au planning.
   // MAIS ON RÉPOND : jeter le message sans un mot laissait l'écran émetteur
   // sur « Enregistrement au planning… » pour toujours — sans bouton Réessayer,
@@ -400,9 +327,6 @@ async function enregistrer(payload, { auto = false, source = null, rendreErreur 
   if (enCours) {
     const dit = 'un envoi est déjà en cours — réessaie dans un instant';
     repondreAuParcours(source, false, dit);
-    // La voie rapide n'a pas de cadre à qui répondre : sans cette levée, elle
-    // se remettrait à neuf en croyant le dossier parti.
-    if (rendreErreur) throw new Error(dit);
     return;
   }
   enCours = true;
@@ -423,10 +347,6 @@ async function enregistrer(payload, { auto = false, source = null, rendreErreur 
     const avis = avisEnregistrement(data);
     if (avis) montrerAvis(avis); else masquerErreur();
     repondreAuParcours(source, true, avis || '');
-
-    // La voie rapide reste sur son écran : la vendeuse enchaîne les clients,
-    // sauter au planning à chaque vente lui coûterait deux gestes de retour.
-    if (rendreErreur) return data;
 
     // Envoi automatique : la ligne est née, le parcours l'affiche lui-même. On
     // laisse la vendeuse sur son ticket.
@@ -449,11 +369,6 @@ async function enregistrer(payload, { auto = false, source = null, rendreErreur 
   } catch (err) {
     const raison = err.name === 'AbortError' ? 'le serveur ne répond pas' : err.message;
     repondreAuParcours(source, false, raison);
-    // L'appelant qui vit dans ce document affiche l'échec LÀ OÙ ON VIENT DE
-    // TAPER. Le bandeau de l'hôte, lui, est au-dessus d'un cadre : pour la voie
-    // rapide il serait hors de vue, et c'est par ce trou que des dossiers sont
-    // partis sans que personne ne s'en aperçoive.
-    if (rendreErreur) throw new Error(raison);
     montrerErreur(raison);
   } finally {
     clearTimeout(stop);
@@ -497,10 +412,6 @@ function auMessage(e) {
 // répond donc à la seule question qu'on sait trancher d'ici : y a-t-il un
 // parcours à l'écran ?
 export function parcoursOuvert() {
-  // La voie rapide vit dans CE document : on sait, elle, ce qu'elle contient.
-  // Un écran vide n'est pas une saisie en cours — inutile de retenir une mise à
-  // jour pour un formulaire que personne n'a touché.
-  if (fluxAffiche === ECLAIR.id) return Boolean(eclairEcran && eclairEcran.enSaisie());
   return fluxAffiche !== null;
 }
 
@@ -527,7 +438,4 @@ export async function resetProjet() {
     if (fluxTouches.has(f.id)) reinitialiser(f.id);
   }
   fluxTouches.clear();
-  // La voie rapide se vide elle aussi : comptoir = on repart net d'un client à
-  // l'autre. Jamais montée, il n'y a rien à vider.
-  if (eclairEcran) eclairEcran.reinitialiser();
 }
