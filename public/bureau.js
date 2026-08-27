@@ -77,8 +77,13 @@ function postesDuPanier(details) {
 
 // Ce que les colonnes de la ligne portent déjà : inutile de le répéter depuis
 // le bloc client de la fiche.
-const DEJA_DIT = new Set(['Client', 'Type de client', 'WhatsApp', 'E-mail',
-  'Téléphone', 'Personne à contacter']);
+// `Nom / société` EST `billing_company` : c'est le mot que le comptoir emploie
+// dans le bloc client de la fiche, et c'est déjà ce que la ligne « Client : »
+// écrit deux lignes plus haut. Il manquait à cette liste — d'où « Client :
+// Marie Lestrade » suivi de « Nom / société : Marie Lestrade », sur le document
+// qui sert à facturer.
+const DEJA_DIT = new Set(['Client', 'Nom / société', 'Type de client', 'WhatsApp',
+  'E-mail', 'Téléphone', 'Personne à contacter']);
 
 // Et ce que le bloc TOTAL écrit déjà, en gros, juste au-dessus.
 const DEJA_TOTAL = new Set(['Total TTC', 'Total HT', 'Taxe', 'Taxe 4 %', 'Paiement',
@@ -131,6 +136,46 @@ function argentDe(l, fiche) {
     acompteVerse: l.acompte_verse === true,
     acompte,
   };
+}
+
+// LE PRIX D'UNE PIÈCE, TEL QUE LE COMPTOIR L'A ÉCRIT.
+//
+// La colonne « P.U. » du papier était VIDE sur toute vente directe. Elle
+// cherchait « Prix unitaire HT » — un libellé que seule la demande de devis
+// écrit. La vente, elle, en écrit DEUX : le prix de l'article et celui de la
+// personnalisation, que le client paie additionnés (`price = priceArticle +
+// priceCustom`, puis `unitHT = price / 1.04`). Le bureau imprimait donc une
+// colonne vide sur son document le plus utilisé.
+//
+// ET CE SONT DES PRIX TTC. C'est le sens que leur donne l'écran de vente : il
+// en DÉDUIT le HT en divisant par 1,04. Les additionner sous un intitulé
+// « P.U. HT » aurait donné un prix faux de 4 % — l'entête suit donc la source.
+const MONTANT = /-?\d[\d\s\u00a0\u202f]*(?:[.,]\d+)?/;
+function montant(v) {
+  const m = String(v == null ? '' : v).match(MONTANT);
+  if (!m) return null;
+  const n = Number(m[0].replace(/[\s\u00a0\u202f]/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function uniteVendue(champs) {
+  // Une demande chiffrée dit son prix unitaire : il fait foi, tel quel.
+  const dit = champs['Prix unitaire HT'] || champs['Prix unitaire'] || '';
+  if (dit) return dit;
+  const article = montant(champs['Prix article']);
+  const perso = montant(champs['Prix personnalisation']);
+  // « Pas de prix » et « prix à zéro » ne se confondent pas : sans aucun des
+  // deux libellés, la case reste vide plutôt que d'annoncer 0,00 €.
+  if (article == null && perso == null) return '';
+  return euro((article || 0) + (perso || 0));
+}
+
+// Une note qui redit une ligne déjà imprimée n'est pas une note.
+function noteUtile(note, dossier) {
+  if (!note) return '';
+  const nu = (v) => String(v).replace(/\s+/g, ' ').trim().toLowerCase();
+  const dit = nu(note);
+  return dossier.some((x) => nu(`${x.k} : ${x.v}`) === dit || nu(x.v) === dit) ? '' : note;
 }
 
 // LE MODÈLE DU BON DE COMMANDE. `l` est une ligne du planning avec sa fiche
@@ -201,7 +246,7 @@ export function modeleBureau(l) {
       categorie: p.champs['Catégorie'] || '',
       reference: p.champs['Référence'] || '',
       couleur: p.champs['Couleur'] || '',
-      unitaire: p.champs['Prix unitaire HT'] || p.champs['Prix unitaire'] || '',
+      unitaire: uniteVendue(p.champs),
       total: p.champs['Total TTC'] || '',
       detail: p.champs['Description de production'] || p.champs['Informations importantes'] || '',
     })),
@@ -210,8 +255,13 @@ export function modeleBureau(l) {
     // délai, la note interne.
     dossier: dossierDuPanier(f.details),
     argent: argentDe(r, f),
-    // Ce que la vendeuse a écrit de sa main sur la ligne.
-    note: texte(r.description),
+    // Ce que la vendeuse a écrit de sa main sur la ligne — SAUF quand elle ne
+    // l'a pas écrite. La colonne `description` d'un dossier du comptoir est
+    // remplie par l'écran (« Délai souhaité : Sous 10 jours ouvrés »), et cette
+    // phrase est mot pour mot une ligne du récapitulatif imprimé vingt lignes
+    // plus haut. Le document la disait donc deux fois, dont une sous un cadre
+    // « ne pas remettre au client » où elle n'apprend rien.
+    note: noteUtile(texte(r.description), dossierDuPanier(f.details)),
     production: texte(f.production),
   };
 }
@@ -370,7 +420,7 @@ export function dessinerBureau(t, doc) {
     const trh = el('tr');
     const colonnes = t.demande
       ? ['Désignation', 'Qté']
-      : ['Désignation', 'Qté', 'P.U. HT', 'Total TTC'];
+      : ['Désignation', 'Qté', 'P.U. TTC', 'Total TTC'];
     for (const c of colonnes) {
       const th = el('th', c === 'Désignation' ? '' : 'bu__num', c);
       trh.append(th);
@@ -474,7 +524,7 @@ export function bureauTexte(t) {
       if (sous) out.push(`  ${sous}`);
       if (a.detail) out.push(`  ${a.detail}`);
       if (!t.demande && (a.unitaire || a.total)) {
-        out.push(`  ${[a.unitaire && `P.U. HT ${a.unitaire}`, a.total && `Total ${a.total}`].filter(Boolean).join(' · ')}`);
+        out.push(`  ${[a.unitaire && `P.U. TTC ${a.unitaire}`, a.total && `Total ${a.total}`].filter(Boolean).join(' · ')}`);
       }
     }
   }

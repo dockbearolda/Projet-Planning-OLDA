@@ -182,5 +182,70 @@ vm.runInContext(
   assert.ok(!/\.style\./.test(SRC.replace(/\/\*[\s\S]*?\*\//g, ' ')),
     'le rendu ne pose aucun style en ligne');
 
+  // --- 9. LE PAPIER D'UNE VRAIE VENTE DIRECTE (27/08/2026) -----------------
+  //
+  // Le dossier d'essai du dessus porte « Article 1 — Prix unitaire HT » : c'est
+  // le libellé de la DEMANDE DE DEVIS, et il n'apparaît sur AUCUNE vente. Ce
+  // dossier ne ressemblait donc à rien de ce qui existe en base, et il a caché
+  // une colonne « P.U. » VIDE sur tout bon de commande d'une vente au comptoir
+  // — le document le plus imprimé du bureau.
+  //
+  // Une vente écrit DEUX prix : l'article et la personnalisation. Le client
+  // paie leur somme, et ce sont des prix TTC — l'écran en déduit le HT en
+  // divisant par 1,04 (unitHT = (priceArticle + priceCustom) / 1.04).
+  const vente = modeleBureau({
+    ...ligne,
+    description: 'Délai souhaité : Sous 10 jours ouvrés (prioritaire)',
+    project_value: 191.4,
+    fiche: {
+      ...ligne.fiche,
+      client: [['Nom / société', 'Blue Martini'], ['E-mail', 'c@bm.fr']]
+        .map(([k, v]) => ({ k, v })),
+      details: [
+        ['Type de dossier', 'Vente directe'],
+        ['Délai souhaité', 'Sous 10 jours ouvrés (prioritaire)'],
+        ['Article 1 — Désignation', 'Tee-shirt NS300 noir'],
+        ['Article 1 — Quantité', '12'],
+        ['Article 1 — Prix article', '8,50 €'],
+        ['Article 1 — Prix personnalisation', '6,00 €'],
+        ['Article 1 — Total TTC', '191,40 €'],
+        ['Article 1 — Description de production', 'Logo coeur 90 mm'],
+      ].map(([k, v]) => ({ k, v })),
+    },
+  });
+  // L'espace avant l'euro est une FINE INSÉCABLE (U+202F), celle que produit
+  // Intl en français : une comparaison avec une espace ordinaire échoue sur
+  // deux chaînes qui s'affichent pareil.
+  assert.match(vente.articles[0].unitaire, /^14,50\s€$/,
+    'le prix d’une pièce est la somme des deux prix que la vente écrit');
+  const texteVente = bureauTexte(vente);
+  assert.match(texteVente, /P\.U\. TTC 14,50/,
+    'et il s’annonce TTC : c’est le sens que l’écran de vente lui donne');
+  assert.ok(!/P\.U\. HT/.test(texteVente),
+    'l’annoncer HT le ferait faux de 4 % sur le document qui sert à facturer');
+
+  // « Client : Blue Martini » puis « Nom / société : Blue Martini », deux
+  // lignes plus bas, sur le même papier.
+  assert.strictEqual((texteVente.match(/Blue Martini/g) || []).length, 1,
+    'le nom du client ne s’écrit qu’une fois');
+
+  // La colonne `description` d'un dossier du comptoir est remplie PAR L'ÉCRAN,
+  // avec une phrase qui est déjà, mot pour mot, une ligne du récapitulatif.
+  assert.strictEqual(vente.note, '',
+    'une note qui redit une ligne déjà imprimée n’est pas une note');
+  assert.strictEqual((texteVente.match(/Sous 10 jours ouvrés/g) || []).length, 1,
+    'le délai ne s’écrit qu’une fois, et pas sous un cadre « ne pas remettre au client »');
+  // Ce que la vendeuse a VRAIMENT écrit reste, lui.
+  assert.strictEqual(modeleBureau({ ...ligne, description: 'Prévenir avant de couper.' }).note,
+    'Prévenir avant de couper.', 'une note de la main de la vendeuse ne se perd pas');
+
+  // Sans aucun des deux libellés, la case reste VIDE : « pas de prix » et
+  // « prix à zéro » ne se confondent pas sur un document qui sert à facturer.
+  const sansPU = modeleBureau({
+    ...ligne,
+    fiche: { ...ligne.fiche, details: [{ k: 'Article 1 — Désignation', v: 'Bâche' }] },
+  });
+  assert.strictEqual(sansPU.articles[0].unitaire, '');
+
   console.log('✓ vue bureau : tout l’argent sur un papier, et rien de lui sur celui de l’atelier');
 })().catch((e) => { console.error(e); process.exit(1); });
