@@ -24,6 +24,9 @@ const path = require('node:path');
 const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
 const APP = lire('public/app.js');
+// Le feu vit dans son propre fichier depuis le 27/08. Ce que app.js en garde,
+// c'est l'APPEL — et c'est ce qu'on continue d'y vérifier.
+const FAITS = lire('public/ligne-faits.js');
 const CSS = lire('public/styles.css');
 const SERVEUR = lire('server.js');
 const SCHEMA = lire('schema.sql');
@@ -67,7 +70,7 @@ console.log('✓ feu : les exigences s’arment seules — devis, BAT, argent');
 // ---------------------------------------------------------------------------
 // On rejoue `FEU_FAITS` tel qu'il est écrit dans app.js : c'est la règle qui se
 // teste, pas une copie qui pourrait diverger.
-const bloc = APP.slice(APP.indexOf('const FEU_FAITS = ['), APP.indexOf('\n// Ce que le dossier exige'));
+const bloc = FAITS.slice(FAITS.indexOf('const FEU_FAITS = ['), FAITS.indexOf('\n// Ce que le dossier exige'));
 assert.ok(bloc.length > 400, 'FEU_FAITS doit être lisible dans app.js');
 
 const APRES_CHIFFRAGE = new Set(['preparation', 'production', 'facturation', 'paiement']);
@@ -93,8 +96,8 @@ assert.match(bloc, /requis: \(r\) => r\.stage === 'production'/);
 assert.match(bloc, /FEU_APRES_CHIFFRAGE\.has\(r\.stage\)/);
 assert.match(bloc, /FEU_APRES_BAT\.has\(r\.stage\)/);
 assert.match(bloc, /r\.paye === true \|\| \(r\.acompte_demande === true && r\.acompte_verse === true\)/);
-assert.match(APP, /const FEU_APRES_CHIFFRAGE = new Set\(\['preparation', 'production', 'facturation', 'paiement'\]\)/);
-assert.match(APP, /const FEU_APRES_BAT = new Set\(\['production', 'facturation', 'paiement'\]\)/);
+assert.match(FAITS, /const FEU_APRES_CHIFFRAGE = new Set\(\['preparation', 'production', 'facturation', 'paiement'\]\)/);
+assert.match(FAITS, /const FEU_APRES_BAT = new Set\(\['production', 'facturation', 'paiement'\]\)/);
 
 // LA TASSE À 12 € AU COMPTOIR : payée à la caisse, ni devis ni BAT. Elle
 // n'exige RIEN, donc sa carte ne porte pas la rangée. C'est le contrôle qui
@@ -158,7 +161,7 @@ assert.deepStrictEqual(
 
 // LA PORTÉE, MESURÉE SUR LES 185 DOSSIERS RÉELS (27/08). Ni muet ni mur : la
 // version d'avant en allumait 0, la toute première 184 sur 307.
-assert.match(APP, /28 s'allument, soit 15 %/,
+assert.match(FAITS, /28 s'allument, soit 15 %/,
   'la portée de la règle est écrite dans le code, avec sa date et son échantillon');
 
 console.log('✓ feu : la tasse n’exige rien, les 200 t-shirts exigent les trois');
@@ -173,12 +176,12 @@ console.log('✓ feu : la tasse n’exige rien, les 200 t-shirts exigent les tro
 // montre-le dans le rythme du reste.
 //
 // L'OBTENU NE S'ÉCRIT PLUS DU TOUT : `feuDuDossier` ne rend que le manquant.
-assert.match(APP, /FEU_FAITS\.filter\(\(f\) => f\.requis\(r\) && !f\.obtenu\(r\)\)/,
+assert.match(FAITS, /FEU_FAITS\.filter\(\(f\) => f\.requis\(r\) && !f\.obtenu\(r\)\)/,
   'seul ce qui manque s’affiche — l’obtenu ne prend aucune place');
 
 // AUCUN GLYPHE. « ● » et « ◌ » sont des caractères de police : ils changent de
 // dessin d'un poste à l'autre et se lisent comme du texte, pas comme un repère.
-const blocFeu = APP.slice(APP.indexOf('function blocFeu'), APP.indexOf('function blocProduction'));
+const blocFeu = FAITS.slice(FAITS.indexOf('function blocFeu'), FAITS.indexOf('function blocProduction'));
 assert.ok(!/[●◌○◉]/.test(blocFeu), 'plus un seul glyphe dans le feu');
 
 // LA MÊME GRILLE QUE LA FICHE DE PRODUCTION : c'est ce qui la fait lire comme
@@ -200,16 +203,16 @@ assert.ok(!/\.feu__val|\.feu__pt/.test(CSS),
 
 // ON NOMME CE QU'ON ATTEND, pas la catégorie. « Argent » ne dit pas quoi faire ;
 // « Acompte » dit qu'il a été réclamé et qu'il n'est pas rentré.
-assert.match(APP, /manque: \(r\) => \(r\.acompte_demande === true \? 'Acompte' : 'Paiement'\)/,
+assert.match(FAITS, /manque: \(r\) => \(r\.acompte_demande === true \? 'Acompte' : 'Paiement'\)/,
   'la rangée nomme ce qu’on attend — « Acompte » s’il a été réclamé, sinon « Paiement »');
-assert.match(APP, /Acompte de \$\{eur\(Number\(r\.acompte_montant\)\)\} demande - pas encore recu/,
+assert.match(FAITS, /Acompte de \$\{eur\(Number\(r\.acompte_montant\)\)\} demande - pas encore recu/,
   'et le survol donne le montant réclamé');
 
 // DEPUIS QUAND. « Il manque le devis » ne dit pas s'il faut relancer ;
 // « Devis 12 j » le dit, et c'est la seule chose que la ligne ajoute.
-assert.match(APP, /function joursDepuis\(iso\)/,
+assert.match(FAITS, /function joursDepuis\(iso\)/,
   'le délai se calcule — il ne se devine pas au survol');
-assert.match(APP, /joursDepuis\(r\.updated_at\)/,
+assert.match(FAITS, /joursDepuis\(r\.updated_at\)/,
   'on lit `updated_at` : le journal ne couvre pas le passé, il dirait MOINS');
 assert.match(blocFeu, /d\.className = 'feu__depuis'/,
   'le nombre de jours s’écrit sur la ligne, collé au mot');
@@ -224,7 +227,7 @@ assert.strictEqual((blocFeu.match(/feu__depuis/g) || []).length, 1,
   'le nombre de jours s’écrit UNE fois, à la fin — pas après chaque mot');
 assert.ok(blocFeu.indexOf('feu__depuis') > blocFeu.indexOf('manque.forEach'),
   '… donc après la boucle qui écrit les mots, pas dedans');
-assert.match(APP, /depuis: jours \? `\$\{jours\}\\u00a0j` : ''/,
+assert.match(FAITS, /depuis: jours \? `\$\{jours\}\\u00a0j` : ''/,
   'l’espace entre le nombre et son unité est INSÉCABLE : « 21 j » ne se coupe pas');
 
 // LA BANDE NE SORT PAS DE SA COLONNE DANS LE TABLEAU (27/08/2026).
@@ -261,15 +264,15 @@ assert.match(bande, /padding: var\(--pas-1\) var\(--pas-2\)/,
 // LE MÊME COMPOSANT DANS LES DEUX VUES : deux écrans à un clic l'un de l'autre
 // doivent donner le même bloc, pas deux qui se ressemblent.
 const carte = APP.match(/function buildCard\(r, options\)[\s\S]*?\n\}/);
-assert.ok(carte && /blocFeu\(r\)/.test(carte[0]), 'la carte porte le feu');
+assert.ok(carte && /blocFeu\(r, attachTip\)/.test(carte[0]), 'la carte porte le feu');
 const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
-assert.ok(cellule && /blocFeu\(r\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME');
+assert.ok(cellule && /blocFeu\(r, attachTip\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME');
 // …ET DANS LE MÊME ORDRE : « Manque » est la CINQUIÈME ligne de la fiche, pas
 // une rangée posée devant. On lit ce qu'il y a à produire, puis ce qui empêche
 // de le faire — et c'est ce qui aligne les cinq intitulés dans une colonne.
-assert.ok(carte[0].indexOf('blocProduction(r)') < carte[0].indexOf('blocFeu(r)'),
+assert.ok(carte[0].indexOf('blocProduction(r, hiddenCols)') < carte[0].indexOf('blocFeu(r, attachTip)'),
   'sur la carte, « Manque » vient APRÈS la fiche de production');
-assert.ok(cellule[0].indexOf('blocProduction(r)') < cellule[0].indexOf('blocFeu(r)'),
+assert.ok(cellule[0].indexOf('blocProduction(r, hiddenCols)') < cellule[0].indexOf('blocFeu(r, attachTip)'),
   'et dans la cellule Infos aussi');
 
 // CHACUN CHOISIT : à l'atelier on veut le feu, à la boutique peut-être pas.
@@ -281,7 +284,7 @@ assert.match(APP, /COLS_REDESSINENT = new Set\(\['price', 'feu'/,
 // IL AFFICHE, IL NE BLOQUE PAS — encore. On regarde d'abord si la règle dit
 // vrai sur de vrais dossiers ; on verrouillera ensuite. Seul le BAT refuse le
 // passage en production aujourd'hui, et c'était déjà le cas.
-assert.match(APP, /ce feu AFFICHE, il ne bloque pas/,
+assert.match(FAITS, /ce feu AFFICHE, il ne bloque pas/,
   'l’intention doit être écrite : un verrou qui se trompe arrête l’atelier');
 
 // ET SUR UN DOSSIER OÙ RIEN NE MANQUE, IL N'Y A PAS DE RANGÉE. C'est là qu'est

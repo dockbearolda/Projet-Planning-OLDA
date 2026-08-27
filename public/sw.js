@@ -73,15 +73,31 @@ const COQUILLE = [
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',
+  // Sortis de app.js le 27/08 et importés statiquement par lui : mêmes deux
+  // lignes, même conséquence. Un fichier qu'on découpe est un fichier de plus
+  // à mettre ici — c'est l'oubli qui accompagne toute découpe, et c'est
+  // `test/coquille-complete.test.js` qui le refuse maintenant.
+  '/format.js',
+  '/ligne-faits.js',
   // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être
   // tombé entre l'ouverture de l'application et le tap sur l'onglet.
   '/nouveau-projet.js',
   '/clients.js',
   '/reglages.js',
   // Les deux parcours du comptoir, affichés dans un cadre par Nouveau Projet.
+  // LEUR FEUILLE EST UN FICHIER À PART depuis le 27/08 : sans elle dans la
+  // coquille, l'écran s'ouvre hors ligne SANS UNE SEULE RÈGLE — il n'est pas
+  // en panne, il est nu, et la vendeuse le remplit quand même.
   '/comptoir/vente-directe.html',
+  '/comptoir/vente-directe.css',
   '/comptoir/demande-devis.html',
+  '/comptoir/demande-devis.css',
   '/comptoir/pont.js',
+  // Le catalogue de la boutique, chargé par une balise <script> de l'écran de
+  // devis — jamais mis dans la coquille depuis qu'il est sorti de la page le
+  // 25/08. Hors ligne, le menu « Produit du catalogue » s'ouvrait VIDE, sans
+  // une erreur : la vendeuse en concluait qu'on ne vend rien de ce rayon.
+  '/comptoir/catalogue.js',
   // Le catalogue textile, chargé par une balise <script> de l'écran de devis :
   // absent de la coquille, hors ligne `window.TextileEngine` n'existe pas et
   // tout le chiffrage textile tombe — sans la moindre erreur à l'écran.

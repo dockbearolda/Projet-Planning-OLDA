@@ -35,6 +35,7 @@ const RACINE = path.join(__dirname, '..');
 const lire = (p) => fs.readFileSync(path.join(RACINE, p), 'utf8');
 const DEVIS = ecran('demande-devis');
 const APP = lire('public/app.js');
+const FAITS = lire('public/ligne-faits.js');
 const CSS = lire('public/styles.css');
 const SERVEUR = lire('server.js');
 
@@ -355,11 +356,13 @@ assert.match(
   // -------------------------------------------------------------------------
   // UN SEUL COMPOSANT. Deux vues à un clic l'une de l'autre doivent donner le
   // même bloc, pas deux qui se ressemblent.
-  assert.ok(/function blocProduction\(r\)/.test(APP), 'le bloc de production est une fonction unique');
+  assert.ok(/export function blocProduction\(r, hiddenCols\)/.test(FAITS),
+    'le bloc de production est une fonction unique — et les colonnes masquées lui '
+    + 'arrivent par la signature, pas par un import de retour vers app.js');
   const carte = APP.match(/function buildCard\(r, options\)[\s\S]*?\n\}/);
-  assert.ok(carte && /blocProduction\(r\)/.test(carte[0]), 'la carte porte le bloc');
+  assert.ok(carte && /blocProduction\(r, hiddenCols\)/.test(carte[0]), 'la carte porte le bloc');
   const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
-  assert.ok(cellule && /blocProduction\(r\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME bloc');
+  assert.ok(cellule && /blocProduction\(r, hiddenCols\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME bloc');
 
   // QUATRE FAITS, QUATRE CASES. Chacun décide de ce qu'il voit.
   for (const cle of ['prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']) {
@@ -374,8 +377,8 @@ assert.match(
   // taille des logos ». Quatre faits portent la graisse forte, et EUX SEULS —
   // une taille de plus aurait demandé une rangée de plus, et c'est la rangée
   // qui permet de balayer une file.
-  const bloc = APP.slice(APP.indexOf('const PROD_FAITS = ['),
-    APP.indexOf('\n];', APP.indexOf('const PROD_FAITS = [')));
+  const bloc = FAITS.slice(FAITS.indexOf('const PROD_FAITS = ['),
+    FAITS.indexOf('\n];', FAITS.indexOf('const PROD_FAITS = [')));
   assert.match(bloc, /morceau\(ref, true\)/, 'la référence porte la graisse');
   assert.match(bloc, /morceau\(p\.encre, true\)/, 'la couleur du marquage aussi');
   assert.match(bloc, /morceau\(q, true\)/, 'la quantité aussi');

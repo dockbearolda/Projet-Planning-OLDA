@@ -22,6 +22,9 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'public/app.js'), 'utf8');
+// La fiche de production et la rangée « Manque » ont quitté app.js le 27/08 :
+// deux blocs sortables, mesurés avant de couper (voir ligne-faits.js).
+const FAITS = fs.readFileSync(path.join(RACINE, 'public/ligne-faits.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(RACINE, 'public/styles.css'), 'utf8');
 
 // Le corps d'une fonction, accolades comptées à partir de celle qui suit la
@@ -102,7 +105,7 @@ assert.match(APP, /const sig = `\$\{r\.id\}:\$\{r\.updated_at\}:\$\{coiffee \? '
 // « T-shirt col rond NS300 » puis « RÉF. NS300 · Blanc » : deux fois NS300 sur
 // trois centimètres. La ligne de production ne répète pas ce que la
 // désignation dit déjà.
-const faits = APP.slice(APP.indexOf('const PROD_FAITS = ['), APP.indexOf('\n];', APP.indexOf('const PROD_FAITS = [')));
+const faits = FAITS.slice(FAITS.indexOf('const PROD_FAITS = ['), FAITS.indexOf('\n];', FAITS.indexOf('const PROD_FAITS = [')));
 assert.match(faits, /nom\.includes\(p\.ref\) \? '' : p\.ref/);
 // La couleur du textile n'est nulle part ailleurs : elle reste, à côté de la
 // référence. Le marquage, lui, a sa propre rangée depuis le 26/08 — l'intitulé
