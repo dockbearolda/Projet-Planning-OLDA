@@ -4328,6 +4328,17 @@ function editeurTicket(r, champs) {
     return ctrl;
   };
 
+  // UNE ZONE DE TEXTE ÉPOUSE SON CONTENU. Sans ça elle garde la hauteur de ses
+  // `rows` et cache le reste derrière un défilement muet — ce qu'on vient
+  // justement de retirer à la désignation. On mesure APRÈS avoir remis la
+  // hauteur à `auto` : sinon `scrollHeight` ne redescend jamais quand on
+  // efface, et le champ reste haut pour toujours.
+  const epouser = (c) => {
+    if (c.tagName !== 'TEXTAREA') return;
+    c.style.height = 'auto';
+    c.style.height = `${c.scrollHeight}px`;
+  };
+
   const champ = (tag, valeur, o) => {
     const c = document.createElement(tag);
     c.className = o.cls ? `tk__champ ${o.cls}` : 'tk__champ';
@@ -4337,6 +4348,12 @@ function editeurTicket(r, champs) {
     if (o.placeholder) c.placeholder = o.placeholder;
     c.value = valeur == null ? '' : String(valeur);
     c.setAttribute('aria-label', o.label);
+    if (tag === 'textarea') {
+      c.addEventListener('input', () => epouser(c));
+      // La feuille n'est pas encore posée dans le document : `scrollHeight`
+      // n'y vaut rien. On mesure au tour suivant, une fois qu'elle y est.
+      requestAnimationFrame(() => epouser(c));
+    }
     return c;
   };
 
@@ -4375,7 +4392,11 @@ function editeurTicket(r, champs) {
         }
         const o = {
           qte: { cls: 'tk__qte', mode: 'numeric', label: 'Quantité' },
-          designation: { label: 'Désignation de l’article' },
+          // ZONE DE TEXTE, PAS CHAMP D'UNE LIGNE. Un `input` ne revient jamais à
+          // la ligne : « Sweat capuche molleton » y demandait 677 px pour 450
+          // disponibles, et se coupait net en plein mot — sur le seul mot que
+          // l'atelier cherche du regard, en 44 px.
+          designation: { tag: 'textarea', rows: 1, label: 'Désignation de l’article' },
           detail: {
             tag: 'textarea', rows: 2, label: 'Ce qu’on produit',
             placeholder: '+ précision pour l’atelier',

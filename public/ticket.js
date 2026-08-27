@@ -417,7 +417,11 @@ export const CSS_TICKET = `
   .tk__geant--texte { font-size: var(--tk-titre); line-height: 1.02; }
   .tk__ident-qte { display: flex; align-items: baseline; gap: 8px; line-height: .95; }
   .tk__ident-unite { font-size: var(--tk-fort); font-weight: 500; color: var(--tk-ardoise); }
-  .tk__ident-nom { margin: 0; padding: 0 28px 18px; font-size: var(--tk-fort); font-weight: 700;
+  /* 30 ET NON 28 : la boîte d'identité juste au-dessus porte un trait de 2 px,
+     que cette ligne-ci n'a pas. À rembourrage égal, les deux textes tombaient
+     donc à 73,3 et 75,2 px du bord de la feuille — deux pixels d'écart, c'est
+     trop peu pour être une hiérarchie et bien assez pour se voir. */
+  .tk__ident-nom { margin: 0; padding: 0 30px 18px; font-size: var(--tk-fort); font-weight: 700;
                    letter-spacing: -.01em; line-height: 1.3; }
   .tk__ident-mq { display: flex; align-items: center; justify-content: space-between; gap: 24px;
                   padding: 14px 28px; border-top: 1px solid var(--tk-filet); }
@@ -498,6 +502,19 @@ export const CSS_TICKET = `
   .tk__champ { font: inherit; color: inherit; letter-spacing: inherit; line-height: inherit;
                background: none; border: 0; border-bottom: 1px dotted var(--tk-ardoise);
                padding: 0; margin: 0; min-width: 0; width: 100%; }
+  /* UN CHAMP D'UNE LIGNE NE REVIENT JAMAIS A LA LIGNE — c'est la nature d'un
+     champ input : son contenu defile a l'interieur, invisible, et rien ne le dit.
+     Ce qui peut être long (la désignation) est donc une ZONE DE TEXTE, qui
+     s'enroule et grandit avec ce qu'on y met. On lui retire la poignée de
+     redimensionnement : la feuille garde ses proportions, on ne la déforme pas
+     à la main. */
+  textarea.tk__champ { resize: none; overflow: hidden; display: block; }
+  /* LA QUANTITE SE MESURE A SON NOMBRE. A 100 % de sa colonne, deux chiffres
+     tiraient un trait pointille de 308 px jusqu'au mot « pieces » : on lisait
+     un champ vide plutot qu'une quantite. field-sizing rend la boite a la
+     taille du contenu ; les navigateurs qui l'ignorent gardent le trait long,
+     ce qui reste lisible. */
+  .tk__qte { field-sizing: content; width: auto; min-width: 2ch; }
   .tk--edit .tk__case-v .tk__champ, .tk--edit .tk__mes-n .tk__champ { text-align: center; }
   .tk__champ:focus { outline: 2px solid var(--tk-encre); outline-offset: 2px; }
 `;
@@ -652,15 +669,32 @@ export function dessinerTicket(t, doc, editeur) {
     const boite = el('div', 'tk__ident');
     const tete2 = el('div', 'tk__ident-tete');
     const cg = el('div', 'tk__ident-col');
-    const nom = el('div', 'tk__geant');
+    // MÊME RÈGLE QUE PLUS BAS (blocsProduction) : ce qu'on écrit ici est
+    // TOUJOURS une désignation — une phrase, jamais un code de six signes,
+    // puisque cette tête-ci sert précisément aux lignes sans fiche. Elle prend
+    // donc le cran en dessous. Sans ça « Sweat capuche molleton » sortait à
+    // 64 px dans une colonne de 450 : mesuré 677 px de texte, coupé net en
+    // plein mot, et sur la seule chose que l'atelier cherche du regard.
+    const nom = el('div', 'tk__geant tk__geant--texte');
     if (editeur) nom.append(val('designation', a.designation, a.ou && a.ou.designation));
     else nom.textContent = a.designation;
     cg.append(cap('ARTICLE'), nom);
     const cd = el('div', 'tk__ident-col tk__ident-col--d');
     const q = el('div', 'tk__ident-qte');
-    if (editeur) q.append(el('span', 'tk__geant', ''), val('qte', a.qte, a.ou && a.ou.qte));
-    else q.append(el('span', 'tk__geant', a.qte || ''));
-    q.append(el('span', 'tk__ident-unite', 'pièces'));
+    // LE NOMBRE EST DANS LA BOÎTE GÉANTE, PAS À CÔTÉ. En correction, le champ
+    // était posé en VOISIN d'un `tk__geant` vide : il n'héritait donc de rien
+    // et la quantité sortait à 17 px — la taille du texte courant — alors que
+    // c'est, avec la référence, l'un des deux seuls faits qu'on cherche du
+    // regard sur une pile de papiers. Elle se nichait en plus derrière un trait
+    // de 139 px pour deux chiffres.
+    if (editeur) {
+      const n = el('span', 'tk__geant');
+      n.append(val('qte', a.qte, a.ou && a.ou.qte));
+      q.append(n);
+    } else {
+      q.append(el('span', 'tk__geant', a.qte || ''));
+    }
+    q.append(el('span', 'tk__ident-unite', Number(a.qte) > 1 ? 'pièces' : 'pièce'));
     cd.append(cap('QUANTITÉ'), q);
     tete2.append(cg, cd);
     boite.append(tete2);
