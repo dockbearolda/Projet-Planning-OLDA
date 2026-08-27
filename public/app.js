@@ -1551,10 +1551,11 @@ const FEU_FAITS = [
     label: 'Argent',
     // ON SIGNALE CE QUI EST ANORMAL, PAS CE QUI EST INCOMPLET.
     //
-    // Première version : « exigé dès qu'il y a un montant ». Mesuré sur 307
-    // dossiers de préparation, elle marquait 184 cartes — 60 % à elle seule, et
-    // 73 % avec le BAT. Un signal qui s'allume sur trois cartes sur quatre n'est
-    // plus un signal, c'est un fond d'écran : on l'éteint au bout d'une semaine.
+    // Première version : « exigé dès qu'il y a un montant ». Sur un jeu de
+    // charge de 307 dossiers de préparation, elle marquait 184 cartes — 60 % à
+    // elle seule, et 73 % avec le BAT. Un signal qui s'allume sur trois cartes
+    // sur quatre n'est plus un signal, c'est un fond d'écran : on l'éteint au
+    // bout d'une semaine.
     //
     // La cause est simple : à l'atelier, « pas encore payé » en préparation
     // n'est pas une anomalie, c'est la NORMALE — on encaisse au retrait. Ce qui
@@ -1562,6 +1563,12 @@ const FEU_FAITS = [
     // arriver : quelqu'un attend une réponse, et personne ne le sait.
     //
     // Avec cette règle : 32 dossiers sur 307 au lieu de 184.
+    //
+    // ⚠️ CES DEUX CHIFFRES VIENNENT DU JEU DE CHARGE, PAS DE L'ATELIER. Mesurée
+    // le 26/08 au soir sur les 184 vrais dossiers de production, la règle
+    // resserrée s'allume sur ZÉRO carte : `acompte_demande` y est NULL sur les
+    // 184 lignes — le champ n'a jamais servi. La règle n'est donc pas fausse,
+    // elle est MUETTE, et un verrou posé par-dessus ne contrôlerait rien.
     //
     // (Le patron dit « en production il doit avoir le paiement ». Cette exigence
     // -là se tiendra au VERROU, quand Charlie aura confirmé la règle — pas dans

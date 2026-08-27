@@ -115,11 +115,16 @@ assert.deepStrictEqual(manque(PRO), ['bat'], 'le devis validé disparaît de la 
 // « Pas encore payé » en préparation n'est pas une anomalie : à l'atelier on
 // encaisse au retrait. Ce qui est anormal, c'est d'avoir RÉCLAMÉ un acompte et
 // de ne pas l'avoir vu arriver — quelqu'un attend, et personne ne le sait.
-// Mesuré sur 307 dossiers de préparation : la règle « dès qu'il y a un montant »
-// marquait 184 cartes (60 % à elle seule, 73 % avec le BAT), la règle
-// « acompte réclamé et pas reçu » en marque 32. Un signal qui s'allume sur
+// Sur un JEU DE CHARGE de 307 dossiers de préparation : la règle « dès qu'il y a
+// un montant » marquait 184 cartes (60 % à elle seule, 73 % avec le BAT), la
+// règle « acompte réclamé et pas reçu » en marque 32. Un signal qui s'allume sur
 // trois cartes sur quatre n'est plus un signal : on l'éteint au bout d'une
 // semaine, et on perd les deux autres avec.
+//
+// ⚠️ CE JEU NE RESSEMBLE PAS À L'ATELIER. Sur les 184 vrais dossiers de prod
+// (26/08 au soir), `acompte_demande` est NULL sur les 184 lignes : la règle
+// resserrée s'allume sur ZÉRO carte. Ce test vérifie la MÉCANIQUE de la règle,
+// pas sa portée — pour la portée, voir la mesure sur copie de prod.
 PRO.acompte_demande = true;
 PRO.acompte_montant = 1360;
 assert.deepStrictEqual(manque(PRO), ['bat', 'argent'],
