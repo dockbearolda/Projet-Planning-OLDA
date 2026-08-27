@@ -290,26 +290,35 @@ assert.ok(/metrics,txDetail\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.tes
 // À découvert : les deux chiffres, puis l'article. Repliés : la marge et le
 // calcul du prix.
 const table = source('txTableau', 'd,c,ou');
-assert.ok(/det\.append\(txEl\('summary',null,'Détails'\),txKpiTotal\(d,c,cle\),txSaisieBloc\(d\)\);/.test(table),
-  'la carte montre son nom, ses prix, puis ce qu’est l’article — et RIEN d’autre');
+assert.ok(/som\.append\(txEl\('span','tx-recap-mot','Détails'\),txKpiTotal\(d,c,cle\)\);/.test(table)
+  && /det\.append\(som,txSaisieBloc\(d\)\);/.test(table),
+'le RÉSUMÉ porte le nom et les prix, le contenu porte ce qu’est l’article — et RIEN d’autre');
 assert.ok(!/txJauge|txDecompo|txAtelier/.test(table),
   'ni la marge, ni le coût atelier, ni la composition ne restent à découvert');
-// IL S'OUVRE PAR DÉFAUT CÔTÉ FORMULAIRE (2e passe du 24/08). Depuis que les
-// prix vivent en tête de son CONTENU, le replier cache aussi le total — et
-// c'est le chiffre qu'on annonce. La fiche, elle, s'ouvre repliée : sa ligne
-// dans le panneau porte déjà le total.
+// IL S'OUVRE REPLIÉ, DES DEUX CÔTÉS (27/08/2026). Il restait ouvert d'office
+// côté formulaire pour une seule raison : les prix vivaient en tête de son
+// CONTENU, et le replier cachait le total. Ils sont maintenant dans le RÉSUMÉ
+// — donc toujours à l'écran, volet fermé compris. Charlie : « par défaut la
+// page détails doit être fermée, seul ça doit rester affiché en haut ».
+// Ce qui se replie, c'est le DÉTAIL du calcul : on l'ouvre pour vérifier, pas
+// à chaque article.
 assert.ok(/txEl\('details','tx-recap'\)/.test(table) && /det\.open=TX_RECAP\[cle\]/.test(table),
   'le récapitulatif est un volet, ouvert selon sa mémoire');
-assert.ok(/const TX_RECAP=\{form:true,fiche:false\};/.test(DEVIS),
-  '… ouverte d’office côté formulaire, repliée côté fiche');
+assert.ok(/const TX_RECAP=\{form:false,fiche:false\};/.test(DEVIS),
+  '… repliée des deux côtés, puisque le prix ne s’y cache plus');
+// La case TGCA est dans le résumé : sans garde, la cocher OUVRIRAIT le volet.
+// On ARRÊTE LA REMONTÉE, on n'annule pas le geste : `preventDefault` sur le
+// résumé rendrait la case inerte — elle ne se cocherait plus du tout.
+assert.ok(/l\.addEventListener\('click',\(ev\)=>ev\.stopPropagation\(\)\)/.test(table),
+  'cocher la TGCA ne doit pas déplier le volet — ni cesser de cocher');
 assert.ok(/if\(det\.isConnected\)TX_RECAP\[cle\]=det\.open/.test(table),
   '… avec le même garde-fou que l’autre volet : un `toggle` différé n’écrase plus la remise à zéro');
 // CHAQUE SURFACE A SA PROPRE MÉMOIRE. Avec une mémoire commune, replier la
 // fiche pour négocier faisait écrire le besoin SUIVANT déjà replié.
 assert.ok(/txTableau\(n\.textile, ?c,'fiche'\)/.test(detail),
   'la fiche a sa propre mémoire d’ouverture');
-assert.ok(/txDetailOuvert=false;TX_RECAP\.form=true;txTgcaForm=true;/.test(source('cancelTextileEdit', '')),
-  '… et un nouveau besoin repart volet OUVERT (le prix doit rester sous les yeux) et TGCA recochée');
+assert.ok(/txDetailOuvert=false;TX_RECAP\.form=false;txTgcaForm=true;/.test(source('cancelTextileEdit', '')),
+  '… et un nouveau besoin repart volet REPLIÉ — le prix est dans le résumé, il ne s’y cache plus — et TGCA recochée');
 // NÉGOCIER, C'EST REGARDER UN SEUL CHIFFRE : les dix rangées de relecture
 // poussaient les solutions hors de l'écran au moment de les comparer. Depuis
 // le 24/08 la négociation d'une ligne posée est un VOLET de la fiche : c'est
@@ -337,13 +346,15 @@ const saisie = source('txSaisieLignes', 'd');
 // choisir lequel lire, et c'est le total que la vendeuse annonce. C'est aussi
 // le RÉSUMÉ du volet : replié, c'est le seul chiffre qui reste.
 const kpis = source('txKpiTotal', 'd,c,ou');
-// LES PRIX OUVRENT LE CONTENU DU VOLET (2e passe du 24/08 : « en haut de
-// Détails, plus en face ») : le résumé ne porte plus que le nom, même rangée
-// que « Tarification » et « Ajustement tarifaire ».
+// LES PRIX SONT REVENUS DANS LE RÉSUMÉ (27/08/2026). Ils étaient descendus
+// dans le CONTENU le 24/08 — ce qui obligeait à laisser le volet ouvert
+// d'office, sans quoi le total disparaissait. Charlie veut le volet fermé par
+// défaut : le prix remonte donc là où il reste visible dans les deux états.
+// Le mot « Détails » à gauche, le prix à droite, sur la même rangée.
 assert.ok(/txEl\('div','tx-recap-tete'\)/.test(kpis),
-  'les prix ouvrent le CONTENU du volet, ils ne sont plus son résumé');
-assert.ok(/txEl\('summary',null,'Détails'\)/.test(source('txTableau', 'd,c,ou')),
-  '… et le résumé ne porte que le nom « Détails », seul sur sa rangée');
+  'les prix restent un bloc à eux, posé dans le résumé');
+assert.ok(/txEl\('span','tx-recap-mot','Détails'\)/.test(source('txTableau', 'd,c,ou')),
+  '… et le résumé porte le nom PUIS les prix');
 assert.ok(!/'Récapitulatif article'/.test(DEVIS),
   '… et il s’appelle « Détails » : il n’ouvre qu’une part de la carte, pas la carte');
 assert.ok(!/Temps de production|Marge/.test(kpis),

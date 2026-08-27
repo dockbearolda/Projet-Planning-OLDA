@@ -571,11 +571,21 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
   assert.ok(!/border(?:-width)?:\s*2px/.test(inval[1]),
     `${nom} : un champ en erreur ne change pas la largeur de son trait — il se décalerait de 1 px`);
   if (nom === 'devis') {
-    // DEPUIS LE 24/08 (7 points du patron) : le champ fautif se SOULIGNE —
-    // un trait intérieur de 2 px, là où l'œil descend chercher le message.
-    // Toujours en ombre : elle ne prend pas de place, rien ne bouge.
-    assert.ok(/box-shadow:inset 0 -2px 0 0 var\(--danger\)/.test(inval[1]),
-      `${nom} : le champ fautif se souligne, d'un trait qui ne prend pas de place`);
+    // DEPUIS LE 27/08 : UN LISERÉ ROUGE, PAS UN SOULIGNEMENT. Le trait
+    // intérieur de 2 px posé le 24/08 se confondait avec le soulignement d'un
+    // champ en cours de saisie — Charlie : « je n'aime pas le liseré actuel,
+    // quand une bulle n'est pas remplie je veux un liseré rouge ».
+    // C'est le dessin que l'écran de VENTE porte déjà : deux écrans à un clic
+    // l'un de l'autre, une seule façon de dire « il manque ça ».
+    // La contrainte d'origine tient toujours : la LARGEUR du trait ne change
+    // pas (1,5 px comme au repos), donc rien ne se décale — c'est le contrôle
+    // juste au-dessus qui l'exige.
+    assert.ok(/border-color:var\(--danger\)/.test(inval[1]),
+      `${nom} : un champ qui manque porte un liseré ROUGE`);
+    assert.ok(/background:var\(--danger-bg\)/.test(inval[1]),
+      `${nom} : … et le fond pâle qui va avec, comme sur l'écran de vente`);
+    assert.ok(!/inset 0 -2px/.test(inval[1]),
+      `${nom} : le soulignement d'avant est parti — il se confondait avec celui de la saisie`);
   } else {
     assert.ok(/box-shadow:0 0 0 1px var\(--danger\)/.test(inval[1]),
       `${nom} : … l'épaisseur qu'on voit vient d'un anneau, qui ne prend pas de place`);

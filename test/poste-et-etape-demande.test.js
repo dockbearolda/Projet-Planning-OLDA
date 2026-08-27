@@ -106,29 +106,27 @@ for (const id of ['requestDate', 'requestDateDisplay', 'salesperson']) {
     `#${id} reste dans le document (le récapitulatif, le ticket et la fiche le lisent)`);
 }
 
-// --- 4. Le canal d'entrée a bien déménagé dans « Projet » -------------------
-
-const step3 = (DEVIS.match(/<section id="step3"[\s\S]*?<\/section>/) || [''])[0];
-assert.ok(/<select id="source"/.test(step3),
-  'le canal d’entrée doit vivre dans l’étape « Construction du projet »');
-assert.strictEqual((DEVIS.match(/<select id="source"/g) || []).length, 1,
-  'un seul canal d’entrée dans le document, sinon $(\'source\') désigne le mauvais');
-// Depuis le 21/08 l'étape ramasse TOUS ses manques avant de rendre la main
-// (les champs virent au rouge ensemble) : le contrôle du canal a changé de
-// forme, pas d'étape.
-assert.ok(/if\(!\$\('source'\)\.value\)m\.push\(\['source'/.test(DEVIS),
-  'le canal se contrôle désormais avec le projet');
+// --- 4. LE CANAL D'ENTRÉE EST PARTI (27/08/2026) ---------------------------
+//
+// Il avait déménagé de l'étape 1 vers « Projet » le 21/08, puis perdu son
+// second contrôle le 24/08. Charlie l'a supprimé le 27 : « supprime en fait le
+// canal d'entrée ».
+//
+// C'ÉTAIT UN CHAMP OBLIGATOIRE POUR UNE INFORMATION QUE PERSONNE NE RELIT. Il
+// ne change ni le prix, ni le délai, ni ce qu'on produit — il bloquait l'étape
+// et se remplissait au hasard, c'est-à-dire qu'il ne disait plus rien. Même
+// raisonnement que les trois champs retirés le 27/08 au matin : aucun champ
+// obligatoire en dessous de 90 % de remplissage RÉEL.
+assert.ok(!/<select id="source"/.test(DEVIS),
+  'le champ « Canal d’entrée » ne doit plus exister');
+assert.ok(!/\$\('source'\)/.test(DEVIS),
+  'plus personne ne le lit — ni le contrôle, ni le devis, ni le récapitulatif');
+assert.ok(!/Canal d’entrée/.test(DEVIS),
+  '… et plus aucun document ne l’écrit');
 assert.ok(!/if\(n===1\)\{/.test(DEVIS),
   'validateStep n’a plus d’étape 1 à valider');
-// Le SECOND contrôle — la liste `STEPS` du bandeau « Dossier incomplet » — a
-// disparu avec le bandeau le 24/08. Il doublait celui-ci et pouvait s'en
-// écarter sans que rien ne le dise. Le canal d'entrée n'est plus réclamé qu'à
-// un seul endroit : l'étape elle-même, au moment où on peut y répondre.
 assert.ok(!/var STEPS=/.test(DEVIS), 'plus de seconde liste des champs obligatoires');
-assert.strictEqual((DEVIS.match(/!\$\('source'\)\.value/g) || []).length, 1,
-  'le canal d’entrée n’est CONTRÔLÉ qu’à un seul endroit');
-assert.ok(!/m\.push\('Canal d’entrée'\)/.test(DEVIS),
-  '… les mentions qui restent sont des libellés du récapitulatif, pas des contrôles');
+
 
 // --- 5. Le fil des étapes : renuméroté, et piloté par data-step -------------
 
