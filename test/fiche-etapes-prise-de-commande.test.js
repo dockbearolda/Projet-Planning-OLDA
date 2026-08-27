@@ -61,7 +61,7 @@ const ranger = (source, client, details) => JSON.parse(JSON.stringify(vm.runInCo
 // Si le patron renomme une étape sur son écran, le libellé de la fiche doit
 // suivre — sinon la vendeuse dit « à l'étape Contrôle » et le chef d'atelier
 // cherche un onglet qui n'existe pas.
-for (const titre of ['1. Besoins', '2. Projet', '3. Contrôle', '4. Client', '5. Récapitulatif']) {
+for (const titre of ['1. Besoins', '2. Projet', '3. Client', '4. Récapitulatif']) {
   assert.ok(DEVIS.includes(`>${titre}<`), `« ${titre} » doit être une étape de demande-devis.html`);
   assert.ok(APP.includes(`'${titre}'`), `« ${titre} » doit être reprise dans la fiche`);
 }
@@ -93,13 +93,17 @@ const CLIENT_INFO = [{ k: 'Type de client', v: 'Professionnel' }];
 const etapes = ranger('Demande de devis', CLIENT_INFO, DETAILS_DEMANDE);
 const parTitre = Object.fromEntries(etapes.map((e) => [e.titre, e.lignes.map((l) => l.k)]));
 assert.deepStrictEqual(parTitre['1. Besoins'], ['Nombre de besoins', 'Besoin 1 — Désignation', 'Besoin 1 — Couleur', 'Besoin 2 — Désignation']);
-assert.deepStrictEqual(parTitre['2. Projet'], ['Titre du projet', 'Date souhaitée']);
-assert.deepStrictEqual(parTitre['3. Contrôle'], ['Statut du logo', 'Suite à donner']);
+// L'ÉTAPE « CONTRÔLE » A DISPARU LE 27/08 : le logo est descendu dans
+// « Projet », avec le reste du dossier. Ses libellés restent RECONNUS — les
+// dossiers d'avant les portent, et une ligne qui ne trouve pas son étape
+// tomberait dans le ramasse-tout.
+assert.deepStrictEqual(parTitre['2. Projet'],
+  ['Titre du projet', 'Date souhaitée', 'Statut du logo', 'Suite à donner']);
 // Le bloc `fiche.client` rejoint l'étape Client : c'est là qu'il a été saisi.
-assert.deepStrictEqual(parTitre['4. Client'], ['Type de client', 'Client', 'WhatsApp']);
+assert.deepStrictEqual(parTitre['3. Client'], ['Type de client', 'Client', 'WhatsApp']);
 // LA DERNIÈRE ÉTAPE RAMASSE LE RESTE. Un libellé inconnu — parce que le patron
 // a renommé un champ sur son écran — ne doit pas s'évaporer en silence.
-assert.deepStrictEqual(parTitre['5. Récapitulatif'],
+assert.deepStrictEqual(parTitre['4. Récapitulatif'],
   ['Type de dossier', 'Référence', 'Un libellé que personne n’a prévu']);
 
 // RIEN NE SE PERD, RIEN NE SE DÉDOUBLE.
@@ -133,7 +137,7 @@ assert.deepStrictEqual(vente.find((e) => e.titre === '3. Paiement').lignes.map((
 // Une étape sans une seule ligne ne s'affiche pas : un onglet vide n'est pas
 // une étape, c'est une impasse.
 const maigre = ranger('Demande de devis', [], [{ k: 'Référence', v: '26.08.26-999' }]);
-assert.deepStrictEqual(maigre.map((e) => e.titre), ['5. Récapitulatif']);
+assert.deepStrictEqual(maigre.map((e) => e.titre), ['4. Récapitulatif']);
 
 // ---------------------------------------------------------------------------
 // 4. C'EST LE COMPOSANT DU COMPTOIR, pas un cousin
@@ -154,8 +158,8 @@ assert.doesNotMatch(CSS, /\.ld-etape \{[^}]*font: inherit/);
 // propre `display` défait `hidden` en silence.
 assert.match(CSS, /\.ld-etape-panneau\[hidden\] \{ display: none; \}/);
 // Les bulles gardent la même HAUTEUR d'un écran à l'autre : à parts égales,
-// « 5. Récapitulatif » passait à la ligne et sa bulle faisait une tête de plus
-// que les quatre autres.
+// « 4. Récapitulatif » passait à la ligne et sa bulle faisait une tête de plus
+// que les autres.
 assert.match(CSS, /\.ld-fil \.step \{ flex: 0 1 auto; white-space: nowrap; \}/);
 // Trois états, ceux du parcours : franchie (done), courante (active), à venir.
 assert.match(APP, /' done' : ''/);

@@ -904,7 +904,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
 })();
 </script>
 <div class="container">
-<div class="stepper no-print"><div class="step active" data-step="2">1. Besoins</div><div class="step" data-step="3">2. Projet</div><div class="step" data-step="4">3. Contrôle</div><div class="step" data-step="5">4. Client</div><div class="step hidden" data-step="6">Chiffrage</div><div class="step" data-step="7">5. Récapitulatif</div></div>
+<div class="stepper no-print"><div class="step active" data-step="2">1. Besoins</div><div class="step" data-step="3">2. Projet</div><div class="step" data-step="5">3. Client</div><div class="step hidden" data-step="6">Chiffrage</div><div class="step" data-step="7">4. Récapitulatif</div></div>
 <div class="layout"><main>
 <!-- ÉTAPE « NOUVELLE DEMANDE » : RETIRÉE DU PARCOURS.
      Elle posait trois questions dont aucune n'en était vraiment une —
@@ -941,32 +941,6 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
      déjà saisis, la pastille ne faisait que la répéter en lecture seule et
      mangeait une moitié de rangée. Le titre prend la ligne entière. -->
       <div class="field"><label for="projectTitle">Titre du projet <span class="req">*</span></label><input id="projectTitle" placeholder="Titre proposé automatiquement"></div>
-</div><div class="bloc"><div class="field priority-field" id="projectPriorityField">
-  <label id="projectPriorityLabel">Priorité du projet *</label>
-  <!-- UNE ÉTIQUETTE QUI NE VISE PAS UN CHAMP NOMME UN GROUPE (25/08/2026).
-       Trois des 68 étiquettes de cet écran ne coiffent pas une case mais un
-       ENSEMBLE de cases : le `for=` n'aurait rien à viser, c'est
-       `aria-labelledby` qui les relie. -->
-  <div class="priority-grid" id="projectPriorityGroup" role="group" aria-labelledby="projectPriorityLabel">
-    <button type="button" class="priority-card" data-priority="1" onclick="selectProjectPriority(1)">
-      <span class="priority-stars">⭐</span>
-      <strong>Projet simple</strong>
-      <small>Petit projet, faible montant ou peu d’enjeu.</small>
-    </button>
-    <button type="button" class="priority-card" data-priority="2" onclick="selectProjectPriority(2)">
-      <span class="priority-stars">⭐⭐</span>
-      <strong>Projet intéressant</strong>
-      <small>Bon potentiel, à suivre rapidement.</small>
-    </button>
-    <button type="button" class="priority-card" data-priority="3" onclick="selectProjectPriority(3)">
-      <span class="priority-stars">⭐⭐⭐</span>
-      <strong>Projet prioritaire</strong>
-      <small>Projet urgent, stratégique ou à fort potentiel.</small>
-    </button>
-  </div>
-  <input type="hidden" id="projectPriority" value="">
-  <div class="field-error msg-flottant hidden" id="projectPriorityError">⚠ Veuillez sélectionner une priorité.</div>
-</div>
 </div><div class="bloc"><div class="grid-3"><div class="field"><label for="desiredDelay">Date souhaitée</label><!-- LA DATE S'ÉCRIT DANS LE CHAMP, PAS DANS UN DEUXIÈME (24/08). « Choisir
      une date » ouvrait un input de plus sous la liste : deux champs pour une
      seule question. Le calendrier natif s'ouvre sur un input FANTÔME — rendu
@@ -980,49 +954,21 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
      exact du 24/08 au matin. Il porte un BOUTON (« Utiliser cette date »),
      donc il ne peut pas flotter comme un message : un message flottant ne
      prend pas le clic. -->
-<div id="desiredDateWarning" class="delay-warn hidden"></div><div class="grid-3"><div class="field"><label for="projectGoal">Objet du projet *</label><select id="projectGoal" onchange="toggleNewProjectGoal()"><option value="">Choisir</option><option>Équiper le personnel</option><option>Créer des produits à revendre</option><option>Préparer un événement</option><option>Communiquer sur l'entreprise</option><option>Aménager / signaler un lieu</option><option>Offrir des cadeaux</option><option value="__new__">+ Nouvel objet du projet</option></select><input id="newProjectGoal" class="hidden" style="margin-top:8px" placeholder="Saisir le nouvel objet du projet"></div><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
+<div id="desiredDateWarning" class="delay-warn hidden"></div><div class="grid-3"><!-- Le canal d'entrée arrive de l'ancienne étape 1 : il dit d'où vient
      l'affaire, il se choisit donc avec le reste du contexte du projet plutôt
      que dans un écran d'ouverture à lui tout seul. -->
-<div class="field"><label for="source">Canal d'entrée *</label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div><div class="field"><label for="projectBudget">Budget indicatif</label><input id="projectBudget" type="number" min="0" step="0.01" placeholder="Facultatif"></div></div></div><div class="bloc"><div class="field"><label for="projectDescription">Description générale du projet *</label><textarea id="projectDescription"></textarea></div><div class="field"><label for="projectConstraints">Décisions ou contraintes à garder en tête</label><textarea id="projectConstraints"></textarea></div></div><div class="actions a-droite"><button class="primary" onclick="goStep(4)">Contrôler le dossier →</button></div></div></section>
+<div class="field"><label for="source">Canal d'entrée <span class="req">*</span></label><select id="source"><option value="">Choisir</option><option>WhatsApp</option><option>Boutique</option><option>Téléphone</option><option>Instagram</option><option>Facebook</option><option>E-mail</option><option>Site internet</option><option>Recommandation</option><option>Autre</option></select></div></div></div>
 
-
-<section id="step4" class="hidden">
-  <div class="card">
-
-    <!-- DEUX CHAMPS PAR LIGNE, ET AUCUN QUI RESTE SEUL SUR LA SIENNE.
-         « État des informations » et « Reprise de vectorisation » prenaient
-         chacun une ligne entière pour une liste de trois mots, entre deux
-         rangées qui en portaient deux : l'œil redescendait en zigzag au lieu
-         de suivre deux colonnes.
-         ET LES PAIRES DISENT QUELQUE CHOSE : l'état des informations avec le
-         chemin par lequel elles sont arrivées, le logo avec son statut, la
-         vectorisation avec la maquette. « Informations transmises par »
-         disparaît quand on est EN ATTENTE (`#receivedViaField`) : sa moitié de
-         rangée reste vide, et l'état ne se déplace pas sous les yeux. -->
-    <div class="bloc"><div class="grid">
-      <div class="field">
-        <label for="controlStatus">État des informations du client *</label>
-        <select id="controlStatus" data-menu-manuel-non onchange="toggleControlStatus(); updateControl()">
-          <option value="" selected disabled hidden>Sélectionner une option</option>
-          <option value="received">Informations reçues</option>
-          <option value="partial">Informations reçues partiellement</option>
-          <option value="waiting">En attente d’informations</option>
-        </select>
-      </div>
-
-      <div class="field" id="receivedViaField">
-        <label for="informationReceivedVia">Informations transmises par</label>
-        <select id="informationReceivedVia" onchange="toggleNewTransmissionMethod('informationReceivedVia','newInformationReceivedVia'); updateControl()">
-          <option value="" selected disabled hidden>Sélectionner une option</option>
-          <option>WhatsApp</option>
-          <option>Email</option>
-          <option value="__new__">+ Créer un nouveau</option>
-        </select>
-        <input id="newInformationReceivedVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
-      </div>
-    </div>
-
-    <div class="grid">
+<!-- LE LOGO EST DESCENDU ICI, ET L'ÉTAPE « CONTRÔLE » A DISPARU (27/08).
+     Elle posait DIX questions et une étape entière du parcours pour ça.
+     Mesuré sur les 22 demandes réelles : « Points à contrôler » remplie 1 fois
+     sur 22, « Transmission prévue par » 3 (et obligatoire), « Informations
+     attendues » 3 (obligatoire), « Décisions ou contraintes » 4, « Éléments
+     reçus » 10, « Informations transmises par » 10. Deux listes donnaient
+     seize fois sur vingt-deux la même réponse — « Informations reçues » et
+     « Pas de besoin ». Trois questions seulement disaient quelque chose : le
+     logo, son statut, la maquette. Elles sont ici, avec le reste du projet. -->
+<div class="bloc"><h3 style="margin-top:0">Le logo</h3><div class="grid-3">
       <div class="field">
         <label for="clientLogoStatus">Type de logo</label>
         <select id="clientLogoStatus" onchange="updateControl()">
@@ -1032,7 +978,6 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
           <option>Logo client non vectorisé</option>
         </select>
       </div>
-
       <div class="field">
         <label for="logoReceptionStatus">Statut du logo</label>
         <select id="logoReceptionStatus" onchange="updateControl()">
@@ -1042,18 +987,6 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
           <option>En cours de création client</option>
         </select>
       </div>
-    </div>
-
-    <div class="grid">
-      <div class="field">
-        <label for="vectorizationStatus">Reprise de vectorisation</label>
-        <select id="vectorizationStatus" onchange="updateControl()">
-          <option selected>Pas de besoin</option>
-          <option>À chiffrer</option>
-          <option>À faire</option>
-        </select>
-      </div>
-
       <div class="field">
         <label for="oldaMockupStatus">Maquette / fichier numérique</label>
         <select id="oldaMockupStatus" onchange="updateControl()">
@@ -1064,51 +997,14 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
           <option>Terminée</option>
         </select>
       </div>
-    </div>
+</div></div>
 
-    </div><div id="waitingInformationBox" class="notice orange hidden">
-      <h3 style="margin-top:0">Informations encore attendues</h3>
-      <div class="grid">
-        <div class="field">
-          <label for="expectedInformationVia">Transmission prévue par *</label>
-          <select id="expectedInformationVia" onchange="toggleNewTransmissionMethod('expectedInformationVia','newExpectedInformationVia'); updateControl()">
-            <option value="" selected disabled hidden>Sélectionner une option</option>
-            <option>WhatsApp</option>
-            <option>Email</option>
-            <option value="__new__">+ Créer un nouveau</option>
-          </select>
-          <input id="newExpectedInformationVia" class="hidden" style="margin-top:8px" placeholder="Nom du nouveau mode de transmission" oninput="updateControl()">
-        </div>
-        <div class="field">
-          <label for="expectedInformation">Informations que le client doit transmettre *</label>
-          <textarea id="expectedInformation" rows="4" placeholder="Ex. logo, texte exact, photos, tailles, dimensions, quantité définitive..." oninput="updateControl()"></textarea>
-        </div>
-      </div>
-    </div>
+<!-- UNE SEULE CASE POUR CE QU'ON A À DIRE. Six cases quasi vides posaient six
+     fois la même question — qu'est-ce qui manque, qui l'apporte, quand. On
+     écrit ce qu'on a à écrire, et ça se relit d'un bloc au récapitulatif. -->
+<div class="bloc"><div class="field"><label for="projectNotes">Notes</label><textarea id="projectNotes" rows="4" placeholder="Ce qui manque, ce qu'on attend du client, une contrainte à ne pas oublier..." oninput="updateControl()"></textarea></div></div>
 
-    <!-- Les deux zones de texte aussi : côte à côte, ce qu'on a reçu et ce
-         qu'il reste à contrôler se comparent d'un regard. Empilées, la
-         seconde tombait sous la ligne de flottaison. -->
-    <div class="bloc"><div class="grid">
-      <div class="field">
-        <label for="receivedElements">Éléments reçus du client</label>
-        <textarea id="receivedElements" rows="5" style="min-height:145px" placeholder="Ex. logo PNG reçu par WhatsApp, texte du dos confirmé, photo du modèle, couleurs souhaitées..." oninput="updateControl()"></textarea>
-      </div>
-
-      <div class="field">
-        <label for="missingNotes">Points à contrôler ou à compléter</label>
-        <textarea id="missingNotes" rows="5" style="min-height:145px" placeholder="Ex. vérifier la qualité du logo, confirmer les tailles, demander le texte exact ou valider la maquette..." oninput="updateControl()"></textarea>
-      </div>
-    </div>
-
-    </div>
-
-    <div class="actions a-droite" style="margin-top:16px">
-      <button class="primary" onclick="goStep(5)">Choisir le client →</button>
-    </div>
-  </div>
-</section>
-
+<div class="actions a-droite"><button class="primary" onclick="goStep(5)">Choisir le client →</button></div></div></section>
 
 <section id="step5" class="hidden">
   <div class="card">
@@ -1170,14 +1066,24 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
             <label for="newClientContact">Personne à contacter *</label>
             <input id="newClientContact" placeholder="Ex. Marie Durand">
           </div>
+        </div>
+        <!-- REPLIÉES (27/08). Mesuré sur les 22 demandes réelles : secteur 38 %,
+             adresse / ville / code postal 40 %, fonction du contact 25 %, et
+             « Second contact / fixe » UNE fois sur 22. L'atelier ne livre pas —
+             le client vient chercher, et la facture part par e-mail. Elles
+             restent saisissables ici d'un clic, et se complètent surtout à
+             froid dans la Base clients, où l'on a le temps.
+             L'ASTÉRISQUE DU SECTEUR EST TOMBÉ : un champ obligatoire rempli
+             38 % du temps n'exige rien, il retarde. -->
+        <details class="volet-plus">
+        <summary class="volet-titre">Coordonnées, secteur, fonction du contact</summary>
+        <div class="grid">
           <div class="field">
             <label for="newClientContactRole">Fonction du contact</label>
             <input id="newClientContactRole" placeholder="Ex. Responsable communication">
           </div>
-        </div>
-        <div class="grid">
           <div class="field">
-            <label for="newClientSector">Secteur d'activité *</label>
+            <label for="newClientSector">Secteur d’activité</label>
             <select id="newClientSector">
               <option value="" selected disabled hidden>Sélectionner une option</option>
               <option>Hôtel</option>
@@ -1220,6 +1126,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
             <input id="newClientPostal" placeholder="97150">
           </div>
         </div>
+        </details>
       </div>
 
       <div class="actions">
@@ -1418,9 +1325,12 @@ function effacerMessagesDeBarre(){
    le champ lui-même qui le dit maintenant. Une seule liste à remplir, pas
    un clic par champ. `__priorite` n'est pas un champ mais une rangée de
    cartes : elle a son propre marquage. */
-function failAll(manques){manques.forEach((m,k)=>m[0]==='__priorite'?showProjectPriorityError(k===0):marquer(m[0],m[1],k===0));return !manques.length}
+function failAll(manques){manques.forEach((m,k)=>marquer(m[0],m[1],k===0));return !manques.length}
 document.addEventListener('input',e=>{if(e.target.classList.contains('invalid')){e.target.classList.remove('invalid');if(e.target.nextElementSibling?.classList.contains('error'))e.target.nextElementSibling.remove()}updateSidebar()});
-function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();document.querySelector('.layout').classList.toggle('sans-demande',n!==2);for(let i=1;i<=7;i++)$(`step${i}`).classList.toggle('hidden',i!==n);document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===4)updateControl();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'});
+function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();document.querySelector('.layout').classList.toggle('sans-demande',n!==2);/* `step4` n'existe plus depuis le 27/08 (l'étape « Contrôle ») : sans cette
+   garde, `showStep` lève à la première bascule et le parcours s'arrête net —
+   sur un écran qui a l'air normal, puisque l'erreur est dans la console. */
+for(let i=1;i<=7;i++){const sec=$(`step${i}`);if(sec)sec.classList.toggle('hidden',i!==n);}document.querySelectorAll('.step').forEach(el=>{const s=Number(el.dataset.step);el.classList.toggle('active',s===n);el.classList.toggle('done',s<n)});if(n===3)prepareProject();if(n===6&&$('pricingNeeds')){renderPricing();calculateQuote()}if(n===7)fillFinal();updateSidebar();window.scrollTo({top:0,behavior:'smooth'});
   /* LA LISTE DES CLIENTS S'OUVRE TOUTE SEULE, comme les cartes qu'elle
      remplace étaient déjà à l'écran. Après le défilement, pas avant : le
      moindre défilement referme les menus (pont.js), y compris celui-ci. */
@@ -1428,20 +1338,15 @@ function showStep(n){currentStep=n;menusPoserTous();menusRafraichirTous();docume
 }
 function validateStep(n){clearErrors();
 if(n===2&&!needs.length)return fail($('besoinAutreForm').classList.contains('hidden')?'txRef':'catProduit','Ajoute au moins un besoin — choisis un produit et ajoute-le à la demande, ou passe par la saisie manuelle.');
+/* DEUX EXIGENCES, PAS CINQ (27/08). « Objet du projet », « Priorité » et
+   « Description générale » étaient obligatoires : la description était ÉCRITE
+   PAR LA MACHINE si on la laissait vide, la priorité valait seize fois sur
+   vingt-deux la même étoile, et l'objet ne ressort sur aucun papier. Un champ
+   qu'on impose sans s'en servir ne fait qu'ajouter un clic entre le client et
+   son devis. Restent le titre et le canal d'entrée. */
 if(n===3){const m=[];
   if(!$('projectTitle').value.trim())m.push(['projectTitle','Renseigne le titre du projet.']);
-  if(!$('projectGoal').value)m.push(['projectGoal','Choisis l’objectif.']);
   if(!$('source').value)m.push(['source','Choisis le canal d’entrée.']);
-  if(!$('projectPriority').value)m.push(['__priorite','']);
-  if(!$('projectDescription').value.trim())m.push(['projectDescription','Décris le projet.']);
-  if(m.length)return failAll(m);
-}
-if(n===4){const m=[];
-  if(!$('controlStatus').value)m.push(['controlStatus','Indique l’état des informations du client.']);
-  if($('controlStatus').value==='waiting'){
-    if(!transmissionValue('expectedInformationVia','newExpectedInformationVia'))m.push([$('expectedInformationVia').value==='__new__'?'newExpectedInformationVia':'expectedInformationVia','Indique comment le client doit transmettre les informations.']);
-    if(!$('expectedInformation').value.trim())m.push(['expectedInformation','Indique les informations encore attendues.']);
-  }
   if(m.length)return failAll(m);
 }
 if(n===5&&!validateStep5ForRecap())return false;
@@ -1535,26 +1440,9 @@ window.oldaParcours={
   /* Rend `true` SI ON A BOUGÉ : c'est ce qui dit au pont de ne pas quitter. */
   revenir(){const n=etapePrecedente();if(n===null)return false;showStep(n);return true}
 };
-function selectProjectPriority(level){
-  $('projectPriority').value=String(level);
-  document.querySelectorAll('.priority-card').forEach(btn=>{
-    btn.classList.toggle('active',btn.dataset.priority===String(level));
-  });
-  clearProjectPriorityError();
-  updateSidebar();
-}
-function showProjectPriorityError(premier){
-  $('projectPriorityField').classList.add('priority-error');
-  $('projectPriorityError').classList.remove('hidden');
-  /* Le défilement n'appartient qu'au PREMIER manque : sans ça, la rangée de
-     priorité ramène la page à elle alors que le focus est trois champs plus
-     haut. */
-  if(premier!==false)$('projectPriorityGroup').scrollIntoView({behavior:'smooth',block:'center'});
-}
-function clearProjectPriorityError(){
-  $('projectPriorityField').classList.remove('priority-error');
-  $('projectPriorityError').classList.add('hidden');
-}
+
+
+
 /* LA DATE S'ÉCRIT DANS LE CHAMP. « Choisir une date » — ou la date déjà en
    place — ouvre le calendrier natif ; « Dans N jours » calcule la sienne. Dans
    les deux cas c'est l'option `custom` qui l'affiche : son texte devient la
@@ -1575,7 +1463,7 @@ function poserDateChoisie(){
   if(iso)$('desiredDelay').value='custom';
   menuRafraichir($('desiredDelay'));
 }
-$('desiredDate').addEventListener('change',poserDateChoisie);function toggleNewProjectGoal(){$('newProjectGoal').classList.toggle('hidden',$('projectGoal').value!=='__new__');if($('projectGoal').value==='__new__')$('newProjectGoal').focus();updateSidebar()}function projectGoalValue(){return $('projectGoal').value==='__new__'?$('newProjectGoal').value.trim():$('projectGoal').value}function selectedNeedCategory(){return $('needCategory').value==='__new__'?$('newCategory').value.trim():$('needCategory').value}function toggleNewCategory(){$('newCategory').classList.toggle('hidden',$('needCategory').value!=='__new__');if($('needCategory').value==='__new__')$('newCategory').focus();renderNeedFaces()}function choisirTypeBesoin(type){const textile=type==='textile';
+$('desiredDate').addEventListener('change',poserDateChoisie);function selectedNeedCategory(){return $('needCategory').value==='__new__'?$('newCategory').value.trim():$('needCategory').value}function toggleNewCategory(){$('newCategory').classList.toggle('hidden',$('needCategory').value!=='__new__');if($('needCategory').value==='__new__')$('newCategory').focus();renderNeedFaces()}function choisirTypeBesoin(type){const textile=type==='textile';
 /* Une modification en cours ne doit pas rester dans un formulaire qu'on masque :
    on la rend à son besoin d'origine avant de basculer, sinon « Enregistrer la
    modification » reviendrait plus tard sur un besoin qu'on croyait reposé. */
@@ -3402,20 +3290,7 @@ function renderNeeds(){
   if(editingNeed<0)poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);
   renderDetailArticle();txRefreshTotals();updateSidebar();
 }
-function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();if(!$('projectDescription').value.trim())$('projectDescription').value=`Le client souhaite ${needs.map(n=>`${n.qty} ${n.label}`).join(', ')}.`}
-function toggleNewTransmissionMethod(selectId,inputId){
-  const show=$(selectId).value==='__new__';
-  $(inputId).classList.toggle('hidden',!show);
-  if(show)$(inputId).focus();
-}
-function transmissionValue(selectId,inputId){
-  return $(selectId).value==='__new__'?$(inputId).value.trim():$(selectId).value;
-}
-function toggleControlStatus(){
-  const status=$('controlStatus').value;
-  $('waitingInformationBox').classList.toggle('hidden',status!=='waiting');
-  $('receivedViaField').classList.toggle('hidden',status==='waiting');
-}
+function categories(){return[...new Set(needs.map(n=>n.category))]}function suggestedTitle(){const c=categories();if(!c.length)return'';if(c.length===1)return`Projet ${c[0]}`;if(c.length===2)return`${c[0]} + ${c[1]}`;return`Projet multi-produits — ${c.slice(0,3).join(', ')}`}function prepareProject(){if(!$('projectTitle').value.trim())$('projectTitle').value=suggestedTitle();}
 /* LE PAVÉ « Informations reçues » A ÉTÉ RETIRÉ. Il relisait en vert, juste
    sous les champs, ce que la vendeuse venait d'y taper — et il poussait le
    bouton de l'étape vers le bas à chaque frappe. Ce qu'il récapitulait se lit
@@ -3600,7 +3475,7 @@ function updateSidebar(){
     r.classList.toggle('hidden',!reste);
   }
 }
-document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));$('newProjectGoal').addEventListener('input',updateSidebar);toggleControlStatus();updateControl();renderClientOptions();
+document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',updateSidebar));updateControl();renderClientOptions();
 function setTextSafe(id,value){const el=$(id);if(el)el.textContent=value;}
 function setHtmlSafe(id,value){const el=$(id);if(el)el.innerHTML=value;}
 function fillFinal(){
@@ -3609,8 +3484,6 @@ function fillFinal(){
   setTextSafe('finalProject',$('projectTitle').value||'—');
   setTextSafe('finalClient',selectedClient?clientName(selectedClient):'—');
   setTextSafe('finalDesired',`${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'}${$('desiredTime').value?` à ${$('desiredTime').value.replace(':','h')}`:''}`);
-  const priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
-  setTextSafe('finalPriority',priorityLabels[$('projectPriority').value]||'—');
   const clientActionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
   setTextSafe('finalClientNextAction',clientActionLabels[clientNextActionValue()]||'—');
   setHtmlSafe('finalNeeds',needs.map(n=>`
@@ -3625,16 +3498,15 @@ function fillFinal(){
     </div>`).join(''));
   const controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
   const details=[];
-  details.push(`<div class="quote-line"><span>État du dossier</span><b>${esc(controlLabels[$('controlStatus').value]||'—')}</b></div>`);
+  
   if($('clientLogoStatus').value)details.push(`<div class="quote-line"><span>Logo</span><span>${esc($('clientLogoStatus').value)}</span></div>`);
   if($('logoReceptionStatus').value)details.push(`<div class="quote-line"><span>Statut du logo</span><span>${esc($('logoReceptionStatus').value)}</span></div>`);
-  if($('vectorizationStatus').value)details.push(`<div class="quote-line"><span>Vectorisation</span><span>${esc($('vectorizationStatus').value)}</span></div>`);
-  if($('expectedInformation').value.trim())details.push(`<div class="quote-line"><span>Informations attendues</span><span>${esc($('expectedInformation').value.trim())}</span></div>`);
+  
+  if($('projectNotes').value.trim())details.push(`<div class="quote-line"><span>Notes</span><span>${esc($('projectNotes').value.trim())}</span></div>`);
   if($('finalControl'))$('finalControl').innerHTML=details.join('');
 }
 function recapText(){
   const actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
-  const priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
   const lines=[
     'ATELIER OLDA — RÉCAPITULATIF DE DEMANDE',
     `Référence : ${reference}`,
@@ -3643,19 +3515,15 @@ function recapText(){
     `Client : ${selectedClient?clientName(selectedClient):'—'}`,
     `WhatsApp : ${selectedClient?.phone||'—'}`,
     `Date souhaitée : ${$('desiredDelay').value?formatDate($('desiredDate').value):'Non précisée'} ${$('desiredTime').value||''}`,
-    `Priorité : ${priorityLabels[$('projectPriority').value]||'—'}`,
-    `Suite à donner : ${actionLabels[clientNextActionValue()]||'—'}`,
     '',
     'BESOINS EXPRIMÉS',
     ...needs.map(n=>`- ${n.qty} × ${n.label} (${n.category})${n.requestedRef?` — Réf. ${n.requestedRef}`:''}${n.color?` — ${n.color}`:''}${n.productionType?` — Production ${n.productionType}`:''}${n.comment?`
   Informations : ${n.comment}`:''}`),
     '',
-    'CONTRÔLE DU DOSSIER',
-    `État : ${({received:'Informations reçues',partial:'Reçues partiellement',waiting:"En attente d'informations"})[$('controlStatus').value]||'—'}`,
+    'LE LOGO',
     `Logo : ${$('clientLogoStatus').value||'—'}`,
     `Statut du logo : ${$('logoReceptionStatus').value||'—'}`,
-    `Vectorisation : ${$('vectorizationStatus').value||'—'}`,
-    $('expectedInformation').value.trim()?`Informations attendues : ${$('expectedInformation').value.trim()}`:''
+    $('projectNotes').value.trim()?`Notes : ${$('projectNotes').value.trim()}`:''
   ];
   return lines.filter((line,index)=>line!==''||lines[index-1]!=='').join('\n');
 }
@@ -3841,7 +3709,7 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
       // d'ailleurs ce que fait patchPlanningButton. (Les deux identifiants de
       // secours, « finalRef » et « finalClient », n'existent nulle part dans le
       // document : ils ne rattrapaient rien.)
-      const pr=val("projectPriority")||"2";
+      const pr="2";
       const next=window.clientNextActionValue();
       const selected = (typeof selectedClient!=="undefined" && selectedClient) || null;
       const clientNom = selected ? (selected.company||selected.name||selected.contact||"Client") : "Client";
@@ -3859,7 +3727,7 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
         stage:"demande",
         status:next==="waiting" ? "Demande à qualifier" : "À chiffrer",
         production:production||"À définir",
-        comment:val("projectConstraints")||val("missingNotes")||"",
+        comment:val("projectNotes")||"",
         amount:null,
         // Même sur le payload de secours : quatre besoins doivent donner quatre
         // lignes, y compris si patchPlanningButton n'a pas eu le temps de passer.
@@ -3867,7 +3735,7 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
         checks:{
           products:false,
           bat:val("oldaMockupStatus")==="Terminée",
-          files:val("controlStatus")==="received",
+          files:true,
           qty:true,
           payment:false
         }
@@ -4433,7 +4301,10 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     if(pro){
       if(!document.getElementById('newClientContact').value.trim())return fail('newClientContact','Renseigne la personne à contacter.');
       if(!document.getElementById('newClientEmail').value.trim())return fail('newClientEmail','L’e-mail est obligatoire pour ce type de client.');
-      if(!document.getElementById('newClientSector').value)return fail('newClientSector','Choisis le secteur d’activité.');
+      /* LE SECTEUR N'EST PLUS EXIGE (27/08) : rempli 38 % du temps sur les
+         dossiers reels. Un champ obligatoire qu'on contourne deux fois sur
+         trois n'exige rien, il retarde — et il est descendu dans le volet,
+         avec l'adresse. Il se complete a froid dans la Base clients. */
     }
     var v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
     var client={
@@ -4551,17 +4422,12 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       '<div class="actions" style="margin-top:10px"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
   };
 
-  function tl(k,v){return '<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(v||'—')+'</strong></div>';}
+  /* MÊME RÈGLE SUR LE TICKET : une ligne sans valeur ne s'imprime pas. Le
+   tiret occupait une ligne de papier pour dire qu'il n'y avait rien à dire. */
+function tl(k,v){var t=String(v==null?'':v).trim();return (!t||t==='—')?'':'<div class="tl"><span>'+esc2(k)+'</span><strong>'+esc2(t)+'</strong></div>';}
   function val(id){var el=document.getElementById(id);return el?el.value:'';}
 
-  window.transmissionLabel=function(selectId,newId){
-    try{return transmissionValue(selectId,newId)||'';}catch(e){
-      var s=val(selectId);return s==='__new__'?val(newId):s;
-    }
-  };
-
   window.fillFinal=function(){
-    var priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
     var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
     var controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
 
@@ -4574,12 +4440,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 
     var extra=[
       tl('Titre du projet',val('projectTitle')),
-      tl('Objet du projet',(typeof projectGoalValue==='function'?projectGoalValue():val('projectGoal'))),
-      tl('Priorité',priorityLabels[val('projectPriority')]||'—'),
       tl('Demande prise par',val('salesperson')),
-      tl('Canal d’entrée',val('source')),
-      tl('Description générale',val('projectDescription')),
-      tl('Décisions / contraintes',val('projectConstraints'))
+      tl('Canal d’entrée',val('source'))
     ];
 
     document.getElementById('ticketProducts').innerHTML=(needs||[]).map(function(n){
@@ -4591,20 +4453,13 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         '</div><div class="ticket-product-price">'+(Number.isFinite(n.unitHT)?money(n.unitHT*n.qty):'À chiffrer')+'</div></div></div>';
     }).join('')||'<div class="ticket-details">Aucun besoin enregistré.</div>';
 
-    extra.push(tl('État du dossier',controlLabels[val('controlStatus')]||'—'));
     var control=[
       tl('Type de logo',val('clientLogoStatus')),
       tl('Statut du logo',val('logoReceptionStatus')),
-      tl('Vectorisation',val('vectorizationStatus')),
-      tl('Maquette / fichier',val('oldaMockupStatus')),
-      tl('Informations transmises par',window.transmissionLabel('informationReceivedVia','newInformationReceivedVia'))
+      tl('Maquette / fichier',val('oldaMockupStatus'))
     ];
-    if(val('controlStatus')==='waiting'){
-      control.push(tl('Transmission prévue par',window.transmissionLabel('expectedInformationVia','newExpectedInformationVia')));
-      control.push(tl('Informations attendues',val('expectedInformation')));
-    }
-    if(val('receivedElements').trim())control.push(tl('Éléments reçus du client',val('receivedElements')));
-    if(val('missingNotes').trim())control.push(tl('Points à contrôler',val('missingNotes')));
+    /* UNE SEULE CASE, ET ELLE NE S'ÉCRIT QUE SI ELLE DIT QUELQUE CHOSE. */
+    if(val('projectNotes').trim())control.push(tl('Notes',val('projectNotes')));
     document.getElementById('ticketExtraDetails').innerHTML=extra.concat(control).join('');
 
     document.getElementById('ticketTTC').textContent=val('projectBudget')?money(val('projectBudget')):'À chiffrer';
@@ -4614,7 +4469,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   };
 
   window.recapLines=function(){
-    var priorityLabels={'1':'⭐ Projet simple','2':'⭐⭐ Projet intéressant','3':'⭐⭐⭐ Projet prioritaire'};
     var actionLabels={quote:'Devis à faire',waiting:'Attendre les informations du client'};
     var controlLabels={received:'Informations reçues',partial:'Informations reçues partiellement',waiting:"En attente d'informations"};
     var d=function(x){var t=String(x==null?'':x).trim();return t?t:'—';};
@@ -4635,13 +4489,8 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       ['Secteur',d(c.sector)],
       ['Adresse',d([c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — '))],
       ['Titre du projet',d(val('projectTitle'))],
-      ['Objet du projet',d(typeof projectGoalValue==='function'?projectGoalValue():val('projectGoal'))],
-      ['Priorité',d(priorityLabels[val('projectPriority')])],
       ['Date souhaitée',d(val('desiredDelay')?formatDate(val('desiredDate')):'Non précisée')],
       ['Heure souhaitée',d(val('desiredTime'))],
-      ['Budget indicatif',val('projectBudget')?money(val('projectBudget')):'À chiffrer'],
-      ['Description générale',d(val('projectDescription'))],
-      ['Décisions / contraintes',d(val('projectConstraints'))],
       ['Nombre de besoins',String((needs||[]).length)],
       ['Quantité totale',String((needs||[]).reduce(function(t,n){return t+Number(n.qty||0);},0))]
     ];
@@ -4658,18 +4507,28 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       out.push([no+'Article proposé',d(n.solution)]);
       out.push([no+'Prix unitaire HT',Number.isFinite(n.unitHT)?money(n.unitHT):'À chiffrer']);
     });
-    out.push(['État du dossier',d(controlLabels[val('controlStatus')])]);
     out.push(['Type de logo',d(val('clientLogoStatus'))]);
     out.push(['Statut du logo',d(val('logoReceptionStatus'))]);
-    out.push(['Vectorisation',d(val('vectorizationStatus'))]);
     out.push(['Maquette / fichier',d(val('oldaMockupStatus'))]);
-    out.push(['Informations transmises par',d(window.transmissionLabel('informationReceivedVia','newInformationReceivedVia'))]);
-    out.push(['Transmission prévue par',d(window.transmissionLabel('expectedInformationVia','newExpectedInformationVia'))]);
-    out.push(['Informations attendues',d(val('expectedInformation'))]);
-    out.push(['Éléments reçus du client',d(val('receivedElements'))]);
-    out.push(['Points à contrôler',d(val('missingNotes'))]);
-    out.push(['Suite à donner',d(actionLabels[window.clientNextActionValue()])]);
-    return out;
+    /* Une case vide ne s'écrit pas : c'est la règle du récapitulatif, et c'est
+       elle qui empêchait le dossier de porter six lignes de tirets. */
+    if(val('projectNotes').trim())out.push(['Notes',val('projectNotes').trim()]);
+    /* UN RÉCAPITULATIF REPREND LES CHAMPS SAISIS — une ligne vide ne s'écrit
+       pas. Elle s'écrivait : sur une demande ordinaire, TREIZE lignes du
+       dossier disaient « — » (fonction du contact, second contact, secteur,
+       adresse, référence du besoin, couleur, production, article proposé…).
+       Elles étaient recopiées sur le bon de commande et relues par quelqu'un à
+       chaque ouverture. Ce qui n'a pas été rempli ne dit rien : on ne l'écrit
+       pas. */
+    /* DEUX EXCEPTIONS, ET ELLES IDENTIFIENT LE DOSSIER : « Type de dossier »
+       et « Référence ». Une référence absente doit se VOIR — c'est le numéro
+       que le client rapporte au comptoir ; la faire disparaître en silence
+       parce qu'elle est vide serait le pire des deux maux. */
+    var IDENTITE={'Type de dossier':1,'Référence':1};
+    return out.filter(function(l){
+      if(IDENTITE[l[0]])return true;
+      var t=String(l[1]==null?'':l[1]).trim();return t&&t!=='—';
+    });
   };
 
   window.recapText=function(){
@@ -4756,11 +4615,11 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
            paraitre la demande en retard des le lendemain, alors que rien
            n'a ete promis au client. Le serveur accepte `null`. */
         due:val('desiredDate')||null,
-        priority:val('projectPriority')||'2',
+        priority:'2',   /* plus demandée au comptoir : elle se règle sur la ligne */
         stage:'demande',
         status:window.clientNextActionValue()==='waiting'?'Demande à qualifier':'À chiffrer',
         production:production||'À définir',
-        comment:[val('projectConstraints'),val('missingNotes'),comment].filter(Boolean).join(' | '),
+        comment:[val('projectNotes'),comment].filter(Boolean).join(' | '),
         // UNE DEMANDE N'A PAS DE PRIX : c'est précisément ce qu'on doit
         // chiffrer. `amount` reste null — surtout pas 0, qui se lirait
         // « gratuit » dans la colonne Prix du planning. Le budget annoncé par
@@ -4772,7 +4631,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
         client_info:window.clientInfoLines(selectedClient),
         details:window.recapLines(),
         recap:window.recapText(),
-        checks:{products:false,bat:val('oldaMockupStatus')==='Terminée',files:val('controlStatus')==='received',qty:true,payment:false},
+        checks:{products:false,bat:val('oldaMockupStatus')==='Terminée',files:true,qty:true,payment:false},
         // --- Ce que le PLANNING lit en clair plutôt que dans du texte ---
         clientObj:selectedClient||null,
         quantity:(needs||[]).reduce(function(t,n){return t+(Number(n.qty)||0);},0),

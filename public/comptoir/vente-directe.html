@@ -2566,9 +2566,11 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
       ['Nombre d’articles',String((typeof products!=="undefined"?products:[]).length)],
       ['Quantité totale',String((typeof products!=="undefined"?products:[]).reduce(function(t,p){return t+Number(p.qty||0);},0))]
     ];
-    /* Les quatre lignes du client ne s'ecrivent que si elles disent quelque
-       chose. Elles restent a LEUR place — juste apres le type de client. */
-    var apresType=2;
+    /* Les cinq lignes du client ne s'ecrivent que si elles disent quelque
+       chose — et elles restent a LEUR place, juste apres le WhatsApp. Posees a
+       la fin, elles se retrouvaient separees du client par la recuperation et
+       le delai : le bloc du dossier ne se lisait plus d'un tenant. */
+    var apresWhatsApp=out.findIndex(function(l){return l[0]==='WhatsApp';})+1;
     [['E-mail',c.email||v('clientEmail')],
      ['Personne à contacter',c.contact],
      ['Fonction du contact',c.contactRole],
@@ -2576,7 +2578,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
      ['Adresse',[c.address,[c.postal,c.city].filter(Boolean).join(' ')].filter(Boolean).join(' — ')]]
       .forEach(function(paire){
         if(vide(paire[1]))return;
-        out.splice(out.length-apresType,0,[paire[0],String(paire[1]).trim()]);
+        out.splice(apresWhatsApp++,0,[paire[0],String(paire[1]).trim()]);
       });
     (typeof products!=="undefined"?products:[]).forEach(function(p,i){
       var no='Article '+(i+1)+' — ';

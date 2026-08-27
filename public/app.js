@@ -4854,17 +4854,23 @@ const LD_ETAPES = {
   'Demande de devis': [
     { titre: '1. Besoins',
       porte: (k) => /^Besoin \d+ — /.test(k) || k === 'Nombre de besoins' || k === 'Quantité totale' },
+    // L'ÉTAPE « CONTRÔLE » A DISPARU DE L'ÉCRAN LE 27/08 : le logo est descendu
+    // dans « Projet », six cases de notes quasi vides sont devenues une seule.
+    // MAIS SES LIBELLÉS RESTENT LISTÉS ICI : les dossiers d'AVANT les portent,
+    // et une ligne archivée qui ne trouve pas son étape tomberait dans le
+    // ramasse-tout de la dernière — le dossier de la semaine dernière ne se
+    // relirait plus comme il a été saisi.
     { titre: '2. Projet',
-      porte: (k) => ['Titre du projet', 'Objet du projet', 'Priorité', 'Date souhaitée',
-        'Heure souhaitée', 'Budget indicatif', 'Description générale',
-        'Décisions / contraintes'].includes(k) },
-    { titre: '3. Contrôle',
-      porte: (k) => ['État du dossier', 'Type de logo', 'Statut du logo', 'Vectorisation',
-        'Maquette / fichier', 'Informations transmises par', 'Transmission prévue par',
+      porte: (k) => ['Titre du projet', 'Date souhaitée', 'Heure souhaitée',
+        'Type de logo', 'Statut du logo', 'Maquette / fichier', 'Notes',
+        // ce que les dossiers d'avant le 27/08 portent encore :
+        'Objet du projet', 'Priorité', 'Budget indicatif', 'Description générale',
+        'Décisions / contraintes', 'État du dossier', 'Vectorisation',
+        'Informations transmises par', 'Transmission prévue par',
         'Informations attendues', 'Éléments reçus du client', 'Points à contrôler',
         'Suite à donner'].includes(k) },
-    { titre: '4. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
-    { titre: '5. Récapitulatif', porte: () => true },
+    { titre: '3. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
+    { titre: '4. Récapitulatif', porte: () => true },
   ],
   'Vente directe': [
     { titre: '1. Articles',

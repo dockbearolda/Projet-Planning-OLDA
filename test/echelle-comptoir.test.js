@@ -636,13 +636,20 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
   assert.ok(/\.bloc>:first-child\{margin-top:0\}/.test(css) && /\.bloc>:last-child\{margin-bottom:0\}/.test(css),
     `${nom} : la bulle porte son rembourrage, ses bords n'ajoutent pas une deuxième marge`);
   // Elle n'ajoute AUCUN intitulé : c'est un cadre, pas un titre.
-  assert.ok(!/<div class="bloc"><h[23]/.test(src.replace(/\n\s*/g, '')) || /<div class="bloc"><h3>Familles/.test(src),
+  // Deux bulles portent un titre, et toutes deux le portaient DÉJÀ avant d'être
+  // emballées : « Familles concernées », et « Le logo » — les trois questions
+  // descendues de l'étape « Contrôle » le 27/08, qui sans lui se liraient comme
+  // la suite du canal d'entrée.
+  const titrees = (src.replace(/\n\s*/g, '').match(/<div class="bloc"><h[23][^>]*>([^<]*)/g) || [])
+    .map((x) => x.replace(/.*>/, ''));
+  assert.ok(titrees.every((t) => /Familles|Le logo/.test(t)),
     `${nom} : la bulle n'invente pas d'intitulé — seuls les titres qui existaient déjà y entrent`);
   assert.ok((src.match(/class="bloc"/g) || []).length >= 4,
     `${nom} : les groupes de champs sont bien tous emballés`);
 });
 // Sur l'écran de devis, chaque étape du parcours porte ses bulles.
-['step2', 'step3', 'step4', 'step5'].forEach((etape) => {
+// (« step4 » a disparu le 27/08 avec l'étape « Contrôle ».)
+['step2', 'step3', 'step5'].forEach((etape) => {
   const m = DEVIS.match(new RegExp(`<section id="${etape}"[\\s\\S]*?</section>`));
   assert.ok(m && /class="bloc"/.test(m[0]), `l'étape ${etape} a au moins un groupe emballé`);
 });

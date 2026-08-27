@@ -242,14 +242,22 @@ assert.ok(!/button\.blocked\{/.test(DEVIS), 'le style du bouton bloqué part ave
 
 assert.ok(/function failAll\(manques\)/.test(DEVIS),
   'les manques se marquent TOUS d’un coup, pas un clic par champ');
-assert.strictEqual((DEVIS.match(/return failAll\(m\)/g) || []).length, 3,
-  'les étapes Projet, Contrôle et Tarification marquent chacune tous leurs manques');
+// L'ÉTAPE « CONTRÔLE » A DISPARU LE 27/08 : dix questions remplies une fois
+// sur cinq, dont deux obligatoires à 14 %. Restent Projet et Tarification.
+assert.strictEqual((DEVIS.match(/return failAll\(m\)/g) || []).length, 2,
+  'les étapes Projet et Tarification marquent chacune tous leurs manques');
 assert.ok(/function marquer\(id,msg,premier\)\{[^}]*classList\.add\('invalid'\)/.test(DEVIS),
   'un champ qui manque devient rouge');
 assert.ok(/if\(premier\)\{[^}]*scrollIntoView/.test(DEVIS),
   'seul le premier manque prend le focus et le défilement');
-assert.ok(/if\(premier!==false\)\$\('projectPriorityGroup'\)\.scrollIntoView/.test(DEVIS),
-  'la rangée de priorité ne ramène plus la page à elle quand le focus est ailleurs');
+// LA PRIORITÉ N'EST PLUS DEMANDÉE AU COMPTOIR (27/08) : seize réponses
+// identiques sur vingt-deux, et le planning a déjà la sienne sur chaque ligne.
+// Sa rangée de trois cartes, son champ caché et son message d'erreur partent
+// avec la question.
+for (const parti of ['projectPriorityGroup', 'projectPriorityField', 'projectPriorityError',
+  'selectProjectPriority', 'priorityLabels']) {
+  assert.ok(!DEVIS.includes(parti), `${parti} ne doit plus exister`);
+}
 assert.ok(/\['input','change'\]\.forEach\(ev=>document\.addEventListener/.test(DEVIS),
   'le rouge s’efface dès que le champ est rempli : le garder ferait douter');
 

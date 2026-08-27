@@ -348,7 +348,8 @@ assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(PONT),
 // tomberait à 0 € SANS erreur, et le devis partirait sous-facturé.
 // (txTgca a quitté la liste le 24/08 : la TGCA n'est plus un <select> global,
 // c'est une case par article, sous le prix du volet « Détails ».)
-['txTransport', 'txGenre', 'txPrintType', 'desiredDelay', 'desiredTime', 'controlStatus']
+// (controlStatus est parti le 27/08 avec l'étape « Contrôle ».)
+['txTransport', 'txGenre', 'txPrintType', 'desiredDelay', 'desiredTime']
   .forEach(id => {
     assert.ok(new RegExp(`<select id="${id}" data-menu-manuel-non`).test(DEVIS),
       `${id} porte un CODE, pas un libellé : pas d’ajout manuel`);

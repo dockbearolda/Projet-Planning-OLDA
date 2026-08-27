@@ -82,13 +82,13 @@ assert.ok(/linear-gradient\(var\(--danger-bg\),\s*var\(--danger-bg\)\),\s*var\(-
 assert.ok(/d\.className\s*=\s*'error msg-flottant'/.test(DEVIS),
   'marquer() pose un message qui flotte');
 
-// Les messages écrits en dur dans la page. `clientNextActionError` a disparu
-// avec le bloc « Suite souhaitée pour ce client » : la question est déduite de
-// l'étape 4, elle ne peut plus être laissée sans réponse.
-for (const id of ['projectPriorityError']) {
-  const div = DEVIS.match(new RegExp(`<div class="[^"]*" id="${id}">`));
-  assert.ok(div, `le message ${id} existe`);
-  assert.ok(/\bmsg-flottant\b/.test(div[0]), `… et ${id} flotte`);
+// Les messages écrits en dur dans la page. Il n'en reste aucun sur l'écran de
+// la demande : `clientNextActionError` est parti avec le bloc « Suite
+// souhaitée », et `projectPriorityError` le 27/08 avec la question de la
+// priorité — seize réponses identiques sur vingt-deux. Ce qui reste se
+// fabrique à la volée, et c'est vérifié juste au-dessus et juste en dessous.
+for (const div of DEVIS.match(/<div class="[^"]*" id="\w*(Error|Msg)">/g) || []) {
+  assert.ok(/\bmsg-flottant\b/.test(div), `un message écrit en dur ne flotte pas : ${div}`);
 }
 
 // L'avis « ce client était déjà dans la base » se pose sous le champ Client,

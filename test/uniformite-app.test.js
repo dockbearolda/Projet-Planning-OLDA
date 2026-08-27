@@ -341,8 +341,8 @@ for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
 // Les deux groupes nommés, et le champ dont le nom vivait dans un titre.
 assert.match(DEVIS, /<div class="tx-sizes" role="group" aria-labelledby="txSizesLabel">/,
   'les six tailles forment un groupe nommé');
-assert.match(DEVIS, /id="projectPriorityGroup" role="group" aria-labelledby="projectPriorityLabel"/,
-  'les trois priorités aussi');
+// (Le groupe des trois priorités a disparu le 27/08 : la question ne se pose
+// plus au comptoir, elle se règle sur la ligne du planning.)
 assert.match(VENTE, /<textarea id="internalNote" aria-labelledby="internalNoteTitle"/,
   'la note interne porte le nom de son bloc');
 

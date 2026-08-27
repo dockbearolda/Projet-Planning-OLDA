@@ -133,13 +133,18 @@ assert.ok(!/m\.push\('Canal d’entrée'\)/.test(DEVIS),
 const stepper = (DEVIS.match(/<div class="stepper[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
 const bulles = [...stepper.matchAll(/<div class="step([^"]*)"\s+data-step="(\d+)">([^<]*)<\/div>/g)]
   .map((m) => ({ cache: m[1].includes('hidden'), etape: Number(m[2]), texte: m[3] }));
-assert.strictEqual(bulles.length, 6, 'les six bulles doivent toutes porter leur numéro d’étape');
+// Une bulle de moins depuis le 27/08 : « 3. Contrôle » posait dix questions
+// remplies une fois sur cinq, dont deux obligatoires à 14 %.
+assert.strictEqual(bulles.length, 5, 'les cinq bulles doivent toutes porter leur numéro d’étape');
 
 const visibles = bulles.filter((b) => !b.cache);
 assert.deepStrictEqual(visibles.map((b) => b.texte),
-  ['1. Besoins', '2. Projet', '3. Contrôle', '4. Client', '5. Récapitulatif'],
+  ['1. Besoins', '2. Projet', '3. Client', '4. Récapitulatif'],
   'le fil visible repart de 1 sur les besoins : plus d’étape « Demande »');
-assert.deepStrictEqual(visibles.map((b) => b.etape), [2, 3, 4, 5, 7],
+// LE NUMÉRO AFFICHÉ SE RENUMÉROTE, LE NUMÉRO INTERNE NON : `step5` reste
+// `step5`, sinon il faudrait renommer la section, ses appels et ses gardes —
+// et un seul oubli enverrait le parcours sur une étape qui n'existe pas.
+assert.deepStrictEqual(visibles.map((b) => b.etape), [2, 3, 5, 7],
   'chaque bulle garde le numéro INTERNE de son étape (le parcours, lui, n’a pas été renuméroté)');
 
 assert.ok(/const s=Number\(el\.dataset\.step\);el\.classList\.toggle\('active',s===n\);el\.classList\.toggle\('done',s<n\)/.test(DEVIS),

@@ -79,7 +79,8 @@ assert.ok(/@media\(min-width:701px\)\{/.test(DEVIS),
 // nouveau client » à 771, « Réinitialiser valeurs Excel » à 365.
 const rangees = DEVIS.match(/<div class="actions[^"]*"[^>]*>[\s\S]*?<\/div>/g) || [];
 const avecAvancement = rangees.filter(r => /<button[^>]*class="primary"[^>]*>[^<]*→/.test(r));
-assert.ok(avecAvancement.length >= 3,
+// Une étape de moins depuis le 27/08 (« Contrôle ») : un pied d'étape de moins.
+assert.ok(avecAvancement.length >= 2,
   `les pieds d’étape portent une commande d’avancement (trouvé ${avecAvancement.length})`);
 
 // Aucune rangée ne remet un alignement à gauche par un style EN LIGNE : il

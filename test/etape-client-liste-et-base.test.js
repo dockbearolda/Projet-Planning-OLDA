@@ -198,7 +198,7 @@ assert.ok(/window\.clientInfoLines=function\(c\)/.test(DEVIS)
 assert.ok(!/id="clientNextAction"/.test(DEVIS), 'le champ caché aussi');
 
 assert.ok(/function clientNextActionValue\(\)\{[\s\S]*?value==='waiting'\?'waiting':'quote'/.test(DEVIS),
-  'la suite se déduit de l’état des informations (étape 4)');
+  'la suite se déduit, elle ne se demande pas');
 
 // LE PIÈGE : `val('clientNextAction')` rend '' quand le champ n'existe plus —
 // donc « Suite à donner : — » sur le ticket et un dossier rangé au hasard,
@@ -210,7 +210,11 @@ assert.ok(!/\$\('clientNextAction'\)\.value/.test(DEVIS), '… sous aucune des d
 // Les six endroits qui la LISENT passent tous par la valeur déduite : le
 // récapitulatif, le texte partagé, le PDF, le ticket, et le dossier envoyé au
 // planning (deux fois : la colonne `status` et la ligne `suite`).
-assert.ok((DEVIS.match(/clientNextActionValue\(\)/g) || []).length >= 7,
+// L'étape « Contrôle » a disparu le 27/08 : la ligne « Suite à donner » du
+// récapitulatif et celle du texte partagé sont parties avec elle — elles
+// disaient « Devis à faire » 21 fois sur 22. Les lecteurs qui restent en
+// passent toujours par la valeur déduite, jamais par un champ.
+assert.ok((DEVIS.match(/clientNextActionValue\(\)/g) || []).length >= 4,
   'tous les lecteurs passent par la valeur déduite');
 
 // Ce que le planning reçoit ne change PAS : « en attente » range la demande
