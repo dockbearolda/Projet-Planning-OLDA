@@ -5893,7 +5893,15 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 0; }
 :root[data-theme="dark"] .ld-v,
 :root[data-theme="dark"] .ld-volet__apercu,
 :root[data-theme="dark"] .ld-title { color: var(--text-1); }
-:root[data-theme="dark"] .ld-ctl { background: var(--bg); border-color: var(--border); color: var(--text-1); }
+/* DE NUIT AUSSI, LE CHAMP EST LA CELLULE. Cette règle datait du temps où il
+   avait son contour : elle lui remettait un fond plus sombre que le corps, et
+   chaque valeur redevenait une case noire posée dans sa cellule — l'effet
+   « boîte dans une boîte » qu'on venait de retirer, visible seulement de nuit.
+   Seule l'encre reste : le fond vient de la cellule, comme de jour. */
+:root[data-theme="dark"] .ld-ctl { color: var(--text-1); }
+/* …et le corps du tableau prend la surface, pas le gris de page : c'est lui la
+   feuille sur laquelle le quadrillage se lit. */
+:root[data-theme="dark"] .ld-body { background: var(--surface); }
 :root[data-theme="dark"] .ld-volet__tete:hover { background: var(--state-hover); }
 :root[data-theme="dark"] .ld-foot { background: var(--surface); border-color: var(--border); }
 /* Le bouton principal de la fiche était posé en dur à l'encre (#111827) : sur

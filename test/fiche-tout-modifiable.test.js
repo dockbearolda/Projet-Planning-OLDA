@@ -172,6 +172,12 @@ const CTL = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
 assert.ok(/border: 0;/.test(CTL), 'le champ n’a pas de contour propre : la cellule en a un');
 assert.ok(/outline-offset: -2px/.test(CSS),
   'le focus se pose EN DEDANS, sinon il déborde sur les cellules voisines');
+// DE NUIT AUSSI. La règle sombre datait du temps où le champ avait son contour :
+// elle lui remettait un fond plus sombre que le corps, et chaque valeur
+// redevenait une case noire posée dans sa cellule — l'effet « boîte dans une
+// boîte » qu'on venait de retirer, visible seulement de nuit.
+assert.ok(!/:root\[data-theme="dark"\] \.ld-ctl \{[^}]*background/.test(CSS),
+  'le champ n’a pas de fond à lui, de nuit comme de jour');
 
 // LE RETRAIT VIT SUR LA CELLULE, une seule fois. Il était porté par CHAQUE
 // contenu — et seulement par ceux qui y avaient pensé : les champs commençaient
