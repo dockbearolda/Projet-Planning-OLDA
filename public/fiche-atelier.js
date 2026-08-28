@@ -292,8 +292,14 @@ export function dessinerFicheAtelier(r, ctx) {
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
     el('span', 'fa-projet', r.product || ''),
   );
+  // LA CROIX REVIENT, et pour une raison qui a change. Elle avait ete retiree
+  // parce qu'elle doublait « Retour au planning » ; puis ce bouton est parti a
+  // son tour, et le clic a cote de la carte a pris le relais. Depuis que
+  // l'ecran DEFILE, la carte occupe toute la largeur et toute la hauteur : il
+  // n'y a plus de « a cote » ou cliquer. Sans elle, la seule sortie serait
+  // Echap — un cul-de-sac a la souris.
   const outils = el('div', 'fa-outils');
-  outils.append(etatSauve);
+  outils.append(etatSauve, bouton('fa-btn fa-btn--carre', '×', () => ctx.fermer()));
   tete.append(ident, outils);
 
   // =========================================================================
@@ -600,13 +606,11 @@ export function dessinerFicheAtelier(r, ctx) {
   // ET IL RESTE MONTÉ, masqué par `display`. Démonté au repliage, il emporte
   // les valeurs qu'on venait d'y saisir et fausse les calculs qui les lisent.
   const panneau = el('div', 'fa-details');
-  // OUVERT PAR DEFAUT quand l'ecran a la hauteur de le porter. Il n'est plus un
-  // calque : deplie, il ALLONGE la fiche au lieu de recouvrir les deux colonnes
-  // — un panneau ouvert d'emblee qui masque le dossier n'aurait aucun sens.
-  // Sur le 14 pouces (630 px) la fiche remplit deja l'ecran : il s'ouvre alors
-  // a la demande, et c'est la scene qui se serre le temps qu'on le consulte.
-  const placePourLesDetails = window.matchMedia('(min-height: 1000px)');
-  panneau.hidden = !placePourLesDetails.matches;
+  // OUVERT PARTOUT, y compris sur le 14 pouces. Il a fallu deux detours avant
+  // d'y arriver — un calque qui recouvrait les colonnes, puis un seuil de
+  // hauteur qui le fermait en dessous de 1000 px. Depuis que c'est L'ECRAN qui
+  // defile et non les colonnes, il n'y a plus de place a economiser.
+  panneau.hidden = false;
 
   const chInfos = champ(null, r.description || '', {
     label: 'Informations', multi: true, rows: 3, placeholder: 'note interne',
@@ -672,10 +676,10 @@ export function dessinerFicheAtelier(r, ctx) {
   );
   panneau.append(colInfos, colReste);
 
-  // Le champ des notes suit la place : dans la colonne gauche des qu'il y a de
-  // quoi l'etirer, dans le panneau sinon. `matchMedia` et non un test unique :
-  // une fenetre se redimensionne, et le champ doit suivre sans se recreer.
-  const assezHaut = window.matchMedia('(min-height: 700px)');
+  // Le champ des notes vit dans la colonne gauche : depuis que l'ecran defile,
+  // il n'y a plus de hauteur a economiser, donc plus de raison de le renvoyer
+  // dans le panneau. Le seuil reste, tres bas, pour un ecran vraiment minuscule.
+  const assezHaut = window.matchMedia('(min-height: 420px)');
   const listeDetails = el('span', 'fa-details__liste');
   const placerNotes = () => {
     const haut = assezHaut.matches;
@@ -704,7 +708,7 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   veille.observe(racine);
 
-  const chevron = el('span', null, panneau.hidden ? '▸' : '▾');
+  const chevron = el('span', null, '▾');
   const barreDetails = bouton('fa-details__b', null, () => {
     panneau.hidden = !panneau.hidden;
     chevron.textContent = panneau.hidden ? '▸' : '▾';
@@ -762,8 +766,14 @@ export function dessinerFicheAtelier(r, ctx) {
   // il redevient un CALQUE (media query) : la fiche remplit deja l'ecran, et
   // dans le flux il y ecrasait les deux colonnes de 349 px — on ne voyait plus
   // le dossier. Deux comportements, un seul element, aucune duplication.
+  // LA RACINE EST LE VOILE, ET C'EST ELLE QUI DEFILE. La CARTE porte le
+  // contenu et prend sa hauteur naturelle : plus une seule barre de defilement
+  // dans les colonnes, une seule pour tout l'ecran. Un clic sur la racine —
+  // donc a cote de la carte — ferme la fiche.
   const scene = el('div', 'fa-scene');
   scene.append(travail, panneau);
-  racine.append(tete, bandeau, scene, bas, barreDetails, calque, zoneToast);
+  const carte = el('div', 'fa-carte');
+  carte.append(tete, bandeau, scene, bas, barreDetails);
+  racine.append(carte, calque, zoneToast);
   return racine;
 }

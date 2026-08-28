@@ -35,64 +35,65 @@ vm.runInContext(`${JS.replace(/^export /gm, '')}\nthis.API = { normaliserMontant
 const { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge } = bac.API;
 
 // ---------------------------------------------------------------------------
-// 1. LA CONTRAINTE CENTRALE : rien ne défile
+// 1. UNE SEULE BARRE DE DÉFILEMENT, ET C'EST CELLE DE L'ÉCRAN
 // ---------------------------------------------------------------------------
-// Mesuré au rendu à 1366 × 630, panneau fermé PUIS ouvert : 0 px de
-// débordement sur les deux colonnes, sur la page et sur la fiche. Ce qui le
-// rend possible tient en quatre décisions, et chacune se casse d'une ligne.
+// La contrainte a changé le 28/08 : « je veux pas de scroll, je veux toute la
+// page, quitte à scroller la page ». Elle était « rien ne défile à 1366 × 630 »
+// — ce qui obligeait chaque colonne à défiler pour elle-même, et l'écran en
+// portait deux barres. Désormais la RACINE est le voile ET le conteneur qui
+// défile ; la CARTE, dedans, prend sa hauteur naturelle et n'est bornée à rien.
 const RACINE_CSS = CSS.match(/\.fa \{[\s\S]*?\n\}/)[0];
-// LA FICHE FAIT SA TAILLE, bornée à l'écran : `inset: 0` la forçait à 100 % de
-// haut, et tout ce qui restait sous son contenu devenait du vide à combler —
-// on l'avait comblé en étirant deux champs à 287 et 416 px, ce qui remplaçait
-// le vide par du gris. Elle s'ancre en haut et s'arrête où son contenu
-// s'arrête ; ce sont les COLONNES qui défilent si un dossier déborde.
-assert.ok(/position: fixed;/.test(RACINE_CSS) && /max-height: 100vh;/.test(RACINE_CSS),
-  'la fiche est bornée à l’écran et ne défile pas elle-même');
-// La racine rogne : le voile est un FRÈRE depuis qu'il a été sorti d'ici, il
-// n'est donc plus coupé. C'est elle qui porte les coins du bas, et non plus le
-// dernier enfant — lequel change selon que le panneau est ouvert ou fermé.
-assert.ok(/overflow: hidden;/.test(RACINE_CSS) && /border-bottom-left-radius/.test(RACINE_CSS),
-  'la racine rogne ses propres coins du bas');
-// Le voile est un FRERE de la fiche : posé dedans, il se voyait à travers
-// l'entête et les colonnes — elles n'ont pas de fond opaque — et grisait tout.
-assert.ok(/\.fa-voile \{[^}]*position: fixed[^}]*z-index: 59/.test(CSS),
-  'le voile se pose juste SOUS la fiche (59 contre 60), jamais dedans');
-assert.ok(/ficheAtelierVoile[\s\S]*document\.body\.appendChild\(ficheAtelierVoile\)/.test(APP)
-  && /ficheAtelierVoile\.remove\(\)/.test(APP),
-  'il est monté et retiré avec la fiche, sinon il reste sur le planning');
-assert.ok(!/fa-voile/.test(JS), 'et il n’est jamais un enfant de la racine');
-// UN CLIC DEHORS FERME. Sur `click` et non `mousedown` : le champ qu'on quitte
-// doit d'abord perdre le focus, c'est son `blur` qui envoie ce qu'on venait d'y
-// écrire. Fermé au premier des deux, la saisie partirait dans le vide.
-assert.ok(/ficheAtelierVoile\.addEventListener\('click', \(\) => fermerFicheAtelier\(\)\)/.test(APP),
-  'un clic sur le voile ferme la fiche');
-assert.ok(!/ficheAtelierVoile\.addEventListener\('mousedown'/.test(APP),
+assert.ok(/position: fixed;/.test(RACINE_CSS) && /overflow-y: auto;/.test(RACINE_CSS),
+  'la racine occupe l’écran et c’est ELLE qui défile');
+assert.ok(/background: var\(--voile\);/.test(RACINE_CSS),
+  'la racine EST le voile : plus d’élément séparé à monter et à retirer');
+assert.ok(!/max-height/.test(RACINE_CSS),
+  'la carte n’est bornée à rien : c’est tout l’intérêt de faire défiler l’écran');
+const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
+assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
+  'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
+assert.ok(/carte\.append\(tete, bandeau, scene, bas, barreDetails\);/.test(JS)
+  && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
+  'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
+// AUCUNE COLONNE NE DÉFILE POUR ELLE-MÊME : c'est exactement ce qui produisait
+// les deux barres intérieures.
+assert.ok(!/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
+  'les colonnes ne défilent pas : une barre par colonne, c’est le défaut qu’on retire');
+assert.ok(!/fa-voile/.test(CSS) && !/fa-voile/.test(JS) && !/ficheAtelierVoile/.test(APP),
+  'l’élément voile séparé a disparu avec sa raison d’être');
+// UN CLIC À CÔTÉ DE LA CARTE FERME. On ne ferme que si le clic a atteint la
+// RACINE elle-même : un clic dans la carte remonte jusqu'à elle par bouillonnement.
+// Sur `click` et non `mousedown` : le champ qu'on quitte doit d'abord perdre le
+// focus, c'est son `blur` qui envoie ce qu'on venait d'y écrire.
+assert.ok(/if \(ev\.target === ficheAtelierEl\) fermerFicheAtelier\(\);/.test(APP),
+  'seul un clic SUR la racine ferme — jamais un clic qui vient de la carte');
+assert.ok(/ficheAtelierEl\.addEventListener\('click'/.test(APP)
+  && !/ficheAtelierEl\.addEventListener\('mousedown'/.test(APP),
   'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
 // La bande « Détails » vient après la barre des actions — un dépliant
-// secondaire se pose sous les actions courantes — et son panneau se déplie
-// juste dessous, en dernier.
-assert.ok(/racine\.append\(tete, bandeau, scene, bas, barreDetails,/.test(JS),
+// secondaire se pose sous les actions courantes.
+assert.ok(/carte\.append\(tete, bandeau, scene, bas, barreDetails\);/.test(JS),
   'la bande « Détails » vient après la barre des actions');
-// L'entête ne porte plus aucun bouton : on sort par Échap ou par un clic
-// dehors, et l'annulation vit dans le message qui suit chaque modification.
+// L'entête ne porte plus aucun bouton : on sort par Échap ou par un clic à côté,
+// et l'annulation vit dans le message qui suit chaque modification.
 // On lit le MONTAGE, pas le fichier : les deux libellés restent cités dans le
 // commentaire qui explique leur retrait, et les chercher partout ferait tomber
 // le garde-fou sur sa propre explication.
-assert.ok(/tete\.append\(ident, outils\);/.test(JS) && /outils\.append\(etatSauve\);/.test(JS),
-  'l’entête ne porte ni bouton de sortie ni bouton d’annulation');
+assert.ok(/tete\.append\(ident, outils\);/.test(JS),
+  'l’entête ne porte plus le bouton « Retour au planning » ni celui d’annulation');
+// LA CROIX EST LA SEULE SORTIE SOURIS. Depuis que l'écran défile, la carte
+// occupe toute la largeur et toute la hauteur : il n'y a plus de « à côté » où
+// cliquer. Sans elle, il ne resterait qu'Échap — un cul-de-sac à la souris,
+// alors que la consigne du 26/08 est « on navigue à la souris ».
+assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×', \(\) => ctx\.fermer\(\)\)\);/.test(JS),
+  'la croix ferme la fiche : c’est la seule sortie souris qui reste');
 assert.ok(/b\.addEventListener\('click', defaire\)/.test(JS),
   'mais le message garde son « Annuler » : sinon la pile devient inatteignable');
-const TRAVAIL = CSS.match(/\.fa-travail \{[\s\S]*?\n\}/)[0];
-assert.ok(/min-height: 0;/.test(TRAVAIL),
-  'sans `min-height: 0`, une grille en flex:1 prend la hauteur de son CONTENU '
-  + 'et pousse la barre basse hors de l’écran');
 for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details__b', '.fa-bas']) {
   const regle = CSS.match(new RegExp(`\\${zone} \\{[\\s\\S]*?\\n\\}`))[0];
   assert.ok(/flex-shrink: 0;/.test(regle),
     `${zone} ne se laisse pas comprimer : c'est du chrome fixe, pas de la place à prendre`);
 }
-assert.ok(/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
-  'ce sont les COLONNES qui défileraient, jamais la page — et elles n’ont pas à le faire');
 
 // ---------------------------------------------------------------------------
 // 2. LE PANNEAU DÉTAILS SE DÉPLIE DANS LE FLUX, ET IL RESTE MONTÉ
@@ -104,25 +105,24 @@ assert.ok(/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
 const PANNEAU = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
 assert.ok(!/position: absolute;/.test(PANNEAU),
   'le panneau se déplie dans le flux : en calque, ouvert par défaut, il masquerait les deux colonnes');
-// SUR UN ÉCRAN COURT IL REDEVIENT UN CALQUE : la fiche y remplit déjà l'écran,
-// et déplié dans le flux il écrasait les deux colonnes de 349 px.
-// `(height < 1000px)` et non `(max-height: 999px)` : le vérificateur de charte
-// lit le second comme une hauteur écrite en dur sur une commande, et refuse le
-// fichier. La syntaxe de plage dit la même chose et lève l'ambiguïté.
-assert.ok(/@media \(height < 1000px\) \{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS),
-  'sur le 14 pouces le panneau redevient un calque');
+// OUVERT PARTOUT, y compris sur le 14 pouces. Il a fallu deux détours avant
+// d'y arriver — un calque qui recouvrait les colonnes, puis un seuil de hauteur
+// qui le fermait sous 1000 px. Depuis que c'est l'ÉCRAN qui défile et non les
+// colonnes, il n'y a plus de place à économiser.
+assert.ok(/panneau\.hidden = false;/.test(JS),
+  'le panneau est ouvert par défaut, sur toutes les tailles d’écran');
+assert.ok(!/@media[^{]*\{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS),
+  'et il ne redevient un calque nulle part');
 assert.ok(/scene\.append\(travail, panneau\);/.test(JS),
-  'il vit dans la scène : c’est elle qui l’allonge, et elle qui l’ancre en calque');
+  'il vit dans la scène, qu’il allonge en se dépliant');
 // TOUT LE FINANCIER D'UN COUP : aucune hauteur maximale, aucun défilement
 // interne. Il avait `max-height: 400px; overflow: auto` du temps du calque.
 assert.ok(!/max-height/.test(PANNEAU) && !/overflow: auto/.test(PANNEAU),
   'rien n’y est coupé ni renvoyé derrière une barre de défilement');
-assert.ok(/placePourLesDetails[\s\S]*?min-height: 1000px/.test(JS)
-  && /panneau\.hidden = !placePourLesDetails\.matches;/.test(JS),
-  'ouvert par défaut quand l’écran a la hauteur de le porter, fermé sur le 14 pouces');
+
 // Démonté au repliage, il emporte les valeurs qu'on venait d'y saisir et fausse
 // les calculs qui les lisent. On le masque, on ne le retire pas.
-assert.ok(/panneau\.hidden = !placePourLesDetails\.matches;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
+assert.ok(/panneau\.hidden = false;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
   'le panneau se masque par `hidden`, il n’est jamais démonté');
 assert.ok(!/panneau\.remove\(\)/.test(JS), 'et jamais retiré du document');
 // `hidden` ne masque rien tout seul quand la classe pose son propre `display`.

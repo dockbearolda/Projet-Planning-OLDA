@@ -3510,7 +3510,6 @@ function rafraichirFichesApresChangement() {
 // reprend pas — le fil des étapes du comptoir, l'historique du client, le
 // journal. Il s'ouvre depuis la fiche, pas depuis la ligne.
 let ficheAtelierEl = null;
-let ficheAtelierVoile = null;
 let ficheAtelierId = null;
 
 // ÉCHAP FERME, comme partout ailleurs. Ce n'est pas un « parcours clavier » —
@@ -3523,7 +3522,6 @@ document.addEventListener('keydown', (e) => {
 
 function fermerFicheAtelier() {
   if (ficheAtelierEl) { ficheAtelierEl.remove(); ficheAtelierEl = null; }
-  if (ficheAtelierVoile) { ficheAtelierVoile.remove(); ficheAtelierVoile = null; }
   ficheAtelierId = null;
   figerLeFond(false);
 }
@@ -3623,20 +3621,15 @@ function openLigneDetail(id) {
     completerFiche(fraiche);
     fermerFicheAtelier();
     ficheAtelierId = String(id);
-    // LE VOILE EST UN FRERE DE LA FICHE, pas son enfant. Pose dedans, il
-    // passait a travers l'entete et les colonnes — elles n'ont pas de fond
-    // opaque — et grisait tout l'ecran au lieu de griser ce qu'il y a dessous.
-    ficheAtelierVoile = document.createElement('div');
-    ficheAtelierVoile.className = 'fa-voile';
-    // UN CLIC DEHORS FERME LA FICHE. Sur `click` et non `mousedown` : le champ
-    // qu'on quitte doit d'abord perdre le focus, c'est son `blur` qui envoie ce
-    // qu'on venait d'y ecrire. Ferme au premier des deux, la saisie partirait
-    // dans le vide. Un glisser de selection commence DANS la fiche et se relache
-    // sur le voile : le `click` part alors sur leur ancetre commun, jamais sur
-    // le voile — il ne ferme donc rien, ce qui est le bon comportement.
-    ficheAtelierVoile.addEventListener('click', () => fermerFicheAtelier());
-    document.body.appendChild(ficheAtelierVoile);
     ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche));
+    // UN CLIC A COTE DE LA CARTE FERME LA FICHE. La racine EST le voile depuis
+    // qu'elle defile : on ne ferme donc que si le clic l'a atteinte ELLE, pas
+    // un de ses enfants. Sur `click` et non `mousedown` : le champ qu'on quitte
+    // doit d'abord perdre le focus, c'est son `blur` qui envoie ce qu'on venait
+    // d'y ecrire — ferme au premier des deux, la saisie partirait dans le vide.
+    ficheAtelierEl.addEventListener('click', (ev) => {
+      if (ev.target === ficheAtelierEl) fermerFicheAtelier();
+    });
     document.body.appendChild(ficheAtelierEl);
     figerLeFond(true);
   });

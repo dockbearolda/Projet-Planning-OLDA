@@ -23,14 +23,21 @@
    revenue, et un écran d'atelier qui se lit debout n'avait aucune raison
    d'être le seul à lire plus petit que le comptoir. */
 .fa {
-  /* L'ÉCRAN REJOINT L'ÉCHELLE DE LA MAISON le 28/08 — 14 / 17 / 21, les crans
-     que lisent le comptoir et le planning. Il avait la sienne (12/13/14/15/19)
-     parce qu'il devait tenir un dossier entier sur 630 px : les steppers de
-     taille et les boutons de date retirés le même jour ont rendu la place, et
-     il restait 150 px vides en bas de l'écran. Un cran plus bas que la maison
-     ne se justifiait plus, et se lisait mal debout à un mètre.
-     Seul `--fa-min` reste hors échelle : une unité (« mm »), un intitulé de
-     section. Rien qui porte une valeur. */
+  /* LA RACINE EST LE VOILE, ET C'EST ELLE QUI DEFILE (28/08). Une seule barre
+     pour tout l'ecran au lieu d'une par colonne : la demande est de voir la
+     fiche ENTIERE, quitte a faire defiler. La carte, dessous, prend sa hauteur
+     naturelle — elle n'est plus bornee a rien. */
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--voile);
+}
+.fa-carte {
+  /* Les cinq crans de cet ecran — l'echelle de la maison, 14 / 17 / 21.
+     Seul `--fa-min` reste hors echelle : une unite, un intitule de section.
+     Rien qui porte une valeur. */
   --fa-min: 13px;      /* intitulé de section, unité, mention */
   --fa-lab: 14px;      /* libellé de champ, bouton secondaire */
   --fa-val: 17px;      /* la valeur qu'on lit et qu'on saisit */
@@ -41,9 +48,7 @@
   /* Quatre hauteurs de commande, et elles disent la densité : un champ posé
      DANS une bulle (les faces), un champ de colonne, un contrôle de bandeau,
      un contrôle de barre. Elles SORTENT du texte, elles ne s'écrivent pas :
-     17 × 1,375 + 2 × 7 + le trait = 39,4 → 40. Montées avec l'échelle le 28/08, jamais écrites au
-     jugé, et bornées par la seule contrainte qui compte : les deux colonnes
-     doivent tenir dans 362 px sans defiler. */
+     17 × 1,375 + 2 × 7 + le trait = 39,4 → 40. */
   --fa-h-pas: 34px;
   --fa-h-champ: 40px;
   --fa-h-bandeau: 42px;
@@ -63,22 +68,8 @@
   --fa-undo-fond: rgba(var(--on-primary-rgb, 255, 255, 255), .14);
   --fa-undo-fond-2: rgba(var(--on-primary-rgb, 255, 255, 255), .26);
 
-  /* LA FICHE FAIT SA TAILLE, elle ne s'etire pas. Ancree en haut, bornee a la
-     hauteur de l'ecran : sur le 14 pouces elle le remplit exactement, sur un
-     ecran plus haut elle s'arrete la ou son contenu s'arrete au lieu de laisser
-     300 px de blanc dedans. `inset: 0` la forcait a 100 % de haut, et tout ce
-     qui etait dessous devenait du vide a combler. */
-  position: fixed;
-  inset: 0 0 auto 0;
-  max-height: 100vh;
-  z-index: 60;
   display: flex;
   flex-direction: column;
-  /* La racine rogne de nouveau : le voile est un FRERE depuis qu'il a ete sorti
-     d'ici, il n'est donc plus coupe. C'est elle qui porte les coins du bas, et
-     non plus le dernier enfant — lequel change selon que le panneau est ouvert
-     ou ferme. */
-  overflow: hidden;
   border-bottom-left-radius: var(--arrondi-carte);
   border-bottom-right-radius: var(--arrondi-carte);
   box-shadow: var(--shadow-pose);
@@ -89,15 +80,7 @@
   font-variant-numeric: tabular-nums;
 }
 .fa *, .fa *::before, .fa *::after { box-sizing: border-box; }
-/* Le planning reste visible sous la fiche, attenue : on voit d'ou l'on vient,
-   sans croire qu'on peut y cliquer.
-   ⚠ LE VOILE EST UN FRERE DE `.fa`, jamais son enfant : l'entete et les
-   colonnes n'ont pas de fond opaque, et pose dedans il se voyait A TRAVERS
-   elles — tout l'ecran grisait. Il se pose juste sous elle (59 contre 60).
-   La fiche, elle, n'a plus `overflow: hidden` : elle ne rogne donc plus ses
-   propres coins, et c'est la barre basse — la seule a toucher le bas — qui
-   les porte. */
-.fa-voile { position: fixed; inset: 0; z-index: 59; background: var(--voile); }
+
 
 /* --- Les commandes, une seule fois ---------------------------------------
    Champ, menu, zone de texte : même boîte, même liseré, même réponse. Écrites
@@ -159,6 +142,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-btn:hover { background: var(--bg); color: var(--text-1); }
 .fa-btn--mini { padding: 0 var(--pas-2); }
+.fa-btn--carre { width: var(--fa-h-champ); padding: 0; font-size: var(--taille-texte); }
 /* Le seul bouton plein de l'écran : celui qui fait AVANCER le dossier. */
 .fa-btn--plein {
   border-color: var(--primary); background: var(--primary); color: var(--surface);
@@ -254,19 +238,16 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    les barres basses commencent — c'est ce qui permet au calque de se caler sur
    `bottom: 0` au lieu d'une hauteur ecrite en dur. */
 .fa-scene {
-  position: relative;
-  flex: 0 1 auto; min-height: 0;
+  flex: 0 0 auto;
   display: flex; flex-direction: column;
 }
 .fa-travail {
-  flex: 0 1 auto; min-height: 0;
+  flex: 0 0 auto;
   display: grid; grid-template-columns: 1fr 1fr;
-  overflow: hidden;
 }
 .fa-col {
   padding: var(--pas-2) var(--pas-4); min-width: 0;
   display: flex; flex-direction: column;
-  overflow: auto;
 }
 .fa-col--g { gap: var(--pas-2); border-right: 1px solid var(--border-soft); }
 .fa-col--d { gap: var(--pas-2); }
@@ -492,29 +473,10 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   .fa-flag, .fa-toast { animation: none; }
 }
 
-/* SUR UN ECRAN COURT, LE PANNEAU REDEVIENT UN CALQUE. La fiche y remplit deja
-   l'ecran : deplie dans le flux, il ecrasait les deux colonnes de 349 px et on
-   ne voyait plus le dossier. En calque il recouvre la scene le temps qu'on le
-   consulte, et la rend entiere des qu'on le referme. Le seuil est celui qui
-   decide aussi de son ouverture par defaut (`min-height: 1000px` en JS). */
-@media (height < 1000px) {
-  .fa-details {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
-    max-height: 100%; overflow: auto;
-    box-shadow: var(--shadow-bas);
-    /* Le rembourrage du haut se serre : le contenu depassait la scene de 8 px,
-       ce qui ne donne rien d'utile — juste une barre de defilement pour une
-       ligne. Le meme defaut coutait 7 px du temps de `max-height: 360px`. */
-    padding: var(--pas-2) var(--pas-4);
-    gap: var(--pas-2) var(--pas-4);
-  }
-}
-
 /* Sous 1180 px, les deux colonnes n'ont plus la place de tenir côte à côte :
    elles s'empilent et la fiche défile. C'est un repli, pas la cible — l'écran
    est dessiné pour 1366. */
 @media (max-width: 1180px) {
-  .fa-travail { grid-template-columns: 1fr; overflow: auto; }
-  .fa-col { overflow: visible; }
+  .fa-travail { grid-template-columns: 1fr; }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
 }
