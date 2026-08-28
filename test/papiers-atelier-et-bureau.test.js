@@ -422,6 +422,16 @@ assert.deepStrictEqual(cases.slice(6, 9).map((c) => c.textContent), ['240', '260
 assert.strictEqual(tousLes(tkCotes, 'tk__aecrire').length, 3,
   'une face à mesurer ouvre un trait PAR TAILLE : la cote peut changer de l’une à l’autre');
 
+// LE DOCUMENT SE LIT LE LONG DE SON BORD GAUCHE. Charlie, 28/08 : « cette partie
+// doit être à gauche, parfaitement calée avec tout le reste » — le bloc du
+// total, qui était sur la colonne de droite comme sur une facture. Le nom du
+// client, la désignation, le total, l'interne et les observations commencent
+// tous au même endroit : l'oeil ne traverse jamais la feuille pour retrouver sa
+// ligne. La seule chose qui reste à droite est l'intitulé de la colonne
+// « Dossier », et c'est sa place.
+assert.match(CSS_BUREAU, /\.bu__demi \{[^}]*grid-column: 1/,
+  'le total est sur la colonne de GAUCHE, calé avec tout le reste');
+
 // UNE TASSE NE SE MESURE PAS AU COMPTOIR. Charlie, 28/08 : « pour les tasses ce
 // n'est pas des tailles que je reçois à l'atelier mais des logos, donc pas de
 // mm » — et « ma vendeuse peut sous chaque logo rentrer des informations et me

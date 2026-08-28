@@ -444,10 +444,15 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
   .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;
                padding: 16px var(--pap-marge) 0; }
   .bu__grille { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--bu-gouttiere); }
-  /* LA COLONNE DE DROITE SEULE, sur la MÊME grille : c'est ce qui met le bord
-     gauche du total exactement sous celui du bloc « Dossier ». La boîte des
-     totaux avait une largeur à elle (76 mm) qui ne s'alignait sur rien. */
-  .bu__demi { grid-column: 2; }
+  /* UNE COLONNE SEULE, sur la MÊME grille. La boîte des totaux avait une
+     largeur à elle (76 mm) qui ne s'alignait sur rien ; posée sur la grille,
+     son bord tombe exactement sur celui des autres blocs.
+     À GAUCHE, et non à droite comme sur une facture (Charlie, 28/08 : « cette
+     partie doit être à gauche, parfaitement calée avec tout le reste »). Le
+     document se lit en une seule descente le long du bord gauche — le nom du
+     client, la désignation, le total, l'interne : tout commence au même endroit,
+     et l'oeil ne traverse jamais la feuille pour retrouver sa ligne. */
+  .bu__demi { grid-column: 1; }
 
   /* UNE LIGNE, UNE HAUTEUR. C'est le rythme du document entier : intitulé à
      gauche, valeur à droite, un filet en dessous, et la ligne suivante tombe au
