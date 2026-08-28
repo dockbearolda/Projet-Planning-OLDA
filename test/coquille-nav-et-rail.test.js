@@ -375,20 +375,36 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
   // au défilement — la barre, hors du cadre, ne bougeait pas.
   assert.ok(!/np-bar|construireBarre|flecheRetour/.test(NP),
     '… et rien ne la construit plus : la barre, son bouton, sa flèche dessinée');
-  // La flèche descend DANS le cadre, dans la rangée d'étapes, qui devient
-  // collante : on voit en permanence où l'on en est ET par où sortir.
-  assert.ok(/id = 'sortieParcours'/.test(PONT) && /b\.className = 'btn-retour'/.test(PONT),
-    'la rangée d’étapes porte la sortie, avec le bouton de la charte');
-  assert.ok(/position:sticky;top:0/.test(PONT),
-    '… et elle est collante : elle ne s’en va plus au défilement');
+  // PLUS AUCUNE FLÈCHE DANS LE CADRE (27/08/2026). Charlie : « cette flèche
+  // devient inutile, supprime ». Elle avait sa raison quand le parcours
+  // occupait l'écran entier : c'était la seule porte. Depuis que la barre de
+  // navigation reste visible autour du cadre, elle en était une deuxième — et
+  // deux sorties à trois centimètres l'une de l'autre se contredisent.
+  // Tout ce qui la construisait part avec elle, sinon c'est du code qu'on
+  // relit pendant des mois sans savoir qu'il ne sert plus.
+  assert.ok(!/sortieParcours/.test(PONT),
+    'le cadre ne greffe plus de flèche de sortie');
+  assert.ok(!/btn-retour/.test(PONT),
+    '… ni le bouton de la charte qui la portait');
+  // LA BARRE, ELLE, RESTE — elle n'a jamais été là pour la flèche. C'est elle
+  // qui pose le fond, la hauteur fixe et la rangée sur UNE seule ligne, pour
+  // les deux parcours à la fois : ils ne composent pas leurs étapes pareil (la
+  // demande de devis en flex, la vente directe en grille de quatre colonnes),
+  // et un bouton posé DANS la rangée y devenait une cinquième colonne.
+  assert.ok(/function grefferBarreEtapes\(\) \{/.test(PONT),
+    'la rangée d’étapes garde sa barre : c’est elle qui la tient sur une ligne');
+  assert.ok(/barre\.className = 'etapes-barre no-print'/.test(PONT)
+    && /barre\.appendChild\(etapes\)/.test(PONT),
+    '… elle enveloppe la rangée au lieu de se glisser dedans');
   // Le fond n'est pas décoratif : sans lui, le contenu défile en transparence
   // derrière les pastilles.
-  assert.ok(/background:var\(--bg\)/.test(PONT),
+  assert.ok(/\.etapes-barre\{[^']*background:var\(--bg\)/.test(PONT),
     '… avec un fond opaque, sinon le contenu défile au travers');
-  // Le parcours ne connaît AUCUNE adresse : il dit qu'on veut sortir, l'hôte
-  // sait ce qu'il y a derrière.
-  assert.ok(/OLDA_PARCOURS_RETOUR/.test(PONT) && /OLDA_PARCOURS_RETOUR'\) \{ afficher\(null\)/.test(NP.replace(/msg\.type === '/, "'")),
-    'le parcours demande la sortie, l’hôte décide de ce que ça veut dire');
+  // L'HÔTE GARDE SON GUICHET. Plus personne ne lui demande de fermer un
+  // parcours depuis le cadre, mais c'est son contrat public : le supprimer
+  // ferait échouer en silence tout parcours qui le rappellerait un jour.
+  assert.ok(/OLDA_PARCOURS_RETOUR'\) \{ afficher\(null\)/.test(NP.replace(/msg\.type === '/, "'")),
+    'l’hôte sait encore fermer un parcours qui le lui demande');
 
   // `← Retour` en bulle grise n'existe plus nulle part.
   //
@@ -420,47 +436,38 @@ console.log('✓ retour : un seul bouton « revenir / fermer » dans toute l’a
     'plus aucune flèche « revenir d’un cran » en bas d’étape');
   assert.ok(!/addBackButton/.test(DEVIS),
     '… et plus rien ne la repose au récapitulatif, toutes les 400 ms');
-  // CE QUI A ÉTÉ RENDU DANS LA FOULÉE (24/08, second tour). Retirer les flèches
-  // du bas avait laissé l'écran SANS AUCUN retour en arrière : celle du haut ne
-  // faisait que quitter le parcours, et les pastilles ne sont pas cliquables.
-  // « Cette flèche doit permettre le retour en arrière. » Elle porte désormais
-  // les deux gestes : revenir d'une étape tant qu'il y en a une derrière, et ne
-  // quitter qu'à la PREMIÈRE — sinon il n'y aurait plus de sortie du tout.
-  assert.ok(/window\.oldaParcours\s*=\s*\{/.test(DEVIS),
-    'le parcours expose comment revenir : lui seul connaît son modèle d’étapes');
-  assert.ok(/peutRevenir\(\)\{return etapePrecedente\(\)!==null\}/.test(DEVIS),
-    '… il sait dire s’il RESTE une étape derrière, sans bouger');
-  assert.ok(/revenir\(\)\{const n=etapePrecedente\(\);if\(n===null\)return false;showStep\(n\);return true\}/.test(DEVIS),
-    '… et il rend `true` seulement s’il a bougé');
+  // ET LE RETOUR EN ARRIÈRE S'EN VA AVEC ELLE (27/08/2026). C'est le prix de
+  // la suppression, écrit noir sur blanc : la flèche portait DEUX gestes —
+  // revenir d'une étape tant qu'il y en avait une derrière, quitter le
+  // parcours à la première. Les pastilles ne sont pas cliquables. Cet écran
+  // n'a donc plus de retour en arrière du tout ; on sort par la barre de
+  // navigation, qui reste visible autour du cadre.
+  //
+  // Le pont était le SEUL consommateur de `window.oldaParcours` : gardé, il
+  // n'aurait plus répondu à personne tout en donnant à lire qu'un retour
+  // existe encore.
+  // Les commentaires de cet écran RACONTENT ce qui est parti : on lit le code,
+  // pas ce qu'il dit de lui-même.
+  const devisNu = sansCommentaire(DEVIS);
+  assert.ok(!/window\.oldaParcours/.test(devisNu),
+    'le parcours n’expose plus comment revenir : plus personne ne le lui demande');
+  assert.ok(!/etapePrecedente|peutRevenir/.test(devisNu),
+    '… et rien ne reste de ce qui calculait l’étape d’avant');
 
-  // L'ORDRE SE LIT SUR LES PASTILLES VISIBLES, PAS SUR `n - 1`. « Chiffrage »
-  // (étape 6) est masquée : un décrément aveugle tomberait dessus.
-  assert.ok(/\.filter\(p=>!p\.classList\.contains\('hidden'\)\)/.test(DEVIS),
-    'les étapes masquées sont sautées');
-
-  // LE PONT NE CONNAÎT AUCUN MODÈLE D'ÉTAPES. Les deux parcours ne composent
-  // pas les leurs pareil — `data-step` + showStep() ici, displayStep() sans
-  // `data-step` en vente directe. Il pose la question ; un parcours muet garde
-  // l'ancien geste, quitter.
+  // LE PONT NE CONNAÎT TOUJOURS AUCUN MODÈLE D'ÉTAPES. C'est ce qui lui permet
+  // d'envelopper les deux rangées sans savoir comment elles sont faites —
+  // `data-step` + showStep() ici, displayStep() sans `data-step` en vente
+  // directe.
   const PONTJS = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
-  const greffe = PONTJS.match(/function grefferSortieDuParcours\(\) \{[\s\S]*?\n  \}/);
-  assert.ok(greffe, 'la greffe de la flèche existe');
+  const greffe = PONTJS.match(/function grefferBarreEtapes\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(greffe, 'la greffe de la barre existe');
   assert.ok(!/showStep|displayStep|data-step/.test(greffe[0]),
-    'le pont ne code en dur aucun modèle d’étapes : il demande, il ne suppose pas');
-  assert.ok(/p\.revenir\(\)\) \{ majEtiquette\(\); return; \}/.test(greffe[0]),
-    'on ne quitte QUE si le parcours n’a pas bougé — sinon un clic ferait les deux');
-  assert.ok(/OLDA_PARCOURS_RETOUR/.test(greffe[0]),
-    '… et à la première étape, la flèche quitte toujours le parcours');
-
-  // L'ÉTIQUETTE SE LIT AVANT LE CLIC — au survol, et par un lecteur d'écran.
-  // Elle doit donc dire ce que la flèche fera à CETTE étape-là, et suivre les
-  // pas que la flèche ne fait pas elle-même (les boutons « suivant »).
-  assert.ok(/Revenir à l’étape précédente'\s*:\s*'Quitter ce parcours'/.test(greffe[0]),
-    'la flèche annonce le geste qu’elle va faire');
-  assert.ok(/new MutationObserver\(majEtiquette\)/.test(greffe[0]),
-    '… et l’étiquette suit l’étape, quel que soit ce qui l’a fait changer');
+    'le pont ne code en dur aucun modèle d’étapes : il enveloppe, il ne suppose pas');
+  // Elle ne se pose qu'une fois : le guet la rappelle toutes les 400 ms.
+  assert.ok(/etapes\.parentNode\.classList\.contains\('etapes-barre'\)\) return/.test(greffe[0]),
+    '… et elle ne s’emboîte pas dans elle-même à chaque tour de guet');
 }
-console.log('✓ flèche : le même « revenir d’un cran » de l’hôte jusqu’aux étapes des parcours');
+console.log('✓ flèche : une seule dans l’application, et plus aucune dans le cadre d’un parcours');
 
 // --- 9. LA RANGÉE D'ONGLETS EST CENTRÉE, ET LES SEPT SUR LA MÊME LIGNE ------
 // Deux défauts mesurés le 24/08 dans la barre du haut.

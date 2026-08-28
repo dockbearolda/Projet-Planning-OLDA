@@ -439,7 +439,19 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
    main : la charte réserve la couleur aux ÉTATS, et « proposé » n'en est pas
    un. C'est la ligne d'aide, sous le tableau, qui dit d'où viennent les
    chiffres. */
-.tx-logo{display:grid;grid-template-columns:max-content repeat(var(--tx-logo-cols,1),minmax(0,1fr));gap:var(--pas-2) var(--pas-3);align-items:center}
+/* UNE CASE DE LARGEUR DE LOGO FAIT LA TAILLE D'UNE CASE DE TAILLE, TOUJOURS
+   (Charlie, 27/08/2026 : « ces bulles-là sont trop grandes, elles doivent
+   toujours faire la même taille »). Les colonnes étaient en `1fr` : avec une
+   seule taille saisie, l'unique case s'étirait sur toute la rangée — un champ
+   de trois chiffres large de 1 000 px, juste sous les six cases étroites des
+   tailles. Elles sont maintenant BORNÉES à la largeur d'une case de taille
+   (la même arithmétique que `.tx-sizes` : six colonnes, cinq écarts), et la
+   grille est calée à gauche pour que la place en trop reste à droite au lieu
+   d'être distribuée. Avec six emplacements, elles rétrécissent plutôt que de
+   déborder — le plancher est zéro. */
+.tx-logo{display:grid;justify-content:start;
+  grid-template-columns:max-content repeat(var(--tx-logo-cols,1),minmax(0,calc((100% - 5 * var(--pas-3)) / 6)));
+  gap:var(--pas-2) var(--pas-3);align-items:center}
 /* Les en-têtes nomment une colonne, exactement comme les intitulés des six
    cases de tailles posées juste au-dessus : ils prennent donc la taille d'un
    INTITULÉ (14 px), pas celle du texte courant. Sans ça, deux rangées de

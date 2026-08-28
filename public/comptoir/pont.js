@@ -2414,80 +2414,32 @@ document.addEventListener('pointerdown',ev=>{
   window.menusPoserTous();
   montrerBrouillonsOublies();
 
-  /* ─────────────────────── LA RANGÉE D'ÉTAPES PORTE LA SORTIE ──────────────
+  /* ─────────────────────── LA RANGÉE D'ÉTAPES ─────────────────────────────
      L'en-tête coûtait 155 px avant le premier champ : 61 px pour une barre de
      l'hôte qui ne contenait QU'UNE flèche, et 94 px pour la rangée d'étapes,
-     passée à deux lignes. Et c'est la rangée d'étapes qui s'en allait au
-     défilement — la barre de l'hôte, elle, ne bougeait pas : elle vit hors du
-     cadre, au-dessus.
-     Les deux n'en font plus qu'une : la flèche descend DANS la rangée
-     d'étapes, qui devient COLLANTE. On voit donc en permanence où l'on en est
-     et par où sortir, pour la moitié de la hauteur.
-     La flèche est le même bouton que partout ailleurs (`.btn-retour` de la
-     charte) et porte le même geste que la barre qu'elle remplace : quitter le
-     parcours. Les flèches de bas d'étape gardent le leur — revenir d'une
-     ÉTAPE. Deux gestes, deux boutons, jamais le même deux fois. */
-  function grefferSortieDuParcours() {
+     passée à deux lignes. Les deux n'en font plus qu'une.
+
+     LA FLÈCHE DE SORTIE EST PARTIE (Charlie, 27/08/2026 : « cette flèche
+     devient inutile, supprime »). Elle avait sa raison quand le parcours
+     occupait l'écran entier : c'était la seule porte. Depuis que la barre de
+     navigation reste visible autour du cadre, elle en est une deuxième — et
+     deux sorties à trois centimètres l'une de l'autre ne disent pas la même
+     chose, elles se contredisent. Le geste « revenir d'une étape » qu'elle
+     portait aussi s'en va avec elle : la rangée d'étapes dit où l'on est, elle
+     n'a jamais dit qu'on pouvait y remonter.
+
+     LA BARRE, ELLE, RESTE. Elle n'a jamais été là pour la flèche : c'est elle
+     qui pose le fond, la hauteur fixe et la rangée sur UNE seule ligne, et
+     c'est le seul élément à figer plutôt qu'un par écran — les deux parcours
+     ne composent pas leurs étapes pareil (la demande de devis en flex, la
+     vente directe en grille de quatre colonnes). */
+  function grefferBarreEtapes() {
     const etapes = document.querySelector('.stepper');
-    if (!etapes || document.getElementById('sortieParcours')) return;
-    /* UNE BARRE QUI ENVELOPPE, plutôt qu'un bouton GLISSÉ DANS la rangée. Les
-       deux parcours ne composent pas leurs étapes pareil — la demande de devis
-       en flex, la vente directe en `grid-template-columns: repeat(4, 1fr)` —
-       et un bouton posé dedans devenait une cinquième colonne : la grille se
-       décalait d'un cran. La barre porte la flèche À CÔTÉ de la rangée, qui
-       garde sa composition, quelle qu'elle soit. C'est aussi elle qui colle
-       en haut : un seul élément à figer plutôt qu'un par écran. */
+    if (!etapes || etapes.parentNode.classList.contains('etapes-barre')) return;
     const barre = document.createElement('div');
     barre.className = 'etapes-barre no-print';
     etapes.parentNode.insertBefore(barre, etapes);
     barre.appendChild(etapes);
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.id = 'sortieParcours';
-    b.className = 'btn-retour';
-
-    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'
-      + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg>';
-    /* LA FLÈCHE PORTE LES DEUX GESTES (24/08, second tour). Elle ne faisait
-       que quitter le parcours ; les flèches de bas d'étape qui revenaient d'un
-       cran ont été retirées le matin même, et plus rien ne ramenait en
-       arrière. Elle revient donc d'une ÉTAPE tant qu'il y en a une derrière,
-       et ne quitte le parcours qu'à la PREMIÈRE.
-       LE PONT NE CONNAÎT AUCUN MODÈLE D'ÉTAPES — les deux parcours ne
-       composent pas les leurs pareil. Il pose la question à `oldaParcours`,
-       que le parcours expose. Un parcours qui ne répond pas garde l'ancien
-       geste, quitter : c'est le cas de la vente directe, qui a gardé sa propre
-       flèche de retour en bas. */
-    const parcours = () => window.oldaParcours;
-    const peutRevenir = () => {
-      const p = parcours();
-      return !!(p && typeof p.peutRevenir === 'function' && p.peutRevenir());
-    };
-    /* L'étiquette se lit AVANT le clic — au survol, et par un lecteur d'écran.
-       Elle doit donc dire ce que la flèche va faire à CETTE étape-là. */
-    const majEtiquette = () => {
-      b.title = b.ariaLabel = peutRevenir()
-        ? 'Revenir à l’étape précédente'
-        : 'Quitter ce parcours';
-    };
-    majEtiquette();
-    /* L'hôte décide de ce que « quitter » veut dire : il est le seul à savoir
-       s'il y a des tuiles derrière. Le parcours ne connaît aucune adresse. */
-    b.onclick = () => {
-      const p = parcours();
-      /* `revenir()` rend `true` s'il a bougé. On ne quitte QUE s'il n'a pas
-         bougé — sans ce retour, un clic à l'étape 3 reviendrait d'un cran ET
-         quitterait le parcours dans la foulée. */
-      if (p && typeof p.revenir === 'function' && p.revenir()) { majEtiquette(); return; }
-      try { parent.postMessage({ type: 'OLDA_PARCOURS_RETOUR' }, location.origin); } catch (_) {}
-    };
-    /* Le parcours change la classe `active` des pastilles à chaque pas : c'est
-       le seul signal commun aux deux écrans, et il couvre les pas que la
-       flèche ne fait pas elle-même (les boutons « suivant » du bas). */
-    new MutationObserver(majEtiquette)
-      .observe(etapes, { subtree: true, attributes: true, attributeFilter: ['class'] });
-    barre.insertBefore(b, barre.firstChild);
   }
   function poserStyleRangeeEtapes() {
     if (document.getElementById('styleRangeeEtapes')) return;
@@ -2541,7 +2493,7 @@ document.addEventListener('pointerdown',ev=>{
     document.head.appendChild(st);
   }
   poserStyleRangeeEtapes();
-  grefferSortieDuParcours();
+  grefferBarreEtapes();
 
   // L'hôte réaffiche l'écran pour un nouveau client : la base a pu bouger
   // entre-temps (un client créé depuis l'onglet Base clients).
