@@ -3628,6 +3628,13 @@ function openLigneDetail(id) {
     // opaque — et grisait tout l'ecran au lieu de griser ce qu'il y a dessous.
     ficheAtelierVoile = document.createElement('div');
     ficheAtelierVoile.className = 'fa-voile';
+    // UN CLIC DEHORS FERME LA FICHE. Sur `click` et non `mousedown` : le champ
+    // qu'on quitte doit d'abord perdre le focus, c'est son `blur` qui envoie ce
+    // qu'on venait d'y ecrire. Ferme au premier des deux, la saisie partirait
+    // dans le vide. Un glisser de selection commence DANS la fiche et se relache
+    // sur le voile : le `click` part alors sur leur ancetre commun, jamais sur
+    // le voile — il ne ferme donc rien, ce qui est le bon comportement.
+    ficheAtelierVoile.addEventListener('click', () => fermerFicheAtelier());
     document.body.appendChild(ficheAtelierVoile);
     ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche));
     document.body.appendChild(ficheAtelierEl);

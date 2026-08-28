@@ -59,6 +59,13 @@ assert.ok(/ficheAtelierVoile[\s\S]*document\.body\.appendChild\(ficheAtelierVoil
   && /ficheAtelierVoile\.remove\(\)/.test(APP),
   'il est monté et retiré avec la fiche, sinon il reste sur le planning');
 assert.ok(!/fa-voile/.test(JS), 'et il n’est jamais un enfant de la racine');
+// UN CLIC DEHORS FERME. Sur `click` et non `mousedown` : le champ qu'on quitte
+// doit d'abord perdre le focus, c'est son `blur` qui envoie ce qu'on venait d'y
+// écrire. Fermé au premier des deux, la saisie partirait dans le vide.
+assert.ok(/ficheAtelierVoile\.addEventListener\('click', \(\) => fermerFicheAtelier\(\)\)/.test(APP),
+  'un clic sur le voile ferme la fiche');
+assert.ok(!/ficheAtelierVoile\.addEventListener\('mousedown'/.test(APP),
+  'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
 const BAS_CSS = CSS.match(/\.fa-bas \{[\s\S]*?\n\}/)[0];
 assert.ok(/border-bottom-left-radius/.test(BAS_CSS),
   'la racine ne rognant plus, c’est la barre basse qui porte les coins du bas');

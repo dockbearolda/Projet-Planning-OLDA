@@ -280,8 +280,11 @@ export function dessinerFicheAtelier(r, ctx) {
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
     el('span', 'fa-projet', r.product || ''),
   );
-  // UNE SEULE SORTIE. « ‹ Retour au planning » et la croix fermaient le même
-  // écran, aux deux bouts de la même barre — celle de gauche dit où l'on va.
+  // UN SEUL BOUTON DE SORTIE. « ‹ Retour au planning » et la croix fermaient le
+  // même écran, aux deux bouts de la même barre — celle de gauche dit où l'on
+  // va. Les deux autres façons de sortir ne sont pas des boutons : Échap, et un
+  // clic dehors (sur le voile, branché dans app.js).
+  // « ↺ Annuler » ne ferme rien : il défait la dernière modification.
   const outils = el('div', 'fa-outils');
   outils.append(etatSauve, bouton('fa-btn', '↺ Annuler', defaire));
   tete.append(retour, ident, outils);
