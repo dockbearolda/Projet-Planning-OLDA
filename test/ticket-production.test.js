@@ -377,14 +377,19 @@ assert.match(CSS_TICKET, /\.tk__matrice-face \{[^}]*text-transform: uppercase/,
   'le nom de la face, lui, est un intitulé : il prend les capitales des autres');
 const cellules = tousLes(nTextile, 'tk__matrice-v').map((n) => n.textContent
   || (n.enfants[0] && n.enfants[0].textContent) || '');
-assert.deepStrictEqual(cellules, ['12', '20', '80', '300', '320'],
-  'la cote tombe SOUS sa taille : 300 sous S, 320 sous M — et le coeur, à cote '
-  + 'unique (80 mm), n’occupe qu’une cellule au lieu de se répéter');
+// UNE COLONNE SE LIT SEULE. À l'établi on prend une taille et on veut y lire
+// TOUT ce qu'il faut pour elle : une cote posée une fois en travers des colonnes
+// oblige à sortir de la sienne pour aller la chercher, et c'est là qu'on lit la
+// ligne du dessus. Le coeur vaut 80 mm en S comme en M : les DEUX cases le
+// disent. Charlie, 28/08 : « les tailles des coeur même identique doivent
+// apparaître sous les tailles ».
+assert.deepStrictEqual(cellules, ['12', '20', '80', '80', '300', '320'],
+  'chaque taille porte sa colonne complète : 80 en S et en M, 300 sous S, 320 sous M');
 // LA COTE UNIQUE S'ÉCRIT UNE FOIS, sur toute la largeur : la répéter sous chaque
 // taille n'apprend rien et fait lire cinq fois la même chose. Le coeur (80 mm
 // partout) a donc UNE cellule, pas deux.
-assert.strictEqual(tousLes(nTextile, 'tk__matrice-v').length, 2 + 1 + 2,
-  'deux pièces, UNE seule cellule pour la cote unique du coeur, deux cotes de dos');
+assert.strictEqual(tousLes(nTextile, 'tk__matrice-v').length, 2 * 3,
+  'trois lignes de deux colonnes : aucune cellule ne manque, aucune n’en couvre deux');
 assert.strictEqual(tousLes(nTextile, 'tk__aecrire').length, 0,
   'toutes ses largeurs sont connues : aucun trait à remplir');
 

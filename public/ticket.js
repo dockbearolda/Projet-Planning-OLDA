@@ -890,10 +890,19 @@ export function dessinerTicket(t, doc, editeur) {
         return c;
       };
 
+      // LA COTE D'UNE FACE POUR UNE TAILLE DONNÉE. Une cote unique vaut pour
+      // toutes les tailles : c'est la MÊME valeur, pas une absence.
+      const coteDe = (mesures, taille) => {
+        if (!mesures.length) return '';
+        if (mesures.length === 1 && !mesures[0].t) return mesures[0].mm;
+        const trouve = mesures.find((x) => x.t === taille);
+        // UNE TAILLE SANS COTE N'EST PAS UNE CASE OUBLIÉE : c'est une cote à
+        // prendre. Un tiret le dit ; un blanc laisserait croire à un zéro.
+        return trouve ? trouve.mm : '—';
+      };
+
       for (const zone of p.logos) {
         const mesures = mesuresDeFace(zone.mm);
-        const parTaille = mesures.length > 1 && mesures.every((x) => x.t)
-          && mesures.every((x) => tailles.some((t) => t.t === x.t));
         const tr = el('tr');
         tr.append(intituleFace(zone));
         if (editeur) {
@@ -905,26 +914,24 @@ export function dessinerTicket(t, doc, editeur) {
           const c = surToute('tk__matrice-v tk__matrice-v--libre');
           c.append(val('prod-logo', zone.mm, zone.ou));
           tr.append(c);
-        } else if (parTaille) {
-          const cotes = new Map(mesures.map((x) => [x.t, x.mm]));
-          for (const x of tailles) {
-            // UNE TAILLE SANS COTE N'EST PAS UNE CASE OUBLIÉE : c'est une cote à
-            // prendre. Un tiret le dit ; un blanc laisserait croire à un zéro.
-            tr.append(el('td', 'tk__matrice-v', cotes.get(x.t) || '—'));
-          }
-        } else if (mesures.length) {
-          const c = surToute('tk__matrice-v');
-          c.textContent = mesures[0].mm;
-          tr.append(c);
-        } else if (zone.quoi) {
-          // UNE CONSIGNE SANS COTE SE SUFFIT : l'atelier sait quoi graver et
-          // décide de la taille sur la pièce. Pas de trait sous elle — un trait
-          // qui ne demande rien finit par être rempli de n'importe quoi.
-          tr.append(surToute('tk__matrice-v'));
         } else {
-          const c = surToute('tk__matrice-v');
-          c.append(el('span', 'tk__aecrire'));
-          tr.append(c);
+          // UNE COLONNE SE LIT SEULE. Charlie, 28/08 : « les tailles des coeur
+          // même identique doivent apparaître sous les tailles ». À l'établi on
+          // prend une taille et on veut y lire TOUT ce qu'il faut pour elle —
+          // une cote posée une fois en travers des colonnes oblige à sortir de
+          // la sienne pour aller la chercher, et c'est là qu'on lit la ligne du
+          // dessus. La même valeur revient donc sous chaque taille.
+          const colonnes = tailles.length ? tailles.map((x) => x.t) : [''];
+          for (const t of colonnes) {
+            const c = el('td', 'tk__matrice-v');
+            const cote = coteDe(mesures, t);
+            if (cote) c.textContent = cote;
+            // UNE CONSIGNE SANS COTE SE SUFFIT : l'atelier sait quoi graver et
+            // décide de la taille sur la pièce. Pas de trait sous elle — un
+            // trait qui ne demande rien finit par être rempli de n'importe quoi.
+            else if (!zone.quoi) c.append(el('span', 'tk__aecrire'));
+            tr.append(c);
+          }
         }
         tbody.append(tr);
       }

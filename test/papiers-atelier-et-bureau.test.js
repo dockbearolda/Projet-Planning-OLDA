@@ -54,10 +54,12 @@ const { modeleBureau, dessinerBureau, bureauTexte, CSS_BUREAU } = chargerPapier(
 // qui permet de les vérifier sans ouvrir Chrome.
 const faireDoc = () => ({
   createElement: (tag) => ({
-    tag, className: '', textContent: '', enfants: [],
+    tag, className: '', textContent: '', enfants: [], attrs: {},
     append(...n) { this.enfants.push(...n); },
     appendChild(n) { this.enfants.push(n); return n; },
-    setAttribute() {},
+    // On RETIENT les attributs : c'est le seul moyen de vérifier qu'aucune
+    // cellule ne couvre plusieurs colonnes de tailles.
+    setAttribute(k, v) { this.attrs[k] = v; },
   }),
 });
 const tousLes = (n, cls, acc = []) => {
@@ -383,6 +385,38 @@ const sansTailles = titresTk({ ref: '', couleur: '', marquage: 'UV', encre: '',
   tailles: [], logos: [{ face: 'Fond', quoi: 'Logo', mm: '' }] });
 assert.deepStrictEqual(sansTailles, ['MARQUAGE', 'FACES À MARQUER', 'INFORMATIONS'],
   'une tasse n’ouvre aucune colonne de taille : ses faces suffisent');
+
+// UNE COLONNE SE LIT SEULE, et c'est la règle qui gouverne tout ce tableau.
+// Charlie, 28/08 : « les tailles des coeur même identique doivent apparaître
+// sous les tailles ». À l'établi on prend UNE taille et on veut y lire tout ce
+// qu'il faut pour elle. Une cote posée une fois en travers des colonnes — même
+// juste, même économe — oblige à sortir de sa colonne pour aller la chercher, et
+// c'est en revenant qu'on lit la ligne du dessus. La même valeur revient donc
+// sous chaque taille, et AUCUNE cellule n'en couvre deux.
+const tkCotes = dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+  retrait: '08/09/2026', client: 'C', contact: '', tel: '', lot: null,
+  lignes: [{ designation: 'A', qte: '9', detail: '', prod: {
+    ref: 'R', couleur: '', marquage: 'DTF', encre: '',
+    tailles: [{ t: 'S', n: '4' }, { t: 'M', n: '8' }, { t: 'L', n: '3' }],
+    // Une cote unique, une cote par taille, et une face à mesurer : les trois
+    // cas, sur la même feuille.
+    logos: [{ face: 'Coeur', quoi: '', mm: '90' },
+      { face: 'Dos', quoi: '', mm: 'S 240/M 260/L 280' },
+      { face: 'Manche', quoi: '', mm: '' }],
+  } }],
+}, faireDoc());
+const cases = tousLes(tkCotes, 'tk__matrice-v');
+assert.strictEqual(cases.length, 4 * 3,
+  'quatre lignes de trois colonnes : aucune cellule ne manque');
+assert.ok(cases.every((c) => !c.attrs || !c.attrs.colspan),
+  'aucune cellule ne couvre plusieurs tailles : une colonne se lit seule');
+assert.deepStrictEqual(cases.slice(3, 6).map((c) => c.textContent), ['90', '90', '90'],
+  'une cote unique se répète sous chaque taille — c’est la MÊME valeur, pas une absence');
+assert.deepStrictEqual(cases.slice(6, 9).map((c) => c.textContent), ['240', '260', '280'],
+  '… et une cote qui varie tombe sous la sienne');
+assert.strictEqual(tousLes(tkCotes, 'tk__aecrire').length, 3,
+  'une face à mesurer ouvre un trait PAR TAILLE : la cote peut changer de l’une à l’autre');
 
 // ---------------------------------------------------------------------------
 // 7. LES DEUX PAPIERS SE DESSINENT HORS NAVIGATEUR
