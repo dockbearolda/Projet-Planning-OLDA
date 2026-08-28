@@ -4699,7 +4699,7 @@ function ldBlocDetail(r) {
   const section = ldBox('Prise de commande — les étapes de la vendeuse', null, true);
   const fil = document.createElement('div');
   fil.className = 'stepper ld-fil';
-  section.append(fil);
+  section.cellule.append(fil);
 
   const onglets = [];
   const panneaux = [];
@@ -4756,7 +4756,7 @@ function ldBlocDetail(r) {
       ligne.append(k, champ);
       panneau.append(ligne);
     }
-    section.append(panneau);
+    section.cellule.append(panneau);
     panneaux.push(panneau);
   });
   fil.setAttribute('role', 'tablist');
@@ -4784,7 +4784,7 @@ function ldBlocHistoriqueClient(r) {
     // La grille ne porte que l'étape affichée : on ne prétend pas connaître
     // tout l'historique du client, on dit ce qu'on voit.
     p.textContent = 'Aucune autre commande de ce client à cette étape.';
-    section.appendChild(p);
+    section.cellule.appendChild(p);
     return section;
   }
   for (const x of autres) {
@@ -4805,7 +4805,7 @@ function ldBlocHistoriqueClient(r) {
     v.textContent = x.project_value == null ? 'à chiffrer' : eur(Number(x.project_value));
     b.append(main, v);
     b.addEventListener('click', () => openLigneDetail(x.id));
-    section.appendChild(b);
+    section.cellule.appendChild(b);
   }
   return section;
 }
@@ -4851,6 +4851,11 @@ function ldBox(label, contenu, pleine) {
   v.className = 'ld-cell';
   for (const c of [].concat(contenu)) if (c) v.append(c);
   rangee.append(k, v);
+  // CE QU'ON AJOUTE APRÈS COUP VA DANS LA CELLULE, jamais sur la rangée : elle
+  // est en `display: contents`, donc un troisième enfant deviendrait une
+  // cellule de grille à lui seul — posée n'importe où dans le tableau. Trois
+  // blocs le faisaient (le fil du comptoir, l'historique du client, le vide).
+  rangee.cellule = v;
   return rangee;
 }
 
@@ -5232,14 +5237,15 @@ function renderLigneDetail() {
 
   const cProduction = ldSuivi('production',
     ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' }), fiche.production);
-  // LA MÊME CONSIGNE QUE SUR LE TICKET. Elle s'écrit surtout depuis le ticket
-  // ouvert sur la ligne (c'est le geste rapide), mais la fiche est l'endroit où
-  // l'on relit TOUT un dossier : une consigne qui n'y figurerait pas serait une
-  // consigne qu'on ne retrouve qu'en imprimant.
+  // LA CONSIGNE POUR L'ATELIER. Elle s'écrivait surtout depuis le ticket ouvert
+  // sur la ligne — le ticket est parti le 28/08, et son intitulé promettait
+  // encore une impression qui n'existe plus. Elle vit ici, avec le reste du
+  // dossier, et elle voyage toujours dans la liste allégée (FICHE_LISTE) : la
+  // grille marque d'un point les dossiers qui parlent à l'atelier.
   const cAtelier = ldSuivi('atelier',
     ldChamp(fiche.atelier, {
       multi: true, rows: 2, label: 'Consigne pour l’atelier',
-      placeholder: 'Ce qu’il faut savoir pour produire — s’imprime sur le ticket',
+      placeholder: 'Ce qu’il faut savoir avant de couper',
     }), fiche.atelier);
   const cInfos = ldSuivi('infos',
     ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' }), r.description);
@@ -5297,8 +5303,8 @@ function renderLigneDetail() {
     ldBox('Créneau de retrait', cCreneau),
     ldBox('Provenance', cProvenance),
     ldBox('Production', cProduction),
-    ldBox('Pour l’atelier — s’imprime sur le ticket', cAtelier, true),
-    ldBox('Informations / commentaire', cInfos, true),
+    ldBox('Consigne atelier', cAtelier, true),
+    ldBox('Informations', cInfos, true),
   );
 
   // --- Documents et paiement : deux encadrés en plus de l'écran du patron -----
@@ -5310,8 +5316,10 @@ function renderLigneDetail() {
   docs.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
   body.append(ldBox('Documents', docs, true));
 
-  const paiement = document.createElement('div');
-  paiement.className = 'ld-pay';
+  // LE PAIEMENT EST FAIT DE PAIRES, comme le reste : « Acompte demandé | Non ».
+  // Il vivait dans une seule cellule, sous forme de quatre encadrés arrondis
+  // empilés — un îlot d'un autre écran au milieu du tableau. Ce sont quatre
+  // rangées, sous leur bandeau, exactement comme les tailles.
   const bascule = (champ, libelle) => ldChip(
     (b) => {
       const on = r[champ] === true;
@@ -5323,10 +5331,11 @@ function renderLigneDetail() {
     },
     () => ldPatch(r, { [champ]: r[champ] !== true }),
   );
-  paiement.append(
-    ldRow('Acompte demandé', bascule('acompte_demande', 'acompte demandé')),
-    ldRow('Acompte versé', bascule('acompte_verse', 'acompte versé')),
-    ldRow('Payé / soldé', bascule('paye', 'payé')),
+  body.append(
+    ldBande('Paiement'),
+    ldBox('Acompte demandé', bascule('acompte_demande', 'acompte demandé')),
+    ldBox('Acompte versé', bascule('acompte_verse', 'acompte versé')),
+    ldBox('Payé / soldé', bascule('paye', 'payé')),
   );
   const modeChip = ldChip(
     (b) => {
@@ -5344,8 +5353,7 @@ function renderLigneDetail() {
       });
     },
   );
-  paiement.append(ldRow('Mode', modeChip));
-  body.append(ldBox('Paiement', paiement, true));
+  body.append(ldBox('Mode de règlement', modeChip));
 
   // --- LE DOSSIER : ses articles, ses étapes, sa prochaine action --------------
   // C'est la « page projet » du §10, posée LÀ où la commande s'ouvre déjà —

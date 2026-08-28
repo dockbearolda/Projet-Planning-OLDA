@@ -134,16 +134,57 @@ assert.ok(/\.ld-rang \{ display: contents; \}/.test(CSS),
   'une rangée ne fabrique pas sa propre grille : elle donne ses cellules à celle du corps');
 // UNE HAUTEUR EST UN JETON, JAMAIS UN NOMBRE (règle du 27/08), et toutes les
 // cellules la prennent dans UNE règle.
-const CELLULES = CSS.match(/\.ld-k, \.ld-cell, \.ld-bande, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
-assert.ok(/min-height: var\(--ctrl-h\);/.test(CELLULES),
+const CELLULES = CSS.match(/\.ld-k, \.ld-cell, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
+assert.ok(/min-height: var\(--ligne-h\);/.test(CELLULES),
   'toutes les cellules ont la même hauteur, et c’est un jeton');
 assert.ok(!/min-height:\s*\d+px/.test(CELLULES), 'jamais une hauteur en dur');
+// UNE RANGÉE DE TABLEAU N'EST PAS UNE COMMANDE ISOLÉE. Trente rangées à
+// `--ctrl-h` (50 px), c'est un formulaire qu'on fait défiler : on en voyait
+// huit à l'écran. Le jeton a son rôle écrit dans la charte, et il est DÉCLARÉ
+// une seule fois — un nombre se recopie de travers.
+const CHARTE = lire('public/charte.css');
+assert.strictEqual((CHARTE.match(/^\s*--ligne-h:/gm) || []).length, 1,
+  '--ligne-h se déclare une seule fois, dans la charte');
+// LES INTITULÉS SE LISENT COMME DES MOTS. En capitales espacées, « Couleur du
+// marquage » tombait sur deux lignes et cassait la rangée : dans un tableur, un
+// en-tête n'est pas un titre. Les capitales vivent sur le BANDEAU, une fois par
+// famille de faits.
+const INTITULES = CSS.match(/\.ld-k, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
+assert.ok(/text-transform: none;/.test(INTITULES),
+  'un intitulé de rangée n’est pas en capitales');
+assert.ok(!/background:/.test(INTITULES),
+  'ni sur un fond de colonne : deux blocs de couleur côte à côte, ce n’est pas un tableau');
+assert.ok(/border-right: 1px solid var\(--border-soft\);/.test(INTITULES),
+  'le quadrillage est vertical AUSSI — c’est lui qui dit que deux valeurs sont dans la même colonne');
+const BANDE = CSS.match(/\.ld-bande \{[\s\S]*?\n\}/)[0];
+assert.ok(/text-transform: uppercase/.test(BANDE), 'les capitales vivent sur le bandeau');
+assert.ok(/grid-column: 1 \/ -1;/.test(BANDE), 'et il traverse les deux colonnes');
 // LE CHAMP EST LA CELLULE : une bordure par champ DANS une cellule qui en a
 // déjà une, c'était une boîte dans une boîte, vingt fois.
 const CTL = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
 assert.ok(/border: 0;/.test(CTL), 'le champ n’a pas de contour propre : la cellule en a un');
 assert.ok(/outline-offset: -2px/.test(CSS),
   'le focus se pose EN DEDANS, sinon il déborde sur les cellules voisines');
+
+// DEUX PIÈGES DE GRILLE, PAYÉS LE 28/08 ET TENUS ICI.
+//
+// 1. UNE RANGÉE EST EN `display: contents` : on ne lui ajoute RIEN après coup.
+//    Un troisième enfant devient une cellule de grille à lui seul, posée
+//    n'importe où dans le tableau. Trois blocs le faisaient — le fil du
+//    comptoir, l'historique du client, le message « aucune commande » — et
+//    partaient se ranger au milieu des autres rangées.
+assert.ok(/rangee\.cellule = v;/.test(APP),
+  'ldBox doit exposer sa cellule : c’est là que les ajouts tardifs vont');
+assert.ok(!/\bsection\.append(Child)?\(/.test(APP),
+  'plus aucun ajout posé SUR la rangée — il irait dans la grille, pas dans la cellule');
+//
+// 2. UN `min-height` SUR UN ITEM DE GRILLE ÉTIRÉ PLAFONNE SA PISTE. Le suivi
+//    du paiement mesurait 206 px dans une cellule figée à 38 et débordait
+//    par-dessus les rangées du dessous ; `min-height: auto` la rend à sa vraie
+//    taille. C'est l'intitulé, à côté, qui garde la hauteur minimale.
+const HAUTE = CSS.match(/\.ld-rang--haut > \.ld-cell \{[^}]*\}/)[0];
+assert.ok(/min-height: auto;/.test(HAUTE),
+  'une rangée à pavé perd son min-height, sinon sa piste plafonne et le contenu déborde');
 
 // ---------------------------------------------------------------------------
 // 4. UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE

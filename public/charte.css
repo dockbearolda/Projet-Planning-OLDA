@@ -231,6 +231,18 @@
      et pas au comptoir, et rien ne distinguait plus une action d'une étiquette. */
   --ctrl-h: 50px;
 
+  /* LA RANGÉE D'UN TABLEAU DE SAISIE — le troisième et dernier rôle de hauteur
+     (28/08/2026). Charlie, devant la fiche : « je veux que ce soit comme un
+     tableau parfait ». Une commande isolée respire à 50 px ; TRENTE rangées
+     empilées à 50 px, c'est un formulaire qu'on fait défiler, pas un tableau
+     qu'on balaie du regard — on n'en voyait que huit à l'écran.
+     38 px n'est pas une valeur choisie au hasard : c'est le texte (17) × son
+     interligne (1,4) plus 2 × 6 px de rembourrage, arrondi au pixel. Le clic
+     reste large sur PC, où l'on vise à la souris.
+     ⚠ ELLE NE S'APPLIQUE QU'À UNE RANGÉE DE TABLEAU. Un champ posé seul, un
+     bouton, un menu gardent `--ctrl-h` : c'est la boîte de l'application. */
+  --ligne-h: 38px;
+
   /* LE ROND — l'autre boîte de la charte, celle qui ne porte PAS de mot :
      une icône seule, une initiale. La forme dit déjà le rôle (voir juste
      au-dessus), il ne manquait que la TAILLE, et l'audit du 26/08 en a mesuré
