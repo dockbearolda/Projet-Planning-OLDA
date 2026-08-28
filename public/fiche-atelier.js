@@ -81,6 +81,9 @@ export function normaliserDate(v, aujourdhui) {
   let d = null;
   if (s === 'auj' || s === "aujourd'hui" || s === 'aujourdhui') d = new Date(now);
   else if (s === 'demain') d = new Date(now.getTime() + JOUR_MS);
+  // « +3 » = dans trois jours. C'est ce que disaient les boutons rapides retirés
+  // le 28/08 : le raccourci reste, il se tape au lieu de se cliquer.
+  else if (/^\+\s*\d{1,3}$/.test(s)) d = new Date(now.getTime() + Number(s.slice(1).trim()) * JOUR_MS);
   else if (JOURS_SAISIS.indexOf(s) > -1) {
     let delta = (JOURS_SAISIS.indexOf(s) - now.getDay() + 7) % 7;
     if (delta === 0) delta = 7;
@@ -359,34 +362,20 @@ export function dessinerFicheAtelier(r, ctx) {
   // =========================================================================
   const gauche = el('div', 'fa-col fa-col--g');
 
-  // LES BOUTONS DE DATE SONT SUR LA MÊME LIGNE que le champ. « Demain » est le
-  // geste le plus fréquent du comptoir : le sortir de la ligne, c'est le rendre
-  // moins accessible que taper la date à la main.
-  const ligneDate = (label, valeurIso, deltas, envoyer) => {
+  // LA DATE SE TAPE, elle ne se clique pas (28/08). Les quatre boutons rapides
+  // disaient exactement ce que le champ comprend deja — « auj », « demain »,
+  // « +3 », un jour de la semaine : ils doublaient la saisie et prenaient la
+  // moitie de la ligne.
+  const ligneDate = (label, valeurIso, opts, envoyer) => {
     const c = champ(null, valeurIso ? jourCourt(new Date(`${String(valeurIso).slice(0, 10)}T12:00:00`)) : '', {
-      label, placeholder: 'jj/mm', requis: !!deltas.requis,
+      label, placeholder: 'jj/mm, demain, +3, lundi', requis: !!opts.requis,
     });
     brancher(c, {
       label,
       normaliser: (v) => normaliserDate(v, ctx.aujourdhui && ctx.aujourdhui()),
       envoyer: (n) => envoyer(n.iso),
     });
-    const rapides = el('div', 'fa-rapides');
-    for (const [n, mot] of deltas.liste) {
-      rapides.append(bouton('fa-btn fa-btn--mini', mot, () => {
-        const base = ctx.aujourdhui ? ctx.aujourdhui() : new Date();
-        const d = new Date(base.getTime() + n * JOUR_MS);
-        const ancien = c.value;
-        c.value = jourCourt(d);
-        envoyer(isoDuJour(d));
-        empiler(() => {
-          c.value = ancien;
-          envoyer(normaliserDate(ancien, ctx.aujourdhui && ctx.aujourdhui()).iso);
-        });
-        coche(c); pulser(); dire(`${label} modifié`);
-      }));
-    }
-    return { rangee: rangee(label, c, deltas.heure || document.createTextNode(''), rapides), champ: c };
+    return { rangee: rangee(label, c, opts.heure || document.createTextNode('')), champ: c };
   };
 
   const chHeure = champ('fa-mini', fiche.heureSouhaitee || '', { label: 'Heure de remise', placeholder: 'heure' });
@@ -394,14 +383,11 @@ export function dessinerFicheAtelier(r, ctx) {
     label: 'Heure de remise', normaliser: normaliserHeure,
     envoyer: (v) => ctx.patchFiche({ heureSouhaitee: v ? v.replace('h', ':') : null }),
   });
-  const remise = ligneDate('Remise au client', r.deadline, {
-    requis: true, heure: chHeure,
-    liste: [[0, 'Auj.'], [1, 'Demain'], [3, '+3 j'], [7, '+1 sem.']],
-  }, (iso) => ctx.patchLigne('deadline', iso));
+  const remise = ligneDate('Remise au client', r.deadline, { requis: true, heure: chHeure },
+    (iso) => ctx.patchLigne('deadline', iso));
 
-  const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, {
-    liste: [[0, 'Auj.'], [1, 'Demain'], [3, '+3 j']],
-  }, (iso) => ctx.patchLigne('date_prevue', iso));
+  const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, {},
+    (iso) => ctx.patchLigne('date_prevue', iso));
 
   const chCreneau = champ('fa-creneau', r.retrait_creneau || '', { label: 'Créneau de retrait', placeholder: 'heure' });
   brancher(chCreneau, {

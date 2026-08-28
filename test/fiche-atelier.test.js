@@ -107,6 +107,11 @@ assert.strictEqual(normaliserDate('auj', REPERE).texte, 'jeu. 27/08');
 // UN NOM DE JOUR RENVOIE LA PROCHAINE OCCURRENCE, jamais aujourd'hui : « jeudi »
 // dit un jeudi veut dire la semaine suivante.
 assert.strictEqual(normaliserDate('jeudi', REPERE).texte, 'jeu. 03/09');
+// « +N » = DANS N JOURS. Les quatre boutons rapides ont été retirés le 28/08 :
+// ce raccourci est ce qu'ils disaient, il doit rester atteignable au clavier.
+assert.strictEqual(normaliserDate('+3', REPERE).texte, 'dim. 30/08');
+assert.strictEqual(normaliserDate('+7', REPERE).texte, 'jeu. 03/09');
+assert.strictEqual(normaliserDate('+ 1', REPERE).texte, 'ven. 28/08');
 assert.strictEqual(normaliserDate('n’importe quoi', REPERE).texte, 'n’importe quoi');
 // L'ISO part en base, le texte reste à l'œil : deux choses, jamais confondues.
 assert.strictEqual(normaliserDate('3/9', REPERE).iso, '2026-09-03');

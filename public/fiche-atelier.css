@@ -213,12 +213,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
 .fa-creneau { width: 94px; flex: 0 0 94px; }
-/* LES BOUTONS DE DATE SONT SUR LA MÊME LIGNE que le champ : « Demain » est le
-   geste le plus fréquent du comptoir, le renvoyer à la ligne suivante le rend
-   moins accessible que taper la date à la main. */
-.fa-rapides { display: flex; gap: 5px; flex-shrink: 0; }
-.fa-rapides .fa-btn { padding: 0 10px; }
-
 .fa-grille-client { display: grid; grid-template-columns: 122px 1fr 1fr; align-items: center; gap: 6px 10px; }
 .fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: 6px 10px; }
 .fa-span2 { grid-column: span 2; }
