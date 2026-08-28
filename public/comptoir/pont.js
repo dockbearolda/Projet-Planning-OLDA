@@ -1450,12 +1450,26 @@
    molette poursuivie en bout de liste part dans la page derriere — et comme
    un defilement d'ecran referme le menu, la liste se fermait au moment ou
    l'on cherchait le dernier article. */
-.menu-liste{max-height:326px;overflow-y:auto;overscroll-behavior:contain;margin:0;padding:6px;list-style:none}
+/* PAS DE REMBOURRAGE EN HAUT : c'est la zone qui defile, et le titre collant
+   s'y arrete a zero. Les six pixels qu'il y avait la laissaient passer une
+   bande de liste AU-DESSUS du titre — une demi-ligne de texte qui flottait au
+   ras du panneau. Le blanc du haut est rendu par le titre lui-meme. */
+.menu-liste{max-height:326px;overflow-y:auto;overscroll-behavior:contain;margin:0;padding:0 6px 6px;list-style:none}
+/* CHAQUE FAMILLE EST SON PROPRE BLOC, et c'est ce qui fait tenir le titre
+   collant. Un titre en position collante ne sort jamais de son bloc englobant :
+   dans une seule liste, les treize titres se collaient au MEME endroit et s'y
+   empilaient — mesure : trois titres a 374 px en meme temps. Comme ils n'ont
+   pas tous la meme hauteur, celui de dessous depassait, et la liste se lisait
+   au travers. Emboite, chaque titre est pousse dehors par le suivant. */
+.menu-famille{list-style:none}
+.menu-famille-liste{margin:0;padding:0;list-style:none}
 /* Le titre de famille reste collé en haut pendant le défilement : 48
-   références sur 13 familles, sans ça on ne sait plus dans quoi on est. */
+   références sur 13 familles, sans ça on ne sait plus dans quoi on est.
+   Sur UNE ligne, toujours : deux titres de hauteurs differentes au meme
+   endroit, c'est le defaut d'avant qui revient par la bande. */
 .menu-groupe{position:sticky;top:0;z-index:1;background:var(--surface);padding:13px 10px 5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-size:var(--taille-texte);font-weight:var(--graisse-forte);letter-spacing:.09em;text-transform:uppercase;color:var(--text-2)}
-.menu-groupe:first-child{padding-top:5px}
 .menu-option{display:flex;align-items:baseline;gap:12px;padding:9px 10px 9px 8px;
   border-left:3px solid transparent;border-radius:8px;cursor:pointer}
 /* La colonne des références : un PLANCHER, pas une largeur fixe. « PARAGON
@@ -1887,13 +1901,30 @@ function menuPeindre(etat){
     rien.textContent=etat.libre?'Aucun choix ne correspond — la saisie reste libre.':'Aucun choix ne correspond.';
     noeuds.push(rien);
   }
-  let groupe=null;
+  /* UNE FAMILLE, UN BLOC. Le titre collant doit pouvoir SORTIR quand sa famille
+     est passée : un `position:sticky` ne quitte jamais son bloc englobant, et
+     à plat dans une seule liste ce bloc est la liste entière — les treize
+     titres restaient donc collés au même endroit, empilés les uns sur les
+     autres. Chaque famille porte maintenant sa propre liste : le titre suivant
+     pousse le précédent dehors, comme il se doit.
+     `cible` dit où va l'option : dans la famille en cours, ou à la racine pour
+     celles qui n'en ont pas (le choix vide et la saisie manuelle, en tête). */
+  let groupe=null,cible=null;
+  const poser=(el)=>{if(cible)cible.append(el);else noeuds.push(el)};
   vus.forEach((o,i)=>{
-    if(o.groupe&&o.groupe!==groupe){
+    if(!o.groupe){groupe=null;cible=null}
+    else if(o.groupe!==groupe){
       groupe=o.groupe;
-      const tete=document.createElement('li');
-      tete.className='menu-groupe';tete.setAttribute('role','presentation');tete.textContent=o.groupe;
-      noeuds.push(tete);
+      const bloc=document.createElement('li');
+      bloc.className='menu-famille';bloc.setAttribute('role','presentation');
+      const tete=document.createElement('div');
+      tete.className='menu-groupe';tete.textContent=o.groupe;
+      cible=document.createElement('ul');
+      cible.className='menu-famille-liste';
+      cible.setAttribute('role','group');
+      cible.setAttribute('aria-label',o.groupe);
+      bloc.append(tete,cible);
+      noeuds.push(bloc);
     }
     const li=document.createElement('li');
     li.className='menu-option'+(i===etat.vise?' est-vise':'');
@@ -1905,7 +1936,7 @@ function menuPeindre(etat){
     if(o.jeton){const j=document.createElement('span');j.className='menu-jeton';j.textContent=o.jeton;li.append(j)}
     if(o.hex){const p=document.createElement('span');p.className='menu-pastille';p.style.background=o.hex;li.append(p)}
     const t=document.createElement('span');t.className='menu-option-texte';t.textContent=o.texte;li.append(t);
-    noeuds.push(li);
+    poser(li);
   });
   etat.liste.replaceChildren(...noeuds);
   menuPeindreVise(etat,true);

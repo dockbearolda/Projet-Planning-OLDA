@@ -607,4 +607,33 @@ assert.ok(/: \(o && o\.value \? \(o\.textContent\|\|''\)\.trim\(\) : ''\)/.test(
 assert.ok(/function previewTextile\(\)\{\s*if\(!txReady\(\)\)return;\s*txPoserObjet\(\);/.test(DEVIS),
   'elle se réécrit sur CHAQUE relecture du formulaire, pas seulement au choix de la référence');
 
+// --- LE TITRE DE FAMILLE NE FLOTTE PAS (27/08/2026) -----------------------
+// Charlie : « ça c'est flottant, ça ne doit pas ».
+//
+// Le titre de famille est COLLANT : sur 82 produits et 13 familles, sans lui on
+// ne sait plus dans quoi on est. Mais un élément collant ne sort jamais de son
+// bloc englobant — et à plat dans une seule liste, ce bloc est la liste
+// ENTIÈRE. Les titres déjà passés restaient donc collés au même endroit, les
+// uns SUR les autres : mesuré, trois titres à 374 px en même temps. Comme ils
+// n'ont pas tous la même hauteur, celui de dessous dépassait de quelques
+// pixels et la liste se lisait au travers du titre.
+//
+// Deux causes, deux corrections, et elles tiennent ensemble :
+//   1. chaque famille est son propre bloc, donc le titre suivant pousse le
+//      précédent dehors ;
+//   2. la zone qui défile n'a plus de rembourrage en haut — ces six pixels-là
+//      laissaient passer une bande de liste AU-DESSUS du titre collé.
+assert.ok(/cible=document\.createElement\('ul'\);\s*cible\.className='menu-famille-liste'/.test(PONT),
+  'chaque famille porte sa propre liste : c’est ce qui laisse le titre sortir');
+assert.ok(/cible\.setAttribute\('role','group'\)/.test(PONT),
+  '… et elle s’annonce comme un groupe, pas comme une deuxième liste de choix');
+assert.ok(/const poser=\(el\)=>\{if\(cible\)cible\.append\(el\);else noeuds\.push\(el\)\}/.test(PONT),
+  '… les options sans famille — le choix vide, la saisie manuelle — restent à la racine');
+assert.ok(/\.menu-liste\{[^}]*padding:0 6px 6px/.test(PONT),
+  'la zone qui défile n’a plus de rembourrage en haut : rien ne peut passer au-dessus du titre collé');
+assert.ok(!/\.menu-groupe:first-child/.test(PONT),
+  'et plus d’exception de hauteur sur le premier titre : deux titres de hauteurs différentes au même endroit, c’est le défaut qui revient');
+assert.ok(/\.menu-groupe\{[^}]*white-space:nowrap/.test(PONT),
+  '… un titre qui s’enroulerait sur deux lignes le ferait revenir aussi');
+
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');
