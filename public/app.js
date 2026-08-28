@@ -5295,14 +5295,15 @@ function renderLigneDetail() {
     // enregistrement refusé : une case qu'on remplit pour rien est pire que pas
     // de case du tout.
     ...(puisJe('marge') ? [ldBox('Coût de revient', cCout)] : []),
-    // CE QU'IL Y A À PRODUIRE, juste sous l'argent : c'est là qu'on corrige une
-    // quantité, et c'est le prix d'à côté qui bouge quand on le fait. Chaque
-    // valeur part en la quittant — pas de bouton, on vient rectifier une chose.
-    ...prodBloc,
     ldBox('Prévu à l’atelier', cPrevue),
     ldBox('Créneau de retrait', cCreneau),
     ldBox('Provenance', cProvenance),
     ldBox('Production', cProduction),
+    // CE QU'IL Y A À PRODUIRE VIENT APRÈS LE DOSSIER, jamais au milieu. Posé
+    // entre le coût et la date d'atelier, son bandeau coupait la logistique en
+    // deux : « Créneau de retrait » se retrouvait sous « Faces à marquer ».
+    // Un tableau se lit par blocs, et un bloc ne s'interrompt pas.
+    ...prodBloc,
     ldBox('Consigne atelier', cAtelier, true),
     ldBox('Informations', cInfos, true),
   );

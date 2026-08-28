@@ -123,8 +123,15 @@ assert.ok(/envoyerFaces\(i, \{ mm: v \}\)/.test(PROD[0]) && /envoyerFaces\(i, \{
 // C'étaient vingt encadrés blancs sur deux colonnes, chacun portant son
 // intitulé AU-DESSUS de son champ : rien ne s'alignait d'un encadré à l'autre.
 const CORPS = CSS.match(/\.ld-body \{[\s\S]*?\n\}/)[0];
-assert.ok(/grid-template-columns: minmax\([^;]+\) minmax\(0, 1fr\);/.test(CORPS),
-  'le corps de la fiche est une grille à DEUX colonnes : intitulé, valeur');
+// DEUX PAIRES PAR LIGNE. Trente-cinq rangées sur une seule colonne, c'était une
+// liste qu'il fallait faire défiler pour voir la moitié du dossier : « toutes
+// les valeurs apparaissent » veut dire tout voir d'un coup.
+assert.ok(/grid-template-columns: repeat\(2, minmax\([^;]+\) minmax\(0, 1fr\)\);/.test(CORPS),
+  'le corps est une grille de DEUX paires intitulé/valeur par ligne');
+// …et une seule paire quand l'écran ne suit plus : deux paires y donneraient
+// des colonnes trop étroites pour une date ou un nom de dossier.
+assert.ok(/@media \(max-width: 1200px\) \{\s*\.ld-body \{ grid-template-columns: minmax\([^;]+\) minmax\(0, 1fr\); \}/.test(CSS),
+  'sous 1200 px, une seule paire par ligne');
 assert.ok(/gap: 0;/.test(CORPS),
   'aucun écart : ce sont les filets qui séparent, comme dans un tableur');
 // `display: contents` sur la rangée : ses deux cellules deviennent des cellules

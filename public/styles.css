@@ -5514,8 +5514,8 @@ body.view-plein .fiverr-tool { display: none !important; }
 @keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
 .ligne-drawer__card {
   position: relative;
-  width: min(980px, 96vw);
-  max-height: 90vh;
+  width: min(1560px, 96vw);
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -5576,14 +5576,21 @@ body.view-plein .fiverr-tool { display: none !important; }
      AUCUN ÉCART : ce sont les filets qui séparent, comme dans un tableur. Un
      `gap` rouvrirait vingt fois le trou qu'on vient de fermer. */
   display: grid;
-  grid-template-columns: minmax(132px, 196px) minmax(0, 1fr);
+  /* DEUX PAIRES PAR LIGNE (28/08). Trente-cinq rangées empilées sur une seule
+     colonne, c'était une liste qu'il fallait faire défiler pour voir la moitié
+     du dossier : « toutes les valeurs apparaissent » veut dire tout voir d'un
+     coup. Quatre colonnes — intitulé, valeur, intitulé, valeur — et le dossier
+     tient sur un écran. */
+  grid-template-columns: repeat(2, minmax(128px, 168px) minmax(0, 1fr));
   gap: 0;
   align-content: start;
   padding: 0;
   background: var(--surface);
 }
-@media (max-width: 760px) {
-  .ld-body { grid-template-columns: minmax(104px, 38%) minmax(0, 1fr); }
+/* Sous 1200 px, une seule paire par ligne : deux paires y donneraient des
+   colonnes de valeur trop étroites pour une date ou un nom de dossier. */
+@media (max-width: 1200px) {
+  .ld-body { grid-template-columns: minmax(128px, 196px) minmax(0, 1fr); }
 }
 
 
@@ -5643,7 +5650,9 @@ body.view-plein .fiverr-tool { display: none !important; }
    revient à la ligne. Son intitulé se cale alors en haut, sinon il flotterait
    au milieu de dix lignes. Ce sont les SEULES rangées qui échappent à la
    hauteur commune, et elles le disent : elles portent un bloc, pas une valeur. */
-.ld-rang--haut > .ld-k { align-items: flex-start; padding-top: 10px; }
+/* UNE RANGÉE À PAVÉ TRAVERSE LA LIGNE ENTIÈRE : elle porte un texte long ou un
+   bloc, elle n'a rien à faire dans une demi-largeur. */
+.ld-rang--haut > .ld-k { grid-column: 1; align-items: flex-start; padding-top: 10px; }
 /* Une rangée à pavé s'étire, donc elle ne coupe pas : `overflow: hidden` est
    la règle des rangées de VALEUR, celles qui tiennent sur leur ligne.
    ⚠ ET ELLE PERD SON `min-height`. Un item de grille ÉTIRÉ qui porte un
@@ -5652,6 +5661,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    volets du dessous. Mesuré : `min-height: auto` rend la rangée à 219 px, sa
    vraie taille. C'est l'intitulé, à côté, qui garde la hauteur minimale. */
 .ld-rang--haut > .ld-cell {
+  grid-column: 2 / -1;
   display: block; padding: 6px 10px; overflow: visible; min-height: auto;
 }
 /* LE FIL DU COMPTOIR DANS UNE CELLULE. C'est le composant de l'écran de la
@@ -5918,7 +5928,12 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
    grammaire que les rangées d'à côté — intitulé, filet, champ sans contour. */
 .ld-detail-line {
   display: grid;
-  grid-template-columns: minmax(132px, 196px) minmax(0, 1fr);
+  /* DEUX PAIRES PAR LIGNE (28/08). Trente-cinq rangées empilées sur une seule
+     colonne, c'était une liste qu'il fallait faire défiler pour voir la moitié
+     du dossier : « toutes les valeurs apparaissent » veut dire tout voir d'un
+     coup. Quatre colonnes — intitulé, valeur, intitulé, valeur — et le dossier
+     tient sur un écran. */
+  grid-template-columns: repeat(2, minmax(128px, 168px) minmax(0, 1fr));
   gap: 0;
   align-items: stretch;
   padding: 0;
