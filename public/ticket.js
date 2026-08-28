@@ -609,11 +609,16 @@ export function dessinerTicket(t, doc, editeur) {
   // vient d'un article du récapitulatif (cf. `ou` dans le modèle).
   const val = (cle, txt, cible) => (editeur ? editeur(cle, txt, cible) : el('span', null, txt));
   const cap = (txt, cls) => el('div', cls ? 'pap-cap ' + cls : 'pap-cap', txt);
+  // UN CHAMP VIDE NE S'IMPRIME PAS. « CONTACT — » n'apprend rien et occupe une
+  // colonne de la rangée du client : c'est déjà la règle du bon de commande, et
+  // les deux papiers sortent de la même ligne à un clic l'un de l'autre.
+  // EN CORRECTION, IL RESTE : c'est là qu'on ajoute le contact qui manquait.
   const champ = (label, valeur, cle, fort) => {
+    if (!valeur && !editeur) return null;
     const b = el('div', 'tk__champ-bloc');
     const v = el('div', 'tk__champ-val' + (fort ? ' tk__champ-val--fort' : ''));
     if (editeur && cle) v.append(val(cle, valeur));
-    else v.textContent = valeur || '—';
+    else v.textContent = valeur;
     b.append(cap(label), v);
     return b;
   };
@@ -659,10 +664,10 @@ export function dessinerTicket(t, doc, editeur) {
   // La date de retrait n'est plus ici : elle est en tête, à côté du titre. Elle
   // y était écrite une deuxième fois — la carte ne dit pas deux fois la même
   // chose, et c'est vrai du papier aussi.
-  champs.append(
+  champs.append(...[
     champ('CONTACT', t.contact, 'contact'),
     champ('TÉL', t.tel, 'tel'),
-  );
+  ].filter(Boolean));
   qui.append(gauche, champs);
   tk.append(qui);
 
@@ -892,7 +897,11 @@ export function dessinerTicket(t, doc, editeur) {
         // les autres — mais PAS l'unité qui le suit : mm est une unité du
         // système international et s'écrit en minuscules.
         nom.append(el('span', 'tk__matrice-face', zone.face));
-        if (avecCote) nom.append(el('span', 'tk__matrice-u', 'mm'));
+        // … ET PAS DEUX FOIS. Certains noms de face portent déjà leur cote et
+        // leur unité — « Face Optimisée 205 x 205 mm », dans la table des
+        // tailles de logo. L'intitulé sortait alors « FACE OPTIMISÉE 205 X 205
+        // MM mm ». On n'ajoute l'unité que si le nom ne la dit pas déjà.
+        if (avecCote && !/\bmm\b/i.test(zone.face)) nom.append(el('span', 'tk__matrice-u', 'mm'));
         k.append(nom);
         // LA CONSIGNE NE RESTE DANS L'INTITULÉ QUE SI LA CELLULE EST PRISE par
         // les cotes. Sans cote, c'est ELLE l'information de la ligne : elle va

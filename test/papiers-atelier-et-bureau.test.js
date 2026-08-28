@@ -328,6 +328,17 @@ assert.ok(!clesRecueil.some((k) => /note interne/i.test(k)),
 const interne = tousLes(feuille, 'bu__interne')[0];
 assert.ok(interne && texteEntier(interne).includes('Cliente pressée'),
   '… elle est dans le cadre « ne pas remettre au client »');
+// ET LA CONSIGNE DE PRODUCTION NE S'Y REDIT PAS. La colonne `description` d'un
+// dossier du comptoir est remplie par l'écran avec la description de
+// production — mot pour mot ce que la ligne du tableau imprime sous la
+// désignation. Le cadre interne la répétait dix lignes plus bas.
+const memeConsigne = modeleBureau({ ...LIGNE,
+  description: 'Logo brodé coeur + marquage dos DTF',
+  fiche: { ...LIGNE.fiche, details: [...LIGNE.fiche.details,
+    { k: 'Article 1 — Description de production', v: 'Logo brodé coeur + marquage dos DTF' }] },
+}, MAISON);
+assert.strictEqual(memeConsigne.note, '',
+  'une note qui redit le détail d’un article n’est pas une note');
 
 // ---------------------------------------------------------------------------
 // 6. LA DATE DE RETRAIT N'EST ÉCRITE QU'UNE FOIS SUR LE TICKET
@@ -451,11 +462,52 @@ const tkTasse = dessinerTicket({
 }, faireDoc());
 assert.strictEqual(tousLes(tkTasse, 'tk__matrice-u').length, 0,
   'aucun « mm » n’est promis sur une pièce qui ne se mesure pas');
+// … ET JAMAIS DEUX FOIS. Certains noms de face portent déjà leur cote et leur
+// unité — « Face Optimisée 205 x 205 mm », dans la table des tailles de logo.
+// L'intitulé sortait « FACE OPTIMISÉE 205 X 205 MM mm ».
+const tkToteBag = dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+  retrait: '15/09/2026', client: 'C', contact: '', tel: '', lot: null,
+  lignes: [{ designation: 'Tote Bag', qte: '50', detail: '', prod: {
+    ref: 'W101', couleur: '', marquage: 'DTF', encre: '', tailles: [],
+    logos: [{ face: 'Face Optimisée 205 x 205 mm', quoi: '', mm: '205' },
+      { face: 'Dos', quoi: '', mm: '250' }],
+  } }],
+}, faireDoc());
+assert.strictEqual(tousLes(tkToteBag, 'tk__matrice-u').length, 1,
+  'l’unité ne s’ajoute qu’aux faces qui ne la portent pas déjà dans leur nom');
 assert.deepStrictEqual(tousLes(tkTasse, 'tk__matrice-v--texte').map((c) => c.textContent),
   ['Logo hôtel'],
   'ce que la vendeuse a écrit occupe la colonne des valeurs, restée vide jusque-là');
 assert.strictEqual(tousLes(tkTasse, 'tk__aecrire').length, 1,
   '… et la face dont rien n’est dit garde son trait à écrire');
+
+// UN CHAMP VIDE NE S'IMPRIME PAS — SUR LES DEUX PAPIERS. Le bon de commande le
+// faisait déjà ; le ticket, lui, sortait « CONTACT — » sur tout dossier sans
+// personne à joindre (le tiers des clients de la base n'en a pas). Un tiret
+// n'apprend rien et occupe une colonne de la rangée du client. Les deux papiers
+// sortent de la même ligne à un clic l'un de l'autre : ils font pareil.
+const sansContact = dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+  retrait: '08/09/2026', client: 'Arawak Charter Boat', contact: '', tel: '06 90 50 25 21',
+  lot: null, lignes: [{ designation: 'A', qte: '9', detail: '' }],
+}, faireDoc());
+assert.strictEqual(tousLes(sansContact, 'tk__champ-bloc').length, 1,
+  'le champ vide ne sort pas : il ne reste que le téléphone');
+assert.ok(!texteEntier(sansContact).split('\n').some((l) => l.trim() === '—'),
+  'et aucun tiret ne le remplace');
+// EN CORRECTION IL RESTE, forcément : c'est là qu'on ajoute ce qui manquait.
+const enCorrection = dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+  retrait: '08/09/2026', client: 'Arawak Charter Boat', contact: '', tel: '06 90 50 25 21',
+  lot: null, lignes: [{ designation: 'A', qte: '9', detail: '' }],
+}, faireDoc(), (cle, txt) => {
+  const n = faireDoc().createElement('input');
+  n.textContent = String(txt || '');
+  return n;
+});
+assert.strictEqual(tousLes(enCorrection, 'tk__champ-bloc').length, 2,
+  'en correction, le contact absent reste remplissable');
 
 // ---------------------------------------------------------------------------
 // 7. LES DEUX PAPIERS SE DESSINENT HORS NAVIGATEUR

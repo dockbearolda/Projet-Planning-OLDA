@@ -194,11 +194,18 @@ function uniteVendue(champs) {
 }
 
 // Une note qui redit une ligne déjà imprimée n'est pas une note.
-function noteUtile(note, dossier) {
+//
+// `dejaDit` porte TOUT ce que la feuille a déjà écrit : le récapitulatif, et le
+// détail de chaque article. La colonne `description` d'un dossier du comptoir
+// est remplie par l'écran avec la description de production — c'est-à-dire mot
+// pour mot ce que la ligne du tableau imprime sous la désignation. Le document
+// la redisait donc dans le cadre « ne pas remettre au client », à dix lignes
+// d'écart, sur la même feuille.
+function noteUtile(note, dejaDit) {
   if (!note) return '';
   const nu = (v) => String(v).replace(/\s+/g, ' ').trim().toLowerCase();
   const dit = nu(note);
-  return dossier.some((x) => nu(`${x.k} : ${x.v}`) === dit || nu(x.v) === dit) ? '' : note;
+  return dejaDit.some((v) => nu(v) === dit) ? '' : note;
 }
 
 // L'ÉMETTEUR DU DOCUMENT. Il vient des réglages de l'atelier, jamais du code :
@@ -288,6 +295,19 @@ export function modeleBureau(l, entreprise) {
     .map((x) => ({ k: texte(x && x.k), v: texte(x && x.v) }))
     .filter((x) => x.k && x.v && !DEJA_DIT.has(x.k));
   const recueilli = dossierDuPanier(f.details, new Set(autresClient.map((x) => x.k)));
+  // LE DÉTAIL, ARTICLE PAR ARTICLE. Le bureau veut le prix unitaire, la
+  // quantité et ce qui a été vendu — pas la fiche de production.
+  const articles = postes.map((p) => ({
+    no: p.no,
+    designation: p.champs['Désignation'] || '',
+    quantite: p.champs['Quantité'] || '',
+    categorie: p.champs['Catégorie'] || '',
+    reference: p.champs['Référence'] || '',
+    couleur: p.champs['Couleur'] || '',
+    unitaire: uniteVendue(p.champs),
+    total: p.champs['Total TTC'] || '',
+    detail: p.champs['Description de production'] || p.champs['Informations importantes'] || '',
+  }));
   const dossier = recueilli.filter((x) => !RE_NOTE_INTERNE.test(x.k));
   const notes = recueilli.filter((x) => RE_NOTE_INTERNE.test(x.k)).map((x) => x.v);
 
@@ -327,19 +347,7 @@ export function modeleBureau(l, entreprise) {
       autres: autresClient,
     },
     responsable: texte(r.responsable),
-    // LE DÉTAIL, ARTICLE PAR ARTICLE. Le bureau veut le prix unitaire, la
-    // quantité et ce qui a été vendu — pas la fiche de production.
-    articles: postes.map((p) => ({
-      no: p.no,
-      designation: p.champs['Désignation'] || '',
-      quantite: p.champs['Quantité'] || '',
-      categorie: p.champs['Catégorie'] || '',
-      reference: p.champs['Référence'] || '',
-      couleur: p.champs['Couleur'] || '',
-      unitaire: uniteVendue(p.champs),
-      total: p.champs['Total TTC'] || '',
-      detail: p.champs['Description de production'] || p.champs['Informations importantes'] || '',
-    })),
+    articles,
     // Le récapitulatif du dossier, tel que la vendeuse l'a rempli. Il porte ce
     // qu'aucune colonne ne range : le canal d'entrée, l'objet du projet, le
     // délai, la note interne.
@@ -353,7 +361,13 @@ export function modeleBureau(l, entreprise) {
     // phrase est mot pour mot une ligne du récapitulatif imprimé vingt lignes
     // plus haut. Le document la disait donc deux fois, dont une sous un cadre
     // « ne pas remettre au client » où elle n'apprend rien.
-    note: noteUtile(texte(r.description), recueilli),
+    // TOUT CE QUE LA FEUILLE A DÉJÀ ÉCRIT : le récapitulatif, et le détail de
+    // chaque article. Sans le second, la consigne de production sortait DEUX
+    // fois — sous la désignation dans le tableau, puis dans le cadre interne.
+    note: noteUtile(texte(r.description), [
+      ...recueilli.map((x) => `${x.k} : ${x.v}`), ...recueilli.map((x) => x.v),
+      ...articles.map((a) => a.detail),
+    ]),
     production: texte(f.production),
   };
 }
