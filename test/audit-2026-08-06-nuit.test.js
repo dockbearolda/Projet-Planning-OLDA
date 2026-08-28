@@ -92,10 +92,11 @@ function bloc(src, signature) {
     'la correction de fiche s’ouvre dans une transaction',
   );
   // Ce qui compte, c'est que la ligne soit PRISE — pas la lettre exacte de la
-  // requête. La clause s'est enrichie depuis (le filtre d'archivage s'y est
-  // ajouté) : on garde donc le verrou sous surveillance, sans figer le reste.
+  // requête. La clause s'est enrichie deux fois depuis (le filtre d'archivage,
+  // puis le prix relu pour savoir s'il a été posé à la main) : on garde donc le
+  // verrou sous surveillance, sans figer les colonnes lues.
   assert.match(
-    handlerFiche, /SELECT fiche FROM requests WHERE id = \$1[^`']*FOR UPDATE/,
+    handlerFiche, /SELECT fiche[^`']*FROM requests WHERE id = \$1[^`']*FOR UPDATE/,
     'la ligne est PRISE pendant qu’on la relit : sans ça, deux corrections '
     + 'simultanées partent de la même fiche d’avant et la seconde efface la première',
   );

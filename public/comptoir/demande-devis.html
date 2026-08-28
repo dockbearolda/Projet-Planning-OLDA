@@ -3482,6 +3482,12 @@ function tl(k,v){var t=String(v==null?'':v).trim();return (!t||t==='—')?'':'<d
         /* CE QU'IL Y A À FAIRE, découpé fait par fait : le planning en compose
            une ligne qui se lit d'un coup d'œil (voir prodDuBesoin). */
         prod:prodDuBesoin(n),
+        /* CE QUI PERMET DE REFAIRE LE PRIX AU PLANNING (28/08). Le besoin porte
+           déjà les entrées du moteur (`n.textile`, posé par saveTextileNeed) :
+           elles ne partaient simplement nulle part. Sans elles, corriger « 30 S »
+           en « 100 S » sur la ligne laisse le prix de trente pièces — le
+           dégressif du fichier V9 ne s'applique plus. */
+        chiffrage:n.textile||null,
         /* Et SEULEMENT ce que le client a précisé de vive voix. La matière, la
            couleur, la technique et les tailles étaient collées ici faute d'un
            endroit pour les mettre : elles en ont un maintenant, et la note

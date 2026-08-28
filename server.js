@@ -15,6 +15,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
 const compression = require('compression');
+// LE PRIX SUIT LA QUANTITÉ (Charlie, 28/08). Le moteur du comptoir, rejoué ici :
+// corriger « 30 S » en « 100 S » sur la ligne du planning doit appliquer le
+// dégressif du fichier V9, pas garder le prix de trente pièces.
+const chiffrage = require('./chiffrage');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -2552,6 +2556,30 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
     }
   }
 
+  // LE PRIX SUIT LA QUANTITÉ — côté VENTE DIRECTE (28/08). Là, aucune grille de
+  // tailles ne commande le total : la vendeuse a tapé un prix à la pièce, et
+  // passer de 10 tasses à 20 doit doubler le montant. La demande de devis, elle,
+  // se retarife par ses tailles (voir le PATCH de la fiche).
+  //
+  // Même règle qu'ailleurs : un prix posé à la main gagne. On le reconnaît en
+  // redemandant ce que la formule donnait pour l'ANCIENNE quantité — si le prix
+  // en base ne vaut plus ça, quelqu'un l'a écrit, et on n'y touche pas. Et si
+  // le même PATCH porte déjà un prix, c'est celui-là qui compte.
+  if ('quantity' in body && !('project_value' in body)) {
+    const f = avant[0].fiche && typeof avant[0].fiche === 'object' ? avant[0].fiche : {};
+    const ch = f.chiffrage;
+    if (ch && ch.moteur === 'unitaire') {
+      const apres = chiffrage.recalculer(ch, null, body.quantity);
+      const ancien = chiffrage.recalculer(ch, null, avant[0].quantity);
+      const calcule = ancien && avant[0].project_value != null
+        && Math.abs(Number(avant[0].project_value) - ancien.ttc) < 0.01;
+      if (apres && calcule) {
+        sets.push(`project_value = $${i++}`);
+        params.push(apres.ttc);
+      }
+    }
+  }
+
   if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
 
   sets.push('updated_at = now()');
@@ -2667,16 +2695,41 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
 // taille change la longueur du tableau, donc les positions de toutes les
 // suivantes — la correction d'à côté irait alors sur la mauvaise case. On
 // retire une taille au dossier, pas au ticket.
+//
+// SAUF QUAND LE PATCH NOMME LA TAILLE (`{ t: 'XL', n: 0 }`, 28/08). Un libellé
+// ne bouge pas quand une taille tombe à zéro, donc le danger des positions
+// n'existe pas : on peut alors descendre à zéro, et même NOMMER UNE TAILLE
+// ABSENTE de la liste — c'est ce qui permet de passer de 0 à 20 XL depuis le
+// planning. Le comptoir ne pose que les tailles commandées ; corriger un
+// dossier, c'est justement en ajouter une.
 function corrigerProd(actuel, patch) {
   if (!actuel || typeof actuel !== 'object') return actuel;
   if (!patch || typeof patch !== 'object') return actuel;
   const out = { ...actuel };
   if (Array.isArray(patch.tailles) && Array.isArray(actuel.tailles)) {
-    out.tailles = actuel.tailles.map((t, i) => {
-      const v = patch.tailles[i];
-      const n = v && typeof v === 'object' ? Number(v.n) : NaN;
-      return Number.isInteger(n) && n > 0 ? { ...t, n } : t;
-    });
+    const parNom = patch.tailles.filter((v) => v && typeof v === 'object' && typeof v.t === 'string');
+    if (parNom.length) {
+      const rang = new Map();
+      const liste = actuel.tailles.map((t) => ({ ...t }));
+      liste.forEach((t, i) => rang.set(String(t.t), i));
+      for (const v of parNom) {
+        const nom = borner(v.t, 60);
+        const n = Number(v.n);
+        if (!nom || !Number.isInteger(n) || n < 0 || n > 100000) continue;
+        if (rang.has(nom)) liste[rang.get(nom)].n = n;
+        else if (n > 0) { rang.set(nom, liste.length); liste.push({ t: nom, n }); }
+      }
+      // UNE TAILLE À ZÉRO N'EST PAS UNE TAILLE. La ligne du planning dit ce
+      // qu'il y a À PRODUIRE : « 0 × XL » y occupe la place d'un fait et n'en
+      // est pas un. Le chiffrage, lui, garde ses six cases (voir chiffrage.js).
+      out.tailles = liste.filter((t) => Number(t.n) > 0);
+    } else {
+      out.tailles = actuel.tailles.map((t, i) => {
+        const v = patch.tailles[i];
+        const n = v && typeof v === 'object' ? Number(v.n) : NaN;
+        return Number.isInteger(n) && n > 0 ? { ...t, n } : t;
+      });
+    }
   }
   if (Array.isArray(patch.logos) && Array.isArray(actuel.logos)) {
     out.logos = actuel.logos.map((l, i) => {
@@ -2686,6 +2739,38 @@ function corrigerProd(actuel, patch) {
     });
   }
   return out;
+}
+
+// --- LE PRIX SUIT LA QUANTITÉ (28/08) ---------------------------------------
+// Les réglages du chiffrage vivent en base — coût DTF, débit, pressage, coût
+// horaire, arrondi, palier de coefficient — et les tarifs de transport dans
+// leur propre table. Le moteur les attend d'un seul tenant.
+const reglagesChiffrage = async () => ({
+  ...(await getReglagesTextile()),
+  transports: await getTarifsTransport(),
+});
+
+// CE QU'IL FAUT RÉÉCRIRE quand les tailles d'une ligne TARIFABLE ont bougé.
+// Rend `null` dès qu'on ne sait pas retarifer — et c'est le cas le plus
+// fréquent : les 184 dossiers d'avant le 28/08 n'ont aucun chiffrage, une
+// tasse et un couteau n'en ont pas non plus. Une ligne qu'on ne sait pas
+// retarifer reste modifiable, son prix ne bouge simplement pas.
+//
+// Le chiffrage repart des tailles de la ligne (`prod.tailles`), jamais des
+// siennes : c'est la ligne qu'on vient de corriger, c'est elle qui a raison.
+// `qte` ne sert qu'à la vente directe : là, ce n'est pas une grille de tailles
+// qui commande le total mais la quantité elle-même, saisie sur la ligne.
+async function retarifer(f, reglages, qte) {
+  const ch = f && f.chiffrage;
+  if (!ch || typeof ch !== 'object') return null;
+  if (ch.moteur === 'unitaire') {
+    const r = chiffrage.recalculer(ch, reglages, qte);
+    return r ? { chiffrage: ch, ...r } : null;
+  }
+  if (!f.prod || !Array.isArray(f.prod.tailles)) return null;
+  const majCh = chiffrage.poserTailles(ch, f.prod.tailles);
+  const r = chiffrage.recalculer(majCh, reglages);
+  return r ? { chiffrage: majCh, ...r } : null;
 }
 
 // PATCH /api/requests/:id/fiche → corrige le DÉTAIL COMPLET d'une commande du
@@ -2728,12 +2813,20 @@ app.patch('/api/requests/:id/fiche', exige('clients'), asyncH(async (req, res) =
     ));
   };
 
+  // LES RÉGLAGES SE LISENT AVANT LE VERROU. Deux requêtes de plus sur le pool
+  // pendant qu'on tient une ligne `FOR UPDATE`, c'est le poste d'à côté qui
+  // attend pour rien — et un pool saturé qui ne peut plus les servir. Ils ne
+  // bougent pas entre-temps ; s'ils bougeaient, c'est le calcul SUIVANT qui en
+  // tiendrait compte, et c'est très bien comme ça.
+  const reglages = 'prod' in b ? await reglagesChiffrage() : null;
+
   const client = await pool.connect();
   let issue;
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `SELECT fiche FROM requests WHERE id = $1 AND ${VIVANTES_NU} FOR UPDATE`, [req.params.id],
+      `SELECT fiche, project_value FROM requests WHERE id = $1 AND ${VIVANTES_NU} FOR UPDATE`,
+      [req.params.id],
     );
     if (rows.length === 0) {
       await client.query('ROLLBACK');
@@ -2776,9 +2869,48 @@ app.patch('/api/requests/:id/fiche', exige('clients'), asyncH(async (req, res) =
     // cette porte : c'est l'identité de l'article, elle se corrige au dossier.
     if ('prod' in b) majFiche.prod = corrigerProd(fiche.prod, b.prod);
 
+    // LE PRIX SUIT LA QUANTITÉ. « Il ne veut plus 30 S, il en veut 100 » : le
+    // dégressif du fichier V9 s'applique, la quantité de la ligne et le coût de
+    // revient suivent. C'est le SERVEUR qui recalcule, une fois, sous le verrou
+    // — deux postes qui corrigent la même ligne obtiennent le même prix.
+    //
+    // UN PRIX POSÉ À LA MAIN GAGNE TOUJOURS. La vendeuse a négocié, ou le patron
+    // a écrit un montant sur la ligne : le recalcul rectifie alors la quantité
+    // et le coût, jamais le prix. Effacer un accord client sans le dire, c'est
+    // le genre de correction qu'on ne découvre qu'à la facture.
+    //
+    // ON NE POSE AUCUN DRAPEAU POUR LE SAVOIR : on REDEMANDE au moteur ce qu'il
+    // donnait AVANT la correction, et on compare au prix en base. Égal, le prix
+    // est calculé et se remet à jour ; différent, une main est passée dessus et
+    // on n'y touche pas. Un drapeau, il aurait fallu le poser partout où un
+    // prix s'écrit — et il aurait manqué sur les dossiers d'avant.
+    //
+    // UN PRIX ABSENT LE RESTE. Une demande de devis vaut `project_value` NULL
+    // et jamais 0 : lui écrire un montant parce qu'on a corrigé une quantité,
+    // ce serait annoncer un prix que personne n'a donné au client.
+    const cols = [];
+    const vals = [];
+    const tarif = 'prod' in b ? await retarifer(majFiche, reglages) : null;
+    if (tarif) {
+      majFiche.chiffrage = tarif.chiffrage;
+      const avant = chiffrage.recalculer(fiche.chiffrage, reglages);
+      const enBase = rows[0].project_value;
+      const calcule = avant && enBase != null
+        && Math.abs(Number(enBase) - avant.ttc) < 0.01;
+      // `$1` porte la fiche et `$2` l'identifiant : les valeurs ajoutées ici
+      // commencent donc à `$3`.
+      const place = (v) => { vals.push(v); return `$${vals.length + 2}`; };
+      cols.push(`quantity = ${place(tarif.qte)}`);
+      // La vente directe n'a pas de coût de revient — la vendeuse tape un prix,
+      // pas une marge. On n'écrit donc pas `null` par-dessus ce que quelqu'un a
+      // pu renseigner à la main dans le tableau de marge.
+      if (tarif.revient != null) cols.push(`cout_revient = ${place(tarif.revient)}`);
+      if (calcule) cols.push(`project_value = ${place(tarif.ttc)}`);
+    }
     const { rows: maj } = await client.query(
-      'UPDATE requests SET fiche = $1, updated_at = now() WHERE id = $2 RETURNING *',
-      [JSON.stringify(majFiche), req.params.id],
+      `UPDATE requests SET fiche = $1${cols.length ? `, ${cols.join(', ')}` : ''},
+              updated_at = now() WHERE id = $2 RETURNING *`,
+      [JSON.stringify(majFiche), req.params.id, ...vals],
     );
     await client.query('COMMIT');
     issue = { ligne: maj[0], avant: fiche, apres: majFiche };
@@ -4535,6 +4667,7 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
       // pas au dossier : quatre articles, quatre références, quatre séries de
       // tailles — les partager reviendrait à annoncer le même travail partout.
       prod: a.prod,
+      chiffrage: a.chiffrage,
       // Le rang sert au suffixe d'empreinte ET à retrouver l'article dans
       // `fiche.details` (« Article 2 — Désignation »), que le ticket relit déjà.
       lot: { ref: refFinale, rang: i + 1, total: nbLignes },
@@ -4549,6 +4682,7 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
       // Un dossier d'un seul article n'a pas de lot, mais il a bien un article :
       // sa ligne mérite la même lecture que les quatre d'un ticket groupé.
       prod: (articles[0] && articles[0].prod) || null,
+      chiffrage: (articles[0] && articles[0].chiffrage) || null,
       lot: null,
       heure: null,
     }];
@@ -4592,6 +4726,7 @@ app.post('/api/comptoir/projet', exige('clients'), asyncH(async (req, res) => un
         empreinte: empreinteDe(i),
         ...(l.lot ? { lot: l.lot } : {}),
         ...(l.prod ? { prod: l.prod } : {}),
+        ...(l.chiffrage ? { chiffrage: l.chiffrage } : {}),
         ...(l.heure ? { heureSouhaitee: l.heure } : {}),
       };
       const { rows: r } = await cx.query(
@@ -4691,6 +4826,16 @@ function articlesDuComptoir(brut) {
       label,
       qte: Number.isInteger(qte) && qte > 0 ? qte : null,
       prod: prodDuComptoir(a.prod),
+      // CE QUI PERMETTRA DE REFAIRE LE PRIX (28/08). Les paramètres du moteur —
+      // référence, genre, transport, emplacement, tailles, remise, majoration —
+      // tels que le comptoir les a chiffrés. Sans eux, corriger une quantité au
+      // planning laisse le prix de la commande d'origine : le dégressif du
+      // fichier V9 ne s'applique plus, et personne ne le voit.
+      //
+      // Ils ne sont pas dans `prod` : `prod` est ce que la ligne AFFICHE et
+      // repart vers chaque poste à chaque rafraîchissement (FICHE_LISTE). Le
+      // chiffrage ne se lit pas, il se rejoue — et seulement au serveur.
+      chiffrage: chiffrage.bornerChiffrage(a.chiffrage),
       detail: borner(a.detail, DESCRIPTION_MAX) || null,
       due: isDay(a.due) ? a.due : null,
       heure: isHeure(a.heure) ? a.heure : null,

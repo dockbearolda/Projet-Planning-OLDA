@@ -1989,7 +1989,13 @@ renderProducts();
         detail:p.description||'',
         due:p.deliveryDate||'',
         heure:p.deliveryTime||'',
-        amount:p.totalTTC
+        amount:p.totalTTC,
+        /* CE QUI PERMET DE REFAIRE LE PRIX AU PLANNING (28/08). Pas de moteur
+           ici : le total est le prix à la pièce (l'objet plus le travail
+           dessus) fois la quantité, majoration de délai comprise. Passer de 10
+           tasses à 20 doit doubler le montant — sans ces deux nombres, la
+           quantité change sur la ligne et le prix reste celui de dix. */
+        chiffrage:{moteur:'unitaire',unitTTC:p.price,rate:p.rate}
       };
     });
   };
