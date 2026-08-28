@@ -410,7 +410,7 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
           rembourrage à zéro SUR LE PAPIER et nulle part ailleurs. */
   .bu {${JETONS_PAPIER}
        --bu-geant: 30px; --bu-cle: 17px; --bu-texte: 13px;
-       --bu-rang: 26px; --bu-gouttiere: 26px;
+       --bu-rang: 26px; --bu-gouttiere: 26px; --bu-section: 24px;
        width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
        display: flex; flex-direction: column;
        background: #ffffff; color: var(--pap-encre);
@@ -455,8 +455,11 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
      Une SEULE grille les porte maintenant, et les paires y sont posées en
      alternance : la grille impose alors la rangée, et deux lignes voisines sont
      à la même hauteur par construction — pas par coïncidence de contenu. */
-  .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;
-               padding: 16px var(--pap-marge) 0; }
+  /* L'ÉCART ENTRE DEUX SECTIONS est un jeton, et il vaut plus du double de
+     l'écart entre deux lignes : c'est ce qui fait qu'on VOIT qu'on change de
+     sujet avant même d'avoir lu l'intitulé. */
+  .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column;
+               gap: var(--bu-section); padding: 16px var(--pap-marge) 0; }
   .bu__grille { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--bu-gouttiere); }
   /* LE TOTAL PREND TOUTE LA LARGEUR (28/08). Il a eu trois places en une
      journée, et la dernière est la bonne : une boîte de 76 mm flottant à droite
@@ -482,10 +485,21 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
      un tableau ; un tableau dont les traits s'arrêtent au milieu se lit comme
      une erreur. */
   .bu__paire--vide { border-bottom-color: var(--pap-filet); }
-  /* L'INTITULÉ D'UNE COLONNE. Il est DANS la grille, donc les deux tombent au
-     même endroit — posés dans deux boîtes séparées, ils suivaient chacun le
-     rembourrage de la sienne. */
-  .bu__col-k { padding-bottom: 5px; border-bottom: 1.5px solid var(--pap-encre); }
+  /* L'INTITULÉ D'UNE SECTION, ET LA SÉPARATION QUI VA AVEC (28/08).
+     Charlie : « le bon de commande sépare chaque secteur, qu'il soit
+     parfaitement visible ». Les six sections — client, dossier, détail, total,
+     ce qui a été recueilli, interne — se suivaient à seize pixels d'écart, avec
+     un intitulé gris ardoise et un filet de la même épaisseur que les lignes.
+     Résultat : une longue coulée de pointillés où rien ne dit qu'on change de
+     sujet.
+     L'intitulé passe donc à l'ENCRE et prend la graisse : c'est lui qui coupe.
+     Le filet passe à 2 px — le double d'une ligne — et l'espace au-dessus est
+     celui d'une respiration, pas d'un interligne (jeton --bu-section, dans le
+     corps). Il est DANS la grille, donc les deux intitulés de la première
+     section tombent au même endroit : posés dans deux boîtes séparées, ils
+     suivaient chacun le rembourrage de la sienne. */
+  .bu__col-k { padding-bottom: 6px; border-bottom: 2px solid var(--pap-encre);
+               color: var(--pap-encre); font-weight: 700; }
   /* LE NOM DU CLIENT est la première valeur de sa colonne, à la place d'une
      paire : c'est POUR QUI, et ça se lit avant tout le reste. La rangée reste
      la rangée — la grille lui donne la même hauteur qu'à sa voisine de droite. */
@@ -498,9 +512,11 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
      bons de commande côte à côte ne se comparaient plus. La désignation prend
      ce qui reste. */
   .bu__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .bu__table th { padding: 0 8px 5px; border-bottom: 1.5px solid var(--pap-encre); text-align: left;
-                  font: 500 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                  letter-spacing: .16em; color: var(--pap-ardoise); }
+  /* L'EN-TÊTE DU TABLEAU EST L'INTITULÉ DE SA SECTION : même encre, même
+     graisse, même filet de 2 px que « Total » ou « Interne ». */
+  .bu__table th { padding: 0 8px 6px; border-bottom: 2px solid var(--pap-encre); text-align: left;
+                  font: 700 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                  letter-spacing: .16em; color: var(--pap-encre); }
   .bu__table td { height: var(--bu-rang); padding: 4px 8px;
                   border-bottom: 1px dotted var(--pap-filet); vertical-align: top; }
   .bu__col--qte { width: 15mm; }
@@ -523,7 +539,9 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
      client. Un liseré rayé le dit sans qu'on ait besoin de le lire. */
   .bu__interne { border: 1px dashed var(--pap-encre); padding: 10px 12px; }
   .bu__interne-tete { display: flex; align-items: baseline; justify-content: space-between;
-                      gap: 12px; padding-bottom: 5px; border-bottom: 1.5px solid var(--pap-encre); }
+                      gap: 12px; padding-bottom: 6px; border-bottom: 2px solid var(--pap-encre); }
+  /* … et son intitulé coupe comme les autres. */
+  .bu__interne-tete .pap-cap:first-child { color: var(--pap-encre); font-weight: 700; }
   .bu__grille3 { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: var(--bu-gouttiere); }
   .bu__mesure { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
                 min-height: var(--bu-rang); padding: 4px 0;

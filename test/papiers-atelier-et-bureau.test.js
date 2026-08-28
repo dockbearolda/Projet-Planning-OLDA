@@ -117,11 +117,12 @@ assert.ok(!/text-transform/.test(regleCap),
 // Dix crans ne font pas une hiérarchie, ils font du désordre. Trois crans
 // propres à chaque papier, plus celui des intitulés qui vient du socle.
 // TROIS CRANS DE TEXTE, et rien d'autre ne porte de taille de police. Les
-// jetons de RYTHME (le pas d'une ligne, la gouttière entre colonnes) sont d'une
-// autre nature : ils ne se lisent pas, ils cadencent. Ils sont nommés ici un par
-// un — c'est ce qui empêche une taille de police de se glisser parmi eux.
+// jetons de RYTHME (le pas d'une ligne, la gouttière entre colonnes, l'écart
+// entre deux sections) sont d'une autre nature : ils ne se lisent pas, ils
+// cadencent. Ils sont nommés ici un par un — c'est ce qui empêche une taille de
+// police de se glisser parmi eux.
 const CRANS = ['geant', 'cle', 'texte'];
-const RYTHME = { tk: ['rang'], bu: ['rang', 'gouttiere'] };
+const RYTHME = { tk: ['rang'], bu: ['rang', 'gouttiere', 'section'] };
 for (const [nom, css, prefixe] of [['ticket', CSS_TICKET, 'tk'], ['bureau', CSS_BUREAU, 'bu']]) {
   const poses = [...new Set(css.match(new RegExp(`--${prefixe}-[a-z]+(?=:\\s*[\\d.]+px)`, 'g')) || [])]
     .map((j) => j.slice(prefixe.length + 3));
@@ -149,6 +150,19 @@ assert.ok(geantBu > cleBu,
   `le montant (${geantBu}) doit dominer le titre (${cleBu}) sur un document du bureau`);
 assert.match(CSS_BUREAU, /\.bu__ttc-v \{[^}]*font-size: var\(--bu-geant\)/,
   'et c’est bien le TTC qui porte ce cran');
+// CHAQUE SECTION SE VOIT. Elles se suivaient à seize pixels d'écart, intitulé en
+// gris ardoise et filet de la même épaisseur que les lignes : une longue coulée
+// de pointillés où rien ne disait qu'on changeait de sujet. L'intitulé coupe
+// maintenant — encre pleine, graisse forte, filet double d'une ligne — et
+// l'écart entre deux sections vaut une respiration, pas un interligne.
+assert.match(CSS_BUREAU, /\.bu__col-k \{[^}]*border-bottom: 2px solid var\(--pap-encre\)/,
+  'le filet d’une section est le double d’une ligne');
+assert.match(CSS_BUREAU, /\.bu__col-k \{[^}]*color: var\(--pap-encre\)/,
+  '… et son intitulé est à l’encre, pas au gris des libellés');
+const sect = parseFloat((CSS_BUREAU.match(/--bu-section:\s*([\d.]+)px/) || [])[1]);
+const rang = parseFloat((CSS_BUREAU.match(/--bu-rang:\s*([\d.]+)px/) || [])[1]);
+assert.ok(sect >= rang * 0.9,
+  `l'écart entre deux sections (${sect}) doit se voir à côté d'un interligne (${rang})`);
 assert.match(CSS_BUREAU, /\.bu__titre \{[^}]*font-size: var\(--bu-cle\)/,
   '… pendant que le titre prend celui des identifiants');
 
