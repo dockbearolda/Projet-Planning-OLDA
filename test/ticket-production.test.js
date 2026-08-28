@@ -435,21 +435,37 @@ assert.strictEqual(tousLes(nTasse, 'tk__matrice-t').length, 0,
   '« Taille unique » n’ouvre AUCUNE colonne de taille : elle n’apprend rien');
 assert.strictEqual(tousLes(nTasse, 'tk__matrice-k').length, 3,
   'les deux flancs et le fond, une ligne chacun, pas un de moins');
+// Les faces de CE jeu d'essai n'ont ni cote ni consigne : rien à lire, donc un
+// trait pour écrire ce qu'on aura mesuré.
 assert.strictEqual(tousLes(nTasse, 'tk__aecrire').length, 3,
-  'une face sans mesure sort un TRAIT pour l’écrire — un blanc ne se remplit pas');
+  'une face sans rien de saisi sort un TRAIT — un blanc ne se remplit pas');
+assert.strictEqual(tousLes(nTasse, 'tk__matrice-u').length, 0,
+  'et aucun « mm » n’est promis : une tasse ne se mesure pas au comptoir');
 
 // CE QU'ON MARQUE TRAVERSE JUSQU'AU PAPIER (26/08). Charlie : « dessus c'est
 // pas des mm mais des noms de logo, des phrases — elle me dit quoi graver ».
 // Sur un textile la largeur vient du catalogue et suffit ; sur une tasse, la
 // CONSIGNE est tout le travail, et la mesure se prend à l'établi.
+//
+// ELLE EST DANS LA COLONNE DES VALEURS quand il n'y a pas de cote à y lire —
+// 28/08 : « pour les tasses ce n'est pas des tailles que je reçois à l'atelier
+// mais des logos, donc pas de mm », et « ma vendeuse peut sous chaque logo
+// rentrer des informations et me donner des informations complémentaires ici ».
+// La cellule était vide sur toutes les tasses : elle porte maintenant ce que la
+// vendeuse a écrit.
 const GRAVE = { ...pTasse, logos: [
   { face: 'Face avant', mm: '', quoi: 'Logo client + « Coco Beach »' },
   { face: 'Fond', mm: '', quoi: 'Logo OLDA' },
 ] };
 const nGrave = papierDe(GRAVE, 24);
-const quoiRendus = tousLes(nGrave, 'tk__matrice-quoi').map((n) => n.textContent);
+const quoiRendus = tousLes(nGrave, 'tk__matrice-v--texte').map((n) => n.textContent);
 assert.deepStrictEqual(quoiRendus, ['Logo client + « Coco Beach »', 'Logo OLDA'],
-  'la carte de zone porte CE QU’ON MARQUE');
+  'la ligne de la face porte CE QU’ON MARQUE, dans sa colonne de valeurs');
+// … ET AUCUN « mm » N'EST PROMIS. Annoncer une unité au-dessus d'une cellule qui
+// n'en portera jamais, c'est promettre une cote — et une cote promise finit par
+// être inventée.
+assert.strictEqual(tousLes(nGrave, 'tk__matrice-u').length, 0,
+  'pas de cote sur cette pièce, donc pas de « mm » dans les intitulés');
 // Une consigne se suffit : pas de trait vide sous elle. Un trait qui ne demande
 // rien finit par être rempli de n’importe quoi.
 assert.strictEqual(tousLes(nGrave, 'tk__aecrire').length, 0,

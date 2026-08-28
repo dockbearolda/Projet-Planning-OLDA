@@ -409,14 +409,43 @@ const tkCotes = dessinerTicket({
 const cases = tousLes(tkCotes, 'tk__matrice-v');
 assert.strictEqual(cases.length, 4 * 3,
   'quatre lignes de trois colonnes : aucune cellule ne manque');
-assert.ok(cases.every((c) => !c.attrs || !c.attrs.colspan),
-  'aucune cellule ne couvre plusieurs tailles : une colonne se lit seule');
+// LA RÈGLE VAUT POUR CE QUI DÉPEND DE LA TAILLE. Une COTE ne couvre jamais
+// plusieurs colonnes ; une phrase, si — elle ne dépend pas de la taille, et la
+// répéter cinq fois ne dirait rien de plus (voir le cas de la tasse plus bas).
+assert.ok(cases.every((c) => (!c.attrs || !c.attrs.colspan)
+  || String(c.className).includes('tk__matrice-v--texte')),
+  'aucune COTE ne couvre plusieurs tailles : une colonne se lit seule');
 assert.deepStrictEqual(cases.slice(3, 6).map((c) => c.textContent), ['90', '90', '90'],
   'une cote unique se répète sous chaque taille — c’est la MÊME valeur, pas une absence');
 assert.deepStrictEqual(cases.slice(6, 9).map((c) => c.textContent), ['240', '260', '280'],
   '… et une cote qui varie tombe sous la sienne');
 assert.strictEqual(tousLes(tkCotes, 'tk__aecrire').length, 3,
   'une face à mesurer ouvre un trait PAR TAILLE : la cote peut changer de l’une à l’autre');
+
+// UNE TASSE NE SE MESURE PAS AU COMPTOIR. Charlie, 28/08 : « pour les tasses ce
+// n'est pas des tailles que je reçois à l'atelier mais des logos, donc pas de
+// mm » — et « ma vendeuse peut sous chaque logo rentrer des informations et me
+// donner des informations complémentaires ici », en désignant la cellule de
+// droite, qui était vide sur toutes les tasses.
+// Deux règles en découlent : l'unité ne s'annonce QUE s'il y a une cote à lire
+// (une cote promise finit par être inventée), et sans cote c'est la CONSIGNE qui
+// occupe la colonne des valeurs.
+const tkTasse = dessinerTicket({
+  demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+  retrait: '08/09/2026', client: 'C', contact: '', tel: '', lot: null,
+  lignes: [{ designation: 'Tasse', qte: '60', detail: '', prod: {
+    ref: '', couleur: 'Blanc', marquage: 'UV', encre: '', tailles: [],
+    logos: [{ face: 'Face avant', quoi: 'Logo hôtel', mm: '' },
+      { face: 'Fond', quoi: '', mm: '' }],
+  } }],
+}, faireDoc());
+assert.strictEqual(tousLes(tkTasse, 'tk__matrice-u').length, 0,
+  'aucun « mm » n’est promis sur une pièce qui ne se mesure pas');
+assert.deepStrictEqual(tousLes(tkTasse, 'tk__matrice-v--texte').map((c) => c.textContent),
+  ['Logo hôtel'],
+  'ce que la vendeuse a écrit occupe la colonne des valeurs, restée vide jusque-là');
+assert.strictEqual(tousLes(tkTasse, 'tk__aecrire').length, 1,
+  '… et la face dont rien n’est dit garde son trait à écrire');
 
 // ---------------------------------------------------------------------------
 // 7. LES DEUX PAPIERS SE DESSINENT HORS NAVIGATEUR

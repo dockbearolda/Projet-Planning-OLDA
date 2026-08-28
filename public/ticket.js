@@ -506,6 +506,12 @@ export const CSS_TICKET = SOCLE_PAPIER + `
      comptoir la compose d'un bloc, la découper ferait écrire cinq fois dans une
      case qui n'en attend qu'une. */
   .tk__matrice-v--libre { text-align: left; padding-left: 10px; font-size: var(--tk-texte); }
+  /* CE QUE LA VENDEUSE A ÉCRIT SUR CETTE FACE, quand il n'y a pas de cote à
+     lire. Ça se LIT, donc ça prend le corps de lecture et non celui des
+     nombres : un nom de logo au cran des cotes déborderait de sa cellule dès le
+     deuxième mot. */
+  .tk__matrice-v--texte { text-align: left; padding-left: 12px; font-size: var(--tk-texte);
+                          font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
   /* UNE FACE SANS COTE N'EST PAS UNE FACE VIDE : c'est une mesure à prendre.
      Elle sort donc avec un trait pour l'écrire, pas avec un blanc — un blanc ne
      se remplit pas. */
@@ -871,16 +877,27 @@ export function dessinerTicket(t, doc, editeur) {
         tbody.append(trQ);
       }
 
-      // L'intitulé d'une ligne de face : son nom, l'unité, et ce qu'on y marque.
-      const intituleFace = (zone) => {
+      // L'INTITULÉ D'UNE LIGNE DE FACE : son nom, et l'unité SEULEMENT s'il y a
+      // une cote à lire dans la ligne.
+      //
+      // « Pour les tasses ce n'est pas des tailles que je reçois à l'atelier
+      // mais des logos, donc pas de mm » (Charlie, 28/08). Une tasse, une
+      // gravure, un panneau : on ne mesure rien, on marque ce que la vendeuse a
+      // écrit. Annoncer « mm » au-dessus d'une cellule qui n'en portera jamais,
+      // c'est promettre une cote — et une cote promise finit par être inventée.
+      const intituleFace = (zone, avecCote) => {
         const k = el('th', 'tk__matrice-k');
         const nom = el('div', 'tk__matrice-nom');
         // LE NOM DE LA FACE EST UN INTITULÉ, il prend donc les capitales de tous
         // les autres — mais PAS l'unité qui le suit : mm est une unité du
         // système international et s'écrit en minuscules.
-        nom.append(el('span', 'tk__matrice-face', zone.face), el('span', 'tk__matrice-u', 'mm'));
+        nom.append(el('span', 'tk__matrice-face', zone.face));
+        if (avecCote) nom.append(el('span', 'tk__matrice-u', 'mm'));
         k.append(nom);
-        if (zone.quoi) k.append(el('div', 'tk__matrice-quoi', zone.quoi));
+        // LA CONSIGNE NE RESTE DANS L'INTITULÉ QUE SI LA CELLULE EST PRISE par
+        // les cotes. Sans cote, c'est ELLE l'information de la ligne : elle va
+        // à sa place, dans la colonne des valeurs.
+        if (zone.quoi && avecCote) k.append(el('div', 'tk__matrice-quoi', zone.quoi));
         return k;
       };
       // Une cellule qui couvre toutes les colonnes de tailles.
@@ -904,7 +921,7 @@ export function dessinerTicket(t, doc, editeur) {
       for (const zone of p.logos) {
         const mesures = mesuresDeFace(zone.mm);
         const tr = el('tr');
-        tr.append(intituleFace(zone));
+        tr.append(intituleFace(zone, mesures.length > 0));
         if (editeur) {
           // EN CORRECTION, LA CHAÎNE SE RÉÉCRIT D'UN BLOC. Le comptoir compose
           // « S 240/M 260/… » en une seule valeur : la découper en cinq champs
@@ -913,6 +930,20 @@ export function dessinerTicket(t, doc, editeur) {
           // qui se réorganise quand on l'ouvre.
           const c = surToute('tk__matrice-v tk__matrice-v--libre');
           c.append(val('prod-logo', zone.mm, zone.ou));
+          tr.append(c);
+        } else if (!mesures.length && zone.quoi) {
+          // PAS DE COTE, MAIS UNE CONSIGNE : c'est ELLE l'information de la
+          // ligne, et elle occupe la colonne des valeurs. « Ma vendeuse peut
+          // sous chaque logo rentrer des informations et me donner des
+          // informations complémentaires ici » (Charlie, 28/08, en désignant
+          // cette cellule).
+          //
+          // ELLE COUVRE LES COLONNES, et c'est la seule chose qui en ait le
+          // droit : la règle « une colonne se lit seule » vaut pour ce qui
+          // DÉPEND de la taille. Une phrase n'en dépend pas — la répéter cinq
+          // fois ne dirait rien de plus et ferait lire cinq fois.
+          const c = surToute('tk__matrice-v tk__matrice-v--texte');
+          c.textContent = zone.quoi;
           tr.append(c);
         } else {
           // UNE COLONNE SE LIT SEULE. Charlie, 28/08 : « les tailles des coeur
@@ -926,10 +957,8 @@ export function dessinerTicket(t, doc, editeur) {
             const c = el('td', 'tk__matrice-v');
             const cote = coteDe(mesures, t);
             if (cote) c.textContent = cote;
-            // UNE CONSIGNE SANS COTE SE SUFFIT : l'atelier sait quoi graver et
-            // décide de la taille sur la pièce. Pas de trait sous elle — un
-            // trait qui ne demande rien finit par être rempli de n'importe quoi.
-            else if (!zone.quoi) c.append(el('span', 'tk__aecrire'));
+            // NI COTE NI CONSIGNE : un trait pour écrire ce qu'on aura mesuré.
+            else c.append(el('span', 'tk__aecrire'));
             tr.append(c);
           }
         }
