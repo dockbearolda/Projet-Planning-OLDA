@@ -189,7 +189,10 @@ assert.ok(/\.ld-cell:focus-within \{ outline: 2px solid var\(--primary\); outlin
 // UNE MARGE DE COMPOSANT NE SUIT PAS DANS UNE CELLULE. `.sub-chip` porte
 // `margin: 8px 12px` pour vivre dans une ligne du planning : ces 12 px la
 // décalaient de la colonne (243 px quand tout le reste tombe à 231).
-assert.ok(/\.ld-cell :is\([^)]*\) \{[\s\S]*?margin: 0;/.test(CSS),
+// La règle se lit sur SON bloc : `[\s\S]*?` traversait les accolades et
+// trouvait le `margin: 0` d'une règle voisine — le contrôle passait sur un
+// défaut qu'il était censé voir.
+assert.ok(/\.ld-cell :is\(\.ld-toggle[^{]*\{[^}]*margin: 0;/.test(CSS),
   'une pastille perd la marge qu’elle porte pour le planning');
 // `align-items: center` VAUT CENTRAGE HORIZONTAL dans une colonne flex : hérité
 // de la règle des cellules, il posait les trois pastilles de documents au milieu
