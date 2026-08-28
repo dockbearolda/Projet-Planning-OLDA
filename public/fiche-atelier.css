@@ -245,6 +245,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* --- ZONES 3 et 4 : les deux colonnes -------------------------------------
    `min-height: 0` sur le conteneur : sans lui, une grille en `flex:1` prend la
    hauteur de son CONTENU et pousse la barre basse hors de l'écran. */
+/* La scene : les deux colonnes et le calque des details. Elle s'arrete pile ou
+   les barres basses commencent — c'est ce qui permet au calque de se caler sur
+   `bottom: 0` au lieu d'une hauteur ecrite en dur. */
+.fa-scene {
+  position: relative;
+  flex: 0 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+}
 .fa-travail {
   flex: 0 1 auto; min-height: 0;
   display: grid; grid-template-columns: 1fr 1fr;
@@ -347,9 +355,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .fa-details__b:hover { background: var(--border-soft); color: var(--text-1); }
+/* La bande est la DERNIERE ligne de la fiche : c'est elle qui porte les coins
+   du bas, la racine ne rognant plus rien (voir `.fa`). */
+.fa-details__b {
+  border-bottom-left-radius: var(--arrondi-carte);
+  border-bottom-right-radius: var(--arrondi-carte);
+}
 .fa-details__liste { font-weight: var(--graisse-texte); color: var(--text-3); }
 .fa-details {
-  position: absolute; left: 0; right: 0; bottom: 105px; z-index: 15;
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-3) var(--pas-4);
   padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
@@ -413,8 +427,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
 .fa-bas {
   flex-shrink: 0;
-  border-bottom-left-radius: var(--arrondi-carte);
-  border-bottom-right-radius: var(--arrondi-carte);
   display: flex; align-items: center; gap: var(--pas-2);
   padding: var(--pas-2) var(--pas-4);
   border-top: 1px solid var(--border);

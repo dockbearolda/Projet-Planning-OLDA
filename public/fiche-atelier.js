@@ -270,8 +270,11 @@ export function dessinerFicheAtelier(r, ctx) {
   // =========================================================================
   // ZONE 1 — la barre d'entête
   // =========================================================================
+  // L'ENTETE NE PORTE PLUS DE BOUTON (28/08). « ‹ Retour au planning » et
+  // « ↺ Annuler » sont retires : on sort par Echap ou par un clic dehors, et
+  // l'annulation vit dans le message qui suit chaque modification. Il ne reste
+  // que ce qui identifie le dossier, et le point qui dit qu'on enregistre.
   const tete = el('header', 'fa-head');
-  const retour = bouton('fa-btn', '‹ Retour au planning', () => ctx.fermer());
   const ident = el('div', 'fa-ident');
   ident.append(
     el('span', 'fa-ref', fiche.ref || ''),
@@ -280,14 +283,9 @@ export function dessinerFicheAtelier(r, ctx) {
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
     el('span', 'fa-projet', r.product || ''),
   );
-  // UN SEUL BOUTON DE SORTIE. « ‹ Retour au planning » et la croix fermaient le
-  // même écran, aux deux bouts de la même barre — celle de gauche dit où l'on
-  // va. Les deux autres façons de sortir ne sont pas des boutons : Échap, et un
-  // clic dehors (sur le voile, branché dans app.js).
-  // « ↺ Annuler » ne ferme rien : il défait la dernière modification.
   const outils = el('div', 'fa-outils');
-  outils.append(etatSauve, bouton('fa-btn', '↺ Annuler', defaire));
-  tete.append(retour, ident, outils);
+  outils.append(etatSauve);
+  tete.append(ident, outils);
 
   // =========================================================================
   // ZONE 2 — le bandeau prioritaire : étape, priorité, valeur
@@ -730,6 +728,16 @@ export function dessinerFicheAtelier(r, ctx) {
   );
 
   majMarge();
-  racine.append(tete, bandeau, travail, barreDetails, panneau, bas, calque, zoneToast);
+  // LA BANDE « DETAILS » EST LA DERNIERE LIGNE (28/08) : c'est un depliant
+  // secondaire, il se pose SOUS la barre des actions courantes. Le panneau,
+  // lui, reste un calque cale au-dessus des deux — il n'en couvre aucune.
+  // LA SCENE porte les deux colonnes ET le panneau : c'est elle qui donne au
+  // calque son point d'ancrage. Cale sur une hauteur ECRITE — `bottom: 105px`
+  // pour 46 + 69 de barres — il recouvrait la barre des actions des que l'une
+  // des deux bougeait d'un pixel. Il se cale maintenant sur `bottom: 0` de la
+  // scene, qui s'arrete pile ou les barres commencent.
+  const scene = el('div', 'fa-scene');
+  scene.append(travail, panneau);
+  racine.append(tete, bandeau, scene, bas, barreDetails, calque, zoneToast);
   return racine;
 }

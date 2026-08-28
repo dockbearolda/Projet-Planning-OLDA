@@ -66,9 +66,22 @@ assert.ok(/ficheAtelierVoile\.addEventListener\('click', \(\) => fermerFicheAtel
   'un clic sur le voile ferme la fiche');
 assert.ok(!/ficheAtelierVoile\.addEventListener\('mousedown'/.test(APP),
   'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
-const BAS_CSS = CSS.match(/\.fa-bas \{[\s\S]*?\n\}/)[0];
-assert.ok(/border-bottom-left-radius/.test(BAS_CSS),
-  'la racine ne rognant plus, c’est la barre basse qui porte les coins du bas');
+// La bande « Détails » est la DERNIÈRE ligne de la fiche : un dépliant
+// secondaire se pose sous la barre des actions courantes, et c'est donc lui
+// qui porte les coins du bas — la racine ne rogne plus rien.
+assert.ok(/racine\.append\(tete, bandeau, scene, bas, barreDetails,/.test(JS),
+  'la bande « Détails » vient après la barre des actions');
+const BANDE_CSS = CSS.match(/\.fa-details__b \{[\s\S]*?border-bottom-left-radius[\s\S]*?\n\}/);
+assert.ok(BANDE_CSS, 'la bande porte les coins du bas de la fiche');
+// L'entête ne porte plus aucun bouton : on sort par Échap ou par un clic
+// dehors, et l'annulation vit dans le message qui suit chaque modification.
+// On lit le MONTAGE, pas le fichier : les deux libellés restent cités dans le
+// commentaire qui explique leur retrait, et les chercher partout ferait tomber
+// le garde-fou sur sa propre explication.
+assert.ok(/tete\.append\(ident, outils\);/.test(JS) && /outils\.append\(etatSauve\);/.test(JS),
+  'l’entête ne porte ni bouton de sortie ni bouton d’annulation');
+assert.ok(/b\.addEventListener\('click', defaire\)/.test(JS),
+  'mais le message garde son « Annuler » : sinon la pile devient inatteignable');
 const TRAVAIL = CSS.match(/\.fa-travail \{[\s\S]*?\n\}/)[0];
 assert.ok(/min-height: 0;/.test(TRAVAIL),
   'sans `min-height: 0`, une grille en flex:1 prend la hauteur de son CONTENU '
@@ -88,7 +101,15 @@ assert.ok(/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
 // la seule chose que cet écran ne doit pas faire.
 const PANNEAU = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
 assert.ok(/position: absolute;/.test(PANNEAU), 'le panneau est un calque, pas un élément du flux');
-assert.ok(/bottom: 105px;/.test(PANNEAU), 'il se pose au-dessus des deux barres basses');
+// `bottom: 0` DE LA SCENE, pas une hauteur écrite. Calé sur « 105px » — la
+// somme supposée des deux barres — il recouvrait la barre des actions dès que
+// l'une d'elles bougeait d'un pixel ; c'est arrivé quand la bande « Détails »
+// est passée sous elle.
+assert.ok(/bottom: 0;/.test(PANNEAU), 'il se pose au-dessus des deux barres basses');
+assert.ok(/\.fa-scene \{[\s\S]*?position: relative;/.test(CSS),
+  'la scène est le point d’ancrage du calque, et elle s’arrête où les barres commencent');
+assert.ok(/scene\.append\(travail, panneau\);/.test(JS),
+  'le panneau vit DANS la scène, sinon il se cale sur la fiche entière');
 // Démonté au repliage, il emporte les valeurs qu'on venait d'y saisir et fausse
 // les calculs qui les lisent. On le masque, on ne le retire pas.
 assert.ok(/panneau\.hidden = true;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
@@ -156,16 +177,18 @@ assert.strictEqual(texteMarge(500, null), '—');
 // ---------------------------------------------------------------------------
 // 5. AUCUN RACCOURCI CLAVIER, SAUF SORTIR
 // ---------------------------------------------------------------------------
-// Demande explicite : la vendeuse travaille à la souris, souvent une main
-// occupée. Tout ce qui est faisable au clavier doit l'être à la souris — d'où
-// les boutons de date, les steppers, et les DEUX points d'entrée de
-// l'annulation (l'entête et le message).
+// Demande explicite : on navigue à la souris, on écrit au clavier. Ce qui se
+// SAISIT se tape (les boutons de date et les steppers ont été retirés le
+// 28/08) ; ce qui se NAVIGUE se clique.
 assert.ok(!/key === '[a-zA-Z]'|ctrlKey|metaKey/.test(JS),
   'aucun raccourci clavier dans la fiche');
 assert.ok(/e\.key === 'Escape' && ficheAtelierId/.test(APP),
   'Échap ferme — c’est le geste que tout le monde a déjà, et il ne remplace aucun bouton');
-assert.ok(/'↺ Annuler', defaire/.test(JS) && /'fa-toast__undo', 'Annuler'/.test(JS),
-  'l’annulation a ses deux points d’entrée souris');
+// L'ANNULATION N'A PLUS QU'UN POINT D'ENTRÉE : le message qui suit chaque
+// modification. Le bouton de l'entête a été retiré le 28/08 — d'où la garde
+// ci-dessous : sans le bouton du message, la pile deviendrait inatteignable.
+assert.ok(/'fa-toast__undo', 'Annuler'/.test(JS),
+  'le message garde son « Annuler » : c’est le seul point d’entrée qui reste');
 // LA PILE EST ILLIMITÉE et sans expiration : une correction de midi se défait
 // à 17 h, c'est la même journée de travail.
 assert.ok(!/annulations\.length >|slice\(-\d/.test(JS), 'la pile d’annulation ne se borne pas');
