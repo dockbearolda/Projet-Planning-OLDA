@@ -347,12 +347,40 @@ const papierDe = (prod, qte) => dessinerTicket({
   lignes: [{ designation: 'Article', qte: String(qte), detail: '', prod }],
 }, faireDoc());
 
-// UN T-SHIRT : deux grilles. Les tailles distinguent, les zones aussi.
+// UN T-SHIRT : une MATRICE de tailles, et une grille de zones.
+// La matrice porte la taille en colonne et ce qu'on en fait en ligne — les
+// pièces, puis la cote de chaque face dont la largeur CHANGE d'une taille à
+// l'autre. Le dos de ce jeu d'essai va de 300 mm en S à 320 en M : sa cote
+// tombe donc sous sa taille, au lieu d'être relistée dans une carte à côté.
+// Le coeur, lui, a une cote unique (80 mm) : il reste une carte.
 const pTextile = modeleTicket({ ...DEMANDE, fiche: { ...DEMANDE.fiche, prod: PROD } }).lignes[0].prod;
 const nTextile = papierDe(pTextile, 32);
-assert.strictEqual(tousLes(nTextile, 'tk__grille').length, 2,
-  'un textile sort ses tailles ET ses zones');
-assert.strictEqual(tousLes(nTextile, 'tk__grille--zones').length, 1);
+assert.strictEqual(tousLes(nTextile, 'tk__matrice').length, 1,
+  'un textile sort UNE matrice de tailles, pas deux tableaux à cinq entrées');
+assert.strictEqual(tousLes(nTextile, 'tk__grille--zones').length, 1,
+  '… et une grille pour les zones qui ne dépendent pas de la taille');
+// Deux colonnes de tailles (S, M) et deux lignes : les pièces, et le dos.
+assert.deepStrictEqual(tousLes(nTextile, 'tk__matrice-t').map((n) => n.textContent), ['S', 'M'],
+  'une colonne par taille, dans l’ordre du dossier');
+const motsDe = (n) => (n.textContent || '') + (n.enfants || []).map(motsDe).join(' ');
+assert.deepStrictEqual(tousLes(nTextile, 'tk__matrice-k').map((n) => motsDe(n).trim()),
+  ['PIÈCES', 'Dos mm'],
+  'une ligne par fait : ce qu’on produit, puis la cote de chaque face qui varie');
+// L'UNITÉ N'EST PAS UN INTITULÉ : elle est dans sa propre boîte, pour que les
+// capitales de la face ne la transforment pas en « MM ». Le même piège que le
+// millimètre des cartes, payé une fois déjà.
+assert.strictEqual(tousLes(nTextile, 'tk__matrice-u')[0].textContent, 'mm',
+  'mm est une unité du SI : elle s’écrit en minuscules');
+assert.match(CSS_TICKET, /\.tk__matrice-face \{[^}]*text-transform: uppercase/,
+  'le nom de la face, lui, est un intitulé : il prend les capitales des autres');
+const cellules = tousLes(nTextile, 'tk__matrice-v').map((n) => n.textContent
+  || (n.enfants[0] && n.enfants[0].textContent) || '');
+assert.deepStrictEqual(cellules, ['12', '20', '300', '320'],
+  'la cote tombe SOUS sa taille : 300 sous S, 320 sous M');
+// LA ZONE À COTE UNIQUE RESTE UNE CARTE : les deux axes ne se croisent que
+// lorsque la cote change vraiment d'une taille à l'autre.
+assert.strictEqual(tousLes(nTextile, 'tk__case').length, 1,
+  'le coeur, à cote unique, ne prend pas une ligne de la matrice');
 assert.strictEqual(tousLes(nTextile, 'tk__aecrire').length, 0,
   'toutes ses largeurs sont connues : aucun trait à remplir');
 
@@ -427,8 +455,12 @@ assert.match(texteGrave, /Zone Fond : Logo OLDA/);
 // UNE SEULE TAILLE QUI DIT QUELQUE CHOSE, elle, reste : « XL » dit quelle boîte
 // ouvrir. On ne retire que les libellés qui SONT le mot « unique ».
 const nXL = papierDe({ ...pTasse, tailles: [{ t: 'XL', n: 5 }] }, 5);
-assert.strictEqual(tousLes(nXL, 'tk__grille').length, 2,
-  '« XL » n’est pas une taille muette : elle garde sa colonne');
+assert.strictEqual(tousLes(nXL, 'tk__matrice').length, 1,
+  '« XL » n’est pas une taille muette : elle ouvre la matrice');
+assert.deepStrictEqual(tousLes(nXL, 'tk__matrice-t').map((n) => n.textContent), ['XL'],
+  '… et elle y garde sa colonne');
+assert.strictEqual(tousLes(nXL, 'tk__grille--zones').length, 1,
+  'les faces de la tasse restent des cartes : leur cote ne dépend pas de la taille');
 
 // UN ARTICLE SANS AUCUNE ZONE ne sort aucun bloc de zones — une bâche ne se
 // marque pas, et un cadre vide finit par être rempli de n’importe quoi.
