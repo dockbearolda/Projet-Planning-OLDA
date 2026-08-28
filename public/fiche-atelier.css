@@ -74,6 +74,11 @@
   z-index: 60;
   display: flex;
   flex-direction: column;
+  /* La racine rogne de nouveau : le voile est un FRERE depuis qu'il a ete sorti
+     d'ici, il n'est donc plus coupe. C'est elle qui porte les coins du bas, et
+     non plus le dernier enfant — lequel change selon que le panneau est ouvert
+     ou ferme. */
+  overflow: hidden;
   border-bottom-left-radius: var(--arrondi-carte);
   border-bottom-right-radius: var(--arrondi-carte);
   box-shadow: var(--shadow-pose);
@@ -317,18 +322,28 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    même largeur, sur UNE ligne. En flex-wrap, deux faces et leur bouton
    demandaient 758 px pour 523 disponibles — la rangée passait à 102 px et la
    colonne débordait de 42. */
+/* AUTANT DE COLONNES QUE LA LARGEUR EN PORTE, jamais une de plus. En
+   `grid-auto-flow: column`, quatre faces se partageaient 523 px : 120 px
+   chacune pour un contenu qui en demande 170, et les bulles se CHEVAUCHAIENT —
+   la piste retrecissait, la bulle non. `auto-fit` en pose deux ou trois selon
+   la place et renvoie le reste a la ligne suivante. */
 .fa-faces {
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: var(--pas-2); flex: 1; min-width: 0;
 }
 .fa-face {
-  display: flex; align-items: center; gap: var(--pas-2);
+  display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
   padding: var(--pas-1) var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
-.fa-face__k { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1); }
-.fa-mm { width: 56px; flex: 0 0 56px; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
+/* ⚠ `min-width: 0` SUR LA BULLE : sans lui elle garde sa largeur intrinseque
+   et sort de sa piste au lieu de se serrer. C'est le meme defaut que sur les
+   cases de taille, et il se voit ici comme un chevauchement. */
+.fa-face__k {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1);
+}
+.fa-mm { width: 74px; flex: 0 1 74px; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-quoi { flex: 1; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
-.fa-unite { font-size: var(--fa-min); color: var(--text-3); }
 .fa-ajout { flex-shrink: 0;
   height: var(--fa-h-champ); padding: 0 var(--pas-3);
   border: 1px dashed var(--border); border-radius: var(--arrondi-champ);
@@ -355,26 +370,19 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .fa-details__b:hover { background: var(--border-soft); color: var(--text-1); }
-/* La bande est la DERNIERE ligne de la fiche : c'est elle qui porte les coins
-   du bas, la racine ne rognant plus rien (voir `.fa`). */
-.fa-details__b {
-  border-bottom-left-radius: var(--arrondi-carte);
-  border-bottom-right-radius: var(--arrondi-carte);
-}
+
 .fa-details__liste { font-weight: var(--graisse-texte); color: var(--text-3); }
+/* DANS LE FLUX SUR UN ECRAN HAUT (28/08) : ouvert par defaut, un calque aurait
+   recouvert les deux colonnes des l'ouverture de la fiche. Deplie ici, il
+   ALLONGE la scene — donc la fiche, qui fait sa taille — et tout se lit d'un
+   coup : aucune hauteur maximale, aucun defilement interne, c'est la demande.
+   Sur le 14 pouces il redevient un calque, plus bas dans ce fichier. */
 .fa-details {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
+  flex-shrink: 0;
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-3) var(--pas-4);
   padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: var(--shadow-bas);
-  /* 400 et non 360 : à l'échelle de la maison le contenu dépassait de 7 px, ce
-     qui ne donne rien d'utile — juste une barre de défilement pour une ligne.
-     Le second terme reste le vrai garde-fou : sur un écran plus court, le
-     panneau s'arrête avant de couvrir l'entête. */
-  max-height: min(400px, calc(100vh - 190px));
-  overflow: auto;
 }
 /* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
    la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
@@ -482,6 +490,24 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    enregistré », « voilà ce qui vient de changer » — se lit sans elles. */
 @media (prefers-reduced-motion: reduce) {
   .fa-flag, .fa-toast { animation: none; }
+}
+
+/* SUR UN ECRAN COURT, LE PANNEAU REDEVIENT UN CALQUE. La fiche y remplit deja
+   l'ecran : deplie dans le flux, il ecrasait les deux colonnes de 349 px et on
+   ne voyait plus le dossier. En calque il recouvre la scene le temps qu'on le
+   consulte, et la rend entiere des qu'on le referme. Le seuil est celui qui
+   decide aussi de son ouverture par defaut (`min-height: 1000px` en JS). */
+@media (height < 1000px) {
+  .fa-details {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
+    max-height: 100%; overflow: auto;
+    box-shadow: var(--shadow-bas);
+    /* Le rembourrage du haut se serre : le contenu depassait la scene de 8 px,
+       ce qui ne donne rien d'utile — juste une barre de defilement pour une
+       ligne. Le meme defaut coutait 7 px du temps de `max-height: 360px`. */
+    padding: var(--pas-2) var(--pas-4);
+    gap: var(--pas-2) var(--pas-4);
+  }
 }
 
 /* Sous 1180 px, les deux colonnes n'ont plus la place de tenir côte à côte :

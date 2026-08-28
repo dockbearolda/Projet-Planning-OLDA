@@ -62,6 +62,15 @@ export function normaliserTelephone(v) {
   return chiffres.length >= 8 ? chiffres.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : brut;
 }
 
+// « 70 » se relit « 70 mm », comme « 1250,5 » se relit « 1 250,50 € ». L'unite
+// entre DANS le champ : ecrite a cote, elle prenait 34 px par face, et quatre
+// faces ne tenaient plus dans la colonne — les bulles se chevauchaient.
+export function normaliserCote(v) {
+  const brut = String(v == null ? '' : v).trim();
+  const n = brut.replace(/\D/g, '');
+  return n ? `${Number(n)} mm` : '';
+}
+
 export function normaliserHeure(v) {
   const brut = String(v == null ? '' : v).trim();
   const d = brut.replace(/\D/g, '');
@@ -528,11 +537,17 @@ export function dessinerFicheAtelier(r, ctx) {
     const bandeF = el('div', 'fa-faces');
     faces.forEach((z, i) => {
       const carte = el('div', 'fa-face');
-      const cMm = champ('fa-mm', z.mm || '', { label: `${z.face} — cote`, placeholder: '0' });
-      brancher(cMm, { label: `${z.face} — cote`, envoyer: (v) => ctx.patchProd({ logos: faces.map((_, j) => (j === i ? { mm: v } : {})) }) });
+      const cMm = champ('fa-mm', normaliserCote(z.mm), { label: `${z.face} — cote`, placeholder: 'mm' });
+      brancher(cMm, {
+        label: `${z.face} — cote`,
+        normaliser: normaliserCote,
+        // On RENVOIE le nombre seul, pas « 70 mm » : c'est une cote en base, et
+        // le papier de l'atelier la relit telle quelle.
+        envoyer: (v) => ctx.patchProd({ logos: faces.map((_, j) => (j === i ? { mm: String(v).replace(/\D/g, '') } : {})) }),
+      });
       const cQuoi = champ('fa-quoi', z.quoi || '', { label: `${z.face} — marquage`, placeholder: 'ce qu’on y marque' });
       brancher(cQuoi, { label: `${z.face} — marquage`, envoyer: (v) => ctx.patchProd({ logos: faces.map((_, j) => (j === i ? { quoi: v } : {})) }) });
-      carte.append(el('span', 'fa-face__k', z.face), cMm, el('span', 'fa-unite', 'mm'), cQuoi);
+      carte.append(el('span', 'fa-face__k', z.face), cMm, cQuoi);
       bandeF.append(carte);
     });
     // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
@@ -585,7 +600,13 @@ export function dessinerFicheAtelier(r, ctx) {
   // ET IL RESTE MONTÉ, masqué par `display`. Démonté au repliage, il emporte
   // les valeurs qu'on venait d'y saisir et fausse les calculs qui les lisent.
   const panneau = el('div', 'fa-details');
-  panneau.hidden = true;
+  // OUVERT PAR DEFAUT quand l'ecran a la hauteur de le porter. Il n'est plus un
+  // calque : deplie, il ALLONGE la fiche au lieu de recouvrir les deux colonnes
+  // — un panneau ouvert d'emblee qui masque le dossier n'aurait aucun sens.
+  // Sur le 14 pouces (630 px) la fiche remplit deja l'ecran : il s'ouvre alors
+  // a la demande, et c'est la scene qui se serre le temps qu'on le consulte.
+  const placePourLesDetails = window.matchMedia('(min-height: 1000px)');
+  panneau.hidden = !placePourLesDetails.matches;
 
   const chInfos = champ(null, r.description || '', {
     label: 'Informations', multi: true, rows: 3, placeholder: 'note interne',
@@ -683,7 +704,7 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   veille.observe(racine);
 
-  const chevron = el('span', null, '▸');
+  const chevron = el('span', null, panneau.hidden ? '▸' : '▾');
   const barreDetails = bouton('fa-details__b', null, () => {
     panneau.hidden = !panneau.hidden;
     chevron.textContent = panneau.hidden ? '▸' : '▾';
@@ -736,6 +757,11 @@ export function dessinerFicheAtelier(r, ctx) {
   // pour 46 + 69 de barres — il recouvrait la barre des actions des que l'une
   // des deux bougeait d'un pixel. Il se cale maintenant sur `bottom: 0` de la
   // scene, qui s'arrete pile ou les barres commencent.
+  // LE PANNEAU VIT DANS LA SCENE. Sur un ecran haut il y est STATIQUE : la
+  // scene s'allonge, la fiche avec, et tout se lit d'un coup. Sur le 14 pouces
+  // il redevient un CALQUE (media query) : la fiche remplit deja l'ecran, et
+  // dans le flux il y ecrasait les deux colonnes de 349 px — on ne voyait plus
+  // le dossier. Deux comportements, un seul element, aucune duplication.
   const scene = el('div', 'fa-scene');
   scene.append(travail, panneau);
   racine.append(tete, bandeau, scene, bas, barreDetails, calque, zoneToast);

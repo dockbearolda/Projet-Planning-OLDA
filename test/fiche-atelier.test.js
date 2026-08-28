@@ -48,9 +48,11 @@ const RACINE_CSS = CSS.match(/\.fa \{[\s\S]*?\n\}/)[0];
 // s'arrête ; ce sont les COLONNES qui défilent si un dossier déborde.
 assert.ok(/position: fixed;/.test(RACINE_CSS) && /max-height: 100vh;/.test(RACINE_CSS),
   'la fiche est bornée à l’écran et ne défile pas elle-même');
-assert.ok(!/overflow: hidden;/.test(RACINE_CSS),
-  '`overflow: hidden` sur la racine rogne le voile à la hauteur de la fiche : '
-  + 'le planning resterait à découvert sous elle');
+// La racine rogne : le voile est un FRÈRE depuis qu'il a été sorti d'ici, il
+// n'est donc plus coupé. C'est elle qui porte les coins du bas, et non plus le
+// dernier enfant — lequel change selon que le panneau est ouvert ou fermé.
+assert.ok(/overflow: hidden;/.test(RACINE_CSS) && /border-bottom-left-radius/.test(RACINE_CSS),
+  'la racine rogne ses propres coins du bas');
 // Le voile est un FRERE de la fiche : posé dedans, il se voyait à travers
 // l'entête et les colonnes — elles n'ont pas de fond opaque — et grisait tout.
 assert.ok(/\.fa-voile \{[^}]*position: fixed[^}]*z-index: 59/.test(CSS),
@@ -66,13 +68,11 @@ assert.ok(/ficheAtelierVoile\.addEventListener\('click', \(\) => fermerFicheAtel
   'un clic sur le voile ferme la fiche');
 assert.ok(!/ficheAtelierVoile\.addEventListener\('mousedown'/.test(APP),
   'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
-// La bande « Détails » est la DERNIÈRE ligne de la fiche : un dépliant
-// secondaire se pose sous la barre des actions courantes, et c'est donc lui
-// qui porte les coins du bas — la racine ne rogne plus rien.
+// La bande « Détails » vient après la barre des actions — un dépliant
+// secondaire se pose sous les actions courantes — et son panneau se déplie
+// juste dessous, en dernier.
 assert.ok(/racine\.append\(tete, bandeau, scene, bas, barreDetails,/.test(JS),
   'la bande « Détails » vient après la barre des actions');
-const BANDE_CSS = CSS.match(/\.fa-details__b \{[\s\S]*?border-bottom-left-radius[\s\S]*?\n\}/);
-assert.ok(BANDE_CSS, 'la bande porte les coins du bas de la fiche');
 // L'entête ne porte plus aucun bouton : on sort par Échap ou par un clic
 // dehors, et l'annulation vit dans le message qui suit chaque modification.
 // On lit le MONTAGE, pas le fichier : les deux libellés restent cités dans le
@@ -95,24 +95,34 @@ assert.ok(/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
   'ce sont les COLONNES qui défileraient, jamais la page — et elles n’ont pas à le faire');
 
 // ---------------------------------------------------------------------------
-// 2. LE PANNEAU DÉTAILS EST UN CALQUE, ET IL RESTE MONTÉ
+// 2. LE PANNEAU DÉTAILS SE DÉPLIE DANS LE FLUX, ET IL RESTE MONTÉ
 // ---------------------------------------------------------------------------
-// Posé dans le flux, il comprime les colonnes et elles se mettent à défiler —
-// la seule chose que cet écran ne doit pas faire.
+// Il a été un CALQUE tant que la fiche était forcée à 100 % de la hauteur : posé
+// dans le flux, il n'avait alors nulle part où aller et comprimait les colonnes.
+// La fiche fait sa taille depuis le 28/08 — il l'allonge, ce qui est la seule
+// façon d'être OUVERT PAR DÉFAUT sans recouvrir le dossier qu'on vient lire.
 const PANNEAU = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
-assert.ok(/position: absolute;/.test(PANNEAU), 'le panneau est un calque, pas un élément du flux');
-// `bottom: 0` DE LA SCENE, pas une hauteur écrite. Calé sur « 105px » — la
-// somme supposée des deux barres — il recouvrait la barre des actions dès que
-// l'une d'elles bougeait d'un pixel ; c'est arrivé quand la bande « Détails »
-// est passée sous elle.
-assert.ok(/bottom: 0;/.test(PANNEAU), 'il se pose au-dessus des deux barres basses');
-assert.ok(/\.fa-scene \{[\s\S]*?position: relative;/.test(CSS),
-  'la scène est le point d’ancrage du calque, et elle s’arrête où les barres commencent');
+assert.ok(!/position: absolute;/.test(PANNEAU),
+  'le panneau se déplie dans le flux : en calque, ouvert par défaut, il masquerait les deux colonnes');
+// SUR UN ÉCRAN COURT IL REDEVIENT UN CALQUE : la fiche y remplit déjà l'écran,
+// et déplié dans le flux il écrasait les deux colonnes de 349 px.
+// `(height < 1000px)` et non `(max-height: 999px)` : le vérificateur de charte
+// lit le second comme une hauteur écrite en dur sur une commande, et refuse le
+// fichier. La syntaxe de plage dit la même chose et lève l'ambiguïté.
+assert.ok(/@media \(height < 1000px\) \{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS),
+  'sur le 14 pouces le panneau redevient un calque');
 assert.ok(/scene\.append\(travail, panneau\);/.test(JS),
-  'le panneau vit DANS la scène, sinon il se cale sur la fiche entière');
+  'il vit dans la scène : c’est elle qui l’allonge, et elle qui l’ancre en calque');
+// TOUT LE FINANCIER D'UN COUP : aucune hauteur maximale, aucun défilement
+// interne. Il avait `max-height: 400px; overflow: auto` du temps du calque.
+assert.ok(!/max-height/.test(PANNEAU) && !/overflow: auto/.test(PANNEAU),
+  'rien n’y est coupé ni renvoyé derrière une barre de défilement');
+assert.ok(/placePourLesDetails[\s\S]*?min-height: 1000px/.test(JS)
+  && /panneau\.hidden = !placePourLesDetails\.matches;/.test(JS),
+  'ouvert par défaut quand l’écran a la hauteur de le porter, fermé sur le 14 pouces');
 // Démonté au repliage, il emporte les valeurs qu'on venait d'y saisir et fausse
 // les calculs qui les lisent. On le masque, on ne le retire pas.
-assert.ok(/panneau\.hidden = true;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
+assert.ok(/panneau\.hidden = !placePourLesDetails\.matches;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
   'le panneau se masque par `hidden`, il n’est jamais démonté');
 assert.ok(!/panneau\.remove\(\)/.test(JS), 'et jamais retiré du document');
 // `hidden` ne masque rien tout seul quand la classe pose son propre `display`.
