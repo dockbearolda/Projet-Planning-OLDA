@@ -344,6 +344,47 @@ assert.strictEqual(surLeTicket.split('\n').filter((l) => l.trim() === '08/09/202
 assert.ok(surLeTicket.includes('À RETIRER LE'), 'et son intitulé dit ce qu’elle est');
 
 // ---------------------------------------------------------------------------
+// 6 bis. UN SEUL TABLEAU POUR TOUTE LA PRODUCTION DU TICKET
+// ---------------------------------------------------------------------------
+// Il y en avait TROIS pour un seul geste — regarder une taille et savoir quoi
+// faire : la grille des quantités, les cotes du dos relistées en colonne dans sa
+// carte, et un bloc de cartes pour les autres faces. Charlie, 28/08 : « ces
+// tailles doivent être sous les tailles », puis, en désignant les cartes qui
+// restaient : « celles-là aussi ».
+assert.ok(!/tk__grille|tk__case|tk__quoi|tk__mes\b/.test(CSS_TICKET),
+  'les grilles de cartes sont parties : une feuille de style qui décrit un bloc '
+  + 'absent finit par le faire réapparaître');
+assert.match(CSS_TICKET, /\.tk__matrice \{[^}]*table-layout: fixed/,
+  'un TABLEAU et non une grille : les colonnes font la même largeur quel que '
+  + 'soit leur nombre, sans que le rendu ait à compter');
+// LE CONTRÔLE DE CONFORMITÉ EST PARTI (« ça, ça dégage »). C'était un cadre à
+// cocher et une phrase de treize mots — deux centimètres de feuille pour une
+// case que personne ne cochait. Ce qui prouve qu'une pièce a été vue, c'est
+// l'étape franchie au planning, pas une signature sur le papier qui part avec.
+for (const parti of ['tk__conformite', 'tk__case-a-cocher', 'CONTRÔLE DE CONFORMITÉ']) {
+  assert.ok(!CSS_TICKET.includes(parti) && !TICKET.includes(`'${parti}`),
+    `« ${parti} » a été retiré du ticket : le laisser, c'est le rouvrir`);
+}
+// ET LE TABLEAU NE S'APPELLE PAS « MARQUAGE » : ce mot est déjà l'intitulé de la
+// TECHNIQUE, trois centimètres plus haut dans la boîte d'identité
+// (« MARQUAGE · DTF · Blanc »). Deux fois le même intitulé pour deux choses
+// différentes sur la même feuille, c'est une feuille qu'on relit.
+const titresTk = (prod) => {
+  const t = { demande: false, titre: 'Ticket atelier', ref: 'X', date: '28/08/2026',
+    retrait: '08/09/2026', client: 'C', contact: '', tel: '', lot: null,
+    lignes: [{ designation: 'A', qte: '9', detail: '', prod }] };
+  return tousLes(dessinerTicket(t, faireDoc()), 'tk__bloc-titre').map((n) => n.textContent);
+};
+const avecTailles = titresTk({ ref: 'R', couleur: '', marquage: 'DTF', encre: 'Blanc',
+  tailles: [{ t: 'S', n: '4' }], logos: [{ face: 'Dos', quoi: '', mm: '90' }] });
+assert.deepStrictEqual(avecTailles, ['MARQUAGE', 'TAILLES ET FACES', 'INFORMATIONS'],
+  'un seul bloc pour les tailles ET les faces, et il ne redit pas « marquage »');
+const sansTailles = titresTk({ ref: '', couleur: '', marquage: 'UV', encre: '',
+  tailles: [], logos: [{ face: 'Fond', quoi: 'Logo', mm: '' }] });
+assert.deepStrictEqual(sansTailles, ['MARQUAGE', 'FACES À MARQUER', 'INFORMATIONS'],
+  'une tasse n’ouvre aucune colonne de taille : ses faces suffisent');
+
+// ---------------------------------------------------------------------------
 // 7. LES DEUX PAPIERS SE DESSINENT HORS NAVIGATEUR
 // ---------------------------------------------------------------------------
 // C'est cette portabilité qui permet de vérifier une feuille sans ouvrir

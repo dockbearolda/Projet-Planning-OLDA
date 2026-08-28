@@ -460,32 +460,26 @@ export const CSS_TICKET = SOCLE_PAPIER + `
   .tk__bloc { display: flex; flex-direction: column; gap: 8px; }
   .tk__bloc-titre { letter-spacing: .18em; }
 
-  /* LES TAILLES ET LES ZONES SONT DEUX AXES INDÉPENDANTS, jamais imbriqués.
-     La maquette rangeait la largeur du dos DANS la carte de la taille : ça se
-     tient pour un t-shirt et ça ne veut rien dire pour une tasse, qui a trois
-     faces et une seule taille. Deux grilles séparées s'adaptent aux deux.
-     LA GRILLE COMPTE SES COLONNES TOUTE SEULE : le nombre de tailles et de
-     zones change d'un article à l'autre, et les poser en style EN LIGNE
-     obligeait le rendu à connaître la largeur du papier — donc rendait le
-     ticket indessinable hors navigateur, là où les tests le mesurent. */
-  .tk__grille { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
-
-  /* LA MATRICE DES TAILLES — LA TAILLE EN COLONNE, CE QU'ON EN FAIT EN LIGNE.
-     Elle ne s'appelle pas « tailles » : ce nom a désigné, jusqu'au 26/08, la
-     PHRASE que Charlie a fait retirer (« 6 × S · 10 × M · 6 × L »), et un
-     garde-fou veille à ce qu'elle ne revienne pas. Deux choses différentes ne
-     partagent pas un nom.
-     Il y avait deux tableaux à cinq entrées sur la même feuille : les quantités
-     dans une grille, et les cotes du dos relistées en colonne dans la carte de
-     la zone. Deux fois les mêmes tailles, à deux endroits, dans deux dessins —
-     et c'est l'atelier qui faisait la correspondance de tête, une taille à la
-     fois. Charlie, 28/08 : « ces tailles doivent être sous les tailles ».
+  /* LE TABLEAU DE PRODUCTION — LA TAILLE EN COLONNE, CE QU'ON EN FAIT EN LIGNE.
+     Il y avait TROIS dessins pour un seul geste : une grille pour les
+     quantités, une liste de cotes en colonne dans la carte du dos, et un bloc
+     de cartes pour les autres faces. Neuf classes et deux grilles pour dire ce
+     qu'une ligne par face dit maintenant. Ce qui les habillait est parti avec
+     elles — une feuille de style qui décrit un bloc absent finit par le faire
+     réapparaître.
      Un TABLEAU et non une grille : les colonnes doivent faire la même largeur
-     quel que soit leur nombre, et table-layout: fixed le fait sans que le
-     rendu ait à compter quoi que ce soit — donc sans style en ligne, donc en
-     restant dessinable hors navigateur. */
+     quel que soit leur nombre, et table-layout: fixed le fait sans que le rendu
+     ait à compter quoi que ce soit — donc sans style en ligne, donc en restant
+     dessinable hors navigateur.
+     Elle ne s'appelle pas « tailles » : ce nom a désigné, jusqu'au 26/08, la
+     PHRASE que Charlie a fait retirer (« 6 x S · 10 x M · 6 x L »), et un
+     garde-fou veille à ce qu'elle ne revienne pas. Deux choses différentes ne
+     partagent pas un nom. */
   .tk__matrice { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .tk__matrice-col-k { width: 30mm; }
+  /* LA COLONNE DES INTITULÉS porte le nom de la face ET ce qu'on y marque :
+     sur une tasse ou une gravure, la consigne est tout le travail, et elle doit
+     rester collée à la face qu'elle concerne. D'où sa largeur. */
+  .tk__matrice-col-k { width: 46mm; }
   .tk__matrice th, .tk__matrice td { border: 1.5px solid var(--pap-encre); }
   /* Le coin haut-gauche ne porte rien : lui donner un cadre fabriquerait une
      case vide, c'est-à-dire une case qu'on cherche à remplir. */
@@ -493,68 +487,31 @@ export const CSS_TICKET = SOCLE_PAPIER + `
   .tk__matrice-t { padding: 5px 4px; text-align: center; text-transform: uppercase;
                    font: 600 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                    letter-spacing: .16em; color: var(--pap-ardoise); overflow-wrap: anywhere; }
-  /* L'INTITULÉ DE LA LIGNE dit ce que la colonne compte : des pièces, ou des
-     millimètres sur telle face. Sans lui, un tableau de nombres ne dit pas de
-     quoi il parle. */
-  .tk__matrice-k { padding: 6px 10px; text-align: left; vertical-align: middle;
-                   font: 600 var(--pap-cap)/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                   letter-spacing: .16em; color: var(--pap-ardoise); overflow-wrap: anywhere; }
+  .tk__matrice-k { padding: 7px 10px; text-align: left; vertical-align: middle; }
+  .tk__matrice-nom { font: 600 var(--pap-cap)/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                     letter-spacing: .16em; color: var(--pap-ardoise); overflow-wrap: anywhere; }
   /* Le nom d'une face vient du dossier, il arrive dans la casse de la vendeuse.
      Ici c'est un INTITULÉ, il prend les capitales des autres — mais l'unité qui
      le suit reste en minuscules : mm ne s'écrit pas « MM ». */
   .tk__matrice-face { text-transform: uppercase; }
   .tk__matrice-u { margin-left: 5px; }
-  .tk__matrice-v { padding: 7px 4px; text-align: center; font-size: var(--tk-cle);
+  /* CE QU'ON MARQUE SUR CETTE FACE. Ça se LIT, donc ça prend le corps de
+     lecture et non celui des nombres — un nom de logo au cran des cotes
+     déborderait de sa colonne dès le deuxième mot. */
+  .tk__matrice-quoi { margin-top: 3px; font-size: var(--tk-texte); font-weight: 700;
+                      line-height: 1.25; color: var(--pap-encre); overflow-wrap: anywhere; }
+  .tk__matrice-v { padding: 7px 6px; text-align: center; font-size: var(--tk-cle);
                    font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
-  /* En correction, la ligne d'une zone porte UN champ pour toute la chaîne :
-     le comptoir la compose d'un bloc, la découper ferait écrire cinq fois dans
-     une case qui n'en attend qu'une. */
-  .tk__matrice-v--suite { text-align: left; padding-left: 10px; font-size: var(--tk-texte); }
-  /* LES ZONES TIENNENT SUR UN SEUL RANG jusqu'à six : à 150 px de large
-     minimum, un vêtement marqué à six emplacements passait à DEUX rangs et la
-     feuille sortait sur un second papier presque vide. */
-  .tk__grille--zones { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
-  .tk__bloc--infos { flex: 1; min-height: 0; }
-  /* UNE CARTE REMPLIT SA BOÎTE. Les cartes d'un même rang s'étirent à la plus
-     haute (c'est la grille qui le fait) : sans cette colonne, le contenu restait
-     collé en haut et « Coeur : 90 mm » flottait au-dessus de 120 px de blanc,
-     à côté d'une carte pleine. */
-  .tk__case { display: flex; flex-direction: column; border: 1.5px solid var(--pap-encre); overflow: hidden; }
-  /* MÊME RÈGLE QUE DANS LA MATRICE : le nom d'une face est un intitulé, il
-     prend les capitales des autres. « Coeur » et « Manche gauche » sortaient en
-     casse mixte au milieu de TAILLES, ZONES DE MARQUAGE et CONSIGNE. */
-  .tk__case-k { padding: 5px 4px; text-align: center; text-transform: uppercase;
-                border-bottom: 1px solid var(--pap-filet);
-                font: 600 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                letter-spacing: .16em; color: var(--pap-ardoise); overflow-wrap: anywhere; }
-  .tk__case-v { flex: 1; display: flex; align-items: center; justify-content: center;
-                padding: 8px 4px; text-align: center; font-size: var(--tk-cle); font-weight: 800;
-                letter-spacing: -.03em; line-height: 1; }
-  /* LA CONSIGNE : ce qu'il y a à marquer sur cette face. Elle se LIT, donc elle
-     prend le corps de lecture et non celui des nombres. */
-  .tk__quoi { padding: 8px 8px 4px; text-align: center;
-              font-size: var(--tk-texte); font-weight: 700; line-height: 1.25;
-              overflow-wrap: anywhere; }
-  /* LA COTE D'UNE FACE, quand elle change d'une taille à l'autre : une ligne
-     par taille, reliée à sa mesure. Sur NS300 le dos va de 240 mm en XS à 320
-     en XL — un seul chiffre enverrait trois pièces sur quatre au mauvais
-     fichier. Le nombre porte le cran des valeurs qui décident, comme le nombre
-     par taille de la grille du dessus : ce sont les mêmes faits, ils ne peuvent
-     pas sortir à deux tailles sur la même feuille. */
-  .tk__mes { display: flex; align-items: center; justify-content: space-between; gap: 6px;
-             padding: 4px 10px; border-top: 1px dotted var(--pap-filet); }
-  .tk__mes-v { display: flex; align-items: baseline; gap: 3px; }
-  .tk__mes-n { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
-  /* L'UNITÉ COLLE AU NOMBRE, elle ne tombe pas au fond de la carte. Posée
-     après un bloc élastique, « mm » se retrouvait à 120 px sous le 90 qu'elle
-     qualifie — et la carte voisine, elle, l'avait juste à côté de sa cote.
-     Deux fois la même chose, deux dessins. */
-  .tk__case-v-n { display: flex; align-items: baseline; gap: 3px; }
-  /* UNE ZONE SANS MESURE N'EST PAS UNE ZONE VIDE : c'est une mesure à prendre.
-     Elle sort donc avec un trait pour l'écrire, pas avec un blanc — et ce trait
-     est à la place du nombre qu'il remplace, au centre de la carte. */
-  .tk__case-v--vide { flex-direction: column; gap: 5px; }
+  /* En correction, la ligne d'une face porte UN champ pour toute la chaîne : le
+     comptoir la compose d'un bloc, la découper ferait écrire cinq fois dans une
+     case qui n'en attend qu'une. */
+  .tk__matrice-v--libre { text-align: left; padding-left: 10px; font-size: var(--tk-texte); }
+  /* UNE FACE SANS COTE N'EST PAS UNE FACE VIDE : c'est une mesure à prendre.
+     Elle sort donc avec un trait pour l'écrire, pas avec un blanc — un blanc ne
+     se remplit pas. */
   .tk__aecrire { display: block; width: 100%; border-bottom: 1px solid var(--pap-encre); height: 20px; }
+
+  .tk__bloc--infos { flex: 1; min-height: 0; }
 
   /* CE QU'ON PRÉCISE DE VIVE VOIX. Cette phrase sortait en 23 px gras, posée
      entre deux blocs sans cadre ni intitulé : la seule chose de la feuille qui
@@ -572,11 +529,6 @@ export const CSS_TICKET = SOCLE_PAPIER + `
   .tk__infos { flex: 1; min-height: 0; padding: 12px 20px 14px; border: 1.5px solid var(--pap-encre);
                background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--tk-rang) - 1px), var(--pap-filet) calc(var(--tk-rang) - 1px), var(--pap-filet) var(--tk-rang));
                background-position: 0 8px; background-clip: content-box; white-space: pre-line; }
-
-  .tk__conformite { display: flex; align-items: center; gap: 16px; margin: 14px var(--pap-marge) 16px;
-                    padding: 12px 16px; border: 1.5px solid var(--pap-encre); }
-  .tk__case-a-cocher { flex: none; width: 22px; height: 22px; border: 1.5px solid var(--pap-encre); }
-  .tk__conformite-txt { font-size: var(--tk-texte); font-weight: 500; line-height: 1.35; }
 
   .tk__pied { display: flex; align-items: center; justify-content: space-between; gap: 24px;
               padding: 12px var(--pap-marge) 20px; border-top: 1px dashed var(--pap-encre); }
@@ -603,7 +555,7 @@ export const CSS_TICKET = SOCLE_PAPIER + `
      taille du contenu ; les navigateurs qui l'ignorent gardent le trait long,
      ce qui reste lisible. */
   .tk__qte { field-sizing: content; width: auto; min-width: 2ch; }
-  .tk--edit .tk__case-v .tk__champ, .tk--edit .tk__mes-n .tk__champ { text-align: center; }
+  .tk--edit .tk__matrice-v .tk__champ { text-align: center; }
   .tk__champ:focus { outline: 2px solid var(--pap-encre); outline-offset: 2px; }
 `;
 
@@ -736,17 +688,11 @@ export function dessinerTicket(t, doc, editeur) {
   corps.append(infos);
   tk.append(corps);
 
-  // LA SIGNATURE DE CONFORMITÉ. Elle n'existait pas sur le rouleau : on ne
-  // signe pas un ticket de caisse. Sur ce papier-ci, elle dit que quelqu'un a
-  // regardé la pièce avant qu'elle parte — et elle nomme ce quelqu'un par sa
-  // main, pas par un champ de plus.
-  const conf = el('div', 'tk__conformite');
-  const txt = el('div', 'tk__ident-col');
-  txt.append(cap('CONTRÔLE DE CONFORMITÉ', 'tk__bloc-titre'),
-    el('div', 'tk__conformite-txt',
-      'Je certifie que l’article a été réalisé et vérifié, et qu’il est conforme à la demande.'));
-  conf.append(el('span', 'tk__case-a-cocher'), txt);
-  tk.append(conf);
+  // LE CONTRÔLE DE CONFORMITÉ A ÉTÉ RETIRÉ (Charlie, 28/08 : « ça, ça dégage »).
+  // C'était un cadre à cocher et une phrase de treize mots — deux centimètres de
+  // feuille pour une case que personne ne cochait. Ce qui prouve qu'une pièce a
+  // été vue, c'est l'étape franchie au planning, pas une signature sur le papier
+  // qui part avec elle.
 
   // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise,
   // et de quel dossier ce papier parle — pour le reclasser, pas pour le faire.
@@ -860,163 +806,130 @@ export function dessinerTicket(t, doc, editeur) {
     }
     corps.append(boite);
 
-    // 2. LES TAILLES — UN SEUL TABLEAU À DOUBLE ENTRÉE.
-    //    La taille en COLONNE, ce qu'on en fait en LIGNE. Il y avait deux
-    //    tableaux à cinq entrées sur la même feuille : la grille des quantités
-    //    (S 4, M 8, L 7, XL 3, 2XL 2) et, dans la carte de la zone « Dos », la
-    //    liste des cotes (S 240, M 260, L 280, XL 300, 2XL 320). Deux fois les
-    //    mêmes cinq tailles, à deux endroits, dans deux dessins — et c'est
-    //    l'atelier qui faisait la correspondance de tête, une taille à la fois.
-    //    Charlie, 28/08 : « ces tailles doivent être sous les tailles ».
+    // 2. UN SEUL TABLEAU POUR TOUTE LA PRODUCTION.
+    //    La taille en COLONNE, ce qu'on en fait en LIGNE : les pièces d'abord,
+    //    puis une ligne par face à marquer.
     //
-    //    LES DEUX AXES RESTENT INDÉPENDANTS, et c'est ce qui rend la fusion
-    //    possible : seule rejoint le tableau une zone dont la cote CHANGE d'une
-    //    taille à l'autre — c'est le seul cas où les deux axes se croisent
-    //    vraiment. Une cote unique (le coeur, 90 mm) ou une cote à prendre à
-    //    l'établi (la manche) reste une carte du bloc des zones, et une tasse,
-    //    qui a trois faces et une seule taille, n'ouvre toujours aucun tableau.
+    //    Il y avait TROIS dessins pour un seul geste — regarder une taille et
+    //    savoir quoi faire. La grille des quantités, les cotes du dos relistées
+    //    en colonne dans sa carte, et un bloc de cartes pour les autres faces.
+    //    Charlie, 28/08 : « ces tailles doivent être sous les tailles », puis,
+    //    en désignant les cartes restantes : « celles-là aussi ».
+    //
+    //    TROIS SORTES DE LIGNES DE FACE, et la ligne dit laquelle par sa forme :
+    //      · la cote CHANGE d'une taille à l'autre : une cellule par colonne,
+    //        chaque cote sous sa taille ;
+    //      · la cote est UNIQUE : une seule cellule sur toute la largeur. La
+    //        répéter sous chaque taille n'apprend rien et fait lire cinq fois ;
+    //      · pas de cote : un trait sur toute la largeur. C'est une mesure à
+    //        prendre a l'établi, et un blanc ne se remplit pas.
+    //
+    //    LA CONSIGNE VIT DANS L'INTITULÉ DE SA LIGNE, sous le nom de la face :
+    //    sur une tasse ou une gravure c'est elle tout le travail, et elle doit
+    //    rester collée à la face qu'elle concerne.
     const tailles = taillesParlantes(p.tailles);
-    // Ce qui va dans le tableau, ce qui reste en carte. La garde est stricte :
-    // il faut que CHAQUE cote trouve sa taille dans la grille. Sinon on
-    // perdrait une cote en la rangeant dans une colonne qui n'existe pas — et
-    // une cote perdue, c'est une pièce au mauvais format.
-    const surTaille = [];
-    const cartes = [];
-    for (const zone of p.logos) {
-      const m = mesuresDeFace(zone.mm);
-      const parNom = m.length > 1 && m.every((x) => x.t)
-        && m.every((x) => tailles.some((t) => t.t === x.t));
-      if (tailles.length && parNom) surTaille.push({ zone, cotes: new Map(m.map((x) => [x.t, x.mm])) });
-      else cartes.push(zone);
-    }
-
-    if (tailles.length) {
+    if (tailles.length || p.logos.length) {
       const bloc = el('div', 'tk__bloc');
-      bloc.append(cap('TAILLES', 'tk__bloc-titre'));
+      // PAS « MARQUAGE » : ce mot est déjà l'intitulé de la TECHNIQUE, trois
+      // centimètres plus haut dans la boîte d'identité (« MARQUAGE · DTF ·
+      // Blanc »). Deux fois le même intitulé pour deux choses différentes sur
+      // la même feuille, c'est une feuille qu'on relit. Ici ce sont les FACES.
+      bloc.append(cap(tailles.length ? 'TAILLES ET FACES' : 'FACES À MARQUER', 'tk__bloc-titre'));
       const table = el('table', 'tk__matrice');
       // LES COLONNES SE COMPTENT EN CSS, pas en style en ligne : le ticket se
       // dessine aussi hors navigateur (les tests le rendent dans un DOM minimal,
-      // sans propriété `style`), et c'est cette portabilité qui permet de
-      // vérifier le papier sans ouvrir Chrome.
+      // sans propriété style), et c'est cette portabilité qui permet de vérifier
+      // le papier sans ouvrir Chrome.
       const groupe = el('colgroup');
       groupe.append(el('col', 'tk__matrice-col-k'));
-      for (let i = 0; i < tailles.length; i += 1) groupe.append(el('col'));
+      for (let i = 0; i < Math.max(1, tailles.length); i += 1) groupe.append(el('col'));
       table.append(groupe);
 
-      const thead = el('thead');
-      const trT = el('tr');
-      // Le coin haut-gauche ne porte rien : lui donner un cadre fabriquerait une
-      // case vide, c'est-à-dire une case qu'on cherche à remplir.
-      trT.append(el('th', 'tk__matrice-coin'));
-      for (const x of tailles) trT.append(el('th', 'tk__matrice-t', x.t));
-      thead.append(trT);
-      table.append(thead);
+      // L'EN-TÊTE N'EXISTE QUE S'IL Y A DES TAILLES. Une tasse a trois faces et
+      // une seule taille : une ligne d'en-tête vide au-dessus de ses faces ne
+      // dirait rien et prendrait la place de ce qui en dit.
+      if (tailles.length) {
+        const thead = el('thead');
+        const trT = el('tr');
+        // Le coin haut-gauche ne porte rien : lui donner un cadre fabriquerait
+        // une case vide, c'est-à-dire une case qu'on cherche à remplir.
+        trT.append(el('th', 'tk__matrice-coin'));
+        for (const x of tailles) trT.append(el('th', 'tk__matrice-t', x.t));
+        thead.append(trT);
+        table.append(thead);
+      }
 
       const tbody = el('tbody');
-      const trQ = el('tr');
-      trQ.append(el('th', 'tk__matrice-k', 'PIÈCES'));
-      for (const x of tailles) {
-        const c = el('td', 'tk__matrice-v');
-        c.append(val('prod-taille', x.n, x.ou));
-        trQ.append(c);
+      if (tailles.length) {
+        const trQ = el('tr');
+        trQ.append(el('th', 'tk__matrice-k', 'PIÈCES'));
+        for (const x of tailles) {
+          const c = el('td', 'tk__matrice-v');
+          c.append(val('prod-taille', x.n, x.ou));
+          trQ.append(c);
+        }
+        tbody.append(trQ);
       }
-      tbody.append(trQ);
 
-      for (const z of surTaille) {
-        const tr = el('tr');
+      // L'intitulé d'une ligne de face : son nom, l'unité, et ce qu'on y marque.
+      const intituleFace = (zone) => {
+        const k = el('th', 'tk__matrice-k');
+        const nom = el('div', 'tk__matrice-nom');
         // LE NOM DE LA FACE EST UN INTITULÉ, il prend donc les capitales de tous
         // les autres — mais PAS l'unité qui le suit : mm est une unité du
-        // système international et s'écrit en minuscules. Les capitales sont
-        // portées par la règle de la face seule, pas par la cellule entière.
-        const k = el('th', 'tk__matrice-k');
-        k.append(el('span', 'tk__matrice-face', z.zone.face), el('span', 'tk__matrice-u', 'mm'));
-        tr.append(k);
+        // système international et s'écrit en minuscules.
+        nom.append(el('span', 'tk__matrice-face', zone.face), el('span', 'tk__matrice-u', 'mm'));
+        k.append(nom);
+        if (zone.quoi) k.append(el('div', 'tk__matrice-quoi', zone.quoi));
+        return k;
+      };
+      // Une cellule qui couvre toutes les colonnes de tailles.
+      const surToute = (cls) => {
+        const c = el('td', cls);
+        if (tailles.length > 1) c.setAttribute('colspan', String(tailles.length));
+        return c;
+      };
+
+      for (const zone of p.logos) {
+        const mesures = mesuresDeFace(zone.mm);
+        const parTaille = mesures.length > 1 && mesures.every((x) => x.t)
+          && mesures.every((x) => tailles.some((t) => t.t === x.t));
+        const tr = el('tr');
+        tr.append(intituleFace(zone));
         if (editeur) {
           // EN CORRECTION, LA CHAÎNE SE RÉÉCRIT D'UN BLOC. Le comptoir compose
           // « S 240/M 260/… » en une seule valeur : la découper en cinq champs
           // ferait écrire cinq fois dans une case qui n'en attend qu'une. La
-          // LIGNE reste à sa place — c'est son contenu qui change de grain, pas
-          // la feuille qui se réorganise quand on l'ouvre.
-          const c = el('td', 'tk__matrice-v tk__matrice-v--suite');
-          c.setAttribute('colspan', String(tailles.length));
-          c.append(val('prod-logo', z.zone.mm, z.zone.ou));
+          // LIGNE reste à sa place — c'est son grain qui change, pas la feuille
+          // qui se réorganise quand on l'ouvre.
+          const c = surToute('tk__matrice-v tk__matrice-v--libre');
+          c.append(val('prod-logo', zone.mm, zone.ou));
           tr.append(c);
-        } else {
+        } else if (parTaille) {
+          const cotes = new Map(mesures.map((x) => [x.t, x.mm]));
           for (const x of tailles) {
-            // UNE TAILLE SANS COTE N'EST PAS UNE CASE OUBLIÉE : c'est une cote
-            // à prendre. Un tiret le dit ; un blanc laisserait croire à un zéro.
-            tr.append(el('td', 'tk__matrice-v', z.cotes.get(x.t) || '—'));
+            // UNE TAILLE SANS COTE N'EST PAS UNE CASE OUBLIÉE : c'est une cote à
+            // prendre. Un tiret le dit ; un blanc laisserait croire à un zéro.
+            tr.append(el('td', 'tk__matrice-v', cotes.get(x.t) || '—'));
           }
+        } else if (mesures.length) {
+          const c = surToute('tk__matrice-v');
+          c.textContent = mesures[0].mm;
+          tr.append(c);
+        } else if (zone.quoi) {
+          // UNE CONSIGNE SANS COTE SE SUFFIT : l'atelier sait quoi graver et
+          // décide de la taille sur la pièce. Pas de trait sous elle — un trait
+          // qui ne demande rien finit par être rempli de n'importe quoi.
+          tr.append(surToute('tk__matrice-v'));
+        } else {
+          const c = surToute('tk__matrice-v');
+          c.append(el('span', 'tk__aecrire'));
+          tr.append(c);
         }
         tbody.append(tr);
       }
       table.append(tbody);
       bloc.append(table);
-      corps.append(bloc);
-    }
-
-    // 3. LES ZONES DE MARQUAGE — une carte par face, quel que soit son nom.
-    //    C'EST LE BLOC QUI ADAPTE LE PAPIER À L'ARTICLE : six faces pour un
-    //    t-shirt, trois pour une tasse (les deux flancs et le fond), une pour
-    //    une casquette, deux pour un couteau gravé. Aucune famille n'est écrite
-    //    en dur ici — les faces viennent du dossier, et le dossier les tient de
-    //    la table des tailles de logo, que Charlie remplit dans le CRM.
-    if (cartes.length) {
-      const bloc = el('div', 'tk__bloc');
-      bloc.append(cap('ZONES DE MARQUAGE', 'tk__bloc-titre'));
-      const grille = el('div', 'tk__grille tk__grille--zones');
-      for (const zone of cartes) {
-        const c = el('div', 'tk__case');
-        c.append(el('div', 'tk__case-k', zone.face));
-        // CE QU'ON MARQUE, en tête de la carte. Sur un textile la case reste
-        // vide (la largeur suffit, le fichier est au catalogue) ; sur une tasse
-        // ou une gravure c'est TOUT le travail, et ça passe donc avant la cote.
-        if (zone.quoi) c.append(el('div', 'tk__quoi', zone.quoi));
-        const mesures = mesuresDeFace(zone.mm);
-        if (zone.quoi && !mesures.length) {
-          // Une consigne sans cote se suffit : l'atelier sait quoi graver et
-          // décide de la taille sur la pièce. Pas de trait vide sous le texte —
-          // un trait qui ne demande rien finit par être rempli de n'importe quoi.
-        } else if (!mesures.length) {
-          // ZONE À MESURER À L'ÉTABLI. Un trait, pas un blanc : un blanc ne se
-          // remplit pas. En correction, c'est le champ lui-même qui prend la
-          // place du trait — la mesure prise revient alors au dossier.
-          const v = el('div', 'tk__case-v tk__case-v--vide');
-          if (editeur) v.append(val('prod-logo', '', zone.ou));
-          else v.append(el('span', 'tk__aecrire'));
-          v.append(cap('mm'));
-          c.append(v);
-        } else if (mesures.length === 1 && !mesures[0].t) {
-          // LA COTE ET SON UNITÉ SUR LA MÊME LIGNE. Posée sous un bloc
-          // élastique, l'unité tombait au fond de la carte — à 120 px du nombre
-          // qu'elle qualifie, alors que la carte d'à côté l'avait collée à sa
-          // cote. Le même fait ne peut pas avoir deux dessins sur une feuille.
-          const v = el('div', 'tk__case-v');
-          const n = el('span', 'tk__case-v-n');
-          if (editeur) n.append(val('prod-logo', zone.mm, zone.ou));
-          else n.append(el('span', null, mesures[0].mm));
-          n.append(cap('mm'));
-          v.append(n);
-          c.append(v);
-        } else if (editeur) {
-          // En correction on réécrit la CHAÎNE telle que le comptoir l'a
-          // composée : la découper en champs par taille écrirait quatre valeurs
-          // dans une case qui n'en attend qu'une.
-          const v = el('div', 'tk__case-v');
-          v.append(val('prod-logo', zone.mm, zone.ou));
-          c.append(v);
-        } else {
-          for (const m of mesures) {
-            const r = el('div', 'tk__mes');
-            const vv = el('span', 'tk__mes-v');
-            vv.append(el('span', 'tk__mes-n', m.mm), cap('mm'));
-            r.append(cap(m.t), vv);
-            c.append(r);
-          }
-        }
-        grille.append(c);
-      }
-      bloc.append(grille);
       corps.append(bloc);
     }
   }
