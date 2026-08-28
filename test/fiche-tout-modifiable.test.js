@@ -91,14 +91,14 @@ assert.ok(/getSelection\(\)/.test(AUCLIC[0]),
 // ---------------------------------------------------------------------------
 // 3. LE BLOC DE PRODUCTION EST MODIFIABLE DE BOUT EN BOUT
 // ---------------------------------------------------------------------------
-const PROD = APP.match(/function ldProduction\(r\) \{[\s\S]*?\n\}\n\nfunction ldSousTitre/);
+const PROD = APP.match(/function ldProduction\(r\) \{[\s\S]*?\n\}\n\n\/\/ UN BANDEAU/);
 assert.ok(PROD, 'ldProduction doit exister');
 for (const cle of ['ref', 'couleur', 'marquage', 'encre']) {
   assert.ok(new RegExp(`\\['${cle}',`).test(PROD[0]),
     `« ${cle} » doit être modifiable : c’est l’identité de l’article`);
 }
-assert.ok(/Tailles/.test(PROD[0]) && /Faces à marquer/.test(PROD[0]),
-  'les deux familles de faits ont leur sous-titre');
+assert.ok(/ldBande\('Tailles'\)/.test(PROD[0]) && /ldBande\('Faces à marquer'\)/.test(PROD[0]),
+  'les deux familles de faits ont leur bandeau');
 // LA LISTE DES TAILLES PART ENTIÈRE ET NOMMÉE. Le serveur lit une taille absente
 // comme un zéro : c'est ce qui permet d'en retirer une, et la seule lecture qui
 // tienne puisque la ligne ne garde pas les tailles vides.
@@ -115,18 +115,35 @@ assert.ok(/envoyerFaces\(i, \{ quoi: v \}\)/.test(PROD[0]),
 assert.ok(/envoyerFaces\(i, \{ mm: v \}\)/.test(PROD[0]) && /envoyerFaces\(i, \{ face: v \}\)/.test(PROD[0]),
   'sa cote et son nom aussi');
 
-// UNE HAUTEUR EST UN JETON, JAMAIS UN NOMBRE (règle du 27/08). Le tableau ne
-// redéclare aucune hauteur : ses champs héritent de `.ld-ctl`, qui porte déjà
-// `--ctrl-h`. Deux écritures redeviennent deux hauteurs le jour où l'une bouge.
-const REGLES = CSS.match(/\.ld-tab, \.ld-faces \{[\s\S]*?\.ld-sous \{[\s\S]*?\n\}/)[0];
-assert.ok(!/min-height:\s*\d+px/.test(REGLES),
-  'aucune hauteur en dur dans le tableau de production');
-assert.ok(/grid-template-columns/.test(REGLES),
-  'c’est une grille : la colonne des valeurs est la même sur toutes les rangées');
-// UNE QUANTITÉ N'A PAS BESOIN DE TOUTE LA LIGNE : étirée, « 100 » flottait seul
-// à un bout d'un champ vide et l'œil devait traverser la fiche.
-assert.ok(/\.ld-tab--nombre \{ grid-template-columns: [^;]+; justify-content: start; \}/.test(CSS),
-  'la colonne des nombres a sa largeur, la même pour toutes les rangées');
+// ---------------------------------------------------------------------------
+// 3 bis. LA FICHE EST UN TABLEAU, PAS VINGT CARTES (28/08)
+// ---------------------------------------------------------------------------
+// Charlie : « pour que ce soit simple je veux que ça s'ouvre façon tableau,
+// presque comme un tableau Excel, pour modifier rapidement les valeurs ».
+// C'étaient vingt encadrés blancs sur deux colonnes, chacun portant son
+// intitulé AU-DESSUS de son champ : rien ne s'alignait d'un encadré à l'autre.
+const CORPS = CSS.match(/\.ld-body \{[\s\S]*?\n\}/)[0];
+assert.ok(/grid-template-columns: minmax\([^;]+\) minmax\(0, 1fr\);/.test(CORPS),
+  'le corps de la fiche est une grille à DEUX colonnes : intitulé, valeur');
+assert.ok(/gap: 0;/.test(CORPS),
+  'aucun écart : ce sont les filets qui séparent, comme dans un tableur');
+// `display: contents` sur la rangée : ses deux cellules deviennent des cellules
+// de la grille du corps. Dans une sous-grille par rangée, chaque largeur se
+// calculerait sur son propre contenu — vingt alignements différents.
+assert.ok(/\.ld-rang \{ display: contents; \}/.test(CSS),
+  'une rangée ne fabrique pas sa propre grille : elle donne ses cellules à celle du corps');
+// UNE HAUTEUR EST UN JETON, JAMAIS UN NOMBRE (règle du 27/08), et toutes les
+// cellules la prennent dans UNE règle.
+const CELLULES = CSS.match(/\.ld-k, \.ld-cell, \.ld-bande, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
+assert.ok(/min-height: var\(--ctrl-h\);/.test(CELLULES),
+  'toutes les cellules ont la même hauteur, et c’est un jeton');
+assert.ok(!/min-height:\s*\d+px/.test(CELLULES), 'jamais une hauteur en dur');
+// LE CHAMP EST LA CELLULE : une bordure par champ DANS une cellule qui en a
+// déjà une, c'était une boîte dans une boîte, vingt fois.
+const CTL = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
+assert.ok(/border: 0;/.test(CTL), 'le champ n’a pas de contour propre : la cellule en a un');
+assert.ok(/outline-offset: -2px/.test(CSS),
+  'le focus se pose EN DEDANS, sinon il déborde sur les cellules voisines');
 
 // ---------------------------------------------------------------------------
 // 4. UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE

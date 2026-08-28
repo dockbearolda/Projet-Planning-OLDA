@@ -4822,15 +4822,36 @@ function ldBlocHistoriqueClient(r) {
 // l'écran validé, et elle vaut mieux ici qu'une sauvegarde à chaque frappe —
 // on relit une fiche entière avant de la valider.
 
+// UNE RANGÉE DU TABLEAU : l'intitulé à gauche, la valeur à droite (28/08/2026).
+//
+// Charlie : « pour que ce soit simple je veux que ça s'ouvre façon tableau,
+// presque comme un tableau Excel, pour modifier rapidement les valeurs ».
+// C'étaient vingt cartes blanches de 14 px de rembourrage posées sur deux
+// colonnes : chacune portait son intitulé AU-DESSUS de son champ, donc rien ne
+// s'alignait d'une carte à l'autre et l'œil devait chercher chaque valeur.
+//
+// `display: contents` sur la rangée : ses deux cellules deviennent des cellules
+// de la grille du corps. C'est ce qui fait qu'UNE seule colonne d'intitulés
+// traverse toute la fiche — dans une sous-grille par rangée, chaque largeur se
+// calculerait sur son propre contenu, et on retomberait sur vingt alignements
+// différents.
 function ldBox(label, contenu, pleine) {
-  const box = document.createElement('section');
-  box.className = 'ld-box' + (pleine ? ' ld-box--full' : '');
-  const k = document.createElement('p');
-  k.className = 'ld-k';
-  k.textContent = label;
-  box.append(k);
-  for (const c of [].concat(contenu)) if (c) box.append(c);
-  return box;
+  const rangee = document.createElement('section');
+  rangee.className = 'ld-rang' + (pleine ? ' ld-rang--haut' : '');
+  // L'intitulé est un MOT le plus souvent, mais parfois un champ : le nom d'une
+  // face se corrige, et il tient quand même la colonne des intitulés — c'est
+  // par lui qu'on trouve sa ligne, comme « S » ou « Référence ».
+  let k = label;
+  if (typeof label === 'string') {
+    k = document.createElement('p');
+    k.className = 'ld-k';
+    k.textContent = label;
+  }
+  const v = document.createElement('div');
+  v.className = 'ld-cell';
+  for (const c of [].concat(contenu)) if (c) v.append(c);
+  rangee.append(k, v);
+  return rangee;
 }
 
 // UN VOLET : tout ce qui se MODIFIE est replié par défaut.
@@ -4841,7 +4862,9 @@ function ldBox(label, contenu, pleine) {
 // aucun script ne pilote l'ouverture.
 function ldVolet(label, apercu, contenu, pleine) {
   const volet = document.createElement('details');
-  volet.className = 'ld-box ld-volet' + (pleine ? ' ld-box--full' : '');
+  // UN VOLET TRAVERSE LE TABLEAU : son titre EST sa rangée. Il ne se range pas
+  // en deux colonnes — il en ouvre d'autres en dessous.
+  volet.className = 'ld-volet';
   const tete = document.createElement('summary');
   tete.className = 'ld-volet__tete';
   const textes = document.createElement('span');
@@ -4974,20 +4997,17 @@ function ldProduction(r) {
   const p = fiche.prod;
   // Pas de fiche de production = rien à montrer. Une ligne créée à la main n'en
   // a pas, et une case vide n'apprend rien à personne.
-  if (!p || typeof p !== 'object') return null;
+  if (!p || typeof p !== 'object') return [];
   const tailles = Array.isArray(p.tailles) ? p.tailles : [];
   const faces = Array.isArray(p.logos) ? p.logos : [];
-  const bloc = document.createElement('div');
+  const rangees = [ldBande('Ce qu’il y a à produire')];
 
   // --- L'IDENTITÉ DE L'ARTICLE ---------------------------------------------
-  const idt = document.createElement('div');
-  idt.className = 'ld-tab';
   for (const [cle, label] of [['ref', 'Référence'], ['couleur', 'Couleur'],
     ['marquage', 'Technique'], ['encre', 'Couleur du marquage']]) {
-    ldTabRow(idt, label, ldProdChamp(p[cle] || '', { label },
-      (v) => ldEnvoyerProd(r, { [cle]: v })));
+    rangees.push(ldBox(label, ldProdChamp(p[cle] || '', { label },
+      (v) => ldEnvoyerProd(r, { [cle]: v }))));
   }
-  bloc.append(idt);
 
   // --- LES TAILLES ----------------------------------------------------------
   // LA LISTE ENTIÈRE PART À CHAQUE FOIS, nommée. Le serveur lit une taille
@@ -4998,13 +5018,12 @@ function ldProduction(r) {
     modif(liste);
     ldEnvoyerProd(r, { tailles: liste.filter((x) => x.t) });
   };
-  const grilleT = document.createElement('div');
-  grilleT.className = 'ld-tab ld-tab--nombre';
-  for (let i = 0; i < tailles.length; i += 1) {
-    ldTabRow(grilleT, `${tailles[i].t}`, ldProdChamp(tailles[i].n, {
-      type: 'number', inputMode: 'numeric', step: '1', label: `Quantité en ${tailles[i].t}`,
-    }, (v) => envoyerTailles((l) => { l[i].n = Math.max(0, Math.round(Number(v) || 0)); })));
-  }
+  rangees.push(ldBande('Tailles'));
+  tailles.forEach((taille, i) => {
+    rangees.push(ldBox(String(taille.t), ldProdChamp(taille.n, {
+      type: 'number', inputMode: 'numeric', step: '1', label: `Quantité en ${taille.t}`,
+    }, (v) => envoyerTailles((l) => { l[i].n = Math.max(0, Math.round(Number(v) || 0)); }))));
+  });
   // LA RANGÉE VIDE AJOUTE. Le comptoir ne pose que les tailles commandées :
   // « finalement il en veut aussi 20 en XL » n'avait aucune porte.
   const nomNouveau = ldChamp('', { label: 'Nouvelle taille', placeholder: 'XL, 35 cl…' });
@@ -5020,8 +5039,7 @@ function ldProduction(r) {
   };
   nbNouveau.addEventListener('change', poserNouvelle);
   nomNouveau.addEventListener('change', () => { if (nbNouveau.value) poserNouvelle(); });
-  grilleT.append(nomNouveau, nbNouveau);
-  bloc.append(ldSousTitre('Tailles'), grilleT);
+  rangees.push(ldAjout(nomNouveau, nbNouveau));
 
   // --- LES FACES À MARQUER --------------------------------------------------
   // Trois choses par face : son nom, sa cote, et CE QU'ON Y MARQUE. La cote ne
@@ -5033,20 +5051,25 @@ function ldProduction(r) {
     liste[i] = patch;
     ldEnvoyerProd(r, { logos: liste });
   };
-  const grilleF = document.createElement('div');
-  grilleF.className = 'ld-faces';
-  const enTeteF = (t) => { const s = document.createElement('span'); s.className = 'ld-faces__k'; s.textContent = t; return s; };
-  grilleF.append(enTeteF('Face'), enTeteF('Cote (mm)'), enTeteF('Ce qu’on marque'));
+  rangees.push(ldBande('Faces à marquer'));
   faces.forEach((z, i) => {
-    grilleF.append(
-      ldProdChamp(z.face || '', { label: 'Nom de la face' }, (v) => envoyerFaces(i, { face: v })),
-      ldProdChamp(z.mm || '', { label: 'Cote', placeholder: '—' }, (v) => envoyerFaces(i, { mm: v })),
-      ldProdChamp(z.quoi || '', { label: 'Ce qu’on marque', placeholder: '—' },
-        (v) => envoyerFaces(i, { quoi: v })),
-    );
+    // LE NOM DE LA FACE TIENT LA COLONNE DES INTITULÉS : c'est lui qu'on lit
+    // pour trouver sa ligne, exactement comme « S » ou « Référence ». Il reste
+    // modifiable — l'effacer retire la face.
+    const nom = ldProdChamp(z.face || '', { label: 'Nom de la face' },
+      (v) => envoyerFaces(i, { face: v }));
+    nom.classList.add('ld-k-champ');
+    const cote = ldProdChamp(z.mm || '', { label: 'Cote (mm)', placeholder: 'mm' },
+      (v) => envoyerFaces(i, { mm: v }));
+    cote.classList.add('ld-court');
+    rangees.push(ldBox(nom, [cote, ldProdChamp(z.quoi || '', {
+      label: 'Ce qu’on marque', placeholder: 'ce qu’on y marque',
+    }, (v) => envoyerFaces(i, { quoi: v }))]));
   });
   const faceNouvelle = ldChamp('', { label: 'Nouvelle face', placeholder: 'Ajouter une face…' });
+  faceNouvelle.classList.add('ld-k-champ');
   const mmNouvelle = ldChamp('', { label: 'Cote', placeholder: 'mm' });
+  mmNouvelle.classList.add('ld-court');
   const quoiNouvelle = ldChamp('', { label: 'Ce qu’on marque', placeholder: 'ce qu’on y marque' });
   faceNouvelle.addEventListener('change', () => {
     const nom = faceNouvelle.value.trim();
@@ -5055,18 +5078,34 @@ function ldProduction(r) {
     faceNouvelle.value = ''; mmNouvelle.value = ''; quoiNouvelle.value = '';
     envoyerFaces(faces.length, patch);
   });
-  grilleF.append(faceNouvelle, mmNouvelle, quoiNouvelle);
-  bloc.append(ldSousTitre('Faces à marquer'), grilleF);
+  rangees.push(ldBox(faceNouvelle, [mmNouvelle, quoiNouvelle]));
 
-  return bloc;
+  return rangees;
 }
 
-function ldSousTitre(texte) {
-  const p = document.createElement('p');
-  p.className = 'ld-sous';
-  p.textContent = texte;
-  return p;
+// UN BANDEAU DE SECTION : il traverse les deux colonnes et dit ce que les
+// rangées du dessous ont en commun. C'est ce qui remplace les vingt cartes —
+// un titre par famille de faits, pas un encadré par fait.
+function ldBande(texte) {
+  const el = document.createElement('p');
+  el.className = 'ld-bande';
+  el.textContent = texte;
+  return el;
 }
+
+// LA RANGÉE QUI AJOUTE : ses deux champs occupent les deux colonnes, donc le
+// nom tombe sous les intitulés et le nombre sous les valeurs.
+function ldAjout(gauche, droite) {
+  const rangee = document.createElement('section');
+  rangee.className = 'ld-rang ld-rang--ajout';
+  gauche.classList.add('ld-k-champ');
+  const cell = document.createElement('div');
+  cell.className = 'ld-cell';
+  cell.append(droite);
+  rangee.append(gauche, cell);
+  return rangee;
+}
+
 
 function renderLigneDetail() {
   const r = completerFiche(ligneDuTiroir());
@@ -5253,7 +5292,7 @@ function renderLigneDetail() {
     // CE QU'IL Y A À PRODUIRE, juste sous l'argent : c'est là qu'on corrige une
     // quantité, et c'est le prix d'à côté qui bouge quand on le fait. Chaque
     // valeur part en la quittant — pas de bouton, on vient rectifier une chose.
-    ...(prodBloc ? [ldBox('Ce qu’il y a à produire', prodBloc, true)] : []),
+    ...prodBloc,
     ldBox('Prévu à l’atelier', cPrevue),
     ldBox('Créneau de retrait', cCreneau),
     ldBox('Provenance', cProvenance),

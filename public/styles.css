@@ -5562,29 +5562,70 @@ body.view-plein .fiverr-tool { display: none !important; }
   padding: 20px;
   background: var(--bg);
   -webkit-overflow-scrolling: touch;
+  /* UN TABLEAU, PAS VINGT CARTES (28/08/2026). Charlie : « pour que ce soit
+     simple je veux que ça s'ouvre façon tableau, presque comme un tableau
+     Excel, pour modifier rapidement les valeurs ». C'étaient vingt encadrés
+     blancs de 14 px de rembourrage sur deux colonnes, chacun portant son
+     intitulé AU-DESSUS de son champ : rien ne s'alignait d'un encadré à
+     l'autre, et l'œil cherchait chaque valeur au lieu de la trouver.
+     DEUX COLONNES POUR TOUTE LA FICHE — intitulé, valeur — et c'est la grille
+     du corps qui les tient : chaque rangée est en `display: contents`, donc
+     ses deux cellules sont des cellules D'ICI. Dans une sous-grille par
+     rangée, chaque largeur se calculerait sur son propre contenu et on
+     retomberait sur vingt alignements différents.
+     AUCUN ÉCART : ce sont les filets qui séparent, comme dans un tableur. Un
+     `gap` rouvrirait vingt fois le trou qu'on vient de fermer. */
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(140px, 232px) minmax(0, 1fr);
+  gap: 0;
   align-content: start;
-}
-@media (max-width: 760px) {
-  .ld-body { grid-template-columns: 1fr; }
-}
-
-
-/* --- Encadrés de la fiche — valeurs reprises telles quelles de l'écran du
-   patron (.sheet-box / .sheet-k / .sheet-v / .sheet-input) ------------------
-   Un écart assumé : les champs sont à 16 px et les cibles à 44 px. En dessous
-   de 16 px, iOS zoome sur le champ dès qu'on le touche, et l'atelier saisit à
-   la tablette. */
-.ld-box {
-  margin: 0;
-  padding: 14px;
-  border: 1px solid #d9dee7;
-  border-radius: var(--arrondi-bloc);
+  padding: 0;
   background: var(--surface);
 }
-.ld-box--full { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .ld-body { grid-template-columns: minmax(104px, 38%) minmax(0, 1fr); }
+}
+
+
+/* --- LE TABLEAU DE LA FICHE ------------------------------------------------
+   Une rangée = deux cellules de la grille du corps. `display: contents` fait
+   disparaître la boîte de la rangée : ses enfants deviennent les cellules, donc
+   la colonne des intitulés est LA MÊME sur toute la fiche.
+   TOUTES LES CELLULES ONT LA MÊME HAUTEUR, et elles la prennent dans UNE règle
+   — `--ctrl-h`, celle de toute commande de l'application. Deux écritures
+   redeviennent deux hauteurs le jour où l'une bouge. */
+.ld-rang { display: contents; }
+.ld-k, .ld-cell, .ld-bande, .ld-k-champ {
+  min-height: var(--ctrl-h);
+  border-bottom: 1px solid var(--border-soft);
+}
+.ld-k, .ld-k-champ {
+  display: flex; align-items: center;
+  margin: 0; padding: 0 12px;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+.ld-cell {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; padding: 0;
+}
+/* Une rangée qui porte un pavé (consigne, informations) ou un bloc (paiement,
+   documents) s'étire : son intitulé se cale alors EN HAUT, sinon il flotterait
+   au milieu de dix lignes de texte. */
+.ld-rang--haut > .ld-k { align-items: flex-start; padding-top: 14px; }
+.ld-rang--haut > .ld-cell { display: block; padding: 8px 10px; }
+/* LE BANDEAU DE SECTION traverse les deux colonnes : il dit ce que les rangées
+   du dessous ont en commun, et c'est lui qui remplace les vingt encadrés. */
+.ld-bande {
+  grid-column: 1 / -1;
+  display: flex; align-items: center;
+  margin: 0; padding: 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--taille-note); font-weight: var(--graisse-forte);
+  letter-spacing: .05em; text-transform: uppercase; color: var(--text-2);
+}
 /* L'INTITULÉ D'UN CHAMP SE LIT — c'est lui qui dit ce qu'on regarde. À
    `--text-3` (« repères, pas du texte à lire », dixit la charte) il ne donnait
    que 2,54:1 en thème clair, en petites capitales espacées, dans le panneau le
@@ -5597,13 +5638,17 @@ body.view-plein .fiverr-tool { display: none !important; }
 }
 .ld-v { margin: 0 0 4px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); white-space: pre-wrap; }
 .ld-v:last-child { margin-bottom: 0; }
+/* LE CHAMP EST LA CELLULE. Dans un tableur on tape DANS la case : une bordure
+   par champ à l'intérieur d'une cellule qui en a déjà une, c'était une boîte
+   dans une boîte, vingt fois. Le filet vient de la cellule, le champ prend
+   toute sa place, et c'est le FOCUS qui dit où l'on est. */
 .ld-ctl {
   width: 100%;
   min-height: var(--ctrl-h);
-  padding: 10px 11px;
-  border: 1.5px solid #d7dce3;
-  border-radius: var(--arrondi-champ);
-  background: #fff;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
   line-height: 1.5;
@@ -5613,7 +5658,10 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 /* rgba(var(--primary-rgb)) et non l'encre en dur : en clair c'est LA MÊME
    couleur (17,24,39), en sombre le jeton s'inverse — l'anneau de saisie était
    noir sur fond noir, plus aucun repère de champ actif dans la fiche. */
-.ld-ctl:focus { outline: 3px solid rgba(var(--primary-rgb), .15); border-color: var(--primary); }
+/* Le focus est le SEUL repère de position maintenant que les champs n'ont plus
+   de contour : il se pose EN DEDANS (`outline-offset` négatif), sinon il
+   déborderait sur les cellules voisines de la grille. */
+.ld-ctl:focus { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--surface); }
 :root[data-theme="dark"] .ld-ctl:focus { outline-color: rgba(var(--primary-rgb), .35); }
 .ld-duo { display: flex; gap: 8px; }
 
@@ -5625,36 +5673,18 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    règle : `--ctrl-h`, celle de toute commande de l'application. Deux écritures
    redeviennent deux hauteurs le jour où l'une bouge. Les champs héritent de
    `.ld-ctl`, qui la porte déjà — on ne la réécrit donc nulle part ici. */
-.ld-tab, .ld-faces { display: grid; gap: 6px 10px; align-items: center; }
-.ld-tab { grid-template-columns: minmax(84px, 32%) 1fr; }
-/* UNE QUANTITÉ N'A PAS BESOIN DE TOUTE LA LIGNE. Étirée sur 460 px, « 100 »
-   flottait seul à un bout d'un champ vide et l'œil devait traverser la fiche
-   pour relier la taille à son nombre. La colonne des nombres a donc SA largeur,
-   la même pour toutes les rangées — c'est la grille qui la tient, pas chaque
-   champ. Le reste de la place revient au blanc, pas au champ. */
-.ld-tab--nombre { grid-template-columns: minmax(84px, 32%) 104px; justify-content: start; }
-/* Un nombre se lit à droite de sa colonne : c'est ce qui permet de comparer
-   trois quantités d'un coup d'œil sans les épeler. */
-.ld-tab--nombre .ld-ctl { text-align: right; }
-/* La rangée qui AJOUTE une taille : le nom prend la colonne des intitulés, le
-   nombre celle des nombres. Elle tombe donc pile sous les rangées du dessus. */
-.ld-tab--nombre .ld-ctl[type="text"] { text-align: left; }
-.ld-tab__k, .ld-faces__k {
-  font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-/* Trois colonnes pour une face : son nom, sa cote, ce qu'on y marque. La
-   consigne prend la place qui reste — c'est elle qui porte tout sur une tasse
-   ou une gravure, où il n'y a aucune cote à lire. */
-.ld-faces { grid-template-columns: minmax(84px, 26%) minmax(56px, 18%) 1fr; }
-.ld-faces__k { padding-bottom: 2px; }
-/* Un sous-titre DANS un encadré : il sépare les trois familles de faits sans
-   ouvrir un encadré de plus. Même graisse que les intitulés du tiroir. */
-.ld-sous {
-  margin: 14px 0 6px;
-  font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
-  text-transform: uppercase; color: var(--text-2);
-}
+/* Une cote tient en trois chiffres : elle n'a pas besoin de la place d'une
+   consigne, qui elle porte tout sur une tasse ou une gravure. */
+.ld-court { flex: 0 0 92px; }
+/* UN NOMBRE NE TRAVERSE PAS LA FICHE. Étalé sur toute la colonne des valeurs,
+   « 100 » se posait à 700 px de son intitulé « S » : pour relier les deux,
+   l'œil devait traverser le panneau. Il prend donc SA largeur — la même pour
+   tous, c'est ce qui aligne la colonne des chiffres — et se cale à droite
+   dedans, comme dans un tableur. */
+.ld-cell .ld-ctl[type="number"] { flex: 0 0 124px; text-align: right; }
+/* La rangée qui AJOUTE : ses champs sont plus clairs que les autres, c'est ce
+   qui la distingue d'une valeur déjà saisie. */
+.ld-rang--ajout > .ld-k-champ, .ld-rang--ajout .ld-ctl { color: var(--text-2); }
 /* Journal des modifications, dans le volet Historique : une ligne par
    changement, la plus récente en haut. */
 .ld-journal__liste { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
@@ -5679,7 +5709,17 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    sa valeur, exactement comme un encadré en lecture seule de l'écran du patron.
    On ne l'ouvre que pour changer quelque chose — parcourir une fiche ne doit
    pas mettre la main sur un champ par accident. */
-.ld-volet { padding: 0; }
+/* UN VOLET TRAVERSE LE TABLEAU. Il ne se range pas en deux colonnes : son titre
+   est une rangée à lui, et ce qu'il ouvre se pose dessous, en pleine largeur. */
+.ld-volet {
+  grid-column: 1 / -1;
+  padding: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+}
+/* Un intitulé de volet ne porte ni fond de colonne ni filet de droite : il n'est
+   pas dans la colonne des intitulés, il traverse. */
+.ld-volet .ld-k { min-height: 0; padding: 0; border: 0; background: none; }
 .ld-volet__tete {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px; min-height: var(--rond);
@@ -5690,6 +5730,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .ld-volet__tete:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .2); outline-offset: -2px; }
 .ld-volet__textes { min-width: 0; }
 .ld-volet__textes .ld-k { margin: 0 0 4px; display: block; }
+.ld-volet .ld-rang > .ld-k { padding: 0 12px; }
 .ld-volet__apercu {
   display: block;
   font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1);
@@ -5740,7 +5781,7 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 /* Thème sombre : la fiche du patron est dessinée en clair. On garde sa
    composition et on ne remplace que les fonds et les encres, sinon elle
    deviendrait illisible sur un poste réglé en sombre. */
-:root[data-theme="dark"] .ld-box { background: var(--surface); border-color: var(--border); }
+:root[data-theme="dark"] :is(.ld-k, .ld-k-champ, .ld-bande) { background: var(--bg); }
 /* `--text-2` est désormais posé sur la règle de base, et le jeton suit le
    thème : cette reprise n'a plus rien à corriger. On la garde nommée pour dire
    que le cas a été traité aux deux endroits — la retirer sans un mot ferait
