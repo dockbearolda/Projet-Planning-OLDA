@@ -160,17 +160,17 @@ export function dessinerFicheAtelier(r, ctx) {
     setTimeout(() => dot.remove(), 1200);
   };
 
+  // L'INDICATEUR NE PARLE QUE QUAND IL SE PASSE QUELQUE CHOSE. Il affichait
+  // « Enregistrement automatique » en permanence : une phrase qui ne dit rien
+  // d'actionnable, dans l'entête, alors que chaque modification donne déjà son
+  // message avec « Annuler ». Il reste un point, éteint au repos.
   const etatSauve = el('span', 'fa-autosave');
-  const motSauve = el('span', null, 'Enregistrement automatique');
+  etatSauve.setAttribute('aria-label', 'Enregistrement automatique');
   let minuteurSauve = 0;
   const pulser = () => {
     etatSauve.classList.add('is-on');
-    motSauve.textContent = 'Enregistré';
     clearTimeout(minuteurSauve);
-    minuteurSauve = setTimeout(() => {
-      etatSauve.classList.remove('is-on');
-      motSauve.textContent = 'Enregistrement automatique';
-    }, 1800);
+    minuteurSauve = setTimeout(() => etatSauve.classList.remove('is-on'), 1800);
   };
 
   const zoneToast = el('div', 'fa-toast-zone');
@@ -277,14 +277,10 @@ export function dessinerFicheAtelier(r, ctx) {
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
     el('span', 'fa-projet', r.product || ''),
   );
+  // UNE SEULE SORTIE. « ‹ Retour au planning » et la croix fermaient le même
+  // écran, aux deux bouts de la même barre — celle de gauche dit où l'on va.
   const outils = el('div', 'fa-outils');
-  const sauve = el('div', 'fa-sauve');
-  sauve.append(etatSauve, motSauve);
-  outils.append(
-    bouton('fa-btn', '↺ Annuler', defaire),
-    sauve,
-    bouton('fa-btn fa-btn--carre', '×', () => ctx.fermer()),
-  );
+  outils.append(etatSauve, bouton('fa-btn', '↺ Annuler', defaire));
   tete.append(retour, ident, outils);
 
   // =========================================================================
@@ -509,11 +505,13 @@ export function dessinerFicheAtelier(r, ctx) {
     });
     majTotal();
 
-    const teteT = el('div', 'fa-tete-t');
+    // LES TAILLES SONT UNE RANGÉE COMME LES AUTRES. Elles avaient leur propre
+    // en-tête — un libellé posé au-dessus alors que toutes les lignes voisines
+    // portent le leur à gauche : une ligne de plus, et deux modèles de rangée
+    // dans la même colonne.
     const compte = el('span', 'fa-compte');
     compte.append(document.createTextNode('Total '), total, document.createTextNode(' pièces'));
-    teteT.append(el('span', 'fa-lab', 'Tailles'), compte);
-    if (tailles.length) droite.append(teteT, grilleT);
+    if (tailles.length) droite.append(rangee('Tailles', grilleT, compte));
 
     // --- LES FACES --------------------------------------------------------
     const faces = Array.isArray(prod.logos) ? prod.logos : [];
@@ -527,13 +525,16 @@ export function dessinerFicheAtelier(r, ctx) {
       carte.append(el('span', 'fa-face__k', z.face), cMm, el('span', 'fa-unite', 'mm'), cQuoi);
       bandeF.append(carte);
     });
-    bandeF.append(bouton('fa-ajout', '+ Ajouter une face', () => {
+    // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
+    // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
+    // pour un troisième emplacement et poussait tout sur deux lignes.
+    const ajoutF = bouton('fa-ajout', '+ Face', () => {
       const nom = window.prompt('Nom de la face à ajouter');
       if (!nom || !nom.trim()) return;
       ctx.patchProd({ logos: [...faces.map(() => ({})), { face: nom.trim() }] });
       dire('Face ajoutée', false);
-    }));
-    droite.append(rangee('Faces', bandeF));
+    });
+    droite.append(rangee('Faces', bandeF, ajoutF));
   }
 
   const chConsigne = champ(null, fiche.atelier || '', {

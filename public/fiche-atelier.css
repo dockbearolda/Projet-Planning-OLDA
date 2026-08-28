@@ -136,7 +136,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
               border-color var(--dur-1) var(--ease);
 }
 .fa-btn:hover { background: var(--bg); color: var(--text-1); }
-.fa-btn--carre { width: var(--fa-h-champ); padding: 0; font-size: var(--taille-texte); }
 .fa-btn--mini { padding: 0 var(--pas-2); }
 /* Le seul bouton plein de l'écran : celui qui fait AVANCER le dossier. */
 .fa-btn--plein {
@@ -168,10 +167,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .fa-outils { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; flex-shrink: 0; }
-.fa-sauve {
-  display: flex; align-items: center; gap: var(--pas-1);
-  font-size: var(--fa-lab); color: var(--text-3); white-space: nowrap;
-}
 .fa-autosave {
   width: var(--fa-point); height: var(--fa-point); border-radius: var(--pilule);
   background: var(--border); transition: background var(--dur-1) var(--ease);
@@ -243,8 +238,8 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   display: flex; flex-direction: column;
   overflow: auto;
 }
-.fa-col--g { gap: var(--pas-3); border-right: 1px solid var(--border-soft); }
-.fa-col--d { gap: var(--pas-3); }
+.fa-col--g { gap: var(--pas-2); border-right: 1px solid var(--border-soft); }
+.fa-col--d { gap: var(--pas-2); }
 .fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
 .fa-sec {
   font-size: var(--fa-min); letter-spacing: .09em; text-transform: uppercase;
@@ -267,9 +262,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-span2 { grid-column: span 2; }
 .fa-fort { font-weight: var(--graisse-note); }
 
-.fa-tete-t { display: flex; align-items: baseline; gap: var(--pas-2); }
-.fa-tete-t > .fa-lab { width: auto; }
-.fa-compte { margin-left: auto; font-size: var(--fa-lab); color: var(--text-2); }
+.fa-compte { margin-left: auto; flex-shrink: 0; font-size: var(--fa-lab); color: var(--text-2); }
 .fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
 
 /* --- Les tailles ----------------------------------------------------------
@@ -279,7 +272,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
-.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); }
+.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); flex: 1; min-width: 0; }
 .fa-taille {
   display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
   padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
@@ -295,16 +288,23 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-nb:hover { background: transparent; }
 
-.fa-faces { display: flex; flex-wrap: wrap; gap: var(--pas-2); flex: 1; min-width: 0; }
+/* LES FACES SE RANGENT COMME LES TAILLES : une colonne chacune, toutes de la
+   même largeur, sur UNE ligne. En flex-wrap, deux faces et leur bouton
+   demandaient 758 px pour 523 disponibles — la rangée passait à 102 px et la
+   colonne débordait de 42. */
+.fa-faces {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  gap: var(--pas-2); flex: 1; min-width: 0;
+}
 .fa-face {
   display: flex; align-items: center; gap: var(--pas-2);
   padding: var(--pas-1) var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
 .fa-face__k { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1); }
 .fa-mm { width: 56px; flex: 0 0 56px; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
-.fa-quoi { width: 180px; max-width: 100%; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
+.fa-quoi { flex: 1; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-unite { font-size: var(--fa-min); color: var(--text-3); }
-.fa-ajout {
+.fa-ajout { flex-shrink: 0;
   height: var(--fa-h-champ); padding: 0 var(--pas-3);
   border: 1px dashed var(--border); border-radius: var(--arrondi-champ);
   background: var(--surface); color: var(--text-2);
