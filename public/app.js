@@ -3549,7 +3549,10 @@ function contexteFicheAtelier(r) {
     rappelDelai: (deadline, heure) => {
       const d = tempsRestant(deadline === undefined ? r.deadline : deadline,
         heure === undefined ? ((r.fiche && r.fiche.heureSouhaitee) || null) : heure);
-      return `${d.echeanceTexte} — ${d.texte} restant`;
+      // SANS LA DATE : elle est affichée en clair deux champs plus haut, dans
+      // la même rangée. Le rappel ne dit que ce qu'elle ne dit pas — le temps
+      // qui reste.
+      return d.texte ? `${d.texte} restant` : '';
     },
     rappelDossier: [
       lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : (r.product || ''),

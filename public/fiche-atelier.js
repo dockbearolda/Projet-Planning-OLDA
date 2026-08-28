@@ -386,7 +386,7 @@ export function dessinerFicheAtelier(r, ctx) {
       envoyer: (n) => envoyer(n.iso),
       apres: opts.apres,
     });
-    return { rangee: rangee(label, c, opts.heure || document.createTextNode('')), champ: c };
+    return { rangee: rangee(opts.court || label, c, ...(opts.suite || [])), champ: c };
   };
 
   // LE RAPPEL DE DÉLAI SE RECALCULE. Écrit une fois à l'ouverture, il continuait
@@ -407,10 +407,10 @@ export function dessinerFicheAtelier(r, ctx) {
     },
     apres: majRappel,
   });
-  const remise = ligneDate('Remise au client', r.deadline, { requis: true, heure: chHeure, apres: majRappel },
+  const remise = ligneDate('Remise au client', r.deadline, { court: 'Remise', requis: true, suite: [chHeure, rappel], apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
 
-  const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, {},
+  const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, { court: 'Atelier' },
     (iso) => ctx.patchLigne('date_prevue', iso));
 
   const chCreneau = champ('fa-creneau', r.retrait_creneau || '', { label: 'Créneau de retrait', placeholder: 'heure' });
@@ -425,7 +425,7 @@ export function dessinerFicheAtelier(r, ctx) {
     titreSection('Dates'),
     remise.rangee,
     prevu.rangee,
-    rangee('Créneau de retrait', chCreneau, rappel),
+    rangee('Retrait', chCreneau),
   );
 
   const chClient = champ('fa-fort', r.billing_company || '', { label: 'Client', placeholder: 'Nom du client', requis: true });

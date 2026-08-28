@@ -79,14 +79,26 @@
 
 /* --- Les commandes, une seule fois ---------------------------------------
    Champ, menu, zone de texte : même boîte, même liseré, même réponse. Écrites
-   trois fois, elles redeviennent trois hauteurs le jour où l'une bouge. */
+   trois fois, elles redeviennent trois hauteurs le jour où l'une bouge.
+
+   CE QUI EST REMPLI SE LIT, CE QUI EST VIDE SE VOIT, LA BOÎTE N'APPARAÎT QU'AU
+   SURVOL (28/08) — la règle du planning, étendue ici. L'écran portait vingt-cinq
+   rectangles identiques : le nom du client et un créneau jamais renseigné
+   avaient exactement le même poids à l'œil, et on lisait des boîtes au lieu de
+   lire un dossier. Au repos il ne reste que les valeurs, alignées ; un champ
+   VIDE garde son fond gris, parce que ce qui manque au dossier est justement ce
+   qu'on vient chercher.
+
+   ⚠ LE TRAIT EST RÉSERVÉ, jamais ajouté : `1px solid transparent` au repos,
+   coloré au survol. Posé seulement au survol, il grandirait la boîte de 2 px et
+   toute la colonne bougerait sous la souris. */
 .fa-in {
   min-width: 0;
   height: var(--fa-h-champ);
   padding: 0 var(--pas-2);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--arrondi-champ);
-  background: var(--surface);
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   font-size: var(--fa-val);
@@ -94,10 +106,15 @@
               color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 textarea.fa-in { height: auto; padding: var(--pas-1) var(--pas-2); line-height: 1.45; resize: none; }
-select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
+select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-in::placeholder { color: var(--text-3); }
-.fa-in:hover { background: var(--bg); }
-.fa-in:focus { outline: none; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--primary); }
+/* Un champ vide se voit sans qu'on le survole : c'est ce qui manque au dossier.
+   Un `select` a toujours une valeur — il n'entre jamais dans ce cas. */
+.fa-in:placeholder-shown { background: var(--bg); }
+.fa-in:hover, .fa-in:focus-visible, .fa-in:focus {
+  border-color: var(--border); background: var(--surface);
+}
+.fa-in:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary); border-color: var(--primary); }
 /* UN CHAMP OBLIGATOIRE VIDE SE SIGNALE, il ne crie pas : un soulignement, pas
    de rouge, pas de message. Le rouge annonce une faute ; ici il n'y en a pas
    encore, il manque seulement quelque chose. */
@@ -237,11 +254,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-row { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
 .fa-row > .fa-in { flex: 1; }
 .fa-lab { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
-.fa-row > .fa-lab { width: 122px; }
+/* UN SEUL RAIL DE VALEURS pour les deux colonnes. Elles partaient de 122 px à
+   gauche et 90 à droite : deux départs côte à côte, et l'œil le voit sans
+   savoir le nommer. 90 partout — les intitulés de gauche ont été raccourcis
+   pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
+.fa-row > .fa-lab { width: 90px; }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
 .fa-creneau { width: 94px; flex: 0 0 94px; }
-.fa-grille-client { display: grid; grid-template-columns: 122px 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+.fa-grille-client { display: grid; grid-template-columns: 90px 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
 .fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
 .fa-span2 { grid-column: span 2; }
 .fa-fort { font-weight: var(--graisse-note); }
@@ -290,7 +311,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   font: inherit; font-size: var(--fa-lab); cursor: pointer;
 }
 .fa-ajout:hover { background: var(--bg); color: var(--text-1); }
-.fa-col--d .fa-row > .fa-lab { width: 90px; }
 .fa-col--d .fa-row { align-items: flex-start; }
 .fa-col--d .fa-row > .fa-lab { padding-top: 9px; }
 
