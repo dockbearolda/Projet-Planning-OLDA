@@ -119,6 +119,11 @@
   /* Le message flottant : plus dense que les autres, il doit se détacher de ce
      qu'il recouvre sans l'assombrir. */
   --shadow-toast: 0 10px 26px rgba(0, 0, 0, .28);
+  /* Un écran POSÉ sur un autre : la fiche atelier descend du haut, s'arrête à
+     la hauteur de son contenu, et laisse voir ce qu'elle recouvre. L'ombre dit
+     qu'elle est au-dessus, le voile dit que le dessous n'est plus jouable. */
+  --shadow-pose: 0 18px 40px rgba(0, 0, 0, .16);
+  --voile: rgba(0, 0, 0, .30);
 
   /* bandeau de famille du rail — gris ardoise, pas l'encre pure : le plein
      noir écrasait le reste de l'écran. Assez sombre pour rester un vrai
@@ -932,6 +937,8 @@ html[data-theme="dark"] .ecran-comptoir {
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, .4);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, .55);
+  --shadow-pose: 0 18px 40px rgba(0, 0, 0, .55);
+  --voile: rgba(0, 0, 0, .55);
   --shadow-bas: 0 -12px 30px rgba(0, 0, 0, .45);
   --shadow-toast: 0 10px 26px rgba(0, 0, 0, .6);
 

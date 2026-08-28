@@ -63,12 +63,20 @@
   --fa-undo-fond: rgba(var(--on-primary-rgb, 255, 255, 255), .14);
   --fa-undo-fond-2: rgba(var(--on-primary-rgb, 255, 255, 255), .26);
 
+  /* LA FICHE FAIT SA TAILLE, elle ne s'etire pas. Ancree en haut, bornee a la
+     hauteur de l'ecran : sur le 14 pouces elle le remplit exactement, sur un
+     ecran plus haut elle s'arrete la ou son contenu s'arrete au lieu de laisser
+     300 px de blanc dedans. `inset: 0` la forcait a 100 % de haut, et tout ce
+     qui etait dessous devenait du vide a combler. */
   position: fixed;
-  inset: 0;
+  inset: 0 0 auto 0;
+  max-height: 100vh;
   z-index: 60;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  border-bottom-left-radius: var(--arrondi-carte);
+  border-bottom-right-radius: var(--arrondi-carte);
+  box-shadow: var(--shadow-pose);
   background: var(--surface);
   color: var(--text-1);
   /* Les chiffres tombent les uns sous les autres : une colonne de quantités se
@@ -76,6 +84,15 @@
   font-variant-numeric: tabular-nums;
 }
 .fa *, .fa *::before, .fa *::after { box-sizing: border-box; }
+/* Le planning reste visible sous la fiche, attenue : on voit d'ou l'on vient,
+   sans croire qu'on peut y cliquer.
+   ⚠ LE VOILE EST UN FRERE DE `.fa`, jamais son enfant : l'entete et les
+   colonnes n'ont pas de fond opaque, et pose dedans il se voyait A TRAVERS
+   elles — tout l'ecran grisait. Il se pose juste sous elle (59 contre 60).
+   La fiche, elle, n'a plus `overflow: hidden` : elle ne rogne donc plus ses
+   propres coins, et c'est la barre basse — la seule a toucher le bas — qui
+   les porte. */
+.fa-voile { position: fixed; inset: 0; z-index: 59; background: var(--voile); }
 
 /* --- Les commandes, une seule fois ---------------------------------------
    Champ, menu, zone de texte : même boîte, même liseré, même réponse. Écrites
@@ -229,7 +246,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    `min-height: 0` sur le conteneur : sans lui, une grille en `flex:1` prend la
    hauteur de son CONTENU et pousse la barre basse hors de l'écran. */
 .fa-travail {
-  flex: 1; min-height: 0;
+  flex: 0 1 auto; min-height: 0;
   display: grid; grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
@@ -354,26 +371,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    laisser la moitie du panneau vide. */
 .fa-details--sans-notes .fa-details__col { grid-column: 1 / -1; }
 
-/* --- Ce qui absorbe la hauteur qui reste ---------------------------------
-   L'ecran est dessine pour 630 px. Au-dessus, le contenu s'arretait en haut et
-   laissait un vide sous « Qui suit » : ce sont la niche des notes et la rangee
-   de consigne qui le prennent, pas les champs — un champ qui grandit avec la
-   fenetre n'a plus de hauteur commune avec ses voisins. */
+/* --- La niche des notes -------------------------------------------------
+   Elle accueille le champ des notes quand l'ecran est assez haut. Elle
+   n'ETIRE rien : deux champs geants pour combler un vide, c'est le vide
+   remplace par du gris. C'est la FICHE qui prend sa taille (voir `.fa`). */
 .fa-niche { display: flex; flex-direction: column; min-height: 0; }
-.fa-col--g > .fa-niche:not(:empty) { flex: 1 1 0; }
-.fa-niche > .fa-bloc--notes { flex: 1 1 0; min-height: 0; align-items: stretch; }
-.fa-niche .fa-bloc--notes > .fa-lab { width: auto; }
-.fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1 1 0; min-height: 0; }
-/* ⚠ La colonne droite pose `align-items: flex-start` sur TOUTES ses rangees
-   (0,2,1) : ecrit sur `.fa-row--haut` seul (0,1,0), le `stretch` perdait, la
-   rangee mesurait bien 416 px et le champ dedans restait a 63. */
-.fa-row--haut, .fa-col--d .fa-row--haut { flex: 1 1 0; min-height: 0; align-items: stretch; }
+.fa-niche > .fa-bloc--notes { align-items: flex-start; }
+.fa-niche .fa-bloc--notes > .fa-lab { width: 90px; padding-top: 9px; }
+.fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1; min-width: 0; }
 .fa-row--haut > .fa-lab { padding-top: 9px; }
-.fa-row--haut > textarea.fa-in { flex: 1 1 0; min-height: 0; }
 /* UNE ZONE N'EST PAS UNE VALEUR. Les champs en ligne perdent leur fond des
    qu'ils portent quelque chose — on lit la valeur, pas la boite. Une zone de
-   texte de 300 px, elle, doit montrer ou elle commence et ou elle finit :
-   sinon on ne sait pas ou cliquer pour ecrire la suite. */
+   texte, elle, doit montrer ou elle commence et ou elle finit. */
 .fa-niche textarea.fa-in, .fa-row--haut > textarea.fa-in { background: var(--bg); }
 .fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
 .fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
@@ -385,6 +394,8 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
 .fa-bas {
   flex-shrink: 0;
+  border-bottom-left-radius: var(--arrondi-carte);
+  border-bottom-right-radius: var(--arrondi-carte);
   display: flex; align-items: center; gap: var(--pas-2);
   padding: var(--pas-2) var(--pas-4);
   border-top: 1px solid var(--border);

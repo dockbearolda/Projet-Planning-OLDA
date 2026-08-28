@@ -41,8 +41,27 @@ const { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate,
 // débordement sur les deux colonnes, sur la page et sur la fiche. Ce qui le
 // rend possible tient en quatre décisions, et chacune se casse d'une ligne.
 const RACINE_CSS = CSS.match(/\.fa \{[\s\S]*?\n\}/)[0];
-assert.ok(/position: fixed;/.test(RACINE_CSS) && /overflow: hidden;/.test(RACINE_CSS),
-  'la fiche occupe l’écran et ne défile pas elle-même');
+// LA FICHE FAIT SA TAILLE, bornée à l'écran : `inset: 0` la forçait à 100 % de
+// haut, et tout ce qui restait sous son contenu devenait du vide à combler —
+// on l'avait comblé en étirant deux champs à 287 et 416 px, ce qui remplaçait
+// le vide par du gris. Elle s'ancre en haut et s'arrête où son contenu
+// s'arrête ; ce sont les COLONNES qui défilent si un dossier déborde.
+assert.ok(/position: fixed;/.test(RACINE_CSS) && /max-height: 100vh;/.test(RACINE_CSS),
+  'la fiche est bornée à l’écran et ne défile pas elle-même');
+assert.ok(!/overflow: hidden;/.test(RACINE_CSS),
+  '`overflow: hidden` sur la racine rogne le voile à la hauteur de la fiche : '
+  + 'le planning resterait à découvert sous elle');
+// Le voile est un FRERE de la fiche : posé dedans, il se voyait à travers
+// l'entête et les colonnes — elles n'ont pas de fond opaque — et grisait tout.
+assert.ok(/\.fa-voile \{[^}]*position: fixed[^}]*z-index: 59/.test(CSS),
+  'le voile se pose juste SOUS la fiche (59 contre 60), jamais dedans');
+assert.ok(/ficheAtelierVoile[\s\S]*document\.body\.appendChild\(ficheAtelierVoile\)/.test(APP)
+  && /ficheAtelierVoile\.remove\(\)/.test(APP),
+  'il est monté et retiré avec la fiche, sinon il reste sur le planning');
+assert.ok(!/fa-voile/.test(JS), 'et il n’est jamais un enfant de la racine');
+const BAS_CSS = CSS.match(/\.fa-bas \{[\s\S]*?\n\}/)[0];
+assert.ok(/border-bottom-left-radius/.test(BAS_CSS),
+  'la racine ne rognant plus, c’est la barre basse qui porte les coins du bas');
 const TRAVAIL = CSS.match(/\.fa-travail \{[\s\S]*?\n\}/)[0];
 assert.ok(/min-height: 0;/.test(TRAVAIL),
   'sans `min-height: 0`, une grille en flex:1 prend la hauteur de son CONTENU '

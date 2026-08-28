@@ -3510,6 +3510,7 @@ function rafraichirFichesApresChangement() {
 // reprend pas — le fil des étapes du comptoir, l'historique du client, le
 // journal. Il s'ouvre depuis la fiche, pas depuis la ligne.
 let ficheAtelierEl = null;
+let ficheAtelierVoile = null;
 let ficheAtelierId = null;
 
 // ÉCHAP FERME, comme partout ailleurs. Ce n'est pas un « parcours clavier » —
@@ -3522,6 +3523,7 @@ document.addEventListener('keydown', (e) => {
 
 function fermerFicheAtelier() {
   if (ficheAtelierEl) { ficheAtelierEl.remove(); ficheAtelierEl = null; }
+  if (ficheAtelierVoile) { ficheAtelierVoile.remove(); ficheAtelierVoile = null; }
   ficheAtelierId = null;
   figerLeFond(false);
 }
@@ -3621,6 +3623,12 @@ function openLigneDetail(id) {
     completerFiche(fraiche);
     fermerFicheAtelier();
     ficheAtelierId = String(id);
+    // LE VOILE EST UN FRERE DE LA FICHE, pas son enfant. Pose dedans, il
+    // passait a travers l'entete et les colonnes — elles n'ont pas de fond
+    // opaque — et grisait tout l'ecran au lieu de griser ce qu'il y a dessous.
+    ficheAtelierVoile = document.createElement('div');
+    ficheAtelierVoile.className = 'fa-voile';
+    document.body.appendChild(ficheAtelierVoile);
     ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche));
     document.body.appendChild(ficheAtelierEl);
     figerLeFond(true);
