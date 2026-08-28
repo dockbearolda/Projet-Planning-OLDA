@@ -574,9 +574,13 @@ console.log('✓ barre : les onglets sur UNE ligne, la rangée centrée sur l’
   // 60 à 90 px dans le coin le plus disputé de la barre.
   assert.ok(/\.poste-nom \{ display: none; \}/.test(sansCommentaire(CSS)),
     'le prénom quitte la barre : la pastille dit déjà qui est au poste');
+  // LE DISQUE EST TOUJOURS UN DISQUE, mais il prend depuis le 28/08 la boîte de
+  // la BARRE et non plus celle du rond général : la barre du haut n'a plus
+  // qu'une seule hauteur (`--ctrl-h`), voir test/meme-hauteur.test.js. Le
+  // `--rond` reste celui de `.btn-retour` et des croix de tiroir, hors barre.
   const poste = sansCommentaire(CSS).match(/\.poste \{[^}]*\}/);
-  assert.ok(poste && /width: var\(--rond\)/.test(poste[0]) && /padding: 0;/.test(poste[0]),
-    '… et le bouton devient son disque');
+  assert.ok(poste && /width: var\(--ctrl-h\)/.test(poste[0]) && /padding: 0;/.test(poste[0]),
+    '… et le bouton devient son disque, à la hauteur de la barre');
   assert.ok(/aria-label="Poste : /.test(HTML) || /aria-label/.test(HTML),
     'le nom complet reste au nom accessible');
 }

@@ -38,8 +38,8 @@ const cssNu = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 const regleRangee = cssNu.match(/\.colbar-item,\s*\n\s*\.np-menu__item\s*\{([^}]*)\}/);
 assert.ok(regleRangee,
   'le panneau « Colonnes » et le menu de « Nouveau Projet » partagent UNE seule règle : deux écritures redeviennent deux hauteurs');
-assert.ok(/min-height:\s*var\(--rond\)/.test(regleRangee[1]),
-  '… et leur hauteur est un JETON (--rond), pas un nombre : un nombre se recopie de travers');
+assert.ok(/min-height:\s*var\(--ctrl-h\)/.test(regleRangee[1]),
+  '… et leur hauteur est un JETON (--ctrl-h), pas un nombre : un nombre se recopie de travers');
 assert.ok(/padding:\s*6px 10px/.test(regleRangee[1]) && /gap:\s*8px/.test(regleRangee[1]),
   '… même rembourrage et même écart : la hauteur seule ne suffit pas à faire la même rangée');
 assert.ok(/font-weight:\s*var\(--graisse-note\)/.test(regleRangee[1]),
@@ -55,6 +55,30 @@ assert.strictEqual(soloItem.length, 0,
 const soloIcone = blocs.filter((b) => b[1].trim() === '.np-menu__ic');
 assert.strictEqual(soloIcone.length, 0,
   '… ni pour son icône, pour la même raison');
+
+// ---------------------------------------------------------------------------
+// 1 bis. UNE SEULE HAUTEUR DANS LA BARRE DU HAUT (28/08/2026)
+// ---------------------------------------------------------------------------
+// « Je veux voir avec 1 seul. » La barre en portait QUATRE : 36 px pour les
+// onglets, 44 pour les boutons ronds et le poste, 50 pour la pilule de
+// recherche. Tout est ramené sur `--ctrl-h` — la boîte que la recherche portait
+// déjà, et que porte tout ce qui se clique et se remplit ailleurs. Descendre la
+// recherche à 44 aurait fait de la barre une exception de plus.
+const boiteDe = (selecteur) => {
+  const m = cssNu.match(new RegExp(`\\n${selecteur.replace(/[.\-]/g, (c) => `\\${c}`)}\\s*\\{([^}]*)\\}`));
+  return m ? m[1] : null;
+};
+for (const [sel, mot] of [['.icon-btn', 'width'], ['.poste', 'height'], ['.nav-switch-btn', 'min-height']]) {
+  const bloc = boiteDe(sel);
+  assert.ok(bloc, `la règle ${sel} existe toujours`);
+  assert.ok(new RegExp(`${mot}:\\s*var\\(--ctrl-h\\)`).test(bloc),
+    `${sel} prend la boîte de l’application (--ctrl-h) : la barre du haut n’a plus qu’UNE hauteur`);
+  assert.ok(!/var\(--rond\)/.test(bloc),
+    `${sel} ne garde aucun reste de --rond : c’est par là que la deuxième hauteur revient`);
+}
+assert.ok(/\.champ-recherche\s*\{[^}]*height:\s*var\(--ctrl-h\)/.test(
+  fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')),
+  '… et la pilule de recherche, qui la portait déjà, ne bouge pas');
 
 // ---------------------------------------------------------------------------
 // 2. L'ICÔNE D'UNE RANGÉE A UNE BOÎTE, ET ELLE EST ÉCRITE

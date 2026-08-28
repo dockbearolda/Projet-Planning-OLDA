@@ -74,8 +74,15 @@ l'une bouge.
 
 Trois corollaires, chacun payé une fois :
 
-- **Une hauteur est un JETON, jamais un nombre.** `min-height: var(--rond)`,
-  pas `min-height: 44px` — un nombre se recopie de travers.
+- **Une hauteur est un JETON, jamais un nombre.** `min-height: var(--ctrl-h)`,
+  pas `min-height: 50px` — un nombre se recopie de travers.
+- **La barre du haut n'a qu'UNE hauteur** (28/08) : `--ctrl-h`, celle que la
+  pilule de recherche portait déjà et que porte tout ce qui se clique et se
+  remplit ailleurs. Elle en avait trois — 36 pour les onglets, 44 pour les
+  boutons ronds et le poste, 50 pour la recherche. Les deux panneaux qui en
+  tombent (« Colonnes », « Nouveau Projet ») la suivent. Ça coûte **14 px** de
+  barre, et c'est le prix décidé. `--rond` (44) ne bouge pas : c'est la boîte
+  de `.btn-retour` et des croix de tiroir, **hors** de la barre.
 - **Un panneau tombe sur le RAIL de ce qui l'ouvre** : on aligne les icônes,
   pas les bords de boîte, et on **mesure** l'écart au lieu de l'écrire. Le
   menu de « Nouveau Projet » tombait 13,7 px à droite du « + » de son onglet

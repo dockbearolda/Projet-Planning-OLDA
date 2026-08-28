@@ -236,11 +236,12 @@ assert.ok(/\.poste-ecran:not\(\[hidden\]\) \{\s*\n\s*display: grid;/.test(STYLES
 assert.ok(!/^\.poste-ecran \{[^}]*display:/m.test(STYLES),
   '.poste-ecran ne doit pas porter un display nu, il défairait hidden');
 
-// LA BOÎTE RONDE DE LA CHARTE (`--rond`), et non plus « une cible prenable au
-// doigt » : le projet est PC uniquement depuis le 21/08. La valeur ne change
-// pas, la raison si — et elle ne s'écrit plus qu'à un endroit.
-assert.ok(/\.poste \{[\s\S]*?height: var\(--rond\);/.test(STYLES),
-  'le bouton du poste prend la boîte ronde de la charte');
+// LA BOÎTE DE LA BARRE (`--ctrl-h`), et non plus « une cible prenable au
+// doigt » : le projet est PC uniquement depuis le 21/08. Elle prenait le rond
+// général (`--rond`, 44) jusqu'au 28/08 ; depuis, la barre du haut n'a plus
+// qu'UNE hauteur et le poste la suit. La raison ne s'écrit qu'à un endroit.
+assert.ok(/\.poste \{[\s\S]*?height: var\(--ctrl-h\);/.test(STYLES),
+  'le bouton du poste prend la boîte de la barre du haut');
 assert.ok(/\.poste-choix-btn \{[\s\S]*?min-height: 64px;/.test(STYLES),
   'les quatre noms se tapent au doigt');
 

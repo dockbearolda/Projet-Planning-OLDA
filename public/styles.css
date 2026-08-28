@@ -201,13 +201,25 @@ button, input, select, textarea { font-family: inherit; }
    deux — d'où le 0 explicite ici. */
 .topbar-right { margin-left: 0; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-/* bouton icône rond (bascule de thème…) */
+/* bouton icône rond (bascule de thème…)
+   UNE SEULE HAUTEUR DANS LA BARRE DU HAUT (28/08/2026, Charlie : « je veux voir
+   avec 1 seul »). La barre en portait QUATRE : 36 px pour les onglets, 44 pour
+   les boutons ronds et le poste, 50 pour la pilule de recherche. Elles sont
+   toutes ramenées sur la BOÎTE de l'application — `--ctrl-h` — celle que la
+   recherche portait déjà, et que porte tout ce qui se clique et se remplit
+   ailleurs dans le CRM comme au comptoir. On ne descend pas la recherche à 44 :
+   ça aurait fait de la barre une exception de plus au lieu d'en supprimer une.
+   `--rond` ne bouge pas : trente autres endroits s'en servent (boutons d'une
+   carte, croix d'un tiroir, initiale d'un référent) et ne sont pas dans la
+   barre. Les quatre boutons `.icon-btn` de l'application sont TOUS dans la
+   barre du haut — vérifié dans index.html : rail, plein écran, thème,
+   actualiser. */
 .icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--rond);
-  height: var(--rond);
+  width: var(--ctrl-h);
+  height: var(--ctrl-h);
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -229,8 +241,8 @@ button, input, select, textarea { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: var(--rond);
-  width: var(--rond);
+  height: var(--ctrl-h);
+  width: var(--ctrl-h);
   justify-content: center;
   padding: 0;
   border: 1px solid transparent;
@@ -2148,15 +2160,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    50, 6/10 de rembourrage contre 0/14, graisse 600 contre 800. Deux composants
    qui se ressemblent au lieu d'un seul — exactement ce que la charte interdit.
    Il n'y en a plus qu'un.
-   La hauteur est celle du ROND du systeme : les boutons ronds de la barre du
-   haut la portent deja, une rangee de panneau se lit avec eux. */
+   La hauteur est celle de la BARRE dont ces panneaux tombent — `--ctrl-h`,
+   depuis que la barre du haut n'en porte plus qu'une (28/08, voir
+   `.icon-btn`). Elle valait `--rond` pendant vingt-quatre heures, le temps que
+   la barre, elle, en porte encore trois. */
 .colbar-item,
 .np-menu__item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: var(--rond);
+  min-height: var(--ctrl-h);
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -3787,7 +3801,7 @@ a,
   .nav-switch-btn {
     flex-direction: column;
     gap: 2px;
-    min-height: var(--rond);
+    min-height: var(--ctrl-h);
     padding: var(--champ-y-serre) var(--pas-2);
   }
   .nav-switch-label { font-size: var(--taille-texte); line-height: 1.15; max-width: 76px; }
@@ -3889,6 +3903,10 @@ a,
      37 px des pilules de filtre et des 39 de la fiche — trois écritures d'une
      même intention. */
   padding: var(--champ-y-serre) var(--pas-2);
+  /* La recette serrée donnait 36 px : la barre avait alors trois hauteurs. Le
+     plancher la ramène sur la boîte de l'application (voir `.icon-btn`). Le
+     rembourrage reste — c'est lui qui tient la largeur du survol. */
+  min-height: var(--ctrl-h);
   border: var(--trait-reserve);
   border-radius: var(--radius);
   background: transparent;
