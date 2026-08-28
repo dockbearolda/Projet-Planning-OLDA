@@ -212,7 +212,11 @@ assert.match(papierTasse, /Zone Fond : à préciser/,
 for (const jeton of ['--tk-geant: 52px', '--tk-cle: 24px', '--tk-texte: 15px']) {
   assert.ok(CSS_TICKET.includes(jeton), `l’échelle du ticket doit poser ${jeton}`);
 }
-const cransTicket = [...new Set((CSS_TICKET.match(/--tk-[a-z]+:\s*[\d.]+px/g) || []))];
+// `--tk-rang` n'est pas un cran de texte : c'est le PAS des lignes du cadre à
+// écrire. Il ne se lit pas, il cadence — et il est là pour que ce pas cesse
+// d'être écrit en clair (il valait 31 et 32 px en dur dans le dégradé).
+const cransTicket = [...new Set((CSS_TICKET.match(/--tk-[a-z]+:\s*[\d.]+px/g) || []))]
+  .filter((j) => !j.startsWith('--tk-rang'));
 assert.strictEqual(cransTicket.length, 3,
   `le ticket ne déclare que trois crans de texte en propre, il en a ${cransTicket.length} : ${cransTicket.join(' · ')}`);
 for (const parti of ['--tk-titre', '--tk-nombre', '--tk-fort', '--tk-mes', '--tk-note', '--tk-etiq']) {

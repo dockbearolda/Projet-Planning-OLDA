@@ -396,6 +396,7 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
           rembourrage à zéro SUR LE PAPIER et nulle part ailleurs. */
   .bu {${JETONS_PAPIER}
        --bu-geant: 30px; --bu-cle: 17px; --bu-texte: 13px;
+       --bu-rang: 26px; --bu-gouttiere: 26px;
        width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
        display: flex; flex-direction: column;
        background: #ffffff; color: var(--pap-encre);
@@ -430,67 +431,98 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
                line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
   .bu__ref-v { font: 700 var(--bu-cle)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-  .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px;
+  /* TOUT EST SUR LA MÊME GRILLE, ET TOUTES LES LIGNES SONT DROITES (28/08).
+     Charlie, capture à l'appui : « tout doit être bien droit sur des lignes
+     parfaitement lisibles ». Les deux cadres CLIENT et DOSSIER étaient deux
+     boîtes indépendantes : la première rangée de gauche tombait à 194,4 px du
+     haut de la feuille, celle de droite à 169,8 — 24,6 px de décalage, et les
+     rangées suivantes ne se rattrapaient jamais. Deux colonnes qu'on lit
+     ensemble et dont aucune ligne n'est en face de l'autre.
+     Une SEULE grille les porte maintenant, et les paires y sont posées en
+     alternance : la grille impose alors la rangée, et deux lignes voisines sont
+     à la même hauteur par construction — pas par coïncidence de contenu. */
+  .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;
                padding: 16px var(--pap-marge) 0; }
-  /* DEUX BLOCS DE MÊME HAUTEUR, toujours : ils sont côte à côte et se lisent
-     ensemble. Un cadre plus court que son voisin se lit comme un cadre
-     inachevé. */
-  .bu__deux { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
-  .bu__bloc { display: flex; flex-direction: column; border: 1px solid var(--pap-filet); padding: 11px 13px; }
-  .bu__bloc-titre { margin-bottom: 7px; }
-  .bu__paire { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
-  .bu__paire + .bu__paire { border-top: 1px dotted var(--pap-filet); }
+  .bu__grille { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--bu-gouttiere); }
+  /* LA COLONNE DE DROITE SEULE, sur la MÊME grille : c'est ce qui met le bord
+     gauche du total exactement sous celui du bloc « Dossier ». La boîte des
+     totaux avait une largeur à elle (76 mm) qui ne s'alignait sur rien. */
+  .bu__demi { grid-column: 2; }
+
+  /* UNE LIGNE, UNE HAUTEUR. C'est le rythme du document entier : intitulé à
+     gauche, valeur à droite, un filet en dessous, et la ligne suivante tombe au
+     pas suivant. La hauteur est un JETON — écrite en clair, elle se recopie de
+     travers et le rythme se casse à la troisième reprise. */
+  .bu__paire { display: flex; align-items: baseline; justify-content: space-between;
+               gap: 12px; min-height: var(--bu-rang); padding: 4px 0;
+               border-bottom: 1px dotted var(--pap-filet); }
   .bu__k { color: var(--pap-ardoise); }
   .bu__v { font-weight: 700; text-align: right; }
-  .bu__nom { font-size: var(--bu-cle); font-weight: 800; letter-spacing: -.02em;
-             line-height: 1.15; margin-bottom: 5px; }
+  /* UNE CELLULE VIDE GARDE SON FILET : c'est ce qui fait qu'une colonne plus
+     courte que l'autre ne casse pas la réglure. Un tableau à trous se lit comme
+     un tableau ; un tableau dont les traits s'arrêtent au milieu se lit comme
+     une erreur. */
+  .bu__paire--vide { border-bottom-color: var(--pap-filet); }
+  /* L'INTITULÉ D'UNE COLONNE. Il est DANS la grille, donc les deux tombent au
+     même endroit — posés dans deux boîtes séparées, ils suivaient chacun le
+     rembourrage de la sienne. */
+  .bu__col-k { padding-bottom: 5px; border-bottom: 1.5px solid var(--pap-encre); }
+  /* LE NOM DU CLIENT est la première valeur de sa colonne, à la place d'une
+     paire : c'est POUR QUI, et ça se lit avant tout le reste. La rangée reste
+     la rangée — la grille lui donne la même hauteur qu'à sa voisine de droite. */
+  .bu__nom { display: flex; align-items: baseline; min-height: var(--bu-rang);
+             padding: 4px 0; border-bottom: 1px dotted var(--pap-filet);
+             font-size: var(--bu-cle); font-weight: 800; letter-spacing: -.02em; }
 
   /* LE DÉTAIL. Les colonnes sont FIXÉES : sans largeur déclarée, la colonne des
      prix se calait sur son contenu et bougeait d'un document à l'autre — deux
-     bons de commande côte à côte ne se comparaient pas. */
+     bons de commande côte à côte ne se comparaient plus. La désignation prend
+     ce qui reste. */
   .bu__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .bu__table th { padding: 5px 8px; border-bottom: 1.5px solid var(--pap-encre); text-align: left;
+  .bu__table th { padding: 0 8px 5px; border-bottom: 1.5px solid var(--pap-encre); text-align: left;
                   font: 500 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                  letter-spacing: .16em; color: var(--pap-ardoise); text-transform: uppercase; }
-  .bu__table td { padding: 7px 8px; border-bottom: 1px dotted var(--pap-filet); vertical-align: top; }
+                  letter-spacing: .16em; color: var(--pap-ardoise); }
+  .bu__table td { height: var(--bu-rang); padding: 4px 8px;
+                  border-bottom: 1px dotted var(--pap-filet); vertical-align: top; }
   .bu__col--qte { width: 15mm; }
   .bu__col--pu { width: 25mm; }
   .bu__col--total { width: 27mm; }
-  .bu__table tbody tr:last-child td { border-bottom: 0; }
   .bu__num { text-align: right; white-space: nowrap; }
   .bu__desi { font-weight: 700; }
   .bu__sous { display: block; color: var(--pap-ardoise); line-height: 1.3; }
 
-  /* LES TOTAUX SONT DANS LE BLOC DU DÉTAIL, pas à côté. La boîte flottait
-     seule à droite, sans rien qui la relie au tableau dont elle fait la somme :
-     sur un document qui sert à facturer, le total doit toucher ce qu'il
-     additionne. */
-  .bu__totaux { display: flex; justify-content: flex-end; margin-top: 12px;
-                padding-top: 12px; border-top: 1.5px solid var(--pap-encre); }
-  /* UN TRAIT NE SÉPARE RIEN QUAND IL N'Y A RIEN AU-DESSUS. Sur un dossier sans
-     détail figé (une ligne créée à la main dans la grille), le tableau ne se
-     dessine pas : le trait des totaux restait seul en haut d'un cadre vide. */
-  .bu__totaux--seul { margin-top: 0; padding-top: 0; border-top: 0; }
-  .bu__totaux-boite { width: 76mm; }
+  /* LE TOTAL. Même rythme de lignes que tout le reste, et le TTC détaché par le
+     seul trait plein du bloc : c'est le chiffre qu'on vient chercher. */
   .bu__ttc { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-             margin-top: 7px; padding-top: 7px; border-top: 1.5px solid var(--pap-encre); }
+             min-height: var(--bu-rang); padding: 8px 0 4px;
+             border-top: 1.5px solid var(--pap-encre); border-bottom: 1.5px solid var(--pap-encre); }
   .bu__ttc-v { font-size: var(--bu-geant); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
-  .bu__achiffrer { font-size: var(--bu-cle); font-weight: 800; }
+  .bu__achiffrer { display: flex; align-items: center; min-height: var(--bu-rang);
+                   font-size: var(--bu-cle); font-weight: 800; }
 
   /* LE BLOC INTERNE. Marge, coût de revient, note : il ne sort PAS chez le
      client. Un liseré rayé le dit sans qu'on ait besoin de le lire. */
-  .bu__interne { border: 1px dashed var(--pap-encre); padding: 11px 13px; }
+  .bu__interne { border: 1px dashed var(--pap-encre); padding: 10px 12px; }
   .bu__interne-tete { display: flex; align-items: baseline; justify-content: space-between;
-                      gap: 12px; margin-bottom: 8px; }
-  .bu__grille3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .bu__mesure { display: flex; flex-direction: column; gap: 2px; }
-  .bu__mesure-v { font-size: var(--bu-cle); font-weight: 800; }
-  .bu__libre { margin: 8px 0 0; white-space: pre-wrap; }
+                      gap: 12px; padding-bottom: 5px; border-bottom: 1.5px solid var(--pap-encre); }
+  .bu__grille3 { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: var(--bu-gouttiere); }
+  .bu__mesure { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+                min-height: var(--bu-rang); padding: 4px 0;
+                border-bottom: 1px dotted var(--pap-filet); }
+  .bu__mesure-v { font-weight: 800; }
+  .bu__libre { margin: 0; min-height: var(--bu-rang); padding: 4px 0;
+               border-bottom: 1px dotted var(--pap-filet); white-space: pre-wrap; }
 
-  /* LE PIED TIENT SUR UNE LIGNE. Il portait le nom, le titre, le numéro et les
-     coordonnées : les deux moitiés revenaient à la ligne en plein milieu du
-     numéro de dossier, ce qui est exactement ce qu'un pied ne doit pas faire —
-     on le lit pour identifier une feuille, pas pour la déchiffrer. */
+  /* LE CADRE À ÉCRIRE ABSORBE, IL NE POUSSE PAS. Il est le seul bloc élastique
+     de la page : c'est lui qui la fait tomber sur 297 mm pile, quel que soit le
+     dossier. Sans lui, un dossier peu rempli laissait un tiers de feuille
+     blanche sans rien dire, et un dossier chargé partait sur une seconde page.
+     Ses lignes sont AU PAS DU DOCUMENT : on écrit dessus dans le même rythme
+     que ce qui est imprimé au-dessus. */
+  .bu__obs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .bu__obs-lignes { flex: 1; min-height: 0;
+                    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--bu-rang) - 1px), var(--pap-filet) calc(var(--bu-rang) - 1px), var(--pap-filet) var(--bu-rang)); }
+
   .bu__pied { display: flex; align-items: center; justify-content: space-between; gap: 24px;
               margin-top: auto; padding: 12px var(--pap-marge) 20px; border-top: 1px dashed var(--pap-encre);
               white-space: nowrap; }
@@ -536,7 +568,12 @@ export function dessinerBureau(t, doc) {
   tete.append(maison);
 
   const bRef = el('div', 'bu__ref');
-  bRef.append(el('div', 'bu__titre', t.titre), el('div', 'bu__ref-v', t.ref || '—'));
+  bRef.append(el('div', 'bu__titre', t.titre));
+  // PAS DE RÉFÉRENCE, PAS DE LIGNE. Un dossier créé à la main dans la grille
+  // n'a pas de numéro de comptoir : le document affichait alors un tiret seul
+  // en 17 px sous son titre — un trait qui ne dit rien, à l'endroit le plus
+  // regardé de la feuille.
+  if (t.ref) bRef.append(el('div', 'bu__ref-v', t.ref));
   // QUAND. Un document commercial porte sa date à côté de son numéro : sans
   // elle, deux versions du même dossier ne se départagent pas.
   if (t.priseLe) bRef.append(cap(`${t.demande ? 'Demande reçue le' : 'Établi le'} ${t.priseLe}`));
@@ -550,40 +587,47 @@ export function dessinerBureau(t, doc) {
   const corps = el('div', 'bu__corps');
   feuille.append(corps);
 
-  // --- Le client, en entier, et les dates ----------------------------------
-  const deux = el('div', 'bu__deux');
-  const bClient = el('div', 'bu__bloc');
-  bClient.append(cap('CLIENT', 'bu__bloc-titre'), el('div', 'bu__nom', t.client.nom || '—'));
+  // --- L'IDENTITÉ : le client et le dossier, SUR LA MÊME GRILLE -------------
+  // Les deux colonnes étaient deux cadres indépendants : leurs rangées ne
+  // tombaient jamais en face (24,6 px d'écart, mesuré). Une seule grille les
+  // porte, et on y pose les cellules en ALTERNANCE — gauche, droite, gauche,
+  // droite. La rangée est alors imposée par la grille, pas par le hasard des
+  // contenus. Une colonne plus courte que l'autre reçoit une cellule vide, qui
+  // garde son filet : un tableau à trous se lit, un tableau dont les traits
+  // s'arrêtent au milieu se lit comme une erreur.
+  const idt = el('div', 'bu__grille');
+  const gauche = [el('div', 'pap-cap bu__col-k', 'CLIENT')];
+  const droite = [el('div', 'pap-cap bu__col-k', 'DOSSIER')];
+
+  // Le nom prend la place de la première paire de sa colonne : c'est POUR QUI,
+  // et ça se lit avant tout le reste.
+  gauche.push(el('div', 'bu__nom', t.client.nom || '—'));
   for (const [k, v] of [['Type', t.client.type], ['Contact', t.client.contact],
     ['Téléphone', t.client.tel], ['E-mail', t.client.email]]) {
     // UN CHAMP VIDE NE S'AFFICHE PAS. « E-mail : — » n'apprend rien et pousse
     // vers le bas ce qu'on cherche vraiment.
-    if (v) bClient.append(paire(k, v));
+    if (v) gauche.push(paire(k, v));
   }
-  for (const x of t.client.autres) bClient.append(paire(x.k, x.v));
+  for (const x of t.client.autres) gauche.push(paire(x.k, x.v));
 
-  const bDates = el('div', 'bu__bloc');
-  bDates.append(cap('DOSSIER', 'bu__bloc-titre'));
-  // La date de prise n'est plus ici : elle est en tête, sous le numéro, là où
-  // un document commercial la porte. Elle y était écrite une deuxième fois.
-  if (t.retrait) bDates.append(paire('Récupération', t.heure ? `${t.retrait} à ${t.heure}` : t.retrait));
-  if (t.responsable) bDates.append(paire('Suivi par', t.responsable));
-  if (t.production) bDates.append(paire('Production', t.production));
-  deux.append(bClient, bDates);
-  corps.append(deux);
+  if (t.retrait) droite.push(paire('Récupération', t.heure ? `${t.retrait} à ${t.heure}` : t.retrait));
+  if (t.responsable) droite.push(paire('Suivi par', t.responsable));
+  if (t.production) droite.push(paire('Production', t.production));
+
+  for (let i = 0; i < Math.max(gauche.length, droite.length); i += 1) {
+    idt.append(gauche[i] || el('div', 'bu__paire bu__paire--vide'),
+      droite[i] || el('div', 'bu__paire bu__paire--vide'));
+  }
+  corps.append(idt);
 
   // --- LE DÉTAIL : c'est le cœur du document du bureau ----------------------
-  // LE TABLEAU ET SON TOTAL NE FONT QU'UN BLOC. La boîte des totaux flottait
-  // seule à droite, séparée du tableau dont elle est la somme : sur un document
-  // qui sert à facturer, le total doit toucher ce qu'il additionne.
-  const blocDetail = el('div', 'bu__bloc');
   if (t.articles.length) {
-    blocDetail.append(cap('DÉTAIL', 'bu__bloc-titre'));
+    const bloc = el('div');
     const table = el('table', 'bu__table');
     // LES LARGEURS SONT DÉCLARÉES, ET ELLES LE SONT EN CSS. Sans largeur, la
     // colonne des prix se calait sur son contenu : un document à 1 362 € et un
     // autre à 88 € n'avaient pas la même grille, et deux bons de commande côte
-    // à côte ne se comparaient plus. La désignation prend ce qui reste.
+    // à côte ne se comparaient plus.
     // EN CSS ET PAS EN STYLE EN LIGNE : le document se dessine aussi hors
     // navigateur — les tests le rendent dans un DOM minimal, sans propriété
     // `style`, et c'est cette portabilité qui permet de vérifier le papier sans
@@ -596,13 +640,15 @@ export function dessinerBureau(t, doc) {
     table.append(groupe);
     const thead = el('thead');
     const trh = el('tr');
+    // EN CAPITALES, comme tous les autres intitulés de la feuille. Le socle ne
+    // les force plus (il mettait aussi « mm » en « MM » sur le ticket) : elles
+    // s'écrivent donc ici. « Désignation » en casse mixte au milieu de CLIENT,
+    // DOSSIER, TOTAL et OBSERVATIONS se lisait comme un intitulé d'une autre
+    // famille — alors que c'en est exactement un.
     const colonnes = t.demande
-      ? ['Désignation', 'Qté']
-      : ['Désignation', 'Qté', 'P.U. TTC', 'Total TTC'];
-    for (const c of colonnes) {
-      const th = el('th', c === 'Désignation' ? '' : 'bu__num', c);
-      trh.append(th);
-    }
+      ? ['DÉSIGNATION', 'QTÉ']
+      : ['DÉSIGNATION', 'QTÉ', 'P.U. TTC', 'TOTAL TTC'];
+    for (const c of colonnes) trh.append(el('th', c === 'DÉSIGNATION' ? '' : 'bu__num', c));
     thead.append(trh);
     table.append(thead);
     const tbody = el('tbody');
@@ -622,18 +668,17 @@ export function dessinerBureau(t, doc) {
       tbody.append(tr);
     }
     table.append(tbody);
-    blocDetail.append(table);
+    bloc.append(table);
+    corps.append(bloc);
   }
 
   // --- L'ARGENT. Le bloc que le ticket d'atelier ne verra jamais ------------
+  // IL EST SUR LA COLONNE DE DROITE DE LA MÊME GRILLE. Il avait une largeur à
+  // lui (76 mm) qui ne s'alignait sur rien : la boîte flottait à droite du vide.
   const arg = t.argent;
-  const totaux = el('div', t.articles.length ? 'bu__totaux' : 'bu__totaux bu__totaux--seul');
-  const boite = el('div', 'bu__totaux-boite');
-  // L'INTITULÉ NE SERT QUE QUAND LA BOÎTE NE SE NOMME PAS TOUTE SEULE. Les
-  // lignes disent déjà « Total HT », « TGCA », « TTC » : un « TOTAL » au-dessus
-  // ne fait que répéter. Sur un dossier sans prix, en revanche, la boîte ne
-  // porte que deux mots et il faut dire de quoi ils parlent.
-  if (arg.ttc == null) boite.append(cap('TOTAL', 'bu__bloc-titre'));
+  const totaux = el('div', 'bu__grille');
+  const boite = el('div', 'bu__demi');
+  boite.append(el('div', 'pap-cap bu__col-k', 'TOTAL'));
   if (arg.ttc == null) {
     // « Pas encore chiffré » n'est PAS « gratuit ». On l'écrit en toutes
     // lettres plutôt que d'imprimer 0,00 € sur un document qui sert à facturer.
@@ -647,22 +692,12 @@ export function dessinerBureau(t, doc) {
     boite.append(paire('Règlement', arg.paye ? (arg.mode || 'Payé') : 'À encaisser'));
   }
   totaux.append(boite);
-  if (t.articles.length) {
-    blocDetail.append(totaux);
-    corps.append(blocDetail);
-  } else {
-    // PAS DE DÉTAIL FIGÉ — une ligne créée à la main dans la grille n'a pas de
-    // panier. Le total reprend alors son propre cadre : le laisser dans un bloc
-    // « Détail » qui ne contient rien donnait un grand rectangle vide avec les
-    // chiffres tassés dans son coin droit.
-    boite.className = 'bu__totaux-boite bu__bloc';
-    corps.append(totaux);
-  }
+  corps.append(totaux);
 
   // --- Ce que la vendeuse a recueilli, tel qu'elle l'a écrit ----------------
   if (t.dossier.length) {
-    const bloc = el('div', 'bu__bloc');
-    bloc.append(cap('CE QUI A ÉTÉ RECUEILLI', 'bu__bloc-titre'));
+    const bloc = el('div');
+    bloc.append(el('div', 'pap-cap bu__col-k', 'CE QUI A ÉTÉ RECUEILLI'));
     for (const x of t.dossier) bloc.append(paire(x.k, x.v));
     corps.append(bloc);
   }
@@ -687,6 +722,14 @@ export function dessinerBureau(t, doc) {
   for (const n of t.notes || []) interne.append(el('p', 'bu__libre', n));
   if (t.note) interne.append(el('p', 'bu__libre', t.note));
   corps.append(interne);
+
+  // --- CE QU'ON ÉCRIT DESSUS, et ce qui fait tomber la feuille à 297 mm -----
+  // Le cadre est réglé, pas vide : un rectangle nu ne se remplit pas, des
+  // lignes si. Il absorbe ce qui reste — sans lui, un dossier peu rempli
+  // laissait un tiers de feuille blanche sans rien dire.
+  const obs = el('div', 'bu__obs');
+  obs.append(el('div', 'pap-cap bu__col-k', 'OBSERVATIONS'), el('div', 'bu__obs-lignes'));
+  corps.append(obs);
 
   // --- Le pied -------------------------------------------------------------
   // LE PIED IDENTIFIE UNE FEUILLE DÉTACHÉE, il ne redit pas l'en-tête. Il

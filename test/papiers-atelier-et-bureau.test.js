@@ -114,10 +114,24 @@ assert.ok(!/text-transform/.test(regleCap),
 // ---------------------------------------------------------------------------
 // Dix crans ne font pas une hiérarchie, ils font du désordre. Trois crans
 // propres à chaque papier, plus celui des intitulés qui vient du socle.
+// TROIS CRANS DE TEXTE, et rien d'autre ne porte de taille de police. Les
+// jetons de RYTHME (le pas d'une ligne, la gouttière entre colonnes) sont d'une
+// autre nature : ils ne se lisent pas, ils cadencent. Ils sont nommés ici un par
+// un — c'est ce qui empêche une taille de police de se glisser parmi eux.
+const CRANS = ['geant', 'cle', 'texte'];
+const RYTHME = { tk: ['rang'], bu: ['rang', 'gouttiere'] };
 for (const [nom, css, prefixe] of [['ticket', CSS_TICKET, 'tk'], ['bureau', CSS_BUREAU, 'bu']]) {
-  const crans = [...new Set(css.match(new RegExp(`--${prefixe}-[a-z]+:\\s*[\\d.]+px`, 'g')) || [])];
-  assert.strictEqual(crans.length, 3,
-    `le ${nom} déclare ${crans.length} crans de texte au lieu de 3 : ${crans.join(' · ')}`);
+  const poses = [...new Set(css.match(new RegExp(`--${prefixe}-[a-z]+(?=:\\s*[\\d.]+px)`, 'g')) || [])]
+    .map((j) => j.slice(prefixe.length + 3));
+  assert.deepStrictEqual(poses.filter((j) => !RYTHME[prefixe].includes(j)).sort(), [...CRANS].sort(),
+    `le ${nom} ne doit poser que trois crans de texte, il pose : ${poses.join(' · ')}`);
+}
+// ET AUCUN PAS DE LIGNE ÉCRIT EN CLAIR. Le cadre à écrire du ticket réglait ses
+// lignes à 31 et 32 px en dur : une hauteur écrite se recopie de travers, et le
+// rythme se casse à la troisième reprise.
+for (const [nom, css] of [['CSS_TICKET', CSS_TICKET], ['CSS_BUREAU', CSS_BUREAU]]) {
+  assert.ok(!/repeating-linear-gradient\([^)]*\d+px/.test(css),
+    `${nom} : le pas des lignes réglées est un jeton, pas un nombre`);
 }
 // LE PLUS GROS CARACTÈRE D'UN DOCUMENT DU BUREAU EST LE MONTANT, jamais son
 // titre. « BON DE COMMANDE » sortait à 34 px au-dessus d'un total à 30 :
@@ -243,6 +257,49 @@ assert.ok(brut.contact.includes('+590590123456'),
   'un numéro international n’a pas le découpage d’un numéro national');
 assert.ok(brut.legal.includes('SIRET 1234567890'),
   'un SIRET qui n’a pas ses quatorze chiffres ressort tel quel');
+
+// ---------------------------------------------------------------------------
+// 4 bis. TOUT EST DROIT — une seule grille, des rangées imposées
+// ---------------------------------------------------------------------------
+// Charlie, 28/08, capture à l'appui : « tout doit être bien droit sur des lignes
+// parfaitement lisibles ». Les colonnes CLIENT et DOSSIER étaient deux boîtes
+// indépendantes : la première rangée de gauche tombait à 194,4 px du haut de la
+// feuille, celle de droite à 169,8 — 24,6 px d'écart, et les rangées suivantes
+// ne se rattrapaient jamais. Deux colonnes qu'on lit ensemble et dont aucune
+// ligne n'est en face de l'autre.
+//
+// Une SEULE grille les porte, et les cellules y sont posées en alternance :
+// gauche, droite, gauche, droite. La rangée est alors imposée par la grille et
+// non par le hasard des contenus — c'est structurel, pas cosmétique, et c'est
+// pour ça que ça se teste ici et pas seulement à l'oeil.
+const grilles = tousLes(feuille, 'bu__grille');
+assert.ok(grilles.length >= 1, 'l’identité est portée par une grille, pas par deux boîtes');
+const identite = grilles[0];
+assert.strictEqual(identite.enfants.length % 2, 0,
+  'la grille se remplit par PAIRES de cellules : un compte impair décale toute la colonne');
+// Le jeu d'essai a six entrées à gauche (le nom, le type, le contact, plus le
+// secteur et l'adresse recueillis) contre trois à droite. Les rangées manquantes
+// sont comblées par des cellules vides QUI GARDENT LEUR FILET : un tableau à
+// trous se lit comme un tableau, un tableau dont les traits s'arrêtent au milieu
+// se lit comme une erreur.
+assert.ok(tousLes(identite, 'bu__paire--vide').length > 0,
+  'une colonne plus courte que l’autre reçoit des cellules vides, sinon la réglure se casse');
+// … ET AUCUNE BOÎTE INDÉPENDANTE NE REVIENT. C'est le retour de `.bu__bloc` qui
+// avait produit le décalage : deux cadres, deux rembourrages, deux rythmes.
+assert.ok(!/\.bu__bloc\b/.test(CSS_BUREAU) && !/'bu__bloc'/.test(BUREAU),
+  'les colonnes ne redeviennent pas deux cadres indépendants');
+// UNE LIGNE, UNE HAUTEUR, et c'est un JETON — écrite en clair, elle se recopie
+// de travers et le rythme se casse à la troisième reprise.
+for (const regle of ['.bu__paire', '.bu__nom', '.bu__mesure']) {
+  assert.match(CSS_BUREAU, new RegExp(`\\${regle} \\{[^}]*min-height: var\\(--bu-rang\\)`),
+    `${regle} prend la hauteur de rangée du document`);
+}
+// UN DOSSIER SANS RÉFÉRENCE N'ÉCRIT PAS DE TIRET. Une ligne créée à la main dans
+// la grille n'a pas de numéro de comptoir : le document affichait un tiret seul
+// en 17 px sous son titre, à l'endroit le plus regardé de la feuille.
+const sansRef = dessinerBureau(modeleBureau({ ...LIGNE, fiche: {} }, MAISON), faireDoc());
+assert.strictEqual(tousLes(sansRef, 'bu__ref-v').length, 0,
+  'pas de référence, pas de ligne — un tiret seul sous le titre ne dit rien');
 
 // ---------------------------------------------------------------------------
 // 5. AUCUNE LIGNE N'EST IMPRIMÉE DEUX FOIS

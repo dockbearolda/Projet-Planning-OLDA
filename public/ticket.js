@@ -379,6 +379,7 @@ export const CSS_TICKET = SOCLE_PAPIER + `
      ATTENTION : aucun accent grave dans ce gabarit, il le terminerait. */
   .tk {${JETONS_PAPIER}
         --tk-geant: 52px; --tk-cle: 24px; --tk-texte: 15px;
+        --tk-rang: 31px;
         width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
         display: flex; flex-direction: column; background: #fff; color: var(--pap-encre);
         font: var(--tk-texte)/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -524,7 +525,7 @@ export const CSS_TICKET = SOCLE_PAPIER + `
      hauteur minimale : il est le seul bloc élastique de la page, et c'est lui
      qui la fait tomber sur 297 mm pile. */
   .tk__infos { flex: 1; min-height: 0; padding: 12px 20px 14px; border: 1.5px solid var(--pap-encre);
-               background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 31px, var(--pap-filet) 31px, var(--pap-filet) 32px);
+               background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--tk-rang) - 1px), var(--pap-filet) calc(var(--tk-rang) - 1px), var(--pap-filet) var(--tk-rang));
                background-position: 0 8px; background-clip: content-box; white-space: pre-line; }
 
   .tk__conformite { display: flex; align-items: center; gap: 16px; margin: 14px var(--pap-marge) 16px;
