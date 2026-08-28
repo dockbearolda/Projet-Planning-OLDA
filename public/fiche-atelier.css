@@ -376,10 +376,29 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    n'ETIRE rien : deux champs geants pour combler un vide, c'est le vide
    remplace par du gris. C'est la FICHE qui prend sa taille (voir `.fa`). */
 .fa-niche { display: flex; flex-direction: column; min-height: 0; }
-.fa-niche > .fa-bloc--notes { align-items: flex-start; }
-.fa-niche .fa-bloc--notes > .fa-lab { width: 90px; padding-top: 9px; }
+/* Sur le 14 pouces le champ des notes reste dans le panneau : la niche est
+   alors VIDE, et un enfant vide compte quand meme dans l'ecart de la colonne —
+   16 px de gouttiere pour rien. */
+.fa-niche:empty { display: none; }
+.fa-niche > .fa-bloc--notes { align-items: stretch; }
+.fa-niche .fa-bloc--notes > .fa-lab { width: 90px; padding-top: 9px; flex-shrink: 0; }
 .fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1; min-width: 0; }
 .fa-row--haut > .fa-lab { padding-top: 9px; }
+
+/* --- LES DEUX COLONNES FINISSENT A LA MEME LIGNE -------------------------
+   Elles ont toujours eu la meme BOITE — la grille les etire toutes les deux —
+   mais leur contenu s'arretait a 369 px a gauche et 313 a droite : un decrochage
+   de 56 px que l'oeil lit comme un defaut d'alignement.
+   Le DERNIER bloc de chaque colonne prend le reste. `flex: 1 0 auto` et non
+   `1 1 0` : la base reste sa hauteur naturelle, donc il grandit pour rattraper
+   mais ne se laisse jamais ecraser sous sa taille de depart — c'est ce qui
+   evite les deux champs geants du 28/08, quand la fiche s'etirait a l'ecran
+   entier et leur donnait 287 et 416 px. Ici le rattrapage vaut ce qui manque,
+   pas plus. */
+.fa-niche, .fa-row--haut { flex: 1 0 auto; align-items: stretch; }
+.fa-niche > .fa-bloc--notes { flex: 1 0 auto; min-height: 0; }
+.fa-niche .fa-bloc--notes > textarea.fa-in,
+.fa-row--haut > textarea.fa-in { align-self: stretch; height: auto; }
 /* UNE ZONE N'EST PAS UNE VALEUR. Les champs en ligne perdent leur fond des
    qu'ils portent quelque chose — on lit la valeur, pas la boite. Une zone de
    texte, elle, doit montrer ou elle commence et ou elle finit. */
