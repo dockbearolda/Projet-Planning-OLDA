@@ -5,8 +5,10 @@
 
    LA CONTRAINTE CENTRALE : aucun défilement à 1366 × 630 px, panneau Détails
    ouvert ou fermé. Toute modification de structure se re-mesure à cette taille.
-   Budget : entête 56 + bandeau 82 + barre Détails 40 + barre basse 64 ≈ 246 px
-   de chrome fixe, il reste 384 px pour les deux colonnes.
+   Budget mesuré au 28/08 : entête 63 + bandeau 96 + barre Détails 46 + barre
+   basse 63 = 268 px de chrome fixe, il reste 362 px pour les deux colonnes —
+   et elles en occupent 362. La marge est nulle : toute rangée ajoutée doit en
+   remplacer une, ou l'écran se met à défiler.
 
    LES COULEURS SONT CELLES DE LA MAISON. La spec en donnait de très proches
    (#111820 contre --text-1 #1f2937, #16202b contre --primary #111827, #f6f7f9
@@ -15,26 +17,37 @@
    spec — un seul accent, aucune couleur sémantique — est exactement la règle
    de la maison, donc rien n'est perdu.
 
-   L'ÉCHELLE, ELLE, EST PROPRE À CET ÉCRAN. La maison lit en 14/17 ; cet
-   écran-ci se lit en 12/13/14/15 parce qu'il porte tout un dossier sur
-   630 px de haut. Les quatre crans sont déclarés UNE fois, ici, avec leur
-   rôle — un écran ne redéclare pas un jeton, il en pose un qui manquait. */
+   L'ÉCHELLE EST CELLE DE LA MAISON — 14 / 17 / 21 (28/08). Cet écran a eu la
+   sienne, un cran plus bas, tant qu'il devait loger des steppers et des
+   boutons de date en plus de son contenu. Ils sont partis, la place est
+   revenue, et un écran d'atelier qui se lit debout n'avait aucune raison
+   d'être le seul à lire plus petit que le comptoir. */
 .fa {
-  /* Les quatre crans de cet écran. Plancher à 12 px, jamais moins : il se lit
-     debout, en lumière d'atelier. */
-  --fa-min: 12px;      /* intitulé de section, unité, mention */
-  --fa-lab: 13px;      /* libellé de champ, bouton secondaire */
-  --fa-val: 14px;      /* la valeur qu'on lit et qu'on saisit */
-  --fa-fort: 15px;     /* un nombre qu'on cherche du regard : total, quantité */
-  --fa-titre: 19px;    /* le nom du client, seul de sa taille */
+  /* L'ÉCRAN REJOINT L'ÉCHELLE DE LA MAISON le 28/08 — 14 / 17 / 21, les crans
+     que lisent le comptoir et le planning. Il avait la sienne (12/13/14/15/19)
+     parce qu'il devait tenir un dossier entier sur 630 px : les steppers de
+     taille et les boutons de date retirés le même jour ont rendu la place, et
+     il restait 150 px vides en bas de l'écran. Un cran plus bas que la maison
+     ne se justifiait plus, et se lisait mal debout à un mètre.
+     Seul `--fa-min` reste hors échelle : une unité (« mm »), un intitulé de
+     section. Rien qui porte une valeur. */
+  --fa-min: 13px;      /* intitulé de section, unité, mention */
+  --fa-lab: 14px;      /* libellé de champ, bouton secondaire */
+  --fa-val: 17px;      /* la valeur qu'on lit et qu'on saisit */
+  --fa-fort: 21px;     /* un nombre qu'on cherche du regard : total, quantité */
+  --fa-titre: 21px;    /* le nom du client — même cran que `--fa-fort`, la
+                          hiérarchie se fait à la GRAISSE, pas au demi-pixel */
 
-  /* Trois hauteurs de commande, et elles disent la densité : un stepper qu'on
-     clique vingt fois de suite, un champ de colonne, un contrôle de barre.
-     Jamais moins de 32 px — c'est le plancher de cible de la spec. */
-  --fa-h-pas: 32px;
-  --fa-h-champ: 36px;
-  --fa-h-bandeau: 38px;
-  --fa-h-barre: 40px;
+  /* Quatre hauteurs de commande, et elles disent la densité : un champ posé
+     DANS une bulle (les faces), un champ de colonne, un contrôle de bandeau,
+     un contrôle de barre. Elles SORTENT du texte, elles ne s'écrivent pas :
+     17 × 1,375 + 2 × 7 + le trait = 39,4 → 40. Montées avec l'échelle le 28/08, jamais écrites au
+     jugé, et bornées par la seule contrainte qui compte : les deux colonnes
+     doivent tenir dans 362 px sans defiler. */
+  --fa-h-pas: 34px;
+  --fa-h-champ: 40px;
+  --fa-h-bandeau: 42px;
+  --fa-h-barre: 44px;
   /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
      automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
      texte, elles se déclarent. */
@@ -130,8 +143,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   white-space: nowrap; cursor: pointer;
 }
 .fa-client:hover { background: var(--bg); }
+/* Le nom du produit accompagne celui du client : il ne le concurrence pas.
+   À `--fa-fort` il faisait le même cran que lui, et l'entête portait deux
+   titres au lieu d'un. */
 .fa-projet {
-  font-size: var(--fa-fort); color: var(--text-2);
+  font-size: var(--fa-val); color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .fa-outils { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
@@ -150,7 +166,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
    d'étape, régler la priorité, corriger le montant. */
 .fa-bandeau {
   flex-shrink: 0;
-  display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: 18px; align-items: end;
+  display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 18px; align-items: end;
   padding: 14px 20px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
@@ -163,7 +179,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-bandeau .fa-btn { height: var(--fa-h-bandeau); }
 .fa-ttc { height: var(--fa-h-bandeau); font-weight: var(--graisse-forte); }
 .fa-marge { display: flex; flex-direction: column; line-height: 1.15; white-space: nowrap; }
-/* PLANCHER À 12 PX, jamais moins : l’écran se lit debout, en lumière
+/* PLANCHER À 13 PX, jamais moins : l’écran se lit debout, en lumière
    d’atelier. La spec disait 11 ici et 12 ailleurs — elle se contredisait. */
 .fa-marge-k { font-size: var(--fa-min); color: var(--text-3); }
 .fa-marge-v { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2); }
@@ -194,13 +210,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   overflow: hidden;
 }
 .fa-col {
-  padding: 14px 20px; min-width: 0;
+  padding: 10px 20px; min-width: 0;
   display: flex; flex-direction: column;
   overflow: auto;
 }
-.fa-col--g { gap: 12px; border-right: 1px solid var(--border-soft); }
-.fa-col--d { gap: 11px; }
-.fa-groupe { display: flex; flex-direction: column; gap: 9px; }
+.fa-col--g { gap: 10px; border-right: 1px solid var(--border-soft); }
+.fa-col--d { gap: 10px; }
+.fa-groupe { display: flex; flex-direction: column; gap: 7px; }
 .fa-sec {
   font-size: var(--fa-min); letter-spacing: .09em; text-transform: uppercase;
   color: var(--text-3); font-weight: var(--graisse-forte);
@@ -223,32 +239,26 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-compte { margin-left: auto; font-size: var(--fa-lab); color: var(--text-2); }
 .fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
 
-/* --- Les tailles, avec leurs steppers -------------------------------------
-   ⚠ `min-width: 0` SUR LA CASE est obligatoire : la largeur intrinsèque d'un
+/* --- Les tailles ----------------------------------------------------------
+   LE NOMBRE S'ÉCRIT (28/08) : les « + / − » sont retirés. Sans eux la case n'a
+   plus que deux enfants, l'étiquette et le nombre — donc le nombre prend toute
+   la largeur rendue, et c'est lui qu'on vient lire.
+   ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
 .fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .fa-taille {
-  display: flex; align-items: center; gap: 5px; min-width: 0;
-  padding: 5px 7px; border-radius: 10px; background: var(--bg);
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 0 10px; border-radius: 10px; background: var(--bg);
 }
 .fa-taille__k {
-  width: 16px; flex-shrink: 0;
-  font-size: var(--fa-min); font-weight: var(--graisse-forte); color: var(--text-3);
+  flex-shrink: 0;
+  font-size: var(--fa-lab); font-weight: var(--graisse-forte); color: var(--text-2);
 }
-.fa-pas {
-  width: var(--fa-h-pas); height: var(--fa-h-pas); flex-shrink: 0;
-  display: grid; place-items: center;
-  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
-  background: var(--surface); color: var(--text-2);
-  font: inherit; font-size: var(--fa-fort); line-height: 1; cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.fa-pas:hover { background: var(--border-soft); color: var(--text-1); }
 .fa-nb {
-  flex: 1; min-width: 0; height: var(--fa-h-pas);
-  padding: 0 4px; border: 0; background: transparent;
-  text-align: center; font-size: var(--fa-fort); font-weight: var(--graisse-note);
+  flex: 1; min-width: 0; height: var(--fa-h-champ);
+  padding: 0; border: 0; background: transparent;
+  text-align: right; font-size: var(--fa-fort); font-weight: var(--graisse-forte);
 }
 .fa-nb:hover { background: transparent; }
 
@@ -296,7 +306,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   border-top: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-bas);
-  max-height: min(360px, calc(100vh - 190px));
+  /* 400 et non 360 : à l'échelle de la maison le contenu dépassait de 7 px, ce
+     qui ne donne rien d'utile — juste une barre de défilement pour une ligne.
+     Le second terme reste le vrai garde-fou : sur un écran plus court, le
+     panneau s'arrête avant de couvrir l'entête. */
+  max-height: min(400px, calc(100vh - 190px));
   overflow: auto;
 }
 /* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
@@ -318,7 +332,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 }
 .fa-bas .fa-btn, .fa-bas .fa-in { height: var(--fa-h-barre); }
 .fa-note { flex: 1; min-width: 0; }
-.fa-referent { flex: 0 0 auto; width: 168px; }
+.fa-referent { flex: 0 0 auto; width: 190px; }
 /* Le trait qui sépare « ajouter la note » des deux actions qui engagent : il
    ne porte aucun mot, sa hauteur se déclare. */
 .fa-sep { width: 1px; height: var(--fa-sep-h); background: var(--border); margin: 0 2px; }

@@ -3530,7 +3530,6 @@ function fermerFicheAtelier() {
 // décide d'aucune règle métier — elle dessine, normalise, et rend la main.
 function contexteFicheAtelier(r) {
   const place = `${r.stage}|${r.sub_stage || ''}`;
-  const delai = tempsRestant(r.deadline, (r.fiche && r.fiche.heureSouhaitee) || null);
   const lot = r.fiche && r.fiche.lot;
   return {
     etapes: placesDuPipeline(place),
@@ -3544,7 +3543,14 @@ function contexteFicheAtelier(r) {
       ...PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }))],
     provenances: [{ value: '', label: 'Provenance : non dite' },
       ...PROVENANCES.map((p) => ({ value: p, label: p }))],
-    rappelDelai: `${delai.echeanceTexte} — ${delai.texte} restant`,
+    // UNE FONCTION, PAS UNE CHAÎNE. Figée à l'ouverture, elle continuait
+    // d'annoncer l'ancienne échéance après qu'on avait déplacé la date : un
+    // chiffre faux à l'écran, juste sous le champ qu'on venait de corriger.
+    rappelDelai: (deadline, heure) => {
+      const d = tempsRestant(deadline === undefined ? r.deadline : deadline,
+        heure === undefined ? ((r.fiche && r.fiche.heureSouhaitee) || null) : heure);
+      return `${d.echeanceTexte} — ${d.texte} restant`;
+    },
     rappelDossier: [
       lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : (r.product || ''),
       r.created_at ? `Créée le ${horodatageFr(r.created_at)}${

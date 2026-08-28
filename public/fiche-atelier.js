@@ -19,10 +19,11 @@
 // étapes, celle des employés. Ce module dessine et normalise — il ne décide
 // d'aucune règle métier.
 //
-// AUCUN RACCOURCI CLAVIER. Demande explicite : la vendeuse travaille à la
-// souris, souvent une main occupée. Tout ce qui est faisable au clavier doit
-// l'être à la souris — d'où les boutons de date, les steppers, et les deux
-// points d'entrée de l'annulation.
+// AUCUN RACCOURCI CLAVIER. Demande explicite : on navigue à la souris, on
+// écrit au clavier. Ce qui se NAVIGUE — une étape, une priorité, l'annulation —
+// se clique. Ce qui se SAISIT — une date, une quantité, un montant — se tape :
+// les boutons de date et les steppers de taille ont été retirés le 28/08 parce
+// qu'ils dupliquaient la frappe au lieu de la remplacer.
 
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const JOURS_SAISIS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -219,7 +220,7 @@ export function dessinerFicheAtelier(r, ctx) {
       });
       coche(champ);
       pulser();
-      dire(`${opts.label} modifié`);
+      dire(`Enregistré — ${opts.label}`);
       opts.apres && opts.apres();
     };
     champ.addEventListener(champ.tagName === 'SELECT' ? 'change' : 'blur', commettre);
@@ -305,7 +306,7 @@ export function dessinerFicheAtelier(r, ctx) {
     selEtape.value = prochaine.value != null ? prochaine.value : prochaine;
     ctx.changerEtape(selEtape.value);
     empiler(() => { selEtape.value = ancien; ctx.changerEtape(ancien); });
-    coche(selEtape); pulser(); dire('Étape modifiée');
+    coche(selEtape); pulser(); dire('Enregistré — étape');
   });
   const rangEtape = el('div', 'fa-duo');
   rangEtape.append(selEtape, suivante);
@@ -323,7 +324,7 @@ export function dessinerFicheAtelier(r, ctx) {
       poserPriorite(n);
       ctx.patchLigne('priority', n);
       empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); });
-      coche(b); pulser(); dire('Priorité modifiée');
+      coche(b); pulser(); dire('Enregistré — priorité');
     });
     return b;
   });
@@ -374,17 +375,31 @@ export function dessinerFicheAtelier(r, ctx) {
       label,
       normaliser: (v) => normaliserDate(v, ctx.aujourdhui && ctx.aujourdhui()),
       envoyer: (n) => envoyer(n.iso),
+      apres: opts.apres,
     });
     return { rangee: rangee(label, c, opts.heure || document.createTextNode('')), champ: c };
+  };
+
+  // LE RAPPEL DE DÉLAI SE RECALCULE. Écrit une fois à l'ouverture, il continuait
+  // d'annoncer l'ancienne échéance juste sous le champ qu'on venait de corriger.
+  const rappel = el('span', 'fa-rappel');
+  let isoRemise = r.deadline || null;
+  let heureRemise = fiche.heureSouhaitee || null;
+  const majRappel = () => {
+    rappel.textContent = ctx.rappelDelai ? ctx.rappelDelai(isoRemise, heureRemise) : '';
   };
 
   const chHeure = champ('fa-mini', fiche.heureSouhaitee || '', { label: 'Heure de remise', placeholder: 'heure' });
   brancher(chHeure, {
     label: 'Heure de remise', normaliser: normaliserHeure,
-    envoyer: (v) => ctx.patchFiche({ heureSouhaitee: v ? v.replace('h', ':') : null }),
+    envoyer: (v) => {
+      heureRemise = v ? v.replace('h', ':') : null;
+      ctx.patchFiche({ heureSouhaitee: heureRemise });
+    },
+    apres: majRappel,
   });
-  const remise = ligneDate('Remise au client', r.deadline, { requis: true, heure: chHeure },
-    (iso) => ctx.patchLigne('deadline', iso));
+  const remise = ligneDate('Remise au client', r.deadline, { requis: true, heure: chHeure, apres: majRappel },
+    (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
 
   const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, {},
     (iso) => ctx.patchLigne('date_prevue', iso));
@@ -394,7 +409,7 @@ export function dessinerFicheAtelier(r, ctx) {
     label: 'Créneau de retrait', normaliser: normaliserHeure,
     envoyer: (v) => ctx.patchLigne('retrait_creneau', v ? v.replace('h', ':') : null),
   });
-  const rappel = el('span', 'fa-rappel', ctx.rappelDelai || '');
+  majRappel();
 
   const blocDates = el('section', 'fa-groupe');
   blocDates.append(
@@ -442,9 +457,10 @@ export function dessinerFicheAtelier(r, ctx) {
     }
     droite.append(idt);
 
-    // --- LES TAILLES, AVEC LEURS STEPPERS ---------------------------------
-    // « + » et « − » plutôt que la seule frappe : à l'atelier on compte des
-    // pièces une par une, et chaque clic s'enregistre et s'annule tout seul.
+    // --- LES TAILLES ------------------------------------------------------
+    // LE NOMBRE S'ÉCRIT (28/08). Les « + / − » ajoutaient une pièce par clic :
+    // pour passer de 30 à 100 il fallait soixante-dix clics, et ils prenaient
+    // les deux tiers de la case. La quantité est connue, elle se tape.
     const tailles = Array.isArray(prod.tailles) ? prod.tailles : [];
     const total = el('span', 'fa-total', '0');
     const listeTailles = () => tailles.map((t) => ({ t: String(t.t), n: Number(t.n) || 0 }));
@@ -472,23 +488,14 @@ export function dessinerFicheAtelier(r, ctx) {
           });
         }
       };
-      c.addEventListener('focus', () => {});
       c.addEventListener('blur', () => {
         const avant = Number(tailles[i].n) || 0;
         const vise = Math.max(0, Math.round(Number(c.value.replace(/\D/g, '')) || 0));
         if (vise === avant) { c.value = avant ? String(avant) : ''; return; }
         poser(vise, true);
-        coche(c); pulser(); dire(`Taille ${taille.t} modifiée`);
+        coche(c); pulser(); dire(`Enregistré — taille ${taille.t}`);
       });
-      const moins = bouton('fa-pas', '−', () => {
-        poser((Number(tailles[i].n) || 0) - 1, true);
-        coche(c); pulser(); dire(`Taille ${taille.t} modifiée`);
-      });
-      const plus = bouton('fa-pas', '+', () => {
-        poser((Number(tailles[i].n) || 0) + 1, true);
-        coche(c); pulser(); dire(`Taille ${taille.t} modifiée`);
-      });
-      case_.append(el('span', 'fa-taille__k', String(taille.t)), moins, c, plus);
+      case_.append(el('span', 'fa-taille__k', String(taille.t)), c);
       grilleT.append(case_);
     });
     majTotal();
@@ -563,7 +570,7 @@ export function dessinerFicheAtelier(r, ctx) {
       b.setAttribute('aria-pressed', String(r[cle]));
       ctx.patchLigne(cle, r[cle]);
       empiler(() => { r[cle] = ancien; b.setAttribute('aria-pressed', String(ancien)); ctx.patchLigne(cle, ancien); });
-      coche(b); pulser(); dire(`${mot} modifié`);
+      coche(b); pulser(); dire(`Enregistré — ${mot}`);
     });
     return b;
   });
