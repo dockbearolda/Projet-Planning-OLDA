@@ -349,6 +349,34 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
 .fa-details[hidden] { display: none; }
 .fa-details__col { display: flex; flex-direction: column; gap: var(--pas-2); min-width: 0; }
+/* Quand le champ des notes est monte dans la colonne gauche, le panneau n'a
+   plus qu'une colonne de contenu : elle prend les deux pistes au lieu de
+   laisser la moitie du panneau vide. */
+.fa-details--sans-notes .fa-details__col { grid-column: 1 / -1; }
+
+/* --- Ce qui absorbe la hauteur qui reste ---------------------------------
+   L'ecran est dessine pour 630 px. Au-dessus, le contenu s'arretait en haut et
+   laissait un vide sous « Qui suit » : ce sont la niche des notes et la rangee
+   de consigne qui le prennent, pas les champs — un champ qui grandit avec la
+   fenetre n'a plus de hauteur commune avec ses voisins. */
+.fa-niche { display: flex; flex-direction: column; min-height: 0; }
+.fa-col--g > .fa-niche:not(:empty) { flex: 1 1 0; }
+.fa-niche > .fa-bloc--notes { flex: 1 1 0; min-height: 0; align-items: stretch; }
+.fa-niche .fa-bloc--notes > .fa-lab { width: auto; }
+.fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1 1 0; min-height: 0; }
+/* ⚠ La colonne droite pose `align-items: flex-start` sur TOUTES ses rangees
+   (0,2,1) : ecrit sur `.fa-row--haut` seul (0,1,0), le `stretch` perdait, la
+   rangee mesurait bien 416 px et le champ dedans restait a 63. */
+.fa-row--haut, .fa-col--d .fa-row--haut { flex: 1 1 0; min-height: 0; align-items: stretch; }
+.fa-row--haut > .fa-lab { padding-top: 9px; }
+.fa-row--haut > textarea.fa-in { flex: 1 1 0; min-height: 0; }
+/* UNE ZONE N'EST PAS UNE VALEUR. Les champs en ligne perdent leur fond des
+   qu'ils portent quelque chose — on lit la valeur, pas la boite. Une zone de
+   texte de 300 px, elle, doit montrer ou elle commence et ou elle finit :
+   sinon on ne sait pas ou cliquer pour ecrire la suite. */
+.fa-niche textarea.fa-in, .fa-row--haut > textarea.fa-in { background: var(--bg); }
+.fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
+.fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
 .fa-details .fa-row > .fa-lab { width: 106px; }
 .fa-docs { display: flex; gap: var(--pas-2); flex-wrap: wrap; }
 .fa-cout { width: 120px; flex: 0 0 120px; }

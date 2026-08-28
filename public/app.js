@@ -3571,6 +3571,30 @@ function contexteFicheAtelier(r) {
       } catch (err) { reportError(err); }
     },
     patchProd: (patchProd) => ldEnvoyerProd(r, patchProd),
+    // Redessine la fiche depuis la base. Necessaire quand un patch change la
+    // STRUCTURE et pas seulement une valeur : ajouter une face l'ecrivait bien
+    // en base — trois emplacements — et l'ecran en montrait toujours deux. On
+    // croyait le clic perdu, et on recommencait.
+    rafraichir: () => openLigneDetail(r.id),
+    // IL MANQUAIT. Le menu d'étape et « Étape suivante » — le geste principal
+    // de la fiche — jetaient « ctx.changerEtape is not a function » à chaque
+    // clic : l'étape ne partait jamais en base. La place s'écrit « famille|sous
+    // étape », les deux colonnes voyagent ensemble.
+    changerEtape: (place) => {
+      const [stage, sub] = String(place || '').split('|');
+      if (!stage) return;
+      const sub_stage = sub || null;
+      if (stage === r.stage && sub_stage === (r.sub_stage ?? null)) return;
+      patch(r, { stage, sub_stage }, () => {
+        r.stage = stage; r.sub_stage = sub_stage;
+        // `render` est LOCAL a deux autres fonctions de ce fichier, il n'existe
+        // pas ici : la premiere version jetait « render is not defined » et
+        // l'etape ne partait toujours pas. Le rendu global du planning, c'est
+        // `applySortAndRender` — la ligne peut changer de place ou sortir du
+        // filtre courant, donc on retrie.
+        ldRefresh(r); applySortAndRender();
+      });
+    },
     ajouterNote: (texte) => {
       const base = String(r.description || '').trim();
       const ligne = `${horodatageFr(new Date().toISOString())} — ${texte}`;

@@ -259,8 +259,11 @@ export function dessinerFicheAtelier(r, ctx) {
 
   const titreSection = (t) => el('div', 'fa-sec', t);
   const rangee = (label, ...contenu) => {
-    const l = el('div', 'fa-row');
-    l.append(el('label', 'fa-lab', label), ...contenu);
+    // Le dernier argument peut etre une classe en plus (`fa-row--haut` pour la
+    // rangee qui s'etire) : elle est reconnue au prefixe, jamais a la position.
+    const sup = typeof contenu[contenu.length - 1] === 'string' ? contenu.pop() : null;
+    const l = el('div', `fa-row${sup ? ` ${sup}` : ''}`);
+    l.append(el('label', 'fa-lab', label), ...contenu.filter(Boolean));
     return l;
   };
 
@@ -444,7 +447,13 @@ export function dessinerFicheAtelier(r, ctx) {
   selQui.classList.add('fa-span2');
   blocClient.append(titreSection('Client & suivi'), grilleClient);
 
-  gauche.append(blocDates, el('div', 'fa-filet'), blocClient);
+  // LES NOTES REMPLISSENT LA HAUTEUR QUI RESTE — quand il y en a. Sur le 14
+  // pouces de l'atelier (630 px) il n'y a rien a distribuer : le champ reste
+  // dans le panneau Details. Au-dela, il monte ici et occupe le vide, qui se
+  // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
+  // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
+  const nicheNotes = el('div', 'fa-niche');
+  gauche.append(blocDates, el('div', 'fa-filet'), blocClient, nicheNotes);
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
@@ -528,11 +537,29 @@ export function dessinerFicheAtelier(r, ctx) {
     // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
     // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
     // pour un troisième emplacement et poussait tout sur deux lignes.
+    // PAS DE `prompt()`. Il bloque la page entiere, il est refuse dans certains
+    // cadres (il jetait « prompt() is not supported » ici meme), et il emmene le
+    // focus hors de l'ecran. Le nom se tape dans une case qui prend la place du
+    // bouton, sur la meme rangee : rien ne se deplace, et Echap rend la main.
     const ajoutF = bouton('fa-ajout', '+ Face', () => {
-      const nom = window.prompt('Nom de la face à ajouter');
-      if (!nom || !nom.trim()) return;
-      ctx.patchProd({ logos: [...faces.map(() => ({})), { face: nom.trim() }] });
-      dire('Face ajoutée', false);
+      const saisie = champ('fa-quoi', '', { label: 'Nom de la face', placeholder: 'nom de la face' });
+      const finir = (garder) => {
+        const nom = garder ? saisie.value.trim() : '';
+        saisie.replaceWith(ajoutF);
+        if (!nom) return;
+        ctx.patchProd({ logos: [...faces.map(() => ({})), { face: nom }] });
+        dire('Face ajoutee', false);
+        // Une face de plus change la STRUCTURE de l'ecran, pas une valeur : il
+        // faut le redessiner, sinon la face part en base et ne s'affiche pas.
+        if (ctx.rafraichir) setTimeout(() => ctx.rafraichir(), 350);
+      };
+      saisie.addEventListener('blur', () => finir(true));
+      saisie.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); saisie.blur(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); finir(false); }
+      });
+      ajoutF.replaceWith(saisie);
+      saisie.focus();
     });
     droite.append(rangee('Faces', bandeF, ajoutF));
   }
@@ -542,7 +569,7 @@ export function dessinerFicheAtelier(r, ctx) {
     placeholder: 'Ce qu’il faut savoir avant de couper',
   });
   brancher(chConsigne, { label: 'Consigne atelier', envoyer: (v) => ctx.patchFiche({ atelier: v }) });
-  droite.append(rangee('Consigne', chConsigne));
+  droite.append(rangee('Consigne', chConsigne, undefined, 'fa-row--haut'));
 
   const travail = el('div', 'fa-travail');
   travail.append(gauche, droite);
@@ -563,7 +590,7 @@ export function dessinerFicheAtelier(r, ctx) {
     label: 'Informations', multi: true, rows: 3, placeholder: 'note interne',
   });
   brancher(chInfos, { label: 'Informations', envoyer: (v) => ctx.patchLigne('description', v || null) });
-  const colInfos = el('div', 'fa-bloc');
+  const colInfos = el('div', 'fa-bloc fa-bloc--notes');
   colInfos.append(el('label', 'fa-lab', 'Informations'), chInfos);
 
   const colReste = el('div', 'fa-details__col');
@@ -623,6 +650,38 @@ export function dessinerFicheAtelier(r, ctx) {
   );
   panneau.append(colInfos, colReste);
 
+  // Le champ des notes suit la place : dans la colonne gauche des qu'il y a de
+  // quoi l'etirer, dans le panneau sinon. `matchMedia` et non un test unique :
+  // une fenetre se redimensionne, et le champ doit suivre sans se recreer.
+  const assezHaut = window.matchMedia('(min-height: 700px)');
+  const listeDetails = el('span', 'fa-details__liste');
+  const placerNotes = () => {
+    const haut = assezHaut.matches;
+    // La classe et la liste d'abord : au tout premier appel le champ est deja
+    // dans le panneau, et la garde de reinsertion sortirait avant de les ecrire
+    // — la barre « Details » restait alors sans un mot.
+    panneau.classList.toggle('fa-details--sans-notes', haut);
+    listeDetails.textContent = haut
+      ? 'Paiement · Documents · Provenance · Récapitulatif'
+      : 'Paiement · Informations · Documents · Provenance · Récapitulatif';
+    const cible = haut ? nicheNotes : panneau;
+    // ON NE REINSERE PAS UN CHAMP DEJA EN PLACE : le deplacer pendant qu'on
+    // ecrit dedans lui ferait perdre le curseur.
+    if (colInfos.parentElement === cible) return;
+    if (haut) cible.append(colInfos); else cible.prepend(colInfos);
+  };
+  placerNotes();
+  // ON OBSERVE LA RACINE, pas la fenetre. Ni `change` de `matchMedia` ni
+  // `resize` ne partent dans tous les cadres : la fenetre passait de 630 a 900
+  // px, le champ restait dans le panneau et le vide sous « Qui suit » revenait
+  // — 307 px. Un `ResizeObserver` voit le changement quelle qu'en soit la
+  // cause, et il se debranche avec l'ecran qu'il observe.
+  const veille = new ResizeObserver(() => {
+    if (!racine.isConnected) { veille.disconnect(); return; }
+    placerNotes();
+  });
+  veille.observe(racine);
+
   const chevron = el('span', null, '▸');
   const barreDetails = bouton('fa-details__b', null, () => {
     panneau.hidden = !panneau.hidden;
@@ -631,7 +690,7 @@ export function dessinerFicheAtelier(r, ctx) {
   barreDetails.append(
     chevron,
     el('span', null, 'Détails'),
-    el('span', 'fa-details__liste', 'Paiement · Informations · Documents · Provenance · Récapitulatif'),
+    listeDetails,
   );
 
   // =========================================================================
