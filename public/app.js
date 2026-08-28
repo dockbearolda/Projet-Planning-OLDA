@@ -23,6 +23,12 @@ import { eur } from './format.js';
 // mesuré avant de couper, et pourquoi les deux emprunts passent par la
 // signature plutôt que par un import de retour vers ce fichier-ci.
 import { blocFeu, blocProduction } from './ligne-faits.js';
+// LA FICHE ATELIER — l'écran qui s'ouvre en cliquant une ligne (28/08). Un
+// module à part : c'est un écran NEUF et autonome, il n'emprunte rien à l'état
+// partagé d'app.js. Ce qu'il sait faire de l'application lui est passé à
+// l'appel (`ctx`), jamais importé en retour — un cycle entre deux modules
+// casse à l'ouverture, et il casse ce jour-là seulement.
+import { dessinerFicheAtelier } from './fiche-atelier.js';
 // LE DOCUMENT DU BUREAU est chargé À LA DEMANDE : c'est un papier qu'on
 // ressort pour facturer ou pour contester, pas à chaque ouverture d'un poste.
 let bureauMod = null;
@@ -3493,7 +3499,103 @@ function rafraichirFichesApresChangement() {
   }, FICHE_DEBOUNCE_MS);
 }
 
+// ===========================================================================
+// OUVRIR UNE COMMANDE — la fiche atelier, plein écran (28/08/2026)
+// ===========================================================================
+// Elle remplace le tiroir : un dossier entier tient sur un portable 14 pouces,
+// sans rien faire défiler, et les trois gestes fréquents (changer d'étape,
+// déplacer une date, corriger une quantité) sont à un clic.
+//
+// LE TIROIR RESTE MONTÉ pour ce qu'il porte encore et que la fiche atelier ne
+// reprend pas — le fil des étapes du comptoir, l'historique du client, le
+// journal. Il s'ouvre depuis la fiche, pas depuis la ligne.
+let ficheAtelierEl = null;
+let ficheAtelierId = null;
+
+// ÉCHAP FERME, comme partout ailleurs. Ce n'est pas un « parcours clavier » —
+// c'est le geste que tout le monde a déjà pour sortir d'un écran posé par
+// dessus, et il ne remplace aucun bouton : la croix et « Retour au planning »
+// sont là pour la souris.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && ficheAtelierId) fermerFicheAtelier();
+});
+
+function fermerFicheAtelier() {
+  if (ficheAtelierEl) { ficheAtelierEl.remove(); ficheAtelierEl = null; }
+  ficheAtelierId = null;
+  figerLeFond(false);
+}
+
+// Le contexte : tout ce que la fiche sait faire de l'application. Elle ne
+// décide d'aucune règle métier — elle dessine, normalise, et rend la main.
+function contexteFicheAtelier(r) {
+  const place = `${r.stage}|${r.sub_stage || ''}`;
+  const delai = tempsRestant(r.deadline, (r.fiche && r.fiche.heureSouhaitee) || null);
+  const lot = r.fiche && r.fiche.lot;
+  return {
+    etapes: placesDuPipeline(place),
+    etapeCourante: place,
+    employes: [{ value: '', label: 'Non attribué' },
+      ...EMPLOYEES.map((n) => ({ value: n, label: n }))],
+    referents: [{ value: '', label: 'Référent : personne' },
+      ...EMPLOYEES.map((n) => ({ value: n, label: n }))],
+    types: [{ value: '', label: 'Non précisé' }, ...CLIENT_TYPES],
+    reglements: [{ value: '', label: 'Non défini' },
+      ...PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }))],
+    provenances: [{ value: '', label: 'Provenance : non dite' },
+      ...PROVENANCES.map((p) => ({ value: p, label: p }))],
+    rappelDelai: `${delai.echeanceTexte} — ${delai.texte} restant`,
+    rappelDossier: [
+      lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : (r.product || ''),
+      r.created_at ? `Créée le ${horodatageFr(r.created_at)}${
+        r.fiche && r.fiche.source ? ` depuis ${r.fiche.source}` : ''}` : '',
+    ].filter(Boolean).join('\n'),
+    aujourdhui: () => new Date(),
+    fermer: fermerFicheAtelier,
+    patchLigne: (champ, valeur) => {
+      patch(r, { [champ]: valeur }, () => { r[champ] = valeur; ldRefresh(r); });
+    },
+    patchFiche: async (corps) => {
+      try {
+        const maj = await api('PATCH', `/api/requests/${r.id}/fiche`, corps);
+        if (maj) { Object.assign(r, maj); memoriserFiche(maj); ldRefresh(r); }
+      } catch (err) { reportError(err); }
+    },
+    patchProd: (patchProd) => ldEnvoyerProd(r, patchProd),
+    ajouterNote: (texte) => {
+      const base = String(r.description || '').trim();
+      const ligne = `${horodatageFr(new Date().toISOString())} — ${texte}`;
+      const suite = base ? `${base}\n${ligne}` : ligne;
+      patch(r, { description: suite }, () => { r.description = suite; ldRefresh(r); });
+    },
+    ouvrirClient: () => { location.hash = '#/clients'; fermerFicheAtelier(); },
+    telecharger: (ligne) => telechargerRecap(ligne),
+    email: (ligne) => envoyerParEmail(ligne),
+  };
+}
+
 function openLigneDetail(id) {
+  const ligne = rows.find((x) => String(x.id) === String(id))
+    || (ligneHorsListe && String(ligneHorsListe.id) === String(id) ? ligneHorsListe : null);
+  if (!ligne) return;
+  ficheAtelierId = String(id);
+  // LA FICHE COMPLÈTE D'ABORD : la liste ne porte qu'un résumé (FICHE_LISTE
+  // côté serveur), sans les tailles ni les faces. Dessinée sans elle, la fiche
+  // s'ouvrirait sur un dossier amputé qui a l'air complet.
+  chargerFicheComplete(id).catch(() => {}).then(() => {
+    if (ficheAtelierId !== String(id)) return;
+    const fraiche = rows.find((x) => String(x.id) === String(id)) || ligne;
+    completerFiche(fraiche);
+    fermerFicheAtelier();
+    ficheAtelierId = String(id);
+    ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche));
+    document.body.appendChild(ficheAtelierEl);
+    figerLeFond(true);
+  });
+}
+
+// Le tiroir d'origine, conservé pour ce que la fiche atelier ne reprend pas.
+function openLigneDrawer(id) {
   ensureLigneDrawer();
   // On ouvre une fiche : rien de ce qui a été tapé dans la précédente n'a à
   // suivre. (Un enregistrement réussi nettoie déjà, mais on peut aussi fermer.)

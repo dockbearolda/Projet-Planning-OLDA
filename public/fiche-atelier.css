@@ -1,0 +1,385 @@
+/* ===========================================================================
+   LA FICHE ATELIER — 14 pouces, sans défilement (28/08/2026)
+   ===========================================================================
+   Spécification livrée en handoff, recréée avec les jetons de la maison.
+
+   LA CONTRAINTE CENTRALE : aucun défilement à 1366 × 630 px, panneau Détails
+   ouvert ou fermé. Toute modification de structure se re-mesure à cette taille.
+   Budget : entête 56 + bandeau 82 + barre Détails 40 + barre basse 64 ≈ 246 px
+   de chrome fixe, il reste 384 px pour les deux colonnes.
+
+   LES COULEURS SONT CELLES DE LA MAISON. La spec en donnait de très proches
+   (#111820 contre --text-1 #1f2937, #16202b contre --primary #111827, #f6f7f9
+   contre --bg #f5f6f8) : les reprendre en dur aurait fait une deuxième palette
+   à 3 % près, invisible à l'œil et ingérable au thème sombre. Le fond de la
+   spec — un seul accent, aucune couleur sémantique — est exactement la règle
+   de la maison, donc rien n'est perdu.
+
+   L'ÉCHELLE, ELLE, EST PROPRE À CET ÉCRAN. La maison lit en 14/17 ; cet
+   écran-ci se lit en 12/13/14/15 parce qu'il porte tout un dossier sur
+   630 px de haut. Les quatre crans sont déclarés UNE fois, ici, avec leur
+   rôle — un écran ne redéclare pas un jeton, il en pose un qui manquait. */
+.fa {
+  /* Les quatre crans de cet écran. Plancher à 12 px, jamais moins : il se lit
+     debout, en lumière d'atelier. */
+  --fa-min: 12px;      /* intitulé de section, unité, mention */
+  --fa-lab: 13px;      /* libellé de champ, bouton secondaire */
+  --fa-val: 14px;      /* la valeur qu'on lit et qu'on saisit */
+  --fa-fort: 15px;     /* un nombre qu'on cherche du regard : total, quantité */
+  --fa-titre: 19px;    /* le nom du client, seul de sa taille */
+
+  /* Trois hauteurs de commande, et elles disent la densité : un stepper qu'on
+     clique vingt fois de suite, un champ de colonne, un contrôle de barre.
+     Jamais moins de 32 px — c'est le plancher de cible de la spec. */
+  --fa-h-pas: 32px;
+  --fa-h-champ: 36px;
+  --fa-h-bandeau: 38px;
+  --fa-h-barre: 40px;
+  /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
+     automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
+     texte, elles se déclarent. */
+  --fa-point: 7px;
+  --fa-coche: 16px;
+  /* Le bouton d'annulation du message : plus court qu'une commande de barre,
+     parce qu'il vit DANS le message et n'a pas à le grandir. */
+  --fa-h-undo: 30px;
+  --fa-sep-h: 28px;
+  /* L'encre du message est l'accent, donc son bouton se pose SUR l'accent :
+     `--on-primary` en transparence. Écrit en blanc dur, il disparaîtrait de
+     nuit — l'accent s'inverse, le blanc reste blanc. */
+  --fa-undo-fond: rgba(var(--on-primary-rgb, 255, 255, 255), .14);
+  --fa-undo-fond-2: rgba(var(--on-primary-rgb, 255, 255, 255), .26);
+
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-1);
+  /* Les chiffres tombent les uns sous les autres : une colonne de quantités se
+     compare du regard, elle ne s'épelle pas. */
+  font-variant-numeric: tabular-nums;
+}
+.fa *, .fa *::before, .fa *::after { box-sizing: border-box; }
+
+/* --- Les commandes, une seule fois ---------------------------------------
+   Champ, menu, zone de texte : même boîte, même liseré, même réponse. Écrites
+   trois fois, elles redeviennent trois hauteurs le jour où l'une bouge. */
+.fa-in {
+  min-width: 0;
+  height: var(--fa-h-champ);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fa-val);
+  transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+textarea.fa-in { height: auto; padding: 8px 10px; line-height: 1.45; resize: none; }
+select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
+.fa-in::placeholder { color: var(--text-3); }
+.fa-in:hover { background: var(--bg); }
+.fa-in:focus { outline: none; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--primary); }
+/* UN CHAMP OBLIGATOIRE VIDE SE SIGNALE, il ne crie pas : un soulignement, pas
+   de rouge, pas de message. Le rouge annonce une faute ; ici il n'y en a pas
+   encore, il manque seulement quelque chose. */
+.fa-in:required:placeholder-shown { box-shadow: inset 0 -1.5px 0 rgba(var(--primary-rgb), .28); }
+.fa-in:required:placeholder-shown:focus { box-shadow: inset 0 0 0 1.5px var(--primary); }
+
+.fa-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--fa-h-champ);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.fa-btn:hover { background: var(--bg); color: var(--text-1); }
+.fa-btn--carre { width: var(--fa-h-champ); padding: 0; font-size: var(--taille-texte); }
+.fa-btn--mini { padding: 0 10px; }
+/* Le seul bouton plein de l'écran : celui qui fait AVANCER le dossier. */
+.fa-btn--plein {
+  border-color: var(--primary); background: var(--primary); color: var(--surface);
+  font-weight: var(--graisse-forte);
+}
+.fa-btn--plein:hover { background: var(--primary); color: var(--surface); filter: brightness(1.15); }
+
+/* --- ZONE 1 : l'entête ---------------------------------------------------- */
+.fa-head {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.fa-ident { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.fa-ref { font-size: var(--fa-lab); font-weight: var(--graisse-forte); letter-spacing: .06em; color: var(--text-3); }
+.fa-client {
+  padding: 3px 7px; border: 0; border-radius: var(--arrondi-champ); background: transparent;
+  font: inherit; font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+  white-space: nowrap; cursor: pointer;
+}
+.fa-client:hover { background: var(--bg); }
+.fa-projet {
+  font-size: var(--fa-fort); color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fa-outils { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.fa-sauve {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fa-lab); color: var(--text-3); white-space: nowrap;
+}
+.fa-autosave {
+  width: var(--fa-point); height: var(--fa-point); border-radius: var(--pilule);
+  background: var(--border); transition: background var(--dur-1) var(--ease);
+}
+.fa-autosave.is-on { background: var(--primary); }
+
+/* --- ZONE 2 : le bandeau prioritaire --------------------------------------
+   Les trois gestes les plus fréquents, en haut et en un clic : changer
+   d'étape, régler la priorité, corriger le montant. */
+.fa-bandeau {
+  flex-shrink: 0;
+  display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: 18px; align-items: end;
+  padding: 14px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.fa-bloc { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fa-min { font-size: var(--fa-min); font-weight: var(--graisse-note); color: var(--text-2); }
+.fa-duo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fa-duo > .fa-in { flex: 1; }
+.fa-etape { height: var(--fa-h-bandeau); font-weight: var(--graisse-note); }
+.fa-bandeau .fa-btn { height: var(--fa-h-bandeau); }
+.fa-ttc { height: var(--fa-h-bandeau); font-weight: var(--graisse-forte); }
+.fa-marge { display: flex; flex-direction: column; line-height: 1.15; white-space: nowrap; }
+/* PLANCHER À 12 PX, jamais moins : l’écran se lit debout, en lumière
+   d’atelier. La spec disait 11 ici et 12 ailleurs — elle se contredisait. */
+.fa-marge-k { font-size: var(--fa-min); color: var(--text-3); }
+.fa-marge-v { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2); }
+
+/* Segmenté : trois valeurs exclusives, la retenue porte l'encre. */
+.fa-seg { display: flex; gap: 6px; flex: 1; min-width: 0; }
+.fa-seg__b {
+  flex: 1; min-width: 0; height: var(--fa-h-bandeau);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--fa-lab);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.fa-seg__b:hover { background: var(--bg); color: var(--text-1); }
+.fa-seg__b[aria-pressed="true"] {
+  border-color: var(--primary); background: var(--primary); color: var(--surface);
+  font-weight: var(--graisse-note);
+}
+
+/* --- ZONES 3 et 4 : les deux colonnes -------------------------------------
+   `min-height: 0` sur le conteneur : sans lui, une grille en `flex:1` prend la
+   hauteur de son CONTENU et pousse la barre basse hors de l'écran. */
+.fa-travail {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+.fa-col {
+  padding: 14px 20px; min-width: 0;
+  display: flex; flex-direction: column;
+  overflow: auto;
+}
+.fa-col--g { gap: 12px; border-right: 1px solid var(--border-soft); }
+.fa-col--d { gap: 11px; }
+.fa-groupe { display: flex; flex-direction: column; gap: 9px; }
+.fa-sec {
+  font-size: var(--fa-min); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--graisse-forte);
+}
+.fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
+.fa-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fa-row > .fa-in { flex: 1; }
+.fa-lab { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
+.fa-row > .fa-lab { width: 122px; }
+.fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
+.fa-mini { width: 80px; flex: 0 0 80px; }
+.fa-creneau { width: 94px; flex: 0 0 94px; }
+/* LES BOUTONS DE DATE SONT SUR LA MÊME LIGNE que le champ : « Demain » est le
+   geste le plus fréquent du comptoir, le renvoyer à la ligne suivante le rend
+   moins accessible que taper la date à la main. */
+.fa-rapides { display: flex; gap: 5px; flex-shrink: 0; }
+.fa-rapides .fa-btn { padding: 0 10px; }
+
+.fa-grille-client { display: grid; grid-template-columns: 122px 1fr 1fr; align-items: center; gap: 6px 10px; }
+.fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: 6px 10px; }
+.fa-span2 { grid-column: span 2; }
+.fa-fort { font-weight: var(--graisse-note); }
+
+.fa-tete-t { display: flex; align-items: baseline; gap: 10px; }
+.fa-tete-t > .fa-lab { width: auto; }
+.fa-compte { margin-left: auto; font-size: var(--fa-lab); color: var(--text-2); }
+.fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
+
+/* --- Les tailles, avec leurs steppers -------------------------------------
+   ⚠ `min-width: 0` SUR LA CASE est obligatoire : la largeur intrinsèque d'un
+   `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
+   les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
+.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fa-taille {
+  display: flex; align-items: center; gap: 5px; min-width: 0;
+  padding: 5px 7px; border-radius: 10px; background: var(--bg);
+}
+.fa-taille__k {
+  width: 16px; flex-shrink: 0;
+  font-size: var(--fa-min); font-weight: var(--graisse-forte); color: var(--text-3);
+}
+.fa-pas {
+  width: var(--fa-h-pas); height: var(--fa-h-pas); flex-shrink: 0;
+  display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--fa-fort); line-height: 1; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.fa-pas:hover { background: var(--border-soft); color: var(--text-1); }
+.fa-nb {
+  flex: 1; min-width: 0; height: var(--fa-h-pas);
+  padding: 0 4px; border: 0; background: transparent;
+  text-align: center; font-size: var(--fa-fort); font-weight: var(--graisse-note);
+}
+.fa-nb:hover { background: transparent; }
+
+.fa-faces { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+.fa-face {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 10px; background: var(--bg);
+}
+.fa-face__k { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1); }
+.fa-mm { width: 56px; flex: 0 0 56px; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
+.fa-quoi { width: 180px; max-width: 100%; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
+.fa-unite { font-size: var(--fa-min); color: var(--text-3); }
+.fa-ajout {
+  height: var(--fa-h-champ); padding: 0 14px;
+  border: 1px dashed var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--fa-lab); cursor: pointer;
+}
+.fa-ajout:hover { background: var(--bg); color: var(--text-1); }
+.fa-col--d .fa-row > .fa-lab { width: 90px; }
+.fa-col--d .fa-row { align-items: flex-start; }
+.fa-col--d .fa-row > .fa-lab { padding-top: 9px; }
+
+/* --- ZONE 5 : la barre « Détails » et son calque --------------------------
+   LE PANNEAU EST UN CALQUE, jamais dans le flux. Posé entre les colonnes et la
+   barre basse, il les comprimerait — et elles se mettraient à défiler, la
+   seule chose que cet écran ne doit pas faire. */
+.fa-details__b {
+  flex-shrink: 0;
+  width: 100%; height: var(--fa-h-barre);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px;
+  border: 0; border-top: 1px solid var(--border);
+  background: var(--bg); color: var(--text-2);
+  font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
+  text-align: left; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.fa-details__b:hover { background: var(--border-soft); color: var(--text-1); }
+.fa-details__liste { font-weight: var(--graisse-texte); color: var(--text-3); }
+.fa-details {
+  position: absolute; left: 0; right: 0; bottom: 105px; z-index: 15;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-bas);
+  max-height: min(360px, calc(100vh - 190px));
+  overflow: auto;
+}
+/* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
+   la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
+.fa-details[hidden] { display: none; }
+.fa-details__col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.fa-details .fa-row > .fa-lab { width: 106px; }
+.fa-docs { display: flex; gap: 8px; flex-wrap: wrap; }
+.fa-cout { width: 120px; flex: 0 0 120px; }
+.fa-rappel-bloc { font-size: var(--fa-lab); color: var(--text-3); line-height: 1.5; white-space: pre-line; }
+
+/* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
+.fa-bas {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.fa-bas .fa-btn, .fa-bas .fa-in { height: var(--fa-h-barre); }
+.fa-note { flex: 1; min-width: 0; }
+.fa-referent { flex: 0 0 auto; width: 168px; }
+/* Le trait qui sépare « ajouter la note » des deux actions qui engagent : il
+   ne porte aucun mot, sa hauteur se déclare. */
+.fa-sep { width: 1px; height: var(--fa-sep-h); background: var(--border); margin: 0 2px; }
+
+/* --- La confirmation et le message ---------------------------------------
+   LA PASTILLE SE POSE DANS UN CALQUE, pas dans le champ : dans le champ, elle
+   en changerait la hauteur, et toute la colonne avec. */
+.fa-flags { position: absolute; inset: 0; pointer-events: none; z-index: 25; }
+.fa-flag {
+  position: absolute;
+  width: var(--fa-coche); height: var(--fa-coche); border-radius: var(--pilule);
+  background: var(--primary); color: var(--surface);
+  font-size: var(--fa-min); line-height: var(--fa-coche); text-align: center;
+  animation: faFlagPop 1.1s var(--ease) both;
+}
+@keyframes faFlagPop {
+  0% { opacity: 0; transform: scale(.6); }
+  20% { opacity: 1; transform: scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fa-toast-zone { position: absolute; left: 20px; bottom: 66px; z-index: 30; }
+.fa-toast {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 10px;
+  background: var(--primary); color: var(--surface);
+  font-size: var(--fa-lab);
+  box-shadow: var(--shadow-toast);
+  animation: faToastIn var(--dur-1) var(--ease) both;
+}
+.fa-toast__undo {
+  height: var(--fa-h-undo); padding: 0 12px;
+  border: 0; border-radius: var(--arrondi-champ);
+  background: var(--fa-undo-fond); color: var(--surface);
+  font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
+  cursor: pointer;
+}
+.fa-toast__undo:hover { background: var(--fa-undo-fond-2); }
+@keyframes faToastIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Le mouvement réduit coupe les deux animations : ce qu'elles disent — « c'est
+   enregistré », « voilà ce qui vient de changer » — se lit sans elles. */
+@media (prefers-reduced-motion: reduce) {
+  .fa-flag, .fa-toast { animation: none; }
+}
+
+/* Sous 1180 px, les deux colonnes n'ont plus la place de tenir côte à côte :
+   elles s'empilent et la fiche défile. C'est un repli, pas la cible — l'écran
+   est dessiné pour 1366. */
+@media (max-width: 1180px) {
+  .fa-travail { grid-template-columns: 1fr; overflow: auto; }
+  .fa-col { overflow: visible; }
+  .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+  .fa-bandeau { grid-template-columns: 1fr; }
+}

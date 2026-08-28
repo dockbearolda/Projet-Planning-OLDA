@@ -43,6 +43,7 @@ const COQUILLE = [
   // une seule couleur — tout est en var() non résolue.
   '/charte.css',
   '/styles.css',
+  '/fiche-atelier.css',
   '/clients.css',
   '/projet.css',
   '/app.js',
@@ -83,6 +84,7 @@ const COQUILLE = [
   // `test/coquille-complete.test.js` qui le refuse maintenant.
   '/format.js',
   '/ligne-faits.js',
+  '/fiche-atelier.js',
   // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être
   // tombé entre l'ouverture de l'application et le tap sur l'onglet.
   '/nouveau-projet.js',
