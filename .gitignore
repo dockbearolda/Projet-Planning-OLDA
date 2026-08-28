@@ -6,3 +6,9 @@ npm-debug.log*
 .superpowers/
 .playwright-mcp/
 .backups/
+
+# Les pages d'essai posées le temps d'une MESURE dans public/ (un aperçu des
+# papiers, une comparaison avant/après). Elles portent de vraies données
+# clients et n'ont rien à faire dans le dépôt — un `git add -A` en a déjà
+# emporté une, le 28/08. Le préfixe `_` les tient à l'écart.
+public/_*
