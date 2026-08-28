@@ -33,6 +33,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { chargerPapier } = require('./socle-papier.js');
 
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
@@ -398,14 +399,7 @@ delete process.env.APP_PASSWORD;
   // emballerait une commande incomplète en la croyant finie.
   // On charge le VRAI source (module ES du navigateur) dans un `vm`, sans ses
   // `export` — même idiome que ticket-atelier.test.js : pas une copie, l'original.
-  const bacTicket = {};
-  vm.createContext(bacTicket);
-  vm.runInContext(
-    `${lire('public/ticket.js').replace(/^export\s+/gm, '')}
-     globalThis.modeleTicket = modeleTicket;
-     globalThis.ticketTexte = ticketTexte;`,
-    bacTicket,
-  );
+  const bacTicket = chargerPapier('ticket.js', ['modeleTicket', 'ticketTexte']);
   const { modeleTicket, ticketTexte } = bacTicket;
   const detailLot = await call('GET', `/api/requests/${parRang[4].id}`);
   const tk = modeleTicket(detailLot.body);

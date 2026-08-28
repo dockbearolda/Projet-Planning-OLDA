@@ -28,6 +28,7 @@ const {
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
+  getEntreprise, setEntreprise,
   getTaillesLogo, majTailleLogo, compterTaillesLogo,
   creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
@@ -1133,6 +1134,24 @@ app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
   const reglages = await setReglagesTextile(body);
   broadcast({ kind: 'settings' });
   res.json(reglages);
+}));
+
+// L'IDENTITÉ DE L'ATELIER — ce qui signe le bon de commande. Elle vaut pour
+// tous les postes : deux papiers sortis de deux PC ne peuvent pas annoncer deux
+// adresses. Lecture ouverte (tout poste imprime), écriture réservée aux
+// réglages.
+app.get('/api/settings/entreprise', asyncH(async (req, res) => {
+  res.json(await getEntreprise());
+}));
+
+app.put('/api/settings/entreprise', exige('reglages'), asyncH(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Objet d’identité attendu' });
+  }
+  const entreprise = await setEntreprise(body);
+  broadcast({ kind: 'settings' });
+  res.json(entreprise);
 }));
 
 // LE TABLEAU DES TAILLES DE LOGO. La largeur du logo à imprimer, par famille,

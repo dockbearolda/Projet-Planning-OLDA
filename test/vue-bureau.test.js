@@ -15,6 +15,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { chargerPapier } = require('./socle-papier.js');
 const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
@@ -24,16 +25,8 @@ const SRC = lire('public/bureau.js');
 // On charge le VRAI source (module ES du navigateur) dans un bac à sable —
 // même technique que pour le ticket : `import()` d'un `.js` sans
 // « type: module » au package le lirait comme du CommonJS.
-const bac = {};
-vm.createContext(bac);
-vm.runInContext(
-  `${SRC.replace(/^export\s+/gm, '')}
-   globalThis.modeleBureau = modeleBureau;
-   globalThis.bureauTexte = bureauTexte;
-   globalThis.dessinerBureau = dessinerBureau;
-   globalThis.CSS_BUREAU = CSS_BUREAU;`,
-  bac,
-);
+const bac = chargerPapier('bureau.js',
+  ['modeleBureau', 'bureauTexte', 'dessinerBureau', 'CSS_BUREAU']);
 
 (async () => {
   const { modeleBureau, bureauTexte, CSS_BUREAU, dessinerBureau } = bac;
@@ -45,7 +38,12 @@ vm.runInContext(
   const etrangers = [...new Set(
     (CSS_BUREAU.match(/var\(\s*(--[a-z0-9-]+)/gi) || [])
       .map((m) => m.replace(/var\(\s*/i, ''))
-      .filter((j) => !j.startsWith('--bu-')),
+      // `--pap-` est le SOCLE PARTAGÉ avec le ticket (papier.js) : l'encre, le
+      // filet, la marge de feuille et la taille des intitulés, écrits UNE fois
+      // pour les deux papiers depuis le 28/08. Ils sont posés sur la feuille
+      // elle-même, donc présents dans le cadre d'impression — ce ne sont pas
+      // des jetons de `charte.css`, qui eux vaudraient VIDE au papier.
+      .filter((j) => !j.startsWith('--bu-') && !j.startsWith('--pap-')),
   )];
   assert.strictEqual(etrangers.join(', '), '',
     'aucun jeton étranger dans la feuille : au papier il vaudrait VIDE');

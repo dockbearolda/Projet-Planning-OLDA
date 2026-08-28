@@ -22,6 +22,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { chargerPapier } = require('./socle-papier.js');
 const vm = require('node:vm');
 
 delete process.env.DATABASE_URL;
@@ -32,14 +33,7 @@ const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'ut
 // Comme whatsapp.test.js : on n'exécute pas une copie, on charge le VRAI source
 // (module ES du navigateur), on retire les `export` et on l'évalue dans un vm.
 const SRC = lire('ticket.js');
-const bac = {};
-vm.createContext(bac);
-vm.runInContext(
-  `${SRC.replace(/^export\s+/gm, '')}
-   globalThis.modeleTicket = modeleTicket;
-   globalThis.ticketTexte = ticketTexte;`,
-  bac,
-);
+const bac = chargerPapier('ticket.js', ['modeleTicket', 'ticketTexte']);
 const { modeleTicket, ticketTexte } = bac;
 
 // Une vente directe telle que le comptoir l'enregistre : la fiche porte le

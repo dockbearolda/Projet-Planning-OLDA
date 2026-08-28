@@ -1810,6 +1810,52 @@ async function setReglagesTextile(patch) {
   return propre;
 }
 
+// --- L'identité de l'atelier --------------------------------------------------
+// CE QUI SIGNE LES PAPIERS. Un bon de commande sans émetteur n'est pas un
+// document : c'est une note. Le nom, l'adresse, le téléphone, l'e-mail et les
+// numéros légaux vivent donc ici, une fois pour tous les postes — pas dans le
+// code, où chaque déménagement demanderait un déploiement.
+//
+// TOUT EST FACULTATIF, et c'est voulu : un champ vide ne s'imprime pas. Le
+// papier sort avec ce qu'on sait, jamais avec une ligne « Adresse : — » sur le
+// document qui sert à facturer. Aucune valeur n'est inventée par défaut : nous
+// ne connaissons que le nom de la maison.
+const ENTREPRISE_CHAMPS = Object.freeze(['nom', 'adresse', 'ville', 'tel', 'email', 'siret', 'tva', 'web']);
+const ENTREPRISE_DEFAULTS = Object.freeze({
+  nom: 'Atelier OLDA', adresse: '', ville: '', tel: '', email: '', siret: '', tva: '', web: '',
+});
+// Assez large pour une adresse sur deux lignes, assez court pour qu'un corps de
+// requête forgé ne remplisse pas la base.
+const ENTREPRISE_MAX = 160;
+
+function nettoyerEntreprise(brut) {
+  const out = { ...ENTREPRISE_DEFAULTS };
+  if (!brut || typeof brut !== 'object') return out;
+  for (const cle of ENTREPRISE_CHAMPS) {
+    if (!(cle in brut)) continue;
+    const v = brut[cle];
+    if (typeof v !== 'string') continue;
+    out[cle] = v.replace(/\s+/g, ' ').trim().slice(0, ENTREPRISE_MAX);
+  }
+  return out;
+}
+
+async function getEntreprise() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'entreprise'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...ENTREPRISE_DEFAULTS };
+  try {
+    return nettoyerEntreprise(JSON.parse(rows[0].value));
+  } catch {
+    return { ...ENTREPRISE_DEFAULTS };
+  }
+}
+
+async function setEntreprise(patch) {
+  const propre = nettoyerEntreprise({ ...(await getEntreprise()), ...(patch || {}) });
+  await poserMeta('entreprise', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Tailles de logo ----------------------------------------------------------
 // LA LARGEUR DU LOGO À IMPRIMER, en millimètres : par famille, par référence,
 // par FACE et par taille. Ce n'est pas une constante par référence — sur NS300
@@ -2918,6 +2964,7 @@ module.exports = {
   SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
+  ENTREPRISE_CHAMPS, ENTREPRISE_DEFAULTS, ENTREPRISE_MAX, getEntreprise, setEntreprise,
   getTaillesLogo, majTailleLogo, compterTaillesLogo, nettoyerTaillesLogo,
   creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,

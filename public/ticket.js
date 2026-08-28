@@ -27,6 +27,8 @@
 // Aucun DOM ici en dehors de `dessinerTicket` : le modèle est une fonction
 // pure, c'est ce qui le rend testable hors navigateur.
 
+import { JETONS_PAPIER, SOCLE_PAPIER } from './papier.js';
+
 // Le placeholder du comptoir pour « pas renseigné ». Il arrive tel quel dans la
 // fiche : le recopier sur un ticket afficherait « Personne à contacter : — ».
 const VIDE = '—';
@@ -356,142 +358,183 @@ export function ticketTexte(t) {
 // des DENSITÉS D'ENCRE, pas des états : la règle de la charte (« la couleur dit
 // un état ») parle de l'écran, où une couleur se lit comme un signal. Ici le
 // gris ardoise ne signale rien, il recule un intitulé derrière sa valeur.
-export const CSS_TICKET = `
-  /* L'ÉCHELLE DU TICKET. Deux tailles PORTENT (la référence et la quantité,
-     les deux seuls faits qu'on cherche du regard sur une pile), une taille
-     DÉCIDE (mesures, nombres par taille), deux tailles ACCOMPAGNENT. */
-  .tk { --tk-encre: #202930; --tk-ardoise: #4A6274; --tk-filet: #ADB8B9;
-        --tk-geant: 64px; --tk-titre: 44px; --tk-nombre: 40px; --tk-cle: 25px;
-        --tk-fort: 23px; --tk-mes: 18px; --tk-texte: 17px; --tk-note: 15px;
-        --tk-etiq: 12px; --tk-cap: 10px;
+export const CSS_TICKET = SOCLE_PAPIER + `
+  /* L'ÉCHELLE DU PAPIER — QUATRE CRANS, PAS DIX.
+     Le ticket en déclarait dix : 64 / 44 / 40 / 25 / 23 / 18 / 17 / 15 / 12 /
+     10. Charlie, 28/08 : « les polices sont démesurées sur le ticket atelier ».
+     Dix crans ne font pas une hiérarchie, ils font du désordre — et sur un
+     papier d'établi le désordre coûte une réimpression. Il en reste quatre, et
+     chacun a UN rôle :
+       --tk-geant  ce qu'on cherche du regard sur une pile : la référence et la
+                   quantité. Deux faits, une taille, rien d'autre ne la prend.
+       --tk-cle    ce qui décide : le client, la date de retrait, le marquage,
+                   le nombre par taille, la cote par face.
+       --tk-texte  ce qui se lit : les consignes, la désignation, la conformité.
+     L'encre, le gris, le filet, la taille des intitulés et la MARGE de la
+     feuille ne sont pas ici : ils sont dans papier.js, avec le bon de
+     commande, parce que les deux papiers sortent de la même ligne à un clic
+     l'un de l'autre. La marge, en particulier, valait 46 px en tête, 46 au
+     corps et 24 au cadre de conformité : trois bords gauches sur la même
+     feuille, ce qui se voit sans qu'on sache le nommer.
+     ATTENTION : aucun accent grave dans ce gabarit, il le terminerait. */
+  .tk {${JETONS_PAPIER}
+        --tk-geant: 52px; --tk-cle: 24px; --tk-texte: 15px;
         width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
-        display: flex; flex-direction: column; background: #fff; color: var(--tk-encre);
+        display: flex; flex-direction: column; background: #fff; color: var(--pap-encre);
         font: var(--tk-texte)/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+  .tk * { box-sizing: border-box; }
 
-  /* LES INTITULÉS. Une seule classe, partout : capitales espacées, gris
-     ardoise, petites. Un intitulé ne se lit pas, il se saute — c'est la valeur
-     qu'on vient chercher. */
-  .tk__cap { font: 500 var(--tk-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-             letter-spacing: .16em; color: var(--tk-ardoise); }
-
-  .tk__tete { display: flex; align-items: flex-end; justify-content: space-between;
-              gap: 24px; padding: 30px 46px 14px; border-bottom: 3px solid var(--tk-encre); }
-  .tk__titre { margin: 0; font-size: var(--tk-titre); font-weight: 800; letter-spacing: -.05em;
-               line-height: .95; text-transform: uppercase; }
-  /* LE COMPTE D'ARTICLES, encadré. Il ne s'affiche QUE si la commande en a
-     plusieurs : « 1/1 » n'apprend rien et occuperait le coin de l'oeil que le
-     compte réel doit occuper seul. */
-  .tk__no { display: flex; align-items: baseline; gap: 6px; padding: 7px 14px;
-            border: 1px solid var(--tk-encre); }
-  .tk__no-n { font: 700 var(--tk-fort)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .tk__no-t { font: 400 var(--tk-etiq)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-              color: var(--tk-ardoise); }
+  /* L'EN-TÊTE DIT DEUX CHOSES : ce qu'est ce papier, et POUR QUAND.
+     Le mot « TICKET ATELIER » sortait à 44 px — le plus gros caractère de la
+     feuille pour le seul mot qui ne fait rien produire : tous les tickets
+     d'atelier portent ce titre. La place qu'il prenait revient à la date de
+     retrait, qui est la seule chose qui fasse ORDONNER le travail sur une pile. */
+  .tk__tete { display: flex; align-items: center; justify-content: space-between;
+              gap: 24px; padding: 22px var(--pap-marge) 14px; border-bottom: 3px solid var(--pap-encre); }
+  .tk__tete-g { display: flex; align-items: center; gap: 12px; }
+  .tk__titre { margin: 0; font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.02em;
+               line-height: 1; text-transform: uppercase; }
+  /* LE COMPTE D'ARTICLES ne s'affiche QUE si la commande en a plusieurs :
+     « 1/1 » n'apprend rien et occuperait le coin de l'oeil que le compte réel
+     doit occuper seul. */
+  .tk__no { display: flex; align-items: baseline; gap: 5px; padding: 5px 10px;
+            border: 1px solid var(--pap-encre); }
+  .tk__no-n { font: 700 var(--tk-texte)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .tk__no-t { font: 400 var(--pap-cap)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              color: var(--pap-ardoise); }
+  /* LA DATE DE RETRAIT, en tête et à droite. Elle ne revient jamais à la ligne :
+     une date coupée en deux ne se lit plus. */
+  .tk__quand { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .tk__quand-v { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.02em;
+                 line-height: 1; white-space: nowrap; }
 
   .tk__qui { display: flex; align-items: flex-end; justify-content: space-between;
-             gap: 28px; padding: 16px 46px; border-bottom: 1px solid var(--tk-filet); }
+             gap: 24px; padding: 14px var(--pap-marge); border-bottom: 1px solid var(--pap-filet); }
   .tk__client-nom { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
-  .tk__champs { display: flex; gap: 28px; }
-  .tk__champ-bloc { display: flex; flex-direction: column; gap: 4px; }
+  .tk__champs { display: flex; gap: 26px; }
+  .tk__champ-bloc { display: flex; flex-direction: column; gap: 3px; }
   .tk__champ-val { font-size: var(--tk-texte); font-weight: 700; }
-  .tk__champ-val--fort { font-weight: 800; }
 
   .tk__corps { flex: 1; min-height: 0; display: flex; flex-direction: column;
-               gap: 18px; padding: 20px 46px 0; }
+               gap: 14px; padding: 16px var(--pap-marge) 0; }
 
-  /* L'IDENTITÉ DE L'ARTICLE. Référence et quantité en 64 px : ce sont les deux
+  /* L'IDENTITÉ DE L'ARTICLE. La référence et la quantité sont les deux seules
      choses qu'on cherche sur une pile de papiers, et elles sont seules à cette
      taille. */
-  .tk__ident { border: 2px solid var(--tk-encre); }
+  .tk__ident { border: 2px solid var(--pap-encre); }
   .tk__ident-tete { display: flex; align-items: flex-start; justify-content: space-between;
-                    gap: 24px; padding: 22px 28px 16px; }
-  .tk__ident-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .tk__ident-col--d { align-items: flex-end; }
+                    gap: 20px; padding: 16px 24px 12px; }
+  .tk__ident-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  /* LA COLONNE DE LA QUANTITÉ NE SE COMPRIME PAS. Elle était élastique comme
+     celle de gauche : sur « Tasse céramique 350 ml », la désignation prenait
+     toute la place et le nombre 60 se cassait en DEUX LIGNES, un 6 au-dessus
+     d'un 0 — mesuré le 28/08, sur les deux jeux d'essai. Le nombre passe donc
+     avant le texte : il garde sa largeur, et c'est la phrase qui s'enroule. */
+  .tk__ident-col--d { align-items: flex-end; flex: 0 0 auto; }
   .tk__geant { font-size: var(--tk-geant); font-weight: 800; letter-spacing: -.045em;
-               line-height: .95; overflow-wrap: anywhere; }
-  /* ATTENTION : aucun accent grave ici, il fermerait le gabarit.
-     Une DESIGNATION prend la place de la reference quand l'article n'en a pas
-     (tasse, gravure, besoin saisi a la main). C'est une phrase, pas un code de
-     six signes : a 64 px elle deborde la colonne. Elle prend le cran en
-     dessous, qui reste le plus gros caractere de la feuille apres le nombre. */
-  .tk__geant--texte { font-size: var(--tk-titre); line-height: 1.02; }
-  .tk__ident-qte { display: flex; align-items: baseline; gap: 8px; line-height: .95; }
-  .tk__ident-unite { font-size: var(--tk-fort); font-weight: 500; color: var(--tk-ardoise); }
-  /* 30 ET NON 28 : la boîte d'identité juste au-dessus porte un trait de 2 px,
-     que cette ligne-ci n'a pas. À rembourrage égal, les deux textes tombaient
-     donc à 73,3 et 75,2 px du bord de la feuille — deux pixels d'écart, c'est
-     trop peu pour être une hiérarchie et bien assez pour se voir. */
-  .tk__ident-nom { margin: 0; padding: 0 30px 18px; font-size: var(--tk-fort); font-weight: 700;
-                   letter-spacing: -.01em; line-height: 1.3; }
-  .tk__ident-mq { display: flex; align-items: center; justify-content: space-between; gap: 24px;
-                  padding: 14px 28px; border-top: 1px solid var(--tk-filet); }
-  .tk__ident-mq-v { font-size: var(--tk-fort); font-weight: 800; letter-spacing: -.02em;
+               line-height: .95; }
+  /* UNE RÉFÉRENCE peut se couper (c'est un code, pas une phrase) ; un NOMBRE,
+     jamais. Le point de coupure vit donc sur la référence seule. */
+  .tk__ident-col .tk__geant { overflow-wrap: anywhere; }
+  .tk__ident-qte, .tk__ident-qte .tk__geant { white-space: nowrap; overflow-wrap: normal; }
+  /* UNE DÉSIGNATION prend la place de la référence quand l'article n'en a pas
+     (tasse, gravure, besoin saisi à la main). C'est une phrase, pas un code de
+     six signes : elle prend le cran des valeurs qui décident, où elle tient sur
+     une ligne au lieu de deux. */
+  .tk__geant--texte { font-size: var(--tk-cle); line-height: 1.15; }
+  .tk__ident-qte { display: flex; align-items: baseline; gap: 6px; line-height: .95; }
+  .tk__ident-unite { font-size: var(--tk-texte); font-weight: 500; color: var(--pap-ardoise); }
+  /* 26 ET NON 24 : la boîte d'identité porte un trait de 2 px que cette ligne
+     n'a pas. À rembourrage égal, les deux textes ne tombent pas au même endroit
+     — deux pixels, c'est trop peu pour être une hiérarchie et bien assez pour
+     se voir. */
+  .tk__ident-nom { margin: 0; padding: 0 26px 14px; font-size: var(--tk-texte); font-weight: 700;
+                   line-height: 1.3; }
+  .tk__ident-mq { display: flex; align-items: center; justify-content: space-between; gap: 20px;
+                  padding: 10px 24px; border-top: 1px solid var(--pap-filet); }
+  .tk__ident-mq-v { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.02em;
                     text-align: right; min-width: 0; overflow-wrap: anywhere; }
 
-  .tk__bloc { display: flex; flex-direction: column; gap: 10px; }
+  .tk__bloc { display: flex; flex-direction: column; gap: 8px; }
   .tk__bloc-titre { letter-spacing: .18em; }
 
   /* LES TAILLES ET LES ZONES SONT DEUX AXES INDÉPENDANTS, jamais imbriqués.
      La maquette rangeait la largeur du dos DANS la carte de la taille : ça se
      tient pour un t-shirt et ça ne veut rien dire pour une tasse, qui a trois
-     faces et une seule taille. Deux grilles séparées s'adaptent aux deux. */
-  /* LA GRILLE COMPTE SES COLONNES TOUTE SEULE. Le nombre de tailles et le
-     nombre de zones changent d'un article à l'autre : les poser en style EN
-     LIGNE obligeait le rendu à connaître la largeur du papier, et rendait le
-     ticket indessinable hors navigateur (les tests le dessinent dans un DOM
-     minimal, sans propriete style). auto-fit fait le calcul en CSS : une zone
-     occupe toute la laize, six se rangent en deux rangs.
-     ATTENTION : aucun accent grave ici, il terminerait le gabarit. */
-  .tk__grille { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
-  /* LES ZONES TIENNENT SUR UN SEUL RANG jusqu'à six. À 150 px de large minimum,
-     un vetement marque a six emplacements passait a DEUX rangs et la feuille
-     sortait a 311 mm — un second papier presque vide, que l'atelier perd.
-     A 104 px, les six tiennent sur un rang et la feuille retombe a 297 mm.
-     Deux zones occupent toujours toute la laize : c'est 1fr qui repartit. */
+     faces et une seule taille. Deux grilles séparées s'adaptent aux deux.
+     LA GRILLE COMPTE SES COLONNES TOUTE SEULE : le nombre de tailles et de
+     zones change d'un article à l'autre, et les poser en style EN LIGNE
+     obligeait le rendu à connaître la largeur du papier — donc rendait le
+     ticket indessinable hors navigateur, là où les tests le mesurent. */
+  .tk__grille { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
+  /* LES ZONES TIENNENT SUR UN SEUL RANG jusqu'à six : à 150 px de large
+     minimum, un vêtement marqué à six emplacements passait à DEUX rangs et la
+     feuille sortait sur un second papier presque vide. */
   .tk__grille--zones { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
   .tk__bloc--infos { flex: 1; min-height: 0; }
-  .tk__case { border: 1.5px solid var(--tk-encre); overflow: hidden; }
-  .tk__case-k { padding: 6px 0; text-align: center; border-bottom: 1px solid var(--tk-filet);
-                font: 600 var(--tk-etiq)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                letter-spacing: .2em; color: var(--tk-ardoise); overflow-wrap: anywhere; }
-  .tk__case-v { padding: 12px 0; text-align: center; font-size: var(--tk-nombre); font-weight: 800;
-                letter-spacing: -.04em; line-height: 1; }
-  /* LA MESURE D'UNE ZONE, quand elle change d'une taille à l'autre : une ligne
-     par taille, reliée à sa mesure. Sur NS300 le dos va de 240 mm en XS à 320 en
-     XL — un seul chiffre enverrait trois pièces sur quatre au mauvais fichier. */
-  /* LA CONSIGNE : ce qu'il y a a marquer sur cette face. Elle se LIT, donc
-     elle prend le corps de lecture et non celui des nombres — un nom de logo
-     en 40 px deborderait de sa carte des le deuxieme mot. */
-  .tk__quoi { padding: 10px 10px 6px; text-align: center;
+  /* UNE CARTE REMPLIT SA BOÎTE. Les cartes d'un même rang s'étirent à la plus
+     haute (c'est la grille qui le fait) : sans cette colonne, le contenu restait
+     collé en haut et « Coeur : 90 mm » flottait au-dessus de 120 px de blanc,
+     à côté d'une carte pleine. */
+  .tk__case { display: flex; flex-direction: column; border: 1.5px solid var(--pap-encre); overflow: hidden; }
+  .tk__case-k { padding: 5px 4px; text-align: center; border-bottom: 1px solid var(--pap-filet);
+                font: 600 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                letter-spacing: .16em; color: var(--pap-ardoise); overflow-wrap: anywhere; }
+  .tk__case-v { flex: 1; display: flex; align-items: center; justify-content: center;
+                padding: 8px 4px; text-align: center; font-size: var(--tk-cle); font-weight: 800;
+                letter-spacing: -.03em; line-height: 1; }
+  /* LA CONSIGNE : ce qu'il y a à marquer sur cette face. Elle se LIT, donc elle
+     prend le corps de lecture et non celui des nombres. */
+  .tk__quoi { padding: 8px 8px 4px; text-align: center;
               font-size: var(--tk-texte); font-weight: 700; line-height: 1.25;
               overflow-wrap: anywhere; }
+  /* LA COTE D'UNE FACE, quand elle change d'une taille à l'autre : une ligne
+     par taille, reliée à sa mesure. Sur NS300 le dos va de 240 mm en XS à 320
+     en XL — un seul chiffre enverrait trois pièces sur quatre au mauvais
+     fichier. Le nombre porte le cran des valeurs qui décident, comme le nombre
+     par taille de la grille du dessus : ce sont les mêmes faits, ils ne peuvent
+     pas sortir à deux tailles sur la même feuille. */
   .tk__mes { display: flex; align-items: center; justify-content: space-between; gap: 6px;
-             padding: 6px 12px; border-top: 1px dotted var(--tk-filet); }
+             padding: 4px 10px; border-top: 1px dotted var(--pap-filet); }
   .tk__mes-v { display: flex; align-items: baseline; gap: 3px; }
-  .tk__mes-n { font-size: var(--tk-mes); font-weight: 800; letter-spacing: -.02em; }
+  .tk__mes-n { font-size: var(--tk-cle); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
+  /* L'UNITÉ COLLE AU NOMBRE, elle ne tombe pas au fond de la carte. Posée
+     après un bloc élastique, « mm » se retrouvait à 120 px sous le 90 qu'elle
+     qualifie — et la carte voisine, elle, l'avait juste à côté de sa cote.
+     Deux fois la même chose, deux dessins. */
+  .tk__case-v-n { display: flex; align-items: baseline; gap: 3px; }
   /* UNE ZONE SANS MESURE N'EST PAS UNE ZONE VIDE : c'est une mesure à prendre.
-     Elle sort donc avec un trait pour l'écrire, pas avec un blanc. */
-  .tk__aecrire { display: block; margin: 14px 12px 12px; border-bottom: 1px solid var(--tk-encre); height: 22px; }
-  .tk__aecrire-k { display: block; padding: 0 12px 10px; text-align: center; }
+     Elle sort donc avec un trait pour l'écrire, pas avec un blanc — et ce trait
+     est à la place du nombre qu'il remplace, au centre de la carte. */
+  .tk__case-v--vide { flex-direction: column; gap: 5px; }
+  .tk__aecrire { display: block; width: 100%; border-bottom: 1px solid var(--pap-encre); height: 20px; }
 
-  /* LE CADRE À ÉCRIRE ABSORBE, IL NE POUSSE PAS. Avec un plancher de 250 px il
-     s'ajoutait aux blocs du dessus au lieu de prendre ce qui reste : un ticket
-     textile (deux grilles) sortait à 324 mm et partait sur une SECONDE feuille
-     presque vide — mesuré le 26/08. Il n'a donc plus de hauteur minimale : il
-     est le seul bloc élastique de la page, et c'est lui qui fait tomber la
-     feuille sur 297 mm pile. */
-  .tk__infos { flex: 1; min-height: 0; padding: 14px 24px 16px; border: 1.5px solid var(--tk-encre);
-               background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, var(--tk-filet) 35px, var(--tk-filet) 36px);
+  /* CE QU'ON PRÉCISE DE VIVE VOIX. Cette phrase sortait en 23 px gras, posée
+     entre deux blocs sans cadre ni intitulé : la seule chose de la feuille qui
+     n'appartenait à rien, et la plus grosse après la référence. Elle a
+     maintenant son bloc, son intitulé, et le corps de lecture. */
+  .tk__consigne { padding: 10px 14px; border-left: 3px solid var(--pap-encre);
+                  background: #f2f4f5; font-size: var(--tk-texte); font-weight: 600;
+                  line-height: 1.35; white-space: pre-line; }
+
+  /* LE CADRE À ÉCRIRE ABSORBE, IL NE POUSSE PAS. Avec un plancher en pixels il
+     s'ajoutait aux blocs du dessus au lieu de prendre ce qui reste, et la
+     feuille partait sur une SECONDE page presque vide. Il n'a donc pas de
+     hauteur minimale : il est le seul bloc élastique de la page, et c'est lui
+     qui la fait tomber sur 297 mm pile. */
+  .tk__infos { flex: 1; min-height: 0; padding: 12px 20px 14px; border: 1.5px solid var(--pap-encre);
+               background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 31px, var(--pap-filet) 31px, var(--pap-filet) 32px);
                background-position: 0 8px; background-clip: content-box; white-space: pre-line; }
 
-  .tk__conformite { display: flex; align-items: center; gap: 18px; margin: 18px 46px 20px;
-                    padding: 14px 18px; border: 1.5px solid var(--tk-encre); }
-  .tk__case-a-cocher { flex: none; width: 24px; height: 24px; border: 1.5px solid var(--tk-encre); }
-  .tk__conformite-txt { font-size: var(--tk-note); font-weight: 500; line-height: 1.35; }
+  .tk__conformite { display: flex; align-items: center; gap: 16px; margin: 14px var(--pap-marge) 16px;
+                    padding: 12px 16px; border: 1.5px solid var(--pap-encre); }
+  .tk__case-a-cocher { flex: none; width: 22px; height: 22px; border: 1.5px solid var(--pap-encre); }
+  .tk__conformite-txt { font-size: var(--tk-texte); font-weight: 500; line-height: 1.35; }
 
   .tk__pied { display: flex; align-items: center; justify-content: space-between; gap: 24px;
-              padding: 14px 46px 24px; border-top: 1px dashed var(--tk-encre); }
-  .tk__pied-fort { font-weight: 700; color: var(--tk-encre); }
+              padding: 12px var(--pap-marge) 20px; border-top: 1px dashed var(--pap-encre); }
+  .tk__pied-fort { font-weight: 700; color: var(--pap-encre); }
 
   /* UN ARTICLE PAR FEUILLE. Sans ça, deux tickets d'une même commande se
      suivent sur la même page et l'établi en perd un. */
@@ -500,23 +543,22 @@ export const CSS_TICKET = `
   /* EN CORRECTION, un champ garde exactement la place et le dessin du texte
      qu'il remplace : le papier ne doit pas se réorganiser quand on l'ouvre. */
   .tk__champ { font: inherit; color: inherit; letter-spacing: inherit; line-height: inherit;
-               background: none; border: 0; border-bottom: 1px dotted var(--tk-ardoise);
+               background: none; border: 0; border-bottom: 1px dotted var(--pap-ardoise);
                padding: 0; margin: 0; min-width: 0; width: 100%; }
-  /* UN CHAMP D'UNE LIGNE NE REVIENT JAMAIS A LA LIGNE — c'est la nature d'un
-     champ input : son contenu defile a l'interieur, invisible, et rien ne le dit.
-     Ce qui peut être long (la désignation) est donc une ZONE DE TEXTE, qui
+  /* UN CHAMP D'UNE LIGNE NE REVIENT JAMAIS À LA LIGNE — c'est la nature d'un
+     champ input : son contenu défile à l'intérieur, invisible, et rien ne le
+     dit. Ce qui peut être long (la désignation) est donc une ZONE DE TEXTE, qui
      s'enroule et grandit avec ce qu'on y met. On lui retire la poignée de
-     redimensionnement : la feuille garde ses proportions, on ne la déforme pas
-     à la main. */
+     redimensionnement : la feuille garde ses proportions. */
   textarea.tk__champ { resize: none; overflow: hidden; display: block; }
-  /* LA QUANTITE SE MESURE A SON NOMBRE. A 100 % de sa colonne, deux chiffres
-     tiraient un trait pointille de 308 px jusqu'au mot « pieces » : on lisait
-     un champ vide plutot qu'une quantite. field-sizing rend la boite a la
+  /* LA QUANTITÉ SE MESURE À SON NOMBRE. À 100 % de sa colonne, deux chiffres
+     tiraient un trait pointillé de 308 px jusqu'au mot « pièces » : on lisait
+     un champ vide plutôt qu'une quantité. field-sizing rend la boîte à la
      taille du contenu ; les navigateurs qui l'ignorent gardent le trait long,
      ce qui reste lisible. */
   .tk__qte { field-sizing: content; width: auto; min-width: 2ch; }
   .tk--edit .tk__case-v .tk__champ, .tk--edit .tk__mes-n .tk__champ { text-align: center; }
-  .tk__champ:focus { outline: 2px solid var(--tk-encre); outline-offset: 2px; }
+  .tk__champ:focus { outline: 2px solid var(--pap-encre); outline-offset: 2px; }
 `;
 
 // LES MESURES D'UNE ZONE. Le comptoir envoie soit une largeur unique (« 260 »),
@@ -562,7 +604,7 @@ export function dessinerTicket(t, doc, editeur) {
   // police et sous la même classe. `cible` dit OÙ la valeur s'écrit quand elle
   // vient d'un article du récapitulatif (cf. `ou` dans le modèle).
   const val = (cle, txt, cible) => (editeur ? editeur(cle, txt, cible) : el('span', null, txt));
-  const cap = (txt, cls) => el('div', cls ? 'tk__cap ' + cls : 'tk__cap', txt);
+  const cap = (txt, cls) => el('div', cls ? 'pap-cap ' + cls : 'pap-cap', txt);
   const champ = (label, valeur, cle, fort) => {
     const b = el('div', 'tk__champ-bloc');
     const v = el('div', 'tk__champ-val' + (fort ? ' tk__champ-val--fort' : ''));
@@ -578,16 +620,26 @@ export function dessinerTicket(t, doc, editeur) {
   // l'atelier, personne n'a besoin qu'il rappelle le nom de la maison où il est
   // lu. La référence du dossier ne s'imprime pas non plus en tête — elle ne fait
   // rien produire ; elle revient au pied, là où on la cherche pour classer.
+  //
+  // LE TITRE NE CRIE PLUS. Il sortait à 44 px : le plus gros caractère de la
+  // feuille pour le seul mot qui ne fait rien produire — tous les tickets
+  // d'atelier s'appellent « ticket atelier ». La place qu'il prenait revient à
+  // la DATE DE RETRAIT, montée ici : c'est la seule chose qui fasse ordonner le
+  // travail, et on la cherche avant tout le reste sur une pile.
   const tete = el('header', 'tk__tete');
-  tete.append(el('h1', 'tk__titre', t.titre));
+  const teteG = el('div', 'tk__tete-g');
+  teteG.append(el('h1', 'tk__titre', t.titre));
   // CE PAPIER NE FAIT PAS TOUTE LA COMMANDE. Un compte, pas un identifiant :
   // sans lui, l'atelier finit son article et emballe en croyant avoir fini.
   if (t.lot) {
     const no = el('div', 'tk__no');
     no.append(cap('NO.'), el('span', 'tk__no-n', String(t.lot.rang)),
       el('span', 'tk__no-t', '/' + t.lot.total));
-    tete.append(no);
+    teteG.append(no);
   }
+  const quand = el('div', 'tk__quand');
+  quand.append(cap('À RETIRER LE'), el('div', 'tk__quand-v', t.retrait || '—'));
+  tete.append(teteG, quand);
   tk.append(tete);
 
   // POUR QUI, ET POUR QUAND. Le nom porte la taille ; le reste sert quand
@@ -600,10 +652,12 @@ export function dessinerTicket(t, doc, editeur) {
   else nomClient.textContent = t.client || '—';
   gauche.append(cap('CLIENT'), nomClient);
   const champs = el('div', 'tk__champs');
+  // La date de retrait n'est plus ici : elle est en tête, à côté du titre. Elle
+  // y était écrite une deuxième fois — la carte ne dit pas deux fois la même
+  // chose, et c'est vrai du papier aussi.
   champs.append(
     champ('CONTACT', t.contact, 'contact'),
     champ('TÉL', t.tel, 'tel'),
-    champ('DATE DE RETRAIT', t.retrait, null, true),
   );
   qui.append(gauche, champs);
   tk.append(qui);
@@ -612,13 +666,19 @@ export function dessinerTicket(t, doc, editeur) {
   for (const a of t.lignes) {
     if (a.prod) blocsProduction(a.prod, a);
     else corps.append(teteArticle(a));
-    // La précision de vive voix. En correction elle est offerte même vide :
-    // c'est là qu'on note ce qui n'entre dans aucune case.
+    // LA PRÉCISION DE VIVE VOIX — ce que la vendeuse a noté et qui n'entre dans
+    // aucune case. Elle sortait en 23 px gras, posée entre deux blocs sans
+    // cadre ni intitulé : la seule chose de la feuille qui n'appartenait à rien,
+    // et la plus grosse après la référence. Elle a maintenant son bloc.
+    // En correction elle est offerte même vide : c'est là qu'on écrit.
     if (a.detail || (editeur && a.ou && a.ou.detail)) {
-      const det = el('p', 'tk__ident-nom');
+      const bloc = el('div', 'tk__bloc');
+      bloc.append(cap('CONSIGNE', 'tk__bloc-titre'));
+      const det = el('p', 'tk__consigne');
       if (editeur) det.append(val('detail', a.detail, a.ou.detail));
       else det.textContent = a.detail;
-      corps.append(det);
+      bloc.append(det);
+      corps.append(bloc);
     }
   }
 
@@ -645,7 +705,7 @@ export function dessinerTicket(t, doc, editeur) {
   // LE PIED porte ce qui ne fait pas produire : quand la commande a été prise,
   // et de quel dossier ce papier parle — pour le reclasser, pas pour le faire.
   const pied = el('footer', 'tk__pied');
-  const g = el('div', 'tk__cap');
+  const g = el('div', 'pap-cap');
   // Aucun nœud de texte nu : le ticket se dessine aussi hors navigateur (les
   // tests le rendent dans un DOM minimal, et c'est cette portabilité qui permet
   // de vérifier le papier sans ouvrir Chrome). Tout passe par un élément.
@@ -655,7 +715,7 @@ export function dessinerTicket(t, doc, editeur) {
   // La clé du dossier ne s'imprime pas : ce papier va à l'établi, pas au
   // classement, et un identifiant de dossier n'y fait rien produire.
   const article = t.lignes.find((x) => x.prod && x.prod.ref);
-  const d = el('div', 'tk__cap');
+  const d = el('div', 'pap-cap');
   d.textContent = [article ? article.prod.ref : '',
     t.lot ? t.lot.rang + '/' + t.lot.total : ''].filter(Boolean).join(' · ');
   pied.append(g, d);
@@ -799,18 +859,23 @@ export function dessinerTicket(t, doc, editeur) {
           // ZONE À MESURER À L'ÉTABLI. Un trait, pas un blanc : un blanc ne se
           // remplit pas. En correction, c'est le champ lui-même qui prend la
           // place du trait — la mesure prise revient alors au dossier.
-          if (editeur) {
-            const v = el('div', 'tk__case-v');
-            v.append(val('prod-logo', '', zone.ou));
-            c.append(v);
-          } else {
-            c.append(el('span', 'tk__aecrire'), cap('mm', 'tk__aecrire-k'));
-          }
+          const v = el('div', 'tk__case-v tk__case-v--vide');
+          if (editeur) v.append(val('prod-logo', '', zone.ou));
+          else v.append(el('span', 'tk__aecrire'));
+          v.append(cap('mm'));
+          c.append(v);
         } else if (mesures.length === 1 && !mesures[0].t) {
+          // LA COTE ET SON UNITÉ SUR LA MÊME LIGNE. Posée sous un bloc
+          // élastique, l'unité tombait au fond de la carte — à 120 px du nombre
+          // qu'elle qualifie, alors que la carte d'à côté l'avait collée à sa
+          // cote. Le même fait ne peut pas avoir deux dessins sur une feuille.
           const v = el('div', 'tk__case-v');
-          if (editeur) v.append(val('prod-logo', zone.mm, zone.ou));
-          else v.append(el('span', null, mesures[0].mm));
-          c.append(v, cap('mm', 'tk__aecrire-k'));
+          const n = el('span', 'tk__case-v-n');
+          if (editeur) n.append(val('prod-logo', zone.mm, zone.ou));
+          else n.append(el('span', null, mesures[0].mm));
+          n.append(cap('mm'));
+          v.append(n);
+          c.append(v);
         } else if (editeur) {
           // En correction on réécrit la CHAÎNE telle que le comptoir l'a
           // composée : la découper en champs par taille écrirait quatre valeurs

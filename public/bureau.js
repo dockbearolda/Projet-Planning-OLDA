@@ -24,6 +24,8 @@
 // LE MODÈLE EST PUR : mêmes entrées, mêmes sorties, aucun DOM en dehors de
 // `dessinerBureau`. C'est ce qui le rend vérifiable hors navigateur.
 
+import { JETONS_PAPIER, SOCLE_PAPIER } from './papier.js';
+
 const VIDE = '—';
 const texte = (v) => {
   const s = String(v == null ? '' : v).trim();
@@ -86,19 +88,40 @@ const DEJA_DIT = new Set(['Client', 'Nom / société', 'Type de client', 'WhatsA
   'E-mail', 'Téléphone', 'Personne à contacter']);
 
 // Et ce que le bloc TOTAL écrit déjà, en gros, juste au-dessus.
+// Et ce que le bloc TOTAL écrit déjà, en gros, juste au-dessus — plus ce que
+// l'EN-TÊTE porte maintenant : « Commande » est la référence imprimée en haut à
+// droite, et « Origine » dit « Vente directe » sous un titre qui s'appelle déjà
+// « Bon de commande ». Deux lignes qui n'apprenaient rien, sur le document où
+// chaque ligne coûte une seconde de lecture.
 const DEJA_TOTAL = new Set(['Total TTC', 'Total HT', 'Taxe', 'Taxe 4 %', 'Paiement',
-  'Nombre d’articles', 'Quantité totale', 'Récupération prévue', 'Date de la vente']);
+  'Nombre d’articles', 'Quantité totale', 'Récupération prévue', 'Date de la vente',
+  'Commande', 'Origine']);
+
+// UNE NOTE INTERNE VA DANS LE BLOC INTERNE, pas dans le récapitulatif. Elle
+// sortait au milieu de ce que la vendeuse a recueilli, c'est-à-dire dans la
+// partie du document qu'on montre — alors que le cadre pointillé juste dessous
+// dit « ne pas remettre au client » et existe pour ça.
+const RE_NOTE_INTERNE = /^note interne\b/i;
 
 // Ce qui n'appartient à AUCUN article : le dossier lui-même. On le garde tel
 // que le comptoir l'a écrit — c'est la trace de la prise de commande.
-function dossierDuPanier(details) {
+// `dejaRendu` porte ce que le bloc CLIENT vient d'imprimer pour CE dossier —
+// il n'est pas connu d'avance : le comptoir range dans le bloc client tout ce
+// qu'il a recueilli en plus (secteur, adresse, fonction du contact), et ces
+// mêmes lignes vivent AUSSI dans le récapitulatif. Le document sortait donc
+// « Adresse : 12 route de Baie Longue » deux fois, à quinze lignes d'écart, sur
+// le papier qui sert à facturer. Une liste figée ne pouvait pas l'attraper :
+// c'est le rendu qui décide, donc c'est le rendu qu'on interroge.
+function dossierDuPanier(details, dejaRendu) {
+  const dit = dejaRendu instanceof Set ? dejaRendu : new Set();
   return (Array.isArray(details) ? details : [])
     .filter((l) => l && typeof l === 'object' && !RE_POSTE.test(String(l.k || '')))
     .map((l) => ({ k: texte(l.k), v: texte(l.v) }))
     // Ni ce que les colonnes portent déjà (le client, ses coordonnées), ni ce
-    // que le bloc TOTAL vient d'écrire : un document qui répète trois fois le
-    // nom du client se lit trois fois plus lentement.
-    .filter((l) => l.k && l.v && !DEJA_DIT.has(l.k) && !DEJA_TOTAL.has(l.k));
+    // que le bloc TOTAL vient d'écrire, ni ce que le bloc CLIENT a rendu : un
+    // document qui répète trois fois le nom du client se lit trois fois plus
+    // lentement.
+    .filter((l) => l.k && l.v && !DEJA_DIT.has(l.k) && !DEJA_TOTAL.has(l.k) && !dit.has(l.k));
 }
 
 // L'ARGENT DU DOSSIER, rassemblé en un endroit. C'est le bloc que le ticket
@@ -178,9 +201,33 @@ function noteUtile(note, dossier) {
   return dossier.some((x) => nu(`${x.k} : ${x.v}`) === dit || nu(x.v) === dit) ? '' : note;
 }
 
+// L'ÉMETTEUR DU DOCUMENT. Il vient des réglages de l'atelier, jamais du code :
+// une adresse écrite en dur demanderait un déploiement le jour d'un
+// déménagement, et elle serait fausse jusque-là sur tous les papiers déjà
+// imprimés.
+//
+// TOUT EST FACULTATIF ET RIEN N'EST INVENTÉ. Tant que le patron n'a pas rempli
+// les réglages, le papier porte le seul nom qu'on connaisse — c'est déjà plus
+// que rien, et c'est honnête. Une ligne vide ne s'imprime pas : « Adresse : — »
+// sur un document qui sert à facturer vaut moins que pas de ligne du tout.
+function maisonDe(e) {
+  const m = e && typeof e === 'object' ? e : {};
+  const legal = [];
+  if (texte(m.siret)) legal.push(`SIRET ${texte(m.siret)}`);
+  if (texte(m.tva)) legal.push(`TVA ${texte(m.tva)}`);
+  return {
+    nom: texte(m.nom),
+    // L'adresse postale, telle qu'on l'écrirait sur une enveloppe.
+    lignes: [texte(m.adresse), texte(m.ville)].filter(Boolean),
+    // De quoi joindre la maison : c'est ce que le client cherche en premier.
+    contact: [texte(m.tel), texte(m.email), texte(m.web)].filter(Boolean),
+    legal,
+  };
+}
+
 // LE MODÈLE DU BON DE COMMANDE. `l` est une ligne du planning avec sa fiche
 // COMPLÈTE (celle de la liste est allégée du détail — voir allegerFiche).
-export function modeleBureau(l) {
+export function modeleBureau(l, entreprise) {
   const r = l && typeof l === 'object' ? l : {};
   const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
   const demande = f.source === 'Demande de devis' || r.order_kind === 'demande';
@@ -201,7 +248,19 @@ export function modeleBureau(l) {
   const seulPoste = rang >= 1 && total >= 1 && postes.length === total;
   if (seulPoste) postes = [postes[rang - 1]];
 
+  // Ce que le bloc CLIENT va rendre en propre, calculé UNE fois : le tri des
+  // doublons se fait ici, pas dans chaque rendu — fait deux fois, il finit par
+  // diverger, et c'est déjà arrivé entre le papier et le texte.
+  const autresClient = (Array.isArray(f.client) ? f.client : [])
+    .map((x) => ({ k: texte(x && x.k), v: texte(x && x.v) }))
+    .filter((x) => x.k && x.v && !DEJA_DIT.has(x.k));
+  const recueilli = dossierDuPanier(f.details, new Set(autresClient.map((x) => x.k)));
+  const dossier = recueilli.filter((x) => !RE_NOTE_INTERNE.test(x.k));
+  const notes = recueilli.filter((x) => RE_NOTE_INTERNE.test(x.k)).map((x) => x.v);
+
   return {
+    // QUI ÉMET CE PAPIER.
+    maison: maisonDe(entreprise),
     // CE QU'EST CE PAPIER. Une demande n'est pas une commande : promettre un
     // « bon de commande » sur un dossier que personne n'a chiffré, c'est le
     // faire passer pour vendu.
@@ -232,9 +291,7 @@ export function modeleBureau(l) {
       // tels quels donnait « Client : Blue Martini » deux fois, à deux lignes
       // d'intervalle. Le tri se fait ICI, une fois — fait dans chaque rendu, il
       // finit par diverger, et c'est arrivé entre le papier et le texte.
-      autres: (Array.isArray(f.client) ? f.client : [])
-        .map((x) => ({ k: texte(x && x.k), v: texte(x && x.v) }))
-        .filter((x) => x.k && x.v && !DEJA_DIT.has(x.k)),
+      autres: autresClient,
     },
     responsable: texte(r.responsable),
     // LE DÉTAIL, ARTICLE PAR ARTICLE. Le bureau veut le prix unitaire, la
@@ -253,7 +310,9 @@ export function modeleBureau(l) {
     // Le récapitulatif du dossier, tel que la vendeuse l'a rempli. Il porte ce
     // qu'aucune colonne ne range : le canal d'entrée, l'objet du projet, le
     // délai, la note interne.
-    dossier: dossierDuPanier(f.details),
+    dossier,
+    // Ce que la vendeuse a noté pour nous, et pour personne d'autre.
+    notes,
     argent: argentDe(r, f),
     // Ce que la vendeuse a écrit de sa main sur la ligne — SAUF quand elle ne
     // l'a pas écrite. La colonne `description` d'un dossier du comptoir est
@@ -261,7 +320,7 @@ export function modeleBureau(l) {
     // phrase est mot pour mot une ligne du récapitulatif imprimé vingt lignes
     // plus haut. Le document la disait donc deux fois, dont une sous un cadre
     // « ne pas remettre au client » où elle n'apprend rien.
-    note: noteUtile(texte(r.description), dossierDuPanier(f.details)),
+    note: noteUtile(texte(r.description), recueilli),
     production: texte(f.production),
   };
 }
@@ -278,80 +337,132 @@ export function modeleBureau(l) {
 //      vaut la chaîne vide, donc le rembourrage tombe à zéro SUR LE PAPIER et
 //      nulle part ailleurs — l'aperçu a la charte, il reste impeccable.
 //      Tous les jetons d'ici commencent par `--bu-`.
-export const CSS_BUREAU = `
-.bu {
-  --bu-encre: #202930; --bu-ardoise: #4A6274; --bu-filet: #ADB8B9;
-  --bu-titre: 34px; --bu-nombre: 30px; --bu-cle: 20px; --bu-fort: 17px;
-  --bu-texte: 14px; --bu-note: 12px; --bu-cap: 10px;
-  width: 210mm; min-height: 297mm; box-sizing: border-box;
-  display: flex; flex-direction: column;
-  background: #ffffff; color: var(--bu-encre);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
-  font-size: var(--bu-texte); line-height: 1.4;
-}
-.bu * { box-sizing: border-box; }
-.bu__cap {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--bu-cap); font-weight: 500; letter-spacing: .16em;
-  color: var(--bu-ardoise); text-transform: uppercase;
-}
-.bu__tete {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
-  padding: 26px 40px 12px; border-bottom: 3px solid var(--bu-encre);
-}
-.bu__titre {
-  font-size: var(--bu-titre); font-weight: 800; letter-spacing: -.04em;
-  line-height: .98; text-transform: uppercase;
-}
-.bu__ref { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.bu__ref-v {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--bu-cle); font-weight: 700;
-}
-.bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 18px 40px 0; }
-.bu__deux { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.bu__bloc { border: 1px solid var(--bu-filet); padding: 12px 14px; }
-.bu__bloc--fort { border: 2px solid var(--bu-encre); }
-.bu__bloc-titre { margin-bottom: 8px; }
-.bu__paire { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
-.bu__paire + .bu__paire { border-top: 1px dotted var(--bu-filet); }
-.bu__k { color: var(--bu-ardoise); }
-.bu__v { font-weight: 700; text-align: right; }
-.bu__nom { font-size: var(--bu-cle); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+export const CSS_BUREAU = SOCLE_PAPIER + `
+  /* L'ÉCHELLE DU DOCUMENT — QUATRE CRANS.
+     Le bon de commande en déclarait sept (34 / 30 / 20 / 17 / 14 / 12 / 10),
+     dont un titre à 34 px qui prenait le tiers de l'en-tête pour annoncer ce
+     que le document est déjà, et deux crans de corps qui ne se distinguaient
+     pas à la lecture. Il en reste quatre :
+       --bu-geant  le MONTANT. Un seul par feuille : c'est le fait qu'on vient
+                   chercher sur un document du bureau.
+       --bu-cle    ce qui identifie : le titre, le numéro, le nom du client, le
+                   nom de la maison.
+       --bu-texte  tout le corps du document.
+       le cran des intitulés vit dans papier.js, avec le ticket.
+     POURQUOI 13 ET NON 15 comme le ticket : les deux papiers ne se lisent pas
+     à la même distance. Le ticket est sur un plan de travail, on le lit à bout
+     de bras et il porte six faits ; celui-ci se lit à trente centimètres et
+     porte tout le dossier. L'encre, le gris, le filet, les intitulés et la
+     marge, eux, sont communs — ils sont dans papier.js.
+     ATTENTION, DEUX PIÈGES DÉJÀ PAYÉS SUR LE TICKET :
+       1. AUCUN ACCENT GRAVE ici : ce gabarit est un littéral, un accent grave
+          dans un commentaire le TERMINE. Le module reste valide, node --check
+          passe, et l'application s'ouvre sur un écran NU.
+       2. AUCUN JETON ÉTRANGER : le cadre d'impression ne charge QUE cette
+          chaîne. Un jeton de la charte y vaut la chaîne vide, donc un
+          rembourrage à zéro SUR LE PAPIER et nulle part ailleurs. */
+  .bu {${JETONS_PAPIER}
+       --bu-geant: 30px; --bu-cle: 17px; --bu-texte: 13px;
+       width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto;
+       display: flex; flex-direction: column;
+       background: #ffffff; color: var(--pap-encre);
+       font: var(--bu-texte)/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+       font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .bu * { box-sizing: border-box; }
 
-.bu__table { width: 100%; border-collapse: collapse; }
-.bu__table th {
-  padding: 6px 8px; border-bottom: 2px solid var(--bu-encre); text-align: left;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--bu-cap); font-weight: 500; letter-spacing: .14em;
-  color: var(--bu-ardoise); text-transform: uppercase;
-}
-.bu__table td { padding: 8px; border-bottom: 1px solid var(--bu-filet); vertical-align: top; }
-.bu__num { text-align: right; white-space: nowrap; }
-.bu__desi { font-weight: 700; }
-.bu__sous { display: block; font-size: var(--bu-note); color: var(--bu-ardoise); }
+  /* L'EN-TÊTE PORTE L'ÉMETTEUR, et c'est le défaut de fond qui a été corrigé
+     le 28/08 : le document ne disait pas de qui il venait. Un bon de commande
+     sans nom, sans adresse et sans numéro légal n'est pas un document, c'est
+     une note — on ne le classe pas, on ne le joint pas, on ne s'en sert pas
+     pour relancer. L'identité vient des réglages, pas du code : un
+     déménagement ne doit pas demander un déploiement. Un champ vide ne
+     s'imprime pas. */
+  .bu__tete { display: flex; align-items: flex-start; justify-content: space-between;
+              gap: 28px; padding: 26px var(--pap-marge) 16px; border-bottom: 3px solid var(--pap-encre); }
+  /* UNE LIGNE D'ADRESSE PEUT ÊTRE LONGUE, et elle est saisie à la main : le
+     réglage accepte 160 signes. Sans point de coupure, une valeur d'un seul
+     tenant poussait le titre et le numéro HORS de la feuille — vu au premier
+     essai dans l'application, sur une saisie de contrôle. */
+  .bu__maison { display: flex; flex-direction: column; gap: 1px; min-width: 0;
+                overflow-wrap: anywhere; }
+  .bu__maison-nom { font-size: var(--bu-cle); font-weight: 800; letter-spacing: -.02em;
+                    line-height: 1.2; margin-bottom: 3px; }
+  .bu__maison-l { color: var(--pap-ardoise); line-height: 1.35; }
+  .bu__ref { display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+             text-align: right; flex: 0 0 auto; }
+  /* LE TITRE NE CRIE PLUS. À 34 px il annonçait en capitales grasses ce que le
+     numéro juste dessous disait déjà, et il déséquilibrait toute la feuille :
+     le plus gros caractère d'un document du bureau doit être le MONTANT. */
+  .bu__titre { font-size: var(--bu-cle); font-weight: 800; letter-spacing: .04em;
+               line-height: 1.15; text-transform: uppercase; white-space: nowrap; }
+  .bu__ref-v { font: 700 var(--bu-cle)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-.bu__totaux { display: flex; justify-content: flex-end; }
-.bu__totaux-boite { min-width: 74mm; border: 2px solid var(--bu-encre); padding: 12px 14px; }
-.bu__ttc { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--bu-encre); }
-.bu__ttc-v { font-size: var(--bu-nombre); font-weight: 800; letter-spacing: -.03em; }
-.bu__achiffrer { font-size: var(--bu-cle); font-weight: 800; }
+  .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px;
+               padding: 16px var(--pap-marge) 0; }
+  /* DEUX BLOCS DE MÊME HAUTEUR, toujours : ils sont côte à côte et se lisent
+     ensemble. Un cadre plus court que son voisin se lit comme un cadre
+     inachevé. */
+  .bu__deux { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+  .bu__bloc { display: flex; flex-direction: column; border: 1px solid var(--pap-filet); padding: 11px 13px; }
+  .bu__bloc-titre { margin-bottom: 7px; }
+  .bu__paire { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .bu__paire + .bu__paire { border-top: 1px dotted var(--pap-filet); }
+  .bu__k { color: var(--pap-ardoise); }
+  .bu__v { font-weight: 700; text-align: right; }
+  .bu__nom { font-size: var(--bu-cle); font-weight: 800; letter-spacing: -.02em;
+             line-height: 1.15; margin-bottom: 5px; }
 
-/* LE BLOC INTERNE. Marge, coût de revient, note : il ne sort PAS chez le
-   client. Un liseré rayé le dit sans qu'on ait besoin de le lire. */
-.bu__interne { border: 1px dashed var(--bu-encre); padding: 12px 14px; }
-.bu__interne-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.bu__grille3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.bu__mesure { display: flex; flex-direction: column; gap: 2px; }
-.bu__mesure-v { font-size: var(--bu-fort); font-weight: 800; }
-.bu__libre { margin: 0; white-space: pre-wrap; }
+  /* LE DÉTAIL. Les colonnes sont FIXÉES : sans largeur déclarée, la colonne des
+     prix se calait sur son contenu et bougeait d'un document à l'autre — deux
+     bons de commande côte à côte ne se comparaient pas. */
+  .bu__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .bu__table th { padding: 5px 8px; border-bottom: 1.5px solid var(--pap-encre); text-align: left;
+                  font: 500 var(--pap-cap)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                  letter-spacing: .16em; color: var(--pap-ardoise); text-transform: uppercase; }
+  .bu__table td { padding: 7px 8px; border-bottom: 1px dotted var(--pap-filet); vertical-align: top; }
+  .bu__col--qte { width: 15mm; }
+  .bu__col--pu { width: 25mm; }
+  .bu__col--total { width: 27mm; }
+  .bu__table tbody tr:last-child td { border-bottom: 0; }
+  .bu__num { text-align: right; white-space: nowrap; }
+  .bu__desi { font-weight: 700; }
+  .bu__sous { display: block; color: var(--pap-ardoise); line-height: 1.3; }
 
-.bu__pied {
-  display: flex; align-items: center; justify-content: space-between; gap: 24px;
-  margin-top: auto; padding: 12px 40px 20px; border-top: 1px dashed var(--bu-encre);
-}
-.bu + .bu { break-before: page; page-break-before: always; }
+  /* LES TOTAUX SONT DANS LE BLOC DU DÉTAIL, pas à côté. La boîte flottait
+     seule à droite, sans rien qui la relie au tableau dont elle fait la somme :
+     sur un document qui sert à facturer, le total doit toucher ce qu'il
+     additionne. */
+  .bu__totaux { display: flex; justify-content: flex-end; margin-top: 12px;
+                padding-top: 12px; border-top: 1.5px solid var(--pap-encre); }
+  /* UN TRAIT NE SÉPARE RIEN QUAND IL N'Y A RIEN AU-DESSUS. Sur un dossier sans
+     détail figé (une ligne créée à la main dans la grille), le tableau ne se
+     dessine pas : le trait des totaux restait seul en haut d'un cadre vide. */
+  .bu__totaux--seul { margin-top: 0; padding-top: 0; border-top: 0; }
+  .bu__totaux-boite { width: 76mm; }
+  .bu__ttc { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+             margin-top: 7px; padding-top: 7px; border-top: 1.5px solid var(--pap-encre); }
+  .bu__ttc-v { font-size: var(--bu-geant); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .bu__achiffrer { font-size: var(--bu-cle); font-weight: 800; }
+
+  /* LE BLOC INTERNE. Marge, coût de revient, note : il ne sort PAS chez le
+     client. Un liseré rayé le dit sans qu'on ait besoin de le lire. */
+  .bu__interne { border: 1px dashed var(--pap-encre); padding: 11px 13px; }
+  .bu__interne-tete { display: flex; align-items: baseline; justify-content: space-between;
+                      gap: 12px; margin-bottom: 8px; }
+  .bu__grille3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .bu__mesure { display: flex; flex-direction: column; gap: 2px; }
+  .bu__mesure-v { font-size: var(--bu-cle); font-weight: 800; }
+  .bu__libre { margin: 8px 0 0; white-space: pre-wrap; }
+
+  /* LE PIED TIENT SUR UNE LIGNE. Il portait le nom, le titre, le numéro et les
+     coordonnées : les deux moitiés revenaient à la ligne en plein milieu du
+     numéro de dossier, ce qui est exactement ce qu'un pied ne doit pas faire —
+     on le lit pour identifier une feuille, pas pour la déchiffrer. */
+  .bu__pied { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+              margin-top: auto; padding: 12px var(--pap-marge) 20px; border-top: 1px dashed var(--pap-encre);
+              white-space: nowrap; }
+  .bu__pied .pap-cap { overflow: hidden; text-overflow: ellipsis; }
+  .bu + .bu { break-before: page; page-break-before: always; }
 `;
 
 // ===========================================================================
@@ -366,7 +477,7 @@ export function dessinerBureau(t, doc) {
     if (txt != null) n.textContent = txt;
     return n;
   };
-  const cap = (txt, cls) => el('div', cls ? `bu__cap ${cls}` : 'bu__cap', txt);
+  const cap = (txt, cls) => el('div', cls ? `pap-cap ${cls}` : 'pap-cap', txt);
   const paire = (k, v) => {
     const p = el('div', 'bu__paire');
     p.append(el('span', 'bu__k', k), el('span', 'bu__v', v));
@@ -375,11 +486,27 @@ export function dessinerBureau(t, doc) {
 
   const feuille = el('div', 'bu');
 
-  // --- L'en-tête : ce que c'est, et son numéro ------------------------------
+  // --- L'en-tête : QUI l'émet, ce que c'est, et son numéro ------------------
+  // L'ÉMETTEUR EST À GAUCHE, comme sur tout document commercial : c'est la
+  // première chose qu'on lit, et c'est ce qui manquait. Le document ne disait
+  // pas de qui il venait — ni nom, ni adresse, ni numéro légal.
   const tete = el('div', 'bu__tete');
-  tete.append(el('div', 'bu__titre', t.titre));
+  const maison = el('div', 'bu__maison');
+  if (t.maison.nom) maison.append(el('div', 'bu__maison-nom', t.maison.nom));
+  for (const ligne of t.maison.lignes) maison.append(el('div', 'bu__maison-l', ligne));
+  if (t.maison.contact.length) {
+    maison.append(el('div', 'bu__maison-l', t.maison.contact.join(' · ')));
+  }
+  // Les numéros légaux ne sont PAS ici : ils sont au pied, là où on les cherche
+  // sur un document commercial et où ils ne disputent pas la place à ce qui
+  // sert tous les jours (le nom, l'adresse, de quoi joindre la maison).
+  tete.append(maison);
+
   const bRef = el('div', 'bu__ref');
-  bRef.append(cap(t.demande ? 'Demande' : 'Commande'), el('div', 'bu__ref-v', t.ref || '—'));
+  bRef.append(el('div', 'bu__titre', t.titre), el('div', 'bu__ref-v', t.ref || '—'));
+  // QUAND. Un document commercial porte sa date à côté de son numéro : sans
+  // elle, deux versions du même dossier ne se départagent pas.
+  if (t.priseLe) bRef.append(cap(`${t.demande ? 'Demande reçue le' : 'Établi le'} ${t.priseLe}`));
   // Le numéro que porte le ticket déjà remis au client, quand il diffère : sans
   // lui, le client tend un papier qu'on ne retrouve nulle part.
   if (t.refTicket) bRef.append(el('div', 'bu__sous', `ticket remis : ${t.refTicket}`));
@@ -393,7 +520,7 @@ export function dessinerBureau(t, doc) {
   // --- Le client, en entier, et les dates ----------------------------------
   const deux = el('div', 'bu__deux');
   const bClient = el('div', 'bu__bloc');
-  bClient.append(cap('Client', 'bu__bloc-titre'), el('div', 'bu__nom', t.client.nom || '—'));
+  bClient.append(cap('CLIENT', 'bu__bloc-titre'), el('div', 'bu__nom', t.client.nom || '—'));
   for (const [k, v] of [['Type', t.client.type], ['Contact', t.client.contact],
     ['Téléphone', t.client.tel], ['E-mail', t.client.email]]) {
     // UN CHAMP VIDE NE S'AFFICHE PAS. « E-mail : — » n'apprend rien et pousse
@@ -403,8 +530,9 @@ export function dessinerBureau(t, doc) {
   for (const x of t.client.autres) bClient.append(paire(x.k, x.v));
 
   const bDates = el('div', 'bu__bloc');
-  bDates.append(cap('Dossier', 'bu__bloc-titre'));
-  if (t.priseLe) bDates.append(paire(t.demande ? 'Demande prise le' : 'Commande prise le', t.priseLe));
+  bDates.append(cap('DOSSIER', 'bu__bloc-titre'));
+  // La date de prise n'est plus ici : elle est en tête, sous le numéro, là où
+  // un document commercial la porte. Elle y était écrite une deuxième fois.
   if (t.retrait) bDates.append(paire('Récupération', t.heure ? `${t.retrait} à ${t.heure}` : t.retrait));
   if (t.responsable) bDates.append(paire('Suivi par', t.responsable));
   if (t.production) bDates.append(paire('Production', t.production));
@@ -412,10 +540,27 @@ export function dessinerBureau(t, doc) {
   corps.append(deux);
 
   // --- LE DÉTAIL : c'est le cœur du document du bureau ----------------------
+  // LE TABLEAU ET SON TOTAL NE FONT QU'UN BLOC. La boîte des totaux flottait
+  // seule à droite, séparée du tableau dont elle est la somme : sur un document
+  // qui sert à facturer, le total doit toucher ce qu'il additionne.
+  const blocDetail = el('div', 'bu__bloc');
   if (t.articles.length) {
-    const bloc = el('div', 'bu__bloc');
-    bloc.append(cap('Détail', 'bu__bloc-titre'));
+    blocDetail.append(cap('DÉTAIL', 'bu__bloc-titre'));
     const table = el('table', 'bu__table');
+    // LES LARGEURS SONT DÉCLARÉES, ET ELLES LE SONT EN CSS. Sans largeur, la
+    // colonne des prix se calait sur son contenu : un document à 1 362 € et un
+    // autre à 88 € n'avaient pas la même grille, et deux bons de commande côte
+    // à côte ne se comparaient plus. La désignation prend ce qui reste.
+    // EN CSS ET PAS EN STYLE EN LIGNE : le document se dessine aussi hors
+    // navigateur — les tests le rendent dans un DOM minimal, sans propriété
+    // `style`, et c'est cette portabilité qui permet de vérifier le papier sans
+    // ouvrir Chrome. Même règle que la grille du ticket.
+    const groupe = el('colgroup');
+    const colonnesL = t.demande
+      ? ['', 'bu__col--qte']
+      : ['', 'bu__col--qte', 'bu__col--pu', 'bu__col--total'];
+    for (const cls of colonnesL) groupe.append(el('col', cls));
+    table.append(groupe);
     const thead = el('thead');
     const trh = el('tr');
     const colonnes = t.demande
@@ -444,15 +589,18 @@ export function dessinerBureau(t, doc) {
       tbody.append(tr);
     }
     table.append(tbody);
-    bloc.append(table);
-    corps.append(bloc);
+    blocDetail.append(table);
   }
 
   // --- L'ARGENT. Le bloc que le ticket d'atelier ne verra jamais ------------
   const arg = t.argent;
-  const totaux = el('div', 'bu__totaux');
+  const totaux = el('div', t.articles.length ? 'bu__totaux' : 'bu__totaux bu__totaux--seul');
   const boite = el('div', 'bu__totaux-boite');
-  boite.append(cap('Total', 'bu__bloc-titre'));
+  // L'INTITULÉ NE SERT QUE QUAND LA BOÎTE NE SE NOMME PAS TOUTE SEULE. Les
+  // lignes disent déjà « Total HT », « TGCA », « TTC » : un « TOTAL » au-dessus
+  // ne fait que répéter. Sur un dossier sans prix, en revanche, la boîte ne
+  // porte que deux mots et il faut dire de quoi ils parlent.
+  if (arg.ttc == null) boite.append(cap('TOTAL', 'bu__bloc-titre'));
   if (arg.ttc == null) {
     // « Pas encore chiffré » n'est PAS « gratuit ». On l'écrit en toutes
     // lettres plutôt que d'imprimer 0,00 € sur un document qui sert à facturer.
@@ -466,12 +614,22 @@ export function dessinerBureau(t, doc) {
     boite.append(paire('Règlement', arg.paye ? (arg.mode || 'Payé') : 'À encaisser'));
   }
   totaux.append(boite);
-  corps.append(totaux);
+  if (t.articles.length) {
+    blocDetail.append(totaux);
+    corps.append(blocDetail);
+  } else {
+    // PAS DE DÉTAIL FIGÉ — une ligne créée à la main dans la grille n'a pas de
+    // panier. Le total reprend alors son propre cadre : le laisser dans un bloc
+    // « Détail » qui ne contient rien donnait un grand rectangle vide avec les
+    // chiffres tassés dans son coin droit.
+    boite.className = 'bu__totaux-boite bu__bloc';
+    corps.append(totaux);
+  }
 
   // --- Ce que la vendeuse a recueilli, tel qu'elle l'a écrit ----------------
   if (t.dossier.length) {
     const bloc = el('div', 'bu__bloc');
-    bloc.append(cap('Ce qui a été recueilli', 'bu__bloc-titre'));
+    bloc.append(cap('CE QUI A ÉTÉ RECUEILLI', 'bu__bloc-titre'));
     for (const x of t.dossier) bloc.append(paire(x.k, x.v));
     corps.append(bloc);
   }
@@ -479,7 +637,7 @@ export function dessinerBureau(t, doc) {
   // --- LE BLOC INTERNE : marge, revient, note. Ne sort pas chez le client ---
   const interne = el('div', 'bu__interne');
   const teteI = el('div', 'bu__interne-tete');
-  teteI.append(cap('Interne'), el('span', 'bu__sous', 'ne pas remettre au client'));
+  teteI.append(cap('INTERNE'), el('span', 'bu__sous', 'ne pas remettre au client'));
   interne.append(teteI);
   const g = el('div', 'bu__grille3');
   const mesure = (k, v) => {
@@ -488,18 +646,24 @@ export function dessinerBureau(t, doc) {
     return m;
   };
   g.append(
-    mesure('Coût de revient', arg.revient == null ? '—' : euro(arg.revient)),
-    mesure('Marge', arg.marge == null ? '—' : euro(arg.marge)),
-    mesure('Acompte', arg.acompteDemande ? (arg.acompteVerse ? 'versé' : 'demandé') : '—'),
+    mesure('COÛT DE REVIENT', arg.revient == null ? '—' : euro(arg.revient)),
+    mesure('MARGE', arg.marge == null ? '—' : euro(arg.marge)),
+    mesure('ACOMPTE', arg.acompteDemande ? (arg.acompteVerse ? 'versé' : 'demandé') : '—'),
   );
   interne.append(g);
+  for (const n of t.notes || []) interne.append(el('p', 'bu__libre', n));
   if (t.note) interne.append(el('p', 'bu__libre', t.note));
   corps.append(interne);
 
   // --- Le pied -------------------------------------------------------------
+  // LE PIED IDENTIFIE UNE FEUILLE DÉTACHÉE, il ne redit pas l'en-tête. Il
+  // portait le nom, le titre, le numéro ET les coordonnées — tout ce qui est
+  // déjà écrit vingt centimètres plus haut, sur deux lignes qui revenaient à la
+  // ligne en plein milieu du numéro. Les mentions légales, elles, sont à leur
+  // place ici : c'est là qu'on les cherche sur un document commercial.
   const pied = el('div', 'bu__pied');
-  pied.append(cap(`Atelier OLDA · ${t.titre}${t.ref ? ` ${t.ref}` : ''}`),
-    cap(t.priseLe || ''));
+  pied.append(cap(t.maison.legal.join(' · ')),
+    cap(`${t.maison.nom}${t.ref ? ` · ${t.ref}` : ''}`));
   feuille.append(pied);
   return feuille;
 }
@@ -508,7 +672,13 @@ export function dessinerBureau(t, doc) {
 // imprimante recopie. Même contenu que le papier, à la ligne près.
 export function bureauTexte(t) {
   const sep = '='.repeat(56);
-  const out = [`${t.titre.toUpperCase()}${t.ref ? ` — ${t.ref}` : ''}`, sep];
+  const out = [];
+  // MÊME CONTENU QUE LE PAPIER. Le texte est ce qu'on colle dans un e-mail :
+  // sans émetteur, le destinataire ne sait pas de qui il vient.
+  for (const l of [t.maison.nom, ...t.maison.lignes, t.maison.contact.join(' · '),
+    t.maison.legal.join(' · ')]) if (l) out.push(l);
+  if (out.length) out.push('');
+  out.push(`${t.titre.toUpperCase()}${t.ref ? ` — ${t.ref}` : ''}`, sep);
   if (t.lot) out.push(`Article ${t.lot.rang} sur ${t.lot.total} de la commande`);
   out.push(`Client : ${t.client.nom}${t.client.type ? ` (${t.client.type})` : ''}`);
   for (const [k, v] of [['Contact', t.client.contact], ['Téléphone', t.client.tel],
@@ -542,6 +712,7 @@ export function bureauTexte(t) {
   out.push(sep, 'INTERNE — ne pas remettre au client');
   out.push(`Coût de revient : ${arg.revient == null ? '—' : euro(arg.revient)}`);
   out.push(`Marge : ${arg.marge == null ? '—' : euro(arg.marge)}`);
+  for (const n of t.notes || []) out.push(n);
   if (t.note) out.push(t.note);
   return out.join('\n');
 }

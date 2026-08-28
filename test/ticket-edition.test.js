@@ -23,6 +23,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { chargerPapier } = require('./socle-papier.js');
 const vm = require('node:vm');
 
 delete process.env.DATABASE_URL;
@@ -31,15 +32,7 @@ delete process.env.APP_PASSWORD;
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 
 const SRC = lire('ticket.js');
-const bac = {};
-vm.createContext(bac);
-vm.runInContext(
-  `${SRC.replace(/^export\s+/gm, '')}
-   globalThis.modeleTicket = modeleTicket;
-   globalThis.ticketTexte = ticketTexte;
-   globalThis.dessinerTicket = dessinerTicket;`,
-  bac,
-);
+const bac = chargerPapier('ticket.js', ['modeleTicket', 'ticketTexte', 'dessinerTicket']);
 const { modeleTicket, ticketTexte, dessinerTicket } = bac;
 
 // Une vente du comptoir : deux articles, dans la forme exacte que produit

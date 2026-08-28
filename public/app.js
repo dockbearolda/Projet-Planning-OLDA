@@ -4150,7 +4150,7 @@ async function ouvrirBureau(r) {
     }
     completerFiche(r);
     if (r.fiche && r.fiche.fichePartielle) throw new Error(TICKET_SANS_DETAIL);
-    t = mod.modeleBureau(r);
+    t = mod.modeleBureau(r, await identiteAtelier());
   } catch (err) {
     bureauOuvert = false;
     reportError(err);
@@ -4225,6 +4225,24 @@ async function ouvrirBureau(r) {
     const premier = actions.querySelector('button');
     if (premier) premier.focus();
   });
+}
+
+// L'IDENTITÉ DE L'ATELIER — ce qui signe le bon de commande. Lue UNE fois par
+// session : elle change deux fois dans la vie d'un atelier, et la relire à
+// chaque ouverture ajouterait un aller-retour entre le clic et le papier.
+// Si la lecture échoue, le document sort SANS en-tête plutôt que pas du tout :
+// un bon de commande incomplet vaut mieux qu'un bouton qui ne fait rien.
+let identitePromesse = null;
+function identiteAtelier() {
+  if (!identitePromesse) {
+    // `fetchBorne` et pas `fetch` nu : un serveur qui ne répond plus laisserait
+    // la promesse suspendue, et le bouton « Bon de commande » ne rendrait
+    // jamais la main.
+    identitePromesse = fetchBorne('/api/settings/entreprise')
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}));
+  }
+  return identitePromesse;
 }
 
 function imprimerBureau(mod, t) {

@@ -36,6 +36,20 @@ production tourne en **UTC** : toute date civile calculée côté serveur passe 
   Une nouvelle version de sa part se pose en **remplaçant le fichier** — on ne
   retranscrit pas le parcours. Tout ce qui doit s'y greffer (base clients,
   numéro du jour, envoi au planning) vit dans `comptoir/pont.js`.
+- **Les deux papiers** (`public/ticket.js` pour l'atelier, `public/bureau.js`
+  pour le bon de commande) sortent de la **même ligne**, à un clic l'un de
+  l'autre. Leur grammaire commune — encre, filet, marge de feuille, intitulés —
+  vit dans `public/papier.js` et **ne se réécrit chez aucun des deux**. Chaque
+  papier déclare **trois crans de texte** en propre, plus celui des intitulés :
+  le ticket en avait dix, ça se voit et ça coûte une réimpression. Deux pièges
+  déjà payés, tenus par les tests : **aucun accent grave** dans les gabarits (il
+  les termine, l'écran s'ouvre NU) et **aucun jeton de `charte.css`** (le cadre
+  d'impression ne la charge pas — le jeton y vaut VIDE au PAPIER, et nulle part
+  ailleurs, donc l'aperçu paraît correct).
+  L'**identité de l'atelier** qui signe le bon de commande est un **réglage**
+  (`app_meta.entreprise`), jamais une constante : un déménagement ne demande pas
+  un déploiement, et un champ vide ne s'imprime pas.
+
 - **Charte unique** (depuis le 29/07) : gris `#f5f6f8`, encre `#111827`.
   La couleur dit un **état**, jamais une décoration.
   **Une seule exception, tranchée par Charlie le 26/08** : les **cinq teintes

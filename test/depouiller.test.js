@@ -109,18 +109,26 @@ assert.deepStrictEqual(repliés, [], `dépouillage abandonné sur : ${repliés.j
 // b) LE COMPORTEMENT EST IDENTIQUE. `ticket.js` est le pire cas du dépôt : un
 //    gabarit de 9 000 caractères bourré de `/* … */`, et des expressions
 //    régulières juste à côté. On l'évalue deux fois et on compare.
-const charger = (code) => {
+// `ticket.js` IMPORTE le socle des deux papiers (`papier.js`) : les jetons
+// d'encre, de filet et de marge y sont écrits UNE fois pour le ticket et le bon
+// de commande. Un contexte `vm` ne sait pas résoudre un import — on colle donc
+// le socle devant, dépouillé lui aussi quand c'est la version dépouillée qu'on
+// évalue : les deux moitiés doivent subir le même traitement, sinon la
+// comparaison ne prouve rien.
+const charger = (code, transformer) => {
   const bac = {};
   vm.createContext(bac);
+  const socle = transformer(lire('public/papier.js'));
   vm.runInContext(
-    `${code.replace(/^export\s+/gm, '')}
+    `${socle.replace(/^export\s+/gm, '')}
+     ${code.replace(/^export\s+/gm, '').replace(/^import[\s\S]*?from\s+'[^']*';$/gm, '')}
      globalThis.M = modeleTicket; globalThis.T = ticketTexte; globalThis.C = CSS_TICKET;`,
     bac,
   );
   return bac;
 };
-const avant = charger(lire('public/ticket.js'));
-const apres = charger(depouiller(lire('public/ticket.js'), 'js'));
+const avant = charger(lire('public/ticket.js'), (x) => x);
+const apres = charger(depouiller(lire('public/ticket.js'), 'js'), (x) => depouiller(x, 'js'));
 
 const DOSSIER = {
   billing_company: 'Beach Bar', contact_referent: 'Yann', contact_phone: '0690 55 12 40',

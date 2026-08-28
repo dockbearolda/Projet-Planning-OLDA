@@ -142,6 +142,20 @@ function buildStatic() {
 
   page.appendChild(card);
 
+  // --- Carte « Identité de l'atelier » ----------------------------------------
+  // CE QUI SIGNE LE BON DE COMMANDE. Le document sortait sans émetteur : ni
+  // nom, ni adresse, ni numéro légal — donc un papier qu'on ne peut ni classer,
+  // ni joindre, ni opposer. L'identité vit ici et non dans le code : un
+  // déménagement ne doit pas demander un déploiement.
+  // `storefront` et pas `store` : la police est un sous-ensemble figé de 91
+  // glyphes, et un nom absent ne lève RIEN — il s'affiche en texte tronqué.
+  // Mesuré au canevas le 28/08 : `store` sort à 100 px (cinq lettres à 20),
+  // `storefront` à 20 (la ligature existe).
+  page.appendChild(carteSimple('storefront', 'Identité de l’atelier',
+    'Le nom, l’adresse et les numéros qui s’impriment en haut et en bas du bon '
+    + 'de commande. Ce qui est laissé vide ne s’imprime pas : le papier sort '
+    + 'avec ce qu’on sait, jamais avec une ligne à trou.', 'reg-entreprise'));
+
   // --- Carte « Tarifs tasse » -------------------------------------------------
   const tcard = el('section', 'reg-card');
   const tch = el('header', 'reg-card__head');
@@ -398,6 +412,51 @@ function renderModeles() {
     return l;
   }));
   if (!modeles.length) hote.append(el('p', 'reg-corb__vide', 'Aucun modèle.'));
+}
+
+// L'IDENTITÉ DE L'ATELIER. Huit lignes de texte libre, enregistrées à la PERTE
+// DU FOCUS : un enregistrement par touche ferait un appel par caractère tapé.
+// L'ordre est celui du papier — le nom d'abord, les mentions légales en
+// dernier, comme elles sortent au pied du document.
+let entreprise = {};
+const ENTREPRISE_LIGNES = [
+  ['nom', 'Nom', 'Atelier OLDA'],
+  ['adresse', 'Adresse', '27 rue de Hollande'],
+  ['ville', 'Code postal et ville', '97150 Marigot, Saint-Martin'],
+  ['tel', 'Téléphone', '0590 87 12 34'],
+  ['email', 'E-mail', 'contact@exemple.fr'],
+  ['web', 'Site', 'exemple.fr'],
+  ['siret', 'SIRET', '812 345 678 00019'],
+  ['tva', 'N° de TVA', 'FR00 812345678'],
+];
+
+function renderEntreprise() {
+  const hote = $('#reg-entreprise');
+  if (!hote) return;
+  // TOUS LES CHAMPS COMMENCENT AU MÊME ENDROIT. Sans cette classe, chaque
+  // intitulé pousse son champ de sa propre largeur — huit lignes, huit bords
+  // gauches, sur une carte qui se lit en colonne (voir styles.css).
+  hote.classList.add('reg-liste--paires');
+  hote.replaceChildren(...ENTREPRISE_LIGNES.map(([cle, nom, exemple]) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', nom));
+    const champ = el('input', 'reg-tarif-input reg-tarif-input--nom');
+    champ.type = 'text';
+    champ.value = entreprise[cle] == null ? '' : String(entreprise[cle]);
+    champ.placeholder = exemple;
+    champ.setAttribute('aria-label', nom);
+    champ.addEventListener('change', async () => {
+      try {
+        entreprise = await api('PUT', '/api/settings/entreprise', { [cle]: champ.value });
+        // On ne redessine pas : le serveur a pu nettoyer la valeur (espaces,
+        // longueur), et remplacer le champ SOUS LES DOIGTS ferait perdre le
+        // curseur à qui enchaîne deux lignes à la tabulation.
+        flash('Enregistré', 'is-ok');
+      } catch (err) { flash(err.message, 'is-ko'); }
+    });
+    l.append(champ);
+    return l;
+  }));
 }
 
 function renderMachines() {
@@ -792,6 +851,7 @@ export async function refreshReglages() {
     api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
     api('GET', '/api/supplements-express').then((d) => { if (d) express = d; }).catch(() => {}),
     api('GET', '/api/tarifs-transport').then((d) => { if (d) transports = d; }).catch(() => {}),
+    api('GET', '/api/settings/entreprise').then((d) => { if (d) entreprise = d; }).catch(() => {}),
   ]);
   renderMarges();
   renderExpress();
@@ -799,6 +859,12 @@ export async function refreshReglages() {
   renderModeles();
   renderMachines();
   renderFlags();
+  // UNE SAISIE EN COURS N'EST JAMAIS ÉCRASÉE. Redessiner l'identité pendant que
+  // le patron tape son adresse lui reprendrait le champ sous les doigts — le
+  // même piège que le message WhatsApp juste en dessous.
+  if (!ROOT.contains(document.activeElement) || !document.activeElement.closest('#reg-entreprise')) {
+    renderEntreprise();
+  }
   // L'état d'un clic précédent ne survit pas à un retour sur l'onglet : ce
   // qu'on relit fait foi.
   try {

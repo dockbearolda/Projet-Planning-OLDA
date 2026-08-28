@@ -6612,6 +6612,16 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .tl-vide { font-size: var(--taille-note); color: var(--text-2); line-height: var(--ligne-texte); margin: 0; }
 .reg-ligne { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
 .reg-ligne:last-child { border-bottom: 0; }
+/* UNE CARTE DE PAIRES : l'intitulé à gauche, le champ à droite, et TOUS les
+   champs commencent AU MÊME ENDROIT. En rangée flexible, chaque intitulé pousse
+   son champ de sa propre largeur : sur l'identité de l'atelier, les huit champs
+   ouvraient à huit abscisses différentes — de 442 px pour « Nom » à 568 pour
+   « Code postal et ville », mesuré le 28/08. Huit bords gauches sur une carte
+   qui se lit en colonne, c'est le défaut que la règle du 27/08 interdit, et il
+   se ferme en UNE règle : une piste d'intitulé, la même pour tous.
+   La largeur est un JETON, pas un nombre recopié dans huit sélecteurs. */
+.reg-liste--paires { --reg-etiq: 152px; }
+.reg-liste--paires .reg-ligne__nom { flex: 0 0 var(--reg-etiq); }
 .reg-ligne__nom { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
 /* `min-width: 0` : sans lui, une suite d'étapes longue garde sa largeur
    intrinsèque et pousse le contrôle hors de la carte. */

@@ -73,6 +73,10 @@ const COQUILLE = [
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',
+  // Le socle des deux papiers (encre, filet, marge, intitulés), importé
+  // statiquement par ticket.js ET par bureau.js : absent du cache, c'est
+  // l'import de ticket.js qui échoue, donc le planning entier.
+  '/papier.js',
   // Sortis de app.js le 27/08 et importés statiquement par lui : mêmes deux
   // lignes, même conséquence. Un fichier qu'on découpe est un fichier de plus
   // à mettre ici — c'est l'oubli qui accompagne toute découpe, et c'est

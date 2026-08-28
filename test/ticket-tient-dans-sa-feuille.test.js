@@ -87,7 +87,10 @@ assert.strictEqual(padNom, padBoite + traitBoite,
 // --- 5. ET TOUJOURS AUCUN ACCENT GRAVE ------------------------------------
 // CSS_TICKET est un littéral de gabarit : un seul accent grave le referme et
 // l'écran s'affiche NU. C'est arrivé en écrivant les commentaires ci-dessus.
-const d = TICKET.indexOf('export const CSS_TICKET = `') + 'export const CSS_TICKET = `'.length;
+// Le gabarit est PRÉCÉDÉ du socle partagé depuis le 28/08
+// (`CSS_TICKET = SOCLE_PAPIER + ...`) : on repère l'accent grave ouvrant, pas la
+// déclaration entière — sinon ce contrôle ne contrôle plus rien en silence.
+const d = TICKET.indexOf('`', TICKET.indexOf('export const CSS_TICKET')) + 1;
 const f = TICKET.indexOf('`;', d);
 assert.ok(f > d, 'CSS_TICKET doit rester repérable');
 assert.strictEqual(TICKET.slice(d, f).indexOf('`'), -1,

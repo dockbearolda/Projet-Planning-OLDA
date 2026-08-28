@@ -23,6 +23,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { chargerPapier } = require('./socle-papier.js');
 
 delete process.env.DATABASE_URL;
 delete process.env.APP_PASSWORD;
@@ -31,16 +32,10 @@ const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
 const APP = lire('public/app.js');
 
-// On charge le VRAI source (module ES du navigateur) dans un bac à sable.
-const bac = {};
-vm.createContext(bac);
-vm.runInContext(
-  `${lire('public/ticket.js').replace(/^export\s+/gm, '')}
-   globalThis.modeleTicket = modeleTicket;
-   globalThis.ticketTexte = ticketTexte;
-   globalThis.CSS_TICKET = CSS_TICKET;`,
-  bac,
-);
+// On charge le VRAI source (module ES du navigateur) dans un bac à sable, avec
+// le socle des deux papiers collé devant — voir test/socle-papier.js.
+const bac = chargerPapier('ticket.js',
+  ['modeleTicket', 'ticketTexte', 'dessinerTicket', 'CSS_TICKET']);
 const { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } = bac;
 
 const PROD = {
@@ -201,19 +196,28 @@ assert.match(papierTasse, /Zone Fond : à préciser/,
 // ---------------------------------------------------------------------------
 // 3. LA MISE EN PAGE DU PAPIER
 // ---------------------------------------------------------------------------
-// UNE ÉCHELLE, QUATRE TAILLES. Elle ne se choisit pas au cas par cas : les
-// valeurs sont des jetons, lus partout. Le plus grand n'habille QUE les deux
-// faits qu'on cherche du regard — la référence et la quantité ; il habillait
-// l'en-tête de marque, retiré le 26/08.
-// UNE ÉCHELLE, DES JETONS, AUCUNE TAILLE EN DUR. Le papier est passé du rouleau
-// de 76 mm à l'A4 le 26/08 : il porte plus de niveaux qu'un ticket de caisse
-// (un titre, un cadre d'identité, deux grilles, un cadre à écrire). Ce qui ne
-// change pas, c'est que chaque taille est DÉCLARÉE — une taille posée au cas par
-// cas dans une règle est une échelle qui dérive au troisième ajout.
-for (const jeton of ['--tk-geant: 64px', '--tk-titre: 44px', '--tk-nombre: 40px',
-  '--tk-cle: 25px', '--tk-fort: 23px', '--tk-mes: 18px', '--tk-texte: 17px',
-  '--tk-note: 15px', '--tk-etiq: 12px', '--tk-cap: 10px']) {
+// QUATRE CRANS, ET PAS UN DE PLUS (28/08).
+// Le papier en déclarait DIX : 64 / 44 / 40 / 25 / 23 / 18 / 17 / 15 / 12 / 10.
+// Charlie, capture à l'appui : « les polices sont démesurées sur le ticket
+// atelier ». Dix crans ne font pas une hiérarchie, ils font du désordre — et
+// sur un papier d'établi le désordre coûte une réimpression.
+//   --tk-geant  ce qu'on cherche du regard sur une pile : la référence et la
+//               quantité. DEUX faits, une taille.
+//   --tk-cle    ce qui décide : client, date de retrait, marquage, nombre par
+//               taille, cote par face.
+//   --tk-texte  ce qui se lit.
+// Le quatrième (les intitulés) vit dans le socle partagé avec le bon de
+// commande. Ce test tient le NOMBRE de crans, pas les valeurs : c'est le
+// nombre qui dérive au troisième ajout.
+for (const jeton of ['--tk-geant: 52px', '--tk-cle: 24px', '--tk-texte: 15px']) {
   assert.ok(CSS_TICKET.includes(jeton), `l’échelle du ticket doit poser ${jeton}`);
+}
+const cransTicket = [...new Set((CSS_TICKET.match(/--tk-[a-z]+:\s*[\d.]+px/g) || []))];
+assert.strictEqual(cransTicket.length, 3,
+  `le ticket ne déclare que trois crans de texte en propre, il en a ${cransTicket.length} : ${cransTicket.join(' · ')}`);
+for (const parti of ['--tk-titre', '--tk-nombre', '--tk-fort', '--tk-mes', '--tk-note', '--tk-etiq']) {
+  assert.ok(!CSS_TICKET.includes(parti),
+    `« ${parti} » a été fondu dans les trois crans : le laisser, c'est le rouvrir`);
 }
 assert.ok(!/font(?:-size)?:[^;]*?\d+px/.test(CSS_TICKET.replace(/\/\*[\s\S]*?\*\//g, ' ')),
   'aucune taille en dur : tout passe par les jetons');
@@ -221,6 +225,14 @@ assert.ok(!/font(?:-size)?:[^;]*?\d+px/.test(CSS_TICKET.replace(/\/\*[\s\S]*?\*\
 // seuls faits qu'on cherche du regard sur une pile de papiers.
 assert.strictEqual((CSS_TICKET.match(/var\(--tk-geant\)/g) || []).length, 1,
   'le plus grand corps n’habille qu’une seule règle');
+// … ET IL NE CASSE JAMAIS UN NOMBRE. La colonne de la quantité était élastique
+// comme celle de la désignation : sur « Tasse céramique 350 ml », la phrase
+// prenait toute la largeur et le 60 sortait en DEUX LIGNES, un 6 au-dessus d'un
+// 0 — mesuré le 28/08 sur deux jeux d'essai, dont une demande de devis (« 12 »).
+assert.match(CSS_TICKET, /\.tk__ident-col--d \{[^}]*flex: 0 0 auto/,
+  'la colonne de la quantité ne se comprime pas : c’est la phrase qui s’enroule');
+assert.match(CSS_TICKET, /\.tk__ident-qte[^{]*\{[^}]*white-space: nowrap/,
+  'un nombre ne revient jamais à la ligne');
 // LA FEUILLE DE STYLE EST UN LITTÉRAL GABARIT : un accent grave dans un
 // commentaire CSS le TERMINE. Le module reste syntaxiquement valide (le
 // morceau suivant devient un gabarit étiqueté), `node --check` passe, et
@@ -238,7 +250,11 @@ assert.ok(!CSS_TICKET.includes('`'), 'aucun accent grave dans la feuille du tick
 const jetonsEtrangers = [...new Set(
   (CSS_TICKET.match(/var\(\s*(--[a-z0-9-]+)/gi) || [])
     .map((m) => m.replace(/var\(\s*/i, ''))
-    .filter((j) => !j.startsWith('--tk-')),
+    // `--pap-` est le SOCLE PARTAGÉ (papier.js) : l'encre, le filet, la marge
+    // et la taille des intitulés, écrits une fois pour le ticket ET pour le bon
+    // de commande. Ils sont posés sur la feuille elle-même, donc présents dans
+    // le cadre d'impression — ce ne sont pas des jetons de `charte.css`.
+    .filter((j) => !j.startsWith('--tk-') && !j.startsWith('--pap-')),
 )];
 assert.deepStrictEqual(jetonsEtrangers, [],
   `la feuille du ticket ne doit dépendre que de ses propres jetons : ${jetonsEtrangers.join(', ')}`);
@@ -248,7 +264,7 @@ assert.deepStrictEqual(jetonsEtrangers, [],
 assert.match(CSS_TICKET, /\.tk__ident \{[^}]*border: 2px solid/);
 assert.match(CSS_TICKET, /\.tk__ident-tete \{[^}]*justify-content: space-between/);
 // La couleur du marquage porte la graisse forte, son intitulé reste une étiquette.
-assert.match(CSS_TICKET, /\.tk__ident-mq-v \{[^}]*font-size: var\(--tk-fort\)/);
+assert.match(CSS_TICKET, /\.tk__ident-mq-v \{[^}]*font-size: var\(--tk-cle\)/);
 
 // LES DEUX GRILLES SONT LA MÊME GRILLE, à une largeur de case près : tailles et
 // zones sont deux AXES INDÉPENDANTS. La maquette rangeait la largeur du dos
@@ -263,7 +279,10 @@ const SRC_TICKET = lire('public/ticket.js');
 const rendu = SRC_TICKET.slice(SRC_TICKET.indexOf('export function dessinerTicket'));
 assert.ok(!/\.style\b/.test(rendu),
   'le rendu du ticket ne pose aucun style en ligne : la grille se compte en CSS');
-assert.match(CSS_TICKET, /\.tk__case-v \{[^}]*font-size: var\(--tk-nombre\)/);
+// LE NOMBRE PAR TAILLE ET LA COTE PAR FACE SONT LE MÊME FAIT : ils sortent au
+// même cran. Ils sortaient à 40 et 18 px dans deux cartes voisines du même rang.
+assert.match(CSS_TICKET, /\.tk__case-v \{[^}]*font-size: var\(--tk-cle\)/);
+assert.match(CSS_TICKET, /\.tk__mes-n \{[^}]*font-size: var\(--tk-cle\)/);
 // UNE ZONE SANS MESURE SORT AVEC UN TRAIT POUR L'ÉCRIRE, pas avec un blanc :
 // un blanc ne se remplit pas.
 assert.match(CSS_TICKET, /\.tk__aecrire \{[^}]*border-bottom: 1px solid/);
@@ -289,7 +308,8 @@ assert.ok(!CSS_TICKET.includes('pointer: coarse'), 'plus d’échelle tactile su
 const couleurs = CSS_TICKET.replace(/\/\*[\s\S]*?\*\//g, ' ')
   .match(/#[0-9a-f]{3,6}/gi) || [];
 for (const c of couleurs) {
-  assert.ok(['#fff', '#202930', '#4a6274', '#adb8b9'].includes(c.toLowerCase()),
+  // `#f2f4f5` est le fond de la consigne : une surface, pas un signal.
+  assert.ok(['#fff', '#202930', '#4a6274', '#adb8b9', '#f2f4f5'].includes(c.toLowerCase()),
     `le ticket ne porte pas de couleur : ${c}`);
 }
 
@@ -341,7 +361,7 @@ assert.strictEqual(tousLes(nTextile, 'tk__aecrire').length, 0,
 // cesse alors de se répéter deux centimètres plus bas.
 const PROD_TASSE = { ...TASSE.fiche.prod };
 const nSansRef = papierDe({ ...PROD_TASSE, ref: '' }, 24);
-const capsSansRef = tousLes(nSansRef, 'tk__cap').map((n) => n.textContent);
+const capsSansRef = tousLes(nSansRef, 'pap-cap').map((n) => n.textContent);
 assert.ok(capsSansRef.includes('ARTICLE'), 'l’intitulé dit ce que la case porte vraiment');
 assert.ok(!capsSansRef.includes('RÉFÉRENCE'),
   'et il ne promet pas une référence qui n’existe pas');
@@ -359,7 +379,7 @@ assert.strictEqual(tousLes(nSansRef, 'tk__ident-nom')[0].textContent,
 // Avec une référence, rien ne bouge : c'est elle l'identité, et la désignation
 // reste la ligne qui confirme qu'on a pris la bonne boîte.
 const nAvecRef = papierDe(PROD_TASSE, 24);
-assert.ok(tousLes(nAvecRef, 'tk__cap').map((n) => n.textContent).includes('RÉFÉRENCE'));
+assert.ok(tousLes(nAvecRef, 'pap-cap').map((n) => n.textContent).includes('RÉFÉRENCE'));
 assert.strictEqual(tousLes(nAvecRef, 'tk__geant')[0].textContent, 'TC 06');
 assert.strictEqual(tousLes(nAvecRef, 'tk__geant')[0].className, 'tk__geant',
   'une référence tient en six signes : elle garde le plus grand corps');
