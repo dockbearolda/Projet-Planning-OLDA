@@ -2499,6 +2499,23 @@ document.addEventListener('pointerdown',ev=>{
   // entre-temps (un client créé depuis l'onglet Base clients).
   window.oldaRafraichirClients = () => chargerClients().catch(raterEnSilence('base clients indisponible'));
 
+  // EST-CE QUE QUELQU'UN A TAPÉ QUELQUE CHOSE ICI ?
+  // L'hôte recharge le parcours à chaque « Nouveau Projet » — c'est la règle du
+  // comptoir : le client suivant ne trouve jamais le formulaire du précédent.
+  // Mais recharger un écran ENCORE VIERGE, c'est 120 Ko de document ré-analysé
+  // et un écran qui blanchit pour revenir exactement au même endroit. C'est ce
+  // que Charlie a vu le 27/08/2026 : « toute la page recharge, c'est bizarre
+  // comme effet ».
+  // On répond donc à la seule question qui décide : y a-t-il quelque chose à
+  // jeter ? Le drapeau se lève à la PREMIÈRE frappe et ne redescend jamais —
+  // en cas de doute (fonction absente, cadre pas encore chargé), l'hôte
+  // recharge : c'est le côté sûr.
+  let saisieCommencee = false;
+  const marquerSaisie = () => { saisieCommencee = true; };
+  document.addEventListener('input', marquerSaisie, true);
+  document.addEventListener('change', marquerSaisie, true);
+  window.oldaParcoursVierge = () => !saisieCommencee && !ecranFinal();
+
   // L'écran ne parle jamais au serveur lui-même : il appelle ceci s'il existe,
   // et continue de tourner seul s'il n'existe pas (fichier ouvert sans pont).
   window.oldaEnregistrerClient = enregistrerClient;

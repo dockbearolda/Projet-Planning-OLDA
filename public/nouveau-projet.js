@@ -128,6 +128,9 @@ function afficher(id) {
     // Chargement à la demande : tant qu'un parcours n'a pas été ouvert, son
     // document n'est même pas téléchargé.
     if (!cadre.hidden && !cadre.src) cadre.src = urlDuFlux(f);
+    // Sali pendant qu'on travaillait sur l'autre parcours : il repart à zéro
+    // ici, au moment où il revient à l'écran (voir `aRafraichir`).
+    else if (!cadre.hidden && aRafraichir.has(f.id)) { aRafraichir.delete(f.id); reinitialiser(f.id); }
   }
   // Le parcours réaffiché a pu rester ouvert pendant qu'un client était créé
   // depuis l'onglet Base clients : sa recherche doit connaître le nouveau.
@@ -136,6 +139,13 @@ function afficher(id) {
     rafraichirClients(flux.id);
   }
 }
+
+// Un parcours SALI qu'on ne regarde pas : il repartira de zéro au moment où on
+// reviendra dessus, jamais avant. Recharger tout de suite le document d'un
+// écran que personne n'a sous les yeux, c'est ~120 Ko de HTML ré-analysé, une
+// base clients retéléchargée et un numéro de ticket réservé pour rien — et
+// c'est ce qui donnait l'impression que « toute la page recharge ».
+const aRafraichir = new Set();
 
 // Les parcours AFFICHÉS depuis la dernière remise à neuf : eux seuls ont pu
 // être salis par une saisie. Les autres sont restés vierges — les recharger
@@ -159,6 +169,17 @@ function rafraichirClients(id) {
 function reinitialiser(id) {
   const cadre = cadreDe(id);
   if (!cadre || !cadre.getAttribute('src')) return;
+  // RIEN DE TAPÉ, RIEN À JETER. Recharger un formulaire encore vierge, c'est
+  // ~120 Ko de document ré-analysé et un écran qui blanchit sous les yeux pour
+  // revenir exactement au même endroit — l'effet « toute la page recharge »
+  // (Charlie, 27/08/2026). Le cadre sait répondre : `oldaParcoursVierge` se
+  // lève à la première frappe. En cas de doute (fonction absente, cadre pas
+  // encore chargé, document d'un autre domaine) on recharge : c'est le côté
+  // sûr — un formulaire du client précédent devant le suivant, jamais.
+  try {
+    const w = cadre.contentWindow;
+    if (w && typeof w.oldaParcoursVierge === 'function' && w.oldaParcoursVierge()) return;
+  } catch (err) { /* on ne sait pas : on recharge */ }
   // On recalcule l'adresse : le thème a pu changer depuis l'ouverture, et
   // recharger l'ancienne rallumerait l'écran en clair le temps d'un message.
   const flux = FLUX.find((f) => f.id === id);
@@ -420,11 +441,25 @@ export function parcoursOuvert() {
 // n'est plus qu'un repli — on y arrive encore par l'adresse, jamais par un clic.
 export const PARCOURS = FLUX.map((f) => ({ id: f.id, label: f.label, icone: f.icone }));
 
-// Ouvrir un parcours SANS passer par l'accueil. `afficher` connaît déjà tout le
-// travail (cadre à la demande, thème, sortie) : on ne fait que lui donner la
-// main depuis l'extérieur.
-export function ouvrirParcours(id) {
+// OUVRIR UN PARCOURS NEUF DEPUIS LE MENU DE LA BARRE, EN UN SEUL MOUVEMENT.
+//
+// Ce que faisait le clic avant (Charlie, 27/08/2026 : « toute la page recharge,
+// c'est bizarre comme effet ») : il appelait `resetProjet()`, qui affiche
+// l'accueil à deux tuiles LE TEMPS D'UNE IMAGE puis recharge TOUS les parcours
+// déjà ouverts — et `setViewMode` le rappelait une seconde fois derrière. Un
+// clic valait donc un aller-retour par un écran qu'on ne voulait pas voir et
+// jusqu'à QUATRE chargements de document.
+//
+// Ce qu'il fait maintenant : le parcours demandé repart à zéro (client suivant,
+// formulaire vierge — la règle du comptoir ne bouge pas), le parcours d'à côté
+// est seulement NOTÉ comme à reprendre, et l'accueil n'est jamais traversé.
+export function ouvrirParcoursNeuf(id) {
   if (!FLUX.some((f) => f.id === id)) return false;
+  for (const f of FLUX) {
+    if (f.id !== id && fluxTouches.has(f.id)) aRafraichir.add(f.id);
+  }
+  if (fluxTouches.has(id)) reinitialiser(id);
+  fluxTouches.clear();
   afficher(id);
   return true;
 }
@@ -452,4 +487,5 @@ export async function resetProjet() {
     if (fluxTouches.has(f.id)) reinitialiser(f.id);
   }
   fluxTouches.clear();
+  aRafraichir.clear();
 }

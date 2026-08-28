@@ -2142,8 +2142,16 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-2); }
 .colbar-list { display: flex; flex-direction: column; gap: 4px; }
 
-/* Une entrée = une colonne, à la hauteur du rond du système. */
-.colbar-item {
+/* UNE RANGEE DE PANNEAU — LA MEME POUR LES DEUX PANNEAUX DE LA BARRE.
+   « Colonnes » et le menu de « + Nouveau Projet » tombent de la MEME barre, a
+   un clic l'un de l'autre, et s'ecrivaient chacun leur rangee : 44 px contre
+   50, 6/10 de rembourrage contre 0/14, graisse 600 contre 800. Deux composants
+   qui se ressemblent au lieu d'un seul — exactement ce que la charte interdit.
+   Il n'y en a plus qu'un.
+   La hauteur est celle du ROND du systeme : les boutons ronds de la barre du
+   haut la portent deja, une rangee de panneau se lit avec eux. */
+.colbar-item,
+.np-menu__item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2159,11 +2167,27 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-weight: var(--graisse-note);
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .colbar-item:hover { background: var(--state-hover); }
-.colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.colbar-item__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
+.colbar-item:focus-visible,
+.np-menu__item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+/* L'ICONE D'UNE RANGEE A UNE BOITE, ET ELLE EST ECRITE.
+   Sans largeur ni hauteur declarees, la boite sortait de la police : elle
+   tombait juste (20 x 20) tant que les glyphes avaient la meme chasse, et
+   aurait change le jour ou l'un d'eux ne l'aurait plus.
+   Ce qui reste inegal, et qu'aucune regle CSS n'egalise, c'est l'ENCRE du
+   pictogramme : 16,67 px pour la caisse contre 13,33 pour le devis, centrees
+   dans la meme boite de 20. Ca se dessine dans la police, pas ici. */
+.colbar-item__ic,
+.np-menu__ic {
+  flex: 0 0 auto;
+  width: var(--ic);
+  height: var(--ic);
+  font-size: var(--ic);
+  line-height: 1;
+  color: var(--text-2);
+}
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* LE MENU DE « + NOUVEAU PROJET ». Deux lignes, posées sous le bouton : c'est
    tout ce que l'écran à deux tuiles disait, et il prenait une page entière pour
@@ -2182,28 +2206,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 @keyframes npMenuEntre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .np-menu { animation: none; } }
-.np-menu__item {
-  display: flex;
-  align-items: center;
-  gap: var(--pas-2);
-  width: 100%;
-  min-height: var(--ctrl-h);
-  padding: 0 var(--champ-x);
-  border: 1px solid transparent;
-  border-radius: var(--arrondi-champ);
-  background: transparent;
-  color: var(--text-1);
-  font: inherit;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  line-height: var(--ligne-champ);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
+/* La rangee elle-meme est declaree avec celle du panneau « Colonnes » (plus
+   haut) : une seule ecriture, une seule hauteur. Ne reste ici que ce qui est
+   propre a ce menu — son survol. */
 .np-menu__item:hover { background: var(--primary-soft); color: var(--primary); }
-.np-menu__item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.np-menu__ic { flex: 0 0 auto; font-size: var(--ic); color: var(--text-2); }
 .np-menu__item:hover .np-menu__ic { color: var(--primary); }
 
 /* LA POIGNÉE DE RANGEMENT. Elle ne se montre qu'au survol de l'entrée : au
@@ -6263,6 +6269,7 @@ summary:focus-visible {
 .stage-link:active,
 .ordre-reset:active,
 .colbar-item:active,
+.np-menu__item:active,
 .menu-item:active,
 .ld-act:active { transform: scale(.97); }
 .pcard__open,
@@ -6274,6 +6281,7 @@ summary:focus-visible {
 .stage-link,
 .ordre-reset,
 .colbar-item,
+.np-menu__item,
 .menu-item,
 .ld-act { transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
             border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }

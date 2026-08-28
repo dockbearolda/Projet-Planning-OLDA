@@ -62,6 +62,34 @@ partagé va dans `public/charte.css` — le seul fichier que le CRM et les deux
 parcours du comptoir lisent tous les deux (déjà le cas du bouton « revenir »,
 du message flottant et du fil des étapes).
 
+**RÈGLE — TOUT CE QUI PEUT ÊTRE À LA MÊME HAUTEUR L'EST (27/08/2026).**
+Consigne de Charlie, mot pour mot : « il est extrêmement important que tout ce
+qui peut être à la même hauteur doit l'être, tu dois être ultra vigilant
+là-dessus ». Elle passe avant le confort d'écriture : deux composants de la
+même famille — deux rangées de menu, deux champs d'une rangée, deux boutons
+d'une barre — prennent **la même hauteur, le même rembourrage, le même écart
+et la même graisse**, et ils le prennent dans **une seule règle**, pas dans
+deux qui se ressemblent. Deux écritures redeviennent deux hauteurs le jour où
+l'une bouge.
+
+Trois corollaires, chacun payé une fois :
+
+- **Une hauteur est un JETON, jamais un nombre.** `min-height: var(--rond)`,
+  pas `min-height: 44px` — un nombre se recopie de travers.
+- **Un panneau tombe sur le RAIL de ce qui l'ouvre** : on aligne les icônes,
+  pas les bords de boîte, et on **mesure** l'écart au lieu de l'écrire. Le
+  menu de « Nouveau Projet » tombait 13,7 px à droite du « + » de son onglet
+  parce qu'il était posé au bord du bouton.
+- **Ce qui n'est pas égalisable se dit.** Deux pictogrammes dans la même boîte
+  de 20 px n'ont pas la même encre (16,67 px pour `point_of_sale`, 13,33 pour
+  `request_quote`) : ça se dessine dans la police, aucune règle CSS ne le
+  corrige. On égalise la boîte, et on ne prétend pas avoir égalisé le reste.
+
+Le garde-fou est `test/meme-hauteur.test.js` : il refuse un bloc dont
+`.np-menu__item` est le seul sélecteur, une hauteur écrite en dur, une boîte
+d'icône sans largeur **et** hauteur. Un écart de ce genre ne se voit pas en
+relisant un écran, seulement en comparant deux écrans — d'où le test.
+
 **Vérification** : ne jamais annoncer qu'un écran est bon sans l'avoir
 **comparé aux autres** — mesurer le même composant sur chaque écran qui le
 porte. Le 25/08, deux bulles d'étape de 41 et 47 px sont passées sous le

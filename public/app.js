@@ -8951,6 +8951,31 @@ function ouvrirMenuProjet(parcours) {
   pan.style.top = `${Math.round(r.bottom + 6)}px`;
   pan.style.left = `${Math.round(r.left)}px`;
   document.body.appendChild(pan);
+  // LE MENU TOMBE SUR LE RAIL DE CE QUI L'OUVRE. Aligné au BORD du bouton, ses
+  // icônes tombaient 13,7 px à droite du « + » de l'onglet : le panneau et
+  // l'onglet ne partaient pas du même trait (Charlie, 27/08/2026 : « les bulles
+  // ne sont pas calées pareil »). On aligne ce qui se regarde — l'icône de la
+  // première rangée sous l'icône de l'onglet — et on le MESURE au lieu de
+  // l'écrire, pour que ça tienne le jour où un rembourrage bouge.
+  const icOnglet = $viewProjet.querySelector('.material-symbols-outlined, .nav-switch-mark');
+  const icRangee = pan.querySelector('.np-menu__ic');
+  if (icOnglet && icRangee) {
+    // Pas d'arrondi, et DEUX passes. L'onglet est posé à 403,34 px : arrondir au
+    // pixel laissait 0,66 px entre les deux icônes. Une seule correction en
+    // laissait encore 0,32 — la rangée se recompose sur la nouvelle position et
+    // les sous-pixels se redistribuent. La deuxième passe rend zéro, et la
+    // boucle s'arrête d'elle-même dès qu'il n'y a plus rien à reprendre.
+    // Jamais hors de l'écran non plus : sur un écran étroit la barre finit à
+    // droite.
+    const large = document.documentElement.clientWidth;
+    for (let passe = 0; passe < 2; passe += 1) {
+      const ecart = icRangee.getBoundingClientRect().left - icOnglet.getBoundingClientRect().left;
+      if (Math.abs(ecart) < 0.05) break;
+      const pose = parseFloat(pan.style.left) || r.left;
+      const gauche = Math.min(Math.max(8, pose - ecart), large - pan.offsetWidth - 8);
+      pan.style.left = `${gauche.toFixed(2)}px`;
+    }
+  }
   menuProjet = pan;
   $viewProjet.setAttribute('aria-expanded', 'true');
   const premier = pan.querySelector('button');
@@ -8964,17 +8989,29 @@ function ouvrirMenuProjet(parcours) {
 // l'onglet repart de l'accueil). Ouvrir le parcours avant que ça se produise le
 // ferait donc refermer aussitôt. On laisse d'abord l'adresse faire son travail,
 // puis on ouvre.
+//
+// ET UN CLIC NE VAUT QU'UNE SEULE REMISE À ZÉRO. Le chemin comptait DEUX
+// `mountProjet()` — celui de `applyHash` et le nôtre — donc deux `resetProjet()`,
+// donc jusqu'à quatre chargements du document du comptoir, plus un passage
+// visible par l'accueil à deux tuiles. « Toute la page recharge, c'est bizarre
+// comme effet » (Charlie, 27/08/2026). Le verrou ci-dessous dit à `mountProjet`
+// de ne rien remettre à zéro : c'est `ouvrirParcoursNeuf` qui s'en charge, pour
+// le seul parcours demandé, et sans traverser l'accueil.
+let ouvertureParcours = false;
+
 async function allerAuParcours(id) {
-  location.hash = '#nouveau-projet';
-  // Un tour d'horloge : le temps que `hashchange` soit traité et que la vue
-  // soit montée. Sans lui, on ouvrait un parcours qui se refermait derrière.
-  await new Promise((r) => setTimeout(r, 0));
-  setViewMode('projet');
-  mountProjet();
+  ouvertureParcours = true;
   try {
+    location.hash = '#nouveau-projet';
+    // Un tour d'horloge : le temps que `hashchange` soit traité et que la vue
+    // soit montée. Sans lui, on ouvrait un parcours qui se refermait derrière.
+    await new Promise((r) => setTimeout(r, 0));
+    setViewMode('projet');
+    mountProjet();
     await projetLoading;
-    if (projetModule && projetModule.ouvrirParcours) projetModule.ouvrirParcours(id);
+    if (projetModule && projetModule.ouvrirParcoursNeuf) projetModule.ouvrirParcoursNeuf(id);
   } catch (err) { reportError(err); }
+  finally { ouvertureParcours = false; }
 }
 
 function mountProjet() {
@@ -8987,9 +9024,11 @@ function mountProjet() {
         projetModule = null;
         console.error('Nouveau Projet : chargement impossible', err);
       });
-  } else if (projetModule && projetModule.resetProjet) {
+  } else if (!ouvertureParcours && projetModule && projetModule.resetProjet) {
     // Comptoir : chaque passage sur l'onglet repart de « Quel client ? »,
     // jamais sur un brouillon laissé par le passage précédent.
+    // SAUF quand c'est le menu de la barre qui ouvre : il fait la même remise à
+    // zéro, mais pour le seul parcours demandé et sans passer par l'accueil.
     projetModule.resetProjet();
   }
 }
