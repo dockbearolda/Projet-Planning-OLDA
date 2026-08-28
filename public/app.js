@@ -4695,76 +4695,41 @@ function ldBlocDetail(r) {
   const vues = ldEtapesDuRecap(f.source, lignesClient, lignesDetail);
   if (!vues.length) return null;
 
+  // TOUTES LES ÉTAPES SONT VISIBLES (28/08). Charlie : « je veux que toutes les
+  // étapes soient parfaitement visibles, c'est le bordel là ». Elles étaient en
+  // ONGLETS : on n'en voyait qu'une sur quatre, et il fallait cliquer d'onglet
+  // en onglet pour relire la prise de commande — dans un tableau qui montre
+  // tout le reste d'un coup.
+  //
+  // Chaque étape devient un BANDEAU suivi de ses rangées, exactement comme les
+  // tailles et les faces. Le fil du comptoir disparaît d'ici : il nommait des
+  // onglets, et il n'y a plus d'onglets. Les étapes gardent leur numéro et
+  // leurs mots — ceux de la vendeuse.
   const champs = { client: [], details: [] };
-  const section = ldBox('Prise de commande — les étapes de la vendeuse', null, true);
-  const fil = document.createElement('div');
-  fil.className = 'stepper ld-fil';
-  section.cellule.append(fil);
-
-  const onglets = [];
-  const panneaux = [];
-  const montrer = (n) => {
-    onglets.forEach((o, i) => {
-      o.classList.toggle('active', i === n);
-      o.setAttribute('aria-selected', i === n ? 'true' : 'false');
-      o.tabIndex = i === n ? 0 : -1;
-    });
-    panneaux.forEach((p, i) => { p.hidden = i !== n; });
-  };
-
-  vues.forEach((e, n) => {
-    const onglet = document.createElement('button');
-    onglet.type = 'button';
-    onglet.role = 'tab';
-    // `done` = l'étape porte au moins une valeur. C'est le même signe que sur
-    // l'écran du comptoir : la coche dit « franchie », pas « jolie ».
-    onglet.className = 'step ld-etape' + (e.lignes.some((l) => ldRenseigne(l.v)) ? ' done' : '');
-    onglet.textContent = e.titre;
-    onglet.addEventListener('click', () => montrer(n));
-    // Les flèches parcourent le fil, comme dans n'importe quelle rangée
-    // d'onglets : c'est un PC, le clavier est la première main.
-    onglet.addEventListener('keydown', (ev) => {
-      const pas = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : 0;
-      if (!pas) return;
-      ev.preventDefault();
-      const cible = (n + pas + vues.length) % vues.length;
-      montrer(cible);
-      onglets[cible].focus();
-    });
-    fil.append(onglet);
-    onglets.push(onglet);
-
-    const panneau = document.createElement('div');
-    panneau.className = 'ld-etape-panneau';
-    panneau.setAttribute('role', 'tabpanel');
-    panneau.setAttribute('aria-label', e.titre);
+  const rangees = [];
+  for (const e of vues) {
+    // Une étape RENSEIGNÉE le dit dans son bandeau : un dossier où le contrôle
+    // du logo n'a jamais été rempli se voit sans qu'on ait à le lire.
+    const vide = !e.lignes.some((l) => ldRenseigne(l.v));
+    rangees.push(ldBande(vide ? `${e.titre} — rien de saisi` : e.titre));
     for (const l of e.lignes) {
-      const ligne = document.createElement('div');
-      ligne.className = 'ld-detail-line';
-      const k = document.createElement('span');
-      k.textContent = l.k;
       // Une valeur longue ou sur plusieurs lignes mérite une zone de texte :
       // une description de production ne se relit pas dans un champ d'une ligne.
       const longue = String(l.v || '').length > 60 || String(l.v || '').includes('\n');
       const champ = document.createElement(longue ? 'textarea' : 'input');
-      champ.className = 'ld-detail-input';
+      champ.className = 'ld-ctl';
       if (longue) champ.rows = 3;
       champ.value = l.v == null ? '' : l.v;
       champ.setAttribute('aria-label', l.k);
       ldSuivi(`detail:${l.groupe}:${l.i}`, champ, l.v);
       champs[l.groupe][l.i] = champ;
-      ligne.append(k, champ);
-      panneau.append(ligne);
+      rangees.push(ldBox(l.k, champ, longue));
     }
-    section.cellule.append(panneau);
-    panneaux.push(panneau);
-  });
-  fil.setAttribute('role', 'tablist');
-  montrer(0);
+  }
 
-  // Pas de bouton ici : le détail s'enregistre avec le reste de la fiche, par
-  // le bouton du bas. Un seul geste pour l'employé.
-  return { box: section, champs };
+  // Pas de bouton ici : chaque valeur part en quittant son champ, comme partout
+  // ailleurs dans le tableau.
+  return { rangees, champs };
 }
 
 // HISTORIQUE DU CLIENT : les autres commandes du même dossier. « On a déjà fait
@@ -5154,35 +5119,18 @@ function renderLigneDetail() {
 
   const actions = document.createElement('div');
   actions.className = 'ld-head__actions';
-  // Dupliquer et « Envoyer vers Fiverr » n'existaient que dans le tableau
-  // complet : depuis les cartes (la vue par défaut), il n'y avait aucun moyen de
-  // recopier une commande. Ils rejoignent la fiche, où l'on ouvre la ligne.
-  const dupliquer = ldActionBtn('dupliquer', 'Dupliquer', (b) => {
-    if (!armerUneFois(b)) return;
-    duplicateRow(r);
-    showToast('Commande dupliquée');
-  });
-  actions.append(dupliquer);
-  for (const t of SEND_TARGETS) {
-    if (t.slug === r.stage) continue; // déjà dans cette catégorie
-    actions.append(ldActionBtn(t.icone || 'envoyer', `Vers ${t.label}`, (b) => {
-      if (armerUneFois(b)) copyToStage(r, t.slug);
-    }));
-  }
-  actions.append(
-    // LES DEUX PAPIERS SONT PARTIS (28/08). Charlie : « on supprime
-    // définitivement tout ticket pour l'instant » — son patron les refait.
-    // Ils étaient aussi la seule porte pour corriger une taille : c'est le
-    // bloc « Ce qu'il y a à produire » de cette fiche qui les remplace, et
-    // c'est pour ça qu'il fallait le construire AVANT de les retirer.
-    ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
-    // ENVOYER PAR EMAIL (§19). Le même principe que la pastille WhatsApp : on
-    // OUVRE le message tout écrit, on n'envoie rien. C'est l'employé qui relit
-    // et qui appuie — un logiciel qui écrit au client tout seul est un logiciel
-    // qu'on n'ose plus utiliser.
-    ldActionBtn('mail', 'Email', () => envoyerParEmail(r)),
-    close,
-  );
+  // L'EN-TÊTE NE PORTE PLUS D'ACTIONS (28/08). Charlie, en les désignant :
+  // « supprime ça ». Quatre boutons — Dupliquer, Vers Fiverr, Récap complet,
+  // Email — au-dessus d'un tableau qu'on vient lire et corriger : ils prenaient
+  // la première rangée de l'écran pour des gestes qu'on fait une fois par mois.
+  //
+  // RIEN N'EST PERDU. Dupliquer et « envoyer vers Fiverr » vivaient DÉJÀ sur la
+  // ligne du planning (au survol, colonne de droite) : l'en-tête les doublait.
+  // Le récapitulatif et l'e-mail, eux, n'existaient qu'ici — ils descendent
+  // dans le tableau, en bas, comme deux valeurs qu'on clique (voir plus bas).
+  // Ce qui reste dans l'en-tête est la seule chose qu'on fait DEPUIS la fiche :
+  // la fermer.
+  actions.append(close);
   head.append(titles, actions);
   ligneDrawerCard.appendChild(head);
 
@@ -5356,6 +5304,31 @@ function renderLigneDetail() {
   );
   body.append(ldBox('Mode de règlement', modeChip));
 
+  // LES DEUX SORTIES DU DOSSIER, en bas du tableau. Elles occupaient deux
+  // boutons de l'en-tête, au-dessus de tout ce qu'on vient lire, pour des
+  // gestes qu'on fait une fois de temps en temps. Ici ce sont deux mots qu'on
+  // clique — la même grammaire que « Non » ou « + mode ».
+  const sortie = (libelle, quoi, faire) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ld-sortie';
+    b.textContent = libelle;
+    attachTip(b, quoi);
+    b.addEventListener('click', () => faire());
+    return b;
+  };
+  const sorties = document.createElement('div');
+  sorties.append(
+    sortie('Récap complet', 'Télécharger le récapitulatif du dossier', () => telechargerRecap(r)),
+    // ENVOYER PAR EMAIL (§19). Même principe que la pastille WhatsApp : on OUVRE
+    // le message tout écrit, on n'envoie rien. C'est l'employé qui relit et qui
+    // appuie — un logiciel qui écrit au client tout seul est un logiciel qu'on
+    // n'ose plus utiliser.
+    sortie('Email au client', 'Ouvrir un message tout écrit — rien ne part tout seul',
+      () => envoyerParEmail(r)),
+  );
+  body.append(ldBox('Sortir le dossier', sorties));
+
   // --- LE DOSSIER : ses articles, ses étapes, sa prochaine action --------------
   // C'est la « page projet » du §10, posée LÀ où la commande s'ouvre déjà —
   // plutôt qu'un écran de plus à atteindre. Elle ne s'affiche que si la ligne
@@ -5400,7 +5373,7 @@ function renderLigneDetail() {
     body.append(ldVolet('Prise de commande', 'Chargement…', ldValeur('Un instant…'), true));
   } else if (fiche.kind === 'comptoir-v17') {
     const bloc = ldBlocDetail(r);
-    if (bloc) { champsDetail = bloc.champs; body.append(bloc.box); }
+    if (bloc) { champsDetail = bloc.champs; body.append(...bloc.rangees); }
   } else {
     const items = ficheItems(r.fiche);
     body.append(ldVolet(

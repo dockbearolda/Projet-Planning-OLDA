@@ -55,10 +55,14 @@ assert.ok(/\{ slug: 'fiverr', label: 'Fiverr', icone: \(\) => fiverrIcon\(\) \}/
 assert.ok(/const marque = t\.icone \? t\.icone\(\) : strokeIcon\(\['M5 12h13'/.test(APP),
   'la ligne doit poser la marque de la cible, la flèche seulement en repli');
 
-// La même règle dans la fiche : le bouton « Vers Fiverr » de l'en-tête portait
-// la flèche `LD_ICONES.envoyer`, c'est le bouton que le patron voit le plus.
-assert.ok(/ldActionBtn\(t\.icone \|\| 'envoyer', `Vers \$\{t\.label\}`/.test(APP),
-  'la fiche doit elle aussi montrer la marque de la destination');
+// L'EN-TÊTE DE LA FICHE N'A PLUS D'ACTIONS (28/08). Charlie, en les désignant :
+// « supprime ça ». Quatre boutons au-dessus d'un tableau qu'on vient lire et
+// corriger, pour des gestes qu'on fait une fois de temps en temps — et deux
+// d'entre eux (dupliquer, vers Fiverr) doublaient la ligne du planning.
+assert.ok(!/ldActionBtn\(t\.icone/.test(APP), 'plus de bouton d’envoi dans l’en-tête');
+assert.ok(/actions\.append\(close\);/.test(APP),
+  'l’en-tête ne garde que ce qu’on fait DEPUIS la fiche : la fermer');
+// …mais la marque reste sur la LIGNE, qui est l'endroit d'où l'on envoie.
 assert.ok(/if \(typeof icone === 'function'\) \{/.test(APP),
   'ldActionBtn doit accepter une icône dessinée à la demande');
 

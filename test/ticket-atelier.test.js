@@ -430,9 +430,12 @@ const DEMANDE = {
     'plus de bouton de papier dans la fiche');
   assert.ok(!/'open-btn'/.test(APP), 'plus de bouton « ouvrir la fiche »');
   assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
-  // Le récapitulatif complet reste accessible — mais en téléchargement : c'est
-  // un document de travail, il n'a jamais eu à sortir sur l'imprimante.
-  assert.ok(/ldActionBtn\('telecharger', 'Récap complet', \(\) => telechargerRecap\(r\)\)/.test(APP));
+  // Le récapitulatif complet reste accessible — mais en téléchargement (c'est un
+  // document de travail, il n'a jamais eu à sortir sur l'imprimante) et depuis
+  // le TABLEAU : l'en-tête de la fiche n'a plus d'actions depuis le 28/08.
+  assert.ok(/sortie\('Récap complet', 'Télécharger le récapitulatif du dossier', \(\) => telechargerRecap\(r\)\)/.test(APP),
+    'le récapitulatif se télécharge depuis une rangée du tableau');
+  assert.ok(/sortie\('Email au client'/.test(APP), 'et l’e-mail au client aussi');
   assert.ok(!/imprimerRecap/.test(APP), 'imprimerRecap ne doit plus exister');
 
   // LA LIGNE S'OUVRE AU CLIC, et par la MÊME fonction que la carte : deux vues

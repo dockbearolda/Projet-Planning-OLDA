@@ -142,31 +142,35 @@ const maigre = ranger('Demande de devis', [], [{ k: 'Référence', v: '26.08.26-
 assert.deepStrictEqual(maigre.map((e) => e.titre), ['4. Récapitulatif']);
 
 // ---------------------------------------------------------------------------
-// 4. C'EST LE COMPOSANT DU COMPTOIR, pas un cousin
+// 4. TOUTES LES ÉTAPES SONT VISIBLES — plus d'onglets (28/08/2026)
 // ---------------------------------------------------------------------------
-// Le fil vit dans charte.css — le seul fichier que le CRM et les deux parcours
-// lisent tous les deux. La fiche s'y branche, elle ne le recopie pas.
-assert.match(CHARTE, /\n\.stepper \{/);
+// Charlie : « je veux que toutes les étapes soient parfaitement visibles, c'est
+// le bordel là ». Elles étaient en ONGLETS : on n'en voyait qu'une sur quatre,
+// et il fallait cliquer d'onglet en onglet pour relire la prise de commande —
+// dans un panneau devenu tableau, qui montre tout le reste d'un coup.
+//
+// Chaque étape est maintenant un BANDEAU suivi de ses rangées, comme les
+// tailles et les faces. Le fil du comptoir a quitté la fiche avec les onglets
+// qu'il nommait ; il vit toujours dans charte.css, pour les deux parcours.
+assert.match(CHARTE, /\n\.stepper \{/, 'le fil reste dans la charte, pour le comptoir');
 assert.match(CHARTE, /\n\.step \{/);
-assert.match(APP, /fil\.className = 'stepper ld-fil'/);
-assert.match(APP, /'step ld-etape'/);
-assert.doesNotMatch(CSS, /\.ld-etape \{[^}]*font-size/,
-  'la bulle prend sa taille du composant partagé, elle ne la redéclare pas');
-// `font-family` et NON le raccourci `font` : celui-ci annulerait l'interligne
-// que .step vient de poser (défaut déjà payé ailleurs).
-assert.match(CSS, /\.ld-etape \{[^}]*font-family: inherit/);
-assert.doesNotMatch(CSS, /\.ld-etape \{[^}]*font: inherit/);
-// Un panneau masqué porte `hidden` ET sa règle : une classe qui déclare son
-// propre `display` défait `hidden` en silence.
-assert.match(CSS, /\.ld-etape-panneau\[hidden\] \{ display: none; \}/);
-// Les bulles gardent la même HAUTEUR d'un écran à l'autre : à parts égales,
-// « 4. Récapitulatif » passait à la ligne et sa bulle faisait une tête de plus
-// que les autres.
-assert.match(CSS, /\.ld-fil \.step \{ flex: 0 1 auto; white-space: nowrap; \}/);
-// Trois états, ceux du parcours : franchie (done), courante (active), à venir.
-assert.match(APP, /' done' : ''/);
-assert.match(APP, /classList\.toggle\('active', i === n\)/);
-// Le clavier parcourt le fil : c'est un PC, pas une tablette.
-assert.match(APP, /ArrowRight[\s\S]{0,120}ArrowLeft/);
+assert.ok(!/ld-fil|ld-etape-panneau|ld-etape\b/.test(APP),
+  'plus d’onglets ni de panneaux masqués dans la fiche : tout est déplié');
+assert.ok(!/ld-fil|ld-etape/.test(CSS),
+  'et plus de style pour un composant que la fiche ne porte plus');
 
-console.log('✓ fiche : les étapes de la prise de commande se retrouvent et se cliquent');
+// CHAQUE ÉTAPE A SON BANDEAU, avec le numéro et les mots de la vendeuse.
+assert.match(APP, /rangees\.push\(ldBande\(vide \? `\$\{e\.titre\} — rien de saisi` : e\.titre\)\)/,
+  'une étape ouvre un bandeau, et dit quand rien n’y a été saisi');
+// Une étape RENSEIGNÉE se reconnaissait à une coche sur son onglet ; sans
+// onglet, c'est le bandeau qui le dit. La règle ne change pas : renseignée
+// veut dire « au moins une valeur », pas « jolie ».
+assert.match(APP, /const vide = !e\.lignes\.some\(\(l\) => ldRenseigne\(l\.v\)\)/);
+// Les valeurs entrent dans le tableau comme les autres : une rangée par ligne
+// du récapitulatif, et le même champ que partout.
+assert.match(APP, /rangees\.push\(ldBox\(l\.k, champ, longue\)\)/,
+  'chaque ligne du récapitulatif est une rangée du tableau');
+assert.match(APP, /champ\.className = 'ld-ctl'/,
+  'et son champ est celui du tableau, pas un cousin');
+
+console.log('✓ fiche : toutes les étapes de la prise de commande sont dépliées dans le tableau');

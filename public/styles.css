@@ -5542,8 +5542,13 @@ body.view-plein .fiverr-tool { display: none !important; }
    largeur, et les actions s'alignent dessous en se repliant si besoin.
    `flex-basis: 100%` plutôt qu'une requête de média : ce qui décide, c'est
    la largeur de la CARTE, pas celle de la fenêtre. */
-.ld-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
-.ld-head__titles { flex: 1 1 100%; min-width: 0; }
+/* L'EN-TÊTE TIENT SUR UNE LIGNE depuis que ses quatre actions sont parties
+   (28/08) : le titre à gauche, la croix à droite. Les titres prenaient toute la
+   largeur (`flex: 1 1 100%`) parce qu'une rangée de boutons se posait dessous ;
+   il n'y a plus de rangée, et la croix seule s'y étalait sur 44 px de haut pour
+   rien — au-dessus du tableau qu'on vient lire. */
+.ld-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.ld-head__titles { flex: 1 1 auto; min-width: 0; }
 
 .ld-close { flex-shrink: 0; display: grid; place-items: center; width: var(--rond); height: var(--rond); border: 1px solid var(--border); background: transparent; color: var(--text-2); border-radius: var(--pilule); cursor: pointer; }
 .ld-close:hover { background: var(--state-hover); color: var(--text-1); }
@@ -5689,17 +5694,15 @@ body.view-plein .fiverr-tool { display: none !important; }
 /* L'initiale du pilote n'est plus une pastille dans une pastille : le prénom
    suffit à dire qui suit, et c'est lui qu'on lit. */
 .ld-cell .resp-ini { display: none; }
+/* Les deux sorties du dossier : deux mots qu'on clique, la même grammaire que
+   les valeurs d'à côté. */
+.ld-sortie {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--taille-note); color: var(--text-1);
+}
+.ld-sortie + .ld-sortie { margin-left: 14px; }
+.ld-sortie:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
 .ld-cell .resp-name { max-width: none; }
-/* LE FIL DU COMPTOIR DANS UNE CELLULE. C'est le composant de l'écran de la
-   vendeuse (`.stepper` / `.step` de charte.css) : il a l'échelle de SON écran —
-   des pastilles à son échelle. Posé dans une rangée de tableau, il en sortait
-   par la droite : il ne revenait pas à la ligne.
-   ON NE TOUCHE PAS À SA TAILLE — c'est le composant du comptoir, et deux écrans
-   à un clic l'un de l'autre doivent donner le MÊME composant (un garde-fou le
-   vérifie). On lui donne seulement de quoi tenir dans la largeur qu'on lui
-   offre. */
-.ld-cell .ld-fil { flex-wrap: wrap; gap: 4px; width: 100%; }
-.ld-rang--haut > .ld-cell > .ld-fil { margin-bottom: 6px; }
 /* LE BANDEAU DE SECTION traverse les deux colonnes. C'est LUI qui porte les
    capitales : une fois par famille de faits, pas trente fois sur la colonne de
    gauche. */
@@ -5906,7 +5909,7 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
    patron. Ils vivent dans l'en-tête, à côté de la croix. */
 /* Elles se replient aussi : sept actions dans 944 px utiles, c'est juste, et
    une action qui sort de la carte est une action qui n'existe pas. */
-.ld-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%; }
+.ld-head__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .ld-act {
   display: inline-flex; align-items: center; gap: var(--pas-1);
   padding: var(--champ-y-serre) var(--pas-2);
@@ -5936,18 +5939,6 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
    à parts égales, « 5. Récapitulatif » passait à la ligne et sa bulle faisait
    une tête de plus que les quatre autres — le défaut des bulles de 41 et 47 px
    du 25/08, repayé. Le fil se replie d'une bulle entière si la place manque. */
-.ld-fil { margin-bottom: var(--pas-2); }
-.ld-fil .step { flex: 0 1 auto; white-space: nowrap; }
-.ld-etape {
-  appearance: none; border: 0; cursor: pointer;
-  font-family: inherit;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.ld-etape:hover:not(.active) { background: var(--state-hover); color: var(--text-1); }
-.ld-etape:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-/* `hidden` seul ne masque rien quand la classe porte son propre `display` :
-   c'est le piège qu'on a déjà payé ailleurs. */
-.ld-etape-panneau[hidden] { display: none; }
 /* LE RÉCAPITULATIF DU COMPTOIR SUIT LE TABLEAU (28/08). Il était écrit en
    17 px, libellés en capitales, champs encadrés de 50 px : posé au milieu d'une
    fiche devenue tableau, il ressemblait à un autre écran collé dedans. Même
