@@ -368,6 +368,44 @@ delete process.env.APP_PASSWORD;
   assert.deepStrictEqual(majPos.body.fiche.prod.tailles, [{ t: 'S', n: 30 }],
     'un zéro SANS nom de taille ne passe pas : la position est trop fragile pour ça');
 
+  // =========================================================================
+  // 11. LES DOSSIERS D'EXEMPLE SONT DE VRAIS DOSSIERS
+  // =========================================================================
+  // Charlie, 28/08 : « supprime tous ceux en local et recrée-m'en des nouveaux
+  // modifiables ». Le piège est silencieux : un prix d'exemple ÉCRIT à la main
+  // serait reconnu comme un prix POSÉ à la main, le recalcul le respecterait, et
+  // la base de démonstration montrerait le contraire de ce qu'elle sert à
+  // montrer. Le semis doit donc DEMANDER son prix au moteur.
+  const demo = (await call('GET', '/api/requests')).body
+    .filter((r) => r.fiche && String(r.fiche.ref || '').startsWith('DEMO-'));
+  assert.ok(demo.length >= 8, `le semis doit poser des dossiers travaillables (${demo.length})`);
+  assert.ok(demo.some((r) => r.fiche.prod && r.fiche.prod.tailles.length),
+    'au moins un dossier d’exemple porte une grille de tailles — c’est le cas que Charlie corrige');
+  assert.ok(demo.some((r) => r.fiche.prod && r.fiche.prod.logos.some((z) => z.quoi)),
+    'et au moins un porte des faces avec une consigne, sans cote : une tasse ne se mesure pas au comptoir');
+
+  let verifies = 0;
+  for (const court of demo) {
+    const r = (await call('GET', `/api/requests/${court.id}`)).body;
+    const ch = r.fiche.chiffrage;
+    if (!ch) continue;
+    const calc = chiffrage.recalculer(ch, reglagesServeur, r.quantity);
+    assert.ok(calc, `le chiffrage de « ${r.billing_company} » doit se rejouer`);
+    assert.strictEqual(Number(r.quantity), calc.qte,
+      `la quantité de « ${r.billing_company} » doit valoir la somme de ses tailles`);
+    // Un dossier laissé SANS prix exprès (demande pas encore chiffrée) le reste :
+    // c'est la règle, et le semis doit la montrer aussi.
+    if (r.project_value != null) {
+      assert.ok(Math.abs(Number(r.project_value) - calc.ttc) < 0.01,
+        `le prix de « ${r.billing_company} » doit être CELUI du moteur (${r.project_value} ≠ ${calc.ttc}) — `
+        + 'un prix écrit à la main serait pris pour un prix négocié et ne bougerait jamais');
+    }
+    verifies += 1;
+  }
+  assert.ok(verifies >= 6, `au moins six dossiers d’exemple doivent être retarifables (${verifies})`);
+  assert.ok(demo.some((r) => r.project_value == null),
+    'et un doit rester SANS prix : une demande pas encore chiffrée n’en reçoit pas');
+
   console.log('✓ le prix suit la quantité : dégressif rejoué, accord préservé, devis sans prix');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

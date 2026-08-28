@@ -4,6 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Pool, types } = require('pg');
+// LE SEMIS CHIFFRE SES DOSSIERS AVEC LE VRAI MOTEUR (28/08). Un prix d'exemple
+// écrit à la main serait pris pour un prix POSÉ à la main : le recalcul le
+// respecterait et ne bougerait jamais — la base de démonstration montrerait
+// exactement le contraire de ce qu'elle doit montrer.
+const chiffrage = require('./chiffrage');
 
 // `deadline` est une colonne `date` : un jour civil, sans heure ni fuseau. Par
 // défaut pg la convertit en Date à minuit LOCAL, que res.json re-sérialise en
@@ -1169,106 +1174,214 @@ async function seed() {
     return x.toISOString().slice(0, 10);
   };
 
+  // CHAQUE DOSSIER D'EXEMPLE EST UN VRAI DOSSIER (28/08/2026)
+  //
+  // Charlie : « supprime tous ceux en local et recrée-m'en des nouveaux
+  // modifiables ». Les treize exemples d'avant n'avaient AUCUNE fiche : ni
+  // référence, ni couleur, ni tailles, ni faces, ni de quoi refaire le prix.
+  // On pouvait les regarder, pas les travailler — et la seule chose qu'on
+  // voulait essayer, corriger une quantité et voir le prix suivre, était
+  // justement impossible dessus.
+  //
+  // Ils portent donc tous une fiche comme celles du comptoir : ce qu'il y a à
+  // produire (`prod`) et de quoi refaire le prix (`chiffrage`).
+  //
+  // LE PRIX N'EST PAS ÉCRIT, IL EST CALCULÉ. Un montant tapé à la main serait
+  // reconnu comme un prix POSÉ à la main (voir le PATCH de la fiche) : le
+  // recalcul le respecterait et ne bougerait jamais. La base de démonstration
+  // montrerait le contraire de ce qu'elle sert à montrer.
+  //
+  // Ce que la table couvre, exprès :
+  //   - du textile à tailles, où « 30 S → 100 S » fait descendre le prix à la
+  //     pièce (c'est le cas que Charlie a décrit) ;
+  //   - de la vente directe au prix à la pièce, où doubler la quantité double
+  //     le montant ;
+  //   - une demande de devis CHIFFRÉE (elle a un prix) et une PAS ENCORE
+  //     chiffrée (sans prix, et qui doit le rester) ;
+  //   - deux dossiers SANS chiffrage — les vieux dossiers de la prod : ils
+  //     restent modifiables, leur prix ne bouge simplement pas ;
+  //   - les cinq états du feu (devis, BAT, paiement, acompte, deux à la fois),
+  //     avec leur horloge reculée : sans eux la rangée « Manque » est muette.
+  const REGLAGES = { ...TEXTILE_DEFAULTS, transports: { ...DEFAULT_TARIFS_TRANSPORT } };
+
+  // Un article textile : les entrées du moteur d'un côté, ce que l'atelier lit
+  // de l'autre. Les deux disent la MÊME grille de tailles — c'est ce qui permet
+  // au recalcul de repartir de la ligne.
+  const textile = ({ ref, genre, marquage, transport = 'Chronopost', tailles, couleur, encre, faces }) => {
+    const sizes = {};
+    for (const [t, n] of Object.entries(tailles)) sizes[t === '2XL' ? 'XXL' : t] = n;
+    return {
+      chiffrage: { ref, genre, transport, printType: marquage, sizes, markupPercent: 0, tgca: true },
+      prod: {
+        ref,
+        couleur,
+        marquage: 'DTF',
+        encre: encre || '',
+        tailles: Object.entries(tailles).map(([t, n]) => ({ t, n })),
+        logos: faces.map((f) => ({ face: f.face, mm: f.mm || '', ...(f.quoi ? { quoi: f.quoi } : {}) })),
+      },
+    };
+  };
+
+  // Un article vendu à la pièce : pas de moteur, un prix TTC saisi au comptoir.
+  const piece = ({ unitTTC, ref, couleur, marquage, faces }) => ({
+    chiffrage: { moteur: 'unitaire', unitTTC, rate: 0 },
+    prod: {
+      ref, couleur, marquage, encre: '', tailles: [],
+      logos: faces.map((f) => ({ face: f.face, mm: f.mm || '', ...(f.quoi ? { quoi: f.quoi } : {}) })),
+    },
+  });
+
   const samples = [
+    // --- DU TEXTILE À TAILLES : le cas « il n'en veut plus 30 mais 100 » -----
     {
-      stage: 'demande_chiffrage', sub_stage: 'demande_recue', responsable: 'Mélina', referent: 'Loïc', priority: 3, client_type: 'pro',
-      billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', quantity: 50,
-      product: '50 t-shirts staff', color: 'Noir', project_value: 850,
-      description: 'Tee-shirts équipe — gros devis', deadline: inDays(3), position: 1000,
+      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', referent: 'Charlie',
+      priority: 3, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Hôtel Esmeralda', contact_referent: 'Julie M.', contact_phone: '0690112233',
+      product: 'T-shirt unisexe bio léger Premium 155 g',
+      description: 'Tee-shirts équipe — le logo est validé, on presse',
+      deadline: inDays(3), position: 1000, paye: true,
+      article: textile({
+        ref: 'NS300', genre: 'Homme', marquage: 'Coeur + Dos', couleur: 'Noir', encre: 'Blanc',
+        tailles: { S: 30, M: 15, L: 5 },
+        faces: [{ face: 'Coeur', mm: '70' }, { face: 'Dos', mm: '320' }],
+      }),
     },
     {
-      stage: 'demande_chiffrage', sub_stage: 'demande_a_qualifier', responsable: 'À attribuer', priority: 1, client_type: 'perso',
-      billing_company: 'Alessandro', contact_referent: 'Alessandro', quantity: 1,
-      product: 'Impression plexi A3', project_value: 30, description: 'Photo à vérifier',
-      deadline: inDays(1), position: 2000,
+      stage: 'preparation', sub_stage: 'prepa_bat', responsable: 'Charlie',
+      priority: 3, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Garage Marigot', contact_referent: 'Pascal D.', contact_phone: '0690445511',
+      product: 'T-shirt homme bio Oversize Premium 220 g',
+      description: 'BAT envoyé, en attente de validation',
+      deadline: inDays(2), position: 1000, bat_requis: true, updated_days_ago: 4,
+      article: textile({
+        ref: 'NS332', genre: 'Homme', marquage: 'Dos Seul', couleur: 'Gris chiné', encre: 'Noir',
+        tailles: { M: 10, L: 10, XL: 5 },
+        faces: [{ face: 'Dos', mm: '300' }],
+      }),
     },
     {
-      stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina', priority: 2, client_type: 'revendeur',
-      billing_company: 'Saint-Barth Store', contact_referent: 'Coach Bernard', quantity: 120,
-      product: 'Collection été', project_value: 1450, description: 'Maillots saison 2026',
-      deadline: inDays(8), position: 1000,
+      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'Mélina',
+      priority: 2, client_type: 'pro', source: 'Demande de devis',
+      billing_company: 'Beach Bar Orient', contact_referent: 'Nathalie R.', contact_phone: '0690778899',
+      product: 'T-shirt unisexe léger Pro 145 g',
+      description: 'Devis parti le 15, aucun retour',
+      deadline: inDays(6), position: 1000, devis_requis: true, updated_days_ago: 12,
+      article: textile({
+        ref: 'K3025', genre: 'Femme', marquage: 'Coeur Seul', couleur: 'Bleu marine',
+        tailles: { S: 20, M: 25, L: 15 },
+        faces: [{ face: 'Coeur', mm: '70' }],
+      }),
+    },
+    // --- UNE DEMANDE PAS ENCORE CHIFFRÉE : elle doit RESTER sans prix --------
+    {
+      stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', responsable: 'Mélina',
+      priority: 2, client_type: 'revendeur', source: 'Demande de devis',
+      billing_company: 'Saint-Barth Store', contact_referent: 'Bernard C.',
+      product: 'T-shirt unisexe Oversize effet sweat 300 g',
+      description: 'Collection été — le client hésite encore sur les quantités',
+      deadline: inDays(8), position: 2000, sansPrix: true,
+      article: textile({
+        ref: 'NS308', genre: 'Homme', marquage: 'Coeur + Dos', couleur: 'Écru',
+        tailles: { M: 12, L: 12, XL: 6 },
+        faces: [{ face: 'Coeur', mm: '70' }, { face: 'Dos', mm: '320' }],
+      }),
+    },
+    // --- DE LA VENTE À LA PIÈCE : doubler la quantité double le montant -----
+    {
+      stage: 'preparation', sub_stage: 'prepa_produits', responsable: 'Mélina',
+      priority: 2, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Grand Case Beach Club', contact_referent: 'Sandra P.', contact_phone: '0690334455',
+      product: 'Tasse céramique 350 ml',
+      description: 'Logo doré sur les deux faces, à retirer avant le week-end',
+      deadline: inDays(4), position: 1000, quantity: 30,
+      article: piece({
+        unitTTC: 10, ref: 'TC 06', couleur: 'Blanche', marquage: 'UV',
+        faces: [
+          { face: 'Face avant', quoi: 'Logo du club, doré' },
+          { face: 'Face arrière', quoi: 'Adresse et téléphone' },
+        ],
+      }),
     },
     {
-      stage: 'preparation', sub_stage: 'a_commander', responsable: 'Charlie', referent: 'Julien', priority: 3, client_type: 'pro',
+      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie',
+      priority: 2, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.', contact_phone: '0690221144',
+      product: 'Couteau Multi bois',
+      description: 'Gravure du prénom sur chaque manche — liste fournie par le client',
+      deadline: inDays(5), position: 2000, quantity: 15,
+      paye: true,
+      flag: 'a_voir', flag_reason: 'Vérifier l’orthographe des prénoms avant de graver',
+      article: piece({
+        unitTTC: 28, ref: 'CM-BOIS', couleur: 'Bois clair', marquage: 'TROTEC',
+        faces: [{ face: 'Manche', quoi: 'Prénom, gravure profonde' }],
+      }),
+    },
+    {
+      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien',
+      priority: 3, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Villa Rousseau', contact_referent: 'Mme Rousseau',
+      product: 'Serviette brodée',
+      description: 'Partie en production sans encaissement',
+      deadline: inDays(1), position: 3000, quantity: 30,
+      paye: false, updated_days_ago: 6,
+      article: piece({
+        unitTTC: 22, ref: 'SERV-50', couleur: 'Blanche', marquage: 'Broderie',
+        faces: [{ face: 'Coin bas', quoi: 'Initiales brodées, fil or' }],
+      }),
+    },
+    {
+      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie',
+      priority: 2, client_type: 'asso', source: 'Vente directe',
+      billing_company: 'Club Nautique', contact_referent: 'Yann L.',
+      product: 'Plaque gravée inox',
+      description: 'Acompte demandé, pas encore versé',
+      deadline: inDays(4), position: 4000, quantity: 80,
+      paye: false, acompte_demande: true, acompte_verse: false, updated_days_ago: 2,
+      article: piece({
+        unitTTC: 20, ref: 'PL-INOX', couleur: 'Inox brossé', marquage: 'TROTEC',
+        faces: [{ face: 'Face', quoi: 'Nom du bateau + année' }],
+      }),
+    },
+    {
+      stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', referent: 'Loïc',
+      priority: 1, client_type: 'pro', source: 'Vente directe',
+      billing_company: 'Pizzeria Bella', contact_referent: 'Marco',
+      product: 'Tablier personnalisé',
+      description: 'Livré, reste à facturer',
+      deadline: inDays(-5), position: 1000, quantity: 8,
+      article: piece({
+        unitTTC: 30, ref: 'TAB-CUIS', couleur: 'Noir', marquage: 'DTF',
+        faces: [{ face: 'Poitrine', mm: '200' }],
+      }),
+    },
+    // --- DEUX DOSSIERS SANS CHIFFRAGE : les vieux de la prod ----------------
+    // Ils n'ont rien à rejouer. Ce qu'ils gardent, c'est qu'une correction y
+    // passe quand même et que leur prix ne bouge pas — c'est le cas le plus
+    // fréquent en base, il ne doit pas ressembler à une panne.
+    {
+      stage: 'preparation', sub_stage: 'a_commander', responsable: 'Charlie', referent: 'Julien',
+      priority: 3, client_type: 'pro',
       billing_company: 'Mairie de Vic', contact_referent: 'Service Com', quantity: 120,
       product: 'Tote bags sérigraphie', color: 'Écru', project_value: 3200,
-      description: 'Sacs marché de Noël — TopTex en cours', deadline: inDays(1), position: 1000,
+      description: 'Sacs marché de Noël — TopTex en cours', deadline: inDays(1), position: 5000,
       flag: 'bloque', flag_reason: 'Attente du BAT signé par le service Com',
     },
     {
-      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', priority: 2, client_type: 'asso',
-      billing_company: 'Auto-école Rapid', contact_referent: 'M. Faure', quantity: 15,
-      product: 'Polos brodés DTF', project_value: 540, description: 'Polos moniteurs',
-      deadline: inDays(-1), position: 1000,
-    },
-    {
-      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie', priority: 3, client_type: 'pro',
-      billing_company: 'Menuiserie Vidal', contact_referent: 'Bruno V.', quantity: 40,
-      product: 'Panneaux PVC', color: 'Blanc', project_value: 1200,
-      description: 'Découpe forme sur la Trotec', deadline: inDays(5), position: 1000,
-      flag: 'a_voir', flag_reason: 'Vérifier la teinte du blanc avec le client',
-    },
-    {
-      stage: 'facturation', sub_stage: 'facturation_a_faire', responsable: 'Mélina', referent: 'Loïc', priority: 1, client_type: 'pro',
-      billing_company: 'Pizzeria Bella', contact_referent: 'Marco', quantity: 8,
-      product: 'Tabliers personnalisés', project_value: 240, description: 'Tabliers cuisine',
-      deadline: inDays(-5), position: 1000,
-    },
-    {
-      // Sans date et ancienne (> 7 j) : illustre le vieillissement « À planifier »
-      // du dashboard (badge orange, remonte au-dessus des « Sans date » récentes).
       stage: 'preparation', sub_stage: 'prepa_produits', priority: 1, client_type: 'perso',
       billing_company: 'Atelier Broderie Sud', contact_referent: 'Mme Costa', quantity: 6,
-      product: 'Casquettes brodées', project_value: 120, description: 'Client pas pressé — à planifier',
-      deadline: null, position: 3000, created_days_ago: 9,
+      product: 'Casquettes brodées', project_value: 120,
+      description: 'Client pas pressé — à planifier',
+      deadline: null, position: 6000, created_days_ago: 9,
     },
-    // --- CINQ DOSSIERS POUR VOIR LE FEU (27/08/2026) -----------------------
-    //
-    // Le feu ne s'allume que sur ce qui MANQUE, et il ne dit rien tant qu'on
-    // n'a pas de dossier qui coince. Les huit exemples ci-dessus sont tous en
-    // règle : la base locale était donc muette sur la seule chose qu'on ait
-    // besoin de regarder pour juger la rangée « Manque ».
-    //
-    // Ces cinq-là couvrent les quatre mots que le feu sait écrire — Devis, BAT,
-    // Paiement, Acompte — plus le cas où deux manquent en même temps. Ils
-    // portent un `updated_at` RECULÉ : sans lui, « depuis 0 j » ne s'écrit pas,
-    // et c'est précisément le nombre qui dit s'il faut relancer.
-    //
-    // Ils ne partent jamais en production : `seed()` n'est appelé QUE sur une
-    // table vide, et la base de l'atelier en porte 187.
+    // --- LE DERNIER ÉTAT DU FEU : deux manques à la fois --------------------
     {
-      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'Mélina', priority: 2, client_type: 'pro',
-      billing_company: 'Beach Bar Orient', contact_referent: 'Nathalie R.', quantity: 60,
-      product: 'Polos service', color: 'Bleu marine', project_value: 1180,
-      description: 'Devis parti le 15, aucun retour', deadline: inDays(6), position: 3000,
-      devis_requis: true, updated_days_ago: 12,
-    },
-    {
-      stage: 'preparation', sub_stage: 'prepa_bat', responsable: 'Charlie', priority: 3, client_type: 'pro',
-      billing_company: 'Garage Marigot', contact_referent: 'Pascal D.', quantity: 25,
-      product: 'Sweats atelier', color: 'Gris', project_value: 900,
-      description: 'BAT envoyé, en attente de validation', deadline: inDays(2), position: 4000,
-      bat_requis: true, updated_days_ago: 4,
-    },
-    {
-      stage: 'production', sub_stage: 'prod_pressage', responsable: 'Julien', priority: 3, client_type: 'pro',
-      billing_company: 'Villa Rousseau', contact_referent: 'Mme Rousseau', quantity: 30,
-      product: 'Serviettes brodées', color: 'Blanc', project_value: 660,
-      description: 'Parti en production sans encaissement', deadline: inDays(1), position: 2000,
-      paye: false, updated_days_ago: 6,
-    },
-    {
-      stage: 'production', sub_stage: 'prod_trotec', responsable: 'Charlie', priority: 2, client_type: 'asso',
-      billing_company: 'Club Nautique', contact_referent: 'Yann L.', quantity: 80,
-      product: 'Plaques gravées', project_value: 1600,
-      description: 'Acompte demandé, pas encore versé', deadline: inDays(4), position: 3000,
-      paye: false, acompte_demande: true, acompte_verse: false, updated_days_ago: 2,
-    },
-    {
-      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'À attribuer', priority: 1, client_type: 'perso',
-      billing_company: 'Sophie Delcourt', contact_referent: 'Sophie Delcourt', quantity: 4,
-      product: 'Tableaux photo', project_value: 260,
-      description: 'Maquette commencée avant le retour du devis', deadline: inDays(10), position: 4000,
+      stage: 'demande_chiffrage', sub_stage: 'devis_envoye', responsable: 'À attribuer',
+      priority: 1, client_type: 'perso', source: 'Demande de devis',
+      billing_company: 'Sophie Delcourt', contact_referent: 'Sophie Delcourt',
+      product: 'Tableau photo contrecollé', quantity: 4, project_value: 260,
+      description: 'Maquette commencée avant le retour du devis',
+      deadline: inDays(10), position: 3000,
       devis_requis: true, bat_requis: true, updated_days_ago: 21,
     },
   ];
@@ -1281,15 +1394,50 @@ async function seed() {
     // « Manque » sort sans son nombre — c'est-à-dire sans ce qui dit s'il faut
     // relancer. Il ne peut pas être plus ancien que la création.
     const updatedAt = recule(Math.max(s.updated_days_ago ?? 0, 0) || s.created_days_ago || 0);
+
+    // CE QUE VAUT LE DOSSIER, DEMANDÉ AU MOTEUR. La quantité en découle aussi :
+    // une grille de tailles qui ne totalise pas la quantité affichée, c'est la
+    // ligne qui ment sur ce qu'il y a à produire.
+    const art = s.article || null;
+    const calcul = art ? chiffrage.recalculer(art.chiffrage, REGLAGES, s.quantity) : null;
+    const quantite = calcul ? calcul.qte : s.quantity ?? null;
+    const valeur = s.sansPrix ? null : (calcul ? calcul.ttc : s.project_value ?? null);
+    const revient = calcul && calcul.revient != null ? calcul.revient : null;
+
+    // La fiche d'un dossier du comptoir, telle que le parcours la produit : le
+    // tiroir du planning la rouvre ligne à ligne. `kind` est ce qui autorise à
+    // corriger le récapitulatif — sans lui, la fiche se dit non modifiable.
+    const fiche = art ? {
+      kind: 'comptoir-v17',
+      source: s.source || 'Vente directe',
+      ref: `DEMO-${String(s.position).padStart(4, '0')}`,
+      creeLe: createdAt,
+      heureSouhaitee: null,
+      prod: art.prod,
+      chiffrage: chiffrage.bornerChiffrage(art.chiffrage),
+      client: [
+        { k: 'Client', v: s.billing_company },
+        ...(s.contact_referent ? [{ k: 'Personne à contacter', v: s.contact_referent }] : []),
+        ...(s.contact_phone ? [{ k: 'WhatsApp', v: s.contact_phone }] : []),
+      ],
+      details: [
+        { k: 'Article 1 — Désignation', v: s.product },
+        { k: 'Article 1 — Quantité', v: String(quantite ?? '') },
+        ...(s.description ? [{ k: 'Article 1 — Description de production', v: s.description }] : []),
+      ],
+    } : null;
+
     await pool.query(
       `INSERT INTO requests
         (stage, sub_stage, responsable, referent, priority, client_type, billing_company, contact_referent,
-         quantity, product, color, project_value, description, deadline, position, created_at, updated_at,
+         contact_phone, quantity, product, color, project_value, cout_revient, description, deadline,
+         position, created_at, updated_at, fiche,
          flag, flag_reason, devis_requis, bat_requis, paye, acompte_demande, acompte_verse)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
       [s.stage, s.sub_stage ?? null, s.responsable ?? null, s.referent ?? null, s.priority, s.client_type,
-       s.billing_company, s.contact_referent, s.quantity, s.product, s.color ?? null,
-       s.project_value, s.description, s.deadline, s.position, createdAt, updatedAt,
+       s.billing_company, s.contact_referent, s.contact_phone ?? null, quantite, s.product, s.color ?? null,
+       valeur, revient, s.description, s.deadline, s.position, createdAt, updatedAt,
+       fiche ? JSON.stringify(fiche) : null,
        s.flag ?? null, s.flag_reason ?? null,
        // `bat_requis` et `devis_requis` sont NOT NULL DEFAULT false : leur
        // passer `null` explicitement viole la contrainte au lieu de prendre le
