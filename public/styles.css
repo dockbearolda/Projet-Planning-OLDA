@@ -5627,9 +5627,15 @@ body.view-plein .fiverr-tool { display: none !important; }
   letter-spacing: 0; text-transform: none; color: var(--text-2);
   overflow-wrap: anywhere;
 }
+/* LE RETRAIT VIT SUR LA CELLULE, une seule fois. Il était porté par CHAQUE
+   contenu — et seulement par ceux qui y avaient pensé : les champs commençaient
+   à 231 px, les valeurs dépouillées (« PRO », « Mélina », le duo date/heure) à
+   221. Dix pixels d'écart dans la même colonne, sur une rangée sur trois : la
+   colonne des valeurs n'était pas droite, et c'est la première chose qu'on voit
+   d'un tableau. */
 .ld-cell {
   display: flex; align-items: center; gap: 6px;
-  min-width: 0; padding: 0;
+  min-width: 0; padding: 0 0 0 10px;
   font-size: var(--taille-note);
 }
 /* DANS UNE CELLULE, RIEN NE S'EMPILE — mesuré : contact 70 px, « qui suit »
@@ -5667,7 +5673,17 @@ body.view-plein .fiverr-tool { display: none !important; }
    vraie taille. C'est l'intitulé, à côté, qui garde la hauteur minimale. */
 .ld-rang--haut > .ld-cell {
   grid-column: 2 / -1;
-  display: block; padding: 6px 10px; overflow: visible; min-height: auto;
+  /* Une COLONNE flex plutôt qu'un bloc : elle empile comme un bloc, et elle
+     CENTRE ce qui est plus court que la rangée — les trois pastilles de
+     documents et le message « aucune commande » tombaient 1 à 3 px trop haut,
+     seuls décalages qui restaient dans tout le tableau. */
+  display: flex; flex-direction: column; justify-content: center;
+  /* `align-items: center` vaut CENTRAGE HORIZONTAL dans une colonne : hérité de
+     la règle des cellules, il posait les trois pastilles de documents au milieu
+     de la largeur (533 px) au lieu du bord (231). `stretch` les remet à gauche
+     et laisse les pavés prendre toute la place. */
+  align-items: stretch;
+  padding: 6px 0 6px 10px; overflow: visible; min-height: auto;
 }
 /* AUCUNE BULLE DANS UN TABLEAU (28/08). Charlie, en désignant les « Non » du
    paiement : « enlève ces bulles, un tableau je veux ». Sept pastilles
@@ -5683,6 +5699,10 @@ body.view-plein .fiverr-tool { display: none !important; }
    une cellule, et rien d'autre ne dirait qu'on peut les toucher. */
 .ld-cell :is(.ld-toggle, .sub-chip, .flag-chip, .resp-chip, .ref-chip, .type-tag) {
   min-height: var(--ligne-h);
+  /* MARGE COMPRISE. `.sub-chip` porte `margin: 8px 12px` pour vivre dans une
+     ligne du planning : dans une cellule, ces 12 px la décalaient de la colonne
+     (243 px quand tout le reste tombe à 231). */
+  margin: 0;
   padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
   font-size: var(--taille-note); font-weight: var(--graisse-texte);
   color: var(--text-1);
@@ -5722,7 +5742,7 @@ body.view-plein .fiverr-tool { display: none !important; }
    la colonne : deux graisses et deux marges gauches dans la même colonne, c'est
    exactement ce qui empêche de lire un tableau de haut en bas. */
 .ld-v {
-  margin: 0; padding: 0 10px;
+  margin: 0; padding: 0;
   font-size: var(--taille-note); font-weight: var(--graisse-texte);
   color: var(--text-1); white-space: pre-wrap;
 }
@@ -5733,7 +5753,7 @@ body.view-plein .fiverr-tool { display: none !important; }
 .ld-ctl {
   width: 100%;
   min-height: var(--ligne-h);
-  padding: 0 10px;
+  padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -5742,14 +5762,17 @@ body.view-plein .fiverr-tool { display: none !important; }
   line-height: 1.4;
   resize: vertical;
 }
-textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
+textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 0; }
 /* rgba(var(--primary-rgb)) et non l'encre en dur : en clair c'est LA MÊME
    couleur (17,24,39), en sombre le jeton s'inverse — l'anneau de saisie était
    noir sur fond noir, plus aucun repère de champ actif dans la fiche. */
-/* Le focus est le SEUL repère de position maintenant que les champs n'ont plus
-   de contour : il se pose EN DEDANS (`outline-offset` négatif), sinon il
-   déborderait sur les cellules voisines de la grille. */
-.ld-ctl:focus { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--surface); }
+/* LE FOCUS S'ALLUME SUR LA CELLULE, pas sur le champ. Depuis que le retrait vit
+   sur la cellule, la boîte du champ commence dix pixels plus loin : un contour
+   posé dessus laissait une bande claire à gauche. C'est la case qui s'allume,
+   comme dans un tableur — et il se pose EN DEDANS, sinon il déborderait sur les
+   cellules voisines de la grille. */
+.ld-ctl:focus { outline: none; }
+.ld-cell:focus-within { outline: 2px solid var(--primary); outline-offset: -2px; }
 :root[data-theme="dark"] .ld-ctl:focus { outline-color: rgba(var(--primary-rgb), .35); }
 .ld-duo { display: flex; gap: 8px; }
 
@@ -5800,8 +5823,10 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
 .ld-volet .ld-k { min-height: 0; padding: 0; border: 0; background: none; }
 .ld-volet__tete {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 14px; min-height: var(--rond);
-  cursor: pointer; list-style: none; border-radius: var(--arrondi-bloc);
+  /* 10 px à gauche, comme la colonne des intitulés : à 14 le titre du volet
+     sortait de deux pixels de l'alignement de tout le tableau. */
+  padding: 10px 14px 10px 10px; min-height: var(--ligne-h);
+  cursor: pointer; list-style: none; border-radius: 0;
 }
 .ld-volet__tete::-webkit-details-marker { display: none; }
 .ld-volet__tete:hover { background: var(--surface-hover); }
@@ -6002,7 +6027,7 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 10px; }
 .ld-hist__title { display: block; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
 .ld-hist__sub { display: block; margin-top: 2px; font-size: var(--taille-texte); color: var(--text-2); }
 .ld-hist__value { font-size: var(--taille-texte); font-weight: var(--graisse-forte); white-space: nowrap; }
-.ld-empty { margin: 0; padding: 0 10px; font-size: var(--taille-note); color: var(--text-2); }
+.ld-empty { margin: 0; padding: 0; font-size: var(--taille-note); color: var(--text-2); }
 
 .ld-fiche-item { padding: var(--champ-y-serre) var(--pas-2); border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
 .ld-fiche-item__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-1); }

@@ -173,6 +173,30 @@ assert.ok(/border: 0;/.test(CTL), 'le champ n’a pas de contour propre : la cel
 assert.ok(/outline-offset: -2px/.test(CSS),
   'le focus se pose EN DEDANS, sinon il déborde sur les cellules voisines');
 
+// LE RETRAIT VIT SUR LA CELLULE, une seule fois. Il était porté par CHAQUE
+// contenu — et seulement par ceux qui y avaient pensé : les champs commençaient
+// à 231 px, les valeurs dépouillées (« PRO », « Mélina », le duo date/heure) à
+// 221. Dix pixels d'écart dans la même colonne, sur une rangée sur trois.
+const HAUTE_ALIGN = CSS.match(/\.ld-rang--haut > \.ld-cell \{[^}]*\}/)[0];
+const CELL = CSS.match(/\n\.ld-cell \{[\s\S]*?\n\}/)[0];
+assert.ok(/padding: 0 0 0 10px;/.test(CELL), 'la cellule porte le retrait');
+const CTL2 = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
+assert.ok(/padding: 0;/.test(CTL2), 'et le champ n’en porte plus : sinon il s’ajoute au premier');
+// LE FOCUS S'ALLUME SUR LA CELLULE. Posé sur le champ, dont la boîte commence
+// dix pixels plus loin, il laissait une bande claire à gauche.
+assert.ok(/\.ld-cell:focus-within \{ outline: 2px solid var\(--primary\); outline-offset: -2px; \}/.test(CSS),
+  'c’est la case qui s’allume, comme dans un tableur');
+// UNE MARGE DE COMPOSANT NE SUIT PAS DANS UNE CELLULE. `.sub-chip` porte
+// `margin: 8px 12px` pour vivre dans une ligne du planning : ces 12 px la
+// décalaient de la colonne (243 px quand tout le reste tombe à 231).
+assert.ok(/\.ld-cell :is\([^)]*\) \{[\s\S]*?margin: 0;/.test(CSS),
+  'une pastille perd la marge qu’elle porte pour le planning');
+// `align-items: center` VAUT CENTRAGE HORIZONTAL dans une colonne flex : hérité
+// de la règle des cellules, il posait les trois pastilles de documents au milieu
+// de la largeur (533 px) au lieu du bord.
+assert.ok(/align-items: stretch;/.test(HAUTE_ALIGN),
+  'une rangée à pavé aligne ses blocs à gauche, pas au centre');
+
 // DEUX PIÈGES DE GRILLE, PAYÉS LE 28/08 ET TENUS ICI.
 //
 // 1. UNE RANGÉE EST EN `display: contents` : on ne lui ajoute RIEN après coup.
