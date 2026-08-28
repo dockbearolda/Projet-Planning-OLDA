@@ -83,7 +83,7 @@
 .fa-in {
   min-width: 0;
   height: var(--fa-h-champ);
-  padding: 0 10px;
+  padding: 0 var(--pas-2);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
   background: var(--surface);
@@ -93,7 +93,7 @@
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
               color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-textarea.fa-in { height: auto; padding: 8px 10px; line-height: 1.45; resize: none; }
+textarea.fa-in { height: auto; padding: var(--pas-1) var(--pas-2); line-height: 1.45; resize: none; }
 select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-in::placeholder { color: var(--text-3); }
 .fa-in:hover { background: var(--bg); }
@@ -105,9 +105,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-in:required:placeholder-shown:focus { box-shadow: inset 0 0 0 1.5px var(--primary); }
 
 .fa-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--pas-1);
   height: var(--fa-h-champ);
-  padding: 0 14px;
+  padding: 0 var(--pas-3);
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
   background: var(--surface);
@@ -120,7 +120,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 }
 .fa-btn:hover { background: var(--bg); color: var(--text-1); }
 .fa-btn--carre { width: var(--fa-h-champ); padding: 0; font-size: var(--taille-texte); }
-.fa-btn--mini { padding: 0 10px; }
+.fa-btn--mini { padding: 0 var(--pas-2); }
 /* Le seul bouton plein de l'écran : celui qui fait AVANCER le dossier. */
 .fa-btn--plein {
   border-color: var(--primary); background: var(--primary); color: var(--surface);
@@ -131,14 +131,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 /* --- ZONE 1 : l'entête ---------------------------------------------------- */
 .fa-head {
   flex-shrink: 0;
-  display: flex; align-items: center; gap: 14px;
-  padding: 10px 20px;
+  display: flex; align-items: center; gap: var(--pas-3);
+  padding: var(--pas-2) var(--pas-4);
   border-bottom: 1px solid var(--border);
 }
-.fa-ident { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.fa-ident { display: flex; align-items: baseline; gap: var(--pas-2); min-width: 0; }
 .fa-ref { font-size: var(--fa-lab); font-weight: var(--graisse-forte); letter-spacing: .06em; color: var(--text-3); }
 .fa-client {
-  padding: 3px 7px; border: 0; border-radius: var(--arrondi-champ); background: transparent;
+  padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
   font: inherit; font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
   white-space: nowrap; cursor: pointer;
 }
@@ -150,9 +150,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   font-size: var(--fa-val); color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.fa-outils { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.fa-outils { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; flex-shrink: 0; }
 .fa-sauve {
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; gap: var(--pas-1);
   font-size: var(--fa-lab); color: var(--text-3); white-space: nowrap;
 }
 .fa-autosave {
@@ -166,28 +166,40 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
    d'étape, régler la priorité, corriger le montant. */
 .fa-bandeau {
   flex-shrink: 0;
-  display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 18px; align-items: end;
-  padding: 14px 20px;
+  display: flex; align-items: center; gap: var(--pas-3);
+  padding: var(--pas-2) var(--pas-4);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-.fa-bloc { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.fa-min { font-size: var(--fa-min); font-weight: var(--graisse-note); color: var(--text-2); }
-.fa-duo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* Un bloc = un libellé et sa commande, sur la MÊME ligne. Le libellé est celui
+   des colonnes (`--fa-lab`) : deux surfaces qui se touchent ne portent pas deux
+   libellés différents. */
+.fa-bloc { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
+.fa-bloc--large { flex: 1; }
+.fa-bloc > .fa-lab { flex-shrink: 0; }
+.fa-bloc--large > .fa-in { flex: 1; }
+.fa-duo { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
 .fa-duo > .fa-in { flex: 1; }
-.fa-etape { height: var(--fa-h-bandeau); font-weight: var(--graisse-note); }
-.fa-bandeau .fa-btn { height: var(--fa-h-bandeau); }
-.fa-ttc { height: var(--fa-h-bandeau); font-weight: var(--graisse-forte); }
-.fa-marge { display: flex; flex-direction: column; line-height: 1.15; white-space: nowrap; }
-/* PLANCHER À 13 PX, jamais moins : l’écran se lit debout, en lumière
-   d’atelier. La spec disait 11 ici et 12 ailleurs — elle se contredisait. */
-.fa-marge-k { font-size: var(--fa-min); color: var(--text-3); }
+/* LA MÊME HAUTEUR POUR TOUT LE BANDEAU, dans une seule règle : menu, bouton,
+   segment, champ. Écrite quatre fois, elle redevient quatre hauteurs. */
+.fa-bandeau :is(.fa-in, .fa-btn, .fa-seg, .fa-seg__b) { height: var(--fa-h-bandeau); }
+.fa-etape { font-weight: var(--graisse-note); }
+/* 128 px : « 12 500,50 € » tient, et les 22 px rendus vont au menu d'etape.
+   Un montant plus long que cinq chiffres n'existe pas sur un dossier d'ici. */
+.fa-ttc { width: 128px; flex: 0 0 128px; font-weight: var(--graisse-forte); }
+/* La marge se lit d'un trait, pas sur deux etages : elle accompagne le montant,
+   elle ne se compare a rien. */
+.fa-marge { display: flex; align-items: baseline; gap: var(--pas-1); white-space: nowrap; }
+.fa-marge-k { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-marge-v { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2); }
 
-/* Segmenté : trois valeurs exclusives, la retenue porte l'encre. */
-.fa-seg { display: flex; gap: 6px; flex: 1; min-width: 0; }
+/* Segmenté : trois valeurs exclusives, la retenue porte l'encre.
+   IL NE RÉTRÉCIT PAS. En `flex: 1` dans une rangée, il cédait sa largeur au
+   menu d'étape et coupait « Moyenne » en plein mot — les TROIS boutons font
+   donc la même largeur fixe, et c'est le menu qui absorbe le reste. */
+.fa-seg { display: flex; gap: var(--pas-1); flex: 0 0 auto; }
 .fa-seg__b {
-  flex: 1; min-width: 0; height: var(--fa-h-bandeau);
+  flex: 0 0 88px; height: var(--fa-h-bandeau);
   border: 1px solid var(--border); border-radius: var(--arrondi-champ);
   background: var(--surface); color: var(--text-2);
   font: inherit; font-size: var(--fa-lab);
@@ -210,31 +222,31 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   overflow: hidden;
 }
 .fa-col {
-  padding: 10px 20px; min-width: 0;
+  padding: var(--pas-2) var(--pas-4); min-width: 0;
   display: flex; flex-direction: column;
   overflow: auto;
 }
-.fa-col--g { gap: 10px; border-right: 1px solid var(--border-soft); }
-.fa-col--d { gap: 10px; }
-.fa-groupe { display: flex; flex-direction: column; gap: 7px; }
+.fa-col--g { gap: var(--pas-3); border-right: 1px solid var(--border-soft); }
+.fa-col--d { gap: var(--pas-3); }
+.fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
 .fa-sec {
   font-size: var(--fa-min); letter-spacing: .09em; text-transform: uppercase;
   color: var(--text-3); font-weight: var(--graisse-forte);
 }
 .fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
-.fa-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fa-row { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
 .fa-row > .fa-in { flex: 1; }
 .fa-lab { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
 .fa-row > .fa-lab { width: 122px; }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
 .fa-creneau { width: 94px; flex: 0 0 94px; }
-.fa-grille-client { display: grid; grid-template-columns: 122px 1fr 1fr; align-items: center; gap: 6px 10px; }
-.fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: 6px 10px; }
+.fa-grille-client { display: grid; grid-template-columns: 122px 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+.fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
 .fa-span2 { grid-column: span 2; }
 .fa-fort { font-weight: var(--graisse-note); }
 
-.fa-tete-t { display: flex; align-items: baseline; gap: 10px; }
+.fa-tete-t { display: flex; align-items: baseline; gap: var(--pas-2); }
 .fa-tete-t > .fa-lab { width: auto; }
 .fa-compte { margin-left: auto; font-size: var(--fa-lab); color: var(--text-2); }
 .fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
@@ -246,10 +258,10 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
    ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
-.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); }
 .fa-taille {
-  display: flex; align-items: center; gap: 8px; min-width: 0;
-  padding: 0 10px; border-radius: 10px; background: var(--bg);
+  display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
+  padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
 .fa-taille__k {
   flex-shrink: 0;
@@ -262,18 +274,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 }
 .fa-nb:hover { background: transparent; }
 
-.fa-faces { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+.fa-faces { display: flex; flex-wrap: wrap; gap: var(--pas-2); flex: 1; min-width: 0; }
 .fa-face {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border-radius: 10px; background: var(--bg);
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding: var(--pas-1) var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
 .fa-face__k { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1); }
 .fa-mm { width: 56px; flex: 0 0 56px; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-quoi { width: 180px; max-width: 100%; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-unite { font-size: var(--fa-min); color: var(--text-3); }
 .fa-ajout {
-  height: var(--fa-h-champ); padding: 0 14px;
-  border: 1px dashed var(--border); border-radius: 10px;
+  height: var(--fa-h-champ); padding: 0 var(--pas-3);
+  border: 1px dashed var(--border); border-radius: var(--arrondi-champ);
   background: var(--surface); color: var(--text-2);
   font: inherit; font-size: var(--fa-lab); cursor: pointer;
 }
@@ -289,8 +301,8 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-details__b {
   flex-shrink: 0;
   width: 100%; height: var(--fa-h-barre);
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 20px;
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding: 0 var(--pas-4);
   border: 0; border-top: 1px solid var(--border);
   background: var(--bg); color: var(--text-2);
   font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
@@ -301,8 +313,8 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 .fa-details__liste { font-weight: var(--graisse-texte); color: var(--text-3); }
 .fa-details {
   position: absolute; left: 0; right: 0; bottom: 105px; z-index: 15;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px;
-  padding: 14px 20px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-3) var(--pas-4);
+  padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-bas);
@@ -316,17 +328,17 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 /* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
    la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
 .fa-details[hidden] { display: none; }
-.fa-details__col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.fa-details__col { display: flex; flex-direction: column; gap: var(--pas-2); min-width: 0; }
 .fa-details .fa-row > .fa-lab { width: 106px; }
-.fa-docs { display: flex; gap: 8px; flex-wrap: wrap; }
+.fa-docs { display: flex; gap: var(--pas-2); flex-wrap: wrap; }
 .fa-cout { width: 120px; flex: 0 0 120px; }
 .fa-rappel-bloc { font-size: var(--fa-lab); color: var(--text-3); line-height: 1.5; white-space: pre-line; }
 
 /* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
 .fa-bas {
   flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 20px;
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding: var(--pas-2) var(--pas-4);
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -356,15 +368,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
 }
 .fa-toast-zone { position: absolute; left: 20px; bottom: 66px; z-index: 30; }
 .fa-toast {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: 10px;
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding: var(--pas-2) var(--pas-3); border-radius: var(--arrondi-champ);
   background: var(--primary); color: var(--surface);
   font-size: var(--fa-lab);
   box-shadow: var(--shadow-toast);
   animation: faToastIn var(--dur-1) var(--ease) both;
 }
 .fa-toast__undo {
-  height: var(--fa-h-undo); padding: 0 12px;
+  height: var(--fa-h-undo); padding: 0 var(--pas-2);
   border: 0; border-radius: var(--arrondi-champ);
   background: var(--fa-undo-fond); color: var(--surface);
   font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
@@ -389,5 +401,4 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: 10px; }
   .fa-travail { grid-template-columns: 1fr; overflow: auto; }
   .fa-col { overflow: visible; }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
-  .fa-bandeau { grid-template-columns: 1fr; }
 }

@@ -292,7 +292,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // =========================================================================
   const bandeau = el('div', 'fa-bandeau');
 
-  const blocEtape = el('div', 'fa-bloc');
+  const blocEtape = el('div', 'fa-bloc fa-bloc--large');
   const selEtape = menu('fa-etape', ctx.etapes, ctx.etapeCourante, 'Étape actuelle');
   brancher(selEtape, {
     label: 'Étape',
@@ -308,9 +308,10 @@ export function dessinerFicheAtelier(r, ctx) {
     empiler(() => { selEtape.value = ancien; ctx.changerEtape(ancien); });
     coche(selEtape); pulser(); dire('Enregistré — étape');
   });
-  const rangEtape = el('div', 'fa-duo');
-  rangEtape.append(selEtape, suivante);
-  blocEtape.append(el('span', 'fa-min', 'Étape actuelle'), rangEtape);
+  // PAS DE LIBELLÉ SUR L'ÉTAPE : le menu dit déjà « Demande & chiffrage ›
+  // Tarif / Devis envoyé – Attente client ». Le mot « Étape actuelle » posé
+  // au-dessus coûtait une ligne au bandeau et ne s'apprenait à personne.
+  blocEtape.append(selEtape, suivante);
 
   const blocPrio = el('div', 'fa-bloc');
   const prios = el('div', 'fa-seg');
@@ -333,7 +334,11 @@ export function dessinerFicheAtelier(r, ctx) {
     boutonsPrio.forEach((b, i) => b.setAttribute('aria-pressed', String(PRIOS[i][0] === n)));
   }
   prios.append(...boutonsPrio);
-  blocPrio.append(el('span', 'fa-min', 'Priorité'), prios);
+  // PAS DE LIBELLÉ NON PLUS : « Basse / Moyenne / Haute » ne peut rien dire
+  // d'autre qu'une priorité, et le mot coûtait 70 px au menu d'étape — qui,
+  // lui, en manquait pour finir « Attente client ».
+  prios.setAttribute('aria-label', 'Priorité');
+  blocPrio.append(prios);
 
   const blocValeur = el('div', 'fa-bloc');
   const valMarge = el('span', 'fa-marge-v', '—');
@@ -352,11 +357,15 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   const marge = el('div', 'fa-marge');
   marge.append(el('span', 'fa-marge-k', 'marge'), valMarge);
-  const rangValeur = el('div', 'fa-duo');
-  rangValeur.append(chTtc, marge);
-  blocValeur.append(el('span', 'fa-min', 'Valeur TTC'), rangValeur);
+  // « TTC » et non « Valeur TTC » : le champ porte deja un montant, le libelle
+  // n'a qu'a lever le doute HT/TTC. Les 55 px rendus vont au menu d'etape, le
+  // texte le plus long de l'ecran.
+  blocValeur.append(el('span', 'fa-lab', 'TTC'), chTtc, marge);
 
-  bandeau.append(blocEtape, blocPrio, blocValeur);
+  // UNE SEULE RANGÉE. Les trois blocs empilaient chacun leur libellé au-dessus
+  // de leur commande : 96 px de bandeau, et sous 1180 px les trois se
+  // remettaient l'un sous l'autre — près de 200 px pour trois contrôles.
+  bandeau.append(blocEtape, el('div', 'fa-sep'), blocPrio, el('div', 'fa-sep'), blocValeur);
 
   // =========================================================================
   // ZONE 3 — colonne gauche : dates, client & suivi
