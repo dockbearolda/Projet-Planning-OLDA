@@ -193,6 +193,27 @@ const HAUTE = CSS.match(/\.ld-rang--haut > \.ld-cell \{[^}]*\}/)[0];
 assert.ok(/min-height: auto;/.test(HAUTE),
   'une rangée à pavé perd son min-height, sinon sa piste plafonne et le contenu déborde');
 
+// AUCUNE BULLE DANS UN TABLEAU. Charlie, en désignant les « Non » du paiement :
+// « enlève ces bulles, un tableau je veux ». Sept pastilles arrondies vivaient
+// dans les cellules — type de client, état, pilote, référent, les trois
+// bascules de paiement, le mode. Une pilule au milieu d'une cellule, c'est un
+// bouton posé sur une valeur : dans un tableur on lit la valeur, on clique
+// dessus, elle change.
+const SANSBULLE = CSS.match(/\.ld-cell :is\(\.ld-toggle[^{]*\{[^}]*\}/)[0];
+for (const mort of ['border-radius: 0', 'border: 0', 'background: none']) {
+  assert.ok(SANSBULLE.includes(mort), `dans une cellule, une valeur perd sa bulle (${mort})`);
+}
+// C'est le SURVOL qui dit qu'elle se change, pas une bulle qui le dit tout le
+// temps.
+assert.ok(/\.ld-cell :is\([^)]*\):hover \{[^}]*text-decoration: underline/.test(CSS),
+  'le survol dit qu’une valeur se change');
+// ⚠ ET SEULEMENT DANS LE TABLEAU : sur la ligne du planning et sur la carte,
+// ces mêmes pastilles gardent leur forme — là, rien d'autre ne dirait qu'on
+// peut les toucher.
+assert.ok(/\n\.ld-toggle \{[\s\S]*?border-radius: var\(--pilule\)/.test(CSS)
+  || /\n\.resp-chip \{[\s\S]*?border-radius: var\(--pilule\)/.test(CSS),
+  'hors du tableau, la pastille reste une pastille');
+
 // ---------------------------------------------------------------------------
 // 4. UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE
 // ---------------------------------------------------------------------------

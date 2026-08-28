@@ -5664,6 +5664,32 @@ body.view-plein .fiverr-tool { display: none !important; }
   grid-column: 2 / -1;
   display: block; padding: 6px 10px; overflow: visible; min-height: auto;
 }
+/* AUCUNE BULLE DANS UN TABLEAU (28/08). Charlie, en désignant les « Non » du
+   paiement : « enlève ces bulles, un tableau je veux ». Sept pastilles
+   arrondies vivaient dans les cellules — le type de client, l'état, le pilote,
+   le référent, les trois bascules de paiement, le mode de règlement. Une
+   pilule au milieu d'une cellule, c'est un BOUTON posé sur une valeur : dans
+   un tableur on lit la valeur, on clique dessus, elle change.
+   Le fond, le contour et l'arrondi partent. La valeur reste, à l'encre du
+   texte, et c'est le SURVOL qui dit qu'elle se change — pas une bulle qui la
+   dit tout le temps.
+   ⚠ CE N'EST VRAI QUE DANS LE TABLEAU. Sur la ligne du planning et sur la
+   carte, ces mêmes pastilles gardent leur forme : là, elles ne sont pas dans
+   une cellule, et rien d'autre ne dirait qu'on peut les toucher. */
+.ld-cell :is(.ld-toggle, .sub-chip, .flag-chip, .resp-chip, .ref-chip, .type-tag) {
+  min-height: var(--ligne-h);
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  font-size: var(--taille-note); font-weight: var(--graisse-texte);
+  color: var(--text-1);
+}
+.ld-cell :is(.flag-chip, .ref-chip, .sub-chip).empty { color: var(--text-2); }
+.ld-cell :is(.ld-toggle, .sub-chip, .flag-chip, .resp-chip, .ref-chip, .type-tag):hover {
+  background: none; color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
+}
+/* L'initiale du pilote n'est plus une pastille dans une pastille : le prénom
+   suffit à dire qui suit, et c'est lui qu'on lit. */
+.ld-cell .resp-ini { display: none; }
+.ld-cell .resp-name { max-width: none; }
 /* LE FIL DU COMPTOIR DANS UNE CELLULE. C'est le composant de l'écran de la
    vendeuse (`.stepper` / `.step` de charte.css) : il a l'échelle de SON écran —
    des pastilles à son échelle. Posé dans une rangée de tableau, il en sortait
