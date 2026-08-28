@@ -217,6 +217,33 @@ assert.ok(!/\d{3}\s?\d{3}\s?\d{3}\s?\d{5}/.test(BUREAU),
 assert.ok(bureauTexte(modele).startsWith('Atelier OLDA'),
   'le document en texte dit lui aussi de qui il vient');
 
+// DEUX NUMÉROS QUI SE LISENT, PAS QUI SE DÉCHIFFRENT. Le patron saisit ce qu'il
+// a sous les yeux — « 0690479788 », « 97829695200028 » — et c'est très bien :
+// on ne lui impose pas une saisie formatée qu'il faudrait réussir du premier
+// coup. C'est l'AFFICHAGE qui habille, et la valeur stockée ne bouge jamais.
+// Les numéros de ce jeu d'essai sont FICTIFS : ceux de l'atelier vivent en base,
+// pas dans le dépôt.
+const lisible = modeleBureau(LIGNE, {
+  ...MAISON, tel: '0590123456', siret: '12345678900012', tva: 'FR00123456789',
+}).maison;
+assert.ok(lisible.contact.includes('05 90 12 34 56'),
+  'un numéro français se lit par paires, pas en dix chiffres collés');
+assert.ok(lisible.legal.includes('SIRET 123 456 789 00012'),
+  'un SIRET s’écrit groupé : trois fois trois du SIREN, puis les cinq du NIC');
+// Le n° de TVA intracommunautaire, lui, s'écrit d'un bloc : ce n'est pas un
+// oubli de symétrie, c'est sa convention.
+assert.ok(lisible.legal.includes('TVA FR00123456789'), 'le n° de TVA reste d’un bloc');
+// ET ON NE TOUCHE QUE CE QU'ON RECONNAÎT. Un numéro international, une saisie
+// déjà espacée, un SIRET incomplet ressortent TELS QUELS : mieux vaut un numéro
+// brut qu'un numéro découpé de travers sur le document qui sert à facturer.
+const brut = modeleBureau(LIGNE, {
+  ...MAISON, tel: '+590590123456', siret: '1234567890', tva: '',
+}).maison;
+assert.ok(brut.contact.includes('+590590123456'),
+  'un numéro international n’a pas le découpage d’un numéro national');
+assert.ok(brut.legal.includes('SIRET 1234567890'),
+  'un SIRET qui n’a pas ses quatorze chiffres ressort tel quel');
+
 // ---------------------------------------------------------------------------
 // 5. AUCUNE LIGNE N'EST IMPRIMÉE DEUX FOIS
 // ---------------------------------------------------------------------------

@@ -210,17 +210,50 @@ function noteUtile(note, dossier) {
 // les réglages, le papier porte le seul nom qu'on connaisse — c'est déjà plus
 // que rien, et c'est honnête. Une ligne vide ne s'imprime pas : « Adresse : — »
 // sur un document qui sert à facturer vaut moins que pas de ligne du tout.
+// DEUX NUMÉROS QUI SE LISENT, PAS QUI SE DÉCHIFFRENT.
+//
+// La valeur STOCKÉE ne bouge jamais : ces deux fonctions habillent l'AFFICHAGE,
+// et rien d'autre. Le patron saisit ce qu'il a sous les yeux, dix chiffres
+// collés pour le téléphone et quatorze pour le SIRET, et c'est très bien : on
+// ne lui impose pas une saisie formatée qu'il faudrait réussir du premier coup.
+// (Aucun numéro réel n'est cité ici : les vrais vivent en base, pas dans le
+// dépôt — c'est ce que le garde-fou refuse, et il a servi en l'écrivant.)
+//
+// ET ELLES NE TOUCHENT QUE CE QU'ELLES RECONNAISSENT. Une valeur qui n'a pas la
+// forme attendue (un numéro international, une saisie déjà espacée, un SIRET
+// incomplet) ressort TELLE QUELLE : mieux vaut un numéro brut qu'un numéro
+// découpé de travers sur le document qui sert à facturer.
+
+// Un numéro français se lit par paires : 06 90 47 97 88. Dix chiffres exactement,
+// et rien d'autre — le « + » d'un international change le découpage.
+function telLisible(v) {
+  const brut = texte(v);
+  return /^\d{10}$/.test(brut) ? brut.replace(/(\d\d)(?=\d)/g, '$1 ') : brut;
+}
+
+// UN SIRET S'ÉCRIT GROUPÉ : les neuf chiffres du SIREN en trois groupes de
+// trois, puis les cinq du NIC. C'est la convention de l'INSEE, et c'est comme ça
+// qu'il se recopie sans se tromper de chiffre.
+// Le n° de TVA intracommunautaire, lui, s'écrit d'un bloc : ce n'est pas un
+// oubli de symétrie, c'est sa convention à lui.
+function siretLisible(v) {
+  const brut = texte(v);
+  return /^\d{14}$/.test(brut)
+    ? `${brut.slice(0, 3)} ${brut.slice(3, 6)} ${brut.slice(6, 9)} ${brut.slice(9)}`
+    : brut;
+}
+
 function maisonDe(e) {
   const m = e && typeof e === 'object' ? e : {};
   const legal = [];
-  if (texte(m.siret)) legal.push(`SIRET ${texte(m.siret)}`);
+  if (texte(m.siret)) legal.push(`SIRET ${siretLisible(m.siret)}`);
   if (texte(m.tva)) legal.push(`TVA ${texte(m.tva)}`);
   return {
     nom: texte(m.nom),
     // L'adresse postale, telle qu'on l'écrirait sur une enveloppe.
     lignes: [texte(m.adresse), texte(m.ville)].filter(Boolean),
     // De quoi joindre la maison : c'est ce que le client cherche en premier.
-    contact: [texte(m.tel), texte(m.email), texte(m.web)].filter(Boolean),
+    contact: [telLisible(m.tel), texte(m.email), texte(m.web)].filter(Boolean),
     legal,
   };
 }
