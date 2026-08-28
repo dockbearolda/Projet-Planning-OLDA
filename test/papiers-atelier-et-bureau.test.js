@@ -433,15 +433,20 @@ assert.deepStrictEqual(cases.slice(6, 9).map((c) => c.textContent), ['240', '260
 assert.strictEqual(tousLes(tkCotes, 'tk__aecrire').length, 3,
   'une face à mesurer ouvre un trait PAR TAILLE : la cote peut changer de l’une à l’autre');
 
-// LE DOCUMENT SE LIT LE LONG DE SON BORD GAUCHE. Charlie, 28/08 : « cette partie
-// doit être à gauche, parfaitement calée avec tout le reste » — le bloc du
-// total, qui était sur la colonne de droite comme sur une facture. Le nom du
-// client, la désignation, le total, l'interne et les observations commencent
-// tous au même endroit : l'oeil ne traverse jamais la feuille pour retrouver sa
-// ligne. La seule chose qui reste à droite est l'intitulé de la colonne
-// « Dossier », et c'est sa place.
-assert.match(CSS_BUREAU, /\.bu__demi \{[^}]*grid-column: 1/,
-  'le total est sur la colonne de GAUCHE, calé avec tout le reste');
+// LE TOTAL PREND TOUTE LA LARGEUR DE LA LIGNE. Il a eu trois places en une
+// journée : une boîte de 76 mm flottant à droite (une largeur à elle, qui ne
+// s'alignait sur rien), la colonne de gauche de la grille, puis toute la ligne —
+// « tout ça doit prendre toute la longueur de la ligne », Charlie, 28/08.
+// C'est aussi ce qui met ses montants exactement sous la colonne « Total TTC »
+// du tableau qu'ils additionnent. Le document se lit en une seule descente :
+// chaque ligne commence au bord gauche et finit au bord droit.
+assert.ok(!/bu__demi|bu__totaux/.test(CSS_BUREAU) && !/bu__demi|bu__totaux/.test(BUREAU),
+  'le total n’a plus de boîte à lui : il prend la ligne entière, comme tout le reste');
+const lignesTotal = tousLes(feuille, 'bu__paire')
+  .filter((n) => texteEntier(n).includes('Total HT'));
+assert.strictEqual(lignesTotal.length, 1, 'le total est bien rendu');
+assert.ok(!tousLes(feuille, 'bu__grille').some((g) => g.enfants.includes(lignesTotal[0])),
+  '… et il n’est plus enfermé dans une demi-grille');
 
 // UNE TASSE NE SE MESURE PAS AU COMPTOIR. Charlie, 28/08 : « pour les tasses ce
 // n'est pas des tailles que je reçois à l'atelier mais des logos, donc pas de

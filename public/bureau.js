@@ -458,15 +458,15 @@ export const CSS_BUREAU = SOCLE_PAPIER + `
   .bu__corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;
                padding: 16px var(--pap-marge) 0; }
   .bu__grille { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--bu-gouttiere); }
-  /* UNE COLONNE SEULE, sur la MÊME grille. La boîte des totaux avait une
-     largeur à elle (76 mm) qui ne s'alignait sur rien ; posée sur la grille,
-     son bord tombe exactement sur celui des autres blocs.
-     À GAUCHE, et non à droite comme sur une facture (Charlie, 28/08 : « cette
-     partie doit être à gauche, parfaitement calée avec tout le reste »). Le
-     document se lit en une seule descente le long du bord gauche — le nom du
-     client, la désignation, le total, l'interne : tout commence au même endroit,
-     et l'oeil ne traverse jamais la feuille pour retrouver sa ligne. */
-  .bu__demi { grid-column: 1; }
+  /* LE TOTAL PREND TOUTE LA LARGEUR (28/08). Il a eu trois places en une
+     journée, et la dernière est la bonne : une boîte de 76 mm flottant à droite
+     (une largeur à elle, qui ne s'alignait sur rien), puis la colonne de gauche
+     de la grille, puis toute la ligne — « tout ça doit prendre toute la longueur
+     de la ligne », Charlie.
+     C'est aussi ce qui met les montants du total exactement sous la colonne
+     « Total TTC » du tableau qu'ils additionnent, et l'intitulé sous la
+     désignation. Le document se lit alors en une seule descente : chaque ligne
+     commence au bord gauche et finit au bord droit. */
 
   /* UNE LIGNE, UNE HAUTEUR. C'est le rythme du document entier : intitulé à
      gauche, valeur à droite, un filet en dessous, et la ligne suivante tombe au
@@ -695,8 +695,7 @@ export function dessinerBureau(t, doc) {
   // IL EST SUR LA COLONNE DE DROITE DE LA MÊME GRILLE. Il avait une largeur à
   // lui (76 mm) qui ne s'alignait sur rien : la boîte flottait à droite du vide.
   const arg = t.argent;
-  const totaux = el('div', 'bu__grille');
-  const boite = el('div', 'bu__demi');
+  const boite = el('div');
   boite.append(el('div', 'pap-cap bu__col-k', 'TOTAL'));
   if (arg.ttc == null) {
     // « Pas encore chiffré » n'est PAS « gratuit ». On l'écrit en toutes
@@ -710,8 +709,7 @@ export function dessinerBureau(t, doc) {
     if (arg.acompte != null) boite.append(paire('Acompte versé', euro(arg.acompte)));
     boite.append(paire('Règlement', arg.paye ? (arg.mode || 'Payé') : 'À encaisser'));
   }
-  totaux.append(boite);
-  corps.append(totaux);
+  corps.append(boite);
 
   // --- Ce que la vendeuse a recueilli, tel qu'elle l'a écrit ----------------
   if (t.dossier.length) {
