@@ -416,20 +416,15 @@ const VENTE = {
   // Et le récapitulatif part par POSITION, une seule case remplie.
   assert.ok(/positions\[cible\.i\] = String\(valeur == null \? '' : valeur\);/.test(APP));
 
-  // Le point sur la pastille dit qu'une consigne existe, dans les DEUX vues.
-  // Depuis le 27/08 un SEUL composant construit les deux boutons de la ligne
-  // (ticket d'atelier + bon de commande) : la classe se compose donc du nom
-  // passé par l'appelant, et le point suit le papier de l'ATELIER — c'est lui
-  // que la consigne concerne.
-  assert.ok(/function consigneAtelier\(r\)/.test(APP));
-  assert.ok(/atelier\.classList\.add\(`\$\{classe\}--consigne`\)/.test(APP),
-    'le point se pose sur le ticket d’atelier, quelle que soit la vue');
-  assert.ok(/boutonsPapiers\(r, 'ticket-cell'\)/.test(APP) && /boutonsPapiers\(r, 'pcard__ticket'\)/.test(APP),
-    'et les deux vues passent bien par ce composant');
-  assert.ok(/\.ticket-cell--consigne::after,\s*\.pcard__ticket--consigne::after/.test(CSS));
-  // Il se peint HORS de la boîte : une pastille qui grossit décalerait toute la
-  // rangée d'actions des cartes, ligne après ligne.
-  assert.ok(/\.ticket-cell--consigne \{ position: relative; \}/.test(CSS));
+  // LA PASTILLE DU TICKET A DISPARU (28/08). Charlie : « ces 3 choses doivent
+  // être supprimées définitivement ». Le point qui signalait une consigne
+  // vivait dessus — il n'a plus de support, mais la CONSIGNE, elle, reste : on
+  // la lit dans la fiche, et la grille continue de la porter dans sa liste
+  // allégée (FICHE_LISTE côté serveur).
+  assert.ok(/function consigneAtelier\(r\)/.test(APP), 'la consigne se lit toujours sur la ligne');
+  assert.ok(!/--consigne/.test(APP) && !/--consigne/.test(CSS),
+    'plus de point sur une pastille qui n’existe plus');
+  assert.ok(!/boutonsPapiers/.test(APP), 'plus de composant de pastilles pour les papiers');
 
   // La fiche montre la MÊME consigne : sinon elle ne se relirait qu'en
   // imprimant le ticket.

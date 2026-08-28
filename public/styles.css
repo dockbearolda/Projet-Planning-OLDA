@@ -993,7 +993,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      La colonne TTC ne peut pas descendre en dessous, sinon elles s'empilent. */
   /* poignée + ticket atelier + bon de commande + ouvrir + supprimer.
      5 x 44 + 4 x 8 = 252 px. */
-  --pcard-actions: 252px;
+  --pcard-actions: 96px;
   grid-template-columns:
     minmax(150px, 1.05fr) minmax(240px, 1.9fr) 190px minmax(var(--pcard-refs), 180px) var(--pcard-actions);
   /* DEUX RANGÉES, partagées par les quatre blocs : les intitulés dans la
@@ -1246,26 +1246,15 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    `display` : la règle est écrite en clair pour que le nom du référent
    disparaisse VRAIMENT quand la pastille le dit déjà. */
 .pcard__ref-name[hidden] { display: none; }
-.pcard__open {
-  display: grid; place-items: center;
-  width: var(--rond); height: var(--rond); border-radius: var(--pilule);
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
-  cursor: pointer;
-}
-/* 18 px comme la poignée et le ticket, quand la corbeille reste à 14 : c'est le
-   geste principal de la carte (tout le dossier est derrière), la corbeille n'a
-   aucune raison d'appeler autant l'œil. */
-.pcard__open svg { width: 18px; height: 18px; }
-.pcard__open:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
-/* Poignée + ticket + ouvrir + supprimer : la colonne d'actions de la carte.
-   Cibles à 44 px et visibles en permanence — au comptoir on est au doigt, rien
-   ne doit dépendre du survol.
-   QUATRE EMPLACEMENTS FIXES, pas une rangée souple : « ouvrir » et « supprimer »
-   doivent tomber au même pixel sur toutes les cartes, qu'il y ait un ticket ou
-   non. 4 × 44 + 3 × 8 = 200 px, la valeur de --pcard-actions. */
+/* Poignée + supprimer : la colonne d'actions de la carte, depuis que les trois
+   pastilles de papier et d'ouverture sont parties (28/08) — la carte s'ouvre
+   maintenant en la cliquant.
+   DEUX EMPLACEMENTS FIXES, pas une rangée souple : « supprimer » doit tomber au
+   même pixel sur toutes les cartes. 2 × 44 + 1 × 8 = 96 px, la valeur de
+   --pcard-actions. */
 .pcard__actions {
   display: grid;
-  grid-template-columns: repeat(5, var(--rond));
+  grid-template-columns: repeat(2, var(--rond));
   gap: 8px;
   align-items: center;
   /* Seul bloc à rester centré quand les autres se calent en haut : la rangée de
@@ -1287,28 +1276,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 }
 .pcard__handle svg { width: 18px; height: 18px; }
 .pcard:hover .pcard__handle { color: var(--text-2); }
-/* LE TICKET DE L'ATELIER, sur la carte. Il ne s'atteignait que par la fiche — et
-   le bouton d'impression y sortait le dossier de travail sur une feuille A4.
-   Ici, à côté de « ouvrir » : un appui montre le ticket, un second l'imprime.
-   Sur TOUTES les cartes : ce papier dit ce qu'il y a à produire, et une ligne
-   tapée à la main se produit comme celles du comptoir. */
-.pcard__ticket {
-  display: grid; place-items: center;
-  width: var(--rond); height: var(--rond); border-radius: var(--pilule);
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
-  cursor: pointer;
-}
-.pcard__ticket:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
-.pcard__ticket:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.pcard__ticket svg { width: 18px; height: 18px; }
-/* Ticket retiré depuis le rail « Colonnes » : la case disparaît des DEUX vues,
-   et la colonne d'actions se resserre d'autant — toutes les cartes ensemble. */
-/* Les DEUX papiers partent ensemble : ils répondent à la même question
-   (« sors-moi le document »), en masquer la moitié n'aurait aucun sens.
-   3 x 44 + 2 x 8 = 148 px. */
-body.cards-off-ticket .pcard { --pcard-actions: 148px; }
-body.cards-off-ticket .pcard__actions { grid-template-columns: repeat(3, var(--rond)); }
-body.cards-off-ticket .pcard__ticket { display: none; }
 .pcard__del {
   display: grid; place-items: center;
   width: var(--rond); height: var(--rond); border-radius: var(--pilule);
@@ -1356,7 +1323,7 @@ body.cards-off-ticket .pcard__ticket { display: none; }
      Trois par rangée, la largeur retombe à 148 px et le texte reprend ses
      100 px. La carte grandit de 52 px, et c'est le bon échange : une carte un
      peu plus haute se lit, un nom coupé en cinq ne se lit pas. */
-  .pcard { --pcard-actions: 148px; }
+  .pcard { --pcard-actions: 96px; }
   .pcard__actions { grid-template-columns: repeat(3, var(--rond)); }
   .pcard {
     grid-template-columns: minmax(0, 1fr) var(--pcard-actions);
@@ -2076,7 +2043,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    que l'étape courante ne remplit pas. */
 .grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
 .grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
-.grid.off-ticket      col[data-col="ticket"],      .grid.off-ticket      th.col-ticket,   .grid.off-ticket      td.col-ticket-cell,
 .grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
 .grid.off-price       col[data-col="price"],       .grid.off-price       th.col-price,    .grid.off-price       td.col-price-cell,
 .grid.off-sub_stage   col[data-col="sub_stage"],   .grid.off-sub_stage   th.col-sub,      .grid.off-sub_stage   td.col-sub-cell,
@@ -2867,7 +2833,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    « DOCUMENTS » demande 113 px, et le tableau étant `table-layout: fixed`, il
    se coupait en plein milieu d'une lettre (« DOCUME »). Une colonne ne peut
    pas être plus étroite que son propre nom. */
-.col-ticket { width: 116px; }
 /* « DESCRIPTION » ET « INFOS » ONT UNE LARGEUR, ELLES AUSSI. Elles étaient les
    seules à ne pas en avoir, et `table-layout: fixed` ne lit QUE la première
    rangée pour répartir : sur les étapes qui en ouvrent une par une BANNIÈRE de
@@ -2907,9 +2872,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    Priorité +4 (la pastille « Moyenne »).
    +42 px depuis que la colonne d'actions porte « Ouvrir la fiche » (116 → 158) :
    sans ce report, ce sont Description et Infos qui payaient le bouton. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1416px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1366px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1506px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1300px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-price) { min-width: calc(1250px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1390px - var(--cols-off, 0px)); }
 
 
 /* Description (produit) + Infos (notes) */
@@ -3065,10 +3030,10 @@ body.col-resizing { user-select: none; cursor: col-resize; }
 body.col-resizing .grid-wrap { pointer-events: none; }
 
 
-/* actions de fin de ligne : ouvrir / envoyer / dupliquer / supprimer.
-   Largeur définie plus haut (.col-del) ; ici seulement l'alignement. Les trois
-   dernières n'apparaissent qu'au survol et peuvent déborder visuellement à
-   gauche sans gêner ; OUVRIR, elle, est toujours là (voir .open-btn). */
+/* actions de fin de ligne : envoyer / dupliquer / supprimer. « Ouvrir » est
+   parti le 28/08 — la ligne s'ouvre en la cliquant. Largeur définie plus haut
+   (.col-del) ; ici seulement l'alignement. Les trois n'apparaissent qu'au
+   survol et peuvent déborder visuellement à gauche sans gêner. */
 .col-del { white-space: nowrap; text-align: right; padding-right: 8px; }
 
 /* LA RANGÉE D'ACTIONS. Les quatre boutons étaient posés en `inline-flex` dans
@@ -3093,32 +3058,6 @@ body.col-resizing .grid-wrap { pointer-events: none; }
      .col-del — la corbeille touchait le bord de la grille. */
   padding-right: 8px;
 }
-
-/* OUVRIR LA FICHE, depuis le tableau complet. Seule action de la colonne à ne
-   PAS attendre le survol : la tablette du comptoir n'a pas de souris, et c'est
-   le geste qui donne accès à tout le reste du dossier. Même gabarit que
-   dupliquer / supprimer pour que les quatre boutons forment une rangée. */
-.open-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: 50%;
-  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
-}
-/* 16 px comme les trois autres dessins de la rangée : des tailles inégales se
-   lisent elles aussi comme un défaut d'alignement, même quand les boutons sont
-   au bon endroit. */
-.open-btn svg { display: block; width: 16px; height: 16px; }
-.open-btn:hover { background: var(--text-1); border-color: var(--text-1); color: var(--surface); }
-.open-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
 /* Ni contour ni pilule depuis que l'icône est le BADGE de la destination
    (cf. fiverrIcon) : un carré plein dans un cercle bordé faisait boîte dans une
@@ -3194,13 +3133,13 @@ body.col-resizing .grid-wrap { pointer-events: none; }
    Une seule boîte, un seul glyphe. La charte n'en veut qu'une (loi 4), et la
    forme ronde dit déjà le rôle : une icône seule (loi 5). */
 .grid tbody { --ligne-ic: 32px; }
-.grid tbody :is(.wa-btn, .pdf-btn, .ticket-cell, .desc-toggle,
-                .open-btn, .send-btn, .dup-btn, .del-btn) {
+.grid tbody :is(.wa-btn, .pdf-btn, .desc-toggle,
+                .send-btn, .dup-btn, .del-btn) {
   width: var(--ligne-ic);
   height: var(--ligne-ic);
 }
-.grid tbody :is(.wa-btn, .pdf-btn, .ticket-cell, .desc-toggle,
-                .open-btn, .send-btn, .dup-btn, .del-btn) > svg {
+.grid tbody :is(.wa-btn, .pdf-btn, .desc-toggle,
+                .send-btn, .dup-btn, .del-btn) > svg {
   width: var(--ic);
   height: var(--ic);
 }
@@ -3601,8 +3540,6 @@ a,
      coup — un saut de taille, soit exactement le mouvement qu'on nous demande
      de retirer. On l'enlève donc pour de bon ; la réponse reste portée par la
      couleur, qui ne bouge pas. */
-  .pcard__open:active,
-  .pcard__ticket:active,
   .pcard__del:active,
   .pcard__ref-btn:active,
   .send-btn:active,
@@ -5679,6 +5616,45 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
 .ld-ctl:focus { outline: 3px solid rgba(var(--primary-rgb), .15); border-color: var(--primary); }
 :root[data-theme="dark"] .ld-ctl:focus { outline-color: rgba(var(--primary-rgb), .35); }
 .ld-duo { display: flex; gap: 8px; }
+
+/* CE QU'IL Y A À PRODUIRE — un vrai tableau (28/08/2026)
+   Charlie : « je clique sur la ligne, elle s'ouvre façon tableau et je peux
+   tout modifier ». Intitulé à gauche, valeur à droite, une rangée par fait.
+
+   TOUTES LES RANGÉES PRENNENT LA MÊME HAUTEUR, et elles la prennent dans UNE
+   règle : `--ctrl-h`, celle de toute commande de l'application. Deux écritures
+   redeviennent deux hauteurs le jour où l'une bouge. Les champs héritent de
+   `.ld-ctl`, qui la porte déjà — on ne la réécrit donc nulle part ici. */
+.ld-tab, .ld-faces { display: grid; gap: 6px 10px; align-items: center; }
+.ld-tab { grid-template-columns: minmax(84px, 32%) 1fr; }
+/* UNE QUANTITÉ N'A PAS BESOIN DE TOUTE LA LIGNE. Étirée sur 460 px, « 100 »
+   flottait seul à un bout d'un champ vide et l'œil devait traverser la fiche
+   pour relier la taille à son nombre. La colonne des nombres a donc SA largeur,
+   la même pour toutes les rangées — c'est la grille qui la tient, pas chaque
+   champ. Le reste de la place revient au blanc, pas au champ. */
+.ld-tab--nombre { grid-template-columns: minmax(84px, 32%) 104px; justify-content: start; }
+/* Un nombre se lit à droite de sa colonne : c'est ce qui permet de comparer
+   trois quantités d'un coup d'œil sans les épeler. */
+.ld-tab--nombre .ld-ctl { text-align: right; }
+/* La rangée qui AJOUTE une taille : le nom prend la colonne des intitulés, le
+   nombre celle des nombres. Elle tombe donc pile sous les rangées du dessus. */
+.ld-tab--nombre .ld-ctl[type="text"] { text-align: left; }
+.ld-tab__k, .ld-faces__k {
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+/* Trois colonnes pour une face : son nom, sa cote, ce qu'on y marque. La
+   consigne prend la place qui reste — c'est elle qui porte tout sur une tasse
+   ou une gravure, où il n'y a aucune cote à lire. */
+.ld-faces { grid-template-columns: minmax(84px, 26%) minmax(56px, 18%) 1fr; }
+.ld-faces__k { padding-bottom: 2px; }
+/* Un sous-titre DANS un encadré : il sépare les trois familles de faits sans
+   ouvrir un encadré de plus. Même graisse que les intitulés du tiroir. */
+.ld-sous {
+  margin: 14px 0 6px;
+  font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text-2);
+}
 /* Journal des modifications, dans le volet Historique : une ligne par
    changement, la plus récente en haut. */
 .ld-journal__liste { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
@@ -6007,41 +5983,6 @@ textarea.ld-ctl { font-weight: var(--graisse-note); }
    le numéro se lit, et chaque ligne le porte au même endroit.
    Encadré plutôt que teinté : le vert des pastilles PDF dit « le document
    existe » — le reprendre ici brouillerait cette lecture. */
-.col-ticket-cell { padding: 0 8px; vertical-align: middle; text-align: center;
-  white-space: nowrap; }
-/* L'écart entre les deux papiers : un pas de l'échelle, pas une valeur
-   choisie ici. Sans lui, les deux pastilles se touchent et se lisent comme
-   un seul bouton large. */
-.ticket-cell + .ticket-cell { margin-left: var(--pas-1); }
-.ticket-cell {
-  display: inline-grid; place-items: center;
-  width: 30px; height: 30px;
-  border: 0; border-radius: var(--pilule);
-  background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
-  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
-  color: var(--text-1);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.ticket-cell:hover { background: var(--primary-soft); color: var(--primary); }
-.ticket-cell:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-/* CE DOSSIER PARLE À L'ATELIER. Le point dit qu'une consigne de production a
-   été écrite sur le ticket — sans lui, il faudrait ouvrir chaque ticket pour
-   savoir lequel en porte une. Posé en `position: absolute` dans une case de
-   taille fixe : il ne pousse rien, la colonne garde la même largeur d'une ligne
-   à l'autre (c'est toute l'histoire de la rangée d'actions des cartes). */
-.ticket-cell--consigne { position: relative; }
-.ticket-cell--consigne::after,
-.pcard__ticket--consigne::after {
-  content: '';
-  position: absolute;
-  top: -1px; right: -1px;
-  width: 9px; height: 9px;
-  border-radius: var(--pilule);
-  background: var(--primary);
-  box-shadow: 0 0 0 2px var(--surface);
-}
-.pcard__ticket--consigne { position: relative; }
 @media (max-width: 720px) {
   .ligne-drawer__card { width: 100vw; }
 }
@@ -6276,8 +6217,6 @@ summary:focus-visible {
   border-color: var(--text-2);
   box-shadow: var(--shadow-1), inset 0 0 0 999px var(--state-press);
 }
-.pcard__open:active,
-.pcard__ticket:active,
 .pcard__del:active,
 .pcard__ref-btn:active { transform: scale(.94); }
 .stage:active { background: var(--rail-hover); }
@@ -6290,8 +6229,6 @@ summary:focus-visible {
 .np-menu__item:active,
 .menu-item:active,
 .ld-act:active { transform: scale(.97); }
-.pcard__open,
-.pcard__ticket,
 .pcard__del,
 .pcard__ref-btn,
 .nav-switch-btn,

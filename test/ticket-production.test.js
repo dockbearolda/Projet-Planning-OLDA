@@ -551,18 +551,36 @@ assert.match(corps, /corps: \{ prod: \{ \[cible\.liste\]: cases \} \}/);
   assert.strictEqual(apres2.tailles[1].n, 20);
   assert.strictEqual(apres2.logos[1].mm, '340', 'la correction précédente tient');
 
-  // CE QUI NE PASSE PAS PAR CETTE PORTE. La référence, la couleur et la
-  // technique sont l'IDENTITÉ de l'article : elles se corrigent au dossier.
-  // Et un nombre de pièces ne descend pas à zéro — retirer une taille décale
-  // toutes les positions suivantes, donc la correction d'à côté.
+  // L'IDENTITÉ DE L'ARTICLE PASSE AUSSI PAR CETTE PORTE DEPUIS LE 28/08.
+  // Elle ne passait pas : « ça se corrige au dossier », disait la règle — sauf
+  // que le dossier n'avait aucun endroit pour ça, et que la seule porte, le
+  // ticket, a été retirée. Charlie : « je clique sur la ligne, elle s'ouvre
+  // façon tableau et je peux TOUT modifier ».
   await call('PATCH', `/api/requests/${id}/fiche`, {
-    prod: { ref: 'PIRATE', couleur: 'PIRATE', tailles: [{ n: 0 }], logos: [{ mm: '' }] },
+    prod: { ref: 'K3025', couleur: 'Bleu marine', marquage: 'UV', encre: 'Or' },
   });
   const apres3 = (await call('GET', `/api/requests/${id}`)).body.fiche.prod;
-  assert.strictEqual(apres3.ref, 'K3008');
-  assert.strictEqual(apres3.couleur, 'Rouge');
-  assert.strictEqual(apres3.tailles[0].n, 14, 'zéro pièce n’est pas une correction');
-  assert.strictEqual(apres3.logos[0].mm, '80', 'une largeur vidée n’efface rien');
+  assert.strictEqual(apres3.ref, 'K3025', 'la référence se corrige sur la ligne');
+  assert.strictEqual(apres3.couleur, 'Bleu marine');
+  assert.strictEqual(apres3.marquage, 'UV');
+  assert.strictEqual(apres3.encre, 'Or');
+  assert.strictEqual(apres3.tailles[0].n, 14, 'et les tailles n’ont pas bougé au passage');
+
+  // CE QUI NE PASSE TOUJOURS PAS : un nombre de pièces à zéro SANS nom de
+  // taille. Retirer une taille décale toutes les positions suivantes, donc la
+  // correction du poste d'à côté. Nommée, elle passe (voir
+  // test/prix-suit-la-quantite) — un libellé, lui, ne se décale pas.
+  await call('PATCH', `/api/requests/${id}/fiche`, {
+    prod: { tailles: [{ n: 0 }], logos: [{ mm: '' }] },
+  });
+  const apres4 = (await call('GET', `/api/requests/${id}`)).body.fiche.prod;
+  assert.strictEqual(apres4.tailles[0].n, 14, 'zéro pièce sans nom n’est pas une correction');
+  // UNE LARGEUR VIDÉE EFFACE, elle, depuis le 28/08 : sur une tasse ou une
+  // gravure il n'y a pas de cote, et un « mm » saisi par erreur doit pouvoir
+  // partir — sinon le ticket promet une mesure qui n'existe pas.
+  // `borner` rend null sur une chaîne vide — c'est la forme que le comptoir
+  // pose déjà. Ce qui compte, c'est qu'il n'y ait PLUS de cote.
+  assert.ok(!apres4.logos[0].mm, 'une largeur vidée s’efface');
 
   console.log('✓ ticket : ce qu’il y a à produire est sur le papier, et se rectifie à l’établi');
   app.__server.close();

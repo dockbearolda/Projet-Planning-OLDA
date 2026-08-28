@@ -1218,13 +1218,6 @@ function cmp(a, b, key) {
   if (key === 'flag') {
     return (FLAG_RANK[va] ?? 2) - (FLAG_RANK[vb] ?? 2);
   }
-  if (key === 'ticket') {
-    // Le numéro du ticket est chronologique (« 26.08.06-002 ») : le trier range
-    // la file dans l'ordre où le comptoir a servi. Les lignes saisies à la main
-    // n'en ont pas — elles se regroupent en fin de tri, jamais entremêlées.
-    va = (a.fiche && a.fiche.ref) || '￿';
-    vb = (b.fiche && b.fiche.ref) || '￿';
-  }
   if (key === 'priority' || key === 'quantity' || key === 'project_value') {
     va = va == null ? -Infinity : Number(va);
     vb = vb == null ? -Infinity : Number(vb);
@@ -1603,13 +1596,6 @@ function buildCard(r, options) {
   }
   majRefs();
 
-  const ouvrir = document.createElement('button');
-  ouvrir.type = 'button';
-  ouvrir.className = 'pcard__open';
-  attachTip(ouvrir, 'Ouvrir la fiche : tout le dossier');
-  ouvrir.appendChild(dossierIcon());
-  ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
-
   // SUPPRIMER. La corbeille n'existait que sur le tableau complet — or le
   // planning s'ouvre sur les cartes : sans elle, une commande entrée par erreur
   // ne pouvait plus sortir du planning. Toujours visible (pas de survol : au
@@ -1645,11 +1631,10 @@ function buildCard(r, options) {
   // l'ATELIER, la question n'est plus « d'où vient ce dossier » mais « qui va le
   // produire » : une ligne saisie à la main se fabrique comme les autres, et son
   // ticket se bâtit sur ce que la ligne sait (cf. modeleTicket).
-  // LES DEUX PAPIERS, le même composant que dans le tableau (voir
-  // `boutonsPapiers`) : deux vues à un clic l'une de l'autre doivent donner le
-  // MÊME bouton, pas deux qui se ressemblent.
-  const [tk, bu] = boutonsPapiers(r, 'pcard__ticket');
-  actions.append(prise, tk, bu, ouvrir, suppr);
+  // LES DEUX PAPIERS ET « OUVRIR » SONT PARTIS (28/08) — dans les deux vues à
+  // la fois : la carte et la ligne doivent donner le même geste, et ce geste
+  // est maintenant le CLIC sur la carte elle-même (voir `ouvrirAuClic`).
+  actions.append(prise, suppr);
 
   // « Délai restant » et non « Délai de production restant » : les intitulés
   // forment UNE rangée partagée (cf. .pcard__bloc), donc le plus long les
@@ -1690,11 +1675,7 @@ function buildCard(r, options) {
   // Aucun risque d'ouverture pendant un DÉFILEMENT : le navigateur n'émet pas
   // de `click` quand le doigt a fait glisser la liste. Reste le GLISSER de la
   // carte, lui suivi à la main — d'où la garde ci-dessous.
-  carte.addEventListener('click', (ev) => {
-    if (ev.target.closest && ev.target.closest(ZONE_CLIQUABLE)) return;
-    if (glisserVientDeFinir()) return;
-    openLigneDetail(r.id);
-  });
+  ouvrirAuClic(carte, r);
 
   // La carte se glisse sur le rail pour changer d'étape, comme une ligne du
   // tableau. On saisit la carte elle-même : elle n'a pas de poignée, tout son
@@ -2124,10 +2105,6 @@ function buildRow(r) {
   tr.appendChild(cellDeadline(r));
   // état : alerte posée par n'importe qui — BLOQUÉE (+ motif) ou À VOIR
   tr.appendChild(cellFlag(r));
-  // les deux papiers du dossier. LES PAPIERS SONT DES OUTILS, PAS DES FAITS :
-  // posés entre « à qui » et « quoi », ils coupaient la lecture en deux. Ils
-  // rejoignent les autres actions, à droite.
-  tr.appendChild(cellTicket(r));
   // actions de fin de ligne : OUVRIR (toujours là) + envoyer vers (Fiverr) +
   // dupliquer + supprimer (révélées au survol)
   const tdDel = document.createElement('td');
@@ -2144,18 +2121,12 @@ function buildRow(r) {
   actions.className = 'row-actions';
   tdDel.appendChild(actions);
 
-  // OUVRIR LA LIGNE. Le tableau complet n'avait AUCUN moyen d'ouvrir la fiche :
-  // les cartes avaient leur bouton, le tableau non — on y voyait onze colonnes
-  // tronquées sans jamais pouvoir lire le dossier entier. Premier de la file, et
-  // le seul de la colonne à ne pas dépendre du survol : sur la tablette du
-  // comptoir il n'y a pas de souris, un bouton qui attend un survol n'existe pas.
-  const ouvrir = document.createElement('button');
-  ouvrir.className = 'open-btn';
-  ouvrir.type = 'button';
-  attachTip(ouvrir, 'Ouvrir la fiche : tout le dossier');
-  ouvrir.appendChild(dossierIcon());
-  ouvrir.addEventListener('click', (ev) => { ev.stopPropagation(); openLigneDetail(r.id); });
-  actions.appendChild(ouvrir);
+  // LE BOUTON « OUVRIR » EST PARTI (28/08). Charlie : « ces trois choses
+  // doivent être supprimées définitivement — je clique sur la ligne, elle
+  // s'ouvre façon tableau et je peux tout modifier ». Trois pastilles pour une
+  // seule intention (ouvrir le dossier, sortir son ticket, sortir son bon de
+  // commande) alors que la ligne elle-même ne faisait rien quand on la
+  // cliquait. C'est la LIGNE qui ouvre, maintenant (voir `ouvrirAuClic`).
 
   for (const t of SEND_TARGETS) {
     if (t.slug === r.stage) continue; // déjà dans cette catégorie
@@ -2189,6 +2160,7 @@ function buildRow(r) {
   actions.appendChild(del);
   tr.appendChild(tdDel);
 
+  ouvrirAuClic(tr, r);
   return tr;
 }
 
@@ -2780,16 +2752,9 @@ function cellDossier(r) {
   // recouvrir la colonne voisine.
   const docs = document.createElement('div');
   docs.className = 'client-docs';
-  // Le ticket A SA PROPRE COLONNE (cf. cellTicket) : dans ce cluster, il ne
-  // paraissait que sur les dossiers du comptoir et décalait d'une pastille
-  // toute la rangée des lignes saisies à la main — WhatsApp, devis, facture et
-  // BAT ne tombaient pas au même endroit d'une ligne à l'autre.
-  //
-  // Plus de pastille « ouvrir la fiche » non plus : dans le tableau elle faisait
-  // doublon. Tout ce que la fiche montre de la ligne se corrige DÉJÀ ici, en
-  // place — nom, description, prix, sous-étape, infos, échéance, état, type,
-  // priorité, qui suit — et ses documents sont les trois pastilles voisines.
-  // Elle reste à un appui sur la carte (le ↗), qui est la vue par défaut.
+  // NI TICKET NI « OUVRIR » ICI (28/08) : les deux papiers ont quitté
+  // l'application et la fiche s'ouvre en cliquant la ligne. Restent les vraies
+  // pièces du dossier — WhatsApp, devis, facture, BAT.
   docs.appendChild(cellWhatsapp(r));
   docs.appendChild(cellPdfSlot(r, 'devis'));
   docs.appendChild(cellPdfSlot(r, 'facture'));
@@ -2865,18 +2830,6 @@ function fiverrIcon() {
   path.setAttribute('fill-rule', 'evenodd');
   svg.appendChild(path);
   return svg;
-}
-
-// OUVRIR LA LIGNE : un dossier qui s'ouvre. C'était une flèche sortante
-// (« ↗ »), qui dit « ça part ailleurs » — or rien ne part, on ouvre. Le mot du
-// comptoir est déjà le bon (« le dossier client ») : le dessin le reprend, et
-// il ne ressemble à aucun autre bouton de la ligne (ni au ticket, ni aux PDF,
-// ni à la corbeille).
-function dossierIcon() {
-  return strokeIcon([
-    'M3 8a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1',
-    'M3 8v10a2 2 0 0 0 2 2h13a2 2 0 0 0 1.9-1.4L22 11H8.4a2 2 0 0 0-1.9 1.4L3 20',
-  ]);
 }
 
 // Devis : une feuille avec des lignes de texte (un document à lire).
@@ -3394,6 +3347,9 @@ function cellDeadline(r) {
 let ligneDrawerEl = null;
 let ligneDrawerCard = null;
 let ligneDrawerId = null; // id (string) de la ligne affichée, ou null si fermé
+// Ce qui enregistre la fiche OUVERTE. Reposé à chaque rendu (voir plus bas) :
+// l'écouteur, lui, est unique et lit toujours la version du moment.
+let ldCommettre = null;
 
 // LA COMMANDE OUVERTE N'EST PAS TOUJOURS DANS LA LISTE. Un vieux dossier
 // retrouvé par la recherche globale vit hors des 400 dernières de son étape :
@@ -3431,6 +3387,16 @@ function ensureLigneDrawer() {
   document.body.appendChild(ligneDrawerEl);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && ligneDrawerId) closeLigneDetail();
+  });
+  // UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE (28/08). `change` remonte de
+  // tous les champs de la fiche, ne part que si la valeur a bougé, et n'arrive
+  // qu'une fois le champ quitté. La note fait exception : elle s'AJOUTE aux
+  // informations, et une note ajoutée deux fois ne se retire pas.
+  ligneDrawerCard.addEventListener('change', (ev) => {
+    const cible = ev.target;
+    if (!cible || !cible.dataset || !cible.dataset.ldKey) return;
+    if (cible.classList.contains('ld-note')) return;
+    if (ldCommettre) ldCommettre();
   });
   // La fiche se DÉCLARE modale (`aria-modal`) : la tabulation doit donc y
   // rester. Sans ce filet, Tab repartait derrière le voile, dans un planning
@@ -4956,6 +4922,152 @@ function placesDuPipeline(placeActuelle) {
   return places;
 }
 
+// ===========================================================================
+// CE QU'IL Y A À PRODUIRE — le tableau modifiable de la fiche (28/08/2026)
+// ===========================================================================
+// Charlie : « je clique sur la ligne, elle s'ouvre façon tableau et je peux
+// TOUT modifier ». Ce bloc-là n'existait nulle part dans la fiche : la
+// référence, la couleur, les tailles et les faces ne se corrigeaient QUE
+// depuis le ticket — c'est-à-dire depuis le papier, qui vient de disparaître.
+//
+// IL S'ENREGISTRE AU VOL, valeur par valeur. C'est la règle de la GRILLE (une
+// cellule quittée est une cellule enregistrée) et non celle d'un formulaire :
+// on vient rectifier UNE chose, vite. Un bouton « Enregistrer » demanderait de
+// viser deux fois pour changer un nombre.
+//
+// LE PRIX SUIT TOUT SEUL. Le serveur retarife la ligne dès que les tailles ou
+// la référence bougent (voir `retarifer`) : la réponse porte la ligne entière,
+// donc le montant affiché est déjà le nouveau.
+async function ldEnvoyerProd(r, patchProd) {
+  try {
+    const maj = await api('PATCH', `/api/requests/${r.id}/fiche`, { prod: patchProd });
+    if (!maj) return;
+    Object.assign(r, maj);
+    memoriserFiche(maj);
+    // `rows` est REMPLACÉ à chaque rafraîchissement : l'objet qu'on tient peut
+    // ne plus être celui de la grille. On repose la réponse sur les deux.
+    const vivante = rows.find((x) => String(x.id) === String(r.id));
+    if (vivante && vivante !== r) Object.assign(vivante, maj);
+    ldRefresh(r);
+  } catch (err) {
+    reportError(err);
+  }
+}
+
+// Un champ du tableau de production : il part quand on le quitte, et seulement
+// s'il a changé (`change` ne se déclenche pas autrement).
+function ldProdChamp(valeur, opts, envoyer) {
+  const el = ldChamp(valeur, opts);
+  el.addEventListener('change', () => envoyer(el.value.trim()));
+  return el;
+}
+
+const ldTabRow = (grille, label, ...controles) => {
+  const k = document.createElement('span');
+  k.className = 'ld-tab__k';
+  k.textContent = label;
+  grille.append(k, ...controles);
+};
+
+function ldProduction(r) {
+  const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
+  const p = fiche.prod;
+  // Pas de fiche de production = rien à montrer. Une ligne créée à la main n'en
+  // a pas, et une case vide n'apprend rien à personne.
+  if (!p || typeof p !== 'object') return null;
+  const tailles = Array.isArray(p.tailles) ? p.tailles : [];
+  const faces = Array.isArray(p.logos) ? p.logos : [];
+  const bloc = document.createElement('div');
+
+  // --- L'IDENTITÉ DE L'ARTICLE ---------------------------------------------
+  const idt = document.createElement('div');
+  idt.className = 'ld-tab';
+  for (const [cle, label] of [['ref', 'Référence'], ['couleur', 'Couleur'],
+    ['marquage', 'Technique'], ['encre', 'Couleur du marquage']]) {
+    ldTabRow(idt, label, ldProdChamp(p[cle] || '', { label },
+      (v) => ldEnvoyerProd(r, { [cle]: v })));
+  }
+  bloc.append(idt);
+
+  // --- LES TAILLES ----------------------------------------------------------
+  // LA LISTE ENTIÈRE PART À CHAQUE FOIS, nommée. Le serveur lit une taille
+  // absente comme un zéro : c'est ce qui permet d'en retirer une, et c'est la
+  // seule lecture qui tienne puisque la ligne ne garde pas les tailles vides.
+  const envoyerTailles = (modif) => {
+    const liste = tailles.map((t) => ({ t: String(t.t), n: Number(t.n) || 0 }));
+    modif(liste);
+    ldEnvoyerProd(r, { tailles: liste.filter((x) => x.t) });
+  };
+  const grilleT = document.createElement('div');
+  grilleT.className = 'ld-tab ld-tab--nombre';
+  for (let i = 0; i < tailles.length; i += 1) {
+    ldTabRow(grilleT, `${tailles[i].t}`, ldProdChamp(tailles[i].n, {
+      type: 'number', inputMode: 'numeric', step: '1', label: `Quantité en ${tailles[i].t}`,
+    }, (v) => envoyerTailles((l) => { l[i].n = Math.max(0, Math.round(Number(v) || 0)); })));
+  }
+  // LA RANGÉE VIDE AJOUTE. Le comptoir ne pose que les tailles commandées :
+  // « finalement il en veut aussi 20 en XL » n'avait aucune porte.
+  const nomNouveau = ldChamp('', { label: 'Nouvelle taille', placeholder: 'XL, 35 cl…' });
+  const nbNouveau = ldChamp('', {
+    type: 'number', inputMode: 'numeric', step: '1', placeholder: 'nombre', label: 'Quantité',
+  });
+  const poserNouvelle = () => {
+    const nom = nomNouveau.value.trim();
+    const n = Math.max(0, Math.round(Number(nbNouveau.value) || 0));
+    if (!nom || !n) return;
+    nomNouveau.value = ''; nbNouveau.value = '';
+    envoyerTailles((l) => { l.push({ t: nom, n }); });
+  };
+  nbNouveau.addEventListener('change', poserNouvelle);
+  nomNouveau.addEventListener('change', () => { if (nbNouveau.value) poserNouvelle(); });
+  grilleT.append(nomNouveau, nbNouveau);
+  bloc.append(ldSousTitre('Tailles'), grilleT);
+
+  // --- LES FACES À MARQUER --------------------------------------------------
+  // Trois choses par face : son nom, sa cote, et CE QU'ON Y MARQUE. La cote ne
+  // dit rien sur une tasse ou une gravure — là c'est la consigne qui porte
+  // tout, et elle était la seule valeur de la ligne qu'on ne pouvait pas
+  // rectifier. Vider le nom retire la face.
+  const envoyerFaces = (i, patch) => {
+    const liste = faces.map(() => ({}));
+    liste[i] = patch;
+    ldEnvoyerProd(r, { logos: liste });
+  };
+  const grilleF = document.createElement('div');
+  grilleF.className = 'ld-faces';
+  const enTeteF = (t) => { const s = document.createElement('span'); s.className = 'ld-faces__k'; s.textContent = t; return s; };
+  grilleF.append(enTeteF('Face'), enTeteF('Cote (mm)'), enTeteF('Ce qu’on marque'));
+  faces.forEach((z, i) => {
+    grilleF.append(
+      ldProdChamp(z.face || '', { label: 'Nom de la face' }, (v) => envoyerFaces(i, { face: v })),
+      ldProdChamp(z.mm || '', { label: 'Cote', placeholder: '—' }, (v) => envoyerFaces(i, { mm: v })),
+      ldProdChamp(z.quoi || '', { label: 'Ce qu’on marque', placeholder: '—' },
+        (v) => envoyerFaces(i, { quoi: v })),
+    );
+  });
+  const faceNouvelle = ldChamp('', { label: 'Nouvelle face', placeholder: 'Ajouter une face…' });
+  const mmNouvelle = ldChamp('', { label: 'Cote', placeholder: 'mm' });
+  const quoiNouvelle = ldChamp('', { label: 'Ce qu’on marque', placeholder: 'ce qu’on y marque' });
+  faceNouvelle.addEventListener('change', () => {
+    const nom = faceNouvelle.value.trim();
+    if (!nom) return;
+    const patch = { face: nom, mm: mmNouvelle.value.trim(), quoi: quoiNouvelle.value.trim() };
+    faceNouvelle.value = ''; mmNouvelle.value = ''; quoiNouvelle.value = '';
+    envoyerFaces(faces.length, patch);
+  });
+  grilleF.append(faceNouvelle, mmNouvelle, quoiNouvelle);
+  bloc.append(ldSousTitre('Faces à marquer'), grilleF);
+
+  return bloc;
+}
+
+function ldSousTitre(texte) {
+  const p = document.createElement('p');
+  p.className = 'ld-sous';
+  p.textContent = texte;
+  return p;
+}
+
 function renderLigneDetail() {
   const r = completerFiche(ligneDuTiroir());
   if (!r) { closeLigneDetail(); return; }
@@ -5014,15 +5126,11 @@ function renderLigneDetail() {
     }));
   }
   actions.append(
-    // LE TICKET D'ABORD. C'est le papier de l'atelier, celui qui part avec le
-    // dossier à l'établi. Le récapitulatif complet — l'adresse, le total HT, la
-    // taxe, la note interne — reste à portée, mais en téléchargement : c'est un
-    // document de travail, il n'a jamais eu à sortir sur l'imprimante.
-    ldActionBtn('ticket', 'Ticket', () => ouvrirTicket(r)),
-    ldActionBtn('imprimer', 'Imprimer', () => imprimerTicket(r)),
-    // L'AUTRE PAPIER DE LA MÊME LIGNE : celui du bureau, avec les prix, la
-    // taxe, le règlement, la marge. Le ticket, lui, n'en porte rien.
-    ldActionBtn('bureau', 'Bon de commande', () => ouvrirBureau(r)),
+    // LES DEUX PAPIERS SONT PARTIS (28/08). Charlie : « on supprime
+    // définitivement tout ticket pour l'instant » — son patron les refait.
+    // Ils étaient aussi la seule porte pour corriger une taille : c'est le
+    // bloc « Ce qu'il y a à produire » de cette fiche qui les remplace, et
+    // c'est pour ça qu'il fallait le construire AVANT de les retirer.
     ldActionBtn('telecharger', 'Récap complet', () => telechargerRecap(r)),
     // ENVOYER PAR EMAIL (§19). Le même principe que la pastille WhatsApp : on
     // OUVRE le message tout écrit, on n'envoie rien. C'est l'employé qui relit
@@ -5106,6 +5214,8 @@ function renderLigneDetail() {
     ldChamp(r.contact_email, { type: 'email', inputMode: 'email', placeholder: 'e-mail', label: 'E-mail' }),
     r.contact_email);
 
+  const prodBloc = ldProduction(r);
+
   const remise = document.createElement('div');
   remise.className = 'ld-duo';
   remise.append(cDate, cHeure);
@@ -5140,6 +5250,10 @@ function renderLigneDetail() {
     // enregistrement refusé : une case qu'on remplit pour rien est pire que pas
     // de case du tout.
     ...(puisJe('marge') ? [ldBox('Coût de revient', cCout)] : []),
+    // CE QU'IL Y A À PRODUIRE, juste sous l'argent : c'est là qu'on corrige une
+    // quantité, et c'est le prix d'à côté qui bouge quand on le fait. Chaque
+    // valeur part en la quittant — pas de bouton, on vient rectifier une chose.
+    ...(prodBloc ? [ldBox('Ce qu’il y a à produire', prodBloc, true)] : []),
     ldBox('Prévu à l’atelier', cPrevue),
     ldBox('Créneau de retrait', cCreneau),
     ldBox('Provenance', cProvenance),
@@ -5265,10 +5379,20 @@ function renderLigneDetail() {
     [{ value: '', label: 'Référent : personne' }, ...EMPLOYEES.map((n) => ({ value: n, label: `Référent : ${n}` }))],
     r.referent || '', 'Référent',
   ), r.referent || '');
-  const enregistrer = document.createElement('button');
-  enregistrer.type = 'button';
-  enregistrer.className = 'ld-save';
-  enregistrer.textContent = 'Enregistrer les modifications';
+  // PLUS DE BOUTON « ENREGISTRER » (28/08). Charlie : « je clique sur la ligne,
+  // elle s'ouvre façon tableau et je peux tout modifier ULTRA RAPIDEMENT ».
+  // C'est la règle de la GRILLE — une cellule quittée est une cellule
+  // enregistrée — et plus celle d'un formulaire. Le bouton coûtait un geste de
+  // visée à chaque correction, et surtout il laissait croire qu'on pouvait
+  // fermer la fiche sans rien perdre alors que tout partait d'un bloc.
+  //
+  // Un seul écouteur, DÉLÉGUÉ sur la carte : `change` remonte de tous les
+  // champs, ne se déclenche que si la valeur a bougé, et n'arrive qu'une fois
+  // le champ quitté. `enregistrerFiche` n'envoie de toute façon QUE ce qui
+  // diffère de la valeur rendue (voir ldSuivi), donc un champ part seul.
+  //
+  // LA NOTE EST LA SEULE EXCEPTION : elle s'AJOUTE aux informations, et une
+  // note ajoutée deux fois ne se retire pas. Elle garde donc son geste à elle.
   const note = ldChamp('', {
     multi: true, rows: 2,
     placeholder: 'Ajouter une note de production, une information client ou un point de contrôle…',
@@ -5276,30 +5400,48 @@ function renderLigneDetail() {
   });
   note.className += ' ld-note';
   ldSuivi('note', note, '');
-
-  enregistrer.addEventListener('click', async () => {
-    enregistrer.disabled = true;
-    const ancien = enregistrer.textContent;
-    enregistrer.textContent = 'Enregistrement…';
+  const champs = {
+    cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cCout, cPrevue, cCreneau, cProvenance,
+    cProduction, cAtelier, cInfos,
+    cTel, cEmail, cPlace, cReferent, note, champsDetail,
+  };
+  const commettre = async () => {
+    // CE QUI AVAIT LE FOCUS DOIT LE RETROUVER. L'enregistrement reconstruit la
+    // fiche : sans ce repère, corriger un champ renvoyait le clavier sur
+    // <body>, et le champ suivant se visait à la souris.
+    const actif = document.activeElement;
+    const cle = actif && actif.dataset ? actif.dataset.ldKey : null;
     try {
-      const modifie = await enregistrerFiche(r, {
-        cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cCout, cPrevue, cCreneau, cProvenance,
-        cProduction, cAtelier, cInfos,
-        cTel, cEmail, cPlace, cReferent, note, champsDetail,
-      });
-      showToast(modifie ? 'Fiche enregistrée' : 'Rien à enregistrer — aucune modification');
+      await enregistrerFiche(r, champs);
       ldRefresh(r);
+      if (cle) {
+        const repris = ligneDrawerCard.querySelector(`[data-ld-key=${cle}]`);
+        if (repris && document.activeElement === document.body) repris.focus();
+      }
     } catch (err) {
       reportError(err);
-    } finally {
-      enregistrer.disabled = false;
-      enregistrer.textContent = ancien;
     }
+  };
+  // LA NOTE NE PART PAS TOUTE SEULE : elle s'AJOUTE aux informations, et une
+  // note ajoutée deux fois ne se retire pas. Elle garde donc son geste à elle.
+  const ajouterNote = document.createElement('button');
+  ajouterNote.type = 'button';
+  ajouterNote.className = 'ld-save';
+  ajouterNote.textContent = 'Ajouter la note';
+  ajouterNote.addEventListener('click', async () => {
+    if (!note.value.trim()) { showToast('Rien à ajouter — la note est vide.'); return; }
+    ajouterNote.disabled = true;
+    try { await commettre(); } finally { ajouterNote.disabled = false; }
   });
+  // L'ÉCOUTEUR SE POSE UNE FOIS, dans ensureLigneDrawer : la carte du tiroir
+  // survit à tous les rendus, un abonnement par rendu enverrait le champ autant
+  // de fois que la fiche a été redessinée. On lui laisse ici la fonction du
+  // rendu COURANT — jamais une fonction figée à la première ouverture.
+  ldCommettre = commettre;
 
   const barre = document.createElement('div');
   barre.className = 'ld-foot__row';
-  barre.append(cPlace, cReferent, enregistrer);
+  barre.append(cPlace, cReferent, ajouterNote);
   pied.append(barre, note);
   ligneDrawerCard.appendChild(pied);
 
@@ -5647,53 +5789,36 @@ async function enregistrerFiche(r, c) {
 // commande derrière l'ouverture de la fiche. Or c'est la MÊME question qu'on
 // se pose devant une ligne (« sors-moi le papier »), et la réponse dépend
 // seulement de qui le demande. Les deux sont donc là, au même endroit.
-function cellTicket(r) {
-  const td = document.createElement('td');
-  td.className = 'col-ticket-cell';
-  for (const b of boutonsPapiers(r, 'ticket-cell')) td.appendChild(b);
-  return td;
-}
-
-// Les deux boutons, construits une fois : la carte et le tableau doivent donner
-// le MÊME composant, pas deux qui se ressemblent.
-function boutonsPapiers(r, classe) {
-  const ref = (r.fiche && r.fiche.ref) || '';
-  const consigne = consigneAtelier(r);
-
-  const atelier = document.createElement('button');
-  atelier.type = 'button';
-  atelier.className = classe;
-  // Un point sur la pastille : ce dossier porte une consigne pour l'atelier.
-  // Le point ne prend AUCUNE place (il se peint hors de la boîte) — la colonne
-  // garde donc la même largeur sur toutes les lignes.
-  if (consigne) atelier.classList.add(`${classe}--consigne`);
-  attachTip(atelier, infobulleTicket(r));
-  atelier.setAttribute('aria-label',
-    `${ref ? `Ticket atelier ${ref}` : 'Ticket atelier'} — corriger et imprimer${
-      consigne ? ' · consigne pour l’atelier' : ''}`);
-  atelier.appendChild(strokeIcon(LD_ICONES.ticket));
-  atelier.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ouvrirTicket(r);
-    atelier.blur();
+// ===========================================================================
+// LA LIGNE S'OUVRE AU CLIC (28/08/2026)
+// ===========================================================================
+// Charlie : « je clique sur la ligne, elle s'ouvre façon tableau et je peux
+// tout modifier ». C'est la seule porte : les trois pastilles qui la
+// doublaient (ouvrir, ticket, bon de commande) sont parties.
+//
+// CE QUI NE DOIT PAS OUVRIR : tout ce qui se manipule DANS la ligne. Une
+// ligne entière cliquable avale les gestes qu'elle porte déjà — la priorité,
+// le pilote, l'état, la date, la poignée de glissement. On ne devine donc pas
+// « le clic vient-il du fond ? » : on demande à la cible si elle est un
+// contrôle, ce qui reste vrai quand on en ajoutera un.
+//
+// Un texte SÉLECTIONNÉ n'ouvre pas non plus : copier une référence à la souris
+// finit toujours par un relâchement sur la ligne, et la fiche s'ouvrait par
+// dessus la sélection qu'on venait de prendre.
+function ouvrirAuClic(el, r) {
+  el.addEventListener('click', (ev) => {
+    if (ev.target.closest && ev.target.closest(ZONE_CLIQUABLE)) return;
+    // Relâcher une ligne qu'on vient de déplacer émet aussi un `click` : sans
+    // cette garde, tout glisser-déposer finissait par ouvrir la fiche du
+    // dossier qu'on venait de ranger, par-dessus la liste qu'on voulait voir.
+    if (glisserVientDeFinir()) return;
+    // Un texte SÉLECTIONNÉ n'ouvre pas : copier une référence à la souris finit
+    // toujours par un relâchement sur la ligne.
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim()) return;
+    openLigneDetail(r.id);
   });
-
-  const bureau = document.createElement('button');
-  bureau.type = 'button';
-  bureau.className = `${classe} ${classe}--bureau`;
-  attachTip(bureau, 'Bon de commande — prix, taxe, règlement et marge');
-  bureau.setAttribute('aria-label',
-    `${ref ? `Bon de commande ${ref}` : 'Bon de commande'} — le document du bureau`);
-  bureau.appendChild(strokeIcon(LD_ICONES.bureau));
-  bureau.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ouvrirBureau(r);
-    bureau.blur();
-  });
-
-  return [atelier, bureau];
 }
-
 // --- Infobulles maison -----------------------------------------------------
 // L'attribut `title` déclenche la bulle système de Chrome : grise, hors charte,
 // lente à venir puis longue à partir — elle se superposait au calendrier qu'on
@@ -6422,7 +6547,9 @@ let dragState = null;
 // `preventDefault()` sur `pointerdown` supprime les évènements souris de
 // compatibilité — donc le `click` qui suit. Sans cette garde, aucun bouton posé
 // sur une zone de prise ne répondrait plus.
-const ZONE_CLIQUABLE = 'button, a, input, select, textarea, [role="button"]';
+// La poignée de glissement en fait partie depuis le 28/08 : la LIGNE s'ouvre
+// maintenant au clic, et attraper sa poignée ne doit pas ouvrir sa fiche.
+const ZONE_CLIQUABLE = 'button, a, input, select, textarea, label, [role="button"], .handle';
 
 // À la SOURIS, relâcher une carte qu'on vient de déplacer émet aussi un `click`
 // sur elle. Sans cette garde, tout glisser-déposer se terminait par l'ouverture
@@ -6953,7 +7080,7 @@ const COL_KEYS = COL_ELS.map((c) => c.dataset.col);
 // flag, sub_stage, del), donc la grille se voyait retrancher une largeur que la
 // colonne rangée n'occupait pas. Elles sont remises au miroir le 27/08.
 const COL_DEFAULTS = {
-  handle: 44, stars: 96, responsable: 132, flag: 120, client: 214, ticket: 116,
+  handle: 44, stars: 96, responsable: 132, flag: 120, client: 214,
   product: 220, price: 132, sub_stage: 140, description: 260, deadline: 148, del: 158,
 };
 
@@ -7012,10 +7139,6 @@ const PLANNING_COLS = [
   { key: 'description', label: 'Infos' },
   { key: 'deadline',    label: 'Date souhaitée' },
   { key: 'flag',        label: 'État' },
-  // La colonne porte les DEUX papiers depuis le 27/08 : « Ticket atelier »
-  // n'en nommait plus que la moitié. Elle est en FIN de ligne depuis le soir
-  // même : ce sont des outils, ils vont avec les autres.
-  { key: 'ticket',      label: 'Documents', surCarte: true },
 ];
 
 // Colonnes qu'on peut éteindre (toutes sauf l'identité de la ligne).
@@ -7064,7 +7187,7 @@ const COLS_TABLEAU = new Set(
 // La donnée la MIEUX remplie de la base était la seule absente de la ligne :
 // le planning d'un atelier ne disait pas ce qu'il y avait à produire. Elle se
 // pose juste après le client — qui, pour quoi — avant l'argent et les papiers.
-const COLS_DEFAUT = new Set(['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline', 'ticket']);
+const COLS_DEFAUT = new Set(['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline']);
 const COLS_MASQUEES_DEFAUT = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !COLS_DEFAUT.has(c.key)).map((c) => c.key),
 );
@@ -7244,11 +7367,6 @@ function applyColVisibility() {
     if (cache) off += COL_DEFAULTS[c.key] || 0;
   }
   $grid.style.setProperty('--cols-off', off + 'px');
-  // Le ticket vit AUSSI sur la carte : la même case le range des deux côtés.
-  // Par le CSS et non par un rendu — la place du bouton reste réservée sur
-  // toutes les cartes, c'est ce qui garde leurs colonnes alignées (cf. la
-  // largeur --pcard-actions dans styles.css).
-  document.body.classList.toggle('cards-off-ticket', hiddenCols.has('ticket'));
 }
 
 const $colbar = document.getElementById('colbar');

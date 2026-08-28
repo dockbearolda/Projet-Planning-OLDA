@@ -80,52 +80,42 @@ assert.ok(!/id="viewFiverr"[\s\S]{0,200}material-symbols-outlined/.test(HTML),
 // 2. OUVRIR LA LIGNE — DANS LES DEUX VUES
 // ===========================================================================
 
-assert.ok(/function dossierIcon\(\) \{/.test(APP), 'dossierIcon() doit exister');
+// LE BOUTON A DISPARU DES DEUX VUES (28/08/2026). Charlie, en désignant les
+// trois pastilles : « ces 3 choses doivent être supprimées définitivement, je
+// clique sur la ligne, elle s'ouvre façon tableau et je peux tout modifier ».
+//
+// Trois portes pour une seule intention — ouvrir le dossier, sortir son ticket,
+// sortir son bon de commande — pendant que la ligne elle-même, la cible la plus
+// large de l'écran, ne faisait rien quand on la cliquait.
+assert.ok(!/'open-btn'/.test(APP), 'plus de bouton d’ouverture dans la ligne');
+assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
+assert.ok(!/open-btn|pcard__open/.test(CSS), 'et plus de style pour un bouton qui n’existe pas');
+assert.ok(!/function dossierIcon/.test(APP), 'ni son dessin');
 
-// LA CARTE. Elle avait déjà son bouton, mais dessiné en flèche sortante — le
-// dessin de « ça part ailleurs », alors que rien ne part.
-const CARTE = APP.match(/ouvrir\.className = 'pcard__open'[\s\S]*?openLigneDetail\(r\.id\);/)[0];
-assert.ok(/ouvrir\.appendChild\(dossierIcon\(\)\)/.test(CARTE),
-  'la carte doit ouvrir sur un dossier, plus sur une flèche sortante');
-assert.ok(!/'M7 17L17 7'/.test(APP), 'la flèche sortante ne doit plus exister nulle part');
+// C'EST LA LIGNE QUI OUVRE, et par la MÊME fonction que la carte : deux vues à
+// un clic l'une de l'autre doivent donner le même geste, pas deux qui se
+// ressemblent.
+const AUCLIC = APP.match(/function ouvrirAuClic\(el, r\) \{[\s\S]*?\n\}/);
+assert.ok(AUCLIC, 'une seule fonction ouvre la fiche');
+assert.ok(/openLigneDetail\(r\.id\)/.test(AUCLIC[0]), 'elle ouvre la fiche de SA ligne');
+assert.ok(/ouvrirAuClic\(tr, r\)/.test(APP), 'la ligne du tableau s’ouvre au clic');
+assert.ok(/ouvrirAuClic\(carte, r\)/.test(APP), 'la carte aussi');
+// CE QUI NE DOIT PAS OUVRIR : tout ce qui se manipule DANS la ligne. Une ligne
+// entière cliquable avale les gestes qu'elle porte déjà — priorité, pilote,
+// état, date, poignée de glissement.
+assert.ok(/ZONE_CLIQUABLE/.test(AUCLIC[0]),
+  'un clic sur un contrôle de la ligne ne doit pas AUSSI ouvrir la fiche');
+assert.ok(/\.handle/.test(APP.match(/const ZONE_CLIQUABLE = '[^']+'/)[0]),
+  'la poignée de glissement en fait partie : l’attraper n’ouvre pas la fiche');
+assert.ok(/glisserVientDeFinir\(\)/.test(AUCLIC[0]),
+  'la dépose d’un glisser ne doit pas ouvrir le dossier qu’on vient de ranger');
+assert.ok(/getSelection\(\)/.test(AUCLIC[0]),
+  'copier un texte à la souris finit par un relâchement sur la ligne : ça n’ouvre pas');
 
-// LA LIGNE DU TABLEAU. Elle n'avait rien : `openLigneDetail` n'était appelée
-// que depuis les cartes, la fiche elle-même et la recherche.
 const LIGNE = APP.match(/function buildRow\(r\)[\s\S]*?\n\}/)[0];
-assert.ok(/ouvrir\.className = 'open-btn'/.test(LIGNE),
-  'la ligne du tableau doit porter son bouton d’ouverture');
-assert.ok(/ouvrir\.appendChild\(dossierIcon\(\)\)/.test(LIGNE),
-  'et le même dessin que la carte');
-assert.ok(/openLigneDetail\(r\.id\)/.test(LIGNE),
-  'il doit ouvrir la fiche de SA ligne');
-// Premier de la file : c'est le geste qui donne accès à tout le reste.
-assert.ok(LIGNE.indexOf("'open-btn'") < LIGNE.indexOf("'send-btn'")
-  && LIGNE.indexOf("'open-btn'") < LIGNE.indexOf("'del-btn'"),
-'« ouvrir » doit précéder envoyer / dupliquer / supprimer');
-
-// Le même libellé des deux côtés : c'est le même geste.
-const libelles = APP.match(/attachTip\((?:ouvrir), '([^']+)'\)/g) || [];
-assert.strictEqual(libelles.length, 2, 'les deux vues doivent nommer le geste');
-assert.strictEqual(libelles[0], libelles[1],
-  'carte et tableau doivent annoncer la MÊME chose');
 
 // ===========================================================================
-// 3. « OUVRIR » NE DÉPEND PAS DU SURVOL
-// ===========================================================================
-// Les autres actions de la colonne n'apparaissent qu'au survol. Sur la tablette
-// du comptoir il n'y a pas de souris : un bouton qui attend un survol n'existe
-// pas. Celui-là est toujours là.
-const REGLE_OPEN = CSS.match(/\n\.open-btn \{[\s\S]*?\n\}/)[0];
-assert.ok(!/opacity:\s*0/.test(REGLE_OPEN),
-  '.open-btn ne doit jamais partir de opacity: 0');
-// Le sélecteur est borné à `.grid tbody` (un `tr:hover` nu marquait tous les
-// <tr> du document comme sensibles au survol) et la révélation rend aussi les
-// boutons cliquables (`pointer-events`) : invisibles, ils ne le sont pas.
-assert.ok(/\.grid tbody tr:hover \.send-btn,\n\.grid tbody tr:hover \.del-btn,\n\.grid tbody tr:hover \.dup-btn \{ opacity: 1; pointer-events: auto; \}/.test(CSS),
-  'le contraste est voulu : les autres actions, elles, restent au survol');
-
-// ===========================================================================
-// 4. LES QUATRE BOUTONS SONT ALIGNÉS
+// 4. LES TROIS BOUTONS SONT ALIGNÉS
 // ===========================================================================
 // Ils étaient posés en `inline-flex` DIRECTEMENT dans la cellule, donc calés sur
 // la ligne de texte — et pas de la même façon : « ouvrir » et Fiverr au milieu
@@ -137,7 +127,7 @@ assert.ok(/actions\.className = 'row-actions'/.test(LIGNE),
   'la cellule doit porter une rangée .row-actions');
 assert.ok(/tdDel\.appendChild\(actions\)/.test(LIGNE),
   'la rangée vit DANS le <td> : un display:flex sur le <td> le sortirait du tableau');
-for (const b of ['ouvrir', 'send', 'dup', 'del']) {
+for (const b of ['send', 'dup', 'del']) {
   assert.ok(new RegExp(`actions\\.appendChild\\(${b}\\)`).test(LIGNE),
     `« ${b} » doit être posé dans la rangée, pas dans la cellule`);
   assert.ok(!new RegExp(`tdDel\\.appendChild\\(${b}\\)`).test(LIGNE),
@@ -152,7 +142,7 @@ const margeDroite = Number(RANGEE.match(/padding-right: (\d+)px/)[1]);
 // Plus aucun calage ni marge PAR BOUTON : c'est exactement ce qui les décalait,
 // et une marge par bouton laisse un trou de travers dès qu'une action manque
 // (le bouton Fiverr disparaît sur une ligne déjà chez lui).
-for (const sel of ['.open-btn', '.send-btn', '.del-btn,\n.dup-btn']) {
+for (const sel of ['.send-btn', '.del-btn,\n.dup-btn']) {
   const regle = CSS.match(new RegExp(`\\n${sel.replace(/[.]/g, '\\.')} \\{[\\s\\S]*?\\n\\}`))[0];
   assert.ok(!/vertical-align/.test(regle),
     `${sel} ne doit plus se caler sur la ligne de texte`);
@@ -165,7 +155,7 @@ for (const sel of ['.open-btn', '.send-btn', '.del-btn,\n.dup-btn']) {
 // débordait sur « État », et les planchers de largeur de la grille étaient
 // calculés avec l'ancienne valeur — Description et Infos auraient payé le bouton.
 const largeurCol = Number(CSS.match(/\.col-del \{ width: (\d+)px; \}/)[1]);
-const rangee = (cible) => 4 * cible + 3 * ecart + margeDroite;
+const rangee = (cible) => 3 * cible + 2 * ecart + margeDroite;
 assert.ok(largeurCol >= rangee(34),
   `.col-del (${largeurCol}px) doit tenir ${rangee(34)}px de rangée`);
 
@@ -190,9 +180,9 @@ assert.ok(/\.col-del \{ white-space: nowrap; text-align: right; padding-right: 8
 // d'abord grandi de 42 px avec la colonne d'actions (116 → 158), puis perdu
 // 66 px le 27/08 quand Type a quitté le tableau — une colonne retirée de
 // PLANNING_COLS ne peut plus être retranchée par `--cols-off`, c'est donc au
-// plancher de l'oublier — et regagné 106 px le même jour, quand cinq colonnes
-// ont été élargies à ce qu'elles portent vraiment.
-for (const [avant, apres] of [[1376, 1416], [1326, 1366], [1466, 1506]]) {
+// plancher de l'oublier — regagné 106 px le même jour quand cinq colonnes ont
+// été élargies, et reperdu les 116 px de « Documents » le 28/08.
+for (const [avant, apres] of [[1416, 1300], [1366, 1250], [1506, 1390]]) {
   assert.ok(CSS.includes(`min-width: calc(${apres}px - var(--cols-off, 0px))`),
     `le plancher ${avant} doit avoir suivi le retrait des deux colonnes`);
 }

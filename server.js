@@ -2702,10 +2702,23 @@ app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
 // ABSENTE de la liste — c'est ce qui permet de passer de 0 à 20 XL depuis le
 // planning. Le comptoir ne pose que les tailles commandées ; corriger un
 // dossier, c'est justement en ajouter une.
+// L'IDENTITÉ DE L'ARTICLE S'ÉCRIT AUSSI (28/08). Elle ne s'écrivait pas : « le
+// reste de prod se corrige au dossier », disait la règle — sauf que le dossier
+// n'avait aucun endroit pour ça, et que la seule porte, le ticket, disparaît.
+// Charlie : « je clique sur la ligne, elle s'ouvre façon tableau et je peux
+// TOUT modifier ». La référence, la couleur, la technique et la couleur du
+// marquage sont donc modifiables comme le reste.
+const PROD_IDENTITE = ['ref', 'couleur', 'marquage', 'encre'];
+
 function corrigerProd(actuel, patch) {
   if (!actuel || typeof actuel !== 'object') return actuel;
   if (!patch || typeof patch !== 'object') return actuel;
   const out = { ...actuel };
+  for (const cle of PROD_IDENTITE) {
+    // `undefined` = le poste n'y touche pas ; une chaîne vide EFFACE (une
+    // couleur saisie par erreur doit pouvoir partir).
+    if (typeof patch[cle] === 'string') out[cle] = borner(patch[cle], 60);
+  }
   if (Array.isArray(patch.tailles) && Array.isArray(actuel.tailles)) {
     const parNom = patch.tailles.filter((v) => v && typeof v === 'object' && typeof v.t === 'string');
     if (parNom.length) {
@@ -2731,12 +2744,36 @@ function corrigerProd(actuel, patch) {
       });
     }
   }
+  // UNE FACE SE CORRIGE EN ENTIER (28/08) : son nom, sa cote, ET CE QU'ON Y
+  // MARQUE. Seule la cote s'écrivait — or sur une tasse ou une gravure il n'y a
+  // pas de cote : c'est `quoi` qui porte toute l'information, et elle était la
+  // seule chose de la ligne qu'on ne pouvait pas rectifier.
+  //
+  // Par position, comme le récapitulatif. `undefined` laisse la valeur en
+  // place ; une chaîne vide efface — un « mm » saisi sur une tasse doit pouvoir
+  // partir, sinon le ticket promet une cote qui n'existe pas.
   if (Array.isArray(patch.logos) && Array.isArray(actuel.logos)) {
-    out.logos = actuel.logos.map((l, i) => {
-      const v = patch.logos[i];
-      const mm = v && typeof v === 'object' ? borner(v.mm, 120) : null;
-      return mm ? { ...l, mm } : l;
+    const liste = actuel.logos.map((l) => ({ ...l }));
+    patch.logos.forEach((v, i) => {
+      if (!v || typeof v !== 'object') return;
+      // UNE FACE DE PLUS. Le comptoir n'en pose que ce que la famille déclare,
+      // et neuf familles sur dix-sept n'en déclarent aucune : sans cette porte,
+      // une tasse arrivée sans face reste à jamais sans face.
+      const zone = i < liste.length ? liste[i] : { face: '', mm: '' };
+      if (typeof v.face === 'string') zone.face = borner(v.face, 60);
+      if (typeof v.mm === 'string') zone.mm = borner(v.mm, 120);
+      if (typeof v.quoi === 'string') {
+        const quoi = borner(v.quoi, 160);
+        // `quoi` N'EXISTE QUE S'IL EXISTE : cette structure repart vers chaque
+        // poste à chaque rafraîchissement, un « quoi: '' » sur chaque face de
+        // chaque textile est du poids sur le fil pour ne rien dire.
+        if (quoi) zone.quoi = quoi; else delete zone.quoi;
+      }
+      if (i >= liste.length) liste.push(zone);
     });
+    // UNE FACE SANS NOM N'EST PAS UNE FACE — c'est ainsi qu'on en retire une :
+    // on efface son nom. (Le comptoir applique déjà la même règle à l'entrée.)
+    out.logos = liste.filter((z) => z.face);
   }
   return out;
 }
@@ -2768,7 +2805,18 @@ async function retarifer(f, reglages, qte) {
     return r ? { chiffrage: ch, ...r } : null;
   }
   if (!f.prod || !Array.isArray(f.prod.tailles)) return null;
-  const majCh = chiffrage.poserTailles(ch, f.prod.tailles);
+  // LA RÉFÉRENCE SUIT L'ARTICLE. Corriger « NS300 » en « NS332 » sur la ligne,
+  // c'est changer de produit : le prix d'achat n'est plus le même, donc le prix
+  // de vente non plus. On ne l'accepte QUE si le moteur connaît la nouvelle
+  // référence — sinon on garde le chiffrage d'origine plutôt que de rendre la
+  // ligne muette au premier nom tapé de travers.
+  let base = ch;
+  const refLigne = String((f.prod.ref || '')).trim();
+  if (refLigne && refLigne !== ch.ref) {
+    const essai = chiffrage.bornerChiffrage({ ...ch, ref: refLigne });
+    if (essai && chiffrage.recalculer(essai, reglages)) base = essai;
+  }
+  const majCh = chiffrage.poserTailles(base, f.prod.tailles);
   const r = chiffrage.recalculer(majCh, reglages);
   return r ? { chiffrage: majCh, ...r } : null;
 }

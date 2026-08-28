@@ -58,7 +58,7 @@ const defaut = APP.match(/const COLS_DEFAUT = new Set\(\[([^\]]*)\]\)/);
 assert.ok(defaut, 'la ligne par défaut doit être écrite en clair, pas déduite');
 const cles = defaut[1].match(/'([^']+)'/g).map((x) => x.slice(1, -1));
 assert.deepStrictEqual(cles,
-  ['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline', 'ticket'],
+  ['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline'],
   'les faits de la ligne, dans l’ordre où elle les lit');
 
 // Le reste se déduit de la liste : ajouter une colonne au rail ne doit pas
@@ -143,8 +143,6 @@ const LIGNE = [
   ['description', 'col-infos', 'cellInfos'],
   ['deadline', 'col-deadline', 'cellDeadline'],
   ['flag', 'col-flag', 'cellFlag'],
-  // Les papiers sont des OUTILS : ils rejoignent les autres actions, à droite.
-  ['ticket', 'col-ticket', 'cellTicket'],
   ['del', 'col-del', 'col-del'],
 ];
 assert.deepStrictEqual(ordreCol, LIGNE.map((x) => x[0]), 'le <colgroup> dit la ligne');
@@ -158,7 +156,7 @@ assert.deepStrictEqual(ordreTd, LIGNE.map((x) => x[2]), 'buildRow pose les cellu
 // encore. Une colonne supprimée doit donc sortir du plancher lui-même, sinon
 // la grille garde 198 px de largeur qu'aucune colonne n'occupe et continue de
 // défiler de côté alors qu'on vient de lui faire de la place.
-for (const px of [1416, 1366, 1506]) {
+for (const px of [1300, 1250, 1390]) {
   assert.ok(CSS.includes(`min-width: calc(${px}px - var(--cols-off, 0px))`),
     `le plancher ${px} doit refléter les colonnes réellement présentes`);
 }
@@ -171,7 +169,7 @@ for (const px of [1416, 1366, 1506]) {
 // accueillaient tout le monde le jour où le tableau est devenu la vue par
 // défaut. Et la colonne du prix ne coupait pas son intitulé mais sa ligne
 // « HT : 1 394,23 € », dès le premier millier. Largeurs mesurées au rendu.
-for (const [sel, px] of [['col-ticket', 116], ['col-price', 132], ['col-deadline', 148], ['col-client', 214]]) {
+for (const [sel, px] of [['col-price', 132], ['col-deadline', 148], ['col-client', 214]]) {
   assert.ok(new RegExp(`\\.${sel} \\{ width: ${px}px; \\}`).test(CSS),
     `${sel} doit tenir son intitulé (${px}px)`);
 }
@@ -180,7 +178,7 @@ for (const [sel, px] of [['col-ticket', 116], ['col-price', 132], ['col-deadline
 assert.match(CSS, /\.grid thead th \{[\s\S]*?font-size: var\(--taille-note\)/);
 // Les mots du tableau et ceux du rail sont les MÊMES : deux noms pour une
 // colonne, c'est deux composants qui se ressemblent au lieu d'un seul.
-for (const mot of ['Nom du dossier client', 'Documents', 'Prix TTC', 'Date souhaitée', 'Qui suit']) {
+for (const mot of ['Nom du dossier client', 'Prix TTC', 'Date souhaitée', 'Qui suit']) {
   assert.ok(HTML.includes(`>${mot}</th>`), `le <th> doit dire « ${mot} », comme le rail`);
   assert.ok(APP.includes(`label: '${mot}'`), `le rail doit dire « ${mot} », comme le <th>`);
 }
@@ -188,7 +186,7 @@ for (const mot of ['Nom du dossier client', 'Documents', 'Prix TTC', 'Date souha
 // COL_DEFAULTS se dit « miroir des .col-* du CSS » : qu'il le soit, sinon
 // `--cols-off` retranche au plancher une largeur que la colonne n'occupait pas.
 const defauts = APP.match(/const COL_DEFAULTS = \{[\s\S]*?\};/)[0];
-for (const [cle, sel] of [['ticket', 'col-ticket'], ['price', 'col-price'],
+for (const [cle, sel] of [['price', 'col-price'],
   ['deadline', 'col-deadline'], ['client', 'col-client'], ['stars', 'col-stars'],
   ['flag', 'col-flag'], ['sub_stage', 'col-sub'], ['del', 'col-del'], ['responsable', 'col-resp'],
   ['product', 'col-product'], ['description', 'col-infos']]) {

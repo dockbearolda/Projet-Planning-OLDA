@@ -116,8 +116,10 @@ function bloc(css, condition, aiguille) {
 // 2. L'APPUI RÉPOND — ET NE SE BAT PAS AVEC LE RÉORDONNANCEMENT
 // ---------------------------------------------------------------------------
 {
-  for (const sel of ['.pcard:active', '.stage:active', '.pcard__open:active',
-    '.pcard__ticket:active', '.pcard__del:active', '.pcard__ref-btn:active']) {
+  // « ouvrir » et les deux papiers ont quitté la carte le 28/08 : elle s'ouvre
+  // en la touchant. Restent la corbeille et la pastille de référent.
+  for (const sel of ['.pcard:active', '.stage:active',
+    '.pcard__del:active', '.pcard__ref-btn:active']) {
     assert.ok(CSS.includes(sel), `« ${sel} » doit exister : sans retour à l’appui, on retape`);
   }
   // LA CARTE NE PORTE PAS DE `transform` À L'APPUI. L'animation de
@@ -130,8 +132,8 @@ function bloc(css, condition, aiguille) {
   assert.ok(CSS.includes('body.dragging-active .pcard:active'),
     'l’appui doit se retirer pendant un glisser');
   // Mouvement réduit : l'enfoncement disparaît, la réponse (couleur) reste.
-  const reduit = bloc(CSS, '(prefers-reduced-motion: reduce)', '.pcard__open:active');
-  assert.ok(/\.pcard__open:active[\s\S]*transform:\s*none/.test(reduit),
+  const reduit = bloc(CSS, '(prefers-reduced-motion: reduce)', '.pcard__del:active');
+  assert.ok(/\.pcard__del:active[\s\S]*transform:\s*none/.test(reduit),
     'l’enfoncement doit se retirer sous `prefers-reduced-motion`');
 }
 
@@ -162,8 +164,12 @@ function bloc(css, condition, aiguille) {
 // 4. LA CARTE S'OUVRE QUAND ON LA TOUCHE — SAUF QUAND ON VIENT DE LA GLISSER
 // ---------------------------------------------------------------------------
 {
+  // Depuis le 28/08 le geste est porté par UNE fonction, partagée avec la ligne
+  // du tableau : deux vues à un clic l'une de l'autre doivent donner le même
+  // geste, pas deux qui se ressemblent.
   const build = fonction(APP, 'buildCard');
-  const ouverture = build.slice(build.indexOf("carte.addEventListener('click'"));
+  assert.ok(build.includes('ouvrirAuClic(carte, r)'), 'la carte s’ouvre au clic');
+  const ouverture = fonction(APP, 'ouvrirAuClic');
   assert.ok(ouverture.includes('ZONE_CLIQUABLE'),
     'un tap sur un bouton de la carte ne doit pas AUSSI ouvrir la fiche');
   assert.ok(ouverture.includes('glisserVientDeFinir()'),

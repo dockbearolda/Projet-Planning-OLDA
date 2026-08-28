@@ -410,45 +410,44 @@ const DEMANDE = {
   const APP = lire('app.js');
   const CSS_APP = lire('styles.css');
 
-  // Le bouton « Imprimer » de la fiche sort le TICKET, plus le récapitulatif.
-  assert.ok(/ldActionBtn\('imprimer', 'Imprimer', \(\) => imprimerTicket\(r\)\)/.test(APP),
-    'la fiche doit imprimer le ticket, pas le récapitulatif complet');
+  // LES DEUX PAPIERS ONT QUITTÉ L'ÉCRAN (28/08/2026)
+  //
+  // Charlie, en désignant les trois pastilles de la ligne — ouvrir la fiche,
+  // ticket d'atelier, bon de commande : « ces 3 choses doivent être supprimées
+  // définitivement, je clique sur la ligne, elle s'ouvre façon tableau et je
+  // peux tout modifier ». Son patron refait les papiers.
+  //
+  // CE QUI LES REMPLACE EXISTE, et c'est ce qui rendait le retrait possible :
+  // le ticket était la SEULE porte pour corriger une taille ou une face. La
+  // fiche porte maintenant « Ce qu'il y a à produire » — d'où l'ordre suivi,
+  // construire d'abord, retirer ensuite.
+  //
+  // Le dessin des papiers, lui, reste (ticket.js, bureau.js, papier.js) : le
+  // ticket de récapitulatif revient plus tard, et le regarder ne coûte rien.
+  assert.ok(!/boutonsPapiers/.test(APP), 'plus de composant de pastilles pour les papiers');
+  assert.ok(!/cellTicket\(/.test(APP), 'plus de colonne « Documents » dans la ligne');
+  assert.ok(!/ldActionBtn\('(ticket|bureau|imprimer)'/.test(APP),
+    'plus de bouton de papier dans la fiche');
+  assert.ok(!/'open-btn'/.test(APP), 'plus de bouton « ouvrir la fiche »');
+  assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
   // Le récapitulatif complet reste accessible — mais en téléchargement : c'est
   // un document de travail, il n'a jamais eu à sortir sur l'imprimante.
   assert.ok(/ldActionBtn\('telecharger', 'Récap complet', \(\) => telechargerRecap\(r\)\)/.test(APP));
   assert.ok(!/imprimerRecap/.test(APP), 'imprimerRecap ne doit plus exister');
 
-  // LES DEUX PAPIERS S'ATTEIGNENT DEPUIS LA LIGNE, dans les deux vues, et par
-  // le MÊME composant (27/08) : une commande sort un ticket d'atelier ET un bon
-  // de commande, et c'est la même question qu'on se pose devant une ligne.
-  assert.ok(/function boutonsPapiers\(r, classe\)/.test(APP),
-    'un seul composant construit les deux boutons : le tableau et la carte ne '
-    + 'doivent pas donner deux boutons qui se ressemblent');
-  assert.ok(/boutonsPapiers\(r, 'pcard__ticket'\)/.test(APP), 'la carte porte les deux papiers');
-  assert.ok(/boutonsPapiers\(r, 'ticket-cell'\)/.test(APP), 'la colonne aussi');
-  assert.ok(/tr\.appendChild\(cellTicket\(r\)\)/.test(APP),
-    'la ligne du tableau doit porter sa colonne documents');
-  assert.ok(/ouvrirTicket\(r\);/.test(APP) && /ouvrirBureau\(r\);/.test(APP),
-    'et chacun ouvre son papier');
-  // La rangée d'actions de la carte compte un bouton de plus : sa largeur doit
-  // suivre, sinon le dernier bouton sort de la carte.
-  assert.ok(/grid-template-columns: repeat\(5, var\(--rond\)\)/.test(CSS_APP),
-    'la rangée d’actions de la carte porte cinq boutons');
-  assert.ok(/--pcard-actions: 252px/.test(CSS_APP),
-    '5 x 44 + 4 x 8 = 252 px : la largeur réservée suit le nombre de boutons');
-
-  // SUR TOUTES LES LIGNES. Le bouton ne paraissait que sur les dossiers nés au
-  // comptoir : logique tant qu'il sortait le papier du CLIENT — une ligne tapée
-  // à la main n'en avait jamais eu. Depuis qu'il sort le papier de l'ATELIER, la
-  // question n'est plus d'où vient le dossier mais qui va le produire.
-  assert.ok(!/aUnTicket/.test(APP), 'plus de garde « né au comptoir » sur le ticket');
-  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(APP),
-    'plus d’emplacement muet : chaque ligne a son bouton');
-  assert.ok(!/ticket-cell--vide|pcard__ticket--vide/.test(CSS_APP),
-    'et plus de règle de style pour un emplacement qui n’existe plus');
-  // Le bouton de la fiche n'est plus conditionnel non plus.
-  assert.ok(/ldActionBtn\('ticket', 'Ticket', \(\) => ouvrirTicket\(r\)\),/.test(APP),
-    'la fiche doit offrir le ticket sur toutes les lignes');
+  // LA LIGNE S'OUVRE AU CLIC, et par la MÊME fonction que la carte : deux vues
+  // à un clic l'une de l'autre doivent donner le même geste, pas deux qui se
+  // ressemblent.
+  assert.ok(/function ouvrirAuClic\(el, r\)/.test(APP), 'une seule fonction ouvre la fiche');
+  assert.ok(/ouvrirAuClic\(tr, r\)/.test(APP), 'la ligne du tableau s’ouvre au clic');
+  assert.ok(/ouvrirAuClic\(carte, r\)/.test(APP), 'la carte aussi');
+  const AUCLIC = APP.match(/function ouvrirAuClic\(el, r\) \{[\s\S]*?\n\}/)[0];
+  assert.ok(/ZONE_CLIQUABLE/.test(AUCLIC),
+    'un clic sur un contrôle de la ligne ne doit pas AUSSI ouvrir la fiche');
+  assert.ok(/glisserVientDeFinir\(\)/.test(AUCLIC),
+    'la dépose d’un glisser ne doit pas ouvrir la fiche du dossier qu’on vient de ranger');
+  assert.ok(/getSelection\(\)/.test(AUCLIC),
+    'copier un texte à la souris finit par un relâchement sur la ligne : ça n’ouvre pas');
 
   // ET IL SE BÂTIT VRAIMENT sur une ligne sans récapitulatif du comptoir : la
   // désignation et la quantité viennent des COLONNES, la production de la fiche.
@@ -465,53 +464,14 @@ const DEMANDE = {
   assert.ok(!papierMain.includes('Œillets'), 'elle reste au dossier');
 
   // -------------------------------------------------------------------------
-  // 6 bis. LE TICKET EN COLONNE — affichable ou non, et sans décaler le reste
+  // 6 bis. PLUS DE COLONNE « DOCUMENTS »
   // -------------------------------------------------------------------------
   const HTML = lire('index.html');
   const CSS = lire('styles.css');
-
-  // Une VRAIE colonne du tableau : <col>, <th> et <td> au même rang. L'ordre
-  // compte — un <col> agit sur la colonne de même rang, pas sur son data-col.
-  // Depuis le 27/08 au soir, la colonne est en FIN de ligne : les deux papiers
-  // sont des OUTILS, pas des faits, et toutes les autres actions de la ligne
-  // sont déjà à droite. Posés entre « à qui » et « quoi », ils coupaient la
-  // lecture en deux.
-  const rangCol = (cle) => HTML.indexOf(`<col data-col="${cle}"`);
-  assert.ok(rangCol('ticket') > rangCol('flag') && rangCol('ticket') < rangCol('del'),
-    'le <col> ticket doit se placer entre flag et del — avec les autres actions');
-  const thead = HTML.match(/<thead>[\s\S]*?<\/thead>/)[0];
-  assert.ok(thead.indexOf('col-ticket') > thead.indexOf('col-flag')
-    && thead.indexOf('col-ticket') < thead.indexOf('col-del'),
-  'le <th> ticket doit suivre le même ordre que le colgroup');
-  const corps = APP.match(/function buildRow\(r\)[\s\S]*?\n\}/)[0];
-  assert.ok(corps.indexOf('cellTicket(r)') > corps.indexOf('cellFlag(r)')
-    && corps.indexOf('cellTicket(r)') < corps.indexOf("className = 'col-del'"),
-  'buildRow doit poser la cellule ticket au même rang que son <col>');
-
-  // Elle se retire depuis le rail « Colonnes », comme les autres.
-  assert.ok(/\{ key: 'ticket',\s+label: '[^']+', surCarte: true \}/.test(APP),
-    'le ticket doit figurer dans PLANNING_COLS');
-  assert.ok(/\.grid\.off-ticket\s+col\[data-col="ticket"\]/.test(CSS),
-    'la règle de masquage off-ticket doit exister');
-
-  // …mais SANS faire basculer les cartes vers le tableau : le ticket vit dans
-  // les deux vues, c'est ce que dit `surCarte` (cf. COLS_TABLEAU).
-  assert.ok(/const COLS_TABLEAU = new Set\(\s*\n\s*PLANNING_COLS\.filter\(\(c\) => !c\.locked && !c\.surCarte\)/.test(APP),
-    'COLS_TABLEAU doit exclure les colonnes présentes sur la carte');
-  assert.ok(/const modeCartes = \(\) => COLS_TABLEAU\.size > 0/.test(APP),
-    'la bascule cartes/tableau ne doit regarder que les colonnes du tableau');
-  assert.ok(/cards-off-ticket/.test(APP) && /body\.cards-off-ticket \.pcard__ticket \{ display: none/.test(CSS),
-    'retirer la colonne doit aussi ranger le bouton de la carte');
-
-  // ALIGNEMENT. La carte est sa propre grille : une colonne dimensionnée par
-  // son CONTENU décale toutes les autres d'une ligne à l'autre. La colonne
-  // d'actions garde donc une largeur arrêtée — et le bouton étant désormais sur
-  // toutes les lignes, plus rien ne peut la faire varier de l'une à l'autre.
-  assert.ok(/--pcard-actions: 252px;/.test(CSS), 'la colonne d’actions doit avoir une largeur fixe');
-  assert.ok(!/grid-template-columns:[^;]*\bauto;/.test(CSS.match(/\.pcard \{[\s\S]*?\n\}/)[0]),
-    'aucune piste `auto` dans la grille de la carte : elle dépendrait du contenu');
-  assert.ok(/body\.cards-off-ticket \.pcard \{ --pcard-actions: 148px; \}/.test(CSS),
-    'ticket rangé : la colonne d’actions se resserre pour toutes les cartes ensemble');
+  assert.ok(!/data-col="ticket"/.test(HTML), 'le <col> ticket a disparu du colgroup');
+  assert.ok(!/col-ticket/.test(HTML), 'et son <th> avec');
+  assert.ok(!/{ key: 'ticket'/.test(APP), 'la colonne quitte aussi le rail « Colonnes »');
+  assert.ok(!/cards-off-ticket/.test(APP), 'plus de bascule pour un bouton qui n’existe plus');
 
   // UN SEUL APERÇU À LA FOIS. La fiche complète s'attend (un aller-retour
   // réseau) : au doigt on tape deux fois avant qu'elle n'arrive, et deux
