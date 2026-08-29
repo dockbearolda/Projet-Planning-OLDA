@@ -29,6 +29,22 @@ const euros = (n) => `${Number(n).toLocaleString('fr-FR',
 // se clique. Ce qui se SAISIT — une date, une quantité, un montant — se tape :
 // les boutons de date et les steppers de taille ont été retirés le 28/08 parce
 // qu'ils dupliquaient la frappe au lieu de la remplacer.
+//
+// ⚠ RE-DEMANDÉ LE 29/08 PAR UN HANDOFF, ET RE-REFUSÉ PAR CHARLIE. Le bundle
+// `design_handoff_fiche_commande 2` propose quatre choses que cet écran a déjà
+// écartées, et il faut les nommer ici parce qu'elles reviendront :
+//   · opt. 05 — steppers « − / + » et molette sur les tailles. RETIRÉS le
+//     28/08 : soixante-dix clics pour passer de 30 à 100, et les deux tiers de
+//     la case. La quantité se tape, et depuis le 29/08 la série entière se
+//     dicte en une ligne (voir `lireTailles`).
+//   · opt. 08 — « Tab / Entrée enchaîne / ⌘↵ étape suivante ». C'est
+//     exactement le parcours clavier que la consigne du 26/08 interdit :
+//     « pas de chaînage à l'Entrée, pas d'ordre de tabulation travaillé ».
+//   · opt. 09 et 10 — palette ⌘K, ⌥↑/⌥↓ entre dossiers. Même refus, même raison.
+//   · opt. 03 — chips « demain / +3 / lundi » sous les champs de date. Les
+//     quatre boutons rapides disaient déjà ce que le champ COMPREND (voir
+//     `normaliserDate`) : ils doublaient la saisie. Retirés le 28/08.
+// Poser un raccourci sur un champ, c'est en casser un qu'elle connaît déjà.
 
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const JOURS_SAISIS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
