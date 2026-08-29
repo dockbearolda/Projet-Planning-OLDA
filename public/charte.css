@@ -177,7 +177,22 @@
      partout, et le comptoir n'a plus la sienne. */
   --radius: 10px;
   --row-h: 76px;
-  --font: 'Manrope', Arial, Helvetica, sans-serif;
+  /* LA POLICE EST CELLE DE LA MACHINE (29/08/2026). Charlie : « il y a toujours
+     un probleme de police important, ca doit etre NATIF ».
+     C'etait Manrope, un fichier de 24 Ko telecharge a chaque ouverture a froid.
+     Une fonte variable non hintee se rend mollement aux petites tailles — c'est
+     exactement le reproche fait a Inter le 21/08, et Manrope y echappait moins
+     qu'on ne le croyait. La police du systeme, elle, est HINTEE pour son propre
+     rendu : SF sur Mac, Segoe UI sur les Windows de l'atelier, et chacune
+     s'affiche comme le reste du poste.
+     MESURE AVANT DE TRANCHER : sur la fiche, la carte fait 993 px avant comme
+     apres, zero texte tronque des deux cotes, et 5 elements sur 58 changent de
+     largeur — de 2 px au maximum. Le changement ne coute rien a la mise en
+     page : toutes les boites sortent de jetons, pas de la fonte.
+     CE QU'IL COUTE, ET C'EST ASSUME : un poste Mac et un poste Windows
+     n'ecriront plus avec le meme dessin. C'est la definition de « natif ».
+     (`git show 0fcc190 -- public/manrope-latin-variable.woff2` la ramene.) */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
 }
 
 /* ---------------------------------------------------------------- Le texte
@@ -187,8 +202,11 @@
    l'œil ne lit pas comme une hiérarchie, seulement comme du désordre.
    Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR.
 
-   TROIS GRAISSES. Manrope s'arrête à 800 : un « font-weight:900 » est raboté
-   et rendu EXACTEMENT comme un 800 — une marche qui ne se voit pas.
+   TROIS GRAISSES — 400 / 600 / 800. Trois marches se lisent ; cinq ne se lisent
+   pas. Manrope, jusqu'au 29/08, rabotait tout au-dessus de 800 : un
+   « font-weight: 900 » se rendait EXACTEMENT comme un 800. La police système,
+   elle, a bien un 900 — raison de plus pour s'en tenir aux trois, sans quoi la
+   hiérarchie n'est plus la même d'un poste à l'autre.
 
    UNE SEULE BOÎTE pour tout ce qui se clique et se remplit : même taille de
    texte + même interligne + même rembourrage = la même hauteur, sans qu'aucune

@@ -288,15 +288,18 @@ assert.ok(/db\.refs\.filter\(r=>r\.genre&&r\.designation&&r\.designation!=='TEST
 
 // --- La police, servie par nous ----------------------------------------------
 
-// Manrope venait de fonts.googleapis.com : hors ligne, la page retombait en
-// silence sur Arial. Rien ne doit venir d'un autre domaine.
+// RIEN NE DOIT VENIR D'UN AUTRE DOMAINE. La police du texte venait de
+// fonts.googleapis.com ; elle est ensuite passée chez nous, puis — le 29/08 —
+// c'est celle de la MACHINE qui écrit : plus rien à charger du tout côté texte.
 [['demande-devis', DEVIS], ['vente-directe', VENTE]].forEach(([nom, src]) => {
   // On cherche un CHARGEMENT, pas une mention : le commentaire qui explique
   // pourquoi Google Fonts est parti a le droit de nommer le domaine.
   assert.ok(!/(href|src|url\()\s*=?\s*["'(]?https?:\/\/fonts\./.test(src),
     `${nom} ne charge plus de police d’un autre domaine`);
-  assert.ok(/url\('\.\.\/manrope-latin-variable\.woff2'\)/.test(src), `${nom} sert la police lui-même`);
-  assert.ok(/font-display:swap/.test(src), `${nom} affiche le texte tout de suite, Arial fait le relais`);
+  assert.ok(!/@font-face\{font-family:'Manrope'/.test(src),
+    `${nom} ne télécharge plus de police de texte`);
+  assert.ok(/body\{font-family:var\(--font\)!important\}/.test(src),
+    `${nom} écrit dans la police de la charte, qui est celle de la machine`);
   // UN CHAMP N'HÉRITE PAS DE LA POLICE DU CORPS : Chrome impose Arial à un
   // `input`, un `select` et un `button`, et du MONOSPACE à une zone de texte.
   // Sans cette règle l'écran est bariolé champ par champ, ce qui saute aux
@@ -305,12 +308,16 @@ assert.ok(/db\.refs\.filter\(r=>r\.genre&&r\.designation&&r\.designation!=='TEST
   assert.ok(/input,select,textarea,button\{font-family:inherit!important\}/.test(src),
     `${nom} : champs, listes et boutons prennent la police de la page`);
 });
-assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-latin-variable.woff2')), 'le fichier de police est là');
-// SIL OFL : le texte de licence accompagne le fichier, sinon on ne peut pas
-// le redistribuer.
-assert.ok(fs.existsSync(path.join(RACINE, 'public/manrope-LICENCE.txt')), 'la licence de la police voyage avec elle');
-assert.ok(/'\/manrope-latin-variable\.woff2'/.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
-  'la police est dans la coquille : hors ligne, le poste garde sa tête');
+// LE FICHIER ET SA LICENCE SONT PARTIS AVEC ELLE : une police qu'on ne sert
+// plus n'a pas à dormir dans public/, et sa licence n'a plus rien à couvrir.
+for (const f of ['public/manrope-latin-variable.woff2', 'public/manrope-LICENCE.txt']) {
+  assert.ok(!fs.existsSync(path.join(RACINE, f)), `${f} ne doit plus être là`);
+}
+assert.ok(!/manrope/i.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
+  'la police de texte a quitté la coquille hors ligne');
+// LES ICÔNES, ELLES, RESTENT SERVIES PAR NOUS : un nom de glyphe absent
+// s'écrit en toutes lettres, il n'y a pas de repli acceptable.
+assert.ok(fs.existsSync(path.join(RACINE, 'public/olda-icones.woff2')), 'la police d’icônes est là');
 
 
 // --- 5. L'AJOUT MANUEL, À LA MÊME PLACE PARTOUT ------------------------------

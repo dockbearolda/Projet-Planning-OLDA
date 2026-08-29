@@ -49,9 +49,9 @@ const RACINE = path.join(__dirname, '..');
 // Un fichier absent de cette table doit être à ZÉRO : c'est ce qui rend le
 // cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
-  'public/comptoir/demande-devis.css': 100,
-  'public/comptoir/vente-directe.css': 43,
-  'public/styles.css': 29,
+  'public/comptoir/demande-devis.css': 99,
+  'public/comptoir/vente-directe.css': 42,
+  'public/styles.css': 28,
   'public/dashboard.css': 9,
   'public/clients.css': 2,
   'public/montravail.css': 4,
@@ -61,7 +61,7 @@ const PLAFONDS = {
 
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 194;
+const TOTAL_MAX = 191;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
@@ -127,11 +127,11 @@ for (const nom of ['vente-directe', 'demande-devis']) {
     `${nom} : les règles vivent dans ${nom}.css, pas dans la page`);
   assert.ok(page.includes(`<link rel="stylesheet" href="${nom}.css">`),
     `${nom} : la page charge sa feuille`);
-  // Le @font-face a suivi la feuille : sans préchargement, Manrope n'est
-  // découverte qu'une fois le CSS reçu ET analysé — la page s'affiche en entier
-  // dans la police de repli, puis TOUT se recompose.
-  assert.ok(/<link rel="preload" as="font"[^>]+manrope/.test(page),
-    `${nom} : la police part en même temps que la feuille qui la nomme`);
+  // IL N'Y A PLUS DE POLICE DE TEXTE À PRÉCHARGER (29/08) : on écrit dans
+  // celle de la machine. Le préchargement existait pour raccourcir l'attente
+  // d'un fichier de 24 Ko ; il n'y a plus de fichier, donc plus d'attente.
+  assert.ok(!/manrope/i.test(page.replace(/<!--[\s\S]*?-->/g, ' ')),
+    `${nom} : plus de police de texte à charger`);
 }
 
 console.log(`✓ charte : cliquet tenu — ${total} écart(s) sur ${TOTAL_MAX}, aucun fichier n'a reculé`);

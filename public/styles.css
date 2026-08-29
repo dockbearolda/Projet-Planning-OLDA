@@ -9,37 +9,14 @@
    =========================================================================== */
 
 
-/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Manrope — c'est celle que le patron
-   veut, et Inter, essayée le 21/08, rendait mal sur les Windows de l'atelier
-   (variable non hintée : maigre et sale sous DirectWrite aux petites tailles,
-   alors qu'elle passe très bien sur Mac). Un seul fichier de 25 Ko, à graisse
-   variable de 200 à 800 : pas de deuxième requête pour le gras. Un
-   `font-weight:900` posé dans une règle retombe donc sur 800, comme avant.
-   Sous-ensemble latin — tous les caractères français y sont, « œ » et « € »
-   compris.
-   `swap` et non `block` : le texte doit s'afficher tout de suite, Arial fait
-   le relais le temps du chargement. Contrairement aux icônes, un mot en Arial
-   se lit très bien ; une icône pas encore prête, elle, s'écrit en toutes
-   lettres — d'où les deux réglages opposés. */
-/* UNE SEULE POLICE POUR TOUTE L'APPLICATION (25/08/2026).
-   Le rail avait la sienne depuis la refonte du 24/08 — Plus Jakarta Sans — et
-   trois caractères se rendaient donc sur le planning : Manrope pour le corps,
-   Plus Jakarta pour toute la colonne de gauche, Arial pour les boutons
-   d'icône. Le premier audit avait annoncé « une seule police sur les neuf
-   écrans » : c'était faux, il n'avait mesuré que l'écran du comptoir, qui n'a
-   pas de rail.
-   Mesuré avant de trancher : à 320 px de rail, Manrope replie exactement les
-   MÊMES quatre libellés, et le plus large mesure 239 px contre 240. Le
-   changement ne coûte rien à la mise en page — il retire une police.
-   (`git show 134338c -- public/plus-jakarta-sans-latin-variable.woff2` la
-   ramène si le choix se rediscute.) */
-@font-face {
-  font-family: 'Manrope';
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url('manrope-latin-variable.woff2') format('woff2');
-}
+/* LA POLICE EST CELLE DE LA MACHINE (29/08/2026), et elle est declaree dans
+   charte.css avec sa raison. Il y avait ici un `@font-face` et un fichier de
+   24 Ko : ils sont partis avec elle. Rien a telecharger cote texte, rien a
+   precharger, rien a mettre dans la coquille hors ligne — et plus de
+   recomposition a l'arrivee de la fonte.
+   (Le rail avait la sienne jusqu'au 25/08 — Plus Jakarta Sans — et trois
+   caracteres se rendaient sur le planning. `git show 134338c` la ramene ;
+   `git show 0fcc190 -- public/manrope-latin-variable.woff2` ramene Manrope.) */
 
 /* Les JETONS de la charte (couleurs, échelle de texte, formes, thème sombre)
    vivent dans charte.css : le planning, la base clients et les deux écrans du
@@ -82,7 +59,8 @@ body {
    et du monospace pour un `textarea`. Le CRM le corrigeait au coup par coup —
    huit règles éparses, dont une `.dashboard button` qui ne faisait que ça — et
    il en manquait : « Colonnes », le seul bouton d'icône de l'écran à porter un
-   MOT, se rendait en Arial 17 px au milieu d'une page en Manrope. C'est le
+   MOT, se rendait en Arial 17 px au milieu d'une page dans la police de la
+   maison. C'est le
    piège que le second audit annonçait comme latent ; il ne l'était pas.
    L'écran de la demande pose la même règle depuis longtemps ; elle manquait
    ici. */
@@ -544,8 +522,8 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    RIEN NE SE PLIE : l'atelier compte quatre personnes et chacune voit toutes
    les étapes en permanence. L'ordre, le regroupement, les libellés et la
    logique (clic, clavier, glisser-déposer) ne bougent pas d'un pixel.
-   Le rail écrit dans la police de la maison comme le reste depuis le 25/08
-   (voir le @font-face plus haut) : graisses 400-800, chiffres tabulaires. */
+   Le rail écrit dans la police de la maison comme le reste depuis le 25/08 :
+   trois graisses, chiffres tabulaires. */
 
 /* L'ascenseur se fait discret : 6 px, pouce gris, piste transparente. */
 .sidebar::-webkit-scrollbar { width: 6px; }

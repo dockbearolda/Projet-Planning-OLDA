@@ -14,15 +14,10 @@
       Toute cette prose partait donc en entier à chaque ouverture d'écran.
       Elle reste dans la source, elle ne quitte plus le serveur. */
 
-/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
-   de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
-   d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
-   même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
-   un poste s'ouvre sans dépendre d'un tiers joignable.
-   Manrope : celle du patron. Inter, essayée le 21/08, rendait mal sur les
-   Windows de l'atelier — variable non hintée, DirectWrite la sort maigre et
-   sale aux petites tailles. Un fichier de 25 Ko, graisse variable 200-800. */
-@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../manrope-latin-variable.woff2') format('woff2')}
+/* LA POLICE EST CELLE DE LA MACHINE (29/08/2026) — declaree dans charte.css,
+   que cet ecran charge. Il y avait ici un `@font-face` pour Manrope et un
+   fichier de 24 Ko : ils sont partis avec elle. Rien a telecharger cote texte,
+   rien a precharger, et plus de recomposition a l'arrivee de la fonte. */
 
 /* ============================================================================
    L'ÉCHELLE DE L'ÉCRAN — LA RÉFÉRENCE DU COMPTOIR (22/08/2026)
@@ -47,7 +42,7 @@
    Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR, jamais en
    changeant la taille d'un demi-point.
 
-   TROIS GRAISSES, ET ELLES SONT DES JETONS. Manrope s'arrête à 800 : un
+   TROIS GRAISSES, ET ELLES SONT DES JETONS. Trois marches se lisent, cinq non. Un
    « font-weight: 900 » est rendu EXACTEMENT comme un 800 (vérifié au
    navigateur, même largeur au pixel). Le 27/08 on avait constaté que la page
    en déclarait cinq — 400, 600, 700, 800, 900 — dont deux qui ne se voyaient
@@ -259,7 +254,7 @@ b,strong{font-weight:var(--graisse-forte)}
    Le cliquet de charte (test/charte-cliquet.test.js) les compte : leur nombre
    ne peut plus monter. Les faire descendre demande la mesure sur les sept
    étapes, pas une relecture. */
-body{font-family:'Manrope',Arial,sans-serif!important}
+body{font-family:var(--font)!important}
 /* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
    Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
    zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
@@ -320,7 +315,7 @@ button:active{transform:scale(.98)}
 button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
 /* Un émoji dans un libellé (« 🖨️ Imprimer le ticket », « 💬 Envoyer sur
    WhatsApp ») tire sa
-   hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
+   hauteur de la police d'émojis, pas celle du texte : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-champ)!important}
@@ -578,7 +573,7 @@ input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;o
    désordre. Ici : `--recap-texte` pour TOUT ce qui se lit, `--recap-grand`
    pour les quatre chiffres clés, et rien d'autre. La hiérarchie se fait à la
    GRAISSE et à la COULEUR — jamais en changeant la taille d'un demi-point.
-   Une seule police, celle du corps (Manrope) : les boutons et les champs en
+   Une seule police, celle du corps : les boutons et les champs en
    héritent déjà par la règle `font-family:inherit!important`. */
 /* La FICHE ouverte à gauche reprend les mêmes blocs : les deux tailles y sont
    déclarées aussi, sinon `var(--recap-grand)` n'y vaut rien et les quatre

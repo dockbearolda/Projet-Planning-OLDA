@@ -25,11 +25,13 @@
       }
     } catch (e) {}
   </script>
-  <!-- LA POLICE D'ICÔNES EST CHEZ NOUS. (La ligne qui disait ici « la charte est
-       en Arial/Helvetica, plus rien à télécharger côté texte » ne vaut plus : le
-       texte est en Manrope, hébergée elle aussi, préchargée juste en dessous.)
-       `olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes réellement employés (`olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes
-       réellement employés). Elle venait de Google Fonts : deux `preconnect` puis
+  <!-- PLUS RIEN À TÉLÉCHARGER CÔTÉ TEXTE (29/08) : la police est celle de la
+       machine — SF sur Mac, Segoe UI sur les Windows de l'atelier. Manrope,
+       ses 24 Ko et son préchargement sont partis ; voir charte.css pour la
+       mesure qui l'a tranché.
+       SEULES LES ICÔNES RESTENT UNE WEBFONT, et elle est CHEZ NOUS :
+       `olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes réellement employés.
+       Elle venait de Google Fonts : deux `preconnect` puis
        une feuille de style BLOQUANT LE RENDU sur un autre domaine, soit une
        chaîne DNS → TLS → CSS → police avant le premier pixel — depuis
        Saint-Martin, en 4G, c'était payé cash sur l'ouverture. Et le service
@@ -38,15 +40,6 @@
        (« d », « s », « c »…). Servie par nous, elle est mise de côté comme le
        reste de la coquille. -->
   <link rel="preload" href="olda-icones.woff2" as="font" type="font/woff2" crossorigin />
-  <!-- MANROPE AUSSI. Elle est déclarée dans styles.css : le navigateur ne la
-       découvrait donc qu'après avoir analysé la feuille, et ne la demandait
-       qu'en posant le premier texte. Avec `font-display: swap`, l'écran
-       s'affichait entier dans la police de secours puis TOUT se recomposait à
-       l'arrivée de la vraie — chaque libellé changeant de largeur d'un coup.
-       C'est le rebond de l'ouverture, le pendant de celui des étapes.
-       Préchargée ici, elle part en même temps que le CSS : 24 Ko, hébergés par
-       nous, arrivés avant le premier pixel de texte. -->
-  <link rel="preload" href="manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
   <!-- LA CHARTE D'ABORD : elle ne porte que des jetons (couleurs, texte,
        formes, thème sombre). Les écrans du comptoir chargent le même fichier —
        une seule charte, un seul endroit où la changer. -->

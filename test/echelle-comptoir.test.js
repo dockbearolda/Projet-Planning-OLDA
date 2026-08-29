@@ -106,13 +106,15 @@ assert.ok(px('--taille-texte') >= 15, 'le texte courant ne descend pas sous 15 p
 
 const GRAISSES = ['--graisse-texte', '--graisse-note', '--graisse-forte'];
 GRAISSES.forEach((nom) => assert.ok(echelle[nom], `${nom} doit être déclarée au :root`));
-// Manrope va de 200 à 800 : au-delà, le navigateur RABOTE et rend du 800. Une
-// graisse qu'on ne voit pas n'est pas une hiérarchie.
+// TROIS MARCHES SE LISENT, CINQ NON. La borne de 800 venait du fichier de
+// police — Manrope s'y arrêtait, et tout ce qui était au-dessus se rendait
+// EXACTEMENT comme un 800. Depuis le 29/08 on écrit dans la police de la
+// machine, qui a bien un 900 : raison de plus pour s'en tenir aux trois, sans
+// quoi la hiérarchie n'est plus la même d'un poste à l'autre.
 GRAISSES.forEach((nom) => assert.ok(Number(echelle[nom]) <= 800,
-  `${nom} = ${echelle[nom]} : la police s'arrête à 800, au-dessus rien ne change`));
-
-assert.ok(/@font-face\{font-family:'Manrope';[^}]*font-weight:200 800/.test(sansCommentaires(DEVIS)),
-  'la borne 800 vient du fichier de police lui-même');
+  `${nom} = ${echelle[nom]} : trois graisses, et la plus forte est 800`));
+assert.ok(!/@font-face\{font-family:'Manrope'/.test(sansCommentaires(DEVIS)),
+  'plus de police de texte téléchargée par cet écran');
 
 // --- 2. AUCUNE TAILLE EN DUR DANS LES RÈGLES DE L'ÉCRAN ----------------------
 //

@@ -14,15 +14,10 @@
       Toute cette prose partait donc en entier à chaque ouverture d'écran.
       Elle reste dans la source, elle ne quitte plus le serveur. */
 
-/* LA POLICE DE TEXTE, SERVIE PAR NOUS. Ce fichier remplace Manrope, qui venait
-   de fonts.googleapis.com : hors ligne — ou simplement chez un fournisseur
-   d'accès qui rame — la page retombait en silence sur Arial et n'avait plus la
-   même tête d'une ouverture à l'autre. Rien ne doit venir d'un autre domaine :
-   un poste s'ouvre sans dépendre d'un tiers joignable.
-   Manrope : celle du patron. Inter, essayée le 21/08, rendait mal sur les
-   Windows de l'atelier — variable non hintée, DirectWrite la sort maigre et
-   sale aux petites tailles. Un fichier de 25 Ko, graisse variable 200-800. */
-@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('../manrope-latin-variable.woff2') format('woff2')}
+/* LA POLICE EST CELLE DE LA MACHINE (29/08/2026) — declaree dans charte.css,
+   que cet ecran charge. Il y avait ici un `@font-face` pour Manrope et un
+   fichier de 24 Ko : ils sont partis avec elle. Rien a telecharger cote texte,
+   rien a precharger, et plus de recomposition a l'arrivee de la fonte. */
 
 /* ============================================================================
    L'ÉCHELLE DE L'ÉCRAN — LE SECOND PARCOURS DU COMPTOIR (23/08/2026)
@@ -32,7 +27,7 @@
    est resté en arrière — et les deux tournent SUR LE MÊME POSTE, à un clic
    l'un de l'autre. Il comptait DIX-NEUF tailles (10, 11, 12, 12.5, 13, 13.5,
    14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 28 px), SIX graisses (400,
-   600, 700, 800, 900, 950 — dont deux que Manrope rabote sur 800, donc deux
+   600, 700, 800, 900, 950 — dont deux que une police système rendait comme un 800, donc deux
    marches invisibles) et QUATRE-VINGT-NEUF teintes.
 
    Il prend la même échelle, et n'en emploie que DEUX marches :
@@ -304,7 +299,7 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
    Il était réglé quatre fois de suite — « V10 », « V10.1 », « V10.2 »,
    « V10.3 » — chaque bloc rejouant les mêmes sélecteurs à coups de !important
    pour corriger le précédent : quinze tailles, un fond noir posé puis repeint
-   en blanc à l'impression, des graisses 900 et 950 que Manrope rabote toutes
+   en blanc à l'impression, des graisses 900 et 950 qui se rendaient toutes
    les deux sur 800. Il est écrit ici UNE fois, dans l'ordre où on le lit. */
 #ticketArea{
   max-width:620px;
@@ -548,7 +543,7 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
   }
 }
 
-body{font-family:'Manrope',Arial,sans-serif!important}
+body{font-family:var(--font)!important}
 /* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
    Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
    zone de texte. Sur un poste Windows ces polices par défaut ne ressemblent à
@@ -615,7 +610,7 @@ button.blocked,button.blocked:hover,button:disabled,
 button:active{transform:scale(.98)}
 button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.3)}
 /* Un émoji dans un libellé (« 💾 Enregistrer », « 📅 Déjà au planning ») tire sa
-   hauteur de la police d'émojis, pas de Manrope : le bouton gagnait un demi
+   hauteur de la police d'émojis, pas celle du texte : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-champ)!important}

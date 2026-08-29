@@ -163,23 +163,24 @@ assert.ok(/nettoyerBandes\(new Set\(\)\)/.test(fonction(APP, 'clearGrid')),
 // ===========================================================================
 // 6. LE REBOND DE L'OUVERTURE : LA POLICE DU TEXTE
 // ===========================================================================
-// Manrope est déclarée dans la feuille de style : le navigateur ne la
-// découvrait qu'après l'avoir analysée, et ne la demandait qu'en posant le
-// premier texte. Avec `font-display: swap`, l'écran s'affichait ENTIER dans la
-// police de secours, puis tout se recomposait à l'arrivée de la vraie — chaque
-// libellé changeant de largeur d'un coup. C'est le même défaut que celui des
-// étapes, à l'ouverture. 24 Ko hébergés par nous : rien ne justifie de les
-// découvrir tard.
+// IL N'Y A PLUS DE POLICE DE TEXTE À ATTENDRE (29/08). C'était Manrope : le
+// navigateur ne la découvrait qu'après avoir analysé la feuille, et l'écran
+// s'affichait ENTIER dans la police de secours avant de tout recomposer à son
+// arrivée. On la préchargeait pour raccourcir l'attente ; depuis qu'on écrit
+// dans la police de la MACHINE, il n'y a plus d'attente du tout.
 const INDEX = lire('public/index.html');
-for (const police of ['manrope-latin-variable.woff2', 'olda-icones.woff2']) {
-  const re = new RegExp(`<link rel="preload" href="${police.replace('.', '\\.')}"[^>]*as="font"[^>]*crossorigin`);
-  assert.ok(re.test(INDEX), `${police} doit être préchargée, avec \`crossorigin\``);
-}
-// Et elles restent dans la coquille du service worker : préchargée mais non
-// mise de côté, la police repart du réseau à chaque ouverture hors ligne.
+// On lit le CODE, pas les commentaires : celui d'index.html CITE le nom de la
+// police retirée pour dire pourquoi elle l'a été.
+const sansCom = (h) => h.replace(/<!--[\s\S]*?-->/g, ' ');
+assert.ok(!/manrope/i.test(sansCom(INDEX)), 'plus de police de texte à précharger');
+assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/manrope-latin-variable.woff2')),
+  '… et son fichier ne dort plus dans public/');
+// LES ICÔNES, ELLES, RESTENT UNE WEBFONT : un nom absent s'y écrit en toutes
+// lettres, donc elle se précharge ET se met de côté.
+const re = /<link rel="preload" href="olda-icones\.woff2"[^>]*as="font"[^>]*crossorigin/;
+assert.ok(re.test(INDEX), 'olda-icones.woff2 doit être préchargée, avec `crossorigin`');
 const SW = lire('public/sw.js');
-for (const police of ['manrope-latin-variable.woff2', 'olda-icones.woff2']) {
-  assert.ok(SW.includes(`/${police}`), `${police} doit être dans la coquille hors ligne`);
-}
+assert.ok(SW.includes('/olda-icones.woff2'), 'olda-icones.woff2 doit être dans la coquille hors ligne');
+assert.ok(!/manrope/i.test(SW), 'la police de texte a quitté la coquille avec le fichier');
 
 console.log('✓ bascule : rien ne se vide avant d’avoir la suite, un seul mouvement, et il ne déplace rien');

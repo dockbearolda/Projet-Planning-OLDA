@@ -123,12 +123,9 @@ const COQUILLE = [
   // La police d'icônes : sans elle, toute la barre de navigation se réduit à la
   // première lettre de chaque icône.
   '/olda-icones.woff2',
-  // La police de texte. Absente, tout retombe sur Arial : lisible, mais le
-  // poste n'a plus la même tête d'une ouverture à l'autre.
-  '/manrope-latin-variable.woff2',
-  // (La police propre au rail est partie le 25/08 : une seule police pour
-  //  toute l'application, donc un fichier de moins dans la coquille.)
-  '/manifest.webmanifest',
+  // (La police de TEXTE a quitte la coquille le 29/08 : c'est desormais celle
+  //  de la machine — rien a telecharger, donc rien a mettre de cote.)
+'/manifest.webmanifest',
 ];
 
 self.addEventListener('install', (e) => {

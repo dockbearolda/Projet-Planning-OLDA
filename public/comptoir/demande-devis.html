@@ -24,14 +24,9 @@ try {
      à côté de la charte arrêtée par la direction le 29/07. Il n'a plus de
      couleurs à lui : il parle le vocabulaire de la maison.
      Servi par nous, comme tout le reste : rien ne vient d'un autre domaine. -->
-<!-- LA POLICE, DEMANDÉE AVANT LA FEUILLE ’UI LA NOMME. Le ’font-face vit
-     maintenant dans la feuille de l’écran : sans cette ligne, le navigateur ne
-     découvre Manrope qu’après avoir reçu ET analysé le CSS — un aller-retour
-     plus tard qu’avant. La page s’affiche alors en entier dans la police de
-     repli, puis TOUT se recompose. Préchargée, elle part en même temps que la
-     feuille. Le crossorigin est obligatoire même chez soi : une police se
-     charge en mode anonyme, et sans lui le préchargement est jeté. -->
-<link rel="preload" as="font" type="font/woff2" crossorigin href="../manrope-latin-variable.woff2">
+<!-- PLUS RIEN A TELECHARGER COTE TEXTE (29/08) : la police est celle de la
+     machine, declaree dans charte.css. Manrope, ses 24 Ko et son prechargement
+     sont partis ; voir charte.css pour la mesure qui l'a tranche. -->
 <link rel="stylesheet" href="../charte.css">
 <link rel="stylesheet" href="demande-devis.css">
 <title>Atelier OLDA — Demande de devis V20 Téléchargements contrôlés</title>
