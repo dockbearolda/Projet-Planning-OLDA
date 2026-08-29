@@ -137,3 +137,39 @@ assert.ok(/catch \(err\) \{ \/\* on ne sait pas : on recharge \*\/ \}/.test(rein
   'en cas de doute on RECHARGE : le formulaire du client précédent devant le suivant, jamais');
 
 console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’icône écrite, le menu sur le rail de son onglet');
+
+
+// ---------------------------------------------------------------------------
+// LA FICHE ATELIER PREND LA MÊME BOÎTE (29/08/2026)
+// ---------------------------------------------------------------------------
+// Elle s'ouvre à UN CLIC du planning, et elle était le seul écran à ne pas
+// prendre `--ctrl-h`. Elle en déclarait QUATRE, en nombres — 34, 40, 42, 44 —
+// pour dire une densité : un champ dans une bulle, un champ de colonne, un
+// contrôle de bandeau, un contrôle de barre. C'est exactement ce que la règle
+// du 27/08 interdit : ce qui peut être à la même hauteur l'est, et une hauteur
+// est un jeton, jamais un nombre.
+//
+// ELLE NE REDÉCLARE PAS L'ÉCHELLE NON PLUS. `--fa-lab: 14px`, `--fa-val: 17px`,
+// `--fa-titre: 21px` valaient exactement `--taille-note`, `--taille-texte` et
+// `--taille-titre` : trois nombres recopiés. Le jour où l'échelle bouge, un
+// écran recopié reste seul dans son coin — et ça ne se voit pas en le relisant,
+// seulement en le comparant à l'écran d'à côté.
+{
+  const FICHE = fs.readFileSync(path.join(RACINE, 'public/fiche-atelier.css'), 'utf8');
+  const jetons = FICHE.match(/^\s+--fa-[\w-]+:[^;]+;/gm) || [];
+  assert.ok(jetons.length, 'la fiche atelier déclare bien ses jetons');
+
+  for (const j of jetons.filter((x) => /--fa-h-/.test(x))) {
+    assert.match(j, /var\(--ctrl-h\)/,
+      `la fiche atelier écrit une hauteur de commande à la main : ${j.trim()}`);
+  }
+  for (const j of jetons.filter((x) => /--fa-(lab|val|fort|titre|min)\b/.test(x))) {
+    assert.match(j, /var\(--taille-/,
+      `la fiche atelier recopie un cran de l’échelle : ${j.trim()}`);
+  }
+  // Et elle n'en invente pas un cinquième : trois crans à l'écran, pas quatre.
+  const crans = new Set((FICHE.match(/--fa-\w+: var\((--taille-[\w-]+)\)/g) || [])
+    .map((m) => m.match(/--taille-[\w-]+/)[0]));
+  assert.ok(crans.size <= 3,
+    `la fiche atelier prend ${crans.size} crans de texte — deux par surface, trois au grand maximum`);
+}

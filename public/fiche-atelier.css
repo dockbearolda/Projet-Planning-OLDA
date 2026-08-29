@@ -35,33 +35,43 @@
   background: var(--voile);
 }
 .fa-carte {
-  /* Les cinq crans de cet ecran — l'echelle de la maison, 14 / 17 / 21.
-     Seul `--fa-min` reste hors echelle : une unite, un intitule de section.
-     Rien qui porte une valeur. */
-  --fa-min: 13px;      /* intitulé de section, unité, mention */
-  --fa-lab: 14px;      /* libellé de champ, bouton secondaire */
-  --fa-val: 17px;      /* la valeur qu'on lit et qu'on saisit */
-  --fa-fort: 21px;     /* un nombre qu'on cherche du regard : total, quantité */
-  --fa-titre: 21px;    /* le nom du client — même cran que `--fa-fort`, la
-                          hiérarchie se fait à la GRAISSE, pas au demi-pixel */
+  /* L'ECHELLE VIENT DE LA CHARTE, ELLE NE SE RECOPIE PAS (29/08).
+     Ces crans etaient ecrits en nombres — 13 / 14 / 17 / 21 — et trois d'entre
+     eux valaient EXACTEMENT les jetons de charte.css. Trois nombres recopies :
+     le jour ou l'echelle bouge, cet ecran-la reste seul dans son coin, et ca ne
+     se voit pas en le relisant — seulement en le comparant a l'ecran d'a cote.
+     `--fa-min` (13 px) disparait : c'etait un cinquieme cran hors echelle, pour
+     une unite et un intitule de section. Ils prennent le cran des libelles. */
+  --fa-lab: var(--taille-note);    /* libellé de champ, unité, mention */
+  --fa-val: var(--taille-texte);   /* la valeur qu'on lit et qu'on saisit */
+  --fa-fort: var(--taille-titre);  /* un nombre qu'on cherche : total, quantité */
+  --fa-titre: var(--taille-titre); /* le nom du client — même cran que
+                          `--fa-fort`, la hiérarchie se fait à la GRAISSE */
 
-  /* Quatre hauteurs de commande, et elles disent la densité : un champ posé
-     DANS une bulle (les faces), un champ de colonne, un contrôle de bandeau,
-     un contrôle de barre. Elles SORTENT du texte, elles ne s'écrivent pas :
-     17 × 1,375 + 2 × 7 + le trait = 39,4 → 40. */
-  --fa-h-pas: 34px;
-  --fa-h-champ: 40px;
-  --fa-h-bandeau: 42px;
-  --fa-h-barre: 44px;
+  /* UNE SEULE HAUTEUR DE COMMANDE, ET C'EST CELLE DE L'APPLICATION (29/08).
+     Il y en avait QUATRE ici — 34, 40, 42, 44 — pour dire une densité : un
+     champ dans une bulle, un champ de colonne, un contrôle de bandeau, un
+     contrôle de barre. Mais la règle du 27/08 dit l'inverse : tout ce qui peut
+     être à la même hauteur l'est, et une hauteur est un JETON, jamais un
+     nombre. `--ctrl-h` (50 px) est la boîte de tout ce qui se clique et se
+     remplit dans styles.css, clients.css, vente-directe.css et pont.js — cet
+     écran était le seul à ne pas la prendre, alors qu'il s'ouvre à un clic du
+     planning.
+     ÇA COÛTE DE LA HAUTEUR, et c'est le prix décidé : la fiche défile depuis le
+     28/08, elle n'a plus de plafond à tenir. */
+  --fa-h-pas: var(--ctrl-h);
+  --fa-h-champ: var(--ctrl-h);
+  --fa-h-bandeau: var(--ctrl-h);
+  --fa-h-barre: var(--ctrl-h);
   /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
      automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
      texte, elles se déclarent. */
   --fa-point: 7px;
   --fa-coche: 16px;
-  /* Le bouton d'annulation du message : plus court qu'une commande de barre,
-     parce qu'il vit DANS le message et n'a pas à le grandir. */
-  --fa-h-undo: 30px;
-  --fa-sep-h: 28px;
+  /* DEUX HAUTEURS ONT DISPARU LE 29/08, elles ne se remplacent pas : elles se
+     DEDUISENT. Le bouton du message sort de son texte (14 × interligne + deux
+     pas + le trait reserve), le filet s'etire sur la rangee qui le porte. Un
+     nombre ecrit ici, c'est un nombre a maintenir. */
   /* L'encre du message est l'accent, donc son bouton se pose SUR l'accent :
      `--on-primary` en transparence. Écrit en blanc dur, il disparaîtrait de
      nuit — l'accent s'inverse, le blanc reste blanc. */
@@ -253,7 +263,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-col--d { gap: var(--pas-2); }
 .fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
 .fa-sec {
-  font-size: var(--fa-min); letter-spacing: .09em; text-transform: uppercase;
+  font-size: var(--fa-lab); letter-spacing: .09em; text-transform: uppercase;
   color: var(--text-3); font-weight: var(--graisse-forte);
 }
 .fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
@@ -426,7 +436,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-referent { flex: 0 0 auto; width: 190px; }
 /* Le trait qui sépare « ajouter la note » des deux actions qui engagent : il
    ne porte aucun mot, sa hauteur se déclare. */
-.fa-sep { width: 1px; height: var(--fa-sep-h); background: var(--border); margin: 0 2px; }
+/* LE FILET S'ÉTIRE SUR SA RANGÉE. Il portait 28 px écrits : le jour où la
+   rangée change de hauteur, il reste court et on ne sait pas pourquoi. */
+.fa-sep { width: 1px; align-self: stretch; background: var(--border); margin: var(--pas-1) 2px; }
 
 /* --- La confirmation et le message ---------------------------------------
    LA PASTILLE SE POSE DANS UN CALQUE, pas dans le champ : dans le champ, elle
@@ -436,7 +448,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   position: absolute;
   width: var(--fa-coche); height: var(--fa-coche); border-radius: var(--pilule);
   background: var(--primary); color: var(--surface);
-  font-size: var(--fa-min); line-height: var(--fa-coche); text-align: center;
+  font-size: var(--fa-lab); line-height: var(--fa-coche); text-align: center;
   animation: faFlagPop 1.1s var(--ease) both;
 }
 @keyframes faFlagPop {
@@ -455,8 +467,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   animation: faToastIn var(--dur-1) var(--ease) both;
 }
 .fa-toast__undo {
-  height: var(--fa-h-undo); padding: 0 var(--pas-2);
-  border: 0; border-radius: var(--arrondi-champ);
+  /* SA BOÎTE SORT DE SON TEXTE : 14 × 1,45 + 2 × 6 + le trait réservé ≈ 34 px.
+     Elle vit DANS le message et n'a pas à le grandir — c'est pour ça qu'elle ne
+     prend pas `--ctrl-h`, et c'est la seule commande de cet écran dans ce cas. */
+  padding: var(--pas-1) var(--pas-2); line-height: var(--ligne-texte);
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
   background: var(--fa-undo-fond); color: var(--surface);
   font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
   cursor: pointer;
