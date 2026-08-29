@@ -52,7 +52,7 @@ assert.ok(!/max-height/.test(RACINE_CSS),
 const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
-assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, bas, barreDetails\);/.test(JS)
+assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, barreDetails\);/.test(JS)
   && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
   'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
 // AUCUNE COLONNE NE DÉFILE POUR ELLE-MÊME : c'est exactement ce qui produisait
@@ -75,8 +75,14 @@ assert.ok(/ficheAtelierEl\.addEventListener\('click'/.test(APP)
 // jusqu'au 29/08 : elle mélangeait l'argent, le type de client, la provenance,
 // le poste de production et les documents. Chacun est parti dans sa zone, elle
 // ne porte plus que l'argent — et elle le dit.
-assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, bas, barreDetails\);/.test(JS),
-  'la bande « Paiement » vient après la barre des actions');
+assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, barreDetails\);/.test(JS),
+  'la bande « Paiement » ferme la carte');
+// LA BARRE D'ACTIONS BASSE A ÉTÉ RETIRÉE le 29/08 : cinq éléments sur une
+// rangée pleine largeur, dont un champ de 700 px, pour des gestes qui vivent
+// déjà ailleurs — la note dans « Informations », l'e-mail dans « Documents »,
+// et « Marquer payé » qui doublait la bascule « Soldé ».
+assert.ok(!/fa-bas/.test(JS) && !/'Ajouter la note'/.test(JS) && !/'Envoyer au client'/.test(JS),
+  'plus de barre d’actions basse');
 assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Paiement');
 
 // ---------------------------------------------------------------------------
@@ -109,9 +115,27 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
     'le poste de production vit dans la zone de production');
   // Le paiement : de l'argent, et rien d'autre.
   for (const attendu of ["rangee('Prix TTC', ligneTtc)", "rangee('Coût', chCout)",
-    "rangee('Paiement', segPaiement)", "rangee('Règlement', selReglement)"]) {
+    "rangee('Acompte', ligneAcompte)", "rangee('Règlement', selReglement)",
+    "rangee('Reste', ligneReste"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
+  // LE RESTE SE DÉDUIT, IL NE SE SAISIT PAS — et « soldé » vaut zéro quoi qu'il
+  // y ait dans les champs, sans quoi le mot ne veut rien dire.
+  assert.ok(/majReste = \(\) => \{/.test(PAIEMENT), 'le reste se calcule');
+  // ET IL SUIT LE PRIX, pas seulement l'acompte : vider le TTC laissait le
+  // reste sur l'ancien montant — le seul chiffre de l'écran qui doive être
+  // juste sans qu'on y pense.
+  assert.ok(/apres: \(\) => \{ majMarge\(\); majReste\(\); \}/.test(JS),
+    'changer le prix recalcule la marge ET le reste à payer');
+  assert.ok(/if \(r\.paye === true\) \{ resteV\.textContent = euros\(0\)/.test(PAIEMENT),
+    'un dossier soldé ne doit plus rien, quel que soit l’acompte saisi');
+  assert.ok(/if \(ttc == null\) \{ resteV\.textContent = '—'/.test(PAIEMENT),
+    'sans prix on ne déduit rien — on le dit, on n’affiche pas un montant faux');
+  // LES DEUX DRAPEAUX SUIVENT LE MONTANT : laissés à la main, ils restaient à
+  // NULL sur les vrais dossiers et le feu du planning se taisait (26/08 au soir).
+  assert.ok(/ctx\.patchLigne\('acompte_verse', verse\)/.test(PAIEMENT)
+    && /ctx\.patchLigne\('acompte_demande', verse\)/.test(PAIEMENT),
+    'un acompte versé est forcément un acompte demandé : les deux se déduisent');
   for (const intrus of ['selType', 'selProvenance', 'chProduction', 'docs.append']) {
     assert.ok(!PAIEMENT.includes(intrus), `${intrus} n’a rien à faire dans la zone Paiement`);
   }
@@ -140,7 +164,7 @@ assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×', \(\)
   'la croix ferme la fiche : c’est la seule sortie souris qui reste');
 assert.ok(/b\.addEventListener\('click', defaire\)/.test(JS),
   'mais le message garde son « Annuler » : sinon la pile devient inatteignable');
-for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details__b', '.fa-bas']) {
+for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details__b']) {
   const regle = CSS.match(new RegExp(`\\${zone} \\{[\\s\\S]*?\\n\\}`))[0];
   assert.ok(/flex-shrink: 0;/.test(regle),
     `${zone} ne se laisse pas comprimer : c'est du chrome fixe, pas de la place à prendre`);

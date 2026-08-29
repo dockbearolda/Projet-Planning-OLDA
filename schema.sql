@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS requests (
   acompte_demande boolean,
   acompte_verse   boolean,
   acompte_montant numeric(12,2),
+  acompte_date    date,
   paye            boolean,
   paiement_mode   text,                              -- 'cb' / 'especes' / 'virement' / 'cheque'
   flag            text,                              -- ALERTE : null / 'bloque' / 'a_voir' (posée par n'importe quel collaborateur)

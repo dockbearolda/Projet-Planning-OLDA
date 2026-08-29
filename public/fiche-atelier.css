@@ -314,15 +314,17 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
-.fa-creneau { width: 94px; flex: 0 0 94px; }
+.fa-date { width: 118px; flex: 0 0 118px; }
 /* LES DEUX GRILLES PRENNENT LE MEME RAIL D'INTITULE QUE LES RANGEES. Elles
    ecrivaient 90 px pendant que `.fa-row` prenait `--fa-lab-w` : les valeurs
    d'une grille et celles d'une rangee, dans la meme colonne, ne tombaient pas
    au meme endroit. Ca ne se voit pas en relisant un bloc, seulement en
    mesurant les deux. */
-.fa-grille-client { display: grid; grid-template-columns: var(--fa-lab-w) 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+/* QUATRE PISTES — intitule, valeur, intitule, valeur — comme la grille de
+   production. Elle en avait trois (un intitule, deux valeurs) : six champs y
+   descendaient sur six lignes, chacune avec 400 px de vide a droite. */
+.fa-grille-client { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
 .fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
-.fa-span2 { grid-column: span 2; }
 .fa-fort { font-weight: var(--graisse-note); }
 
 .fa-compte { margin-left: auto; flex-shrink: 0; font-size: var(--fa-lab); color: var(--text-2); }
@@ -340,14 +342,23 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
   padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
+/* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, comme tous les autres : meme cran,
+   meme graisse de note, meme encre. Elle etait en 800 — la seule etiquette de
+   l'ecran a crier plus fort que le mot « Tailles » qui la coiffe. */
 .fa-taille__k {
   flex-shrink: 0;
-  font-size: var(--fa-lab); font-weight: var(--graisse-forte); color: var(--text-2);
+  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2);
 }
+/* LA QUANTITE SE LIT A LA MEME TAILLE QUE TOUT LE RESTE (29/08). Elle etait au
+   cran d'ANNONCE (21 px) a cote d'une lettre de 14 : deux crans dans une boite
+   de 4 cm, pour un nombre qu'on vient corriger — pas annoncer. Elle prend le
+   cran de la valeur, comme les autres champs ; c'est la GRAISSE qui la fait
+   ressortir, pas le demi-pouce de plus. Le seul chiffre annonce de cette
+   colonne reste le TOTAL, qui lui se lit de loin. */
 .fa-nb {
   flex: 1; min-width: 0; height: var(--fa-h-champ);
   padding: 0; border: 0; background: transparent;
-  text-align: right; font-size: var(--fa-fort); font-weight: var(--graisse-forte);
+  text-align: right; font-size: var(--fa-val); font-weight: var(--graisse-forte);
 }
 .fa-nb:hover { background: transparent; }
 
@@ -476,21 +487,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-rappel-bloc:empty { display: none; }
 
-/* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
-.fa-bas {
-  flex-shrink: 0;
-  display: flex; align-items: center; gap: var(--pas-2);
-  padding: var(--pas-2) var(--pas-4);
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-}
-.fa-bas .fa-btn, .fa-bas .fa-in { height: var(--fa-h-barre); }
-.fa-note { flex: 1; min-width: 0; }
-.fa-referent { flex: 0 0 auto; width: 190px; }
-/* Le trait qui sépare « ajouter la note » des deux actions qui engagent : il
-   ne porte aucun mot, sa hauteur se déclare. */
-/* LE FILET S'ÉTIRE SUR SA RANGÉE. Il portait 28 px écrits : le jour où la
-   rangée change de hauteur, il reste court et on ne sait pas pourquoi. */
+/* --- ZONE 6 : LA BARRE D'ACTIONS BASSE A ETE RETIREE (29/08) --------------
+   Cinq elements sur une rangee pleine largeur, dont un champ de saisie de
+   700 px, pour des gestes qui vivent deja ailleurs — la note dans
+   « Informations », l'e-mail dans « Documents », et « Marquer paye » qui
+   doublait la bascule « Solde ». Il ne reste que le filet, qui sert au
+   bandeau. */
 .fa-sep { width: 1px; align-self: stretch; background: var(--border); margin: var(--pas-1) 2px; }
 
 /* --- La confirmation et le message ---------------------------------------
@@ -548,3 +550,31 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   .fa-travail { grid-template-columns: 1fr; }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
 }
+
+/* --- CE QUI EST PAYE, ET CE QU'IL RESTE (29/08) ---------------------------
+   « En un coup d'oeil on doit voir ce qui est paye et combien il reste a
+   payer ». Le reste est un CHIFFRE QU'ON ANNONCE, pas une valeur qu'on
+   saisit : il prend le cran de titre, comme le total des pieces — les deux
+   seuls de l'ecran. Et il ne se tape pas : il se deduit du prix et de
+   l'acompte. */
+.fa-reste {
+  display: flex; align-items: baseline; gap: var(--pas-2); min-width: 0;
+  height: var(--fa-h-champ); padding: 0 var(--pas-2);
+  border-radius: var(--arrondi-champ);
+}
+.fa-reste__k { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
+.fa-reste__v {
+  font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+/* L'ETAT SE DIT PAR LA COULEUR, et la couleur dit un ETAT — pas une
+   decoration. Solde : le vert de la charte. Entame : l'ambre, il reste quelque
+   chose. Entier : rien n'est tombe, l'encre courante suffit. */
+.fa-reste[data-etat="solde"] { background: var(--success-bg); }
+.fa-reste[data-etat="solde"] .fa-reste__v,
+.fa-reste[data-etat="solde"] .fa-reste__k { color: var(--success); }
+.fa-reste[data-etat="entame"] { background: var(--warning-bg); }
+.fa-reste[data-etat="entame"] .fa-reste__v,
+.fa-reste[data-etat="entame"] .fa-reste__k { color: var(--warning); }
+.fa-row--reste > .fa-duo { gap: var(--pas-3); }
+.fa-solde { flex: 0 0 auto; }

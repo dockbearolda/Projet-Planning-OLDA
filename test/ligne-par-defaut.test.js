@@ -123,7 +123,9 @@ assert.match(FICHE, /menu\(null, ctx\.types, r\.client_type/,
 assert.match(FICHE, /el\('label', 'fa-lab', 'Type'\), selType/,
   '… et il est nommé, dans la zone du client');
 assert.match(FICHE, /ctx\.employes/, 'le pilote se change toujours, dans la fiche');
-assert.match(FICHE, /ctx\.referents/, 'le référent aussi');
+// Le référent de NOTE est parti avec la barre basse le 29/08 ; le référent du
+// DOSSIER reste sur la ligne du planning (colonne « Qui suit »).
+assert.match(APP, /function respControl\(r\) \{/, 'le référent reste sur la ligne');
 assert.match(APP, /function respControl\(r\) \{/);
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,8 @@
+// « 1 250,50 € ». La fiche n'importe rien d'app.js — c'est ce qui lui permet
+// d'etre chargee, relue et testee seule (voir test/fiche-atelier.test.js).
+const euros = (n) => `${Number(n).toLocaleString('fr-FR',
+  { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+
 // ===========================================================================
 // LA FICHE ATELIER — 14 pouces, sans défilement (28/08/2026)
 // ===========================================================================
@@ -366,10 +371,15 @@ export function dessinerFicheAtelier(r, ctx) {
     return Number.isFinite(n) ? n : null;
   };
   const majMarge = () => { valMarge.textContent = texteMarge(nombreDe(chTtc.value), nombreDe(chCout.value)); };
+  // LE RESTE A PAYER SE DEDUIT DU PRIX, donc il se recalcule quand le prix
+  // bouge. Il est ecrit plus bas (zone Paiement, avec l'acompte) : on reserve
+  // sa place ici, sinon vider le prix laissait le reste sur l'ancien montant —
+  // le seul chiffre de l'ecran qui doive etre juste sans qu'on y pense.
+  let majReste = () => {};
   brancher(chTtc, {
     label: 'Valeur TTC', normaliser: normaliserMontant,
     envoyer: (v) => ctx.patchLigne('project_value', nombreDe(v)),
-    apres: majMarge,
+    apres: () => { majMarge(); majReste(); },
   });
   const marge = el('div', 'fa-marge');
   marge.append(el('span', 'fa-marge-k', 'marge'), valMarge);
@@ -415,26 +425,29 @@ export function dessinerFicheAtelier(r, ctx) {
     rappel.textContent = ctx.rappelDelai ? ctx.rappelDelai(isoRemise, heureRemise) : '';
   };
 
-  const chHeure = champ('fa-mini', fiche.heureSouhaitee || '', { label: 'Heure de remise', placeholder: 'heure' });
+  // UNE SEULE DATE ET UNE SEULE HEURE (29/08). Charlie : « ça c'est des
+  // doublons, seule la date et l'heure à laquelle le client veut venir chercher
+  // sa commande est importante ». Il y avait DEUX heures cote a cote — l'heure
+  // de remise (dans `fiche.heureSouhaitee`) et le creneau de retrait (colonne
+  // `retrait_creneau`) — pour le meme fait : quand le client passe.
+  // On garde `heureSouhaitee`, celle que le comptoir remplit ; `retrait_creneau`
+  // n'est plus lue par la fiche (la colonne reste, elle porte l'historique).
+  const chHeure = champ('fa-mini', fiche.heureSouhaitee || '', { label: 'Heure de retrait', placeholder: 'heure' });
   brancher(chHeure, {
-    label: 'Heure de remise', normaliser: normaliserHeure,
+    label: 'Heure de retrait', normaliser: normaliserHeure,
     envoyer: (v) => {
       heureRemise = v ? v.replace('h', ':') : null;
       ctx.patchFiche({ heureSouhaitee: heureRemise });
     },
     apres: majRappel,
   });
-  const remise = ligneDate('Remise au client', r.deadline, { court: 'Remise', requis: true, suite: [chHeure, rappel], apres: majRappel },
+  const remise = ligneDate('Retrait par le client', r.deadline,
+    { court: 'Retrait', requis: true, suite: [chHeure, rappel], apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
 
   const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, { court: 'Atelier' },
     (iso) => ctx.patchLigne('date_prevue', iso));
 
-  const chCreneau = champ('fa-creneau', r.retrait_creneau || '', { label: 'Créneau de retrait', placeholder: 'heure' });
-  brancher(chCreneau, {
-    label: 'Créneau de retrait', normaliser: normaliserHeure,
-    envoyer: (v) => ctx.patchLigne('retrait_creneau', v ? v.replace('h', ':') : null),
-  });
   majRappel();
 
   // « PREVU A L'ATELIER » A CHANGE DE COLONNE : c'est une date de PRODUCTION,
@@ -446,7 +459,6 @@ export function dessinerFicheAtelier(r, ctx) {
   blocDates.append(
     titreSection('Client'),
     remise.rangee,
-    rangee('Retrait', chCreneau),
   );
 
   const chClient = champ('fa-fort', r.billing_company || '', { label: 'Client', placeholder: 'Nom du client', requis: true });
@@ -471,12 +483,19 @@ export function dessinerFicheAtelier(r, ctx) {
     bouton('fa-btn fa-btn--mini', 'Email au client', () => ctx.email && ctx.email(r)),
   );
 
+  // DEUX PAIRES PAR LIGNE (29/08). Charlie : « ça doit tenir sur 2 lignes ».
+  // Six champs sur six lignes, chacune avec 400 px de vide a droite : la
+  // colonne descendait pour rien. La grille passe a quatre pistes — intitule,
+  // valeur, intitule, valeur — et les six tiennent sur trois lignes, dont les
+  // deux premieres portent tout ce qu'il demandait. Le telephone et la personne
+  // a joindre restent ensemble : c'est UN fait, « qui on appelle ».
   const blocClient = el('section', 'fa-groupe');
   const grilleClient = el('div', 'fa-grille-client');
   grilleClient.append(
     el('label', 'fa-lab', 'Client'), chClient,
-    el('label', 'fa-lab', 'Contact'), chTel, chPersonne,
     el('label', 'fa-lab', 'Qui suit'), selQui,
+    el('label', 'fa-lab', 'Contact'), chTel,
+    el('label', 'fa-lab', 'Personne'), chPersonne,
     // VENUS DU PANNEAU DU BAS (29/08) : ils disent QUI est en face, pas
     // comment il paie. Ils etaient coinces entre le mode de reglement et le
     // champ de production.
@@ -487,10 +506,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // menu pose seul apres son intitule n'en remplit que deux, et l'intitule
   // suivant part dans la troisieme colonne — c'est ce qui a jete « Provenance »
   // sur sa propre ligne, sous sa valeur.
-  chClient.classList.add('fa-span2');
-  selQui.classList.add('fa-span2');
-  selType.classList.add('fa-span2');
-  selProvenance.classList.add('fa-span2');
+
   blocClient.append(grilleClient);
 
   // LES NOTES REMPLISSENT LA HAUTEUR QUI RESTE — quand il y en a. Sur le 14
@@ -661,26 +677,86 @@ export function dessinerFicheAtelier(r, ctx) {
   // unes sous les autres sur 1 126 px de large, dont trois qui etiraient un
   // menu de trois lettres sur 1 010 px. Le panneau declarait « deux colonnes »
   // et n'en rendait qu'une.
+  // LES RANGEES ENTRENT DIRECTEMENT DANS LA GRILLE DU PANNEAU (29/08). Elles
+  // vivaient dans une colonne qui prenait les deux pistes : six rangees les
+  // unes sous les autres sur 1 126 px de large, dont trois qui etiraient un
+  // menu de trois lettres sur 1 010 px. Le panneau declarait « deux colonnes »
+  // et n'en rendait qu'une.
   const rangeesPanneau = [];
-  const bascules = [
-    ['acompte_demande', 'Acompte demandé'],
-    ['acompte_verse', 'Acompte versé'],
-    ['paye', 'Soldé'],
-  ].map(([cle, mot]) => {
-    const b = bouton('fa-seg__b', mot);
-    b.setAttribute('aria-pressed', String(r[cle] === true));
-    b.addEventListener('click', () => {
-      const ancien = r[cle] === true;
-      r[cle] = !ancien;
-      b.setAttribute('aria-pressed', String(r[cle]));
-      ctx.patchLigne(cle, r[cle]);
-      empiler(() => { r[cle] = ancien; b.setAttribute('aria-pressed', String(ancien)); ctx.patchLigne(cle, ancien); });
-      coche(b); pulser(); dire(`Enregistré — ${mot}`);
-    });
-    return b;
+
+  // =========================================================================
+  // CE QUI EST PAYE, ET CE QU'IL RESTE — d'un coup d'oeil (29/08)
+  // =========================================================================
+  // Charlie : « tu conserves reference et paye et tu ajoutes acompte paye avec
+  // le prix de l'acompte verse a la date, et que ca se deduise automatiquement ;
+  // en un coup d'oeil on doit voir ce qui est paye et combien il reste a payer ».
+  //
+  // Il y avait TROIS BASCULES — acompte demande, acompte verse, solde — et
+  // aucun montant. Trois oui/non pour une question qui appelle un chiffre : on
+  // savait qu'un acompte etait tombe, jamais combien, ni quand, ni ce qui
+  // restait. Le reste a payer se faisait de tete, a chaque appel.
+  //
+  // UN SEUL FAIT SE SAISIT : le montant de l'acompte et sa date. Les deux
+  // drapeaux s'en deduisent — un acompte VERSE a forcement ete DEMANDE — et
+  // c'est ce qui garde le feu du planning juste sans qu'on ait a cocher.
+  const chAcompte = champ('fa-cout', r.acompte_montant == null ? '' : normaliserMontant(r.acompte_montant), {
+    label: 'Acompte versé', placeholder: '0,00 €',
   });
-  const segPaiement = el('div', 'fa-seg');
-  segPaiement.append(...bascules);
+  const chAcompteDate = champ('fa-date', r.acompte_date
+    ? jourCourt(new Date(`${String(r.acompte_date).slice(0, 10)}T12:00:00`)) : '', {
+    label: 'Date de l’acompte', placeholder: 'le…',
+  });
+  const resteV = el('span', 'fa-reste__v', '—');
+  const resteK = el('span', 'fa-reste__k', 'reste à payer');
+  const reste = el('div', 'fa-reste');
+  reste.append(resteK, resteV);
+
+  // LE RESTE SE CALCULE, IL NE SE SAISIT PAS. Solde => zero, quoi qu'il y ait
+  // dans les champs : c'est la seule facon que « solde » veuille dire quelque
+  // chose. Sans prix, on ne peut rien deduire — on le dit au lieu d'afficher
+  // un montant faux.
+  majReste = () => {
+    const ttc = nombreDe(chTtc.value);
+    const av = nombreDe(chAcompte.value) || 0;
+    if (r.paye === true) { resteV.textContent = euros(0); reste.dataset.etat = 'solde'; resteK.textContent = 'soldé'; return; }
+    resteK.textContent = 'reste à payer';
+    if (ttc == null) { resteV.textContent = '—'; reste.dataset.etat = 'inconnu'; return; }
+    const du = Math.round((ttc - av) * 100) / 100;
+    resteV.textContent = euros(du);
+    reste.dataset.etat = du <= 0 ? 'solde' : (av > 0 ? 'entame' : 'entier');
+  };
+
+  brancher(chAcompte, {
+    label: 'Acompte versé', normaliser: normaliserMontant,
+    envoyer: (v) => {
+      const n = nombreDe(v);
+      ctx.patchLigne('acompte_montant', n);
+      // LES DEUX DRAPEAUX SUIVENT LE MONTANT. Le feu du planning les lit ;
+      // laisses a la main, ils restaient a NULL sur les vrais dossiers et le
+      // feu se taisait — c'est le defaut du 26/08 au soir.
+      const verse = n != null && n > 0;
+      if ((r.acompte_verse === true) !== verse) { r.acompte_verse = verse; ctx.patchLigne('acompte_verse', verse); }
+      if ((r.acompte_demande === true) !== verse) { r.acompte_demande = verse; ctx.patchLigne('acompte_demande', verse); }
+    },
+    apres: majReste,
+  });
+  brancher(chAcompteDate, {
+    label: 'Date de l’acompte',
+    normaliser: (v) => normaliserDate(v, ctx.aujourdhui && ctx.aujourdhui()),
+    envoyer: (n) => ctx.patchLigne('acompte_date', n.iso),
+  });
+
+  const bSolde = bouton('fa-seg__b fa-solde', 'Soldé');
+  bSolde.setAttribute('aria-pressed', String(r.paye === true));
+  bSolde.addEventListener('click', () => {
+    const ancien = r.paye === true;
+    r.paye = !ancien;
+    bSolde.setAttribute('aria-pressed', String(r.paye));
+    ctx.patchLigne('paye', r.paye);
+    empiler(() => { r.paye = ancien; bSolde.setAttribute('aria-pressed', String(ancien)); ctx.patchLigne('paye', ancien); majReste(); });
+    coche(bSolde); pulser(); dire(r.paye ? 'Enregistré — soldé' : 'Enregistré — non soldé');
+    majReste();
+  });
 
   const selReglement = menu(null, ctx.reglements, r.paiement_mode || '', 'Mode de règlement');
   brancher(selReglement, { label: 'Mode de règlement', envoyer: (v) => ctx.patchLigne('paiement_mode', v || null) });
@@ -696,11 +772,16 @@ export function dessinerFicheAtelier(r, ctx) {
   // se lit du TTC et du coût, les trois se relisent d'un coup.
   const ligneTtc = el('div', 'fa-duo');
   ligneTtc.append(chTtc, marge);
+  const ligneAcompte = el('div', 'fa-duo');
+  ligneAcompte.append(chAcompte, el('label', 'fa-lab', 'le'), chAcompteDate);
+  const ligneReste = el('div', 'fa-duo');
+  ligneReste.append(reste, bSolde);
   rangeesPanneau.push(
     rangee('Prix TTC', ligneTtc),
     rangee('Coût', chCout),
-    rangee('Paiement', segPaiement),
+    rangee('Acompte', ligneAcompte),
     rangee('Règlement', selReglement),
+    rangee('Reste', ligneReste, undefined, 'fa-row--reste'),
   );
   panneau.append(...rangeesPanneau);
 
@@ -725,39 +806,22 @@ export function dessinerFicheAtelier(r, ctx) {
   );
 
   // =========================================================================
-  // ZONE 6 — la barre d'actions basse
+  // ZONE 6 — LA BARRE D'ACTIONS BASSE A ETE RETIREE (29/08)
   // =========================================================================
-  const bas = el('footer', 'fa-bas');
-  const chNote = champ('fa-note', '', {
-    label: 'Note',
-    placeholder: 'Ajouter une note de production, une information client ou un point de contrôle…',
-  });
-  const selReferent = menu('fa-referent', ctx.referents, r.referent || '', 'Référent de la note');
-  brancher(selReferent, { label: 'Référent', envoyer: (v) => ctx.patchLigne('referent', v || null) });
-  bas.append(
-    chNote,
-    selReferent,
-    bouton('fa-btn', 'Ajouter la note', () => {
-      const texte = chNote.value.trim();
-      if (!texte) { dire('Rien à ajouter — la note est vide', false); return; }
-      ctx.ajouterNote(texte);
-      chNote.value = '';
-      pulser();
-      dire('Note ajoutée', false);
-    }),
-    el('div', 'fa-sep'),
-    bouton('fa-btn', 'Envoyer au client', () => ctx.email && ctx.email(r)),
-    bouton('fa-btn', 'Marquer payé', () => {
-      if (r.paye === true) { dire('Déjà soldé', false); return; }
-      r.paye = true;
-      bascules[2].setAttribute('aria-pressed', 'true');
-      ctx.patchLigne('paye', true);
-      empiler(() => { r.paye = false; bascules[2].setAttribute('aria-pressed', 'false'); ctx.patchLigne('paye', false); });
-      pulser(); dire('Marqué payé');
-    }),
-  );
+  // Charlie, en designant le champ de note, le referent, « Ajouter la note » et
+  // « Envoyer au client » : « tout ca prend de la place pour rien, tu conserves
+  // reference et paye ». Cinq elements sur une rangee pleine largeur, dont un
+  // champ de saisie de 700 px, pour des gestes qui vivent deja ailleurs :
+  //   · la note s'ecrit dans « Informations », dans la zone Client ;
+  //   · l'e-mail au client est dans « Documents », meme zone ;
+  //   · « Marquer paye » doublait la bascule « Solde » de la zone Paiement.
+  // Ce qui reste : la reference du dossier, en pied de carte, et le paiement,
+  // dans sa zone. CE QUI DISPARAIT AVEC ELLE : la note HORODATEE et signee d'un
+  // referent (`ctx.ajouterNote`). Le champ « Informations » garde le texte
+  // libre ; il ne pose pas l'heure ni le prenom.
 
   majMarge();
+  majReste();
   // LA BANDE « DETAILS » EST LA DERNIERE LIGNE (28/08) : c'est un depliant
   // secondaire, il se pose SOUS la barre des actions courantes. Le panneau,
   // lui, reste un calque cale au-dessus des deux — il n'en couvre aucune.
@@ -783,7 +847,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // ligne. Elle vivait au bout du panneau du bas ; elle se pose en pied de
   // carte, là où on la lit sans la chercher.
   const rappelDossier = el('div', 'fa-rappel-bloc', ctx.rappelDossier || '');
-  carte.append(tete, bandeau, scene, rappelDossier, bas, barreDetails);
+  carte.append(tete, bandeau, scene, rappelDossier, barreDetails);
   racine.append(carte, calque, zoneToast);
   return racine;
 }

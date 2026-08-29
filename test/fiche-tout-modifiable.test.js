@@ -139,9 +139,13 @@ assert.ok(!/Enregistrer les modifications/.test(APP + FICHE),
 // UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE.
 assert.ok(/addEventListener\('blur'/.test(FICHE),
   'quitter un champ l’enregistre');
-// LA NOTE GARDE SON GESTE : elle s'AJOUTE aux informations.
-assert.ok(/'Ajouter la note'/.test(FICHE) && /ctx\.ajouterNote\(texte\)/.test(FICHE),
-  'la note a son bouton, et elle s’ajoute');
+// LA NOTE HORODATÉE A DISPARU AVEC LA BARRE BASSE (29/08). Charlie, en
+// désignant le champ, le référent et ses deux boutons : « tout ça prend de la
+// place pour rien ». Ce qui reste : le champ « Informations » de la zone
+// Client, qui porte le texte libre — sans l'heure ni le prénom.
+assert.ok(!/ctx\.ajouterNote\(/.test(FICHE), 'la barre de note a bien été retirée');
+assert.ok(/label: 'Informations'/.test(FICHE) && /ctx\.patchLigne\('description'/.test(FICHE),
+  '… mais on écrit toujours une information sur le dossier');
 
 // ---------------------------------------------------------------------------
 // 6. LE SERVEUR : l'identité s'écrit, une face s'ajoute et se retire

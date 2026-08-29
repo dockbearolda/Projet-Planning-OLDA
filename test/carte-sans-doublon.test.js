@@ -61,7 +61,10 @@ assert.match(CARTE, /attachTip\(delaiEl, `À terminer avant \$\{d\.echeanceTexte
 // La fiche, elle, l'écrit en toutes lettres — dans fiche-atelier.js depuis que
 // le tiroir a été retiré (29/08) : le champ « Remise au client » porte la date
 // en clair, et se corrige sur place.
-assert.match(FICHE, /ligneDate\('Remise au client'/,
+// Depuis le 29/08 la date porte le nom du geste qu'elle décrit : le RETRAIT.
+// Il y avait deux heures côte à côte — l'heure de remise et le créneau de
+// retrait — pour le même fait : quand le client passe prendre sa commande.
+assert.match(FICHE, /ligneDate\('Retrait par le client'/,
   'la fiche, elle, l’écrit en toutes lettres — et elle se corrige');
 // Deux `.pcard__sub` au plus dans une carte : la remise, et le motif d'alerte
 // n'en est pas un. Trois, c'était l'empilement d'avant.

@@ -215,7 +215,7 @@ const PATCHABLE = [
   'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline', 'position',
   'flag', 'flag_reason', 'provenance', 'date_prevue', 'retrait_creneau',
-  'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
+  'acompte_demande', 'acompte_verse', 'acompte_montant', 'acompte_date', 'paye', 'paiement_mode',
   'cout_revient',
 ];
 
@@ -245,7 +245,7 @@ const CAPACITE_PAR_CHAMP = {
   // SOUHAITÉE (`deadline`) est une promesse au client, donc à la boutique.
   date_prevue: 'production',
   project_value: 'argent', acompte_demande: 'argent', acompte_verse: 'argent',
-  acompte_montant: 'argent', paye: 'argent', paiement_mode: 'argent',
+  acompte_montant: 'argent', acompte_date: 'argent', paye: 'argent', paiement_mode: 'argent',
   // Le coût de revient est d'un cran au-dessus du prix : le prix se négocie
   // devant le client, le coût dit ce que l'atelier gagne. Direction seule.
   cout_revient: 'marge',
@@ -364,6 +364,9 @@ function validateField(key, value) {
       if (!Number.isFinite(n)) return { ok: false, error: 'position doit être numérique' };
       return { ok: true, value: n };
     }
+    // MEME RECETTE QUE `deadline` : une date bien formee mais inexistante
+    // (« 2026-02-30 ») partirait telle quelle vers une colonne `date`.
+    case 'acompte_date':
     case 'deadline': {
       if (value === '') return { ok: true, value: null };
       // Une date bien formée mais inexistante (« 2026-02-30 ») partait telle
@@ -703,7 +706,7 @@ const exige = (capacite) => (req, res, next) => {
 // opérateur qui ouvre les outils de son navigateur ne doit pas trouver le prix
 // dans la réponse réseau. Le patron l'écrit noir sur blanc pour ce rôle-là.
 const CHAMPS_ARGENT = ['project_value', 'acompte_demande', 'acompte_verse',
-  'acompte_montant', 'paye', 'paiement_mode', 'cout_revient'];
+  'acompte_montant', 'acompte_date', 'paye', 'paiement_mode', 'cout_revient'];
 
 // LE COÛT EST D'UN CRAN AU-DESSUS DU PRIX. La boutique doit voir le prix — elle
 // le négocie et encaisse l'acompte — mais ce que l'atelier GAGNE sur chaque
@@ -1262,7 +1265,7 @@ const COLONNES_REQUEST = [
   'id', 'stage', 'sub_stage', 'order_kind', 'responsable', 'referent', 'priority',
   'client_type', 'billing_company', 'contact_referent', 'contact_phone', 'contact_email',
   'quantity', 'product', 'color', 'project_value', 'description', 'deadline',
-  'acompte_demande', 'acompte_verse', 'acompte_montant', 'paye', 'paiement_mode',
+  'acompte_demande', 'acompte_verse', 'acompte_montant', 'acompte_date', 'paye', 'paiement_mode',
   'flag', 'flag_reason', 'position', 'fiche', 'created_at', 'updated_at',
   // Un identifiant, donc 36 octets par ligne — et il gagne sa place : c'est lui
   // qui dit à la grille qu'une ligne appartient à un DOSSIER, donc qu'il y a une

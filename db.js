@@ -277,10 +277,18 @@ async function init() {
   // Toutes nullables et sans valeur par défaut : une ligne d'avant cette
   // migration n'affirme rien plutôt que d'affirmer « non payé » à tort.
   // Down : ALTER TABLE requests DROP COLUMN IF EXISTS <col> pour chacune.
+  //
+  // `acompte_date` (29/08) : LA DATE DU VERSEMENT. Charlie : « tu ajoutes
+  // acompte payé avec le prix de l'acompte versé à la date ». Un acompte sans
+  // sa date ne dit pas si l'argent est arrivé cette semaine ou en juin — et
+  // c'est la question qu'on se pose en relançant un client. Nullable : une
+  // ligne d'avant n'affirme rien.
+  // Down : ALTER TABLE requests DROP COLUMN IF EXISTS acompte_date;
   for (const [col, type] of [
     ['acompte_demande', 'boolean'],
     ['acompte_verse', 'boolean'],
     ['acompte_montant', 'numeric(12,2)'],
+    ['acompte_date', 'date'],
     ['paye', 'boolean'],
     ['paiement_mode', 'text'],
   ]) {
