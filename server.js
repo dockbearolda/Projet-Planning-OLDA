@@ -14,6 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
+const zlib = require('node:zlib');
 const compression = require('compression');
 // LE PRIX SUIT LA QUANTITÉ (Charlie, 28/08). Le moteur du comptoir, rejoué ici :
 // corriger « 30 S » en « 100 S » sur la ligne du planning doit appliquer le
@@ -5057,40 +5058,81 @@ const NO_CACHE = /\.(html|js|css|webmanifest|svg|woff2)$/;
 // modifié se resert dépouillé à neuf sans redémarrer. Il est BORNÉ par le
 // nombre de fichiers du dossier, pas par le trafic.
 const { depouiller } = require('./depouiller.js');
-const DEPOUILLABLE = /\.(js|css)$/;
+
+// LE HTML EN FAIT PARTIE DEPUIS LE 29/08. Il était le dernier à partir entier :
+// `index.html` portait 12 Ko de prose sur 27 — et c'est la PREMIÈRE requête d'un
+// poste, celle qui bloque la découverte de tout le reste. Les deux écrans du
+// comptoir en portaient bien plus, dans des blocs `<style>` et `<script>` en
+// ligne qu'aucun des deux autres dépouilleurs n'atteignait : 209 Ko pour
+// `demande-devis.html`. Les trois pèsent 111 Ko compressés, ils en pèsent 60.
+const DEPOUILLABLE = /\.(js|css|html)$/;
+const TYPE_MIME = { css: 'text/css', html: 'text/html; charset=utf-8', js: 'text/javascript' };
+const genre = (chemin) => (chemin.endsWith('.css') ? 'css' : chemin.endsWith('.html') ? 'html' : 'js');
+
+// UNE ENTRÉE PAR CHEMIN, PAS UNE SEULE EN TOUT. Le cache se vidait avant chaque
+// écriture : il ne contenait donc jamais qu'un fichier, et un poste qui ouvre
+// l'application en demande seize d'un coup. Chaque ouverture redépouillait donc
+// TOUT — 27 ms de calcul et 1 Mo de lecture disque à chaque fois, sur le seul
+// conteneur qui sert tout l'atelier. Le cache est maintenant borné par le
+// nombre de fichiers du dossier, ce que son commentaire promettait déjà.
 const depouilles = new Map();
 
-function servirDepouille(res, chemin, stat) {
-  const cle = `${chemin}:${stat.size}:${stat.mtimeMs}`;
-  let corps = depouilles.get(cle);
-  if (corps === undefined) {
-    const src = fs.readFileSync(chemin, 'utf8');
-    corps = depouiller(src, chemin.endsWith('.css') ? 'css' : 'js');
-    depouilles.clear();               // une seule version en vol : la dernière
-    depouilles.set(cle, corps);
+// BROTLI. `compression` ne connaît que gzip ; sur le boot complet, brotli rend
+// 110 Ko là où gzip en rend 121. On ne le fait QUE sur ces fichiers-là (ils
+// sont 100 % du poids d'ouverture) et le résultat est mis de côté avec le
+// corps, donc le calcul n'a lieu qu'une fois par version de fichier.
+// QUALITÉ 9, PAS 11 : 11 descendrait à 102 Ko, mais coûterait 395 ms de calcul
+// bloquant au premier appel après un déploiement — sur un conteneur unique,
+// c'est tout l'atelier qui attend. 9 coûte 15 ms pour 9 Ko de moins que gzip.
+const BROTLI = { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } };
+
+function servirDepouille(req, res, chemin, stat) {
+  const cle = `${stat.size}:${stat.mtimeMs}`;
+  let entree = depouilles.get(chemin);
+  if (!entree || entree.cle !== cle) {
+    const corps = depouiller(fs.readFileSync(chemin, 'utf8'), genre(chemin));
+    entree = { cle, corps, br: null };
+    depouilles.set(chemin, entree);
   }
   // L'ETAG DOIT SUIVRE LE CORPS SERVI, pas le fichier sur le disque : sinon un
   // poste qui a l'ancienne version en cache reçoit un 304 pour un contenu qui
   // a changé, et garde du code périmé — exactement le mal que `no-cache`
   // existe pour empêcher.
-  res.setHeader('ETag', `W/"d-${Buffer.byteLength(corps)}-${Math.round(stat.mtimeMs)}"`);
+  const taille = Buffer.byteLength(entree.corps);
   res.setHeader('Cache-Control', 'no-cache');
-  res.type(chemin.endsWith('.css') ? 'text/css' : 'text/javascript');
-  res.send(corps);
+  res.setHeader('Vary', 'Accept-Encoding');
+  res.type(TYPE_MIME[genre(chemin)]);
+
+  if (/\bbr\b/.test(String(req.headers['accept-encoding'] || ''))) {
+    if (!entree.br) entree.br = zlib.brotliCompressSync(Buffer.from(entree.corps), BROTLI);
+    // L'EMPREINTE PORTE L'ENCODAGE. Deux corps différents sous une même
+    // empreinte, et un cache intermédiaire rend le gzip à qui demandait brotli.
+    res.setHeader('ETag', `W/"d-${taille}-${Math.round(stat.mtimeMs)}-br"`);
+    res.setHeader('Content-Encoding', 'br');
+    res.send(entree.br);
+    return;
+  }
+  res.setHeader('ETag', `W/"d-${taille}-${Math.round(stat.mtimeMs)}"`);
+  res.send(entree.corps);
 }
 
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-  if (!DEPOUILLABLE.test(req.path)) return next();
+  // `/` EST `index.html`. C'est l'adresse que tapent les postes, et c'est
+  // `express.static` qui la servait — en amont de la route `/` posée plus bas,
+  // et sans passer par ici. Le fichier le plus lu de l'application était donc le
+  // seul à repartir avec ses 12 Ko de prose.
+  const voulu = req.path.endsWith('/') ? `${req.path}index.html` : req.path;
+  if (!DEPOUILLABLE.test(voulu)) return next();
   // `path.join` normalise `..` : on vérifie ensuite qu'on n'est pas sorti de
   // `public/`, sans quoi une adresse fabriquée lirait n'importe quel fichier.
   const racine = path.join(__dirname, 'public');
-  const chemin = path.join(racine, decodeURIComponent(req.path));
+  const chemin = path.join(racine, decodeURIComponent(voulu));
   if (!chemin.startsWith(racine + path.sep)) return next();
   let stat;
   try { stat = fs.statSync(chemin); } catch (_) { return next(); }
   if (!stat.isFile()) return next();
-  try { servirDepouille(res, chemin, stat); } catch (_) { return next(); }
+  try { servirDepouille(req, res, chemin, stat); } catch (_) { return next(); }
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -5098,6 +5140,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     if (NO_CACHE.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
   },
 }));
+// Filet : si le dépouillage a renoncé, la racine reste servie telle quelle.
 app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

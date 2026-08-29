@@ -210,6 +210,104 @@ function depouillerCss(src) {
   return out;
 }
 
+// --- HTML ------------------------------------------------------------------
+// Le HTML etait le dernier a partir entier : `index.html` porte 12 Ko de prose
+// sur 27, et les deux ecrans du comptoir en portent bien plus dans leurs blocs
+// `<style>` et `<script>` en ligne, que ni depouillerCss ni depouillerJs
+// n'atteignaient. Or `index.html` est la PREMIERE requete d'un poste : c'est
+// elle qui bloque la decouverte de tout le reste.
+//
+// UN COMMENTAIRE NE S'OUVRE JAMAIS AU MILIEU D'UNE BALISE. C'est la seule
+// protection qui compte : sans elle, un `<!--` ecrit dans un attribut ferait
+// avaler du vrai balisage jusqu'au prochain `-->`. On recopie donc chaque
+// balise d'un bloc, guillemets compris, et on ne cherche `<!--` qu'entre deux
+// balises.
+//
+// ET LE CONTENU DE `<script>` / `<style>` N'EST PAS DU HTML. Un `<!--` y vit
+// tres bien dans une chaine ; on remet donc ces blocs a depouillerJs et
+// depouillerCss, qui savent ou ils sont. Un `<script src=...>` n'a pas de
+// contenu, et un `<script type="application/json">` n'est pas du JavaScript :
+// tous deux passent intacts.
+const BRUTES = new Set(['script', 'style']);
+
+// Les seuls types de `<script>` que depouillerJs a le droit de toucher.
+const TYPES_JS = new Set(['', 'module', 'text/javascript', 'application/javascript']);
+
+// La fin de la balise ouverte en `i`, guillemets d'attributs respectes : un
+// `>` entre guillemets ne ferme rien.
+function finDeBalise(src, i) {
+  let j = i + 1;
+  const n = src.length;
+  while (j < n) {
+    const c = src[j];
+    if (c === '"' || c === "'") {
+      const q = src.indexOf(c, j + 1);
+      if (q === -1) return -1;
+      j = q + 1;
+      continue;
+    }
+    if (c === '>') return j;
+    j++;
+  }
+  return -1;
+}
+
+const nomDeBalise = (balise) => (balise.match(/^<\/?([a-zA-Z][\w-]*)/) || ['', ''])[1].toLowerCase();
+
+const attribut = (balise, nom) => {
+  const m = balise.match(new RegExp(`\\s${nom}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+  return m ? (m[2] !== undefined ? m[2] : m[3] !== undefined ? m[3] : m[4]) : null;
+};
+
+function depouillerHtml(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+
+  while (i < n) {
+    if (src[i] !== '<') { out += src[i]; i++; continue; }
+
+    // --- un commentaire, et on n'est pas dans une balise ---------------------
+    if (src.startsWith('<!--', i)) {
+      const fin = src.indexOf('-->', i + 4);
+      const j = fin === -1 ? n : fin + 3;
+      out += memesSautsDeLigne(src.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    // --- une balise : recopiee telle quelle ---------------------------------
+    const fin = finDeBalise(src, i);
+    if (fin === -1) { out += src.slice(i); break; }
+    const balise = src.slice(i, fin + 1);
+    out += balise;
+    i = fin + 1;
+
+    // Une balise FERMANTE n'ouvre rien. `</script>` porte pourtant le meme nom
+    // que `<script>` : pris pour une ouverture, il faisait avaler tout le
+    // document jusqu'au `<script>` suivant — index.html sortait intact, et le
+    // filet le disait « stable » puisque plus rien n'y restait a retirer.
+    const nom = nomDeBalise(balise);
+    if (balise.startsWith('</') || !BRUTES.has(nom) || balise.endsWith('/>')) continue;
+
+    // --- le contenu d'un `<script>` ou d'un `<style>` -----------------------
+    const bas = src.toLowerCase();
+    let ferm = bas.indexOf(`</${nom}`, i);
+    if (ferm === -1) ferm = n;
+    const contenu = src.slice(i, ferm);
+    if (nom === 'style') {
+      out += depouillerCss(contenu);
+    } else if (attribut(balise, 'src') === null
+               && TYPES_JS.has(String(attribut(balise, 'type') || '').toLowerCase())) {
+      out += depouillerJs(contenu);
+    } else {
+      out += contenu;
+    }
+    i = ferm;
+  }
+  return out;
+}
+
 // LE FILET. Un dépouillage qui se trompe ne doit JAMAIS sortir : on vérifie que
 // le résultat porte exactement les mêmes délimiteurs que la source une fois ses
 // commentaires ignorés — mêmes accents graves, mêmes guillemets, mêmes
@@ -222,8 +320,16 @@ function memeSquelette(depouille, type) {
   // On compare le dépouillé à LUI-MÊME re-dépouillé : un passage stable prouve
   // qu'il ne reste plus rien à retirer, donc qu'aucun délimiteur n'a été avalé
   // en cours de route.
-  const encore = type === 'css' ? depouillerCss(depouille) : depouillerJs(depouille);
+  const encore = type === 'css' ? depouillerCss(depouille)
+    : type === 'html' ? depouillerHtml(depouille)
+      : depouillerJs(depouille);
   if (encore !== depouille) return false;
+  // LE COMPTE DE DÉLIMITEURS NE VAUT PAS EN HTML : nos commentaires sont de la
+  // prose française, pleine d'apostrophes et de parenthèses, et leur départ
+  // fait légitimement chuter les comptes. Ce qui protège le HTML est ailleurs —
+  // un commentaire ne peut pas s'ouvrir au milieu d'une balise (voir
+  // depouillerHtml), donc aucun balisage ne peut être avalé.
+  if (type === 'html') return true;
   for (const d of DELIMITEURS) {
     const a = (depouille.match(new RegExp(`\\${d}`, 'g')) || []).length;
     const b = (encore.match(new RegExp(`\\${d}`, 'g')) || []).length;
@@ -235,7 +341,9 @@ function memeSquelette(depouille, type) {
 // Dépouille `src`, ou rend la source intacte si quoi que ce soit cloche.
 function depouiller(src, type) {
   try {
-    const sortie = type === 'css' ? depouillerCss(src) : depouillerJs(src);
+    const sortie = type === 'css' ? depouillerCss(src)
+      : type === 'html' ? depouillerHtml(src)
+        : depouillerJs(src);
     if (!sortie || !memeSquelette(sortie, type)) return src;
     // Les sauts de ligne doivent être au compte exact : c'est ce qui garde les
     // numéros de ligne alignés sur la source.
@@ -247,4 +355,4 @@ function depouiller(src, type) {
   }
 }
 
-module.exports = { depouiller, depouillerJs, depouillerCss };
+module.exports = { depouiller, depouillerJs, depouillerCss, depouillerHtml };

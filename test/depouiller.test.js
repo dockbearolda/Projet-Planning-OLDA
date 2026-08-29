@@ -176,3 +176,104 @@ const gain = Math.round((avantKo - apresKo) / 1024);
 assert.ok(gain > 150, `le gain doit dépasser 150 Ko compressés, mesuré ${gain} Ko`);
 
 console.log(`✓ dépouillage : ${Math.round(avantKo / 1024)} → ${Math.round(apresKo / 1024)} Ko gzip (${gain} Ko de moins sur le fil)`);
+
+// ---------------------------------------------------------------------------
+// 6. LE HTML AUSSI — ET SON SQUELETTE NE BOUGE PAS D'UN NŒUD
+// ---------------------------------------------------------------------------
+// Le HTML était le dernier à partir entier. `index.html` est la PREMIÈRE
+// requête d'un poste : c'est elle qui bloque la découverte de tout le reste, et
+// elle portait 12 Ko de prose sur 27. Les deux écrans du comptoir en portaient
+// bien plus, dans des blocs `<style>` et `<script>` en ligne que ni
+// depouillerCss ni depouillerJs n'atteignaient.
+//
+// Le filet des délimiteurs ne vaut RIEN ici : nos commentaires sont de la prose
+// française, pleine d'apostrophes, et leur départ fait légitimement chuter les
+// comptes. Ce qui protège le HTML se prouve donc ici, sur les fichiers réels :
+// le SQUELETTE — la suite des balises, leurs identifiants, leurs adresses — est
+// rigoureusement le même avant et après.
+const HTML_SERVIS = [
+  'public/index.html',
+  'public/comptoir/demande-devis.html',
+  'public/comptoir/vente-directe.html',
+];
+
+// Extracteur INDÉPENDANT de depouiller.js : s'il partageait son code, il
+// partagerait aussi son erreur. Il ignore les commentaires — et le CONTENU des
+// blocs `<script>` / `<style>`, qui est du texte, pas du balisage : nos
+// commentaires JavaScript y parlent de `<details>` et de `<select>`, et un
+// extracteur naïf les comptait comme de vraies balises.
+function squelette(html) {
+  const nu = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/(<(script|style)\b[^>]*>)[\s\S]*?(<\/\2>)/gi, '$1$3');
+  const balises = nu.match(/<\/?[a-zA-Z][\w-]*/g) || [];
+  return {
+    balises: balises.map((b) => b.toLowerCase()).join(' '),
+    ids: (nu.match(/\sid="[^"]*"/g) || []).join(' '),
+    adresses: (nu.match(/\s(?:src|href)="[^"]*"/g) || []).join(' '),
+  };
+}
+
+// Le contenu des blocs en ligne, dans l'ordre. Il doit sortir EXACTEMENT comme
+// depouillerJs / depouillerCss l'auraient rendu seuls — ni plus, ni moins :
+// c'est ce qui prouve que le passage par le HTML n'ajoute aucun risque propre.
+function blocs(html) {
+  const out = [];
+  const re = /<(script|style)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  let m;
+  while ((m = re.exec(html))) out.push({ nom: m[1].toLowerCase(), attrs: m[2], corps: m[3] });
+  return out;
+}
+
+let htmlAvant = 0; let htmlApres = 0;
+for (const f of HTML_SERVIS) {
+  const src = lire(f);
+  const out = depouiller(src, 'html');
+
+  const a = squelette(src); const b = squelette(out);
+  assert.strictEqual(b.balises, a.balises, `${f} : la suite des balises a changé au dépouillage`);
+  assert.strictEqual(b.ids, a.ids, `${f} : un identifiant a disparu`);
+  assert.strictEqual(b.adresses, a.adresses, `${f} : une adresse src/href a disparu`);
+
+  const ba = blocs(src); const bb = blocs(out);
+  assert.strictEqual(bb.length, ba.length, `${f} : un bloc <script>/<style> a disparu`);
+  ba.forEach((bloc, k) => {
+    const attendu = bloc.nom === 'style' ? depouillerCss(bloc.corps)
+      : /\ssrc\s*=|\stype\s*=\s*["']?application\/json/i.test(bloc.attrs) ? bloc.corps
+        : depouillerJs(bloc.corps);
+    assert.strictEqual(bb[k].corps, attendu,
+      `${f} : le bloc <${bloc.nom}> n° ${k + 1} n'a pas été dépouillé comme il devait l'être`);
+  });
+
+  // Les numéros de ligne, comme pour le JS et le CSS.
+  assert.strictEqual(lignes(out), lignes(src), `${f} : les numéros de ligne ont bougé`);
+  // Plus un seul commentaire HTML ne part sur le fil.
+  assert.strictEqual(/<!--/.test(out), false, `${f} : un commentaire HTML est resté`);
+
+  htmlAvant += gz(src); htmlApres += gz(out);
+}
+
+// `</script>` PORTE LE MÊME NOM QUE `<script>`. Pris pour une ouverture, il
+// faisait avaler tout le document jusqu'au script suivant — et le filet le
+// déclarait « stable », puisqu'il ne restait effectivement plus rien à retirer.
+// index.html ressortait alors intact, sans la moindre erreur.
+const deuxScripts = '<script>var a = 1;</script>\n<!-- parti -->\n<script>var b = 2;</script>';
+assert.strictEqual(/<!--/.test(depouiller(deuxScripts, 'html')), false,
+  'un commentaire entre deux <script> doit partir');
+
+// Un `<!--` dans une CHAÎNE JavaScript n'ouvre pas de commentaire HTML.
+const piegeChaine = '<script>var s = "<!-- pas un commentaire";</script><p>a</p>';
+assert.strictEqual(depouiller(piegeChaine, 'html').includes('<p>a</p>'), true,
+  'un `<!--` dans une chaîne ne doit rien avaler');
+
+// Un `<script src>` et un `<script type="application/json">` ne sont pas du
+// JavaScript à dépouiller : on n'y touche pas.
+assert.strictEqual(
+  depouiller('<script type="application/json">{"a": "// b"}</script>', 'html'),
+  '<script type="application/json">{"a": "// b"}</script>',
+);
+
+const gainHtml = Math.round((htmlAvant - htmlApres) / 1024);
+assert.ok(gainHtml > 40, `le HTML doit gagner plus de 40 Ko compressés, mesuré ${gainHtml} Ko`);
+
+console.log(`✓ dépouillage HTML : ${Math.round(htmlAvant / 1024)} → ${Math.round(htmlApres / 1024)} Ko gzip, squelette identique (${gainHtml} Ko de moins)`);
