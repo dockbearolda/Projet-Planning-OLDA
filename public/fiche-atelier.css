@@ -337,7 +337,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
-.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); flex: 1; min-width: 0; }
+/* LA SERIE DICTEE SE POSE AU-DESSUS DE LA GRILLE. Le bloc prend la place que
+   la grille prenait seule (`flex: 1; min-width: 0`) : la rangee ne change pas
+   de forme, elle gagne une ligne. L'ecart est le meme jeton que celui des
+   cases, pour que les deux lignes se lisent comme un seul bloc. */
+.fa-tailles-bloc { display: grid; gap: var(--pas-2); flex: 1; min-width: 0; }
+.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); min-width: 0; }
 .fa-taille {
   display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
   padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);

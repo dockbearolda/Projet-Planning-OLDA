@@ -158,7 +158,14 @@ const cibles = (iEx >= 0 ? args.slice(0, iEx) : args);
 if (!cibles.length) cibles.push('.');
 
 const fichiers = [];
+/* LES PAGES D'ESSAI NE SE NOTENT PAS. Le prefixe `_` est deja le motif que le
+   depot ignore (`public/_*` dans .gitignore) : ce sont des pages posees le temps
+   d'une mesure — un apercu de papier, une maquette de handoff a regarder a cote
+   de l'ecran. Les compter faisait RECULER la charte le temps qu'elles trainent,
+   donc echouer `npm test`, qui doit etre vert avant tout commit : le controle
+   se mettait a interdire le fait meme de comparer deux ecrans. */
 const explorer = (p) => {
+  if (basename(p).startsWith('_')) return;
   const st = statSync(p);
   if (st.isDirectory()) {
     if (exclus.has(basename(p))) return;

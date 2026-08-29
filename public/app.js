@@ -4334,8 +4334,15 @@ async function envoyerProduction(r, patchProd) {
     const vivante = rows.find((x) => String(x.id) === String(r.id));
     if (vivante && vivante !== r) Object.assign(vivante, maj);
     rafraichirLigne(r);
+    // ON REND LA LIGNE REFAITE. Corriger une taille refait le prix côté serveur
+    // (voir chiffrage.js) : la fiche ouverte doit pouvoir reposer son « Prix
+    // TTC », sinon elle garde l'ancien — et la marge et le reste à payer, qui
+    // s'en déduisent, affichent des chiffres faux sur un écran qu'on lit pour
+    // décider.
+    return maj;
   } catch (err) {
     reportError(err);
+    return null;
   }
 }
 
