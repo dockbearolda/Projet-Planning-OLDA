@@ -4294,15 +4294,24 @@ async function ouvrirTicket(r) {
 // Seule exception : la place ACTUELLE de la commande. Une ligne déjà « à
 // préciser » doit retrouver sa valeur dans la liste, sinon le sélecteur
 // afficherait la première option et l'enregistrement la déplacerait toute seule.
+// CHAQUE PLACE PORTE SA FAMILLE (29/08). Charlie, sur le menu d'étape : « quand
+// je clique ici ça doit être lisible PAR FAMILLE plus facilement ». C'était une
+// liste à plat de trente lignes qui répétaient toutes leur famille en tête —
+// « Préparation du projet › » écrit neuf fois de suite — et il fallait lire la
+// moitié de chaque ligne avant d'arriver à ce qui les distingue.
+// La famille devient le TITRE d'un groupe, et l'option ne porte plus que la
+// sous-étape. Le menu ne dit plus une seule fois de trop ce qu'il a déjà dit.
 function placesDuPipeline(placeActuelle) {
   const places = [];
   for (const f of STAGES) {
     const subs = SUB_STAGES[f.slug] || [];
+    // Une famille sans sous-étape n'est pas un groupe d'une seule ligne : elle
+    // reste une entrée à elle seule, sinon le menu porte un titre pour rien.
     if (!subs.length) { places.push({ value: `${f.slug}|`, label: f.label }); continue; }
     if (placeActuelle === `${f.slug}|`) {
-      places.push({ value: `${f.slug}|`, label: `${f.label} › à préciser` });
+      places.push({ value: `${f.slug}|`, label: 'à préciser', groupe: f.label });
     }
-    for (const s of subs) places.push({ value: `${f.slug}|${s.slug}`, label: `${f.label} › ${s.label}` });
+    for (const s of subs) places.push({ value: `${f.slug}|${s.slug}`, label: s.label, groupe: f.label });
   }
   return places;
 }

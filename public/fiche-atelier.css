@@ -331,7 +331,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-fort { font-weight: var(--graisse-note); }
 
 .fa-compte { margin-left: auto; flex-shrink: 0; font-size: var(--fa-lab); color: var(--text-2); }
-.fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* LES CHIFFRES DE LA RANGEE DES TAILLES SE LISENT EN NORMAL (29/08). Charlie :
+   « la police des chiffres ici et ici doit etre normal ». Le total des pieces et
+   chaque quantite etaient en 800 — la graisse la plus lourde de la charte, celle
+   du montant TTC et du reste a payer — pour des nombres qu'on relit sans les
+   chercher. Une valeur ordinaire de la fiche est en 400 ; ils la prennent. */
+.fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-texte); color: var(--text-1); }
 
 /* --- Les tailles ----------------------------------------------------------
    LE NOMBRE S'ÉCRIT (28/08) : les « + / − » sont retirés. Sans eux la case n'a
@@ -340,12 +345,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
-/* LA SERIE DICTEE SE POSE AU-DESSUS DE LA GRILLE. Le bloc prend la place que
-   la grille prenait seule (`flex: 1; min-width: 0`) : la rangee ne change pas
-   de forme, elle gagne une ligne. L'ecart est le meme jeton que celui des
-   cases, pour que les deux lignes se lisent comme un seul bloc. */
-.fa-tailles-bloc { display: grid; gap: var(--pas-2); flex: 1; min-width: 0; }
-.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); min-width: 0; }
+.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); flex: 1; min-width: 0; }
 .fa-taille {
   display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
   padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
@@ -366,7 +366,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-nb {
   flex: 1; min-width: 0; height: var(--fa-h-champ);
   padding: 0; border: 0; background: transparent;
-  text-align: right; font-size: var(--fa-val); font-weight: var(--graisse-forte);
+  text-align: right; font-size: var(--fa-val); font-weight: var(--graisse-texte);
 }
 .fa-nb:hover { background: transparent; }
 
@@ -403,8 +403,25 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   font: inherit; font-size: var(--fa-lab); cursor: pointer;
 }
 .fa-ajout:hover { background: var(--bg); color: var(--text-1); }
-.fa-col--d .fa-row { align-items: flex-start; }
-.fa-col--d .fa-row > .fa-lab { padding-top: 9px; }
+/* UNE RANGEE QUI PORTE PLUSIEURS LIGNES cale son intitule EN HAUT, contre la
+   premiere : centre, il flotte au milieu d'une rangee de 110 px et ne designe
+   plus rien. Mais c'est la RANGEE qui le decide, pas la colonne.
+   ⚠ La regle portait sur `.fa-col--d .fa-row` — TOUTE rangee de la colonne de
+   droite. « Atelier », haute d'une seule commande, y calait donc son intitule
+   en haut pendant que « Retrait », son exact vis-a-vis a gauche, le centrait :
+   les deux premieres lignes de la fiche etaient a 10 px l'une de l'autre. Meme
+   composant, deux comportements, decides par le voisinage plutot que par le
+   contenu. */
+.fa-row--empile { align-items: flex-start; }
+/* SON INTITULE PREND LA BOITE D'UNE COMMANDE et y centre son texte : il tombe
+   donc exactement sur la premiere ligne de la rangee, quelle que soit la
+   hauteur du reste. C'etait un `padding-top: 9px` — un nombre regle a l'oeil
+   sur une mise en page qui a bouge depuis, et qui posait l'intitule 6 px
+   au-dessus de son vis-a-vis de gauche. Une hauteur est un JETON. */
+.fa-row--empile > .fa-lab {
+  min-height: var(--fa-h-champ);
+  display: flex; align-items: center;
+}
 
 /* --- ZONE 5 : la barre « Détails » et son calque --------------------------
    LE PANNEAU EST UN CALQUE, jamais dans le flux. Posé entre les colonnes et la

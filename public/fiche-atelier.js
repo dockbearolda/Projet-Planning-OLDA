@@ -150,48 +150,6 @@ export function texteMarge(ttc, cout) {
   return `${marge.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € · ${pct} %`;
 }
 
-// --- LA GRILLE DES TAILLES, DICTEE EN UNE LIGNE ----------------------------
-// « M12 L12 XL6 » remplace toute la grille d'un coup. C'est la forme sous
-// laquelle un client donne une serie : on la recopie au lieu de la ventiler.
-//
-// L'EXPRESSION NE S'ECRIT PAS EN DUR. Le handoff propose
-// `/(XXL|XL|[SMLX])\s*(\d+)/g` : sur NOS etiquettes elle se trompe deux fois —
-// « XS12 » y trouve « S » et laisse un « X » orphelin, « 2XL6 » y trouve « XL »
-// et perd le « 2 ». Les tailles connues viennent donc du DOSSIER lui-meme,
-// triees de la plus longue a la plus courte pour que « 2XL » passe avant « XL ».
-//
-// UNE TAILLE ABSENTE DE LA GRILLE EST REFUSEE, jamais creee. Les tailles
-// viennent du catalogue et du chiffrage : en inventer une donnerait a l'atelier
-// une piece qu'il ne sait pas couper, et au serveur un prix qu'il ne sait pas
-// faire. Ce qui n'a pas ete compris repart dans `inconnues`, et l'ecran le dit
-// plutot que d'avaler la frappe en silence.
-//
-// UNE TAILLE NON CITEE PASSE A ZERO : on dicte la serie ENTIERE, c'est tout
-// l'interet. Le geste est donc annulable d'un seul clic, comme les autres.
-export function lireTailles(saisie, connues) {
-  const brut = String(saisie == null ? '' : saisie).trim();
-  const grille = (Array.isArray(connues) ? connues : []).map((t) => String(t)).filter(Boolean);
-  if (!brut || !grille.length) return { tailles: null, lues: 0, inconnues: [] };
-  const parCle = new Map(grille.map((t) => [t.toLowerCase(), t]));
-  const echapper = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const motif = [...grille].sort((a, b) => b.length - a.length).map(echapper).join('|');
-  const lues = new Map();
-  // Le separateur entre la taille et le nombre est libre — « M12 », « M 12 »,
-  // « M x 12 » : c'est dicte a l'oral aussi souvent que copie d'un message.
-  const reste = brut.replace(new RegExp(`(${motif})\\s*[x*:=]?\\s*(\\d{1,4})`, 'gi'), (_, t, n) => {
-    const canon = parCle.get(String(t).toLowerCase());
-    if (canon) lues.set(canon, Math.min(9999, Number(n)));
-    return ' ';
-  });
-  const inconnues = reste.split(/[\s,;]+/).filter(Boolean);
-  if (!lues.size) return { tailles: null, lues: 0, inconnues };
-  return {
-    tailles: grille.map((t) => ({ t, n: lues.has(t) ? lues.get(t) : 0 })),
-    lues: lues.size,
-    inconnues,
-  };
-}
-
 // ===========================================================================
 // L'ÉCRAN
 // ===========================================================================
@@ -310,12 +268,31 @@ export function dessinerFicheAtelier(r, ctx) {
     return c;
   };
 
+  // UNE OPTION PEUT DECLARER SON GROUPE, et le menu le rend en `<optgroup>` —
+  // le titre que le navigateur dessine lui-meme, en tete de section. Sans lui,
+  // le menu d'etape etait trente lignes a plat qui repetaient leur famille en
+  // tete : « Preparation du projet › » neuf fois de suite, et il fallait lire la
+  // moitie de chaque ligne avant d'arriver a ce qui les distingue.
+  //
+  // LE GROUPE EST UNE DONNEE DE L'OPTION, pas une decoupe faite ici sur le
+  // libelle : couper sur un « › » marcherait jusqu'au jour ou une sous-etape en
+  // contient un. Les options sans groupe restent a plat, comme avant — c'est ce
+  // que font « Qui suit » et « Reglement », qui n'ont pas de familles.
   const menu = (cls, options, valeur, label) => {
     const s = el('select', `fa-in${cls ? ` ${cls}` : ''}`);
+    const groupes = new Map();
     for (const o of options) {
       const opt = el('option', null, o.label != null ? o.label : o);
       opt.value = o.value != null ? o.value : (o.label != null ? o.label : o);
-      s.append(opt);
+      const g = o && o.groupe;
+      if (!g) { s.append(opt); continue; }
+      if (!groupes.has(g)) {
+        const bloc = el('optgroup');
+        bloc.label = g;
+        groupes.set(g, bloc);
+        s.append(bloc);
+      }
+      groupes.get(g).append(opt);
     }
     s.value = valeur == null ? '' : String(valeur);
     s.setAttribute('aria-label', label || '');
@@ -595,7 +572,12 @@ export function dessinerFicheAtelier(r, ctx) {
   // ZONE 4 — colonne droite : ce qu'il y a à produire
   // =========================================================================
   const droite = el('div', 'fa-col fa-col--d');
-  droite.append(titreSection('Production'), prevu.rangee);
+  // MEME FORME QUE LA COLONNE DE GAUCHE : un titre, la DATE, un filet, puis le
+  // detail. Le filet manquait ici — et comme il vaut 1 px plus un ecart, TOUTES
+  // les lignes de droite tombaient 11 px au-dessus de leurs voisines de gauche.
+  // Il separe la meme chose des deux cotes : la date d'un cote du trait, ce
+  // qu'on decrit de l'autre.
+  droite.append(titreSection('Production'), prevu.rangee, el('div', 'fa-filet'));
 
   if (prod) {
     const idt = el('div', 'fa-grille-prod');
@@ -617,13 +599,9 @@ export function dessinerFicheAtelier(r, ctx) {
     const majTotal = () => { total.textContent = String(tailles.reduce((s, t) => s + (Number(t.n) || 0), 0)); };
 
     const grilleT = el('div', 'fa-tailles');
-    // Les cases sont retenues : la saisie en une ligne les repose TOUTES d'un
-    // coup, y compris celles qu'elle remet a zero.
-    const champsT = [];
     tailles.forEach((taille, i) => {
       const case_ = el('div', 'fa-taille');
       const c = champ('fa-nb', taille.n, { label: `Taille ${taille.t}`, placeholder: '0', inputMode: 'numeric' });
-      champsT.push(c);
       const poser = (n, tracer) => {
         const borne = Math.max(0, Math.round(Number(n) || 0));
         const ancien = Number(tailles[i].n) || 0;
@@ -654,69 +632,13 @@ export function dessinerFicheAtelier(r, ctx) {
     });
     majTotal();
 
-    // --- LA SERIE SE DICTE EN UNE LIGNE -----------------------------------
-    // « M12 L12 XL6 » : c'est la forme sous laquelle la serie ARRIVE — dans un
-    // message, au telephone, sur un bon. La ventiler case par case, c'est la
-    // retranscrire ; ici on la recopie. Le champ se pose AU-DESSUS de la
-    // grille, comme dans la maquette, et il prend la meme boite que tous les
-    // autres champs de l'ecran (`champ()` -> `.fa-in`) : une seule regle de
-    // hauteur, jamais deux qui se ressemblent.
-    //
-    // C'EST UNE COMMANDE, PAS UNE VALEUR : elle se vide une fois jouee. Un
-    // champ qui garde « M12 L12 » apres coup laisse croire que c'est l'etat de
-    // la grille, alors que la grille a pu bouger depuis.
-    const dicter = champ('fa-serie', '', {
-      label: 'Serie complete',
-      placeholder: 'Saisie rapide : M12 L12 XL6 puis Entrée',
-    });
-    const jouerSerie = () => {
-      const brut = dicter.value.trim();
-      if (!brut) return;
-      const lu = lireTailles(brut, tailles.map((t) => t.t));
-      if (!lu.tailles) {
-        // ON NE MANGE PAS LA FRAPPE. Le texte reste dans le champ : elle vient
-        // d'ecrire quelque chose, si on l'efface elle ne sait pas quoi corriger.
-        dire(`Rien compris dans « ${brut} » — attendu : ${tailles.map((t) => t.t).join(' ')} + un nombre`, false);
-        return;
-      }
-      const avantSerie = listeTailles();
-      const poserGrille = (liste) => {
-        liste.forEach((t, i) => {
-          if (!tailles[i]) return;
-          tailles[i].n = t.n;
-          if (champsT[i]) champsT[i].value = t.n ? String(t.n) : '';
-        });
-        majTotal();
-        Promise.resolve(ctx.patchProd({ tailles: liste.map((t) => ({ t: String(t.t), n: Number(t.n) || 0 })) }))
-          .then(reposerPrix);
-      };
-      poserGrille(lu.tailles);
-      empiler(() => poserGrille(avantSerie));
-      dicter.value = '';
-      coche(dicter);
-      pulser();
-      const total = lu.tailles.reduce((n, t) => n + t.n, 0);
-      dire(lu.inconnues.length
-        ? `Enregistré — ${total} pièces, « ${lu.inconnues.join(' ')} » ignoré`
-        : `Enregistré — série de ${total} pièces`);
-    };
-    dicter.addEventListener('blur', jouerSerie);
-    // ENTREE JOUE LA LIGNE, ET NE BOUGE PAS LE FOCUS. Ce n'est pas un parcours
-    // clavier : c'est la validation du champ ou l'on est, comme pour « + Face ».
-    // Rien n'enchaine sur le champ suivant — voir l'entete de ce fichier.
-    dicter.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') { ev.preventDefault(); jouerSerie(); }
-    });
-    const blocT = el('div', 'fa-tailles-bloc');
-    blocT.append(dicter, grilleT);
-
     // LES TAILLES SONT UNE RANGÉE COMME LES AUTRES. Elles avaient leur propre
     // en-tête — un libellé posé au-dessus alors que toutes les lignes voisines
     // portent le leur à gauche : une ligne de plus, et deux modèles de rangée
     // dans la même colonne.
     const compte = el('span', 'fa-compte');
     compte.append(document.createTextNode('Total '), total, document.createTextNode(' pièces'));
-    if (tailles.length) droite.append(rangee('Tailles', blocT, compte));
+    if (tailles.length) droite.append(rangee('Tailles', grilleT, compte, 'fa-row--empile'));
 
     // --- LES FACES --------------------------------------------------------
     const faces = Array.isArray(prod.logos) ? prod.logos : [];
@@ -763,7 +685,7 @@ export function dessinerFicheAtelier(r, ctx) {
       ajoutF.replaceWith(saisie);
       saisie.focus();
     });
-    droite.append(rangee('Faces', bandeF, ajoutF));
+    droite.append(rangee('Faces', bandeF, ajoutF, 'fa-row--empile'));
   }
 
   // TROIS CHAMPS DE TEXTE LIBRE, UN SEUL RESTE (29/08). Charlie, en designant
