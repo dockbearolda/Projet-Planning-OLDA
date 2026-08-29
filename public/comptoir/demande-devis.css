@@ -245,7 +245,20 @@ b,strong{font-weight:var(--graisse-forte)}
    Autrement dit, le compte « une centaine d'inutiles » est à peu près juste
    (97 mesurés retirables un par un ici) mais le raisonnement ne l'est pas :
    ils s'appuient les uns sur les autres. On n'y touche pas sans rejouer la
-   mesure sur les SEPT étapes, et l'écran tourne chez le patron. */
+   mesure sur les SEPT étapes, et l'écran tourne chez le patron.
+
+   REPROPOSÉ LE 29/08, ET RE-ÉCARTÉ POUR LA MÊME RAISON. Le compte ci-dessus
+   n'a pas bougé ; ce qu'on a mesuré en plus ce jour-là, c'est OÙ ils vivent :
+     · 59 des 263 sont dans un `@media print` — un `!important` y force l'encre
+       noire contre le style d'écran, c'est son emploi le plus légitime ;
+     · QUARANTE portent un SÉLECTEUR NU (`input`, `select`, `body`, `button`).
+       Ce sont eux, les dangereux : ils battent n'importe quelle classe, y
+       compris celle d'un composant partagé qui arriverait plus tard. C'est
+       exactement l'accident du fond de la tasse, rendu CARRÉ parce qu'un
+       `input { border-radius: … !important }` d'ici passait devant.
+   Le cliquet de charte (test/charte-cliquet.test.js) les compte : leur nombre
+   ne peut plus monter. Les faire descendre demande la mesure sur les sept
+   étapes, pas une relecture. */
 body{font-family:'Manrope',Arial,sans-serif!important}
 /* LES CHAMPS N'HÉRITENT PAS DE LA POLICE DU CORPS. Chrome leur en impose une :
    Arial pour un `input`, un `select` et un `button`, et du MONOSPACE pour une
@@ -1036,7 +1049,13 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   position:fixed;
   inset:0;
   z-index:9999;
-  background:rgba(0,0,0,.45);
+  /* LE VOILE EST UN JETON DEPUIS LE 29/08. Il y en avait QUATRE dans
+     l'application pour le meme geste — poser un panneau par-dessus et dire que
+     le dessous n'est plus jouable : .30 dans le CRM, .45 ici et sur la modale
+     de la vente, .52 sur son ecran de fin. Trois ecrans a un clic l'un de
+     l'autre, trois gris differents. `--voile` s'inverse aussi de nuit ; un
+     `rgba(0,0,0,…)` ecrit en clair, non. */
+  background:var(--voile);
   align-items:center;
   justify-content:center;
   padding:20px}
