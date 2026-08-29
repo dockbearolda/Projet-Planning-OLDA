@@ -378,11 +378,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
    la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
 .fa-details[hidden] { display: none; }
-.fa-details__col { display: flex; flex-direction: column; gap: var(--pas-2); min-width: 0; }
-/* Quand le champ des notes est monte dans la colonne gauche, le panneau n'a
-   plus qu'une colonne de contenu : elle prend les deux pistes au lieu de
-   laisser la moitie du panneau vide. */
-.fa-details--sans-notes .fa-details__col { grid-column: 1 / -1; }
+/* LES RANGEES SONT LES ENFANTS DIRECTS DE LA GRILLE (29/08). Elles vivaient
+   dans une colonne qui prenait les deux pistes : six rangees empilees sur
+   1 126 px de large, dont trois qui etiraient un menu de trois lettres sur
+   1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
+   402 px de haut pour ce qui en demande 190. */
+.fa-details > .fa-row { min-width: 0; }
 
 /* --- La niche des notes -------------------------------------------------
    Elle accueille le champ des notes quand l'ecran est assez haut. Elle

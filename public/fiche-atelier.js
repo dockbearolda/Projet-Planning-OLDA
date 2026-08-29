@@ -619,7 +619,12 @@ export function dessinerFicheAtelier(r, ctx) {
   const colInfos = el('div', 'fa-bloc fa-bloc--notes');
   colInfos.append(el('label', 'fa-lab', 'Informations'), chInfos);
 
-  const colReste = el('div', 'fa-details__col');
+  // LES RANGEES ENTRENT DIRECTEMENT DANS LA GRILLE DU PANNEAU (29/08). Elles
+  // vivaient dans une colonne qui prenait les deux pistes : six rangees les
+  // unes sous les autres sur 1 126 px de large, dont trois qui etiraient un
+  // menu de trois lettres sur 1 010 px. Le panneau declarait « deux colonnes »
+  // et n'en rendait qu'une.
+  const rangeesPanneau = [];
   const bascules = [
     ['acompte_demande', 'Acompte demandé'],
     ['acompte_verse', 'Acompte versé'],
@@ -665,7 +670,7 @@ export function dessinerFicheAtelier(r, ctx) {
 
   const reglementLigne = el('div', 'fa-duo');
   reglementLigne.append(selReglement, el('label', 'fa-lab', 'Coût'), chCout);
-  colReste.append(
+  rangeesPanneau.push(
     rangee('Paiement', segPaiement),
     rangee('Règlement', reglementLigne),
     rangee('Type de client', selType),
@@ -674,39 +679,16 @@ export function dessinerFicheAtelier(r, ctx) {
     rangee('Documents', docs),
     el('div', 'fa-rappel-bloc', ctx.rappelDossier || ''),
   );
-  panneau.append(colInfos, colReste);
+  panneau.append(...rangeesPanneau);
 
-  // Le champ des notes vit dans la colonne gauche : depuis que l'ecran defile,
-  // il n'y a plus de hauteur a economiser, donc plus de raison de le renvoyer
-  // dans le panneau. Le seuil reste, tres bas, pour un ecran vraiment minuscule.
-  const assezHaut = window.matchMedia('(min-height: 420px)');
-  const listeDetails = el('span', 'fa-details__liste');
-  const placerNotes = () => {
-    const haut = assezHaut.matches;
-    // La classe et la liste d'abord : au tout premier appel le champ est deja
-    // dans le panneau, et la garde de reinsertion sortirait avant de les ecrire
-    // — la barre « Details » restait alors sans un mot.
-    panneau.classList.toggle('fa-details--sans-notes', haut);
-    listeDetails.textContent = haut
-      ? 'Paiement · Documents · Provenance · Récapitulatif'
-      : 'Paiement · Informations · Documents · Provenance · Récapitulatif';
-    const cible = haut ? nicheNotes : panneau;
-    // ON NE REINSERE PAS UN CHAMP DEJA EN PLACE : le deplacer pendant qu'on
-    // ecrit dedans lui ferait perdre le curseur.
-    if (colInfos.parentElement === cible) return;
-    if (haut) cible.append(colInfos); else cible.prepend(colInfos);
-  };
-  placerNotes();
-  // ON OBSERVE LA RACINE, pas la fenetre. Ni `change` de `matchMedia` ni
-  // `resize` ne partent dans tous les cadres : la fenetre passait de 630 a 900
-  // px, le champ restait dans le panneau et le vide sous « Qui suit » revenait
-  // — 307 px. Un `ResizeObserver` voit le changement quelle qu'en soit la
-  // cause, et il se debranche avec l'ecran qu'il observe.
-  const veille = new ResizeObserver(() => {
-    if (!racine.isConnected) { veille.disconnect(); return; }
-    placerNotes();
-  });
-  veille.observe(racine);
+  // LE CHAMP DES NOTES VIT DANS LA COLONNE GAUCHE, POINT. Il y avait ici un
+  // seuil de hauteur (420 px) qui le renvoyait dans le panneau sur un ecran
+  // minuscule, avec le `ResizeObserver` qui allait avec — trois etats a tenir,
+  // pour un cas qu'aucun PC ne produit. Le projet est PC uniquement depuis le
+  // 21/08 ; c'etait un reste de la tablette.
+  nicheNotes.append(colInfos);
+  const listeDetails = el('span', 'fa-details__liste',
+    'Paiement · Documents · Provenance · Récapitulatif');
 
   const chevron = el('span', null, '▾');
   const barreDetails = bouton('fa-details__b', null, () => {
