@@ -52,7 +52,7 @@ assert.ok(!/max-height/.test(RACINE_CSS),
 const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
-assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, barreDetails\);/.test(JS)
+assert.ok(/carte\.append\(tete, bandeau, scene, barreDetails\);/.test(JS)
   && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
   'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
 // AUCUNE COLONNE NE DÉFILE POUR ELLE-MÊME : c'est exactement ce qui produisait
@@ -75,8 +75,21 @@ assert.ok(/ficheAtelierEl\.addEventListener\('click'/.test(APP)
 // jusqu'au 29/08 : elle mélangeait l'argent, le type de client, la provenance,
 // le poste de production et les documents. Chacun est parti dans sa zone, elle
 // ne porte plus que l'argent — et elle le dit.
-assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, barreDetails\);/.test(JS),
+assert.ok(/carte\.append\(tete, bandeau, scene, barreDetails\);/.test(JS),
   'la bande « Paiement » ferme la carte');
+// LE BLOC DE PIED EST RETIRÉ (29/08, Charlie). Il portait le nom du produit —
+// déjà écrit dans l'entête, à trois centimètres, et c'est exactement le doublon
+// que la règle du 26/08 interdit — et l'horodatage de création, que personne ne
+// vient chercher sur une fiche d'atelier.
+assert.ok(!/fa-rappel-bloc/.test(JS) && !/fa-rappel-bloc/.test(CSS) && !/rappelDossier/.test(APP),
+  'le bloc de pied est parti en entier : le montage, sa règle et son contexte');
+// CE QU'IL DISAIT D'UTILE MONTE DANS L'ENTÊTE. « Article 2 sur 3 du ticket … »
+// n'était écrit nulle part ailleurs dans la fiche : c'est une IDENTITÉ, elle
+// rejoint la référence, dans la même étiquette en capitales.
+assert.ok(/el\('span', 'fa-ref', ctx\.lotDossier \|\| ''\)/.test(JS),
+  'l’appartenance au lot est dans l’entête, avec la référence');
+assert.ok(/lotDossier: lot \? `Article \$\{lot\.rang\} sur \$\{lot\.total\} du ticket \$\{lot\.ref\}` : '',/.test(APP),
+  '… et vide sur un dossier ordinaire : `:empty` le retire de la rangée');
 // LA BARRE D'ACTIONS BASSE A ÉTÉ RETIRÉE le 29/08 : cinq éléments sur une
 // rangée pleine largeur, dont un champ de 700 px, pour des gestes qui vivent
 // déjà ailleurs — la note dans « Informations », l'e-mail dans « Documents »,
@@ -109,8 +122,24 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // La production : ce qu'il y a à faire, et QUAND on le fait.
   assert.ok(PRODUCTION.includes("titreSection('Production')"),
     'la zone de production porte son nom');
-  assert.ok(/prevu\.rangee/.test(PRODUCTION),
-    '« Prévu à l’atelier » est une date de production, pas un engagement client');
+  // « PRÉVU À L'ATELIER » EST RETIRÉE (29/08, Charlie). C'était la seule date de
+  // la colonne de production, et une deuxième à tenir à jour à côté de celle
+  // qu'on a promise au client. La colonne `date_prevue` reste en base.
+  // On cherche l'ÉCRITURE, pas le mot : le commentaire qui explique le retrait
+  // dit « la colonne `date_prevue` reste en base », et le test tomberait sur sa
+  // propre explication.
+  assert.ok(!/prevu\.rangee/.test(JS) && !/patchLigne\('date_prevue'/.test(JS),
+    '« Prévu à l’atelier » ne se saisit plus dans la fiche');
+  // LE FILET PASSE SOUS LE TITRE, DES DEUX CÔTÉS. Il séparait la DATE du détail :
+  // à droite il n'y a plus de date, et laisser la règle telle quelle aurait fait
+  // partir la colonne de droite 71 px au-dessus de sa voisine. Sous le titre, il
+  // souligne la zone — même geste des deux côtés, et les QUATRE premières
+  // rangées des deux colonnes retombent sur la même ligne (mesuré à 1440 :
+  // 187,3 · 247,3 · 307,3 · 367,3 des deux côtés).
+  assert.ok(PRODUCTION.includes("droite.append(titreSection('Production'), el('div', 'fa-filet'));"),
+    'la colonne de production ouvre sur son titre et son filet');
+  assert.ok(CLIENT.includes("gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient,"),
+    '… et celle du client sur les deux mêmes, dans le même ordre');
   // ⚠ « Production » ET « Consigne » SONT PARTIS (29/08). Charlie, en désignant
   // les trois champs de texte libre de la fiche : « tout ça doit être supprimé
   // et il doit y avoir UNE SEULE note à la fin ». Ils demandaient la même chose
@@ -125,11 +154,16 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // sur un même rail. À gauche, ce qui ne regarde que l'atelier.
   // TOUT L'ARGENT SUR UNE SEULE BANDE (29/08) : six cases, chacune un intitulé
   // au-dessus de sa valeur, et les deux signes qui disent la soustraction.
-  for (const attendu of ["caseArgent('Coût', chCout)", "caseArgent('Règlement', selReglement)",
-    "caseArgent('Marge', valMarge)", "caseArgent('Prix TTC', chTtc)", "'Acompte versé le'",
-    "caseArgent('Reste à payer', bSolde, reste)", "signe('−')", "signe('=')"]) {
+  for (const attendu of ["caseArgent('Coût', null, chCout)", "caseArgent('Règlement', 'fa-case--large', selReglement)",
+    "caseArgent('Marge', null, valMarge)", "caseArgent('Prix TTC', null, chTtc)", "'Acompte versé le'",
+    "caseArgent('Reste à payer', 'fa-case--fin', bSolde, reste)"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
+  // DEUX MOITIÉS, comme la fiche au-dessus : à gauche ce qui ne regarde que
+  // l'atelier, à droite le compte du client — et le trait entre les deux tombe
+  // sur celui qui sépare les deux colonnes.
+  assert.ok(PAIEMENT.includes('panneau.append(moitieG, moitieD);'),
+    'la bande est faite de deux moitiés, pas d’une file de neuf éléments');
   // RIEN NE PASSE A DROITE DU CHIFFRE. Au premier essai, la date de l'acompte
   // et le bouton « Soldé » étaient posés APRÈS le montant dans leur rangée :
   // les trois chiffres finissaient à 1 330, 1 181 et 1 268 px — trois rails.
@@ -139,9 +173,12 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // ET IL SE COLLE A DROITE PAR UNE MARGE AUTOMATIQUE. `justify-content:
   // flex-end` rognerait par la GAUCHE dès que le contenu déborde : c'est le
   // début de la ligne qui disparaîtrait, donc le libellé.
-  const ARGENT = CSS.match(/\.fa-argent \{[\s\S]*?\n\}/)[0];
-  assert.match(ARGENT, /margin-left: auto;/,
-    'le compte se colle à droite par une marge, jamais par `flex-end`');
+  // LE COMPTE EMPILÉ A ÉTÉ REMPLACÉ PAR LA BANDE, puis la bande a été posée sur
+  // les rails des colonnes (29/08). `.fa-argent*` et `.fa-moins` ne sont plus
+  // écrits nulle part : leurs règles sont parties avec eux.
+  assert.ok(!/\.fa-argent[ .{]/.test(CSS.replace(/\/\*[\s\S]*?\*\//g, ''))
+    && !/fa-argent/.test(JS) && !/fa-moins/.test(JS),
+    'plus une seule règle ne vise le compte empilé');
   // ⚠ IL NE TRAVERSE PLUS LES DEUX COLONNES (29/08). Il le faisait, et ce qui
   // ne regarde que l'atelier tenait une rangée pleine largeur AU-DESSUS de lui :
   // le compte descendait donc sous elle, et il restait un rectangle vide de
@@ -149,12 +186,15 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // cette partie doit être ensemble, et beaucoup moins haute ». Le compte tient
   // maintenant la colonne de DROITE, l'atelier celle de gauche, et le panneau
   // fait la hauteur du plus haut des deux au lieu de leur somme.
-  assert.ok(!/grid-column: 1 \/ -1;/.test(ARGENT),
-    '… et il tient la colonne de droite, il ne s’étale plus sur les deux');
-  // Les montants s'alignent sur leur dernier chiffre : c'est tout l'intérêt de
-  // les empiler.
-  assert.match(CSS, /\.fa-argent \.fa-in \{ text-align: right; \}/,
-    'les montants du compte s’alignent à droite');
+  // CHAQUE CASE PART D'UN RAIL DE LA GRILLE DU HAUT. Mesuré à 1440 : Coût 24,
+  // Marge 140, Règlement 364,5 → 695 ; Prix TTC 744, Acompte 860 → 1191, Reste
+  // à payer 1201 → 1416. Ce sont exactement les bornes de `.fa-grille-client` et
+  // de `.fa-grille-prod`, au centième près.
+  const MOITIE = CSS.match(/\.fa-details__moitie \{[\s\S]*?\n\}/)[0];
+  assert.match(MOITIE, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
+    'chaque moitié reprend les quatre pistes des grilles du haut');
+  assert.match(CSS, /\.fa-case--large \{ grid-column: span 2; \}/,
+    'ce qui n’entre pas dans une piste en prend deux — jamais une largeur écrite');
   // LE RESTE SE DÉDUIT, IL NE SE SAISIT PAS — et « soldé » vaut zéro quoi qu'il
   // y ait dans les champs, sans quoi le mot ne veut rien dire.
   assert.ok(/majReste = \(\) => \{/.test(PAIEMENT), 'le reste se calcule');

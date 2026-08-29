@@ -203,6 +203,10 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    capitales. Elles avaient deux ecartements de lettres, .06em et .09em — deux
    reglages pour une intention, et l'ecart ne se voit qu'en les mesurant. */
 .fa-ref { font-size: var(--fa-lab); font-weight: var(--graisse-forte); letter-spacing: var(--fa-caps); color: var(--text-3); }
+/* L'ETIQUETTE DU LOT EST VIDE SUR UN DOSSIER ORDINAIRE — et un enfant vide
+   compte quand meme dans l'ecart de la rangee : 10 px de vide entre la
+   reference et le nom du client, sur tous les dossiers sauf ceux d'un ticket. */
+.fa-ref:empty { display: none; }
 .fa-client {
   padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
   font: inherit; font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
@@ -246,7 +250,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-etape { font-weight: var(--graisse-note); }
 /* 128 px : « 12 500,50 € » tient, et les 22 px rendus vont au menu d'etape.
    Un montant plus long que cinq chiffres n'existe pas sur un dossier d'ici. */
-.fa-ttc { width: 128px; flex: 0 0 128px; font-weight: var(--graisse-forte); }
+.fa-ttc { font-weight: var(--graisse-forte); }
 /* LA MARGE A SA PROPRE LIGNE DANS LE COMPTE (29/08), avec son intitule a
    gauche comme tous les autres. Collee au cout dans une paire, elle etait le
    seul endroit du panneau ou une case portait DEUX faits. Il ne reste que sa
@@ -356,15 +360,27 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
    les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
 .fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); flex: 1; min-width: 0; }
+/* LA BULLE EST COUPEE EN DEUX AU MILIEU (29/08). Charlie, en la designant :
+   « les bulles ici ont un probleme, rien n'est centre ». L'etiquette etait
+   collee a gauche, le nombre pousse a droite par un `flex: 1`, et entre les
+   deux 30 px de vide — trois bulles cote a cote donnaient trois trous. Pire,
+   l'etiquette prenant sa largeur naturelle (12,4 px pour « M », 8 pour « L »,
+   17,9 pour « XL »), les nombres commencaient a 892, 1 000 et 1 122 px : trois
+   departs pour la meme colonne de chiffres.
+   Deux pistes EGALES, l'etiquette calee sur la fin de la premiere et le nombre
+   sur le debut de la seconde : la coupure tombe au milieu de la bulle quelle
+   que soit la taille, les etiquettes partagent un rail et les nombres un autre. */
 .fa-taille {
-  display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
+  display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+  gap: var(--pas-2); min-width: 0;
   padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
 }
 /* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, comme tous les autres : meme cran,
    meme graisse de note, meme encre. Elle etait en 800 — la seule etiquette de
    l'ecran a crier plus fort que le mot « Tailles » qui la coiffe. */
 .fa-taille__k {
-  flex-shrink: 0;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: right;
   font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2);
 }
 /* LA QUANTITE SE LIT A LA MEME TAILLE QUE TOUT LE RESTE (29/08). Elle etait au
@@ -374,9 +390,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ressortir, pas le demi-pouce de plus. Le seul chiffre annonce de cette
    colonne reste le TOTAL, qui lui se lit de loin. */
 .fa-nb {
-  flex: 1; min-width: 0; height: var(--fa-h-champ);
+  width: 100%; min-width: 0; height: var(--fa-h-champ);
   padding: 0; border: 0; background: transparent;
-  text-align: right; font-size: var(--fa-val); font-weight: var(--graisse-texte);
+  text-align: left; font-size: var(--fa-val); font-weight: var(--graisse-texte);
 }
 .fa-nb:hover { background: transparent; }
 
@@ -459,56 +475,73 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* TOUT L'ARGENT SUR UNE SEULE BANDE (29/08). Charlie : « je veux que tu fasses
    rentrer ca proprement sur une seule ligne ». Les deux blocs empiles
    demandaient 202 px de haut pour six valeurs.
-   ⚠ ELLE SE CALE A DROITE PAR UNE MARGE AUTOMATIQUE sur la premiere case,
-   jamais par `justify-content: flex-end` : celui-ci rogne par la GAUCHE des que
-   le contenu deborde, et c'est le debut de la bande qui disparait.
-   `align-items: flex-end` aligne les VALEURS entre elles ; les intitules, plus
-   ou moins longs, montent au-dessus sans decaler personne. */
+   ET SUR LES RAILS DES DEUX COLONNES (29/08, meme jour, apres avoir designe les
+   six intitules et quatre intitules du formulaire) : « je veux que tout ca soit
+   parfaitement aligne avec ces colonnes ». Elle flottait a droite par une marge
+   automatique, chaque case a la largeur de son contenu — le premier intitule
+   commencait a 320 px, sur aucun trait existant.
+   Elle reprend donc la grille de `.fa-travail` : deux moities, et dans chacune
+   les QUATRE MEMES PISTES que `.fa-grille-client` / `.fa-grille-prod`. Une
+   seule ecriture pour les trois, sinon ce sont trois rails qui se ressemblent.
+   Le filet entre l'atelier et le client est celui de `.fa-col--g`, prolonge :
+   c'est le meme trait, au meme endroit, pas un second fabrique pour l'occasion. */
 .fa-details {
   flex-shrink: 0;
-  /* `--pas-3`, la gouttiere d'un formulaire : neuf elements sur une bande, c'est
-     ce qui les separe, pas l'ecart de deux blocs. A `--pas-4` les huit ecarts
-     mangeaient 192 px sur les 1 306 disponibles. */
-  display: flex; align-items: flex-end; gap: var(--pas-3);
-  padding: var(--pas-3) var(--pas-4);
+  display: grid; grid-template-columns: 1fr 1fr;
   border-top: 1px solid var(--border);
 }
-.fa-details > *:first-child { margin-left: auto; }
+.fa-details__moitie {
+  display: grid;
+  grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr;
+  align-items: end;
+  gap: var(--pas-2);
+  padding: var(--pas-3) var(--pas-4);
+  min-width: 0;
+}
+.fa-details__moitie--g { border-right: 1px solid var(--border-soft); }
 .fa-details[hidden] { display: none; }
 /* UNE CASE = UN INTITULE AU-DESSUS, SA VALEUR DESSOUS. Cote a cote, les
    intitules ne prennent plus de largeur : c'est ce qui fait tenir six valeurs
    sur une ligne sans rien couper. La valeur garde la hauteur d'une commande —
    un JETON — pour que les six s'alignent, y compris celles qui ne portent
-   qu'un texte. */
-/* UNE CASE NE SE LAISSE PAS COMPRIMER SOUS SON CONTENU. Sans `flex-shrink: 0`,
-   flexbox rogne la plus large pour faire tenir la bande : « 26,05 € » passait a
-   la ligne DANS sa bulle, 61 px de haut pour une police de 21 — un montant coupe
-   en deux, a l'endroit meme ou on vient chercher le chiffre. C'est le meme piege
-   qu'une colonne plus etroite que son intitule. */
-.fa-case { display: flex; flex-direction: column; gap: var(--pas-1); flex-shrink: 0; }
+   qu'un texte.
+   ⚠ `min-width: 0` OBLIGATOIRE : la largeur intrinseque d'un `<input>` ou d'un
+   `<select>` l'emporte sinon sur sa piste, et la moitie deborde de sa colonne.
+   C'est le meme piege que sur les cases de taille, et il ne se voit qu'au rendu.
+   (Avant la grille, c'etait `flex-shrink: 0` qui tenait ce role : sans lui,
+   « 26,05 € » passait a la ligne DANS sa bulle.) */
+.fa-case { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+/* DEUX PISTES POUR CE QUI N'ENTRE PAS DANS UNE : le menu de reglement (183 px
+   au plus long) et la ligne d'acompte (une date, deux raccourcis, un montant).
+   Une colonne n'est jamais plus etroite que ce qu'elle porte. */
+.fa-case--large { grid-column: span 2; }
+/* LA DERNIERE CASE FINIT SUR LE BORD DROIT — celui ou finissent tous les champs
+   de la colonne au-dessus. C'est le nombre qu'on vient chercher.
+   ⚠ Par une MARGE AUTOMATIQUE, jamais par `justify-content: flex-end` : celui-ci
+   rogne par la GAUCHE des que le contenu deborde, et c'est le debut de la valeur
+   qui disparait. Une marge auto se resout a zero dans ce cas. */
+.fa-case--fin .fa-case__k { margin-left: auto; }
+.fa-case--fin .fa-case__v > *:first-child { margin-left: auto; }
 .fa-case__k { font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap; }
 .fa-case__v {
   display: flex; align-items: center; gap: var(--pas-2);
-  min-height: var(--fa-h-champ); white-space: nowrap;
+  min-height: var(--fa-h-champ); white-space: nowrap; min-width: 0;
 }
-/* LES SIGNES DISENT LA SOUSTRACTION. Empilee, elle se lisait par un filet ;
-   couchee, ce sont eux. Ils tombent sur la ligne des VALEURS, pas sur celle des
-   intitules — d'ou la meme hauteur de commande que les cases. */
-.fa-signe {
-  display: flex; align-items: center; min-height: var(--fa-h-champ);
-  color: var(--text-3); flex-shrink: 0;
-}
-/* Le trait qui separe ce qui regarde l'atelier de ce qui regarde le client. */
-.fa-sep {
-  align-self: stretch; width: 1px; flex-shrink: 0;
-  background: var(--border); margin: 0 var(--pas-1);
-}
-/* LES RANGEES SONT LES ENFANTS DIRECTS DE LA GRILLE (29/08). Elles vivaient
-   dans une colonne qui prenait les deux pistes : six rangees empilees sur
-   1 126 px de large, dont trois qui etiraient un menu de trois lettres sur
-   1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
-   402 px de haut pour ce qui en demande 190. */
-.fa-details > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
+/* LES CHAMPS DE LA BANDE REMPLISSENT LEUR PISTE. Ils portaient des largeurs
+   ECRITES — 120 px pour le cout, 128 pour le TTC — qui avaient un sens quand la
+   bande flottait et se calait sur son contenu. Sur des rails, une largeur en dur
+   est exactement ce qui empeche de tomber dessus.
+   ET LEUR TEXTE PART DU RAIL, pas 10 px a droite. Un champ de la fiche est
+   inseré de son rembourrage : dans les colonnes ca ne se voit pas, l'intitule
+   est sur un AUTRE rail. Ici l'intitule est juste au-dessus — 10 px de decalage
+   entre les deux, sur six cases, et c'est precisement ce qu'on vient corriger.
+   Le rembourrage rendu, c'est aussi 20 px de plus pour le montant : « 1 250,50 € »
+   debordait de 2 px du cout et de 9 px du prix TTC — le chiffre le plus lu de la
+   fiche, coupe sur une commande a quatre chiffres. */
+.fa-details .fa-in { width: auto; flex: 1 1 auto; min-width: 0; padding: 0; }
+/* Les deux raccourcis « 30 % / 50 % » gardent leur taille : ce sont des boutons,
+   pas des champs, et ils ne portent que deux caracteres. */
+.fa-details .fa-seg__b { flex: 0 0 auto; }
 
 /* LA NOTE, UNE SEULE, EN FIN DE FICHE (29/08). Il y en avait trois — Production,
    Consigne, Informations — qui demandaient la meme chose et que la vendeuse
@@ -556,12 +589,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
 .fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
 .fa-docs { display: flex; gap: var(--pas-2); flex-wrap: wrap; }
-.fa-cout { width: 120px; flex: 0 0 120px; }
-.fa-rappel-bloc {
-  flex-shrink: 0; padding: var(--pas-2) var(--pas-4) 0;
-  font-size: var(--fa-lab); color: var(--text-3); line-height: var(--ligne-texte); white-space: pre-line;
-}
-.fa-rappel-bloc:empty { display: none; }
+/* LE COUT ET LE MONTANT DE L'ACOMPTE N'ONT PLUS DE CLASSE DU TOUT : `.fa-cout`
+   ne portait qu'une largeur — 120 px — qui avait un sens quand la bande se
+   calait sur son contenu. Sur des rails, une largeur ecrite est exactement ce
+   qui empeche de tomber sur le trait : la regle est partie, la classe avec.
+   `.fa-ttc` reste, elle : ce n'est pas une largeur qu'elle porte, c'est la
+   graisse du chiffre qu'on vient chercher. */
 
 /* --- ZONE 6 : LA BARRE D'ACTIONS BASSE A ETE RETIREE (29/08) --------------
    Cinq elements sur une rangee pleine largeur, dont un champ de saisie de
@@ -625,48 +658,23 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 @media (max-width: 1180px) {
   .fa-travail { grid-template-columns: 1fr; }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+  /* LA BANDE SUIT LES COLONNES : elle est faite de leurs deux moities, elle
+     s'empile quand elles s'empilent. Restee sur deux, la ligne d'acompte se
+     serrait de 15 px sous ce qu'elle porte, et la bande racontait deux colonnes
+     sous un formulaire qui n'en avait plus qu'une. */
+  .fa-details { grid-template-columns: 1fr; }
+  .fa-details__moitie--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
 }
 
-/* --- LE COMPTE, EN BAS A DROITE (29/08) -----------------------------------
+/* --- LE COMPTE EMPILE A ETE REMPLACE PAR LA BANDE (29/08) -----------------
    Charlie : « le prix visuellement doit etre en bas a droite, c'est la norme ».
-   C'est celle de tout devis et de toute facture : le total ferme le document,
-   cale a droite, ses lignes empilees sur un meme rail — c'est ce rail qui rend
-   la soustraction lisible sans qu'on ecrive « moins ».
+   Il a d'abord ete un compte empile — deux pistes, un filet de total, un signe
+   « moins » — puis la meme demande a ete reformulee en « une seule ligne », et
+   la bande l'a remplace le jour meme. `.fa-argent*` et `.fa-moins` ne sont plus
+   ecrits nulle part dans `fiche-atelier.js` : leurs regles partent avec eux.
+   Ce qui SURVIT du compte, c'est sa grammaire — l'intitule au-dessus de son
+   montant, et le total en bas a droite — tenue par `.fa-case` plus haut. */
 
-   IL PREND LES DEUX PISTES ET SE COLLE A DROITE PAR UNE MARGE AUTOMATIQUE.
-   `justify-content: flex-end` rognerait par la GAUCHE des que le contenu
-   deborde : c'est le debut de la ligne qui disparaitrait, donc le libelle. */
-.fa-argent {
-  /* IL TIENT LA COLONNE DE DROITE, il ne traverse plus les deux (29/08) : c'est
-     ce qui permet a la moitie gauche de venir se poser en face au lieu de
-     s'empiler au-dessus. La marge automatique le garde colle a droite. */
-  margin-left: auto;
-  padding: 0 var(--pas-4);
-  display: grid; grid-template-columns: auto auto;
-  align-items: center;
-  gap: var(--pas-1) var(--pas-3);
-}
-/* LA CASE DU LIBELLE porte aussi ce qui accompagne le montant — la date de
-   l'acompte, le signe « moins ». Rien ne passe a droite du chiffre. */
-/* TOUTE LIGNE DU COMPTE FAIT LA HAUTEUR D'UNE COMMANDE, meme celle qui ne porte
-   qu'un texte. Sans ca, la ligne « marge » — un simple `<span>` de 20 px —
-   ecrasait sa rangee, et les trois lignes de gauche tombaient 6, 3 et 7 px a
-   cote de celles de droite. C'est un JETON, jamais un nombre : la meme hauteur
-   que tout ce qui se clique et se remplit ailleurs dans la fiche. */
-.fa-argent__k, .fa-argent__v { min-height: var(--fa-h-champ); }
-.fa-argent__k {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--pas-1);
-  font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap;
-}
-.fa-argent__v { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
-/* LE FILET DU TOTAL : il traverse les deux pistes, comme sur un devis. */
-.fa-argent__filet { grid-column: 1 / -1; height: 1px; background: var(--border); }
-/* Le signe « moins » dit la soustraction sans l'ecrire en toutes lettres. */
-.fa-moins { font-size: var(--fa-val); color: var(--text-3); }
-.fa-argent__le { font-size: var(--fa-lab); color: var(--text-2); }
-/* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
-   pas — c'est tout l'interet de les empiler. */
-.fa-argent .fa-in { text-align: right; }
 /* LES BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes — la
    largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
    doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px
@@ -705,9 +713,8 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-reste[data-etat="entame"] { background: var(--warning-bg); }
 .fa-reste[data-etat="entame"] .fa-reste__v { color: var(--warning); }
 .fa-solde { flex: 0 0 auto; }
-/* LA LIGNE DU TOTAL SE LIT PLUS FORT QUE LES DEUX QU'ELLE FERME. */
-/* LA LIGNE DU TOTAL SE LIT PLUS FORT QUE LES DEUX QU'ELLE FERME : c'est la
-   seule du bloc qui vienne APRES le filet. */
-.fa-argent__filet + .fa-argent__k { font-weight: var(--graisse-note); color: var(--text-1); }
-/* La date de l'acompte est un champ, pas un montant : elle garde sa largeur. */
-.fa-argent__k .fa-date { text-align: left; }
+/* LA DATE DE L'ACOMPTE SE LIT PAR LA GAUCHE : c'est un champ, pas un montant.
+   Les deux dernieres regles du compte empile (`.fa-argent__filet + …` et
+   `.fa-argent__k .fa-date`) sont parties avec lui — la premiere mettait en gras
+   la ligne qui suivait le filet de total, la seconde faisait deja ceci. */
+.fa-details .fa-date { text-align: left; }

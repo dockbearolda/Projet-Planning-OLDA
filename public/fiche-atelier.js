@@ -327,6 +327,13 @@ export function dessinerFicheAtelier(r, ctx) {
   const ident = el('div', 'fa-ident');
   ident.append(
     el('span', 'fa-ref', fiche.ref || ''),
+    // L'APPARTENANCE AU LOT EST UNE IDENTITÉ, pas un rappel de pied de page.
+    // « Article 2 sur 3 du ticket … » vivait dans le bloc gris du bas, retiré le
+    // 29/08 — dont l'autre ligne redisait mot pour mot le nom du produit affiché
+    // trois centimètres plus haut. Ce fait-là ne se redit nulle part : il prend
+    // sa place ici, dans la même étiquette en capitales que la référence.
+    // Vide sur un dossier ordinaire : `:empty` le retire de la rangée.
+    el('span', 'fa-ref', ctx.lotDossier || ''),
     // LE NOM DU CLIENT MÈNE À SA FICHE : c'est la question qui suit
     // immédiatement « qui est-ce ? » — on a déjà fait quoi pour eux.
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
@@ -496,21 +503,19 @@ export function dessinerFicheAtelier(r, ctx) {
     { court: 'Retrait', requis: true, suite: [chHeure, rappel], apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
 
-  const prevu = ligneDate('Prévu à l’atelier', r.date_prevue, { court: 'Atelier' },
-    (iso) => ctx.patchLigne('date_prevue', iso));
-
   majRappel();
 
-  // « PREVU A L'ATELIER » A CHANGE DE COLONNE : c'est une date de PRODUCTION,
-  // pas un engagement pris devant le client. Elle rejoint la zone qui la porte.
+  // « PRÉVU À L'ATELIER » EST RETIRÉE (29/08, Charlie). C'était la seule date de
+  // la colonne de production, et une deuxieme date a tenir a jour a cote de
+  // celle qu'on a promise au client. La colonne `date_prevue` reste en base —
+  // elle porte l'historique — elle n'est simplement plus editee ici.
+  //
+  // LE FILET PASSE SOUS LE TITRE, DES DEUX COTES. Il separait la DATE du detail :
+  // a droite il n'y a plus de date, et laisser la regle telle quelle aurait fait
+  // partir la colonne de droite 71 px au-dessus de sa voisine. Sous le titre, il
+  // souligne la zone — meme geste a gauche et a droite, et les quatre premieres
+  // rangees des deux colonnes retombent sur la meme ligne.
   // TROIS ZONES, TROIS MOTS : Client, Production, Paiement — ceux de Charlie.
-  // La colonne en portait deux (« Dates », « Client & suivi ») : deux titres
-  // pour une seule zone, et aucun des deux ne disait de quelle zone il s'agit.
-  const blocDates = el('section', 'fa-groupe');
-  blocDates.append(
-    titreSection('Client'),
-    remise.rangee,
-  );
 
   const chClient = champ('fa-fort', r.billing_company || '', { label: 'Client', placeholder: 'Nom du client', requis: true });
   brancher(chClient, { label: 'Client', envoyer: (v) => ctx.patchLigne('billing_company', v || null) });
@@ -565,19 +570,17 @@ export function dessinerFicheAtelier(r, ctx) {
   // dans le panneau Details. Au-dela, il monte ici et occupe le vide, qui se
   // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
   // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
-  gauche.append(blocDates, el('div', 'fa-filet'), blocClient,
+  gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient,
     rangee('Documents', docs));
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
   // =========================================================================
   const droite = el('div', 'fa-col fa-col--d');
-  // MEME FORME QUE LA COLONNE DE GAUCHE : un titre, la DATE, un filet, puis le
-  // detail. Le filet manquait ici — et comme il vaut 1 px plus un ecart, TOUTES
-  // les lignes de droite tombaient 11 px au-dessus de leurs voisines de gauche.
-  // Il separe la meme chose des deux cotes : la date d'un cote du trait, ce
-  // qu'on decrit de l'autre.
-  droite.append(titreSection('Production'), prevu.rangee, el('div', 'fa-filet'));
+  // MEME FORME QUE LA COLONNE DE GAUCHE : un titre, un filet, puis le detail.
+  // Le filet manquait ici — et comme il vaut 1 px plus un ecart, TOUTES les
+  // lignes de droite tombaient 11 px au-dessus de leurs voisines de gauche.
+  droite.append(titreSection('Production'), el('div', 'fa-filet'));
 
   if (prod) {
     const idt = el('div', 'fa-grille-prod');
@@ -768,7 +771,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // UN SEUL FAIT SE SAISIT : le montant de l'acompte et sa date. Les deux
   // drapeaux s'en deduisent — un acompte VERSE a forcement ete DEMANDE — et
   // c'est ce qui garde le feu du planning juste sans qu'on ait a cocher.
-  const chAcompte = champ('fa-cout', r.acompte_montant == null ? '' : normaliserMontant(r.acompte_montant), {
+  const chAcompte = champ(null, r.acompte_montant == null ? '' : normaliserMontant(r.acompte_montant), {
     label: 'Acompte versé', placeholder: '0,00 €',
   });
   const chAcompteDate = champ('fa-date', r.acompte_date
@@ -859,7 +862,7 @@ export function dessinerFicheAtelier(r, ctx) {
 
   const selReglement = menu(null, ctx.reglements, r.paiement_mode || '', 'Mode de règlement');
   brancher(selReglement, { label: 'Mode de règlement', envoyer: (v) => ctx.patchLigne('paiement_mode', v || null) });
-  const chCout = champ('fa-cout', r.cout_revient == null ? '' : normaliserMontant(r.cout_revient), {
+  const chCout = champ(null, r.cout_revient == null ? '' : normaliserMontant(r.cout_revient), {
     label: 'Coût de revient', placeholder: '0,00 €',
   });
   brancher(chCout, {
@@ -913,31 +916,54 @@ export function dessinerFicheAtelier(r, ctx) {
   // = Reste ». Empilee, elle se lisait par un filet ; ici ce sont les deux
   // signes qui la disent. C'est ce qui evite que la barre devienne une rangee de
   // chiffres sans rapport entre eux.
-  const caseArgent = (cle, ...contenu) => {
-    const c = el('div', 'fa-case');
+  // LA BANDE TOMBE SUR LES COLONNES DE LA FICHE (29/08). Charlie, en designant
+  // les six intitules et les quatre rails du formulaire : « je veux que tout ca
+  // soit parfaitement aligne avec ces colonnes ». Elle flottait a DROITE, callee
+  // par une marge automatique, chaque case a la largeur de son contenu : le
+  // premier intitule commencait a 320 px, c'est-a-dire sur rien. Six valeurs
+  // posees sous un formulaire, et pas une qui partait d'un trait existant.
+  //
+  // Elle reprend donc EXACTEMENT la grille des deux colonnes : deux moities, et
+  // dans chacune les quatre memes pistes — intitule, valeur, intitule, valeur.
+  // Chaque case part d'un rail que l'oeil connait deja, et le trait qui separe
+  // l'atelier du client tombe pile sur celui qui separe les deux colonnes.
+  //
+  // LES DEUX SIGNES « − » ET « = » SONT PARTIS AVEC LE FLOTTEMENT. Ils disaient
+  // la soustraction quand la bande n'etait qu'une suite de chiffres sans rapport
+  // entre eux ; sur des rails, sous leurs intitules, « Prix TTC », « Acompte
+  // verse le » et « Reste a payer » se lisent dans cet ordre sans qu'on ait a
+  // ponctuer. Et un signe n'a pas de rail : garde, il aurait decale les trois
+  // cases qui le suivent.
+  const caseArgent = (cle, cls, ...contenu) => {
+    const c = el('div', `fa-case${cls ? ` ${cls}` : ''}`);
     c.append(el('div', 'fa-case__k', cle));
     const v = el('div', 'fa-case__v');
     v.append(...contenu.filter(Boolean));
     c.append(v);
     return c;
   };
-  const signe = (t) => el('div', 'fa-signe', t);
 
-  panneau.append(
-    // A GAUCHE, ce qui ne regarde que l'atelier.
-    caseArgent('Coût', chCout),
-    caseArgent('Marge', valMarge),
-    caseArgent('Règlement', selReglement),
-    el('div', 'fa-sep'),
-    // A DROITE, le compte du client — et la barre finit sur le nombre qu'on
-    // vient chercher, en bas a droite : c'est la norme, elle ne change pas
-    // parce que le compte s'est couche.
-    caseArgent('Prix TTC', chTtc),
-    signe('−'),
-    caseArgent('Acompte versé le', chAcompteDate, pastilleAcompte(0.3), pastilleAcompte(0.5), chAcompte),
-    signe('='),
-    caseArgent('Reste à payer', bSolde, reste),
+  // A GAUCHE, ce qui ne regarde que l'atelier — sur les rails de la colonne
+  // Client. « Reglement » prend les deux dernieres pistes : c'est un menu, et le
+  // plus long de ses libelles demande 183 px quand une piste d'intitule en fait
+  // 106. Une colonne n'est jamais plus etroite que ce qu'elle porte.
+  const moitieG = el('div', 'fa-details__moitie fa-details__moitie--g');
+  moitieG.append(
+    caseArgent('Coût', null, chCout),
+    caseArgent('Marge', null, valMarge),
+    caseArgent('Règlement', 'fa-case--large', selReglement),
   );
+  // A DROITE, le compte du client — sur les rails de la colonne Production. La
+  // bande finit sur le nombre qu'on vient chercher, cale au bord droit : le meme
+  // que celui ou finissent tous les champs de la colonne au-dessus.
+  const moitieD = el('div', 'fa-details__moitie');
+  moitieD.append(
+    caseArgent('Prix TTC', null, chTtc),
+    caseArgent('Acompte versé le', 'fa-case--large',
+      chAcompteDate, pastilleAcompte(0.3), pastilleAcompte(0.5), chAcompte),
+    caseArgent('Reste à payer', 'fa-case--fin', bSolde, reste),
+  );
+  panneau.append(moitieG, moitieD);
 
   // LE CHAMP DES NOTES VIT DANS LA COLONNE GAUCHE, POINT. Il y avait ici un
   // seuil de hauteur (420 px) qui le renvoyait dans le panneau sur un ecran
@@ -1009,12 +1035,12 @@ export function dessinerFicheAtelier(r, ctx) {
   // pas de raison de tenir dans une demi-colonne.
   scene.append(travail, blocNote, panneau);
   const carte = el('div', 'fa-carte');
-  // LA PROVENANCE DU DOSSIER — « Créée le … depuis Demande de devis » — n'est
-  // ni du client, ni de la production, ni du paiement : c'est l'identité de la
-  // ligne. Elle vivait au bout du panneau du bas ; elle se pose en pied de
-  // carte, là où on la lit sans la chercher.
-  const rappelDossier = el('div', 'fa-rappel-bloc', ctx.rappelDossier || '');
-  carte.append(tete, bandeau, scene, rappelDossier, barreDetails);
+  // LE BLOC DE PIED EST RETIRÉ (29/08, Charlie). Il portait deux lignes : le nom
+  // du produit — déjà écrit dans l'entête, à trois centimètres, et c'est
+  // exactement le doublon que la règle du 26/08 interdit — et l'horodatage de
+  // création, que personne ne vient chercher sur une fiche d'atelier. Ce qu'il
+  // disait d'utile, l'appartenance au lot, a rejoint l'entête (voir plus haut).
+  carte.append(tete, bandeau, scene, barreDetails);
   racine.append(carte, calque, zoneToast);
   return racine;
 }

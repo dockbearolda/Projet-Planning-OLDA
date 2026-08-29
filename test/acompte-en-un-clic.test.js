@@ -67,9 +67,9 @@ assert.match(BLOC, /if \(n === avant\) return;/,
 // calculent l'ACOMPTE : elles sont dans sa case. « Soldé » met le RESTE à zéro :
 // il est dans la sienne, et devant le nombre — la bande finit sur le chiffre
 // qu'on vient y chercher.
-assert.match(JS, /caseArgent\('Acompte versé le', chAcompteDate, pastilleAcompte\(0\.3\), pastilleAcompte\(0\.5\), chAcompte\)/,
+assert.match(JS, /caseArgent\('Acompte versé le', 'fa-case--large',\s*\n\s*chAcompteDate, pastilleAcompte\(0\.3\), pastilleAcompte\(0\.5\), chAcompte\)/,
   'les deux pastilles sont dans la case de l’acompte, qu’elles calculent');
-assert.match(JS, /caseArgent\('Reste à payer', bSolde, reste\)/,
+assert.match(JS, /caseArgent\('Reste à payer', 'fa-case--fin', bSolde, reste\)/,
   '« Soldé » est dans la case du reste, qu’il met à zéro');
 assert.match(BLOC, /`\$\{Math\.round\(part \* 100\)\} %`/,
   'le libellé se déduit du taux : un seul nombre, pas deux à tenir d’accord');
@@ -86,27 +86,57 @@ assert.strictEqual(acompte(52.1, 0.5), 26.05);
 // ---------------------------------------------------------------------------
 // Charlie : « je veux que tu fasses rentrer ça proprement sur une seule ligne ».
 // Les deux blocs empilés demandaient 202 px de haut pour six valeurs.
-assert.match(JS, /const caseArgent = \(cle, \.\.\.contenu\) => \{/,
+assert.match(JS, /const caseArgent = \(cle, cls, \.\.\.contenu\) => \{/,
   'chaque valeur est une case : son intitulé au-dessus, sa valeur dessous');
-// LA SOUSTRACTION SE LIT ENCORE, à l'horizontale : empilée, un filet la disait ;
-// couchée, ce sont les deux signes. Sans eux la bande devient une rangée de
-// chiffres sans rapport entre eux.
-assert.match(JS, /signe\('−'\)/, 'le moins de la soustraction');
-assert.match(JS, /signe\('='\)/, 'et son égal');
-const DETAILS = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
-assert.match(DETAILS, /display: flex; align-items: flex-end;/,
-  'les VALEURS s’alignent entre elles ; les intitulés montent au-dessus');
-assert.ok(!/justify-content: flex-end/.test(DETAILS),
-  'jamais `flex-end` : il rogne par la gauche quand ça déborde');
+// LES DEUX SIGNES « − » ET « = » SONT PARTIS AVEC LE FLOTTEMENT (29/08). Ils
+// disaient la soustraction quand la bande n'était qu'une suite de chiffres
+// calée à droite, sans rapport entre eux. Sur les rails des colonnes, sous
+// leurs intitulés, « Prix TTC », « Acompte versé le » et « Reste à payer » se
+// lisent dans cet ordre sans qu'on ait à ponctuer — et un signe n'a pas de
+// rail : gardé, il aurait décalé les trois cases qui le suivent.
+assert.ok(!/signe\('−'\)/.test(JS) && !/const signe =/.test(JS),
+  'plus de signes intercalaires : ils n’ont pas de rail, ils décaleraient tout ce qui suit');
+assert.ok(!/fa-signe/.test(CSS), '… et leur règle est partie avec eux');
 
-// UNE CASE NE SE LAISSE PAS COMPRIMER SOUS SON CONTENU. Sans ça, flexbox rogne
-// la plus large pour faire tenir la bande : « 26,05 € » passait à la ligne DANS
-// sa bulle, 61 px de haut pour une police de 21 — un montant coupé en deux, à
-// l'endroit même où on vient chercher le chiffre.
+// LA BANDE TOMBE SUR LES COLONNES DE LA FICHE (29/08). Charlie, en désignant
+// les six intitulés puis quatre intitulés du formulaire : « je veux que tout ça
+// soit parfaitement aligné avec ces colonnes ». Elle flottait à DROITE par une
+// marge automatique, chaque case à la largeur de son contenu : le premier
+// intitulé commençait à 320 px, c'est-à-dire sur rien.
+const DETAILS = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
+assert.match(DETAILS, /display: grid; grid-template-columns: 1fr 1fr;/,
+  'la bande reprend les DEUX moitiés de `.fa-travail`');
+assert.ok(!/margin-left: auto/.test(DETAILS),
+  'elle ne flotte plus à droite : elle part du bord gauche du contenu, comme les colonnes');
+const MOITIE = CSS.match(/\.fa-details__moitie \{[\s\S]*?\n\}/)[0];
+assert.match(MOITIE, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
+  '… et dans chaque moitié les QUATRE MÊMES PISTES que les deux grilles du haut');
+const GRILLES = CSS.match(/\.fa-grille-client,\n\.fa-grille-prod \{[^}]*\}/)[0];
+assert.match(GRILLES, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
+  '… lues là où elles sont écrites : trois rails recopiés, ce sont trois rails qui divergent');
+assert.ok(!/justify-content: flex-end/.test(DETAILS) && !/justify-content: flex-end/.test(MOITIE),
+  'jamais `flex-end` : il rogne par la gauche quand ça déborde');
+// LA DERNIÈRE CASE FINIT SUR LE BORD DROIT, par une MARGE AUTOMATIQUE : c'est
+// le nombre qu'on vient chercher, et `flex-end` ferait disparaître son début.
+assert.match(CSS, /\.fa-case--fin \.fa-case__v > \*:first-child \{ margin-left: auto; \}/,
+  'le reste à payer se colle à droite par une marge, jamais par `flex-end`');
+
+// UNE CASE NE DÉBORDE PAS DE SA PISTE. `min-width: 0` est obligatoire : la
+// largeur intrinsèque d'un `<input>` ou d'un `<select>` l'emporte sinon sur la
+// piste, et la moitié sort de sa colonne. (Avant la grille, c'était
+// `flex-shrink: 0` qui tenait ce rôle : sans lui, « 26,05 € » passait à la
+// ligne DANS sa bulle, 61 px de haut pour une police de 21.)
 const CASE = CSS.match(/\.fa-case \{[^}]*\}/)[0];
-assert.match(CASE, /flex-shrink: 0/, 'une case ne se comprime pas sous son montant');
+assert.match(CASE, /min-width: 0/, 'une case ne déborde pas de sa piste');
 assert.match(CSS, /\.fa-case__v \{[^}]*white-space: nowrap;/,
   'et son montant ne s’enroule pas');
+// ET LE MONTANT PART DU RAIL DE SON INTITULÉ. Un champ de la fiche est inséré
+// de son rembourrage ; dans les colonnes ça ne se voit pas, l'intitulé est sur
+// un AUTRE rail. Ici il est juste au-dessus. Le rembourrage rendu, c'est aussi
+// 20 px de plus pour le montant : « 1 250,50 € » débordait de 2 px du coût et
+// de 9 px du prix TTC — mesuré au rendu.
+assert.match(CSS, /\.fa-details \.fa-in \{[^}]*padding: 0;/,
+  'le texte d’un champ de la bande part du rail, pas 10 px à droite');
 
 // ⚠ LE SÉLECTEUR DES BOUTONS SUIT LA CASE. Il portait sur `.fa-argent__k`, la
 // case de l'ancien compte empilé : la bande l'a remplacée, la règle ne mordait
