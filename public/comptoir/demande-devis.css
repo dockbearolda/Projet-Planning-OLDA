@@ -142,7 +142,7 @@ b,strong{font-weight:var(--graisse-forte)}
    donc posé à côté de la liste, en clair. Les deux mènent au même formulaire :
    il n'y en a pas un deuxième à tenir. */
 .cat-hors{display:inline-flex;align-items:center;gap:7px;margin-top:var(--pas-3)}
-.cat-hors-plus{line-height:1}
+.cat-hors-plus{line-height:var(--ligne-glyphe)}
 @media(max-width:700px){.cat-ligne>.field{flex:1 1 100%}.cat-ligne button{width:100%}.cat-hors{display:flex;width:100%;justify-content:center}}
 /* LA DEMANDE — une LIGNE par article, pas une carte. Un devis de dix articles
    tenait sur trois écrans : la vendeuse ne voyait plus ce qu'elle venait
@@ -185,7 +185,7 @@ b,strong{font-weight:var(--graisse-forte)}
    le prix, lui, reprend le rail du nom et des intitulés : d'où le décalage
    d'exactement une gouttière de quantité plus une gouttière de colonne. */
 .need-pied{display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;margin-top:var(--pas-2);padding-top:var(--pas-2);border-top:1px solid var(--border-soft)}
-.priority-stars{font-size:var(--taille-texte);line-height:1}
+.priority-stars{font-size:var(--taille-texte);line-height:var(--ligne-glyphe)}
 .priority-card strong{font-size:var(--taille-texte)}
 .priority-card small{font-size:var(--taille-texte);line-height:var(--ligne-texte);color:var(--text-2)}
 @media(max-width:760px){.priority-grid{grid-template-columns:1fr}}
@@ -1097,6 +1097,11 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-client-box{
   padding:16px 18px;
   font-size:16px;
+/* LE TICKET GARDE SES PROPRES INTERLIGNES, comme il garde ses propres tailles
+   et son encre noire : c'est un PAPIER, pas un ecran. Il compose sur 80 mm et
+   se relit a l'etabli — l'echelle de l'application ne le regarde pas. Partout
+   ailleurs, l'interligne est un jeton (voir charte.css).
+   Verifie : ce sont les SEULS interlignes ecrits en clair de cet ecran. */
   line-height:1.55;
   border:1px solid #d9dee7}
 .ticket-section-label{

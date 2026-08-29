@@ -61,7 +61,7 @@
   background: transparent;
   color: var(--text-2);
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--arrondi-champ);
@@ -197,7 +197,7 @@
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: var(--pilule);
-  line-height: 1.55;
+  line-height: var(--ligne-texte);
 }
 .cl-nature--pro { color: var(--st-demande); background: var(--st-demande-bg); }
 .cl-nature--perso { color: var(--st-archive); background: var(--st-archive-bg); }

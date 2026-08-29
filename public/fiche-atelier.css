@@ -72,6 +72,9 @@
      relisant une moitie, seulement en mesurant les deux. 106 px, parce qu'une
      colonne n'est jamais plus etroite que son intitule (« Type de client »). */
   --fa-lab-w: 106px;
+  /* L'ECARTEMENT DES CAPITALES, une fois. Une etiquette en capitales se lit
+     mal collee : c'est le seul endroit de l'ecran ou l'on ecarte les lettres. */
+  --fa-caps: .09em;
   --fa-point: 7px;
   --fa-coche: 16px;
   /* DEUX HAUTEURS ONT DISPARU LE 29/08, elles ne se remplacent pas : elles se
@@ -84,6 +87,13 @@
   --fa-undo-fond: rgba(var(--on-primary-rgb, 255, 255, 255), .14);
   --fa-undo-fond-2: rgba(var(--on-primary-rgb, 255, 255, 255), .26);
 
+  /* L'INTERLIGNE EST UN JETON, ET IL EST POSE ICI (29/08). 138 des 141 textes
+     de cet ecran se rendaient en `line-height: normal` : c'est le CONTENU qui
+     decidait de leur hauteur, jamais la recette. C'est le defaut qui a donne
+     cinq boutons de 37, 39, 40, 44 et 50 px au meme rembourrage.
+     Deux interlignes, pas plus : celui du texte, et celui — plus serre — de
+     tout ce qui tient sur UNE ligne dans une boite. */
+  line-height: var(--ligne-texte);
   display: flex;
   flex-direction: column;
   border-bottom-left-radius: var(--arrondi-carte);
@@ -121,12 +131,18 @@
   border-radius: var(--arrondi-champ);
   background: transparent;
   color: var(--text-1);
+  /* `font: inherit` REMET L'INTERLIGNE DE L'HERITAGE : il doit donc etre
+     reecrit APRES, jamais avant — le raccourci annule ce qu'on a pose. */
   font: inherit;
   font-size: var(--fa-val);
+  line-height: var(--ligne-serre);
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
               color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-textarea.fa-in { height: auto; padding: var(--pas-1) var(--pas-2); line-height: 1.45; resize: none; }
+/* UNE ZONE DE TEXTE PORTE PLUSIEURS LIGNES : elle reprend l'interligne du
+   texte, pas celui d'une commande d'une ligne. (Elle ecrivait 1.45 en clair —
+   c'est-a-dire la valeur de `--ligne-texte`, recopiee.) */
+textarea.fa-in { height: auto; padding: var(--pas-1) var(--pas-2); line-height: var(--ligne-texte); resize: none; }
 select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-in::placeholder { color: var(--text-3); }
 /* Un champ vide se voit sans qu'on le survole : c'est ce qui manque au dossier.
@@ -151,6 +167,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   background: var(--surface);
   color: var(--text-2);
   font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
@@ -158,7 +175,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-btn:hover { background: var(--bg); color: var(--text-1); }
 .fa-btn--mini { padding: 0 var(--pas-2); }
-.fa-btn--carre { width: var(--fa-h-champ); padding: 0; font-size: var(--taille-texte); }
+/* UNE ICONE SEULE PREND LE ROND — c'est la forme qui dit le role (rectangle
+   arrondi : ca se remplit ou ca agit ; rond : une icone, une initiale ; pilule :
+   une etiquette). La croix de la fiche etait un rectangle nomme « carre », a la
+   boite d'un champ. C'est le meme rond que le bouton « revenir » de la charte. */
+.fa-btn--carre {
+  width: var(--rond); height: var(--rond); padding: 0;
+  border-radius: var(--pilule);
+  font-size: var(--fa-val);
+}
 /* Le seul bouton plein de l'écran : celui qui fait AVANCER le dossier. */
 .fa-btn--plein {
   border-color: var(--primary); background: var(--primary); color: var(--surface);
@@ -174,7 +199,10 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   border-bottom: 1px solid var(--border);
 }
 .fa-ident { display: flex; align-items: baseline; gap: var(--pas-2); min-width: 0; }
-.fa-ref { font-size: var(--fa-lab); font-weight: var(--graisse-forte); letter-spacing: .06em; color: var(--text-3); }
+/* LA REFERENCE ET LES TITRES DE ZONE SONT LA MEME CHOSE : une etiquette en
+   capitales. Elles avaient deux ecartements de lettres, .06em et .09em — deux
+   reglages pour une intention, et l'ecart ne se voit qu'en les mesurant. */
+.fa-ref { font-size: var(--fa-lab); font-weight: var(--graisse-forte); letter-spacing: var(--fa-caps); color: var(--text-3); }
 .fa-client {
   padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
   font: inherit; font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
@@ -236,7 +264,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   flex: 0 0 88px; height: var(--fa-h-bandeau);
   border: 1px solid var(--border); border-radius: var(--arrondi-champ);
   background: var(--surface); color: var(--text-2);
-  font: inherit; font-size: var(--fa-lab);
+  font: inherit; font-size: var(--fa-lab); line-height: var(--ligne-serre);
+  /* LA GRAISSE NE BOUGE PAS QUAND ON CHOISIT. Le bouton actif passait en 600 :
+     le mot s'elargissait sous le doigt, dans une boite de largeur fixe. L'etat
+     se dit par le FOND, qui ne deplace rien. */
+  font-weight: var(--graisse-note);
   cursor: pointer; white-space: nowrap;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
               border-color var(--dur-1) var(--ease);
@@ -244,7 +276,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-seg__b:hover { background: var(--bg); color: var(--text-1); }
 .fa-seg__b[aria-pressed="true"] {
   border-color: var(--primary); background: var(--primary); color: var(--surface);
-  font-weight: var(--graisse-note);
 }
 
 /* --- ZONES 3 et 4 : les deux colonnes -------------------------------------
@@ -269,7 +300,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-col--d { gap: var(--pas-2); }
 .fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
 .fa-sec {
-  font-size: var(--fa-lab); letter-spacing: .09em; text-transform: uppercase;
+  font-size: var(--fa-lab); letter-spacing: var(--fa-caps); text-transform: uppercase;
   color: var(--text-3); font-weight: var(--graisse-forte);
 }
 .fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
@@ -441,7 +472,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-cout { width: 120px; flex: 0 0 120px; }
 .fa-rappel-bloc {
   flex-shrink: 0; padding: var(--pas-2) var(--pas-4) 0;
-  font-size: var(--fa-lab); color: var(--text-3); line-height: 1.5; white-space: pre-line;
+  font-size: var(--fa-lab); color: var(--text-3); line-height: var(--ligne-texte); white-space: pre-line;
 }
 .fa-rappel-bloc:empty { display: none; }
 

@@ -213,6 +213,12 @@
   /* Les champs et les boutons : en RAPPORT et non en « normal », sinon Chrome
      ne calcule pas la boite d'un div comme celle d'un champ. */
   --ligne-champ: 1.375;
+  /* AUCUN INTERLIGNE : le glyphe fait sa propre boite. Un pictogramme, une
+     initiale, une croix — rien qui se lise sur plusieurs lignes. Il valait `1`
+     ecrit en clair a HUIT endroits de styles.css : c'est le meme rôle, il lui
+     fallait un nom. Ne jamais le poser sur un texte : la boite tomberait sous
+     la hauteur des jambages. */
+  --ligne-glyphe: 1;
 
   /* Les formes. « --radius » et « --radius-card » plus haut disent la même
      chose pour le planning ; ces trois-là nomment les trois seules formes de
@@ -536,7 +542,7 @@ input[type="radio"]:focus-visible {
   width: 22px; height: 22px; border-radius: var(--pilule);
   border: 1.5px solid var(--border-strong);
   display: grid; place-items: center;
-  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: 1;
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height:var(--ligne-glyphe);
 }
 /* Le trait qui relie deux étapes. Posé à GAUCHE de chaque bulle sauf la
    première : dans une rangée qui peut se replier, un trait accroché à droite

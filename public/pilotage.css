@@ -20,8 +20,8 @@
 .pil-tuile__titre { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
 /* La SEULE grande taille de l'écran, et elle est là pour ça : « les chiffres
    qu'on annonce au client » — ici, ceux qu'on s'annonce à soi-même. */
-.pil-tuile__n { font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.pil-tuile__note { font-size: var(--taille-note); color: var(--text-2); line-height: 1.4; }
+.pil-tuile__n { font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: var(--ligne-glyphe); }
+.pil-tuile__note { font-size: var(--taille-note); color: var(--text-2); line-height: var(--ligne-texte); }
 .pil-tuile.is-alerte { border-color: var(--st-bloque); background: var(--st-bloque-bg); }
 .pil-tuile.is-alerte .pil-tuile__n { color: var(--st-bloque); }
 .pil-tuile.is-attention .pil-tuile__n { color: var(--warning); }

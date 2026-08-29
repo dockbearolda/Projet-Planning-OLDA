@@ -216,8 +216,10 @@ assert.ok(prix, 'la cellule du prix doit reprendre la main sur la hauteur du cha
 assert.match(prix[0], /height: auto;/,
   'le champ ne prend plus la hauteur d’une rangée');
 // `line-height: normal` laisse le CONTENU décider de la hauteur — c'est ce qui
-// donne trois hauteurs de champ dans une même application.
-assert.match(prix[0], /line-height: 1\.3;/);
+// donne trois hauteurs de champ dans une même application. Et il est un JETON
+// depuis le 29/08 : il s'écrivait en dix valeurs dans styles.css, dont cinq
+// pour la seule taille de 17 px.
+assert.match(prix[0], /line-height: var\(--ligne-serre\);/);
 
 // LE MÊME BORD DROIT. 24 px de rembourrage pour le champ, 8 pour le HT : deux
 // nombres alignés à droite et décalés de 16 px l'un sous l'autre.

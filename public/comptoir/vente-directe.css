@@ -337,6 +337,11 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
   border-radius:var(--arrondi-champ);
   font-size:var(--tk-texte);
   font-weight:var(--graisse-forte);
+/* LE TICKET GARDE SES PROPRES INTERLIGNES, comme il garde ses propres tailles
+   et son encre noire : c'est un PAPIER, pas un ecran. Il compose sur 80 mm et
+   se relit a l'etabli — l'echelle de l'application ne le regarde pas. Partout
+   ailleurs, l'interligne est un jeton (voir charte.css).
+   Verifie : ce sont les SEULS interlignes ecrits en clair de cet ecran. */
   line-height:1.55;
   margin-bottom:16px;
 }
@@ -691,7 +696,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 #ticketArea #ticketPickup{font-size:var(--tk-texte)}
 #ticketArea .ticket-product-description{white-space:pre-line}
 
-.live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.55}
+.live-check{margin:14px 0 0;padding:12px 14px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:var(--ligne-texte)}
 .live-check.ok{background:var(--success-bg);border:1px solid var(--success-line);color:var(--success)}
 .live-check.todo{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 .live-check ul{margin:7px 0 0;padding-left:18px}
@@ -718,7 +723,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 }
 .delay-chip:hover{border-color:var(--border-strong)!important;background:var(--surface-hover)}
 .delay-chip:active{background:var(--primary-soft)}
-.delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:1.5}
+.delay-warn{margin-top:9px;padding:11px 13px;border-radius:var(--arrondi-bloc);font-weight:var(--graisse-forte);line-height:var(--ligne-texte)}
 .delay-warn.bad{background:var(--danger-bg);border:1px solid var(--danger-line);color:var(--danger)}
 .delay-warn.warn{background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning)}
 /* `.ok` n'existe plus : le créneau valide ne s'annonce pas (voir checkDeliveryDate). */

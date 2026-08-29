@@ -373,8 +373,18 @@ assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/plus-jakarta-sans-la
   '… et le fichier de la seconde police ne dort plus dans public/');
 // Chrome impose Arial aux champs et aux boutons : sans cette règle, « Colonnes »
 // — le seul bouton d'icône à porter un mot — sortait en Arial 17 px.
-assert.match(CRM, /button, input, select, textarea \{ font-family: inherit; \}/,
-  'les contrôles héritent de la police du corps');
+{
+  const regle = CRM.match(/button, input, select, textarea \{[^}]*\}/);
+  assert.ok(regle, 'la règle qui rend aux contrôles ce que Chrome leur prend');
+  for (const [quoi, attendu] of [
+    ['la police', /font-family: inherit;/],
+    ['la taille', /font-size: inherit;/],
+    ['l’interligne', /line-height: var\(--ligne-serre\);/],
+  ]) assert.match(regle[0], attendu, `les contrôles héritent de ${quoi} du corps`);
+  // PAS le raccourci `font:` — il écraserait l'interligne qu'on vient de poser.
+  assert.ok(!/\bfont:\s/.test(regle[0]),
+    '… et jamais par le raccourci `font:`, qui remet l’interligne de l’héritage');
+}
 
 // ===========================================================================
 // 13. UN JETON, UNE VALEUR
@@ -482,3 +492,53 @@ for (const [nom, src] of [['charte.css', CHARTE], ['styles.css', CRM]]) {
 
 console.log('✓ uniformité : une boîte, trois graisses, le gris qui se lit, et tout atteignable au clavier');
 console.log('✓ couleur : l’exception du rail est écrite, et elle reste au rail');
+
+
+// ===========================================================================
+// L'INTERLIGNE EST UN JETON — MESURÉ AU RENDU LE 29/08/2026
+// ===========================================================================
+// Charlie, en désignant la fiche : « sur toute cette page y'a un énorme
+// problème de taille de police, de normalisation… applique pharedesign et
+// normalise les polices, leurs tailles et leurs formes ».
+//
+// Ce qui était vraiment faux, mesuré AU RENDU et pas dans la feuille :
+//   · 138 des 141 textes de la fiche et 50 des 86 du planning se composaient en
+//     `line-height: normal` — c'est la FONTE qui décidait de leur hauteur ;
+//   · là où il était écrit, il l'était en DIX valeurs différentes dans le seul
+//     styles.css, dont cinq pour la même taille de 17 px : 17 / 22,1 / 23,4 /
+//     24,7 / 27,2 px d'interligne sur le même texte.
+//
+// C'est la quatrième loi du système : une boîte SORT du texte, de son
+// interligne et de son rembourrage. Quatre interlignes, chacun avec son rôle :
+//   --ligne-titre  1.2    ce qu'on annonce
+//   --ligne-champ  1.375  (--ligne-serre) une ligne dans une boîte
+//   --ligne-texte  1.45   la prose
+//   --ligne-glyphe 1      un pictogramme, une initiale — pas du texte
+{
+  const FEUILLES = [
+    'public/styles.css', 'public/charte.css', 'public/clients.css', 'public/projet.css',
+    'public/fiche-atelier.css', 'public/dashboard.css', 'public/reglages.css',
+    'public/tailles-logos.css', 'public/montravail.css', 'public/pilotage.css',
+  ];
+  const enDur = [];
+  for (const f of FEUILLES) {
+    const css = lire(f).replace(/\/\*[\s\S]*?\*\//g, ' ');
+    for (const m of css.matchAll(/line-height:\s*([0-9][\w.%]*)/g)) {
+      enDur.push(`${f} : line-height: ${m[1]}`);
+    }
+  }
+  assert.deepStrictEqual(enDur, [],
+    'un interligne s’écrit avec un jeton, jamais en clair :\n  ' + enDur.join('\n  '));
+
+  // Les quatre jetons existent, et ils se déclarent UNE fois.
+  const CHARTE0 = lire('public/charte.css');
+  for (const jeton of ['--ligne-titre', '--ligne-texte', '--ligne-champ', '--ligne-glyphe']) {
+    const n = (CHARTE0.match(new RegExp(`^\\s*${jeton}:`, 'gm')) || []).length;
+    assert.strictEqual(n, 1, `${jeton} se déclare une seule fois, dans la charte (trouvé ${n})`);
+  }
+
+  // ET LE CORPS EN POSE UN : sans lui, tout ce qui n'a pas de règle propre
+  // retombe sur `normal`, et la fonte reprend la main.
+  assert.match(lire('public/styles.css'), /line-height: var\(--ligne-texte\);/,
+    'le corps de l’application pose l’interligne du texte');
+}

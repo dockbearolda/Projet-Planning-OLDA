@@ -50,7 +50,7 @@
    signale qu'un état — un vert ici laisserait croire à un statut « OK ». */
 .reg-card__ic { font-size: var(--ic); color: var(--text-2); }
 .reg-card__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.reg-card__desc { margin: 4px 0 0; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
+.reg-card__desc { margin: 4px 0 0; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 
 .reg-field { display: flex; flex-direction: column; gap: 8px; }
 .reg-textarea {
@@ -62,7 +62,7 @@
   color: var(--text-1);
   font: inherit;
   font-size: var(--taille-texte);            /* iOS : en dessous de 16px, le champ zoome */
-  line-height: 1.55;
+  line-height: var(--ligne-texte);
   resize: vertical;
   min-height: 104px;
 }
@@ -97,7 +97,7 @@
   background: var(--st-livree-bg);
   color: var(--text-1);
   font-size: var(--taille-texte);
-  line-height: 1.5;
+  line-height: var(--ligne-texte);
   white-space: pre-wrap;
 }
 .reg-apercu__bulle.is-vide { background: var(--surface-hover); color: var(--text-2); font-style: italic; }

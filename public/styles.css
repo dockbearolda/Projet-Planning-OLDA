@@ -55,6 +55,18 @@ html, body {
   font-family: var(--font);
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
+  /* L'INTERLIGNE EST POSÉ ICI, ET IL EST UN JETON (29/08/2026).
+     Il ne l'était NULLE PART : mesuré au rendu, 50 des 86 textes de l'écran du
+     planning se composaient en `line-height: normal` — c'est-à-dire que la
+     POLICE décidait de leur hauteur, jamais la recette. Et là où il était
+     écrit, il l'était en dix valeurs différentes, dont cinq pour la seule
+     taille de 17 px : 17, 22,1, 23,4, 24,7 et 27,2 px d'interligne sur le même
+     texte. C'est la quatrième loi du système : une boîte SORT du texte, de son
+     interligne et de son rembourrage — elle ne s'écrit pas, et surtout elle ne
+     se laisse pas décider par la fonte.
+     Deux interlignes, et deux seulement : celui du texte (ici), et le SERRÉ,
+     que prend tout ce qui tient sur une ligne dans une boîte (juste dessous). */
+  line-height: var(--ligne-texte);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
@@ -74,7 +86,24 @@ body {
    piège que le second audit annonçait comme latent ; il ne l'était pas.
    L'écran de la demande pose la même règle depuis longtemps ; elle manquait
    ici. */
-button, input, select, textarea { font-family: inherit; }
+/* …NI DE LA TAILLE, NI DE L'INTERLIGNE. Même cause, deux oublis de plus.
+   LA TAILLE : Chrome pose 13,33 px sur une commande. Mesuré au rendu le 29/08,
+   133 commandes de l'application s'y rendaient — 78 des 88 de la Base clients,
+   39 des 129 des Réglages, 16 des 58 du planning. Aucune ne BOUGE en héritant
+   des 17 px (vérifié : zéro déplacement sur les trois écrans), parce qu'elles
+   ne portent qu'une icône, dont la taille est posée à part. C'est un piège
+   LATENT : le jour où l'une d'elles reçoit un mot, ce mot sort en 13,33 px au
+   milieu d'une page en 17 — c'est exactement ce qui était arrivé à « Colonnes »
+   le 25/08, et on n'avait corrigé que la police.
+   L'INTERLIGNE : Chrome pose `normal`, donc la fonte décide de la boîte. Une
+   commande tient sur UNE ligne dans une boîte : elle prend le serré.
+   ⚠ PAS `font: inherit` : le raccourci écrase l'interligne qu'on vient de
+   poser — c'est un piège déjà payé sur cet écran. */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: var(--ligne-serre);
+}
 
 /* Icônes Material Symbols.
    Chaque icône est un MOT écrit en toutes lettres (« view_kanban », « search »)
@@ -102,7 +131,7 @@ button, input, select, textarea { font-family: inherit; }
   flex-shrink: 0;
   font-weight: normal;
   font-style: normal;
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   letter-spacing: normal;
   text-transform: none;
   display: inline-block;
@@ -311,7 +340,7 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: var(--shadow-pose);
 }
 .poste-titre { margin: 0 0 8px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.poste-aide { margin: 0 0 20px; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
+.poste-aide { margin: 0 0 20px; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 .poste-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .poste-choix-btn {
   display: flex;
@@ -389,13 +418,13 @@ button, input, select, textarea { font-family: inherit; }
 .grid-search-ic { font-size: var(--ic); color: var(--text-2); flex-shrink: 0; }
 .grid-search-clear {
   border: 0; background: transparent; color: var(--text-2);
-  font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1; cursor: pointer; padding: 2px 4px;
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-glyphe); cursor: pointer; padding: 2px 4px;
   border-radius: 50%; flex-shrink: 0;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .grid-search-clear:hover { color: var(--text-1); background: var(--state-hover); }
 .grid-search-kbd {
-  font-family: inherit; font-size: var(--taille-texte); line-height: 1.6; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2);
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--arrondi-champ);
   padding: 0 6px; flex-shrink: 0;
 }
@@ -954,7 +983,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .fiverr-tool-result-value {
   font-size: var(--taille-grand);
   font-weight: var(--graisse-texte);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   color: var(--primary);
   font-variant-numeric: tabular-nums;
 }
@@ -1050,9 +1079,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
   text-transform: uppercase; color: var(--text-2);
 }
-.pcard__client { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1.2; color: var(--text-1); }
+.pcard__client { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); color: var(--text-1); }
 .pcard__ref { margin-top: 3px; font-size: var(--taille-texte); color: var(--text-2); }
-.pcard__name { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1.25; color: var(--text-1); }
+.pcard__name { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); color: var(--text-1); }
 .pcard__meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 .pcard__pill {
   display: inline-block; padding: 4px 7px; border-radius: var(--pilule);
@@ -1069,7 +1098,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .pcard__motif {
   margin-top: 6px; padding-left: 8px;
   border-left: 2px solid var(--st-bloque);
-  font-size: var(--taille-texte); line-height: 1.35; color: var(--text-2);
+  font-size: var(--taille-texte); line-height: var(--ligne-serre); color: var(--text-2);
 }
 /* CE QU'IL Y A À FAIRE — le MÊME bloc sur la carte et dans la cellule « Infos »
    du tableau (voir blocProduction dans app.js). Le chef d'atelier lisait une
@@ -1177,13 +1206,13 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .prod-fiche__cle {
   font-size: var(--taille-note); font-weight: var(--graisse-note);
   letter-spacing: .05em; text-transform: uppercase;
-  line-height: 1.4; color: var(--text-2);
+  line-height: var(--ligne-texte); color: var(--text-2);
 }
 /* Les chiffres en chasse fixe : « 3 × S · 5 × M » et « 12 × S · 5 × M » doivent
    tomber l'un sous l'autre d'une ligne à la suivante. */
 .prod-fiche__val {
   font-size: var(--taille-texte); font-weight: var(--graisse-texte);
-  line-height: 1.3; color: var(--text-1);
+  line-height: var(--ligne-serre); color: var(--text-1);
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
 /* LES QUATRE FAITS QU'ON CHERCHE DU REGARD — référence, quantité, couleur du
@@ -1191,7 +1220,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    de la valeur : une taille de plus obligerait à une rangée de plus, et la
    rangée est ce qui permet de balayer une file. */
 .prod-fiche__fort { font-weight: var(--graisse-forte); }
-.pcard__delai { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pcard__delai { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); font-variant-numeric: tabular-nums; }
 .pcard__delai--retard { color: var(--danger); }
 .pcard__delai--urgent { color: var(--warning-2); }
 .pcard__sub { margin-top: 4px; font-size: var(--taille-texte); color: var(--text-2); }
@@ -1752,7 +1781,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   background: var(--text-1);
   color: var(--surface);
   font-size: var(--taille-texte);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   cursor: pointer;
   padding: 0;
 }
@@ -1841,7 +1870,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   color: var(--primary);
   font-size: var(--taille-texte);
   font-weight: var(--graisse-note);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
 }
 .resp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Non assigné : puce discrète en pointillé, appelle à remplir. */
@@ -1950,7 +1979,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   background: transparent;
   font: inherit;
   font-size: var(--taille-texte);
-  line-height: 1.3;
+  line-height: var(--ligne-serre);
   text-align: left;
   color: var(--text-2);
   cursor: pointer;
@@ -2116,7 +2145,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   color: var(--text-2);
 }
 .colbar-legend[hidden], .colbar-empty[hidden] { display: none; }
-.colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-2); }
+.colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 .colbar-list { display: flex; flex-direction: column; gap: 4px; }
 
 /* UNE RANGEE DE PANNEAU — LA MEME POUR LES DEUX PANNEAUX DE LA BARRE.
@@ -2164,7 +2193,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   width: var(--ic);
   height: var(--ic);
   font-size: var(--ic);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   color: var(--text-2);
 }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2296,7 +2325,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: var(--pas-2) 24px 0;
   /* `line-height: normal` laisse le contenu décider de la hauteur : c'est ce
      qui donne trois hauteurs de champ dans une même application. */
-  line-height: 1.3;
+  line-height: var(--ligne-serre);
 }
 .cell-price-ht {
   display: block;
@@ -2307,7 +2336,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
      pesait exactement autant que le montant qu'elle contrôle. */
   font-size: var(--taille-note);
   font-variant-numeric: tabular-nums;
-  line-height: 1.3;
+  line-height: var(--ligne-serre);
   white-space: nowrap;
 }
 
@@ -2368,7 +2397,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   color: var(--text-1);
   font: inherit;
   font-size: var(--taille-texte);
-  line-height: 1.35;
+  line-height: var(--ligne-serre);
   resize: vertical;
 }
 .reason-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .22); }
@@ -2468,7 +2497,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   color: var(--tip-fg);
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
-  line-height: 1.35;
+  line-height: var(--ligne-serre);
   box-shadow: var(--shadow-pop);
   pointer-events: none; /* ne doit jamais intercepter le clic sur le badge */
   animation: tipIn var(--dur-1) var(--ease) both;
@@ -2557,7 +2586,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .search-palette-hint kbd {
   font-family: inherit;
   font-size: var(--taille-texte);
-  line-height: 1.5;
+  line-height: var(--ligne-texte);
   color: var(--text-2);
   background: var(--search-bg);
   border: 1px solid var(--border);
@@ -2717,7 +2746,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   background: transparent;
   color: var(--text-2);
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   cursor: pointer;
   transition: background var(--dur-1) var(--ease);
 }
@@ -2907,7 +2936,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: 2px 14px 4px;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
-  line-height: 1.45;
+  line-height: var(--ligne-texte);
   color: var(--text-2);
   resize: none;
   overflow: hidden;
@@ -2937,7 +2966,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: 2px 14px 4px;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
-  line-height: 1.45;
+  line-height: var(--ligne-texte);
   color: var(--text-2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -3200,7 +3229,7 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   content: 'grid_view';
   font-family: 'Material Symbols Outlined';
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
-  line-height: 1;
+  line-height: var(--ligne-glyphe);
   color: var(--primary);
   width: 64px;
   height: 64px;
@@ -3279,7 +3308,7 @@ input[type="date"].cell-input { color: var(--text-1); }
 }
 .maj__txt { display: flex; flex-direction: column; min-width: 0; }
 .maj__titre { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.maj__detail { font-size: var(--taille-texte); line-height: 1.35; color: var(--text-2); }
+.maj__detail { font-size: var(--taille-texte); line-height: var(--ligne-serre); color: var(--text-2); }
 /* 44 px de haut : c'est un bouton qu'on tape au doigt, sur une tablette posée
    à plat et souvent avec les mains occupées. */
 .maj__btn {
@@ -3339,7 +3368,7 @@ input[type="date"].cell-input { color: var(--text-1); }
 }
 .ask.open .ask__card { transform: none; }
 .ask__title { margin: 0 0 8px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.ask__text { margin: 0 0 18px; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
+.ask__text { margin: 0 0 18px; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 .ask__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .ask__btn {
   min-height: var(--ctrl-h);
@@ -3443,7 +3472,7 @@ input[type="date"].cell-input { color: var(--text-1); }
 .tk-modal__aide {
   margin: 0;
   font-size: var(--taille-texte);
-  line-height: 1.4;
+  line-height: var(--ligne-texte);
   color: var(--text-2);
   text-align: center;
 }
@@ -3758,7 +3787,7 @@ a,
     min-height: var(--ctrl-h);
     padding: var(--champ-y-serre) var(--pas-2);
   }
-  .nav-switch-label { font-size: var(--taille-texte); line-height: 1.15; max-width: 76px; }
+  .nav-switch-label { font-size: var(--taille-texte); line-height: var(--ligne-titre); max-width: 76px; }
   /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
      fichier et gagnerait à spécificité égale. */
   #viewProjet { padding-right: 8px; margin-right: 4px; }
