@@ -97,7 +97,7 @@ try {
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
-<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" data-menu-manuel-texte="Produit hors catalogue" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><!-- CE QUE LE CLIENT VEUT SUR CE PRODUIT (Charlie, 27/08/2026) : « dans autre
+<div class="bloc"><div class="cat-ligne"><div class="field"><label for="catProduit">Produit du catalogue</label><select id="catProduit" data-menu-manuel="__manuel" data-menu-manuel-texte="Produit hors catalogue" onchange="choisirProduitCatalogue()"></select></div><div class="field"><label for="catQte">Quantité <span class="opt">optionnel</span></label><input id="catQte" type="number" min="1" step="1" value="" placeholder="1" inputmode="numeric"></div><div class="field"><button type="button" class="primary" onclick="ajouterALaDemande()">Ajouter à la demande</button></div></div><!-- CE QUE LE CLIENT VEUT SUR CE PRODUIT (Charlie, 27/08/2026) : « dans autre
      je dois pouvoir sous chaque produit ajouter la personnalisation que
      souhaite le client sur le produit ».
      Un produit du catalogue partait dans la demande sans un mot sur ce qu'on
@@ -725,6 +725,15 @@ function choisirProduitCatalogue(){
   const sel=$('catProduit');
   if(sel.value==='__manuel'){
     sel.value='';
+    /* ⚠ REPEINDRE LE CHAMP. Une ecriture directe de `.value` ne declenche AUCUN
+       evenement : le menu garde ce qu'il affichait, et il affichait la ligne
+       qu'on vient de choisir. Le champ montrait donc « + Saisie manuelle —
+       produit hors catalogue » comme si c'etait un produit, avec une valeur
+       VIDE derriere. Cliquer « Ajouter a la demande » repondait alors « Choisis
+       un produit dans la liste. » juste sous un champ qui en montrait un : la
+       vendeuse n'a aucun moyen de sortir de la contradiction sans rouvrir le
+       menu. C'est le piege que `menuRafraichir` existe pour fermer. */
+    if(window.menuRafraichir)window.menuRafraichir(sel);
     viderCatPerso();
     ouvrirSaisieManuelle();
     return;
@@ -777,8 +786,24 @@ function basculerSaisieManuelle(force){
 
 /* /CATALOGUE-COMPTOIR */
 function saveNeed(){const fail=(id,msg)=>failPres('needManqueMsg',id,msg);clearErrors();const category=selectedNeedCategory();if(!$('needCategory').value)return fail('needCategory','Choisis une catégorie.');if($('needCategory').value==='__new__'&&!category)return fail('newCategory','Renseigne la nouvelle catégorie.');if(!$('needLabel').value.trim())return fail('needLabel','Renseigne la désignation du besoin.');if(Number($('needQty').value)<=0)return fail('needQty','La quantité doit être supérieure à 0.');const old=editingNeed>=0?needs[editingNeed]:{};const n={category,label:$('needLabel').value.trim(),qty:Number($('needQty').value),requestedRef:$('needRequestedRef').value.trim(),color:$('needColor').value.trim(),productionType:$('needProductionType').value,comment:$('needComment').value.trim(),zones:zonesDuBesoin(category,$('needLabel').value.trim()),solution:old.solution||'',reference:old.reference||'',unitHT:Number.isFinite(old.unitHT)?old.unitHT:NaN};editingNeed>=0?needs[editingNeed]=n:needs.push(n);cancelNeedEdit();renderNeeds();updateSidebar()}
-function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';needFaces=typeof window.valeursDepuisZones==='function'?window.valeursDepuisZones(n.zones):{};renderNeedFaces(true);poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
-function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
+function editNeed(i){if(needs[i]&&needs[i].textile)return editTextileNeed(i);choisirTypeBesoin('autre');basculerSaisieManuelle(true);const n=needs[i];editingNeed=i;const exists=[...$('needCategory').options].some(o=>o.value===n.category);$('needCategory').value=exists?n.category:'__new__';$('newCategory').value=exists?'':n.category;toggleNewCategory();$('needLabel').value=n.label;$('needQty').value=n.qty;$('needRequestedRef').value=n.requestedRef||'';$('needColor').value=n.color||'';$('needProductionType').value=n.productionType||'';$('needComment').value=n.comment||'';repeindreMenusDuBesoin();needFaces=typeof window.valeursDepuisZones==='function'?window.valeursDepuisZones(n.zones):{};renderNeedFaces(true);poserTitreForm('needFormTitle',`Modifier le besoin n°${i+1}`,true);$('saveNeedBtn').textContent='Enregistrer la modification';$('cancelNeedBtn').textContent='Annuler la modification';$('besoinManuel').scrollIntoView({behavior:'smooth',block:'center'})}
+/* ⚠ LES DEUX MENUS DU BESOIN SE REPEIGNENT A LA MAIN. « Categorie » et « Type de
+   production » sont des <select> habilles par le menu du comptoir, et une
+   ecriture directe de `.value` ne declenche AUCUN evenement : le champ ferme
+   garde ce qu'il affichait.
+   Ce que ca donnait, mesure : on ajoute un besoin « Signaletique / TROTEC »,
+   `cancelNeedEdit` vide les deux valeurs pour le besoin suivant — mais l'ecran
+   continue d'afficher « Signaletique » et « TROTEC ». On remplit la designation
+   et la quantite, on valide, et l'ecran repond « Choisis une categorie. » sous
+   un champ qui en montre une. Il fallait rouvrir le menu et rechoisir la valeur
+   qu'on avait sous les yeux — a CHAQUE besoin apres le premier.
+   Meme piege dans `editNeed`, dans l'autre sens : rouvrir un besoin posait ses
+   valeurs sans que les champs les montrent. */
+function repeindreMenusDuBesoin(){
+  if(!window.menuRafraichir)return;
+  [$('needCategory'),$('needProductionType')].forEach(s=>{if(s)window.menuRafraichir(s)});
+}
+function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';repeindreMenusDuBesoin();needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
    détail d'un AUTRE article, et le volet négocierait sur celui d'à côté. */
 /* UN INDEX D'ÉDITION EST UN INDEX DANS `needs` (25/08/2026). Il se décale

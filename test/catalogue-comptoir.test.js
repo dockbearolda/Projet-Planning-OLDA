@@ -71,8 +71,14 @@ assert.ok(/let html='<option value=""[^']*'\+\n\s*'<option value="__manuel"/.tes
   '… juste après le choix vide, avant la première famille');
 assert.ok(/<select id="catProduit"[^>]*onchange="choisirProduitCatalogue\(\)"/.test(step2),
   'la choisir doit faire quelque chose tout de suite');
-assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';\s*viderCatPerso\(\);\s*ouvrirSaisieManuelle\(\)/.test(DEVIS),
-  'elle ouvre le formulaire ET rend la liste à vide : ce n’est pas un produit');
+// … ET LE CHAMP EST REPEINT. Rendre la liste à vide ne suffit pas : le menu du
+// comptoir peint le champ fermé lui-même, et une écriture directe de `.value`
+// ne déclenche aucun évènement. Sans `menuRafraichir`, le champ restait sur
+// « + Saisie manuelle — produit hors catalogue » avec une valeur VIDE derrière,
+// et « Ajouter à la demande » répondait « Choisis un produit dans la liste. »
+// sous un champ qui en montrait un (29/08).
+assert.ok(/function choisirProduitCatalogue\(\)\{[\s\S]*?sel\.value='';[\s\S]*?menuRafraichir\(sel\);\s*viderCatPerso\(\);\s*ouvrirSaisieManuelle\(\)/.test(DEVIS),
+  'elle ouvre le formulaire, rend la liste à vide ET repeint le champ');
 
 // CE QUE LE CLIENT VEUT SUR CE PRODUIT (27/08/2026). Un produit du catalogue
 // partait dans la demande sans un mot sur ce qu'on devait y marquer :
