@@ -588,6 +588,21 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
    pas — c'est tout l'interet de les empiler. */
 .fa-argent .fa-in { text-align: right; }
+/* LA RANGEE DES ACTIONS traverse les deux colonnes et se colle a droite par une
+   MARGE AUTOMATIQUE, jamais par `flex-end` : celui-ci rogne par la gauche des
+   que le contenu deborde, et trois boutons de 88 px sont pile a la limite.
+   L'ecart est le meme jeton que celui qui separe deja les colonnes du compte. */
+.fa-argent__actions {
+  grid-column: 1 / -1;
+  display: flex; gap: var(--pas-2); margin-left: auto;
+}
+/* LES TROIS BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes
+   — la largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
+   doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px
+   on obtenait 88 / 88 / 52, trois boites inegales sur une meme rangee. On egalise
+   ce qui doit l'etre — hauteur, rembourrage, graisse, ecart, tenus par
+   `.fa-seg__b` — et la largeur suit le mot. UNE regle pour les trois. */
+.fa-argent__actions .fa-seg__b { flex: 0 0 auto; }
 
 /* --- CE QUI EST PAYE, ET CE QU'IL RESTE (29/08) ---------------------------
    « En un coup d'oeil on doit voir ce qui est paye et combien il reste a

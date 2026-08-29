@@ -845,24 +845,56 @@ export function dessinerFicheAtelier(r, ctx) {
     reste.dataset.etat = du <= 0 ? 'solde' : (av > 0 ? 'entame' : 'entier');
   };
 
+  // LE MONTANT ET SES DEUX DRAPEAUX, ECRITS UNE SEULE FOIS. Deux portes mènent
+  // au même fait — la frappe dans le champ, et les pastilles « 30 % / 50 % » —
+  // et le jour où l'une des deux oublie un drapeau, le feu du planning se tait
+  // sur ces dossiers-là sans que rien ne le dise. C'est le défaut du 26/08 au
+  // soir : `acompte_demande` était NULL sur les 184 dossiers.
+  const envoyerAcompte = (n) => {
+    ctx.patchLigne('acompte_montant', n);
+    // UN ACOMPTE VERSÉ A FORCÉMENT ÉTÉ DEMANDÉ : les deux drapeaux se déduisent
+    // du montant, ils ne se cochent jamais à la main.
+    const verse = n != null && n > 0;
+    if ((r.acompte_verse === true) !== verse) { r.acompte_verse = verse; ctx.patchLigne('acompte_verse', verse); }
+    if ((r.acompte_demande === true) !== verse) { r.acompte_demande = verse; ctx.patchLigne('acompte_demande', verse); }
+  };
   brancher(chAcompte, {
     label: 'Acompte versé', normaliser: normaliserMontant,
-    envoyer: (v) => {
-      const n = nombreDe(v);
-      ctx.patchLigne('acompte_montant', n);
-      // LES DEUX DRAPEAUX SUIVENT LE MONTANT. Le feu du planning les lit ;
-      // laisses a la main, ils restaient a NULL sur les vrais dossiers et le
-      // feu se taisait — c'est le defaut du 26/08 au soir.
-      const verse = n != null && n > 0;
-      if ((r.acompte_verse === true) !== verse) { r.acompte_verse = verse; ctx.patchLigne('acompte_verse', verse); }
-      if ((r.acompte_demande === true) !== verse) { r.acompte_demande = verse; ctx.patchLigne('acompte_demande', verse); }
-    },
+    envoyer: (v) => envoyerAcompte(nombreDe(v)),
     apres: majReste,
   });
   brancher(chAcompteDate, {
     label: 'Date de l’acompte',
     normaliser: (v) => normaliserDate(v, ctx.aujourdhui && ctx.aujourdhui()),
     envoyer: (n) => ctx.patchLigne('acompte_date', n.iso),
+  });
+
+  // --- L'ACOMPTE EN UN CLIC ---------------------------------------------
+  // Optimisation 14. Un acompte se demande presque toujours au tiers ou a la
+  // moitie : le chiffre existe, il se DEDUIT du prix, et le taper a la main
+  // c'est refaire un calcul que l'ecran sait faire.
+  //
+  // ELLES PRENNENT LA BOITE DE « Soldé » (`fa-seg__b`), pas une a elles : trois
+  // boutons sur la meme rangee doivent avoir la meme hauteur, le meme
+  // rembourrage et la meme graisse, et les prendre dans UNE regle.
+  //
+  // SANS PRIX, ON NE CALCULE RIEN. Un pourcentage de rien vaut zero, et un
+  // acompte a 0,00 € pose sur un dossier non chiffre allumerait les deux
+  // drapeaux du feu pour un versement qui n'a pas eu lieu.
+  const pastilleAcompte = (part) => bouton('fa-seg__b', `${Math.round(part * 100)} %`, () => {
+    const ttc = nombreDe(chTtc.value);
+    if (ttc == null || ttc <= 0) { dire('Pas de prix TTC — l’acompte ne peut pas s’en déduire', false); return; }
+    const avant = nombreDe(chAcompte.value);
+    const n = Math.round(ttc * part * 100) / 100;
+    if (n === avant) return;
+    const poser = (v) => {
+      chAcompte.value = v == null ? '' : normaliserMontant(v);
+      envoyerAcompte(v);
+      majReste();
+    };
+    poser(n);
+    empiler(() => poser(avant));
+    coche(chAcompte); pulser(); dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
   });
 
   const bSolde = bouton('fa-seg__b fa-solde', 'Soldé');
@@ -935,9 +967,15 @@ export function dessinerFicheAtelier(r, ctx) {
   ligneArgent('Reste à payer', resteCase);
   // LE BOUTON FERME LE COMPTE, sous le total : c'est une ACTION, elle n'a rien
   // a faire dans la colonne des chiffres.
-  argent.append(el('div', 'fa-argent__k'), (() => {
-    const v = el('div', 'fa-argent__v');
-    v.append(bSolde);
+  // L'ACTION QUI ENGAGE EST LA DERNIERE A DROITE : « Soldé » ferme la rangee,
+  // les deux raccourcis de calcul le precedent.
+  // ELLE TRAVERSE LES DEUX COLONNES au lieu de tenir dans celle des montants :
+  // trois boutons de 88 px y auraient elargi la colonne des chiffres de 136 px,
+  // donc deplace tous les libelles vers la gauche. Le rail des montants ne
+  // bouge pas d'un pixel ; c'est la rangee des actions qui s'etale.
+  argent.append((() => {
+    const v = el('div', 'fa-argent__actions');
+    v.append(pastilleAcompte(0.3), pastilleAcompte(0.5), bSolde);
     return v;
   })());
 
