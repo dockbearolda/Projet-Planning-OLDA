@@ -3486,11 +3486,12 @@ function contexteFicheAtelier(r) {
       // qui reste.
       return d.texte ? `${d.texte} restant` : '';
     },
-    rappelDossier: [
-      lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : (r.product || ''),
-      r.created_at ? `Créée le ${horodatageFr(r.created_at)}${
-        r.fiche && r.fiche.source ? ` depuis ${r.fiche.source}` : ''}` : '',
-    ].filter(Boolean).join('\n'),
+    // L'APPARTENANCE AU LOT, ET RIEN D'AUTRE. C'était un bloc gris de deux lignes
+    // en pied de fiche : la première redisait le nom du produit affiché dans
+    // l'entête, la seconde horodatait la création. Retiré le 29/08 ; ce qui
+    // restait vrai — « cette ligne est un article d'un ticket de trois » — monte
+    // dans l'entête, avec la référence.
+    lotDossier: lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : '',
     aujourdhui: () => new Date(),
     fermer: fermerFicheAtelier,
     patchLigne: (champ, valeur) => {
@@ -4393,12 +4394,6 @@ function envoyerParEmail(r) {
   window.location.href = `mailto:${encodeURIComponent(dest)}`
     + `?subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(coupe)}`;
 }
-
-
-const horodatageFr = (iso) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('fr-FR');
-};
 
 
 // Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
@@ -7410,41 +7405,27 @@ const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
 const $tailleslogos = document.getElementById('tailleslogos');
-const $viewProjet = document.getElementById('viewProjet');
-// « + Nouveau Projet » NE NAVIGUE PLUS, il PROPOSE. Le module qui connaît les
-// deux parcours n'est chargé qu'au premier passage : on l'importe au premier
-// clic, puis on garde la liste sous la main.
-let parcoursConnus = null;
-if ($viewProjet) {
-  $viewProjet.setAttribute('aria-haspopup', 'menu');
-  $viewProjet.setAttribute('aria-expanded', 'false');
-  $viewProjet.addEventListener('click', async (ev) => {
+// « VENTE » ET « DEVIS » SONT DEUX ONGLETS (29/08/2026, Charlie : « je veux
+// retrouver directement vente et devis, ils doivent être cliquables direct »).
+// Il y avait un onglet « Nouveau Projet » qui ne menait nulle part : il
+// dépliait un panneau de deux lignes pour poser une question à deux réponses.
+// Les deux réponses sont maintenant dans la barre, chacune avec son adresse.
+//
+// CE SONT DES LIENS DE HASH, comme tous les autres onglets : c'est l'adresse
+// qui pilote la vue (voir applyHash), donc un rechargement rouvre le parcours
+// où on était, et le bouton « précédent » du navigateur en ressort.
+// Le seul écouteur qu'ils portent sert au cas que le hash ne couvre pas :
+// recliquer sur l'onglet DÉJÀ ouvert. Aucun `hashchange` n'est émis, et « un
+// nouveau projet » doit quand même repartir de zéro.
+const $viewVente = document.getElementById('viewVente');
+const $viewDevis = document.getElementById('viewDevis');
+for (const [el, id] of [[$viewVente, 'vente'], [$viewDevis, 'devis']]) {
+  if (!el) continue;
+  el.addEventListener('click', (ev) => {
+    if (location.hash !== el.getAttribute('href')) return;   // le hash s'en charge
     ev.preventDefault();
-    if (menuProjet) { fermerMenuProjet(); return; }
-    if (!parcoursConnus) {
-      try {
-        const m = await import('./nouveau-projet.js');
-        parcoursConnus = m.PARCOURS;
-      } catch (err) {
-        // Le module ne répond pas : on retombe sur l'écran à deux tuiles plutôt
-        // que de ne rien faire du tout.
-        reportError(err);
-        location.hash = '#nouveau-projet';
-        return;
-      }
-    }
-    ouvrirMenuProjet(parcoursConnus);
+    allerAuParcours(id);
   });
-  // Un clic ailleurs, Échap : le menu se referme. Il n'y a pas d'état bloqué.
-  document.addEventListener('pointerdown', (ev) => {
-    if (!menuProjet) return;
-    if (menuProjet.contains(ev.target) || ev.target.closest('#viewProjet')) return;
-    fermerMenuProjet();
-  });
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && menuProjet) { fermerMenuProjet(); $viewProjet.focus(); }
-  });
-  window.addEventListener('resize', fermerMenuProjet, { passive: true });
 }
 const $projet = document.getElementById('nouveau-projet');
 
@@ -7716,77 +7697,16 @@ let projetModule = null;
 // ça. » C'était une page entière pour poser une question à deux réponses : un
 // clic, un chargement, et une grande carte vide autour de deux tuiles.
 //
-// Le parcours voulu s'ouvre donc DIRECTEMENT depuis « + Nouveau Projet ».
-// L'écran à deux tuiles n'est pas supprimé — on y arrive encore par l'adresse
+// PUIS LE MENU EST PARTI À SON TOUR (29/08/2026, Charlie : « je veux retrouver
+// directement vente et devis, ils doivent être cliquables direct »). Le panneau
+// qui tombait de l'onglet posait la même question à deux réponses, en deux
+// clics au lieu d'un — plus un calque à caler au pixel sur le rail de son
+// onglet, à fermer sur Échap, au clic dehors et au redimensionnement. Les deux
+// réponses sont maintenant deux ONGLETS, chacun avec son adresse.
+//
+// L'écran à deux tuiles n'est pas supprimé : il reste au bout de
 // `#nouveau-projet`, et c'est là que retombe un poste qui ne sait pas encore
-// lequel il veut — mais plus personne n'y passe par un clic.
-let menuProjet = null;
-
-function fermerMenuProjet() {
-  if (!menuProjet) return;
-  menuProjet.remove();
-  menuProjet = null;
-  if ($viewProjet) $viewProjet.setAttribute('aria-expanded', 'false');
-}
-
-function ouvrirMenuProjet(parcours) {
-  fermerMenuProjet();
-  const pan = document.createElement('div');
-  pan.className = 'np-menu';
-  pan.setAttribute('role', 'menu');
-  for (const p of parcours) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'np-menu__item';
-    b.setAttribute('role', 'menuitem');
-    const ic = document.createElement('span');
-    ic.className = 'material-symbols-outlined np-menu__ic';
-    ic.setAttribute('aria-hidden', 'true');
-    ic.textContent = p.icone;
-    b.append(ic, document.createTextNode(p.label));
-    b.addEventListener('click', () => {
-      fermerMenuProjet();
-      allerAuParcours(p.id);
-    });
-    pan.appendChild(b);
-  }
-  // Posé sous le bouton, dans le document : la barre de navigation est
-  // elle-même dans un conteneur qui défile, un panneau en `absolute` s'y
-  // couperait (même piège que le menu du comptoir).
-  const r = $viewProjet.getBoundingClientRect();
-  pan.style.top = `${Math.round(r.bottom + 6)}px`;
-  pan.style.left = `${Math.round(r.left)}px`;
-  document.body.appendChild(pan);
-  // LE MENU TOMBE SUR LE RAIL DE CE QUI L'OUVRE. Aligné au BORD du bouton, ses
-  // icônes tombaient 13,7 px à droite du « + » de l'onglet : le panneau et
-  // l'onglet ne partaient pas du même trait (Charlie, 27/08/2026 : « les bulles
-  // ne sont pas calées pareil »). On aligne ce qui se regarde — l'icône de la
-  // première rangée sous l'icône de l'onglet — et on le MESURE au lieu de
-  // l'écrire, pour que ça tienne le jour où un rembourrage bouge.
-  const icOnglet = $viewProjet.querySelector('.material-symbols-outlined, .nav-switch-mark');
-  const icRangee = pan.querySelector('.np-menu__ic');
-  if (icOnglet && icRangee) {
-    // Pas d'arrondi, et DEUX passes. L'onglet est posé à 403,34 px : arrondir au
-    // pixel laissait 0,66 px entre les deux icônes. Une seule correction en
-    // laissait encore 0,32 — la rangée se recompose sur la nouvelle position et
-    // les sous-pixels se redistribuent. La deuxième passe rend zéro, et la
-    // boucle s'arrête d'elle-même dès qu'il n'y a plus rien à reprendre.
-    // Jamais hors de l'écran non plus : sur un écran étroit la barre finit à
-    // droite.
-    const large = document.documentElement.clientWidth;
-    for (let passe = 0; passe < 2; passe += 1) {
-      const ecart = icRangee.getBoundingClientRect().left - icOnglet.getBoundingClientRect().left;
-      if (Math.abs(ecart) < 0.05) break;
-      const pose = parseFloat(pan.style.left) || r.left;
-      const gauche = Math.min(Math.max(8, pose - ecart), large - pan.offsetWidth - 8);
-      pan.style.left = `${gauche.toFixed(2)}px`;
-    }
-  }
-  menuProjet = pan;
-  $viewProjet.setAttribute('aria-expanded', 'true');
-  const premier = pan.querySelector('button');
-  if (premier) premier.focus();
-}
+// lequel il veut.
 
 // Ouvrir un parcours demande le module : il n'est chargé qu'au premier passage.
 //
@@ -7808,10 +7728,6 @@ let ouvertureParcours = false;
 async function allerAuParcours(id) {
   ouvertureParcours = true;
   try {
-    location.hash = '#nouveau-projet';
-    // Un tour d'horloge : le temps que `hashchange` soit traité et que la vue
-    // soit montée. Sans lui, on ouvrait un parcours qui se refermait derrière.
-    await new Promise((r) => setTimeout(r, 0));
     setViewMode('projet');
     mountProjet();
     await projetLoading;
@@ -7820,21 +7736,36 @@ async function allerAuParcours(id) {
   finally { ouvertureParcours = false; }
 }
 
+// LE PARCOURS À OUVRIR SE LIT DANS L'ADRESSE, il ne se passe plus de main en
+// main. `#vente` et `#devis` mènent tous deux à la vue « projet » (voir VIEWS) :
+// c'est le hash qui dit LEQUEL des deux, donc un rechargement, un favori et le
+// bouton « précédent » du navigateur rouvrent le bon écran.
 function mountProjet() {
   if (!$projet) return;
+  const voulu = PARCOURS_PAR_HASH[location.hash] || null;
+  // UN CLIC NE VAUT QU'UNE SEULE REMISE À ZÉRO. Quand c'est `allerAuParcours`
+  // qui ouvre — recliquer sur l'onglet déjà ouvert — il le fait lui-même : sans
+  // ce verrou, le parcours repartirait de zéro deux fois de suite.
+  const ouvrir = () => {
+    if (voulu && !ouvertureParcours && projetModule) projetModule.ouvrirParcoursNeuf(voulu);
+  };
   if (!projetLoading) {
     projetLoading = Promise.all([poserFeuille('projet.css'), import('./nouveau-projet.js')])
       .then(([, m]) => { projetModule = m; return m.initProjet($projet); })
+      .then(ouvrir)
       .catch((err) => {
         projetLoading = null;
         projetModule = null;
         console.error('Nouveau Projet : chargement impossible', err);
       });
-  } else if (!ouvertureParcours && projetModule && projetModule.resetProjet) {
-    // Comptoir : chaque passage sur l'onglet repart de « Quel client ? »,
-    // jamais sur un brouillon laissé par le passage précédent.
-    // SAUF quand c'est le menu de la barre qui ouvre : il fait la même remise à
-    // zéro, mais pour le seul parcours demandé et sans passer par l'accueil.
+    return;
+  }
+  // Un parcours NEUF, jamais l'accueil : `resetProjet` afficherait les deux
+  // tuiles le temps d'une image et rechargerait les deux cadres (Charlie,
+  // 27/08 : « toute la page recharge, c'est bizarre comme effet »).
+  if (voulu) projetLoading.then(ouvrir);
+  else if (!ouvertureParcours && projetModule && projetModule.resetProjet) {
+    // `#nouveau-projet` : l'écran de repli, celui qui pose encore la question.
     projetModule.resetProjet();
   }
 }
@@ -7896,7 +7827,9 @@ function setViewMode(mode) {
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
-  if ($viewProjet) $viewProjet.classList.toggle('active', mode === 'projet');
+  // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
+  if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
+  if ($viewDevis) $viewDevis.classList.toggle('active', mode === 'projet' && location.hash === HASH_DEVIS);
   for (const p of PROMOTED) {
     const btn = document.getElementById(p.btn);
     if (btn) btn.classList.toggle('active', mode === p.view);
@@ -7956,9 +7889,17 @@ function setViewMode(mode) {
 // seule autre écriture de ce hash dans le fichier portait une barre en trop et
 // l'onglet ne s'ouvrait pas (voir `ouvrirClient`).
 const HASH_CLIENTS = '#clients';
+// LES DEUX PARCOURS DU COMPTOIR ONT CHACUN SON ADRESSE (29/08). Ils partagent
+// la vue « projet » — c'est le même onglet, le même cadre — mais pas le même
+// hash : sans ça, rien dans l'URL ne dit lequel est ouvert, et un rechargement
+// retombe sur l'accueil à deux tuiles.
+const HASH_VENTE = '#vente';
+const HASH_DEVIS = '#devis';
+const PARCOURS_PAR_HASH = { [HASH_VENTE]: 'vente', [HASH_DEVIS]: 'devis' };
 const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
+  [HASH_VENTE]: 'projet', [HASH_DEVIS]: 'projet',
   [HASH_CLIENTS]: 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   '#pilotage': 'pilotage',
   '#tailles-logos': 'tailleslogos',
@@ -7968,6 +7909,11 @@ function applyHash() {
   const h = location.hash;
   const mode = VIEWS[h] || 'planning';
   setViewMode(mode);
+  // TROIS HASH MÈNENT À LA VUE « PROJET » — `#vente`, `#devis`, `#nouveau-projet`.
+  // `setViewMode` ne fait RIEN quand la vue ne change pas : passer de « Vente »
+  // à « Devis » laissait donc le premier parcours à l'écran, onglet allumé sur
+  // le second. C'est ici qu'on demande le parcours, pas dans la bascule de vue.
+  if (mode === 'projet') mountProjet();
   // Onglet Fiverr / À commander : la grille doit pointer sur LEUR catégorie.
   // On ne recharge que si elle affiche autre chose (revenir sur l'onglet déjà
   // ouvert ne doit pas vider la grille sous les yeux). Au tout premier passage
@@ -8130,7 +8076,8 @@ function appliquerDroits() {
   onglet($viewPilotage, comptesActifs() && puisJe('marge'));
   onglet($viewReglages, puisJe('reglages'));
   onglet($viewClients, puisJe('clients'));
-  onglet($viewProjet, puisJe('clients'));
+  onglet($viewVente, puisJe('clients'));
+  onglet($viewDevis, puisJe('clients'));
   // « À commander » et « Fiverr » sont des entrées PROMUES (voir PROMOTED) :
   // elles n'ont pas de constante dédiée, on les prend par leur identifiant.
   onglet(document.getElementById('viewACommander'), puisJe('production'));
@@ -8154,7 +8101,7 @@ function appliquerDroits() {
   const interdit = (location.hash === '#pilotage' && !puisJe('marge'))
     || (location.hash === '#reglages' && !puisJe('reglages'))
     || (location.hash === '#clients' && !puisJe('clients'))
-    || (location.hash === '#nouveau-projet' && !puisJe('clients'));
+    || (VIEWS[location.hash] === 'projet' && !puisJe('clients'));
   if (interdit) location.hash = comptesActifs() ? '#mon-travail' : '#planning';
 }
 

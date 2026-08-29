@@ -436,12 +436,11 @@ export function parcoursOuvert() {
   return fluxAffiche !== null;
 }
 
-// LES DEUX PARCOURS, NOMMÉS DEHORS. La barre de navigation propose le choix
-// directement (voir `menuNouveauProjet` dans app.js) : l'écran à deux tuiles
-// n'est plus qu'un repli — on y arrive encore par l'adresse, jamais par un clic.
-export const PARCOURS = FLUX.map((f) => ({ id: f.id, label: f.label, icone: f.icone }));
-
-// OUVRIR UN PARCOURS NEUF DEPUIS LE MENU DE LA BARRE, EN UN SEUL MOUVEMENT.
+// OUVRIR UN PARCOURS NEUF DEPUIS LA BARRE, EN UN SEUL MOUVEMENT.
+//
+// La barre porte les DEUX parcours, chacun son onglet et son adresse (`#vente`,
+// `#devis`, voir VIEWS dans app.js) : l'écran à deux tuiles n'est plus qu'un
+// repli, on y arrive encore par `#nouveau-projet`, jamais par un clic.
 //
 // Ce que faisait le clic avant (Charlie, 27/08/2026 : « toute la page recharge,
 // c'est bizarre comme effet ») : il appelait `resetProjet()`, qui affiche
@@ -475,7 +474,7 @@ export async function initProjet(root) {
   window.addEventListener('message', auMessage);
 }
 
-// Un tap sur « Nouveau Projet » dans la nav revient TOUJOURS au choix, avec deux
+// L'écran de repli (`#nouveau-projet`) revient TOUJOURS au choix, avec deux
 // parcours vierges : comptoir = on repart net, on ne cherche jamais un brouillon
 // abandonné entre deux clients. Sont remis à zéro TOUS les parcours affichés
 // depuis la dernière remise à neuf (voir fluxTouches) — un parcours resté

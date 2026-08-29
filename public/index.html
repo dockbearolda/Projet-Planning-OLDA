@@ -112,15 +112,26 @@
            de vue qui se contredit. Nouveau Projet = LA porte d'entrée (toute
            commande y naît) ; Base clients (CRM) = le socle. -->
       <nav class="nav-switch" aria-label="Navigation">
-        <a class="nav-switch-btn nav-switch-btn--projet" id="viewProjet" href="#nouveau-projet">
-          <!-- `add` et pas `bolt` : l'éclair décrivait une VITESSE, pas une
-               action. Cette entrée est la seule de la barre qui CRÉE quelque
-               chose — le plus dit exactement ça, et ne se confond avec aucune
-               autre icône de l'application. Toute icône Material posée ici doit
-               figurer dans olda-icones.woff2 (91 glyphes) : un nom absent
-               s'affiche en TEXTE réduit à sa première lettre, sans erreur. -->
-          <span class="material-symbols-outlined" aria-hidden="true">add</span>
-          <span class="nav-switch-label">Nouveau Projet</span>
+        <!-- LES DEUX PARCOURS SONT DEUX ONGLETS, plus un menu (29/08/2026).
+             « je veux retrouver directement vente et devis, ils doivent être
+             cliquables direct ». Il y avait un onglet « Nouveau Projet » qui
+             n'allait nulle part : il dépliait un panneau de deux lignes pour
+             poser une question à deux réponses. Deux clics, un panneau à caler
+             au pixel sur le rail de son onglet, et un état de plus à fermer.
+             Les deux réponses sont maintenant DANS la barre, chacune avec son
+             adresse (#vente, #devis) : un clic ouvre le parcours, et l'adresse
+             dit lequel — donc un rechargement le rouvre au même endroit.
+             Toute icône Material posée ici doit figurer dans olda-icones.woff2
+             (91 glyphes) : un nom absent s'affiche en TEXTE réduit à sa
+             première lettre, sans erreur. Ce sont les deux mêmes que portaient
+             les rangées du menu. -->
+        <a class="nav-switch-btn nav-switch-btn--projet" id="viewVente" href="#vente">
+          <span class="material-symbols-outlined" aria-hidden="true">point_of_sale</span>
+          <span class="nav-switch-label">Vente</span>
+        </a>
+        <a class="nav-switch-btn nav-switch-btn--projet nav-switch-btn--projet-fin" id="viewDevis" href="#devis">
+          <span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
+          <span class="nav-switch-label">Devis</span>
         </a>
         <!-- `work` EST dans la police (91 glyphes) : déjà utilisé par la fiche
              client. Un nom absent ne lève rien, il s'affiche en texte tronqué. -->
@@ -136,11 +147,14 @@
              TEXTE, sans erreur ni message. On avait donc repris `dashboard` —
              mais l'onglet d'à côté le portait déjà, et deux onglets voisins
              avec le même pictogramme ne se distinguent plus que par leur mot.
-             `request_quote` est dans la police (vérifié au rendu : un glyphe
-             présent mesure une case, un nom absent mesure sa longueur) et il
-             dit ce que cet écran montre — l'argent, la marge, ce qui bloque. -->
+             Puis `request_quote`, jusqu'au 29/08 : c'est le glyphe du DEVIS, et
+             l'onglet « Devis » est arrivé dans la même barre. Un devis se
+             demande au comptoir, il ne se pilote pas — le nom revient donc à
+             l'écran qui le porte, et le pilotage prend `overview` : la vue
+             d'ensemble, ce que cet écran est. (Dans la police, vérifié : un
+             glyphe présent mesure une case, un nom absent mesure sa longueur.) -->
         <a class="nav-switch-btn nav-switch-btn--pilotage" id="viewPilotage" href="#pilotage" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
+          <span class="material-symbols-outlined" aria-hidden="true">overview</span>
           <span class="nav-switch-label">Pilotage</span>
         </a>
         <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">

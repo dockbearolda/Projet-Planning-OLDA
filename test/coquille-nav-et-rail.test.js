@@ -27,16 +27,25 @@ const HTML = fs.readFileSync(path.join(RACINE, 'public/index.html'), 'utf8');
 const CSS = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
 const APP = fs.readFileSync(path.join(RACINE, 'public/app.js'), 'utf8');
 
-// --- 1. Nouveau Projet est un onglet comme les autres ------------------------
-// L'onglet reste un lien de HASH : c'est lui, et lui seul, qui pilote la vue
+// --- 1. Vente et Devis sont des onglets comme les autres ---------------------
+// Ils ont remplacé « Nouveau Projet » le 29/08 (Charlie : « je veux retrouver
+// directement vente et devis, ils doivent être cliquables direct ») : l'onglet
+// unique ne menait nulle part, il dépliait un panneau de deux lignes pour poser
+// une question à deux réponses.
+// Ils restent des liens de HASH : c'est lui, et lui seul, qui pilote la vue
 // (voir applyHash). Un `target="_blank"` ou un `.html` ouvrirait bien une
 // nouvelle page — c'est exactement ce qu'on ne veut pas.
-const lienProjet = HTML.match(/<a[^>]*id="viewProjet"[^>]*>/);
-assert.ok(lienProjet, 'l’onglet Nouveau Projet doit exister');
-assert.ok(/href="#nouveau-projet"/.test(lienProjet[0]),
-  'Nouveau Projet est un lien de hash : il s’ouvre DANS l’outil');
-assert.ok(!/target=/.test(lienProjet[0]),
-  '… et jamais dans un nouvel onglet');
+for (const [id, hash] of [['viewVente', '#vente'], ['viewDevis', '#devis']]) {
+  const lien = HTML.match(new RegExp(`<a[^>]*id="${id}"[^>]*>`));
+  assert.ok(lien, `l’onglet ${id} doit exister`);
+  assert.ok(new RegExp(`href="${hash}"`).test(lien[0]),
+    `${id} est un lien de hash : il s’ouvre DANS l’outil`);
+  assert.ok(!/target=/.test(lien[0]), '… et jamais dans un nouvel onglet');
+}
+// Et le panneau qu'ils remplacent n'existe plus nulle part : ni sa rangée, ni
+// son calque, ni les trois écouteurs qu'il fallait pour le refermer.
+assert.ok(!/np-menu/.test(CSS) && !/np-menu/.test(APP),
+  'le menu de « Nouveau Projet » est parti en entier — feuille comprise');
 
 // La navigation ne se masque plus sur cette vue : c'est TOUT le sujet de la
 // demande. Le rail, lui, reste hors sujet — il ne porte que les étapes du

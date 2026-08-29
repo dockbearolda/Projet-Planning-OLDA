@@ -2149,18 +2149,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-empty { margin: 2px 4px; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 .colbar-list { display: flex; flex-direction: column; gap: 4px; }
 
-/* UNE RANGEE DE PANNEAU — LA MEME POUR LES DEUX PANNEAUX DE LA BARRE.
-   « Colonnes » et le menu de « + Nouveau Projet » tombent de la MEME barre, a
-   un clic l'un de l'autre, et s'ecrivaient chacun leur rangee : 44 px contre
-   50, 6/10 de rembourrage contre 0/14, graisse 600 contre 800. Deux composants
-   qui se ressemblent au lieu d'un seul — exactement ce que la charte interdit.
-   Il n'y en a plus qu'un.
-   La hauteur est celle de la BARRE dont ces panneaux tombent — `--ctrl-h`,
-   depuis que la barre du haut n'en porte plus qu'une (28/08, voir
-   `.icon-btn`). Elle valait `--rond` pendant vingt-quatre heures, le temps que
-   la barre, elle, en porte encore trois. */
-.colbar-item,
-.np-menu__item {
+/* UNE RANGEE DE PANNEAU — celle du panneau « Colonnes », qui tombe de la barre
+   du haut. Le menu de « + Nouveau Projet » partageait cette regle : il ecrivait
+   sa propre rangee (44 px contre 50, 6/10 de rembourrage contre 0/14, graisse
+   600 contre 800) jusqu'a ce qu'elles soient reunies. Il n'existe plus — les
+   deux parcours sont deux ONGLETS depuis le 29/08 — mais la regle garde sa
+   raison d'etre : la hauteur est celle de la BARRE dont le panneau tombe,
+   `--ctrl-h`, la seule que porte la barre du haut (28/08, voir `.icon-btn`). */
+.colbar-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2179,17 +2175,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 .colbar-item:hover { background: var(--state-hover); }
-.colbar-item:focus-visible,
-.np-menu__item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.colbar-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 /* L'ICONE D'UNE RANGEE A UNE BOITE, ET ELLE EST ECRITE.
    Sans largeur ni hauteur declarees, la boite sortait de la police : elle
    tombait juste (20 x 20) tant que les glyphes avaient la meme chasse, et
    aurait change le jour ou l'un d'eux ne l'aurait plus.
    Ce qui reste inegal, et qu'aucune regle CSS n'egalise, c'est l'ENCRE du
    pictogramme : 16,67 px pour la caisse contre 13,33 pour le devis, centrees
-   dans la meme boite de 20. Ca se dessine dans la police, pas ici. */
-.colbar-item__ic,
-.np-menu__ic {
+   dans la meme boite de 20. Ca se dessine dans la police, pas ici — et ca se
+   voit maintenant dans la BARRE, ou les deux onglets « Vente » et « Devis »
+   portent ces deux memes glyphes. */
+.colbar-item__ic {
   flex: 0 0 auto;
   width: var(--ic);
   height: var(--ic);
@@ -2198,29 +2194,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   color: var(--text-2);
 }
 .colbar-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* LE MENU DE « + NOUVEAU PROJET ». Deux lignes, posées sous le bouton : c'est
-   tout ce que l'écran à deux tuiles disait, et il prenait une page entière pour
-   le dire. Posé dans le <body> et non sous le bouton : la barre de navigation
-   vit dans un conteneur qui défile, un panneau en `absolute` s'y couperait. */
-.np-menu {
-  position: fixed;
-  z-index: 1200;
-  min-width: 232px;
-  padding: var(--pas-1);
-  border: 1px solid var(--border);
-  border-radius: var(--arrondi-bloc);
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-  animation: npMenuEntre var(--dur-2) var(--ease);
-}
-@keyframes npMenuEntre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .np-menu { animation: none; } }
-/* La rangee elle-meme est declaree avec celle du panneau « Colonnes » (plus
-   haut) : une seule ecriture, une seule hauteur. Ne reste ici que ce qui est
-   propre a ce menu — son survol. */
-.np-menu__item:hover { background: var(--primary-soft); color: var(--primary); }
-.np-menu__item:hover .np-menu__ic { color: var(--primary); }
-
 /* LA POIGNÉE DE RANGEMENT. Elle ne se montre qu'au survol de l'entrée : au
    repos, la liste se lit ; sous la souris, elle se manipule. Elle garde sa
    place — l'opacité, pas `display` — sinon l'intitulé se décale au survol. */
@@ -3734,9 +3707,9 @@ a,
    seule dans 7 px de chaque côté ferait une cible de 34 px. */
 .nav-switch.est-serree .nav-switch-label { display: none; }
 .topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 11px; }
-.topbar .nav-switch.est-serree .nav-switch-btn--projet { padding-right: 14px; }
+.topbar .nav-switch.est-serree .nav-switch-btn--projet-fin { padding-right: 14px; }
 .topbar .nav-switch.est-serree .nav-switch-btn--reglages { padding-left: 14px; }
-.topbar .nav-switch-btn--projet { padding-right: 11px; margin-right: 4px; }
+.topbar .nav-switch-btn--projet-fin { padding-right: 11px; margin-right: 4px; }
 .topbar .nav-switch-btn--reglages { padding-left: 11px; margin-left: 4px; }
 /* ET IL FAUT RENDRE LA MARGE AUTOMATIQUE, sans quoi tout ce qui précède ne
    sert à rien. Sur la rangée pleine, les onglets tiennent la droite par
@@ -3952,23 +3925,28 @@ a,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
-/* « Nouveau Projet » reste reconnaissable par son icône accentuée et son
-   texte gras — plus par un aplat plein en permanence, qui rivalisait avec le
-   VRAI bouton d'action de l'écran (Enregistrer la commande, etc.). Un seul
+/* « Vente » et « Devis » restent reconnaissables par leur icône accentuée et
+   leur texte gras — plus par un aplat plein en permanence, qui rivalisait avec
+   le VRAI bouton d'action de l'écran (Enregistrer la commande, etc.). Un seul
    remplissage plein par écran : celui de l'action, jamais celui de la nav. */
-/* Nouveau Projet ouvre la marche et reste SEUL à créer : un filet le détache des
-   onglets qui ne font que consulter (même grammaire que Réglages, à l'autre bout). */
 .nav-switch-btn--projet {
   font-weight: var(--graisse-note);
+}
+.nav-switch-btn--projet .material-symbols-outlined { color: var(--primary); }
+.nav-switch-btn--projet.active { background: transparent; color: var(--text-1); }
+.nav-switch-btn--projet.active .material-symbols-outlined { color: var(--primary); }
+/* LE FILET FERME LE GROUPE, PAS CHAQUE ENTRÉE. Les deux seules entrées qui
+   CRÉENT quelque chose ouvrent la marche ; un filet les détache de celles qui
+   ne font que consulter (même grammaire que Réglages, à l'autre bout). Il
+   n'appartient donc qu'à la DERNIÈRE des deux : posé sur les deux, il aurait
+   coupé « Vente » de « Devis » aussi fort que du reste de la barre. */
+.nav-switch-btn--projet-fin {
   margin-right: 6px;
   padding-right: 14px;
   border-right: 1px solid var(--border-soft);
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
-.nav-switch-btn--projet .material-symbols-outlined { color: var(--primary); }
-.nav-switch-btn--projet.active { background: transparent; color: var(--text-1); }
-.nav-switch-btn--projet.active .material-symbols-outlined { color: var(--primary); }
 
 /* Réglages ferme la marche, détaché lui aussi : on n'y va pas pour travailler,
    on y va pour régler l'outil. */
@@ -4319,7 +4297,6 @@ summary:focus-visible {
 .stage-link:active,
 .ordre-reset:active,
 .colbar-item:active,
-.np-menu__item:active,
 .menu-item:active { transform: scale(.97); }
 .pcard__del,
 .pcard__ref-btn,
@@ -4328,7 +4305,6 @@ summary:focus-visible {
 .stage-link,
 .ordre-reset,
 .colbar-item,
-.np-menu__item,
 .menu-item { transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
             border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
 /* Le doigt qui GLISSE une carte n'appuie pas dessus : sans ça, l'enfoncement
