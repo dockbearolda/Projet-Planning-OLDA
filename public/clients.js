@@ -1238,3 +1238,36 @@ export async function refreshClients() {
   });
   return refreshEnVol;
 }
+
+// UN DOSSIER MÈNE À SON CLIENT (29/08). Le nom du client, en tête de la fiche
+// atelier, ouvre la Base clients SUR CE CLIENT : « on a déjà fait quoi pour
+// eux » est la question qui suit immédiatement « qui est-ce ? ». C'est ce qui
+// remplace l'historique du client que portait le tiroir retiré le 29/08 — un
+// LIEN vers la fiche qui le tient déjà, pas une deuxième copie à tenir à jour.
+//
+// LE LIEN SE FAIT PAR LE NOM, faute de mieux : `requests` ne porte aucune
+// colonne `client_id`. Un dossier et une fiche client ne sont rattachés que par
+// ce qui est écrit dessus. On CHERCHE donc, on ne prétend pas résoudre :
+//   · une seule fiche trouvée  → elle s'ouvre ;
+//   · plusieurs, ou aucune     → la recherche reste posée à l'écran, et c'est
+//     la vendeuse qui tranche. Ouvrir « le premier de la liste » ouvrirait la
+//     fiche d'un homonyme sans rien dire, et elle écrirait dedans.
+//
+// LE FILTRE DE NATURE SE REMET SUR « Tous » : laissé sur « Professionnel », il
+// cache un client particulier qui porte pourtant le nom cherché — la recherche
+// paraît alors vide alors que la fiche existe.
+export function viserClient(nom) {
+  if (!mounted) return;
+  const q = String(nom == null ? '' : nom).trim();
+  if (!q) return;
+  query = q;
+  const champ = $('#cl-q');
+  if (champ) champ.value = q;
+  natureFilter = 'all';
+  for (const b of ROOT.querySelectorAll('.cl-filter__btn')) {
+    b.classList.toggle('is-on', b.dataset.nature === 'all');
+  }
+  const trouves = filtered();
+  renderList();
+  if (trouves.length === 1) openClient(trouves[0].id);
+}

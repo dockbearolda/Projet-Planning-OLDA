@@ -858,9 +858,19 @@ export function dessinerFicheAtelier(r, ctx) {
   //   · l'e-mail au client est dans « Documents », meme zone ;
   //   · « Marquer paye » doublait la bascule « Solde » de la zone Paiement.
   // Ce qui reste : la reference du dossier, en pied de carte, et le paiement,
-  // dans sa zone. CE QUI DISPARAIT AVEC ELLE : la note HORODATEE et signee d'un
-  // referent (`ctx.ajouterNote`). Le champ « Informations » garde le texte
-  // libre ; il ne pose pas l'heure ni le prenom.
+  // dans sa zone.
+  //
+  // LA NOTE HORODATEE NE REVIENT PAS (29/08, tranche par Charlie). Elle n'etait
+  // d'ailleurs pas ce que son nom disait : `ajouterNote` collait « heure — texte »
+  // a la fin de `description`, et le menu « Referent » pose a cote ecrivait la
+  // colonne `referent` de la ligne — le prenom n'entrait JAMAIS dans le texte.
+  // Ce qui disparait, c'est donc l'horodatage automatique et le geste « ajouter
+  // sans ecraser », pas une signature.
+  // La plomberie est partie avec : `ctx.ajouterNote` n'existe plus dans app.js.
+  // Le champ « Informations » garde le texte libre, dans la zone Client.
+  // Si un vrai journal de note revient un jour, il lui faut sa TABLE : la
+  // mediane de `description` est deja a 336 caracteres sur les dossiers reels,
+  // empiler des lignes horodatees dedans le ferait deborder de la fiche.
 
   majMarge();
   majReste();

@@ -307,9 +307,16 @@ assert.ok(!/annulations\.length >|slice\(-\d/.test(JS), 'la pile d’annulation 
 assert.ok(!/from '\.\/app\.js'/.test(JS), 'la fiche n’importe rien d’app.js');
 assert.ok(/import \{ dessinerFicheAtelier \} from '\.\/fiche-atelier\.js'/.test(APP),
   'c’est app.js qui l’importe, dans ce sens seulement');
-for (const clef of ['patchLigne', 'patchFiche', 'patchProd', 'fermer', 'ajouterNote']) {
+for (const clef of ['patchLigne', 'patchFiche', 'patchProd', 'fermer']) {
   assert.ok(new RegExp(`ctx\\.${clef}`).test(JS), `\`ctx.${clef}\` doit être fourni par l'appelant`);
 }
+// LA NOTE HORODATÉE NE REVIENT PAS COMME CODE MORT (29/08). `ctx.ajouterNote`
+// a survécu une journée entière à la barre basse qui l'appelait : plus rien ne
+// la déclenchait, et le contrôle d'à côté la trouvait quand même — dans un
+// COMMENTAIRE de la fiche. Une sonde qui cherche un nom dans un fichier ne dit
+// pas s'il est ATTEINT (voir la mémoire « les sondes de code mort mentent ») :
+// celle-ci porte donc sur la déclaration, dans app.js, où la fonction vivait.
+assert.ok(!/^\s*ajouterNote:/m.test(APP), '`ajouterNote` est partie avec la barre basse');
 // LE PRIX SUIT TOUJOURS : corriger une taille passe par la même porte que le
 // reste (voir chiffrage.js), la fiche ne recalcule rien elle-même.
 assert.ok(/patchProd: \(patchProd\) => envoyerProduction\(r, patchProd\)/.test(APP),

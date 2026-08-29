@@ -3527,13 +3527,19 @@ function contexteFicheAtelier(r) {
         rafraichirLigne(r);
       });
     },
-    ajouterNote: (texte) => {
-      const base = String(r.description || '').trim();
-      const ligne = `${horodatageFr(new Date().toISOString())} — ${texte}`;
-      const suite = base ? `${base}\n${ligne}` : ligne;
-      patch(r, { description: suite }, () => { r.description = suite; rafraichirLigne(r); });
+    // LE HASH S'ÉCRIVAIT « #/clients » — AVEC UNE BARRE QUI N'EXISTE NULLE PART
+    // (corrigé le 29/08). La table `VIEWS` n'accepte que « #clients » : elle ne
+    // trouvait rien, `applyHash` retombait sur son défaut ('planning'), et le
+    // clic sur le nom du client refermait la fiche pour rouvrir… la grille.
+    // L'onglet était MORT sans que rien ne le dise — le symptôme exact de la
+    // mémoire « vue et hash doivent rester alignés ». Une clé de `VIEWS`, jamais
+    // une chaîne écrite à la main : c'est ce qui a laissé passer la barre.
+    ouvrirClient: (ligne) => {
+      const cible = ligne || r;
+      clientVise = cible.billing_company || cible.contact_referent || '';
+      location.hash = HASH_CLIENTS;
+      fermerFicheAtelier();
     },
-    ouvrirClient: () => { location.hash = '#/clients'; fermerFicheAtelier(); },
     telecharger: (ligne) => telechargerRecap(ligne),
     email: (ligne) => envoyerParEmail(ligne),
   };
@@ -7563,19 +7569,36 @@ function poserFeuille(href) {
 
 let clientsLoading = null;
 let clientsModule = null;
+// LE CLIENT QU'ON VIENT DE QUITTER. Posé par le nom du client de la fiche
+// atelier, consommé UNE fois par le montage de la vue — puis oublié : sans quoi
+// le prochain passage par l'onglet Base clients rouvrirait la fiche d'un client
+// qu'on n'a plus sous les yeux. La vue est chargée PARESSEUSEMENT : au premier
+// clic le module n'existe pas encore, la cible doit donc attendre `initClients`.
+let clientVise = null;
+function viserDansClients(nom) {
+  if (!nom || !clientsModule || !clientsModule.viserClient) return;
+  clientsModule.viserClient(nom);
+}
 function mountClients() {
   if (!$clients) return;
+  const vise = clientVise;
+  clientVise = null;
   if (!clientsLoading) {
     clientsLoading = Promise.all([poserFeuille('clients.css'), import('./clients.js')])
       .then(([, m]) => m)
       .then((m) => { clientsModule = m; return m.initClients($clients); })
+      .then(() => viserDansClients(vise))
       .catch((err) => {
         clientsLoading = null;                // rechargeable au prochain essai
         clientsModule = null;
         console.error('Base clients : chargement impossible', err);
       });
-  } else if (clientsModule && clientsModule.refreshClients) {
-    clientsModule.refreshClients();
+  } else if (clientsModule) {
+    // `refreshClients` se tait quand elle vient de tourner (garde de 3 s) : la
+    // cible ne peut donc pas attendre sa promesse, elle se pose tout de suite
+    // sur la liste déjà à l'écran.
+    if (clientsModule.refreshClients) clientsModule.refreshClients();
+    viserDansClients(vise);
   }
 }
 
@@ -7906,10 +7929,14 @@ function setViewMode(mode) {
 // il n'existe plus d'écran de saisie parallèle. Les anciens `#demande` et
 // `#commande` ne figurent plus ici — ils retombent sur le planning, comme tout
 // hash inconnu.
+// LE HASH DE LA BASE CLIENTS EST UNE CONSTANTE, plus une chaîne recopiée : la
+// seule autre écriture de ce hash dans le fichier portait une barre en trop et
+// l'onglet ne s'ouvrait pas (voir `ouvrirClient`).
+const HASH_CLIENTS = '#clients';
 const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
-  '#clients': 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
+  [HASH_CLIENTS]: 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   '#pilotage': 'pilotage',
   '#tailles-logos': 'tailleslogos',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
