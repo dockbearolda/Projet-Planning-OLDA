@@ -326,8 +326,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* QUATRE PISTES — intitule, valeur, intitule, valeur — comme la grille de
    production. Elle en avait trois (un intitule, deux valeurs) : six champs y
    descendaient sur six lignes, chacune avec 400 px de vide a droite. */
-.fa-grille-client { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
-.fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+/* L'ECART ENTRE DEUX RANGEES EST LE MEME PARTOUT — dans une grille comme entre
+   deux blocs de la colonne. Il valait `--pas-1` (6 px) dans les deux grilles et
+   `--pas-2` (10 px) partout ailleurs : la colonne de droite quitte sa grille
+   une rangee plus tot que celle de gauche, elle prenait donc le grand ecart au
+   moment ou l'autre prenait encore le petit. Resultat, les rangees 3 et 4
+   tombaient 4 px plus haut a droite qu'a gauche — deux jetons pour un seul
+   rythme, et un decalage qu'on ne voit qu'en mesurant les deux colonnes l'une
+   contre l'autre. Mesure apres : les CINQ rangees tombent a 0 px.
+   Et une seule regle pour les deux grilles : elles etaient ecrites deux fois,
+   a l'identique. */
+.fa-grille-client,
+.fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-2); }
 .fa-fort { font-weight: var(--graisse-note); }
 
 .fa-compte { margin-left: auto; flex-shrink: 0; font-size: var(--fa-lab); color: var(--text-2); }

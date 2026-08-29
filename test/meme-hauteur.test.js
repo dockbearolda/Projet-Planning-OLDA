@@ -176,3 +176,32 @@ console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’ic
   assert.ok(crans.size <= 3,
     `la fiche atelier prend ${crans.size} crans de texte — deux par surface, trois au grand maximum`);
 }
+
+// ---------------------------------------------------------------------------
+// … ET SES DEUX COLONNES BATTENT LE MÊME RYTHME (29/08/2026)
+// ---------------------------------------------------------------------------
+// Les rangées 3 et 4 de la fiche tombaient 4 px plus haut à droite qu'à gauche.
+// Cause : deux jetons d'écart pour un seul rythme. Les grilles espaçaient leurs
+// rangées de `--pas-1` (6 px), la colonne espaçait ses blocs de `--pas-2` (10).
+// La colonne de droite quitte sa grille une rangée plus tôt que celle de
+// gauche : elle prenait donc le grand écart au moment où l'autre prenait encore
+// le petit, et le décalage se reportait sur tout ce qui suit.
+//
+// Ça ne se voit pas en relisant la fiche — les deux colonnes sont correctes
+// prises séparément. Ça se voit en mesurant l'une CONTRE l'autre : les cinq
+// rangées tombent à 0 px depuis, mesuré au rendu à 1440 px.
+{
+  const FICHE = fs.readFileSync(path.join(RACINE, 'public/fiche-atelier.css'), 'utf8');
+  const nu = FICHE.replace(/\/\*[\s\S]*?\*\//g, '');
+  const grilles = nu.match(/\.fa-grille-client,\s*\n\.fa-grille-prod \{([^}]*)\}/);
+  assert.ok(grilles,
+    'les deux grilles de la fiche partagent UNE règle : écrites deux fois, elles divergent');
+  assert.match(grilles[1], /gap: var\(--pas-2\);/,
+    'leur écart de rangée est celui de la colonne — un seul rythme, un seul jeton');
+  // Et la colonne garde le sien : c'est le même.
+  const colonnes = nu.match(/\.fa-col--g \{([^}]*)\}/);
+  assert.ok(colonnes && /gap: var\(--pas-2\)/.test(colonnes[1]),
+    '… celui-là même que la colonne applique entre deux blocs');
+}
+
+console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même rythme');
