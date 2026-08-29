@@ -973,33 +973,34 @@ export function dessinerFicheAtelier(r, ctx) {
   const acompteCase = chAcompte;
   const resteCase = reste;
 
+  // CHAQUE ACTION SE POSE CONTRE LE NOMBRE QU'ELLE CHANGE, dans la case du
+  // LIBELLE — la seule place ou quelque chose peut accompagner un montant sans
+  // sortir du rail des chiffres (regle du 29/08 : rien ne passe A DROITE du
+  // montant). Les deux pastilles calculent l'ACOMPTE, elles vivent donc sur sa
+  // ligne ; « Solde » met le RESTE a zero, il vit sur la sienne. C'est aussi ce
+  // qui retire la quatrieme rangee du compte : elle ne portait qu'eux, et
+  // coutait 56 px de haut pour rien.
   ligneArgent('Prix TTC', ttcCase);
   ligneArgent([
     el('span', 'fa-moins', '−'),
     document.createTextNode('Acompte versé le '),
     chAcompteDate,
+    pastilleAcompte(0.3),
+    pastilleAcompte(0.5),
   ], acompteCase);
   argent.append(el('div', 'fa-argent__filet'));
-  ligneArgent('Reste à payer', resteCase);
-  // LE BOUTON FERME LE COMPTE, sous le total : c'est une ACTION, elle n'a rien
-  // a faire dans la colonne des chiffres.
-  // L'ACTION QUI ENGAGE EST LA DERNIERE A DROITE : « Soldé » ferme la rangee,
-  // les deux raccourcis de calcul le precedent.
-  // ELLE TRAVERSE LES DEUX COLONNES au lieu de tenir dans celle des montants :
-  // trois boutons de 88 px y auraient elargi la colonne des chiffres de 136 px,
-  // donc deplace tous les libelles vers la gauche. Le rail des montants ne
-  // bouge pas d'un pixel ; c'est la rangee des actions qui s'etale.
-  argent.append((() => {
-    const v = el('div', 'fa-argent__actions');
-    v.append(pastilleAcompte(0.3), pastilleAcompte(0.5), bSolde);
-    return v;
-  })());
+  ligneArgent([bSolde, document.createTextNode('Reste à payer')], resteCase);
 
-  rangeesPanneau.push(
-    rangee('Coût', ligneCout),
-    rangee('Règlement', selReglement),
-    argent,
-  );
+  // LE PANNEAU EST UN SEUL BLOC, PAS DEUX MORCEAUX ET UN VIDE (29/08). Les deux
+  // rangees de l'atelier tenaient la premiere ligne sur TOUTE la largeur, et le
+  // compte descendait SOUS elles, cale a droite : il restait un rectangle vide
+  // de 910 x 225 px en bas a gauche, et le panneau faisait 318 px de haut.
+  // Elles se rangent maintenant DANS la moitie gauche, en colonne, face au
+  // compte : rien ne flotte seul, et la hauteur du panneau est celle du compte
+  // au lieu d'etre celle du compte PLUS une rangee.
+  const atelier = el('div', 'fa-details__atelier');
+  atelier.append(rangee('Coût', ligneCout), rangee('Règlement', selReglement));
+  rangeesPanneau.push(atelier, argent);
   panneau.append(...rangeesPanneau);
 
   // LE CHAMP DES NOTES VIT DANS LA COLONNE GAUCHE, POINT. Il y avait ici un

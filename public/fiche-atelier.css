@@ -449,6 +449,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
    402 px de haut pour ce qui en demande 190. */
 .fa-details > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
+/* LA MOITIE GAUCHE DU PANNEAU (29/08). Ce qui ne regarde que l'atelier — le
+   cout, la marge qui s'en deduit, le mode de reglement — se range en colonne
+   FACE au compte, au lieu de tenir une rangee pleine largeur au-dessus de lui.
+   Avant : deux rangees sur 1 354 px, puis le compte cale a droite en dessous,
+   et un rectangle vide de 910 x 225 px en bas a gauche. */
+.fa-details__atelier { display: grid; gap: var(--pas-2); align-content: start; min-width: 0; }
+.fa-details__atelier > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
 
 /* --- La niche des notes -------------------------------------------------
    Elle accueille le champ des notes quand l'ecran est assez haut. Elle
@@ -566,7 +573,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    `justify-content: flex-end` rognerait par la GAUCHE des que le contenu
    deborde : c'est le debut de la ligne qui disparaitrait, donc le libelle. */
 .fa-argent {
-  grid-column: 1 / -1;
+  /* IL TIENT LA COLONNE DE DROITE, il ne traverse plus les deux (29/08) : c'est
+     ce qui permet a la moitie gauche de venir se poser en face au lieu de
+     s'empiler au-dessus. La marge automatique le garde colle a droite. */
   margin-left: auto;
   padding: 0 var(--pas-4);
   display: grid; grid-template-columns: auto auto;
@@ -588,21 +597,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
    pas — c'est tout l'interet de les empiler. */
 .fa-argent .fa-in { text-align: right; }
-/* LA RANGEE DES ACTIONS traverse les deux colonnes et se colle a droite par une
-   MARGE AUTOMATIQUE, jamais par `flex-end` : celui-ci rogne par la gauche des
-   que le contenu deborde, et trois boutons de 88 px sont pile a la limite.
-   L'ecart est le meme jeton que celui qui separe deja les colonnes du compte. */
-.fa-argent__actions {
-  grid-column: 1 / -1;
-  display: flex; gap: var(--pas-2); margin-left: auto;
-}
-/* LES TROIS BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes
-   — la largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
+/* LES BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes — la
+   largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
    doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px
-   on obtenait 88 / 88 / 52, trois boites inegales sur une meme rangee. On egalise
-   ce qui doit l'etre — hauteur, rembourrage, graisse, ecart, tenus par
-   `.fa-seg__b` — et la largeur suit le mot. UNE regle pour les trois. */
-.fa-argent__actions .fa-seg__b { flex: 0 0 auto; }
+   on obtenait 88 / 88 / 52, trois boites inegales cote a cote. On egalise ce qui
+   doit l'etre — hauteur, rembourrage, graisse, ecart, tenus par `.fa-seg__b` —
+   et la largeur suit le mot. UNE regle pour les trois.
+   Ils vivent dans la case du LIBELLE, contre le nombre qu'ils changent : les
+   deux pastilles sur la ligne de l'acompte, « Solde » sur celle du reste. */
+.fa-argent__k .fa-seg__b { flex: 0 0 auto; }
 
 /* --- CE QUI EST PAYE, ET CE QU'IL RESTE (29/08) ---------------------------
    « En un coup d'oeil on doit voir ce qui est paye et combien il reste a

@@ -119,7 +119,7 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // sur un même rail. À gauche, ce qui ne regarde que l'atelier.
   for (const attendu of ["rangee('Coût', ligneCout)", "rangee('Règlement', selReglement)",
     "ligneArgent('Prix TTC', ttcCase)", "'Acompte versé le '",
-    "ligneArgent('Reste à payer', resteCase)", "el('div', 'fa-argent__filet')"]) {
+    "document.createTextNode('Reste à payer')", "el('div', 'fa-argent__filet')"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
   // RIEN NE PASSE A DROITE DU CHIFFRE. Au premier essai, la date de l'acompte
@@ -134,7 +134,15 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   const ARGENT = CSS.match(/\.fa-argent \{[\s\S]*?\n\}/)[0];
   assert.match(ARGENT, /margin-left: auto;/,
     'le compte se colle à droite par une marge, jamais par `flex-end`');
-  assert.match(ARGENT, /grid-column: 1 \/ -1;/, '… et il prend toute la largeur du panneau');
+  // ⚠ IL NE TRAVERSE PLUS LES DEUX COLONNES (29/08). Il le faisait, et ce qui
+  // ne regarde que l'atelier tenait une rangée pleine largeur AU-DESSUS de lui :
+  // le compte descendait donc sous elle, et il restait un rectangle vide de
+  // 910 × 225 px en bas à gauche, pour 318 px de panneau. Charlie : « toute
+  // cette partie doit être ensemble, et beaucoup moins haute ». Le compte tient
+  // maintenant la colonne de DROITE, l'atelier celle de gauche, et le panneau
+  // fait la hauteur du plus haut des deux au lieu de leur somme.
+  assert.ok(!/grid-column: 1 \/ -1;/.test(ARGENT),
+    '… et il tient la colonne de droite, il ne s’étale plus sur les deux');
   // Les montants s'alignent sur leur dernier chiffre : c'est tout l'intérêt de
   // les empiler.
   assert.match(CSS, /\.fa-argent \.fa-in \{ text-align: right; \}/,

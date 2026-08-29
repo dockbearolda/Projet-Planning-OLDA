@@ -19,9 +19,12 @@
 //      0,00 € posé sur un dossier non chiffré allumerait les deux drapeaux pour
 //      un versement qui n'a pas eu lieu. Or « demande de devis = sans prix »
 //      est le cas NORMAL ici : `project_value` y est NULL, jamais 0.
-//   3. LE RAIL DES MONTANTS NE BOUGE PAS. Trois boutons de 88 px posés dans la
-//      colonne des chiffres l'auraient élargie de 136 px, donc déplacé tous les
-//      libellés. La rangée traverse les deux colonnes à la place.
+//   3. CHAQUE ACTION SE POSE CONTRE LE NOMBRE QU'ELLE CHANGE, dans la case du
+//      LIBELLÉ — la seule place où quelque chose peut accompagner un montant
+//      sans sortir du rail des chiffres (règle du 29/08 : rien ne passe à DROITE
+//      du montant). Les deux pastilles sur la ligne de l'acompte, « Soldé » sur
+//      celle du reste. Ça retire au passage la quatrième rangée du compte, qui
+//      ne portait qu'eux et coûtait 56 px de haut.
 
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -60,10 +63,16 @@ assert.match(BLOC, /empiler\(\(\) => poser\(avant\)\);/,
 assert.match(BLOC, /if \(n === avant\) return;/,
   'recliquer la même pastille ne réécrit rien et n’empile pas un faux retour');
 
-// Les deux taux, et rien d'autre : le libellé se déduit du taux, il ne se tape
-// pas à côté — sinon « 30 % » finira par calculer 35 %.
-assert.match(JS, /pastilleAcompte\(0\.3\), pastilleAcompte\(0\.5\), bSolde/,
-  '30 %, 50 %, puis Soldé — l’action qui engage est la dernière à droite');
+// CHAQUE ACTION CONTRE LE NOMBRE QU'ELLE CHANGE (29/08). Les deux pastilles
+// calculent l'ACOMPTE : elles vivent sur sa ligne. « Soldé » met le RESTE à
+// zéro : il vit sur la sienne. Elles sont dans la case du LIBELLÉ — la seule
+// place où quelque chose peut accompagner un montant sans sortir du rail.
+assert.match(JS, /chAcompteDate,\s*\n\s*pastilleAcompte\(0\.3\),\s*\n\s*pastilleAcompte\(0\.5\),/,
+  'les deux pastilles sont sur la ligne de l’acompte, qu’elles calculent');
+assert.match(JS, /ligneArgent\(\[bSolde, document\.createTextNode\('Reste à payer'\)\], resteCase\);/,
+  '« Soldé » est sur la ligne du reste, qu’il met à zéro');
+// Et la quatrième rangée du compte n'existe plus : elle ne portait qu'eux.
+assert.ok(!/fa-argent__actions/.test(JS), 'plus de rangée d’actions à elle seule');
 assert.match(BLOC, /`\$\{Math\.round\(part \* 100\)\} %`/,
   'le libellé se déduit du taux : un seul nombre, pas deux à tenir d’accord');
 
@@ -81,17 +90,33 @@ assert.strictEqual(acompte(52.1, 0.5), 26.05);
 // le même rembourrage, le même écart et la même graisse — dans UNE règle.
 assert.match(JS, /bouton\('fa-seg__b', `\$\{Math\.round\(part \* 100\)\} %`/,
   'les pastilles prennent la boîte de « Soldé », pas une à elles');
-const ACTIONS = CSS.match(/\.fa-argent__actions \{[^}]*\}/)[0];
-assert.match(ACTIONS, /grid-column: 1 \/ -1;/,
-  'la rangée traverse les deux colonnes : la colonne des chiffres ne s’élargit pas');
-// `flex-end` rogne par la gauche dès que le contenu déborde — défaut déjà payé.
-assert.match(ACTIONS, /margin-left: auto;/, 'elle se colle à droite par une marge automatique');
-assert.ok(!/justify-content: flex-end/.test(ACTIONS), 'jamais par `flex-end`');
-assert.match(ACTIONS, /gap: var\(--pas-2\)/, 'l’écart est un jeton');
-assert.ok(!/\d+px/.test(ACTIONS.replace(/var\([^)]*\)/g, '')),
-  'aucune mesure écrite en dur dans la rangée');
 // La largeur des trois suit leur mot : à 88 px fixes on obtenait 88 / 88 / 52.
-assert.match(CSS, /\.fa-argent__actions \.fa-seg__b \{ flex: 0 0 auto; \}/,
+assert.match(CSS, /\.fa-argent__k \.fa-seg__b \{ flex: 0 0 auto; \}/,
   'UNE règle donne aux trois boutons la même façon de se dimensionner');
+assert.ok(!/\.fa-argent__actions/.test(CSS), 'la rangée d’actions n’a plus de règle non plus');
+
+// ---------------------------------------------------------------------------
+// 4. LE PANNEAU EST UN SEUL BLOC, PAS DEUX MORCEAUX ET UN VIDE
+// ---------------------------------------------------------------------------
+// Charlie, 29/08 : « toute cette partie doit être ensemble, et cette bulle doit
+// être beaucoup moins haute ». Les deux rangées de l'atelier tenaient une ligne
+// PLEINE LARGEUR au-dessus du compte, qui descendait sous elles calé à droite :
+// il restait un rectangle vide de 910 × 225 px en bas à gauche, pour 318 px de
+// panneau. Elles se rangent maintenant dans la moitié gauche, face au compte.
+assert.match(JS, /const atelier = el\('div', 'fa-details__atelier'\);/,
+  'ce qui ne regarde que l’atelier tient sa propre moitié');
+assert.match(JS, /rangeesPanneau\.push\(atelier, argent\);/,
+  'deux moitiés côte à côte, et rien d’empilé au-dessus');
+const ATELIER = CSS.match(/\.fa-details__atelier \{[^}]*\}/)[0];
+assert.match(ATELIER, /align-content: start/,
+  'ses rangées restent EN HAUT : étirées, elles rouvriraient le vide qu’on vient de fermer');
+assert.match(ATELIER, /gap: var\(--pas-2\)/, 'l’écart est un jeton');
+assert.ok(!/\d+px/.test(ATELIER.replace(/var\([^)]*\)/g, '')),
+  'aucune mesure écrite en dur');
+// Le compte ne traverse plus les deux colonnes : c'est ce qui libère la gauche.
+const ARGENT = CSS.match(/\.fa-argent \{[\s\S]*?\n\}/)[0];
+assert.ok(!/grid-column: 1 \/ -1/.test(ARGENT),
+  'le compte tient la colonne de droite, il ne s’étale plus sur les deux');
+assert.match(ARGENT, /margin-left: auto;/, 'et reste collé à droite par une marge automatique');
 
 console.log('✓ acompte en un clic : 30 % / 50 % déduits du TTC, les deux drapeaux suivent, le rail ne bouge pas');
