@@ -103,20 +103,48 @@ assert.ok(!/\.fa-argent__actions/.test(CSS), 'la rangée d’actions n’a plus 
 // PLEINE LARGEUR au-dessus du compte, qui descendait sous elles calé à droite :
 // il restait un rectangle vide de 910 × 225 px en bas à gauche, pour 318 px de
 // panneau. Elles se rangent maintenant dans la moitié gauche, face au compte.
-assert.match(JS, /const atelier = el\('div', 'fa-details__atelier'\);/,
+assert.match(JS, /const atelier = grilleCompte\(\);/,
   'ce qui ne regarde que l’atelier tient sa propre moitié');
 assert.match(JS, /rangeesPanneau\.push\(atelier, argent\);/,
   'deux moitiés côte à côte, et rien d’empilé au-dessus');
-const ATELIER = CSS.match(/\.fa-details__atelier \{[^}]*\}/)[0];
-assert.match(ATELIER, /align-content: start/,
-  'ses rangées restent EN HAUT : étirées, elles rouvriraient le vide qu’on vient de fermer');
-assert.match(ATELIER, /gap: var\(--pas-2\)/, 'l’écart est un jeton');
-assert.ok(!/\d+px/.test(ATELIER.replace(/var\([^)]*\)/g, '')),
-  'aucune mesure écrite en dur');
 // Le compte ne traverse plus les deux colonnes : c'est ce qui libère la gauche.
 const ARGENT = CSS.match(/\.fa-argent \{[\s\S]*?\n\}/)[0];
 assert.ok(!/grid-column: 1 \/ -1/.test(ARGENT),
   'le compte tient la colonne de droite, il ne s’étale plus sur les deux');
 assert.match(ARGENT, /margin-left: auto;/, 'et reste collé à droite par une marge automatique');
+
+// ---------------------------------------------------------------------------
+// 5. LES DEUX MOITIÉS SONT LA MÊME FAMILLE
+// ---------------------------------------------------------------------------
+// Charlie, 29/08 : « tout ça doit être la même famille ». C'étaient deux
+// composants différents côte à côte — à gauche l'intitulé posé au rail de
+// GAUCHE et la valeur qui le suit, à droite l'intitulé calé CONTRE la colonne
+// des montants. Même paire, deux géométries : exactement ce qui se voit sans
+// qu'on sache le nommer.
+assert.match(JS, /const grilleCompte = \(\) => el\('div', 'fa-argent'\);/,
+  'les deux moitiés sortent de la MÊME fabrique');
+assert.match(JS, /const ligneDe = \(hote\) => \(cle, montant\) => \{/,
+  'et leurs lignes du même composant, pas de deux qui se ressemblent');
+assert.ok(!/fa-details__atelier|fa-duo|fa-marge-k/.test(JS),
+  'plus aucun composant propre à la moitié gauche');
+assert.ok(!/\.fa-duo|\.fa-marge \{/.test(CSS),
+  'ni la moindre règle qui lui reste');
+// MÊME FORME, LIGNE POUR LIGNE : deux faits qu'on saisit, un filet, le nombre
+// qui en tombe. C'est le filet qui fait tomber les six lignes aux mêmes
+// hauteurs — sans lui, la gauche décalait de 6, 3 et 7 px.
+const PANNEAU = JS.slice(JS.indexOf('const atelier = grilleCompte();'), JS.indexOf('panneau.append(...rangeesPanneau);'));
+assert.match(PANNEAU, /ligneAtelier\('Coût', chCout\);\s*\n\s*ligneAtelier\('Règlement', selReglement\);\s*\n\s*atelier\.append\(el\('div', 'fa-argent__filet'\)\);\s*\n\s*ligneAtelier\('Marge', valMarge\);/,
+  'deux faits, un filet, la marge — le miroir exact du compte de droite');
+// TOUTE LIGNE FAIT LA HAUTEUR D'UNE COMMANDE, même celle qui ne porte qu'un
+// texte : sans ça la ligne « Marge » écrasait sa rangée. Et c'est un JETON.
+assert.match(CSS, /\.fa-argent__k, \.fa-argent__v \{ min-height: var\(--fa-h-champ\); \}/,
+  'la hauteur d’une ligne du compte est un jeton, jamais un nombre');
+// La moitié gauche s'appuie sur le bord gauche comme le compte sur le droit.
+assert.match(CSS, /\.fa-argent--atelier \{ margin-left: 0; margin-right: auto; \}/,
+  'seul le bord change entre les deux moitiés');
+// ⚠ ET APRÈS `.fa-argent` DANS LA FEUILLE : même spécificité, c'est l'ordre qui
+// tranche. Posée avant, `margin-left: auto` la battait et le bloc flottait.
+assert.ok(CSS.indexOf('.fa-argent {') < CSS.indexOf('.fa-argent--atelier'),
+  'le modificateur vient APRÈS ce qu’il modifie');
 
 console.log('✓ acompte en un clic : 30 % / 50 % déduits du TTC, les deux drapeaux suivent, le rail ne bouge pas');

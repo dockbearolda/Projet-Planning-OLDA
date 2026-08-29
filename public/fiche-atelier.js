@@ -458,9 +458,6 @@ export function dessinerFicheAtelier(r, ctx) {
     envoyer: (v) => ctx.patchLigne('project_value', nombreDe(v)),
     apres: () => { majMarge(); majReste(); },
   });
-  const marge = el('div', 'fa-marge');
-  marge.append(el('span', 'fa-marge-k', 'marge'), valMarge);
-
   // UNE SEULE RANGÉE. Les trois blocs empilaient chacun leur libellé au-dessus
   // de leur commande : 96 px de bandeau, et sous 1180 px les trois se
   // remettaient l'un sous l'autre — près de 200 px pour trois contrôles.
@@ -949,9 +946,6 @@ export function dessinerFicheAtelier(r, ctx) {
   //
   // A GAUCHE, ce qui ne regarde que l'atelier : le cout de revient, la marge
   // qui s'en deduit, et le mode de reglement. A DROITE, le compte du client.
-  const ligneCout = el('div', 'fa-duo');
-  ligneCout.append(chCout, marge);
-
   // L'ECHELLE DES MONTANTS : libelle a gauche, montant a droite, tous sur le
   // meme rail — c'est ce qui rend la soustraction lisible sans l'ecrire.
   // LA COLONNE DES MONTANTS EST LA DERNIERE, ET RIEN NE PASSE A SA DROITE.
@@ -960,15 +954,29 @@ export function dessinerFicheAtelier(r, ctx) {
   // 1 181 et 1 268 px, donc sur trois rails. Une echelle de montants qui ne
   // s'aligne pas ne se lit pas : c'est tout ce qu'on lui demande.
   // Ce qui accompagne un montant va donc dans la case du LIBELLE, a sa gauche.
-  const argent = el('div', 'fa-argent');
-  const ligneArgent = (cle, montant) => {
+  // UNE SEULE FAMILLE POUR TOUT LE BAS DE LA FICHE (29/08). Charlie, en
+  // designant les deux moities du panneau : « tout ca doit etre la meme
+  // famille ». Elles etaient deux composants differents cote a cote — a gauche
+  // l'intitule pose au rail de GAUCHE et la valeur qui le suit, a droite
+  // l'intitule cale CONTRE la colonne des montants. Meme paire, deux
+  // geometries : c'est exactement ce qui se voit sans qu'on sache le nommer.
+  //
+  // C'est la forme du COMPTE qui gagne, pour deux raisons : c'est la norme d'un
+  // devis (l'intitule contre son montant, les montants sur un rail), et c'est
+  // celle que Charlie a demandee le 29/08 pour le total. Le bas de la fiche
+  // parle d'argent d'un bout a l'autre : il se lit donc comme un compte, et
+  // plus comme la suite des colonnes du haut.
+  const grilleCompte = () => el('div', 'fa-argent');
+  const ligneDe = (hote) => (cle, montant) => {
     const k = el('div', 'fa-argent__k');
     k.append(...(Array.isArray(cle) ? cle : [document.createTextNode(cle)]));
     const v = el('div', 'fa-argent__v');
     v.append(montant);
-    argent.append(k, v);
+    hote.append(k, v);
     return { k, v };
   };
+  const argent = grilleCompte();
+  const ligneArgent = ligneDe(argent);
   const ttcCase = chTtc;
   const acompteCase = chAcompte;
   const resteCase = reste;
@@ -998,8 +1006,18 @@ export function dessinerFicheAtelier(r, ctx) {
   // Elles se rangent maintenant DANS la moitie gauche, en colonne, face au
   // compte : rien ne flotte seul, et la hauteur du panneau est celle du compte
   // au lieu d'etre celle du compte PLUS une rangee.
-  const atelier = el('div', 'fa-details__atelier');
-  atelier.append(rangee('Coût', ligneCout), rangee('Règlement', selReglement));
+  const atelier = grilleCompte();
+  atelier.classList.add('fa-argent--atelier');
+  const ligneAtelier = ligneDe(atelier);
+  // MEME FORME QUE LE COMPTE, ligne pour ligne : deux faits qu'on SAISIT, un
+  // filet, puis le nombre qui en TOMBE. A droite c'est prix moins acompte egale
+  // reste ; a gauche c'est cout et reglement, puis la marge — qui se calcule
+  // elle aussi et ne se tape jamais. Le filet dit la meme chose des deux cotes,
+  // et c'est lui qui fait tomber les six lignes aux memes hauteurs.
+  ligneAtelier('Coût', chCout);
+  ligneAtelier('Règlement', selReglement);
+  atelier.append(el('div', 'fa-argent__filet'));
+  ligneAtelier('Marge', valMarge);
   rangeesPanneau.push(atelier, argent);
   panneau.append(...rangeesPanneau);
 

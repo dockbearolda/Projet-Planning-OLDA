@@ -117,8 +117,10 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // LE COMPTE EST EN BAS A DROITE — c'est la norme de tout devis et de toute
   // facture : le total ferme le document, calé à droite, ses lignes empilées
   // sur un même rail. À gauche, ce qui ne regarde que l'atelier.
-  for (const attendu of ["rangee('Coût', ligneCout)", "rangee('Règlement', selReglement)",
-    "ligneArgent('Prix TTC', ttcCase)", "'Acompte versé le '",
+  // LES DEUX MOITIES SONT LA MEME FAMILLE (29/08) : meme fabrique, meme
+  // composant de ligne, meme forme — deux faits, un filet, le nombre qui tombe.
+  for (const attendu of ["ligneAtelier('Coût', chCout)", "ligneAtelier('Règlement', selReglement)",
+    "ligneAtelier('Marge', valMarge)", "ligneArgent('Prix TTC', ttcCase)", "'Acompte versé le '",
     "document.createTextNode('Reste à payer')", "el('div', 'fa-argent__filet')"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }

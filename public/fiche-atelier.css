@@ -240,8 +240,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-bloc--large { flex: 1; }
 .fa-bloc > .fa-lab { flex-shrink: 0; }
 .fa-bloc--large > .fa-in { flex: 1; }
-.fa-duo { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
-.fa-duo > .fa-in { flex: 1; }
 /* LA MÊME HAUTEUR POUR TOUT LE BANDEAU, dans une seule règle : menu, bouton,
    segment, champ. Écrite quatre fois, elle redevient quatre hauteurs. */
 .fa-bandeau :is(.fa-in, .fa-btn, .fa-seg, .fa-seg__b) { height: var(--fa-h-bandeau); }
@@ -249,11 +247,16 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* 128 px : « 12 500,50 € » tient, et les 22 px rendus vont au menu d'etape.
    Un montant plus long que cinq chiffres n'existe pas sur un dossier d'ici. */
 .fa-ttc { width: 128px; flex: 0 0 128px; font-weight: var(--graisse-forte); }
-/* La marge se lit d'un trait, pas sur deux etages : elle accompagne le montant,
-   elle ne se compare a rien. */
-.fa-marge { display: flex; align-items: baseline; gap: var(--pas-1); white-space: nowrap; }
-.fa-marge-k { font-size: var(--fa-lab); color: var(--text-3); }
-.fa-marge-v { font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2); }
+/* LA MARGE A SA PROPRE LIGNE DANS LE COMPTE (29/08), avec son intitule a
+   gauche comme tous les autres. Collee au cout dans une paire, elle etait le
+   seul endroit du panneau ou une case portait DEUX faits. Il ne reste que sa
+   valeur : elle se lit d'un trait, elle ne se compare a rien. */
+/* LA MARGE EST UNE VALEUR DU COMPTE, pas une note en marge d'une autre. Elle
+   etait d'un cran plus petite que ses voisines (`--fa-lab`, la taille des
+   INTITULES) parce qu'elle vivait collee au cout ; sur sa ligne, ce cran la
+   sortait de la famille. Elle prend celui des montants — sans aller jusqu'a
+   celui du total, qui reste au « Reste a payer ». */
+.fa-marge-v { font-weight: var(--graisse-note); color: var(--text-1); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Segmenté : trois valeurs exclusives, la retenue porte l'encre.
    IL NE RÉTRÉCIT PAS. En `flex: 1` dans une rangée, il cédait sa largeur au
@@ -449,13 +452,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
    402 px de haut pour ce qui en demande 190. */
 .fa-details > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
-/* LA MOITIE GAUCHE DU PANNEAU (29/08). Ce qui ne regarde que l'atelier — le
-   cout, la marge qui s'en deduit, le mode de reglement — se range en colonne
-   FACE au compte, au lieu de tenir une rangee pleine largeur au-dessus de lui.
-   Avant : deux rangees sur 1 354 px, puis le compte cale a droite en dessous,
-   et un rectangle vide de 910 x 225 px en bas a gauche. */
-.fa-details__atelier { display: grid; gap: var(--pas-2); align-content: start; min-width: 0; }
-.fa-details__atelier > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
 
 /* --- La niche des notes -------------------------------------------------
    Elle accueille le champ des notes quand l'ecran est assez haut. Elle
@@ -584,6 +580,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 /* LA CASE DU LIBELLE porte aussi ce qui accompagne le montant — la date de
    l'acompte, le signe « moins ». Rien ne passe a droite du chiffre. */
+/* TOUTE LIGNE DU COMPTE FAIT LA HAUTEUR D'UNE COMMANDE, meme celle qui ne porte
+   qu'un texte. Sans ca, la ligne « marge » — un simple `<span>` de 20 px —
+   ecrasait sa rangee, et les trois lignes de gauche tombaient 6, 3 et 7 px a
+   cote de celles de droite. C'est un JETON, jamais un nombre : la meme hauteur
+   que tout ce qui se clique et se remplit ailleurs dans la fiche. */
+.fa-argent__k, .fa-argent__v { min-height: var(--fa-h-champ); }
 .fa-argent__k {
   display: flex; align-items: center; justify-content: flex-end; gap: var(--pas-1);
   font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap;
@@ -597,6 +599,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
    pas — c'est tout l'interet de les empiler. */
 .fa-argent .fa-in { text-align: right; }
+/* LA MOITIE GAUCHE DU PANNEAU (29/08). Ce qui ne regarde que l'atelier — le
+   cout, la marge qui s'en deduit, le mode de reglement — tenait une rangee
+   PLEINE LARGEUR au-dessus du compte, qui descendait sous elle cale a droite :
+   il restait un rectangle vide de 910 x 225 px en bas a gauche.
+   ELLE EST LA MEME GRILLE QUE LE COMPTE, pas une autre (« tout ca doit etre la
+   meme famille ») : meme composant, meme rangee, meme facon de poser un
+   intitule contre sa valeur. Seul le bord change — elle s'appuie a GAUCHE la ou
+   le compte s'appuie a DROITE, comme les deux colonnes de la scene du haut.
+   ⚠ ELLE DOIT VENIR APRES `.fa-argent` DANS LA FEUILLE : meme specificite, donc
+   c'est l'ordre qui tranche. Posee avant, `margin-left: auto` la battait et le
+   bloc flottait a 179 px du bord. */
+.fa-argent--atelier { margin-left: 0; margin-right: auto; }
 /* LES BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes — la
    largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
    doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px
