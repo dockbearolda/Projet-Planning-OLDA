@@ -281,7 +281,12 @@ button, input, select, textarea { font-family: inherit; }
 /* Personne ne s'est encore nommé : c'est un manque à combler, pas un état
    normal — l'ambre de la charte, celui de « attention », pas une décoration. */
 .poste.is-vide { border-color: var(--warning-line); background: var(--warning-bg); color: var(--warning); }
-.poste.is-vide .poste-pastille { background: var(--warning); color: #fff; }
+/* L'ENCRE DE LA PASTILLE S'INVERSE AVEC SON FOND. Elle était en `#fff` dur :
+   de jour, blanc sur l'ambre appuyé (#854d0e), lisible ; de NUIT, `--warning`
+   devient un ambre CLAIR (#fcd34d) et le blanc s'y rend à 1,34:1 — la lettre
+   disparaissait exactement sur le bouton qui demande de se nommer.
+   `--on-primary` est fait pour ça : blanc de jour, encre sombre de nuit. */
+.poste.is-vide .poste-pastille { background: var(--warning); color: var(--on-primary); }
 
 /* L'écran « Qui est au poste ? ». Il s'ouvre tout seul au premier chargement
    d'un appareil, et sur tap du bouton pour prendre la relève.
@@ -292,7 +297,7 @@ button, input, select, textarea { font-family: inherit; }
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(17, 24, 39, .55);
+  background: var(--voile);
   backdrop-filter: blur(2px);
 }
 .poste-carte {
@@ -303,7 +308,7 @@ button, input, select, textarea { font-family: inherit; }
   border: 1px solid var(--card-border);
   border-radius: var(--arrondi-carte);
   padding: 28px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .28);
+  box-shadow: var(--shadow-pose);
 }
 .poste-titre { margin: 0 0 8px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
 .poste-aide { margin: 0 0 20px; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
@@ -2266,7 +2271,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     border-top: 1px solid var(--border);
     border-radius: 16px 16px 0 0;
     background: var(--surface);
-    box-shadow: 0 -12px 32px rgba(16, 24, 40, .16);
+    box-shadow: var(--shadow-bas);
   }
   .colbar-list { flex-direction: row; flex-wrap: wrap; }
   .colbar-item { width: auto; }
@@ -2497,9 +2502,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .search-palette-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(15, 22, 38, .28);
+  /* UN SEUL VOILE POUR TOUTE L'APPLICATION (29/08). Cette page en portait cinq,
+     sur quatre valeurs — .55 pour « qui est au poste », .28 ici (et .45 de
+     nuit, dans une règle à part), .45 pour la confirmation et pour le ticket —
+     plus trois au comptoir. Le voile ne dit qu'une chose : le dessous n'est
+     plus jouable. Une seule chose, un seul jeton, et il s'inverse de nuit tout
+     seul — la règle sombre qui suivait n'a plus lieu d'être. */
+  background: var(--voile);
 }
-:root[data-theme="dark"] .search-palette-scrim { background: rgba(0, 0, 0, .45); }
 
 .search-palette-panel {
   position: fixed;
@@ -3312,7 +3322,7 @@ input[type="date"].cell-input { color: var(--text-1); }
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(16, 24, 40, .45);
+  background: var(--voile);
   opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
@@ -3352,10 +3362,10 @@ input[type="date"].cell-input { color: var(--text-1); }
    deux thèmes. */
 .ask__btn--danger {
   border-color: transparent;
-  background: #c2261c;
-  color: #fff;
+  background: var(--danger-plein);
+  color: var(--on-danger-plein);
 }
-.ask__btn--danger:hover { background: #a41f16; }
+.ask__btn--danger:hover { background: var(--danger-plein-hover); }
 @media (max-width: 480px) {
   .ask__actions { flex-direction: column-reverse; }
   .ask__btn { width: 100%; }
@@ -3377,7 +3387,7 @@ input[type="date"].cell-input { color: var(--text-1); }
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(16, 24, 40, .45);
+  background: var(--voile);
   opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
@@ -3420,6 +3430,10 @@ input[type="date"].cell-input { color: var(--text-1); }
   -webkit-overflow-scrolling: touch;
   padding: 6px 0;
   border-radius: var(--arrondi-bloc);
+  /* BLANC DUR, ET C'EST VOULU : c'est un PAPIER. Un ticket est blanc à encre
+     noire, de jour comme de nuit — l'inverser en thème sombre donnerait un
+     aperçu qui ne ressemble pas à ce qui sort de l'imprimante. Même règle qu'au
+     comptoir, où les 101 teintes de l'aperçu sont fixes pour la même raison. */
   background: #fff;
   border: 1px solid var(--border-soft);
 }
@@ -4101,7 +4115,7 @@ body.view-plein .fiverr-tool { display: none !important; }
      APPUYÉ (1,52:1 contre 1,27) : c'est un en-tête de groupe, pas le contour
      d'un champ au repos. */
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--arrondi-champ);
   font-size: var(--taille-note);
   color: var(--text-2);
 }

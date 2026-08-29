@@ -87,6 +87,13 @@
   --danger:  #b91c1c;   --danger-bg:  #fef2f2;   --danger-line:  #fecaca;
   --success: #166534;   --success-bg: #ecfdf3;   --success-line: #bbf7d0;
   --warning: #854d0e;   --warning-bg: #fefce8;   --warning-line: #fde68a;
+  /* LE ROUGE PLEIN D'UNE ACTION QUI DÉTRUIT — « Supprimer définitivement ».
+     FIXE DANS LES DEUX THÈMES, et c'est le seul jeton de couleur dans ce cas.
+     `--danger` s'éclaircit de nuit (#fca5a5) pour servir d'ENCRE ; du blanc posé
+     dessus tomberait à 1,9:1. Ici le rouge est un FOND, pas une encre : il ne
+     suit donc pas le thème, et son encre non plus. Le blanc est écrit ici, une
+     fois, avec sa raison — c'est ce qui l'empêche d'être recopié ailleurs. */
+  --danger-plein: #c2261c;   --danger-plein-hover: #a41f16;   --on-danger-plein: #fff;
   /* Le vert en composantes : l'anneau « enregistré » s'éteint en fondu, il lui
      faut donc une opacité variable — impossible à partir du seul #166534. */
   --success-rgb: 22, 101, 52;

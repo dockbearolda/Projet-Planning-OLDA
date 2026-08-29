@@ -51,9 +51,9 @@ const RACINE = path.join(__dirname, '..');
 const PLAFONDS = {
   'public/comptoir/demande-devis.css': 100,
   'public/comptoir/vente-directe.css': 43,
-  'public/styles.css': 41,
-  'public/dashboard.css': 11,
-  'public/clients.css': 4,
+  'public/styles.css': 29,
+  'public/dashboard.css': 9,
+  'public/clients.css': 2,
   'public/montravail.css': 4,
   'public/reglages.css': 4,
   'public/projet.css': 3,
@@ -61,7 +61,7 @@ const PLAFONDS = {
 
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 210;
+const TOTAL_MAX = 194;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
@@ -135,3 +135,37 @@ for (const nom of ['vente-directe', 'demande-devis']) {
 }
 
 console.log(`✓ charte : cliquet tenu — ${total} écart(s) sur ${TOTAL_MAX}, aucun fichier n'a reculé`);
+
+
+// ---------------------------------------------------------------------------
+// UN SEUL VOILE POUR TOUTE L'APPLICATION (29/08/2026)
+// ---------------------------------------------------------------------------
+// Il ne dit qu'une chose — le dessous n'est plus jouable — et il y en avait
+// HUIT, sur cinq valeurs : .55 pour « qui est au poste », .28 (et .45 de nuit)
+// pour la palette de recherche, .45 pour la confirmation, .45 pour le ticket,
+// .45 et .52 au comptoir, .30 dans la charte. Trois écrans à un clic l'un de
+// l'autre, trois gris différents.
+//
+// Un `rgba(0, 0, 0, …)` écrit en clair ne s'inverse pas non plus de nuit :
+// `--voile`, si.
+{
+  const A_VOILER = [
+    'public/styles.css', 'public/clients.css', 'public/projet.css',
+    'public/fiche-atelier.css', 'public/dashboard.css',
+    'public/comptoir/demande-devis.css', 'public/comptoir/vente-directe.css',
+  ];
+  const enDur = [];
+  for (const f of A_VOILER) {
+    const css = fs.readFileSync(path.join(RACINE, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    // un fond noir translucide POSÉ SUR UN PANNEAU PLEIN ÉCRAN, c'est un voile.
+    for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim();
+      if (!sel || sel.startsWith('@')) continue;
+      if (!/position:\s*(fixed|absolute)/.test(m[2]) || !/inset:\s*0/.test(m[2])) continue;
+      const fond = m[2].match(/background(?:-color)?:\s*(rgba?\([^)]*\))/);
+      if (fond && !/var\(/.test(fond[1])) enDur.push(`${f} — ${sel.split(',')[0].trim()} : ${fond[1]}`);
+    }
+  }
+  assert.deepStrictEqual(enDur, [],
+    'un voile s’écrit `var(--voile)`, jamais en clair :\n  ' + enDur.join('\n  '));
+}

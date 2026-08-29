@@ -255,7 +255,7 @@
 .cl-drawer__scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, .42);
+  background: var(--voile);
   animation: clScrim var(--dur-2) var(--ease) both;
 }
 @keyframes clScrim { from { opacity: 0; } to { opacity: 1; } }
@@ -535,7 +535,7 @@
    panneau reste posé, invisible mais plein écran, et avale TOUS les taps de la
    Base clients (plus une fiche ne s'ouvre). Même précaution que `.cl-drawer`. */
 .cl-secteurs[hidden] { display: none; }
-.cl-secteurs__scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.cl-secteurs__scrim { position: absolute; inset: 0; background: var(--voile); }
 .cl-secteurs__card {
   position: relative; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
   background: var(--surface); border-radius: var(--arrondi-carte); box-shadow: var(--shadow-pop); padding: 22px;
