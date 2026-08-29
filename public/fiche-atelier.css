@@ -551,6 +551,39 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
 }
 
+/* --- LE COMPTE, EN BAS A DROITE (29/08) -----------------------------------
+   Charlie : « le prix visuellement doit etre en bas a droite, c'est la norme ».
+   C'est celle de tout devis et de toute facture : le total ferme le document,
+   cale a droite, ses lignes empilees sur un meme rail — c'est ce rail qui rend
+   la soustraction lisible sans qu'on ecrive « moins ».
+
+   IL PREND LES DEUX PISTES ET SE COLLE A DROITE PAR UNE MARGE AUTOMATIQUE.
+   `justify-content: flex-end` rognerait par la GAUCHE des que le contenu
+   deborde : c'est le debut de la ligne qui disparaitrait, donc le libelle. */
+.fa-argent {
+  grid-column: 1 / -1;
+  margin-left: auto;
+  padding: 0 var(--pas-4);
+  display: grid; grid-template-columns: auto auto;
+  align-items: center;
+  gap: var(--pas-1) var(--pas-3);
+}
+/* LA CASE DU LIBELLE porte aussi ce qui accompagne le montant — la date de
+   l'acompte, le signe « moins ». Rien ne passe a droite du chiffre. */
+.fa-argent__k {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--pas-1);
+  font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap;
+}
+.fa-argent__v { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+/* LE FILET DU TOTAL : il traverse les deux pistes, comme sur un devis. */
+.fa-argent__filet { grid-column: 1 / -1; height: 1px; background: var(--border); }
+/* Le signe « moins » dit la soustraction sans l'ecrire en toutes lettres. */
+.fa-moins { font-size: var(--fa-val); color: var(--text-3); }
+.fa-argent__le { font-size: var(--fa-lab); color: var(--text-2); }
+/* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
+   pas — c'est tout l'interet de les empiler. */
+.fa-argent .fa-in { text-align: right; }
+
 /* --- CE QUI EST PAYE, ET CE QU'IL RESTE (29/08) ---------------------------
    « En un coup d'oeil on doit voir ce qui est paye et combien il reste a
    payer ». Le reste est un CHIFFRE QU'ON ANNONCE, pas une valeur qu'on
@@ -558,11 +591,10 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    seuls de l'ecran. Et il ne se tape pas : il se deduit du prix et de
    l'acompte. */
 .fa-reste {
-  display: flex; align-items: baseline; gap: var(--pas-2); min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end; min-width: 0;
   height: var(--fa-h-champ); padding: 0 var(--pas-2);
   border-radius: var(--arrondi-champ);
 }
-.fa-reste__k { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
 .fa-reste__v {
   font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
   font-variant-numeric: tabular-nums;
@@ -571,10 +603,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    decoration. Solde : le vert de la charte. Entame : l'ambre, il reste quelque
    chose. Entier : rien n'est tombe, l'encre courante suffit. */
 .fa-reste[data-etat="solde"] { background: var(--success-bg); }
-.fa-reste[data-etat="solde"] .fa-reste__v,
-.fa-reste[data-etat="solde"] .fa-reste__k { color: var(--success); }
+.fa-reste[data-etat="solde"] .fa-reste__v { color: var(--success); }
 .fa-reste[data-etat="entame"] { background: var(--warning-bg); }
-.fa-reste[data-etat="entame"] .fa-reste__v,
-.fa-reste[data-etat="entame"] .fa-reste__k { color: var(--warning); }
-.fa-row--reste > .fa-duo { gap: var(--pas-3); }
+.fa-reste[data-etat="entame"] .fa-reste__v { color: var(--warning); }
 .fa-solde { flex: 0 0 auto; }
+/* LA LIGNE DU TOTAL SE LIT PLUS FORT QUE LES DEUX QU'ELLE FERME. */
+/* LA LIGNE DU TOTAL SE LIT PLUS FORT QUE LES DEUX QU'ELLE FERME : c'est la
+   seule du bloc qui vienne APRES le filet. */
+.fa-argent__filet + .fa-argent__k { font-weight: var(--graisse-note); color: var(--text-1); }
+/* La date de l'acompte est un champ, pas un montant : elle garde sa largeur. */
+.fa-argent__k .fa-date { text-align: left; }

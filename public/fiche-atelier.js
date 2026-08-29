@@ -707,9 +707,8 @@ export function dessinerFicheAtelier(r, ctx) {
     label: 'Date de l’acompte', placeholder: 'le…',
   });
   const resteV = el('span', 'fa-reste__v', '—');
-  const resteK = el('span', 'fa-reste__k', 'reste à payer');
   const reste = el('div', 'fa-reste');
-  reste.append(resteK, resteV);
+  reste.append(resteV);
 
   // LE RESTE SE CALCULE, IL NE SE SAISIT PAS. Solde => zero, quoi qu'il y ait
   // dans les champs : c'est la seule facon que « solde » veuille dire quelque
@@ -718,8 +717,7 @@ export function dessinerFicheAtelier(r, ctx) {
   majReste = () => {
     const ttc = nombreDe(chTtc.value);
     const av = nombreDe(chAcompte.value) || 0;
-    if (r.paye === true) { resteV.textContent = euros(0); reste.dataset.etat = 'solde'; resteK.textContent = 'soldé'; return; }
-    resteK.textContent = 'reste à payer';
+    if (r.paye === true) { resteV.textContent = euros(0); reste.dataset.etat = 'solde'; return; }
     if (ttc == null) { resteV.textContent = '—'; reste.dataset.etat = 'inconnu'; return; }
     const du = Math.round((ttc - av) * 100) / 100;
     resteV.textContent = euros(du);
@@ -770,18 +768,62 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   // LE PRIX EST ICI, EN BAS, et plus dans le bandeau. La marge le suit : elle
   // se lit du TTC et du coût, les trois se relisent d'un coup.
-  const ligneTtc = el('div', 'fa-duo');
-  ligneTtc.append(chTtc, marge);
-  const ligneAcompte = el('div', 'fa-duo');
-  ligneAcompte.append(chAcompte, el('label', 'fa-lab', 'le'), chAcompteDate);
-  const ligneReste = el('div', 'fa-duo');
-  ligneReste.append(reste, bSolde);
+  // =========================================================================
+  // LE COMPTE EST EN BAS A DROITE — c'est la norme (29/08)
+  // =========================================================================
+  // Charlie : « le prix visuellement doit etre en bas a droite, c'est la norme,
+  // mets ca a jour ». C'est celle de tout devis et de toute facture : le total
+  // ferme le document, en bas, cale a droite, avec ses lignes empilees.
+  // Le panneau les posait en deux colonnes de rangees ordinaires — le prix en
+  // haut a gauche, le reste tout en bas a gauche, et rien qui ne dise que les
+  // trois montants se soustraient.
+  //
+  // A GAUCHE, ce qui ne regarde que l'atelier : le cout de revient, la marge
+  // qui s'en deduit, et le mode de reglement. A DROITE, le compte du client.
+  const ligneCout = el('div', 'fa-duo');
+  ligneCout.append(chCout, marge);
+
+  // L'ECHELLE DES MONTANTS : libelle a gauche, montant a droite, tous sur le
+  // meme rail — c'est ce qui rend la soustraction lisible sans l'ecrire.
+  // LA COLONNE DES MONTANTS EST LA DERNIERE, ET RIEN NE PASSE A SA DROITE.
+  // Premier essai : la date de l'acompte et le bouton « Solde » etaient poses
+  // APRES le montant dans leur rangee — les trois chiffres finissaient a 1 330,
+  // 1 181 et 1 268 px, donc sur trois rails. Une echelle de montants qui ne
+  // s'aligne pas ne se lit pas : c'est tout ce qu'on lui demande.
+  // Ce qui accompagne un montant va donc dans la case du LIBELLE, a sa gauche.
+  const argent = el('div', 'fa-argent');
+  const ligneArgent = (cle, montant) => {
+    const k = el('div', 'fa-argent__k');
+    k.append(...(Array.isArray(cle) ? cle : [document.createTextNode(cle)]));
+    const v = el('div', 'fa-argent__v');
+    v.append(montant);
+    argent.append(k, v);
+    return { k, v };
+  };
+  const ttcCase = chTtc;
+  const acompteCase = chAcompte;
+  const resteCase = reste;
+
+  ligneArgent('Prix TTC', ttcCase);
+  ligneArgent([
+    el('span', 'fa-moins', '−'),
+    document.createTextNode('Acompte versé le '),
+    chAcompteDate,
+  ], acompteCase);
+  argent.append(el('div', 'fa-argent__filet'));
+  ligneArgent('Reste à payer', resteCase);
+  // LE BOUTON FERME LE COMPTE, sous le total : c'est une ACTION, elle n'a rien
+  // a faire dans la colonne des chiffres.
+  argent.append(el('div', 'fa-argent__k'), (() => {
+    const v = el('div', 'fa-argent__v');
+    v.append(bSolde);
+    return v;
+  })());
+
   rangeesPanneau.push(
-    rangee('Prix TTC', ligneTtc),
-    rangee('Coût', chCout),
-    rangee('Acompte', ligneAcompte),
+    rangee('Coût', ligneCout),
     rangee('Règlement', selReglement),
-    rangee('Reste', ligneReste, undefined, 'fa-row--reste'),
+    argent,
   );
   panneau.append(...rangeesPanneau);
 

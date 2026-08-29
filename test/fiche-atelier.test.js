@@ -114,11 +114,31 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   assert.ok(PRODUCTION.includes("rangee('Production', chProduction)"),
     'le poste de production vit dans la zone de production');
   // Le paiement : de l'argent, et rien d'autre.
-  for (const attendu of ["rangee('Prix TTC', ligneTtc)", "rangee('Coût', chCout)",
-    "rangee('Acompte', ligneAcompte)", "rangee('Règlement', selReglement)",
-    "rangee('Reste', ligneReste"]) {
+  // LE COMPTE EST EN BAS A DROITE — c'est la norme de tout devis et de toute
+  // facture : le total ferme le document, calé à droite, ses lignes empilées
+  // sur un même rail. À gauche, ce qui ne regarde que l'atelier.
+  for (const attendu of ["rangee('Coût', ligneCout)", "rangee('Règlement', selReglement)",
+    "ligneArgent('Prix TTC', ttcCase)", "'Acompte versé le '",
+    "ligneArgent('Reste à payer', resteCase)", "el('div', 'fa-argent__filet')"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
+  // RIEN NE PASSE A DROITE DU CHIFFRE. Au premier essai, la date de l'acompte
+  // et le bouton « Soldé » étaient posés APRÈS le montant dans leur rangée :
+  // les trois chiffres finissaient à 1 330, 1 181 et 1 268 px — trois rails.
+  // Une échelle de montants qui ne s'aligne pas ne se lit pas.
+  assert.ok(!/acompteCase\.append/.test(PAIEMENT) && !/resteCase\.append/.test(PAIEMENT),
+    'un montant est seul dans sa case : ce qui l’accompagne va dans le libellé');
+  // ET IL SE COLLE A DROITE PAR UNE MARGE AUTOMATIQUE. `justify-content:
+  // flex-end` rognerait par la GAUCHE dès que le contenu déborde : c'est le
+  // début de la ligne qui disparaîtrait, donc le libellé.
+  const ARGENT = CSS.match(/\.fa-argent \{[\s\S]*?\n\}/)[0];
+  assert.match(ARGENT, /margin-left: auto;/,
+    'le compte se colle à droite par une marge, jamais par `flex-end`');
+  assert.match(ARGENT, /grid-column: 1 \/ -1;/, '… et il prend toute la largeur du panneau');
+  // Les montants s'alignent sur leur dernier chiffre : c'est tout l'intérêt de
+  // les empiler.
+  assert.match(CSS, /\.fa-argent \.fa-in \{ text-align: right; \}/,
+    'les montants du compte s’alignent à droite');
   // LE RESTE SE DÉDUIT, IL NE SE SAISIT PAS — et « soldé » vaut zéro quoi qu'il
   // y ait dans les champs, sans quoi le mot ne veut rien dire.
   assert.ok(/majReste = \(\) => \{/.test(PAIEMENT), 'le reste se calcule');
