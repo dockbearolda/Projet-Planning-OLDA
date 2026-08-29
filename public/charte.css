@@ -339,6 +339,19 @@
      compte dans la boîte. On le réserve donc PARTOUT, et la boîte serrée fait
      enfin la même chose sur les quatre écrans qui la portent. */
   --trait-reserve: 1px solid transparent;
+  /* … ET LA BOÎTE SERRÉE, ASSEMBLÉE. Les quatre ingrédients ci-dessus suffisent
+     tant qu'une commande ne porte QUE du texte : sa hauteur en sort toute
+     seule. Ils ne suffisent plus dès qu'elle porte autre chose — un disque
+     d'initiale, un pictogramme — parce que c'est alors le CONTENU qui décide,
+     et deux pastilles voisines finissent à deux hauteurs.
+     C'est ce qui est arrivé à la colonne « Qui suit » du planning : la pastille
+     du pilote (un disque + un nom) mesurait 36 px, celle du référent absent
+     (« + référent », du texte et un trait pointillé) 39. Le même objet, empilé
+     dans la même cellule, à 3 px près.
+     La recette rendue en VALEUR, donc — pas un nombre de plus : ce qui porte un
+     disque le pose DANS la boîte au lieu de la faire grandir, comme la charte
+     le dit de `--rond-serre` deux paragraphes plus haut. 39,375 px. */
+  --ctrl-h-serre: calc(var(--taille-texte) * var(--ligne-serre) + 2 * var(--champ-y-serre) + 2px);
 
   /* La colonne des valeurs d'un tableau. Fixe, pour que deux tables
      imbriquées — un récapitulatif et son calcul déplié — alignent leurs

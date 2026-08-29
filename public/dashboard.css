@@ -138,7 +138,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  /* La boite serree de la charte, comme la pastille « Qui suit » du planning :
+     une pilule qui porte un disque prend la boite, pas la taille du disque. */
+  min-height: var(--ctrl-h-serre);
   padding: 6px 12px 6px 6px;
   border: 1px solid var(--border);
   border-radius: var(--pilule);
@@ -158,8 +160,10 @@
 }
 .cat-ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .cat-ref-av {
-  width: 26px;
-  height: 26px;
+  /* Le disque d'une initiale posee dans une ligne : `--rond-serre`. Il valait
+     deja 26 px — mais ecrit en nombre, donc seul le jour ou le jeton bouge. */
+  width: var(--rond-serre);
+  height: var(--rond-serre);
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -341,7 +345,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--pas-1);
-  height: 40px;
+  /* MEME BOITE QUE L'ONGLET D'A COTE. Les deux sont dans la meme rangee
+     (`.pj-head-row`) et mesuraient 40 px contre 45,38 — deux boutons d'une
+     barre, deux hauteurs, et 3 px de decalage vertical entre eux. */
+  height: var(--ctrl-h-serre);
   padding: 0 var(--pas-3);
   border: 1px solid var(--pj-border);
   border-radius: var(--arrondi-champ);
@@ -371,9 +378,14 @@
   display: inline-flex;
   align-items: center;
   gap: var(--pas-1);
-  padding: var(--pas-2) var(--pas-3);
+  /* … ET L'ONGLET PREND LA MEME. Son rembourrage de 10 px et son trait de 2 le
+     portaient a 45,38 px pendant que le bouton d'a cote en faisait 40 : c'est
+     `--champ-y-serre` qu'il lui faut, et le trait du bas tient lieu de trait
+     reserve. 17 x 1,375 + 2 x 7 + 2 = 39,375 — la boite de la charte. */
+  padding: var(--champ-y-serre) var(--pas-3);
   border: 0;
   border-bottom: 2px solid transparent;
+  line-height: var(--ligne-serre);
   background: none;
   color: var(--pj-ink-2);
   font-size: var(--taille-texte);
@@ -815,8 +827,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  /* LE MÊME DISQUE QU'AU PLANNING. La charte n'en a qu'un pour une initiale
+     posée dans une ligne — `--rond-serre`. Il en faisait 24 ici et 28 là-bas,
+     pour la même personne, sur deux écrans ouverts à un clic l'un de l'autre. */
+  width: var(--rond-serre);
+  height: var(--rond-serre);
   border-radius: var(--pilule);
   background: var(--av, var(--pj-ink-2));
   color: var(--on-primary);
@@ -1182,8 +1197,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  /* Le meme disque d'initiale que partout ailleurs — il en faisait 20 ici. La
+     pilule qui le porte fait deja `--rond` de haut : il y tient sans la pousser. */
+  width: var(--rond-serre);
+  height: var(--rond-serre);
   margin-left: -4px;
   flex-shrink: 0;
   border-radius: 50%;

@@ -1827,13 +1827,22 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   max-width: calc(100% - 20px);
   margin: 8px 12px;
   padding: 4px 12px 4px 4px;
-  border: 0;
+  /* LE TRAIT EST RÉSERVÉ ICI AUSSI. Le pilote n'en avait pas, le référent
+     absent portait un pointillé : 2 px d'écart entre deux pastilles empilées
+     dans la même cellule, avant même de compter le rembourrage. */
+  border: var(--trait-reserve);
   border-radius: var(--pilule);
+  /* … ET LA BOÎTE EST LA BOÎTE SERRÉE DE LA CHARTE. Sans elle, c'est le CONTENU
+     qui décide : un disque d'initiale donnait 36 px au pilote, du texte et un
+     trait donnaient 39 au « + référent ». Le disque se pose DANS la boîte, il
+     ne la fait pas grandir — c'est ce que la charte dit de `--rond-serre`. */
+  min-height: var(--ctrl-h-serre);
   background: var(--border-soft);
   color: var(--text-1);
   font: inherit;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
+  line-height: var(--ligne-serre);
   cursor: pointer;
   /* Fond + encre fondus, pas seulement le survol — cf. .prio-tag. */
   transition: filter var(--dur-1) var(--ease),
@@ -1847,8 +1856,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  /* LE DISQUE D'UNE INITIALE POSÉ DANS UNE LIGNE : la charte en a UN, et il
+     vaut 26 px. Celui-ci en faisait 28 au planning quand celui du Point du jour
+     — la même personne, à un clic de là — en faisait 24. C'est le défaut refermé
+     le 26/08 (cinq ronds pour une initiale) qui était revenu par deux nombres. */
+  width: var(--rond-serre);
+  height: var(--rond-serre);
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--primary-soft);
@@ -1858,11 +1871,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   line-height: var(--ligne-glyphe);
 }
 .resp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Non assigné : puce discrète en pointillé, appelle à remplir. */
+/* Non assigné : puce discrète en pointillé, appelle à remplir. Même
+   rembourrage vertical et même boîte que la puce remplie — seul le TRAIT
+   change, et il était déjà réservé. */
 .resp-chip.empty {
-  padding: 6px 12px;
+  padding: 4px 12px;
   background: transparent;
-  border: 1px dashed var(--border);
+  border-style: dashed;
+  border-color: var(--border);
   color: var(--text-2);
   font-weight: var(--graisse-texte);
 }

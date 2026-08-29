@@ -51,8 +51,8 @@ const RACINE = path.join(__dirname, '..');
 const PLAFONDS = {
   'public/comptoir/demande-devis.css': 99,
   'public/comptoir/vente-directe.css': 42,
-  'public/styles.css': 28,
-  'public/dashboard.css': 9,
+  'public/styles.css': 25,
+  'public/dashboard.css': 4,
   'public/clients.css': 2,
   'public/montravail.css': 4,
   'public/reglages.css': 4,
@@ -61,7 +61,7 @@ const PLAFONDS = {
 
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 191;
+const TOTAL_MAX = 183;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
