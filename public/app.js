@@ -1079,7 +1079,11 @@ function cmpAuto(a, b) {
   return cmpDeadline(a.deadline, b.deadline);
 }
 
-// `syncDrawer: false` rend la grille SANS reconstruire la side bar de détail.
+// `syncDrawer` a disparu avec le tiroir : la fiche atelier n'est pas dans la
+// grille et un rendu de grille ne la touche pas. Elle NE SE FERME PAS non plus
+// quand la commande quitte l'étape affichée — c'est le tiroir qui faisait ça, et
+// ce serait exactement le contraire de ce qu'on veut ici : changer d'étape est
+// le geste principal de la fiche, elle ne peut pas se refermer dessus.
 // Réservé aux sauvegardes d'un champ de saisie DU tiroir : le champ affiche
 // déjà ce qu'on vient d'y taper, et le reconstruire démonterait la puce sur
 // laquelle l'utilisateur est peut-être en train de cliquer (le clic tomberait
@@ -1141,7 +1145,7 @@ function regrouperLots(liste) {
   return out;
 }
 
-function applySortAndRender({ syncDrawer = true } = {}) {
+function applySortAndRender() {
   // `rows` contient TOUTE la famille ; si une sous-catégorie est active, on ne
   // rend que les commandes qui en relèvent (filtre instantané, côté client).
   // On trie AVANT de filtrer : la tranche affichée est donc toujours une
@@ -1157,7 +1161,6 @@ function applySortAndRender({ syncDrawer = true } = {}) {
   // Plus rien en attente : la liste est entière à l'écran (voir listeMontee).
   if (!suiteRendu) marquerRenduAcheve();
   applySearchAndCounts();
-  if (syncDrawer) renderLigneDetailIfOpen();
 }
 
 function cmpDeadline(a, b) {
@@ -2213,36 +2216,6 @@ function cellStars(r) {
   return td;
 }
 
-// La puce de type : Pro / Perso / Asso / Revendeur, menu au clic (4 valeurs).
-// Elle n'a plus de colonne dans le tableau depuis le 27/08 — elle vit dans la
-// fiche projet, qui l'a toujours réutilisée telle quelle.
-function typeControl(r) {
-  const type = document.createElement('button');
-  type.type = 'button';
-  const renderType = () => {
-    const t = CLIENT_TYPES.find((x) => x.value === r.client_type) || CLIENT_TYPES[0];
-    type.className = 'type-tag ' + t.cls;
-    type.textContent = t.label;
-  };
-  renderType();
-  attachTip(type, 'cliquer pour changer le type de client');
-  type.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openMenu(type, CLIENT_TYPES.map((t) => ({ value: t.value, label: t.label })), r.client_type, (val) => {
-      if (val === r.client_type) return;
-      patch(r, { client_type: val }, () => {
-        r.client_type = val;
-        renderType();
-        // Seul un PARTICULIER lit son nom en deux graisses : la cellule voisine
-        // doit suivre le changement de type sans attendre un rechargement.
-        const tr = type.closest('tr');
-        const box = tr && tr.querySelector('.client-name');
-        if (box) paintClientName(box, val);
-      }, type);
-    });
-  });
-  return type;
-}
 
 // Espace RESPONSABLE : QUI pilote le projet (puce principale) et QUI en est le
 // référent (puce plus discrète en dessous). Les deux affichent le nom EFFECTIF —
@@ -3342,30 +3315,11 @@ function cellDeadline(r) {
   return td;
 }
 
-// --- Side bar détail de ligne -----------------------------------------------
-// Panneau à droite, calqué sur le tiroir de clients.js (.cl-drawer) : mêmes
-// jetons CSS que la grille, classes dédiées (.ligne-drawer) pour ne pas
-// mélanger deux fonctionnalités indépendantes. Une seule instance, montée au
-// premier clic ; son contenu est entièrement reconstruit à chaque ouverture
-// ou re-synchronisation — jamais de référence figée à un objet `r` : `rows`
-// est remplacé (pas muté) à chaque poll/SSE (cf. renderRows), donc on stocke
-// seulement l'id et on refait `rows.find(...)` à chaque rendu.
-let ligneDrawerEl = null;
-let ligneDrawerCard = null;
-let ligneDrawerId = null; // id (string) de la ligne affichée, ou null si fermé
-// Ce qui enregistre la fiche OUVERTE. Reposé à chaque rendu (voir plus bas) :
-// l'écouteur, lui, est unique et lit toujours la version du moment.
-let ldCommettre = null;
-
-// LA COMMANDE OUVERTE N'EST PAS TOUJOURS DANS LA LISTE. Un vieux dossier
-// retrouvé par la recherche globale vit hors des 400 dernières de son étape :
 // on ne charge plus l'archive entière pour l'afficher (c'est ce qui figeait la
 // tablette), on garde SA ligne à part. Sans ça, `rows.find` ne la trouverait pas
 // et le tiroir se refermerait tout seul au premier rafraîchissement.
 let ligneHorsListe = null;
 
-const ligneDuTiroir = () => rows.find((x) => String(x.id) === ligneDrawerId)
-  || (ligneHorsListe && String(ligneHorsListe.id) === ligneDrawerId ? ligneHorsListe : null);
 
 // Va chercher UNE commande et ouvre sa fiche, sans toucher à la grille.
 async function ouvrirFicheHorsListe(id) {
@@ -3376,53 +3330,6 @@ async function ouvrirFicheHorsListe(id) {
   showToast('Commande hors de la liste affichée — ouverte depuis la recherche.');
 }
 
-function ensureLigneDrawer() {
-  if (ligneDrawerEl) return;
-  ligneDrawerEl = document.createElement('div');
-  ligneDrawerEl.className = 'ligne-drawer';
-  ligneDrawerEl.hidden = true;
-  const scrim = document.createElement('div');
-  scrim.className = 'ligne-drawer__scrim';
-  scrim.addEventListener('click', closeLigneDetail);
-  ligneDrawerCard = document.createElement('aside');
-  ligneDrawerCard.className = 'ligne-drawer__card';
-  ligneDrawerCard.setAttribute('role', 'dialog');
-  ligneDrawerCard.setAttribute('aria-modal', 'true');
-  ligneDrawerCard.setAttribute('aria-label', 'Détail de la commande');
-  ligneDrawerEl.append(scrim, ligneDrawerCard);
-  document.body.appendChild(ligneDrawerEl);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && ligneDrawerId) closeLigneDetail();
-  });
-  // UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE (28/08). `change` remonte de
-  // tous les champs de la fiche, ne part que si la valeur a bougé, et n'arrive
-  // qu'une fois le champ quitté. La note fait exception : elle s'AJOUTE aux
-  // informations, et une note ajoutée deux fois ne se retire pas.
-  ligneDrawerCard.addEventListener('change', (ev) => {
-    const cible = ev.target;
-    if (!cible || !cible.dataset || !cible.dataset.ldKey) return;
-    if (cible.classList.contains('ld-note')) return;
-    if (ldCommettre) ldCommettre();
-  });
-  // La fiche se DÉCLARE modale (`aria-modal`) : la tabulation doit donc y
-  // rester. Sans ce filet, Tab repartait derrière le voile, dans un planning
-  // qu'on ne voit plus mais dont les champs restaient modifiables.
-  ligneDrawerEl.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab' || !ligneDrawerId) return;
-    const cibles = [...ligneDrawerCard.querySelectorAll(
-      'a[href], button:not([disabled]), input, select, textarea, summary, [tabindex]:not([tabindex="-1"])',
-    )].filter((el) => el.offsetParent !== null || el === document.activeElement);
-    if (!cibles.length) return;
-    const premier = cibles[0];
-    const dernier = cibles[cibles.length - 1];
-    if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier.focus(); }
-    else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier.focus(); }
-  });
-}
-
-// Ce qui avait le focus avant l'ouverture de la fiche : on le lui rend à la
-// fermeture, sinon le clavier repart du haut de la page à chaque consultation.
-let ldFocusAvant = null;
 
 // Le fond ne doit être ni cliquable ni tabulable pendant qu'une fiche est
 // ouverte. `inert` fait les deux (et le retire de l'arbre d'accessibilité) ;
@@ -3488,13 +3395,18 @@ const FICHE_DEBOUNCE_MS = 150;
 
 function rafraichirFichesApresChangement() {
   fichesCompletes.clear();
-  if (!ligneDrawerId) return;
+  // ELLE LISAIT `ligneDrawerId`, TOUJOURS NUL. Le tiroir avait cessé d'être
+  // ouvert le 28/08 sans que personne ne reprenne sa place ici : une fiche
+  // ouverte ne voyait donc JAMAIS la modification d'un autre poste. Le cache
+  // était bien vidé — d'où l'illusion que tout marchait, puisque la fiche
+  // suivante était juste.
+  if (!ficheAtelierId) return;
   clearTimeout(ficheDebounce);
   ficheDebounce = setTimeout(() => {
-    const id = ligneDrawerId;
+    const id = ficheAtelierId;
     if (!id) return;
     chargerFicheComplete(id)
-      .then(() => { if (ligneDrawerId === id) renderLigneDetailIfOpen(); })
+      .then(() => { if (ficheAtelierId === id) rafraichirFicheOuverte(); })
       .catch(() => { /* silencieux : la fiche reste utilisable avec ce qu'elle a */ });
   }, FICHE_DEBOUNCE_MS);
 }
@@ -3524,6 +3436,26 @@ function fermerFicheAtelier() {
   if (ficheAtelierEl) { ficheAtelierEl.remove(); ficheAtelierEl = null; }
   ficheAtelierId = null;
   figerLeFond(false);
+}
+
+// Vrai si la fiche ne doit pas être reconstruite : quelqu'un écrit dedans, ou un
+// menu / calendrier y est ancré et la reconstruction le démonterait sous le
+// popup. Même garde que pour une ligne de la grille (isRowBusy) — et c'est
+// `isDrawerBusy` qui la tenait, sur un tiroir qui ne s'ouvrait plus : la bulle
+// « mise à jour disponible » pouvait donc s'afficher en pleine saisie.
+function ficheAtelierOccupee() {
+  if (!ficheAtelierEl) return false;
+  if (openMenuEl || openCalendar) return true;
+  const ae = document.activeElement;
+  if (!ae || !ficheAtelierEl.contains(ae)) return false;
+  return ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT';
+}
+
+// Un autre poste a touché la commande ouverte : on la redessine — jamais sous
+// les doigts de quelqu'un qui est en train d'y écrire.
+function rafraichirFicheOuverte() {
+  if (!ficheAtelierId || ficheAtelierOccupee()) return;
+  openLigneDetail(ficheAtelierId);
 }
 
 // Le contexte : tout ce que la fiche sait faire de l'application. Elle ne
@@ -3562,15 +3494,15 @@ function contexteFicheAtelier(r) {
     aujourdhui: () => new Date(),
     fermer: fermerFicheAtelier,
     patchLigne: (champ, valeur) => {
-      patch(r, { [champ]: valeur }, () => { r[champ] = valeur; ldRefresh(r); });
+      patch(r, { [champ]: valeur }, () => { r[champ] = valeur; rafraichirLigne(r); });
     },
     patchFiche: async (corps) => {
       try {
         const maj = await api('PATCH', `/api/requests/${r.id}/fiche`, corps);
-        if (maj) { Object.assign(r, maj); memoriserFiche(maj); ldRefresh(r); }
+        if (maj) { Object.assign(r, maj); memoriserFiche(maj); rafraichirLigne(r); }
       } catch (err) { reportError(err); }
     },
-    patchProd: (patchProd) => ldEnvoyerProd(r, patchProd),
+    patchProd: (patchProd) => envoyerProduction(r, patchProd),
     // Redessine la fiche depuis la base. Necessaire quand un patch change la
     // STRUCTURE et pas seulement une valeur : ajouter une face l'ecrivait bien
     // en base — trois emplacements — et l'ecran en montrait toujours deux. On
@@ -3592,14 +3524,14 @@ function contexteFicheAtelier(r) {
         // l'etape ne partait toujours pas. Le rendu global du planning, c'est
         // `applySortAndRender` — la ligne peut changer de place ou sortir du
         // filtre courant, donc on retrie.
-        ldRefresh(r); applySortAndRender();
+        rafraichirLigne(r);
       });
     },
     ajouterNote: (texte) => {
       const base = String(r.description || '').trim();
       const ligne = `${horodatageFr(new Date().toISOString())} — ${texte}`;
       const suite = base ? `${base}\n${ligne}` : ligne;
-      patch(r, { description: suite }, () => { r.description = suite; ldRefresh(r); });
+      patch(r, { description: suite }, () => { r.description = suite; rafraichirLigne(r); });
     },
     ouvrirClient: () => { location.hash = '#/clients'; fermerFicheAtelier(); },
     telecharger: (ligne) => telechargerRecap(ligne),
@@ -3635,211 +3567,17 @@ function openLigneDetail(id) {
   });
 }
 
-// Le tiroir d'origine, conservé pour ce que la fiche atelier ne reprend pas.
-function openLigneDrawer(id) {
-  ensureLigneDrawer();
-  // On ouvre une fiche : rien de ce qui a été tapé dans la précédente n'a à
-  // suivre. (Un enregistrement réussi nettoie déjà, mais on peut aussi fermer.)
-  if (ligneDrawerId !== String(id)) ldOublierSaisie();
-  const premiereOuverture = !ligneDrawerId;
-  if (premiereOuverture) ldFocusAvant = document.activeElement;
-  ligneDrawerId = String(id);
-  ligneDrawerEl.hidden = false;
-  figerLeFond(true);
-  // Chargement du détail en tâche de fond : le tiroir s'ouvre TOUT DE SUITE
-  // avec ce que la grille connaît déjà (client, projet, prix, échéance), et le
-  // récapitulatif complet s'y ajoute dès qu'il arrive. Personne n'attend
-  // devant un écran vide.
-  chargerFicheComplete(id)
-    .then(() => {
-      if (ligneDrawerId !== String(id)) return;
-      renderLigneDetail();
-      // Ce second rendu remplace le corps de la fiche : s'il a emporté
-      // l'élément qui avait le focus (le bouton Fermer posé à l'ouverture) et
-      // que personne d'autre ne l'a pris entre-temps, on le repose. Sinon le
-      // clavier se retrouve sur <body>, hors de la fiche qui se dit modale.
-      if (document.activeElement === document.body) focusFiche();
-    })
-    .catch((err) => {
-      // Le tiroir reste utilisable sans le récapitulatif, mais on ne le passe
-      // pas sous silence : sinon un détail manquant ressemble à un détail
-      // « jamais enregistré », et personne ne cherche plus loin.
-      console.warn('Détail de la commande non chargé :', err);
-      showToast('Détail complet indisponible — vérifie la connexion.');
-    });
-  // Le corps du tiroir précédent est encore monté (closeLigneDetail masque, ne
-  // vide pas) et le navigateur lui rend sa position de scroll dès qu'il
-  // redevient visible : on la remet à zéro APRÈS l'affichage — sinon la remise
-  // à zéro tombe sur un élément sans boîte de défilement et reste sans effet —
-  // pour que renderLigneDetail n'aille pas reporter le scroll d'une AUTRE ligne
-  // sur celle qu'on ouvre.
-  const oldBody = ligneDrawerCard.querySelector('.ld-body');
-  if (oldBody) oldBody.scrollTop = 0;
-  renderLigneDetail();
-  // Le clavier entre dans la fiche — mais SEULEMENT à l'ouverture : reposer le
-  // focus à chaque re-rendu (temps réel) arracherait le curseur du champ en
-  // cours de saisie.
-  focusFiche();
-}
-
-// Pose le focus sur le bouton Fermer de la fiche : le premier arrêt du clavier
-// à l'intérieur du panneau.
-function focusFiche() {
-  const fermer = ligneDrawerCard && ligneDrawerCard.querySelector('.ld-close');
-  if (fermer) fermer.focus();
-}
-
-function closeLigneDetail() {
-  if (!ligneDrawerEl) return;
-  ligneDrawerId = null;
-  // La commande tenue à part n'a plus de raison d'être : elle n'appartient pas à
-  // la liste et rien d'autre ne la lit.
-  ligneHorsListe = null;
-  ligneDrawerEl.hidden = true;
-  figerLeFond(false);
-  ldOublierSaisie();
-  if (ldFocusAvant && ldFocusAvant.isConnected && ldFocusAvant.focus) ldFocusAvant.focus();
-  ldFocusAvant = null;
-}
-
-// Rappelée après CHAQUE (re)rendu de la grille (poll, SSE, tri, sauvegarde
-// locale) : la side bar se re-synchronise depuis `rows`, et se ferme si la
-// ligne a quitté la vue courante (déplacée vers une autre étape, supprimée).
-function renderLigneDetailIfOpen() {
-  if (!ligneDrawerId) return;
-  const r = completerFiche(ligneDuTiroir());
-  // La fermeture passe AVANT la garde : un tiroir ouvert sur une ligne qui a
-  // quitté la vue doit se fermer même si le focus est resté dedans.
-  if (!r) { closeLigneDetail(); return; }
-  if (isDrawerBusy()) return;
-  renderLigneDetail();
-}
-
-// Vrai si le tiroir ne doit pas être reconstruit : focus d'édition à l'intérieur
-// (même protection que isRowBusy pour une ligne de la grille). Sans elle, un
-// rendu déclenché par un tiers — ex. `category-owners` en SSE, qui appelle
-// applySortAndRender() sans passer par la garde isInteracting() de poll() —
-// remplacerait le <textarea> des Notes et effacerait la saisie non sauvegardée.
-// On se limite aux champs de saisie, comme isInteracting() : c'est ce qui
-// garantit que poll() s'arrête AVANT d'avoir consommé lastRowsSig. Geler aussi
-// sur un bouton ou un lien qui garde le focus laisserait le tiroir périmé pour
-// de bon — poll() aurait avalé le changement sans jamais le rendre.
-// Un menu / calendrier ouvert compte aussi : il est ancré à une puce du tiroir,
-// que la reconstruction démonterait sous le popup (même règle qu'isInteracting).
-// Ces popups sont transitoires — clic dehors ou Échap les ferme — donc le tiroir
-// ne peut pas rester gelé.
-function isDrawerBusy() {
-  if (!ligneDrawerCard) return false;
-  if (openMenuEl || openCalendar) return true;
-  const ae = document.activeElement;
-  if (!ae || !ligneDrawerCard.contains(ae)) return false;
-  return ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.tagName === 'SELECT';
-}
 
 // --- Champs éditables du tiroir --------------------------------------------
 // Le tiroir n'est pas une fiche de lecture : TOUT ce qu'il affiche se modifie
-// sur place, avec exactement les mêmes contrôles que la grille (même bindInline,
-// mêmes menus, même calendrier) — donc les mêmes validations côté serveur.
-
-// Une rangée « libellé / contrôle » : le libellé à gauche, le champ ou la puce
-// modifiable à droite.
-function ldRow(label, control) {
-  const row = document.createElement('div');
-  row.className = 'ld-field';
-  const k = document.createElement('span');
-  k.className = 'ld-field__label';
-  k.textContent = label;
-  row.append(k, control);
-  return row;
-}
-
-// Après une modification faite DANS le tiroir : la grille affiche les mêmes
+// Après une modification faite DANS la fiche : la grille affiche les mêmes
 // valeurs (nom, prix, priorité, échéance…) et le tri peut déplacer la ligne —
 // on périme sa signature et on re-rend.
-// `syncDrawer` distingue les deux origines : une puce (menu, calendrier) doit
-// se relire depuis `r`, donc le tiroir se reconstruit ; un champ de saisie
-// affiche déjà la valeur tapée et n'a rien à reconstruire (cf. applySortAndRender).
-function ldRefresh(r, syncDrawer = true) {
+function rafraichirLigne(r) {
   invalidateRowCache(r.id);
-  applySortAndRender({ syncDrawer });
+  applySortAndRender();
 }
 
-// PATCH optimiste d'un champ choisi dans un menu du tiroir (rollback + resync
-// gérés par patch()).
-function ldPatch(r, body) {
-  patch(r, body, () => {
-    Object.assign(r, body);
-    ldRefresh(r);
-  });
-}
-
-// --- La saisie en cours dans la fiche ---------------------------------------
-// La fiche est un FORMULAIRE : rien ne part avant « Enregistrer ». Or elle se
-// reconstruit entièrement dès qu'un autre poste touche au planning (SSE). Deux
-// dégâts, tous les deux silencieux : ce qu'on venait de taper disparaissait, et
-// « Enregistrer » renvoyait les valeurs d'origine — écrasant au passage ce que
-// le collègue venait de changer.
-// On mémorise donc, pour chaque contrôle, LA VALEUR TELLE QU'ELLE A ÉTÉ RENDUE.
-// La différence avec ce qu'affiche le contrôle, c'est exactement la correction
-// de l'employé : elle survit aux reconstructions, et elle seule part au serveur.
-let ldValeursRendues = {};   // { clé: valeur au moment du rendu }
-let ldSaisieEnCours = {};    // { clé: valeur tapée, non encore enregistrée }
-
-function ldOublierSaisie() {
-  ldValeursRendues = {};
-  ldSaisieEnCours = {};
-}
-
-// Déclare un contrôle et la valeur avec laquelle il vient d'être rempli.
-function ldSuivi(cle, el, valeur) {
-  el.dataset.ldKey = cle;
-  ldValeursRendues[cle] = valeur == null ? '' : String(valeur);
-  return el;
-}
-
-// Avant de tout reconstruire : on relève ce qui a été tapé et pas enregistré.
-//
-// UNE CORRECTION EST UN ÉCART À CE QU'ON A RENDU — encore faut-il qu'on ait
-// rendu quelque chose. `ldValeursRendues` est vidé par `ldOublierSaisie()`
-// (ouverture d'une AUTRE commande, fermeture, enregistrement réussi) ; sans la
-// garde ci-dessous, la capture qui suit comparait alors les champs de la fiche
-// PRÉCÉDENTE — encore montée à l'écran — à du vide, prenait tout pour une
-// correction en cours, et `ldAppliquerSaisie()` la reposait sur la commande
-// qu'on vient d'ouvrir. Ouvrir deux fiches à la suite remplissait la seconde
-// avec le dossier de la première, et « Enregistrer » écrasait pour de bon le
-// client, le projet, le prix, l'échéance et l'étape. Une clé absente de
-// `ldValeursRendues` = ce contrôle n'appartient pas au rendu courant : il n'y a
-// rien à en retenir.
-function ldCapturerSaisie() {
-  if (!ligneDrawerCard) return;
-  for (const el of ligneDrawerCard.querySelectorAll('[data-ld-key]')) {
-    const cle = el.dataset.ldKey;
-    if (!(cle in ldValeursRendues)) continue;
-    if (String(el.value) !== ldValeursRendues[cle]) ldSaisieEnCours[cle] = el.value;
-  }
-}
-
-// Après reconstruction : on repose les corrections en cours par-dessus.
-function ldAppliquerSaisie() {
-  if (!ligneDrawerCard) return;
-  for (const el of ligneDrawerCard.querySelectorAll('[data-ld-key]')) {
-    const cle = el.dataset.ldKey;
-    if (cle in ldSaisieEnCours) el.value = ldSaisieEnCours[cle];
-  }
-}
-
-// Vrai si ce contrôle porte une valeur différente de celle qui a été rendue.
-const ldModifie = (el) => !!el && String(el.value) !== (ldValeursRendues[el.dataset.ldKey] ?? '');
-
-// Puce cliquable du tiroir : `render` réécrit libellé + classe depuis `r`,
-// `open` ouvre le menu (ou le popover) au clic.
-function ldChip(render, open) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  render(btn);
-  btn.addEventListener('click', (e) => { e.stopPropagation(); open(btn); });
-  return btn;
-}
 
 function stageDestinationLabel(stage, sub) {
   const family = STAGE_LABEL[stage] || stage;
@@ -3847,160 +3585,6 @@ function stageDestinationLabel(stage, sub) {
   return familyHasSub(stage) ? `${family} › à préciser` : family;
 }
 
-// Un article du détail produit : un titre, puis ses sous-lignes (les valeurs
-// vides sont ignorées, pour ne jamais afficher de ligne creuse).
-function ficheLigneEl(titre, sousLignes) {
-  const box = document.createElement('div');
-  box.className = 'ld-fiche-item';
-  const t = document.createElement('p');
-  t.className = 'ld-fiche-item__title';
-  t.textContent = titre;
-  box.appendChild(t);
-  for (const s of sousLignes) {
-    if (!s) continue;
-    const p = document.createElement('p');
-    p.className = 'ld-fiche-item__sub';
-    p.textContent = s;
-    box.appendChild(p);
-  }
-  return box;
-}
-
-// Flux « Commande » (tasses / textiles / objets), fiche.kind = 'commande-atelier'.
-// Mêmes champs que detailLigne() côté serveur (server.js:1115-1153), rendus en
-// HTML structuré plutôt qu'en texte à flèches « ↳ ».
-function ficheItemsCommandeAtelier(fiche) {
-  const items = [];
-  for (const l of fiche.tasses || []) {
-    items.push(ficheLigneEl(
-      `${l.quantite} × ${l.ref}${l.couleur ? ` — ${l.couleur}` : ''}`,
-      [
-        ...(l.faces || []).map((f) => `${f.label} (${f.hint}) : ${f.visuel}`),
-        (l.options || []).length ? l.options.map((o) => o.label).join(' · ') : null,
-        l.typo ? `Typo : ${l.typo}` : null,
-        l.infos || null,
-        l.remarque ? `Remarque : ${l.remarque}` : null,
-      ],
-    ));
-  }
-  for (const l of fiche.textiles || []) {
-    const tailleTxt = (l.tailles && l.tailles.length)
-      ? l.tailles.map((t) => `${t.taille}×${t.quantite}`).join(' · ')
-      : (l.taille ? `taille ${l.taille}` : '');
-    const id = [l.ref && `réf. ${l.ref}`, l.couleur, tailleTxt].filter(Boolean).join(' · ');
-    items.push(ficheLigneEl(
-      `${l.quantite} × ${l.vetement}${id ? ` — ${id}` : ''}`,
-      [
-        l.note || null,
-        ...(l.zones || []).map((z) => {
-          const tech = z.technique === 'a_definir' ? '' : ` [${z.techniqueLabel}]`;
-          const detail = [z.logo, z.couleur, z.largeur ? `${z.largeur} cm` : null]
-            .filter(Boolean).join(' · ') || z.consigne || '';
-          return `${z.zoneLabel}${tech}${detail ? ` : ${detail}` : ''}`;
-        }),
-      ],
-    ));
-  }
-  for (const l of fiche.objets || []) {
-    items.push(ficheLigneEl(
-      `${l.quantite} × ${l.ref}`,
-      [l.techniqueLabel ? `${l.techniqueLabel}${l.infos ? ` : ${l.infos}` : ''}` : (l.infos || null)],
-    ));
-  }
-  return items;
-}
-
-// Flux « Nouveau Projet » (panier multi-type), fiche.kind = 'projet-simple'.
-// `l.bat` est l'option catalogue tarifée (server.js buildLigneTasse) — à NE PAS
-// confondre avec la pièce jointe BAT (documents) : badge texte distinct.
-// Depuis la v4, chaque famille porte sa fiche de production : on rend ce que
-// l'atelier doit lire pour produire, pas seulement le nom du produit.
-function ficheItemsProjetSimple(fiche) {
-  return (fiche.lignes || []).map((l) => {
-    const prix = l.prixUnitaireTtc != null
-      ? `${Number(l.prixUnitaireTtc).toFixed(2)} € TTC / unité`
-      : null;
-    if (l.produit) {
-      const opts = [l.face1, l.face2, l.dessous].filter((o) => o && o.label !== 'Aucune').map((o) => o.label);
-      return ficheLigneEl(
-        `${l.quantite} × ${l.produit.label}${l.coloris ? ` (${l.coloris})` : ''}`,
-        [
-          opts.length ? opts.join(', ') : null,
-          l.face1Texte ? `Face 01 (anse à droite) : ${l.face1Texte}` : null,
-          l.face2Texte ? `Face 02 (anse à gauche) : ${l.face2Texte}` : null,
-          l.dessousTexte ? `Dessous : ${l.dessousTexte}` : null,
-          l.typo ? `Typo : ${l.typo}` : null,
-          l.remarque ? `Remarque : ${l.remarque}` : null,
-          l.bat ? '★ BAT à confirmer avant production' : null,
-          prix,
-        ],
-      );
-    }
-    // Depuis la v4, `description` est un résumé complet qui commence par la
-    // quantité (« 10 × Polo — réf. … ») ; avant, elle ne portait que le texte
-    // libre saisi, qu'il fallait préfixer. `designation` distingue les deux.
-    const titre = l.designation ? l.description : `${l.quantite} × ${l.description}`;
-    // Textile : les faces marquées, une sous-ligne chacune. Le titre porte déjà
-    // référence, couleur et grille de tailles.
-    if (l.faces || l.tailles) {
-      return ficheLigneEl(titre, [
-        ...(l.faces || []).map((f) => [
-          f.faceLabel, f.emplacement && f.emplacement.label,
-          // `technique` n'existe pas sur les fiches archivées avant sa mise en
-          // place : la sous-ligne se contente alors de ce qu'elle a.
-          f.technique && f.technique.label,
-          f.typeLogo && f.typeLogo.label, f.referenceLogo, f.couleurMarquage,
-        ].filter(Boolean).join(' · ')),
-        l.remarque ? `Remarque : ${l.remarque}` : null,
-        prix,
-      ]);
-    }
-    // Autres / Plaque signalétique. `categorie` vient de la demande de devis :
-    // le client demande une famille (Textile, Goodies…) bien avant qu'un article
-    // du catalogue soit choisi. Le titre porte déjà référence et couleur.
-    return ficheLigneEl(titre, [
-      l.categorie ? `Catégorie : ${l.categorie}` : null,
-      l.explication || null,
-      l.matiere ? `Matière : ${l.matiere}` : null,
-      l.format ? `Format : ${l.format}` : null,
-      l.methode ? `Production : ${l.methode}` : null,
-      // Une demande de devis n'a pas encore de prix : c'est précisément ce
-      // qu'on doit chiffrer. On le DIT, plutôt que de ne rien afficher.
-      prix || (fiche.orderKind === 'demande' ? 'Prix : à chiffrer' : null),
-    ]);
-  });
-}
-
-// Flux « Nouveau Projet » du comptoir (public/comptoir/*.html), fiche.kind =
-// 'comptoir-v17'. Le parcours a déjà mis son dossier en forme pour le ticket :
-// des paires libellé / valeur, dans l'ordre où la vendeuse les a saisies. On les
-// rend TELLES QUELLES — deux blocs, le client puis le dossier. Réinterpréter
-// serait une occasion de perdre une ligne à chaque nouvelle version de l'écran.
-function ficheItemsComptoir(fiche) {
-  const bloc = (titre, lignes) => (lignes && lignes.length
-    ? [ficheLigneEl(titre, lignes.map((l) => `${l.k} : ${l.v}`))]
-    : []);
-  return [
-    ...bloc('Client', fiche.client),
-    ...bloc(fiche.source === 'Demande de devis' ? 'Demande' : 'Vente', fiche.details),
-  ];
-}
-
-// Détail produit : reconstruit un affichage lisible depuis `r.fiche` (le JSON
-// archivé à la création de la commande, jamais retouché après). Trois formats
-// possibles selon le flux de création — cf. server.js buildCommande/buildProjet
-// et POST /api/comptoir/projet.
-// Retourne `null` si `fiche` est absent ou d'un `kind` non reconnu (ligne créée
-// à la main dans la grille) ; une fiche de commande v1, qui porte bien le
-// `kind` mais pas les tableaux attendus, renvoie `[]`. Dans les deux cas
-// l'appelant masque la section, sans erreur.
-function ficheItems(fiche) {
-  if (!fiche || typeof fiche !== 'object') return null;
-  if (fiche.kind === 'commande-atelier') return ficheItemsCommandeAtelier(fiche);
-  if (fiche.kind === 'projet-simple') return ficheItemsProjetSimple(fiche);
-  if (fiche.kind === 'comptoir-v17') return ficheItemsComptoir(fiche);
-  return null;
-}
 
 // --- La fiche projet : ce que l'écran du patron appelle « la bulle » ---------
 
@@ -4027,39 +3611,6 @@ const LD_ICONES = {
   bureau: ['M6 3h8l4 4v14H6z', 'M14 3v4h4', 'M9 12h6', 'M9 15.5h6', 'M9 19h3'],
 };
 
-// `icone` : une fonction qui rend un SVG (une marque, cf. fiverrIcon), une clé
-// de LD_ICONES (dessinée au trait) ou un nom de glyphe présent dans la police
-// auto-hébergée.
-function ldActionBtn(icone, label, onClick) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'ld-act';
-  let i;
-  if (typeof icone === 'function') {
-    i = icone();
-    i.setAttribute('width', '17');
-    i.setAttribute('height', '17');
-  } else if (LD_ICONES[icone]) {
-    i = strokeIcon(LD_ICONES[icone]);
-    i.setAttribute('width', '17');
-    i.setAttribute('height', '17');
-  } else {
-    i = document.createElement('span');
-    i.className = 'material-symbols-outlined';
-    i.setAttribute('aria-hidden', 'true');
-    i.textContent = icone;
-  }
-  const t = document.createElement('span');
-  t.className = 'ld-act-label';
-  t.textContent = label;
-  b.append(i, t);
-  b.setAttribute('aria-label', label);
-  // Le bouton lui-même est passé au gestionnaire : les actions qui CRÉENT
-  // quelque chose (dupliquer, envoyer vers) doivent pouvoir se désarmer le temps
-  // que la création parte, sinon un appui appuyé au doigt fait deux copies.
-  b.addEventListener('click', (e) => onClick(b, e));
-  return b;
-}
 
 // Même règle de rapprochement que le serveur (clientKey) : insensible à la
 // casse, aux accents et à la ponctuation. « Coco Beach » et « coco-beach »
@@ -4145,25 +3696,6 @@ async function telechargerRecap(r) {
 // L'ARGENT N'EST PLUS DESSUS. Ni prix, ni total, ni paiement : ça se corrige
 // toujours, mais sur la ligne du planning et dans la fiche, là où ça vit.
 
-// LA CONSIGNE ÉCRITE POUR L'ATELIER, si la ligne en porte une. Elle voyage dans
-// la liste allégée (FICHE_LISTE côté serveur) : la grille marque donc d'un point
-// les dossiers qui parlent à l'atelier sans aller ouvrir une seule fiche.
-function consigneAtelier(r) {
-  const f = r && r.fiche;
-  return f && typeof f === 'object' ? String(f.atelier || '').trim() : '';
-}
-
-// Ce que dit la pastille du ticket, dans les deux vues. La consigne y figure
-// tronquée : au survol on veut savoir CE QU'ELLE DIT, pas ouvrir le ticket pour
-// s'apercevoir qu'elle ne concernait pas ce qu'on cherchait.
-function infobulleTicket(r) {
-  const ref = (r.fiche && r.fiche.ref) || '';
-  const quoi = `${ref ? `Ticket atelier ${ref}` : 'Ticket atelier'} — corriger et imprimer`;
-  const consigne = consigneAtelier(r);
-  if (!consigne) return quoi;
-  const court = consigne.length > 70 ? `${consigne.slice(0, 69)}…` : consigne;
-  return `${quoi} · atelier : ${court.replace(/\s*\n\s*/g, ' ')}`;
-}
 
 // LA FICHE COMPLÈTE D'ABORD — ET RIEN NE S'IMPRIME SANS ELLE.
 // La liste ne transporte qu'un RÉSUMÉ de la fiche (FICHE_LISTE côté serveur) :
@@ -4225,10 +3757,6 @@ function imprimerModele(t, titre) {
   setTimeout(() => cadre.remove(), 1000);
 }
 
-async function imprimerTicket(r) {
-  const t = await ticketDeLaLigne(r);
-  imprimerModele(t, `Ticket atelier ${t.ref || r.billing_company || ''}`.trim());
-}
 
 // ===========================================================================
 // LE DOCUMENT DU BUREAU — l'autre papier de la même ligne
@@ -4748,291 +4276,6 @@ async function ouvrirTicket(r) {
   requestAnimationFrame(() => { fond.classList.add('open'); imprimer.focus(); });
 }
 
-// DÉTAIL COMPLET, MODIFIABLE. Le récapitulatif du comptoir, ligne à ligne :
-// libellé figé (il vient du parcours), valeur éditable. On n'enregistre qu'au
-// bouton — corriger dix lignes ne doit pas faire dix allers-retours réseau, et
-// tant qu'on n'a pas validé, rien n'a bougé en base.
-// LES ÉTAPES DE LA PRISE DE COMMANDE, telles que la vendeuse les a franchies.
-//
-// Le détail archivé s'affichait en UNE liste de cinquante champs à la file,
-// sous « tout est modifiable » : on y trouvait tout et on n'y repérait rien.
-// Or ces cinquante lignes ont été saisies EN ÉTAPES, et ce sont ces
-// étapes-là — les siennes, avec ses mots — qu'on doit retrouver en ouvrant le
-// dossier. On rend donc le MÊME fil que son écran (`.stepper` / `.step` de
-// charte.css, littéralement le composant du comptoir) : on clique une étape,
-// on voit ce qu'elle porte.
-//
-// Une étape RENSEIGNÉE porte la coche du parcours (`done`) — un dossier où le
-// contrôle du logo n'a jamais été rempli le dit sans qu'on ait à l'ouvrir.
-const LD_ETAPE_CLIENT = new Set(['Client', 'Type de client', 'Personne à contacter',
-  'Fonction du contact', 'WhatsApp', 'Second contact', 'E-mail', 'Secteur', 'Adresse']);
-// Les libellés sont ceux des écrans du comptoir, mot pour mot : `recapLines`
-// dans demande-devis.html, `saleRecapLines` dans vente-directe.html. Une étape
-// se reconnaît à ses lignes, et la DERNIÈRE ramasse tout le reste — aucune
-// ligne archivée ne peut disparaître parce qu'un libellé a changé chez le
-// patron.
-const LD_ETAPES = {
-  'Demande de devis': [
-    { titre: '1. Besoins',
-      porte: (k) => /^Besoin \d+ — /.test(k) || k === 'Nombre de besoins' || k === 'Quantité totale' },
-    // L'ÉTAPE « CONTRÔLE » A DISPARU DE L'ÉCRAN LE 27/08 : le logo est descendu
-    // dans « Projet », six cases de notes quasi vides sont devenues une seule.
-    // MAIS SES LIBELLÉS RESTENT LISTÉS ICI : les dossiers d'AVANT les portent,
-    // et une ligne archivée qui ne trouve pas son étape tomberait dans le
-    // ramasse-tout de la dernière — le dossier de la semaine dernière ne se
-    // relirait plus comme il a été saisi.
-    { titre: '2. Projet',
-      porte: (k) => ['Titre du projet', 'Date souhaitée', 'Heure souhaitée',
-        'Type de logo', 'Statut du logo', 'Maquette / fichier', 'Notes',
-        // ce que les dossiers d'avant le 27/08 portent encore :
-        'Objet du projet', 'Priorité', 'Budget indicatif', 'Description générale',
-        'Décisions / contraintes', 'État du dossier', 'Vectorisation',
-        'Informations transmises par', 'Transmission prévue par',
-        'Informations attendues', 'Éléments reçus du client', 'Points à contrôler',
-        'Suite à donner'].includes(k) },
-    { titre: '3. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
-    { titre: '4. Récapitulatif', porte: () => true },
-  ],
-  'Vente directe': [
-    { titre: '1. Articles',
-      porte: (k) => /^Article \d+ — /.test(k) || ['Nombre d’articles', 'Quantité totale',
-        'Récupération prévue', 'Délai souhaité'].includes(k) },
-    { titre: '2. Client', client: true, porte: (k) => LD_ETAPE_CLIENT.has(k) },
-    { titre: '3. Paiement',
-      porte: (k) => ['Total HT', 'Taxe', 'Suppléments', 'Total TTC', 'Paiement',
-        'Montant donné', 'Monnaie rendue', 'Part carte', 'Part espèces'].includes(k) },
-    { titre: '4. Ticket', porte: () => true },
-  ],
-};
-
-// Une valeur que le comptoir a écrite « — » est un champ VIDE, pas une valeur :
-// c'est sa marque à lui. Elle ne fait pas franchir une étape.
-const ldRenseigne = (v) => { const t = String(v == null ? '' : v).trim(); return !!t && t !== '—'; };
-
-// LE RANGEMENT, À PART DU RENDU : c'est lui qui décide où va chaque ligne, et
-// c'est lui qu'il faut pouvoir éprouver sans écran.
-//
-// L'INDEX D'ORIGINE SUIT LE CHAMP. Le récapitulatif se réécrit PAR POSITION
-// dans `fiche.client` / `fiche.details` (voir ldEnregistrer) : regrouper à
-// l'écran ne doit renuméroter personne, ou l'on écrirait la couleur du
-// besoin 2 dans la désignation du besoin 1.
-function ldEtapesDuRecap(source, lignesClient, lignesDetail) {
-  const etapes = (LD_ETAPES[source] || LD_ETAPES['Demande de devis'])
-    .map((e) => ({ ...e, lignes: [] }));
-  const derniere = etapes[etapes.length - 1];
-  const pourClient = etapes.find((e) => e.client) || derniere;
-  lignesClient.forEach((l, i) => pourClient.lignes.push({ ...l, groupe: 'client', i }));
-  lignesDetail.forEach((l, i) => {
-    (etapes.find((e) => e.porte(String(l.k || ''))) || derniere)
-      .lignes.push({ ...l, groupe: 'details', i });
-  });
-  return etapes.filter((e) => e.lignes.length);
-}
-
-function ldBlocDetail(r) {
-  const f = r.fiche;
-  const lignesClient = Array.isArray(f.client) ? f.client : [];
-  const lignesDetail = Array.isArray(f.details) ? f.details : [];
-  if (!lignesClient.length && !lignesDetail.length) return null;
-
-  const vues = ldEtapesDuRecap(f.source, lignesClient, lignesDetail);
-  if (!vues.length) return null;
-
-  // TOUTES LES ÉTAPES SONT VISIBLES (28/08). Charlie : « je veux que toutes les
-  // étapes soient parfaitement visibles, c'est le bordel là ». Elles étaient en
-  // ONGLETS : on n'en voyait qu'une sur quatre, et il fallait cliquer d'onglet
-  // en onglet pour relire la prise de commande — dans un tableau qui montre
-  // tout le reste d'un coup.
-  //
-  // Chaque étape devient un BANDEAU suivi de ses rangées, exactement comme les
-  // tailles et les faces. Le fil du comptoir disparaît d'ici : il nommait des
-  // onglets, et il n'y a plus d'onglets. Les étapes gardent leur numéro et
-  // leurs mots — ceux de la vendeuse.
-  const champs = { client: [], details: [] };
-  const rangees = [];
-  for (const e of vues) {
-    // Une étape RENSEIGNÉE le dit dans son bandeau : un dossier où le contrôle
-    // du logo n'a jamais été rempli se voit sans qu'on ait à le lire.
-    const vide = !e.lignes.some((l) => ldRenseigne(l.v));
-    rangees.push(ldBande(vide ? `${e.titre} — rien de saisi` : e.titre));
-    for (const l of e.lignes) {
-      // Une valeur longue ou sur plusieurs lignes mérite une zone de texte :
-      // une description de production ne se relit pas dans un champ d'une ligne.
-      const longue = String(l.v || '').length > 60 || String(l.v || '').includes('\n');
-      const champ = document.createElement(longue ? 'textarea' : 'input');
-      champ.className = 'ld-ctl';
-      if (longue) champ.rows = 3;
-      champ.value = l.v == null ? '' : l.v;
-      champ.setAttribute('aria-label', l.k);
-      ldSuivi(`detail:${l.groupe}:${l.i}`, champ, l.v);
-      champs[l.groupe][l.i] = champ;
-      rangees.push(ldBox(l.k, champ, longue));
-    }
-  }
-
-  // Pas de bouton ici : chaque valeur part en quittant son champ, comme partout
-  // ailleurs dans le tableau.
-  return { rangees, champs };
-}
-
-// HISTORIQUE DU CLIENT : les autres commandes du même dossier. « On a déjà fait
-// quoi pour eux ? » est la question qu'on pose au téléphone, et la réponse doit
-// être sous les yeux, pas à chercher dans la grille.
-function ldBlocHistoriqueClient(r) {
-  const cle = clientKeyLocal(r.billing_company);
-  if (!cle) return null;
-  const autres = rows
-    .filter((x) => String(x.id) !== String(r.id) && clientKeyLocal(x.billing_company) === cle)
-    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-
-  const section = ldBox(`Historique du client (${autres.length})`, null, true);
-  if (!autres.length) {
-    const p = document.createElement('p');
-    p.className = 'ld-empty';
-    // La grille ne porte que l'étape affichée : on ne prétend pas connaître
-    // tout l'historique du client, on dit ce qu'on voit.
-    p.textContent = 'Aucune autre commande de ce client à cette étape.';
-    section.cellule.appendChild(p);
-    return section;
-  }
-  for (const x of autres) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'ld-hist';
-    const main = document.createElement('span');
-    main.className = 'ld-hist__main';
-    const t = document.createElement('span');
-    t.className = 'ld-hist__title';
-    t.textContent = x.product || 'Sans description';
-    const s = document.createElement('span');
-    s.className = 'ld-hist__sub';
-    s.textContent = stageDestinationLabel(x.stage, x.sub_stage ?? null);
-    main.append(t, s);
-    const v = document.createElement('span');
-    v.className = 'ld-hist__value';
-    v.textContent = x.project_value == null ? 'à chiffrer' : eur(Number(x.project_value));
-    b.append(main, v);
-    b.addEventListener('click', () => openLigneDetail(x.id));
-    section.cellule.appendChild(b);
-  }
-  return section;
-}
-
-// ===========================================================================
-// LA FICHE PROJET — « la bulle », telle que l'écran du patron la dessine
-// ===========================================================================
-// Une carte du planning ne dit que l'essentiel ; la fiche dit TOUT, et tout y
-// est modifiable. Elle se lit en encadrés à deux colonnes : chaque encadré
-// porte un libellé en capitales et son contenu.
-//
-// La fiche suit le modèle « je corrige, puis j'enregistre » : les champs se
-// tapent librement et rien ne part avant le bouton du bas. C'est la règle de
-// l'écran validé, et elle vaut mieux ici qu'une sauvegarde à chaque frappe —
-// on relit une fiche entière avant de la valider.
-
-// UNE RANGÉE DU TABLEAU : l'intitulé à gauche, la valeur à droite (28/08/2026).
-//
-// Charlie : « pour que ce soit simple je veux que ça s'ouvre façon tableau,
-// presque comme un tableau Excel, pour modifier rapidement les valeurs ».
-// C'étaient vingt cartes blanches de 14 px de rembourrage posées sur deux
-// colonnes : chacune portait son intitulé AU-DESSUS de son champ, donc rien ne
-// s'alignait d'une carte à l'autre et l'œil devait chercher chaque valeur.
-//
-// `display: contents` sur la rangée : ses deux cellules deviennent des cellules
-// de la grille du corps. C'est ce qui fait qu'UNE seule colonne d'intitulés
-// traverse toute la fiche — dans une sous-grille par rangée, chaque largeur se
-// calculerait sur son propre contenu, et on retomberait sur vingt alignements
-// différents.
-function ldBox(label, contenu, pleine) {
-  const rangee = document.createElement('section');
-  rangee.className = 'ld-rang' + (pleine ? ' ld-rang--haut' : '');
-  // L'intitulé est un MOT le plus souvent, mais parfois un champ : le nom d'une
-  // face se corrige, et il tient quand même la colonne des intitulés — c'est
-  // par lui qu'on trouve sa ligne, comme « S » ou « Référence ».
-  let k = label;
-  if (typeof label === 'string') {
-    k = document.createElement('p');
-    k.className = 'ld-k';
-    k.textContent = label;
-  }
-  const v = document.createElement('div');
-  v.className = 'ld-cell';
-  for (const c of [].concat(contenu)) if (c) v.append(c);
-  rangee.append(k, v);
-  // CE QU'ON AJOUTE APRÈS COUP VA DANS LA CELLULE, jamais sur la rangée : elle
-  // est en `display: contents`, donc un troisième enfant deviendrait une
-  // cellule de grille à lui seul — posée n'importe où dans le tableau. Trois
-  // blocs le faisaient (le fil du comptoir, l'historique du client, le vide).
-  rangee.cellule = v;
-  return rangee;
-}
-
-// UN VOLET : tout ce qui se MODIFIE est replié par défaut.
-// La fiche s'ouvre donc en lecture — on la parcourt d'un coup d'œil sans risquer
-// de retoucher un champ au passage. Le volet fermé montre le libellé ET la
-// valeur du moment : on lit sans ouvrir, on n'ouvre que pour changer.
-// `<details>` natif : ça marche au clavier, ça s'imprime déplié si besoin, et
-// aucun script ne pilote l'ouverture.
-function ldVolet(label, apercu, contenu, pleine) {
-  const volet = document.createElement('details');
-  // UN VOLET TRAVERSE LE TABLEAU : son titre EST sa rangée. Il ne se range pas
-  // en deux colonnes — il en ouvre d'autres en dessous.
-  volet.className = 'ld-volet';
-  const tete = document.createElement('summary');
-  tete.className = 'ld-volet__tete';
-  const textes = document.createElement('span');
-  textes.className = 'ld-volet__textes';
-  const k = document.createElement('span');
-  k.className = 'ld-k';
-  k.textContent = label;
-  const v = document.createElement('span');
-  v.className = 'ld-volet__apercu';
-  v.textContent = apercu == null || apercu === '' ? '—' : String(apercu);
-  textes.append(k, v);
-  const chevron = document.createElement('span');
-  chevron.className = 'material-symbols-outlined ld-volet__chevron';
-  chevron.setAttribute('aria-hidden', 'true');
-  chevron.textContent = 'expand_more';
-  tete.append(textes, chevron);
-  volet.append(tete);
-  for (const c of [].concat(contenu)) if (c) volet.append(c);
-  return volet;
-}
-
-// Valeur en lecture seule (étape courante, échéance calculée…).
-function ldValeur(texte) {
-  const p = document.createElement('p');
-  p.className = 'ld-v';
-  p.textContent = texte;
-  return p;
-}
-
-function ldChamp(valeur, opts = {}) {
-  const el = document.createElement(opts.multi ? 'textarea' : 'input');
-  el.className = 'ld-ctl';
-  if (opts.multi) el.rows = opts.rows || 3;
-  else el.type = opts.type || 'text';
-  if (opts.inputMode) el.inputMode = opts.inputMode;
-  if (opts.step) el.step = opts.step;
-  if (opts.placeholder) el.placeholder = opts.placeholder;
-  el.value = valeur == null ? '' : valeur;
-  if (opts.label) el.setAttribute('aria-label', opts.label);
-  return el;
-}
-
-function ldSelect(options, valeur, label) {
-  const s = document.createElement('select');
-  s.className = 'ld-ctl';
-  if (label) s.setAttribute('aria-label', label);
-  for (const o of options) {
-    const opt = document.createElement('option');
-    opt.value = o.value;
-    opt.textContent = o.label;
-    if (String(o.value) === String(valeur)) opt.selected = true;
-    s.append(opt);
-  }
-  return s;
-}
 
 // Toutes les places possibles du pipeline, « Famille › Sous-étape ». Une
 // famille sans sous-étape est une destination à elle seule.
@@ -5074,7 +4317,7 @@ function placesDuPipeline(placeActuelle) {
 // LE PRIX SUIT TOUT SEUL. Le serveur retarife la ligne dès que les tailles ou
 // la référence bougent (voir `retarifer`) : la réponse porte la ligne entière,
 // donc le montant affiché est déjà le nouveau.
-async function ldEnvoyerProd(r, patchProd) {
+async function envoyerProduction(r, patchProd) {
   try {
     const maj = await api('PATCH', `/api/requests/${r.id}/fiche`, { prod: patchProd });
     if (!maj) return;
@@ -5084,538 +4327,12 @@ async function ldEnvoyerProd(r, patchProd) {
     // ne plus être celui de la grille. On repose la réponse sur les deux.
     const vivante = rows.find((x) => String(x.id) === String(r.id));
     if (vivante && vivante !== r) Object.assign(vivante, maj);
-    ldRefresh(r);
+    rafraichirLigne(r);
   } catch (err) {
     reportError(err);
   }
 }
 
-// Un champ du tableau de production : il part quand on le quitte, et seulement
-// s'il a changé (`change` ne se déclenche pas autrement).
-function ldProdChamp(valeur, opts, envoyer) {
-  const el = ldChamp(valeur, opts);
-  el.addEventListener('change', () => envoyer(el.value.trim()));
-  return el;
-}
-
-const ldTabRow = (grille, label, ...controles) => {
-  const k = document.createElement('span');
-  k.className = 'ld-tab__k';
-  k.textContent = label;
-  grille.append(k, ...controles);
-};
-
-function ldProduction(r) {
-  const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
-  const p = fiche.prod;
-  // Pas de fiche de production = rien à montrer. Une ligne créée à la main n'en
-  // a pas, et une case vide n'apprend rien à personne.
-  if (!p || typeof p !== 'object') return [];
-  const tailles = Array.isArray(p.tailles) ? p.tailles : [];
-  const faces = Array.isArray(p.logos) ? p.logos : [];
-  const rangees = [ldBande('Ce qu’il y a à produire')];
-
-  // --- L'IDENTITÉ DE L'ARTICLE ---------------------------------------------
-  for (const [cle, label] of [['ref', 'Référence'], ['couleur', 'Couleur'],
-    ['marquage', 'Technique'], ['encre', 'Couleur du marquage']]) {
-    rangees.push(ldBox(label, ldProdChamp(p[cle] || '', { label },
-      (v) => ldEnvoyerProd(r, { [cle]: v }))));
-  }
-
-  // --- LES TAILLES ----------------------------------------------------------
-  // LA LISTE ENTIÈRE PART À CHAQUE FOIS, nommée. Le serveur lit une taille
-  // absente comme un zéro : c'est ce qui permet d'en retirer une, et c'est la
-  // seule lecture qui tienne puisque la ligne ne garde pas les tailles vides.
-  const envoyerTailles = (modif) => {
-    const liste = tailles.map((t) => ({ t: String(t.t), n: Number(t.n) || 0 }));
-    modif(liste);
-    ldEnvoyerProd(r, { tailles: liste.filter((x) => x.t) });
-  };
-  rangees.push(ldBande('Tailles'));
-  tailles.forEach((taille, i) => {
-    rangees.push(ldBox(String(taille.t), ldProdChamp(taille.n, {
-      type: 'number', inputMode: 'numeric', step: '1', label: `Quantité en ${taille.t}`,
-    }, (v) => envoyerTailles((l) => { l[i].n = Math.max(0, Math.round(Number(v) || 0)); }))));
-  });
-  // LA RANGÉE VIDE AJOUTE. Le comptoir ne pose que les tailles commandées :
-  // « finalement il en veut aussi 20 en XL » n'avait aucune porte.
-  const nomNouveau = ldChamp('', { label: 'Nouvelle taille', placeholder: 'XL, 35 cl…' });
-  const nbNouveau = ldChamp('', {
-    type: 'number', inputMode: 'numeric', step: '1', placeholder: 'nombre', label: 'Quantité',
-  });
-  const poserNouvelle = () => {
-    const nom = nomNouveau.value.trim();
-    const n = Math.max(0, Math.round(Number(nbNouveau.value) || 0));
-    if (!nom || !n) return;
-    nomNouveau.value = ''; nbNouveau.value = '';
-    envoyerTailles((l) => { l.push({ t: nom, n }); });
-  };
-  nbNouveau.addEventListener('change', poserNouvelle);
-  nomNouveau.addEventListener('change', () => { if (nbNouveau.value) poserNouvelle(); });
-  rangees.push(ldAjout(nomNouveau, nbNouveau));
-
-  // --- LES FACES À MARQUER --------------------------------------------------
-  // Trois choses par face : son nom, sa cote, et CE QU'ON Y MARQUE. La cote ne
-  // dit rien sur une tasse ou une gravure — là c'est la consigne qui porte
-  // tout, et elle était la seule valeur de la ligne qu'on ne pouvait pas
-  // rectifier. Vider le nom retire la face.
-  const envoyerFaces = (i, patch) => {
-    const liste = faces.map(() => ({}));
-    liste[i] = patch;
-    ldEnvoyerProd(r, { logos: liste });
-  };
-  rangees.push(ldBande('Faces à marquer'));
-  faces.forEach((z, i) => {
-    // LE NOM DE LA FACE TIENT LA COLONNE DES INTITULÉS : c'est lui qu'on lit
-    // pour trouver sa ligne, exactement comme « S » ou « Référence ». Il reste
-    // modifiable — l'effacer retire la face.
-    const nom = ldProdChamp(z.face || '', { label: 'Nom de la face' },
-      (v) => envoyerFaces(i, { face: v }));
-    nom.classList.add('ld-k-champ');
-    const cote = ldProdChamp(z.mm || '', { label: 'Cote (mm)', placeholder: 'mm' },
-      (v) => envoyerFaces(i, { mm: v }));
-    cote.classList.add('ld-court');
-    rangees.push(ldBox(nom, [cote, ldProdChamp(z.quoi || '', {
-      label: 'Ce qu’on marque', placeholder: 'ce qu’on y marque',
-    }, (v) => envoyerFaces(i, { quoi: v }))]));
-  });
-  const faceNouvelle = ldChamp('', { label: 'Nouvelle face', placeholder: 'Ajouter une face…' });
-  faceNouvelle.classList.add('ld-k-champ');
-  const mmNouvelle = ldChamp('', { label: 'Cote', placeholder: 'mm' });
-  mmNouvelle.classList.add('ld-court');
-  const quoiNouvelle = ldChamp('', { label: 'Ce qu’on marque', placeholder: 'ce qu’on y marque' });
-  faceNouvelle.addEventListener('change', () => {
-    const nom = faceNouvelle.value.trim();
-    if (!nom) return;
-    const patch = { face: nom, mm: mmNouvelle.value.trim(), quoi: quoiNouvelle.value.trim() };
-    faceNouvelle.value = ''; mmNouvelle.value = ''; quoiNouvelle.value = '';
-    envoyerFaces(faces.length, patch);
-  });
-  rangees.push(ldBox(faceNouvelle, [mmNouvelle, quoiNouvelle]));
-
-  return rangees;
-}
-
-// UN BANDEAU DE SECTION : il traverse les deux colonnes et dit ce que les
-// rangées du dessous ont en commun. C'est ce qui remplace les vingt cartes —
-// un titre par famille de faits, pas un encadré par fait.
-function ldBande(texte) {
-  const el = document.createElement('p');
-  el.className = 'ld-bande';
-  el.textContent = texte;
-  return el;
-}
-
-// LA RANGÉE QUI AJOUTE : ses deux champs occupent les deux colonnes, donc le
-// nom tombe sous les intitulés et le nombre sous les valeurs.
-function ldAjout(gauche, droite) {
-  const rangee = document.createElement('section');
-  rangee.className = 'ld-rang ld-rang--ajout';
-  gauche.classList.add('ld-k-champ');
-  const cell = document.createElement('div');
-  cell.className = 'ld-cell';
-  cell.append(droite);
-  rangee.append(gauche, cell);
-  return rangee;
-}
-
-
-function renderLigneDetail() {
-  const r = completerFiche(ligneDuTiroir());
-  if (!r) { closeLigneDetail(); return; }
-  // Ce que l'employé a tapé sans l'enregistrer doit traverser la reconstruction.
-  ldCapturerSaisie();
-  ldValeursRendues = {};
-  // `.ld-body` est le conteneur qui défile, et replaceChildren() le détruit :
-  // on relève sa position pour la reposer sur le corps reconstruit, sinon la
-  // fiche remonte en haut à chaque enregistrement alors qu'on travaillait tout
-  // en bas. Le navigateur borne lui-même la valeur au défilement réellement
-  // disponible, donc un contenu plus court retombe naturellement.
-  const oldBody = ligneDrawerCard.querySelector('.ld-body');
-  const prevScrollTop = oldBody ? oldBody.scrollTop : 0;
-  ligneDrawerCard.replaceChildren();
-
-  const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
-  const delai = tempsRestant(r.deadline, fiche.heureSouhaitee);
-
-  // --- En-tête ---------------------------------------------------------------
-  const head = document.createElement('header');
-  head.className = 'ld-head';
-
-  const titles = document.createElement('div');
-  titles.className = 'ld-head__titles';
-  const eyebrow = document.createElement('p');
-  eyebrow.className = 'ld-eyebrow';
-  eyebrow.textContent = [fiche.ref, fiche.source].filter(Boolean).join(' • ')
-    || stageDestinationLabel(r.stage, r.sub_stage ?? null);
-  const titre = document.createElement('h2');
-  titre.className = 'ld-title';
-  titre.textContent = [r.billing_company || 'Sans nom', r.product].filter(Boolean).join(' — ');
-  titles.append(eyebrow, titre);
-
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'ld-close';
-  close.setAttribute('aria-label', 'Fermer la fiche');
-  close.appendChild(strokeIcon(['M18 6L6 18', 'M6 6l12 12']));
-  close.addEventListener('click', closeLigneDetail);
-
-  const actions = document.createElement('div');
-  actions.className = 'ld-head__actions';
-  // L'EN-TÊTE NE PORTE PLUS D'ACTIONS (28/08). Charlie, en les désignant :
-  // « supprime ça ». Quatre boutons — Dupliquer, Vers Fiverr, Récap complet,
-  // Email — au-dessus d'un tableau qu'on vient lire et corriger : ils prenaient
-  // la première rangée de l'écran pour des gestes qu'on fait une fois par mois.
-  //
-  // RIEN N'EST PERDU. Dupliquer et « envoyer vers Fiverr » vivaient DÉJÀ sur la
-  // ligne du planning (au survol, colonne de droite) : l'en-tête les doublait.
-  // Le récapitulatif et l'e-mail, eux, n'existaient qu'ici — ils descendent
-  // dans le tableau, en bas, comme deux valeurs qu'on clique (voir plus bas).
-  // Ce qui reste dans l'en-tête est la seule chose qu'on fait DEPUIS la fiche :
-  // la fermer.
-  actions.append(close);
-  head.append(titles, actions);
-  ligneDrawerCard.appendChild(head);
-
-  // --- Corps ------------------------------------------------------------------
-  const body = document.createElement('div');
-  body.className = 'ld-body';
-
-  const cClient = ldSuivi('client', ldChamp(r.billing_company, { label: 'Client' }), r.billing_company);
-  const cProjet = ldSuivi('projet', ldChamp(r.product, { label: 'Projet' }), r.product);
-  const cPriorite = ldSuivi('priorite', ldSelect(
-    [3, 2, 1].map((i) => ({ value: i, label: PRIORITY_LEVELS[i].label })),
-    prioBand(r), 'Priorité',
-  ), prioBand(r));
-  const dateIso = String(r.deadline || '').slice(0, 10);
-  const cDate = ldSuivi('date', ldChamp(dateIso, { type: 'date', label: 'Date de remise' }), dateIso);
-  // Pas de 14:00 pré-rempli : ouvrir puis enregistrer une fiche gravait alors
-  // une heure de remise que le client n'avait jamais demandée, et la carte
-  // l'annonçait ensuite comme une promesse (« Remise client : … à 14h00 »).
-  // Le calcul du délai, lui, prend déjà 14 h par défaut de son côté.
-  const cHeure = ldSuivi('heure',
-    ldChamp(fiche.heureSouhaitee || '', { type: 'time', label: 'Heure de remise' }),
-    fiche.heureSouhaitee || '');
-  const cPrix = ldSuivi('prix', ldChamp(r.project_value == null ? '' : r.project_value, {
-    type: 'number', step: '0.01', inputMode: 'decimal',
-    placeholder: 'à chiffrer', label: 'Valeur TTC',
-  }), r.project_value == null ? '' : r.project_value);
-  // LE COÛT DE REVIENT. Il se remplit tout seul quand le dossier vient de
-  // « Nouveau Projet » (le moteur connaît les prix d'achat et les temps) ; au
-  // comptoir, le moteur V9 sort un PRIX sans dire ce qu'il coûte — il faut donc
-  // pouvoir le saisir, sinon la marge de ces dossiers reste à jamais vide.
-  // Réservé à la Direction : c'est la donnée qui dit ce que l'atelier gagne.
-  const cCout = ldSuivi('cout', ldChamp(r.cout_revient == null ? '' : r.cout_revient, {
-    type: 'number', step: '0.01', inputMode: 'decimal',
-    placeholder: 'coût inconnu', label: 'Coût de revient',
-  }), r.cout_revient == null ? '' : r.cout_revient);
-  // LA DATE PRÉVUE ≠ LA DATE SOUHAITÉE. Celle du client est une promesse ;
-  // celle-ci est le jour où l'atelier compte vraiment le faire. Les confondre,
-  // c'est déplacer une promesse en croyant déplacer un planning.
-  const cPrevue = ldSuivi('prevue',
-    ldChamp(jourSeul(r.date_prevue), { type: 'date', label: 'Prévu à l’atelier' }), jourSeul(r.date_prevue));
-  // LE CRÉNEAU DE RETRAIT (§22). L'heure vivait dans le JSON de la fiche :
-  // illisible depuis la liste, donc inutilisable pour préparer une journée de
-  // retraits.
-  const cCreneau = ldSuivi('creneau',
-    ldChamp(r.retrait_creneau || '', { type: 'time', label: 'Créneau de retrait' }), r.retrait_creneau || '');
-  // D'OÙ VIENT LA DEMANDE (§8). C'est la seule information qui dit où mettre
-  // l'effort, et elle ne se retrouve nulle part une fois la demande passée.
-  const cProvenance = ldSuivi('provenance', ldSelect(
-    [{ value: '', label: 'Provenance : non dite' },
-      ...PROVENANCES.map((v) => ({ value: v, label: v }))],
-    r.provenance || '', 'Provenance de la demande'), r.provenance || '');
-
-  const cProduction = ldSuivi('production',
-    ldChamp(fiche.production, { placeholder: 'À définir', label: 'Production' }), fiche.production);
-  // LA CONSIGNE POUR L'ATELIER. Elle s'écrivait surtout depuis le ticket ouvert
-  // sur la ligne — le ticket est parti le 28/08, et son intitulé promettait
-  // encore une impression qui n'existe plus. Elle vit ici, avec le reste du
-  // dossier, et elle voyage toujours dans la liste allégée (FICHE_LISTE) : la
-  // grille marque d'un point les dossiers qui parlent à l'atelier.
-  const cAtelier = ldSuivi('atelier',
-    ldChamp(fiche.atelier, {
-      multi: true, rows: 2, label: 'Consigne pour l’atelier',
-      placeholder: 'Ce qu’il faut savoir avant de couper',
-    }), fiche.atelier);
-  const cInfos = ldSuivi('infos',
-    ldChamp(r.description, { multi: true, rows: 3, label: 'Informations / commentaire' }), r.description);
-  // Téléphone et e-mail ne vivaient que dans un popover du tableau complet :
-  // depuis les cartes, on ne pouvait ni les lire, ni les corriger, ni prévenir
-  // le client. Ils rejoignent la fiche, avec la pastille WhatsApp.
-  const cTel = ldSuivi('tel',
-    ldChamp(r.contact_phone, { type: 'tel', inputMode: 'tel', placeholder: 'téléphone', label: 'Téléphone' }),
-    r.contact_phone);
-  const cEmail = ldSuivi('email',
-    ldChamp(r.contact_email, { type: 'email', inputMode: 'email', placeholder: 'e-mail', label: 'E-mail' }),
-    r.contact_email);
-
-  const prodBloc = ldProduction(r);
-
-  const remise = document.createElement('div');
-  remise.className = 'ld-duo';
-  remise.append(cDate, cHeure);
-
-  const contact = document.createElement('div');
-  contact.className = 'ld-duo';
-  contact.append(cTel, cEmail);
-  const contactBloc = document.createElement('div');
-  contactBloc.append(contact, cellWhatsapp(r));
-
-  // Les champs de tête restent SOUS LES YEUX, comme sur l'écran du patron : ce
-  // sont ceux qu'on corrige au téléphone, avec le client en ligne. Seuls les
-  // deux longs pavés du bas se replient (voir plus loin).
-  body.append(
-    ldBox('Client', cClient),
-    ldBox('Type de client', typeControl(r)),
-    ldBox('Contact', contactBloc),
-    ldBox('Projet', cProjet),
-    ldBox('Étape actuelle', ldValeur(stageDestinationLabel(r.stage, r.sub_stage ?? null))),
-    // L'ALERTE, ENFIN ACCESSIBLE. Sur les cartes on lisait « Bloquée » sans
-    // pouvoir savoir pourquoi ni y remédier : le contrôle n'existait que dans le
-    // tableau complet, qui est éteint par défaut. Il est ici, avec son motif.
-    ldBox('État', flagControl(r, null)),
-    ldBox('Qui suit', respControl(r)),
-    ldBox('Priorité', cPriorite),
-    ldBox('Remise au client', remise),
-    ldBox('À terminer avant', ldValeur(`${delai.echeanceTexte} — ${delai.texte} restant`)),
-    ldBox('Valeur TTC', cPrix),
-    // LE COÛT JUSTE APRÈS LE PRIX, et seulement pour qui peut le voir : c'est
-    // côte à côte qu'ils se lisent (« 850 pour 300, ça va »). Affiché aux
-    // autres, il serait vide — le serveur le retire de la réponse — et son
-    // enregistrement refusé : une case qu'on remplit pour rien est pire que pas
-    // de case du tout.
-    ...(puisJe('marge') ? [ldBox('Coût de revient', cCout)] : []),
-    ldBox('Prévu à l’atelier', cPrevue),
-    ldBox('Créneau de retrait', cCreneau),
-    ldBox('Provenance', cProvenance),
-    ldBox('Production', cProduction),
-    // CE QU'IL Y A À PRODUIRE VIENT APRÈS LE DOSSIER, jamais au milieu. Posé
-    // entre le coût et la date d'atelier, son bandeau coupait la logistique en
-    // deux : « Créneau de retrait » se retrouvait sous « Faces à marquer ».
-    // Un tableau se lit par blocs, et un bloc ne s'interrompt pas.
-    ...prodBloc,
-    ldBox('Consigne atelier', cAtelier, true),
-    ldBox('Informations', cInfos, true),
-  );
-
-  // --- Documents et paiement : deux encadrés en plus de l'écran du patron -----
-  // Les pièces jointes (devis, facture, BAT) et le suivi du paiement n'existent
-  // que dans le CRM. Les retirer pour « coller à la maquette » ferait perdre
-  // des fonctions dont l'atelier se sert : ils prennent leur place ici.
-  const docs = document.createElement('div');
-  docs.className = 'ld-docs';
-  docs.append(cellPdfSlot(r, 'devis'), cellPdfSlot(r, 'facture'), cellPdfSlot(r, 'bat'));
-  body.append(ldBox('Documents', docs, true));
-
-  // LE PAIEMENT EST FAIT DE PAIRES, comme le reste : « Acompte demandé | Non ».
-  // Il vivait dans une seule cellule, sous forme de quatre encadrés arrondis
-  // empilés — un îlot d'un autre écran au milieu du tableau. Ce sont quatre
-  // rangées, sous leur bandeau, exactement comme les tailles.
-  const bascule = (champ, libelle) => ldChip(
-    (b) => {
-      const on = r[champ] === true;
-      b.className = `ld-toggle${on ? ' is-on' : ''}`;
-      b.setAttribute('role', 'switch');
-      b.setAttribute('aria-checked', String(on));
-      b.textContent = on ? 'Oui' : (r[champ] === false ? 'Non' : '—');
-      attachTip(b, on ? `retirer « ${libelle} »` : `marquer « ${libelle} »`);
-    },
-    () => ldPatch(r, { [champ]: r[champ] !== true }),
-  );
-  body.append(
-    ldBande('Paiement'),
-    ldBox('Acompte demandé', bascule('acompte_demande', 'acompte demandé')),
-    ldBox('Acompte versé', bascule('acompte_verse', 'acompte versé')),
-    ldBox('Payé / soldé', bascule('paye', 'payé')),
-  );
-  const modeChip = ldChip(
-    (b) => {
-      const m = PAIEMENT_MODES.find((x) => x.id === r.paiement_mode);
-      b.className = 'sub-chip' + (m ? '' : ' empty');
-      b.textContent = m ? m.label : '+ mode';
-      attachTip(b, 'mode de paiement');
-    },
-    (b) => {
-      const items = PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }));
-      items.push({ value: null, label: 'Non précisé', muted: true });
-      openMenu(b, items, r.paiement_mode ?? null, (val) => {
-        if ((val ?? null) === (r.paiement_mode ?? null)) return;
-        ldPatch(r, { paiement_mode: val });
-      });
-    },
-  );
-  body.append(ldBox('Mode de règlement', modeChip));
-
-  // LES DEUX SORTIES DU DOSSIER, en bas du tableau. Elles occupaient deux
-  // boutons de l'en-tête, au-dessus de tout ce qu'on vient lire, pour des
-  // gestes qu'on fait une fois de temps en temps. Ici ce sont deux mots qu'on
-  // clique — la même grammaire que « Non » ou « + mode ».
-  const sortie = (libelle, quoi, faire) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'ld-sortie';
-    b.textContent = libelle;
-    attachTip(b, quoi);
-    b.addEventListener('click', () => faire());
-    return b;
-  };
-  const sorties = document.createElement('div');
-  sorties.append(
-    sortie('Récap complet', 'Télécharger le récapitulatif du dossier', () => telechargerRecap(r)),
-    // ENVOYER PAR EMAIL (§19). Même principe que la pastille WhatsApp : on OUVRE
-    // le message tout écrit, on n'envoie rien. C'est l'employé qui relit et qui
-    // appuie — un logiciel qui écrit au client tout seul est un logiciel qu'on
-    // n'ose plus utiliser.
-    sortie('Email au client', 'Ouvrir un message tout écrit — rien ne part tout seul',
-      () => envoyerParEmail(r)),
-  );
-  body.append(ldBox('Sortir le dossier', sorties));
-
-  // --- LE DOSSIER : ses articles, ses étapes, sa prochaine action --------------
-  // C'est la « page projet » du §10, posée LÀ où la commande s'ouvre déjà —
-  // plutôt qu'un écran de plus à atteindre. Elle ne s'affiche que si la ligne
-  // appartient à un dossier ou porte des étapes : sur une commande d'un seul
-  // article sans liste d'étapes, il n'y aurait rien à montrer.
-  const dossierEl = document.createElement('div');
-  dossierEl.className = 'ld-dossier';
-  body.append(dossierEl);
-  chargerDossier(r, dossierEl);
-
-  // --- Historique (replié) ------------------------------------------------------
-  // L'application ne tient pas de journal des modifications : on affiche ce
-  // qu'on sait vraiment, la naissance de la ligne et sa dernière retouche,
-  // plutôt qu'un historique inventé.
-  // Replié comme le détail complet : c'est un pavé qu'on consulte de temps en
-  // temps, pas une information de travail. Déplié en permanence, il repousserait
-  // les champs qu'on corrige vraiment hors de l'écran.
-  const histoLignes = [
-    fiche.creeLe || r.created_at ? `Créée le ${horodatageFr(fiche.creeLe || r.created_at)}${fiche.source ? ` depuis ${fiche.source}` : ''}` : null,
-    r.updated_at ? `Dernière modification le ${horodatageFr(r.updated_at)}` : null,
-  ].filter(Boolean);
-  const histoBox = document.createElement('div');
-  histoBox.className = 'ld-journal';
-  histoBox.append(...histoLignes.map(ldValeur));
-  // Le journal des modifications (étape, état, prix, échéance…) arrive du
-  // serveur : on annonce l'attente plutôt que d'afficher un vide qui se lirait
-  // comme « rien n'a jamais bougé ».
-  const journalEl = document.createElement('div');
-  journalEl.className = 'ld-journal__liste';
-  journalEl.appendChild(ldValeur('Chargement du journal…'));
-  histoBox.appendChild(journalEl);
-  body.append(ldVolet('Historique', histoLignes[0] || '—', [histoBox], true));
-  chargerJournal(r.id, journalEl);
-
-  // --- Détail complet, modifiable, replié ---------------------------------------
-  // Le récapitulatif du comptoir fait des dizaines de lignes : déplié, il pousse
-  // tout le reste de la fiche hors de l'écran. On l'ouvre quand on en a besoin.
-  let champsDetail = null;
-  if (fiche.fichePartielle) {
-    // Le détail arrive dans un instant (voir openLigneDetail) : on l'annonce
-    // plutôt que d'afficher « non enregistré », qui serait faux.
-    body.append(ldVolet('Prise de commande', 'Chargement…', ldValeur('Un instant…'), true));
-  } else if (fiche.kind === 'comptoir-v17') {
-    const bloc = ldBlocDetail(r);
-    if (bloc) { champsDetail = bloc.champs; body.append(...bloc.rangees); }
-  } else {
-    const items = ficheItems(r.fiche);
-    body.append(ldVolet(
-      'Détail complet',
-      items && items.length ? `${items.length} article${items.length > 1 ? 's' : ''}` : 'Non enregistré',
-      items && items.length ? items : ldValeur('Cette commande a été créée avant l’enregistrement du détail complet.'),
-      true,
-    ));
-  }
-
-  // --- Historique du client -----------------------------------------------------
-  const histoClient = ldBlocHistoriqueClient(r);
-  if (histoClient) body.append(histoClient);
-
-  ligneDrawerCard.appendChild(body);
-
-  // --- Pied : où va la ligne, qui la suit, et on enregistre --------------------
-  const pied = document.createElement('footer');
-  pied.className = 'ld-foot';
-  const placeActuelle = `${r.stage}|${r.sub_stage || ''}`;
-  const cPlace = ldSuivi('place',
-    ldSelect(placesDuPipeline(placeActuelle), placeActuelle, 'Étape de la commande'), placeActuelle);
-  const cReferent = ldSuivi('referent', ldSelect(
-    [{ value: '', label: 'Référent : personne' }, ...EMPLOYEES.map((n) => ({ value: n, label: `Référent : ${n}` }))],
-    r.referent || '', 'Référent',
-  ), r.referent || '');
-  // PLUS DE BOUTON « ENREGISTRER » (28/08). Charlie : « je clique sur la ligne,
-  // elle s'ouvre façon tableau et je peux tout modifier ULTRA RAPIDEMENT ».
-  // C'est la règle de la GRILLE — une cellule quittée est une cellule
-  // enregistrée — et plus celle d'un formulaire. Le bouton coûtait un geste de
-  // visée à chaque correction, et surtout il laissait croire qu'on pouvait
-  // fermer la fiche sans rien perdre alors que tout partait d'un bloc.
-  //
-  // Un seul écouteur, DÉLÉGUÉ sur la carte : `change` remonte de tous les
-  // champs, ne se déclenche que si la valeur a bougé, et n'arrive qu'une fois
-  // le champ quitté. `enregistrerFiche` n'envoie de toute façon QUE ce qui
-  // diffère de la valeur rendue (voir ldSuivi), donc un champ part seul.
-  //
-  // LA NOTE EST LA SEULE EXCEPTION : elle s'AJOUTE aux informations, et une
-  // note ajoutée deux fois ne se retire pas. Elle garde donc son geste à elle.
-  const note = ldChamp('', {
-    multi: true, rows: 2,
-    placeholder: 'Ajouter une note de production, une information client ou un point de contrôle…',
-    label: 'Ajouter une note',
-  });
-  note.className += ' ld-note';
-  ldSuivi('note', note, '');
-  const champs = {
-    cClient, cProjet, cPriorite, cDate, cHeure, cPrix, cCout, cPrevue, cCreneau, cProvenance,
-    cProduction, cAtelier, cInfos,
-    cTel, cEmail, cPlace, cReferent, note, champsDetail,
-  };
-  const commettre = async () => {
-    // CE QUI AVAIT LE FOCUS DOIT LE RETROUVER. L'enregistrement reconstruit la
-    // fiche : sans ce repère, corriger un champ renvoyait le clavier sur
-    // <body>, et le champ suivant se visait à la souris.
-    const actif = document.activeElement;
-    const cle = actif && actif.dataset ? actif.dataset.ldKey : null;
-    try {
-      await enregistrerFiche(r, champs);
-      ldRefresh(r);
-      if (cle) {
-        const repris = ligneDrawerCard.querySelector(`[data-ld-key=${cle}]`);
-        if (repris && document.activeElement === document.body) repris.focus();
-      }
-    } catch (err) {
-      reportError(err);
-    }
-  };
-  // LA NOTE NE PART PAS TOUTE SEULE : elle s'AJOUTE aux informations, et une
-  // note ajoutée deux fois ne se retire pas. Elle garde donc son geste à elle.
-  const ajouterNote = document.createElement('button');
-  ajouterNote.type = 'button';
-  ajouterNote.className = 'ld-save';
-  ajouterNote.textContent = 'Ajouter la note';
-  ajouterNote.addEventListener('click', async () => {
-    if (!note.value.trim()) { showToast('Rien à ajouter — la note est vide.'); return; }
-    ajouterNote.disabled = true;
-    try { await commettre(); } finally { ajouterNote.disabled = false; }
-  });
-  // L'ÉCOUTEUR SE POSE UNE FOIS, dans ensureLigneDrawer : la carte du tiroir
-  // survit à tous les rendus, un abonnement par rendu enverrait le champ autant
-  // de fois que la fiche a été redessinée. On lui laisse ici la fonction du
-  // rendu COURANT — jamais une fonction figée à la première ouverture.
-  ldCommettre = commettre;
-
-  const barre = document.createElement('div');
-  barre.className = 'ld-foot__row';
-  barre.append(cPlace, cReferent, ajouterNote);
-  pied.append(barre, note);
-  ligneDrawerCard.appendChild(pied);
-
-  // Les corrections tapées et pas encore enregistrées reviennent par-dessus les
-  // valeurs fraîchement rendues : une reconstruction ne fait plus perdre la
-  // saisie en cours.
-  ldAppliquerSaisie();
-
-  body.scrollTop = prevScrollTop;
-}
 
 // Libellés du journal (miroir de JOURNAL_FIELDS côté serveur) et mise en mots
 // des valeurs brutes : « production » ne veut rien dire dans une fiche, « Étape :
@@ -5626,146 +4343,6 @@ function renderLigneDetail() {
 const PROVENANCES = ['Passage', 'Bouche-à-oreille', 'Client existant', 'Instagram',
   'Facebook', 'Téléphone', 'Site web'];
 
-// Une colonne `date` revient en objet Date selon le pilote : le champ HTML
-// n'accepte que « aaaa-mm-jj ». Sans cette coupe, le champ restait vide alors
-// que la date était bien en base.
-const jourSeul = (v) => (v ? String(v).slice(0, 10) : '');
-
-const JOURNAL_LABELS = {
-  stage: 'Étape', sub_stage: 'Sous-étape', flag: 'État', flag_reason: 'Motif',
-  priority: 'Priorité', project_value: 'Prix TTC', deadline: 'Date souhaitée',
-  responsable: 'Pilote', referent: 'Référent',
-  quantity: 'Quantité', product: 'Désignation',
-  acompte_demande: 'Acompte demandé', acompte_verse: 'Acompte reçu',
-  acompte_montant: 'Montant de l’acompte', paye: 'Payé', paiement_mode: 'Mode de règlement',
-  fiche_heure: 'Heure de retrait', fiche_detail: 'Détail de la fiche',
-  fiche_atelier: 'Consigne atelier',
-  archive: 'Archivage',
-};
-
-function journalValeur(field, brut) {
-  if (brut == null || brut === '') return '—';
-  if (field === 'stage') return STAGE_LABEL[brut] || brut;
-  if (field === 'sub_stage') return SUB_LABEL[brut] || brut;
-  if (field === 'flag') return FLAG_BY_VALUE[brut] ? FLAG_BY_VALUE[brut].label : brut;
-  if (field === 'priority') return PRIORITY_LEVELS[brut] ? PRIORITY_LEVELS[brut].label : brut;
-  // Même écriture que sur les cartes (centimes toujours affichés) : « 99,5 € »
-  // dans un journal de prix se lit comme une valeur tronquée.
-  if (field === 'project_value') {
-    const n = Number(brut);
-    return Number.isFinite(n) ? eur(n) : String(brut);
-  }
-  if (field === 'deadline') return dateFr(brut);
-  if (field === 'paye') return brut === 'true' ? 'oui' : 'non';
-  return String(brut);
-}
-
-// LE DOSSIER — les articles voisins, les étapes de celui-ci, la prochaine action.
-//
-// Trois questions auxquelles la fiche ne savait pas répondre : « qu'est-ce qu'il
-// y a d'autre dans cette commande ? », « où en est CET article ? », « qu'est-ce
-// qu'il faut faire ensuite ? ». La troisième est celle que le patron appelle
-// « très importante » : l'objectif est qu'un projet ne puisse pas être oublié.
-async function chargerDossier(r, hote) {
-  let taches = [];
-  let projet = null;
-  try {
-    [taches, projet] = await Promise.all([
-      api('GET', `/api/requests/${r.id}/taches`),
-      r.project_id ? api('GET', `/api/projets/${r.project_id}`) : Promise.resolve(null),
-    ]);
-  } catch (_) {
-    // Le dossier est un CONFORT : son absence ne doit pas amputer la fiche, qui
-    // porte déjà tout ce qui permet de travailler.
-    return;
-  }
-  if (!hote.isConnected) return;
-  const morceaux = [];
-
-  // 1. LA PROCHAINE ACTION, en tête et en clair. Elle vaut pour tout le dossier.
-  if (projet) {
-    const pa = document.createElement('div');
-    pa.className = 'ld-pa';
-    const champ = document.createElement('input');
-    champ.type = 'text';
-    champ.className = 'ld-pa__champ';
-    champ.placeholder = 'Prochaine action — relancer le client, commander le textile…';
-    champ.value = projet.action || '';
-    champ.maxLength = 160;
-    // À LA PERTE DU FOCUS, jamais à la frappe : reconstruire la fiche à chaque
-    // touche reprendrait le champ sous les doigts et perdrait le curseur.
-    champ.addEventListener('change', async () => {
-      try { await api('PATCH', `/api/projets/${projet.id}`, { action: champ.value.trim() || null }); }
-      catch (err) { reportError(err); }
-    });
-    pa.append(champ);
-    morceaux.push(ldVolet('Prochaine action', projet.action || 'Aucune — le dossier peut s’oublier', [pa], true));
-  }
-
-  // 2. LES AUTRES ARTICLES du même dossier. « Je peux produire les casquettes
-  //    mais pas les mugs » : encore faut-il voir les deux.
-  if (projet && Array.isArray(projet.articles) && projet.articles.length > 1) {
-    const liste = document.createElement('div');
-    liste.className = 'ld-articles';
-    for (const a of projet.articles) {
-      const l = document.createElement('div');
-      l.className = 'ld-article' + (a.id === r.id ? ' is-moi' : '');
-      l.append(
-        ldValeur(`${a.quantity ? `${a.quantity} × ` : ''}${a.product || 'Sans désignation'}`),
-        ldValeur(SUB_LABEL[a.sub_stage] || STAGE_LABEL[a.stage] || ''),
-      );
-      liste.append(l);
-    }
-    morceaux.push(ldVolet(
-      'Articles du dossier', `${projet.articles.length} articles`, [liste], true,
-    ));
-  }
-
-  // 3. LES ÉTAPES de CET article — et de quoi en poser si la liste est vide.
-  const etapes = document.createElement('div');
-  etapes.className = 'ld-taches';
-  if (taches.length) {
-    for (const t of taches) {
-      const l = document.createElement('div');
-      l.className = 'ld-tache' + (t.fait ? ' is-faite' : '');
-      const marque = t.fait ? '✓' : '·';
-      const compte = t.qte_faite != null
-        ? ` — ${t.qte_faite}${t.qte_prevue != null ? `/${t.qte_prevue}` : ''}${t.perte ? `, ${t.perte} perdue${t.perte > 1 ? 's' : ''}` : ''}`
-        : '';
-      l.append(ldValeur(`${marque} ${t.libelle}${t.qui ? ` · ${t.qui}` : ''}${compte}`));
-      etapes.append(l);
-    }
-  } else {
-    etapes.append(ldValeur('Aucune étape posée. Choisis un modèle pour en poser une liste.'));
-  }
-  // Poser une liste d'étapes est un geste de CHEF D'ATELIER : c'est lui qui
-  // organise la production. On ne propose pas le choix à qui se le verrait
-  // refuser par le serveur.
-  if (puisJe('production')) {
-    const choix = document.createElement('select');
-    choix.className = 'ld-modeles';
-    choix.append(new Option('Poser une liste d’étapes…', ''));
-    for (const m of MODELES) choix.append(new Option(m.nom, m.id));
-    choix.addEventListener('change', async () => {
-      if (!choix.value) return;
-      try {
-        await api('POST', `/api/requests/${r.id}/taches`, { modele: choix.value });
-        showToast('Étapes posées.');
-        chargerDossier(r, hote);
-      } catch (err) { reportError(err); }
-      choix.value = '';
-    });
-    etapes.append(choix);
-  }
-  const faites = taches.filter((t) => t.fait).length;
-  morceaux.push(ldVolet(
-    'Étapes de cet article',
-    taches.length ? `${faites}/${taches.length} faites` : 'aucune',
-    [etapes], true,
-  ));
-
-  hote.replaceChildren(...morceaux);
-}
 
 // Les modèles d'étapes, lus UNE fois : ce sont quatre listes de mots qui ne
 // changent qu'aux Réglages, pas à chaque ouverture de fiche.
@@ -5795,137 +4372,12 @@ function envoyerParEmail(r) {
     + `?subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(coupe)}`;
 }
 
-// Va chercher ce qui a changé sur cette commande et l'écrit dans l'Historique.
-//
-// Le journal dit maintenant QUI — le prénom que le poste s'est donné, envoyé à
-// chaque écriture. C'est DÉCLARATIF, pas une preuve : l'application n'a toujours
-// qu'un mot de passe commun, et n'importe quel poste peut se dire n'importe qui.
-// La note du bas le rappelle, parce qu'un nom affiché sans réserve se lit comme
-// une certitude — et il ne faut pas qu'une ligne d'historique serve à accuser
-// quelqu'un. Un poste qui ne s'est pas nommé n'ajoute simplement rien.
-async function chargerJournal(id, hote) {
-  let lignes = [];
-  try {
-    lignes = await api('GET', `/api/requests/${id}/journal`);
-  } catch (_) {
-    hote.replaceChildren(ldValeur('Journal indisponible — vérifie la connexion.'));
-    return;
-  }
-  if (!hote.isConnected) return;
-  if (!Array.isArray(lignes) || !lignes.length) {
-    hote.replaceChildren(ldValeur('Aucune modification enregistrée depuis la mise en service du journal.'));
-    return;
-  }
-  const items = lignes.map((l) => {
-    const par = l.who ? ` · ${l.who}` : '';
-    // L'ARCHIVAGE se raconte, il ne se compare pas : « Archivage : — → Retirée
-    // du planning » serait du charabia pour un geste qui n'a pas d'avant.
-    const corps = l.field === 'archive'
-      ? journalValeur(l.field, l.value_after)
-      : `${JOURNAL_LABELS[l.field] || l.field} : `
-        + `${journalValeur(l.field, l.value_before)} → ${journalValeur(l.field, l.value_after)}`;
-    return ldValeur(`${horodatageFr(l.created_at)}${par} — ${corps}`);
-  });
-  const note = ldValeur('Le prénom est celui que le poste s’est donné : il dit qui a saisi, il ne le prouve pas.');
-  note.className += ' ld-journal__note';
-  hote.replaceChildren(...items, note);
-}
 
 const horodatageFr = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('fr-FR');
 };
 
-// Applique en une fois tout ce que la fiche a modifié : les colonnes de la
-// ligne, la place dans le pipeline, le détail du comptoir, et la note ajoutée.
-// Un seul geste pour l'employé, un aller-retour par nature de donnée.
-async function enregistrerFiche(r, c) {
-  const nombre = (v) => {
-    const t = String(v == null ? '' : v).trim().replace(',', '.');
-    if (t === '') return null;
-    const n = Number(t);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-  const texte = (v) => {
-    const t = String(v == null ? '' : v).trim();
-    return t === '' ? null : t;
-  };
-
-  // ON N'ENVOIE QUE CE QUI A CHANGÉ. La fiche renvoyait tout son formulaire d'un
-  // bloc : ouvrir une commande, la laisser deux minutes à l'écran et cliquer
-  // « Enregistrer » remettait alors les valeurs d'origine par-dessus le travail
-  // d'un collègue — y compris l'étape, si l'atelier venait de faire avancer la
-  // commande. Chaque contrôle est comparé à la valeur avec laquelle il a été
-  // rendu (voir ldSuivi) : ce qu'on n'a pas touché ne part pas.
-  const corps = {};
-  if (ldModifie(c.cClient)) corps.billing_company = texte(c.cClient.value);
-  if (ldModifie(c.cProjet)) corps.product = texte(c.cProjet.value);
-  if (ldModifie(c.cPriorite)) corps.priority = Number(c.cPriorite.value);
-  if (ldModifie(c.cDate)) corps.deadline = texte(c.cDate.value);
-  if (ldModifie(c.cPrix)) corps.project_value = nombre(c.cPrix.value);
-  if (c.cCout && ldModifie(c.cCout)) corps.cout_revient = nombre(c.cCout.value);
-  if (ldModifie(c.cPrevue)) corps.date_prevue = texte(c.cPrevue.value);
-  if (ldModifie(c.cCreneau)) corps.retrait_creneau = texte(c.cCreneau.value);
-  if (ldModifie(c.cProvenance)) corps.provenance = texte(c.cProvenance.value);
-  if (ldModifie(c.cTel)) corps.contact_phone = texte(c.cTel.value);
-  if (ldModifie(c.cEmail)) corps.contact_email = texte(c.cEmail.value);
-  if (ldModifie(c.cReferent)) corps.referent = c.cReferent.value || null;
-  if (ldModifie(c.cPlace)) {
-    const [stage, sub] = c.cPlace.value.split('|');
-    corps.stage = stage;
-    corps.sub_stage = sub || null;
-  }
-
-  // La note s'AJOUTE aux informations, elle ne les remplace pas : on n'efface
-  // jamais ce qu'un collègue avait écrit. Si le pavé d'infos n'a pas été touché,
-  // on repart de sa valeur À JOUR (celle de la ligne) et non de ce que la fiche
-  // affichait — c'est là que se perdait la note d'un collègue.
-  const noteAjoutee = texte(c.note.value);
-  const infosModifiees = ldModifie(c.cInfos);
-  if (infosModifiees || noteAjoutee) {
-    const base = infosModifiees ? texte(c.cInfos.value) : texte(r.description);
-    corps.description = noteAjoutee
-      ? [base, `${horodatageFr(new Date().toISOString())} — ${noteAjoutee}`].filter(Boolean).join('\n')
-      : base;
-  }
-
-  let touche = false;
-  if (Object.keys(corps).length) {
-    const maj = await api('PATCH', `/api/requests/${r.id}`, corps);
-    Object.assign(r, maj);
-    memoriserFiche(maj);
-    touche = true;
-  }
-
-  // L'heure de retrait, le secteur de production et le détail du comptoir
-  // vivent dans `fiche` : seconde route, qui ne touche qu'aux valeurs et jamais
-  // aux libellés.
-  const corpsFiche = {};
-  if (ldModifie(c.cHeure)) corpsFiche.heureSouhaitee = texte(c.cHeure.value);
-  if (ldModifie(c.cProduction)) corpsFiche.production = texte(c.cProduction.value);
-  if (ldModifie(c.cAtelier)) corpsFiche.atelier = texte(c.cAtelier.value);
-  if (c.champsDetail) {
-    const detail = [...c.champsDetail.client, ...c.champsDetail.details];
-    // Le récapitulatif s'envoie par positions : dès qu'UNE ligne bouge, on
-    // renvoie les deux listes complètes — mais telles qu'elles sont à l'écran,
-    // donc déjà recalées sur la dernière version connue de la fiche.
-    if (detail.some(ldModifie)) {
-      corpsFiche.client = c.champsDetail.client.map((x) => x.value);
-      corpsFiche.details = c.champsDetail.details.map((x) => x.value);
-    }
-  }
-  if (Object.keys(corpsFiche).length) {
-    const majFiche = await api('PATCH', `/api/requests/${r.id}/fiche`, corpsFiche);
-    Object.assign(r, majFiche);
-    memoriserFiche(majFiche);
-    touche = true;
-  }
-
-  // Tout est parti : la saisie en cours n'a plus lieu d'être conservée.
-  ldOublierSaisie();
-  if (touche) await loadCounts();
-  return touche;
-}
 
 // Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
 // cellule Dossier. C'est LUI qui ouvre la bulle récapitulative — comme le ↗ de
@@ -6613,7 +5065,7 @@ async function removeRow(r) {
   // La commande ouverte HORS de la liste ne peut pas « disparaître de la
   // grille » : elle n'y est pas. On ferme sa fiche, sinon on resterait devant un
   // dossier supprimé, en apparence intact.
-  if (ligneHorsListe && String(ligneHorsListe.id) === String(r.id)) closeLigneDetail();
+  if (ligneHorsListe && String(ligneHorsListe.id) === String(r.id)) fermerFicheAtelier();
   // Ligne pas encore créée côté serveur : on l'enlève localement et on marque
   // l'id temporaire — si son POST de création est encore en vol, finalizeCreate
   // supprimera la commande orpheline à la réponse.
@@ -7896,8 +6348,8 @@ let lastRowsSig = '';
 // écraserait. Compter n'importe quel champ de la page gelait le planning du
 // poste dès qu'on laissait le curseur dans la recherche de la barre du haut —
 // les compteurs du rail continuaient de bouger, eux, et l'écran se contredisait.
-// Le tiroir de détail a sa propre garde (isDrawerBusy) et conserve désormais les
-// valeurs en cours de saisie à travers un re-rendu (voir renderLigneDetail).
+// La fiche atelier a sa propre garde (ficheAtelierOccupee) : elle est montée sur
+// <body>, donc hors de tout ce que compte isInteracting().
 function isInteracting() {
   if (dragState) return true;
   if (openCalendar) return true; // popup ancré à un badge de la grille
@@ -7934,7 +6386,7 @@ function rafraichirTemps() {
     invalidateRowCache();
     // Le tiroir n'est PAS reconstruit ici : il porte peut-être une correction
     // non encore enregistrée, et son affichage ne dépend pas de la minute.
-    applySortAndRender({ syncDrawer: false });
+    applySortAndRender();
     return;
   }
 
@@ -8155,7 +6607,7 @@ function startRealtime() {
   // dossiers. `fluxVivant` évite d'interroger le serveur quand l'évènement du
   // flux fait déjà le travail.
   surveillerMaj({
-    saisieEnCours: () => isInteracting() || isDrawerBusy() || comptoirOuvert(),
+    saisieEnCours: () => isInteracting() || ficheAtelierOccupee() || comptoirOuvert(),
     fluxVivant: () => streamAlive,
   });
   // filet de sécurité : si le flux est coupé, on revient à un poll lent
@@ -9397,11 +7849,10 @@ function setViewMode(mode) {
   }
   if (mode === viewMode) return;
   viewMode = mode;
-  // Le tiroir de détail est monté sur <body>, pas dans la vue Planning : il ne
-  // part donc pas tout seul quand on change de vue (y compris via le bouton
-  // Retour du navigateur ou le balayage depuis le bord sur tablette), et il
-  // resterait posé par-dessus le Dashboard, scrim compris.
-  closeLigneDetail();
+  // La fiche atelier est montée sur <body>, pas dans la vue Planning : elle ne
+  // part donc pas toute seule quand on change de vue (y compris via le bouton
+  // Retour du navigateur), et elle resterait posée par-dessus le Dashboard.
+  fermerFicheAtelier();
 
   const dash = mode === 'dashboard';
   const clients = mode === 'clients';

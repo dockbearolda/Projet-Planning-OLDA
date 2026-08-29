@@ -301,7 +301,9 @@ for (const [nom, src] of [['app.js', APP], ['pont.js', PONT]]) {
   const css = sansCom(CRM);
   const confinement = css.match(/([^{}]*)\{[^{}]*overscroll-behavior:\s*contain[^{}]*\}/g) || [];
   const couvert = confinement.join(' ');
-  for (const panneau of ['.pj-body', '.dd-scroll', '.ld-body', '.menu-pop', '.search-palette-results', '.colbar-scroll']) {
+  // `.ld-body` a quitté la liste le 29/08 avec le tiroir : la fiche atelier
+  // défile avec la PAGE, elle n'a plus de boîte à confiner (voir fiche-atelier.css).
+  for (const panneau of ['.pj-body', '.dd-scroll', '.menu-pop', '.search-palette-results', '.colbar-scroll']) {
     assert.ok(couvert.includes(panneau),
       `${panneau} confine son défilement — sinon la page derrière bouge quand on arrive au bout`);
   }
@@ -330,7 +332,8 @@ for (const jeton of ['--ligne-serre', '--trait-reserve', '--champ-y-serre']) {
   assert.ok(new RegExp(`${jeton}:`).test(CHARTE), `${jeton} est déclarée dans la charte`);
 }
 for (const [nom, src, sels] of [
-  ['styles.css', CRM, ['.nav-switch-btn', '.ld-act']],
+  // `.ld-act` (l'action du tiroir) est partie le 29/08 avec lui.
+  ['styles.css', CRM, ['.nav-switch-btn']],
   ['clients.css', CLIENTS, ['.cl-filter__btn', '.cl-sort__btn']],
   // Le sélecteur segmenté est monté dans la charte le 26/08 : les Réglages et
   // l'écran des tailles de logo le portent aussi. La recette le suit — c'est

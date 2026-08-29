@@ -217,7 +217,7 @@ for (const clef of ['patchLigne', 'patchFiche', 'patchProd', 'fermer', 'ajouterN
 }
 // LE PRIX SUIT TOUJOURS : corriger une taille passe par la même porte que le
 // reste (voir chiffrage.js), la fiche ne recalcule rien elle-même.
-assert.ok(/patchProd: \(patchProd\) => ldEnvoyerProd\(r, patchProd\)/.test(APP),
+assert.ok(/patchProd: \(patchProd\) => envoyerProduction\(r, patchProd\)/.test(APP),
   'les tailles passent par le chemin qui retarife la ligne');
 
 // ---------------------------------------------------------------------------

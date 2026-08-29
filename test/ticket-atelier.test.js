@@ -408,6 +408,7 @@ const DEMANDE = {
   // 6. LE BRANCHEMENT DANS L'ÉCRAN
   // =========================================================================
   const APP = lire('app.js');
+  const FICHE_ATELIER = lire('fiche-atelier.js');
   const CSS_APP = lire('styles.css');
 
   // LES DEUX PAPIERS ONT QUITTÉ L'ÉCRAN (28/08/2026)
@@ -426,16 +427,19 @@ const DEMANDE = {
   // ticket de récapitulatif revient plus tard, et le regarder ne coûte rien.
   assert.ok(!/boutonsPapiers/.test(APP), 'plus de composant de pastilles pour les papiers');
   assert.ok(!/cellTicket\(/.test(APP), 'plus de colonne « Documents » dans la ligne');
-  assert.ok(!/ldActionBtn\('(ticket|bureau|imprimer)'/.test(APP),
-    'plus de bouton de papier dans la fiche');
+  assert.ok(!/ticket|bureau|imprimer/i.test(FICHE_ATELIER.split('const outils')[1].split('tete.append')[0]),
+    'plus de bouton de papier dans l’en-tête de la fiche');
   assert.ok(!/'open-btn'/.test(APP), 'plus de bouton « ouvrir la fiche »');
   assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
   // Le récapitulatif complet reste accessible — mais en téléchargement (c'est un
-  // document de travail, il n'a jamais eu à sortir sur l'imprimante) et depuis
-  // le TABLEAU : l'en-tête de la fiche n'a plus d'actions depuis le 28/08.
-  assert.ok(/sortie\('Récap complet', 'Télécharger le récapitulatif du dossier', \(\) => telechargerRecap\(r\)\)/.test(APP),
-    'le récapitulatif se télécharge depuis une rangée du tableau');
-  assert.ok(/sortie\('Email au client'/.test(APP), 'et l’e-mail au client aussi');
+  // document de travail, il n'a jamais eu à sortir sur l'imprimante). Il vivait
+  // dans une rangée du tiroir ; depuis le 29/08 c'est la fiche atelier qui le
+  // porte, dans sa rangée « Documents », et app.js garde la fonction.
+  assert.ok(/'Récap complet'/.test(FICHE_ATELIER) && /ctx\.telecharger/.test(FICHE_ATELIER),
+    'le récapitulatif se télécharge depuis la fiche');
+  assert.ok(/telecharger: \(ligne\) => telechargerRecap\(ligne\)/.test(APP),
+    '… et c’est bien telechargerRecap qui le fabrique');
+  assert.ok(/'Email au client'/.test(FICHE_ATELIER), 'et l’e-mail au client aussi');
   assert.ok(!/imprimerRecap/.test(APP), 'imprimerRecap ne doit plus exister');
 
   // LA LIGNE S'OUVRE AU CLIC, et par la MÊME fonction que la carte : deux vues

@@ -325,7 +325,9 @@ console.log('✓ vocabulaire : deux boîtes de commande, et une bascule de vue q
   assert.ok(/width: var\(--rond\)/.test(modele[0]) && /border-radius: var\(--pilule\)/.test(modele[0]),
     '… la boîte ronde nommée de la charte');
   assert.match(CHARTE0, /--rond:\s*44px/, '… et ce rond vaut 44 px');
-  for (const sel of ['.colbar-close', '.cat-close', '.ld-close']) {
+  // `.ld-close` est parti avec le tiroir le 29/08. La croix de la fiche
+  // atelier est `.fa-btn--carre`, dans sa propre feuille.
+  for (const sel of ['.colbar-close', '.cat-close']) {
     const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
     assert.ok(r, `${sel} doit exister`);
     assert.ok(/width: var\(--rond\)/.test(r[0]) && /height: var\(--rond\)/.test(r[0]),

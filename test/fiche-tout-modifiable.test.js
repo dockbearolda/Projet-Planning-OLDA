@@ -35,6 +35,7 @@ const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
 const APP = lire('public/app.js');
 const CSS = lire('public/styles.css');
+const FICHE = lire('public/fiche-atelier.js');
 const HTML = lire('public/index.html');
 
 delete process.env.DATABASE_URL;
@@ -91,191 +92,56 @@ assert.ok(/getSelection\(\)/.test(AUCLIC[0]),
 // ---------------------------------------------------------------------------
 // 3. LE BLOC DE PRODUCTION EST MODIFIABLE DE BOUT EN BOUT
 // ---------------------------------------------------------------------------
-const PROD = APP.match(/function ldProduction\(r\) \{[\s\S]*?\n\}\n\n\/\/ UN BANDEAU/);
-assert.ok(PROD, 'ldProduction doit exister');
+// LE BLOC A DÉMÉNAGÉ dans la fiche atelier (fiche-atelier.js) le 28/08, et le
+// tiroir qui le portait a été retiré le 29/08. Ce qu'on garde, c'est l'exigence :
+// l'identité de l'article se corrige de bout en bout, là où elle se lit.
+const PROD = [FICHE];
+assert.ok(FICHE.length > 0, 'la fiche atelier doit exister');
 for (const cle of ['ref', 'couleur', 'marquage', 'encre']) {
   assert.ok(new RegExp(`\\['${cle}',`).test(PROD[0]),
     `« ${cle} » doit être modifiable : c’est l’identité de l’article`);
 }
-assert.ok(/ldBande\('Tailles'\)/.test(PROD[0]) && /ldBande\('Faces à marquer'\)/.test(PROD[0]),
-  'les deux familles de faits ont leur bandeau');
+// LES DEUX FAMILLES DE FAITS ONT LEUR RANGÉE, chacune nommée.
+assert.ok(/rangee\('Tailles'/.test(PROD[0]) && /rangee\('Faces'/.test(PROD[0]),
+  'les deux familles de faits ont leur rangée');
 // LA LISTE DES TAILLES PART ENTIÈRE ET NOMMÉE. Le serveur lit une taille absente
 // comme un zéro : c'est ce qui permet d'en retirer une, et la seule lecture qui
 // tienne puisque la ligne ne garde pas les tailles vides.
 assert.ok(/tailles\.map\(\(t\) => \(\{ t: String\(t\.t\), n: Number\(t\.n\) \|\| 0 \}\)\)/.test(PROD[0]),
   'les tailles partent nommées, la liste entière');
-// LA RANGÉE VIDE AJOUTE. Le comptoir ne pose que les tailles commandées :
-// « finalement il en veut aussi 20 en XL » n'avait aucune porte.
-assert.ok(/Nouvelle taille/.test(PROD[0]), 'une rangée vide doit permettre d’ajouter une taille');
-assert.ok(/Nouvelle face/.test(PROD[0]), 'et une face');
+// LE NOMBRE SE TAPE. Les deux boutons « + / − » ont été retirés le 28/08 :
+// passer de 30 à 100 demandait soixante-dix clics.
+assert.ok(!/fa-pas/.test(PROD[0]), 'plus de bouton pas-à-pas sur une quantité');
+// AJOUTER UNE FACE. Le comptoir ne pose que celles qu'il connaît ; « il en veut
+// une de plus dans le dos » n'avait aucune porte.
+assert.ok(/'\+ Face'/.test(PROD[0]), 'une face doit pouvoir s’ajouter');
 // CE QU'ON MARQUE se corrige : sur une tasse ou une gravure il n'y a pas de
 // cote, et c'était la seule valeur de la ligne qu'on ne pouvait pas rectifier.
-assert.ok(/envoyerFaces\(i, \{ quoi: v \}\)/.test(PROD[0]),
-  'la consigne d’une face doit se corriger');
-assert.ok(/envoyerFaces\(i, \{ mm: v \}\)/.test(PROD[0]) && /envoyerFaces\(i, \{ face: v \}\)/.test(PROD[0]),
-  'sa cote et son nom aussi');
+assert.ok(/\{ quoi: v \}/.test(PROD[0]), 'la consigne d’une face doit se corriger');
+assert.ok(/\{ mm: String\(v\)/.test(PROD[0]) || /mm: /.test(PROD[0]),
+  'sa cote aussi');
+assert.ok(/\{ face: nom \}/.test(PROD[0]), 'et son nom')
+
 
 // ---------------------------------------------------------------------------
-// 3 bis. LA FICHE EST UN TABLEAU, PAS VINGT CARTES (28/08)
+// 3 bis. LA MISE EN PAGE ET L'ENREGISTREMENT ONT DÉMÉNAGÉ (29/08)
 // ---------------------------------------------------------------------------
-// Charlie : « pour que ce soit simple je veux que ça s'ouvre façon tableau,
-// presque comme un tableau Excel, pour modifier rapidement les valeurs ».
-// C'étaient vingt encadrés blancs sur deux colonnes, chacun portant son
-// intitulé AU-DESSUS de son champ : rien ne s'alignait d'un encadré à l'autre.
-const CORPS = CSS.match(/\.ld-body \{[\s\S]*?\n\}/)[0];
-// DEUX PAIRES PAR LIGNE. Trente-cinq rangées sur une seule colonne, c'était une
-// liste qu'il fallait faire défiler pour voir la moitié du dossier : « toutes
-// les valeurs apparaissent » veut dire tout voir d'un coup.
-assert.ok(/grid-template-columns: repeat\(2, minmax\([^;]+\) minmax\(0, 1fr\)\);/.test(CORPS),
-  'le corps est une grille de DEUX paires intitulé/valeur par ligne');
-// …et une seule paire quand l'écran ne suit plus : deux paires y donneraient
-// des colonnes trop étroites pour une date ou un nom de dossier.
-assert.ok(/@media \(max-width: 1200px\) \{\s*\.ld-body \{ grid-template-columns: minmax\([^;]+\) minmax\(0, 1fr\); \}/.test(CSS),
-  'sous 1200 px, une seule paire par ligne');
-assert.ok(/gap: 0;/.test(CORPS),
-  'aucun écart : ce sont les filets qui séparent, comme dans un tableur');
-// `display: contents` sur la rangée : ses deux cellules deviennent des cellules
-// de la grille du corps. Dans une sous-grille par rangée, chaque largeur se
-// calculerait sur son propre contenu — vingt alignements différents.
-assert.ok(/\.ld-rang \{ display: contents; \}/.test(CSS),
-  'une rangée ne fabrique pas sa propre grille : elle donne ses cellules à celle du corps');
-// UNE HAUTEUR EST UN JETON, JAMAIS UN NOMBRE (règle du 27/08), et toutes les
-// cellules la prennent dans UNE règle.
-const CELLULES = CSS.match(/\.ld-k, \.ld-cell, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
-assert.ok(/min-height: var\(--ligne-h\);/.test(CELLULES),
-  'toutes les cellules ont la même hauteur, et c’est un jeton');
-assert.ok(!/min-height:\s*\d+px/.test(CELLULES), 'jamais une hauteur en dur');
-// UNE RANGÉE DE TABLEAU N'EST PAS UNE COMMANDE ISOLÉE. Trente rangées à
-// `--ctrl-h` (50 px), c'est un formulaire qu'on fait défiler : on en voyait
-// huit à l'écran. Le jeton a son rôle écrit dans la charte, et il est DÉCLARÉ
-// une seule fois — un nombre se recopie de travers.
-const CHARTE = lire('public/charte.css');
-assert.strictEqual((CHARTE.match(/^\s*--ligne-h:/gm) || []).length, 1,
-  '--ligne-h se déclare une seule fois, dans la charte');
-// LES INTITULÉS SE LISENT COMME DES MOTS. En capitales espacées, « Couleur du
-// marquage » tombait sur deux lignes et cassait la rangée : dans un tableur, un
-// en-tête n'est pas un titre. Les capitales vivent sur le BANDEAU, une fois par
-// famille de faits.
-const INTITULES = CSS.match(/\.ld-k, \.ld-k-champ \{[\s\S]*?\n\}/)[0];
-assert.ok(/text-transform: none;/.test(INTITULES),
-  'un intitulé de rangée n’est pas en capitales');
-assert.ok(!/background:/.test(INTITULES),
-  'ni sur un fond de colonne : deux blocs de couleur côte à côte, ce n’est pas un tableau');
-assert.ok(/border-right: 1px solid var\(--border-soft\);/.test(INTITULES),
-  'le quadrillage est vertical AUSSI — c’est lui qui dit que deux valeurs sont dans la même colonne');
-const BANDE = CSS.match(/\.ld-bande \{[\s\S]*?\n\}/)[0];
-assert.ok(/text-transform: uppercase/.test(BANDE), 'les capitales vivent sur le bandeau');
-assert.ok(/grid-column: 1 \/ -1;/.test(BANDE), 'et il traverse les deux colonnes');
-// LE CHAMP EST LA CELLULE : une bordure par champ DANS une cellule qui en a
-// déjà une, c'était une boîte dans une boîte, vingt fois.
-const CTL = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
-assert.ok(/border: 0;/.test(CTL), 'le champ n’a pas de contour propre : la cellule en a un');
-assert.ok(/outline-offset: -2px/.test(CSS),
-  'le focus se pose EN DEDANS, sinon il déborde sur les cellules voisines');
-// DE NUIT AUSSI. La règle sombre datait du temps où le champ avait son contour :
-// elle lui remettait un fond plus sombre que le corps, et chaque valeur
-// redevenait une case noire posée dans sa cellule — l'effet « boîte dans une
-// boîte » qu'on venait de retirer, visible seulement de nuit.
-assert.ok(!/:root\[data-theme="dark"\] \.ld-ctl \{[^}]*background/.test(CSS),
-  'le champ n’a pas de fond à lui, de nuit comme de jour');
-
-// LE RETRAIT VIT SUR LA CELLULE, une seule fois. Il était porté par CHAQUE
-// contenu — et seulement par ceux qui y avaient pensé : les champs commençaient
-// à 231 px, les valeurs dépouillées (« PRO », « Mélina », le duo date/heure) à
-// 221. Dix pixels d'écart dans la même colonne, sur une rangée sur trois.
-const HAUTE_ALIGN = CSS.match(/\.ld-rang--haut > \.ld-cell \{[^}]*\}/)[0];
-const CELL = CSS.match(/\n\.ld-cell \{[\s\S]*?\n\}/)[0];
-assert.ok(/padding: 0 0 0 10px;/.test(CELL), 'la cellule porte le retrait');
-const CTL2 = CSS.match(/\n\.ld-ctl \{[\s\S]*?\n\}/)[0];
-assert.ok(/padding: 0;/.test(CTL2), 'et le champ n’en porte plus : sinon il s’ajoute au premier');
-// LE FOCUS S'ALLUME SUR LA CELLULE. Posé sur le champ, dont la boîte commence
-// dix pixels plus loin, il laissait une bande claire à gauche.
-assert.ok(/\.ld-cell:focus-within \{ outline: 2px solid var\(--primary\); outline-offset: -2px; \}/.test(CSS),
-  'c’est la case qui s’allume, comme dans un tableur');
-// UNE MARGE DE COMPOSANT NE SUIT PAS DANS UNE CELLULE. `.sub-chip` porte
-// `margin: 8px 12px` pour vivre dans une ligne du planning : ces 12 px la
-// décalaient de la colonne (243 px quand tout le reste tombe à 231).
-// La règle se lit sur SON bloc : `[\s\S]*?` traversait les accolades et
-// trouvait le `margin: 0` d'une règle voisine — le contrôle passait sur un
-// défaut qu'il était censé voir.
-assert.ok(/\.ld-cell :is\(\.ld-toggle[^{]*\{[^}]*margin: 0;/.test(CSS),
-  'une pastille perd la marge qu’elle porte pour le planning');
-// `align-items: center` VAUT CENTRAGE HORIZONTAL dans une colonne flex : hérité
-// de la règle des cellules, il posait les trois pastilles de documents au milieu
-// de la largeur (533 px) au lieu du bord.
-assert.ok(/align-items: stretch;/.test(HAUTE_ALIGN),
-  'une rangée à pavé aligne ses blocs à gauche, pas au centre');
-
-// DEUX PIÈGES DE GRILLE, PAYÉS LE 28/08 ET TENUS ICI.
-//
-// 1. UNE RANGÉE EST EN `display: contents` : on ne lui ajoute RIEN après coup.
-//    Un troisième enfant devient une cellule de grille à lui seul, posée
-//    n'importe où dans le tableau. Trois blocs le faisaient — le fil du
-//    comptoir, l'historique du client, le message « aucune commande » — et
-//    partaient se ranger au milieu des autres rangées.
-assert.ok(/rangee\.cellule = v;/.test(APP),
-  'ldBox doit exposer sa cellule : c’est là que les ajouts tardifs vont');
-assert.ok(!/\bsection\.append(Child)?\(/.test(APP),
-  'plus aucun ajout posé SUR la rangée — il irait dans la grille, pas dans la cellule');
-//
-// 2. UN `min-height` SUR UN ITEM DE GRILLE ÉTIRÉ PLAFONNE SA PISTE. Le suivi
-//    du paiement mesurait 206 px dans une cellule figée à 38 et débordait
-//    par-dessus les rangées du dessous ; `min-height: auto` la rend à sa vraie
-//    taille. C'est l'intitulé, à côté, qui garde la hauteur minimale.
-const HAUTE = CSS.match(/\.ld-rang--haut > \.ld-cell \{[^}]*\}/)[0];
-assert.ok(/min-height: auto;/.test(HAUTE),
-  'une rangée à pavé perd son min-height, sinon sa piste plafonne et le contenu déborde');
-
-// AUCUNE BULLE DANS UN TABLEAU. Charlie, en désignant les « Non » du paiement :
-// « enlève ces bulles, un tableau je veux ». Sept pastilles arrondies vivaient
-// dans les cellules — type de client, état, pilote, référent, les trois
-// bascules de paiement, le mode. Une pilule au milieu d'une cellule, c'est un
-// bouton posé sur une valeur : dans un tableur on lit la valeur, on clique
-// dessus, elle change.
-const SANSBULLE = CSS.match(/\.ld-cell :is\(\.ld-toggle[^{]*\{[^}]*\}/)[0];
-for (const mort of ['border-radius: 0', 'border: 0', 'background: none']) {
-  assert.ok(SANSBULLE.includes(mort), `dans une cellule, une valeur perd sa bulle (${mort})`);
-}
-// C'est le SURVOL qui dit qu'elle se change, pas une bulle qui le dit tout le
-// temps.
-assert.ok(/\.ld-cell :is\([^)]*\):hover \{[^}]*text-decoration: underline/.test(CSS),
-  'le survol dit qu’une valeur se change');
-// ⚠ ET SEULEMENT DANS LE TABLEAU : sur la ligne du planning et sur la carte,
-// ces mêmes pastilles gardent leur forme — là, rien d'autre ne dirait qu'on
-// peut les toucher.
-assert.ok(/\n\.ld-toggle \{[\s\S]*?border-radius: var\(--pilule\)/.test(CSS)
-  || /\n\.resp-chip \{[\s\S]*?border-radius: var\(--pilule\)/.test(CSS),
-  'hors du tableau, la pastille reste une pastille');
-
-// ---------------------------------------------------------------------------
-// 4. UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE
-// ---------------------------------------------------------------------------
-assert.ok(!/Enregistrer les modifications/.test(APP),
+// Tout ce que cette section tenait — la fiche en TABLEAU plutôt qu'en vingt
+// encadrés, une hauteur de rangée qui est un JETON, le champ qui s'enregistre
+// en le quittant, la note qui s'AJOUTE — portait sur le tiroir (`.ld-*`).
+// Le tiroir a été retiré le 29/08 : il n'était plus appelé depuis que la fiche
+// atelier avait pris sa place, et il coûtait 35 Ko de CSS à chaque poste.
+// Les mêmes exigences vivent désormais dans test/fiche-atelier.test.js, sur
+// fiche-atelier.css / fiche-atelier.js. On garde ici les trois qui disent que
+// la CAPACITÉ n'a pas disparu avec le meuble.
+assert.ok(!/Enregistrer les modifications/.test(APP + FICHE),
   'plus de bouton « Enregistrer » : on vient rectifier UNE chose, vite');
-// UN SEUL ÉCOUTEUR, et il se pose UNE FOIS. La carte du tiroir survit à tous
-// les rendus : un abonnement par rendu enverrait le champ autant de fois que la
-// fiche a été redessinée.
-const ENSURE = APP.match(/function ensureLigneDrawer\(\) \{[\s\S]*?\n\}/)[0];
-assert.ok(/ligneDrawerCard\.addEventListener\('change'/.test(ENSURE),
-  'l’écouteur d’enregistrement se pose à la construction du tiroir');
-assert.strictEqual((APP.match(/ligneDrawerCard\.addEventListener\('change'/g) || []).length, 1,
-  'et une seule fois dans tout le fichier');
-// …mais il lit la fonction du rendu COURANT, jamais une fonction figée à la
-// première ouverture — c'est le piège qui avait déjà écrasé une fiche client.
-assert.ok(/ldCommettre = commettre;/.test(APP),
-  'le rendu courant repose sa fonction d’enregistrement');
-assert.ok(/if \(ldCommettre\) ldCommettre\(\);/.test(ENSURE),
-  'l’écouteur appelle la version du moment');
-// CE QUI AVAIT LE FOCUS DOIT LE RETROUVER : l'enregistrement reconstruit la
-// fiche, et sans repère le clavier retombait sur <body>.
-assert.ok(/dataset\.ldKey/.test(APP.match(/const commettre = async \(\) => \{[\s\S]*?\n  \};/)[0]),
-  'le champ qui avait le focus doit le retrouver après reconstruction');
-
-// 5. LA NOTE GARDE SON GESTE : elle s'AJOUTE aux informations, et une note
-// ajoutée deux fois ne se retire pas.
-assert.ok(/ajouterNote\.textContent = 'Ajouter la note';/.test(APP), 'la note a son bouton');
-assert.ok(/cible\.classList\.contains\('ld-note'\)/.test(ENSURE),
-  'et elle ne part pas toute seule en quittant le champ');
+// UNE VALEUR QUITTÉE EST UNE VALEUR ENREGISTRÉE.
+assert.ok(/addEventListener\('blur'/.test(FICHE),
+  'quitter un champ l’enregistre');
+// LA NOTE GARDE SON GESTE : elle s'AJOUTE aux informations.
+assert.ok(/'Ajouter la note'/.test(FICHE) && /ctx\.ajouterNote\(texte\)/.test(FICHE),
+  'la note a son bouton, et elle s’ajoute');
 
 // ---------------------------------------------------------------------------
 // 6. LE SERVEUR : l'identité s'écrit, une face s'ajoute et se retire

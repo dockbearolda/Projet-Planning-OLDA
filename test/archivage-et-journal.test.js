@@ -273,11 +273,12 @@ delete process.env.APP_PASSWORD;
   assert.ok(/'X-Qui': encodeURIComponent\(nom\)/.test(PONT),
     'le comptoir aussi : c’est là que naissent les dossiers');
 
-  // La fiche ne doit plus affirmer que l'application ignore qui a fait quoi.
+  // La note de l'Historique vivait dans le TIROIR, retiré le 29/08 : la fiche
+  // atelier ne montre pas le journal (voir le compte rendu de ce jour-là — c'est
+  // l'une des quatre choses qu'elle ne reprend pas). Ce qui compte reste vrai et
+  // se contrôle côté serveur, plus haut : le journal enregistre le « qui ».
   assert.ok(!/enregistre ce qui a changé, pas qui l’a fait/.test(APP),
-    'la note de l’Historique ne dit plus le contraire de ce que fait le code');
-  assert.ok(/il dit qui a saisi, il ne le prouve pas/.test(APP),
-    '… mais elle garde la réserve : un prénom déclaré n’est pas une preuve');
+    'plus une ligne de l’application n’affirme le contraire de ce que fait le code');
 
   console.log('✓ archivage : rien ne s’efface, tout revient, et le journal dit qui');
   process.exit(0);

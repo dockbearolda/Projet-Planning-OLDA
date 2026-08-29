@@ -26,6 +26,7 @@ const path = require('node:path');
 const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 const APP = lire('app.js');
 const CSS = lire('styles.css');
+const FICHE = lire('fiche-atelier.js');
 const HTML = lire('index.html');
 
 // ===========================================================================
@@ -59,12 +60,12 @@ assert.ok(/const marque = t\.icone \? t\.icone\(\) : strokeIcon\(\['M5 12h13'/.t
 // « supprime ça ». Quatre boutons au-dessus d'un tableau qu'on vient lire et
 // corriger, pour des gestes qu'on fait une fois de temps en temps — et deux
 // d'entre eux (dupliquer, vers Fiverr) doublaient la ligne du planning.
-assert.ok(!/ldActionBtn\(t\.icone/.test(APP), 'plus de bouton d’envoi dans l’en-tête');
-assert.ok(/actions\.append\(close\);/.test(APP),
+// Le tiroir qui portait cet en-tête a été retiré le 29/08 : c'est la fiche
+// atelier qu'on contrôle, et elle n'a JAMAIS eu ces quatre boutons.
+assert.ok(!/fiverr|dupliquer/i.test(FICHE.split('const outils')[1] || ''),
+  'plus de bouton d’envoi dans l’en-tête');
+assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×'/.test(FICHE),
   'l’en-tête ne garde que ce qu’on fait DEPUIS la fiche : la fermer');
-// …mais la marque reste sur la LIGNE, qui est l'endroit d'où l'on envoie.
-assert.ok(/if \(typeof icone === 'function'\) \{/.test(APP),
-  'ldActionBtn doit accepter une icône dessinée à la demande');
 
 // L'ONGLET Fiverr du bandeau porte LE MÊME dessin : c'est ce qui fait
 // comprendre que le bouton de la ligne mène à cet onglet-là. Les deux tracés

@@ -875,12 +875,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .help-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .help-btn-ic { font-size: var(--ic); flex-shrink: 0; }
 
-
-/* Tablette / téléphone étroit : le panneau devient une feuille en bas d'écran,
-   plus naturelle au pouce. */
-@media (max-width: 820px) {
-}
-
 /* ------------------------------------------------ Outil de devis Fiverr */
 .fiverr-tool {
   display: flex;
@@ -3507,15 +3501,25 @@ body.dragging-active .grid-wrap { pointer-events: none; }
    ne l'a vu parce que le symptôme est celui d'à-côté — c'est la PAGE qui bouge,
    pas le panneau. Deuxième cas du même accident dans ce fichier ; voir aussi
    `.dd-panel` en thème sombre, plus bas. */
-.pj-body, .dd-scroll, .ld-body, .menu-pop, .search-palette-results,
-.tk-modal__paper, .colbar-scroll, .cat-list, .reglages {
+.pj-body,
+.dd-scroll,
+.menu-pop,
+.search-palette-results,
+.tk-modal__paper,
+.colbar-scroll,
+.cat-list,
+.reglages {
   overscroll-behavior: contain;
 }
 /* La place de la barre de défilement est RÉSERVÉE : sans ça, chaque frappe dans
    la recherche faisait apparaître / disparaître la barre (12 px), et les treize
    colonnes du tableau se recalaient à chaque caractère — un décalage de mise en
    page sur l'écran principal, au rythme de la saisie. */
-.grid-wrap, .pj-body, .ld-body, .dd-scroll, .search-palette-results, .colbar-scroll {
+.grid-wrap,
+.pj-body,
+.dd-scroll,
+.search-palette-results,
+.colbar-scroll {
   scrollbar-gutter: stable;
 }
 
@@ -3550,8 +3554,7 @@ a,
   .stage-link:active,
   .ordre-reset:active,
   .colbar-item:active,
-  .menu-item:active,
-  .ld-act:active { transform: none; }
+  .menu-item:active { transform: none; }
 }
 
 /* Bascule clair / sombre : les transitions se taisent le temps d'une image
@@ -5496,434 +5499,6 @@ body.view-plein .fiverr-tool { display: none !important; }
   .reg-status { flex-basis: 100%; margin-right: 0; }
   .reg-btn { flex: 1; }
 }
-
-/* --- Fiche projet (planning) -----------------------------------------------
-   LA BULLE : un clic sur une ligne du planning ouvre son récapitulatif complet,
-   au centre de l'écran, comme dans l'écran du patron (`.project-sheet`). Elle
-   était auparavant un tiroir collé à droite ; posée au centre, elle peut être
-   large — c'est une FICHE, pas une barre latérale, et son « Détail complet »
-   tient sur deux colonnes au lieu de défiler sur un fil. */
-.ligne-drawer { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.ligne-drawer[hidden] { display: none; }
-.ligne-drawer__scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(16, 24, 40, .45);
-  animation: ldScrim var(--dur-2) var(--ease) both;
-}
-@keyframes ldScrim { from { opacity: 0; } to { opacity: 1; } }
-.ligne-drawer__card {
-  position: relative;
-  width: min(1560px, 96vw);
-  max-height: 92vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--arrondi-carte);
-  overflow: hidden;
-  box-shadow: 0 24px 70px rgba(16, 24, 40, .30);
-  animation: ldSlide var(--dur-3) var(--ease) both;
-}
-@keyframes ldSlide { from { transform: translateY(14px) scale(.99); opacity: .4; } to { transform: none; opacity: 1; } }
-/* Téléphone : la fiche prend tout l'écran, une marge de bulle ne servirait
-   qu'à rétrécir un contenu déjà à l'étroit. */
-@media (max-width: 700px) {
-  .ligne-drawer { padding: 0; }
-  .ligne-drawer__card { width: 100vw; max-height: 100vh; height: 100%; border: 0; border-radius: 0; }
-}
-
-/* L'en-tête reste blanc et posé sur le gris du corps, comme le bandeau de
-   l'écran Nouveau Projet au-dessus de sa page grise. */
-/* LE TITRE PREND SA LIGNE. Six actions libellées et la croix demandent
-   855 px ; la carte en fait 980 au plus. Le titre, en `flex: 1`, héritait
-   donc des 75 px restants et s'enroulait sur douze lignes d'un ou deux mots
-   — 292 px d'en-tête pour deux phrases. Il passe devant, sur toute la
-   largeur, et les actions s'alignent dessous en se repliant si besoin.
-   `flex-basis: 100%` plutôt qu'une requête de média : ce qui décide, c'est
-   la largeur de la CARTE, pas celle de la fenêtre. */
-/* L'EN-TÊTE TIENT SUR UNE LIGNE depuis que ses quatre actions sont parties
-   (28/08) : le titre à gauche, la croix à droite. Les titres prenaient toute la
-   largeur (`flex: 1 1 100%`) parce qu'une rangée de boutons se posait dessous ;
-   il n'y a plus de rangée, et la croix seule s'y étalait sur 44 px de haut pour
-   rien — au-dessus du tableau qu'on vient lire. */
-.ld-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--surface); border-bottom: 1px solid var(--border); }
-.ld-head__titles { flex: 1 1 auto; min-width: 0; }
-
-.ld-close { flex-shrink: 0; display: grid; place-items: center; width: var(--rond); height: var(--rond); border: 1px solid var(--border); background: transparent; color: var(--text-2); border-radius: var(--pilule); cursor: pointer; }
-.ld-close:hover { background: var(--state-hover); color: var(--text-1); }
-
-/* Le corps prend le gris de page (--bg) et chaque section devient une carte
-   blanche : c'est la composition de tout le reste de l'app (écran Nouveau
-   client, Réglages) — fond gris, contenu en cartes. Sur un corps blanc, les
-   cartes auraient été invisibles. */
-/* La fiche étant large, le corps se lit sur DEUX colonnes — comme la
-   `.sheet-grid` de l'écran du patron. Les sections qui portent du texte long
-   (détail complet, notes, historique) reprennent la pleine largeur. */
-.ld-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px;
-  background: var(--bg);
-  -webkit-overflow-scrolling: touch;
-  /* UN TABLEAU, PAS VINGT CARTES (28/08/2026). Charlie : « pour que ce soit
-     simple je veux que ça s'ouvre façon tableau, presque comme un tableau
-     Excel, pour modifier rapidement les valeurs ». C'étaient vingt encadrés
-     blancs de 14 px de rembourrage sur deux colonnes, chacun portant son
-     intitulé AU-DESSUS de son champ : rien ne s'alignait d'un encadré à
-     l'autre, et l'œil cherchait chaque valeur au lieu de la trouver.
-     DEUX COLONNES POUR TOUTE LA FICHE — intitulé, valeur — et c'est la grille
-     du corps qui les tient : chaque rangée est en `display: contents`, donc
-     ses deux cellules sont des cellules D'ICI. Dans une sous-grille par
-     rangée, chaque largeur se calculerait sur son propre contenu et on
-     retomberait sur vingt alignements différents.
-     AUCUN ÉCART : ce sont les filets qui séparent, comme dans un tableur. Un
-     `gap` rouvrirait vingt fois le trou qu'on vient de fermer. */
-  display: grid;
-  /* DEUX PAIRES PAR LIGNE (28/08). Trente-cinq rangées empilées sur une seule
-     colonne, c'était une liste qu'il fallait faire défiler pour voir la moitié
-     du dossier : « toutes les valeurs apparaissent » veut dire tout voir d'un
-     coup. Quatre colonnes — intitulé, valeur, intitulé, valeur — et le dossier
-     tient sur un écran. */
-  grid-template-columns: repeat(2, minmax(128px, 168px) minmax(0, 1fr));
-  gap: 0;
-  align-content: start;
-  padding: 0;
-  background: var(--surface);
-}
-/* Sous 1200 px, une seule paire par ligne : deux paires y donneraient des
-   colonnes de valeur trop étroites pour une date ou un nom de dossier. */
-@media (max-width: 1200px) {
-  .ld-body { grid-template-columns: minmax(128px, 196px) minmax(0, 1fr); }
-}
-
-
-/* --- LE TABLEAU DE LA FICHE ------------------------------------------------
-   Charlie, 28/08 : « je veux que ce soit comme un tableau parfait ».
-
-   CE QUI FAIT UN TABLEAU, et qui manquait :
-     · UN QUADRILLAGE, pas une pile de traits. Chaque cellule porte son filet en
-       bas ET à droite, la même épaisseur, la même encre — c'est la grille qui
-       se lit, et c'est elle qui dit que deux valeurs sont dans la même colonne.
-     · UNE SEULE HAUTEUR, dense. Trente rangées à 50 px, c'est un formulaire
-       qu'on fait défiler : on en voyait huit. À `--ligne-h` on en voit seize.
-     · DES INTITULÉS QUI SE LISENT. En capitales espacées, « COULEUR DU
-       MARQUAGE » tombait sur deux lignes et cassait la rangée : dans un
-       tableur, un en-tête s'écrit comme un mot.
-     · AUCUN FOND DE COLONNE. La colonne d'intitulés grise faisait deux blocs
-       de couleur côte à côte, pas un tableau. Tout est blanc, le quadrillage
-       suffit — c'est exactement ce qu'on regarde dans un tableur. */
-.ld-rang { display: contents; }
-.ld-k, .ld-cell, .ld-k-champ {
-  min-height: var(--ligne-h);
-  border-bottom: 1px solid var(--border-soft);
-}
-.ld-k, .ld-k-champ {
-  display: flex; align-items: center;
-  margin: 0; padding: 0 10px;
-  border-right: 1px solid var(--border-soft);
-  font-size: var(--taille-note); font-weight: var(--graisse-texte);
-  letter-spacing: 0; text-transform: none; color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-/* LE RETRAIT VIT SUR LA CELLULE, une seule fois. Il était porté par CHAQUE
-   contenu — et seulement par ceux qui y avaient pensé : les champs commençaient
-   à 231 px, les valeurs dépouillées (« PRO », « Mélina », le duo date/heure) à
-   221. Dix pixels d'écart dans la même colonne, sur une rangée sur trois : la
-   colonne des valeurs n'était pas droite, et c'est la première chose qu'on voit
-   d'un tableau. */
-.ld-cell {
-  display: flex; align-items: center; gap: 6px;
-  min-width: 0; padding: 0 0 0 10px;
-  font-size: var(--taille-note);
-}
-/* DANS UNE CELLULE, RIEN NE S'EMPILE — mesuré : contact 70 px, « qui suit »
-   77 px, état 45 px, dans des rangées de 38. Trois cellules débordaient sur la
-   rangée du dessous, et c'est la SEULE chose qu'on voyait d'un tableau dont les
-   trente autres rangées tombaient au pixel. Ces blocs ont été écrits pour une
-   carte, où l'on empile ; dans une rangée, on couche. */
-.ld-cell > * { min-width: 0; }
-/* …UNE RANGÉE DE VALEUR, pas une rangée à bloc. Le suivi du paiement est une
-   grille de quatre lignes et les pièces jointes une rangée de pastilles :
-   couchés de force, ils sortaient de la carte. Eux s'étirent (`--haut`). */
-.ld-rang:not(.ld-rang--haut) > .ld-cell > div {
-  display: flex; flex-direction: row; align-items: center; gap: 6px;
-}
-.ld-rang:not(.ld-rang--haut) :is(.resp-stack, .flag-stack) {
-  flex-direction: row; align-items: center; padding: 0;
-}
-.ld-cell .wa-btn, .ld-cell .resp-chip, .ld-cell .ref-chip, .ld-cell .flag-chip { flex: none; margin: 0; }
-/* ET RIEN N'EN SORT. Un contenu plus haut que sa rangée la ferait grandir, une
-   seule suffit à faire perdre la ligne à l'œil. */
-.ld-cell { overflow: hidden; }
-/* UNE RANGÉE QUI PORTE UN PAVÉ s'étire — un tableur fait pareil quand le texte
-   revient à la ligne. Son intitulé se cale alors en haut, sinon il flotterait
-   au milieu de dix lignes. Ce sont les SEULES rangées qui échappent à la
-   hauteur commune, et elles le disent : elles portent un bloc, pas une valeur. */
-/* UNE RANGÉE À PAVÉ TRAVERSE LA LIGNE ENTIÈRE : elle porte un texte long ou un
-   bloc, elle n'a rien à faire dans une demi-largeur. */
-.ld-rang--haut > .ld-k { grid-column: 1; align-items: flex-start; padding-top: 10px; }
-/* Une rangée à pavé s'étire, donc elle ne coupe pas : `overflow: hidden` est
-   la règle des rangées de VALEUR, celles qui tiennent sur leur ligne.
-   ⚠ ET ELLE PERD SON `min-height`. Un item de grille ÉTIRÉ qui porte un
-   `min-height` voit sa piste plafonner à cette valeur : le suivi du paiement
-   mesurait 206 px dans une cellule figée à 38, et débordait par-dessus les
-   volets du dessous. Mesuré : `min-height: auto` rend la rangée à 219 px, sa
-   vraie taille. C'est l'intitulé, à côté, qui garde la hauteur minimale. */
-.ld-rang--haut > .ld-cell {
-  grid-column: 2 / -1;
-  /* Une COLONNE flex plutôt qu'un bloc : elle empile comme un bloc, et elle
-     CENTRE ce qui est plus court que la rangée — les trois pastilles de
-     documents et le message « aucune commande » tombaient 1 à 3 px trop haut,
-     seuls décalages qui restaient dans tout le tableau. */
-  display: flex; flex-direction: column; justify-content: center;
-  /* `align-items: center` vaut CENTRAGE HORIZONTAL dans une colonne : hérité de
-     la règle des cellules, il posait les trois pastilles de documents au milieu
-     de la largeur (533 px) au lieu du bord (231). `stretch` les remet à gauche
-     et laisse les pavés prendre toute la place. */
-  align-items: stretch;
-  padding: 6px 0 6px 10px; overflow: visible; min-height: auto;
-}
-/* AUCUNE BULLE DANS UN TABLEAU (28/08). Charlie, en désignant les « Non » du
-   paiement : « enlève ces bulles, un tableau je veux ». Sept pastilles
-   arrondies vivaient dans les cellules — le type de client, l'état, le pilote,
-   le référent, les trois bascules de paiement, le mode de règlement. Une
-   pilule au milieu d'une cellule, c'est un BOUTON posé sur une valeur : dans
-   un tableur on lit la valeur, on clique dessus, elle change.
-   Le fond, le contour et l'arrondi partent. La valeur reste, à l'encre du
-   texte, et c'est le SURVOL qui dit qu'elle se change — pas une bulle qui la
-   dit tout le temps.
-   ⚠ CE N'EST VRAI QUE DANS LE TABLEAU. Sur la ligne du planning et sur la
-   carte, ces mêmes pastilles gardent leur forme : là, elles ne sont pas dans
-   une cellule, et rien d'autre ne dirait qu'on peut les toucher. */
-.ld-cell :is(.ld-toggle, .sub-chip, .flag-chip, .resp-chip, .ref-chip, .type-tag) {
-  min-height: var(--ligne-h);
-  /* MARGE COMPRISE. `.sub-chip` porte `margin: 8px 12px` pour vivre dans une
-     ligne du planning : dans une cellule, ces 12 px la décalaient de la colonne
-     (243 px quand tout le reste tombe à 231). */
-  margin: 0;
-  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
-  font-size: var(--taille-note); font-weight: var(--graisse-texte);
-  color: var(--text-1);
-}
-.ld-cell :is(.flag-chip, .ref-chip, .sub-chip).empty { color: var(--text-2); }
-.ld-cell :is(.ld-toggle, .sub-chip, .flag-chip, .resp-chip, .ref-chip, .type-tag):hover {
-  background: none; color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
-}
-/* L'initiale du pilote n'est plus une pastille dans une pastille : le prénom
-   suffit à dire qui suit, et c'est lui qu'on lit. */
-.ld-cell .resp-ini { display: none; }
-/* Les deux sorties du dossier : deux mots qu'on clique, la même grammaire que
-   les valeurs d'à côté. */
-.ld-sortie {
-  padding: 0; border: 0; background: none; cursor: pointer;
-  font: inherit; font-size: var(--taille-note); color: var(--text-1);
-}
-.ld-sortie + .ld-sortie { margin-left: 14px; }
-.ld-sortie:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
-.ld-cell .resp-name { max-width: none; }
-/* LE BANDEAU DE SECTION traverse les deux colonnes. C'est LUI qui porte les
-   capitales : une fois par famille de faits, pas trente fois sur la colonne de
-   gauche. */
-.ld-bande {
-  grid-column: 1 / -1;
-  display: flex; align-items: center;
-  margin: 0; padding: 0 10px;
-  min-height: var(--ligne-h);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--bg);
-  font-size: var(--taille-note); font-weight: var(--graisse-forte);
-  letter-spacing: .05em; text-transform: uppercase; color: var(--text-2);
-}
-/* UNE VALEUR QU'ON NE MODIFIE PAS SE LIT COMME LES AUTRES. En gras et sans le
-   rembourrage du champ, « Étape actuelle » et « À terminer avant » sortaient de
-   la colonne : deux graisses et deux marges gauches dans la même colonne, c'est
-   exactement ce qui empêche de lire un tableau de haut en bas. */
-.ld-v {
-  margin: 0; padding: 0;
-  font-size: var(--taille-note); font-weight: var(--graisse-texte);
-  color: var(--text-1); white-space: pre-wrap;
-}
-/* LE CHAMP EST LA CELLULE. Dans un tableur on tape DANS la case : une bordure
-   par champ à l'intérieur d'une cellule qui en a déjà une, c'était une boîte
-   dans une boîte, vingt fois. Le filet vient de la cellule, le champ prend
-   toute sa place, et c'est le FOCUS qui dit où l'on est. */
-.ld-ctl {
-  width: 100%;
-  min-height: var(--ligne-h);
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-1);
-  font: inherit; font-size: var(--taille-note); font-weight: var(--graisse-texte);
-  line-height: 1.4;
-  resize: vertical;
-}
-textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 0; }
-/* rgba(var(--primary-rgb)) et non l'encre en dur : en clair c'est LA MÊME
-   couleur (17,24,39), en sombre le jeton s'inverse — l'anneau de saisie était
-   noir sur fond noir, plus aucun repère de champ actif dans la fiche. */
-/* LE FOCUS S'ALLUME SUR LA CELLULE, pas sur le champ. Depuis que le retrait vit
-   sur la cellule, la boîte du champ commence dix pixels plus loin : un contour
-   posé dessus laissait une bande claire à gauche. C'est la case qui s'allume,
-   comme dans un tableur — et il se pose EN DEDANS, sinon il déborderait sur les
-   cellules voisines de la grille. */
-.ld-ctl:focus { outline: none; }
-.ld-cell:focus-within { outline: 2px solid var(--primary); outline-offset: -2px; }
-:root[data-theme="dark"] .ld-ctl:focus { outline-color: rgba(var(--primary-rgb), .35); }
-.ld-duo { display: flex; gap: 8px; }
-
-/* CE QU'IL Y A À PRODUIRE — un vrai tableau (28/08/2026)
-   Charlie : « je clique sur la ligne, elle s'ouvre façon tableau et je peux
-   tout modifier ». Intitulé à gauche, valeur à droite, une rangée par fait.
-
-   TOUTES LES RANGÉES PRENNENT LA MÊME HAUTEUR, et elles la prennent dans UNE
-   règle : `--ctrl-h`, celle de toute commande de l'application. Deux écritures
-   redeviennent deux hauteurs le jour où l'une bouge. Les champs héritent de
-   `.ld-ctl`, qui la porte déjà — on ne la réécrit donc nulle part ici. */
-/* Une cote tient en trois chiffres : elle n'a pas besoin de la place d'une
-   consigne, qui elle porte tout sur une tasse ou une gravure. */
-.ld-court { flex: 0 0 92px; }
-/* UN NOMBRE NE TRAVERSE PAS LA FICHE. Étalé sur toute la colonne des valeurs,
-   « 100 » se posait à 700 px de son intitulé « S » : pour relier les deux,
-   l'œil devait traverser le panneau. Il prend donc SA largeur — la même pour
-   tous, c'est ce qui aligne la colonne des chiffres — et se cale à droite
-   dedans, comme dans un tableur. */
-.ld-cell .ld-ctl[type="number"] { flex: 0 0 124px; text-align: right; }
-/* La rangée qui AJOUTE : ses champs sont plus clairs que les autres, c'est ce
-   qui la distingue d'une valeur déjà saisie. */
-.ld-rang--ajout > .ld-k-champ, .ld-rang--ajout .ld-ctl { color: var(--text-2); }
-/* Journal des modifications, dans le volet Historique : une ligne par
-   changement, la plus récente en haut. */
-.ld-journal__liste { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
-.ld-journal__liste .ld-v { font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-2); }
-.ld-journal__note { margin-top: 8px; font-size: var(--taille-texte); font-weight: var(--graisse-texte); font-style: italic; color: var(--text-2); }
-/* La pastille WhatsApp sous les deux champs de contact. */
-.ld-duo + .wa-btn { margin-top: 8px; }
-.ld-duo .ld-ctl { min-width: 0; }
-
-/* --- VOLETS : tout ce qui se MODIFIE est replié -----------------------------
-   La fiche s'ouvre en LECTURE : chaque encadré modifiable montre son libellé et
-   sa valeur, exactement comme un encadré en lecture seule de l'écran du patron.
-   On ne l'ouvre que pour changer quelque chose — parcourir une fiche ne doit
-   pas mettre la main sur un champ par accident. */
-/* UN VOLET TRAVERSE LE TABLEAU. Il ne se range pas en deux colonnes : son titre
-   est une rangée à lui, et ce qu'il ouvre se pose dessous, en pleine largeur. */
-.ld-volet {
-  grid-column: 1 / -1;
-  padding: 0;
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--surface);
-}
-/* Un intitulé de volet ne porte ni fond de colonne ni filet de droite : il n'est
-   pas dans la colonne des intitulés, il traverse. */
-.ld-volet .ld-k { min-height: 0; padding: 0; border: 0; background: none; }
-.ld-volet__tete {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  /* 10 px à gauche, comme la colonne des intitulés : à 14 le titre du volet
-     sortait de deux pixels de l'alignement de tout le tableau. */
-  padding: 10px 14px 10px 10px; min-height: var(--ligne-h);
-  cursor: pointer; list-style: none; border-radius: 0;
-}
-.ld-volet__tete::-webkit-details-marker { display: none; }
-.ld-volet__tete:hover { background: var(--surface-hover); }
-.ld-volet__tete:focus-visible { outline: 3px solid rgba(var(--primary-rgb), .2); outline-offset: -2px; }
-.ld-volet__textes { min-width: 0; }
-.ld-volet__textes .ld-k { margin: 0 0 4px; display: block; }
-.ld-volet .ld-rang > .ld-k { padding: 0 12px; }
-.ld-volet__apercu {
-  display: block;
-  font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* Le chevron dit si le volet est ouvert : un état, pas un décor (2,54:1 avant). */
-.ld-volet__chevron { flex: none; color: var(--text-2); transition: transform var(--dur-2) var(--ease); }
-.ld-volet[open] > .ld-volet__tete { border-bottom: 1px solid var(--border-soft); border-radius: 12px 12px 0 0; }
-.ld-volet[open] > .ld-volet__tete .ld-volet__chevron { transform: rotate(180deg); }
-/* Ouvert, la valeur laisse la place au champ : elle serait écrite deux fois. */
-.ld-volet[open] .ld-volet__apercu { display: none; }
-.ld-volet > *:not(.ld-volet__tete) { margin: 14px; }
-.ld-volet > .ld-detail-line { margin: 0; }
-.ld-volet > .ld-hist { margin: 8px 14px; }
-
-.ld-eyebrow {
-  margin: 0 0 2px;
-  font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: .04em;
-  color: var(--text-2);
-}
-.ld-title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-
-/* --- Pied de la fiche : où va la ligne, qui la suit, et on enregistre -------
-   Épinglé sous le contenu qui défile : la commande d'enregistrement ne doit
-   jamais être « quelque part plus bas ». */
-.ld-foot {
-  flex: 0 0 auto;
-  padding: 16px 20px;
-  border-top: 1px solid #d9dee7;
-  background: #fff;
-}
-.ld-foot__row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.ld-foot__row .ld-ctl { flex: 1 1 180px; width: auto; }
-.ld-save {
-  flex: 0 0 auto;
-  min-height: var(--ctrl-h); padding: 11px 20px;
-  border: 1px solid #111827; border-radius: var(--arrondi-champ);
-  background: #111827; color: #fff;
-  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte); cursor: pointer;
-}
-.ld-save:hover:not(:disabled) { background: #000; }
-.ld-save:disabled { border-color: transparent; background: var(--inactif); color: var(--inactif-encre); cursor: default; }
-.ld-note { margin-top: 10px; min-height: 80px; }
-@media (max-width: 620px) {
-  .ld-foot__row .ld-ctl, .ld-save { flex: 1 1 100%; }
-}
-
-/* Thème sombre : la fiche du patron est dessinée en clair. On garde sa
-   composition et on ne remplace que les fonds et les encres, sinon elle
-   deviendrait illisible sur un poste réglé en sombre. */
-:root[data-theme="dark"] .ld-bande { background: var(--bg); }
-/* `--text-2` est désormais posé sur la règle de base, et le jeton suit le
-   thème : cette reprise n'a plus rien à corriger. On la garde nommée pour dire
-   que le cas a été traité aux deux endroits — la retirer sans un mot ferait
-   croire, à la prochaine lecture, que le sombre a été oublié. */
-:root[data-theme="dark"] .ld-k, :root[data-theme="dark"] .ld-volet__chevron { color: var(--text-2); }
-:root[data-theme="dark"] .ld-v,
-:root[data-theme="dark"] .ld-volet__apercu,
-:root[data-theme="dark"] .ld-title { color: var(--text-1); }
-/* DE NUIT AUSSI, LE CHAMP EST LA CELLULE. Cette règle datait du temps où il
-   avait son contour : elle lui remettait un fond plus sombre que le corps, et
-   chaque valeur redevenait une case noire posée dans sa cellule — l'effet
-   « boîte dans une boîte » qu'on venait de retirer, visible seulement de nuit.
-   Seule l'encre reste : le fond vient de la cellule, comme de jour. */
-:root[data-theme="dark"] .ld-ctl { color: var(--text-1); }
-/* …et le corps du tableau prend la surface, pas le gris de page : c'est lui la
-   feuille sur laquelle le quadrillage se lit. */
-:root[data-theme="dark"] .ld-body { background: var(--surface); }
-:root[data-theme="dark"] .ld-volet__tete:hover { background: var(--state-hover); }
-:root[data-theme="dark"] .ld-foot { background: var(--surface); border-color: var(--border); }
-/* Le bouton principal de la fiche était posé en dur à l'encre (#111827) : sur
-   un pied de fiche lui-même sombre, il disparaissait — « Enregistrer les
-   modifications » se lisait comme du texte, plus comme un bouton. En thème
-   sombre c'est l'inverse qu'il faut : une pastille CLAIRE sur fond sombre. */
-:root[data-theme="dark"] .ld-save {
-  background: var(--text-1);
-  border-color: var(--text-1);
-  color: var(--bg);
-}
-:root[data-theme="dark"] .ld-save:hover:not(:disabled) { background: #fff; border-color: #fff; }
-:root[data-theme="dark"] /* Les filets et les gris posés en dur pour l'écran clair : en sombre, le filet
-   #eef0f3 barrait la fiche d'un trait blanc et les gris moyens (#697586,
-   #667085) tombaient sous 2,1:1 de contraste — illisibles. */
-:root[data-theme="dark"] .ld-journal__liste,
-:root[data-theme="dark"] .ld-volet[open] > .ld-volet__tete { border-color: var(--border-soft); }
-:root[data-theme="dark"] .ld-journal__liste .ld-v { color: var(--text-2); }
-:root[data-theme="dark"] .ld-journal__note,
-:root[data-theme="dark"] /* Les grandes ombres portées gardaient leur alpha « clair » : le panneau ne se
-   détachait plus du fond sombre. */
-:root[data-theme="dark"] .ligne-drawer__card { box-shadow: 0 24px 70px rgba(0, 0, 0, .6); }
 /* UN SÉLECTEUR RESTÉ OUVERT (retrouvé le 26/08). La règle disait :
      :root[data-theme="dark"] .dd-panel,
      :root[data-theme="dark"] .pj-feed { box-shadow: …rgba(0,0,0,.5); }
@@ -5935,206 +5510,6 @@ textarea.ld-ctl { font-weight: var(--graisse-texte); padding: 6px 0; }
    écart de 6 px entre ses enfants EN THÈME SOMBRE seulement, et l'ombre qui
    devait le détacher du fond sombre n'existait plus. */
 :root[data-theme="dark"] .dd-panel { box-shadow: -18px 0 48px rgba(0, 0, 0, .5); }
-
-.ld-docs { display: flex; gap: var(--pas-1); }
-
-/* Imprimer / Télécharger le récapitulatif : les deux gestes de l'écran du
-   patron. Ils vivent dans l'en-tête, à côté de la croix. */
-/* Elles se replient aussi : sept actions dans 944 px utiles, c'est juste, et
-   une action qui sort de la carte est une action qui n'existe pas. */
-.ld-head__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.ld-act {
-  display: inline-flex; align-items: center; gap: var(--pas-1);
-  padding: var(--champ-y-serre) var(--pas-2);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); color: var(--text-1);
-  /* L'interligne APRÈS `font: inherit` : le raccourci l'écrase (voir .nav-switch-btn). */
-  font: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
-  line-height: var(--ligne-serre); cursor: pointer;
-}
-.ld-act:hover { background: var(--state-hover); border-color: var(--text-2); }
-.ld-act .material-symbols-outlined { font-size: var(--ic-serre); }
-@media (max-width: 700px) { .ld-act-label { display: none; } }
-
-/* DÉTAIL COMPLET DE LA DEMANDE — tout est modifiable.
-   Le récapitulatif que le comptoir a enregistré, ligne à ligne. Ce n'est pas
-   une archive en lecture seule : une quantité change, une taille se précise,
-   et c'est ICI qu'on le corrige — sinon la correction ne vit que dans la tête
-   de celui qui l'a apprise. */
-/* LE FIL DES ÉTAPES DE LA PRISE DE COMMANDE, dans la fiche. C'est LE composant
-   du comptoir (`.stepper` / `.step` de charte.css) — pas un cousin : le chef
-   d'atelier retrouve, en ouvrant le dossier, exactement les étapes que la
-   vendeuse a franchies, avec leurs mots et leurs coches. Ici elles se cliquent,
-   d'où le <button> : on lui retire seulement ce que le navigateur ajoute de
-   son côté. `font-family` et NON le raccourci `font` — celui-ci annulerait
-   l'interligne que .step vient de poser. */
-/* Chaque bulle prend la largeur de son mot, elle ne se partage pas la rangée :
-   à parts égales, « 5. Récapitulatif » passait à la ligne et sa bulle faisait
-   une tête de plus que les quatre autres — le défaut des bulles de 41 et 47 px
-   du 25/08, repayé. Le fil se replie d'une bulle entière si la place manque. */
-/* LE RÉCAPITULATIF DU COMPTOIR SUIT LE TABLEAU (28/08). Il était écrit en
-   17 px, libellés en capitales, champs encadrés de 50 px : posé au milieu d'une
-   fiche devenue tableau, il ressemblait à un autre écran collé dedans. Même
-   grammaire que les rangées d'à côté — intitulé, filet, champ sans contour. */
-.ld-detail-line {
-  display: grid;
-  /* DEUX PAIRES PAR LIGNE (28/08). Trente-cinq rangées empilées sur une seule
-     colonne, c'était une liste qu'il fallait faire défiler pour voir la moitié
-     du dossier : « toutes les valeurs apparaissent » veut dire tout voir d'un
-     coup. Quatre colonnes — intitulé, valeur, intitulé, valeur — et le dossier
-     tient sur un écran. */
-  grid-template-columns: repeat(2, minmax(128px, 168px) minmax(0, 1fr));
-  gap: 0;
-  align-items: stretch;
-  padding: 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-.ld-detail-line > span {
-  display: flex; align-items: center;
-  min-height: var(--ligne-h); padding: 0 10px;
-  border-right: 1px solid var(--border-soft);
-  font-size: var(--taille-note); font-weight: var(--graisse-texte);
-  letter-spacing: 0; text-transform: none; color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-.ld-detail-input {
-  width: 100%;
-  min-height: var(--ligne-h);
-  border: 0;
-  border-radius: 0;
-  padding: 0 10px;
-  font: inherit;
-  font-size: var(--taille-note);
-  background: transparent;
-  color: var(--text-1);
-  resize: vertical;
-}
-/* `--focus` n'existait nulle part : le repli noir s'appliquait dans LES DEUX
-   thèmes — invisible en sombre. Même jeton inversible que les autres anneaux. */
-.ld-detail-input:focus { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--surface); }
-:root[data-theme="dark"] .ld-detail-input:focus { outline-color: rgba(var(--primary-rgb), .4); }
-
-
-@media (max-width: 620px) {
-  .ld-detail-line { grid-template-columns: 1fr; }
-  .ld-detail-line > span { padding-top: 0; }
-}
-
-/* Historique du client : les autres commandes du même dossier. Cliquables —
-   « on a déjà fait quoi pour eux ? » est la question qu'on pose au téléphone. */
-.ld-hist {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  width: 100%; text-align: left;
-  padding: 10px; margin-bottom: 8px;
-  border: 1px solid var(--border-soft); border-radius: var(--radius);
-  background: var(--bg); color: inherit; font: inherit; cursor: pointer;
-}
-.ld-hist:last-child { margin-bottom: 0; }
-.ld-hist:hover { border-color: var(--text-2); background: var(--state-hover); }
-.ld-hist__main { min-width: 0; }
-.ld-hist__title { display: block; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.ld-hist__sub { display: block; margin-top: 2px; font-size: var(--taille-texte); color: var(--text-2); }
-.ld-hist__value { font-size: var(--taille-texte); font-weight: var(--graisse-forte); white-space: nowrap; }
-.ld-empty { margin: 0; padding: 0; font-size: var(--taille-note); color: var(--text-2); }
-
-.ld-fiche-item { padding: var(--champ-y-serre) var(--pas-2); border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border-soft); margin-bottom: 8px; }
-.ld-fiche-item__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-1); }
-.ld-fiche-item__sub { margin: 3px 0 0; font-size: var(--taille-texte); color: var(--text-2); padding-left: 10px; }
-
-/* Même recette de champ que .pjc-card textarea/input : cadre visible au repos. */
-
-
-/* --- Tiroir éditable ------------------------------------------------------
-   Le tiroir n'est pas une fiche de lecture : chaque rangée porte un contrôle
-   (champ ou puce) qui enregistre sur place.
-   Le couple se lit EMPILÉ — étiquette grasse au-dessus, contrôle en dessous —
-   comme partout ailleurs dans l'app (.pjc-field de l'écran Nouveau client,
-   .cl-f du tiroir Base clients). L'ancien libellé-à-gauche / valeur-à-droite
-   n'existait qu'ici, et c'est ce qui faisait lire ce panneau comme une pièce
-   rapportée. */
-.ld-field {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  font-size: var(--taille-texte);
-}
-.ld-field + .ld-field { margin-top: 14px; }
-.ld-field__label { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-/* Le contrôle ne doit jamais imposer son min-content : sans ça un email ou un
-   motif long crée un défilement horizontal dans .ld-body. */
-.ld-field > :last-child { min-width: 0; }
-/* Empilés, seuls les champs de saisie prennent toute la largeur : une puce ou
-   un interrupteur étiré sur 400 px n'aurait plus l'air cliquable. */
-.ld-field > button,
-.ld-field > .flag-reason { align-self: flex-start; max-width: 100%; }
-
-/* ICI VIVAIT L'ANCIEN TIROIR DE FICHE — retiré le 25/08/2026.
-   Quinze classes (`ld-input` et ses deux variantes, `ld-section`, `ld-value`,
-   `ld-notes`, `ld-reason`, `ld-stage-chip`, `ld-resp-chip`, `ld-detail-save`,
-   `ld-detail-state`, `ld-head__badges`…) décrivaient une fiche remplacée
-   depuis, mais jamais retirée de la feuille : leurs règles ne peignaient plus
-   rien. Vérifié la fiche OUVERTE, pas déduit : elle porte 35 classes `ld-*`,
-   aucune de cette liste. */
-
-
-/* Valeur en lecture seule (le HT déduit du TTC) : calée sur le rembourrage d'un
-   champ pour rester dans l'alignement de la colonne, mais sans cadre ni
-   interaction — rien à y modifier, c'est un calcul. */
-
-
-/* Interrupteur du bloc Paiement : trois états lisibles — Oui (allumé), Non,
-   et « — » quand personne ne s'est encore prononcé. */
-.ld-toggle {
-  min-width: 64px;
-  min-height: 32px;
-  padding: 5px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--pilule);
-  background: var(--surface);
-  color: var(--text-2);
-  font: inherit;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-note);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.ld-toggle:hover { border-color: var(--primary); color: var(--primary); }
-.ld-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
-.ld-toggle.is-on {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--on-primary);
-}
-.ld-toggle.is-on:hover { filter: brightness(1.05); color: var(--on-primary); }
-
-/* Puces réutilisées de la grille : elles y portent les marges de leur cellule,
-   inutiles ici (la rangée .ld-field gère l'espacement). */
-.ld-field .resp-chip,
-.ld-field .ref-chip,
-.ld-field .sub-chip,
-.ld-field .flag-chip,
-.ld-field .flag-reason,
-.ld-field .deadline-badge { margin: 0; }
-
-/* Étape et motif peuvent être longs : ils se replient au lieu de déborder du
-   panneau. Empilés sous leur étiquette, ils disposent de toute la largeur — le
-   bornage à 66 % et l'alignement à droite de l'ancienne rangée n'ont plus lieu
-   d'être. */
-
-
-/* Bouton « voir détails », dans le cluster documents de la cellule Dossier. */
-
-/* COLONNE TICKET : le numéro du papier remis au client, en clair et
-   réimprimable depuis la ligne. Il vivait en pastille dans le cluster de la
-   cellule Dossier — 24 px, donc sans le numéro, et absent des lignes saisies à
-   la main, ce qui décalait d'un cran toute la rangée de pastilles. En colonne,
-   le numéro se lit, et chaque ligne le porte au même endroit.
-   Encadré plutôt que teinté : le vert des pastilles PDF dit « le document
-   existe » — le reprendre ici brouillerait cette lecture. */
-@media (max-width: 720px) {
-  .ligne-drawer__card { width: 100vw; }
-}
 
 
 /* ===========================================================================
@@ -6376,8 +5751,7 @@ summary:focus-visible {
 .ordre-reset:active,
 .colbar-item:active,
 .np-menu__item:active,
-.menu-item:active,
-.ld-act:active { transform: scale(.97); }
+.menu-item:active { transform: scale(.97); }
 .pcard__del,
 .pcard__ref-btn,
 .nav-switch-btn,
@@ -6386,8 +5760,7 @@ summary:focus-visible {
 .ordre-reset,
 .colbar-item,
 .np-menu__item,
-.menu-item,
-.ld-act { transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
+.menu-item { transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
             border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
 /* Le doigt qui GLISSE une carte n'appuie pas dessus : sans ça, l'enfoncement
    se posait au début de chaque prise et luttait avec le fantôme. */
@@ -6462,20 +5835,6 @@ body.dragging-active .pcard:active { border-color: var(--border); }
 .mt-compte__n:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
 .mt-compte__total { color: var(--text-3); white-space: nowrap; }
 .mt-compte__perte { color: var(--st-bloque); font-weight: var(--graisse-note); white-space: nowrap; }
-
-/* LE DOSSIER dans la fiche : articles voisins, étapes de l'article, prochaine
-   action. Mêmes volets que le reste de la fiche, aucun composant neuf. */
-.ld-dossier { display: contents; }
-.ld-pa__champ { width: 100%; min-height: var(--ctrl-h); padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-texte); }
-.ld-pa__champ:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
-.ld-articles, .ld-taches { display: flex; flex-direction: column; gap: 4px; }
-.ld-article { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border-soft); }
-.ld-article:last-child { border-bottom: 0; }
-/* L'article qu'on a ouvert, dans la liste de ses voisins : sans repère, on ne
-   sait plus lequel des quatre on est en train de regarder. */
-.ld-article.is-moi { font-weight: var(--graisse-forte); }
-.ld-tache.is-faite { color: var(--text-3); }
-.ld-modeles { margin-top: 8px; min-height: var(--ctrl-h); padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-texte); }
 
 /* ===========================================================================
    PILOTAGE — l'écran de la Direction (§24).

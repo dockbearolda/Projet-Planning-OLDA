@@ -95,8 +95,9 @@ const A_LIRE = [
   ['.flag-chip.empty', 'la pastille d’état vide propose une alerte'],
   ['.flag-reason.empty', 'le motif vide propose d’écrire un motif'],
   ['.colbar-item__ic', 'la case du panneau Colonnes porte un ÉTAT (sur l’écran / retirée)'],
-  ['.ld-k', 'l’intitulé d’un champ de la fiche dit ce qu’on regarde'],
-  ['.ld-volet__chevron', 'le chevron dit si le volet est ouvert'],
+  // Les deux entrées du tiroir (`.ld-k`, `.ld-volet__chevron`) sont parties le
+  // 29/08 avec lui. Leur équivalent dans la fiche atelier est `.fa-lab`, et il
+  // vit dans fiche-atelier.css — contrôlé par test/fiche-atelier.test.js.
 ];
 for (const [sel, pourquoi] of A_LIRE) {
   const re = new RegExp(`${sel.replace(/[.]/g, '\\.')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`);

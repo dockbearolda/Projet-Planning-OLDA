@@ -148,7 +148,10 @@ assert.ok(/buildTodoView\(activeTab\)/.test(DASH),
 // glyphes cliquables (l'étoile du panneau détail) gardent une taille propre —
 // ce ne sont pas des textes.
 const DEBUT = CSS.indexOf('/* ------------------------------------------------ En-tête « Point du jour » */');
-const FIN = CSS.indexOf('/* --- Fiche projet (planning) ---');
+// LA BORNE DE FIN ÉTAIT LE TITRE DU TIROIR, parti le 29/08 avec lui. On prend
+// la section suivante qui reste : le bloc contrôlé est donc au moins aussi
+// large qu'avant, jamais moins.
+const FIN = CSS.indexOf('/* ------------------------------------------------------- Finitions desktop');
 assert.ok(DEBUT > 0 && FIN > DEBUT, 'bloc CSS du Point du jour introuvable');
 const blocPJ = CSS.slice(DEBUT, FIN);
 

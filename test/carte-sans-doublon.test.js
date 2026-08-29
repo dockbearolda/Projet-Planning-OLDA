@@ -26,6 +26,7 @@ const APP = fs.readFileSync(path.join(RACINE, 'public/app.js'), 'utf8');
 // deux blocs sortables, mesurés avant de couper (voir ligne-faits.js).
 const FAITS = fs.readFileSync(path.join(RACINE, 'public/ligne-faits.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(RACINE, 'public/styles.css'), 'utf8');
+const FICHE = fs.readFileSync(path.join(RACINE, 'public/fiche-atelier.js'), 'utf8');
 
 // Le corps d'une fonction, accolades comptées à partir de celle qui suit la
 // parenthèse fermante — et NON de la première rencontrée : une valeur par
@@ -57,7 +58,11 @@ assert.doesNotMatch(CARTE, /cible\.textContent/,
 // Elle n'est pas PERDUE pour autant : elle se lit au survol du décompte, et en
 // clair dans la fiche.
 assert.match(CARTE, /attachTip\(delaiEl, `À terminer avant \$\{d\.echeanceTexte\}`\)/);
-assert.match(APP, /ldBox\('À terminer avant'/, 'la fiche, elle, l’écrit en toutes lettres');
+// La fiche, elle, l'écrit en toutes lettres — dans fiche-atelier.js depuis que
+// le tiroir a été retiré (29/08) : le champ « Remise au client » porte la date
+// en clair, et se corrige sur place.
+assert.match(FICHE, /ligneDate\('Remise au client'/,
+  'la fiche, elle, l’écrit en toutes lettres — et elle se corrige');
 // Deux `.pcard__sub` au plus dans une carte : la remise, et le motif d'alerte
 // n'en est pas un. Trois, c'était l'empilement d'avant.
 assert.strictEqual((CARTE.match(/'pcard__sub'/g) || []).length, 1);

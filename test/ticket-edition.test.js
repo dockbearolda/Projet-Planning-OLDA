@@ -389,6 +389,7 @@ const VENTE = {
   // 7. LE BRANCHEMENT DANS L'ÉCRAN
   // =========================================================================
   const APP = lire('app.js');
+  const FICHE_ATELIER = lire('fiche-atelier.js');
   const CSS = lire('styles.css');
 
   // L'aperçu s'ouvre DÉJÀ modifiable : le même dessin, avec l'éditeur.
@@ -421,15 +422,22 @@ const VENTE = {
   // vivait dessus — il n'a plus de support, mais la CONSIGNE, elle, reste : on
   // la lit dans la fiche, et la grille continue de la porter dans sa liste
   // allégée (FICHE_LISTE côté serveur).
-  assert.ok(/function consigneAtelier\(r\)/.test(APP), 'la consigne se lit toujours sur la ligne');
+  // `consigneAtelier` n'était plus lu que par l'infobulle de la pastille
+  // supprimée : il est parti le 29/08 avec le reste du tiroir. La CONSIGNE, elle,
+  // se relit et se corrige dans la fiche atelier.
+  assert.ok(/label: 'Consigne atelier'/.test(FICHE_ATELIER) && /rangee\('Consigne'/.test(FICHE_ATELIER),
+    'la consigne se lit toujours, dans la fiche');
   assert.ok(!/--consigne/.test(APP) && !/--consigne/.test(CSS),
     'plus de point sur une pastille qui n’existe plus');
   assert.ok(!/boutonsPapiers/.test(APP), 'plus de composant de pastilles pour les papiers');
 
   // La fiche montre la MÊME consigne : sinon elle ne se relirait qu'en
-  // imprimant le ticket.
-  assert.ok(/const cAtelier = ldSuivi\('atelier',/.test(APP));
-  assert.ok(/if \(ldModifie\(c\.cAtelier\)\) corpsFiche\.atelier = texte\(c\.cAtelier\.value\);/.test(APP));
+  // imprimant le ticket. C'est `fiche.atelier` des deux côtés — le ticket la
+  // lit là, la fiche l'y écrit.
+  assert.ok(/fiche\.atelier \|\| ''/.test(FICHE_ATELIER),
+    'la fiche lit la consigne dans `fiche.atelier`');
+  assert.ok(/ctx\.patchFiche\(\{ atelier: v \}\)/.test(FICHE_ATELIER),
+    '… et c’est là qu’elle la réécrit');
 
   // Le module du ticket part avec la coquille hors ligne (rien n'y a changé,
   // mais un oubli ici rendrait le ticket muet sur un poste sans réseau).

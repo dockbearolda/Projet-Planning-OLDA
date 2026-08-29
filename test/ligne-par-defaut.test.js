@@ -50,6 +50,7 @@ const lire = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'ut
 const APP = lire('app.js');
 const HTML = lire('index.html');
 const CSS = lire('styles.css');
+const FICHE = lire('fiche-atelier.js');
 
 // ---------------------------------------------------------------------------
 // 1. LES SIX FAITS DE LA LIGNE
@@ -112,11 +113,14 @@ assert.match(CSS, /\.grid\.off-responsable col\[data-col="responsable"\]/,
   'elle se range depuis le rail, comme les autres');
 
 // ON RETIRE UNE COLONNE, PAS UNE CAPACITÉ.
-assert.match(APP, /ldBox\('Type de client', typeControl\(r\)\)/,
+// Depuis le 29/08 c'est la FICHE ATELIER qui les porte : le tiroir qui les
+// tenait n'était plus appelé, et `typeControl` est mort avec lui. Le pilote,
+// lui, garde son contrôle dans la grille (colonne « Qui suit »).
+assert.match(FICHE, /menu\(null, ctx\.types, r\.client_type/,
   'le type se change toujours, dans la fiche');
-assert.match(APP, /ldBox\('Qui suit', respControl\(r\)\)/,
-  'le pilote et le référent se changent toujours, dans la fiche');
-assert.match(APP, /function typeControl\(r\) \{/);
+assert.match(FICHE, /rangee\('Type de client', selType\)/, '… et il y est nommé');
+assert.match(FICHE, /ctx\.employes/, 'le pilote se change toujours, dans la fiche');
+assert.match(FICHE, /ctx\.referents/, 'le référent aussi');
 assert.match(APP, /function respControl\(r\) \{/);
 
 // ---------------------------------------------------------------------------
