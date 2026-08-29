@@ -123,11 +123,11 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // LE COMPTE EST EN BAS A DROITE — c'est la norme de tout devis et de toute
   // facture : le total ferme le document, calé à droite, ses lignes empilées
   // sur un même rail. À gauche, ce qui ne regarde que l'atelier.
-  // LES DEUX MOITIES SONT LA MEME FAMILLE (29/08) : meme fabrique, meme
-  // composant de ligne, meme forme — deux faits, un filet, le nombre qui tombe.
-  for (const attendu of ["ligneAtelier('Coût', chCout)", "ligneAtelier('Règlement', selReglement)",
-    "ligneAtelier('Marge', valMarge)", "ligneArgent('Prix TTC', ttcCase)", "'Acompte versé le '",
-    "document.createTextNode('Reste à payer')", "el('div', 'fa-argent__filet')"]) {
+  // TOUT L'ARGENT SUR UNE SEULE BANDE (29/08) : six cases, chacune un intitulé
+  // au-dessus de sa valeur, et les deux signes qui disent la soustraction.
+  for (const attendu of ["caseArgent('Coût', chCout)", "caseArgent('Règlement', selReglement)",
+    "caseArgent('Marge', valMarge)", "caseArgent('Prix TTC', chTtc)", "'Acompte versé le'",
+    "caseArgent('Reste à payer', bSolde, reste)", "signe('−')", "signe('=')"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
   // RIEN NE PASSE A DROITE DU CHIFFRE. Au premier essai, la date de l'acompte

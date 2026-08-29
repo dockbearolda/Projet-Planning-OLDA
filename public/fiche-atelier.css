@@ -446,37 +446,53 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ALLONGE la scene — donc la fiche, qui fait sa taille — et tout se lit d'un
    coup : aucune hauteur maximale, aucun defilement interne, c'est la demande.
    Sur le 14 pouces il redevient un calque, plus bas dans ce fichier. */
-/* LES DEUX BLOCS DU COMPTE SONT ENSEMBLE, EN BAS A DROITE (29/08). Charlie :
-   « toutes ces valeurs doivent etre en bas a droite ou centre, mais elles
-   doivent etre ENSEMBLE ». Poses aux deux bords opposes d'une grille en deux
-   colonnes, ils se lisaient encore comme deux choses — 480 px de blanc entre le
-   cout et le prix. Ils se touchent maintenant, separes du seul ecart de la
-   maison, et la PAIRE est calee a droite.
-   ⚠ Par une MARGE AUTOMATIQUE sur le premier bloc, jamais par `justify-content:
-   flex-end` : celui-ci rogne par la GAUCHE des que le contenu deborde, et c'est
-   le debut de la ligne qui disparait — donc l'intitule. */
+/* TOUT L'ARGENT SUR UNE SEULE BANDE (29/08). Charlie : « je veux que tu fasses
+   rentrer ca proprement sur une seule ligne ». Les deux blocs empiles
+   demandaient 202 px de haut pour six valeurs.
+   ⚠ ELLE SE CALE A DROITE PAR UNE MARGE AUTOMATIQUE sur la premiere case,
+   jamais par `justify-content: flex-end` : celui-ci rogne par la GAUCHE des que
+   le contenu deborde, et c'est le debut de la bande qui disparait.
+   `align-items: flex-end` aligne les VALEURS entre elles ; les intitules, plus
+   ou moins longs, montent au-dessus sans decaler personne. */
 .fa-details {
   flex-shrink: 0;
-  /* MEME DECOUPAGE QUE LA SCENE DU HAUT, sinon les deux moities de l'ecran ne
-     tombent pas sur les memes rails. Le panneau se rembourrait sur ses bords
-     puis posait un ecart entre ses colonnes ; la scene, elle, coupe la carte en
-     deux et chaque colonne se rembourre vers l'interieur. Deux geometries, deux
-     rails a 12 px l'un de l'autre. Ici la grille coupe la carte en deux comme
-     la scene, et c'est la RANGEE qui porte le rembourrage — comme une colonne
-     du haut. */
-  /* ⚠ `--pas-4` — « entre deux blocs », c'est exactement ce que sont les deux
-     moities du compte. J'avais ecrit `--pas-6`, qui n'existe pas : l'echelle
-     s'arrete a 4. Une variable inconnue ne leve RIEN, la declaration tombe et
-     l'ecart valait zero — les deux blocs se touchaient sans qu'aucun controle
-     ne bronche. */
-  display: flex; gap: var(--pas-4);
-  padding: var(--pas-3) 0;
+  /* `--pas-3`, la gouttiere d'un formulaire : neuf elements sur une bande, c'est
+     ce qui les separe, pas l'ecart de deux blocs. A `--pas-4` les huit ecarts
+     mangeaient 192 px sur les 1 306 disponibles. */
+  display: flex; align-items: flex-end; gap: var(--pas-3);
+  padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
-  background: var(--surface);
 }
-/* `hidden` ne masque rien tout seul quand la classe pose son propre `display` :
-   la règle est écrite en clair. Défaut déjà payé sur cet écran-ci. */
+.fa-details > *:first-child { margin-left: auto; }
 .fa-details[hidden] { display: none; }
+/* UNE CASE = UN INTITULE AU-DESSUS, SA VALEUR DESSOUS. Cote a cote, les
+   intitules ne prennent plus de largeur : c'est ce qui fait tenir six valeurs
+   sur une ligne sans rien couper. La valeur garde la hauteur d'une commande —
+   un JETON — pour que les six s'alignent, y compris celles qui ne portent
+   qu'un texte. */
+/* UNE CASE NE SE LAISSE PAS COMPRIMER SOUS SON CONTENU. Sans `flex-shrink: 0`,
+   flexbox rogne la plus large pour faire tenir la bande : « 26,05 € » passait a
+   la ligne DANS sa bulle, 61 px de haut pour une police de 21 — un montant coupe
+   en deux, a l'endroit meme ou on vient chercher le chiffre. C'est le meme piege
+   qu'une colonne plus etroite que son intitule. */
+.fa-case { display: flex; flex-direction: column; gap: var(--pas-1); flex-shrink: 0; }
+.fa-case__k { font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap; }
+.fa-case__v {
+  display: flex; align-items: center; gap: var(--pas-2);
+  min-height: var(--fa-h-champ); white-space: nowrap;
+}
+/* LES SIGNES DISENT LA SOUSTRACTION. Empilee, elle se lisait par un filet ;
+   couchee, ce sont eux. Ils tombent sur la ligne des VALEURS, pas sur celle des
+   intitules — d'ou la meme hauteur de commande que les cases. */
+.fa-signe {
+  display: flex; align-items: center; min-height: var(--fa-h-champ);
+  color: var(--text-3); flex-shrink: 0;
+}
+/* Le trait qui separe ce qui regarde l'atelier de ce qui regarde le client. */
+.fa-sep {
+  align-self: stretch; width: 1px; flex-shrink: 0;
+  background: var(--border); margin: 0 var(--pas-1);
+}
 /* LES RANGEES SONT LES ENFANTS DIRECTS DE LA GRILLE (29/08). Elles vivaient
    dans une colonne qui prenait les deux pistes : six rangees empilees sur
    1 126 px de large, dont trois qui etiraient un menu de trois lettres sur
@@ -641,31 +657,20 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* LES MONTANTS S'ALIGNENT SUR LEUR DERNIER CHIFFRE, sinon la colonne ne se lit
    pas — c'est tout l'interet de les empiler. */
 .fa-argent .fa-in { text-align: right; }
-/* LA MOITIE GAUCHE DU PANNEAU (29/08). Ce qui ne regarde que l'atelier — le
-   cout, la marge qui s'en deduit, le mode de reglement — tenait une rangee
-   PLEINE LARGEUR au-dessus du compte, qui descendait sous elle cale a droite :
-   il restait un rectangle vide de 910 x 225 px en bas a gauche.
-   ELLE EST LA MEME GRILLE QUE LE COMPTE, pas une autre (« tout ca doit etre la
-   meme famille ») : meme composant, meme rangee, meme facon de poser un
-   intitule contre sa valeur. Seul le bord change — elle s'appuie a GAUCHE la ou
-   le compte s'appuie a DROITE, comme les deux colonnes de la scene du haut.
-   ⚠ ELLE DOIT VENIR APRES `.fa-argent` DANS LA FEUILLE : meme specificite, donc
-   c'est l'ordre qui tranche. Posee avant, `margin-left: auto` la battait et le
-   bloc flottait a 179 px du bord. */
-/* C'est le PREMIER bloc qui porte la marge : elle pousse la paire entiere vers
-   la droite, et les deux restent colles l'un a l'autre. */
-.fa-argent--atelier { margin-left: auto; margin-right: 0; }
-.fa-details > .fa-argent { margin-left: 0; }
-.fa-details > .fa-argent--atelier { margin-left: auto; }
 /* LES BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes — la
    largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
    doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px
    on obtenait 88 / 88 / 52, trois boites inegales cote a cote. On egalise ce qui
    doit l'etre — hauteur, rembourrage, graisse, ecart, tenus par `.fa-seg__b` —
    et la largeur suit le mot. UNE regle pour les trois.
-   Ils vivent dans la case du LIBELLE, contre le nombre qu'ils changent : les
-   deux pastilles sur la ligne de l'acompte, « Solde » sur celle du reste. */
-.fa-argent__k .fa-seg__b { flex: 0 0 auto; }
+   Ils vivent dans la case du montant qu'ils changent : les deux pastilles avec
+   l'acompte, « Solde » avec le reste.
+   ⚠ LE SELECTEUR SUIT LA CASE. Il portait sur `.fa-argent__k`, la case de
+   l'ancien compte empile : la bande d'une ligne l'a remplacee, la regle ne
+   mordait plus, et les boutons reprenaient leurs 88 px — 76 px perdus sur une
+   bande qui debordait deja de 47. Une regle qui ne s'applique plus ne dit rien,
+   elle ne casse rien : c'est pour ca qu'on ne la voit pas. */
+.fa-case__v .fa-seg__b { flex: 0 0 auto; }
 
 /* --- CE QUI EST PAYE, ET CE QU'IL RESTE (29/08) ---------------------------
    « En un coup d'oeil on doit voir ce qui est paye et combien il reste a

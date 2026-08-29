@@ -753,8 +753,6 @@ export function dessinerFicheAtelier(r, ctx) {
   // unes sous les autres sur 1 126 px de large, dont trois qui etiraient un
   // menu de trois lettres sur 1 010 px. Le panneau declarait « deux colonnes »
   // et n'en rendait qu'une.
-  const rangeesPanneau = [];
-
   // =========================================================================
   // CE QUI EST PAYE, ET CE QU'IL RESTE — d'un coup d'oeil (29/08)
   // =========================================================================
@@ -903,60 +901,43 @@ export function dessinerFicheAtelier(r, ctx) {
   // celle que Charlie a demandee le 29/08 pour le total. Le bas de la fiche
   // parle d'argent d'un bout a l'autre : il se lit donc comme un compte, et
   // plus comme la suite des colonnes du haut.
-  const grilleCompte = () => el('div', 'fa-argent');
-  const ligneDe = (hote) => (cle, montant) => {
-    const k = el('div', 'fa-argent__k');
-    k.append(...(Array.isArray(cle) ? cle : [document.createTextNode(cle)]));
-    const v = el('div', 'fa-argent__v');
-    v.append(montant);
-    hote.append(k, v);
-    return { k, v };
+  // TOUT L'ARGENT SUR UNE SEULE LIGNE (29/08). Charlie : « je veux que tu fasses
+  // rentrer ca proprement sur une seule ligne ». Les deux blocs empiles
+  // demandaient 202 px de haut pour six valeurs qui tiennent sur une bande.
+  //
+  // CHAQUE VALEUR EST UNE CASE : son intitule au-dessus, sa valeur dessous. Cote
+  // a cote les intitules ne prennent plus de largeur — c'est ce qui permet de
+  // tout tenir sur une ligne sans rien couper.
+  //
+  // LA SOUSTRACTION SE LIT ENCORE, mais a l'horizontale : « Prix TTC − Acompte
+  // = Reste ». Empilee, elle se lisait par un filet ; ici ce sont les deux
+  // signes qui la disent. C'est ce qui evite que la barre devienne une rangee de
+  // chiffres sans rapport entre eux.
+  const caseArgent = (cle, ...contenu) => {
+    const c = el('div', 'fa-case');
+    c.append(el('div', 'fa-case__k', cle));
+    const v = el('div', 'fa-case__v');
+    v.append(...contenu.filter(Boolean));
+    c.append(v);
+    return c;
   };
-  const argent = grilleCompte();
-  const ligneArgent = ligneDe(argent);
-  const ttcCase = chTtc;
-  const acompteCase = chAcompte;
-  const resteCase = reste;
+  const signe = (t) => el('div', 'fa-signe', t);
 
-  // CHAQUE ACTION SE POSE CONTRE LE NOMBRE QU'ELLE CHANGE, dans la case du
-  // LIBELLE — la seule place ou quelque chose peut accompagner un montant sans
-  // sortir du rail des chiffres (regle du 29/08 : rien ne passe A DROITE du
-  // montant). Les deux pastilles calculent l'ACOMPTE, elles vivent donc sur sa
-  // ligne ; « Solde » met le RESTE a zero, il vit sur la sienne. C'est aussi ce
-  // qui retire la quatrieme rangee du compte : elle ne portait qu'eux, et
-  // coutait 56 px de haut pour rien.
-  ligneArgent('Prix TTC', ttcCase);
-  ligneArgent([
-    el('span', 'fa-moins', '−'),
-    document.createTextNode('Acompte versé le '),
-    chAcompteDate,
-    pastilleAcompte(0.3),
-    pastilleAcompte(0.5),
-  ], acompteCase);
-  argent.append(el('div', 'fa-argent__filet'));
-  ligneArgent([bSolde, document.createTextNode('Reste à payer')], resteCase);
-
-  // LE PANNEAU EST UN SEUL BLOC, PAS DEUX MORCEAUX ET UN VIDE (29/08). Les deux
-  // rangees de l'atelier tenaient la premiere ligne sur TOUTE la largeur, et le
-  // compte descendait SOUS elles, cale a droite : il restait un rectangle vide
-  // de 910 x 225 px en bas a gauche, et le panneau faisait 318 px de haut.
-  // Elles se rangent maintenant DANS la moitie gauche, en colonne, face au
-  // compte : rien ne flotte seul, et la hauteur du panneau est celle du compte
-  // au lieu d'etre celle du compte PLUS une rangee.
-  const atelier = grilleCompte();
-  atelier.classList.add('fa-argent--atelier');
-  const ligneAtelier = ligneDe(atelier);
-  // MEME FORME QUE LE COMPTE, ligne pour ligne : deux faits qu'on SAISIT, un
-  // filet, puis le nombre qui en TOMBE. A droite c'est prix moins acompte egale
-  // reste ; a gauche c'est cout et reglement, puis la marge — qui se calcule
-  // elle aussi et ne se tape jamais. Le filet dit la meme chose des deux cotes,
-  // et c'est lui qui fait tomber les six lignes aux memes hauteurs.
-  ligneAtelier('Coût', chCout);
-  ligneAtelier('Règlement', selReglement);
-  atelier.append(el('div', 'fa-argent__filet'));
-  ligneAtelier('Marge', valMarge);
-  rangeesPanneau.push(atelier, argent);
-  panneau.append(...rangeesPanneau);
+  panneau.append(
+    // A GAUCHE, ce qui ne regarde que l'atelier.
+    caseArgent('Coût', chCout),
+    caseArgent('Marge', valMarge),
+    caseArgent('Règlement', selReglement),
+    el('div', 'fa-sep'),
+    // A DROITE, le compte du client — et la barre finit sur le nombre qu'on
+    // vient chercher, en bas a droite : c'est la norme, elle ne change pas
+    // parce que le compte s'est couche.
+    caseArgent('Prix TTC', chTtc),
+    signe('−'),
+    caseArgent('Acompte versé le', chAcompteDate, pastilleAcompte(0.3), pastilleAcompte(0.5), chAcompte),
+    signe('='),
+    caseArgent('Reste à payer', bSolde, reste),
+  );
 
   // LE CHAMP DES NOTES VIT DANS LA COLONNE GAUCHE, POINT. Il y avait ici un
   // seuil de hauteur (420 px) qui le renvoyait dans le panneau sur un ecran
