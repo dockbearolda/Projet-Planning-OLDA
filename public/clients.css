@@ -37,12 +37,20 @@
   border-bottom: 1px solid var(--border);
 }
 .cl-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* L'INITIALE QUI COIFFE UN OBJET EST UN ROND. La charte le dit en toutes
+   lettres : « rond parfait = une icone seule, une initiale ». Les trois
+   initiales de cet ecran — la marque en tete, la carte d'un client, l'en-tete
+   de sa fiche — etaient des rectangles arrondis, et c'etait la SEULE famille
+   d'initiales de l'application a ne pas etre un disque : celles du planning, du
+   Point du jour, des references de categorie et de la pilule de repartition le
+   sont toutes. Ca ne se voit pas sur cet ecran, seulement en passant de l'un a
+   l'autre. */
 .cl-brand__av {
   display: grid;
   place-items: center;
   width: var(--rond);
   height: var(--rond);
-  border-radius: var(--arrondi-bloc);
+  border-radius: 50%;
   background: var(--primary);
   color: var(--on-primary);
   font-weight: var(--graisse-forte);
@@ -164,7 +172,7 @@
   place-items: center;
   width: var(--rond);
   height: var(--rond);
-  border-radius: var(--arrondi-bloc);
+  border-radius: 50%;
   background: var(--primary-soft);
   color: var(--primary);
   font-weight: var(--graisse-forte);
@@ -241,7 +249,10 @@
 .cl-badge--cmd { background: var(--primary-soft); color: var(--primary); }
 .cl-badge--note { background: var(--state-hover); color: var(--text-2); }
 .cl-card__time { font-size: var(--taille-texte); color: var(--text-2); white-space: nowrap; }
-.cl-card__chev { color: var(--text-2); font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
+/* Le chevron est une ICONE, pas du texte : il prend `--ic` comme toutes les
+   autres. A `--taille-texte` il sortait a 17 px — 78 fois par ecran, seul
+   pictogramme de l'application a ne pas etre a la taille des autres. */
+.cl-card__chev { color: var(--text-2); font-size: var(--ic); }
 
 .cl-empty {
   margin: 40px auto;
@@ -289,7 +300,7 @@
   place-items: center;
   width: var(--rond);
   height: var(--rond);
-  border-radius: var(--arrondi-bloc);
+  border-radius: 50%;
   background: var(--primary-soft);
   color: var(--primary);
   font-weight: var(--graisse-forte);

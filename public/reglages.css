@@ -93,7 +93,9 @@
 .reg-apercu__bulle {
   margin: 0;
   padding: 11px 14px;
-  border-radius: 14px 14px 14px 4px;
+  /* Trois formes, et la bulle en est une variante : le coin bas-gauche marque
+     d'ou vient le message. Les trois autres prennent l'arrondi d'un bloc. */
+  border-radius: var(--arrondi-bloc) var(--arrondi-bloc) var(--arrondi-bloc) 4px;
   background: var(--st-livree-bg);
   color: var(--text-1);
   font-size: var(--taille-texte);
@@ -146,7 +148,14 @@
 .reg-tarif-input { min-width: 0; min-height: var(--ctrl-h); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: var(--taille-texte); background: var(--surface); color: var(--text-1); }
 .reg-tarif-input--nom { flex: 1 1 250px; }
 .reg-tarif-input--num { flex: 0 0 102px; text-align: right; }
-.reg-tarif-toggle, .reg-tarif-del { flex: 0 0 36px; min-height: 36px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+/* LES DEUX COMMANDES DE LA RANGEE PRENNENT LA BOITE DE LA RANGEE. Elles
+   s'ecrivaient 36 px pendant que les champs a cote d'elles prenaient `--ctrl-h`
+   (50) : trois objets sur une meme ligne, deux hauteurs. Et leur glyphe sortait
+   a 17 px — la taille du TEXTE, pas celle d'une icone. */
+.reg-tarif-toggle, .reg-tarif-del { flex: 0 0 var(--ctrl-h); min-height: var(--ctrl-h); border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.reg-tarif-toggle .material-symbols-outlined,
+.reg-tarif-del .material-symbols-outlined,
+.reg-tarif-add .material-symbols-outlined { font-size: var(--ic); }
 .reg-tarif-toggle.is-on { color: var(--primary); }
 .reg-tarif-del:hover { color: var(--danger); }
 .reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: var(--ctrl-h); padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: var(--taille-texte); cursor: pointer; }
@@ -207,4 +216,4 @@
 .reg-ligne__aide { flex: 1 1 auto; min-width: 0; font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reg-champ { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
 .reg-champ__unite { font-size: var(--taille-note); color: var(--text-2); }
-.reg-inter { flex: 0 0 auto; width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+.reg-inter { flex: 0 0 auto; width: var(--ic); height: var(--ic); accent-color: var(--primary); cursor: pointer; }

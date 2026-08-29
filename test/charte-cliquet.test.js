@@ -55,13 +55,13 @@ const PLAFONDS = {
   'public/dashboard.css': 4,
   'public/clients.css': 2,
   'public/montravail.css': 4,
-  'public/reglages.css': 4,
+  'public/reglages.css': 1,
   'public/projet.css': 3,
 };
 
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 183;
+const TOTAL_MAX = 180;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
