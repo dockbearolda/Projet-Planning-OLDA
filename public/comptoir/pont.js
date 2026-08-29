@@ -1339,7 +1339,12 @@
    gardent leur largeur fixe (tabular-nums), c'est du réglage de chiffres, pas
    un changement de police. */
 .menu-jeton{flex:none;font-size:var(--taille-texte);font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums;
-  color:var(--text-1);background:var(--border-soft);border-radius:6px;padding:4px 7px;white-space:nowrap}
+  /* UNE ETIQUETTE PREND LA PILULE. La charte n'admet que trois formes, et la
+     forme dit le role : rectangle = ca agit, rond = une icone seule, pilule =
+     une etiquette, un etat, un compteur. Une reference posee a cote d'un
+     libelle est une etiquette ; elle etait ecrite en 6 px, une quatrieme forme.
+     (Aucun accent grave ici : ce bloc est un gabarit, il le terminerait.) */
+  color:var(--text-1);background:var(--border-soft);border-radius:var(--pilule);padding:4px 7px;white-space:nowrap}
 /* UNE VALEUR CHOISIE NE SE LIT PAS COMME UN PLACEHOLDER. Les deux états
    pointaient sur le MÊME jeton (--text-2) : « OUI — 4 % » sortait dans le gris
    exact de « Choisir », et un menu rempli avait l'air vide — d'autant plus
