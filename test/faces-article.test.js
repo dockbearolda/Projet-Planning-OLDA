@@ -56,6 +56,7 @@ const bac = new Function(`${SECTION}
 assert.strictEqual(bac.cleDeFace('Face arrière'), 'arriere');
 assert.strictEqual(bac.cleDeFace('Face avant'), 'avant');
 assert.strictEqual(bac.cleDeFace('Fond'), 'fond');
+assert.strictEqual(bac.cleDeFace('Dessous'), 'dessous');
 assert.strictEqual(bac.cleDeFace('Manche DR'), 'manche-dr');
 assert.strictEqual(bac.cleDeFace(null), '');
 
@@ -68,12 +69,12 @@ assert.strictEqual(bac.dessinDeFamille(''), '');
 
 // UNE FACE VIDE N'EST PAS UNE ZONE.
 const zones = bac.zonesDepuisFaces(
-  ['Face avant', 'Face arrière', 'Fond'],
-  { 'Face avant': '  Logo client  ', 'Face arrière': '   ', Fond: 'Logo OLDA' },
+  ['Face avant', 'Face arrière', 'Dessous'],
+  { 'Face avant': '  Logo client  ', 'Face arrière': '   ', Dessous: 'Logo OLDA' },
 );
 assert.deepStrictEqual(zones, [
   { face: 'Face avant', mm: '', quoi: 'Logo client' },
-  { face: 'Fond', mm: '', quoi: 'Logo OLDA' },
+  { face: 'Dessous', mm: '', quoi: 'Logo OLDA' },
 ], 'seules les faces écrites deviennent des zones, et la consigne est ébarbée');
 assert.ok(zones.every((z) => z.mm === ''),
   'AUCUN MILLIMÈTRE AU COMPTOIR : demander une largeur ici, c’est obtenir un chiffre inventé');
@@ -82,7 +83,7 @@ assert.deepStrictEqual(bac.zonesDepuisFaces([], { x: 'y' }), [],
 
 // Une ligne rouverte se relit à l'identique : c'est elle qui a été annoncée.
 assert.deepStrictEqual(bac.valeursDepuisZones(zones),
-  { 'Face avant': 'Logo client', Fond: 'Logo OLDA' });
+  { 'Face avant': 'Logo client', Dessous: 'Logo OLDA' });
 assert.deepStrictEqual(bac.valeursDepuisZones(null), {},
   'un dossier d’avant les faces se rouvre sans faces, pas en erreur');
 
@@ -118,9 +119,15 @@ assert.ok(/\.faces__zone\s*\{/.test(CHARTE) && /\.faces--tasse/.test(CHARTE),
 assert.ok(!/\.tasse__/.test(CHARTE),
   'plus de composant « tasse » à part : une seule famille de classes');
 
-// LE FOND EST UN DISQUE, et rien ne doit le reprendre.
-const disque = (CHARTE.match(/\.faces--tasse \.faces__face--fond \.faces__zone \{[^}]*\}/) || [''])[0];
-assert.ok(/border-radius:\s*50%/.test(disque), 'le fond de la tasse est un disque');
+// LE DESSOUS EST UN DISQUE, et rien ne doit le reprendre.
+// ⚠ SOUS SES DEUX NOMS. « Fond » s'appelle « Dessous » depuis le 29/08 — le mot
+// de l'atelier — mais les dossiers déjà écrits portent l'ancien : la règle du
+// disque doit répondre aux deux, sinon une tasse d'avant se dessine CARRÉE,
+// c'est-à-dire à l'endroit exact où la forme dit de quel côté on marque.
+const disque = (CHARTE.match(/\.faces--tasse :is\(\.faces__face--dessous, \.faces__face--fond\) \.faces__zone \{[^}]*\}/) || [''])[0];
+assert.ok(/border-radius:\s*50%/.test(disque), 'le dessous de la tasse est un disque');
+assert.match(CHARTE, /\.faces--tasse :is\(\.faces__face--dessous, \.faces__face--fond\) \{ align-items: center; \}/,
+  'et il se centre sous ses deux noms');
 
 // AUCUNE COULEUR EN DUR dans le composant : la couleur dit un état, et une face
 // n'est pas un état.
@@ -173,8 +180,19 @@ delete process.env.APP_PASSWORD;
   const table = await fetch(`${base}/api/tailles-logo`).then((r) => r.json());
   const famille = (table.familles || []).find((f) => f.nom === 'Tasse céramique 350 ml');
   assert.ok(famille, 'la tasse est au tableau des tailles de logo');
-  assert.deepStrictEqual(famille.faces, ['Face avant', 'Face arrière', 'Fond'],
-    'ses trois faces : les deux parois et le fond');
+  assert.deepStrictEqual(famille.faces, ['Face avant', 'Face arrière', 'Dessous'],
+    'ses trois faces : les deux parois et le dessous');
+  // LE RENOMMAGE A SA PROPRE GARDE, comme toute migration de ce dépôt, et il
+  // ne peut pas passer par l'instantané : la clé `tailles_logo` existe en
+  // production depuis le 26/08, `semerTaillesLogo` n'y repassera plus jamais.
+  assert.match(DB, /async function renommerFondEnDessous\(\)/);
+  assert.match(DB, /SELECT 1 FROM app_meta WHERE key = 'faces_tasse_dessous'/,
+    'sa PROPRE garde, pas celle des faces de la tasse');
+  assert.match(DB, /await renommerFondEnDessous\(\);/, 'et elle est jouée au démarrage');
+  // Rejouée, elle ne doit rien dupliquer : une famille qui porte déjà
+  // « Dessous » et « Fond » perd le second au lieu d'en avoir deux.
+  assert.match(DB, /if \(f\.faces\.includes\('Dessous'\)\) f\.faces\.splice\(i, 1\);/,
+    'jamais deux fois la même face');
   assert.deepStrictEqual(famille.tailles, ['Taille unique'],
     'une seule taille — ce sont les FACES qui portent le travail');
 

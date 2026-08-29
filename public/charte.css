@@ -1151,8 +1151,8 @@ body.a-connecter { overflow: hidden; }
    d'interface ; ici le rond n'est pas un rôle, c'est la pièce.
    Il porte moins de texte que les parois — on y met une mention, pas une
    composition — donc il est plus petit, et c'est juste. */
-.faces--tasse .faces__face--fond { align-items: center; }
-.faces--tasse .faces__face--fond .faces__zone {
+.faces--tasse :is(.faces__face--dessous, .faces__face--fond) { align-items: center; }
+.faces--tasse :is(.faces__face--dessous, .faces__face--fond) .faces__zone {
   width: calc(var(--ctrl-h) * 2.4);
   height: calc(var(--ctrl-h) * 2.4);
   min-height: 0;

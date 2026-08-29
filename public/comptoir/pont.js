@@ -2590,8 +2590,14 @@ function dessinDeFamille(famille) {
 const FACES_AIDE = {
   avant: 'Logo, texte, photo…',
   arriere: 'Rien si vierge',
+  dessous: 'Souvent le logo OLDA',
   fond: 'Souvent le logo OLDA',
 };
+/* LE MEME COTE SOUS DEUX NOMS. « Fond » s'est appele « Dessous » le 29/08 —
+   c'est le mot de l'atelier. Les dossiers deja ecrits portent l'ancien nom et le
+   gardent ; c'est ici qu'on sait que les deux designent la meme piece, pour que
+   le disque se dessine et que ce qui etait ecrit dessus se retrouve. */
+const FACE_ALIAS = { dessous: 'fond', fond: 'dessous' };
 const FACES_AIDE_DEFAUT = 'Ce qu’on marque ici';
 
 /* Pose les faces dans `hote` et renvoie de quoi les relire.
@@ -2610,7 +2616,12 @@ function facesArticle(hote, faces, valeurs, auChangement, dessin) {
   for (const [k, v] of Object.entries(valeurs || {})) parCle[cleDeFace(k)] = v;
   for (const nom of noms) {
     const v = (valeurs || {})[nom];
-    etat[nom] = String((v === undefined ? parCle[cleDeFace(nom)] : v) || '');
+    const cle = cleDeFace(nom);
+    /* … et a defaut par son ALIAS : une tasse dont le dessous portait « Fond »
+       garde ce qui y etait ecrit quand le tableau dit maintenant « Dessous ».
+       Sans ca, le renommage effacait la mention a la premiere reouverture. */
+    const repli = parCle[cle] === undefined ? parCle[FACE_ALIAS[cle]] : parCle[cle];
+    etat[nom] = String((v === undefined ? repli : v) || '');
   }
 
   const boite = document.createElement('div');

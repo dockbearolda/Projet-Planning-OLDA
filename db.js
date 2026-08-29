@@ -397,6 +397,8 @@ async function init() {
   await semerFacesCouteau();
   // La face de repli, pour tout ce que le tableau ne declare pas encore.
   await semerFaceDefaut();
+  // « Fond » se dit « Dessous » a l'atelier.
+  await renommerFondEnDessous();
   // Le feu ne peut rien dire des dossiers d'avant lui tant qu'on ne lui a pas
   // rendu ce qu'ils portaient déjà.
   await rattraperFeu();
@@ -2279,7 +2281,7 @@ const TASSE_FAMILLE = 'Tasse céramique 350 ml';
 // Le nom se change dans Réglages → Tailles de logo, c'est une donnée.
 const COUTEAU_FAMILLE = 'Couteau Multi';
 const COUTEAU_FACES = ['Manche — face 1', 'Manche — face 2'];
-const TASSE_FACES = ['Face avant', 'Face arrière', 'Fond'];
+const TASSE_FACES = ['Face avant', 'Face arrière', 'Dessous'];
 async function semerFacesTasse() {
   const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_tasse'");
   if (rows.length) return;
@@ -2366,6 +2368,40 @@ async function semerFaceDefaut() {
     }
   });
   await poserMeta('faces_defaut', '1');
+}
+
+// LE TROISIEME COTE D'UNE TASSE S'APPELLE « DESSOUS » (29/08/2026)
+// ===========================================================================
+// Charlie : « et pour tasse c'est pas Fond, c'est Dessous ». C'est le mot de
+// l'atelier ; « Fond » se confond avec le fond d'un ecran ou le fond d'un sac.
+//
+// LE RENOMMAGE NE PEUT PAS SE FAIRE PAR L'INSTANTANE : la cle `tailles_logo`
+// existe en production depuis le 26/08, `semerTaillesLogo` n'y repassera plus.
+// Il faut donc reecrire la face en place, avec sa PROPRE garde.
+//
+// ⚠ ON NE TOUCHE PAS AUX DOSSIERS DEJA ECRITS. Un dossier porte le NOM de la
+// face dans `fiche.prod.logos[].face` : ceux qui disent « Fond » continuent de
+// le dire, et le papier les rend tels quels. C'est le tableau qu'on renomme,
+// pas l'histoire — reecrire les dossiers changerait ce que l'atelier a lu.
+//
+// Down : UPDATE app_meta SET value = replace(value, '"Dessous"', '"Fond"')
+//        WHERE key = 'tailles_logo';
+//        DELETE FROM app_meta WHERE key = 'faces_tasse_dessous';
+async function renommerFondEnDessous() {
+  const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_tasse_dessous'");
+  if (rows.length) return;
+  await ecrireTaillesLogo(async (table) => {
+    for (const f of table.familles || []) {
+      if (!Array.isArray(f.faces)) continue;
+      const i = f.faces.indexOf('Fond');
+      // Une famille qui porte deja « Dessous » ne recoit pas un doublon.
+      if (i >= 0) {
+        if (f.faces.includes('Dessous')) f.faces.splice(i, 1);
+        else f.faces[i] = 'Dessous';
+      }
+    }
+  });
+  await poserMeta('faces_tasse_dessous', '1');
 }
 
 // --- Rattrapage du feu : ce que les dossiers d'avant savaient déjà -----------
@@ -3158,7 +3194,7 @@ module.exports = {
   pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
   // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
-  semerFaceDefaut,
+  semerFaceDefaut, renommerFondEnDessous,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
