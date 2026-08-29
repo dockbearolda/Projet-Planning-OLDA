@@ -1854,9 +1854,27 @@ function facesDeclarees(nom){
    l'article.
    Conséquence : déclarer un objet dans Réglages → Tailles de logo suffit à le
    faire marcher. Pas de catégorie à créer, pas de menu à toucher. */
+/* ET QUAND PERSONNE N'A RIEN DECLARE : UNE FACE, plutot que rien (29/08).
+   Mesure du catalogue ce jour-la : sur 82 lignes vendables, 63 n'ouvraient
+   AUCUNE boite « Ce qu'on marque » — une seule des 8 familles en declarait
+   (la tasse), et deux des 17 categories de la saisie hors catalogue. Pour tout
+   le reste, la vendeuse retombait dans le pave « Informations importantes » et
+   l'atelier lisait un paragraphe au lieu d'une carte : exactement ce que les
+   faces devaient supprimer.
+   LE REPLI EST UNE DONNEE, pas une constante du code : c'est la famille
+   « Par defaut » du tableau des tailles de logo. La vider rend le comportement
+   d'avant, au pixel pres ; y ajouter une face la donne a tout le catalogue.
+   Une famille creee demain marche demain, sans revenir ici.
+   MAIS TANT QUE RIEN N'EST CHOISI, PAS DE BOITE : sans cette garde le repli
+   ouvrirait la grille avant meme qu'on ait dit de quel article on parle. */
+const FACES_REPLI='Par défaut';
 function facesDeLaCategorie(cat,label){
   const parArticle=facesDeclarees(label);
-  return parArticle.length?parArticle:facesDeclarees(cat);
+  if(parArticle.length)return parArticle;
+  const parFamille=facesDeclarees(cat);
+  if(parFamille.length)return parFamille;
+  if(!txLogoCle(cat)&&!txLogoCle(label))return[];
+  return facesDeclarees(FACES_REPLI);
 }
 /* On ne reconstruit QUE si la liste des faces change. Reposer le composant à
    chaque passage reprendrait le champ sous les doigts de la vendeuse : le

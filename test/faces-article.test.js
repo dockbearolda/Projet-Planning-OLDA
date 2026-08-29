@@ -237,8 +237,13 @@ delete process.env.APP_PASSWORD;
   // catalogue arrive avec `category: 'Art de la table'` : sans cette cascade,
   // il n'aurait jamais ses faces.
   const PAGE = ecran('demande-devis');
-  assert.match(PAGE, /function facesDeLaCategorie\(cat,label\)\{\s*\n\s*const parArticle=facesDeclarees\(label\);\s*\n\s*return parArticle\.length\?parArticle:facesDeclarees\(cat\);/,
+  assert.match(PAGE, /const parArticle=facesDeclarees\(label\);\s*\n\s*if\(parArticle\.length\)return parArticle;\s*\n\s*const parFamille=facesDeclarees\(cat\);/,
     'la désignation d’abord, la catégorie ensuite');
+  // ET LE REPLI EN DERNIER (29/08) : la cascade a un troisième cran, la famille
+  // « Par défaut ». Il ne prend jamais la main sur une famille qui déclare —
+  // c'est ce que l'ordre des trois lignes ci-dessus garantit.
+  assert.match(PAGE, /if\(parFamille\.length\)return parFamille;\s*\n\s*if\(!txLogoCle\(cat\)&&!txLogoCle\(label\)\)return\[\];\s*\n\s*return facesDeclarees\(FACES_REPLI\);/,
+    'le repli passe APRÈS l’article et la famille, et jamais sur un écran vierge');
   assert.match(PAGE, /zones:zonesDuBesoin\(category,\$\('needLabel'\)\.value\.trim\(\)\)/,
     'et le besoin enregistré passe bien la désignation');
   assert.match(PAGE, /l\.addEventListener\('input',\(\)=>renderNeedFaces\(\)\)/,

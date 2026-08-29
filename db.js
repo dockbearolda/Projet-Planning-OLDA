@@ -395,6 +395,8 @@ async function init() {
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
   await semerFacesCouteau();
+  // La face de repli, pour tout ce que le tableau ne declare pas encore.
+  await semerFaceDefaut();
   // Le feu ne peut rien dire des dossiers d'avant lui tant qu'on ne lui a pas
   // rendu ce qu'ils portaient déjà.
   await rattraperFeu();
@@ -2318,6 +2320,54 @@ async function semerFacesCouteau() {
   await poserMeta('faces_couteau', '1');
 }
 
+// UNE FAMILLE SANS FACE N'AFFICHE RIEN — ET C'ÉTAIT LE CAS DE PRESQUE TOUT
+// (29/08/2026, tranché par Charlie)
+// ===========================================================================
+// Les faces d'un article viennent de la FAMILLE déclarée dans Réglages → Tailles
+// de logo, et le comptoir les rend telles quelles. Le mécanisme est bon ; le
+// tableau, lui, n'était pas rempli. Mesuré sur le catalogue du comptoir :
+//
+//   · 82 lignes vendables, 63 SANS AUCUNE FACE (42 articles distincts) — le
+//     décapsuleur, la planche à découper, le shaker, le plateau… ;
+//   · 8 familles au catalogue, UNE SEULE déclarait des faces (la tasse) ;
+//   · 17 catégories dans la saisie hors catalogue, DEUX seulement en ramenaient.
+//
+// Pour tous les autres, la boîte « Ce qu'on marque » ne s'ouvrait pas du tout :
+// la vendeuse décrivait les zones dans le pavé « Informations importantes », et
+// l'atelier lisait un paragraphe au lieu d'une carte. C'est exactement ce que
+// les faces devaient supprimer.
+//
+// UNE FAMILLE DE REPLI, ET C'EST UNE DONNÉE. Elle porte UNE face — de quoi
+// écrire une consigne, ce qui suffit quand on ne sait pas encore combien de
+// côtés a l'objet. Elle se règle, se renomme et se vide depuis l'écran Tailles
+// de logo comme n'importe quelle autre famille : la vider rend exactement le
+// comportement d'avant. Une famille ajoutée au catalogue demain marche demain,
+// sans repasser par le code — ce qu'un repli écrit en dur n'aurait pas donné.
+//
+// Down : DELETE FROM app_meta WHERE key = 'faces_defaut';
+//        puis retirer la famille depuis Réglages → Tailles de logo.
+const DEFAUT_FAMILLE = 'Par défaut';
+const DEFAUT_FACES = ['Face à marquer'];
+async function semerFaceDefaut() {
+  const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'faces_defaut'");
+  if (rows.length) return;
+  await ecrireTaillesLogo(async (table) => {
+    const f = table.familles.find((x) => x.nom === DEFAUT_FAMILLE);
+    if (f) {
+      for (const face of DEFAUT_FACES) if (!f.faces.includes(face)) f.faces.push(face);
+    } else {
+      // UNE TAILLE, parce que le tableau en exige une pour retenir une mesure.
+      // Celle-ci n'en retiendra aucune : un objet du repli se mesure à
+      // l'établi, la zone porte une CONSIGNE et pas une cote.
+      table.familles.push({
+        nom: DEFAUT_FAMILLE, tailles: ['Taille unique'],
+        faces: [...DEFAUT_FACES], references: [], refs: {},
+      });
+    }
+  });
+  await poserMeta('faces_defaut', '1');
+}
+
 // --- Rattrapage du feu : ce que les dossiers d'avant savaient déjà -----------
 // `bat_requis` et `devis_requis` s'arment TOUT SEULS depuis leur création — au
 // dépôt d'un PDF, ou au passage par une sous-étape de BAT / de chiffrage. Mais
@@ -3106,6 +3156,9 @@ async function getRequestJournal(requestId) {
 
 module.exports = {
   pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
+  // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux
+  // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
+  semerFaceDefaut,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,

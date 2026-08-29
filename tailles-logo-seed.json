@@ -425,6 +425,17 @@
       ],
       "refs": {},
       "references": []
+    },
+    {
+      "nom": "Par défaut",
+      "tailles": [
+        "Taille unique"
+      ],
+      "faces": [
+        "Face à marquer"
+      ],
+      "refs": {},
+      "references": []
     }
   ]
 }
