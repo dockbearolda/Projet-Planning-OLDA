@@ -47,10 +47,18 @@
    Le reste de la hiérarchie se fait à la GRAISSE et à la COULEUR, jamais en
    changeant la taille d'un demi-point.
 
-   TROIS GRAISSES. Manrope s'arrête à 800 : un « font-weight:900 » était rendu
-   EXACTEMENT comme un 800 (vérifié au navigateur, même largeur au pixel). La
-   page en déclarait cinq — 400, 600, 700, 800, 900 — dont deux qui ne se
-   voyaient pas. Il en reste trois, qui se distinguent vraiment.
+   TROIS GRAISSES, ET ELLES SONT DES JETONS. Manrope s'arrête à 800 : un
+   « font-weight: 900 » est rendu EXACTEMENT comme un 800 (vérifié au
+   navigateur, même largeur au pixel). Le 27/08 on avait constaté que la page
+   en déclarait cinq — 400, 600, 700, 800, 900 — dont deux qui ne se voyaient
+   pas ; mais on n'avait retiré que le doublon, pas les nombres.
+   Le 29/08 il en restait DIX-HUIT écrits en clair, dont quatorze en 900 ou 950
+   — cinq d'entre elles en `!important`, donc écrasant tout le reste pour
+   afficher... la même graisse que la voisine. Une hiérarchie écrite dans le
+   fichier, invisible à l'écran.
+   Elles passent toutes par les trois jetons de la charte : 900 et 950 comme
+   800 deviennent `--graisse-forte`, 700 comme 600 deviennent `--graisse-note`.
+   Un nombre se recopie de travers ; un jeton, non.
 
    UNE SEULE BOÎTE POUR TOUT CE QUI SE CLIQUE OU SE REMPLIT. Un champ faisait
    51 px, le bouton d'à côté 49,6 et le bouton bordé 48,3 : trois hauteurs sur
@@ -977,12 +985,12 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-client-box{
   background:#f5f7fa;
   border-radius:10px;
-  font-weight:800;
+  font-weight:var(--graisse-forte);
   margin-bottom:16px}
 .ticket-section-label{
   text-transform:uppercase;
   color:#667085;
-  font-weight:900}
+  font-weight:var(--graisse-forte)}
 .ticket-product{
   border-bottom:1px solid #eaecf0}
 .ticket-product-main,
@@ -993,16 +1001,16 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   grid-template-columns:1fr auto;
   gap:14px;
   align-items:start}
-.ticket-product-name{font-weight:900}
-.ticket-product-price{font-weight:900;white-space:nowrap}
+.ticket-product-name{font-weight:var(--graisse-forte)}
+.ticket-product-price{font-weight:var(--graisse-forte);white-space:nowrap}
 .ticket-extra-line{
   border-left:3px solid #f59e0b;
   background:#fffbeb;
   border-radius:0 8px 8px 0}
-.ticket-extra-price{font-weight:900}
+.ticket-extra-price{font-weight:var(--graisse-forte)}
 .ticket-total-line{
   border-top:2px solid #111827;
-  font-weight:950}
+  font-weight:var(--graisse-forte)}
 .ticket-footer{
   background:#f5f7fa;
   color:#667085;
@@ -1156,16 +1164,16 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   color:#111!important}
 .ticket-section-label{
   color:#111!important;
-  font-weight:950!important}
+  font-weight:var(--graisse-forte)!important}
 .ticket-product-name{
   color:#000!important;
-  font-weight:950!important}
+  font-weight:var(--graisse-forte)!important}
 .ticket-product-description{
   color:#222!important;
-  font-weight:600!important}
+  font-weight:var(--graisse-note)!important}
 .ticket-product-price{
   color:#000!important;
-  font-weight:950!important}
+  font-weight:var(--graisse-forte)!important}
 .ticket-extra-line{
   background:#fff4d6!important;
   border-left-color:#111!important;
@@ -1173,11 +1181,11 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-extra-line *,
 .ticket-extra-price{
   color:#111!important;
-  font-weight:900!important}
+  font-weight:var(--graisse-forte)!important}
 .ticket-total-line{
   color:#000!important;
   border-top-color:#000!important;
-  font-weight:950!important}
+  font-weight:var(--graisse-forte)!important}
 .ticket-payment-line{
   background:#ececec!important;
   color:#111!important}
@@ -1186,7 +1194,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-footer{
   background:#ececec!important;
   color:#111!important;
-  font-weight:700!important}
+  font-weight:var(--graisse-note)!important}
 @media print{
 .ticket-product-description,
   .ticket-footer,
@@ -1199,7 +1207,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   border-top:1px solid #777;
   color:#000;
   font-size:15px;
-  font-weight:900}
+  font-weight:var(--graisse-forte)}
 @media print{
 .ticket{
     border:1px solid #555!important;
@@ -1245,10 +1253,14 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     -webkit-print-color-adjust:economy!important;
     print-color-adjust:economy!important}
 }
-#ticketArea .ticket-details{font-size:12.5px;font-weight:600;line-height:1.5;color:#344054;margin-top:8px}
+#ticketArea .ticket-details{font-size:12.5px;font-weight:var(--graisse-note);line-height:1.5;color:#344054;margin-top:8px}
 #ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
-#ticketArea .ticket-details .tl span{color:#667085;font-weight:700;font-size:12px}
-#ticketArea .ticket-details .tl strong{color:#101828;font-weight:700;font-size:12.5px;white-space:pre-line}
+#ticketArea .ticket-details .tl span{color:#667085;font-weight:var(--graisse-note);font-size:12px}
+/* LE LIBELLE PREND LA GRAISSE DE NOTE, LA VALEUR CELLE DE TITRE. Les deux
+   etaient a 700 : sur un ticket lu a l'etabli, rien ne separait « Couleur » de
+   « Noir » que la teinte de l'encre — et l'encre, sur une imprimante noir et
+   blanc reglee en economie, ne separe plus grand-chose. */
+#ticketArea .ticket-details .tl strong{color:#101828;font-weight:var(--graisse-forte);font-size:12.5px;white-space:pre-line}
 #ticketArea .ticket-client-box{font-size:14px!important}
 #ticketArea #ticketClient{font-size:15px}
 #ticketArea #ticketOrder{font-size:14px}

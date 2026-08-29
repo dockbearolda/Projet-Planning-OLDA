@@ -42,14 +42,14 @@ const { spawnSync } = require('node:child_process');
 
 const RACINE = path.join(__dirname, '..');
 
-// Plafonds relevés le 27/08/2026, RE-RÉPARTIS le 29/08 : `styles.css` a été
+// Plafonds relevés le 27/08/2026, RE-RÉPARTIS puis REDESCENDUS le 29/08 : `styles.css` a été
 // découpé par écran (dashboard.css, reglages.css, montravail.css…), et ses
 // écarts ont suivi leurs règles. Le TOTAL ne monte pas — il descend, parce que
 // le tiroir mort est parti le même jour : 239 écarts la veille, 228 ici.
 // Un fichier absent de cette table doit être à ZÉRO : c'est ce qui rend le
 // cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
-  'public/comptoir/demande-devis.css': 116,
+  'public/comptoir/demande-devis.css': 101,
   'public/comptoir/vente-directe.css': 45,
   'public/styles.css': 41,
   'public/dashboard.css': 11,
@@ -61,7 +61,7 @@ const PLAFONDS = {
 
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 228;
+const TOTAL_MAX = 213;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
