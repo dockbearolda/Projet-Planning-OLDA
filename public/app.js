@@ -6043,10 +6043,17 @@ function colbarItem(col) {
     btn.draggable = true;
     btn.dataset.cle = col.key;
     btn.classList.add('is-deplacable');
+    // LA MÊME POIGNÉE QUE LA LIGNE DU TABLEAU, dessinée — pas un nom de glyphe.
+    // `drag_indicator` n'est PAS dans le sous-ensemble de 91 ligatures que nous
+    // hébergeons : le nom s'affichait donc en toutes lettres, coupé à 1 em par
+    // `.material-symbols-outlined`, soit le début d'un « d » à la place des six
+    // points. Rien ne le signalait — un glyphe absent ne lève aucune erreur.
+    // `gripIcon()` existe depuis toujours pour la poignée du tableau et celle
+    // des cartes : deux gestes identiques, un seul dessin.
     const grip = document.createElement('span');
-    grip.className = 'material-symbols-outlined colbar-item__grip';
+    grip.className = 'colbar-item__grip';
     grip.setAttribute('aria-hidden', 'true');
-    grip.textContent = 'drag_indicator';
+    grip.appendChild(gripIcon());
     btn.appendChild(grip);
   }
 

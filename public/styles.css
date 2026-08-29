@@ -1280,7 +1280,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   touch-action: none;
   transition: color var(--dur-1) var(--ease);
 }
-.pcard__handle svg { width: 18px; height: 18px; }
 .pcard:hover .pcard__handle { color: var(--text-2); }
 .pcard__del {
   display: grid; place-items: center;
@@ -1538,7 +1537,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   transition: color var(--dur-1) var(--ease);
 }
 .handle:active { cursor: grabbing; }
-.handle svg { width: 18px; height: 18px; }
+/* LA POIGNÉE DE GLISSER — UNE SEULE BOÎTE, où qu'elle serve. Le dessin est le
+   même partout (`gripIcon`, six points) : la ligne du tableau, la carte du
+   planning, la rangée du panneau « Colonnes ». Sa taille s'écrivait pourtant
+   18 px dans deux règles séparées, et en `font-size` de glyphe dans la
+   troisième — trois écritures pour un objet identique, donc trois tailles le
+   jour où l'une bouge. Elle vaut `--ic`, comme toute icône de commande. */
+.handle svg,
+.pcard__handle svg,
+.colbar-item__grip svg { width: var(--ic); height: var(--ic); }
 .grid tbody tr:hover .handle { color: var(--text-2); }
 
 /* Priorité, attribuable par ligne : badge texte (Basse/Moyenne/Haute),
@@ -2201,10 +2208,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* LA POIGNÉE DE RANGEMENT. Elle ne se montre qu'au survol de l'entrée : au
    repos, la liste se lit ; sous la souris, elle se manipule. Elle garde sa
    place — l'opacité, pas `display` — sinon l'intitulé se décale au survol. */
+/* Elle prend la BOÎTE DE L'ICÔNE de sa propre rangée — la case à cocher qui lui
+   fait face fait `--ic`, la poignée aussi. C'est un dessin (`gripIcon`), pas un
+   glyphe : la police ne porte pas `drag_indicator`. */
 .colbar-item__grip {
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: var(--ic);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ic);
+  height: var(--ic);
   color: var(--text-2);
   opacity: 0;
   transition: opacity var(--dur-1) var(--ease);

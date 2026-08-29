@@ -217,7 +217,13 @@ function buildStatic() {
   // déploiement, alors qu'un tarif de transporteur bouge — et ne fait
   // qu'augmenter. Le catalogue garde la LISTE des transports (c'est elle qui
   // remplit le menu du comptoir) ; c'est ici qu'on pose leur PRIX.
-  page.appendChild(carteSimple('local_shipping', 'Transport',
+  // ⚠ PAS `local_shipping` : la police est un sous-ensemble figé de 91
+  // ligatures, et le camion n'en fait pas partie. Un nom absent ne lève rien —
+  // il s'écrit en toutes lettres, coupé à 1 em, et la carte portait le début
+  // d'un « l » là où l'œil cherche un pictogramme. `flight_takeoff` y est, et
+  // il nomme la seule ligne qui porte un prix : le Chronopost. Le maritime est
+  // compris dans le prix d'achat et reste à zéro.
+  page.appendChild(carteSimple('flight_takeoff', 'Transport',
     'Le coût du transport d’une pièce, en euros HT. Il entre dans le prix '
     + 'd’achat avant le coefficient : le changer rechiffre tout ce qui part '
     + 'ensuite. Le maritime est compris dans le prix d’achat, il reste à zéro.',
