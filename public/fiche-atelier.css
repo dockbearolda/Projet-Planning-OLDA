@@ -66,6 +66,12 @@
   /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
      automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
      texte, elles se déclarent. */
+  /* LA COLONNE DES INTITULES, UN SEUL NOMBRE. Elle valait 90 px en haut et
+     106 px dans le panneau : les valeurs des deux moities de l'ecran ne
+     tombaient donc pas sur le meme rail, a 4 px pres — ca ne se voit pas en
+     relisant une moitie, seulement en mesurant les deux. 106 px, parce qu'une
+     colonne n'est jamais plus etroite que son intitule (« Type de client »). */
+  --fa-lab-w: 106px;
   --fa-point: 7px;
   --fa-coche: 16px;
   /* DEUX HAUTEURS ONT DISPARU LE 29/08, elles ne se remplacent pas : elles se
@@ -274,12 +280,17 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    gauche et 90 à droite : deux départs côte à côte, et l'œil le voit sans
    savoir le nommer. 90 partout — les intitulés de gauche ont été raccourcis
    pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
-.fa-row > .fa-lab { width: 90px; }
+.fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
 .fa-creneau { width: 94px; flex: 0 0 94px; }
-.fa-grille-client { display: grid; grid-template-columns: 90px 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
-.fa-grille-prod { display: grid; grid-template-columns: 90px 1fr 90px 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+/* LES DEUX GRILLES PRENNENT LE MEME RAIL D'INTITULE QUE LES RANGEES. Elles
+   ecrivaient 90 px pendant que `.fa-row` prenait `--fa-lab-w` : les valeurs
+   d'une grille et celles d'une rangee, dans la meme colonne, ne tombaient pas
+   au meme endroit. Ca ne se voit pas en relisant un bloc, seulement en
+   mesurant les deux. */
+.fa-grille-client { display: grid; grid-template-columns: var(--fa-lab-w) 1fr 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
+.fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-1) var(--pas-2); }
 .fa-span2 { grid-column: span 2; }
 .fa-fort { font-weight: var(--graisse-note); }
 
@@ -370,8 +381,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    Sur le 14 pouces il redevient un calque, plus bas dans ce fichier. */
 .fa-details {
   flex-shrink: 0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-3) var(--pas-4);
-  padding: var(--pas-3) var(--pas-4);
+  /* MEME DECOUPAGE QUE LA SCENE DU HAUT, sinon les deux moities de l'ecran ne
+     tombent pas sur les memes rails. Le panneau se rembourrait sur ses bords
+     puis posait un ecart entre ses colonnes ; la scene, elle, coupe la carte en
+     deux et chaque colonne se rembourre vers l'interieur. Deux geometries, deux
+     rails a 12 px l'un de l'autre. Ici la grille coupe la carte en deux comme
+     la scene, et c'est la RANGEE qui porte le rembourrage — comme une colonne
+     du haut. */
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-2) 0;
+  padding: var(--pas-3) 0;
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -383,7 +401,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    1 126 px de large, dont trois qui etiraient un menu de trois lettres sur
    1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
    402 px de haut pour ce qui en demande 190. */
-.fa-details > .fa-row { min-width: 0; }
+.fa-details > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
 
 /* --- La niche des notes -------------------------------------------------
    Elle accueille le champ des notes quand l'ecran est assez haut. Elle
@@ -395,7 +413,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    16 px de gouttiere pour rien. */
 .fa-niche:empty { display: none; }
 .fa-niche > .fa-bloc--notes { align-items: stretch; }
-.fa-niche .fa-bloc--notes > .fa-lab { width: 90px; padding-top: 9px; flex-shrink: 0; }
+.fa-niche .fa-bloc--notes > .fa-lab { width: var(--fa-lab-w); padding-top: 9px; flex-shrink: 0; }
 .fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1; min-width: 0; }
 .fa-row--haut > .fa-lab { padding-top: 9px; }
 
@@ -419,10 +437,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-niche textarea.fa-in, .fa-row--haut > textarea.fa-in { background: var(--bg); }
 .fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
 .fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
-.fa-details .fa-row > .fa-lab { width: 106px; }
 .fa-docs { display: flex; gap: var(--pas-2); flex-wrap: wrap; }
 .fa-cout { width: 120px; flex: 0 0 120px; }
-.fa-rappel-bloc { font-size: var(--fa-lab); color: var(--text-3); line-height: 1.5; white-space: pre-line; }
+.fa-rappel-bloc {
+  flex-shrink: 0; padding: var(--pas-2) var(--pas-4) 0;
+  font-size: var(--fa-lab); color: var(--text-3); line-height: 1.5; white-space: pre-line;
+}
+.fa-rappel-bloc:empty { display: none; }
 
 /* --- ZONE 6 : la barre d'actions basse ------------------------------------ */
 .fa-bas {

@@ -163,7 +163,10 @@ console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’ic
     assert.match(j, /var\(--ctrl-h\)/,
       `la fiche atelier écrit une hauteur de commande à la main : ${j.trim()}`);
   }
-  for (const j of jetons.filter((x) => /--fa-(lab|val|fort|titre|min)\b/.test(x))) {
+  // `--fa-lab-w` est la LARGEUR de la colonne des intitulés, pas un cran de
+  // texte : elle se déduit du plus long d'entre eux (« Type de client »), et
+  // c'est déjà un jeton unique pour les deux moitiés de l'écran.
+  for (const j of jetons.filter((x) => /--fa-(lab|val|fort|titre|min)\s*:/.test(x))) {
     assert.match(j, /var\(--taille-/,
       `la fiche atelier recopie un cran de l’échelle : ${j.trim()}`);
   }

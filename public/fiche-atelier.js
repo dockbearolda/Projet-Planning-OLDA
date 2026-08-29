@@ -303,8 +303,13 @@ export function dessinerFicheAtelier(r, ctx) {
   tete.append(ident, outils);
 
   // =========================================================================
-  // ZONE 2 — le bandeau prioritaire : étape, priorité, valeur
+  // ZONE 2 — le bandeau : OU EN EST LE DOSSIER, et rien d'autre
   // =========================================================================
+  // L'ARGENT N'EST PLUS ICI (29/08). Charlie : « le prix doit etre en bas, il
+  // est important de bien separer client, production et paiement ». Le bandeau
+  // portait le TTC et la marge a cote de l'etape : trois sujets sur une rangee,
+  // et le seul chiffre d'argent de l'ecran perdu au milieu du reste. Il tient
+  // maintenant sa propre zone, en bas, avec le cout et le reglement.
   const bandeau = el('div', 'fa-bandeau');
 
   const blocEtape = el('div', 'fa-bloc fa-bloc--large');
@@ -313,20 +318,15 @@ export function dessinerFicheAtelier(r, ctx) {
     label: 'Étape',
     envoyer: (v) => ctx.changerEtape(v),
   });
-  const suivante = bouton('fa-btn fa-btn--plein', 'Étape suivante ›', () => {
-    const i = ctx.etapes.findIndex((e) => (e.value != null ? e.value : e) === selEtape.value);
-    const prochaine = ctx.etapes[i + 1];
-    if (!prochaine) { dire('Dernière étape du parcours', false); return; }
-    const ancien = selEtape.value;
-    selEtape.value = prochaine.value != null ? prochaine.value : prochaine;
-    ctx.changerEtape(selEtape.value);
-    empiler(() => { selEtape.value = ancien; ctx.changerEtape(ancien); });
-    coche(selEtape); pulser(); dire('Enregistré — étape');
-  });
   // PAS DE LIBELLÉ SUR L'ÉTAPE : le menu dit déjà « Demande & chiffrage ›
   // Tarif / Devis envoyé – Attente client ». Le mot « Étape actuelle » posé
   // au-dessus coûtait une ligne au bandeau et ne s'apprenait à personne.
-  blocEtape.append(selEtape, suivante);
+  //
+  // ET PLUS DE BOUTON « ÉTAPE SUIVANTE » (29/08) : il doublait le menu d'à
+  // côté, qui fait la même chose et permet en plus de SAUTER une étape — un
+  // dossier ne passe pas toujours par toutes. Il coûtait 175 px au menu, qui
+  // est le texte le plus long de l'écran et finissait tronqué.
+  blocEtape.append(selEtape);
 
   const blocPrio = el('div', 'fa-bloc');
   const prios = el('div', 'fa-seg');
@@ -355,7 +355,8 @@ export function dessinerFicheAtelier(r, ctx) {
   prios.setAttribute('aria-label', 'Priorité');
   blocPrio.append(prios);
 
-  const blocValeur = el('div', 'fa-bloc');
+  // LE PRIX ET LA MARGE : construits ici parce que `majMarge` sert aussi au coût
+  // de revient, mais POSÉS dans la zone Paiement, en bas (voir ZONE 5).
   const valMarge = el('span', 'fa-marge-v', '—');
   const chTtc = champ('fa-ttc', r.project_value == null ? '' : normaliserMontant(r.project_value), {
     label: 'Valeur TTC', placeholder: '0,00 €',
@@ -372,19 +373,20 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   const marge = el('div', 'fa-marge');
   marge.append(el('span', 'fa-marge-k', 'marge'), valMarge);
-  // « TTC » et non « Valeur TTC » : le champ porte deja un montant, le libelle
-  // n'a qu'a lever le doute HT/TTC. Les 55 px rendus vont au menu d'etape, le
-  // texte le plus long de l'ecran.
-  blocValeur.append(el('span', 'fa-lab', 'TTC'), chTtc, marge);
 
   // UNE SEULE RANGÉE. Les trois blocs empilaient chacun leur libellé au-dessus
   // de leur commande : 96 px de bandeau, et sous 1180 px les trois se
   // remettaient l'un sous l'autre — près de 200 px pour trois contrôles.
-  bandeau.append(blocEtape, el('div', 'fa-sep'), blocPrio, el('div', 'fa-sep'), blocValeur);
+  bandeau.append(blocEtape, el('div', 'fa-sep'), blocPrio);
 
   // =========================================================================
-  // ZONE 3 — colonne gauche : dates, client & suivi
+  // ZONE 3 — CLIENT : qui c'est, quand il l'a, et ce qu'on lui envoie
   // =========================================================================
+  // TROIS ZONES, ET ELLES NE SE MELANGENT PLUS (29/08). Charlie : « il est
+  // important de bien separer client, production et paiement ». Le type de
+  // client et sa provenance vivaient dans le panneau du bas, entre le mode de
+  // reglement et le champ de production ; « Prevu a l'atelier » vivait avec les
+  // dates client. Chaque fait rejoint la zone dont il parle.
   const gauche = el('div', 'fa-col fa-col--g');
 
   // LA DATE SE TAPE, elle ne se clique pas (28/08). Les quatre boutons rapides
@@ -435,11 +437,15 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   majRappel();
 
+  // « PREVU A L'ATELIER » A CHANGE DE COLONNE : c'est une date de PRODUCTION,
+  // pas un engagement pris devant le client. Elle rejoint la zone qui la porte.
+  // TROIS ZONES, TROIS MOTS : Client, Production, Paiement — ceux de Charlie.
+  // La colonne en portait deux (« Dates », « Client & suivi ») : deux titres
+  // pour une seule zone, et aucun des deux ne disait de quelle zone il s'agit.
   const blocDates = el('section', 'fa-groupe');
   blocDates.append(
-    titreSection('Dates'),
+    titreSection('Client'),
     remise.rangee,
-    prevu.rangee,
     rangee('Retrait', chCreneau),
   );
 
@@ -451,6 +457,19 @@ export function dessinerFicheAtelier(r, ctx) {
   brancher(chPersonne, { label: 'Personne à contacter', envoyer: (v) => ctx.patchLigne('contact_referent', v || null) });
   const selQui = menu(null, ctx.employes, r.responsable || '', 'Qui suit');
   brancher(selQui, { label: 'Qui suit', envoyer: (v) => ctx.patchLigne('responsable', v || null) });
+  const selType = menu(null, ctx.types, r.client_type || '', 'Type de client');
+  brancher(selType, { label: 'Type de client', envoyer: (v) => ctx.patchLigne('client_type', v || null) });
+  const selProvenance = menu(null, ctx.provenances, r.provenance || '', 'Provenance');
+  brancher(selProvenance, { label: 'Provenance', envoyer: (v) => ctx.patchLigne('provenance', v || null) });
+
+  // CE QU'ON ENVOIE AU CLIENT part avec le client. Ces deux boutons vivaient
+  // dans le panneau du bas, devenu la zone Paiement : un recapitulatif et un
+  // e-mail ne sont pas de l'argent.
+  const docs = el('div', 'fa-docs');
+  docs.append(
+    bouton('fa-btn fa-btn--mini', 'Récap complet', () => ctx.telecharger && ctx.telecharger(r)),
+    bouton('fa-btn fa-btn--mini', 'Email au client', () => ctx.email && ctx.email(r)),
+  );
 
   const blocClient = el('section', 'fa-groupe');
   const grilleClient = el('div', 'fa-grille-client');
@@ -458,10 +477,21 @@ export function dessinerFicheAtelier(r, ctx) {
     el('label', 'fa-lab', 'Client'), chClient,
     el('label', 'fa-lab', 'Contact'), chTel, chPersonne,
     el('label', 'fa-lab', 'Qui suit'), selQui,
+    // VENUS DU PANNEAU DU BAS (29/08) : ils disent QUI est en face, pas
+    // comment il paie. Ils etaient coinces entre le mode de reglement et le
+    // champ de production.
+    el('label', 'fa-lab', 'Type'), selType,
+    el('label', 'fa-lab', 'Provenance'), selProvenance,
   );
+  // TROIS CELLULES PAR RANGEE, TOUJOURS. La grille en a trois par ligne : un
+  // menu pose seul apres son intitule n'en remplit que deux, et l'intitule
+  // suivant part dans la troisieme colonne — c'est ce qui a jete « Provenance »
+  // sur sa propre ligne, sous sa valeur.
   chClient.classList.add('fa-span2');
   selQui.classList.add('fa-span2');
-  blocClient.append(titreSection('Client & suivi'), grilleClient);
+  selType.classList.add('fa-span2');
+  selProvenance.classList.add('fa-span2');
+  blocClient.append(grilleClient);
 
   // LES NOTES REMPLISSENT LA HAUTEUR QUI RESTE — quand il y en a. Sur le 14
   // pouces de l'atelier (630 px) il n'y a rien a distribuer : le champ reste
@@ -469,13 +499,14 @@ export function dessinerFicheAtelier(r, ctx) {
   // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
   // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
   const nicheNotes = el('div', 'fa-niche');
-  gauche.append(blocDates, el('div', 'fa-filet'), blocClient, nicheNotes);
+  gauche.append(blocDates, el('div', 'fa-filet'), blocClient,
+    rangee('Documents', docs), nicheNotes);
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
   // =========================================================================
   const droite = el('div', 'fa-col fa-col--d');
-  droite.append(titreSection('Ce qu’il y a à produire'));
+  droite.append(titreSection('Production'), prevu.rangee);
 
   if (prod) {
     const idt = el('div', 'fa-grille-prod');
@@ -591,13 +622,19 @@ export function dessinerFicheAtelier(r, ctx) {
     placeholder: 'Ce qu’il faut savoir avant de couper',
   });
   brancher(chConsigne, { label: 'Consigne atelier', envoyer: (v) => ctx.patchFiche({ atelier: v }) });
+  // « PRODUCTION » VIENT DU PANNEAU DU BAS, ou il vivait entre la provenance du
+  // client et les boutons de documents. C'est le poste de fabrication : il ne
+  // pouvait pas etre ailleurs que dans la zone de production.
+  const chProduction = champ(null, fiche.production || '', { label: 'Production', placeholder: 'À définir' });
+  brancher(chProduction, { label: 'Production', envoyer: (v) => ctx.patchFiche({ production: v }) });
+  droite.append(rangee('Production', chProduction));
   droite.append(rangee('Consigne', chConsigne, undefined, 'fa-row--haut'));
 
   const travail = el('div', 'fa-travail');
   travail.append(gauche, droite);
 
   // =========================================================================
-  // ZONE 5 — la barre « Détails » et son calque
+  // ZONE 5 — PAIEMENT : le seul endroit de l'écran où il est question d'argent
   // =========================================================================
   // LE PANNEAU EST UN CALQUE, jamais dans le flux : posé entre les colonnes et
   // la barre basse, il les comprimerait et elles se mettraient à défiler — la
@@ -655,29 +692,15 @@ export function dessinerFicheAtelier(r, ctx) {
     envoyer: (v) => ctx.patchLigne('cout_revient', nombreDe(v)),
     apres: majMarge,
   });
-  const selType = menu(null, ctx.types, r.client_type || '', 'Type de client');
-  brancher(selType, { label: 'Type de client', envoyer: (v) => ctx.patchLigne('client_type', v || null) });
-  const selProvenance = menu(null, ctx.provenances, r.provenance || '', 'Provenance');
-  brancher(selProvenance, { label: 'Provenance', envoyer: (v) => ctx.patchLigne('provenance', v || null) });
-  const chProduction = champ(null, fiche.production || '', { label: 'Production', placeholder: 'À définir' });
-  brancher(chProduction, { label: 'Production', envoyer: (v) => ctx.patchFiche({ production: v }) });
-
-  const docs = el('div', 'fa-docs');
-  docs.append(
-    bouton('fa-btn fa-btn--mini', 'Récap complet', () => ctx.telecharger && ctx.telecharger(r)),
-    bouton('fa-btn fa-btn--mini', 'Email au client', () => ctx.email && ctx.email(r)),
-  );
-
-  const reglementLigne = el('div', 'fa-duo');
-  reglementLigne.append(selReglement, el('label', 'fa-lab', 'Coût'), chCout);
+  // LE PRIX EST ICI, EN BAS, et plus dans le bandeau. La marge le suit : elle
+  // se lit du TTC et du coût, les trois se relisent d'un coup.
+  const ligneTtc = el('div', 'fa-duo');
+  ligneTtc.append(chTtc, marge);
   rangeesPanneau.push(
+    rangee('Prix TTC', ligneTtc),
+    rangee('Coût', chCout),
     rangee('Paiement', segPaiement),
-    rangee('Règlement', reglementLigne),
-    rangee('Type de client', selType),
-    rangee('Provenance', selProvenance),
-    rangee('Production', chProduction),
-    rangee('Documents', docs),
-    el('div', 'fa-rappel-bloc', ctx.rappelDossier || ''),
+    rangee('Règlement', selReglement),
   );
   panneau.append(...rangeesPanneau);
 
@@ -688,7 +711,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // 21/08 ; c'etait un reste de la tablette.
   nicheNotes.append(colInfos);
   const listeDetails = el('span', 'fa-details__liste',
-    'Paiement · Documents · Provenance · Récapitulatif');
+    'Prix TTC · Coût · Marge · Règlement');
 
   const chevron = el('span', null, '▾');
   const barreDetails = bouton('fa-details__b', null, () => {
@@ -697,7 +720,7 @@ export function dessinerFicheAtelier(r, ctx) {
   });
   barreDetails.append(
     chevron,
-    el('span', null, 'Détails'),
+    el('span', null, 'Paiement'),
     listeDetails,
   );
 
@@ -755,7 +778,12 @@ export function dessinerFicheAtelier(r, ctx) {
   const scene = el('div', 'fa-scene');
   scene.append(travail, panneau);
   const carte = el('div', 'fa-carte');
-  carte.append(tete, bandeau, scene, bas, barreDetails);
+  // LA PROVENANCE DU DOSSIER — « Créée le … depuis Demande de devis » — n'est
+  // ni du client, ni de la production, ni du paiement : c'est l'identité de la
+  // ligne. Elle vivait au bout du panneau du bas ; elle se pose en pied de
+  // carte, là où on la lit sans la chercher.
+  const rappelDossier = el('div', 'fa-rappel-bloc', ctx.rappelDossier || '');
+  carte.append(tete, bandeau, scene, rappelDossier, bas, barreDetails);
   racine.append(carte, calque, zoneToast);
   return racine;
 }

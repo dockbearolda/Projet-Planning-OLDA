@@ -52,7 +52,7 @@ assert.ok(!/max-height/.test(RACINE_CSS),
 const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
-assert.ok(/carte\.append\(tete, bandeau, scene, bas, barreDetails\);/.test(JS)
+assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, bas, barreDetails\);/.test(JS)
   && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
   'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
 // AUCUNE COLONNE NE DÉFILE POUR ELLE-MÊME : c'est exactement ce qui produisait
@@ -70,10 +70,61 @@ assert.ok(/if \(ev\.target === ficheAtelierEl\) fermerFicheAtelier\(\);/.test(AP
 assert.ok(/ficheAtelierEl\.addEventListener\('click'/.test(APP)
   && !/ficheAtelierEl\.addEventListener\('mousedown'/.test(APP),
   'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
-// La bande « Détails » vient après la barre des actions — un dépliant
-// secondaire se pose sous les actions courantes.
-assert.ok(/carte\.append\(tete, bandeau, scene, bas, barreDetails\);/.test(JS),
-  'la bande « Détails » vient après la barre des actions');
+// La bande « Paiement » vient après la barre des actions — un dépliant
+// secondaire se pose sous les actions courantes. Elle s'appelait « Détails »
+// jusqu'au 29/08 : elle mélangeait l'argent, le type de client, la provenance,
+// le poste de production et les documents. Chacun est parti dans sa zone, elle
+// ne porte plus que l'argent — et elle le dit.
+assert.ok(/carte\.append\(tete, bandeau, scene, rappelDossier, bas, barreDetails\);/.test(JS),
+  'la bande « Paiement » vient après la barre des actions');
+assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Paiement');
+
+// ---------------------------------------------------------------------------
+// TROIS ZONES, ET ELLES NE SE MÉLANGENT PLUS (29/08/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « il est important de bien séparer client, production et paiement ».
+// Chaque fait vit dans la zone dont il parle, et le contrôle porte sur le CODE
+// qui l'y pose — c'est le seul endroit où l'appartenance est écrite.
+{
+  const zone = (deb, fin) => {
+    const i = JS.indexOf(deb); const j = JS.indexOf(fin, i);
+    assert.ok(i >= 0 && j > i, `zone introuvable : ${deb}`);
+    return JS.slice(i, j);
+  };
+  const CLIENT = zone("// ZONE 3 — CLIENT", "// ZONE 4");
+  const PRODUCTION = zone("// ZONE 4", "// ZONE 5");
+  const PAIEMENT = zone("// ZONE 5 — PAIEMENT", "// ZONE 6");
+
+  // Le client : qui c'est, quand il l'a, ce qu'on lui envoie.
+  for (const attendu of ["'Type'), selType", "'Provenance'), selProvenance",
+    "rangee('Documents', docs)", "titreSection('Client')"]) {
+    assert.ok(CLIENT.includes(attendu), `la zone Client doit porter ${attendu}`);
+  }
+  // La production : ce qu'il y a à faire, et QUAND on le fait.
+  assert.ok(PRODUCTION.includes("titreSection('Production')"),
+    'la zone de production porte son nom');
+  assert.ok(/prevu\.rangee/.test(PRODUCTION),
+    '« Prévu à l’atelier » est une date de production, pas un engagement client');
+  assert.ok(PRODUCTION.includes("rangee('Production', chProduction)"),
+    'le poste de production vit dans la zone de production');
+  // Le paiement : de l'argent, et rien d'autre.
+  for (const attendu of ["rangee('Prix TTC', ligneTtc)", "rangee('Coût', chCout)",
+    "rangee('Paiement', segPaiement)", "rangee('Règlement', selReglement)"]) {
+    assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
+  }
+  for (const intrus of ['selType', 'selProvenance', 'chProduction', 'docs.append']) {
+    assert.ok(!PAIEMENT.includes(intrus), `${intrus} n’a rien à faire dans la zone Paiement`);
+  }
+  // LE PRIX EST EN BAS, plus dans le bandeau.
+  const BANDEAU = zone('// ZONE 2', '// ZONE 3');
+  assert.ok(!/chTtc|valMarge/.test(BANDEAU.split('const valMarge')[0]),
+    'le bandeau ne porte plus le prix');
+  assert.ok(JS.includes("bandeau.append(blocEtape, el('div', 'fa-sep'), blocPrio);"),
+    '… il ne porte plus que l’étape et la priorité');
+  // ET PLUS DE « ÉTAPE SUIVANTE » : il doublait le menu d'à côté, qui fait la
+  // même chose et permet en plus de sauter une étape.
+  assert.ok(!/Étape suivante/.test(JS), 'plus de bouton « Étape suivante »');
+}
 // L'entête ne porte plus aucun bouton : on sort par Échap ou par un clic à côté,
 // et l'annulation vit dans le message qui suit chaque modification.
 // On lit le MONTAGE, pas le fichier : les deux libellés restent cités dans le

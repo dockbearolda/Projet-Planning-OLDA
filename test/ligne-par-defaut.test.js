@@ -118,7 +118,10 @@ assert.match(CSS, /\.grid\.off-responsable col\[data-col="responsable"\]/,
 // lui, garde son contrôle dans la grille (colonne « Qui suit »).
 assert.match(FICHE, /menu\(null, ctx\.types, r\.client_type/,
   'le type se change toujours, dans la fiche');
-assert.match(FICHE, /rangee\('Type de client', selType\)/, '… et il y est nommé');
+// Depuis le 29/08 il vit dans la ZONE CLIENT (« il est important de bien
+// séparer client, production et paiement ») : sa grille le nomme « Type ».
+assert.match(FICHE, /el\('label', 'fa-lab', 'Type'\), selType/,
+  '… et il est nommé, dans la zone du client');
 assert.match(FICHE, /ctx\.employes/, 'le pilote se change toujours, dans la fiche');
 assert.match(FICHE, /ctx\.referents/, 'le référent aussi');
 assert.match(APP, /function respControl\(r\) \{/);
