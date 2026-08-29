@@ -2443,6 +2443,11 @@ document.addEventListener('pointerdown',ev=>{
   }
   function poserStyleRangeeEtapes() {
     if (document.getElementById('styleRangeeEtapes')) return;
+    /* La colonne a qui l'on confie le defilement. Les deux parcours ne sont pas
+       batis pareil : la demande de devis a `.layout > main`, la vente directe
+       empile ses cartes dans `.container`. Le bloc du bas ne s'ecrit que si
+       cette colonne existe (voir sa note). */
+    const colonneQuiDefile = !!document.querySelector('.layout > main');
     const st = document.createElement('style');
     st.id = 'styleRangeeEtapes';
     /* `top: 0` : le cadre est ce qui défile (l'hôte, lui, ne bouge pas).
@@ -2479,16 +2484,30 @@ document.addEventListener('pointerdown',ev=>{
          plus de sens — on rend alors le défilement à la page.
          Et JAMAIS À L'IMPRESSION : une hauteur d'écran y couperait le
          récapitulatif à la première page. */
-      '@media screen and (min-width:981px){',
-      'html,body{height:100%;overflow:hidden}',
-      '.container{height:100%;display:flex;flex-direction:column;margin-top:0;margin-bottom:0;padding-bottom:0}',
-      '.layout{flex:1 1 auto;min-height:0;align-items:stretch}',
-      /* `min-height:0` : sans lui, un enfant de flex refuse de descendre sous
-         la hauteur de son contenu et c'est la PAGE qui reprend le défilement. */
-      '.layout>main{min-height:0;overflow-y:auto;padding-bottom:var(--pas-4)}',
-      '.layout .sidebar{position:static;top:auto;height:100%;min-height:0;display:flex;flex-direction:column}',
-      '.layout .sidebar>*{min-height:0}',
-      '}',
+      /* ⚠ ET SEULEMENT SUR UN ECRAN QUI A CETTE COLONNE. On RETIRE le
+         defilement au document : il faut donc qu'un element le reprenne, sinon
+         la page est simplement coupee a la hauteur de la fenetre.
+         C'est ce qui arrivait a la VENTE DIRECTE, qui n'a ni `.layout` ni
+         `<main>` — ses cartes sont posees a la suite dans `.container`. A
+         1366 x 700, mesure : `.container` demandait 1665 px dans 700, et
+         « Ajouter l'article » tombait 147 px SOUS le bas de l'ecran, hors
+         d'atteinte — la molette ne faisait rien, `html` et `body` etant en
+         `overflow:hidden`. La vendeuse ne pouvait pas ajouter un article.
+         La regle est donc conditionnee a la presence de la colonne qui doit
+         defiler ; sans elle, la page garde son defilement normal, comme avant
+         que ce bloc existe. */
+      colonneQuiDefile ? [
+        '@media screen and (min-width:981px){',
+        'html,body{height:100%;overflow:hidden}',
+        '.container{height:100%;display:flex;flex-direction:column;margin-top:0;margin-bottom:0;padding-bottom:0}',
+        '.layout{flex:1 1 auto;min-height:0;align-items:stretch}',
+        /* `min-height:0` : sans lui, un enfant de flex refuse de descendre sous
+           la hauteur de son contenu et c'est la PAGE qui reprend le défilement. */
+        '.layout>main{min-height:0;overflow-y:auto;padding-bottom:var(--pas-4)}',
+        '.layout .sidebar{position:static;top:auto;height:100%;min-height:0;display:flex;flex-direction:column}',
+        '.layout .sidebar>*{min-height:0}',
+        '}',
+      ].join('') : '',
     ].join('');
     document.head.appendChild(st);
   }
