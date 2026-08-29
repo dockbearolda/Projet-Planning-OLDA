@@ -139,12 +139,29 @@ assert.match(PANNEAU, /ligneAtelier\('Coût', chCout\);\s*\n\s*ligneAtelier\('R�
 // texte : sans ça la ligne « Marge » écrasait sa rangée. Et c'est un JETON.
 assert.match(CSS, /\.fa-argent__k, \.fa-argent__v \{ min-height: var\(--fa-h-champ\); \}/,
   'la hauteur d’une ligne du compte est un jeton, jamais un nombre');
-// La moitié gauche s'appuie sur le bord gauche comme le compte sur le droit.
-assert.match(CSS, /\.fa-argent--atelier \{ margin-left: 0; margin-right: auto; \}/,
-  'seul le bord change entre les deux moitiés');
-// ⚠ ET APRÈS `.fa-argent` DANS LA FEUILLE : même spécificité, c'est l'ordre qui
-// tranche. Posée avant, `margin-left: auto` la battait et le bloc flottait.
-assert.ok(CSS.indexOf('.fa-argent {') < CSS.indexOf('.fa-argent--atelier'),
-  'le modificateur vient APRÈS ce qu’il modifie');
+// LES DEUX BLOCS SONT ENSEMBLE, EN BAS À DROITE (29/08). Charlie : « toutes ces
+// valeurs doivent être en bas à droite ou centré, mais elles doivent être
+// ENSEMBLE ». Posés aux deux bords opposés d'une grille en deux colonnes, ils se
+// lisaient encore comme deux choses — 480 px de blanc entre le coût et le prix.
+const DETAILS = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
+assert.match(DETAILS, /display: flex; gap: var\(--pas-4\);/,
+  'les deux blocs se suivent, séparés d’un seul écart de la maison');
+assert.ok(!/grid-template-columns/.test(DETAILS),
+  'plus de grille en deux colonnes qui les écarte aux deux bords');
+// ⚠ LA PAIRE SE COLLE À DROITE PAR UNE MARGE AUTOMATIQUE sur le PREMIER bloc,
+// jamais par `justify-content: flex-end` : celui-ci rogne par la gauche dès que
+// le contenu déborde, et c'est le début de la ligne — donc l'intitulé — qui
+// disparaît. Défaut déjà payé ailleurs.
+assert.ok(!/justify-content: flex-end/.test(DETAILS), 'jamais par `flex-end`');
+assert.match(CSS, /\.fa-details > \.fa-argent--atelier \{ margin-left: auto; \}/,
+  'c’est le premier bloc qui pousse la paire à droite');
+assert.match(CSS, /\.fa-details > \.fa-argent \{ margin-left: 0; \}/,
+  'et le second reste collé au premier');
+// ⚠ `--pas-6` N'EXISTE PAS — l'échelle s'arrête à 4. Une variable inconnue ne
+// lève rien : la déclaration tombe et l'écart valait ZÉRO, les deux blocs se
+// touchaient sans qu'aucun contrôle ne bronche.
+const jetonsEcart = [...CSS.matchAll(/var\(--pas-(\d+)\)/g)].map((m) => Number(m[1]));
+assert.ok(jetonsEcart.every((n) => n >= 1 && n <= 4),
+  `l’échelle des écarts s’arrête à --pas-4 (trouvé : ${[...new Set(jetonsEcart)].join(', ')})`);
 
 console.log('✓ acompte en un clic : 30 % / 50 % déduits du TTC, les deux drapeaux suivent, le rail ne bouge pas');

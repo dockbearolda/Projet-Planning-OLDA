@@ -111,8 +111,14 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
     'la zone de production porte son nom');
   assert.ok(/prevu\.rangee/.test(PRODUCTION),
     '« Prévu à l’atelier » est une date de production, pas un engagement client');
-  assert.ok(PRODUCTION.includes("rangee('Production', chProduction)"),
-    'le poste de production vit dans la zone de production');
+  // ⚠ « Production » ET « Consigne » SONT PARTIS (29/08). Charlie, en désignant
+  // les trois champs de texte libre de la fiche : « tout ça doit être supprimé
+  // et il doit y avoir UNE SEULE note à la fin ». Ils demandaient la même chose
+  // trois fois, et la vendeuse devait choisir lequel remplir.
+  // Le poste de production n'est pas orphelin : le ticket de l'atelier le porte
+  // et le rend modifiable, et les deux papiers l'impriment.
+  assert.ok(!/chProduction|chConsigne/.test(JS),
+    'ni le poste de production ni la consigne ne se saisissent plus ici');
   // Le paiement : de l'argent, et rien d'autre.
   // LE COMPTE EST EN BAS A DROITE — c'est la norme de tout devis et de toute
   // facture : le total ferme le document, calé à droite, ses lignes empilées
@@ -218,8 +224,10 @@ assert.ok(/panneau\.hidden = false;/.test(JS),
   'le panneau est ouvert par défaut, sur toutes les tailles d’écran');
 assert.ok(!/@media[^{]*\{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS),
   'et il ne redevient un calque nulle part');
-assert.ok(/scene\.append\(travail, panneau\);/.test(JS),
-  'il vit dans la scène, qu’il allonge en se dépliant');
+// LA NOTE S'INTERCALE ENTRE LES DEUX (29/08) : on a fini de lire le dossier, on
+// écrit ce qui ne rentrait dans aucune case, puis on regarde l'argent.
+assert.ok(/scene\.append\(travail, blocNote, panneau\);/.test(JS),
+  'il vit dans la scène, qu’il allonge en se dépliant — et la note le précède');
 // TOUT LE FINANCIER D'UN COUP : aucune hauteur maximale, aucun défilement
 // interne. Il avait `max-height: 400px; overflow: auto` du temps du calque.
 assert.ok(!/max-height/.test(PANNEAU) && !/overflow: auto/.test(PANNEAU),
@@ -232,7 +240,7 @@ assert.ok(/panneau\.hidden = false;/.test(JS) && /panneau\.hidden = !panneau\.hi
 assert.ok(!/panneau\.remove\(\)/.test(JS), 'et jamais retiré du document');
 // `hidden` ne masque rien tout seul quand la classe pose son propre `display`.
 assert.ok(/\.fa-details\[hidden\] \{ display: none; \}/.test(CSS),
-  'la règle de masquage est écrite en clair : `display: grid` défait `hidden` en silence');
+  'la règle de masquage est écrite en clair : `display: flex` défait `hidden` en silence');
 
 // ---------------------------------------------------------------------------
 // 3. CE QU'ON TAPE VITE, CE QU'ON RELIT

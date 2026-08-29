@@ -141,11 +141,21 @@ assert.ok(/addEventListener\('blur'/.test(FICHE),
   'quitter un champ l’enregistre');
 // LA NOTE HORODATÉE A DISPARU AVEC LA BARRE BASSE (29/08). Charlie, en
 // désignant le champ, le référent et ses deux boutons : « tout ça prend de la
-// place pour rien ». Ce qui reste : le champ « Informations » de la zone
-// Client, qui porte le texte libre — sans l'heure ni le prénom.
+// place pour rien ».
 assert.ok(!/ctx\.ajouterNote\(/.test(FICHE), 'la barre de note a bien été retirée');
-assert.ok(/label: 'Informations'/.test(FICHE) && /ctx\.patchLigne\('description'/.test(FICHE),
-  '… mais on écrit toujours une information sur le dossier');
+// ET LES TROIS CHAMPS DE TEXTE LIBRE SONT DEVENUS UN SEUL (29/08). « Tout ça
+// doit être supprimé et il doit y avoir UNE SEULE note à la fin. » Production,
+// Consigne et Informations demandaient la même chose trois fois. Ce qui reste,
+// c'est `description` : la colonne remplie sur 65 % des dossiers réels, la seule
+// des trois qui existe ailleurs que dans la fiche, et celle que la LIGNE du
+// planning affiche déjà.
+assert.ok(/label: 'Note'/.test(FICHE) && /ctx\.patchLigne\('description'/.test(FICHE),
+  '… mais on écrit toujours une note sur le dossier');
+const notes = FICHE.match(/ctx\.patchLigne\('description'/g) || [];
+assert.strictEqual(notes.length, 1,
+  `UN SEUL champ écrit la note (${notes.length} trouvés) — deux s’écraseraient l’un l’autre`);
+assert.ok(!/label: 'Informations'|label: 'Consigne atelier'|label: 'Production'/.test(FICHE),
+  'et les trois anciens intitulés ont disparu');
 
 // ---------------------------------------------------------------------------
 // 6. LE SERVEUR : l'identité s'écrit, une face s'ajoute et se retire

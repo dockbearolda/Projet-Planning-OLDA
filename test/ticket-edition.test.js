@@ -423,21 +423,31 @@ const VENTE = {
   // la lit dans la fiche, et la grille continue de la porter dans sa liste
   // allégée (FICHE_LISTE côté serveur).
   // `consigneAtelier` n'était plus lu que par l'infobulle de la pastille
-  // supprimée : il est parti le 29/08 avec le reste du tiroir. La CONSIGNE, elle,
-  // se relit et se corrige dans la fiche atelier.
-  assert.ok(/label: 'Consigne atelier'/.test(FICHE_ATELIER) && /rangee\('Consigne'/.test(FICHE_ATELIER),
-    'la consigne se lit toujours, dans la fiche');
+  // supprimée : il est parti le 29/08 avec le reste du tiroir.
+  //
+  // ⚠ ET LE CHAMP LUI-MÊME EST PARTI LE 29/08 AU SOIR. Charlie, en désignant
+  // « Production », « Consigne » et « Informations » : « tout ça doit être
+  // supprimé et il doit y avoir UNE SEULE note à la fin ». Trois champs de texte
+  // libre demandaient la même chose, et la vendeuse devait choisir lequel.
+  //
+  // CE QUE ÇA COÛTE, mesuré avant de le faire : AUCUN papier ne lit
+  // `fiche.atelier` — le commentaire ci-dessus datait de la pastille du ticket,
+  // retirée le 28/08. La clé reste sur le fil (`FICHE_LISTE`) et dans le journal
+  // (`fiche_atelier`), mais plus rien ne l'écrit ni ne l'affiche. UN dossier sur
+  // les 187 de la production en portait une : son texte devient invisible.
+  assert.ok(!/label: 'Consigne atelier'/.test(FICHE_ATELIER) && !/rangee\('Consigne'/.test(FICHE_ATELIER),
+    'la consigne ne se saisit plus dans la fiche : une seule note reste');
   assert.ok(!/--consigne/.test(APP) && !/--consigne/.test(CSS),
     'plus de point sur une pastille qui n’existe plus');
   assert.ok(!/boutonsPapiers/.test(APP), 'plus de composant de pastilles pour les papiers');
 
-  // La fiche montre la MÊME consigne : sinon elle ne se relirait qu'en
-  // imprimant le ticket. C'est `fiche.atelier` des deux côtés — le ticket la
-  // lit là, la fiche l'y écrit.
-  assert.ok(/fiche\.atelier \|\| ''/.test(FICHE_ATELIER),
-    'la fiche lit la consigne dans `fiche.atelier`');
-  assert.ok(/ctx\.patchFiche\(\{ atelier: v \}\)/.test(FICHE_ATELIER),
-    '… et c’est là qu’elle la réécrit');
+  // LA NOTE UNIQUE ÉCRIT `description`, la colonne — pas une clé de la fiche.
+  // C'est celle des trois qui existe ailleurs que dans le JSON : remplie sur
+  // 65 % des dossiers réels, et affichée par la LIGNE du planning.
+  assert.ok(!/ctx\.patchFiche\(\{ atelier: v \}\)/.test(FICHE_ATELIER),
+    'plus rien n’écrit `fiche.atelier`');
+  assert.ok(/label: 'Note'/.test(FICHE_ATELIER) && /ctx\.patchLigne\('description'/.test(FICHE_ATELIER),
+    'la note unique écrit la colonne `description`');
 
   // Le module du ticket part avec la coquille hors ligne (rien n'y a changé,
   // mais un oubli ici rendrait le ticket muet sur un poste sans réseau).

@@ -429,6 +429,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ALLONGE la scene — donc la fiche, qui fait sa taille — et tout se lit d'un
    coup : aucune hauteur maximale, aucun defilement interne, c'est la demande.
    Sur le 14 pouces il redevient un calque, plus bas dans ce fichier. */
+/* LES DEUX BLOCS DU COMPTE SONT ENSEMBLE, EN BAS A DROITE (29/08). Charlie :
+   « toutes ces valeurs doivent etre en bas a droite ou centre, mais elles
+   doivent etre ENSEMBLE ». Poses aux deux bords opposes d'une grille en deux
+   colonnes, ils se lisaient encore comme deux choses — 480 px de blanc entre le
+   cout et le prix. Ils se touchent maintenant, separes du seul ecart de la
+   maison, et la PAIRE est calee a droite.
+   ⚠ Par une MARGE AUTOMATIQUE sur le premier bloc, jamais par `justify-content:
+   flex-end` : celui-ci rogne par la GAUCHE des que le contenu deborde, et c'est
+   le debut de la ligne qui disparait — donc l'intitule. */
 .fa-details {
   flex-shrink: 0;
   /* MEME DECOUPAGE QUE LA SCENE DU HAUT, sinon les deux moities de l'ecran ne
@@ -438,7 +447,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
      rails a 12 px l'un de l'autre. Ici la grille coupe la carte en deux comme
      la scene, et c'est la RANGEE qui porte le rembourrage — comme une colonne
      du haut. */
-  display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-2) 0;
+  /* ⚠ `--pas-4` — « entre deux blocs », c'est exactement ce que sont les deux
+     moities du compte. J'avais ecrit `--pas-6`, qui n'existe pas : l'echelle
+     s'arrete a 4. Une variable inconnue ne leve RIEN, la declaration tombe et
+     l'ecart valait zero — les deux blocs se touchaient sans qu'aucun controle
+     ne bronche. */
+  display: flex; gap: var(--pas-4);
   padding: var(--pas-3) 0;
   border-top: 1px solid var(--border);
   background: var(--surface);
@@ -452,6 +466,17 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    1 010 px. Le panneau annoncait deux colonnes et n'en rendait qu'une —
    402 px de haut pour ce qui en demande 190. */
 .fa-details > .fa-row { min-width: 0; padding: 0 var(--pas-4); }
+
+/* LA NOTE, UNE SEULE, EN FIN DE FICHE (29/08). Il y en avait trois — Production,
+   Consigne, Informations — qui demandaient la meme chose et que la vendeuse
+   devait departager. Elle ferme la scene, sur toute la largeur : c'est du texte
+   libre, il n'a pas de raison de tenir dans une demi-colonne. Son intitule et sa
+   boite sont ceux de partout ailleurs. */
+.fa-note {
+  padding: var(--pas-3) var(--pas-4);
+  border-top: 1px solid var(--border);
+}
+.fa-note > .fa-in { min-height: calc(var(--fa-h-champ) * 2); resize: vertical; }
 
 /* --- La niche des notes -------------------------------------------------
    Elle accueille le champ des notes quand l'ecran est assez haut. Elle
@@ -610,7 +635,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ⚠ ELLE DOIT VENIR APRES `.fa-argent` DANS LA FEUILLE : meme specificite, donc
    c'est l'ordre qui tranche. Posee avant, `margin-left: auto` la battait et le
    bloc flottait a 179 px du bord. */
-.fa-argent--atelier { margin-left: 0; margin-right: auto; }
+/* C'est le PREMIER bloc qui porte la marge : elle pousse la paire entiere vers
+   la droite, et les deux restent colles l'un a l'autre. */
+.fa-argent--atelier { margin-left: auto; margin-right: 0; }
+.fa-details > .fa-argent { margin-left: 0; }
+.fa-details > .fa-argent--atelier { margin-left: auto; }
 /* LES BOUTONS DU COMPTE EPOUSENT LEUR MOT. `.fa-seg__b` vaut 88 px fixes — la
    largeur qu'il faut au segment de priorite, ou « Basse / Moyenne / Haute »
    doivent faire la meme. Ici les trois mots n'ont pas la meme longueur : a 88 px

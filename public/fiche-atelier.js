@@ -588,9 +588,8 @@ export function dessinerFicheAtelier(r, ctx) {
   // dans le panneau Details. Au-dela, il monte ici et occupe le vide, qui se
   // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
   // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
-  const nicheNotes = el('div', 'fa-niche');
   gauche.append(blocDates, el('div', 'fa-filet'), blocClient,
-    rangee('Documents', docs), nicheNotes);
+    rangee('Documents', docs));
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
@@ -767,18 +766,26 @@ export function dessinerFicheAtelier(r, ctx) {
     droite.append(rangee('Faces', bandeF, ajoutF));
   }
 
-  const chConsigne = champ(null, fiche.atelier || '', {
-    label: 'Consigne atelier', multi: true, rows: 2,
-    placeholder: 'Ce qu’il faut savoir avant de couper',
-  });
-  brancher(chConsigne, { label: 'Consigne atelier', envoyer: (v) => ctx.patchFiche({ atelier: v }) });
-  // « PRODUCTION » VIENT DU PANNEAU DU BAS, ou il vivait entre la provenance du
-  // client et les boutons de documents. C'est le poste de fabrication : il ne
-  // pouvait pas etre ailleurs que dans la zone de production.
-  const chProduction = champ(null, fiche.production || '', { label: 'Production', placeholder: 'À définir' });
-  brancher(chProduction, { label: 'Production', envoyer: (v) => ctx.patchFiche({ production: v }) });
-  droite.append(rangee('Production', chProduction));
-  droite.append(rangee('Consigne', chConsigne, undefined, 'fa-row--haut'));
+  // TROIS CHAMPS DE TEXTE LIBRE, UN SEUL RESTE (29/08). Charlie, en designant
+  // « Production », « Consigne » et « Informations » : « tout ca doit etre
+  // supprime et il doit y avoir UNE SEULE note a la fin ».
+  //
+  // Ils demandaient la meme chose trois fois — ecris ce qu'il faut savoir — et
+  // la vendeuse devait choisir lequel. Trois cases a moitie remplies disent
+  // moins qu'une pleine : on ne savait plus dans laquelle chercher.
+  //
+  // CE QUI RESTE, c'est `description` : la colonne, remplie sur 65 % des
+  // dossiers reels, celle que la LIGNE du planning affiche deja, et la seule
+  // des trois qui existe ailleurs que dans la fiche.
+  //
+  // CE QUI PART :
+  //   · `fiche.production` — le poste de fabrication. Il n'est pas orphelin :
+  //     le ticket de l'atelier le porte et le rend modifiable (`ticket.js`,
+  //     `{ ou: 'fiche', cle: 'production' }`), et les deux papiers l'impriment.
+  //     Zero dossier sur 187 le portait en production.
+  //   · `fiche.atelier` — la consigne. Aucun papier ne l'imprime ; UN dossier
+  //     sur 187 en porte une. Elle reste sur le fil (`FICHE_LISTE`) et dans le
+  //     journal, mais plus rien ne l'ecrit ici.
 
   const travail = el('div', 'fa-travail');
   travail.append(gauche, droite);
@@ -799,12 +806,20 @@ export function dessinerFicheAtelier(r, ctx) {
   // defile et non les colonnes, il n'y a plus de place a economiser.
   panneau.hidden = false;
 
-  const chInfos = champ(null, r.description || '', {
-    label: 'Informations', multi: true, rows: 3, placeholder: 'note interne',
+  // LA NOTE, UNE SEULE, EN FIN DE FICHE. Elle ferme les deux colonnes : on a
+  // fini de lire le dossier, on ecrit ce qui ne rentrait dans aucune case.
+  const chNote = champ(null, r.description || '', {
+    label: 'Note', multi: true, rows: 3,
+    placeholder: 'Ce qu’il faut savoir sur ce dossier',
   });
-  brancher(chInfos, { label: 'Informations', envoyer: (v) => ctx.patchLigne('description', v || null) });
-  const colInfos = el('div', 'fa-bloc fa-bloc--notes');
-  colInfos.append(el('label', 'fa-lab', 'Informations'), chInfos);
+  brancher(chNote, { label: 'Note', envoyer: (v) => ctx.patchLigne('description', v || null) });
+  // ELLE EST UNE RANGEE COMME LES AUTRES : intitule a GAUCHE, sur le meme rail
+  // que « Client », « Reference » ou « Faces ». Pose au-dessus de son champ —
+  // ce que faisait l'ancien bloc « Informations » — il etait le seul intitule de
+  // la fiche a ne pas tomber sur ce rail. `fa-row--haut` cale l'intitule en haut
+  // du champ, comme pour toute rangee qui s'etire.
+  const blocNote = rangee('Note', chNote, 'fa-row--haut');
+  blocNote.classList.add('fa-note');
 
   // LES RANGEES ENTRENT DIRECTEMENT DANS LA GRILLE DU PANNEAU (29/08). Elles
   // vivaient dans une colonne qui prenait les deux pistes : six rangees les
@@ -1026,7 +1041,6 @@ export function dessinerFicheAtelier(r, ctx) {
   // minuscule, avec le `ResizeObserver` qui allait avec — trois etats a tenir,
   // pour un cas qu'aucun PC ne produit. Le projet est PC uniquement depuis le
   // 21/08 ; c'etait un reste de la tablette.
-  nicheNotes.append(colInfos);
   const listeDetails = el('span', 'fa-details__liste',
     'Prix TTC · Coût · Marge · Règlement');
 
@@ -1086,7 +1100,11 @@ export function dessinerFicheAtelier(r, ctx) {
   // dans les colonnes, une seule pour tout l'ecran. Un clic sur la racine —
   // donc a cote de la carte — ferme la fiche.
   const scene = el('div', 'fa-scene');
-  scene.append(travail, panneau);
+  // LA NOTE FERME LA SCENE, entre les deux colonnes et le compte : on a fini de
+  // lire le dossier, on ecrit ce qui ne rentrait dans aucune case, puis on
+  // regarde l'argent. Elle prend toute la largeur — c'est du texte libre, il n'a
+  // pas de raison de tenir dans une demi-colonne.
+  scene.append(travail, blocNote, panneau);
   const carte = el('div', 'fa-carte');
   // LA PROVENANCE DU DOSSIER — « Créée le … depuis Demande de devis » — n'est
   // ni du client, ni de la production, ni du paiement : c'est l'identité de la
