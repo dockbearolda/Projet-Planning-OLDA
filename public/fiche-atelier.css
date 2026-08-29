@@ -423,12 +423,23 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-mm { width: 74px; flex: 0 1 74px; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-quoi { flex: 1; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-ajout { flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: var(--pas-1);
   height: var(--fa-h-champ); padding: 0 var(--pas-3);
   border: 1px dashed var(--border); border-radius: var(--arrondi-champ);
   background: var(--surface); color: var(--text-2);
   font: inherit; font-size: var(--fa-lab); cursor: pointer;
 }
 .fa-ajout:hover { background: var(--bg); color: var(--text-1); }
+/* LE CHEVRON DIT QUE LE BOUTON OUVRE. Sa boite est celle de toutes les icones
+   de l'application — largeur ET hauteur ecrites, sinon elle sort de la police et
+   change avec le glyphe. Il se retourne a l'ouverture : c'est l'etat du menu, et
+   la seule chose qui le disait etait `aria-expanded`, que personne ne voit. */
+.fa-ajout .material-symbols-outlined {
+  width: var(--ic); height: var(--ic);
+  font-size: var(--ic); line-height: var(--ligne-glyphe);
+  transition: transform var(--dur-1) var(--ease);
+}
+.fa-ajout[aria-expanded="true"] .material-symbols-outlined { transform: rotate(180deg); }
 
 /* --- LE MENU DES FACES (29/08) --------------------------------------------
    Charlie : « pour les textiles ici les faces doivent etre selectionnables via

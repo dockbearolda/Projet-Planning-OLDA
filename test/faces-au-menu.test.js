@@ -53,10 +53,10 @@ assert.ok(fin > deb, 'la cascade doit se lire dans app.js');
 const bac = vm.createContext({});
 vm.runInContext(
   `let taillesLogo = null;\n${APP.slice(deb, fin)}\n`
-  + 'this.API = { facesProposees, poser: (t) => { taillesLogo = t; } };',
+  + 'this.API = { facesProposees, familleDuDossier, poser: (t) => { taillesLogo = t; } };',
   bac,
 );
-const { facesProposees, poser } = bac.API;
+const { facesProposees, familleDuDossier, poser } = bac.API;
 poser(JSON.parse(lire('tailles-logo-seed.json')));
 
 const TEXTILE = ['Coeur', 'Poitrine', 'Avant', 'Dos', 'Manche DR', 'Manche GA'];
@@ -99,6 +99,61 @@ poser({ familles: [] });
 assert.strictEqual(facesProposees({ product: 'Casquettes' }).length, 0,
   'tableau vide : rien à proposer');
 poser(JSON.parse(lire('tailles-logo-seed.json')));
+
+// LA CASCADE REND LA FAMILLE, pas seulement ses faces : sans son NOM, une face
+// créée à la main ne saurait pas où s'écrire.
+assert.strictEqual(familleDuDossier({ fiche: { prod: { ref: 'K3025' } } }).nom, 'Homme',
+  'la référence dit à quelle famille le dossier appartient');
+assert.strictEqual(familleDuDossier({ product: 'Casquette' }).nom, 'Casquettes',
+  '… et le nom de l’article aussi');
+assert.strictEqual(familleDuDossier({}).nom, 'Par défaut',
+  '… et le repli est une famille comme les autres, donc elle a un nom');
+poser({ familles: [] });
+assert.strictEqual(familleDuDossier({}), null,
+  'aucune famille reconnue : la face restera sur le seul dossier, et la fiche le dit');
+poser(JSON.parse(lire('tailles-logo-seed.json')));
+
+// ---------------------------------------------------------------------------
+// 1 bis. « LA POSSIBILITÉ DE CRÉER MES PROPRES FACES »
+// ---------------------------------------------------------------------------
+// Charlie, 29/08. Une face tapée à la main ne vivait que sur LE dossier où on
+// l'avait tapée : le t-shirt suivant ne la proposait pas, il fallait la retaper —
+// et la retaper autrement, ce qui est exactement ce que le menu existe pour
+// empêcher. Elle rejoint donc la liste de sa famille, d'où elle se renomme et se
+// retire comme les autres.
+assert.ok(APP.includes("await api('PATCH', `/api/tailles-logo/familles/${encodeURIComponent(famille.nom)}`,")
+  && APP.includes('{ faces: [...famille.faces, propre] });'),
+  'créer une face l’ajoute à la liste de sa famille');
+assert.match(APP, /if \(\(famille\.faces \|\| \[\]\)\.some\(\(f\) => cleFamille\(f\) === cleFamille\(propre\)\)\) return true;/,
+  '… une seule fois : une face déjà déclarée ne se redouble pas dans la liste');
+assert.ok(APP.includes('taillesLogo = table;') && APP.includes('taillesLogoEnVol = Promise.resolve(table);'),
+  '… et la réponse se repose tout de suite : le menu se rouvre dans la seconde');
+// ⚠ ET ON NE PERD JAMAIS CE QUI VIENT D'ÊTRE TAPÉ. Un poste sans droit sur les
+// réglages reçoit un 403 : la face entre quand même SUR LE DOSSIER, elle ne
+// sera simplement pas proposée la prochaine fois.
+const CREER = APP.slice(APP.indexOf('async function creerFaceDeFamille'), APP.indexOf('function facesProposees'));
+assert.ok(/\} catch \(err\) \{[\s\S]*return false;/.test(CREER),
+  'un refus des réglages rend `false`, il ne jette pas');
+assert.match(FICHE, /const rangee = ctx\.creerFace \? await ctx\.creerFace\(nom\) : false;\s*\n\s*dire\(rangee \? `Face creee — \$\{nom\}` : `Face ajoutee — \$\{nom\}`, false\);\s*\n\s*await poserFaces\(/,
+  'la fiche dit laquelle des deux a eu lieu, et pose la face sur le dossier dans les deux cas');
+// ⚠ L'ORDRE COMPTE : la FAMILLE d'abord, le DOSSIER ensuite. Poser la face sur
+// le dossier redessine la fiche — la structure change — et emporte la fonction
+// avec elle : l'écriture suivante n'arriverait jamais.
+const FINIR = FICHE.slice(FICHE.indexOf('const saisirFace'), FICHE.indexOf('// LE MENU. Il vit DANS la rangee'));
+assert.ok(FINIR.indexOf('ctx.creerFace(nom)') < FINIR.indexOf('poserFaces('),
+  'la famille s’écrit AVANT le dossier : le redessin emporterait la seconde écriture');
+
+// ---------------------------------------------------------------------------
+// 1 ter. LE BOUTON DIT QU'IL OUVRE
+// ---------------------------------------------------------------------------
+// « + Face » seul annonce un ajout immédiat — c'est ce qu'il faisait avant, et
+// rien ne disait qu'il propose maintenant une liste.
+assert.match(FICHE, /ajoutF\.append\(ic\('expand_more'\)\);/, 'le bouton porte un chevron');
+const AJOUT = CSS.match(/\.fa-ajout \.material-symbols-outlined \{[\s\S]*?\n\}/)[0];
+assert.match(AJOUT, /width: var\(--ic\); height: var\(--ic\);/,
+  '… dans la boîte de toutes les icônes : largeur ET hauteur écrites, sinon elle sort de la police');
+assert.match(CSS, /\.fa-ajout\[aria-expanded="true"\] \.material-symbols-outlined \{ transform: rotate\(180deg\); \}/,
+  '… et il se retourne à l’ouverture : `aria-expanded` seul, personne ne le voit');
 
 // LE TABLEAU SE LIT UNE FOIS PAR SESSION, et il se périme quand un réglage bouge.
 assert.match(APP, /Promise\.all\(\[chargerFicheComplete\(id\)\.catch\(\(\) => \{\}\), chargerTaillesLogo\(\)\]\)/,
@@ -289,6 +344,26 @@ assert.match(FICHE, /document\.removeEventListener\('keydown', clavierF, true\);
   assert.ok(!/\n  if \(prod\) \{/.test(FICHE),
     '… elle n’est plus conditionnée à sa présence');
 
-  console.log('✓ faces au menu : la famille propose, on coche, et une fiche sans production accepte sa première écriture');
+  // ET « CRÉER MES PROPRES FACES » VA JUSQU'AU BOUT : la face entre dans la
+  // liste de la famille, et le tableau relu la porte — c'est ce qui la fait
+  // proposer sur le dossier SUIVANT.
+  const table = (await call('GET', '/api/tailles-logo')).body;
+  const homme = table.familles.find((f) => f.nom === 'Homme');
+  assert.ok(homme && homme.faces.length === 6, 'la famille Homme part de ses six emplacements');
+  const ajoutee = await call('PATCH', '/api/tailles-logo/familles/Homme',
+    { faces: [...homme.faces, 'Étiquette col'] });
+  assert.strictEqual(ajoutee.status, 200);
+  const apres = ajoutee.body.familles.find((f) => f.nom === 'Homme');
+  assert.deepStrictEqual(apres.faces.slice(-1), ['Étiquette col'],
+    'une face créée à la main rejoint la liste de sa famille');
+  // Et elle survit à la relecture : c'est le tableau, pas une réponse en l'air.
+  const relu = (await call('GET', '/api/tailles-logo')).body.familles.find((f) => f.nom === 'Homme');
+  assert.deepStrictEqual(relu.faces.slice(-1), ['Étiquette col'],
+    '… et le tableau relu la porte : le dossier suivant la proposera');
+  // Les mesures des six autres emplacements ne partent pas avec l'ajout.
+  assert.deepStrictEqual(relu.faces.slice(0, 6), homme.faces,
+    'les six emplacements d’origine restent, dans leur ordre');
+
+  console.log('✓ faces au menu : la famille propose, on coche, on crée les siennes — et une fiche sans production accepte sa première écriture');
   if (app.__server) app.__server.close();
 })().catch((e) => { console.error(e); process.exit(1); });

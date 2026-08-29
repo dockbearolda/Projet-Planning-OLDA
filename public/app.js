@@ -3498,7 +3498,9 @@ const cleFamille = (v) => String(v == null ? '' : v).trim().toLowerCase()
 // ensuite, la famille « Par défaut » en dernier. Un couteau et une planche
 // vivent tous deux dans « Art de la table » et ne se gravent pas au même endroit.
 const FACES_REPLI = 'Par défaut';
-function facesProposees(r) {
+// LA CASCADE REND LA FAMILLE, pas seulement ses faces : c'est elle qu'une face
+// créée à la main vient rejoindre, et sans son NOM on ne saurait pas où l'écrire.
+function familleDuDossier(r) {
   const familles = (taillesLogo && taillesLogo.familles) || [];
   const sesFaces = (f) => (f && Array.isArray(f.faces) ? f.faces : []);
   const prod = (r && r.fiche && r.fiche.prod) || null;
@@ -3506,13 +3508,49 @@ function facesProposees(r) {
   if (ref) {
     const parRef = familles.find((f) => Object.keys((f && f.refs) || {})
       .some((x) => cleFamille(x) === ref));
-    if (sesFaces(parRef).length) return sesFaces(parRef);
+    if (sesFaces(parRef).length) return parRef;
   }
   const parNom = (nom) => (cleFamille(nom)
     ? familles.find((f) => cleFamille(f && f.nom) === cleFamille(nom)) : null);
   const parArticle = parNom(r && r.product);
-  if (sesFaces(parArticle).length) return sesFaces(parArticle);
-  return sesFaces(parNom(FACES_REPLI));
+  if (sesFaces(parArticle).length) return parArticle;
+  const repli = parNom(FACES_REPLI);
+  return sesFaces(repli).length ? repli : null;
+}
+
+// CRÉER UNE FACE, C'EST L'AJOUTER À LA FAMILLE — pas seulement au dossier.
+// « La possibilité de créer MES PROPRES faces » (Charlie, 29/08) : une face
+// tapée à la main ne vivait que sur le dossier où on l'avait tapée. Le t-shirt
+// suivant ne la proposait pas, il fallait la retaper — et la retaper autrement,
+// ce qui est exactement ce que le menu existe pour empêcher.
+// Elle rejoint donc la liste de la famille (Réglages → Tailles de logo), d'où
+// elle se renomme et se retire comme les autres.
+async function creerFaceDeFamille(r, nom) {
+  const famille = familleDuDossier(r);
+  const propre = String(nom == null ? '' : nom).trim();
+  if (!famille || !famille.nom || !propre) return false;
+  // Déjà déclarée : rien à écrire, et surtout pas un doublon dans la liste.
+  if ((famille.faces || []).some((f) => cleFamille(f) === cleFamille(propre))) return true;
+  try {
+    const table = await api('PATCH', `/api/tailles-logo/familles/${encodeURIComponent(famille.nom)}`,
+      { faces: [...famille.faces, propre] });
+    if (!table || !Array.isArray(table.familles)) return false;
+    // On repose la réponse au lieu d'attendre le `settings` du flux : le menu
+    // se rouvre dans la seconde, il doit déjà la porter.
+    taillesLogo = table;
+    taillesLogoEnVol = Promise.resolve(table);
+    return true;
+  } catch (err) {
+    // Poste sans droit sur les réglages, ou tableau injoignable : la face entre
+    // quand même SUR LE DOSSIER — elle ne sera simplement pas proposée la
+    // prochaine fois. On ne perd jamais ce qui vient d'être tapé.
+    return false;
+  }
+}
+
+function facesProposees(r) {
+  const f = familleDuDossier(r);
+  return f && Array.isArray(f.faces) ? f.faces : [];
 }
 
 function contexteFicheAtelier(r) {
@@ -3535,6 +3573,10 @@ function contexteFicheAtelier(r) {
     // chiffre faux à l'écran, juste sous le champ qu'on venait de corriger.
     // CE QUE LA FAMILLE DÉCLARE, pour que la fiche propose au lieu de faire taper.
     facesProposees: facesProposees(r),
+    // La famille où atterrit une face créée à la main — vide si aucune n'est
+    // reconnue : la face reste alors sur le seul dossier, et la fiche le dit.
+    familleDesFaces: (familleDuDossier(r) || {}).nom || '',
+    creerFace: (nom) => creerFaceDeFamille(r, nom),
     // La boîte de l'application, jamais celle du navigateur — et la fiche
     // n'importe rien elle-même (elle se relit dans un `vm`, un `import` la
     // rendrait illisible au test).

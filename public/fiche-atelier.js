@@ -753,12 +753,21 @@ export function dessinerFicheAtelier(r, ctx) {
     // bouton, sur la meme rangee : rien ne se deplace, et Echap rend la main.
     const saisirFace = () => {
       const saisie = champ('fa-quoi', '', { label: 'Nom de la face', placeholder: 'nom de la face' });
-      const finir = (garder) => {
+      const finir = async (garder) => {
         const nom = garder ? saisie.value.trim() : '';
         saisie.replaceWith(ajoutF);
         if (!nom) return;
-        dire('Face ajoutee', false);
-        poserFaces([...faces, { face: nom }]);
+        // CRÉER UNE FACE, C'EST L'AJOUTER A LA FAMILLE. Tapee ici, elle ne
+        // vivait que sur CE dossier : le t-shirt suivant ne la proposait pas et
+        // il fallait la retaper — autrement, ce qui est exactement ce que le
+        // menu existe pour empecher. Elle rejoint la liste de sa famille, d'ou
+        // elle se renomme et se retire comme les autres.
+        // ⚠ ET L'ORDRE COMPTE : la famille D'ABORD, le dossier ENSUITE. Poser la
+        // face sur le dossier redessine la fiche (la structure change) et emporte
+        // cette fonction avec elle — l'ecriture suivante n'arriverait jamais.
+        const rangee = ctx.creerFace ? await ctx.creerFace(nom) : false;
+        dire(rangee ? `Face creee — ${nom}` : `Face ajoutee — ${nom}`, false);
+        await poserFaces([...faces, { face: nom }]);
       };
       saisie.addEventListener('blur', () => finir(true));
       saisie.addEventListener('keydown', (ev) => {
@@ -844,7 +853,11 @@ export function dessinerFicheAtelier(r, ctx) {
     // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
     // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
     // pour un troisième emplacement et poussait tout sur deux lignes.
+    // LE BOUTON DIT QU'IL OUVRE QUELQUE CHOSE. « + Face » seul annonce un ajout
+    // immediat — c'est ce qu'il faisait avant, et rien ne disait qu'il propose
+    // maintenant une liste. Le chevron le dit, et il se retourne a l'ouverture.
     const ajoutF = bouton('fa-ajout', '+ Face', ouvrirMenuF);
+    ajoutF.append(ic('expand_more'));
     ajoutF.setAttribute('aria-haspopup', 'menu');
     ajoutF.setAttribute('aria-expanded', 'false');
     const ligneFaces = rangee('Faces', bandeF, ajoutF, 'fa-row--empile fa-row--ancre');
