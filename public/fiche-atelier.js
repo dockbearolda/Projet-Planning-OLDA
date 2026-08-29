@@ -57,6 +57,16 @@ const el = (tag, cls, txt) => {
   return n;
 };
 
+// LE PICTOGRAMME, MEME FABRIQUE QUE PARTOUT AILLEURS (`ic`, comme clients.js,
+// reglages.js et tailles-logos.js) : c'est cette forme-la que le garde-fou de la
+// police sait lire, et il n'y a que 91 ligatures dans olda-icones.woff2 — un nom
+// absent s'affiche EN TEXTE, coupe a 1 em, sans lever la moindre erreur.
+const ic = (name, cls) => {
+  const n = el('span', `material-symbols-outlined${cls ? ` ${cls}` : ''}`, name);
+  n.setAttribute('aria-hidden', 'true');
+  return n;
+};
+
 const deuxChiffres = (n) => String(n).padStart(2, '0');
 const jourCourt = (d) => `${JOURS[d.getDay()]} ${deuxChiffres(d.getDate())}/${deuxChiffres(d.getMonth() + 1)}`;
 const isoDuJour = (d) => `${d.getFullYear()}-${deuxChiffres(d.getMonth() + 1)}-${deuxChiffres(d.getDate())}`;
@@ -165,7 +175,17 @@ export function texteMarge(ttc, cout) {
 //   ctx.ouvrirClient() / ctx.telecharger() / ctx.email()
 export function dessinerFicheAtelier(r, ctx) {
   const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
-  const prod = fiche.prod && typeof fiche.prod === 'object' ? fiche.prod : null;
+  // LA COLONNE DE PRODUCTION EXISTE MEME SANS `fiche.prod` (29/08). Elle etait
+  // conditionnee a sa presence — et `fiche.prod` n'existe sur AUCUN des 187
+  // dossiers de la production, mesure ce jour-la : la structure est posterieure
+  // au comptoir qui les a crees. Sur un dossier reel, la colonne se resumait
+  // donc a la date « Prevu a l'atelier », et le jour ou celle-ci est retiree
+  // (meme date, demande de Charlie) il ne restait plus qu'un titre et un filet.
+  // La reference, la couleur, la technique, le marquage et les FACES se
+  // remplissent maintenant sur n'importe quel dossier — c'est « je clique sur la
+  // ligne et je peux TOUT modifier », qui n'avait jamais valu pour ces 187-la.
+  // Cote serveur, `corrigerProd` accepte desormais une fiche sans `prod`.
+  const prod = fiche.prod && typeof fiche.prod === 'object' ? fiche.prod : {};
 
   const racine = el('div', 'fa');
   // LA PILE D'ANNULATION EST ILLIMITÉE et sans limite de temps. Une correction
@@ -582,7 +602,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // lignes de droite tombaient 11 px au-dessus de leurs voisines de gauche.
   droite.append(titreSection('Production'), el('div', 'fa-filet'));
 
-  if (prod) {
+  {
     const idt = el('div', 'fa-grille-prod');
     for (const [cle, label] of [['ref', 'Référence'], ['couleur', 'Couleur'],
       ['marquage', 'Technique'], ['encre', 'Marquage']]) {
@@ -661,24 +681,84 @@ export function dessinerFicheAtelier(r, ctx) {
       carte.append(el('span', 'fa-face__k', z.face), cMm, cQuoi);
       bandeF.append(carte);
     });
-    // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
-    // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
-    // pour un troisième emplacement et poussait tout sur deux lignes.
+    // ON COCHE CE QUE LE CLIENT VEUT, ON NE LE TAPE PAS (29/08)
+    // ---------------------------------------------------------------------
+    // Charlie, en designant cette rangee : « pour les textiles ici les faces
+    // doivent etre selectionnables via un menu, et cocher ce que le client
+    // souhaite : avant, coeur, dos etc. »
+    //
+    // Le bouton demandait un NOM LIBRE. Or sur un textile les six emplacements
+    // sont connus : ils sont declares par la famille dans Reglages > Tailles de
+    // logo, et c'est deja par ce nom que la largeur du logo se retrouve. Les
+    // taper a la main, c'est ecrire « coeur » la ou le tableau dit « Coeur » —
+    // la mesure ne suit plus, et rien ne le signale.
+    //
+    // LA LISTE : ce que la famille declare (`ctx.facesProposees`, meme cascade
+    // qu'au comptoir — la REFERENCE d'abord, l'article ensuite, la famille
+    // « Par defaut » en dernier), PLUS les faces deja posees sur le dossier.
+    // Sans ce second morceau, une face ajoutee a la main — ou heritee d'une
+    // famille qui a change depuis — ne pourrait plus se decocher.
+    const cleF = (v) => String(v == null ? '' : v).trim().toLowerCase();
+    const choixF = Array.isArray(ctx.facesProposees) ? [...ctx.facesProposees] : [];
+    for (const z of faces) {
+      if (z.face && !choixF.some((n) => cleF(n) === cleF(z.face))) choixF.push(z.face);
+    }
+
+    // LE PATCH DES FACES EST POSITIONNEL cote serveur : chaque entree corrige la
+    // face de meme rang, une entree de plus l'ajoute, et un NOM VIDE la retire
+    // (« une face sans nom n'est pas une face »). On envoie donc la liste voulue,
+    // suivie d'autant de noms vides qu'il reste de places occupees — sans eux,
+    // retirer la face du milieu laisserait la derniere en double.
+    const poserFaces = (voulues) => Promise.resolve(ctx.patchProd({
+      logos: [
+        ...voulues.map((z) => ({ face: z.face, mm: z.mm || '', quoi: z.quoi || '' })),
+        ...faces.slice(voulues.length).map(() => ({ face: '' })),
+      ],
+    })).then(() => {
+      // Une face de plus ou de moins change la STRUCTURE de l'ecran, pas une
+      // valeur : sans redessin le clic parait perdu, et on recommence.
+      if (ctx.rafraichir) ctx.rafraichir();
+    });
+
+    const basculerFace = async (nom) => {
+      const i = faces.findIndex((z) => cleF(z.face) === cleF(nom));
+      // LE MENU SE FERME AVANT LA QUESTION, jamais apres. Laisse ouvert, il se
+      // refermait de toute facon au premier clic dans la boite (l'ecouteur
+      // « dehors » voit ce clic) : annuler ne rendait donc pas l'ecran d'avant.
+      fermerMenuF();
+      if (i < 0) {
+        dire(`Face ajoutee — ${nom}`, false);
+        await poserFaces([...faces, { face: nom }]);
+        return;
+      }
+      // DECOCHER UNE FACE QUI PORTE QUELQUE CHOSE, C'EST LE PERDRE : la cote et
+      // la consigne partent avec elle, et le redessin qui suit vide la pile
+      // d'annulation. On demande — jamais pour une face vide, ou decocher
+      // deviendrait un clic sur deux.
+      const z = faces[i];
+      if ((z.mm || z.quoi) && ctx.confirmer) {
+        const porte = [z.mm ? `la cote ${normaliserCote(z.mm)}` : '', z.quoi ? `« ${z.quoi} »` : '']
+          .filter(Boolean).join(' et ');
+        const ok = await ctx.confirmer('Retirer cette face ?',
+          `« ${nom} » porte ${porte}. Ce sera perdu.`, 'Retirer');
+        if (!ok) return;
+      }
+      dire(`Face retiree — ${nom}`, false);
+      await poserFaces(faces.filter((_, j) => j !== i));
+    };
+
     // PAS DE `prompt()`. Il bloque la page entiere, il est refuse dans certains
     // cadres (il jetait « prompt() is not supported » ici meme), et il emmene le
     // focus hors de l'ecran. Le nom se tape dans une case qui prend la place du
     // bouton, sur la meme rangee : rien ne se deplace, et Echap rend la main.
-    const ajoutF = bouton('fa-ajout', '+ Face', () => {
+    const saisirFace = () => {
       const saisie = champ('fa-quoi', '', { label: 'Nom de la face', placeholder: 'nom de la face' });
       const finir = (garder) => {
         const nom = garder ? saisie.value.trim() : '';
         saisie.replaceWith(ajoutF);
         if (!nom) return;
-        ctx.patchProd({ logos: [...faces.map(() => ({})), { face: nom }] });
         dire('Face ajoutee', false);
-        // Une face de plus change la STRUCTURE de l'ecran, pas une valeur : il
-        // faut le redessiner, sinon la face part en base et ne s'affiche pas.
-        if (ctx.rafraichir) setTimeout(() => ctx.rafraichir(), 350);
+        poserFaces([...faces, { face: nom }]);
       };
       saisie.addEventListener('blur', () => finir(true));
       saisie.addEventListener('keydown', (ev) => {
@@ -687,8 +767,88 @@ export function dessinerFicheAtelier(r, ctx) {
       });
       ajoutF.replaceWith(saisie);
       saisie.focus();
-    });
-    droite.append(rangee('Faces', bandeF, ajoutF, 'fa-row--empile'));
+    };
+
+    // LE MENU. Il vit DANS la rangee, en absolu : pose sur le document, il
+    // resterait accroche a l'ecran pendant que la fiche defile sous lui.
+    let menuF = null;
+    const fermerMenuF = () => {
+      if (!menuF) return;
+      document.removeEventListener('pointerdown', dehorsF, true);
+      document.removeEventListener('keydown', clavierF, true);
+      menuF.remove();
+      menuF = null;
+      ajoutF.setAttribute('aria-expanded', 'false');
+    };
+    function dehorsF(ev) {
+      if (!menuF || menuF.contains(ev.target) || ajoutF.contains(ev.target)) return;
+      fermerMenuF();
+    }
+    function clavierF(ev) {
+      if (ev.key !== 'Escape' || !menuF) return;
+      // EN CAPTURE, ET ON ARRETE LA. L'ecouteur d'app.js ferme la FICHE sur
+      // Echap : sans ca, refermer le menu refermait le dossier derriere.
+      ev.preventDefault();
+      ev.stopPropagation();
+      fermerMenuF();
+      ajoutF.focus();
+    }
+    // LA RANGEE DU PANNEAU EST CELLE DU PANNEAU « COLONNES » (`.colbar-item`,
+    // dans styles.css) : meme boite, meme case a cocher, meme hauteur. Deux
+    // listes a cocher dans la meme application ne s'ecrivent pas deux fois.
+    const caseAcocher = (on) => (on
+      ? ic('check_box', 'colbar-item__ic')
+      : ic('check_box_outline_blank', 'colbar-item__ic'));
+
+    const ouvrirMenuF = () => {
+      if (menuF) { fermerMenuF(); return; }
+      // Rien de declare nulle part : on retombe sur la saisie libre, exactement
+      // l'ecran d'avant. Un menu vide ne dit rien a personne.
+      if (!choixF.length) { saisirFace(); return; }
+      const pan = el('div', 'fa-menu');
+      pan.setAttribute('role', 'menu');
+      // LA RANGEE EST CELLE DU PANNEAU « COLONNES » (`.colbar-item`) ; la LISTE,
+      // non. `.colbar-list` porte une regle de repli — `flex-flow: wrap` sous
+      // 900 px — qui a du sens dans un tiroir pleine hauteur et aucun ici : le
+      // menu se depliait a l'horizontale, six cases en escalier sur 837 px.
+      // C'est `.fa-menu` qui empile, et c'est son flex qui ETIRE les rangees :
+      // `.colbar-item` fait `width: 100%`, or un pourcentage contre un conteneur
+      // en `max-content` vaut `auto` — sans lui, chaque rangee reprend sa
+      // largeur de texte (81 a 141 px mesures).
+      const liste = pan;
+      for (const nom of choixF) {
+        const on = faces.some((z) => cleF(z.face) === cleF(nom));
+        const b = bouton(`colbar-item ${on ? 'is-on' : 'is-off'}`, null, () => basculerFace(nom));
+        b.setAttribute('role', 'menuitemcheckbox');
+        b.setAttribute('aria-checked', String(on));
+        b.append(caseAcocher(on), el('span', 'colbar-item__label', nom));
+        liste.append(b);
+      }
+      // LA CREATION N'EST PAS UN CHOIX DE LA LISTE. Posee comme une ligne parmi
+      // les autres, elle se coche par erreur — et ce qu'elle ouvre n'est pas une
+      // face, c'est un champ. Elle vit sous le filet de la fiche, avec sa propre
+      // icone.
+      liste.append(el('div', 'fa-filet'));
+      const creer = bouton('colbar-item', null, () => { fermerMenuF(); saisirFace(); });
+      creer.append(ic('add', 'colbar-item__ic'), el('span', 'colbar-item__label', 'Autre face…'));
+      liste.append(creer);
+      ligneFaces.append(pan);
+      menuF = pan;
+      ajoutF.setAttribute('aria-expanded', 'true');
+      document.addEventListener('pointerdown', dehorsF, true);
+      document.addEventListener('keydown', clavierF, true);
+      const premier = pan.querySelector('button');
+      if (premier) premier.focus();
+    };
+
+    // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
+    // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
+    // pour un troisième emplacement et poussait tout sur deux lignes.
+    const ajoutF = bouton('fa-ajout', '+ Face', ouvrirMenuF);
+    ajoutF.setAttribute('aria-haspopup', 'menu');
+    ajoutF.setAttribute('aria-expanded', 'false');
+    const ligneFaces = rangee('Faces', bandeF, ajoutF, 'fa-row--empile fa-row--ancre');
+    droite.append(ligneFaces);
   }
 
   // TROIS CHAMPS DE TEXTE LIBRE, UN SEUL RESTE (29/08). Charlie, en designant

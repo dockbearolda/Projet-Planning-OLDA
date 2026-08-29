@@ -75,6 +75,9 @@ const FABRIQUES = [
   'public/app.js',
   'public/clients.js',
   'public/dashboard.js',
+  // La fiche atelier depuis le 29/08 : son menu des faces porte les deux cases
+  // a cocher du panneau « Colonnes » et le « + » de la creation.
+  'public/fiche-atelier.js',
   'public/index.html',
   'public/nouveau-projet.js',
   'public/reglages.js',

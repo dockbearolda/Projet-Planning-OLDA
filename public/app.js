@@ -3460,6 +3460,61 @@ function rafraichirFicheOuverte() {
 
 // Le contexte : tout ce que la fiche sait faire de l'application. Elle ne
 // décide d'aucune règle métier — elle dessine, normalise, et rend la main.
+// LES FACES QU'UNE FAMILLE DÉCLARE — le même tableau que le comptoir
+// ===========================================================================
+// Un t-shirt a six emplacements de marquage, un tote bag deux, une casquette
+// un seul. Ils sont déclarés dans Réglages → Tailles de logo, et c'est déjà par
+// ce NOM que la largeur du logo se retrouve : les taper à la main dans la fiche,
+// c'est écrire « coeur » là où le tableau dit « Coeur » et perdre la mesure sans
+// que rien ne le signale.
+//
+// LU UNE FOIS PAR SESSION, et seulement quand une fiche s'ouvre : c'est un
+// document de réglage, il ne bouge pas trois fois par jour. Un `settings` du flux
+// le périme — c'est le même signal qu'émet l'écran des tailles de logo quand on
+// y touche.
+let taillesLogo = null;
+let taillesLogoEnVol = null;
+function chargerTaillesLogo() {
+  if (taillesLogo) return Promise.resolve(taillesLogo);
+  if (!taillesLogoEnVol) {
+    taillesLogoEnVol = api('GET', '/api/tailles-logo')
+      .then((t) => { taillesLogo = (t && Array.isArray(t.familles)) ? t : { familles: [] }; return taillesLogo; })
+      // Le tableau injoignable ne bloque pas la fiche : elle retombe sur la
+      // saisie libre, exactement comme avant qu'il existe.
+      .catch(() => { taillesLogoEnVol = null; return { familles: [] }; });
+  }
+  return taillesLogoEnVol;
+}
+
+// Le tableau et le catalogue ne se sont pas mis d'accord sur les pluriels ni sur
+// les accents : on compare sur une forme réduite, jamais pour réécrire. C'est la
+// règle `txLogoCle` du comptoir, à l'identique — deux écrans qui rapprochent les
+// mêmes noms doivent le faire pareil.
+const cleFamille = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/s$/, '');
+
+// LA CASCADE DU COMPTOIR, DANS LE MÊME ORDRE : la RÉFÉRENCE d'abord (K3025 est
+// rangée « Homme », et c'est elle qui porte les six emplacements), l'ARTICLE
+// ensuite, la famille « Par défaut » en dernier. Un couteau et une planche
+// vivent tous deux dans « Art de la table » et ne se gravent pas au même endroit.
+const FACES_REPLI = 'Par défaut';
+function facesProposees(r) {
+  const familles = (taillesLogo && taillesLogo.familles) || [];
+  const sesFaces = (f) => (f && Array.isArray(f.faces) ? f.faces : []);
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  const ref = cleFamille(prod && prod.ref);
+  if (ref) {
+    const parRef = familles.find((f) => Object.keys((f && f.refs) || {})
+      .some((x) => cleFamille(x) === ref));
+    if (sesFaces(parRef).length) return sesFaces(parRef);
+  }
+  const parNom = (nom) => (cleFamille(nom)
+    ? familles.find((f) => cleFamille(f && f.nom) === cleFamille(nom)) : null);
+  const parArticle = parNom(r && r.product);
+  if (sesFaces(parArticle).length) return sesFaces(parArticle);
+  return sesFaces(parNom(FACES_REPLI));
+}
+
 function contexteFicheAtelier(r) {
   const place = `${r.stage}|${r.sub_stage || ''}`;
   const lot = r.fiche && r.fiche.lot;
@@ -3478,6 +3533,12 @@ function contexteFicheAtelier(r) {
     // UNE FONCTION, PAS UNE CHAÎNE. Figée à l'ouverture, elle continuait
     // d'annoncer l'ancienne échéance après qu'on avait déplacé la date : un
     // chiffre faux à l'écran, juste sous le champ qu'on venait de corriger.
+    // CE QUE LA FAMILLE DÉCLARE, pour que la fiche propose au lieu de faire taper.
+    facesProposees: facesProposees(r),
+    // La boîte de l'application, jamais celle du navigateur — et la fiche
+    // n'importe rien elle-même (elle se relit dans un `vm`, un `import` la
+    // rendrait illisible au test).
+    confirmer: (titre, texte, libelle) => confirmerAction(titre, texte, libelle),
     rappelDelai: (deadline, heure) => {
       const d = tempsRestant(deadline === undefined ? r.deadline : deadline,
         heure === undefined ? ((r.fiche && r.fiche.heureSouhaitee) || null) : heure);
@@ -3554,7 +3615,10 @@ function openLigneDetail(id) {
   // LA FICHE COMPLÈTE D'ABORD : la liste ne porte qu'un résumé (FICHE_LISTE
   // côté serveur), sans les tailles ni les faces. Dessinée sans elle, la fiche
   // s'ouvrirait sur un dossier amputé qui a l'air complet.
-  chargerFicheComplete(id).catch(() => {}).then(() => {
+  // LE TABLEAU DES FACES PART AVEC LA FICHE, pas au démarrage : deux requêtes en
+  // parallèle, et la seconde ne coûte qu'une fois par session (elle est mise de
+  // côté). Sans elle, le menu des faces s'ouvrirait vide sur la première fiche.
+  Promise.all([chargerFicheComplete(id).catch(() => {}), chargerTaillesLogo()]).then(() => {
     if (ficheAtelierId !== String(id)) return;
     const fraiche = rows.find((x) => String(x.id) === String(id)) || ligne;
     completerFiche(fraiche);
@@ -6547,7 +6611,14 @@ function onStreamChange(e) {
   }
   // Le patron vient de réécrire le message WhatsApp : les pastilles des lignes
   // doivent ouvrir le NOUVEAU texte, sans recharger la page.
-  if (kind === 'settings') loadWhatsappMessage();
+  if (kind === 'settings') {
+    loadWhatsappMessage();
+    // Les faces déclarées viennent des réglages : quelqu'un vient peut-être
+    // d'en ajouter une. On périme, on ne recharge pas — la prochaine fiche le
+    // fera, et personne ne paie une requête pour un écran qui n'est pas ouvert.
+    taillesLogo = null;
+    taillesLogoEnVol = null;
+  }
   // Une étape vient d'être rangée (ou dérangée) par un autre poste : la décision
   // est partagée, l'ordre affiché ici doit suivre.
   if (kind === 'ordre-manuel') {

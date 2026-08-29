@@ -429,6 +429,43 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   font: inherit; font-size: var(--fa-lab); cursor: pointer;
 }
 .fa-ajout:hover { background: var(--bg); color: var(--text-1); }
+
+/* --- LE MENU DES FACES (29/08) --------------------------------------------
+   Charlie : « pour les textiles ici les faces doivent etre selectionnables via
+   un menu, et cocher ce que le client souhaite ». Le bouton demandait un nom
+   libre ; les six emplacements d'un textile sont declares par sa famille.
+
+   IL VIT DANS LA RANGEE, EN ABSOLU. Pose sur le document en `fixed`, il
+   resterait accroche a l'ecran pendant que la fiche defile sous lui — et la
+   fiche defile depuis le 28/08. `right: 0` le cale sur le bouton, qui est le
+   dernier element de la rangee : c'est le meme bord que celui ou finissent tous
+   les champs de la colonne.
+
+   SA LARGEUR SUIT SON CONTENU, sans nombre ecrit : une face peut s'appeler
+   « Face Optimisee 205 x 205 mm » comme « Avant ». `max-width: 100%` l'empeche
+   de sortir de la colonne.
+
+   LA RANGEE EST CELLE DU PANNEAU « COLONNES » (`.colbar-item`, dans
+   styles.css) : deux listes a cocher dans la meme application ne s'ecrivent pas
+   deux fois — meme boite, meme case, meme hauteur (`--ctrl-h`).
+   ⚠ MAIS PAS `.colbar-list` : elle porte un repli `flex-flow: wrap` sous 900 px
+   qui a du sens dans un tiroir pleine hauteur et aucun ici — le menu se
+   depliait a l'horizontale, six cases en escalier sur 837 px. C'est `.fa-menu`
+   qui empile. Et c'est SON flex qui etire les rangees : `.colbar-item` fait
+   `width: 100%`, or un pourcentage contre un conteneur en `max-content` vaut
+   `auto` — sans lui chaque rangee reprend sa largeur de texte (81 a 141 px). */
+.fa-row--ancre { position: relative; }
+.fa-menu {
+  position: absolute; z-index: 30;
+  top: 100%; right: 0; margin-top: var(--pas-1);
+  width: max-content; max-width: 100%;
+  display: flex; flex-direction: column; gap: var(--pas-1);
+  padding: var(--pas-1);
+  border: 1px solid var(--border); border-radius: var(--arrondi-bloc);
+  background: var(--surface); box-shadow: var(--shadow-pop);
+}
+/* Le filet qui detache la CREATION des choix est celui de la fiche (`.fa-filet`,
+   plus haut) : un trait ne se redessine pas par endroit. */
 /* UNE RANGEE QUI PORTE PLUSIEURS LIGNES cale son intitule EN HAUT, contre la
    premiere : centre, il flotte au milieu d'une rangee de 110 px et ne designe
    plus rien. Mais c'est la RANGEE qui le decide, pas la colonne.

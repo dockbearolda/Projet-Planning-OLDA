@@ -2718,16 +2718,25 @@ function corrigerProd(actuel, patch) {
   if (!actuel || typeof actuel !== 'object') return actuel;
   if (!patch || typeof patch !== 'object') return actuel;
   const out = { ...actuel };
+  // UNE FICHE PEUT N'AVOIR NI TAILLES NI FACES — et c'est le cas de TOUS les
+  // dossiers d'avant le nouveau comptoir : `fiche.prod` n'existe sur aucun des
+  // 187 de la production (mesuré le 29/08). Les deux blocs ci-dessous exigeaient
+  // que la liste existe DÉJÀ pour accepter d'y écrire : la fiche atelier
+  // affichait donc la colonne Production sur ces dossiers, et rien de ce qu'on y
+  // tapait n'arrivait — sans erreur, sans message. Une liste absente vaut une
+  // liste vide : on peut y ajouter.
+  const taillesActuelles = Array.isArray(actuel.tailles) ? actuel.tailles : [];
+  const logosActuels = Array.isArray(actuel.logos) ? actuel.logos : [];
   for (const cle of PROD_IDENTITE) {
     // `undefined` = le poste n'y touche pas ; une chaîne vide EFFACE (une
     // couleur saisie par erreur doit pouvoir partir).
     if (typeof patch[cle] === 'string') out[cle] = borner(patch[cle], 60);
   }
-  if (Array.isArray(patch.tailles) && Array.isArray(actuel.tailles)) {
+  if (Array.isArray(patch.tailles)) {
     const parNom = patch.tailles.filter((v) => v && typeof v === 'object' && typeof v.t === 'string');
     if (parNom.length) {
       const rang = new Map();
-      const liste = actuel.tailles.map((t) => ({ ...t }));
+      const liste = taillesActuelles.map((t) => ({ ...t }));
       liste.forEach((t, i) => rang.set(String(t.t), i));
       for (const v of parNom) {
         const nom = borner(v.t, 60);
@@ -2741,7 +2750,7 @@ function corrigerProd(actuel, patch) {
       // est pas un. Le chiffrage, lui, garde ses six cases (voir chiffrage.js).
       out.tailles = liste.filter((t) => Number(t.n) > 0);
     } else {
-      out.tailles = actuel.tailles.map((t, i) => {
+      out.tailles = taillesActuelles.map((t, i) => {
         const v = patch.tailles[i];
         const n = v && typeof v === 'object' ? Number(v.n) : NaN;
         return Number.isInteger(n) && n > 0 ? { ...t, n } : t;
@@ -2756,8 +2765,8 @@ function corrigerProd(actuel, patch) {
   // Par position, comme le récapitulatif. `undefined` laisse la valeur en
   // place ; une chaîne vide efface — un « mm » saisi sur une tasse doit pouvoir
   // partir, sinon le ticket promet une cote qui n'existe pas.
-  if (Array.isArray(patch.logos) && Array.isArray(actuel.logos)) {
-    const liste = actuel.logos.map((l) => ({ ...l }));
+  if (Array.isArray(patch.logos)) {
+    const liste = logosActuels.map((l) => ({ ...l }));
     patch.logos.forEach((v, i) => {
       if (!v || typeof v !== 'object') return;
       // UNE FACE DE PLUS. Le comptoir n'en pose que ce que la famille déclare,
@@ -2919,7 +2928,11 @@ app.patch('/api/requests/:id/fiche', exige('clients'), asyncH(async (req, res) =
     // rectifient deux largeurs différentes ne s'effacent pas l'un l'autre.
     // Le reste de `prod` (référence, couleur, technique) ne s'écrit PAS par
     // cette porte : c'est l'identité de l'article, elle se corrige au dossier.
-    if ('prod' in b) majFiche.prod = corrigerProd(fiche.prod, b.prod);
+    // `fiche.prod || {}` : une fiche sans production accepte sa PREMIÈRE écriture.
+    // Sans ce repli, `corrigerProd` rendait `undefined` et la colonne Production
+    // de la fiche atelier était en lecture seule sur tout le passé — 187 dossiers
+    // sur 187, et rien à l'écran ne le disait.
+    if ('prod' in b) majFiche.prod = corrigerProd(fiche.prod || {}, b.prod);
 
     // LE PRIX SUIT LA QUANTITÉ. « Il ne veut plus 30 S, il en veut 100 » : le
     // dégressif du fichier V9 s'applique, la quantité de la ligne et le coût de
