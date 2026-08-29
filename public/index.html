@@ -25,9 +25,10 @@
       }
     } catch (e) {}
   </script>
-  <!-- La charte est en Arial/Helvetica (police système) : plus rien à
-       télécharger côté texte. Seules les icônes restent une webfont, et elle est
-       DÉSORMAIS CHEZ NOUS (`olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes
+  <!-- LA POLICE D'ICÔNES EST CHEZ NOUS. (La ligne qui disait ici « la charte est
+       en Arial/Helvetica, plus rien à télécharger côté texte » ne vaut plus : le
+       texte est en Manrope, hébergée elle aussi, préchargée juste en dessous.)
+       `olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes réellement employés (`olda-icones.woff2`, 16 Ko, réduit aux ~60 glyphes
        réellement employés). Elle venait de Google Fonts : deux `preconnect` puis
        une feuille de style BLOQUANT LE RENDU sur un autre domaine, soit une
        chaîne DNS → TLS → CSS → police avant le premier pixel — depuis
@@ -52,10 +53,13 @@
   <link rel="stylesheet" href="charte.css" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="fiche-atelier.css" />
-  <!-- clients.css et projet.css NE SONT PAS ICI : chacune part avec l'écran
-       qu'elle habille, au premier passage (voir poserFeuille dans app.js).
-       Elles pesaient 30 Ko au démarrage de tous les postes, pour deux écrans
-       dont le JavaScript, lui, attendait déjà. -->
+  <!-- SEPT FEUILLES NE SONT PAS ICI : clients.css, projet.css, et depuis le
+       29/08 dashboard.css, reglages.css, tailles-logos.css, montravail.css et
+       pilotage.css. Chacune part avec l'écran qu'elle habille, au premier
+       passage (voir poserFeuille dans app.js). Le JavaScript de ces écrans
+       attendait déjà ; leur habillage, lui, partait à l'ouverture de TOUS les
+       postes — 57 Ko de plus, dont 33 pour le seul Point du jour, sur des
+       postes qui ne quittent jamais le planning. -->
   <!-- Les modules importés par app.js ne sont découverts qu'une fois app.js
        téléchargé et analysé : deux allers-retours en série. On les annonce dès
        le départ pour qu'ils partent en même temps (~1 aller-retour de gagné en

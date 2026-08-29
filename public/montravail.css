@@ -1,0 +1,65 @@
+/* ===========================================================================
+   MON TRAVAIL — la feuille de l'ecran de l'operateur (29/08/2026)
+   =========================================================================== */
+
+/* ===========================================================================
+   MON TRAVAIL — l'écran de celui qui produit (§25).
+   Trois listes, rien d'autre. Mêmes jetons, mêmes deux tailles de texte que
+   partout ailleurs : 17 pour ce qui se lit, 14 pour ce qui se consulte.
+   =========================================================================== */
+.mt-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
+.mt-head__titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+
+.mt-bloc { display: flex; flex-direction: column; gap: 10px; }
+.mt-bloc__head { display: flex; align-items: baseline; gap: 10px; }
+/* PAS de quatrième taille : la charte en compte trois, et la hiérarchie se
+   fait à la GRAISSE. Un titre de bloc est du texte de 17 en 800, pas une
+   taille intermédiaire de plus. */
+.mt-bloc__titre { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.01em; }
+/* Un REPÈRE, pas une performance : il dit s'il reste du travail. */
+.mt-bloc__n { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mt-bloc__vide { margin: 0; font-size: var(--taille-texte); color: var(--text-2); }
+
+.mt-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.mt-carte {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.mt-carte:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.mt-carte:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.mt-carte__haut { display: flex; align-items: baseline; gap: 8px; }
+/* `min-width: 0` : sans lui un nom long garde sa largeur intrinsèque et pousse
+   la pastille « Urgent » hors de la carte. Même piège que partout ailleurs. */
+.mt-carte__client { min-width: 0; flex: 1 1 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-carte__urgent { flex: 0 0 auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+.mt-carte__quoi { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
+.mt-carte__quand { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mt-carte__quand.is-proche { color: var(--warning); }
+.mt-carte__quand.is-retard { color: var(--st-bloque); }
+/* Le motif du blocage : sur une ligne bloquée, c'est LA seule chose à lire. */
+.mt-carte.is-bloque { border-color: var(--st-bloque-bg); background: var(--st-bloque-bg); }
+.mt-carte__motif { margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+
+/* Les ÉTAPES d'un article, sur sa carte de « Mon travail ». Une case, un nom,
+   et ce qui a été déclaré — rien d'autre. */
+.mt-etapes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+.mt-etape { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: var(--taille-note); color: var(--text-2); }
+.mt-etape__label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.mt-etape__case { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex: 0 0 auto; }
+.mt-etape__nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* L'étape EN COURS est la seule mise en avant : le reste est un chemin
+   parcouru et un chemin restant, et n'appelle aucune décision. */
+.mt-etape.is-en-cours .mt-etape__nom { color: var(--text-1); font-weight: var(--graisse-forte); }
+.mt-etape.is-faite .mt-etape__nom { text-decoration: line-through; color: var(--text-3); }
+.mt-etape__qui { margin-left: auto; flex: 0 0 auto; color: var(--text-3); }
+/* Le compte : un champ DÉJÀ JUSTE, à corriger seulement si ça ne l'est pas. */
+.mt-compte { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; flex: 0 0 auto; }
+.mt-compte__n { width: 58px; min-height: 28px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--taille-note); text-align: right; font-variant-numeric: tabular-nums; }
+.mt-compte__n:focus-visible { outline: none; border-color: var(--border-strong); background: var(--field-focus); }
+.mt-compte__total { color: var(--text-3); white-space: nowrap; }
+.mt-compte__perte { color: var(--st-bloque); font-weight: var(--graisse-note); white-space: nowrap; }

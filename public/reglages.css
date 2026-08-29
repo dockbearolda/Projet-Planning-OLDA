@@ -1,0 +1,210 @@
+/* ===========================================================================
+   LES REGLAGES — leur feuille, chargee avec leur ecran (29/08/2026)
+   ===========================================================================
+   DEUX ECRANS LA CHARGENT, et c'est voulu : les Reglages, et les Tailles des
+   logos, qui reprend les memes rangees `.reg-` — c'est la meme grammaire de
+   formulaire, et deux ecrans a un clic l'un de l'autre doivent donner le meme
+   composant, pas deux qui se ressemblent. Les deux mounts appellent donc
+   `poserFeuille('reglages.css')` ; `poserFeuille` ne pose une feuille qu'une
+   fois. */
+
+/* ===========================================================================
+   Onglet RÉGLAGES — ce que le patron règle une fois pour tout l'atelier.
+   Une colonne bornée en largeur (on lit un formulaire, on ne remplit pas un
+   tableau) et centrée, comme les autres écrans hors planning.
+   =========================================================================== */
+.reglages:not([hidden]) {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reg-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 26px 22px calc(40px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.reg-head { display: flex; align-items: flex-start; gap: 12px; }
+.reg-head__ic { font-size: var(--ic-grand); color: var(--primary); }
+.reg-head__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.02em; color: var(--text-1); }
+.reg-head__sub { margin: 2px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
+
+.reg-card {
+  padding: var(--pas-4);
+  border: 1px solid var(--card-border);
+  border-radius: var(--arrondi-carte);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reg-card__head { display: flex; align-items: flex-start; gap: 12px; }
+/* Icône de section : décorative, donc grise. Dans la charte la couleur ne
+   signale qu'un état — un vert ici laisserait croire à un statut « OK ». */
+.reg-card__ic { font-size: var(--ic); color: var(--text-2); }
+.reg-card__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+.reg-card__desc { margin: 4px 0 0; font-size: var(--taille-texte); line-height: 1.5; color: var(--text-2); }
+
+.reg-field { display: flex; flex-direction: column; gap: 8px; }
+.reg-textarea {
+  width: 100%;
+  padding: var(--champ-y) var(--champ-x);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);            /* iOS : en dessous de 16px, le champ zoome */
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 104px;
+}
+.reg-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+.reg-field__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.reg-jetons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.reg-jetons__t { font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-2); }
+.reg-jeton {
+  min-height: var(--ctrl-h);
+  padding: 0 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--pilule);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.reg-jeton:hover { background: var(--primary-soft); border-color: var(--primary); }
+.reg-count { margin-left: auto; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* Aperçu : une bulle de conversation, pour juger le message tel qu'il arrive. */
+.reg-apercu { display: flex; flex-direction: column; gap: 6px; }
+.reg-apercu__t { font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.reg-apercu__bulle {
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--st-livree-bg);
+  color: var(--text-1);
+  font-size: var(--taille-texte);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.reg-apercu__bulle.is-vide { background: var(--surface-hover); color: var(--text-2); font-style: italic; }
+
+.reg-actions { display: flex; align-items: center; gap: 10px; }
+.reg-status { margin-right: auto; font-size: var(--taille-texte); color: var(--text-2); }
+.reg-status.is-ok { color: var(--st-livree); font-weight: var(--graisse-note); }
+.reg-status.is-ko { color: var(--st-bloque); font-weight: var(--graisse-note); }
+.reg-btn {
+  min-height: var(--ctrl-h);           /* cible tactile : la tablette de l'atelier */
+  padding: 0 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.reg-btn:hover:not(:disabled) { background: var(--state-hover); }
+/* Cette règle porte (0,2,0) : elle passe DEVANT `.reg-btn--primary` (0,1,0),
+   et c'est voulu — un « Enregistrer » qu'on ne peut pas encore actionner
+   s'éteint comme les autres au lieu de garder son fond d'accent. */
+.reg-btn:disabled {
+  border-color: transparent;
+  background: var(--inactif);
+  color: var(--inactif-encre);
+  cursor: default;
+}
+.reg-btn--primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
+.reg-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+.reg-tarif-cat { margin: 18px 0 8px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
+.reg-tarif-cat:first-child { margin-top: 4px; }
+.reg-tarif-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* `min-width: 0` N'EST PAS DÉCORATIF ICI. La taille minimale automatique d'un
+   élément de formulaire vaut sa largeur INTRINSÈQUE — une vingtaine de
+   caractères — et elle l'emporte sur `flex-basis`. Les deux champs de prix ne
+   faisaient donc pas 102 px mais 190, comme le champ de désignation : les trois
+   se partageaient la rangée à parts égales. Ça passait tant que 3 × 190 tombait
+   juste ; en 17 px la même règle donne 3 × 211 et la rangée déborde de 63 px.
+   Avec `min-width: 0`, le prix reprend ses 102 px et la désignation récupère
+   les 150 px qu'on lui prenait. */
+.reg-tarif-input { min-width: 0; min-height: var(--ctrl-h); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: var(--taille-texte); background: var(--surface); color: var(--text-1); }
+.reg-tarif-input--nom { flex: 1 1 250px; }
+.reg-tarif-input--num { flex: 0 0 102px; text-align: right; }
+.reg-tarif-toggle, .reg-tarif-del { flex: 0 0 36px; min-height: 36px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.reg-tarif-toggle.is-on { color: var(--primary); }
+.reg-tarif-del:hover { color: var(--danger); }
+.reg-tarif-add { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; border: 1px dashed var(--border); border-radius: var(--radius); min-height: var(--ctrl-h); padding: 0 12px; background: none; color: var(--primary); font: inherit; font-size: var(--taille-texte); cursor: pointer; }
+
+/* CORBEILLE — même rangée que les tarifs, mêmes jetons, aucun composant neuf.
+   `min-width: 0` sur le bloc qui porte le texte : sans lui, un nom de client
+   long garde sa largeur intrinsèque et pousse le bouton hors de la carte
+   (même piège que `.reg-tarif-input`, juste au-dessus). */
+.reg-corb { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.reg-corb:last-child { border-bottom: 0; }
+.reg-corb__quoi { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+.reg-corb__nom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-corb__detail { font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-corb__quand { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* LE MÊME PIÈGE QUE `.reg-tarif-input`, dans l'autre sens : sans `flex: 0 0
+   auto`, le bouton se laisse écraser à 120 px, son libellé passe sur deux
+   lignes et il monte à 71 px — quand les deux autres `reg-btn` de l'écran font
+   50. Un composant partagé doit mesurer pareil partout où il est posé. */
+.reg-corb .reg-btn { flex: 0 0 auto; white-space: nowrap; }
+.reg-corb__vide { margin: 12px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
+
+.reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: var(--taille-texte); color: var(--text-2); }@media (max-width: 700px) {
+  .reg-page { padding: 18px 14px calc(32px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 700px) {
+  .reg-card { padding: 16px; }
+}
+@media (max-width: 700px) {
+  .reg-actions { flex-wrap: wrap; }
+}
+@media (max-width: 700px) {
+  .reg-status { flex-basis: 100%; margin-right: 0; }
+}
+@media (max-width: 700px) {
+  .reg-btn { flex: 1; }
+}
+
+
+/* Les cartes de réglage qui listent des lignes (marge, modèles, machines,
+   fonctions en cours). Une rangée = un nom, une aide, et le contrôle à droite —
+   la même forme que `.reg-tarif-row`, sans en refaire une nouvelle. */
+.reg-liste { display: flex; flex-direction: column; }
+.reg-ligne { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.reg-ligne:last-child { border-bottom: 0; }
+/* UNE CARTE DE PAIRES : l'intitulé à gauche, le champ à droite, et TOUS les
+   champs commencent AU MÊME ENDROIT. En rangée flexible, chaque intitulé pousse
+   son champ de sa propre largeur : sur l'identité de l'atelier, les huit champs
+   ouvraient à huit abscisses différentes — de 442 px pour « Nom » à 568 pour
+   « Code postal et ville », mesuré le 28/08. Huit bords gauches sur une carte
+   qui se lit en colonne, c'est le défaut que la règle du 27/08 interdit, et il
+   se ferme en UNE règle : une piste d'intitulé, la même pour tous.
+   La largeur est un JETON, pas un nombre recopié dans huit sélecteurs. */
+.reg-liste--paires { --reg-etiq: 152px; }
+.reg-liste--paires .reg-ligne__nom { flex: 0 0 var(--reg-etiq); }
+.reg-ligne__nom { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* `min-width: 0` : sans lui, une suite d'étapes longue garde sa largeur
+   intrinsèque et pousse le contrôle hors de la carte. */
+.reg-ligne__aide { flex: 1 1 auto; min-width: 0; font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-champ { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+.reg-champ__unite { font-size: var(--taille-note); color: var(--text-2); }
+.reg-inter { flex: 0 0 auto; width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }

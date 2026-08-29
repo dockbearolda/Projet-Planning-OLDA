@@ -33,7 +33,7 @@ const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 
 const CHARTE = lire('public/charte.css');
-const CRM = lire('public/styles.css');
+const CRM = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
 const DEVIS = ecran('demande-devis');
 const VENTE = ecran('vente-directe');
 

@@ -46,6 +46,14 @@ const COQUILLE = [
   '/fiche-atelier.css',
   '/clients.css',
   '/projet.css',
+  // LES CINQ FEUILLES SORTIES DE styles.css LE 29/08. Chacune part avec son
+  // ecran ; hors ligne, une feuille absente de la coquille laisse son ecran NU
+  // — lisible, mais meconnaissable — et rien ne le signale.
+  '/dashboard.css',
+  '/reglages.css',
+  '/tailles-logos.css',
+  '/montravail.css',
+  '/pilotage.css',
   '/app.js',
   '/dashboard.js',
   '/priority.js',

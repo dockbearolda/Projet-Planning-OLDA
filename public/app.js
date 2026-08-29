@@ -7503,8 +7503,11 @@ let pjChargement = null;
 let pjModule = null;
 function chargerPointDuJour() {
   if (!pjChargement) {
-    pjChargement = import('./dashboard.js')
-      .then((m) => {
+    // SA FEUILLE PART AVEC LUI (29/08). Les 33 Ko du Point du jour vivaient dans
+    // styles.css : tous les postes les téléchargeaient à l'ouverture, y compris
+    // ceux qui ne quittent jamais le planning.
+    pjChargement = Promise.all([poserFeuille('dashboard.css'), import('./dashboard.js')])
+      .then(([, m]) => {
         pjModule = m.createDashboard({
           root: $dashboard,
           api, EMPLOYEES, FAMILIES, SUB_STAGES, STAGE_LABEL, SUB_LABEL,
@@ -7587,8 +7590,8 @@ let pilModule = null;
 function mountPilotage() {
   if (!$pilotage) return;
   if (!pilLoading) {
-    pilLoading = import('./pilotage.js')
-      .then((m) => { pilModule = m; return m.initPilotage($pilotage); })
+    pilLoading = Promise.all([poserFeuille('pilotage.css'), import('./pilotage.js')])
+      .then(([, m]) => { pilModule = m; return m.initPilotage($pilotage); })
       .catch((err) => { pilLoading = null; pilModule = null; reportError(err); });
   } else if (pilModule && pilModule.refreshPilotage) {
     pilModule.refreshPilotage();
@@ -7603,8 +7606,13 @@ let tlModule = null;
 function mountTaillesLogos() {
   if (!$tailleslogos) return;
   if (!tlLoading) {
-    tlLoading = import('./tailles-logos.js')
-      .then((m) => { tlModule = m; return m.initTaillesLogos($tailleslogos); })
+    // DEUX FEUILLES : la sienne, et celle des Réglages — cet écran reprend
+    // leurs rangées de formulaire, et deux écrans à un clic l'un de l'autre
+    // doivent donner le même composant, pas deux qui se ressemblent.
+    tlLoading = Promise.all([
+      poserFeuille('reglages.css'), poserFeuille('tailles-logos.css'), import('./tailles-logos.js'),
+    ])
+      .then(([, , m]) => { tlModule = m; return m.initTaillesLogos($tailleslogos); })
       .catch((err) => { tlLoading = null; tlModule = null; reportError(err); });
   } else if (tlModule && tlModule.refreshTaillesLogos) {
     tlModule.refreshTaillesLogos();
@@ -7616,8 +7624,8 @@ let mtModule = null;
 function mountMonTravail() {
   if (!$montravail) return;
   if (!mtLoading) {
-    mtLoading = import('./montravail.js')
-      .then((m) => {
+    mtLoading = Promise.all([poserFeuille('montravail.css'), import('./montravail.js')])
+      .then(([, m]) => {
         mtModule = m;
         // Les libellés de sous-étape vivent déjà ici : les redemander au serveur
         // ferait un appel de plus pour une table que l'écran connaît par cœur.
@@ -7639,8 +7647,8 @@ let reglagesModule = null;
 function mountReglages() {
   if (!$reglages) return;
   if (!reglagesLoading) {
-    reglagesLoading = import('./reglages.js')
-      .then((m) => { reglagesModule = m; return m.initReglages($reglages); })
+    reglagesLoading = Promise.all([poserFeuille('reglages.css'), import('./reglages.js')])
+      .then(([, m]) => { reglagesModule = m; return m.initReglages($reglages); })
       .catch((err) => {
         reglagesLoading = null;               // rechargeable au prochain essai
         reglagesModule = null;

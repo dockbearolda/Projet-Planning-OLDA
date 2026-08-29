@@ -42,15 +42,26 @@ const { spawnSync } = require('node:child_process');
 
 const RACINE = path.join(__dirname, '..');
 
-// Plafonds relevés le 27/08/2026. Un fichier absent de cette table doit être
-// à ZÉRO : c'est ce qui rend le cliquet valable pour les fichiers À VENIR.
+// Plafonds relevés le 27/08/2026, RE-RÉPARTIS le 29/08 : `styles.css` a été
+// découpé par écran (dashboard.css, reglages.css, montravail.css…), et ses
+// écarts ont suivi leurs règles. Le TOTAL ne monte pas — il descend, parce que
+// le tiroir mort est parti le même jour : 239 écarts la veille, 228 ici.
+// Un fichier absent de cette table doit être à ZÉRO : c'est ce qui rend le
+// cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
   'public/comptoir/demande-devis.css': 116,
-  'public/styles.css': 84,
   'public/comptoir/vente-directe.css': 45,
+  'public/styles.css': 41,
+  'public/dashboard.css': 11,
   'public/clients.css': 4,
+  'public/montravail.css': 4,
+  'public/reglages.css': 4,
   'public/projet.css': 3,
 };
+
+// LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
+// permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
+const TOTAL_MAX = 228;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',
@@ -91,6 +102,14 @@ assert.deepStrictEqual(trop, [],
   'la charte a reculé :\n  ' + trop.join('\n  ')
   + '\n  → `node outils/verifier-charte.mjs public` dit la ligne exacte.');
 
+// … ET LE TOTAL NE MONTE PAS. Découper un fichier en deux répartirait les mêmes
+// écarts sans qu'aucun plafond par fichier ne bouge : c'est le trou que ce
+// second cliquet ferme.
+const total = Object.values(compte).reduce((a, b) => a + b, 0);
+assert.ok(total <= TOTAL_MAX,
+  `la charte a reculé au total : ${total} écarts pour un plafond de ${TOTAL_MAX}`);
+if (total < TOTAL_MAX) console.log(`  ↓ le total peut descendre — ${total} au lieu de ${TOTAL_MAX}`);
+
 // LE GARDE-FOU DOIT RESTER DANS LE DÉPÔT. Il vient d'une bibliothèque
 // extérieure : s'il n'y est pas copié, il ne tourne que sur le poste de qui l'a
 // installée — c'est-à-dire nulle part le jour où quelqu'un d'autre reprend.
@@ -115,5 +134,4 @@ for (const nom of ['vente-directe', 'demande-devis']) {
     `${nom} : la police part en même temps que la feuille qui la nomme`);
 }
 
-const total = Object.values(compte).reduce((s, n) => s + n, 0);
-console.log(`✓ charte : cliquet tenu — ${total} écart(s), aucun fichier n'a reculé`);
+console.log(`✓ charte : cliquet tenu — ${total} écart(s) sur ${TOTAL_MAX}, aucun fichier n'a reculé`);

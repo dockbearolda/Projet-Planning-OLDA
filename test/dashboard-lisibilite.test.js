@@ -27,7 +27,7 @@ const vm = require('node:vm');
 const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const DASH = lire('public/dashboard.js');
 const PRIO = lire('public/priority.js');
-const CSS = lire('public/styles.css');
+const CSS = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
 
 // ===========================================================================
 // 1. AUCUNE INFORMATION ÉCRITE DEUX FOIS SUR UNE LIGNE
@@ -147,13 +147,11 @@ assert.ok(/buildTodoView\(activeTab\)/.test(DASH),
 // texte en dur : tout passe par --taille-*. Seules les fontes d'icônes et les
 // glyphes cliquables (l'étoile du panneau détail) gardent une taille propre —
 // ce ne sont pas des textes.
-const DEBUT = CSS.indexOf('/* ------------------------------------------------ En-tête « Point du jour » */');
-// LA BORNE DE FIN ÉTAIT LE TITRE DU TIROIR, parti le 29/08 avec lui. On prend
-// la section suivante qui reste : le bloc contrôlé est donc au moins aussi
-// large qu'avant, jamais moins.
-const FIN = CSS.indexOf('/* ------------------------------------------------------- Finitions desktop');
-assert.ok(DEBUT > 0 && FIN > DEBUT, 'bloc CSS du Point du jour introuvable');
-const blocPJ = CSS.slice(DEBUT, FIN);
+// LE BLOC EST DEVENU UN FICHIER (29/08). Il se delimitait par deux titres de
+// section, dont l'un appartenait au tiroir : depuis que le Point du jour a sa
+// propre feuille, il n'y a plus rien a decouper — on la lit entiere, ce qui est
+// une garde strictement plus large qu'avant.
+const blocPJ = require('./feuilles-crm').lireFeuille('public/dashboard.css');
 
 // On lit le CODE, pas les commentaires : ceux-ci CITENT les valeurs retirées
 // pour expliquer pourquoi elles l'ont été.
@@ -202,8 +200,27 @@ assert.ok(/--pj-ink-4: var\(--text-2\);/.test(CSS),
 assert.ok(/--pj-star-off: var\(--text-2\);/.test(CSS),
   'l’étoile éteinte du panneau détail doit se voir — c’est la FORME du glyphe qui '
   + 'dit l’état, pas un gris à 1,52:1');
-assert.ok(!/var\(--text-3\)/.test(sansCommentaires),
+// L'ANCIENNE BORNE DE CE BLOC CACHAIT LES JETONS. Il se découpait entre deux
+// titres de section, et la déclaration des jetons `--pj-*` tombait AVANT le
+// premier : deux d'entre eux valaient `--text-3` sans que rien ne le dise.
+// Depuis que le Point du jour a sa feuille, on la lit entière — et on garde la
+// règle telle qu'elle est écrite plus haut : `--text-3` est un REPÈRE (un fond,
+// une barre de charge), jamais une encre.
+const encres = sansCommentaires.match(/color:\s*var\(--text-3\)/g) || [];
+assert.deepStrictEqual(encres, [],
   'aucune règle du Point du jour ne doit tirer directement sur l’encre atténuée');
+// Un jeton qui VAUT `--text-3` doit être lu par quelqu'un : `--pj-neutral` était
+// déclaré depuis le début et personne ne s'en servait. Un gris à 2,54:1 qui
+// attend dans une feuille finit tôt ou tard sur du texte.
+// (OÙ il a le droit de servir n'est pas décidé ici : c'est la liste nommée de
+// test/uniformite-app.test.js — la barre de charge et le séparateur, les deux
+// endroits où l'effacement EST le message.)
+for (const m of sansCommentaires.matchAll(/(--pj-[\w-]+):\s*var\(--text-3\)/g)) {
+  const jeton = m[1];
+  assert.ok(new RegExp(`var\\(${jeton}\\)[^;]*;`).test(sansCommentaires.replace(`${jeton}: var(--text-3)`, '')),
+    `${jeton} vaut --text-3 et personne ne le lit : un gris à 2,54:1 qui attend `
+    + 'dans une feuille finit tôt ou tard sur du texte');
+}
 
 // Et l'étoile de la FILE a disparu : la priorité y est un mot, comme sur le
 // planning. C'est elle qui se rendait à 1,18:1 — l'étoile PLEINE, celle qui

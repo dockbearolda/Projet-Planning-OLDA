@@ -24,7 +24,7 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(RACINE, 'public/index.html'), 'utf8');
-const CSS = fs.readFileSync(path.join(RACINE, 'public/styles.css'), 'utf8');
+const CSS = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
 const APP = fs.readFileSync(path.join(RACINE, 'public/app.js'), 'utf8');
 
 // --- 1. Nouveau Projet est un onglet comme les autres ------------------------

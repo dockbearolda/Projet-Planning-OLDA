@@ -1,0 +1,1339 @@
+/* ===========================================================================
+   LE POINT DU JOUR — sa feuille, chargee avec son ecran (29/08/2026)
+   ===========================================================================
+   Ces 45 Ko vivaient dans styles.css : ils partaient donc a l'ouverture de TOUS
+   les postes, y compris ceux qui ne quittent pas le planning de la journee. Le
+   module `dashboard.js` se chargeait deja a la demande ; sa feuille le suit
+   maintenant (`poserFeuille` dans app.js), comme clients.css et projet.css.
+
+   Quatre familles : `.pj-` (le tableau), `.dd-` (le volet de detail), `.cat-`
+   (la configuration des categories), `.mac-` (les machines) — plus `.dashboard`,
+   la section elle-meme.
+
+   CE QUI EST PARTI ICI EST TOUT CE QUI EST CANTONNE A CET ECRAN, regles d'ETAT
+   comprises (`.pj-card.is-dim`, `.dd-panel.open`) et enveloppes conditionnelles
+   comprises (`@media`, `@container`). Les laisser derriere aurait casse la
+   cascade : leur regle de base arrive maintenant APRES, et a specificite egale
+   l'ordre aurait bascule. Trois regles seulement sont restees dans styles.css —
+   des listes que cet ecran PARTAGE avec le CRM.
+
+   L'ORDRE ENTRE CES REGLES EST CELUI D'ORIGINE. */
+
+/* Conteneur principal du dashboard. Base sans `display` pour que [hidden]
+   fonctionne ; affiché seulement quand il n'est pas masqué. */
+.dashboard:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+/* Le bouton suit le rail : il est disponible sur TOUTES les vues, puisque le
+   rail y est. C'est le seul geste qui le range. */
+
+/* Le bouton « Nouvelle commande » ne crée une ligne QUE dans la grille : hors
+   du Planning il n'a rien à piloter, et son résultat serait invisible. */
+
+/* `view-comptoir` (Nouveau Projet) : c'est un ONGLET COMME LES AUTRES, et il
+   NE TOUCHE PLUS RIEN DANS LA BARRE.
+   Il masquait toute la navigation — « poste de vente, devant le client » — et
+   l'écran devenait un cul-de-sac : plus d'onglets, plus de rail, rien qui dise
+   qu'on est encore dans l'outil. Le patron l'a refusé le 24/08.
+   La RECHERCHE restait masquée, elle : elle filtre la grille du planning, qui
+   n'est pas à l'écran. Refusé aussi, le 24/08 au soir — une barre qui perd un
+   élément en changeant d'onglet n'est plus une ossature, et le vide qu'elle
+   laissait déplaçait le reste. Elle reste donc à sa place partout : elle
+   n'a jamais eu besoin de la grille pour travailler (elle interroge le
+   SERVEUR et rend ses résultats dans sa propre palette, par-dessus l'écran),
+   et chercher une commande depuis un parcours est exactement ce qu'on fait
+   quand un client en rappelle une au comptoir.
+   La marge automatique qui rattrapait ce vide sur `.topbar-right` part avec :
+   sans trou à rattraper, elle n'a plus d'objet. */
+
+/* Panneau « Attribution des catégories ». */
+.cat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .42);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.cat-overlay.open { opacity: 1; }
+.cat-card {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 20px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop);
+  transform: translateY(8px) scale(.98);
+  transition: transform var(--dur-2) var(--ease);
+}
+.cat-overlay.open .cat-card { transform: none; }
+.cat-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: var(--rond);
+  height: var(--rond);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--pilule);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.cat-close:hover { background: var(--surface-hover); color: var(--text-1); }
+.cat-title { margin: 0 0 6px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+.cat-desc { margin: 0 0 18px; font-size: var(--taille-texte); line-height: 1.45; color: var(--text-2); }
+.cat-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.cat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cat-row.indented { padding-left: 22px; }
+.cat-row.indented .cat-row-label { color: var(--text-2); font-weight: var(--graisse-texte); font-size: var(--taille-texte); }
+.cat-row-label { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* Pilote (select) + référents (puces) côte à côte dès qu'il y a la place. */
+.cat-row-fields { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 16px; }
+.cat-field { display: flex; flex-direction: column; gap: 5px; }
+.cat-field-label {
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.cat-row-select {
+  flex-shrink: 0;
+  min-width: 150px;
+  min-height: var(--ctrl-h);
+  padding: var(--champ-y) var(--champ-x);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+  cursor: pointer;
+}
+.cat-row-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.cat-refs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--pilule);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.cat-ref-chip:hover { background: var(--surface-hover); }
+.cat-ref-chip.on {
+  border-color: rgba(var(--primary-rgb), .55);
+  background: rgba(var(--primary-rgb), .12);
+  color: var(--text-1);
+}
+.cat-ref-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.cat-ref-av {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  /* Fond pastel uni + initiale colorée (même patron que .cl-av côté fiche
+     client) — plus doux qu'un rond plein accent/blanc, cohérent partout. */
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  opacity: .38;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.cat-ref-chip.on .cat-ref-av { opacity: 1; }
+
+/* ===========================================================================
+   POINT DU JOUR — dashboard
+   Une console d'atelier, pas une galerie de cartes : on la lit debout, de loin,
+   pendant le point du matin. Trois partis pris qui tiennent tout le reste :
+
+     1. LA COULEUR NE DIT QU'UN ÉTAT. Rouge = retard ou blocage, ambre = ça
+        arrive, un dégradé d'encre = position dans la chaîne. Tout le reste est
+        gris. Une explication (« pourquoi cette ligne est là ») est du TEXTE,
+        jamais une pastille colorée — sinon elle parle la même langue qu'une
+        alerte et l'écran devient un sapin de Noël.
+     2. UN SEUL ACCENT PAR ZONE. Le nom du client dans une ligne, le chiffre
+        d'un compteur qui n'est pas à zéro, le titre d'une section. Quand tout
+        est en gras, plus rien n'est en gras — c'était le défaut principal.
+     3. DES COLONNES QUI TOMBENT AU MÊME ENDROIT. La file et le bac sont des
+        grilles à pistes FIXES : l'œil descend une colonne au lieu de relire
+        chaque carte. Jamais de piste `auto` — un élément absent d'une ligne
+        décalerait toute la file (même piège que la carte du planning).
+
+   Les tokens --pj-* ne sont que des alias de la charte (voir :root tout en
+   haut) : un seul jeu de couleurs pour l'app, le thème sombre suit tout seul.
+   Cibles : Galaxy Tab paysage 1280×800 (mode d'usage principal), portrait
+   800×1280, desktop, iPhone.
+   =========================================================================== */
+.dashboard, .dd-panel {
+  /* surfaces & texte */
+  --pj-bg: var(--bg);
+  --pj-surface: var(--surface);
+  --pj-border: var(--border);
+  --pj-border-soft: var(--border-soft);
+  --pj-ink: var(--text-1);
+  --pj-ink-2: var(--text-2);
+  --pj-ink-3: var(--text-2);
+  /* LA QUATRIÈME ENCRE PORTE DU TEXTE, ELLE DOIT DONC SE LIRE (25/08/2026).
+     Elle pointait sur le troisième gris de la charte — « atténué : repères,
+     pas du texte à lire » — et 24 règles du Point du jour s'en servaient pour
+     du texte : l'heure de chaque événement du fil, les compteurs de tête, les
+     intitulés du panneau de détail. Mesuré : 2,54:1 sur le blanc d'une carte,
+     2,35 sur le gris de fond, 3,04 en thème sombre — là où un texte courant en
+     demande 4,5.
+     ON NE L'ASSOMBRIT PAS : la valeur qui passerait le seuil sur les trois
+     fonds vaut #656c7a, et le deuxième gris vaut #5f6774 — les deux se
+     confondent. Un troisième cran ne peut pas être à la fois lisible et
+     discret ; c'est arithmétique, pas une question de goût.
+     Le gris atténué reste donc, sous son propre nom, pour les endroits où
+     l'effacement EST le message : l'état zéro, un séparateur, une invite de
+     saisie. Partout ailleurs on lit. */
+  --pj-ink-4: var(--text-2);
+  --pj-muet: var(--text-3);
+  --pj-accent: var(--primary);
+  /* urgences : trois crans de la famille ambre + le rouge pour le retard */
+  --pj-late: var(--danger);       --pj-late-bg: var(--danger-bg);
+  --pj-soon: var(--warning);      --pj-soon-deep: var(--warning-deep);  --pj-soon-bg: var(--warning-bg);
+  --pj-plan: var(--warning-2);    --pj-plan-deep: var(--warning);       --pj-plan-bg: var(--warning-bg);
+  /* `--pj-neutral` a ete retire le 29/08 : le jeton etait declare depuis le
+     debut et RIEN ne le lisait — seul son fond sert. Un gris a 2,54:1 qui
+     attend dans une feuille finit tot ou tard sur du texte. */
+  --pj-neutral-bg: var(--zone-bg);
+  /* détails */
+  /* Les étoiles du panneau détail (le RÉGLAGE de la priorité — l'affichage,
+     lui, est un mot depuis le 25/08). L'étoile éteinte était à --border-strong,
+     soit 1,52:1 sur la surface : on ne voyait pas qu'il restait des crans à
+     cliquer. Elle passe à l'encre secondaire — c'est la FORME du glyphe
+     (★ plein / ☆ creux) qui dit l'état, pas la seule intensité du gris. */
+  --pj-star: var(--primary);      --pj-star-off: var(--text-2);
+  --pj-chip-ink: var(--text-1);   --pj-chip-bg: var(--primary-soft);
+  --pj-green: var(--success);     --pj-green-ink: var(--success);  --pj-green-bg: var(--success-bg);  --pj-green-line: var(--success-line);
+  --pj-shadow: var(--shadow-2);
+  --pj-font: var(--font);
+
+  /* Les pistes de la grille des lignes, nommées une fois : l'entête de
+     colonnes et les lignes DOIVENT partager exactement la même définition.
+     Aucune piste « pourquoi » : le motif d'un classement descend sur un
+     deuxième rang, et seulement quand il existe. Dans le BAC, ce qu'on attend
+     EST le sujet de la ligne : il y prend une piste souple, aussi large que le
+     client. */
+  --pj-c-rank: 32px;
+  --pj-c-pos: 176px;
+  --pj-c-due: 104px;
+  --pj-c-prio: 62px;
+  --pj-c-pilot: 128px;
+  --pj-c-tag: 92px;
+
+  font-family: var(--pj-font);
+}
+
+.dashboard { background: var(--pj-bg); color: var(--pj-ink); }
+
+/* L'attribut hidden doit gagner même sur les éléments qui portent un display. */
+.dashboard [hidden], .dd-panel [hidden] { display: none !important; }
+
+/* Focus clavier visibles partout dans le point du jour. */
+.dashboard button:focus-visible, .dd-panel button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .35);
+}
+
+/* ===========================================================================
+   LE POINT DU JOUR — L'ÉCRAN DE QUATRE PERSONNES
+   ---------------------------------------------------------------------------
+   Refonte du 25/08. Le verdict était « absolument illisible », et il se
+   mesurait :
+
+     · NEUF tailles de texte sur un écran (11, 12, 13, 14, 16, 17, 19, 26 px)
+       et cinq graisses, quand la charte en pose QUATRE et TROIS. Le corps de
+       la file — badge, étape, rôle, intitulé de compteur — était à 11 px : la
+       charte n'a rien en dessous de 13.
+     · SEPT textes sous le seuil de contraste, dont l'étoile pleine de la
+       priorité à 1,18:1 sur blanc, c'est-à-dire invisible.
+     · La même information écrite deux ou trois fois par ligne (voir
+       dashboard.js, « LA LIGNE »).
+
+   Ce qui tient l'écran maintenant :
+
+     1. L'ÉCHELLE DE LA CHARTE, SANS EXCEPTION. 13 px pour la méta, 15 px pour
+        ce qui se lit, 19 px pour les titres et le chiffre d'alarme. Trois
+        graisses. Aucune valeur en dur ailleurs que dans les hauteurs de boîte.
+     2. LA COULEUR NE DIT QU'UN ÉTAT, et seulement quand il brûle. Rouge =
+        retard ou blocage, ambre = ça arrive, tout le reste est de l'encre. Un
+        compteur qui n'a rien à dire QUITTE la barre.
+     3. LA FILE EST UN TABLEAU, PAS UNE PILE DE CARTES. Cinquante rectangles
+        blancs arrondis liserés sur un fond gris, c'est cinquante objets à
+        traiter ; un tableau à filets, c'est une colonne qu'on descend. Les
+        pistes sont FIXES et chaque cellule est placée explicitement — un
+        élément absent ne décale pas la file (même piège que la carte du
+        planning).
+     4. PC UNIQUEMENT (CLAUDE.md du dépôt). Les replis 800 / 580 / 440 px
+        écrits pour la Galaxy Tab et le téléphone ont disparu ; restent deux
+        crans pour une fenêtre étroite, en requêtes de CONTENEUR — la même file
+        s'affiche pleine largeur et dans la colonne d'une vue personne.
+
+   Les tokens --pj-* ne sont que des alias de la charte : un seul jeu de
+   couleurs pour l'app, le thème sombre suit tout seul.
+   =========================================================================== */
+
+/* ------------------------------------------------ En-tête « Point du jour » */
+/* UNE SEULE RANGÉE : les onglets à gauche, les deux réglages à droite. Le titre
+   « Point du jour » et sa date sont partis le 25/08 — l'onglet actif de la
+   barre du haut dit déjà où l'on est, et la date du jour, celui qui la lit la
+   connaît. */
+.pj-head {
+  flex-shrink: 0;
+  padding: 0 var(--pas-4);
+  background: var(--pj-surface);
+  border-bottom: 1px solid var(--pj-border);
+}
+.pj-head-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  min-width: 0;
+}
+/* Les onglets prennent la place ; les réglages sont poussés à droite PAR UNE
+   MARGE, pas par `justify-content: flex-end` — sur une rangée trop étroite,
+   `flex-end` rogne par la GAUCHE et mange le premier onglet au lieu de faire
+   défiler. Même piège que la barre du comptoir. */
+.pj-head-row > .pj-tabs { flex: 1; min-width: 0; }
+.pj-head-row > .pj-tool:first-of-type { margin-left: auto; }
+
+/* Les trois outils du patron : Activité, Machines, Attribution. */
+.pj-tool {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pas-1);
+  height: 40px;
+  padding: 0 var(--pas-3);
+  border: 1px solid var(--pj-border);
+  border-radius: var(--arrondi-champ);
+  background: var(--pj-surface);
+  color: var(--pj-ink-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.pj-tool:hover { background: var(--state-hover); color: var(--pj-ink); }
+.pj-tool--icon { width: 40px; padding: 0; justify-content: center; }
+.pj-tool .material-symbols-outlined { font-size: var(--ic); }
+
+/* ------------------------------------------------ Onglets */
+.pj-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pj-tabs::-webkit-scrollbar { display: none; }
+.pj-tab {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pas-1);
+  padding: var(--pas-2) var(--pas-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--pj-ink-2);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.pj-tab:hover { color: var(--pj-ink); }
+.pj-tab.active {
+  color: var(--pj-ink);
+  border-bottom-color: var(--pj-accent);
+  font-weight: var(--graisse-forte);
+}
+/* « À toi, Prénom » : l'onglet par défaut se distingue des autres AVANT d'être
+   actif — c'est la réponse à la question qu'on vient poser à cet écran. */
+/* « C'est toi. » L'onglet de la personne au poste ne CHANGE PAS DE PLACE — les
+   quatre prénoms restent dans le même ordre d'un poste à l'autre, on ne
+   réapprend pas une liste qu'on connaît par cœur — il porte simplement une
+   marque. Un liseré, pas une couleur : la couleur dit un état, et « c'est toi »
+   n'en est pas un. */
+.pj-tab--moi .pj-tab-l {
+  box-shadow: inset 0 -2px 0 var(--pj-border-strong);
+}
+.pj-tab--moi.active .pj-tab-l { box-shadow: none; }
+/* Le libellé cède avant le compte : un onglet ne s'élargit pas indéfiniment,
+   et c'est le nombre — pas la fin du prénom — qu'on vient chercher. */
+.pj-tab-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pj-tab-n {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--pilule);
+  background: var(--pj-border-soft);
+  color: var(--pj-ink-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pj-tab.active .pj-tab-n { background: var(--pj-accent); color: var(--on-primary); }
+.pj-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pilule);
+  background: var(--pj-late);
+}
+
+/* ------------------------------------------------ Corps défilant */
+.pj-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--pas-4) var(--pas-4) 40px;
+}
+.pj-empty {
+  margin: 0;
+  padding: var(--pas-3);
+  border: 1px dashed var(--pj-border);
+  border-radius: var(--arrondi-bloc);
+  color: var(--pj-ink-2);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+}
+
+/* ------------------------------------------------ En-tête de section */
+.pj-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  margin-bottom: var(--pas-2);
+  min-width: 0;
+}
+.pj-section-title {
+  margin: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink);
+  white-space: nowrap;
+}
+.pj-section-count {
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: var(--pilule);
+  background: var(--pj-accent);
+  color: var(--on-primary);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* Le filet qui court jusqu'au bord : il découpe l'écran sans peser. */
+.pj-section-rule { flex: 1; height: 1px; min-width: 12px; background: var(--pj-border-soft); }
+.pj-section-hint {
+  flex-shrink: 0;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+  white-space: nowrap;
+}
+
+.pj-todo { display: flex; flex-direction: column; gap: var(--pas-4); }
+.pj-todo-sec { min-width: 0; }
+
+.pj-todo-list, .pj-hold-list {
+  container-type: inline-size;
+  border: 1px solid var(--pj-border);
+  border-radius: var(--arrondi-carte);
+  background: var(--pj-surface);
+  overflow: hidden;                   /* les coins rognent la première ligne */
+}
+
+/* La file d'une PERSONNE : cinq colonnes. Pas de « pilote » — ce serait son
+   propre nom à chaque rang — et pas de colonne « pourquoi » : le motif est une
+   exception (machine goulot, stagnation), il descend sur le deuxième rang
+   quand il existe, au lieu de réserver 176 px de vide sur toutes les lignes.
+   La file de l'ATELIER (`is-atelier`) ajoute le pilote, qui, lui, change d'une
+   ligne à l'autre. */
+.pj-row-head, .pj-row {
+  display: grid;
+  grid-template-columns:
+    var(--pj-c-rank)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    var(--pj-c-due)
+    var(--pj-c-prio);
+  align-items: center;
+  gap: 0 var(--pas-3);
+}
+.pj-todo-list.is-atelier .pj-row-head,
+.pj-todo-list.is-atelier .pj-row {
+  grid-template-columns:
+    var(--pj-c-rank)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    var(--pj-c-due)
+    var(--pj-c-prio)
+    var(--pj-c-pilot);
+}
+/* Le bac n'a ni rang ni priorité : une pastille d'état les remplace. Il garde
+   en revanche SA colonne « on attend quoi » — ici l'attente est le sujet de la
+   ligne, pas une exception. */
+/* Dans le bac, « on attend quoi » est le SUJET de la ligne : il obtient une
+   piste souple aussi large que le client, au lieu des 176 px de la file où il
+   n'est qu'une exception. Deux pistes en `fr` restent déterministes — elles se
+   calculent sur la largeur du conteneur, donc toutes les lignes s'alignent ;
+   c'est `auto`, qui se calcule sur le contenu, qui décalerait la file. */
+.pj-row--hold, .pj-hold-list .pj-row-head {
+  grid-template-columns:
+    var(--pj-c-tag)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    minmax(0, 1fr)
+    var(--pj-c-due);
+}
+.pj-hold-list.is-atelier .pj-row--hold,
+.pj-hold-list.is-atelier .pj-row-head {
+  grid-template-columns:
+    var(--pj-c-tag)
+    minmax(0, 1fr)
+    var(--pj-c-pos)
+    minmax(0, 1fr)
+    var(--pj-c-due)
+    var(--pj-c-pilot);
+}
+
+/* CHAQUE cellule est placée explicitement, jamais laissée à l'auto-placement.
+   Dès qu'un élément descend d'une ligne, la répartition automatique remplit
+   les trous restés libres à sa gauche : l'échéance et le pilote se
+   retrouvaient sous le rang, en bas à gauche de la ligne. Placer, c'est dire
+   à la fois LA COLONNE et LA LIGNE. */
+.pj-row > .pj-row-rank { grid-area: 1 / 1; }
+.pj-row > .pj-row-who  { grid-area: 1 / 2; }
+.pj-row > .pj-pos      { grid-area: 1 / 3; }
+.pj-row > .pj-badge    { grid-area: 1 / 4; }
+.pj-row > .pj-prio     { grid-area: 1 / 5; }
+.pj-row > .pj-porteur  { grid-area: 1 / 6; }
+/* Le deuxième rang porte TOUT l'exceptionnel d'un coup — rôle, motif, alerte —
+   dans un seul conteneur. Placer chaque élément sur son propre rang créerait
+   des rangs implicites vides quand l'un d'eux manque. */
+.pj-row > .pj-row-plus { grid-area: 2 / 2 / auto / -1; }
+
+.pj-row--hold > .pj-hold-tag { grid-area: 1 / 1; }
+.pj-row--hold > .pj-row-who  { grid-area: 1 / 2; }
+.pj-row--hold > .pj-pos      { grid-area: 1 / 3; }
+.pj-row--hold > .pj-row-why  { grid-area: 1 / 4; }
+.pj-row--hold > .pj-badge    { grid-area: 1 / 5; }
+.pj-row--hold > .pj-porteur  { grid-area: 1 / 6; }@container (max-width: 820px) {
+  .pj-row-head, .pj-row,
+  .pj-todo-list.is-atelier .pj-row-head,
+  .pj-todo-list.is-atelier .pj-row {
+    grid-template-columns: var(--pj-c-rank) minmax(0, 1fr) var(--pj-c-due) var(--pj-c-prio);
+  }
+}
+@container (max-width: 820px) {
+  .pj-row--hold, .pj-hold-list .pj-row-head,
+  .pj-hold-list.is-atelier .pj-row--hold,
+  .pj-hold-list.is-atelier .pj-row-head {
+    grid-template-columns: var(--pj-c-tag) minmax(0, 1fr) var(--pj-c-due);
+  }
+}
+@container (max-width: 820px) {
+  .pj-row-head-c.c-pos, .pj-row-head-c.c-pilot, .pj-row-head-c.c-why { display: none; }
+}
+@container (max-width: 820px) {
+  /* Repliée sous le client, l'étape se remet à plat : « Production · Pressage ».
+     Le sélecteur passe par la LISTE, pas par `.pj-pos` seul : la règle de base
+     `.pj-pos { flex-direction: column }` est écrite plus bas dans le fichier et
+     gagnerait à spécificité égale — la position resterait sur deux lignes. */
+  .pj-todo-list .pj-pos, .pj-hold-list .pj-pos {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--pas-1);
+  }
+}
+@container (max-width: 820px) {
+  .pj-todo-list .pj-pos-sub::before,
+  .pj-hold-list .pj-pos-sub::before { content: '· '; }
+}
+@container (max-width: 820px) {
+
+  .pj-row > .pj-badge   { grid-area: 1 / 3; }
+}
+@container (max-width: 820px) {
+  .pj-row > .pj-prio    { grid-area: 1 / 4; }
+}
+@container (max-width: 820px) {
+  .pj-row > .pj-pos     { grid-area: 2 / 2 / auto / -1; margin-top: 3px; }
+}
+@container (max-width: 820px) {
+  .pj-row > .pj-porteur { grid-area: 3 / 2 / auto / -1; margin-top: 3px; }
+}
+@container (max-width: 820px) {
+  .pj-row > .pj-row-plus { grid-area: 4 / 2 / auto / -1; }
+}
+@container (max-width: 820px) {
+
+  .pj-row--hold > .pj-badge   { grid-area: 1 / 3; }
+}
+@container (max-width: 820px) {
+  .pj-row--hold > .pj-pos     { grid-area: 2 / 2 / auto / -1; margin-top: 3px; }
+}
+@container (max-width: 820px) {
+  .pj-row--hold > .pj-row-why { grid-area: 3 / 2 / auto / -1; }
+}
+@container (max-width: 820px) {
+  .pj-row--hold > .pj-porteur { grid-area: 4 / 2 / auto / -1; margin-top: 3px; }
+}
+
+
+/* La rangée d'en-têtes : elle nomme les colonnes une fois pour toutes. C'est
+   elle qui fait basculer une pile de lignes en TABLEAU. */
+.pj-row-head {
+  padding: var(--pas-2) var(--pas-3);
+  background: var(--pj-neutral-bg);
+  border-bottom: 1px solid var(--pj-border);
+}
+.pj-row-head-c {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--pj-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------ La ligne */
+.pj-card {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: var(--pj-surface);
+  color: var(--pj-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.pj-row {
+  padding: var(--pas-2) var(--pas-3);
+  border-top: 1px solid var(--row-line);
+}
+.pj-row-head + .pj-row { border-top: 0; }
+.pj-row:hover { background: var(--row-hover); }
+
+/* Le liseré d'état, à gauche. Il ne se dépense QUE pour ce qui réclame :
+   retard, blocage, à voir. Une commande dans les temps n'a pas de liseré —
+   sinon cinquante lignes en portent un et plus aucune ne se détache. */
+.pj-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+.pj-row.u-late::before { background: var(--pj-late); }
+.pj-row.u-soon::before { background: var(--pj-soon); }
+.pj-row.is-bloque::before { background: var(--pj-late); }
+.pj-row.is-a-voir::before { background: var(--pj-soon); }
+.pj-row--hold.is-attente::before { background: var(--pj-soon); }
+
+/* Une ligne hors du filtre courant s'estompe sans disparaître : on garde le
+   contexte, on retire l'accroche. */
+.pj-card.is-dim { opacity: .38; }
+
+.pj-row-rank {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Client + article : LES DEUX SEULES TAILLES d'une ligne. Le client porte
+   l'identité (15 px, graisse forte), l'article la précise (13 px). */
+.pj-row-who { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pj-card-client {
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-card-article {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La position dans la chaîne, en deux étages : l'étape précise en tête, la
+   famille en rappel dessous. */
+.pj-pos { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pj-pos-main {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--pj-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-pos-sub {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le deuxième rang : rôle, motif, alerte. Il n'apparaît que s'il a quelque
+   chose à porter, et il ne coûte donc rien aux lignes ordinaires. */
+.pj-row-plus {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pas-1) var(--pas-2);
+  min-width: 0;
+  margin-top: var(--pas-1);
+}
+.pj-row-plus > .pj-flag { flex: 1 1 100%; }
+
+/* Le « pourquoi » : du texte, jamais une pastille — c'est une explication, pas
+   un état. Il ne porte plus que ce qu'aucune autre cellule ne dit. */
+.pj-row-why {
+  min-width: 0;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink-2);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* L'échéance — la SEULE écriture de la date dans la ligne. */
+.pj-badge {
+  justify-self: start;
+  padding: 3px var(--pas-2);
+  border-radius: var(--arrondi-champ);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  white-space: nowrap;
+}
+.pj-badge.u-late { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-badge.u-soon { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
+.pj-badge.u-plan { background: var(--pj-plan-bg); color: var(--pj-plan-deep); }
+/* Dans les temps ou sans date : aucun fond, et l'encre SECONDAIRE — jamais
+   l'atténuée. À --text-3 ces deux badges se rendaient à 2,54:1. */
+.pj-badge.u-ok, .pj-badge.u-none {
+  background: none;
+  padding-left: 0;
+  color: var(--pj-ink-2);
+  font-weight: var(--graisse-note);
+}
+
+/* La priorité : un MOT, et seulement quand elle est haute. La cellule reste
+   là quand elle est vide — c'est une piste de grille. */
+.pj-prio { justify-self: start; min-height: 1px; }
+.pj-prio.is-haute {
+  padding: 3px var(--pas-2);
+  border-radius: var(--arrondi-champ);
+  background: var(--pj-accent);
+  color: var(--on-primary);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  white-space: nowrap;
+}
+
+/* Le porteur : le pilote quand on regarde le travail des autres, le rôle
+   quand on regarde le sien. */
+.pj-porteur {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pas-1);
+  min-width: 0;
+}
+.pj-porteur-n {
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--pj-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-porteur.is-none .pj-porteur-n { color: var(--pj-ink-2); font-weight: var(--graisse-texte); }
+
+.pj-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pilule);
+  background: var(--av, var(--pj-ink-2));
+  color: var(--on-primary);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  line-height: 1;
+}
+
+.pj-role {
+  padding: 2px var(--pas-1);
+  border-radius: var(--arrondi-champ);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  white-space: nowrap;
+  background: var(--pj-border-soft);
+  color: var(--pj-ink-2);
+}
+.pj-role.role-pilote { background: var(--primary-soft); color: var(--pj-ink); }
+
+/* Pastille d'état du bac « à débloquer / relancer ». */
+.pj-hold-tag {
+  justify-self: start;
+  padding: 3px var(--pas-2);
+  border-radius: var(--arrondi-champ);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  white-space: nowrap;
+}
+.pj-hold-tag.t-bloque { background: var(--pj-late-bg); color: var(--pj-late); }
+.pj-hold-tag.t-attente { background: var(--pj-soon-bg); color: var(--pj-soon-deep); }
+
+/* --- Alerte de commande (Bloquée / À voir) ------------------------------- */
+/* Un dossier bloqué se voit d'une rangée entière, pas d'un liseré de 3 px : le
+   MOTIF est ce qui débloque la journée, il est donc écrit en clair. */
+.pj-flag {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pas-1);
+  min-width: 0;
+  padding: 4px var(--pas-2);
+  border-radius: var(--arrondi-champ);
+}
+.pj-flag-tag {
+  flex-shrink: 0;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-forte);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.pj-flag-why {
+  min-width: 0;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--pj-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-flag.f-bloque { background: var(--pj-late-bg); }
+.pj-flag.f-bloque .pj-flag-tag { color: var(--pj-late); }
+.pj-flag.f-a-voir { background: var(--pj-soon-bg); }
+.pj-flag.f-a-voir .pj-flag-tag { color: var(--pj-soon-deep); }
+
+/* ===========================================================================
+   VUE ÉQUIPE — quatre files côte à côte, plus la charge de la chaîne
+   =========================================================================== */
+.pj-team { display: flex; flex-direction: column; gap: var(--pas-4); }
+
+/* --- Les quatre colonnes -------------------------------------------------- */
+.pj-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pas-3);
+  align-items: start;
+}
+.pj-col {
+  min-width: 0;
+  border: 1px solid var(--pj-border);
+  border-radius: var(--arrondi-carte);
+  background: var(--pj-surface);
+  overflow: hidden;
+}
+.pj-col-head {
+  display: block;
+  width: 100%;
+  padding: var(--pas-3);
+  border: 0;
+  border-bottom: 1px solid var(--pj-border);
+  background: var(--pj-neutral-bg);
+  color: var(--pj-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pj-col-head:hover { background: var(--surface-hover); }
+.pj-col-line { display: flex; align-items: center; gap: var(--pas-1); min-width: 0; }
+.pj-col-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-col-count {
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--pj-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+/* Jauge : la part de la charge du plus chargé, la fraction en retard en rouge
+   par-dessus. Repère commun aux quatre colonnes — sans lui, quatre hauteurs
+   différentes ne disent pas qui est surchargé. */
+.pj-col-load {
+  position: relative;
+  display: block;
+  height: 5px;
+  margin: var(--pas-2) 0 var(--pas-1);
+  border-radius: var(--pilule);
+  background: var(--pj-border-soft);
+  overflow: hidden;
+}
+.pj-col-load-fill, .pj-col-load-late {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--pilule);
+}
+.pj-col-load-fill { background: var(--pj-muet); }
+.pj-col-load-late { background: var(--pj-late); z-index: 1; }
+.pj-col-sub {
+  display: block;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--pj-ink-2);
+}
+.pj-col-sub.is-late { color: var(--pj-late); }
+
+.pj-col-cards { display: flex; flex-direction: column; }
+.pj-free {
+  padding: var(--pas-3);
+  color: var(--pj-ink-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+}
+
+/* La carte d'équipe : DEUX lignes. « client — échéance », puis
+   « article · étape ». Six rangs par dossier ne laissaient voir que quatre
+   dossiers d'une file de seize. */
+.pj-card--board {
+  display: block;
+  padding: var(--pas-2) var(--pas-3);
+  border-top: 1px solid var(--row-line);
+}
+.pj-card--board:hover { background: var(--row-hover); }
+.pj-card--board::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+.pj-card--board.u-late::before { background: var(--pj-late); }
+.pj-card--board.u-soon::before { background: var(--pj-soon); }
+.pj-card--board.is-bloque::before { background: var(--pj-late); }
+.pj-card--board.is-a-voir::before { background: var(--pj-soon); }
+.pj-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pas-1);
+  min-width: 0;
+}
+.pj-card-top .pj-card-client { flex: 1; min-width: 0; }
+.pj-card-bas {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pas-1);
+  min-width: 0;
+}
+.pj-card-bas .pj-card-article { flex: 0 1 auto; }
+.pj-card-etape {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--pj-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+.pj-card--board .pj-flag { margin-top: 3px; }
+.pj-card--board .pj-role { display: inline-block; margin-top: 3px; }@media (max-width: 1180px) {
+  .pj-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .pj-board { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ------------------------------------------------ Slide-over détail (420px) */
+.dd-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(15, 23, 42, .42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.dd-scrim.open { opacity: 1; pointer-events: auto; }
+.dd-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  width: min(430px, 100vw);
+  background: var(--pj-surface);
+  color: var(--pj-ink);
+  box-shadow: -18px 0 48px rgba(15, 23, 42, .18);
+  transform: translateX(102%);
+  /* Fermé : visibility retire le panneau du focus clavier (posée APRÈS la
+     glissade de sortie pour ne pas couper l'animation). */
+  visibility: hidden;
+  transition: transform var(--dur-3) var(--ease), visibility 0s var(--dur-3);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.dd-panel.open { transform: translateX(0); visibility: visible; transition: transform var(--dur-3) var(--ease); }
+.dd-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: var(--rond);
+  height: var(--rond);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pj-ink-3);
+  cursor: pointer;
+}
+.dd-close:hover { background: var(--pj-neutral-bg); color: var(--pj-ink); }
+
+.dd-head { padding: 20px 22px 15px; border-bottom: 1px solid var(--pj-border-soft); }
+/* Ici les étoiles se RÈGLENT : le glyphe reste, c'est l'affordance connue. */
+.dd-stars { display: flex; gap: 2px; margin: 0 0 8px -6px; }
+.dd-star {
+  width: var(--rond);
+  height: var(--rond);
+  border: 0;
+  border-radius: var(--arrondi-champ);
+  background: none;
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  line-height: 1;
+  color: var(--pj-star-off);
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.dd-star.on { color: var(--pj-star); }
+.dd-star:hover { transform: scale(1.12); }
+.dd-client {
+  margin: 0 34px 3px 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.dd-article { margin: 0 0 11px; font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--pj-ink-2); }
+.dd-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.dd-badges .pj-badge { font-size: var(--taille-texte); padding: 4px 10px; justify-self: auto; }
+
+.dd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 22px 18px; }
+.dd-sec-title {
+  display: block;
+  margin: 0 0 8px;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+
+/* Prochaine action : la consigne, en tête du panneau. Une barre d'encre à
+   gauche, pas un encart ambre — ce n'est pas une alerte, c'est l'instruction. */
+.dd-next {
+  margin-bottom: 18px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--pj-ink);
+}
+.dd-next-label {
+  display: block;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+.dd-next-text { margin: 4px 0 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--pj-ink); line-height: 1.35; }
+
+/* Position actuelle : d'où l'on part, avant de dire où l'envoyer. */
+.dd-pos { margin-bottom: 18px; }
+.dd-pos-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--taille-texte);
+}
+.dd-pos-fam { font-weight: var(--graisse-texte); color: var(--pj-ink-3); }
+.dd-pos-sep { color: var(--pj-muet); }
+.dd-pos-sub { font-weight: var(--graisse-forte); color: var(--pj-ink); }
+
+.dd-group { margin-bottom: 14px; }
+.dd-group-title {
+  margin: 0 0 7px;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+.dd-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.dd-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: var(--rond);
+  padding: 0 13px;
+  border: 1px solid var(--pj-border);
+  border-radius: var(--pilule);
+  background: var(--pj-surface);
+  color: var(--pj-ink-2);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.dd-pill:hover { border-color: var(--pj-accent); color: var(--pj-ink); background: var(--pj-bg); }
+.dd-pill.current {
+  background: var(--pj-ink);
+  border-color: var(--pj-ink);
+  color: var(--pj-bg);
+  font-weight: var(--graisse-forte);
+  cursor: default;
+}
+.dd-pill-av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: -4px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+}
+.dd-pill.current .dd-pill-av { background: var(--pj-bg); color: var(--pj-ink); }
+
+.dd-team { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--pj-border-soft); }
+.dd-team-line { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.dd-team-who { display: inline-flex; align-items: center; gap: 8px; }
+.dd-team-name { font-size: var(--taille-texte); font-weight: var(--graisse-forte); }
+.dd-team-tag {
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--pj-ink-4);
+}
+.dd-team-none { font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--pj-ink-4); }
+
+.dd-foot {
+  display: flex;
+  gap: 10px;
+  padding: 13px 22px 15px;
+  border-top: 1px solid var(--pj-border-soft);
+  background: var(--pj-surface);
+}
+.dd-done, .dd-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: var(--ctrl-h);
+  border-radius: var(--arrondi-champ);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.dd-done {
+  flex: 1;
+  border: 0;
+  background: var(--pj-green);
+  /* le remplissage sémantique s'inverse avec le thème : l'encre posée dessus
+     doit donc être la surface, jamais un blanc en dur. */
+  color: var(--surface);
+}
+.dd-done:hover { filter: brightness(1.06); }
+.dd-done .material-symbols-outlined { font-size: var(--ic); }
+.dd-open {
+  padding: 0 16px;
+  border: 1px solid var(--pj-border);
+  background: var(--pj-surface);
+  color: var(--pj-ink-2);
+}
+.dd-open:hover { background: var(--pj-bg); color: var(--pj-ink); }
+.dd-open .material-symbols-outlined { font-size: var(--ic-serre); }
+
+/* ------------------------------------------------ Réglages Machines */
+.mac-card { width: min(640px, 100%); }
+.mac-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.mac-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.mac-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mac-field--name { flex: 1 1 170px; }
+.mac-field--imp { flex: 1 1 150px; }
+.mac-field--dur { flex: 0 1 130px; }
+.mac-name, .mac-dur {
+  width: 100%;
+  min-height: var(--ctrl-h);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+}
+.mac-name:focus-visible, .mac-dur:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
+.mac-imp { width: 100%; min-height: var(--ctrl-h); accent-color: var(--pj-accent); cursor: pointer; }
+.mac-remove {
+  flex-shrink: 0;
+  align-self: flex-end;
+  width: var(--rond);
+  height: var(--rond);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.mac-remove:hover { background: var(--pj-late-bg); color: var(--pj-late); border-color: transparent; }
+.mac-add {
+  align-self: flex-start;
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--ctrl-h);
+  padding: 0 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--pj-accent);
+  font: inherit;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  cursor: pointer;
+}
+.mac-add:hover { background: var(--surface-hover); border-color: var(--pj-accent); }@media (max-width: 1279px) {
+  .dashboard, .dd-panel { --pj-c-why: 148px; --pj-c-pos: 150px; --pj-c-pilot: 116px; }
+}
+@media (max-width: 900px) {
+  .pj-head-row { flex-wrap: wrap; }
+}
+@media (max-width: 900px) {
+  .pj-tool { width: 40px; padding: 0; justify-content: center; }
+}
+@media (max-width: 900px) {
+  .pj-head { padding-inline: var(--pas-3); }
+}
+@media (max-width: 900px) {
+  .pj-body { padding-inline: var(--pas-3); }
+}
+@media (min-width: 1900px) {
+  .pj-head > *, .pj-body > * { max-width: 1800px; margin-inline: auto; }
+}
+
+/* UN SÉLECTEUR RESTÉ OUVERT (retrouvé le 26/08). La règle disait :
+     :root[data-theme="dark"] .dd-panel,
+     :root[data-theme="dark"] .pj-feed { box-shadow: …rgba(0,0,0,.5); }
+   La refonte du Point du jour (089d581) a retiré `.pj-feed` — et avec lui la
+   ligne qui FERMAIT la liste. Il restait « .dd-panel, » suivi d'une virgule,
+   d'un commentaire, puis de la règle suivante : le navigateur lisait donc
+   « :root[data-theme=dark] .dd-panel, .ld-docs { display:flex; gap:6px } ».
+   Deux dégâts, tous deux silencieux : le panneau du Point du jour gagnait un
+   écart de 6 px entre ses enfants EN THÈME SOMBRE seulement, et l'ombre qui
+   devait le détacher du fond sombre n'existait plus. */
+:root[data-theme="dark"] .dd-panel { box-shadow: -18px 0 48px rgba(0, 0, 0, .5); }

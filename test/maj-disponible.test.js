@@ -403,7 +403,7 @@ function fonction(src, nom) {
 
   // Le style existe, et la bulle passe SOUS la boîte de confirmation (1300) —
   // sinon la question s'ouvre derrière ce qui l'a posée.
-  const CSS = lire('public/styles.css');
+  const CSS = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
   assert.match(CSS, /\.maj \{/, 'la bulle doit avoir son style');
   const zMaj = Number(CSS.match(/\.maj \{[\s\S]*?z-index: (\d+)/)[1]);
   const zAsk = Number(CSS.match(/\.ask \{[\s\S]*?z-index: (\d+)/)[1]);

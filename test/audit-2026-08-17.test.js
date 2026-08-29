@@ -35,7 +35,7 @@ const racine = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(racine, f), 'utf8');
 
 const APP = lire('public/app.js');
-const CSS = lire('public/styles.css');
+const CSS = require('./feuilles-crm').cssCrm();   // styles.css + les cinq feuilles d'ecran
 const DASH = lire('public/dashboard.js');
 const REG = lire('public/reglages.js');
 const SERVER = lire('server.js');

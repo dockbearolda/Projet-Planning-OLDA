@@ -1,0 +1,48 @@
+/* ===========================================================================
+   PILOTAGE — la feuille de l'ecran de la Direction (29/08/2026)
+   ===========================================================================
+   Ecran reserve (capacite `marge`), cote serveur compris : un poste qui n'y a
+   pas droit ne telecharge meme plus son habillage. */
+
+/* ===========================================================================
+   PILOTAGE — l'écran de la Direction (§24).
+   Des tuiles, un chiffre chacune. Aucune couleur décorative : le rouge dit un
+   ÉTAT (en dessous du minimum, en retard, bloqué), rien d'autre.
+   =========================================================================== */
+.pil-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
+.pil-titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+.pil-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.pil-tuile {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--radius);
+}
+.pil-tuile__titre { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+/* La SEULE grande taille de l'écran, et elle est là pour ça : « les chiffres
+   qu'on annonce au client » — ici, ceux qu'on s'annonce à soi-même. */
+.pil-tuile__n { font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.pil-tuile__note { font-size: var(--taille-note); color: var(--text-2); line-height: 1.4; }
+.pil-tuile.is-alerte { border-color: var(--st-bloque); background: var(--st-bloque-bg); }
+.pil-tuile.is-alerte .pil-tuile__n { color: var(--st-bloque); }
+.pil-tuile.is-attention .pil-tuile__n { color: var(--warning); }
+
+.pil-bloc { display: flex; flex-direction: column; gap: 10px; }
+.pil-bloc__titre { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+.pil-vide { margin: 0; font-size: var(--taille-texte); color: var(--text-2); }
+.pil-charge { display: flex; flex-direction: column; }
+.pil-poste { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.pil-poste:last-child { border-bottom: 0; }
+.pil-poste__nom { flex: 1 1 auto; min-width: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pil-poste__n { flex: 0 0 auto; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.pil-poste__lignes { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
+
+
+/* À DÉBLOQUER (§6) — la LISTE, pas le compteur. Un « 4 » ne montre rien : il
+   faudrait aller chercher lesquels, et c'est le geste que l'écran supprime. */
+.pil-bloques { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.pil-bloque { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: var(--st-bloque-bg); border: 1px solid var(--st-bloque); border-radius: var(--radius); }
+.pil-bloque__haut { display: flex; align-items: baseline; gap: 10px; }
+.pil-bloque__client { flex: 1 1 auto; min-width: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pil-bloque__depuis { flex: 0 0 auto; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); white-space: nowrap; }
+.pil-bloque__motif { margin: 0; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--st-bloque); }
+.pil-bloque__quoi { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
