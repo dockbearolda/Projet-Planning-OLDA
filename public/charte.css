@@ -609,7 +609,12 @@ input[type="radio"]:focus-visible {
   width: var(--pas-2); height: 2px; margin-top: -1px;
   background: var(--card-border);
 }
-.step.done { color: var(--text-1); }
+/* UNE ÉTAPE FRANCHIE SE REVISITE (Charlie, 30/08/2026) : le curseur le dit,
+   avant même qu'on clique. Le survol reprend le gris des boutons secondaires —
+   aucune couleur neuve, la charte n'en invente pas pour un simple repère de
+   clic. */
+.step.done { color: var(--text-1); cursor: pointer; }
+.step.done:hover { background: var(--border-soft); }
 .step.done::before {
   content: "\2713";
   background: var(--primary); border-color: var(--primary); color: var(--on-primary);

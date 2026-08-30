@@ -359,9 +359,13 @@ h2{letter-spacing:-.01em}
 .neg-panneau{margin-top:14px;padding-top:14px;border-top:1px solid var(--border-soft)}
 .neg-saisie{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:var(--pas-3);align-items:end;margin-bottom:var(--pas-3)}
 .neg-saisie .field{margin-bottom:0}
-.neg-saisie>div:not(.field){font-size:var(--taille-texte)}
-.neg-saisie>div:not(.field) span{color:var(--text-2);display:block}
-.neg-saisie>div:not(.field) b{font-size:var(--taille-texte);font-variant-numeric:tabular-nums}
+/* LES DEUX LECTURES SE LISENT COMME LE CHAMP D'À CÔTÉ (Charlie, 30/08/2026).
+   « Prix de revient / pièce » et « Devis actuel » n'étaient que du texte qui
+   courait sur deux lignes, plus court que le champ qu'il borde : la même
+   étiquette au-dessus, la même boîte — encre plus douce puisqu'on ne peut pas
+   y écrire — en dessous, et les trois rangées tombent à la même hauteur. */
+.neg-saisie>div:not(.field) span{color:var(--text-2);display:block;font-weight:var(--graisse-note);font-size:var(--dd-taille-label);margin-bottom:var(--dd-label-gap)}
+.neg-saisie>div:not(.field) b{display:flex;align-items:center;height:var(--dd-champ-h);padding:0 var(--dd-champ-x);border:1px solid var(--border-soft);border-radius:var(--arrondi-champ);background:var(--zone-bg);font-size:var(--dd-taille-valeur);font-weight:var(--graisse-forte);font-variant-numeric:tabular-nums}
 
 .neg-sol{border:1px solid var(--border-soft);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-bottom:var(--pas-2);background:var(--surface)}
 .neg-sol.is-best{border:2px solid var(--primary);background:var(--zone-bg);padding:calc(var(--pas-3) - 1px)}
@@ -438,12 +442,6 @@ h2{letter-spacing:-.01em}
 .cat-perso{margin-top:var(--pas-3);padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
 .cat-perso .field:last-child{margin-bottom:0}
 
-/* LE RÉSUMÉ DU VOLET PORTE LE PRIX (27/08/2026). Le mot « Détails » à gauche,
-   le prix à droite : le volet peut se replier sans rien cacher de ce qu'on
-   annonce. La rangée garde la hauteur d'une commande, comme partout. */
-.tx-recap>summary{display:flex;align-items:center;justify-content:space-between;gap:var(--pas-3);flex-wrap:wrap}
-.tx-recap>summary .tx-recap-tete{margin:0;flex:0 1 auto}
-.tx-recap-mot{flex:none;font-weight:var(--graisse-forte)}
 .tx-sizes .field{margin-bottom:0}
 .tx-sizes label{color:var(--text-2)}
 
@@ -542,6 +540,17 @@ h2{letter-spacing:-.01em}
 /* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
    encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
 .bloc .notice,.notice .bloc{background:var(--zone-bg)}
+/* LE CLIENT SÉLECTIONNÉ TIENT SUR DEUX LIGNES, PAS SEPT (Charlie, 30/08/2026).
+   La bulle en pointillés listait une paire par ligne — Type, Contact,
+   WhatsApp, E-mail, Secteur, Adresse — pour une carte plus grande que
+   l'information qu'elle portait ; nulle part ailleurs sur l'écran une bulle de
+   ce genre ne réapparaît. Un simple trait au-dessus, comme un volet : le nom
+   et « Modifier » sur la même rangée, l'essentiel en dessous, joint sur une
+   ligne. */
+.client-recap{padding-top:var(--pas-3);border-top:1px solid var(--border-soft)}
+.client-recap-tete{display:flex;align-items:center;justify-content:space-between;gap:var(--pas-3)}
+.client-recap-tete b{font-weight:var(--graisse-forte)}
+.client-recap .help{margin-top:4px}
 /* Les blocs blancs du dedans le restent : sur un fond retiré, un cadre
    transparent se confondrait avec lui. */
 /* (les blocs internes n'ont plus de fond à eux : voir le pavé « trois niveaux ») */
@@ -686,12 +695,14 @@ h2{letter-spacing:-.01em}
   font-weight:var(--graisse-forte);line-height:var(--ligne-texte)}
 .tx-adjust>summary::before,.tx-volet>summary::before,.tx-recap>summary::before{content:'▸';color:var(--text-2)}
 .tx-adjust[open]>summary::before,.tx-volet[open]>summary::before,.tx-recap[open]>summary::before{content:'▾'}
-/* LES PRIX OUVRENT LE CONTENU DU VOLET (24/08 au soir) : le résumé ne porte
-   plus que « Détails » — même rangée que les deux autres volets — et le bloc
-   des prix descend en tête du contenu, aligné à droite comme la colonne des
-   valeurs qu'il coiffe. Sous le prix, la case TGCA de l'article. */
-.tx-recap-tete{display:flex;flex-direction:column;align-items:flex-end;gap:3px;padding:var(--pas-1) 0 var(--pas-2)}
-.tx-recap-prix{display:flex;flex-direction:column;align-items:flex-end;min-width:0}
+/* LE PRIX AU-DESSUS DE « DÉTAILS », SUR UNE SEULE RANGÉE, À DROITE (Charlie,
+   30/08/2026). Il vivait dans le résumé du volet — « Détails » n'y
+   ressemblait plus à ses deux frères, « Tarification » et « Ajustement
+   tarifaire ». Il redescend dans SA propre ligne, au-dessus du volet : total,
+   prix à la pièce et case TGCA groupés à droite, comme le prix l'était déjà
+   avant de quitter le résumé. */
+.tx-recap-ligne{display:flex;align-items:center;justify-content:flex-end;gap:var(--pas-3);padding:var(--pas-1) 0 var(--pas-2)}
+.tx-recap-prix{display:flex;align-items:baseline;gap:var(--pas-2);min-width:0}
 .tx-recap-total{font-size:var(--recap-grand);line-height:var(--ligne-serre);
   font-weight:var(--graisse-forte);color:var(--primary)}
 .tx-recap-piece{font-weight:var(--graisse-note);color:var(--text-2)}

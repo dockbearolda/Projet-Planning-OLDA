@@ -290,9 +290,14 @@ assert.ok(/metrics,txDetail\(n\.textile,c\),\.\.\.txAlertes\(n\.textile,c\)/.tes
 // À découvert : les deux chiffres, puis l'article. Repliés : la marge et le
 // calcul du prix.
 const table = source('txTableau', 'd,c,ou');
-assert.ok(/som\.append\(txEl\('span','tx-recap-mot','Détails'\),txKpiTotal\(d,c,cle\)\);/.test(table)
-  && /det\.append\(som,txSaisieBloc\(d\)\);/.test(table),
-'le RÉSUMÉ porte le nom et les prix, le contenu porte ce qu’est l’article — et RIEN d’autre');
+// « DÉTAILS » SE LIT COMME SES DEUX FRÈRES (Charlie, 30/08/2026) : un résumé
+// texte, rien de plus — le prix n'y vit plus (voir plus bas, txKpiTotal).
+assert.ok(/det\.append\(txEl\('summary',null,'Détails'\),txSaisieBloc\(d\)\);/.test(table),
+  'le RÉSUMÉ ne porte que le nom, le contenu porte ce qu’est l’article — et RIEN d’autre');
+// UN ÉLÉMENT, PAS UN FRAGMENT : le bloc-prix et le volet vivent dans UN
+// conteneur, que l'appelant peut classer d'un coup (voir renderDetailArticle).
+assert.ok(/const bloc=txEl\('div','tx-recap-bloc'\);\s*bloc\.append\(txKpiTotal\(d,c,cle\),det\);\s*return bloc;/.test(table),
+  'le prix est posé AU-DESSUS du volet, dans le même conteneur que lui');
 assert.ok(!/txJauge|txDecompo|txAtelier/.test(table),
   'ni la marge, ni le coût atelier, ni la composition ne restent à découvert');
 // IL S'OUVRE REPLIÉ, DES DEUX CÔTÉS (27/08/2026). Il restait ouvert d'office
@@ -306,11 +311,11 @@ assert.ok(/txEl\('details','tx-recap'\)/.test(table) && /det\.open=TX_RECAP\[cle
   'le récapitulatif est un volet, ouvert selon sa mémoire');
 assert.ok(/const TX_RECAP=\{form:false,fiche:false\};/.test(DEVIS),
   '… repliée des deux côtés, puisque le prix ne s’y cache plus');
-// La case TGCA est dans le résumé : sans garde, la cocher OUVRIRAIT le volet.
-// On ARRÊTE LA REMONTÉE, on n'annule pas le geste : `preventDefault` sur le
-// résumé rendrait la case inerte — elle ne se cocherait plus du tout.
-assert.ok(/l\.addEventListener\('click',\(ev\)=>ev\.stopPropagation\(\)\)/.test(table),
-  'cocher la TGCA ne doit pas déplier le volet — ni cesser de cocher');
+// La case TGCA vit maintenant HORS du résumé, dans la ligne de prix
+// au-dessus du volet : elle ne peut plus en déplier le contenu, et la garde
+// qui l'en empêchait quand elle vivait dans le <summary> a disparu avec lui.
+assert.ok(!/l\.addEventListener\('click',\(ev\)=>ev\.stopPropagation\(\)\)/.test(table),
+  'la garde anti-bascule n’a plus lieu d’être : la case n’est plus dans le résumé');
 assert.ok(/if\(det\.isConnected\)TX_RECAP\[cle\]=det\.open/.test(table),
   '… avec le même garde-fou que l’autre volet : un `toggle` différé n’écrase plus la remise à zéro');
 // CHAQUE SURFACE A SA PROPRE MÉMOIRE. Avec une mémoire commune, replier la
@@ -346,25 +351,24 @@ const saisie = source('txSaisieLignes', 'd');
 // choisir lequel lire, et c'est le total que la vendeuse annonce. C'est aussi
 // le RÉSUMÉ du volet : replié, c'est le seul chiffre qui reste.
 const kpis = source('txKpiTotal', 'd,c,ou');
-// LES PRIX SONT REVENUS DANS LE RÉSUMÉ (27/08/2026). Ils étaient descendus
-// dans le CONTENU le 24/08 — ce qui obligeait à laisser le volet ouvert
-// d'office, sans quoi le total disparaissait. Charlie veut le volet fermé par
-// défaut : le prix remonte donc là où il reste visible dans les deux états.
-// Le mot « Détails » à gauche, le prix à droite, sur la même rangée.
-assert.ok(/txEl\('div','tx-recap-tete'\)/.test(kpis),
-  'les prix restent un bloc à eux, posé dans le résumé');
-assert.ok(/txEl\('span','tx-recap-mot','Détails'\)/.test(source('txTableau', 'd,c,ou')),
-  '… et le résumé porte le nom PUIS les prix');
+// LE PRIX EST REMONTÉ AU-DESSUS DE « DÉTAILS » (30/08/2026). Il vivait dans
+// le résumé du volet, ce qui faisait de « Détails » un résumé différent de
+// ses deux frères. Il se lit maintenant dans sa propre ligne, au-dessus du
+// volet — et reste visible que le volet soit ouvert ou fermé.
+assert.ok(/txEl\('div','tx-recap-ligne'\)/.test(kpis),
+  'les prix restent un bloc à eux, posé au-dessus du volet');
+assert.ok(/txEl\('summary',null,'Détails'\)/.test(source('txTableau', 'd,c,ou')),
+  '… et le résumé ne porte plus QUE le nom, comme ses deux frères');
 assert.ok(!/'Récapitulatif article'/.test(DEVIS),
   '… et il s’appelle « Détails » : il n’ouvre qu’une part de la carte, pas la carte');
 assert.ok(!/Temps de production|Marge/.test(kpis),
   '… et rien de la lecture d’atelier n’y monte');
-// LES DEUX PRIX, L'UN SOUS L'AUTRE. Le volet étant fermé par défaut, un prix à
-// la pièce resté dans le corps ne se voyait plus du tout.
+// LES DEUX PRIX, SUR LA MÊME LIGNE. Le volet étant fermé par défaut, un prix
+// à la pièce resté dans son contenu ne se voyait plus du tout.
 assert.ok(/money\(c\.total\)/.test(kpis) && /\$\{money\(c\.sold\)\} \/ pièce/.test(kpis),
-  'la tête du volet porte le total ET le prix à la pièce');
+  'la ligne au-dessus du volet porte le total ET le prix à la pièce');
 assert.ok(kpis.indexOf('c.total') < kpis.indexOf('c.sold'),
-  '… le total d’abord, le prix à la pièce en dessous');
+  '… le total d’abord, le prix à la pièce juste après');
 // Un seul chiffre en grand, et c'est le total.
 assert.strictEqual((DEVIS.match(/font-size:var\(--recap-grand\)/g) || []).length, 1,
   'une seule déclaration de la grande taille dans toute la carte');
@@ -373,11 +377,12 @@ assert.ok(/\.tx-recap-total\{font-size:var\(--recap-grand\)/.test(DEVIS),
 // LE CHEVRON NE SE DESSINE QU'UNE FOIS. `txRang` recopie la classe de
 // l'intitulé sur la cellule de la valeur quand on ne lui en donne pas une :
 // le chevron apparaissait alors une seconde fois, à gauche du prix à la pièce.
-// LA TGCA SE DÉCIDE SOUS LE PRIX, PAR ARTICLE (24/08). Elle était un réglage
-// global en tête de formulaire : à un écran du prix qu'elle modifie, et
-// impossible à retirer pour UN article au milieu d'un devis.
+// LA TGCA SE DÉCIDE SUR LA MÊME LIGNE QUE LE PRIX, PAR ARTICLE (24/08).
+// Elle était un réglage global en tête de formulaire : à un écran du prix
+// qu'elle modifie, et impossible à retirer pour UN article au milieu d'un
+// devis.
 assert.ok(/coche\.checked=d\.tgca!==false/.test(kpis),
-  'la case TGCA se lit sous le prix, cochée d’office');
+  'la case TGCA se lit à côté du prix, cochée d’office');
 assert.ok(/txTgcaForm=coche\.checked;\s*previewTextile\(\)/.test(kpis)
   && /d\.tgca=coche\.checked;/.test(kpis),
   '… la décocher recalcule : le formulaire par sa mémoire, la fiche en écrivant la ligne');
@@ -591,14 +596,17 @@ assert.ok(/\.tx-barre-actions\{[^}]*margin-inline-start:auto/.test(DEVIS),
 const rangeeAutre = DEVIS.match(/<div class="actions a-droite">([\s\S]*?id="saveNeedBtn"[\s\S]*?<\/button>)/);
 assert.ok(rangeeAutre, 'la rangée de la saisie « Autre » suit la même règle');
 assert.ok(rangeeAutre[1].indexOf('cancelNeedBtn') < rangeeAutre[1].indexOf('saveNeedBtn'),
-  '« Ajouter un besoin » ferme la rangée, « Fermer » le précède');
-// LE MÊME MOT SUR LES DEUX FORMULAIRES (23/08/2026) : le textile disait
-// « Ajouter cet article », l'autre « Ajouter ce besoin » — deux libellés pour
-// le même geste, sur le même écran.
-assert.ok(!/Ajouter cet article|Ajouter ce besoin/.test(DEVIS),
-  'plus qu’un seul libellé pour le geste qui pose une ligne');
-assert.strictEqual((DEVIS.match(/Ajouter un besoin/g) || []).length, 4,
-  '« Ajouter un besoin » : les deux boutons, et les deux remises à zéro');
+  '« Ajouter » ferme la rangée, « Fermer » le précède');
+// LE MÊME MOT SUR LES DEUX FORMULAIRES (23/08/2026, raccourci le 30/08). Le
+// textile disait « Ajouter cet article », l'autre « Ajouter ce besoin » — deux
+// libellés pour le même geste, sur le même écran. Les deux se sont ensuite
+// rejoints sur « Ajouter un besoin », puis Charlie l'a voulu court : « Ajouter »
+// seul, des deux côtés — le bouton dit ce qu'il fait, la carte au-dessus dit
+// déjà ce qu'on ajoute.
+assert.ok(!/Ajouter cet article|Ajouter ce besoin|Ajouter un besoin/.test(DEVIS),
+  'plus qu’un seul libellé, court, pour le geste qui pose une ligne');
+assert.strictEqual((DEVIS.match(/>Ajouter<|='Ajouter'/g) || []).length, 4,
+  '« Ajouter » : les deux boutons, et les deux remises à zéro');
 // LE VOLET SE REFERME AVEC LA LIGNE QU'ON VIENT DE POSER. Sa mémoire existe
 // pour qu'il ne se referme pas sous les doigts pendant la frappe, pas pour
 // qu'un besoin s'ouvre déjà déplié parce que le précédent l'était.

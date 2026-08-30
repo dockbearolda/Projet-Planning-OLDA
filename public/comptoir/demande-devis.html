@@ -93,7 +93,7 @@ try {
      Le TEXTILE aura le sien (tailles, coloris, emplacements de marquage). Sa
      tuile est posée MAINTENANT, vide, pour que la place qui l'attend se voie —
      et le panneau DIT qu'il arrive plutôt que de rester muet. -->
-<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-aide">T-shirts, sweats, casquettes</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-aide">Objet, signalétique, sur-mesure</span></span></button></div><div id="besoinTextileForm"><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label for="txColor">Couleur textile <span class="opt">optionnel</span></label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label for="txGenre">Genre</label><select id="txGenre" data-menu-manuel-non onchange="onTextileGenreChange()"></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label for="txCustomRef">Référence libre <span class="opt">optionnel</span></label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label for="txCustomPurchase">Prix d'achat HT</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label for="txCustomDesignation">Désignation <span class="opt">optionnel</span></label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label for="txPrintType">Emplacement du marquage</label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label for="txMarkColor">Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div><div class="field"><label for="txTransport">Transport</label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost</option></select></div></div><div class="field"><label id="txSizesLabel">Tailles</label><div class="tx-sizes" role="group" aria-labelledby="txSizesLabel"><div class="field"><label for="txS">S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txM">M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txL">L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXL">XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXXL">2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txOther">Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field hidden" id="txLogoWrap"><label id="txLogoLabel">Taille du logo (mm)</label><div class="tx-logo" role="group" aria-labelledby="txLogoLabel" id="txLogo"></div></div><div class="field"><label for="txNote">Note <span class="opt">optionnel</span></label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><div class="tx-preview hidden" id="txPreview"></div><details class="tx-adjust"><summary>Ajustement tarifaire</summary><div class="grid"><div class="field"><label for="txDiscount">Remise % <span class="opt">optionnel</span></label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label for="txManualPrice">Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div><div id="txNegHote"></div></details><div class="tx-barre"><div class="error msg-flottant msg-barre hidden" id="txManqueMsg"></div><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter un besoin</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label for="txSetDtfCost">Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetDtfSpeed">Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetPressMin">Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetHourlyCost">Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetRoundStep">Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetMaxCoefQty">Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
+<div class="besoin-type" role="group" aria-label="Type de besoin"><button type="button" class="besoin-tuile is-on" id="besoinTuileTextile" data-type="textile" aria-pressed="true" aria-controls="besoinTextileForm" onclick="choisirTypeBesoin('textile')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3 4 5.6 2.6 10l3.1 1 .6-1.7V21h11.4V9.3l.6 1.7 3.1-1L20 5.6 15.4 3a3.4 3.4 0 0 1-6.8 0Z"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Textile</span><span class="besoin-aide">T-shirts, sweats, casquettes</span></span></button><button type="button" class="besoin-tuile" id="besoinTuileAutre" data-type="autre" aria-pressed="false" aria-controls="besoinAutreForm" onclick="choisirTypeBesoin('autre')"><span class="besoin-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><circle cx="7" cy="7" r="3.6"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="1.6"/><path d="M7 13.4 10.6 20.6H3.4Z"/><path d="M17 13.4v7.2M13.4 17h7.2"/></svg></span><span class="besoin-txt"><span class="besoin-nom">Autre</span><span class="besoin-aide">Objet, signalétique, sur-mesure</span></span></button></div><div id="besoinTextileForm"><div class="article-bloc"><div class="form-tete"><h3 class="form-num" id="txFormTitle">Article n°1</h3><span class="form-objet" id="txFormObjet"></span></div><div class="grid-3"><div class="field"><label for="txRef">Référence</label><select id="txRef" onchange="onTextileRefChange()" data-menu-recherche data-menu-filtre="Filtrer : NS300, sweat, capuche…"><option value="">Chargement du catalogue…</option></select></div><div class="field"><label for="txColor">Couleur textile <span class="opt">optionnel</span></label><input id="txColor" list="txColorList" placeholder="Ex. Noir" oninput="onTextileColorChange()"><datalist id="txColorList"></datalist></div><div class="field"><label for="txGenre">Genre</label><select id="txGenre" data-menu-manuel-non onchange="onTextileGenreChange()"></select></div></div><div class="grid-3" id="txCustomWrap" style="display:none"><div class="field"><label for="txCustomRef">Référence libre <span class="opt">optionnel</span></label><input id="txCustomRef" placeholder="Ex. SWEAT-XL" oninput="previewTextile()"></div><div class="field"><label for="txCustomPurchase">Prix d'achat HT</label><input id="txCustomPurchase" type="number" min="0" step="0.01" placeholder="Ex. 12.50" oninput="previewTextile()"></div><div class="field"><label for="txCustomDesignation">Désignation <span class="opt">optionnel</span></label><input id="txCustomDesignation" placeholder="Ex. Sweat zippé premium" oninput="previewTextile()"></div></div><div class="grid-3"><div class="field"><label for="txPrintType">Emplacement du marquage</label><select id="txPrintType" data-menu-manuel-non onchange="previewTextile()"><option value="">Chargement…</option></select></div><div class="field"><label for="txMarkColor">Couleur du marquage</label><input id="txMarkColor" list="txMarkColorList" placeholder="Choisis ou saisis une couleur" oninput="onTextileMarkColorChange()"><datalist id="txMarkColorList"></datalist></div><div class="field"><label for="txTransport">Transport</label><select id="txTransport" data-menu-manuel-non onchange="previewTextile()"><option value="" selected>Choisir</option><option value="Maritime">Maritime</option><option value="Chronopost">Chronopost</option></select></div></div><div class="field"><label id="txSizesLabel">Tailles</label><div class="tx-sizes" role="group" aria-labelledby="txSizesLabel"><div class="field"><label for="txS">S</label><input id="txS" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txM">M</label><input id="txM" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txL">L</label><input id="txL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXL">XL</label><input id="txXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txXXL">2XL</label><input id="txXXL" type="number" min="0" step="1" value="" oninput="previewTextile()"></div><div class="field"><label for="txOther">Autres</label><input id="txOther" type="number" min="0" step="1" value="" oninput="previewTextile()"></div></div></div><div class="field hidden" id="txLogoWrap"><label id="txLogoLabel">Taille du logo (mm)</label><div class="tx-logo" role="group" aria-labelledby="txLogoLabel" id="txLogo"></div></div><div class="field"><label for="txNote">Note <span class="opt">optionnel</span></label><input id="txNote" placeholder="Texte à graver, prénom, logo, précision…" oninput="previewTextile()"></div><div class="tx-preview hidden" id="txPreview"></div><details class="tx-adjust"><summary>Ajustement tarifaire</summary><div class="grid"><div class="field"><label for="txDiscount">Remise % <span class="opt">optionnel</span></label><input id="txDiscount" type="number" min="0" max="100" step="0.1" value="" oninput="previewTextile()"></div><div class="field"><label for="txManualPrice">Prix manuel HT (facultatif)</label><input id="txManualPrice" type="number" min="0" step="0.1" value="" placeholder="remplace le calcul" oninput="previewTextile()"></div></div><div id="txNegHote"></div></details><div class="tx-barre"><div class="error msg-flottant msg-barre hidden" id="txManqueMsg"></div><div class="tx-barre-actions"><button id="txCancelBtn" class="secondary hidden" onclick="cancelTextileEdit()">Annuler la modification</button><button id="txSaveBtn" class="primary" onclick="saveTextileNeed()"><span id="txSaveLabel">Ajouter</span></button></div></div></div><details class="tx-reglages"><summary>Réglages production et marge</summary><div class="tx-settings-grid" style="margin-top:12px"><div class="field"><label for="txSetDtfCost">Coût DTF €/m</label><input id="txSetDtfCost" type="number" min="0" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetDtfSpeed">Débit DTF m/h</label><input id="txSetDtfSpeed" type="number" min="0.1" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetPressMin">Pressage min / impression</label><input id="txSetPressMin" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetHourlyCost">Coût atelier €/h</label><input id="txSetHourlyCost" type="number" min="0" step="0.1" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetRoundStep">Arrondi supérieur €</label><input id="txSetRoundStep" type="number" min="0.01" step="0.01" oninput="onTextileSettingsChange()"></div><div class="field"><label for="txSetMaxCoefQty">Qté max coefficient</label><input id="txSetMaxCoefQty" type="number" min="1" step="1" oninput="onTextileSettingsChange()"></div></div><div class="actions" style="margin-top:10px"><button class="secondary" onclick="resetTextileSettings()">Réinitialiser valeurs Excel</button></div><p class="help" id="txSettingsHelp">Réglages partagés par tous les postes.</p></details></div><div id="besoinAutreForm" class="hidden"><!-- LA SAISIE MANUELLE EST LA PREMIÈRE LIGNE DE LA LISTE. Le catalogue ne
      couvre pas tout — un textile, une commande spéciale, un produit hors
      rayon — et cette porte-là se prend au même endroit que les autres
      produits : dans le menu. Le formulaire détaillé s'ouvre dessous. -->
@@ -112,7 +112,7 @@ try {
 </div>
 <button type="button" class="secondary cat-hors" id="catHorsBtn" onclick="ouvrirSaisieManuelle()"><span class="cat-hors-plus" aria-hidden="true">+</span>Ajouter un produit hors catalogue</button></div><div id="besoinManuel" class="hidden article-bloc"><h3 class="form-num" id="needFormTitle">Besoin n°1</h3><div class="grid-3"><div class="field"><label for="needCategory">Catégorie</label><select id="needCategory" onchange="toggleNewCategory()"><option value="">Choisir</option><option>Textile</option><option>Casquette</option><option>Goodies</option><option>Signalétique</option><option>Impression DTF</option><option>Impression UV</option><option>Gravure / découpe laser</option><option>Broderie</option><option>Rubber Label</option><option>Art de la table</option><option>Du quotidien</option><option>Voyage</option><option>Gourdes</option><option>Jeux &amp; loisirs</option><option>Papeterie</option><option>Porte-clés</option><option>Tasse céramique 350 ml</option><option value="__new__">+ Nouvelle catégorie</option></select><input id="newCategory" class="hidden" style="margin-top:8px" placeholder="Nom de la nouvelle catégorie"></div><div class="field"><label for="needLabel">Désignation du besoin</label><input id="needLabel" placeholder="Ex. Tee-shirts manches courtes"></div><div class="field"><label for="needQty">Quantité estimée</label><input id="needQty" type="number" min="1" step="1" placeholder="Ex. 25"></div></div><div class="grid-3"><div class="field"><label for="needRequestedRef">Référence <span class="opt">optionnel</span></label><input id="needRequestedRef" placeholder="Ex. NS300"></div><div class="field"><label for="needColor">Couleur <span class="opt">optionnel</span></label><input id="needColor" placeholder="Ex. Noir"></div></div><div class="grid"><div class="field"><label for="needProductionType">Type de production <span class="opt">optionnel</span></label><select id="needProductionType"><option value="">Non précisé</option><option>DTF</option><option>TROTEC</option><option>TROTEC + UV</option><option>UV</option><option>AUTRE</option></select></div></div><!-- CE QU'ON MARQUE, FACE PAR FACE. Vide et masqué tant que la catégorie
      choisie ne déclare pas de faces : une famille sans faces garde
-     exactement l'écran d'avant. --><div class="field hidden" id="needFacesWrap"><label id="needFacesLabel">Ce qu’on marque, face par face</label><div id="needFacesHote" role="group" aria-labelledby="needFacesLabel"></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter un besoin</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
+     exactement l'écran d'avant. --><div class="field hidden" id="needFacesWrap"><label id="needFacesLabel">Ce qu’on marque, face par face</label><div id="needFacesHote" role="group" aria-labelledby="needFacesLabel"></div></div><div class="field"><label for="needComment">Informations importantes <span class="opt">optionnel</span></label><textarea id="needComment" rows="5" style="min-height:150px" placeholder="Ex. tailles, dimensions, emplacement du logo, type de marquage, qualité souhaitée, délai impératif ou toute information à ne pas oublier..."></textarea></div><div class="actions a-droite"><div class="error msg-flottant msg-barre hidden" id="needManqueMsg"></div><button id="cancelNeedBtn" class="secondary" onclick="cancelNeedEdit()">Fermer</button><button id="saveNeedBtn" class="primary" onclick="saveNeed()">Ajouter</button></div></div></div></div><!-- LE DÉTAIL D'UN ARTICLE. La demande vit à DROITE ; ce qu'un article
      coûte, laisse et se négocie a besoin de largeur, donc ça reste ici.
      Vide et masqué tant qu'aucune ligne n'est ouverte. -->
 <div class="card hidden" id="detailArticle"></div></section>
@@ -320,7 +320,7 @@ try {
       </div>
     </div>
 
-    <div id="selectedClientCard" class="notice green hidden" style="margin-top:16px"></div>
+    <div id="selectedClientCard" class="client-recap hidden" style="margin-top:16px"></div>
 
     <div id="step5ValidationSummary" class="validation-summary hidden"></div>
 
@@ -402,7 +402,7 @@ try {
 <!-- LA DEMANDE EN COURS. Trois tasses et deux tee-shirts s'empilent ici, dans
      l'ordre où la vendeuse les ajoute, quel que soit le formulaire d'origine.
      Le pied porte les totaux et le pas suivant : la liste peut s'allonger,
-     « Construire le projet » ne part jamais hors de l'écran. -->
+     « Continuer » ne part jamais hors de l'écran. -->
 <aside class="sidebar no-print" id="colonneDemande">
 <div class="demande-panneau">
 <div class="demande-tete"><h2>La demande</h2><span class="badge" id="needCount">0 besoin</span></div>
@@ -421,7 +421,7 @@ try {
 <p class="help demande-reste hidden" id="dmdAChiffrer"></p>
 <!-- Tant que la demande est vide, il n'y a rien à construire : le bouton le
      DIT au lieu de mener à une étape sans objet. -->
-<button class="primary full" id="dmdCta" onclick="goStep(3)">Construire le projet →</button>
+<button class="primary full" id="dmdCta" onclick="goStep(3)">Continuer →</button>
 </div>
 </div>
 </aside>
@@ -602,6 +602,15 @@ function goStep(next){if(validateStep(next-1))showStep(next)}
    « reviens » : c'était le seul consommateur de `window.oldaParcours`, qui
    n'aurait plus rien répondu à personne. Retiré avec la flèche, plutôt que
    laissé en place à faire croire qu'un retour existe encore. */
+/* ON REVIENT PAR LE FIL LUI-MÊME (Charlie, 30/08/2026), pas par une flèche
+   séparée ni par `pont.js` : une étape déjà franchie (`.step.done`) ramène
+   dessus d'un clic, sans revalider — on ne revalide qu'en AVANÇANT (voir
+   `goStep`), jamais en revenant sur ce qui a déjà été rempli. */
+document.querySelector('.stepper').addEventListener('click',ev=>{
+  const step=ev.target.closest('.step');
+  if(!step||!step.classList.contains('done'))return;
+  showStep(Number(step.dataset.step));
+});
 
 
 
@@ -803,7 +812,7 @@ function repeindreMenusDuBesoin(){
   if(!window.menuRafraichir)return;
   [$('needCategory'),$('needProductionType')].forEach(s=>{if(s)window.menuRafraichir(s)});
 }
-function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';repeindreMenusDuBesoin();needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter un besoin';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
+function cancelNeedEdit(){editingNeed=-1;$('needCategory').value='';$('newCategory').value='';$('newCategory').classList.add('hidden');$('needLabel').value='';$('needQty').value='';$('needRequestedRef').value='';$('needColor').value='';$('needProductionType').value='';$('needComment').value='';repeindreMenusDuBesoin();needFaces={};needFacesSignature='';renderNeedFaces(true);poserTitreForm('needFormTitle',`Besoin n°${needs.length+1}`,false);$('saveNeedBtn').textContent='Ajouter';$('cancelNeedBtn').textContent='Fermer';basculerSaisieManuelle(false)}
 /* Les indices derrière se décalent : garder `articleOuvert` ouvrirait le
    détail d'un AUTRE article, et le volet négocierait sur celui d'à côté. */
 /* UN INDEX D'ÉDITION EST UN INDEX DANS `needs` (25/08/2026). Il se décale
@@ -1487,19 +1496,14 @@ function txRang(g,libelle,valeur,cls,clsValeur){
    ne rivalise plus avec lui.
    Seule la VALEUR grandit : un intitulé de 28 px n'annonce rien, il prend juste
    la place. Les deux cellules restent sur la même ligne de base. */
-/* LES PRIX OUVRENT LE CONTENU DU VOLET (24/08 au soir : « en haut de
-   Détails, plus en face »). Ils étaient le résumé du volet, en face du titre ;
-   ils descendent en tête du contenu — le titre reste seul sur sa rangée,
-   comme « Tarification » et « Ajustement tarifaire » — et le volet s'ouvre
-   PAR DÉFAUT, sans quoi le total disparaîtrait au moment de l'annoncer.
-   UN SEUL PRIX EN GRAND, toujours : le total ; le prix à la pièce l'explique
-   en dessous, à la taille du texte.
-   ET LA TGCA SE DÉCIDE LÀ, SOUS LE PRIX. Elle était un réglage GLOBAL en tête
-   de formulaire : à un écran du prix qu'elle modifie, et impossible à retirer
-   pour UN article au milieu d'un devis. Une case par article, cochée
-   d'office — la décocher recalcule tout de suite. */
+/* LE PRIX EST AU-DESSUS DE « DÉTAILS », SUR UNE SEULE RANGÉE (Charlie,
+   30/08/2026). Il vivait dans le résumé du volet, à côté du mot « Détails » :
+   celui-ci ne ressemblait donc plus à ses deux frères de la même rangée,
+   « Tarification » et « Ajustement tarifaire ». Le prix redescend au-dessus
+   du volet, dans SA propre ligne — total, prix à la pièce, case TGCA, tout
+   sur la même rangée — et « Détails » redevient un résumé comme les autres. */
 function txKpiTotal(d,c,ou){
-  const tete=txEl('div','tx-recap-tete');
+  const ligne=txEl('div','tx-recap-ligne');
   const prix=txEl('span','tx-recap-prix');
   prix.append(txEl('span','tx-recap-total',money(c.total)),
     txEl('span','tx-recap-piece',`${money(c.sold)} / pièce`));
@@ -1520,8 +1524,8 @@ function txKpiTotal(d,c,ou){
     }
   });
   ligneTgca.append(coche,document.createTextNode(`TGCA ${txPctCourt(TX_TGCA_TAUX)}`));
-  tete.append(prix,ligneTgca);
-  return tete;
+  ligne.append(prix,ligneTgca);
+  return ligne;
 }
 
 /* CE QUE LA LIGNE COÛTE À L'ATELIER. */
@@ -1612,26 +1616,17 @@ function txTableau(d,c,ou){
   /* Le volet retiré du document délivre encore son `toggle` — même garde-fou
      que txDetail, sans quoi une remise à zéro se ferait écraser après coup. */
   det.addEventListener('toggle',()=>{if(det.isConnected)TX_RECAP[cle]=det.open});
-  /* LE PRIX EST DANS LE RÉSUMÉ, PAS DANS LE CONTENU (Charlie, 27/08/2026).
-     Il vivait en tête du contenu : refermer le volet cachait donc aussi le
-     total — et c'est le chiffre qu'on annonce, la raison même pour laquelle le
-     volet restait ouvert d'office. En le remontant dans le résumé, on peut
-     enfin le replier : « par défaut la page détails doit être fermée, seul ça
-     doit rester affiché en haut de détails ».
-     Ce qui reste dedans, c'est le DÉTAIL du calcul — on l'ouvre pour vérifier,
-     pas à chaque article. */
-  const som=txEl('summary');
-  som.append(txEl('span','tx-recap-mot','Détails'),txKpiTotal(d,c,cle));
-  /* La case TGCA vit dans le résumé : sans garde, la cocher BASCULE le volet —
-     un clic sur un résumé l'ouvre, quoi qu'on y ait visé.
-     On ARRÊTE LA REMONTÉE plutôt que d'annuler le geste : `preventDefault` sur
-     le résumé annule aussi la bascule de la case, qui devient inerte (essayé).
-     Le clic agit donc sur la case, et n'atteint jamais le résumé. */
-  som.querySelectorAll('.tx-tgca').forEach(l=>{
-    l.addEventListener('click',(ev)=>ev.stopPropagation());
-  });
-  det.append(som,txSaisieBloc(d));
-  return det;
+  /* « DÉTAILS » SE LIT COMME SES DEUX FRÈRES, RIEN DE PLUS (Charlie,
+     30/08/2026) : un résumé texte, comme « Tarification » et « Ajustement
+     tarifaire ». Le prix n'y vit plus — voir txKpiTotal, posé au-dessus. */
+  det.append(txEl('summary',null,'Détails'),txSaisieBloc(d));
+  /* UN ÉLÉMENT, PAS UN FRAGMENT : le détail d'un article posé ajoute une
+     classe au retour de txTableau (voir renderDetailArticle), et un
+     DocumentFragment n'a pas de `classList` — il se serait vidé à
+     l'insertion. Le bloc-prix et le volet vivent donc dans UN conteneur. */
+  const bloc=txEl('div','tx-recap-bloc');
+  bloc.append(txKpiTotal(d,c,cle),det);
+  return bloc;
 }
 
 /* TOUT CE QUI NE S'ANNONCE PAS AU CLIENT, DERRIÈRE UN SEUL CLIC. Il y avait
@@ -2034,7 +2029,7 @@ function cancelTextileEdit(){
   ['txCustomRef','txCustomPurchase','txCustomDesignation','txColor','txGenre','txTransport','txPrintType','txMarkColor','txNote','txS','txM','txL','txXL','txXXL','txOther','txDiscount','txManualPrice'].forEach(id=>$(id).value='');
   $('txRef').value='';onTextileRefChange();menusRafraichirTous();
   poserTitreForm('txFormTitle',`Article n°${needs.length+1}`,false);
-  $('txSaveLabel').textContent='Ajouter un besoin';
+  $('txSaveLabel').textContent='Ajouter';
   $('txCancelBtn').classList.add('hidden');
   previewTextile();
 }
@@ -3349,13 +3344,25 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
     return lines;
   };
 
+  /* LA CARTE TIENT SUR DEUX LIGNES, PAS SEPT (Charlie, 30/08/2026). Elle
+     recopiait `clientInfoLines` une paire par ligne — Type, Contact, WhatsApp,
+     E-mail, Secteur, Adresse — une bulle grande comme un tiers de la carte
+     pour l'information qu'elle porte. `clientInfoLines` ne change pas : le
+     ticket et la fiche en dépendent (voir ticket-comptoir-papier.test.js) —
+     seul l'AFFICHAGE se resserre, à l'essentiel joint sur une ligne. */
   window.renderSelectedClient=function(){
     var box=document.getElementById('selectedClientCard');
     if(!selectedClient){box.classList.add('hidden');box.innerHTML='';return;}
     box.classList.remove('hidden');
-    box.innerHTML='<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">'+esc2(selectedClient.name)+'</span>'+
-      '<div class="help" style="margin-top:6px">'+window.clientInfoLines(selectedClient).map(function(l){return '<b>'+esc2(l[0])+'</b> : '+esc2(l[1]);}).join('<br>')+'</div>'+
-      '<div class="actions" style="margin-top:10px"><button type="button" class="secondary" onclick="editSelectedClientInfo()">✏️ Modifier les informations</button></div>';
+    var c=selectedClient;
+    var infos=[c.type,
+      c.contact?c.contact+(c.contactRole?' ('+c.contactRole+')':''):'',
+      c.phone,
+      c.sector
+    ].filter(Boolean).join(' · ');
+    box.innerHTML='<div class="client-recap-tete"><b>'+esc2(c.name)+'</b>'+
+      '<button type="button" class="secondary" onclick="editSelectedClientInfo()">Modifier</button></div>'+
+      '<div class="help">'+esc2(infos)+'</div>';
   };
 
   /* MÊME RÈGLE SUR LE TICKET : une ligne sans valeur ne s'imprime pas. Le
