@@ -113,11 +113,22 @@ assert.ok(/tailles\.map\(\(t\) => \(\{ t: String\(t\.t\), n: Number\(t\.n\) \|\|
 // passer de 30 à 100 demandait soixante-dix clics.
 assert.ok(!/fa-pas/.test(PROD[0]), 'plus de bouton pas-à-pas sur une quantité');
 // AJOUTER UNE FACE. Le comptoir ne pose que celles qu'il connaît ; « il en veut
-// une de plus dans le dos » n'avait aucune porte.
-assert.ok(/'\+ Face'/.test(PROD[0]), 'une face doit pouvoir s’ajouter');
-// CE QU'ON MARQUE se corrige : sur une tasse ou une gravure il n'y a pas de
-// cote, et c'était la seule valeur de la ligne qu'on ne pouvait pas rectifier.
-assert.ok(/\{ quoi: v \}/.test(PROD[0]), 'la consigne d’une face doit se corriger');
+// une de plus dans le dos » n'avait aucune porte. Depuis le 29/08 la porte est
+// un MENU — la rangée ne porte plus que lui, et « + Face » a été remplacé par
+// la sélection elle-même (« Coeur · Dos »), qui dit ce qui est marqué.
+assert.ok(/bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face', ouvrirMenuF\)/.test(PROD[0]),
+  'une face doit pouvoir s’ajouter, et le menu dit ce qui est choisi');
+// ⚠ LA COTE ET LA CONSIGNE NE SE SAISISSENT PLUS ICI (29/08, tranché par
+// Charlie en désignant la rangée) : « ça disparaît, les tailles sont affichées
+// sur le BAT ». La cote d'un textile vient déjà du tableau des tailles de logo
+// et le BAT la montre ; la consigne, quand il en faut une, s'écrit dans la note
+// de fin de fiche. Les valeurs déjà saisies RESTENT en base et continuent de
+// s'imprimer sur le ticket — on retire le champ, pas la donnée : c'est
+// `poserFaces` qui les recopie à chaque écriture.
+assert.ok(!/\{ quoi: v \}/.test(PROD[0]) && !/fa-mm/.test(PROD[0]),
+  'la rangée ne porte plus que le menu : ni cote ni consigne à taper');
+assert.ok(/face: z\.face, mm: z\.mm \|\| '', quoi: z\.quoi \|\| ''/.test(PROD[0]),
+  '… et ce qui y était déjà écrit se recopie, il ne se perd pas');
 assert.ok(/\{ mm: String\(v\)/.test(PROD[0]) || /mm: /.test(PROD[0]),
   'sa cote aussi');
 assert.ok(/\{ face: nom \}/.test(PROD[0]), 'et son nom')

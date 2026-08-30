@@ -1694,6 +1694,33 @@ app.get('/api/requests/:id', asyncH(async (req, res) => {
   res.json(selonMoi(req, rows[0]));
 }));
 
+// GET /api/requests/:id/marquage → CE QUE COÛTE CHAQUE EMPLACEMENT sur CE
+// dossier-là (29/08). Charlie : « le prix est écrit en face de chaque
+// personnalisation et s'ajoute ou se soustrait au devis ».
+//
+// L'ÉCART, PAS LE COÛT « EN SOI ». Le prix passe par deux arrondis au palier et
+// par la majoration : ajouter un emplacement ne coûte donc pas la même chose
+// selon ce qu'il y a déjà. On rejoue le moteur avec et sans, et on rend la
+// différence — c'est très exactement ce que le devis fera.
+//
+// UNE REQUÊTE, ET SEULEMENT QUAND LA FICHE S'OUVRE : ces neuf recalculs n'ont
+// aucune raison de voyager sur chaque ligne de la grille, à chaque
+// rafraîchissement.
+app.get('/api/requests/:id/marquage', asyncH(async (req, res) => {
+  const { rows } = await pool.query(`${SELECT_COMPLET} WHERE r.id = $1 AND ${VIVANTES}`, [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'Commande introuvable' });
+  const f = rows[0].fiche;
+  const ch = f && typeof f === 'object' ? f.chiffrage : null;
+  const connus = chiffrage.emplacements();
+  // Un dossier sans chiffrage — une tasse, une gravure, les 184 d'avant le
+  // 28/08 — n'a pas de prix à faire bouger. On le DIT (`tarifable: false`)
+  // plutôt que de rendre des zéros, qui se liraient comme « c'est gratuit ».
+  const dispo = chiffrage.ecartsParEmplacement(chiffrage.bornerChiffrage(ch), await reglagesChiffrage());
+  res.json(dispo
+    ? { tarifable: true, connus, ...dispo }
+    : { tarifable: false, connus, actuels: [], ttc: null, ecarts: {} });
+}));
+
 // GET /api/mon-travail → les trois listes de l'écran « Mon travail » (§25).
 //
 // « L'objectif : ouvrir le logiciel le matin et savoir immédiatement quoi
@@ -2757,6 +2784,17 @@ function corrigerProd(actuel, patch) {
       });
     }
   }
+  // LES EMPLACEMENTS DE MARQUAGE — ce qui est FACTURÉ, pas ce qui est écrit sur
+  // le papier. La fiche les coche un par un depuis le 29/08, et le prix suit :
+  // c'est `retarifer` qui les repose dans le chiffrage juste après.
+  // Une liste VIDE est une décision (« plus aucun marquage »), pas un oubli :
+  // seule l'absence de clé laisse le marquage en place.
+  if (Array.isArray(patch.emplacements)) {
+    out.emplacements = patch.emplacements
+      .filter((v) => typeof v === 'string')
+      .map((v) => borner(v, 60))
+      .filter(Boolean);
+  }
   // UNE FACE SE CORRIGE EN ENTIER (28/08) : son nom, sa cote, ET CE QU'ON Y
   // MARQUE. Seule la cote s'écrivait — or sur une tasse ou une gravure il n'y a
   // pas de cote : c'est `quoi` qui porte toute l'information, et elle était la
@@ -2829,7 +2867,20 @@ async function retarifer(f, reglages, qte) {
     const essai = chiffrage.bornerChiffrage({ ...ch, ref: refLigne });
     if (essai && chiffrage.recalculer(essai, reglages)) base = essai;
   }
-  const majCh = chiffrage.poserTailles(base, f.prod.tailles);
+  let majCh = chiffrage.poserTailles(base, f.prod.tailles);
+  // LES EMPLACEMENTS SUIVENT LA FICHE, quand elle les porte (29/08). Ils
+  // n'étaient reliés à RIEN : cocher « Manche GA » l'écrivait sur le ticket de
+  // l'atelier, et le devis ne la facturait pas — `prod.logos` vient des zones du
+  // besoin, `chiffrage.printType` de la liste du comptoir, et les deux vivaient
+  // chacune de leur côté.
+  // ⚠ SEULEMENT SI LA FICHE LES POSE (`prod.emplacements`). Sur les dossiers
+  // d'avant, `prod.logos` peut très bien ne porter qu'une face pendant que le
+  // marquage facturé en compte deux : les relire ici ferait BAISSER un prix déjà
+  // annoncé au client, à la première correction de quantité, sans que personne
+  // ne l'ait demandé.
+  if (Array.isArray(f.prod.emplacements)) {
+    majCh = chiffrage.poserEmplacements(majCh, f.prod.emplacements);
+  }
   const r = chiffrage.recalculer(majCh, reglages);
   return r ? { chiffrage: majCh, ...r } : null;
 }

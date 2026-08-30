@@ -70,6 +70,65 @@ const nombre = (v) => {
 const centime = (v) => Math.round(nombre(v) * 100) / 100;
 const mot = (v, max) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
 
+// --- LES EMPLACEMENTS DE MARQUAGE, COMPOSÉS -------------------------------
+// Le fichier V9 ne nomme que treize COMBINAISONS. La formule, elle, est
+// additive : chaque emplacement coûte ses mètres de film, son passage sous la
+// presse, et son coefficient de quantité — `calculate` les additionne dans une
+// boucle sur `PLACEMENTS`. Composer une combinaison que le fichier n'a pas
+// nommée n'invente donc aucune arithmétique : c'est la même, sur un autre
+// sous-ensemble.
+//
+// ⚠ ON NE TOUCHE PAS DURABLEMENT À `DB.printTypes`. La table du moteur porte
+// treize entrées et un test de conformité les compte. La combinaison composée y
+// est posée le temps d'un appel — `calculate` est SYNCHRONE, rien ne s'intercale
+// — puis retirée.
+const emplacementsConnus = () => [...TE().PLACEMENTS];
+
+// Ne garde que des emplacements que le moteur connaît, sans doublon, dans
+// l'ordre du moteur. Rend `null` si rien de valable : « pas de liste » et
+// « liste vide » ne veulent pas dire la même chose (la seconde est un marquage
+// retiré, et elle doit pouvoir s'écrire).
+function emplacementsValides(brut) {
+  if (!Array.isArray(brut)) return null;
+  const connus = emplacementsConnus();
+  const vus = new Set();
+  for (const v of brut) {
+    const n = mot(v, 60);
+    const trouve = connus.find((p) => p.toLowerCase() === n.toLowerCase());
+    if (trouve) vus.add(trouve);
+  }
+  return connus.filter((p) => vus.has(p));
+}
+
+// Le NOM d'une combinaison. On rend celui du patron quand il existe — c'est lui
+// qui s'imprime sur le devis et sur le ticket, et « Coeur + Dos » vaut mieux que
+// n'importe quoi qu'on fabriquerait à côté.
+function nomDeCombinaison(places) {
+  const db = TE().DB;
+  const connus = emplacementsConnus();
+  const veut = new Set(places);
+  for (const [nom, flags] of Object.entries(db.printTypes || {})) {
+    const a = connus.filter((p) => nombre(flags[p]) > 0);
+    if (a.length === veut.size && a.every((p) => veut.has(p))) return nom;
+  }
+  return places.length ? places.join(' + ') : 'Aucun';
+}
+
+// Pose la combinaison dans la table du moteur le temps d'un appel, puis la
+// retire. Une combinaison déjà nommée n'est jamais touchée.
+function avecCombinaison(nom, places, faire) {
+  const db = TE().DB;
+  if (Object.prototype.hasOwnProperty.call(db.printTypes, nom)) return faire();
+  const flags = {};
+  for (const p of emplacementsConnus()) flags[p] = places.includes(p) ? 1 : 0;
+  db.printTypes[nom] = flags;
+  try {
+    return faire();
+  } finally {
+    delete db.printTypes[nom];
+  }
+}
+
 // --- CE QU'ON GARDE D'UN ARTICLE CHIFFRÉ ------------------------------------
 // Exactement les entrées du moteur (`calculate`), et rien d'autre. La
 // référence, la couleur, la note et les tailles sont DÉJÀ dans `fiche.prod`,
@@ -156,6 +215,23 @@ function bornerTextile(brut) {
   } else if (!ch.ref) {
     return null;
   }
+  // LES EMPLACEMENTS, QUAND ILS SONT COMPOSÉS À LA MAIN (29/08).
+  // Le fichier V9 ne NOMME que treize combinaisons — « Coeur + Dos »,
+  // « Poitrine + Dos + Manche Dr »… Le comptoir les propose telles quelles, et
+  // c'est très bien pour prendre une commande. Mais la fiche d'atelier coche
+  // maintenant emplacement par emplacement (Charlie, 29/08 : « le prix est
+  // écrit en face de chaque personnalisation et s'ajoute ou se soustrait au
+  // devis »), et « Coeur + Manche GA » n'a pas de nom dans le fichier.
+  //
+  // ⚠ ON GARDE LA LISTE, PAS SEULEMENT LE NOM. `printType` est persisté dans la
+  // fiche ; un nom que le moteur ne connaît pas y vaudrait `flags = {}` au
+  // prochain recalcul, c'est-à-dire AUCUN marquage — le prix tomberait tout
+  // seul, des mois plus tard, sans que rien ne le dise.
+  //
+  // ABSENT = COMPORTEMENT D'AVANT, à l'octet près : un dossier qui n'a jamais
+  // été coché garde son `printType` et son prix.
+  const places = emplacementsValides(brut.emplacements);
+  if (places) ch.emplacements = places;
   return ch;
 }
 
@@ -184,7 +260,14 @@ function recalculer(ch, reglages, qte) {
   const te = TE();
   te.resetSettings();
   te.setSettings(reglages || {});
-  const c = te.calculate(ch);
+  // UNE COMBINAISON COMPOSÉE se calcule avec la MÊME formule : on la pose dans
+  // la table du moteur le temps de l'appel, sous le nom que porte déjà le
+  // chiffrage. Sans `emplacements`, rien de tout ceci ne s'exécute — et c'est
+  // le cas de tout ce qui a été chiffré avant le 29/08.
+  const places = Array.isArray(ch.emplacements) ? ch.emplacements : null;
+  const c = places
+    ? avecCombinaison(ch.printType, places, () => te.calculate(ch))
+    : te.calculate(ch);
   if (!c) return null;
   const ht = centime(c.total);
   const taxe = ch.tgca === false ? 0 : centime(ht * TGCA);
@@ -256,11 +339,54 @@ function poserTailles(ch, tailles) {
   return connue ? { ...ch, sizes } : ch;
 }
 
+// --- ÉCRIRE UNE COMBINAISON DANS LE CHIFFRAGE -------------------------------
+// Le nom SUIT la liste : c'est lui qui s'imprime (« Marquage Coeur + Dos » sur
+// le devis, « Emplacement du marquage » au récapitulatif). Les deux ne peuvent
+// pas diverger, donc ils s'écrivent ensemble et jamais séparément.
+function poserEmplacements(ch, places) {
+  if (!ch || ch.moteur === 'unitaire') return ch;
+  const propres = emplacementsValides(places);
+  if (!propres) return ch;
+  return { ...ch, emplacements: propres, printType: nomDeCombinaison(propres) };
+}
+
+// CE QUE COÛTE CHAQUE EMPLACEMENT, DANS CE DOSSIER-LÀ.
+// Pas son coût « en soi » : le prix passe par deux arrondis au palier et par la
+// majoration, donc ajouter un emplacement ne coûte pas la même chose selon ce
+// qu'il y a déjà. On rend donc l'ÉCART RÉEL — ce que cocher ajouterait, ce que
+// décocher retirerait — calculé en rejouant le moteur avec et sans. C'est ce
+// qui s'écrit en face de chaque ligne du menu, et c'est exactement ce que le
+// devis fera.
+function ecartsParEmplacement(ch, reglages) {
+  if (!ch || ch.moteur === 'unitaire') return null;
+  const base = Array.isArray(ch.emplacements)
+    ? ch.emplacements
+    : emplacementsValides(Object.entries((TE().DB.printTypes || {})[ch.printType] || {})
+      .filter(([, v]) => nombre(v) > 0).map(([k]) => k)) || [];
+  const prix = (places) => {
+    const r = recalculer(poserEmplacements(ch, places), reglages);
+    return r ? r.ttc : null;
+  };
+  const ici = prix(base);
+  if (ici == null) return null;
+  const out = { actuels: base, ttc: ici, ecarts: {} };
+  for (const p of emplacementsConnus()) {
+    const dedans = base.includes(p);
+    const autre = dedans ? base.filter((x) => x !== p) : [...base, p];
+    const v = prix(autre);
+    out.ecarts[p] = v == null ? null : centime(v - ici);
+  }
+  return out;
+}
+
 module.exports = {
   TGCA,
   bornerChiffrage,
   recalculer,
   poserTailles,
+  poserEmplacements,
+  ecartsParEmplacement,
+  emplacements: emplacementsConnus,
   taillesDuChiffrage,
   cleDeTaille,
   // Exposé pour les tests et pour le serveur : il faut les mêmes clés des deux

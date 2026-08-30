@@ -664,23 +664,18 @@ export function dessinerFicheAtelier(r, ctx) {
     if (tailles.length) droite.append(rangee('Tailles', grilleT, compte, 'fa-row--empile'));
 
     // --- LES FACES --------------------------------------------------------
+    // LA RANGÉE N'EST PLUS QU'UN MENU (29/08). Charlie : « cette ligne est à
+    // revoir, je ne veux qu'un menu pour sélectionner les faces, et pouvoir
+    // modifier le choix ». Elle portait une CARTE par face — le nom, une cote,
+    // une consigne — plus un bouton : trois choses pour dire ce qu'on marque.
+    //
+    // LES DEUX CHAMPS SONT RETIRÉS, tranché le même jour : « ça disparaît, les
+    // tailles sont affichées sur le BAT ». La cote d'un textile vient déjà du
+    // tableau des tailles de logo, et le BAT la montre ; la consigne, quand il
+    // en faut une, s'écrit dans la note en bas de fiche. Les valeurs déjà
+    // saisies restent en base et continuent de s'imprimer — on retire le champ,
+    // pas la donnée.
     const faces = Array.isArray(prod.logos) ? prod.logos : [];
-    const bandeF = el('div', 'fa-faces');
-    faces.forEach((z, i) => {
-      const carte = el('div', 'fa-face');
-      const cMm = champ('fa-mm', normaliserCote(z.mm), { label: `${z.face} — cote`, placeholder: 'mm' });
-      brancher(cMm, {
-        label: `${z.face} — cote`,
-        normaliser: normaliserCote,
-        // On RENVOIE le nombre seul, pas « 70 mm » : c'est une cote en base, et
-        // le papier de l'atelier la relit telle quelle.
-        envoyer: (v) => ctx.patchProd({ logos: faces.map((_, j) => (j === i ? { mm: String(v).replace(/\D/g, '') } : {})) }),
-      });
-      const cQuoi = champ('fa-quoi', z.quoi || '', { label: `${z.face} — marquage`, placeholder: 'ce qu’on y marque' });
-      brancher(cQuoi, { label: `${z.face} — marquage`, envoyer: (v) => ctx.patchProd({ logos: faces.map((_, j) => (j === i ? { quoi: v } : {})) }) });
-      carte.append(el('span', 'fa-face__k', z.face), cMm, cQuoi);
-      bandeF.append(carte);
-    });
     // ON COCHE CE QUE LE CLIENT VEUT, ON NE LE TAPE PAS (29/08)
     // ---------------------------------------------------------------------
     // Charlie, en designant cette rangee : « pour les textiles ici les faces
@@ -699,52 +694,101 @@ export function dessinerFicheAtelier(r, ctx) {
     // Sans ce second morceau, une face ajoutee a la main — ou heritee d'une
     // famille qui a change depuis — ne pourrait plus se decocher.
     const cleF = (v) => String(v == null ? '' : v).trim().toLowerCase();
+    const marq = ctx.marquage && typeof ctx.marquage === 'object' ? ctx.marquage : null;
+    const tarifable = !!(marq && marq.tarifable);
+    // Les emplacements que le MOTEUR sait chiffrer. Une face de la famille qu'il
+    // ne connaît pas — « Étiquette col » — reste une face du dossier : elle
+    // s'imprime, elle ne se facture pas, et le menu ne lui met pas de prix.
+    const chiffrables = new Set((marq && Array.isArray(marq.connus) ? marq.connus : []).map(cleF));
+    const chiffrable = (nom) => tarifable && chiffrables.has(cleF(nom));
+
     const choixF = Array.isArray(ctx.facesProposees) ? [...ctx.facesProposees] : [];
     for (const z of faces) {
       if (z.face && !choixF.some((n) => cleF(n) === cleF(z.face))) choixF.push(z.face);
     }
+
+    // CE QUI EST COCHÉ : LE PRIX FAIT FOI POUR CE QU'IL FACTURE.
+    // `prod.logos` vient des zones du besoin (ce que la vendeuse a décrit) et
+    // `chiffrage.printType` de la liste du comptoir (ce qui est facturé) : les
+    // deux vivaient chacune de leur côté, et une face pouvait donc être écrite
+    // sur le ticket de l'atelier sans être au devis. Pour les emplacements que
+    // le moteur chiffre, c'est le MARQUAGE qui dit la vérité ; pour les autres,
+    // `logos`. Ouvrir la fiche montre donc ce qui est réellement vendu, et la
+    // première coche remet les deux d'accord.
+    const actuels = new Set((marq && Array.isArray(marq.actuels) ? marq.actuels : []).map(cleF));
+    const coche = (nom) => (chiffrable(nom)
+      ? actuels.has(cleF(nom))
+      : faces.some((z) => cleF(z.face) === cleF(nom)));
+    const cochees = () => choixF.filter(coche);
+
+    // L'ÉCART QU'ON ÉCRIT EN FACE. Signé : « + 492,96 € » dit ce que cocher
+    // ajoute, « − 99,84 € » ce que décocher retire. C'est exactement ce que le
+    // devis fera — le serveur l'a calculé en rejouant le moteur avec et sans.
+    const ecartDe = (nom) => {
+      if (!chiffrable(nom) || !marq.ecarts) return null;
+      const cle = (marq.connus || []).find((p) => cleF(p) === cleF(nom));
+      const v = cle == null ? null : marq.ecarts[cle];
+      return typeof v === 'number' && v !== 0 ? v : null;
+    };
 
     // LE PATCH DES FACES EST POSITIONNEL cote serveur : chaque entree corrige la
     // face de meme rang, une entree de plus l'ajoute, et un NOM VIDE la retire
     // (« une face sans nom n'est pas une face »). On envoie donc la liste voulue,
     // suivie d'autant de noms vides qu'il reste de places occupees — sans eux,
     // retirer la face du milieu laisserait la derniere en double.
+    // ET IL ÉCRIT LES DEUX : `logos` pour le papier de l'atelier, `emplacements`
+    // pour le PRIX. Une seule écriture, donc les deux ne peuvent plus diverger —
+    // c'est le défaut qu'on ferme. Le serveur repose ensuite le chiffrage sur
+    // ces emplacements, et le devis suit (voir `retarifer`).
+    // ⚠ `emplacements` n'est envoyé que si le dossier est tarifable : sur les
+    // 184 d'avant, `logos` peut ne porter qu'une face quand le marquage facturé
+    // en compte deux, et les relire ferait BAISSER un prix déjà annoncé.
     const poserFaces = (voulues) => Promise.resolve(ctx.patchProd({
       logos: [
         ...voulues.map((z) => ({ face: z.face, mm: z.mm || '', quoi: z.quoi || '' })),
         ...faces.slice(voulues.length).map(() => ({ face: '' })),
       ],
+      ...(tarifable
+        ? { emplacements: voulues.map((z) => z.face).filter(chiffrable) }
+        : {}),
     })).then(() => {
       // Une face de plus ou de moins change la STRUCTURE de l'ecran, pas une
       // valeur : sans redessin le clic parait perdu, et on recommence.
       if (ctx.rafraichir) ctx.rafraichir();
     });
 
+    // La zone déjà posée, quand elle existe : décocher puis recocher ne doit pas
+    // effacer une cote ou une consigne héritée du comptoir.
+    const zoneDe = (nom) => faces.find((z) => cleF(z.face) === cleF(nom)) || { face: nom };
+
     const basculerFace = async (nom) => {
-      const i = faces.findIndex((z) => cleF(z.face) === cleF(nom));
+      const dedans = coche(nom);
       // LE MENU SE FERME AVANT LA QUESTION, jamais apres. Laisse ouvert, il se
       // refermait de toute facon au premier clic dans la boite (l'ecouteur
       // « dehors » voit ce clic) : annuler ne rendait donc pas l'ecran d'avant.
       fermerMenuF();
-      if (i < 0) {
-        dire(`Face ajoutee — ${nom}`, false);
-        await poserFaces([...faces, { face: nom }]);
+      const suite = dedans
+        ? cochees().filter((n) => cleF(n) !== cleF(nom))
+        : [...cochees(), nom];
+      if (!dedans) {
+        const e = ecartDe(nom);
+        dire(e ? `${nom} — ${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}` : `Face ajoutee — ${nom}`, false);
+        await poserFaces(suite.map(zoneDe));
         return;
       }
-      // DECOCHER UNE FACE QUI PORTE QUELQUE CHOSE, C'EST LE PERDRE : la cote et
-      // la consigne partent avec elle, et le redessin qui suit vide la pile
-      // d'annulation. On demande — jamais pour une face vide, ou decocher
-      // deviendrait un clic sur deux.
-      const z = faces[i];
-      if ((z.mm || z.quoi) && ctx.confirmer) {
-        const porte = [z.mm ? `la cote ${normaliserCote(z.mm)}` : '', z.quoi ? `« ${z.quoi} »` : '']
-          .filter(Boolean).join(' et ');
+      // DECOCHER UNE FACE QUI PORTE QUELQUE CHOSE, C'EST LE PERDRE : la consigne
+      // part avec elle, et le redessin qui suit vide la pile d'annulation. On
+      // demande — jamais pour une face vide, ou decocher deviendrait un clic sur
+      // deux. (Le PRIX, lui, se refait tout seul : il n'y a rien a perdre.)
+      const z = zoneDe(nom);
+      if (z.quoi && ctx.confirmer) {
         const ok = await ctx.confirmer('Retirer cette face ?',
-          `« ${nom} » porte ${porte}. Ce sera perdu.`, 'Retirer');
+          `« ${nom} » porte « ${z.quoi} ». Ce sera perdu.`, 'Retirer');
         if (!ok) return;
       }
-      dire(`Face retiree — ${nom}`, false);
-      await poserFaces(faces.filter((_, j) => j !== i));
+      const e = ecartDe(nom);
+      dire(e ? `${nom} — ${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}` : `Face retiree — ${nom}`, false);
+      await poserFaces(suite.map(zoneDe));
     };
 
     // PAS DE `prompt()`. Il bloque la page entiere, il est refuse dans certains
@@ -826,11 +870,18 @@ export function dessinerFicheAtelier(r, ctx) {
       // largeur de texte (81 a 141 px mesures).
       const liste = pan;
       for (const nom of choixF) {
-        const on = faces.some((z) => cleF(z.face) === cleF(nom));
+        const on = coche(nom);
         const b = bouton(`colbar-item ${on ? 'is-on' : 'is-off'}`, null, () => basculerFace(nom));
         b.setAttribute('role', 'menuitemcheckbox');
         b.setAttribute('aria-checked', String(on));
         b.append(caseAcocher(on), el('span', 'colbar-item__label', nom));
+        // LE PRIX EST ÉCRIT EN FACE (29/08, Charlie) : ce que cocher AJOUTERAIT,
+        // ce que décocher RETIRERAIT. Rien pour une face que le moteur ne
+        // chiffre pas — un « 0,00 € » se lirait « c'est gratuit », et c'est
+        // faux : elle n'est simplement pas au devis.
+        const e = ecartDe(nom);
+        if (e) b.append(el('span', `fa-menu__prix${e > 0 ? '' : ' fa-menu__prix--moins'}`,
+          `${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}`));
         liste.append(b);
       }
       // LA CREATION N'EST PAS UN CHOIX DE LA LISTE. Posee comme une ligne parmi
@@ -856,11 +907,18 @@ export function dessinerFicheAtelier(r, ctx) {
     // LE BOUTON DIT QU'IL OUVRE QUELQUE CHOSE. « + Face » seul annonce un ajout
     // immediat — c'est ce qu'il faisait avant, et rien ne disait qu'il propose
     // maintenant une liste. Le chevron le dit, et il se retourne a l'ouverture.
-    const ajoutF = bouton('fa-ajout', '+ Face', ouvrirMenuF);
+    // LE BOUTON DIT CE QUI EST CHOISI, ET QU'IL OUVRE. La rangée ne porte plus
+    // que lui : « je ne veux qu'un menu pour sélectionner les faces, et pouvoir
+    // modifier le choix » (Charlie, 29/08). Les cartes qui l'accompagnaient
+    // disaient la même chose une seconde fois, en trois fois plus de place.
+    const nomsCoches = cochees();
+    const ajoutF = bouton('fa-choix', nomsCoches.join(' · ') || 'Aucune face', ouvrirMenuF);
     ajoutF.append(ic('expand_more'));
     ajoutF.setAttribute('aria-haspopup', 'menu');
     ajoutF.setAttribute('aria-expanded', 'false');
-    const ligneFaces = rangee('Faces', bandeF, ajoutF, 'fa-row--empile fa-row--ancre');
+    ajoutF.setAttribute('aria-label', 'Faces à marquer');
+    if (!nomsCoches.length) ajoutF.classList.add('fa-choix--vide');
+    const ligneFaces = rangee('Faces', ajoutF, 'fa-row--ancre');
     droite.append(ligneFaces);
   }
 

@@ -35,6 +35,10 @@ const APP = lire('public/app.js');
 const FICHE = lire('public/fiche-atelier.js');
 const CSS = lire('public/fiche-atelier.css');
 const CSS_CRM = lire('public/styles.css');
+// Le fichier SANS ses commentaires : plusieurs contrôles tombaient sur leur
+// propre explication (« PAS DE `prompt()` », « pas `.colbar-list` »…).
+const FICHE_NUE = FICHE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const CSS_NU = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 
 delete process.env.DATABASE_URL;
 delete process.env.APP_PASSWORD;
@@ -156,7 +160,8 @@ assert.match(CSS, /\.fa-ajout\[aria-expanded="true"\] \.material-symbols-outline
   '… et il se retourne à l’ouverture : `aria-expanded` seul, personne ne le voit');
 
 // LE TABLEAU SE LIT UNE FOIS PAR SESSION, et il se périme quand un réglage bouge.
-assert.match(APP, /Promise\.all\(\[chargerFicheComplete\(id\)\.catch\(\(\) => \{\}\), chargerTaillesLogo\(\)\]\)/,
+assert.ok(APP.includes('chargerFicheComplete(id).catch(() => {}),')
+  && APP.includes('chargerTaillesLogo(),'),
   'il part avec la fiche, jamais au démarrage');
 assert.match(APP, /taillesLogo = null;\s*\n\s*taillesLogoEnVol = null;/,
   '… et un `settings` du flux le périme : quelqu’un vient peut-être d’ajouter une face');
@@ -164,12 +169,19 @@ assert.match(APP, /taillesLogo = null;\s*\n\s*taillesLogoEnVol = null;/,
 // ---------------------------------------------------------------------------
 // 2. LE MENU : CE QU'IL LISTE, ET OÙ VIT LA CRÉATION
 // ---------------------------------------------------------------------------
-assert.match(FICHE, /const ajoutF = bouton\('fa-ajout', '\+ Face', ouvrirMenuF\);/,
-  'le bouton OUVRE le menu — il ne demande plus de taper un nom');
+// LA RANGÉE N'EST PLUS QU'UN MENU (29/08). Charlie : « cette ligne est à revoir,
+// je ne veux qu'un menu pour sélectionner les faces, et pouvoir modifier le
+// choix ». Elle portait une CARTE par face — nom, cote, consigne — PLUS un
+// bouton : trois composants pour dire ce qu'on marque.
+assert.match(FICHE, /const ajoutF = bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face', ouvrirMenuF\);/,
+  'le bouton porte la sélection ET ouvre le menu');
+assert.match(FICHE, /const ligneFaces = rangee\('Faces', ajoutF, 'fa-row--ancre'\);/,
+  '… et il est SEUL sur la rangée : plus de cartes à côté');
+assert.ok(!/fa-faces|fa-face__k|'fa-mm'/.test(FICHE_NUE) && !/fa-faces|fa-face__k/.test(CSS_NU),
+  'les cartes de face sont parties — le montage ET leur feuille');
 // ⚠ ON CHERCHE L'APPEL, PAS LE MOT : le commentaire qui explique pourquoi il n'y
 // en a pas dit « PAS DE `prompt()` », et le contrôle tombait sur sa propre
 // explication.
-const FICHE_NUE = FICHE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 assert.ok(!/\bprompt\(/.test(FICHE_NUE),
   'et toujours pas de `prompt()` : il gèle la page et sort le focus de l’écran');
 
@@ -209,8 +221,11 @@ assert.ok(!/setTimeout\(\(\) => ctx\.rafraichir\(\), \d+\)/.test(FICHE),
 // consigne partent avec elle, et le redessin qui suit vide la pile
 // d'annulation. On demande — jamais pour une face vide, ou décocher deviendrait
 // un clic sur deux.
-assert.match(FICHE, /if \(\(z\.mm \|\| z\.quoi\) && ctx\.confirmer\) \{/,
-  'une face qui porte une cote ou une consigne demande confirmation');
+// Seule la CONSIGNE se perd désormais : la cote n'est plus saisie ici (elle vient
+// du tableau des tailles de logo et s'affiche sur le BAT), et le PRIX se refait
+// tout seul — il n'y a rien à perdre de ce côté.
+assert.match(FICHE, /if \(z\.quoi && ctx\.confirmer\) \{/,
+  'une face qui porte une consigne demande confirmation avant de partir');
 assert.match(APP, /confirmer: \(titre, texte, libelle\) => confirmerAction\(titre, texte, libelle\),/,
   '… avec la boîte de l’application, passée par le contexte (la fiche n’importe rien elle-même)');
 // LE MENU SE FERME AVANT LA QUESTION. Laissé ouvert, il se refermait de toute
@@ -254,8 +269,8 @@ assert.match(MENU, /position: absolute;/, 'le menu est ancré à sa rangée');
 assert.ok(!/position: fixed/.test(MENU), '… jamais à l’écran');
 assert.match(CSS, /\.fa-row--ancre \{ position: relative; \}/,
   '… et c’est la rangée qui porte l’ancre');
-assert.match(FICHE, /rangee\('Faces', bandeF, ajoutF, 'fa-row--empile fa-row--ancre'\)/,
-  '… celle des faces');
+assert.match(FICHE, /rangee\('Faces', ajoutF, 'fa-row--ancre'\)/,
+  '… celle des faces, qui ne porte plus que le menu');
 
 // d. ÉCHAP FERME LE MENU, PAS LE DOSSIER. `app.js` écoute Échap pour fermer la
 //    fiche : sans capture ni arrêt, refermer le menu refermait le dossier

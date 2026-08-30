@@ -123,7 +123,11 @@
    ⚠ LE TRAIT EST RÉSERVÉ, jamais ajouté : `1px solid transparent` au repos,
    coloré au survol. Posé seulement au survol, il grandirait la boîte de 2 px et
    toute la colonne bougerait sous la souris. */
-.fa-in {
+/* LE MENU DES FACES EST UNE VALEUR, PAS UN BOUTON D'ACTION (29/08). Il porte
+   ce qu'on marque — « Coeur · Dos » — et il se relit comme les champs d'a cote :
+   meme boite, meme liseré, meme reponse au survol. Ecrit a part, il aurait
+   redonné a la rangee un composant de plus qui ressemble aux autres. */
+.fa-in, .fa-choix {
   min-width: 0;
   height: var(--fa-h-champ);
   padding: 0 var(--pas-2);
@@ -148,10 +152,29 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* Un champ vide se voit sans qu'on le survole : c'est ce qui manque au dossier.
    Un `select` a toujours une valeur — il n'entre jamais dans ce cas. */
 .fa-in:placeholder-shown { background: var(--bg); }
-.fa-in:hover, .fa-in:focus-visible, .fa-in:focus {
+.fa-in:hover, .fa-in:focus-visible, .fa-in:focus,
+.fa-choix:hover, .fa-choix:focus-visible {
   border-color: var(--border); background: var(--surface);
 }
 .fa-in:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary); border-color: var(--primary); }
+.fa-choix:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary); border-color: var(--primary); }
+/* Ce qui reste PROPRE au bouton : il se clique, il aligne son chevron a droite,
+   et sa valeur ne s'enroule pas. */
+.fa-choix {
+  display: flex; align-items: center; gap: var(--pas-2);
+  cursor: pointer; text-align: left;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.fa-choix > .material-symbols-outlined {
+  margin-left: auto; flex: 0 0 auto;
+  width: var(--ic); height: var(--ic);
+  font-size: var(--ic); line-height: var(--ligne-glyphe); color: var(--text-2);
+  transition: transform var(--dur-1) var(--ease);
+}
+.fa-choix[aria-expanded="true"] > .material-symbols-outlined { transform: rotate(180deg); }
+/* AUCUNE FACE, C'EST CE QU'ON VIENT CHERCHER : le vide garde son fond gris,
+   comme un champ vide (`:placeholder-shown`). */
+.fa-choix--vide { background: var(--bg); color: var(--text-3); }
 /* UN CHAMP OBLIGATOIRE VIDE SE SIGNALE, il ne crie pas : un soulignement, pas
    de rouge, pas de message. Le rouge annonce une faute ; ici il n'y en a pas
    encore, il manque seulement quelque chose. */
@@ -312,7 +335,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
 .fa-row { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
-.fa-row > .fa-in { flex: 1; }
+.fa-row > .fa-in, .fa-row > .fa-choix { flex: 1; }
 .fa-lab { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
 /* UN SEUL RAIL DE VALEURS pour les deux colonnes. Elles partaient de 122 px à
    gauche et 90 à droite : deux départs côte à côte, et l'œil le voit sans
@@ -396,31 +419,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-nb:hover { background: transparent; }
 
-/* LES FACES SE RANGENT COMME LES TAILLES : une colonne chacune, toutes de la
-   même largeur, sur UNE ligne. En flex-wrap, deux faces et leur bouton
-   demandaient 758 px pour 523 disponibles — la rangée passait à 102 px et la
-   colonne débordait de 42. */
-/* AUTANT DE COLONNES QUE LA LARGEUR EN PORTE, jamais une de plus. En
-   `grid-auto-flow: column`, quatre faces se partageaient 523 px : 120 px
-   chacune pour un contenu qui en demande 170, et les bulles se CHEVAUCHAIENT —
-   la piste retrecissait, la bulle non. `auto-fit` en pose deux ou trois selon
-   la place et renvoie le reste a la ligne suivante. */
-.fa-faces {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--pas-2); flex: 1; min-width: 0;
-}
-.fa-face {
-  display: flex; align-items: center; gap: var(--pas-2); min-width: 0;
-  padding: var(--pas-1) var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
-}
-/* ⚠ `min-width: 0` SUR LA BULLE : sans lui elle garde sa largeur intrinseque
-   et sort de sa piste au lieu de se serrer. C'est le meme defaut que sur les
-   cases de taille, et il se voit ici comme un chevauchement. */
-.fa-face__k {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1);
-}
-.fa-mm { width: 74px; flex: 0 1 74px; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
+/* LES CARTES DE FACE SONT RETIREES (29/08). La rangee « Faces » ne porte plus
+   qu'un menu : « je ne veux qu'un menu pour selectionner les faces, et pouvoir
+   modifier le choix » (Charlie). Les cartes redisaient ce que le menu montre
+   deja, et leurs deux champs — la cote, la consigne — sont partis avec elles :
+   « ca disparait, les tailles sont affichees sur le BAT ». `.fa-faces`,
+   `.fa-face`, `.fa-face__k` et `.fa-mm` ne sont plus ecrits nulle part.
+   ⚠ `.fa-quoi` RESTE : c'est la boite de la case ou l'on tape le nom d'une face
+   qu'on cree, et elle prend la place du menu le temps de la saisie. */
 .fa-quoi { flex: 1; min-width: 0; height: var(--fa-h-pas); border: 0; font-size: var(--fa-lab); }
 .fa-ajout { flex-shrink: 0;
   display: inline-flex; align-items: center; gap: var(--pas-1);
@@ -475,6 +481,19 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   border: 1px solid var(--border); border-radius: var(--arrondi-bloc);
   background: var(--surface); box-shadow: var(--shadow-pop);
 }
+/* LE PRIX EN FACE DE CHAQUE PERSONNALISATION (29/08, Charlie). C'est l'ECART :
+   ce que cocher ajoutera au devis, ce que decocher lui retirera. Il se cale a
+   droite par une marge automatique — `justify-content` rognerait le nom de la
+   face des que la rangee deborde. Les chiffres tombent les uns sous les autres
+   (la carte pose deja `tabular-nums`), donc la colonne se compare du regard. */
+.fa-menu__prix {
+  margin-left: auto; flex: 0 0 auto; padding-left: var(--pas-2);
+  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2);
+}
+/* Ce qui SORT du devis se lit autrement de ce qui y entre. La couleur dit un
+   etat — ici « decocher fera baisser le prix » — et pas une decoration. */
+.fa-menu__prix--moins { color: var(--text-3); }
+
 /* Le filet qui detache la CREATION des choix est celui de la fiche (`.fa-filet`,
    plus haut) : un trait ne se redessine pas par endroit. */
 /* UNE RANGEE QUI PORTE PLUSIEURS LIGNES cale son intitule EN HAUT, contre la

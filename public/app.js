@@ -3553,7 +3553,7 @@ function facesProposees(r) {
   return f && Array.isArray(f.faces) ? f.faces : [];
 }
 
-function contexteFicheAtelier(r) {
+function contexteFicheAtelier(r, marquage) {
   const place = `${r.stage}|${r.sub_stage || ''}`;
   const lot = r.fiche && r.fiche.lot;
   return {
@@ -3573,6 +3573,13 @@ function contexteFicheAtelier(r) {
     // chiffre faux à l'écran, juste sous le champ qu'on venait de corriger.
     // CE QUE LA FAMILLE DÉCLARE, pour que la fiche propose au lieu de faire taper.
     facesProposees: facesProposees(r),
+    // CE QUE CHAQUE EMPLACEMENT COÛTE SUR CE DOSSIER-LÀ — l'écart réel, pas le
+    // coût « en soi » : le prix passe par deux arrondis au palier et par la
+    // majoration, donc cocher un emplacement ne vaut pas la même chose selon ce
+    // qu'il y a déjà. Le serveur rejoue le moteur avec et sans (voir
+    // `/api/requests/:id/marquage`). Nul sur un dossier qu'on ne sait pas
+    // tarifer — une tasse, une gravure, les 184 d'avant le 28/08.
+    marquage: marquage && typeof marquage === 'object' ? marquage : null,
     // La famille où atterrit une face créée à la main — vide si aucune n'est
     // reconnue : la face reste alors sur le seul dossier, et la fiche le dit.
     familleDesFaces: (familleDuDossier(r) || {}).nom || '',
@@ -3660,13 +3667,20 @@ function openLigneDetail(id) {
   // LE TABLEAU DES FACES PART AVEC LA FICHE, pas au démarrage : deux requêtes en
   // parallèle, et la seconde ne coûte qu'une fois par session (elle est mise de
   // côté). Sans elle, le menu des faces s'ouvrirait vide sur la première fiche.
-  Promise.all([chargerFicheComplete(id).catch(() => {}), chargerTaillesLogo()]).then(() => {
+  // LE PRIX DE CHAQUE EMPLACEMENT part avec elles. Neuf recalculs du moteur : ils
+  // n'ont aucune raison de voyager sur chaque ligne de la grille, à chaque
+  // rafraîchissement — ils ne servent qu'ici, et seulement quand on ouvre.
+  Promise.all([
+    chargerFicheComplete(id).catch(() => {}),
+    chargerTaillesLogo(),
+    api('GET', `/api/requests/${id}/marquage`).catch(() => null),
+  ]).then(([, , marquage]) => {
     if (ficheAtelierId !== String(id)) return;
     const fraiche = rows.find((x) => String(x.id) === String(id)) || ligne;
     completerFiche(fraiche);
     fermerFicheAtelier();
     ficheAtelierId = String(id);
-    ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche));
+    ficheAtelierEl = dessinerFicheAtelier(fraiche, contexteFicheAtelier(fraiche, marquage));
     // UN CLIC A COTE DE LA CARTE FERME LA FICHE. La racine EST le voile depuis
     // qu'elle defile : on ne ferme donc que si le clic l'a atteinte ELLE, pas
     // un de ses enfants. Sur `click` et non `mousedown` : le champ qu'on quitte
