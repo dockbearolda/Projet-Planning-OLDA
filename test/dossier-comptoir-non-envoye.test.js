@@ -93,8 +93,33 @@ assert.ok(!/source:|payload\s*=|client_info/.test(ENVOI),
 // du client à l'écran, et il lui reste à l'imprimer.
 assert.ok(/OLDA_ENVOI_AUTOMATIQUE/.test(PONT) && /OLDA_ENVOI_AUTOMATIQUE/.test(HOTE),
   'le parcours doit pouvoir dire à l’hôte que l’envoi est automatique');
-assert.ok(/if \(auto\) return;/.test(HOTE),
+// Depuis le 30/08, l'envoi automatique périme quand même le cache de « À
+// trier » (voir `olda:projet-cree-en-fond` dans app.js) : le bloc `if (auto)`
+// s'est étoffé d'une ligne, mais il doit toujours se terminer par un `return`
+// SANS jamais déclencher l'évènement qui fait sauter l'hôte vers la ligne
+// créée (`olda:projet-cree`, réservé à l'envoi tapé par la vendeuse).
+const BLOC_AUTO = HOTE.match(/if \(auto\) \{[\s\S]*?\n {4}\}/);
+assert.ok(BLOC_AUTO, 'l’envoi automatique doit rester un cas à part dans enregistrer()');
+assert.ok(/return;/.test(BLOC_AUTO[0]),
   'un envoi automatique ne doit pas sauter sur la ligne du planning');
+assert.ok(!/CustomEvent\('olda:projet-cree'\)/.test(BLOC_AUTO[0]),
+  'un envoi automatique ne doit pas déclencher le saut vers la ligne — seul le clic de la vendeuse le fait');
+assert.ok(/CustomEvent\('olda:projet-cree-en-fond', \{ detail: \{ stage: data\.stage \} \}\)/.test(BLOC_AUTO[0]),
+  'il doit quand même signaler l’étape touchée, pour que l’hôte périme son cache en silence');
+
+// L'HÔTE PÉRIME SON CACHE, IL NE RECHARGE RIEN DE LUI-MÊME. Sans ce filet, la
+// vendeuse (ou quiconque avait déjà « À trier » sous les yeux avant l'envoi)
+// retrouvait la liste D'AVANT cette vente en y revenant, jusqu'à ce qu'un
+// évènement sans rapport la rafraîchisse — le symptôme exact que ce fichier
+// documente, une marche plus loin : le dossier EST au planning, mais rien ne
+// le montre à qui regardait déjà « À trier ».
+const APP = lire('app.js');
+const ECOUTEUR_FOND = APP.match(/addEventListener\('olda:projet-cree-en-fond'[\s\S]*?\n\}\);/);
+assert.ok(ECOUTEUR_FOND, 'l’hôte doit écouter le signal d’arrière-plan du comptoir');
+assert.ok(/lastRowsSig = ''/.test(ECOUTEUR_FOND[0]),
+  'il doit périmer le cache de la liste (pas juste les compteurs) pour forcer une relecture au retour');
+assert.ok(/stage === currentStage/.test(ECOUTEUR_FOND[0]),
+  'il ne doit périmer que l’étape effectivement affichée — les autres se rechargeront de toute façon en y arrivant');
 assert.ok(/if \(!auto\) montrerEnvoi\(\)/.test(HOTE),
   'un envoi automatique ne doit pas afficher le bandeau d’attente de l’hôte');
 

@@ -370,8 +370,15 @@ async function enregistrer(payload, { auto = false, source = null } = {}) {
     repondreAuParcours(source, true, avis || '');
 
     // Envoi automatique : la ligne est née, le parcours l'affiche lui-même. On
-    // laisse la vendeuse sur son ticket.
-    if (auto) return;
+    // laisse la vendeuse sur son ticket — on ne saute PAS sur la ligne. Mais le
+    // cache local de « À trier » (là où TOUT dossier du comptoir naît) doit
+    // quand même être périmé : sans ça, quelqu'un déjà sur cet onglet au moment
+    // de l'envoi (le cas le plus courant) retrouve la liste d'AVANT cette vente
+    // en y revenant, jusqu'à ce qu'un évènement sans rapport la rafraîchisse.
+    if (auto) {
+      window.dispatchEvent(new CustomEvent('olda:projet-cree-en-fond', { detail: { stage: data.stage } }));
+      return;
+    }
 
     // LA RÉFÉRENCE A CHANGÉ : le ticket déjà remis au client ne porte plus le bon
     // numéro, et c'est à corriger maintenant. On reste donc sur l'écran, message

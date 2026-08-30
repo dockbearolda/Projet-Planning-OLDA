@@ -3088,6 +3088,20 @@ function cellPrice(r) {
   price.placeholder = '—';
   price.setAttribute('aria-label', 'Prix TTC de la commande, en euros');
 
+  // SANS PRIX, LE CHAMP N'A RIEN À ÉDITER — IL OUVRE LA FICHE. Un champ vide
+  // couvre presque toute la cellule (voir ZONE_CLIQUABLE) : le clic le plus
+  // naturel, sur le prix lui-même, tombait dans un champ qui ne montrait
+  // jamais rien de plus qu'un curseur vide, et la fiche — avec son « Reste à
+  // payer », le budget indicatif, tout ce qui parle d'argent — ne s'ouvrait
+  // JAMAIS depuis cette cellule. Dès qu'un prix existe, la cellule redevient
+  // ce qu'elle a toujours été : un champ qu'on édite en place.
+  price.addEventListener('mousedown', (e) => {
+    if (r.project_value == null) {
+      e.preventDefault();
+      openLigneDetail(r.id);
+    }
+  });
+
   const ht = document.createElement('span');
   ht.className = 'cell-price-ht';
   const refreshHt = () => { ht.textContent = htLabel(r.project_value); };
@@ -7852,6 +7866,17 @@ window.addEventListener('olda:projet-cree', async (e) => {
   // local — sans relecture forcée, le raccourci « même famille » redessinerait
   // ce qu'on avait déjà et rien n'apparaîtrait à l'écran.
   await ouvrirCommandeAuPlanning({ id, stage, sub }, true);
+});
+
+// Envoi AUTOMATIQUE du comptoir (écran de fin affiché tout seul, voir
+// `guetterEcranFinal` dans pont.js) : on ne saute PAS sur la ligne — la
+// vendeuse a son ticket à l'écran — mais si l'étape touchée (toujours « À
+// trier ») est celle actuellement affichée, son cache est déjà faux. Sans
+// ça, revenir sur cet onglet reprenait le raccourci « même famille » de
+// `selectStage` et redessinait la liste d'AVANT cette vente.
+window.addEventListener('olda:projet-cree-en-fond', (e) => {
+  const { stage } = e.detail || {};
+  if (stage && stage === currentStage) lastRowsSig = '';
 });
 
 // Une catégorie promue en onglet reste une vue de PLANNING : même grille, même
