@@ -44,9 +44,12 @@
      une unite et un intitule de section. Ils prennent le cran des libelles. */
   --fa-lab: var(--taille-note);    /* libellé de champ, unité, mention */
   --fa-val: var(--taille-texte);   /* la valeur qu'on lit et qu'on saisit */
-  --fa-fort: var(--taille-titre);  /* un nombre qu'on cherche : total, quantité */
-  --fa-titre: var(--taille-titre); /* le nom du client — même cran que
-                          `--fa-fort`, la hiérarchie se fait à la GRAISSE */
+  --fa-fort: var(--taille-titre);  /* le 3e cran : ce qu'on cherche des yeux —
+                          le nom du client, un total, une quantité. La hiérarchie
+                          entre eux se fait à la GRAISSE, jamais au cran.
+                          ⚠ `--fa-titre` valait EXACTEMENT la même chose et a été
+                          retiré le 30/08 : deux noms pour un cran, c'est deux
+                          crans le jour où l'un des deux bouge. */
 
   /* UNE SEULE HAUTEUR DE COMMANDE, ET C'EST CELLE DE L'APPLICATION (29/08).
      Il y en avait QUATRE ici — 34, 40, 42, 44 — pour dire une densité : un
@@ -91,8 +94,16 @@
      decidait de leur hauteur, jamais la recette. C'est le defaut qui a donne
      cinq boutons de 37, 39, 40, 44 et 50 px au meme rembourrage.
      Deux interlignes, pas plus : celui du texte, et celui — plus serre — de
-     tout ce qui tient sur UNE ligne dans une boite. */
-  line-height: var(--ligne-texte);
+     tout ce qui tient sur UNE ligne dans une boite.
+     ⚠ C'EST LE SERRE QUI EST PAR DEFAUT (30/08), et pas l'inverse. Le defaut
+     etait celui du TEXTE : les commandes le corrigeaient chacune (`.fa-in`,
+     `.fa-choix`, `.fa-seg__b`), et tout ce qui n'est pas une commande le
+     gardait — donc « Marge », une valeur en `<span>`, se rendait sur 24,65 px
+     quand « Cout » et « Prix TTC », deux champs, se rendaient sur 23,375 : la
+     meme bande portait deux interlignes, et le texte de « Marge » tombait
+     1,36 px plus bas que celui de ses voisines. Sur cet ecran, UN SEUL bloc
+     porte plusieurs lignes — la note — et il le declare lui-meme. */
+  line-height: var(--ligne-serre);
   display: flex;
   flex-direction: column;
   border-bottom-left-radius: var(--arrondi-carte);
@@ -230,7 +241,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-ref:empty { display: none; }
 .fa-client {
   padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
-  font: inherit; font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+  font: inherit; font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1);
   white-space: nowrap; cursor: pointer;
 }
 .fa-client:hover { background: var(--bg); }
@@ -777,7 +788,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   border-radius: var(--arrondi-champ);
 }
 .fa-reste__v {
-  font-size: var(--fa-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+  font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1);
   font-variant-numeric: tabular-nums;
 }
 /* L'ETAT SE DIT PAR LA COULEUR, et la couleur dit un ETAT — pas une
