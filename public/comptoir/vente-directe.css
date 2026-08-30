@@ -66,10 +66,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
 /* .container : partagé avec le devis, vit dans charte.css (voir « Le cadre du comptoir »). */
 
 .card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
-h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
+h2{margin:0 0 var(--pas-3);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
 h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pas-3)}
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3)}
+/* .grid / .grid-3 : gouttière alignée sur celle du devis (--dd-rangee), voir
+   « Le champ et son intitulé » dans charte.css — même mesure, deux techniques
+   de rangée (celle-ci garde son subgrid, propre à cet écran). */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--dd-rangee)}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--dd-rangee)}
 /* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
    Les grilles de formulaire collaient leurs cellules EN BAS
    (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son
@@ -96,12 +99,18 @@ h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);l
      Une rangée qui contient un champ à deux intitulés renonce donc au partage
      de lignes et se range normalement — c'est le seul cas des deux écrans. */
   .grid:has(>.field label~label),.grid-3:has(>.field label~label){grid-template-rows:none}
-  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--pas-3)}
+  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--dd-rangee)}
 }
-.field{margin-bottom:var(--pas-3)}
-label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
+.field{margin-bottom:var(--dd-rangee)}
+/* label : même intitulé que le devis (voir « Le champ et son intitulé » dans
+   charte.css) — il prenait 17 px en graisse 800 (celle des titres), quand
+   --taille-note/--graisse-note (14 px / 600) porte déjà « Référence » à côté.
+   input/select/textarea/button gardent --champ-x : même valeur (14 px) que
+   --dd-champ-x du devis, déjà éprouvée par les deux écrans. */
+label{display:block;font-size:var(--taille-note);font-weight:var(--graisse-note);margin-bottom:var(--dd-label-gap)}
 input,select,textarea{width:100%;padding:0 var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface)}input,select{height:var(--ctrl-h)}textarea{padding:var(--champ-x);min-height:110px;resize:vertical}
-textarea{min-height:110px;resize:vertical}
+input::placeholder,textarea::placeholder{color:var(--dd-placeholder)}
+button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padding:0 var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
 /* UN CHAMP EN ERREUR NE BOUGE PAS D'UN PIXEL. Le trait passait de 1,5 à 2 px :
    le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
    ne s'alignait plus avec ses voisins — au moment précis où l'œil le cherche.
@@ -113,7 +122,6 @@ textarea{min-height:110px;resize:vertical}
    qu'un fond rosé, que personne ne remarque à bout de bras. */
 .invalid{border-width:1.5px!important;border-style:solid!important;border-color:var(--danger)!important;background:var(--danger-bg)!important;box-shadow:0 0 0 1px var(--danger)!important}
 .help{font-size:var(--taille-texte);color:var(--text-2);margin-top:5px}
-button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padding:0 var(--champ-x);font-size:var(--taille-texte);font-weight:var(--graisse-forte);cursor:pointer}
 .primary{background:var(--primary);color:var(--on-primary)}
 .primary:hover{background:var(--primary-hover)}
 .secondary{background:var(--border-soft);color:var(--text-1)}

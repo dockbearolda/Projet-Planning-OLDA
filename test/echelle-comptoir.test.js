@@ -379,8 +379,11 @@ for (const m of FEUILLES_V.matchAll(/:root\s*\{([^}]*)\}/g)) {
 assert.deepStrictEqual(jetonsVente, [], 'l’écran de vente n’a plus de charte à lui');
 assert.ok(!/--vd-/.test(VENTE), 'et plus une seule trace de l’ancienne palette');
 
-// DEUX TAILLES SUR CET ÉCRAN, comme sur celui d'à côté : ce qui se lit, et les
-// chiffres qu'on annonce. Le ticket a les siennes, et ne s'en sert que là.
+// TROIS TAILLES SUR CET ÉCRAN (30/08) : l'intitulé d'un champ a rejoint celui
+// du devis — 14 px, comme partout ailleurs dans l'application — au lieu
+// d'hériter les 17 px de ce qu'on saisit. « Article * » et « Référence »
+// tombaient à deux tailles avant ce jour-là. Le ticket a les siennes, et ne
+// s'en sert que là.
 const taillesVente = new Set();
 const taillesTicket = new Set();
 for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
@@ -393,8 +396,9 @@ for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     taillesVente.add(v);
   }
 }
-assert.deepStrictEqual([...taillesVente].sort(), ['var(--taille-grand)', 'var(--taille-texte)'],
-  'l’écran de vente n’a droit qu’à la taille du texte et à celle des chiffres qu’on annonce');
+assert.deepStrictEqual([...taillesVente].sort(),
+  ['var(--taille-grand)', 'var(--taille-note)', 'var(--taille-texte)'],
+  'l’écran de vente n’a droit qu’à l’intitulé, à la taille du texte et à celle des chiffres qu’on annonce');
 // Le ticket ne pioche PAS dans l'échelle de l'écran, et l'écran ne pioche pas
 // dans la sienne : deux échelles qui se mélangent, c'est vingt-cinq tailles qui
 // reviennent par la bande.
