@@ -57,8 +57,26 @@ const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
 assert.ok(/carte\.append\(tete, bandeau, scene\);/.test(JS)
-  && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
-  'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
+  && /racine\.append\(carte, zoneToast\);/.test(JS),
+  'tout le contenu vit dans la carte ; seul le message reste sur la racine');
+// L'ÉCHELLE EST DÉCLARÉE SUR LA RACINE, PAS SUR LA CARTE (30/08) : le message
+// est posé À CÔTÉ de la carte, donc ses `var(--fa-…)` ne résolvaient rien — son
+// bouton « Annuler » sortait en 17 px au lieu de 14. Une échelle se déclare là
+// où tout l'écran la lit.
+{
+  const RACINE_R = CSS.match(/\.fa \{[\s\S]*?\n\}/)[0];
+  const CARTE_R = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
+  assert.ok(/--fa-lab:/.test(RACINE_R) && /--fa-h-champ:/.test(RACINE_R),
+    'les crans et les boîtes sont sur la racine');
+  assert.ok(!/^\s*--fa-[a-z-]+:/m.test(CARTE_R.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+    '… et plus aucun sur la carte : ce qui vit à côté d’elle les lirait de travers');
+}
+// LA PASTILLE DE CONFIRMATION EST RETIRÉE (30/08, Charlie : « sur la validation
+// c'est moche, je n'aime pas du tout »). Elle disait une TROISIÈME fois ce que
+// le point de l'entête et le message du bas disaient déjà — et elle le disait
+// mal : sa boîte entière était un jeton qu'elle ne pouvait pas lire.
+assert.ok(!/fa-flag/.test(JS) && !/\.fa-flag\s*\{/.test(CSS),
+  'plus de pastille de confirmation : deux signaux suffisent, dont un actionnable');
 // LA BARRE QUI REPLIAIT LE PANNEAU EST RETIRÉE (30/08, Charlie : « supprime
 // ça »). Elle pliait un panneau qui s'ouvre toujours, et pour l'annoncer elle
 // recopiait sous lui les intitulés de quatre de ses six cases, en plus petit.

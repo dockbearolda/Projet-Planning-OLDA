@@ -33,8 +33,29 @@
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--voile);
-}
-.fa-carte {
+
+  /* L'ECHELLE EST DECLAREE SUR LA RACINE, PAS SUR LA CARTE (30/08). Elle
+     l'etait sur `.fa-carte` — mais le message du bas et le calque des pastilles
+     sont poses A COTE de la carte, sur cette racine : leurs `var(--fa-…)` ne
+     resolvaient donc RIEN. Mesure : le bouton « Annuler » du message sortait en
+     17 px au lieu de 14, et la pastille de confirmation, dont la boite entiere
+     etait un jeton, sortait en losange de 14,3 x 23,4 px au lieu d'un rond de
+     16. Une echelle se declare la ou tout l'ecran la lit. */
+  /* L'INTERLIGNE EST UN JETON, ET IL EST POSE ICI (29/08). 138 des 141 textes
+     de cet ecran se rendaient en `line-height: normal` : c'est le CONTENU qui
+     decidait de leur hauteur, jamais la recette. C'est le defaut qui a donne
+     cinq boutons de 37, 39, 40, 44 et 50 px au meme rembourrage.
+     Deux interlignes, pas plus : celui du texte, et celui — plus serre — de
+     tout ce qui tient sur UNE ligne dans une boite.
+     ⚠ C'EST LE SERRE QUI EST PAR DEFAUT (30/08), et pas l'inverse. Le defaut
+     etait celui du TEXTE : les commandes le corrigeaient chacune (`.fa-in`,
+     `.fa-choix`, `.fa-seg__b`), et tout ce qui n'est pas une commande le
+     gardait — donc « Marge », une valeur en `<span>`, se rendait sur 24,65 px
+     quand « Cout » et « Prix TTC », deux champs, se rendaient sur 23,375 : la
+     meme bande portait deux interlignes, et le texte de « Marge » tombait
+     1,36 px plus bas que celui de ses voisines. Sur cet ecran, UN SEUL bloc
+     porte plusieurs lignes — la note — et il le declare lui-meme. */
+  line-height: var(--ligne-serre);
   /* L'ECHELLE VIENT DE LA CHARTE, ELLE NE SE RECOPIE PAS (29/08).
      Ces crans etaient ecrits en nombres — 13 / 14 / 17 / 21 — et trois d'entre
      eux valaient EXACTEMENT les jetons de charte.css. Trois nombres recopies :
@@ -65,9 +86,9 @@
   --fa-h-pas: var(--ctrl-h);
   --fa-h-champ: var(--ctrl-h);
   --fa-h-bandeau: var(--ctrl-h);
-  /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
-     automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
-     texte, elles se déclarent. */
+  /* Une boîte qui ne porte PAS de mot : le point de l'enregistrement
+     automatique. Il ne se déduit d'aucun texte, il se déclare. (`--fa-coche`
+     est parti le 30/08 avec la pastille de confirmation.) */
   /* LA COLONNE DES INTITULES, UN SEUL NOMBRE. Elle valait 90 px en haut et
      106 px dans le panneau : les valeurs des deux moities de l'ecran ne
      tombaient donc pas sur le meme rail, a 4 px pres — ca ne se voit pas en
@@ -78,7 +99,6 @@
      mal collee : c'est le seul endroit de l'ecran ou l'on ecarte les lettres. */
   --fa-caps: .09em;
   --fa-point: 7px;
-  --fa-coche: 16px;
   /* DEUX HAUTEURS ONT DISPARU LE 29/08, elles ne se remplacent pas : elles se
      DEDUISENT. Le bouton du message sort de son texte (14 × interligne + deux
      pas + le trait reserve), le filet s'etire sur la rangee qui le porte. Un
@@ -103,7 +123,8 @@
      meme bande portait deux interlignes, et le texte de « Marge » tombait
      1,36 px plus bas que celui de ses voisines. Sur cet ecran, UN SEUL bloc
      porte plusieurs lignes — la note — et il le declare lui-meme. */
-  line-height: var(--ligne-serre);
+}
+.fa-carte {
   display: flex;
   flex-direction: column;
   border-bottom-left-radius: var(--arrondi-carte);
@@ -691,19 +712,12 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* --- La confirmation et le message ---------------------------------------
    LA PASTILLE SE POSE DANS UN CALQUE, pas dans le champ : dans le champ, elle
    en changerait la hauteur, et toute la colonne avec. */
-.fa-flags { position: absolute; inset: 0; pointer-events: none; z-index: 25; }
-.fa-flag {
-  position: absolute;
-  width: var(--fa-coche); height: var(--fa-coche); border-radius: var(--pilule);
-  background: var(--primary); color: var(--surface);
-  font-size: var(--fa-lab); line-height: var(--fa-coche); text-align: center;
-  animation: faFlagPop 1.1s var(--ease) both;
-}
-@keyframes faFlagPop {
-  0% { opacity: 0; transform: scale(.6); }
-  20% { opacity: 1; transform: scale(1); }
-  70% { opacity: 1; }
-  100% { opacity: 0; }
+/* LA PASTILLE DE CONFIRMATION EST RETIREE (30/08) — `.fa-flags`, `.fa-flag` et
+   son animation avec. Elle disait une TROISIEME fois ce que le point de
+   l'entete et le message du bas disaient deja, et elle le disait mal : posee
+   dans un calque de la racine quand l'echelle vivait sur la carte, sa boite
+   entiere — largeur, hauteur, interligne — ne resolvait rien, et le rond de
+   16 px sortait en losange de 14,3 x 23,4. */
 }
 .fa-toast-zone { position: absolute; left: 20px; bottom: 66px; z-index: 30; }
 .fa-toast {
@@ -733,7 +747,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 /* Le mouvement réduit coupe les deux animations : ce qu'elles disent — « c'est
    enregistré », « voilà ce qui vient de changer » — se lit sans elles. */
 @media (prefers-reduced-motion: reduce) {
-  .fa-flag, .fa-toast { animation: none; }
+  .fa-toast { animation: none; }
 }
 
 /* Sous 1180 px, les deux colonnes n'ont plus la place de tenir côte à côte :

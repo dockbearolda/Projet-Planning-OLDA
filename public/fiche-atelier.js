@@ -200,22 +200,22 @@ export function dessinerFicheAtelier(r, ctx) {
   const annulations = [];
 
   // --- La confirmation, l'indicateur, le message ----------------------------
-  const calque = el('div', 'fa-flags');
-  const empiler = (defaire) => { annulations.push(defaire); };
-
-  // LA PASTILLE SE POSE SUR LE CHAMP MODIFIÉ, dans un calque : posée DANS le
-  // champ, elle en aurait changé la hauteur, et toute la colonne avec.
-  const coche = (cible) => {
-    if (!cible || !calque.isConnected) return;
-    const rc = cible.getBoundingClientRect();
-    const rl = calque.getBoundingClientRect();
-    const dot = el('div', 'fa-flag', '✓');
-    dot.style.left = `${Math.round(rc.right - rl.left - 17)}px`;
-    dot.style.top = `${Math.round(rc.top - rl.top + rc.height / 2 - 8)}px`;
-    calque.append(dot);
-    setTimeout(() => dot.remove(), 1200);
-  };
-
+  // LA PASTILLE DE CONFIRMATION EST RETIREE (30/08). Charlie, en designant le
+  // menu du reglement : « une fois selectionne, sur la validation c'est moche,
+  // je n'aime pas du tout, il faut quelque chose de ultra rapide ».
+  //
+  // ELLE ETAIT CASSEE, et pas seulement de trop : elle vivait dans un calque
+  // pose sur la RACINE, alors que l'echelle de la fiche etait declaree sur la
+  // CARTE. Ses `var(--fa-coche)` ne resolvaient donc rien — ni largeur, ni
+  // hauteur, ni interligne — et le rond de 16 px sortait en losange de
+  // 14,3 x 23,4 px, le crochet decale dedans. (Les jetons sont remontes sur la
+  // racine par la meme occasion : le message du bas les lisait de travers lui
+  // aussi, son bouton « Annuler » sortait en 17 px au lieu de 14.)
+  //
+  // ET ELLE DISAIT UNE TROISIEME FOIS ce que deux autres disaient deja : le
+  // point de l'entete s'allume, et le message du bas nomme le champ ET porte
+  // « Annuler ». Trois confirmations pour une frappe — « le vert se tait,
+  // l'echec parle ». Il en reste deux, dont une actionnable.
   // L'INDICATEUR NE PARLE QUE QUAND IL SE PASSE QUELQUE CHOSE. Il affichait
   // « Enregistrement automatique » en permanence : une phrase qui ne dit rien
   // d'actionnable, dans l'entête, alors que chaque modification donne déjà son
@@ -274,12 +274,22 @@ export function dessinerFicheAtelier(r, ctx) {
         opts.envoyer(opts.normaliser ? opts.normaliser(ancien) : ancien);
         opts.apres && opts.apres();
       });
-      coche(champ);
       pulser();
       dire(`Enregistré — ${opts.label}`);
       opts.apres && opts.apres();
     };
-    champ.addEventListener(champ.tagName === 'SELECT' ? 'change' : 'blur', commettre);
+    // UN MENU REND LA MAIN DES QU'ON A CHOISI (30/08). Charlie : « une fois
+    // selectionne, le contour rond de l'input disparait directement, avant
+    // qu'on reclique dessus ». Un `<select>` garde le focus apres un choix —
+    // donc son lisere d'accent restait allume sur un champ qu'on ne remplit
+    // plus, jusqu'au clic suivant N'IMPORTE OU. On le rend, tout de suite.
+    // Le retrait est HORS de `commettre` : le lisere doit tomber meme quand on
+    // rechoisit la meme valeur, cas ou `commettre` s'arrete avant d'agir.
+    if (champ.tagName === 'SELECT') {
+      champ.addEventListener('change', () => { commettre(); champ.blur(); });
+    } else {
+      champ.addEventListener('blur', commettre);
+    }
     return champ;
   };
 
@@ -412,8 +422,7 @@ export function dessinerFicheAtelier(r, ctx) {
       if (ancien === n) return;
       poserPriorite(n);
       ctx.patchLigne('priority', n);
-      empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); });
-      coche(b); pulser(); dire('Enregistré — priorité');
+      empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); }); pulser(); dire('Enregistré — priorité');
     });
     return b;
   });
@@ -701,8 +710,7 @@ export function dessinerFicheAtelier(r, ctx) {
         const avant = Number(tailles[i].n) || 0;
         const vise = Math.max(0, Math.round(Number(c.value.replace(/\D/g, '')) || 0));
         if (vise === avant) { c.value = avant ? String(avant) : ''; return; }
-        poser(vise, true);
-        coche(c); pulser(); dire(`Enregistré — taille ${taille.t}`);
+        poser(vise, true); pulser(); dire(`Enregistré — taille ${taille.t}`);
       });
       // L'INTITULE EST DEHORS, LA BULLE N'ENTOURE QUE LE CHAMP (30/08).
       case_.append(el('span', 'fa-lab fa-taille__k', String(taille.t)), c);
@@ -1179,8 +1187,7 @@ export function dessinerFicheAtelier(r, ctx) {
       majReste();
     };
     poser(n);
-    empiler(() => poser(avant));
-    coche(chAcompte); pulser(); dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
+    empiler(() => poser(avant)); pulser(); dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
   });
 
   // LA BASCULE « SOLDÉ » EST RETIRÉE (30/08, Charlie : « supprime ça »). Elle
@@ -1362,6 +1369,6 @@ export function dessinerFicheAtelier(r, ctx) {
   // création, que personne ne vient chercher sur une fiche d'atelier. Ce qu'il
   // disait d'utile, l'appartenance au lot, a rejoint l'entête (voir plus haut).
   carte.append(tete, bandeau, scene);
-  racine.append(carte, calque, zoneToast);
+  racine.append(carte, zoneToast);
   return racine;
 }
