@@ -206,3 +206,77 @@ console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’ic
 }
 
 console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même rythme');
+
+// ---------------------------------------------------------------------------
+// 5. LES HUIT ÉCRANS S'OUVRENT DE LA MÊME FAÇON (30/08/2026)
+// ---------------------------------------------------------------------------
+// Le titre d'écran était écrit SIX fois dans CINQ fichiers : `.mt-head__titre`
+// et `.pil-titre` (identiques au caractère près, 32 px), `.work-title h1` (17),
+// `.cl-brand__title` (17), `.reg-head__title` (17 plus une icône de 24) — et le
+// Point du jour n'en avait aucun. Mesuré au rendu : TROIS tailles, QUATRE
+// abscisses (349 / 371 / 389 / 425) et CINQ ordonnées.
+//
+// C'est le défaut que ce fichier existe pour refuser, dans sa forme la plus
+// large : chaque écran était correct relu seul.
+{
+  const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+  const nu = CHARTE.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  const tete = nu.match(/\.ecran-tete \{([^}]*)\}/);
+  assert.ok(tete, 'l’en-tête d’écran vit dans la charte : c’est le seul fichier que le CRM et le comptoir lisent tous les deux');
+
+  // SA HAUTEUR EST UN CALCUL, JAMAIS UN NOMBRE — même règle que partout
+  // ailleurs dans ce fichier : un nombre se recopie de travers.
+  assert.match(tete[1], /min-height: calc\(var\(--ctrl-h\)/,
+    'la hauteur de l’en-tête sort de la boîte de l’application, elle ne s’écrit pas');
+  assert.ok(!/min-height:\s*[0-9]/.test(tete[1]),
+    'aucune hauteur d’en-tête écrite en dur');
+
+  // ET SA VERTICALE AUSSI. Les quatre abscisses mesurées venaient de quatre
+  // rembourrages écrits à la main dans quatre feuilles.
+  assert.match(tete[1], /padding: var\(--pas-3\) var\(--ecran-pad-x\)/,
+    'l’en-tête démarre sur la verticale commune, par son jeton');
+  assert.match(nu, /--ecran-pad-x:\s*\d+px;/,
+    '… et ce jeton est déclaré une fois, dans la charte');
+
+  // LE TITRE PREND LE CRAN QUE LA CHARTE LUI RÉSERVE. `--taille-titre` était
+  // déclaré « titre d'une carte, d'une section » et ne servait qu'à UN endroit
+  // de toute l'application : c'est pour ça que les titres d'écran improvisaient
+  // entre 17 et 32.
+  const titre = nu.match(/\.ecran-tete__titre \{([^}]*)\}/);
+  assert.ok(titre, 'le titre d’écran a sa règle, dans la charte');
+  assert.match(titre[1], /font-size: var\(--taille-titre\)/,
+    'le titre d’écran prend `--taille-titre`, pas le cran des chiffres qu’on annonce');
+
+  // AUCUN ÉCRAN NE SE REFAIT LE SIEN. C'est la garde qui compte : la règle
+  // ci-dessus peut être parfaite pendant qu'un écran la double en silence.
+  const FEUILLES = require('./feuilles-crm');
+  for (const f of [...FEUILLES.FEUILLES_CRM, 'public/clients.css']) {
+    const nuf = FEUILLES.lireFeuille(f).replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const perdue of ['.mt-head__titre', '.pil-titre', '.work-title', '.cl-brand__title',
+      '.reg-head__title', '.reg-head__ic', '.cl-head', '.work-head-left', '.pj-head-row']) {
+      assert.ok(!nuf.includes(perdue),
+        `${f} : « ${perdue} » réécrit l’en-tête de la charte — il n’y en a qu’un`);
+    }
+  }
+
+  // ET TOUS LE CONSTRUISENT PAR LE MÊME MODULE : une forme partagée avec six
+  // markups redevient six en-têtes le jour où l'un d'eux ajoute une ligne.
+  for (const f of ['montravail', 'pilotage', 'dashboard', 'clients', 'reglages', 'tailles-logos']) {
+    const js = fs.readFileSync(path.join(RACINE, `public/${f}.js`), 'utf8');
+    assert.match(js, /import \{ ecranTete \} from '\.\/ecran-tete\.js'/,
+      `public/${f}.js doit bâtir son en-tête avec celui de la charte`);
+  }
+
+  // L'ACTION POSÉE DANS UNE LIGNE, elle aussi, n'a plus qu'une écriture — et
+  // elle ne prend PAS la pilule : la charte la réserve à une étiquette, et
+  // `.ordre-reset` la prenait pour une action.
+  const action = nu.match(/\.action-ligne \{([^}]*)\}/);
+  assert.ok(action, '« Renommer », « Retirer », « revenir au tri » : un seul objet');
+  assert.match(action[1], /min-height: var\(--ctrl-h-serre\)/,
+    'sa hauteur est la boîte serrée de la charte, pas un nombre');
+  assert.ok(!/border-radius: var\(--pilule\)/.test(action[1]),
+    'une action ne prend jamais la pilule — sinon rien ne la distingue d’une étiquette');
+}
+
+console.log('✓ écrans : un seul en-tête, une seule verticale, une seule action de ligne');

@@ -13,6 +13,7 @@
 // ici, il n'arrive tout simplement pas.
 
 import { fetchBorne } from './reseau.js';
+import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
 const el = (tag, cls, text) => {
@@ -217,10 +218,8 @@ let dernier = null;
 export function renderMonTravail(data) {
   if (!ROOT) return;
   dernier = data;
+  const tete = ecranTete({ titre: data.qui ? `Bonjour ${data.qui}` : 'Mon travail' });
   const page = el('div', 'mt-page');
-  const head = el('header', 'mt-head');
-  head.append(el('h1', 'mt-head__titre', data.qui ? `Bonjour ${data.qui}` : 'Mon travail'));
-  page.append(head);
 
   page.append(bloc('À faire', data.aFaire || [], 'Rien ne t’attend. Va voir le planning.'));
   page.append(bloc('En attente', data.enAttente || [],
@@ -229,7 +228,7 @@ export function renderMonTravail(data) {
     ...f, sub_stage: f.sub_stage,
   })), 'Rien de terminé aujourd’hui, pour l’instant.'));
 
-  ROOT.replaceChildren(page);
+  ROOT.replaceChildren(tete, page);
 }
 
 export async function refreshMonTravail() {

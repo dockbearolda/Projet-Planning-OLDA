@@ -27,41 +27,24 @@
   height: 100%;
 }
 
-/* --- En-tête --- */
-.cl-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-.cl-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-/* L'INITIALE QUI COIFFE UN OBJET EST UN ROND. La charte le dit en toutes
-   lettres : « rond parfait = une icone seule, une initiale ». Les trois
-   initiales de cet ecran — la marque en tete, la carte d'un client, l'en-tete
-   de sa fiche — etaient des rectangles arrondis, et c'etait la SEULE famille
-   d'initiales de l'application a ne pas etre un disque : celles du planning, du
-   Point du jour, des references de categorie et de la pilule de repartition le
-   sont toutes. Ca ne se voit pas sur cet ecran, seulement en passant de l'un a
-   l'autre. */
-.cl-brand__av {
-  display: grid;
-  place-items: center;
-  width: var(--rond);
-  height: var(--rond);
-  border-radius: 50%;
-  background: var(--primary);
-  color: var(--on-primary);
-  font-weight: var(--graisse-forte);
-  font-size: var(--taille-texte);
-  flex-shrink: 0;
-}
-.cl-brand__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.2px; color: var(--text-1); }
-.cl-brand__sub { margin: 0; font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* --- En-tete ---
+   Il vit dans la charte (`.ecran-tete`) depuis le 30/08. Ce qui etait ici :
+   `.cl-head` (rembourrage 16/20 et filet `--border`) doublait `.work-head`
+   du planning (16/22 et filet `--border-soft`) a 2 px et un jeton pres, et
+   `.cl-brand__av` etait le seul disque de marque pose dans un en-tete de
+   toute l'application. */
 
 /* Même objet qu'au planning : la pilule vit dans charte.css
    (`.champ-recherche`). Ne reste ici que la largeur — celle-ci pousse. */
+/* La barre de recherche et de filtres, sous l'en-tete. Meme verticale que
+   lui et que la liste : les trois commencent sur le meme axe. */
+.cl-barre {
+  display: flex; align-items: center; gap: var(--pas-2) var(--pas-3);
+  flex-wrap: wrap;
+  padding: var(--pas-3) var(--ecran-pad-x);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
 .cl-search { flex: 1 1 280px; min-width: 200px; }
 .cl-search__ic { font-size: var(--ic); color: var(--text-2); flex-shrink: 0; }
 .cl-search__clear {
@@ -143,11 +126,10 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 14px 20px 28px;
+  padding: var(--pas-3) var(--ecran-pad-x) 28px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
@@ -524,12 +506,7 @@
 
 /* --- Mobile / tablette --- */
 @media (max-width: 720px) {
-  .cl-head { padding: 12px 14px; gap: 10px; }
-  .cl-brand { order: 1; }
-  .cl-new { order: 2; margin-left: auto; }
-  .cl-search { order: 3; flex-basis: 100%; }
-  .cl-filter { order: 4; }
-  .cl-sort { order: 5; }
+  .cl-search { flex-basis: 100%; }
   .cl-list { padding: 12px 14px 24px; }
   .cl-card__badges { display: none; }
   .cl-drawer__card { width: 100vw; }

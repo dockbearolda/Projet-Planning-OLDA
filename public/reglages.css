@@ -21,19 +21,23 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* L'ecran se lit en colonne bornee ; l'en-tete est DEDANS, pas au-dessus, sinon
+   son titre tomberait au bord gauche de la fenetre et la colonne resterait
+   centree — deux verticales pour un seul ecran. C'est donc la colonne qui est
+   nue, et ses enfants qui reprennent la verticale commune : l'en-tete la porte
+   deja lui-meme (`.ecran-tete`, charte.css), les cartes la reprennent ici.
+   `env(safe-area-inset-bottom)` est parti avec le reste des restes tactiles :
+   la cible est le PC depuis le 21/08. */
 .reg-page {
   max-width: 760px;
   margin: 0 auto;
-  padding: 26px 22px calc(40px + env(safe-area-inset-bottom));
+  padding: 0 0 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-
-.reg-head { display: flex; align-items: flex-start; gap: 12px; }
-.reg-head__ic { font-size: var(--ic-grand); color: var(--primary); }
-.reg-head__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); letter-spacing: -.02em; color: var(--text-1); }
-.reg-head__sub { margin: 2px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
+.reg-page > :not(.ecran-tete) { margin-inline: var(--ecran-pad-x); }
+.reg-intro { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
 
 .reg-card {
   padding: var(--pas-4);
@@ -176,9 +180,6 @@
 .reg-corb__vide { margin: 12px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
 
 .reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: var(--taille-texte); color: var(--text-2); }@media (max-width: 700px) {
-  .reg-page { padding: 18px 14px calc(32px + env(safe-area-inset-bottom)); }
-}
-@media (max-width: 700px) {
   .reg-card { padding: 16px; }
 }
 @media (max-width: 700px) {

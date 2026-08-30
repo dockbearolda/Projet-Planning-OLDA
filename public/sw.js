@@ -79,6 +79,11 @@ const COQUILLE = [
   // ET l'écran de la demande — même règle : absent du cache, l'import échoue et
   // l'écran concerné ne s'ouvre plus hors ligne.
   '/modale.js',
+  // L'en-tete d'ecran de la charte, importe statiquement par les huit ecrans
+  // du CRM (reglages.js, clients.js, dashboard.js, montravail.js,
+  // pilotage.js, tailles-logos.js) : absent du cache, aucun d'eux ne
+  // s'ouvre hors ligne.
+  '/ecran-tete.js',
   // Le calendrier des trois écrans, importé statiquement par fiche-atelier.js
   // ET chargé à la demande par comptoir/pont.js : absent du cache, la fiche de
   // l'atelier ne s'ouvre plus hors ligne, et les deux écrans du comptoir

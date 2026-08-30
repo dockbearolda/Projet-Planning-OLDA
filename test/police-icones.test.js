@@ -81,7 +81,9 @@ const FABRIQUES = [
   'public/index.html',
   'public/nouveau-projet.js',
   'public/reglages.js',
-  'public/tailles-logos.js',
+  // `public/tailles-logos.js` est sorti de cette liste le 30/08 : sa seule
+  // icone etait celle de son en-tete maison, et l'en-tete de la charte n'en
+  // porte pas — la barre du haut dit deja sur quel ecran on est.
 ];
 
 const balaye = (dir) => fs.readdirSync(path.join(RACINE, dir), { withFileTypes: true })

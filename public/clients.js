@@ -18,6 +18,7 @@ import { fetchBorne } from './reseau.js';
 // Le focus suit la fenêtre qui s'ouvre, et revient d'où il venait à la
 // fermeture. Le tiroir se déclarait modal en laissant le clavier DERRIÈRE lui.
 import { armerModale } from './modale.js';
+import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -260,15 +261,10 @@ function buildStatic() {
 
   const view = el('div', 'cl');
 
-  // En-tête : marque + recherche + tri + Nouveau.
-  const head = el('header', 'cl-head');
-  const brand = el('div', 'cl-brand');
-  brand.append(el('span', 'cl-brand__av', 'O'));
-  const bt = el('div', 'cl-brand__text');
-  bt.append(el('h2', 'cl-brand__title', 'Base clients'));
-  bt.append(el('p', 'cl-brand__sub', ''));
-  brand.append(bt);
-
+  // En-tête : le composant de la charte (`.ecran-tete`), plus les commandes
+  // propres à l'écran. Le disque « O » de la marque est parti avec lui : il
+  // était la seule marque posée dans un en-tête de toute l'application, et il
+  // ne disait rien que la barre du haut ne dise déjà.
   const search = el('div', 'champ-recherche cl-search');
   search.append(ic('search', 'cl-search__ic'));
   const input = el('input', 'cl-search__input');
@@ -317,7 +313,18 @@ function buildStatic() {
   secBtn.id = 'cl-secteurs-btn';
   secBtn.append(ic('work'), el('span', null, 'Secteurs'));
 
-  head.append(brand, search, natWrap, sortWrap, secBtn, nw);
+  const head = ecranTete({
+    niveau: 'h2',
+    titre: 'Base clients',
+    droite: [secBtn, nw],
+  });
+
+  // LA RECHERCHE ET LES FILTRES SONT UNE BARRE, PAS UN EN-TETE. Poses dans la
+  // rangee du titre, ils la faisaient passer de 82 a 143 px : cet ecran etait le
+  // seul dont l'en-tete tombait a une autre hauteur que les sept autres. Ils
+  // descendent donc d'un cran, comme l'outil de devis de Fiverr sous le sien.
+  const barre = el('div', 'cl-barre');
+  barre.append(search, natWrap, sortWrap);
 
   const list = el('div', 'cl-list');
   list.id = 'cl-list';
@@ -325,7 +332,7 @@ function buildStatic() {
   empty.id = 'cl-empty';
   empty.hidden = true;
 
-  view.append(head, list, empty);
+  view.append(head, barre, list, empty);
 
   // Suggestions type / zone (remplies au rendu), secteur (liste modifiable en
   // base) et ville (les six territoires desservis, saisie libre autorisée).
@@ -441,12 +448,13 @@ function renderList() {
   const clear = $('#cl-q-clear');
   if (clear) clear.hidden = !query;
 
-  // Sous-titre : total, ou « filtrés / total » quand une recherche est active.
-  const brandSub = $('.cl-brand__sub');
-  if (brandSub) {
-    brandSub.textContent = query
+  // Le compteur : total, ou « filtrés / total » quand une recherche est active.
+  const compte = $('.ecran-tete__compte');
+  if (compte) {
+    compte.textContent = query
       ? `${list.length} / ${LIST.length} clients`
-      : `OLDA · ${LIST.length} client${LIST.length > 1 ? 's' : ''}`;
+      : `${LIST.length} client${LIST.length > 1 ? 's' : ''}`;
+    compte.hidden = false;
   }
 }
 

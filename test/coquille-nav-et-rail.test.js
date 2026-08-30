@@ -250,10 +250,23 @@ assert.deepStrictEqual([...employees].sort(), ['--taille-grand', '--taille-note'
 
 // LA HIÉRARCHIE SE DIT À LA GRAISSE : sans ça, un titre et son paragraphe se
 // lisent pareil — c'est ce qui est arrivé en ramenant tout sur une taille.
-assert.ok(/#stageTitle|\.work-title h1/.test(CSS), 'le titre d’étape doit avoir sa règle');
-const titreEtape = sansCommentaire(CSS).match(/\.work-title h1 \{[^}]*\}/);
-assert.ok(titreEtape && /font-weight: var\(--graisse-forte\)/.test(titreEtape[0]),
-  'le titre d’étape se distingue par sa GRAISSE, plus par sa taille');
+// Le titre d'étape a rejoint l'en-tête d'écran de la charte le 30/08 : la règle
+// à garder est donc celle du composant, dans `charte.css`, et il n'y en a plus
+// qu'UNE pour les huit écrans (il y en avait six).
+const CHARTE_TETE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+const titreEcran = sansCommentaire(CHARTE_TETE).match(/\.ecran-tete__titre \{[^}]*\}/);
+assert.ok(titreEcran, 'l’en-tête d’écran de la charte doit avoir sa règle de titre');
+assert.ok(/font-weight: var\(--graisse-forte\)/.test(titreEcran[0]),
+  'le titre d’écran se distingue par sa GRAISSE');
+assert.ok(/font-size: var\(--taille-titre\)/.test(titreEcran[0]),
+  'le titre d’écran prend le cran que la charte lui réserve (21 px), pas celui des chiffres');
+// AUCUN ÉCRAN NE RÉÉCRIT SON TITRE. C'est le fond de la passe du 30/08 : six
+// classes de titre dans cinq fichiers, trois tailles, quatre abscisses. Un écran
+// qui s'en refait un ne se voit qu'en comparant deux écrans — donc ici.
+for (const perdu of ['.work-title', '.mt-head__titre', '.pil-titre', '.cl-brand__title', '.reg-head__title']) {
+  assert.ok(!sansCommentaire(CSS).includes(`${perdu} `) && !sansCommentaire(CLIENTS).includes(`${perdu} `),
+    `${perdu} : un écran ne réécrit pas le titre de la charte`);
+}
 
 // UNE SEULE BOÎTE DE SAISIE, celle de la charte. Deux exceptions ASSUMÉES, et
 // elles sont écrites dans le fichier : l'éditeur posé sur une cellule de la

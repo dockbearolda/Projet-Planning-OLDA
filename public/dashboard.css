@@ -317,24 +317,17 @@
    « Point du jour » et sa date sont partis le 25/08 — l'onglet actif de la
    barre du haut dit déjà où l'on est, et la date du jour, celui qui la lit la
    connaît. */
-.pj-head {
-  flex-shrink: 0;
-  padding: 0 var(--pas-4);
-  background: var(--pj-surface);
-  border-bottom: 1px solid var(--pj-border);
-}
-.pj-head-row {
-  display: flex;
-  align-items: center;
-  gap: var(--pas-2);
-  min-width: 0;
-}
-/* Les onglets prennent la place ; les réglages sont poussés à droite PAR UNE
-   MARGE, pas par `justify-content: flex-end` — sur une rangée trop étroite,
-   `flex-end` rogne par la GAUCHE et mange le premier onglet au lieu de faire
-   défiler. Même piège que la barre du comptoir. */
-.pj-head-row > .pj-tabs { flex: 1; min-width: 0; }
-.pj-head-row > .pj-tool:first-of-type { margin-left: auto; }
+/* L'en-tete est celui de la charte (`.ecran-tete`) : rembourrage, filet et
+   `flex-shrink` viennent de la. Il ne reste ici que ce qui est propre a cet
+   ecran — rien pour l'instant, la classe ne subsiste que comme poignee des
+   deux media queries plus bas. Le fond BLANC est parti avec le reste : c'etait
+   le seul en-tete d'ecran de l'application a en porter un, les sept autres
+   posent leur titre sur le gris de fond. */
+/* `.pj-head-row` a disparu avec l'en-tete maison : les onglets sont le groupe
+   de GAUCHE de `.ecran-tete`, les deux outils celui de DROITE. Le piege que
+   son commentaire gardait — `flex-end` rogne par la GAUCHE et mange le
+   premier onglet — est tenu par la charte : `.ecran-tete__droite` pousse par
+   une marge automatique, pas par un `justify-content`. */
 
 /* Les trois outils du patron : Activité, Machines, Attribution. */
 .pj-tool {
@@ -352,13 +345,16 @@
   border-radius: var(--arrondi-champ);
   background: var(--pj-surface);
   color: var(--pj-ink-2);
-  font-size: var(--taille-note);
+  /* 14 px jusqu'au 30/08 — mais `--ctrl-h-serre` EST le calcul 17 x 1,375 + 2 x 7
+     + 2 : ecrit avec une autre taille de texte, il ne sort plus de son contenu,
+     il le contraint. La reference du comptoir n'a aucune commande a 14 px. */
+  font-size: var(--taille-texte);
   font-weight: var(--graisse-note);
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .pj-tool:hover { background: var(--state-hover); color: var(--pj-ink); }
-.pj-tool--icon { width: 40px; padding: 0; justify-content: center; }
+.pj-tool--icon { width: var(--ctrl-h-serre); padding: 0; justify-content: center; }
 .pj-tool .material-symbols-outlined { font-size: var(--ic); }
 
 /* ------------------------------------------------ Onglets */
@@ -366,6 +362,11 @@
   display: flex;
   align-items: flex-end;
   gap: 2px;
+  /* Les onglets prennent la place restante du groupe de gauche — ce que
+     faisait `.pj-head-row > .pj-tabs` — et defilent au lieu de pousser les
+     deux outils hors de la rangee. */
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1065,7 +1066,6 @@
      glissade de sortie pour ne pas couper l'animation). */
   visibility: hidden;
   transition: transform var(--dur-3) var(--ease), visibility 0s var(--dur-3);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 .dd-panel.open { transform: translateX(0); visibility: visible; transition: transform var(--dur-3) var(--ease); }
 .dd-close {
@@ -1326,10 +1326,7 @@
   .dashboard, .dd-panel { --pj-c-why: 148px; --pj-c-pos: 150px; --pj-c-pilot: 116px; }
 }
 @media (max-width: 900px) {
-  .pj-head-row { flex-wrap: wrap; }
-}
-@media (max-width: 900px) {
-  .pj-tool { width: 40px; padding: 0; justify-content: center; }
+  .pj-tool { width: var(--ctrl-h-serre); padding: 0; justify-content: center; }
 }
 @media (max-width: 900px) {
   .pj-head { padding-inline: var(--pas-3); }

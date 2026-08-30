@@ -248,20 +248,24 @@
     <!-- Zone de travail : colonne de droite, sous la barre du haut. -->
     <div class="app">
       <main class="work">
-        <header class="work-head">
-          <div class="work-head-left">
-            <div class="work-title">
-              <h1 id="stageTitle">Commande</h1>
-              <span class="work-count" id="stageCount"></span>
-              <!-- Apparaît UNIQUEMENT quand l'étape a été rangée à la main : sans
-                   lui, on entrerait dans l'ordre manuel sans jamais pouvoir en
-                   sortir. -->
-              <button class="ordre-reset" id="ordreReset" type="button" hidden>
-                Ordre manuel · revenir au tri par urgence
-              </button>
+        <!-- `.ecran-tete` est le composant de la charte, commun aux huit écrans ;
+             `.work-head` ne reste que comme POIGNÉE : c'est par elle que
+             `body.view-plein` efface cet en-tête-ci sur les écrans qui portent
+             le leur. Une classe pour la forme, une pour la place. -->
+        <header class="work-head ecran-tete">
+          <div class="ecran-tete__gauche">
+            <div class="ecran-tete__titres">
+              <h1 class="ecran-tete__titre" id="stageTitle">Commande</h1>
             </div>
+            <span class="ecran-tete__compte" id="stageCount"></span>
+            <!-- Apparaît UNIQUEMENT quand l'étape a été rangée à la main : sans
+                 lui, on entrerait dans l'ordre manuel sans jamais pouvoir en
+                 sortir. -->
+            <button class="action-ligne ordre-reset" id="ordreReset" type="button" hidden>
+              Ordre manuel · revenir au tri par urgence
+            </button>
           </div>
-          <div class="work-head-right">
+          <div class="ecran-tete__droite">
             <button class="help-btn colbar-open" id="colbarOpen" type="button" aria-expanded="true" aria-controls="colbar">
               <span class="material-symbols-outlined help-btn-ic" aria-hidden="true">view_column</span>
               <span class="help-btn-label">Colonnes</span>

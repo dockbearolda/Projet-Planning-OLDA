@@ -69,17 +69,10 @@
 .tl-outils--face { margin-top: calc(-1 * var(--pas-2)); }
 /* Renommer, retirer : des gestes rares. Ils ne prennent pas la forme d'un
    bouton, qui appellerait le clic tous les jours pour un usage par trimestre. */
-.tl-lien {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-2);
-  font-family: inherit;
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-note);
-  cursor: pointer;
-}
-.tl-lien:hover { color: var(--text-1); text-decoration: underline; }
+/* Les actions de cet ecran (« Renommer », « Retirer », « + Reference ») prennent
+   `.action-ligne` de la charte. `.tl-lien` etait du texte nu de 19,25 px de
+   haut — la plus petite cible du CRM — et sa classe ne servait plus a rien une
+   fois la forme partagee : elle est partie avec la regle. */
 
 /* LES FACES DE LA FAMILLE — un tote bag en a deux, une casquette une seule. */
 .tl-faces { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--pilule); width: fit-content; max-width: 100%; }
