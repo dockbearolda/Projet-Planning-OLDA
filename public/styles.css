@@ -2065,23 +2065,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .sub-chip.empty:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); filter: none; }
 
-/* Colonne « Sous-étape » masquée pour les familles sans sous-familles
-   (Demande, Attente Client, Archivé, Fiverr) → vue plus aérée. */
-.grid.no-sub col[data-col="sub_stage"],
-.grid.no-sub th.col-sub,
-.grid.no-sub td.col-sub-cell { display: none; }
-
-/* Colonne « Prix TTC » masquée hors des étapes où elle est réellement remplie
-   (chiffrage, facturation, paiement) : inutile de l'afficher en Production… */
-.grid.no-price col[data-col="price"],
-.grid.no-price th.col-price,
-.grid.no-price td.col-price-cell { display: none; }
-
 /* Colonnes retirées À LA MAIN depuis le rail de droite (voir PLANNING_COLS
-   dans app.js). Une classe `off-<clé>` par colonne posée sur la grille : même
-   patron que .no-sub / .no-price ci-dessus, qui restent les règles AUTOMATIQUES
-   par étape. Les deux se cumulent — le choix du rail ne rouvre pas une colonne
-   que l'étape courante ne remplit pas. */
+   dans app.js). Une classe `off-<clé>` par colonne posée sur la grille — le
+   SEUL levier qui masque une colonne. Aucune règle par étape ne s'y ajoute
+   plus : « Prix TTC » et « Sous-étape » restaient masqués selon l'étape
+   affichée (Production, Demande…), et le tableau changeait de colonnes à
+   chaque clic dans le rail de gauche — « Infos » et « Date souhaitée »
+   sautaient d'une catégorie à l'autre au lieu de tomber en face (Charlie,
+   30/08). Une colonne cochée reste maintenant à SA PLACE partout ; sur les
+   étapes qu'elle ne remplit jamais, la cellule est simplement vide. */
 .grid.off-stars       col[data-col="stars"],       .grid.off-stars       th.col-stars,    .grid.off-stars       td.col-stars-cell,
 .grid.off-responsable col[data-col="responsable"], .grid.off-responsable th.col-resp,     .grid.off-responsable td.col-resp-cell,
 .grid.off-product     col[data-col="product"],     .grid.off-product     th.col-product,  .grid.off-product     td.col-product-cell,
@@ -2245,8 +2237,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-item.is-locked { cursor: default; background: transparent; border-color: var(--border-soft); }
 .colbar-item.is-locked:hover { background: transparent; }
 
-/* Sélectionnée mais vide à cette étape (règle automatique .no-sub/.no-price) :
-   on le DIT, sinon le patron coche une colonne et ne la voit pas apparaître. */
+/* Sélectionnée mais vide à cette étape (`auto` dans PLANNING_COLS) : la
+   colonne reste affichée, on DIT juste qu'elle n'a rien à montrer ici. */
 .colbar-item__note {
   flex: 0 0 auto;
   font-size: var(--taille-texte); font-weight: var(--graisse-forte);
@@ -2869,12 +2861,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .col-product { width: 220px; }
 .col-infos { width: 260px; }
 
-/* Plancher de largeur de la grille, par jeu de colonnes affichées.
+/* Plancher de largeur de la grille, toutes colonnes affichées (aucune ne se
+   masque plus selon l'étape, voir la note plus haut sur .off-* — une colonne
+   cochée reste montée sur CHAQUE étape, vide ou non).
    Même politique que le `min-width: 1180px` du palier 1280 : quand il n'y a
    plus la place, la grille DÉFILE horizontalement au lieu de tasser les
    colonnes de texte. « Nom du Dossier » étant maintenant fixe (210 px), sans
-   ces planchers ce sont Description et Infos qui absorbaient tout le manque
-   (27 px sur les étapes qui montrent Prix + Sous-étape : illisible).
+   ce plancher ce sont Description et Infos qui absorbaient tout le manque
+   (27 px avec Prix + Sous-étape affichées : illisible).
    Calcul : colonnes fixes + 210 (dossier) + ~92 (priorité) + 2 × 110 (texte).
    `:not(.manual-cols)` : dès que l'utilisateur règle ses largeurs à la main,
    c'est lui qui décide (cf. .grid.manual-cols { min-width: 0 }).
@@ -2884,8 +2878,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    valable — retirer une colonne de 210 px baisse le plancher de 210 px, point.
    Sans ça, retirer trois colonnes laissait la grille défiler horizontalement
    alors qu'on venait justement de lui faire de la place.
-   Les trois valeurs comptent la colonne Documents (82 px) : elle est allumée
-   par défaut, et `--cols-off` la retranche dès qu'on la retire du rail.
+   La valeur compte la colonne Documents (82 px) : elle est allumée par
+   défaut, et `--cols-off` la retranche dès qu'on la retire du rail.
    −66 px le 27/08 : Type (66) a quitté le tableau, et une colonne supprimée ne
    peut plus être retranchée par `--cols-off` puisqu'elle n'est plus dans
    PLANNING_COLS — c'est donc au plancher de l'oublier. « Qui suit » (132), elle,
@@ -2896,9 +2890,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    Priorité +4 (la pastille « Moyenne »).
    +42 px depuis que la colonne d'actions porte « Ouvrir la fiche » (116 → 158) :
    sans ce report, ce sont Description et Infos qui payaient le bouton. */
-.grid:not(.manual-cols):not(.no-sub) { min-width: calc(1300px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-price) { min-width: calc(1250px - var(--cols-off, 0px)); }
-.grid:not(.manual-cols):not(.no-sub):not(.no-price) { min-width: calc(1390px - var(--cols-off, 0px)); }
+.grid:not(.manual-cols) { min-width: calc(1390px - var(--cols-off, 0px)); }
 
 
 /* Description (produit) + Infos (notes) */

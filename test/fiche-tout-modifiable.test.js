@@ -64,10 +64,8 @@ assert.ok(!/\{ key: 'ticket'/.test(APP), 'et le rail « Colonnes »');
 // colonnes RANGÉES, celles qui existent encore : sans ça la grille garde
 // 116 px qu'aucune colonne n'occupe et défile de côté pour rien.
 assert.ok(!/ticket: 116/.test(APP), 'COL_DEFAULTS oublie la colonne retirée');
-for (const px of [1300, 1250, 1390]) {
-  assert.ok(CSS.includes(`min-width: calc(${px}px - var(--cols-off, 0px))`),
-    `le plancher ${px} doit avoir suivi le retrait de la colonne`);
-}
+assert.ok(CSS.includes('min-width: calc(1390px - var(--cols-off, 0px))'),
+  'le plancher doit avoir suivi le retrait de la colonne');
 
 // ---------------------------------------------------------------------------
 // 2. LA LIGNE ET LA CARTE S'OUVRENT PAR LA MÊME FONCTION

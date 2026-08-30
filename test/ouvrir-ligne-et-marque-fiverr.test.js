@@ -187,9 +187,7 @@ assert.ok(/\.col-del \{ white-space: nowrap; text-align: right; padding-right: 8
 // PLANNING_COLS ne peut plus être retranchée par `--cols-off`, c'est donc au
 // plancher de l'oublier — regagné 106 px le même jour quand cinq colonnes ont
 // été élargies, et reperdu les 116 px de « Documents » le 28/08.
-for (const [avant, apres] of [[1416, 1300], [1366, 1250], [1506, 1390]]) {
-  assert.ok(CSS.includes(`min-width: calc(${apres}px - var(--cols-off, 0px))`),
-    `le plancher ${avant} doit avoir suivi le retrait des deux colonnes`);
-}
+assert.ok(CSS.includes('min-width: calc(1390px - var(--cols-off, 0px))'),
+  'le plancher doit avoir suivi le retrait des deux colonnes');
 
 console.log('✓ planning : la marque Fiverr remplace la flèche, la ligne s’ouvre dans les deux vues OK');
