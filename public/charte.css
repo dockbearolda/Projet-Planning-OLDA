@@ -511,6 +511,20 @@
   font-weight: var(--graisse-note);
 }
 
+/* TOUT CE QUI SE SAISIT PORTE LA MÊME ENCRE ET LA MÊME TAILLE (30/08/2026).
+   Chaque champ le réécrivait à sa charge — `.cl-f__input`, `.reg-textarea`,
+   `.fiverr-tool-input`, `.reason-input`, l'`input,select,textarea` de chacun
+   des deux écrans du comptoir — et celui de la demande de devis avait fini
+   par oublier la couleur : ses champs rendaient l'encre par défaut du
+   navigateur, pas celle de la charte. Posée ICI, dans le seul fichier que le
+   CRM et les deux parcours du comptoir chargent tous les deux, c'est la
+   valeur par défaut de tout ce qui se saisit — un sélecteur plus précis reste
+   libre de la changer (lecture seule, champ manquant, placeholder). */
+input, select, textarea {
+  font-size: var(--taille-texte);
+  color: var(--text-1);
+}
+
 .champ-recherche {
   display: flex; align-items: center; gap: var(--pas-2);
   margin: 0; padding: 0 var(--champ-x);
@@ -543,8 +557,8 @@ input[type="radio"]:focus-visible {
 .champ-recherche input {
   flex: 1; min-width: 0;
   border: 0; outline: 0; background: transparent;
-  font-family: inherit; font-size: var(--taille-texte);
-  font-weight: var(--graisse-texte); color: var(--text-1);
+  font-family: inherit;
+  font-weight: var(--graisse-texte);
 }
 .champ-recherche input::placeholder { color: var(--text-3); }
 

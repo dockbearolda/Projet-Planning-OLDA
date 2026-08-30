@@ -102,7 +102,7 @@ h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);l
 }
 .field{margin-bottom:var(--pas-3)}
 label{display:block;font-weight:var(--graisse-forte);margin-bottom:var(--pas-1)}
-input,select,textarea{width:100%;padding:0 var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface);color:var(--text-1)}input,select{height:var(--ctrl-h)}textarea{padding:var(--champ-x);min-height:110px;resize:vertical}
+input,select,textarea{width:100%;padding:0 var(--champ-x);border:1px solid var(--border);border-radius:var(--arrondi-champ);font-size:var(--taille-texte);background:var(--surface)}input,select{height:var(--ctrl-h)}textarea{padding:var(--champ-x);min-height:110px;resize:vertical}
 textarea{min-height:110px;resize:vertical}
 /* UN CHAMP EN ERREUR NE BOUGE PAS D'UN PIXEL. Le trait passait de 1,5 à 2 px :
    le champ gagnait 1 px de haut, et sur une rangée de trois, celui qui manque
