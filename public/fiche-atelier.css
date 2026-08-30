@@ -354,7 +354,20 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
 .fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
-.fa-mini { width: 80px; flex: 0 0 80px; }
+/* UNE BOITE COURTE CENTRE CE QU'ELLE PORTE (30/08). Charlie, en designant le
+   champ de l'heure : « ce qui est ecrit dans les input comme exemple doit etre
+   parfaitement centre ». « heure » commencait au rembourrage de gauche et
+   laissait 25,6 px a droite — 7,3 px hors du milieu, ce qui se voit dans une
+   boite de 80 px et pas ailleurs.
+   ⚠ LE PLACEHOLDER PREND L'ALIGNEMENT DU CHAMP, jamais le sien : centre pour
+   l'exemple et cale a gauche pour la valeur, le texte sauterait sous le curseur
+   a la premiere frappe. C'est donc la BOITE qui centre, exemple et valeur.
+   ET SEULEMENT LES BOITES COURTES : les champs poses sur les rails de la grille
+   font partir leur texte du rail de leur intitule (regle du 29/08). Les centrer
+   sortirait toute la colonne de ses rails — celle-la meme qu'on vient d'aligner.
+   Sur cet ecran, les boites courtes sont l'heure et les bulles de taille : elles
+   se comportent pareil. */
+.fa-mini { width: 80px; flex: 0 0 80px; text-align: center; }
 /* LA DATE ET L'HEURE PARTAGENT UNE CELLULE : c'est UN fait — quand le client
    passe — et la grille du client ne donne qu'une case par valeur. La date prend
    ce qui reste, l'heure garde sa boite courte. */
