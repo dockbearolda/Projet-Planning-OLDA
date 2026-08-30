@@ -359,7 +359,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    passe — et la grille du client ne donne qu'une case par valeur. La date prend
    ce qui reste, l'heure garde sa boite courte. */
 .fa-quand { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
-.fa-quand > .fa-in { flex: 1; min-width: 0; }
+/* ⚠ `:not(.fa-mini)` : sans lui, cette regle (0,2,0) bat la boite courte de
+   l'heure (0,1,0) et les deux champs se partagent la cellule en deux. La date
+   tombait alors a 102,3 px pour 106,5 px de texte — « sam. 05/09 » coupe en
+   plein milieu, et rien qui le dise. */
+.fa-quand > .fa-in:not(.fa-mini) { flex: 1; min-width: 0; }
 .fa-date { width: 118px; flex: 0 0 118px; }
 /* LES DEUX GRILLES PRENNENT LE MEME RAIL D'INTITULE QUE LES RANGEES. Elles
    ecrivaient 90 px pendant que `.fa-row` prenait `--fa-lab-w` : les valeurs
