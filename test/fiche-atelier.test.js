@@ -148,8 +148,16 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // 187,3 · 247,3 · 307,3 · 367,3 des deux côtés).
   assert.ok(PRODUCTION.includes("droite.append(titreSection('Production'), el('div', 'fa-filet'));"),
     'la colonne de production ouvre sur son titre et son filet');
-  assert.ok(CLIENT.includes("gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient);"),
+  assert.ok(CLIENT.includes("gauche.append(titreSection('Client'), el('div', 'fa-filet'), blocClient);"),
     '… et celle du client sur les deux mêmes, dans le même ordre');
+  // LE RETRAIT EST DANS LA GRILLE (30/08). Il vivait dans une rangée en `flex`
+  // à lui : sa date s'étirait sur ce qui restait et l'heure démarrait à
+  // 347,2 px, là où les trois rangées du dessous posent leur deuxième intitulé
+  // à 364,5 — un rail de plus, sur la seule ligne hors grille.
+  assert.ok(CLIENT.includes("el('label', 'fa-lab', 'Retrait'), remise.champ,")
+    && CLIENT.includes("el('label', 'fa-lab', 'Heure'), quand,"),
+    'la date de retrait et son heure sont deux rangées de la grille du client');
+  assert.ok(!/remise\.rangee/.test(JS), 'plus de rangée à part pour la date');
   // ⚠ « Production » ET « Consigne » SONT PARTIS (29/08). Charlie, en désignant
   // les trois champs de texte libre de la fiche : « tout ça doit être supprimé
   // et il doit y avoir UNE SEULE note à la fin ». Ils demandaient la même chose

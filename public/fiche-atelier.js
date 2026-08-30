@@ -527,7 +527,7 @@ export function dessinerFicheAtelier(r, ctx) {
       c.value = fantome.value;
       c.dispatchEvent(new Event('blur'));
     });
-    return { rangee: rangee(opts.court || label, c, ...(opts.suite || []), fantome), champ: c };
+    return { champ: c, fantome };
   };
 
   // LE RAPPEL DE DÉLAI SE RECALCULE. Écrit une fois à l'ouverture, il continuait
@@ -556,8 +556,13 @@ export function dessinerFicheAtelier(r, ctx) {
     apres: majRappel,
   });
   const remise = ligneDate('Retrait par le client', r.deadline,
-    { court: 'Retrait', requis: true, suite: [chHeure, rappel], apres: majRappel },
+    { requis: true, apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
+  // L'HEURE ET SON RAPPEL TIENNENT DANS UNE CELLULE (30/08) : la rangee du
+  // retrait entre dans la grille du client (voir plus bas), et une cellule de
+  // grille n'accepte qu'UN element sous peine de decaler tout ce qui suit.
+  const quand = el('div', 'fa-quand');
+  quand.append(chHeure, rappel);
 
   majRappel();
 
@@ -604,6 +609,15 @@ export function dessinerFicheAtelier(r, ctx) {
   const blocClient = el('section', 'fa-groupe');
   const grilleClient = el('div', 'fa-grille-client');
   grilleClient.append(
+    // LE RETRAIT ENTRE DANS LA GRILLE (30/08). Charlie : « realigne
+    // verticalement et horizontalement tout ce que tu peux ». Il vivait dans
+    // une rangee a lui, en `flex` : sa date s'etirait sur ce qui restait et
+    // l'heure demarrait a 347,2 px, la ou les trois rangees du dessous posent
+    // leur deuxieme intitule a 364,5. Un rail de plus, sur la seule ligne qui
+    // n'etait pas dans la grille — et l'heure n'avait meme pas d'intitule, elle
+    // se devinait a son texte d'invite.
+    el('label', 'fa-lab', 'Retrait'), remise.champ,
+    el('label', 'fa-lab', 'Heure'), quand,
     el('label', 'fa-lab', 'Client'), chClient,
     el('label', 'fa-lab', 'Qui suit'), selQui,
     el('label', 'fa-lab', 'Contact'), chTel,
@@ -619,14 +633,17 @@ export function dessinerFicheAtelier(r, ctx) {
   // suivant part dans la troisieme colonne — c'est ce qui a jete « Provenance »
   // sur sa propre ligne, sous sa valeur.
 
-  blocClient.append(grilleClient);
+  // LE FANTOME DE LA DATE VIT HORS DU FLUX (voir `ligneDate`) : pose dans la
+  // grille il n'y prendrait pas de case — il est absolu — mais son voisinage
+  // n'a plus a s'en soucier ici.
+  blocClient.append(grilleClient, remise.fantome);
 
   // LES NOTES REMPLISSENT LA HAUTEUR QUI RESTE — quand il y en a. Sur le 14
   // pouces de l'atelier (630 px) il n'y a rien a distribuer : le champ reste
   // dans le panneau Details. Au-dela, il monte ici et occupe le vide, qui se
   // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
   // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
-  gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient);
+  gauche.append(titreSection('Client'), el('div', 'fa-filet'), blocClient);
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
