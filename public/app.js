@@ -637,20 +637,6 @@ function playStageEnter() {
   stageEnterTimer = setTimeout(() => host.classList.remove('liste-entre'), 500);
 }
 
-// Masque la colonne « Sous-étape » quand la famille courante n'a pas de
-// sous-familles (Demande, Attente Client, Archivé, Fiverr) → vue plus aérée.
-function updateSubColVisibility(slug) {
-  const grid = document.getElementById('grid');
-  if (grid) grid.classList.toggle('no-sub', !familyHasSub(slug));
-}
-
-// Masque la colonne « Prix » hors des étapes où elle se remplit réellement
-// (Commande, Facturation) → pas de colonne vide en Demande, Production…
-function updatePriceColVisibility(slug) {
-  const grid = document.getElementById('grid');
-  if (grid) grid.classList.toggle('no-price', !PRICE_VISIBLE_STAGES.has(slug));
-}
-
 // Vide la grille INSTANTANÉMENT au changement de famille : on ne laisse jamais les
 // lignes (ni le compteur) de l'ancienne famille sous le nouvel entête pendant que
 // les nouvelles données arrivent. La colonne « Sous-étape » et l'animation d'entrée
@@ -972,10 +958,7 @@ async function loadRows() {
   listeTotal = total;
   renderListeSuite();
   lastRowsSig = signature(rows);
-  updateSubColVisibility(slug); // colonne « Sous-étape » posée AVEC la donnée
-  updatePriceColVisibility(slug);
-  // La mention « vide ici » du rail dépend de l'étape : elle se recalcule ici,
-  // en même temps que les deux règles automatiques ci-dessus.
+  // La mention « vide ici » du rail dépend de l'étape : elle se recalcule ici.
   renderColbar();
   renderOrdreReset(); // l'ordre manuel est propre à l'étape : le bouton la suit
   applySortAndRender();
@@ -5793,19 +5776,23 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 // clic sans aller chercher un menu.
 //
 // Le choix est GLOBAL (pas par étape) : c'est un réglage de poste, pas un
-// paramètre de navigation. Il se cumule avec les règles automatiques
-// .no-sub / .no-price, qui elles restent par étape — cocher « Prix TTC » ne
-// le fait donc pas apparaître en Production, où il est toujours vide. Le rail
-// l'écrit noir sur blanc (voir la mention « vide ici ») pour qu'on ne croie
-// pas à un bug.
+// paramètre de navigation. Une colonne cochée reste à SA PLACE quelle que
+// soit l'étape affichée — masquer « Prix TTC » en Production le temps d'un
+// clic faisait sauter « Infos » et « Date souhaitée » d'une étape à l'autre
+// (Charlie, 30/08) : deux tableaux ouverts à un clic l'un de l'autre doivent
+// tomber en face, pas se redessiner à chaque catégorie. La colonne reste donc
+// montée, simplement vide sur les étapes qu'elle ne remplit jamais (`auto`) ;
+// le rail l'écrit noir sur blanc (voir la mention « vide ici ») pour qu'on ne
+// croie pas à un bug.
 // `v3` : nouvelle clé volontairement, pour que TOUS les postes repartent sur la
 // ligne arrêtée le 27/08 (cf. COLS_DEFAUT). Un poste qui avait réglé ses
 // colonnes en v2 aurait sinon gardé son écran, et la nouvelle ligne par défaut
 // ne serait apparue nulle part.
 const COLS_KEY = 'olda_cols_v4';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
-// posée dans index.html et buildRow(). `auto` = la règle automatique qui peut
-// la masquer en plus du choix manuel. `surCarte` = colonne qui existe DANS LES
+// posée dans index.html et buildRow(). `auto` = la règle qui dit si l'étape
+// courante la remplit jamais — sert au seul badge « vide ici » du rail, ne
+// masque plus rien. `surCarte` = colonne qui existe DANS LES
 // DEUX VUES (le ticket : une colonne du tableau, un bouton sur la carte) — la
 // retirer ne fait donc pas basculer d'une vue à l'autre.
 const PLANNING_COLS = [
@@ -6126,12 +6113,12 @@ function colbarItem(col) {
     btn.setAttribute('aria-disabled', 'true');
     attachTip(btn, 'Toujours affichée : c’est elle qui identifie la ligne.');
   } else if (on && col.auto && col.auto(currentStage)) {
-    // Cochée mais masquée par la règle automatique de l'étape courante.
+    // Cochée, affichée, mais l'étape courante ne la remplit jamais.
     const note = document.createElement('span');
     note.className = 'colbar-item__note';
     note.textContent = 'vide ici';
     btn.appendChild(note);
-    attachTip(btn, 'Affichée, mais cette étape ne la remplit jamais — elle réapparaît sur les étapes concernées.');
+    attachTip(btn, 'Affichée, mais cette étape ne la remplit jamais — elle se remplit sur les étapes concernées.');
   }
 
   if (!col.locked) {
@@ -8035,8 +8022,6 @@ async function start() {
     attachStarsHeaderTip();
     initColbar();
   }
-  updateSubColVisibility(currentStage);
-  updatePriceColVisibility(currentStage);
   applyColWidths();
   // L'EN-TÊTE NE DÉPEND D'AUCUN RÉSEAU : on le pose avant tout appel. Hors
   // ligne (le service worker sert la coquille), l'écran affichait sinon le

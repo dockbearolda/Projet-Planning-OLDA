@@ -165,10 +165,8 @@ assert.deepStrictEqual(ordreTd, LIGNE.map((x) => x[2]), 'buildRow pose les cellu
 // encore. Une colonne supprimée doit donc sortir du plancher lui-même, sinon
 // la grille garde 198 px de largeur qu'aucune colonne n'occupe et continue de
 // défiler de côté alors qu'on vient de lui faire de la place.
-for (const px of [1300, 1250, 1390]) {
-  assert.ok(CSS.includes(`min-width: calc(${px}px - var(--cols-off, 0px))`),
-    `le plancher ${px} doit refléter les colonnes réellement présentes`);
-}
+assert.ok(CSS.includes('min-width: calc(1390px - var(--cols-off, 0px))'),
+  'le plancher doit refléter les colonnes réellement présentes');
 // ---------------------------------------------------------------------------
 // 5. UNE COLONNE N'EST JAMAIS PLUS ÉTROITE QUE SON PROPRE INTITULÉ
 // ---------------------------------------------------------------------------
