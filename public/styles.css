@@ -41,9 +41,18 @@ html, body {
      texte. C'est la quatrième loi du système : une boîte SORT du texte, de son
      interligne et de son rembourrage — elle ne s'écrit pas, et surtout elle ne
      se laisse pas décider par la fonte.
-     Deux interlignes, et deux seulement : celui du texte (ici), et le SERRÉ,
-     que prend tout ce qui tient sur une ligne dans une boîte (juste dessous). */
-  line-height: var(--ligne-texte);
+     Deux interlignes, et deux seulement : le SERRÉ — que prend tout ce qui
+     tient sur UNE ligne dans une boîte, c'est-à-dire presque tout cet écran —
+     et celui du TEXTE, que déclare ce qui porte plusieurs lignes.
+     ⚠ C'EST LE SERRÉ QUI EST PAR DÉFAUT DEPUIS LE 30/08, et pas l'inverse. Le
+     défaut était celui du texte, et le serré était posé sur `button, input,
+     select, textarea` : le partage se faisait donc entre COMMANDES et le reste,
+     ce qui n'a rien à voir avec le nombre de lignes. Un `<span>` qui porte une
+     valeur d'une ligne prenait l'interligne du texte, et son voisin de rangée —
+     la même valeur, dans un champ — prenait le serré. Mesuré sur la bande de
+     l'argent de la fiche : « Marge » se composait sur 24,65 px et tombait
+     1,36 px plus bas que « Coût » et « Prix TTC », sur la même ligne. */
+  line-height: var(--ligne-serre);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
@@ -80,8 +89,16 @@ body {
 button, input, select, textarea {
   font-family: inherit;
   font-size: inherit;
-  line-height: var(--ligne-serre);
+  /* `inherit`, PAS le jeton : la feuille du navigateur pose `normal` sur une
+     commande, il faut donc écrire quelque chose — mais écrire le jeton ici en
+     ferait une deuxième source de vérité à côté de celle du corps de page. */
+  line-height: inherit;
 }
+/* UNE ZONE DE TEXTE PORTE PLUSIEURS LIGNES, par définition : c'est le seul
+   contrôle qui prend l'interligne du texte. Il prenait le serré avec les
+   autres — quatre lignes de note s'y composaient 5 px plus serrées que le même
+   texte posé à côté. */
+textarea { line-height: var(--ligne-texte); }
 
 /* Icônes Material Symbols.
    Chaque icône est un MOT écrit en toutes lettres (« view_kanban », « search »)

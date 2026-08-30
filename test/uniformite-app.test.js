@@ -379,8 +379,20 @@ assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/plus-jakarta-sans-la
   for (const [quoi, attendu] of [
     ['la police', /font-family: inherit;/],
     ['la taille', /font-size: inherit;/],
-    ['l’interligne', /line-height: var\(--ligne-serre\);/],
+    // L'INTERLIGNE S'HÉRITE, il ne se recopie plus (30/08) : le corps de page
+    // porte le SERRÉ, et l'écrire une deuxième fois ici en ferait une deuxième
+    // source de vérité. Il faut quand même l'écrire — la feuille du navigateur
+    // pose `normal` sur une commande.
+    ['l’interligne', /line-height: inherit;/],
   ]) assert.match(regle[0], attendu, `les contrôles héritent de ${quoi} du corps`);
+  // ET LE CORPS PORTE LE SERRÉ, pas celui du texte : le partage se faisait
+  // entre COMMANDES et le reste, ce qui n'a rien à voir avec le nombre de
+  // lignes. Un `<span>` d'une ligne prenait l'interligne du texte quand son
+  // voisin de rangée, la même valeur dans un champ, prenait le serré.
+  assert.match(CRM, /\n  line-height: var\(--ligne-serre\);\n/,
+    'le corps de page compose sur l’interligne serré');
+  assert.match(CRM, /textarea \{ line-height: var\(--ligne-texte\); \}/,
+    '… et la zone de texte, seul contrôle à porter plusieurs lignes, prend l’autre');
   // PAS le raccourci `font:` — il écraserait l'interligne qu'on vient de poser.
   assert.ok(!/\bfont:\s/.test(regle[0]),
     '… et jamais par le raccourci `font:`, qui remet l’interligne de l’héritage');
