@@ -355,10 +355,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 .fa-mini { width: 80px; flex: 0 0 80px; }
-/* L'HEURE ET LE RAPPEL DE DELAI PARTAGENT UNE CELLULE : ils disent la meme
-   chose — quand le client passe, et combien de temps il reste. La cellule prend
-   la boite d'un champ pour que la ligne garde sa hauteur, comme ses voisines. */
-.fa-quand { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; min-height: var(--fa-h-champ); }
+/* LA DATE ET L'HEURE PARTAGENT UNE CELLULE : c'est UN fait — quand le client
+   passe — et la grille du client ne donne qu'une case par valeur. La date prend
+   ce qui reste, l'heure garde sa boite courte. */
+.fa-quand { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
+.fa-quand > .fa-in { flex: 1; min-width: 0; }
 .fa-date { width: 118px; flex: 0 0 118px; }
 /* LES DEUX GRILLES PRENNENT LE MEME RAIL D'INTITULE QUE LES RANGEES. Elles
    ecrivaient 90 px pendant que `.fa-row` prenait `--fa-lab-w` : les valeurs

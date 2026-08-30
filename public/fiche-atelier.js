@@ -558,11 +558,13 @@ export function dessinerFicheAtelier(r, ctx) {
   const remise = ligneDate('Retrait par le client', r.deadline,
     { requis: true, apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
-  // L'HEURE ET SON RAPPEL TIENNENT DANS UNE CELLULE (30/08) : la rangee du
-  // retrait entre dans la grille du client (voir plus bas), et une cellule de
-  // grille n'accepte qu'UN element sous peine de decaler tout ce qui suit.
+  // LA DATE ET L'HEURE TIENNENT DANS UNE CELLULE (30/08) : c'est UN fait —
+  // quand le client passe — et la grille du client ne donne qu'une case par
+  // valeur. Le delai restant, lui, est une deduction : il prend la case
+  // suivante, avec son propre intitule. Mis derriere l'heure, il n'avait plus
+  // que 124 px et « 5 jours ouvres restant » s'y cassait en deux lignes.
   const quand = el('div', 'fa-quand');
-  quand.append(chHeure, rappel);
+  quand.append(remise.champ, chHeure);
 
   majRappel();
 
@@ -616,8 +618,8 @@ export function dessinerFicheAtelier(r, ctx) {
     // leur deuxieme intitule a 364,5. Un rail de plus, sur la seule ligne qui
     // n'etait pas dans la grille — et l'heure n'avait meme pas d'intitule, elle
     // se devinait a son texte d'invite.
-    el('label', 'fa-lab', 'Retrait'), remise.champ,
-    el('label', 'fa-lab', 'Heure'), quand,
+    el('label', 'fa-lab', 'Retrait'), quand,
+    el('label', 'fa-lab', 'Délai'), rappel,
     el('label', 'fa-lab', 'Client'), chClient,
     el('label', 'fa-lab', 'Qui suit'), selQui,
     el('label', 'fa-lab', 'Contact'), chTel,

@@ -154,9 +154,14 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // à lui : sa date s'étirait sur ce qui restait et l'heure démarrait à
   // 347,2 px, là où les trois rangées du dessous posent leur deuxième intitulé
   // à 364,5 — un rail de plus, sur la seule ligne hors grille.
-  assert.ok(CLIENT.includes("el('label', 'fa-lab', 'Retrait'), remise.champ,")
-    && CLIENT.includes("el('label', 'fa-lab', 'Heure'), quand,"),
-    'la date de retrait et son heure sont deux rangées de la grille du client');
+  assert.ok(CLIENT.includes("el('label', 'fa-lab', 'Retrait'), quand,")
+    && CLIENT.includes("el('label', 'fa-lab', 'Délai'), rappel,"),
+    'la date de retrait et le délai restant sont deux cases de la grille du client');
+  // LA DATE ET L'HEURE DANS UNE SEULE CASE : c'est un fait, pas deux. Le délai
+  // restant est une déduction — il a sa case. Derrière l'heure, il n'avait plus
+  // que 124 px et « 5 jours ouvrés restant » s'y cassait en deux lignes.
+  assert.ok(CLIENT.includes('quand.append(remise.champ, chHeure);'),
+    'la date et l’heure partagent leur case');
   assert.ok(!/remise\.rangee/.test(JS), 'plus de rangée à part pour la date');
   // ⚠ « Production » ET « Consigne » SONT PARTIS (29/08). Charlie, en désignant
   // les trois champs de texte libre de la fiche : « tout ça doit être supprimé
