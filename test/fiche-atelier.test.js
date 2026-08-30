@@ -77,6 +77,16 @@ assert.ok(/carte\.append\(tete, bandeau, scene\);/.test(JS)
 // mal : sa boîte entière était un jeton qu'elle ne pouvait pas lire.
 assert.ok(!/fa-flag/.test(JS) && !/\.fa-flag\s*\{/.test(CSS),
   'plus de pastille de confirmation : deux signaux suffisent, dont un actionnable');
+// … ET CE QUI RESTE EST DÉCLARÉ. En retirant la pastille, la déclaration
+// d'`empiler` — la ligne d'à côté — est partie avec elle. Rien ne l'a signalé :
+// la syntaxe reste valable, les 126 contrôles restaient verts, et l'écran ne
+// tombait qu'au moment où l'on CHANGEAIT vraiment une valeur — le chemin
+// s'arrête avant `empiler` quand rien n'a bougé. Un menu gardait alors son
+// liseré, sans message ni enregistrement.
+for (const nom of ['empiler', 'pulser', 'dire', 'defaire']) {
+  assert.ok(new RegExp(`(const|function)\\s+${nom}\\b`).test(JS),
+    `${nom} doit être DÉCLARÉ : le chemin d’enregistrement l’appelle`);
+}
 // LA BARRE QUI REPLIAIT LE PANNEAU EST RETIRÉE (30/08, Charlie : « supprime
 // ça »). Elle pliait un panneau qui s'ouvre toujours, et pour l'annoncer elle
 // recopiait sous lui les intitulés de quatre de ses six cases, en plus petit.

@@ -198,6 +198,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // faite à midi peut se défaire à 17 h : c'est la même journée de travail, et
   // rien ne justifie qu'elle expire.
   const annulations = [];
+  const empiler = (defaire) => { annulations.push(defaire); };
 
   // --- La confirmation, l'indicateur, le message ----------------------------
   // LA PASTILLE DE CONFIRMATION EST RETIREE (30/08). Charlie, en designant le
@@ -422,7 +423,9 @@ export function dessinerFicheAtelier(r, ctx) {
       if (ancien === n) return;
       poserPriorite(n);
       ctx.patchLigne('priority', n);
-      empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); }); pulser(); dire('Enregistré — priorité');
+      empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); });
+      pulser();
+      dire('Enregistré — priorité');
     });
     return b;
   });
@@ -710,7 +713,9 @@ export function dessinerFicheAtelier(r, ctx) {
         const avant = Number(tailles[i].n) || 0;
         const vise = Math.max(0, Math.round(Number(c.value.replace(/\D/g, '')) || 0));
         if (vise === avant) { c.value = avant ? String(avant) : ''; return; }
-        poser(vise, true); pulser(); dire(`Enregistré — taille ${taille.t}`);
+        poser(vise, true);
+        pulser();
+        dire(`Enregistré — taille ${taille.t}`);
       });
       // L'INTITULE EST DEHORS, LA BULLE N'ENTOURE QUE LE CHAMP (30/08).
       case_.append(el('span', 'fa-lab fa-taille__k', String(taille.t)), c);
@@ -1187,7 +1192,9 @@ export function dessinerFicheAtelier(r, ctx) {
       majReste();
     };
     poser(n);
-    empiler(() => poser(avant)); pulser(); dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
+    empiler(() => poser(avant));
+    pulser();
+    dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
   });
 
   // LA BASCULE « SOLDÉ » EST RETIRÉE (30/08, Charlie : « supprime ça »). Elle
