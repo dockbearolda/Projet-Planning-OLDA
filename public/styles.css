@@ -334,8 +334,6 @@ textarea { line-height: var(--ligne-texte); }
   padding: 28px;
   box-shadow: var(--shadow-pose);
 }
-.poste-titre { margin: 0 0 8px; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.poste-aide { margin: 0 0 20px; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 .poste-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .poste-choix-btn {
   display: flex;
