@@ -108,9 +108,18 @@ export function normaliserCote(v) {
   return n ? `${Number(n)} mm` : '';
 }
 
-// `normaliserHeure` A ETE RETIREE (30/08) : l'heure du retrait se CHOISIT
-// maintenant dans une liste de creneaux, elle ne se tape plus — plus rien
-// n'avait a rattraper « 1430 » en « 14h30 ».
+// ELLE SERT A LA SAISIE LIBRE DU MENU (30/08). L'heure se CHOISIT dans une
+// liste de creneaux — elle etait donc partie le matin — mais Charlie a demande
+// de pouvoir « ajouter sa propre heure » depuis ce menu : la case qui s'ouvre
+// alors accepte « 1430 » et doit rendre « 14h30 ».
+export function normaliserHeure(v) {
+  const brut = String(v == null ? '' : v).trim();
+  const d = brut.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length <= 2) return `${d.padStart(2, '0')}h00`;
+  if (d.length === 3) return `0${d[0]}h${d.slice(1)}`;
+  return `${d.slice(0, 2)}h${d.slice(2, 4)}`;
+}
 
 // Rend { texte, iso } : le texte pour l'œil, l'ISO pour la base. Un nom de jour
 // renvoie la PROCHAINE occurrence, jamais aujourd'hui — « jeudi » dit par un
@@ -320,6 +329,68 @@ export function dessinerFicheAtelier(r, ctx) {
     const b = el('button', cls, texte);
     b.type = 'button';
     if (faire) b.addEventListener('click', faire);
+    return b;
+  };
+
+  // UN MENU HABILLE, ECRIT UNE FOIS (30/08). L'ecran en porte maintenant DEUX —
+  // les faces a marquer et l'heure du retrait — et ils font le meme travail :
+  // ouvrir un panneau sous leur bouton, le refermer sur un clic dehors ou sur
+  // Echap, rendre le focus. Ecrits chacun de leur cote, ils divergeraient au
+  // premier correctif ; c'est la regle de la maison, deux choses de la meme
+  // famille tiennent dans UNE ecriture.
+  //
+  // ⚠ LE PANNEAU VIT DANS LA RANGEE, en absolu : pose sur le document, il
+  // resterait accroche a l'ecran pendant que la fiche defile sous lui.
+  // ⚠ ECHAP EST PRIS EN CAPTURE, ET ON S'ARRETE LA : l'ecouteur d'app.js ferme
+  // la FICHE sur Echap — sans ca, refermer le menu refermait le dossier derriere.
+  const menuHabille = (declencheur, ancre, remplir) => {
+    let pan = null;
+    function dehors(ev) {
+      if (!pan || pan.contains(ev.target) || declencheur.contains(ev.target)) return;
+      fermer();
+    }
+    function clavier(ev) {
+      if (ev.key !== 'Escape' || !pan) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      fermer();
+      declencheur.focus();
+    }
+    function fermer() {
+      if (!pan) return;
+      document.removeEventListener('pointerdown', dehors, true);
+      document.removeEventListener('keydown', clavier, true);
+      pan.remove();
+      pan = null;
+      declencheur.setAttribute('aria-expanded', 'false');
+    }
+    const ouvrir = () => {
+      pan = el('div', 'fa-menu');
+      pan.setAttribute('role', 'menu');
+      remplir(pan);
+      ancre.append(pan);
+      declencheur.setAttribute('aria-expanded', 'true');
+      document.addEventListener('pointerdown', dehors, true);
+      document.addEventListener('keydown', clavier, true);
+      const premier = pan.querySelector('button');
+      if (premier) premier.focus();
+    };
+    declencheur.setAttribute('aria-haspopup', 'menu');
+    declencheur.setAttribute('aria-expanded', 'false');
+    return { ouvrir, fermer, bascule: () => (pan ? fermer() : ouvrir()) };
+  };
+
+  // LA RANGEE D'UN PANNEAU EST CELLE DU TIROIR « COLONNES » (`.colbar-item`,
+  // dans styles.css) : meme boite, meme hauteur, meme icone. Deux listes de la
+  // meme application ne s'ecrivent pas deux fois.
+  // ⚠ ELLE RECOIT L'ICONE DEJA FAITE, pas son nom : la police n'a que 91
+  // ligatures et `test/police-icones.test.js` verifie chaque nom pose — il les
+  // lit dans les appels a `ic(…)`. Un nom qui transiterait par ici ne serait
+  // verifie par personne, et une ligature absente s'ecrit en toutes lettres
+  // dans la boite sans qu'aucune erreur ne le dise.
+  const ligneMenu = (icone, texte, faire, cls) => {
+    const b = bouton(`colbar-item${cls ? ` ${cls}` : ''}`, null, faire);
+    b.append(icone, el('span', 'colbar-item__label', texte));
     return b;
   };
 
@@ -536,42 +607,102 @@ export function dessinerFicheAtelier(r, ctx) {
   // `retrait_creneau`) — pour le meme fait : quand le client passe.
   // On garde `heureSouhaitee`, celle que le comptoir remplit ; `retrait_creneau`
   // n'est plus lue par la fiche (la colonne reste, elle porte l'historique).
-  // L'HEURE SE CHOISIT, ELLE NE SE TAPE PLUS (30/08). Charlie : « les heures ici
-  // doivent etre un menu deroulant de 9h30 a 11h30 et 14h a 17h, avec toutes les
-  // demi-heures ». C'est l'amplitude ou l'atelier recoit — la taper laissait
+  // L'HEURE SE CHOISIT DANS LE MEME MENU QUE LES FACES (30/08). Charlie, en deux
+  // fois : « les heures ici doivent etre un menu deroulant de 9h30 a 11h30 et
+  // 14h a 17h avec toutes les demi-heures », puis « on doit pouvoir ajouter sa
+  // propre heure avec "ajouter" dans l'input ».
+  //
+  // C'EST LE MENU HABILLE DE LA FICHE, pas une liste du navigateur. Deux
+  // raisons : la liste native se deroule ou Chrome veut — parfois vers le haut,
+  // ce que Charlie a refuse le meme jour — et surtout elle n'a pas de panneau,
+  // donc pas d'endroit ou poser « Autre heure… » autrement qu'en option
+  // deguisee en valeur. Le menu des faces, a deux rangees de la, sait deja
+  // faire les deux : c'est le meme composant.
+  //
+  // LA LISTE EST L'AMPLITUDE OU L'ATELIER RECOIT. La frappe libre laissait
   // poser « 06h00 » ou « 23h30 », des heures ou personne n'est la, et le rappel
-  // de delai comptait dessus.
+  // de delai comptait dessus. Elle reste possible — « Autre heure… » — mais
+  // c'est un geste de plus, pas le geste par defaut.
   // ⚠ UNE HEURE HORS LISTE NE SE PERD PAS. Les dossiers du comptoir en portent
   // (« 06:00 » sur celui de demonstration) : un menu qui ne la propose pas la
-  // rendrait VIDE a l'affichage, et la premiere ecriture du champ l'effacerait
-  // sans que rien ne le dise. Elle entre donc dans la liste, a sa place.
+  // rendrait VIDE a l'affichage, et la premiere ecriture l'effacerait sans que
+  // rien ne le dise. Elle entre donc dans la liste, a sa place.
   const CRENEAUX = ['09:30', '10:00', '10:30', '11:00', '11:30',
     '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
   const heureLisible = (h) => `${Number(String(h).slice(0, 2))}h${String(h).slice(3, 5)}`;
-  const heureDuDossier = fiche.heureSouhaitee ? String(fiche.heureSouhaitee).slice(0, 5) : '';
-  const creneaux = CRENEAUX.includes(heureDuDossier) || !heureDuDossier
+  let heureChoisie = fiche.heureSouhaitee ? String(fiche.heureSouhaitee).slice(0, 5) : '';
+  const creneaux = () => (!heureChoisie || CRENEAUX.includes(heureChoisie)
     ? CRENEAUX
-    : [...CRENEAUX, heureDuDossier].sort();
-  const chHeure = menu('fa-mini', [{ value: '', label: 'heure' },
-    ...creneaux.map((h) => ({ value: h, label: heureLisible(h) }))], heureDuDossier, 'Heure de retrait');
-  brancher(chHeure, {
-    label: 'Heure de retrait',
-    envoyer: (v) => {
-      heureRemise = v || null;
-      ctx.patchFiche({ heureSouhaitee: heureRemise });
-    },
-    apres: majRappel,
-  });
+    : [...CRENEAUX, heureChoisie].sort());
+
+  const chHeure = bouton('fa-choix fa-mini');
+  chHeure.setAttribute('aria-label', 'Heure de retrait');
+  const direHeure = () => {
+    chHeure.replaceChildren(
+      document.createTextNode(heureChoisie ? heureLisible(heureChoisie) : 'heure'),
+      ic('expand_more'));
+    chHeure.classList.toggle('fa-choix--vide', !heureChoisie);
+  };
+  direHeure();
+  const poserHeure = (h) => {
+    const propre = h || '';
+    if (propre === heureChoisie) return;
+    heureChoisie = propre;
+    heureRemise = propre || null;
+    direHeure();
+    ctx.patchFiche({ heureSouhaitee: heureRemise });
+    pulser();
+    majRappel();
+  };
+
+  // PAS DE `prompt()`, ici non plus : la case prend la place du bouton, sur la
+  // meme rangee — rien ne se deplace, et Echap rend la main. Meme geste que
+  // « Autre face… ».
+  const saisirHeure = () => {
+    const saisie = champ('fa-quoi fa-mini', '', { label: 'Heure de retrait', placeholder: '1430' });
+    const finir = (garder) => {
+      const lu = garder ? normaliserHeure(saisie.value) : '';
+      saisie.replaceWith(chHeure);
+      if (lu) poserHeure(lu.replace('h', ':'));
+    };
+    saisie.addEventListener('blur', () => finir(true));
+    saisie.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); saisie.blur(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finir(false); }
+    });
+    chHeure.replaceWith(saisie);
+    saisie.focus();
+  };
+
   const remise = ligneDate('Retrait par le client', r.deadline,
     { requis: true, apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
-  // LA DATE ET L'HEURE TIENNENT DANS UNE CELLULE (30/08) : c'est UN fait —
-  // quand le client passe — et la grille du client ne donne qu'une case par
-  // valeur. Le delai restant, lui, est une deduction : il prend la case
-  // suivante, avec son propre intitule. Mis derriere l'heure, il n'avait plus
-  // que 124 px et « 5 jours ouvres restant » s'y cassait en deux lignes.
-  const quand = el('div', 'fa-quand');
+
+  const quand = el('div', 'fa-quand fa-row--ancre');
   quand.append(remise.champ, chHeure);
+  const menuHeure = menuHabille(chHeure, quand, (pan) => {
+    for (const h of creneaux()) {
+      const on = h === heureChoisie;
+      const b = ligneMenu(on
+        ? ic('check_box', 'colbar-item__ic')
+        : ic('check_box_outline_blank', 'colbar-item__ic'),
+      heureLisible(h), () => { menuHeure.fermer(); poserHeure(h); }, on ? 'is-on' : 'is-off');
+      b.setAttribute('role', 'menuitemradio');
+      b.setAttribute('aria-checked', String(on));
+      pan.append(b);
+    }
+    // CE QUI N'EST PAS UN CRENEAU VIT SOUS LE FILET, avec sa propre icone :
+    // pose comme une ligne parmi les autres, « Autre heure… » se choisit par
+    // erreur — et ce qu'elle ouvre n'est pas une heure, c'est un champ.
+    pan.append(el('div', 'fa-filet'));
+    pan.append(ligneMenu(ic('add', 'colbar-item__ic'), 'Autre heure…',
+      () => { menuHeure.fermer(); saisirHeure(); }));
+    if (heureChoisie) {
+      pan.append(ligneMenu(ic('close', 'colbar-item__ic'), 'Sans heure',
+        () => { menuHeure.fermer(); poserHeure(''); }));
+    }
+  });
+  chHeure.addEventListener('click', () => menuHeure.bascule());
 
   majRappel();
 
@@ -898,59 +1029,29 @@ export function dessinerFicheAtelier(r, ctx) {
       saisie.focus();
     };
 
-    // LE MENU. Il vit DANS la rangee, en absolu : pose sur le document, il
-    // resterait accroche a l'ecran pendant que la fiche defile sous lui.
-    let menuF = null;
-    const fermerMenuF = () => {
-      if (!menuF) return;
-      document.removeEventListener('pointerdown', dehorsF, true);
-      document.removeEventListener('keydown', clavierF, true);
-      menuF.remove();
-      menuF = null;
-      ajoutF.setAttribute('aria-expanded', 'false');
-    };
-    function dehorsF(ev) {
-      if (!menuF || menuF.contains(ev.target) || ajoutF.contains(ev.target)) return;
-      fermerMenuF();
-    }
-    function clavierF(ev) {
-      if (ev.key !== 'Escape' || !menuF) return;
-      // EN CAPTURE, ET ON ARRETE LA. L'ecouteur d'app.js ferme la FICHE sur
-      // Echap : sans ca, refermer le menu refermait le dossier derriere.
-      ev.preventDefault();
-      ev.stopPropagation();
-      fermerMenuF();
-      ajoutF.focus();
-    }
-    // LA RANGEE DU PANNEAU EST CELLE DU PANNEAU « COLONNES » (`.colbar-item`,
-    // dans styles.css) : meme boite, meme case a cocher, meme hauteur. Deux
-    // listes a cocher dans la meme application ne s'ecrivent pas deux fois.
+    // LE BOUTON DIT CE QUI EST CHOISI, ET QU'IL OUVRE. La rangée ne porte plus
+    // que lui : « je ne veux qu'un menu pour sélectionner les faces, et pouvoir
+    // modifier le choix » (Charlie, 29/08). Les cartes qui l'accompagnaient
+    // disaient la même chose une seconde fois, en trois fois plus de place.
+    // Le chevron dit qu'il ouvre, et il se retourne à l'ouverture.
+    const nomsCoches = cochees();
+    const ajoutF = bouton('fa-choix', nomsCoches.join(' · ') || 'Aucune face');
+    ajoutF.append(ic('expand_more'));
+    ajoutF.setAttribute('aria-label', 'Faces à marquer');
+    if (!nomsCoches.length) ajoutF.classList.add('fa-choix--vide');
+    const ligneFaces = rangee('Faces', ajoutF, 'fa-row--ancre');
+
+    // LA CASE A COCHER EST CELLE DU TIROIR « COLONNES », comme la rangée.
     const caseAcocher = (on) => (on
       ? ic('check_box', 'colbar-item__ic')
       : ic('check_box_outline_blank', 'colbar-item__ic'));
 
-    const ouvrirMenuF = () => {
-      if (menuF) { fermerMenuF(); return; }
-      // Rien de declare nulle part : on retombe sur la saisie libre, exactement
-      // l'ecran d'avant. Un menu vide ne dit rien a personne.
-      if (!choixF.length) { saisirFace(); return; }
-      const pan = el('div', 'fa-menu');
-      pan.setAttribute('role', 'menu');
-      // LA RANGEE EST CELLE DU PANNEAU « COLONNES » (`.colbar-item`) ; la LISTE,
-      // non. `.colbar-list` porte une regle de repli — `flex-flow: wrap` sous
-      // 900 px — qui a du sens dans un tiroir pleine hauteur et aucun ici : le
-      // menu se depliait a l'horizontale, six cases en escalier sur 837 px.
-      // C'est `.fa-menu` qui empile, et c'est son flex qui ETIRE les rangees :
-      // `.colbar-item` fait `width: 100%`, or un pourcentage contre un conteneur
-      // en `max-content` vaut `auto` — sans lui, chaque rangee reprend sa
-      // largeur de texte (81 a 141 px mesures).
-      const liste = pan;
+    const menuFaces = menuHabille(ajoutF, ligneFaces, (pan) => {
       for (const nom of choixF) {
         const on = coche(nom);
-        const b = bouton(`colbar-item ${on ? 'is-on' : 'is-off'}`, null, () => basculerFace(nom));
+        const b = ligneMenu(caseAcocher(on), nom, () => basculerFace(nom), on ? 'is-on' : 'is-off');
         b.setAttribute('role', 'menuitemcheckbox');
         b.setAttribute('aria-checked', String(on));
-        b.append(caseAcocher(on), el('span', 'colbar-item__label', nom));
         // LE PRIX EST ÉCRIT EN FACE (29/08, Charlie) : ce que cocher AJOUTERAIT,
         // ce que décocher RETIRERAIT. Rien pour une face que le moteur ne
         // chiffre pas — un « 0,00 € » se lirait « c'est gratuit », et c'est
@@ -958,43 +1059,24 @@ export function dessinerFicheAtelier(r, ctx) {
         const e = ecartDe(nom);
         if (e) b.append(el('span', `fa-menu__prix${e > 0 ? '' : ' fa-menu__prix--moins'}`,
           `${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}`));
-        liste.append(b);
+        pan.append(b);
       }
       // LA CREATION N'EST PAS UN CHOIX DE LA LISTE. Posee comme une ligne parmi
       // les autres, elle se coche par erreur — et ce qu'elle ouvre n'est pas une
       // face, c'est un champ. Elle vit sous le filet de la fiche, avec sa propre
       // icone.
-      liste.append(el('div', 'fa-filet'));
-      const creer = bouton('colbar-item', null, () => { fermerMenuF(); saisirFace(); });
-      creer.append(ic('add', 'colbar-item__ic'), el('span', 'colbar-item__label', 'Autre face…'));
-      liste.append(creer);
-      ligneFaces.append(pan);
-      menuF = pan;
-      ajoutF.setAttribute('aria-expanded', 'true');
-      document.addEventListener('pointerdown', dehorsF, true);
-      document.addEventListener('keydown', clavierF, true);
-      const premier = pan.querySelector('button');
-      if (premier) premier.focus();
-    };
+      pan.append(el('div', 'fa-filet'));
+      pan.append(ligneMenu(ic('add', 'colbar-item__ic'), 'Autre face…',
+        () => { fermerMenuF(); saisirFace(); }));
+    });
+    const fermerMenuF = () => menuFaces.fermer();
+    // Rien de declare nulle part : on retombe sur la saisie libre, exactement
+    // l'ecran d'avant. Un menu vide ne dit rien a personne.
+    ajoutF.addEventListener('click', () => {
+      if (!choixF.length) { saisirFace(); return; }
+      menuFaces.bascule();
+    });
 
-    // LE BOUTON N'EST PAS UNE FACE : il sort de la grille et se pose au bout de
-    // la rangée, comme le total se pose au bout des tailles. Dedans, il passait
-    // pour un troisième emplacement et poussait tout sur deux lignes.
-    // LE BOUTON DIT QU'IL OUVRE QUELQUE CHOSE. « + Face » seul annonce un ajout
-    // immediat — c'est ce qu'il faisait avant, et rien ne disait qu'il propose
-    // maintenant une liste. Le chevron le dit, et il se retourne a l'ouverture.
-    // LE BOUTON DIT CE QUI EST CHOISI, ET QU'IL OUVRE. La rangée ne porte plus
-    // que lui : « je ne veux qu'un menu pour sélectionner les faces, et pouvoir
-    // modifier le choix » (Charlie, 29/08). Les cartes qui l'accompagnaient
-    // disaient la même chose une seconde fois, en trois fois plus de place.
-    const nomsCoches = cochees();
-    const ajoutF = bouton('fa-choix', nomsCoches.join(' · ') || 'Aucune face', ouvrirMenuF);
-    ajoutF.append(ic('expand_more'));
-    ajoutF.setAttribute('aria-haspopup', 'menu');
-    ajoutF.setAttribute('aria-expanded', 'false');
-    ajoutF.setAttribute('aria-label', 'Faces à marquer');
-    if (!nomsCoches.length) ajoutF.classList.add('fa-choix--vide');
-    const ligneFaces = rangee('Faces', ajoutF, 'fa-row--ancre');
     droite.append(ligneFaces);
     if (ligneTailles) droite.append(ligneTailles);
   }

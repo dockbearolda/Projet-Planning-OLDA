@@ -116,7 +116,8 @@ assert.ok(!/fa-pas/.test(PROD[0]), 'plus de bouton pas-à-pas sur une quantité'
 // une de plus dans le dos » n'avait aucune porte. Depuis le 29/08 la porte est
 // un MENU — la rangée ne porte plus que lui, et « + Face » a été remplacé par
 // la sélection elle-même (« Coeur · Dos »), qui dit ce qui est marqué.
-assert.ok(/bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face', ouvrirMenuF\)/.test(PROD[0]),
+assert.ok(/bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face'\)/.test(PROD[0])
+  && /'Autre face…',/.test(PROD[0]),
   'une face doit pouvoir s’ajouter, et le menu dit ce qui est choisi');
 // ⚠ LA COTE ET LA CONSIGNE NE SE SAISISSENT PLUS ICI (29/08, tranché par
 // Charlie en désignant la rangée) : « ça disparaît, les tailles sont affichées

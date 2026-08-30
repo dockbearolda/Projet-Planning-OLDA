@@ -177,8 +177,21 @@ assert.match(APP, /taillesLogo = null;\s*\n\s*taillesLogoEnVol = null;/,
 // je ne veux qu'un menu pour sélectionner les faces, et pouvoir modifier le
 // choix ». Elle portait une CARTE par face — nom, cote, consigne — PLUS un
 // bouton : trois composants pour dire ce qu'on marque.
-assert.match(FICHE, /const ajoutF = bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face', ouvrirMenuF\);/,
-  'le bouton porte la sélection ET ouvre le menu');
+assert.match(FICHE, /const ajoutF = bouton\('fa-choix', nomsCoches\.join\(' · '\) \|\| 'Aucune face'\);/,
+  'le bouton porte la sélection');
+assert.match(FICHE, /menuFaces\.bascule\(\);/, '… et il ouvre le menu');
+// LE MENU EST ÉCRIT UNE FOIS POUR LES DEUX (30/08). L'écran en porte deux — les
+// faces et l'heure du retrait — et ils font le même travail : ouvrir un panneau
+// sous leur bouton, le refermer sur un clic dehors ou sur Échap, rendre le
+// focus. Écrits chacun de leur côté, ils divergeraient au premier correctif.
+assert.match(FICHE, /const menuHabille = \(declencheur, ancre, remplir\) => \{/,
+  'l’ouverture et la fermeture d’un menu s’écrivent UNE fois');
+const habilles = FICHE.match(/= menuHabille\(/g) || [];
+assert.strictEqual(habilles.length, 2,
+  `un seul composant, deux usages — les faces et l’heure (trouvé ${habilles.length})`);
+// ET LA RANGÉE D'UN PANNEAU AUSSI : c'est celle du tiroir « Colonnes ».
+assert.match(FICHE, /const ligneMenu = \(icone, texte, faire, cls\) => \{/,
+  'la rangée d’un panneau s’écrit UNE fois');
 assert.match(FICHE, /const ligneFaces = rangee\('Faces', ajoutF, 'fa-row--ancre'\);/,
   '… et il est SEUL sur la rangée : plus de cartes à côté');
 assert.ok(!/fa-faces|fa-face__k|'fa-mm'/.test(FICHE_NUE) && !/fa-faces|fa-face__k/.test(CSS_NU),
@@ -204,10 +217,12 @@ assert.match(FICHE, /if \(!choixF\.length\) \{ saisirFace\(\); return; \}/,
 // option `__new__` avait été refusée) : elle vit sous un filet, avec sa propre
 // icône. Posée comme une ligne parmi les autres, elle se coche par erreur — et
 // ce qu'elle ouvre n'est pas une face, c'est un champ.
-const bloc = FICHE.slice(FICHE.indexOf('const ouvrirMenuF'), FICHE.indexOf('const ajoutF = bouton'));
-assert.ok(bloc.indexOf("el('div', 'fa-filet')") < bloc.indexOf("'Autre face…'"),
-  'la création vient APRÈS un filet : elle ne se mélange pas aux choix');
-assert.match(bloc, /liste\.append\(el\('div', 'fa-filet'\)\);/,
+for (const [quoi, ouvre] of [['face', "'Autre face…'"], ['heure', "'Autre heure…'"]]) {
+  const bloc = FICHE.slice(FICHE.indexOf('menuHabille(', FICHE.indexOf(ouvre) - 3000), FICHE.indexOf(ouvre));
+  assert.ok(bloc.lastIndexOf("el('div', 'fa-filet')") > -1,
+    `la création d’une ${quoi} vient APRÈS un filet : elle ne se mélange pas aux choix`);
+}
+assert.match(FICHE, /pan\.append\(el\('div', 'fa-filet'\)\);/,
   '… et c’est le filet de la fiche, pas un trait redessiné pour l’occasion');
 
 // UNE FACE SE RETIRE EN EFFAÇANT SON NOM, et les places en trop s'effacent avec
@@ -244,7 +259,7 @@ assert.ok(basc.indexOf('fermerMenuF();') < basc.indexOf('ctx.confirmer'),
 // ---------------------------------------------------------------------------
 // a. LA RANGÉE EST CELLE DU PANNEAU « COLONNES » — deux listes à cocher dans la
 //    même application ne s'écrivent pas deux fois.
-assert.match(FICHE, /bouton\(`colbar-item \$\{on \? 'is-on' : 'is-off'\}`/,
+assert.match(FICHE, /ligneMenu\(caseAcocher\(on\), nom, \(\) => basculerFace\(nom\), on \? 'is-on' : 'is-off'\)/,
   'la rangée du menu est celle du panneau « Colonnes »');
 assert.match(CSS_CRM.replace(/\/\*[\s\S]*?\*\//g, ''), /\n\.colbar-item \{[^}]*min-height: var\(--ctrl-h\)/,
   '… dont la hauteur reste le jeton de l’application');
@@ -279,11 +294,11 @@ assert.match(FICHE, /rangee\('Faces', ajoutF, 'fa-row--ancre'\)/,
 // d. ÉCHAP FERME LE MENU, PAS LE DOSSIER. `app.js` écoute Échap pour fermer la
 //    fiche : sans capture ni arrêt, refermer le menu refermait le dossier
 //    derrière — et ce qu'on venait y chercher avec.
-assert.match(FICHE, /document\.addEventListener\('keydown', clavierF, true\);/,
+assert.match(FICHE, /document\.addEventListener\('keydown', clavier, true\);/,
   'l’écouteur du menu passe en CAPTURE : celui de la fiche est sur le document');
-assert.match(FICHE, /ev\.stopPropagation\(\);\s*\n\s*fermerMenuF\(\);/,
-  '… et il arrête là : sinon Échap ferme les deux d’un coup');
-assert.match(FICHE, /document\.removeEventListener\('keydown', clavierF, true\);/,
+assert.match(FICHE, /ev\.stopPropagation\(\);\s*\n\s*fermer\(\);/,
+  '… et il s’arrête là : sinon Échap refermait le dossier derrière le menu');
+assert.match(FICHE, /document\.removeEventListener\('keydown', clavier, true\);/,
   'et les deux écouteurs se retirent à la fermeture : la fiche se redessine sans arrêt');
 
 // ---------------------------------------------------------------------------

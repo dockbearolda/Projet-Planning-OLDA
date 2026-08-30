@@ -388,7 +388,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
 .fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
-.fa-mini { width: 80px; flex: 0 0 80px; }
+/* LA BOITE DE L'HEURE porte maintenant un chevron a cote de sa valeur (30/08) :
+   « 14h30 » fait 42 px, le chevron 20, le rembourrage 20 — 82 px de contenu
+   dans une boite de 80. Elle passe a 90, et la date garde de quoi s'ecrire en
+   entier (214,5 − 90 − 10 = 114,5 pour 106,5 de texte). */
+.fa-mini { width: 90px; flex: 0 0 90px; }
 /* LA DATE ET L'HEURE PARTAGENT UNE CELLULE : c'est UN fait — quand le client
    passe — et la grille du client ne donne qu'une case par valeur. La date prend
    ce qui reste, l'heure garde sa boite courte. */
@@ -647,7 +651,26 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    Le rembourrage rendu, c'est aussi 20 px de plus pour le montant : « 1 250,50 € »
    debordait de 2 px du cout et de 9 px du prix TTC — le chiffre le plus lu de la
    fiche, coupe sur une commande a quatre chiffres. */
-.fa-details .fa-in { width: auto; flex: 1 1 auto; min-width: 0; padding: 0; }
+/* LA BULLE REPREND LE REMBOURRAGE DES AUTRES, ET LE TEXTE NE QUITTE PAS SON
+   RAIL (30/08). Charlie, en designant le menu du reglement : « la bulle a un
+   probleme, les ecritures sont collees a gauche de la bulle, je veux qu'elle
+   soit comme les autres ». Elle etait a `padding: 0` — decide le 29/08 pour que
+   la valeur parte du rail de son intitule, comme les colonnes du dessus. Les
+   deux tiennent : le rembourrage revient, et une marge negative de la MEME
+   valeur rend au texte sa place. La boite grandit vers la gauche, le texte ne
+   bouge pas d'un pixel — et elle grandit dans l'ecart de la grille (`--pas-2`),
+   pas sur sa voisine.
+   ⚠ A GAUCHE SEULEMENT. Un rembourrage des DEUX cotes coute 20 px de largeur
+   au texte : c'est ce qui avait fait deborder « 1 250,50 € » de 2 px du cout et
+   de 9 px du prix TTC (mesure le 29/08). A gauche seul, la marge negative rend
+   exactement ce que le rembourrage prend — la boite n'y perd rien. Et le champ
+   remplit sa case (`flex: 1 1 auto`), donc son bord droit est deja loin de la
+   fin du texte : il n'y a rien a inserer de ce cote. */
+.fa-details .fa-in, .fa-details .fa-choix {
+  width: auto; flex: 1 1 auto; min-width: 0;
+  padding: 0 0 0 var(--pas-2);
+  margin-left: calc(var(--pas-2) * -1);
+}
 /* Les deux raccourcis « 30 % / 50 % » gardent leur taille : ce sont des boutons,
    pas des champs, et ils ne portent que deux caracteres. */
 .fa-details .fa-seg__b { flex: 0 0 auto; }

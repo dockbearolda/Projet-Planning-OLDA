@@ -155,10 +155,21 @@ assert.match(CSS, /\.fa-case__v \{[^}]*white-space: nowrap;/,
 // ET LE MONTANT PART DU RAIL DE SON INTITULÉ. Un champ de la fiche est inséré
 // de son rembourrage ; dans les colonnes ça ne se voit pas, l'intitulé est sur
 // un AUTRE rail. Ici il est juste au-dessus. Le rembourrage rendu, c'est aussi
-// 20 px de plus pour le montant : « 1 250,50 € » débordait de 2 px du coût et
-// de 9 px du prix TTC — mesuré au rendu.
-assert.match(CSS, /\.fa-details \.fa-in \{[^}]*padding: 0;/,
-  'le texte d’un champ de la bande part du rail, pas 10 px à droite');
+// 20 px de moins pour le montant : « 1 250,50 € » débordait de 2 px du coût et
+// de 9 px du prix TTC — mesuré au rendu le 29/08.
+// DEPUIS LE 30/08 LES DEUX TIENNENT (Charlie : « la bulle a un problème, les
+// écritures sont collées à gauche de la bulle »). Le rembourrage revient À
+// GAUCHE SEULEMENT, et une marge négative de la même valeur rend au texte sa
+// place : la boîte grandit vers la gauche, le texte ne bouge pas, et rien
+// n'est perdu en largeur.
+{
+  const regle = CSS.match(/\.fa-details \.fa-in, \.fa-details \.fa-choix \{[^}]*\}/);
+  assert.ok(regle, 'les champs de la bande ont leur règle');
+  assert.match(regle[0], /padding: 0 0 0 var\(--pas-2\);/,
+    'le rembourrage revient, à gauche seulement — des deux côtés il coûte 20 px au montant');
+  assert.match(regle[0], /margin-left: calc\(var\(--pas-2\) \* -1\);/,
+    '… et la marge négative rend au texte le rail de son intitulé');
+}
 
 // ⚠ LE SÉLECTEUR DES BOUTONS SUIT LA CASE. Il portait sur `.fa-argent__k`, la
 // case de l'ancien compte empilé : la bande l'a remplacée, la règle ne mordait

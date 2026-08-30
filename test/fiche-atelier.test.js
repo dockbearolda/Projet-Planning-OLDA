@@ -35,8 +35,8 @@ vm.createContext(bac);
 // modules, et les fonctions éprouvées ici n'en dépendent pas (le calendrier ne
 // sert qu'au dessin de la rangée « Retrait »).
 const NU = JS.replace(/^export /gm, '').replace(/^import[\s\S]*?from '[^']*';$/gm, '');
-vm.runInContext(`${NU}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserDate, texteMarge };`, bac);
-const { normaliserMontant, normaliserTelephone, normaliserDate, texteMarge } = bac.API;
+vm.runInContext(`${NU}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge };`, bac);
+const { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge } = bac.API;
 
 // ---------------------------------------------------------------------------
 // 1. UNE SEULE BARRE DE DÉFILEMENT, ET C'EST CELLE DE L'ÉCRAN
@@ -371,7 +371,14 @@ assert.strictEqual(normaliserTelephone('123'), '123');
 // L'HEURE NE SE TAPE PLUS (30/08) : elle se choisit dans une liste de créneaux
 // — 9h30 à 11h30 et 14h à 17h, toutes les demi-heures. `normaliserHeure` est
 // partie avec la frappe ; ce qu'on vérifie maintenant, c'est la LISTE.
-assert.ok(!/function normaliserHeure/.test(JS), 'plus de rattrapage de frappe pour l’heure');
+// `normaliserHeure` SERT À LA SAISIE LIBRE du menu — « Autre heure… ». Elle
+// était partie le matin avec la frappe, elle revient l'après-midi avec la case
+// qui s'ouvre sous cette ligne : elle accepte « 1430 » et rend « 14h30 ».
+assert.strictEqual(normaliserHeure('14'), '14h00');
+assert.strictEqual(normaliserHeure('1430'), '14h30');
+assert.strictEqual(normaliserHeure(''), '');
+assert.match(JS, /if \(lu\) poserHeure\(lu\.replace\('h', ':'\)\);/,
+  '… et ce qu’elle rend se range en « HH:MM », le format de la base');
 {
   const l = JS.match(/const CRENEAUX = \[([\s\S]*?)\];/);
   assert.ok(l, 'les créneaux sont une liste nommée');
@@ -382,8 +389,19 @@ assert.ok(!/function normaliserHeure/.test(JS), 'plus de rattrapage de frappe po
   // ⚠ UNE HEURE HORS LISTE NE SE PERD PAS : les dossiers du comptoir en portent
   // (« 06:00 »). Un menu qui ne la propose pas la rendrait VIDE à l'affichage,
   // et la première écriture du champ l'effacerait sans que rien ne le dise.
-  assert.ok(/\[\.\.\.CRENEAUX, heureDuDossier\]\.sort\(\)/.test(JS),
+  assert.ok(/\[\.\.\.CRENEAUX, heureChoisie\]\.sort\(\)/.test(JS),
     'une heure déjà posée hors créneaux entre dans la liste, à sa place');
+  // ET ON PEUT AJOUTER LA SIENNE (30/08, Charlie : « on doit pouvoir ajouter sa
+  // propre heure avec "ajouter" dans l'input »). C'est le MÊME menu que celui
+  // des faces, à deux rangées de là : un panneau, donc un endroit où poser une
+  // création — ce qu'une liste du navigateur n'a pas.
+  assert.match(JS, /'Autre heure…',/, 'le menu de l’heure porte sa ligne de création');
+  assert.match(JS, /const saisirHeure = \(\) => \{/,
+    '… qui ouvre une case, pas un `prompt\(\)`');
+  // ⚠ SUR LE CODE NU : le commentaire qui explique pourquoi on ne l'utilise pas
+  // le nomme, et le contrôle tombait sur sa propre explication.
+  assert.ok(!/prompt\(/.test(JS.replace(/\/\/[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')),
+    'jamais `prompt()` : il bloque la page et emmène le focus');
 }
 
 // Un jeudi 27 août 2026 pour repère.
