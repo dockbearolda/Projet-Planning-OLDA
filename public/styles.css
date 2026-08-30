@@ -419,7 +419,7 @@ textarea { line-height: var(--ligne-texte); }
 }
 .grid-search-clear:hover { color: var(--text-1); background: var(--state-hover); }
 .grid-search-kbd {
-  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-serre); color: var(--text-2);
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--arrondi-champ);
   padding: 0 6px; flex-shrink: 0;
 }
@@ -1201,7 +1201,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .prod-fiche__cle {
   font-size: var(--taille-note); font-weight: var(--graisse-note);
   letter-spacing: .05em; text-transform: uppercase;
-  line-height: var(--ligne-texte); color: var(--text-2);
+  line-height: var(--ligne-serre); color: var(--text-2);
 }
 /* Les chiffres en chasse fixe : « 3 × S · 5 × M » et « 12 × S · 5 × M » doivent
    tomber l'un sous l'autre d'une ligne à la suivante. */

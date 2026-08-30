@@ -205,7 +205,10 @@
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: var(--pilule);
-  line-height: var(--ligne-texte);
+  /* UN MOT SUR UNE LIGNE prend l'interligne serre, comme tout ce qui tient sur
+     une ligne (30/08) : 78 pilules composees sur 24,65 px au milieu d'une liste
+     ou tout le reste tombait a 23,375. */
+  line-height: var(--ligne-serre);
 }
 .cl-nature--pro { color: var(--st-demande); background: var(--st-demande-bg); }
 .cl-nature--perso { color: var(--st-archive); background: var(--st-archive-bg); }
