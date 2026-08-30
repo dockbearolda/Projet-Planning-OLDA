@@ -49,6 +49,7 @@ import { armerModale } from './modale.js';
 // Qui est au poste : c'est cette personne que l'onglet marque, et pour qui le
 // briefing du matin est calculé.
 import { lirePoste } from './poste.js';
+import { ecranTete } from './ecran-tete.js';
 
 export function createDashboard(deps) {
   const {
@@ -436,14 +437,9 @@ export function createDashboard(deps) {
   // jour, celui qui la lit la connaît. Une ligne qui répète ce qu'on sait
   // déjà, c'est une ligne de travail en moins à l'écran.
   function buildHead() {
-    $head = el('header', 'pj-head');
-
-    const row = el('div', 'pj-head-row');
-
     // Onglets : Équipe, puis les quatre prénoms dans l'ordre.
     $tabs = el('nav', 'pj-tabs');
     $tabs.setAttribute('aria-label', 'Vue du point du jour');
-    row.appendChild($tabs);
 
     // Machines (réglages du patron : importance + durée de fabrication).
     const mach = el('button', 'pj-tool pj-tool--icon');
@@ -451,7 +447,6 @@ export function createDashboard(deps) {
     mach.appendChild(icon('precision_manufacturing'));
     attachTip(mach, 'Machines — priorité & durée');
     mach.addEventListener('click', openMachines);
-    row.appendChild(mach);
 
     // Attribution des catégories (config du patron).
     const gear = el('button', 'pj-tool pj-tool--icon');
@@ -459,9 +454,19 @@ export function createDashboard(deps) {
     gear.appendChild(icon('tune'));
     attachTip(gear, 'Attribution des catégories');
     gear.addEventListener('click', openConfig);
-    row.appendChild(gear);
 
-    $head.appendChild(row);
+    // L'ECRAN A UN NOM, COMME LES SEPT AUTRES (30/08). Il n'en avait aucun
+    // depuis le 26/08, et l'argument tenait : « la barre du haut dit deja ou
+    // l'on est ». Il tenait pour les huit ecrans, pas pour celui-la seul — et
+    // c'est ce qui en faisait le cas extreme de l'ecart qu'on ferme ici. Le
+    // titre entre sur la rangee QUI EXISTE DEJA : la ligne supprimee ce jour-la
+    // (titre plus date du jour) ne revient pas, l'ecran ne perd pas un pixel de
+    // travail.
+    // Les outils partent A DROITE par le groupe de la charte, pas par une
+    // marge automatique : `flex-end` rogne par la GAUCHE sur une rangee
+    // trop etroite et mangeait le premier onglet.
+    $head = ecranTete({ titre: 'Point du jour', gauche: [$tabs], droite: [mach, gear] });
+    $head.classList.add('pj-head');
 
     return $head;
   }

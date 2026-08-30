@@ -9,8 +9,7 @@
    Des tuiles, un chiffre chacune. Aucune couleur décorative : le rouge dit un
    ÉTAT (en dessous du minimum, en retard, bloqué), rien d'autre.
    =========================================================================== */
-.pil-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
-.pil-titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+.pil-page { display: flex; flex-direction: column; gap: 28px; padding: var(--pas-4) var(--ecran-pad-x) 40px; }
 .pil-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .pil-tuile {
   display: flex; flex-direction: column; gap: 4px;

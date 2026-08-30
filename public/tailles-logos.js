@@ -18,6 +18,7 @@
 // Chargé À LA DEMANDE par app.js au premier passage sur l'onglet.
 
 import { fetchBorne } from './reseau.js';
+import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -25,11 +26,6 @@ const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text != null) n.textContent = text;
-  return n;
-};
-const ic = (name, cls) => {
-  const n = el('span', `material-symbols-outlined${cls ? ` ${cls}` : ''}`, name);
-  n.setAttribute('aria-hidden', 'true');
   return n;
 };
 
@@ -136,13 +132,7 @@ function render() {
   if (f && !f.faces.includes(faceNom)) [faceNom] = f.faces;
 
   const page = el('div', 'reg-page tl-page');
-  const tete = el('header', 'reg-head');
-  tete.append(ic('draw', 'reg-head__ic'), (() => {
-    const t = el('div', 'reg-head__titles');
-    t.append(el('h2', 'reg-head__title', 'Tailles des logos'));
-    return t;
-  })());
-  page.appendChild(tete);
+  page.appendChild(ecranTete({ niveau: 'h2', titre: 'Tailles des logos' }));
 
   const carte = el('section', 'reg-card tl-carte');
   carte.append(colonneFamilles(), f ? panneau(f) : el('p', 'tl-vide', 'Aucune famille — créez-en une à gauche.'));
@@ -194,7 +184,7 @@ function panneau(f) {
   tete.append(el('h3', 'tl-nom-famille', f.nom));
   const outils = el('div', 'tl-outils');
   for (const [action, mot] of [['famille-renommer', 'Renommer'], ['famille-retirer', 'Retirer']]) {
-    const b = el('button', 'tl-lien', mot);
+    const b = el('button', 'action-ligne', mot);
     b.type = 'button';
     b.dataset.action = action;
     outils.append(b);
@@ -223,7 +213,7 @@ function panneau(f) {
   const outilsFace = el('div', 'tl-outils tl-outils--face');
   for (const [action, mot] of [['face-renommer', 'Renommer la face'], ['face-retirer', 'Retirer la face'],
     ['ref-ajouter', '+ Référence']]) {
-    const b = el('button', 'tl-lien', mot);
+    const b = el('button', 'action-ligne', mot);
     b.type = 'button';
     b.dataset.action = action;
     outilsFace.append(b);

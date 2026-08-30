@@ -391,7 +391,128 @@
   --pas-2: 10px;   /* entre deux éléments d'un même groupe */
   --pas-3: 16px;   /* gouttière d'un formulaire, rembourrage d'un bloc */
   --pas-4: 24px;   /* rembourrage d'une carte, entre deux blocs */
+
+  /* LA VERTICALE SUR LAQUELLE UN ECRAN COMMENCE (30/08/2026).
+     Mesuree au rendu sur les huit ecrans du CRM : le premier mot du titre
+     tombait sur QUATRE abscisses — 349 px au « Mon travail » et au Pilotage
+     (rembourrage nul), 371 sur Fiverr, « A commander », Reglages et Tailles
+     logos (22 px), 389 au Point du jour (24 px), 425 a la Base clients (20 px
+     plus un rond de marque). 76 px d'ecart entre deux ecrans ouverts a un clic
+     l'un de l'autre, et personne ne peut le voir en relisant un seul ecran.
+     C'est le 22 px qui l'emporte : il tenait deja quatre ecrans sur huit. */
+  --ecran-pad-x: 22px;
 }
+
+/* --------------------------------------------------------- L'EN-TETE D'ECRAN
+   UN SEUL OBJET, PARCE QU'IL Y EN AVAIT SIX (30/08/2026).
+   Chaque ecran du CRM ecrivait son titre pour lui : `.mt-head__titre` et
+   `.pil-titre` (32 px), `.work-title h1` (17), `.cl-brand__title` (17),
+   `.reg-head__title` (17 plus une icone de 24), et le Point du jour n'en avait
+   AUCUN. Six classes dans cinq fichiers pour le meme objet — dont deux regles
+   identiques au caractere pres, ce que la regle du 27/08 interdit en toutes
+   lettres.
+   Mesure au rendu avant de trancher : TROIS tailles (17 / 24 / 32), QUATRE
+   abscisses (349 / 371 / 389 / 425) et CINQ ordonnees (140 a 169). Un ecran
+   relu seul paraissait correct a chaque fois ; c'est en les comparant deux a
+   deux que ca se voit.
+   LA TAILLE EST `--taille-titre` (21 px), et ce n'est pas un compromis : la
+   charte declare ce cran « titre d'une carte, d'une section » depuis le 25/08
+   et il ne servait qu'a UN endroit de toute l'application (fiche-atelier.css).
+   Les titres d'ecran improvisaient entre 17 et 32 parce que le cran prevu pour
+   eux etait mort. 32 px reste ce qu'on ecrit pour un CHIFFRE qu'on annonce au
+   client, pas pour un nom d'ecran.
+   Il vit dans la charte, comme `.btn-retour` : c'est le seul fichier que le CRM
+   et les deux parcours du comptoir lisent tous les deux.
+   LE FILET EST TOUJOURS LA. Il l'etait sous quatre en-tetes (planning,
+   « A commander », Fiverr, Base clients) et pas sous les quatre autres, et
+   c'est encore une difference que personne ne voit sans comparer deux ecrans.
+   Un trait de 1 px sous le nom de l'ecran ne coute rien la ou il n'y a pas de
+   zone qui defile, et il dit partout la meme chose : au-dessus, ou l'on est ;
+   au-dessous, le travail. */
+.ecran-tete {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--pas-2) var(--pas-3);
+  padding: var(--pas-3) var(--ecran-pad-x);
+  /* TOUS LES EN-TETES A LA MEME HAUTEUR, et elle ne s'ecrit pas : c'est la
+     boite de l'application (`--ctrl-h`) plus son rembourrage, donc 82 px. Sans
+     ce plancher, chaque en-tete prenait la hauteur de ce qu'il portait —
+     mesure au rendu le 30/08 : 61,9 px quand il n'y a qu'un titre, 72,4 avec
+     les onglets du Point du jour, 83 avec un bouton de pleine boite. Trois
+     hauteurs pour la meme rangee, et le titre qui descend de 10 px quand on
+     change d'ecran. */
+  /* LE FILET COMPTE DANS LA BOITE, comme la charte le dit deja du trait
+     reserve de la boite serree : en `border-box`, un plancher de 82 px
+     laisse 81 px au contenu, et une commande de pleine boite (50) pousse
+     l'en-tete a 83. Quatre ecrans a 83, quatre a 82 — un pixel, mais le
+     titre descend d'un demi-pixel avec, et c'est exactement le genre
+     d'ecart qu'on ne voit qu'en comparant deux ecrans. */
+  min-height: calc(var(--ctrl-h) + 2 * var(--pas-3) + 1px);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+/* La gauche et la droite sont deux groupes, pas deux marges : `flex-end`
+   rognerait par la gauche sur une rangee trop etroite — meme piege que la
+   barre du comptoir et que la rangee du Point du jour. */
+.ecran-tete__gauche { display: flex; align-items: center; gap: var(--pas-3); min-width: 0; }
+.ecran-tete__droite { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; }
+
+/* PAS D'ICONE DANS CET EN-TETE, ET C'EST UN CHOIX. Les Reglages et les Tailles
+   logos en posaient une (24 px, nue, sans boite) ; les six autres ecrans non.
+   Elle ne pouvait dire qu'une chose — sur quel ecran on est — et la rangee
+   d'onglets, toujours visible juste au-dessus, le dit deja en surlignant celui
+   qui est actif. C'est l'argument que le Point du jour avait deja retenu le
+   26/08 pour supprimer sa ligne de titre. A egalite, celui qui montre moins
+   gagne : il ne reste que le nom de l'ecran. */
+.ecran-tete__titres { display: flex; flex-direction: column; min-width: 0; }
+.ecran-tete__titre {
+  margin: 0;
+  font-size: var(--taille-titre); font-weight: var(--graisse-forte);
+  line-height: var(--ligne-serre); color: var(--text-1);
+  letter-spacing: -.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* PAS DE SOUS-TITRE NON PLUS, et c'est la derniere difference qui tombe. Les
+   Reglages etaient le seul ecran a en porter un : deux lignes empilees dans une
+   rangee centree, et leur titre remontait de 10 px par rapport aux huit autres
+   (158,9 px contre 168,6, mesure au rendu). Une phrase d'explication n'est pas
+   le nom de l'ecran — elle est descendue dans la page, ou elle ne decale rien.
+   Le compteur, lui, reste : il tient sur la ligne du titre, a cote. */
+.ecran-tete__compte {
+  margin: 0;
+  font-size: var(--taille-note); font-weight: var(--graisse-texte);
+  line-height: var(--ligne-serre); color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.ecran-tete__compte { white-space: nowrap; }
+
+/* ------------------------------------------------ L'ACTION POSEE DANS UNE LIGNE
+   « Renommer », « Retirer », « revenir au tri par urgence » : une commande qui
+   vit A COTE d'un titre ou d'un intitule, pas dans une barre. Il y en avait
+   deux ecritures, et aucune ne suivait la charte :
+     · `.tl-lien` (tailles-logos) — du texte nu a 14 px, padding 0 : 19,25 px de
+       haut, donc rien a viser a la souris ;
+     · `.ordre-reset` (planning) — `min-height: 32px` ECRIT EN DUR, et surtout
+       `border-radius: var(--pilule)`, que la charte interdit en toutes lettres
+       a une action : « un bouton d'action ne prend JAMAIS la pilule, sinon rien
+       ne distingue plus une action d'une etiquette ».
+   Une seule regle, et sa hauteur SORT de son contenu : c'est la boite serree de
+   la charte (17 x 1,375 + 2 x 7 + 2 = 39,375 px), trait reserve compris. */
+.action-ligne {
+  display: inline-flex; align-items: center; gap: var(--pas-1);
+  min-height: var(--ctrl-h-serre);
+  padding: var(--champ-y-serre) var(--pas-2);
+  border: var(--trait-reserve);
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--taille-texte); line-height: var(--ligne-serre);
+  white-space: nowrap; cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.action-ligne:hover { color: var(--text-1); background: var(--surface-hover); }
+.action-ligne:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.action-ligne[hidden] { display: none; }
 
 /* ------------------------------------------------------- Revenir d'un cran
    UN SEUL OBJET POUR UN SEUL GESTE : rond, 44 px, bordé, la flèche à l'encre.

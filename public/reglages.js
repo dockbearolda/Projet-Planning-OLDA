@@ -12,6 +12,7 @@
 // Sans minuteur, un enregistrement de réglage parti sur un réseau qui décroche
 // laisse le bouton désactivé et « Enregistrement… » à l'écran, indéfiniment.
 import { fetchBorne } from './reseau.js';
+import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -71,17 +72,10 @@ let saved = '';          // dernier texte confirmé par le serveur
 function buildStatic() {
   const page = el('div', 'reg-page');
 
-  const head = el('header', 'reg-head');
-  head.append(
-    ic('settings', 'reg-head__ic'),
-    (() => {
-      const t = el('div', 'reg-head__titles');
-      t.append(el('h2', 'reg-head__title', 'Réglages'),
-        el('p', 'reg-head__sub', 'Ce que vous réglez ici vaut pour tous les postes de l’atelier.'));
-      return t;
-    })(),
-  );
-  page.appendChild(head);
+  page.appendChild(ecranTete({ niveau: 'h2', titre: 'Réglages' }));
+  // La phrase qui prévient que ces réglages valent PARTOUT : dans la page, pas
+  // dans l'en-tête — voir la note de `.ecran-tete__compte` dans charte.css.
+  page.appendChild(el('p', 'reg-intro', 'Ce que vous réglez ici vaut pour tous les postes de l’atelier.'));
 
   // --- Carte « message WhatsApp » -------------------------------------------
   const card = el('section', 'reg-card');

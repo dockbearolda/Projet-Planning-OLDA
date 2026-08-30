@@ -16,6 +16,7 @@
 // la boutique ne le voient pas, et l'API le refuse.
 
 import { fetchBorne } from './reseau.js';
+import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
 const el = (tag, cls, text) => {
@@ -59,8 +60,8 @@ function depuis(iso) {
 
 export function renderPilotage(d) {
   if (!ROOT) return;
+  const tete = ecranTete({ titre: 'Pilotage' });
   const page = el('div', 'pil-page');
-  page.append(el('h1', 'pil-titre', 'Pilotage'));
 
   const grille = el('div', 'pil-grille');
   const c = d.enCours || {};
@@ -143,7 +144,7 @@ export function renderPilotage(d) {
     bloc.append(liste);
   }
   page.append(bloc);
-  ROOT.replaceChildren(page);
+  ROOT.replaceChildren(tete, page);
 }
 
 export async function refreshPilotage() {

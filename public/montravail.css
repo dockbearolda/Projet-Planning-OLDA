@@ -7,8 +7,9 @@
    Trois listes, rien d'autre. Mêmes jetons, mêmes deux tailles de texte que
    partout ailleurs : 17 pour ce qui se lit, 14 pour ce qui se consulte.
    =========================================================================== */
-.mt-page { display: flex; flex-direction: column; gap: 28px; padding: 4px 0 40px; }
-.mt-head__titre { margin: 0; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); letter-spacing: -.02em; }
+/* Le titre de cet ecran vit dans la charte (`.ecran-tete`) depuis le 30/08 :
+   sa regle et celle du Pilotage etaient identiques au caractere pres. */
+.mt-page { display: flex; flex-direction: column; gap: 28px; padding: var(--pas-4) var(--ecran-pad-x) 40px; }
 
 .mt-bloc { display: flex; flex-direction: column; gap: 10px; }
 .mt-bloc__head { display: flex; align-items: baseline; gap: 10px; }
