@@ -3428,8 +3428,15 @@ let ficheAtelierId = null;
 // c'est le geste que tout le monde a déjà pour sortir d'un écran posé par
 // dessus, et il ne remplace aucun bouton : la croix et « Retour au planning »
 // sont là pour la souris.
+// ÉCHAP FERME CE QUI EST OUVERT PAR-DESSUS, PAS LA FICHE (30/08). Le calendrier
+// du champ « Retrait » est posé dans le <body>, au-dessus de la fiche : sans
+// cette garde, la même touche fermait les DEUX, et la date qu'on venait de
+// renoncer à changer emportait l'écran avec elle. Le menu des faces a déjà sa
+// garde, à lui, dans fiche-atelier.js.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && ficheAtelierId) fermerFicheAtelier();
+  if (e.key !== 'Escape' || !ficheAtelierId) return;
+  if (document.querySelector('.cal-panneau')) return;
+  fermerFicheAtelier();
 });
 
 function fermerFicheAtelier() {

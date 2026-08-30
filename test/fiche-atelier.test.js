@@ -355,8 +355,13 @@ assert.strictEqual(texteMarge(500, null), '—');
 // 28/08) ; ce qui se NAVIGUE se clique.
 assert.ok(!/key === '[a-zA-Z]'|ctrlKey|metaKey/.test(JS),
   'aucun raccourci clavier dans la fiche');
-assert.ok(/e\.key === 'Escape' && ficheAtelierId/.test(APP),
+assert.ok(/if \(e\.key !== 'Escape' \|\| !ficheAtelierId\) return;/.test(APP),
   'Échap ferme — c’est le geste que tout le monde a déjà, et il ne remplace aucun bouton');
+// … MAIS D'ABORD CE QUI EST POSÉ PAR-DESSUS. Le calendrier du champ « Retrait »
+// vit dans le <body>, au-dessus de la fiche : sans garde, une seule touche
+// fermait les deux, et renoncer à changer une date emportait l'écran.
+assert.ok(/if \(document\.querySelector\('\.cal-panneau'\)\) return;/.test(APP),
+  'Échap referme le calendrier avant la fiche');
 // L'ANNULATION N'A PLUS QU'UN POINT D'ENTRÉE : le message qui suit chaque
 // modification. Le bouton de l'entête a été retiré le 28/08 — d'où la garde
 // ci-dessous : sans le bouton du message, la pile deviendrait inatteignable.
