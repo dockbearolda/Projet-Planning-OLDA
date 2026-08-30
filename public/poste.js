@@ -67,20 +67,10 @@ function construireEcran(employes, choisir) {
   fond.hidden = true;
   fond.setAttribute('role', 'dialog');
   fond.setAttribute('aria-modal', 'true');
-  fond.setAttribute('aria-labelledby', 'posteEcranTitre');
+  fond.setAttribute('aria-label', 'Qui est au poste ?');
 
   const carte = document.createElement('div');
   carte.className = 'poste-carte';
-
-  const titre = document.createElement('h2');
-  titre.className = 'poste-titre';
-  titre.id = 'posteEcranTitre';
-  titre.textContent = 'Qui est au poste ?';
-
-  const aide = document.createElement('p');
-  aide.className = 'poste-aide';
-  aide.textContent = 'Ton nom signe les demandes prises sur cet appareil. '
-    + 'Il y reste jusqu’à ce que quelqu’un le change.';
 
   const choix = document.createElement('div');
   choix.className = 'poste-choix';
@@ -106,7 +96,7 @@ function construireEcran(employes, choisir) {
   fermer.className = 'poste-fermer';
   fermer.textContent = 'Annuler';
 
-  carte.append(titre, aide, choix, fermer);
+  carte.append(choix, fermer);
   fond.append(carte);
   return { fond, choix, fermer };
 }
