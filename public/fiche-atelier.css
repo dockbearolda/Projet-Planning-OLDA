@@ -325,8 +325,20 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   padding: var(--pas-2) var(--pas-4); min-width: 0;
   display: flex; flex-direction: column;
 }
-.fa-col--g { gap: var(--pas-2); border-right: 1px solid var(--border-soft); }
+.fa-col--g { gap: var(--pas-2); }
 .fa-col--d { gap: var(--pas-2); }
+/* LE TRAIT DU MILIEU PRENAIT 1 PX A UNE SEULE DES DEUX COLONNES (30/08).
+   Il est pose sur le bord droit de celle de gauche : sa boite mesurait donc
+   671 px de contenu quand celle de droite en mesurait 672, et ses deux pistes
+   souples 214,5 contre 215. Les rails 3 et 4 tombaient a 364,5 et 480,5 a
+   gauche pour 341 et 457 d'ecart a droite — un demi-pixel, invisible sur un
+   ecran, mais c'est un rail de plus des qu'on mesure.
+   LA COLONNE DE DROITE REPREND LE MEME PIXEL, transparent : les deux boites
+   perdent la meme chose, le trait reste net (une decoration en degrade tomberait
+   a cheval sur deux pixels), et la regle dit pourquoi.
+   Meme geste sur les deux moities de la bande du bas : elles portaient le meme
+   trait, donc le meme demi-pixel. */
+.fa-col--g, .fa-col--d, .fa-details__moitie--d { border-left: 1px solid transparent; }
 .fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
 .fa-sec {
   font-size: var(--fa-lab); letter-spacing: var(--fa-caps); text-transform: uppercase;
@@ -715,12 +727,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 @media (max-width: 1180px) {
   .fa-travail { grid-template-columns: 1fr; }
   .fa-col--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+  .fa-col--d { border-left: 0; }
   /* LA BANDE SUIT LES COLONNES : elle est faite de leurs deux moities, elle
      s'empile quand elles s'empilent. Restee sur deux, la ligne d'acompte se
      serrait de 15 px sous ce qu'elle porte, et la bande racontait deux colonnes
      sous un formulaire qui n'en avait plus qu'une. */
   .fa-details { grid-template-columns: 1fr; }
   .fa-details__moitie--g { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+  .fa-details__moitie--d { border-left: 0; }
 }
 
 /* --- LE COMPTE EMPILE A ETE REMPLACE PAR LA BANDE (29/08) -----------------

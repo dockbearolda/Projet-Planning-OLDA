@@ -1263,7 +1263,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // A DROITE, le compte du client — sur les rails de la colonne Production. La
   // bande finit sur le nombre qu'on vient chercher, cale au bord droit : le meme
   // que celui ou finissent tous les champs de la colonne au-dessus.
-  const moitieD = el('div', 'fa-details__moitie');
+  const moitieD = el('div', 'fa-details__moitie fa-details__moitie--d');
   moitieD.append(
     caseArgent('Prix TTC', null, chTtc),
     caseArgent('Acompte versé le', 'fa-case--large',
