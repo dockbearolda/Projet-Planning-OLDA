@@ -166,8 +166,7 @@ assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte so
   // supprimes »). On cherche l'ÉCRITURE, pas le mot : le commentaire qui
   // explique le retrait nomme la rangée, et le test tomberait sur sa propre
   // explication — piège déjà payé deux lignes plus bas.
-  for (const attendu of ["'Type'), selType", "'Provenance'), selProvenance",
-    "titreSection('Client')"]) {
+  for (const attendu of ["'Type'), selType", "titreSection('Client')"]) {
     assert.ok(CLIENT.includes(attendu), `la zone Client doit porter ${attendu}`);
   }
   assert.ok(!/rangee\('Documents'/.test(JS) && !/fa-btn--mini/.test(JS),
@@ -278,7 +277,7 @@ assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte so
   assert.ok(/ctx\.patchLigne\('acompte_verse', verse\)/.test(PAIEMENT)
     && /ctx\.patchLigne\('acompte_demande', verse\)/.test(PAIEMENT),
     'un acompte versé est forcément un acompte demandé : les deux se déduisent');
-  for (const intrus of ['selType', 'selProvenance', 'chProduction', 'docs.append']) {
+  for (const intrus of ['selType', 'chProduction', 'docs.append']) {
     assert.ok(!PAIEMENT.includes(intrus), `${intrus} n’a rien à faire dans la zone Paiement`);
   }
   // LE PRIX EST EN BAS, plus dans le bandeau.

@@ -683,10 +683,13 @@ export function dessinerFicheAtelier(r, ctx) {
   const menuHeure = menuHabille(chHeure, quand, (pan) => {
     for (const h of creneaux()) {
       const on = h === heureChoisie;
-      const b = ligneMenu(on
-        ? ic('check_box', 'colbar-item__ic')
-        : ic('check_box_outline_blank', 'colbar-item__ic'),
-      heureLisible(h), () => { menuHeure.fermer(); poserHeure(h); }, on ? 'is-on' : 'is-off');
+      // PAS DE PETIT CARRE A COTE DES HEURES (30/08, Charlie). Une case a cocher
+      // annonce qu'on peut en prendre PLUSIEURS — c'est vrai des faces, faux
+      // d'une heure. Celle qui est choisie porte une coche, les autres ne
+      // portent rien : la BOITE de l'icone reste, vide, sinon leurs intitules
+      // partiraient d'un rail different de celui de la coche.
+      const b = ligneMenu(on ? ic('check', 'colbar-item__ic') : el('span', 'colbar-item__ic'),
+        heureLisible(h), () => { menuHeure.fermer(); poserHeure(h); }, on ? 'is-on' : 'is-off');
       b.setAttribute('role', 'menuitemradio');
       b.setAttribute('aria-checked', String(on));
       pan.append(b);
@@ -728,8 +731,6 @@ export function dessinerFicheAtelier(r, ctx) {
   brancher(selQui, { label: 'Qui suit', envoyer: (v) => ctx.patchLigne('responsable', v || null) });
   const selType = menu(null, ctx.types, r.client_type || '', 'Type de client');
   brancher(selType, { label: 'Type de client', envoyer: (v) => ctx.patchLigne('client_type', v || null) });
-  const selProvenance = menu(null, ctx.provenances, r.provenance || '', 'Provenance');
-  brancher(selProvenance, { label: 'Provenance', envoyer: (v) => ctx.patchLigne('provenance', v || null) });
 
   // LA RANGEE « DOCUMENTS » EST RETIREE (30/08). Charlie a designe les trois
   // morceaux — l'intitule et les deux boutons : « tout ca tu supprimes ».
@@ -766,7 +767,6 @@ export function dessinerFicheAtelier(r, ctx) {
     // comment il paie. Ils etaient coinces entre le mode de reglement et le
     // champ de production.
     el('label', 'fa-lab', 'Type'), selType,
-    el('label', 'fa-lab', 'Provenance'), selProvenance,
   );
   // TROIS CELLULES PAR RANGEE, TOUJOURS. La grille en a trois par ligne : un
   // menu pose seul apres son intitule n'en remplit que deux, et l'intitule
@@ -796,8 +796,12 @@ export function dessinerFicheAtelier(r, ctx) {
 
   {
     const idt = el('div', 'fa-grille-prod');
+    // « TECHNIQUE » ET « PROVENANCE » SONT RETIREES (30/08, Charlie : « tout ca
+    // supprime »). La technique du marquage (`prod.marquage`, « DTF ») continue
+    // de s'imprimer sur le ticket de l'atelier — elle ne se corrige simplement
+    // plus d'ici, et rien d'autre dans l'application ne l'ecrit.
     for (const [cle, label] of [['ref', 'Référence'], ['couleur', 'Couleur'],
-      ['marquage', 'Technique'], ['encre', 'Marquage']]) {
+      ['encre', 'Marquage']]) {
       const c = champ(null, prod[cle] || '', { label, placeholder: label.toLowerCase() });
       brancher(c, { label, envoyer: (v) => ctx.patchProd({ [cle]: v }) });
       idt.append(el('label', 'fa-lab', label), c);

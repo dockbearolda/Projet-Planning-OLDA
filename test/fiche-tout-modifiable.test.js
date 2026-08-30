@@ -97,10 +97,15 @@ assert.ok(/getSelection\(\)/.test(AUCLIC[0]),
 // l'identité de l'article se corrige de bout en bout, là où elle se lit.
 const PROD = [FICHE];
 assert.ok(FICHE.length > 0, 'la fiche atelier doit exister');
-for (const cle of ['ref', 'couleur', 'marquage', 'encre']) {
+// « TECHNIQUE » (`prod.marquage`) A ÉTÉ RETIRÉE LE 30/08 — Charlie, en la
+// désignant : « tout ça supprime ». Elle continue de s'imprimer sur le ticket
+// de l'atelier ; elle ne se corrige simplement plus depuis la fiche, et rien
+// d'autre dans l'application ne l'écrit.
+for (const cle of ['ref', 'couleur', 'encre']) {
   assert.ok(new RegExp(`\\['${cle}',`).test(PROD[0]),
     `« ${cle} » doit être modifiable : c’est l’identité de l’article`);
 }
+assert.ok(!/\['marquage',/.test(PROD[0]), '« Technique » ne se saisit plus ici');
 // LES DEUX FAMILLES DE FAITS ONT LEUR RANGÉE, chacune nommée.
 assert.ok(/rangee\('Tailles'/.test(PROD[0]) && /rangee\('Faces'/.test(PROD[0]),
   'les deux familles de faits ont leur rangée');

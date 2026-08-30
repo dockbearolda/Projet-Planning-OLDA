@@ -3572,8 +3572,6 @@ function contexteFicheAtelier(r, marquage) {
     types: [{ value: '', label: 'Non précisé' }, ...CLIENT_TYPES],
     reglements: [{ value: '', label: 'Non défini' },
       ...PAIEMENT_MODES.map((m) => ({ value: m.id, label: m.label }))],
-    provenances: [{ value: '', label: 'Provenance : non dite' },
-      ...PROVENANCES.map((p) => ({ value: p, label: p }))],
     // UNE FONCTION, PAS UNE CHAÎNE. Figée à l'ouverture, elle continuait
     // d'annoncer l'ancienne échéance après qu'on avait déplacé la date : un
     // chiffre faux à l'écran, juste sous le champ qu'on venait de corriger.
@@ -4432,15 +4430,11 @@ async function envoyerProduction(r, patchProd) {
   }
 }
 
+// LA PROVENANCE A QUITTE LA FICHE (30/08, Charlie : « tout ca supprime »), et
+// la liste avec : la fiche etait le SEUL endroit de l'application qui ecrivait
+// cette colonne. Elle reste en base — elle porte l'historique — et rien ne la
+// remplit plus.
 
-// Libellés du journal (miroir de JOURNAL_FIELDS côté serveur) et mise en mots
-// des valeurs brutes : « production » ne veut rien dire dans une fiche, « Étape :
-// Préparation du projet » si.
-// D'OÙ VIENT LA DEMANDE (§8). Liste courte et FERMÉE : sept provenances qu'on
-// peut compter valent mieux qu'un champ libre où « bouche à oreille »,
-// « bouche-à-oreille » et « BAO » feraient trois lignes différentes.
-const PROVENANCES = ['Passage', 'Bouche-à-oreille', 'Client existant', 'Instagram',
-  'Facebook', 'Téléphone', 'Site web'];
 
 
 // Les modèles d'étapes, lus UNE fois : ce sont quatre listes de mots qui ne
