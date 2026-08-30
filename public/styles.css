@@ -1074,9 +1074,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   font-size: var(--taille-texte); font-weight: var(--graisse-note); letter-spacing: .05em;
   text-transform: uppercase; color: var(--text-2);
 }
-.pcard__client { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); color: var(--text-1); }
+.pcard__client { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-serre); color: var(--text-1); }
 .pcard__ref { margin-top: 3px; font-size: var(--taille-texte); color: var(--text-2); }
-.pcard__name { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); color: var(--text-1); }
+.pcard__name { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-serre); color: var(--text-1); }
 .pcard__meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 .pcard__pill {
   display: inline-block; padding: 4px 7px; border-radius: var(--pilule);
@@ -1215,7 +1215,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    de la valeur : une taille de plus obligerait à une rangée de plus, et la
    rangée est ce qui permet de balayer une file. */
 .prod-fiche__fort { font-weight: var(--graisse-forte); }
-.pcard__delai { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-titre); font-variant-numeric: tabular-nums; }
+.pcard__delai { font-size: var(--taille-texte); font-weight: var(--graisse-forte); line-height: var(--ligne-serre); font-variant-numeric: tabular-nums; }
 .pcard__delai--retard { color: var(--danger); }
 .pcard__delai--urgent { color: var(--warning-2); }
 .pcard__sub { margin-top: 4px; font-size: var(--taille-texte); color: var(--text-2); }
@@ -3785,7 +3785,7 @@ a,
     min-height: var(--ctrl-h);
     padding: var(--champ-y-serre) var(--pas-2);
   }
-  .nav-switch-label { font-size: var(--taille-texte); line-height: var(--ligne-titre); max-width: 76px; }
+  .nav-switch-label { font-size: var(--taille-texte); line-height: var(--ligne-serre); max-width: 76px; }
   /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
      fichier et gagnerait à spécificité égale. */
   #viewProjet { padding-right: 8px; margin-right: 4px; }

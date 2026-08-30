@@ -68,8 +68,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
 
 
 .card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
-h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
-h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-titre)}
+h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
+h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pas-3)}
 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pas-3)}
 /* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
@@ -613,9 +613,9 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    hauteur de la police d'émojis, pas celle du texte : le bouton gagnait un demi
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
-button{line-height:var(--ligne-champ)!important}
+button{line-height:var(--ligne-serre)!important}
 .card:not(:has(> .bloc)){border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
-input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-champ)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
+input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-serre)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 
@@ -651,7 +651,7 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
    49,6. Deux pixels, sur une rangée où « Date de commande » côtoie un bouton,
    se voient comme un décalage sans cause. On ramène cette boîte-là sur
    l'interligne de l'échelle et on lui retire son rembourrage propre. */
-input[type=date]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit{line-height:var(--ligne-champ);padding:0;margin:0;height:auto}
+input[type=date]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit{line-height:var(--ligne-serre);padding:0;margin:0;height:auto}
 input[type=date]::-webkit-datetime-edit-fields-wrapper,input[type=time]::-webkit-datetime-edit-fields-wrapper{padding:0;margin:0}
 input[type=date]::-webkit-inner-spin-button,input[type=time]::-webkit-inner-spin-button{display:none}
 /* LA FLÈCHE DU MENU SUIT LE THÈME. Elle est gravée DANS l'image — un data-URI

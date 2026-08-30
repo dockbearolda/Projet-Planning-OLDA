@@ -241,8 +241,11 @@ const pilule = regle('.primary,.secondary,.danger,.whatsapp');
 // remplit, et aucune hauteur locale — les deux la lisent au même endroit.
 assert.strictEqual(champ['font-size'], 'var(--dd-taille-valeur)', 'un champ écrit dans la taille des valeurs');
 assert.strictEqual(bouton['font-size'], 'var(--dd-taille-valeur)', 'un bouton aussi');
-assert.strictEqual(champ['line-height'], 'var(--ligne-champ)', 'le champ a une hauteur de ligne en rapport');
-assert.strictEqual(bouton['line-height'], 'var(--ligne-champ)', '… le bouton la même');
+// `--ligne-champ` a été fondu dans `--ligne-serre` le 30/08 : les deux
+// valaient 1,375, deux noms pour un nombre. Le principe ne bouge pas — un
+// RAPPORT, jamais `normal`, sinon la boîte se laisse décider par la fonte.
+assert.strictEqual(champ['line-height'], 'var(--ligne-serre)', 'le champ a une hauteur de ligne en rapport');
+assert.strictEqual(bouton['line-height'], 'var(--ligne-serre)', '… le bouton la même');
 assert.ok(/input,select\{height:var\(--dd-champ-h\)\}/.test(FEUILLES),
   'le champ fait la boîte nommée de la charte');
 assert.strictEqual(bouton['min-height'], 'var(--dd-champ-h)',
@@ -476,7 +479,7 @@ assert.strictEqual(boutonV['border-radius'], 'var(--arrondi-champ)', '… tous l
 // Chrome compose la valeur d'un champ de date dans une boîte interne qui porte
 // SON rembourrage : le champ sortait 2 px plus haut que ses voisins.
 [DEVIS, VENTE].forEach((src, i) => assert.ok(
-  /input\[type=date\]::-webkit-datetime-edit,input\[type=time\]::-webkit-datetime-edit\{line-height:var\(--ligne-champ\)/.test(src),
+  /input\[type=date\]::-webkit-datetime-edit,input\[type=time\]::-webkit-datetime-edit\{line-height:var\(--ligne-serre\)/.test(src),
   `${i ? 'la vente' : 'le devis'} : un champ de date fait la hauteur des autres`));
 
 // ===========================================================================

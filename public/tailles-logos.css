@@ -64,7 +64,7 @@
 
 .tl-panneau { display: flex; flex-direction: column; gap: var(--pas-3); min-width: 0; }
 .tl-tete-famille { display: flex; align-items: baseline; gap: var(--pas-3); flex-wrap: wrap; }
-.tl-nom-famille { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); line-height: var(--ligne-titre); }
+.tl-nom-famille { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); line-height: var(--ligne-serre); }
 .tl-outils { display: flex; gap: var(--pas-3); flex-wrap: wrap; }
 .tl-outils--face { margin-top: calc(-1 * var(--pas-2)); }
 /* Renommer, retirer : des gestes rares. Ils ne prennent pas la forme d'un

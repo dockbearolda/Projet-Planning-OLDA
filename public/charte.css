@@ -226,11 +226,22 @@
   --graisse-note: 600;
   --graisse-forte: 800;
 
-  --ligne-titre: 1.2;
+  /* TROIS INTERLIGNES, TROIS ROLES, AUCUN RECOUVREMENT (30/08/2026).
+     Il y en avait CINQ noms pour quatre valeurs : `--ligne-titre` (1,2),
+     `--ligne-texte` (1,45), `--ligne-champ` (1,375), `--ligne-serre` — qui
+     valait `--ligne-champ`, donc le meme nombre sous deux noms — et
+     `--ligne-glyphe` (1).
+     · `--ligne-serre` : ce qui tient sur UNE ligne, texte comme commande. En
+       RAPPORT et non en « normal », sinon Chrome ne calcule pas la boite d'un
+       div comme celle d'un champ.
+     · `--ligne-texte` : ce qui en porte plusieurs.
+     · `--ligne-glyphe` : un pictogramme, qui fait sa propre boite.
+     `--ligne-titre` est RETIRE : il ne servait qu'a des noms d'une seule ligne,
+     ecrits au cran du texte — un nom de client sur une carte, un intitule de
+     section du comptoir. Au meme cran que leurs voisins et sur un autre
+     interligne, ils cassaient le rythme de la carte qui les porte. */
   --ligne-texte: 1.45;
-  /* Les champs et les boutons : en RAPPORT et non en « normal », sinon Chrome
-     ne calcule pas la boite d'un div comme celle d'un champ. */
-  --ligne-champ: 1.375;
+  --ligne-serre: 1.375;
   /* AUCUN INTERLIGNE : le glyphe fait sa propre boite. Un pictogramme, une
      initiale, une croix — rien qui se lise sur plusieurs lignes. Il valait `1`
      ecrit en clair a HUIT endroits de styles.css : c'est le meme rôle, il lui
@@ -330,8 +341,9 @@
      bouton « Colonnes ». Cinq hauteurs pour la même intention.
      C'est `normal` le coupable, et la charte le dit déjà pour la grande boîte :
      un RAPPORT suit la taille du texte et ne dépend ni de la police chargée ni
-     de ce qu'on pose dans le bouton. 17 × 1,375 + 2 × 7 = 37,4 px, toujours. */
-  --ligne-serre: var(--ligne-champ);
+     de ce qu'on pose dans le bouton. 17 × 1,375 + 2 × 7 = 37,4 px, toujours.
+     (Son interligne est `--ligne-serre`, déclaré tout en haut avec les deux
+     autres : il valait la peine d'être nommé une fois, pas deux.) */
   /* … ET LE TRAIT RÉSERVÉ. Quatrième ingrédient, et le dernier : un onglet
      garde `1px solid transparent` pour pouvoir s'entourer sans se déplacer, une
      pilule de filtre n'en avait pas. Même texte, même interligne, même
@@ -560,7 +572,7 @@ input[type="radio"]:focus-visible {
   display: flex; align-items: center; justify-content: center; gap: var(--pas-1);
   border-radius: var(--pilule); padding: 8px 12px; text-align: center;
   font-size: var(--taille-texte); font-weight: var(--graisse-note);
-  line-height: var(--ligne-champ);
+  line-height: var(--ligne-serre);
   /* UNE ÉTAPE À VENIR SE LIT (25/08/2026). Elle était posée sur le gris
      atténué — 2,85:1 —, or « 2. Projet » dit où l'on va : c'est de la
      navigation, pas du décor. Ce qui distingue les trois états, c'est la

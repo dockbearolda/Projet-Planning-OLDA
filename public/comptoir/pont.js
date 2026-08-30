@@ -1304,7 +1304,7 @@
 .menu-declencheur{display:flex;align-items:center;gap:11px;width:100%;padding:0 var(--champ-x);
   min-height:var(--ctrl-h);
   border:1.5px solid var(--border);border-radius:var(--arrondi-champ);background:var(--surface);cursor:pointer;text-align:left;
-  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-champ);color:var(--text-1);transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-serre);color:var(--text-1);transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
 /* C'est la ligne de TEXTE qui donne sa hauteur au champ fermé : ni la
    référence ni la pastille ne doivent la dépasser, sinon le champ regrandit
    et l'alignement repart. */
@@ -1390,7 +1390,7 @@
   padding:0 var(--champ-x);margin:0;
   border:1.5px solid var(--primary);border-radius:var(--arrondi-champ);
   background:var(--surface);color:var(--text-1);
-  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-champ);
+  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-serre);
   box-shadow:0 0 0 3px rgba(var(--primary-rgb),.10);
   outline:none;z-index:1}
 /* Ce qui était choisi reste lisible pendant qu'on cherche : il devient

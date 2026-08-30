@@ -521,11 +521,18 @@ console.log('✓ couleur : l’exception du rail est écrite, et elle reste au r
 //     24,7 / 27,2 px d'interligne sur le même texte.
 //
 // C'est la quatrième loi du système : une boîte SORT du texte, de son
-// interligne et de son rembourrage. Quatre interlignes, chacun avec son rôle :
-//   --ligne-titre  1.2    ce qu'on annonce
-//   --ligne-champ  1.375  (--ligne-serre) une ligne dans une boîte
+// interligne et de son rembourrage.
+//
+// TROIS INTERLIGNES DEPUIS LE 30/08, chacun avec son rôle, aucun recouvrement :
+//   --ligne-serre  1.375  une ligne dans une boîte — texte comme commande
 //   --ligne-texte  1.45   la prose
 //   --ligne-glyphe 1      un pictogramme, une initiale — pas du texte
+// Il y en avait CINQ noms pour quatre valeurs. `--ligne-champ` valait 1,375 et
+// `--ligne-serre` valait `--ligne-champ` : le même nombre sous deux noms.
+// `--ligne-titre` (1,2) ne servait qu'à des noms d'UNE ligne écrits au cran du
+// texte — un nom de client sur une carte, un intitulé de section du comptoir :
+// au même cran que leurs voisins et sur un autre interligne, ils cassaient le
+// rythme de la carte qui les porte.
 {
   const FEUILLES = [
     'public/styles.css', 'public/charte.css', 'public/clients.css', 'public/projet.css',
@@ -542,15 +549,21 @@ console.log('✓ couleur : l’exception du rail est écrite, et elle reste au r
   assert.deepStrictEqual(enDur, [],
     'un interligne s’écrit avec un jeton, jamais en clair :\n  ' + enDur.join('\n  '));
 
-  // Les quatre jetons existent, et ils se déclarent UNE fois.
+  // Les trois jetons existent, et ils se déclarent UNE fois.
   const CHARTE0 = lire('public/charte.css');
-  for (const jeton of ['--ligne-titre', '--ligne-texte', '--ligne-champ', '--ligne-glyphe']) {
+  for (const jeton of ['--ligne-texte', '--ligne-serre', '--ligne-glyphe']) {
     const n = (CHARTE0.match(new RegExp(`^\\s*${jeton}:`, 'gm')) || []).length;
     assert.strictEqual(n, 1, `${jeton} se déclare une seule fois, dans la charte (trouvé ${n})`);
   }
+  // ET LES DEUX NOMS EN TROP NE REVIENNENT PAS. Un nom de plus pour la même
+  // valeur, c'est deux valeurs le jour où l'une bouge.
+  const TOUT = FEUILLES.map((f) => lire(f).replace(/\/\*[\s\S]*?\*\//g, ' ')).join('\n');
+  assert.ok(!/--ligne-titre|--ligne-champ/.test(TOUT),
+    'ni `--ligne-titre` ni `--ligne-champ` : trois interlignes, trois rôles');
 
   // ET LE CORPS EN POSE UN : sans lui, tout ce qui n'a pas de règle propre
-  // retombe sur `normal`, et la fonte reprend la main.
-  assert.match(lire('public/styles.css'), /line-height: var\(--ligne-texte\);/,
-    'le corps de l’application pose l’interligne du texte');
+  // retombe sur `normal`, et la fonte reprend la main. C'est le SERRÉ — presque
+  // tout l'écran tient sur une ligne, et ce qui n'y tient pas le déclare.
+  assert.match(lire('public/styles.css'), /line-height: var\(--ligne-serre\);/,
+    'le corps de l’application pose l’interligne serré');
 }

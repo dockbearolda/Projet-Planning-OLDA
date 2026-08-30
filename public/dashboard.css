@@ -709,7 +709,7 @@
   font-size: var(--taille-texte);
   font-weight: var(--graisse-forte);
   color: var(--pj-ink);
-  line-height: var(--ligne-titre);
+  line-height: var(--ligne-serre);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1110,7 +1110,7 @@
   font-size: var(--taille-texte);
   font-weight: var(--graisse-forte);
   letter-spacing: -.02em;
-  line-height: var(--ligne-titre);
+  line-height: var(--ligne-serre);
   overflow-wrap: anywhere;
 }
 .dd-article { margin: 0 0 11px; font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--pj-ink-2); }
