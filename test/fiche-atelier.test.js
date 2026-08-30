@@ -35,8 +35,8 @@ vm.createContext(bac);
 // modules, et les fonctions éprouvées ici n'en dépendent pas (le calendrier ne
 // sert qu'au dessin de la rangée « Retrait »).
 const NU = JS.replace(/^export /gm, '').replace(/^import[\s\S]*?from '[^']*';$/gm, '');
-vm.runInContext(`${NU}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge };`, bac);
-const { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge } = bac.API;
+vm.runInContext(`${NU}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserDate, texteMarge };`, bac);
+const { normaliserMontant, normaliserTelephone, normaliserDate, texteMarge } = bac.API;
 
 // ---------------------------------------------------------------------------
 // 1. UNE SEULE BARRE DE DÉFILEMENT, ET C'EST CELLE DE L'ÉCRAN
@@ -368,10 +368,23 @@ assert.strictEqual(normaliserTelephone('0690778899'), '06 90 77 88 99');
 // Sous huit chiffres ce n'est pas un numéro : un poste, un début de saisie.
 assert.strictEqual(normaliserTelephone('123'), '123');
 
-assert.strictEqual(normaliserHeure('14'), '14h00');
-assert.strictEqual(normaliserHeure('143'), '01h43');
-assert.strictEqual(normaliserHeure('1430'), '14h30');
-assert.strictEqual(normaliserHeure(''), '');
+// L'HEURE NE SE TAPE PLUS (30/08) : elle se choisit dans une liste de créneaux
+// — 9h30 à 11h30 et 14h à 17h, toutes les demi-heures. `normaliserHeure` est
+// partie avec la frappe ; ce qu'on vérifie maintenant, c'est la LISTE.
+assert.ok(!/function normaliserHeure/.test(JS), 'plus de rattrapage de frappe pour l’heure');
+{
+  const l = JS.match(/const CRENEAUX = \[([\s\S]*?)\];/);
+  assert.ok(l, 'les créneaux sont une liste nommée');
+  const creneaux = l[1].match(/'(\d\d:\d\d)'/g).map((x) => x.slice(1, -1));
+  assert.deepStrictEqual(creneaux, ['09:30', '10:00', '10:30', '11:00', '11:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'],
+  'de 9h30 à 11h30 et de 14h à 17h, toutes les demi-heures');
+  // ⚠ UNE HEURE HORS LISTE NE SE PERD PAS : les dossiers du comptoir en portent
+  // (« 06:00 »). Un menu qui ne la propose pas la rendrait VIDE à l'affichage,
+  // et la première écriture du champ l'effacerait sans que rien ne le dise.
+  assert.ok(/\[\.\.\.CRENEAUX, heureDuDossier\]\.sort\(\)/.test(JS),
+    'une heure déjà posée hors créneaux entre dans la liste, à sa place');
+}
 
 // Un jeudi 27 août 2026 pour repère.
 const REPERE = new Date(2026, 7, 27, 12, 0, 0);

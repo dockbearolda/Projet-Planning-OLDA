@@ -103,4 +103,17 @@ for (const [nom, src, cle] of [['pont.js', PONT, 'STYLE_MENU'], ['calendrier.js'
     `${nom} : un accent grave non échappé referme le gabarit, et la feuille part NUE`);
 }
 
+// --- 7. IL SE DEROULE VERS LE BAS -----------------------------------------
+// Charlie (30/08) : « tous les menus déroulants doivent se dérouler vers le
+// bas ». Le calendrier ET les menus du comptoir se retournaient AU-DESSUS du
+// champ dès qu'ils ne tenaient pas dessous et qu'ils tenaient dessus : le même
+// geste ouvrait le panneau tantôt en haut tantôt en bas, selon l'endroit de
+// l'écran. S'il ne tient pas, il glisse juste assez pour rester visible.
+assert.ok(!/r\.top-6-p\.height/.test(CAL),
+  'le calendrier ne se retourne plus au-dessus du champ');
+assert.match(CAL, /if\(y\+p\.height>window\.innerHeight-marge\)y=Math\.max\(marge,window\.innerHeight-marge-p\.height\);/,
+  '… il glisse pour rester visible, il ne change pas de côté');
+assert.ok(!/champ\.top-6-haut/.test(PONT),
+  'les menus du comptoir non plus');
+
 console.log('✓ calendrier : un seul pour les TROIS écrans, la semaine commence lundi, et les cases tiennent dans la boîte');

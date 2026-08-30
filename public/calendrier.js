@@ -218,8 +218,14 @@ function calPlacer(etat,ancrage){
   let x=r.left;
   if(x+p.width>window.innerWidth-marge)x=window.innerWidth-marge-p.width;
   if(x<marge)x=marge;
+  /* TOUJOURS VERS LE BAS (30/08). Charlie : « tous les menus deroulants doivent
+     se derouler vers le bas ». Il se retournait AU-DESSUS du champ des qu'il ne
+     tenait pas dessous et qu'il tenait dessus — le meme geste ouvrait le
+     calendrier tantot en haut tantot en bas, selon l'endroit de l'ecran.
+     S'il ne tient pas, il glisse juste assez pour rester visible : il ne passe
+     plus de l'autre cote. */
   let y=r.bottom+6;
-  if(y+p.height>window.innerHeight-marge&&r.top-6-p.height>marge)y=r.top-6-p.height;
+  if(y+p.height>window.innerHeight-marge)y=Math.max(marge,window.innerHeight-marge-p.height);
   panneau.style.left=`${Math.round(x)}px`;
   panneau.style.top=`${Math.round(y)}px`;
   panneau.style.visibility='';

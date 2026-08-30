@@ -108,14 +108,9 @@ export function normaliserCote(v) {
   return n ? `${Number(n)} mm` : '';
 }
 
-export function normaliserHeure(v) {
-  const brut = String(v == null ? '' : v).trim();
-  const d = brut.replace(/\D/g, '');
-  if (!d) return '';
-  if (d.length <= 2) return `${d.padStart(2, '0')}h00`;
-  if (d.length === 3) return `0${d[0]}h${d.slice(1)}`;
-  return `${d.slice(0, 2)}h${d.slice(2, 4)}`;
-}
+// `normaliserHeure` A ETE RETIREE (30/08) : l'heure du retrait se CHOISIT
+// maintenant dans une liste de creneaux, elle ne se tape plus — plus rien
+// n'avait a rattraper « 1430 » en « 14h30 ».
 
 // Rend { texte, iso } : le texte pour l'œil, l'ISO pour la base. Un nom de jour
 // renvoie la PROCHAINE occurrence, jamais aujourd'hui — « jeudi » dit par un
@@ -541,11 +536,28 @@ export function dessinerFicheAtelier(r, ctx) {
   // `retrait_creneau`) — pour le meme fait : quand le client passe.
   // On garde `heureSouhaitee`, celle que le comptoir remplit ; `retrait_creneau`
   // n'est plus lue par la fiche (la colonne reste, elle porte l'historique).
-  const chHeure = champ('fa-mini', fiche.heureSouhaitee || '', { label: 'Heure de retrait', placeholder: 'heure' });
+  // L'HEURE SE CHOISIT, ELLE NE SE TAPE PLUS (30/08). Charlie : « les heures ici
+  // doivent etre un menu deroulant de 9h30 a 11h30 et 14h a 17h, avec toutes les
+  // demi-heures ». C'est l'amplitude ou l'atelier recoit — la taper laissait
+  // poser « 06h00 » ou « 23h30 », des heures ou personne n'est la, et le rappel
+  // de delai comptait dessus.
+  // ⚠ UNE HEURE HORS LISTE NE SE PERD PAS. Les dossiers du comptoir en portent
+  // (« 06:00 » sur celui de demonstration) : un menu qui ne la propose pas la
+  // rendrait VIDE a l'affichage, et la premiere ecriture du champ l'effacerait
+  // sans que rien ne le dise. Elle entre donc dans la liste, a sa place.
+  const CRENEAUX = ['09:30', '10:00', '10:30', '11:00', '11:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
+  const heureLisible = (h) => `${Number(String(h).slice(0, 2))}h${String(h).slice(3, 5)}`;
+  const heureDuDossier = fiche.heureSouhaitee ? String(fiche.heureSouhaitee).slice(0, 5) : '';
+  const creneaux = CRENEAUX.includes(heureDuDossier) || !heureDuDossier
+    ? CRENEAUX
+    : [...CRENEAUX, heureDuDossier].sort();
+  const chHeure = menu('fa-mini', [{ value: '', label: 'heure' },
+    ...creneaux.map((h) => ({ value: h, label: heureLisible(h) }))], heureDuDossier, 'Heure de retrait');
   brancher(chHeure, {
-    label: 'Heure de retrait', normaliser: normaliserHeure,
+    label: 'Heure de retrait',
     envoyer: (v) => {
-      heureRemise = v ? v.replace('h', ':') : null;
+      heureRemise = v || null;
       ctx.patchFiche({ heureSouhaitee: heureRemise });
     },
     apres: majRappel,

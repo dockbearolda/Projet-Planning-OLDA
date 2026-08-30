@@ -2077,13 +2077,18 @@ function menuPlacer(etat){
   if(gauche<b.gauche+marge)gauche=b.gauche+marge;
   panneau.style.left=Math.round(gauche)+'px';
   panneau.style.right='auto';
-  /* Vertical : sous le champ, au-dessus si ça ne tient pas en dessous ET que
-     ça tient au-dessus. La hauteur se lit APRÈS la largeur — une liste plus
-     étroite est plus haute. */
+  /* Vertical : TOUJOURS SOUS LE CHAMP (30/08). Charlie : « tous les menus
+     deroulants doivent se derouler vers le bas ». Il se retournait au-dessus
+     des qu'il ne tenait pas dessous et qu'il tenait dessus — le meme geste
+     ouvrait la liste tantot en haut tantot en bas, selon l'endroit de l'ecran.
+     S'il ne tient pas, il glisse juste assez pour rester visible : il ne passe
+     plus de l'autre cote, et sa liste defile deja (`.menu-liste`, 326 px).
+     La hauteur se lit APRES la largeur — une liste plus etroite est plus haute. */
   const haut=panneau.getBoundingClientRect().height;
-  const dessous=b.bas-champ.bottom-marge, dessus=champ.top-b.haut-marge;
   panneau.style.bottom='auto';
-  panneau.style.top=Math.round(haut>dessous&&dessus>dessous ? Math.max(b.haut+marge,champ.top-6-haut) : champ.bottom+6)+'px';
+  let y=champ.bottom+6;
+  if(y+haut>b.bas-marge)y=Math.max(b.haut+marge,b.bas-marge-haut);
+  panneau.style.top=Math.round(y)+'px';
 }
 
 /* UN PANNEAU POSÉ EN COORDONNÉES DE FENÊTRE NE SUIT PAS CE QUI DÉFILE. Il
