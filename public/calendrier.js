@@ -289,6 +289,10 @@ document.addEventListener('keydown',(ev)=>{
   calFermer();
 },true);
 window.addEventListener('resize',calFermer,{passive:true});
+/* Posé en coordonnées de FENÊTRE : tout défilement le laisse en plan pendant
+   que son champ s'en va, comme le redimensionnement ci-dessus. En capture,
+   pour voir un défilement de conteneur qui ne remonte pas jusqu'ici. */
+window.addEventListener('scroll',calFermer,{capture:true,passive:true});
 
 /** Ouvre le calendrier d'un champ. `ancrage` permet de l'accrocher AILLEURS que
  *  sur le champ lui-meme — c'est ce dont se servent l'ecran de devis (sa date
