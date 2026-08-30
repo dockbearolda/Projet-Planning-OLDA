@@ -56,9 +56,20 @@ assert.ok(!/max-height/.test(RACINE_CSS),
 const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
-assert.ok(/carte\.append\(tete, bandeau, scene, barreDetails\);/.test(JS)
+assert.ok(/carte\.append\(tete, bandeau, scene\);/.test(JS)
   && /racine\.append\(carte, calque, zoneToast\);/.test(JS),
   'tout le contenu vit dans la carte ; seuls le calque et le message restent sur la racine');
+// LA BARRE QUI REPLIAIT LE PANNEAU EST RETIRÉE (30/08, Charlie : « supprime
+// ça »). Elle pliait un panneau qui s'ouvre toujours, et pour l'annoncer elle
+// recopiait sous lui les intitulés de quatre de ses six cases, en plus petit.
+assert.ok(!/const barreDetails =/.test(JS) && !/fa-details__liste/.test(JS),
+  'plus de barre repliable sous la bande du paiement');
+// ⚠ On cherche les RÈGLES, pas les noms : le commentaire qui raconte le
+// retrait les cite toutes les trois.
+assert.ok(!/\.fa-details__b\s*[{:]/.test(CSS) && !/\.fa-details\[hidden\]\s*\{/.test(CSS),
+  '… ni ses règles : le panneau n’a plus d’état caché');
+assert.ok(!/--fa-h-barre/.test(CSS),
+  '… ni son jeton de hauteur, qui ne servait qu’à elle');
 // AUCUNE COLONNE NE DÉFILE POUR ELLE-MÊME : c'est exactement ce qui produisait
 // les deux barres intérieures.
 assert.ok(!/\.fa-col \{[\s\S]*?overflow: auto;/.test(CSS),
@@ -74,13 +85,13 @@ assert.ok(/if \(ev\.target === ficheAtelierEl\) fermerFicheAtelier\(\);/.test(AP
 assert.ok(/ficheAtelierEl\.addEventListener\('click'/.test(APP)
   && !/ficheAtelierEl\.addEventListener\('mousedown'/.test(APP),
   'jamais sur `mousedown` : le blur du champ n’aurait pas encore envoyé la saisie');
-// La bande « Paiement » vient après la barre des actions — un dépliant
-// secondaire se pose sous les actions courantes. Elle s'appelait « Détails »
-// jusqu'au 29/08 : elle mélangeait l'argent, le type de client, la provenance,
-// le poste de production et les documents. Chacun est parti dans sa zone, elle
-// ne porte plus que l'argent — et elle le dit.
-assert.ok(/carte\.append\(tete, bandeau, scene, barreDetails\);/.test(JS),
-  'la bande « Paiement » ferme la carte');
+// La bande de l'argent ferme la scène. Elle s'appelait « Détails » jusqu'au
+// 29/08 : elle mélangeait l'argent, le type de client, la provenance, le poste
+// de production et les documents. Chacun est parti dans sa zone, elle ne porte
+// plus que l'argent. Depuis le 30/08 elle ne se replie plus — le bouton qui la
+// pliait annonçait, en plus petit, les intitulés qu'on lisait juste au-dessus.
+assert.ok(/scene\.append\(travail, panneau\)|panneau\.append\(moitieG, moitieD\);/.test(JS),
+  'la bande de l’argent est faite de ses deux moitiés');
 // LE BLOC DE PIED EST RETIRÉ (29/08, Charlie). Il portait le nom du produit —
 // déjà écrit dans l'entête, à trois centimètres, et c'est exactement le doublon
 // que la règle du 26/08 interdit — et l'horodatage de création, que personne ne
@@ -100,7 +111,11 @@ assert.ok(/lotDossier: lot \? `Article \$\{lot\.rang\} sur \$\{lot\.total\} du t
 // et « Marquer payé » qui doublait la bascule « Soldé ».
 assert.ok(!/fa-bas/.test(JS) && !/'Ajouter la note'/.test(JS) && !/'Envoyer au client'/.test(JS),
   'plus de barre d’actions basse');
-assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Paiement');
+// La zone qui porte l'argent s'appelle « Paiement » dans le CODE, dans son
+// commentaire de zone : depuis le 30/08 elle ne porte plus d'étiquette à
+// l'écran — la barre qui l'annonçait a été retirée, et les six intitulés des
+// cases disent déjà ce qu'on lit.
+assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte son nom');
 
 // ---------------------------------------------------------------------------
 // TROIS ZONES, ET ELLES NE SE MÉLANGENT PLUS (29/08/2026)
@@ -179,7 +194,7 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // au-dessus de sa valeur, et les deux signes qui disent la soustraction.
   for (const attendu of ["caseArgent('Coût', null, chCout)", "caseArgent('Règlement', 'fa-case--large', selReglement)",
     "caseArgent('Marge', null, valMarge)", "caseArgent('Prix TTC', null, chTtc)", "'Acompte versé le'",
-    "caseArgent('Reste à payer', 'fa-case--fin', bSolde, reste)"]) {
+    "caseArgent('Reste à payer', 'fa-case--fin', reste)"]) {
     assert.ok(PAIEMENT.includes(attendu), `la zone Paiement doit porter ${attendu}`);
   }
   // DEUX MOITIÉS, comme la fiche au-dessus : à gauche ce qui ne regarde que
@@ -263,7 +278,8 @@ assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×', \(\)
   'la croix ferme la fiche : c’est la seule sortie souris qui reste');
 assert.ok(/b\.addEventListener\('click', defaire\)/.test(JS),
   'mais le message garde son « Annuler » : sinon la pile devient inatteignable');
-for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details__b']) {
+// (`.fa-details__b` a quitté cette liste le 30/08 avec la barre repliable.)
+for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details']) {
   const regle = CSS.match(new RegExp(`\\${zone} \\{[\\s\\S]*?\\n\\}`))[0];
   assert.ok(/flex-shrink: 0;/.test(regle),
     `${zone} ne se laisse pas comprimer : c'est du chrome fixe, pas de la place à prendre`);
@@ -279,12 +295,12 @@ for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details__b']) {
 const PANNEAU = CSS.match(/\.fa-details \{[\s\S]*?\n\}/)[0];
 assert.ok(!/position: absolute;/.test(PANNEAU),
   'le panneau se déplie dans le flux : en calque, ouvert par défaut, il masquerait les deux colonnes');
-// OUVERT PARTOUT, y compris sur le 14 pouces. Il a fallu deux détours avant
-// d'y arriver — un calque qui recouvrait les colonnes, puis un seuil de hauteur
-// qui le fermait sous 1000 px. Depuis que c'est l'ÉCRAN qui défile et non les
-// colonnes, il n'y a plus de place à économiser.
-assert.ok(/panneau\.hidden = false;/.test(JS),
-  'le panneau est ouvert par défaut, sur toutes les tailles d’écran');
+// OUVERT PARTOUT, ET PLUS SEULEMENT PAR DÉFAUT. Il a fallu trois détours avant
+// d'y arriver — un calque qui recouvrait les colonnes, un seuil de hauteur qui
+// le fermait sous 1000 px, puis une barre repliable dont personne ne se servait.
+// Depuis le 30/08 il n'a plus d'état caché du tout : ni `hidden`, ni bouton.
+assert.ok(!/panneau\.hidden/.test(JS),
+  'le panneau n’a plus d’état caché : il est là, tout le temps');
 assert.ok(!/@media[^{]*\{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS),
   'et il ne redevient un calque nulle part');
 // LA NOTE S'INTERCALE ENTRE LES DEUX (29/08) : on a fini de lire le dossier, on
@@ -296,14 +312,10 @@ assert.ok(/scene\.append\(travail, blocNote, panneau\);/.test(JS),
 assert.ok(!/max-height/.test(PANNEAU) && !/overflow: auto/.test(PANNEAU),
   'rien n’y est coupé ni renvoyé derrière une barre de défilement');
 
-// Démonté au repliage, il emporte les valeurs qu'on venait d'y saisir et fausse
-// les calculs qui les lisent. On le masque, on ne le retire pas.
-assert.ok(/panneau\.hidden = false;/.test(JS) && /panneau\.hidden = !panneau\.hidden;/.test(JS),
-  'le panneau se masque par `hidden`, il n’est jamais démonté');
-assert.ok(!/panneau\.remove\(\)/.test(JS), 'et jamais retiré du document');
-// `hidden` ne masque rien tout seul quand la classe pose son propre `display`.
-assert.ok(/\.fa-details\[hidden\] \{ display: none; \}/.test(CSS),
-  'la règle de masquage est écrite en clair : `display: flex` défait `hidden` en silence');
+// IL N'EST JAMAIS DÉMONTÉ. Retiré du document, il emporterait les valeurs qu'on
+// venait d'y saisir et fausserait les calculs qui les lisent — `majReste` lit
+// `chTtc.value` et `chAcompte.value` dans le DOM.
+assert.ok(!/panneau\.remove\(\)/.test(JS), 'jamais retiré du document');
 
 // ---------------------------------------------------------------------------
 // 3. CE QU'ON TAPE VITE, CE QU'ON RELIT

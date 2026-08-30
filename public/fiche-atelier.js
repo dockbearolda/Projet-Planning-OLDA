@@ -1038,7 +1038,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // d'y arriver — un calque qui recouvrait les colonnes, puis un seuil de
   // hauteur qui le fermait en dessous de 1000 px. Depuis que c'est L'ECRAN qui
   // defile et non les colonnes, il n'y a plus de place a economiser.
-  panneau.hidden = false;
+  // Le panneau ne se replie plus : la barre qui le pliait est partie le 30/08.
 
   // LA NOTE, UNE SEULE, EN FIN DE FICHE. Elle ferme les deux colonnes : on a
   // fini de lire le dossier, on ecrit ce qui ne rentrait dans aucune case.
@@ -1080,12 +1080,26 @@ export function dessinerFicheAtelier(r, ctx) {
   // UN SEUL FAIT SE SAISIT : le montant de l'acompte et sa date. Les deux
   // drapeaux s'en deduisent — un acompte VERSE a forcement ete DEMANDE — et
   // c'est ce qui garde le feu du planning juste sans qu'on ait a cocher.
-  const chAcompte = champ(null, r.acompte_montant == null ? '' : normaliserMontant(r.acompte_montant), {
+  // LE MONTANT SE CENTRE DANS SA BOITE (30/08, Charlie : « centre les 0,00 »).
+  // Il n'est sur AUCUN rail — il est pose au milieu d'un groupe, entre « 50 % »
+  // et le bord de la case — donc rien ne l'appelle a gauche. Meme traitement que
+  // la boite de l'heure et les bulles de taille : une boite courte centre ce
+  // qu'elle porte, exemple ET valeur. Le cout et le prix TTC, eux, ne bougent
+  // pas : ils partent du rail de leur intitule.
+  const chAcompte = champ('fa-mont', r.acompte_montant == null ? '' : normaliserMontant(r.acompte_montant), {
     label: 'Acompte versé', placeholder: '0,00 €',
   });
+  // « LE… » EST RETIRE (30/08). Charlie : « supprime le "le..." a l'interieur ».
+  // La case s'appelle deja « Acompte verse le » : le champ le redisait, a
+  // 20 px de son propre intitule. La carte ne dit pas deux fois la meme chose.
+  // ⚠ LE TEXTE D'EXEMPLE PART, PAS LA BULLE : c'est `:placeholder-shown` qui
+  // donne son fond a un champ vide — « ce qui manque au dossier se voit sans
+  // qu'on le survole ». Un placeholder RETIRE emporterait la bulle avec lui, et
+  // la case vide deviendrait invisible. Il reste donc, vide de texte : une
+  // espace insecable, que rien ne dessine et que le fond continue de suivre.
   const chAcompteDate = champ('fa-date', r.acompte_date
     ? jourCourt(new Date(`${String(r.acompte_date).slice(0, 10)}T12:00:00`)) : '', {
-    label: 'Date de l’acompte', placeholder: 'le…',
+    label: 'Date de l’acompte', placeholder: '\u00a0',
   });
   const resteV = el('span', 'fa-reste__v', '—');
   const reste = el('div', 'fa-reste');
@@ -1117,6 +1131,18 @@ export function dessinerFicheAtelier(r, ctx) {
     const verse = n != null && n > 0;
     if ((r.acompte_verse === true) !== verse) { r.acompte_verse = verse; ctx.patchLigne('acompte_verse', verse); }
     if ((r.acompte_demande === true) !== verse) { r.acompte_demande = verse; ctx.patchLigne('acompte_demande', verse); }
+    // ET « SOLDÉ » AVEC EUX (30/08). Charlie a fait retirer la bascule qui le
+    // cochait — elle était le SEUL endroit de l'application qui écrivait `paye`,
+    // et sans elle un dossier entièrement réglé serait resté « à encaisser » sur
+    // le bon de commande, et se serait plaint au feu du planning.
+    // Le troisième drapeau rejoint donc les deux autres : il se déduit du
+    // montant, comme le dit déjà cette fonction. Un versement qui couvre le TTC
+    // solde le dossier ; le ramener en dessous le rouvre.
+    // ⚠ AU CENTIME : `n >= ttc` refuserait 648,96 contre 648,96 dès qu'un
+    // arrondi de centième traîne dans l'un des deux.
+    const ttc = nombreDe(chTtc.value);
+    const solde = verse && ttc != null && ttc > 0 && n >= ttc - 0.005;
+    if ((r.paye === true) !== solde) { r.paye = solde; ctx.patchLigne('paye', solde); }
   };
   brancher(chAcompte, {
     label: 'Acompte versé', normaliser: normaliserMontant,
@@ -1157,17 +1183,11 @@ export function dessinerFicheAtelier(r, ctx) {
     coche(chAcompte); pulser(); dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
   });
 
-  const bSolde = bouton('fa-seg__b fa-solde', 'Soldé');
-  bSolde.setAttribute('aria-pressed', String(r.paye === true));
-  bSolde.addEventListener('click', () => {
-    const ancien = r.paye === true;
-    r.paye = !ancien;
-    bSolde.setAttribute('aria-pressed', String(r.paye));
-    ctx.patchLigne('paye', r.paye);
-    empiler(() => { r.paye = ancien; bSolde.setAttribute('aria-pressed', String(ancien)); ctx.patchLigne('paye', ancien); majReste(); });
-    coche(bSolde); pulser(); dire(r.paye ? 'Enregistré — soldé' : 'Enregistré — non soldé');
-    majReste();
-  });
+  // LA BASCULE « SOLDÉ » EST RETIRÉE (30/08, Charlie : « supprime ça »). Elle
+  // posait à la main un drapeau que le montant dit déjà — voir `envoyerAcompte`,
+  // qui le déduit maintenant comme les deux autres. Elle pouvait même le
+  // contredire : « Soldé » allumé sur un acompte de 30 % affichait « Reste à
+  // payer : 0,00 € » sur un dossier à moitié réglé.
 
   const selReglement = menu(null, ctx.reglements, r.paiement_mode || '', 'Mode de règlement');
   brancher(selReglement, { label: 'Mode de règlement', envoyer: (v) => ctx.patchLigne('paiement_mode', v || null) });
@@ -1270,7 +1290,7 @@ export function dessinerFicheAtelier(r, ctx) {
     caseArgent('Prix TTC', null, chTtc),
     caseArgent('Acompte versé le', 'fa-case--large',
       chAcompteDate, pastilleAcompte(0.3), pastilleAcompte(0.5), chAcompte),
-    caseArgent('Reste à payer', 'fa-case--fin', bSolde, reste),
+    caseArgent('Reste à payer', 'fa-case--fin', reste),
   );
   panneau.append(moitieG, moitieD);
 
@@ -1279,19 +1299,11 @@ export function dessinerFicheAtelier(r, ctx) {
   // minuscule, avec le `ResizeObserver` qui allait avec — trois etats a tenir,
   // pour un cas qu'aucun PC ne produit. Le projet est PC uniquement depuis le
   // 21/08 ; c'etait un reste de la tablette.
-  const listeDetails = el('span', 'fa-details__liste',
-    'Prix TTC · Coût · Marge · Règlement');
-
-  const chevron = el('span', null, '▾');
-  const barreDetails = bouton('fa-details__b', null, () => {
-    panneau.hidden = !panneau.hidden;
-    chevron.textContent = panneau.hidden ? '▸' : '▾';
-  });
-  barreDetails.append(
-    chevron,
-    el('span', null, 'Paiement'),
-    listeDetails,
-  );
+  // LA BARRE « ▾ PAIEMENT · PRIX TTC · COUT · MARGE · REGLEMENT » EST RETIREE
+  // (30/08, Charlie : « supprime ca »). Elle repliait un panneau qui s'ouvre
+  // toujours — et pour l'annoncer, elle recopiait sous lui les intitules de
+  // quatre de ses six cases, en plus petit. Une ligne entiere pour redire ce
+  // qu'on lisait juste au-dessus, plus un pli que personne ne fait.
 
   // =========================================================================
   // ZONE 6 — LA BARRE D'ACTIONS BASSE A ETE RETIREE (29/08)
@@ -1349,7 +1361,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // exactement le doublon que la règle du 26/08 interdit — et l'horodatage de
   // création, que personne ne vient chercher sur une fiche d'atelier. Ce qu'il
   // disait d'utile, l'appartenance au lot, a rejoint l'entête (voir plus haut).
-  carte.append(tete, bandeau, scene, barreDetails);
+  carte.append(tete, bandeau, scene);
   racine.append(carte, calque, zoneToast);
   return racine;
 }

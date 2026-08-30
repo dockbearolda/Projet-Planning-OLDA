@@ -62,7 +62,6 @@
   --fa-h-pas: var(--ctrl-h);
   --fa-h-champ: var(--ctrl-h);
   --fa-h-bandeau: var(--ctrl-h);
-  --fa-h-barre: var(--ctrl-h);
   /* Deux boîtes qui ne portent PAS de mot : le point de l'enregistrement
      automatique et la pastille de confirmation. Elles ne se déduisent d'aucun
      texte, elles se déclarent. */
@@ -354,20 +353,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
 .fa-row > .fa-lab { width: var(--fa-lab-w); }
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
-/* UNE BOITE COURTE CENTRE CE QU'ELLE PORTE (30/08). Charlie, en designant le
-   champ de l'heure : « ce qui est ecrit dans les input comme exemple doit etre
-   parfaitement centre ». « heure » commencait au rembourrage de gauche et
-   laissait 25,6 px a droite — 7,3 px hors du milieu, ce qui se voit dans une
-   boite de 80 px et pas ailleurs.
-   ⚠ LE PLACEHOLDER PREND L'ALIGNEMENT DU CHAMP, jamais le sien : centre pour
-   l'exemple et cale a gauche pour la valeur, le texte sauterait sous le curseur
-   a la premiere frappe. C'est donc la BOITE qui centre, exemple et valeur.
-   ET SEULEMENT LES BOITES COURTES : les champs poses sur les rails de la grille
-   font partir leur texte du rail de leur intitule (regle du 29/08). Les centrer
-   sortirait toute la colonne de ses rails — celle-la meme qu'on vient d'aligner.
-   Sur cet ecran, les boites courtes sont l'heure et les bulles de taille : elles
-   se comportent pareil. */
-.fa-mini { width: 80px; flex: 0 0 80px; text-align: center; }
+.fa-mini { width: 80px; flex: 0 0 80px; }
 /* LA DATE ET L'HEURE PARTAGENT UNE CELLULE : c'est UN fait — quand le client
    passe — et la grille du client ne donne qu'une case par valeur. La date prend
    ce qui reste, l'heure garde sa boite courte. */
@@ -441,7 +427,7 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    tape. Sa HAUTEUR et sa BORDURE restent celles de `.fa-in` : reecrites ici,
    elles rendaient la bulle 2 px plus courte que les champs d'a cote, et le
    survol ne posait plus de lisere. */
-.fa-nb { width: 100%; padding: 0; text-align: center; background: var(--bg); font-size: var(--fa-val); font-weight: var(--graisse-texte); }
+.fa-nb { width: 100%; padding: 0; background: var(--bg); font-size: var(--fa-val); font-weight: var(--graisse-texte); }
 /* LE TOTAL PREND LA BOITE D'UNE BULLE SANS EN ETRE UNE : meme hauteur, meme
    rail, ni fond ni bordure — on ne le tape pas. C'est le seul chiffre de la
    colonne qu'on lit de loin, il garde donc le cran d'annonce. */
@@ -549,24 +535,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   display: flex; align-items: center;
 }
 
-/* --- ZONE 5 : la barre « Détails » et son calque --------------------------
-   LE PANNEAU EST UN CALQUE, jamais dans le flux. Posé entre les colonnes et la
-   barre basse, il les comprimerait — et elles se mettraient à défiler, la
-   seule chose que cet écran ne doit pas faire. */
-.fa-details__b {
-  flex-shrink: 0;
-  width: 100%; height: var(--fa-h-barre);
-  display: flex; align-items: center; gap: var(--pas-2);
-  padding: 0 var(--pas-4);
-  border: 0; border-top: 1px solid var(--border);
-  background: var(--bg); color: var(--text-2);
-  font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
-  text-align: left; cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.fa-details__b:hover { background: var(--border-soft); color: var(--text-1); }
-
-.fa-details__liste { font-weight: var(--graisse-texte); color: var(--text-3); }
+/* --- ZONE 5 : la bande du paiement ----------------------------------------
+   LA BARRE QUI LA REPLIAIT EST RETIREE (30/08, Charlie : « supprime ca »).
+   Elle pliait un panneau qui s'ouvre toujours, et pour l'annoncer elle
+   recopiait sous lui les intitules de quatre de ses six cases, en plus petit :
+   une ligne entiere de 44 px pour redire ce qu'on lisait juste au-dessus.
+   Ses trois regles sont parties avec elle, et son jeton de hauteur aussi : il
+   ne servait qu'a elle. Le panneau n'a plus d'etat cache. */
 /* DANS LE FLUX SUR UN ECRAN HAUT (28/08) : ouvert par defaut, un calque aurait
    recouvert les deux colonnes des l'ouverture de la fiche. Deplie ici, il
    ALLONGE la scene — donc la fiche, qui fait sa taille — et tout se lit d'un
@@ -599,7 +574,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   min-width: 0;
 }
 .fa-details__moitie--g { border-right: 1px solid var(--border-soft); }
-.fa-details[hidden] { display: none; }
 /* UNE CASE = UN INTITULE AU-DESSUS, SA VALEUR DESSOUS. Cote a cote, les
    intitules ne prennent plus de largeur : c'est ce qui fait tenir six valeurs
    sur une ligne sans rien couper. La valeur garde la hauteur d'une commande —
@@ -813,9 +787,26 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-reste[data-etat="solde"] .fa-reste__v { color: var(--success); }
 .fa-reste[data-etat="entame"] { background: var(--warning-bg); }
 .fa-reste[data-etat="entame"] .fa-reste__v { color: var(--warning); }
-.fa-solde { flex: 0 0 auto; }
-/* LA DATE DE L'ACOMPTE SE LIT PAR LA GAUCHE : c'est un champ, pas un montant.
-   Les deux dernieres regles du compte empile (`.fa-argent__filet + …` et
-   `.fa-argent__k .fa-date`) sont parties avec lui — la premiere mettait en gras
-   la ligne qui suivait le filet de total, la seconde faisait deja ceci. */
-.fa-details .fa-date { text-align: left; }
+/* `.fa-solde` est partie avec la bascule « Solde » (30/08) : le drapeau se
+   deduit maintenant du montant verse, comme les deux autres. */
+
+/* ===========================================================================
+   UNE BOITE COURTE CENTRE CE QU'ELLE PORTE
+   ===========================================================================
+   Charlie, en designant le champ de l'heure (30/08) : « ce qui est ecrit dans
+   les input comme exemple doit etre parfaitement centre ». « heure » commencait
+   au rembourrage de gauche et laissait 25,6 px a droite — 7,3 px hors du
+   milieu, ce qui se voit dans une boite de 80 px et pas dans un champ de 214.
+
+   C'EST LA BOITE QUI CENTRE, EXEMPLE ET VALEUR. Centrer le seul texte
+   d'exemple (`::placeholder`) le ferait sauter sous le curseur a la premiere
+   frappe : l'exemple doit se poser exactement la ou la valeur va s'ecrire.
+
+   ET SEULEMENT LES BOITES COURTES. Les champs poses sur les rails de la grille
+   font partir leur texte du rail de leur intitule (regle du 29/08) : les
+   centrer sortirait toute la colonne de ses rails. Les quatre boites courtes de
+   l'ecran — l'heure, les bulles de taille, la date de l'acompte et son montant —
+   ne sont sur aucun rail, elles sont posees au milieu d'un groupe. Elles sont
+   ecrites ICI, dans UNE regle : deux ecritures redeviennent deux alignements le
+   jour ou l'une bouge. */
+.fa-mini, .fa-nb, .fa-mont, .fa-details .fa-date { text-align: center; }

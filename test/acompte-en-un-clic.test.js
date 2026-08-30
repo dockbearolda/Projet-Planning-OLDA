@@ -52,7 +52,7 @@ assert.strictEqual(verse.length, 1,
 // ---------------------------------------------------------------------------
 // 2. LE CALCUL, ET CE QU'IL REFUSE DE FAIRE
 // ---------------------------------------------------------------------------
-const BLOC = JS.slice(JS.indexOf('const pastilleAcompte ='), JS.indexOf('const bSolde ='));
+const BLOC = JS.slice(JS.indexOf('const pastilleAcompte ='), JS.indexOf('const selReglement ='));
 assert.match(BLOC, /if \(ttc == null \|\| ttc <= 0\)/,
   'sans prix TTC, la pastille ne calcule rien');
 assert.match(BLOC, /dire\('Pas de prix TTC/, 'et elle le DIT, au lieu de poser un zéro');
@@ -64,13 +64,33 @@ assert.match(BLOC, /if \(n === avant\) return;/,
   'recliquer la même pastille ne réécrit rien et n’empile pas un faux retour');
 
 // CHAQUE ACTION EST DANS LA CASE DU MONTANT QU'ELLE CHANGE. Les deux pastilles
-// calculent l'ACOMPTE : elles sont dans sa case. « Soldé » met le RESTE à zéro :
-// il est dans la sienne, et devant le nombre — la bande finit sur le chiffre
-// qu'on vient y chercher.
+// calculent l'ACOMPTE : elles sont dans sa case.
 assert.match(JS, /caseArgent\('Acompte versé le', 'fa-case--large',\s*\n\s*chAcompteDate, pastilleAcompte\(0\.3\), pastilleAcompte\(0\.5\), chAcompte\)/,
   'les deux pastilles sont dans la case de l’acompte, qu’elles calculent');
-assert.match(JS, /caseArgent\('Reste à payer', 'fa-case--fin', bSolde, reste\)/,
-  '« Soldé » est dans la case du reste, qu’il met à zéro');
+
+// ---------------------------------------------------------------------------
+// 2 bis. « SOLDÉ » EST RETIRÉE — LE TROISIÈME DRAPEAU SE DÉDUIT (30/08)
+// ---------------------------------------------------------------------------
+// Charlie, en désignant la bascule : « supprime ça ». Elle était le SEUL
+// endroit de l'application qui écrivait `paye` : sans elle et sans déduction,
+// un dossier entièrement réglé serait resté « à encaisser » sur le bon de
+// commande (bureau.js) et se serait plaint au feu du planning (ligne-faits.js).
+// Elle pouvait même contredire les chiffres : allumée sur un acompte de 30 %,
+// elle affichait « Reste à payer : 0,00 € » sur un dossier à moitié réglé.
+assert.ok(!/fa-solde|const bSolde/.test(JS), 'la bascule « Soldé » n’existe plus');
+// ⚠ On cherche la RÈGLE, pas le nom : le commentaire qui raconte le retrait
+// cite la classe, et un test qui trébuche sur son propre commentaire est un
+// test qu'on désarme au lieu de le lire.
+assert.ok(!/\.fa-solde\s*\{/.test(CSS), '… ni sa règle');
+assert.match(JS, /caseArgent\('Reste à payer', 'fa-case--fin', reste\)/,
+  'la case du reste ne porte plus que son nombre');
+// LE DRAPEAU REJOINT LES DEUX AUTRES, dans la MÊME fonction : un versement qui
+// couvre le TTC solde le dossier, le ramener en dessous le rouvre.
+assert.match(JS, /const solde = verse && ttc != null && ttc > 0 && n >= ttc - 0\.005;/,
+  '« payé » se déduit du montant versé, au centime près');
+const paye = JS.match(/ctx\.patchLigne\('paye',/g) || [];
+assert.strictEqual(paye.length, 1,
+  `un seul endroit écrit « payé » (${paye.length} trouvés)`);
 assert.match(BLOC, /`\$\{Math\.round\(part \* 100\)\} %`/,
   'le libellé se déduit du taux : un seul nombre, pas deux à tenir d’accord');
 
