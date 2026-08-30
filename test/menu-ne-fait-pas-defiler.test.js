@@ -26,6 +26,7 @@ const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
 const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+const CALENDRIER = fs.readFileSync(path.join(RACINE, 'public/calendrier.js'), 'utf8');
 
 // --- 1. Le panneau sort du conteneur qui défile ----------------------------
 // En position absolue il restait DEDANS : quoi qu'on calcule, il comptait dans
@@ -101,14 +102,12 @@ function faireNoeud(enfants = []) {
   return n;
 }
 const vm = require('node:vm');
-function joue(ev, etats, cal) {
+function joue(ev, etats) {
   const fermes = [];
   const contexte = vm.createContext({
     ev,
     menus: new Map(etats.map((e, i) => [i, e])),
     menuFermer: (e) => { e.ouvert = false; fermes.push(e.nom); },
-    calOuvert: cal || null,
-    calFermer: () => fermes.push('calendrier'),
     // Les noeuds factices sont de simples objets : `instanceof Node` doit donc
     // les reconnaitre, sinon la garde tomberait pour la mauvaise raison.
     Node: Object,
@@ -137,13 +136,23 @@ assert.deepStrictEqual(joue({ target: faireNoeud() }, [menuA, { ...menuB, ouvert
 assert.deepStrictEqual(joue({ target: faireNoeud() }, [{ nom: 'C', ouvert: false, panneau: faireNoeud() }]), [],
   'un menu fermé est laissé tranquille');
 
-// LE CALENDRIER SUIT LA MÊME RÈGLE. Il est posé en coordonnées de fenêtre lui
-// aussi : sans ça il restait en plan pendant que son champ s'en allait.
-const panneauCal = faireNoeud();
-assert.deepStrictEqual(joue({ target: faireNoeud() }, [], { panneau: panneauCal }), ['calendrier'],
-  'un défilement de l’écran referme aussi le calendrier');
-assert.deepStrictEqual(joue({ target: panneauCal }, [], { panneau: panneauCal }), [],
-  '… et jamais un défilement venu de lui-même');
+// LE CALENDRIER SUIT LA MÊME RÈGLE, MAIS DEPUIS SON PROPRE FICHIER. Il est
+// posé en coordonnées de fenêtre lui aussi : sans ça il restait en plan
+// pendant que son champ s'en allait. `calOuvert`/`calFermer` sont PRIVÉS au
+// module ES `calendrier.js` — pont.js ne peut pas les lire depuis sa propre
+// écoute globale : c'est exactement ce que faisait l'ancienne version de ce
+// garde-fou, en les injectant à la main dans un bac à sable qui ne existait
+// pas en vrai. `calFermer` throw en silence à CHAQUE défilement du comptoir.
+// Le calendrier ferme donc désormais sur son propre `window.addEventListener
+// ('scroll', …)`, au même endroit que son `resize` déjà présent.
+assert.ok(!/\bcalOuvert\b/.test(source[0]) && !/\bcalFermer\b/.test(source[0]),
+  'pont.js ne référence plus des noms privés à calendrier.js — ils n’existent pas dans sa portée');
+const ecouteScrollCal = CALENDRIER.match(/window\.addEventListener\('scroll',calFermer,([^)]*)\)/);
+assert.ok(ecouteScrollCal, 'un défilement referme aussi le calendrier, depuis calendrier.js');
+assert.ok(/capture:\s*true/.test(ecouteScrollCal[1]),
+  '… en capture — un conteneur qui défile ne remonte pas au document');
+assert.ok(/passive:\s*true/.test(ecouteScrollCal[1]),
+  '… et en passif, comme le reste');
 
 // --- 3 ter. LE DÉFILEMENT S'ARRÊTE AU BAS DE LA LISTE ---------------------
 // Sans `overscroll-behavior`, la molette poursuivie en bout de liste part dans

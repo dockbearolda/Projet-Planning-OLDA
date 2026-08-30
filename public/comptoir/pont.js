@@ -2117,9 +2117,8 @@ function menuDefilementExterieur(ev){
     if(cible instanceof Node&&a.panneau.contains(cible))return;
     menuFermer(a,false);
   });
-  /* Le calendrier, lui, n'a rien qui défile : tout défilement le laisse en
-     plan, posé en coordonnées de fenêtre pendant que son champ s'en va. */
-  if(calOuvert&&!(cible instanceof Node&&calOuvert.panneau.contains(cible)))calFermer();
+  /* Le calendrier se referme lui-même sur tout défilement, depuis
+     calendrier.js — il n'a pas d'état à consulter ici. */
 }
 window.addEventListener('scroll',menuDefilementExterieur,{capture:true,passive:true});
 window.addEventListener('resize',()=>{menus.forEach(a=>menuFermer(a,false))},{passive:true});
