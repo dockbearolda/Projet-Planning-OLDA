@@ -63,9 +63,7 @@ b,strong{font-weight:var(--graisse-forte)}
 
 *{box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
-.container{max-width:1180px;margin:var(--pas-4) auto;padding:0 var(--pas-3) 40px}
-
-
+/* .container : partagé avec le devis, vit dans charte.css (voir « Le cadre du comptoir »). */
 
 .card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
 h2{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}

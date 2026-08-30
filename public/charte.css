@@ -562,6 +562,20 @@ input[type="radio"]:focus-visible {
 }
 .champ-recherche input::placeholder { color: var(--text-3); }
 
+/* ---------------------------------------------------------- Le cadre du comptoir
+   UN SEUL CADRE, pour la même raison que le fil des étapes juste en dessous :
+   chaque parcours avait le sien, et ils ne tombaient pas au même endroit.
+   Mesuré le 30/08 : le devis (1260 px, rembourrage 24 px — il lui faut la
+   place pour sa colonne « La demande ») centrait son cadre 40 px plus à
+   gauche que la vente (1180 px, rembourrage 16 px) puis lui reprenait encore
+   24 px de rembourrage contre 16 — la bulle « 1. Besoins » démarrait donc
+   32 px plus à gauche que « 1. Articles ». Deux écrans ouverts à un clic
+   l'un de l'autre doivent tomber en face, pas se ressembler.
+   Il vit donc ICI, comme le fil des étapes qu'il porte : le cadre ne peut
+   plus diverger, et le devis (le plus large des deux) donne sa mesure aux
+   deux parcours. */
+.container { max-width: 1260px; margin: var(--pas-4) auto; padding: 0 var(--pas-4) 55px; }
+
 /* ------------------------------------------------------- Le fil des étapes
    UN SEUL FIL D'ÉTAPES, pour la même raison que le bouton juste au-dessus :
    les deux parcours du comptoir en avaient chacun un, et ils ne se
