@@ -403,7 +403,17 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    `<input>` (≈ 20 caracteres) l'emporte sinon sur la piste, et les cases
    debordent de la colonne. Defaut deja paye ailleurs. */
 .fa-tailles { display: flex; gap: var(--pas-2); flex: 1; min-width: 0; }
-.fa-taille { display: flex; flex-direction: column; gap: var(--pas-1); flex: 1 1 0; min-width: 0; }
+/* DEUX BANDES, ET LA PREMIERE EST CELLE D'UNE RANGEE (30/08). Charlie, en
+   designant « Tailles », « Type » et « Provenance » : « tout ca doit etre
+   aligne horizontalement ». L'etiquette de la taille etait collee au-dessus de
+   sa bulle, dans une bande a sa seule hauteur de texte : elle tombait donc 14,85
+   px plus haut que les intitules de la colonne d'en face, qui se centrent, eux,
+   dans la boite d'une commande. Sa bande prend la meme boite — un JETON, pas un
+   calage a l'oeil — et les cinq etiquettes retombent sur la meme ligne. */
+.fa-taille {
+  display: grid; grid-template-rows: var(--fa-h-champ) auto; align-items: center;
+  gap: var(--pas-1); flex: 1 1 0; min-width: 0;
+}
 /* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, exactement comme celui de la rangee
    a cote duquel elle se pose maintenant : elle prend `.fa-lab` au lieu de
    redeclarer son cran, son encre et sa graisse — elle les redeclarait, et PAS a
@@ -515,14 +525,16 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    composant, deux comportements, decides par le voisinage plutot que par le
    contenu. */
 .fa-row--empile { align-items: flex-start; }
-/* SON INTITULE NE PREND PLUS LA BOITE D'UNE COMMANDE (30/08). Il la prenait —
-   `min-height: var(--fa-h-champ)` et son texte centre dedans — pour tomber sur
-   la premiere ligne de la rangee, du temps ou cette premiere ligne etait une
-   bulle de 50 px. Depuis que l'intitule de la taille est sorti de la bulle, la
-   premiere ligne est une LIGNE DE TEXTE : « Tailles » et « S », meme cran, meme
-   encre, meme interligne, tous deux poses en haut de la rangee — ils tombent au
-   meme endroit sans qu'on ait rien a caler. La boite de 50 px les separait de
-   16 px. */
+/* SON INTITULE PREND LA BOITE D'UNE COMMANDE et y centre son texte : il tombe
+   donc exactement sur la premiere BANDE de la rangee, quelle que soit la hauteur
+   du reste — et cette bande fait la meme boite que toute rangee de la fiche,
+   d'ou l'alignement avec « Type » et « Provenance » en face.
+   C'etait un `padding-top: 9px` avant le 29/08 — un nombre regle a l'oeil sur
+   une mise en page qui a bouge depuis. Une hauteur est un JETON. */
+.fa-row--empile > .fa-lab {
+  min-height: var(--fa-h-champ);
+  display: flex; align-items: center;
+}
 
 /* --- ZONE 5 : la barre « Détails » et son calque --------------------------
    LE PANNEAU EST UN CALQUE, jamais dans le flux. Posé entre les colonnes et la
