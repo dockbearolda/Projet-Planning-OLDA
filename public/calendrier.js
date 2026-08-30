@@ -269,7 +269,19 @@ document.addEventListener('pointerdown',(ev)=>{
   if(calOuvert.panneau.contains(ev.target)||ev.target===calOuvert.champ)return;
   calFermer();
 },true);
-document.addEventListener('keydown',(ev)=>{if(ev.key==='Escape')calFermer()});
+/* ECHAP FERME LE CALENDRIER, ET RIEN D'AUTRE. En CAPTURE, et le composant
+   retient l'evenement : l'ecran qui l'accueille a presque toujours son propre
+   Echap — la fiche de l'atelier se ferme avec, l'ecran de devis aussi — et une
+   seule touche fermait les DEUX. Renoncer a changer une date emportait l'ecran.
+   La capture passe avant tout ecouteur pose sur `document`, quel que soit
+   l'ordre de chargement des fichiers : une garde du cote de l'ecran (« y a-t-il
+   un calendrier ouvert ? ») dependait, elle, de qui s'etait inscrit en premier —
+   et le calendrier avait deja retire son panneau quand la fiche regardait. */
+document.addEventListener('keydown',(ev)=>{
+  if(ev.key!=='Escape'||!calOuvert)return;
+  ev.stopPropagation();
+  calFermer();
+},true);
 window.addEventListener('resize',calFermer,{passive:true});
 
 /** Ouvre le calendrier d'un champ. `ancrage` permet de l'accrocher AILLEURS que

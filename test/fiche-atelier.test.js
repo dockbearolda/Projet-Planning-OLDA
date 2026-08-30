@@ -373,8 +373,16 @@ assert.ok(/if \(e\.key !== 'Escape' \|\| !ficheAtelierId\) return;/.test(APP),
 // … MAIS D'ABORD CE QUI EST POSÉ PAR-DESSUS. Le calendrier du champ « Retrait »
 // vit dans le <body>, au-dessus de la fiche : sans garde, une seule touche
 // fermait les deux, et renoncer à changer une date emportait l'écran.
-assert.ok(/if \(document\.querySelector\('\.cal-panneau'\)\) return;/.test(APP),
-  'Échap referme le calendrier avant la fiche');
+// LA GARDE EST DANS LE COMPOSANT, EN CAPTURE — écrite du côté de la fiche
+// (« y a-t-il un panneau ouvert ? ») elle ne marchait pas : le calendrier avait
+// déjà retiré le sien quand on regardait.
+{
+  const CAL = fs.readFileSync(path.join(RACINE, 'public/calendrier.js'), 'utf8');
+  assert.ok(/if\(ev\.key!=='Escape'\|\|!calOuvert\)return;\s*\n\s*ev\.stopPropagation\(\);/.test(CAL),
+    'Échap referme le calendrier et s’arrête là');
+  assert.ok(/calFermer\(\);\n\},true\);/.test(CAL),
+    '… en capture, pour passer avant l’Échap de l’écran qui l’accueille');
+}
 // L'ANNULATION N'A PLUS QU'UN POINT D'ENTRÉE : le message qui suit chaque
 // modification. Le bouton de l'entête a été retiré le 28/08 — d'où la garde
 // ci-dessous : sans le bouton du message, la pile deviendrait inatteignable.
