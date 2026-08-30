@@ -1234,3 +1234,29 @@ body.a-connecter { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .volet-plus::details-content { transition: none; }
 }
+
+
+/* ===========================================================================
+   LE CHAMP DE DATE FANTÔME
+   ===========================================================================
+   Notre calendrier (`calendrier.js`) se greffe sur un `input[type=date]` et
+   n'écrit que là : c'est ce qui permet à un écran de garder SON champ à lui —
+   une liste d'options sur la demande de devis, un champ de texte qui accepte
+   « demain » et « +3 » sur la fiche de l'atelier — et de laisser la date ISO
+   vivre dans un champ qu'on ne voit pas.
+
+   IL EST INVISIBLE MAIS RENDU. `display: none` le rendrait inatteignable, et
+   `showPicker()` — le repli quand le module n'arrive pas — refuse un élément
+   qui n'est pas rendu. Il est donc à 1 px, transparent, hors du flux : posé
+   dans une rangée en `flex`, un fantôme en `width: 100%` prendrait une part de
+   la ligne et décalerait tout ce qui la partage.
+
+   ⚠ UNE SEULE RÈGLE, ICI. Elle était écrite dans `demande-devis.css`, donc
+   invisible depuis le CRM : le deuxième écran qui en a eu besoin l'aurait
+   réécrite de mémoire, et les deux auraient divergé. */
+input[type="date"].date-fantome {
+  position: absolute;
+  width: 1px; height: 1px; min-height: 0;
+  padding: 0; margin: 0; border: 0;
+  opacity: 0; pointer-events: none;
+}

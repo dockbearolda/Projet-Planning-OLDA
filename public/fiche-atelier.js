@@ -67,6 +67,12 @@ const ic = (name, cls) => {
   return n;
 };
 
+// LE CALENDRIER EST CELUI DU COMPTOIR (30/08). Charlie, en designant le champ
+// « Retrait » : « ici je veux un calendrier, le meme que l'autre ». Le meme,
+// litteralement : le composant a ete sorti de `comptoir/pont.js` vers
+// `calendrier.js`, que les trois ecrans lisent. Cf. l'entete de ce module-la.
+import { calendrierOuvrir } from './calendrier.js';
+
 const deuxChiffres = (n) => String(n).padStart(2, '0');
 const jourCourt = (d) => `${JOURS[d.getDay()]} ${deuxChiffres(d.getDate())}/${deuxChiffres(d.getMonth() + 1)}`;
 const isoDuJour = (d) => `${d.getFullYear()}-${deuxChiffres(d.getMonth() + 1)}-${deuxChiffres(d.getDate())}`;
@@ -485,13 +491,43 @@ export function dessinerFicheAtelier(r, ctx) {
     const c = champ(null, valeurIso ? jourCourt(new Date(`${String(valeurIso).slice(0, 10)}T12:00:00`)) : '', {
       label, placeholder: 'jj/mm, demain, +3, lundi', requis: !!opts.requis,
     });
+    // LA DATE ISO VIT DANS UN CHAMP QU'ON NE VOIT PAS. Le calendrier n'ecrit
+    // que dans un `input[type=date]` ; le champ qu'on lit, lui, porte
+    // « sam. 05/09 » et accepte encore « demain », « +3 », « lundi ». Deux
+    // roles, deux champs — c'est le meme montage que sur l'ecran de devis, ou
+    // la date se choisit dans une liste.
+    const fantome = el('input', 'date-fantome');
+    fantome.type = 'date';
+    fantome.tabIndex = -1;
+    fantome.setAttribute('aria-hidden', 'true');
+    fantome.value = String(valeurIso || '').slice(0, 10);
     brancher(c, {
       label,
       normaliser: (v) => normaliserDate(v, ctx.aujourdhui && ctx.aujourdhui()),
-      envoyer: (n) => envoyer(n.iso),
+      // LE FANTOME SUIT, Y COMPRIS QUAND ON ANNULE : sinon le calendrier
+      // rouvrirait sur le jour qu'on vient de defaire, et le cerclerait.
+      envoyer: (n) => { fantome.value = n.iso || ''; envoyer(n.iso); },
       apres: opts.apres,
     });
-    return { rangee: rangee(opts.court || label, c, ...(opts.suite || [])), champ: c };
+    // LE CLIC OUVRE LE CALENDRIER, LE CLAVIER GARDE LA SAISIE. On prend le
+    // `pointerdown` — donc le champ ne prend pas le curseur a la souris — mais
+    // la tabulation l'atteint toujours, et ce qu'on y tape passe par le meme
+    // `blur` qu'avant. Charlie : « qui se deroule quand je clique dessus ».
+    c.setAttribute('aria-haspopup', 'dialog');
+    c.setAttribute('aria-expanded', 'false');
+    c.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      calendrierOuvrir(fantome, c);
+    });
+    // CE QUE LE CALENDRIER POSE PASSE PAR LE MEME CHEMIN QUE LA FRAPPE : on
+    // ecrit l'ISO dans le champ visible et on lui rend son `blur`. Il
+    // normalise (« sam. 05/09 »), envoie, empile l'annulation et dit
+    // « Enregistre » — une deuxieme ecriture ici aurait perdu ces trois-la.
+    fantome.addEventListener('change', () => {
+      c.value = fantome.value;
+      c.dispatchEvent(new Event('blur'));
+    });
+    return { rangee: rangee(opts.court || label, c, ...(opts.suite || []), fantome), champ: c };
   };
 
   // LE RAPPEL DE DÉLAI SE RECALCULE. Écrit une fois à l'ouverture, il continuait
@@ -672,7 +708,18 @@ export function dessinerFicheAtelier(r, ctx) {
     // en-tête — un libellé posé au-dessus alors que toutes les lignes voisines
     // portent le leur à gauche : une ligne de plus, et deux modèles de rangée
     // dans la même colonne.
-    if (tailles.length) droite.append(rangee('Tailles', grilleT, 'fa-row--empile'));
+    //
+    // ELLE PASSE EN DERNIER, SOUS LES FACES (30/08). Charlie : « mets cette
+    // ligne au-dessus des tailles et réaligne verticalement tout ce que tu
+    // peux ». Les deux vont ensemble : depuis que l'intitulé de la taille est
+    // sorti de la bulle, cette rangée fait DEUX lignes — 76,3 px au lieu de 50.
+    // Posée au milieu de la colonne, elle décalait de 26,3 px tout ce qui la
+    // suivait, et « Faces » ne tombait plus en face de sa voisine de gauche.
+    // En dernier, son surplus pend sous une colonne qui n'a plus rien en face :
+    // les quatre rangées de droite retombent sur les quatre rails de gauche.
+    // Et l'ordre y gagne : la référence, la couleur, la technique, le marquage
+    // et les faces disent l'ARTICLE ; les tailles disent COMBIEN.
+    const ligneTailles = tailles.length ? rangee('Tailles', grilleT, 'fa-row--empile') : null;
 
     // --- LES FACES --------------------------------------------------------
     // LA RANGÉE N'EST PLUS QU'UN MENU (29/08). Charlie : « cette ligne est à
@@ -931,6 +978,7 @@ export function dessinerFicheAtelier(r, ctx) {
     if (!nomsCoches.length) ajoutF.classList.add('fa-choix--vide');
     const ligneFaces = rangee('Faces', ajoutF, 'fa-row--ancre');
     droite.append(ligneFaces);
+    if (ligneTailles) droite.append(ligneTailles);
   }
 
   // TROIS CHAMPS DE TEXTE LIBRE, UN SEUL RESTE (29/08). Charlie, en designant

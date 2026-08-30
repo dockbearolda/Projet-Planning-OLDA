@@ -182,8 +182,21 @@ assert.ok(/<option id="desiredDateOption" value="custom">Choisir une date<\/opti
   '« Choisir une date » est le premier choix de la liste, et c’est lui qui affichera la date');
 assert.ok(/<input id="desiredDate" class="date-fantome" type="date" tabindex="-1" aria-hidden="true">/.test(DEVIS),
   'l’input de date est un fantôme : plus jamais un deuxième champ à l’écran');
-assert.ok(/input\[type="date"\]\.date-fantome\{[^}]*height:0;min-height:0;opacity:0/.test(DEVIS),
-  '… rendu mais sans place ni encre, à une spécificité qui bat la règle des champs');
+// LA RÈGLE A DÉMÉNAGÉ DANS charte.css (30/08) : la fiche de l'atelier pose le
+// même fantôme, et deux écrans ne peuvent pas le décrire chacun de leur côté.
+// Elle y gagne `position: absolute` — posé dans une rangée en `flex`, un
+// fantôme en `width: 100%` prendrait une part de la ligne.
+{
+  const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8');
+  const regle = CHARTE.match(/input\[type="date"\]\.date-fantome \{[^}]*\}/);
+  assert.ok(regle, 'le fantôme est habillé dans la charte partagée');
+  for (const morceau of ['position: absolute', 'min-height: 0', 'opacity: 0']) {
+    assert.ok(regle[0].includes(morceau),
+      `… rendu mais sans place ni encre (${morceau}), à une spécificité qui bat la règle des champs`);
+  }
+  assert.ok(!/display:\s*none/.test(regle[0]),
+    'JAMAIS display:none : showPicker() refuse un élément qui n’est pas rendu');
+}
 assert.ok(/try\{\$\('desiredDate'\)\.showPicker\(\)\}catch\(e\)\{\$\('desiredDate'\)\.focus\(\)\}/.test(DEVIS),
   'choisir « Choisir une date » ouvre le calendrier natif, avec un repli');
 assert.ok(/opt\.textContent=iso\?formatDate\(iso\):'Choisir une date'/.test(DEVIS),

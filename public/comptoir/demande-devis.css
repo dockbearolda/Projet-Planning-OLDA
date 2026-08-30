@@ -400,7 +400,8 @@ h2{letter-spacing:-.01em}
    `visibility:hidden` casseraient l'ouverture du calendrier natif. */
 /* `input[type="date"]` (0,1,1) battait la classe seule (0,1,0) : le fantôme
    reprenait les 44 px d'un champ et creusait un trou invisible sous la liste. */
-input[type="date"].date-fantome{display:block;width:100%;height:0;min-height:0;opacity:0;margin:0;padding:0;border:0;overflow:hidden}
+/* Le champ fantome est habille par charte.css (30/08) : le CRM en pose un
+   aussi, et deux ecrans ne peuvent pas le decrire chacun de leur cote. */
 /* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
    Les grilles de formulaire collaient leurs cellules EN BAS
    (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son

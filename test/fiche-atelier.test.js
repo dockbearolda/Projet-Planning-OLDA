@@ -31,7 +31,11 @@ const APP = lire('public/app.js');
 // deux papiers. Aucun DOM n'est touché par les fonctions qu'on éprouve ici.
 const bac = { document: { createElement: () => ({ style: {}, classList: { add() {} } }) }, window: {}, console, Math, JSON, Number, String, Array, Object, Date, parseFloat, parseInt, setTimeout, clearTimeout };
 vm.createContext(bac);
-vm.runInContext(`${JS.replace(/^export /gm, '')}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge };`, bac);
+// Les `import` partent avec les `export` : le bac n'a pas de chargeur de
+// modules, et les fonctions éprouvées ici n'en dépendent pas (le calendrier ne
+// sert qu'au dessin de la rangée « Retrait »).
+const NU = JS.replace(/^export /gm, '').replace(/^import[\s\S]*?from '[^']*';$/gm, '');
+vm.runInContext(`${NU}\nthis.API = { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge };`, bac);
 const { normaliserMontant, normaliserTelephone, normaliserHeure, normaliserDate, texteMarge } = bac.API;
 
 // ---------------------------------------------------------------------------
