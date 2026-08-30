@@ -946,9 +946,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   outline: none;
   padding: 9px 0;
   font-family: inherit;
-  font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
-  color: var(--text-1);
   background: transparent;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
@@ -1508,7 +1506,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   border: 0;
   background: transparent;
   font: inherit;
-  color: var(--text-1);
   padding: 20px 24px;
   height: var(--row-h);
   font-family: inherit;
@@ -2392,9 +2389,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
   background: var(--surface);
-  color: var(--text-1);
   font: inherit;
-  font-size: var(--taille-texte);
   line-height: var(--ligne-serre);
   resize: vertical;
 }
@@ -3238,7 +3233,6 @@ body.col-resizing .grid-wrap { pointer-events: none; }
 }
 
 select.cell-input { -webkit-appearance: none; appearance: none; }
-input[type="date"].cell-input { color: var(--text-1); }
 
 /* scrollbars sobres */
 ::-webkit-scrollbar { width: 12px; height: 12px; }

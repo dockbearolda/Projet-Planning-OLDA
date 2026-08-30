@@ -127,9 +127,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  color: var(--text-1);
   font: inherit;
-  font-size: var(--taille-texte);
   cursor: pointer;
 }
 .cat-row-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }

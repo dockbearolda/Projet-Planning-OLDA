@@ -59,9 +59,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
-  color: var(--text-1);
   font: inherit;
-  font-size: var(--taille-texte);            /* iOS : en dessous de 16px, le champ zoome */
   line-height: var(--ligne-texte);
   resize: vertical;
   min-height: 104px;
@@ -145,7 +143,7 @@
    juste ; en 17 px la même règle donne 3 × 211 et la rangée déborde de 63 px.
    Avec `min-width: 0`, le prix reprend ses 102 px et la désignation récupère
    les 150 px qu'on lui prenait. */
-.reg-tarif-input { min-width: 0; min-height: var(--ctrl-h); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; font-size: var(--taille-texte); background: var(--surface); color: var(--text-1); }
+.reg-tarif-input { min-width: 0; min-height: var(--ctrl-h); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; font: inherit; background: var(--surface); }
 .reg-tarif-input--nom { flex: 1 1 250px; }
 .reg-tarif-input--num { flex: 0 0 102px; text-align: right; }
 /* LES DEUX COMMANDES DE LA RANGEE PRENNENT LA BOITE DE LA RANGEE. Elles
