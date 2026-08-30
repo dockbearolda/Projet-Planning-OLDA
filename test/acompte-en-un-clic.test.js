@@ -58,10 +58,12 @@ assert.match(BLOC, /if \(ttc == null \|\| ttc <= 0\)/,
 assert.match(BLOC, /dire\('Pas de prix TTC/, 'et elle le DIT, au lieu de poser un zéro');
 assert.match(BLOC, /Math\.round\(ttc \* part \* 100\) \/ 100/,
   'le montant est arrondi au centime, pas laissé en flottant');
-assert.match(BLOC, /empiler\(\(\) => poser\(avant\)\);/,
-  'un acompte posé d’un clic s’annule d’un clic');
+// LA PILE D'ANNULATION EST RETIRÉE (30/08) : son unique porte était le bouton
+// « Annuler » du message, et le message ne dit plus les réussites. Ce qui reste
+// vrai, et qui compte : recliquer la même pastille ne réécrit rien.
 assert.match(BLOC, /if \(n === avant\) return;/,
-  'recliquer la même pastille ne réécrit rien et n’empile pas un faux retour');
+  'recliquer la même pastille ne réécrit rien');
+assert.ok(!/empiler\(/.test(JS), 'plus de pile d’annulation : elle n’avait plus de porte');
 
 // CHAQUE ACTION EST DANS LA CASE DU MONTANT QU'ELLE CHANGE. Les deux pastilles
 // calculent l'ACOMPTE : elles sont dans sa case.

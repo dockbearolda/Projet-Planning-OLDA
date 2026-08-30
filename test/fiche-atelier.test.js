@@ -83,7 +83,7 @@ assert.ok(!/fa-flag/.test(JS) && !/\.fa-flag\s*\{/.test(CSS),
 // tombait qu'au moment où l'on CHANGEAIT vraiment une valeur — le chemin
 // s'arrête avant `empiler` quand rien n'a bougé. Un menu gardait alors son
 // liseré, sans message ni enregistrement.
-for (const nom of ['empiler', 'pulser', 'dire', 'defaire']) {
+for (const nom of ['pulser', 'dire']) {
   assert.ok(new RegExp(`(const|function)\\s+${nom}\\b`).test(JS),
     `${nom} doit être DÉCLARÉ : le chemin d’enregistrement l’appelle`);
 }
@@ -304,8 +304,10 @@ assert.ok(/tete\.append\(ident, outils\);/.test(JS),
 // alors que la consigne du 26/08 est « on navigue à la souris ».
 assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×', \(\) => ctx\.fermer\(\)\)\);/.test(JS),
   'la croix ferme la fiche : c’est la seule sortie souris qui reste');
-assert.ok(/b\.addEventListener\('click', defaire\)/.test(JS),
-  'mais le message garde son « Annuler » : sinon la pile devient inatteignable');
+// LE MESSAGE NE DIT PLUS LES RÉUSSITES (30/08) — donc plus de « Annuler », et
+// plus de pile d'annulation : elle n'avait que cette porte-là.
+assert.ok(!/'fa-toast__undo'/.test(JS) && !/const annulations/.test(JS),
+  'plus de pile d’annulation : son unique porte est partie avec le message');
 // (`.fa-details__b` a quitté cette liste le 30/08 avec la barre repliable.)
 for (const zone of ['.fa-head', '.fa-bandeau', '.fa-details']) {
   const regle = CSS.match(new RegExp(`\\${zone} \\{[\\s\\S]*?\\n\\}`))[0];
@@ -423,14 +425,28 @@ assert.ok(/if \(e\.key !== 'Escape' \|\| !ficheAtelierId\) return;/.test(APP),
   assert.ok(/calFermer\(\);\n\},true\);/.test(CAL),
     '… en capture, pour passer avant l’Échap de l’écran qui l’accueille');
 }
-// L'ANNULATION N'A PLUS QU'UN POINT D'ENTRÉE : le message qui suit chaque
-// modification. Le bouton de l'entête a été retiré le 28/08 — d'où la garde
-// ci-dessous : sans le bouton du message, la pile deviendrait inatteignable.
-assert.ok(/'fa-toast__undo', 'Annuler'/.test(JS),
-  'le message garde son « Annuler » : c’est le seul point d’entrée qui reste');
-// LA PILE EST ILLIMITÉE et sans expiration : une correction de midi se défait
-// à 17 h, c'est la même journée de travail.
-assert.ok(!/annulations\.length >|slice\(-\d/.test(JS), 'la pile d’annulation ne se borne pas');
+// LE MESSAGE NE PARLE PLUS QUE DES REFUS (30/08). Charlie, en désignant la
+// bande noire qui s'affichait à chaque enregistrement : « il faut supprimer
+// ça ». Elle était grande PAR DÉFAUT — une accolade orpheline avalait la règle
+// qui posait sa zone — mais l'arbitrage porte sur le fond : trois confirmations
+// pour une frappe, il n'en reste qu'UNE, le point de l'entête.
+// « Le vert se tait, l'échec parle » : le message reste, pour ce qu'on refuse.
+{
+  const messages = JS.match(/\bdire\(/g) || [];
+  assert.strictEqual(messages.length, 1,
+    `le message ne sert plus qu’aux refus (${messages.length} appels trouvés)`);
+  assert.ok(/dire\('Pas de prix TTC/.test(JS),
+    '… et celui qui reste est un refus, pas une réussite');
+}
+// ⚠ ET SA ZONE EST BIEN POSÉE. Une accolade orpheline au premier niveau d'une
+// feuille n'est pas ignorée : l'analyseur la prend pour le début d'une règle et
+// AVALE la suivante. C'est ce qui est arrivé à `.fa-toast-zone` — sans elle,
+// plus de `position: absolute` ni de `left`, et la pastille du coin s'étalait
+// sur les 1440 px de l'écran.
+assert.ok(/\.fa-toast-zone \{ position: absolute; left: 20px;/.test(CSS),
+  'le message se pose dans le coin, il ne barre pas l’écran');
+assert.ok(!/^\}$/m.test(CSS.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[^{}\n]*\{[\s\S]*?\n\}$/gm, '')),
+  'aucune accolade orpheline : elle mangerait la règle qui la suit');
 
 // ---------------------------------------------------------------------------
 // 6. LE MODULE NE DÉPEND PAS D'APP.JS

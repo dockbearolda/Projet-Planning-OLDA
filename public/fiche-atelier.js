@@ -194,13 +194,7 @@ export function dessinerFicheAtelier(r, ctx) {
   const prod = fiche.prod && typeof fiche.prod === 'object' ? fiche.prod : {};
 
   const racine = el('div', 'fa');
-  // LA PILE D'ANNULATION EST ILLIMITÉE et sans limite de temps. Une correction
-  // faite à midi peut se défaire à 17 h : c'est la même journée de travail, et
-  // rien ne justifie qu'elle expire.
-  const annulations = [];
-  const empiler = (defaire) => { annulations.push(defaire); };
-
-  // --- La confirmation, l'indicateur, le message ----------------------------
+  // --- Ce qui dit que ca s'enregistre --------------------------------------
   // LA PASTILLE DE CONFIRMATION EST RETIREE (30/08). Charlie, en designant le
   // menu du reglement : « une fois selectionne, sur la validation c'est moche,
   // je n'aime pas du tout, il faut quelque chose de ultra rapide ».
@@ -213,10 +207,22 @@ export function dessinerFicheAtelier(r, ctx) {
   // racine par la meme occasion : le message du bas les lisait de travers lui
   // aussi, son bouton « Annuler » sortait en 17 px au lieu de 14.)
   //
-  // ET ELLE DISAIT UNE TROISIEME FOIS ce que deux autres disaient deja : le
-  // point de l'entete s'allume, et le message du bas nomme le champ ET porte
-  // « Annuler ». Trois confirmations pour une frappe — « le vert se tait,
-  // l'echec parle ». Il en reste deux, dont une actionnable.
+  // ET LE MESSAGE DU BAS NE DIT PLUS LES REUSSITES (30/08, deuxieme passe).
+  // Charlie : « y'a une grande barre noire qui s'affiche une fois que j'ai
+  // selectionne, il faut supprimer ca ». Elle etait grande PAR DEFAUT : un
+  // accolade orpheline, laissee la veille en retirant l'animation de la
+  // pastille, avalait la regle qui posait la zone du message — sans elle, plus
+  // de `position: absolute`, plus de `left: 20px`, et la pastille noire du
+  // coin s'etalait sur les 1440 px de l'ecran, haute de 53.
+  // L'accolade est reparee, ET le message se tait sur les reussites : trois
+  // confirmations pour une frappe, il n'en reste qu'UNE, le point de l'entete.
+  //
+  // CE QUE CA COUTE, et c'est le prix decide : « Annuler » etait la SEULE porte
+  // de la pile d'annulation. Elle part avec le message, la pile aussi. Sur cette
+  // fiche chaque champ se corrige la ou il se lit — defaire, c'est retaper.
+  //
+  // LE MESSAGE RESTE POUR LES REFUS : « le vert se tait, l'echec parle ». Il ne
+  // s'affiche donc plus que quand on demande quelque chose d'impossible.
   // L'INDICATEUR NE PARLE QUE QUAND IL SE PASSE QUELQUE CHOSE. Il affichait
   // « Enregistrement automatique » en permanence : une phrase qui ne dit rien
   // d'actionnable, dans l'entête, alors que chaque modification donne déjà son
@@ -232,28 +238,14 @@ export function dessinerFicheAtelier(r, ctx) {
 
   const zoneToast = el('div', 'fa-toast-zone');
   let minuteurToast = 0;
-  const dire = (message, avecAnnuler) => {
+  const dire = (message) => {
     zoneToast.replaceChildren();
     const t = el('div', 'fa-toast');
     t.append(el('span', null, message));
-    if (avecAnnuler !== false) {
-      const b = el('button', 'fa-toast__undo', 'Annuler');
-      b.type = 'button';
-      b.addEventListener('click', defaire);
-      t.append(b);
-    }
     zoneToast.append(t);
     clearTimeout(minuteurToast);
     minuteurToast = setTimeout(() => zoneToast.replaceChildren(), 6000);
   };
-
-  function defaire() {
-    const geste = annulations.pop();
-    if (!geste) { dire('Rien à annuler', false); return; }
-    geste();
-    pulser();
-    dire('Modification annulée', false);
-  }
 
   // --- LE CYCLE D'UN CHAMP --------------------------------------------------
   // `focus` retient la valeur, `blur` normalise, compare, et n'envoie QUE si ça
@@ -269,14 +261,7 @@ export function dessinerFicheAtelier(r, ctx) {
       const ancien = avant;
       avant = champ.value;
       opts.envoyer(normalise);
-      empiler(() => {
-        champ.value = ancien;
-        avant = ancien;
-        opts.envoyer(opts.normaliser ? opts.normaliser(ancien) : ancien);
-        opts.apres && opts.apres();
-      });
       pulser();
-      dire(`Enregistré — ${opts.label}`);
       opts.apres && opts.apres();
     };
     // UN MENU REND LA MAIN DES QU'ON A CHOISI (30/08). Charlie : « une fois
@@ -423,9 +408,7 @@ export function dessinerFicheAtelier(r, ctx) {
       if (ancien === n) return;
       poserPriorite(n);
       ctx.patchLigne('priority', n);
-      empiler(() => { poserPriorite(ancien); ctx.patchLigne('priority', ancien); });
       pulser();
-      dire('Enregistré — priorité');
     });
     return b;
   });
@@ -691,7 +674,7 @@ export function dessinerFicheAtelier(r, ctx) {
     tailles.forEach((taille, i) => {
       const case_ = el('div', 'fa-taille');
       const c = champ('fa-nb', taille.n, { label: `Taille ${taille.t}`, placeholder: '0', inputMode: 'numeric' });
-      const poser = (n, tracer) => {
+      const poser = (n) => {
         const borne = Math.max(0, Math.round(Number(n) || 0));
         const ancien = Number(tailles[i].n) || 0;
         if (borne === ancien) return;
@@ -700,22 +683,13 @@ export function dessinerFicheAtelier(r, ctx) {
         majTotal();
         const liste = listeTailles();
         Promise.resolve(ctx.patchProd({ tailles: liste })).then(reposerPrix);
-        if (tracer) {
-          empiler(() => {
-            tailles[i].n = ancien;
-            c.value = ancien ? String(ancien) : '';
-            majTotal();
-            Promise.resolve(ctx.patchProd({ tailles: listeTailles() })).then(reposerPrix);
-          });
-        }
       };
       c.addEventListener('blur', () => {
         const avant = Number(tailles[i].n) || 0;
         const vise = Math.max(0, Math.round(Number(c.value.replace(/\D/g, '')) || 0));
         if (vise === avant) { c.value = avant ? String(avant) : ''; return; }
-        poser(vise, true);
+        poser(vise);
         pulser();
-        dire(`Enregistré — taille ${taille.t}`);
       });
       // L'INTITULE EST DEHORS, LA BULLE N'ENTOURE QUE LE CHAMP (30/08).
       case_.append(el('span', 'fa-lab fa-taille__k', String(taille.t)), c);
@@ -862,7 +836,6 @@ export function dessinerFicheAtelier(r, ctx) {
         : [...cochees(), nom];
       if (!dedans) {
         const e = ecartDe(nom);
-        dire(e ? `${nom} — ${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}` : `Face ajoutee — ${nom}`, false);
         await poserFaces(suite.map(zoneDe));
         return;
       }
@@ -877,7 +850,6 @@ export function dessinerFicheAtelier(r, ctx) {
         if (!ok) return;
       }
       const e = ecartDe(nom);
-      dire(e ? `${nom} — ${e > 0 ? '+' : '−'} ${euros(Math.abs(e))}` : `Face retiree — ${nom}`, false);
       await poserFaces(suite.map(zoneDe));
     };
 
@@ -899,8 +871,10 @@ export function dessinerFicheAtelier(r, ctx) {
         // ⚠ ET L'ORDRE COMPTE : la famille D'ABORD, le dossier ENSUITE. Poser la
         // face sur le dossier redessine la fiche (la structure change) et emporte
         // cette fonction avec elle — l'ecriture suivante n'arriverait jamais.
-        const rangee = ctx.creerFace ? await ctx.creerFace(nom) : false;
-        dire(rangee ? `Face creee — ${nom}` : `Face ajoutee — ${nom}`, false);
+        // LA FAMILLE D'ABORD, LE DOSSIER ENSUITE — voir le commentaire du bloc.
+        // Ce que la famille a repondu ne se dit plus : la fiche ne raconte plus
+        // ses reussites (30/08). Dans les deux cas la face entre sur le dossier.
+        if (ctx.creerFace) await ctx.creerFace(nom);
         await poserFaces([...faces, { face: nom }]);
       };
       saisie.addEventListener('blur', () => finir(true));
@@ -1182,7 +1156,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // drapeaux du feu pour un versement qui n'a pas eu lieu.
   const pastilleAcompte = (part) => bouton('fa-seg__b', `${Math.round(part * 100)} %`, () => {
     const ttc = nombreDe(chTtc.value);
-    if (ttc == null || ttc <= 0) { dire('Pas de prix TTC — l’acompte ne peut pas s’en déduire', false); return; }
+    if (ttc == null || ttc <= 0) { dire('Pas de prix TTC — l’acompte ne peut pas s’en déduire'); return; }
     const avant = nombreDe(chAcompte.value);
     const n = Math.round(ttc * part * 100) / 100;
     if (n === avant) return;
@@ -1192,9 +1166,7 @@ export function dessinerFicheAtelier(r, ctx) {
       majReste();
     };
     poser(n);
-    empiler(() => poser(avant));
     pulser();
-    dire(`Enregistré — acompte de ${Math.round(part * 100)} %`);
   });
 
   // LA BASCULE « SOLDÉ » EST RETIRÉE (30/08, Charlie : « supprime ça »). Elle

@@ -138,8 +138,12 @@ assert.ok(APP.includes('taillesLogo = table;') && APP.includes('taillesLogoEnVol
 const CREER = APP.slice(APP.indexOf('async function creerFaceDeFamille'), APP.indexOf('function facesProposees'));
 assert.ok(/\} catch \(err\) \{[\s\S]*return false;/.test(CREER),
   'un refus des réglages rend `false`, il ne jette pas');
-assert.match(FICHE, /const rangee = ctx\.creerFace \? await ctx\.creerFace\(nom\) : false;\s*\n\s*dire\(rangee \? `Face creee — \$\{nom\}` : `Face ajoutee — \$\{nom\}`, false\);\s*\n\s*await poserFaces\(/,
-  'la fiche dit laquelle des deux a eu lieu, et pose la face sur le dossier dans les deux cas');
+// LE MESSAGE QUI DISAIT LAQUELLE DES DEUX A EU LIEU EST RETIRÉ (30/08) : la
+// fiche ne dit plus les réussites — « il faut supprimer ça » (Charlie, en
+// désignant la bande noire). Ce qui compte tient toujours : la face est posée
+// sur le dossier dans les deux cas, que sa famille l'ait acceptée ou non.
+assert.match(FICHE, /if \(ctx\.creerFace\) await ctx\.creerFace\(nom\);\s*\n\s*await poserFaces\(/,
+  'la face est posée sur le dossier, que sa famille l’ait acceptée ou non');
 // ⚠ L'ORDRE COMPTE : la FAMILLE d'abord, le DOSSIER ensuite. Poser la face sur
 // le dossier redessine la fiche — la structure change — et emporte la fonction
 // avec elle : l'écriture suivante n'arriverait jamais.

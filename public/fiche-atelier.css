@@ -103,11 +103,6 @@
      DEDUISENT. Le bouton du message sort de son texte (14 × interligne + deux
      pas + le trait reserve), le filet s'etire sur la rangee qui le porte. Un
      nombre ecrit ici, c'est un nombre a maintenir. */
-  /* L'encre du message est l'accent, donc son bouton se pose SUR l'accent :
-     `--on-primary` en transparence. Écrit en blanc dur, il disparaîtrait de
-     nuit — l'accent s'inverse, le blanc reste blanc. */
-  --fa-undo-fond: rgba(var(--on-primary-rgb, 255, 255, 255), .14);
-  --fa-undo-fond-2: rgba(var(--on-primary-rgb, 255, 255, 255), .26);
 
   /* L'INTERLIGNE EST UN JETON, ET IL EST POSE ICI (29/08). 138 des 141 textes
      de cet ecran se rendaient en `line-height: normal` : c'est le CONTENU qui
@@ -718,7 +713,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    dans un calque de la racine quand l'echelle vivait sur la carte, sa boite
    entiere — largeur, hauteur, interligne — ne resolvait rien, et le rond de
    16 px sortait en losange de 14,3 x 23,4. */
-}
+
+/* ⚠ UNE ACCOLADE ORPHELINE MANGE LA REGLE SUIVANTE. En retirant l'animation de
+   la pastille, son `}` de fermeture etait reste seul sur sa ligne. Au premier
+   niveau d'une feuille, un `}` n'est pas ignore : l'analyseur le prend pour le
+   debut d'une regle et AVALE la suivante en entier. C'est `.fa-toast-zone` qui
+   y est passee — sans elle, plus de `position: absolute` ni de `left`, et la
+   pastille noire du coin s'est etalee sur les 1440 px de l'ecran, haute de 53.
+   « Une grande barre noire » (Charlie). Rien ne le signale : la feuille se
+   charge, tout le reste s'applique. */
 .fa-toast-zone { position: absolute; left: 20px; bottom: 66px; z-index: 30; }
 .fa-toast {
   display: flex; align-items: center; gap: var(--pas-2);
@@ -728,24 +731,15 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   box-shadow: var(--shadow-toast);
   animation: faToastIn var(--dur-1) var(--ease) both;
 }
-.fa-toast__undo {
-  /* SA BOÎTE SORT DE SON TEXTE : 14 × 1,45 + 2 × 6 + le trait réservé ≈ 34 px.
-     Elle vit DANS le message et n'a pas à le grandir — c'est pour ça qu'elle ne
-     prend pas `--ctrl-h`, et c'est la seule commande de cet écran dans ce cas. */
-  padding: var(--pas-1) var(--pas-2); line-height: var(--ligne-texte);
-  border: 1px solid transparent; border-radius: var(--arrondi-champ);
-  background: var(--fa-undo-fond); color: var(--surface);
-  font: inherit; font-size: var(--fa-lab); font-weight: var(--graisse-note);
-  cursor: pointer;
-}
-.fa-toast__undo:hover { background: var(--fa-undo-fond-2); }
+/* LE BOUTON « ANNULER » EST PARTI AVEC LA PILE (30/08) : le message ne dit plus
+   les reussites, il ne restait donc aucune porte vers elle. */
 @keyframes faToastIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Le mouvement réduit coupe les deux animations : ce qu'elles disent — « c'est
-   enregistré », « voilà ce qui vient de changer » — se lit sans elles. */
+/* Le mouvement réduit coupe l'animation : ce que le message dit — un refus —
+   se lit sans elle. */
 @media (prefers-reduced-motion: reduce) {
   .fa-toast { animation: none; }
 }
