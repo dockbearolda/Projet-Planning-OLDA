@@ -114,11 +114,17 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   const PRODUCTION = zone("// ZONE 4", "// ZONE 5");
   const PAIEMENT = zone("// ZONE 5 — PAIEMENT", "// ZONE 6");
 
-  // Le client : qui c'est, quand il l'a, ce qu'on lui envoie.
+  // Le client : qui c'est, et quand il l'a.
+  // LA RANGÉE « DOCUMENTS » A ÉTÉ RETIRÉE (30/08, Charlie : « tout ça tu
+  // supprimes »). On cherche l'ÉCRITURE, pas le mot : le commentaire qui
+  // explique le retrait nomme la rangée, et le test tomberait sur sa propre
+  // explication — piège déjà payé deux lignes plus bas.
   for (const attendu of ["'Type'), selType", "'Provenance'), selProvenance",
-    "rangee('Documents', docs)", "titreSection('Client')"]) {
+    "titreSection('Client')"]) {
     assert.ok(CLIENT.includes(attendu), `la zone Client doit porter ${attendu}`);
   }
+  assert.ok(!/rangee\('Documents'/.test(JS) && !/fa-btn--mini/.test(JS),
+    'plus de rangée « Documents » : ni le récapitulatif .txt, ni le brouillon mailto');
   // La production : ce qu'il y a à faire, et QUAND on le fait.
   assert.ok(PRODUCTION.includes("titreSection('Production')"),
     'la zone de production porte son nom');
@@ -138,7 +144,7 @@ assert.ok(/el\('span', null, 'Paiement'\)/.test(JS), '… et elle s’appelle Pa
   // 187,3 · 247,3 · 307,3 · 367,3 des deux côtés).
   assert.ok(PRODUCTION.includes("droite.append(titreSection('Production'), el('div', 'fa-filet'));"),
     'la colonne de production ouvre sur son titre et son filet');
-  assert.ok(CLIENT.includes("gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient,"),
+  assert.ok(CLIENT.includes("gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient);"),
     '… et celle du client sur les deux mêmes, dans le même ordre');
   // ⚠ « Production » ET « Consigne » SONT PARTIS (29/08). Charlie, en désignant
   // les trois champs de texte libre de la fiche : « tout ça doit être supprimé

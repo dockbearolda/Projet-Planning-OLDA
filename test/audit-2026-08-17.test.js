@@ -74,9 +74,17 @@ function bloc(src, signature) {
   assert.ok(!/throw err;/.test(o),
     'aucun appelant n’attend cette promesse : la rejeter ne produit RIEN à l’écran');
 
-  const t = bloc(APP, 'async function telechargerRecap(r)');
-  assert.ok(!/\.catch\(\(\) => \{\}\)/.test(t) && /reportError\(/.test(t),
-    'même règle pour le récapitulatif : pas de fichier amputé en silence');
+  // LE RÉCAPITULATIF EN .TXT N'EXISTE PLUS (30/08) : sa seule porte était la
+  // rangée « Documents » de la fiche atelier, retirée sur demande de Charlie
+  // (« tout ça tu supprimes »). L'exigence, elle, ne bouge pas — elle passe sur
+  // ce qui reste, le ticket : rien ne sort du poste sans son détail.
+  // ⚠ On cherche la DÉFINITION, pas le nom : le commentaire qui raconte le
+  // retrait cite les deux fonctions, et un test qui trébuche sur son propre
+  // commentaire est un test qu'on désarme au lieu de le lire.
+  assert.ok(!/function telechargerRecap\(/.test(APP) && !/function recapTexte\(/.test(APP),
+    'le récapitulatif .txt est retiré, fonction comprise — plus rien ne l’appelait');
+  assert.ok(!/function envoyerParEmail\(/.test(APP) && !/const EMAIL_MAX =/.test(APP),
+    'le brouillon mailto aussi : son bouton est parti avec la rangée');
 }
 
 // ===========================================================================

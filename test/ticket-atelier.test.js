@@ -431,15 +431,20 @@ const DEMANDE = {
     'plus de bouton de papier dans l’en-tête de la fiche');
   assert.ok(!/'open-btn'/.test(APP), 'plus de bouton « ouvrir la fiche »');
   assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
-  // Le récapitulatif complet reste accessible — mais en téléchargement (c'est un
-  // document de travail, il n'a jamais eu à sortir sur l'imprimante). Il vivait
-  // dans une rangée du tiroir ; depuis le 29/08 c'est la fiche atelier qui le
-  // porte, dans sa rangée « Documents », et app.js garde la fonction.
-  assert.ok(/'Récap complet'/.test(FICHE_ATELIER) && /ctx\.telecharger/.test(FICHE_ATELIER),
-    'le récapitulatif se télécharge depuis la fiche');
-  assert.ok(/telecharger: \(ligne\) => telechargerRecap\(ligne\)/.test(APP),
-    '… et c’est bien telechargerRecap qui le fabrique');
-  assert.ok(/'Email au client'/.test(FICHE_ATELIER), 'et l’e-mail au client aussi');
+  // LE RÉCAPITULATIF EN .TXT EST PARTI À SON TOUR (30/08). Il avait déménagé du
+  // tiroir vers la rangée « Documents » de la fiche le 29/08 ; Charlie a fait
+  // supprimer la rangée entière le lendemain — l'intitulé et ses deux boutons.
+  // La fonction part avec : un fichier que personne ne descend est un format de
+  // plus à tenir à jour à chaque champ ajouté.
+  // CE QUI RESTE, et qui suffit : `ticketTexte(modeleTicket(r))`, le même
+  // récapitulatif en texte, copié dans le presse-papier depuis la boîte du
+  // ticket — c'est ce qu'on colle dans un message au client.
+  assert.ok(!/'Récap complet'|'Email au client'/.test(FICHE_ATELIER),
+    'la fiche ne porte plus la rangée « Documents »');
+  assert.ok(!/ctx\.telecharger|ctx\.email/.test(FICHE_ATELIER), 'ni les deux crochets du contexte');
+  assert.ok(!/telecharger: \(ligne\)|email: \(ligne\)/.test(APP), '… que la fiche ne réclame plus');
+  assert.ok(/const texte = ticketTexte\(modeleTicket\(r\)\);/.test(APP),
+    'le récapitulatif en texte reste, et se copie');
   assert.ok(!/imprimerRecap/.test(APP), 'imprimerRecap ne doit plus exister');
 
   // LA LIGNE S'OUVRE AU CLIC, et par la MÊME fonction que la carte : deux vues

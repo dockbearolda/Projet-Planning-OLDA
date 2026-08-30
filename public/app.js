@@ -3651,8 +3651,6 @@ function contexteFicheAtelier(r, marquage) {
       location.hash = HASH_CLIENTS;
       fermerFicheAtelier();
     },
-    telecharger: (ligne) => telechargerRecap(ligne),
-    email: (ligne) => envoyerParEmail(ligne),
   };
 }
 
@@ -3754,62 +3752,14 @@ function dateFr(iso) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
 }
 
-// Le récapitulatif en TEXTE, tel qu'il s'imprime et se télécharge. Reconstruit
-// à la demande depuis la ligne ET sa fiche : il porte donc les corrections
-// faites depuis, pas l'état du jour de la prise.
-function recapTexte(r) {
-  const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
-  const lignes = [
-    'ATELIER OLDA — RÉCAPITULATIF PROJET',
-    '',
-    f.ref ? `Référence : ${f.ref}` : null,
-    f.source ? `Origine : ${f.source}` : null,
-    `Client : ${r.billing_company || '—'}`,
-    `Projet : ${r.product || '—'}`,
-    `Étape : ${stageDestinationLabel(r.stage, r.sub_stage ?? null)}`,
-    `Responsable : ${r.responsable || 'À attribuer'}`,
-    r.referent ? `Référent : ${r.referent}` : null,
-    `Date souhaitée : ${dateFr(r.deadline)}${f.heureSouhaitee ? ` à ${f.heureSouhaitee.replace(':', 'h')}` : ''}`,
-    // Une demande n'a pas de prix : on le DIT, on n'écrit pas « 0,00 € ».
-    `Prix TTC : ${r.project_value == null ? 'à chiffrer' : eur(Number(r.project_value))}`,
-    f.production ? `Production : ${f.production}` : null,
-  ].filter(Boolean);
-
-  const bloc = (titre, liste) => {
-    if (!Array.isArray(liste) || !liste.length) return;
-    lignes.push('', titre.toUpperCase());
-    for (const l of liste) lignes.push(`${l.k} : ${l.v}`);
-  };
-  bloc('Client', f.client);
-  bloc(f.source === 'Demande de devis' ? 'Demande' : 'Vente', f.details);
-  return lignes.join('\n');
-}
-
-async function telechargerRecap(r) {
-  // Le récapitulatif se compose depuis la fiche COMPLÈTE. Si elle n'arrive pas,
-  // on ne descend PAS un fichier amputé : il finirait imprimé ou envoyé, et il
-  // aurait l'air complet. Même règle que le ticket.
-  try {
-    await chargerFicheComplete(r.id);
-    completerFiche(r);
-  } catch (_) {
-    reportError(new Error('Détail de la commande indisponible — vérifie la connexion, puis retélécharge.'));
-    return;
-  }
-  const nom = `Recap_${(r.fiche && r.fiche.ref) || r.billing_company || 'projet'}`.replace(/[^\w.-]+/g, '_');
-  // Le BOM en tête : sans lui, Excel et le Bloc-notes de Windows affichent les
-  // accents en charabia — et ce fichier finit souvent sur un poste Windows.
-  const blob = new Blob([`﻿${recapTexte(r).replace(/\n/g, '\r\n')}`], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${nom}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  showToast('Récapitulatif téléchargé');
-}
+// LE RÉCAPITULATIF EN .TXT EST RETIRÉ (30/08). Il se téléchargeait depuis la
+// rangée « Documents » de la fiche atelier, que Charlie a fait supprimer d'un
+// bloc — l'intitulé et ses deux boutons. Plus rien n'appelait `recapTexte` ni
+// `telechargerRecap`, et un fichier que personne ne descend est un format de
+// plus à tenir à jour à chaque champ ajouté.
+// CE QUI RESTE : `ticketTexte(modeleTicket(r))`, le même récapitulatif en texte,
+// que la boîte du ticket copie dans le presse-papier — c'est ce qu'on colle
+// dans un message au client.
 
 // ===========================================================================
 // LE TICKET DE L'ATELIER — le ressortir depuis la ligne, le corriger, l'imprimer
@@ -4494,27 +4444,10 @@ async function chargerModeles() {
   try { MODELES = await api('GET', '/api/modeles'); } catch (_) { MODELES = []; }
 }
 
-// OUVRE le brouillon d'email, avec le récapitulatif déjà écrit. Rien ne part.
-//
-// `mailto:` a une limite pratique de longueur (les clients mail coupent au-delà
-// de ~2 000 caractères, sans le dire) : un récapitulatif de trente articles
-// arriverait tronqué au milieu d'une ligne. On coupe donc NOUS, proprement, et
-// on le dit dans le message plutôt que de laisser le client mail décider.
-const EMAIL_MAX = 1800;
-function envoyerParEmail(r) {
-  const texte = ticketTexte(modeleTicket(r));
-  const coupe = texte.length > EMAIL_MAX
-    ? `${texte.slice(0, EMAIL_MAX)}\n\n[…] Récapitulatif complet en pièce jointe.`
-    : texte;
-  const objet = `${r.billing_company || 'Votre commande'} — Atelier OLDA`;
-  const dest = r.contact_email || '';
-  // Sans adresse, on ouvre quand même : le brouillon est prêt, il ne manque que
-  // le destinataire — c'est plus utile qu'un refus « pas d'email sur la fiche ».
-  if (!dest) showToast('Pas d’email sur la fiche — le brouillon s’ouvre sans destinataire.');
-  window.location.href = `mailto:${encodeURIComponent(dest)}`
-    + `?subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(coupe)}`;
-}
-
+// LE BROUILLON D'E-MAIL EST RETIRÉ (30/08), avec le bouton « Email au client »
+// qui l'ouvrait — seul appelant. Il passait par `mailto:`, donc par le client
+// mail configuré sur le poste : sur un poste qui n'en a pas, le clic ne faisait
+// rien du tout, sans rien dire.
 
 // Bouton « ouvrir la fiche projet » : rejoint le cluster documents de la
 // cellule Dossier. C'est LUI qui ouvre la bulle récapitulative — comme le ↗ de

@@ -197,7 +197,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
               border-color var(--dur-1) var(--ease);
 }
 .fa-btn:hover { background: var(--bg); color: var(--text-1); }
-.fa-btn--mini { padding: 0 var(--pas-2); }
 /* UNE ICONE SEULE PREND LE ROND — c'est la forme qui dit le role (rectangle
    arrondi : ca se remplit ou ca agit ; rond : une icone, une initiale ; pilule :
    une etiquette). La croix de la fiche etait un rectangle nomme « carre », a la
@@ -367,57 +366,46 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-2); }
 .fa-fort { font-weight: var(--graisse-note); }
 
-.fa-compte { margin-left: auto; flex-shrink: 0; font-size: var(--fa-lab); color: var(--text-2); }
-/* LES CHIFFRES DE LA RANGEE DES TAILLES SE LISENT EN NORMAL (29/08). Charlie :
-   « la police des chiffres ici et ici doit etre normal ». Le total des pieces et
-   chaque quantite etaient en 800 — la graisse la plus lourde de la charte, celle
-   du montant TTC et du reste a payer — pour des nombres qu'on relit sans les
-   chercher. Une valeur ordinaire de la fiche est en 400 ; ils la prennent. */
-.fa-total { font-size: var(--fa-fort); font-weight: var(--graisse-texte); color: var(--text-1); }
 
 /* --- Les tailles ----------------------------------------------------------
-   LE NOMBRE S'ÉCRIT (28/08) : les « + / − » sont retirés. Sans eux la case n'a
-   plus que deux enfants, l'étiquette et le nombre — donc le nombre prend toute
-   la largeur rendue, et c'est lui qu'on vient lire.
-   ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinsèque d'un
-   `<input>` (≈ 20 caractères) l'emporte sinon sur la piste de la grille, et
-   les quatre cases débordent de la colonne. Défaut déjà payé ailleurs. */
-.fa-tailles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--pas-2); flex: 1; min-width: 0; }
-/* LA BULLE EST COUPEE EN DEUX AU MILIEU (29/08). Charlie, en la designant :
-   « les bulles ici ont un probleme, rien n'est centre ». L'etiquette etait
-   collee a gauche, le nombre pousse a droite par un `flex: 1`, et entre les
-   deux 30 px de vide — trois bulles cote a cote donnaient trois trous. Pire,
-   l'etiquette prenant sa largeur naturelle (12,4 px pour « M », 8 pour « L »,
-   17,9 pour « XL »), les nombres commencaient a 892, 1 000 et 1 122 px : trois
-   departs pour la meme colonne de chiffres.
-   Deux pistes EGALES, l'etiquette calee sur la fin de la premiere et le nombre
-   sur le debut de la seconde : la coupure tombe au milieu de la bulle quelle
-   que soit la taille, les etiquettes partagent un rail et les nombres un autre. */
-.fa-taille {
-  display: grid; grid-template-columns: 1fr 1fr; align-items: center;
-  gap: var(--pas-2); min-width: 0;
-  padding: 0 var(--pas-2); border-radius: var(--arrondi-champ); background: var(--bg);
+   L'INTITULE SORT DE LA BULLE (30/08). Charlie, en designant une case : « la
+   taille doit etre a l'exterieur de la bulle, et la bulle ne sert qu'a rentrer
+   les chiffres a l'interieur, les modifier ». La bulle enveloppait les DEUX —
+   la lettre et le nombre : elle disait « voici une taille » la ou elle doit dire
+   « on tape ici », et c'etait le seul rectangle arrondi de la fiche qui ne se
+   remplissait pas. La lettre monte au-dessus, la bulle redescend autour du seul
+   champ, le nombre s'y centre.
+   TOUT SUR UNE LIGNE : la grille en tenait quatre par rangee et renvoyait la
+   cinquieme dessous, sous une case vide. Des parts egales d'une seule ligne — un
+   nombre de trois chiffres tient dans 60 px.
+   ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinseque d'un
+   `<input>` (≈ 20 caracteres) l'emporte sinon sur la piste, et les cases
+   debordent de la colonne. Defaut deja paye ailleurs. */
+.fa-tailles { display: flex; gap: var(--pas-2); flex: 1; min-width: 0; }
+.fa-taille { display: flex; flex-direction: column; gap: var(--pas-1); flex: 1 1 0; min-width: 0; }
+/* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, exactement comme celui de la rangee
+   a cote duquel elle se pose maintenant : elle prend `.fa-lab` au lieu de
+   redeclarer son cran, son encre et sa graisse — elle les redeclarait, et PAS a
+   l'identique (600 contre 400). Deux ecritures, deux resultats, sur une ligne
+   qu'ils partagent desormais. Elle n'ajoute que le centrage. */
+.fa-taille__k { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+/* LA QUANTITE SE LIT AU CRAN DE TOUTES LES VALEURS (29/08) — c'est la GRAISSE
+   qui la fait ressortir, pas un demi-pouce de plus. Elle etait au cran d'annonce
+   a cote d'une lettre de 14.
+   LE FOND NE LA QUITTE PLUS : un champ en ligne de la fiche perd le sien des
+   qu'il porte quelque chose, celui-ci le garde — c'est ce fond qui dit ou l'on
+   tape. Sa HAUTEUR et sa BORDURE restent celles de `.fa-in` : reecrites ici,
+   elles rendaient la bulle 2 px plus courte que les champs d'a cote, et le
+   survol ne posait plus de lisere. */
+.fa-nb { width: 100%; padding: 0; text-align: center; background: var(--bg); font-size: var(--fa-val); font-weight: var(--graisse-texte); }
+/* LE TOTAL PREND LA BOITE D'UNE BULLE SANS EN ETRE UNE : meme hauteur, meme
+   rail, ni fond ni bordure — on ne le tape pas. C'est le seul chiffre de la
+   colonne qu'on lit de loin, il garde donc le cran d'annonce. */
+.fa-taille__n {
+  display: flex; align-items: center; justify-content: center;
+  height: var(--fa-h-champ); min-width: 0;
+  font-size: var(--fa-fort); font-weight: var(--graisse-texte); color: var(--text-1);
 }
-/* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, comme tous les autres : meme cran,
-   meme graisse de note, meme encre. Elle etait en 800 — la seule etiquette de
-   l'ecran a crier plus fort que le mot « Tailles » qui la coiffe. */
-.fa-taille__k {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  text-align: right;
-  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-2);
-}
-/* LA QUANTITE SE LIT A LA MEME TAILLE QUE TOUT LE RESTE (29/08). Elle etait au
-   cran d'ANNONCE (21 px) a cote d'une lettre de 14 : deux crans dans une boite
-   de 4 cm, pour un nombre qu'on vient corriger — pas annoncer. Elle prend le
-   cran de la valeur, comme les autres champs ; c'est la GRAISSE qui la fait
-   ressortir, pas le demi-pouce de plus. Le seul chiffre annonce de cette
-   colonne reste le TOTAL, qui lui se lit de loin. */
-.fa-nb {
-  width: 100%; min-width: 0; height: var(--fa-h-champ);
-  padding: 0; border: 0; background: transparent;
-  text-align: left; font-size: var(--fa-val); font-weight: var(--graisse-texte);
-}
-.fa-nb:hover { background: transparent; }
 
 /* LES CARTES DE FACE SONT RETIREES (29/08). La rangee « Faces » ne porte plus
    qu'un menu : « je ne veux qu'un menu pour selectionner les faces, et pouvoir
@@ -506,15 +494,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    composant, deux comportements, decides par le voisinage plutot que par le
    contenu. */
 .fa-row--empile { align-items: flex-start; }
-/* SON INTITULE PREND LA BOITE D'UNE COMMANDE et y centre son texte : il tombe
-   donc exactement sur la premiere ligne de la rangee, quelle que soit la
-   hauteur du reste. C'etait un `padding-top: 9px` — un nombre regle a l'oeil
-   sur une mise en page qui a bouge depuis, et qui posait l'intitule 6 px
-   au-dessus de son vis-a-vis de gauche. Une hauteur est un JETON. */
-.fa-row--empile > .fa-lab {
-  min-height: var(--fa-h-champ);
-  display: flex; align-items: center;
-}
+/* SON INTITULE NE PREND PLUS LA BOITE D'UNE COMMANDE (30/08). Il la prenait —
+   `min-height: var(--fa-h-champ)` et son texte centre dedans — pour tomber sur
+   la premiere ligne de la rangee, du temps ou cette premiere ligne etait une
+   bulle de 50 px. Depuis que l'intitule de la taille est sorti de la bulle, la
+   premiere ligne est une LIGNE DE TEXTE : « Tailles » et « S », meme cran, meme
+   encre, meme interligne, tous deux poses en haut de la rangee — ils tombent au
+   meme endroit sans qu'on ait rien a caler. La boite de 50 px les separait de
+   16 px. */
 
 /* --- ZONE 5 : la barre « Détails » et son calque --------------------------
    LE PANNEAU EST UN CALQUE, jamais dans le flux. Posé entre les colonnes et la
@@ -655,7 +642,6 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 .fa-niche textarea.fa-in, .fa-row--haut > textarea.fa-in { background: var(--bg); }
 .fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
 .fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
-.fa-docs { display: flex; gap: var(--pas-2); flex-wrap: wrap; }
 /* LE COUT ET LE MONTANT DE L'ACOMPTE N'ONT PLUS DE CLASSE DU TOUT : `.fa-cout`
    ne portait qu'une largeur — 120 px — qui avait un sens quand la bande se
    calait sur son contenu. Sur des rails, une largeur ecrite est exactement ce

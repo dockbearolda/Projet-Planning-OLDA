@@ -172,7 +172,7 @@ export function texteMarge(ttc, cout) {
 //   ctx.patchProd(patch)           → ce qu'il y a à produire (le prix suit)
 //   ctx.etapes / ctx.employes / ctx.provenances / ctx.reglements / ctx.types
 //   ctx.fermer()                   → retour au planning
-//   ctx.ouvrirClient() / ctx.telecharger() / ctx.email()
+//   ctx.ouvrirClient()             → la fiche du client, dans son onglet
 export function dessinerFicheAtelier(r, ctx) {
   const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
   // LA COLONNE DE PRODUCTION EXISTE MEME SANS `fiche.prod` (29/08). Elle etait
@@ -550,14 +550,14 @@ export function dessinerFicheAtelier(r, ctx) {
   const selProvenance = menu(null, ctx.provenances, r.provenance || '', 'Provenance');
   brancher(selProvenance, { label: 'Provenance', envoyer: (v) => ctx.patchLigne('provenance', v || null) });
 
-  // CE QU'ON ENVOIE AU CLIENT part avec le client. Ces deux boutons vivaient
-  // dans le panneau du bas, devenu la zone Paiement : un recapitulatif et un
-  // e-mail ne sont pas de l'argent.
-  const docs = el('div', 'fa-docs');
-  docs.append(
-    bouton('fa-btn fa-btn--mini', 'Récap complet', () => ctx.telecharger && ctx.telecharger(r)),
-    bouton('fa-btn fa-btn--mini', 'Email au client', () => ctx.email && ctx.email(r)),
-  );
+  // LA RANGEE « DOCUMENTS » EST RETIREE (30/08). Charlie a designe les trois
+  // morceaux — l'intitule et les deux boutons : « tout ca tu supprimes ».
+  // Elle sortait un recapitulatif en .txt et ouvrait un brouillon d'e-mail dans
+  // le client mail du poste : deux sorties de secours sur la seule colonne qui
+  // parle du client, la ou on vient corriger un nom et un telephone.
+  // `telechargerRecap` et `envoyerParEmail` sont partis avec elle dans app.js :
+  // plus rien ne les appelait. Le recapitulatif en TEXTE, lui, reste — c'est
+  // `ticketTexte`, que la boite du ticket copie toujours dans le presse-papier.
 
   // DEUX PAIRES PAR LIGNE (29/08). Charlie : « ça doit tenir sur 2 lignes ».
   // Six champs sur six lignes, chacune avec 400 px de vide a droite : la
@@ -590,8 +590,7 @@ export function dessinerFicheAtelier(r, ctx) {
   // dans le panneau Details. Au-dela, il monte ici et occupe le vide, qui se
   // trouvait pile sous « Qui suit ». C'est le MEME champ qu'on deplace, jamais
   // un second : deux champs sur `description` s'ecraseraient l'un l'autre.
-  gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient,
-    rangee('Documents', docs));
+  gauche.append(titreSection('Client'), el('div', 'fa-filet'), remise.rangee, blocClient);
 
   // =========================================================================
   // ZONE 4 — colonne droite : ce qu'il y a à produire
@@ -617,7 +616,7 @@ export function dessinerFicheAtelier(r, ctx) {
     // pour passer de 30 à 100 il fallait soixante-dix clics, et ils prenaient
     // les deux tiers de la case. La quantité est connue, elle se tape.
     const tailles = Array.isArray(prod.tailles) ? prod.tailles : [];
-    const total = el('span', 'fa-total', '0');
+    const total = el('span', 'fa-taille__n', '0');
     const listeTailles = () => tailles.map((t) => ({ t: String(t.t), n: Number(t.n) || 0 }));
     const majTotal = () => { total.textContent = String(tailles.reduce((s, t) => s + (Number(t.n) || 0), 0)); };
 
@@ -650,18 +649,30 @@ export function dessinerFicheAtelier(r, ctx) {
         poser(vise, true);
         coche(c); pulser(); dire(`Enregistré — taille ${taille.t}`);
       });
-      case_.append(el('span', 'fa-taille__k', String(taille.t)), c);
+      // L'INTITULE EST DEHORS, LA BULLE N'ENTOURE QUE LE CHAMP (30/08).
+      case_.append(el('span', 'fa-lab fa-taille__k', String(taille.t)), c);
       grilleT.append(case_);
     });
+    // LE TOTAL EST UNE CASE DE LA RANGÉE (30/08). Charlie : « le total doit
+    // être refait aussi ». Il vivait à part — « Total 45 pièces » poussé en bout
+    // de rangée par une marge automatique, donc renvoyé à la ligne du dessous dès
+    // que la grille prenait sa largeur : une deuxième ligne pour un nombre, et
+    // un modèle de plus dans une rangée qui n'en portait qu'un.
+    // Il prend maintenant la place d'une case, sur le même rail que les
+    // quantités et avec son intitulé au-dessus comme elles. Il n'a PAS de
+    // bulle : la bulle dit « on tape ici », et un total ne se tape pas.
+    // Le mot « pièces » tombe avec elle : la rangée s'appelle « Tailles », et
+    // ce qu'on y compte n'a jamais été autre chose.
+    const caseTotal = el('div', 'fa-taille');
+    caseTotal.append(el('span', 'fa-lab fa-taille__k', 'Total'), total);
+    grilleT.append(caseTotal);
     majTotal();
 
     // LES TAILLES SONT UNE RANGÉE COMME LES AUTRES. Elles avaient leur propre
     // en-tête — un libellé posé au-dessus alors que toutes les lignes voisines
     // portent le leur à gauche : une ligne de plus, et deux modèles de rangée
     // dans la même colonne.
-    const compte = el('span', 'fa-compte');
-    compte.append(document.createTextNode('Total '), total, document.createTextNode(' pièces'));
-    if (tailles.length) droite.append(rangee('Tailles', grilleT, compte, 'fa-row--empile'));
+    if (tailles.length) droite.append(rangee('Tailles', grilleT, 'fa-row--empile'));
 
     // --- LES FACES --------------------------------------------------------
     // LA RANGÉE N'EST PLUS QU'UN MENU (29/08). Charlie : « cette ligne est à
