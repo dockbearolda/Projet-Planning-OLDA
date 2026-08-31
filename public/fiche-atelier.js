@@ -395,12 +395,30 @@ export function dessinerFicheAtelier(r, ctx) {
   };
 
   const titreSection = (t) => el('div', 'fa-sec', t);
+  // L'INTITULE EST AU-DESSUS DE SA VALEUR, ET C'EST LA SEULE FACON (31/08).
+  // Charlie, en designant l'article du comptoir : « ce design comprend des
+  // polices, leurs tailles, des tailles de input etc. — je veux qu'il soit
+  // applique a la modification de la ligne ».
+  // La fiche en avait TROIS, pour un seul geste : cette fonction posait
+  // l'intitule A GAUCHE sur un rail de 106 px ; les deux grilles les alternaient
+  // en pistes (`intitule valeur intitule valeur`) ; et la bande du paiement,
+  // elle, les posait DEJA au-dessus (`caseArgent`). Trois ecritures, trois
+  // rendus, dans un ecran ouvert a un clic du comptoir qui n'en connait qu'un.
+  // Il n'en reste qu'un — celui du comptoir — et `caseArgent` n'est plus qu'un
+  // nom de plus pour lui (voir zone Paiement).
+  // ⚠ LA VALEUR EST DANS SA PROPRE BOITE (`__v`) et non collee a l'intitule :
+  // une case porte souvent PLUSIEURS elements sur sa ligne — la date et l'heure
+  // du retrait, la date d'acompte et ses deux raccourcis — et sans boite ils
+  // s'empileraient sous l'intitule au lieu de se ranger a cote.
   const rangee = (label, ...contenu) => {
-    // Le dernier argument peut etre une classe en plus (`fa-row--haut` pour la
+    // Le dernier argument peut etre une classe en plus (`fa-case--haut` pour la
     // rangee qui s'etire) : elle est reconnue au prefixe, jamais a la position.
     const sup = typeof contenu[contenu.length - 1] === 'string' ? contenu.pop() : null;
-    const l = el('div', `fa-row${sup ? ` ${sup}` : ''}`);
-    l.append(el('label', 'fa-lab', label), ...contenu.filter(Boolean));
+    const l = el('div', `fa-case${sup ? ` ${sup}` : ''}`);
+    l.append(el('label', 'fa-lab', label));
+    const v = el('div', 'fa-case__v');
+    v.append(...contenu.filter(Boolean));
+    l.append(v);
     return l;
   };
 
@@ -686,7 +704,7 @@ export function dessinerFicheAtelier(r, ctx) {
     { requis: true, apres: majRappel },
     (iso) => { isoRemise = iso; ctx.patchLigne('deadline', iso); });
 
-  const quand = el('div', 'fa-quand fa-row--ancre');
+  const quand = el('div', 'fa-quand');
   quand.append(remise.champ, chHeure);
   const menuHeure = menuHabille(chHeure, quand, (pan) => {
     for (const h of creneaux()) {
@@ -759,27 +777,28 @@ export function dessinerFicheAtelier(r, ctx) {
   const grilleClient = el('div', 'fa-grille-client');
   grilleClient.append(
     // LE RETRAIT ENTRE DANS LA GRILLE (30/08). Charlie : « realigne
-    // verticalement et horizontalement tout ce que tu peux ». Il vivait dans
-    // une rangee a lui, en `flex` : sa date s'etirait sur ce qui restait et
-    // l'heure demarrait a 347,2 px, la ou les trois rangees du dessous posent
-    // leur deuxieme intitule a 364,5. Un rail de plus, sur la seule ligne qui
-    // n'etait pas dans la grille — et l'heure n'avait meme pas d'intitule, elle
-    // se devinait a son texte d'invite.
-    el('label', 'fa-lab', 'Retrait'), quand,
-    el('label', 'fa-lab', 'Délai'), rappel,
-    el('label', 'fa-lab', 'Client'), chClient,
-    el('label', 'fa-lab', 'Qui suit'), selQui,
-    el('label', 'fa-lab', 'Contact'), chTel,
-    el('label', 'fa-lab', 'Personne'), chPersonne,
+    // verticalement et horizontalement tout ce que tu peux ». Il vivait dans une
+    // rangee a lui : sa date s'etirait sur ce qui restait quand ses voisines
+    // posaient toutes leur valeur au meme endroit — un rail de plus, sur la
+    // seule ligne hors grille. Et l'heure n'avait meme pas d'intitule : elle se
+    // devinait a son texte d'invite.
+    rangee('Retrait', quand),
+    rangee('Délai', rappel),
+    rangee('Client', chClient),
+    rangee('Qui suit', selQui),
+    rangee('Contact', chTel),
+    rangee('Personne', chPersonne),
     // VENUS DU PANNEAU DU BAS (29/08) : ils disent QUI est en face, pas
     // comment il paie. Ils etaient coinces entre le mode de reglement et le
     // champ de production.
-    el('label', 'fa-lab', 'Type'), selType,
+    rangee('Type', selType),
   );
-  // TROIS CELLULES PAR RANGEE, TOUJOURS. La grille en a trois par ligne : un
-  // menu pose seul apres son intitule n'en remplit que deux, et l'intitule
-  // suivant part dans la troisieme colonne — c'est ce qui a jete « Provenance »
-  // sur sa propre ligne, sous sa valeur.
+  // DEUX CASES PAR RANGEE. Depuis le 31/08 une case porte son intitule ET sa
+  // valeur (voir `rangee`) : elle occupe donc UNE piste, et la grille en a deux.
+  // Le piege d'avant a disparu avec le rail — l'intitule et la valeur etaient
+  // deux enfants separes, et une valeur posee seule decalait tout ce qui la
+  // suivait d'une piste (c'est ce qui avait jete « Provenance » sur sa propre
+  // ligne, sous sa valeur). Une case ne peut plus se desolidariser de son nom.
 
   // LE FANTOME DE LA DATE VIT HORS DU FLUX (voir `ligneDate`) : pose dans la
   // grille il n'y prendrait pas de case — il est absolu — mais son voisinage
@@ -812,7 +831,7 @@ export function dessinerFicheAtelier(r, ctx) {
       ['encre', 'Marquage']]) {
       const c = champ(null, prod[cle] || '', { label, placeholder: label.toLowerCase() });
       brancher(c, { label, envoyer: (v) => ctx.patchProd({ [cle]: v }) });
-      idt.append(el('label', 'fa-lab', label), c);
+      idt.append(rangee(label, c));
     }
     droite.append(idt);
 
@@ -865,22 +884,22 @@ export function dessinerFicheAtelier(r, ctx) {
     grilleT.append(caseTotal);
     majTotal();
 
-    // LES TAILLES SONT UNE RANGÉE COMME LES AUTRES. Elles avaient leur propre
-    // en-tête — un libellé posé au-dessus alors que toutes les lignes voisines
-    // portent le leur à gauche : une ligne de plus, et deux modèles de rangée
-    // dans la même colonne.
+    // LES TAILLES SONT UNE RANGÉE COMME LES AUTRES — et depuis le 31/08 c'est
+    // vrai au pied de la lettre : elles avaient leur propre en-tête, un libellé
+    // posé AU-DESSUS quand les lignes voisines portaient le leur à gauche. C'est
+    // désormais la grammaire de tout l'écran, celle du comptoir.
     //
     // ELLE PASSE EN DERNIER, SOUS LES FACES (30/08). Charlie : « mets cette
     // ligne au-dessus des tailles et réaligne verticalement tout ce que tu
-    // peux ». Les deux vont ensemble : depuis que l'intitulé de la taille est
-    // sorti de la bulle, cette rangée fait DEUX lignes — 76,3 px au lieu de 50.
-    // Posée au milieu de la colonne, elle décalait de 26,3 px tout ce qui la
-    // suivait, et « Faces » ne tombait plus en face de sa voisine de gauche.
-    // En dernier, son surplus pend sous une colonne qui n'a plus rien en face :
-    // les quatre rangées de droite retombent sur les quatre rails de gauche.
+    // peux ». Cette rangée est plus haute que les autres — elle porte cinq
+    // cases de taille plus le total — et posée au milieu de la colonne elle
+    // décalait tout ce qui la suivait, si bien que « Faces » ne tombait plus en
+    // face de sa voisine de gauche. En dernier, son surplus pend sous une
+    // colonne qui n'a plus rien en face, et les rangées du dessus retombent sur
+    // celles de gauche.
     // Et l'ordre y gagne : la référence, la couleur, la technique, le marquage
     // et les faces disent l'ARTICLE ; les tailles disent COMBIEN.
-    const ligneTailles = tailles.length ? rangee('Tailles', grilleT, 'fa-row--empile') : null;
+    const ligneTailles = tailles.length ? rangee('Tailles', grilleT) : null;
 
     // --- LES FACES --------------------------------------------------------
     // LA RANGÉE N'EST PLUS QU'UN MENU (29/08). Charlie : « cette ligne est à
@@ -1051,7 +1070,7 @@ export function dessinerFicheAtelier(r, ctx) {
     ajoutF.append(ic('expand_more'));
     ajoutF.setAttribute('aria-label', 'Faces à marquer');
     if (!nomsCoches.length) ajoutF.classList.add('fa-choix--vide');
-    const ligneFaces = rangee('Faces', ajoutF, 'fa-row--ancre');
+    const ligneFaces = rangee('Faces', ajoutF, 'fa-case--ancre');
 
     // LA CASE A COCHER EST CELLE DU TIROIR « COLONNES », comme la rangée.
     const caseAcocher = (on) => (on
@@ -1140,12 +1159,14 @@ export function dessinerFicheAtelier(r, ctx) {
     placeholder: 'Ce qu’il faut savoir sur ce dossier',
   });
   brancher(chNote, { label: 'Note', envoyer: (v) => ctx.patchLigne('description', v || null) });
-  // ELLE EST UNE RANGEE COMME LES AUTRES : intitule a GAUCHE, sur le meme rail
-  // que « Client », « Reference » ou « Faces ». Pose au-dessus de son champ —
-  // ce que faisait l'ancien bloc « Informations » — il etait le seul intitule de
-  // la fiche a ne pas tomber sur ce rail. `fa-row--haut` cale l'intitule en haut
-  // du champ, comme pour toute rangee qui s'etire.
-  const blocNote = rangee('Note', chNote, 'fa-row--haut');
+  // ELLE EST UNE RANGEE COMME LES AUTRES : son intitule se pose au-dessus de son
+  // champ, comme « Client », « Reference » ou « Faces ». C'etait deja ce que
+  // faisait l'ancien bloc « Informations » — a l'epoque il etait le SEUL de la
+  // fiche dans ce cas, et c'est ce qui l'a fait rentrer dans le rang le 29/08 ;
+  // le 31/08 c'est le rang qui est venu a lui.
+  // `fa-case--haut` lui donne le reste de la hauteur de la colonne : une zone de
+  // texte est le seul champ de l'ecran qui gagne a s'etirer.
+  const blocNote = rangee('Note', chNote, 'fa-case--haut');
   blocNote.classList.add('fa-note');
 
   // LES RANGEES ENTRENT DIRECTEMENT DANS LA GRILLE DU PANNEAU (29/08). Elles

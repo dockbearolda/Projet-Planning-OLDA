@@ -392,6 +392,33 @@
   --pas-3: 16px;   /* gouttière d'un formulaire, rembourrage d'un bloc */
   --pas-4: 24px;   /* rembourrage d'une carte, entre deux blocs */
 
+  /* LA GRAMMAIRE D'UN CHAMP, POUR TOUTE L'APPLICATION (31/08/2026).
+     Ces trois valeurs vivaient sur `.ecran-comptoir`, sous les noms
+     `--dd-label-gap` et `--dd-rangee` : la demande de devis et la vente
+     directe les lisaient, aucun autre ecran ne le pouvait. (Le troisieme,
+     `--dd-champ-x`, etait pire encore : un DOUBLON exact de `--champ-x`, pose
+     au :root quinze regles plus haut et lu par toute l'application — deux
+     noms pour 14 px, donc deux valeurs le jour ou l'une bouge.) C'est
+     ce qui a laisse la fiche atelier — ouverte a un clic du planning — se
+     donner sa PROPRE facon de poser un intitule devant une valeur : un rail
+     de 106 px a gauche, la ou le comptoir met l'intitule au-dessus. Deux
+     grammaires pour un seul geste, et l'ecart ne se voit qu'en ouvrant les
+     deux ecrans l'un apres l'autre.
+     Charlie, le 31/08 : « ce design comprend des polices, leurs tailles, des
+     tailles de input etc. — je veux que ce design soit applique a la
+     modification de la ligne ». Ce sont donc des jetons de la MAISON, et leur
+     nom ne porte plus celui d'un ecran.
+     ⚠ AUCUN N'EST UN `--pas-*`, et c'est voulu : les quatre pas disent
+     l'ecart entre deux BLOCS, ceux-ci disent la boite d'une COMMANDE. Les
+     confondre, c'est se retrouver a choisir entre 10 et 16 px la ou la
+     mesure de l'ecran de reference dit 14. */
+  --lab-gap: 8px;    /* de l'intitule a son champ */
+  --rangee: 20px;    /* d'une rangee de champs a la suivante */
+  /* LE TRAIT D'UNE COMMANDE EST PLUS EPAIS QUE CELUI D'UNE CARTE. Mesure sur
+     l'ecran de reference : 1,5 px. A 1 px le champ se confond avec le filet
+     qui separe deux blocs ; c'est le trait qui dit « on tape ici ». */
+  --champ-trait: 1.5px;
+
   /* LA VERTICALE SUR LAQUELLE UN ECRAN COMMENCE (30/08/2026).
      Mesuree au rendu sur les huit ecrans du CRM : le premier mot du titre
      tombait sur QUATRE abscisses — 349 px au « Mon travail » et au Pilotage
@@ -983,9 +1010,12 @@ input[type="radio"]:focus-visible {
      l'application. Le jeton reste pour que les règles de l'écran (et le
      `--dd-champ-h:auto` local d'une ligne de liste) continuent de le nommer. */
   --dd-champ-h: var(--ctrl-h);
-  --dd-champ-x: 14px;      /* rembourrage horizontal d'un champ */
-  --dd-label-gap: 8px;     /* de l'intitulé à son champ */
-  --dd-rangee: 20px;       /* d'une rangée de champs à la suivante */
+  /* LES TROIS AUTRES SONT REMONTES AU `:root` LE 31/08 — `--champ-x`,
+     `--lab-gap`, `--rangee`. Ce ne sont pas des reglages du comptoir : c'est
+     la grammaire d'un champ, et la fiche atelier la prend desormais aussi.
+     `--dd-champ-h` reste, seul, parce que des regles de l'ecran le neutralisent
+     localement (`--dd-champ-h:auto` sur une ligne de liste) : c'est un
+     INTERRUPTEUR de portee, pas une valeur. */
 
   /* LES QUATRE RÔLES DE LA DENSITÉ RESTENT NOMMÉS, mais depuis le 25/08 au
      soir ils se replient sur DEUX valeurs (demande du patron : uniformiser,

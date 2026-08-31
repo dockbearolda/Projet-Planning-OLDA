@@ -192,7 +192,7 @@ assert.strictEqual(habilles.length, 2,
 // ET LA RANGÉE D'UN PANNEAU AUSSI : c'est celle du tiroir « Colonnes ».
 assert.match(FICHE, /const ligneMenu = \(icone, texte, faire, cls\) => \{/,
   'la rangée d’un panneau s’écrit UNE fois');
-assert.match(FICHE, /const ligneFaces = rangee\('Faces', ajoutF, 'fa-row--ancre'\);/,
+assert.match(FICHE, /const ligneFaces = rangee\('Faces', ajoutF, 'fa-case--ancre'\);/,
   '… et il est SEUL sur la rangée : plus de cartes à côté');
 assert.ok(!/fa-faces|fa-face__k|'fa-mm'/.test(FICHE_NUE) && !/fa-faces|fa-face__k/.test(CSS_NU),
   'les cartes de face sont parties — le montage ET leur feuille');
@@ -286,9 +286,9 @@ assert.match(MENU, /width: max-content; max-width: 100%;/,
 //    fiche défile depuis le 28/08.
 assert.match(MENU, /position: absolute;/, 'le menu est ancré à sa rangée');
 assert.ok(!/position: fixed/.test(MENU), '… jamais à l’écran');
-assert.match(CSS, /\.fa-row--ancre \{ position: relative; \}/,
+assert.match(CSS, /\.fa-case--ancre, \.fa-quand \{ position: relative; \}/,
   '… et c’est la rangée qui porte l’ancre');
-assert.match(FICHE, /rangee\('Faces', ajoutF, 'fa-row--ancre'\)/,
+assert.match(FICHE, /rangee\('Faces', ajoutF, 'fa-case--ancre'\)/,
   '… celle des faces, qui ne porte plus que le menu');
 
 // d. ÉCHAP FERME LE MENU, PAS LE DOSSIER. `app.js` écoute Échap pour fermer la
