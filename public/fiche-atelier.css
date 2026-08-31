@@ -33,6 +33,18 @@
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--voile);
+  /* LA BULLE FLOTTE AU MILIEU DE L'ECRAN, LE PLANNING FLOUTE DERRIERE (30/08,
+     Charlie : « une bulle en plein milieu de l'ecran avec le vide et le
+     planning derriere en flou »). La racine reste le voile et le conteneur qui
+     defile (regle du 28/08 ci-dessus) : `margin: auto` sur la carte la centre
+     sans la contraindre, et retombe a zero — donc au defilement depuis le
+     haut — des qu'elle depasse l'ecran. Le flou est pose ICI, sur le voile qui
+     couvre tout l'ecran, jamais sur la carte : c'est le planning DERRIERE
+     qu'on brouille, pas le dossier qu'on lit. */
+  display: flex;
+  padding: var(--pas-4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 
   /* L'ECHELLE EST DECLAREE SUR LA RACINE, PAS SUR LA CARTE (30/08). Elle
      l'etait sur `.fa-carte` — mais le message du bas et le calque des pastilles
@@ -89,12 +101,9 @@
   /* Une boîte qui ne porte PAS de mot : le point de l'enregistrement
      automatique. Il ne se déduit d'aucun texte, il se déclare. (`--fa-coche`
      est parti le 30/08 avec la pastille de confirmation.) */
-  /* LA COLONNE DES INTITULES, UN SEUL NOMBRE. Elle valait 90 px en haut et
-     106 px dans le panneau : les valeurs des deux moities de l'ecran ne
-     tombaient donc pas sur le meme rail, a 4 px pres — ca ne se voit pas en
-     relisant une moitie, seulement en mesurant les deux. 106 px, parce qu'une
-     colonne n'est jamais plus etroite que son intitule (« Type de client »). */
-  --fa-lab-w: 106px;
+  /* LE RAIL D'INTITULES (106 px) EST RETIRE LE 31/08 : il n'y a plus d'intitule
+     A GAUCHE d'une valeur nulle part sur cet ecran, donc plus de colonne a lui
+     reserver. Les trois grilles qui le nommaient tombent sur des pistes egales. */
   /* L'ECARTEMENT DES CAPITALES, une fois. Une etiquette en capitales se lit
      mal collee : c'est le seul endroit de l'ecran ou l'on ecarte les lettres. */
   --fa-caps: .09em;
@@ -122,8 +131,17 @@
 .fa-carte {
   display: flex;
   flex-direction: column;
-  border-bottom-left-radius: var(--arrondi-carte);
-  border-bottom-right-radius: var(--arrondi-carte);
+  /* LES QUATRE COINS SONT ARRONDIS (30/08) : la carte flotte maintenant au
+     milieu du voile, elle ne touche plus le haut de l'ecran — les deux coins
+     du bas n'avaient plus de raison d'etre les seuls arrondis. */
+  border-radius: var(--arrondi-carte);
+  /* CENTREE PAR LA MARGE, PAS PAR LE VOILE (30/08). Dans un parent en
+     `display: flex`, `margin: auto` centre la carte sur les deux axes sans la
+     contraindre : elle garde sa hauteur naturelle (la racine defile toujours,
+     regle du 28/08) et une largeur fluide sous 1400px — au-dela, le vide
+     gagne sur les cotes plutot que d'etirer la fiche a perte de vue. */
+  margin: auto;
+  width: min(1400px, 100%);
   box-shadow: var(--shadow-pose);
   background: var(--surface);
   color: var(--text-1);
@@ -156,10 +174,15 @@
 .fa-in, .fa-choix {
   min-width: 0;
   height: var(--fa-h-champ);
-  padding: 0 var(--pas-2);
-  border: 1px solid transparent;
+  /* LA BOITE EST CELLE DU COMPTOIR (31/08). Mesuree sur l'ecran de reference
+     (`demande-devis`, l'article) : 50 px de haut, 17 px/400, interligne serre,
+     14 px de rembourrage, un trait de 1,5 px, l'arrondi de champ, fond blanc.
+     Les cinq premieres valeurs etaient DEJA les bonnes ici — c'est le TRAIT et
+     le FOND qui divergeaient. */
+  padding: 0 var(--champ-x);
+  border: var(--champ-trait) solid var(--border);
   border-radius: var(--arrondi-champ);
-  background: transparent;
+  background: var(--surface);
   color: var(--text-1);
   /* `font: inherit` REMET L'INTERLIGNE DE L'HERITAGE : il doit donc etre
      reecrit APRES, jamais avant — le raccourci annule ce qu'on a pose. */
@@ -173,7 +196,10 @@
    texte, pas celui d'une commande d'une ligne. (Elle ecrivait 1.45 en clair —
    c'est-a-dire la valeur de `--ligne-texte`, recopiee.) */
 textarea.fa-in { height: auto; padding: var(--pas-1) var(--pas-2); line-height: var(--ligne-texte); resize: none; }
-select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
+/* ⚠ PAS DE REMBOURRAGE A PART POUR UN MENU. Il rognait sa droite a 10 px
+   quand tout le reste en prend 14 : la valeur d'un menu ne finissait donc pas
+   sur le meme rail que celle du champ d'a cote. */
+select.fa-in { appearance: none; cursor: pointer; }
 /* CE QUI OUVRE UN PANNEAU PREND LA MAIN (30/08). Charlie, en designant le champ
    du retrait : « quand je clique je veux que le curseur soit une main pour
    ouvrir le calendrier ». Il est bati sur un `<input>` — donc le curseur du
@@ -183,15 +209,24 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ce qui vaut pour tout champ qui ouvrira un panneau demain. */
 .fa-in[aria-haspopup] { cursor: pointer; }
 .fa-in::placeholder { color: var(--text-3); }
-/* Un champ vide se voit sans qu'on le survole : c'est ce qui manque au dossier.
-   Un `select` a toujours une valeur — il n'entre jamais dans ce cas. */
-.fa-in:placeholder-shown { background: var(--bg); }
-.fa-in:hover, .fa-in:focus-visible, .fa-in:focus,
-.fa-choix:hover, .fa-choix:focus-visible {
-  border-color: var(--border); background: var(--surface);
+/* ⚠ « LE VIDE AU SURVOL, LE REMPLI TOUJOURS » NE VAUT PLUS ICI (31/08).
+   La regle du 28/08 posait `1px solid transparent` au repos et ne revelait la
+   boite qu'au survol : la fiche portait vingt-cinq rectangles identiques, et le
+   nom du client pesait autant a l'oeil qu'un creneau jamais renseigne.
+   Elle tombe parce que Charlie a tranche pour la grammaire du comptoir, ou la
+   boite est VISIBLE en permanence — et parce que les deux ecrans s'ouvrent a un
+   clic l'un de l'autre : un champ qui apparait d'un cote et pas de l'autre,
+   c'est le defaut que la charte nomme en toutes lettres. Ce qu'on perd — le
+   reperage du vide — se dit maintenant par le seul fond gris des zones de
+   texte et par le soulignement des champs obligatoires, plus bas.
+   LE FOCUS EST CELUI DU COMPTOIR : un halo POSE PAR-DESSUS (`outline`), jamais
+   un trait interieur. Un `box-shadow: inset` epaissit la bordure vers l'interieur
+   et fait sauter le texte d'un demi-pixel a la prise de focus. */
+.fa-in:hover, .fa-choix:hover { border-color: var(--border-strong); }
+.fa-in:focus, .fa-in:focus-visible, .fa-choix:focus-visible {
+  outline: 3px solid rgba(var(--primary-rgb), .13);
+  border-color: var(--primary);
 }
-.fa-in:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary); border-color: var(--primary); }
-.fa-choix:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary); border-color: var(--primary); }
 /* Ce qui reste PROPRE au bouton : il se clique, il aligne son chevron a droite,
    et sa valeur ne s'enroule pas. */
 .fa-choix {
@@ -213,7 +248,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    de rouge, pas de message. Le rouge annonce une faute ; ici il n'y en a pas
    encore, il manque seulement quelque chose. */
 .fa-in:required:placeholder-shown { box-shadow: inset 0 -1.5px 0 rgba(var(--primary-rgb), .28); }
-.fa-in:required:placeholder-shown:focus { box-shadow: inset 0 0 0 1.5px var(--primary); }
+/* ⚠ AU FOCUS, LE SOULIGNEMENT S'EFFACE — il ne se remplace pas par un anneau.
+   Cette ligne reecrivait l'ANCIEN focus (un `box-shadow` interieur), abandonne
+   le 31/08 pour le halo du comptoir : un champ obligatoire vide etait donc le
+   seul de la fiche a prendre le focus autrement que les dix-neuf autres. */
+.fa-in:required:placeholder-shown:focus { box-shadow: none; }
 
 .fa-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--pas-1);
@@ -263,27 +302,39 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    compte quand meme dans l'ecart de la rangee : 10 px de vide entre la
    reference et le nom du client, sur tous les dossiers sauf ceux d'un ticket. */
 .fa-ref:empty { display: none; }
-.fa-client {
-  padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
-  font: inherit; font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1);
+/* --- LES DEUX COMMANDES DE L'ENTETE, DANS UNE SEULE REGLE -----------------
+   Le nom du client et celui du produit s'editent tous les deux ici, et tous les
+   deux dans une BARRE DE TITRE — pas dans un formulaire. Ils ne prennent donc
+   PAS la boite d'un champ : ni sa hauteur (`--ctrl-h`, 50 px — posee ici,
+   l'entete montait a 71 px pour un texte qui en occupe 19, mesure le 30/08),
+   ni son rembourrage, ni son TRAIT, ni son FOND.
+   ⚠ CES DEUX DERNIERS DOIVENT SE DIRE DEPUIS LE 31/08. Tant que `.fa-in` etait
+   transparent au repos, `.fa-projet` n'avait rien a declarer — il l'heritait.
+   Depuis que la boite d'un champ est visible en permanence (grammaire du
+   comptoir), l'heritage lui posait un rectangle blanc borde EN PLEIN TITRE, a
+   cote du nom du client qui, lui, n'en a pas. Deux commandes cote a cote, deux
+   apparences, pour le meme geste.
+   CE QU'ELLES DISENT QU'ON PEUT LES MODIFIER, c'est le fond au SURVOL — comme
+   partout ailleurs dans une barre. */
+.fa-client, .fa-projet {
+  padding: var(--pas-1); height: auto;
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
+  background: transparent;
+  font: inherit;
   white-space: nowrap; cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
 }
-.fa-client:hover { background: var(--bg); }
-/* Le nom du produit accompagne celui du client : il ne le concurrence pas.
-   À `--fa-fort` il faisait le même cran que lui, et l'entête portait deux
-   titres au lieu d'un. SE MODIFIE ICI (30/08) : c'est un `.fa-in` comme le
-   reste de la fiche, `flex` pour prendre ce que le reste de la rangée laisse
-   et se réduire en « … » plutôt que pousser la croix de fermeture hors cadre.
-   `height`/`padding` ÉCRASENT ceux de `.fa-in` (30/08) : `--fa-h-champ` vaut
-   `--ctrl-h` (50px), la hauteur d'un CHAMP DE GRILLE — posée ici, l'entête
-   entière montait à 71 px (mesuré) pour un texte qui en occupe 19. Ce champ
-   n'est pas dans une grille, il est dans une rangée `align-items: baseline`
-   à côté d'étiquettes de texte : il reprend leur boîte, comme `.fa-client`. */
+.fa-client:hover, .fa-projet:hover { background: var(--bg); }
+/* Ce qui reste PROPRE a chacune : le client est le titre, le produit
+   l'accompagne sans le concurrencer — a `--fa-fort` ils faisaient le meme cran
+   et l'entete portait DEUX titres. */
+.fa-client { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* Le produit prend ce que la rangee laisse et se reduit en « … » plutot que de
+   pousser la croix de fermeture hors cadre. */
 .fa-projet {
   flex: 1 1 auto; min-width: 0;
-  height: auto; padding: var(--pas-1);
   font-size: var(--fa-val); color: var(--text-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .fa-outils { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; flex-shrink: 0; }
 .fa-autosave {
@@ -368,8 +419,13 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   padding: var(--pas-2) var(--pas-4); min-width: 0;
   display: flex; flex-direction: column;
 }
-.fa-col--g { gap: var(--pas-2); }
-.fa-col--d { gap: var(--pas-2); }
+/* L'ECART ENTRE DEUX RANGEES EST CELUI DU COMPTOIR (`--rangee`, 20 px). Il
+   valait `--pas-2` (10) — assez quand l'intitule etait a gauche et qu'une
+   rangee ne faisait qu'une ligne ; trop serre des que chaque rangee en fait
+   deux, ou les 10 px separaient la valeur d'une case de l'intitule de la
+   suivante aussi peu que l'intitule de sa propre valeur (8). */
+.fa-col--g { gap: var(--rangee); }
+.fa-col--d { gap: var(--rangee); }
 /* LE TRAIT DU MILIEU PRENAIT 1 PX A UNE SEULE DES DEUX COLONNES (30/08).
    Il est pose sur le bord droit de celle de gauche : sa boite mesurait donc
    671 px de contenu quand celle de droite en mesurait 672, et ses deux pistes
@@ -382,20 +438,27 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    Meme geste sur les deux moities de la bande du bas : elles portaient le meme
    trait, donc le meme demi-pixel. */
 .fa-col--g, .fa-col--d, .fa-details__moitie--d { border-left: 1px solid transparent; }
-.fa-groupe { display: flex; flex-direction: column; gap: var(--pas-2); }
+.fa-groupe { display: flex; flex-direction: column; gap: var(--rangee); }
 .fa-sec {
   font-size: var(--fa-lab); letter-spacing: var(--fa-caps); text-transform: uppercase;
   color: var(--text-3); font-weight: var(--graisse-forte);
 }
 .fa-filet { height: 1px; background: var(--border-soft); flex-shrink: 0; }
-.fa-row { display: flex; align-items: center; gap: var(--pas-2); min-width: 0; }
-.fa-row > .fa-in, .fa-row > .fa-choix { flex: 1; }
-.fa-lab { font-size: var(--fa-lab); color: var(--text-2); flex-shrink: 0; }
-/* UN SEUL RAIL DE VALEURS pour les deux colonnes. Elles partaient de 122 px à
-   gauche et 90 à droite : deux départs côte à côte, et l'œil le voit sans
-   savoir le nommer. 90 partout — les intitulés de gauche ont été raccourcis
-   pour y tenir (« Remise au client » → « Remise », la section dit DATES). */
-.fa-row > .fa-lab { width: var(--fa-lab-w); }
+/* UN INTITULE, SA VALEUR DESSOUS — LE COMPOSANT DE TOUTE LA FICHE (31/08).
+   `.fa-row` (rail de 106 px a gauche) et `.fa-case` (intitule au-dessus)
+   disaient la meme chose de deux facons ; il ne reste que la seconde, qui est
+   celle du comptoir. Les deux noms restent, sur UNE regle : `caseArgent` est
+   cite mot pour mot par le garde-fou de la zone Paiement. */
+.fa-case { display: flex; flex-direction: column; gap: var(--lab-gap); min-width: 0; }
+.fa-case > .fa-case__v > .fa-in, .fa-case > .fa-case__v > .fa-choix { flex: 1; }
+/* L'INTITULE EST CELUI DU COMPTOIR : 14 px, GRAISSE 600, ENCRE PLEINE. Il etait
+   en 400 et en `--text-2` — un gris qui recule. Sur l'ecran de reference c'est
+   le contraire : l'intitule est ce qu'on balaie pour trouver la bonne case, il
+   porte donc l'encre, et c'est la VALEUR qui se lit en 400. */
+.fa-lab, .fa-case__k {
+  font-size: var(--fa-lab); font-weight: var(--graisse-note); color: var(--text-1);
+  flex-shrink: 0;
+}
 .fa-rappel { font-size: var(--fa-lab); color: var(--text-3); }
 /* LA BOITE DE L'HEURE porte maintenant un chevron a cote de sa valeur (30/08) :
    « 14h30 » fait 42 px, le chevron 20, le rembourrage 20 — 82 px de contenu
@@ -412,26 +475,29 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    plein milieu, et rien qui le dise. */
 .fa-quand > .fa-in:not(.fa-mini) { flex: 1; min-width: 0; }
 .fa-date { width: 118px; flex: 0 0 118px; }
-/* LES DEUX GRILLES PRENNENT LE MEME RAIL D'INTITULE QUE LES RANGEES. Elles
-   ecrivaient 90 px pendant que `.fa-row` prenait `--fa-lab-w` : les valeurs
-   d'une grille et celles d'une rangee, dans la meme colonne, ne tombaient pas
-   au meme endroit. Ca ne se voit pas en relisant un bloc, seulement en
-   mesurant les deux. */
-/* QUATRE PISTES — intitule, valeur, intitule, valeur — comme la grille de
-   production. Elle en avait trois (un intitule, deux valeurs) : six champs y
-   descendaient sur six lignes, chacune avec 400 px de vide a droite. */
-/* L'ECART ENTRE DEUX RANGEES EST LE MEME PARTOUT — dans une grille comme entre
-   deux blocs de la colonne. Il valait `--pas-1` (6 px) dans les deux grilles et
-   `--pas-2` (10 px) partout ailleurs : la colonne de droite quitte sa grille
-   une rangee plus tot que celle de gauche, elle prenait donc le grand ecart au
-   moment ou l'autre prenait encore le petit. Resultat, les rangees 3 et 4
-   tombaient 4 px plus haut a droite qu'a gauche — deux jetons pour un seul
-   rythme, et un decalage qu'on ne voit qu'en mesurant les deux colonnes l'une
-   contre l'autre. Mesure apres : les CINQ rangees tombent a 0 px.
-   Et une seule regle pour les deux grilles : elles etaient ecrites deux fois,
-   a l'identique. */
+/* --- LES DEUX GRILLES DES COLONNES ----------------------------------------
+   DEUX PISTES EGALES, PLUS QUATRE (31/08). Elles alternaient intitule et
+   valeur — `106px 1fr 106px 1fr` — ce qui n'a plus de sens depuis que
+   l'intitule est AU-DESSUS de sa valeur : une case porte les deux, elle occupe
+   donc UNE piste. Deux champs par rangee, comme avant ; un rail de moins.
+   (Le piege d'alors est parti avec : l'intitule et la valeur etant deux enfants
+   SEPARES, une valeur posee seule decalait tout ce qui suivait d'une piste.)
+
+   `align-items: start` et non `center` : deux cases voisines n'ont pas
+   forcement la meme hauteur (« Tailles » en porte cinq), et centrees elles
+   decrochaient leurs intitules l'un de l'autre.
+
+   L'ECART ENTRE DEUX RANGEES EST LE MEME PARTOUT — dans une grille comme entre
+   deux blocs de la colonne, et c'est `--rangee`. Il y en a eu DEUX pour un seul
+   rythme (`--pas-1` dans les grilles, `--pas-2` ailleurs) : la colonne de
+   droite quitte sa grille une rangee plus tot que celle de gauche, elle prenait
+   donc le grand ecart quand l'autre prenait encore le petit, et les rangees 3
+   et 4 tombaient 4 px plus haut a droite. Ca ne se voit qu'en mesurant les deux
+   colonnes l'une CONTRE l'autre.
+   Et UNE seule regle pour les deux grilles : elles ont deja ete ecrites deux
+   fois, a l'identique — c'est ainsi qu'elles divergent. */
 .fa-grille-client,
-.fa-grille-prod { display: grid; grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr; align-items: center; gap: var(--pas-2); }
+.fa-grille-prod { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: var(--rangee); }
 .fa-fort { font-weight: var(--graisse-note); }
 
 
@@ -449,17 +515,21 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    ⚠ `min-width: 0` SUR LA CASE reste obligatoire : la largeur intrinseque d'un
    `<input>` (≈ 20 caracteres) l'emporte sinon sur la piste, et les cases
    debordent de la colonne. Defaut deja paye ailleurs. */
-.fa-tailles { display: flex; gap: var(--pas-2); flex: 1; min-width: 0; }
-/* DEUX BANDES, ET LA PREMIERE EST CELLE D'UNE RANGEE (30/08). Charlie, en
-   designant « Tailles », « Type » et « Provenance » : « tout ca doit etre
-   aligne horizontalement ». L'etiquette de la taille etait collee au-dessus de
-   sa bulle, dans une bande a sa seule hauteur de texte : elle tombait donc 14,85
-   px plus haut que les intitules de la colonne d'en face, qui se centrent, eux,
-   dans la boite d'une commande. Sa bande prend la meme boite — un JETON, pas un
-   calage a l'oeil — et les cinq etiquettes retombent sur la meme ligne. */
+/* ⚠ `align-items: start` : sans lui, la boite de valeur (`.fa-case__v`, en
+   `align-items: center`) centrerait les cinq cases les unes contre les autres
+   et leurs etiquettes ne tomberaient plus sur la meme ligne. */
+.fa-tailles { display: flex; gap: var(--pas-2); flex: 1; min-width: 0; align-items: start; }
+/* LA CASE DE TAILLE EST UNE CASE COMME LES AUTRES (31/08). Sa premiere bande
+   valait la boite d'une COMMANDE (50 px) : c'etait le rattrapage du 30/08 pour
+   que son etiquette tombe sur les intitules de la colonne d'en face, qui se
+   centraient alors dans un champ. Depuis que TOUS les intitules de la fiche
+   sont poses au-dessus de leur valeur, l'alignement vient de lui-meme — et
+   cette bande de 50 px ne faisait plus que creuser 30 px de vide au-dessus de
+   chaque lettre. Deux bandes qui se suivent, et l'ecart de l'intitule a sa
+   valeur (`--lab-gap`), exactement comme `.fa-case`. */
 .fa-taille {
-  display: grid; grid-template-rows: var(--fa-h-champ) auto; align-items: center;
-  gap: var(--pas-1); flex: 1 1 0; min-width: 0;
+  display: grid; grid-template-rows: auto auto; align-items: center;
+  gap: var(--lab-gap); flex: 1 1 0; min-width: 0;
 }
 /* L'ETIQUETTE DE LA TAILLE EST UN INTITULE, exactement comme celui de la rangee
    a cote duquel elle se pose maintenant : elle prend `.fa-lab` au lieu de
@@ -475,7 +545,14 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    tape. Sa HAUTEUR et sa BORDURE restent celles de `.fa-in` : reecrites ici,
    elles rendaient la bulle 2 px plus courte que les champs d'a cote, et le
    survol ne posait plus de lisere. */
-.fa-nb { width: 100%; padding: 0; background: var(--bg); font-size: var(--fa-val); font-weight: var(--graisse-texte); }
+/* LA BULLE DE TAILLE EST UNE COMMANDE COMME LES AUTRES (31/08) : meme
+   rembourrage (elle etait a `padding: 0`) et meme FOND (elle etait grise).
+   Le gris avait une raison le 30/08 — aucun champ de la fiche ne montrait sa
+   boite au repos, et c'est lui qui disait « on tape ici ». Depuis que la boite
+   est visible en permanence, il ne dit plus rien qu'elle ne dise deja : c'est
+   une couleur qui ne porte pas d'etat, donc un defaut.
+   Son texte est centre, la symetrie du rembourrage ne lui coute donc rien. */
+.fa-nb { width: 100%; font-size: var(--fa-val); font-weight: var(--graisse-texte); }
 /* LE TOTAL PREND LA BOITE D'UNE BULLE SANS EN ETRE UNE : meme hauteur, meme
    rail, ni fond ni bordure — on ne le tape pas. C'est le seul chiffre de la
    colonne qu'on lit de loin, il garde donc le cran d'annonce. */
@@ -537,7 +614,9 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    qui empile. Et c'est SON flex qui etire les rangees : `.colbar-item` fait
    `width: 100%`, or un pourcentage contre un conteneur en `max-content` vaut
    `auto` — sans lui chaque rangee reprend sa largeur de texte (81 a 141 px). */
-.fa-row--ancre { position: relative; }
+/* CE QUI ANCRE UN PANNEAU. `.fa-quand` le porte en propre : le menu des
+   heures s'ouvre sous la paire date+heure, pas sous la case entiere. */
+.fa-case--ancre, .fa-quand { position: relative; }
 .fa-menu {
   position: absolute; z-index: 30;
   top: 100%; right: 0; margin-top: var(--pas-1);
@@ -562,26 +641,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 
 /* Le filet qui detache la CREATION des choix est celui de la fiche (`.fa-filet`,
    plus haut) : un trait ne se redessine pas par endroit. */
-/* UNE RANGEE QUI PORTE PLUSIEURS LIGNES cale son intitule EN HAUT, contre la
-   premiere : centre, il flotte au milieu d'une rangee de 110 px et ne designe
-   plus rien. Mais c'est la RANGEE qui le decide, pas la colonne.
-   ⚠ La regle portait sur `.fa-col--d .fa-row` — TOUTE rangee de la colonne de
-   droite. « Atelier », haute d'une seule commande, y calait donc son intitule
-   en haut pendant que « Retrait », son exact vis-a-vis a gauche, le centrait :
-   les deux premieres lignes de la fiche etaient a 10 px l'une de l'autre. Meme
-   composant, deux comportements, decides par le voisinage plutot que par le
-   contenu. */
-.fa-row--empile { align-items: flex-start; }
-/* SON INTITULE PREND LA BOITE D'UNE COMMANDE et y centre son texte : il tombe
-   donc exactement sur la premiere BANDE de la rangee, quelle que soit la hauteur
-   du reste — et cette bande fait la meme boite que toute rangee de la fiche,
-   d'ou l'alignement avec « Type » et « Provenance » en face.
-   C'etait un `padding-top: 9px` avant le 29/08 — un nombre regle a l'oeil sur
-   une mise en page qui a bouge depuis. Une hauteur est un JETON. */
-.fa-row--empile > .fa-lab {
-  min-height: var(--fa-h-champ);
-  display: flex; align-items: center;
-}
+/* `.fa-row--empile` ET SA REGLE DE CALAGE SONT PARTIES (31/08) : elles
+   existaient pour rattraper un intitule pose A GAUCHE d'une rangee haute de
+   plusieurs lignes — il fallait le remonter contre la premiere, et lui donner
+   la boite d'une commande pour qu'il tombe sur le rail d'en face. Un intitule
+   pose AU-DESSUS de sa valeur n'a ni l'un ni l'autre de ces problemes. */
 
 /* --- ZONE 5 : la bande du paiement ----------------------------------------
    LA BARRE QUI LA REPLIAIT EST RETIREE (30/08, Charlie : « supprime ca »).
@@ -615,9 +679,21 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
 }
 .fa-details__moitie {
   display: grid;
-  grid-template-columns: var(--fa-lab-w) 1fr var(--fa-lab-w) 1fr;
-  align-items: end;
-  gap: var(--pas-2);
+  /* QUATRE PISTES ICI, DEUX DANS LES COLONNES DU HAUT — et c'est le CONTENU qui
+     le decide, pas une envie. Une moitie porte TROIS cases dont une large
+     (« Coût · Marge · Règlement » ; « Prix TTC · Acompte versé le · Reste à
+     payer ») : 1 + 1 + 2 = quatre pistes, donc UNE rangee. A deux pistes elle en
+     prenait trois a droite, avec une case vide a cote de « Prix TTC » — 197 px
+     de bande pour du vide (mesure : 108 → 305 px).
+     Les colonnes du haut, elles, portent des champs qu'on REMPLIT : a quatre
+     pistes ils tomberaient a 145 px et « dim. 06/09 » n'y tiendrait pas.
+     C'est exactement ce que fait l'ecran de reference, qui a `.grid` (deux) et
+     `.grid-3` (trois) selon ce qu'il pose dedans. Ce qui NE change pas d'une
+     grille a l'autre — et c'est la le garde-fou — c'est la GOUTTIERE
+     (`--rangee`) et la CASE (`.fa-case`). */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--rangee);
   padding: var(--pas-3) var(--pas-4);
   min-width: 0;
 }
@@ -632,7 +708,11 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    C'est le meme piege que sur les cases de taille, et il ne se voit qu'au rendu.
    (Avant la grille, c'etait `flex-shrink: 0` qui tenait ce role : sans lui,
    « 26,05 € » passait a la ligne DANS sa bulle.) */
-.fa-case { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+/* (`.fa-case` est declaree UNE fois, avec `.fa-lab`, plus haut : c'est LE
+   composant de la fiche. Elle etait redeclaree ici a `--pas-1` — et comme elle
+   venait apres, c'est elle qui gagnait : les dix-sept intitules de l'ecran se
+   posaient a 6 px de leur valeur au lieu des 8 du comptoir. Une regle en double
+   ne se voit pas en relisant la feuille, seulement en mesurant l'ecran.) */
 /* DEUX PISTES POUR CE QUI N'ENTRE PAS DANS UNE : le menu de reglement (183 px
    au plus long) et la ligne d'acompte (une date, deux raccourcis, un montant).
    Une colonne n'est jamais plus etroite que ce qu'elle porte. */
@@ -644,11 +724,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    qui disparait. Une marge auto se resout a zero dans ce cas. */
 .fa-case--fin .fa-case__k { margin-left: auto; }
 .fa-case--fin .fa-case__v > *:first-child { margin-left: auto; }
-.fa-case__k { font-size: var(--fa-lab); color: var(--text-2); white-space: nowrap; }
+/* (`.fa-case__k` prend sa police avec `.fa-lab`, plus haut : une seule regle.)
+   LA BOITE DE VALEUR aligne ce qu'elle porte sur UNE ligne — la date et l'heure
+   du retrait, la date d'acompte et ses deux raccourcis. `min-height` la cale sur
+   la boite d'une commande meme quand elle ne porte qu'un texte, pour que deux
+   cases voisines finissent a la meme ligne.
+   ⚠ `white-space: nowrap` ne descend PAS sur une zone de texte : la note s'y
+   ecrirait sur une seule ligne infinie. */
 .fa-case__v {
   display: flex; align-items: center; gap: var(--pas-2);
   min-height: var(--fa-h-champ); white-space: nowrap; min-width: 0;
 }
+.fa-case__v > textarea.fa-in { white-space: pre-wrap; }
 /* LES CHAMPS DE LA BANDE REMPLISSENT LEUR PISTE. Ils portaient des largeurs
    ECRITES — 120 px pour le cout, 128 pour le TTC — qui avaient un sens quand la
    bande flottait et se calait sur son contenu. Sur des rails, une largeur en dur
@@ -660,25 +747,18 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
    Le rembourrage rendu, c'est aussi 20 px de plus pour le montant : « 1 250,50 € »
    debordait de 2 px du cout et de 9 px du prix TTC — le chiffre le plus lu de la
    fiche, coupe sur une commande a quatre chiffres. */
-/* LA BULLE REPREND LE REMBOURRAGE DES AUTRES, ET LE TEXTE NE QUITTE PAS SON
-   RAIL (30/08). Charlie, en designant le menu du reglement : « la bulle a un
-   probleme, les ecritures sont collees a gauche de la bulle, je veux qu'elle
-   soit comme les autres ». Elle etait a `padding: 0` — decide le 29/08 pour que
-   la valeur parte du rail de son intitule, comme les colonnes du dessus. Les
-   deux tiennent : le rembourrage revient, et une marge negative de la MEME
-   valeur rend au texte sa place. La boite grandit vers la gauche, le texte ne
-   bouge pas d'un pixel — et elle grandit dans l'ecart de la grille (`--pas-2`),
-   pas sur sa voisine.
-   ⚠ A GAUCHE SEULEMENT. Un rembourrage des DEUX cotes coute 20 px de largeur
-   au texte : c'est ce qui avait fait deborder « 1 250,50 € » de 2 px du cout et
-   de 9 px du prix TTC (mesure le 29/08). A gauche seul, la marge negative rend
-   exactement ce que le rembourrage prend — la boite n'y perd rien. Et le champ
-   remplit sa case (`flex: 1 1 auto`), donc son bord droit est deja loin de la
-   fin du texte : il n'y a rien a inserer de ce cote. */
+/* LA BANDE DU PAIEMENT PREND LA BOITE DE TOUS LES CHAMPS (31/08). Elle portait
+   `padding: 0 0 0 10px` et une marge negative de 10 px : une ruse pour que le
+   TEXTE de la valeur parte exactement du rail de son intitule, du temps ou les
+   intitules des colonnes du dessus vivaient sur un rail de 106 px a gauche.
+   Ce rail n'existe plus — l'intitule est au-dessus de sa valeur partout — et la
+   ruse ne rattrapait donc plus rien : elle donnait juste a six champs sur vingt
+   un rembourrage a eux. La bande reprend `0 14px`, comme le reste de la fiche
+   et comme le comptoir.
+   ⚠ CE QUI RESTE EST NECESSAIRE : un champ en flex doit pouvoir RETRECIR sous
+   sa largeur intrinseque (≈ 20 caracteres), sinon il sort de sa piste. */
 .fa-details .fa-in, .fa-details .fa-choix {
   width: auto; flex: 1 1 auto; min-width: 0;
-  padding: 0 0 0 var(--pas-2);
-  margin-left: calc(var(--pas-2) * -1);
 }
 /* Les deux raccourcis « 30 % / 50 % » gardent leur taille : ce sont des boutons,
    pas des champs, et ils ne portent que deux caracteres. */
@@ -693,42 +773,34 @@ select.fa-in { appearance: none; cursor: pointer; padding-right: var(--pas-2); }
   padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
 }
-.fa-note > .fa-in { min-height: calc(var(--fa-h-champ) * 2); resize: vertical; }
+.fa-note textarea.fa-in { min-height: calc(var(--fa-h-champ) * 2); resize: vertical; }
 
-/* --- La niche des notes -------------------------------------------------
-   Elle accueille le champ des notes quand l'ecran est assez haut. Elle
-   n'ETIRE rien : deux champs geants pour combler un vide, c'est le vide
-   remplace par du gris. C'est la FICHE qui prend sa taille (voir `.fa`). */
-.fa-niche { display: flex; flex-direction: column; min-height: 0; }
-/* Sur le 14 pouces le champ des notes reste dans le panneau : la niche est
-   alors VIDE, et un enfant vide compte quand meme dans l'ecart de la colonne —
-   16 px de gouttiere pour rien. */
-.fa-niche:empty { display: none; }
-.fa-niche > .fa-bloc--notes { align-items: stretch; }
-.fa-niche .fa-bloc--notes > .fa-lab { width: var(--fa-lab-w); padding-top: 9px; flex-shrink: 0; }
-.fa-niche .fa-bloc--notes > textarea.fa-in { flex: 1; min-width: 0; }
-.fa-row--haut > .fa-lab { padding-top: 9px; }
+/* --- LA NICHE DES NOTES EST RETIREE (31/08) ------------------------------
+   `.fa-niche` et `.fa-bloc--notes` : SEPT regles pour un element qu'aucune
+   ligne de `fiche-atelier.js` ne produit plus. Elles accueillaient le champ des
+   notes « quand l'ecran est assez haut » — l'arbitrage de hauteur du 14 pouces,
+   parti le 30/08 avec son `ResizeObserver` quand la note est descendue dans la
+   colonne de gauche. Une regle qui ne s'applique plus ne casse rien : c'est
+   pour ca qu'elle survit sept jours a ce qu'elle habillait.
 
-/* --- LES DEUX COLONNES FINISSENT A LA MEME LIGNE -------------------------
-   Elles ont toujours eu la meme BOITE — la grille les etire toutes les deux —
-   mais leur contenu s'arretait a 369 px a gauche et 313 a droite : un decrochage
-   de 56 px que l'oeil lit comme un defaut d'alignement.
-   Le DERNIER bloc de chaque colonne prend le reste. `flex: 1 0 auto` et non
-   `1 1 0` : la base reste sa hauteur naturelle, donc il grandit pour rattraper
-   mais ne se laisse jamais ecraser sous sa taille de depart — c'est ce qui
-   evite les deux champs geants du 28/08, quand la fiche s'etirait a l'ecran
-   entier et leur donnait 287 et 416 px. Ici le rattrapage vaut ce qui manque,
-   pas plus. */
-.fa-niche, .fa-row--haut { flex: 1 0 auto; align-items: stretch; }
-.fa-niche > .fa-bloc--notes { flex: 1 0 auto; min-height: 0; }
-.fa-niche .fa-bloc--notes > textarea.fa-in,
-.fa-row--haut > textarea.fa-in { align-self: stretch; height: auto; }
-/* UNE ZONE N'EST PAS UNE VALEUR. Les champs en ligne perdent leur fond des
-   qu'ils portent quelque chose — on lit la valeur, pas la boite. Une zone de
-   texte, elle, doit montrer ou elle commence et ou elle finit. */
-.fa-niche textarea.fa-in, .fa-row--haut > textarea.fa-in { background: var(--bg); }
-.fa-niche textarea.fa-in:hover, .fa-row--haut > textarea.fa-in:hover,
-.fa-niche textarea.fa-in:focus, .fa-row--haut > textarea.fa-in:focus { background: var(--surface); }
+   --- LA NOTE S'ETIRE JUSQU'AU BAS DE LA COLONNE --------------------------
+   Les deux colonnes ont toujours eu la meme BOITE — la grille les etire toutes
+   les deux — mais leur contenu s'arretait a 369 px a gauche et 313 a droite :
+   un decrochage que l'oeil lit comme un defaut d'alignement. Le DERNIER bloc de
+   chaque colonne prend le reste. `flex: 1 0 auto` et non `1 1 0` : la base
+   reste sa hauteur naturelle, donc il grandit pour rattraper mais ne se laisse
+   jamais ecraser sous sa taille de depart — c'est ce qui evite les deux champs
+   geants du 28/08, quand la fiche s'etirait a l'ecran entier et leur donnait
+   287 et 416 px. Ici le rattrapage vaut ce qui manque, pas plus. */
+.fa-case--haut { flex: 1 0 auto; }
+.fa-case--haut > .fa-case__v { flex: 1 0 auto; min-height: 0; align-items: stretch; }
+.fa-case--haut > .fa-case__v > textarea.fa-in { align-self: stretch; height: auto; }
+/* UNE ZONE N'EST PAS UNE VALEUR. Un champ d'une ligne se lit par sa valeur ;
+   une zone de texte, elle, doit montrer ou elle commence et ou elle finit —
+   d'ou le fond gris, qui la distingue des champs a fond blanc d'a cote. */
+.fa-case--haut > .fa-case__v > textarea.fa-in { background: var(--bg); }
+.fa-case--haut > .fa-case__v > textarea.fa-in:hover,
+.fa-case--haut > .fa-case__v > textarea.fa-in:focus { background: var(--surface); }
 /* LE COUT ET LE MONTANT DE L'ACOMPTE N'ONT PLUS DE CLASSE DU TOUT : `.fa-cout`
    ne portait qu'une largeur — 120 px — qui avait un sens quand la bande se
    calait sur son contenu. Sur des rails, une largeur ecrite est exactement ce

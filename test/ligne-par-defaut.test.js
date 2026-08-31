@@ -120,7 +120,7 @@ assert.match(FICHE, /menu\(null, ctx\.types, r\.client_type/,
   'le type se change toujours, dans la fiche');
 // Depuis le 29/08 il vit dans la ZONE CLIENT (« il est important de bien
 // séparer client, production et paiement ») : sa grille le nomme « Type ».
-assert.match(FICHE, /el\('label', 'fa-lab', 'Type'\), selType/,
+assert.match(FICHE, /rangee\('Type', selType\)/,
   '… et il est nommé, dans la zone du client');
 assert.match(FICHE, /ctx\.employes/, 'le pilote se change toujours, dans la fiche');
 // Le référent de NOTE est parti avec la barre basse le 29/08 ; le référent du

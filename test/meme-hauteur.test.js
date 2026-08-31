@@ -164,9 +164,10 @@ console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’ic
     assert.match(j, /var\(--ctrl-h\)/,
       `la fiche atelier écrit une hauteur de commande à la main : ${j.trim()}`);
   }
-  // `--fa-lab-w` est la LARGEUR de la colonne des intitulés, pas un cran de
-  // texte : elle se déduit du plus long d'entre eux (« Type de client »), et
-  // c'est déjà un jeton unique pour les deux moitiés de l'écran.
+  // (`--fa-lab-w`, la LARGEUR de la colonne des intitulés, était l'exception de
+  // cette boucle : ce n'était pas un cran de texte. Elle a disparu le 31/08 avec
+  // le rail lui-même — l'intitulé se pose désormais AU-DESSUS de sa valeur,
+  // comme au comptoir, et aucune colonne n'a plus à lui être réservée.)
   for (const j of jetons.filter((x) => /--fa-(lab|val|fort|titre|min)\s*:/.test(x))) {
     assert.match(j, /var\(--taille-/,
       `la fiche atelier recopie un cran de l’échelle : ${j.trim()}`);
@@ -197,11 +198,19 @@ console.log('✓ même hauteur : une seule rangée de panneau, une boîte d’ic
   const grilles = nu.match(/\.fa-grille-client,\s*\n\.fa-grille-prod \{([^}]*)\}/);
   assert.ok(grilles,
     'les deux grilles de la fiche partagent UNE règle : écrites deux fois, elles divergent');
-  assert.match(grilles[1], /gap: var\(--pas-2\);/,
+  // ⚠ LE JETON A CHANGÉ DE NOM LE 31/08, PAS DE RÔLE : `--pas-2` (10 px) →
+  // `--rangee` (20 px), celui du comptoir. L'écart de 10 px suffisait quand
+  // l'intitulé était à GAUCHE et qu'une rangée tenait sur une ligne ; l'intitulé
+  // étant passé AU-DESSUS, 10 px séparaient la valeur d'une case de l'intitulé
+  // de la suivante presque aussi peu (10) que cet intitulé de sa propre valeur
+  // (8) — et l'œil ne savait plus quel libellé allait avec quel champ.
+  // Ce que ce contrôle tient est INCHANGÉ : les grilles et la colonne battent le
+  // même rythme, et elles le lisent au MÊME endroit.
+  assert.match(grilles[1], /gap: var\(--rangee\);/,
     'leur écart de rangée est celui de la colonne — un seul rythme, un seul jeton');
   // Et la colonne garde le sien : c'est le même.
   const colonnes = nu.match(/\.fa-col--g \{([^}]*)\}/);
-  assert.ok(colonnes && /gap: var\(--pas-2\)/.test(colonnes[1]),
+  assert.ok(colonnes && /gap: var\(--rangee\)/.test(colonnes[1]),
     '… celui-là même que la colonne applique entre deux blocs');
 }
 

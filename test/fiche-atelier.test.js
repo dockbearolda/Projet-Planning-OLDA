@@ -56,6 +56,37 @@ assert.ok(!/max-height/.test(RACINE_CSS),
 const CARTE_CSS = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
 assert.ok(/background: var\(--surface\);/.test(CARTE_CSS) && /box-shadow: var\(--shadow-pose\);/.test(CARTE_CSS),
   'la carte porte le fond et l’ombre — la racine, elle, est transparente au voile près');
+// UNE BULLE AU MILIEU, LE PLANNING FLOU DERRIÈRE (30/08, Charlie : « je voudrais
+// que ce soit une bulle en plein milieu de l'écran avec le vide et le planning
+// derrière en flou »). Trois choses qui se cassent en silence :
+//
+//   · LE FLOU EST SUR LE VOILE, JAMAIS SUR LA CARTE. `backdrop-filter` brouille
+//     ce qui est DERRIÈRE l'élément qui le porte : posé sur la carte, il
+//     brouillerait le voile qu'elle couvre déjà — donc rien de visible — et le
+//     planning resterait net. Mesuré au rendu : blur(8px) sur `.fa`, le planning
+//     part, la fiche reste lisible.
+//   · LE CENTRAGE EST UNE MARGE AUTOMATIQUE, jamais `justify-content: center`.
+//     La racine DÉFILE (règle du 28/08) : sur un conteneur qui défile, un
+//     centrage par `justify-content` rend le HAUT du contenu débordant
+//     inatteignable — on ne peut plus remonter à l'entête de la fiche. Une marge
+//     `auto` retombe à zéro quand la place manque. Mesuré à 1366 × 560, où la
+//     carte déborde de 108 px : sommet ET pied atteignables.
+//   · LES QUATRE COINS SONT ARRONDIS. Deux l'étaient — la carte était collée au
+//     haut de l'écran, ses coins hauts n'existaient pas. Elle flotte, ils se
+//     voient.
+assert.ok(/backdrop-filter: blur\(/.test(RACINE_CSS),
+  'le flou est sur le voile : c’est le planning DERRIÈRE qu’on brouille');
+assert.ok(!/backdrop-filter/.test(CARTE_CSS),
+  '… et jamais sur la carte, qui brouillerait le voile au lieu du planning');
+assert.ok(/margin: auto;/.test(CARTE_CSS),
+  'la carte se centre par une marge automatique — elle retombe à zéro quand la place manque');
+assert.ok(!/justify-content|align-items/.test(RACINE_CSS),
+  'jamais par `justify-content` sur un conteneur qui défile : le haut deviendrait inatteignable');
+assert.ok(/border-radius: var\(--arrondi-carte\);/.test(CARTE_CSS)
+  && !/border-bottom-left-radius/.test(CARTE_CSS),
+  'les quatre coins sont arrondis : la carte ne touche plus le bord de l’écran');
+assert.ok(/padding: var\(--pas-\d\);/.test(RACINE_CSS),
+  'le vide autour de la bulle est un JETON, jamais un nombre');
 assert.ok(/carte\.append\(tete, bandeau, scene\);/.test(JS)
   && /racine\.append\(carte, zoneToast\);/.test(JS),
   'tout le contenu vit dans la carte ; seul le message reste sur la racine');
@@ -166,7 +197,7 @@ assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte so
   // supprimes »). On cherche l'ÉCRITURE, pas le mot : le commentaire qui
   // explique le retrait nomme la rangée, et le test tomberait sur sa propre
   // explication — piège déjà payé deux lignes plus bas.
-  for (const attendu of ["'Type'), selType", "titreSection('Client')"]) {
+  for (const attendu of ["rangee('Type', selType)", "titreSection('Client')"]) {
     assert.ok(CLIENT.includes(attendu), `la zone Client doit porter ${attendu}`);
   }
   assert.ok(!/rangee\('Documents'/.test(JS) && !/fa-btn--mini/.test(JS),
@@ -196,8 +227,8 @@ assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte so
   // à lui : sa date s'étirait sur ce qui restait et l'heure démarrait à
   // 347,2 px, là où les trois rangées du dessous posent leur deuxième intitulé
   // à 364,5 — un rail de plus, sur la seule ligne hors grille.
-  assert.ok(CLIENT.includes("el('label', 'fa-lab', 'Retrait'), quand,")
-    && CLIENT.includes("el('label', 'fa-lab', 'Délai'), rappel,"),
+  assert.ok(CLIENT.includes("rangee('Retrait', quand),")
+    && CLIENT.includes("rangee('Délai', rappel),"),
     'la date de retrait et le délai restant sont deux cases de la grille du client');
   // LA DATE ET L'HEURE DANS UNE SEULE CASE : c'est un fait, pas deux. Le délai
   // restant est une déduction — il a sa case. Derrière l'heure, il n'avait plus
@@ -251,13 +282,30 @@ assert.ok(/ZONE 5 — PAIEMENT/.test(JS), '… et la zone de l’argent porte so
   // cette partie doit être ensemble, et beaucoup moins haute ». Le compte tient
   // maintenant la colonne de DROITE, l'atelier celle de gauche, et le panneau
   // fait la hauteur du plus haut des deux au lieu de leur somme.
-  // CHAQUE CASE PART D'UN RAIL DE LA GRILLE DU HAUT. Mesuré à 1440 : Coût 24,
-  // Marge 140, Règlement 364,5 → 695 ; Prix TTC 744, Acompte 860 → 1191, Reste
-  // à payer 1201 → 1416. Ce sont exactement les bornes de `.fa-grille-client` et
-  // de `.fa-grille-prod`, au centième près.
+  // CHAQUE CASE PART D'UN RAIL DE LA GRILLE DU HAUT — c'est l'invariant, et il
+  // ne dépend pas du nombre de pistes. Il en fallait QUATRE tant que l'intitulé
+  // vivait à gauche de sa valeur (`106px 1fr 106px 1fr`) ; depuis le 31/08 il
+  // est AU-DESSUS, une case porte donc les deux et n'occupe qu'une piste. Deux
+  // champs par rangée dans les deux cas — ce qui compte est que les TROIS
+  // grilles se définissent au même endroit, sinon ce sont trois rails qui se
+  // ressemblent.
   const MOITIE = CSS.match(/\.fa-details__moitie \{[\s\S]*?\n\}/)[0];
-  assert.match(MOITIE, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
-    'chaque moitié reprend les quatre pistes des grilles du haut');
+  const GRILLES = CSS.match(/\.fa-grille-client,\n\.fa-grille-prod \{[^}]*\}/)[0];
+  assert.match(GRILLES, /grid-template-columns: 1fr 1fr;/,
+    'les deux grilles du haut portent EXACTEMENT la même définition');
+  for (const [nom, regle] of [['la bande', MOITIE], ['les colonnes', GRILLES]]) {
+    assert.match(regle, /gap: var\(--rangee\);/,
+      `${nom} : la gouttière est partagée — c'est elle qui fait le rythme, pas le nombre de pistes`);
+  }
+  // L'INTITULÉ EST AU-DESSUS DE SA VALEUR, PARTOUT — la grammaire du comptoir
+  // (31/08, Charlie). La fiche en avait trois : le rail de gauche (`.fa-row`),
+  // l'alternance en pistes des deux grilles, et la case du paiement. Il ne
+  // reste que la dernière, et plus rien ne doit rappeler les deux autres.
+  assert.ok(!/\.fa-row[ .{,:]/.test(CSS.replace(/\/\*[\s\S]*?\*\//g, ''))
+    && !/fa-row/.test(JS.replace(/\/\/.*$/gm, '')),
+    'plus une seule règle ni un seul nœud ne pose l’intitulé à gauche de sa valeur');
+  assert.ok(!/--fa-lab-w/.test(CSS.replace(/\/\*[\s\S]*?\*\//g, '')),
+    'le rail de 106 px n’a plus d’objet : aucun intitulé ne se pose à gauche');
   assert.match(CSS, /\.fa-case--large \{ grid-column: span 2; \}/,
     'ce qui n’entre pas dans une piste en prend deux — jamais une largeur écrite');
   // LE RESTE SE DÉDUIT, IL NE SE SAISIT PAS — et « soldé » vaut zéro quoi qu'il

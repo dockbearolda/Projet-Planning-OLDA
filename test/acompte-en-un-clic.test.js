@@ -130,12 +130,28 @@ assert.match(DETAILS, /display: grid; grid-template-columns: 1fr 1fr;/,
   'la bande reprend les DEUX moitiés de `.fa-travail`');
 assert.ok(!/margin-left: auto/.test(DETAILS),
   'elle ne flotte plus à droite : elle part du bord gauche du contenu, comme les colonnes');
+// ⚠ DEUX PISTES DEPUIS LE 31/08, ET NON QUATRE. Il en fallait quatre —
+// `106px 1fr 106px 1fr` — tant que l'intitulé se posait à GAUCHE de sa valeur :
+// chaque paire mangeait deux pistes. Depuis que la fiche a pris la grammaire du
+// comptoir, l'intitulé est AU-DESSUS et une case n'occupe plus qu'une piste.
+// Deux champs par rangée dans les deux cas : c'est le même rail, écrit
+// autrement. Ce que ce contrôle tient n'a pas bougé — les TROIS grilles se
+// définissent au même endroit, sinon ce sont trois rails qui divergent.
+// LE NOMBRE DE PISTES SUIT LE CONTENU ; CE QUI EST PARTAGÉ, C'EST LA GOUTTIÈRE
+// ET LA CASE. La moitié porte trois cases dont une large (1+1+2) : quatre
+// pistes, donc UNE rangée. Les colonnes du haut portent des champs qu'on
+// remplit : deux pistes, sinon « dim. 06/09 » ne tient pas dans 145 px. C'est
+// ce que fait l'écran de référence, qui a `.grid` (2) et `.grid-3` (3).
 const MOITIE = CSS.match(/\.fa-details__moitie \{[\s\S]*?\n\}/)[0];
-assert.match(MOITIE, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
-  '… et dans chaque moitié les QUATRE MÊMES PISTES que les deux grilles du haut');
+assert.match(MOITIE, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/,
+  'la moitié tient ses trois cases sur UNE rangée : 1 + 1 + 2 = quatre pistes');
 const GRILLES = CSS.match(/\.fa-grille-client,\n\.fa-grille-prod \{[^}]*\}/)[0];
-assert.match(GRILLES, /grid-template-columns: var\(--fa-lab-w\) 1fr var\(--fa-lab-w\) 1fr;/,
-  '… lues là où elles sont écrites : trois rails recopiés, ce sont trois rails qui divergent');
+assert.match(GRILLES, /grid-template-columns: 1fr 1fr;/,
+  'les colonnes du haut en ont deux : un champ de saisie ne tient pas dans un quart de colonne');
+for (const [nom, regle] of [['la bande', MOITIE], ['les colonnes', GRILLES]]) {
+  assert.match(regle, /gap: var\(--rangee\);/,
+    `${nom} : la gouttière est la MÊME, et c'est elle qu'on partage — pas le nombre de pistes`);
+}
 assert.ok(!/justify-content: flex-end/.test(DETAILS) && !/justify-content: flex-end/.test(MOITIE),
   'jamais `flex-end` : il rogne par la gauche quand ça déborde');
 // LA DERNIÈRE CASE FINIT SUR LE BORD DROIT, par une MARGE AUTOMATIQUE : c'est
@@ -157,18 +173,39 @@ assert.match(CSS, /\.fa-case__v \{[^}]*white-space: nowrap;/,
 // un AUTRE rail. Ici il est juste au-dessus. Le rembourrage rendu, c'est aussi
 // 20 px de moins pour le montant : « 1 250,50 € » débordait de 2 px du coût et
 // de 9 px du prix TTC — mesuré au rendu le 29/08.
-// DEPUIS LE 30/08 LES DEUX TIENNENT (Charlie : « la bulle a un problème, les
-// écritures sont collées à gauche de la bulle »). Le rembourrage revient À
-// GAUCHE SEULEMENT, et une marge négative de la même valeur rend au texte sa
-// place : la boîte grandit vers la gauche, le texte ne bouge pas, et rien
-// n'est perdu en largeur.
+// ⚠ CE RATTRAPAGE EST RETIRÉ LE 31/08, et c'est une MESURE qui le dit. Il
+// alignait le TEXTE de la valeur sur le texte de son intitulé (rembourrage à
+// gauche seulement + marge négative de la même valeur). Or l'écran de référence
+// — l'article de `demande-devis`, celui dont Charlie a demandé le design — fait
+// l'inverse, mesuré au rendu : intitulé « Référence » à 50 px, BOÎTE du champ à
+// 50 px, TEXTE du champ à 64. Il aligne les BOÎTES et laisse le texte s'insérer
+// de ses 14 px. La fiche faisait donc autrement sur six champs de sa bande et
+// comme le comptoir sur les vingt autres : un rembourrage à part pour un seul
+// bloc, ce qui est exactement le défaut que la charte nomme.
+// Ce que Charlie demandait le 30/08 — « les écritures sont collées à gauche de
+// la bulle, je veux qu'elle soit comme les autres » — est TENU, et mieux :
+// la bande prend maintenant `0 14px`, la boîte de tous les champs de l'app.
 {
   const regle = CSS.match(/\.fa-details \.fa-in, \.fa-details \.fa-choix \{[^}]*\}/);
   assert.ok(regle, 'les champs de la bande ont leur règle');
-  assert.match(regle[0], /padding: 0 0 0 var\(--pas-2\);/,
-    'le rembourrage revient, à gauche seulement — des deux côtés il coûte 20 px au montant');
-  assert.match(regle[0], /margin-left: calc\(var\(--pas-2\) \* -1\);/,
-    '… et la marge négative rend au texte le rail de son intitulé');
+  assert.ok(!/padding:/.test(regle[0]) && !/margin-left:/.test(regle[0]),
+    'la bande n’a plus de rembourrage à elle : elle prend celui de tous les champs');
+  assert.match(regle[0], /min-width: 0;/,
+    '… mais elle garde ce qui la fait tenir : un champ en flex doit pouvoir rétrécir');
+}
+// ET LE REMBOURRAGE EST LE MÊME POUR TOUTE COMMANDE DE LA FICHE — une seule
+// écriture, celle de `.fa-in, .fa-choix`. C'est le contrôle qui remplace celui
+// d'au-dessus : il ne vérifie plus qu'un bloc fait bien son exception, il
+// vérifie qu'aucun ne la fait.
+{
+  const base = CSS.match(/\.fa-in, \.fa-choix \{[\s\S]*?\n\}/)[0];
+  assert.match(base, /padding: 0 var\(--champ-x\);/,
+    'la boîte d’une commande prend le rembourrage de la maison');
+  const nu = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const exceptions = (nu.match(/^\.fa-[a-z-]*(?:[^{]*)\{[^}]*padding(?:-left|-right)?:/gm) || [])
+    .filter((r) => !/\.fa-in, \.fa-choix|--carre|textarea|\.fa-btn|\.fa-ajout|\.fa-menu|\.fa-col|\.fa-head|\.fa-bandeau|\.fa-note|\.fa-details__moitie|\.fa-toast|\.fa-reste|\.fa-client/.test(r));
+  assert.deepStrictEqual(exceptions, [],
+    `aucune commande ne se donne son propre rembourrage (trouvé : ${exceptions.join(' | ')})`);
 }
 
 // ⚠ LE SÉLECTEUR DES BOUTONS SUIT LA CASE. Il portait sur `.fa-argent__k`, la
