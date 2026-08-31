@@ -302,27 +302,39 @@ select.fa-in { appearance: none; cursor: pointer; }
    compte quand meme dans l'ecart de la rangee : 10 px de vide entre la
    reference et le nom du client, sur tous les dossiers sauf ceux d'un ticket. */
 .fa-ref:empty { display: none; }
-.fa-client {
-  padding: var(--pas-1); border: 0; border-radius: var(--arrondi-champ); background: transparent;
-  font: inherit; font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1);
+/* --- LES DEUX COMMANDES DE L'ENTETE, DANS UNE SEULE REGLE -----------------
+   Le nom du client et celui du produit s'editent tous les deux ici, et tous les
+   deux dans une BARRE DE TITRE — pas dans un formulaire. Ils ne prennent donc
+   PAS la boite d'un champ : ni sa hauteur (`--ctrl-h`, 50 px — posee ici,
+   l'entete montait a 71 px pour un texte qui en occupe 19, mesure le 30/08),
+   ni son rembourrage, ni son TRAIT, ni son FOND.
+   ⚠ CES DEUX DERNIERS DOIVENT SE DIRE DEPUIS LE 31/08. Tant que `.fa-in` etait
+   transparent au repos, `.fa-projet` n'avait rien a declarer — il l'heritait.
+   Depuis que la boite d'un champ est visible en permanence (grammaire du
+   comptoir), l'heritage lui posait un rectangle blanc borde EN PLEIN TITRE, a
+   cote du nom du client qui, lui, n'en a pas. Deux commandes cote a cote, deux
+   apparences, pour le meme geste.
+   CE QU'ELLES DISENT QU'ON PEUT LES MODIFIER, c'est le fond au SURVOL — comme
+   partout ailleurs dans une barre. */
+.fa-client, .fa-projet {
+  padding: var(--pas-1); height: auto;
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
+  background: transparent;
+  font: inherit;
   white-space: nowrap; cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
 }
-.fa-client:hover { background: var(--bg); }
-/* Le nom du produit accompagne celui du client : il ne le concurrence pas.
-   À `--fa-fort` il faisait le même cran que lui, et l'entête portait deux
-   titres au lieu d'un. SE MODIFIE ICI (30/08) : c'est un `.fa-in` comme le
-   reste de la fiche, `flex` pour prendre ce que le reste de la rangée laisse
-   et se réduire en « … » plutôt que pousser la croix de fermeture hors cadre.
-   `height`/`padding` ÉCRASENT ceux de `.fa-in` (30/08) : `--fa-h-champ` vaut
-   `--ctrl-h` (50px), la hauteur d'un CHAMP DE GRILLE — posée ici, l'entête
-   entière montait à 71 px (mesuré) pour un texte qui en occupe 19. Ce champ
-   n'est pas dans une grille, il est dans une rangée `align-items: baseline`
-   à côté d'étiquettes de texte : il reprend leur boîte, comme `.fa-client`. */
+.fa-client:hover, .fa-projet:hover { background: var(--bg); }
+/* Ce qui reste PROPRE a chacune : le client est le titre, le produit
+   l'accompagne sans le concurrencer — a `--fa-fort` ils faisaient le meme cran
+   et l'entete portait DEUX titres. */
+.fa-client { font-size: var(--fa-fort); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* Le produit prend ce que la rangee laisse et se reduit en « … » plutot que de
+   pousser la croix de fermeture hors cadre. */
 .fa-projet {
   flex: 1 1 auto; min-width: 0;
-  height: auto; padding: var(--pas-1);
   font-size: var(--fa-val); color: var(--text-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .fa-outils { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; flex-shrink: 0; }
 .fa-autosave {
