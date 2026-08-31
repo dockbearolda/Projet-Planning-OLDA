@@ -268,18 +268,20 @@ for (const perdu of ['.work-title', '.mt-head__titre', '.pil-titre', '.cl-brand_
     `${perdu} : un écran ne réécrit pas le titre de la charte`);
 }
 
-// UNE SEULE BOÎTE DE SAISIE, celle de la charte. Deux exceptions ASSUMÉES, et
-// elles sont écrites dans le fichier : l'éditeur posé sur une cellule de la
-// grille et les titres de la fiche ne sont pas des champs — ce sont des textes
-// qu'on peut taper, leur rembourrage aligne leurs lettres sur celles qu'ils
-// recouvrent.
+// UNE SEULE BOÎTE DE SAISIE, celle de la charte. Une exception ASSUMÉE — les
+// titres de la fiche ne sont pas des champs, ce sont des textes qu'on peut
+// taper, leur rembourrage aligne leurs lettres sur celles qu'ils recouvrent.
+// La SECONDE exception, `.cell-input` (l'éditeur posé sur une cellule de la
+// grille), A DISPARU LE 30/08 avec la ligne elle-même : les quatre champs
+// qu'elle portait (dossier, article, prix, note) ne s'éditent plus en place,
+// ils se lisent — voir test/prix-vide-ouvre-la-fiche.test.js.
 for (const sel of ['.reason-input', '.cat-row-select', '.reg-textarea']) {
   const r = sansCommentaire(CSS).match(new RegExp('\\' + sel + ' \\{[^}]*\\}'));
   assert.ok(r && /padding: var\(--champ-y\) var\(--champ-x\)/.test(r[0]),
     `${sel} prend la boîte de saisie de la charte`);
 }
-assert.ok(/CET ÉDITEUR N'EST PAS UN CHAMP/.test(CSS),
-  'l’exception de `.cell-input` est écrite dans le fichier, pas devinée');
+assert.ok(!/cell-input/.test(CSS),
+  'l’exception `.cell-input` est partie avec la dernière cellule éditable en ligne');
 
 console.log('✓ échelle : le CRM parle la langue de l’écran de référence du comptoir');
 

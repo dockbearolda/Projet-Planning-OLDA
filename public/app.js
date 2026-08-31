@@ -2648,60 +2648,44 @@ function cellSubStage(r) {
   return td;
 }
 
-// (Re)peint la vue « Prénom NOM » superposée au champ du nom de dossier. `box`
-// est le conteneur .client-name : il porte le champ ET la vue. Un particulier se
-// lit prénom en graisse normale + NOM DE FAMILLE EN GRAS (c'est le nom qu'on
-// cherche en balayant la colonne) ; une société garde son nom d'un seul bloc.
-function paintClientName(box, clientType) {
-  const input = box.querySelector('.client-company');
-  const view = box.querySelector('.client-company-view');
-  if (!input || !view) return;
+// Peint le nom du dossier dans `el` : un particulier se lit prénom en graisse
+// normale + NOM DE FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la
+// colonne) ; une société ou un nom seul gardent un seul bloc.
+function paintClientName(el, clientType, valeur) {
   const { prenom, nom } = clientType === 'perso'
-    ? splitPersoName(input.value)
+    ? splitPersoName(valeur)
     : { prenom: '', nom: '' };
-  // Rien à couper en deux graisses (société, nom seul, champ vide) : le champ
-  // s'affiche tel quel et la vue reste vide.
-  const deuxParts = !!(prenom && nom);
-  box.classList.toggle('is-split', deuxParts);
-  if (!deuxParts) { view.replaceChildren(); return; }
+  if (!(prenom && nom)) { el.textContent = valeur; return; }
   const famille = document.createElement('b');
   famille.textContent = nom;
-  view.replaceChildren(document.createTextNode(`${prenom} `), famille);
+  el.replaceChildren(document.createTextNode(`${prenom} `), famille);
 }
 
-// Nom du dossier client : champ principal éditable. Le référent, le téléphone et
-// l'email restent saisissables via le popover contact (icône de la 1re colonne).
+// Nom du dossier client : SE LIT ici, se modifie dans la fiche (30/08, Charlie :
+// « la seule façon de faire des modifs est de cliquer dessus, la ligne »). Le
+// référent, le téléphone et l'email restent lisibles via le popover contact
+// (icône de la 1re colonne) ; les trois se corrigent dans la fiche.
 function cellDossier(r) {
   const td = document.createElement('td');
   td.className = 'col-client-cell';
   const stack = document.createElement('div');
   stack.className = 'client-stack';
 
-  const company = document.createElement('input');
-  company.className = 'cell-input client-company';
-  company.type = 'text';
-  company.value = r.billing_company ?? '';
-  company.placeholder = 'nom du dossier';
-  company.setAttribute('aria-label', 'Nom du dossier client');
-
-  // Un <input> ne porte qu'UNE graisse : pour lire « Jean DUPONT » avec le nom
-  // en gras, une vue formatée se superpose au champ et s'efface dès qu'il prend
-  // le focus. La saisie, elle, reste un champ texte ordinaire.
   const name = document.createElement('div');
   name.className = 'client-name';
-  const view = document.createElement('div');
-  view.className = 'client-company-view';
-  view.setAttribute('aria-hidden', 'true');   // le champ porte déjà la valeur
-  name.append(company, view);
-
-  const peindre = () => paintClientName(name, r.client_type);
-  bindInline(company, r, 'billing_company', (v) => v === '' ? null : v, capitalizeName);
-  // Écouteurs posés APRÈS bindInline : son propre `blur` range la casse en
-  // premier, la vue se repeint donc sur la valeur définitive.
-  company.addEventListener('input', peindre);
-  company.addEventListener('blur', peindre);
-  peindre();
-  syncTitleOnOverflow(company);
+  const company = document.createElement('div');
+  company.className = 'client-company';
+  const texte = r.billing_company ?? '';
+  company.title = texte;
+  if (texte === '') {
+    company.classList.add('is-empty');
+    company.textContent = 'nom du dossier';
+  } else {
+    // « Jean DUPONT » : prénom en graisse normale, NOM DE FAMILLE EN GRAS — le
+    // nom qu'on cherche en balayant la colonne.
+    paintClientName(company, r.client_type, texte);
+  }
+  name.appendChild(company);
 
   const line = document.createElement('div');
   line.className = 'client-line';
@@ -3016,26 +3000,21 @@ function cellWhatsapp(r) {
   return a;
 }
 
-// Description : ce qui est produit (ancien champ « produit »). Champ simple,
-// éditable en ligne, avec majuscules automatiques à la validation.
+// Description : ce qui est produit (ancien champ « produit »). SE LIT ici
+// (30/08, Charlie : « la seule façon de faire des modifs est de cliquer
+// dessus, la ligne ») — se modifie dans l'entête de la fiche.
 function cellDescription(r) {
   const td = document.createElement('td');
   td.className = 'col-product-cell';
   const stack = document.createElement('div');
   stack.className = 'product-stack';
 
-  const name = document.createElement('input');
-  name.className = 'cell-input product-name';
-  name.type = 'text';
-  name.value = r.product ?? '';
-  name.placeholder = 'article';
-  // Le `<th>` de la colonne ne nomme PAS le champ qu'elle contient : au clavier
-  // comme au lecteur d'écran, ces trois cellules du tableau (dossier, projet,
-  // prix) s'annonçaient « zone de texte », sans dire laquelle — et le prix, dont
-  // l'indication de saisie est un tiret, ne disait rigoureusement rien.
-  name.setAttribute('aria-label', 'Projet — description de la commande');
-  bindInline(name, r, 'product', (v) => v === '' ? null : v, capitalizeName);
-  syncTitleOnOverflow(name);
+  const name = document.createElement('div');
+  name.className = 'product-name';
+  const texte = r.product ?? '';
+  name.classList.toggle('is-empty', texte === '');
+  name.textContent = texte || 'article';
+  name.title = texte;
 
   stack.appendChild(name);
   // « 2/4 » SOUS LA DESCRIPTION. Dispersée dans le pipeline, la ligne doit dire
@@ -3053,63 +3032,25 @@ function cellDescription(r) {
 }
 
 // Prix : montant TTC de la commande — celui que le client paie. Le HT s'affiche
-// dessous, calculé, jamais saisi. Vide tant que rien n'est chiffré : le prix ne
-// conditionne plus aucun déplacement de ligne, il ne fait que renseigner.
+// dessous, calculé. Vide tant que rien n'est chiffré. SE LIT ici (30/08,
+// Charlie : « la seule façon de faire des modifs est de cliquer dessus, la
+// ligne ») — se modifie dans la fiche (« Prix TTC », zone Paiement), qui porte
+// aussi le Reste à payer et le budget indicatif qu'un simple champ ne montre pas.
 function cellPrice(r) {
   const td = document.createElement('td');
   td.className = 'col-price-cell';
 
-  const price = document.createElement('input');
-  price.className = 'cell-input num cell-price';
-  price.type = 'text';
-  price.inputMode = 'decimal';
+  const price = document.createElement('span');
+  price.className = 'cell-price';
+  const vide = r.project_value == null;
+  price.classList.toggle('is-empty', vide);
   // LE MONTANT S'ÉCRIT EN FRANÇAIS, ici comme sur la carte, le ticket et la
-  // fiche : « 88,80 » et non « 88.8 ». La cellule était la seule à rendre le
-  // nombre brut de la base, puis à le ranger avec un POINT en le quittant —
-  // dans un outil dont tout le reste affiche une virgule et deux décimales.
-  price.value = r.project_value != null ? Number(r.project_value).toFixed(2).replace('.', ',') : '';
-  price.placeholder = '—';
-  price.setAttribute('aria-label', 'Prix TTC de la commande, en euros');
-
-  // SANS PRIX, LE CHAMP N'A RIEN À ÉDITER — IL OUVRE LA FICHE. Un champ vide
-  // couvre presque toute la cellule (voir ZONE_CLIQUABLE) : le clic le plus
-  // naturel, sur le prix lui-même, tombait dans un champ qui ne montrait
-  // jamais rien de plus qu'un curseur vide, et la fiche — avec son « Reste à
-  // payer », le budget indicatif, tout ce qui parle d'argent — ne s'ouvrait
-  // JAMAIS depuis cette cellule. Dès qu'un prix existe, la cellule redevient
-  // ce qu'elle a toujours été : un champ qu'on édite en place.
-  price.addEventListener('mousedown', (e) => {
-    if (r.project_value == null) {
-      e.preventDefault();
-      openLigneDetail(r.id);
-    }
-  });
+  // fiche : « 88,80 » et non « 88.8 ».
+  price.textContent = vide ? '—' : Number(r.project_value).toFixed(2).replace('.', ',');
 
   const ht = document.createElement('span');
   ht.className = 'cell-price-ht';
-  const refreshHt = () => { ht.textContent = htLabel(r.project_value); };
-  refreshHt();
-
-  bindInline(
-    price, r, 'project_value',
-    (raw) => {
-      const t = raw.trim();
-      return t === '' ? null : parseFloat(t.replace(',', '.'));
-    },
-    (raw) => {
-      const t = raw.trim();
-      if (t === '') return '';
-      const n = parseFloat(t.replace(',', '.'));
-      return Number.isNaN(n) ? raw : n.toFixed(2).replace('.', ',');
-    },
-  );
-  // Le HT suit la frappe : on voit tout de suite ce que la remise donne hors
-  // taxe, sans attendre l'enregistrement de la cellule.
-  price.addEventListener('input', () => {
-    const n = parseFloat(price.value.trim().replace(',', '.'));
-    ht.textContent = price.value.trim() === '' || Number.isNaN(n) ? '' : htLabel(n);
-  });
-  price.addEventListener('blur', refreshHt);
+  ht.textContent = htLabel(r.project_value);
 
   td.append(price, ht);
   return td;
@@ -3148,7 +3089,9 @@ function relireLesNotes() {
 }
 
 // Infos : notes libres multi-lignes (ancien champ « description »). Repliée à
-// deux lignes par défaut ; dès qu'elle est coupée, une flèche déroule la suite.
+// deux lignes par défaut ; dès qu'elle est coupée, une flèche déroule la
+// suite. SE LIT ici (30/08, Charlie : « la seule façon de faire des modifs
+// est de cliquer dessus, la ligne ») — se modifie dans la fiche (« Note »).
 function cellInfos(r) {
   const td = document.createElement('td');
   td.className = 'col-infos-cell';
@@ -3170,25 +3113,14 @@ function cellInfos(r) {
 
   const descRow = document.createElement('div');
   descRow.className = 'product-desc-row';
-  const desc = document.createElement('textarea');
-  desc.className = 'cell-input product-desc';
-  desc.rows = 2;
-  desc.value = r.description ?? '';
-  desc.placeholder = '+ Ajouter une note';
-  desc.setAttribute('aria-label', 'Infos — note libre sur la commande');
 
-  // UNE NOTE SE LIT. Le champ seul ne pouvait pas la rendre lisible : un
-  // `textarea` IGNORE `text-overflow: ellipsis` — la propriété ne vaut que pour
-  // un bloc, pas pour le texte interne d'une commande de formulaire. La note
-  // était donc coupée net, en plein mot, sans le moindre signe qu'il y avait
-  // une suite. Mesuré en PRODUCTION : 122 notes, MÉDIANE 336 caractères, et
-  // 66 % d'entre elles plus longues que ce qu'une ligne de 244 px peut montrer.
-  // On lisait donc un huitième de note sur deux dossiers sur trois.
-  // La vue est un vrai bloc : deux lignes, et de vrais points de suspension.
-  // Elle s'efface dès qu'on entre dans le champ (comme le nom du dossier).
+  // UNE NOTE SE LIT. Un `<div>` IGNORE… non : c'est le `<textarea>` qu'on a
+  // retiré qui ignorait `text-overflow: ellipsis` — la propriété ne vaut que
+  // pour un bloc. Mesuré en PRODUCTION : 122 notes, MÉDIANE 336 caractères, et
+  // 66 % d'entre elles plus longues que ce qu'une ligne de 244 px peut
+  // montrer. Ce bloc-ci pose de vrais points de suspension.
   const view = document.createElement('div');
   view.className = 'product-desc-view';
-  view.setAttribute('aria-hidden', 'true');
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -3198,7 +3130,6 @@ function cellInfos(r) {
   toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
   let open = false;
-  let lastSent = r.description ?? '';
   // LA FLÈCHE APPARAÎT QUAND IL Y A QUELQUE CHOSE À DÉPLIER — c'est-à-dire
   // quand la vue est COUPÉE. Elle ne se montrait qu'aux notes portant un retour
   // à la ligne : une note d'un seul paragraphe de 300 signes n'en avait donc
@@ -3207,50 +3138,20 @@ function cellInfos(r) {
   const estCoupee = () => view.scrollHeight > view.clientHeight + 1;
 
   const sync = () => {
-    stack.classList.toggle('desc-empty', desc.value.trim() === '');
-    // La vue porte le texte tant qu'on n'écrit pas dedans.
-    view.textContent = desc.value;
-    const expanded = open || document.activeElement === desc;
-    desc.classList.toggle('expanded', expanded);
-    view.classList.toggle('expanded', expanded);
-    const coupee = estCoupee() || open;
+    const vide = !r.description || !r.description.trim();
+    stack.classList.toggle('desc-empty', vide);
+    view.textContent = vide ? '+ Ajouter une note' : r.description;
+    view.classList.toggle('expanded', open);
+    const coupee = (!vide && estCoupee()) || open;
     toggle.hidden = !coupee;
     if (!coupee) open = false;
     toggle.classList.toggle('open', open);
-    // hauteur : repliée = deux lignes (CSS) ; dépliée OU en édition = tout.
-    if (expanded) {
-      desc.style.height = 'auto';
-      desc.style.height = desc.scrollHeight + 'px';
-    } else {
-      desc.style.height = '';
-    }
     // Repliée + texte tronqué : l'infobulle donne la note complète au survol.
-    // `title` et non `attachTip` : attachTip pose aussi un `aria-label`, et le
-    // lecteur d'écran annonçait alors le CONTENU du champ en guise d'étiquette
-    // (« Vérifier la taille des logos, zone de saisie ») au lieu de son rôle.
-    desc.title = desc.value.trim() ? desc.value : 'cliquer pour ajouter une note';
+    view.title = vide ? '' : r.description;
   };
 
   toggle.addEventListener('click', (e) => { e.stopPropagation(); open = !open; sync(); });
-  desc.addEventListener('input', sync);
-  desc.addEventListener('focus', sync);
-  desc.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { desc.value = lastSent; desc.blur(); } // Entrée = nouvelle ligne
-  });
-  desc.addEventListener('blur', () => {
-    const val = desc.value === '' ? null : desc.value;
-    if ((val ?? '') !== (lastSent ?? '')) {
-      const prev = r.description;
-      r.description = val;
-      lastSent = desc.value;
-      patchRow(r, { description: val }).catch((err) => {
-        r.description = prev; reportError(err);
-      });
-    }
-    sync();
-  });
 
-  descRow.appendChild(desc);
   descRow.appendChild(view);
   descRow.appendChild(toggle);
   stack.appendChild(descRow);
@@ -4838,98 +4739,6 @@ function showDeadlineCalendar(r, anchor, onPick) {
     document.addEventListener('pointerdown', onCalDocDown, true);
     document.addEventListener('keydown', onCalKey, true);
   }, 0);
-}
-
-// --- Majuscules automatiques (noms, référents, projets) --------------------
-// On tape vite en minuscules ; le champ se range proprement à la validation
-// (Entrée / sortie du champ). Title-case « à la française » :
-//   - 1re lettre de chaque mot en majuscule (« mug photo » → « Mug Photo ») ;
-//   - particules en minuscule sauf en tête (« brasserie du coin » → « Brasserie du Coin ») ;
-//   - sigles métier toujours en capitales (dtf, uv, bat… → DTF, UV, BAT) ;
-//   - un mot déjà saisi avec une majuscule interne est respecté (acronyme voulu).
-// Idempotent : ré-appliquer ne change rien (sûr à repasser à chaque blur).
-const NAME_PARTICLES = new Set(['de', 'du', 'des', 'd', 'la', 'le', 'les', 'l', 'et', 'au', 'aux', 'von', 'van', 'der', 'den', 'di', 'da', 'dos', 'das']);
-const FORCE_UPPER = new Set(['dtf', 'uv', 'bat', 'tva', 'olda', 'pdf', 'cmjn', 'rvb', 'sav']);
-
-function capitalizeName(s) {
-  if (s == null) return s;
-  let first = true;
-  return s.trim().replace(/\s+/g, ' ').replace(/[\p{L}\p{N}]+/gu, (word) => {
-    const lower = word.toLowerCase();
-    const wasFirst = first;
-    first = false;
-    if (FORCE_UPPER.has(lower)) return lower.toUpperCase();
-    if (/\p{Lu}/u.test(word.slice(1))) return word;       // majuscule interne → acronyme voulu
-    if (!wasFirst && NAME_PARTICLES.has(lower)) return lower; // particule (hors tête) → minuscule
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  });
-}
-
-// --- Édition inline générique (texte/nombre) ------------------------------
-// `normalize` (optionnel) range la valeur saisie avant l'enregistrement et la
-// réécrit dans le champ (ex. capitalizeName pour les noms / projets).
-// `onSaved` (optionnel) est rappelé après un enregistrement réussi : la grille
-// s'auto-suffit (le champ édité EST celui affiché), le tiroir de détail s'en
-// sert pour recaler la ligne correspondante du tableau.
-function bindInline(input, r, field, transform, normalize, onSaved) {
-  let lastSent = r[field] ?? '';
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      input.blur(); // Entrée valide → blur déclenche l'enregistrement
-    } else if (e.key === 'Escape') {
-      // Échap annule : on restaure la dernière valeur validée et on quitte le
-      // champ. Comme input.value === lastSent, le blur ci-dessous ne PATCH pas.
-      input.value = (lastSent ?? '').toString();
-      input.blur();
-    }
-  });
-  input.addEventListener('blur', () => {
-    let raw = input.value;
-    if (normalize) {
-      const norm = normalize(raw);
-      if (norm !== raw) { input.value = norm; raw = norm; } // range le champ à l'écran
-    }
-    if (raw === (lastSent ?? '').toString()) return;
-    const val = transform(raw);
-    if (val !== null && typeof val === 'number' && Number.isNaN(val)) {
-      input.value = r[field] ?? ''; return;
-    }
-    // RIEN N'A CHANGÉ POUR DE VRAI : on ne réveille pas les autres postes.
-    // La comparaison portait sur le TEXTE tapé, pas sur la valeur : une ligne
-    // reconstruite (temps réel) réaffiche « 88.8 », que `normalize` range en
-    // « 88,80 » — deux écritures différentes du MÊME montant. Traverser la
-    // colonne des prix à la tabulation partait donc en un PATCH par ligne, dont
-    // chacun bousculait `updated_at` et faisait relire la ligne à tous les
-    // postes connectés. Idem pour un nom que `capitalizeName` recase.
-    if (memeValeur(val, r[field])) { lastSent = raw; return; }
-    const prev = r[field];
-    r[field] = val;
-    lastSent = raw;
-    patchRow(r, { [field]: val })
-      .then(() => {
-        // MÊME HALO QUE LES PUCES. Le prix, le nom du dossier, la description
-        // et les notes s'écrivent AU CLAVIER, en optimiste : à l'écran, une
-        // valeur partie et une valeur acceptée se ressemblaient trait pour
-        // trait — alors que la priorité, l'alerte ou le pilote, eux, poussaient
-        // leur halo vert depuis `patch()`. Ce sont pourtant les champs où l'on
-        // tape un montant avant de refermer la tablette.
-        confirmerVisuellement(input);
-        if (onSaved) onSaved();
-      })
-      .catch((err) => {
-        r[field] = prev; input.value = prev ?? ''; lastSent = prev ?? ''; reportError(err);
-      });
-  });
-}
-
-// Infobulle native (title) calée sur la valeur d'un champ tronqué en « … »
-// (voir .client-company / .product-name en CSS) : le survol révèle le texte
-// complet sans attendre la bulle maison (attachTip), absente sur ces champs.
-function syncTitleOnOverflow(input) {
-  const sync = () => { input.title = input.value; };
-  sync();
-  input.addEventListener('input', sync);
-  input.addEventListener('blur', sync);
 }
 
 // --- PATCH générique optimiste --------------------------------------------

@@ -117,34 +117,35 @@ function bloc(src, signature) {
 
 // ===========================================================================
 // 4. La grille dit ce qu'elle demande
+// ---------------------------------------------------------------------------
+// DÉPASSÉ LE 30/08 : nom du dossier, article et prix n'ÉDITENT plus rien dans
+// la grille — ils se lisent, un clic ouvre la fiche (voir
+// test/prix-vide-ouvre-la-fiche.test.js). Un nom accessible réparait un champ
+// muet ; ces trois cellules ne sont plus des champs du tout, la question ne
+// se pose plus. Ce qui reste à garantir : aucune des trois ne recrée
+// discrètement un `<input>`/`<textarea>`.
 // ===========================================================================
 {
-  assert.ok(/company\.setAttribute\('aria-label', 'Nom du dossier client'\)/.test(APP));
-  assert.ok(/name\.setAttribute\('aria-label', 'Projet — description de la commande'\)/.test(APP));
-  assert.ok(/price\.setAttribute\('aria-label', 'Prix TTC de la commande, en euros'\)/.test(APP),
-    'l’indication de saisie du prix est un tiret : sans nom, le champ ne dit RIEN');
+  const dossier = bloc(APP, 'function cellDossier(r)');
+  const description = bloc(APP, 'function cellDescription(r)');
+  for (const [nom, b] of [['cellDossier', dossier], ['cellDescription', description]]) {
+    assert.ok(!/createElement\('input'\)/.test(b) && !/createElement\('textarea'\)/.test(b),
+      `${nom} ne doit plus créer aucun champ de saisie`);
+  }
 }
 
 // ===========================================================================
 // 5 + 6 + 7. bindInline : halo, pas d'écriture à vide, montant en français
+// ---------------------------------------------------------------------------
+// DÉPASSÉ LE 30/08 : `bindInline` n'a plus d'appelant et a été retiré avec la
+// dernière cellule qu'il servait (voir ci-dessus). Le halo au clavier et la
+// garde anti-PATCH-inutile ne se posent plus pour ces champs — il n'y a plus
+// de clavier à brancher dessus. Le montant en français, lui, survit : c'est
+// désormais un fait d'AFFICHAGE, testé dans test/prix-vide-ouvre-la-fiche.test.js.
 // ===========================================================================
 {
-  const b = bloc(APP, 'function bindInline(input, r, field, transform, normalize, onSaved)');
-  assert.ok(/confirmerVisuellement\(input\);/.test(b),
-    'un champ texte enregistré pousse le même halo que les puces');
-  assert.ok(/if \(memeValeur\(val, r\[field\]\)\) \{ lastSent = raw; return; \}/.test(b),
-    'on compare la VALEUR, pas le texte tapé : « 88.8 » et « 88,80 » sont le même montant');
-  // La garde doit venir AVANT l'envoi, sinon elle ne sert à rien.
-  assert.ok(b.indexOf('memeValeur(val, r[field])') < b.indexOf('patchRow(r, { [field]: val })'),
-    'la garde se place avant le PATCH');
-
-  const p = bloc(APP, 'function cellPrice(r)');
-  assert.ok(/Number\(r\.project_value\)\.toFixed\(2\)\.replace\('\.', ','\)/.test(p),
-    'le montant s’affiche en français, comme sur la carte, le ticket et la fiche');
-  assert.ok(/n\.toFixed\(2\)\.replace\('\.', ','\)/.test(p),
-    'et il se range en français quand on quitte le champ');
-  assert.ok(/parseFloat\(t\.replace\(',', '\.'\)\)/.test(p),
-    'la virgule tapée reste comprise');
+  assert.ok(!APP.includes('function bindInline('),
+    'bindInline n’a plus d’appelant depuis que la ligne n’édite plus rien en place — code mort retiré');
 }
 
 // ===========================================================================

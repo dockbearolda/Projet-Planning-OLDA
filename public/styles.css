@@ -1373,7 +1373,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   letter-spacing: .06em;
   text-align: left;
   /* Gouttière plus large entre colonnes (façon SumUp) : 14 → 20px, même
-     rythme que .cell/.cell-input ci-dessous, pour que l'en-tête et le
+     rythme que .cell ci-dessous, pour que l'en-tête et le
      contenu restent alignés. */
   padding: 14px 20px;
   white-space: nowrap;
@@ -1477,38 +1477,9 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 }
 .cell.num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
 
-/* CET ÉDITEUR N'EST PAS UN CHAMP, c'est du texte qu'on peut taper : il se pose
-   SUR une cellule de la grille, sa hauteur vient de `--row-h` et son
-   rembourrage aligne ses lettres sur celles de la cellule qu'il recouvre. Lui
-   donner la boîte de la charte décalerait le texte au moment du clic — il
-   garde donc la sienne, à dessein. */
-.cell-input {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  padding: 20px 24px;
-  height: var(--row-h);
-  font-family: inherit;
-  border-radius: 0;
-  transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
-}
-.cell-input::placeholder { color: var(--text-3); }
-.cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
-
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-/* focus : fond gris clair + soulignement accent (soulignement inset) */
-.cell-input:focus {
-  outline: none;
-  background: var(--field-focus);
-  box-shadow: inset 0 -2px 0 var(--primary);
-  position: relative;
-  z-index: 1;
-}
-
 
 /* poignée de glisser (largeur : voir .col-handle plus bas, avec ses voisines) */
 .handle-cell {
@@ -1589,49 +1560,24 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-weight: var(--graisse-texte);
   letter-spacing: -.01em;
   color: var(--text-1);
+  white-space: nowrap;
   /* Colonne resserrable par l'utilisateur : un nom long se lit en « … » plutôt
      que de couper un caractère au milieu, le survol (title) montre le reste. */
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Vide (aucun `billing_company`) : « nom du dossier » en gris, l'invite d'un
+   champ sans en être un — il se remplit dans la fiche. */
+.client-company.is-empty { color: var(--text-3); }
 
 /* Le nom du dossier occupe toute la 1re rangée de la cellule. */
 .client-line { display: flex; align-items: center; min-width: 0; }
-.client-line .client-name { flex: 1 1 auto; min-width: 0; position: relative; }
-.client-name .client-company { width: 100%; }
+.client-line .client-name { flex: 1 1 auto; min-width: 0; }
 
 /* Nom d'un PARTICULIER : « Jean DUPONT » — prénom en graisse normale, NOM DE
-   FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la colonne). Un
-   <input> ne portant qu'une seule graisse, cette vue se superpose au champ,
-   au pixel près (mêmes marges, même fonte) ; elle ne prend pas le clic, donc
-   la cellule reste un champ texte ordinaire — un clic pose le curseur, la vue
-   s'efface et la saisie se fait sur le texte brut « Prénom NOM ».
-   Montée SEULEMENT quand les deux parties sont lisibles (classe .is-split) :
-   une société, un nom seul ou un champ vide s'affichent tels quels.
-   Bloc et non flex : le texte reste UN SEUL flux, donc l'espace entre le
-   prénom et le nom survit (un flex l'aurait rogné, « Jean-MarcDUPONT ») et la
-   troncature en « … » fonctionne comme dans le champ. L'alignement vertical
-   vient des mêmes marges et de la même interligne (`normal`) que le champ. */
-.client-company-view {
-  position: absolute;
-  inset: 0;
-  display: none;
-  padding: 6px 14px;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-texte);
-  letter-spacing: -.01em;
-  color: var(--text-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-.client-company-view b { font-weight: var(--graisse-forte); }
-.client-name.is-split .client-company-view { display: block; }
-.client-name.is-split .client-company { color: transparent; }
-/* Focus : le champ reprend sa couleur, la vue s'efface — on édite « Prénom NOM ». */
-.client-name.is-split .client-company:focus { color: var(--text-1); }
-.client-name.is-split:focus-within .client-company-view { display: none; }
+   FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la colonne). Une
+   société, un nom seul ou un champ vide s'affichent tels quels. */
+.client-company b { font-weight: var(--graisse-forte); }
 
 /* Les pastilles du dossier (WhatsApp, devis, facture, BAT, détail, envoi PDF)
    tiennent leur PROPRE rangée, sous le nom. Elles pèsent 204 px
@@ -2288,12 +2234,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    de 16 px l'un sous l'autre. */
 .col-price-cell { text-align: right; }
 .col-price-cell .cell-price {
+  display: block;
   height: auto;
   padding: var(--pas-2) 24px 0;
   /* `line-height: normal` laisse le contenu décider de la hauteur : c'est ce
      qui donne trois hauteurs de champ dans une même application. */
   line-height: var(--ligne-serre);
+  font-variant-numeric: tabular-nums;
 }
+/* Vide (aucun `project_value`) : le tiret en gris, pas en encre pleine — rien
+   n'est encore chiffré. */
+.cell-price.is-empty { color: var(--text-3); }
 .cell-price-ht {
   display: block;
   padding: 0 24px var(--pas-2);
@@ -2887,47 +2838,27 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
   color: var(--text-1);
+  white-space: nowrap;
   /* Idem colonne « Nom du dossier » : « … » plutôt qu'une coupe silencieuse,
      le survol (title) révèle le texte complet. */
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Vide (aucun `product`) : « article » en gris, l'invite d'un champ sans en
+   être un — il se remplit dans l'entête de la fiche. */
+.product-name.is-empty { color: var(--text-3); }
 .product-desc-row { display: flex; align-items: flex-start; gap: 2px; }
-.product-desc {
+
+/* LA VUE DE LECTURE DE LA NOTE.
+   Un `<textarea>` IGNORE `text-overflow: ellipsis` : la propriété ne
+   s'applique qu'à un bloc, jamais au texte interne d'une commande de
+   formulaire. La note se coupait donc net, en plein mot, sans le moindre
+   signe qu'il y avait une suite — sur 66 % des notes de la production, dont
+   la médiane fait 336 caractères. Ce bloc-ci, lui, sait poser de vrais
+   points de suspension. */
+.product-desc-view {
   flex: 1;
   min-width: 0;
-  height: auto;
-  min-height: 0;
-  padding: 2px 14px 4px;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-texte);
-  line-height: var(--ligne-texte);
-  color: var(--text-2);
-  resize: none;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-family: inherit;
-  background: transparent;
-  border: 0;
-  transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-/* Repliée = deux lignes coupées par la VUE ci-dessous. Dépliée (flèche) ou en
-   cours d'édition = retour au texte multi-lignes normal. */
-.product-desc.expanded { white-space: pre-wrap; text-overflow: clip; }
-
-/* LA VUE DE LECTURE DE LA NOTE, posée par-dessus le champ.
-   Un `textarea` IGNORE `text-overflow: ellipsis` : la propriété ne s'applique
-   qu'à un bloc, jamais au texte interne d'une commande de formulaire. La note
-   se coupait donc net, en plein mot, sans le moindre signe qu'il y avait une
-   suite — sur 66 % des notes de la production, dont la médiane fait 336
-   caractères. Ce bloc-ci, lui, sait poser de vrais points de suspension.
-   Même patron que le nom du dossier client (.client-company-view) : deux
-   écrans du même tableau ne peuvent pas résoudre le même problème de deux
-   façons. */
-.product-desc-view {
-  position: absolute;
-  inset: 0 0 auto 0;
   padding: 2px 14px 4px;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);
@@ -2937,31 +2868,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  pointer-events: none;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* La rangée porte la vue : c'est elle le repère de position. */
-.product-desc-row { position: relative; }
-/* Le champ garde la place ET reste cliquable ; c'est son TEXTE qu'on efface,
-   pas lui — sinon on ne pourrait plus entrer dedans pour écrire. */
-.product-desc-row .product-desc { color: transparent; caret-color: var(--text-1); }
-.product-desc-row:focus-within .product-desc-view,
-.product-desc-view.expanded { display: none; }
-.product-desc-row:focus-within .product-desc,
-.product-desc.expanded { color: var(--text-2); }
-.product-desc-row:focus-within .product-desc { color: var(--text-1); }
-/* Vide : le champ montre son invite (« + Ajouter une note »), la vue n'a rien
-   à dire et s'efface. */
-.infos-stack.desc-empty .product-desc-view { display: none; }
-.infos-stack.desc-empty .product-desc { color: var(--text-2); }
-.product-desc::placeholder { color: var(--text-3); }
-.product-desc:focus {
-  outline: none;
-  background: var(--field-focus);
-  box-shadow: inset 0 -2px 0 var(--primary);
-  color: var(--text-1);
-}
+/* Dépliée (flèche) : la coupe à deux lignes tombe, le texte va au bout. */
+.product-desc-view.expanded { -webkit-line-clamp: unset; overflow: visible; }
+/* Vide : « + Ajouter une note » en gris, l'invite d'un champ sans en être
+   un — elle se remplit dans la fiche. */
+.infos-stack.desc-empty .product-desc-view { color: var(--text-3); }
 .desc-toggle {
   flex-shrink: 0;
   display: flex;
@@ -2985,12 +2899,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    recalait sinon la largeur du champ voisin à chaque note qui passe (ou non)
    sur deux lignes. */
 .desc-toggle[hidden] { display: flex; visibility: hidden; }
-/* Case Infos vide : on garde le textarea visible (placeholder « infos ») pour
-   qu'un collaborateur puisse cliquer dedans et saisir une note. Avant, la ligne
-   passait en display:none quand vide → case non cliquable sur desktop, donc
-   impossible d'AJOUTER une info (un textarea masqué n'est pas focusable). Le
-   mobile la montrait déjà toujours ; on aligne desktop dessus. La ligne .product-desc-row
-   par défaut est déjà en display:flex — rien de plus à faire ici. */
 
 /* Largeur des colonnes réglable */
 .grid.manual-cols { table-layout: fixed; min-width: 0; }
@@ -3203,8 +3111,6 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   border-radius: 50%;
   background: var(--primary-soft);
 }
-
-select.cell-input { -webkit-appearance: none; appearance: none; }
 
 /* scrollbars sobres */
 ::-webkit-scrollbar { width: 12px; height: 12px; }
