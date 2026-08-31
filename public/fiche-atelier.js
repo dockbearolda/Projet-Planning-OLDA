@@ -411,6 +411,14 @@ export function dessinerFicheAtelier(r, ctx) {
   // « ↺ Annuler » sont retires : on sort par Echap ou par un clic dehors, et
   // l'annulation vit dans le message qui suit chaque modification. Il ne reste
   // que ce qui identifie le dossier, et le point qui dit qu'on enregistre.
+  // L'ARTICLE SE CORRIGE ICI (30/08, Charlie : « la seule façon de faire des
+  // modifs est de cliquer dessus, la ligne »). La ligne du planning ne fait
+  // plus que le lire — voir cellDossier / cellDescription / cellPrice dans
+  // app.js — et n'avait de toute façon aucune autre porte : `product`
+  // n'était nulle part ailleurs éditable.
+  const chProjet = champ('fa-projet', r.product || '', { label: 'Projet', placeholder: 'article' });
+  brancher(chProjet, { label: 'Projet', envoyer: (v) => ctx.patchLigne('product', v || null) });
+
   const tete = el('header', 'fa-head');
   const ident = el('div', 'fa-ident');
   ident.append(
@@ -425,7 +433,7 @@ export function dessinerFicheAtelier(r, ctx) {
     // LE NOM DU CLIENT MÈNE À SA FICHE : c'est la question qui suit
     // immédiatement « qui est-ce ? » — on a déjà fait quoi pour eux.
     bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
-    el('span', 'fa-projet', r.product || ''),
+    chProjet,
   );
   // LA CROIX REVIENT, et pour une raison qui a change. Elle avait ete retiree
   // parce qu'elle doublait « Retour au planning » ; puis ce bouton est parti a
