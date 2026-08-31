@@ -49,6 +49,20 @@ assert.ok(bloc.includes("'html,body{height:100%;overflow:hidden}'"),
 assert.ok(bloc.includes("'.layout>main{min-height:0;overflow-y:auto;padding-bottom:var(--pas-4)}'"),
   '… avec la colonne qui reprend le défilement, dans le même bloc');
 
+// LE CADRE GARDE SA MARGE HAUTE, celle de `charte.css`, qui pose les DEUX
+// parcours à la même ordonnée. Ce bloc ne s'écrit que sur la demande de devis
+// — elle seule a la colonne — donc tout ce qu'il fait à la marge du haut ne
+// touche QU'ELLE, et les deux écrans se décalent l'un de l'autre sans que rien
+// ne le signale. Payé le 30/08 : un `margin-top:0` ici posait la bulle
+// « 1. Besoins » à 10 px quand « 1. Articles » tombait à 34.
+// La hauteur doit alors défalquer cette marge, sinon le cadre dépasse d'autant
+// et le `overflow:hidden` ci-dessus rogne le bas de la colonne.
+assert.ok(!/margin-top:\s*0/.test(bloc),
+  'le bloc du devis ne remet pas à zéro la marge haute du cadre : elle seule aligne '
+  + 'sa rangée d’étapes sur celle de la vente directe');
+assert.ok(bloc.includes('.container{height:calc(100% - var(--pas-4))'),
+  '… et il défalque cette marge de la hauteur, sinon le bas de la colonne est rogné');
+
 // --- 2. LES DEUX PAGES, TELLES QU'ELLES SONT --------------------------------
 // On ne les corrige pas ici : les écrans du comptoir viennent du patron et se
 // remplacent en entier (CLAUDE.md). On vérifie seulement que la greffe suit ce

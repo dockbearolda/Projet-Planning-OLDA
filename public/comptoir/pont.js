@@ -2287,7 +2287,14 @@ document.addEventListener('pointerdown',ev=>{
       colonneQuiDefile ? [
         '@media screen and (min-width:981px){',
         'html,body{height:100%;overflow:hidden}',
-        '.container{height:100%;display:flex;flex-direction:column;margin-top:0;margin-bottom:0;padding-bottom:0}',
+        /* LA MARGE DU HAUT RESTE — elle seule aligne les deux parcours. Ce bloc
+           ne s'ecrit que sur la demande de devis (elle seule a la colonne), donc
+           un margin-top a zero ici ne montait QUE sa rangee d'etapes : mesure du
+           30/08, la bulle « 1. Besoins » a 10 px et « 1. Articles » a 34 px.
+           On deduit donc la marge de la hauteur au lieu de la supprimer, sinon
+           le cadre depasse d'autant et overflow hidden rogne le bas de la
+           colonne. */
+        '.container{height:calc(100% - var(--pas-4));display:flex;flex-direction:column;margin-bottom:0;padding-bottom:0}',
         '.layout{flex:1 1 auto;min-height:0;align-items:stretch}',
         /* `min-height:0` : sans lui, un enfant de flex refuse de descendre sous
            la hauteur de son contenu et c'est la PAGE qui reprend le défilement. */
