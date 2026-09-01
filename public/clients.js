@@ -413,6 +413,10 @@ function card(c) {
   const body = el('div', 'cl-card__body');
   const nameRow = el('div', 'cl-card__namerow');
   nameRow.append(el('span', 'cl-card__name', c.entreprise));
+  // LE NUMÉRO, à côté du nom — le même que sur la fiche, le même que sur le
+  // classeur du patron. Il ne s'affiche que s'il existe : une fiche créée
+  // pendant que le rattrapage tourne encore ne montre pas un tiret orphelin.
+  if (c.code) nameRow.append(el('span', 'cl-card__code', c.code));
   const nat = nature(c.client_type);
   nameRow.append(el('span', `cl-nature cl-nature--${nat}`, natureLabel(nat)));
   body.append(nameRow);

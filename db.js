@@ -311,11 +311,19 @@ async function init() {
   // adresse détaillée, secteur d'activité, référent. Tous nullable : une fiche
   // créée avant cette migration reste valide, juste incomplète.
   // Down : ALTER TABLE clients DROP COLUMN IF EXISTS <col> pour chacune.
-  for (const col of ['code', 'raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom', 'prenom']) {
+  // `code` a QUITTÉ cette liste : ce n'est pas un champ enrichi de plus, c'est un
+  // numéro attribué par le serveur, unique en base et jamais modifiable à la
+  // main. Il a sa propre migration, avec sa propre garde — voir
+  // migrerColonneCodeClient() plus bas.
+  for (const col of ['raison_sociale', 'code_postal', 'ville', 'pays', 'secteur', 'referent_prenom', 'prenom']) {
     try {
       await pool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col} text`);
     } catch (_) { /* pg-mem local : colonne déjà présente via le schéma */ }
   }
+
+  // Le NUMÉRO du client, sa colonne. Migration à part, garde à part : il est
+  // écrit par le serveur, unique en base, et jamais modifiable à la main.
+  await migrerColonneCodeClient();
 
   // Migration RÉVERSIBLE de la liste d'employés : « Opérateur » a été retiré au
   // profit de « Julien ». Les lignes encore pilotées par « Opérateur » basculent
@@ -406,6 +414,11 @@ async function init() {
   // Identifiant lisible pour les fiches qui n'en ont pas — après l'import, pour
   // que les clients rapatriés en reçoivent un eux aussi.
   await rattraperCodesClients();
+
+  // …et l'unicité par-dessus, une fois tout le monde numéroté. Posée EN BASE :
+  // c'est elle qui protège deux postes qui créent une fiche en même temps, pas
+  // le code applicatif.
+  await poserUniciteCodeClient();
 
   // ARCHIVAGE au lieu de suppression, sur les deux tables qui portent du métier.
   // Colonnes nullables sans défaut : une ligne d'avant la migration vaut « null »
@@ -720,6 +733,91 @@ async function migrerCleClient() {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_cle ON clients (cle)');
     } catch (_) { /* pg-mem : sans conséquence, la table est petite */ }
   }
+}
+
+// LE NUMÉRO DU CLIENT, sa colonne. « CLI-PRO-0007 » / « CLI-PERSO-0007 » : le
+// repère qu'on dicte au téléphone, là où l'`id` est un UUID que personne ne lit.
+//
+// Il vivait dans la boucle des « champs enrichis de la fiche client », au milieu
+// de sept colonnes de texte libre. Ce n'en est pas une : il est écrit par le
+// SERVEUR à la création, il est UNIQUE, et il n'est jamais modifiable à la main
+// (il ne figure pas dans CLIENT_FIELDS, donc ni POST ni PATCH ne l'atteignent).
+// Il a donc sa migration, et sa garde app_meta À LUI — deux incidents réels sont
+// venus d'une garde partagée.
+//
+// Down : DELETE FROM app_meta WHERE key = 'clients_code_colonne_v1';
+//        ALTER TABLE clients DROP COLUMN IF EXISTS code;
+async function migrerColonneCodeClient() {
+  const { rows: deja } = await pool.query(
+    "SELECT 1 FROM app_meta WHERE key = 'clients_code_colonne_v1'",
+  );
+  if (deja.length) return;
+  try {
+    await pool.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS code text');
+  } catch (_) { /* déjà là — en local, posée par schema.sql */ }
+  // La garde ne se pose QUE si la colonne existe VRAIMENT. Une migration qui se
+  // croit faite alors que l'ALTER a échoué ne se rejoue jamais : le code client
+  // n'existerait plus, et personne ne saurait pourquoi.
+  try {
+    await pool.query('SELECT code FROM clients LIMIT 0');
+  } catch (_) {
+    console.error('⚠  Colonne « clients.code » absente : migration à rejouer au prochain démarrage.');
+    return;
+  }
+  await poserMeta('clients_code_colonne_v1', '1');
+}
+
+// L'UNICITÉ DU NUMÉRO, POSÉE EN BASE. C'est la seule chose qui protège pour de
+// bon. Le compteur d'`app_meta` est déjà atomique (nextClientCode : un unique
+// INSERT … ON CONFLICT DO UPDATE, PostgreSQL sérialise les écritures sur la
+// même clé), mais un compteur remis en cause — restauration de sauvegarde,
+// import, `app_meta` recopiée d'un autre environnement — redistribuerait des
+// numéros déjà pris. L'index, lui, refuse.
+// En local, pg-mem NE VERROUILLE RIEN : un test de concurrence y passerait au
+// vert sans rien prouver de la production. C'est l'index qu'on teste, pas la
+// course.
+//
+// PAS de garde app_meta ici, et c'est VOULU. Une base qui porte déjà deux fois
+// le même numéro (fiches recopiées à la main avant cette migration) refuse
+// l'index : on retombe alors sur un index simple, on NOMME les fiches en cause
+// dans les logs, et on retente au démarrage suivant, une fois corrigées. Une
+// garde figerait l'échec pour toujours. Un `CREATE … IF NOT EXISTS` sur une base
+// saine ne coûte rien.
+// Down : DROP INDEX IF EXISTS idx_clients_code;
+//        DROP INDEX IF EXISTS idx_clients_code_repli;
+async function poserUniciteCodeClient() {
+  // LE REPLI D'UN DÉMARRAGE PRÉCÉDENT S'EFFACE D'ABORD. Un index SIMPLE posé
+  // sur la même colonne suffit à faire passer le `CREATE UNIQUE … IF NOT EXISTS`
+  // qui suit pour déjà fait — l'unicité ne se poserait alors JAMAIS, même une
+  // fois les fiches corrigées, et personne ne le verrait. Il est recréé plus bas
+  // si les doublons sont toujours là.
+  try {
+    await pool.query('DROP INDEX IF EXISTS idx_clients_code_repli');
+  } catch (_) { /* jamais posé : le cas courant */ }
+  try {
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_code ON clients (code)');
+    return;
+  } catch (err) {
+    // Rien d'autre que « il y a déjà des doublons » ne concerne cette migration.
+    if (!err || err.code !== '23505') return;
+  }
+  let noms = '';
+  try {
+    const { rows } = await pool.query(`
+      SELECT code, COUNT(*)::int AS n FROM clients
+       WHERE code IS NOT NULL GROUP BY code HAVING COUNT(*) > 1 ORDER BY code LIMIT 20`);
+    noms = rows.map((r) => `${r.code} ×${r.n}`).join(', ');
+  } catch (_) { /* l'aperçu est un confort */ }
+  console.error(
+    '⚠  Base clients : des fiches portent le MÊME numéro, l\'unicité n\'a PAS été',
+    'posée (rien n\'a été supprimé ni renuméroté). À corriger depuis Base clients.',
+    noms ? `Concernés : ${noms}.` : '',
+  );
+  // Le repli prend un AUTRE NOM que l'index unique : c'est à ce nom-là qu'on
+  // sait, au démarrage suivant, qu'il faut l'effacer avant de retenter.
+  try {
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_clients_code_repli ON clients (code)');
+  } catch (_) { /* pg-mem : la table est petite, on s'en passe */ }
 }
 
 // Les clients nés d'une prise de commande n'avaient PAS de code : la création
@@ -3195,6 +3293,10 @@ module.exports = {
   // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
   semerFaceDefaut, renommerFondEnDessous,
+  // Exportée pour la même raison : le chemin qui compte n'est pas le nominal,
+  // c'est celui d'une base qui porte DÉJÀ des numéros en double. Un test doit
+  // pouvoir le rejouer sans redémarrer le service.
+  poserUniciteCodeClient,
   STAGES, STAGE_SLUGS, FAMILIES, SUB_STAGES, SUB_SLUGS, EMPLOYEES, RESPONSABLES, CLIENT_TYPES, FLAGS,
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
