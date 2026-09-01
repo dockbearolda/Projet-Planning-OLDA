@@ -381,14 +381,35 @@ assert.match(
     FAITS.indexOf('\n];', FAITS.indexOf('const PROD_FAITS = [')));
   assert.match(bloc, /morceau\(ref, true\)/, 'la référence porte la graisse');
   assert.match(bloc, /morceau\(p\.encre, true\)/, 'la couleur du marquage aussi');
-  assert.match(bloc, /morceau\(q, true\)/, 'la quantité aussi');
   assert.match(bloc, /x\.mm\} mm` : String\(x\.mm\), fort: true/, 'la largeur des logos aussi');
+  // LA QUANTITÉ, ELLE, A CHANGÉ DE RANGÉE — PAS DE RÔLE (01/09/2026).
+  // Elle portait la graisse dans « TAILLES 24 pièces : 6 × S · 10 × M ». Le
+  // titre de la ligne la porte désormais, en tête et en graisse forte :
+  // « 24 × T-shirt col rond ». Écrite aux deux endroits, elle se lisait deux
+  // fois sur trois centimètres — exactement ce que la référence juste
+  // au-dessus refuse déjà quand la désignation la contient.
+  // Le quatrième fait mis en avant le 26/08 est donc toujours mis en avant :
+  // il l'est là où l'œil se pose en premier, et une seule fois.
+  assert.ok(!/morceau\(q, true\)/.test(bloc),
+    'la quantité ne s’écrit plus dans la rangée « Tailles » : le titre la porte');
+  assert.match(FAITS, /export function nomArticle\(r, hote\)/,
+    '… et le titre de la ligne est un composant, pas deux écritures');
+  const titre = FAITS.match(/export function nomArticle[\s\S]*?\n\}/)[0];
+  assert.match(titre, /className = 'prod-fiche__fort'/,
+    'le nombre porte la graisse des quatre faits, pas une graisse à lui');
+  assert.match(titre, /\$\{q\}\\u00a0×/,
+    '… et « 24 × » ne se coupe pas entre le nombre et son signe');
+  // LE MÊME TITRE DANS LES DEUX VUES : écrit deux fois, il divergerait.
+  assert.ok(/nomArticle\(r, name\)/.test(APP), 'la cellule « Article » du tableau prend le composant');
+  assert.ok(/nomArticle\(r, nom\)/.test(APP), '… et le titre de la carte le même');
   // …et rien d'autre : la couleur du textile, la technique, la désignation et
   // le détail par taille ENTOURENT ces quatre-là. Ils s'écrivent sans graisse,
   // explicitement — c'est le contraste qui fait la hiérarchie.
-  for (const sans of ['morceau(p.couleur)', 'morceau(p.marquage)', 'morceau(cases)']) {
+  for (const sans of ['morceau(p.couleur)', 'morceau(p.marquage)']) {
     assert.ok(bloc.includes(sans), `${sans} doit rester en graisse de texte`);
   }
+  assert.match(bloc, /lire: \(p\) => morceau\(\(p\.tailles/,
+    'le détail par taille reste en graisse de texte');
 
   // LE MOT « ENCRE » NE S'ÉCRIT PLUS. La clé de la fiche s'appelle encore ainsi
   // — on ne renomme pas un champ stocké pour un mot d'écran — mais aucun

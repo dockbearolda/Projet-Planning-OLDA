@@ -881,6 +881,43 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .help-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .help-btn-ic { font-size: var(--ic); flex-shrink: 0; }
 
+/* ------------------------------------ CE QU'IL Y A A PRODUIRE, PAR MACHINE
+   Une pilule par poste du registre (app_meta.machines), posee dans l'en-tete
+   de la phase Production, a cote du compteur d'etape.
+
+   AUCUN COMPOSANT NEUF : la pilule EST `.action-ligne`, celle de la charte —
+   la meme boite serree, le meme rembourrage, le meme arrondi et la meme
+   graisse que « revenir au tri par urgence », qui se pose sur CETTE rangee-la.
+   Deux commandes voisines dans le meme en-tete doivent etre le meme objet, pas
+   deux qui se ressemblent : c'est la regle du 27/08, et elle se tient ici en
+   n'ecrivant aucune boite. Il ne reste donc a declarer que ce que la charte ne
+   peut pas savoir — le compteur, le poste vide, et le poste regarde.
+
+   LE COMPTEUR SE LIT SANS OUVRIR QUOI QUE CE SOIT : c'est tout l'objet de la
+   rangee. Il porte la graisse forte et les chiffres tabulaires — quatre
+   nombres empiles cote a cote se comparent d'un coup d'oeil, a condition que
+   le « 1 » prenne la meme place que le « 8 ».
+
+   LE POSTE REGARDE PREND L'ACCENT PLEIN, comme le titre de famille du rail
+   (`.stage.zone-head.active`) : c'est le meme role — dire OU l'on est, et
+   une seule pilule le porte a la fois. La charte reserve l'accent au bouton
+   d'action principal ; le rail avait deja pose l'exception pour l'etat
+   « selectionne », et c'est exactement celui-ci. */
+.machines { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pas-1); min-width: 0; }
+.machines[hidden] { display: none; }
+.machine__n { font-weight: var(--graisse-forte); font-variant-numeric: tabular-nums; color: var(--text-1); }
+/* Un poste sans rien a produire ne disparait pas — il s'eteint. Il disparaitrait
+   et reviendrait sous les doigts au fil de la journee, et la rangee se
+   redessinerait a chaque ligne rangee : une bascule = UN mouvement, et
+   celui-la n'en est pas un. On l'eteint donc comme toute commande eteinte de
+   l'application (le fond s'eclaircit, l'encre passe au secondaire) plutot qu'a
+   l'`opacity`, qui est une impasse arithmetique. */
+.machine.is-vide { background: var(--inactif); color: var(--inactif-encre); }
+.machine.is-vide .machine__n { color: var(--inactif-encre); }
+.machine.is-actif,
+.machine.is-actif:hover { background: var(--primary); color: var(--on-primary); }
+.machine.is-actif .machine__n { color: var(--on-primary); }
+
 /* ------------------------------------------------ Outil de devis Fiverr */
 .fiverr-tool {
   display: flex;

@@ -52,8 +52,19 @@ export const WAITING_REASON = {
 };
 
 // Sous-étape de PRODUCTION → machine (signal le plus sûr : on est déjà au poste).
+//
+// « DÉCOUPE & CONTRÔLE DTF » EST DU TRAVAIL DTF, et il manquait (01/09/2026).
+// Elle est la seule des sept sous-étapes de production à nommer une machine
+// dans son intitulé sans être rattachée à elle : une ligne qui attend d'être
+// découpée retombait alors sur la technique de sa fiche — donc sur RIEN pour
+// les dossiers sans fiche, c'est-à-dire la majorité. Elle ne comptait dans
+// aucune file de machine, et le filtre « DTF » du planning l'aurait sautée
+// alors que c'est exactement du travail à faire au poste DTF.
+// Les trois autres — pressage, montage/finition, contrôle & emballage — ne
+// nomment aucun poste : elles restent à la technique de la fiche.
 export const SUBSTAGE_MACHINE = {
   prod_dtf: 'dtf',
+  decoupe_dtf: 'dtf',
   prod_pressage: 'presse',
   prod_trotec: 'trotec',
   prod_uv: 'uv',
