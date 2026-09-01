@@ -318,6 +318,19 @@ Vérifiés sains : la précache de `sw.js` (48 entrées, toutes présentes ; `bu
 
 Dans l'ordre : ce qui part sans discussion, puis ce qui demande d'adapter des tests ou de regarder la prod, enfin ce qui engage une décision du patron ou des données.
 
+### ✅ Fait le 01/09 (lot 2) — le garde-fou
+
+Le nettoyage vaut ce que vaut ce qui l’empêche de se défaire. `outils/chercher-code-mort.mjs`
+cherche les `export` sans importeur, les classes CSS sans porteur, les routes sans
+appelant et les fichiers que rien ne cite ; `test/code-mort-cliquet.test.js` en fait
+un cliquet, plafond par catégorie, qui ne peut que descendre. **Aujourd’hui :
+exports 1, classes 0, routes 0, orphelins 0.** Le test se prouve lui-même en
+fabriquant une classe orpheline et en vérifiant que la sonde la trouve.
+
+Un bug latent corrigé au passage : le panneau d’un menu déroulant restait posé sur
+l’écran suivant quand on changeait de vue. La fonction qui devait le fermer
+existait et personne ne l’appelait ; le module s’en charge désormais seul.
+
 ### ✅ Fait le 01/09 (lot 1) — lignes 1 à 9, plus 10, 13, 14 et 15
 
 Commit « le code mort part, et l’appel à l’API n’existe plus qu’une fois » :
