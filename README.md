@@ -570,6 +570,42 @@ colonne « Variante ». Deviner poserait un prix faux en rayon.
 Une colonne **absente du fichier n'efface rien** : un export à trois colonnes ne
 remet pas les temps machine à zéro.
 
+#### Les règles d'import — `catalogue-import-regles.json`
+
+Ce que l'export ne dit pas, et qu'on ne devine pas. Des **données**, pas du
+code : un rayon qui change ne doit pas demander un déploiement. Trois sortes,
+appliquées dans cet ordre, et **toutes lues sur le rayon d'origine** — celui que
+le patron a sous les yeux dans son tableur :
+
+1. **`ecartes`** — un rayon qui n'est pas un produit (`Express` est un réglage,
+   `Perso` / `perso textile` sont du travail graphique). Ses lignes sont
+   comptées **`ecartees`**, jamais confondues avec un refus : ce n'est pas une
+   erreur, c'est une décision, et elle porte sa raison écrite.
+2. **`variantes`** — le nom d'une variante, retrouvé par son **prix**, seul
+   repère que l'export laisse. Une variante déjà écrite dans le fichier gagne
+   toujours sur la règle.
+3. **`familles`** — le rayon SumUp → le rayon du comptoir.
+
+**Nommer une variante coupe le produit en deux, et c'est le piège.** Tant
+qu'aucune ligne n'est nommée, la ligne « d'ouverture » de SumUp — celle qui
+ouvre le produit **sans prix** — se fond avec les autres. Dès qu'une règle nomme
+les lignes tarifées, elle reste seule et fabrique un **produit fantôme** sans
+variante et sans prix, posé au menu du comptoir à côté de ses propres variantes.
+Elle est donc **absorbée** ; et une ligne qui porte un prix mais qu'aucune règle
+n'a su nommer, alors que ses sœurs l'ont été, est **refusée** plutôt que posée
+au menu sans nom.
+
+**Deux variantes au même prix sont indistinguables** : le Magnet a quatre lignes
+tarifées pour trois prix, les deux à 7 € se fondent forcément. L'aperçu le dit ;
+les séparer demande une colonne « Variante » dans le fichier.
+
+Chaque ligne du rapport dit **ce qu'une règle lui a fait** — le rayon d'où elle
+vient, le nom posé sur sa variante. Une règle qui agit en silence est une règle
+qu'on ne relit jamais. Le fichier est **relu à chaque import** (aucun
+redémarrage) et sa cohérence est tenue par `test/import-regles.test.js` : pas
+deux règles pour un même prix, pas de rayon à la fois écarté et remappé, pas
+d'exclusion sans raison écrite.
+
 Le détail structuré d'un projet est conservé dans `requests.fiche` (jsonb) ;
 `requests.description` en porte en parallèle un résumé lisible, donc la grille
 n'a jamais besoin de lire ce JSON. Les fiches enregistrées par l'ancienne prise
@@ -654,6 +690,7 @@ Deux exceptions assumées :
 ├── catalog.json      natures, délais et modes de paiement (source unique)
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
+├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
 ├── public/
 │   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system

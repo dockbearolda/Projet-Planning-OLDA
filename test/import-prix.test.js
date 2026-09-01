@@ -85,7 +85,7 @@ const enBase = (liste) => liste.map((p, i) => ({
   ].join('\n'), catalogue);
 
   assert.deepStrictEqual(rap.resume,
-    { lues: 6, creees: 1, majs: 1, inchangees: 1, refusees: 3 },
+    { lues: 6, creees: 1, majs: 1, inchangees: 1, refusees: 3, ecartees: 0 },
     'les quatre comptes sont ceux du fichier, pas une approximation');
   assert.strictEqual(rap.separateur, ';', 'le séparateur d’Excel français est deviné');
 
@@ -170,10 +170,21 @@ const enBase = (liste) => liste.map((p, i) => ({
   assert.strictEqual(sumup.resume.creees, 1,
     'trois lignes d’accord (dont une muette) ne font qu’UN produit');
   assert.strictEqual(sumup.plan.creations[0].prixVenteTtc, 35);
-  assert.strictEqual(sumup.resume.refusees, 3,
-    'les trois lignes du bracelet sont refusées : deux prix, aucune raison de choisir');
-  const raison = sumup.lignes.find((l) => l.designation === 'Bracelet').refus[0];
-  assert.match(raison, /apparaît 3 fois avec des prix de vente TTC différents \(19 et 15\)/);
+
+  // LA LIGNE D'OUVERTURE EST ABSORBÉE, PAS REFUSÉE. Elle ne porte AUCUNE
+  // valeur : elle ne peut rien apprendre et rien contredire. La compter comme
+  // un refus ferait lire un problème là où il n'y en a pas — et, dès qu'une
+  // règle nomme les variantes tarifées, la laisser de côté fabriquerait un
+  // PRODUIT FANTÔME sans variante et sans prix, posé au menu à côté des siennes.
+  assert.strictEqual(sumup.resume.ecartees, 2, 'les deux lignes d’ouverture sont absorbées');
+  const ouverture = sumup.lignes.find((l) => l.numero === 2);
+  assert.strictEqual(ouverture.action, 'ecartee');
+  assert.match(ouverture.ecarte, /ligne d’ouverture du produit/);
+
+  assert.strictEqual(sumup.resume.refusees, 2,
+    'restent les deux lignes tarifées du bracelet : deux prix, aucune raison de choisir');
+  const raison = sumup.lignes.find((l) => l.designation === 'Bracelet' && l.refus.length).refus[0];
+  assert.match(raison, /apparaît 2 fois avec des prix de vente TTC différents \(19 et 15\)/);
   assert.match(raison, /Ajoute une colonne « Variante »/,
     'et le refus dit QUOI FAIRE — sinon le patron rouvre le tableur et devine');
   assert.match(raison, /aucune de ces lignes n’est importée/);
@@ -231,7 +242,7 @@ const enBase = (liste) => liste.map((p, i) => ({
   assert.strictEqual(apercu.status, 200);
   assert.strictEqual(apercu.body.ecrit, false);
   assert.deepStrictEqual(apercu.body.resume,
-    { lues: 3, creees: 1, majs: 1, inchangees: 0, refusees: 1 });
+    { lues: 3, creees: 1, majs: 1, inchangees: 0, refusees: 1, ecartees: 0 });
   const inchange = (await call('GET', '/api/catalogue-produits')).body;
   assert.strictEqual(inchange.length, 82, 'un aperçu ne crée rien');
   assert.strictEqual(inchange.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, null,
@@ -291,7 +302,7 @@ const enBase = (liste) => liste.map((p, i) => ({
   // =========================================================================
   const rejoue = await call('POST', '/api/catalogue-produits/import/apercu', { csv: partiel });
   assert.deepStrictEqual(rejoue.body.resume,
-    { lues: 1, creees: 0, majs: 0, inchangees: 1, refusees: 0 },
+    { lues: 1, creees: 0, majs: 0, inchangees: 1, refusees: 0, ecartees: 0 },
     'le même fichier deux fois de suite ne crée rien la seconde');
 
   console.log('✓ import de prix : on lit tout, on dit tout, et rien ne s’écrit sur un fichier à moitié lu');

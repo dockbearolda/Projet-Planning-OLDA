@@ -264,3 +264,8 @@
 .reg-import__pourquoi, .reg-import__delta { flex: 1 1 auto; min-width: 0; font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-2); }
 .reg-import__delta { font-variant-numeric: tabular-nums; }
 .reg-import__note { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
+/* UNE LIGNE ÉCARTÉE N'EST PAS UN REFUS : c'est une décision (un rayon traité
+   ailleurs dans le logiciel) ou une ligne d'ouverture de produit sans valeur.
+   La couleur ne dit qu'un ÉTAT — et « écarté » n'est pas l'état d'alerte que
+   porte un refus. Même rangée, encre ordinaire. */
+.reg-import__refus.est-ecartee .reg-import__ou { color: var(--text-2); }

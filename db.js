@@ -2032,8 +2032,22 @@ async function poserUniciteCatalogue() {
 //
 // Le calcul du rapport est dans `catalogue-csv.js` : il ne touche à aucune base
 // et s'éprouve donc sans en démarrer une.
+// LES RÈGLES D'IMPORT sont des DONNÉES, pas du code : l'export SumUp ne nomme
+// jamais ses variantes et ne range pas ses rayons comme le comptoir, et corriger
+// ça ne doit pas demander un déploiement. Relues à CHAQUE import — le fichier se
+// corrige entre deux essais, et personne ne redémarre le service pour ça.
+// Absent ou illisible : l'import marche sans, il applique simplement zéro règle.
+// Down : supprimer catalogue-import-regles.json.
+function reglesImportCatalogue() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'catalogue-import-regles.json'), 'utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
 async function apercuImportCatalogue(csv) {
-  return analyserImport(csv, await getCatalogueProduits());
+  return analyserImport(csv, await getCatalogueProduits(), reglesImportCatalogue());
 }
 
 // L'ÉCRITURE, EN UNE TRANSACTION. Un import à moitié écrit — la moitié des prix
@@ -3619,7 +3633,7 @@ module.exports = {
   // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
   semerCatalogueProduits, poserUniciteCatalogue,
-  apercuImportCatalogue, appliquerImportCatalogue,
+  apercuImportCatalogue, appliquerImportCatalogue, reglesImportCatalogue,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,

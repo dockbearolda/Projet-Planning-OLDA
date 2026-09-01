@@ -205,6 +205,38 @@ function cleProduit(famille, designation, variante) {
   return [reduire(famille), reduire(designation), reduire(variante)].join('');
 }
 
+// --- LES RÈGLES D'IMPORT ----------------------------------------------------
+//
+// L'export SumUp ne nomme JAMAIS les variantes — il répète la ligne du produit
+// une fois par variante, la première sans prix — et ses rayons ne sont pas ceux
+// du comptoir. Ces deux écarts se comblent par des DONNÉES
+// (`catalogue-import-regles.json`), pas par du code : un rayon qui change ne
+// doit pas demander un déploiement.
+//
+// UNE RÈGLE QUI AGIT EN SILENCE EST UNE RÈGLE QU'ON NE RELIT JAMAIS. Chaque
+// ligne du rapport dit donc ce qu'on lui a fait : le rayon d'où elle vient
+// (`rangeDepuis`) et le nom qu'on a posé sur sa variante (`varianteNommee`).
+function preparerRegles(brut) {
+  const r = brut && typeof brut === 'object' ? brut : {};
+  const ecartes = new Map();
+  for (const e of Array.isArray(r.ecartes) ? r.ecartes : []) {
+    if (e && e.famille) ecartes.set(reduire(e.famille), String(e.pourquoi || 'rayon écarté'));
+  }
+  const familles = new Map();
+  for (const f of Array.isArray(r.familles) ? r.familles : []) {
+    if (f && f.de && f.vers) familles.set(reduire(f.de), String(f.vers));
+  }
+  // La clé porte le PRIX : c'est le seul repère que l'export laisse pour
+  // distinguer deux lignes d'un même produit.
+  const variantes = new Map();
+  for (const v of Array.isArray(r.variantes) ? r.variantes : []) {
+    if (!v || !v.famille || !v.designation || v.variante == null) continue;
+    variantes.set(`${reduire(v.famille)}\u0001${reduire(v.designation)}\u0001${Number(v.prix)}`,
+      String(v.variante));
+  }
+  return { ecartes, familles, variantes, actives: ecartes.size + familles.size + variantes.size };
+}
+
 // --- L'analyse --------------------------------------------------------------
 
 const CHAMPS_NUM = [
@@ -256,7 +288,8 @@ const CHAMPS_IMPORTES = ['reference', 'prixAchat', 'prixVenteTtc', 'tempsMoMin',
 //
 // Rend le RAPPORT complet — c'est lui que l'écran montre avant d'écrire, et
 // c'est lui que l'écriture rejoue. Il ne touche à rien.
-function analyserImport(texte, existants) {
+function analyserImport(texte, existants, reglesBrutes) {
+  const regles = preparerRegles(reglesBrutes);
   const lu = lireCsv(texte);
   if (lu.erreur) return { erreur: lu.erreur };
 
@@ -293,10 +326,76 @@ function analyserImport(texte, existants) {
     if (!l.designation) l.refus.push('désignation vide');
     lignes.push(l);
     if (l.refus.length) return;
+
+    // LES RÈGLES, DANS CET ORDRE — et elles se lisent toutes sur le rayon
+    // D'ORIGINE, celui que le patron a sous les yeux dans son tableur.
+    //
+    // 1. LE RAYON ÉCARTÉ. Ce n'est pas un refus : c'est une décision, et elle
+    //    se compte à part. Confondre les deux ferait lire « 55 refusées » là où
+    //    il y a des erreurs ET des exclusions voulues.
+    const cleFamille = reduire(l.famille);
+    const ecart = regles.ecartes.get(cleFamille);
+    if (ecart) { l.ecarte = ecart; return; }
+
+    // 2. LE NOM DE LA VARIANTE, retrouvé par son prix — le seul repère que
+    //    l'export laisse. Une variante déjà nommée dans le fichier gagne
+    //    toujours : la colonne du patron passe avant la règle.
+    if (!l.variante && l.prixVenteTtc != null) {
+      const nom = regles.variantes.get(
+        `${cleFamille}\u0001${reduire(l.designation)}\u0001${l.prixVenteTtc}`,
+      );
+      if (nom) { l.variante = nom; l.varianteNommee = true; }
+    }
+
+    // 3. LE RAYON DU COMPTOIR. En dernier : les deux règles au-dessus se
+    //    lisent sur le rayon d'origine.
+    const versFamille = regles.familles.get(cleFamille);
+    if (versFamille && versFamille !== l.famille) {
+      l.rangeDepuis = l.famille;
+      l.famille = versFamille;
+    }
+
+    l.produit = `${reduire(l.famille)}\u0001${reduire(l.designation)}`;
+  });
+
+  // 1er passage bis : NOMMER UNE VARIANTE COUPE LE PRODUIT EN DEUX.
+  //
+  // Tant qu'aucune ligne n'était nommée, les lignes d'un même produit se
+  // fondaient toutes ensemble — y compris la ligne « parente » de SumUp, celle
+  // qui ouvre le produit SANS prix. Dès qu'une règle nomme les lignes tarifées,
+  // la parente reste seule de son côté : elle fabriquait un PRODUIT FANTÔME,
+  // sans variante et sans prix, posé au menu à côté de ses propres variantes.
+  //
+  // Deux corrections, et chacune se DIT dans le rapport :
+  //   · la parente sans aucune valeur est ABSORBÉE par son produit ;
+  //   · une ligne qui porte un PRIX mais qu'aucune règle n'a su nommer, alors
+  //     que ses sœurs l'ont été, est REFUSÉE — elle entrerait au menu comme un
+  //     « Porte-clés » nu à côté d'un « Porte-clés — Classique », et personne ne
+  //     saurait lequel prendre.
+  const nommes = new Set();
+  const parProduit = new Map();
+  for (const l of lignes) {
+    if (!l.produit || l.refus.length || l.ecarte) continue;
+    if (l.varianteNommee) nommes.add(l.produit);
+    parProduit.set(l.produit, (parProduit.get(l.produit) || 0) + 1);
+  }
+  for (const l of lignes) {
+    if (!l.produit || l.refus.length || l.ecarte) continue;
+    const muette = !l.variante && CHAMPS_IMPORTES.every((c) => l[c] == null || l[c] === '');
+    if (muette && parProduit.get(l.produit) > 1) {
+      l.absorbee = 'ligne d’ouverture du produit (aucune valeur) : fondue dans ses variantes';
+      continue;
+    }
+    if (!l.variante && nommes.has(l.produit) && l.prixVenteTtc != null) {
+      l.refus.push(`variante inconnue pour ${l.prixVenteTtc} € — les autres lignes de `
+        + `« ${l.designation} » ont été nommées, pas celle-ci. Ajoute sa règle dans `
+        + 'catalogue-import-regles.json, ou une colonne « Variante » au fichier.');
+      continue;
+    }
     l.cle = cleProduit(l.famille, l.designation, l.variante);
     if (!paquets.has(l.cle)) paquets.set(l.cle, []);
     paquets.get(l.cle).push(l);
-  });
+  }
 
   // 2e passage : les lignes qui parlent du MÊME produit.
   //
@@ -319,6 +418,11 @@ function analyserImport(texte, existants) {
       if (conflit) break;
       fusion[champ] = valeur;
     }
+    // DEUX VARIANTES AU MÊME PRIX SONT INDISTINGUABLES. Le Magnet a QUATRE
+    // lignes tarifées pour TROIS prix : les deux à 7 € se fondent forcément en
+    // une. Aucune règle ne peut inventer ce que le fichier ne porte pas — mais
+    // se taire ferait disparaître une variante sans que personne ne le voie.
+    if (!conflit && groupe.length > 1) fusion.fondues = groupe.length;
     if (conflit) {
       const nom = (CHAMPS_NUM.find(([c]) => c === conflit.champ) || [null, conflit.champ])[1];
       const raison = `« ${groupe[0].famille} / ${groupe[0].designation}${groupe[0].variante ? ` / ${groupe[0].variante}` : ''} » `
@@ -365,6 +469,8 @@ function analyserImport(texte, existants) {
 
   const refusees = lignes.filter((l) => l.refus.length);
   for (const l of refusees) l.action = 'refus';
+  const ecartees = lignes.filter((l) => l.ecarte || l.absorbee);
+  for (const l of ecartees) l.action = 'ecartee';
 
   const plan = {
     creations: creations.map((f) => extraire(f)),
@@ -378,7 +484,9 @@ function analyserImport(texte, existants) {
       majs: majs.length,
       inchangees: inchangees.length,
       refusees: refusees.length,
+      ecartees: ecartees.length,
     },
+    regles: regles.actives,
     colonnes: Object.keys(par),
     inconnues,
     separateur: lu.sep === '\t' ? 'tabulation' : lu.sep,
@@ -391,6 +499,15 @@ function analyserImport(texte, existants) {
       prixVenteTtc: l.prixVenteTtc,
       prixAchat: l.prixAchat,
       refus: l.refus,
+      // CE QU'UNE RÈGLE A FAIT À CETTE LIGNE. Une règle qui agit en silence est
+      // une règle qu'on ne relit jamais — et celle-ci déplace un produit de
+      // rayon ou lui pose un nom de variante.
+      ecarte: l.ecarte || l.absorbee || null,
+      rangeDepuis: l.rangeDepuis || null,
+      varianteNommee: !!l.varianteNommee,
+      // Combien de lignes du fichier ce produit a-t-il avalées (leur prix étant
+      // le même, ou muet). C'est ce chiffre qui dit qu'une variante a disparu.
+      fondues: (fusions.get(l.cle) || {}).fondues || 0,
       changements: (majs.find((m) => m.cle === l.cle) || {}).changements || [],
     })),
     plan,
@@ -411,4 +528,4 @@ function signer(plan) {
   return crypto.createHash('sha256').update(JSON.stringify(plan)).digest('hex').slice(0, 16);
 }
 
-module.exports = { analyserImport, lireCsv, cleProduit, reduire, nombre, signer, MAX_LIGNES };
+module.exports = { analyserImport, lireCsv, cleProduit, reduire, nombre, signer, preparerRegles, MAX_LIGNES };

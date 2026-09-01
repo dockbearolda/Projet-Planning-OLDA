@@ -964,15 +964,15 @@ async function appliquerImport(bouton) {
 // LE RAPPORT, EN CLAIR. Les refus se regroupent par RAISON — cinquante lignes
 // qui disent la même chose n'apprennent rien de plus que la raison et la liste
 // des numéros, et elles noieraient les autres.
-function renderRefus(box, lignes) {
+function renderRefus(box, lignes, ecartees) {
   const parRaison = new Map();
   for (const l of lignes) {
-    const raison = l.refus.join(' · ');
+    const raison = ecartees ? String(l.ecarte || '') : l.refus.join(' · ');
     if (!parRaison.has(raison)) parRaison.set(raison, []);
     parRaison.get(raison).push(l.numero);
   }
   for (const [raison, numeros] of parRaison) {
-    const row = el('div', 'reg-import__refus');
+    const row = el('div', `reg-import__refus${ecartees ? ' est-ecartee' : ''}`);
     const ou = numeros.length > 6
       ? `lignes ${numeros.slice(0, 6).join(', ')} … (+${numeros.length - 6})`
       : `ligne${numeros.length > 1 ? 's' : ''} ${numeros.join(', ')}`;
@@ -1024,6 +1024,11 @@ function renderImport(message, cls) {
   };
   resume.append(compte(r.lues, 'lues'), compte(r.creees, 'à créer'), compte(r.majs, 'à mettre à jour'),
     compte(r.inchangees, 'inchangées'), compte(r.refusees, 'refusées', true));
+  // ÉCARTÉES ≠ REFUSÉES. Une ligne écartée n'est pas une erreur : c'est une
+  // décision (un rayon traité ailleurs dans le logiciel) ou une ligne
+  // d'ouverture de produit qui ne portait aucune valeur. Les confondre ferait
+  // lire « 64 refusées » là où il y a onze problèmes et cinquante-trois choix.
+  if (r.ecartees) resume.append(compte(r.ecartees, 'écartées'));
   box.appendChild(resume);
 
   if (importRapport.inconnues && importRapport.inconnues.length) {
@@ -1033,6 +1038,10 @@ function renderImport(message, cls) {
 
   const refusees = importRapport.lignes.filter((l) => l.action === 'refus');
   if (refusees.length) renderRefus(box, refusees);
+  // Les écartées se disent aussi, et par la même grammaire : une règle qui agit
+  // en silence est une règle que personne ne relit.
+  const ecartees = importRapport.lignes.filter((l) => l.action === 'ecartee');
+  if (ecartees.length) renderRefus(box, ecartees, true);
 
   // CE QUI VA CHANGER, PRIX PAR PRIX. « 4 mises à jour » ne dit pas si un prix
   // passe de 6 à 6,50 ou de 6 à 600 : ce sont les deux nombres qui le disent.
@@ -1050,6 +1059,20 @@ function renderImport(message, cls) {
   }
   if (majs.length > 40) {
     box.appendChild(el('p', 'reg-import__note', `… et ${majs.length - 40} autres mises à jour.`));
+  }
+
+  // CE QU'UNE RÈGLE A DÉPLACÉ. Un produit qui change de rayon en silence, c'est
+  // un produit qu'on cherchera au mauvais endroit au comptoir.
+  const rangees = importRapport.lignes.filter((l) => l.rangeDepuis);
+  if (rangees.length) {
+    const paires = [...new Set(rangees.map((l) => `${l.rangeDepuis} → ${l.famille}`))];
+    box.appendChild(el('p', 'reg-import__note',
+      `${rangees.length} lignes rangées dans un autre rayon : ${paires.join(', ')}.`));
+  }
+  const nommees = importRapport.lignes.filter((l) => l.varianteNommee).length;
+  if (nommees) {
+    box.appendChild(el('p', 'reg-import__note',
+      `${nommees} variantes nommées par une règle (le fichier ne les nomme pas).`));
   }
 
   if (importRapport.ecrit) return;   // déjà importé : plus rien à déclencher
