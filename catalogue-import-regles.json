@@ -32,6 +32,21 @@
       "pourquoi": "Travail graphique (Perso Classique 10 €, Perso simple 6 €, Reprise de logo simple 20 €) : décidé le 01/09 d'en faire une GRILLE DE RÉGLAGE, comme celle de la tasse, pas des articles du menu."
     },
     {
+      "famille": "Tasses",
+      "designation": "Tasse Céramique 350 ml",
+      "pourquoi": "Son prix de vente est CALCULÉ par la grille de chiffrage (Réglages > Tarifs Tasse) : tasse nue 10 € + une face 6 € = 16 €, exactement le prix magasin, et le logo du client sur l'autre face fait +6 € → 22 €. L'importer ici ferait DEUX sources pour un même nombre — et si le catalogue servait un jour à chiffrer, le marquage s'ajouterait par-dessus un prix qui le contient déjà : 22 € pour une tasse de rayon."
+    },
+    {
+      "famille": "Tasses",
+      "designation": "Tasse Expresso 180 ml",
+      "pourquoi": "Même raison : la grille la tarife. ⚠ ÉCART CONSTATÉ le 01/09 — la grille sort 13 € (7 + 6) là où le magasin vend 14 €. À trancher dans Réglages, pas ici : c'est le composant « tasse nue » qui vaut 7 € au lieu de 8 €."
+    },
+    {
+      "famille": "Tasses",
+      "designation": "Tasse Bois",
+      "pourquoi": "Même raison : la grille la tarife (« Tasse en Bois »). ⚠ ÉCART CONSTATÉ le 01/09 — la grille sort 16 € (10 + 6) là où le magasin vend 22 €, soit 6 € perdus sur chaque devis. Le composant « tasse nue » devrait valoir 16 € et non 10 €. À trancher dans Réglages."
+    },
+    {
       "famille": "perso textile",
       "pourquoi": "Même décision : les paliers « Avec / Sans textiles OLDA » et « Reprise Logo » sont du travail graphique sur textile — la grille de réglage que le textile n'a pas encore, et que la tasse a déjà."
     }

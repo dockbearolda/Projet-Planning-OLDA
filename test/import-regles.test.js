@@ -64,6 +64,26 @@ const express = rap.lignes.find((l) => l.numero === 2);
 assert.strictEqual(express.action, 'ecartee');
 assert.match(express.ecarte, /réglage/, 'une ligne écartée dit POURQUOI, comme un refus');
 
+// UN ÉCART PORTE SUR UN RAYON, OU SUR UN SEUL PRODUIT — et le plus précis
+// gagne. C'est arrivé avec les tasses : la famille entière n'est pas à écarter,
+// mais les trois que la GRILLE DE CHIFFRAGE tarife déjà, si. Vérifié le 01/09 en
+// faisant tourner le vrai moteur : tasse nue 10 € + une face 6 € = 16 €, le prix
+// magasin au centime, et le logo du client sur l'autre face fait +6 € → 22 €.
+// Importer ce 16 € ferait DEUX sources pour un même nombre — et si le catalogue
+// servait un jour à chiffrer, le marquage s'ajouterait par-dessus un prix qui le
+// contient déjà.
+const parProduit = {
+  ecartes: [{ famille: 'Tasses', designation: 'Tasse Céramique 350 ml', pourquoi: 'la grille la tarife déjà' }],
+};
+rap = analyserImport([
+  'Category;Item name;Price',
+  'Tasses;Tasse Céramique 350 ml;16.00',
+  'Tasses;Tasse Fuck;18.00',
+].join('\n'), [], parProduit);
+assert.strictEqual(rap.resume.ecartees, 1, 'la tasse que la grille tarife est écartée');
+assert.strictEqual(rap.resume.creees, 1, '… et le reste du rayon entre normalement');
+assert.strictEqual(rap.plan.creations[0].designation, 'Tasse Fuck');
+
 // --- 2. Une variante se nomme par son prix ---------------------------------
 
 rap = analyserImport([
