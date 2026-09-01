@@ -33,6 +33,9 @@ const FEUILLE = lire('public/devis-flash.css');
 const FICHE_CSS = lire('public/fiche-atelier.css');
 const APP = lire('public/app.js');
 const INDEX = lire('public/index.html');
+const CHARTE_CSS = lire('public/charte.css');
+const REGLAGES_JS = lire('public/reglages.js');
+const REGLAGES_CSS = lire('public/reglages.css');
 
 const {
   CSS_DEVIS, modeleDevis, dessinerDevis, calculerDevis, jourPlus,
@@ -296,8 +299,201 @@ assert.ok(!/(?:min-)?height:\s*\d+px/.test(FEUILLE.replace(/\/\*[\s\S]*?\*\//g, 
   'aucune hauteur écrite en dur dans devis-flash.css');
 // LE MESSAGE NE POUSSE PERSONNE : posé dans la colonne, il descendrait tous les
 // champs sous les doigts au moment précis où l'on vient de cliquer.
-assert.ok(/msg\.className = `msg-flottant/.test(ECRAN) && /document\.body\.appendChild\(msg\)/.test(ECRAN),
-  'le message de l’écran sort du flux et se pose sur le corps de la page');
+assert.ok(/msg\.className = `msg-flottant/.test(ECRAN),
+  'le message de l’écran sort du flux');
+
+// ⚠ … MAIS IL S'ANCRE À LA COMMANDE QUI LE PROVOQUE, JAMAIS AU CORPS DE LA PAGE.
+// ---------------------------------------------------------------------------
+// « Quand je clique sur enregistrer au planning rien ne s'affiche » (Charlie,
+// 01/09). Le dossier partait bien : c'est le message qui ne se voyait pas, et
+// TOUS étaient dans ce cas — les deux refus, la confirmation, l'échec
+// d'impression. `.msg-flottant` est `position: absolute; top: 100%` et prend
+// pour ancre son parent DIRECT (`:has(> .msg-flottant)`, charte.css) : sur
+// `<body>`, « 100 % » vaut la hauteur de la PAGE. Mesuré au rendu : 904 px dans
+// une fenêtre de 900 — quatre pixels sous le pli, à tous les coups.
+//
+// Le défaut ne se voyait ni en relisant l'écran (la classe est la bonne) ni en
+// relisant la charte (la règle est la bonne) : il naît de leur RENCONTRE. D'où
+// cette garde, et pas une bonne intention.
+assert.ok(!/document\.body\.appendChild\(msg\)/.test(ECRAN),
+  'le message ne se pose PAS sur <body> : « top: 100 % » y vaut la hauteur de la page');
+assert.ok(/const hote = \$\('\.ecran-tete__droite'\)/.test(ECRAN),
+  'il s’ancre à la rangée des boutons de l’en-tête — la commande qui le provoque');
+assert.ok(/msg\.parentElement !== hote/.test(ECRAN),
+  'un écran rebâti ne réutilise pas un message resté hors de la page');
+
+// LES DEUX ÉTATS DU MESSAGE EXISTENT VRAIMENT. L'écran écrivait `is-ok` /
+// `is-ko` — les noms que `.reg-status` emploie aux Réglages — sur un
+// `.msg-flottant` qui ne les connaissait pas : son refus s'affichait en gris.
+assert.ok(/\.msg-flottant\.is-ko/.test(CHARTE_CSS) && /\.msg-flottant\.is-ok/.test(CHARTE_CSS),
+  'is-ok / is-ko sont des états du message flottant, pas des classes mortes');
+// Le rouge garde UNE écriture : `is-ko` entre dans la règle existante, il n’en
+// ouvre pas une seconde qui lui ressemble.
+assert.ok(/\.error\.msg-flottant,\s*\.field-error\.msg-flottant,\s*\.msg-flottant\.is-ko\s*\{/.test(CHARTE_CSS),
+  'le rouge du message reste défini une seule fois, pour les trois noms');
+
+// ---------------------------------------------------------------------------
+// 3 bis. L'AIDE SE DEMANDE — elle ne tient plus le haut de la colonne
+// ---------------------------------------------------------------------------
+// « Supprime les phrases de ce genre, et mettre à côté du titre un petit i dans
+// une bulle qui nous affiche les infos quand on clique dessus » (Charlie,
+// 01/09). Quatre paragraphes de deux à quatre lignes tenaient le haut de la
+// colonne de saisie du devis, six autres celui des Réglages.
+assert.ok(!/reg-card__desc/.test(ECRAN) && !/reg-card__desc/.test(REGLAGES_JS)
+  && !/reg-card__desc/.test(REGLAGES_CSS),
+  'plus une seule phrase d’explication posée sous un titre de carte');
+assert.ok(/poserAide/.test(ECRAN) && /poserAide/.test(REGLAGES_JS),
+  'les deux écrans passent par la MÊME fabrique : la carte est commune, la bulle aussi');
+// LA BULLE NE POUSSE PERSONNE NON PLUS. Dépliée dans le flux, elle descendrait
+// toute la carte — et l'écran de saisie du devis est précisément celui qu'on
+// remplit devant le client.
+{
+  const regle = CHARTE_CSS.match(/\n\.aide-bulle \{[^}]*\}/);
+  assert.ok(regle, 'la bulle d’aide est définie une fois, dans le fichier partagé');
+  assert.ok(/position: absolute/.test(regle[0]), 'elle sort du flux');
+  assert.ok(/left: 0; right: 0/.test(regle[0]),
+    'elle prend la largeur de son HÔTE : ancrée au « i », elle déborderait de la '
+    + 'colonne de saisie — qui défile, donc dont l’overflow rognerait ce qui dépasse');
+  assert.ok(/:has\(> \.aide-bulle\) \{ position: relative/.test(CHARTE_CSS),
+    '… et son parent direct lui sert d’ancre, comme le message flottant');
+  assert.ok(/\.aide-bulle\[hidden\] \{ display: none/.test(CHARTE_CSS),
+    '`hidden` reste plus fort que l’affichage : sinon l’aide reste posée sur la carte');
+}
+// LE « i » PREND LA BOÎTE D'UNE ICÔNE, et il la déclare en largeur ET en
+// hauteur — la garde de `meme-hauteur.test.js`.
+{
+  const b = CHARTE_CSS.match(/\n\.aide-b \{[^}]*\}/);
+  assert.ok(b, 'le « i » est un composant, pas un bouton réécrit par écran');
+  assert.ok(/width: var\(--ic\); height: var\(--ic\)/.test(b[0]),
+    'sa boîte est un JETON, en largeur et en hauteur');
+  assert.ok(/border-radius: var\(--pilule\)/.test(b[0]), 'et c’est un rond : une icône seule');
+}
+
+// ---------------------------------------------------------------------------
+// 3 ter. LE TEXTILE : MÊME BASE, MÊME MOTEUR — PAS UNE COPIE
+// ---------------------------------------------------------------------------
+// « Les t-shirts doivent être inclus dans le devis flash ; vente, devis et
+// devis flash doivent avoir exactement la même base de données de produit »
+// (Charlie, 01/09). Les références du fichier du patron sont descendues dans
+// `catalogue_produits` : elles arrivent ici par le MÊME endpoint que les tasses.
+//
+// ⚠ MAIS UN T-SHIRT NE SE VEND PAS À UN PRIX DE RAYON, IL SE CHIFFRE — à la
+// quantité (coefficients dégressifs), au marquage (mètres de DTF, temps de
+// presse) et au genre (la table des temps). Le moteur qui sait faire ça est
+// écrit, conforme au fichier V9, et vérifié sur 611 520 combinaisons. L'écran
+// l'APPELLE. La moindre formule recopiée ici ferait DEUX moteurs — et le jour
+// où l'un bouge, le devis et le comptoir cessent de dire le même prix sans que
+// personne ne s'en aperçoive.
+assert.ok(/CHEMIN_MOTEUR = '\/comptoir\/textile-catalog\.js'/.test(ECRAN),
+  'le devis charge LE moteur du comptoir, il n’en embarque pas un deuxième');
+assert.ok(/TE\.calculate\(/.test(ECRAN),
+  '… et il l’appelle : c’est lui qui fait le prix');
+// Aucune arithmétique de chiffrage ne doit exister dans cet écran. Ces cinq
+// noms sont les briques du moteur : leur présence ici voudrait dire qu'on a
+// recommencé à calculer sur place.
+for (const brique of ['dtfCost', 'dtfSpeed', 'pressMin', 'ceilStep', 'coefFor', 'purchase']) {
+  assert.ok(!new RegExp(`\\b${brique}\\b`).test(ECRAN),
+    `« ${brique} » est une brique du moteur : le devis ne refait pas son calcul`);
+}
+// LE MOTEUR SE CHARGE À LA DEMANDE. 78 Ko que la plupart des devis n'ouvrent
+// jamais : au premier t-shirt posé, pas à l'ouverture de l'écran.
+assert.ok(/function moteurTextile\(\)/.test(ECRAN) && /document\.head\.appendChild\(s\)/.test(ECRAN),
+  'le moteur arrive par une balise posée au premier t-shirt');
+assert.ok(!/^import[^\n]*textile-catalog/m.test(ECRAN),
+  '… et pas par un import de tête, qui le chargerait pour tout le monde');
+
+// LES DEUX PARAMÈTRES QUI SE PAYENT S'ILS SONT FAUX.
+assert.ok(/markupPercent: 0/.test(ECRAN),
+  'les coefficients du V9 portent déjà la marge : une majoration de plus la compterait deux fois');
+assert.ok(/TRANSPORT_MOTEUR = 'Maritime'/.test(ECRAN),
+  'le transport a sa PROPRE ligne sur le devis (bouton « Transport », tarif des '
+  + 'Réglages) : le chiffrer aussi dans le prix à la pièce le facturerait deux fois');
+// Le genre décide de la table des temps : introuvable, il vaut ZÉRO mètre de
+// DTF — donc un marquage facturé 2,30 € au lieu de 9,90 €.
+assert.ok(/genre: ligne\.textile\.genre/.test(ECRAN),
+  'le genre du moteur voyage avec la ligne');
+
+// UN MARQUAGE DEVINÉ EST UN PRIX FAUX UNE FOIS SUR DEUX. « Aucun » donne le
+// prix juste du vêtement nu, qui est une vente réelle ; le menu est dans la
+// rangée, à côté de la quantité.
+assert.ok(/MARQUAGE_AUCUN = 'Aucun'/.test(ECRAN),
+  'le marquage par défaut ne se devine pas');
+assert.ok(/const ID_MARQUAGES = 'dvf-marquages';/.test(ECRAN)
+  && /function poserMarquages\(champMarq\)/.test(ECRAN),
+  'sur un textile le marquage propose les emplacements du moteur : « coeur+dos » tapé '
+  + 'à la main ne serait plus un emplacement, et la ligne sortirait au prix du vêtement nu');
+// … et il devient une liste SANS changer de forme : le composant HABILLE le
+// champ, il ne le remplace pas. Rien ne bouge sous les doigts (loi 9), et une
+// ligne qui n'est pas un textile garde un champ ordinaire — pas un menu vide.
+assert.ok(/champMarq\.setAttribute\('list', ID_MARQUAGES\);\s*\n\s*menuPoser\(champMarq\);/.test(ECRAN),
+  'le champ de marquage se fait habiller, il ne se fait pas remplacer');
+
+// ---------------------------------------------------------------------------
+// 3 quater. LE PRODUIT SE CHOISIT DANS LA LIGNE, ET LA RECHERCHE EST OBLIGATOIRE
+// ---------------------------------------------------------------------------
+// Charlie, 01/09, en désignant la Désignation d'un article : « y'a un gros
+// problème pour bien sélectionner le produit ; ya 2 parties dans mon
+// entreprise, Textiles et le reste ; dans le menu déroulant je veux pouvoir
+// switch entre les 2 familles ; ce input doit avoir OBLIGATOIREMENT une
+// fonction recherche COMME TOUS LES INPUTS avec un menu déroulant. »
+//
+// La barre portait une liste de 130 entrées SANS recherche, posée ailleurs que
+// dans la ligne : il fallait descendre à la molette pour trouver un t-shirt.
+assert.ok(!/dvf-catalogue/.test(ECRAN),
+  'la liste « Ajouter un article du catalogue » de la barre est partie : un endroit de moins');
+assert.ok(/import \{[^}]*\bmenuPoser\b[^}]*\} from '\.\/menu-recherche\.js';/.test(ECRAN),
+  'le devis prend LE menu du comptoir, pas un qui lui ressemble');
+assert.ok(/design\.setAttribute\('list', ID_PRODUITS\);/.test(ECRAN)
+  && /menuPoser\(design\);/.test(ECRAN),
+  'la désignation est le champ où le produit se cherche');
+// LES DEUX MÉTIERS DE LA MAISON, et le composant sait les basculer.
+assert.ok(/o\.dataset\.onglet = p\.famille === FAMILLE_TEXTILE \? 'Textile' : 'Boutique';/.test(ECRAN),
+  'chaque produit dit de quel métier il est');
+{
+  const MENU_JS = lire('public/menu-recherche.js');
+  assert.ok(/function menuOngletsDe\(etat\)/.test(MENU_JS)
+    && /onglets\.className='menu-onglets';/.test(MENU_JS),
+    'le composant porte la rangée des deux métiers');
+  assert.ok(/return vus\.length>1\?vus:\[\];/.test(MENU_JS),
+    'moins de deux métiers : pas de rangée — un seul bouton est un bouton qui ne fait rien');
+  assert.ok(/if\(!etat\.onglet\)return liste;\s*\n\s*return liste\.filter\(o=>!o\.onglet\|\|o\.onglet===etat\.onglet\);/.test(MENU_JS),
+    'une option sans métier traverse : le choix vide appartient aux deux');
+  // ⚠ UNE IMPASSE SE DIT. Chercher « NS300 » depuis « Boutique » ne rendait
+  // RIEN, alors que la réponse était à un clic.
+  assert.ok(/b\.className='menu-ailleurs-lien';/.test(MENU_JS),
+    'ce qui est de l’autre côté se dit, et se franchit d’un clic');
+  // … mais on ne bascule pas tout seul : un menu qui change de métier sous les
+  // doigts est pire que le trou qu'il comble.
+  assert.ok(!/etat\.onglet=nom;etat\.vise=0;menuPeindre\(etat\);\s*\n\s*\}\);\s*\n\s*\/\* auto/.test(MENU_JS),
+    'la bascule reste un geste, jamais un effet de bord');
+}
+
+// LE PRIX SUIT LA QUANTITÉ, PARCE QUE LE COEFFICIENT EST DÉGRESSIF. Dix
+// t-shirts et cent t-shirts n'ont pas le même prix à la pièce.
+{
+  const surQte = ECRAN.slice(ECRAN.indexOf("qte.addEventListener('input'"), ECRAN.indexOf("pu.addEventListener('input'"));
+  assert.ok(/recalculer\(\)/.test(surQte), 'changer la quantité refait le prix');
+}
+// … MAIS UN PRIX TAPÉ PENDANT UNE NÉGOCIATION NE SE FAIT PAS ÉCRASER.
+assert.ok(/ligne\.puManuel = true/.test(ECRAN) && /if \(!ligne \|\| !ligne\.textile \|\| ligne\.puManuel\) return null/.test(ECRAN),
+  'un prix repris à la main tient jusqu’à ce qu’on rende la main au moteur');
+assert.ok(/'action-ligne', 'Recalculer'/.test(ECRAN),
+  '… et on la rend avec le composant de la charte, pas un bouton de plus');
+
+// LE NOM DU RAYON EST LE MÊME PARTOUT. Trois fichiers le lisent : l'écran pour
+// reconnaître une ligne qui se chiffre, le menu du comptoir pour l'écarter (il
+// a son propre parcours textile), la semence pour le poser. Trois écritures,
+// c'est trois occasions de se tromper d'un accent.
+{
+  const CATALOGUE_JS = lire('public/comptoir/catalogue.js');
+  const SEMENCE = JSON.parse(lire('catalogue-textile-seed.json'));
+  assert.ok(/FAMILLE_TEXTILE = 'Textile'/.test(ECRAN), 'l’écran nomme le rayon');
+  assert.ok(/FAMILLE_TEXTILE='Textile'/.test(CATALOGUE_JS), 'le menu du comptoir le nomme pareil');
+  assert.ok(SEMENCE.every((p) => p.famille === 'Textile'), 'et la semence aussi');
+  assert.ok(/famille===FAMILLE_TEXTILE\)continue/.test(CATALOGUE_JS),
+    'le comptoir écarte le textile de sa liste « Autre » : il y a sa tuile, celle '
+    + 'qui sait faire le prix — deux chemins pour la même chose, c’est une ligne mal chiffrée');
+}
 
 // ---------------------------------------------------------------------------
 // 4. ON NE RECONSTRUIT PAS UN CHAMP SOUS LES DOIGTS

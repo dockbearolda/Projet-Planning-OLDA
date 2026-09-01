@@ -227,7 +227,10 @@ const enBase = (liste) => liste.map((p, i) => ({
   };
 
   const depart = (await call('GET', '/api/catalogue-produits')).body;
-  assert.strictEqual(depart.length, 82);
+  // Les 82 objets du patron, plus les 48 références textiles qui les ont
+  // rejoints le 01/09 dans la même table — c'est l'import qu'on éprouve ici,
+  // pas le nombre de rayons : on compte donc ce que l'import VISE.
+  assert.strictEqual(depart.filter((p) => p.famille !== 'Textile').length, 82);
   assert.strictEqual(depart.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, null);
 
   const CSV = [
@@ -244,7 +247,7 @@ const enBase = (liste) => liste.map((p, i) => ({
   assert.deepStrictEqual(apercu.body.resume,
     { lues: 3, creees: 1, majs: 1, inchangees: 0, refusees: 1, ecartees: 0 });
   const inchange = (await call('GET', '/api/catalogue-produits')).body;
-  assert.strictEqual(inchange.length, 82, 'un aperçu ne crée rien');
+  assert.strictEqual(inchange.length, depart.length, 'un aperçu ne crée rien');
   assert.strictEqual(inchange.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, null,
     '… et n’écrit aucun prix');
 
@@ -260,7 +263,7 @@ const enBase = (liste) => liste.map((p, i) => ({
     { csv: CSV, signature: 'jamais-vue' });
   assert.strictEqual(fausse.status, 409);
   assert.match(fausse.body.error, /rien n’a été écrit/);
-  assert.strictEqual((await call('GET', '/api/catalogue-produits')).body.length, 82);
+  assert.strictEqual((await call('GET', '/api/catalogue-produits')).body.length, depart.length);
 
   // L'ÉCRITURE, avec la signature de l'aperçu.
   const fait = await call('POST', '/api/catalogue-produits/import',
@@ -268,7 +271,7 @@ const enBase = (liste) => liste.map((p, i) => ({
   assert.strictEqual(fait.status, 200);
   assert.strictEqual(fait.body.ecrit, true);
   const apres = (await call('GET', '/api/catalogue-produits')).body;
-  assert.strictEqual(apres.length, 83, 'un produit créé, un mis à jour, un refusé');
+  assert.strictEqual(apres.length, depart.length + 1, 'un produit créé, un mis à jour, un refusé');
   assert.strictEqual(apres.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, 6);
   assert.strictEqual(apres.find((p) => p.designation === 'Sticker').prixVenteTtc, 4);
   assert.ok(!apres.some((p) => p.designation === 'Plateau Liège' && p.prixVenteTtc != null),

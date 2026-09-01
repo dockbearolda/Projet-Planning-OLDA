@@ -96,7 +96,11 @@ assert.match(CAL, /\.cal-panneau button\{padding:0;min-height:0;min-width:0;marg
 // Elle vit dans un littéral de gabarit : un seul accent grave non échappé le
 // referme, et les composants des deux écrans redeviennent des champs bruts —
 // sans une erreur visible nulle part. C'est arrivé DEUX fois le 27/08.
-for (const [nom, src, cle] of [['pont.js', PONT, 'STYLE_MENU'], ['calendrier.js', CAL, 'CSS_CALENDRIER']]) {
+// Les DEUX composants partagés sont concernés — le menu a quitté pont.js le
+// 01/09 pour `menu-recherche.js`, mais son piège l'a suivi : sa feuille vit
+// toujours dans un littéral de gabarit.
+const MENU_JS = fs.readFileSync(path.join(RACINE, 'public/menu-recherche.js'), 'utf8');
+for (const [nom, src, cle] of [['menu-recherche.js', MENU_JS, 'STYLE_MENU'], ['calendrier.js', CAL, 'CSS_CALENDRIER']]) {
   const bloc = src.match(new RegExp(`const ${cle}\\s*=\\s*\`([\\s\\S]*?)\\n\`;`));
   assert.ok(bloc, `${nom} : la feuille du composant doit rester repérable`);
   assert.strictEqual(bloc[1].replace(/\\`/g, '').indexOf('`'), -1,

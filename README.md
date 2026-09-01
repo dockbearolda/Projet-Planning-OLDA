@@ -602,6 +602,147 @@ et la pilule de recherche de `charte.css`. Mesuré dans la coquille : 38
 commandes, **toutes à 50,0 px**, et quatre tailles de texte rendues — 14 / 17 /
 21 / 32, et rien d'autre.
 
+#### Le produit se cherche DANS la ligne, et les deux métiers se basculent (01/09/2026)
+
+« Y'a un gros problème pour bien sélectionner le produit. Ya 2 parties dans mon
+entreprise, Textiles et le reste : dans le menu déroulant je veux pouvoir switch
+entre les 2 familles. Ce input doit avoir **obligatoirement** une fonction
+recherche **comme tous les inputs** avec un menu déroulant. »
+
+La barre des Articles portait une liste de **130 entrées sans recherche**, posée
+ailleurs que dans la ligne : pour trouver un t-shirt il fallait descendre à la
+molette. Elle est partie. Le produit se choisit maintenant dans la
+**Désignation** de la ligne — là où son nom s'écrit. Un endroit de moins, et
+celui qui reste est celui qu'on regarde.
+
+**« Comme tous les inputs » est une consigne d'architecture**, pas un souhait
+d'apparence. Le menu déroulant avec recherche existait depuis le 27/08, mais il
+vivait dans `comptoir/pont.js` — 920 lignes, le fichier des deux écrans du
+comptoir, que le CRM ne lit pas. Le recopier aurait donné deux menus qui se
+ressemblent et divergent au premier correctif. Il déménage donc dans
+**`public/menu-recherche.js`**, comme `calendrier.js` avant lui, pour la même
+raison et de la même façon : pont.js n'est pas un module, il le charge par
+`import()` et garde ses trois `window.*` à l'identique — ils sont écrits dans les
+`onchange` des écrans du patron, et un écran remplacé ne doit rien avoir à
+apprendre. ⚠ Ils rendent la main **tout de suite**, module ou pas :
+`menusPoserTous` est appelé par un MutationObserver plusieurs fois par seconde,
+le faire attendre bloquerait le guet de l'écran de fin, donc l'envoi du dossier.
+
+**Les deux métiers.** Une option porte `data-onglet` ; le composant en fait une
+rangée de bascules en tête du panneau, et le filtre travaille dans le métier
+actif. Moins de deux métiers, pas de rangée — un seul bouton est un bouton qui
+ne fait rien, et c'est pourquoi les menus du comptoir n'ont pas changé d'un
+pixel. **Une impasse se dit** : chercher « NS300 » depuis « Boutique » ne rendait
+rien alors que la réponse était à un clic — le panneau propose maintenant
+« 5 dans « Textile » », et le clic bascule. On ne bascule jamais tout seul : un
+menu qui change de métier sous les doigts est pire que le trou qu'il comble.
+
+Mesuré au rendu, à 1 440 px : la désignation **619,2 × 50 px** comme ses
+voisines, le panneau exactement à sa largeur, les bascules à **39,4 px** (la
+boîte serrée de la charte), zéro débordement horizontal. Et sur les écrans du
+comptoir : cinq menus à **246,7 × 50 px**, 48 références, **0 bascule** — rien
+n'a bougé.
+
+#### Une seule base produits pour les trois écrans (01/09/2026)
+
+« Les t-shirts doivent être inclus dans le devis flash ; vente, devis et devis
+flash doivent avoir exactement la même base de données de produit. »
+
+Il y avait **deux catalogues** et **trois écrans** qui n'en voyaient pas les
+mêmes morceaux :
+
+| écran | ce qu'il voyait |
+|---|---|
+| Vente directe | **rien** — sept intitulés écrits en dur dans la page (« Tee-shirt personnalisé »…), sans référence ni prix |
+| Demande de devis | la table `catalogue_produits` (82 objets) **plus** les 49 références du moteur textile, dans deux endroits |
+| Devis flash | la table seule — donc pas un seul t-shirt |
+
+Les références du moteur descendent dans la **même table**, famille
+« Textile » : **130 lignes, un seul endpoint**, les trois écrans y lisent.
+
+**⚠ Ce qui ne descend pas : l'argent.** La table porte l'*identité* du produit —
+famille, désignation, référence, genre — pas son prix. Un t-shirt ne se vend pas
+à un prix de rayon : il se **chiffre**, quantité par quantité et marquage par
+marquage. Un prix d'achat posé au catalogue serait une case qu'on corrige et qui
+ne change rien au devis : le pire des deux mondes.
+
+**La semence ne peut pas dériver du moteur.** `test/catalogue-textile-base.test.js`
+compare les deux référence par référence, et applique **exactement** la règle
+d'exclusion que l'écran du comptoir applique déjà (`r.genre && r.designation !==
+'TEST'`) — pas une deuxième qui lui ressemble. Une référence ajoutée au fichier
+du patron sans l'être au catalogue fait échouer le test : sans ça on aurait un
+t-shirt qu'on sait chiffrer et qu'on ne trouve pas, et un catalogue ne signale
+jamais ce qu'il ne contient pas.
+
+**Le devis flash chiffre le textile avec LE moteur, pas avec une copie.** Il le
+charge à la demande — 78 Ko qu'un devis de tasses n'ouvre jamais — et appelle
+`TextileEngine.calculate`. La rangée d'un textile porte le **menu des treize
+emplacements** du fichier V9 à la place du champ libre : « coeur+dos » tapé à la
+main ne serait plus un emplacement pour le moteur, il vaudrait zéro mètre de DTF
+et la ligne sortirait au prix du vêtement nu. Le prix **suit la quantité**, parce
+que le coefficient est dégressif — mesuré à l'écran contre le moteur : 12,20 € à
+1 pièce, 23,30 € à 10 avec Cœur + Dos, 17,60 € à 50, au centime près sur cinq
+combinaisons. Un prix tapé pendant une négociation **tient** ; « Recalculer » le
+rend au moteur.
+
+Deux paramètres qui se paieraient s'ils étaient faux, et qui sont tenus par le
+test : `markupPercent: 0` (les coefficients du V9 portent déjà la marge) et
+`transport: 'Maritime'` (0 €/pièce — le transport a sa **propre ligne** sur le
+devis, au tarif des Réglages ; le compter aussi dans le prix à la pièce le
+facturerait deux fois).
+
+**Le comptoir écarte le textile de sa liste « Autre »**, et c'est voulu : il a sa
+tuile Textile, celle qui sait faire le prix. La base est unique — c'est ce que
+chaque écran en *montre* qui diffère, et chacun montre le chemin qui sait
+chiffrer.
+
+**La vente directe reçoit le catalogue par le pont**, jamais dans la page : les
+écrans du comptoir viennent du patron et se remplacent en entier, une greffe
+écrite dedans partirait avec le fichier. Le prix de rayon se pose **seulement si
+la case est vide** — on remise et on arrondit au comptoir, un prix qui écrase un
+prix négocié est une remise perdue à chaque article.
+
+#### Le message tombait quatre pixels sous le pli (01/09/2026)
+
+« Quand je clique sur enregistrer au planning rien ne s'affiche. » Le dossier
+partait bien : c'est le **message** qui ne se voyait pas — et tous l'étaient,
+les deux refus, la confirmation et l'échec d'impression.
+
+`.msg-flottant` est `position: absolute; top: 100%` et prend pour ancre **son
+parent direct** (`:has(> .msg-flottant)`, `charte.css`). L'écran le posait sur
+`<body>` : « 100 % » y vaut la hauteur de la **page entière**. Mesuré au rendu :
+**904 px dans une fenêtre de 900**. Le défaut ne se voit ni en relisant l'écran
+(la classe est la bonne) ni en relisant la charte (la règle est la bonne) — il
+naît de leur rencontre. Il s'ancre désormais à la rangée des boutons de
+l'en-tête, c'est-à-dire à la commande qui le provoque, et
+`test/devis-flash.test.js` refuse le retour à `<body>`.
+
+Au passage, `is-ok` / `is-ko` — les deux noms que `.reg-status` emploie déjà aux
+Réglages — sont devenus de vrais états du message flottant. L'écran les écrivait
+sur un composant qui ne les connaissait pas : son refus sortait en gris. Le
+rouge garde **une seule écriture**, il n'en ouvre pas une seconde qui lui
+ressemble.
+
+#### L'aide se demande, elle ne tient plus le haut de l'écran (01/09/2026)
+
+« Supprime les phrases de ce genre, et mettre à côté du titre un petit i dans
+une bulle qui nous affiche les infos quand on clique dessus. »
+
+Chaque carte du Devis et des Réglages portait sous son titre un paragraphe de
+deux à quatre lignes. **Seize cartes** : de la prose à franchir avant le premier
+champ, relue zéro fois après la première ouverture. Le texte n'est pas perdu —
+il est dans la bulle du « i » (`public/aide-bulle.js`, `.aide-b` / `.aide-bulle`
+dans `charte.css`), **une seule fabrique pour les deux écrans**.
+
+La bulle **ne pousse personne** (loi 8) : elle sort du flux et se pose sur la
+largeur de son **hôte**, pas sur celle du « i » — ancrée au bouton, elle
+déborderait de la colonne de saisie du devis, qui défile, donc dont
+l'`overflow-y: auto` contamine l'autre axe et rognerait ce qui dépasse. Mesuré
+au rendu, seize cartes ouvertes une à une : **0 px de déplacement**, 0 px de
+débordement, une seule bulle ouverte à la fois. Le « i » prend la boîte de
+l'icône qui lui fait face — **20 × 20**, et les trois centres (icône, titre,
+« i ») tombent au même pixel sur les seize.
+
 ### L'import de prix — on lit tout, on dit tout, PUIS on écrit
 
 Un écran dans **Réglages** avale un **CSV UTF-8** (« Enregistrer sous » depuis
@@ -763,6 +904,8 @@ Deux exceptions assumées :
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
 ├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
+├── catalogue-textile-seed.json   les 48 références du moteur, semées dans la MÊME table
+│                                 que les objets — identité seule, jamais l'argent
 ├── public/
 │   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system
@@ -775,6 +918,11 @@ Deux exceptions assumées :
 │   ├── devis.js      le DEVIS : le calcul de l'argent, et la feuille A4 (règles pures)
 │   ├── devis-flash.js  l'écran du devis : saisie à gauche, feuille vivante à droite
 │   ├── devis-flash.css la coupe en deux moitiés et la rangée d'article — rien d'autre
+│   ├── aide-bulle.js   le « i » à côté d'un titre : l'aide se demande, elle ne s'affiche
+│   │                 pas d'office — Réglages et Devis, une seule fabrique
+│   ├── menu-recherche.js  LE menu déroulant avec recherche des TROIS écrans : il habille
+│   │                 un <select> ou un <input list>, filtre, et bascule entre les
+│   │                 deux métiers de la maison (Textile / Boutique)
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning

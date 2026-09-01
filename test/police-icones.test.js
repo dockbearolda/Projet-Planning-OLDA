@@ -116,9 +116,11 @@ assert.deepStrictEqual(porteurs, FABRIQUES,
 // fautive était bien dans le fichier, l'extracteur ne la lisait pas. Les
 // enveloppes sont donc RECENSÉES (ENVELOPPES ci-dessous) et le paragraphe 2 bis
 // vérifie qu'il n'en existe pas une de plus.
-// `carte` est celle de l'ecran du devis, `carteSimple` celle des Reglages :
-// toutes deux recoivent un nom d'icone en parametre et le transmettent.
-const ENVELOPPES = ['carteSimple', 'carte'];
+// `carte` est celle de l'ecran du devis, `carteSimple` et `teteCarte` celles des
+// Reglages : toutes trois recoivent un nom d'icone en parametre et le
+// transmettent. `carteSimple` passe meme par `teteCarte` — une enveloppe qui en
+// enveloppe une autre, et les deux doivent etre nommees ici.
+const ENVELOPPES = ['carteSimple', 'carte', 'teteCarte'];
 
 function nomsDe(fichier) {
   const src = lire(fichier);
@@ -155,19 +157,36 @@ function nomsDe(fichier) {
 // quatre formes ci-dessus, et ne seraient donc jamais contrôlés. On les repère
 // à la source — une fabrique appelée avec l'un des PARAMÈTRES de la fonction
 // qui l'entoure — et on exige que la liste soit à jour.
+// ⚠ UNE ENVELOPPE PEUT EN ENVELOPPER UNE AUTRE (01/09). Aux Reglages,
+// `carteSimple` ne pose plus l'icone elle-meme : elle passe son parametre a
+// `teteCarte`, qui appelle `ic`. Un detecteur qui ne cherche que `ic(param)`
+// perdait donc `carteSimple` de vue — et avec elle les cinq noms d'icones
+// qu'elle recoit, plus controles par personne. On boucle donc jusqu'au point
+// fixe : est une enveloppe qui transmet un parametre a une fabrique OU a une
+// enveloppe deja connue.
 function enveloppesDe(src) {
   const vues = new Set();
   const entetes = [
     /function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g,          // function nom(a, b) {
     /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>/g, // const nom = (a, b) =>
   ];
+  const fonctions = [];
   for (const re of entetes) {
     for (const m of src.matchAll(re)) {
       const params = m[2].split(',').map((p) => p.trim().split('=')[0].trim()).filter(Boolean);
       if (!params.length) continue;
-      const corps = src.slice(m.index + m[0].length, m.index + m[0].length + 2500);
-      for (const appel of corps.matchAll(/\b(?:ic|icon|icone)\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g)) {
-        if (params.includes(appel[1])) { vues.add(m[1]); break; }
+      fonctions.push({ nom: m[1], params, corps: src.slice(m.index + m[0].length, m.index + m[0].length + 2500) });
+    }
+  }
+  let bouge = true;
+  while (bouge) {
+    bouge = false;
+    for (const f of fonctions) {
+      if (vues.has(f.nom)) continue;
+      const cibles = ['ic', 'icon', 'icone', ...vues];
+      const re = new RegExp(`\\b(?:${cibles.join('|')})\\(\\s*([A-Za-z_$][\\w$]*)\\s*[,)]`, 'g');
+      for (const appel of f.corps.matchAll(re)) {
+        if (f.params.includes(appel[1])) { vues.add(f.nom); bouge = true; break; }
       }
     }
   }

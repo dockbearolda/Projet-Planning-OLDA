@@ -24,6 +24,11 @@ const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
 const DEVIS = ecran('demande-devis');
 const PONT = lire('public/comptoir/pont.js');
+// Le COMPOSANT de menu a quitté pont.js le 01/09 (voir `menus-comptoir.test.js`) :
+// les gardes qui portent sur lui — l'action posée dans le panneau, la recherche —
+// le suivent dans `menu-recherche.js`. Ce qui reste ici est ce que le comptoir
+// fait AVEC : brancher `menu-action`, ouvrir la liste sans clic.
+const MENU = lire('public/menu-recherche.js');
 const SERVEUR = lire('server.js');
 
 // ===========================================================================
@@ -130,15 +135,15 @@ assert.ok(/\$\('clientSelect'\)\.addEventListener\('menu-action',\(\)=>window\.s
   '… et c’est la page qui décide de ce qui s’ouvre : le menu n’en sait rien');
 assert.ok(!/onclick="showNewClientForm\(\)"/.test(DEVIS),
   'le bouton d’à côté n’existe plus : un seul chemin vers la création');
-assert.ok(/const motAction=hote\.dataset\.menuAction;/.test(PONT),
+assert.ok(/const motAction=hote\.dataset\.menuAction;/.test(MENU),
   'pont.js sait poser une action qui n’est pas une valeur');
-assert.ok(/if\(action\)panneau\.append\(action\);\n  if\(avecManuel\)panneau\.append\(manuel,saisie\);/.test(PONT),
+assert.ok(/if\(action\)panneau\.append\(action\);\n  if\(avecManuel\)panneau\.append\(manuel,saisie\);/.test(MENU),
   '… en tête du panneau, au-dessus du filtre — jamais dans la liste');
-assert.ok(/dispatchEvent\(new CustomEvent\('menu-action',\{bubbles:true\}\)\)/.test(PONT),
+assert.ok(/dispatchEvent\(new CustomEvent\('menu-action',\{bubbles:true\}\)\)/.test(MENU),
   '… et le clic dit « menu-action », il ne choisit AUCUNE valeur');
 // AU CLAVIER AUSSI : Tab s'arrête sur l'action avant de refermer le panneau.
 // Un raccourci qu'on ne peut pas atteindre au clavier n'existe pas.
-assert.ok(/if\(etat\.action&&document\.activeElement!==etat\.action\)\{\n      ev\.preventDefault\(\);etat\.action\.focus\(\);return;/.test(PONT),
+assert.ok(/if\(etat\.action&&document\.activeElement!==etat\.action\)\{\n      ev\.preventDefault\(\);etat\.action\.focus\(\);return;/.test(MENU),
   'la tabulation entre dans le panneau : premier arrêt, l’action');
 
 // L'ancienne mécanique — un champ de recherche maison doublé d'une pile de
@@ -181,12 +186,12 @@ assert.ok(/data-menu-filtre="Filtrer : nom, téléphone, e-mail…"/.test(DEVIS)
   'le filtre promet toujours les trois');
 assert.ok(/return \[c\.phone,c\.email,c\.type,c\.contact\]\.filter\(Boolean\)\.join\(' '\)/.test(DEVIS),
   '… et l’option les emporte, invisibles, dans `data-cherche`');
-assert.ok(/cherche:o\.dataset\.cherche\|\|''/.test(PONT),
+assert.ok(/cherche:o\.dataset\.cherche\|\|''/.test(MENU),
   'le composant lit ce texte caché');
 // `menuReduire` depuis le 27/08 : la recherche réduit les deux côtés à leurs
 // lettres et à leurs chiffres, pour que « ns 300 » trouve « NS300 ». Ce qui
 // compte ici reste le même — le texte caché est cherché AVEC le reste.
-assert.ok(/menuReduire\(`\$\{o\.jeton\} \$\{o\.texte\} \$\{o\.groupe\} \$\{o\.cherche\}`\)/.test(PONT),
+assert.ok(/menuReduire\(`\$\{o\.jeton\} \$\{o\.texte\} \$\{o\.groupe\} \$\{o\.cherche\}`\)/.test(MENU),
   '… et le cherche avec le reste');
 
 // Le détail n'est pas perdu : il se lit sur la fiche, juste sous le champ.

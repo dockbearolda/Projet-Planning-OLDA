@@ -52,6 +52,17 @@ function catCle(cat,label,color){return cat+'\u0001'+label+'\u0001'+(color||'')}
    famille et regroupe les variantes d'un même article. On refait donc le
    chemin inverse — et la famille garde l'ORDRE de la base, celui que le patron
    range depuis les réglages. */
+/* ⚠ LE TEXTILE NE PASSE PAS PAR CE MENU, ET C'EST VOULU (01/09/2026).
+   Depuis que les references du moteur sont dans la MEME table que les objets,
+   cet ecran les verrait deux fois : une fois dans la tuile « Textile », qui
+   sait les chiffrer (references, coloris TopTex, tailles, marquage, coefficients
+   degressifs du fichier V9), et une fois dans la liste « Autre », qui ne sait
+   qu'en poser le nom. Deux chemins pour la meme chose, c'est une question de
+   plus au comptoir et une ligne mal chiffree un jour sur deux.
+   La BASE est bien unique — c'est ce qu'elle MONTRE qui differe d'un ecran a
+   l'autre, et chaque ecran montre le chemin qui sait faire le prix. */
+const FAMILLE_TEXTILE='Textile';
+
 function catalogueDepuisLignes(lignes){
   const familles=[];
   const parFamille=new Map();
@@ -61,6 +72,7 @@ function catalogueDepuisLignes(lignes){
     const famille=String(r.famille||'').trim();
     const designation=String(r.designation||'').trim();
     if(!famille||!designation)continue;
+    if(famille===FAMILLE_TEXTILE)continue;
     let f=parFamille.get(famille);
     if(!f){f={famille,note:String(r.familleNote||''),items:[]};parFamille.set(famille,f);familles.push(f)}
     /* La note de famille se prend sur la PREMIÈRE ligne qui en porte une :

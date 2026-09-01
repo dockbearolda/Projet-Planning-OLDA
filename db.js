@@ -408,6 +408,12 @@ async function init() {
   await semerCatalogueProduits();
   await poserUniciteCatalogue();
 
+  // LE TEXTILE DANS LA MÊME TABLE, APRÈS l'unicité : la contrainte est déjà là
+  // quand les quarante-huit références arrivent, donc deux conteneurs qui
+  // démarrent ensemble ne peuvent pas les poser deux fois. Elle vaut aussi pour
+  // une base DÉJÀ remplie — la production en a quatre-vingt-deux lignes.
+  await semerCatalogueTextile();
+
   // Les deux tasses que la grille sous-tarifait de 1 € et de 6 €.
   await corrigerTarifsTasseMagasin();
 
@@ -1991,6 +1997,73 @@ async function semerCatalogueProduits() {
     if (Array.isArray(brut) && brut.length) await setCatalogueProduits(brut);
   }
   await poserMeta('catalogue_produits_seed_v1', '1');
+}
+
+// LE TEXTILE DESCEND DANS LA MÊME BASE QUE LE RESTE (01/09/2026)
+// ===========================================================================
+// « Les t-shirts doivent être inclus dans le devis flash ; vente, devis et
+// devis flash doivent avoir exactement la même base de données de produit »
+// (Charlie). Il y avait DEUX catalogues et TROIS écrans qui n'en voyaient pas
+// les mêmes morceaux :
+//
+//   · Vente directe        : AUCUN catalogue — tout se tapait à la main ;
+//   · Demande de devis     : la table `catalogue_produits` (82 lignes) POUR
+//                            les objets, et les 49 références du moteur
+//                            textile pour les t-shirts, dans un autre écran ;
+//   · Devis flash          : la table seule — donc pas un seul t-shirt.
+//
+// Les références du moteur descendent donc dans la table, famille « Textile »,
+// avec leur RÉFÉRENCE (NS300…) et leur genre. Une base, un point d'entrée.
+//
+// ⚠ CE QUI NE DESCEND PAS : L'ARGENT. La table porte l'IDENTITÉ du produit —
+// famille, désignation, référence, genre — pas son prix. Un t-shirt ne se vend
+// pas à un prix de rayon : il se CHIFFRE, quantité par quantité et marquage par
+// marquage, par le moteur conforme au fichier V9 du patron, qui garde ses
+// propres prix d'achat. Poser ici un prix d'achat modifiable donnerait une case
+// que l'on corrige et qui ne change rien — le pire des deux mondes.
+//
+// AUCUNE DÉRIVE POSSIBLE : `test/catalogue-textile-base.test.js` compare la
+// semence aux références du moteur, une par une. Une référence ajoutée au
+// moteur sans l'être ici fait échouer le test.
+//
+// Down : DELETE FROM catalogue_produits WHERE famille = 'Textile';
+//        DELETE FROM app_meta WHERE key = 'catalogue_textile_seed_v1';
+async function semerCatalogueTextile() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'catalogue_textile_seed_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  let brut = [];
+  try {
+    brut = JSON.parse(fs.readFileSync(path.join(__dirname, 'catalogue-textile-seed.json'), 'utf8'));
+  } catch (_) {
+    return;   // pas de semence : la garde n'est pas posée, on réessaiera au prochain démarrage
+  }
+  if (!Array.isArray(brut) || !brut.length) return;
+
+  // ON N'ÉCRASE RIEN. La table est déjà remplie en production (82 lignes, plus
+  // ce qu'un import y a mis) : on n'insère que les clés ABSENTES, une par une.
+  // Un `setCatalogueProduits` remplacerait le catalogue entier — et emporterait
+  // les prix importés avec.
+  const { rows: dejaLa } = await pool.query('SELECT cle FROM catalogue_produits');
+  const connues = new Set(dejaLa.map((r) => r.cle));
+  const { rows: fin } = await pool.query('SELECT COALESCE(MAX(position), 0) AS p FROM catalogue_produits');
+  let position = Number(fin[0].p) || 0;
+
+  for (const ligne of brut) {
+    const produit = nettoyerProduit({ ...ligne, position: position + 10 });
+    if (!produit || connues.has(produit.cle)) continue;
+    connues.add(produit.cle);
+    position += 10;
+    // `ON CONFLICT DO NOTHING` en plus de la garde : deux conteneurs qui
+    // démarrent en même temps lisent tous les deux une table sans textile.
+    await pool.query(
+      `INSERT INTO catalogue_produits (${CATALOGUE_COLONNES})
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ON CONFLICT DO NOTHING`,
+      valeursProduit(produit),
+    );
+  }
+  await poserMeta('catalogue_textile_seed_v1', '1');
 }
 
 // L'UNICITÉ DE LA CLÉ, POSÉE EN BASE. C'est elle — pas le code — qui empêche
@@ -3705,7 +3778,7 @@ module.exports = {
   corrigerTarifsTasseMagasin,
   // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
-  semerCatalogueProduits, poserUniciteCatalogue,
+  semerCatalogueProduits, semerCatalogueTextile, poserUniciteCatalogue,
   apercuImportCatalogue, appliquerImportCatalogue, reglesImportCatalogue,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,

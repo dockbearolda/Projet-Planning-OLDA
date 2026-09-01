@@ -25,7 +25,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RACINE = path.join(__dirname, '..');
-const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
+// ⚠ LE COMPOSANT A DÉMÉNAGÉ LE 01/09 : il vit dans `public/menu-recherche.js`,
+// que les DEUX écrans du comptoir et le CRM importent (voir
+// `menus-comptoir.test.js`). Les gardes de placement suivent le composant.
+const PONT = fs.readFileSync(path.join(RACINE, 'public/menu-recherche.js'), 'utf8');
 const CALENDRIER = fs.readFileSync(path.join(RACINE, 'public/calendrier.js'), 'utf8');
 
 // --- 1. Le panneau sort du conteneur qui défile ----------------------------

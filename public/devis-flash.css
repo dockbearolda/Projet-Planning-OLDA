@@ -264,3 +264,4 @@
   .dvf-apercu { border-left: 0; border-top: 1px solid var(--border); padding-top: var(--pas-4); }
   .dvf-r3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+

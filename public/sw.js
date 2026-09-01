@@ -91,6 +91,10 @@ const COQUILLE = [
   // l'atelier ne s'ouvre plus hors ligne, et les deux écrans du comptoir
   // retombent sur le calendrier de Chrome.
   '/calendrier.js',
+  // LE MENU DEROULANT AVEC RECHERCHE, extrait de pont.js le 01/09 : les DEUX
+  // ecrans du comptoir ET le CRM l'importent. Absent hors ligne, les <select>
+  // natifs restent en place — l'ecran est moins beau, il n'est pas en panne.
+  '/menu-recherche.js',
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',
@@ -116,6 +120,10 @@ const COQUILLE = [
   // sa feuille — donc sans le document qu'il sert a produire.
   '/devis-flash.js',
   '/devis.js',
+  // La bulle du « i » : partagee par les Reglages et le Devis. Absente, les
+  // deux ecrans s'ouvrent hors ligne AVEC leurs cartes mais SANS leur aide —
+  // un module manquant fait echouer l'import de l'ecran entier.
+  '/aide-bulle.js',
   // Les deux parcours du comptoir, affichés dans un cadre par Nouveau Projet.
   // LEUR FEUILLE EST UN FICHIER À PART depuis le 27/08 : sans elle dans la
   // coquille, l'écran s'ouvre hors ligne SANS UNE SEULE RÈGLE — il n'est pas
