@@ -248,20 +248,19 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | GET | `/api/requests?stage=<slug>` | Liste d'une étape (priorité desc, échéance asc). |
 | GET | `/api/requests` | Toutes les demandes. |
 | GET | `/api/counts` | `{ <slug>: <nombre>, ... }` pour les compteurs. |
-| GET | `/api/stages` | Liste ordonnée des étapes (libellé + slug). |
 | GET | `/api/version` | Empreinte du contenu de `public/`, calculée au démarrage. Le filet de la bulle « mise à jour disponible » pour un poste dont le flux temps réel est mort — le chemin normal est l'évènement `version` envoyé à l'ouverture de `/api/stream`. |
 | POST | `/api/requests` | Crée une demande (corps partiel autorisé). |
 | POST | `/api/requests/:id/copie` | **Recopie une commande** (« Dupliquer », « Envoyer vers Fiverr »), dans une autre famille si `{ stage }` est fourni. La copie emporte `fiche` — le récapitulatif du comptoir, donc tout ce que l'atelier doit lire pour produire. Ne se copient PAS : le numéro de ticket (`fiche.ref`, il identifie UNE prise de commande), l'alerte en cours et les pièces jointes. La copie se fait ici et non côté navigateur : la liste ne transporte qu'un résumé de `fiche`, et `fiche` n'est pas un champ écrivable par PATCH. |
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | PATCH | `/api/requests/:id/fiche` | **Corrige la fiche** : le récapitulatif du comptoir par **position** (`{ client: [], details: [] }` — les libellés viennent du parcours et ne se réécrivent pas ; une case non remplie n'est pas touchée, donc deux postes qui corrigent deux articles ne s'effacent pas), l'heure de retrait, le secteur de production, la **consigne pour l'atelier** (`atelier`, 500 caractères) et le **numéro du papier remis au client** (`refTicket`). La ligne est prise `FOR UPDATE` le temps de la relire et de la réécrire. `fiche.ref` n'est **jamais** modifiable par cette porte. |
-| DELETE | `/api/requests/:id` | Supprime une demande (avec ses PDF, ses secteurs et son journal). |
+| DELETE | `/api/requests/:id` | **Archive** la demande — elle ne s'efface pas. La ligne quitte tous les écrans (`deleted_at`), garde son journal et ses PDF, et se retrouve dans la corbeille des Réglages, d'où elle revient à sa famille et à sa sous-étape. |
 | GET | `/api/requests/recherche?q=…` | **La recherche globale**, faite par le serveur (une page de résultats, pas tout le planning). Tous les jetons doivent apparaître, sans distinction de casse ni d'accent. Cherche dans le dossier, le référent, la description, les contacts, l'alerte — **et le numéro du ticket** (`fiche.ref`, plus `fiche.refTicket` quand le papier remis au client porte un autre numéro) : c'est le seul repère que le client rapporte au comptoir. |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
 | GET | `/api/ordre-manuel` | `[<slugÉtape>, ...]` — les étapes rangées à la main. |
 | PUT | `/api/ordre-manuel` | `{ etape, range }` — ne touche QUE cette étape, le serveur fusionne avec ce que les autres postes ont décidé et rend la liste à jour. Diffusé en SSE. Envoyer la liste entière (ancienne forme, toujours acceptée pour un onglet resté ouvert sur le JS d'avant) impose aux autres la vision qu'on avait AVANT leur geste : deux vendeuses rangeant deux étapes dans la même minute, et la seconde effaçait la décision de la première. |
 | GET | `/api/pipeline` | Familles et leurs sous-étapes (destination d'une commande). |
 | POST | `/api/comptoir/projet` | **Le dossier d'un des deux parcours du comptoir** → crée la ligne dans le planning (`stage` + `sub_stage` retrouvée par son libellé), remplit la fiche client et archive le récapitulatif complet dans `fiche`. Répond `{ id, stage, subStage }`. Refuse seulement un dossier sans nom de client. |
-| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron ; conservé le temps de confirmer qu'on n'y revient pas. |
+| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron (31/07). ⚠ ET POURTANT ON LE GARDE, constat de l'audit du 01/09 : c'est le SEUL endroit du serveur qui CALCULE un prix depuis la grille tarifaire tasse. Le comptoir, lui, envoie un montant déjà chiffré à l'écran (`prixComptoir` ne fait que le valider). C'est par cette route que `test/tarifs-tasse.test.js` prouve qu'une tasse sort à 16, 14 et 22 €, et qu'un logo client sur l'autre face vaut +6 € — les prix du fichier V9. Tant que ce calcul n'a pas d'autre porte, la route reste, et `catalog.json` avec elle. |
 | POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
 | POST | `/api/devis/numero` | Même compteur, série distincte, pour une demande de devis (`DEV-26.07.30-001`). |
 | POST | `/api/devis` | **Le devis chiffré** de l'onglet « Devis flash » → crée la ligne à `demande_chiffrage / devis_envoye`, nature `demande` (le client n'a rien signé), `project_value` = le TTC annoncé, et archive dans `fiche.devis` le devis TEL QU'IL A ÉTÉ IMPRIMÉ. Réserve le numéro si l'écran n'a rien imprimé. Idempotent sur le numéro : renvoyer deux fois le même dossier rend la ligne existante. Refuse un devis sans client, sans article, ou dont le montant est illisible. |
@@ -900,7 +899,11 @@ Deux exceptions assumées :
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
-├── catalog.json      natures, délais et modes de paiement (source unique)
+├── catalog.json      natures, délais, zones, techniques et modes de paiement.
+│                     ⚠ SEULS les modes de paiement servent encore à un écran
+│                     (le planning en garde un miroir, tenu par
+│                     test/paiement-modes-miroir.js). Tout le reste n'est lu que
+│                     par POST /api/projets — voir la note de cette route.
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
 ├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
@@ -933,7 +936,27 @@ Deux exceptions assumées :
 │   │   └── pont.js              base clients réelle + numéro du jour réservé côté serveur
 │   ├── clients.css   vue Base clients, scopée sous #clients
 │   ├── clients.js    liste, fiche éditable, notes, secteurs, villes
-│   └── reglages.js   vue Réglages (WhatsApp, tarifs, catalogue produits, import de prix)
+│   ├── reglages.js   vue Réglages (WhatsApp, tarifs, catalogue produits, import de prix)
+│   ├── reseau.js     TOUTE REQUÊTE A UNE FIN — et l'appel à l'API n'existe
+│   │                 qu'ici : délai, signature du poste (X-Qui), corps du refus
+│   │                 rapporté avec l'erreur. Les cinq écrans en avaient chacun
+│   │                 une copie jusqu'au 01/09 ; celle du devis flash ne signait
+│   │                 rien et n'avait pas de délai.
+│   ├── session.js    qui est connecté, ce qu'il peut, le voile de connexion
+│   ├── poste.js      le prénom choisi une fois par appareil (olda.qui)
+│   ├── dashboard.js  le Point du jour + dashboard.css · priority.js le classement
+│   ├── montravail.js « Mon travail » + montravail.css
+│   ├── pilotage.js   la marge, réservée à la Direction, + pilotage.css
+│   ├── tailles-logos.js  le tableau de l'atelier + tailles-logos.css
+│   ├── fiche-atelier.js  le dossier ouvert en grand + fiche-atelier.css
+│   ├── ligne-faits.js    ce qu'une ligne du planning dit d'elle-même
+│   ├── bureau.js     LE BON DE COMMANDE (tout l'argent), sur le socle papier.js
+│   ├── calendrier.js · modale.js · ecran-tete.js · confirmer.js · nom-client.js
+│   │                 · format.js  les composants partagés par plusieurs écrans
+│   └── manifest.webmanifest · olda-logo.svg · olda-icones.woff2 (91 glyphes)
+├── outils/verifier-charte.mjs   le garde-fou de la charte, en cliquet
+├── scripts/refresh-toptex-couleurs.js  les coloris textile, À LA MAIN
+├── ARCHITECTURE.md   l'audit du 01/09 : ce qui vit, ce qui est mort, le plan
 ├── .env.example
 └── README.md
 ```

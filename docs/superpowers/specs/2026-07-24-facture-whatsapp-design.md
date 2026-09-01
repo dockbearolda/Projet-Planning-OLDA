@@ -1,3 +1,9 @@
+> ⚠ **DOCUMENT HISTORIQUE.** Écrit avant le 01/09/2026 et jamais relu depuis.
+> Il cite des fichiers qui n'existent plus (`public/projet.js`, `public/commande.js`,
+> `public/guide.js`), des tables retirées (`production_sectors`) ou des décisions
+> annulées depuis. Il dit ce qu'on a pensé ce jour-là, pas ce que le code fait
+> aujourd'hui : pour ça, `ARCHITECTURE.md` et `README.md` font foi.
+
 # Facture PDF + envoi WhatsApp en un clic — Design
 
 **Date :** 2026-07-24

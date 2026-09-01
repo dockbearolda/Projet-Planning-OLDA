@@ -1,11 +1,38 @@
 # ARCHITECTURE — Planning OLDA
 
 Audit du **01/09/2026** sur `main` (commit `e9aef62`, PR #190 incluse).
-Constat seul : **rien n'a été supprimé**. Méthode : lecture du code et
-recoupements automatiques — routes du serveur ↔ appels réseau des écrans,
-`export` ↔ `import`, classes CSS ↔ HTML/JS, colonnes ↔ requêtes SQL, liste de
-précache du service worker ↔ fichiers présents. La suite de tests a été
-exécutée sur ce commit : **107 fichiers, tous verts** (`npm test`, sortie 0).
+Méthode : lecture du code et recoupements automatiques — routes du serveur ↔
+appels réseau des écrans, `export` ↔ `import`, classes CSS ↔ HTML/JS, colonnes ↔
+requêtes SQL, liste de précache du service worker ↔ fichiers présents. La suite
+de tests a été exécutée sur ce commit : **107 fichiers, tous verts**.
+
+> ## Ce que le nettoyage a changé depuis le constat
+>
+> Les parties 1 à 4 décrivent l'état **avant** nettoyage. Le premier lot du plan
+> (partie 5) a été exécuté le 01/09 : voir le commit
+> « le code mort part, et l'appel à l'API n'existe plus qu'une fois ».
+> **Trois choses que l'audit avait mal jugées**, corrigées après vérification :
+>
+> 1. **`POST /api/projets` ne part pas.** Il porte le SEUL chiffrage serveur de
+>    la grille tasse — le comptoir, lui, envoie un montant déjà calculé à
+>    l'écran. C'est par cette route que `test/tarifs-tasse.test.js` prouve
+>    qu'une tasse sort à 16, 14 et 22 €, et qu'un logo client sur l'autre face
+>    vaut +6 €. On ne retire pas le seul endroit qui prouve qu'un prix est
+>    juste. `catalog.json` reste pour la même raison. La ligne 12 du plan est
+>    donc **annulée** : le vrai chantier n'est pas « supprimer », c'est « sortir
+>    ce calcul dans un module à lui », et ça touche au chiffrage.
+> 2. **Les routes qui lisent un historique qu'on écrit restent** (journal d'un
+>    dossier, versions d'un PDF). Les retirer rendrait des données inaccessibles
+>    sans cesser de les écrire. La ligne 11 du plan est réduite en conséquence.
+> 3. **`editSelectedClient` n'était pas simplement morte** : l'écran de vente en
+>    déclarait une version en haut et la redéfinissait en bas, et le bouton
+>    appelle la seconde. La sonde ne voyait pas `window.<nom> =`. La déclaration
+>    morte est partie, et le test qui l'épinglait suit désormais la version
+>    vivante — il gardait une fausse sécurité.
+>
+> **Les migrations de retrait restent utiles** : sur la base de production,
+> `statuses`, `production_sectors` et la colonne `requests.status` existent
+> encore. La ligne 16 du plan attend qu'elles aient disparu.
 
 | Repère | Valeur |
 |---|---|
@@ -246,7 +273,21 @@ Attention avant tout retrait d'`export` : plusieurs tests lisent le **source** e
 
 ### 4.4 Tables et colonnes inutilisées
 
-À vérifier sur la base réelle **avant** tout `DROP` (un `SELECT count(*)` par colonne) : le code ne les écrit pas, la prod peut en porter quand même.
+**Mesuré sur la base de production le 01/09** (lecture seule, aucun écrit). La base porte 205 dossiers, dont 202 vivants.
+
+| Ce qu'on soupçonnait | Ce que la prod dit |
+|---|---|
+| `projects` jamais alimentée | **6 lignes** — la migration des lots en a créé, elles existent |
+| `tasks` | 0 ligne |
+| `attachment_versions` | 0 ligne |
+| `requests.provenance` / `date_prevue` / `retrait_creneau` | 0 valeur non nulle sur 205 |
+| `projects.action` | 0 |
+| `tasks.qte_prevue` | 0 |
+| `users.derniere_connexion` | 0 sur 4 comptes |
+| `statuses`, `production_sectors`, colonne `requests.status` | **existent encore** : les migrations de retrait servent toujours |
+| tables de stock | aucune, elles sont bien parties |
+
+Autrement dit : les colonnes soupçonnées sont **vides pour de bon**, mais `projects` porte six lignes réelles — c'est une fonctionnalité à moitié construite avec des données dedans, pas un reliquat.
 
 - Table `projects` (`schema.sql`) : 7 références SQL, toutes dans les routes sans écran (4.1) et dans la migration `migrerLotsEnProjets` ([db.js:3086](db.js:3086)), qui a pu créer des lignes en prod.
 - Table `attachment_versions` : remplie à chaque remplacement de PDF (`archiverVersion`), lue par deux routes sans écran.
@@ -276,6 +317,17 @@ Vérifiés sains : la précache de `sw.js` (48 entrées, toutes présentes ; `bu
 ## PARTIE 5 — Plan de nettoyage
 
 Dans l'ordre : ce qui part sans discussion, puis ce qui demande d'adapter des tests ou de regarder la prod, enfin ce qui engage une décision du patron ou des données.
+
+### ✅ Fait le 01/09 (lot 1) — lignes 1 à 9, plus 10, 13, 14 et 15
+
+Commit « le code mort part, et l’appel à l’API n’existe plus qu’une fois » :
+deux fichiers orphelins, six fonctions, le script du barème, 45 règles CSS,
+47 `export` superflus, deux routes sans consommateur, trois `require` en
+double, l’appel à l’API mis en commun (le devis flash gagne son délai et sa
+signature), le taux de TGCA du bon de commande devenu un réglage, le miroir des
+modes de paiement tenu par un test, le README remis à jour et les 17 documents
+de `docs/superpowers/` coiffés d’un bandeau « historique ».
+**139 tests verts**, cinq écrans vérifiés au navigateur, une écriture testée.
 
 ### Risque faible — supprimer sans discussion
 
