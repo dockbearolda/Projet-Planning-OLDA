@@ -71,14 +71,16 @@ const PROD_FAITS = [
   {
     key: 'prod_tailles',
     label: 'Tailles',
-    // LE TOTAL EN TÊTE : c'est la quantité de la commande, et c'est aussi la
-    // somme qu'on vérifie d'un coup d'œil. Puis le NOMBRE avant la taille —
-    // « 3 × S » — comme aux trois autres endroits qui les écrivent.
-    lire: (p, r) => {
-      const cases = (p.tailles || []).map((x) => `${x.n} × ${x.t}`).join(' · ');
-      const q = r && r.quantity != null ? `${r.quantity} pièce${r.quantity > 1 ? 's' : ''}` : '';
-      return joindre([morceau(q, true), morceau(cases)], ' : ');
-    },
+    // LE TOTAL A QUITTÉ CETTE RANGÉE (01/09/2026) — il est passé DANS LE TITRE
+    // de la ligne, « 24 × T-shirt col rond » (voir nomArticle plus bas). Il
+    // s'écrivait ici « 24 pièces : 6 × S · 10 × M », en graisse forte, à trois
+    // centimètres d'un titre qui portait déjà le même 24 en graisse forte : la
+    // carte disait deux fois la même chose. Même règle, et même précédent, que
+    // la référence juste au-dessus — elle ne s'écrit pas non plus quand la
+    // désignation la porte déjà.
+    // Reste ce que le titre ne peut PAS dire : la répartition, nombre d'abord
+    // — « 3 × S » — comme aux trois autres endroits qui l'écrivent.
+    lire: (p) => morceau((p.tailles || []).map((x) => `${x.n} × ${x.t}`).join(' · ')),
   },
   {
     key: 'prod_logos',
@@ -99,6 +101,44 @@ const PROD_FAITS = [
     },
   },
 ];
+
+// LE TITRE DE LA LIGNE : COMBIEN, ET DE QUOI (01/09/2026)
+// ---------------------------------------------------------------------------
+// « Chaque ligne dit ce qu'il y a à produire, avec sa quantité. » L'article
+// était sur la ligne depuis le 27/08 (`product`, la donnée la mieux remplie de
+// la base : 186 dossiers de production sur 187) ; la quantité, elle, n'avait
+// de colonne nulle part et ne se lisait que dans le bloc de production, une
+// case du rail « Colonnes » que personne n'allume — et seulement sur les
+// dossiers nés au comptoir, qui portent une `fiche.prod`. Sur un planning
+// d'atelier, « T-shirt col rond NS300 » sans son nombre ne dit pas le travail.
+//
+// ELLE S'ÉCRIT DEVANT, ET COLLÉE : « 24 × T-shirt col rond ». C'est la
+// grammaire de la maison — le nombre avant ce qu'il compte, au signe multiplié
+// — celle des tailles (« 3 × S ») et celle du besoin dans la fiche depuis le
+// 24/08. Un rail de colonne à elle coûterait 46 px de largeur sur toutes les
+// lignes pour un nombre à deux chiffres.
+//
+// SEUL LE NOMBRE PORTE LA GRAISSE, avec la classe des quatre faits de
+// production : c'est lui qu'on cherche du regard, la désignation l'entoure.
+// LE MÊME COMPOSANT POUR LES DEUX VUES — la cellule « Article » du tableau et
+// le titre de la carte. Écrit deux fois, il divergeait au premier changement.
+export function nomArticle(r, hote) {
+  const q = r && r.quantity != null && Number.isFinite(Number(r.quantity)) && Number(r.quantity) > 0
+    ? Number(r.quantity)
+    : null;
+  const nom = String((r && r.product) || '');
+  hote.replaceChildren();
+  if (q !== null) {
+    const fort = document.createElement('span');
+    fort.className = 'prod-fiche__fort';
+    // L'ESPACE EST INSÉCABLE : « 24 × » ne se coupe pas entre le nombre et son
+    // signe, et le signe ne se retrouve pas seul devant la désignation.
+    fort.textContent = `${q}\u00a0×\u00a0`;
+    hote.appendChild(fort);
+  }
+  if (nom) hote.append(nom);
+  return { q, nom, texte: q === null ? nom : `${q} × ${nom}` };
+}
 
 // ===========================================================================
 // LE FEU : CE QUI MANQUE AVANT DE PRODUIRE
