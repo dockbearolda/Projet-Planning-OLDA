@@ -178,6 +178,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* LE NUMÉRO DU CLIENT, à côté du nom. Ce n'est pas un état : aucune couleur ne
+   le dit — il prend l'encre secondaire, la même que le sous-titre et l'heure de
+   la même carte, et la SEULE taille de texte que la carte connaît. Un jeton sur
+   une ligne prend l'interligne serré, comme la puce Nature juste à côté. */
+.cl-card__code {
+  flex-shrink: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
+  color: var(--text-2);
+  /* Chiffres de même chasse : quatre numéros empilés s'alignent au chiffre. */
+  font-variant-numeric: tabular-nums;
+}
+
 /* Puce NATURE (pro/perso) — mêmes teintes que le tag pro/perso du planning. */
 .cl-nature {
   flex-shrink: 0;
