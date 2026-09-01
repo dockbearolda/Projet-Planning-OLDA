@@ -418,9 +418,55 @@ assert.ok(/genre: ligne\.textile\.genre/.test(ECRAN),
 // rangée, à côté de la quantité.
 assert.ok(/MARQUAGE_AUCUN = 'Aucun'/.test(ECRAN),
   'le marquage par défaut ne se devine pas');
-assert.ok(/estTextile\s*\?\s*menu\(/.test(ECRAN),
-  'sur un textile le marquage est un MENU : « coeur+dos » tapé à la main ne serait '
-  + 'plus un emplacement du moteur, et la ligne sortirait au prix du vêtement nu');
+assert.ok(/const ID_MARQUAGES = 'dvf-marquages';/.test(ECRAN)
+  && /function poserMarquages\(champMarq\)/.test(ECRAN),
+  'sur un textile le marquage propose les emplacements du moteur : « coeur+dos » tapé '
+  + 'à la main ne serait plus un emplacement, et la ligne sortirait au prix du vêtement nu');
+// … et il devient une liste SANS changer de forme : le composant HABILLE le
+// champ, il ne le remplace pas. Rien ne bouge sous les doigts (loi 9), et une
+// ligne qui n'est pas un textile garde un champ ordinaire — pas un menu vide.
+assert.ok(/champMarq\.setAttribute\('list', ID_MARQUAGES\);\s*\n\s*menuPoser\(champMarq\);/.test(ECRAN),
+  'le champ de marquage se fait habiller, il ne se fait pas remplacer');
+
+// ---------------------------------------------------------------------------
+// 3 quater. LE PRODUIT SE CHOISIT DANS LA LIGNE, ET LA RECHERCHE EST OBLIGATOIRE
+// ---------------------------------------------------------------------------
+// Charlie, 01/09, en désignant la Désignation d'un article : « y'a un gros
+// problème pour bien sélectionner le produit ; ya 2 parties dans mon
+// entreprise, Textiles et le reste ; dans le menu déroulant je veux pouvoir
+// switch entre les 2 familles ; ce input doit avoir OBLIGATOIREMENT une
+// fonction recherche COMME TOUS LES INPUTS avec un menu déroulant. »
+//
+// La barre portait une liste de 130 entrées SANS recherche, posée ailleurs que
+// dans la ligne : il fallait descendre à la molette pour trouver un t-shirt.
+assert.ok(!/dvf-catalogue/.test(ECRAN),
+  'la liste « Ajouter un article du catalogue » de la barre est partie : un endroit de moins');
+assert.ok(/import \{[^}]*\bmenuPoser\b[^}]*\} from '\.\/menu-recherche\.js';/.test(ECRAN),
+  'le devis prend LE menu du comptoir, pas un qui lui ressemble');
+assert.ok(/design\.setAttribute\('list', ID_PRODUITS\);/.test(ECRAN)
+  && /menuPoser\(design\);/.test(ECRAN),
+  'la désignation est le champ où le produit se cherche');
+// LES DEUX MÉTIERS DE LA MAISON, et le composant sait les basculer.
+assert.ok(/o\.dataset\.onglet = p\.famille === FAMILLE_TEXTILE \? 'Textile' : 'Boutique';/.test(ECRAN),
+  'chaque produit dit de quel métier il est');
+{
+  const MENU_JS = lire('public/menu-recherche.js');
+  assert.ok(/function menuOngletsDe\(etat\)/.test(MENU_JS)
+    && /onglets\.className='menu-onglets';/.test(MENU_JS),
+    'le composant porte la rangée des deux métiers');
+  assert.ok(/return vus\.length>1\?vus:\[\];/.test(MENU_JS),
+    'moins de deux métiers : pas de rangée — un seul bouton est un bouton qui ne fait rien');
+  assert.ok(/if\(!etat\.onglet\)return liste;\s*\n\s*return liste\.filter\(o=>!o\.onglet\|\|o\.onglet===etat\.onglet\);/.test(MENU_JS),
+    'une option sans métier traverse : le choix vide appartient aux deux');
+  // ⚠ UNE IMPASSE SE DIT. Chercher « NS300 » depuis « Boutique » ne rendait
+  // RIEN, alors que la réponse était à un clic.
+  assert.ok(/b\.className='menu-ailleurs-lien';/.test(MENU_JS),
+    'ce qui est de l’autre côté se dit, et se franchit d’un clic');
+  // … mais on ne bascule pas tout seul : un menu qui change de métier sous les
+  // doigts est pire que le trou qu'il comble.
+  assert.ok(!/etat\.onglet=nom;etat\.vise=0;menuPeindre\(etat\);\s*\n\s*\}\);\s*\n\s*\/\* auto/.test(MENU_JS),
+    'la bascule reste un geste, jamais un effet de bord');
+}
 
 // LE PRIX SUIT LA QUANTITÉ, PARCE QUE LE COEFFICIENT EST DÉGRESSIF. Dix
 // t-shirts et cent t-shirts n'ont pas le même prix à la pièce.

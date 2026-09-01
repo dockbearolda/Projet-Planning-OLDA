@@ -38,6 +38,11 @@ import {
 // L'AIDE D'UNE CARTE SE DEMANDE (01/09) : le « i » a cote du titre, et la meme
 // fabrique que les Reglages — la carte est la leur, la bulle doit l'etre aussi.
 import { poserAide } from './aide-bulle.js';
+// LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
+// 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
+// TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
+// qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
+import { menuPoser, menuRafraichir, menuOuvrirDe, poserStyleMenu } from './menu-recherche.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -194,6 +199,8 @@ export async function initDevisFlash(root) {
   ROOT = root;
   root.classList.add('devis-flash');
   poserStyleDevis();
+  // La feuille du composant de menu part avec lui, et une seule fois.
+  poserStyleMenu();
   relireBrouillon();
   batir();
   // Les quatre réglages que l'écran lit. Aucun n'est bloquant : un devis se
@@ -473,72 +480,87 @@ function carteProjet() {
 // ===========================================================================
 function carteArticles() {
   const c = carte('local_grocery_store', 'Articles',
-    'Pioche dans le catalogue produits, ou saisis une ligne libre. Les prix sont HT : '
-    + 'le devis est le seul document de la maison qui les affiche ainsi. Un prix de '
-    + 'catalogue, lui, est TTC : il est converti en HT au taux en vigueur, et reste '
-    + 'modifiable ligne par ligne.');
+    'Le produit se cherche dans la DÉSIGNATION de la ligne : on tape, la liste '
+    + 'filtre, et les deux métiers de la maison — Textile et Boutique — se '
+    + 'basculent en haut du menu. Rien n’oblige à choisir : une désignation '
+    + 'écrite à la main reste une ligne valable. Les prix affichés sont HT — le '
+    + 'devis est le seul document de la maison qui les montre ainsi ; un prix de '
+    + 'catalogue, lui, est TTC, et il est converti au taux en vigueur.');
 
   const liste = el('div', 'dvf-liste');
   liste.id = 'dvf-liste';
   c.append(liste);
 
+  // LA LISTE DES PRODUITS EST POSÉE UNE FOIS POUR TOUT L'ÉCRAN. Chaque rangée
+  // la vise par son `list=` : un <datalist> par article, c'est cent trente
+  // options recopiées autant de fois qu'il y a de lignes au devis.
+  const produits = el('datalist');
+  produits.id = ID_PRODUITS;
+  c.append(produits);
+
+  // ⚠ LE CHOIX DU PRODUIT A QUITTÉ CETTE BARRE (01/09). Elle portait une liste
+  // déroulante « Ajouter un article du catalogue » — cent trente entrées sans
+  // recherche, où il fallait descendre à la molette pour trouver un t-shirt.
+  // « Y'a un gros problème pour bien sélectionner le produit » (Charlie). Le
+  // choix se fait maintenant DANS la ligne, là où le nom du produit s'écrit :
+  // un endroit de moins, et celui qui reste est celui qu'on regarde.
   const barre = el('div', 'reg-actions');
-  const depuis = el('select', 'reg-tarif-input reg-tarif-input--nom');
-  depuis.id = 'dvf-catalogue';
-  depuis.setAttribute('aria-label', 'Ajouter un article du catalogue');
-  const bLibre = el('button', 'reg-btn', 'Ligne libre');
-  bLibre.type = 'button';
+  const bLigne = el('button', 'reg-btn reg-btn--primary', 'Ajouter un article');
+  bLigne.type = 'button';
+  bLigne.id = 'dvf-ajouter';
   const bTransport = el('button', 'reg-btn', 'Transport');
   bTransport.type = 'button';
   bTransport.id = 'dvf-transport';
-  barre.append(depuis, bLibre, bTransport);
+  barre.append(bLigne, bTransport);
   c.append(barre);
 
   const aide = el('p', 'dvf-aide');
   aide.id = 'dvf-aide-cat';
   c.append(aide);
 
-  depuis.addEventListener('change', () => {
-    const i = Number(depuis.value);
-    if (Number.isInteger(i) && catalogue[i]) ajouterDuCatalogue(catalogue[i]);
-    depuis.value = '';
-  });
-  bLibre.addEventListener('click', () => ajouterLigne({}));
+  bLigne.addEventListener('click', () => ajouterLigne({}));
   bTransport.addEventListener('click', ajouterTransport);
   return c;
 }
 
+// LE NOM D'UN PRODUIT, tel qu'il s'écrit dans la ligne et sur le devis. Une
+// seule fabrique : c'est cette chaîne qui sert de CLÉ pour retrouver le produit
+// quand la vendeuse en choisit un, et deux écritures qui divergent d'un tiret
+// feraient un choix qui ne retrouve rien.
+function nomProduit(p) {
+  return [p.label || p.designation, p.variante].filter(Boolean).join(' — ');
+}
+
 function remplirCatalogue() {
-  const sel = $('#dvf-catalogue');
+  const listeProduits = document.getElementById(ID_PRODUITS);
   const aide = $('#dvf-aide-cat');
-  if (!sel) return;
-  sel.replaceChildren();
-  const vide = el('option', null,
-    catalogue.length ? 'Ajouter un article du catalogue…' : 'Catalogue injoignable — passe par « Ligne libre »');
-  vide.value = '';
-  sel.append(vide);
-  // RANGÉ PAR RAYON. Le catalogue porte 130 lignes depuis que le textile l'a
-  // rejoint : à plat, on descend une liste de 130 entrées pour trouver un
-  // t-shirt. Les rayons sont ceux de la base, dans SON ordre — celui que le
-  // patron range depuis les réglages.
-  let rayon = null;
-  let groupe = null;
-  catalogue.forEach((p, i) => {
-    if (p.famille !== rayon) {
-      rayon = p.famille;
-      groupe = el('optgroup');
-      groupe.label = rayon;
-      sel.append(groupe);
-    }
-    // LA RÉFÉRENCE EST DANS L'INTITULÉ quand il y en a une : le patron et le
-    // client parlent en « NS300 », pas en « T-shirt unisexe bio léger ».
-    const bouts = [[p.label || p.designation, p.variante].filter(Boolean).join(' — ')];
-    if (p.reference) bouts.push(p.reference);
-    if (p.prixVenteTtc != null) bouts.push(`${euro(p.prixVenteTtc)} TTC`);
-    const o = el('option', null, bouts.join(' · '));
-    o.value = String(i);
-    (groupe || sel).append(o);
-  });
+  if (!listeProduits) return;
+  parNom.clear();
+  const frag = document.createDocumentFragment();
+  for (const p of catalogue) {
+    const nom = nomProduit(p);
+    if (!nom || parNom.has(nom)) continue;
+    parNom.set(nom, p);
+    const o = el('option');
+    o.value = nom;
+    // CE QUE LE COMPOSANT SAIT FAIRE D'UNE OPTION : `data-ref` se pose en JETON
+    // en tête de ligne, `data-cherche` se cherche SANS s'afficher, `data-onglet`
+    // range l'option dans l'un des deux métiers de la maison.
+    if (p.reference) o.dataset.ref = p.reference;
+    o.dataset.cherche = [p.famille, p.reference || '', p.designation, p.variante || '',
+      p.prixVenteTtc != null ? String(p.prixVenteTtc) : ''].filter(Boolean).join(' ');
+    o.dataset.onglet = p.famille === FAMILLE_TEXTILE ? 'Textile' : 'Boutique';
+    frag.append(o);
+  }
+  listeProduits.replaceChildren(frag);
+  // Les menus déjà posés voient la nouvelle liste : le catalogue arrive APRÈS
+  // l'écran, et une rangée ouverte entre-temps resterait sur une liste vide.
+  // ⚠ UN CHAMP DÉJÀ HABILLÉ N'A PLUS D'ATTRIBUT `list` : le composant le
+  // débranche (sinon Chrome ouvre SA liste par-dessus la nôtre) et en retient
+  // le nom dans `data-menu-liste`. Chercher sur `list=` seul ne trouvait donc
+  // que les rangées posées à l'instant.
+  for (const n of ROOT.querySelectorAll(
+    `input[list="${ID_PRODUITS}"], input[data-menu-liste="${ID_PRODUITS}"]`)) menuRafraichir(n);
   if (!aide) return;
   const tarifes = catalogue.filter((p) => p.prixVenteTtc != null).length;
   // L'ÉCRAN DIT CE QU'IL SAIT. Un catalogue sans prix n'est pas une panne :
@@ -584,6 +606,12 @@ function remplirCatalogue() {
 // qui se chiffre, `catalogue.js` pour l'écarter du menu du comptoir (elle y a
 // son propre parcours, celui qui sait faire le prix), et `db.js` pour la semer.
 const FAMILLE_TEXTILE = 'Textile';
+// LA LISTE DES PRODUITS, POSÉE UNE FOIS POUR TOUT L'ÉCRAN, et le chemin inverse
+// — du nom écrit dans la ligne au produit du catalogue. C'est ce qui permet à
+// une désignation TAPÉE à la main de valoir un choix : si elle tombe juste, la
+// ligne gagne sa référence et son prix.
+const ID_PRODUITS = 'dvf-produits';
+const parNom = new Map();
 const CHEMIN_MOTEUR = '/comptoir/textile-catalog.js';
 let moteurEnRoute = null;
 function moteurTextile() {
@@ -631,31 +659,39 @@ function majPrixLigne(ligne) {
   if (maj) maj();
 }
 
-// LE MENU DES MARQUAGES ARRIVE APRÈS LA RANGÉE. Le moteur pèse 78 Ko et se
-// charge à la demande : la rangée se pose tout de suite avec le marquage
-// courant pour seule entrée, et les treize emplacements du fichier V9 la
-// remplacent dès qu'il est là. Rien ne bouge entre-temps — c'est le même menu,
-// à la même place, avec la même valeur choisie.
-function remplirMarquages(sel, ligne) {
+// LE MARQUAGE DEVIENT UNE LISTE LE JOUR OÙ LA LIGNE DEVIENT UN TEXTILE.
+// ===========================================================================
+// Il décide du prix : « coeur+dos » tapé à la main n'est plus un emplacement
+// pour le moteur, il vaut zéro mètre de DTF, et la ligne sort au prix du
+// vêtement nu. Les treize emplacements du fichier V9 sont donc proposés.
+//
+// LE CHAMP NE CHANGE PAS DE FORME POUR AUTANT. Il reste l'input qu'il était,
+// à la même place, avec la même valeur : le composant l'HABILLE, il ne le
+// remplace pas. Rien ne bouge sous les doigts (loi 9) — et une ligne qui n'est
+// pas un textile garde un champ de texte ordinaire, sans menu vide à ouvrir.
+const ID_MARQUAGES = 'dvf-marquages';
+function poserMarquages(champMarq) {
+  if (!champMarq || champMarq.dataset.menuListe === ID_MARQUAGES) return;
   moteurTextile().then((TE) => {
     const noms = Object.keys(TE.DB.printTypes || {});
     if (!noms.length) return;
-    const choisi = ligne.marquage || MARQUAGE_AUCUN;
-    sel.replaceChildren();
-    for (const nom of noms) {
-      const o = el('option', null, nom);
-      o.value = nom;
-      sel.append(o);
+    let liste = document.getElementById(ID_MARQUAGES);
+    if (!liste) {
+      liste = el('datalist');
+      liste.id = ID_MARQUAGES;
+      ROOT.append(liste);
     }
-    // Un marquage qui ne serait plus au catalogue du moteur reste à l'écran
-    // plutôt que de disparaître en silence : c'est celui du devis en cours.
-    if (!noms.includes(choisi)) {
-      const o = el('option', null, choisi);
-      o.value = choisi;
-      sel.append(o);
+    if (!liste.options.length) {
+      for (const nom of noms) {
+        const o = el('option');
+        o.value = nom;
+        liste.append(o);
+      }
     }
-    sel.value = choisi;
-  }).catch(() => { /* moteur injoignable : le menu garde son unique entrée */ });
+    if (champMarq.dataset.menuListe === ID_MARQUAGES) return;
+    champMarq.setAttribute('list', ID_MARQUAGES);
+    menuPoser(champMarq);
+  }).catch(() => { /* moteur injoignable : le champ reste une saisie libre */ });
 }
 
 // Le prix d'une ligne textile, par le moteur du patron. Rend `null` si le
@@ -689,44 +725,42 @@ async function chiffrerTextile(ligne) {
   return ligne.unitaireHt;
 }
 
-function ajouterDuCatalogue(p) {
-  // UN T-SHIRT PART SANS PRIX ET LE MOTEUR LE POSE. Il n'a pas de prix de rayon
-  // (`prixVenteTtc` est nul en base, et c'est voulu) : le chiffrage arrive juste
-  // après, sur la quantité et le marquage de la ligne.
-  if (p.famille === FAMILLE_TEXTILE) return ajouterTextile(p);
+// CHOISIR UN PRODUIT SUR UNE LIGNE QUI EXISTE DÉJÀ. C'est le seul chemin depuis
+// le 01/09 : la liste « Ajouter un article du catalogue » de la barre est
+// partie, le choix se fait dans la DÉSIGNATION de la ligne.
+//
+// Il vaut aussi pour une désignation TAPÉE : si elle tombe exactement sur un
+// produit du catalogue, la ligne gagne sa référence et son prix. Taper le nom
+// exact d'un produit, c'est le désigner.
+function choisirProduit(ligne, nom, apres) {
+  const p = parNom.get(String(nom || '').trim());
+  if (!p) return false;
+  ligne.reference = p.reference || '';
+  if (p.couleur) ligne.couleur = p.couleur;
+  if (p.famille === FAMILLE_TEXTILE) {
+    // UN T-SHIRT N'A PAS DE PRIX DE RAYON, il se CHIFFRE : quantité, marquage
+    // et genre. `note` porte le genre du moteur — c'est lui qui choisit la
+    // table des temps ; introuvable, il vaudrait zéro mètre de DTF, donc un
+    // marquage facturé 2,30 € au lieu de 9,90 €.
+    ligne.textile = { ref: p.reference || '', genre: p.note || '' };
+    if (!ligne.marquage) ligne.marquage = MARQUAGE_AUCUN;
+    chiffrerTextile(ligne).then(() => { if (apres) apres(); redessiner(); });
+    return true;
+  }
+  ligne.textile = null;
   // UN PRIX DE CATALOGUE EST TTC (c'est le prix de rayon). Le devis compte en
-  // HT : la conversion se fait ici, au taux du moment, et le montant reste
-  // modifiable — le prix affiché sur le devis engage la maison, pas le rayon.
-  const ht = p.prixVenteTtc != null && saisie.tauxTgca
-    ? Math.round((Number(p.prixVenteTtc) / (1 + saisie.tauxTgca)) * 100) / 100
-    : (p.prixVenteTtc != null ? Number(p.prixVenteTtc) : 0);
-  ajouterLigne({
-    designation: [p.label || p.designation, p.variante].filter(Boolean).join(' — '),
-    reference: p.reference || '',
-    couleur: p.couleur || '',
-    quantite: 1,
-    unitaireHt: ht,
-  });
-}
-
-function ajouterTextile(p) {
-  ajouterLigne({
-    designation: p.label || p.designation,
-    reference: p.reference || '',
-    quantite: 1,
-    unitaireHt: 0,
-    marquage: MARQUAGE_AUCUN,
-    // `note` porte le genre du moteur (« Unisexe », « Tote Bag ») : c'est lui
-    // qui choisit la table des temps de marquage. Introuvable, il vaudrait zéro
-    // mètre de DTF — donc un marquage facturé 2,30 € au lieu de 9,90 €.
-    textile: { ref: p.reference || '', genre: p.note || '' },
-  });
-  const ligne = saisie.lignes[saisie.lignes.length - 1];
-  chiffrerTextile(ligne).then((prix) => {
-    if (prix == null) return;
-    majPrixLigne(ligne);
-    redessiner();
-  });
+  // HT : la conversion se fait ici, au taux du moment.
+  //
+  // ⚠ ET IL NE REMPLACE PAS UN PRIX DÉJÀ POSÉ. On négocie devant le client :
+  // corriger la désignation d'une ligne dont on vient d'accorder le prix ne
+  // doit pas rendre la remise. C'est la même règle qu'à la vente directe.
+  if (p.prixVenteTtc != null && !ligne.unitaireHt && !ligne.puManuel) {
+    ligne.unitaireHt = saisie.tauxTgca
+      ? Math.round((Number(p.prixVenteTtc) / (1 + saisie.tauxTgca)) * 100) / 100
+      : Number(p.prixVenteTtc);
+  }
+  if (apres) apres();
+  return true;
 }
 
 function ajouterTransport() {
@@ -787,10 +821,10 @@ function poserLignes() {
 function rangeeArticle(ligne) {
   const n = Math.random().toString(36).slice(2, 8);
   const bloc = el('div', 'dvf-art');
-  // LE TYPE DE LA LIGNE EST DÉCIDÉ À SA CONSTRUCTION, une fois. Un textile
-  // porte un MENU de marquage (celui du moteur) là où une ligne libre porte un
-  // champ de texte : deux contrôles pour une case, et on ne bascule pas de
-  // l'un à l'autre sous les doigts.
+  // LA LIGNE PEUT DEVENIR UN TEXTILE APRÈS SA CONSTRUCTION — c'est le cas
+  // normal : on ajoute une ligne, PUIS on cherche son produit. Ce drapeau ne
+  // dit donc que l'état de DÉPART, celui d'un brouillon relu ; partout ailleurs
+  // c'est `ligne.textile` qui fait foi, au moment où on le lit.
   const estTextile = !!(ligne.textile && ligne.textile.ref);
 
   const tete = el('div', 'dvf-art__tete');
@@ -807,15 +841,36 @@ function rangeeArticle(ligne) {
   sup.type = 'button';
   sup.setAttribute('aria-label', 'Retirer cet article');
   sup.append(ic('delete'));
-  tete.append(nom, total, ...(estTextile ? [reprendre] : []), sup);
+  // ⚠ IL EST DANS LA RANGÉE DÈS LE DÉPART, MASQUÉ. Une ligne devient un textile
+  // quand on choisit son produit — après sa construction — et une rangée ne se
+  // reconstruit pas : elle reprendrait le curseur à qui écrit.
+  tete.append(nom, total, reprendre, sup);
   bloc.append(tete);
 
   // LA DÉSIGNATION PREND SA PROPRE LIGNE. Elle porte une phrase — « T-shirt
   // Unisexe Bio Léger Premium 155 g » — quand tout le reste porte une référence
   // ou deux chiffres. Sur la même rangée qu'eux, elle tombait à 59 px de large
   // au plus petit poste de l'atelier (mesuré à 1280 px).
-  const design = entree(`dvf-a-${n}-d`, { valeur: ligne.designation, exemple: 'T-shirt coton bio' });
+  const design = entree(`dvf-a-${n}-d`, {
+    valeur: ligne.designation,
+    exemple: 'Cherche un produit, ou écris la désignation',
+  });
+  // ⚠ C'EST ICI QUE LE PRODUIT SE CHOISIT (01/09). « Y'a un gros problème pour
+  // bien sélectionner le produit » (Charlie) : il fallait descendre une liste
+  // de cent trente entrées, sans recherche, posée ailleurs que dans la ligne.
+  // Le champ vise la liste partagée de l'écran et se fait habiller par LE menu
+  // du comptoir — celui des deux autres écrans, pas un qui lui ressemble. Il
+  // reste un champ LIBRE : une désignation écrite à la main est une ligne
+  // valable, et c'est ce qui rend la « ligne libre » inutile en tant que bouton.
+  design.setAttribute('list', ID_PRODUITS);
+  design.dataset.menuFiltre = 'Cherche : NS300, tasse, magnet…';
+  // PAS DE « + AJOUTER » SUR CE CHAMP-LÀ. Le composant le propose pour saisir
+  // une valeur hors liste — mais ici le champ EST libre : le bouton ouvrait une
+  // seconde zone de frappe pour faire ce qu'on fait déjà en tapant, et il
+  // poussait la rangée des deux métiers d'un cran vers le bas.
+  design.dataset.menuManuelNon = '';
   bloc.append(champ('Désignation', design));
+  menuPoser(design);
 
   const rA = el('div', 'dvf-r3');
   const refe = entree(`dvf-a-${n}-r`, { valeur: ligne.reference, exemple: 'NS300' });
@@ -836,11 +891,8 @@ function rangeeArticle(ligne) {
   // une phrase libre. Le marquage décide du prix : « Coeur + Dos » tapé
   // « coeur+dos » ne serait plus le même emplacement pour le moteur, il vaudrait
   // zéro mètre de DTF, et la ligne sortirait au prix du vêtement nu.
-  const marq = estTextile
-    ? menu(`dvf-a-${n}-m`, [{ id: ligne.marquage || MARQUAGE_AUCUN, label: ligne.marquage || MARQUAGE_AUCUN }],
-      ligne.marquage || MARQUAGE_AUCUN)
-    : entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
-  if (estTextile) remplirMarquages(marq, ligne);
+  const marq = entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
+  marq.id = `dvf-a-${n}-m`;
   r3.append(champ('Couleur', coul), champ('Tailles', tail), champ('Marquage', marq));
   bloc.append(r3);
 
@@ -852,7 +904,7 @@ function rangeeArticle(ligne) {
     nom.textContent = vide ? 'Article sans désignation' : ligne.designation;
     nom.classList.toggle('dvf-art__vide', vide);
     total.textContent = euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
-    reprendre.hidden = !(estTextile && ligne.puManuel);
+    reprendre.hidden = !(ligne.textile && ligne.puManuel);
   };
   // LE PRIX QUE LE MOTEUR VIENT DE POSER REDESCEND DANS LE CHAMP. C'est la
   // seule case que l'écran écrit lui-même : partout ailleurs la saisie va vers
@@ -875,18 +927,54 @@ function rangeeArticle(ligne) {
     });
   };
 
-  for (const [n2, cle] of [[design, 'designation'], [refe, 'reference'], [coul, 'couleur'],
+  for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'],
     [tail, 'tailles'], [note, 'note']]) {
     n2.addEventListener('input', () => { ligne[cle] = n2.value; rafraichirTete(); redessiner(); });
   }
-  // Le marquage : une frappe sur une ligne libre, un choix sur un textile — et
-  // dans ce cas le prix suit.
-  marq.addEventListener(estTextile ? 'change' : 'input', () => {
+
+  // LA DÉSIGNATION ÉCRIT, ET ELLE CHOISIT. La frappe pose le texte tel quel —
+  // une ligne libre reste une ligne valable. `change` arrive quand on choisit
+  // dans la liste (le composant le lève) ou quand on quitte le champ : si le
+  // texte tombe exactement sur un produit, la ligne prend sa référence, son
+  // prix ou son chiffrage. Taper le nom exact d'un produit, c'est le désigner.
+  const surDesignation = () => {
+    ligne.designation = design.value;
+    rafraichirTete();
+    redessiner();
+  };
+  design.addEventListener('input', surDesignation);
+  design.addEventListener('change', () => {
+    ligne.designation = design.value;
+    const etaitTextile = !!ligne.textile;
+    choisirProduit(ligne, design.value, () => {
+      refe.value = ligne.reference;
+      coul.value = ligne.couleur;
+      majPu();
+      rafraichirTete();
+    });
+    // La liste des marquages n'arrive QUE sur un textile, et une seule fois.
+    if (ligne.textile && !etaitTextile) poserMarquages(marq);
+    // LA CASE DIT CE QUE LA LIGNE PORTE. `choisirProduit` pose « Aucun » sur un
+    // textile qui n'a pas encore de marquage — sans cette ligne, le champ
+    // restait VIDE pendant que le prix était bien celui d'un vêtement nu : deux
+    // choses qui se contredisent à l'écran, et le devis part avec un marquage
+    // qu'on croit avoir oublié de choisir.
+    if (ligne.textile) marq.value = ligne.marquage || '';
+    rafraichirTete();
+    redessiner();
+  });
+  // LE MARQUAGE : une frappe, ou un choix dans la liste. Les deux évènements,
+  // parce que le composant annonce un choix par `change` et la frappe par
+  // `input` — écouter l'un des deux seulement, c'est perdre la moitié des
+  // saisies.
+  const surMarquage = () => {
     ligne.marquage = marq.value;
     rafraichirTete();
     redessiner();
-    if (estTextile) recalculer();
-  });
+    if (ligne.textile) recalculer();
+  };
+  marq.addEventListener('input', surMarquage);
+  marq.addEventListener('change', surMarquage);
   qte.addEventListener('input', () => {
     ligne.quantite = Math.max(0, Number(qte.value) || 0);
     rafraichirTete();
@@ -895,14 +983,14 @@ function rangeeArticle(ligne) {
     // même prix à la pièce. Le prix suit donc la quantité, sinon il faudrait le
     // savoir et le refaire à la main — c'est exactement ce qu'on vient
     // d'enlever.
-    if (estTextile) recalculer();
+    if (ligne.textile) recalculer();
   });
   pu.addEventListener('input', () => {
     ligne.unitaireHt = Math.max(0, Number(pu.value) || 0);
     // ON REPREND LA MAIN, ET LE MOTEUR LA REND. Un prix tapé pendant une
     // négociation ne doit pas se faire écraser au prochain changement de
     // quantité ; « Recalculer » le rend au moteur quand on a fini.
-    if (estTextile) ligne.puManuel = true;
+    if (ligne.textile) ligne.puManuel = true;
     rafraichirTete();
     redessiner();
   });
@@ -919,6 +1007,10 @@ function rangeeArticle(ligne) {
     if (!saisie.lignes.length) poserLignes();
     redessiner();
   });
+
+  // Un brouillon relu porte déjà des lignes textiles : elles retrouvent leur
+  // liste de marquages sans qu'on ait à rechoisir le produit.
+  if (estTextile) poserMarquages(marq);
 
   rafraichirTete();
   return bloc;

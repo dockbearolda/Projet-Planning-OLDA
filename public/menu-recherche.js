@@ -36,7 +36,15 @@ const STYLE_MENU = `
    Deux variantes, même panneau : le menu fermé (on choisit dans la liste) et
    le menu libre (le champ reste saisissable — la vendeuse peut écrire une
    couleur qui n'est pas au catalogue). Poste PC : survol, focus, clavier. */
-.menu{position:relative}
+/* LA PEAU PREND LA PLACE DU CHAMP QU'ELLE ENVELOPPE, et le champ remplit la
+   peau. Sans ces deux lignes, une case qui donnait sa largeur a son champ la
+   donne desormais a la peau — et le champ, lui, retombe sur sa largeur
+   intrinseque (≈ 20 caracteres). Mesure au rendu le 01/09 dans le devis : une
+   designation a 218,5 px dans une case de 619. La regle vit ICI parce que
+   c'est le composant qui enveloppe : chaque ecran qui la reecrirait chez lui
+   la reecrirait de travers un jour sur deux. */
+.menu{position:relative;flex:1 1 auto;min-width:0}
+.menu>input{width:100%}
 .menu>select,.menu>datalist{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
 /* LE DÉCLENCHEUR EST UN <div> : il ÉCHAPPE au « input,select,textarea{padding:
    13px 14px!important} » que les deux écrans imposent, et se retrouvait 5 px
@@ -200,6 +208,35 @@ const STYLE_MENU = `
 .menu-option[aria-selected="true"]{border-left-color:var(--text-1);background:var(--zone-bg)}
 .menu-option[aria-selected="true"] .menu-option-texte{color:var(--text-1);font-weight:var(--graisse-forte)}
 .menu-rien{padding:22px 14px;text-align:center;color:var(--text-2);font-size:var(--taille-texte)}
+/* ---- LES DEUX METIERS DE LA MAISON ---------------------------------------
+   Charlie, 01/09 : « y'a 2 parties dans mon entreprise, Textiles et le reste ;
+   dans le menu deroulant je veux pouvoir switch entre les 2 familles ».
+   Une rangee de bascules, pas des pilules : la charte reserve la pilule a ce
+   qui ETIQUETTE, et ceci AGIT — c'est un rectangle arrondi. Chaque bouton
+   prend la boite serree de la charte, la meme que « Renommer » ou
+   « Recalculer », et ils la prennent dans UNE regle. */
+.menu-onglets{display:flex;gap:var(--pas-1);padding:10px;border-bottom:1px solid var(--border-soft);background:var(--zone-bg)}
+.menu-onglets[hidden]{display:none}
+.menu-onglet{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:var(--pas-1);
+  min-height:var(--ctrl-h-serre);padding:var(--champ-y-serre) var(--pas-2);
+  border:1px solid var(--border);border-radius:var(--arrondi-champ);
+  background:var(--surface);color:var(--text-2);
+  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-serre);font-weight:var(--graisse-note);
+  white-space:nowrap;cursor:pointer;
+  transition:color var(--dur-1) var(--ease),background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
+.menu-onglet:hover{color:var(--text-1);background:var(--surface-hover)}
+.menu-onglet.est-actif{color:var(--on-primary);background:var(--primary);border-color:var(--primary)}
+.menu-onglet-compte{font-variant-numeric:tabular-nums;opacity:.75}
+/* CE QUI EST DE L'AUTRE COTE SE DIT, ET SE FRANCHIT D'UN CLIC. Chercher
+   « NS300 » depuis « Boutique » ne rendait rien, alors que la reponse etait a
+   un clic — et l'ecran n'en disait pas un mot. */
+.menu-ailleurs{padding:0 14px 18px;text-align:center}
+.menu-ailleurs-lien{min-height:var(--ctrl-h-serre);padding:var(--champ-y-serre) var(--pas-2);
+  border:1px solid var(--border);border-radius:var(--arrondi-champ);
+  background:var(--surface);color:var(--text-1);
+  font:inherit;font-size:var(--taille-texte);line-height:var(--ligne-serre);font-weight:var(--graisse-note);
+  cursor:pointer;transition:background var(--dur-1) var(--ease)}
+.menu-ailleurs-lien:hover{background:var(--surface-hover)}
 /* L'AJOUT MANUEL — la même ligne, au même endroit, dans TOUS les menus.
    Avant, trois listes portaient leur propre « produit libre » noyé au milieu
    du catalogue, les autres n'en avaient aucun : on ne savait jamais où
@@ -336,6 +373,13 @@ function menuOption(o,groupe){
        le champ de filtre promet « nom, téléphone, e-mail » : ils restent donc
        cherchables, posés en `data-cherche` sur l'option. */
     cherche:o.dataset.cherche||'',
+    /* L'ONGLET est une famille GROSSIERE, au-dessus des groupes. Charlie,
+       01/09 : « y'a 2 parties dans mon entreprise, Textiles et le reste ; dans
+       le menu deroulant je veux pouvoir switch entre les 2 familles ». Les
+       <optgroup> disent les rayons (huit, plus le textile) ; ceci dit les
+       METIERS. Une option sans onglet se montre dans tous — c'est le cas du
+       choix vide. */
+    onglet:o.dataset.onglet||'',
     groupe,
   };
 }
@@ -452,15 +496,27 @@ function menuPoser(hote){
      « + Ajouter » puis la liste, et rien d'autre. La mention qui expliquait
      qu'on pouvait écrire dans le champ est partie avec — un deuxième message
      au même endroit, formulé autrement, c'est déjà une hésitation. */
+  /* LA RANGEE D'ONGLETS. Vide tant que les options ne declarent pas
+     `data-onglet` — elle ne coute alors rien et ne se voit pas. Elle est POSEE
+     ici et remplie a chaque peinture : le formulaire reecrit ses options en
+     cours de route (le catalogue arrive apres l'ecran), et une rangee batie une
+     seule fois manquerait la moitie des metiers. */
+  const onglets=document.createElement('div');
+  onglets.className='menu-onglets';
+  onglets.setAttribute('role','tablist');
+  onglets.hidden=true;
   if(action)panneau.append(action);
   if(avecManuel)panneau.append(manuel,saisie);
-  panneau.append(tete,liste);
+  panneau.append(onglets,tete,liste);
   peau.append(panneau);
   /* Posé APRÈS le panneau : il se superpose au déclencheur, pas au panneau. */
   if(!libre)peau.append(filtre);
 
-  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,
-    avecManuel,manuel,saisie,champLibre,action,vus:[],vise:-1,ouvert:false,filtrer:false};
+  const etat={hote,libre,peau,declencheur,panneau,tete,filtre,compte,liste,onglets,
+    avecManuel,manuel,saisie,champLibre,action,vus:[],vise:-1,ouvert:false,filtrer:false,
+    /* '' = pas d'onglet actif, donc tout. C'est l'etat d'un menu qui n'en a
+       pas, et celui d'un menu qui n'a pas encore ete ouvert. */
+    onglet:''};
   menus.set(hote,etat);
 
   declencheur.addEventListener('click',()=>etat.ouvert?menuFermer(etat,false):menuOuvrir(etat));
@@ -574,8 +630,26 @@ function menuProposees(etat){
     (renvoi===undefined||o.valeur!==renvoi) && !(rienChoisi&&o.valeur===''));
 }
 
+/* Les onglets presents, dans l'ordre du formulaire. Moins de deux : il n'y a
+   rien a basculer, et une rangee d'un seul bouton est un bouton qui ne fait
+   rien. */
+function menuOngletsDe(etat){
+  const vus=[];
+  for(const o of menuProposees(etat)){
+    if(o.onglet&&!vus.includes(o.onglet))vus.push(o.onglet);
+  }
+  return vus.length>1?vus:[];
+}
+
+/* Ce que l'onglet actif laisse passer. Une option sans onglet traverse : le
+   choix vide et la saisie manuelle appartiennent aux deux metiers. */
+function menuDeLOnglet(etat,liste){
+  if(!etat.onglet)return liste;
+  return liste.filter(o=>!o.onglet||o.onglet===etat.onglet);
+}
+
 function menuFiltrees(etat){
-  const toutes=menuProposees(etat);
+  const toutes=menuDeLOnglet(etat,menuProposees(etat));
   /* Un champ libre ne filtre QU'À PARTIR de la première frappe : à l'ouverture
      il contient déjà une valeur, et filtrer dessus ne laisserait voir que cette
      valeur-là — cliquer doit montrer toute la liste. */
@@ -591,14 +665,57 @@ function menuFiltrees(etat){
     .map(x=>x.o);
 }
 
+/* La rangee d'onglets, repeinte a chaque peinture. Elle porte le compte de
+   CHAQUE metier — pas seulement de celui qu'on regarde : c'est la seule facon
+   de savoir qu'il y a quelque chose de l'autre cote sans y aller. */
+function menuPeindreOnglets(etat){
+  const noms=menuOngletsDe(etat);
+  etat.onglets.hidden=!noms.length;
+  if(!noms.length){etat.onglet='';etat.onglets.replaceChildren();return}
+  if(!noms.includes(etat.onglet))etat.onglet=noms[0];
+  const brut=etat.libre?(etat.filtrer?etat.hote.value:''):etat.filtre.value;
+  const q=String(brut||'').trim();
+  const toutes=menuProposees(etat);
+  etat.onglets.replaceChildren(...noms.map((nom)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='menu-onglet'+(nom===etat.onglet?' est-actif':'');
+    b.setAttribute('role','tab');
+    b.setAttribute('aria-selected',String(nom===etat.onglet));
+    const t=document.createElement('span');
+    t.textContent=nom;
+    b.append(t);
+    /* Le compte ne s'affiche que pendant une recherche : au repos, deux
+       nombres a cote de deux mots sont deux mots de plus a lire. */
+    if(q){
+      const n=toutes.filter(o=>o.onglet===nom&&menuScore(o,q)>=0).length;
+      const c=document.createElement('span');
+      c.className='menu-onglet-compte';
+      c.textContent=String(n);
+      b.append(c);
+    }
+    b.addEventListener('click',(ev)=>{
+      ev.preventDefault();ev.stopPropagation();
+      etat.onglet=nom;
+      etat.vise=0;
+      menuPeindre(etat);
+      /* On rend la frappe au filtre : basculer de metier n'est pas finir de
+         chercher. */
+      if(!etat.libre)etat.filtre.focus(); else etat.hote.focus();
+    });
+    return b;
+  }));
+}
+
 function menuPeindre(etat){
+  menuPeindreOnglets(etat);
   const vus=menuFiltrees(etat);
   etat.vus=vus;
   etat.vise=Math.min(Math.max(etat.vise,0),vus.length-1);
 
   /* Le compteur porte sur ce qui est PROPOSÉ, pas sur le contenu brut du
      <select> : il affichait « 49 / 50 » alors que rien n'était filtré. */
-  const toutes=menuProposees(etat).length;
+  const toutes=menuDeLOnglet(etat,menuProposees(etat)).length;
   /* UNE SEULE RECHERCHE SUR L'ÉCRAN, celle de la référence — c'est la seule
      liste qu'on ne parcourt pas des yeux. Partout ailleurs le champ de filtre
      et son compteur sont un deuxième champ dans le champ : on le pose donc à
@@ -617,6 +734,33 @@ function menuPeindre(etat){
     rien.className='menu-rien';rien.setAttribute('role','presentation');
     rien.textContent=etat.libre?'Aucun choix ne correspond — la saisie reste libre.':'Aucun choix ne correspond.';
     noeuds.push(rien);
+    /* ⚠ UNE IMPASSE SE DIT. Chercher « NS300 » depuis « Boutique » ne rendait
+       RIEN, alors que la reponse est a un clic — et rien a l'ecran ne disait
+       qu'elle etait de l'autre cote. On ne bascule pas tout seul (un menu qui
+       change de metier sous les doigts est pire), on le PROPOSE. */
+    const brut=etat.libre?(etat.filtrer?etat.hote.value:''):etat.filtre.value;
+    const q=String(brut||'').trim();
+    if(q){
+      const toutes=menuProposees(etat);
+      for(const nom of menuOngletsDe(etat)){
+        if(nom===etat.onglet)continue;
+        const n=toutes.filter(o=>o.onglet===nom&&menuScore(o,q)>=0).length;
+        if(!n)continue;
+        const li=document.createElement('li');
+        li.className='menu-ailleurs';li.setAttribute('role','presentation');
+        const b=document.createElement('button');
+        b.type='button';
+        b.className='menu-ailleurs-lien';
+        b.textContent=`${n} dans « ${nom} »`;
+        b.addEventListener('click',(ev)=>{
+          ev.preventDefault();ev.stopPropagation();
+          etat.onglet=nom;etat.vise=0;menuPeindre(etat);
+          if(!etat.libre)etat.filtre.focus(); else etat.hote.focus();
+        });
+        li.append(b);
+        noeuds.push(li);
+      }
+    }
   }
   /* UNE FAMILLE, UN BLOC. Le titre collant doit pouvoir SORTIR quand sa famille
      est passée : un `position:sticky` ne quitte jamais son bloc englobant, et
@@ -757,6 +901,11 @@ function menuOuvrir(etat){
       ? [choisie.jeton,choisie.texte].filter(Boolean).join(' — ')
       : (etat.hote.dataset.menuFiltre||'Rechercher…');
   }
+  /* ON OUVRE SUR LE METIER DU CHOIX EN COURS. Rouvrir la ligne d'un t-shirt
+     pour la corriger et retomber sur « Boutique » obligerait a rebasculer a
+     chaque fois — et a se demander, une seconde, si on n'a pas perdu la ligne. */
+  const choisieOnglet=options.find(o=>o.valeur===etat.hote.value&&o.onglet);
+  if(choisieOnglet)etat.onglet=choisieOnglet.onglet;
   /* On ouvre sur le choix en cours, pas en tête de liste. */
   etat.vise=Math.max(0,options.findIndex(o=>o.valeur===etat.hote.value));
   menuPeindre(etat);

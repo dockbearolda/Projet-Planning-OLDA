@@ -355,7 +355,7 @@ assert.ok(fs.existsSync(path.join(RACINE, 'public/olda-icones.woff2')), 'la poli
 // panneau, hors de la liste : ni emportée par un filtre, ni repoussée par le
 // défilement.
 
-assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(MENU),
+assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(onglets,tete,liste\)/.test(MENU),
   'la ligne d’ajout manuel est posée AVANT le filtre et la liste — tout en haut du panneau');
 // UN CHAMP LIBRE S'ÉCRIT DÉJÀ : un gros bouton « Saisir autre chose » y est du
 // bruit, il ne lui manque que de le DIRE. Une mention, pas une commande.
@@ -393,9 +393,11 @@ assert.ok(!/Choisir une référence/.test(DEVIS.replace(/\/\*[\s\S]*?\*\//g, '')
 assert.ok(/txFill\(\$\('txRef'\),noeuds\);[\s\S]{0,400}?\$\('txRef'\)\.value='';/.test(DEVIS),
   '… et la référence repart explicitement sur aucune option sélectionnée');
 // Le compteur portait sur le contenu brut du <select> : « 49 / 50 » alors que
-// rien n'était filtré.
-assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(MENU),
-  'le compteur compte ce qui est proposé, pas ce que le <select> contient');
+// rien n'était filtré. Depuis le 01/09 il porte aussi sur le MÉTIER qu'on
+// regarde : « 6 / 130 » sur une liste où seuls 48 produits sont visibles serait
+// un deuxième chiffre faux.
+assert.ok(/const toutes=menuDeLOnglet\(etat,menuProposees\(etat\)\)\.length;/.test(MENU),
+  'le compteur compte ce qui est proposé DANS l’onglet, pas ce que le <select> contient');
 
 // UNE VALEUR LIBRE NE DOIT JAMAIS DEVENIR UNE CLÉ DE BARÈME. `DB.times[x]` et
 // `DB.printTypes[x]` rendent `{}` pour une valeur inconnue : le marquage

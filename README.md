@@ -602,6 +602,47 @@ et la pilule de recherche de `charte.css`. Mesuré dans la coquille : 38
 commandes, **toutes à 50,0 px**, et quatre tailles de texte rendues — 14 / 17 /
 21 / 32, et rien d'autre.
 
+#### Le produit se cherche DANS la ligne, et les deux métiers se basculent (01/09/2026)
+
+« Y'a un gros problème pour bien sélectionner le produit. Ya 2 parties dans mon
+entreprise, Textiles et le reste : dans le menu déroulant je veux pouvoir switch
+entre les 2 familles. Ce input doit avoir **obligatoirement** une fonction
+recherche **comme tous les inputs** avec un menu déroulant. »
+
+La barre des Articles portait une liste de **130 entrées sans recherche**, posée
+ailleurs que dans la ligne : pour trouver un t-shirt il fallait descendre à la
+molette. Elle est partie. Le produit se choisit maintenant dans la
+**Désignation** de la ligne — là où son nom s'écrit. Un endroit de moins, et
+celui qui reste est celui qu'on regarde.
+
+**« Comme tous les inputs » est une consigne d'architecture**, pas un souhait
+d'apparence. Le menu déroulant avec recherche existait depuis le 27/08, mais il
+vivait dans `comptoir/pont.js` — 920 lignes, le fichier des deux écrans du
+comptoir, que le CRM ne lit pas. Le recopier aurait donné deux menus qui se
+ressemblent et divergent au premier correctif. Il déménage donc dans
+**`public/menu-recherche.js`**, comme `calendrier.js` avant lui, pour la même
+raison et de la même façon : pont.js n'est pas un module, il le charge par
+`import()` et garde ses trois `window.*` à l'identique — ils sont écrits dans les
+`onchange` des écrans du patron, et un écran remplacé ne doit rien avoir à
+apprendre. ⚠ Ils rendent la main **tout de suite**, module ou pas :
+`menusPoserTous` est appelé par un MutationObserver plusieurs fois par seconde,
+le faire attendre bloquerait le guet de l'écran de fin, donc l'envoi du dossier.
+
+**Les deux métiers.** Une option porte `data-onglet` ; le composant en fait une
+rangée de bascules en tête du panneau, et le filtre travaille dans le métier
+actif. Moins de deux métiers, pas de rangée — un seul bouton est un bouton qui
+ne fait rien, et c'est pourquoi les menus du comptoir n'ont pas changé d'un
+pixel. **Une impasse se dit** : chercher « NS300 » depuis « Boutique » ne rendait
+rien alors que la réponse était à un clic — le panneau propose maintenant
+« 5 dans « Textile » », et le clic bascule. On ne bascule jamais tout seul : un
+menu qui change de métier sous les doigts est pire que le trou qu'il comble.
+
+Mesuré au rendu, à 1 440 px : la désignation **619,2 × 50 px** comme ses
+voisines, le panneau exactement à sa largeur, les bascules à **39,4 px** (la
+boîte serrée de la charte), zéro débordement horizontal. Et sur les écrans du
+comptoir : cinq menus à **246,7 × 50 px**, 48 références, **0 bascule** — rien
+n'a bougé.
+
 #### Une seule base produits pour les trois écrans (01/09/2026)
 
 « Les t-shirts doivent être inclus dans le devis flash ; vente, devis et devis
@@ -879,6 +920,9 @@ Deux exceptions assumées :
 │   ├── devis-flash.css la coupe en deux moitiés et la rangée d'article — rien d'autre
 │   ├── aide-bulle.js   le « i » à côté d'un titre : l'aide se demande, elle ne s'affiche
 │   │                 pas d'office — Réglages et Devis, une seule fabrique
+│   ├── menu-recherche.js  LE menu déroulant avec recherche des TROIS écrans : il habille
+│   │                 un <select> ou un <input list>, filtre, et bascule entre les
+│   │                 deux métiers de la maison (Textile / Boutique)
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning
