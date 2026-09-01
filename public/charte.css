@@ -862,11 +862,94 @@ input[type="radio"]:focus-visible {
    fichiers. Le fond est COMPOSÉ sur --surface — en thème sombre --danger-bg
    est translucide, et le texte de la page se lirait au travers. */
 .error.msg-flottant,
-.field-error.msg-flottant {
+.field-error.msg-flottant,
+.msg-flottant.is-ko {
   border-color: var(--danger-line);
   background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface);
   color: var(--danger);
 }
+
+/* `is-ko` / `is-ok` sont les DEUX noms que le CRM emploie deja (`.reg-status`,
+   Reglages) : le devis les ecrivait sur un message flottant ou ils ne
+   voulaient rien dire, et son refus s'affichait donc en gris. Le rouge est
+   nomme dans la regle ci-dessus, pas dans une seconde qui lui ressemble.
+
+   LE VERT EST BREF, ET IL NE DIT QUE CE QU'ON NE VOIT PAS. La regle du 24/08
+   reste entiere : aucun bandeau vert POSE ne relit ce qui est deja a l'ecran.
+   Ce message-ci s'efface tout seul et confirme un ALLER-RETOUR serveur — la
+   seule chose qu'on ne peut pas deviner en regardant la page. Meme composition
+   sur --surface : --success-bg est translucide de nuit. */
+.msg-flottant.is-ok {
+  border-color: var(--success-line);
+  background: linear-gradient(var(--success-bg), var(--success-bg)), var(--surface);
+  color: var(--success);
+}
+
+/* ============================================================ L'AIDE SE DEMANDE
+   01/09/2026, consigne de Charlie : « supprime les phrases de ce genre, et
+   mettre a cote du titre un petit i dans une bulle qui nous affiche les infos
+   quand on clique dessus. »
+
+   Chaque carte des Reglages et du Devis portait sous son titre un paragraphe
+   de deux a quatre lignes. Six cartes : trente lignes de prose a franchir avant
+   le premier champ, relues zero fois apres la premiere ouverture. Le texte ne
+   disparait pas — il se DEMANDE.
+
+   LA BULLE NE POUSSE PERSONNE (loi 8). Elle sort du flux et se pose sur la
+   LARGEUR DE SON HOTE (`left: 0; right: 0`), pas sur celle du « i » : ancree au
+   bouton, elle deborderait a droite de la colonne de saisie du devis — qui
+   defile, donc dont l'`overflow-y: auto` contamine l'autre axe et rognerait ce
+   qui depasse. Sur l'hote, elle tient par construction.
+
+   Le composant vit ici parce que deux ecrans le portent — c'est la regle du
+   fichier partage ; le comportement (ouvrir, refermer, Echap) vit dans
+   `aide-bulle.js`, une seule ecriture pour les deux. */
+:has(> .aide-bulle) { position: relative; }
+
+/* LE « i » EST UNE ICONE, DONC IL PREND LA BOITE D'UNE ICONE : --ic, la meme
+   que celle de la carte a sa gauche. Ce n'est pas une commande de formulaire —
+   --ctrl-h en ferait une bulle de 50 px a cote d'un titre de 17. */
+.aide-b {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--ic); height: var(--ic);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--pilule);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--taille-note);
+  line-height: var(--ligne-serre);
+  font-weight: var(--graisse-forte);
+  cursor: pointer;
+  transition: background var(--dur-1), color var(--dur-1), border-color var(--dur-1);
+}
+.aide-b:hover,
+.aide-b:focus-visible,
+.aide-b[aria-expanded="true"] { background: var(--surface-hover); color: var(--text-1); }
+
+.aide-bulle {
+  position: absolute; top: calc(100% + var(--pas-1)); left: 0; right: 0; z-index: 40;
+  margin: 0;
+  padding: var(--pas-3);
+  border: 1px solid var(--border);
+  /* ELLE SE POSE SUR UN CHAMP, DONC ELLE NE DOIT PAS EN AVOIR L'AIR. Mesure au
+     rendu du 01/09 : avec l'arrondi d'un champ et l'ombre d'une carte, la bulle
+     du message WhatsApp recouvrait sa zone de texte et on ne distinguait plus
+     l'une de l'autre — deux rectangles blancs de meme rayon, meme liseré. Elle
+     prend donc l'arrondi d'une CARTE et l'ombre des elements qui flottent
+     par-dessus la page (celle du toast, `--shadow-pop`). */
+  border-radius: var(--arrondi-carte);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-2);
+  font-size: var(--taille-texte);
+  line-height: var(--ligne-texte);
+}
+/* `hidden` doit rester plus fort que l'affichage : une bulle qui declarerait un
+   `display` defairait l'attribut, et l'aide resterait posee sur la carte. */
+.aide-bulle[hidden] { display: none; }
 
 /* ============================================================ LE RAIL DES ÉTAPES
    REFONTE DU 24/08/2026 (spécification du patron, appliquée telle quelle).

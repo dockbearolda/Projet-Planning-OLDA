@@ -35,6 +35,9 @@ import {
   APPROS, APPRO_DEFAUT, ACOMPTES, ARRONDIS, REGIMES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
 } from './devis.js';
+// L'AIDE D'UNE CARTE SE DEMANDE (01/09) : le « i » a cote du titre, et la meme
+// fabrique que les Reglages — la carte est la leur, la bulle doit l'etre aussi.
+import { poserAide } from './aide-bulle.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -133,13 +136,17 @@ function relireBrouillon() {
 // se redessinent, et ni l'un ni l'autre ne porte de curseur.
 function carte(icone, titre, aide) {
   const c = el('section', 'reg-card');
-  const t = el('div', 'reg-card__head');
+  const t = el('header', 'reg-card__head');
   t.append(ic(icone));
   t.firstChild.classList.add('reg-card__ic');
-  const bloc = el('div');
-  bloc.append(el('h2', 'reg-card__title', titre));
-  if (aide) bloc.append(el('p', 'reg-card__desc', aide));
-  t.append(bloc);
+  const ligne = el('div', 'reg-card__t');
+  ligne.append(el('h2', 'reg-card__title', titre));
+  t.append(ligne);
+  // CE QUI EXPLIQUE LA CARTE N'EST PLUS SOUS SON TITRE. Quatre paragraphes de
+  // deux a quatre lignes tenaient le haut de la colonne de saisie : on les lit
+  // une fois, et ensuite on les franchit a chaque devis. Ils sont dans la bulle
+  // du « i » — meme fabrique que les Reglages, la carte est la leur.
+  poserAide(t, ligne, aide);
   c.append(t);
   return c;
 }
@@ -467,7 +474,9 @@ function carteProjet() {
 function carteArticles() {
   const c = carte('local_grocery_store', 'Articles',
     'Pioche dans le catalogue produits, ou saisis une ligne libre. Les prix sont HT : '
-    + 'le devis est le seul document de la maison qui les affiche ainsi.');
+    + 'le devis est le seul document de la maison qui les affiche ainsi. Un prix de '
+    + 'catalogue, lui, est TTC : il est converti en HT au taux en vigueur, et reste '
+    + 'modifiable ligne par ligne.');
 
   const liste = el('div', 'dvf-liste');
   liste.id = 'dvf-liste';
@@ -519,9 +528,13 @@ function remplirCatalogue() {
   // L'ÉCRAN DIT CE QU'IL SAIT. Un catalogue sans prix n'est pas une panne :
   // c'est un import qui n'a pas encore été fait, et le devis se compose quand
   // même — mais il faut le savoir avant de chercher un tarif qui n'existe pas.
+  // CE QUI RESTE ICI EST UN COMPTE, PAS UNE PHRASE. La regle de conversion
+  // TTC → HT est passee dans la bulle du « i » : elle ne change jamais, donc
+  // elle n'a rien a faire sous les yeux a chaque devis. Ces deux nombres, eux,
+  // changent — et un catalogue sans prix n'est pas une panne, c'est un import
+  // qui n'a pas encore ete fait.
   aide.textContent = catalogue.length
-    ? `${catalogue.length} produits au catalogue, ${tarifes} tarifés. `
-      + 'Un prix de catalogue est TTC : il est converti en HT au taux en vigueur, et reste modifiable.'
+    ? `${catalogue.length} produits au catalogue, ${tarifes} tarifés.`
     : '';
 }
 
@@ -878,14 +891,34 @@ function repartirDeZero() {
 // LE MESSAGE NE POUSSE PERSONNE. Il sort du flux (`.msg-flottant`, charte.css) :
 // posé dans la colonne, il descendrait tous les champs sous les doigts au moment
 // précis où l'on vient de cliquer.
+//
+// ⚠ IL S'ANCRE AU BOUTON QU'ON VIENT DE CLIQUER, PAS AU CORPS DE LA PAGE.
+// Signalé par Charlie le 01/09 : « quand je clique sur enregistrer au planning
+// rien ne s'affiche ». Le dossier partait bien — c'est le message qui était
+// invisible, et TOUS l'étaient : les deux refus, la confirmation, l'échec
+// d'impression. `.msg-flottant` est `position: absolute; top: 100%` et prend
+// pour ancre son parent DIRECT (`:has(> .msg-flottant)`). Posé sur `<body>`,
+// « 100 % » vaut donc la hauteur de la page entière : mesuré au rendu, le
+// message s'affichait à 904 px dans une fenêtre de 900 — quatre pixels sous le
+// pli, à chaque fois, sans que rien ne le signale.
+//
+// Il se pose maintenant sur la rangée des trois boutons de l'en-tête : le
+// composant est fait pour s'accrocher à la commande qui le provoque, et il
+// tombe juste sous celle qu'on vient de cliquer.
 let minuteurMsg = 0;
 function dire(texte, cls) {
+  const hote = $('.ecran-tete__droite') || ROOT;
+  if (!hote) return;
   let msg = document.getElementById('dvf-msg');
-  if (!msg) {
+  // `batir()` remplace tout le contenu de l'écran : un message gardé d'un
+  // montage précédent n'est plus dans la page, et le réutiliser reviendrait à
+  // écrire dans le vide.
+  if (!msg || msg.parentElement !== hote) {
+    if (msg) msg.remove();
     msg = el('div', 'msg-flottant');
     msg.id = 'dvf-msg';
     msg.setAttribute('role', 'status');
-    document.body.appendChild(msg);
+    hote.appendChild(msg);
   }
   msg.className = `msg-flottant ${cls || ''}`.trim();
   msg.textContent = texte;

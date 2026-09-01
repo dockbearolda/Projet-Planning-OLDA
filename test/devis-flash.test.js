@@ -33,6 +33,9 @@ const FEUILLE = lire('public/devis-flash.css');
 const FICHE_CSS = lire('public/fiche-atelier.css');
 const APP = lire('public/app.js');
 const INDEX = lire('public/index.html');
+const CHARTE_CSS = lire('public/charte.css');
+const REGLAGES_JS = lire('public/reglages.js');
+const REGLAGES_CSS = lire('public/reglages.css');
 
 const {
   CSS_DEVIS, modeleDevis, dessinerDevis, calculerDevis, jourPlus,
@@ -296,8 +299,75 @@ assert.ok(!/(?:min-)?height:\s*\d+px/.test(FEUILLE.replace(/\/\*[\s\S]*?\*\//g, 
   'aucune hauteur écrite en dur dans devis-flash.css');
 // LE MESSAGE NE POUSSE PERSONNE : posé dans la colonne, il descendrait tous les
 // champs sous les doigts au moment précis où l'on vient de cliquer.
-assert.ok(/msg\.className = `msg-flottant/.test(ECRAN) && /document\.body\.appendChild\(msg\)/.test(ECRAN),
-  'le message de l’écran sort du flux et se pose sur le corps de la page');
+assert.ok(/msg\.className = `msg-flottant/.test(ECRAN),
+  'le message de l’écran sort du flux');
+
+// ⚠ … MAIS IL S'ANCRE À LA COMMANDE QUI LE PROVOQUE, JAMAIS AU CORPS DE LA PAGE.
+// ---------------------------------------------------------------------------
+// « Quand je clique sur enregistrer au planning rien ne s'affiche » (Charlie,
+// 01/09). Le dossier partait bien : c'est le message qui ne se voyait pas, et
+// TOUS étaient dans ce cas — les deux refus, la confirmation, l'échec
+// d'impression. `.msg-flottant` est `position: absolute; top: 100%` et prend
+// pour ancre son parent DIRECT (`:has(> .msg-flottant)`, charte.css) : sur
+// `<body>`, « 100 % » vaut la hauteur de la PAGE. Mesuré au rendu : 904 px dans
+// une fenêtre de 900 — quatre pixels sous le pli, à tous les coups.
+//
+// Le défaut ne se voyait ni en relisant l'écran (la classe est la bonne) ni en
+// relisant la charte (la règle est la bonne) : il naît de leur RENCONTRE. D'où
+// cette garde, et pas une bonne intention.
+assert.ok(!/document\.body\.appendChild\(msg\)/.test(ECRAN),
+  'le message ne se pose PAS sur <body> : « top: 100 % » y vaut la hauteur de la page');
+assert.ok(/const hote = \$\('\.ecran-tete__droite'\)/.test(ECRAN),
+  'il s’ancre à la rangée des boutons de l’en-tête — la commande qui le provoque');
+assert.ok(/msg\.parentElement !== hote/.test(ECRAN),
+  'un écran rebâti ne réutilise pas un message resté hors de la page');
+
+// LES DEUX ÉTATS DU MESSAGE EXISTENT VRAIMENT. L'écran écrivait `is-ok` /
+// `is-ko` — les noms que `.reg-status` emploie aux Réglages — sur un
+// `.msg-flottant` qui ne les connaissait pas : son refus s'affichait en gris.
+assert.ok(/\.msg-flottant\.is-ko/.test(CHARTE_CSS) && /\.msg-flottant\.is-ok/.test(CHARTE_CSS),
+  'is-ok / is-ko sont des états du message flottant, pas des classes mortes');
+// Le rouge garde UNE écriture : `is-ko` entre dans la règle existante, il n’en
+// ouvre pas une seconde qui lui ressemble.
+assert.ok(/\.error\.msg-flottant,\s*\.field-error\.msg-flottant,\s*\.msg-flottant\.is-ko\s*\{/.test(CHARTE_CSS),
+  'le rouge du message reste défini une seule fois, pour les trois noms');
+
+// ---------------------------------------------------------------------------
+// 3 bis. L'AIDE SE DEMANDE — elle ne tient plus le haut de la colonne
+// ---------------------------------------------------------------------------
+// « Supprime les phrases de ce genre, et mettre à côté du titre un petit i dans
+// une bulle qui nous affiche les infos quand on clique dessus » (Charlie,
+// 01/09). Quatre paragraphes de deux à quatre lignes tenaient le haut de la
+// colonne de saisie du devis, six autres celui des Réglages.
+assert.ok(!/reg-card__desc/.test(ECRAN) && !/reg-card__desc/.test(REGLAGES_JS)
+  && !/reg-card__desc/.test(REGLAGES_CSS),
+  'plus une seule phrase d’explication posée sous un titre de carte');
+assert.ok(/poserAide/.test(ECRAN) && /poserAide/.test(REGLAGES_JS),
+  'les deux écrans passent par la MÊME fabrique : la carte est commune, la bulle aussi');
+// LA BULLE NE POUSSE PERSONNE NON PLUS. Dépliée dans le flux, elle descendrait
+// toute la carte — et l'écran de saisie du devis est précisément celui qu'on
+// remplit devant le client.
+{
+  const regle = CHARTE_CSS.match(/\n\.aide-bulle \{[^}]*\}/);
+  assert.ok(regle, 'la bulle d’aide est définie une fois, dans le fichier partagé');
+  assert.ok(/position: absolute/.test(regle[0]), 'elle sort du flux');
+  assert.ok(/left: 0; right: 0/.test(regle[0]),
+    'elle prend la largeur de son HÔTE : ancrée au « i », elle déborderait de la '
+    + 'colonne de saisie — qui défile, donc dont l’overflow rognerait ce qui dépasse');
+  assert.ok(/:has\(> \.aide-bulle\) \{ position: relative/.test(CHARTE_CSS),
+    '… et son parent direct lui sert d’ancre, comme le message flottant');
+  assert.ok(/\.aide-bulle\[hidden\] \{ display: none/.test(CHARTE_CSS),
+    '`hidden` reste plus fort que l’affichage : sinon l’aide reste posée sur la carte');
+}
+// LE « i » PREND LA BOÎTE D'UNE ICÔNE, et il la déclare en largeur ET en
+// hauteur — la garde de `meme-hauteur.test.js`.
+{
+  const b = CHARTE_CSS.match(/\n\.aide-b \{[^}]*\}/);
+  assert.ok(b, 'le « i » est un composant, pas un bouton réécrit par écran');
+  assert.ok(/width: var\(--ic\); height: var\(--ic\)/.test(b[0]),
+    'sa boîte est un JETON, en largeur et en hauteur');
+  assert.ok(/border-radius: var\(--pilule\)/.test(b[0]), 'et c’est un rond : une icône seule');
+}
 
 // ---------------------------------------------------------------------------
 // 4. ON NE RECONSTRUIT PAS UN CHAMP SOUS LES DOIGTS

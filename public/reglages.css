@@ -49,12 +49,21 @@
   flex-direction: column;
   gap: 16px;
 }
-.reg-card__head { display: flex; align-items: flex-start; gap: 12px; }
+/* L'EN-TETE D'UNE CARTE EST UNE RANGEE D'UNE SEULE LIGNE depuis le 01/09 : le
+   paragraphe d'explication est parti dans la bulle du « i » (`aide-bulle.js`).
+   `align-items: center` et pas `flex-start` — trois boites de la meme famille
+   sur la meme ligne (l'icone 20, le titre 17, le « i » 20) sont a la MEME
+   hauteur, et un `flex-start` les alignait par le haut de trois boites
+   inegales. */
+.reg-card__head { display: flex; align-items: center; gap: 12px; }
 /* Icône de section : décorative, donc grise. Dans la charte la couleur ne
    signale qu'un état — un vert ici laisserait croire à un statut « OK ». */
 .reg-card__ic { font-size: var(--ic); color: var(--text-2); }
+/* Le titre et son « i » : une rangee, un seul ecart, et le titre qui rend la
+   place quand il n'y en a plus (`min-width: 0`) plutot que de pousser le
+   bouton hors de la carte. */
+.reg-card__t { display: flex; align-items: center; gap: var(--pas-1); min-width: 0; flex: 1 1 auto; }
 .reg-card__title { margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
-.reg-card__desc { margin: 4px 0 0; font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2); }
 
 .reg-field { display: flex; flex-direction: column; gap: 8px; }
 .reg-textarea {

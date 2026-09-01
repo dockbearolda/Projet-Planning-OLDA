@@ -602,6 +602,47 @@ et la pilule de recherche de `charte.css`. Mesuré dans la coquille : 38
 commandes, **toutes à 50,0 px**, et quatre tailles de texte rendues — 14 / 17 /
 21 / 32, et rien d'autre.
 
+#### Le message tombait quatre pixels sous le pli (01/09/2026)
+
+« Quand je clique sur enregistrer au planning rien ne s'affiche. » Le dossier
+partait bien : c'est le **message** qui ne se voyait pas — et tous l'étaient,
+les deux refus, la confirmation et l'échec d'impression.
+
+`.msg-flottant` est `position: absolute; top: 100%` et prend pour ancre **son
+parent direct** (`:has(> .msg-flottant)`, `charte.css`). L'écran le posait sur
+`<body>` : « 100 % » y vaut la hauteur de la **page entière**. Mesuré au rendu :
+**904 px dans une fenêtre de 900**. Le défaut ne se voit ni en relisant l'écran
+(la classe est la bonne) ni en relisant la charte (la règle est la bonne) — il
+naît de leur rencontre. Il s'ancre désormais à la rangée des boutons de
+l'en-tête, c'est-à-dire à la commande qui le provoque, et
+`test/devis-flash.test.js` refuse le retour à `<body>`.
+
+Au passage, `is-ok` / `is-ko` — les deux noms que `.reg-status` emploie déjà aux
+Réglages — sont devenus de vrais états du message flottant. L'écran les écrivait
+sur un composant qui ne les connaissait pas : son refus sortait en gris. Le
+rouge garde **une seule écriture**, il n'en ouvre pas une seconde qui lui
+ressemble.
+
+#### L'aide se demande, elle ne tient plus le haut de l'écran (01/09/2026)
+
+« Supprime les phrases de ce genre, et mettre à côté du titre un petit i dans
+une bulle qui nous affiche les infos quand on clique dessus. »
+
+Chaque carte du Devis et des Réglages portait sous son titre un paragraphe de
+deux à quatre lignes. **Seize cartes** : de la prose à franchir avant le premier
+champ, relue zéro fois après la première ouverture. Le texte n'est pas perdu —
+il est dans la bulle du « i » (`public/aide-bulle.js`, `.aide-b` / `.aide-bulle`
+dans `charte.css`), **une seule fabrique pour les deux écrans**.
+
+La bulle **ne pousse personne** (loi 8) : elle sort du flux et se pose sur la
+largeur de son **hôte**, pas sur celle du « i » — ancrée au bouton, elle
+déborderait de la colonne de saisie du devis, qui défile, donc dont
+l'`overflow-y: auto` contamine l'autre axe et rognerait ce qui dépasse. Mesuré
+au rendu, seize cartes ouvertes une à une : **0 px de déplacement**, 0 px de
+débordement, une seule bulle ouverte à la fois. Le « i » prend la boîte de
+l'icône qui lui fait face — **20 × 20**, et les trois centres (icône, titre,
+« i ») tombent au même pixel sur les seize.
+
 ### L'import de prix — on lit tout, on dit tout, PUIS on écrit
 
 Un écran dans **Réglages** avale un **CSV UTF-8** (« Enregistrer sous » depuis
@@ -775,6 +816,8 @@ Deux exceptions assumées :
 │   ├── devis.js      le DEVIS : le calcul de l'argent, et la feuille A4 (règles pures)
 │   ├── devis-flash.js  l'écran du devis : saisie à gauche, feuille vivante à droite
 │   ├── devis-flash.css la coupe en deux moitiés et la rangée d'article — rien d'autre
+│   ├── aide-bulle.js   le « i » à côté d'un titre : l'aide se demande, elle ne s'affiche
+│   │                 pas d'office — Réglages et Devis, une seule fabrique
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning

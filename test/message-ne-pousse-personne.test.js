@@ -71,8 +71,12 @@ assert.ok(/\.msg-flottant\.hidden\s*\{\s*display:\s*none/.test(CHARTE),
 // En thème sombre --danger-bg vaut rgba(185,28,28,.2) : posé seul sur un
 // élément hors flux, le texte de la page se lirait AU TRAVERS du message.
 // Il est donc empilé sur --surface, qui est opaque dans les deux thèmes.
-const rougeur = CHARTE.match(/\.error\.msg-flottant,\s*\.field-error\.msg-flottant\s*\{[^}]*\}/);
-assert.ok(rougeur, 'le rouge du message est défini une fois, pour les deux classes');
+// TROIS NOMS DEPUIS LE 01/09, ET TOUJOURS UNE SEULE RÈGLE. `is-ko` est le nom
+// que `.reg-status` emploie déjà aux Réglages ; le devis l'écrivait sur un
+// message flottant qui ne le connaissait pas, et son refus sortait en gris. Il
+// entre donc dans la règle qui existe, pas dans une seconde qui lui ressemble.
+const rougeur = CHARTE.match(/\.error\.msg-flottant,\s*\.field-error\.msg-flottant,\s*\.msg-flottant\.is-ko\s*\{[^}]*\}/);
+assert.ok(rougeur, 'le rouge du message est défini une fois, pour les trois classes');
 assert.ok(/linear-gradient\(var\(--danger-bg\),\s*var\(--danger-bg\)\),\s*var\(--surface\)/.test(rougeur[0]),
   'le fond rouge est composé sur --surface : sinon illisible en thème sombre');
 

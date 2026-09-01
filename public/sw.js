@@ -116,6 +116,10 @@ const COQUILLE = [
   // sa feuille — donc sans le document qu'il sert a produire.
   '/devis-flash.js',
   '/devis.js',
+  // La bulle du « i » : partagee par les Reglages et le Devis. Absente, les
+  // deux ecrans s'ouvrent hors ligne AVEC leurs cartes mais SANS leur aide —
+  // un module manquant fait echouer l'import de l'ecran entier.
+  '/aide-bulle.js',
   // Les deux parcours du comptoir, affichés dans un cadre par Nouveau Projet.
   // LEUR FEUILLE EST UN FICHIER À PART depuis le 27/08 : sans elle dans la
   // coquille, l'écran s'ouvre hors ligne SANS UNE SEULE RÈGLE — il n'est pas

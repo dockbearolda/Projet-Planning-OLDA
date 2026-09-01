@@ -13,6 +13,8 @@
 // laisse le bouton désactivé et « Enregistrement… » à l'écran, indéfiniment.
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
+// L'AIDE D'UNE CARTE SE DEMANDE, elle ne s'ecrit plus dessous (01/09).
+import { poserAide } from './aide-bulle.js';
 // UN NOM DE CLIENT SE LIT EN CAPITALES — règle unique, voir nom-client.js.
 import { nomClientAffiche } from './nom-client.js';
 
@@ -81,18 +83,10 @@ function buildStatic() {
 
   // --- Carte « message WhatsApp » -------------------------------------------
   const card = el('section', 'reg-card');
-  const ch = el('header', 'reg-card__head');
-  ch.append(ic('chat', 'reg-card__ic'),
-    (() => {
-      const t = el('div');
-      t.append(el('h3', 'reg-card__title', 'Message WhatsApp « commande prête »'),
-        el('p', 'reg-card__desc',
-          'Sur le planning, chaque commande dont le client a laissé un numéro porte '
-          + 'une pastille WhatsApp. Un clic ouvre la conversation avec CE message déjà '
-          + 'écrit — vous relisez, vous appuyez sur Envoyer. Rien ne part tout seul.'));
-      return t;
-    })());
-  card.appendChild(ch);
+  card.appendChild(teteCarte('chat', 'Message WhatsApp « commande prête »',
+    'Sur le planning, chaque commande dont le client a laissé un numéro porte '
+    + 'une pastille WhatsApp. Un clic ouvre la conversation avec CE message déjà '
+    + 'écrit — vous relisez, vous appuyez sur Envoyer. Rien ne part tout seul.'));
 
   const field = el('div', 'reg-field');
   const ta = el('textarea', 'reg-textarea');
@@ -154,17 +148,9 @@ function buildStatic() {
 
   // --- Carte « Tarifs tasse » -------------------------------------------------
   const tcard = el('section', 'reg-card');
-  const tch = el('header', 'reg-card__head');
-  tch.append(ic('local_cafe', 'reg-card__ic'),
-    (() => {
-      const t = el('div');
-      t.append(el('h3', 'reg-card__title', 'Tarifs — Tasse'),
-        el('p', 'reg-card__desc',
-          'Les prix et temps utilisés par Nouveau Projet pour calculer le total TTC '
-          + 'd’une tasse personnalisée. Chaque changement est immédiat pour tous les postes.'));
-      return t;
-    })());
-  tcard.appendChild(tch);
+  tcard.appendChild(teteCarte('local_cafe', 'Tarifs — Tasse',
+    'Les prix et temps utilisés par Nouveau Projet pour calculer le total TTC '
+    + 'd’une tasse personnalisée. Chaque changement est immédiat pour tous les postes.'));
   const tarifsList = el('div', 'reg-tarifs-list');
   tarifsList.id = 'reg-tarifs-list';
   tcard.appendChild(tarifsList);
@@ -249,18 +235,11 @@ function buildStatic() {
   // qu'on ferait — combien créées, combien mises à jour, combien refusées et
   // POURQUOI — et c'est seulement au second clic que la base bouge.
   const icard = el('section', 'reg-card');
-  const ich = el('header', 'reg-card__head');
-  ich.append(ic('view_column', 'reg-card__ic'), (() => {
-    const t = el('div');
-    t.append(el('h3', 'reg-card__title', 'Import de prix'),
-      el('p', 'reg-card__desc',
-        'Un fichier CSV, exporté d’Excel par « Enregistrer sous » (choisir '
-        + '« CSV UTF-8 »). Les intitulés de SumUp — Category, Item name, Price — '
-        + 'sont reconnus tels quels. Rien ne s’écrit avant que vous n’ayez lu ce '
-        + 'que l’import va faire.'));
-    return t;
-  })());
-  icard.appendChild(ich);
+  icard.appendChild(teteCarte('view_column', 'Import de prix',
+    'Un fichier CSV, exporté d’Excel par « Enregistrer sous » (choisir '
+    + '« CSV UTF-8 »). Les intitulés de SumUp — Category, Item name, Price — '
+    + 'sont reconnus tels quels. Rien ne s’écrit avant que vous n’ayez lu ce '
+    + 'que l’import va faire.'));
   const ibox = el('div', 'reg-import');
   ibox.id = 'reg-import';
   icard.appendChild(ibox);
@@ -271,18 +250,10 @@ function buildStatic() {
   // Sans cette carte, l'archivage serait invisible — donc, pour l'employé qui
   // s'est trompé de ligne, exactement aussi définitif qu'une suppression.
   const ccard = el('section', 'reg-card');
-  const cch = el('header', 'reg-card__head');
-  cch.append(ic('delete', 'reg-card__ic'),
-    (() => {
-      const t = el('div');
-      t.append(el('h3', 'reg-card__title', 'Corbeille'),
-        el('p', 'reg-card__desc',
-          'Les commandes retirées du planning. Rien n’est effacé : elles gardent leur '
-          + 'prix, leurs documents et tout leur historique, et reviennent d’un clic à '
-          + 'l’étape où elles étaient.'));
-      return t;
-    })());
-  ccard.appendChild(cch);
+  ccard.appendChild(teteCarte('delete', 'Corbeille',
+    'Les commandes retirées du planning. Rien n’est effacé : elles gardent leur '
+    + 'prix, leurs documents et tout leur historique, et reviennent d’un clic à '
+    + 'l’étape où elles étaient.'));
   const corbList = el('div', 'reg-corbeille');
   corbList.id = 'reg-corbeille';
   ccard.appendChild(corbList);
@@ -291,18 +262,25 @@ function buildStatic() {
   ROOT.replaceChildren(page);
 }
 
+// L'EN-TETE D'UNE CARTE, ET IL N'Y EN A QU'UN. Il etait ecrit CINQ fois dans ce
+// fichier — cinq fois la meme rangee, cinq fois le meme paragraphe sous le
+// titre. Depuis le 01/09 l'explication est dans la bulle du « i » : une seule
+// fabrique, sinon la prochaine carte reecrira la sienne.
+function teteCarte(icone, titre, aide) {
+  const head = el('header', 'reg-card__head');
+  const ligne = el('div', 'reg-card__t');
+  ligne.append(el('h3', 'reg-card__title', titre));
+  head.append(ic(icone, 'reg-card__ic'), ligne);
+  poserAide(head, ligne, aide);
+  return head;
+}
+
 // Une carte de réglage = un en-tête + un conteneur que le rendu remplit. Les
 // deux premières cartes (WhatsApp, Tarifs) sont écrites à la main parce qu'elles
 // portent des contrôles particuliers ; celles-ci se ressemblent toutes.
 function carteSimple(icone, titre, desc, idContenu) {
   const card = el('section', 'reg-card');
-  const head = el('header', 'reg-card__head');
-  head.append(ic(icone, 'reg-card__ic'), (() => {
-    const t = el('div');
-    t.append(el('h3', 'reg-card__title', titre), el('p', 'reg-card__desc', desc));
-    return t;
-  })());
-  card.appendChild(head);
+  card.appendChild(teteCarte(icone, titre, desc));
   const box = el('div', 'reg-liste');
   box.id = idContenu;
   card.appendChild(box);
