@@ -3784,7 +3784,10 @@ module.exports = {
   getTarifsTasseParametres, setTarifsTasseParametres,
   getSupplementsExpress, setSupplementsExpress,
   getTarifsTransport, setTarifsTransport,
-  getCommandeZones, getHiddenCommandeZones,
+  // `getHiddenCommandeZones` n'est plus exportée (01/09) : son seul lecteur
+  // était la route du catalogue de commande, qui n'avait plus d'écran. La
+  // fonction reste dans le fichier, et le réglage reste en base.
+  getCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,

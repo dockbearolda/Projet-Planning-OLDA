@@ -258,7 +258,6 @@ export function dessinerFicheAtelier(r, ctx) {
       const texte = typeof normalise === 'string' ? normalise : normalise.texte;
       if (texte !== champ.value) champ.value = texte;
       if (champ.value === avant) return;
-      const ancien = avant;
       avant = champ.value;
       opts.envoyer(normalise);
       pulser();

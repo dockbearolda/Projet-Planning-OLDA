@@ -78,7 +78,7 @@ const villeByLabel = (v) => VILLES.find((x) => fold(x.label) === fold(String(v |
 // Casse imposée à la saisie : « DUPONT » pour un nom, « Jean-Marc » pour un
 // prénom. Appliquée au blur seulement — jamais pendant la frappe, sinon le
 // curseur saute et corriger devient pénible.
-export function applyCasse(mode, raw) {
+function applyCasse(mode, raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return '';
   if (mode === 'majuscules') return s.toLocaleUpperCase('fr-FR');
@@ -124,7 +124,7 @@ function fieldsForNature(nat) {
 // patron l'ajuste depuis Base clients. Ce cache est partagé avec Nouveau Projet
 // pour que les deux formulaires proposent exactement la même chose. La valeur
 // de départ est le repli quand l'appel échoue — pas la référence.
-export let SECTEURS = [
+let SECTEURS = [
   'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
   'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
   'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',

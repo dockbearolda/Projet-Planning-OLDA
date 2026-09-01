@@ -213,7 +213,6 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 .choice-card{border:2px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--surface);cursor:pointer;text-align:left}
 .choice-card.active{border-color:var(--primary);background:var(--primary-soft)}
 .notice{padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);border:1px solid var(--warning-line);margin:12px 0}
-.modal{width:min(520px,100%);background:var(--surface);border-radius:var(--arrondi-carte);padding:22px;box-shadow:var(--shadow-pop)}
 @media(max-width:800px){
   .client-result,.choice-grid{grid-template-columns:1fr;display:grid}
 }

@@ -31,7 +31,7 @@ const {
   getTarifsTasseParametres, setTarifsTasseParametres,
   getSupplementsExpress, setSupplementsExpress,
   getTarifsTransport, setTarifsTransport,
-  getCommandeZones, getHiddenCommandeZones,
+  getCommandeZones,
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
@@ -2573,7 +2573,7 @@ app.patch('/api/requests/positions', exige('production'), asyncH(async (req, res
       params.push(item.id, Number(item.position));
       return `WHEN $${params.length - 1}::uuid THEN $${params.length}::int`;
     });
-    const ids = list.map((item, i) => `$${params.length + i + 1}::uuid`);
+    const ids = list.map((_, i) => `$${params.length + i + 1}::uuid`);
     params.push(...list.map((item) => item.id));
     const { rows } = await pool.query(
       `UPDATE requests SET position = CASE id ${cas.join(' ')} END, updated_at = now()
@@ -3777,13 +3777,14 @@ const TEXTE_MAX = 200;          // face de tasse, typo, info de personnalisation
 // catalogue. Gardés en MÉMOIRE pour que la validation d'un article reste
 // synchrone ; la base n'est relue qu'au démarrage et à chaque ajout / retrait.
 let CUSTOM_ZONES = [];
-// Emplacements du catalogue masqués (inutiles pour ce poste) : le catalogue
-// n'est pas modifié, on filtre juste ce qu'on en sert.
-let HIDDEN_ZONES = [];
+// LES EMPLACEMENTS MASQUÉS N'ONT PLUS DE LECTEUR (01/09). Ils ne servaient
+// qu'à `allZones()`, qui ne servait qu'à `GET /api/commande/catalog` — la route
+// qu'aucun écran n'appelait, partie le même jour. On cesse donc de charger un
+// réglage que personne ne lit ; `app_meta.commande_zones_masquees` reste EN
+// BASE, intact, pour le jour où un écran redemande à masquer un emplacement.
 const zoneById = (id) => COM_ZONE_BY_ID.get(id) || CUSTOM_ZONES.find((z) => z.id === id) || null;
 async function loadCommandeZones() {
   CUSTOM_ZONES = await getCommandeZones();
-  HIDDEN_ZONES = await getHiddenCommandeZones();
 }
 
 // Nouveau Projet demande OÙ enregistrer avant de valider : il lui faut donc le

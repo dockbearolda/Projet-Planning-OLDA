@@ -129,7 +129,7 @@ export function daysUntil(deadline, now) {
 }
 
 // Âge en jours depuis un horodatage ISO (updated_at) ; 0 si illisible.
-export function ageDays(ts, now) {
+function ageDays(ts, now) {
   const t = Date.parse(ts);
   if (!Number.isFinite(t)) return 0;
   return Math.max(0, Math.floor((now - t) / 86400000));
