@@ -223,13 +223,20 @@ function preparerRegles(brut) {
   // trois que la GRILLE DE CHIFFRAGE tarife déjà, si — leur prix de vente s'y
   // calcule, et l'importer une seconde fois ferait deux sources pour un même
   // nombre. C'est le second qu'on oublie de corriger.
+  // TROIS PORTÉES, DE LA PLUS PRÉCISE À LA PLUS LARGE : une LIGNE (rayon +
+  // produit + prix), un PRODUIT, un RAYON. La plus fine est arrivée le 01/09
+  // avec le porte-clés à 9 € : « pas de porte-clés à 9 euros » (Charlie). Le
+  // produit n'est pas à écarter — ses trois autres lignes se vendent — c'est
+  // CETTE ligne-là qui ne correspond à rien. Sans cette portée, il fallait
+  // choisir entre perdre le produit entier et laisser entrer un tarif qui
+  // n'existe pas.
   const ecartes = new Map();
   for (const e of Array.isArray(r.ecartes) ? r.ecartes : []) {
     if (!e || !e.famille) continue;
-    const cle = e.designation
-      ? `${reduire(e.famille)}\u0001${reduire(e.designation)}`
-      : reduire(e.famille);
-    ecartes.set(cle, String(e.pourquoi || 'rayon écarté'));
+    const bouts = [reduire(e.famille)];
+    if (e.designation) bouts.push(reduire(e.designation));
+    if (e.designation && e.prix != null) bouts.push(String(Number(e.prix)));
+    ecartes.set(bouts.join('\u0001'), String(e.pourquoi || 'rayon écarté'));
   }
   const familles = new Map();
   for (const f of Array.isArray(r.familles) ? r.familles : []) {
@@ -237,11 +244,26 @@ function preparerRegles(brut) {
   }
   // La clé porte le PRIX : c'est le seul repère que l'export laisse pour
   // distinguer deux lignes d'un même produit.
+  //
+  // ⚠ DEUX VARIANTES PEUVENT PARTAGER UN PRIX, et c'est le cas depuis le 01/09 :
+  // « les porte-clés à 7 euros sont les acrylique et bois » (Charlie), pareil
+  // pour les magnets. Le prix ne les distingue donc plus — mais on SAIT qu'il
+  // y en a deux, et on sait leurs noms. Une règle peut alors porter une LISTE
+  // (`variantes`) au lieu d'un nom (`variante`) : les lignes de ce prix les
+  // prennent dans l'ordre où elles se présentent. Les deux lignes étant par
+  // ailleurs identiques (même rayon, même produit, aucune autre valeur), l'ordre
+  // ne change rien au résultat — il n'y a que l'étiquette qui s'échange.
+  // Ce qu'on ne fait JAMAIS : réutiliser un nom déjà pris. Deux lignes du même
+  // nom se FONDENT en un produit, et une variante disparaîtrait en silence.
   const variantes = new Map();
   for (const v of Array.isArray(r.variantes) ? r.variantes : []) {
-    if (!v || !v.famille || !v.designation || v.variante == null) continue;
+    if (!v || !v.famille || !v.designation) continue;
+    const noms = (Array.isArray(v.variantes) ? v.variantes : [v.variante])
+      .filter((n) => n != null && String(n).trim() !== '')
+      .map((n) => String(n));
+    if (!noms.length) continue;
     variantes.set(`${reduire(v.famille)}\u0001${reduire(v.designation)}\u0001${Number(v.prix)}`,
-      String(v.variante));
+      noms);
   }
   return { ecartes, familles, variantes, actives: ecartes.size + familles.size + variantes.size };
 }
@@ -327,6 +349,8 @@ function analyserImport(texte, existants, reglesBrutes) {
   // 1er passage : lire chaque ligne, la ranger sous sa clé.
   const paquets = new Map();
   const lignes = [];
+  // Combien de lignes ont déjà consommé un nom sous une clé rayon+produit+prix.
+  const prisParPrix = new Map();
   corps.forEach((cases, i) => {
     const numero = i + 2;                       // 1 = les intitulés, à l'œil du patron
     const l = lireLigne(cases, par);
@@ -343,8 +367,12 @@ function analyserImport(texte, existants, reglesBrutes) {
     //    se compte à part. Confondre les deux ferait lire « 55 refusées » là où
     //    il y a des erreurs ET des exclusions voulues.
     const cleFamille = reduire(l.famille);
-    // Le PRODUIT d'abord, le rayon ensuite : une règle plus précise l'emporte.
-    const ecart = regles.ecartes.get(`${cleFamille}\u0001${reduire(l.designation)}`)
+    const cleProduit = `${cleFamille}\u0001${reduire(l.designation)}`;
+    // LA LIGNE d'abord, puis le PRODUIT, puis le RAYON : une règle plus précise
+    // l'emporte toujours sur une plus large.
+    const ecart = (l.prixVenteTtc != null
+        && regles.ecartes.get(`${cleProduit}\u0001${l.prixVenteTtc}`))
+      || regles.ecartes.get(cleProduit)
       || regles.ecartes.get(cleFamille);
     if (ecart) { l.ecarte = ecart; return; }
 
@@ -352,10 +380,20 @@ function analyserImport(texte, existants, reglesBrutes) {
     //    l'export laisse. Une variante déjà nommée dans le fichier gagne
     //    toujours : la colonne du patron passe avant la règle.
     if (!l.variante && l.prixVenteTtc != null) {
-      const nom = regles.variantes.get(
-        `${cleFamille}\u0001${reduire(l.designation)}\u0001${l.prixVenteTtc}`,
-      );
-      if (nom) { l.variante = nom; l.varianteNommee = true; }
+      const cleVariante = `${cleProduit}\u0001${l.prixVenteTtc}`;
+      const noms = regles.variantes.get(cleVariante);
+      // LE RANG, pas seulement le prix. Deux variantes peuvent partager un
+      // montant (les magnets et les porte-clés acrylique et bois, à 7 € les
+      // deux) : la règle porte alors les deux noms, et chaque ligne prend le
+      // suivant. Une ligne de plus que de noms reste SANS NOM — elle sera
+      // refusée avec sa raison, plutôt que de reprendre un nom déjà pris et de
+      // se fondre en silence dans la variante d'à côté.
+      const rang = prisParPrix.get(cleVariante) || 0;
+      if (noms && noms[rang]) {
+        l.variante = noms[rang];
+        l.varianteNommee = true;
+        prisParPrix.set(cleVariante, rang + 1);
+      }
     }
 
     // 3. LE RAYON DU COMPTOIR. En dernier : les deux règles au-dessus se

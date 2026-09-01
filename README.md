@@ -639,10 +639,13 @@ code : un rayon qui change ne doit pas demander un déploiement. Trois sortes,
 appliquées dans cet ordre, et **toutes lues sur le rayon d'origine** — celui que
 le patron a sous les yeux dans son tableur :
 
-1. **`ecartes`** — un rayon qui n'est pas un produit (`Express` est un réglage,
-   `Perso` / `perso textile` sont du travail graphique). Ses lignes sont
-   comptées **`ecartees`**, jamais confondues avec un refus : ce n'est pas une
-   erreur, c'est une décision, et elle porte sa raison écrite.
+1. **`ecartes`** — ce qui ne doit pas entrer, à **trois portées** : un RAYON qui
+   n'est pas un produit (`Express` est un réglage, `Perso` / `perso textile` sont
+   du travail graphique), un PRODUIT (les trois tasses que la grille tarife
+   déjà), ou une **seule LIGNE** visée par son prix (`+ prix`) — « pas de
+   porte-clés à 9 € ». La plus précise l'emporte. Ces lignes sont comptées
+   **`ecartees`**, jamais confondues avec un refus : ce n'est pas une erreur,
+   c'est une décision, et elle porte sa raison écrite.
 2. **`variantes`** — le nom d'une variante, retrouvé par son **prix**, seul
    repère que l'export laisse. Une variante déjà écrite dans le fichier gagne
    toujours sur la règle.
@@ -657,9 +660,16 @@ Elle est donc **absorbée** ; et une ligne qui porte un prix mais qu'aucune règ
 n'a su nommer, alors que ses sœurs l'ont été, est **refusée** plutôt que posée
 au menu sans nom.
 
-**Deux variantes au même prix sont indistinguables** : le Magnet a quatre lignes
-tarifées pour trois prix, les deux à 7 € se fondent forcément. L'aperçu le dit ;
-les séparer demande une colonne « Variante » dans le fichier.
+**Deux variantes peuvent partager un prix**, et c'est le cas du Magnet comme du
+Porte-clés : quatre lignes tarifées pour trois montants (7, 5, 9 et encore 7).
+Le prix ne les distingue plus — mais on sait qu'il y en a deux et on sait leurs
+noms (« Magnet acrylique et bois 7 euros », Charlie, 01/09). Une règle porte
+alors une **liste** (`variantes: ["Acrylique", "Bois"]`) au lieu d'un nom, et
+les lignes de ce prix les prennent **dans l'ordre où elles se présentent** — les
+deux lignes étant par ailleurs identiques, seule l'étiquette s'échange. **Un nom
+déjà pris n'est jamais réutilisé** : deux lignes du même nom se *fondent* en un
+produit, et une variante disparaîtrait en silence. Une ligne de plus que de noms
+reste donc sans nom, et se fait refuser avec sa raison.
 
 Chaque ligne du rapport dit **ce qu'une règle lui a fait** — le rayon d'où elle
 vient, le nom posé sur sa variante. Une règle qui agit en silence est une règle
