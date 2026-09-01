@@ -681,6 +681,21 @@ function remplirSelectCatalogue(){
       g.lignes.map(l=>`<option value="${CAT_LIGNES.push(l)-1}">${esc(l.texte)}</option>`).join('')+'</optgroup>';
   });
   sel.innerHTML=html;
+  /* LE MENU DIT QUAND IL N'A RIEN A MONTRER. Le catalogue vient de la base
+     depuis le 01/09 : si elle est injoignable au chargement, la liste n'a que
+     ses deux lignes d'en-tete, et un menu qui s'ouvre sur « Choisir un
+     produit... » sans en proposer un seul laisse la vendeuse chercher une
+     panne qui n'est pas la sienne. La porte de secours — la saisie manuelle —
+     est juste en dessous, et elle, elle marche toujours. */
+  if(!CAT_LIGNES.length&&sel.options&&sel.options.length)
+    sel.options[0].textContent='Catalogue injoignable — passe par la saisie manuelle';
+  /* LE CHAMP FERME SE REPEINT. Le menu du comptoir dessine lui-meme ce qui est
+     visible : remplacer les options ne le previent de rien, et le champ
+     garderait l'intitule d'avant l'arrivee du catalogue.
+     `typeof window` et non `window.` : le controle de cette fonction la joue
+     hors navigateur, ou l'objet global n'existe pas — et une reference a un nom
+     absent ne rend pas `undefined`, elle LEVE. */
+  if(typeof window!=='undefined'&&window.menuRafraichir)window.menuRafraichir(sel);
 }
 /* La première ligne du menu n'est pas un produit : c'est la porte de la
    saisie manuelle. La choisir ouvre le formulaire et rend la liste à vide —

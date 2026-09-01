@@ -400,6 +400,14 @@ async function init() {
   // Tailles de logo : l'instantané livré avec le code, si la base n'en a pas.
   await semerTaillesLogo();
 
+  // LE CATALOGUE DU COMPTOIR ENTRE EN BASE. La semence d'abord (une base neuve
+  // part avec les quatre-vingt-deux lignes de l'ancien fichier), l'unicité de
+  // la clé ensuite — dans cet ordre : poser la contrainte sur une table vide ne
+  // dit rien, la poser sur une table remplie dit tout de suite si deux produits
+  // se marchent dessus.
+  await semerCatalogueProduits();
+  await poserUniciteCatalogue();
+
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
   await semerFacesCouteau();
@@ -1805,6 +1813,311 @@ async function setTarifsTasseParametres(p) {
   const value = JSON.stringify(clean);
   await poserMeta('tarifs_tasse_parametres', value);
   return clean;
+}
+
+// --- LE CATALOGUE DU COMPTOIR, EN BASE (01/09/2026) --------------------------
+//
+// Ce que la boutique vend, rayon par rayon — et, désormais, ce que ça coûte.
+// Il vivait en DUR dans `public/comptoir/catalogue.js` : tant qu'un catalogue
+// est du code, aucun prix ne peut s'y importer. C'était ça, le verrou.
+//
+// LE FICHIER DEVIENT UNE SEMENCE, comme `tailles-logo-seed.json` : il remplit
+// une base NEUVE (`catalogue-produits-seed.json`, engendré depuis l'ancien
+// fichier, quatre-vingt-deux lignes vendables) et n'est plus jamais relu
+// ensuite. Le comptoir lit la base.
+//
+// LES MÊMES COLONNES QUE LA GRILLE TARIFAIRE TASSE, qui marche déjà : prix
+// d'achat, prix de vente TTC, temps de main-d'œuvre, temps machine.
+//
+// ⚠ CES PRIX NE RETARIFENT RIEN. Le chiffrage d'une ligne est FIGÉ dans
+// `fiche.chiffrage` au moment de la prise de commande : changer un prix ici ne
+// touche aucune commande déjà passée, et c'est tenu par un test
+// (test/catalogue-produits-base.test.js). Le moteur de chiffrage, conforme au
+// fichier V9 du patron, ne lit pas cette table.
+
+const { cleProduit: cleCatalogue, analyserImport } = require('./catalogue-csv');
+
+const CATALOGUE_MAX_TEXTE = 120;
+
+const texteCatalogue = (v, max = CATALOGUE_MAX_TEXTE) => String(v == null ? '' : v).trim().slice(0, max);
+
+// Un montant ABSENT reste absent. Le mettre à zéro ferait annoncer « 0 € » au
+// comptoir sur un produit qu'on n'a simplement pas encore tarifé — et un prix
+// nul se lit comme un prix, pas comme un blanc.
+function montantCatalogue(v, decimales) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const f = 10 ** decimales;
+  return Math.round(n * f) / f;
+}
+
+// Normalise une ligne reçue (import, écran de réglages, semence). Rend `null`
+// si elle n'a pas de quoi être un produit : sans famille ni désignation, il n'y
+// a rien à ranger au menu, et une ligne muette au catalogue est une ligne que
+// personne ne retrouvera jamais pour la corriger.
+function nettoyerProduit(p, index) {
+  if (!p || typeof p !== 'object') return null;
+  const famille = texteCatalogue(p.famille, 80);
+  const designation = texteCatalogue(p.designation, 100);
+  if (!famille || !designation) return null;
+  const variante = texteCatalogue(p.variante, 80);
+  return {
+    cle: cleCatalogue(famille, designation, variante),
+    famille,
+    familleNote: texteCatalogue(p.familleNote, 80),
+    designation,
+    variante,
+    note: texteCatalogue(p.note, 80),
+    label: texteCatalogue(p.label, 140),
+    couleur: texteCatalogue(p.couleur, 80),
+    reference: texteCatalogue(p.reference, 60),
+    prixAchat: montantCatalogue(p.prixAchat, 2),
+    prixVenteTtc: montantCatalogue(p.prixVenteTtc, 2),
+    tempsMoMin: montantCatalogue(p.tempsMoMin, 1),
+    tempsMachineMin: montantCatalogue(p.tempsMachineMin, 1),
+    actif: p.actif !== false,
+    position: Number.isFinite(Number(p.position)) ? Number(p.position) : (index + 1) * 10,
+  };
+}
+
+// La ligne telle que l'écran et le comptoir la lisent. `numeric` revient de
+// Postgres en CHAÎNE (« 6.00 ») : sans cette conversion, le comptoir
+// comparerait des textes et l'écran de réglages afficherait « 6.00 » dans un
+// champ de nombre qui attend 6.
+function produitDeLaLigne(r) {
+  const nb = (v) => (v == null ? null : Number(v));
+  return {
+    id: r.id,
+    famille: r.famille,
+    familleNote: r.famille_note || '',
+    designation: r.designation,
+    variante: r.variante || '',
+    note: r.note || '',
+    label: r.label || '',
+    couleur: r.couleur || '',
+    reference: r.reference || '',
+    prixAchat: nb(r.prix_achat),
+    prixVenteTtc: nb(r.prix_vente_ttc),
+    tempsMoMin: nb(r.temps_mo_min),
+    tempsMachineMin: nb(r.temps_machine_min),
+    actif: r.actif !== false,
+    position: nb(r.position),
+  };
+}
+
+const CATALOGUE_ORDRE = 'ORDER BY position ASC NULLS LAST, famille ASC, designation ASC, variante ASC';
+
+async function getCatalogueProduits({ actifsSeuls = false } = {}) {
+  const { rows } = await pool.query(
+    `SELECT * FROM catalogue_produits ${actifsSeuls ? 'WHERE actif = true ' : ''}${CATALOGUE_ORDRE}`,
+  );
+  return rows.map(produitDeLaLigne);
+}
+
+const CATALOGUE_COLONNES = `cle, famille, famille_note, designation, variante, note, label, couleur,
+    reference, prix_achat, prix_vente_ttc, temps_mo_min, temps_machine_min, actif, position`;
+
+const valeursProduit = (p) => [p.cle, p.famille, p.familleNote || null, p.designation, p.variante,
+  p.note || null, p.label || null, p.couleur || null, p.reference,
+  p.prixAchat, p.prixVenteTtc, p.tempsMoMin, p.tempsMachineMin, p.actif, p.position];
+
+// REMPLACE LE CATALOGUE ENTIER. C'est ce que fait l'écran de réglages quand on
+// corrige une case : il renvoie sa liste, comme la grille tarifaire tasse.
+//
+// EN UNE TRANSACTION : un vidage suivi d'une insertion qui échoue laisserait la
+// boutique SANS catalogue, et le comptoir s'ouvrirait sur un menu vide sans que
+// personne ne comprenne pourquoi.
+async function setCatalogueProduits(liste) {
+  const brut = Array.isArray(liste) ? liste : [];
+  const propres = [];
+  const vues = new Set();
+  brut.map(nettoyerProduit).forEach((p) => {
+    // Deux lignes de même clé, c'est une case qui écrirait dans l'autre : la
+    // première gagne, comme pour les machines.
+    if (!p || vues.has(p.cle)) return;
+    vues.add(p.cle);
+    propres.push(p);
+  });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM catalogue_produits');
+    for (const p of propres) {
+      await client.query(
+        `INSERT INTO catalogue_produits (${CATALOGUE_COLONNES})
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        valeursProduit(p),
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* la connexion est déjà perdue */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+  return getCatalogueProduits();
+}
+
+// LA SEMENCE. Garde `app_meta` PROPRE — une par migration, deux incidents réels
+// sont venus d'une garde partagée. Et une deuxième condition : la table doit
+// être VIDE. Une base où le patron a supprimé un produit ne doit pas le voir
+// revenir au redémarrage suivant.
+// Down : DELETE FROM catalogue_produits;
+//        DELETE FROM app_meta WHERE key = 'catalogue_produits_seed_v1';
+async function semerCatalogueProduits() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'catalogue_produits_seed_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  const { rows: cnt } = await pool.query('SELECT COUNT(*)::int AS n FROM catalogue_produits');
+  if (cnt[0].n === 0) {
+    let brut = [];
+    try {
+      brut = JSON.parse(fs.readFileSync(path.join(__dirname, 'catalogue-produits-seed.json'), 'utf8'));
+    } catch (_) {
+      return;   // pas de semence : on démarre sans, l'import la remplira
+    }
+    if (Array.isArray(brut) && brut.length) await setCatalogueProduits(brut);
+  }
+  await poserMeta('catalogue_produits_seed_v1', '1');
+}
+
+// L'UNICITÉ DE LA CLÉ, POSÉE EN BASE. C'est elle — pas le code — qui empêche
+// deux imports lancés en même temps de créer deux fois le même produit : entre
+// la lecture de l'existant et l'écriture, il y a un `await`.
+//
+// Même prudence que pour le numéro de client : PAS de garde `app_meta`. Une
+// base qui porte déjà des doublons refuse l'index ; on nomme les coupables dans
+// les journaux, on retombe sur un index simple, et on retente au démarrage
+// suivant une fois corrigés. Une garde figerait l'échec pour toujours — et le
+// repli porte un AUTRE NOM, sinon il ferait passer le `CREATE UNIQUE … IF NOT
+// EXISTS` suivant pour déjà fait.
+// Down : DROP INDEX IF EXISTS idx_catalogue_produits_cle;
+//        DROP INDEX IF EXISTS idx_catalogue_produits_cle_repli;
+async function poserUniciteCatalogue() {
+  try {
+    await pool.query('DROP INDEX IF EXISTS idx_catalogue_produits_cle_repli');
+  } catch (_) { /* jamais posé : le cas courant */ }
+  try {
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_catalogue_produits_cle ON catalogue_produits (cle)');
+    return;
+  } catch (err) {
+    if (!err || err.code !== '23505') return;
+  }
+  let apercu = '';
+  try {
+    const { rows } = await pool.query(`
+      SELECT famille, designation, COUNT(*)::int AS n FROM catalogue_produits
+       GROUP BY cle, famille, designation HAVING COUNT(*) > 1 ORDER BY n DESC LIMIT 10`);
+    apercu = rows.map((r) => `${r.famille} / ${r.designation} ×${r.n}`).join(', ');
+  } catch (_) { /* l'aperçu est un confort */ }
+  console.error(
+    '⚠  Catalogue : des produits portent la MÊME famille + désignation + variante.',
+    'L\'unicité n\'a PAS été posée (rien n\'a été supprimé). À corriger depuis Réglages.',
+    apercu ? `Concernés : ${apercu}.` : '',
+  );
+  try {
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_catalogue_produits_cle_repli ON catalogue_produits (cle)');
+  } catch (_) { /* pg-mem : la table est petite, on s'en passe */ }
+}
+
+// --- L'IMPORT DE PRIX -------------------------------------------------------
+//
+// DEUX TEMPS, TOUJOURS. On analyse le fichier ENTIER et on rend le rapport ;
+// rien n'est écrit. Puis, et seulement si le patron a vu ce rapport, on écrit —
+// et on n'écrit QUE ce qu'il a vu : la signature de l'aperçu doit revenir
+// inchangée, sinon le fichier ou la base ont bougé entre les deux et l'écriture
+// est refusée.
+//
+// Le calcul du rapport est dans `catalogue-csv.js` : il ne touche à aucune base
+// et s'éprouve donc sans en démarrer une.
+async function apercuImportCatalogue(csv) {
+  return analyserImport(csv, await getCatalogueProduits());
+}
+
+// L'ÉCRITURE, EN UNE TRANSACTION. Un import à moitié écrit — la moitié des prix
+// neufs, l'autre moitié ancienne — serait pire que pas d'import du tout : rien
+// à l'écran ne dirait où s'arrête le neuf.
+async function appliquerImportCatalogue(csv, signature) {
+  const rapport = await apercuImportCatalogue(csv);
+  if (rapport.erreur) return rapport;
+  if (signature && signature !== rapport.signature) {
+    return {
+      ...rapport,
+      erreur: 'Le catalogue ou le fichier a changé depuis l’aperçu : rien n’a été écrit. '
+        + 'Relance l’aperçu et relis-le avant d’importer.',
+    };
+  }
+  const { creations, majs } = rapport.plan;
+  if (!creations.length && !majs.length) return { ...rapport, ecrit: true };
+
+  // La position des nouveaux : à la SUITE de ce qui existe. Un produit importé
+  // n'a pas à s'intercaler au milieu des rayons du patron.
+  const { rows: fin } = await pool.query('SELECT COALESCE(MAX(position), 0) AS p FROM catalogue_produits');
+  let position = Number(fin[0].p) || 0;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const c of creations) {
+      position += 10;
+      const p = nettoyerProduit({ ...c, position });
+      if (!p) continue;
+      await client.query(
+        `INSERT INTO catalogue_produits (${CATALOGUE_COLONNES})
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        valeursProduit(p),
+      );
+    }
+    for (const m of majs) {
+      // ⚠ ON N'ÉCRIT QUE LES CASES QUE LE FICHIER REMPLIT. Une colonne absente
+      // du CSV ne doit pas effacer ce qui est en base : un fichier « Category /
+      // Item name / Price » ne parle pas des temps machine, il ne les met donc
+      // pas à zéro.
+      const mises = [];
+      const args = [];
+      for (const { champ, apres } of m.changements) {
+        const colonne = {
+          reference: 'reference',
+          prixAchat: 'prix_achat',
+          prixVenteTtc: 'prix_vente_ttc',
+          tempsMoMin: 'temps_mo_min',
+          tempsMachineMin: 'temps_machine_min',
+          actif: 'actif',
+        }[champ];
+        if (!colonne) continue;
+        args.push(apres);
+        mises.push(`${colonne} = $${args.length}`);
+      }
+      if (!mises.length) continue;
+      args.push(m.id);
+      await client.query(
+        `UPDATE catalogue_produits SET ${mises.join(', ')}, updated_at = now() WHERE id = $${args.length}`,
+        args,
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* la connexion est déjà perdue */ }
+    // DEUX IMPORTS LANCÉS EN MÊME TEMPS. Entre la lecture de l'existant et
+    // l'écriture il y a un `await` : les deux ont pu décider « création » sur
+    // la même clé. C'est l'unicité EN BASE qui tranche — la transaction est
+    // annulée en entier, donc rien n'est à moitié écrit — et le second doit
+    // LIRE pourquoi plutôt que de recevoir une erreur 500 muette.
+    if (err && err.code === '23505') {
+      return {
+        ...rapport,
+        ecrit: false,
+        erreur: 'Un autre poste a importé ces produits pendant la lecture : rien n’a été écrit. '
+          + 'Relance l’aperçu — il dira ce qu’il reste à faire.',
+      };
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+  return { ...rapport, ecrit: true };
 }
 
 // --- Suppléments express (vente directe) -------------------------------------
@@ -3302,6 +3615,11 @@ module.exports = {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
+  getCatalogueProduits, setCatalogueProduits, nettoyerProduit,
+  // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
+  // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
+  semerCatalogueProduits, poserUniciteCatalogue,
+  apercuImportCatalogue, appliquerImportCatalogue,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,

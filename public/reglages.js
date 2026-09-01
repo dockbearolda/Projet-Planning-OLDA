@@ -231,6 +231,41 @@ function buildStatic() {
     + 'comporte exactement comme avant. Allumer « Connexion nominative » demandera '
     + 'à chacun de choisir son prénom et son code au prochain chargement.', 'reg-flags'));
 
+  // --- Carte « Catalogue produits » -------------------------------------------
+  // Ce que la boutique vend, rayon par rayon. Il vivait EN DUR dans
+  // `public/comptoir/catalogue.js` : tant qu'un catalogue est du code, aucun
+  // prix ne peut s'y importer — il aurait fallu redéployer pour changer un
+  // tarif. Il est en base depuis le 01/09, le comptoir l'y lit, et c'est ce qui
+  // ouvre la porte à la carte juste en dessous.
+  page.appendChild(carteSimple('local_grocery_store', 'Catalogue produits',
+    'Les produits que le comptoir propose au menu, et ce qu’ils coûtent. Ils '
+    + 'sont en base : le comptoir les y lit à chaque ouverture, et un prix '
+    + 'importé ici vaut aussitôt pour tous les postes. Les commandes déjà '
+    + 'passées, elles, ne bougent pas — leur prix est figé au moment de la prise.',
+    'reg-catalogue'));
+
+  // --- Carte « Import de prix » -----------------------------------------------
+  // DEUX TEMPS, ET LE PREMIER N'ÉCRIT RIEN. On lit le fichier ENTIER, on dit ce
+  // qu'on ferait — combien créées, combien mises à jour, combien refusées et
+  // POURQUOI — et c'est seulement au second clic que la base bouge.
+  const icard = el('section', 'reg-card');
+  const ich = el('header', 'reg-card__head');
+  ich.append(ic('view_column', 'reg-card__ic'), (() => {
+    const t = el('div');
+    t.append(el('h3', 'reg-card__title', 'Import de prix'),
+      el('p', 'reg-card__desc',
+        'Un fichier CSV, exporté d’Excel par « Enregistrer sous » (choisir '
+        + '« CSV UTF-8 »). Les intitulés de SumUp — Category, Item name, Price — '
+        + 'sont reconnus tels quels. Rien ne s’écrit avant que vous n’ayez lu ce '
+        + 'que l’import va faire.'));
+    return t;
+  })());
+  icard.appendChild(ich);
+  const ibox = el('div', 'reg-import');
+  ibox.id = 'reg-import';
+  icard.appendChild(ibox);
+  page.appendChild(icard);
+
   // --- Carte « Corbeille » ----------------------------------------------------
   // Une commande retirée du planning n'est plus détruite : elle attend ici.
   // Sans cette carte, l'archivage serait invisible — donc, pour l'employé qui
@@ -813,6 +848,222 @@ function renderTarifs() {
   p.append(field('tauxHoraireMo', 'Taux horaire MO (€)'), field('tauxHoraireMachine', 'Taux horaire machine (€)'), field('tgca', 'TGCA (ex. 0.04 = 4 %)'));
 }
 
+// --- LE CATALOGUE ET SON IMPORT (01/09/2026) ---------------------------------
+// Le catalogue du comptoir vit en base depuis le 01/09. Ces deux cartes sont ce
+// que le patron en voit : ce qu'elle contient, et la porte par où les prix
+// entrent.
+let catalogue = [];
+let importCsv = '';        // le texte du fichier choisi, tel qu'il a été lu
+let importNom = '';        // son nom, pour que l'écran dise SUR QUOI il parle
+let importRapport = null;  // le dernier aperçu rendu par le serveur
+
+const NB = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Un montant ABSENT n'est pas zéro : « — » le dit, « 0,00 € » mentirait.
+const euros = (v) => (v == null ? '—' : `${NB.format(v)} €`);
+
+// Combien de produits, dans combien de rayons, et combien portent un prix.
+// C'est la seule question qu'on se pose devant cette carte : que reste-t-il à
+// tarifer ?
+function renderCatalogue() {
+  const box = $('#reg-catalogue');
+  if (!box) return;
+  box.replaceChildren();
+  if (!catalogue.length) {
+    box.appendChild(el('p', 'reg-corb__vide',
+      'Aucun produit en base. Une base neuve se sème toute seule au démarrage ; '
+      + 'sinon, l’import ci-dessous les créera.'));
+    return;
+  }
+  const familles = [];
+  const par = new Map();
+  for (const p of catalogue) {
+    let f = par.get(p.famille);
+    if (!f) { f = { nom: p.famille, total: 0, tarifes: 0, eteints: 0 }; par.set(p.famille, f); familles.push(f); }
+    f.total += 1;
+    if (p.prixVenteTtc != null) f.tarifes += 1;
+    if (!p.actif) f.eteints += 1;
+  }
+  const tarifes = familles.reduce((n, f) => n + f.tarifes, 0);
+  const tete = el('div', 'reg-ligne');
+  tete.append(el('span', 'reg-ligne__nom', `${catalogue.length} produits · ${familles.length} familles`),
+    el('span', 'reg-ligne__aide',
+      tarifes === catalogue.length
+        ? 'tous ont un prix de vente'
+        : `${catalogue.length - tarifes} sans prix de vente`));
+  box.appendChild(tete);
+  for (const f of familles) {
+    const row = el('div', 'reg-ligne');
+    const detail = [`${f.tarifes}/${f.total} tarifés`];
+    if (f.eteints) detail.push(`${f.eteints} éteints`);
+    row.append(el('span', 'reg-ligne__nom', f.nom), el('span', 'reg-ligne__aide', detail.join(' · ')));
+    box.appendChild(row);
+  }
+}
+
+// LE FICHIER SE LIT EN UTF-8, PUIS EN WINDOWS-1252 À DÉFAUT. Excel sait
+// enregistrer un CSV dans les deux ; sans ce repli, « Décapsuleur » revenait
+// « D?capsuleur » et l'import créait un doublon au lieu de retrouver la ligne.
+async function lireFichierCsv(fichier) {
+  const octets = await fichier.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(octets);
+  } catch (_) {
+    return new TextDecoder('windows-1252').decode(octets);
+  }
+}
+
+async function choisirFichierImport(fichier) {
+  if (!fichier) return;
+  importRapport = null;
+  importNom = fichier.name || 'fichier.csv';
+  renderImport('Lecture du fichier…');
+  try {
+    importCsv = await lireFichierCsv(fichier);
+  } catch (_) {
+    importCsv = '';
+    return renderImport('Fichier illisible.', 'is-ko');
+  }
+  await demanderApercu();
+}
+
+// L'APERÇU N'ÉCRIT RIEN. C'est le serveur qui analyse — le même code que celui
+// qui écrira ensuite, sinon l'aperçu ne prouverait rien.
+async function demanderApercu() {
+  if (!importCsv) return;
+  renderImport('Analyse du fichier…');
+  try {
+    importRapport = await api('POST', '/api/catalogue-produits/import/apercu', { csv: importCsv });
+    renderImport('');
+  } catch (err) {
+    importRapport = null;
+    renderImport(err.message, 'is-ko');
+  }
+}
+
+// L'ÉCRITURE, avec la SIGNATURE de l'aperçu. Si elle ne correspond plus, c'est
+// que la base a bougé entre les deux : le serveur refuse, et il a raison.
+async function appliquerImport(bouton) {
+  if (!importRapport || !importRapport.signature) return;
+  bouton.disabled = true;
+  try {
+    const fait = await api('POST', '/api/catalogue-produits/import',
+      { csv: importCsv, signature: importRapport.signature });
+    importRapport = fait;
+    catalogue = await api('GET', '/api/catalogue-produits');
+    renderCatalogue();
+    const r = fait.resume;
+    renderImport(`Importé : ${r.creees} créés, ${r.majs} mis à jour.`, 'is-ok');
+  } catch (err) {
+    // « Le vert se tait, l'échec parle » : un import qui échoue doit le DIRE,
+    // sinon le patron repart en croyant ses prix posés.
+    renderImport(err.message, 'is-ko');
+    bouton.disabled = false;
+  }
+}
+
+// LE RAPPORT, EN CLAIR. Les refus se regroupent par RAISON — cinquante lignes
+// qui disent la même chose n'apprennent rien de plus que la raison et la liste
+// des numéros, et elles noieraient les autres.
+function renderRefus(box, lignes) {
+  const parRaison = new Map();
+  for (const l of lignes) {
+    const raison = l.refus.join(' · ');
+    if (!parRaison.has(raison)) parRaison.set(raison, []);
+    parRaison.get(raison).push(l.numero);
+  }
+  for (const [raison, numeros] of parRaison) {
+    const row = el('div', 'reg-import__refus');
+    const ou = numeros.length > 6
+      ? `lignes ${numeros.slice(0, 6).join(', ')} … (+${numeros.length - 6})`
+      : `ligne${numeros.length > 1 ? 's' : ''} ${numeros.join(', ')}`;
+    row.append(el('span', 'reg-import__ou', ou), el('span', 'reg-import__pourquoi', raison));
+    box.appendChild(row);
+  }
+}
+
+function renderImport(message, cls) {
+  const box = $('#reg-import');
+  if (!box) return;
+  box.replaceChildren();
+
+  // La porte : un vrai `<input type="file">`, caché derrière le bouton qui le
+  // déclenche — l'habillage natif ne prend pas la boîte des autres commandes de
+  // l'écran, et deux boutons sur une même barre ont la même hauteur.
+  const barre = el('div', 'reg-actions');
+  const champ = el('input');
+  champ.type = 'file';
+  champ.accept = '.csv,text/csv,text/plain';
+  champ.id = 'reg-import-fichier';
+  champ.className = 'reg-import__fichier';
+  champ.addEventListener('change', () => choisirFichierImport(champ.files && champ.files[0]));
+  const choisir = el('label', 'reg-btn');
+  choisir.setAttribute('for', 'reg-import-fichier');
+  choisir.append(ic('add'), el('span', null, importNom ? 'Choisir un autre fichier' : 'Choisir un fichier CSV…'));
+
+  const etat = el('span', `reg-status${cls ? ` ${cls}` : ''}`,
+    message || (importNom ? importNom : 'Aucun fichier choisi.'));
+  barre.append(etat, choisir, champ);
+  box.appendChild(barre);
+
+  if (!importRapport) return;
+
+  if (importRapport.erreur) {
+    const boite = el('div', 'reg-import__refus');
+    boite.append(el('span', 'reg-import__ou', 'Fichier refusé'),
+      el('span', 'reg-import__pourquoi', importRapport.erreur));
+    box.appendChild(boite);
+    return;
+  }
+
+  const r = importRapport.resume;
+  const resume = el('div', 'reg-import__resume');
+  const compte = (n, mot, alerte) => {
+    const c = el('span', `reg-import__compte${alerte && n ? ' est-refus' : ''}`);
+    c.append(el('b', null, String(n)), el('span', null, ` ${mot}`));
+    return c;
+  };
+  resume.append(compte(r.lues, 'lues'), compte(r.creees, 'à créer'), compte(r.majs, 'à mettre à jour'),
+    compte(r.inchangees, 'inchangées'), compte(r.refusees, 'refusées', true));
+  box.appendChild(resume);
+
+  if (importRapport.inconnues && importRapport.inconnues.length) {
+    box.appendChild(el('p', 'reg-import__note',
+      `Colonnes ignorées (aucun sens connu) : ${importRapport.inconnues.join(', ')}.`));
+  }
+
+  const refusees = importRapport.lignes.filter((l) => l.action === 'refus');
+  if (refusees.length) renderRefus(box, refusees);
+
+  // CE QUI VA CHANGER, PRIX PAR PRIX. « 4 mises à jour » ne dit pas si un prix
+  // passe de 6 à 6,50 ou de 6 à 600 : ce sont les deux nombres qui le disent.
+  const majs = importRapport.lignes.filter((l) => l.action === 'maj');
+  for (const l of majs.slice(0, 40)) {
+    const row = el('div', 'reg-import__maj');
+    row.append(el('span', 'reg-import__quoi', `${l.famille} / ${l.designation}${l.variante ? ` / ${l.variante}` : ''}`));
+    const quoi = l.changements.map((c) => {
+      const nom = { prixVenteTtc: 'vente', prixAchat: 'achat', tempsMoMin: 'MO', tempsMachineMin: 'machine', reference: 'réf.', actif: 'état' }[c.champ] || c.champ;
+      const val = (v) => (c.champ.startsWith('prix') ? euros(v) : String(v == null ? '—' : v));
+      return `${nom} ${val(c.avant)} → ${val(c.apres)}`;
+    }).join(' · ');
+    row.append(el('span', 'reg-import__delta', quoi));
+    box.appendChild(row);
+  }
+  if (majs.length > 40) {
+    box.appendChild(el('p', 'reg-import__note', `… et ${majs.length - 40} autres mises à jour.`));
+  }
+
+  if (importRapport.ecrit) return;   // déjà importé : plus rien à déclencher
+
+  const actions = el('div', 'reg-actions');
+  const go = el('button', 'reg-btn reg-btn--primary');
+  go.type = 'button';
+  go.append(ic('check'), el('span', null, `Importer (${r.creees + r.majs} lignes)`));
+  go.disabled = (r.creees + r.majs) === 0;
+  go.addEventListener('click', () => appliquerImport(go));
+  actions.append(el('span', 'reg-status', 'Rien n’est encore écrit.'), go);
+  box.appendChild(actions);
+}
+
 function wire() {
   const ta = $('#reg-wa-message');
   ta.addEventListener('input', sync);
@@ -852,6 +1103,7 @@ export async function refreshReglages() {
     api('GET', '/api/machines').then((d) => { if (Array.isArray(d)) machines = d; }).catch(() => {}),
     api('GET', '/api/flags').then((d) => { if (d) flags = d; }).catch(() => {}),
     api('GET', '/api/supplements-express').then((d) => { if (d) express = d; }).catch(() => {}),
+    api('GET', '/api/catalogue-produits').then((d) => { if (Array.isArray(d)) catalogue = d; }).catch(() => {}),
     api('GET', '/api/tarifs-transport').then((d) => { if (d) transports = d; }).catch(() => {}),
     api('GET', '/api/settings/entreprise').then((d) => { if (d) entreprise = d; }).catch(() => {}),
   ]);
@@ -861,6 +1113,11 @@ export async function refreshReglages() {
   renderModeles();
   renderMachines();
   renderFlags();
+  renderCatalogue();
+  // UN APERÇU EN COURS DE LECTURE N'EST PAS ÉCRASÉ. Revenir sur l'onglet
+  // pendant qu'on relit un rapport de 55 refus le ferait disparaître sous les
+  // yeux — même règle que le message WhatsApp et l'identité de l'atelier.
+  if (!importRapport) renderImport('');
   // UNE SAISIE EN COURS N'EST JAMAIS ÉCRASÉE. Redessiner l'identité pendant que
   // le patron tape son adresse lui reprendrait le champ sous les doigts — le
   // même piège que le message WhatsApp juste en dessous.

@@ -338,3 +338,56 @@ CREATE TABLE IF NOT EXISTS attachments (
   updated_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (request_id, kind)
 );
+
+-- LE CATALOGUE DU COMPTOIR, EN BASE (01/09/2026).
+--
+-- Il vivait en DUR dans `public/comptoir/catalogue.js` : familles, articles,
+-- variantes — et AUCUN prix, parce qu'un prix ne s'importe pas dans du code.
+-- C'était ça, le verrou : pas l'import, le catalogue. Le fichier reste, comme
+-- `tailles-logo-seed.json` reste : il est la SEMENCE d'une base neuve
+-- (`catalogue-produits-seed.json`), plus une source lue à chaud.
+--
+-- LES MÊMES COLONNES QUE LA GRILLE TARIFAIRE TASSE, qui marche déjà : prix
+-- d'achat, prix de vente TTC, temps de main-d'œuvre, temps machine. La tasse,
+-- elle, tient dans `app_meta` (dix-huit lignes lues d'un bloc) ; le catalogue
+-- fait quatre-vingts lignes qui s'importent par paquets et se corrigent une
+-- case à la fois — d'où une vraie table.
+--
+-- LES PRIX SONT NULLABLES, ET C'EST TOUT LE SUJET. Le catalogue d'aujourd'hui
+-- n'en porte aucun : les semer à 0 ferait annoncer « 0 € » au comptoir sur
+-- quatre-vingts produits. Un prix absent n'est pas un prix nul (même règle que
+-- `project_value` sur une demande de devis).
+--
+-- `label`, `note`, `couleur`, `famille_note` : ce que le menu du comptoir
+-- affiche déjà. Une tasse s'appelle « TC 01 » mais se lit « Tasse céramique
+-- 350 ml TC 01 » sur le devis — « TC 01 » seul ne dit rien à l'atelier trois
+-- jours plus tard.
+--
+-- `cle` : famille + désignation + variante, réduites (sans casse ni accent).
+-- C'est l'identité d'un produit, et c'est par elle que l'import retrouve une
+-- ligne existante — « Art de la Table » et « Art de la table » sont le même
+-- rayon. Son UNICITÉ est posée EN BASE, dans db.js : c'est elle qui empêche
+-- deux imports lancés en même temps de créer deux fois le même produit.
+-- Down : DROP TABLE catalogue_produits;
+--        DELETE FROM app_meta WHERE key = 'catalogue_produits_seed_v1';
+CREATE TABLE IF NOT EXISTS catalogue_produits (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  cle               text NOT NULL,
+  famille           text NOT NULL,
+  famille_note      text,                      -- « extérieur / intérieur » : l'intitulé du groupe au menu
+  designation       text NOT NULL,
+  variante          text NOT NULL DEFAULT '',  -- Bois / Liège, Clair / Foncé, XL… déjà dans la ligne du menu
+  note              text,                      -- « Rouge / Blanc » : ce qui suit le tiret au menu
+  label             text,                      -- l'intitulé porté sur le devis, s'il diffère de la désignation
+  couleur           text,                      -- ce que la ligne du besoin appelle `color`
+  reference         text NOT NULL DEFAULT '',
+  prix_achat        numeric(12,2),
+  prix_vente_ttc    numeric(12,2),
+  temps_mo_min      numeric(8,1),
+  temps_machine_min numeric(8,1),
+  actif             boolean NOT NULL DEFAULT true,
+  position          double precision,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_catalogue_produits_ordre ON catalogue_produits (position);

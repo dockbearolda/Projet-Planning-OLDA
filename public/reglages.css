@@ -110,8 +110,19 @@
 .reg-status { margin-right: auto; font-size: var(--taille-texte); color: var(--text-2); }
 .reg-status.is-ok { color: var(--st-livree); font-weight: var(--graisse-note); }
 .reg-status.is-ko { color: var(--st-bloque); font-weight: var(--graisse-note); }
+/* UN BOUTON DE REGLAGE MESURE PAREIL PARTOUT OU IL EST POSE. Sans `flex: 0 0
+   auto`, il se laisse ecraser par ce qui partage sa rangee — son libelle passe
+   sur deux lignes et il monte a 71 px quand les autres en font 50. C'est arrive
+   deux fois : au bouton « Remettre au planning » de la corbeille (29/08), puis
+   au « Choisir un fichier CSV... » de l'import (01/09), pousse par un message
+   de refus de trois lignes. La regle est donc UNE, sur le composant, et pas une
+   copie par endroit : deux ecritures redeviennent deux hauteurs le jour ou
+   l'une bouge. Le `@media (max-width: 700px)` plus bas la desserre exprès pour
+   que les boutons se partagent la largeur — il vient apres, il gagne. */
 .reg-btn {
-  min-height: var(--ctrl-h);           /* cible tactile : la tablette de l'atelier */
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: var(--ctrl-h);
   padding: 0 20px;
   border: 1px solid var(--border);
   border-radius: var(--arrondi-champ);
@@ -172,11 +183,6 @@
 .reg-corb__nom { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reg-corb__detail { font-size: var(--taille-note); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reg-corb__quand { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); font-variant-numeric: tabular-nums; }
-/* LE MÊME PIÈGE QUE `.reg-tarif-input`, dans l'autre sens : sans `flex: 0 0
-   auto`, le bouton se laisse écraser à 120 px, son libellé passe sur deux
-   lignes et il monte à 71 px — quand les deux autres `reg-btn` de l'écran font
-   50. Un composant partagé doit mesurer pareil partout où il est posé. */
-.reg-corb .reg-btn { flex: 0 0 auto; white-space: nowrap; }
 .reg-corb__vide { margin: 12px 0 0; font-size: var(--taille-texte); color: var(--text-2); }
 
 .reg-tarif-param { display: flex; flex-direction: column; gap: 4px; font-size: var(--taille-texte); color: var(--text-2); }@media (max-width: 700px) {
@@ -216,3 +222,45 @@
 .reg-champ { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
 .reg-champ__unite { font-size: var(--taille-note); color: var(--text-2); }
 .reg-inter { flex: 0 0 auto; width: var(--ic); height: var(--ic); accent-color: var(--primary); cursor: pointer; }
+
+/* IMPORT DE PRIX — le rapport que le patron lit AVANT que rien ne s'écrive.
+   Aucun composant neuf : la barre reprend `.reg-actions`, les lignes reprennent
+   la rangée `.reg-ligne`. Ce qui s'ajoute, c'est ce que ces deux-là n'ont pas —
+   une rangee de comptes, et deux colonnes pour dire « quoi » puis « pourquoi ».
+
+   LE CHAMP DE FICHIER EST CACHÉ, PAS ABSENT : son habillage natif ne prend pas
+   la boîte des autres commandes de l'écran (Chrome le dessine à 32 px quand
+   tout le reste en fait `--ctrl-h`), et deux boutons d'une même barre prennent
+   la même hauteur. C'est son `<label>` qu'on voit, et c'est un `.reg-btn`.
+   `position: absolute` et non `display: none` : un champ retiré du rendu n'est
+   plus atteignable au clavier, et l'écran se pilote au clavier. */
+.reg-import { display: flex; flex-direction: column; gap: 10px; }
+.reg-import__fichier {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+/* Le champ vient APRÈS son étiquette dans la rangée : c'est donc `:has()` qui
+   porte le focus visible, pas un frère adjacent. */
+.reg-btn:has(+ .reg-import__fichier:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.reg-import__resume { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 0; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+.reg-import__compte { font-size: var(--taille-texte); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.reg-import__compte b { color: var(--text-1); font-weight: var(--graisse-forte); }
+/* LA COULEUR DIT UN ÉTAT, et un refus en est un. Zéro refus reste à l'encre
+   ordinaire : « le vert se tait, l'échec parle ». */
+.reg-import__compte.est-refus, .reg-import__compte.est-refus b { color: var(--st-bloque); }
+
+.reg-import__refus, .reg-import__maj { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+.reg-import__ou, .reg-import__quoi { flex: 0 0 200px; font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-1); }
+.reg-import__ou { color: var(--st-bloque); }
+/* `min-width: 0` : sans lui, une raison longue garde sa largeur intrinsèque et
+   pousse la carte hors de la colonne (même piège que `.reg-tarif-input`). */
+.reg-import__pourquoi, .reg-import__delta { flex: 1 1 auto; min-width: 0; font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-2); }
+.reg-import__delta { font-variant-numeric: tabular-nums; }
+.reg-import__note { margin: 0; font-size: var(--taille-note); color: var(--text-2); }
