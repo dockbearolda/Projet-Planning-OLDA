@@ -24,6 +24,18 @@ const path = require('node:path');
 const RACINE = path.join(__dirname, '..');
 const DEVIS = ecran('demande-devis');
 const VENTE = ecran('vente-directe');
+// ⚠ LE COMPOSANT A DÉMÉNAGÉ LE 01/09. Il vivait dans `comptoir/pont.js` — 920
+// lignes — parce que ce fichier était alors le seul que les DEUX écrans du
+// comptoir lisent. Charlie en a demandé un troisième, sur le champ
+// « Désignation » d'un article du devis : « ce input doit avoir OBLIGATOIREMENT
+// une fonction recherche COMME TOUS LES INPUTS avec un menu déroulant ». Le
+// recopier dans le CRM aurait donné deux menus qui se ressemblent, et qui
+// divergent au premier correctif.
+//
+// Les gardes suivent le composant : elles lisent `public/menu-recherche.js`.
+// Ce qui RESTE dans pont.js — les trois noms que les écrans du patron
+// appellent, et le pont qui charge le module — se vérifie à part, plus bas.
+const MENU = fs.readFileSync(path.join(RACINE, 'public/menu-recherche.js'), 'utf8');
 const PONT = fs.readFileSync(path.join(RACINE, 'public/comptoir/pont.js'), 'utf8');
 
 // L'ÉCHELLE DE L'ÉCRAN (22/08/2026). Les tailles, graisses, interlignes et
@@ -97,7 +109,7 @@ function bloc(src, nom) {
 }
 // Garde-fou : sans lui, une extraction tronquée ferait passer les tests d'ordre
 // pour de mauvaises raisons (deux `indexOf` à -1 se valent).
-assert.ok(bloc(PONT, 'menuPeindre').includes('menu-option-texte'),
+assert.ok(bloc(MENU, 'menuPeindre').includes('menu-option-texte'),
   'l’extraction de menuPeindre doit couvrir toute la fonction');
 
 // --- 1. L'hôte reste ---------------------------------------------------------
@@ -109,14 +121,28 @@ assert.ok(/<select id="txRef" onchange="onTextileRefChange\(\)"/.test(DEVIS),
   'la référence reste un <select> : c’est lui qui porte valeur et évènement');
 assert.ok(/<input id="txColor" list="txColorList"/.test(DEVIS),
   'la couleur reste un champ LIBRE : la vendeuse peut saisir hors catalogue');
-assert.ok(/hote\.tagName!=='SELECT'/.test(PONT), 'le composant distingue le menu fermé du menu libre');
-assert.ok(/hote\.replaceWith\(peau\);\s*peau\.append\(hote\)/.test(PONT),
+assert.ok(/hote\.tagName!=='SELECT'/.test(MENU), 'le composant distingue le menu fermé du menu libre');
+assert.ok(/hote\.replaceWith\(peau\);\s*peau\.append\(hote\)/.test(MENU),
   'l’hôte est déplacé DANS la peau, jamais retiré de la page');
 
 // Le composant vit dans pont.js pour que les DEUX écrans du comptoir aient les
 // mêmes menus — et qu'un écran remplacé par le patron ne l'emporte pas.
-assert.ok(/window\.menusPoserTous\s*=/.test(PONT) && /window\.menuRafraichir\s*=/.test(PONT),
-  'pont.js expose de quoi poser et rafraîchir les menus');
+assert.ok(/window\.menusPoserTous\s*=/.test(PONT) && /window\.menuRafraichir\s*=/.test(PONT)
+  && /window\.menusRafraichirTous\s*=/.test(PONT),
+  'pont.js garde les TROIS noms que les écrans du patron appellent : ils sont écrits '
+  + 'dans leurs `onchange`, et un écran remplacé ne doit rien avoir à apprendre');
+assert.ok(/import\('\.\.\/menu-recherche\.js'\)/.test(PONT),
+  '… et il charge le composant partagé, il n’en porte plus de copie');
+assert.ok(!/const STYLE_MENU/.test(PONT) && !/function menuPoser/.test(PONT),
+  'plus une ligne du composant dans pont.js : deux écritures redeviennent deux menus');
+// ⚠ ET ILS RENDENT LA MAIN TOUT DE SUITE. `menusPoserTous` est appelé par un
+// MutationObserver qui tourne plusieurs fois par seconde ; le faire attendre le
+// module bloquerait le guet de l'écran de fin, donc l'envoi du dossier.
+assert.ok(/const quandMenus = \(faire\) => \{ if \(menuModule\) faire\(menuModule\); else menuAuRetour\.push\(faire\); \};/.test(PONT),
+  'le temps que le module arrive, les appels attendent dans une file — ils ne bloquent personne');
+// LE CALENDRIER N'EST PAS UN MENU : il reste posé par pont.js, au même moment.
+assert.ok(/document\.querySelectorAll\('input\[type="date"\]'\)\.forEach\(calendrierPoser\)/.test(PONT),
+  'le calendrier des deux parcours se pose toujours, et toujours d’ici');
 [['demande-devis', DEVIS], ['vente-directe', VENTE]].forEach(([nom, src]) => {
   assert.ok(/<script src="pont\.js"><\/script>/.test(src), `${nom} charge pont.js`);
 });
@@ -130,22 +156,22 @@ assert.ok(/window\.menusPoserTous=window\.menusPoserTous\|\|\(\(\)=>\{\}\)/.test
 
 assert.ok(/o\.dataset\.ref=r\.ref/.test(DEVIS),
   'chaque option porte sa référence : c’est elle qui devient le jeton');
-const peindreListe = bloc(PONT, 'menuPeindre');
+const peindreListe = bloc(MENU, 'menuPeindre');
 assert.ok(peindreListe.indexOf("className='menu-jeton'") < peindreListe.indexOf("className='menu-option-texte'"),
   'dans la liste, le jeton de référence est posé avant la désignation');
-const peindreChamp = bloc(PONT, 'menuPeindreChamp');
+const peindreChamp = bloc(MENU, 'menuPeindreChamp');
 assert.ok(peindreChamp.indexOf("className='menu-jeton'") < peindreChamp.indexOf("className='menu-texte'"),
   'dans le champ fermé, le jeton de référence est posé avant la désignation');
 // Le tri par référence rend la colonne de gauche lisible d'un trait.
 assert.ok(/\.sort\(\(a,b\)=>a\.ref\.localeCompare\(b\.ref,'fr',\{numeric:true\}\)\)/.test(DEVIS),
   'les références se rangent par référence dans leur groupe');
 // Les <optgroup> deviennent les titres de famille, collés en haut au défilement.
-assert.ok(/n\.tagName==='OPTGROUP'/.test(PONT), 'un optgroup devient un titre de famille');
+assert.ok(/n\.tagName==='OPTGROUP'/.test(MENU), 'un optgroup devient un titre de famille');
 
 // La teinte d'un coloris est une information, pas une décoration : sans elle
 // « Wet Sand » ne dit rien.
 assert.ok(/if\(hex\)o\.dataset\.hex=hex/.test(DEVIS), 'chaque coloris emporte sa teinte');
-assert.ok(/className='menu-pastille'/.test(PONT), 'la teinte devient une pastille');
+assert.ok(/className='menu-pastille'/.test(MENU), 'la teinte devient une pastille');
 
 // --- 3. Les écritures par programme -----------------------------------------
 
@@ -163,7 +189,7 @@ assert.ok(/\[\$\('txRef'\),\$\('txPrintType'\),\$\('txMarkColor'\)\]\.forEach\(m
 
 // Les options sont relues À CHAQUE ouverture : le formulaire les réécrit en
 // cours de route (coloris d'une référence, genres d'une famille).
-assert.ok(/function menuProposees\(etat\)\{[\s\S]{0,200}?return menuOptions\(etat\.hote\)\.filter/.test(PONT),
+assert.ok(/function menuProposees\(etat\)\{[\s\S]{0,200}?return menuOptions\(etat\.hote\)\.filter/.test(MENU),
   'la liste se construit sur les options du moment, jamais sur une copie figée');
 
 // --- 4. Les sorties ----------------------------------------------------------
@@ -173,23 +199,23 @@ assert.ok(/function menuProposees\(etat\)\{[\s\S]{0,200}?return menuOptions\(eta
 assert.ok(/const peau=el\.closest\('\.menu'\),cible=peau&&el\.tagName==='SELECT'\?peau:el/.test(DEVIS),
   'un menu fermé fait rougir sa peau, pas le <select> caché');
 assert.ok(/focusable\.focus\(\)/.test(DEVIS), 'le focus va sur le déclencheur, qui est visible');
-assert.ok(/menuEffacerRouge\(etat\)/.test(PONT), 'choisir efface le rouge du champ manquant');
-assert.ok(/dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/.test(PONT),
+assert.ok(/menuEffacerRouge\(etat\)/.test(MENU), 'choisir efface le rouge du champ manquant');
+assert.ok(/dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/.test(MENU),
   'choisir déclenche `change` : c’est lui qui porte les onchange du formulaire');
 
 // Un menu qui n'a pas encore d'options ne doit pas s'ouvrir sur du vide.
-assert.ok(/if\(!options\.length\)return;/.test(PONT),
+assert.ok(/if\(!options\.length\)return;/.test(MENU),
   'un menu sans options ne s’ouvre pas — le catalogue peut n’être pas encore là');
 
 // La liste NATIVE doit être débranchée du champ : tant que `list` reste posé,
 // Chrome ouvre la sienne — fond sombre, deuxième chevron — PAR-DESSUS la nôtre.
 // Le <datalist> reste dans la page, c'est le formulaire qui le remplit par son id.
-const poser = bloc(PONT, 'menuPoser');
+const poser = bloc(MENU, 'menuPoser');
 assert.ok(/hote\.dataset\.menuListe=hote\.getAttribute\('list'\);\s*hote\.removeAttribute\('list'\)/.test(poser),
   'le champ libre perd son attribut `list` : sinon la liste native s’ouvre par-dessus');
 assert.ok(/hote\.setAttribute\('autocomplete','off'\)/.test(poser),
   'les saisies mémorisées du navigateur se superposeraient pareil');
-assert.ok(/document\.getElementById\(hote\.dataset\.menuListe\|\|hote\.getAttribute\('list'\)\)/.test(PONT),
+assert.ok(/document\.getElementById\(hote\.dataset\.menuListe\|\|hote\.getAttribute\('list'\)\)/.test(MENU),
   'les options se relisent par le nom retenu');
 assert.ok(/<datalist id="txColorList">/.test(DEVIS) && /<datalist id="txMarkColorList">/.test(DEVIS),
   'les <datalist> restent dans la page : le formulaire les remplit par leur id');
@@ -197,9 +223,9 @@ assert.ok(/<datalist id="txColorList">/.test(DEVIS) && /<datalist id="txMarkColo
 // CLIQUER MONTRE TOUT. Un champ libre contient déjà une valeur : filtrer dessus
 // à l'ouverture ne laissait voir QUE cette valeur — « Multi couleur » cachait
 // les dix-sept autres couleurs de marquage. C'est exactement le bug remonté.
-assert.ok(/etat\.filtrer=false;\s*\/\* on ouvre sur la liste ENTIÈRE \*\//.test(PONT),
+assert.ok(/etat\.filtrer=false;\s*\/\* on ouvre sur la liste ENTIÈRE \*\//.test(MENU),
   'ouvrir un champ libre montre la liste entière, pas seulement sa valeur');
-assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\.filtre\.value/.test(PONT),
+assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\.filtre\.value/.test(MENU),
   'le filtre d’un champ libre ne part qu’à la première frappe');
 
 // Le panneau est plus large que son champ : celui de la dernière colonne
@@ -210,13 +236,13 @@ assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\
 // devenu conteneur défilant le même jour, et comptait dans sa largeur quoi
 // qu'on calcule. Il est désormais posé en position FIXE, hors du conteneur, et
 // ramené dans les bornes réelles — voir menu-ne-fait-pas-defiler.test.js.
-assert.ok(/function menuPlacer\(etat\)/.test(PONT),
+assert.ok(/function menuPlacer\(etat\)/.test(MENU),
   'le panneau est placé à la main');
-assert.ok(/if\(gauche\+largeur>b\.droite-marge\)gauche=b\.droite-marge-largeur/.test(PONT),
+assert.ok(/if\(gauche\+largeur>b\.droite-marge\)gauche=b\.droite-marge-largeur/.test(MENU),
   'un panneau qui ne tient pas à droite est ramené à l’intérieur');
-assert.ok(/if\(gauche<b\.gauche\+marge\)gauche=b\.gauche\+marge/.test(PONT),
+assert.ok(/if\(gauche<b\.gauche\+marge\)gauche=b\.gauche\+marge/.test(MENU),
   '… et il ne sort pas par la gauche pour autant');
-assert.ok(/menuPlacer\(etat\);/.test(bloc(PONT, 'menuOuvrir')),
+assert.ok(/menuPlacer\(etat\);/.test(bloc(MENU, 'menuOuvrir')),
   'le placement se recalcule à chaque ouverture');
 
 // Une couleur de marquage doit se VOIR : « Vert » et « Vert pastel » ne se
@@ -248,21 +274,21 @@ assert.ok(/const hex=TE\(\)\.markColorHexFor\(x\)/.test(DEVIS),
 // Les deux tiennent ensemble, parce que ce n'est plus le même objet : le champ
 // ne s'ajoute plus SOUS la bulle, il DEVIENT la bulle. Il n'y a toujours qu'un
 // seul champ pour une seule question — et le curseur y est déjà.
-assert.ok(!/MENU_SEUIL_FILTRE/.test(PONT), 'plus de seuil qui pose un filtre tout seul');
-assert.ok(/\.menu\.est-ouvert>\.menu-filtre\{/.test(PONT),
+assert.ok(!/MENU_SEUIL_FILTRE/.test(MENU), 'plus de seuil qui pose un filtre tout seul');
+assert.ok(/\.menu\.est-ouvert>\.menu-filtre\{/.test(MENU),
   'le champ de recherche se pose SUR le déclencheur, à sa place exacte');
-assert.ok(/if\(!libre\)peau\.append\(filtre\)/.test(PONT),
+assert.ok(/if\(!libre\)peau\.append\(filtre\)/.test(MENU),
   '… donc sur la peau du menu, pas dans le panneau');
-assert.ok(/if\(!etat\.libre\)etat\.filtre\.focus\(\)/.test(PONT),
+assert.ok(/if\(!etat\.libre\)etat\.filtre\.focus\(\)/.test(MENU),
   'ouvrir un menu, c’est vouloir choisir : le curseur est dans la bulle, sur TOUS les menus');
-assert.ok(/etat\.filtre\.placeholder=choisie&&choisie\.valeur/.test(PONT),
+assert.ok(/etat\.filtre\.placeholder=choisie&&choisie\.valeur/.test(MENU),
   'ce qui était choisi devient l’invite : on cherche sans perdre de vue ce qu’on remplace');
 
 // LA RECHERCHE COMPREND CE QU'ON TAPE VRAIMENT. « NS300 », « ns 300 »,
 // « n ns 300 », « NS-300 », « ns3 » désignent la même référence.
-assert.ok(/function menuReduire\(s\)\{return menuNorm\(s\)\.replace\(\/\[\^a-z0-9\]\+\/g,''\)\}/.test(PONT),
+assert.ok(/function menuReduire\(s\)\{return menuNorm\(s\)\.replace\(\/\[\^a-z0-9\]\+\/g,''\)\}/.test(MENU),
   'les deux côtés se réduisent à leurs lettres et à leurs chiffres avant comparaison');
-assert.ok(/if\(jeton&&jeton\.startsWith\(tout\)\)return 3/.test(PONT),
+assert.ok(/if\(jeton&&jeton\.startsWith\(tout\)\)return 3/.test(MENU),
   'une référence qui COMMENCE par ce qu’on tape remonte en tête — le rang compte autant que le filtre');
 assert.strictEqual((DEVIS.match(/data-menu-recherche/g) || []).length, 2,
   'deux listes seulement portent une recherche sur l’écran de devis');
@@ -273,13 +299,13 @@ assert.ok(/<select id="clientSelect"[\s\S]{0,200}?data-menu-recherche/.test(DEVI
 assert.ok(!/data-menu-recherche/.test(VENTE), 'aucune sur l’écran de vente directe');
 
 // Le clavier fait tout : le comptoir est un poste PC.
-const touche = bloc(PONT, 'menuTouche');
+const touche = bloc(MENU, 'menuTouche');
 ['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', 'Escape', 'Tab'].forEach((k) => {
   assert.ok(touche.includes(`'${k}'`), `la touche ${k} doit être traitée`);
 });
-assert.ok(/normalize\('NFD'\)/.test(bloc(PONT, 'menuNorm')),
+assert.ok(/normalize\('NFD'\)/.test(bloc(MENU, 'menuNorm')),
   'le filtre ignore les accents : « debardeur » doit trouver « Débardeur »');
-assert.ok(/addEventListener\('pointerdown'/.test(PONT),
+assert.ok(/addEventListener\('pointerdown'/.test(MENU),
   'un clic dehors referme AVANT que le clic n’atteigne ce qu’il visait');
 
 // La ligne d'essai du fichier du patron n'a jamais rien à faire dans le menu.
@@ -329,32 +355,32 @@ assert.ok(fs.existsSync(path.join(RACINE, 'public/olda-icones.woff2')), 'la poli
 // panneau, hors de la liste : ni emportée par un filtre, ni repoussée par le
 // défilement.
 
-assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(PONT),
+assert.ok(/if\(avecManuel\)panneau\.append\(manuel,saisie\);\s*panneau\.append\(tete,liste\)/.test(MENU),
   'la ligne d’ajout manuel est posée AVANT le filtre et la liste — tout en haut du panneau');
 // UN CHAMP LIBRE S'ÉCRIT DÉJÀ : un gros bouton « Saisir autre chose » y est du
 // bruit, il ne lui manque que de le DIRE. Une mention, pas une commande.
 // LA MÊME LIGNE PARTOUT, champ libre compris. Un deuxième message au même
 // endroit, formulé autrement, c'est déjà une hésitation.
-assert.ok(!/menu-mention/.test(PONT),
+assert.ok(!/menu-mention/.test(MENU),
   'plus de mention à part dans un champ libre : c’est « + Ajouter » comme ailleurs');
-assert.ok(/if\(!etat\.libre&&!\[\.\.\.hote\.options\]\.some\(o=>o\.value===texte\)\)\{/.test(PONT),
+assert.ok(/if\(!etat\.libre&&!\[\.\.\.hote\.options\]\.some\(o=>o\.value===texte\)\)\{/.test(MENU),
   'un champ libre porte sa valeur directement — il n’a pas d’options où la ranger');
-assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.menu\.est-saisie \.menu-liste\{display:none\}/.test(PONT),
+assert.ok(/\.menu\.est-saisie \.menu-manuel,\.menu\.est-saisie \.menu-tete,\.menu\.est-saisie \.menu-liste\{display:none\}/.test(MENU),
   'pendant la saisie libre la liste s’efface : une seule façon de répondre à la fois');
 
 // L'option libre déjà gérée par le formulaire n'apparaît pas DEUX fois : la
 // ligne du haut y renvoie, et la liste ne la montre plus.
-assert.ok(/const MENU_VALEURS_LIBRES=\['__new__','__manuel','__CUSTOM__'\]/.test(PONT),
+assert.ok(/const MENU_VALEURS_LIBRES=\['__new__','__manuel','__CUSTOM__'\]/.test(MENU),
   'les trois valeurs conventionnelles d’entrée libre sont reconnues d’office');
-assert.ok(/\(renvoi===undefined\|\|o\.valeur!==renvoi\)/.test(PONT),
+assert.ok(/\(renvoi===undefined\|\|o\.valeur!==renvoi\)/.test(MENU),
   'l’option vers laquelle la ligne renvoie sort de la liste — sinon elle y est deux fois');
 // « — Choisir une référence — » en tête de liste, mise en avant comme le choix
 // EN COURS, alors que c'est exactement ce que le champ fermé affiche déjà.
-assert.ok(/const rienChoisi=etat\.hote\.value==='';\s*return menuOptions\(etat\.hote\)\.filter\(o=>\s*\(renvoi===undefined\|\|o\.valeur!==renvoi\) && !\(rienChoisi&&o\.valeur===''\)\)/.test(PONT),
+assert.ok(/const rienChoisi=etat\.hote\.value==='';\s*return menuOptions\(etat\.hote\)\.filter\(o=>\s*\(renvoi===undefined\|\|o\.valeur!==renvoi\) && !\(rienChoisi&&o\.valeur===''\)\)/.test(MENU),
   'la ligne d’attente ne se propose pas tant que rien n’est choisi…');
 // … mais elle revient ensuite : sur « Délai souhaité », « Non précisée » n'est
 // pas un libellé d'attente, c'est une réponse — et le seul chemin de retour.
-assert.ok(/rienChoisi&&o\.valeur===''/.test(PONT),
+assert.ok(/rienChoisi&&o\.valeur===''/.test(MENU),
   '… et redevient proposable une fois une vraie valeur prise');
 // LA RÉFÉRENCE, ELLE, N'EN A PLUS DU TOUT (23/08/2026). Elle est obligatoire :
 // on ne revient jamais à « rien », et la ligne d'attente occupait la première
@@ -368,7 +394,7 @@ assert.ok(/txFill\(\$\('txRef'\),noeuds\);[\s\S]{0,400}?\$\('txRef'\)\.value='';
   '… et la référence repart explicitement sur aucune option sélectionnée');
 // Le compteur portait sur le contenu brut du <select> : « 49 / 50 » alors que
 // rien n'était filtré.
-assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(PONT),
+assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(MENU),
   'le compteur compte ce qui est proposé, pas ce que le <select> contient');
 
 // UNE VALEUR LIBRE NE DOIT JAMAIS DEVENIR UNE CLÉ DE BARÈME. `DB.times[x]` et
@@ -385,19 +411,19 @@ assert.ok(/const toutes=menuProposees\(etat\)\.length;/.test(PONT),
 assert.ok(/<select id="deliveryTime" data-menu-manuel-non/.test(VENTE),
   'une heure de retrait ne se saisit pas librement');
 assert.ok(/select\.setAttribute\('data-menu-manuel-non', ''\)/.test(PONT),
-  'l’indicatif du pays non plus : « 590 » ou rien');
+  'l’indicatif du pays non plus : « 590 » ou rien — et cette greffe-là reste au comptoir');
 
 // Ce qui est tapé devient une option RÉELLE de la liste — le formulaire lit
 // toujours `.value`, il n'a rien de spécial à savoir. Et une deuxième saisie
 // identique réutilise la même option, sinon la liste se remplit de doublons
 // au fil de la journée.
-assert.ok(/menuManuelFermer\(etat\);\s*menuChoisir\(etat,texte\)/.test(PONT),
+assert.ok(/menuManuelFermer\(etat\);\s*menuChoisir\(etat,texte\)/.test(MENU),
   'valider choisit la valeur : `change` part, le rouge s’efface, le formulaire suit');
 
 // Le panneau ne se rouvre jamais en cours de frappe libre, et se referme à plat.
-assert.ok(/etat\.filtrer=false;[^\n]*\n\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(PONT),
+assert.ok(/etat\.filtrer=false;[^\n]*\n\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(MENU),
   'ouvrir un menu repart de la liste, jamais du champ libre resté ouvert');
-assert.ok(/etat\.peau\.classList\.remove\('est-ouvert'\);\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(PONT),
+assert.ok(/etat\.peau\.classList\.remove\('est-ouvert'\);\s*etat\.peau\.classList\.remove\('est-saisie'\)/.test(MENU),
   'fermer un menu referme aussi la saisie libre');
 
 // --- 6. LE NUMÉRO DE LA LIGNE EN COURS ---------------------------------------
@@ -444,32 +470,32 @@ assert.ok(/Recharge la page\.';\s*\$\('txPreview'\)\.classList\.remove\('hidden'
 // Le chevron répondait à « il y a autre chose en dessous ». Au comptoir la
 // question n'est pas celle-là, c'est « est-ce que ça se clique ? ». Le doigt
 // le dit sans un mot, et le dit pareil sur les vingt-cinq champs.
-assert.ok(!/menu-chevron|menuChevron|menu-doigt|menuDoigt/.test(PONT),
+assert.ok(!/menu-chevron|menuChevron|menu-doigt|menuDoigt/.test(MENU),
   'RIEN dans le champ : ni flèche, ni pictogramme — la place revient au texte');
 // LE DOIGT EST LE CURSEUR. Un champ qui propose un choix se clique : la main
 // le dit au survol. Le déclencheur d'une liste l'avait déjà ; c'est le champ
 // LIBRE qui affichait un curseur de texte et se lisait comme une zone de
 // frappe ordinaire.
-assert.ok(/\.menu>input\{cursor:pointer;caret-color:transparent\}/.test(PONT),
+assert.ok(/\.menu>input\{cursor:pointer;caret-color:transparent\}/.test(MENU),
   'un champ libre qui propose un choix montre la main, pas le curseur de texte');
 // CLIQUER OUVRE, ÇA NE COMMENCE PAS UNE SAISIE. Le trait clignotant ramenait
 // le champ à une zone de frappe alors qu'on venait d'en faire un bouton.
-assert.ok(/\.menu>input\.est-frappe\{cursor:text;caret-color:auto\}/.test(PONT),
+assert.ok(/\.menu>input\.est-frappe\{cursor:text;caret-color:auto\}/.test(MENU),
   'le trait ne revient qu’une fois qu’on tape vraiment');
-assert.ok(/hote\.addEventListener\('keydown',ev=>\{\s*if\(ev\.key\.length===1\|\|ev\.key==='Backspace'\|\|ev\.key==='Delete'\)hote\.classList\.add\('est-frappe'\)/.test(PONT),
+assert.ok(/hote\.addEventListener\('keydown',ev=>\{\s*if\(ev\.key\.length===1\|\|ev\.key==='Backspace'\|\|ev\.key==='Delete'\)hote\.classList\.add\('est-frappe'\)/.test(MENU),
   'la première touche rend le trait — sur keydown, sinon il arrive une frappe en retard');
-assert.ok(/hote\.addEventListener\('pointerdown',\(\)=>hote\.classList\.remove\('est-frappe'\)\)/.test(PONT),
+assert.ok(/hote\.addEventListener\('pointerdown',\(\)=>hote\.classList\.remove\('est-frappe'\)\)/.test(MENU),
   'un clic le reprend : on revient à « je choisis »');
-assert.ok(/if\(etat\.libre\)etat\.hote\.classList\.remove\('est-frappe'\)/.test(PONT),
+assert.ok(/if\(etat\.libre\)etat\.hote\.classList\.remove\('est-frappe'\)/.test(MENU),
   'une valeur prise dans la liste n’est pas une saisie');
-assert.ok(/\.menu-declencheur\{[^}]*cursor:pointer/.test(PONT),
+assert.ok(/\.menu-declencheur\{[^}]*cursor:pointer/.test(MENU),
   'le déclencheur d’une liste aussi');
 // « Saisir autre chose… » barrait le haut du panneau comme une bannière. Un
 // raccourci se montre, il ne passe pas devant la réponse attendue.
-assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
+assert.ok(/\|\|'Ajouter';/.test(MENU) && !/Saisir autre chose/.test(MENU),
   'l’ajout manuel tient en un « + » et un mot');
 {
-  const manuel = reglesDe(PONT, '.menu-manuel');
+  const manuel = reglesDe(MENU, '.menu-manuel');
   const ech = echelleDe(DEVIS);
   // La page ne connaît plus qu'UNE taille de texte (22/08) : l'ajout manuel
   // l'a comme le reste, et se détache par sa graisse et son gris.
@@ -477,7 +503,7 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
     'il se lit à la taille du texte de la page');
   assert.strictEqual(resoudre(manuel['font-weight'], ech), '600',
     '… en demi-gras, pas en gras : ce n’est pas la réponse attendue');
-  assert.ok(/\.menu-manuel\{[^}]*color:var\(--text-2/.test(PONT), '… et en gris, pas à l’encre');
+  assert.ok(/\.menu-manuel\{[^}]*color:var\(--text-2/.test(MENU), '… et en gris, pas à l’encre');
 }
 
 
@@ -487,7 +513,7 @@ assert.ok(/\|\|'Ajouter';/.test(PONT) && !/Saisir autre chose/.test(PONT),
 // « input,select,textarea{…!important} » que les deux écrans imposent. Il était
 // 5 px plus court que l'<input> d'à côté, avec un trait plus fin (1 px contre
 // 1,5), plus sombre (#bcc2c8 contre #d7dce3) et moins arrondi (9 px contre 10).
-const declencheur = reglesDe(PONT, '.menu-declencheur');
+const declencheur = reglesDe(MENU, '.menu-declencheur');
 // ELLE ÉTAIT CALCULÉE, ELLE EST MAINTENANT LUE (25/08). Le calcul
 // « interligne + 2 × rembourrage + 3 » tenait tant que ses trois termes
 // restaient d'accord avec ceux du champ voisin — et ils avaient fini par
@@ -575,9 +601,9 @@ const regleChampHauteur = (src) => reglesDe(src, 'input,select').height || '';
 //
 // Elle était composée en monospace pour aligner les colonnes. Le patron n'en
 // veut pas : la graisse suffit à la détacher de la désignation qui la suit.
-assert.ok(!/font-family:ui-monospace/.test(PONT), 'plus de chasse fixe dans les menus');
+assert.ok(!/font-family:ui-monospace/.test(MENU), 'plus de chasse fixe dans les menus');
 {
-  const jeton = reglesDe(PONT, '.menu-jeton');
+  const jeton = reglesDe(MENU, '.menu-jeton');
   const ech = echelleDe(DEVIS);
   assert.strictEqual(resoudre(jeton['font-size'], ech), resoudre('var(--taille-texte)', ech),
     'la référence se lit à la taille du texte de la page');
@@ -587,7 +613,7 @@ assert.ok(!/font-family:ui-monospace/.test(PONT), 'plus de chasse fixe dans les 
 // par-dessus la désignation. Un plancher garde les courtes alignées et laisse
 // les longues pousser leur seule ligne — une référence ne se coupe jamais,
 // c'est elle qui identifie l'article.
-assert.ok(/\.menu-option \.menu-jeton\{[^}]*min-width:100px;flex:none\}/.test(PONT),
+assert.ok(/\.menu-option \.menu-jeton\{[^}]*min-width:100px;flex:none\}/.test(MENU),
   'la colonne des références a un plancher, pas une largeur fixe');
 
 
@@ -597,9 +623,9 @@ assert.ok(/\.menu-option \.menu-jeton\{[^}]*min-width:100px;flex:none\}/.test(PO
 // largeur du champ et finissait en points de suspension. Elle s'écrit à côté du
 // numéro de la ligne, où on la lit d'un coup d'œil — et l'infobulle du champ
 // porte toujours les deux.
-assert.ok(/if\(!\(choisie&&choisie\.jeton\)\)\{[\s\S]{0,220}?declencheur\.append\(t\);\s*\}/.test(PONT),
+assert.ok(/if\(!\(choisie&&choisie\.jeton\)\)\{[\s\S]{0,220}?declencheur\.append\(t\);\s*\}/.test(MENU),
   'une option qui porte une référence se suffit à elle-même dans le champ');
-assert.ok(/declencheur\.title=choisie&&choisie\.valeur\?\[choisie\.jeton,choisie\.texte\]/.test(PONT),
+assert.ok(/declencheur\.title=choisie&&choisie\.valeur\?\[choisie\.jeton,choisie\.texte\]/.test(MENU),
   '… l’infobulle, elle, garde la référence ET la désignation');
 assert.ok(/<span class="form-objet" id="txFormObjet"><\/span>/.test(DEVIS),
   'la désignation a sa place à côté du numéro de la ligne');
@@ -630,17 +656,17 @@ assert.ok(/function previewTextile\(\)\{\s*if\(!txReady\(\)\)return;\s*txPoserOb
 //      précédent dehors ;
 //   2. la zone qui défile n'a plus de rembourrage en haut — ces six pixels-là
 //      laissaient passer une bande de liste AU-DESSUS du titre collé.
-assert.ok(/cible=document\.createElement\('ul'\);\s*cible\.className='menu-famille-liste'/.test(PONT),
+assert.ok(/cible=document\.createElement\('ul'\);\s*cible\.className='menu-famille-liste'/.test(MENU),
   'chaque famille porte sa propre liste : c’est ce qui laisse le titre sortir');
-assert.ok(/cible\.setAttribute\('role','group'\)/.test(PONT),
+assert.ok(/cible\.setAttribute\('role','group'\)/.test(MENU),
   '… et elle s’annonce comme un groupe, pas comme une deuxième liste de choix');
-assert.ok(/const poser=\(el\)=>\{if\(cible\)cible\.append\(el\);else noeuds\.push\(el\)\}/.test(PONT),
+assert.ok(/const poser=\(el\)=>\{if\(cible\)cible\.append\(el\);else noeuds\.push\(el\)\}/.test(MENU),
   '… les options sans famille — le choix vide, la saisie manuelle — restent à la racine');
-assert.ok(/\.menu-liste\{[^}]*padding:0 6px 6px/.test(PONT),
+assert.ok(/\.menu-liste\{[^}]*padding:0 6px 6px/.test(MENU),
   'la zone qui défile n’a plus de rembourrage en haut : rien ne peut passer au-dessus du titre collé');
-assert.ok(!/\.menu-groupe:first-child/.test(PONT),
+assert.ok(!/\.menu-groupe:first-child/.test(MENU),
   'et plus d’exception de hauteur sur le premier titre : deux titres de hauteurs différentes au même endroit, c’est le défaut qui revient');
-assert.ok(/\.menu-groupe\{[^}]*white-space:nowrap/.test(PONT),
+assert.ok(/\.menu-groupe\{[^}]*white-space:nowrap/.test(MENU),
   '… un titre qui s’enroulerait sur deux lignes le ferait revenir aussi');
 
 console.log('✓ menus du comptoir : un seul modèle sur les deux écrans, la référence ouvre la ligne, la police est à nous');

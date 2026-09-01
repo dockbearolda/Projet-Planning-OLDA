@@ -91,6 +91,10 @@ const COQUILLE = [
   // l'atelier ne s'ouvre plus hors ligne, et les deux écrans du comptoir
   // retombent sur le calendrier de Chrome.
   '/calendrier.js',
+  // LE MENU DEROULANT AVEC RECHERCHE, extrait de pont.js le 01/09 : les DEUX
+  // ecrans du comptoir ET le CRM l'importent. Absent hors ligne, les <select>
+  // natifs restent en place — l'ecran est moins beau, il n'est pas en panne.
+  '/menu-recherche.js',
   // Le ticket de l'atelier, importé statiquement par app.js — même règle : absent
   // du cache, l'import échoue et le planning ne s'ouvre plus hors ligne.
   '/ticket.js',

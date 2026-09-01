@@ -509,13 +509,16 @@ assert.ok(/e\.data\.type === 'OLDA_THEME'/.test(PONT),
 // Le composant de menu posait un fond BLANC en dur : en thème sombre, le champ
 // restait blanc au milieu d'un écran anthracite, et sa valeur — écrite à
 // l'encre claire — devenait invisible.
-assert.ok(!/background:#fff|color:#fff/.test(PONT),
+// (Le composant a quitté pont.js le 01/09 : ses gardes le suivent dans
+// `menu-recherche.js`, que les DEUX écrans du comptoir et le CRM importent.)
+const MENU_JS = fs.readFileSync(path.join(RACINE, 'public/menu-recherche.js'), 'utf8');
+assert.ok(!/background:#fff|color:#fff/.test(MENU_JS) && !/background:#fff|color:#fff/.test(PONT),
   'le composant de menu ne peint plus en blanc en dur');
 // Et une valeur choisie ne se lit pas comme un placeholder : les deux états
 // pointaient sur le même jeton.
-assert.ok(/\.menu-texte\{[^}]*color:var\(--text-1/.test(PONT),
+assert.ok(/\.menu-texte\{[^}]*color:var\(--text-1/.test(MENU_JS),
   'une valeur choisie prend l’encre du texte');
-assert.ok(/\.menu-texte\.est-vide\{color:var\(--text-2/.test(PONT),
+assert.ok(/\.menu-texte\.est-vide\{color:var\(--text-2/.test(MENU_JS),
   '… et un menu vide garde le gris des placeholders');
 
 const NP = fs.readFileSync(path.join(RACINE, 'public/nouveau-projet.js'), 'utf8');
