@@ -47,6 +47,12 @@
       "pourquoi": "Même raison : la grille la tarife (« Tasse en Bois »). ÉCART CORRIGÉ le 01/09 : la grille sortait 16 € (10 + 6) là où le magasin vend 22 € — six euros perdus sur chaque devis, et rien à l'écran ne le disait. Charlie a tranché — « TASSE en bois 22euro » — et le composant « tasse nue » est passé de 10 € à 16 €. La grille sort désormais 22 €, tenu par test/tarifs-tasse.test.js."
     },
     {
+      "famille": "Goodies",
+      "designation": "Porte-clés",
+      "prix": 9,
+      "pourquoi": "Il n'y a PAS de porte-clés à 9 € (Charlie, 01/09) : cette ligne du fichier ne correspond à rien qu'on vende. « Friendly Books » à 9 €, c'est le MAGNET. Écartée et non refusée — ce n'est pas une erreur de lecture, c'est une décision, et les trois autres lignes du porte-clés entrent normalement."
+    },
+    {
       "famille": "perso textile",
       "pourquoi": "Même décision : les paliers « Avec / Sans textiles OLDA » et « Reprise Logo » sont du travail graphique sur textile — la grille de réglage que le textile n'a pas encore, et que la tasse a déjà."
     }
@@ -76,24 +82,41 @@
     "LE NOM D'UNE VARIANTE, RETROUVÉ PAR SON PRIX. C'est le seul repère que l'export",
     "laisse : deux lignes du même produit ne se distinguent que par leur montant.",
     "",
-    "⚠ DEUX VARIANTES AU MÊME PRIX SONT INDISTINGUABLES. Le Magnet et le Porte-clés",
-    "ont QUATRE lignes tarifées pour TROIS prix (7, 5, 9 et encore 7) : les deux à",
-    "7 € se fondent forcément en une. L'aperçu le DIT (« 2 lignes fondues »). Pour",
-    "les séparer il faut une colonne « Variante » dans le fichier — aucune règle ne",
-    "peut inventer ce que le fichier ne porte pas.",
+    "DEUX VARIANTES PEUVENT PARTAGER UN PRIX. Le magnet et le porte-clés ont chacun",
+    "QUATRE lignes tarifées pour TROIS montants (7, 5, 9 et encore 7) — et depuis le",
+    "01/09 on sait pourquoi : « Magnet acrylique et bois 7 euros », « les porte-clés",
+    "à 7 euros sont les acrylique et bois » (Charlie). Ce ne sont pas des doublons,",
+    "ce sont deux matières au même tarif.",
     "",
-    "Magnet et Porte-clés : noms déduits des lignes « Pack 3 + 1 » du même fichier",
-    "(4 pièces au prix de 3, donc pack ÷ 3 = prix unitaire). Contrôle : le Pack",
-    "Sticker à 12 € donne 4 €, et le Sticker EST à 4 € — la seule ligne du groupe",
-    "qui ne se contredisait pas."
+    "Une règle peut donc porter une LISTE (`variantes`) au lieu d'un nom",
+    "(`variante`) : les lignes de ce prix prennent les noms dans l'ordre où elles se",
+    "présentent. Les deux lignes étant par ailleurs identiques — même rayon, même",
+    "produit, aucune autre valeur — l'ordre ne change rien au résultat : il n'y a",
+    "que l'étiquette qui s'échange. Une ligne de plus que de noms reste SANS NOM et",
+    "sera refusée avec sa raison, plutôt que de reprendre un nom déjà pris et de se",
+    "fondre en silence dans la variante d'à côté.",
+    "",
+    "⚠ « CLASSIQUE » ÉTAIT UNE DÉDUCTION, ET ELLE ÉTAIT FAUSSE. Elle venait des",
+    "lignes « Pack 3 + 1 » du fichier (4 pièces au prix de 3, donc pack ÷ 3 = prix",
+    "unitaire) : le « Pack 3 + 1 Magnet classique » à 21 € donnait bien 7 €. Charlie",
+    "a tranché le 01/09 : à 7 €, ce sont l'acrylique et le bois. Le nom du pack est",
+    "conservé ici pour la trace, pas comme source.",
+    "",
+    "Les autres déductions par pack tiennent : Plexi 15 ÷ 3 = 5, Friendly Books",
+    "27 ÷ 3 = 9, Porte-clés Plexiglass 15 ÷ 3 = 5. Contrôle : le Pack Sticker à 12 €",
+    "donne 4 €, et le Sticker EST à 4 €.",
+    "",
+    "Le magnet et le porte-clés acrylique et bois se raréfient — « on en produit",
+    "plus beaucoup » (Charlie, 01/09). Ce n'est pas une raison de les retirer du",
+    "catalogue ; c'est une raison de ne pas en promettre cinquante au comptoir."
   ],
   "variantes": [
     { "famille": "Goodies", "designation": "Magnet", "prix": 5, "variante": "Plexi" },
-    { "famille": "Goodies", "designation": "Magnet", "prix": 7, "variante": "Classique" },
+    { "famille": "Goodies", "designation": "Magnet", "prix": 7, "variantes": ["Acrylique", "Bois"] },
     { "famille": "Goodies", "designation": "Magnet", "prix": 9, "variante": "Friendly Books" },
 
     { "famille": "Goodies", "designation": "Porte-clés", "prix": 5, "variante": "Plexiglass" },
-    { "famille": "Goodies", "designation": "Porte-clés", "prix": 7, "variante": "Classique" },
+    { "famille": "Goodies", "designation": "Porte-clés", "prix": 7, "variantes": ["Acrylique", "Bois"] },
 
     { "famille": "Papeterie", "designation": "Carte Postale", "prix": 2.5, "variante": "Petite" },
     { "famille": "Papeterie", "designation": "Carte Postale", "prix": 4, "variante": "Grande" },
@@ -108,7 +131,11 @@
     { "famille": "Tableaux", "designation": "Tableau Black", "prix": 59, "variante": "A3" },
 
     { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 59, "variante": "Grand" },
-    { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 39, "variante": "Petit" }
+    { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 39, "variante": "Petit" },
+
+    { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 4.5, "variante": "1 pièce" },
+    { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 15, "variante": "2 pièces" },
+    { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 19, "variante": "6 pièces" }
   ],
 
   "_en_attente": [
@@ -116,16 +143,36 @@
     "raison. On ne devine pas un prix : un tarif faux part au client sans que rien",
     "ne proteste.",
     "",
-    "· Goodies / Porte-clés à 9 € — « Friendly Books » est un MAGNET, pas un",
-    "  porte-clés (Charlie, 01/09). Ce 9 €, c'est quoi ?",
-    "· Goodies / Magnet ET Porte-clés — la QUATRIÈME variante, celle qui partage",
-    "  les 7 € de « Classique ».",
-    "· Art de la Table / Dessous Verre — 4,50 / 15 / 19 €. « 1, 2, 6 » ne tombe pas",
-    "  juste : 2 pièces à 15 € feraient 7,50 la pièce, plus cher que 4,50 l'unité.",
-    "  Avec 1 / 4 / 6, la dégressivité est propre : 4,50 · 3,75 · 3,17 la pièce.",
-    "· Verre / Verre à Ti Punch — 12 € noté ; reste une seconde ligne à 14 €.",
-    "· Sous-traitance / Armelle B — 49 · 69 · 89 · 6 · 25 €, cinq variantes sans nom.",
+    "LES PRIX SONT TRANCHÉS (01/09/2026). Charlie : « les prix que je viens de te",
+    "donner sont les prix qui font foi, c'est les derniers prix mis à jour par mon",
+    "patron ». Vérifié ligne à ligne contre le fichier : Tasse Céramique 16,",
+    "Expresso 14, Bois 22, Fuck 18 — les quatre concordent, et la grille de",
+    "chiffrage sort déjà les trois premiers (PR #188).",
+    "",
+    "LES GOODIES SONT TRANCHÉS AUSSI (01/09), et c'est le gros du reste : le magnet",
+    "et le porte-clés à 7 € sont l'acrylique et le bois ; il n'y a pas de porte-clés",
+    "à 9 €. Sept produits entrent proprement là où quatre lignes se contredisaient.",
+    "",
+    "IL RESTE CECI, ET CHARLIE A DIT « POUR LE RESTE ON S'EN FOUT » (01/09). Ces",
+    "lignes restent donc REFUSÉES à l'import, avec leur raison : rien de faux",
+    "n'entre au catalogue, et on n'y revient pas tant que personne ne le demande.",
+    "",
+    "· Verre / Verre à Ti Punch — deux lignes, 12 et 14 €. Charlie a dit « Verre Ti",
+    "  punch 12 » : c'est le prix du verre. Ce qu'est la ligne à 14 € reste inconnu,",
+    "  les deux se contredisent, les deux sont refusées.",
+    "· Sous-traitance / Armelle B — 49, 69, 89, 6 et 25 €, cinq variantes sans nom",
+    "  et sans pack pour les déduire.",
     "· Offres Spéciales — prix normal, ou prix PROMO ? Quatre de ses cinq articles",
-    "  sont déjà au catalogue sous un autre rayon."
+    "  sont déjà au catalogue sous un autre rayon.",
+    "· LA TABLE DE CORRESPONDANCE DES RAYONS reste le plus gros : sans elle, une",
+    "  quinzaine d'objets entrent EN DOUBLE (le Décapsuleur Bois à 6 € sous",
+    "  « Offres Spéciales », et sans prix sous « Art de la table »).",
+    "",
+    "DESSOUS VERRE EST TRANCHÉ (01/09) : trois lignes tarifées, 4,50 / 15 / 19, et",
+    "Charlie a dit « dessous de verre 1,2,6 ». Elles sont nommées dans l'ordre",
+    "croissant des prix — 1 pièce, 2 pièces, 6 pièces. La dégressivité n'est PAS",
+    "régulière (2 pièces à 15 € font 7,50 la pièce, contre 4,50 à l'unité) : ça a",
+    "été signalé, et le prix du patron fait foi. Une seule ligne à changer si",
+    "l'ordre n'est pas celui-là."
   ]
 }

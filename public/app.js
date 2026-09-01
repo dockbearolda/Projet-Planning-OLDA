@@ -7270,6 +7270,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'montravail') return mountMonTravail();
   if (viewMode === 'pilotage') return mountPilotage();
   if (viewMode === 'tailleslogos') return mountTaillesLogos();
+  if (viewMode === 'devisflash') return mountDevisFlash();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7345,10 +7346,12 @@ const $viewReglages = document.getElementById('viewReglages');
 const $viewMonTravail = document.getElementById('viewMonTravail');
 const $viewPilotage = document.getElementById('viewPilotage');
 const $viewTaillesLogos = document.getElementById('viewTaillesLogos');
+const $viewDevisFlash = document.getElementById('viewDevisFlash');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
 const $tailleslogos = document.getElementById('tailleslogos');
+const $devisflash = document.getElementById('devis-flash');
 // « VENTE » ET « DEVIS » SONT DEUX ONGLETS (29/08/2026, Charlie : « je veux
 // retrouver directement vente et devis, ils doivent être cliquables direct »).
 // Il y avait un onglet « Nouveau Projet » qui ne menait nulle part : il
@@ -7590,6 +7593,34 @@ function mountTaillesLogos() {
   }
 }
 
+// LE DEVIS CHIFFRE — meme montage paresseux. Il tire TROIS feuilles et deux
+// modules (l'ecran et le papier) : rien ne part du serveur tant qu'on n'a pas
+// ouvert l'onglet.
+//   · `reglages.css` pour la carte, la barre d'actions et le bouton — ceux des
+//     Reglages et des Tailles de logos, a un clic d'ici ;
+//   · `devis-flash.css` pour ce qu'aucun autre ecran ne porte : la coupe en deux
+//     moities et la rangee d'un article.
+// Le CHAMP, lui, n'a pas de feuille a poser : il vient de `fiche-atelier.css`,
+// qui part avec la coquille — c'est la grammaire du comptoir, et deux ecrans a
+// un clic l'un de l'autre doivent donner le meme composant.
+let dfLoading = null;
+let dfModule = null;
+function mountDevisFlash() {
+  if (!$devisflash) return;
+  if (!dfLoading) {
+    dfLoading = Promise.all([
+      poserFeuille('reglages.css'), poserFeuille('devis-flash.css'), import('./devis-flash.js'),
+    ])
+      .then(([, , m]) => { dfModule = m; return m.initDevisFlash($devisflash); })
+      .catch((err) => { dfLoading = null; dfModule = null; reportError(err); });
+  } else if (dfModule && dfModule.refreshDevisFlash) {
+    // ON NE REMONTE PAS L'ECRAN EN REVENANT DESSUS : un devis en cours de
+    // composition se perdrait au premier aller-retour vers le planning. Seuls
+    // les reglages (clients, catalogue, identite, taux) se relisent.
+    dfModule.refreshDevisFlash();
+  }
+}
+
 let mtLoading = null;
 let mtModule = null;
 function mountMonTravail() {
@@ -7782,6 +7813,7 @@ function setViewMode(mode) {
   if ($viewMonTravail) $viewMonTravail.classList.toggle('active', mode === 'montravail');
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
+  if ($viewDevisFlash) $viewDevisFlash.classList.toggle('active', mode === 'devisflash');
   // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
   if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
   if ($viewDevis) $viewDevis.classList.toggle('active', mode === 'projet' && location.hash === HASH_DEVIS);
@@ -7802,6 +7834,7 @@ function setViewMode(mode) {
   const montravail = mode === 'montravail';
   const pilotage = mode === 'pilotage';
   const tailleslogos = mode === 'tailleslogos';
+  const devisflash = mode === 'devisflash';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
@@ -7809,6 +7842,7 @@ function setViewMode(mode) {
   if ($montravail) $montravail.hidden = !montravail;
   if ($pilotage) $pilotage.hidden = !pilotage;
   if ($tailleslogos) $tailleslogos.hidden = !tailleslogos;
+  if ($devisflash) $devisflash.hidden = !devisflash;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7827,6 +7861,7 @@ function setViewMode(mode) {
   if (montravail) mountMonTravail();
   if (pilotage) mountPilotage();
   if (tailleslogos) mountTaillesLogos();
+  if (devisflash) mountDevisFlash();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7858,6 +7893,7 @@ const VIEWS = {
   [HASH_CLIENTS]: 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   '#pilotage': 'pilotage',
   '#tailles-logos': 'tailleslogos',
+  '#devis-flash': 'devisflash',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {

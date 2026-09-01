@@ -51,6 +51,11 @@ modules natifs, aucun build, aucun framework, aucun bundler).
   ni total HT, ni taxe, ni **note interne OLDA**. Le récapitulatif complet, lui,
   reste à disposition dans la fiche, en **téléchargement** : c'est un document de
   travail, il n'a jamais eu à sortir sur l'imprimante.
+- **Devis flash** : le devis se compose DEVANT le client — on saisit à gauche,
+  la feuille A4 se refait à droite à chaque frappe, on imprime, et le dossier
+  part au planning à « Tarif / Devis envoyé – Attente client ». Clients,
+  catalogue, taux de TGCA, tarif de transport, identité de l'atelier et numéro
+  de devis viennent tous de l'application — rien n'est écrit dans le code.
 - **Pastille WhatsApp** sur toute ligne dont le client a laissé un numéro : un
   clic ouvre la conversation avec le message « votre commande est prête » déjà
   écrit. Rien ne part tout seul, c'est l'employé qui appuie sur Envoyer. Le
@@ -259,6 +264,7 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron ; conservé le temps de confirmer qu'on n'y revient pas. |
 | POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
 | POST | `/api/devis/numero` | Même compteur, série distincte, pour une demande de devis (`DEV-26.07.30-001`). |
+| POST | `/api/devis` | **Le devis chiffré** de l'onglet « Devis flash » → crée la ligne à `demande_chiffrage / devis_envoye`, nature `demande` (le client n'a rien signé), `project_value` = le TTC annoncé, et archive dans `fiche.devis` le devis TEL QU'IL A ÉTÉ IMPRIMÉ. Réserve le numéro si l'écran n'a rien imprimé. Idempotent sur le numéro : renvoyer deux fois le même dossier rend la ligne existante. Refuse un devis sans client, sans article, ou dont le montant est illisible. |
 | GET | `/api/catalogue-produits` | **Le catalogue du comptoir** : `[{ id, famille, familleNote, designation, variante, note, label, couleur, reference, prixAchat, prixVenteTtc, tempsMoMin, tempsMachineMin, actif, position }]`. Ouvert en lecture — les deux écrans du comptoir sont des documents à part qui le lisent au chargement pour remplir leur menu produits. |
 | PUT | `/api/catalogue-produits` | Remplace la liste (corps = tableau), comme la grille tarifaire tasse. Réservé à `reglages`. Deux lignes de même clé (famille + désignation + variante, réduites) n'en font qu'une : la première gagne. |
 | POST | `/api/catalogue-produits/import/apercu` | `{ csv }` → **ce que l'import ferait, sans rien écrire** : `{ resume: { lues, creees, majs, inchangees, refusees }, lignes: [...], plan, signature }`. Un fichier illisible (guillemet non refermé, colonne obligatoire absente) est refusé EN ENTIER en 400. |
@@ -540,6 +546,62 @@ d'une ligne est figé dans `fiche.chiffrage` au moment de la prise, et le moteur
 `test/catalogue-produits-base.test.js`, qui joue la scène en entier : une vente
 à 6 €, le tarif qui triple, la quantité corrigée — le dossier reste à son prix.
 
+### Le devis flash — il se compose DEVANT le client (01/09/2026)
+
+Onglet **« Devis flash »**. On saisit à gauche, **la feuille A4 se refait à
+droite à chaque frappe** : le client voit le prix se faire, et le papier qu'il
+regarde est exactement celui qui sortira de l'imprimante — l'aperçu et le cadre
+d'impression reçoivent la MÊME chaîne de style (`CSS_DEVIS`).
+
+Ce n'est **pas** l'onglet « Devis » d'à côté : celui-là est la *demande* prise au
+comptoir, **sans prix** — c'est ce qu'on doit chiffrer. Celui-ci **est** le
+chiffrage.
+
+L'écran vient du patron ; ce qui a été repris, c'est son **parcours** (client,
+projet, délai, articles, fiscalité) et ses **textes commerciaux** — la phrase du
+délai et celle du bon à tirer, mot pour mot : ce n'est pas de la mise en forme,
+c'est ce qu'on peut opposer à la maison si la commande prend du retard. Tout le
+reste vient de l'application :
+
+| Il avait | Il a maintenant |
+|---|---|
+| trois clients écrits en dur | la **base clients** (`/api/clients`), et un client inconnu y entre à l'enregistrement |
+| trois articles pré-remplis | le **catalogue produits**, qui vit en base et se tarife par import |
+| une adresse et un IBAN dans le code | l'**identité de l'atelier**, un réglage — un déménagement ne demande pas un déploiement |
+| `TGCA 4 %` écrit dans le calcul | le **taux des Réglages** |
+| `1,80 €` de transport en dur | le **tarif de transport des Réglages** |
+| `DE0681` écrit dans le gabarit | le **compteur du serveur** — deux postes qui impriment ensemble ne peuvent pas remettre le même numéro |
+| un brouillon dans le navigateur | le brouillon **et** le dépôt au planning |
+
+**Le numéro se réserve au premier papier**, pas à l'ouverture de l'écran : un
+poste ouvert le matin et laissé là brûlerait un numéro par jour, et la série
+aurait des trous que personne ne saurait expliquer.
+
+**« Enregistrer au planning »** dépose le dossier à *Demande & chiffrage › Tarif /
+Devis envoyé – Attente client*, avec son montant : l'étape dit qu'on a chiffré,
+une colonne Prix vide la contredirait. Sa **nature reste `demande`** — le client
+n'a rien signé. Un devis imprimé qui n'est nulle part n'existe pas : personne ne
+le relance.
+
+**L'addition tombe juste par construction.** On arrondit le TTC (c'est le nombre
+que le client paie), puis le HT au centime, et la taxe est *ce qui reste* — pas
+un troisième arrondi indépendant. Sans ça un devis peut imprimer
+`100,00 + 4,00 = 104,01`, et c'est le genre de ligne qui fait rappeler un
+comptable. `test/devis-flash.test.js` le vérifie sur les trois arrondis, quatre
+prix unitaires et trois quantités.
+
+**Et le prix est figé** : `fiche.devis` archive le devis tel qu'il a été
+imprimé. Un tarif de catalogue qui change demain ne retarife jamais un devis
+déjà remis — joué de bout en bout dans `test/devis-au-planning.test.js`.
+
+L'écran **n'invente aucun composant** : la carte, la barre et le bouton viennent
+de `reglages.css` ; le champ (intitulé au-dessus, boîte toujours visible, 50 px)
+de `fiche-atelier.css`, qui le tient du comptoir — et les jetons de cette
+grammaire sont déclarés sur **une seule règle**, `.fa, .devis-flash` ; l'en-tête
+et la pilule de recherche de `charte.css`. Mesuré dans la coquille : 38
+commandes, **toutes à 50,0 px**, et quatre tailles de texte rendues — 14 / 17 /
+21 / 32, et rien d'autre.
+
 ### L'import de prix — on lit tout, on dit tout, PUIS on écrit
 
 Un écran dans **Réglages** avale un **CSV UTF-8** (« Enregistrer sous » depuis
@@ -577,10 +639,13 @@ code : un rayon qui change ne doit pas demander un déploiement. Trois sortes,
 appliquées dans cet ordre, et **toutes lues sur le rayon d'origine** — celui que
 le patron a sous les yeux dans son tableur :
 
-1. **`ecartes`** — un rayon qui n'est pas un produit (`Express` est un réglage,
-   `Perso` / `perso textile` sont du travail graphique). Ses lignes sont
-   comptées **`ecartees`**, jamais confondues avec un refus : ce n'est pas une
-   erreur, c'est une décision, et elle porte sa raison écrite.
+1. **`ecartes`** — ce qui ne doit pas entrer, à **trois portées** : un RAYON qui
+   n'est pas un produit (`Express` est un réglage, `Perso` / `perso textile` sont
+   du travail graphique), un PRODUIT (les trois tasses que la grille tarife
+   déjà), ou une **seule LIGNE** visée par son prix (`+ prix`) — « pas de
+   porte-clés à 9 € ». La plus précise l'emporte. Ces lignes sont comptées
+   **`ecartees`**, jamais confondues avec un refus : ce n'est pas une erreur,
+   c'est une décision, et elle porte sa raison écrite.
 2. **`variantes`** — le nom d'une variante, retrouvé par son **prix**, seul
    repère que l'export laisse. Une variante déjà écrite dans le fichier gagne
    toujours sur la règle.
@@ -595,9 +660,16 @@ Elle est donc **absorbée** ; et une ligne qui porte un prix mais qu'aucune règ
 n'a su nommer, alors que ses sœurs l'ont été, est **refusée** plutôt que posée
 au menu sans nom.
 
-**Deux variantes au même prix sont indistinguables** : le Magnet a quatre lignes
-tarifées pour trois prix, les deux à 7 € se fondent forcément. L'aperçu le dit ;
-les séparer demande une colonne « Variante » dans le fichier.
+**Deux variantes peuvent partager un prix**, et c'est le cas du Magnet comme du
+Porte-clés : quatre lignes tarifées pour trois montants (7, 5, 9 et encore 7).
+Le prix ne les distingue plus — mais on sait qu'il y en a deux et on sait leurs
+noms (« Magnet acrylique et bois 7 euros », Charlie, 01/09). Une règle porte
+alors une **liste** (`variantes: ["Acrylique", "Bois"]`) au lieu d'un nom, et
+les lignes de ce prix les prennent **dans l'ordre où elles se présentent** — les
+deux lignes étant par ailleurs identiques, seule l'étiquette s'échange. **Un nom
+déjà pris n'est jamais réutilisé** : deux lignes du même nom se *fondent* en un
+produit, et une variante disparaîtrait en silence. Une ligne de plus que de noms
+reste donc sans nom, et se fait refuser avec sa raison.
 
 Chaque ligne du rapport dit **ce qu'une règle lui a fait** — le rayon d'où elle
 vient, le nom posé sur sa variante. Une règle qui agit en silence est une règle
@@ -698,6 +770,11 @@ Deux exceptions assumées :
 │   ├── sw.js         service worker : coquille hors ligne, réseau prioritaire
 │   ├── maj.js        la bulle « mise à jour disponible » : compare l'empreinte du site et propose de recharger
 │   ├── ticket.js     le TICKET du client, reconstruit depuis la ligne (règles pures)
+│   ├── papier.js     LE SOCLE DES TROIS PAPIERS : encre, filet, marge, intitulés,
+│   │                 et l'identité de la maison (un RÉGLAGE, jamais du code)
+│   ├── devis.js      le DEVIS : le calcul de l'argent, et la feuille A4 (règles pures)
+│   ├── devis-flash.js  l'écran du devis : saisie à gauche, feuille vivante à droite
+│   ├── devis-flash.css la coupe en deux moitiés et la rangée d'article — rien d'autre
 │   ├── whatsapp.js   numéro au format international + message rempli (règles pures)
 │   ├── projet.css        coquille de Nouveau Projet (.np-*) : accueil, bascule, cadre
 │   ├── nouveau-projet.js aiguillage des 2 parcours + pont vers le planning

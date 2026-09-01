@@ -109,6 +109,82 @@ rap = analyserImport([
 assert.strictEqual(rap.plan.creations[0].variante, 'Bois gravé');
 assert.strictEqual(rap.lignes[0].varianteNommee, false, '… et le rapport ne prétend pas l’avoir nommée');
 
+// --- 2 bis. DEUX VARIANTES AU MÊME PRIX -------------------------------------
+// Le prix ne les distingue plus — mais on SAIT qu'il y en a deux, et on sait
+// leurs noms. « Magnet acrylique et bois 7 euros », « les porte-clés à 7 euros
+// sont les acrylique et bois » (Charlie, 01/09). La règle porte alors une LISTE,
+// et chaque ligne de ce prix prend le nom suivant.
+{
+  const deux = {
+    variantes: [
+      { famille: 'Goodies', designation: 'Magnet', prix: 5, variante: 'Plexi' },
+      { famille: 'Goodies', designation: 'Magnet', prix: 7, variantes: ['Acrylique', 'Bois'] },
+    ],
+  };
+  const r = analyserImport([
+    'Category;Item name;Price',
+    'Goodies;Magnet;',
+    'Goodies;Magnet;7',
+    'Goodies;Magnet;5',
+    'Goodies;Magnet;7',
+  ].join('\n'), [], deux);
+  assert.strictEqual(r.resume.creees, 3, 'trois variantes, dont deux au même prix');
+  assert.deepStrictEqual(r.plan.creations.map((c) => [c.variante, c.prixVenteTtc]),
+    [['Acrylique', 7], ['Plexi', 5], ['Bois', 7]],
+    'chaque ligne prend le nom suivant, dans l’ordre où elle se présente');
+  assert.strictEqual(r.resume.refusees, 0);
+
+  // ⚠ ON NE RÉUTILISE JAMAIS UN NOM DÉJÀ PRIS. Deux lignes du même nom se
+  // FONDENT en un seul produit : une variante disparaîtrait en silence, et le
+  // catalogue vendrait trois choses là où il y en a quatre. Une ligne de plus
+  // que de noms reste donc SANS NOM, et se fait refuser avec sa raison — c'est
+  // exactement ce qu'on veut lire dans l'aperçu avant d'écrire.
+  const trop = analyserImport([
+    'Category;Item name;Price',
+    'Goodies;Magnet;',
+    'Goodies;Magnet;7',
+    'Goodies;Magnet;7',
+    'Goodies;Magnet;7',
+  ].join('\n'), [], deux);
+  assert.strictEqual(trop.resume.creees, 2, 'deux noms, deux produits — pas trois');
+  assert.strictEqual(trop.resume.refusees, 1, 'la troisième ligne à 7 € n’a plus de nom');
+  assert.match(trop.lignes.find((l) => l.refus.length).refus[0], /variante inconnue pour 7/);
+}
+
+// --- 2 ter. UNE SEULE LIGNE S'ÉCARTE, pas tout le produit -------------------
+// « pas de porte-clés à 9 euros » (Charlie, 01/09). Le produit n'est pas à
+// écarter — ses autres lignes se vendent — c'est CETTE ligne-là qui ne
+// correspond à rien. Sans la portée « prix », il fallait choisir entre perdre
+// le produit entier et laisser entrer un tarif qui n'existe pas.
+{
+  const fine = {
+    ecartes: [{ famille: 'Goodies', designation: 'Porte-clés', prix: 9, pourquoi: 'il n’y en a pas à 9 €' }],
+    variantes: [
+      { famille: 'Goodies', designation: 'Porte-clés', prix: 5, variante: 'Plexiglass' },
+      { famille: 'Goodies', designation: 'Porte-clés', prix: 7, variantes: ['Acrylique', 'Bois'] },
+    ],
+  };
+  const r = analyserImport([
+    'Category;Item name;Price',
+    'Goodies;Porte-clés ;',
+    'Goodies;Porte-clés ;7',
+    'Goodies;Porte-clés ;5',
+    'Goodies;Porte-clés ;7',
+    'Goodies;Porte-clés ;9',
+  ].join('\n'), [], fine);
+  assert.strictEqual(r.resume.creees, 3, 'les trois autres lignes entrent normalement');
+  assert.strictEqual(r.resume.refusees, 0, 'et la ligne à 9 € n’est pas un refus');
+  const neuf = r.lignes.find((l) => l.numero === 6);
+  assert.match(neuf.ecarte, /9 €/, 'elle est écartée, avec sa raison');
+  assert.ok(!r.plan.creations.some((c) => c.prixVenteTtc === 9),
+    'aucun porte-clés à 9 € au catalogue');
+
+  // LA RÈGLE LA PLUS PRÉCISE L'EMPORTE : une ligne visée par son prix passe
+  // devant l'écart du produit, qui passe devant celui du rayon.
+  const portees = preparerRegles(fine);
+  assert.strictEqual(portees.ecartes.size, 1);
+}
+
 // --- 3. La ligne d'ouverture est absorbée, pas laissée derrière -------------
 // C'EST LE PIÈGE DE CE LOT. Sans absorption, la ligne sans prix reste seule dès
 // qu'une règle nomme les autres : le catalogue porte alors « Magnet » (sans

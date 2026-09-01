@@ -24,7 +24,7 @@
 // LE MODÈLE EST PUR : mêmes entrées, mêmes sorties, aucun DOM en dehors de
 // `dessinerBureau`. C'est ce qui le rend vérifiable hors navigateur.
 
-import { JETONS_PAPIER, SOCLE_PAPIER } from './papier.js';
+import { JETONS_PAPIER, SOCLE_PAPIER, maisonPapier } from './papier.js';
 // LE NOM DU CLIENT S'IMPRIME EN CAPITALES, comme il se lit à l'écran : c'est le
 // mot qu'on cherche en balayant une pile de papiers. Un particulier comme un
 // restaurant. La règle vit dans `nom-client.js`, une seule fois pour les six
@@ -240,39 +240,14 @@ function noteUtile(note, dejaDit) {
 // incomplet) ressort TELLE QUELLE : mieux vaut un numéro brut qu'un numéro
 // découpé de travers sur le document qui sert à facturer.
 
-// Un numéro français se lit par paires : 06 90 47 97 88. Dix chiffres exactement,
-// et rien d'autre — le « + » d'un international change le découpage.
-function telLisible(v) {
-  const brut = texte(v);
-  return /^\d{10}$/.test(brut) ? brut.replace(/(\d\d)(?=\d)/g, '$1 ') : brut;
-}
-
-// UN SIRET S'ÉCRIT GROUPÉ : les neuf chiffres du SIREN en trois groupes de
-// trois, puis les cinq du NIC. C'est la convention de l'INSEE, et c'est comme ça
-// qu'il se recopie sans se tromper de chiffre.
-// Le n° de TVA intracommunautaire, lui, s'écrit d'un bloc : ce n'est pas un
-// oubli de symétrie, c'est sa convention à lui.
-function siretLisible(v) {
-  const brut = texte(v);
-  return /^\d{14}$/.test(brut)
-    ? `${brut.slice(0, 3)} ${brut.slice(3, 6)} ${brut.slice(6, 9)} ${brut.slice(9)}`
-    : brut;
-}
-
-function maisonDe(e) {
-  const m = e && typeof e === 'object' ? e : {};
-  const legal = [];
-  if (texte(m.siret)) legal.push(`SIRET ${siretLisible(m.siret)}`);
-  if (texte(m.tva)) legal.push(`TVA ${texte(m.tva)}`);
-  return {
-    nom: texte(m.nom),
-    // L'adresse postale, telle qu'on l'écrirait sur une enveloppe.
-    lignes: [texte(m.adresse), texte(m.ville)].filter(Boolean),
-    // De quoi joindre la maison : c'est ce que le client cherche en premier.
-    contact: [telLisible(m.tel), texte(m.email), texte(m.web)].filter(Boolean),
-    legal,
-  };
-}
+// L'IDENTITÉ DE LA MAISON EST DANS LE SOCLE (`papier.js`) depuis le 01/09 :
+// le DEVIS la demande mot pour mot — nom, adresse, contact, numéros légaux,
+// coordonnées bancaires. Recopiée ici, elle serait devenue deux identités le
+// jour où l'une bouge, et cet écart-là ne se voit qu'en comparant deux
+// documents IMPRIMÉS. Les habillages du téléphone et du SIRET l'ont suivie :
+// ils n'habillent que ce qu'ils reconnaissent, et la valeur stockée ne bouge
+// jamais.
+const maisonDe = maisonPapier;
 
 // LE MODÈLE DU BON DE COMMANDE. `l` est une ligne du planning avec sa fiche
 // COMPLÈTE (celle de la liste est allégée du détail — voir allegerFiche).

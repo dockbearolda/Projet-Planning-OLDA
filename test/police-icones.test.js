@@ -75,6 +75,9 @@ const FABRIQUES = [
   'public/app.js',
   'public/clients.js',
   'public/dashboard.js',
+  // L'ecran du DEVIS depuis le 01/09 : sa fabrique est `ic()`, la forme (b) de
+  // l'extracteur ci-dessous.
+  'public/devis-flash.js',
   // La fiche atelier depuis le 29/08 : son menu des faces porte les deux cases
   // a cocher du panneau « Colonnes » et le « + » de la creation.
   'public/fiche-atelier.js',
@@ -113,7 +116,9 @@ assert.deepStrictEqual(porteurs, FABRIQUES,
 // fautive était bien dans le fichier, l'extracteur ne la lisait pas. Les
 // enveloppes sont donc RECENSÉES (ENVELOPPES ci-dessous) et le paragraphe 2 bis
 // vérifie qu'il n'en existe pas une de plus.
-const ENVELOPPES = ['carteSimple'];
+// `carte` est celle de l'ecran du devis, `carteSimple` celle des Reglages :
+// toutes deux recoivent un nom d'icone en parametre et le transmettent.
+const ENVELOPPES = ['carteSimple', 'carte'];
 
 function nomsDe(fichier) {
   const src = lire(fichier);

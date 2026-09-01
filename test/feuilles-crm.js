@@ -30,6 +30,7 @@ const FEUILLES_CRM = [
   'public/tailles-logos.css',
   'public/montravail.css',
   'public/pilotage.css',
+  'public/devis-flash.css',
 ];
 
 const lireFeuille = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');

@@ -81,8 +81,19 @@ const texteEntier = (n) => {
 // leur taille d'intitulé et leur marge de feuille — cinq valeurs identiques
 // écrites deux fois, ce qui redevient deux valeurs le jour où l'une bouge.
 for (const [nom, src] of [['ticket.js', TICKET], ['bureau.js', BUREAU]]) {
-  assert.match(src, /import \{ JETONS_PAPIER, SOCLE_PAPIER \} from '\.\/papier\.js';/,
+  assert.match(src, /import \{[^}]*\bJETONS_PAPIER\b[^}]*\bSOCLE_PAPIER\b[^}]*\} from '\.\/papier\.js';/,
     `${nom} doit prendre le socle partagé, pas réécrire sa propre grammaire`);
+}
+// L'IDENTITÉ DE LA MAISON EST DANS LE SOCLE, ELLE AUSSI (01/09). Le devis la
+// demande mot pour mot — nom, adresse, contact, numéros légaux, banque. Elle
+// vivait dans `bureau.js` ; recopiée pour le troisième papier, elle serait
+// devenue deux identités le jour où l'une bouge, et cet écart-là ne se voit
+// qu'en comparant deux documents IMPRIMÉS.
+assert.ok(/export function maisonPapier/.test(PAPIER),
+  'le socle porte l’identité de la maison, une seule fois pour les trois papiers');
+for (const [nom, src] of [['ticket.js', TICKET], ['bureau.js', BUREAU]]) {
+  assert.ok(!/function\s+(maisonDe|siretLisible|telLisible)\b/.test(src),
+    `${nom} refabrique l’identité de la maison : le socle ne sert plus à rien`);
 }
 for (const jeton of ['--pap-encre', '--pap-ardoise', '--pap-filet', '--pap-cap', '--pap-marge']) {
   assert.ok(PAPIER.includes(`${jeton}:`), `le socle doit poser ${jeton}`);

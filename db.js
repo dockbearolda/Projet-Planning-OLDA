@@ -2468,9 +2468,18 @@ async function setReglagesTextile(patch) {
 // papier sort avec ce qu'on sait, jamais avec une ligne « Adresse : — » sur le
 // document qui sert à facturer. Aucune valeur n'est inventée par défaut : nous
 // ne connaissons que le nom de la maison.
-const ENTREPRISE_CHAMPS = Object.freeze(['nom', 'adresse', 'ville', 'tel', 'email', 'siret', 'tva', 'web']);
+// SIX CHAMPS DE PLUS LE 01/09, et c'est le DEVIS qui les demande : il réclame
+// un acompte, donc il doit dire OÙ le verser (banque, IBAN, BIC), et il porte
+// les mentions légales complètes au pied (APE, RCS, capital) — celles qu'un
+// client fait vérifier à son comptable avant de signer. Les onze autres papiers
+// n'en ont pas besoin et ne les impriment pas : un champ vide ne s'imprime pas.
+// Rien n'a de valeur par défaut au-delà du nom : on ne devine pas l'IBAN d'un
+// atelier, et un IBAN faux coûte plus cher qu'un cadre absent.
+const ENTREPRISE_CHAMPS = Object.freeze(['nom', 'adresse', 'ville', 'tel', 'email', 'siret', 'tva', 'web',
+  'banque', 'iban', 'bic', 'ape', 'rcs', 'capital']);
 const ENTREPRISE_DEFAULTS = Object.freeze({
   nom: 'Atelier OLDA', adresse: '', ville: '', tel: '', email: '', siret: '', tva: '', web: '',
+  banque: '', iban: '', bic: '', ape: '', rcs: '', capital: '',
 });
 // Assez large pour une adresse sur deux lignes, assez court pour qu'un corps de
 // requête forgé ne remplisse pas la base.

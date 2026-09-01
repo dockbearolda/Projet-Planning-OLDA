@@ -45,7 +45,22 @@
   padding: var(--pas-4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
 
+/* ===========================================================================
+   LA GRAMMAIRE DE CHAMP, ET QUI LA PARTAGE
+   ===========================================================================
+   UNE SEULE REGLE POUR DEUX ECRANS (01/09). L'ECHELLE ET LA BOITE etaient
+   declarees sur `.fa` seul — c'est-a-dire sur un VOILE en `position: fixed`.
+   L'ecran du DEVIS reprend exactement le meme composant de champ (intitule
+   au-dessus, boite toujours visible, 50 px) : recopier les six jetons chez lui
+   aurait donne deux echelles qui se ressemblent, et la premiere a bouger aurait
+   laisse l'autre seule dans son coin — le defaut que la charte nomme en toutes
+   lettres. Les DEUX racines sont donc nommees ici, sur une seule regle ; les
+   classes `.fa-*` qui suivent servent les deux ecrans sans changer d'un signe.
+   La geometrie du voile, elle, reste au-dessus : elle n'appartient qu'a la
+   fiche. */
+.fa, .devis-flash {
   /* L'ECHELLE EST DECLAREE SUR LA RACINE, PAS SUR LA CARTE (30/08). Elle
      l'etait sur `.fa-carte` — mais le message du bas et le calque des pastilles
      sont poses A COTE de la carte, sur cette racine : leurs `var(--fa-…)` ne

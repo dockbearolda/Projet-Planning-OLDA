@@ -464,7 +464,17 @@ const ENTREPRISE_LIGNES = [
   ['email', 'E-mail', 'contact@exemple.fr'],
   ['web', 'Site', 'exemple.fr'],
   ['siret', 'SIRET', '812 345 678 00019'],
+  ['ape', 'Code APE', '1813Z'],
+  ['rcs', 'RCS', '812 345 678'],
   ['tva', 'N° de TVA', 'FR00 812345678'],
+  ['capital', 'Capital', '500,00 €'],
+  // OÙ LE CLIENT VERSE SON ACOMPTE. Trois lignes, et elles vont ensemble : le
+  // devis n'imprime son cadre de règlement que si les trois sont là — un devis
+  // qui réclame un acompte sans dire où le virer fait rappeler le client, et
+  // c'est pire qu'un cadre absent.
+  ['banque', 'Banque', 'Credit Mutuel'],
+  ['iban', 'IBAN', 'FR76 1234 5678 9012 3456 7890 123'],
+  ['bic', 'BIC', 'CMCIFR2A'],
 ];
 
 function renderEntreprise() {
