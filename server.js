@@ -5123,6 +5123,166 @@ function lignesLibelleValeur(brut) {
     .filter((l) => l.k && l.v);
 }
 
+// ---------------------------------------------------------------------------
+// LE DEVIS CHIFFRÉ — l'écran qui se compose devant le client
+// ---------------------------------------------------------------------------
+// CE N'EST PAS UNE DEMANDE DE DEVIS. Celle-là entre par le comptoir et vaut
+// « à chiffrer » : `project_value` NULL, surtout pas 0, qui se lirait
+// « gratuit ». Celui-ci EST le chiffrage : les lignes sont posées, le prix est
+// annoncé au client, le papier est imprimé. Il entre donc directement à
+// « Demande & chiffrage › Tarif / Devis envoyé – Attente client », avec son
+// montant — l'étape dit qu'on a chiffré, une colonne Prix vide la
+// contredirait.
+//
+// LA NATURE RESTE `demande` : le client n'a rien signé. C'est ce qui fait la
+// différence avec une vente, et c'est ce que le planning lit pour ne pas
+// compter un devis comme du chiffre d'affaires.
+//
+// L'ARITHMÉTIQUE VIENT DE L'ÉCRAN, comme pour la vente directe du comptoir
+// (`prixComptoir` sur `b.amount`) : elle vit une seule fois, dans
+// `public/devis.js`, et c'est elle qui a imprimé le papier que le client tient.
+// La recalculer ici en donnerait une DEUXIÈME — et le jour où les deux
+// divergent, c'est l'archive qui contredit le papier remis au client. Le
+// serveur contrôle donc que le montant est un nombre, et archive ce qui a été
+// imprimé.
+//
+// LE PRIX EST FIGÉ. `fiche.devis` porte les lignes telles qu'elles sont sorties
+// sur la feuille : un tarif de catalogue qui change demain ne retarife jamais
+// ce devis-ci.
+app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALaFois(async () => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const cl = b.client && typeof b.client === 'object' ? b.client : {};
+
+  const nomDossier = borner(cl.nom, 120);
+  if (!nomDossier) return res.status(400).json({ error: 'le nom du client est requis' });
+
+  // UN DEVIS SANS LIGNE N'EST PAS UN DEVIS. On refuse plutôt que d'ouvrir un
+  // dossier vide au planning, que personne ne saurait relire.
+  const lignes = (Array.isArray(b.lignes) ? b.lignes : [])
+    .filter((l) => l && typeof l === 'object' && trimOrNull(l.designation))
+    .slice(0, 60)
+    .map((l) => ({
+      designation: borner(l.designation, 200),
+      reference: borner(l.reference, 60),
+      couleur: borner(l.couleur, 80),
+      tailles: borner(l.tailles, 120),
+      marquage: borner(l.marquage, 120),
+      note: borner(l.note, 400),
+      quantite: Math.max(0, Math.round(Number(l.quantite) || 0)),
+      unitaireHt: Math.max(0, Math.round((Number(l.unitaireHt) || 0) * 100) / 100),
+      totalHt: Math.max(0, Math.round((Number(l.totalHt) || 0) * 100) / 100),
+    }));
+  if (!lignes.length) return res.status(400).json({ error: 'un devis sans article ne s’enregistre pas' });
+
+  // UN MONTANT ILLISIBLE N'EST PAS « PAS DE PRIX » : c'est une faute de frappe.
+  // On la renvoie à l'écran plutôt que d'enregistrer un devis sans montant, que
+  // personne ne remarque avant la relance.
+  const prix = prixComptoir(b.ttc);
+  if (prix.error) return res.status(400).json({ error: prix.error });
+  if (prix.valeur == null) return res.status(400).json({ error: 'le montant du devis est requis' });
+
+  // LE NUMÉRO EST CELUI DU PAPIER. L'écran le réserve avant d'imprimer — c'est
+  // lui que le client a sous les yeux. S'il n'a rien imprimé, on en réserve un
+  // ici : un dossier de devis sans référence ne se retrouve pas.
+  let numero = borner(b.numero, 40);
+  if (!numero) {
+    const r = await reserverNumeroDuJour('devis', { jour: b.jour });
+    numero = `DEV-${r.numero}`;
+  }
+
+  // IDEMPOTENCE. Le réseau peut avaler la RÉPONSE d'un envoi qui a pourtant
+  // abouti : l'écran annonce un échec, on réessaie, et le devis entrerait une
+  // seconde fois sous le même numéro. On rend alors la ligne existante.
+  const { rows: deja } = await pool.query(
+    "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [numero],
+  );
+  if (deja.length) {
+    return res.json({
+      id: deja[0].id, stage: deja[0].stage, subStage: deja[0].sub_stage,
+      numero, dejaEnregistre: true,
+    });
+  }
+
+  const famille = 'demande_chiffrage';
+  const sousEtape = 'devis_envoye';
+  const clientType = COMPTOIR_CLIENT_TYPE[String(cl.type || '').toLowerCase()] || 'pro';
+  const responsable = RESPONSABLE_SET.has(b.responsable) ? b.responsable : 'À attribuer';
+  const quantite = lignes.reduce((t, l) => t + l.quantite, 0) || null;
+  // CE QU'ON PRODUIT, EN UN MOT : la première désignation, et le nombre des
+  // autres. La colonne « Article » du planning fait deux cents pixels — y
+  // déverser quatre désignations n'y rend rien lisible, et le détail complet
+  // est de toute façon dans la fiche.
+  const produit = lignes.length > 1
+    ? borner(`${lignes[0].designation} + ${lignes.length - 1} autre${lignes.length > 2 ? 's' : ''}`, 200)
+    : lignes[0].designation;
+
+  const fiche = {
+    kind: 'devis-v1',
+    source: 'Devis',
+    ref: numero,
+    creeLe: new Date().toISOString(),
+    // LE DEVIS TEL QU'IL A ÉTÉ IMPRIMÉ. C'est l'archive : elle ne se retouche
+    // pas, et c'est elle qu'on ressort quand le client revient avec sa feuille.
+    devis: {
+      numero,
+      date: isDay(b.date) ? b.date : todayPlus(0),
+      validite: isDay(b.validite) ? b.validite : null,
+      projet: borner(b.projet, 120),
+      appro: borner(b.appro, 40),
+      regime: borner(b.regime, 40),
+      tauxTgca: Number(b.tauxTgca) || 0,
+      arrondi: borner(b.arrondi, 20),
+      lignes,
+      sousTotalHt: prixComptoir(b.sousTotalHt).valeur ?? null,
+      totalHt: prixComptoir(b.totalHt).valeur ?? null,
+      taxe: prixComptoir(b.taxe).valeur ?? null,
+      ttc: prix.valeur,
+      acompte: {
+        pourcent: [0, 30, 50, 100].includes(Number(b.acomptePourcent)) ? Number(b.acomptePourcent) : 0,
+        montant: prixComptoir(b.acompteMontant).valeur ?? null,
+      },
+    },
+    client: [
+      ['Client', nomDossier], ['Code client', borner(cl.code, 20)],
+      ['Ville', borner(cl.ville, 120)], ['Personne à contacter', borner(cl.contact, 120)],
+      ['Téléphone', borner(cl.tel, 40)], ['E-mail', borner(cl.email, 160)],
+    ].filter(([, v]) => v).map(([k, v]) => ({ k, v })),
+  };
+
+  const { rows: posRows } = await pool.query(
+    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+  );
+  const { rows } = await pool.query(
+    `INSERT INTO requests
+       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+        contact_referent, contact_phone, contact_email, quantity, product, description,
+        deadline, position, fiche, project_value)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+     RETURNING id`,
+    [
+      famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
+      borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
+      quantite, produit, borner(b.projet, DESCRIPTION_MAX),
+      // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE. Sans elle le dossier n'a pas
+      // d'échéance : la dater du jour le ferait paraître en retard dès demain
+      // alors que personne n'a rien promis au client.
+      isDay(b.dueDate) ? b.dueDate : null,
+      posRows[0].pos, JSON.stringify(fiche), prix.valeur,
+    ],
+  );
+
+  await upsertClientSansBloquer({
+    societe: nomDossier,
+    type: clientType,
+    contact: trimOrNull(cl.contact),
+    telephone: trimOrNull(cl.tel),
+    email: trimOrNull(cl.email),
+  });
+
+  broadcast({ kind: 'create', stages: [famille] });
+  res.status(201).json({ id: rows[0].id, stage: famille, subStage: sousEtape, numero });
+})));
+
 // POST /api/vente/numero → réserve le numéro du ticket de vente directe,
 // « 26.07.30-001 » : deux chiffres d'année, mois, jour, puis le rang de la vente
 // DANS LA JOURNÉE. Le compteur vit en app_meta (même principe que les codes

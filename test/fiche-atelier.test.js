@@ -95,12 +95,26 @@ assert.ok(/carte\.append\(tete, bandeau, scene\);/.test(JS)
 // bouton « Annuler » sortait en 17 px au lieu de 14. Une échelle se déclare là
 // où tout l'écran la lit.
 {
-  const RACINE_R = CSS.match(/\.fa \{[\s\S]*?\n\}/)[0];
+  // Le bloc qui porte l'échelle est celui dont la liste de sélecteurs COMMENCE
+  // par `.fa` — depuis le 01/09 elle en nomme deux (voir juste après).
+  const RACINE_R = CSS.match(/\n\.fa,[^{]*\{[\s\S]*?\n\}/)[0];
   const CARTE_R = CSS.match(/\.fa-carte \{[\s\S]*?\n\}/)[0];
   assert.ok(/--fa-lab:/.test(RACINE_R) && /--fa-h-champ:/.test(RACINE_R),
     'les crans et les boîtes sont sur la racine');
   assert.ok(!/^\s*--fa-[a-z-]+:/m.test(CARTE_R.replace(/\/\*[\s\S]*?\*\//g, ' ')),
     '… et plus aucun sur la carte : ce qui vit à côté d’elle les lirait de travers');
+  // UNE SEULE RÈGLE POUR DEUX ÉCRANS (01/09). L'écran du DEVIS reprend le même
+  // composant de champ — intitulé au-dessus, boîte toujours visible, la boîte de
+  // l'application. Recopier les six jetons chez lui aurait donné deux échelles
+  // qui se ressemblent, et la première à bouger aurait laissé l'autre seule dans
+  // son coin. Les deux racines sont donc nommées sur LA MÊME règle.
+  assert.ok(/\.fa, \.devis-flash \{/.test(CSS),
+    'la grammaire de champ est déclarée une fois pour la fiche ET le devis');
+  // … et la géométrie du voile, elle, n'appartient qu'à la fiche : un écran
+  // plein qui hériterait de `position: fixed` recouvrirait le planning.
+  const VOILE = CSS.match(/\n\.fa \{[\s\S]*?\n\}/)[0];
+  assert.ok(/position: fixed/.test(VOILE) && !/--fa-lab:/.test(VOILE),
+    'le voile reste à la fiche seule ; l’échelle est dans la règle partagée');
 }
 // LA PASTILLE DE CONFIRMATION EST RETIRÉE (30/08, Charlie : « sur la validation
 // c'est moche, je n'aime pas du tout »). Elle disait une TROISIÈME fois ce que

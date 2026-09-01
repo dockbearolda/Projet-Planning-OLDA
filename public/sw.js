@@ -54,6 +54,8 @@ const COQUILLE = [
   '/tailles-logos.css',
   '/montravail.css',
   '/pilotage.css',
+  // La feuille du DEVIS (01/09), posee avec son ecran comme les cinq du dessus.
+  '/devis-flash.css',
   '/app.js',
   '/dashboard.js',
   '/priority.js',
@@ -108,6 +110,12 @@ const COQUILLE = [
   '/nouveau-projet.js',
   '/clients.js',
   '/reglages.js',
+  // L'ECRAN DU DEVIS ET SON PAPIER (01/09). Le devis se compose DEVANT le
+  // client : c'est exactement le moment ou l'on ne peut pas attendre que le
+  // reseau revienne. Sans `devis.js` dans la coquille, l'ecran s'ouvrirait sans
+  // sa feuille — donc sans le document qu'il sert a produire.
+  '/devis-flash.js',
+  '/devis.js',
   // Les deux parcours du comptoir, affichés dans un cadre par Nouveau Projet.
   // LEUR FEUILLE EST UN FICHIER À PART depuis le 27/08 : sans elle dans la
   // coquille, l'écran s'ouvre hors ligne SANS UNE SEULE RÈGLE — il n'est pas

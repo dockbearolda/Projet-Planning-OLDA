@@ -1,0 +1,266 @@
+/* ===========================================================================
+   LE DEVIS — l'écran, et rien que sa mise en place (01/09/2026)
+   ===========================================================================
+   CET ÉCRAN N'INVENTE AUCUN COMPOSANT. Le patron l'avait écrit d'un bloc, avec
+   sa propre échelle, ses propres boîtes et ses propres couleurs ; tout ça
+   existait déjà trois fois dans l'application.
+
+     · la CARTE, la BARRE D'ACTIONS et le BOUTON viennent de `reglages.css` —
+       ceux des Réglages et des Tailles de logos, à un clic d'ici ;
+     · le CHAMP (intitulé au-dessus, boîte toujours visible, 50 px) vient de
+       `fiche-atelier.css`, qui le tient lui-même du comptoir : `.fa-case`,
+       `.fa-lab`, `.fa-in`. Les jetons de cette grammaire sont déclarés sur
+       `.fa, .devis-flash` — UNE règle, deux écrans ;
+     · l'EN-TÊTE et la PILULE DE RECHERCHE viennent de `charte.css`.
+
+   Il ne reste donc ici que ce qu'aucun autre écran ne porte : la coupe en deux
+   moitiés, la feuille qui se tient à droite pendant qu'on saisit à gauche, et
+   la rangée d'un article.
+
+   LA MOITIÉ DROITE NE BOUGE PAS PENDANT QU'ON ÉCRIT. C'est tout l'intérêt du
+   devis vivant : le client regarde son papier se faire. Les deux colonnes
+   défilent donc SÉPARÉMENT — une seule barre pour toute la page aurait fait
+   remonter la feuille dès qu'on descend dans le formulaire.
+   =========================================================================== */
+
+.devis-flash:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  /* Le débordement est géré par chaque colonne : la page, elle, ne défile pas. */
+  overflow: hidden;
+}
+
+/* L'en-tête tient toute la largeur : il coiffe les deux moitiés, il n'appartient
+   pas à l'une d'elles. */
+.dvf-deux {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* LA SAISIE PREND UN PEU PLUS QUE LA FEUILLE. Une feuille A4 se lit très bien
+     réduite ; un formulaire de devis, non — il porte quatre champs par rangée.
+     `minmax(0, …)` sur les deux pistes : sans lui, la largeur intrinsèque d'un
+     champ (une vingtaine de caractères) l'emporte sur la fraction, et la
+     colonne de gauche déborde de sa moitié. */
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+}
+
+/* Chaque moitié défile pour elle-même. `min-width: 0` pour la même raison que
+   ci-dessus, sur l'axe horizontal cette fois. */
+.dvf-saisie,
+.dvf-apercu {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.dvf-saisie {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-4);
+  padding: 0 var(--ecran-pad-x) 40px;
+}
+/* LA FEUILLE EST POSÉE SUR UN FOND, PAS SUR LA PAGE. Le papier est blanc, la
+   surface d'une carte aussi : sur le fond général de l'application, une feuille
+   A4 se serait fondue dans l'écran et on n'aurait plus vu où elle commence. */
+.dvf-apercu {
+  padding: 0 var(--pas-4) var(--pas-4);
+  background: var(--zone-bg);
+  border-left: 1px solid var(--border);
+}
+/* LA FEUILLE GARDE SES PROPORTIONS. Elle fait 210 mm par construction (c'est ce
+   qui sortira de l'imprimante) : dans une colonne plus étroite, on la met à
+   l'échelle plutôt que de la rogner — on verrait alors autre chose que ce qu'on
+   imprime. `transform` ne réserve pas de place, d'où la hauteur rendue au
+   conteneur par `--dvf-echelle`. */
+.dvf-feuille {
+  --dvf-echelle: 1;
+  transform: scale(var(--dvf-echelle));
+  transform-origin: top center;
+}
+.dvf-cadre {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* --- La rangée d'un article ------------------------------------------------
+   Un article, c'est un bloc de champs et un total. Le bloc reprend la zone
+   douce de l'application (`--zone-bg`) : ce n'est pas une carte dans une carte,
+   c'est un groupe DANS la carte des articles. */
+.dvf-art {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rangee);
+  padding: var(--pas-3);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--arrondi-bloc);
+  background: var(--zone-bg);
+}
+.dvf-art__tete {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+}
+/* `min-width: 0` : une désignation longue pousserait le total et la corbeille
+   hors du bloc. */
+.dvf-art__nom {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--text-1);
+}
+.dvf-art__vide { color: var(--text-3); font-weight: var(--graisse-note); }
+.dvf-art__total {
+  flex: 0 0 auto;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+}
+
+/* DEUX GRILLES, ET PAS UNE DE PLUS. Une rangée de QUATRE champs a été essayée
+   puis retirée le jour même : mesurée dans la coquille à 1280 px — le plus
+   petit poste de l'atelier — la colonne de saisie fait 484 px, la carte 440, sa
+   rangée 356. Quatre champs et trois gouttières y laissaient 59 px à la
+   DÉSIGNATION, c'est-à-dire quatre caractères pour « T-shirt Unisexe Bio Léger
+   Premium 155 g ». La désignation prend donc sa propre ligne, et ce qui se
+   compte tient à trois par rangée. */
+.dvf-r3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--rangee);
+  align-items: start;
+}
+.dvf-r2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rangee);
+  align-items: start;
+}
+/* UN NOMBRE SE LIT PAR LA DROITE, et ses chiffres font tous la même largeur :
+   sans ça, deux prix l'un sous l'autre ne s'alignent pas sur la virgule. */
+.dvf-nb { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Le résultat du calcul, sous les trois réglages d'argent --------------
+   Les mêmes nombres que la feuille, dans la même colonne que les réglages qui
+   les produisent : c'est là qu'on les regarde en parlant au client. Ils
+   viennent tous de `calculerDevis`, comme le papier — deux calculs qui se
+   ressemblent finissent par se contredire. */
+.dvf-totaux { display: flex; flex-direction: column; }
+.dvf-tot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pas-3);
+  padding: var(--pas-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--taille-texte);
+  color: var(--text-2);
+}
+.dvf-tot b { color: var(--text-1); font-weight: var(--graisse-forte); font-variant-numeric: tabular-nums; }
+.dvf-tot--grand {
+  border-bottom: 0;
+  border-top: 2px solid var(--text-1);
+  padding-top: var(--pas-3);
+  color: var(--text-1);
+  font-weight: var(--graisse-forte);
+}
+.dvf-tot--grand b { font-size: var(--taille-grand); letter-spacing: -.02em; }
+
+/* --- Ce que la recherche client propose ------------------------------------
+   LA LISTE NE POUSSE RIEN. Elle sort du flux, sous la pilule de recherche :
+   posée dans la colonne, elle aurait descendu les quatre champs du client à
+   chaque frappe — et c'est exactement ce que la règle du message interdit. */
+.dvf-cherche { position: relative; }
+.dvf-props {
+  position: absolute;
+  z-index: 5;
+  inset-inline: 0;
+  top: calc(100% + var(--pas-1));
+  /* CINQ PROPOSITIONS, PAS UN NOMBRE DE PIXELS. La liste s'arrête sur une
+     rangée entière : bornée en pixels, elle coupe la sixième en deux et on
+     croit la liste finie. La rangée, c'est la boîte de l'application. */
+  max-height: calc(5 * var(--ctrl-h));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.dvf-props[hidden] { display: none; }
+.dvf-prop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pas-3);
+  width: 100%;
+  min-height: var(--ctrl-h);
+  padding: var(--pas-1) var(--champ-x);
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.dvf-prop:last-child { border-bottom: 0; }
+.dvf-prop:hover, .dvf-prop:focus-visible { background: var(--surface-hover); outline: none; }
+.dvf-prop__ou { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
+.dvf-prop__qui { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--graisse-note); }
+
+/* --- L'état du délai -------------------------------------------------------
+   LA COULEUR DIT UN ÉTAT, et c'en est un : ce que l'atelier peut promettre.
+   C'est la seule teinte de l'écran. */
+.dvf-etat {
+  display: flex;
+  align-items: center;
+  /* IL SE REPLIE, LUI. C'est un MESSAGE, pas une valeur : la boîte de valeur
+     partagée (`.fa-case__v`) tient ses enfants sur une ligne — c'est ce qu'il
+     faut pour une date ou un montant, et c'est ce qui faisait déborder la
+     colonne de saisie de 150 px, mesuré à 1280 px. Une phrase de délai se
+     replie et rétrécit ; elle garde la boîte de l'application comme plancher,
+     et elle est la dernière rangée de sa carte : en grandissant elle ne pousse
+     rien. */
+  min-width: 0;
+  white-space: normal;
+  min-height: var(--ctrl-h);
+  padding: var(--pas-2) var(--champ-x);
+  border: var(--champ-trait) solid transparent;
+  border-radius: var(--arrondi-champ);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-serre);
+}
+.dvf-etat--ok { background: var(--success-bg); border-color: var(--success-line); color: var(--success); }
+.dvf-etat--attention { background: var(--warning-bg); border-color: var(--warning-line); color: var(--warning); }
+.dvf-etat--danger { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger); }
+
+/* --- Le pied d'une carte : une aide, et rien qui pousse ------------------- */
+.dvf-aide { margin: 0; font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-2); }
+.dvf-vide {
+  padding: var(--pas-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--arrondi-bloc);
+  text-align: center;
+  font-size: var(--taille-texte);
+  color: var(--text-2);
+}
+
+/* SOUS 1180 px, LA FEUILLE PASSE SOUS LE FORMULAIRE. Deux moitiés de 520 px
+   donnent un formulaire à quatre champs par rangée illisible ET une feuille
+   réduite de moitié : ni l'un ni l'autre ne sert. On empile, et chacun reprend
+   toute la largeur. */
+@media (max-width: 1180px) {
+  .dvf-deux { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  .dvf-saisie, .dvf-apercu { overflow: visible; }
+  .dvf-apercu { border-left: 0; border-top: 1px solid var(--border); padding-top: var(--pas-4); }
+  .dvf-r3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
