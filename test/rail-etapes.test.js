@@ -141,9 +141,14 @@ assert.ok(!/localStorage/.test(blocGlisse),
   'l’ouverture au glisser ne doit rien écrire : elle est temporaire');
 assert.match(APP, /function refermerApresGlisser/,
   'et le rail se referme à la fin du geste');
-// Refermée dans les TROIS sorties du geste : dépose, réordonnancement, annulation.
-assert.strictEqual((APP.match(/refermerApresGlisser\(\)/g) || []).length, 4,
-  'refermée à la définition + aux trois sorties du geste (dépose, réordre, annulation)');
+// Refermée dans les QUATRE sorties du geste : dépose, réordonnancement,
+// annulation par le système (pointercancel), et abandon (Échap, la fenêtre qui
+// part en Alt+Tab, le clic droit — cf. `annulerGlisser`, 01/09). Une sortie qui
+// oublie le rail le laisse déplié sur des étapes vides que personne n'a ouvertes.
+assert.strictEqual((APP.match(/refermerApresGlisser\(\)/g) || []).length, 5,
+  'refermée à la définition + aux quatre sorties du geste');
+assert.match(APP, /function annulerGlisser\(\)/,
+  'un geste abandonné a sa propre sortie : sans elle, rien ne se relâche');
 
 // ON NE REPEINT QU'UNE FOIS PAR PHASE. Le suivi en vol tourne à chaque frame :
 // reconstruire le rail soixante fois par seconde ferait clignoter tout le côté
