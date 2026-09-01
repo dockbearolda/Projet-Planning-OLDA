@@ -1481,20 +1481,21 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-/* poignée de glisser (largeur : voir .col-handle plus bas, avec ses voisines) */
-.handle-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: var(--row-h);
-}
+/* LA POIGNÉE DE GLISSER REMPLIT SA CELLULE (largeur : voir .col-handle plus
+   bas, avec ses voisines). Elle mesurait 28 px dans une colonne de 44, et
+   `--row-h` de haut dans une cellule qui grandit avec son contenu : autour du
+   dessin, 8 px de vide à gauche, 8 à droite et jusqu'à 18 en bas où la prise ne
+   répondait pas. On vise la COLONNE de gauche, pas un pictogramme de 20 px.
+   `height: 100%` se résout bien ici : la cellule qui la porte a une hauteur
+   (`.grid tbody td { height: var(--row-h) }`), et le plancher la garde debout
+   si cette règle bouge un jour. */
 .handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: var(--row-h);
+  width: 100%;
+  height: 100%;
+  min-height: var(--row-h);
   color: var(--text-3);
   cursor: grab;
   touch-action: none;
@@ -3369,19 +3370,25 @@ body.col-resizing .grid-wrap { pointer-events: none; }
 }
 
 /* ---------------------------------------------------------------- Drag ghost */
+/* CE QU'ON TIENT — une étiquette, à côté du curseur. Elle prenait la largeur de
+   la LIGNE (jusqu'à 1 300 px) posée sous le curseur : elle masquait la ligne
+   visée, débordait sur le panneau des colonnes et sortait de la fenêtre. Elle
+   se dimensionne maintenant sur son texte, bornée à 320 px : où l'on dépose se
+   lit sur la liste, qui se réordonne en direct sous elle. */
 .drag-ghost {
   position: fixed;
   left: 0; top: 0;
   will-change: transform;
   z-index: 1000;
   pointer-events: none;
+  max-width: 320px;
   background: var(--surface);
   border: 1px solid var(--primary);
   border-radius: var(--arrondi-champ);
   box-shadow: var(--shadow-pop);
-  padding: 10px 14px;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-texte);
+  padding: 6px 12px;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
   color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;

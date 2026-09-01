@@ -2061,19 +2061,22 @@ function buildRow(r) {
   if (r.flag === 'bloque') tr.classList.add('is-bloque');
   else if (r.flag === 'a_voir') tr.classList.add('is-a-voir');
 
-  // début de ligne : poignée draggable + icône contact discret
-  // (téléphone / email), sans modifier le reste.
+  // DÉBUT DE LIGNE : LA POIGNÉE, ET ELLE REMPLIT SA CELLULE. Elle tenait
+  // 28 px de large dans une colonne de 44, et la hauteur d'une ligne NORMALE
+  // (`--row-h`) dans une cellule qui grandit avec son contenu : on visait donc
+  // une boîte bordée de 8 px de vide à gauche, 8 à droite et jusqu'à 18 en bas,
+  // tous inertes. La colonne entière est la zone de prise — on vise la gauche
+  // de la ligne, pas un pictogramme de 20 px.
+  // Le `div.handle-cell` qui l'enveloppait servait un second contenu (une icône
+  // de contact) retiré depuis : il ne restait qu'une boîte autour d'une boîte.
   const tdHandle = document.createElement('td');
   tdHandle.className = 'col-handle';
-  const handleCell = document.createElement('div');
-  handleCell.className = 'handle-cell';
   const grip = document.createElement('div');
   grip.className = 'handle';
   attachTip(grip, 'glisser pour déplacer');
   grip.appendChild(gripIcon());
-  handleCell.appendChild(grip);
   attachDrag(grip, tr, r);
-  tdHandle.appendChild(handleCell);
+  tdHandle.appendChild(grip);
   tr.appendChild(tdHandle);
 
   // étoiles : 1 à 3, attribuables au clic (réglent la priorité de la ligne)
@@ -5030,14 +5033,29 @@ function copyToStage(r, slug) {
 // on utilise donc les Pointer Events (souris, doigt et stylet unifiés).
 let dragState = null;
 
-// Sur une carte du planning, toute la surface est saisissable : la poignée EST
-// la carte. Mais elle porte aussi des boutons (référent, ouvrir la fiche), et
+// DEUX LISTES, PAS UNE — les confondre a éteint le glisser des lignes.
+//
+// `ZONE_SANS_PRISE`, ce qui n'est JAMAIS une prise : les vrais contrôles. Sur
+// une carte du planning toute la surface est saisissable — la poignée EST la
+// carte — mais elle porte aussi des boutons (référent, supprimer), et
 // `preventDefault()` sur `pointerdown` supprime les évènements souris de
-// compatibilité — donc le `click` qui suit. Sans cette garde, aucun bouton posé
+// compatibilité, donc le `click` qui suit. Sans cette garde, aucun bouton posé
 // sur une zone de prise ne répondrait plus.
-// La poignée de glissement en fait partie depuis le 28/08 : la LIGNE s'ouvre
-// maintenant au clic, et attraper sa poignée ne doit pas ouvrir sa fiche.
-const ZONE_CLIQUABLE = 'button, a, input, select, textarea, label, [role="button"], .handle';
+//
+// `ZONE_CLIQUABLE`, ce qui n'OUVRE PAS la fiche au clic : les mêmes contrôles,
+// PLUS la poignée. La ligne s'ouvre au clic depuis le 28/08 : attraper sa
+// poignée ne doit pas ouvrir son dossier.
+//
+// LA POIGNÉE APPARTIENT À LA SECONDE LISTE, PAS À LA PREMIÈRE. Entrée le 28/08
+// dans la liste unique que les deux gestes se partageaient alors, elle a éteint
+// le glisser en silence : appuyer sur les six points vise le `<svg>` du
+// pictogramme, soit un élément qui n'EST pas la poignée mais dont
+// `closest('.handle')` la trouve — la garde « ce n'est pas une prise » se
+// déclenchait donc sur la prise elle-même. Il ne restait que les 4 px de marge
+// autour du dessin pour attraper une ligne. C'est exactement ce que l'atelier
+// décrivait : « on n'arrive pas à attraper les six points ».
+const ZONE_SANS_PRISE = 'button, a, input, select, textarea, label, [role="button"]';
+const ZONE_CLIQUABLE = `${ZONE_SANS_PRISE}, .handle`;
 
 // À la SOURIS, relâcher une carte qu'on vient de déplacer émet aussi un `click`
 // sur elle. Sans cette garde, tout glisser-déposer se terminait par l'ouverture
@@ -5049,7 +5067,7 @@ const glisserVientDeFinir = () => performance.now() - finGlisser < 300;
 function attachDrag(handle, tr, r) {
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (e.target !== handle && e.target.closest && e.target.closest(ZONE_CLIQUABLE)) return;
+    if (e.target !== handle && e.target.closest && e.target.closest(ZONE_SANS_PRISE)) return;
     // Au doigt / stylet, une CARTE ne se saisit que par sa poignée : le reste de
     // sa surface reste libre pour faire défiler la liste (elle occupe tout
     // l'écran du planning, un `touch-action: none` global y bloquait le
@@ -5072,7 +5090,7 @@ function attachDrag(handle, tr, r) {
     dragState = {
       id: r.id, r, tr, handle,
       startX: e.clientX, startY: e.clientY,
-      pointerId: e.pointerId, active: false, ghost: null, grabDX: 0, grabDY: 0,
+      pointerId: e.pointerId, active: false, ghost: null,
       raf: 0, lastX: e.clientX, lastY: e.clientY,
     };
     try { handle.setPointerCapture(e.pointerId); } catch (_) {}
@@ -5083,19 +5101,29 @@ function attachDrag(handle, tr, r) {
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
     window.addEventListener('pointercancel', onDragEnd);
+    // Les trois sorties sans dépose (cf. annulerGlisser) : Échap, la fenêtre qui
+    // part, le menu contextuel. Posées et retirées avec le geste, jamais à
+    // demeure — un écouteur de clavier qui survit au glisser avale l'Échap de
+    // la fiche.
+    window.addEventListener('keydown', toucheGlisser, true);
+    window.addEventListener('blur', annulerGlisser);
+    window.addEventListener('contextmenu', annulerGlisser);
   });
 }
 
 function beginDrag() {
-  const { tr, r, startX, startY } = dragState;
-  const rect = tr.getBoundingClientRect();
+  const { tr, r } = dragState;
   dragState.active = true;
-  dragState.grabDX = startX - rect.left;
-  dragState.grabDY = startY - rect.top;
+  // UNE ÉTIQUETTE, PAS UNE BARRE. Le fantôme prenait la LARGEUR DE LA LIGNE —
+  // 1 308 px sur le poste du patron — et se posait sous le curseur : il
+  // recouvrait la ligne visée, débordait sur le panneau « Colonnes » et sortait
+  // de la fenêtre. On ne voyait plus où l'on déposait, alors que c'est
+  // justement ce qu'on regarde. La ligne d'origine, elle, se déplace déjà en
+  // direct dans la liste (`.dragging`, cf. placerDansLaListe) : elle dit la
+  // destination, l'étiquette dit ce qu'on transporte — deux rôles, deux tailles.
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
   ghost.textContent = nomClientAffiche(r.billing_company, r.client_type) || r.product || 'commande';
-  ghost.style.width = rect.width + 'px';
   document.body.appendChild(ghost);
   dragState.ghost = ghost;
   dragState.wrap = document.querySelector('.grid-wrap');
@@ -5124,9 +5152,12 @@ function onDragMove(e) {
   }
   e.preventDefault();
   // Position du fantôme : transform compositor-only → suit le doigt à chaque
-  // évènement, sans déclencher de layout/repaint.
+  // évènement, sans déclencher de layout/repaint. L'étiquette se pose À CÔTÉ du
+  // curseur (14 px à droite, centrée sur lui) et jamais dessous : ce qu'on
+  // regarde en glissant, c'est la ligne qu'on vise, pas ce qu'on tient. Le
+  // décalage vit dans le `transform`, donc sans mesurer la boîte au vol.
   dragState.ghost.style.transform =
-    `translate3d(${e.clientX - dragState.grabDX}px, ${e.clientY - dragState.grabDY}px, 0)`;
+    `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(14px, -50%)`;
   // Détection de cible + réordonnancement : ces lectures de layout
   // (elementFromPoint, getBoundingClientRect par ligne) sont coûteuses, on les
   // limite à une fois par frame pour ne pas saturer le thread au tactile.
@@ -5220,6 +5251,65 @@ function updateDragTarget() {
   autoScroll(y);
 }
 
+// TOUT CE QUI TIENT LE GESTE EN L'AIR, RENDU EN UNE SEULE FOIS : les écouteurs,
+// la capture de pointeur, le suivi en vol, les marques posées sur la ligne et
+// l'étiquette. Trois sorties s'en servent — la dépose, l'abandon, et le simple
+// clic qui n'a jamais franchi le seuil — et elles doivent défaire exactement la
+// même chose. Ce qu'une seule d'entre elles oublierait resterait collé à l'écran
+// jusqu'au rechargement.
+function relacherGlisser(ds) {
+  if (ds.raf) cancelAnimationFrame(ds.raf);
+  if (defilementRaf) { cancelAnimationFrame(defilementRaf); defilementRaf = 0; }
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragEnd);
+  window.removeEventListener('pointercancel', onDragEnd);
+  window.removeEventListener('keydown', toucheGlisser, true);
+  window.removeEventListener('blur', annulerGlisser);
+  window.removeEventListener('contextmenu', annulerGlisser);
+  try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
+  // La ligne cesse d'être « prise » quoi qu'il arrive ensuite — y compris sur
+  // un simple tap. L'oublier, c'était figer la ligne : jamais reconstruite, elle
+  // gardait indéfiniment ce qu'elle affichait au moment du tap, sans plus jamais
+  // suivre le temps réel.
+  ds.tr.classList.remove('prise-en-cours');
+  ds.tr.classList.remove('dragging');
+  if (ds.ghost) ds.ghost.remove();
+  document.body.classList.remove('dragging-active');
+  document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
+  hideTip();
+  dragState = null;
+}
+
+// TROIS FAÇONS DE LÂCHER UNE LIGNE SANS LA DÉPOSER, et Windows les sert toutes
+// les trois : la touche Échap (le geste qu'on cherche quand on s'aperçoit qu'on
+// tient la mauvaise ligne), Alt+Tab qui emporte la fenêtre au milieu du glisser,
+// et le clic droit qui pose le menu du système par-dessus. Aucune n'émet de
+// `pointerup` : sans cette sortie, l'étiquette restait collée à l'écran, la
+// ligne figée en transparence, et le suivi en vol tournait dans le vide jusqu'au
+// rechargement. Rien ne se dépose et rien ne s'écrit — la grille reprend
+// simplement l'ordre qu'elle avait.
+function annulerGlisser() {
+  if (!dragState) return;
+  const ds = dragState;
+  const enVol = ds.active;
+  relacherGlisser(ds);
+  if (!enVol) return;
+  // Le bouton relâché après coup émet quand même un `click` sur la ligne : sans
+  // cette marque, abandonner un glisser ouvrait la fiche qu'on ne voulait pas.
+  finGlisser = performance.now();
+  refermerApresGlisser();
+  applySortAndRender();
+}
+
+// En CAPTURE et arrêtée net : Échap referme aussi le calendrier et la fiche, et
+// un geste en cours passe avant eux.
+function toucheGlisser(e) {
+  if (e.key !== 'Escape' || !dragState) return;
+  e.preventDefault();
+  e.stopPropagation();
+  annulerGlisser();
+}
+
 async function onDragEnd(e) {
   if (!dragState) return;
   // Seul le doigt qui a commencé le glisser peut le terminer. Sans ce filtre,
@@ -5228,30 +5318,14 @@ async function onDragEnd(e) {
   // une entrée du rail, donc un changement d'étape que personne n'a demandé.
   if (e.pointerId !== dragState.pointerId) return;
   const ds = dragState;
-  if (ds.raf) cancelAnimationFrame(ds.raf);
-  if (defilementRaf) { cancelAnimationFrame(defilementRaf); defilementRaf = 0; }
-  window.removeEventListener('pointermove', onDragMove);
-  window.removeEventListener('pointerup', onDragEnd);
-  window.removeEventListener('pointercancel', onDragEnd);
-  try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
-  // La ligne cesse d'être « prise » quoi qu'il arrive ensuite — y compris sur
-  // un simple tap, qui sort juste en dessous. L'oublier là, c'était figer la
-  // ligne : jamais reconstruite, elle gardait indéfiniment ce qu'elle affichait
-  // au moment du tap, sans plus jamais suivre le temps réel.
-  ds.tr.classList.remove('prise-en-cours');
-
-  if (!ds.active) { dragState = null; return; } // simple clic, pas un drag
-  finGlisser = performance.now();
-
-  const el = document.elementFromPoint(e.clientX, e.clientY);
+  // La cible se lit AVANT de rendre le geste : `relacherGlisser` retire les
+  // marques, pas ce qui se trouve sous le curseur.
+  const el = ds.active ? document.elementFromPoint(e.clientX, e.clientY) : null;
   const stageEl = el && el.closest ? el.closest('.stage') : null;
+  relacherGlisser(ds);
 
-  if (ds.ghost) ds.ghost.remove();
-  ds.tr.classList.remove('dragging');
-  document.body.classList.remove('dragging-active');
-  document.querySelectorAll('.stage.drop-target').forEach((s) => s.classList.remove('drop-target'));
-  hideTip();
-  dragState = null;
+  if (!ds.active) return; // simple clic, pas un drag
+  finGlisser = performance.now();
 
   // Geste ANNULÉ par le système (défilement natif qui prend la main, alerte,
   // bascule d'application sur tablette…) : rien ne se dépose, rien ne s'écrit —

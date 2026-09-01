@@ -30,6 +30,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
@@ -80,8 +81,18 @@ assert.ok(/ouvrirAuClic\(carte, r\)/.test(APP), 'la carte aussi');
 // entière cliquable avale les gestes qu'elle porte déjà.
 assert.ok(/ZONE_CLIQUABLE/.test(AUCLIC[0]),
   'un clic sur un contrôle de la ligne ne doit pas AUSSI ouvrir la fiche');
-assert.ok(/\.handle/.test(APP.match(/const ZONE_CLIQUABLE = '[^']+'/)[0]),
-  'la poignée de glissement en fait partie : l’attraper n’ouvre pas la fiche');
+// LES DEUX LISTES SE LISENT POUR LEUR VALEUR, pas pour leur orthographe :
+// `ZONE_CLIQUABLE` se construit sur `ZONE_SANS_PRISE` depuis le 01/09, et un
+// contrôle qui cherchait un littéral ne voyait plus rien.
+{
+  const src = APP.match(/const ZONE_SANS_PRISE = [\s\S]*?const ZONE_CLIQUABLE = [^;]+;/);
+  assert.ok(src, 'les deux listes de sélecteurs restent repérables');
+  const zones = vm.runInNewContext(`${src[0]}\n({ ZONE_SANS_PRISE, ZONE_CLIQUABLE })`);
+  assert.ok(zones.ZONE_CLIQUABLE.includes('.handle'),
+    'la poignée de glissement en fait partie : l’attraper n’ouvre pas la fiche');
+  assert.ok(!zones.ZONE_SANS_PRISE.includes('.handle'),
+    '… mais elle n’entre PAS dans la liste du glisser : la poignée EST la prise');
+}
 assert.ok(/glisserVientDeFinir\(\)/.test(AUCLIC[0]),
   'la dépose d’un glisser n’ouvre pas le dossier qu’on vient de ranger');
 assert.ok(/getSelection\(\)/.test(AUCLIC[0]),
