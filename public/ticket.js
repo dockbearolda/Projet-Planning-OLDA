@@ -28,6 +28,15 @@
 // pure, c'est ce qui le rend testable hors navigateur.
 
 import { JETONS_PAPIER, SOCLE_PAPIER } from './papier.js';
+// LE NOM DU CLIENT S'IMPRIME EN CAPITALES, comme il se lit à l'écran : c'est le
+// mot qu'on cherche en balayant une pile de papiers. Un particulier comme un
+// restaurant. La règle vit dans `nom-client.js`, une seule fois pour les six
+// écrans et les deux papiers — et elle ne touche que L'AFFICHAGE, jamais la
+// ligne en base.
+//
+// « Personne à contacter » n'y passe PAS : ce n'est pas le nom du client mais
+// un champ libre, et sept fois sur dix il ne porte qu'un prénom (« Mélina »).
+import { nomClientAffiche } from './nom-client.js';
 
 // Le placeholder du comptoir pour « pas renseigné ». Il arrive tel quel dans la
 // fiche : le recopier sur un ticket afficherait « Personne à contacter : — ».
@@ -288,7 +297,7 @@ export function modeleTicket(r) {
     retrait: dateSeule(l.deadline),
     // POUR QUI. Le nom sur l'établi, et de quoi joindre quelqu'un : « appeler
     // avant de couper » ne sert à rien sans le numéro.
-    client: texte(l.billing_company),
+    client: nomClientAffiche(texte(l.billing_company), l.client_type),
     contact: texte(l.contact_referent),
     tel: texte(l.contact_phone),
     // QUOI ET COMBIEN, avec ce qu'on en fait.

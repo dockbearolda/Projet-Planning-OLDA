@@ -118,7 +118,8 @@ assert.deepStrictEqual(repliés, [], `dépouillage abandonné sur : ${repliés.j
 const charger = (code, transformer) => {
   const bac = {};
   vm.createContext(bac);
-  const socle = transformer(lire('public/papier.js'));
+  const socle = ['public/papier.js', 'public/nom-client.js']
+    .map((f) => transformer(lire(f))).join('\n');
   vm.runInContext(
     `${socle.replace(/^export\s+/gm, '')}
      ${code.replace(/^export\s+/gm, '').replace(/^import[\s\S]*?from\s+'[^']*';$/gm, '')}

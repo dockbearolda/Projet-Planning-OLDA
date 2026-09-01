@@ -25,6 +25,15 @@
 // `dessinerBureau`. C'est ce qui le rend vérifiable hors navigateur.
 
 import { JETONS_PAPIER, SOCLE_PAPIER } from './papier.js';
+// LE NOM DU CLIENT S'IMPRIME EN CAPITALES, comme il se lit à l'écran : c'est le
+// mot qu'on cherche en balayant une pile de papiers. Un particulier comme un
+// restaurant. La règle vit dans `nom-client.js`, une seule fois pour les six
+// écrans et les deux papiers — et elle ne touche que L'AFFICHAGE, jamais la
+// ligne en base.
+//
+// « Personne à contacter » n'y passe PAS : ce n'est pas le nom du client mais
+// un champ libre, et sept fois sur dix il ne porte qu'un prénom (« Mélina »).
+import { nomClientAffiche } from './nom-client.js';
 
 const VIDE = '—';
 const texte = (v) => {
@@ -332,7 +341,7 @@ export function modeleBureau(l, entreprise) {
     // POUR QUI, en entier — c'est un document du bureau : il sert à facturer,
     // à relancer, à retrouver.
     client: {
-      nom: texte(r.billing_company),
+      nom: nomClientAffiche(texte(r.billing_company), r.client_type),
       type: r.client_type === 'perso' ? 'Particulier' : 'Professionnel',
       contact: texte(r.contact_referent),
       tel: texte(r.contact_phone),
