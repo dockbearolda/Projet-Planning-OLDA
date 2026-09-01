@@ -39,12 +39,12 @@
     {
       "famille": "Tasses",
       "designation": "Tasse Expresso 180 ml",
-      "pourquoi": "Même raison : la grille la tarife. ⚠ ÉCART CONSTATÉ le 01/09 — la grille sort 13 € (7 + 6) là où le magasin vend 14 €. À trancher dans Réglages, pas ici : c'est le composant « tasse nue » qui vaut 7 € au lieu de 8 €."
+      "pourquoi": "Même raison : la grille la tarife. ÉCART CORRIGÉ le 01/09 : la grille sortait 13 € (7 + 6) là où le magasin vend 14 €. Charlie a tranché — « expresso 14euros » — et le composant « tasse nue » est passé de 7 € à 8 €. La grille sort désormais 14 €, tenu par test/tarifs-tasse.test.js."
     },
     {
       "famille": "Tasses",
       "designation": "Tasse Bois",
-      "pourquoi": "Même raison : la grille la tarife (« Tasse en Bois »). ⚠ ÉCART CONSTATÉ le 01/09 — la grille sort 16 € (10 + 6) là où le magasin vend 22 €, soit 6 € perdus sur chaque devis. Le composant « tasse nue » devrait valoir 16 € et non 10 €. À trancher dans Réglages."
+      "pourquoi": "Même raison : la grille la tarife (« Tasse en Bois »). ÉCART CORRIGÉ le 01/09 : la grille sortait 16 € (10 + 6) là où le magasin vend 22 € — six euros perdus sur chaque devis, et rien à l'écran ne le disait. Charlie a tranché — « TASSE en bois 22euro » — et le composant « tasse nue » est passé de 10 € à 16 €. La grille sort désormais 22 €, tenu par test/tarifs-tasse.test.js."
     },
     {
       "famille": "perso textile",

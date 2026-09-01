@@ -408,6 +408,9 @@ async function init() {
   await semerCatalogueProduits();
   await poserUniciteCatalogue();
 
+  // Les deux tasses que la grille sous-tarifait de 1 € et de 6 €.
+  await corrigerTarifsTasseMagasin();
+
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
   await semerFacesCouteau();
@@ -1726,8 +1729,15 @@ const TARIFS_TASSE_CATEGORIES = new Set(['produit', 'face', 'dessous', 'bat']);
 // Valeurs du classeur patron au 2026-07-25 (onglet « Tarifs & coûts »).
 const DEFAULT_TARIFS_TASSE_ARTICLES = [
   { categorie: 'produit', designation: 'Tasse Céramique 350 ml', prixAchat: 1.78, prixVenteTtc: 10, tempsMoMin: 0.5, tempsMachineMin: 0 },
-  { categorie: 'produit', designation: 'Tasse Expresso 180 ml', prixAchat: 0, prixVenteTtc: 7, tempsMoMin: 0.5, tempsMachineMin: 0 },
-  { categorie: 'produit', designation: 'Tasse en Bois', prixAchat: 0, prixVenteTtc: 10, tempsMoMin: 0.5, tempsMachineMin: 0 },
+  // ⚠ CES DEUX PRIX ONT ÉTÉ CORRIGÉS LE 01/09/2026, et le chiffre à retenir est
+  // celui du MAGASIN. Le composant est la tasse NUE ; le prix de rayon, c'est
+  // elle plus une face (« Logo OLDA existant », 6 €). La grille sortait donc
+  // 13 € pour l'expresso et 16 € pour la tasse en bois là où le comptoir les
+  // vend 14 € et 22 € — six euros perdus sur chaque devis d'une tasse en bois,
+  // et rien à l'écran ne le disait. Charlie a tranché : « TASSE en bois
+  // 22euro, expresso 14euros ». 8 + 6 = 14, 16 + 6 = 22.
+  { categorie: 'produit', designation: 'Tasse Expresso 180 ml', prixAchat: 0, prixVenteTtc: 8, tempsMoMin: 0.5, tempsMachineMin: 0 },
+  { categorie: 'produit', designation: 'Tasse en Bois', prixAchat: 0, prixVenteTtc: 16, tempsMoMin: 0.5, tempsMachineMin: 0 },
   { categorie: 'face', designation: 'Aucune', prixAchat: 0, prixVenteTtc: 0, tempsMoMin: 0, tempsMachineMin: 0 },
   { categorie: 'face', designation: 'Logo OLDA existant', prixAchat: 0, prixVenteTtc: 6, tempsMoMin: 0, tempsMachineMin: 0 },
   { categorie: 'face', designation: 'Logo OLDA à ajouter', prixAchat: 0, prixVenteTtc: 8, tempsMoMin: 3, tempsMachineMin: 3 },
@@ -2132,6 +2142,59 @@ async function appliquerImportCatalogue(csv, signature) {
     client.release();
   }
   return { ...rapport, ecrit: true };
+}
+
+// LES DEUX TASSES SOUS-TARIFÉES (01/09/2026).
+//
+// Le composant de la grille est la tasse NUE ; le prix de rayon, c'est elle
+// plus une face. La grille sortait 13 € pour l'expresso et 16 € pour la tasse
+// en bois, là où le comptoir les vend 14 € et 22 € — SIX EUROS perdus sur
+// chaque devis d'une tasse en bois, et rien à l'écran ne le disait.
+// Charlie, 01/09 : « TASSE en bois 22euro, expresso 14euros ».
+//
+// Les valeurs du CODE sont corrigées (DEFAULT_TARIFS_TASSE_ARTICLES) : ça suffit
+// à toute base qui n'a jamais enregistré la grille — c'est le cas de la
+// production, vérifié le 01/09 (la clé `tarifs_tasse_articles` y est absente).
+// Cette migration ne sert QUE pour une base qui a déjà écrit la clé : sans elle,
+// le poste garderait ses anciens prix sans que personne ne s'en aperçoive.
+//
+// ⚠ ON NE TOUCHE QU'À CE QUI PORTE ENCORE L'ANCIEN CHIFFRE. Un prix que
+// quelqu'un a délibérément posé à 9 € ou à 25 € n'est pas une erreur à réparer :
+// c'est une décision, et l'écraser serait exactement le défaut qu'on corrige.
+// Garde `app_meta` PROPRE (deux incidents réels sont venus d'une garde partagée).
+// Down : DELETE FROM app_meta WHERE key = 'tarifs_tasse_prix_magasin_v1';
+//        puis reposer 7 et 10 sur les deux désignations.
+const PRIX_MAGASIN_2026_09_01 = [
+  { designation: 'Tasse Expresso 180 ml', avant: 7, apres: 8 },
+  { designation: 'Tasse en Bois', avant: 10, apres: 16 },
+];
+
+async function corrigerTarifsTasseMagasin() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'tarifs_tasse_prix_magasin_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'tarifs_tasse_articles'");
+  // Pas de clé : la grille vient du code, déjà corrigé. Rien à faire — et on
+  // pose quand même la garde, sinon on relirait la table à chaque démarrage.
+  if (rows[0] && typeof rows[0].value === 'string') {
+    let liste = null;
+    try { liste = JSON.parse(rows[0].value); } catch (_) { liste = null; }
+    if (Array.isArray(liste)) {
+      let touchees = 0;
+      for (const a of liste) {
+        if (!a || a.categorie !== 'produit') continue;
+        const regle = PRIX_MAGASIN_2026_09_01.find((r) => r.designation === a.designation);
+        if (!regle || Number(a.prixVenteTtc) !== regle.avant) continue;
+        a.prixVenteTtc = regle.apres;
+        touchees += 1;
+      }
+      if (touchees) {
+        await poserMeta('tarifs_tasse_articles', JSON.stringify(liste));
+        console.log(`ℹ  Grille tasse : ${touchees} prix réalignés sur le tarif magasin (expresso 14 €, bois 22 €).`);
+      }
+    }
+  }
+  await poserMeta('tarifs_tasse_prix_magasin_v1', '1');
 }
 
 // --- Suppléments express (vente directe) -------------------------------------
@@ -3630,6 +3693,7 @@ module.exports = {
   getCategoryReferents, setCategoryReferents,
   DEFAULT_MACHINES, getMachines, setMachines,
   getCatalogueProduits, setCatalogueProduits, nettoyerProduit,
+  corrigerTarifsTasseMagasin,
   // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
   semerCatalogueProduits, poserUniciteCatalogue,
