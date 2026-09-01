@@ -259,6 +259,10 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron ; conservé le temps de confirmer qu'on n'y revient pas. |
 | POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
 | POST | `/api/devis/numero` | Même compteur, série distincte, pour une demande de devis (`DEV-26.07.30-001`). |
+| GET | `/api/catalogue-produits` | **Le catalogue du comptoir** : `[{ id, famille, familleNote, designation, variante, note, label, couleur, reference, prixAchat, prixVenteTtc, tempsMoMin, tempsMachineMin, actif, position }]`. Ouvert en lecture — les deux écrans du comptoir sont des documents à part qui le lisent au chargement pour remplir leur menu produits. |
+| PUT | `/api/catalogue-produits` | Remplace la liste (corps = tableau), comme la grille tarifaire tasse. Réservé à `reglages`. Deux lignes de même clé (famille + désignation + variante, réduites) n'en font qu'une : la première gagne. |
+| POST | `/api/catalogue-produits/import/apercu` | `{ csv }` → **ce que l'import ferait, sans rien écrire** : `{ resume: { lues, creees, majs, inchangees, refusees }, lignes: [...], plan, signature }`. Un fichier illisible (guillemet non refermé, colonne obligatoire absente) est refusé EN ENTIER en 400. |
+| POST | `/api/catalogue-produits/import` | `{ csv, signature }` → écrit, en UNE transaction. La `signature` est celle de l'aperçu : si le fichier ou la base ont bougé entre les deux, l'écriture est refusée (409) et rien n'est écrit. |
 | GET | `/api/settings/whatsapp` | `{ message }` — le texte « commande prête » réglé par le patron. |
 | PUT | `/api/settings/whatsapp` | Remplace ce texte (`{ message }`, 1000 caractères max), diffusé en SSE. |
 | GET | `/api/clients` | Base clients complète (auto-complétion + fiche). |
@@ -509,6 +513,99 @@ Les **secteurs d'activité**, eux, vivent en base
 (`app_meta.client_secteurs`) et se complètent depuis Base clients, sans
 redéploiement.
 
+### Le catalogue PRODUITS, lui, vit en base (01/09/2026)
+
+À ne pas confondre avec `catalog.json` ci-dessus : ce sont les **objets que la
+boutique vend**, rayon par rayon — ceux du menu déroulant de la demande de
+devis. Ils vivaient en dur dans `public/comptoir/catalogue.js`, et **aucun prix
+ne pouvait s'y importer** : il aurait fallu redéployer pour changer un tarif.
+C'était ça, le verrou.
+
+Ils sont dans la table **`catalogue_produits`**, aux **mêmes colonnes que la
+grille tarifaire tasse** : prix d'achat, prix de vente TTC, temps de
+main-d'œuvre, temps machine. Les prix sont **nullables** — le catalogue
+d'aujourd'hui n'en porte aucun, et les semer à `0` ferait annoncer « 0 € » en
+rayon sur quatre-vingts produits.
+
+`public/comptoir/catalogue.js` est devenu le **lecteur** de cette table ; sa
+liste de produits est partie dans `catalogue-produits-seed.json`, la **semence**
+d'une base neuve — comme `tailles-logo-seed.json`, et **plus une source lue à
+chaud**. Le dernier catalogue lu reste sur le poste (`localStorage`) : un wifi
+qui décroche ne rend pas un menu vide au client qui est devant. Si rien n'a
+jamais été lu, le menu le **dit** et renvoie vers la saisie manuelle.
+
+**Un prix qui change ne retarife JAMAIS une commande déjà passée.** Le chiffrage
+d'une ligne est figé dans `fiche.chiffrage` au moment de la prise, et le moteur
+(conforme au fichier V9 du patron) ne lit pas cette table. C'est tenu par
+`test/catalogue-produits-base.test.js`, qui joue la scène en entier : une vente
+à 6 €, le tarif qui triple, la quantité corrigée — le dossier reste à son prix.
+
+### L'import de prix — on lit tout, on dit tout, PUIS on écrit
+
+Un écran dans **Réglages** avale un **CSV UTF-8** (« Enregistrer sous » depuis
+Excel). Le format est du CSV et pas du `.xlsx` : le dépôt n'a que trois
+dépendances (express, pg, compression) et lire un `.xlsx` natif — un ZIP, du
+XML, la table des chaînes partagées et celle des styles pour savoir si « 35 »
+est un prix ou une date — en demanderait une quatrième.
+
+Les intitulés de **SumUp** (`Category`, `Item name`, `Price`) sont reconnus tels
+quels, en plus des noms français ; le séparateur (`;`, `,`, tabulation) est
+deviné sur la ligne des intitulés, le BOM d'Excel retiré, et les nombres se
+lisent à la française (`12,50 €`, `1 234,56`). Un montant qu'on ne sait pas lire
+est **refusé**, jamais ramené à zéro.
+
+**Rien ne s'écrit sur un import à moitié lu.** Le fichier est analysé en entier
+d'abord ; un guillemet jamais refermé ou une colonne obligatoire absente refuse
+le **fichier**, pas ses quatre-vingts premières lignes. L'aperçu rend les quatre
+comptes — créées / mises à jour / inchangées / refusées — et **la raison de
+chaque refus avec son numéro de ligne**. L'écriture réclame la **signature** de
+cet aperçu : on n'écrit que ce qui a été montré.
+
+SumUp répète la ligne d'un produit **une fois par variante**, la première sans
+prix, sans jamais nommer la variante. Deux lignes du même produit se **fondent**
+tant qu'elles sont d'accord (une case vide ne contredit rien) ; dès qu'elles se
+contredisent, **aucune** n'est retenue et le refus dit quoi faire — ajouter une
+colonne « Variante ». Deviner poserait un prix faux en rayon.
+
+Une colonne **absente du fichier n'efface rien** : un export à trois colonnes ne
+remet pas les temps machine à zéro.
+
+#### Les règles d'import — `catalogue-import-regles.json`
+
+Ce que l'export ne dit pas, et qu'on ne devine pas. Des **données**, pas du
+code : un rayon qui change ne doit pas demander un déploiement. Trois sortes,
+appliquées dans cet ordre, et **toutes lues sur le rayon d'origine** — celui que
+le patron a sous les yeux dans son tableur :
+
+1. **`ecartes`** — un rayon qui n'est pas un produit (`Express` est un réglage,
+   `Perso` / `perso textile` sont du travail graphique). Ses lignes sont
+   comptées **`ecartees`**, jamais confondues avec un refus : ce n'est pas une
+   erreur, c'est une décision, et elle porte sa raison écrite.
+2. **`variantes`** — le nom d'une variante, retrouvé par son **prix**, seul
+   repère que l'export laisse. Une variante déjà écrite dans le fichier gagne
+   toujours sur la règle.
+3. **`familles`** — le rayon SumUp → le rayon du comptoir.
+
+**Nommer une variante coupe le produit en deux, et c'est le piège.** Tant
+qu'aucune ligne n'est nommée, la ligne « d'ouverture » de SumUp — celle qui
+ouvre le produit **sans prix** — se fond avec les autres. Dès qu'une règle nomme
+les lignes tarifées, elle reste seule et fabrique un **produit fantôme** sans
+variante et sans prix, posé au menu du comptoir à côté de ses propres variantes.
+Elle est donc **absorbée** ; et une ligne qui porte un prix mais qu'aucune règle
+n'a su nommer, alors que ses sœurs l'ont été, est **refusée** plutôt que posée
+au menu sans nom.
+
+**Deux variantes au même prix sont indistinguables** : le Magnet a quatre lignes
+tarifées pour trois prix, les deux à 7 € se fondent forcément. L'aperçu le dit ;
+les séparer demande une colonne « Variante » dans le fichier.
+
+Chaque ligne du rapport dit **ce qu'une règle lui a fait** — le rayon d'où elle
+vient, le nom posé sur sa variante. Une règle qui agit en silence est une règle
+qu'on ne relit jamais. Le fichier est **relu à chaque import** (aucun
+redémarrage) et sa cohérence est tenue par `test/import-regles.test.js` : pas
+deux règles pour un même prix, pas de rayon à la fois écarté et remappé, pas
+d'exclusion sans raison écrite.
+
 Le détail structuré d'un projet est conservé dans `requests.fiche` (jsonb) ;
 `requests.description` en porte en parallèle un résumé lisible, donc la grille
 n'a jamais besoin de lire ce JSON. Les fiches enregistrées par l'ancienne prise
@@ -591,6 +688,9 @@ Deux exceptions assumées :
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
 ├── catalog.json      natures, délais et modes de paiement (source unique)
+├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
+├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
+├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
 ├── public/
 │   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system
@@ -604,10 +704,11 @@ Deux exceptions assumées :
 │   ├── comptoir/         LES ÉCRANS DU PATRON, repris tels quels
 │   │   ├── vente-directe.html   Articles → Client → Paiement → Ticket
 │   │   ├── demande-devis.html   Demande → Besoins → Projet → Contrôle → Client → Récap
+│   │   ├── catalogue.js         LIT le catalogue produits en base (repli localStorage)
 │   │   └── pont.js              base clients réelle + numéro du jour réservé côté serveur
 │   ├── clients.css   vue Base clients, scopée sous #clients
 │   ├── clients.js    liste, fiche éditable, notes, secteurs, villes
-│   └── reglages.js   vue Réglages (message WhatsApp « commande prête »)
+│   └── reglages.js   vue Réglages (WhatsApp, tarifs, catalogue produits, import de prix)
 ├── .env.example
 └── README.md
 ```

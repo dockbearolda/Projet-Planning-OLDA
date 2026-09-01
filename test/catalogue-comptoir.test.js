@@ -45,6 +45,9 @@ const path = require('node:path');
 const lire = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const DEVIS = ecran('demande-devis');
 const CATALOGUE_JS = lire('public/comptoir/catalogue.js');
+// LA SEMENCE, pas le fichier de code : depuis le 01/09 les produits vivent en
+// base, et ce fichier-là est ce qui remplit une base NEUVE.
+const SEMENCE = JSON.parse(lire('catalogue-produits-seed.json'));
 const step2 = (DEVIS.match(/<section id="step2">[\s\S]*?<\/section>/) || [''])[0];
 
 // --- 1. Le bandeau qui expliquait l'étape a disparu -------------------------
@@ -359,9 +362,19 @@ function bacASable() {
   // catalogues à tenir — donc un produit ajouté d'un côté et introuvable de
   // l'autre. Le bac à sable charge les deux morceaux DANS L'ORDRE DE LA PAGE :
   // le fichier partagé d'abord, ce qui s'en sert ensuite.
-  const bloc = CATALOGUE_JS.replace(/^window\..*$/gm, '')
+  const bloc = CATALOGUE_JS
     + (DEVIS.match(/\/\* CATALOGUE-COMPTOIR[\s\S]*?\/\* \/CATALOGUE-COMPTOIR \*\//) || [''])[0];
-  assert.ok(/const CATALOGUE\s*=/.test(CATALOGUE_JS), 'le catalogue vit dans son propre fichier');
+  // LE CATALOGUE N'EST PLUS DU CODE (01/09). Tant qu'il l'était, aucun prix ne
+  // pouvait s'y importer : il aurait fallu redéployer pour changer un tarif.
+  // `catalogue.js` est devenu le LECTEUR de la base ; la liste des produits est
+  // partie dans la semence, qui ne remplit qu'une base NEUVE.
+  assert.ok(!/const CATALOGUE\s*=\s*\[\s*\{/.test(CATALOGUE_JS),
+    'le catalogue ne vit plus en dur dans le fichier : un prix ne s’importe pas dans du code');
+  assert.ok(/\/api\/catalogue-produits/.test(CATALOGUE_JS),
+    'il lit la base — sinon le comptoir et les réglages montreraient deux catalogues');
+  assert.ok(/catalogueDepuisLignes/.test(CATALOGUE_JS),
+    'et il sait remettre les lignes de la base en rayons');
+  assert.ok(SEMENCE.length > 0, 'la semence porte les produits, comme tailles-logo-seed.json');
   assert.ok(/CATALOGUE-COMPTOIR/.test(DEVIS), 'et l’écran garde le bloc qui s’en sert');
   assert.ok(/<script src="catalogue\.js"><\/script>/.test(DEVIS),
     'l’écran charge le catalogue partagé — sinon la page s’ouvre sans produits');
@@ -381,8 +394,14 @@ function bacASable() {
     fail(id, msg) { echecs.push({ id, msg }); return false; },
     renderNeeds() {}, updateSidebar() {},
   };
+  // LE BAC À SABLE SÈME LA BASE. En vrai, `catalogue.js` va chercher ses lignes
+  // à `/api/catalogue-produits` ; ici on lui passe la semence directement —
+  // c'est le MÊME chemin de code (`catalogueDepuisLignes`), sans réseau.
+  ctx.semence = SEMENCE;
   const fabrique = new Function('ctx', `with(ctx){${bloc}
-    return {CATALOGUE,ajouterALaDemande,catCle,lignesCatalogue,remplirSelectCatalogue};}`);
+    catalogueDepuisLignes(ctx.semence);
+    return {CATALOGUE,ajouterALaDemande,catCle,lignesCatalogue,remplirSelectCatalogue,
+            catalogueDepuisLignes};}`);
   return Object.assign(fabrique(ctx), { needs: ctx.needs, els, echecs });
 }
 

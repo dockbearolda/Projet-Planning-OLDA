@@ -143,8 +143,12 @@ assert.deepStrictEqual(faces('Papeterie', 'Carnet A5'), [],
 // Les chiffres du 29/08, pris sur le vrai catalogue. Ils sont ici pour qu'une
 // famille qui déclare enfin ses faces le DISE, au lieu de laisser le compte
 // dériver sans que personne ne le voie.
+// LE CATALOGUE VIENT DE LA BASE (01/09). `catalogue.js` n'est plus qu'un
+// lecteur : ce sont les lignes de la semence — celles qui remplissent une base
+// neuve — qu'on lui donne ici, par le MÊME chemin de code que le comptoir.
 const catalogue = vm.createContext({ window: {} });
 vm.runInContext(lire('public/comptoir/catalogue.js'), catalogue);
+catalogue.window.catalogueDepuisLignes(JSON.parse(lire('catalogue-produits-seed.json')));
 const groupes = catalogue.window.lignesCatalogue();
 const lignes = groupes.flatMap((g) => g.lignes.map((l) => ({ famille: g.famille, label: l.label })));
 

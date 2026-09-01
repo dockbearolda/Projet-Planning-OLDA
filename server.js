@@ -25,6 +25,8 @@ const {
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
   getMachines, setMachines,
+  getCatalogueProduits, setCatalogueProduits,
+  apercuImportCatalogue, appliquerImportCatalogue,
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
   getSupplementsExpress, setSupplementsExpress,
@@ -1045,6 +1047,73 @@ app.put('/api/tarifs-tasse/parametres', exige('reglages'), asyncH(async (req, re
   await chargerTaux();
   broadcast({ kind: 'tarifs-tasse' });
   res.json(saved);
+}));
+
+// LE CATALOGUE DU COMPTOIR (01/09/2026). Il vivait en dur dans
+// `public/comptoir/catalogue.js` : familles, articles, variantes, et aucun
+// prix — parce qu'un prix ne s'importe pas dans du code. Il est en base.
+//
+// GET est OUVERT, comme celui des tarifs tasse : les deux écrans du comptoir
+// sont des documents à part qui le lisent au chargement pour remplir leur menu
+// produits. Sans lui, la page s'ouvre sans rayon.
+// GET → [ { id, famille, familleNote, designation, variante, note, label,
+//           couleur, reference, prixAchat, prixVenteTtc, tempsMoMin,
+//           tempsMachineMin, actif, position }, ... ]
+app.get('/api/catalogue-produits', asyncH(async (req, res) => {
+  res.json(await getCatalogueProduits());
+}));
+
+// PUT → remplace la liste (corps = tableau), comme la grille tarifaire tasse.
+// C'est la porte de l'écran de réglages, celle qui corrige une case.
+app.put('/api/catalogue-produits', exige('reglages'), asyncH(async (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Tableau de produits attendu' });
+  }
+  const saved = await setCatalogueProduits(req.body);
+  broadcast({ kind: 'catalogue-produits' });
+  res.json(saved);
+}));
+
+// L'IMPORT DE PRIX, EN DEUX TEMPS — et le premier n'écrit RIEN.
+//
+// « Rien ne s'écrit sur un import à moitié lu » : l'aperçu analyse le fichier
+// ENTIER et rend ce qu'il ferait, ligne par ligne — combien créées, combien
+// mises à jour, combien refusées et POURQUOI. C'est seulement au second appel,
+// avec la SIGNATURE de cet aperçu, que la base bouge.
+//
+// Le format est du CSV UTF-8 (« Enregistrer sous » depuis Excel) : lire du
+// .xlsx natif demanderait une quatrième dépendance au dépôt, qui n'en a que
+// trois. Les intitulés de SumUp (« Category », « Item name », « Price ») sont
+// reconnus tels quels — le patron n'a pas trois colonnes à renommer avant
+// chaque import.
+const csvDuCorps = (req) => (req.body && typeof req.body.csv === 'string' ? req.body.csv : null);
+
+app.post('/api/catalogue-produits/import/apercu', exige('reglages'), asyncH(async (req, res) => {
+  const csv = csvDuCorps(req);
+  if (csv === null) return res.status(400).json({ error: 'Corps attendu : { csv: "…" }' });
+  const rapport = await apercuImportCatalogue(csv);
+  // Un fichier illisible n'est pas une PANNE du serveur : c'est une réponse,
+  // et l'écran doit pouvoir l'afficher telle quelle plutôt qu'un « Erreur 500 »
+  // qui n'apprend rien au patron.
+  // `error` autant qu'`erreur` : c'est sous ce nom-là que toutes les autres
+  // routes rendent un refus, et sous ce nom-là que les écrans le lisent.
+  res.status(rapport.erreur ? 400 : 200).json({ ...rapport, error: rapport.erreur, ecrit: false });
+}));
+
+app.post('/api/catalogue-produits/import', exige('reglages'), asyncH(async (req, res) => {
+  const csv = csvDuCorps(req);
+  if (csv === null) return res.status(400).json({ error: 'Corps attendu : { csv: "…" }' });
+  // LA SIGNATURE EST OBLIGATOIRE : c'est elle qui garantit qu'on n'écrit que ce
+  // qui a été MONTRÉ. Sans elle, un appel direct écrirait un import que
+  // personne n'a relu — exactement ce que cette route existe pour empêcher.
+  const signature = String((req.body && req.body.signature) || '');
+  if (!signature) {
+    return res.status(400).json({ error: 'Signature de l’aperçu manquante : rien n’a été écrit.' });
+  }
+  const rapport = await appliquerImportCatalogue(csv, signature);
+  if (rapport.erreur) return res.status(409).json({ ...rapport, error: rapport.erreur, ecrit: false });
+  broadcast({ kind: 'catalogue-produits' });
+  res.json(rapport);
 }));
 
 // SUPPLÉMENTS EXPRESS de la vente directe, par palier de délai (en pourcents).

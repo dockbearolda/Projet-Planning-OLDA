@@ -1,0 +1,116 @@
+{
+  "_lisez_moi": [
+    "LES RÈGLES D'IMPORT — ce que le fichier du patron ne dit pas, et qu'on ne devine pas.",
+    "",
+    "L'export SumUp ne nomme JAMAIS les variantes : il répète la ligne du produit une",
+    "fois par variante, la première sans prix. Et ses rayons ne sont pas ceux du",
+    "comptoir. Ces deux écarts se comblent ICI, en données — pas dans le code : un",
+    "rayon qui change ne doit pas demander un déploiement.",
+    "",
+    "Ce fichier est appliqué à CHAQUE import, et l'aperçu DIT ce qu'il a fait, ligne",
+    "par ligne : une règle qui agit en silence est une règle qu'on ne relit jamais.",
+    "",
+    "ÉTAT AU 01/09/2026 : `familles` est VIDE — la table de correspondance des rayons",
+    "est attendue de Charlie. Tant qu'elle est vide, chaque rayon SumUp entre sous son",
+    "propre nom, et les quinze objets qui existent déjà au catalogue sous un autre",
+    "rayon feraient un doublon. L'import le DIT dans son aperçu avant d'écrire."
+  ],
+
+  "_ecartes": [
+    "DES RAYONS QUI NE SONT PAS DES PRODUITS. Le comptoir les traite ailleurs — les",
+    "mettre au menu ferait DEUX endroits pour un même prix, et c'est le second qu'on",
+    "oublie de corriger. Les lignes concernées sont comptées à part (`ecartees`),",
+    "jamais confondues avec un refus : ce n'est pas une erreur, c'est une décision."
+  ],
+  "ecartes": [
+    {
+      "famille": "Express",
+      "pourquoi": "Le supplément d'urgence est un RÉGLAGE (app_meta.supplements_express), pas un article. ⚠ Votre fichier dit 40 % le jour même et 25 % sous 24 h ; le logiciel est réglé sur 20 / 10 / 0 % en jours ouvrés. Deux barèmes pour une même majoration — à trancher dans Réglages."
+    },
+    {
+      "famille": "Perso",
+      "pourquoi": "Travail graphique (Perso Classique 10 €, Perso simple 6 €, Reprise de logo simple 20 €) : décidé le 01/09 d'en faire une GRILLE DE RÉGLAGE, comme celle de la tasse, pas des articles du menu."
+    },
+    {
+      "famille": "perso textile",
+      "pourquoi": "Même décision : les paliers « Avec / Sans textiles OLDA » et « Reprise Logo » sont du travail graphique sur textile — la grille de réglage que le textile n'a pas encore, et que la tasse a déjà."
+    }
+  ],
+
+  "_familles": [
+    "LE RAYON SUMUP → LE RAYON DU COMPTOIR. `de` se compare sans casse ni accent.",
+    "Une famille absente d'ici entre sous son propre nom.",
+    "",
+    "SEULE ENTRÉE CONFIRMÉE À CE JOUR : la fusion des six rayons « FEMME ». L'export",
+    "a mis l'indice de variante dans la colonne du rayon — « 2 FEMME » à « 6 FEMME »",
+    "ne portent que F001 et F002, à 39 €, pendant que « 01 FEMME » les porte SANS",
+    "prix. Les fondre règle les deux : un seul rayon, et F001/F002 reçoivent 39 €",
+    "(une case vide ne contredit rien, c'est la règle de fusion de l'import).",
+    "Le NOM « Textile — Femme » est ma proposition : une ligne à changer."
+  ],
+  "familles": [
+    { "de": "01 FEMME", "vers": "Textile — Femme" },
+    { "de": "2 FEMME", "vers": "Textile — Femme" },
+    { "de": "3 FEMME", "vers": "Textile — Femme" },
+    { "de": "4 FEMME", "vers": "Textile — Femme" },
+    { "de": "5 FEMME", "vers": "Textile — Femme" },
+    { "de": "6 FEMME", "vers": "Textile — Femme" }
+  ],
+
+  "_variantes": [
+    "LE NOM D'UNE VARIANTE, RETROUVÉ PAR SON PRIX. C'est le seul repère que l'export",
+    "laisse : deux lignes du même produit ne se distinguent que par leur montant.",
+    "",
+    "⚠ DEUX VARIANTES AU MÊME PRIX SONT INDISTINGUABLES. Le Magnet et le Porte-clés",
+    "ont QUATRE lignes tarifées pour TROIS prix (7, 5, 9 et encore 7) : les deux à",
+    "7 € se fondent forcément en une. L'aperçu le DIT (« 2 lignes fondues »). Pour",
+    "les séparer il faut une colonne « Variante » dans le fichier — aucune règle ne",
+    "peut inventer ce que le fichier ne porte pas.",
+    "",
+    "Magnet et Porte-clés : noms déduits des lignes « Pack 3 + 1 » du même fichier",
+    "(4 pièces au prix de 3, donc pack ÷ 3 = prix unitaire). Contrôle : le Pack",
+    "Sticker à 12 € donne 4 €, et le Sticker EST à 4 € — la seule ligne du groupe",
+    "qui ne se contredisait pas."
+  ],
+  "variantes": [
+    { "famille": "Goodies", "designation": "Magnet", "prix": 5, "variante": "Plexi" },
+    { "famille": "Goodies", "designation": "Magnet", "prix": 7, "variante": "Classique" },
+    { "famille": "Goodies", "designation": "Magnet", "prix": 9, "variante": "Friendly Books" },
+
+    { "famille": "Goodies", "designation": "Porte-clés", "prix": 5, "variante": "Plexiglass" },
+    { "famille": "Goodies", "designation": "Porte-clés", "prix": 7, "variante": "Classique" },
+
+    { "famille": "Papeterie", "designation": "Carte Postale", "prix": 2.5, "variante": "Petite" },
+    { "famille": "Papeterie", "designation": "Carte Postale", "prix": 4, "variante": "Grande" },
+
+    { "famille": "Accessoires", "designation": "Bracelet", "prix": 19, "variante": "Bois" },
+    { "famille": "Accessoires", "designation": "Bracelet", "prix": 15, "variante": "Acrylique" },
+
+    { "famille": "Accessoires", "designation": "Veilleuse Lumineuse", "prix": 49, "variante": "Personnalisée" },
+    { "famille": "Accessoires", "designation": "Veilleuse Lumineuse", "prix": 35, "variante": "Seule" },
+
+    { "famille": "Tableaux", "designation": "Tableau Black", "prix": 39, "variante": "A4" },
+    { "famille": "Tableaux", "designation": "Tableau Black", "prix": 59, "variante": "A3" },
+
+    { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 59, "variante": "Grand" },
+    { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 39, "variante": "Petit" }
+  ],
+
+  "_en_attente": [
+    "CE QUI N'EST PAS ENCORE NOMMÉ — et qui reste donc REFUSÉ à l'import, avec sa",
+    "raison. On ne devine pas un prix : un tarif faux part au client sans que rien",
+    "ne proteste.",
+    "",
+    "· Goodies / Porte-clés à 9 € — « Friendly Books » est un MAGNET, pas un",
+    "  porte-clés (Charlie, 01/09). Ce 9 €, c'est quoi ?",
+    "· Goodies / Magnet ET Porte-clés — la QUATRIÈME variante, celle qui partage",
+    "  les 7 € de « Classique ».",
+    "· Art de la Table / Dessous Verre — 4,50 / 15 / 19 €. « 1, 2, 6 » ne tombe pas",
+    "  juste : 2 pièces à 15 € feraient 7,50 la pièce, plus cher que 4,50 l'unité.",
+    "  Avec 1 / 4 / 6, la dégressivité est propre : 4,50 · 3,75 · 3,17 la pièce.",
+    "· Verre / Verre à Ti Punch — 12 € noté ; reste une seconde ligne à 14 €.",
+    "· Sous-traitance / Armelle B — 49 · 69 · 89 · 6 · 25 €, cinq variantes sans nom.",
+    "· Offres Spéciales — prix normal, ou prix PROMO ? Quatre de ses cinq articles",
+    "  sont déjà au catalogue sous un autre rayon."
+  ]
+}
