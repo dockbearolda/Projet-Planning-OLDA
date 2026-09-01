@@ -370,6 +370,86 @@ assert.ok(/poserAide/.test(ECRAN) && /poserAide/.test(REGLAGES_JS),
 }
 
 // ---------------------------------------------------------------------------
+// 3 ter. LE TEXTILE : MÊME BASE, MÊME MOTEUR — PAS UNE COPIE
+// ---------------------------------------------------------------------------
+// « Les t-shirts doivent être inclus dans le devis flash ; vente, devis et
+// devis flash doivent avoir exactement la même base de données de produit »
+// (Charlie, 01/09). Les références du fichier du patron sont descendues dans
+// `catalogue_produits` : elles arrivent ici par le MÊME endpoint que les tasses.
+//
+// ⚠ MAIS UN T-SHIRT NE SE VEND PAS À UN PRIX DE RAYON, IL SE CHIFFRE — à la
+// quantité (coefficients dégressifs), au marquage (mètres de DTF, temps de
+// presse) et au genre (la table des temps). Le moteur qui sait faire ça est
+// écrit, conforme au fichier V9, et vérifié sur 611 520 combinaisons. L'écran
+// l'APPELLE. La moindre formule recopiée ici ferait DEUX moteurs — et le jour
+// où l'un bouge, le devis et le comptoir cessent de dire le même prix sans que
+// personne ne s'en aperçoive.
+assert.ok(/CHEMIN_MOTEUR = '\/comptoir\/textile-catalog\.js'/.test(ECRAN),
+  'le devis charge LE moteur du comptoir, il n’en embarque pas un deuxième');
+assert.ok(/TE\.calculate\(/.test(ECRAN),
+  '… et il l’appelle : c’est lui qui fait le prix');
+// Aucune arithmétique de chiffrage ne doit exister dans cet écran. Ces cinq
+// noms sont les briques du moteur : leur présence ici voudrait dire qu'on a
+// recommencé à calculer sur place.
+for (const brique of ['dtfCost', 'dtfSpeed', 'pressMin', 'ceilStep', 'coefFor', 'purchase']) {
+  assert.ok(!new RegExp(`\\b${brique}\\b`).test(ECRAN),
+    `« ${brique} » est une brique du moteur : le devis ne refait pas son calcul`);
+}
+// LE MOTEUR SE CHARGE À LA DEMANDE. 78 Ko que la plupart des devis n'ouvrent
+// jamais : au premier t-shirt posé, pas à l'ouverture de l'écran.
+assert.ok(/function moteurTextile\(\)/.test(ECRAN) && /document\.head\.appendChild\(s\)/.test(ECRAN),
+  'le moteur arrive par une balise posée au premier t-shirt');
+assert.ok(!/^import[^\n]*textile-catalog/m.test(ECRAN),
+  '… et pas par un import de tête, qui le chargerait pour tout le monde');
+
+// LES DEUX PARAMÈTRES QUI SE PAYENT S'ILS SONT FAUX.
+assert.ok(/markupPercent: 0/.test(ECRAN),
+  'les coefficients du V9 portent déjà la marge : une majoration de plus la compterait deux fois');
+assert.ok(/TRANSPORT_MOTEUR = 'Maritime'/.test(ECRAN),
+  'le transport a sa PROPRE ligne sur le devis (bouton « Transport », tarif des '
+  + 'Réglages) : le chiffrer aussi dans le prix à la pièce le facturerait deux fois');
+// Le genre décide de la table des temps : introuvable, il vaut ZÉRO mètre de
+// DTF — donc un marquage facturé 2,30 € au lieu de 9,90 €.
+assert.ok(/genre: ligne\.textile\.genre/.test(ECRAN),
+  'le genre du moteur voyage avec la ligne');
+
+// UN MARQUAGE DEVINÉ EST UN PRIX FAUX UNE FOIS SUR DEUX. « Aucun » donne le
+// prix juste du vêtement nu, qui est une vente réelle ; le menu est dans la
+// rangée, à côté de la quantité.
+assert.ok(/MARQUAGE_AUCUN = 'Aucun'/.test(ECRAN),
+  'le marquage par défaut ne se devine pas');
+assert.ok(/estTextile\s*\?\s*menu\(/.test(ECRAN),
+  'sur un textile le marquage est un MENU : « coeur+dos » tapé à la main ne serait '
+  + 'plus un emplacement du moteur, et la ligne sortirait au prix du vêtement nu');
+
+// LE PRIX SUIT LA QUANTITÉ, PARCE QUE LE COEFFICIENT EST DÉGRESSIF. Dix
+// t-shirts et cent t-shirts n'ont pas le même prix à la pièce.
+{
+  const surQte = ECRAN.slice(ECRAN.indexOf("qte.addEventListener('input'"), ECRAN.indexOf("pu.addEventListener('input'"));
+  assert.ok(/recalculer\(\)/.test(surQte), 'changer la quantité refait le prix');
+}
+// … MAIS UN PRIX TAPÉ PENDANT UNE NÉGOCIATION NE SE FAIT PAS ÉCRASER.
+assert.ok(/ligne\.puManuel = true/.test(ECRAN) && /if \(!ligne \|\| !ligne\.textile \|\| ligne\.puManuel\) return null/.test(ECRAN),
+  'un prix repris à la main tient jusqu’à ce qu’on rende la main au moteur');
+assert.ok(/'action-ligne', 'Recalculer'/.test(ECRAN),
+  '… et on la rend avec le composant de la charte, pas un bouton de plus');
+
+// LE NOM DU RAYON EST LE MÊME PARTOUT. Trois fichiers le lisent : l'écran pour
+// reconnaître une ligne qui se chiffre, le menu du comptoir pour l'écarter (il
+// a son propre parcours textile), la semence pour le poser. Trois écritures,
+// c'est trois occasions de se tromper d'un accent.
+{
+  const CATALOGUE_JS = lire('public/comptoir/catalogue.js');
+  const SEMENCE = JSON.parse(lire('catalogue-textile-seed.json'));
+  assert.ok(/FAMILLE_TEXTILE = 'Textile'/.test(ECRAN), 'l’écran nomme le rayon');
+  assert.ok(/FAMILLE_TEXTILE='Textile'/.test(CATALOGUE_JS), 'le menu du comptoir le nomme pareil');
+  assert.ok(SEMENCE.every((p) => p.famille === 'Textile'), 'et la semence aussi');
+  assert.ok(/famille===FAMILLE_TEXTILE\)continue/.test(CATALOGUE_JS),
+    'le comptoir écarte le textile de sa liste « Autre » : il y a sa tuile, celle '
+    + 'qui sait faire le prix — deux chemins pour la même chose, c’est une ligne mal chiffrée');
+}
+
+// ---------------------------------------------------------------------------
 // 4. ON NE RECONSTRUIT PAS UN CHAMP SOUS LES DOIGTS
 // ---------------------------------------------------------------------------
 // Redessiner le formulaire à chaque frappe reprend le curseur à qui écrit :

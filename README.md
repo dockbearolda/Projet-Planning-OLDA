@@ -602,6 +602,65 @@ et la pilule de recherche de `charte.css`. Mesuré dans la coquille : 38
 commandes, **toutes à 50,0 px**, et quatre tailles de texte rendues — 14 / 17 /
 21 / 32, et rien d'autre.
 
+#### Une seule base produits pour les trois écrans (01/09/2026)
+
+« Les t-shirts doivent être inclus dans le devis flash ; vente, devis et devis
+flash doivent avoir exactement la même base de données de produit. »
+
+Il y avait **deux catalogues** et **trois écrans** qui n'en voyaient pas les
+mêmes morceaux :
+
+| écran | ce qu'il voyait |
+|---|---|
+| Vente directe | **rien** — sept intitulés écrits en dur dans la page (« Tee-shirt personnalisé »…), sans référence ni prix |
+| Demande de devis | la table `catalogue_produits` (82 objets) **plus** les 49 références du moteur textile, dans deux endroits |
+| Devis flash | la table seule — donc pas un seul t-shirt |
+
+Les références du moteur descendent dans la **même table**, famille
+« Textile » : **130 lignes, un seul endpoint**, les trois écrans y lisent.
+
+**⚠ Ce qui ne descend pas : l'argent.** La table porte l'*identité* du produit —
+famille, désignation, référence, genre — pas son prix. Un t-shirt ne se vend pas
+à un prix de rayon : il se **chiffre**, quantité par quantité et marquage par
+marquage. Un prix d'achat posé au catalogue serait une case qu'on corrige et qui
+ne change rien au devis : le pire des deux mondes.
+
+**La semence ne peut pas dériver du moteur.** `test/catalogue-textile-base.test.js`
+compare les deux référence par référence, et applique **exactement** la règle
+d'exclusion que l'écran du comptoir applique déjà (`r.genre && r.designation !==
+'TEST'`) — pas une deuxième qui lui ressemble. Une référence ajoutée au fichier
+du patron sans l'être au catalogue fait échouer le test : sans ça on aurait un
+t-shirt qu'on sait chiffrer et qu'on ne trouve pas, et un catalogue ne signale
+jamais ce qu'il ne contient pas.
+
+**Le devis flash chiffre le textile avec LE moteur, pas avec une copie.** Il le
+charge à la demande — 78 Ko qu'un devis de tasses n'ouvre jamais — et appelle
+`TextileEngine.calculate`. La rangée d'un textile porte le **menu des treize
+emplacements** du fichier V9 à la place du champ libre : « coeur+dos » tapé à la
+main ne serait plus un emplacement pour le moteur, il vaudrait zéro mètre de DTF
+et la ligne sortirait au prix du vêtement nu. Le prix **suit la quantité**, parce
+que le coefficient est dégressif — mesuré à l'écran contre le moteur : 12,20 € à
+1 pièce, 23,30 € à 10 avec Cœur + Dos, 17,60 € à 50, au centime près sur cinq
+combinaisons. Un prix tapé pendant une négociation **tient** ; « Recalculer » le
+rend au moteur.
+
+Deux paramètres qui se paieraient s'ils étaient faux, et qui sont tenus par le
+test : `markupPercent: 0` (les coefficients du V9 portent déjà la marge) et
+`transport: 'Maritime'` (0 €/pièce — le transport a sa **propre ligne** sur le
+devis, au tarif des Réglages ; le compter aussi dans le prix à la pièce le
+facturerait deux fois).
+
+**Le comptoir écarte le textile de sa liste « Autre »**, et c'est voulu : il a sa
+tuile Textile, celle qui sait faire le prix. La base est unique — c'est ce que
+chaque écran en *montre* qui diffère, et chacun montre le chemin qui sait
+chiffrer.
+
+**La vente directe reçoit le catalogue par le pont**, jamais dans la page : les
+écrans du comptoir viennent du patron et se remplacent en entier, une greffe
+écrite dedans partirait avec le fichier. Le prix de rayon se pose **seulement si
+la case est vide** — on remise et on arrondit au comptoir, un prix qui écrase un
+prix négocié est une remise perdue à chaque article.
+
 #### Le message tombait quatre pixels sous le pli (01/09/2026)
 
 « Quand je clique sur enregistrer au planning rien ne s'affiche. » Le dossier
@@ -804,6 +863,8 @@ Deux exceptions assumées :
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
 ├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
+├── catalogue-textile-seed.json   les 48 références du moteur, semées dans la MÊME table
+│                                 que les objets — identité seule, jamais l'argent
 ├── public/
 │   ├── index.html    coquille + les vues (planning, dashboard, projet, clients, réglages)
 │   ├── styles.css    design system

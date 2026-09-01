@@ -2362,6 +2362,13 @@ document.addEventListener('pointerdown',ev=>{
   // et continue de tourner seul s'il n'existe pas (fichier ouvert sans pont).
   window.oldaEnregistrerClient = enregistrerClient;
 
+  // LE MINUTEUR EST PARTAGÉ, PAS RECOPIÉ. Les greffes posées à la suite de ce
+  // fichier (le catalogue de la vente directe) sont hors de cette fermeture et
+  // ne peuvent pas le voir. Une deuxième écriture, c'est un jour où l'une des
+  // deux garde 15 secondes et l'autre 30 — et un fetch sans minuteur reste
+  // suspendu pour la journée.
+  window.oldaFetchMinute = fetchMinute;
+
   /* Ouvre un menu déroulant sans clic : l'étape 5 arrive avec sa liste de
      clients déjà dépliée, il n'y a plus qu'à choisir. */
   window.oldaOuvrirMenu = (hote) => {
@@ -2543,3 +2550,108 @@ window.zonesDepuisFaces = zonesDepuisFaces;
 window.valeursDepuisZones = valeursDepuisZones;
 window.dessinDeFamille = dessinDeFamille;
 window.cleDeFace = cleDeFace;
+
+/* ===========================================================================
+   LE CATALOGUE DE LA VENTE DIRECTE (01/09/2026)
+   ===========================================================================
+   Charlie : « vente, devis et devis flash doivent avoir exactement la meme
+   base de donnees de produit ».
+
+   Cet ecran n'en avait AUCUNE. Son champ « Article » proposait sept intitules
+   ecrits en dur dans la page — « Tee-shirt personnalise », « Tasse
+   personnalisee »… — qui ne correspondaient a aucun produit reel, ne portaient
+   ni reference ni prix, et ne pouvaient pas bouger sans redeploiement. Pendant
+   ce temps le meme article existait en base, tarife par import, et les deux
+   autres ecrans le lisaient.
+
+   Les sept intitules sont donc REMPLACES par le catalogue — et remplaces, pas
+   completes : les garder ferait deux bases dans un seul menu, et c'est
+   exactement ce qu'on vient de defaire.
+
+   CE QUI SE GREFFE ICI ET NULLE PART AILLEURS. L'ecran vient du patron : une
+   nouvelle version de sa part se pose en remplacant le fichier. Tout ce qu'on
+   lui ajoute vit dans ce pont — sinon la greffe part avec le fichier remplace.
+
+   LE PRIX NE S'IMPOSE PAS. Il se pose dans « Prix article » SEULEMENT si la
+   case est vide : la vente directe est une vente au comptoir, ou l'on remise,
+   ou l'on arrondit, et un prix de rayon qui ecraserait un prix negocie serait
+   une remise perdue a chaque fois.
+
+   UN TEXTILE N'A PAS DE PRIX DE RAYON, et c'est voulu : il se chiffre a la
+   quantite et au marquage (voir la famille « Textile » de la base). Il est bien
+   dans la liste — c'est la meme base — mais il arrive sans prix, et la vendeuse
+   le pose. Le devis flash, lui, sait le chiffrer : c'est la qu'on va pour un
+   marquage.
+   =========================================================================== */
+(function () {
+  const liste = document.getElementById('productsList');
+  const champ = document.getElementById('productName');
+  const prix = document.getElementById('articlePrice');
+  if (!liste || !champ) return;   /* pas cet ecran : le pont sert les deux */
+
+  /* Le meme repli que le menu du comptoir, et la MEME cle : la vente directe ne
+     charge pas `catalogue.js`, mais les deux ecrans tournent sur le meme poste
+     et le dernier catalogue lu vaut pour les deux. Un wifi qui decroche ne doit
+     pas rendre un menu vide a une vendeuse qui a le client devant elle. */
+  const CLE_REPLI = 'olda.catalogue';
+  const parNom = new Map();
+
+  /* L'intitule qu'on INSERE dans le champ : c'est lui qui partira sur le ticket
+     et au planning. La reference et le prix vont dans le `label` de l'option —
+     ils aident a choisir, ils n'ont rien a faire dans le nom de l'article. */
+  const nomArticle = (p) => [p.label || p.designation, p.variante].filter(Boolean).join(' — ');
+
+  function poser(lignes) {
+    const produits = (Array.isArray(lignes) ? lignes : []).filter((p) => p && p.actif !== false && p.designation);
+    if (!produits.length) return false;
+    parNom.clear();
+    const frag = document.createDocumentFragment();
+    for (const p of produits) {
+      const nom = nomArticle(p);
+      if (!nom || parNom.has(nom)) continue;
+      parNom.set(nom, p);
+      const o = document.createElement('option');
+      o.value = nom;
+      const aide = [p.famille, p.reference || '', p.prixVenteTtc != null ? `${p.prixVenteTtc} EUR TTC` : '']
+        .filter(Boolean).join(' · ');
+      if (aide) o.label = aide;
+      frag.appendChild(o);
+    }
+    liste.replaceChildren(frag);
+    return true;
+  }
+
+  /* LE PRIX SUIT LE CHOIX, JAMAIS L'INVERSE. On ecrit dans « Prix article »
+     seulement si la case est vide, et on previent l'ecran par un evenement
+     `input` : ses propres ecouteurs (total, controles) tournent alors comme si
+     la vendeuse avait tape. */
+  function poserPrix() {
+    if (!prix || String(prix.value).trim() !== '') return;
+    const p = parNom.get(String(champ.value).trim());
+    if (!p || p.prixVenteTtc == null) return;
+    prix.value = String(p.prixVenteTtc);
+    prix.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  champ.addEventListener('change', poserPrix);
+  champ.addEventListener('input', poserPrix);
+
+  try {
+    const brut = localStorage.getItem(CLE_REPLI);
+    if (brut) poser(JSON.parse(brut));
+  } catch (_) { /* stockage refuse, ou contenu illisible : la base repondra */ }
+
+  /* Le minuteur du pont, pas un `fetch` nu : une reponse qui ne vient jamais
+     laisserait le menu sur son repli sans que rien ne le dise. */
+  const appel = window.oldaFetchMinute
+    || ((url, o) => fetch(url, { ...o, signal: AbortSignal.timeout(15000) }));
+  appel('/api/catalogue-produits', { headers: { Accept: 'application/json' } })
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then((lignes) => {
+      if (!poser(lignes)) return;
+      try { localStorage.setItem(CLE_REPLI, JSON.stringify(lignes)); } catch (_) { /* stockage refuse */ }
+    })
+    /* ON GARDE CE QU'ON A. Une reponse ratee ne doit pas vider le menu sous les
+       doigts : les sept intitules du patron, ou le dernier catalogue lu,
+       restent en place. */
+    .catch((err) => { console.error('Catalogue produits injoignable :', err.message); });
+})();

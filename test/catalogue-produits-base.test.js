@@ -74,14 +74,23 @@ delete process.env.APP_PASSWORD;
   // =========================================================================
   let r = await call('GET', '/api/catalogue-produits');
   assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.body.length, 82, 'les 82 lignes vendables de l’ancien fichier');
-  assert.strictEqual(r.body.length, SEMENCE.length, '… c’est-à-dire exactement la semence');
+  // LES OBJETS DU PATRON, ET LE TEXTILE QUI LES A REJOINTS LE 01/09. Les deux
+  // vivent dans la même table depuis que les trois écrans doivent lire la même
+  // base — voir `test/catalogue-textile-base.test.js`, qui tient le textile.
+  const objets = r.body.filter((p) => p.famille !== 'Textile');
+  assert.strictEqual(objets.length, 82, 'les 82 lignes vendables de l’ancien fichier');
+  assert.strictEqual(objets.length, SEMENCE.length, '… c’est-à-dire exactement la semence');
 
-  const familles = [...new Set(r.body.map((p) => p.famille))];
+  const familles = [...new Set(objets.map((p) => p.famille))];
   assert.deepStrictEqual(familles, [
     'Art de la table', 'Du quotidien', 'Voyage', 'Gourdes', 'Jeux & loisirs',
     'Papeterie', 'Porte-clés', 'Tasse céramique 350 ml',
   ], 'les familles du patron, dans SON ordre — le menu du comptoir s’y range');
+  // … et le textile arrive APRÈS elles : un t-shirt ne s'intercale pas au
+  // milieu des rayons de la boutique.
+  assert.deepStrictEqual([...new Set(r.body.map((p) => p.famille))],
+    [...familles, 'Textile'],
+    'le textile est le dernier rayon — la semence part à la suite des positions');
 
   const couteau = r.body.filter((p) => p.designation === 'Couteau Multi');
   assert.deepStrictEqual(couteau.map((p) => p.variante), ['Bois', 'Liège'],
@@ -117,17 +126,31 @@ delete process.env.APP_PASSWORD;
   // 3. LA GARDE NE REJOUE PAS, ET NE RESSUSCITE RIEN
   // =========================================================================
   const sansTasses = r.body.filter((p) => p.famille !== 'Tasse céramique 350 ml');
+  const restantes = r.body.length - 17;
   await call('PUT', '/api/catalogue-produits', sansTasses);
   let apres = (await call('GET', '/api/catalogue-produits')).body;
-  assert.strictEqual(apres.length, 65, 'le patron retire les tasses du rayon');
+  assert.strictEqual(apres.length, restantes, 'le patron retire les tasses du rayon');
 
-  // La semence rejouée à la main : c'est ce que fait un redémarrage.
+  // La semence rejouée à la main : c'est ce que fait un redémarrage. LES DEUX
+  // semences, depuis le 01/09 — celle des objets et celle du textile, chacune
+  // avec sa PROPRE garde `app_meta`.
   await db.semerCatalogueProduits();
+  await db.semerCatalogueTextile();
   apres = (await call('GET', '/api/catalogue-produits')).body;
-  assert.strictEqual(apres.length, 65,
+  assert.strictEqual(apres.length, restantes,
     'un redémarrage ne fait pas revenir un produit que le patron a retiré');
   assert.ok(!apres.some((p) => p.designation === 'TC 01'),
     '… pas même une tasse');
+
+  // Et le textile suit la même règle : retiré du rayon, il ne revient pas au
+  // démarrage suivant. Un catalogue qui repousse tout seul est un catalogue
+  // que le patron ne contrôle plus.
+  const sansTextile = apres.filter((p) => p.famille !== 'Textile');
+  await call('PUT', '/api/catalogue-produits', sansTextile);
+  await db.semerCatalogueTextile();
+  apres = (await call('GET', '/api/catalogue-produits')).body;
+  assert.ok(!apres.some((p) => p.famille === 'Textile'),
+    'un t-shirt retiré ne revient pas non plus');
 
   // =========================================================================
   // 4. L'UNICITÉ EST POSÉE EN BASE
