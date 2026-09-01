@@ -193,8 +193,7 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 .lock{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:5px 9px;font-weight:var(--graisse-forte)}
 .hidden{display:none!important}
 .payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:var(--graisse-texte)}
-.payment-option input,.inline-check input{width:auto}
-.inline-check{display:flex;align-items:center;gap:8px;font-weight:var(--graisse-texte);margin:14px 0}
+.payment-option input{width:auto}
 .success{background:var(--success-bg);border:1px solid var(--success-line);border-radius:var(--arrondi-bloc);padding:15px}
 .center{text-align:center}
 .footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -214,7 +213,6 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 .choice-card{border:2px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);background:var(--surface);cursor:pointer;text-align:left}
 .choice-card.active{border-color:var(--primary);background:var(--primary-soft)}
 .notice{padding:12px 14px;border-radius:var(--arrondi-bloc);background:var(--warning-bg);border:1px solid var(--warning-line);margin:12px 0}
-.modal-backdrop{position:fixed;inset:0;background:var(--voile);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
 .modal{width:min(520px,100%);background:var(--surface);border-radius:var(--arrondi-carte);padding:22px;box-shadow:var(--shadow-pop)}
 @media(max-width:800px){
   .client-result,.choice-grid{grid-template-columns:1fr;display:grid}
@@ -288,10 +286,6 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 #selectedClientMeta{
   color:var(--text-2);
   line-height:var(--ligne-texte);
-}
-.client-result.selected-result{
-  border:2px solid var(--primary);
-  background:var(--primary-soft);
 }
 
 /* ------------------------------------------------------------------ LE TICKET
@@ -474,29 +468,6 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
   .ticket-export-buttons{grid-template-columns:1fr}
 }
 
-/* ---------------------------------------------------------- Date de retrait */
-.pickup-card{
-  margin:18px 0;
-  padding:var(--pas-3);
-  border:1px solid var(--border);
-  border-radius:var(--arrondi-bloc);
-  background:var(--surface);
-}
-.pickup-card h3{
-  margin:0 0 4px;
-}
-.pickup-help{
-  margin:0 0 13px;
-  color:var(--text-2);
-}
-.pickup-summary{
-  margin-top:var(--pas-2);
-  padding:10px 12px;
-  border-left:4px solid var(--primary);
-  background:var(--zone-bg);
-  font-weight:var(--graisse-forte);
-}
-
 /* ------------------------------------------------------------ L'IMPRESSION
    Le ticket est le seul contenu qui parte sur la feuille, et il part en encre
    NOIRE sur papier BLANC : les jetons de la charte suivent le thème du poste,
@@ -625,29 +596,6 @@ input,select,textarea{border:1.5px solid var(--border)!important;line-height:var
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
 
-/* ---- Barème express : discret sous la ligne de supplément ----
-   Un lien, pas un bouton d'action : on ne règle pas le barème à chaque vente,
-   mais quand on en a besoin il est là, sous les yeux, pas dans un autre écran. */
-.bareme-open{
-  display:inline-flex;align-items:center;
-  margin-top:2px;padding:var(--champ-y-serre) 0;border:0;background:none;
-  color:var(--text-2);font-weight:var(--graisse-forte);text-decoration:underline;
-  text-underline-offset:3px;cursor:pointer;
-}
-.bareme-open:hover{color:var(--text-1)}
-.bareme{margin-top:var(--pas-1);padding:var(--pas-3);border:1.5px solid var(--border);border-radius:var(--arrondi-carte);background:var(--surface)}
-.bareme.hidden{display:none}
-.bareme-grid{display:grid;gap:var(--pas-2)}
-.bareme-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.bareme-grid label span{display:flex;align-items:center;gap:var(--pas-1);font-weight:var(--graisse-forte);color:var(--text-2)}
-.bareme-grid input{width:88px;text-align:right;padding:var(--champ-y-serre) var(--pas-2)!important}
-.bareme-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.bareme-actions::before{content:"";flex:1 1 0;min-width:0}
-.bareme-actions button{padding:var(--champ-y-serre) 18px!important}
-.bareme-msg{margin:var(--pas-2) 0 0;font-weight:var(--graisse-forte);min-height:1em}
-.bareme-msg.ok{color:var(--success)}
-.bareme-msg.ko{color:var(--danger)}
-
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
@@ -713,9 +661,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
    et une rangée qui se replie change de hauteur selon la longueur du texte. */
 .delai-rangee{display:flex;align-items:center;gap:var(--pas-3);flex-wrap:wrap;margin-top:var(--pas-2)}
 .delai-rangee .delay-quick{margin-top:0}
-/* « Modifier le barème » ferme la rangée, à droite. Par une marge AUTOMATIQUE :
-   un `justify-content:flex-end` qui déborde se fait rogner par la gauche. */
-.delai-rangee .bareme-open{margin-inline-start:auto}
 .delai-etat{margin-top:var(--pas-2)}
 .delay-chip{
   flex:1 1 auto;padding:var(--champ-y-serre) var(--champ-x);

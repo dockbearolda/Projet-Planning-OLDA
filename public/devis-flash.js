@@ -42,7 +42,8 @@ import { poserAide } from './aide-bulle.js';
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
-import { menuPoser, menuRafraichir, menuOuvrirDe, poserStyleMenu } from './menu-recherche.js';
+import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
+import { api } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -64,18 +65,6 @@ const ic = (nom) => {
 const EURO = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 const euro = (n) => EURO.format(Number(n) || 0);
 
-async function api(method, chemin, corps) {
-  const r = await fetch(chemin, {
-    method,
-    headers: corps ? { 'Content-Type': 'application/json' } : undefined,
-    body: corps ? JSON.stringify(corps) : undefined,
-  });
-  const t = await r.text();
-  let d = null;
-  try { d = t ? JSON.parse(t) : null; } catch (_) { d = null; }
-  if (!r.ok) throw new Error((d && (d.error || d.erreur)) || `${method} ${chemin} : ${r.status}`);
-  return d;
-}
 
 // ===========================================================================
 // CE QUE L'ÉCRAN TIENT
@@ -654,10 +643,6 @@ const TRANSPORT_MOTEUR = 'Maritime';
 // supprimée s'oublie toute seule, et surtout pour que rien de tout ça ne parte
 // dans le brouillon ni dans l'archive du devis.
 const MAJ_LIGNE = new WeakMap();
-function majPrixLigne(ligne) {
-  const maj = MAJ_LIGNE.get(ligne);
-  if (maj) maj();
-}
 
 // LE MARQUAGE DEVIENT UNE LISTE LE JOUR OÙ LA LIGNE DEVIENT UN TEXTILE.
 // ===========================================================================

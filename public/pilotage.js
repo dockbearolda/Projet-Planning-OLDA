@@ -60,7 +60,7 @@ function depuis(iso) {
   return `depuis ${j} jours`;
 }
 
-export function renderPilotage(d) {
+function renderPilotage(d) {
   if (!ROOT) return;
   const tete = ecranTete({ titre: 'Pilotage' });
   const page = el('div', 'pil-page');

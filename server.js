@@ -41,7 +41,7 @@ const {
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
   FLAGS_CONNUS, getFlags, setFlags,
-  ROLES, ROLE_LABELS, CODE_MIN, CODE_MAX,
+  ROLE_LABELS, CODE_MIN, CODE_MAX,
   getModeles, setModeles,
   getMarges, setMarges,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
@@ -125,7 +125,6 @@ const APP_PASSWORD = process.env.APP_PASSWORD;
 // Comparaison à temps constant. `timingSafeEqual` exige deux tampons de MÊME
 // longueur : on compare donc les empreintes, qui font toujours 32 octets.
 function memeSecret(a, b) {
-  const crypto = require('crypto');
   const h = (s) => crypto.createHash('sha256').update(String(s), 'utf8').digest();
   return crypto.timingSafeEqual(h(a), h(b));
 }
@@ -950,9 +949,6 @@ function broadcast(payload) {
 // API REST
 // ---------------------------------------------------------------------------
 
-// Liste des étapes (pour le front).
-app.get('/api/stages', (req, res) => res.json(STAGES));
-
 // Attribution des catégories à un employé (config du patron).
 // GET  → { slugCatégorie: employé, ... }
 // PUT  → remplace la config (corps = même forme). Diffusé en SSE pour que le
@@ -1616,7 +1612,7 @@ function allegerSynthese(row) {
 // fait que grossir, aucune commande ne quittant jamais le planning.
 // Le poste renvoie donc l'empreinte qu'il a reçue ; tant qu'elle correspond, on
 // ne réexpédie pas la liste — il garde celle qu'il a déjà.
-const empreinteIds = (ids) => require('crypto')
+const empreinteIds = (ids) => crypto
   .createHash('sha1').update(ids.join(','), 'utf8').digest('hex').slice(0, 16);
 
 // CE QUE LE POINT DU JOUR REGARDE, ET RIEN DE PLUS. Son écran ne parle que des
@@ -3784,12 +3780,6 @@ let CUSTOM_ZONES = [];
 // Emplacements du catalogue masqués (inutiles pour ce poste) : le catalogue
 // n'est pas modifié, on filtre juste ce qu'on en sert.
 let HIDDEN_ZONES = [];
-// `custom: true` distingue les zones effaçables (ajoutées) de celles du
-// catalogue, que la fiche ne propose pas de retirer.
-const allZones = () => [
-  ...COM.zones.filter((z) => !HIDDEN_ZONES.includes(z.id)),
-  ...CUSTOM_ZONES.map((z) => ({ ...z, custom: true })),
-];
 const zoneById = (id) => COM_ZONE_BY_ID.get(id) || CUSTOM_ZONES.find((z) => z.id === id) || null;
 async function loadCommandeZones() {
   CUSTOM_ZONES = await getCommandeZones();
@@ -3803,12 +3793,6 @@ async function loadCommandeZones() {
 const PIPELINE = STAGES.map((s) => ({ ...s, subs: SUB_STAGES[s.slug] || [] }));
 
 app.get('/api/pipeline', (req, res) => res.json(PIPELINE));
-
-app.get('/api/commande/catalog', (req, res) => {
-  res.json({
-    ...COM, zones: allZones(), employes: RESPONSABLES, clientTypes: CLIENT_TYPES, pipeline: PIPELINE,
-  });
-});
 
 // Quantité d'une ligne : « Qté identique », le nombre de pièces rigoureusement
 // semblables. Toujours au moins 1 — une ligne sans pièce n'existe pas.
@@ -4618,7 +4602,7 @@ function empreinteDossier(b, ref, nomDossier, valeur, quantite) {
     String(b.source || ''), String(b.name || ''), String(b.recap || ''), String(b.comment || ''),
     detail(b.client_info), detail(b.details),
   ].join('\u001f');
-  return require('crypto').createHash('sha256').update(brut, 'utf8').digest('hex').slice(0, 32);
+  return crypto.createHash('sha256').update(brut, 'utf8').digest('hex').slice(0, 32);
 }
 
 // Une référence libre, à partir de celle demandée. On ne renvoie JAMAIS null :

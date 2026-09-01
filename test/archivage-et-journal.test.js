@@ -30,6 +30,11 @@ const DB = lire('db.js');
 const SQL = lire('schema.sql');
 const APP = lire('public/app.js');
 const PONT = lire('public/comptoir/pont.js');
+const RESEAU = lire('public/reseau.js');
+const CLIENTS = lire('public/clients.js');
+const REGLAGES = lire('public/reglages.js');
+const TAILLES = lire('public/tailles-logos.js');
+const DEVIS_FLASH = lire('public/devis-flash.js');
 
 // Base en mémoire, accès ouvert : mêmes conditions que les autres tests.
 delete process.env.DATABASE_URL;
@@ -268,8 +273,19 @@ delete process.env.APP_PASSWORD;
     'le filtre porte sur toutes les lectures : il lui faut son index, et partiel');
 
   // Le poste signe, des DEUX côtés, et toujours encodé.
-  assert.ok(/opts\.headers\['X-Qui'\] = encodeURIComponent\(qui\)/.test(APP),
+  // CÔTÉ CRM, LA SIGNATURE EST DANS `reseau.js` DEPUIS LE 01/09 : les cinq
+  // écrans avaient chacun leur copie de `api()`, et celle du devis flash ne
+  // signait rien — ses écritures arrivaient au journal sans nom. Une seule
+  // fonction, donc une seule signature, donc plus d'écran qui l'oublie.
+  assert.ok(/opts\.headers\['X-Qui'\] = encodeURIComponent\(qui\)/.test(RESEAU),
     'le CRM signe ses appels — encodés, sinon `fetch` lève sur un prénom hors latin-1');
+  assert.ok(!/async function api\(/.test(APP),
+    '… et le planning ne se refait pas la sienne à côté');
+  for (const [nom, src] of [['clients', CLIENTS], ['réglages', REGLAGES],
+    ['tailles de logos', TAILLES], ['devis flash', DEVIS_FLASH]]) {
+    assert.ok(/import \{[^}]*\bapi\b[^}]*\} from '\.\/reseau\.js'/.test(src),
+      `l’écran « ${nom} » prend l’appel commun, il n’en réécrit pas un`);
+  }
   assert.ok(/'X-Qui': encodeURIComponent\(nom\)/.test(PONT),
     'le comptoir aussi : c’est là que naissent les dossiers');
 

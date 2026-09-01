@@ -61,12 +61,14 @@ assert.match(REGLAGES, /api\('PUT', '\/api\/supplements-express'/,
   '… sur la MÊME API : un seul barème, pas deux');
 assert.match(REGLAGES, /api\('GET', '\/api\/supplements-express'\)/,
   '… relu à chaque retour sur l’onglet');
-// LE PIÈGE : le chargement partait APRÈS la garde qui cherchait le bouton.
-const gardeV = VENTE.indexOf('const ouvrir = el("baremeOpen");');
-const chargeV = VENTE.indexOf('    charger();');
-assert.ok(chargeV > -1 && chargeV < gardeV,
+// LE PIÈGE (27/08) : le chargement partait APRÈS la garde qui cherchait le
+// bouton. Depuis le 01/09 l'éditeur n'a plus de script du tout : il ne reste
+// que le chargement, branché directement sur l'ouverture de la page.
+assert.match(VENTE, /document\.addEventListener\("DOMContentLoaded", charger\);/,
   'le comptoir charge toujours le barème : sinon il applique les valeurs par '
   + 'DÉFAUT et le supplément affiché au client est faux');
+assert.ok(!/baremeSave|baremeCancel|baremeMsg|bareme-j5/.test(VENTE),
+  'l’éditeur du barème est parti en entier, script compris');
 
 // ---------------------------------------------------------------------------
 // 3. LES COORDONNÉES DE FACTURATION SONT DERRIÈRE UN VOLET

@@ -83,7 +83,7 @@ export function siretLisible(v) {
 
 // UN IBAN SE RECOPIE PAR GROUPES DE QUATRE. C'est la convention, et c'est la
 // seule chose qui rend un virement saisissable sans se tromper de caractère.
-export function ibanLisible(v) {
+function ibanLisible(v) {
   const brut = papTexte(v).replace(/\s+/g, '').toUpperCase();
   return /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(brut)
     ? brut.replace(/(.{4})(?=.)/g, '$1 ')

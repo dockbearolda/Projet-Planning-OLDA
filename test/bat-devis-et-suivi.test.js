@@ -267,7 +267,10 @@ delete process.env.APP_PASSWORD;
   // L'écran propose de forcer plutôt que de laisser chercher.
   assert.ok(/d\.batBloque && d\.forcable/.test(APP),
     'quand le serveur refuse ET que le poste peut forcer, l’écran le PROPOSE');
-  assert.ok(/err\.detail = corps;/.test(APP),
+  // Le corps du refus voyage désormais depuis `reseau.js` : l'appel à l'API a
+  // été mis en commun le 01/09, et cette garantie vaut donc pour les cinq
+  // écrans, plus seulement pour le planning.
+  assert.ok(/err\.detail = data;/.test(lire('public/reseau.js')),
     'le corps du refus voyage avec l’erreur — sinon un 409 n’est qu’un texte');
 
   // =========================================================================

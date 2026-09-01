@@ -157,11 +157,16 @@ assert.ok(FINIR.indexOf('ctx.creerFace(nom)') < FINIR.indexOf('poserFaces('),
 // « + Face » seul annonce un ajout immédiat — c'est ce qu'il faisait avant, et
 // rien ne disait qu'il propose maintenant une liste.
 assert.match(FICHE, /ajoutF\.append\(ic\('expand_more'\)\);/, 'le bouton porte un chevron');
-const AJOUT = CSS.match(/\.fa-ajout \.material-symbols-outlined \{[\s\S]*?\n\}/)[0];
+// Le bouton est un `.fa-choix` (la classe `.fa-ajout` n'est plus écrite nulle
+// part depuis que le bouton a pris la boîte des champs de choix ; ses règles
+// sont parties le 01/09) : c'est donc SA règle de chevron qui compte.
+assert.match(FICHE, /const ajoutF = bouton\('fa-choix'/, 'le bouton des faces est un champ de choix');
+const AJOUT = CSS.match(/\.fa-choix > \.material-symbols-outlined \{[\s\S]*?\n\}/)[0];
 assert.match(AJOUT, /width: var\(--ic\); height: var\(--ic\);/,
   '… dans la boîte de toutes les icônes : largeur ET hauteur écrites, sinon elle sort de la police');
-assert.match(CSS, /\.fa-ajout\[aria-expanded="true"\] \.material-symbols-outlined \{ transform: rotate\(180deg\); \}/,
+assert.match(CSS, /\.fa-choix\[aria-expanded="true"\] > \.material-symbols-outlined \{ transform: rotate\(180deg\); \}/,
   '… et il se retourne à l’ouverture : `aria-expanded` seul, personne ne le voit');
+assert.ok(!/\.fa-ajout\b/.test(CSS), 'aucune règle ne survit à une classe que rien ne porte');
 
 // LE TABLEAU SE LIT UNE FOIS PAR SESSION, et il se périme quand un réglage bouge.
 assert.ok(APP.includes('chargerFicheComplete(id).catch(() => {}),')

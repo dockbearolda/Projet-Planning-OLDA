@@ -16,7 +16,7 @@ import { capitales, nomClientAffiche } from './nom-client.js';
 import { confirmerAction } from './confirmer.js';
 // `fetch` avec une fin : sans minuteur, une requête partie sur un réseau qui
 // décroche n'échoue jamais et laisse le bouton (ou l'écran) figé pour la journée.
-import { fetchBorne, DELAI_ENVOI } from './reseau.js';
+import { fetchBorne, DELAI_ENVOI, api, surNonConnecte } from './reseau.js';
 // LE TICKET du client — celui que la vendeuse imprime au comptoir, réimprimable
 // à l'identique depuis n'importe quelle ligne du planning.
 import { modeleTicket, ticketTexte, dessinerTicket, CSS_TICKET } from './ticket.js';
@@ -44,8 +44,13 @@ import { noterVersion, surveillerMaj } from './maj.js';
 // Qui est au poste : le nom affiché en haut à droite, et celui qui signe les
 // demandes prises sur cet appareil (le parcours comptoir le relit).
 import { monterPoste, lirePoste } from './poste.js';
-import { relireSession, puisJe, moi, comptesActifs, seDeconnecter, signalerNonConnecte, surChangement }
+import { relireSession, puisJe, moi, comptesActifs, signalerNonConnecte, surChangement }
   from './session.js';
+
+// UN 401 EN PLEIN TRAVAIL REDEMANDE QUI EST LÀ, depuis N'IMPORTE QUEL écran.
+// `api()` vit dans `reseau.js`, qui ne connaît pas la session : c'est le
+// planning — la seule coquille montée en permanence — qui lui dit quoi faire.
+surNonConnecte(signalerNonConnecte);
 
 // --- Pipeline à 2 NIVEAUX (modèle « familles », d'après le CRM du patron) -----
 // La FAMILLE (barre latérale) dit OÙ en est le projet ; la SOUS-ÉTAPE (puce sur
@@ -373,52 +378,6 @@ function updateStageLink(slug) {
 }
 
 // --- API helpers -----------------------------------------------------------
-async function api(method, url, body) {
-  const opts = { method, headers: {} };
-  // LE POSTE SIGNE CE QU'IL FAIT. Le prénom choisi une fois par appareil part
-  // avec chaque écriture : c'est ce que le journal enregistre dans « qui ».
-  // Déclaratif, jamais une preuve — mais « Mélina, hier à 16 h » répond à une
-  // question à laquelle « hier à 16 h » ne répondait pas.
-  // Sur les lectures aussi : ça ne coûte rien et ça évite d'avoir à se demander,
-  // à chaque nouvel appel, s'il fallait le mettre.
-  // ⚠ ENCODÉ, et ce n'est pas de la coquetterie : `fetch` REFUSE un en-tête qui
-  // sort du latin-1 et lève une TypeError. Un prénom saisi avec un caractère
-  // exotique ferait alors échouer NON PAS la signature, mais l'appel entier —
-  // toutes les écritures de l'application, pour un champ décoratif. En pourcent,
-  // c'est de l'ASCII quoi qu'on tape ; le serveur le décode.
-  const qui = lirePoste();
-  if (qui) opts.headers['X-Qui'] = encodeURIComponent(qui);
-  if (body !== undefined) {
-    opts.headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
-  }
-  const res = await fetchBorne(url, opts);
-  if (!res.ok) {
-    let detail = res.statusText;
-    let corps = null;
-    try { corps = await res.json(); detail = corps.error || detail; } catch (_) {}
-    // 401 EN PLEIN TRAVAIL : la session a expiré (trente jours), ou les comptes
-    // viennent d'être allumés depuis un autre poste. On redemande qui est là
-    // plutôt que d'afficher « Erreur 401 » sur un écran qui se vide.
-    const err = new Error(detail);
-    // Le CORPS du refus voyage avec l'erreur : sans lui, un 409 « BAT non
-    // validé » n'est qu'un texte, et l'écran ne peut rien proposer d'autre que
-    // de le lire. C'est ce qui permet à la Direction de forcer le passage.
-    err.detail = corps;
-    err.status = res.status;
-    if (res.status === 401 && corps && corps.connexion) {
-      signalerNonConnecte();
-      // MARQUÉ, pour que le reste de l'application se taise : le voile de
-      // connexion dit déjà quoi faire, et un bandeau « Connecte-toi pour
-      // continuer » posé par-dessus ne fait que répéter la même phrase — sur un
-      // écran où il n'y a plus rien d'autre à lire.
-      err.aConnecter = true;
-    }
-    throw err;
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
 
 // --- Rendu sidebar ---------------------------------------------------------
 // Une entrée de rail = une FAMILLE (sub omis) ou une SOUS-CATÉGORIE (sub fourni).
@@ -3641,13 +3600,6 @@ const LD_ICONES = {
 };
 
 
-// Même règle de rapprochement que le serveur (clientKey) : insensible à la
-// casse, aux accents et à la ponctuation. « Coco Beach » et « coco-beach »
-// sont LE MÊME client.
-const clientKeyLocal = (s) => String(s == null ? '' : s)
-  .normalize('NFD').replace(/\p{Diacritic}/gu, '')
-  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
 // Une échéance en français sur un document destiné à un humain. `deadline` est
 // une chaîne « aaaa-mm-jj », mais une base de test la rend en ISO complet : on
 // coupe avant de découper, plutôt que de dater le récapitulatif en anglais.
@@ -3768,7 +3720,9 @@ async function ouvrirBureau(r) {
     }
     completerFiche(r);
     if (r.fiche && r.fiche.fichePartielle) throw new Error(TICKET_SANS_DETAIL);
-    t = mod.modeleBureau(r, await identiteAtelier());
+    // LE TAUX DE TGCA VIENT DES RÉGLAGES, comme partout ailleurs : le papier
+    // le lisait en dur, et un changement de taux ne l'atteignait pas.
+    t = mod.modeleBureau(r, await identiteAtelier(), TGCA);
   } catch (err) {
     bureauOuvert = false;
     reportError(err);

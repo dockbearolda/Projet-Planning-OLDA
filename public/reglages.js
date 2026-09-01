@@ -11,7 +11,7 @@
 
 // Sans minuteur, un enregistrement de réglage parti sur un réseau qui décroche
 // laisse le bouton désactivé et « Enregistrement… » à l'écran, indéfiniment.
-import { fetchBorne } from './reseau.js';
+import { fetchBorne, api } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
 // L'AIDE D'UNE CARTE SE DEMANDE, elle ne s'ecrit plus dessous (01/09).
 import { poserAide } from './aide-bulle.js';
@@ -32,21 +32,6 @@ const ic = (name, cls) => {
   return n;
 };
 
-async function api(method, path, body) {
-  const res = await fetchBorne(path, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  // Le statut AVANT le corps : une page d'erreur du proxy (HTML) faisait échouer
-  // l'analyse JSON d'abord, et l'écran affichait « Unexpected token < » au lieu
-  // de « Erreur 502 ».
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
-  if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
-  return data;
-}
 
 const MESSAGE_MAX = 1000;      // miroir de db.js (WHATSAPP_MESSAGE_MAX)
 

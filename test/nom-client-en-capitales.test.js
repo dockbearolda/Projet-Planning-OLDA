@@ -185,7 +185,18 @@ assert.match(DEVIS, /\['Client',d\(c\.name\)\]/,
 // transformation à l'écriture que la règle interdit.
 assert.match(DEVIS, /set\('newClientName',selectedClient\.name\)/,
   'le formulaire d’édition reprend le nom SAISI, pas le nom affiché');
-assert.match(VENTE, /document\.getElementById\("newIndividualName"\)\.value=selectedClient\.name\|\|""/,
-  'idem sur la vente directe');
+// ⚠ SUR LA VENTE DIRECTE, C'EST LA GREFFE QUI COMPTE, PAS LA DÉCLARATION.
+// L'écran déclarait `function editSelectedClient()` en haut ET la redéfinissait
+// en bas (`window.editSelectedClient = …`) ; le bouton appelle
+// `window.editSelectedClient()`, donc seule la seconde s'exécute — le
+// commentaire du branchement le dit depuis le 25/08. Ce test épinglait la
+// PREMIÈRE : il gardait une fausse sécurité sur du code que personne n'exécute.
+// La déclaration morte est partie le 01/09 ; l'assertion suit la vivante.
+const greffeVente = VENTE.slice(VENTE.indexOf('window.editSelectedClient=function()'));
+assert.ok(greffeVente, 'la vente directe a bien une greffe d’édition du client');
+assert.match(greffeVente.slice(0, 900), /set\('newIndividualName',c\.name\)/,
+  'idem sur la vente directe : le formulaire reprend le nom SAISI');
+assert.ok(!/function editSelectedClient\(\)\{/.test(VENTE),
+  'et la déclaration morte qu’elle écrasait ne revient pas : deux versions, une seule exécutée');
 
 console.log('✓ nom de client : EN CAPITALES sur les six surfaces, et la valeur en base intacte');

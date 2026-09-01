@@ -104,15 +104,6 @@ export function normaliserTelephone(v) {
   return chiffres.length >= 8 ? chiffres.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : brut;
 }
 
-// « 70 » se relit « 70 mm », comme « 1250,5 » se relit « 1 250,50 € ». L'unite
-// entre DANS le champ : ecrite a cote, elle prenait 34 px par face, et quatre
-// faces ne tenaient plus dans la colonne — les bulles se chevauchaient.
-export function normaliserCote(v) {
-  const brut = String(v == null ? '' : v).trim();
-  const n = brut.replace(/\D/g, '');
-  return n ? `${Number(n)} mm` : '';
-}
-
 // ELLE SERT A LA SAISIE LIBRE DU MENU (30/08). L'heure se CHOISIT dans une
 // liste de creneaux — elle etait donc partie le matin — mais Charlie a demande
 // de pouvoir « ajouter sa propre heure » depuis ce menu : la case qui s'ouvre

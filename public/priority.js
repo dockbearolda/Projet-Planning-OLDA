@@ -15,20 +15,20 @@
 // d'une MACHINE (réglages) — une machine « goulot » pousse ses commandes en tête.
 
 // Pondération par défaut : l'échéance domine, la stagnation n'est qu'un rappel.
-export const DEFAULT_WEIGHTS = { deadline: 0.5, priority: 0.2, machine: 0.2, stagnation: 0.1 };
+const DEFAULT_WEIGHTS = { deadline: 0.5, priority: 0.2, machine: 0.2, stagnation: 0.1 };
 
 // Au-delà de cet horizon, l'échéance ne pèse plus (une commande à 3 semaines
 // n'est pas « à faire maintenant »).
-export const DEADLINE_HORIZON_DAYS = 14;
+const DEADLINE_HORIZON_DAYS = 14;
 // Une commande figée depuis ce nombre de jours atteint le poids de stagnation max.
-export const STAGNATION_CAP_DAYS = 7;
+const STAGNATION_CAP_DAYS = 7;
 // Importance « neutre » d'une machine (échelle 1..5) : au-dessus = coup de pouce.
-export const NEUTRAL_IMPORTANCE = 3;
+const NEUTRAL_IMPORTANCE = 3;
 
 // Familles hors du « à faire maintenant » : rien à pousser (fin de flux / hors flux).
 // « Paiement & clôture » couvre l'ancien Terminé + Archivé : la commande est
 // partie chez le client, il ne reste plus de travail d'atelier à pousser.
-export const INACTIVE_STAGES = new Set(['paiement', 'fiverr']);
+const INACTIVE_STAGES = new Set(['paiement', 'fiverr']);
 
 // Positions « la balle est dans le camp du client » : le devis est parti, le BAT
 // attend sa validation, ou la commande est FINIE et le client doit venir la
@@ -62,7 +62,7 @@ export const WAITING_REASON = {
 // alors que c'est exactement du travail à faire au poste DTF.
 // Les trois autres — pressage, montage/finition, contrôle & emballage — ne
 // nomment aucun poste : elles restent à la technique de la fiche.
-export const SUBSTAGE_MACHINE = {
+const SUBSTAGE_MACHINE = {
   prod_dtf: 'dtf',
   decoupe_dtf: 'dtf',
   prod_pressage: 'presse',
@@ -72,7 +72,7 @@ export const SUBSTAGE_MACHINE = {
 
 // Technique de la fiche (prise de commande) → machine, AVANT la production, pour
 // que l'importance d'une machine goulot compte dès le chiffrage / la prépa.
-export const TECHNIQUE_MACHINE = {
+const TECHNIQUE_MACHINE = {
   dtf: 'dtf',
   uv: 'uv',
   laser: 'trotec',

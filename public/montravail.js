@@ -218,7 +218,7 @@ function bloc(titre, lignes, vide, avecEtape = true) {
 
 let dernier = null;
 
-export function renderMonTravail(data) {
+function renderMonTravail(data) {
   if (!ROOT) return;
   dernier = data;
   const tete = ecranTete({ titre: data.qui ? `Bonjour ${data.qui}` : 'Mon travail' });
